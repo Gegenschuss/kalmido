@@ -371,6 +371,18 @@ def pl_clean_mapping(d):
 
 
 # ---- one document -------------------------------------------------------------------------------------------------------
+def monetary_value(doc, fields):
+    """2.98.0 D (#2178): (amount '12.50', currency 'EUR' | None) of the first custom field of type monetary ('EUR12.50'), else None
+    -- the only amount an import takes over (no guessing from the text)."""
+    for f in doc.get("custom_fields") or []:
+        fd = (fields or {}).get(f.get("field")) if isinstance(f, dict) else None
+        if isinstance(fd, dict) and fd.get("type") == "monetary":
+            m = re.fullmatch(r"([A-Za-z]{3})?\s*(\d+(?:\.\d+)?)", str(f.get("value") or "").strip())
+            if m and float(m.group(2)) > 0:
+                return f"{float(m.group(2)):.2f}", (m.group(1) or "").upper() or None
+    return None
+
+
 def _doc_text(doc, notes, fields):
     """Paperless' text + custom fields + notes + archive serial number (labelled, below the text)."""
     parts = [str(doc.get("content") or "").strip()]
@@ -411,10 +423,10 @@ def pl_import_doc(c, r, uid, tok, doc, labels, fields):
         return "skip"
     data, mime, fname = pl_get(c, r["url"], tok, f"/api/documents/{pid}/download/?original=true", raw=True,
                                limit=MAX_FILE_MB * 1024 * 1024)
-    return plh_store(c, r, uid, src, doc, data, mime, fname, labels, lambda: _doc_text(doc, _notes(c, r, tok, doc), fields))
+    return plh_store(c, r, uid, src, doc, data, mime, fname, labels, lambda: _doc_text(doc, _notes(c, r, tok, doc), fields), fields)
 
 
-def plh_store(c, r, uid, src, doc, data, mime, fname, labels, text):
+def plh_store(c, r, uid, src, doc, data, mime, fname, labels, text, fields=None):
     """2.69.0 A (#1846): file the bytes of one Paperless document (fetched over the API or read from an export ZIP) into r's
     workspace: the same file already there = 'dup', else the mapping of r (tags / folder / sender / type) and docs_ingest =
     'new'; either way one pl_imported row (ws, src, pl_id). text() = the document's text (only asked for a new one)."""
@@ -441,6 +453,9 @@ def plh_store(c, r, uid, src, doc, data, mime, fname, labels, text):
         elif name not in tags:
             tags.append(name)
     meta = {"ext_id": f"pl:{src}:{pid}", "date": _day(doc.get("created") or doc.get("created_date")), "tags": tags, "text": text()}
+    money = monetary_value(doc, fields)
+    if money:                                # 2.98.0 D (#2178): amount only from a monetary field, due date stays empty
+        meta["amount"], meta["currency"] = money[0], money[1] or ""
     for key, kind, field in (("senders", "correspondents", "correspondent"), ("types", "document_types", "document_type")):
         lid = doc.get(field)
         if isinstance(lid, int):

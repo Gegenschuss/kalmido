@@ -104,6 +104,9 @@ KINDS = {
                         "trash, presence, completion); a formula's source of another workspace cannot be chosen and shows no value"),
     # 2.97.0 A (#1950): bookmarks belong to one organisation (every member reads, the owner / its admins change) or one person
     "bookmark": ("matrix", "p297_a_api_test.py: a bookmark of another organisation / person: 404 (read, change, delete, picture, move)"),
+    # 2.98.0 A (#1953): scheduling polls belong to one organisation (every member reads, the owner / its admins change) or one person
+    "poll": ("matrix", "p298_a_api_test.py: a poll of another organisation / person: 404 (read, change, delete, choose, move, list); "
+                       "the public link reads inside the poll's organisation only"),
     # ---- not relevant for the boundary between organisations (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account (before a session or about the session's own person)"),
     "own": ("n/a", "the person's own rows only (settings, devices, tokens, habits, time, filters, imports, Home & life, their own "
@@ -168,6 +171,19 @@ ROUTES = {
     "GET /api/agents/jobs": "agent", "POST /api/agents/jobs/{}/action": "agent",
     "POST /api/agents/{}/chat/{}/choice": "agent", "PUT /api/agents/{}/permission-mode": "agent",
     "GET /api/agents/{}/chat": "agent", "POST /api/agents/{}/chat": "agent",
+    # 2.98.0 A (#1953): scheduling polls (p298_a_api_test.py) - routes below this line
+    "GET /api/polls": "poll", "POST /api/polls": "poll", "GET /api/polls/{}": "poll", "PATCH /api/polls/{}": "poll",
+    "DELETE /api/polls/{}": "poll", "POST /api/polls/{}/restore": "poll", "POST /api/polls/{}/decide": "poll",
+    "POST /api/polls/{}/reopen": "poll", "POST /api/polls/{}/move-space": "poll", "GET /s/v/{}": "poll", "POST /s/v/{}": "poll",
+    "GET /s/v/time.js": "public",
+    # (2.98.0 spacer A)
+    # 2.98.0 B (#1954): questionnaires (p298_b_api_test.py) - routes below this line
+    "GET /api/forms/{}/entries": "form", "GET /api/forms/{}/entries.csv": "form",
+    # (2.98.0 spacer B)
+    # 2.98.0 C (#2180 #2181): office menu, tables (p298_c_ui.js) - routes below this line
+    # (2.98.0 spacer C)
+    # 2.98.0 D (#2163 #2178 #2184): polish (p298_d_api_test.py) - routes below this line
+    # (2.98.0 spacer D)
     # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
     "GET /api/bookmarks": "bookmark", "POST /api/bookmarks": "bookmark", "GET /api/bookmarks/{}": "bookmark",
     "PATCH /api/bookmarks/{}": "bookmark", "DELETE /api/bookmarks/{}": "bookmark", "POST /api/bookmarks/{}/restore": "bookmark",

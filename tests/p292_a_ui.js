@@ -48,7 +48,7 @@ const day = n => { const d = new Date(today + 'T12:00:00Z'); d.setUTCDate(d.getU
     await signIn(ev, 'alice');
     await nav(B + '#office/agreements');
     check(await ready(ev, `document.querySelectorAll('.agr-li .ofcrow').length === 1`, 80), '#1925: the tab lists the contract');
-    check(await ev(`!!document.querySelector('#view .ofmenu [data-ofm="agreements"]')`), '#1925: the tab for the admin');
+    check(await ev(`!!document.querySelector('#view .ofrail [data-ofm="agreements"]')`), '#1925: the tab for the admin');  // 2.98.0 (#2180): the office rail
     check(await ev(`(() => { const t = document.querySelector('.agr-li').textContent; return /Betriebshaftpflicht/.test(t) && /20\\.00/.test(t) && /Cancel by/.test(t) && /20 days left/.test(t); })()`),
       '#1925: name, contribution per month, the last day to cancel ' + await ev(`document.querySelector('.agr-li')?.textContent`));
     check(await ev(`!!document.querySelector('.agr-li .agr-late')`), '#1925: within the lead time in red');
@@ -90,8 +90,8 @@ const day = n => { const d = new Date(today + 'T12:00:00Z'); d.setUTCDate(d.getU
     await signIn(ev, 'bob');
     await nav(B + 'static/icon.svg');
     await nav(B + '#office/offers');
-    check(await ready(ev, `!!document.querySelector('#view .ofmenu [data-ofm="offers"]')`, 80), 'the office (member)');
-    check(await ev(`!document.querySelector('#view .ofmenu [data-ofm="agreements"]')`), '#1925: a member does not see the tab');
+    check(await ready(ev, `!!document.querySelector('#view .ofrail [data-ofm="offers"]')`, 80), 'the office (member)');  // 2.98.0 (#2180): the office rail
+    check(await ev(`!document.querySelector('#view .ofrail [data-ofm="agreements"]')`), '#1925: a member does not see the tab');  // 2.98.0 (#2180): the office rail
   }, false);
 
   console.log(`p292_a_ui: ${ok} ok, ${F.length} failed`);

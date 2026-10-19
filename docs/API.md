@@ -992,7 +992,12 @@ and `/portal` (the reporter's tickets of the same space, cookie for 7 days).
 `GET|POST /lists/{id}/forms`, `PATCH|DELETE /forms/{id}` (`structure`; owner / list admins): a form's `url`, `access`
 (`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link. 2.63.0: `ttype` (`''` | `bug` | `feature` |
 `task`, the type of a sent task), `files` (one file allowed), `portal` (a sender without an account gets a status link on
-the thank-you page and once by mail; turns `ask_email` on).
+the thank-you page and once by mail; turns `ask_email` on). 2.98.0 (#1954): `questions` (a questionnaire: at most 30
+`{id?, kind: short | long | choice | multi | date | number | file | yesno, label, help?, required?, options?}`; a choice
+needs two options, at most 3 file questions; the list replaces the old one, a known `id` keeps earlier answers mapped;
+`[]` = the classic form), `one_per_step` (one question per step), `client_match` (the sender's e-mail is matched to a
+client of the list's space), `client_new` (an unknown address becomes a new client, default off). The submissions and
+their CSV (`/forms/{id}/entries`) are in the app only.
 
 ## Storage and the server's notice (2.24.0)
 

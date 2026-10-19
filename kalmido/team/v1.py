@@ -85,7 +85,7 @@ def v1_forms(lid):
 def v1_form_create(lid):
     v1_args(())
     b = v1_json()
-    reject_unknown(b, ("title", "intro", "access", "section_id", "ask_email", "ttype", "files", "portal"))  # 2.63.0 (#1513)
+    reject_unknown(b, ("title", "intro", "access", "section_id", "ask_email", "ttype", "files", "portal", *FQ_V1))  # 2.63.0 (#1513), 2.98.0 B
     return jsonify(v1_call(form_create, lid, body=b)), 201
 
 
@@ -94,7 +94,7 @@ def v1_form_create(lid):
 def v1_form_update(fid):
     v1_args(())
     b = v1_json()
-    reject_unknown(b, ("title", "intro", "access", "section_id", "ask_email", "enabled", "regenerate", "ttype", "files", "portal"))
+    reject_unknown(b, ("title", "intro", "access", "section_id", "ask_email", "enabled", "regenerate", "ttype", "files", "portal", *FQ_V1))
     return jsonify(v1_call(form_update, fid, body=b))
 
 
@@ -109,6 +109,20 @@ def v1_form_delete(fid):
 FRM_V1 = {"ttype": {"type": "string", "enum": list(FRM_TTYPES), "description": "2.63.0: the type of the task a sent form makes ('' = none, bug = bug report)"},
           "files": {"type": "boolean", "description": "2.63.0: the sender may add one file"},
           "portal": {"type": "boolean", "description": "2.63.0: a sender without an account gets a status link (page and one mail); turns ask_email on"}}
+# 2.98.0 B (#1954): a questionnaire: own questions instead of subject / description, one per step, the client by e-mail
+FQ_V1 = {"questions": {"type": "array", "maxItems": 30, "description": "2.98.0: own questions (empty = the classic form with subject / "
+                       "description). A known id keeps the answers of earlier submissions mapped; the list replaces the old one",
+                       "items": {"type": "object", "properties": {
+                           "id": {"type": "string", "description": "Kept when given (6-16 a-z0-9), else made up"},
+                           "kind": {"type": "string", "enum": ["short", "long", "choice", "multi", "date", "number", "file", "yesno"]},
+                           "label": {"type": "string", "maxLength": 300}, "help": {"type": "string", "maxLength": 500},
+                           "required": {"type": "boolean"},
+                           "options": {"type": "array", "items": {"type": "string", "maxLength": 120}, "maxItems": 20,
+                                       "description": "choice / multi: at least two"}}, "required": ["kind", "label"]}},
+         "one_per_step": {"type": "boolean", "description": "2.98.0: the page shows one question per step (else all on one page)"},
+         "client_match": {"type": "boolean", "description": "2.98.0: the sender's e-mail is matched to a client of the list's space; "
+                          "the task names it (else 'client unknown')"},
+         "client_new": {"type": "boolean", "description": "2.98.0: an unknown address becomes a new client in the list's space (default off)"}}
 
 
 def pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
@@ -195,10 +209,10 @@ def pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "access": {"type": "string", "enum": list(FORM_ACCESS), "description": "org = signed-in people of the owner's organisations; public = anyone with the link"},
         "section_id": nul("integer"), "ask_email": {"type": "boolean"}, "enabled": {"type": "boolean"}, "count": {"type": "integer"},
         "last_at": nul("string"), "created_at": {"type": "string"}, "url": {"type": "string", "description": "The form's link"},
-        "live": {"type": "boolean", "description": "Enabled and allowed (public forms need the switch Public links)"}, **FRM_V1}}
+        "live": {"type": "boolean", "description": "Enabled and allowed (public forms need the switch Public links)"}, **FRM_V1, **FQ_V1}}
     fin = {"type": "object", "additionalProperties": False, "properties": {
         "title": {"type": "string"}, "intro": {"type": "string"}, "access": {"type": "string", "enum": list(FORM_ACCESS)},
-        "section_id": nul("integer"), "ask_email": {"type": "boolean"}, **FRM_V1}}
+        "section_id": nul("integer"), "ask_email": {"type": "boolean"}, **FRM_V1, **FQ_V1}}
     paths["/lists/{id}/forms"] = {
         "get": op("2.23.0 (module forms): the forms of a list (owner / list admins)", F,
                   ok({"type": "object", "properties": {"forms": {"type": "array", "items": ref("Form")}, "public_links": {"type": "boolean"}}})

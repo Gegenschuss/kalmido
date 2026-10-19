@@ -75,7 +75,7 @@ const typeIn = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input
   await until(() => d.querySelector('#view .msclempty'), 60);
   check(/Private people belong in Contacts/.test(d.querySelector('#view .msclempty')?.textContent || ''), '#1734: the empty list explains clients vs. contacts');
   // 2.87.9 (#1917): no heading "Office > Clients" any more (it looked like a way back); the office menu shows the place
-  check(!d.querySelector('#view .msclh') && (!d.querySelector('#view .ofmenu') || !!d.querySelector('#view .ofmenu [data-ofm="clients"][aria-current="page"]')), '#1917: no heading, the menu marks Clients');
+  check(!d.querySelector('#view .msclh') && (!d.querySelector('#view .ofrail') || !!d.querySelector('#view .ofrail [data-ofm="clients"][aria-current="page"]')), '#1917: no heading, the menu marks Clients');  // 2.98.0 (#2180): the office rail
   w.close();
   const cl = [];
   for (const [n, o] of [['Alpha GmbH', {rate: 90, budget_h: 20, contacts: [{name: 'Max Example', role: 'Producer', is_default: true}]}], ['Beta AG', {}], ['Gamma KG', {}]]) cl.push((await call('POST', '/api/clients', {name: n, org_id: ORG, ...o})).id);

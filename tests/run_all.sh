@@ -1155,6 +1155,16 @@ fresh; run p297_c_ui node p297_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.97.0 part D: locked wiki spaces re-keyed in the browser on a move, orphan clean-up (#2050 #2051)
 fresh; run p297_d_api "$PY" p297_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p297_d_ui node p297_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.98.0 part A: scheduling polls (#1953)
+fresh; run p298_a_api "$PY" p298_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p298_a_ui node p298_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.98.0 part B: questionnaires (#1954)
+fresh; run p298_b_api "$PY" p298_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p298_b_ui node p298_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.98.0 part C: office menu as a rail on the left, resizable tables + own window (#2180 #2181)
+fresh; run p298_c_ui node p298_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.98.0 part D: longer tick / create animation, document guesses only where they fit, comment names (#2163 #2178 #2184)
+fresh; run p298_d_api "$PY" p298_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.87.9 part E (#1914 #1920 #1909 #1933 #1937 #1952 #1963): polish
 fresh; run p287b_e_ui node p287b_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.90.0 part A (#1921): bookkeeping light (EUeR, VAT return figures, tax reserve, receipt photo)

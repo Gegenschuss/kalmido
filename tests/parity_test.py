@@ -252,6 +252,10 @@ APP_ONLY = [
       "=POST /api/sheets/{}/columns/{}/restore", "=DELETE /api/sheets/{}/rows/{}", "=POST /api/sheets/{}/rows/{}/restore",
       "=POST /api/sheets/{}/rows/order", "=POST /api/sheets/{}/cells/{}/freeze", "=POST /api/sheets/{}/cells/{}/name",
       "=POST /api/sheets/{}/presence")),
+    ("2.98.0 B (#1954): the evaluation of a questionnaire (all submissions with the senders' names, addresses and answers, "
+     "their CSV) stays with the people who manage the form in the app; an agent gets each submission as its task (task_added, "
+     "the answers in the description) and sets the questions through the form's fields",
+     ("=GET /api/forms/{}/entries", "=GET /api/forms/{}/entries.csv")),
     # 2.70.0 (#1357): agents propose contact merges as a proposal (kind merge); the person applies them, the routes stay with people
     ("2.66.0 (#1835): merging duplicate contacts / clients and its undo stay with people; agents propose contact merges "
      "(proposal kind merge, #1357), the person applies them",
@@ -474,6 +478,10 @@ APP_ONLY = [
      "(each one undo step); agents work inside a sheet through the table tools and create tasks / office drafts their own ways",
      ("=GET /api/sheets/{}/links", "=POST /api/sheets/{}/to-tasks", "=POST /api/sheets/{}/to-offer", "=POST /api/sheets/{}/rows-from-list",
       "=POST /api/sheets/{}/links/{}/undo", "=POST /api/sheets/{}/links/{}/redo")),
+    # 2.98.0 A (#1953): scheduling polls are for people in 2.98.0 (voters use the public link; agent access is its own step)
+    ("2.98.0 A (#1953): scheduling polls (create, results, choose the time, move) are only for people in 2.98.0; the voters use "
+     "the public link without an account, agents never vote; agent access via REST v1 / MCP comes as its own step of the agents list",
+     ("* /api/polls",)),
     ("2.94.0 B (#1929): the appointment booking page (settings, appointment types, the bookings and cancelling one) is a person's "
      "own page; customers book on the public page without an account, agents get no access (no agent API in 2.94)",
      ("* /api/appt/",)),

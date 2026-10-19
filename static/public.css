@@ -47,6 +47,21 @@ details.donegrp .n{font-family:var(--mono);font-weight:400}
 .pw button{background:var(--accent);color:var(--ink);border:0;border-radius:.375rem;padding:.5rem 1rem;font:inherit;font-weight:600;cursor:pointer}
 .err{color:var(--danger)}
 footer{max-width:40rem;margin:0 auto;padding:0 1rem 2rem;color:var(--muted);font-size:.75rem}
+/* 2.98.0 A (#1953): the scheduling poll (/vote/<token>): one card per time, three large answers side by side, the best time marked */
+.tpo-form fieldset.tpo-opt{border:1px solid var(--line2);border-radius:.5rem;padding:.625rem .75rem .75rem;margin:.5rem 0 0;min-width:0}
+.tpo-form fieldset.tpo-opt.tpo-best{border-color:var(--accent)}
+.tpo-opt legend{padding:0 .25rem;font-weight:600;color:var(--text);overflow-wrap:anywhere}
+.tpo-n{margin:.125rem 0 .5rem;color:var(--muted);font-size:.8125rem}
+.tpo-as{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.375rem}
+.tpo-form .tpo-a{margin:0;position:relative}
+.tpo-a input{position:absolute;opacity:0;width:1px;height:1px}
+.tpo-a span{display:flex;align-items:center;justify-content:center;min-height:2.75rem;border:1px solid var(--line2);border-radius:.375rem;background:var(--bg3);color:var(--text);font-size:.9375rem;cursor:pointer;text-align:center}
+.tpo-a input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--ink);font-weight:600}
+.tpo-a input:focus-visible+span{outline:2px solid var(--accent);outline-offset:1px}
+.tpo-who{margin:.375rem 0 0;color:var(--text2);font-size:.8125rem;overflow-wrap:anywhere}
+.tpo-note{color:var(--text2)}
+.tpo-done{margin:1rem 0}
+.tpo-chosen{font-size:1.25rem;font-weight:600;margin:.25rem 0}
 /* 2.14.0: the heron on the error pages (lines in the text colour, the sun = the accent) and the way back */
 .heron{display:block;width:7.5rem;height:7.5rem;margin:0 auto 1rem;color:var(--text2)}
 .heron path{vector-effect:non-scaling-stroke}
@@ -109,6 +124,32 @@ section.fb .ok{color:var(--accent)}
 .fform select{background:var(--bg3);border:1px solid var(--line2);border-radius:.375rem;padding:.5rem .75rem;color:var(--text);font:inherit;width:100%;min-height:2.75rem}
 /* 2.63.0 A (#1513): the report form's file field and the status link on the thank-you page */
 .fform input[type=file]{padding:.5rem .75rem}
+/* 2.98.0 B (#1954): questionnaires -- own questions, one page or one question per step (sections switched by :target, no script) */
+.fq{display:flex;flex-direction:column;gap:.375rem;margin:.5rem 0 0;padding:0;border:0;min-width:0}
+.fq legend{font-size:.8125rem;color:var(--muted);padding:0;margin:0 0 .25rem}
+.fq>label{font-size:.8125rem;color:var(--muted)}
+.fqh{margin:0;color:var(--text2);font-size:.8125rem}
+.fqreq{color:var(--accent);margin-left:.125rem}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.fform .fqo{display:flex;align-items:center;gap:.625rem;min-height:2.75rem;padding:0 .75rem;margin:0;border:1px solid var(--line2);border-radius:.375rem;background:var(--bg3);color:var(--text);font-size:.9375rem;cursor:pointer}
+.fform .fqo input{width:1.125rem;height:1.125rem;min-height:0;margin:0;padding:0;accent-color:var(--accent);flex:none}
+.fform .fqo:has(input:checked){border-color:var(--accent)}
+.fform .fqo:focus-within{outline:2px solid var(--accent);outline-offset:1px}
+.fq-steps .fqs{display:none;flex-direction:column;gap:.375rem}
+.fq-steps .fqs.cur{display:flex}
+.fq-steps:has(.fqs:target) .fqs.cur:not(:target){display:none}
+.fq-steps .fqs:target{display:flex}
+.fqp{margin:0;color:var(--muted);font-size:.75rem}
+.fqbar{width:100%;height:.375rem;border:0;border-radius:62.5rem;background:var(--bg3);overflow:hidden;-webkit-appearance:none;appearance:none}
+.fqbar::-webkit-progress-bar{background:var(--bg3);border-radius:62.5rem}
+.fqbar::-webkit-progress-value{background:var(--accent);border-radius:62.5rem}
+.fqbar::-moz-progress-bar{background:var(--accent);border-radius:62.5rem}
+.fqnav{display:flex;gap:.75rem;margin-top:1rem}
+.fqnav:empty{display:none}
+.fqnav .btn{display:inline-flex;align-items:center;justify-content:center;min-height:2.75rem;padding:0 1.25rem;border-radius:.5rem;background:var(--accent);color:var(--ink);font-weight:600;text-decoration:none;flex:1}
+.fqnav .btn.sec{background:transparent;color:var(--text);border:1px solid var(--line2)}
+.fqnav .btn:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+.fq-steps .fqs button[type=submit]{align-self:stretch}
 .msg .frm-link{display:block;width:100%;max-width:32rem;margin:.75rem auto;background:var(--bg3);border:1px solid var(--line2);border-radius:.375rem;padding:.625rem .75rem;color:var(--text);font:inherit;min-height:2.75rem;text-align:center}
 .msg .frm-link:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 /* 2.63.0 B (#1513) the status page of a customer report (/p/<token>) and the portal (/portal) */

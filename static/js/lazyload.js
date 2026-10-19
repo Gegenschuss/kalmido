@@ -28,7 +28,7 @@ const LD_MODS = {
   timeline: ['timeline', 'roadmap'],
   feeds: ['feeds'],  // 2.85.0 B (#1162)
   bookmarks: ['bookmarks'],  // 2.97.0 A (#1950)
-  sheets: ['sheets', 'sheets2', 'sheetsio'],  // 2.89.0 (#1916); D: sheets2.js (step 2), C: sheetsio.js (import/export)
+  sheets: ['sheets', 'sheets2', 'sheetsio', 'sheetsize'],  // 2.89.0 (#1916); D: sheets2.js (step 2), C: sheetsio.js (import/export); 2.98.0 C (#2181): sheetsize.js (the frame)
   videos: ['videorev'],  // 2.99.1 A (#1959): video sign-offs
   pubvideo: ['pubvideo'],  // 2.99.1 A (#1959): only the customer page of a video sign-off loads it (/s/q/<token>), the app never
 };

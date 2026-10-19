@@ -133,3 +133,22 @@
 .sh2f select{min-height:2.75rem}
 .sh2rows{border:0;padding:0;margin:.25rem 0 .5rem;display:flex;flex-direction:column;gap:.375rem}
 .sh2rows label{display:flex;align-items:center;gap:.5rem;min-height:2.75rem}
+/* 2.98.0 C (#2181): the frame of a table - its grip at the bottom right corner, the size kept per table (sheetsize.js), the
+   empty columns / rows that fill it (display only), the table's own window (/?mini=1) and full screen */
+.shzbox{position:relative;max-width:100%;min-width:0}
+.shzbox[data-shzset] .shvscroll{height:100%;max-height:none}
+@media (min-width:900px){ .shzbox:not([data-shzset]) .shvscroll{min-height:min(22rem,calc(100dvh - 15rem))} }
+.shzgrip{position:absolute;right:.125rem;bottom:.125rem;z-index:5;width:1rem;height:1rem;padding:0;border:0;border-radius:var(--r-s);cursor:nwse-resize;opacity:.7;
+  background:linear-gradient(135deg,transparent 45%,var(--faint) 45%,var(--faint) 55%,transparent 55%,transparent 70%,var(--faint) 70%,var(--faint) 80%,transparent 80%)}
+.shzgrip:hover,.shzgrip:focus-visible{opacity:1}
+.shzgrip:focus-visible{outline:.125rem solid var(--accent);outline-offset:.0625rem}
+.shzcol{width:7rem}
+.shvgrid td.shzph{position:relative;background:var(--bg);cursor:cell;padding:0 .5rem}
+.shvgrid td.shzph.shzon{box-shadow:inset 0 0 0 .125rem var(--accent)}
+.shvgrid td.shzph:has(#shz-ed){padding:0}
+.shvgrid thead th.shzph{padding:0 .5rem;color:var(--faint)}
+.shzrh{color:var(--faint);font:var(--fs-s) var(--mono)}
+html.shzfull #side,html.shzfull #tabs,html.shzfull #top,html.shzfull #chatfab,html.shzfull #achat,html.shzfull #fab{display:none!important}
+html.shzfull #app{grid-template-columns:minmax(0,1fr)}
+html.shzfull .shvscroll,html.mini-sheet .shvscroll{max-height:none;height:calc(100dvh - 10rem)}
+html.mini-sheet .shvtop>a.btn{display:none}

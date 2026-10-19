@@ -1,4 +1,4 @@
-/* Kalmido web client: knowledge pages (#1199, "SilverBullet lite"). Route #wiki (the pages of the current space) and
+/* Kalmido web client: knowledge pages (#1199). Route #wiki (the pages of the current space) and
    #wiki/<id> (one page). A space = an organisation (every member reads and writes) or "Private" (only me); the sidebar's
    workspace switch picks it, else the last one used here. Pages are Markdown with a path as their name ("Processes/
    Shoot day/Checklist": the folders of the tree), [[Path]] links another page (suggestions while typing), #123 a task

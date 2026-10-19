@@ -70,7 +70,8 @@ const an_rowsBack = ids => ids.forEach(id => document.querySelectorAll(`#view .t
 // row then folds away (height + opacity, ~0.25 s), otherwise it stays struck through. Ticked again meanwhile: the exit is
 // cancelled. The redraw (load + render) waits until no row is still animating, so several quick ticks never make the list jump.
 const UI = {busy: 0, idle: [], pend: new Map()};
-const UI_STRIKE_MS = 380, UI_GONE_MS = 250;
+const UI_POP_MS = 350;                  // 2.98.0 D (#2163): the tick's pop (app.css o3c-pop); the row leaves only after it
+const UI_STRIKE_MS = UI_POP_MS + 30, UI_GONE_MS = 250;
 const ui_motion = () => { try { return !matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return true; } };
 const ui_idle = () => UI.busy ? new Promise(r => UI.idle.push(r)) : Promise.resolve();
 function ui_doneStart(id, hide) {

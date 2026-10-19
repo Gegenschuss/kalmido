@@ -182,6 +182,14 @@ CHECKS = {
     # refuse it; the formulas show "No access" then) -- (sheet, who pressed the button; counted only)
     "sheet_link": ("SELECT s.id, k.created_by FROM sheet_links k JOIN sheets s ON s.id=k.sheet_id JOIN tasks t ON t.id=k.target_id "
                    "JOIN lists l ON l.id=t.list_id WHERE k.kind IN ('task', 'row') AND k.undone_at IS NULL AND l.org_id IS DISTINCT FROM s.org_id"),
+    # 2.98.0 A (#1953): a scheduling poll of an organisation held by an agent or a person outside it, or bound to a task / client /
+    # list of another workspace (the read layer needs the membership and drops a foreign reference: calendars/polls.py
+    # tpo_ref_ok; counted only) -- (poll, owner)
+    "sched_poll": ("SELECT p.id, p.user_id FROM sched_polls p JOIN users u ON u.id=p.user_id LEFT JOIN tasks t ON t.id=p.task_id "
+                   "LEFT JOIN lists tl ON tl.id=t.list_id LEFT JOIN clients cl ON cl.id=p.client_id LEFT JOIN lists l ON l.id=p.list_id "
+                   "WHERE p.deleted_at IS NULL AND ((p.org_id IS NOT NULL AND (u.kind='agent' OR " + _PERSON.format(o="p", m="p") + ")) "
+                   "OR (tl.id IS NOT NULL AND tl.org_id IS DISTINCT FROM p.org_id) OR (cl.id IS NOT NULL AND cl.org_id IS DISTINCT FROM p.org_id) "
+                   "OR (l.id IS NOT NULL AND l.org_id IS DISTINCT FROM p.org_id))"),
     "hub_token_person": ("SELECT m.org_id, m.user_id FROM hub_tokens m JOIN users u ON u.id=m.user_id WHERE m.org_id IS NOT NULL AND "
                          + _PERSON.format(o="m", m="m")),
     # 2.97.0 A (#1950): a bookmark of an organisation held by an agent or by a person outside it (the read layer needs the

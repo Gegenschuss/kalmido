@@ -204,6 +204,37 @@ from one address are refused, one e-mail address can have at most 3 unconfirmed 
 server's daily limit of mails per recipient applies. Unconfirmed bookings are deleted a week after they expired. The
 booking page is separate from the disposition (bookings of people and equipment in the office).
 
+## Finding a date: scheduling polls (2.98.0)
+
+Several people, no shared calendar: propose a few times and let everybody vote. Open **Calendar › Find a date** (or
+**Find a date** in a task next to *Schedule as an event*, or **Find a date…** in a client's menu: the poll is then about
+that task or client).
+
+- **New poll:** title, description, place or video link, duration and 2 to 20 proposed times (date and time; *Add a time*
+  adds the next day). With organisations you choose the workspace. Optional: the day voting ends, and whether voters see
+  the names and answers of the others (on by default).
+- **The link:** copy it or show its QR code and send it to the people. They vote without an account: their name and
+  *Yes* / *Maybe* / *No* per time, optionally an e-mail address (only you see it). The page shows the times in the
+  voter's own time zone and names the poll's zone. A voter can change their vote later on the same device or with the
+  link on the thank-you page.
+- **The result:** per time the votes as a bar, the names, the best time marked (most *Yes*, then most *Maybe*).
+- **Choose this time:** pick the calendar (your Kalmido calendars, or a subscribed CalDAV calendar with *Allow writing*;
+  never Google) and Kalmido makes one event with the title, place and description; the voters are named in it. The
+  invitation by e-mail to the voters with an address is off unless you tick it (the event goes along as an `.ics`
+  file). The poll is then closed and its link shows only the chosen time. *Reopen poll* (or Undo) puts the event into
+  the trash and opens the poll again.
+- **The menu (…):** edit, a new link (the old one stops working), turn the link off / on, move to another workspace,
+  delete (Undo brings it back).
+
+In an organisation every member sees the organisation's polls; only who created a poll or an admin of the organisation
+changes it, and only its creator moves it. Agents have no access to polls in 2.98.0 and never vote through the link.
+
+Protection: unknown, revoked, expired and deleted links look the same (no guessing), the link has 144 random bits and only
+its hash is used to find it, a hidden field catches simple bots, a vote sent within 3 seconds of loading the page or with
+a page used before is asked again, votes from other sites and too many votes from one address (per minute, per poll) are
+refused, a poll takes at most 300 votes. The page loads no outside scripts; its one small script only shows the times in
+the voter's zone. The page lives below the public links' prefix `/s/` and needs the server's *Public links* switch.
+
 ## For admins
 
 ### Settings

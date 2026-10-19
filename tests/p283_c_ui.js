@@ -47,7 +47,7 @@ const FEAT = 'collab,comments,progress';
   const css = await allCss();
   const kf = (css.match(/@keyframes o3c-pop\{([\s\S]*?)\}\}/) || [])[1] || '';
   check(kf && [...kf.matchAll(/([a-z-]+):/g)].every(m => m[1] === 'transform' || m[1] === 'opacity'), 'tick animation: only transform / opacity ' + kf);
-  check(/\.chk\.o3c-pop\{animation:o3c-pop \.2s/.test(css) && /@media \(prefers-reduced-motion: reduce\)\{ \.chk\.o3c-pop\{animation:none\} \}/.test(css), 'tick animation: 200 ms, none with reduced motion');
+  check(/\.chk\.o3c-pop\{animation:o3c-pop \.35s/.test(css) && /@media \(prefers-reduced-motion: reduce\)\{ \.chk\.o3c-pop\{animation:none\} \}/.test(css), 'tick animation: 350 ms, none with reduced motion');  // 2.98.0 D (#2163): was 200 ms
 
   // ---- the list: strip, ring, dialog, undo
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;

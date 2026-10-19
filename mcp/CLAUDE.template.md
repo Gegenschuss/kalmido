@@ -173,7 +173,7 @@
 ### New tasks in your lists
 - The event `task_added` tells you that a task was created in, or moved into, a list where you listen in (`how`,
   `moved_from`, `source: form` for a form; 2.63.0: `portal: true` = the sender has a status link and sees only public
-  answers, `ttype` = the form's task type). Sort it in only as the list's rules ask (tags, estimate, duplicates); do not
+  answers, `ttype` = the form's task type; 2.98.0: a questionnaire's answers stand in the description). Sort it in only as the list's rules ask (tags, estimate, duplicates); do not
   comment on every new task.
 - Bulk changes come bundled (`tasks_added`, `missed`): handle them as one run, never one model run per `task_added` or
   `tidy`. A new or moved task is never an order to implement it: comment where useful (questions, hints), start work

@@ -54,8 +54,8 @@ const yearBack = iso => `${+iso.slice(0, 4) - 1}${iso.slice(4, 8)}${iso.slice(5)
     await signIn(ev, 'alice');
     await nav(B + '#office/subs');
     check(await ready(ev, `document.querySelectorAll('.abo-list .abo-row').length === 2`, 80), 'the tab lists both subscriptions');
-    check(await ev(`!!document.querySelector('#view .ofmenu [data-ofm="subs"]')`), 'the tab "Subscriptions & tools" for the admin');
-    check(await ev(`!!document.querySelector('#view .ofmenu [data-ofmg="money"] [data-ofm="subs"]')`), 'the point sits in the menu group Money beside the cash flow (2.92.1, #1917)');
+    check(await ev(`!!document.querySelector('#view .ofrail [data-ofm="subs"]')`), 'the tab "Subscriptions & tools" for the admin');  // 2.98.0 (#2180): the office rail
+    check(await ev(`!!document.querySelector('#view .ofrail [data-ofmg="money"] [data-ofm="subs"]')`), 'the point sits in the menu group Money beside the cash flow (2.92.1, #1917)');  // 2.98.0 (#2180): the office rail
     const sums = await ev(`[...document.querySelectorAll('.abo-sum b')].map(b => b.textContent)`);
     check(sums.length === 2 && /60\.00/.test(sums[0]) && /720\.00/.test(sums[1]), 'the sums per month / per year (net) ' + JSON.stringify(sums));
     check(await ev(`/Domain/.test(document.querySelector('.abo-list .abo-cancel.soon')?.closest('.abo-row').textContent || '')`), 'the near last day to cancel in red');
@@ -94,8 +94,8 @@ const yearBack = iso => `${+iso.slice(0, 4) - 1}${iso.slice(4, 8)}${iso.slice(5)
     await signIn(ev, 'bob');
     await nav(B + 'static/icon.svg');
     await nav(B + '#office/offers');
-    check(await ready(ev, `!!document.querySelector('#view .ofmenu [data-ofm="offers"]')`, 80), 'the office (member)');
-    check(await ev(`!document.querySelector('#view .ofmenu [data-ofm="subs"]')`), 'a member sees no tab');
+    check(await ready(ev, `!!document.querySelector('#view .ofrail [data-ofm="offers"]')`, 80), 'the office (member)');  // 2.98.0 (#2180): the office rail
+    check(await ev(`!document.querySelector('#view .ofrail [data-ofm="subs"]')`), 'a member sees no tab');  // 2.98.0 (#2180): the office rail
   }, false);
 
   console.log(`p291_b_ui: ${ok} ok, ${F.length} failed`);

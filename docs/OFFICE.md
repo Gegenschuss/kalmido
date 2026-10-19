@@ -77,23 +77,29 @@ area, also of an organisation): new quotations and invoices are made without VAT
 wird keine Umsatzsteuer berechnet." (`vat_mode` `novat`, `vat_note` `small`); the e-invoice gets the tax category `E`
 with this exemption reason.
 
-## The office menu (2.87.9)
+## The office menu (2.87.9, a rail on the left since 2.98.0)
 
-The area Office (office, clients, contacts) has one menu with four groups instead of tab rows:
+The area Office (office, clients, contacts) has one menu with three groups instead of tab rows:
 
-- **Sell** - Pipeline, Quotes & invoices, Clients, Contacts
-- **Money** - Cash flow, Figures
-- **On the road** - Travel expenses
-- **Administration** - Services, Equipment, Framework contracts, Text blocks, Settings
+- **Sell** - Pipeline, Quotes & invoices, Clients, Contacts, Documents, Framework contracts
+- **Money** - Cash flow, Figures, Bank, Bookkeeping, Subscriptions & tools, Travel expenses
+- **Administration** - Equipment, Contracts & insurance, Settings
 
-On a computer the groups stand side by side above the page and stay there while scrolling; the point shown is in the
-accent colour. On a phone `#office` (or `#office/start`) opens a start page with a tile per group and, for admins of the
-office, the key figures; every other page shows the path "Office › group" (a tap goes back to the tiles) and the points of
-its group. Points for admins only (pipeline, cash flow, figures, travel expenses) and groups without a point are hidden;
-a person without an organisation is the admin of the personal office and sees all of them. Detail pages show a grey path
-("Clients › Example Ltd"), text only. Every old address keeps working (`#office/offers`, `#office/import` under Settings,
-`#clients`, `#client/<id>`, `#contacts` …). A new part of the office joins a group with an entry in `OFM_ITEMS`
-(`static/js/areas.js`, field `group`); an office tab without one appears under Administration.
+Services and text blocks are no menu points any more: they are the tab **Templates** under **Settings** (Settings has the
+tabs *General* and *Templates*; Templates switches between *Services* and *Text blocks*, the one used last opens).
+
+On a computer the menu is a narrow column left of the page (15 rem, 12 rem below 1100 px): the groups as small capitals,
+their points below each other, the point shown in the accent colour (`aria-current="page"`); it stays while scrolling.
+The page starts with its own heading (the name of the point), a detail page with its grey path ("Clients › Example Ltd",
+text only) instead. Arrow up / down, Home and End move inside the column. On a phone `#office` (or `#office/start`) opens
+a start page with, for admins of the office, the key figures and then one list per group in a single column; every other
+page shows "‹ Office · group" (back to the start page) and the points of its group as one row of tabs that scrolls
+sideways and never wraps (arrow left / right inside it). Points for admins only (pipeline, cash flow, figures, travel
+expenses, ...) and groups without a point are hidden; a person without an organisation is the admin of the personal
+office and sees all of them. Every old address keeps working (`#office/offers`, `#office/services` and `#office/texts`
+open the tab Templates, `#office/import` sits under Settings, `#clients`, `#client/<id>`, `#contacts` ...). A new part of
+the office joins a group with an entry in `OFM_ITEMS` (`static/js/areas.js`, field `group`, its place in `OFR_ORDER`); an
+office tab without one appears at the end of its group (`OFC_TABS` field 5, else Administration).
 
 ## Tabs
 
@@ -404,7 +410,7 @@ e-mail* (the server's mailbox, see SELF-HOSTING.md "Mail"); without it the addre
 
 ## Travel expenses: taking over a per diem spreadsheet (2.95)
 
-Office -> On the road -> Travel expenses -> **Take over from Excel** (shown while the trip list is empty and in the
+Office -> Money -> Travel expenses -> **Take over from Excel** (shown while the trip list is empty and in the
 evaluation) reads a per diem spreadsheet you kept so far (.xlsx, up to 2 MB, at most 30 sheets with 500 rows each).
 Nothing is stored before you confirm.
 
