@@ -77,8 +77,10 @@ FID, F = freelancer(B, A)
 
 RIGHTS = {"de": {"time": "unbegrenzt", "territory": "weltweit", "media": "intern, web, unpaid media", "note": "Im Übrigen gelten unsere AGB."},
           "en": {"time": "in perpetuity", "territory": "worldwide", "media": "internal use, web", "note": "Otherwise, our terms apply."}}
-TXT = {"de": {"title": "RECHTEÜBERTRAGUNG", "see": "Rechteübertragung siehe Anhang", "sign": "Mit freundlichen Grüßen", "accept": "AUFTRAGSERTEILUNG"},
-       "en": {"title": "TRANSFEROFRIGHTS", "see": "Transfer of rights see appendix", "sign": "Kind regards", "accept": "ORDERCONFIRMATION"}}
+TXT = {"de": {"title": "RECHTEÜBERTRAGUNG", "see": "Rechteübertragung siehe Anhang", "sign": "Mit freundlichen Grüßen", "accept": "AUFTRAGSERTEILUNG",
+             "acc_see": "Auftragserteilung per Unterschrift auf Seite {0}"},
+       "en": {"title": "TRANSFEROFRIGHTS", "see": "Transfer of rights see appendix", "sign": "Kind regards", "accept": "ORDERCONFIRMATION",
+             "acc_see": "Order confirmation by signature on page {0}"}}
 
 
 def scenario(S, who):
@@ -105,8 +107,10 @@ def scenario(S, who):
         check(squash("Interaktives Modul").upper() in squash(pg[-2]).upper() and "Animation" in pg[-2], f"{who} {lang}: the part's page comes before the appendix")
         check(not any(squash(t["see"]) in squash(x) for x in pg[-2:]), f"{who} {lang}: the reference line not on the part / appendix pages")
         main = squash("\n".join(pg[:-2]))
-        i_see, i_sign, i_acc = main.find(squash(t["see"])), main.find(squash(t["sign"])), main.find(t["accept"])
-        check(0 <= i_see < i_sign < i_acc, f"{who} {lang}: reference line, then signature, then order confirmation ({i_see} {i_sign} {i_acc})")
+        # 2.114.5 (#2300): the order confirmation moved behind the appendix; the main page names its page
+        i_see, i_sign, i_ref = main.find(squash(t["see"])), main.find(squash(t["sign"])), main.find(squash(t["acc_see"].format(n)))
+        check(0 <= i_see < i_ref < i_sign and t["accept"] not in main, f"{who} {lang}: reference lines, then signature; no order confirmation on the main page ({i_see} {i_ref} {i_sign})")
+        check(squash(pg[-1]).find(t["title"]) < squash(pg[-1]).find(t["accept"]), f"{who} {lang}: the order confirmation follows the rights on the last page")
         check(squash(f"Seite {n} von {n}" if lang == "de" else f"Page {n} of {n}") in squash(pg[-1]), f"{who} {lang}: the appendix carries 'page n of n'")
         if who == "org":
             shot(f"kva-{lang}", r.content, [1, n])
@@ -118,6 +122,8 @@ def scenario(S, who):
         check(len(pg2) == n - 1, f"{who} {lang}: without rights one page less ({len(pg2)} vs {n})")
         check(not any(squash(t["see"]) in squash(x) or t["title"] in squash(x) for x in pg2), f"{who} {lang}: without rights no reference line, no rights title")
         check("Animation" in pg2[-1], f"{who} {lang}: without rights the part's page is the last one")
+        # 2.114.5 (#2300): without rights the order confirmation follows the part, page 1 names that page
+        check(t["accept"] in squash(pg2[-1]) and squash(t["acc_see"].format(len(pg2))) in squash(pg2[0]), f"{who} {lang}: order confirmation behind the part")
 
 
 # ---------------------------------------------------------------- an organisation's office

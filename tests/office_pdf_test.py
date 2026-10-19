@@ -167,7 +167,8 @@ check(squash("Seite 1 von " + str(n)) in squash(T[0]), f"page 1 says 'Seite 1 vo
 check(all(squash(f"Seite {i + 1} von {n}") in squash(t) for i, t in enumerate(T)), "every page carries 'Seite x von y'")
 check(all("Studio Nordlicht GmbH" in t and "Hafenstraße 12" in t and "Beispielbank" in t for t in T), "the footer columns on every page")
 check(squash("RECHTEÜBERTRAGUNG") in squash(all_t) and squash("AUFTRAGSERTEILUNG") in squash(all_t), "section headings (umlauts in the bold font)")
-check(squash("POS.LEISTUNGMENGEPREISMWST.GESAMT") in squash(T[0]), "the table head on page 1")
+# 2.114.5 (#2300): every position carries 19 % -> no VAT column
+check(squash("POS.LEISTUNGMENGEPREISGESAMT") in squash(T[0]), "the table head on page 1 (one rate: no VAT column)")
 check("3750" not in all_t and "16630" not in all_t and "16.630" not in all_t, "internal costs / margin are never printed")
 check(not has_image(r.pages[0]) and "Studio Nordlicht GmbH" in T[0].split("\n")[0], "without a logo: the company name in the letterhead, no image")
 check(r.metadata.title == "Kostenvoranschlag KVA-2026-031" and r.metadata.author == "Studio Nordlicht GmbH", f"document info: {r.metadata}")
@@ -183,7 +184,7 @@ for i, t in enumerate(T40):
         check(t.lstrip().startswith("Studio Nordlicht GmbH") or "Kostenvoranschlag KVA-2026-031" in t.split("\n")[0] + t.split("\n")[1],
               f"page {i + 1}: the small head with title and number")
         if re.search(r"^\d+ Zusatzleistung|^\d+ [A-ZÄÖÜ]", t, re.M) and i < n40 - 1:  # 2.114.1 (#2258): the last page is the rights appendix
-            check(squash("POS.LEISTUNGMENGEPREISMWST.GESAMT") in squash(t), f"page {i + 1}: the table head is repeated")
+            check(squash("POS.LEISTUNGMENGEPREISGESAMT") in squash(t), f"page {i + 1}: the table head is repeated")  # 2.114.5 (#2300)
     # a category heading (upper case line of a category) is never the last line before the footer
     body_lines = [x for x in t.split("\n") if x.strip()]
     foot_at = next((k for k, x in enumerate(body_lines) if x.startswith("Studio Nordlicht GmbH") and k > 2), len(body_lines))
@@ -244,7 +245,7 @@ for want in ("QUOTATION", "Quotation No.", "Valid until", "Net Total", "includin
     check(squash(want) in squash(all_en), f"EN: text layer has {want!r}")
 # 2.114.4 (#2282): the page count only from two pages on
 check((squash("Page 1 of " + str(len(ren.pages))) in squash(Ten[0])) == (len(ren.pages) >= 2), "EN: 'Page 1 of n' (from two pages on)")
-check(squash("NO.TITLEXUNITPRICEVATTOTAL") in squash(Ten[0]), "EN: the pack's column labels")
+check(squash("NO.TITLEXUNITPRICETOTAL") in squash(Ten[0]), "EN: the pack's column labels")  # 2.114.5 (#2300): one rate, no VAT column
 dinc = office_pdf(fixture(raw="included"))
 _, Tinc = texts(dinc)
 check("Bereitstellung der Rohdaten" in "\n".join(Tinc) and "ohne Rohdaten" in "\n".join(Tinc) and "Optional" not in "\n".join(Tinc),

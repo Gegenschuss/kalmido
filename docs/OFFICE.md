@@ -152,7 +152,7 @@ office tab without one appears at the end of its group (`OFC_TABS` field 5, else
 ## Number scheme
 
 Placeholders: `{yyyy}` `{yy}` year, `{seq}` or `{seq:03}` the counter (zero-padded to the given width), `{project}`,
-`{client}`, `{date}` (`yyyymmdd`), `{initials}`. Default `KVA-{yyyy}-{seq:03}` -> `KVA-2026-001`. The counter runs per
+`{client}`, `{date}` (`yyyymmdd`), `{initials}`, `{version}` (quotations, see below). Default `KVA-{yyyy}-{seq:03}` -> `KVA-2026-001`. The counter runs per
 organisation, document kind and period: with `{yyyy}` / `{yy}` in the scheme it starts again every year, without it
 never. A number is reserved once and never reused.
 
@@ -161,6 +161,20 @@ organisation can switch this to "when it is finalised" (settings key `offer_numb
 draft carries no number ("Draft") and the number is assigned in the moment the document is finalised, so deleted
 drafts leave no gaps. Later document kinds (invoices) are always numbered when they are finalised. Numbers are unique per
 organisation.
+
+**Quotation counter per client or project** (settings key `offer_counter`: `org` (default) | `client` | `project`):
+per client each client counts on its own (a quotation without a client by its recipient's name), per project each
+project (its list, else its project title); with a year in the scheme each one starts again at 1 every year. A new
+client / project counter continues from the highest running number its existing quotations carry under today's scheme;
+existing numbers stay as they are. A quotation counted this way gets its number once its client / project is set (at the
+latest when it is finalised, then from the organisation's counter). Invoices, credit notes and reminders always keep
+one gapless counter per organisation.
+
+**`{version}`** (quotation schemes only; invoice, credit note and reminder schemes refuse it): the first quotation is 1,
+each duplicate in its chain of versions the next number. A duplicate keeps the running number of the first quotation
+and does not move the counter: `KV-{client}-{yyyy}-{seq:02}-V{version}` gives `KV-ACME-2026-03-V1`, then
+`KV-ACME-2026-03-V2`. When the first quotation's number does not follow today's scheme, the duplicate takes the next
+number with its version.
 
 ## Country packs
 
@@ -1264,10 +1278,15 @@ Layout (DIN 5008 form B, the usual German business letter):
 - Totals block: net total, "including raw data" (raw data optional) or "excluding raw data" (raw data included via a
   framework contract), the VAT note of the pack (quotations show the note, not the tax lines), the exchange rate note
   for USD, the validity note.
-- The raw data option in its own dashed box below the totals, the transfer of rights as its own section (duration,
+- The raw data option as three rows of the totals (since 2.114.5: net total, "+ Optional: <name>", net total with the
+  option), the transfer of rights as its own section (duration,
   territory, media, exceptions, exclusivity, note), closing text, greeting with the signer's name, an order confirmation
   area (place / date, signature) and a footer in up to four columns (company, contact, registration, bank; empty
-  columns are left out). Since 2.114.4 the order confirmation area can be switched off: the office setting `accept_on`
+  columns are left out; since 2.114.5 at most three lines each: the address on one line, the two shortest lines of a
+  column joined with " · ", the font shrinks a little before a line breaks). Since 2.114.5 page 1 is tighter: one VAT
+  rate in all positions -> no VAT column (the note names that rate), no validity sentence below the table (the head has
+  "Valid until"), a smaller logo, a closer greeting; with a rights appendix or printed parts the order confirmation
+  area stands at the very end (behind the appendix) and page 1 says "Order confirmation by signature on page n". Since 2.114.4 the order confirmation area can be switched off: the office setting `accept_on`
   (default on) and per quotation `accept_on` (empty = like the setting, 1 = on, 0 = off, "Order confirmation with
   signature line" in the texts section of the editor); a finalised quotation keeps the value it was finalised with. The company colour is the only accent (rules, title underline, category headings).
 - Page breaks: following pages carry a small head (logo, title, number, recipient) and repeat the table head; from

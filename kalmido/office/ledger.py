@@ -254,7 +254,7 @@ def ofx_company_print(fields, free, lang="de", pack=None):
     if f.get("country") and f["country"] != home and addr:
         addr.append(f["country"])
     from .pdf import pdf_phone  # 2.114.4 A (#2272): grouped for print, the stored value stays
-    contact = [x for x in (f"{W['phone']} {pdf_phone(f['phone'])}" if f.get("phone") else "", f"{W['email']} {f['email']}" if f.get("email") else "") if x]
+    contact = [x for x in (f"{W['phone']} {pdf_phone(f['phone'])}" if f.get("phone") else "", f"{W['email']}: {f['email']}" if f.get("email") else "") if x]  # 2.114.5 (#2300): "E-Mail:"
     reg = []
     if f.get("register_court") or f.get("register_no"):
         reg.append(" ".join(x for x in (W["register"] + ":" if f.get("register_court") else "", f.get("register_court"), f.get("register_no")) if x))

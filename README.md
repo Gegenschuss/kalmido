@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.118.0** (2026-10-19): quotation numbers per client or project (e.g. KV-ACME-2026-03) and a `{version}` block
+  for duplicates (KV-ACME-2026-03-V2); one switch for the progress line and rings in the sidebar.
 - **2.117.0** (2026-10-19): travel costs filtered by person and with own purposes, a row menu per trip, the "To"
   calendar starts at the start date; seven document samples, PDFs attached to framework contracts, a compact chat filter on phones.
 - **2.99.0** (2026-10-19): files on knowledge pages (PDFs, pictures) and a ZIP import that keeps them, one "…" menu on
@@ -27,6 +29,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   a name addition for clients and a company name on up to three lines, 44 px fields in the document editor, aligned chat icons.
 - **2.102.0** (2026-10-19): a trash for deleted lists (organisation lists in the organisation's trash, 30 days),
   questionnaire links per client, calmer news counts, the send hint in chats, background work once per instance.
+- **2.114.5** (2026-10-19): office fixes 5 - page 1 of the quotation PDF tightened (order confirmation at the end with
+  a page line, no VAT column with one rate, the option as total rows, a three-line footer).
 - **2.114.4** (2026-10-19): office fixes 4 - a calmer quotation PDF (footer without breaks, page number only from
   two pages, only the VAT rates that occur), the order confirmation optional, documents with PDF preview and the same
   footer, travel costs with the per diem as the main amount.
