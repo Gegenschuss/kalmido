@@ -278,6 +278,8 @@ check(A.post(B + f"/api/evcals/{CAL}/feed", json=["create"]).status_code == 400,
 ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "calendar"], "username": "evhelper", "display_name": "Ev Helper"}).json()
 A.put(B + f"/api/evcals/{CAL}/members", json={"user_id": ag["id"], "role": "edit"})
 AH = {"Authorization": "Bearer " + ag["token"]}
+dbx("INSERT INTO user_settings(user_id,key,value) VALUES(?,'features',?) ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value",
+    (ag["id"], FEAT))  # the agent's own module switches: events on
 r = requests.post(B + "/api/v1/events", headers=AH, json={"cal_id": CAL, "title": "Agent", "start": f"{D}T07:00", "end": f"{D}T07:30",
                                                          "attendees": [{"email": "agent-ext@example.com"}], "send_invites": True})
 check(r.status_code == 403, f"an agent with send_invites: 403 ({r.status_code} {r.text[:150]})")
