@@ -377,3 +377,7 @@ button.jcdh{cursor:pointer}
 @media (pointer:coarse){ .jcdseg button{min-height:2.75rem} }
 @media (max-width:40rem){ .jcdseg{display:none} .jcdsel{display:block} }
 @media (prefers-reduced-motion:reduce){ .jcdt .i{transition:none} }
+/* 2.102.0 B (#2204): the key hint next to the send button (the team chat and the agent / job chat) */
+.chcomp .chkh{flex:none;align-self:center;font-size:var(--fs-s);white-space:nowrap}
+.chcomp .chkh:empty{display:none}
+@media (max-width:40rem){.chcomp .chkh{display:none}}

@@ -25,12 +25,14 @@ addresses and paths to your setup.
 - [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom)
 - [Server hardening](#server-hardening)
 - [Intrusion alerts](#intrusion-alerts)
+- [Errors in the browser (2.102)](#errors-in-the-browser-2102)
 - [Mail](#mail)
 - [Virus scan of uploads](#virus-scan-of-uploads)
 - [Documents: text recognition](#documents-text-recognition)
   - [Import from Paperless-ngx (2.48)](#import-from-paperless-ngx-248)
 - [Related tasks: the embedding service (2.59)](#related-tasks-the-embedding-service-259)
 - [Several servers in one app (2.73)](#several-servers-in-one-app-273)
+- [Capacity, health and a worker process (2.102)](#capacity-health-and-a-worker-process-2102)
 - [Moving to a new server](#moving-to-a-new-server)
 - [Production updates](#production-updates)
 - [Support Kalmido (supporter licence)](#support-kalmido-supporter-licence)
@@ -262,7 +264,9 @@ version: [Upgrade to 2.37](#upgrade-to-237-postgresql-required).
 - **Extensions need the database owner.** `init_db` creates `unaccent` and `pg_trgm` (both trusted extensions in the
   official image). With an external server, the user in `DATABASE_URL` must own the database, or create them once yourself.
 - **Connections.** Kalmido keeps up to 56 connections (`KALMIDO_DB_POOL_MAX`); `max_connections` of the server must be
-  higher (the default 100 is enough for one instance).
+  higher (the default 100 is enough for one instance). Since 2.102 the pool follows the web threads (`KALMIDO_THREADS`,
+  see [Capacity, health and a worker process](#capacity-health-and-a-worker-process-2102)), and the start warns in the log
+  when the containers could open more connections than the server allows.
 - **Timeouts.** A statement may run 30 s (`KALMIDO_DB_STATEMENT_TIMEOUT`, seconds, `0` = no limit; raise it for very
   large instances, for example when deleting a user with many tasks or opening office numbers over many years), a
   transaction may idle 5 minutes. At the start Kalmido waits up to 60 s for the database (`KALMIDO_DB_WAIT`).
@@ -814,7 +818,24 @@ or a push service, not only to the server itself:
 
 Trigger every alert once on purpose after setting it up, the dead man's switch too.
 
-## Mail
+## Errors in the browser (2.102)
+
+An unexpected error in the web app (an unhandled script error or a rejected promise) can become a bug ticket, so it
+does not vanish in a browser console nobody opens. Off until an admin picks a list: *Settings > Administration > Server >
+Errors in the browser > Report to* offers the project lists the admin manages that have **error reports** switched on
+(list dialog > Repository > Error reports). Switching error reports off in that list, or choosing *Off*, stops it at once;
+the browsers then send nothing.
+
+- **What is sent:** the error message, the place in the code (`/static/js/file.js:line:column`), a short stack of such
+  places (at most 2 KB), the client's and the server's version, the name of the open area (`tasks`, `office`, ...) and
+  whether it was an error or a rejected promise. The server cuts the message once more: quoted texts that are no plain
+  names, e-mail addresses, links and long numbers or ids become placeholders. No task texts, form values, user names or
+  addresses with ids; the ticket is created by nobody.
+- **Who may send:** people signed in (no agents, no public pages), at most 5 reports per person and minute and 60 per
+  hour, at most 20 per page load, the same error once per page load. The list's own limits apply as for every error
+  report: the same error again only counts up at its open ticket, at most 30 new tickets per hour.
+- **Reports from every workspace** of the server go into this one list, without any person's name. Pick a list only the
+  people who look after the server see.
 
 - **Give *Tasks by e-mail* its own mailbox.** Kalmido marks every mail it reads as read and imports it as a task; a
   mailbox you also use yourself gets mixed up.
@@ -1163,6 +1184,79 @@ Nothing is copied or synced: every task stays on its server, and the app asks th
 - A server that does not answer shows one quiet line ("Work not reachable – last update 10:42") instead of error messages; a
   change on it is never queued offline, it is either done or reported.
 - Agents only ever see the server they are connected to.
+
+## Capacity, health and a worker process (2.102)
+
+One container serves the web app **and** runs the background work (reminders and pushes, calendar and contact sync,
+backups, webhooks, mail in, repositories, text recognition, the Paperless import). That stays the default. For bigger
+instances the numbers can be set and the work can be split:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `KALMIDO_THREADS` | `16` | request threads of the web server |
+| `KALMIDO_DB_POOL_MAX` | threads x 3 + 8 (= 56) | database connections per container (`KALMIDO_POOL_MAX` works too) |
+| `KALMIDO_REPLICAS` | `1` | how many Kalmido containers share the database: only for the start-up check of `max_connections` |
+| `KALMIDO_ROLE` | `all` | `all` = web + background work, `web` = requests only, `worker` = background work only |
+| `KALMIDO_LOOP_LOCKS` | `1` | `0` = every container runs its background loops (the behaviour before 2.102; only for diagnosis) |
+
+- **Start-up check.** When `KALMIDO_REPLICAS` x (pool + 6) is above `max_connections` minus a reserve, the log says
+  `WARNING database connections: ...` with the numbers. Raise `max_connections` of the database or lower the pool.
+- **Loop locks need a direct database connection.** They are session-level advisory locks: behind a connection pooler in
+  transaction mode (for example pgbouncer `pool_mode = transaction`) they do not hold; point Kalmido at Postgres directly.
+- **A request that waits 30 s for a connection** is no longer silent: the log shows `WARNING database pool exhausted`
+  with the pool's counters (at most once a minute).
+- **Health numbers.** `GET /api/admin/health` (signed in as an admin of the server) answers with the version, the role,
+  the threads (configured, busy now, the peak, requests served), the pool (size, available, waiting, timeouts), the
+  connection budget and the state of every background loop (`running` here, `waiting` = another container runs it).
+  With a worker it also shows the worker's last heartbeat. It holds numbers only, no user data.
+- **Each background loop runs once per instance.** Every loop takes a lock of its own in the database before its rounds
+  (also in the role `all`). Two containers on one database therefore never send a reminder twice, deliver a webhook
+  twice or write two backups; the second one waits and takes over when the first one stops.
+
+### Example: a web container and a worker
+
+Split the work only when the web container is busy with imports or text recognition. Both containers use the same image,
+the same `.env`, the same database and the same `./data` and `./secret` folders (backups, attachments and the server key
+live there). Only the web container gets the port and the reverse proxy:
+
+```yaml
+services:
+  kalmido:                       # the web part (as before, plus the role)
+    # ... everything as in docker-compose.yml ...
+    environment:
+      KALMIDO_ROLE: web
+      KALMIDO_REPLICAS: "2"
+  kalmido-worker:
+    image: ${KALMIDO_IMAGE:-kalmido:local}
+    container_name: kalmido-worker
+    command: ["python", "app.py", "worker"]
+    restart: unless-stopped
+    user: "1000:1000"
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://kalmido:${POSTGRES_PASSWORD}@db:5432/kalmido}
+      KALMIDO_SECRET_FILE: ${KALMIDO_SECRET_FILE:-/secret/kalmido.key}
+      KALMIDO_CLAMD: ${KALMIDO_CLAMD-clamav:3310}
+      KALMIDO_REPLICAS: "2"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./data:/data
+      - ./secret:/secret
+    networks: [default, embed]
+    # no ports, no healthcheck on /api/health (no web server); the web's GET /api/admin/health shows its heartbeat
+```
+
+Notes:
+
+- The worker has no web server. Work that a request starts (the queues for text recognition, documents, Paperless and
+  related tasks) is stored in the database; the worker picks it up on its next round (seconds to a minute later).
+- A few short jobs still run in the web container: mails sent right after an action, exports and imports started by
+  a person, the manual *Back up now*.
+- Back to one container: remove `kalmido-worker` and `KALMIDO_ROLE`; nothing else changes.
 
 ## Moving to a new server
 

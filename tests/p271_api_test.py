@@ -215,7 +215,7 @@ check("ProjectOverview" in spec["components"]["schemas"], "OpenAPI: ProjectOverv
 
 # ================================================================== the list goes for good: its files go too
 A.patch(B + f"/api/lists/{P}", json={"archived": 1})
-check(A.delete(B + f"/api/lists/{P}").ok, "delete the archived project")
+check(A.delete(B + f"/api/lists/{P}").ok and A.delete(B + f"/api/trash/lists/{P}").ok, "delete the archived project")  # 2.102.0 (#1988): deleting moves the list into the list trash; the purge from there deletes for good
 left = subprocess.run(["docker", "exec", CT, "sh", "-c", f"ls /data/attachments/lists/{P}/ 2>/dev/null | wc -l"], capture_output=True, text=True).stdout.strip()
 check(left == "0", f"project files removed with the list: {left}")
 check(A.get(B + f"/api/list-files/{fp}").status_code == 404, "file id gone")

@@ -218,6 +218,9 @@ function newsText(it, U) {
       larchive: d.member ? tr('{0} archived the list {1} (list admin)', who, q(d.name || '')) : tr('{0} archived your list {1} (list admin)', who, q(d.name || '')),  // 2.40.0 (#1337): d.member
       lrestore: d.member ? tr('{0} restored the list {1} from the archive (list admin)', who, q(d.name || '')) : tr('{0} restored your list {1} from the archive (list admin)', who, q(d.name || '')),
       ldelete: tr('{0} deleted your list {1} for good (list admin). Its tasks are in the trash of your basket.', who, q(d.name || '')),
+      // 2.102.0 A (#1988): into the list trash (restorable there with everything)
+      trash: tr('{0} moved the list {1} to the trash (admin of {2})', who, q(d.name || ''), q(d.org || '')),
+      ltrash: tr('{0} moved your list {1} to the trash (list admin)', who, q(d.name || '')),
       lrename: tr('{0} renamed your list {1} to {2} (list admin)', who, q(d.old || ''), q(d.name || '')),  // 2.40.0 (#1431)
       owner: tr('{0} handed the list {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || '')),
       // 2.56.0 (#1795): an organisation admin renamed it / changed its icon or colour
@@ -275,7 +278,7 @@ function viewNews() {
   // 2.28.0 (#987): "For you" (people: mentions, assignments, replies, direct messages) | "Activity" (changes, agents) | All
   const tab = newsTab(), nMe = (mine0 || []).filter(it => !it.read && newsForMe(it) && newsInWs(it)).length + dmRows().reduce((a, r) => a + r.unread, 0), nAct = (mine0 || []).filter(it => !it.read && !newsForMe(it) && newsInWs(it)).length;
   if (teamOn() && S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.route.mod === 'news') renderView(); }); }
-  const tabs = `<div class="seg ntabs" role="tablist" aria-label="${esc(tr('News'))}">${[['all', 'bell', N_('All'), 0], ['me', 'at', N_('For you'), nMe], ['act', 'pulse', N_('Activity'), nAct]].map(([k, i, n, c]) => `<button type="button" role="tab" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}" data-act="news-tab" data-tab="${k}">${ic(i, 's')}<span>${tr(n)}</span>${c ? `<span class="c nunread">${c}</span>` : ''}</button>`).join('')}</div>`;
+  const tabs = `<div class="seg ntabs" role="tablist" aria-label="${esc(tr('News'))}">${[['all', 'bell', N_('All'), nMe + nAct], ['me', 'at', N_('For you'), nMe], ['act', 'pulse', N_('Activity'), nAct]].map(([k, i, n, c]) => `<button type="button" role="tab" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}" data-act="news-tab" data-tab="${k}">${ic(i, 's')}<span>${tr(n)}</span>${c ? `<span class="c nunread">${c}</span>` : ''}</button>`).join('')}</div>`;
   const inTab = it => newsInWs(it) && (tab === 'all' || (tab === 'me') === newsForMe(it));
   const bar = tabs + bar0 + fchips((mine0 || []).filter(it => (!S.nf.unread || !it.read || it.keep) && inTab(it)));
   if (S.nf.err && !S.nf.items) return bar + `<div class="empty">${S.nf.err === 'offline' ? tr('News are only available online.') : esc(S.nf.err)}</div>`;
@@ -449,7 +452,7 @@ function actText0(a, U) {
   const d = a.data || {}, who = `<b>${esc(viaName(d, a.user_id, U))}</b>`, q = x => `<b>${esc(x)}</b>`;
   const due = () => q((d.start && d.start < d.due ? fmtDayAbs(d.start) + ' – ' : '') + fmtDayAbs(d.due) + (d.time ? ', ' + d.time : ''));
   switch (a.kind) {
-    case 'created': if (d.report) return tr('Created from an error report ({0})', q(d.report === 'sentry' ? 'Sentry' : tr('webhook')));  // 2.18.0 (#408)
+    case 'created': if (d.report) return tr('Created from an error report ({0})', q(d.report === 'sentry' ? 'Sentry' : d.report === 'client' ? tr('Browser') : tr('webhook')));  // 2.18.0 (#408); 2.102.0 E (#1999): client
       if (d.sheet) return tr('{0} carried the task over from a table', who) + ` <a href="#sheets/${+d.sheet}">${esc(tr('Open table'))}</a>`;  // 2.89.0 (#1916, D): no table name (the list may be shared wider)
       return d.proposal ? tr('{0} created the task from a proposal by {1}', who, q(uname(d.agent, U))) : tr('{0} created the task', who);
     case 'proposal': return tr('{0} applied a proposal by {1}', who, q(uname(d.agent, U)));  // 2.3.0 (#262)
@@ -658,7 +661,7 @@ function cmComposer(t, top = false) {  // top: 2.4.2 (#386) newest first, the bo
   return `<div class="dcomp ${top ? 'dctop' : ''}">${replyBarHtml('c:' + t.id)}<div class="ccomp ${used ? 'used' : ''}"><textarea id="c-input" rows="1" name="kalmido-comment" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${soc ? tr('Write a comment… (@ mentions someone)') : tr('Write a comment…')}" aria-label="${tr('Comment')}">${esc(S.drafts[t.id] || '')}</textarea>
       <div class="mpick hidden"></div>
       <div class="cfiles" id="c-files">${composerFiles(t.id)}</div>
-      <div class="cbar"><label class="iconbtn" title="${tr('Attach files')}">${ic('clip', 's')}<input type="file" id="c-file" multiple hidden></label>${typeof rf_btnHtml === 'function' ? rf_btnHtml('c') : '' /* 2.53.0 (#1449) */}<span class="muted chint">${isMobile() ? '' : tr('Ctrl+Enter sends')}</span><span class="spacer"></span><span id="c-ptl">${typeof ptl_switchHtml === 'function' ? ptl_switchHtml(t) : '' /* 2.63.0 B (#1513) */}</span><button class="btn sm pri" data-act="c-send">${ic('send', 's')} ${tr('Send')}</button></div></div></div>`;
+      <div class="cbar"><label class="iconbtn" title="${tr('Attach files')}">${ic('clip', 's')}<input type="file" id="c-file" multiple hidden></label>${typeof rf_btnHtml === 'function' ? rf_btnHtml('c') : '' /* 2.53.0 (#1449) */}<span class="muted chint">${esc(chatKeyHintVis())}</span><span class="spacer"></span><span id="c-ptl">${typeof ptl_switchHtml === 'function' ? ptl_switchHtml(t) : '' /* 2.63.0 B (#1513) */}</span><button class="btn sm pri" data-act="c-send">${ic('send', 's')} ${tr('Send')}</button></div></div></div>`;
 }
 function drawTimeline() {
   if (S.tl.id !== S.sel) return;

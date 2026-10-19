@@ -1637,10 +1637,11 @@ function viewArchived() {
 function viewHistory() {
   const trash = S.route.key === 'trash';
   const arr = S.extra || [];
-  if (!arr.length) return `<div class="empty">${ic(trash ? 'trash' : 'done')}${trash ? tr('Trash is empty.') : tr('Nothing completed yet.')}</div>`;
+  const otr = trash ? otr_html() : '';  // 2.102.0 A (#1988): "Deleted lists" above the tasks
+  if (!arr.length) return otr + (otr ? '' : `<div class="empty">${ic(trash ? 'trash' : 'done')}${trash ? tr('Trash is empty.') : tr('Nothing completed yet.')}</div>`);
   if (trash) {  // 2.0.5: what "Empty" leaves behind (shared lists of other owners) is said up front and marked per row
     const kept = S.hist?.k === 'trash' && S.hist.kept != null ? S.hist.kept : arr.filter(t => t.keep).length;  // 2.40.0 (#1432): the whole trash
-    return (kept ? `<div class="shint trkeep">${ic('lock', 's')} ${esc(trn('{0} item stays when you empty the trash: it is in a list of another owner, only they can delete it for good.', '{0} items stay when you empty the trash: they are in lists of other owners, only they can delete them for good.', kept))}</div>` : '')
+    return otr + (kept ? `<div class="shint trkeep">${ic('lock', 's')} ${esc(trn('{0} item stays when you empty the trash: it is in a list of another owner, only they can delete it for good.', '{0} items stay when you empty the trash: they are in lists of other owners, only they can delete them for good.', kept))}</div>` : '')
       + (vl_begin(arr.length) ? vl_seg('trash', arr, t => taskRow(t, {trash: true, showList: true})) : arr.map(t => taskRow(t, {trash: true, showList: true})).join('')) + histMoreHtml();  // 2.65.0 (#1825)
   }
   const g = new Map();

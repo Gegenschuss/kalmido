@@ -54,7 +54,7 @@ def gf_own_conns(c, lid):
 
 
 def _owner_lists(c, owner, folder):
-    return [r for r in c.execute("SELECT id, name, folder, kind, archived, git_folder_off FROM lists WHERE owner_id=? AND is_inbox=0 ORDER BY sort, id",
+    return [r for r in c.execute("SELECT id, name, folder, kind, archived, git_folder_off FROM lists WHERE owner_id=? AND is_inbox=0 AND deleted_at IS NULL ORDER BY sort, id",
                                  (owner,)) if _under(r["folder"], folder)]
 
 

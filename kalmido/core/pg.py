@@ -27,7 +27,7 @@ import psycopg
 from psycopg import adapt, errors as pgerrors  # noqa: F401  (pgerrors: specific SQLSTATE classes for callers)
 from psycopg.pq import TransactionStatus
 from psycopg.types.string import TextLoader
-from psycopg_pool import ConnectionPool
+from psycopg_pool import ConnectionPool, PoolTimeout
 
 Error = psycopg.Error
 DatabaseError = psycopg.DatabaseError
@@ -410,8 +410,17 @@ def pool_refresh():
 
 # 2.37.0 (#1150): 16 waitress threads x up to 3 connections each (a request may borrow a second one, e.g. for a push) plus the
 # background threads. Postgres' max_connections must stay above this (its default 100 does). KALMIDO_DB_POOL_MAX overrides it.
+# 2.102.0 D (#1994): the threads come from KALMIDO_THREADS (default 16, as before) and the pool follows them: 3 per thread + 8 for
+# the background threads (16 -> 56, unchanged); KALMIDO_DB_POOL_MAX (or KALMIDO_POOL_MAX) still sets it explicitly.
+try:
+    WEB_THREADS = min(256, max(2, int(os.environ.get("KALMIDO_THREADS", "") or 16)))
+except ValueError:
+    print("warning: KALMIDO_THREADS is not a number; using 16", flush=True)
+    WEB_THREADS = 16
 POOL_MIN = 4
-POOL_MAX = max(POOL_MIN, int(os.environ.get("KALMIDO_DB_POOL_MAX", "") or 56))
+POOL_MAX = max(POOL_MIN, int(os.environ.get("KALMIDO_DB_POOL_MAX", "") or os.environ.get("KALMIDO_POOL_MAX", "") or WEB_THREADS * 3 + 8))
+POOL_WAIT_S = 30
+_POOL_TO = {"n": 0, "last": 0.0}  # 2.102.0 D (#1994): pool waits that ran out (the health check shows them, the log warns)
 # Every session: no statement runs longer than 30 s, no transaction idles longer than 5 min (a hung network call inside a
 # transaction would otherwise hold its snapshot and locks). init_db and the backup lift the statement limit for themselves.
 # 2.37.0 (review K2-4): KALMIDO_DB_STATEMENT_TIMEOUT overrides the 30 s (seconds; 0 = no limit) for big instances.
@@ -433,7 +442,7 @@ def pool(url):
         p = _POOL["p"]
         if p is None:
             # check: a cheap test of every borrowed connection, so a database restart costs no failed requests
-            p = ConnectionPool(url, min_size=POOL_MIN, max_size=POOL_MAX, timeout=30, open=False, configure=_configure,
+            p = ConnectionPool(url, min_size=POOL_MIN, max_size=POOL_MAX, timeout=POOL_WAIT_S, open=False, configure=_configure,
                                kwargs={**_new_conn_kwargs(), "context": _ctx_for_adapters()},
                                check=ConnectionPool.check_connection,
                                reset=lambda pg: pg.rollback() if pg.info.transaction_status != TransactionStatus.IDLE else None)
@@ -453,9 +462,38 @@ class _AdaptCtx:
 
 def connect_pooled(url):
     p = pool(url)
-    pg = p.getconn()
+    try:
+        pg = p.getconn()
+    except PoolTimeout:
+        pool_timeout_warn(p)
+        raise
     pg.row_factory = _row_factory
     return Conn(pg, release=p.putconn)
+
+
+def pool_timeout_warn(p):
+    """2.102.0 D (#1994): a request waited POOL_WAIT_S for a connection in vain -- no longer silent: a log line with the pool's
+    counters (at most one a minute; the health check counts every one)."""
+    _POOL_TO["n"] += 1
+    now = time.time()
+    if now - _POOL_TO["last"] < 60:
+        return
+    _POOL_TO["last"] = now
+    try:
+        st = p.get_stats()
+    except Exception:  # noqa: BLE001
+        st = {}
+    print(f"WARNING database pool exhausted: waited {POOL_WAIT_S} s for a connection ({_POOL_TO['n']} times so far); "
+          f"size {st.get('pool_size')}/{POOL_MAX}, available {st.get('pool_available')}, waiting {st.get('requests_waiting')}, "
+          f"threads {WEB_THREADS}. Raise KALMIDO_DB_POOL_MAX / KALMIDO_THREADS or look for slow requests.", flush=True)
+
+
+def pool_stats():
+    """2.102.0 D (#1994): the pool's counters (numbers only) for /api/admin/health."""
+    p = _POOL["p"]
+    st = dict(p.get_stats()) if p is not None else {}
+    return {"min": POOL_MIN, "max": POOL_MAX, "timeouts": _POOL_TO["n"],
+            **{k: v for k, v in st.items() if isinstance(v, (int, float))}}
 
 
 def connect_direct(url, timeout=10):

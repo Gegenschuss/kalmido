@@ -565,9 +565,18 @@ def list_delete(lid):
     # 1.5 (UX1): deleting for good only from the archive; "Delete" in the app archives (undoable) first
     if not r["archived"]:
         return err(tr("Archive the list first: only archived lists can be deleted for good"), 409)
+    from ..collab.liste2e import le2e_mode
+    if not le2e_mode(c, lid):  # 2.102.0 A (#1988): into the list trash with everything (lists/listtrash.py), restorable
+        from .listtrash import otr_trash
+        if role != "owner":
+            lm_owner_news(c, r, "ltrash", gone=True)
+        otr_trash(c, lid, me())
+        bump(c)
+        c.commit()
+        return jsonify(ok=True, trash=True)
     if role != "owner":  # 2.39.1 (#1188): the owner hears about a list admin's delete (the News kind of #1101)
         lm_owner_news(c, r, "ldelete", gone=True)
-    icon, lfiles = list_purge(c, lid, my_inbox(c, r["owner_id"]))  # the tasks go to the owner's trash, also when an admin deletes
+    icon, lfiles = list_purge(c, lid, my_inbox(c, r["owner_id"]))  # end-to-end lists: list_purge deletes for good
     bump(c)
     c.commit()
     list_icon_drop_file(lid, icon)

@@ -799,6 +799,7 @@ function settingsModal(focus) {
     try { await put(to); } catch { return; }
     setSaved(histAdd({label: tr('Changed setting: {0}', tr('Hours per day')), sett: true, undo: () => put(from), redo: () => put(to)}));
   });
+  md.addEventListener('change', e => { if (e.target.id === 's-cerlist') cer_setList(e.target); });  // 2.102.0 E (#1999)
   onRemove(md, () => { if (!md._noflush) flush(); });
   $('.snav', md).addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (b) { show(b.dataset.sec); if (md.classList.contains('sidx')) { idx(false); setTimeout(() => $('.spane:not(.hidden) h4, .spane:not(.hidden) button, .spane:not(.hidden) input', md)?.focus?.({preventScroll: true}), 0); } } });
   md.addEventListener('click', e => { if (e.target.closest('[data-m="s-index"]')) { idx(true); $('.snav [data-sec]', md)?.focus(); } });
@@ -1124,10 +1125,26 @@ function instanceHtml(chk, hint) {
     ${S.timeAll !== false ? `<h4 id="s-dayh-h">${tr('Time sums')}</h4>
     <div class="row"><label for="s-dayh">${tr('Hours per day')}</label><input id="s-dayh" inputmode="decimal" class="numin" value="${esc(fmtNum(a.time_day_h || S.timeDayH || 8, 2))}"><span class="muted">${tr('h per working day / shift')}</span></div>
     ${hint(tr('Project lists show their tracked time in hours and in days of this length. A list can set its own value (list dialog); it then applies to everyone in that list.'))}` : ''}
+    ${cer_html(a, hint)}
     ${a.cal_on || S.webhooks?.enabled ? `<details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary><h4 id="s-calhosts-h">${tr('Allowed internal hosts')}</h4>
     ${hint(tr('Calendar subscriptions and webhooks may only reach public addresses. List servers in your own network here (host or host:port, separated by commas), for example your own Nextcloud, Radicale or n8n; every user can then use them. Webhooks may use http:// only for these hosts.') + (a.cal_allow_env ? ' ' + esc(tr('Also allowed by the server configuration: {0}', a.cal_allow_env)) : ''))}
     <div class="row"><textarea id="s-calhosts" rows="2" spellcheck="false" autocapitalize="off" aria-labelledby="s-calhosts-h" placeholder="nextcloud.home.arpa, 10.0.0.20:5232">${esc(a.cal_allow_hosts || '')}</textarea></div>
     </details>` : ''}`;
+}
+// 2.102.0 E (#1999): the browser's own errors (static/js/clienterr.js) as bug tickets in one project list with error reports
+// on (list dialog > Repository); only lists the admin manages. "Off" = the browsers send nothing.
+function cer_html(a, hint) {
+  const ls = a.client_errors_lists || [], cur = a.client_errors_list || 0;
+  return `<h4 id="s-cer-h">${tr('Errors in the browser')}</h4>
+    ${hint(tr('An unexpected error in the app becomes a bug ticket in this list: only the message, the place in the code, the version and the open area; never texts of tasks or form values. The same error only counts up. For the choice a project list needs error reports switched on (list dialog > Repository).'))}
+    <div class="row"><label for="s-cerlist">${tr('Report to')}</label><select id="s-cerlist"><option value="0">${tr('Off')}</option>${ls.map(l => `<option value="${l.id}"${l.id === cur ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}</select></div>`;
+}
+async function cer_setList(el) {
+  const from = (S.about || {}).client_errors_list || 0, to = +el.value || 0;
+  if (to === from) return;
+  const put = async v => { const j = await api('PATCH', '/api/admin/settings', {client_errors_list: v || null}); S.about = {...S.about, ...j}; const f = $('#s-cerlist'); if (f) f.value = String(j.client_errors_list || 0); return {skipped: []}; };
+  try { await put(to); } catch { el.value = String(from); return; }
+  setSaved(histAdd({label: tr('Changed setting: {0}', tr('Errors in the browser')), sett: true, undo: () => put(from), redo: () => put(to)}));
 }
 // Settings > Users > Whole server > Admin alerts: operational warnings to the admins via ntfy (server side, own
 // "Save"; loaded when the pane opens). Recent alerts below, with "Clear".

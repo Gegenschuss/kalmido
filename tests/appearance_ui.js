@@ -76,7 +76,9 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
 
   // ---- UI
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
-  let w = await boot({user: 'alice'}), d = w.document;
+  // 2.102.0: the first window right after this suite's own container start loads its 136 start scripts in ~4 s on the
+  // test VM (cold server), more than boot()'s default 2.5 s
+  let w = await boot({user: 'alice', wait: 6000}), d = w.document;
   const de = d.documentElement.dataset;
   check(de.fsize === 'm' && de.font === 'geist' && de.accent === 'violet' && de.theme === 'auto' && de.density === 'compact', 'defaults: normal size, Geist, violet (2.11.0), automatic, compact');
   check(w.eval('uiZ()') === 1 && w.eval('weekH()') === 44, 'default scale 1 (week grid 44 px per hour)');

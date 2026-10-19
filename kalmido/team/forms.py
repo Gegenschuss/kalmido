@@ -337,6 +337,10 @@ def _page(c, f, token, lg, vals=None, error="", qvals=None, cur=None):
         elif f["ask_email"]:
             fields.append(f'<label for="ff-email">{e(t("Your e-mail (for questions)"))}</label><input id="ff-email" name="email" type="email" autocomplete="email" maxlength="200" value="{e(v.get("email", ""))}">')
         fields.append(f'<input type="hidden" name="stamp" value="{e(frm_stamp(c, f["id"]))}">')
+    from .formq import fq_ck_in
+    ck = fq_ck_in()  # 2.102.0 C (#2201): the client link goes along unchecked (the same page for a right or a wrong one)
+    if ck:
+        fields.append(f'<input type="hidden" name="ck" value="{e(ck)}">')
     if f["files"]:  # 2.63.0 (#1513): one file (a screenshot, a log)
         fields.append(f'<label for="ff-file">{e(tr("Attachment (optional, at most {0} MB)", FRM_FILE_MAX // (1024 * 1024), lg=lg))}</label><input id="ff-file" name="file" type="file">')
     hp = '<div class="hp" aria-hidden="true"><label for="ff-web">Website</label><input id="ff-web" name="website" tabindex="-1" autocomplete="off"></div>'
@@ -385,7 +389,7 @@ def form_send(token):
     bad = _may_use(c, f)
     if bad:
         return bad
-    from .formq import FqRefused, fq_client, fq_entry_save, fq_file_count, fq_list, fq_markdown, fq_read, fq_text_of, fq_vals
+    from .formq import FqRefused, fq_ck_client, fq_ck_in, fq_client, fq_entry_save, fq_file_count, fq_list, fq_markdown, fq_read, fq_text_of, fq_vals
     qs = fq_list(f)  # 2.98.0 B (#1954): a questionnaire (own questions instead of subject / description)
     if hit_limit("forms:" + rate_ip(), FORM_SEND_RATE) or hit_limit(f"formh:{f['id']}", FORM_SEND_HOUR, 3600):
         return _msg(tr("Too many requests", lg=lg), tr("Please wait a minute and try again.", lg=lg), lg, 429)
@@ -453,7 +457,10 @@ def form_send(token):
     from ..collab.liste2eguard import LE2B_OFF_MSG, le2b_list_locked
     if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): a form cannot write plain texts into a list with the lock
         return again(tr(LE2B_OFF_MSG, lg=lg))
-    cid, cnote = fq_client(c, f, email, name, olg) if f["client_match"] else (None, "")  # 2.98.0 B (#1954): only the list's space
+    # 2.102.0 C (#2201): a valid client link first (also without the e-mail matching), else as before
+    cid, cnote = fq_ck_client(c, f, fq_ck_in())
+    if not cid:
+        cid, cnote = fq_client(c, f, email, name, olg) if f["client_match"] else (None, "")  # 2.98.0 B (#1954): only the list's space
     if cnote:
         content += "\n\n" + cnote
     srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
@@ -493,8 +500,9 @@ def form_send(token):
         threading.Thread(target=frm_mail, args=(email, *frm_mail_text(f["title"], subject, status_url, lg)), daemon=True).start()
     if status_url:
         return frm_thanks(token, status_url, email if mailed else "", lg)
+    ck = fq_ck_in()  # 2.102.0 C (#2201): "Send another one" keeps the client link
     return _msg(tr("Thank you!", lg=lg), tr("Your request has been sent.", lg=lg), lg, 200,
-                (f"/f/{token}", tr("Send another one", lg=lg)))
+                (f"/f/{token}" + (f"?k={ck}" if ck else ""), tr("Send another one", lg=lg)))
 
 
 # ---- 2.63.0 (#1513): the thank-you page with the status link and the one confirmation mail

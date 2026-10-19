@@ -376,8 +376,15 @@ def ev_sig(c, uid):
     ids = my_cal_ids(c, uid)
     q = ",".join("?" * len(ids)) or "NULL"
     a = c.execute(f"SELECT COUNT(*), MAX(changed_at) FROM ev_cals WHERE id IN ({q})", list(ids)).fetchone()
-    b = c.execute("SELECT COUNT(*), MAX(e.updated_at) FROM events e JOIN event_attendees x ON x.event_id=e.id WHERE x.user_id=?", (uid,)).fetchone()
-    return f"{a[0]}.{a[1] or ''}.{b[0]}.{b[1] or ''}"
+    # 2.102.0 A (#2003): only invitations that still count (ev_att_ok, same join as ev_range) -- a former org member's
+    # signature no longer moves with that org's events
+    from ..events.model import ev_att_ok
+    rows = c.execute("SELECT k.org_id, COUNT(*), MAX(e.updated_at) FROM events e JOIN event_attendees x ON x.event_id=e.id "
+                     "JOIN ev_cals k ON k.id=e.cal_id WHERE x.user_id=? GROUP BY k.org_id", (uid,)).fetchall()
+    ok = [r for r in rows if ev_att_ok(c, uid, r[0])]
+    b = (sum(r[1] for r in ok), max((r[2] for r in ok if r[2]), default=None))
+    # 2.102.0 A (#2006): the count of invitations comes first ("<n>|..."): calEvOn shows the calendar from it alone
+    return f"{b[0]}|{a[0]}.{a[1] or ''}.{b[1] or ''}"
 
 
 def ev_links(c, uid, task_ids):

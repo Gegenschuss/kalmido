@@ -81,6 +81,7 @@ const i18nGet = k => I18N.dict[k] ?? I18N_EN[k];
 const LOCALE = () => i18nGet('_meta')?.locale || I18N.code;
 const i18nFmt = (s, a) => a.length ? s.replace(/\{(\d+)\}/g, (m, i) => a[i] ?? m) : s;
 const i18nKey = k => { const bar = k.indexOf('|'); return bar > 0 && !/[<>]/.test(k) ? k.slice(0, bar) : k; };
+/** @param {string} key @param {...any} a @returns {string} */  // 2.102.0 (#1995)
 function tr(key, ...a) {
   const v = I18N.dict[key];
   return i18nFmt(typeof v === 'string' ? v : i18nKey(key), a);
@@ -92,10 +93,12 @@ function plOne(n) {
   if (n !== 0 || !I18N.code || I18N.code === 'en') return false;
   try { if (!I18N_PL || I18N_PL.c !== I18N.code) I18N_PL = {c: I18N.code, r: new Intl.PluralRules(LOCALE())}; return I18N_PL.r.select(0) === 'one'; } catch { return false; }
 }
+/** @param {string} one @param {string} other @param {number} n @param {...any} a @returns {string} */
 function trn(one, other, n, ...a) {
   const v = I18N.dict[one], i = Array.isArray(v) && plOne(n) ? 0 : n === 1 ? 0 : 1;
   return i18nFmt(Array.isArray(v) ? v[i] : i18nKey(i ? other : one), [n, ...a]);
 }
+/** @type {(s: string) => string} */
 const N_ = s => s;
 // weekday / month names of the active language (index like Date.getDay() / getMonth())
 const i18nArr = k => new Proxy(I18N_EN[k], {get: (_, p) => Reflect.get(i18nGet(k), p)});
