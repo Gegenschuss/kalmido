@@ -131,6 +131,12 @@ ROUTES = {
     "POST /api/office/undo/{}/{}": "office",
     # (2.111.0 spacer A)
     # 2.106.0 A (#2028): letters (p2106_a_api_test.py) - routes below this line
+    "GET /api/office/letters": "office", "POST /api/office/letters": "office", "GET /api/office/letters/recipients": "office",
+    "GET /api/office/letters/profile": "office", "PUT /api/office/letters/profile": "office",
+    "DELETE /api/office/letters/profile/image": "office", "GET /api/office/letters/{}": "office", "PATCH /api/office/letters/{}": "office",
+    "DELETE /api/office/letters/{}": "office", "POST /api/office/letters/{}/restore": "office", "GET /api/office/letters/{}/pdf": "office",
+    "POST /api/office/letters/{}/sent": "office", "POST /api/office/letters/{}/delivered": "office",
+    "DELETE /api/office/letters/{}/delivered": "office", "POST /api/office/letters/{}/template": "office",
     # 2.106.0 B (#2028): letter links (p2106_b_api_test.py) - routes below this line
     # 2.106.0 C (#2029 #2030): letter mail, text blocks (p2106_c_api_test.py) - routes below this line
     "GET /api/office/letters/mail-info": "office", "GET /api/office/letters/{}/mail-draft": "office", "POST /api/office/letters/{}/send-mail": "office",

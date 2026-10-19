@@ -160,7 +160,7 @@ r = A.post(B + TP, json={"starter": "confirmation", "lang": "en"})
 check(r.status_code == 201 and r.json()["name"] == "Order confirmation" and r.json()["sign"] == 0, "use sample: order confirmation in English (not signable)")
 TO = r.json()["id"]
 check(A.post(B + TP, json={"starter": "lease"}).status_code == 400, "an unknown sample: 400")
-check(A.post(B + TP, json={"kind": "letter", "name": "X", "body": "x"}).status_code == 400, "a bad kind: 400")
+check(A.post(B + TP, json={"kind": "poster", "name": "X", "body": "x"}).status_code == 400, "a bad kind: 400")  # 2.106.0 (#2028): letter is a kind now
 check(A.post(B + TP, json={"kind": "other", "name": "  ", "body": "x"}).status_code == 400, "an empty name: 400")
 BODY = ("# Vereinbarung {{client.name}}\n\nZwischen {{company.name}}, {{company.address}} und {{client.name}}, {{client.address}}.\n"
         "Ansprechpartner: {{client.contact}}\n\n## Projekt\n- Projekt: {{project.title}}\n- Angebot {{offer.number}} vom {{offer.date}} über {{offer.total}}\n\n"
@@ -177,7 +177,7 @@ check(A.delete(B + f"{TP}/{TT}").ok and TT not in [t["id"] for t in A.get(B + TP
 check(TT in [t["id"] for t in A.get(B + TP + "?archived=1").json()["templates"]], "archived templates on request")
 check(A.post(B + f"{TP}/{TT}/restore").ok and TT in [t["id"] for t in A.get(B + TP).json()["templates"]], "restore (the undo)")
 j = A.get(B + TP).json()
-check(len(j["vars"]) == 10 and j["vars"][0]["key"] == "client.name" and {k["key"] for k in j["kinds"]} == {"contract", "confirmation", "nda", "other"},
+check(len(j["vars"]) == 10 and j["vars"][0]["key"] == "client.name" and {k["key"] for k in j["kinds"]} == {"contract", "confirmation", "nda", "other", "letter"},  # 2.106.0 (#2028): kind letter
       "the variables and kinds")
 check(Ca.get(B + TP).json()["templates"] == [], "another organisation: its own empty templates")
 
