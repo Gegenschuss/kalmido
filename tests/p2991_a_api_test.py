@@ -251,9 +251,11 @@ csp = pg.headers.get("Content-Security-Policy", "")
 check(pg.status_code == 200 and "frame-src https://player.vimeo.com https://www.youtube-nocookie.com" in csp and "script-src 'self'" in csp
       and "default-src 'none'" in csp and "frame-ancestors 'none'" in csp, f"the page's own CSP {csp}")
 check('src="https://www.youtube-nocookie.com/embed/AbCdEfGhI_9?enablejsapi=1&amp;rel=0&amp;playsinline=1&amp;origin=' in pg.text
-      and 'referrerpolicy="strict-origin-when-cross-origin"' in pg.text and '<script src="/static/pubvideo.js" defer></script>' in pg.text,
+      and 'referrerpolicy="strict-origin-when-cross-origin"' in pg.text and '<script src="/static/js/pubvideo.js" defer></script>' in pg.text,
       "the player of the newest version, no script of the provider")
 check("Ton zu leise" not in pg.text, "the team's internal comment is not on the customer page")
+js = anon("/static/js/pubvideo.js")
+check(js.status_code == 200 and "postMessage" in js.text, "the customer page's script is served from the app itself")
 fk, vk = keys(pg.text)
 check(len(fk) == 2 and fk[0] != fk[1] and vk, "a form check value for comments and one for the decision")
 CF, DF, VV = fk[0], fk[1], vk[0]
