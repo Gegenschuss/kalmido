@@ -293,5 +293,12 @@ r = Do.post(B + f"{LT}/doc/{DD}/deadline-task", json={})
 check(r.status_code == 201 and r.json()["due"] == "2026-10-29", f"freelancer: deadline task ({r.text[:200]})")
 check(Do.get(B + f"{LT}/{LD}/thread").ok and Do.get(B + f"{LT}/{LD}/links").json()["docs_ws"] == "private", "freelancer: history + space of the picker")
 
+# ---- the nightly boundary check knows letter links across the boundary
+BC = "import json\nfrom kalmido.core.db import connect\nfrom kalmido.accounts.tenancy import boundary_check\nc = connect()\nprint(json.dumps(boundary_check(c)['kinds']))\nc.close()"
+check("letter_link" not in in_ct(BC), "boundary check: the links made here are fine")
+sql("INSERT INTO office_letter_links(org_id, letter_id, node_id, kind, created_at) VALUES(?,?,?,?,?)", (ORG, LB["id"], DC, "answers", "2026-10-19T00:00:00Z"), write=True)
+check(in_ct(BC).get("letter_link") == 1, "boundary check: a link to another organisation's document is counted")
+sql("DELETE FROM office_letter_links WHERE letter_id=? AND node_id=?", (LB["id"], DC), write=True)
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
