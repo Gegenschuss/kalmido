@@ -7,6 +7,16 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.122.4] - 2026-10-20
+
+Fixes: quotation PDF, storage quota, CSV exports, phone sizes, boundary check and edit rights of the instance admin, feeds, video sign-off, two clock-dependent tests.
+
+### Fixed
+- Quotation PDF lists "Exceptions" and "Exclusive" of the transfer of rights only once (#2261); the storage quota counts entertainment receipts and contract files (#2316); every CSV export guards text cells against formulas, also after a tab or line break (#2317).
+- Instance admin: the boundary check names objects and people only inside the own organisations, and a private connection no longer gives the right to edit members of another organisation (#1724); the same feed address is followed only once, also on a double tap or parallel import (#1906).
+- Video sign-off: protocols stay after a move between private and organisation and come back on undo, the customer page controls YouTube under any address, writing at an office client needs an office role, the customer's decision shows in the reader's language (#2215 #2217).
+- Phones: 44 px selects in office settings on iOS, the contact import notice lies under dialogs, larger touch targets in video sign-off and bookmarks, full-width bookmark fields, "Save" stays reachable above the keyboard (#2326 #2348 #2217 #2223); tests no longer depend on the time of day (#2218 #1910).
+
 ## [2.120.0] - 2026-10-19
 
 Office: progress and final invoices, cash discount, client portal with documents, delivery notes, DATEV input side, own letterhead.
