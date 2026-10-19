@@ -1325,6 +1325,8 @@ from a half read letterhead.
 - Finalising freezes the letterhead with the sender (a copy `lhs-<hash>.pdf`), so a finalised document looks the same
   later; documents finalised before stay as they were. The e-invoice XML inside a ZUGFeRD PDF and the PDF/A metadata
   stay as they are. Without a letterhead the PDF is exactly the one of before.
+- PDF/A: the letterhead's fonts are copied as they are. Export the letterhead with embedded fonts (the default of most
+  programs); a letterhead with fonts that are not embedded still prints, but the invoice is then no strict PDF/A file.
 - Organisation admins (and a person without organisation in the personal office) upload and change it; members see the
   state and the preview. The file is stored sealed like the documents below `<data>/office/<org_id>/`.
 
