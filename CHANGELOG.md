@@ -25,6 +25,22 @@ Quotation counter per client or project, one progress switch.
   all devices; the separate device switch for the rings is gone, a device that had it off hands that to the account
   once (#2297).
 
+## [2.114.5] - 2026-10-19
+
+Office fixes 5 (page 1 of the quotation PDF tightened).
+
+### Changed
+- Quotation PDF, page 1 takes more positions: with a rights appendix or printed parts the order confirmation (when on,
+  #2270) moves to the very end behind the appendix and page 1 says "Order confirmation by signature on page n"; switched
+  off, neither the block nor the line is printed. One VAT rate in all positions -> no VAT column; no validity sentence
+  below the table (the head has the date); the raw data option as three total rows (net, + option, net with option)
+  instead of the dashed box; smaller logo, closer greeting; footer columns at most three lines, "E-Mail:" with a colon (#2300).
+
+## [2.117.1] - 2026-10-19
+
+### Fixed
+- PDF metadata: the PDF module finds the version also when it is loaded on its own (#2262).
+
 ## [2.117.0] - 2026-10-19
 
 Travel costs, document samples, small fixes.

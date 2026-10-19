@@ -1240,10 +1240,15 @@ Layout (DIN 5008 form B, the usual German business letter):
 - Totals block: net total, "including raw data" (raw data optional) or "excluding raw data" (raw data included via a
   framework contract), the VAT note of the pack (quotations show the note, not the tax lines), the exchange rate note
   for USD, the validity note.
-- The raw data option in its own dashed box below the totals, the transfer of rights as its own section (duration,
+- The raw data option as three rows of the totals (since 2.114.5: net total, "+ Optional: <name>", net total with the
+  option), the transfer of rights as its own section (duration,
   territory, media, exceptions, exclusivity, note), closing text, greeting with the signer's name, an order confirmation
   area (place / date, signature) and a footer in up to four columns (company, contact, registration, bank; empty
-  columns are left out). Since 2.114.4 the order confirmation area can be switched off: the office setting `accept_on`
+  columns are left out; since 2.114.5 at most three lines each: the address on one line, the two shortest lines of a
+  column joined with " · ", the font shrinks a little before a line breaks). Since 2.114.5 page 1 is tighter: one VAT
+  rate in all positions -> no VAT column (the note names that rate), no validity sentence below the table (the head has
+  "Valid until"), a smaller logo, a closer greeting; with a rights appendix or printed parts the order confirmation
+  area stands at the very end (behind the appendix) and page 1 says "Order confirmation by signature on page n". Since 2.114.4 the order confirmation area can be switched off: the office setting `accept_on`
   (default on) and per quotation `accept_on` (empty = like the setting, 1 = on, 0 = off, "Order confirmation with
   signature line" in the texts section of the editor); a finalised quotation keeps the value it was finalised with. The company colour is the only accent (rules, title underline, category headings).
 - Page breaks: following pages carry a small head (logo, title, number, recipient) and repeat the table head; from
