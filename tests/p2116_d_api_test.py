@@ -97,7 +97,7 @@ check(j["due"] == tmr and j["due_time"] == "08:00", f"20:00 done -> 08:00 tomorr
 und = j.get("undo")
 check(bool(und), "complete returns an undo record")
 if und:
-    ru = A.post(B + f"/api/tasks/{T}/undo", json={"undo": und})
+    ru = A.post(B + f"/api/tasks/{T}/undo", json=und)
     check(ru.ok and get(T)["due"] == TODAY and get(T)["due_time"] == "20:00", f"undo takes the time back: {ru.text[:200]} {get(T)['due']} {get(T)['due_time']}")
 j = A.post(B + f"/api/tasks/{T}/skip", json={}).json()
 check(j["due"] == tmr and j["due_time"] == "08:00", f"skip after the last time -> first of tomorrow: {j.get('due')} {j.get('due_time')}")
@@ -112,11 +112,13 @@ A.post(B + f"/api/tasks/{C}/complete", json={})
 j = A.post(B + f"/api/tasks/{C}/complete", json={}).json()
 check(j["status"] == 2 and not j["repeat"], f"COUNT=2 ends after two ticks: {j['status']} {j['repeat']}")
 # refused
-for rule, why in (("FREQ=DAILY;TIMES=" + ",".join(f"{h:02d}00" for h in range(1, 14)), "13 times"), ("FREQ=DAILY;TIMES=0800,0800", "double"),
+for rule, why in (("FREQ=DAILY;TIMES=" + ",".join(f"{h:02d}00" for h in range(1, 14)), "13 times"), 
                   ("FREQ=WEEKLY;TIMES=0800", "weekly"), ("FREQ=DAILY;TIMES=2500", "hour 25"), ("FREQ=DAILY;TIMES=0860", "minute 60"),
                   ("FREQ=HOURLY", "hourly"), ("FREQ=DAILY;BYHOUR=8,13", "byhour"), ("FREQ=DAILY;TIMES=", "empty")):
     check(new(rule).status_code == 400, f"refused: {why}")
 check(new("FREQ=DAILY;TIMES=" + ",".join(f"{h:02d}00" for h in range(8, 20))).status_code in (200, 201), "12 times are fine")
+rd = new("FREQ=DAILY;TIMES=1300,0800,1300")
+check(rd.status_code in (200, 201) and rd.json()["repeat"] == "FREQ=DAILY;TIMES=0800,1300", f"doubles are dropped: {rd.text[:200]}")
 # ---------------------------------------------------------------- #2067 focus + habit stats over API v1
 Pr = token(A, ["read", "time", "tasks:write"])
 Pro = token(A, ["read"])
