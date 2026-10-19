@@ -77,7 +77,7 @@ const TXT = 'Versicherung Beispiel AG\nDatum: 05.10.2026\nUnser Zeichen: VB-2026
     check(await ready(ev, `location.hash === '#office/letters/new?answers=${NID}'`), 'answer: the new letter is opened ' + await ev('location.hash'));
     // ================= the letter side: the section of office_letterlinks.js (drawn into the page by hand)
     check(await ready(ev, `typeof ltkSection === 'function' && typeof LT_HOOKS === 'object' && LT_HOOKS.sections.includes(ltkSection)`, 80), 'letter: the section is in LT_HOOKS');
-    await ev(`(async () => { const d = await api('GET', '/api/office/letters/${L.id}'); const box = document.createElement('div'); box.id = 'ltk-probe'; document.querySelector('#view').prepend(box); box.innerHTML = ltkSection(d); return 1; })()`);
+    await ev(`(async () => { const d = await api('GET', '/api/office/letters/${L.id}'); const box = document.createElement('div'); box.id = 'ltk-probe'; box.style.cssText = 'position:fixed;inset:auto 0 0 0;z-index:9999;background:var(--bg);max-height:60vh;overflow:auto;padding:1rem'; document.body.append(box); box.innerHTML = ltkSection(d); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('#ltk-probe .ltk-list a[href="#docs/${NID}"]')`), 'letter: the reference document is listed');
     await ev(`(() => { const d = document.querySelector('#ltk-probe .ltk-th'); d.open = true; return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('#ltk-probe .ltk-tl li').length === 2`), 'letter: the history (document + letter)');

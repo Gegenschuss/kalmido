@@ -128,7 +128,7 @@ REFS = [
     ("Geschäftszeichen\nIII-4 / 2026-0815", [("theirs", "III-4 / 2026-0815")]),
 ]
 res = in_ct("import json\nfrom kalmido.office.letterlinks import ltl_deadline, ltl_refs\n"
-            f"C = {json.dumps(CASES)}\nR = {json.dumps([t for t, _ in REFS])}\n"
+            f"C = json.loads({json.dumps(json.dumps(CASES))})\nR = json.loads({json.dumps(json.dumps([t for t, _ in REFS]))})\n"
             "print(json.dumps({'dl': [(ltl_deadline(t, d) or {}).get('date') for t, d, _ in C], 'refs': [[(x['kind'], x['value']) for x in ltl_refs(t)] for t in R]}))")
 for (t, _d, want), got in zip(CASES, res["dl"]):
     check(got == want, f"deadline of {t!r}: {got} (want {want})")
