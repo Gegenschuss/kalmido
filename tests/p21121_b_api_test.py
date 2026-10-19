@@ -188,6 +188,10 @@ check(r.status_code == 200 and r.headers.get("Content-Type", "").startswith("app
 log = dbx("SELECT action, user_id, detail FROM fs_log WHERE node_id=? AND action LIKE 'ext_%' ORDER BY id", (FA,))
 check(("ext_download", None, "Kunde Nord") in [tuple(x) for x in log], "history: the download through the link (no person, the label) " + str(log))
 check(dbx("SELECT COUNT(*) FROM fs_log WHERE node_id=? AND action='ext_view'", (F,))[0][0] >= 1, "history: the view of the folder")
+# 2.112.1 (#2058, review): the label is for the owners; an editor sees the line without it
+clog = Ca.get(B + f"/api/files/nodes/{FA}").json().get("log", [])
+check(any(x["action"] == "ext_download" for x in clog) and all(not x["detail"] for x in clog if x["action"].startswith("ext_")),
+      "history: an editor sees no link label " + str([x for x in clog if x["action"].startswith("ext_")]))
 j = A.get(B + f"/api/files/nodes/{F}/ext-links").json()
 check(j["links"][0]["views"] >= 2 and j["links"][0]["last_seen_at"], "the link counts views + last opened")
 check(j["enabled"] is True and j["blocked"] is None, "list: enabled, nothing blocks")
@@ -195,7 +199,8 @@ items = A.get(B + "/api/files", params={"space": f"org:{ORG}"}).json()["items"]
 check(next(x for x in items if x["id"] == F).get("xl") is True and not next(x for x in items if x["id"] == OUT).get("xl"), "badge: the folder's row")
 bitems = Bo.get(B + "/api/files", params={"space": "shared"}).json().get("items", [])
 check(not any(x.get("xl") for x in bitems), "badge: only for who may share")
-check(Bo.post(B + f"/api/files/ext-links/{L1['id']}/regenerate").status_code == 403, "renew: view share 403")
+# 2.112.1 (#2058, review): no hint which link ids exist -> 404 instead of 403
+check(Bo.post(B + f"/api/files/ext-links/{L1['id']}/regenerate").status_code == 404, "renew: view share 404")
 check(Da.delete(B + f"/api/files/ext-links/{L1['id']}").status_code == 404, "revoke: another workspace 404")
 check(Da.post(B + f"/api/files/ext-links/{L1['id']}/restore").status_code == 404, "restore: another workspace 404")
 
@@ -352,6 +357,8 @@ if r.status_code == 404 and "Download all as ZIP" not in pub(FP).text:
 else:
     check(r.status_code == 200 and r.content[:2] == b"PK" and "attachment" in r.headers.get("Content-Disposition", ""), "ZIP of the folder")
     check(pub(f"{FP}/zip?p={OUT}").status_code == 404, "ZIP: nothing outside the tree")
+    # 2.112.1 (#2058, review): one history line for the ZIP (on the folder), not one per file
+    check(dbx("SELECT COUNT(*) FROM fs_log WHERE node_id=? AND action='ext_download'", (F,))[0][0] >= 1, "ZIP: history line on the folder")
 
 # ---- the boundary check, cascade, rollback
 check(not dbx("SELECT x.id FROM fs_ext_links x JOIN fs_nodes n ON n.id=x.node_id WHERE x.org_id IS DISTINCT FROM n.org_id"),

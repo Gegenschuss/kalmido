@@ -919,7 +919,9 @@ Uploads are then taken without a scan and without a mark. An own ClamAV elsewher
 **ZIP downloads of the file store (2.112.1).** Several chosen items or a folder are packed on the server into a temporary
 file (the system's temp folder, removed as soon as the download starts) and refused beforehand when they pass a limit:
 `KALMIDO_FILES_ZIP_MAX_MB` (default `1024`, the sum of the file sizes) and `KALMIDO_FILES_ZIP_MAX_FILES` (default `5000`).
-Keep enough free space in the temp folder for the largest ZIP you allow.
+Keep enough free space in the temp folder for the largest ZIP you allow. A folder ZIP through an external share link has
+lower limits of its own, `KALMIDO_EXT_ZIP_MAX_MB` (default `256`) and `KALMIDO_EXT_ZIP_MAX_FILES` (default `1000`), and is
+limited per link and per address; at most two ZIPs or phone scans are built at the same time per server process.
 
 **Photos turned by the camera** are turned upright and saved again when their metadata are removed (see TEAM.md). The
 re-encode holds the whole picture in memory, so it is done only up to `KALMIDO_PHOTO_MAX_PIXELS` pixels (2.81; default
