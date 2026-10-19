@@ -78,7 +78,7 @@ FID, F = freelancer(B, A)
 RIGHTS = {"de": {"time": "unbegrenzt", "territory": "weltweit", "media": "intern, web, unpaid media", "note": "Im Übrigen gelten unsere AGB."},
           "en": {"time": "in perpetuity", "territory": "worldwide", "media": "internal use, web", "note": "Otherwise, our terms apply."}}
 TXT = {"de": {"title": "RECHTEÜBERTRAGUNG", "see": "Rechteübertragung siehe Anhang", "sign": "Mit freundlichen Grüßen", "accept": "AUFTRAGSERTEILUNG"},
-       "en": {"title": "TRANSFEROFRIGHTS", "see": "Transfer of rights see appendix", "sign": "With best regards", "accept": "ORDERCONFIRMATION"}}
+       "en": {"title": "TRANSFEROFRIGHTS", "see": "Transfer of rights see appendix", "sign": "Kind regards", "accept": "ORDERCONFIRMATION"}}
 
 
 def scenario(S, who):

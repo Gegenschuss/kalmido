@@ -182,7 +182,7 @@ for i, t in enumerate(T40):
     if i > 0:
         check(t.lstrip().startswith("Studio Nordlicht GmbH") or "Kostenvoranschlag KVA-2026-031" in t.split("\n")[0] + t.split("\n")[1],
               f"page {i + 1}: the small head with title and number")
-        if re.search(r"^\d+ Zusatzleistung|^\d+ [A-ZÄÖÜ]", t, re.M):
+        if re.search(r"^\d+ Zusatzleistung|^\d+ [A-ZÄÖÜ]", t, re.M) and i < n40 - 1:  # 2.114.1 (#2258): the last page is the rights appendix
             check(squash("POS.LEISTUNGMENGEPREISMWST.GESAMT") in squash(t), f"page {i + 1}: the table head is repeated")
     # a category heading (upper case line of a category) is never the last line before the footer
     body_lines = [x for x in t.split("\n") if x.strip()]
