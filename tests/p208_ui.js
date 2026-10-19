@@ -226,11 +226,14 @@ async function swTests() {
   w.close();
 
   // ================= #331 #reply/<id>: the task opens with the comment box focused
-  w = await boot({user: 'alice', hash: 'reply/' + plan}); d = w.document; await sleep(800);
+  w = await boot({user: 'alice', hash: 'reply/' + plan}); d = w.document;
+  // 2.122.4 (#2218): wait for the condition, not a fixed time
+  for (let i = 0; i < 40 && d.activeElement?.id !== 'c-input'; i++) await sleep(150);
   check(w.eval('S.sel') === plan && d.activeElement?.id === 'c-input', 'desktop: #reply/<id> opens the task, the comment box has the focus');
   check(w.location.hash === '#all' || !/reply/.test(w.location.hash), 'the reply hash is replaced: ' + w.location.hash);
   w.close();
-  w = await boot({user: 'alice', mobile: true, hash: 'reply/' + plan}); d = w.document; await sleep(900);
+  w = await boot({user: 'alice', mobile: true, hash: 'reply/' + plan}); d = w.document;
+  for (let i = 0; i < 40 && d.activeElement?.id !== 'c-input'; i++) await sleep(150);
   check(w.eval('S.sel') === plan && d.activeElement?.id === 'c-input', 'phone: the same');
   w.close();
 
