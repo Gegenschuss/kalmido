@@ -55,7 +55,7 @@ const CASES = {
     ['Dentiste demain 15h rappelle-moi 30 min avant', {title: 'Dentiste', due: D(1), due_time: '15:00', reminders: '30'}],
     ['Facture rappelle-moi demain à 9h', {title: 'Facture', remind_at: `${D(1)} + 'T09:00'`}],
     ['Réunion pendant 2h', {title: 'Réunion', duration: 120}],
-    ['Réunion 15h', {title: 'Réunion', due_time: '15:00'}],  // a French "15h" is a time, never a duration
+    ['Réunion 15h', {title: 'Réunion', due: `('15:00' < nowHM() ? addDays(today(), 1) : today())`, due_time: '15:00'}],  // a French "15h" is a time, never a duration
   ],
 };
 const KEYS = ['title', 'due', 'due_time', 'assignee_id', 'assignee_group_id', 'duration', 'reminders', 'remind_at'];
