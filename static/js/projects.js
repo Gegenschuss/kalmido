@@ -583,7 +583,7 @@ function fieldModal(lid, f, done) {
 function fieldsBox(lid) {
   const fs = fieldsAll(lid);
   return fs.map((f, i) => `<div class="mrow" data-fid="${f.id}">${ic(FT_ICON[f.type] || 'edit', 's')}<span class="n">${esc(f.name)}</span><span class="muted">${esc(ftLabel(f.type))}</span>
-    <button class="iconbtn ${f.pinned ? 'on' : ''}" data-fpin="${f.id}" title="${tr('Show in the task rows')}">${ic('pin', 's')}</button>
+    <button class="iconbtn ${f.pinned ? 'on' : ''}" data-fpin="${f.id}" title="${tr('Show in the task rows')}" aria-pressed="${!!f.pinned}">${ic(f.pinned ? 'pinf' : 'pin', 's')}</button>
     <button class="iconbtn" data-fup="${f.id}" title="${tr('move up')}" ${i ? '' : 'disabled'}>${ic('chev', 's up')}</button>
     <button class="iconbtn" data-fedit="${f.id}" title="${tr('Edit')}">${ic('edit', 's')}</button></div>`).join('') +
     `<div class="mrow"><button class="btn sm" data-m="field-add">${ic('plus', 's')} ${tr('Field')}</button>${fs.length ? '' : hintOnce('fields', tr('Own columns for this list: budget, stage, client, …'))}</div>`;

@@ -297,6 +297,13 @@ ROUTES = {
     # 2.117.0 A (#2292): own purposes of trips, office admins (p2117_a_api_test.py)
     "GET /api/office/trips/purposes": "office", "POST /api/office/trips/purposes": "office", "PATCH /api/office/trips/purposes/{}": "office",
     "DELETE /api/office/trips/purposes/{}": "office",
+    "GET /api/office/meals": "office", "POST /api/office/meals": "office", "GET /api/office/meals/{}": "office",  # 2.119.0 A (#2288): entertainment receipts
+    "PATCH /api/office/meals/{}": "office", "DELETE /api/office/meals/{}": "office", "POST /api/office/meals/{}/restore": "office",
+    "POST /api/office/meals/{}/approve": "office", "POST /api/office/meals/{}/unlock": "office", "POST /api/office/meals/{}/file": "office",
+    "GET /api/office/meals/{}/file/{}": "office", "DELETE /api/office/meals/{}/file/{}": "office",
+    "POST /api/office/meals/{}/file/{}/restore": "office", "GET /api/office/meals/{}/pdf": "office", "GET /api/office/meals/report": "office",
+    "GET /api/office/meals/choices": "office", "POST /api/office/meals/choices": "office", "PATCH /api/office/meals/choices/{}": "office",
+    "DELETE /api/office/meals/choices/{}": "office",
     "POST /api/office/fixed-costs": "office", "PATCH /api/office/fixed-costs/{}": "office", "DELETE /api/office/fixed-costs/{}": "office",
     # 2.67.0 (#1838): the import of fixed costs, its template, the undo of an import, the monthly check task (office admins)
     "POST /api/office/fixed-costs/import/preview": "office", "POST /api/office/fixed-costs/import": "office", "GET /api/office/fixed-costs/import/template": "office",
