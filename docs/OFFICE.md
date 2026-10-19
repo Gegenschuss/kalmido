@@ -608,6 +608,11 @@ is billed net (the input tax stays yours), without a rate or in a small business
 is never billed twice, and Undo takes the positions back while the document is a draft. Agents may suggest amount, currency and VAT
 rate of a receipt as well; you change them in the suggestion card before you accept (Undo brings the old values back).
 
+**Accounts per category (2.121):** with the DATEV export set up, a receipt's sheet shows under the category the account of the
+chart SKR03 or SKR04 (Settings → DATEV) it is booked on - the default the export finds for the category (e.g. Software 4964 /
+6837), or your own. **Change account** sets your own account for this category (empty = the default again; one undo step); the
+DATEV batch and the lines of the income/expense statement use the same account.
+
 ## Bank reconciliation (2.90)
 
 The tab **Bank** (admins of the office area; in a personal office its owner) matches the bookings of your account with
