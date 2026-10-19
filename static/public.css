@@ -47,11 +47,14 @@ details.donegrp .n{font-family:var(--mono);font-weight:400}
 .pw button{background:var(--accent);color:var(--ink);border:0;border-radius:.375rem;padding:.5rem 1rem;font:inherit;font-weight:600;cursor:pointer}
 .err{color:var(--danger)}
 footer{max-width:40rem;margin:0 auto;padding:0 1rem 2rem;color:var(--muted);font-size:.75rem}
-/* 2.14.0: the heron on the error pages (lines in the text colour, the sun = the accent) and the way back */
-.heron{display:block;width:7.5rem;height:7.5rem;margin:0 auto 1rem;color:var(--text2)}
-.heron path{vector-effect:non-scaling-stroke}
-.heron .hr-eye{fill:currentColor;stroke:none}
-.heron .hr-sun{fill:var(--accent);stroke:none}
+/* 2.14.0: the figure on the error pages (2.136.0, #2193: the bot, like the app: dark plate + white body, light plate + dark
+   body in the light scheme, the eyes in the plate's colour, the antenna = the accent) and the way back */
+.bot{display:block;width:6.5rem;height:6.5rem;margin:0 auto 1rem;--b-plate:#18171D;--b-body:#ffffff}
+@media (prefers-color-scheme:light){.bot{--b-plate:#F1F0F5;--b-body:#2B2A31}}
+.bot .b-plate{fill:var(--b-plate)}
+.bot .b-body{fill:var(--b-body)}
+.bot .b-eyes path{stroke:var(--b-plate)}
+.bot .b-ant{stroke:var(--accent)}
 .msg .btn{display:inline-flex;align-items:center;min-height:2.75rem;padding:0 1.25rem;border-radius:.5rem;background:var(--accent);color:var(--ink);font-weight:600;text-decoration:none}
 .msg .btn:focus-visible{outline:2px solid var(--text);outline-offset:2px}
 /* 2.23.0 (#463): forms (/f/<token>): label + field per line, the honeypot hidden, the send button */

@@ -422,7 +422,7 @@ function renderSide() {
   const oldAcct = $('#side .sbacct');  // 2.47.0 (#1654): keep the account node (same <img>) when nothing about it changed
   $('#side').innerHTML = `
     <div class="sbfix">${'' /* 2.57.0 (#1798): the fixed head (brand, workspace, search, favourites) stays while the rest scrolls */}
-    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Start|home'))}" aria-label="${esc(APP_NAME + ': ' + tr('Start|home'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span class="sbtxt"><span>${esc(APP_NAME)}</span></span></button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${kbFoldAllBtn()}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}${netDotHtml()}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
+    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Start|home'))}" aria-label="${esc(APP_NAME + ': ' + tr('Start|home'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span class="sbtxt"><span>${wordSvg()}</span></span></button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${kbFoldAllBtn()}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}${netDotHtml()}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
     <div class="sbsrch">${'' /* 2.87.9 (#1933): search and workspace in one line */}<button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>${wsBarHtml()}</div>
     ${favSideHtml(lists, listRow, head)}</div>
     ${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('')}
@@ -1122,21 +1122,25 @@ function fieldCell(f, v, lid) {  // column view (desktop)
   if (f.type === 'url') return flkLink(v, 'lnk', esc(urlHost(v)), true);
   return `<span title="${esc(fieldText(f, v, lid))}">${esc(fieldText(f, v, lid))}</span>`;
 }
-// ---- 2.14.0: the heron (empty states, welcome, offline, errors). A line drawing in the text colour; its sun (the dot) is
-// the accent and follows theme and accent colour (CSS .heron .hr-sun); 2.16.0 (#447): standing / welcome / offline: a half sun on
-// the horizon (the dot above the beak read as a balanced stone). Decorative: hidden from screen readers, the text
-// next to it says what it means.
-const HERON = {
-  agent: ['0 0 120 120', '<circle class="hr-sun" cx="96" cy="97" r="3.4"/><g transform="translate(-14 0)"><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M70 62C66 52 62 44 64 36C66 30 72 29 75 33"/><path d="M75 33L92 41"/><circle class="hr-eye" cx="69" cy="34" r="1.8" /><path d="M60 76V106"/><path d="M60 88L52 84L57 79"/><path d="M42 108H78M50 113H70"/></g><path d="M86 106V96A10 10 0 0 1 106 96V106"/><path d="M96 86V81"/><path d="M111 90A6 6 0 0 1 111 100"/><path d="M82 108H112"/>'],
-  done: ['0 0 120 120', '<circle class="hr-sun" cx="95" cy="99" r="6.5"/><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M70 62C66 52 62 44 64 36C66 30 72 29 75 33"/><path d="M75 33L93 40"/><path d="M66.8 33.6Q69 35.4 71.2 33.6"/><path d="M60 76V106"/><path d="M60 88L52 84L57 79"/><path d="M42 108H104M50 113H70"/>'],
-  error: ['0 0 120 120', '<circle class="hr-sun" cx="77" cy="108" r="2.6"/><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M72 63C73 53 79 46 85 48C88 49 89 53 87 57"/><circle class="hr-eye" cx="84.5" cy="51.5" r="1.6" /><path d="M87.5 56L95 74"/><path d="M60 76V106"/><path d="M60 88L52 84L57 79"/><path d="M30 108H71M83 108L100 104.5M48 113H66"/>'],
-  empty: ['0 0 120 120', '<circle class="hr-sun" cx="92" cy="104" r="3.2"/><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M72 63C76 55 83 51 87 55C90 58 90 63 88 67"/><circle class="hr-eye" cx="86.2" cy="59.5" r="1.6" /><path d="M88.5 66L92 86"/><path d="M60 76V102"/><path d="M60 88L52 84L57 79"/><path d="M36 104H84M100 104H108M48 110H66"/><path d="M84 109Q92 112 100 109"/>'],
-  stand: ['0 0 120 120', '<path class="hr-sun" d="M89 108A9 9 0 0 1 107 108Z"/><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M70 62C66 52 62 44 64 36C66 30 72 29 75 33"/><path d="M75 33L94 38"/><circle class="hr-eye" cx="69" cy="34" r="1.8" /><path d="M60 76V106"/><path d="M60 88L52 84L57 79"/><path d="M42 108H112M50 113H70"/>'],
-  offline: ['0 0 120 120', '<path class="hr-sun dim" d="M89 108A9 9 0 0 1 107 108Z"/><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M72 63C75 56 71 50 65 51C60 52 59 57 62 60"/><path d="M64 54.5Q66 56 68 54.5"/><path d="M61 53L47 58"/><path d="M60 76V106"/><path d="M60 88L52 84L57 79"/><path d="M42 108H112M50 113H70"/>'],
-  welcome: ['0 0 120 120', '<path class="hr-sun" d="M89 108A9 9 0 0 1 107 108Z"/><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M46 61C40 52 40 42 47 35"/><path d="M52 60C48 53 48 47 52 42"/><path d="M70 62C66 52 62 44 64 36C66 30 72 29 75 33"/><path d="M75 33L94 38"/><circle class="hr-eye" cx="69" cy="34" r="1.8" /><path d="M60 76V106"/><path d="M60 88L52 84L57 79"/><path d="M42 108H112M50 113H70"/>'],
+// ---- 2.136.0 (#2193): the bot figure (empty states, search, done, agents, welcome, offline, errors) instead of the heron
+// of 2.14.0. The drawing of the design files (100 grid, the plate of the variants hell / dunkel): plate, body and eyes take
+// the theme's colours (CSS .bot), the antenna is the accent. States: ruhig (calm), schaut (looks), erledigt (done, happy
+// eyes), arbeitet (working, the antenna moves), wartet (waiting, antenna up), offline (calm eyes low, dim antenna).
+// Motion is CSS only and gentle (a blink, a glance, a hop; a loop only for the agent states), none with reduced motion.
+// Decorative: hidden from screen readers, the text next to it says what it means.
+const BOT_EYES = {
+  ruhig: ['M41 44V56', 'M59 50V50.1'], schaut: ['M48 42V54', 'M66 48V48.1'], arbeitet: ['M41 50V56', 'M59 53V53.1'],
+  wartet: ['M41 39V51', 'M59 45V45.1'], erledigt: ['M36 52L40.5 46.5L45 52', 'M55 52L59.5 46.5L64 52'], offline: ['M41 50V56', 'M59 53V53.1'],
 };
-const heron = (pose, cls = '') => { const [vb, inner] = HERON[pose] || HERON.empty; return `<svg class="heron ${cls}" viewBox="${vb}" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`; };
-const heronEmpty = (pose, title, sub = '') => `<div class="empty hempty">${heron(pose)}<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
+const botFig = (st = 'ruhig', cls = '') => {
+  const e = BOT_EYES[st] || BOT_EYES.ruhig;
+  if (!BOT_EYES[st]) st = 'ruhig';
+  return `<svg class="bot b-${st}${cls ? ' ' + cls : ''}" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><rect class="b-plate" width="100" height="100" rx="22.5"/>`
+    + '<g transform="translate(50 50) scale(.9) translate(-50 -40)"><g class="b-hop"><path class="b-body" d="M50 22C74 22 78 26 78 50S74 78 50 78 22 74 22 50 26 22 50 22Z"/>'
+    + `<g class="b-eyes" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="${e[0]}" stroke-width="6.5"/><path d="${e[1]}" stroke-width="${st === 'erledigt' ? 6.5 : 8.5}"/></g>`
+    + `<path class="b-ant" d="${st === 'wartet' ? 'M58 1V15' : 'M58 6V15'}" stroke-width="7" stroke-linecap="round"/></g></g></svg>`;
+};
+const botEmpty = (st, title, sub = '') => `<div class="empty hempty">${botFig(st)}<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
 // 2.40.0 (#1191): list columns from 600 px on (tablets, an unfolded Fold); isMobile() (< 900 px) stays for the rest of the app
 const td_colsWide = () => td_rc('colw', () => !isMobile() || matchMedia('(min-width:600px)').matches);
 const fieldCols = lid => td_colsWide() && !!LS.get('fcols.' + lid, false) && fieldsOf(lid).length > 0;
@@ -1525,8 +1529,8 @@ function viewListBody() {
   })();
   const tin = S.route.key === 'today' && todayInbox() ? todayInboxTasks() : [];  // 2.22.0 (#681)
   if (!total && !tin.length) {
-    // 2.14.0: the heron; 2.83.0 C (#1427): the Kalmido K as a line drawing instead (o3c_empty, listhead.js; no animal)
-    h += S.route.key === 'today' ? (v.done.length ? o3c_empty(tr('All done for today.'), tr('Enjoy the rest of the day.')) : o3c_empty(tr('Nothing left for today.')))
+    // 2.14.0: the heron; 2.83.0 C (#1427): the Kalmido K; 2.136.0 (#2193): the bot figure (o3c_empty, listhead.js), done = erledigt
+    h += S.route.key === 'today' ? (v.done.length ? o3c_empty(tr('All done for today.'), tr('Enjoy the rest of the day.'), 'erledigt') : o3c_empty(tr('Nothing left for today.')))
       : o3c_empty(tr('No tasks.'), rl && !ro ? (isMobile() && !tabletDock() ? tr('Add the first one with the + button.') : tr('Add the first one with the field below.')) : '');  // 2.25.0 (UX-27): what this device shows
   }
   let lastSub = '';
@@ -1644,7 +1648,7 @@ function viewSearch() {
   return `<div class="search"><input id="searchq" type="search" aria-label="${esc(tr('Search'))}" placeholder="${tr('Search titles and notes')}" autocomplete="off" enterkeyhint="search"></div>${typeof rt9_searchToggleHtml === 'function' ? rt9_searchToggleHtml() : ''}<div id="sresults">${S.searchRes ? renderSearchRes() : ''}</div><div id="msvvsearch">${msvvSearchHtml()}</div><div id="smsgs">${msgSecHtml()}</div>`;
 }
 function renderSearchRes() {
-  if (!S.searchRes.length) return heronEmpty('empty', tr('No results.'), tr('Try fewer or other words.'));
+  if (!S.searchRes.length) return botEmpty('schaut', tr('No results.'), tr('Try fewer or other words.'));
   const row = (t, i) => (typeof rt9_simHead === 'function' ? rt9_simHead(t, S.searchRes[i - 1]) : '') + taskRow(t, {showList: true, drag: false, tcols: {list: true}})
     + (typeof ftxtHitHtml === 'function' ? ftxtHitHtml(t) : '');  // 2.59.0 B (#1375): + heading of the similar ones, 2.61.0 (#1820): "in file" note
   return vl_begin(S.searchRes.length) ? vl_seg('search', S.searchRes, row) : S.searchRes.map(row).join('');  // 2.65.0 (#1825)

@@ -2625,7 +2625,7 @@ USER_DEFAULTS = {
     # v1.1
     "evcals_hidden": "[]",      # 2.21.0 (#659): json list of the event calendars I hid from my views (server-only)
     "purpose": "",              # 2.19.0 (#653): what the person uses Kalmido for (me | family | team | software; server-only)
-    "celebrate": "1",           # the heron celebrates an emptied Today / a completed list or project
+    "celebrate": "1",           # the figure celebrates an emptied Today / a completed list or project
     "list_emoji": "1",          # 2.32.0 (#1077): a new list suggests an icon from its name (0 = off)
     "side_icons": "line",       # 2.36.0 (#1117): the sidebar's list icons: line (grey line icon for the name's emoji) | emoji | dot
     "prio_bg": "",              # 2.40.0 (#1416): tasks with a priority tinted in its colour: '' (off) | soft | strong

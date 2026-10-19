@@ -144,7 +144,7 @@ async function api(cookie, method, url, body) {
   await w.eval('quipsLoad()');
   await w.eval(`toggleTask(${t0[0].id})`); await sleep(100);
   let ce = d.querySelector('.cele');
-  check(ce && ce.dataset.kind === 'today' && ce.querySelector('.cheron') && ce.querySelectorAll('.cconf').length > 10, 'Today emptied: heron + checkmark confetti');
+  check(ce && ce.dataset.kind === 'today' && ce.querySelector('.cbot svg.bot.b-erledigt') && ce.querySelectorAll('.cconf').length > 10, 'Today emptied: the bot figure + checkmark confetti');  // 2.136.0 (#2193)
   const q1 = d.querySelector('.cele-quip span')?.textContent;
   check(quips.en.includes(q1), 'quip from quips.json (en): ' + q1);
   // list completed (not Today): a list with one open task
@@ -167,23 +167,23 @@ async function api(cookie, method, url, body) {
   click(w, d.querySelector('.stmodal [data-m="save"]')); await sleep(900);
   ce = d.querySelector('.cele');
   check(ce && ce.dataset.kind === 'project', 'project status complete: celebration');
-  // still frame (screenshots): 2.22.0 (#688) the heron flies (no vine): at progress 0.5 it is in the middle of the screen
+  // still frame (screenshots): at progress 0.5 the figure is in the middle of the screen (2.136.0, #2193: the bot instead of the heron)
   d.querySelectorAll('.cele,.cele-quip').forEach(x => x.remove());
   w.eval(`celebrate('today', {frame: 0.5, force: true})`);
-  const fx = parseFloat((d.querySelector('.cele .cbird').style.transform.match(/translate\(([-\d.]+)px/) || [])[1]);
-  const fw = parseFloat(d.querySelector('.cele .cbird').style.width);  // 2.39.1 (#1292): it hovers in the middle, about a quarter of the width
-  check(Math.abs(fx + fw / 2 - w.innerWidth / 2) < 2 && fw >= w.innerWidth * 0.2 && !d.querySelector('.cele .cvine') && d.querySelector('.cele .cwing'), 'frame 0.5: the heron hovers in the middle (no vine) ' + fx + ' ' + fw);
+  const fx = parseFloat((d.querySelector('.cele .cbot').style.transform.match(/translate\(([-\d.]+)px/) || [])[1]);
+  const fw = parseFloat(d.querySelector('.cele .cbot').style.width);  // 2.136.0 (#2193): the figure 110-200 px
+  check(Math.abs(fx + fw / 2 - w.innerWidth / 2) < 2 && fw >= 90 && !d.querySelector('.cele .cvine') && !d.querySelector('.cele .cbird'), 'frame 0.5: the bot figure hops in the middle (no heron, no vine) ' + fx + ' ' + fw);
   // multi-select batch completing the rest of a list
   d.querySelectorAll('.cele,.cele-quip').forEach(x => x.remove());
   w.eval(`S.multi = new Set([${T3.id}])`); await w.eval(`batch('complete', {}, true)`); await sleep(100);
   check(d.querySelector('.cele')?.dataset.kind === 'list', 'batch complete of the last task: celebration');
   w.close();
-  // reduced motion: calm variant (small heron + line, no swing, no confetti)
+  // reduced motion: calm variant (the small still figure + line, no motion, no confetti)
   w = await boot({user: 'alice', media: {'(prefers-reduced-motion: reduce)': true}}); d = w.document;
   const T4 = await api(ck, 'POST', '/api/tasks', {title: 'Only one', list_id: L.id});
   await w.eval('load()'); w.eval('render()'); await w.eval('quipsLoad()');
   await w.eval(`toggleTask(${T4.id})`); await sleep(100);
-  check(!d.querySelector('.cele') && d.querySelector('.cele-quip.calm .cheron'), 'reduced motion: calm variant only');
+  check(!d.querySelector('.cele') && d.querySelector('.cele-quip.calm svg.bot'), 'reduced motion: calm variant only');
   w.close();
   // setting off: nothing; German quips
   await api(ck, 'PATCH', '/api/settings', {celebrate: '0', lang: 'de'});
