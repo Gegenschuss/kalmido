@@ -49,7 +49,8 @@ const labels = (w, id) => w.eval(`listMenuItems(${id}, document.body).filter(x =
   const dlg = await until(() => d.querySelector('.cdlg'));
   const txt = (dlg?.textContent || '').replace(/\s+/g, ' ');
   check(/The list is shared: all 2 other people lose it/.test(txt), '#1188: the dialog says the list is shared ' + txt.slice(0, 300));
-  check(/basket of Bob/.test(txt) && /Bob is told/.test(txt), '#1188: the tasks go to the owner\'s basket, the owner is told ' + txt.slice(0, 300));
+  // 2.102.0 (#1988): the list goes into the organisation's trash with its tasks (no longer the owner's basket)
+  check(/organisation’s trash/.test(txt) && !/basket of Bob/.test(txt) && /Bob is told/.test(txt), '#1188: the list goes to the trash, the owner is told ' + txt.slice(0, 300));
   click(w, dlg.querySelector('[data-cd="no"]')); await sleep(200);
   check((await call('GET', '/api/state', null, CB)).lists.some(l => l.id === SH), '#1188: Cancel deletes nothing');
   w.close();

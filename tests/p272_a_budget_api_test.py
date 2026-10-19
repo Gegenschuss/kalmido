@@ -474,6 +474,7 @@ check(r.ok and r.json().get("created") == 0 and one("SELECT COUNT(*) FROM public
 # ================================================================ deleting a budget list removes its receipts
 Bo.patch(B + f"/api/lists/{L2}", json={"archived": True})
 r = Bo.delete(B + f"/api/lists/{L2}")
+r = Bo.delete(B + f"/api/trash/lists/{L2}") if r.ok else r  # 2.102.0 (#1988): deleting moves the list into the list trash; the purge from there deletes for good
 gone = not os.path.exists(fp2)
 for _ in range(20):
     if gone:

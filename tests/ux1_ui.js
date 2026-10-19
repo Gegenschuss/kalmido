@@ -195,8 +195,9 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   // delete for good: the dialog names what is lost; Esc = no
   let p = w.eval(`listDeleteForGood(${WORK})`); await sleep(100);
   let cd = d.querySelector('.modal.cdlg');
-  check(cd && cd.getAttribute('role') === 'alertdialog' && cd.querySelector('.btn.danger.solid[data-cd="yes"]') && /permanently/.test(cd.querySelector('h3').textContent), 'own dialog: alertdialog, red action');
-  check(cd && /sections/.test(cd.textContent) && /trash/.test(cd.textContent) && cd.querySelectorAll('.cdlg-l li').length >= 2, 'names what is lost and where the tasks go');
+  // 2.102.0 (#1988): the list goes into the trash with everything (restorable), the dialog says so
+  check(cd && cd.getAttribute('role') === 'alertdialog' && cd.querySelector('.btn.danger.solid[data-cd="yes"]') && /Delete “/.test(cd.querySelector('h3').textContent), 'own dialog: alertdialog, red action');
+  check(cd && /goes to the trash with its tasks/.test(cd.textContent) && /restored/.test(cd.textContent), 'says where the list goes and that it can come back');
   check(d.activeElement === cd?.querySelector('[data-cd="no"]'), 'focus on "Cancel" for a destructive action');
   key(w, d.activeElement, 'Escape'); 
   check(await p === false && !d.querySelector('.modal.cdlg') && (await st()).lists.some(l => l.id === WORK), 'Esc = no, nothing deleted');

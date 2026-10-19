@@ -280,7 +280,8 @@ A.patch(B + "/api/users/3", json={"disabled": False})
 check(page(cp).status_code == 200, "owner enabled again: works")
 Ca = sess("carol")
 Ca.patch(B + f"/api/lists/{cl}", json={"archived": 1})  # 1.5: deleting for good only from the archive
-check(Ca.delete(B + f"/api/lists/{cl}").ok and not dbx("SELECT 1 FROM public_links WHERE list_id=?", (cl,)) and page(cp).status_code == 404,
+# 2.102.0 (#1988): deleting moves the list into the list trash; the purge from there deletes for good
+check(Ca.delete(B + f"/api/lists/{cl}").ok and Ca.delete(B + f"/api/trash/lists/{cl}").ok and not dbx("SELECT 1 FROM public_links WHERE list_id=?", (cl,)) and page(cp).status_code == 404,
       "list deleted: link gone (cascade)")
 
 # ---- checklist mode
