@@ -136,7 +136,7 @@ assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com", "
 for s in (A, Bo):
     s.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 A.put(B + O + "/settings", json={"company_fields": {"name": "Beispiel Film GmbH", **COMPANY}})
-CL = A.post(B + "/api/clients", json={"name": "Kunde Eins GmbH"}).json()["id"]
+CL = A.post(B + "/api/clients", json={"name": "Kunde Eins GmbH", "street": "Kundenweg 2", "zip": "20095", "city": "Hamburg", "country": "DE"}).json()["id"]
 
 # ---------------------------------------------------------------- #2168 travel receipts
 r = A.post(B + T, json={"date_from": DAY(20), "dest": "Hamburg - Berlin", "purpose": "job", "client_id": CL,

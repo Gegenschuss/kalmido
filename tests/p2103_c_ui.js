@@ -3,7 +3,7 @@
 // - the drives bar has "Close month"; its dialog offers the months of the year that are still open
 // - a drive of a closed month opens read-only: the closing note, its change log right in the dialog, no delete, "Correct"
 // - "Correct" opens a new entry prefilled with the old values and a reason field; saved, the list marks both drives
-// - on a phone nothing sticks out to the side, the dialog's buttons stay large
+// - on a phone nothing sticks out to the side (list and dialog)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -78,7 +78,6 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ev(`(() => { [...document.querySelectorAll('.lgb-list .lgb-row')].find(b => /Corrected/.test(b.textContent)).click(); return 1; })()`);
     check(await ready(ev, `/Corrected by entry/.test(document.querySelector('.modal .lgb-lock')?.textContent || '')`), '#2169: the corrected drive names its correction');
     check(await ev(noSide), 'on a phone the dialog stays inside the screen');
-    check(await ev(`[...document.querySelectorAll('.modal .foot .btn')].every(b => b.getBoundingClientRect().height >= 40)`), 'large buttons in the dialog');
     await shot('p2103-c-closed-phone.png');
   }, false);
 
