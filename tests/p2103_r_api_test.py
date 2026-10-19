@@ -5,17 +5,36 @@ Invented accounts only (example.com).
  - every kind (trash, logs, backups, files, chat) with its period, its env names and the switch; the test server runs
    without KALMIDO_RETENTION_PURGE, so every kind is off (count only) -- the safe default of an update
  - numbers only: no user names or mail addresses in the answer
+ - #2166 (built in 2.102.0 A): a deleted list keeps fields + values and its chat in the trash; the purge after the period
+   takes them along (no orphan rows of list_fields, task_field_values, tchat_rooms / tchat_msgs)
 usage: p2103_r_api_test.py <datadir>      (a fresh server on KALMIDO_TEST_PORT)
 freelancer-matrix: admin"""
 import os
+import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 
+import dbx as dbxm
 import requests
 from freelancer_fixture import freelancer
 
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
+CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), ".data")
 FAILS, OKS = [], [0]
+
+
+def sql(q, args=(), write=False):
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    try:
+        r = c.execute(q, args)
+        if write:
+            c.commit()
+            return None
+        return r.fetchall()
+    finally:
+        c.close()
 
 
 def check(cond, what):
@@ -61,6 +80,33 @@ check("alice" not in r.text and "example.com" not in r.text, "#2165: numbers onl
 check(Bo.get(B + "/api/admin/retention").status_code == 403, "#2165: a member who is no instance admin: 403")
 check(Fr.get(B + "/api/admin/retention").status_code == 403, "#2165: a person without an organisation: 403")
 check(requests.get(B + "/api/admin/retention", headers=H).status_code in (401, 403), "#2165: nobody signed in: 401 / 403")
+
+# ---- #2166: fields, values and the list chat stay in the trash and go with the purge
+BOB = sql("SELECT id FROM users WHERE username='bob'")[0][0]
+L = A.post(B + "/api/lists", json={"name": "Shared shoot", "org_id": None}).json()["id"]
+A.put(B + f"/api/lists/{L}/members", json={"user_id": BOB, "role": "edit"})
+F = A.post(B + f"/api/lists/{L}/fields", json={"name": "Budget", "type": "number"}).json()["id"]
+T = A.post(B + "/api/tasks", json={"title": "Book the studio", "list_id": L}).json()["id"]
+A.patch(B + f"/api/tasks/{T}", json={"fields": {str(F): "1200"}})
+room = next((x for x in A.get(B + "/api/team").json().get("rooms", []) if x["kind"] == "list" and x["list_id"] == L), None)
+if room:
+    A.post(B + f"/api/team/rooms/{room['id']}/messages", json={"body": "Studio is booked"})
+check(room is not None, "#2166 setup: the shared list has its chat")
+A.patch(B + f"/api/lists/{L}", json={"archived": True})
+check(A.delete(B + f"/api/lists/{L}").ok, "#2166: the list goes to the trash")
+kept = (sql("SELECT COUNT(*) FROM list_fields WHERE list_id=?", (L,))[0][0], sql("SELECT COUNT(*) FROM task_field_values WHERE task_id=?", (T,))[0][0],
+        sql("SELECT COUNT(*) FROM tchat_rooms WHERE list_id=?", (L,))[0][0])
+check(kept == (1, 1, 1 if room else 0), f"#2166: field, value and chat stay in the trash {kept}")
+old = (datetime.now(timezone.utc) - timedelta(days=31)).isoformat(timespec="seconds")
+sql("UPDATE lists SET deleted_at=? WHERE id=?", (old, L), write=True)
+out = subprocess.run(["docker", "exec", CT, "python", "-c",
+                      "import app\nfrom kalmido.core.db import connect\nfrom kalmido.lists.listtrash import otr_prune\n"
+                      "c = connect()\nprint('purged', otr_prune(c, True))\nc.close()"], capture_output=True, text=True)
+check("purged 1" in out.stdout, "#2166: the purge after the period " + (out.stdout + out.stderr)[-300:])
+gone = (sql("SELECT COUNT(*) FROM list_fields WHERE list_id=?", (L,))[0][0], sql("SELECT COUNT(*) FROM task_field_values WHERE task_id=?", (T,))[0][0],
+        sql("SELECT COUNT(*) FROM tchat_rooms WHERE list_id=?", (L,))[0][0],
+        sql("SELECT COUNT(*) FROM tchat_msgs WHERE room_id=?", (room["id"],))[0][0] if room else 0)
+check(gone == (0, 0, 0, 0), f"#2166: field, value, chat room and messages are gone with the purge {gone}")
 
 print(f"p2103_r_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
