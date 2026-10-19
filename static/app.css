@@ -7388,3 +7388,5 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .absel input{width:1.25rem;height:1.25rem;accent-color:var(--accent)}
 .abselbar{position:sticky;bottom:.75rem;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.75rem;padding:.5rem .75rem;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--bg2);box-shadow:0 .25rem 1rem rgba(0,0,0,.12)}
 .abselbar .btn,.abselbar .iconbtn{min-height:2.75rem}
+/* 2.102.0 B (#2206): while choosing, room below the list as high as the sticky bar, so the last row stays tappable */
+.ablist.abselon{padding-bottom:7.5rem}

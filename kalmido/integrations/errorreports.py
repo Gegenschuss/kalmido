@@ -9,10 +9,10 @@ import time
 from datetime import timedelta
 from flask import g, jsonify, request
 
-from ..core.config import app, PUBLIC_URL
+from ..core.config import app, APP_VERSION, PUBLIC_URL
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import lang, tr
-from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
+from ..core.db import body, bump, db, err, gset, gsetting, iso, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.access import acx_anon_bind, is_project, list_people, MANAGE_ROLES, need_list, task_visible
 from ..core.pages import valid_url
@@ -104,7 +104,8 @@ def err_parse(j):
 
 
 def err_content(c, lid, rep, lg):
-    lines = [f"**{err_md(tr('Error report', lg=lg))}** · {'Sentry' if rep['source'] == 'sentry' else err_md(tr('webhook', lg=lg))}"
+    src = {"sentry": "Sentry", "client": err_md(tr("Browser", lg=lg))}.get(rep["source"]) or err_md(tr("webhook", lg=lg))  # 2.102.0 E
+    lines = [f"**{err_md(tr('Error report', lg=lg))}** · {src}"
              + (f" · {rep['level']}" if rep["level"] else ""), "",
              f"**{err_md(tr('Error', lg=lg))}:** {err_md(rep['title'])}"]
     if rep["culprit"]:
@@ -153,6 +154,12 @@ def errhook_in(lid, token):
         rep = None
     if not rep:
         return err(tr("Invalid value: {0}", "body"))
+    return err_take(c, lid, r, rep)
+
+
+def err_take(c, lid, r, rep):
+    """A parsed report into list lid (r: its issue_hooks row + owner_id, tickets, archived): a new bug ticket, or a count on
+    the open ticket of the same error. 2.102.0 E (#1999): the browser's error reports (cer_report) take the same way."""
     now = iso(now_utc())
     c.execute("UPDATE issue_hooks SET last_at=?, received=received+1 WHERE list_id=?", (now, lid))
     old = c.execute("SELECT * FROM issue_reports WHERE list_id=? AND fp=?", (lid, rep["fp"])).fetchone()
@@ -342,3 +349,131 @@ def v1_git_list(lid):
     from ..integrations.git import git_conns_of_list
     rows = git_conns_of_list(c, lid)  # 2.33.0 (#934): its own repositories, else the folder's (folder = its path)
     return jsonify(data=[git_public(c, r) for r in rows])
+
+
+# ---------------------------------------------------------------- 2.102.0 E (#1999): the browser's own errors -> tickets
+# The web client reports an unhandled error / rejected promise (window.onerror, unhandledrejection; static/js/clienterr.js)
+# here. The server operator picks ONE project list with error reports switched on (Settings > Administration, gsetting
+# client_errors_list); without it (or after error reports went off in that list) nothing is sent or stored. A report then
+# takes the way of every error report (err_take): a bug ticket, the same error only counted, the hourly limit of the list.
+# Only people signed in; never data of a person: the message (quoted texts, addresses, long numbers and ids cut), the file
+# below /static/ with line:column, a stack of such places (2 KB), the client's version and the name of the open view.
+# At most CER_PER_MIN reports per person and minute and CER_PER_HOUR per hour (the client stops after 20 per page load).
+CER_PER_MIN, CER_PER_HOUR = 5, 60
+CER_STACK_MAX = 2048
+_CER_RATE = {}
+
+
+def cer_list(c):
+    """The list the browser's error reports go to: (id, its row as errhook_in reads it) or (None, None)."""
+    v = gsetting(c, "client_errors_list") or ""
+    if not v.isdigit():
+        return None, None
+    with system_ctx(c):  # the operator's choice, read for every person: one row, its organisation only to bind (below)
+        r = c.execute("SELECT h.*, l.owner_id, l.tickets, l.archived, l.org_id FROM issue_hooks h JOIN lists l ON l.id=h.list_id "
+                      "WHERE h.list_id=?", (int(v),)).fetchone()
+    return (int(v), r) if r else (None, None)
+
+
+def cer_text(s, n):
+    """A text of the browser without data of a person: quoted texts that are no plain names, e-mail addresses, links and
+    long numbers / ids become a placeholder; control characters go."""
+    s = re.sub(r"[\x00-\x1f\x7f]+", " ", str(s or "")).strip()
+    s = re.sub(r"\S+@\S+", "<mail>", s)
+    s = re.sub(r"(?i)\b(?:https?|blob|data|file):\S*", lambda m: cer_place(m.group(0)) or "<url>", s)
+    s = re.sub(r"(['\"`])(.*?)\1", lambda m: m.group(0) if re.fullmatch(r"[\w$.#-]{1,40}", m.group(2)) else m.group(1) + "…" + m.group(1), s)
+    s = re.sub(r"\b[0-9a-fA-F-]{16,}\b|\d{4,}", "<n>", s)
+    return s[:n]
+
+
+def cer_place(u):
+    """A script place as /static/js/x.js:12:5 (origin, query and anything outside /static/ dropped), else ""."""
+    m = re.search(r"(/static/[\w./-]{1,120}?\.m?js)(?:\?[^\s:)]*)?((?::\d{1,7}){0,2})", str(u or ""))
+    return (m.group(1) + m.group(2)) if m and ".." not in m.group(1) else ""
+
+
+def cer_stack(s):
+    out = []
+    for line in str(s or "").splitlines()[:40]:
+        place = cer_place(line)
+        fn = re.match(r"\s*(?:at\s+)?([\w$.<>]{1,80})(?:\s*\(|@)", line)
+        if place:
+            out.append(f"{fn.group(1) if fn else '?'} {place}")
+    return "\n".join(out)[:CER_STACK_MAX]
+
+
+def cer_rate_ok(uid):
+    now = time.time()
+    with _ERR_LOCK:
+        lst = [t for t in _CER_RATE.get(uid, []) if t > now - 3600]
+        if len(lst) >= CER_PER_HOUR or len([t for t in lst if t > now - 60]) >= CER_PER_MIN:
+            _CER_RATE[uid] = lst
+            return False
+        _CER_RATE[uid] = lst + [now]
+        if len(_CER_RATE) > 5000:
+            _CER_RATE.clear()
+    return True
+
+
+@app.post("/api/client-errors")
+def cer_report():
+    """One error of the web client (people only). 204 = taken or deliberately dropped (off, limit): the client never retries."""
+    u = g.user
+    if not u or u.get("kind", "user") != "user":
+        return err(tr("Not allowed"), 403)
+    c = db()
+    lid, r = cer_list(c)
+    if not lid or not cer_rate_ok(u["id"]):
+        return "", 204
+    b = body()
+    msg = cer_text(b.get("msg"), 300)
+    if not msg:
+        return err(tr("Invalid value: {0}", "msg"))
+    place = cer_place(f"{b.get('src') or ''}:{b.get('line') or ''}:{b.get('col') or ''}" if b.get("line") else b.get("src"))
+    ver = b.get("ver") if isinstance(b.get("ver"), str) and re.fullmatch(r"[\w.+-]{1,30}", b["ver"]) else ""
+    view = b.get("view") if isinstance(b.get("view"), str) and re.fullmatch(r"[\w-]{1,40}", b["view"]) else ""
+    kind = "rejection" if b.get("kind") == "rejection" else "error"
+    stack = cer_stack(b.get("stack"))
+    info = " · ".join(x for x in (f"{tr('Version')} {ver}" if ver else "", f"Server {APP_VERSION}", view, kind) if x)
+    rep = {"source": "client", "title": msg, "culprit": place + (f" ({view})" if view and place else view if not place else ""),
+           "url": "", "level": "error", "fid": "", "body": info + ("\n" + stack if stack else ""),
+           # the same error = the same message at the same place (line, not column: minified or not, one ticket)
+           "fp": "cl:" + hashlib.sha256((msg + "\n" + re.sub(r":\d+$", "", place)).encode()).hexdigest()[:32]}
+    acx_anon_bind(c, r["org_id"])  # from here on as nobody inside the chosen list's organisation (like errhook_in)
+    if not err_rate_ok(lid):
+        return "", 204
+    err_take(c, lid, r, rep)
+    return "", 204
+
+
+def cer_about(c, u):
+    """For everyone: whether the client reports (client_errors); for admins the chosen list and the choice (project lists
+    with error reports on that the admin manages)."""
+    lid, _ = cer_list(c)
+    d = {"client_errors": bool(lid)}
+    if u and u["is_admin"]:
+        from ..core.access import list_role
+        rows = c.execute("SELECT l.id, l.name FROM issue_hooks h JOIN lists l ON l.id=h.list_id WHERE l.archived=0 "
+                         "ORDER BY lower(l.name)").fetchall()
+        d["client_errors_list"] = lid
+        d["client_errors_lists"] = [{"id": x["id"], "name": x["name"]} for x in rows if list_role(c, x["id"], u["id"]) in MANAGE_ROLES]
+    return d
+
+
+def cer_settings(c, b):
+    """PATCH /api/admin/settings {client_errors_list: list id | null}: only a list with error reports the admin manages."""
+    if "client_errors_list" not in b:
+        return None
+    v = b["client_errors_list"]
+    if v in (None, "", 0):
+        gset(c, "client_errors_list", "")
+        return None
+    if not isinstance(v, int) or isinstance(v, bool):
+        return err(tr("Invalid value: {0}", "client_errors_list"))
+    from ..core.access import list_role
+    ok = c.execute("SELECT 1 FROM issue_hooks h JOIN lists l ON l.id=h.list_id WHERE h.list_id=?",
+                   (v,)).fetchone()
+    if not ok or list_role(c, v, me()) not in MANAGE_ROLES:
+        return err(tr("Switch on error reports in this list first (list dialog > Repository)."))
+    gset(c, "client_errors_list", str(v))
+    return None

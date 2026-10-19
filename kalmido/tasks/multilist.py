@@ -121,7 +121,8 @@ def ml_check(c, tid, lid):
         return tr("Locked lists cannot share tasks with other lists"), 400
     if x["archived"]:
         return tr("The list is archived"), 400
-    n = c.execute("SELECT COUNT(*) FROM task_links WHERE task_id=? AND list_id!=?", (tid, lid)).fetchone()[0]
+    n = c.execute("SELECT COUNT(*) FROM task_links WHERE task_id=? AND list_id!=? AND list_id IN (SELECT id FROM lists WHERE deleted_at IS NULL)",
+                  (tid, lid)).fetchone()[0]  # 2.102.0 A (#1988): a further list in the trash does not count (its link comes back with it)
     if n >= ML_MAX:
         return tr("A task can be shown in at most {0} further lists", ML_MAX), 400
     return None

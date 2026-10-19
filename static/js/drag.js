@@ -1,0 +1,187 @@
+// @ts-check
+/* Kalmido web client: the shared core of dragging (2.102.0, #1998). One way to follow a finger, a mouse or a pen: the
+   threshold before a drag starts, the long press on touch, a ghost that slides by transform, auto-scroll at the edge of the
+   scroller, Esc cancels, the click after a drag is swallowed. The callers keep what is theirs (where something may go, what
+   a drop does): onStart / onMove / onDrop / onCancel / onTap. Sections (secdrag.js) and bottom sheets (sheetdrag.js) use it;
+   caldrag, roadmap, timeline, dnd / dragmulti and mindmap are next (docs/ARCHITECTURE.md "Dragging").
+   Touch uses touch events, not pointer events: the browser cancels a pointer as soon as it starts to pan the page, a touch
+   whose touchmove is prevented stays ours. Mouse and pen use pointer events with pointer capture.
+   Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
+'use strict';
+
+/**
+ * @typedef {Object} DrgOpts
+ * @property {(t: HTMLElement, x: number, y: number, kind: string, ev: Event) => any} [start]  drg_attach: the drag's data for
+ *   a press on t, or a falsy value (no drag here; the press stays the browser's)
+ * @property {boolean} [touch]  drg_attach: follow touches (default true)
+ * @property {boolean} [mouse]  drg_attach: follow mouse / pen (default true)
+ * @property {number} [hold]  drg_attach, touch: long press in ms before a move may drag (default 0 = at once); moving more
+ *   than holdMove px before it ends the press (it was a scroll)
+ * @property {number} [holdMove]  default 8
+ * @property {number} [threshold]  px of movement before onStart (default 6)
+ * @property {(d: any, dx: number, dy: number) => (boolean|null)} [accept]  instead of the threshold: true = start, false =
+ *   give up (the gesture stays the browser's, onCancel follows), null = not yet
+ * @property {boolean} [raf]  onMove, the ghost and auto-scroll at most once per frame
+ * @property {HTMLElement|(() => HTMLElement)} [scroll]  auto-scroll this scroller while the pointer is near its top / bottom
+ * @property {number} [edge]  the edge zone in px (default 56)
+ * @property {number} [step]  px per frame at the very edge (default 14)
+ * @property {{el: HTMLElement, cls?: string}} [ghost]  a copy of el follows the pointer (fixed, by transform)
+ * @property {(d: any, x: number, y: number) => void} [onStart]
+ * @property {(d: any, x: number, y: number, dx: number, dy: number) => void} [onMove]
+ * @property {(d: any, x: number, y: number) => void} [onDrop]
+ * @property {(d: any) => void} [onCancel]  Esc, a second finger, touchcancel / pointercancel, a gesture given up
+ * @property {(d: any) => void} [onTap]  let go before the drag started (a tap or a long press without moving)
+ */
+
+/** @type {any} the running drag (one at a time) */
+let drg_cur = null;
+const drg_reduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * Lets presses inside root start drags: touchstart / pointerdown ask opts.start whether this press drags.
+ * @param {HTMLElement|Document} root @param {DrgOpts} o
+ */
+function drg_attach(root, o) {
+  if (o.touch !== false) {
+    root.addEventListener('touchstart', ev => {
+      const e = /** @type {TouchEvent} */ (ev), t = e.touches || [];
+      if (t.length !== 1) { if (drg_cur) drg_end(drg_cur, false); return; }  // a second finger: pinch / zoom, not a drag
+      const d = o.start && o.start(/** @type {HTMLElement} */ (e.target), t[0].clientX, t[0].clientY, 'touch', e);
+      if (!d) return;
+      if (drg_cur) drg_end(drg_cur, false);
+      drg_open(o, d, 'touch', t[0].clientX, t[0].clientY, document, false);
+    }, {passive: true});
+  }
+  if (o.mouse !== false) {
+    root.addEventListener('pointerdown', ev => {
+      const e = /** @type {PointerEvent} */ (ev);
+      if (e.pointerType === 'touch' || e.button !== 0) return;
+      const d = o.start && o.start(/** @type {HTMLElement} */ (e.target), e.clientX, e.clientY, e.pointerType || 'mouse', e);
+      if (!d) return;
+      if (drg_cur) drg_end(drg_cur, false);
+      const s = drg_open(o, d, 'mouse', e.clientX, e.clientY, document, false);
+      s.pid = e.pointerId;
+      try { /** @type {HTMLElement} */ (e.target).setPointerCapture?.(e.pointerId); } catch { /* not capturable */ }
+    });
+  }
+}
+
+/**
+ * Starts a drag at once (a long press the caller detected, e.g. dnd.js on a section header): the ghost shows now, the
+ * touch is followed on el (it keeps getting the events even if a redraw takes it out of the page).
+ * @param {HTMLElement} el @param {number} x @param {number} y @param {DrgOpts} o @param {any} [d]
+ */
+function drg_begin(el, x, y, o, d) {
+  if (drg_cur) drg_end(drg_cur, false);
+  const s = drg_open(o, d === undefined ? {} : d, 'touch', x, y, el, true);
+  if (o.ghost) drg_ghost(s);
+  return s;
+}
+
+/** Cancels the running drag (onCancel). */
+function drg_cancel() { if (drg_cur) drg_end(drg_cur, false); }
+
+/** @param {DrgOpts} o @param {any} d @param {string} kind @param {number} x @param {number} y @param {EventTarget} on @param {boolean} begun */
+function drg_open(o, d, kind, x, y, on, begun) {
+  const s = {o, d, kind, x0: x, y0: y, x, y, on: false, begun, at: on, pid: null, held: !(o.hold > 0 && kind === 'touch' && !begun),
+    timer: 0, ghost: null, raf: 0, sraf: 0, l: {}};
+  if (!s.held) s.timer = setTimeout(() => { s.held = true; }, o.hold);
+  const L = s.l;
+  if (kind === 'touch') {
+    L.touchmove = e => { const t = e.touches && e.touches[0]; if (t) drg_move(s, t.clientX, t.clientY, e); };
+    L.touchend = e => drg_end(s, true, e);
+    L.touchcancel = () => drg_end(s, false);
+  } else {
+    L.pointermove = e => { if (s.pid == null || e.pointerId === s.pid) drg_move(s, e.clientX, e.clientY, e); };
+    L.pointerup = e => { if (s.pid == null || e.pointerId === s.pid) drg_end(s, true, e); };
+    L.pointercancel = () => drg_end(s, false);
+  }
+  for (const k in L) on.addEventListener(k, L[k], k === 'touchmove' ? {passive: false} : undefined);
+  L.keydown = e => { if (e.key === 'Escape' && s.on) { e.preventDefault(); e.stopPropagation(); drg_end(s, false); } };
+  document.addEventListener('keydown', L.keydown, true);
+  drg_cur = s;
+  return s;
+}
+
+/** @param {any} s @param {number} x @param {number} y @param {Event} e */
+function drg_move(s, x, y, e) {
+  if (drg_cur !== s) return;
+  s.x = x; s.y = y;
+  const dx = x - s.x0, dy = y - s.y0;
+  if (!s.on) {
+    if (!s.held) { if (Math.hypot(dx, dy) > (s.o.holdMove || 8)) drg_end(s, false); return; }  // moved during the long press: a scroll
+    const ok = s.o.accept ? s.o.accept(s.d, dx, dy) : Math.hypot(dx, dy) >= (s.o.threshold ?? 6) ? true : null;
+    if (ok === null) return;
+    if (!ok) { drg_end(s, false); return; }
+    s.on = true;
+    if (s.o.ghost && !s.ghost) drg_ghost(s);
+    s.o.onStart?.(s.d, x, y);
+    if (drg_cur !== s) return;  // onStart may have ended it
+  }
+  if (e.cancelable && s.kind === 'touch') e.preventDefault();  // the page does not scroll under a drag
+  if (!s.o.raf) drg_frame(s);
+  else if (!s.raf) s.raf = requestAnimationFrame(() => { s.raf = 0; if (drg_cur === s) drg_frame(s); });
+}
+
+function drg_frame(s) {
+  if (s.ghost) s.ghost.style.transform = `translate(${s.x - s.x0}px, ${s.y - s.y0}px)`;
+  s.o.onMove?.(s.d, s.x, s.y, s.x - s.x0, s.y - s.y0);
+  if (s.o.scroll && !s.sraf) drg_scroll(s);
+}
+
+/** Auto-scroll: near the scroller's top / bottom edge it scrolls every frame (faster deeper in the zone), also while the
+ * pointer stays still, until it leaves the zone or the drag ends. */
+function drg_scroll(s) {
+  s.sraf = 0;
+  if (drg_cur !== s || !s.on) return;
+  const sc = typeof s.o.scroll === 'function' ? s.o.scroll() : s.o.scroll; if (!sc) return;
+  const doc = sc === document.scrollingElement || sc === document.documentElement;
+  const r = doc ? {top: 0, bottom: innerHeight} : sc.getBoundingClientRect(), edge = s.o.edge || 56, step = s.o.step || 14;
+  const top = r.top + edge - s.y, bot = s.y - (Math.min(r.bottom, innerHeight) - edge);
+  const v = top > 0 ? -Math.ceil(step * Math.min(1, top / edge)) : bot > 0 ? Math.ceil(step * Math.min(1, bot / edge)) : 0;
+  if (!v) return;
+  const before = sc.scrollTop;
+  sc.scrollBy(0, v);
+  if (sc.scrollTop === before) return;  // at the end: nothing more to scroll
+  s.o.onMove?.(s.d, s.x, s.y, s.x - s.x0, s.y - s.y0);  // the content moved under the pointer
+  s.sraf = requestAnimationFrame(() => drg_scroll(s));
+}
+
+/** A copy of the ghost's element, fixed where the element is; it slides by transform. */
+function drg_ghost(s) {
+  const src = s.o.ghost.el; if (!src || !src.isConnected) return;
+  const r = src.getBoundingClientRect(), g = /** @type {HTMLElement} */ (src.cloneNode(true));
+  if (s.o.ghost.cls) g.classList.add(...s.o.ghost.cls.split(' ').filter(Boolean));
+  g.removeAttribute('id');
+  g.setAttribute('aria-hidden', 'true');
+  g.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;z-index:95;pointer-events:none`;
+  document.body.appendChild(g);
+  s.ghost = g;
+}
+
+/** @param {any} s @param {boolean} drop @param {Event} [e] */
+function drg_end(s, drop, e) {
+  if (drg_cur === s) drg_cur = null; else if (s.done) return;
+  s.done = true;
+  clearTimeout(s.timer);
+  if (s.raf) cancelAnimationFrame(s.raf);
+  if (s.sraf) cancelAnimationFrame(s.sraf);
+  for (const k in s.l) (k === 'keydown' ? document : s.at).removeEventListener(k, s.l[k], k === 'keydown' ? true : undefined);
+  // a touch the caller started (long press) ends without the click that would follow it
+  if (s.begun && e && e.cancelable && e.type === 'touchend') e.preventDefault();
+  try {
+    if (s.on && drop) s.o.onDrop?.(s.d, s.x, s.y);
+    else if (!s.on && drop && s.held) s.o.onTap?.(s.d);
+    else s.o.onCancel?.(s.d);
+  } finally {
+    s.ghost?.remove();
+    if (s.on) drg_noClick();
+  }
+}
+
+/** The drag is not a tap: the click that follows it does not press the button under the pointer. */
+function drg_noClick() {
+  const stop = e => { e.stopPropagation(); e.preventDefault(); };
+  document.addEventListener('click', stop, {capture: true, once: true});
+  setTimeout(() => document.removeEventListener('click', stop, {capture: true}), 350);
+}

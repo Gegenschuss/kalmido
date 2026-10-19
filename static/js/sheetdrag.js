@@ -33,14 +33,18 @@ function sd_start(t, x, y, touch) {
   Object.assign(SD, {el, head, base: b && b !== 'none' ? b + ' ' : '', x0: x, y0: y, h0: r.height, on: false, ty: 0, lastY: y, lastT: performance.now(), v: 0, sized: false, t});
   return true;
 }
-function sd_move(x, y) {
+// 2.102.0 (#1998): drag.js asks whether a move starts the drag: 8 px in either direction, then only a vertical move, and in
+// the content only a pull down while it is scrolled to the very top
+function sd_accept(dx, dy) {
   const el = SD.el; if (!el) return false;
+  if (Math.abs(dy) < 8 && Math.abs(dx) < 8) return null;
+  if (Math.abs(dx) > Math.abs(dy) || (!SD.head && (dy < 0 || sd_scrolled(SD.t, el)))) { SD.el = null; return false; }
+  SD.on = true; el.style.transition = 'none'; el.classList.add('sd-drag');
+  return true;
+}
+function sd_move(x, y) {
+  const el = SD.el; if (!el || !SD.on) return false;
   const dx = x - SD.x0, dy = y - SD.y0;
-  if (!SD.on) {
-    if (Math.abs(dy) < 8 && Math.abs(dx) < 8) return false;
-    if (Math.abs(dx) > Math.abs(dy) || (!SD.head && (dy < 0 || sd_scrolled(SD.t, el)))) { SD.el = null; return false; }
-    SD.on = true; el.style.transition = 'none'; el.classList.add('sd-drag');
-  }
   const now = performance.now(), dt = Math.max(1, now - SD.lastT);
   SD.v = 0.6 * SD.v + 0.4 * ((y - SD.lastY) / dt); SD.lastY = y; SD.lastT = now;
   const vh = sd_vh(), maxH = Math.round(vh * 0.94), minH = Math.min(SD.h0, Math.round(vh * 0.4));
@@ -65,7 +69,7 @@ function sd_end(cancel) {
   const el = SD.el; SD.el = null; if (!el || !SD.on) return false;
   el.classList.remove('sd-drag');
   const h = el.getBoundingClientRect().height + SD.ty, flick = SD.v > 0.6 && SD.ty > 12;
-  el.style.transition = 'transform .18s ease-out';
+  el.style.transition = drg_reduced() ? 'none' : 'transform .18s ease-out';
   if (!cancel && (SD.ty > Math.min(120, h * 0.3) || flick)) {
     el.style.transform = `${SD.base}translateY(${Math.round(h + 40)}px)`;
     setTimeout(() => {
@@ -80,27 +84,19 @@ function sd_end(cancel) {
     }
     el.style.transform = '';
   }
-  // the drag is not a tap: the click that follows it does not press the button under the finger
-  const stop = e => { e.stopPropagation(); e.preventDefault(); };
-  document.addEventListener('click', stop, {capture: true, once: true});
-  setTimeout(() => document.removeEventListener('click', stop, {capture: true}), 350);
-  return true;
+  return true;  // drag.js swallows the click that follows the drag
 }
 function sd_reset(el, keepSize) {
   el.style.transition = ''; el.style.transform = '';
   if (!keepSize) { el.style.height = ''; el.style.maxHeight = ''; }
 }
-// touch: touch events (a pointer would be cancelled as soon as the browser starts to pan the sheet's content)
-// 2.39.1 (#1181): a synthetic touch event may come without a touches list
-document.addEventListener('touchstart', e => { const t = e.touches || []; if (t.length === 1) sd_start(e.target, t[0].clientX, t[0].clientY, true); else if (SD.el) sd_end(true); }, {passive: true});
-document.addEventListener('touchmove', e => { const t = e.touches || []; if (SD.el && t.length === 1 && sd_move(t[0].clientX, t[0].clientY) && e.cancelable) e.preventDefault(); }, {passive: false});
-document.addEventListener('touchend', () => sd_end(false), {passive: true});
-document.addEventListener('touchcancel', () => sd_end(true), {passive: true});
-// mouse / pen (a narrow desktop window, tests): the same at the head, with pointer capture
-document.addEventListener('pointerdown', e => {
-  if (e.pointerType === 'touch' || e.button !== 0) return;
-  if (sd_start(e.target, e.clientX, e.clientY, false)) { try { e.target.setPointerCapture?.(e.pointerId); } catch {} }
+// 2.102.0 (#1998): touch (touch events: a pointer would be cancelled as soon as the browser starts to pan the sheet's content;
+// a second finger cancels) and mouse / pen (a narrow desktop window, tests; at the head, with pointer capture) through drag.js
+drg_attach(document, {
+  start: (t, x, y, kind) => sd_start(t, x, y, kind === 'touch'),
+  accept: (d, dx, dy) => sd_accept(dx, dy),
+  onMove: (d, x, y) => { sd_move(x, y); },
+  onDrop: () => { sd_end(false); },
+  onTap: () => { sd_end(false); },
+  onCancel: () => { sd_end(true); },
 });
-document.addEventListener('pointermove', e => { if (e.pointerType !== 'touch' && SD.el) sd_move(e.clientX, e.clientY); });
-document.addEventListener('pointerup', e => { if (e.pointerType !== 'touch') sd_end(false); });
-document.addEventListener('pointercancel', e => { if (e.pointerType !== 'touch') sd_end(true); });

@@ -12,7 +12,9 @@ const newsBundled = () => LS.get('newsBundle', true) !== false;
 function newsGroups(items) {
   const groups = new Map();
   for (const [it, i] of items) {
-    const key = it.task_id && !(it.tasks || []).length ? 't' + it.task_id : it.list_id && ['share', 'role', 'unshare', 'owner', 'status'].includes(it.kind) ? 'l' + it.list_id : 'k' + it.kind + (it.kind === 'comment' ? it.actor_id : '');
+    // 2.102.0 B (#2197): per task only, never per person over tasks and days (a bundle of the server stays its own line); read and unread never share a line
+    const key0 = it.task_id && !(it.tasks || []).length ? 't' + it.task_id : it.list_id && ['share', 'role', 'unshare', 'owner', 'status'].includes(it.kind) ? 'l' + it.list_id : it.kind === 'comment' ? 'i' + it.id : 'k' + it.kind,
+      key = key0 + (it.read ? 'r' : 'u');
     if (!groups.has(key)) groups.set(key, {key, items: [], needs: false, unread: 0, at: it.created_at});
     const g = groups.get(key);
     // 2.25.0 (UX-45): a comment that names me (@me) needs me too, like a mention
@@ -20,7 +22,8 @@ function newsGroups(items) {
     // 2.66.1 (#1943): what the server marks "For you" (the bell's number: replies to me, an agent's comments that reach me) needs me too
     g.items.push([it, i]); if (NEWS_NEEDS.includes(it.kind) || toMe || it.to_me) g.needs = true; if (!it.read) g.unread++;
   }
-  return [...groups.values()];
+  // 2.102.0 B (#2197): unread lines first (the sort is stable: the server's order stays inside)
+  return [...groups.values()].sort((a, b) => (b.unread > 0) - (a.unread > 0));
 }
 function newsSummaryLine(g) {
   const c = {};
@@ -34,14 +37,14 @@ function newsSummaryLine(g) {
 }
 function newsGroupHtml(g, pop) {
   const [first] = g.items[0], U = S.nf.users;
-  const title = first.task_id && !(first.tasks || []).length ? esc(first.task_title || '') : first.list_id && g.key[0] === 'l' ? esc(newsListName(first)) : newsText(first, U);
+  const title = first.task_id && !(first.tasks || []).length ? esc(first.task_title || '') : first.kind === 'comment' && (first.tasks || []).length === 1 ? esc(first.tasks[0].title || '') : first.list_id && g.key[0] === 'l' ? esc(newsListName(first)) : newsText(first, U);
   const actors = [...new Set(g.items.flatMap(([it]) => it.actors || [it.actor_id]).filter(Boolean))].slice(0, 4);
   const ids = g.items.flatMap(([it]) => it.ids || [it.id]);
   const open = g.items.length === 1 ? (pop ? 'data-bp="open"' : 'data-act="news-open"') + ` data-i="${g.items[0][1]}"` : `data-act="news-group" data-g="${esc(g.key)}"`;
   const exp = S.nf.openG === g.key;
   return `<div class="ngroup ${g.unread ? 'unread' : ''} ${g.needs ? 'needs' : ''}" data-gk="${esc(g.key)}">
     <div class="nghead"><div class="ngav">${actors.map(a => av(a, uname(a, U), 'avatar sm')).join('')}</div>
-      <div class="ngmain" role="button" tabindex="0" ${open} ${g.items.length > 1 ? `aria-expanded="${exp}"` : ''}><div class="ngt">${title}${g.items.length > 1 ? `<span class="ngn">${g.items.length}</span>` : ''}</div><div class="ngs muted">${esc(newsSummaryLine(g))} · <time>${esc(relTime(g.at))}</time></div>${(() => {  // 2.25.0 (UX-45): what was written, one line
+      <div class="ngmain" role="button" tabindex="0" ${open} ${g.items.length > 1 ? `aria-expanded="${exp}"` : ''}><div class="ngt">${title}${g.items.length > 1 && g.unread ? `<span class="ngn" title="${esc(tr('Unread'))}">${g.unread}</span>` : ''}</div><div class="ngs muted">${esc(newsSummaryLine(g))} · <time>${esc(relTime(g.at))}</time></div>${(() => {  // 2.25.0 (UX-45): what was written, one line
         const ex = g.items.map(([it]) => it).find(it => (it.kind === 'mention' || it.kind === 'comment') && it.excerpt);
         return ex ? `<div class="nexc ngex">${newsExcerpt(ex.excerpt, U)}</div>` : ''; })()}</div>
       ${g.unread ? `<button type="button" class="iconbtn" data-act="news-gread" data-ids="${ids.join(',')}" title="${esc(tr('Mark read'))}" aria-label="${esc(tr('Mark read') + ': ' + title.replace(/<[^>]+>/g, ''))}">${ic('check', 's')}</button>` : ''}</div>

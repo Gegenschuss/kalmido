@@ -70,6 +70,8 @@ def about_info(c, u):
         d.update(hosting_admin(c))  # 2.24.0 (#905 #907 #910 #899)
     from ..admin.supporter import sup_about
     d.update(sup_about(c, u))  # 2.74.0 (#338): self-hosted only (hosted: no fields)
+    from ..integrations.errorreports import cer_about
+    d.update(cer_about(c, u))  # 2.102.0 E (#1999): the browser's error reports
     return d
 
 
@@ -176,6 +178,9 @@ def admin_settings():
         return e
     from ..admin.hosting import hosting_settings
     e = hosting_settings(c, b)  # 2.24.0: storage quota, support address, mail limit, the notice
+    if not e:
+        from ..integrations.errorreports import cer_settings
+        e = cer_settings(c, b)  # 2.102.0 E (#1999): the list for the browser's error reports
     if e:
         c.rollback()
         return e

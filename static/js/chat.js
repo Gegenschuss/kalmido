@@ -88,7 +88,7 @@ function tcRoomHtml() {
   return `${typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}${e2eRoomNotice(room)}${le2eChanNotice(room)}${cpnBarHtml('t:' + rid)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
     <button type="button" class="chnew hidden" id="tc-new">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${replyBarHtml('t:' + rid)}<div class="chcomp tccomp"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Message to {0}…', name.length > 18 ? name.slice(0, 17).trimEnd() + '…' : name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="enter" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
-    <button type="button" class="btn pri" data-act="tc-send" title="${esc(chatKeyHint())}"${csdBusy('t:' + rid) ? ' disabled' : ''}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
+    <span class="muted chkh">${esc(chatKeyHintVis())}</span><button type="button" class="btn pri" data-act="tc-send" title="${esc(chatKeyHint())}"${csdBusy('t:' + rid) ? ' disabled' : ''}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
 }
 function tcMsgsHtml() {
   if (S.tc.err && !S.tc.msgs.length) return `<div class="muted mhint" data-k="err">${esc(S.tc.err)}</div>`;
@@ -236,6 +236,8 @@ async function dmWhy(kind, msg, name) {
   if (ok && off) settingsModal('collab');
 }
 // 2.94.0 (#2024): title of the Send buttons; no key hint on touch devices without a keyboard
+// 2.102.0 B (#2204): the visible hint next to a send button; empty on touch devices (the tooltip text there is just "Send")
+const chatKeyHintVis = () => matchMedia('(hover:none)').matches ? '' : chatKeyHint();
 const chatKeyHint = () => matchMedia('(hover:none)').matches ? tr('Send') : /Mac|iPhone|iPad/.test(navigator.platform || '') ? tr('Cmd+Enter sends') : tr('Ctrl+Enter sends');
 // the open conversation follows the route; switching rooms loads it
 function teamRoute(rid) {

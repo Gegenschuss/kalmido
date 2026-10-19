@@ -25,7 +25,7 @@ OL_LOG_MAX = 50
 def _ol_list(c, oid, lid):
     """The list lid of organisation oid (never an inbox), else 404 -- the same answer for a private list, another
     organisation's list and a list that does not exist."""
-    lr = c.execute("SELECT * FROM lists WHERE id=? AND org_id=? AND is_inbox=0", (lid, oid)).fetchone()
+    lr = c.execute("SELECT * FROM lists WHERE id=? AND org_id=? AND is_inbox=0 AND deleted_at IS NULL", (lid, oid)).fetchone()  # 2.102.0 A (#1988)
     if not lr:
         raise Denied(404)
     return lr
@@ -90,13 +90,13 @@ def _ol_out(c, oid):
     from ..collab.comments import user_names
     # 2.39.1 (#1188): only lists of the organisation that are shared with at least one more person (people, not agents):
     # private lists never (also when shared), lists without members never, inboxes never; the folder path of the owner
-    rows = c.execute("""SELECT l.id, l.name, l.color, l.icon, l.owner_id, l.archived, l.archived_at, l.created_at, l.folder,
+    rows = c.execute("""SELECT l.id, l.name, l.color, l.icon, l.owner_id, l.archived, l.archived_at, l.created_at, l.folder, l.e2e,
                                (SELECT COUNT(*) FROM tasks t WHERE t.list_id=l.id AND t.deleted_at IS NULL AND t.status=0) AS open_n,
                                (SELECT COUNT(*) FROM tasks t WHERE t.list_id=l.id AND t.deleted_at IS NULL) AS all_n,
                                (SELECT MAX(t.updated_at) FROM tasks t WHERE t.list_id=l.id) AS changed,
                                (SELECT COUNT(*) FROM list_members m JOIN users u ON u.id=m.user_id
                                  WHERE m.list_id=l.id AND m.user_id!=l.owner_id AND COALESCE(u.kind,'user')!='agent') AS members
-                        FROM lists l WHERE l.org_id=? AND l.is_inbox=0 ORDER BY l.archived, lower(l.name), l.id""", (oid,)).fetchall()
+                        FROM lists l WHERE l.org_id=? AND l.is_inbox=0 AND l.deleted_at IS NULL ORDER BY l.archived, lower(l.name), l.id""", (oid,)).fetchall()
     rows = [r for r in rows if r["members"] > 0]
     log = c.execute("SELECT * FROM org_list_log WHERE org_id=? ORDER BY id DESC LIMIT ?", (oid, OL_LOG_MAX)).fetchall()
     people = c.execute("""SELECT u.id FROM org_members m JOIN users u ON u.id=m.user_id
@@ -109,7 +109,8 @@ def _ol_out(c, oid):
                    "owner_agent": r["owner_id"] in agents, "mine": r["owner_id"] == me(), "archived": bool(r["archived"]),
                    "archived_at": r["archived_at"], "open": r["open_n"], "tasks": r["all_n"], "members": r["members"], "folder": r["folder"] or "",
                    "changed_at": r["changed"] or r["created_at"],
-                   "color": r["color"] or "", "icon": list_icon_url(r)} for r in rows],  # 2.56.0 (#1795): for "Edit"
+                   "color": r["color"] or "", "icon": list_icon_url(r),  # 2.56.0 (#1795): for "Edit"
+                   "e2e": bool(r["e2e"])} for r in rows],  # 2.102.0 A (#1988): with the lock deleting stays for good
         "people": sorted(({"id": r[0], "name": names.get(r[0], "")} for r in people), key=lambda x: x["name"].lower()),
         "log": [{"at": r["created_at"], "action": r["action"], "list_id": r["list_id"], "list_name": r["list_name"],
                  "by": names.get(r["by_id"], ""), "owner": names.get(r["owner_id"], ""), "to": names.get(r["to_id"], ""),
@@ -161,6 +162,16 @@ def oadm_delete(oid, lid):
         return err(tr("Archive the list first: only archived lists can be deleted for good"), 409)
     if str(b.get("confirm") or "").strip() != lr["name"].strip():
         return err(tr("Type the name of the list to delete it for good"))
+    from ..collab.liste2e import le2e_mode
+    if not le2e_mode(c, lid):  # 2.102.0 A (#1988): into the organisation's list trash (lists/listtrash.py), never a private one
+        from ..lists.listtrash import otr_trash
+        _ol_news(c, oid, lr, "trash", gone=True)
+        _ol_log(c, oid, lr, "trash")
+        otr_trash(c, lid, me())
+        bump(c)
+        c.commit()
+        print("organisation", oid, "list", lid, "moved to the trash by admin", g.user["username"], flush=True)
+        return jsonify(ok=True, trash=True, **_ol_out(c, oid))
     _ol_news(c, oid, lr, "delete", gone=True)
     _ol_log(c, oid, lr, "delete")
     icon, lfiles = list_purge(c, lid, my_inbox(c, lr["owner_id"]))

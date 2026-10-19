@@ -1,3 +1,4 @@
+// @ts-check
 /* Kalmido web client: modules loaded on demand (2.53.0, #1410). Rarely opened areas (the settings dialog, the contacts
    view, Office & finance) have no script tag in index.html: their first use loads them (loadModule), then they stay.
    The service worker precaches them (LAZY in sw.js), so they open offline too; tools/check_layout.py compares the lists.
@@ -149,8 +150,8 @@ for (const [n, [m, view]] of Object.entries(LD_VIEW)) window[n] = () => { if (!v
 // the office switch of an agent (Settings > Agents, the agent chat's settings): its row is drawn at once, the office part
 // only loads when the office is on
 window.oa_switchRowHtml = aid => officeOn() ? `<div class="oa_sw" data-oa-aid="${+aid}" hidden></div>` : '';
-window.oa_switchLoad = md => !officeOn() ? Promise.resolve() : loadModule('office').then(() => { if (window.oa_switchLoad.ld) return; return oa_switchLoad(md); }).catch(() => {});
-window.oa_switchLoad.ld = 1;
+window.oa_switchLoad = md => !officeOn() ? Promise.resolve() : loadModule('office').then(() => { if (/** @type {any} */ (window.oa_switchLoad).ld) return; return oa_switchLoad(md); }).catch(() => {});
+/** @type {any} */ (window.oa_switchLoad).ld = 1;
 // 2.65.0 (#1823) knowledge pages: the command bar's pages and a task's "Mentioned in" load the module in the background (the
 // first time without them, as before while the pages were fetched); the task panel is drawn again once it is there
 window.wk_palAdd = () => { if (feat('wiki')) loadModule('wiki').catch(() => {}); };
@@ -163,7 +164,7 @@ window.wk_mentionHtml = t => { if (feat('wiki') && t?.id > 0) loadModule('wiki')
 // from pdfview.js). A link that should open the preview: <a href="…" data-pview='{"url","name","size","dlUrl"}'>; a modifier
 // key keeps the browser's own behaviour (Ctrl/Cmd-click = new tab), like the text viewer's links
 document.addEventListener('click', e => {
-  const l = e.target.closest?.('a[data-pview],button[data-pview]');
+  const l = /** @type {HTMLElement} */ (e.target).closest?.('a[data-pview],button[data-pview]');
   if (!l || e.button || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
   let o; try { o = JSON.parse(l.dataset.pview); } catch { return; }
   e.preventDefault(); e.stopPropagation();
@@ -225,7 +226,7 @@ const pv_attr = o => ` data-pview="${esc(JSON.stringify(o))}"`;
 const dv_is = a => !!a && !a.enc && (/\.(docx|xlsx)$/i.test(String(a.name || '')) || /officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet)$/.test(a.mime || ''));
 const dv_attr = o => ` data-dview="${esc(JSON.stringify(o))}"`;
 document.addEventListener('click', e => {
-  const l = e.target.closest?.('a[data-dview],button[data-dview]');
+  const l = /** @type {HTMLElement} */ (e.target).closest?.('a[data-dview],button[data-dview]');
   if (!l || e.button || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
   let o; try { o = JSON.parse(l.dataset.dview); } catch { return; }
   e.preventDefault(); e.stopPropagation();
@@ -234,6 +235,7 @@ document.addEventListener('click', e => {
 // the settings dialog is opened most often: loaded in the background once the app has started and is idle
 // 2.65.0 (#1823): then, one per idle moment, the areas this person has switched on (not all modules: no office, contacts,
 // statistics, PDF, playbooks), so their first click stays quick without slowing the start
+/** @type {[string, () => boolean][]} */
 const LD_IDLE = [['settings', () => true], ['calendar', () => feat('cal')], ['timeline', () => feat('timeline')], ['wiki', () => feat('wiki')],
   ['docs', () => feat('docs')], ['life', () => lifeOn()]];
 function ld_idle(i) {

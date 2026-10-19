@@ -255,7 +255,7 @@ async function wsIconPick(md, oid, how) {
 // ---- 2.35.0 (#1101): an organisation admin's "Lists of the organisation": the lists that belong to the organisation (never
 // private lists, private sharing or inboxes) with owner, numbers and the last change - never their contents. Archive / restore,
 // hand over to another person of the organisation, delete for good from the archive (the name typed to confirm); a history.
-const OADM_ACT = {archive: N_('{0} archived {1}'), restore: N_('{0} restored {1}'), delete: N_('{0} deleted {1} for good'), owner: N_('{0} handed {1} to {2}'),
+const OADM_ACT = {archive: N_('{0} archived {1}'), restore: N_('{0} restored {1}'), delete: N_('{0} deleted {1} for good'), trash: N_('{0} moved {1} to the trash'), undelete: N_('{0} restored {1} from the trash'), purge: N_('{0} deleted {1} for good'), owner: N_('{0} handed {1} to {2}'),
   edit: N_('{0} changed {1}'), icon: N_('{0} changed the icon of {1}')};  // 2.56.0 (#1795)
 function oadmRow(x) {
   const sub = [x.owner_agent ? tr('Owner: {0} (agent)', x.owner_name) : tr('Owner: {0}', x.owner_name), tr('{0} open', x.open) + ' / ' + trn('{0} task', '{0} tasks', x.tasks),
@@ -293,12 +293,13 @@ async function oadmOpen(oid, name) {
         j = await api('POST', base + '/archive', {archived: true}); toast(tr('Archived'));
       } else if (k === 'restore') { j = await api('POST', base + '/archive', {archived: false}); toast(tr('Restored')); }
       else if (k === 'delete') {
-        const v = await askDialog({title: tr('Delete “{0}” permanently?', x.name), danger: true, ok: tr('Delete permanently'),
-          html: `<p>${esc(tr('This cannot be undone. Its tasks go to the trash in the basket of {0} and can be restored from there; its files and the sharing are lost. {0} and the members are told.', x.owner_name))}</p><p>${esc(tr('Type the name of the list to delete it for good'))}</p>`,
+        const v = await askDialog({title: x.e2e ? tr('Delete “{0}” permanently?', x.name) : tr('Delete “{0}”?', x.name), danger: true, ok: x.e2e ? tr('Delete permanently') : tr('Delete'),  // 2.102.0 A (#1988): the organisation's list trash
+          html: `<p>${esc(x.e2e ? tr('This cannot be undone. Its tasks go to the trash in the basket of {0} and can be restored from there; its files and the sharing are lost. {0} and the members are told.', x.owner_name) : otr_orgNote(x.owner_name))}</p><p>${esc(tr('Type the name of the list to delete it'))}</p>`,
           input: {placeholder: x.name, max: 200}});
         if (v === null) return;
         if (v.trim() !== x.name.trim()) { toast(tr('The name does not match: nothing was deleted')); return; }
-        j = await api('DELETE', base, {confirm: v.trim()}); toast(tr('Deleted'));
+        j = await api('DELETE', base, {confirm: v.trim()});
+        if (j?.trash) otr_offerUndo(x.id, x.name); else toast(tr('Deleted'));
       } else if (k === 'owner') {
         const ps = (md._j.people || []).filter(p => p.id !== x.owner_id);
         if (!ps.length) { toast(tr('Nobody else in the organisation to hand it to')); return; }

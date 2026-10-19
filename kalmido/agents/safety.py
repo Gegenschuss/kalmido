@@ -74,7 +74,7 @@ def agent_cap(c, aid):
 
 def agent_reach(c, aid):
     """The lists agent aid can really use: owned or shared with it (no health list), within its list restriction."""
-    rows = [r[0] for r in c.execute("""SELECT id FROM lists WHERE COALESCE(life,'') NOT IN ('health', 'budget') AND e2e IS NULL AND (owner_id=? OR id IN
+    rows = [r[0] for r in c.execute("""SELECT id FROM lists WHERE COALESCE(life,'') NOT IN ('health', 'budget') AND e2e IS NULL AND deleted_at IS NULL AND (owner_id=? OR id IN
                                        (SELECT list_id FROM list_members WHERE user_id=?))""", (aid, aid))]
     cap = agent_cap(c, aid)
     return [x for x in rows if cap is None or x in cap]
@@ -250,7 +250,7 @@ def agent_lists_set(c, aid, v, ok=False):
     """agents.list_ids (and its tokens): only lists the agent is in. The caller checked who may change the agent. Widening the
     limit (or lifting it) must not switch on a bridge nobody approved: 409 agent_bridge, or with ok (bridge_ok from a person
     who may approve every pair) the approvals are stored."""
-    reach = {r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=? OR id IN (SELECT list_id FROM list_members WHERE user_id=?)", (aid, aid))}
+    reach = {r[0] for r in c.execute("SELECT id FROM lists WHERE deleted_at IS NULL AND (owner_id=? OR id IN (SELECT list_id FROM list_members WHERE user_id=?))", (aid, aid))}
     csv_ = list_ids_clean(c, v, lambda n: n in reach)
     before = _open_pairs(c, aid)
     c.execute("UPDATE agents SET list_ids=? WHERE user_id=?", (csv_, aid))
