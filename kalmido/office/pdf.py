@@ -42,6 +42,7 @@ PDF_NEXT_TOP = 30 * MM   # body top on following pages (below the small head)
 PDF_LOGO_MAX_W = 45 * MM  # 2.114.5 (#2300): smaller logo (was 60 x 22 mm)
 PDF_LOGO_MAX_H = 16 * MM
 PDF_LOGO_MAX_PX = 1600   # the upload route scales to this width; the writer accepts anything Pillow reads
+BP = None                # 2.120.0 E (#2091): the own letterhead in effect -- set only in the run of bp_layout
 
 # ---- colours ("#rrggbb"); the accent comes from the company settings ----------------------------------------------
 C_INK, C_INK2, C_RULE, C_RULE2, C_WHITE = "#16191f", "#4b515c", "#c9ced6", "#e7e9ee", "#ffffff"
@@ -482,12 +483,17 @@ def pdf_write(pages, images, title="", author="", xml=None, meta=None):
     for name, (w, h, data) in images.items():
         img_ids[name] = add(f"<< /Type /XObject /Subtype /Image /Width {w} /Height {h} /ColorSpace /DeviceRGB "
                             f"/BitsPerComponent 8 /Filter /FlateDecode /Length {len(data)} >>\nstream\n".encode() + data + b"\nendstream")
+    form_ids = {}  # 2.120.0 E (#2091): the letterhead pages (page.forms {name: emit(objs) -> object number}), each written once
+    for p in pages:
+        for n, emit in sorted((getattr(p, "forms", None) or {}).items()):
+            if n not in form_ids:
+                form_ids[n] = emit(objs)
     pages_id = len(objs) + 1 + 2 * len(pages)  # the Pages object comes after all page + content objects
     page_ids = []
     for p in pages:
         content = zlib.compress("\n".join(p.ops).encode("latin-1"), 6)
         cid = add(f"<< /Length {len(content)} /Filter /FlateDecode >>\nstream\n".encode() + content + b"\nendstream")
-        xo = " ".join(f"/{n} {img_ids[n]} 0 R" for n in sorted(p.images) if n in img_ids)
+        xo = " ".join([f"/{n} {img_ids[n]} 0 R" for n in sorted(p.images) if n in img_ids] + [f"/{n} {form_ids[n]} 0 R" for n in sorted(getattr(p, "forms", None) or {})])
         pid = add(f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 {A4_W:.2f} {A4_H:.2f}] "
                   f"/Resources << /Font << /F1 {font_ids[False]} 0 R /F2 {font_ids[True]} 0 R >> /XObject << {xo} >> "
                   f"/ProcSet [/PDF /Text /ImageC] >> /Contents {cid} 0 R >>".encode())
@@ -766,6 +772,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     logo_bytes: the logo file (else company.logo_path is read). xml / meta (2.38.0): the e-invoice XML to embed and the
     writer's metadata, see pdf_write. model["draft_mark"]: a word printed as a light diagonal mark on every page (drafts)."""
     m = model or {}
+    if BP is None and isinstance(m.get("letterhead"), dict):  # 2.120.0 E (#2091): own letterhead: the same layout with its margins
+        return bp_layout(m["letterhead"], model, logo_bytes, xml, meta)
     lang = "en" if str(m.get("lang") or "de").lower().startswith("en") else "de"
     L = dict(PDF_LABELS[lang])
     ml = m.get("labels") or {}
@@ -804,6 +812,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
 
     # -- letterhead (page 1) and the small head (following pages)
     def draw_letterhead(p):
+        if BP and BP["hide_head"]:  # 2.120.0 E (#2091): logo, name and fold marks come with the letterhead
+            return
         if logo:
             w, h = logo_box(PDF_LOGO_MAX_W, PDF_LOGO_MAX_H)
             p.image("Logo", A4_W - PDF_R - w, PDF_TOP + 2 * MM, w, h)
@@ -816,14 +826,17 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             p.line(5 * MM, y, 9 * MM, y, 0.4, C_RULE)
 
     def draw_small_head(p):
-        y = 12 * MM
-        if logo:
+        y = 12 * MM if not BP else max(4 * MM, PDF_NEXT_TOP - 18 * MM)  # 2.120.0 E (#2091): above the body of the letterhead
+        if BP and BP["hide_head"]:
+            pass
+        elif logo:
             w, h = logo_box(32 * MM, 11 * MM)
             p.image("Logo", A4_W - PDF_R - w, y, w, h)
         else:
             p.text(PDF_L + PDF_CW, y, co.get("name") or "", 9, True, C_INK, align="r", spacing=0.6)
         p.text(PDF_L, y + 2, f"{title} {number}".strip() + (" · " + rc["name"] if rc.get("name") else ""), 8, False, C_INK2)
-        p.line(PDF_L, 24.5 * MM, PDF_L + PDF_CW, 24.5 * MM, 0.5, accent)
+        ry = 24.5 * MM if not BP else y + 12.5 * MM
+        p.line(PDF_L, ry, PDF_L + PDF_CW, ry, 0.5, accent)
 
     # -- footer (every page), four columns; empty ones are left out (2.114.4 A (#2271): shared with the document templates)
     cols = pdf_footer_cols(co)
@@ -833,7 +846,10 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
 
     def draw_footer(p, n, total):
         # 2.114.4 A (#2282): the page count only from two pages on, the number stays
-        pdf_draw_footer(p, cols, " · ".join(x for x in (number, L["page"].format(n, total) if total >= 2 else "") if x), p3f, foot_h)
+        right = " · ".join(x for x in (number, L["page"].format(n, total) if total >= 2 else "") if x)
+        if BP and BP["hide_footer"]:  # 2.120.0 E (#2091): the letterhead has its own footer; number + page under the body
+            return p.text(PDF_L + PDF_CW, BP["bottom"][n > 1] + 3 * MM, right, 6.8, False, C_INK2, align="r")
+        pdf_draw_footer(p, cols, right, p3f, foot_h)
 
     # -- blocks: (height, draw(page, y), keep_next, keep_prev, table)
     blocks = []
@@ -911,6 +927,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
 
     # -- the table: columns Pos. | Service | Qty | Unit price | VAT | Total
     c_pos, c_qty, c_rate, c_vat, c_tot = 22, 64, 70, 36, 76
+    np_ = bool(m.get("noprice"))  # 2.120.0 D (#2089): delivery note / timesheet: no price, VAT or total columns
+    if np_:
+        c_pos, c_rate, c_vat, c_tot = int(m.get("pos_w") or 22), 0, 0, 0
     # 2.114.5 (#2300): a quotation whose positions (parts too) all carry the same rate prints no VAT column
     p3v = {str(x.get("tax_pct")) for x in list(m.get("lines") or []) + [y for pt in (m.get("parts") or []) if isinstance(pt, dict) for y in (pt.get("lines") or [])]
            if isinstance(x, dict) and (x.get("kind") or "item") in ("item", "producing", "raw", "discount") and x.get("tax_pct") not in (None, "")}
@@ -930,10 +949,11 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         p.text(x_pos + 3, yy, L["pos"].upper(), 7.4, True, C_INK2, spacing=0.6)
         p.text(x_title + 3, yy, L["service"].upper(), 7.4, True, C_INK2, spacing=0.6)
         p.text(x_qty, yy, L["qty"].upper(), 7.4, True, C_INK2, align="r", width=c_qty - 3, spacing=0.6)
-        p.text(x_rate, yy, L["rate"].upper(), 7.4, True, C_INK2, align="r", width=c_rate - 3, spacing=0.6)
-        if c_vat:
-            p.text(x_vat, yy, L["vat"].upper(), 7.4, True, C_INK2, align="c", width=c_vat, spacing=0.6)
-        p.text(x_tot, yy, L["total"].upper(), 7.4, True, C_INK2, align="r", width=c_tot - 3, spacing=0.6)
+        if not np_:  # 2.120.0 D (#2089): no price columns on a delivery note
+            p.text(x_rate, yy, L["rate"].upper(), 7.4, True, C_INK2, align="r", width=c_rate - 3, spacing=0.6)
+            if c_vat:
+                p.text(x_vat, yy, L["vat"].upper(), 7.4, True, C_INK2, align="c", width=c_vat, spacing=0.6)
+            p.text(x_tot, yy, L["total"].upper(), 7.4, True, C_INK2, align="r", width=c_tot - 3, spacing=0.6)
         p.line(PDF_L, y + thead_h - 1, PDF_L + PDF_CW, y + thead_h - 1, 1.1, C_INK)
 
     lines = [x for x in (m.get("lines") or []) if isinstance(x, dict)]
@@ -971,6 +991,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 rate_s = str(ln.get("rate_text") or "") if "rate_text" in ln else (money(ln["rate"]) if ln.get("rate") not in (None, "") else "")
                 vat_s = (pdf_num(ln["tax_pct"], lang, fmt) + " %") if ln.get("tax_pct") not in (None, "") and c_vat else ""
                 tot_s = str(ln.get("total_text") or "") if ln.get("total_text") else money(ln.get("total") or 0)
+                if np_:
+                    rate_s = vat_s = tot_s = ""
                 pos_s = str(ln.get("pos") or "") if k in ("item", "producing") else ""  # 2.114.4 A (#2276): producing numbered too
                 t_lines = pdf_wrap(t, body, c_title - 6)
                 d_lines = pdf_wrap(detail, 8.4, c_title + c_qty + c_rate + c_vat + c_tot - 6) if detail else []
@@ -1094,7 +1116,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         for s in note_lines:
             p.text(PDF_L, ny, s, 8.4, False, C_INK2)
             ny += 8.4 * 1.42
-    block(sum_h, draw_sum, keep_prev=last_item_idx is not None)
+    if not (np_ and not (isinstance(tot.get("rows"), list) and tot["rows"])):  # 2.120.0 D (#2089): a delivery note has no totals
+        block(sum_h, draw_sum, keep_prev=last_item_idx is not None)
 
     # -- 2.38.0 (#1021): payment information of an invoice (due text + bank line) right below the totals
     pay = m.get("payment") if isinstance(m.get("payment"), dict) else None
@@ -1186,13 +1209,13 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
 
     def draw_accept(p, y):
         p3a_at.append(p)
-        p.text(PDF_L, y + 16, L["accept"].upper(), 7.4, True, C_INK2, spacing=0.8)
+        p.text(PDF_L, y + 16, str(m.get("receipt_label") or L["accept"]).upper(), 7.4, True, C_INK2, spacing=0.8)  # 2.120.0 D (#2089): + receipt label
         yl = y + 16 + 40
         p.line(PDF_L, yl, PDF_L + half, yl, 0.6, C_INK)
         p.text(PDF_L, yl + 3, L["place_date"], 7.6, False, C_INK2)
         p.line(PDF_L + half + 28, yl, PDF_L + PDF_CW, yl, 0.6, C_INK)
         p.text(PDF_L + half + 28, yl + 3, L["sign"], 7.6, False, C_INK2)
-    if p3a_on and not p3a_end:
+    if (p3a_on and not p3a_end) or (m.get("kind") == "delivery" and np_):  # 2.120.0 D (#2089): the receipt box of a delivery note
         block(16 + 40 + 16, draw_accept)
     bfc_see_ref()  # no signature, no order confirmation: the line ends the main pages
 
@@ -1265,7 +1288,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             j += 1
         group_h = sum(blocks[k]["h"] for k in range(i, j + 1))
         need = group_h + (thead_h if b["table"] and (first_on_page or not blocks[i - 1]["table"]) else 0)
-        if y + need > body_bottom and not first_on_page:
+        if y + need > ((BP["bottom"][len(pages) > 1] if BP["hide_footer"] else min(BP["bottom"][len(pages) > 1], body_bottom)) if BP else body_bottom) and not first_on_page:  # 2.120.0 E (#2091)
             # does b alone fit together with everything that must precede the break? no: new page
             page = _Page()
             draw_small_head(page)
@@ -1291,4 +1314,46 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     if str(m.get("draft_mark") or "").strip():
         for p in pages:
             p.mark(str(m["draft_mark"]).strip())
+    if BP:
+        bp_finish(pages, BP)  # 2.120.0 E (#2091): the letterhead behind every page
     return pdf_write(pages, images, title=f"{title} {number}".strip(), author=co.get("name") or "", xml=xml, meta=meta)
+
+
+def bp_layout(lh, model, logo_bytes=None, xml=None, meta=None):
+    """2.120.0 E (#2091): office_pdf with an own letterhead (office.letterhead bp_model): lh = {"m1": [top, right, bottom,
+    left] mm of page 1 (top = where the address field begins), "m2": the same for the following pages, "hide_head",
+    "hide_footer": 0/1, "pages": 1 or 2 letterhead pages, "emit": fn(objs, i) -> object number of letterhead page i as a
+    form XObject}. The layout code stays as it is: it runs once more with its margin constants taken from lh (a copy of
+    this module's globals for this call only, so parallel requests never see each other's margins). The text width is
+    the narrower one of the two pages; following pages are moved by the difference of the left margins."""
+    import types
+    mm = lambda key, dflt: [min(150.0, max(0.0, float(v))) * MM for v in (list(lh.get(key) or []) + dflt)[:4]]  # noqa: E731
+    t1, r1, b1, l1 = mm("m1", [45, 20, 32, 25])
+    t2, r2, b2, l2 = mm("m2", [30, 20, 32, 25])
+    cw = max(60 * MM, min(A4_W - l1 - r1, A4_W - l2 - r2))
+    bottom = [A4_H - b1, A4_H - b2]
+    if not lh.get("hide_footer"):  # the own footer stays where it is: the body ends above it
+        bottom = [min(y, PDF_BODY_BOTTOM) for y in bottom]
+    bottom = [max(y, t + 40 * MM) for y, t in zip(bottom, (t1 + PDF_ADDR_H, t2))]  # never a page without room
+    g = dict(globals())
+    g.update(PDF_L=l1, PDF_R=A4_W - l1 - cw, PDF_CW=cw, PDF_ADDR_TOP=t1, PDF_NEXT_TOP=t2,
+             BP={"hide_head": bool(lh.get("hide_head")), "hide_footer": bool(lh.get("hide_footer")), "bottom": bottom,
+                 "dx": l2 - l1, "pages": int(lh.get("pages") or 0), "emit": lh.get("emit")})
+    for k, v in list(g.items()):
+        if isinstance(v, types.FunctionType) and v.__module__ == __name__:
+            g[k] = types.FunctionType(v.__code__, g, v.__name__, v.__defaults__, v.__closure__)
+    return g["office_pdf"](model, logo_bytes, xml, meta)
+
+
+def bp_finish(pages, bp):
+    """2.120.0 E (#2091): following pages moved by the left margin difference, the letterhead page (1 for page 1, 2 for
+    the rest; one letterhead page for all) drawn first as a form XObject so the document stays on top."""
+    for n, p in enumerate(pages):
+        if n and bp["dx"]:
+            p.ops.insert(0, f"q 1 0 0 1 {bp['dx']:.2f} 0 cm")
+            p.ops.append("Q")
+        if bp["pages"] and bp["emit"]:
+            i = min(1 if n else 0, bp["pages"] - 1)
+            name = f"BP{i + 1}"
+            p.ops.insert(0, f"q /{name} Do Q")
+            p.forms = {name: (lambda objs, i=i: bp["emit"](objs, i))}

@@ -529,7 +529,7 @@ def v1_office_invoice_post(did):
     project, rights ...; parts_mode for a quotation with parts). Never finalised or sent."""
     from .docs import doc_row, recalc
     from .invoices import inv_from_offer
-    b = _json(("parts_mode", "notify"))
+    b = _json(("parts_mode", "notify", "inv_type", "amount", "pct"))  # 2.120.0 A (#2087): progress / final invoice
     c = db()
     notify = _flag_notify(b)
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True, target="invoice")
@@ -541,7 +541,17 @@ def v1_office_invoice_post(did):
     pm = b.get("parts_mode")
     if pm not in (None, "", "full", "title", "summary"):
         raise BadInput(tr("Invalid value: {0}", "parts_mode"))
-    nid = inv_from_offer(c, oid, uid, r, pm or None, None)
+    typ = b.get("inv_type") or ""
+    if typ == "progress":
+        from .abschlag import abs_progress
+        nid = abs_progress(c, oid, uid, r, b.get("amount"), b.get("pct"))
+    elif typ == "final":
+        from .abschlag import abs_final
+        nid = abs_final(c, oid, uid, r, pm or None, None)
+    elif typ:
+        raise BadInput(tr("Invalid value: {0}", "inv_type"))
+    else:
+        nid = inv_from_offer(c, oid, uid, r, pm or None, None)
     c.execute("UPDATE office_docs SET agent_id=?, list_id=? WHERE id=? AND org_id=?", (aid, r["list_id"], nid, oid))
     recalc(c, oid, nid)
     return _draft_answer(c, aid, uid, oid, nid, notify, N_("Invoice draft"))
@@ -796,7 +806,11 @@ def ofa_spec(paths, schemas, op, ok, errs, ref, pid, q):
     paths["/office/offers/{id}/invoice"] = {"post": op("An invoice draft from an accepted quotation (2.51.0)", T, ok(o, "Created", "201") | errs("400", "403", "404", "409"),
                                                        [pid("id", "Quotation id")], body={"type": "object", "properties": {
                                                            "parts_mode": {"type": "string", "enum": ["full", "title", "summary"]}, "notify": {"type": "boolean"},
-                                                           "requested_by": {"type": "integer"}}}, scope="office")}
+                                                           # 2.120.0 A (#2087): a progress invoice (amount net or pct of the quotation's net) / the final invoice
+                                                           "inv_type": {"type": "string", "enum": ["", "progress", "final"]}, "amount": {"type": "number"},
+                                                           "pct": {"type": "number"}, "requested_by": {"type": "integer"}}}, scope="office",
+                                                       desc="inv_type progress: amount (net) or pct of the quotation's net, split onto its VAT rates; final: the whole "
+                                                            "quotation less its finalised progress invoices (one negative position per invoice and rate).")}
     paths["/office/reminders"] = {"post": op("A reminder draft over open invoices of one client (2.51.0)", T, ok(o, "Created", "201") | errs("400", "403", "404", "409"),
                                              body={"type": "object", "required": ["invoice_ids"], "properties": {
                                                  "invoice_ids": {"type": "array", "items": {"type": "integer"}}, "level": {"type": "integer", "enum": [1, 2, 3]},

@@ -218,6 +218,8 @@ ORDER = (
     "office.signoff",  # 2.50.0 C (#1200): approval links with a simple electronic signature (quotations, list acceptance)
     "office.ledger",  # 2.36.2 (#1021, #1142, E): finalising, structured company data, office log
     "office.invoices",  # 2.38.0 (#1021, F1): invoices, credit notes, reminders, payments, sending, DATEV inbox
+    "office.delivery",  # 2.120.0 D (#2089): delivery notes / proofs of service, the timesheet of an invoice
+    "office.abschlag",  # 2.120.0 A (#2087): progress / final invoices, cash discount (Skonto)
     "office.doclang",  # 2.40.0 (#1381): language switch of drafts swaps the standard texts (no routes; used by office.docs)
     "office.countries",  # 2.40.0 (#1372): the ISO 3166-1 alpha-2 list (no routes)
     "office.contacts_cl",  # 2.40.0 (#1380): contact persons of a client (no routes; used by team.clients, office.docs, legacyimport)
@@ -236,6 +238,7 @@ ORDER = (
     "office.leads",  # 2.94.0 A (#1930): leads before the pipeline (stage lead): convert, CSV import, agents
     "office.kpi",  # 2.50.0 B (#1197): the business figures
     "office.datev",  # 2.47.3 (#1460): DATEV booking batch (EXTF) of invoices, credit notes and payments
+    "office.datevin",  # 2.120.0 C (#2090): DATEV batch input side (receipts, travel expenses) + its accounts route
     "office.books",  # 2.90.0 A (#1921): bookkeeping light: income/expense statement (EUeR), VAT return figures, tax reserve, receipt photo
     "office.catacct",  # 2.121.0 (#2093): receipt categories with an SKR03 / SKR04 account (no routes; shown by office.books)
     "office.bank",  # 2.90.0 B (#1921): bank reconciliation: CSV / CAMT import, matching bookings to invoices and receipts
@@ -249,12 +252,15 @@ ORDER = (
     "office.agreements",  # 2.92.0 A (#1925): business contracts and insurances (term, notice, contribution, cash flow, deadline task)
     "office.contractfiles",  # 2.117.0 B (#2285): PDF files of a framework contract (upload, view, replace, trash)
     "office.assets",  # 2.92.0 B (#1931): equipment value: purchase, depreciation, current value, insurance list
+    "office.bpread",  # 2.120.0 E (#2091): the PDF reader of the own letterhead (no routes, no kalmido imports)
+    "office.letterhead",  # 2.120.0 E (#2091): the own letterhead behind the office documents (upload, margins, preview)
     "files.officeprev",  # 2.92.0 C (#1926): preview + text of .docx / .xlsx (limited worker), who can summarise a file
     "team.approvals",
     "tasks.review",  # 2.60.0 C (#1512): review step (reviewer, gate, list setting, API v1)
     "team.forms",
     "team.formq",  # 2.98.0 B (#1954): questionnaires (own questions in forms, answers become a task at the customer)
     "team.portal",  # 2.63.0 (#1513): customer reports (status link) and the customer portal
+    "office.portaldocs",  # 2.120.0 B (#2088): the customer's documents in the customer portal
     "team.v1",
     "accounts.signup",
     "accounts.pwreset",  # 2.49.0 (#1531): "Forgot your password?"

@@ -2570,6 +2570,15 @@ MIGRATIONS = [
     # 2.102.0 A (#1988): a deleted list stays in the trash with everything (tasks, fields, tags, chat) until the purge
     ("lists", "deleted_at", "ALTER TABLE lists ADD COLUMN deleted_at TEXT"),
     ("lists", "deleted_by", "ALTER TABLE lists ADD COLUMN deleted_by BIGINT REFERENCES users(id) ON DELETE SET NULL"),
+    # 2.120.0 D (#2089): delivery notes (kind 'delivery'); delivery_title '' = "Lieferschein", 'service' = "Leistungsnachweis". 2.117 never reads it
+    ("office_docs", "delivery_title", "ALTER TABLE office_docs ADD COLUMN delivery_title TEXT NOT NULL DEFAULT ''"),
+    # 2.120.0 A (#2087): progress / final invoices (inv_type '' | progress | final, abs_refs = the progress invoices a final
+    # one deducts) and the cash discount of an invoice (skonto_pct / skonto_days, NULL = none). Older versions never read them
+    ("office_docs", "inv_type", "ALTER TABLE office_docs ADD COLUMN inv_type TEXT NOT NULL DEFAULT ''"),
+    ("office_docs", "abs_refs", "ALTER TABLE office_docs ADD COLUMN abs_refs TEXT NOT NULL DEFAULT '[]'"),
+    ("office_docs", "skonto_pct", "ALTER TABLE office_docs ADD COLUMN skonto_pct NUMERIC(14,4)"),
+    ("office_docs", "skonto_days", "ALTER TABLE office_docs ADD COLUMN skonto_days BIGINT"),
+    # (2.120.0 A end)
     # 2.121.0 C (#2096): an agent's suggestion may carry an amount (sealed like the note), currency and VAT rate; prev_* = what the
     # document had before an accept (NULL = the accept did not touch it; prev_vat_pct "-" = it was unknown), for the undo.
     # 2.121.0 C (#2094): a receipt billed on to a client (the document and the day); 2.120 and older never read any of them
