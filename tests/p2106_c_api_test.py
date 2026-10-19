@@ -149,6 +149,12 @@ if not os.environ.get("P2106C_NOSTART"):
     time.sleep(0.8)
 s0 = requests.Session()
 s0.headers.update(H)
+for _ in range(60):  # 2.106.0: the server may still be starting after start.sh (seen once on the Mac: connection refused)
+    try:
+        s0.get(B + "/api/auth/state", timeout=2)
+        break
+    except requests.exceptions.ConnectionError:
+        time.sleep(0.5)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
 A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True, "modules": ["comments"]})
