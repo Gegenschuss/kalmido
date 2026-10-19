@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.102.0** (2026-10-19): a trash for deleted lists (organisation lists in the organisation's trash, 30 days),
+  questionnaire links per client, calmer news counts, the send hint in chats, background work once per instance.
 - **2.114.4** (2026-10-19): office fixes 4 - a calmer quotation PDF (footer without breaks, page number only from
   two pages, only the VAT rates that occur), the order confirmation optional, documents with PDF preview and the same
   footer, travel costs with the per diem as the main amount.
