@@ -750,6 +750,11 @@ ROUTES = {
     "DELETE /api/office/contracts/{}/files/{}": "office", "POST /api/office/contracts/{}/files/{}/restore": "office",
     # 2.120.0 B (#2088): documents in the customer portal of a freelancer's personal office (p2120_b_api_test.py)
     "GET /portal/docs/{}/pdf": "link", "POST /api/office/clients/{}/portal-link": "office",
+    # 2.112.1 B (#2058): external share links of the file store (p21121_b_api_test.py calls them as a freelancer too)
+    "GET /api/files/nodes/{}/ext-links": "files", "POST /api/files/nodes/{}/ext-links": "files",
+    "POST /api/files/ext-links/{}/regenerate": "files", "DELETE /api/files/ext-links/{}": "files",
+    "POST /api/files/ext-links/{}/restore": "files", "GET /s/f/{}": "link", "POST /s/f/{}/unlock": "link",
+    "GET /s/f/{}/d/{}": "link", "GET /s/f/{}/v/{}": "link", "GET /s/f/{}/zip": "link",
 }
 
 

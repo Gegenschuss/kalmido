@@ -159,6 +159,9 @@ KINDS = {
     "servers": ("matrix", "p273_a_api_test.py: the server accounts of another person 404 (read, change, delete, restore, data, tasks, move); agents 403; nothing of another person's tasks moves"),
     # 2.84.0 A (#1198): mails filed with a client / project (hub/hubmail.py hbm_can: the client / list / recipient, always in the mail's workspace)
     "hubmail": ("matrix", "p284_a_api_test.py: a mail / attachment / address of another organisation or a private client of another person 404, a forged sender finds only the recipient's workspace, after leaving nothing, assigning across workspaces refused, agents 403"),
+    # 2.112.1 B (#2058): external share links of the file store (files/extlinks.py)
+    "fileextlink": ("matrix", "p21121_b_api_test.py: the links of another organisation's / person's node 404 (list, create, renew, revoke, "
+                              "restore); a link serves only its own tree (other ids 404); dead when the creator leaves / loses the right"),
 }
 
 ROUTES = {
@@ -954,6 +957,11 @@ ROUTES = {
     # 2.120.0 B (#2088): the customer's documents in the portal (cookie address + space + client, another client / space /
     # a draft 404) and the office's "Send portal link" (a client of the office area only; p2120_b_api_test.py)
     "GET /portal/docs/{}/pdf": "portal", "POST /api/office/clients/{}/portal-link": "office",
+    # 2.112.1 B (#2058): external share links (p21121_b_api_test.py)
+    "GET /api/files/nodes/{}/ext-links": "fileextlink", "POST /api/files/nodes/{}/ext-links": "fileextlink",
+    "POST /api/files/ext-links/{}/regenerate": "fileextlink", "DELETE /api/files/ext-links/{}": "fileextlink",
+    "POST /api/files/ext-links/{}/restore": "fileextlink", "GET /s/f/{}": "fileextlink", "POST /s/f/{}/unlock": "fileextlink",
+    "GET /s/f/{}/d/{}": "fileextlink", "GET /s/f/{}/v/{}": "fileextlink", "GET /s/f/{}/zip": "fileextlink",
 }
 
 # ---- 1. every route is classified, nothing stale
