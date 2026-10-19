@@ -1297,6 +1297,18 @@ fresh; run p2121_c_api "$PY" p2121_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2121_c_ui node p2121_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.121.0 lead: receipt categories with an SKR03 / SKR04 account (#2093)
 fresh; run p2121_d_api "$PY" p2121_d_api_test.py "$KALMIDO_TEST_DATA"
+# 2.123.0 part A: page text sealed at rest (#2105), page history (#2102), search with word index (#2106)
+fresh; run p2123_a_api "$PY" p2123_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2123_a_ui node p2123_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.123.0 part B: share a page / folder: read only, guest, public link (#2104)
+fresh; run p2123_b_api "$PY" p2123_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2123_b_ui node p2123_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.123.0 part C: pictures from the Ablage in pages (#2103), [[datei:]] / [[tabelle:]] links (#2107), checkboxes as tasks (#2108)
+fresh; run p2123_c_api "$PY" p2123_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2123_c_ui node p2123_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.123.0 part D: cash flow: opening balance, manual corrections, reconciliation (#2341); installment list number format (#2351)
+fresh; run p2123_d_api "$PY" p2123_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2123_d_ui node p2123_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
