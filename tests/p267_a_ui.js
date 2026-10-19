@@ -75,6 +75,9 @@ const ym = TC.today().slice(0, 7);
     await sleep(400);
     check(await ev(noSide('.fcidlg .fcirow *')), 'on a phone the preview rows stay inside the screen');
     check(await ev(`[...document.querySelectorAll('.fcidlg .fcick')].every(x => x.getBoundingClientRect().height >= 43 && x.getBoundingClientRect().width >= 43)`), 'large tap targets for the ticks');
+    // 2.122.2 (#2323): on a phone amount + VAT rate sit on a second line below the name, inside the row
+    check(await ev(`[...document.querySelectorAll('.fcidlg .fcirow:not(.err)')].every(r => { const n = r.querySelector('.ofcn').getBoundingClientRect(), a = r.querySelector('.fciamt').getBoundingClientRect(), o = r.getBoundingClientRect(); return a.top >= n.bottom - 1 && a.bottom <= o.bottom + 1 && a.right <= o.right + 1; })`),
+      'on a phone amount and VAT below the name, inside the row');
     await shot('p267-a-import-phone.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await ev(`(() => { document.querySelector('.fcidlg [data-fci="go"]').click(); return 1; })()`);
@@ -93,6 +96,10 @@ const ym = TC.today().slice(0, 7);
     await sleep(400);
     check(await ev(noSide('.office .ofcbody *')), 'on a phone the cash flow stays inside the screen');
     await shot('p267-a-cashflow-phone.png');
+    // 2.122.2 (#2327): a reload after saving keeps the old content (no "Loading…" page) and the scroll position
+    await ev(`(() => { const v = document.getElementById('view'); v.scrollTop = v.scrollHeight; window.__st = v.scrollTop; rk_cfReload(); return 1; })()`);
+    check(await ev(`!!document.querySelector('.office .rkcfms') && ![...document.querySelectorAll('.office p.lempty')].some(p => p.textContent === tr('Loading…'))`), 'the reload keeps the old content until the new data is there');
+    check(await ready(ev, `!!RKF.data && document.getElementById('view').scrollTop === window.__st`), 'the scroll position stays after the reload ' + await ev(`document.getElementById('view').scrollTop + '/' + window.__st`));
   }, false);
 
   console.log(`p267_a_ui: ${ok} ok, ${F.length} failed`);
