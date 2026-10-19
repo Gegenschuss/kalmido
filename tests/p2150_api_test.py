@@ -295,7 +295,7 @@ check(Ca.post(B + f"/api/agents/jobs/{J}/action", json={"action": "approve"}).st
 check(dbx("SELECT COUNT(*) FROM lists WHERE id=?", (AL,))[0][0] == 1, "nothing happened yet")
 r = A.post(B + f"/api/agents/jobs/{J}/action", json={"action": "approve"})
 check(r.ok and r.json()["state"] == "done", f"approve: replayed, job done {r.text[:300]}")
-check(dbx("SELECT COUNT(*) FROM lists WHERE id=?", (AL,))[0][0] == 0, "approved: the list is gone")
+check(dbx("SELECT COUNT(*) FROM lists WHERE id=? AND deleted_at IS NULL", (AL,))[0][0] == 0, "approved: the list is gone (2.102.0 #1988: into the trash)")
 check(A.post(B + f"/api/agents/jobs/{J}/action", json={"action": "approve"}).status_code == 409, "approve twice: 409")
 evs, _ = events(cl, ev0)
 je = [e for e in evs if e["event"] == "job" and e["data"]["job"]["id"] == J]
