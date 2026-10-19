@@ -386,9 +386,11 @@ if pb and tn:
           f"correspondent -> sender, type renamed ({pb.get('sender')}, {pb.get('type')})")
     check([t["name"] for t in pb["tags"]] == ["Taxes"] and [t["name"] for t in tn["tags"]] == ["Taxes"], f"tag renamed, left out ({pb['tags']}, {tn['tags']})")
     check((pb.get("folder") or {}).get("name") == "Archive 2025" and not tn.get("folder"), f"a tag as folder ({pb.get('folder')})")
-    t = Bo.get(B + f"/api/docs/{pb['id']}").json().get("text") or ""
-    check("Power bill May total 42.00 EUR" in t and "Archive serial number: 17" in t and "Contract number: C-123" in t
-          and "Status: Paid" in t and "Paid on 10 May" in t, f"text + serial number + custom fields + note ({t[:300]!r})")
+    full = Bo.get(B + f"/api/docs/{pb['id']}").json()
+    t = full.get("text") or ""
+    cf = {x["name"]: x.get("label") for x in full.get("custom_fields") or []}  # 2.108.0 (#2179): custom fields are fields now
+    check("Power bill May total 42.00 EUR" in t and "Archive serial number: 17" in t and "Paid on 10 May" in t
+          and cf.get("Contract number") == "C-123" and cf.get("Status") == "Paid", f"text + serial number + note, custom fields as fields ({t[:300]!r}, {cf})")
     f = Bo.get(B + f"/api/docs/{pb['id']}/file")
     check(f.ok and f.content == PDF1, "the original file, unchanged")
 check(not any(d["org_id"] == ORG for d in docs(A, "all")), "alice (no member) sees none of them")

@@ -284,7 +284,8 @@
   should read (reports, drafts, patches) go into your own result folder (`write_file` without `folder_id`), not into a local
   work folder. Every access you make is listed in the file's history for its owner.
 - **Documents and receipts (2.48.0).** Documents are files of the file store with recognised text and fields (date, due,
-  amount, sender, type, tags): `list_documents`, `get_document`, where you may edit `update_document`, and `create_document` (a new file into a folder you may edit, or your own result folder). Kalmido sorts
+  amount, sender, type, tags; 2.153.0 also the workspace's custom fields, `custom_fields` by name): `list_documents`,
+  `get_document`, where you may edit `update_document` (only fields that exist; you never add fields), and `create_document` (a new file into a folder you may edit, or your own result folder). Kalmido sorts
   them in without you; your values are marked as set by an agent and may wait in *To review*. For a receipt or incoming
   invoice only **suggest** project, category, amount and VAT rate (`suggest_receipt`, event `document_added`); a person accepts it, you never
   set, move or delete it yourself.

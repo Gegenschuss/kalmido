@@ -1122,6 +1122,14 @@ version shows those values empty). `docs-to-account-key` switches it on again. W
 forwarding address for documents in the documents' settings: PDFs and images attached to mails sent there become
 documents.
 
+**Custom fields (2.108.0).** *Documents > Settings > Custom fields* adds fields of its own to every document of the
+workspace (an organisation's: its admins; the own documents: the person, also without an organisation), e.g. a contract
+or customer number: text, number, amount, date, check box, selection or link. Nothing is preset. The fields show in the
+document's sheet for everyone who sees the document; whoever may change it fills them in. Values are sealed like the
+recognised text and found by the search; deleting a field deletes its values. A document moved into the other workspace
+takes its values along (the field is found there by name and type or made). Tables `doc_fields` / `doc_field_values`
+(additive; the way back to 2.107: `DROP TABLE doc_field_values, doc_fields`).
+
 ### Import from Paperless-ngx (2.48)
 
 An existing Paperless-ngx instance can be connected (2.69: also on a hosted server, see below)
@@ -1136,7 +1144,9 @@ Paperless-ngx…* and *Connect Paperless-ngx*.
   becomes a tag, a folder of the documents or is left out; correspondents become senders, document types types (names can be
   changed in the preview).
 - **What comes along:** the original file, the recognised text (no new recognition), the date, tags, correspondent, type,
-  and custom fields, notes and the archive serial number as text below the document's text.
+  notes and the archive serial number as text below the document's text. Custom fields (2.108.0) become custom fields of
+  the documents in the target workspace (same name; text, number, amount, date, yes / no, selection, link; a link to another
+  Paperless document as text "Paperless #12"), marked *imported*; before 2.108.0 they were lines below the text.
 - **Preview images (2.66.1):** imported PDFs and images get their preview image and the QR-code archive number check like an
   upload (also from a ZIP). Documents imported before get their missing previews once after the update, in small portions in
   the background while the documents queue is idle; nothing else of them changes. `KALMIDO_DOCS_THUMB_FILL=off` skips it.

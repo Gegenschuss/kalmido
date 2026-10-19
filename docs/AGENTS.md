@@ -1712,7 +1712,7 @@ a folder above it) is shared with it, and every access is written into the file'
 | Documents shared with you (`q` = words of the text, `review=1` = waiting in *To review*; 2.122.0: `q` takes `tag:Name`, `sender:Name`, `type:Name`, `date:2025-01..2025-03`, `"exact phrase"`, `-word`; filters `tag` / `not_tag` / `tag_mode`, `sender`, `type`, `folder`, `added_from` / `added_to`, `no_tag`, `no_sender`, `ftype`) | `GET /api/v1/documents` | `list_documents` |
 | One document with its fields, open suggestions and the recognised text | `GET /api/v1/documents/{id}` | `get_document` |
 | A new document (2.122.0: `content_base64` + `name`, or multipart `file`; optional `title`, `parent_id`, `sender`, `type`, `tags`, `date`, `due`, `amount`, `currency`; without `parent_id` an agent writes into its own result folder) | `POST /api/v1/documents` | `create_document` |
-| Set fields (role *edit*): `date`, `due`, `amount`, `currency`, `sender`, `type`, `tags` (names) | `PATCH /api/v1/documents/{id}` | `update_document` |
+| Set fields (role *edit*): `date`, `due`, `amount`, `currency`, `sender`, `type`, `tags` (names), `custom_fields` (2.108.0: `{name or id: value}`, only fields the workspace has) | `PATCH /api/v1/documents/{id}` | `update_document` |
 | The file itself | `GET /api/v1/files/{id}/content` | -- |
 
 Scopes: `files:read` / `files:write` (the file store's). Values an agent sets are marked *set by an agent*. Where the

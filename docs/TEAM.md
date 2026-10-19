@@ -375,8 +375,8 @@ Files, folders (with everything in them) and documents move between the private 
 search and the filters find) and moves them into the documents folder of the other workspace; a single document has the
 button in its sheet. The dialog names source and target and says beforehand what happens: how many files, duplicates
 already there, shares and openings to the whole organisation that end, what stays (links to task files, agent folders,
-the trash). Sender, type, tags, the archive number (when it is free there), the recognised text and a Paperless origin go
-along; the files are sealed again with the target's key. One undo step moves everything back.
+the trash). Sender, type, tags, the custom fields with their values (2.108.0: found or made by name and type in the
+target), the archive number (when it is free there), the recognised text and a Paperless origin go along; the files are sealed again with the target's key. One undo step moves everything back.
 
 Out of an organisation only the owner (or who uploaded it) or an organisation admin moves something; a person without an
 organisation has no other workspace and does not see the action. Agents never move data between workspaces.

@@ -1196,6 +1196,9 @@ fresh; run p298_b_ui node p298_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p298_c_ui node p298_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.98.0 part D: longer tick / create animation, document guesses only where they fit, comment names (#2163 #2178 #2184)
 fresh; run p298_d_api "$PY" p298_d_api_test.py "$KALMIDO_TEST_DATA"
+# 2.108.0: custom fields of documents (#2179)
+fresh; run p2108_a_api "$PY" p2108_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2108_a_ui node p2108_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.87.9 part E (#1914 #1920 #1909 #1933 #1937 #1952 #1963): polish
 fresh; run p287b_e_ui node p287b_e_ui.js "$KALMIDO_TEST_DATA"
 shard 15  # 2.124.2: the 2.90-2.93 and 2.99.1 suites (was shard 11: over 45 min)
