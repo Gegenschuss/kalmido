@@ -354,10 +354,26 @@ registering the ones of its area.
 
 ### Adding a client file
 
-1. Create `static/js/<name>.js` with the header comment and `'use strict';`.
+1. Create `static/js/<name>.js` with `// @ts-check` as its first line (2.102.0), the header comment and `'use strict';`.
 2. Add its `<script>` tag to `static/index.html` (before `main.js`, after the files whose functions it calls while it
    loads), add it to `SHELL` in `static/sw.js` in the same order and bump `CACHE` there.
 3. `python3 tools/check_layout.py` compares the three lists; `node --check` runs on every file in CI.
+
+### Type check (2.102.0)
+
+TypeScript checks the client without a build step and without changing the code: `jsconfig.json` makes every file of
+`static/js/` (and `static/i18n.js`) one program in the global scope, exactly as the browser runs the classic scripts, but
+only files whose first line is `// @ts-check` are checked. `tools/tsc/kalmido.d.ts` types the shared globals (`S`, the
+answer of `api()`, `about`, `window` stand-ins); `S`, `api()` and `tr()` carry JSDoc types in `core.js` / `i18n.js`. The
+app never loads the `.d.ts`. CI runs `python tools/check_tscheck.py` (every file not in its `BASE` list, so every new file,
+must start with `// @ts-check`) and `npx -p typescript@6.0.3 tsc -p jsconfig.json`. Locally the same in the repo root:
+
+```bash
+python3 tools/check_tscheck.py && npx --yes -p typescript@6.0.3 tsc -p jsconfig.json
+```
+
+Switching an older file on: add `// @ts-check` as its first line, fix what tsc reports (mostly a JSDoc type or cast
+`/** @type {HTMLElement} */ (e.target)`; never a change of behaviour), remove the name from `BASE`.
 
 ### Long lists (2.65.0)
 

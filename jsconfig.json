@@ -1,0 +1,14 @@
+{
+  "//": "2.102.0 (#1995): type check of the web client without a build step. Every classic script of static/js is part of ONE program (they share the global scope, like in the browser), but only files that start with // @ts-check are checked (checkJs off). tools/tsc/kalmido.d.ts types S, api(), tr(); it is never loaded by the app. CI: npx typescript@<pinned> -p jsconfig.json. tools/check_tscheck.py: new files must carry // @ts-check.",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "strict": false,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "include": ["static/i18n.js", "static/js/*.js", "tools/tsc/*.d.ts"]
+}
