@@ -53,6 +53,7 @@ PDF_LABELS = {
            "qty": "Menge", "rate": "Einzelpreis", "vat": "MwSt.", "total": "Gesamt", "net": "Summe netto",
            "vat_plus": "zzgl. {0} % MwSt.", "gross": "Gesamt brutto", "incl_raw": "Gesamt inklusive Rohdaten",
            "excl_raw": "Summe ohne Rohdaten", "net_suffix": "netto", "optional": "Optional", "rights": "Rechteübertragung",
+           "rights_see": "Rechteübertragung siehe Anhang",  # 2.114.1 C (#2258)
            "accept": "Auftragserteilung", "place_date": "Ort, Datum", "sign": "Unterschrift, Stempel Auftraggeber",
            "page": "Seite {0} von {1}", "contact": "Kontakt", "register": "Register", "bank": "Bank",
            "discount": "Rabatt", "producing": "Producing"},
@@ -61,6 +62,7 @@ PDF_LABELS = {
            "qty": "Qty", "rate": "Unit price", "vat": "VAT", "total": "Total", "net": "Net total",
            "vat_plus": "plus {0} % VAT", "gross": "Total incl. VAT", "incl_raw": "Total including raw data",
            "excl_raw": "Total excluding raw data", "net_suffix": "net", "optional": "Optional", "rights": "Transfer of rights",
+           "rights_see": "Transfer of rights see appendix",  # 2.114.1 C (#2258)
            "accept": "Order confirmation", "place_date": "Place, date", "sign": "Signature, stamp of the client",
            "page": "Page {0} of {1}", "contact": "Contact", "register": "Registration", "bank": "Bank",
            "discount": "Discount", "producing": "Producing"},
@@ -939,7 +941,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 yy += 8.4 * 1.42
         block(opt_h, draw_opt)
 
-    # -- rights block (not torn)
+    # -- rights block (not torn); 2.114.1 C (#2258): printed as an appendix on its own last page, see below
+    bfc_rights, bfc_seen = [], []
     rights = m.get("rights") or {}
     r_rows = [(str(r[0]), str(r[1])) for r in (rights.get("rows") or []) if isinstance(r, (list, tuple)) and len(r) >= 2 and str(r[1]).strip()]
     if str(rights.get("exceptions") or "").strip():
@@ -949,29 +952,35 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     if r_rows or rights.get("note"):
         lab_w = 112
         r_lines = [(a, pdf_wrap(b, 9, PDF_CW - lab_w - 12)) for a, b in r_rows]
-        rn_lines = pdf_wrap(str(rights.get("note") or ""), 8.4, PDF_CW) if rights.get("note") else []
-        r_h = 14 + 12 + sum(max(1, len(b)) * 9 * 1.45 + 2 for _, b in r_lines) + (len(rn_lines) * 8.4 * 1.42 + 6 if rn_lines else 0)
+        rn_lines = pdf_wrap(str(rights.get("note") or ""), 8, PDF_CW) if rights.get("note") else []  # 2.114.1 C (#2258): small note
+        r_h = 14 + sum(max(1, len(b)) * 9 * 1.6 + 10 for _, b in r_lines) + (len(rn_lines) * 8 * 1.42 + 14 if rn_lines else 0)
 
-        def draw_rights(p, y):
-            p.text(PDF_L, y + 14, str(rights.get("title") or L["rights"]).upper(), 7.4, True, C_INK2, spacing=0.8)
-            yy = y + 26
+        def draw_rights(p, y):  # 2.114.1 C (#2258): the title is the appendix heading, rows with more air
+            yy = y + 14
             for a, b in r_lines:
                 p.text(PDF_L, yy, a, 9, False, C_INK2)
                 for j, s in enumerate(b):
-                    p.text(PDF_L + lab_w, yy + j * 9 * 1.45, s, 9)
-                yy += max(1, len(b)) * 9 * 1.45 + 2
+                    p.text(PDF_L + lab_w, yy + j * 9 * 1.6, s, 9)
+                yy += max(1, len(b)) * 9 * 1.6 + 10
             if rn_lines:
-                yy += 4
+                yy += 12
                 for s in rn_lines:
-                    p.text(PDF_L, yy, s, 8.4, False, C_INK2)
-                    yy += 8.4 * 1.42
-        block(r_h, draw_rights)
+                    p.text(PDF_L, yy, s, 8, False, C_INK2)
+                    yy += 8 * 1.42
+        bfc_rights.append((r_h, draw_rights))
+
+    def bfc_see_ref():  # 2.114.1 C (#2258): one short line above the signature pointing to the rights appendix
+        if bfc_rights and not bfc_seen:
+            bfc_seen.append(1)
+            block(lh + 8, lambda p, y, t=str(ml.get("rights_see") or L["rights_see"]): p.text(PDF_L, y + 10, t, 8.6, False, C_INK2), keep_next=True)
 
     # -- closing text, signature, order confirmation
     if m.get("closing"):
         ct = str(m["closing"])
         n = len(pdf_wrap(ct, body, PDF_CW))
         block(n * lh + 14, lambda p, y, t=ct: p.para(PDF_L, y + 12, t, body, PDF_CW), keep_next=bool(m.get("signature")))
+    if m.get("signature") or (m.get("kind") or "offer") == "offer":
+        bfc_see_ref()
     if m.get("signature"):
         sg = str(m["signature"])
         sl = [sg, ""] + [str(x) for x in (m.get("signature_name"), co.get("name")) if x]
@@ -987,6 +996,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             p.line(PDF_L + half + 28, yl, PDF_L + PDF_CW, yl, 0.6, C_INK)
             p.text(PDF_L + half + 28, yl + 3, L["sign"], 7.6, False, C_INK2)
         block(16 + 40 + 16, draw_accept)
+    bfc_see_ref()  # no signature, no order confirmation: the line ends the main pages
 
     # -- 2.47.0 (#1215): every printed part of a quotation on its own page(s): part title + number, its rows, its sums
     for part in m.get("parts") or []:
@@ -1017,6 +1027,19 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     p.text(PDF_L + PDF_CW - 190, yy, val, 10.4 if j == 0 else 8.8, j == 0, align="r", width=190)
                     yy += (10.4 if j == 0 else 9) * 1.5
             block(14 + sum((10.4 if j == 0 else 9) * 1.5 for j in range(len(prow))) + 5, draw_part_sum, keep_prev=True)
+
+    # -- 2.114.1 C (#2258): the rights block as an appendix on its own last page, after the parts
+    if bfc_rights:
+        rtitle = str(rights.get("title") or L["rights"])
+        rsub = " · ".join(x for x in (f"{L['number']} {number}" if number else "", str(m.get("project_title") or "")) if x)
+
+        def bfc_draw_rights_head(p, y, rtitle=rtitle, rsub=rsub):
+            p.text(PDF_L, y + 6, rtitle.upper(), 14, True, C_INK, spacing=0.8)
+            p.line(PDF_L, y + 6 + 20, PDF_L + 14 * MM, y + 6 + 20, 1.6, accent)
+            if rsub:
+                p.text(PDF_L + PDF_CW, y + 8, rsub, 8.6, False, C_INK2, align="r")
+        block(34 + 12, bfc_draw_rights_head, keep_next=True, brk=True)
+        block(*bfc_rights[0])
 
     # -- lay the blocks out on pages
     pages = []
