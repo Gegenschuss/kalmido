@@ -146,7 +146,7 @@ office tab without one appears at the end of its group (`OFC_TABS` field 5, else
 ## Number scheme
 
 Placeholders: `{yyyy}` `{yy}` year, `{seq}` or `{seq:03}` the counter (zero-padded to the given width), `{project}`,
-`{client}`, `{date}` (`yyyymmdd`), `{initials}`. Default `KVA-{yyyy}-{seq:03}` -> `KVA-2026-001`. The counter runs per
+`{client}`, `{date}` (`yyyymmdd`), `{initials}`, `{version}` (quotations, see below). Default `KVA-{yyyy}-{seq:03}` -> `KVA-2026-001`. The counter runs per
 organisation, document kind and period: with `{yyyy}` / `{yy}` in the scheme it starts again every year, without it
 never. A number is reserved once and never reused.
 
@@ -155,6 +155,20 @@ organisation can switch this to "when it is finalised" (settings key `offer_numb
 draft carries no number ("Draft") and the number is assigned in the moment the document is finalised, so deleted
 drafts leave no gaps. Later document kinds (invoices) are always numbered when they are finalised. Numbers are unique per
 organisation.
+
+**Quotation counter per client or project** (settings key `offer_counter`: `org` (default) | `client` | `project`):
+per client each client counts on its own (a quotation without a client by its recipient's name), per project each
+project (its list, else its project title); with a year in the scheme each one starts again at 1 every year. A new
+client / project counter continues from the highest running number its existing quotations carry under today's scheme;
+existing numbers stay as they are. A quotation counted this way gets its number once its client / project is set (at the
+latest when it is finalised, then from the organisation's counter). Invoices, credit notes and reminders always keep
+one gapless counter per organisation.
+
+**`{version}`** (quotation schemes only; invoice, credit note and reminder schemes refuse it): the first quotation is 1,
+each duplicate in its chain of versions the next number. A duplicate keeps the running number of the first quotation
+and does not move the counter: `KV-{client}-{yyyy}-{seq:02}-V{version}` gives `KV-ACME-2026-03-V1`, then
+`KV-ACME-2026-03-V2`. When the first quotation's number does not follow today's scheme, the duplicate takes the next
+number with its version.
 
 ## Country packs
 
