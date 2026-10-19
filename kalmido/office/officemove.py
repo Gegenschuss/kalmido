@@ -31,6 +31,7 @@ the client copies and archive copies made by the move go again (a copied client 
 import hashlib
 import json
 import os
+import uuid
 
 from flask import jsonify
 
@@ -58,6 +59,12 @@ OFM_DOC_KIDS = ("office_doc_items", "office_doc_parts")  # move with their docum
 # the undo puts a link back only while what it points at still exists
 OFM_FK = {"office_docs": {"client_id": "clients", "contract_id": "office_contracts", "list_id": "lists"},
           "office_doc_items": {"service_id": "office_services"}, "office_client_contacts": {"contact_id": "contacts"}}
+# 2.119.1 C (#2298): framework contracts with their PDF files (office/contractfiles.py); their routes are for admins only
+OFM_WHAT += ("contracts",)
+OFM_TABLE["contracts"] = "office_contracts"
+OFM_ADMIN += ("contracts",)
+OFM_FK["office_contracts"] = {"client_id": "clients", "rights_time_id": "office_texts", "rights_territory_id": "office_texts",
+                              "rights_media_id": "office_texts"}
 
 
 def ofm_fk_refs(c, table):
@@ -228,6 +235,8 @@ def ofm_plan(c, uid, what, src, rows, own=False):
             else:
                 p["trips"].append(r)
                 p["unclient"] += 1 if r["client_id"] else 0
+    elif what == "contracts":  # 2.119.1 C (#2298)
+        rmv_plan(c, p, rows)
     elif what == "templates":
         p["tpls"] = list(rows)
         q = ",".join("?" * len(rows))
@@ -285,6 +294,8 @@ def ofm_notes(c, what, p, copy):
         notes.append(trn("{0} template moves", "{0} templates move", len(p["tpls"])))
         if p["detach"]:
             notes.append(trn("{0} document made from it keeps its text and stays", "{0} documents made from them keep their text and stay", p["detach"]))
+    if p.get("ctr"):
+        notes.extend(rmv_notes(p))  # 2.119.1 C (#2298)
     k = p["keep"]
     if k.get("issued"):
         notes.append(trn("{0} issued document stays in the old workspace (retention)", "{0} issued documents stay in the old workspace (retention)", k["issued"]))
@@ -294,7 +305,7 @@ def ofm_notes(c, what, p, copy):
         notes.append(trn("{0} draft stays: it has payments, a sign-off link or billed receipts there", "{0} drafts stay: they have payments, sign-off links or billed receipts there", k["linked"]))
     if k.get("trip"):
         notes.append(trn("{0} trip stays: receipts of it are in DATEV or billed", "{0} trips stay: receipts of them are in DATEV or billed", k["trip"]))
-    if not (p["clients"] or p["docs"] or p["trips"] or p["tpls"]):
+    if not (p["clients"] or p["docs"] or p["trips"] or p["tpls"] or p.get("ctr")):
         block = tr("Nothing here can move: issued documents and receipts stay where they were issued")
     return notes, block
 
@@ -443,7 +454,7 @@ def ofm_move_space():
     copy = b.get("copy_issued") in (1, True, "1")
     plain = pb_owner(c, src) is None and office_role(c, uid, src) != "admin"  # a plain member out of an organisation
     p = ofm_plan(c, uid, what, src, rows, own=plain)
-    if sum(len(x["contacts"]) + 1 for x in p["clients"]) + len(p["docs"]) + len(p["trips"]) + len(p["tpls"]) > SMV_MAX:
+    if sum(len(x["contacts"]) + 1 for x in p["clients"]) + len(p["docs"]) + len(p["trips"]) + len(p["tpls"]) + len(p.get("ctr", ())) > SMV_MAX:
         raise BadInput(tr("Too many at once"))
     notes, block = ofm_notes(c, what, p, copy and not plain)
     if copy and plain:  # copies of an organisation's issued documents: its office admin only
@@ -452,7 +463,7 @@ def ofm_move_space():
     counts = {"clients": len(p["clients"]), "copied": sum(1 for x in p["clients"] if x["mode"] == "copy"), "drafts": len(p["docs"]),
               "trips": len(p["trips"]), "templates": len(p["tpls"]), "contacts": sum(len(x["contacts"]) for x in p["clients"]),
               "issued": sum(len(x["issued"]) + len(x["arch"]) for x in p["clients"]) + p["keep"].get("issued", 0),
-              "stay": sum(p["keep"].values())}
+              "stay": sum(p["keep"].values()), "contracts": len(p.get("ctr", ()))}
     if b.get("dry"):
         return jsonify(smv_answer(notes, block, count=counts))
     if block:
@@ -481,6 +492,8 @@ def ofm_move_space():
         for r in p["tpls"]:
             ofm_move_row(c, rec, "office_doc_templates", r, src, dst, dst, {"updated_at": ts})
             ofm_detach(c, rec, "office_gen_docs", "template_id", r["id"], "office_doc_templates")
+        if p.get("ctr"):  # 2.119.1 C (#2298)
+            rmv_move(c, uid, p, src, dst, rec, made, files, ts)
         detail = {"src": src, "dst": dst, "what": what, "ids": ids, "copy": 1 if copy else 0, "rows": rec, "made": made, "at": ts}
         mid = insert_id(c, "INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES(?,?,?,?,?,?,?)",
                         (f"office_{what}", ids[0], frm_ws, to, uid, ts, json.dumps(detail, default=str)))
@@ -489,6 +502,7 @@ def ofm_move_space():
         ofx_log(c, dst, "move_in", target="space", detail=dict(log, **{"from": ofm_ws_key(frm_ws)}))
         bump(c)
         c.commit()
+        rmv_unlink(p.get("gone"))  # 2.119.1 C (#2298): the PDFs' old copies in the source's folder
     except BaseException:
         c.rollback()
         for f in files:
@@ -551,6 +565,9 @@ def ofm_undo(c, uid, mid):
         for col, ref in OFM_FK.get(t, {}).items():
             if old.get(col) and not c.execute(f"SELECT 1 FROM {ref} WHERE id=?", (old[col],)).fetchone():
                 old[col] = None
+        if r.get("cfile"):  # 2.119.1 C (#2298): the PDF back into the source's folder, sealed with its key
+            old["file"] = rmv_file_copy(c, cur, dst, src, cur["contract_id"], [])
+            gone.append(rmv_path(dst, cur["file"]))
         if r.get("area"):
             old.update(ofm_reseal(c, t, cur, dst, src))
         if t == "office_docs" and old.get("number"):
@@ -575,6 +592,8 @@ def ofm_undo(c, uid, mid):
                     kept += 1  # the target uses the new client since: it stays
                 else:
                     c.execute("DELETE FROM clients WHERE id=?", (m["id"],))  # its contact persons go with it (cascade)
+        elif m["t"] in ("office_contracts", "office_contract_files", "office_texts"):
+            kept += rmv_unmake(c, m, dst, gone)  # 2.119.1 C (#2298)
     d["undone"] = ts
     c.execute("UPDATE space_moves SET detail=? WHERE id=?", (json.dumps(d, default=str), mid))
     nid = insert_id(c, "INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES(?,?,?,?,?,?,?)",
@@ -590,3 +609,156 @@ def ofm_undo(c, uid, mid):
         except OSError:
             pass
     return jsonify(smv_answer([], None, ok=True, move_id=nid, undone=mid, kept=kept, space=ofm_ws_key(x["from_org"])))
+
+
+# ---------------------------------------------------------------- 2.119.1 C (#2298): framework contracts
+# A contract moves with its live PDF files (re-sealed with the target's key, a new file in the target's folder, the old one
+# goes after the commit). Like a client: one that an issued document (or anything but a draft) still points at stays in
+# the old office archived and is created anew in the target with copies of its files; the drafts pointing at a moving
+# contract lose the link (the undo puts it back). The rights text blocks it names are copied into the target (one with
+# the same kind and text there is used); its client stays behind (another workspace), the undo puts it back.
+RMV_RIGHTS = ("rights_time_id", "rights_territory_id", "rights_media_id")
+
+
+def rmv_path(oid, name):
+    from .contractfiles import dma_path
+    return dma_path(oid, name)
+
+
+def rmv_plan(c, p, rows):
+    p["ctr"] = []
+    for r in rows:
+        issued = drafts = 0
+        for d in c.execute("SELECT * FROM office_docs WHERE contract_id=? ORDER BY id", (r["id"],)).fetchall():
+            if ofm_doc_hold(c, d) == "issued":
+                issued += 1
+            else:
+                drafts += 1
+        files = c.execute("SELECT * FROM office_contract_files WHERE org_id=? AND contract_id=? AND deleted_at IS NULL ORDER BY id",
+                          (r["org_id"], r["id"])).fetchall()
+        copy = issued or ofm_refs(c, "office_contracts", r["id"], skip=("office_docs",))
+        p["ctr"].append({"row": r, "mode": "copy" if copy else "move", "issued": issued, "drafts": 0 if copy else drafts, "files": files})
+
+
+def rmv_notes(p):
+    cs = p["ctr"]
+    moved = [x for x in cs if x["mode"] == "move"]
+    notes = [trn("{0} framework contract moves with its PDF files", "{0} framework contracts move with their PDF files", len(moved)) if moved else ""]
+    for x in [x for x in cs if x["mode"] == "copy"][:8]:
+        notes.append(trn("“{1}” stays archived in the old workspace for {0} issued document and is created anew in the target",
+                         "“{1}” stays archived in the old workspace for {0} issued documents and is created anew in the target", x["issued"], x["row"]["name"])
+                     if x["issued"] else tr("“{0}” is still used in the old workspace (projects, trips or deals): it stays there archived and is created anew in the target",
+                                            x["row"]["name"]))
+    n = sum(x["drafts"] for x in cs)
+    notes.append(trn("{0} draft loses its framework contract", "{0} drafts lose their framework contract", n) if n else "")
+    n = sum(1 for x in cs if x["row"]["client_id"])
+    notes.append(trn("{0} framework contract loses its client (clients stay in their workspace)",
+                     "{0} framework contracts lose their client (clients stay in their workspace)", n) if n else "")
+    return notes
+
+
+def rmv_file_copy(c, f, src, dst, cid, files):
+    """Copies the stored PDF of contract file row f from office area src into dst's folder, sealed with dst's key. -> the
+    new bare file name (f's own one when the file is missing); the new path is noted in files (removed on an error)."""
+    from .contractfiles import dma_dir
+    p = rmv_path(src, f["file"])
+    if not p or not os.path.isfile(p):
+        return f["file"]
+    data = oc_read_file(c, p)
+    name = f"contract{int(cid)}-{uuid.uuid4().hex[:16]}.pdf"
+    os.makedirs(dma_dir(dst), mode=0o700, exist_ok=True)
+    path = rmv_path(dst, name)
+    files.append(path)
+    oc_write_file(c, dst, path, data, fresh=True)  # like the upload: sealed with the area's key at rest
+    os.chmod(path, 0o600)
+    return name
+
+
+def rmv_texts(c, r, src, dst, tmap, made):
+    """{rights column: text id in dst} for the rights text blocks contract row r names in src (copied when dst has none)."""
+    out = {}
+    for col in RMV_RIGHTS:
+        tid = r[col]
+        if not tid:
+            continue
+        if tid not in tmap:
+            t = c.execute("SELECT * FROM office_texts WHERE id=? AND org_id=?", (tid, src)).fetchone()
+            if not t:
+                tmap[tid] = None
+            else:
+                same = c.execute("SELECT id FROM office_texts WHERE org_id=? AND kind=? AND text_de=? AND text_en=? ORDER BY archived, id LIMIT 1",
+                                 (dst, t["kind"], t["text_de"], t["text_en"])).fetchone()
+                if same:
+                    tmap[tid] = same["id"]
+                else:
+                    row = {k: t[k] for k in sorted(table_columns(c, "office_texts") - {"id"})}
+                    row["org_id"] = dst
+                    tmap[tid] = insert_id(c, f"INSERT INTO office_texts({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+                    made.append({"t": "office_texts", "id": tmap[tid]})
+        out[col] = tmap[tid]
+    return out
+
+
+def rmv_move(c, uid, p, src, dst, rec, made, files, ts):
+    tmap = {}
+    p["gone"] = []
+    cols = sorted(table_columns(c, "office_contracts") - {"id"})
+    for x in p["ctr"]:
+        r = x["row"]
+        extra = {"client_id": None, "updated_at": ts, **rmv_texts(c, r, src, dst, tmap, made)}
+        if x["mode"] == "move":
+            ofm_move_row(c, rec, "office_contracts", r, src, dst, dst, extra)
+            ofm_detach(c, rec, "office_docs", "contract_id", r["id"], "office_contracts")
+            for f in x["files"]:
+                name = rmv_file_copy(c, f, src, dst, r["id"], files)
+                ofm_move_row(c, rec, "office_contract_files", f, src, dst, dst, {"file": name})
+                rec[-1]["cfile"] = 1
+                if name != f["file"]:
+                    p["gone"].append(rmv_path(src, f["file"]))
+            continue
+        row = {k: r[k] for k in cols}
+        row.update(ofm_reseal(c, "office_contracts", r, src, dst), org_id=dst, created_at=ts, archived=0, **extra)
+        if "import_run_id" in row:
+            row["import_run_id"] = None
+        nid = insert_id(c, f"INSERT INTO office_contracts({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+        made.append({"t": "office_contracts", "id": nid})
+        for f in x["files"]:
+            name = rmv_file_copy(c, f, src, dst, nid, files)
+            if name == f["file"]:
+                continue  # the stored file is missing: no copy
+            fid = insert_id(c, "INSERT INTO office_contract_files(org_id, contract_id, name, file, size, sha256, date, created_by, created_at) "
+                               "VALUES(?,?,?,?,?,?,?,?,?)", (dst, nid, f["name"], name, f["size"], f["sha256"], f["date"], uid, ts))
+            made.append({"t": "office_contract_files", "id": fid, "contract": nid})
+        if not r["archived"]:
+            rec.append({"t": "office_contracts", "id": r["id"], "old": {"archived": 0}, "src": 1})
+            c.execute("UPDATE office_contracts SET archived=1, updated_at=? WHERE id=?", (ts, r["id"]))
+
+
+def rmv_unlink(paths):
+    for f in paths or ():
+        try:
+            if f:
+                os.unlink(f)
+        except OSError:
+            pass
+
+
+def rmv_unmake(c, m, dst, gone):
+    """The undo of a copy made by a contract move (in the target dst): a contract copy the target uses since stays (1)."""
+    t, rid = m["t"], m["id"]
+    if t == "office_contract_files":
+        if ofm_refs(c, "office_contracts", m.get("contract") or 0):
+            return 0  # its contract stays
+        r = c.execute("SELECT file FROM office_contract_files WHERE id=? AND org_id=?", (rid, dst)).fetchone()
+        if r:
+            c.execute("DELETE FROM office_contract_files WHERE id=?", (rid,))
+            gone.append(rmv_path(dst, r["file"]))
+        return 0
+    if not c.execute(f"SELECT 1 FROM {t} WHERE id=? AND org_id=?", (rid, dst)).fetchone():
+        return 0
+    if ofm_refs(c, t, rid):
+        return 1 if t == "office_contracts" else 0  # used in the target since: it stays
+    if t == "office_contracts":  # files the target added since go into its trash (purged with the files later)
+        c.execute("UPDATE office_contract_files SET deleted_at=? WHERE org_id=? AND contract_id=? AND deleted_at IS NULL", (iso(now_utc()), dst, rid))
+    c.execute(f"DELETE FROM {t} WHERE id=?", (rid,))
+    return 0

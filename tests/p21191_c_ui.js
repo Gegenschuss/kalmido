@@ -1,6 +1,9 @@
 // 2.119.1 UI tests, part C, own container (start.sh; P21191C_NOSTART=1: a running server). jsdom:
 // - #2304: deleting an ACTIVE list (archived first by the delete): the undo right after brings it back active (not into the
 //   archive), with its folder, position and task; redo moves it into the trash again; an archived list still comes back archived
+// - #2298: the framework contract dialog offers "Move to another workspace…" (office admin, another workspace there); the
+//   move dialog names the contract with its files; moved -> in the organisation's office, one undo step brings it back.
+//   A plain member of the organisation does not get the button; a person without an organisation neither (no other workspace)
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
@@ -62,6 +65,57 @@ const click = (w, el, o = {}) => el.dispatchEvent(new w.MouseEvent('click', {bub
   check(await p2 === true && await until(async () => (await call('GET', '/api/trash/lists')).lists?.some(x => x.id === A), 60), 'archived list: into the trash');
   await w.eval(`histStep('undo')`);
   check(await until(async () => { const x = await lst(A); return x && x.archived; }, 60), 'archived list: undo brings it back archived');
+  w.close();
+
+  // ================= #2298 framework contracts: the move button in the contract dialog
+  await call('POST', '/api/admin/setup', {org_name: 'Alpha', lang: 'en', collab_all: true, modules: ['comments']});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'clients,office'});
+  const ORG = (await st()).me.workspaces[0].id;
+  await call('POST', '/api/users', {orgs: [ORG], username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com'});
+  await call('POST', '/api/users', {orgs: [], username: 'frida', display_name: 'Frida', password: 'password123', email: 'frida@example.com'});
+  const CB = await login('bob'), CF = await login('frida');
+  for (const ck of [CB, CF]) await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'clients,office'}, ck);
+  await call('PATCH', '/api/settings', {workspace: 'private'});
+  const C = (await call('POST', '/api/office/contracts', {name: 'Rahmenvertrag Nord'})).id;
+  check(!!C, 'setup: a private framework contract');
+  const openC = async (w, cid) => {
+    const d = w.document;
+    const row = await until(() => d.querySelector(`[data-ofc="open"][data-kind="contracts"][data-id="${cid}"]`), 60);
+    if (!row) return null;
+    click(w, row);
+    return until(() => d.querySelector('.modal.ofcdlg'));
+  };
+  w = await boot({user: 'alice', hash: 'office/contracts'}); d = w.document;
+  let md = await openC(w, C);
+  const mvb = md && md.querySelector('[data-m="move"]');
+  check(!!mvb && /Move to another workspace/.test(mvb.textContent), '#2298: the contract dialog offers the move');
+  if (mvb) click(w, mvb);
+  const smv = await until(() => d.querySelector('.smv-dlg'));
+  check(!!smv && /Rahmenvertrag Nord/.test(smv.querySelector('.smv-what')?.textContent || ''), '#2298: the move dialog names the contract');
+  check(await until(() => /framework contract moves with its PDF files/.test(smv?.querySelector('.smv-notes')?.textContent || '')), '#2298: the dry run note ' + (smv?.querySelector('.smv-notes')?.textContent || ''));
+  const yes = smv && await until(() => { const b = smv.querySelector('[data-smv="yes"]'); return b && !b.disabled ? b : null; });
+  if (yes) click(w, yes);
+  await call('PATCH', '/api/settings', {workspace: `org:${ORG}`});
+  const inOrg = async () => ((await call('GET', '/api/office/contracts?archived=1')).items || []).some(x => x.id === C);
+  check(await until(inOrg, 60), '#2298: the contract is in the organisation\'s office');
+  await w.eval(`histStep('undo')`);
+  check(await until(async () => !(await inOrg()), 60), '#2298: one undo step takes it back');
+  await call('PATCH', '/api/settings', {workspace: 'private'});
+  check(((await call('GET', '/api/office/contracts')).items || []).some(x => x.id === C), '#2298: back in the personal office');
+  w.close();
+  // a plain member: no button (the routes of contracts are for admins)
+  await call('PATCH', '/api/settings', {workspace: `org:${ORG}`}, CB);
+  await call('PATCH', '/api/settings', {workspace: `org:${ORG}`});
+  const CO2 = (await call('POST', '/api/office/contracts', {name: 'Vertrag der Organisation'})).id;
+  w = await boot({user: 'bob', hash: 'office/contracts'});
+  md = await openC(w, CO2);
+  check(md && !md.querySelector('[data-m="move"]'), '#2298: a plain member gets no move button');
+  w.close();
+  // freelancer-matrix: office - a person without an organisation: no other workspace, no button
+  const CFr = (await call('POST', '/api/office/contracts', {name: 'Rahmenvertrag privat'}, CF)).id;
+  w = await boot({user: 'frida', hash: 'office/contracts'});
+  md = await openC(w, CFr);
+  check(md && !md.querySelector('[data-m="move"]'), '#2298: without an organisation there is no move button');
   w.close();
 
   console.log(`${ok} ok, ${F.length} failed`);

@@ -241,12 +241,15 @@ function ofcModal(kind, r) {
   if (!adm) for (const el of $$('input,select,textarea,button[data-dpfor]', md)) el.disabled = true;
   if (kind === 'equipment') astBind(md, r);  // 2.92.0 B (#1931)
   if (kind === 'contracts' && typeof dmaLoad === 'function') dmaLoad(md);  // 2.117.0 B (#2285)
+  // 2.119.1 C (#2298): a contract (with its PDF files) into another workspace, admins of the office (officemove.py)
+  if (kind === 'contracts' && r && adm && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom())) $('.foot .spacer', md)?.insertAdjacentHTML('beforebegin', `<button class="btn" data-m="move">${ic('brief', 's')} ${esc(tr('Move to another workspace…'))}</button>`);
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     const m = b.dataset.m;
     if (m === 'close') { close(); return; }
     if (m === 'add-item') { const eq = ofcRows('equipment').filter(x => !x.archived).map(x => [x.id, x.name]); $('#of-items', md).insertAdjacentHTML('beforeend', ofcSetItemHtml(eq, {equipment_id: eq[0]?.[0], qty: 1})); return; }
     if (m === 'rm-item') { b.closest('.ofcitem').remove(); return; }
+    if (m === 'move') { md.remove(); ofm_move({what: 'contracts', ids: [r.id], from: ofm_officeFrom(), label: qn(r.name), after: async () => ofcReload('contracts')}); return; }  // 2.119.1 C (#2298)
     try {
       if (m === 'del') {
         if (!await askConfirm(tr('Delete “{0}”?', r.name || r.name_de || r.key || ''), tr('Entries that documents, contracts or sets still use are archived instead.'), {ok: tr('Delete'), danger: true})) return;
