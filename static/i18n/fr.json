@@ -10848,5 +10848,9 @@
   "Use the values of the document": "Reprendre les valeurs du document",
   "incl. producing ({0})": "producing inclus ({0})",
   "incl. producing 1 day": "producing inclus 1 jour",
-  "incl. producing {0} days": "producing inclus {0} jours"
+  "incl. producing {0} days": "producing inclus {0} jours",
+  "Like the settings ({0})": "Comme dans les réglages ({0})",
+  "Order confirmation with signature line": "Bon pour accord avec ligne de signature",
+  "Print the order confirmation with signature line": "Imprimer le bon pour accord avec ligne de signature",
+  "Default for quotations, can be changed in each quotation": "Par défaut pour les devis, modifiable dans chaque devis"
 }

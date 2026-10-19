@@ -1195,9 +1195,11 @@ Layout (DIN 5008 form B, the usual German business letter):
 - The raw data option in its own dashed box below the totals, the transfer of rights as its own section (duration,
   territory, media, exceptions, exclusivity, note), closing text, greeting with the signer's name, an order confirmation
   area (place / date, signature) and a footer in up to four columns (company, contact, registration, bank; empty
-  columns are left out). The company colour is the only accent (rules, title underline, category headings).
-- Page breaks: following pages carry a small head (logo, title, number, recipient) and repeat the table head; every
-  page says "Page x of y"; a category heading never stays alone at the end of a page, text blocks and the rights block
+  columns are left out). Since 2.114.4 the order confirmation area can be switched off: the office setting `accept_on`
+  (default on) and per quotation `accept_on` (empty = like the setting, 1 = on, 0 = off, "Order confirmation with
+  signature line" in the texts section of the editor); a finalised quotation keeps the value it was finalised with. The company colour is the only accent (rules, title underline, category headings).
+- Page breaks: following pages carry a small head (logo, title, number, recipient) and repeat the table head; from
+  two pages on the footer says "Page x of y" (a one-page PDF has no page line); a category heading never stays alone at the end of a page, text blocks and the rights block
   are not torn, and the totals never stand alone on a page (the last position comes along). No carry-over lines.
 
 Logo: `POST /api/office/logo` (organisation admin, multipart `file`) accepts PNG, JPEG or WebP up to 4 MB, scales it to

@@ -10848,5 +10848,9 @@
   "Use the values of the document": "Werte vom Dokument übernehmen",
   "incl. producing ({0})": "inkl. Producing ({0})",
   "incl. producing 1 day": "inkl. Producing 1 Tag",
-  "incl. producing {0} days": "inkl. Producing {0} Tage"
+  "incl. producing {0} days": "inkl. Producing {0} Tage",
+  "Like the settings ({0})": "Wie in den Einstellungen ({0})",
+  "Order confirmation with signature line": "Auftragserteilung mit Unterschriftszeile",
+  "Print the order confirmation with signature line": "Auftragserteilung mit Unterschriftszeile drucken",
+  "Default for quotations, can be changed in each quotation": "Standard für Angebote, in jedem Angebot änderbar"
 }

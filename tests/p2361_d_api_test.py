@@ -154,7 +154,7 @@ all_t = "\n".join(T)
 check(r.content.startswith(b"%PDF-1.7"), "a PDF 1.7 file (PDF/A-3b since 2.38.0)")
 for want in (NUMBER, "Beispielkunde AG", "z. Hd. Max Mustermann", "50667 Köln", "KOSTENVORANSCHLAG", "Imagefilm Herbstkampagne", "PO-4711",
              "Storyboard-Erstellung", "Animation 2D / Motion Design", "Sound Design", "Producing", "Die Untertitel liefern wir als SRT-Datei.",
-             "Studio Nordlicht GmbH", "Hafenstraße 12", "Beispielbank", "Seite 1 von"):
+             "Studio Nordlicht GmbH", "Hafenstraße 12", "Beispielbank") + (("Seite 1 von",) if len(T) >= 2 else ()):  # 2.114.4 (#2282)
     check(want in all_t, f"pdf text layer has {want!r}")
 net_text = f"{NET:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") + " €"
 check(net_text in all_t, f"the net total {net_text} is printed (model net {NET})")
@@ -171,7 +171,7 @@ EN = r.json()["id"]
 A.put(B + f"{D}/{EN}/items", json={"items": [{"service_id": S_STORY, "qty": 2}]})
 r = A.get(B + f"{D}/{EN}/pdf")
 _, Ten = pdf_texts(r.content)
-check(r.ok and "QUOTATION" in Ten[0] and "Example Client Ltd." in Ten[0] and "Page 1 of" in Ten[0].replace("  ", " "), "an English quotation: English labels and 'Page 1 of'")
+check(r.ok and "QUOTATION" in Ten[0] and "Example Client Ltd." in Ten[0] and ("Page 1 of" in Ten[0].replace("  ", " ")) == (len(Ten) >= 2), "an English quotation: English labels and 'Page 1 of' only from two pages on")  # 2.114.4 (#2282)
 check("$" in Ten[0] or "USD" in Ten[0], "USD amounts in the English PDF")
 # a long quotation: several pages, every page numbered
 r = A.post(B + D, json={"project_title": "Langes Angebot", "recipient": {"name": "Beispielkunde AG", "lines": ["Marktstraße 5", "50667 Köln"]}})

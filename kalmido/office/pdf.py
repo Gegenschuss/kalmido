@@ -10,7 +10,7 @@ colour as the only accent (rules, title, category headings). Text wraps with the
 dictionary), an sRGB OutputIntent with the embedded ICC profile (fonts/sRGB2014.icc), a file identifier in the
 trailer, all fonts embedded, no encryption, no actions; an invoice / credit note may carry its e-invoice XML as the
 embedded file factur-x.xml (AFRelationship Alternative, ZUGFeRD / Factur-X EN 16931 with the fx: XMP schema). Page breaks: following pages carry a
-small head (logo, title, number) and repeat the table head; "Page x of y" is written after all pages are laid out;
+small head (logo, title, number) and repeat the table head; "Page x of y" (only from two pages on) is written in the footer after all pages are laid out;
 a category heading never stays alone at the end of a page, text blocks and the rights block are not torn, the totals
 never stand alone on a page (the last position comes along); no carry-over lines.
 
@@ -51,7 +51,7 @@ PDF_LABELS = {
     "de": {"title": "Kostenvoranschlag", "number": "Angebot Nr.", "date": "Datum", "valid_until": "Gültig bis",
            "client": "Kunde", "ref": "Ihre Referenz", "project": "Projekt", "pos": "Pos.", "service": "Leistung",
            "qty": "Menge", "rate": "Einzelpreis", "vat": "MwSt.", "total": "Gesamt", "net": "Summe netto",
-           "vat_plus": "zzgl. {0} % MwSt.", "gross": "Gesamt brutto", "incl_raw": "Gesamt inklusive Rohdaten",
+           "vat_plus": "zzgl. {0} % MwSt.", "gross": "Gesamt brutto", "incl_raw": "Summe netto mit Option Rohdaten",  # 2.114.4 A (#2275)
            "excl_raw": "Summe ohne Rohdaten", "net_suffix": "netto", "optional": "Optional", "rights": "Rechteübertragung",
            "rights_see": "Rechteübertragung siehe Anhang",  # 2.114.1 C (#2258)
            "accept": "Auftragserteilung", "place_date": "Ort, Datum", "sign": "Unterschrift, Stempel Auftraggeber",
@@ -60,7 +60,7 @@ PDF_LABELS = {
     "en": {"title": "Quotation", "number": "Quotation No.", "date": "Date", "valid_until": "Valid until",
            "client": "Client", "ref": "Your reference", "project": "Project", "pos": "No.", "service": "Service",
            "qty": "Qty", "rate": "Unit price", "vat": "VAT", "total": "Total", "net": "Net total",
-           "vat_plus": "plus {0} % VAT", "gross": "Total incl. VAT", "incl_raw": "Total including raw data",
+           "vat_plus": "plus {0} % VAT", "gross": "Total incl. VAT", "incl_raw": "Net total with option raw data",
            "excl_raw": "Total excluding raw data", "net_suffix": "net", "optional": "Optional", "rights": "Transfer of rights",
            "rights_see": "Transfer of rights see appendix",  # 2.114.1 C (#2258)
            "accept": "Order confirmation", "place_date": "Place, date", "sign": "Signature, stamp of the client",
@@ -580,6 +580,125 @@ def pdf_date(s, lang, fmt=None):
 
 
 # ---- the document ------------------------------------------------------------------------------------------------------
+PDF_CC2 = ("20", "27", "30", "31", "32", "33", "34", "36", "39", "40", "41", "43", "44", "45", "46", "47", "48", "49", "51", "52", "53",
+           "54", "55", "56", "57", "58", "60", "61", "62", "63", "64", "65", "66", "81", "82", "84", "86", "90", "91", "92", "93", "94", "95", "98")
+PDF_DE_AREA2 = ("30", "40", "69", "89")
+PDF_DE_AREA3 = ("228", "234", "335", "340", "345", "355", "365", "375", "385", "395")
+
+
+def pdf_phone(s):
+    """2.114.4 A (#2272): a phone number grouped for print ("+4922178966436" -> "+49 221 78966436"); only display, the
+    stored value stays. A number the user already spaced stays as it is. German area codes by a simple rule (Berlin,
+    Hamburg, Frankfurt, Munich 2 digits; "xx1" and a few big cities 3; mobile 15x 4, 16x / 17x 3; else 4), other
+    countries only split off the country code."""
+    t = str(s or "").strip()
+    if not t or " " in t or not re.fullmatch(r"(\+|00)?[0-9/()\-]{6,}", t):
+        return t
+    d = re.sub(r"\D", "", t)
+    if t.startswith("+") or t.startswith("00"):
+        d = d[2:] if t.startswith("00") else d
+        cc = d[:1] if d[:1] in ("1", "7") else d[:2] if d[:2] in PDF_CC2 else d[:3]
+        nat, pre = d[len(cc):], "+" + cc + " "
+        if cc != "49":
+            return pre + nat
+    elif d.startswith("0") and not d.startswith("00"):
+        nat, pre = d[1:], "0"
+    else:
+        return t
+    nat = nat.lstrip("0")
+    if nat[:3] in ("800", "180", "900"):  # service numbers 0800 / 0180 / 0900 (review)
+        n = 3
+    elif nat[:2] in PDF_DE_AREA2:
+        n = 2
+    elif nat[:2] in ("15",):
+        n = 4
+    elif nat[:2] in ("16", "17") or nat[2:3] == "1" or nat[:3] in PDF_DE_AREA3:
+        n = 3
+    else:
+        n = 4
+    if len(nat) <= n + 2:
+        return t
+    return pre + nat[:n] + " " + nat[n:]
+
+
+def pdf_phone_in(ln):
+    """2.114.4 A (#2272): ln with every unspaced phone number in it grouped (a footer line "Tel. +4922178966436")."""
+    return re.sub(r"(?<![\w@.])(?:\+|00|0)[0-9][0-9/()\-]{5,}(?![\w@])", lambda mt: pdf_phone(mt.group(0)), str(ln))
+
+
+def pdf_footer_cols(co):
+    """2.114.4 A (#2271): the footer columns of a printed company (name + address, contact, register, bank; empty
+    ones left out) -> [[(line, keep)]]; keep = the line never breaks (address, phone / email, IBAN / BIC / tax number)."""
+    co = co or {}
+    # 2.99.0 D (#2188): the up to three name lines one under the other; with a long first column (review L3) one line
+    nl = [str(x).strip() for x in (co.get("name_lines") or str(co.get("name") or "").split("\n")) if str(x).strip()][:3] or [""]
+    head = list(dict.fromkeys(nl + [str(x) for x in (co.get("lines") or [])]))
+    if len(nl) > 1 and len(head) > 6:
+        head = list(dict.fromkeys([" ".join(nl)] + [str(x) for x in (co.get("lines") or [])]))
+    cols = [[(ln, j > 0) for j, ln in enumerate(head)], [(pdf_phone_in(x), True) for x in (co.get("contact_lines") or [])],
+            [(str(x), False) for x in (co.get("register_lines") or [])], [(str(x), True) for x in (co.get("bank_lines") or [])]]
+    return [c for c in cols if any(ln.strip() for ln, _ in c)]
+
+
+def bwa_half(ln, fs, bold=False):
+    """2.114.4 A (#2271): the narrowest width at which ln takes at most two lines (the wider half of the best split)."""
+    ws = ln.split(" ")
+    return min([max(pdf_text_width(" ".join(ws[:q]), fs, bold), pdf_text_width(" ".join(ws[q:]), fs, bold)) for q in range(1, len(ws))]
+               or [pdf_text_width(ln, fs, bold)])
+
+
+def bwa_wrap(ln, keep, fs, width, bold=False):
+    """2.114.4 A (#2271): a footer line within width: whole when it fits (an unbreakable line always tries so), a
+    "Label: value" line breaks after the label first, everything else wraps by words."""
+    if pdf_text_width(ln, fs, bold) <= width:
+        return [ln]
+    if not keep and ": " in ln:
+        a, b = ln.split(": ", 1)
+        if pdf_text_width(a + ":", fs, bold) <= width and pdf_text_width(b, fs, bold) <= width:
+            return [a + ":", b]
+    return pdf_wrap(ln, fs, width, bold=bold)
+
+
+def pdf_draw_footer(p, cols, right=""):
+    """2.114.4 A (#2271): the footer of a page: a rule, the columns of pdf_footer_cols and the text bottom right
+    (number / page). Widths follow the content: every column gets at least its longest unbreakable line (an IBAN, "E-Mail
+    x"), the rest goes to the columns that still wrap; when even that does not fit, the font shrinks a little."""
+    top = A4_H - 12 * MM - PDF_FOOT_H
+    p.line(PDF_L, top, PDF_L + PDF_CW, top, 0.5, C_RULE)
+    if cols:
+        free = PDF_CW - 8 * (len(cols) - 1)
+        bold = lambda i, j: i == 0 and j == 0  # noqa: E731
+        # no break at all when a slightly smaller font allows it, else the narrowest font that keeps every unbreakable line
+        for fs, whole in ((6.9, 1), (6.6, 1), (6.3, 1), (6.9, 0), (6.6, 0), (6.3, 0), (6.0, 0)):
+            nat = [max(pdf_text_width(ln, fs, bold(i, j)) for j, (ln, _k) in enumerate(c)) + 3 for i, c in enumerate(cols)]
+            low = [max(pdf_text_width(ln, fs, bold(i, j)) if k else bwa_half(ln, fs, bold(i, j)) for j, (ln, k) in enumerate(c)) + 3
+                   for i, c in enumerate(cols)]
+            if whole and sum(nat) > free:
+                continue
+            if sum(nat) <= free:
+                cws = [w + (free - sum(nat)) / len(cols) for w in nat]
+            elif sum(low) <= free:
+                want = [a - b for a, b in zip(nat, low)]
+                cws = [b + (free - sum(low)) * w / sum(want) for b, w in zip(low, want)]
+            else:
+                cws = [free * b / sum(low) for b in low]
+            shown = [[(w, j == 0) for j, (ln, k) in enumerate(c)
+                      for w in bwa_wrap(ln, k, fs, cws[i] - 2, bold(i, j))]
+                     for i, c in enumerate(cols)]
+            if sum(low) <= free and max(len(x) for x in shown) <= 6:
+                break
+        x = PDF_L
+        for i, c in enumerate(shown):
+            if i:
+                x += cws[i - 1] + 8
+            yy = top + 5
+            for ln, first in c[:6]:
+                p.text(x, yy, ln, fs, bold=(i == 0 and first), color=C_INK if (i == 0 and first) else C_INK2)
+                yy += fs * 1.39
+    if right:
+        p.text(PDF_L + PDF_CW, A4_H - 9 * MM, right, 6.8, False, C_INK2, align="r")
+
+
 def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     """The document PDF (bytes, PDF/A-3b) from the print model of office.docs:
     {kind, lang, currency, number, date, valid_until, title, project_title, project_ref, client (name, optional),
@@ -603,7 +722,6 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     co = m.get("company") or {}
     # 2.99.0 D (#2188): the company name's lines (up to three) for the letterhead and the footer; "name" is the one-line form
     co_lines = [str(x).strip() for x in (co.get("name_lines") or str(co.get("name") or "").split("\n")) if str(x).strip()][:3]
-    n_bold = max(1, len(co_lines))
     rc = m.get("recipient") or {}
     accent = co.get("color") or "#2f5d8a"
     number = str(m.get("number") or "")
@@ -650,40 +768,12 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         p.text(PDF_L, y + 2, f"{title} {number}".strip() + (" · " + rc["name"] if rc.get("name") else ""), 8, False, C_INK2)
         p.line(PDF_L, 24.5 * MM, PDF_L + PDF_CW, 24.5 * MM, 0.5, accent)
 
-    # -- footer (every page), four columns; empty ones are left out
-    cols = [list(dict.fromkeys((co_lines or [""]) + [str(x) for x in (co.get("lines") or [])])), list(co.get("contact_lines") or []),
-            list(co.get("register_lines") or []), list(co.get("bank_lines") or [])]
-    foot_bold = n_bold
-    if n_bold > 1 and len(cols[0]) > 6:  # 2.99.0 (#2188, review L3): a long first column keeps the name on one line
-        cols[0] = [" ".join(co_lines)] + cols[0][n_bold:]
-        foot_bold = 1
-    cols = [c for c in cols if any(str(x).strip() for x in c)]
+    # -- footer (every page), four columns; empty ones are left out (2.114.4 A (#2271): shared with the document templates)
+    cols = pdf_footer_cols(co)
 
     def draw_footer(p, n, total):
-        top = A4_H - 12 * MM - PDF_FOOT_H
-        p.line(PDF_L, top, PDF_L + PDF_CW, top, 0.5, C_RULE)
-        if cols:
-            # widths follow the longest line of each column (an IBAN stays on one line), never below 60 % of a fair share
-            free = PDF_CW - 8 * (len(cols) - 1)
-            nat = [max(pdf_text_width(str(ln), 6.9, bold=(i == 0 and j == 0)) for j, ln in enumerate(c)) + 3 for i, c in enumerate(cols)]
-            if sum(nat) <= free:
-                cws = [w + (free - sum(nat)) / len(cols) for w in nat]
-            else:
-                floor = 0.6 * free / len(cols)
-                want = [max(0.0, w - floor) for w in nat]
-                extra = free - floor * len(cols)
-                cws = [floor + (extra * w / sum(want) if sum(want) else extra / len(cols)) for w in want]
-            x = PDF_L
-            for i, c in enumerate(cols):
-                if i:
-                    x += cws[i - 1] + 8
-                cw = cws[i]
-                yy = top + 5
-                shown = [(w, j < foot_bold) for j, ln in enumerate(c) for w in pdf_wrap(str(ln), 6.9, cw - 2, bold=(i == 0 and j < foot_bold))][:6]
-                for ln, first in shown:
-                    p.text(x, yy, ln, 6.9, bold=(i == 0 and first), color=C_INK if (i == 0 and first) else C_INK2)
-                    yy += 9.6
-        p.text(PDF_L + PDF_CW, A4_H - 9 * MM, (number + " · " if number else "") + L["page"].format(n, total), 6.8, False, C_INK2, align="r")
+        # 2.114.4 A (#2282): the page count only from two pages on, the number stays
+        pdf_draw_footer(p, cols, " · ".join(x for x in (number, L["page"].format(n, total) if total >= 2 else "") if x))
 
     # -- blocks: (height, draw(page, y), keep_next, keep_prev, table)
     blocks = []
@@ -703,7 +793,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             info.append((L["date"], m.get("date_text") or pdf_date(m["date"], lang, fmt)))
         if m.get("valid_until"):
             info.append((L["valid_until"], m.get("valid_until_text") or pdf_date(m["valid_until"], lang, fmt)))
-        if m.get("client") and str(m["client"]).strip() and str(m["client"]).strip() != str(rc.get("name") or "").strip():
+        if m.get("client") and str(m["client"]).strip() and not str(rc.get("name") or "").strip():  # 2.114.4 A (#2277): only without a recipient name
             info.append((L["client"], str(m["client"])))
         if m.get("project_ref"):
             info.append((L["ref"], str(m["project_ref"])))
@@ -745,10 +835,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     block(head_h, draw_head)
 
     # -- title line, project title, intro
-    title_at = {}
 
     def draw_title(p, y):
-        title_at["page"], title_at["y"] = p, y
         p.text(PDF_L, y + 6, title.upper(), 16, True, C_INK, spacing=1.0)
         p.line(PDF_L, y + 6 + 22, PDF_L + 14 * MM, y + 6 + 22, 1.6, accent)
     block(34, draw_title, keep_next=True)
@@ -806,7 +894,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 t = str(ln.get("title") or (L["producing"] if k == "producing" else L["discount"] if k == "discount" else ""))
                 if k == "discount" and ln.get("pct") not in (None, "", 0):
                     t = f"{t} {pdf_num(ln['pct'], lang, fmt)} %"
-                detail = str(ln.get("detail") or "")
+                detail = str(ln.get("detail") or "") if k != "producing" else ""  # 2.114.4 A (#2276): the formula only in the app
                 qty = ln.get("qty")
                 unit = str(ln.get("unit") or "")
                 unit = str(ln.get("unit_text") or ln.get("unit") or "")
@@ -817,7 +905,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 rate_s = str(ln.get("rate_text") or "") if "rate_text" in ln else (money(ln["rate"]) if ln.get("rate") not in (None, "") else "")
                 vat_s = (pdf_num(ln["tax_pct"], lang, fmt) + " %") if ln.get("tax_pct") not in (None, "") else ""
                 tot_s = str(ln.get("total_text") or "") if ln.get("total_text") else money(ln.get("total") or 0)
-                pos_s = str(ln.get("pos") or "") if k == "item" else ""
+                pos_s = str(ln.get("pos") or "") if k in ("item", "producing") else ""  # 2.114.4 A (#2276): producing numbered too
                 t_lines = pdf_wrap(t, body, c_title - 6)
                 d_lines = pdf_wrap(detail, 8.4, c_title + c_qty + c_rate + c_vat + c_tot - 6) if detail else []
                 h = 8 + len(t_lines) * lh + (len(d_lines) * 8.4 * 1.42 + 2 if d_lines else 0)
@@ -1016,7 +1104,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     if (m.get("kind") or "offer") == "offer" and acc:  # 2.99.0 C (#2195): accepted online -> the signature box instead of the empty lines
         acc_rows = [(str(x[0]), str(x[1])) for x in acc.get("rows") or [] if isinstance(x, (list, tuple)) and len(x) >= 2]
         block(8 + qac_sig_block_h(acc_rows), lambda p, y: qac_sig_block(p, y + 8, acc_rows, str(acc.get("head") or ""), str(acc.get("foot") or ""), accent))
-    elif (m.get("kind") or "offer") == "offer":
+    elif (m.get("kind") or "offer") == "offer" and m.get("accept_on", 1):  # 2.114.4 B (#2270): the block can be switched off
         half = (PDF_CW - 28) / 2
 
         def draw_accept(p, y):
@@ -1114,8 +1202,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     total = len(pages)
     for n, p in enumerate(pages, 1):
         draw_footer(p, n, total)
-    if title_at:  # "Page 1 of n" next to the title, known only now
-        title_at["page"].text(PDF_L + PDF_CW, title_at["y"] + 12, L["page"].format(1, total), 8.6, False, C_INK2, align="r")
+    # 2.114.4 A (#2273): no "Page 1 of n" next to the title any more, the footer has it
     if str(m.get("draft_mark") or "").strip():
         for p in pages:
             p.mark(str(m["draft_mark"]).strip())

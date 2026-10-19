@@ -51,6 +51,32 @@ on accepted quotations, a short sidebar group Exchange, the rest of the fixed re
 - Chat composer: the paperclip and the meeting (list) icon sit on one line; the width grip's label shows to its left and
   no longer covers the send button (#2185).
 
+## [2.114.4] - 2026-10-19
+
+Office fixes 4 (quotation PDF, documents, travel costs).
+
+### Added
+- Quotations: the order confirmation block (place, date, signature of the client) is optional - an office setting
+  (default on) and a choice per quotation (like the setting / on / off); a finalised quotation keeps the state it was
+  finalised with (#2270).
+- Documents: a large "Preview (PDF)" button in the draft opens the pages like in quotations (#2278).
+
+### Changed
+- Quotation and invoice PDF: the footer columns follow their content, IBAN, BIC, e-mail and tax number never break;
+  phone numbers are printed grouped (+49 221 ...); the page number stands only in the footer and only from two pages
+  on, also in documents (#2271 #2272 #2273 #2282).
+- Quotation PDF: the VAT note names only the rates that occur; the option sum reads "Net total with option raw data";
+  the producing line gets a position number and "1 day", its formula shows only in the app; the "Client" row in the
+  head is gone, the name stands in the address (#2274 #2275 #2276 #2277).
+- Documents: the footer has the same columns as the quotation (address, contact, register, bank) (#2284).
+- Documents: variable buttons insert at the cursor with a space, the client address on lines of its own; finishing
+  with empty variables names them and asks first (#2280 #2281).
+- Travel costs: without receipts in the year the per diem is the main amount, with receipts there are two columns
+  "Per diem" and "Receipts", a missing value shows a dash (#2286).
+
+### Fixed
+- Invoice from a quotation with parts: the choice texts stand right next to their radio buttons again (#2269).
+
 ## [2.114.3] - 2026-10-19
 
 ### Changed

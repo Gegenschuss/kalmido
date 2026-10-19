@@ -10848,5 +10848,9 @@
   "Use the values of the document": "Usar los valores del documento",
   "incl. producing ({0})": "incl. producing ({0})",
   "incl. producing 1 day": "incl. producing 1 día",
-  "incl. producing {0} days": "incl. producing {0} días"
+  "incl. producing {0} days": "incl. producing {0} días",
+  "Like the settings ({0})": "Como en los ajustes ({0})",
+  "Order confirmation with signature line": "Confirmación del encargo con línea de firma",
+  "Print the order confirmation with signature line": "Imprimir la confirmación del encargo con línea de firma",
+  "Default for quotations, can be changed in each quotation": "Predeterminado para presupuestos, modificable en cada presupuesto"
 }

@@ -2474,6 +2474,9 @@ MIGRATIONS = [
     # buyer name BT-44); office_company.address_extra = the company's extra address line (BT-36). 2.97 never reads them
     ("clients", "name_extra", "ALTER TABLE clients ADD COLUMN name_extra TEXT NOT NULL DEFAULT ''"),
     ("office_company", "address_extra", "ALTER TABLE office_company ADD COLUMN address_extra TEXT NOT NULL DEFAULT ''"),
+    # 2.114.4 B (#2270): the order confirmation block of a quotation per document (NULL = the office setting accept_on,
+    # 0 / 1 = off / on); a finalised document prints the value frozen in its sender snapshot. Older versions never read it
+    ("office_docs", "accept_on", "ALTER TABLE office_docs ADD COLUMN accept_on BIGINT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

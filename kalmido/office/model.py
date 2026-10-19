@@ -72,6 +72,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # 2.40.0 (#1379): producing (markup by production days) and the raw data surcharge are switched on per
                      # organisation; new organisations start without them, fe_office_rules_migrate keeps them for those using them
                      "producing_on": 0, "raw_on": 0,
+                     "accept_on": 1,  # 2.114.4 B (#2270): quotations print the order confirmation block (per document: docs.accept_on)
                      # 2.47.3 (#1360): small business (section 19 UStG): new documents without VAT + the note (also orgs)
                      "small_business": 0,
                      # 2.47.0 (#1216): industry packs switched on (office/packs/industry/<code>.json; "film" = shoot calculation)
@@ -345,7 +346,7 @@ def office_settings_clean(c, oid, b, cur):
         elif k == "industry_packs":  # 2.47.0 (#1216)
             from .sheet import dk_packs_clean
             out[k] = dk_packs_clean(v)
-        elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read"):  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
+        elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on"):  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k in ("invoice_closing_de", "invoice_closing_en", "reminder_text_de", "reminder_text_en"):
             out[k] = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""

@@ -253,7 +253,8 @@ def ofx_company_print(fields, free, lang="de", pack=None):
     addr = [x for x in (f.get("street"), f.get("address_extra"), " ".join(y for y in (f.get("zip"), f.get("city")) if y)) if x]  # 2.99.0 D (#2188): + extra line
     if f.get("country") and f["country"] != home and addr:
         addr.append(f["country"])
-    contact = [x for x in (f"{W['phone']} {f['phone']}" if f.get("phone") else "", f"{W['email']} {f['email']}" if f.get("email") else "") if x]
+    from .pdf import pdf_phone  # 2.114.4 A (#2272): grouped for print, the stored value stays
+    contact = [x for x in (f"{W['phone']} {pdf_phone(f['phone'])}" if f.get("phone") else "", f"{W['email']} {f['email']}" if f.get("email") else "") if x]
     reg = []
     if f.get("register_court") or f.get("register_no"):
         reg.append(" ".join(x for x in (W["register"] + ":" if f.get("register_court") else "", f.get("register_court"), f.get("register_no")) if x))
@@ -347,7 +348,9 @@ def ofx_finalize(c, oid, uid, did):
     sender = {"company": ofx_company_print(fields, s.get("company") or {}, lang, pack), "fields": fields, "color": color,
               "logo": logo, "logo_sha256": sha, "pack": pack.get("code") or s["pack"]}
     sender["company"]["sender_line"] = ofx_sender_line(sender["company"])  # 2.97.1 (#2224): frozen with the rest
-    from .docs import cdn_doc_recipient
+    from .docs import cdn_doc_recipient, bwb_accept_on
+    if r["kind"] == "offer":  # 2.114.4 B (#2270): the order confirmation block frozen with the rest (a later setting never changes it)
+        sender["accept_on"] = bwb_accept_on(r, s)
     rec = cdn_doc_recipient(c, oid, r)  # 2.97.0 B (#1951): the client's address as it is now, frozen below
     if r["client_id"] and rec.get("lines") is not None:
         c.execute("UPDATE office_docs SET recipient=? WHERE id=? AND org_id=?",
