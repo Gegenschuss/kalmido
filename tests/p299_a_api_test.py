@@ -259,6 +259,18 @@ check(r.ok and sorted(r.json()["ids"]) == sorted(U["created"]) and Ca.get(B + f"
 r = Ca.post(B + "/api/wiki/restore", json={"ids": U["created"], "files": U["files"]})
 check(r.ok and Ca.get(B + f"/api/wiki/files/{some}").ok, "#2182: Redo of the import " + r.text[:200])
 
+# ---------------------------------------------------------------- 2.96.0 move between spaces: the files go along
+mp = {p["path"]: p["id"] for p in Ca.get(B + "/api/wiki", params={"space": SP2}).json()["pages"]}["Projekte/Plan"]
+mf = Ca.get(B + f"/api/wiki/pages/{mp}").json()["files"]
+before = {f["id"]: Ca.get(B + f["url"]).content for f in mf}
+r = Ca.post(B + "/api/wiki/move-space", json={"pages": [mp], "space": SP2, "to": "private"})
+check(r.ok and mf, "#2182: a page with files moves to the private space " + r.text[:200])
+check(all(Ca.get(B + f["url"]).content == before[f["id"]] for f in mf), "#2182: its files are readable after the move")
+check(all(tuple(x) == (None, CAROL) for x in sql(f"SELECT org_id, owner_id FROM wiki_files WHERE page_id={int(mp)}")),
+      "#2182: the file rows follow the page (private, owner)")
+r = Ca.post(B + "/api/wiki/move-space", json={"pages": [mp], "space": "private", "to": SP2})
+check(r.ok and all(Ca.get(B + f["url"]).content == before[f["id"]] for f in mf), "#2182: and back into the organisation " + r.text[:200])
+
 # ---------------------------------------------------------------- a locked space (encrypted in the browser)
 r = Ca.post(B + "/api/wiki/e2e/start", json={"space": SP2, "keys": []})
 check(r.status_code == 409 and "have files" in r.json().get("error", ""), "#2182: a space with files cannot be locked yet " + r.text[:200])

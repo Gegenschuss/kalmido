@@ -315,6 +315,35 @@ def wka_org_files(c, oid):
     return [r[0] for r in c.execute("SELECT path FROM wiki_files WHERE org_id=?", (oid,))]
 
 
+def wka_move_files(c, page_ids, to, uid):
+    """2.99.0 (#2182 x 2.96.0 #1941): pages moved between the private space and an organisation take their files along (also
+    the ones in the trash): row org / owner as the page, the stored file sealed again with the target's key. The caller
+    commits; a file read with its own header key, so a failed commit leaves every file readable."""
+    ids = [int(x) for x in page_ids]
+    if not ids:
+        return 0
+    rows = c.execute(f"SELECT id, path FROM wiki_files WHERE page_id IN ({','.join('?' * len(ids))})", ids).fetchall()
+    space = int(to) if to else oc_user_space(uid)
+    for r in rows:
+        full = os.path.join(ATT_DIR, r["path"])
+        try:
+            data = oc_read_file(c, full)
+        except OSError:
+            continue  # a missing file stays missing (the storage check reports it)
+        oc_write_file(c, space, full, data)
+    if rows:
+        q = ",".join("?" * len(rows))
+        fids = [r["id"] for r in rows]
+        c.execute(f"UPDATE wiki_files SET org_id=?, owner_id=? WHERE id IN ({q})", (to, None if to else uid, *fids))
+        c.execute(f"UPDATE upload_scan SET org_id=? WHERE kind='wiki' AND ref_id IN ({q})", (to, *fids))
+    return len(rows)
+
+
+def wka_pages_have_files(c, page_ids):
+    ids = [int(x) for x in page_ids]
+    return bool(ids) and bool(c.execute(f"SELECT 1 FROM wiki_files WHERE page_id IN ({','.join('?' * len(ids))}) LIMIT 1", ids).fetchone())
+
+
 def wka_tick(c):
     """Watchdog (review M1, rule "deleting = really gone"): a file deleted on its own (its page is not in the trash) is removed
     for good after WKA_TRASH_DAYS -- row, scan / text marks, the stored file after the commit. Files of a page in the trash
