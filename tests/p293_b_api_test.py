@@ -229,7 +229,7 @@ check(any(r_[6] == "'=HYPERLINK(1)" for r_ in rows if len(r_) > 6), "CSV: formul
 check(sum(1 for r_ in rows if len(r_) > 2 and r_[0] == "2026-03-09") == 1, "CSV: the drive without vehicle is listed")
 check(not any(r_[:1] == ["2026-03-07"] for r_ in rows), "CSV: the deleted drive is not among the drives")
 i = next(n for n, r_ in enumerate(rows) if r_[:1] == ["Change log"])
-lg = [r_ for r_ in rows[i + 2:] if len(r_) == 5]
+lg = [r_ for r_ in rows[i + 2:] if len(r_) == 6]  # 2.103.0 (#2169): + the drive's ID as the sixth column
 check(any(r_[2] == "Deleted" for r_ in lg) and any(r_[2] == "Changed" and "Purpose" in r_[4] for r_ in lg), f"CSV: the change log with the deleted drive {rows[i:i + 4]}")
 check(any(r_[2] == "Changed" and r_[4] == "Vehicle Kombi: Kind: Private car used for business -> Company car" for r_ in lg)
       and any(r_[4] == "Mileage allowance per business km 2026: 0,30 -> 0,35" for r_ in lg) and not any("2025" in r_[4] for r_ in lg)
