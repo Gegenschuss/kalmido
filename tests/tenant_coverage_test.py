@@ -181,6 +181,8 @@ ROUTES = {
     # (2.98.0 spacer A)
     # 2.98.0 B (#1954): questionnaires (p298_b_api_test.py) - routes below this line
     "GET /api/forms/{}/entries": "form", "GET /api/forms/{}/entries.csv": "form",
+    # 2.102.0 C (#2201): the client link of a questionnaire (p2102_c_api_test.py)
+    "GET /api/forms/{}/client-link": "form", "GET /api/clients/{}/forms": "client",
     # (2.98.0 spacer B)
     # 2.98.0 C (#2180 #2181): office menu, tables (p298_c_ui.js) - routes below this line
     # (2.98.0 spacer C)

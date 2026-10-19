@@ -259,6 +259,9 @@ APP_ONLY = [
      "their CSV) stays with the people who manage the form in the app; an agent gets each submission as its task (task_added, "
      "the answers in the description) and sets the questions through the form's fields",
      ("=GET /api/forms/{}/entries", "=GET /api/forms/{}/entries.csv")),
+    ("2.102.0 C (#2201): the client link of a questionnaire is copied by the people who manage the form (form dialog, the "
+     "client's menu) and handed to the client; an agent gets the submission as its task with the client already set",
+     ("=GET /api/forms/{}/client-link", "=GET /api/clients/{}/forms")),
     # 2.70.0 (#1357): agents propose contact merges as a proposal (kind merge); the person applies them, the routes stay with people
     ("2.66.0 (#1835): merging duplicate contacts / clients and its undo stay with people; agents propose contact merges "
      "(proposal kind merge, #1357), the person applies them",
