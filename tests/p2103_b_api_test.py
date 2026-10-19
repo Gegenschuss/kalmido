@@ -284,23 +284,32 @@ GINA = one("SELECT id FROM users WHERE username='gina'")
 HUGO = one("SELECT id FROM users WHERE username='hugo'")
 Hu = sess("hugo")
 HL = Hu.post(B + "/api/lists", json={"name": "Hugo's project"}).json()["id"]
+# 2.103.0 review F7: an account deleted in the last 7 days is only disabled by a restore; gina is an old account deleted
+# 10 days ago (created_at and the journal row moved back), ida one deleted today
+OLD30 = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat(timespec="seconds")
+sql("UPDATE users SET created_at=? WHERE id=?", (OLD30, GINA), write=True)
+assert A.post(B + "/api/users", json={"username": "ida", "display_name": "Ida", "password": "password123", "email": "ida@example.com"}).ok
+IDA = one("SELECT id FROM users WHERE username='ida'")
 WITH = backup_now()
 check(WITH and WITH != GOOD, f"the backup with gina and hugo: {WITH}")
 check(A.delete(B + f"/api/users/{GINA}").ok, "gina deleted")
 r = A.delete(B + f"/api/users/{HUGO}", params={"lists": "delete", "confirm": "hugo"})
 check(r.ok, "hugo deleted with his list " + r.text[:160])
-jr = sql("SELECT user_id, email_hash, username_hash FROM deleted_accounts ORDER BY id")
+check(A.delete(B + f"/api/users/{IDA}").ok, "ida deleted")
+sql("UPDATE deleted_accounts SET at=? WHERE user_id=?", ((datetime.now(timezone.utc) - timedelta(days=10)).isoformat(timespec="seconds"), GINA), write=True)
+jr = sql("SELECT user_id, email_hash, username_hash FROM deleted_accounts WHERE user_id IN (?, ?) ORDER BY id", (GINA, HUGO))
 check([x[0] for x in jr] == [GINA, HUGO] and all(len(x[1]) == 64 and len(x[2]) == 64 for x in jr), f"journal: two rows of hashes {jr}")
 check(not sql("SELECT 1 FROM deleted_accounts WHERE email_hash LIKE '%example%' OR username_hash IN ('gina', 'hugo')"), "journal: no plain text")
 r = A.post(B + "/api/admin/backups/restore", json={"name": WITH, "confirm": "RESTORE"})
 if not r.ok:
     app_log()
 j = r.json() if r.ok else {}
-check(r.ok and j.get("deleted_again") == {"deleted": 1, "disabled": 1}, f"restored: gina deleted again, hugo disabled: {r.text[:300]}")
+check(r.ok and j.get("deleted_again") == {"deleted": 1, "disabled": 2}, f"restored: gina deleted again, hugo + ida disabled: {r.text[:300]}")
+check(sql("SELECT disabled FROM users WHERE id=?", (IDA,)) == [(1,)], "review F7: ida (deleted today) is back disabled, not deleted again")
 check(not sql("SELECT 1 FROM users WHERE id=?", (GINA,)), "gina is gone again")
 check(sql("SELECT disabled FROM users WHERE id=?", (HUGO,)) == [(1,)] and sql("SELECT 1 FROM lists WHERE id=?", (HL,)),
       "hugo (owns a list) is back disabled, his list waits for the admin")
-check([x[0] for x in sql("SELECT user_id FROM deleted_accounts ORDER BY id")] == [GINA, HUGO], "the journal survived the restore")
+check([x[0] for x in sql("SELECT user_id FROM deleted_accounts ORDER BY id")] == [GINA, HUGO, IDA], "the journal survived the restore")
 check(requests.post(B + "/api/auth/login", headers=H, json={"username": "gina", "password": "password123"}).status_code in (401, 403),
       "gina cannot log in")
 
