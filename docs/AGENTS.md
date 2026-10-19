@@ -1661,6 +1661,11 @@ workspace leaves a feature to an agent (level *Left to an agent* in the document
 waits as a suggestion in *To review* until a person accepts it. Agents never move a document and never see documents of
 another workspace.
 
+2.121.0: `get_document` also carries `extracted` for invoices and receipts -- what Kalmido's own rules read off the text
+(`supplier`, `vat_id`, `tax_no`, `invoice_no`, `vat_pct`, `vat_rates`, `net`, `vat`, `gross`, `currency`), or null. It is a
+suggestion for people: only a person takes it over in the app (agents get `403`). Use it as a starting point, e.g. for a
+receipt suggestion; the recognised `text` stays the source.
+
 ### Receipts: suggest project and category (2.48.0)
 
 An incoming invoice or receipt can be assigned to a **project** (a list of kind project of the document's workspace) and
@@ -1669,12 +1674,12 @@ with suggests, a person accepts (also with changed values) or rejects it in the 
 
 | What | Endpoint | MCP |
 |---|---|---|
-| Suggest `project_id` and / or `category` (`note` = why) | `POST /api/v1/documents/{id}/receipt-suggestion` | `suggest_receipt` |
+| Suggest `project_id`, `category`, `amount` (+ `currency`) and / or `vat_pct` (`note` = why) | `POST /api/v1/documents/{id}/receipt-suggestion` | `suggest_receipt` |
 | Your suggestions and what became of them (`state=open\|accepted\|rejected\|all`) | `GET /api/v1/receipt-suggestions` | `list_receipt_suggestions` |
 
 Flow *assign a receipt*: `list_documents` (e.g. `review=1`) -> `get_document` (text, sender, amount) -> `list_lists` (the
 projects you can see) -> `suggest_receipt`. The project must be one you can see, in the document's workspace and within
-your list restriction (else `400`); a new suggestion replaces your open one. The document then waits in *To review*. You
+your list restriction (else `400`); a new suggestion replaces your open one. Amount (gross, more than 0, at most two decimals) and VAT rate (`19`, `7`, `0`) are suggestions as well: the person may change them when accepting, and Undo brings the old values back. The document then waits in *To review*. You
 can never set, move or delete it yourself.
 
 ### Office: drafts only (2.51.0)

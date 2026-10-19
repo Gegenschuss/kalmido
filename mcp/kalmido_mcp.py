@@ -1670,11 +1670,15 @@ TOOLS += [
 # 2.48.0 (#1356): receipts -- an agent suggests project and category of a document shared with it; a person confirms
 TOOLS += [
     ("suggest_receipt", "2.48.0: suggest the project (project_id: a project list you can see, in the document's workspace) and / or "
-                        "the category (short text, e.g. Travel, Material, Software) of a receipt or incoming invoice shared with you, "
-                        "note = why. It waits in To review until a person accepts or rejects it; you never set it yourself. "
+                        "the category (short text, e.g. Travel, Material, Software), the gross amount (> 0, at most two decimals) with its "
+                        "currency (3 letters) and the VAT rate (vat_pct 19, 7 or 0; 2.121.0) of a receipt or incoming invoice shared with "
+                        "you, at least one of them, note = why. It waits in To review until a person accepts or rejects it; you never set it yourself. "
                         "A new suggestion replaces your open one.",
-     _obj({"document_id": S_ID, "project_id": S_ID, "category": {"type": "string", "maxLength": 60}, "note": {"type": "string"}}, ["document_id"]),
-     lambda api, a: api.call("POST", f"/documents/{int(a['document_id'])}/receipt-suggestion", body=_pick(a, ("project_id", "category", "note")))),
+     _obj({"document_id": S_ID, "project_id": S_ID, "category": {"type": "string", "maxLength": 60}, "note": {"type": "string"},
+                "amount": {"type": ["string", "number"]}, "currency": {"type": "string", "maxLength": 3},
+                "vat_pct": {"type": "string", "enum": ["19", "7", "0"]}}, ["document_id"]),
+     lambda api, a: api.call("POST", f"/documents/{int(a['document_id'])}/receipt-suggestion",
+                             body=_pick(a, ("project_id", "category", "note", "amount", "currency", "vat_pct")))),
     ("list_receipt_suggestions", "2.48.0: your receipt suggestions and what became of them (state open, accepted, rejected or all).",
      _obj({"state": {"type": "string", "enum": ["open", "accepted", "rejected", "all"]}}),
      lambda api, a: api.call("GET", "/receipt-suggestions", _pick(a, ("state",)))),

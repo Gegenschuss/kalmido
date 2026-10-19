@@ -179,6 +179,7 @@ ROUTES = {
     # 2.122.0 B (#2099 #2294)
     "GET /api/files/nodes/{}/tags": "files", "PUT /api/files/nodes/{}/tags": "files", "GET /api/files/tags": "files", "GET /api/files/tagged": "files",
     "POST /api/docs/bulk": "files", "POST /api/docs/zip": "files", "GET /api/docs/zip/{}": "files",
+    "POST /api/docs/{}/extracted": "files",  # 2.121.0 A (#2092): take over / discard the recognised receipt values
     "POST /api/v1/files/{}/versions": "files", "PUT /api/docs/settings": "files", "PUT /api/docs/{}/receipt": "files",
     # ---- hub (27)
     "DELETE /api/hubmail/address": "hub", "DELETE /api/hubmail/mails/{}": "hub", "DELETE /api/team/absences/{}": "hub",
@@ -319,7 +320,7 @@ ROUTES = {
     "GET /api/office/legacy/runs": "office", "GET /api/office/log": "office", "GET /api/office/logo": "office",
     "GET /api/office/mail-status": "office", "GET /api/office/number-preview": "office", "GET /api/office/packs": "office",
     "GET /api/office/packs/{}": "office", "GET /api/office/pay-props": "office", "GET /api/office/settings": "office",
-    "GET /api/office/trips": "office", "GET /api/office/trips/bill-docs": "office", "GET /api/office/trips/report": "office",
+    "GET /api/office/trips": "office", "GET /api/office/trips/bill-docs": "office", "GET /api/office/receipts/billed": "office", "GET /api/office/trips/report": "office",
     "GET /api/office/trips/vma": "office", "GET /api/office/trips/vma-rates": "office", "GET /api/office/trips/vma.csv": "office",  # 2.95.0 A (#1932)
     "GET /api/office/trips/vma.pdf": "office", "GET /api/office/trips/vma.xlsx": "office",
     "GET /api/office/trips/purposes": "office", "POST /api/office/trips/purposes": "office",  # 2.117.0 A (#2292)
@@ -368,7 +369,7 @@ ROUTES = {
     "POST /api/office/logo": "office", "POST /api/office/move": "office", "POST /api/office/packs/install": "office",
     "POST /api/office/packs/installed/{}/{}/restore": "office", "POST /api/office/packs/validate": "office",
     "POST /api/office/pay-props/{}": "office", "POST /api/office/signoffs/{}/revoke": "office",
-    "POST /api/office/trips": "office", "POST /api/office/trips/bill": "office", "POST /api/office/trips/unbill": "office",
+    "POST /api/office/trips": "office", "POST /api/office/trips/bill": "office", "POST /api/office/trips/unbill": "office", "POST /api/office/receipts/bill": "office", "POST /api/office/receipts/unbill": "office",
     "POST /api/office/trips/delete": "office", "POST /api/office/trips/import": "office", "POST /api/office/trips/import/preview": "office",  # 2.95.0 B (#1932)
     "POST /api/office/trips/{}/items": "office", "POST /api/office/{}": "office", "POST /api/paperless/import": "office",
     "POST /api/paperless/stop": "office", "POST /api/paperless/zip": "office", "POST /api/paperless/zip/import": "office",
@@ -687,6 +688,12 @@ ROUTES = {
     "POST /api/office/drives/{}/restore": "office", "GET /api/office/drives/{}/log": "office", "POST /api/office/drives/{}/trip": "office",
     "GET /api/office/logbook/report": "office", "GET /api/office/logbook.csv": "office", "GET /api/office/logbook.pdf": "office",
     "PUT /api/office/logbook/settings": "office",
+    # 2.121.0 B (#2095): the cash book, the personal office of a freelancer in p2121_b_api_test.py
+    "GET /api/office/cashbooks": "office", "POST /api/office/cashbooks": "office", "GET /api/office/cashbooks/links": "office",
+    "PATCH /api/office/cashbooks/{}": "office", "GET /api/office/cashbooks/{}/entries": "office", "POST /api/office/cashbooks/{}/entries": "office",
+    "PATCH /api/office/cash-entries/{}": "office", "POST /api/office/cash-entries/{}/cancel": "office", "GET /api/office/cash-entries/{}/log": "office",
+    "GET /api/office/cashbooks/{}/closing": "office", "POST /api/office/cashbooks/{}/closing": "office", "GET /api/office/cashbooks/{}/log": "office",
+    "GET /api/docs/{}/cashbook": "office", "GET /api/office/cashbook.csv": "office", "GET /api/office/cashbook.pdf": "office",
     # 2.94.0 (#1930): leads (personal office, p294_a_api_test.py); (#1929): the booking page (own calendar, p294_b_api_test.py),
     # its public pages (a customer without an account, the same for a freelancer's page: p294_b_api_test.py books on one)
     "DELETE /api/appt/types/{}": "pim", "GET /api/appt/bookings": "pim", "GET /api/appt/page": "pim", "GET /api/appt/types": "pim",

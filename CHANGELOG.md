@@ -7,7 +7,7 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
-## [2.122.0] - 2026-10-19
+## [2.122.0] - 2026-10-20
 
 File store and documents: file request links, tags everywhere, a stronger search; swiping through the news; yearly VAT.
 
@@ -34,6 +34,28 @@ File store and documents: file request links, tags everywhere, a stronger search
 
 ### Not yet
 - Documents: saved searches and sorting by relevance with highlighted matches follow later (#2294).
+## [2.121.0] - 2026-10-20
+
+Receipts: recognition of supplier, VAT and invoice number, accounts per category, billing on to clients, cash book,
+agents suggest amount and VAT.
+
+### Added
+- Receipts: the recognition now also reads the supplier (with VAT id and tax number), the VAT rate(s), net, VAT and
+  gross and the invoice number - locally, without any language model. It is only a suggestion: a line "Recognised: …"
+  with "Take over" (sender, VAT rate, amount; one undo step) and "Discard"; the invoice number can be copied. Agents
+  read the values as `extracted` of `GET /documents/{id}`, they never take them over (#2092).
+- Receipts: a category shows its account of the chart SKR03 or SKR04 - the one the DATEV export books on (default
+  by keywords or your own); "Change account" in the receipt sheet sets your own, the EÜR lines show it too (#2093).
+- Office: receipts can be billed on to a client as outlays - net when the receipt has a VAT rate, else gross, with an
+  optional markup, one position per receipt or one for all; never twice, undo takes it back while the document is a
+  draft (#2094).
+- Office: a cash book for cash income and expenses - gapless numbers per cash box, balance, quick entry for the phone,
+  several cash boxes. No deleting: a correction is a cancellation (counter entry); the day closing is final, the
+  balance never goes below zero, every change is logged. Export as CSV and PDF with closings and log. Receipts show
+  their cash entry. The cash book does not count into the EÜR (#2095).
+- Agents: a receipt suggestion may also carry amount, currency and VAT rate; the person can change all of it when
+  accepting, undo brings the old values back. Agent rights stay as they are (#2096).
+
 ## [2.120.0] - 2026-10-19
 
 Office: progress and final invoices, cash discount, client portal with documents, delivery notes, DATEV input side, own letterhead.

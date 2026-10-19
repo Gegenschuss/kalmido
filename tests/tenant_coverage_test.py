@@ -291,7 +291,8 @@ ROUTES = {
     # 2.47.3 (#1022, #1652): travel expenses and the cash flow, admins of the office area only (p2473_b_api_test.py: other org 404, member 403)
     "GET /api/office/trips": "office", "POST /api/office/trips": "office", "PATCH /api/office/trips/{}": "office", "DELETE /api/office/trips/{}": "office",
     "POST /api/office/trips/{}/items": "office", "PATCH /api/office/trips/{}/items/{}": "office", "DELETE /api/office/trips/{}/items/{}": "office",
-    "GET /api/office/trips/report": "office", "GET /api/office/trips/bill-docs": "office", "POST /api/office/trips/bill": "office",
+    "GET /api/office/trips/report": "office", "GET /api/office/trips/bill-docs": "office", "POST /api/office/trips/bill": "office", "GET /api/office/receipts/billed": "office", "POST /api/office/receipts/bill": "office",
+    "POST /api/office/receipts/unbill": "office",
     "POST /api/office/trips/unbill": "office", "GET /api/office/cashflow": "office", "GET /api/office/fixed-costs": "office",
     # 2.95.0 A (#1932): the per diem report and the rates, office admins (p295_a_api_test.py)
     "GET /api/office/trips/vma-rates": "office", "GET /api/office/trips/vma": "office", "GET /api/office/trips/vma.pdf": "office",
@@ -347,6 +348,12 @@ ROUTES = {
     "POST /api/office/drives/{}/restore": "office", "GET /api/office/drives/{}/log": "office", "POST /api/office/drives/{}/trip": "office",
     "GET /api/office/logbook/report": "office", "GET /api/office/logbook.csv": "office", "GET /api/office/logbook.pdf": "office",
     "PUT /api/office/logbook/settings": "office",
+    # 2.121.0 B (#2095): the cash book, the personal office of a freelancer in p2121_b_api_test.py
+    "GET /api/office/cashbooks": "office", "POST /api/office/cashbooks": "office", "GET /api/office/cashbooks/links": "office",
+    "PATCH /api/office/cashbooks/{}": "office", "GET /api/office/cashbooks/{}/entries": "office", "POST /api/office/cashbooks/{}/entries": "office",
+    "PATCH /api/office/cash-entries/{}": "office", "POST /api/office/cash-entries/{}/cancel": "office", "GET /api/office/cash-entries/{}/log": "office",
+    "GET /api/office/cashbooks/{}/closing": "office", "POST /api/office/cashbooks/{}/closing": "office", "GET /api/office/cashbooks/{}/log": "office",
+    "GET /api/docs/{}/cashbook": "office", "GET /api/office/cashbook.csv": "office", "GET /api/office/cashbook.pdf": "office",
     # 2.50.0 (#1196, #1197): the sales pipeline and the business figures, admins of the office area only (p250_b_api_test.py: other org 404, member 403)
     "GET /api/office/deals": "office", "POST /api/office/deals": "office", "PATCH /api/office/deals/{}": "office", "DELETE /api/office/deals/{}": "office",
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
@@ -793,7 +800,8 @@ ROUTES = {
     "GET /api/files/nodes/{}/tags": "file", "PUT /api/files/nodes/{}/tags": "file", "GET /api/files/tags": "file", "GET /api/files/tagged": "file",
     # 2.48.0 (#1207 / #1152 / #1356)
     "DELETE /api/files/nodes/{}": "file", "DELETE /api/files/shares/{}": "file", "DELETE /api/paperless": "paperless",
-    "GET /api/docs/{}/receipt": "receipt", "GET /api/files": "file", "GET /api/files/folders": "file",
+    "GET /api/docs/{}/receipt": "receipt", "POST /api/docs/{}/extracted": "document",  # 2.121.0 A (#2092)
+    "GET /api/files": "file", "GET /api/files/folders": "file",
     "GET /api/files/search": "file", "GET /api/v1/files/search": "file",  # 2.61.0 (#1820): names + recognised text, the boundary tested in p261_c_api_test.py
     "GET /api/files/nodes/{}": "file", "GET /api/files/nodes/{}/content": "file",
     "GET /api/files/nodes/{}/share-targets": "file", "GET /api/paperless": "paperless",

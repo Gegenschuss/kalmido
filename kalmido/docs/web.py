@@ -98,6 +98,8 @@ def doc_json(c, m, node, full=False, role=None):
         d["role"] = role
     if full:
         d["text"] = S.meta_text(c, m)
+        from ..receipts.extracted import rx_doc_view
+        d["extracted"] = rx_doc_view(c, m)  # 2.121.0 A (#2092): what the recognition read off a receipt (a suggestion)
     return d
 
 

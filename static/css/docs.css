@@ -97,6 +97,11 @@
   border-radius: .5rem; background: var(--accent-soft); margin-bottom: .5rem; }
 .rc-acts { display: flex; gap: .4rem; }
 .rc-acts .btn { min-height: 2.5rem; }
+/* 2.121.0 C (#2096): amount / currency / VAT rate of a suggestion */
+.rc-money { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .4rem; }
+.rc-money input, .rc-money select { min-height: 2.5rem; min-width: 0; }
+.rc-money input[data-rcs="amount"] { width: 7rem; }
+.rc-money input[data-rcs="currency"] { width: 4.5rem; text-transform: uppercase; }
 /* 2.96.0 A (#1941): choosing documents (to move them into the other workspace) */
 .dc-card>button{position:relative}
 .dc-card.dc-on>button{border-color:var(--accent);box-shadow:inset 0 0 0 .125rem var(--accent)}
@@ -108,9 +113,10 @@
 .dc-grid.dc-selon{padding-bottom:7.5rem}
 /* 2.119.1 D (#2206): the pseudo box starts inside the .125rem border: -.625rem makes the 2.75rem (44 px), -.5rem was 2.5rem (40 px) */
 .dc-selmark::after{content:"";position:absolute;inset:-.625rem}
-/* 2.122.0 B (#2294): the filter panel below the bar (desktop; phones: the sheet .dc-fsheet), the line of chosen filters */
-.dc-fpanel{margin:.25rem 0 .5rem;padding:.75rem;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--bg2)}
-.dc-fpanel .tsgrp{max-height:9rem}
-.dc-flt .dc-range{display:inline-flex;align-items:center;gap:.375rem}
-.dc-syn{margin:.75rem 0 0;font-size:var(--fs-xs)}
-.dc-fbar{padding-top:0}
+/* 2.121.0 A (#2092): the recognised values of a receipt (receipts.js rx_html) */
+.rx-slot { display: grid; gap: .4rem; margin: .5rem 0; }
+.rx-sug { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem .6rem;
+  border-radius: .5rem; background: var(--accent-soft); overflow-wrap: anywhere; }
+.rx-no { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem; font-size: var(--fs-s); }
+.rx-nov { font-variant-numeric: tabular-nums; user-select: all; overflow-wrap: anywhere; }
+.rx-no .linkbtn { min-height: 2.5rem; }

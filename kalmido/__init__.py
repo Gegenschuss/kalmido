@@ -229,6 +229,7 @@ ORDER = (
     "office.archiveedit",  # 2.81.0 B (#1834): correct an archived document afterwards (client, tax lines, paid) + its history
     "office.parts",  # 2.47.0 (#1215): parts of a quotation (Teilangebote): routes, title page calculation, invoice modes
     "office.travel",  # 2.47.3 (#1022, part B): travel expenses (trips, receipts, evaluation, billing on)
+    "office.outlays",  # 2.121.0 C (#2094): bill receipts of the bookkeeping on to a client (outlays)
     "office.vma",  # 2.95.0 (#1932): the per diem rates (BMF tables per year) and its calculation (pure functions)
     "office.vmareport",  # 2.95.0 A (#1932): the per diem report per person and year (JSON, PDF, Excel, CSV), the rates
     "office.vmaimport",  # 2.95.0 B (#1932): the import of a per diem spreadsheet (preview, import, undo)
@@ -241,11 +242,13 @@ ORDER = (
     "office.datev",  # 2.47.3 (#1460): DATEV booking batch (EXTF) of invoices, credit notes and payments
     "office.datevin",  # 2.120.0 C (#2090): DATEV batch input side (receipts, travel expenses) + its accounts route
     "office.books",  # 2.90.0 A (#1921): bookkeeping light: income/expense statement (EUeR), VAT return figures, tax reserve, receipt photo
+    "office.catacct",  # 2.121.0 (#2093): receipt categories with an SKR03 / SKR04 account (no routes; shown by office.books)
     "office.bank",  # 2.90.0 B (#1921): bank reconciliation: CSV / CAMT import, matching bookings to invoices and receipts
     "office.doctpl_samples",  # 2.117.0 B (#2283): the letter samples of the document templates (data, no routes)
     "office.doctpl",  # 2.93.0 A (#1927): document templates with variables, documents as PDF, signature by customer link
     "videos.review",  # 2.99.1 A (#1959): video sign-off with comments at a timecode (links only), customer link = signoff kind video
     "office.logbook",  # 2.93.0 B (#1928): the logbook (vehicles, drives, change log, year report, mileage allowance)
+    "office.cashbook",  # 2.121.0 B (#2095): the cash book (cash boxes, entries, cancellations, day closings, CSV / PDF)
     "office.taxdates",  # 2.90.0 C (#1922): tax dates as recurring tasks (VAT return, income tax prepayments, trade tax)
     "office.agentdocs",  # 2.51.0 A (#1348, #1350): agents in the office: drafts, payment suggestions, the switches (API v1 + routes)
     "office.agreements",  # 2.92.0 A (#1925): business contracts and insurances (term, notice, contribution, cash flow, deadline task)
@@ -300,6 +303,7 @@ ORDER = (
     "newsletter.sync",  # 2.55.0 (#1455): connection, segments, consent, the sync runs (no routes)
     "newsletter.web",  # 2.55.0 (#1455): the routes of the newsletter connection
     "receipts.suggest",  # 2.48.0 (#1356): receipts: project / category, agents suggest, people confirm
+    "receipts.extracted",  # 2.121.0 A (#2092): supplier / VAT / net / gross / invoice number read off a receipt, taken over by a person
     "accounts.layouts_more",  # 2.55.0 (#1067): the new views' blocks for the agents' proposals (after agents.lyprop)
     "tasks.related",  # 2.59.0 B (#1375): related tasks (text vectors from the optional embedding service, API v1, agent events)
     "lists.points",  # 2.60.0 B (#1511): story points velocity (after api.v1)

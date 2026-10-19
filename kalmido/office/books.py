@@ -271,6 +271,8 @@ def bk_euer(c, oid, year):
               for k, v in sorted(inc.items(), key=lambda kv: order(kv[0]))]
     expenses = [{"key": k, "label": x["label"], "net": m2(x["v"][0]), "vat": m2(x["v"][1]), "gross": m2(x["v"][2]), "count": x["count"]}
                 for k, x in sorted(exp.items(), key=lambda kv: (kv[0] == "km", kv[0][:2] == "t:", kv[0] == "c:", kv[1]["label"].casefold()))]
+    from .catacct import ca_euer
+    expenses = ca_euer(c, oid, expenses)  # 2.121.0 (#2093): the account of each receipt category line
     tot = lambda rows, f: sum((dec(r[f]) for r in rows), Decimal(0))  # noqa: E731
     i_net, i_gross = tot(income, "net"), tot(income, "gross")
     e_net, e_gross = tot(expenses, "net"), tot(expenses, "gross")
@@ -390,7 +392,10 @@ def bk_get():
     m_from, m_to = bk_period(int(mo[:4]), "m" + mo[5:])
     month = [_rc_public(x) for x in bk_receipts(c, oid, m_from, m_to)][-BK_LIST_MAX:]
     missing = [_rc_public(x) for x in bk_receipts(c, oid, f"{year}-01-01", f"{year}-12-31") if x["vat_pct"] is None][:BK_LIST_MAX]
-    return jsonify(upload_ws="private" if ws[0] == "u" else f"org:{oid}", categories=rc_categories(c, ws), currency=_home(s),
+    from .catacct import ca_accounts
+    cats = rc_categories(c, ws)
+    return jsonify(upload_ws="private" if ws[0] == "u" else f"org:{oid}", categories=cats, currency=_home(s),
+                   accounts=ca_accounts(c, oid, cats),  # 2.121.0 (#2093): SKR03 / SKR04 account per category (None: no DATEV input side)
                    small_business=bool(s.get("small_business")), month=mo, receipts=month, year=year,
                    missing=[] if s.get("small_business") else missing, note=tr(BK_NOTE))
 
