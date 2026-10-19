@@ -92,6 +92,7 @@ const PDF = '%PDF-1.4\\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Typ
     await sleep(400);
     check(await ev(noSide), '#2285: on a phone the PDF row stays inside the screen');
     check(await ev(`[...document.querySelectorAll('.modal .dma-acts .iconbtn, .modal .dma-up')].every(b => b.getBoundingClientRect().height >= 40)`), '#2285: big targets on a phone');
+    await ev(`(() => { document.querySelector('.modal #dma-box').scrollIntoView({block: 'center'}); return 1; })()`);
     await shot('p2117-b-contract-phone.png');
     await ev(`(() => { document.querySelector('.modal [data-m="close"]').click(); return 1; })()`);
     await ready(ev, `!document.querySelector('.modal')`);
