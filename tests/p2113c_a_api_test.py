@@ -261,6 +261,14 @@ lg = A.get(B + f"{D}/{Q}/log").json()["log"]
 acc = [x for x in lg if x["action"] == "signoff_accepted"]
 check(acc and (acc[0].get("detail") or {}).get("terms") == {"lang": "de", "date": "2026-10-01", "sha256": SHA1}, f"the decision record names the terms {acc[:1]}")
 
+# 2.113.2 (#2253) review: an open link of a quotation that is not finalised: other terms void it (the record never names unseen terms)
+check(A.post(B + f"{D}/{Q2}/status", json={"status": "sent"}).ok, "setup: the unfinalised quotation sent")
+TOK2 = A.post(B + f"{D}/{Q2}/signoff", json={}).json()["url"].split("/s/q/")[1]
+check(anon(f"/s/q/{TOK2}/terms").content == DE2, "the unfinalised quotation's link serves the current terms")
+check(upload(A, "de", DE1, date="2026-10-20", name="AGB A.pdf").ok, "setup: other German terms")
+check(anon("/s/q/" + TOK2).status_code == 404 and anon(f"/s/q/{TOK2}/terms").status_code == 404, "other terms void the open link (404)")
+check(A.post(B + f"{T}/de/restore", json={"sha256": SHA2, "date": "2026-10-15", "name": "AGB neu.pdf"}).ok, "setup: the terms of 15.10. back")
+
 # ---------------------------------------------------------------- remove, undo (restore)
 check(Bo.delete(B + f"{T}/de").status_code == 403, "a member cannot remove (403)")
 r = A.delete(B + f"{T}/de")
