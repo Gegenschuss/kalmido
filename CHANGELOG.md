@@ -7,6 +7,86 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.99.0] - 2026-10-19
+
+Files on knowledge pages and a ZIP import that keeps PDFs and pictures, one "…" menu on knowledge pages, the acceptance note
+on accepted quotations, a short sidebar group Exchange, the rest of the fixed recipient fields of office documents and
+44 px fields in the document editor.
+
+### Added
+- Knowledge pages carry files: PDFs and pictures (PNG, JPEG, GIF, WebP, cleaned SVG) below the text (*Attach files*, up to
+  25 MB each), shown in the text as a picture or a link; they have the rights of their page, are encrypted at rest like
+  task attachments, go into the backup and the organisation export, and a file deleted on its own is removed for good
+  after 30 days; they move along when their pages move between the private space and an organisation (#2182).
+- The ZIP import of knowledge pages (SilverBullet export) takes PDFs and pictures along: a file goes to the page that links
+  it (`[[file.pdf]]`, `![[_attachments/pic.png]]`, `![](pic.png)`, `[text](file.pdf)`) and the links are rewritten; files
+  nobody links land on the page *Imported files* of their folder. The type is checked by the content. Limits: 25 MB per
+  file, 500 MB per ZIP. A report lists pages, files and every skipped file with its reason. The export puts the files
+  under `_attachments/`, so importing it again gives the same pages and files (#2182).
+- A quotation accepted online through the customer link gets the acceptance box instead of the empty signature lines in
+  its PDF: "Accepted online by <name>", the time (UTC) and the SHA-256 of the accepted content - in the customer's
+  download and in the app (the original stays available) (#2195).
+
+- Clients have a *Name addition*: its own line under the name in the recipient of documents (preview and PDF), joined to
+  the buyer name in the e-invoice (BT-44 "Name - addition"), one line in lists and search; agents read and write it
+  (`name_extra`) (#2188).
+- The own company: the name may have up to three lines (letterhead and footer print them below each other, the sender
+  line and the e-invoice BT-27 join them), a new field *Address extra* (BT-36); old free address lines are read into the
+  fixed fields when the settings open (nothing is changed until you save) (#2188).
+
+### Changed
+- Sidebar group *Exchange*: people show only when you pin them (right click / long press, or the pin in *All people …*;
+  at most five, the same on all devices); a person with a chat is not listed twice; *All people …* opens the list of
+  everyone you share lists with (tasks, message, pin); groups only where you are a member; agents only when pinned or
+  when they have something unread, waiting or running - the others stay under *Agents* (#2187).
+- The e-invoice takes the client's normal e-mail as buyer address (BT-49) when no invoice e-mail is set (#2188).
+- Knowledge pages: export, import and encryption moved into the "…" menu of the header (section *Space*); the menu above
+  the page list is gone, the page's own menu shows on hover of the title row on a desktop and always on a phone (#2183).
+- An encrypted (locked) knowledge space takes no files yet: uploads are refused with a clear message, the browser import
+  skips files with a reason, and switching the lock on deletes the space's files in the trash for good (#2182).
+
+### Fixed
+- Document editor: every field is 44 px high with 16 px text on phones, also the selects on iOS (customer, language,
+  currency, status, text blocks, unit, VAT) and the position detail (#2025).
+- Chat composer: the paperclip and the meeting (list) icon sit on one line; the width grip's label shows to its left and
+  no longer covers the send button (#2185).
+
+## [2.102.0] - 2026-10-19
+
+Architecture audit T3, news, chat and phone fixes; a trash for deleted lists.
+
+### Added
+- Deleted lists go to the trash with everything (tasks, fields, tags, chat, sections); a list of an organisation goes
+  to the organisation's trash, where its admins can restore it. After 30 days a list is deleted for good, files
+  included. The tasks of a deleted organisation list no longer land in the owner's private trash; a list in the trash
+  has no public link and is not part of an account export (#1988 #2166).
+- Questionnaires: a client link (the form's link signed for one client, from the form dialog or the client's menu)
+  assigns a submission to that client before any e-mail matching; only clients of the list's space count (#2201).
+- Browser errors can become a bug ticket in a project list chosen by the admin (default off; only the message, the
+  place in the code, the version and the open area) (#1999).
+- Server: KALMIDO_THREADS, the database pool follows the threads, warnings for an exhausted pool or a too small
+  max_connections, GET /api/admin/health (#1994).
+- Migrations are recorded in the table kalmido_migrations (stable ids, one-shot flags mirrored) (#1996).
+- For developers: type check without a build step (jsconfig.json, `// @ts-check` for new client files) (#1995) and a
+  layer linter tools/check_layers.py in CI (#1999).
+
+### Changed
+- News: bundles only per task, read and unread apart, unread on top, the number per line counts unread, the tab
+  "All" has its own number (#2197).
+- Chat: a visible hint "Ctrl/Cmd+Enter sends" next to the send button in team chat, agent / job chat and comments
+  (#2204).
+- Every background loop runs only once per instance (database lock); web and worker can run apart (KALMIDO_ROLE,
+  `python app.py worker`), one container stays the default (#1997).
+- One shared drag core (drag.js): sections and bottom sheets drag the same with touch, mouse and pen, scroll at the
+  edge, Esc cancels (#1998, first part).
+- Start size: scheduling polls and questionnaires load on demand, the start budget is lower again (#2208).
+
+### Fixed
+- The calendar shows invitations also without an own calendar (#2006); the change detection counts only valid
+  invitations (#2003).
+- Files and documents: in selection mode the bar no longer covers the last row; the selection marks in documents have
+  a 44 px target (#2206).
+
 ## [2.114.4] - 2026-10-19
 
 Office fixes 4 (quotation PDF, documents, travel costs).

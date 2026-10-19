@@ -73,6 +73,8 @@ const CONTRAST = `(() => {
   const J = (await tcall('POST', '/agent/jobs', KOL.tok, {title: 'Move #' + T.ppl + ' to Done?', task_id: T.ppl, state: 'waiting', log: 'review ready'})).id;
   check(J > 0, 'a waiting job of Kollege');
 
+  // 2.99.0 (#2187): people and idle / offline agents only stand in the sidebar while pinned
+  await call('PATCH', '/api/settings', {side_people: String(BOB), side_agents: String(ARC.id)});
   // ================= desktop (jsdom)
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
   check(!d.querySelector('#rail') && !d.querySelector('.rbtn'), 'no icon rail');

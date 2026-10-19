@@ -1100,6 +1100,19 @@ fresh; run p294_a_ui node p294_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p294_b_api "$PY" p294_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p294_b_ui node p294_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p294_c_ui node p294_c_ui.js "$KALMIDO_TEST_DATA"
+shard 4  # 2.99.0: the 2.99 suites run in shard 4 (23 min in run 212; shard 12 got the 2.98 suites, shard 13 ran past the 45 min CI limit)
+# 2.99.0 part A: wiki ZIP import keeps PDFs and images as page attachments (#2182)
+fresh; run p299_a_api "$PY" p299_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.99.0 part B: one ... menu on wiki pages, chat composer icons aligned (#2183 #2185)
+fresh; run p299_b_ui node p299_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.99.0 part C: the quotation PDF after the online acceptance carries the acceptance note (#2195)
+fresh; run p299_c_api "$PY" p299_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.99.0 part D: office documents - fixed recipient fields rest (name addition, own company fields, 3-line company name), 44 px fields (#2188 #2025)
+fresh; run p299_d_api "$PY" p299_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p299_d_ui node p299_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.99.0 part E: the sidebar group Exchange stays short (recent chats, pinned people / agents, "All people") (#2187)
+fresh; run p299_e_ui node p299_e_ui.js "$KALMIDO_TEST_DATA"
+shard 13  # back to shard 13 for the suites after this block
 # 2.86.0 (#1896): hardening from audit #476 part 1, groups A-E
 fresh; run p286_a_api "$PY" p286_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_b_api "$PY" p286_b_api_test.py "$KALMIDO_TEST_DATA"
@@ -1132,6 +1145,21 @@ fresh; run p296_c_ui node p296_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p296_d_api "$PY" p296_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.96.0 part E (#1941): the separation after a move between private and organisation; moved documents are learned by the target
 fresh; run p296_e_api "$PY" p296_e_api_test.py "$KALMIDO_TEST_DATA"
+shard 4  # 2.102.0: the 2.102 suites run in shard 4 (shard 13 near the 45 min limit, shard 4 took 18 min)
+# 2.102.0 part A (#1988 #2003 #2006): organisation trash for deleted lists, calendar invitations
+fresh; run p2102_a_api "$PY" p2102_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2102_a_ui node p2102_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.102.0 part B (#2197 #2204 #2206): news bundles and counts, chat send hint, selection bar padding
+fresh; run p2102_b_ui node p2102_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.102.0 part C (#2201 #2208 #2210): questionnaire customer link, polls/forms on demand, pin agents
+fresh; run p2102_c_api "$PY" p2102_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2102_c_ui node p2102_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.102.0 part D (#1994 #1996 #1997): pool from env + health, migrations table, background worker
+fresh; run p2102_d_api "$PY" p2102_d_api_test.py "$KALMIDO_TEST_DATA"
+# 2.102.0 part E (#1995 #1998 #1999): type check, drag library, layer linter + client error report
+fresh; run p2102_e_api "$PY" p2102_e_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2102_e_ui node p2102_e_ui.js "$KALMIDO_TEST_DATA"
+shard 13  # back to shard 13 for the 2.97 suites
 # 2.97.0 part A: bookmarks (#1950)
 fresh; run p297_a_api "$PY" p297_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p297_a_ui node p297_a_ui.js "$KALMIDO_TEST_DATA"

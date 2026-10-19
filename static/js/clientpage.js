@@ -37,7 +37,7 @@ async function ms_clGdLoad(id) {
 }
 function ms_clDraw() { if (S.route.mod === 'clients') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('clients', viewClients()))); } }
 const ms_clDirty = () => { MSC.items = null; MSC.inv = null; };
-const ms_clShown = () => (MSC.items || []).filter(c => (MSC.arch || !c.archived) && (!MSC.q.trim() || [c.name, c.display_name, c.label, c.contact, c.email, c.phone, c.note, c.billing?.customer_no]
+const ms_clShown = () => (MSC.items || []).filter(c => (MSC.arch || !c.archived) && (!MSC.q.trim() || [c.name, c.name_extra, c.display_name, c.label, c.contact, c.email, c.phone, c.note, c.billing?.customer_no]
   .some(v => (v || '').toLowerCase().includes(MSC.q.trim().toLowerCase()))));
 const ms_clAv = (c, big) => `<span class="avatar ctav mscav ${big ? 'big' : ''}" style="${cssColor(c.color) ? '--cc:' + cssColor(c.color) : ''}" aria-hidden="true">${c.icon ? esc(c.icon) : ic('brief', big ? '' : 's')}</span>`;
 const ms_tag = (kind) => kind === 'client' ? `<span class="mstag mstag-cl">${ic('brief', 's')}${tr('Client')}</span>` : `<span class="mstag">${ic('user', 's')}${tr('Contact')}</span>`;
@@ -220,7 +220,8 @@ document.addEventListener('click', e => {
       const msg = c.archived ? trn('{0} client restored', '{0} clients restored', 1) : trn('{0} client archived', '{0} clients archived', 1);
       if (j.changed) ms_hist(msg, msg, async () => { await ms_clSend({action: 'restore', items: j.undo}); await ms_clAfter(); }, async () => { await ms_clSend({action: c.archived ? 'unarchive' : 'archive', ids: [c.id]}); await ms_clAfter(); });
     }}, ofm_can(c.org_id ?? null) ? {label: tr('Move to another workspace…'), icon: 'brief', fn: () => ofm_clients([c.id])} : null,  // 2.97.0 C (#2049)
-    typeof tpo_on === 'function' && tpo_on() ? {label: tr('Find a date…'), icon: 'users', fn: () => tpo_forClient(c)} : null]);  // 2.98.0 A (#1953)
+    typeof tpo_on === 'function' && tpo_on() ? {label: tr('Find a date…'), icon: 'users', fn: () => tpo_forClient(c)} : null,  // 2.98.0 A (#1953)
+    formsOn() && !S.me?.kid ? {label: tr('Copy questionnaire link for this client'), icon: 'copy', fn: () => fq_clientLink(c, b)} : null]);  // 2.102.0 C (#2201)
   }
 });
 document.addEventListener('keydown', e => {  // capture: before the global Esc (an open menu / dialog closes first)

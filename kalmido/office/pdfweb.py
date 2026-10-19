@@ -12,7 +12,11 @@ invoice / credit note, the e-invoice XML; ZUGFeRD = embedded in the PDF as well,
 <data dir>/office/<org_id>/doc<id>-<kind>-<number>.pdf / .xml (flat below the organisation folder so the backup's member
 rule and restore cover them unchanged), notes both SHA-256 in office_docs and logs "store". GET .../pdf serves the
 stored file of a finalised document (a draft is rendered with a "Draft" mark), GET .../xml the stored XML (409 for
-drafts and other kinds). epdf_doc_files(c, org_id, doc_id) hands the files to the mail dispatch of office.ledger / web."""
+drafts and other kinds). epdf_doc_files(c, org_id, doc_id) hands the files to the mail dispatch of office.ledger / web.
+
+2.99.0 C (#2195): a quotation accepted online (office/signoff.py) gets its accepted version as its own file
+doc<id>-<number>.accepted-<signoff id>.pdf (qac_pdf: the signature box instead of the empty lines); the customer's
+download and GET .../pdf of the app serve it (?original=1 the original), the original file is never changed."""
 import datetime
 import hashlib
 import io
@@ -204,6 +208,49 @@ def epdf_doc_files(c, oid, did):
     return out
 
 
+def qac_signoff(c, oid, r):
+    """2.99.0 C (#2195): the newest online acceptance of quotation row r that still covers its content (the signoff row,
+    signer data decrypted) or None: open / declined links, other kinds and a quotation changed since stay the original."""
+    from .signoff import sig_dec, sig_doc_hash
+    if r["kind"] != "offer":
+        return None
+    s = c.execute("SELECT * FROM office_signoffs WHERE org_id=? AND doc_id=? AND kind='offer' AND state='accepted' ORDER BY id DESC LIMIT 1",
+                  (oid, r["id"])).fetchone()
+    if not s or sig_doc_hash(c, oid, r["id"])[0] != s["doc_hash"]:
+        return None
+    return sig_dec(c, s)
+
+
+def qac_path(oid, r, sid):
+    """The accepted version of quotation row r (signoff sid): its own file next to the original, which stays as it is."""
+    return os.path.join(OFFICE_DIR, str(int(oid)), f"doc{int(r['id'])}-{epdf_name(r)}.accepted-{int(sid)}.pdf")
+
+
+def qac_pdf(c, oid, r, s):
+    """2.99.0 C (#2195): the PDF of quotation row r as accepted through signoff s (decrypted row): the stored file, else
+    rendered from the print model (the snapshot when finalised) with the box "accepted online by <name> at <time UTC>,
+    SHA-256 of the quotation <doc_hash>" instead of the empty signature lines and stored sealed next to the original
+    (written by the acceptance, sig_decide; a failed write leaves it to the next read). The hash is the one of the
+    accepted content, as in the protocol."""
+    p = qac_path(oid, r, s["id"])
+    if os.path.isfile(p):
+        return oc_read_file(c, p)
+    model = _model(c, oid, r["id"])
+    lang = "en" if model.get("lang") == "en" else "de"
+    model["accepted"] = {"head": tr("Simple electronic signature", lg=lang),
+                         "rows": [[tr("Accepted online by", lg=lang), s["signer_name"] or ""],
+                                  [tr("Time (UTC)", lg=lang), (s["signed_at"] or "")[:19].replace("T", " ")],
+                                  [tr("SHA-256 of the quotation", lg=lang), s["doc_hash"] or ""]],
+                         "foot": tr("Accepted through a customer link of {0}.", (model.get("company") or {}).get("name") or "", lg=lang)}
+    data = _render(c, oid, r, model)[0]
+    try:
+        os.makedirs(os.path.dirname(p), mode=0o700, exist_ok=True)
+        oc_write_file(c, oid, p, data)  # sealed with the organisation's key at rest, like the original (epdf_store)
+    except Exception as e:  # noqa: BLE001 -- the customer still gets the PDF; the next read tries again
+        print("qac_pdf store failed", r["id"], type(e).__name__, flush=True)
+    return data
+
+
 def _file_response(data, name, mime, inline=False):
     resp = Response(data, mimetype=mime)
     resp.headers["Content-Disposition"] = f'{"inline" if inline else "attachment"}; filename="{name}"'
@@ -222,6 +269,9 @@ def opdf_doc_pdf(did):
     r = doc_row(c, oid, did)
     ofx_log(c, oid, "pdf", doc_id=did, dedupe_min=10)
     c.commit()
+    acc = qac_signoff(c, oid, r) if request.args.get("original") != "1" else None
+    if acc:  # 2.99.0 C (#2195): a quotation accepted online opens as accepted (?original=1 the original as sent)
+        return _file_response(qac_pdf(c, oid, r, acc), epdf_name(r) + "-accepted.pdf", "application/pdf", inline=request.args.get("inline") == "1")
     p = _stored_or_missing(c, oid, r, "pdf")
     if p:
         data = oc_read_file(c, p)  # 2.42.0 (#828): the stored PDF/A-3 is sealed at rest, served as the original

@@ -29,52 +29,35 @@ function sb_secMark(spot) {
   else spot.el.classList.add('dropbefore');
 }
 const sb_secFold = (h, on) => { const g = h?.closest('.group, .kcol'); if (!g) return; g.classList.toggle('dragging', on); if (g.classList.contains('group')) g.classList.toggle('sb-secfold', on); };
-// touch: dnd.js calls this after the long press on a section header
+// touch: dnd.js calls this after the long press on a section header. 2.102.0 (#1998): the drag itself is drag.js (ghost,
+// threshold, auto-scroll, Esc); here only where the section goes
 let sb_sd = null;
 function sb_secHoldStart(h, sid, x, y) {
   sb_secTouchStop();
-  const r = h.getBoundingClientRect(), g = h.cloneNode(true);
-  g.classList.add('ghost-drag', 'sb-secghost');
-  g.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;z-index:95;pointer-events:none`;
-  document.body.appendChild(g);
-  sb_sd = {h, sid, g, x, y, dx: x - r.left, dy: y - r.top, moved: false, sc: tdScroller(h)};
-  // the events stay with the touched element: listen on the header (it still gets them if a live update takes it out)
-  h.addEventListener('touchmove', sb_secTouchMove, {passive: false});
-  h.addEventListener('touchend', sb_secTouchEnd);
-  h.addEventListener('touchcancel', sb_secTouchStop);
+  const st = sb_sd = {h, sid, moved: false};
+  drg_begin(h, x, y, {
+    ghost: {el: h, cls: 'ghost-drag sb-secghost'}, threshold: 6, raf: true, scroll: tdScroller(h),
+    onStart: () => { st.moved = true; },
+    onMove: (d, mx, my) => { if (sb_sd !== st) return; const sp = sb_secSpot(mx, my); sb_secMark(sp && sb_secOrder(st.sid, sp) ? sp : null); },
+    onDrop: (d, mx, my) => {
+      const o = sb_secOrder(st.sid, sb_secSpot(mx, my));  // measured while the section is still folded
+      sb_secTouchStop();
+      if (o) saveSectionOrder(o.lid, o.ids);
+    },
+    // held without moving: up / down as before (on the header now shown: a live update may have drawn it anew)
+    onTap: () => {
+      sb_secTouchStop();
+      const hh = st.h.isConnected ? st.h : $(`#view .ghead[data-section="${st.sid}"], #view .khead[data-ksec="${st.sid}"]`); if (hh) secHeadMenu(hh, st.sid);
+    },
+    onCancel: () => sb_secTouchStop(),
+  }, st);
   sb_secFold(h, true);
   if (navigator.vibrate) navigator.vibrate(12);
 }
-function sb_secTouchMove(e) {
-  const st = sb_sd, p = e.touches[0]; if (!st || !p) return;
-  if (!st.moved && Math.hypot(p.clientX - st.x, p.clientY - st.y) < 6) return;
-  e.preventDefault(); st.moved = true; st.lx = p.clientX; st.ly = p.clientY;
-  sb_secFrame(p.clientX, p.clientY);
-}
-// 2.87.9 (#1965): once per frame; the ghost slides by transform
-const sb_secFrame = rafThrottle((x, y) => {
-  const st = sb_sd; if (!st) return;
-  st.g.style.transform = `translate(${x - st.x}px, ${y - st.y}px)`;
-  const sp = sb_secSpot(x, y);
-  sb_secMark(sp && sb_secOrder(st.sid, sp) ? sp : null);
-  const sc = st.sc, r = sc === document.scrollingElement || sc === document.documentElement ? {top: 0, bottom: innerHeight} : sc.getBoundingClientRect();
-  if (y < r.top + 56) sc.scrollBy(0, -14); else if (y > Math.min(r.bottom, innerHeight) - 56) sc.scrollBy(0, 14);
-});
-function sb_secTouchEnd(e) {
-  const st = sb_sd; if (!st) return;
-  const o = st.moved && sb_secOrder(st.sid, sb_secSpot(st.lx, st.ly));  // measured while the section is still folded
-  sb_secTouchStop();
-  if (e?.cancelable) e.preventDefault();
-  // held without moving: up / down as before (on the header now shown: a live update may have drawn it anew)
-  if (!st.moved) { const h = st.h.isConnected ? st.h : $(`#view .ghead[data-section="${st.sid}"], #view .khead[data-ksec="${st.sid}"]`); if (h) secHeadMenu(h, st.sid); return; }
-  if (o) saveSectionOrder(o.lid, o.ids);
-}
 function sb_secTouchStop() {
-  sb_secFrame.cancel();
   const st = sb_sd; sb_sd = null;
+  if (st && drg_cur && drg_cur.d === st) drg_cancel();
   $$('.sb-secghost').forEach(x => x.remove());
   $$('#view .dropbefore, #view .dropafter').forEach(x => x.classList.remove('dropbefore', 'dropafter'));
-  if (!st) return;
-  st.h.removeEventListener('touchmove', sb_secTouchMove); st.h.removeEventListener('touchend', sb_secTouchEnd); st.h.removeEventListener('touchcancel', sb_secTouchStop);
-  sb_secFold(st.h, false);
+  if (st) sb_secFold(st.h, false);
 }

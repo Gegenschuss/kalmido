@@ -667,6 +667,8 @@ def org_delete(oid):
         if n:
             return err(tr("This organisation still has {0} folders and files in its file store: delete them first", n), 409)
         fs_files = fs_org_purge(c, oid)
+        from ..wiki.wikiatt import wka_org_files
+        fs_files += wka_org_files(c, oid)  # 2.99.0 A (#2182): files of its knowledge pages (the rows go with the organisation)
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))  # 2.30.0 (#1036): they stay with their owners, private
         c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))  # 2.52.0 C (#1438): its own books -> the managers'
@@ -729,7 +731,7 @@ def org_mine_dict(c, r, uid):
             "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "member",
                          "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
-            "lists": c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (r["id"],)).fetchone()[0]}
+            "lists": c.execute("SELECT COUNT(*) FROM lists WHERE org_id=? AND deleted_at IS NULL", (r["id"],)).fetchone()[0]}
 
 
 @app.get("/api/orgs")
@@ -897,6 +899,8 @@ def org_leave(c, oid, uid, heir):
             owner_transfer(c, lr, heir, force=True)  # 2.64.1 (#1817): a list with the lock too (the heir waits for its key)
             c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lr["id"], uid))
             n += 1
+        elif lr["deleted_at"]:  # 2.102.0 A (#1988): a list in the trash stays the organisation's (never the leaver's private one)
+            continue
         else:
             c.execute("UPDATE lists SET org_id=NULL WHERE id=?", (lr["id"],))
             from ..admin.orgcrypt_cli import oc_settle_kick

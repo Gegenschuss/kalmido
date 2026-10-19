@@ -237,6 +237,9 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.102.0 A (#1988): the trash of deleted lists stays with people -- restoring a list or deleting it for good is the owner's, "
+     "a list admin's or the organisation admins' decision (the routes answer 404 to agents); an agent's delete lands there too",
+     ("=GET /api/trash/lists", "=POST /api/trash/lists/{}/restore", "=DELETE /api/trash/lists/{}")),
     ("2.99.1 C (#1959): a video sign-off itself stays with people -- creating, renaming, trash / restore, new versions, the "
      "customer link and moving it; deleting comments and editing their text; an agent reads it, comments and marks comments done",
      ("=POST /api/videos", "=PATCH /api/videos/{}", "=DELETE /api/videos/{}", "=POST /api/videos/{}/restore", "* /api/videos/{}/versions",
@@ -256,6 +259,9 @@ APP_ONLY = [
      "their CSV) stays with the people who manage the form in the app; an agent gets each submission as its task (task_added, "
      "the answers in the description) and sets the questions through the form's fields",
      ("=GET /api/forms/{}/entries", "=GET /api/forms/{}/entries.csv")),
+    ("2.102.0 C (#2201): the client link of a questionnaire is copied by the people who manage the form (form dialog, the "
+     "client's menu) and handed to the client; an agent gets the submission as its task with the client already set",
+     ("=GET /api/forms/{}/client-link", "=GET /api/clients/{}/forms")),
     # 2.70.0 (#1357): agents propose contact merges as a proposal (kind merge); the person applies them, the routes stay with people
     ("2.66.0 (#1835): merging duplicate contacts / clients and its undo stay with people; agents propose contact merges "
      "(proposal kind merge, #1357), the person applies them",
@@ -296,6 +302,9 @@ APP_ONLY = [
      ("=GET /api/state/delta",)),
     ("2.34.0 (#368): the briefing field reads a PDF the person picks (nothing stored); agents read stored files with GET /attachments/{id}/text",
      ("=POST /api/pdf-text",)),
+    # 2.102.0 (#1999): the web app reports its own unexpected errors; a service reports to a list's error hook (token)
+    ("2.102.0 (#1999): the web app's own unexpected errors (window.onerror) -- agents and services use the error hook of a list",
+     ("=POST /api/client-errors",)),
     ("2.92.0 C (#1926): which agents a person may ask for a summary of a file (the preview's button); the request is a comment that mentions the agent",
      ("=GET /api/attachments/{}/agents",)),
     ("sign-in, sessions, two-factor, passkeys, OIDC: a person in a browser", ("* /api/auth/", "* /api/me/2fa", "* /api/me/passkeys", "=PATCH /api/me", "=GET /api/me")),

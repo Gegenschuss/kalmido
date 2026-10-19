@@ -153,6 +153,9 @@ CHECKS = {
     "wiki_key": ("SELECT k.space_id, k.user_id FROM wiki_keys k JOIN wiki_spaces s ON s.id=k.space_id JOIN users u ON u.id=k.user_id "
                  "WHERE (s.org_id IS NULL AND k.user_id<>s.owner_id) OR (s.org_id IS NOT NULL AND (u.kind='agent' OR "
                  + _PERSON.format(o="s", m="k") + "))"),
+    # 2.99.0 A (#2182): a file of a knowledge page that lies in another space than its page (org / owner) -- (file, who stored it)
+    "wiki_file": ("SELECT f.id, f.created_by FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id WHERE "
+                  "COALESCE(f.org_id,0)<>COALESCE(p.org_id,0) OR (p.org_id IS NULL AND f.owner_id IS DISTINCT FROM p.owner_id)"),
     # 2.71.0 B (#1459): a task shown in a list of another workspace (the trigger kalmido_ml_prune drops such links on every
     # move; the read layer ignores them: tasks/multilist.py ml_fill) -- (further list, who linked it)
     "list_task_link": ("SELECT k.list_id, k.added_by FROM task_links k JOIN tasks t ON t.id=k.task_id JOIN lists o ON o.id=t.list_id "

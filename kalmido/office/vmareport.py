@@ -281,7 +281,8 @@ def vmr_pdf():
     from .pdf import A4_H, C_INK, C_INK2, C_RULE, PDF_CW, PDF_L, _Page, pdf_date, pdf_money, pdf_text_width, pdf_wrap, pdf_write
     c, uid, oid, year, person, lg = vmr_args()
     rep = vmr_report(c, oid, year, person, lg)
-    co = (office_settings(c, oid).get("company") or {}).get("name") or ""
+    from .model import ofx_name1
+    co = ofx_name1((office_settings(c, oid).get("company") or {}).get("name") or "")  # 2.99.0 (#2188): up to three lines -> one
     cols = [(tr("From"), 0.11, "l"), (tr("to"), 0.11, "l"), (tr("Destination / route"), 0.18, "l"), (tr("Occasion"), 0.17, "l"),
             (tr("Breakdown"), 0.31, "l"), (tr("Per diem"), 0.12, "r")]
     xs, x = [], PDF_L

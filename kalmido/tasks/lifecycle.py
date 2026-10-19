@@ -616,7 +616,11 @@ def do_delete(c, tid):
 
 @app.post("/api/tasks/<int:tid>/restore")
 def task_restore(tid):
+    from ..lists.listtrash import otr_err_task
     c = db()
+    e = otr_err_task(c, tid)  # 2.102.0 A (#1988): a task of a deleted list comes back only with its list (same place)
+    if e is not None:
+        return e
     need_task(c, tid)
     restore_task(c, tid)
     bump(c)

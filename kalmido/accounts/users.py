@@ -434,6 +434,8 @@ def user_purge(c, uid):
     if before_user_delete(c, uid)[1]:  # a file that lives on could not be sealed for its new place: keep the key
         raise Denied(409, tr("Some files could not be encrypted again for their new place. Nothing was deleted; see the server log."))
     oc_drop_key(c, -int(uid))
+    from ..wiki.wikiatt import wka_user_files
+    files += wka_user_files(c, uid)  # 2.99.0 A (#2182): the files of its private pages (the rows go with the account)
     from ..wiki.wikie2e import wke_user_purge
     wke_user_purge(c, uid)  # 2.64.3 A (#1817): knowledge spaces with the lock whose key the person held: rotation pending
     c.execute("DELETE FROM users WHERE id=?", (uid,))  # cascades: settings, memberships, sessions

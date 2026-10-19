@@ -111,6 +111,8 @@ function clientSheet(c) {  // the time view of the client's month, then its prin
 function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's area, null = private), o.stay (no jump to the client)
   const md = modal(`<h3>${c ? tr('Edit client') : tr('New client')}</h3>
     <div class="row"><label for="cl-name">${tr('Name')}</label><input id="cl-name" maxlength="80" value="${esc(c?.name || '')}" autocomplete="organization"></div>
+    <div class="row"><label for="cl-nx">${tr('Name addition')}</label><input id="cl-nx" maxlength="120" value="${esc(c?.name_extra || '')}" autocomplete="off" placeholder="${esc(tr('optional'))}" aria-describedby="cl-nx-h"></div>
+    <div class="shint lhint keep" id="cl-nx-h">${tr('Printed as its own line under the name, e.g. the legal form or the partners.')}</div>
     ${o.quick ? '' : `<div class="row"><label for="cl-dname">${tr('Display name (optional)')}</label><input id="cl-dname" maxlength="80" value="${esc(c?.display_name || '')}" autocomplete="off" aria-describedby="cl-dname-h"></div>
     <div class="shint lhint keep" id="cl-dname-h">${tr('Shown in pickers and lists, not on the invoice.')}</div>`}
     ${o.quick ? cdn_addrHtml({}) : `<div class="row"><label for="cl-icon">${tr('Symbol')}</label><input id="cl-icon" maxlength="8" class="numin" value="${esc(c?.icon || '')}" placeholder="🏢"></div>
@@ -139,8 +141,8 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
         await api('DELETE', `/api/clients/${c.id}`); md.remove(); await load(); if (S.route.client === c.id) go('clients'); else render(); clReload(); return;
       }
       const v = s => $(s, md)?.value ?? '';  // 2.97.0 B (#1951): the quick dialog (a document's "Add client") has name + address only
-      const body = o.quick ? {name: v('#cl-name')} : {name: v('#cl-name'), icon: v('#cl-icon'), contacts: clkValue(md), email: v('#cl-email'),
-        phone: v('#cl-phone'), display_name: v('#cl-dname'), note: v('#cl-note')};
+      const body = o.quick ? {name: v('#cl-name'), name_extra: v('#cl-nx')} : {name: v('#cl-name'), name_extra: v('#cl-nx'), icon: v('#cl-icon'), contacts: clkValue(md), email: v('#cl-email'),
+        phone: v('#cl-phone'), display_name: v('#cl-dname'), note: v('#cl-note')};  // 2.99.0 D (#2188): + name_extra
       if (!c && 'org_id' in o) body.org_id = o.org_id;
       if ($('#cl-rate', md)) Object.assign(body, {rate: num($('#cl-rate', md).value), budget_h: num($('#cl-bh', md).value), budget_amount: num($('#cl-ba', md).value)});
       if ($('#cl-arch', md)) body.archived = $('#cl-arch', md).checked;
@@ -344,7 +346,8 @@ async function approvalDecide(id, k) {
 
 // ---- forms of a list (#463 / #341)
 async function formsModal(lid) {
-  let j; try { j = await api('GET', `/api/lists/${lid}/forms`); } catch { return; }
+  // 2.102.0 C (#2208): the questions' part of the dialog (formq.js) loads with it
+  let j; try { [j] = await Promise.all([api('GET', `/api/lists/${lid}/forms`), loadModule('formq', () => formsModal(lid))]); } catch { return; }
   const l = listById(lid), secs = S.sections.filter(s => s.list_id === lid);
   const row = f => `<div class="mrow fmrow ${f.live ? '' : 'off'}" data-fid="${f.id}"><span class="n"><b>${esc(f.title)}</b> <span class="muted">${esc(f.access === 'public' ? tr('anyone with the link') : tr('people of your organisation'))} · ${esc(trn('{0} sent', '{0} sent', f.count))}${f.live ? '' : ' · ' + esc(tr('off'))}</span></span>
     <button class="iconbtn" data-fm="copy" title="${esc(tr('Copy the link'))}" aria-label="${esc(tr('Copy the link of {0}', f.title))}">${ic('copy', 's')}</button><button class="iconbtn" data-fm="edit" title="${esc(tr('Edit form'))}" aria-label="${esc(tr('Edit {0}', f.title))}">${ic('edit', 's')}</button></div>`;

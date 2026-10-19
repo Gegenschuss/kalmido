@@ -53,6 +53,7 @@ function weekTitle(first) {
   return `${dayNoWd(a, other && a.getFullYear() !== b.getFullYear())} – ${dayNoWd(b, other)} · ${tr('Week {0}', isoWeek(addDays(first, 3)))}`;
 }
 // ------------------------------------------------------------------ state
+/** @type {KalmidoState} */  // 2.102.0 (#1995): the type for the type check (jsconfig.json, tools/tsc/kalmido.d.ts)
 const S = {
   lists: [], sections: [], tasks: new Map(), habits: [], pomo: null, pomoToday: {count: 0, minutes: 0},
   settings: {}, counts: {}, v: 0, ntfyUrl: 'https://ntfy.sh', me: null,
@@ -347,6 +348,7 @@ function savedPing() {
   el.innerHTML = `${ic('check', 's')}<span>${esc(tr('Saved'))}</span>`; el.classList.add('on');
   clearTimeout(savedPing.t); savedPing.t = setTimeout(() => el.classList.remove('on'), 1600);
 }
+/** @param {string} method @param {string} url @param {any} [body] @returns {Promise<any>} */  // 2.102.0 (#1995)
 async function api(method, url, body) {
   const lk = tlkGuard(method, url, body); if (lk) throw lk;  // 2.36.0 (#1118)
   // 2.64.1 (#1817): encrypted before the outbox (it holds ciphers only); a Promise only when there is something to encrypt, so

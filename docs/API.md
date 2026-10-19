@@ -293,7 +293,7 @@ had been made in the app. Webhooks fire too.
 | `POST /files` · `POST /files/{id}/versions` | files:write | 2.48.0: a new file `{parent_id?, name, content \| content_base64, mime?}` or folder (`kind: "folder"`) in a folder with role edit (agents without `parent_id`: their own folder); a new version of a file `{content \| content_base64}` (the older ones stay). A taken name gets " (2)". Every access of an agent is in the file's history |
 | `PATCH /comments/{id}` · `DELETE …` | comments | 2.15.0: edit your comment `{body}`; delete (author, list owner / admins) |
 | `GET /folders` · `POST /folders/rename` · `POST /folders/delete` | read · structure | 2.15.0: your folders `{path, lists}`; rename / move `{old, new}`; remove `{name}` (its lists move up). Agents: approval |
-| `DELETE /lists/{id}` | delete | 2.15.0: delete an archived list for good (owner; 2.39.1: also a list admin, the owner is told; archive it with `PATCH {archived: true}` first, else `409`); its tasks go to the owner's trash. Agents: approval |
+| `DELETE /lists/{id}` | delete | 2.15.0: delete an archived list for good (owner; 2.39.1: also a list admin, the owner is told; archive it with `PATCH {archived: true}` first, else `409`); its tasks go to the owner's trash. 2.102.0: a list without the lock goes into the list trash instead (`trash: true` in the answer) with its tasks, fields, tags and chat, an organisation's list into the organisation's; people restore it in the app (Trash > Deleted lists) or delete it for good, after 30 days it is deleted for good; its tasks no longer go to the owner's inbox and come back only with the list (`POST /tasks/{id}/restore`: `409`). Agents: approval |
 | `GET /lists/{id}/members` · `PUT …/{user_id}` · `DELETE …/{user_id}` | read · structure | 2.15.0: owner and members with roles; share with a person `{role}` (owner / list admins); stop sharing, or leave (your own id). Agents: approval |
 | `PUT /lists/{id}/status` | structure | 2.15.0: a project status update `{status: on_track \| at_risk \| off_track \| on_hold \| complete \| "", note?}`; members are told |
 | `GET /filters` · `POST …` · `PATCH /filters/{id}` · `DELETE …` | read · structure · delete | 2.15.0: saved filters `{name, rules}` |
@@ -946,6 +946,15 @@ company's) until they are finalised or sent; a `recipient` sent for such a draft
 and `recipient_missing` is `true` while street, postcode or city is missing. A document without a client keeps the
 `recipient` it is given. Finalising freezes the recipient with the fixed fields; the e-invoice takes them directly
 (`address_extra` = LineTwo), older documents with free lines only are parsed as before.
+2.99.0 (#2188): `name_extra` (up to 120 characters, empty = none) is a second name line of the client (e.g. the legal form
+or the partners): documents print it as its own line under the name, the e-invoice joins it to the buyer name (BT-44,
+`name - name_extra`), lists and the `label` show `name - name_extra` on one line. The recipient of a document carries it
+(`recipient.name_extra`, older finalised documents without it stay as they are). The buyer e-mail (BT-49) is the client's
+`email_invoice`, else its `email`. Office settings: `company_fields.name` may have up to three lines (`\n`; more = `400`),
+the letterhead and the footer print them one under the other, the sender line, mails and the e-invoice (BT-27) on one
+line; `company_fields.address_extra` is the company's extra address line (BT-36). While street, postcode and city of the
+company are empty, a plain free address (`company.lines`: street, postcode + city, maybe a country) is read into them in
+the answer; saving the settings keeps them, the free lines stay.
 A list's client: `PATCH /lists/{id}` `{client_id}`. The timesheet of a client is the time report of its lists:
 `GET /time/entries?lists=1,2&from=&to=` (web) or `/api/time/export.csv`.
 

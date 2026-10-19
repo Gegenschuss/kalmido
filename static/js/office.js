@@ -287,7 +287,7 @@ function ofcSettingsHtml() {
   const dis = adm ? '' : 'disabled';
   return `<form class="ofcset" id="ofc-set" data-fg="ofc-set:${OFC.info.org_id}" autocomplete="off">
     <h3>${tr('Company')}</h3>
-    ${ofcRowF('os-name', tr('Company name'), `<input id="os-name" value="${esc(cf.name || co.name || '')}" maxlength="200" ${dis}>`)}
+    ${ofcRowF('os-name', tr('Company name'), `<textarea id="os-name" rows="${Math.min(3, Math.max(1, String(cf.name || co.name || '').split('\n').length))}" maxlength="200" ${dis}>${esc(cf.name || co.name || '')}</textarea>`, tr('up to three lines; the letterhead and the footer print them one under the other'))}
     ${ofcCompanyFieldsHtml(cf, dis)}
     <details class="ofcfree"><summary>${tr('Free lines (used where the fields above are empty)')}</summary>
     ${ofcII('lines')}${ta('os-lines', tr('Address lines'), co.lines, tr('one line each: street, postcode and city'))}
@@ -358,7 +358,7 @@ function ofcSettingsHtml() {
 }
 // 2.47.3 (#1360): the personal office becomes a new organisation (one way: name, then a confirmation)
 async function pb_move() {
-  const name = ((await askPrompt(tr('Name of the new organisation'), OFC.info?.settings?.company?.name || OFC.info?.company_fields?.name || '', {ok: tr('Next'), input: {max: 60}})) || '').trim();
+  const name = ((await askPrompt(tr('Name of the new organisation'), (OFC.info?.settings?.company?.name || OFC.info?.company_fields?.name || '').split('\n').join(' '), {ok: tr('Next'), input: {max: 60}})) || '').trim();
   if (!name) return;
   if (!await askConfirm(tr('Move your personal office into “{0}”?', name), tr('Turns this personal office into a new organisation with you as its admin: documents, numbers, settings, master data and your private clients go with it. This cannot be undone.'), {ok: tr('Move'), danger: true})) return;
   try {
@@ -369,7 +369,7 @@ async function pb_move() {
   } catch (x) { toast(x.message || tr('unknown')); }
 }
 // 2.36.2 (#1021 P4): the company as single fields (print lines are made from them; the free lines stay the fallback)
-const OFC_CO_FIELDS = [['street', N_('Street'), 200], ['zip', N_('Postcode'), 20], ['city', N_('City'), 120], ['country', N_('Country'), 2],
+const OFC_CO_FIELDS = [['street', N_('Street'), 200], ['address_extra', N_('Address extra'), 200], ['zip', N_('Postcode'), 20], ['city', N_('City'), 120], ['country', N_('Country'), 2],  // 2.99.0 D (#2188): + BT-36
   ['email', N_('E-mail'), 200], ['phone', N_('Phone'), 60], ['tax_number', N_('Tax number'), 40], ['vat_id', N_('VAT ID'), 20], ['bank_name', N_('Bank'), 120],
   ['iban', N_('IBAN'), 42], ['bic', N_('BIC'), 11], ['register_court', N_('Register court'), 120], ['register_no', N_('Register number'), 60],
   ['managing_directors', N_('Managing directors'), 300]];

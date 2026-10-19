@@ -392,3 +392,35 @@ answers `{users, total, offset, limit, agents}` (without `limit` the whole list 
 `DELETE /api/users/{id}?lists=transfer&to={id}` or `?lists=delete&confirm={user name}` (without `lists` an account that
 owns lists still gets 409), `POST /api/users/bulk {ids, action: disable | enable | org_add, org_id}` and
 `DELETE /api/orgs/{org}/members/{id}?to={id}`. Agents do not manage accounts: no REST API or MCP change.
+
+## The group "Conversations" in the sidebar (2.99.0)
+
+The group no longer grows with every person you share a list with:
+
+- **Messages** and at most five last conversations stay, unread ones first.
+- People only show while you **pin** them (at most five): right-click a person or a direct conversation in the sidebar and
+  choose "Pin to the sidebar" / "Unpin from the sidebar", or use the pin in **All people …**. A person who already stands
+  there as a conversation is not shown a second time. Pin and unpin are one undo step each.
+- **All people …** at the end of the group lists everyone you share a list with: a name opens their tasks, the bubble writes
+  them a message, the pin puts them into the sidebar. Without an organisation it works the same way.
+- Groups: only the ones you are a member of.
+- Agents: only pinned ones and those with something unread, waiting or running; all others are under **Agents**.
+- The pins are personal settings (`side_people`, `side_agents`) and hold on every device. A pinned person you no longer
+  share a list with drops out quietly.
+
+## Deleted lists in the trash (2.102.0)
+
+Deleting an archived list no longer scatters it: the list goes into the trash with everything in it (tasks, custom fields
+and their values, sections, tags, the list's chat) and nothing moves anywhere else.
+
+- **Where it goes:** a private list into the trash of its owner, a list of an organisation into the organisation's trash.
+  Its tasks never land in someone's private basket, and a single task comes back only together with its list.
+- **Who sees it:** for a private list its owner and its list admins; for an organisation's list the organisation's admins,
+  its owner and its list admins, as long as they belong to the organisation. Agents never.
+- **Trash > Deleted lists:** name, who deleted it and when, the number of tasks; *Restore* brings the list back into its
+  archive in the same place (the same organisation or the private space), *Delete permanently…* removes it for good.
+  Right after deleting, *Undo* in the notice does the same as *Restore*.
+- **After 30 days** the list is deleted for good with its tasks, comments, attachments (also the files on disk), fields and
+  chat. Tracked time stays (without the list) for the bookkeeping.
+- Lists with end-to-end encryption are still deleted for good at once (nobody could read them in the trash).
+

@@ -35,7 +35,7 @@ from ..core.pg import write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_json_store, oc_log_detail
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
-from .model import office_gate, office_org, office_role, office_settings, pb_cl_sql
+from .model import ofx_name1, ofx_name_clean, ofx_name_lines, office_gate, office_org, office_role, office_settings, pb_cl_sql
 from .packs import office_pack
 
 # P2: does a document of this kind get its number only when it is finalised? (quotations: at creation, unless the
@@ -45,9 +45,9 @@ OFX_LOCKED = N_("This document is finalised and cannot be changed. Duplicate it 
 OFX_DETAIL_MAX = 60000
 Q2 = Decimal("0.01")
 
-COMPANY_COLS = ("name", "street", "zip", "city", "country", "email", "phone", "tax_number", "vat_id", "iban", "bic", "bank_name",
+COMPANY_COLS = ("name", "street", "address_extra", "zip", "city", "country", "email", "phone", "tax_number", "vat_id", "iban", "bic", "bank_name",
                 "register_court", "register_no", "managing_directors", "md_label")
-COMPANY_MAX = {"name": 200, "street": 200, "zip": 20, "city": 120, "country": 2, "email": 200, "phone": 60, "tax_number": 40,
+COMPANY_MAX = {"name": 200, "street": 200, "address_extra": 200, "zip": 20, "city": 120, "country": 2, "email": 200, "phone": 60, "tax_number": 40,
                "vat_id": 20, "iban": 42, "bic": 11, "bank_name": 120, "register_court": 120, "register_no": 60, "managing_directors": 300, "md_label": 20}
 # 2.40.0 (#1377): the word before the names of the management in the printed footer (md_label; '' = "Geschäftsführung" as before)
 FE_MD_LABELS = {"": ("Geschäftsführung", "Managing directors"), "shareholders": ("Gesellschafter", "Shareholders"),
@@ -163,7 +163,28 @@ def ofx_log_rows(c, oid, doc_id=None, limit=100):
 def ofx_company(c, oid):
     r = c.execute("SELECT * FROM office_company WHERE org_id=?", (oid,)).fetchone()
     r = oc_dec_fields(c, oid, "office_company", r) if r else None  # 2.42.0 (#828): bank / tax fields encrypted at rest
-    return {k: (r[k] if r else "") or "" for k in COMPANY_COLS}
+    out = {k: (r[k] if r and k in r.keys() else "") or "" for k in COMPANY_COLS}
+    if not any(out[k] for k in ("street", "zip", "city")):  # 2.99.0 D (#2188): the old free address lines, read into the fields
+        out.update(ofx_company_from_free(out, (office_settings(c, oid).get("company") or {}).get("lines") or []))
+    return out
+
+
+def ofx_company_from_free(f, lines):
+    """2.99.0 D (#2188): {street, zip, city, country?} read from the free address lines of the settings (the parser of the
+    clients' free address, 2.97.0 #1951) -- only for a plain address (street, postcode + city, maybe a country: nothing
+    would be lost in print); else {} and the free lines stay what the documents print. Nothing is stored here: the form
+    shows the fields, saving it keeps them; the free lines stay in the settings."""
+    from ..team.clients import cdn_split_free
+    lines = [str(x).strip() for x in lines if str(x).strip()]
+    if not 2 <= len(lines) <= 3:
+        return {}
+    sp = cdn_split_free({"name": ofx_name1(f.get("name")) or "-", "address": "\n".join(lines), "country": ""})
+    from .legacyimport import COUNTRIES
+    if not all(sp.get(k) for k in ("street", "zip", "city")) or (len(lines) == 3 and lines[-1].strip(" .").lower() not in COUNTRIES):
+        return {}
+    if f.get("country"):
+        sp.pop("country", None)
+    return sp
 
 
 def _iban_ok(v):
@@ -186,7 +207,7 @@ def ofx_company_clean(v, cur):
             x = ""
         if not isinstance(x, str):
             raise BadInput(tr("Invalid value: {0}", k))
-        x = re.sub(r"[\x00-\x1f]+", " ", x).strip()
+        x = ofx_name_clean(x, COMPANY_MAX[k]) if k == "name" else re.sub(r"[\x00-\x1f]+", " ", x).strip()  # 2.99.0 D (#2188): up to 3 lines
         if k in ("iban", "bic"):
             x = x.replace(" ", "").upper()
         if k == "country":
@@ -229,7 +250,7 @@ def ofx_company_print(fields, free, lang="de", pack=None):
     f = fields or {}
     free = free or {}
     home = ((pack or {}).get("code") or "").upper()
-    addr = [x for x in (f.get("street"), " ".join(y for y in (f.get("zip"), f.get("city")) if y)) if x]
+    addr = [x for x in (f.get("street"), f.get("address_extra"), " ".join(y for y in (f.get("zip"), f.get("city")) if y)) if x]  # 2.99.0 D (#2188): + extra line
     if f.get("country") and f["country"] != home and addr:
         addr.append(f["country"])
     from .pdf import pdf_phone  # 2.114.4 A (#2272): grouped for print, the stored value stays
@@ -251,7 +272,8 @@ def ofx_company_print(fields, free, lang="de", pack=None):
         bank.append(f"{W['tax_number']} {f['tax_number']}")
     if f.get("vat_id"):
         bank.append(f"{W['vat_id']} {f['vat_id']}")
-    return {"name": f.get("name") or free.get("name") or "", "lines": addr or list(free.get("lines") or []),
+    nm = f.get("name") or free.get("name") or ""  # 2.99.0 D (#2188): name = one line, name_lines = the up to three lines
+    return {"name": ofx_name1(nm), "name_lines": ofx_name_lines(nm), "lines": addr or list(free.get("lines") or []),
             "contact_lines": contact or list(free.get("contact_lines") or []),
             "register_lines": reg or list(free.get("register_lines") or []), "bank_lines": bank or list(free.get("bank_lines") or [])}
 
@@ -333,13 +355,15 @@ def ofx_finalize(c, oid, uid, did):
     if r["client_id"] and rec.get("lines") is not None:
         c.execute("UPDATE office_docs SET recipient=? WHERE id=? AND org_id=?",
                   (json.dumps({k: v for k, v in rec.items() if k != "missing"}, ensure_ascii=False), did, oid))
-    rsnap = {"name": rec.get("name") or "", "lines": rec.get("lines") or []}
+    rsnap = {"name": rec.get("name") or "", "name_extra": rec.get("name_extra") or "", "lines": rec.get("lines") or []}  # 2.99.0 D (#2188)
     if r["client_id"]:
         cl = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (r["client_id"],)).fetchone()
         if cl:
             for k in ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days"):
                 rsnap[k] = cl[k] if k in cl.keys() else None
             rsnap["extra"] = cl["address_extra"] if "address_extra" in cl.keys() else ""  # 2.97.0 B (#1951)
+            if not rsnap.get("email_invoice") and cl["email"]:  # 2.99.0 D (#2188): BT-49 falls back to the client's e-mail
+                rsnap["email_invoice"] = cl["email"]
             from .docs import fk_doc_contact
             k = fk_doc_contact(c, r["client_id"], r["contact_id"] if "contact_id" in r.keys() else None)  # 2.40.0 (#1380)
             rsnap["contact"] = {"name": k["name"], "email": k["email"], "phone": k["phone"]} if k else None

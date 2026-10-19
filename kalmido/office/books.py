@@ -29,7 +29,7 @@ from ..core.access import Denied
 from ..core.i18n import N_, tr
 from ..personal.timetrack import BadInput
 from .calc import dec, dstr, money
-from .model import office_gate, office_org, office_settings, pb_owner
+from .model import ofx_name1, office_gate, office_org, office_settings, pb_owner
 
 BK_NOTE = N_("No tax advice; figures without guarantee.")
 BK_VAT = ("19", "7", "0")
@@ -444,7 +444,7 @@ def bk_euer_pdf_bytes(c, oid, d, lang):
     from .ledger import ofx_company
     from .pdf import A4_H, A4_W, C_INK2, C_RULE, _Page, pdf_money, pdf_write
     s = office_settings(c, oid)
-    company = (ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name") or "").strip()
+    company = ofx_name1(ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name"))  # 2.99.0 D (#2188): one line
     cur = d["currency"]
     lg = "de" if lang == "de" else "en"
     m = lambda v: pdf_money(v, lg, cur)  # noqa: E731

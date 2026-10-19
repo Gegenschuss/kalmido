@@ -96,7 +96,8 @@ KINDS = {
                            "(list, read, export, cells, rows, columns, undo), an agent without a shared list sees nothing, a variable "
                            "of a list not shared with the agent is denied, an import into another workspace 404"),
     # 2.49.0 (#1199 / #1201): knowledge pages belong to one organisation (every member) or one person (org_id NULL, owner_id)
-    "wiki": ("matrix", "p249_c_api_test.py: a page of another organisation / person: 404 (read, change, delete, move, trash, search, export, mentions)"),
+    "wiki": ("matrix", "p249_c_api_test.py: a page of another organisation / person: 404 (read, change, delete, move, trash, search, export, mentions); "
+                       "p299_a_api_test.py: page files (read, upload, delete, trash)"),
     # 2.89.0 (#1916): tables belong to one organisation (every member) or one person (org_id NULL, owner_id); attached to a list
     # the list decides; Kalmido variables in formulas are evaluated per viewer (a source they may not see: "denied", no name / value)
     "sheet": ("matrix", "p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
@@ -111,6 +112,9 @@ KINDS = {
     "own": ("n/a", "the person's own rows only (settings, devices, tokens, habits, time, filters, imports, Home & life, their own "
                    "connections): read and written as user_id = me, never shared; a task / list named in them is checked with "
                    "need_task / need_list (covered by the task / list matrix)"),
+    # 2.102.0 (#1999)
+    "clienterr": ("n/a", "the web app's own unexpected error (message cut of data, place in the code, version, area): written as "
+                         "nobody into the one project list the server operator chose, nothing is read back or answered"),
     "admin": ("n/a", "the operator's administration (need_admin): server settings, backups, alerts, agents, integrations; the operator "
                      "is trusted with the whole server (architecture review 2.1 / B4); people in it are filtered by visible_people"),
     "public": ("n/a", "pages and facts without data of a person (app shell, health, version, robots, manifest, QR code of a given text)"),
@@ -178,6 +182,8 @@ ROUTES = {
     # (2.98.0 spacer A)
     # 2.98.0 B (#1954): questionnaires (p298_b_api_test.py) - routes below this line
     "GET /api/forms/{}/entries": "form", "GET /api/forms/{}/entries.csv": "form",
+    # 2.102.0 C (#2201): the client link of a questionnaire (p2102_c_api_test.py)
+    "GET /api/forms/{}/client-link": "form", "GET /api/clients/{}/forms": "client",
     # (2.98.0 spacer B)
     # 2.98.0 C (#2180 #2181): office menu, tables (p298_c_ui.js) - routes below this line
     # (2.98.0 spacer C)
@@ -212,6 +218,9 @@ ROUTES = {
     "GET /api/dayplan": "aggregate", "GET /api/dayplan/review": "aggregate", "GET /api/v1/dayplan": "aggregate",
     "GET /api/v1/dayplan/review": "aggregate", "GET /api/deps": "aggregate", "POST /api/tasks/purge-done": "aggregate",
     "DELETE /api/trash": "aggregate", "GET /api/roadmap": "aggregate",
+    # 2.102.0 A (#1988): the list trash -- only lists the person may restore (otr_can: owner / list admin / the org's admins,
+    # members only), by id the same 404 for every other list (p2102_a_api_test.py)
+    "GET /api/trash/lists": "aggregate", "POST /api/trash/lists/{}/restore": "list", "DELETE /api/trash/lists/{}": "list",
     # ---- attachment (16)
     "GET /api/v1/tasks/{}/attachments": "attachment", "GET /api/v1/attachments/{}": "attachment",
     "GET /api/v1/lists/{}/files": "attachment", "POST /api/v1/lists/{}/files": "attachment",
@@ -437,6 +446,7 @@ ROUTES = {
     "GET /api/v1/lists/{}/notify-template": "list", "POST /api/notify-templates/asked": "own",
     "GET /api/search/messages": "aggregate",  # 2.33.0 (#1080): only what the person may read (vis_sql, rooms, own agent chats)
     "GET /api/admin/client-ip": "admin",  # 2.33.0 (#834)
+    "GET /api/admin/health": "admin",  # 2.102.0 D (#1994): numbers only (pool, threads, role, loops), no user data
     # ---- form (10)
     "GET /api/lists/{}/forms": "form", "POST /api/lists/{}/forms": "form", "PATCH /api/forms/{}": "form",
     "DELETE /api/forms/{}": "form", "GET /f/{}": "form", "POST /f/{}": "form", "GET /api/v1/lists/{}/forms": "form",
@@ -588,7 +598,7 @@ ROUTES = {
     "GET /api/users/{}/delete-info": "people", "POST /api/users/bulk": "people",
     "GET /api/avatar/{}/{}.jpg": "people",
     # ---- public (15)
-    "GET /api/v1/announcement": "public", "GET /api/v1/openapi.json": "public", "GET /api/about": "public",
+    "GET /api/v1/announcement": "public", "GET /api/v1/openapi.json": "public", "GET /api/about": "public", "POST /api/client-errors": "clienterr",
     "GET /": "public", "GET /capture": "public", "GET /share": "public", "POST /share": "public", "POST /drop": "public",
     "POST /drop/drop": "public", "GET /robots.txt": "public", "GET /manifest.json": "public", "GET /sw.js": "public",
     "GET /api/health": "public", "GET /api/version": "public", "POST /api/qr": "public",
@@ -719,6 +729,9 @@ ROUTES = {
     # 2.96.0 B (#1941): wiki pages / folders to the other workspace (p296_b_api_test.py)
     "POST /api/wiki/move-space": "wiki",
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
+    # 2.99.0 A (#2182): files of knowledge pages (a file of another organisation / person: 404, p299_a_api_test.py)
+    "GET /api/wiki/files/{}": "wiki", "GET /api/wiki/files/{}/{}": "wiki", "DELETE /api/wiki/files/{}": "wiki",
+    "POST /api/wiki/pages/{}/files": "wiki",
     # 2.64.3 A (#1817): the lock per knowledge space (wiki_space: a space of another organisation 404, p264c_a_api_test.py)
     "GET /api/wiki/e2e": "wiki", "POST /api/wiki/e2e/start": "wiki", "GET /api/wiki/e2e/todo": "wiki",
     "POST /api/wiki/e2e/bulk": "wiki", "POST /api/wiki/e2e/finish": "wiki", "POST /api/wiki/e2e/stop": "wiki",

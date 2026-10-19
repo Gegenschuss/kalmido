@@ -104,3 +104,6 @@
 .dc-on .dc-selmark{background:var(--accent);color:var(--accent-ink)}
 .dc-selbar{position:sticky;bottom:.75rem;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.75rem;padding:.5rem .75rem;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--bg2);box-shadow:0 .25rem 1rem rgba(0,0,0,.12)}
 .dc-selbar .btn,.dc-selbar .iconbtn{min-height:2.75rem}
+/* 2.102.0 B (#2206): room below the grid as high as the sticky bar; the choosing mark gets a 2.75rem touch target (the circle stays 1.75rem) */
+.dc-grid.dc-selon{padding-bottom:7.5rem}
+.dc-selmark::after{content:"";position:absolute;inset:-.5rem}

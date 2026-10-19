@@ -540,6 +540,8 @@ def watchdog_tick(c):
     _wd_section(c, "merge snapshots", mg_prune, False)  # 2.66.0 (#1835): the undo data of merges after 30 days
     from ..videos.review import vdr_trash_prune
     _wd_section(c, "video trash", vdr_trash_prune)  # 2.99.1 (#1959) review M3: video sign-offs in the trash after 30 days
+    from ..lists.listtrash import otr_prune
+    _wd_section(c, "list trash", otr_prune)  # 2.102.0 A (#1988): deleted lists for good after 30 days, with their files
     from ..admin.acctexport import umz_cleanup
     _wd_section(c, "account export cleanup", umz_cleanup)  # 2.73.0 B (#1473): account exports + import uploads after 24 h
     from ..accounts.servers import msv_cleanup
@@ -591,6 +593,8 @@ def watchdog_tick(c):
     _wd_section(c, "virus scan", sc_tick)  # 2.61.0 (#1818): the uploads the scanner could not check yet
     from ..files.fsmove import fsm_orphans_gc
     _wd_section(c, "files cleanup", fsm_orphans_gc)  # 2.97.0 D (#2051): stored versions without a row, once a night
+    from ..wiki.wikiatt import wka_tick
+    _wd_section(c, "wiki files", wka_tick)  # 2.99.0 (#2182): files in the trash for good after 30 days
     _wd_section(c, "admin alerts", aa_tick)
 
 

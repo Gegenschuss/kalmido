@@ -32,6 +32,29 @@ TEXT_KINDS = ("rights_time", "rights_territory", "rights_media", "intro", "closi
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 SCHEME_RE = re.compile(r"\{(yyyy|yy|seq(?::0?(\d{1,2}))?|project|client|date|initials|version)\}")  # 2.118.0 A (#2265): version
 NAME_MAX = 200
+# 2.99.0 D (#2188, decision 18.10.2026): the own company name may have up to three lines (stored with line breaks); the
+# letterhead and the footer print them one under the other, the sender line, mails and the e-invoice (BT-27) on one line
+OFX_NAME_LINES = 3
+
+
+def ofx_name_lines(v):
+    """The lines of a (company) name: whitespace folded per line, empty lines dropped."""
+    return [x for x in (re.sub(r"\s+", " ", ln).strip() for ln in str(v or "").replace("\r", "").split("\n")) if x]
+
+
+def ofx_name1(v):
+    """A (company) name on one line: its lines joined with a space."""
+    return " ".join(ofx_name_lines(v))
+
+
+def ofx_name_clean(v, mx=NAME_MAX):
+    """A name of up to OFX_NAME_LINES lines (control characters out, the lines joined with \\n); more lines: BadInput."""
+    lines = ofx_name_lines(re.sub(r"[\x00-\x09\x0b-\x1f\x7f]", " ", str(v or "")))
+    if len(lines) > OFX_NAME_LINES:
+        raise BadInput(tr("The company name has at most {0} lines.", OFX_NAME_LINES))
+    return "\n".join(lines)[:mx].strip()
+
+
 TEXT_MAX = 8000
 
 # ---- settings (office_settings.data), defaults filled from the country pack
@@ -287,7 +310,7 @@ def office_settings_clean(c, oid, b, cur):
                 raise BadInput(tr("Invalid value: {0}", "company"))
             co = out["company"]
             if "name" in v:
-                co["name"] = re.sub(r"[\x00-\x1f\x7f]", "", v.get("name") or "").strip()[:NAME_MAX] if isinstance(v.get("name"), str) else ""
+                co["name"] = ofx_name_clean(v["name"]) if isinstance(v.get("name"), str) else ""  # 2.99.0 D (#2188): up to three lines
             for f in ("lines", "contact_lines", "register_lines", "bank_lines"):
                 if f in v:
                     co[f] = _lines(v[f], f)

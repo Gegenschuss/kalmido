@@ -20,9 +20,20 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
 - **Templates.** Pages under `Templates/` are offered as the start of a new page.
 - **Saving** is automatic. When someone else saved the page in between, you choose which version stays.
 - **Undo.** Creating, renaming, deleting and importing are one step each (the arrow on top, Ctrl/Cmd+Z, the toast).
-- **Export / import.** The menu of the page list exports a space as a ZIP of `.md` files in folders (the format of
-  SilverBullet and similar tools) and imports such a ZIP: only Markdown files, at most 2000 files, 1 MB each and 30 MB
-  in total; pages with an existing name are skipped unless you replace them. Paths with `..` are refused.
+- **Files (2.99.0).** A page can carry PDFs and pictures (PNG, JPEG, GIF, WebP, SVG): *Attach files* below the text,
+  at most 25 MB each. The type is checked by the content, not by the name; an SVG is cleaned (no scripts, no outside
+  references). In the text, `![label](/api/wiki/files/<id>/<name>)` shows a picture and `[label](…)` opens a file; the
+  link button next to a file copies that line. The files have the rights of their page: whoever may read the page may
+  open them. Deleting a file or its page can be undone. An encrypted space (see below) takes no files yet.
+- **Export / import.** The "…" menu in the header (section *Space*) exports a space as a ZIP of `.md` files in folders (the format of
+  SilverBullet and similar tools) and imports such a ZIP: at most 2000 files, 1 MB per page, 25 MB per PDF or picture and
+  500 MB in total; pages with an existing name are skipped unless you replace them. Paths with `..` are refused.
+  PDFs and pictures come along (2.99.0): a file goes to the page that links it (`[[contract.pdf]]`, `![[_attachments/sketch.png]]`,
+  `![](../_attachments/sketch.png)`, `[text](contract.pdf)`; relative to the page's folder, the top of the ZIP or `_attachments/`)
+  and the links point at it; a file several pages link is stored once; a file nobody links lands on the page *Imported
+  files* of its folder. Other files, and files whose content does not match their name, are skipped. After the import a
+  report shows how many pages and files came in and what was skipped, with the reason. The export puts the files under
+  `_attachments/<page>/` and writes the links as `[[_attachments/…]]`, so importing it again gives the same pages and files.
 - **Mind maps in pages.** A fenced block with the language `mindmap` draws its Markdown list as a mind map:
 
   ````
@@ -34,8 +45,8 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   ```
   ````
 
-Organisation exports (Settings > Organisation) contain the pages (`wiki/pages.json`). Agents have no access to knowledge
-pages yet.
+Organisation exports (Settings > Organisation) contain the pages (`wiki/pages.json`) and their files (`wiki/files.json`,
+the bytes under `files/wiki/`). Agents have no access to knowledge pages yet.
 
 ## Encrypted space (2.64.3)
 
@@ -52,9 +63,11 @@ organisation.
   leaves, the key changes and older pages are encrypted again in the background as soon as an admin opens the knowledge pages
   with their encryption unlocked (for a key seen there for the first time, by a button).
 - **In use.** Search, backlinks, "mentioned in", page links, templates, and moving a folder (every page is renamed) work in the browser over the decrypted pages. A locked space shows a placeholder until you unlock.
-- **Export and import** of such a space are done by the browser: the menu entry to export it as a ZIP gives plain Markdown files;
+- **Export and import** of such a space are done by the browser: the entry *Export as ZIP* in the header menu gives plain Markdown files;
   import reads a ZIP and encrypts the pages. The server answers its own export and import with an error there.
-- **Not available:** access for agents or the API, templates copied by the server, and the server's own search.
+- **Not available:** access for agents or the API, templates copied by the server, the server's own search, and files on pages
+  (2.99.0: the import in the browser skips PDFs and pictures with the reason; a space whose pages have files cannot be
+  switched on until they are deleted).
 - **Limits.** A changed script delivered by the server could capture the passphrase; page names are encrypted but the number of pages,
   their sizes (in steps of 64 bytes) and who changed them when stay visible. Content a member saw stays with them.
 

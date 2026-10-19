@@ -115,6 +115,9 @@ app.wsgi_app = proxy_mw(app.wsgi_app)
 # ---- maintenance gate (restore of a backup). Every request and every background tick is an "active holder"; a
 # restore switches maintenance on, waits until it is the only holder left, swaps the data and switches it off.
 # Meanwhile new requests get 503 (except the health check and static files) and background threads wait.
+_BG_TURN = {"f": None}  # 2.102.0 D (#1997): admin/worker.py wrk_turn -- a background loop runs in one process at a time
+
+
 class _Gate:
     def __init__(self):
         self.cond = threading.Condition()
@@ -137,6 +140,8 @@ class _Gate:
 
     @contextlib.contextmanager
     def bg(self):
+        if _BG_TURN["f"] is not None:  # 2.102.0 D (#1997): waits while another process runs this loop
+            _BG_TURN["f"]()
         self.enter(True)
         try:
             yield

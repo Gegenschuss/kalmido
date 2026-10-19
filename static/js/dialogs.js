@@ -472,7 +472,9 @@ async function listDeleteForGood(id) {
   const lost = [tr('the list itself, its sections, colour, folder and type'), fieldsOf(id).length && trn('{0} custom field and its values', '{0} custom fields and their values', fieldsOf(id).length),
     l.shared && tr('the sharing: members lose access at once'), l.status && tr('the project status'), tr('its public link, if there is one'),
     l.e2e && all.length && tr('its tasks, comments and notes: they are encrypted in the browser and do not go to the trash')].filter(Boolean);  // 2.64.1 (#1817)
-  const ok = await askConfirm(tr('Delete “{0}” permanently?', lname(l)), '', {danger: true, ok: tr('Delete permanently'),
+  // 2.102.0 A (#1988): a list without the lock goes into the list trash (restorable, undo below); with the lock: for good
+  const ok = !l.e2e ? await askConfirm(tr('Delete “{0}”?', lname(l)), '', {danger: true, ok: tr('Delete'), html: `<p>${esc(otr_note(l))}</p>${lmDeleteNotes(l, all.length, open)}`})
+    : await askConfirm(tr('Delete “{0}” permanently?', lname(l)), '', {danger: true, ok: tr('Delete permanently'),
     html: `<p>${tr('This cannot be undone. Lost for good:')}</p><ul class="cdlg-l">${lost.map(x => `<li>${esc(x)}</li>`).join('')}</ul>${isOwner(l) ? '' : lmDeleteNotes(l, all.length, open)}<p class="muted" ${isOwner(l) && !l.e2e ? '' : 'hidden'}>${all.length ? trn('Its {0} task goes to the trash of your basket ({1} open) and can be restored from there.', 'Its {0} tasks go to the trash of your inbox ({1} open) and can be restored from there.', all.length, open) : tr('The list has no tasks.')}</p>${isOwner(l) ? lmDeleteNotes(l, all.length, open) : ''}`});
   if (!ok) return false;
   // 2.46.2 (#1659): the list (and its tasks) leave the screen at once; archive + delete + the reload run behind it, an
@@ -485,10 +487,11 @@ async function listDeleteForGood(id) {
     for (const t of ts) S.tasks.delete(t.id);
     return () => { if (!listById(id)) S.lists.splice(Math.min(i, S.lists.length), 0, x); for (const t of ts) if (!S.tasks.has(t.id)) S.tasks.set(t.id, t); };
   };
+  let inTrash = false;
   optWrite(put, async () => {
     if (!l.archived) await api('PATCH', '/api/lists/' + id, {archived: 1});
-    await api('DELETE', '/api/lists/' + id);
-  }).then(() => toast(tr('“{0}” deleted', nm)), () => {})  // an error: api() said why, the list is back
+    inTrash = !!(await api('DELETE', '/api/lists/' + id))?.trash;
+  }).then(() => inTrash ? otr_offerUndo(id, nm) : toast(tr('“{0}” deleted', nm)), () => {})  // an error: api() said why, the list is back
     .then(() => load()).then(render, () => {});  // half done (archived, not deleted) shows the real state
   return true;  // gone from the screen: the dialog closes at once
 }
@@ -814,7 +817,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="shint lhint" id="l-bellhint">${tr(BELLS.find(b => b[0] === (l.bell || 'default'))[2])} · ${tr('only for you')}</div>${isOwner(l) ? '' : ntfMemberHint(l)}
     <div class="row" id="l-bellc" ${l.bell === 'custom' ? '' : 'hidden'}><span class="spacer"></span><button type="button" class="btn sm" data-m="bell-custom">${ic('sliders', 's')} ${tr('Choose events…')}</button></div>` : ''}
     ${id && !l.is_inbox && collab() ? `<h4>${tr('List tags')}</h4><div class="shint lhint">${tr('Tags of this list: everyone in it sees them, with their colour. Personal tags (with the person icon) stay yours.')}${l.shared ? '' : ' ' + tr('They become visible to everyone as soon as you share the list.')}</div><div class="members" id="l-ltags">${ltagsBoxHtml(l)}</div>` : ''}
-    <div class="foot">${id && !l.is_inbox && canManage(l) ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore list from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete list permanently…')}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your lists; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive list')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave list')}</button>` : ''}${id ? `<button class="btn" data-m="tpl" title="${l.e2e ? esc(tr('Not available in encrypted lists')) : tr('Save the sections and open tasks as a template')}" ${l.e2e ? 'disabled' : ''}>${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}${id && dupOk(l) ? `<button class="btn" data-m="dup" title="${tr('A copy of this list with its sections, tasks and notepads')}">${ic('copy', 's')} ${tr('Duplicate')}</button>` : ''}<span class="spacer"></span>${id ? (o.back ? `<button class="btn pri" data-m="close">${ic('back', 's')} ${tr('Back')}</button>` : '') : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`);
+    <div class="foot">${id && !l.is_inbox && canManage(l) ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore list from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${l.e2e ? tr('Delete list permanently…') : tr('Delete list…') /* 2.102.0 (#1988): into the trash */}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your lists; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive list')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave list')}</button>` : ''}${id ? `<button class="btn" data-m="tpl" title="${l.e2e ? esc(tr('Not available in encrypted lists')) : tr('Save the sections and open tasks as a template')}" ${l.e2e ? 'disabled' : ''}>${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}${id && dupOk(l) ? `<button class="btn" data-m="dup" title="${tr('A copy of this list with its sections, tasks and notepads')}">${ic('copy', 's')} ${tr('Duplicate')}</button>` : ''}<span class="spacer"></span>${id ? (o.back ? `<button class="btn pri" data-m="close">${ic('back', 's')} ${tr('Back')}</button>` : '') : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`);
   if (id) md.classList.add('lmodal'); else md.classList.add('lnew');
   if (!id && tplOf('list').length) api('GET', '/api/templates').then(j => {  // 2.4.0 (#328): what each own template brings
     for (const tp of j.templates || []) { const el = $(`[data-ptd="${tp.id}"]`, md); if (el) el.textContent = tp.data?.rel ? tr('Dates from the project start · {0} days', tp.data.span || 0) : trn('{0} task', '{0} tasks', tp.count); }

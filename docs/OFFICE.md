@@ -819,6 +819,15 @@ day of acceptance), stored anew when the accepted quotation changes and removed 
   its client. Drafts always read the client's current address; finalising (or sending) freezes it, later changes at the
   client leave issued documents alone. Old documents with free address lines keep them. With the clients module off the
   free recipient fields stay.
+- 2.99.0: a client may have a **name addition** (field under the name, e.g. "Berg, Tal & Partner GbR" under
+  "NORDLICHT"). Quotations and invoices print it as its own line under the name, the e-invoice joins it to the buyer
+  name with " - ", lists and the search show "name - addition" on one line. The buyer e-mail of the e-invoice is the
+  client's invoice e-mail, else its e-mail; VAT ID and buyer reference (Leitweg-ID) come from the client's billing fields.
+- 2.99.0: the own **company name** in the office settings may have up to three lines; the letterhead and the footer print
+  them one under the other, the small sender line above the address, mails and the e-invoice (seller name) on one line.
+  The company address has the same fixed fields as a client (street, address extra, postcode, city, country). While
+  they are empty, a plain address in the old free "Address lines" (street, postcode + city, maybe a country) is shown in
+  the fields; saving the settings keeps it there, the free lines stay as they were.
 
 ## Finalising
 
@@ -1087,6 +1096,14 @@ impossible. A quotation that changes after the link was made voids the link. The
 it again); unknown, expired, stopped and voided links get the same `404`; decisions are limited per client address and
 per link; the form carries a check value bound to the link. Name, e-mail, reason, address and user agent are encrypted at
 rest in organisations with encryption.
+
+**The accepted PDF** (2.99.0): once the customer accepts, the quotation's PDF shows a box *Accepted online by <name>*, the
+time (UTC) and the SHA-256 of the accepted content (`doc_hash`) instead of the empty *Order confirmation* lines. The
+accepted version is written right after the acceptance as its own file next to the original
+(`doc<id>-<number>.accepted-<signoff id>.pdf` below the organisation's office folder, sealed like the original); the stored
+original of a finalised quotation is never changed. The customer's download `/s/q/<token>/pdf` and the app's
+`GET /api/office/docs/<id>/pdf` serve the accepted version while the quotation's content is still the accepted one;
+`?original=1` returns the original as sent. Open and declined quotations keep the original.
 
 This is a **simple electronic signature**: usually enough to accept a quotation or confirm an acceptance; not for contracts
 that the law requires in written form (they need a qualified signature). Kalmido gives no legal advice and builds no

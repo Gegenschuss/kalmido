@@ -540,6 +540,12 @@ def sig_pdf_get(token):
     if r["kind"] != "offer" or not h6c_sig_pdf_ok(c, r):
         return pub_gone()
     d = doc_row(c, r["org_id"], r["doc_id"])
+    if r["state"] == "accepted":  # 2.99.0 C (#2195): the accepted version with the signer's box (h6c_sig_pdf_ok: content unchanged)
+        from .pdfweb import qac_pdf
+        resp = _file_response(qac_pdf(c, r["org_id"], d, sig_dec(c, r)), epdf_name(d) + "-accepted.pdf", "application/pdf")
+        resp.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+        resp.headers["Referrer-Policy"] = "no-referrer"
+        return resp
     try:
         p = _stored_or_missing(c, r["org_id"], d, "pdf")
     except Denied:
@@ -555,6 +561,20 @@ def _clean_text(v, mx):
     v = (v or "").replace("\r", "")
     v = "".join(ch for ch in v if ch == "\n" or ord(ch) >= 32)
     return v.strip()[:mx]
+
+
+def qac_file(c, r):
+    """2.99.0 C (#2195): files the accepted version of the quotation of signoff r next to its original right after the
+    acceptance (office/pdfweb.py qac_pdf). Best effort: the decision is committed; on a failure the next read writes it."""
+    from .docs import doc_row
+    from .pdfweb import qac_pdf
+    try:
+        s = c.execute("SELECT * FROM office_signoffs WHERE id=?", (r["id"],)).fetchone()
+        qac_pdf(c, r["org_id"], doc_row(c, r["org_id"], r["doc_id"]), sig_dec(c, s))
+        c.commit()
+    except Exception as e:  # noqa: BLE001
+        c.rollback()
+        print("qac_file failed", r["id"], type(e).__name__, flush=True)
 
 
 @app.post("/s/q/<token>")
@@ -639,6 +659,8 @@ def sig_decide(token):
     push = sig_notify(c, r, st, name)
     c.commit()
     print("signoff", r["id"], st, flush=True)
+    if r["kind"] == "offer" and st == "accepted":
+        qac_file(c, r)
     if push:
         threading.Thread(target=push, daemon=True).start()
     return redirect(SIG_PREFIX + token, 303)

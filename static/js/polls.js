@@ -8,7 +8,7 @@
 // the poll's zone; the dialogs show them as they are and name the zone when it is not the device's. Every action is ONE undo
 // step: create (undo = trash), change (undo = the fields before), delete (undo = restore), choose a time (undo = reopen, its
 // event goes to the trash), move to another workspace (undo = the move back). Agents get no access (people only).
-const tpo_on = () => feat('events') && S.me?.kind !== 'agent';
+// tpo_on and the start points' clicks stay at start (lazyload.js, 2.102.0 C #2208): this file loads on the first use
 const TPO_DUR = [15, 30, 45, 60, 90, 120, 180, 240];
 const tpo_tzNote = p => p.tz && p.tz !== evTz() ? ` (${p.tz})` : '';
 function tpo_when(o, p) {
@@ -243,14 +243,6 @@ function tpo_decide(p, oid, done) {
   });
 }
 
-// ---- the start points
-document.addEventListener('click', e => {
-  if (e.target.closest('[data-act="tpo-list"]')) { tpo_list(); return; }
-  if (e.target.closest('[data-act="tpo-task"]')) {
-    const t = taskById(S.sel); if (!t) return;
-    const l = listById(t.list_id);
-    tpo_edit(null, {task_id: t.id, title: t.title, space: wsOf(l)});
-  }
-});
+// ---- the start points (their clicks: lazyload.js)
 // a client's "…" menu (clientpage.js): the poll is about this client, in its workspace
 function tpo_forClient(c) { tpo_edit(null, {client_id: c.id, title: c.name, space: c.org_id ? 'org:' + c.org_id : 'private'}); }

@@ -7,6 +7,20 @@ hooks and error handlers register in that order, and each module may use names o
 """
 import importlib
 
+# 2.102.0 E (#1999): every package belongs to one of five layers, lowest first. A module imports at module level only from
+# its own or a lower layer; a higher layer only inside a function. tools/check_layers.py checks it (the import graph of
+# 2.96 still has upward imports -- they stand there as known exceptions). A single module may sit in another layer than
+# its package (LAYER_OF). The layers do not change ORDER.
+LAYERS = (
+    ("core", ("core",)),
+    ("accounts", ("accounts",)),
+    ("domain", ("tasks", "lists", "calendars", "events", "collab", "contacts", "files", "docs", "sheets", "office", "personal",
+                "life", "family", "wiki", "hub", "notify", "videos", "receipts", "team")),
+    ("integrations", ("integrations", "api", "admin", "paperless", "newsletter")),
+    ("agents", ("agents", "assistant", "startup")),
+)
+LAYER_OF = {"admin.migrate": "core"}  # the move from SQLite runs inside init_db
+
 ORDER = (
     "core.config",
     "core.schema",
@@ -37,6 +51,7 @@ ORDER = (
     "lists.folders",
     "lists.foldershare",  # 2.41.0 (#1420)
     "lists.listhead",  # 2.83.0 C (#1427)
+    "lists.listtrash",  # 2.102.0 A (#1988)
     "tasks.validation",
     "tasks.tasks",
     "tasks.roadmap",
@@ -142,6 +157,7 @@ ORDER = (
     "collab.liste2echan",  # 2.64.2 C (#1817): the list channel (team chat of a list) with the lock
     "wiki.wikie2e",  # 2.64.3 (#1817): the lock per knowledge space (path + text encrypted in the browser)
     "wiki.wkmove",  # 2.96.0 B (#1941): wiki pages and folders to the other workspace (private <-> organisation)
+    "wiki.wikiatt",  # 2.99.0 A (#2182): files of knowledge pages (upload, ZIP import / export)
     "files.store",  # 2.48.0 (#1207): the file store (Ablage): tree, roles, versions (no routes; the interface of docs / import)
     "files.scan",  # 2.61.0 (#1818): virus scan of uploads (clamd), the later scan, the admin's scanner state
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
@@ -282,6 +298,7 @@ ORDER = (
     "admin.supporter",  # 2.74.0 (#338): the supporter licence (self-hosted only, a badge, unlocks nothing)
     "assistant.core",  # 2.75.0 (#1411): the built-in assistant -- configuration, model call, prompts (off unless configured)
     "assistant.web",  # 2.75.0 (#1411): the routes of the built-in assistant
+    "admin.worker",  # 2.102.0 D (#1994 / #1997): health numbers, the process role, one runner per background loop
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]
