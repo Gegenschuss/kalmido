@@ -194,8 +194,6 @@ def docs_zip_get(tok):
         t = DSR_TICKETS.get(str(tok))
         if not t or t[0] != uid:  # another account's request leaves the ticket alone
             raise Denied(404)
-        if DSR_BUSY.locked():  # review: a busy server keeps the ticket for the next try
-            raise Denied(429, tr("Too many requests"))
         DSR_TICKETS.pop(str(tok), None)
     rows = dsr_visible(c, uid, t[1])
     if not rows:
@@ -204,6 +202,8 @@ def docs_zip_get(tok):
     if msg:
         return err(msg, 413)
     if not DSR_BUSY.acquire(blocking=False):
+        with DSR_LOCK:  # review: a busy server keeps the ticket for the next try
+            DSR_TICKETS[str(tok)] = t
         raise Denied(429, tr("Too many requests"))
     fd, path = tempfile.mkstemp(prefix="kalmido-docs-zip-", suffix=".zip")
     try:
