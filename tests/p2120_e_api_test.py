@@ -94,6 +94,24 @@ def mk_pdf(marks, size=A4, encrypt=False):
     return bytes(out)
 
 
+def mk_bomb(datas):
+    """2.120.0 (review H1): one A4 page whose /Contents are the given decoded stream data (Flate), classic xref."""
+    objs = [b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            ("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Contents [" + " ".join(f"{4 + i} 0 R" for i in range(len(datas))) + "] >>").encode()]
+    for d in datas:
+        z = zlib.compress(d, 9)
+        objs.append(f"<< /Length {len(z)} /Filter /FlateDecode >>\nstream\n".encode() + z + b"\nendstream")
+    out = bytearray(b"%PDF-1.4\n")
+    offs = []
+    for i, o in enumerate(objs, 1):
+        offs.append(len(out))
+        out += f"{i} 0 obj\n".encode() + o + b"\nendobj\n"
+    x = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1) + b"".join(b"%010d 00000 n \n" % o for o in offs)
+    out += f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{x}\n%%EOF\n".encode()
+    return bytes(out)
+
+
 def mk_pdf_xrefstm(mark):
     """A PDF 1.5 with one page: catalog, pages, font and page in an object stream, the cross-reference as an xref
     stream (W [1 4 2], FlateDecode with the PNG Up predictor) -- how many office programs write today."""
@@ -224,7 +242,9 @@ check(f"{x(25 * MM)} ".encode() in ops0 and f" {x(12 * MM + 20 * MM)} m ".encode
 
 # ================================================================ upload: refused files
 for data, what in ((b"not a pdf at all", "rubbish"), (b"%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\n%%EOF", "no pages"),
-                   (mk_pdf(["X"], encrypt=True), "encrypted"), (mk_pdf(["X"], size=(841.89, 595.28)), "landscape")):
+                   (mk_pdf(["X"], encrypt=True), "encrypted"), (mk_pdf(["X"], size=(841.89, 595.28)), "landscape"),
+                   # 2.120.0 (review H1): a zlib bomb (20 MB of spaces from ~20 KB) and too many content streams
+                   (mk_bomb([b" " * (20 * 1024 * 1024)]), "zlib bomb"), (mk_bomb([b"q Q %d" % i for i in range(70)]), "70 content streams")):
     r = up(A, data)
     check(r.status_code == 400 and r.json().get("error"), f"#2091: {what} -> 400 {r.status_code} {r.text[:200]}")
 r = up(A, b"%PDF-1.4\n" + b"0" * (10 * 1024 * 1024 + 10))
