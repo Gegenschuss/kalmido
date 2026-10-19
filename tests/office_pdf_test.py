@@ -154,7 +154,7 @@ data = office_pdf(fixture())
 check(data.startswith(b"%PDF-1.7") and data.rstrip().endswith(b"%%EOF"), "a PDF 1.7 file with a trailer")
 r, T = texts(data)
 n = len(r.pages)
-check(2 >= n >= 1, f"12 positions fit on one or two pages ({n})")
+check(3 >= n >= 2, f"12 positions fit on one or two pages, plus the rights appendix ({n})")  # 2.114.1 (#2258): rights on their own last page
 all_t = "\n".join(T)
 for want in ("KVA-2026-031", "Beispielkunde AG", "z. Hd. Max Mustermann", "50667 Köln", "KOSTENVORANSCHLAG", "Imagefilm Herbstkampagne",
              "Storyboard-Erstellung", "Tonschnitt & Mischung", "Untertitel, Grundgebühr", "2.940,00 €", "20.380,00 €", "23.802,50 €",
@@ -182,7 +182,7 @@ for i, t in enumerate(T40):
     if i > 0:
         check(t.lstrip().startswith("Studio Nordlicht GmbH") or "Kostenvoranschlag KVA-2026-031" in t.split("\n")[0] + t.split("\n")[1],
               f"page {i + 1}: the small head with title and number")
-        if re.search(r"^\d+ Zusatzleistung|^\d+ [A-ZÄÖÜ]", t, re.M):
+        if re.search(r"^\d+ Zusatzleistung|^\d+ [A-ZÄÖÜ]", t, re.M) and i < n40 - 1:  # 2.114.1 (#2258): the last page is the rights appendix
             check(squash("POS.LEISTUNGMENGEPREISMWST.GESAMT") in squash(t), f"page {i + 1}: the table head is repeated")
     # a category heading (upper case line of a category) is never the last line before the footer
     body_lines = [x for x in t.split("\n") if x.strip()]
@@ -194,7 +194,7 @@ check(sum_page is not None, "the totals are printed")
 if sum_page is not None:
     check(re.search(r"^\d+ (Zusatzleistung|Untertitel)", T40[sum_page], re.M) or "Producing" in T40[sum_page],
           f"page {sum_page + 1}: the totals come with at least one position (never alone)")
-    check("Zeitliche Auswertung" in T40[sum_page] or sum_page + 1 < n40, "the rights follow the totals")
+    check("Zeitliche Auswertung" in T40[-1] and not any("Zeitliche Auswertung" in t for t in T40[:-1]), "the rights stand on the last page")  # 2.114.1 (#2258)
 rights_page = next((t for t in T40 if "Zeitliche Auswertung" in t), "")
 check("Räumliche Auswertung" in rights_page and "Mediale Auswertung" in rights_page, "the rights block is not torn across pages")
 check("Übertrag" not in "\n".join(T40), "no carry-over lines")
