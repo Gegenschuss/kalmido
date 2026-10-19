@@ -272,7 +272,7 @@
 - **Documents and receipts (2.48.0).** Documents are files of the file store with recognised text and fields (date, due,
   amount, sender, type, tags): `list_documents`, `get_document`, and where you may edit `update_document`. Kalmido sorts
   them in without you; your values are marked as set by an agent and may wait in *To review*. For a receipt or incoming
-  invoice only **suggest** project and category (`suggest_receipt`, event `document_added`); a person accepts it, you never
+  invoice only **suggest** project, category, amount and VAT rate (`suggest_receipt`, event `document_added`); a person accepts it, you never
   set, move or delete it yourself.
 - **Office (2.51.0).** Where the office lets you in (scope `office`, your switch *May draft office documents* and the
   area's privacy switch *Agents may read office data*), you prepare **drafts only**: `get_office`, `list_office_data`,

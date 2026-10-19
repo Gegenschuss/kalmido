@@ -1668,12 +1668,12 @@ with suggests, a person accepts (also with changed values) or rejects it in the 
 
 | What | Endpoint | MCP |
 |---|---|---|
-| Suggest `project_id` and / or `category` (`note` = why) | `POST /api/v1/documents/{id}/receipt-suggestion` | `suggest_receipt` |
+| Suggest `project_id`, `category`, `amount` (+ `currency`) and / or `vat_pct` (`note` = why) | `POST /api/v1/documents/{id}/receipt-suggestion` | `suggest_receipt` |
 | Your suggestions and what became of them (`state=open\|accepted\|rejected\|all`) | `GET /api/v1/receipt-suggestions` | `list_receipt_suggestions` |
 
 Flow *assign a receipt*: `list_documents` (e.g. `review=1`) -> `get_document` (text, sender, amount) -> `list_lists` (the
 projects you can see) -> `suggest_receipt`. The project must be one you can see, in the document's workspace and within
-your list restriction (else `400`); a new suggestion replaces your open one. The document then waits in *To review*. You
+your list restriction (else `400`); a new suggestion replaces your open one. Amount (gross, more than 0, at most two decimals) and VAT rate (`19`, `7`, `0`) are suggestions as well: the person may change them when accepting, and Undo brings the old values back. The document then waits in *To review*. You
 can never set, move or delete it yourself.
 
 ### Office: drafts only (2.51.0)
