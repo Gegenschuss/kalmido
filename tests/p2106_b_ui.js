@@ -74,13 +74,16 @@ const TXT = 'Versicherung Beispiel AG\nDatum: 05.10.2026\nUnser Zeichen: VB-2026
     check(await ev(noSide('.ltd')), 'phone: nothing of the block sticks out to the side');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await ev(`(() => { document.querySelector('.ltd [data-ltd="answer"]').click(); return 1; })()`);
-    check(await ready(ev, `location.hash === '#office/letters/new?answers=${NID}'`), 'answer: the new letter is opened ' + await ev('location.hash'));
+    check(await ready(ev, `/^#office\\/letters\\/(new\\?answers=${NID}|\\d+)$/.test(location.hash)`), 'answer: the new letter is opened ' + await ev('location.hash'));
+    // 2.106.0 (#2028): with part A merged the address really opens a new answering draft in the office; leave the editor
+    // again so the probe below is the only letter section on the page (one letter is open at a time)
+    await sleep(800); await ev(`(() => { location.hash = '#docs'; return 1; })()`); await sleep(800);
     // ================= the letter side: the section of office_letterlinks.js (drawn into the page by hand)
     check(await ready(ev, `typeof ltkSection === 'function' && typeof LT_HOOKS === 'object' && LT_HOOKS.sections.includes(ltkSection)`, 80), 'letter: the section is in LT_HOOKS');
     await ev(`(async () => { const d = await api('GET', '/api/office/letters/${L.id}'); const box = document.createElement('div'); box.id = 'ltk-probe'; box.style.cssText = 'position:fixed;inset:auto 0 0 0;z-index:9999;background:var(--bg);max-height:60vh;overflow:auto;padding:1rem'; document.body.append(box); box.innerHTML = ltkSection(d); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('#ltk-probe .ltk-list a[href="#docs/${NID}"]')`), 'letter: the reference document is listed');
     await ev(`(() => { const d = document.querySelector('#ltk-probe .ltk-th'); d.open = true; return 1; })()`);
-    check(await ready(ev, `document.querySelectorAll('#ltk-probe .ltk-tl li').length === 2`), 'letter: the history (document + letter)');
+    check(await ready(ev, `document.querySelectorAll('#ltk-probe .ltk-tl li').length >= 2`), 'letter: the history (document + letter)');
     await ev(`(() => { document.querySelector('#ltk-probe [data-ltk^="unlink:"]').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('#ltk-probe .ltk-none')`), 'letter: unlinked');
     await ev(`(() => { histStep('undo'); return 1; })()`);

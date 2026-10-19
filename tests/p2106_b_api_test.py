@@ -9,7 +9,7 @@ freelancer-matrix: office
  - the document side: GET /api/office/letters/doc/<nid> (letters of both directions, deadline, references); a member,
    another organisation, a document outside the office's space -> {available: false}
  - a new letter answering a document: recipient from the sender (the client with that name: address + e-mail), subject
-   "Your letter of <date>", DIN 5008 reference line, the link "answers"; a foreign / private document 404
+   "Ihr Schreiben vom <date>" (the letter's language), DIN 5008 reference line, the link "answers"; a foreign / private document 404
  - links: set / remove (both kinds, also at a sent letter), bad kind 400, the reference line filled at a draft without one
  - history: the thread of a letter (letters + documents over links, in date order), the threads of a client
  - deadline -> task (due = the deadline, the document linked; a second call sets the due date of the same task)
@@ -186,9 +186,10 @@ check(r.status_code == 201, f"answer: created ({r.status_code} {r.text[:200]})")
 L1 = r.json()
 check(L1.get("client_id") == CL and L1.get("rcpt_name") == "Versicherung Beispiel AG" and "Versicherungsweg 2" in (L1.get("rcpt_address") or "")
       and "20000 Hamburg" in (L1.get("rcpt_address") or "") and L1.get("rcpt_email") == "post@versicherung.example.com", f"answer: the recipient {L1}")
-check(L1.get("subject") == "Your letter of 5 October 2026", f"answer: the subject {L1.get('subject')}")
+# 2.106.0 (#2028): the prefill speaks the letter's language (the office's document language, German here), not the reader's
+check(L1.get("subject") == "Ihr Schreiben vom 05.10.2026", f"answer: the subject {L1.get('subject')}")
 rl = L1.get("ref_line") or ""
-check("Your reference: VB-2026/4711" in rl and "Your message of 5 October 2026" in rl and "Policy number: 123 456 789" in rl, f"answer: the reference line {rl}")
+check("Ihr Zeichen: VB-2026/4711" in rl and "Ihre Nachricht vom 05.10.2026" in rl and "Versicherungsnummer: 123 456 789" in rl, f"answer: the reference line {rl}")
 x = A.get(B + f"{LT}/doc/{D1}").json()
 check([(l["id"], l["kind"]) for l in x["letters"]] == [(L1["id"], "answers")], f"document: the answer is linked {x['letters']}")
 x = A.get(B + f"{LT}/{L1['id']}/links").json()
@@ -283,7 +284,7 @@ DD = upload(Do, "Finanzamt.txt", "Finanzamt Beispielstadt\nDatum: 01.10.2026\nSt
 x = Do.get(B + f"{LT}/doc/{DD}").json()
 check(x.get("available") is True and (x.get("deadline") or {}).get("date") == "2026-10-29", f"freelancer: the document side {x}")
 r = Do.post(B + LT, json={"answers": DD})
-check(r.status_code == 201 and "Your reference: ESt 2025-17" in (r.json().get("ref_line") or "") and "Tax number: 12/345/67890" in r.json()["ref_line"],
+check(r.status_code == 201 and "Ihr Zeichen: ESt 2025-17" in (r.json().get("ref_line") or "") and "Steuernummer: 12/345/67890" in r.json()["ref_line"],  # 2.106.0: the letter language (de)
       f"freelancer: the answer ({r.text[:250]})")
 LD = r.json()["id"]
 check(A.get(B + f"{LT}/{LD}").status_code == 404 and A.get(B + f"{LT}/{LD}/links").status_code == 404, "freelancer: the letter is not the others'")
