@@ -74,6 +74,8 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   const done = await until(() => dlg.querySelector(`[data-cid="${c1 && c1.id}"] [data-vdr="done"]`));
   done?.click();
   check(await until(async () => (await call('GET', '/api/videos/' + RID)).comments.find(x => x.id === c1.id).done), 'done');
+  // 2.99.1: the undo step is recorded after the answer (its toast) - wait for it, the server saw "done" earlier
+  await until(() => /Marked as done/.test(d.querySelector('#toast')?.textContent || ''));
   await w.eval(`histStep('undo')`);
   check(await until(async () => !(await call('GET', '/api/videos/' + RID)).comments.find(x => x.id === c1.id).done), 'Undo: open again');
   // the section lists the review
