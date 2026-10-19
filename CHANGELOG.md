@@ -7,6 +7,36 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.98.0] - 2026-10-19
+
+Scheduling polls, questionnaires in forms, the office menu as a rail on the left, resizable tables and polish.
+
+### Added
+- Scheduling polls: propose 2 to 20 times, send a link, people vote without an account (yes / maybe / no, their own vote
+  can be changed later); the best time is highlighted and becomes an event with one click, in a Kalmido calendar or a
+  writable CalDAV calendar, an invitation mail only when you tick it. Start from the calendar, a task or a customer. Polls
+  live in the private space or an organisation and move between them. The link is unguessable, can be renewed, switched
+  off or expire; votes are limited per address and poll, no outside service (#1953).
+- Questionnaires: forms get own questions (short and long text, single and multiple choice, date, number, file, yes / no)
+  with "required" and a help text, sorted by dragging; on one page or one question per step, without scripts. A submission
+  becomes a task with the answers as Markdown and the files as attachments; on request the sender's e-mail is matched to a
+  customer of the same workspace. Submissions are listed in the form dialog and download as CSV (#1954).
+- Tables: the frame can be resized freely, also when the table is empty (kept per device); empty cells fill it and typing
+  into one creates the row or column. "Open in own window" and full screen next to "Dependencies" (#2181).
+
+### Changed
+- Office: the menu is a rail on the left with three groups (Sell, Money, Administration); every page has its own heading.
+  Services and text blocks are a "Templates" tab under Settings; travel expenses moved to Money, framework contracts to Sell.
+  On phones the office start lists the groups one below the other, and a page shows "‹ Office · group" with one swipeable
+  tab row (#2180).
+- Ticking off and creating a task animate a little longer; a ticked row leaves only after its animation (#2163).
+- Documents: amount and due date are only guessed for invoices and receipts with a total line (and for "to pay by" lines of
+  tax notices); the Paperless import takes only money fields; empty amount / due fields are hidden in the document view (#2178).
+
+### Fixed
+- A table could stay on "Loading…" when it was loaded twice at the same time (#2181).
+- Code comments no longer carry the name of another product (#2184).
+
 ## [2.97.0] - 2026-10-19
 
 Bookmarks, a display name for customers, office data and locked wiki spaces between your private space and an organisation.

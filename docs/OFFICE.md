@@ -410,7 +410,7 @@ e-mail* (the server's mailbox, see SELF-HOSTING.md "Mail"); without it the addre
 
 ## Travel expenses: taking over a per diem spreadsheet (2.95)
 
-Office -> On the road -> Travel expenses -> **Take over from Excel** (shown while the trip list is empty and in the
+Office -> Money -> Travel expenses -> **Take over from Excel** (shown while the trip list is empty and in the
 evaluation) reads a per diem spreadsheet you kept so far (.xlsx, up to 2 MB, at most 30 sheets with 500 rows each).
 Nothing is stored before you confirm.
 

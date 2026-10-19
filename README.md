@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.98.0** (2026-10-19): scheduling polls with a public vote link, questionnaires in forms (answers become a task at the
+  customer), the office menu as a rail on the left, resizable tables in their own window, documents guess amounts only
+  where they fit.
 - **2.97.0** (2026-10-19): bookmarks with preview, tags and search (Karakeep fills the same store), a display name for
   customers and the recipient always from the customer, office data and wiki spaces with a lock move between the private
   space and an organisation.
