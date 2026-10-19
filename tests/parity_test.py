@@ -237,6 +237,9 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.102.0 A (#1988): the trash of deleted lists stays with people -- restoring a list or deleting it for good is the owner's, "
+     "a list admin's or the organisation admins' decision (the routes answer 404 to agents); an agent's delete lands there too",
+     ("=GET /api/trash/lists", "=POST /api/trash/lists/{}/restore", "=DELETE /api/trash/lists/{}")),
     ("2.99.1 C (#1959): a video sign-off itself stays with people -- creating, renaming, trash / restore, new versions, the "
      "customer link and moving it; deleting comments and editing their text; an agent reads it, comments and marks comments done",
      ("=POST /api/videos", "=PATCH /api/videos/{}", "=DELETE /api/videos/{}", "=POST /api/videos/{}/restore", "* /api/videos/{}/versions",

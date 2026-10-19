@@ -159,19 +159,33 @@ check(r.ok and dbx("SELECT archived, archived_at FROM lists WHERE id=?", (TEAM,)
 check(any(x["data"]["action"] == "restore" for x in news(Bo)), "#1101: restore told")
 A.post(B + f"/api/orgs/{ORG}/lists/{TEAM}/archive", json={"archived": True})
 
-# ---- delete for good: only with the exact name; tasks to the owner's trash, restorable
+# ---- delete: only with the exact name; 2.102.0 (#1988): into the organisation's list trash, restorable with the list
 check(A.delete(B + f"/api/orgs/{ORG}/lists/{TEAM}", json={}).status_code == 400, "#1101: no name, no delete")
 check(A.delete(B + f"/api/orgs/{ORG}/lists/{TEAM}", json={"confirm": "bob team"}).status_code == 400, "#1101: the name must match exactly")
 check(dbx("SELECT COUNT(*) FROM lists WHERE id=?", (TEAM,))[0][0] == 1, "#1101: still there after the wrong names")
+# 2.102.0 (#1988): the admin's delete moves the list into the ORGANISATION's list trash with its tasks (they stay in it);
+# nothing lands in the owner's private inbox, a single task comes back only with its list
 r = A.delete(B + f"/api/orgs/{ORG}/lists/{TEAM}", json={"confirm": "Bob Team"})
-check(r.ok and TEAM not in {x["id"] for x in r.json()["lists"]}, "#1101: the admin deletes it for good " + r.text[:120])
-check(dbx("SELECT COUNT(*) FROM lists WHERE id=?", (TEAM,))[0][0] == 0, "#1101: the list is gone")
+check(r.ok and r.json().get("trash") and TEAM not in {x["id"] for x in r.json()["lists"]}, "#1101: the admin deletes it (into the trash) " + r.text[:120])
+check(dbx("SELECT deleted_at IS NOT NULL, org_id FROM lists WHERE id=?", (TEAM,))[0] == (1, ORG), "#1988: the list is in the trash, still the organisation's")
 rows = dbx("SELECT id, list_id, deleted_at IS NOT NULL FROM tasks WHERE id IN (?, ?)", (T1, T2))
-check(len(rows) == 2 and all(x[1] == BINBOX and x[2] for x in rows), "#1101: its tasks are in the trash of the OWNER's inbox " + str(rows))
-check(Bo.post(B + f"/api/tasks/{T1}/restore").ok and dbx("SELECT deleted_at FROM tasks WHERE id=?", (T1,))[0][0] is None, "#1101: the owner restores a task from the trash")
-nb = [x for x in news(Bo) if x["data"]["action"] == "delete"]
+check(len(rows) == 2 and all(x[1] == TEAM and x[2] for x in rows), "#1988: its tasks stay in it (in the trash) " + str(rows))
+check(not dbx("SELECT 1 FROM tasks WHERE list_id=? AND title LIKE 'Secret%'", (BINBOX,)), "#1988: nothing in the owner's private inbox")
+check(Bo.post(B + f"/api/tasks/{T1}/restore").status_code == 409 and dbx("SELECT deleted_at IS NOT NULL FROM tasks WHERE id=?", (T1,))[0][0],
+      "#1988: the owner cannot restore a single task into the private space (409: only with the list)")
+nb = [x for x in news(Bo) if x["data"]["action"] == "trash"]
 check(nb and nb[0]["list_id"] is None and nb[0]["data"]["name"] == "Bob Team", "#1101: the owner is told about the delete (the name in the News)")
-check(any(x["data"]["action"] == "delete" for x in news(Ca)), "#1101: the former member is told about the delete")
+check(any(x["data"]["action"] == "trash" for x in news(Ca)), "#1101: the former member is told about the delete")
+tl = A.get(B + "/api/trash/lists").json()["lists"]
+check([(x["id"], x["org_id"], x["tasks"]) for x in tl if x["id"] == TEAM] == [(TEAM, ORG, 2)], "#1988: the organisation admin sees it in the trash " + str(tl))
+check(not any(x["id"] == TEAM for x in Ca.get(B + "/api/trash/lists").json()["lists"])
+      and Ca.post(B + f"/api/trash/lists/{TEAM}/restore").status_code == 404 and Ca.delete(B + f"/api/trash/lists/{TEAM}").status_code == 404,
+      "#1988: a member (no admin) neither sees nor restores nor purges it")
+r = requests.post(B + f"/api/trash/lists/{TEAM}/restore", headers=AGH)
+check(r.status_code in (401, 403, 404), f"#1988: an agent with admin rights cannot restore it: {r.status_code}")
+check(A.post(B + f"/api/trash/lists/{TEAM}/restore").ok and dbx("SELECT deleted_at, org_id, archived FROM lists WHERE id=?", (TEAM,))[0] == (None, ORG, 1)
+      and not dbx("SELECT 1 FROM tasks WHERE id IN (?, ?) AND deleted_at IS NOT NULL", (T1, T2)), "#1988: restored into the organisation (archived) with both tasks")
+check(any(x["action"] == "undelete" for x in A.get(B + f"/api/orgs/{ORG}/lists").json()["log"]), "#1988: the history names the restore")
 
 # ---- hand over
 check(A.post(B + f"/api/orgs/{ORG}/lists/{KEEP}/owner", json={"user_id": AG}).status_code in (400, 404), "#1101: never to an agent")

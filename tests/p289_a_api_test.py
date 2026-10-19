@@ -280,6 +280,7 @@ check(cell(get(A, SID), "H1")["value"] == 2, "thawed: calculated again (2 hours)
 # the project deleted: "deleted" + the last value for whoever saw it
 A.patch(B + f"/api/lists/{P}", json={"archived": True})
 r = A.delete(B + f"/api/lists/{P}")
+r = A.delete(B + f"/api/trash/lists/{P}") if r.ok else r  # 2.102.0 (#1988): deleting moves the list into the list trash; the purge from there deletes for good
 check(r.ok, "project deleted " + r.text[:200])
 d = get(A, SID)
 check(cell(d, "H1")["error"] == "deleted" and cell(d, "H1")["last_value"] == "2", "alice: deleted + her last value " + json.dumps(cell(d, "H1"))[:300])

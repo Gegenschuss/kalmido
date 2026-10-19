@@ -109,17 +109,20 @@ Ca.patch(B + f"/api/lists/{SH}", json={"archived": 1})
 # a server admin who is only an editor of the list: still no delete
 check(Bo.put(B + f"/api/lists/{SH}/members", json={"user_id": dbx("SELECT id FROM users WHERE username='alice'")[0][0], "role": "edit"}).ok, "setup: alice edits")
 check(A.delete(B + f"/api/lists/{SH}").status_code == 403, "#1188: a server admin with edit in the list: 403 (no delete right for others' lists)")
+# 2.102.0 (#1988): into the list trash of the organisation; the tasks stay in the list (in the trash)
 r = Ca.delete(B + f"/api/lists/{SH}")
-check(r.ok and not dbx("SELECT 1 FROM lists WHERE id=?", (SH,)), "#1188: the list admin deletes the archived list " + r.text[:120])
+check(r.ok and dbx("SELECT deleted_at IS NOT NULL FROM lists WHERE id=?", (SH,)) == [(1,)], "#1188: the list admin deletes the archived list " + r.text[:120])
 rows = dbx("SELECT list_id, deleted_at IS NOT NULL FROM tasks WHERE id IN (?,?) ORDER BY id", (T1, T2))
-check(rows == [(BINBOX, 1), (BINBOX, 1)], "#1188: the tasks are in the trash of the OWNER's inbox " + str(rows))
+check(rows == [(SH, 1), (SH, 1)] and not dbx("SELECT 1 FROM tasks WHERE id IN (?,?) AND list_id=?", (T1, T2, BINBOX)),
+      "#1988: the tasks stay in the list (in the trash), not in the owner's inbox " + str(rows))
 check(not dbx("SELECT 1 FROM tasks WHERE list_id=?", (CINBOX,)), "#1188: nothing in the admin's inbox")
 nb = news(Bo)
-check(any((x.get("data") or {}).get("action") == "ldelete" and (x.get("data") or {}).get("name") == "Fair stand" for x in nb),
-      "#1188: the owner is told about the delete " + json.dumps(nb)[:300])
-check(not any((x.get("data") or {}).get("action") == "ldelete" for x in news(Ca)), "#1188: the admin who deleted gets no News about it")
-r = Bo.post(B + f"/api/tasks/{T1}/restore")
-check(r.ok or Bo.patch(B + f"/api/tasks/{T1}", json={"deleted": False}).ok, "#1188: the owner can restore a task from the trash")
+check(any((x.get("data") or {}).get("action") == "ltrash" and (x.get("data") or {}).get("name") == "Fair stand" for x in nb),
+      "#1188: the owner is told about the delete " + json.dumps(nb)[:300])  # 2.102.0 (#1988): ltrash
+check(not any((x.get("data") or {}).get("action") in ("ldelete", "ltrash") for x in news(Ca)), "#1188: the admin who deleted gets no News about it")
+check(Bo.post(B + f"/api/tasks/{T1}/restore").status_code == 409, "#1988: a single task comes back only with its list")
+check(Bo.post(B + f"/api/trash/lists/{SH}/restore").ok and dbx("SELECT deleted_at FROM tasks WHERE id=?", (T1,)) == [(None,)],
+      "#1188 / #1988: the owner restores the list with its tasks from the trash")
 
 # the owner deletes his own list: no News to himself, the old way
 OWN = Bo.post(B + "/api/lists", json={"name": "Own list", "org_id": ORG}).json()["id"]

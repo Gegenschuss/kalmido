@@ -135,7 +135,7 @@ const FEAT = 'cal,comments,collab,agents';
   w.prompt = () => 'Bob Team';
   click(w, brow().querySelector('[data-oa="delete"]')); await until(() => !brow());
   check(!brow() && (await call('GET', `/api/orgs/${ORG}/lists`)).lists.every(x => x.id !== BT), '#1101: deleted for good with the name');
-  check(/deleted .*Bob Team.* for good/.test(md().querySelector('.oadmlog')?.textContent || ''), '#1101: the history names it');
+  check(/moved .*Bob Team.* to the trash/.test(md().querySelector('.oadmlog')?.textContent || ''), '#1101: the history names it');  // 2.102.0 (#1988)
   check((await call('GET', '/api/news', null, CB)).items.some(x => x.kind === 'orglist'), '#1101: bob got a News entry');
   w.close();
   const wb = await boot({user: 'bob', hash: 'news'}); await sleep(500);

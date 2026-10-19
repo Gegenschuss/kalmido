@@ -331,7 +331,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   let asked = '';
   w.confirm = m => { asked = m; return false; };
   click(w, d.querySelector(`#view .arow[data-list="${GONE}"] [data-act="arch-del"]`)); await sleep(300);
-  check(/Delete “Gone” permanently/.test(asked) && (await st()).lists.some(l => l.id === GONE), 'asks with the own dialog; Cancel keeps it');
+  check(/Delete “Gone”\?/.test(asked) && (await st()).lists.some(l => l.id === GONE), 'asks with the own dialog; Cancel keeps it');  // 2.102.0 (#1988): into the trash
   w.confirm = () => true;
   click(w, d.querySelector(`#view .arow[data-list="${GONE}"] [data-act="arch-del"]`));
   check(await until(async () => !(await st()).lists.some(l => l.id === GONE)), 'confirmed: deleted for good');

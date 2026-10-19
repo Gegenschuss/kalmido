@@ -457,7 +457,10 @@ ROUTES = {
     "DELETE /api/repos/{}": "tasks", "DELETE /api/sample": "tasks", "DELETE /api/sprints/{}": "tasks",
     "DELETE /api/tasks/{}": "tasks", "DELETE /api/tasks/{}/contacts/{}": "tasks", "DELETE /api/tasks/{}/enc-note": "tasks",
     "DELETE /api/tasks/{}/links/{}": "tasks", "DELETE /api/tasks/{}/note-lock": "tasks",
-    "DELETE /api/tasks/{}/waiting": "tasks", "DELETE /api/trash": "tasks", "DELETE /api/v1/attachments/{}": "tasks",
+    "DELETE /api/tasks/{}/waiting": "tasks", "DELETE /api/trash": "tasks",
+    # 2.102.0 A (#1988): the list trash (p2102_a_api_test.py: a person without an organisation deletes / restores / purges)
+    "GET /api/trash/lists": "lists", "POST /api/trash/lists/{}/restore": "lists", "DELETE /api/trash/lists/{}": "lists",
+    "DELETE /api/v1/attachments/{}": "tasks",
     "DELETE /api/v1/chat-attachments/{}": "tasks", "DELETE /api/v1/comments/{}": "tasks",
     "DELETE /api/v1/comments/{}/reactions/{}": "tasks", "DELETE /api/v1/notepads/{}": "tasks",
     "DELETE /api/v1/notes/{}": "tasks", "DELETE /api/v1/tasks/{}": "tasks", "DELETE /api/v1/tasks/{}/contacts/{}": "tasks",
