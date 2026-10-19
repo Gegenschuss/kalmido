@@ -147,6 +147,10 @@ LINKS = [
     ("https://www.youtube.com/watch?v=short", "link", None),
     ("https://evil.example.com/player.vimeo.com/video/1", "link", None),
     ("https://vimeo.com.evil.example/123456789", "link", None),
+    # 2.99.1 review L6: an explicit :443, the video of a showcase
+    ("https://www.youtube.com:443/watch?v=AbCdEfGhI-9", "youtube", "https://www.youtube-nocookie.com/embed/AbCdEfGhI-9?enablejsapi=1&rel=0&playsinline=1"),
+    ("https://vimeo.com/showcase/1234567/video/76979871", "vimeo", "https://player.vimeo.com/video/76979871?dnt=1&playsinline=1"),
+    ("https://www.youtube.com:8443/watch?v=AbCdEfGhI-9", "link", None),
 ]
 for url, prov, emb in LINKS:
     r = A.post(B + f"{V}/{VID}/versions", json={"url": url})
@@ -273,7 +277,8 @@ check(ppost(f"/s/q/{TOK}/comments", f="0" * 64, v=VV, name="Erika", text="x").st
 check(ppost(f"/s/q/{TOK}/comments", f=CF, v=VV, name="E", text="x").status_code == 400, "a name of one letter: 400")
 check(ppost(f"/s/q/{TOK}/comments", f=CF, v=VV, name="Erika", text="  ").status_code == 400, "no text: 400")
 check(ppost(f"/s/q/{TOK}/comments", f=CF, v=str(int(VV) + 999), name="Erika", text="alt").status_code == 409, "a stale version: 409")
-check(ppost(f"/s/q/{TOK}/comments", f=CF, v=VV, name="Erika", text="x", at="zz").status_code == 303, "a bad timecode is dropped, the comment stays")
+# 2.99.1 (#1959) review L8: a bad timecode is said (400 with the way back), not silently dropped
+check(ppost(f"/s/q/{TOK}/comments", f=CF, v=VV, name="Erika", text="x", at="zz").status_code == 400, "a bad timecode: 400")
 # a new version keeps the link; the decision names the version shown
 r = A.post(B + f"{V}/{CV}/versions", json={"url": "https://vimeo.com/987654321"})
 pg = anon("/s/q/" + TOK)
