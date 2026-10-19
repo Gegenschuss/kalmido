@@ -330,6 +330,7 @@ ROUTES = {
     "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/docs": "office",
     "POST /api/office/docs/from-time": "office", "POST /api/office/docs/reminder": "office",
+    "POST /api/office/docs/{}/delivery": "office", "GET /api/office/docs/{}/timesheet.pdf": "office",  # 2.120.0 D (#2089)
     "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/{}/datev": "office",
     "POST /api/office/docs/{}/cashflow": "office", "POST /api/office/docs/{}/duplicate": "office", "POST /api/office/docs/{}/fee": "office",
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
