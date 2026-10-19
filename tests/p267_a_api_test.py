@@ -262,7 +262,7 @@ from freelancer_fixture import freelancer  # noqa: E402
 _FID, Fr = freelancer(B, A, "fenja")
 G = [["Grundkosten 2025", "Betrag", "fällig Monat"], ["Bank"], ["Sparkasse Kontoführung", 12, 0], ["Girokarte", 15, 1],
      ["Kredit Auto Tilgung", 250, 0], ["", "", 0], ["Steuern"], ["Grundsteuer", 80, 2], ["KFZ-Steuer", 120, 5], ["Steuerberater", 150, 0],
-     ["Hausgeld", 300, 0], ["ADAC Mitgliedschaft", 59, 3], ["KSK", 40, 0], ["Knappschaft", 90, 0], ["BG ETEM", 70, 4], ["Datenbank Hosting", 9, 0]]
+     ["Hausgeld", 300, 0], ["ADAC Mitgliedschaft", 59, 3], ["KSK", 40, 0], ["Knappschaft", 90, 0], ["BG ETEM", 70, 4], ["Software"], ["Datenbank Hosting", 9, 0]]
 for who, s_ in (("an org admin", A), ("a freelancer", Fr)):
     r = up(s_, xlsx(G))
     check(r.ok, f"{who}: A1 = a title, the first text column is the name {r.status_code} {r.text[:200]}")
@@ -273,7 +273,7 @@ for who, s_ in (("an org admin", A), ("a freelancer", Fr)):
     check(g["counts"]["error"] == 0, f"{who}: a row with only 0 is skipped, no error {g['counts']}")
     check(all(vat.get(n) == 0 for n in ("Sparkasse Kontoführung", "Girokarte", "Kredit Auto Tilgung", "Grundsteuer", "KFZ-Steuer", "Hausgeld",
                                         "ADAC Mitgliedschaft", "KSK", "Knappschaft", "BG ETEM")), f"{who}: bank, taxes, memberships 0 % {vat}")
-    check(vat.get("Steuerberater") == 19 and vat.get("Datenbank Hosting") == 19, f"{who}: the tax adviser and a database 19 % {vat}")
+    check(vat.get("Steuerberater") == 19 and vat.get("Datenbank Hosting") == 19, f"{who}: the tax adviser (also below the group Steuern) and a database 19 % {vat}")
     check(next(x for x in g["rows"] if x["label"] == "Girokarte")["category"] == "Bank", f"{who}: group rows still the category")
 
 # ---------------------------------------------------------------- rights
