@@ -1128,6 +1128,12 @@ list's Share dialog > Public link (*Request acceptance*); the customer's list pa
 newest version's player and the customer's comments at a timecode (`POST /s/q/<token>/comments`, limited per client address
 and per link, a form check value of its own) and *Approve* / *Request changes*; the decision names the version shown.
 
+## Documents in the customer portal (2.120.0)
+
+*Settings > Invoices > Show documents in the customer portal* (off by default) lets clients see their sent quotations,
+invoices with the payment state and credit notes in the customer portal; *Send portal link* in the client's menu mails them
+the sign-in link. Details: [TEAM.md](TEAM.md) *The customer portal*.
+
 ## Documents from templates (2.93.0)
 
 Tab *Documents* (admins of the office area; members `403`, agents `403`, another area `404`; a person without an

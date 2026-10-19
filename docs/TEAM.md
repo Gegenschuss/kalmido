@@ -323,6 +323,21 @@ private list owner) - never reports of another organisation, even with the same 
   names of team members other than the name of an answer's author.
 - Agents answer customers the same way (`add_comment` with `portal: true`, see AGENTS.md).
 
+### Quotations and invoices in the portal (2.120.0)
+
+With *Office > Settings > Invoices > Show documents in the customer portal* (off by default; the office's admin, or the
+person in their own personal office) the portal also lists the client's **documents**: sent quotations (with the button
+*Review and approve* while an approval link is open), invoices with their payment state (open, partly paid with the open
+amount, overdue, paid; the due date) and credit notes. Each opens as the PDF that was sent. The customer is every client
+of the same organisation (or the same personal office) whose e-mail or e-mail for invoices is the signed-in address.
+
+- **Getting in.** In the client's menu (*More*) **Send portal link** mails the client the same one-time sign-in link
+  (30 minutes, once; then signed in for 7 days) to the e-mail for invoices, else the e-mail. No account, no password;
+  at most three links per address and hour.
+- **What the customer never sees:** drafts, invoices that were finalised but not sent yet, reminders, internal notes,
+  purchase prices, documents of other clients - and nothing of another organisation, even with the same address.
+- Switched off (or public links off on the server), the portal is exactly as before.
+
 ## A task in several lists (2.71.0)
 
 - **Show also in list…** in a task's menu (and in the task panel's list path) puts the task into a further list of the same

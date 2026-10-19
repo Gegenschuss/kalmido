@@ -868,6 +868,9 @@ ROUTES = {
     "GET /api/office/contracts/{}/files": "office", "POST /api/office/contracts/{}/files": "office",
     "GET /api/office/contracts/{}/files/{}": "office", "PATCH /api/office/contracts/{}/files/{}": "office",
     "DELETE /api/office/contracts/{}/files/{}": "office", "POST /api/office/contracts/{}/files/{}/restore": "office",
+    # 2.120.0 B (#2088): the customer's documents in the portal (cookie address + space + client, another client / space /
+    # a draft 404) and the office's "Send portal link" (a client of the office area only; p2120_b_api_test.py)
+    "GET /portal/docs/{}/pdf": "portal", "POST /api/office/clients/{}/portal-link": "office",
 }
 
 # ---- 1. every route is classified, nothing stale

@@ -677,6 +677,8 @@ ROUTES = {
     "GET /api/office/contracts/{}/files": "office", "POST /api/office/contracts/{}/files": "office",
     "GET /api/office/contracts/{}/files/{}": "office", "PATCH /api/office/contracts/{}/files/{}": "office",
     "DELETE /api/office/contracts/{}/files/{}": "office", "POST /api/office/contracts/{}/files/{}/restore": "office",
+    # 2.120.0 B (#2088): documents in the customer portal of a freelancer's personal office (p2120_b_api_test.py)
+    "GET /portal/docs/{}/pdf": "link", "POST /api/office/clients/{}/portal-link": "office",
 }
 
 
