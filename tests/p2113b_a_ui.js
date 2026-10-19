@@ -72,8 +72,8 @@ fs.writeFileSync(path.join(DATA, 'packs', 'industry', 'example_share.json'), JSO
     const q1 = await call(CA, 'POST', '/api/office/docs', {project_title: 'Mit Paket'});
     await call(CA, 'PUT', `/api/office/docs/${q1.id}/items`, {items: [...its, {kind: 'service', title: 'Hotel', qty: 1, rate: 400, unit: 'flat', in_handling: 0, in_markup: 0}]});
     await nav(B + 'static/icon.svg'); await nav(B + '#office/settings');
-    check(await ready(ev, `!!document.querySelector('#ofc-set #os-sf')`, 80) && await ev(`!!document.querySelector('#os-prod-on')?.checked && document.querySelector('#os-sf').value.replace(',', '.') === '0.50' && document.querySelector('#os-sr').value.replace('.', '').startsWith('500')`),
-      '#2251: the settings show switch, factor and day rate from the pack');
+    check(await ready(ev, `!!document.querySelector('#ofc-set #os-sf')`, 80) && await ev(`!!document.querySelector('#os-prod-on')?.checked && +document.querySelector('#os-sf').value.replace(',', '.') === 0.5 && /^500([.,]00)?$/.test(document.querySelector('#os-sr').value)`),
+      '#2251: the settings show switch, factor and day rate from the pack: ' + await ev(`[document.querySelector('#os-prod-on')?.checked, document.querySelector('#os-sf')?.value, document.querySelector('#os-sr')?.value].join(' ')`));
     await open(nav, q1.id);
     check(await ready(ev, `document.querySelectorAll('.ofdeditor .ofdits .ofdit').length >= 2`, 80), 'the quotation editor with a pack');
     check(await ev(`!!document.querySelector('#ofd-producing_on')?.checked && !!document.querySelector('#ofd-prod_quotient') && /÷ day rate × factor/.test(document.querySelector('#ofd-prod_quotient').closest('.row')?.textContent || '')`),
