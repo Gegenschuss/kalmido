@@ -1109,6 +1109,8 @@ fresh; run p299_c_api "$PY" p299_c_api_test.py "$KALMIDO_TEST_DATA"
 # 2.99.0 part D: office documents - fixed recipient fields rest (name addition, own company fields, 3-line company name), 44 px fields (#2188 #2025)
 fresh; run p299_d_api "$PY" p299_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p299_d_ui node p299_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.99.0 part E: the sidebar group Exchange stays short (recent chats, pinned people / agents, "All people") (#2187)
+fresh; run p299_e_ui node p299_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.86.0 (#1896): hardening from audit #476 part 1, groups A-E
 fresh; run p286_a_api "$PY" p286_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_b_api "$PY" p286_b_api_test.py "$KALMIDO_TEST_DATA"
