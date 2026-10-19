@@ -400,6 +400,25 @@ choose pictures), turn a page by 90 degrees, change the order, remove a page, th
 scaled to about 2000 pixels, without the photo's metadata or location -- and stores it like an upload: the storage limit,
 the virus scan and the text recognition apply. From *Documents* the PDF becomes a document of the workspace there.
 
+## Links for external people (2.112.1)
+
+A file or a folder of the file store can go to people without an account through a secret link: **Link for external
+people…** in a row's menu, or **Create link** in its details. Choose how long it is valid (1 day, 7 days, 30 days, until a
+date, no end), optionally a password and a label only the owners see (one link per customer, for example). The page shows
+a file with its size and a download button (pictures with a preview), a folder with its folders and files, each to
+download, and the whole folder as a ZIP. Nothing else: no upload, no versions, no comments, no names of people. A row with
+a live link carries a link badge; the details list every link with views and the last time it was opened, **Copy**,
+**New link** (the old address stops at once) and **Revoke** (one undo step brings the same address back).
+
+Only who may share the item (its owner, an organisation's admins) makes a link; agents never do, and folders of agents,
+linked task files and items in the trash cannot be shared outside. A link stops working at once when it expires, is
+revoked, the item or a folder above it goes into the trash or into another workspace, the person who made it can no
+longer share it (left the organisation, no longer admin), the organisation's admin turns off **Allow external share
+links** (Settings > Workspaces; nothing is deleted, turning it on brings the links back) or the server's admin turns off
+public links. Every view and download through a link shows up in the item's history, without the visitor's address;
+the page is never indexed or cached, and guessing addresses or passwords is limited per address. A person without an
+organisation shares from the private space the same way (only the server's switch applies).
+
 ## Pinned chat messages (2.62.0)
 
 Important messages stay in view: in the team chat and in the chat with an agent, *Pin* in the menu of a message (on a
