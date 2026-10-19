@@ -26,7 +26,7 @@ from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, 
 from .invoices import (INV_KINDS, INV_STATUSES, STATE_TXT, inv_apply_client, inv_manual_number, inv_money_fields, inv_new_row, inv_paid_map, inv_payments,
                        inv_reminder_totals, inv_render, inv_scheme, inv_state)
 
-DOC_KINDS = ("offer",) + INV_KINDS  # 2.38.0 (#1021, F1): invoices, credit notes, reminders live in office/invoices.py
+DOC_KINDS = ("offer",) + INV_KINDS + ("delivery",)  # 2.120.0 D (#2089): delivery notes / proofs of service (office/delivery.py); 2.38.0 (#1021, F1): invoices, credit notes, reminders live in office/invoices.py
 STATUSES = ("draft", "sent", "accepted", "declined")
 ITEM_KINDS = ("service", "text", "heading")
 STATUS_TXT = {"draft": N_("Draft"), "sent": N_("Sent"), "accepted": N_("Accepted"), "declined": N_("Declined"), **STATE_TXT}
@@ -292,7 +292,7 @@ def doc_totals(c, oid, r, items=None):
     pack = office_pack(s["pack"]) or office_pack("DE")
     if r["kind"] == "reminder":  # 2.38.0: a reminder has no positions, its lines are the invoices it lists
         return inv_reminder_totals(c, oid, r, pack)
-    calc = inv_calc if r["kind"] in ("invoice", "credit") else office_calc
+    calc = inv_calc if r["kind"] in ("invoice", "credit", "delivery") else office_calc
     if r["kind"] == "offer":  # 2.47.0 (#1215): a quotation with parts (None: it has none, computed as before)
         from .parts import tp_doc_totals
         t = tp_doc_totals(c, oid, r, items if items is not None else doc_items(c, r["id"], oid), pack)
@@ -382,6 +382,8 @@ def doc_public(c, oid, r, admin, items=True):
     d["can_unlock"] = bool(admin) and locked and not bga_offer_block(c, oid, r)  # 2.114.2 A (#2263): back to a draft, or delete
     d["can_delete"] = d["can_unlock"] if locked else bool(admin) and r["status"] != "sent"
     d["number_at_finalize"] = ofx_number_at_finalize(office_settings(c, oid), r["kind"])
+    if r["kind"] == "invoice":  # 2.120.0 D (#2089): "attach timesheet" is offered when the invoice has a client and a period
+        d["timesheet_ok"] = bool(r["client_id"] and r["service_from"] and r["service_to"])
     from .agentdocs import ofa_doc_extra
     ofa_doc_extra(c, d)  # 2.51.0 A (#1348): "drafted by agent X", the project list
     if r["kind"] == "offer":
@@ -401,7 +403,8 @@ def doc_brief(r, pm=None):
          "net": t.get("net") or 0, "net_text": fmt_money(t.get("net") or 0, r["lang"], r["currency"]),
          "gross": t.get("gross") or 0, "gross_text": fmt_money(t.get("gross") or 0, r["lang"], r["currency"]),
          "net_incl_raw": t.get("net_incl_raw"), "updated_at": r["updated_at"], "created_by": r["created_by"],
-         "locked": ofx_locked(r), "due_date": r["due_date"] if "due_date" in r.keys() else None, "cancels_id": r["cancels_id"] if "cancels_id" in r.keys() else None}
+         "locked": ofx_locked(r), "due_date": r["due_date"] if "due_date" in r.keys() else None, "cancels_id": r["cancels_id"] if "cancels_id" in r.keys() else None,
+         "inv_type": r["inv_type"] if "inv_type" in r.keys() else ""}  # 2.120.0 A (#2087)
     if r["kind"] == "offer" and "cashflow" in r.keys():  # 2.88.0 (#1915)
         d.update(version_of=r["version_of"], cashflow=r["cashflow"] or "auto")
     if r["kind"] in ("invoice", "credit"):
@@ -569,6 +572,10 @@ def clean_doc(c, oid, b, cur, admin):
         f["vat_note"] = _choice(b.get("vat_note") or "", "vat_note", ("",) + INV_VAT_NOTES)
     if "einvoice_format" in b:
         f["einvoice_format"] = _choice(b.get("einvoice_format") or "", "einvoice_format", ("", "zugferd", "xrechnung"))
+    if cur["kind"] == "delivery" and "delivery_title" in b:  # 2.120.0 D (#2089): "Lieferschein" or "Leistungsnachweis"
+        f["delivery_title"] = _choice(b.get("delivery_title") or "", "delivery_title", ("", "service"))
+    from .abschlag import abs_clean
+    abs_clean(b, cur, f)  # 2.120.0 A (#2087): cash discount, progress / final invoice
     if cur["kind"] == "reminder":
         if "reminder_level" in b:
             f["reminder_level"] = int(_num(b.get("reminder_level"), "reminder_level", 1, 3) or 1)
@@ -1106,7 +1113,7 @@ DUP_SKIP = {"id", "number", "status", "created_at", "updated_at", "sent_at", "cr
             "due_date", "paid_at", "pdf_sha256", "xml_sha256", "datev_sent_at",  # 2.38.0: the invoice's own marks
             "cancels_id", "ref_doc_ids", "source_doc_id",  # 2.38.0 review: a copy is a fresh document, bound to nothing
             "version_of", "cashflow",  # 2.88.0 (#1915): set below (a quotation's copy = its next version, cash flow auto)
-            "series_id", "series_period"}  # 2.91.0 A (#1923): a copy is no invoice of the series (office/recurring.py sets them itself)
+            "series_id", "series_period", "abs_refs"}  # 2.120.0 A (#2087): abs_refs  # 2.91.0 A (#1923): a copy is no invoice of the series (office/recurring.py sets them itself)
 DUP_ITEM_SKIP = {"id", "tax_pct", "net", "tax_amount"}
 
 

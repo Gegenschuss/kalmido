@@ -257,12 +257,15 @@ function ofcModal(kind, r) {
   if (!adm) for (const el of $$('input,select,textarea,button[data-dpfor]', md)) el.disabled = true;
   if (kind === 'equipment') astBind(md, r);  // 2.92.0 B (#1931)
   if (kind === 'contracts' && typeof dmaLoad === 'function') dmaLoad(md);  // 2.117.0 B (#2285)
+  // 2.119.1 C (#2298): a contract (with its PDF files) into another workspace, admins of the office (officemove.py)
+  if (kind === 'contracts' && r && adm && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom())) $('.foot .spacer', md)?.insertAdjacentHTML('beforebegin', `<button class="btn" data-m="move">${ic('brief', 's')} ${esc(tr('Move to another workspace…'))}</button>`);
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     const m = b.dataset.m;
     if (m === 'close') { close(); return; }
     if (m === 'add-item') { const eq = ofcRows('equipment').filter(x => !x.archived).map(x => [x.id, x.name]); $('#of-items', md).insertAdjacentHTML('beforeend', ofcSetItemHtml(eq, {equipment_id: eq[0]?.[0], qty: 1})); return; }
     if (m === 'rm-item') { b.closest('.ofcitem').remove(); return; }
+    if (m === 'move') { md.remove(); ofm_move({what: 'contracts', ids: [r.id], from: ofm_officeFrom(), label: qn(r.name), after: async () => ofcReload('contracts')}); return; }  // 2.119.1 C (#2298)
     try {
       if (m === 'del') {
         if (!await askConfirm(tr('Delete “{0}”?', r.name || r.name_de || r.key || ''), tr('Entries that documents, contracts or sets still use are archived instead.'), {ok: tr('Delete'), danger: true})) return;
@@ -315,6 +318,7 @@ function ofcSettingsHtml() {
     ${ta('os-bank', tr('Bank lines'), co.bank_lines, tr('bank, IBAN, BIC; tax number / VAT id'))}</details>
     <div class="row"><label>${tr('Logo')}</label><span class="lacts">${logo}${adm ? `<input type="file" id="os-logo" accept="image/png,image/jpeg,image/webp" aria-label="${esc(tr('Upload logo'))}">${s.logo ? `<button type="button" class="btn sm" data-ofc="logo-del">${tr('Remove')}</button>` : ''}` : ''}</span><span class="muted ofchint">${tr('PNG at least 600 px wide (also JPEG or WebP, up to 4 MB)')}</span></div>
     ${ofcRowF('os-color', tr('Brand colour'), `<span class="lacts"><input id="os-color" value="${esc(s.color || '')}" maxlength="7" placeholder="#2f5d8a" class="numin" ${dis}><i class="ofcsw" style="background:${cssColor(s.color) || 'var(--accent)'}"></i></span>`, tr('accent in the printed documents; empty = the app’s accent colour'))}${ofcII('color')}
+    ${typeof bp_settingsHtml === 'function' ? bp_settingsHtml(s, dis) : ''}
     <h3>${tr('Documents')}</h3>
     ${ofcRowF('os-lang', tr('Document language'), ofcSel('os-lang', s.lang, [['de', 'Deutsch'], ['en', 'English']]))}
     ${ofcRowF('os-currency', tr('Currency'), `<span class="lacts">${ofcSel('os-currency', s.currency, [['EUR', 'EUR'], ['USD', 'USD']])}<label for="os-fx" class="muted">${tr('1 € in USD')}</label><input id="os-fx" value="${esc(fmtNum(s.fx_usd, 4))}" inputmode="decimal" class="numin" ${dis}></span>`)}${ofcII('currency')}
@@ -328,13 +332,16 @@ function ofcSettingsHtml() {
     ${ofcSchemeHtml('os-inv-scheme', 'invoice', tr('Invoice numbers'), s.invoice_scheme, dis)}
     ${ofcSchemeHtml('os-cr-scheme', 'credit', tr('Credit note numbers'), s.credit_scheme, dis)}
     ${ofcSchemeHtml('os-rm-scheme', 'reminder', tr('Reminder numbers'), s.reminder_scheme, dis)}
+    ${ofcSchemeHtml('os-ls-scheme', 'delivery', tr('Delivery note numbers'), s.delivery_scheme, dis)}
     ${ofcRowF('os-paydays', tr('Payment terms'), `<span class="lacts"><input id="os-paydays" value="${esc(String(s.payment_days ?? 14))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`, tr('a client\'s own payment terms win'))}${ofcII('paydays')}
+    ${ofcRowF('os-skonto', tr('Cash discount'), `<span class="lacts"><input id="os-skonto" value="${esc(+s.skonto_pct ? fmtNum(s.skonto_pct, 2) : '')}" inputmode="decimal" class="numin" ${dis}><span class="muted">%</span><input id="os-skonto-days" aria-label="${esc(tr('days'))}" value="${esc(+s.skonto_days ? String(s.skonto_days) : '')}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`, tr('default for new invoices; empty = none'))}
     ${ofcRowF('os-rmfee', tr('Reminder fee'), `<span class="lacts"><input id="os-rmfee" value="${esc(fmtNum(s.reminder_fee ?? 0, 2))}" inputmode="decimal" class="numin" ${dis}><span class="muted">${ofcCur() === 'USD' ? '$' : '€'}</span></span>`)}${ofcII('rmfee')}
     ${ofcRowF('os-rmdays', tr('Payment deadline'), `<span class="lacts"><input id="os-rmdays" value="${esc(String(s.reminder_deadline_days ?? 10))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`, tr('on reminders'))}${ofcII('rmdays')}
     ${typeof tpSettingsHtml === 'function' ? tpSettingsHtml(s, dis) : ''}
     ${ofcRowF('os-einv', tr('E-invoice format'), ofcSel('os-einv', s.einvoice_format || 'zugferd', [['zugferd', 'ZUGFeRD (PDF with XML)'], ['xrechnung', 'XRechnung (XML)']]), tr('clients with a buyer reference get XRechnung proposed'))}${ofcII('einv')}
     ${ofcRowF('os-datev', tr('DATEV inbox'), `<input id="os-datev" type="email" value="${esc(s.datev_email || '')}" maxlength="200" placeholder="${esc(tr('e-mail address of the document inbox'))}" ${dis}>`, tr('finalised invoices are mailed there as PDF + XML'))}${ofcII('datev')}
     ${ofcChk('os-datev-auto', tr('Send every invoice to the DATEV inbox when it is sent'), s.datev_auto)}${ofcII('datev_auto')}
+    ${ofcChk('os-portal-docs', tr('Show documents in the customer portal'), s.portal_docs)}<p class="muted ofchint">${tr('Sent quotations, invoices with their payment status and credit notes; the client signs in with the link from the client’s menu “Send portal link”')}</p>
     ${typeof dx_settingsHtml === 'function' ? dx_settingsHtml(s, dis) : ''}
     ${ofcRowF('os-inv-close-de', tr('Invoice closing (German)'), `<textarea id="os-inv-close-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.invoice_closing_de || '')}</textarea>`)}
     ${ofcRowF('os-inv-close-en', tr('Invoice closing (English)'), `<textarea id="os-inv-close-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.invoice_closing_en || '')}</textarea>`)}
@@ -504,10 +511,12 @@ async function ofcSaveSettings(form) {
     prod_quotient: ofcNum(v('#os-pq')), producing_service_id: +v('#os-ps') || null, producing_rate: ofcNum(v('#os-pr')), raw_factor: ofcNum(v('#os-rf')),
     producing_on: $('#os-prod-on', form)?.checked ? 1 : 0, raw_on: $('#os-raw-on', form)?.checked ? 1 : 0,
     ...($('#os-accept-on', form) ? {accept_on: $('#os-accept-on', form).checked ? 1 : 0} : {}),  // 2.114.4 B (#2270)
+    ...($('#os-portal-docs', form) ? {portal_docs: $('#os-portal-docs', form).checked ? 1 : 0} : {}),  // 2.120.0 B (#2088)
     industry_packs: typeof pkc_indBody === 'function' ? pkc_indBody(form) : $('#os-ind-film', form)?.checked ? ['film'] : [],  // 2.47.0 (#1216), 2.76.0 (#1023): every os-ind-*
     intro_text_id: {de: +v('#os-intro-de') || null, en: +v('#os-intro-en') || null}, closing_text_id: {de: +v('#os-closing-de') || null, en: +v('#os-closing-en') || null},
     rights_default: {time_id: +v('#os-rt') || null, territory_id: +v('#os-rr') || null, media_id: +v('#os-rm') || null}, pack: v('#os-pack'),
-    invoice_scheme: v('#os-inv-scheme'), credit_scheme: v('#os-cr-scheme'), reminder_scheme: v('#os-rm-scheme'), payment_days: ofcNum(v('#os-paydays')), reminder_fee: ofcNum(v('#os-rmfee')),
+    invoice_scheme: v('#os-inv-scheme'), credit_scheme: v('#os-cr-scheme'), reminder_scheme: v('#os-rm-scheme'), delivery_scheme: v('#os-ls-scheme'), payment_days: ofcNum(v('#os-paydays')), reminder_fee: ofcNum(v('#os-rmfee')),
+    ...($('#os-skonto', form) ? {skonto_pct: ofcNum(v('#os-skonto')) || 0, skonto_days: ofcNum(v('#os-skonto-days')) || 0} : {}),  // 2.120.0 A (#2087)
     reminder_deadline_days: ofcNum(v('#os-rmdays')), einvoice_format: v('#os-einv'), datev_email: v('#os-datev').trim(), datev_auto: $('#os-datev-auto', form)?.checked ? 1 : 0, small_business: $('#os-small', form)?.checked ? 1 : 0,
     invoice_closing_de: v('#os-inv-close-de'), invoice_closing_en: v('#os-inv-close-en'), reminder_text_de: v('#os-rm-text-de'), reminder_text_en: v('#os-rm-text-en')};
   if (typeof tpSettingsBody === 'function') Object.assign(body, tpSettingsBody(form));  // 2.47.0 (#1215)

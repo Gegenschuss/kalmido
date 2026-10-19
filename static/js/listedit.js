@@ -221,7 +221,7 @@ function agentLive() {
   // 2.12.2 (#451): the typing row and the state chip are swapped only when they changed; the dots appearing make the list
   // shorter, so a list that was at the bottom is put back to the bottom
   const c = $('#chat-typing'), a = S.chat.aid && agentById(S.chat.aid), box = $('#chat-msgs'), pin = !!box && chatNear(box);
-  const swap = (el, h) => { if (el && el._h !== h && el.outerHTML !== h) { el.outerHTML = h; const n = $('#' + el.id); if (n) n._h = h; } };
+  const swap = (el, h) => { if (el && !wk_sameEl(el, h)) {  /* 2.119.1 D (#2310): compared as nodes */ el.outerHTML = h; const n = $('#' + el.id); if (n) n._h = h; } };
   if (c) swap(c, typingHtml(chatTypers(a), 'chat-typing'));
   if (a) swap($('#chat-st'), chatStHtml(a));
   if (pin && box.isConnected && !chatNear(box)) box.scrollTop = box.scrollHeight;

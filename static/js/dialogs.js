@@ -479,7 +479,7 @@ async function listDeleteForGood(id) {
   if (!ok) return false;
   // 2.46.2 (#1659): the list (and its tasks) leave the screen at once; archive + delete + the reload run behind it, an
   // error brings the list back (optWrite: a state that arrives meanwhile gets it removed again)
-  const nm = lname(l);
+  const nm = lname(l), active = !l.archived;  // 2.119.1 C (#2304): the undo brings an active list back active
   if (S.route.key === 'l:' + id) go(START_KEY);
   const put = () => {
     const i = S.lists.findIndex(x => x.id === id); if (i < 0) return null;
@@ -489,9 +489,9 @@ async function listDeleteForGood(id) {
   };
   let inTrash = false;
   optWrite(put, async () => {
-    if (!l.archived) await api('PATCH', '/api/lists/' + id, {archived: 1});
+    if (active) await api('PATCH', '/api/lists/' + id, {archived: 1});
     inTrash = !!(await api('DELETE', '/api/lists/' + id))?.trash;
-  }).then(() => inTrash ? otr_offerUndo(id, nm) : toast(tr('“{0}” deleted', nm)), () => {})  // an error: api() said why, the list is back
+  }).then(() => inTrash ? otr_offerUndo(id, nm, active) : toast(tr('“{0}” deleted', nm)), () => {})  // an error: api() said why, the list is back
     .then(() => load()).then(render, () => {});  // half done (archived, not deleted) shows the real state
   return true;  // gone from the screen: the dialog closes at once
 }

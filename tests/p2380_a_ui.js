@@ -45,7 +45,8 @@ const TEST_IBAN = 'DE02120300000000202051';
   // ================= jsdom: the list with kind chips and state tags
   let w = await boot({hash: 'office/offers'}); let d = w.document;
   await until(() => d.querySelector('.ofdkinds [data-kind="invoice"]'), 60);
-  check(d.querySelectorAll('.ofdkinds [data-ofd="kind"]').length === 5 && d.querySelector('.ofdkinds [data-kind="offer"]')?.getAttribute('aria-selected') === 'true', 'documents tab: five kind chips (2.39.1 #1182: + Archive), quotations first');
+  // 2.120.0 (#2089): + delivery notes -> six kinds
+  check(d.querySelectorAll('.ofdkinds [data-ofd="kind"]').length === 6 && d.querySelector('.ofdkinds [data-kind="offer"]')?.getAttribute('aria-selected') === 'true', 'documents tab: six kind chips (2.39.1 #1182: + Archive, 2.120.0: + delivery notes), quotations first');
   check(d.querySelectorAll('.ofdlist .ofdrow').length === 1 && /Draft/.test(d.querySelector('.ofdlist .rotag')?.textContent || ''), 'quotation list as before');
   d.querySelector('.ofdkinds [data-kind="invoice"]').click();
   await until(() => d.querySelectorAll('.ofdlist .ofdrow').length === 2, 60);

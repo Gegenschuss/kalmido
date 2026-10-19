@@ -84,6 +84,8 @@
 .ofdauto .ofcn small{font-size:var(--fs-s)}
 .ofdauto .ofdlt{font-variant-numeric:tabular-nums;white-space:nowrap}
 .ofdrules{margin-top:.5rem}
+/* 2.120.0 D (#2089): a delivery note shows no prices (rate, tax, line total) */
+.ofdls .ofdrate,.ofdls .ofdit .ofdlt,.ofdls .ofdnums>.muted,.ofdls .ofdnums select[data-k="tax"],.ofdls .ofdpctof{display:none}
 .ofdtotals{margin-top:.75rem;padding:.5rem .75rem;border-top:2px solid var(--accent)}
 .ofdtotals dl{margin:0;display:flex;flex-direction:column;gap:.125rem;max-width:28rem;margin-left:auto}
 .ofdtotals .ofdtr{display:flex;justify-content:space-between;gap:1rem;min-height:1.75rem;align-items:center}

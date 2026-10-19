@@ -1159,6 +1159,17 @@ fresh; run p2102_d_api "$PY" p2102_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.102.0 part E (#1995 #1998 #1999): type check, drag library, layer linter + client error report
 fresh; run p2102_e_api "$PY" p2102_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2102_e_ui node p2102_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.119.1 part A: contacts - CSV import/export, more than 500 contacts, duplicate hint, manage groups (#2080 #2081 #2084 #2085)
+fresh; run p21191_a_api "$PY" p21191_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21191_a_ui node p21191_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.119.1 part B: contact card - client from contact, history, address as map link (#2082 #2083 #2086)
+fresh; run p21191_b_api "$PY" p21191_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21191_b_ui node p21191_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.119.1 part C: framework contracts between workspaces, undo of a list delete keeps the list active (#2298 #2304)
+fresh; run p21191_c_api "$PY" p21191_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21191_c_ui node p21191_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.119.1 part D: live panel window redraw flake, 44 px select marks in documents (#2310 #2206)
+fresh; run p21191_d_ui node p21191_d_ui.js "$KALMIDO_TEST_DATA"
 shard 13  # back to shard 13 for the 2.97 suites
 # 2.97.0 part A: bookmarks (#1950)
 fresh; run p297_a_api "$PY" p297_a_api_test.py "$KALMIDO_TEST_DATA"
@@ -1260,6 +1271,21 @@ fresh; run p21141_b_api "$PY" p21141_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21141_b_ui node p21141_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.114.1 part C: transfer of rights on its own last page of the quotation PDF (#2258)
 fresh; run p21141_c_api "$PY" p21141_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.120.0 part A: progress and final invoices, cash discount (#2087)
+fresh; run p2120_a_api "$PY" p2120_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2120_a_ui node p2120_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.120.0 part B: client portal with quotations, invoices and payment state (#2088)
+fresh; run p2120_b_api "$PY" p2120_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2120_b_ui node p2120_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.120.0 part C: DATEV export with incoming receipts and travel costs (#2090)
+fresh; run p2120_c_api "$PY" p2120_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2120_c_ui node p2120_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.120.0 part D: delivery note / proof of work, timesheet as invoice attachment (#2089)
+fresh; run p2120_d_api "$PY" p2120_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2120_d_ui node p2120_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.120.0 part E: own letterhead as background PDF (#2091)
+fresh; run p2120_e_api "$PY" p2120_e_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2120_e_ui node p2120_e_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

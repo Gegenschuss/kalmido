@@ -7,6 +7,43 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.120.0] - 2026-10-19
+
+Office: progress and final invoices, cash discount, client portal with documents, delivery notes, DATEV input side, own letterhead.
+
+### Added
+- Invoices: progress invoices from a quotation (amount or percentage of its net, split onto its VAT rates, e-invoice type 326) and a final invoice that deducts every finalised, not cancelled progress invoice per VAT rate (type 380); a second final invoice or a progress invoice after the final one is refused; the cash flow plan keeps the rest of the quotation after a progress invoice (#2087).
+- Invoices: cash discount (Skonto) per invoice with a default in the office settings - a line under the payment terms in the PDF, the XRechnung discount line in BT-20, a payment of the discounted amount within the period settles the invoice (#2087).
+- Client portal: clients see their sent quotations, invoices with payment state and due date and credit notes and download the PDF as it was sent (office setting "Show documents in the client portal", off by default); "Send portal link" in the client menu mails the sign-in link - no account, no password (#2088).
+- Delivery notes / proofs of service as a document kind of their own (number series LS-, positions without prices, a receipt box for signature, from a quotation or invoice); a timesheet PDF for invoices with a client and service period, optionally attached when sending (#2089).
+- DATEV booking batch: incoming receipts (expense account per category, input tax key, collective creditor or bank) and travel costs incl. per diem; hints before the download for receipts without amount, category or VAT rate; travel receipts already marked "in DATEV" are not exported again; new settings "Receipts and travel costs" that save at once (#2090).
+- Own letterhead: upload a PDF (page 1 behind the first page, page 2 behind the following ones), margins per page, switch off the own head and footer, preview, every change undoable; finalised documents keep their letterhead, the ZUGFeRD XML stays embedded, without a letterhead the PDF is unchanged (#2091).
+
+### Changed
+- Country pack de: bookkeeping export DATEV is marked ready (#2090).
+- Agents: `draft_invoice_from_offer` / POST /api/v1/office/offers/{id}/invoice take `inv_type`, `amount` and `pct` (#2087).
+
+## [2.119.2] - 2026-10-19
+
+Contacts, undo of a list delete, framework contracts between workspaces, a flaky chat test.
+
+### Added
+- Contacts: CSV import (Outlook, Google, Excel) with a column mapping step - encoding and separator are detected, the headers of Outlook (English and German) and Google are mapped for you - and a CSV export that Excel opens directly; formula cells are defused, phone numbers stay as they are (#2080).
+- Contacts: a hint on possible duplicates when you create a contact (same e-mail, phone or name; "Create anyway" or open the existing one) and after an import, with a way to the merge view; nothing is merged on its own (#2084).
+- Contacts: "Manage groups…" with the count per group, rename and delete (only the label) across all writable address books, one undo step; synced devices get the change (#2085).
+- Contact card: "Create client" in the card's menu takes over company, e-mail, phone and address and links the contact as the contact person, with undo; a linked contact shows "Open client" (#2082).
+- Contact card: a "Contact history" section with filed e-mails, quotations, invoices and appointments, newest first - only what you may see anyway (#2083).
+- Office: framework contracts move with their PDF files between the private area and an organisation ("Move to another workspace…" in the contract dialog), one step undo; a contract that issued documents point to stays archived and is created anew in the target (#2298).
+
+### Changed
+- Contacts: long address books load further pages while you scroll instead of stopping at 500; "All" in selection mode really takes every match (#2081).
+- Addresses on the contact card and the client page open the map app on a tap (Apple Maps on Apple devices, Google Maps elsewhere) (#2086).
+
+### Fixed
+- Deleting a list: "Undo" right after it brings an active list back active in its old place, not into the archive; restoring from the trash still goes to the archive (#2304).
+- Documents: the selection marks have a real 44 px touch target on phones (#2206).
+- Chat side window: unchanged parts (job filter, status, steps) are no longer redrawn on every update, and a team conversation parked right after opening loads its messages instead of staying at "Loading…" (#2310).
+
 ## [2.119.1] - 2026-10-19
 
 ### Fixed

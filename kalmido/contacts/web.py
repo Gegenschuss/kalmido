@@ -198,21 +198,32 @@ def op_contact_delete(c, uid, cid):
     c.commit()
 
 
-def op_import(c, uid, bid, raw, bg=False):
+def op_import(c, uid, bid, raw, bg=False, csv_ok=False, mapping=None, preview=False, name=""):
     need_book(c, bid, write=True)
     if len(raw) > VCF_MAX:
         raise BadInput(tr("The file is too large (at most {0} MB)", VCF_MAX // (1024 * 1024)))
-    try:
-        text = raw.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        text = raw.decode("latin-1")
-    if "BEGIN:VCARD" not in text.upper():
-        raise BadInput(tr("This is not a contacts file (vCard)"))
-    cards = split_vcards(text)
+    from ..contacts.ctxlist import ctx_cards, ctx_import_dupes, ctx_is_csv, ctx_max_id, ctx_preview
+    if csv_ok and ctx_is_csv(raw, name):  # 2.119.1 A (#2080): the app's CSV: preview = columns + suggested fields; else rows as vCards
+        if preview:
+            return ctx_preview(raw)
+        cards = ctx_cards(raw, mapping)
+    else:
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = raw.decode("latin-1")
+        if "BEGIN:VCARD" not in text.upper():
+            raise BadInput(tr("This is not a contacts file (vCard or CSV)") if csv_ok else tr("This is not a contacts file (vCard)"))
+        if preview:
+            return {"format": "vcard"}
+        cards = split_vcards(text)
+    since = ctx_max_id(c, bid)  # 2.119.1 A (#2084): the contacts after it are the new ones (likely duplicates in the answer)
     if bg and len(cards) > IMPORT_SYNC_MAX:
-        return lv_import_start(c, uid, bid, cards)
-    res = import_vcards(c, uid, bid, text, batch=IMPORT_BATCH, cards=cards, photos=15)  # 2.41.0 (#1437): commits per batch; 2.47.3: 15 s photo budget
+        return lv_import_start(c, uid, bid, cards, since)
+    res = import_vcards(c, uid, bid, None, batch=IMPORT_BATCH, cards=cards, photos=15)  # 2.41.0 (#1437): commits per batch; 2.47.3: 15 s photo budget
     c.commit()
+    if csv_ok:
+        res.update(ctx_import_dupes(c, uid, bid, since))
     return res
 
 
@@ -225,12 +236,13 @@ _IMP, _IMP_LOCK = {}, threading.Lock()
 
 def lv_import_public(st):
     d = {k: st[k] for k in ("import_id", "book_id", "state", "total", "done", "created", "updated", "unchanged", "errors", "error")}
+    d.update({k: st[k] for k in ("dupes", "dupe_groups") if k in st})  # 2.119.1 A (#2084)
     for k in ("started_at", "ended_at"):
         d[k] = iso(datetime.fromtimestamp(st[k], timezone.utc)) if st[k] else None
     return d
 
 
-def lv_import_start(c, uid, bid, cards):
+def lv_import_start(c, uid, bid, cards, since=None):
     iid = secrets.token_urlsafe(12)
     st = {"import_id": iid, "user_id": uid, "book_id": bid, "state": "running", "total": min(len(cards), CONTACTS_PER_BOOK), "done": 0,
           "created": 0, "updated": 0, "unchanged": 0, "errors": 0, "error": "", "started_at": time.time(), "ended_at": None}
@@ -240,12 +252,12 @@ def lv_import_start(c, uid, bid, cards):
             _IMP.pop(k, None)
         _IMP[iid] = st
     ctx = c.ctx  # the starter's row-level-security context goes with the thread
-    threading.Thread(target=lv_import_run, args=(st, ctx, uid, bid, cards), daemon=True).start()
+    threading.Thread(target=lv_import_run, args=(st, ctx, uid, bid, cards, since), daemon=True).start()
     with _IMP_LOCK:
         return lv_import_public(st)
 
 
-def lv_import_run(st, ctx, uid, bid, cards):
+def lv_import_run(st, ctx, uid, bid, cards, since=None):
     def prog(done, total, res):
         with _IMP_LOCK:
             st.update(done=done, **res)
@@ -255,6 +267,9 @@ def lv_import_run(st, ctx, uid, bid, cards):
         c.set_ctx(*ctx)
         res = import_vcards(c, uid, bid, None, batch=IMPORT_BATCH, progress=prog, cards=cards, photos=900)
         c.commit()
+        if since is not None:  # 2.119.1 A (#2084): the new contacts that look like one already there
+            from ..contacts.ctxlist import ctx_import_dupes
+            res.update(ctx_import_dupes(c, uid, bid, since))
         with _IMP_LOCK:
             st.update(state="done", done=st["total"], **res)
     except Exception as e:  # noqa: BLE001 -- any failure ends the import with a message; the batches before it stay
@@ -347,7 +362,9 @@ def books_import(bid):
         return err(tr("No file"))
     # 2.41.0 (#1437): ?background=1 (the app): a large file answers 202 {import_id, state: "running", ...} at once
     bg = request.args.get("background") in ("1", "true")
-    r = op_import(db(), me(), bid, raw, bg=bg)
+    # 2.119.1 A (#2080): a CSV file too; ?preview=1 answers its columns, the form field mapping = a field per column
+    r = op_import(db(), me(), bid, raw, bg=bg, csv_ok=True, mapping=request.form.get("mapping"), preview=request.args.get("preview") in ("1", "true"),
+                  name=f.filename or "" if f else "")
     return (jsonify(r), 202) if "import_id" in r else jsonify(r)
 
 

@@ -43,19 +43,24 @@ async function ctLoad() {
   const seq = ++CT.seq;
   ct_prune();
   CT.loading = true;
-  const qs = new URLSearchParams({q: CT.q, limit: '500'});
+  // 2.119.1 A (#2081): a reload of the same search keeps the pages loaded so far (up to the server's 2000), the rest come by scrolling
+  const key = ctx_key(), keep = CT.items && CT.qk === key ? Math.min(2000, CT.items.length) : 0;
+  let fresh = false;
+  const qs = new URLSearchParams({q: CT.q, limit: String(Math.max(CTX_PAGE, keep))});
   if (CT.group) qs.set('group', CT.group);
   if (CT.book) qs.set('book_id', CT.book);
   try {
     const j = await api('GET', '/api/contacts?' + qs);
     if (seq !== CT.seq) return;
-    CT.items = j.items; CT.total = j.total; CT.groups = j.groups || [];
+    fresh = CT.qk !== key;
+    CT.items = j.items; CT.total = j.total; CT.groups = j.groups || []; CT.qk = key;
   } catch (e) {
     if (seq === CT.seq && e?.status === 404 && CT.book) { CT.book = ''; CT.loading = false; return ctLoad(); }  // 2.46.4 (#1732): the filtered book is gone
     if (seq === CT.seq) CT.items = CT.items || [];
   }
   CT.loading = false;
   if (S.route.mod === 'contacts') ctDraw();
+  if (fresh) for (const w of [$('#view .ctlistw'), $('#view')]) if (w) w.scrollTop = 0;  // 2.119.1 A (#2081): another search starts at the top (not at the end, which would load page two)
 }
 async function ctRoute(id) {
   if (CT.items === null && !CT.loading) ctLoad();
@@ -74,16 +79,46 @@ function viewContacts() {
   const items = CT.items === null ? null : CT.items.filter(c => !ctBook(c.book_id) || wsObjIn(ctBook(c.book_id)));
   const mob = isMobile(), showCard = CT.card && (!mob || CT.sel);
   const bar = `<div class="ctbar"><div class="ctsearch">${ic('search', 's')}<input id="ct-q" type="search" value="${esc(CT.q)}" placeholder="${esc(tr('Search contacts'))}" aria-label="${esc(tr('Search contacts'))}" autocomplete="off" enterkeyhint="search"></div>
-    ${CT.groups.length ? `<select id="ct-group" aria-label="${esc(tr('Group'))}"><option value="">${tr('All groups')}</option>${CT.groups.map(g => `<option value="${esc(g)}" ${g === CT.group ? 'selected' : ''}>${esc(g)}</option>`).join('')}</select>` : ''}
+    ${CT.groups.length ? `<select id="ct-group" aria-label="${esc(tr('Group'))}"><option value="">${tr('All groups')}</option>${CT.groups.map(g => `<option value="${esc(g)}" ${g === CT.group ? 'selected' : ''}>${esc(g)}</option>`).join('')}<option value="${CTX_MANAGE}">${tr('Manage groups…')}</option></select>` : ''}
     ${books.length > 1 ? `<select id="ct-book" aria-label="${esc(tr('Address book'))}"><option value="">${tr('All address books')}</option>${books.map(b => `<option value="${b.id}" ${String(b.id) === String(CT.book) ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>` : ''}
     <span class="spacer"></span>${books.some(ctWrite) ? `<button class="iconbtn ${CT.pick ? 'on' : ''}" data-ct="pick" aria-pressed="${!!CT.pick}" aria-label="${esc(tr(CT.pick ? 'End selection' : 'Select'))}" title="${esc(tr(CT.pick ? 'End selection' : 'Select'))}">${ic('select')}</button>` : ''}<button class="btn sm pri" data-ct="new">${ic('plus', 's')}<span class="cdl">${tr('New contact')}</span></button>
     <button class="iconbtn" data-ct="menu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
   const list = items === null ? `<div class="muted ctempty">${tr('Loading…')}</div>` : !items.length
     ? `<div class="empty">${ic('users')}${CT.q || CT.group ? tr('No contact matches.') : tr('No contacts yet. Add one, import a vCard file, or connect the phone.')}</div>`
     : `<ul class="ctlist" role="list" aria-label="${esc(tr('Contacts'))}">${ctRows(items, (c, vl) => `<li${vl}><button type="button" class="ctrow ${c.id === CT.sel ? 'on' : ''} ${bk_rowCls(c)}" data-ctopen="${c.id}" ${CT.pick ? `aria-pressed="${CT.pick.has(c.id)}"` : `aria-current="${c.id === CT.sel}"`}>${CT.pick ? bk_chk(c) : ''}${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org || '?')}</b><small class="muted">${esc([c.org !== c.fn ? c.org : '', c.email || c.phone].filter(Boolean).join(' · '))}</small></span>${(books.length > 1 && ctBook(c.book_id)) ? `<i class="cevdot" style="--cc:${cssColor(ctBook(c.book_id).color) || 'var(--accent)'}" title="${esc(ctBook(c.book_id).name)}"></i>` : ''}</button></li>`)}</ul>
-      ${CT.total > CT.items.length ? `<div class="muted ctmore">${tr('{0} of {1} shown: search to narrow it down', items.length, CT.total)}</div>` : ''}`;
+      ${CT.total > CT.items.length ? `<div class="muted ctmore">${tr('{0} of {1} loaded', CT.items.length, CT.total)} <button type="button" class="linkbtn" data-ctxmore ${CT.more ? 'disabled' : ''}>${tr('Show more')}</button></div>` : ''}`;  // 2.119.1 A (#2081): the next page comes when scrolling near the end
   return `<div class="ctview ${showCard ? 'withcard' : ''} ${CT.pick ? 'ctpicking' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${CT.pick && !(mob && showCard) ? bk_barHtml() : ''}${mob && showCard ? '' : bar}<div class="ctcols">${mob && showCard ? '' : `<div class="ctlistw" data-vlsc>${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Choose a contact')}</div>`}</div></div>`;
 }
+// 2.119.1 A (#2081): every contact is reachable: the list loads pages of CTX_PAGE (GET /api/contacts offset / limit); scrolling
+// near the end of the list (or "Show more") appends the next page. A new search / group / address book starts again at page one
+const CTX_PAGE = 500;
+const ctx_key = () => [CT.q, CT.group, CT.book].join('\u0001');
+async function ctx_more() {
+  if (!CT.items || CT.loading || CT.more || CT.items.length >= CT.total) return;
+  const seq = CT.seq, key = ctx_key();
+  if (CT.qk !== key) return;
+  CT.more = true;
+  const qs = new URLSearchParams({q: CT.q, limit: String(CTX_PAGE), offset: String(CT.items.length)});
+  if (CT.group) qs.set('group', CT.group);
+  if (CT.book) qs.set('book_id', CT.book);
+  try {
+    const j = await api('GET', '/api/contacts?' + qs);
+    if (seq === CT.seq && key === ctx_key() && CT.items) {
+      const have = new Set(CT.items.map(c => c.id));
+      CT.items.push(...j.items.filter(c => !have.has(c.id)));
+      CT.total = j.items.length ? j.total : CT.items.length;  // an empty page: the rest is gone meanwhile
+    }
+  } catch { /* api() showed it; scrolling tries again */ }
+  CT.more = false;
+  if (seq === CT.seq && S.route.mod === 'contacts') ctDraw();
+}
+function ctx_near(sc) { return sc.scrollHeight - sc.scrollTop - sc.clientHeight < Math.max(600, sc.clientHeight * 1.5); }
+document.addEventListener('scroll', e => {
+  if (S.route.mod !== 'contacts' || !CT.items || CT.more || CT.items.length >= CT.total) return;
+  const sc = e.target; if (!(sc instanceof Element) || !(sc.matches('.ctlistw') || sc.id === 'view')) return;
+  if (ctx_near(sc)) ctx_more();
+}, {capture: true, passive: true});
+document.addEventListener('click', e => { if (e.target.closest('[data-ctxmore]')) { e.preventDefault(); ctx_more(); } });
 // 2.65.0 (#1825): a long address book draws only the rows near the visible part (vlist.js); row(c, attrs) = one <li>
 function ctRows(items, row) {
   if (!vl_begin(items.length)) return items.map(c => row(c, '')).join('');
@@ -93,7 +128,7 @@ function ctCardHtml(c) {
   const b = ctBook(c.book_id), w = ctWrite(b);
   const it = (k, icon, href) => (c[k] || []).map(x => `<div class="ctf">${ic(icon, 's')}<span class="ctfl muted">${esc(ctTypeWord(k, x))}</span>${href(x)}</div>`).join('');
   const adr = (c.addresses || []).map(a => { const t = [a.street, [a.code, a.city].filter(Boolean).join(' '), a.region, a.country].filter(Boolean).join(', ');
-    return `<div class="ctf">${ic('mappin', 's')}<span class="ctfl muted">${esc(ctTypeWord('addresses', a))}</span><span>${esc(t)}</span></div>`; }).join('');
+    return `<div class="ctf">${ic('mappin', 's')}<span class="ctfl muted">${esc(ctTypeWord('addresses', a))}</span>${ctk_mapLink(t)}</div>`; }).join('');  // 2.119.1 B (#2086): a map link
   const kinds = Object.fromEntries(CT_LINK);
   return `<article class="ctcard" aria-labelledby="ct-h">
     <div class="cthead">${isMobile() ? `<button class="iconbtn" data-ct="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ctAv(c, 'avatar ctav big')}<div class="cthn"><h3 id="ct-h">${esc(c.fn || c.org || '?')}</h3>${feat('clients') ? `<div class="mstags">${ms_tag('contact')}</div>` : ''}${[c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).length ? `<div class="muted">${esc([c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).join(' · '))}</div>` : ''}</div>
@@ -115,8 +150,83 @@ function ctCardHtml(c) {
     ${(c.clients || []).length ? `<div class="ctsec cklsec"><h4>${tr('Contact person at')}</h4><ul class="ctlinks">${c.clients.map(x => `<li><a class="linkbtn" href="#client/${x.client_id}">${ic('brief', 's')} ${esc(x.name)}</a>${x.role ? `<span class="muted"> · ${esc(x.role)}</span>` : ''}</li>`).join('')}</ul></div>` : ''}${''/* 2.59.0 (#1735): the clients this contact is a contact person of (only who may open them) */}
     <div class="ctsec"><h4>${tr('Tasks')}</h4>${(c.tasks || []).length ? `<ul class="ctlinks">${c.tasks.map(t => `<li><button type="button" class="linkbtn ${t.status ? 'done' : ''}" data-cttask="${t.task_id}">${ic(t.status ? 'done' : 'list', 's')} ${esc(t.title)}</button><span class="muted"> · ${esc(tr(kinds[t.kind] || 'About'))}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No linked tasks yet: “Link a contact” in a task’s panel.')}</p>`}</div>
     ${(c.events || []).length ? `<div class="ctsec"><h4>${tr('Events')}</h4><ul class="ctlinks">${c.events.map(e => `<li><button type="button" class="linkbtn" data-evopen="${e.event_id}">${ic('cal', 's')} ${esc(e.title)}</button><span class="muted"> · ${esc(e.all_day ? fmtDayAbs(e.start.slice(0, 10)) : fmtDayAbs(e.start.slice(0, 10)) + ' ' + fmtTimeLoc(e.start.slice(11, 16)))}</span></li>`).join('')}</ul></div>` : ''}
+    ${ctk_histHtml(c)}
     ${w && (c.merges || []).length ? ctm_histHtml(c) : ''}
   </article>`;
+}
+// 2.119.1 B (#2083): "History" on the card -- filed mails from / to the contact, the quotations / invoices / credit notes of
+// its clients and its events, newest first (GET /api/contacts/<id>/history, only what the person may see; "Show more"
+// fetches the next page). Loaded once per opened card (a new card object = a new load); hidden while empty.
+const CTK = {card: null, items: [], more: false, loading: false};
+function ctk_histHtml(c) {
+  if (S.me?.kid || S.me?.kind === 'agent') return '';
+  if (CTK.card !== c) { CTK.card = c; CTK.items = []; CTK.more = false; setTimeout(() => ctk_histLoad(c, 0), 0); return `<div class="ctsec ctkhist" data-ctkh hidden></div>`; }
+  if (!CTK.items.length) return `<div class="ctsec ctkhist" data-ctkh hidden></div>`;
+  const icon = {mail: 'mail', offer: 'file', invoice: 'receipt', credit: 'receipt', event: 'cal'};
+  const word = {mail: tr('E-mail'), offer: tr('Quotation'), invoice: tr('Invoice'), credit: tr('Credit note'), event: tr('Appointment')};
+  const when = x => !x.at ? '' : x.kind === 'event' && !x.all_day && x.at.length > 10 ? `${fmtDayAbs(x.at.slice(0, 10))} ${fmtTimeLoc(x.at.slice(11, 16))}` : fmtDayAbs(x.at.slice(0, 10));
+  const title = x => x.title || (x.kind === 'mail' ? tr('(no subject)') : x.kind === 'event' ? '?' : tr('Draft'));
+  const open = x => x.kind === 'event' ? `<button type="button" class="linkbtn" data-evopen="${x.id}">` : x.kind === 'mail' ? `<button type="button" class="linkbtn" data-ctkmail="${x.id}">`
+    : `<a class="linkbtn" href="#office/offers/${x.id}">`;
+  return `<div class="ctsec ctkhist" data-ctkh><h4>${tr('Contact history')}</h4><ul class="ctlinks">${CTK.items.map(x => `<li>${open(x)}${ic(icon[x.kind] || 'file', 's')} ${esc(title(x))}${x.kind === 'event' || x.kind === 'mail' ? '</button>' : '</a>'}<span class="muted"> · ${esc([word[x.kind], x.sub, when(x)].filter(Boolean).join(' · '))}</span></li>`).join('')}</ul>
+    ${CTK.more ? `<button type="button" class="linkbtn" data-ctkmore ${CTK.loading ? 'disabled' : ''}>${tr('Show more')}</button>` : ''}</div>`;
+}
+async function ctk_histLoad(c, offset) {
+  CTK.loading = true;
+  let j; try { j = await rawFetch('GET', `/api/contacts/${c.id}/history?offset=${offset}`); } catch { j = null; }  // quiet: no section
+  CTK.loading = false;
+  if (CTK.card !== c || !j) return;
+  CTK.items = offset ? [...CTK.items, ...j.items] : j.items; CTK.more = !!j.more;
+  const el = $('#view [data-ctkh]'); if (el) el.outerHTML = ctk_histHtml(c);
+}
+// 2.119.1 B (#2082): "Create as client" in the card's menu (people with the module Clients): a client with the contact's
+// company (else its name), first e-mail, phone and address, and the contact as its default contact person, linked when
+// the address book fits the client (POST /api/clients checks it, office/contacts_cl.py ckl_book_fits: an organisation's
+// book -> a client of that organisation, an own private book -> a private client). Other books (a personal book in an
+// organisation's workspace, one shared by somebody else): the client of the book's workspace without the link. One undo
+// step (delete the client again). A linked contact shows "Open client" instead.
+function ctk_clientItem(c, b) {
+  if (typeof clientsOn !== 'function' || !clientsOn() || S.me?.kid || S.me?.kind === 'agent' || c.kind === 'group') return false;
+  const cl = (c.clients || [])[0];
+  if (cl) return {label: tr('Open client'), icon: 'brief', fn: () => go('client/' + cl.client_id)};
+  return {label: tr('Create as client'), icon: 'brief', fn: () => ctk_makeClient(c, b)};
+}
+function ctk_cty(v) {  // a contact's country (a code or a name in any app language) -> its ISO code, '' when unknown
+  const s = String(v || '').trim(); if (!s || typeof ctyValid !== 'function') return '';
+  if (s.length <= 3 && ctyValid(s)) return ctyCode(s);
+  const f = ctyFold(s);
+  return Object.entries(ctyNames()).find(([, n]) => ctyFold(n) === f)?.[0] || '';
+}
+function ctk_clientBody(c, b, link) {
+  const pick = (k, pref) => { const xs = (c[k] || []).filter(x => (x.value || '').trim()); return (xs.find(x => (x.type || []).includes(pref)) || xs[0])?.value?.trim() || ''; };
+  const okMail = v => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) ? v : '';
+  const email = okMail(pick('emails', 'work')), phone = pick('phones', 'work');
+  const as = c.addresses || [], a = as.find(x => (x.type || []).includes('work')) || as[0] || {};
+  const name = (c.org || c.fn || '').trim().slice(0, 80);
+  const body = {name, email: email.slice(0, 200), phone: phone.slice(0, 60), street: (a.street || '').slice(0, 200), zip: (a.code || '').slice(0, 20),
+    city: (a.city || '').slice(0, 120), org_id: link ? (b.org_owned ? b.org_id : null) : (b?.org_id ?? null),
+    contacts: [{name: (c.fn || c.org || name).trim().slice(0, 120), role: (c.title || '').slice(0, 120), email: email.slice(0, 200), phone: phone.slice(0, 60),
+      is_default: true, contact_id: link ? c.id : null}]};
+  const cty = ctk_cty(a.country); if (cty) body.country = cty;
+  return body;
+}
+async function ctk_makeClient(c, b) {
+  const link = !!b && (b.org_owned ? !!b.org_id : !b.org_id && b.owner_id === S.me?.id);
+  const body = ctk_clientBody(c, b, link);
+  if (!body.name) return;
+  let id = 0;
+  const after = async () => { await load().catch(() => {}); if (CT.card?.id === c.id) await ctOpen(c.id); if (typeof clReload === 'function') clReload(); };
+  const make = async () => {
+    let r;
+    try { r = await rawFetch('POST', '/api/clients', body); }
+    catch (x) {  // the contact went away / its book no longer fits: the client without the link
+      if (x.data?.code !== 'contact_gone') throw x;
+      body.contacts[0].contact_id = null; r = await rawFetch('POST', '/api/clients', body);
+    }
+    id = r.id; await after(); return r;
+  };
+  let r; try { r = await make(); } catch (x) { toast(x.message || ''); return; }
+  offerUndo(tr('Added: {0}', r.name), histAdd({label: tr('Create as client'), undo: async () => { await api('DELETE', `/api/clients/${id}`); await after(); }, redo: make}));
 }
 document.addEventListener('input', e => {
   if (e.target.id !== 'ct-q') return;
@@ -124,6 +234,7 @@ document.addEventListener('input', e => {
   clearTimeout(CT.t); CT.t = setTimeout(ctLoad, 200);
 });
 document.addEventListener('change', e => {
+  if (e.target.id === 'ct-group' && e.target.value === CTX_MANAGE) { e.target.value = CT.group; ctx_groupsModal(); return; }  // 2.119.1 A (#2085)
   if (e.target.id === 'ct-group') { CT.group = e.target.value; ctLoad(); }
   if (e.target.id === 'ct-book') { CT.book = e.target.value; ctLoad(); }
 });
@@ -136,6 +247,9 @@ document.addEventListener('click', async e => {
   if (o && (CT.pick || (ms_modClick(e) && !isMobile() && bk_canPick()))) { e.preventDefault(); if (!ms_lpRecent(bk_lpS)) bk_click(+o.dataset.ctopen, e.shiftKey); return; }  // 2.46.1 (#1554): the selection mode; 2.47.3 (#1733): Shift- / Cmd-click
   if (o && ms_lpRecent(bk_lpS)) { e.preventDefault(); return; }  // the click that ends a long press
   if (o) { e.preventDefault(); if (isMobile()) go('contacts/' + o.dataset.ctopen); else ctOpen(+o.dataset.ctopen); return; }
+  const hm = e.target.closest('[data-ctkmail]');  // 2.119.1 B (#2083): a mail of the card's history
+  if (hm) { if (typeof hbm_open === 'function') hbm_open(+hm.dataset.ctkmail); return; }
+  if (e.target.closest('[data-ctkmore]') && CTK.card && !CTK.loading) { ctk_histLoad(CTK.card, CTK.items.length); return; }
   const tk = e.target.closest('[data-cttask]');
   if (tk) { e.preventDefault(); const id = +tk.dataset.cttask; if (taskById(id)) openDetail(id); else go('t/' + id); return; }
   const gp = e.target.closest('[data-ctgroup]');
@@ -149,8 +263,11 @@ document.addEventListener('click', async e => {
   else if (k === 'menu') {
     menu(b, [{label: tr('Address books…'), icon: 'folder', fn: ctBooksModal},
       {label: tr('Import a vCard file…'), icon: 'upload', fn: () => ctImport()},
+      {label: tr('Import a CSV file…'), icon: 'upload', fn: () => ctImport(null, 'csv')},  // 2.119.1 A (#2080): Outlook, Google, a spreadsheet
       ...(S.books || []).map(x => ({label: tr('Export {0} (vCard)', x.name), icon: 'download', fn: () => { location.href = `/api/books/${x.id}/export.vcf`; }})),
+      ...(S.books || []).map(x => ({label: tr('Export {0} (CSV)', x.name), icon: 'download', fn: () => { location.href = `/api/books/${x.id}/export.csv`; }})),
       {label: tr('On the phone…'), icon: 'phone', fn: davGuide},
+      CT.groups.length && {label: tr('Manage groups…'), icon: 'tag', fn: ctx_groupsModal},  // 2.119.1 A (#2085)
       typeof nwl_open === 'function' && {label: tr('Newsletter…'), icon: 'mail', fn: nwl_open},  // 2.55.0 (#1455)
       typeof dup_open === 'function' && propOn() && dup_books().length && {label: tr('Find duplicates with an agent…'), icon: 'bot', fn: () => dup_open()}]);  // 2.70.0 B (#1357)
   } else if (k === 'cmenu' && CT.card) {
@@ -160,7 +277,8 @@ document.addEventListener('click', async e => {
       try { await api('DELETE', `/api/contacts/${c.id}`); } catch { return; }
       CT.sel = null; CT.card = null; toast(tr('Contact deleted')); await load().catch(() => {}); if (isMobile()) go('contacts'); ctLoad(); }},
       feat('events') && {label: tr('Invite to a new event'), icon: 'cal', fn: () => evEditor({attendees: [{contact_id: c.id, name: c.fn, email: c.emails?.[0]?.value || '', partstat: 'needs-action'}]})},
-      typeof nwl_ctItem === 'function' && nwl_ctItem(c, w, b)]);  // 2.55.0 (#1455): the newsletter consent
+      typeof nwl_ctItem === 'function' && nwl_ctItem(c, w, b),  // 2.55.0 (#1455): the newsletter consent
+      ctk_clientItem(c, ctBook(c.book_id))]);  // 2.119.1 B (#2082): create a client from the contact / open its client
   }
 });
 
@@ -177,7 +295,7 @@ function bk_toggle(id) {
   const c = (CT.items || []).find(x => x.id === id); if (!c || !CT.pick) return;
   if (!bk_can(c)) { toast(tr('You can only read this address book')); return; }
   if (CT.pick.has(id)) CT.pick.delete(id); else CT.pick.add(id);
-  CT.last = id;
+  CT.last = id; CT.pickAll = null;
   ctDraw();
 }
 const bk_canPick = () => (S.books || []).some(b => ctWrite(b) && wsObjIn(b));
@@ -189,11 +307,11 @@ function bk_click(id, shift) {  // 2.47.3 (#1733): Shift-click ticks the rows be
   CT.last = id; ctDraw();
 }
 function bk_start(id) { CT.pick = new Set(); bk_toggle(id); if (!CT.pick.size) ctDraw(); }
-function bk_end() { CT.pick = null; ctDraw(); }
+function bk_end() { CT.pick = null; CT.pickAll = null; ctDraw(); }
 function bk_barHtml() {
   return ms_barHtml('ct-sbar', 'ctb', CT.pick.size, tr('Tap contacts'), [['all', 'all', bk_allOn() ? tr('Select none') : tr('All')], ['edit', 'edit', tr('Edit')], ['move', 'folder', tr('Move')], ['merge', 'collapse', tr('Merge'), '', 2], ['del', 'trash', tr('Delete'), 'danger']]);
 }
-// every contact of the current search / group / address book (the list shows 500, an import has more): fetched as pages
+// every contact of the current search / group / address book (also the pages the list has not loaded yet): fetched as pages
 async function bk_matching() {
   if (CT.items && CT.total <= CT.items.length) return CT.items;
   const out = [];
@@ -207,14 +325,15 @@ async function bk_matching() {
   return out;
 }
 const bk_shown = items => items.filter(c => bk_can(c) && (!ctBook(c.book_id) || wsObjIn(ctBook(c.book_id))));
-const bk_allOn = () => !!CT.pick?.size && CT.items !== null && CT.total <= CT.items.length && bk_shown(CT.items).every(c => CT.pick.has(c.id)) && CT.pick.size >= bk_shown(CT.items).length;
+const bk_allOn = () => !!CT.pick?.size && CT.items !== null && (CT.pickAll === ctx_key() || CT.total <= CT.items.length && bk_shown(CT.items).every(c => CT.pick.has(c.id)) && CT.pick.size >= bk_shown(CT.items).length);  // 2.119.1 A (#2081): "All" also covers the pages not loaded yet
 async function bk_barAct(k, el) {
   if (!CT.pick) return;
   if (k === 'close') { bk_end(); return; }
   if (k === 'all') {
-    if (bk_allOn()) { CT.pick.clear(); ctDraw(); return; }
+    if (bk_allOn()) { CT.pick.clear(); CT.pickAll = null; ctDraw(); return; }
     let all; try { all = bk_shown(await bk_matching()); } catch { return; }
     for (const c of all) CT.pick.add(c.id);
+    CT.pickAll = ctx_key();
     ctDraw(); return;
   }
   const ids = [...CT.pick]; if (!ids.length) return;
@@ -359,6 +478,7 @@ async function ctEditor(c) {
       phones: clean('phones'), emails: clean('emails'), urls: clean('urls'), addresses: clean('addresses', true), bday: dt('bday'), anniversary: dt('anniversary'),
       note: $('#ct-note', md).value, groups: v('ct-groups').split(',').map(x => x.trim()).filter(Boolean), photo: st.photo || '', book_id: +v('ct-bk') || st.book_id};
     if (!body.given && !body.family && !body.org && !body.fn) { toast(tr('A name or a company, please')); $('#ct-given', md).focus(); return; }
+    if (!c && !await ctx_dupAsk(body, md)) return;  // 2.119.1 A (#2084): a look-alike first (the next Save creates it anyway)
     try {
       const r = c ? await api('PATCH', `/api/contacts/${c.id}`, {...body, expect: c.updated_at}) : await api('POST', '/api/contacts', body);
       LS.set('ctBook', body.book_id);
@@ -369,6 +489,48 @@ async function ctEditor(c) {
     } catch { /* api() showed it */ }
   });
   setTimeout(() => { if (!c && !isTouch()) $('#ct-given', md)?.focus(); }, 40);
+}
+// 2.119.1 A (#2084): before a new contact is created, the address books one sees are asked for one with the same e-mail, phone
+// or name (POST /api/contacts/dupcheck, reads only). A hit shows a quiet note in the editor: open the one there, or Save again
+// = create anyway. Never merged by itself; a failed check never blocks the save
+async function ctx_dupAsk(body, md) {
+  const sig = JSON.stringify([body.fn, body.given, body.family, body.org, body.emails.map(x => x.value), body.phones.map(x => x.value)]);
+  if (md.dataset.ctxok === sig) return true;
+  let j; try { j = await rawFetch('POST', '/api/contacts/dupcheck', {fn: body.fn, given: body.given, family: body.family, org: body.org, emails: body.emails.map(x => x.value), phones: body.phones.map(x => x.value)}); } catch { return true; }
+  const it = j.items || [];
+  if (!it.length) return true;
+  md.dataset.ctxok = sig;
+  const why = {email: tr('same e-mail'), phone: tr('same phone'), name: tr('same name')};
+  $('.ctxdup', md)?.remove();
+  $('.foot', md).insertAdjacentHTML('beforebegin', `<div class="ctxdup" role="status"><p>${ic('users', 's')} ${tr('There is already a contact like this:')}</p><ul class="ctlinks">${it.map(x => `<li><button type="button" class="linkbtn" data-ctxdup="${x.id}">${esc(x.fn || x.org || '?')}</button><span class="muted"> · ${esc(x.reasons.map(r => why[r]).join(', '))}${ctBook(x.book_id) && (S.books || []).length > 1 ? ' · ' + esc(ctBook(x.book_id).name) : ''}</span></li>`).join('')}</ul><p class="muted">${tr('Save again to create it anyway.')}</p></div>`);
+  $('[data-ctm2="save"]', md).textContent = tr('Create anyway');
+  if (!md.dataset.ctxl) md.addEventListener('click', e => {
+    const o = e.target.closest('[data-ctxdup]'); if (!o) return;
+    md.remove(); if (S.route.mod === 'contacts' && isMobile()) go('contacts/' + o.dataset.ctxdup); else if (S.route.mod === 'contacts') ctOpen(+o.dataset.ctxdup); else go('contacts/' + o.dataset.ctxdup);
+  });
+  md.dataset.ctxl = '1';
+  announce(tr('There is already a contact like this:'));
+  return false;
+}
+// the import's answer names the new contacts that look like one already there; "Check" lists them, each opens the merge view
+function ctx_dupBtn(el, groups) {
+  el.querySelector('[data-ctimp="dup"]')?.remove();
+  const b = document.createElement('button'); b.className = 'btn sm'; b.dataset.ctimp = 'dup'; b.textContent = tr('Check');
+  b.onclick = () => ctx_dupList(groups);
+  el.querySelector('[data-ctimp="close"]').before(b);
+}
+function ctx_dupList(groups) {
+  const md = modal(`<div class="lhdr"><h3>${tr('Possible duplicates')}</h3><span class="spacer"></span><button class="iconbtn" data-ctxd="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
+    <p class="muted">${tr('These new contacts look like one already there. Merge them, or leave them as they are.')}</p>
+    <ul class="evclist">${groups.map((g, i) => `<li class="evcrow"><span class="evcn"><b>${esc(g.fn || '?')}</b> <span class="muted">· ${esc(tr('like {0}', g.like.map(x => x.fn || '?').join(', ')))}</span></span><button class="btn sm" data-ctxdm="${i}">${tr('Merge')}</button></li>`).join('')}</ul>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-ctxd="close">${tr('Done')}</button></div>`);
+  md.addEventListener('click', e => {
+    if (e.target.closest('[data-ctxd="close"]')) { md.remove(); return; }
+    const m = e.target.closest('[data-ctxdm]'); if (!m) return;
+    const g = groups[+m.dataset.ctxdm]; md.remove();
+    if (S.route.mod !== 'contacts') go('contacts');
+    ctm_merge([g.id, ...g.like.map(x => x.id)].slice(0, CTM_MAX));
+  });
 }
 function ctPhoto(file) {  // a square JPEG of at most 256 px (small enough for every phone's contact card)
   return new Promise(res => {
@@ -388,11 +550,11 @@ function ctPhoto(file) {  // a square JPEG of at most 256 px (small enough for e
     r.readAsDataURL(file);
   });
 }
-function ctImport(bookId) {
+function ctImport(bookId, kind) {
   const books = (S.books || []).filter(b => ctWrite(b) && wsObjIn(b));
   const run = async bid => {
     const inp = document.createElement('input');
-    inp.type = 'file'; inp.accept = '.vcf,text/vcard,text/x-vcard';
+    inp.type = 'file'; inp.accept = kind === 'csv' ? '.csv,.txt,.tsv,text/csv,text/plain' : '.vcf,text/vcard,text/x-vcard';  // 2.119.1 A (#2080)
     inp.onchange = async () => {
       const f = inp.files[0]; if (!f) return;
       // 2.87.9 (#1940): where the contacts go, in words; from an organisation's book also into an own private book
@@ -404,7 +566,7 @@ function ctImport(bookId) {
         if (!pb) { try { pb = await api('POST', '/api/books', {name: tr('Contacts'), org_id: null}); await load(); } catch { return; } }
         bid = pb.id;
       }
-      ctImpRun(bid, f);
+      if (kind === 'csv' || !/\.vcf$/i.test(f.name)) ctx_csvMap(bid, f); else ctImpRun(bid, f);  // 2.119.1 A (#2080): CSV: the columns first
     };
     inp.click();
   };
@@ -433,10 +595,11 @@ function ctImpPanel() {
   };
   return {el, set};
 }
-function ctImpRun(bid, f) {
+function ctImpRun(bid, f, mapping) {
   const p = ctImpPanel();
   const done = async j => {
-    p.set(tr('Imported: {0} new, {1} updated', j.created, j.updated) + (j.errors ? ' · ' + trn('{0} not readable', '{0} not readable', j.errors) : ''), null, true);
+    p.set(tr('Imported: {0} new, {1} updated', j.created, j.updated) + (j.errors ? ' · ' + trn('{0} not readable', '{0} not readable', j.errors) : '') + (j.dupes ? ' · ' + trn('{0} possible duplicate', '{0} possible duplicates', j.dupes) : ''), null, true);
+    if (j.dupes && (j.dupe_groups || []).length) ctx_dupBtn(p.el, j.dupe_groups);  // 2.119.1 A (#2084)
     await load().catch(() => {}); ctLoad();
   };
   const fail = msg => p.set(tr('Import failed') + (msg ? ': ' + msg : ''), null, true);
@@ -461,7 +624,80 @@ function ctImpRun(bid, f) {
       p.set(tr('Import running…') + ' ' + tr('{0} of {1} contacts', st.done, st.total), .3 + .7 * (st.total ? st.done / st.total : 0));
     }
   };
-  x.send((() => { const fd = new FormData(); fd.append('file', f); return fd; })());
+  x.send((() => { const fd = new FormData(); fd.append('file', f); if (mapping) fd.append('mapping', JSON.stringify(mapping)); return fd; })());
+}
+// 2.119.1 A (#2080): a CSV file (Outlook, Google Contacts, a spreadsheet): the server reads it (delimiter, encoding) and suggests
+// a field per column; here the person checks / changes them, then the rows take the vCard import's way (ctImpRun: progress, background)
+const ctx_F = () => {
+  const ty = (k, t) => `${tr(k === 'email' ? 'E-mail' : 'Phone')} (${tr(t)})`, ad = (t, p) => `${tr(p)} (${tr(t)})`;
+  return [['', tr('Do not import')], ['fn', tr('Display name')], ['given', tr('First name')], ['middle', tr('Middle name')], ['family', tr('Last name')],
+    ['prefix', tr('Name prefix')], ['suffix', tr('Name suffix')], ['nickname', tr('Nickname')], ['org', tr('Company')], ['dept', tr('Department')], ['title', tr('Job title')],
+    ['email:home', ty('email', 'Home')], ['email:work', ty('email', 'Work')], ['email:other', ty('email', 'Other')],
+    ['phone:cell', ty('phone', 'Mobile')], ['phone:home', ty('phone', 'Home')], ['phone:work', ty('phone', 'Work')], ['phone:fax', tr('Fax')], ['phone:other', ty('phone', 'Other')],
+    ...[['home', 'Home'], ['work', 'Work'], ['other', 'Other']].flatMap(([t, n]) => [['street', 'Street'], ['code', 'Postcode'], ['city', 'City'], ['region', N_('Region')], ['country', 'Country']].map(([p, pn]) => [`adr:${t}:${p}`, ad(n, pn)])),
+    ['url', tr('Website')], ['bday', tr('Birthday')], ['anniversary', tr('Anniversary')], ['note', tr('Notes')], ['groups', tr('Groups')]];
+};
+async function ctx_csvMap(bid, f) {
+  let p;
+  try { const fd = new FormData(); fd.append('file', f); p = await api('POST', `/api/books/${bid}/import?preview=1`, fd); } catch { return; }
+  if (p.format !== 'csv') { ctImpRun(bid, f); return; }  // a vCard after all
+  const F = ctx_F(), map = [...p.guess];
+  const ex = i => p.sample.map(r => r[i]).find(Boolean) || '';
+  const md = modal(`<div class="lhdr"><h3>${tr('Import a CSV file…').replace(/…$/, '')}</h3><span class="spacer"></span><button class="iconbtn" data-ctx="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
+    <p class="muted">${esc(f.name)} · ${esc(trn('{0} contact', '{0} contacts', p.rows))} · ${tr('Which column holds what? Kalmido has guessed; please check.')}</p>
+    <div class="ctxmap">${p.columns.map((c, i) => `<div class="row"><label for="ctx-c${i}">${esc(c || tr('Column {0}', i + 1))}${ex(i) ? `<small class="muted">${esc(ex(i))}</small>` : ''}</label><select id="ctx-c${i}" data-ctxcol="${i}">${F.map(([k, n]) => `<option value="${esc(k)}" ${map[i] === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>`).join('')}</div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-ctx="close">${tr('Cancel')}</button><button class="btn pri" data-ctx="go">${esc(trn('Import {0} contact', 'Import {0} contacts', p.rows))}</button></div>`);
+  md.classList.add('ctmodal');
+  md.addEventListener('change', e => { const s = e.target.closest('[data-ctxcol]'); if (s) map[+s.dataset.ctxcol] = s.value; });
+  md.addEventListener('click', e => {
+    const k = e.target.closest('[data-ctx]')?.dataset.ctx; if (!k) return;
+    if (k === 'close') { md.remove(); return; }
+    if (!map.some(Boolean)) { toast(tr('Choose at least one column')); return; }
+    md.remove(); ctImpRun(bid, f, map);
+  });
+}
+// 2.119.1 A (#2085): the groups (CATEGORIES labels) over all contacts one sees: the count per group, rename and delete (only the
+// label, the contacts stay) in the address books one may change. Each change is one undo step: the server answers the old
+// labels, the undo puts them back (POST /api/contacts/bulk action restore), the redo does the change again
+const CTX_MANAGE = '\u0001manage';
+async function ctx_groupsModal() {
+  const md = modal(`<div class="lhdr"><h3>${ic('tag', 's')} ${tr('Groups')}</h3><span class="spacer"></span><button class="iconbtn" data-ctg="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div><div id="ctg-body"><p class="muted">${tr('Loading…')}</p></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-ctg="close">${tr('Done')}</button></div>`);
+  let items = [];
+  const draw = async () => {
+    try { items = (await api('GET', '/api/contacts/groups')).items || []; } catch { md.remove(); return; }
+    if (!md.isConnected) return;
+    $('#ctg-body', md).innerHTML = items.length ? `<ul class="evclist">${items.map((g, i) => `<li class="evcrow"><span class="evcn">${esc(g.name)} <span class="muted">· ${esc(trn('{0} contact', '{0} contacts', g.count))}${g.writable < g.count ? ' · ' + esc(trn('{0} can only be read', '{0} can only be read', g.count - g.writable)) : ''}</span></span>${g.writable ? `<button class="iconbtn" data-ctgr="${i}" aria-label="${esc(tr('Rename {0}', g.name))}" title="${esc(tr('Rename…'))}">${ic('edit')}</button><button class="iconbtn" data-ctgd="${i}" aria-label="${esc(tr('Delete {0}', g.name))}" title="${esc(tr('Delete…'))}">${ic('trash')}</button>` : ''}</li>`).join('')}</ul>` : `<p class="muted">${tr('No groups yet. Groups are added in a contact or for several selected contacts.')}</p>`;
+  };
+  const after = async (from, to) => {
+    if (CT.group && CT.group.toLowerCase() === from.toLowerCase()) CT.group = to || '';
+    ctLoad(); if (CT.sel) ctOpen(CT.sel); if (md.isConnected) draw();
+  };
+  const run = async (g, to) => {
+    const send = () => api('POST', '/api/contacts/groups', to ? {action: 'rename', name: g.name, to} : {action: 'delete', name: g.name});
+    let j; try { j = await send(); } catch { return; }
+    let undo = j.undo || [];
+    await after(g.name, to);
+    const msg = [to ? tr('Group renamed') : tr('Group deleted'), trn('{0} contact changed', '{0} contacts changed', j.changed), j.skipped ? trn('{0} in an imported address book stayed', '{0} in imported address books stayed', j.skipped) : ''].filter(Boolean).join(' · ');
+    if (!j.changed) { toast(msg); return; }
+    ms_hist(msg, to ? tr('Group renamed') : tr('Group deleted'),
+      async () => { await bk_set({action: 'restore'}, null, undo); await after(to || g.name, g.name); },
+      async () => { undo = (await send()).undo || []; await after(g.name, to); });
+  };
+  md.addEventListener('click', async e => {
+    if (e.target.closest('[data-ctg="close"]')) { md.remove(); return; }
+    const r = e.target.closest('[data-ctgr]'), d = e.target.closest('[data-ctgd]');
+    if (r) {
+      const g = items[+r.dataset.ctgr]; if (!g) return;
+      const n = await askPrompt(tr('Rename the group'), g.name, {input: {max: 100}});
+      if (n && n.trim() && n.trim() !== g.name) run(g, n.trim().replace(/,/g, ' '));
+    } else if (d) {
+      const g = items[+d.dataset.ctgd]; if (!g) return;
+      if (!await askConfirm(tr('Delete the group “{0}”?', g.name), trn('The {0} contact stays; only the group is removed from it.', 'The {0} contacts stay; only the group is removed from them.', g.writable), {ok: tr('Delete'), danger: true})) return;
+      run(g, '');
+    }
+  });
+  draw();
 }
 async function ctBooksModal() {
   let users = [];
@@ -489,7 +725,9 @@ async function ctBooksModal() {
         own && b.org_owned && {label: tr('Make personal again…'), icon: 'home', fn: () => ob_drop(b, refresh)},
         own && famOn() && !b.imported && {label: tr('Birthdays as tasks…'), icon: 'cake', fn: () => ctBdayModal(b, refresh)},
         ctWrite(b) && {label: tr('Import a vCard file…'), icon: 'upload', fn: () => ctImport(b.id)},
+        ctWrite(b) && {label: tr('Import a CSV file…'), icon: 'upload', fn: () => ctImport(b.id, 'csv')},  // 2.119.1 A (#2080)
         {label: tr('Export (vCard)'), icon: 'download', fn: () => { location.href = `/api/books/${b.id}/export.vcf`; }},
+        {label: tr('Export (CSV)'), icon: 'download', fn: () => { location.href = `/api/books/${b.id}/export.csv`; }},
         !own && {label: tr('Leave this address book'), icon: 'logout', fn: async () => { try { await api('DELETE', `/api/books/${b.id}/members/${S.me.id}`); } catch { return; } refresh(); }},
         own && {label: tr('Delete…'), icon: 'trash', cls: 'danger', fn: async () => { if (!await askConfirm(tr('Delete the address book “{0}” with all its contacts?', b.name), tr('This cannot be undone.'), {ok: tr('Delete'), danger: true})) return; try { await api('DELETE', `/api/books/${b.id}`); } catch { return; } refresh(); }}]);
       return;

@@ -498,12 +498,18 @@ def pt_login_page(tok):
     bad = [("ptbad:" + rate_ip(), PT_BAD_LIMIT)]
     if _rate_blocked(bad):
         return _pt_rt().pub_limited(lg)
-    if not _pt_rt().public_links_on(c) or not _pt_login_row(c, tok):
+    r = _pt_login_row(c, tok) if _pt_rt().public_links_on(c) else None
+    if not r:
         _rate_fail(bad)
         return _pt_link_gone(lg)
     e = html.escape
-    return _pt_rt().pub_html(tr("Your reports", lg=lg), f'<div class="msg"><h1>{e(tr("Your reports", lg=lg))}</h1>'
-                             f'<form method="post" action="/portal/login/{e(tok)}" class="fform"><button type="submit">{e(tr("Show my reports", lg=lg))}</button></form></div>', lg)
+    from ..office.portaldocs import kp_login_docs
+    if kp_login_docs(c, r):  # 2.120.0 (#2088): a space with documents in the portal
+        head, btn = tr("Customer portal", lg=lg), tr("Show my documents", lg=lg)
+    else:
+        head, btn = tr("Your reports", lg=lg), tr("Show my reports", lg=lg)
+    return _pt_rt().pub_html(head, f'<div class="msg"><h1>{e(head)}</h1>'
+                             f'<form method="post" action="/portal/login/{e(tok)}" class="fform"><button type="submit">{e(btn)}</button></form></div>', lg)
 
 
 def pt_cookie_make(c, eh, org_id, owner_id, exp, lid):
@@ -603,8 +609,13 @@ def pt_portal():
         items.append(f'<li><a href="/p/{e(pt_token(c, r))}"><b>{e(r["title"])}</b><span class="sub">'
                      f'{e(" · ".join(x for x in (tr(kind, lg=lg) if kind else "", pt_day(r["created_at"], lg)) if x))}</span></a>'
                      f'<span class="ptst ptst-{st}">{e(tr(PT_STATE_TXT[st], lg=lg))}</span></li>')
-    out = (f'<header><h1>{e(tr("Your reports", lg=lg))}</h1></header>'
-           + (f'<ul class="ptall">{"".join(items)}</ul>' if items else f'<p class="empty">{e(tr("No reports for this address.", lg=lg))}</p>')
+    from ..office.portaldocs import kp_portal_html
+    docs = kp_portal_html(c, who, lg)  # 2.120.0 B (#2088): the documents of the address (None = off: the page as before)
+    tickets = f'<ul class="ptall">{"".join(items)}</ul>' if items else f'<p class="empty">{e(tr("No reports for this address.", lg=lg))}</p>'
+    if docs is not None:
+        tickets = docs + (f'<h2>{e(tr("Your reports", lg=lg))}</h2>{tickets}' if items else "")
+    out = (f'<header><h1>{e(tr("Your reports", lg=lg) if docs is None else tr("Customer portal", lg=lg))}</h1></header>'
+           + tickets
            + f'<form method="post" action="/portal/logout" class="ptout"><input type="hidden" name="f" value="{pt_out_key(c)}">'
            f'<button type="submit">{e(tr("Sign out", lg=lg))}</button></form>')
     return _pt_rt().pub_html(f'{tr("Your reports", lg=lg)} · {APP_NAME}', out, lg)
