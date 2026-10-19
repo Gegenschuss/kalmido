@@ -1271,6 +1271,12 @@ fresh; run p21141_b_api "$PY" p21141_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21141_b_ui node p21141_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.114.1 part C: transfer of rights on its own last page of the quotation PDF (#2258)
 fresh; run p21141_c_api "$PY" p21141_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.122.4 part A: rights - org overview for the instance admin, edit right, feeds once, video sign-off rests (#1724 #1906 #2215 #2217)
+fresh; run p21224_a_api "$PY" p21224_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.122.4 part B: office - rights once in the quotation PDF, storage counts meal/contract PDFs, CSV formula guard (#2261 #2316 #2317)
+fresh; run p21224_b_api "$PY" p21224_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.122.4 part C: phone sizes - office settings selects, contact import notice, video sign-off targets, bookmarks (#2326 #2348 #2217 #2223)
+fresh; run p21224_c_ui node p21224_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.120.0 part A: progress and final invoices, cash discount (#2087)
 fresh; run p2120_a_api "$PY" p2120_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2120_a_ui node p2120_a_ui.js "$KALMIDO_TEST_DATA"
