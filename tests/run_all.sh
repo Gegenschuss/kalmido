@@ -1203,6 +1203,11 @@ fresh; run p21144_c_api "$PY" p21144_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21144_c_ui node p21144_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.114.4 part D: invoice from quotation dialog texts, travel costs allowance as main amount (#2269 #2286)
 fresh; run p21144_d_ui node p21144_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.118.0 part A (#2265): quotation counter per client / project, building block {version}
+fresh; run p2118_a_api "$PY" p2118_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2118_a_ui node p2118_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.118.0 part B (#2297): one switch for progress (line + ring) in the sidebar, kept in the account
+fresh; run p2118_b_ui node p2118_b_ui.js "$KALMIDO_TEST_DATA"
 shard 13  # 2.98.1: new suites go here, above this line
 # 2.114.1 part A: bank button "Match" wording + 44 px buttons, empty heading, producing checkbox (#2017 #2254 #2255)
 fresh; run p21141_a_ui node p21141_a_ui.js "$KALMIDO_TEST_DATA"
