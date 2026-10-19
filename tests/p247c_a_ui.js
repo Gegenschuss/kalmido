@@ -87,12 +87,14 @@ const sec = (d, k) => d.querySelector(`#achat .cwin[data-cw="${k}"]`);
   // ================= a new answer of a parked agent only touches that window
   pe(w, sec(d, 'a:' + A1).querySelector('.chmsgs'), 'pointerdown');
   const n1 = sec(d, 'a:' + A1).querySelector('.cmsg'), nt = sec(d, 't:' + RID).querySelector('.cmsg');
+  // 2.98.1 (CI red): the 4 s change poll could redraw the other windows while CI is slow - held while counting (as p2412_ui)
+  await until(() => w.eval('td_polling ? false : (td_polling = true)'), 80);
   w.eval(`window.__ins = {}; window.__mo = new MutationObserver(ms => { for (const m of ms) for (const x of m.addedNodes) if (x.nodeType === 1) { const k = m.target.closest?.('.cwin')?.dataset.cw || '-'; __ins[k] = (__ins[k] || 0) + 1; } }); __mo.observe($('#achat'), {childList: true, subtree: true}); 1`);
   await say(a2, 'Scout found something');
   w.eval('agentPoll()');
   await until(() => sec(d, 'a:' + A2)?.textContent.includes('Scout found something'), 60);
   check(sec(d, 'a:' + A2)?.textContent.includes('Scout found something'), '#1720: the parked window shows the new answer');
-  const ins = w.eval('__mo.disconnect(); __ins');
+  const ins = w.eval('__mo.disconnect(); td_polling = false; __ins');
   check(!ins['a:' + A1] && !ins['t:' + RID] && !ins['-'], '#1720: only that window was drawn again ' + JSON.stringify(ins));
   check(sec(d, 'a:' + A1).querySelector('.cmsg') === n1 && sec(d, 't:' + RID).querySelector('.cmsg') === nt, '#1720: the other windows keep their nodes');
 
