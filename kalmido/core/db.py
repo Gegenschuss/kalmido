@@ -292,6 +292,59 @@ def startup_guard():
     return True
 
 
+def mig_ids():
+    """2.102.0 D (#1996): (id, table, column, ddl) per MIGRATIONS step; id = "table.column", the n-th step of the same column
+    "table.column#n" -- stable wherever a release inserts its steps."""
+    seen, out = {}, []
+    for table, col, ddl in MIGRATIONS:
+        k = f"{table}.{col}"
+        seen[k] = seen.get(k, 0) + 1
+        out.append((k if seen[k] == 1 else f"{k}#{seen[k]}", table, col, ddl))
+    return out
+
+
+def mig_apply(c):
+    """2.102.0 D (#1996): runs the MIGRATIONS steps whose column is missing and records every step in kalmido_migrations
+    ("applied", or "present" for a column that existed already: every database before 2.102 on its first start, or one an
+    older version added after a rollback). The column check stays the judge -- one catalog read per start -- so a recorded
+    step whose column is gone again (a hand-made change, a partial restore) runs again ("again") instead of failing later.
+    Returns (applied, recorded as present)."""
+    done = {r[0] for r in c.execute("SELECT id FROM kalmido_migrations").fetchall()}
+    have = {}
+    for t, col in c.execute("SELECT table_name, column_name FROM information_schema.columns "
+                            "WHERE table_schema=current_schema()").fetchall():
+        have.setdefault(t, set()).add(col)
+    at, n, m = iso(now_utc()), 0, 0
+    for mid, table, col, ddl in mig_ids():
+        if col not in have.get(table, ()):
+            c.execute(ddl)
+            n += 1
+            c.execute("INSERT INTO kalmido_migrations(id,applied_at,note) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET "
+                      "applied_at=excluded.applied_at, note=excluded.note", (mid, at, "again" if mid in done else "applied"))
+        elif mid not in done:
+            m += 1
+            c.execute("INSERT INTO kalmido_migrations(id,applied_at,note) VALUES(?,?,'present') ON CONFLICT DO NOTHING", (mid, at))
+    if n:
+        print("migrations:", n, "step(s) applied", flush=True)
+    return n, m
+
+
+def mig_flags_sync(c, before=None):
+    """2.102.0 D (#1996): the one-shot data migrations (settings flags migr_* = "1") are recorded in kalmido_migrations as
+    "flag:migr_*" too. The settings flag stays the switch that is read and written: an older version (rollback) reads it and
+    runs nothing twice, and deleting the flag still repeats a one-shot (then its row gets the new time). Called before the
+    one-shots (returns the flags set then) and after them with that set."""
+    flags = {r[0] for r in c.execute("SELECT key FROM settings WHERE key ILIKE 'migr\\_%' ESCAPE '\\' AND value='1'").fetchall()}
+    at = iso(now_utc())
+    for k in sorted(flags):
+        if before is None or k in before:
+            c.execute("INSERT INTO kalmido_migrations(id,applied_at,note) VALUES(?,?,'one-shot') ON CONFLICT DO NOTHING", ("flag:" + k, at))
+        else:  # ran during this start (new, or repeated after its flag was deleted)
+            c.execute("INSERT INTO kalmido_migrations(id,applied_at,note) VALUES(?,?,'one-shot') ON CONFLICT(id) DO UPDATE SET "
+                      "applied_at=excluded.applied_at", ("flag:" + k, at))
+    return flags
+
+
 def init_db(guard=True, load=None):
     """load: admin/migrate.py -- load(c) copies an old SQLite database inside this transaction, after the tables and columns
     exist and before the one-shot data migrations, triggers, indexes and row-level security."""
@@ -313,13 +366,8 @@ def init_db(guard=True, load=None):
         for ext in ("unaccent", "pg_trgm"):  # message search (collab/msgsearch.py); both ship with the postgres image
             c.execute(f"CREATE EXTENSION IF NOT EXISTS {ext}")
         c.executescript(SCHEMA)
-        have = {}
-        for t, col in c.execute("SELECT table_name, column_name FROM information_schema.columns "
-                                "WHERE table_schema=current_schema()").fetchall():
-            have.setdefault(t, set()).add(col)
-        for table, col, ddl in MIGRATIONS:
-            if col not in have.get(table, ()):
-                c.execute(ddl)
+        flags0 = mig_flags_sync(c)  # 2.102.0 D (#1996): the one-shots done before this start (recorded if not yet)
+        mig_apply(c)  # 2.102.0 D (#1996): only the MIGRATIONS steps not yet recorded in kalmido_migrations
         if load is not None:
             load(c)  # 2.37.0 (#1150): the move from SQLite (migrate-sqlite)
         # 2.10.0 (#441): member rows from before groups (or written by a path that sets no own_role) are personal shares
@@ -615,6 +663,7 @@ def init_db(guard=True, load=None):
             if INSTANCE_ENV == "workspaces" or c.execute("SELECT COUNT(*) FROM orgs WHERE personal_of IS NULL").fetchone()[0] > 1:
                 print(f"FATAL: {OFF_HELP} Several organisations need it. Refusing to start.", flush=True)
                 raise DataDirError(3)
+        mig_flags_sync(c, flags0)  # 2.102.0 D (#1996): the one-shots of this start into the table
         c.execute("INSERT INTO kalmido_meta(key,value) VALUES('schema_version',?) ON CONFLICT(key) DO UPDATE SET value="
                   "CASE WHEN CAST(kalmido_meta.value AS BIGINT) < CAST(excluded.value AS BIGINT) THEN excluded.value "
                   "ELSE kalmido_meta.value END", (str(int(SCHEMA_VERSION)),))

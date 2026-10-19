@@ -7,6 +7,42 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.102.0] - 2026-10-19
+
+Architecture audit T3, news, chat and phone fixes; a trash for deleted lists.
+
+### Added
+- Deleted lists go to the trash with everything (tasks, fields, tags, chat, sections); a list of an organisation goes
+  to the organisation's trash, where its admins can restore it. After 30 days a list is deleted for good, files
+  included. The tasks of a deleted organisation list no longer land in the owner's private trash; a list in the trash
+  has no public link and is not part of an account export (#1988 #2166).
+- Questionnaires: a client link (the form's link signed for one client, from the form dialog or the client's menu)
+  assigns a submission to that client before any e-mail matching; only clients of the list's space count (#2201).
+- Browser errors can become a bug ticket in a project list chosen by the admin (default off; only the message, the
+  place in the code, the version and the open area) (#1999).
+- Server: KALMIDO_THREADS, the database pool follows the threads, warnings for an exhausted pool or a too small
+  max_connections, GET /api/admin/health (#1994).
+- Migrations are recorded in the table kalmido_migrations (stable ids, one-shot flags mirrored) (#1996).
+- For developers: type check without a build step (jsconfig.json, `// @ts-check` for new client files) (#1995) and a
+  layer linter tools/check_layers.py in CI (#1999).
+
+### Changed
+- News: bundles only per task, read and unread apart, unread on top, the number per line counts unread, the tab
+  "All" has its own number (#2197).
+- Chat: a visible hint "Ctrl/Cmd+Enter sends" next to the send button in team chat, agent / job chat and comments
+  (#2204).
+- Every background loop runs only once per instance (database lock); web and worker can run apart (KALMIDO_ROLE,
+  `python app.py worker`), one container stays the default (#1997).
+- One shared drag core (drag.js): sections and bottom sheets drag the same with touch, mouse and pen, scroll at the
+  edge, Esc cancels (#1998, first part).
+- Start size: scheduling polls and questionnaires load on demand, the start budget is lower again (#2208).
+
+### Fixed
+- The calendar shows invitations also without an own calendar (#2006); the change detection counts only valid
+  invitations (#2003).
+- Files and documents: in selection mode the bar no longer covers the last row; the selection marks in documents have
+  a 44 px target (#2206).
+
 ## [2.114.4] - 2026-10-19
 
 Office fixes 4 (quotation PDF, documents, travel costs).

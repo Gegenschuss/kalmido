@@ -170,7 +170,7 @@ def admin_lists_orphaned():
                                (SELECT COUNT(*) FROM list_members m WHERE m.list_id=l.id) AS members,
                                (SELECT COUNT(*) FROM tasks t WHERE t.list_id=l.id AND t.deleted_at IS NULL) AS tasks
                         FROM lists l JOIN users u ON u.id=l.owner_id
-                        WHERE l.is_inbox=0 AND (u.kind='agent' OR u.disabled=1) ORDER BY l.id""").fetchall()
+                        WHERE l.is_inbox=0 AND l.deleted_at IS NULL AND (u.kind='agent' OR u.disabled=1) ORDER BY l.id""").fetchall()
     return jsonify(lists=[{"id": r["id"], "name": r["name"], "archived": bool(r["archived"]), "owner_id": r["owner_id"],
                            "owner_name": r["display_name"] or r["username"], "reason": "agent" if r["kind"] == "agent" else "disabled",
                            "members": r["members"], "tasks": r["tasks"]} for r in rows],

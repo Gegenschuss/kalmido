@@ -13,13 +13,14 @@ function lmDangerItems(l, id) {
   if (!mine && !org) return [];
   const arch = l.archived ? {label: tr('Restore list from the archive'), icon: 'undo', danger: 1, fn: () => listArchive(id, false)}
     : {label: tr('Archive list'), icon: 'archive', danger: 1, fn: () => listArchive(id, true)};
-  const del = {label: l.archived ? tr('Delete list permanently…') : tr('Delete list…'), icon: 'trash', cls: 'flag-5', danger: 1, fn: () => listDeleteForGood(id)};
+  const del = {label: l.archived && l.e2e ? tr('Delete list permanently…') : tr('Delete list…') /* 2.102.0 (#1988): plain lists go to the trash */, icon: 'trash', cls: 'flag-5', danger: 1, fn: () => listDeleteForGood(id)};
   return ['-', arch, ...(mine || l.archived ? [del] : [])];  // an organisation admin deletes from the archive only (as in #1101)
 }
 // the delete dialog: who loses the list, where the tasks go when I am not the owner
 function lmDeleteNotes(l, n, open) {
   const others = listPeople(l).filter(p => p.user_id !== S.me?.id && !p.agent && !agentById(p.user_id)).length;
-  const tasks = isOwner(l) ? '' : `<p class="muted">${n ? trn('Its {0} task goes to the trash of the basket of {2} ({1} open), the owner, and can be restored there.', 'Its {0} tasks go to the trash of the basket of {2} ({1} open), the owner, and can be restored there.', n, open, esc(l.owner_name || '?')) : tr('The list has no tasks.')} ${esc(tr('{0} is told.', l.owner_name || '?'))}</p>`;
+  // 2.102.0 A (#1988): the tasks stay in the list (list trash), so only "the owner is told" is left here
+  const tasks = isOwner(l) ? '' : `<p class="muted">${esc(tr('{0} is told.', l.owner_name || '?'))}</p>`;
   return tasks + (others ? `<p class="shint keep lmshared">${ic('users', 's')} ${esc(trn('The list is shared: {0} other person loses it.', 'The list is shared: all {0} other people lose it.', others))}</p>` : '');
 }
 // an organisation admin (not owner / list admin): archive, restore, delete for good through /api/orgs/{id}/lists
@@ -32,13 +33,14 @@ async function lmOrgAct(l, k) {
       if (S.route.key === 'l:' + l.id) go(START_KEY);
     } else if (k === 'restore') { await api('POST', base + '/archive', {archived: false}); toast(tr('Restored')); }
     else if (k === 'delete') {
-      const v = await askDialog({title: tr('Delete “{0}” permanently?', nm), danger: true, ok: tr('Delete permanently'),
-        html: `<p>${esc(tr('This cannot be undone. Its tasks go to the trash in the basket of {0} and can be restored from there; its files and the sharing are lost. {0} and the members are told.', l.owner_name || '?'))}</p>${lmDeleteNotes({...l, owner_name: l.owner_name, role: 'owner'}, 0, 0)}<p>${esc(tr('Type the name of the list to delete it for good'))}</p>`,
-        input: {placeholder: l.name, max: 200}});
+      const v = await askDialog({title: l.e2e ? tr('Delete “{0}” permanently?', nm) : tr('Delete “{0}”?', nm), danger: true, ok: l.e2e ? tr('Delete permanently') : tr('Delete'),
+        html: `<p>${esc(l.e2e ? tr('This cannot be undone. Its tasks go to the trash in the basket of {0} and can be restored from there; its files and the sharing are lost. {0} and the members are told.', l.owner_name || '?') : otr_orgNote(l.owner_name || '?'))}</p>${lmDeleteNotes({...l, owner_name: l.owner_name, role: 'owner'}, 0, 0)}<p>${esc(tr('Type the name of the list to delete it'))}</p>`,
+        input: {placeholder: l.name, max: 200}});  // 2.102.0 A (#1988): into the organisation's list trash (end-to-end lists: for good)
       if (v === null) return false;
       if (v.trim() !== l.name.trim()) { toast(tr('The name does not match: nothing was deleted')); return false; }
-      await api('DELETE', base, {confirm: v.trim()}); toast(tr('“{0}” deleted', nm));
+      const j = await api('DELETE', base, {confirm: v.trim()});
       if (S.route.key === 'l:' + l.id) go(START_KEY);
+      if (j?.trash) otr_offerUndo(l.id, nm); else toast(tr('“{0}” deleted', nm));
     }
   } catch { return false; }  // api() said it
   await load(); render();
@@ -122,3 +124,49 @@ async function lmDoneReset(key) {
   await put(undefined);
   offerUndo(tr('Completed tasks follow the default here'), histAdd({label: `${tr('Completed: like the default')}: ${titleFor(key)}`, sett: true, undo: () => put(was), redo: () => put(undefined)}));
 }
+
+// ---- 2.102.0 A (#1988): the trash of deleted lists (lists/listtrash.py). Deleting an archived list moves it with its tasks,
+// fields, tags and chat into the trash of its place (private: the owner's; an organisation's list: the organisation's, for
+// its admins); "Deleted lists" on the Trash page restores it or deletes it for good; the undo right after the delete restores.
+S.otr = {items: null, at: 0, days: 30};
+const otr_orgNote = owner => owner ? tr('The list goes to the organisation’s trash with its tasks, fields and chat; the organisation’s admins can restore it there. {0} and the members are told.', owner)
+  : tr('The list goes to the organisation’s trash with its tasks, fields and chat; the organisation’s admins can restore it there.');
+const otr_note = l => l.org_id ? otr_orgNote('') : tr('The list goes to the trash with its tasks, fields, tags and chat. It can be restored there for {0} days, then it is deleted for good.', S.otr.days || 30);
+async function otr_load(force) {
+  if (!force && S.otr.at && Date.now() - S.otr.at < 30000) return;
+  S.otr.at = Date.now();
+  try { const j = await api('GET', '/api/trash/lists'); S.otr.items = j.lists || []; S.otr.days = j.days || 30; } catch { S.otr.items = S.otr.items || []; return; }
+  if (S.route.key === 'trash') renderView();
+}
+function otr_offerUndo(id, nm) {
+  S.otr.at = 0;
+  offerUndo(tr('“{0}” moved to the trash', nm), histAdd({label: tr('Delete “{0}”', nm),
+    undo: async () => { await api('POST', `/api/trash/lists/${id}/restore`); S.otr.at = 0; return {}; },
+    redo: async () => { await api('DELETE', '/api/lists/' + id); S.otr.at = 0; return {}; }}));
+}
+function otr_html() {
+  otr_load();
+  const xs = (S.otr.items || []).filter(x => wsObjIn({org_id: x.org_id}));
+  if (!xs.length) return '';
+  return `<div class="group otrlists"><div class="ghead">${esc(tr('Deleted lists'))} <span class="c">${xs.length}</span></div>`
+    + xs.map(x => `<div class="mrow otrrow" data-otr="${x.id}"><span class="n"><b>${esc(x.name)}</b><small class="muted">${esc([tr('Deleted {0} by {1}', fmtWhen(x.deleted_at), x.by_name || '?'), trn('{0} task', '{0} tasks', x.tasks), x.org_id && wsLabel(x.org_id)].filter(Boolean).join(' · '))}</small></span>`
+      + `<span class="oadmb"><button type="button" class="btn sm" data-otra="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button><button type="button" class="btn sm danger" data-otra="purge">${ic('trash', 's')}<span>${tr('Delete permanently…')}</span></button></span></div>`).join('')
+    + `<div class="muted otrnote">${esc(tr('Lists in the trash are deleted for good after {0} days.', S.otr.days))}</div></div>`;
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest?.('[data-otra]'); if (!b) return;
+  const row = b.closest('[data-otr]'), id = +row?.dataset.otr, x = (S.otr.items || []).find(y => y.id === id); if (!x) return;
+  e.preventDefault();
+  try {
+    if (b.dataset.otra === 'restore') {
+      await api('POST', `/api/trash/lists/${id}/restore`);
+      toast(tr('“{0}” is back in the archive', x.name));
+    } else {
+      if (!await askConfirm(tr('Delete “{0}” permanently?', x.name), tr('The list, its tasks, comments, files, fields and chat are deleted for good. This cannot be undone.'), {danger: true, ok: tr('Delete permanently')})) return;
+      await api('DELETE', `/api/trash/lists/${id}`);
+      toast(tr('“{0}” deleted', x.name));
+    }
+  } catch { return; }  // api() said why
+  S.otr.at = 0;
+  await load(); render();
+});

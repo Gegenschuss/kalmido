@@ -362,6 +362,12 @@ def ov_role(c, lid, uid, row=None):
     return "edit" if row["org_edit"] else "view"
 
 
+def otr_live(a="l"):
+    """2.102.0 A (#1988): THE condition "the list is not in the trash" (lists.deleted_at, see lists/listtrash.py) for SQL on
+    lists (a = the alias, "" without one). A deleted list is invisible everywhere except the trash's own routes."""
+    return f"{a + '.' if a else ''}deleted_at IS NULL"
+
+
 def acx_lists_sql(write=False, req=True, ov=True):
     """THE list scope (2.36.2, #1142): subquery of the list ids an account may see (write: change as a whole). Two ? = the
     account id. One place for owner / members / roles, the collaboration switch, the organisation boundary and (req=True:
@@ -371,7 +377,7 @@ def acx_lists_sql(write=False, req=True, ov=True):
     roles = " AND role IN ('edit', 'admin')" if write else ""
     org = f" AND (NOT ({_boundary_sql()}) OR {_ORG_SCOPE_SQL})" if _boundary_on() else ""
     return (f"(SELECT l.id FROM lists l, (SELECT CAST(? AS INTEGER) AS u, CAST(? AS INTEGER) AS v) p "
-            f"WHERE (l.owner_id=p.u OR l.id IN (SELECT list_id FROM list_members WHERE user_id=p.v{roles}{_members_on()}){_ov_sql(write) if ov else ''}){org}"
+            f"WHERE {otr_live()} AND (l.owner_id=p.u OR l.id IN (SELECT list_id FROM list_members WHERE user_id=p.v{roles}{_members_on()}){_ov_sql(write) if ov else ''}){org}"
             f"{_req_filters_sql() if req else ''})")
 
 
@@ -490,8 +496,8 @@ def acx_task_ok(c, tid, uid):
 
 def list_role(c, lid, uid=None):
     uid = uid or me()
-    r = c.execute("SELECT owner_id, life, org_id, family, org_visibility, org_edit FROM lists WHERE id=?", (lid,)).fetchone()
-    if not r:
+    r = c.execute("SELECT owner_id, life, org_id, family, org_visibility, org_edit, deleted_at FROM lists WHERE id=?", (lid,)).fetchone()
+    if not r or r[6]:  # 2.102.0 A (#1988): a list in the trash has no roles (only the trash routes reach it)
         return None
     if r[1] in ("health", "budget") and health_hidden(c, uid):  # 2.22.0 (#663); 2.72.0 (#1333): budgets too
         return None

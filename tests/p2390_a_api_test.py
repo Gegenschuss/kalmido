@@ -378,7 +378,7 @@ check(d.get("version") == 5 and len(A.get(PB(W) + "/versions").json()["versions"
 
 # ---- deleting the list removes its Playbook
 A.patch(B + f"/api/lists/{nl}", json={"archived": True})
-check(A.delete(B + f"/api/lists/{nl}").ok, "setup: delete the template list")
+check(A.delete(B + f"/api/lists/{nl}").ok and A.delete(B + f"/api/trash/lists/{nl}").ok, "setup: delete the template list")  # 2.102.0 (#1988): deleting moves the list into the list trash; the purge from there deletes for good
 check(dbx("SELECT COUNT(*) FROM playbooks WHERE list_id=?", (nl,))[0][0] == 0, "#1168: a deleted list takes its Playbook along")
 
 print(f"p2390_a_api: {OKS[0]} ok, {len(FAILS)} failed")

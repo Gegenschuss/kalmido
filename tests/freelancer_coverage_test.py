@@ -50,6 +50,9 @@ KINDS = {
     # ---- nothing to check without an organisation (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account: the same for every person, before any workspace"),
     "public": ("n/a", "pages and facts without data of a person (app shell, health, version, manifest, share target, QR code)"),
+    # 2.102.0 (#1999)
+    "clienterr": ("n/a", "the web app's own unexpected error (message cut of data, place in the code, version, area): written as "
+                         "nobody into the one project list the server operator chose, nothing is read back or answered"),
     "admin": ("n/a", "the server operator's administration (need_admin): no organisation involved -- a freelancer running the "
                      "own server is its operator with exactly these pages (p2473_a_api_test.py sets up a server without any "
                      "organisation)"),
@@ -70,6 +73,7 @@ ROUTES = {
     "GET /api/admin/agents/audit": "admin", "GET /api/admin/agents/{}/audit": "admin",
     "GET /api/admin/agents/{}/machines": "admin", "GET /api/admin/alerts": "admin", "GET /api/admin/assistant": "admin",
     "GET /api/admin/backups": "admin", "GET /api/admin/backups/{}/download": "admin", "GET /api/admin/client-ip": "admin",
+    "GET /api/admin/health": "admin",  # 2.102.0 D (#1994): the server's capacity numbers
     "GET /api/admin/lists/orphaned": "admin", "GET /api/admin/orgcrypt": "admin", "GET /api/admin/related": "admin",
     "GET /api/admin/storage-check": "admin", "GET /api/admin/upload-scan": "admin",
     "GET /api/v1/admin/agents/{}/audit": "admin", "GET /api/v1/admin/status": "admin", "GET /api/v1/admin/users": "admin",
@@ -97,6 +101,7 @@ ROUTES = {
     # (2.98.0 spacer A)
     # 2.98.0 B (#1954): questionnaires (p298_b_api_test.py) - routes below this line
     "GET /api/forms/{}/entries": "lists", "GET /api/forms/{}/entries.csv": "lists",
+    "GET /api/forms/{}/client-link": "lists", "GET /api/clients/{}/forms": "office",  # 2.102.0 C (#2201)
     # (2.98.0 spacer B)
     # 2.98.0 C (#2180 #2181): office menu, tables (p298_c_ui.js) - routes below this line
     # (2.98.0 spacer C)
@@ -466,7 +471,7 @@ ROUTES = {
     "PUT /api/contacts/{}/care": "pim", "PUT /api/evcals/{}/members": "pim", "PUT /api/v1/address-books/{}/members/{}": "pim",
     "PUT /api/v1/contacts/{}/care": "pim", "PUT /api/v1/event-calendars/{}/members/{}": "pim",
     # ---- public (19)
-    "GET /": "public", "GET /agent-setup.ps1": "public", "GET /agent-setup.sh": "public", "GET /api/about": "public",
+    "GET /": "public", "GET /agent-setup.ps1": "public", "GET /agent-setup.sh": "public", "GET /api/about": "public", "POST /api/client-errors": "clienterr",
     "GET /api/health": "public", "GET /api/layouts/std": "public", "GET /api/related/config": "public",
     "GET /api/v1/announcement": "public", "GET /api/v1/openapi.json": "public", "GET /api/version": "public",
     "GET /capture": "public", "GET /manifest.json": "public", "GET /robots.txt": "public", "GET /share": "public",
@@ -481,7 +486,10 @@ ROUTES = {
     "DELETE /api/repos/{}": "tasks", "DELETE /api/sample": "tasks", "DELETE /api/sprints/{}": "tasks",
     "DELETE /api/tasks/{}": "tasks", "DELETE /api/tasks/{}/contacts/{}": "tasks", "DELETE /api/tasks/{}/enc-note": "tasks",
     "DELETE /api/tasks/{}/links/{}": "tasks", "DELETE /api/tasks/{}/note-lock": "tasks",
-    "DELETE /api/tasks/{}/waiting": "tasks", "DELETE /api/trash": "tasks", "DELETE /api/v1/attachments/{}": "tasks",
+    "DELETE /api/tasks/{}/waiting": "tasks", "DELETE /api/trash": "tasks",
+    # 2.102.0 A (#1988): the list trash (p2102_a_api_test.py: a person without an organisation deletes / restores / purges)
+    "GET /api/trash/lists": "lists", "POST /api/trash/lists/{}/restore": "lists", "DELETE /api/trash/lists/{}": "lists",
+    "DELETE /api/v1/attachments/{}": "tasks",
     "DELETE /api/v1/chat-attachments/{}": "tasks", "DELETE /api/v1/comments/{}": "tasks",
     "DELETE /api/v1/comments/{}/reactions/{}": "tasks", "DELETE /api/v1/notepads/{}": "tasks",
     "DELETE /api/v1/notes/{}": "tasks", "DELETE /api/v1/tasks/{}": "tasks", "DELETE /api/v1/tasks/{}/contacts/{}": "tasks",

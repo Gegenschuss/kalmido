@@ -22,7 +22,7 @@ allowed). Session cookies are HttpOnly + SameSite=Lax.
 
 Code layout: the server lives in the package kalmido/ (one module per area, see docs/ARCHITECTURE.md); this file is the
 entry point (`python app.py`, `python app.py set-password <user>`, `python app.py import <file> [user]`,
-`python app.py migrate-sqlite [--check] [--source /data/tasks.db]`)."""
+`python app.py migrate-sqlite [--check] [--source /data/tasks.db]`, `python app.py worker`)."""
 import json as _json
 import os as _os
 import sys as _sys
@@ -31,6 +31,9 @@ import sys as _sys
 # (kalmido/admin/migrate.py mig_startup) and ends the process there
 if __name__ == "__main__" and len(_sys.argv) >= 2 and _sys.argv[1] == "migrate-sqlite":
     _os.environ["KALMIDO_MIGRATE_CLI"] = _json.dumps(_sys.argv[2:])
+# 2.102.0 D (#1997): `python app.py worker` = the background loops only (no web server); same as KALMIDO_ROLE=worker
+if __name__ == "__main__" and len(_sys.argv) >= 2 and _sys.argv[1] == "worker":
+    _os.environ["KALMIDO_ROLE"] = "worker"
 import kalmido
 
 # every module's names stay reachable as app.<name> (python -c "import app; app.connect()", the test suites, WSGI servers
@@ -62,6 +65,8 @@ if __name__ == "__main__":
         sys.exit(0 if n else f"no user {sys.argv[2]!r}")
     if len(sys.argv) >= 3 and sys.argv[1] == "announce":  # 2.24.0 (#907): docker exec <container> python app.py announce "text" --minutes 30
         sys.exit(announce_cli(sys.argv[2:]))
+    if WRK_ROLE == "worker":  # 2.102.0 D (#1997): kalmido/admin/worker.py
+        sys.exit(wrk_main())
     from kalmido.accounts.setupcode import sh_code_startup
     sh_code_startup()  # 2.45.0 (#1515): a server without users prints its one-time setup code
     from waitress import serve
@@ -71,5 +76,6 @@ if __name__ == "__main__":
     # 2.0.0: 16 threads (was 8): agents' long-polls (at most KALMIDO_AGENT_WAITERS) each hold one while waiting
     # 2.10.0 (#445): forwarded headers are handled by proxy_mw (several trusted proxies / networks, which waitress'
     # trusted_proxy cannot express); waitress must not clear them before the app sees them.
-    serve(app, listen=listen, threads=16, max_request_body_size=max(BK_MAX_BYTES, app.config["MAX_CONTENT_LENGTH"]) + 1024 * 1024,
+    # 2.102.0 D (#1994): KALMIDO_THREADS (default 16, core/pg.py WEB_THREADS; the pool follows it)
+    serve(app, listen=listen, threads=WEB_THREADS, max_request_body_size=max(BK_MAX_BYTES, app.config["MAX_CONTENT_LENGTH"]) + 1024 * 1024,
           clear_untrusted_proxy_headers=False)

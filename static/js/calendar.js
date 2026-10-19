@@ -67,7 +67,7 @@ async function ensureOcc(lo, hi) {
 // Events of the user's calendar subscriptions (Settings > Integrations > Calendars), synced by the server. Fetched
 // per visible range (not part of /api/state), kept in S.cal; the last few ranges stay in localStorage for offline
 // use. Events never behave like tasks: no drag, no checkbox; a click opens a small popover (cevPop).
-const calEvOn = () => !!((S.calendars?.enabled && S.calendars.subs > 0) || (feat('events') && ((S.evcals || []).length || S.cal.items.some(e => e.own))));  // 2.21.0 (#659): own events too
+const calEvOn = () => !!((S.calendars?.enabled && S.calendars.subs > 0) || (feat('events') && ((S.evcals || []).length || S.cal.items.some(e => e.own) || +String(S.evsig || '').split('|')[0] > 0)));  // 2.21.0 (#659): own events too; 2.102.0 A (#2006): invitations alone
 const fmtHM = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 function cevPrep(e) {  // local first / last day (+ Date objects for timed events)
   if (e.all_day) { e.d0 = e.start; e.d1 = e.end > e.start ? addDays(e.end, -1) : e.start; }

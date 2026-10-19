@@ -235,6 +235,10 @@ link(Bo, T, OX)
 check(Bo.patch(B + f"/api/lists/{OX}", json={"archived": True}).ok, "setup: the further list archived (delete needs it)")
 r = Bo.delete(B + f"/api/lists/{OX}")
 check(r.ok, "setup: the further list deleted " + r.text[:120])
+check(links(T) == sorted([O2, OX]) and task_in(Bo, T) is not None and [a["list_id"] for a in task_in(Bo, T).get("also", [])] == [O2],
+      "#1988: a further list in the trash keeps its link (back with the list), the task shows only the live one")
+r = Bo.delete(B + f"/api/trash/lists/{OX}")  # 2.102.0 (#1988): for good from the trash = the old delete
+check(r.ok, "setup: the further list deleted for good " + r.text[:120])
 check(links(T) == [O2] and task_in(Bo, T) is not None, "#1459: deleting the further list keeps the task")
 many = [mk(Bo, f"Extra {i}", ORG) for i in range(10)]
 codes = [link(Bo, T, x).status_code for x in many]

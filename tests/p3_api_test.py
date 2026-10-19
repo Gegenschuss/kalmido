@@ -468,6 +468,7 @@ A.post(B + f"/api/lists/{PR}/fields", json={"name": "Tmp", "type": "text"})
 check(A.get(B + "/api/version").json()["v"] > v0, "field changes bump the version")
 A.patch(B + f"/api/lists/{PR}", json={"archived": 1})  # 1.5: deleting for good only from the archive
 A.delete(B + f"/api/lists/{PR}")
+A.delete(B + f"/api/trash/lists/{PR}")  # 2.102.0 (#1988): deleting moves the list into the list trash; the purge from there deletes for good
 with db() as c:
     check(not c.execute("SELECT 1 FROM list_fields WHERE list_id=?", (PR,)).fetchone(), "deleted list: fields gone")
 

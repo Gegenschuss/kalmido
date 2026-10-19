@@ -3,7 +3,8 @@
 archive. PATCH archived (with _prev for undo / redo and the conflict rule), DELETE refuses a list that is not archived
 (409, nothing changes), the inbox never; the owner only; DELETE of an archived list removes the list, its sections,
 sharing, custom fields and public link, and moves every task (open and done) to the trash of the owner's inbox, where
-it can be restored; members of a shared list lose access. Plus the settings the app now saves one by one (every key
+it can be restored; members of a shared list lose access. 2.102.0 (#1988): DELETE moves the list into the list trash, the
+purge from there deletes for good. Plus the settings the app now saves one by one (every key
 alone, the undo value back)."""
 import os, dbx, sys
 import requests
@@ -87,19 +88,31 @@ check(lj["archived"] and any(t["id"] == t_open for t in st["tasks"]), "archived:
 check(any(x["id"] == L and x["archived"] for x in Bb.get(B + "/api/state").json()["lists"]), "member still sees the archived list")
 
 # ================= delete for good from the archive
+# 2.102.0 (#1988): DELETE moves the list into the list trash with everything (the tasks stay in it, in the trash); restoring
+# brings it back whole; the purge from the trash deletes for good what DELETE used to delete at once
 r = A.delete(B + f"/api/lists/{L}")
-check(r.status_code == 200 and r.json().get("ok"), f"DELETE of an archived list -> ok ({r.status_code})")
+check(r.status_code == 200 and r.json().get("ok") and r.json().get("trash"), f"DELETE of an archived list -> ok, into the trash ({r.status_code})")
+check(q("SELECT deleted_at FROM lists WHERE id=?", L)[0]["deleted_at"], "list in the trash (deleted_at)")
+check(q("SELECT 1 FROM sections WHERE list_id=?", L) and q("SELECT 1 FROM list_fields WHERE list_id=?", L), "sections + fields kept")
+rows = {x["id"]: dict(x) for x in q("SELECT id, list_id, deleted_at, section_id, status FROM tasks WHERE id IN (?, ?)", t_open, t_done)}
+check(all(x["list_id"] == L and x["deleted_at"] for x in rows.values()) and rows[t_open]["section_id"] == SEC and rows[t_done]["status"] == 2,
+      "open and done tasks in the trash, still in their list and section")
+check(not any(x["id"] == L for x in Bb.get(B + "/api/state").json()["lists"]), "the member lost the list")
+check(not any(x["id"] == L for x in A.get(B + "/api/state").json()["lists"]), "the owner does not see it among the lists")
+check(A.post(B + f"/api/tasks/{t_open}/restore").status_code == 409, "a single task comes back only with its list (409)")
+check(A.delete(B + f"/api/lists/{L}").status_code == 404, "deleting again -> 404")
+tl = A.get(B + "/api/trash/lists").json()["lists"]
+check([x["id"] for x in tl] == [L] and tl[0]["tasks"] == 2, "the trash names the list with its 2 tasks " + str(tl))
+check(Bb.get(B + "/api/trash/lists").json()["lists"] == [] and Bb.post(B + f"/api/trash/lists/{L}/restore").status_code == 404, "not the member's trash")
+check(A.post(B + f"/api/trash/lists/{L}/restore").ok and not q("SELECT deleted_at FROM lists WHERE id=?", L)[0]["deleted_at"]
+      and not q("SELECT 1 FROM tasks WHERE id IN (?, ?) AND deleted_at IS NOT NULL", t_open, t_done), "restored: the list and both tasks")
+check(A.delete(B + f"/api/lists/{L}").ok and A.delete(B + f"/api/trash/lists/{L}").ok, "into the trash again, then deleted for good")
 check(not q("SELECT 1 FROM lists WHERE id=?", L), "list gone")
 check(not q("SELECT 1 FROM sections WHERE list_id=?", L), "sections gone")
 check(not q("SELECT 1 FROM list_members WHERE list_id=?", L), "sharing gone")
 check(not q("SELECT 1 FROM list_fields WHERE list_id=?", L), "custom fields gone")
 check(not q("SELECT 1 FROM public_links WHERE list_id=?", L), "public link gone")
-rows = {x["id"]: dict(x) for x in q("SELECT id, list_id, deleted_at, section_id, status FROM tasks WHERE id IN (?, ?)", t_open, t_done)}
-check(all(x["list_id"] == INBOX and x["deleted_at"] and x["section_id"] is None for x in rows.values()) and rows[t_done]["status"] == 2,
-      "open and done tasks in the trash of the owner's inbox")
-check(not any(x["id"] == L for x in Bb.get(B + "/api/state").json()["lists"]), "the member lost the list")
-check(A.post(B + f"/api/tasks/{t_open}/restore").ok and q("SELECT deleted_at FROM tasks WHERE id=?", t_open)[0]["deleted_at"] is None, "a task restored from the trash")
-check(A.delete(B + f"/api/lists/{L}").status_code == 404, "deleting again -> 404")
+check(not q("SELECT 1 FROM tasks WHERE id IN (?, ?)", t_open, t_done), "its tasks gone")
 
 # ================= settings one by one (autosave) and back (undo)
 for k, v in (("allday_time", "07:15"), ("digest_time", ""), ("push_priority", "5"), ("pomo_focus", "30"), ("time_target", "7.5"), ("hide_blocked_today", "1"), ("features", "cal,habits")):

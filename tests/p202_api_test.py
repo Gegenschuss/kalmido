@@ -103,7 +103,9 @@ L2 = A.post(B + "/api/lists", json={"name": "Tmp"}).json()["id"]
 u2 = A.post(B + f"/api/lists/{L2}/icon", files={"file": ("x.png", png_bytes(40, 40), "image/png")}).json()["icon"]
 p2 = os.path.join(DATA, "attachments", "listicons", f"l{L2}-{u2.rsplit('/', 1)[1]}")
 A.patch(B + f"/api/lists/{L2}", json={"archived": 1})
-check(os.path.isfile(p2) and A.delete(B + f"/api/lists/{L2}").ok and not os.path.exists(p2), "list deleted for good: icon file gone")
+# 2.102.0 (#1988): deleting moves the list into the list trash; the purge from there deletes for good
+check(os.path.isfile(p2) and A.delete(B + f"/api/lists/{L2}").ok and os.path.isfile(p2) and A.delete(B + f"/api/trash/lists/{L2}").ok
+      and not os.path.exists(p2), "list deleted for good: icon file gone")
 
 # ================================================================== /drop and /drop/drop
 dt = A.get(B + "/api/me").json()["drop_token"]

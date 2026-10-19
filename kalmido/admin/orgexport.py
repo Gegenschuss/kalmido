@@ -177,7 +177,7 @@ def _rows(c, oid, table, where, args, paged=True):
             yield _clean(c, oid, table, r)
 
 
-LSQ = "SELECT id FROM lists WHERE org_id=? AND is_inbox=0"
+LSQ = "SELECT id FROM lists WHERE org_id=? AND is_inbox=0 AND deleted_at IS NULL"  # 2.102.0 A (#1988): not the list trash
 TSQ = f"SELECT id FROM tasks WHERE list_id IN ({LSQ})"
 DSQ = "SELECT id FROM office_docs WHERE org_id=?"
 # (archive name, table, where; every "?" is the organisation id) -- the order of the archive
