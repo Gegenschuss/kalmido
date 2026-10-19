@@ -226,6 +226,8 @@ ORDER = (
     "office.vma",  # 2.95.0 (#1932): the per diem rates (BMF tables per year) and its calculation (pure functions)
     "office.vmareport",  # 2.95.0 A (#1932): the per diem report per person and year (JSON, PDF, Excel, CSV), the rates
     "office.vmaimport",  # 2.95.0 B (#1932): the import of a per diem spreadsheet (preview, import, undo)
+    "office.mealpdf",  # 2.119.0 A (#2288): the PDFs of the entertainment receipts (no routes)
+    "office.meals",  # 2.119.0 A (#2288): entertainment receipts (Bewirtungsbelege): meals, approval + log, choices, evaluation
     "office.cashflow",  # 2.47.3 (#1652, part B): cash flow per month + fixed costs
     "office.pipeline",  # 2.50.0 B (#1196): the sales pipeline
     "office.leads",  # 2.94.0 A (#1930): leads before the pipeline (stage lead): convert, CSV import, agents
