@@ -1240,6 +1240,11 @@ fresh; run p2117_b_ui node p2117_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.117.0 part C: PDF metadata "Kalmido v<version>", agent chat filter compact on phones (#2262 #2260)
 fresh; run p2117_c_api "$PY" p2117_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2117_c_ui node p2117_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.119.0 part A: entertainment receipts as office module (#2288)
+fresh; run p2119_a_api "$PY" p2119_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2119_a_ui node p2119_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.119.0 part B: filled active icon buttons, send-key hint in the agent chat side window, pin agents in "All people" (#2301 #2302 #2210)
+fresh; run p2119_b_ui node p2119_b_ui.js "$KALMIDO_TEST_DATA"
 shard 13  # 2.98.1: new suites go here, above this line
 # 2.114.1 part A: bank button "Match" wording + 44 px buttons, empty heading, producing checkbox (#2017 #2254 #2255)
 fresh; run p21141_a_ui node p21141_a_ui.js "$KALMIDO_TEST_DATA"
