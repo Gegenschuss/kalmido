@@ -525,6 +525,7 @@ ROUTES = {
     # ---- ical (3)
     "GET /ical/{}.ics": "ical", "GET /ical/ev/{}.ics": "ical", "GET /api/ical": "ical", "POST /api/ical": "ical",
     # ---- list (100)
+    "GET /api/lists/{}/export.csv": "list",  # 2.116.0 C (#2064): the list CSV, role of the list + tvis
     "GET /api/lists/{}/agent-access": "list",  # 2.30.0 (#919): the agents' access log of a list (its members)
     "PUT /api/lists/{}/favorite": "list", "DELETE /api/lists/{}/favorite": "list", "PUT /api/lists/{}/in-mine": "list",  # 2.41.0 (#1365)
     "PUT /api/lists/{}/icon": "list", "POST /api/lists/{}/icon": "list", "DELETE /api/lists/{}/icon": "list",

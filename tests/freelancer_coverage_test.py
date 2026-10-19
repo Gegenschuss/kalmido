@@ -234,6 +234,7 @@ ROUTES = {
     "GET /api/folders/public-links": "lists", "GET /api/folders/repos": "lists", "GET /api/group-avatar/{}/{}.jpg": "lists",
     "GET /api/groups": "lists", "GET /api/layouts/offers/{}": "lists", "GET /api/layouts/saved": "lists",
     "GET /api/list-files/{}": "lists", "GET /api/list-header/{}/{}.jpg": "lists", "GET /api/list-icon/{}/{}.png": "lists",
+    "GET /api/lists/{}/export.csv": "lists",  # 2.116.0 C (#2064): p2116_c_api_test.py
     "GET /api/lists/{}/agent-access": "lists", "GET /api/lists/{}/checks": "lists", "GET /api/lists/{}/e2e": "lists",
     "GET /api/lists/{}/e2e/todo": "lists", "GET /api/lists/{}/envs": "lists", "GET /api/lists/{}/error-hook": "lists",
     "GET /api/lists/{}/folder-preview": "lists", "GET /api/lists/{}/forms": "lists", "GET /api/lists/{}/groups": "lists",
