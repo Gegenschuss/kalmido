@@ -156,6 +156,8 @@ def fill_row(t, org):
             has_org = sql("SELECT 1 FROM information_schema.columns WHERE table_name=? AND column_name='org_id'", (ref,))
             r = sql(f"SELECT MIN(id) FROM {ref}" + (" WHERE org_id=?" if has_org and ref != "orgs" else ""), (org,) if has_org and ref != "orgs" else ())
             v = r[0][0] if r and r[0][0] is not None else 1
+            if ref == "users" and org != ALPHA:  # 2.115.0 (#2062): org_invites is keyed by the user: another person per organisation
+                v = sql("SELECT MAX(id) FROM users")[0][0] or v
         elif "int" in typ or typ in ("numeric", "double precision"):
             v = 0
         elif typ == "bytea":

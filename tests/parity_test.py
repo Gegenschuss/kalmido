@@ -349,7 +349,7 @@ APP_ONLY = [
      ("=POST /api/client-errors",)),
     ("2.92.0 C (#1926): which agents a person may ask for a summary of a file (the preview's button); the request is a comment that mentions the agent",
      ("=GET /api/attachments/{}/agents",)),
-    ("sign-in, sessions, two-factor, passkeys, OIDC: a person in a browser", ("* /api/auth/", "* /api/me/2fa", "* /api/me/passkeys", "=PATCH /api/me", "=GET /api/me")),
+    ("sign-in, sessions, two-factor, passkeys, OIDC: a person in a browser", ("* /api/auth/", "* /api/me/2fa", "* /api/me/passkeys", "* /api/me/sessions", "=PATCH /api/me", "=GET /api/me")),
     ("credentials and keys of the account: tokens, webhooks, upload token, avatar, phone shortcut", (
         "* /api/me/tokens", "* /api/me/webhooks", "POST /api/me/drop-token", "* /api/me/avatar", "GET /api/me/share/")),
     ("administration: never through a token (agents are never admins); admins read users / status with admin-read", (
