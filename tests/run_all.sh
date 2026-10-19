@@ -1152,6 +1152,8 @@ fresh; run p291_b_ui node p291_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.99.1 part A: video review with comments at the time code, links only (#1959)
 fresh; run p2991_a_api "$PY" p2991_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2991_a_ui node p2991_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.99.1 part C: video sign-offs for agents (API v1 + MCP, #1959)
+fresh; run p2991_c_api "$PY" p2991_c_api_test.py "$KALMIDO_TEST_DATA"
 # 2.99.1 part B: contributing national e-invoice formats by pull request (#1961)
 fresh; run p2991_b "$PY" p2991_b_test.py "$KALMIDO_TEST_DATA"
 # 2.93.0 (#1927 #1928): document templates with signature, logbook

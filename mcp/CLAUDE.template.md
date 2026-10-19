@@ -400,6 +400,15 @@ colours, rows with inputs and formulas - all in ONE call), `sheet_update`, `shee
 you created. Every write call is one batch the person can take back; a cell with error `denied` is a source not shared with
 you: never guess its value. Formulas: `=SUMME(B2:B9)`, `=stunden*satz`, `=projekt.<name>.zeit_gesamt` (arguments with `;`).
 
+### Video sign-offs (2.99.1)
+A video sign-off holds links only (Vimeo, YouTube, a video file; each new link = a version v1, v2 ...) and comments at a
+timecode, from the team and from the customer (through the approval link). `list_video_reviews` (task_id or list_id),
+`get_video_review` (versions, state open | approved | changes, every comment with `timecode`, `customer`, `done`,
+`replies`), `add_video_comment` (body, at_sec?, version_id?, parent_id? = an answer) and `set_video_comment_done` (scope
+comments). You see only sign-offs at a task / list shared with you, never the customer link. Typical job: sum up the
+customer's feedback for the edit as one comment or task note, sorted by timecode. Your comments stay internal; an ANSWER to a
+customer's comment shows on the customer page - write one only when the person asked you to.
+
 ### Contracts and notice deadlines (2.70.0)
 The event `contract_notice` comes once per contract and deadline when the last day to cancel a contract in a list shared
 with you is near (the contract's own lead, else 30 days): `name`, `provider`, `cost` / `per`, `monthly`, `due` (cancel by),
@@ -465,7 +474,7 @@ them instead of adding a second task.
 Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get_document` (text, sender, amount) ->
 `add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
 `add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_shop_areas`, `add_snippet`,
-`add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
+`add_subtask`, `add_time_entry`, `add_upkeep`, `add_video_comment`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
 `chat_typing`, `check_in_habit`, `check_time_entries`, `clear_plan_usage`, `clear_waiting`, `client_id`,
 `comment_typing`, `complete_task`, `create_address_book`, `create_client`, `create_contact`, `create_event`,
 `create_event_calendar`, `create_field`, `create_file_folder`, `create_filter`, `create_form`, `create_habit`,
@@ -481,7 +490,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `get_dispo`, `get_dispo_free`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_key_figures`,
 `get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`,
 `get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`,
-`get_usage`, `get_velocity`, `get_view_layout`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`,
+`get_usage`, `get_velocity`, `get_video_review`, `get_view_layout`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`,
 `ingredients_to_shopping`, `link_contact`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_environments`,
 `set_deployment`,
 `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`,
@@ -490,7 +499,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_notepads`, `list_notes`, `list_office_data`, `list_office_documents`, `list_office_leads`, `list_packing_templates`,
 `list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_rules`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
-`list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
+`list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_video_reviews`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
 `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`, `propose_contract_notice`, `propose_import`, `propose_layout`, `propose_playbook`,
 `propose_rule`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,
@@ -500,7 +509,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`, `review_task`, `search_contacts`,
 `search_files`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `sheet_add_column`, `sheet_append_rows`,
 `sheet_create`, `sheet_read`, `sheet_set_cells`, `sheet_undo_batch`, `sheet_update`, `sheet_vars`, `sheets_list`, `set_contact_care`, `set_list_columns`, `set_list_review`,
-`set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `set_wip_limit`, `share_address_book`,
+`set_project_overview`, `set_project_status`, `set_status`, `set_video_comment_done`, `set_waiting`, `set_wip_limit`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`,
 `time_from_events`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`, `unshare_list`,

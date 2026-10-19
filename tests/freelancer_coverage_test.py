@@ -40,7 +40,8 @@ KINDS = {
     "hub": ("matrix", SUITE + ": absences, bookings and hub mail in the personal area (the freelancer is its own admin)"),
     "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature"),
     "videos": ("matrix", "p2991_a_api_test.py: video sign-offs (2.99.1) at a private task / list / client of a person without an "
-               "organisation: create, comments, versions, customer link, export, delete + restore"),
+               "organisation: create, comments, versions, customer link, export, delete + restore; p2991_c_api_test.py: the own agent "
+               "of such a person reads and comments them through the API v1"),
     "sheets": ("matrix", "p289_b_api_test.py, p289_c_api_test.py, p289_d_api_test.py: tables (2.89.0) in the private space of a "
                          "person without an organisation and with that person's own agent; rows to tasks / quotation drafts"),
     "own": ("matrix", SUITE + ": the own settings, profile, tokens, app passwords, push, account export / import"),
@@ -532,6 +533,9 @@ ROUTES = {
     "DELETE /api/videos/{}/comments/{}": "videos", "POST /api/videos/{}/comments/{}/restore": "videos",
     "GET /api/videos/{}/export": "videos", "POST /api/videos/{}/signoff": "videos", "POST /api/videos/{}/signoffs/{}/revoke": "videos",
     "POST /api/videos/{}/move-space": "videos",
+    # 2.99.1 C (#1959): video sign-offs for agents (videos/v1.py; p2991_c_api_test.py)
+    "GET /api/v1/videos": "videos", "GET /api/v1/videos/{}": "videos", "POST /api/v1/videos/{}/comments": "videos",
+    "PATCH /api/v1/videos/{}/comments/{}": "videos",
     "DELETE /api/sheets/{}": "sheets", "DELETE /api/sheets/{}/columns/{}": "sheets",
     "DELETE /api/sheets/{}/rows/{}": "sheets", "GET /api/sheets": "sheets", "GET /api/sheets/{}": "sheets",
     "GET /api/sheets/{}/export.csv": "sheets", "GET /api/sheets/{}/export.xlsx": "sheets",
