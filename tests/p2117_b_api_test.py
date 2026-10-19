@@ -179,8 +179,8 @@ items = A.get(B + F).json()["items"]
 check([x["id"] for x in items] == [F2, F1], f"#2285: list sorted by date {items}")
 r = A.get(B + f"{F}/{F1}")
 cd = r.headers.get("Content-Disposition", "")
-check(r.ok and r.content == P1 and r.headers.get("Content-Type", "").startswith("application/pdf") and cd.startswith("attachment; filename*=UTF-8''")
-      and '"' not in cd, f"#2285: open = the same bytes, a download {cd!r}")
+check(r.ok and r.content == P1 and r.headers.get("Content-Type", "").startswith("application/pdf") and cd.startswith('attachment; filename="')
+      and "filename*=UTF-8''" in cd and cd.count('"') == 2, f"#2285: open = the same bytes, a download {cd!r}")  # review: + ASCII fallback
 fn = sql("SELECT file FROM office_contract_files WHERE id=?", (F1,))[0][0]
 p = os.path.join(DATA, "office", str(ORG), fn)
 try:
