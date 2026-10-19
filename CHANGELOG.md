@@ -7,6 +7,11 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.98.1] - 2026-10-19
+
+### Fixed
+- Scheduling polls: the proposed times and the end of voting use the app's own date and time pickers instead of the browser's (2.98.0 CI).
+
 ## [2.98.0] - 2026-10-19
 
 Scheduling polls, questionnaires in forms, the office menu as a rail on the left, resizable tables and polish.
