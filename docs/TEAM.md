@@ -460,6 +460,17 @@ workspace).
 - Health lists, the basket and locked lists have no rules. Copying a list or making a template does not copy its rules.
 - Agents read rules and can only propose one; the owner or an admin accepts it with 👍.
 
+2.138.0 adds three triggers and three actions:
+
+- *A task is created* (also by an agent, the API or an import step), *A task is assigned* (to a chosen person or to anyone;
+  only when the person is new on the task) and *A custom field changes* (any change, or for selection and checkbox fields
+  only a chosen value: an option, checked, unchecked). Formula fields are calculated and never start a rule.
+- *Set the priority* (none, low, medium, high), *Add a list tag* (only tags of this list: the rule belongs to everyone in
+  the list, personal tags stay personal) and *Set a custom field* (a fixed value, checked like a value you type; empty
+  clears the field).
+- A deleted custom field or list tag pauses the rules that use it. A value set by a rule never starts a "field changes"
+  rule (the same loop protection as above).
+
 ## An own picture as the organisation's symbol (2.87.9)
 
 An organisation's symbol was an emoji only. Its admins can now use an own picture instead, like a profile picture:
