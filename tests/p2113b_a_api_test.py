@@ -13,8 +13,10 @@ Invented companies, people and figures only. freelancer-matrix: office
  - no file or text of a private pack under kalmido/office/packs (the public repository)
  - a person without an organisation does the same in their own office
 usage: p2113b_a_api_test.py <datadir>"""
+import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -216,13 +218,18 @@ j = A.patch(B + f"{D}/{Q3['id']}", json={"handling_pct": None, "markup_pct": Non
 check(line(j, "surcharge") is None and j["totals"]["net"] == 2250, "#2252: both switched off, no line")
 
 # ---------------------------------------------------------------- no private pack in the repository
-hits = []
-for root, dirs, files in os.walk(PACKS):
-    for x in files:
-        txt = open(os.path.join(root, x), encoding="utf-8", errors="replace").read().lower()
-        if "gegenschuss" in x.lower() or "gegenschuss" in txt:
-            hits.append(x)
-check(not hits, "#2251: no private pack under kalmido/office/packs " + str(hits))
+# only the shipped pack files, and no word whose hash is the private pack's name (the name itself stays out of the repository)
+PRIVATE = {"284fe9eb10533a2a9c106e5c168c69ff825140ab3f2dbcd5ea4566d76101f513"}
+files, hits = [], []
+for root, dirs, fs in os.walk(PACKS):
+    for x in fs:
+        rel = os.path.relpath(os.path.join(root, x), PACKS)
+        files.append(rel)
+        words = set(re.findall(r"[a-z0-9_]+", (rel + " " + open(os.path.join(root, x), encoding="utf-8", errors="replace").read()).lower()))
+        if any(hashlib.sha256(w.encode()).hexdigest() in PRIVATE for w in words):
+            hits.append(rel)
+check(sorted(files) == ["de.json", os.path.join("industry", "film.json")], "#2251: only the shipped packs under kalmido/office/packs " + str(files))
+check(not hits, "#2251: no private pack name under kalmido/office/packs " + str(hits))
 
 # ---------------------------------------------------------------- a person without an organisation (freelancer-matrix: office)
 FID, Fr = freelancer(B, A, "fiona")
