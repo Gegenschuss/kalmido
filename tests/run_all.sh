@@ -1135,9 +1135,9 @@ fresh; run p296_e_api "$PY" p296_e_api_test.py "$KALMIDO_TEST_DATA"
 # 2.102.0 part A (#1988 #2003 #2006): organisation trash for deleted lists, calendar invitations
 fresh; run p2102_a_api "$PY" p2102_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2102_a_ui node p2102_a_ui.js "$KALMIDO_TEST_DATA"
-# 2.102.0 part B (#2204 #2206 #2208 #2210): chat send hint, selection bar padding, lazy polls/forms, pin agents
+# 2.102.0 part B (#2197 #2204 #2206): news bundles and counts, chat send hint, selection bar padding
 fresh; run p2102_b_ui node p2102_b_ui.js "$KALMIDO_TEST_DATA"
-# 2.102.0 part C (#2197 #2201): news bundles and counts, questionnaire customer link
+# 2.102.0 part C (#2201 #2208 #2210): questionnaire customer link, polls/forms on demand, pin agents
 fresh; run p2102_c_api "$PY" p2102_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2102_c_ui node p2102_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.102.0 part D (#1994 #1996 #1997): pool from env + health, migrations table, background worker
