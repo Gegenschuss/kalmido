@@ -1138,6 +1138,8 @@ fresh; run p297_a_ui node p297_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.97.0 part B: customer display name, address from the customer (#1951)
 fresh; run p297_b_api "$PY" p297_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p297_b_ui node p297_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.97.1: the sender line with the company name (#2224)
+fresh; run p2971_api "$PY" p2971_api_test.py "$KALMIDO_TEST_DATA"
 # 2.97.0 part C: office data between the personal office and an organisation (#2049)
 fresh; run p297_c_api "$PY" p297_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p297_c_ui node p297_c_ui.js "$KALMIDO_TEST_DATA"
