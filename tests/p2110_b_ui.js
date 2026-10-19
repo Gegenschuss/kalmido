@@ -40,7 +40,7 @@ async function receipt(ck, ws, name, amount, day, category, vat) {
 
 (async () => {
   await sleep(600);
-  const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
+  const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', lang: 'en'})});
   check(r.ok, 'setup');
   const CA = await login('alice');
   await call(CA, 'POST', '/api/admin/setup', {lang: 'en', collab_all: true});
