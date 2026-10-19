@@ -14,6 +14,7 @@ freelancer-matrix: office
  - OpenAPI with x-kalmido-scope office
  - a person without an organisation (personal office) and her own agent: the same flow; another office's agent: 404
 usage: p2106_d_api_test.py <datadir>      (P2106D_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
+import json
 import os
 import subprocess
 import sys
@@ -169,7 +170,8 @@ L1 = r.json() if r.status_code == 201 else {}
 check(L1.get("status") == "draft" and L1.get("agent_id") == AG and L1.get("client_id") == CL and L1.get("app_url") == f"#office/letters/{L1.get('id')}",
       f"the draft: status draft, agent_id, client, app_url {L1}")
 check(bool(L1.get("chat_message_id")), "the card in the person's chat (notify default true)")
-chat = A.get(B + f"/api/agents/{AG}/chat").text
+r = A.get(B + f"/api/agents/{AG}/chat")
+chat = json.dumps(r.json(), ensure_ascii=False) if r.ok else r.text  # umlauts are escaped in the raw JSON
 check("Kündigung Wartungsvertrag" in chat and f"#office/letters/{L1.get('id')}" in chat, "the card names the subject and opens the letter")
 h = A.get(B + f"{O}/letters/{L1.get('id')}")
 check(h.ok and h.json().get("agent_id") == AG and h.json().get("status") == "draft", f"the admin sees the agent's draft ({h.status_code})")
