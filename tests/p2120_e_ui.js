@@ -2,8 +2,8 @@
 // width). Invented companies only; the letterhead PDF is made here.
 // - the office settings have the section "Letterhead": empty state, upload (the same request the button sends), the file
 //   with its pages, margins of page 1 / following pages and the two switches appear
-// - every change is saved at once (no save button of its own) and can be undone in the toast; Enter never submits the
-//   settings form
+// - every change is saved at once (no save button of its own) and is one step of the undo history (toast, redo); Enter
+//   never submits the settings form
 // - the preview opens the PDF viewer; removing has its undo
 // - on a phone the section stays inside the screen; a member sees the state without the buttons, the fields locked
 // - a person without organisation: the same in the personal office
@@ -71,6 +71,7 @@ const MKPDF = `(() => { const objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /
       'the file name and its pages');
     check(await ev(`document.getElementById('bp-hide-head').checked && document.getElementById('bp-hide-foot').checked`), 'both switches on by default');
     check((await ev(state)).on === true, 'the letterhead is stored');
+    await ev(`(() => { document.getElementById('bpset').scrollIntoView({block: 'start'}); return 1; })()`);
     await shot('letterhead-desktop');
     // a margin: saved at once, undo in the toast
     await ev(setVal('bp-m1-left', '30'));
@@ -79,6 +80,12 @@ const MKPDF = `(() => { const objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /
     check(await ready(ev, undoToast, 20), 'the toast offers the undo');
     st = null; for (let i = 0; i < 40 && !(st && st.m1[3] === 25); i++) { st = await ev(state); await sleep(250); }
     check(st && st.m1[3] === 25, 'undo restores the margin');
+    await ev(`(() => { histStep('redo'); return 1; })()`);
+    st = null; for (let i = 0; i < 40 && !(st && st.m1[3] === 30); i++) { st = await ev(state); await sleep(250); }
+    check(st && st.m1[3] === 30, 'redo sets the margin again');
+    await ready(ev, `document.getElementById('bp-m1-left')?.value === '30'`);
+    await ev(setVal('bp-m1-left', '25'));
+    st = null; for (let i = 0; i < 40 && !(st && st.m1[3] === 25); i++) { st = await ev(state); await sleep(250); }
     await ev(setVal('bp-m1-left', '150'));
     check(await ready(ev, `/at least/.test(document.getElementById('bp-err')?.textContent || '')`), 'an impossible margin shows the error at the section');
     check((await ev(state)).m1[3] === 25, 'the impossible margin is not saved');
