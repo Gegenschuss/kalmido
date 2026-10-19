@@ -73,6 +73,7 @@ KINDS = {
     "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share"),
     # 2.48.0 (#1207 / #1152 / #1356): the file store (fs_role / need_node / fs_visible_sql, org boundary before shares), the
     # Paperless-ngx connection of one workspace, receipt data / agent suggestions on a visible document
+    "file_request": ("matrix", "p2122_a_api_test.py: a file request of another organisation's folder (list, create, change, remove): 404; the link writes only into its own folder as its creator, the page shows nothing of the folder (2.122.0 A, #2097)"),
     "file": ("matrix", "p248_a_api_test.py: a node of another organisation / person: 404 (read, list, content, versions, share, move); shares only to people and agents of the node's workspace"),
     "paperless": ("matrix", "p248_d_paperless_api_test.py: the connection of another workspace: 404; organisation admins only change it; agents never"),
     # 2.55.0 (#1455): the newsletter connection of one workspace (segments, log, sync) + the consent of a contact
@@ -318,6 +319,10 @@ ROUTES = {
     # 2.92.0 C (#1926): file preview / text of docx and xlsx, summarise by an agent (p292_c_api_test.py)
     "GET /api/attachments/{}/preview": "attachment", "GET /api/attachments/{}/agents": "attachment",
     "GET /api/list-files/{}/preview": "attachment", "GET /api/files/nodes/{}/preview": "file",
+    # 2.122.0 A (#2097): file requests of a folder and their public page
+    "GET /api/files/nodes/{}/requests": "file_request", "POST /api/files/nodes/{}/requests": "file_request",
+    "PATCH /api/files/requests/{}": "file_request", "DELETE /api/files/requests/{}": "file_request",
+    "POST /api/files/requests/{}/restore": "file_request", "GET /u/{}": "file_request", "POST /u/{}": "file_request", "GET /u/v/up.js": "public",
     # 2.93.0 A (#1927): document templates and documents with signature, office admins (p293_a_api_test.py)
     "GET /api/office/doc-templates": "office", "POST /api/office/doc-templates": "office", "PATCH /api/office/doc-templates/{}": "office",
     "DELETE /api/office/doc-templates/{}": "office", "POST /api/office/doc-templates/{}/restore": "office", "GET /api/office/doc-templates/starters": "office",
