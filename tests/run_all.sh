@@ -1361,6 +1361,13 @@ fresh; run p2125_c_api "$PY" p2125_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2125_c_ui node p2125_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.125.0 part D: browser demo like a new account, all modules (#1653) (no container)
        run p2125_d_demo node p2125_d_demo_test.js
+# 2.111.0: Buero-Rueckgaengig (a), Termin-Einladungen + Abo-Link (b), Schnellerfassung (c)
+fresh; run p2111_a_api "$PY" p2111_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2111_a_ui node p2111_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2111_b_api "$PY" p2111_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2111_b_ui node p2111_b_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2111_c_api "$PY" p2111_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2111_c_ui node p2111_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
