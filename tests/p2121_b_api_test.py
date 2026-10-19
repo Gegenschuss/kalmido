@@ -176,7 +176,8 @@ for body, what in (({"day": "2026-03-02", "dir": "in", "amount": "0", "text": "x
                    ({"day": "2026-03-02", "dir": "in", "amount": "abc", "text": "x"}, "not a number"), ({"day": "2026-03-02", "dir": "sideways", "amount": "1", "text": "x"}, "kind"),
                    ({"day": "2026-03-02", "dir": "in", "amount": "1", "text": " "}, "no text"), ({"day": "2026-03-02", "dir": "in", "amount": "1", "text": "x", "vat_pct": "16"}, "VAT 16"),
                    ({"day": "2099-01-01", "dir": "in", "amount": "1", "text": "x"}, "future"), ({"day": "2025-12-31", "dir": "in", "amount": "1", "text": "x"}, "before the opening day"),
-                   ({"day": "2026-03-02", "dir": "in", "amount": True, "text": "x"}, "amount true")):
+                   ({"day": "2026-03-02", "dir": "in", "amount": True, "text": "x"}, "amount true"),
+                   ({"day": "2026-03-02", "dir": "in", "amount": "0.004", "text": "x"}, "amount rounding to 0,00 (review M2)")):
     check(post(A, body).status_code == 400, f"entry: {what} 400")
 r = post(A, {"day": "2026-03-02", "dir": "out", "amount": "500", "text": "zu viel"})
 check(r.status_code == 400 and "below zero" in r.text, "the balance never below zero " + r.text[:200])
@@ -210,6 +211,7 @@ check(enc(sql("SELECT prev FROM office_cash_log WHERE entry_id=? ORDER BY id DES
 check(A.patch(B + f"{CE}/{E2}", json={"amount": "900"}).status_code == 400, "change: below zero 400")
 
 # cancellation
+check(A.post(B + f"{CE}/{E1}/cancel", json={"day": "2099-01-01"}).status_code == 400, "review M1: a cancellation never lies in the future")
 r = A.post(B + f"{CE}/{E1}/cancel", json={"day": "2026-03-05"})
 check(r.status_code == 201 and r.json()["entry"]["no"] == 11 and r.json()["entry"]["dir"] == "out" and r.json()["entry"]["amount"] == "50.00"
       and r.json()["entry"]["storno_of"] == E1 and r.json()["entry"]["storno_of_no"] == 1 and r.json()["original"]["cancelled_by_no"] == 11,
