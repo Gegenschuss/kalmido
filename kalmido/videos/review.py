@@ -254,8 +254,9 @@ def vdr_full(c, uid, r):
     return bool(is_org_admin(c, uid, r["org_id"])) if r["org_id"] else r["owner_id"] == uid
 
 
-def vdr_dict(c, r, uid, full=False):
-    """A review for the app: place, state, versions, open comments; full = with the comments and the approval links."""
+def vdr_dict(c, r, uid, full=False, signoffs=True):
+    """A review for the app: place, state, versions, open comments; full = with the comments and the approval links
+    (signoffs=False: never built, the agents' API)."""
     vs = vdr_versions(c, r["id"])
     n_open = c.execute("SELECT COUNT(*) FROM video_comments WHERE review_id=? AND deleted_at IS NULL AND done=0 AND parent_id IS NULL",
                        (r["id"],)).fetchone()[0]
@@ -270,7 +271,7 @@ def vdr_dict(c, r, uid, full=False):
         cm = vdr_comments(c, r["id"])
         names = user_names(c, [x["author_id"] for x in cm])
         d["comments"] = [vdr_comment_dict(x, names) for x in cm]
-        if d["can_write"]:
+        if d["can_write"] and signoffs:
             rows = c.execute("SELECT * FROM office_signoffs WHERE video_id=? AND kind='video' ORDER BY id DESC LIMIT 20", (r["id"],)).fetchall()
             adm = vdr_full(c, uid, r)
             d["signoffs"] = [sig_public(c, s, adm) for s in rows]
