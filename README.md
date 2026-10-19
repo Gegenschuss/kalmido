@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.114.4** (2026-10-19): office fixes 4 - a calmer quotation PDF (footer without breaks, page number only from
+  two pages, only the VAT rates that occur), the order confirmation optional, documents with PDF preview and the same
+  footer, travel costs with the per diem as the main amount.
 - **2.114.2** (2026-10-19): office fixes 2 - a finalised quotation that never left the house can be deleted or
   taken back to a draft (same number), number scheme errors under the field with a reset button.
 - **2.114.1** (2026-10-19): office fixes - the transfer of rights as the last page of the quotation PDF, receipts in
