@@ -589,6 +589,22 @@ on the 1st of every month in that person's basket, with only a link to the cash 
 ends the old task and creates a new one; switching it off ends the task (done, without a next date; not deleted). If the
 person later loses access to the cash flow, the tab says so; nobody else is picked automatically.
 
+**Account balance** (2.123): a rough orientation also when not everything is in Kalmido. In the office settings, section
+**Cash flow**, the admin enters a **starting balance** (may be negative) and its **reference date** (saved on change, one undo
+step; empty = no balance). The cash flow then shows per month the **account balance at the end of the month** (computed):
+the starting balance plus all money in minus all money out from the reference date on - actual and planned, so also in
+the preview - always gross (the account sees gross amounts), also when the view is set to net. Months before the reference
+date have none. **Corrections by hand** ("Other money in" / "Other money out", amount and a short note, per month, marked
+"by hand") are for money outside Kalmido: they count only in the account balance, the computed rows (in, out, balance,
+tax reserve) stay as they are. Adding, editing and deleting is one undo step each. **Real balance** (optional, by hand):
+the balance from the bank statement at the end of a month; the card shows the **difference** to the computed balance
+(only shown, nothing is booked). Without a starting balance and without corrections the cash flow looks exactly as before.
+Amounts and notes are encrypted at rest; the same for organisations and for freelancers in their personal office.
+`GET/PUT/DELETE /api/office/cashflow/start` (`{amount, day}` -> `{start, prev}`), `POST /api/office/cashflow/adjust`
+(`{month, dir in|out, amount, note}`), `PATCH/DELETE /api/office/cashflow/adjust/<id>` (delete answers the row for the undo),
+`PUT /api/office/cashflow/actual` (`{month, amount}`; null removes it). The cash flow answer adds `start`, `adjust` and per
+month `account`, `manual {in, out}`, `real`, `diff` - only when they are set.
+
 Routes (office admins, people only; agents get 403): `GET /api/office/cashflow?from=YYYY-MM&months=1..12&basis=gross|net`,
 `GET/POST /api/office/fixed-costs`, `PATCH/DELETE /api/office/fixed-costs/<id>` (`category`, `vat_rate` 0/7/19; the answer
 adds `gross`), `POST /api/office/fixed-costs/import/preview` (multipart `file`), `POST /api/office/fixed-costs/import`
