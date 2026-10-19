@@ -63,6 +63,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   the cash flow, books up to date right after a bank match, clearer bank buttons on phones.
 - **2.136.0** (2026-10-19): a new face - the Kalmido bot replaces the heron in the app icon, the empty views, the
   celebration and the loading screen; on iPhone / iPad add the web app to the home screen again for the new icon.
+- **2.111.0** (2026-10-19): office editors save with an undo when you leave, invitations by e-mail with .ics to external
+  attendees, secret subscription links for event calendars, quick add with @person, duration and reminders at a fixed time.
 - **2.98.0** (2026-10-19): scheduling polls with a public vote link, questionnaires in forms (answers become a task at the
   customer), the office menu as a rail on the left, resizable tables in their own window, documents guess amounts only
   where they fit.
