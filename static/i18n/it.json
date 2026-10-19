@@ -10815,5 +10815,14 @@
   "Back to a draft?": "Tornare a bozza?",
   "The quotation can be changed again and keeps its number {0}.": "Il preventivo si può di nuovo modificare e mantiene il numero {0}.",
   "Back to a draft": "Di nuovo in bozza",
-  "finalising undone": "finalizzazione annullata"
+  "finalising undone": "finalizzazione annullata",
+  "Applies to the positions of this page with a producing tick. Parts without an own setting take over the switch and calculate their producing themselves.": "Vale per le posizioni di questa pagina con la spunta producing. Le parti senza impostazione propria riprendono l’interruttore e calcolano da sé il loro producing.",
+  "Applies to the positions with a producing tick.": "Vale per le posizioni con la spunta producing.",
+  "Applies to the positions of this part with a producing tick.": "Vale per le posizioni di questa parte con la spunta producing.",
+  "own setting": "impostazione propria",
+  "like the document": "come il documento",
+  "Use the values of the document": "Usa i valori del documento",
+  "incl. producing ({0})": "incl. producing ({0})",
+  "incl. producing 1 day": "incl. producing 1 giorno",
+  "incl. producing {0} days": "incl. producing {0} giorni"
 }

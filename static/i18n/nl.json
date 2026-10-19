@@ -10815,5 +10815,14 @@
   "Back to a draft?": "Terug naar concept?",
   "The quotation can be changed again and keeps its number {0}.": "De offerte kan weer worden gewijzigd en houdt haar nummer {0}.",
   "Back to a draft": "Weer een concept",
-  "finalising undone": "definitief maken ongedaan gemaakt"
+  "finalising undone": "definitief maken ongedaan gemaakt",
+  "Applies to the positions of this page with a producing tick. Parts without an own setting take over the switch and calculate their producing themselves.": "Geldt voor de posities op deze pagina met een producing-vinkje. Deelofferten zonder eigen instelling nemen de schakelaar over en berekenen hun producing zelf.",
+  "Applies to the positions with a producing tick.": "Geldt voor de posities met een producing-vinkje.",
+  "Applies to the positions of this part with a producing tick.": "Geldt voor de posities van dit deel met een producing-vinkje.",
+  "own setting": "eigen instelling",
+  "like the document": "zoals het document",
+  "Use the values of the document": "Waarden van het document gebruiken",
+  "incl. producing ({0})": "incl. producing ({0})",
+  "incl. producing 1 day": "incl. producing 1 dag",
+  "incl. producing {0} days": "incl. producing {0} dagen"
 }
