@@ -1,0 +1,36 @@
+name: E-invoice format proposal
+description: A national e-invoice format you would like to add or contribute
+labels: [enhancement]
+body:
+  - type: input
+    id: format
+    attributes:
+      label: Format and country
+      description: For example a national CIUS, a Peppol BIS variant or another EN 16931 syntax.
+    validations:
+      required: true
+  - type: input
+    id: spec
+    attributes:
+      label: Specification (link and version)
+    validations:
+      required: true
+  - type: textarea
+    id: validator
+    attributes:
+      label: Official validator or Schematron
+      description: Which one can run in CI, and where is it published?
+  - type: dropdown
+    id: clearance
+    attributes:
+      label: Is an invoice sent to an authority interface (clearance / real-time reporting)?
+      options:
+        - "No, the file is only created"
+        - "Yes, submission is required"
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Would you like to maintain the format and send the pull request yourself?

@@ -110,6 +110,14 @@ CHECKS = {
                     "WHERE (cl.id IS NOT NULL AND cl.org_id IS DISTINCT FROM d.org_id AND NOT (cl.org_id IS NULL AND o.personal_of=cl.created_by)) OR "
                     "(l.id IS NOT NULL AND l.org_id IS DISTINCT FROM d.org_id AND NOT (l.org_id IS NULL AND o.personal_of=l.owner_id)) OR "
                     "(od.id IS NOT NULL AND od.org_id IS DISTINCT FROM d.org_id) OR (t.id IS NOT NULL AND t.org_id IS DISTINCT FROM d.org_id)"),
+    # 2.99.1 A (#1959): a video sign-off bound to a task / list / client of another workspace, a version / comment / approval
+    # link of it in another workspace than the sign-off
+    "video_ref": ("SELECT v.id, v.created_by FROM video_reviews v LEFT JOIN tasks t ON t.id=v.task_id LEFT JOIN lists tl ON tl.id=t.list_id "
+                  "LEFT JOIN lists l ON l.id=v.list_id LEFT JOIN clients cl ON cl.id=v.client_id WHERE v.deleted_at IS NULL AND ("
+                  "(tl.id IS NOT NULL AND tl.org_id IS DISTINCT FROM v.org_id) OR (l.id IS NOT NULL AND l.org_id IS DISTINCT FROM v.org_id) OR "
+                  "(cl.id IS NOT NULL AND cl.org_id IS DISTINCT FROM v.org_id) OR EXISTS (SELECT 1 FROM video_versions x WHERE x.review_id=v.id "
+                  "AND x.org_id IS DISTINCT FROM v.org_id) OR EXISTS (SELECT 1 FROM video_comments x WHERE x.review_id=v.id AND x.org_id IS DISTINCT "
+                  "FROM v.org_id) OR EXISTS (SELECT 1 FROM office_signoffs s WHERE s.video_id=v.id AND s.org_id IS DISTINCT FROM v.org_id))"),
     "gen_doc_signoff": ("SELECT s.id, s.created_by FROM office_signoffs s JOIN office_gen_docs d ON d.id=s.gen_doc_id WHERE d.org_id IS DISTINCT FROM s.org_id"),
     "pay_prop": ("SELECT p.id, p.agent_id FROM office_pay_props p JOIN office_docs d ON d.id=p.doc_id WHERE d.org_id IS DISTINCT FROM p.org_id"),
     # an agent of an organisation that is gone, or a personal agent working in an organisation its owner is not in

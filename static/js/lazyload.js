@@ -29,6 +29,8 @@ const LD_MODS = {
   feeds: ['feeds'],  // 2.85.0 B (#1162)
   bookmarks: ['bookmarks'],  // 2.97.0 A (#1950)
   sheets: ['sheets', 'sheets2', 'sheetsio'],  // 2.89.0 (#1916); D: sheets2.js (step 2), C: sheetsio.js (import/export)
+  videos: ['videorev'],  // 2.99.1 A (#1959): video sign-offs
+  pubvideo: ['pubvideo'],  // 2.99.1 A (#1959): only the customer page of a video sign-off loads it (/s/q/<token>), the app never
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
@@ -51,7 +53,7 @@ const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 
 // them next to the scripts and resolves only once they apply (no unstyled flash when the area opens)
 const LD_CSS = {settings: ['settings'], contacts: ['contacts'], office: ['office'], agentchat: ['agentchat'], pdf: ['pdf'], mindmap: ['mindmap'],
   wiki: ['wiki'], stats: ['stats'], calendar: ['calendar'], docs: ['docs'], life: ['life'],
-  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets']};  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
+  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev']};  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
 const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office'],
   // 2.65.0 (#1823)
   chatViewHtml: ['agentchat', 1], jobStepsHtml: ['agentchat'], aiuCardHtml: ['agentchat'], aiuNewsText: ['agentchat'], chatInner: ['agentchat'],
@@ -155,6 +157,10 @@ window.oa_switchLoad.ld = 1;
 // 2.65.0 (#1823) knowledge pages: the command bar's pages and a task's "Mentioned in" load the module in the background (the
 // first time without them, as before while the pages were fetched); the task panel is drawn again once it is there
 window.wk_palAdd = () => { if (feat('wiki')) loadModule('wiki').catch(() => {}); };
+// 2.99.1 A (#1959): video sign-offs (videorev.js, module videos): a task's panel, a project's overview and a client's card load
+// the module when they are drawn and draw again once it is there
+window.vdr_taskHtml = t => { if (t?.id > 0) loadModule('videos').then(() => { if (S.sel === t.id && vdr_rows('task_id', t.id, () => vdr_redrawTask(t.id))) vdr_redrawTask(t.id); }, () => {}); return ''; };  // 2.96.3: one redraw, focus kept
+window.vdr_projHtml = window.vdr_clientHtml = () => { ld_later('videos'); return ''; };
 window.wk_mentionHtml = t => { if (feat('wiki') && t?.id > 0) loadModule('wiki').then(() => { if (S.sel === t.id) renderDetail(); }, () => {}); return ''; };
 // 2.65.0 (#1823) the PDF preview (pdfview.js, module pdf): its links are drawn at start, a click loads the module (moved here
 // from pdfview.js). A link that should open the preview: <a href="…" data-pview='{"url","name","size","dlUrl"}'>; a modifier

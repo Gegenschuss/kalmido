@@ -280,6 +280,11 @@ def umz_extra_queries(uid):
         "sheet_columns": (f"SELECT * FROM sheet_columns WHERE sheet_id IN (SELECT id FROM sheets WHERE {sheets})", (uid,)),
         "sheet_rows": (f"SELECT * FROM sheet_rows WHERE sheet_id IN (SELECT id FROM sheets WHERE {sheets})", (uid,)),
         "sheet_cells": (f"SELECT * FROM sheet_cells WHERE sheet_id IN (SELECT id FROM sheets WHERE {sheets})", (uid,)),
+        # 2.99.1 A (#1959): my private video sign-offs (organisation ones are in the organisation export)
+        "video_reviews": ("SELECT * FROM video_reviews WHERE owner_id=? AND org_id IS NULL AND deleted_at IS NULL", (uid,)),
+        "video_versions": ("SELECT * FROM video_versions WHERE review_id IN (SELECT id FROM video_reviews WHERE owner_id=? AND org_id IS NULL)", (uid,)),
+        "video_comments": ("SELECT * FROM video_comments WHERE review_id IN (SELECT id FROM video_reviews WHERE owner_id=? AND org_id IS NULL) "
+                           "AND deleted_at IS NULL", (uid,)),
     }
 
 

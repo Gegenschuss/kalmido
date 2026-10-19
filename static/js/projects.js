@@ -282,7 +282,7 @@ function viewProjOv() {
   for (const p of j.layout?.pads || []) P['np' + p.id] = () => wgPadHtml(l, p, can);  // 2.43.0 (#1346): the notepads
   const y = j.layout || {}, cust = S.ly.view === 'project';
   const bar = `<div class="povlybar">${!cust && y.mine ? `<span class="muted">${tr('Your own arrangement')}</span>` : ''}<span class="spacer"></span>${cust ? '' : `<button type="button" class="btn sm" data-rpt="open" data-id="${l.id}">${ic('journal', 's')}${tr('Status report')}</button>` + lyCustomBtn('project')}</div>`;  // 2.34.0 (#265)
-  return `<div class="pov">${head}${bar}${lyHtml('project', P, {canStd: !!y.can_std && !l.archived, override: true})}${typeof hbm_projHtml === 'function' ? hbm_projHtml(l) : ''}</div>`;  // 2.84.0 A (#1198): + the project's e-mails
+  return `<div class="pov">${head}${bar}${lyHtml('project', P, {canStd: !!y.can_std && !l.archived, override: true})}${typeof hbm_projHtml === 'function' ? hbm_projHtml(l) : ''}${typeof vdr_projHtml === 'function' ? vdr_projHtml(l) : ''}</div>`;  // 2.84.0 A (#1198): + the project's e-mails; 2.99.1 A (#1959): + video sign-offs
 }
 async function povApi(method, url, body) {
   const lid = routeList()?.id;

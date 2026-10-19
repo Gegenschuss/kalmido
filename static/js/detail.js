@@ -228,7 +228,7 @@ const DETAIL_ORDER = ['family', 'life', 'subtasks', 'deps', 'links', 'tags', 'at
 // 2.27.0 (#957, back to #322): the comments come LAST again, below "More details" (the box stays at the bottom edge); the fold
 // says in its summary line what it holds, so nothing is overlooked
 const DETAIL_TOP = ['family', 'life', 'subtasks'];
-const DETAIL_MORE = ['deps', 'links', 'attachments', 'tags', 'fields', 'custom', 'time', 'snippets', 'code', 'history'];  // code: 2.2.0 (#271)  // history: private lists only (2.0.7)
+const DETAIL_MORE = ['deps', 'links', 'attachments', 'video', 'tags', 'fields', 'custom', 'time', 'snippets', 'code', 'history'];  // code: 2.2.0 (#271)  // history: private lists only (2.0.7)
 // 2.27.0 (#957): the summary line of the folded "More details": what is set inside it ("3 tags · Link · 2 fields")
 function moreSummary(t, ks) {
   const out = [], has = k => ks.includes(k);
@@ -475,6 +475,7 @@ function renderDetail0() {
     snippets: ck ? '' : snipHtml(t, ro),  // 2.35.0 (#1095): code snippets
     family: ck ? '' : famDetailHtml(t, l, ro),  // 2.19.0 (#653)
     life: ck ? '' : lifeDetailHtml(t, l, ro),  // 2.22.0 (#663)
+    video: ck || typeof vdr_taskHtml !== 'function' ? '' : vdr_taskHtml(t, ro),  // 2.99.1 A (#1959): video sign-offs (videorev.js, loaded on demand)
     links: ck ? '' : linksDetailHtml(t, ro)};  // 2.21.0 (#659 / #658): events + contacts of the task
   setHtml($('#detail'), `
     <div class="dtop">
@@ -516,7 +517,7 @@ function renderDetail0() {
       ${msT && t.id > 0 ? `<div class="dsec mssec" id="d-ms">${msReportHtml(t)}</div>` : ''}
       ${(() => {  // 2.24.0 (UX-41)
         const keep = k => (k === 'snippets' && (snipCount(t) || S.snip?.tid === t.id || listById(t.list_id)?.ptype === 'software'))  // 2.35.0 (#1095)
-          || (k === 'attachments' && (t.attachments || []).length) || (k === 'deps' && (t.waiting_at || (t.blockers || []).length)) || (k === 'links' && (((S.tcontacts || {})[t.id] || []).length || ((S.evlinks || {})[t.id] || []).length));
+          || (k === 'attachments' && (t.attachments || []).length) || (k === 'video' && typeof vdr_count === 'function' && vdr_count(t)) || (k === 'deps' && (t.waiting_at || (t.blockers || []).length)) || (k === 'links' && (((S.tcontacts || {})[t.id] || []).length || ((S.evlinks || {})[t.id] || []).length));
         const top = DETAIL_TOP.map(k => SEC[k]).concat(DETAIL_MORE.filter(keep).map(k => SEC[k]));
         const rest = DETAIL_MORE.filter(k => !keep(k)).map(k => SEC[k]).filter(x => x && x.trim());
         const sum = moreSummary(t, DETAIL_MORE.filter(k => !keep(k)));

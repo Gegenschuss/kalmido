@@ -678,6 +678,8 @@ def openapi_spec():
     docs_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1111)
     from ..sheets.v1 import sheets_spec
     sheets_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.89.0 C (#1916)
+    from ..videos.v1 import vdr_v1_spec
+    vdr_v1_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.99.1 C (#1959)
     pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.23.0 (#463)
     from ..lists.envs import env_spec
     env_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.60.0 D (#1514)

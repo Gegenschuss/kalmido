@@ -119,6 +119,43 @@ only** and are meant to be shared through a separate packs repository with a cat
 Code parts - new e-invoice formats, exports, bookkeeping interfaces, new rules of the calculator - are not packs: they
 come as a pull request to this repository, with tests, like any other change.
 
+## Contributing national e-invoice formats
+
+Kalmido writes e-invoices in the formats below. More European (and other) national formats are welcome, as a pull
+request to this repository. Formats are code, not packs: they are reviewed, tested and shipped with Kalmido. There are
+no scripts or plugins that run on a server, and a format never sends invoice data to a third party.
+
+Formats today (`EIN_FORMATS` in `kalmido/office/einvoice.py`), each with its specification:
+
+- `zugferd`: ZUGFeRD 2.x / Factur-X, profile EN 16931 (UN/CEFACT CII D16B inside a PDF/A-3 file),
+  specification: [EN 16931](https://ec.europa.eu/digital-building-blocks/sites/display/DIGITAL/Obligation+to+accept+e-invoices)
+  and the [FeRD ZUGFeRD](https://www.ferd-net.de/) documentation, version 2.x.
+- `xrechnung`: XRechnung 3.0, the German CIUS of EN 16931 (CII syntax),
+  specification: [KoSIT XRechnung](https://xeinkauf.de/xrechnung/) version 3.0.
+
+How the code is laid out:
+
+- `ein_build(model, fmt)` builds the XML from the print model of a finalised document (no database, pure function).
+  A new format is a new entry in `EIN_FORMATS` and `EIN_PROFILE` plus its own builder branch or function next to the
+  existing ones. Keep amounts as `Decimal` strings, never float.
+- `ein_check(xml)` is the plausibility check without a validator; extend it for the new format's mandatory fields.
+- The format choice is offered by `epdf_format` in `kalmido/office/pdfweb.py` (the list there must contain the new key).
+- `tests/office_einvoice_test.py` writes example invoices to `tests/.data/einvoice/`; add yours there.
+
+What every contribution needs:
+
+1. **Example invoices** in the test: invented companies, people and addresses only (`@example.com`), never real data.
+2. **A validator run in CI.** Use the official validator or Schematron of the format, pinned by SHA-256 like the
+   existing ones, and call it from `tools/einvoice_validate.sh` so that the `einvoice` job in `.github/workflows/ci.yml`
+   (blocking) checks your files. You can run it locally: `tools/einvoice_validate.sh tests/.data/einvoice/*.xml`.
+3. **The source of the specification** (link and version) in this section, and the name of the person who maintains the
+   format (answers issues and follows new versions of the specification).
+4. The checklist *New e-invoice format* of the pull request template.
+
+Countries with clearance or reporting duties over an authority interface (real-time submission) only after agreeing in
+an issue first: use the issue template *E-invoice format proposal*. Kalmido does not send invoice data to third
+parties without a decision of the project.
+
 ## Pull requests
 
 - One topic per pull request, with a short description of the *why* and how you tested it.

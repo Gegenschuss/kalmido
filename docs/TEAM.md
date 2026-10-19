@@ -217,6 +217,34 @@ approval*.
 - A linked pull request that is merged, or approved with 👍 in Kalmido, counts as the approval.
 - Every step can be undone.
 
+## Video sign-off with comments at a timecode (2.99.1)
+
+For film and video work: the customer or a colleague watches a cut and comments at the second it is about. **Kalmido
+stores no videos**: a video sign-off holds **links only** -- Vimeo (also unlisted with its hash), YouTube (also unlisted,
+youtu.be, Shorts) or a direct video file over https (MP4, WebM, MOV, e.g. a file link from Nextcloud, a NAS or Dropbox; the
+link has to end with the file name). Any other link (a Google Drive page, a Nextcloud share page) is a *link without time
+control*: it opens in a new tab and its comments carry no timecode.
+
+- Where: a task's panel (*More details* > *Video sign-off*), a project's overview and a client's card: *Add video link*.
+- Comments: typing pauses the player and keeps its time (*at 01:23*; a tap on it comments without a time). A tap on a
+  timecode or on a mark of the time line under the player jumps there. Answers (one level), *done* and back, delete.
+- Versions: *New version…* in the menu adds the next cut (v1, v2 …); the version switch shows the older ones with their
+  comments.
+- Export: *Copy comments as text* (timecode, name, text, done -- for the edit) and *Download comments (CSV)*.
+- Customer link: *Create customer link* gives a page without an account (the approval link of the office, see
+  [OFFICE.md](OFFICE.md) *Approval by the customer*): the newest version, the customer's comments with a timecode (name
+  needed) and *Approve* / *Request changes* (with a reason). The decision sets the state of the sign-off and stands in its
+  comments; the creator of the link gets a push (notification switch *Approval requests*, also for the customer's first
+  comment within ten minutes). Comments of the team stay internal; only answers to the customer's comments are shown to
+  them. A new link stops the older one; deleting the sign-off stops it at once.
+- Rights: who sees the task / project / client sees the sign-off and may comment (like task comments); changing it, new
+  versions, the customer link, moving and deleting need the right to edit there. A locked list (end-to-end) has none.
+- *Move to another workspace…* takes it with its versions and comments into a project of the private space or an
+  organisation (its creator or an admin of the organisation); the customer links and their record stay in the old
+  workspace. Undo brings it back to its old place.
+- Every step can be undone. The players are embedded without loading any script of Vimeo or YouTube (YouTube through
+  youtube-nocookie.com); only the two player addresses may be framed (Content-Security-Policy).
+
 ## Story points, WIP limits and velocity (2.60.0)
 
 For software teams working on a board. Everything is off until you switch it on.
