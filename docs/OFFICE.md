@@ -1178,6 +1178,20 @@ a sample), `GET /api/office/doc-templates/starters?lang=`, `PATCH/DELETE /api/of
 `GET /api/office/gen-docs/<id>/signoffs`; a link is stopped with `POST /api/office/signoffs/<sid>/revoke`. Template and
 document texts are encrypted at rest in organisations with encryption.
 
+## Delivery notes and the timesheet (2.120.0)
+
+- **Delivery note / proof of service** (document kind `delivery`, tab "Delivery notes"): made from a quotation or an invoice
+  (`POST /api/office/docs/<id>/delivery`, positions without prices, discounts left out) or empty. Own number series
+  (`delivery_scheme`, default `LS-{yyyy}-{seq:03}`, set at finalising). `delivery_title` picks the title: "" = Lieferschein,
+  `service` = Leistungsnachweis. The PDF shows no prices, sums, tax or payment details and ends with the box "received /
+  accepted" (place, date, signature). It has no e-invoice, no payment state and is not counted in revenue, cash flow, DATEV or
+  reminders. Finalising needs a recipient (with address) and one position; sending works like other documents.
+- **Timesheet of an invoice** (`GET /api/office/docs/<id>/timesheet.pdf`, `?inline=1`): for an invoice with a client and a
+  period of service, the time entries of the client's lists in that period (date, person, activity, hours per list, total),
+  rounded like the time report. Only entries the signed-in person may see in the time report; made on demand, never stored.
+  `POST .../send` takes `timesheet: true` to attach it as a second file (the invoice's own PDF / ZUGFeRD file is unchanged;
+  the DATEV copy never gets it). The document answer has `timesheet_ok`.
+
 ## Access log
 
 Every change and every read of documents and master data is written to the office log (`office_doc_log`): who, when,
