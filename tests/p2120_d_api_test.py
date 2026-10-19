@@ -150,7 +150,7 @@ check(r.status_code == 400 and "position" in r.json().get("error", ""), "an empt
 r = A.put(B + O + "/settings", json={"delivery_scheme": "LSN-{yy}-{seq:04}"})
 check(r.ok and r.json()["settings"]["delivery_scheme"] == "LSN-{yy}-{seq:04}", "delivery_scheme saved " + r.text[:120])
 pv = A.get(B + O + "/number-preview", params={"scheme": "LSN-{yy}-{seq:04}", "kind": "delivery"}).json()
-check(pv["valid"] and re.fullmatch(r"LSN-\d\d-0001", pv["preview"]), f"preview {pv}")
+check(pv["valid"] and re.fullmatch(r"LSN-\d\d-0003", pv["preview"]), f"preview {pv}")
 check(A.get(B + O + "/settings").json()["settings"]["invoice_scheme"].startswith("RE-"), "other schemes unchanged")
 # from an invoice
 r = A.post(B + D, json={"kind": "invoice", "client_id": CL, "service_from": "2026-05-01", "service_to": "2026-05-31", "items": [item("Beratung", 4, 100, "hour")]})
