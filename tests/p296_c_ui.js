@@ -103,13 +103,15 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
 
   // ================= the filter
   const filt = () => d.querySelector('#jcd-filt');
-  check(filt() && !filt().hidden && filt().querySelectorAll('.jcdseg button').length === 3 && filt().querySelectorAll('select.jcdsel option').length === 3, 'with a job: the filter (buttons + a menu for the phone)');
+  check(filt() && !filt().hidden && filt().querySelectorAll('.jcdseg button').length === 3 && d.querySelector('#jcd-fbtn.jcdfbtn:not([hidden])'), 'with a job: the filter (buttons + a header icon for the phone)'  // 2.117.0 (#2260));
   check(/Only me and Dev Bot/.test(filt().textContent), 'the filter names the agent ' + filt().textContent);
   click(w, filt().querySelector('[data-f="jobs"]'));
   await until(() => !/plain answer/.test(box().textContent));
   check(card() && !/plain answer/.test(box().textContent) && !box().querySelector(':scope > .cmsg.me') && d.querySelector(`#chat-msgs [data-mid="a:${mq}"]`), 'Jobs: the card and the question, not the plain answer or my message');
   check(w.eval(`LS.get('jcdFilt')`) === 'jobs' && filt().querySelector('[data-f="jobs"]').getAttribute('aria-pressed') === 'true', 'the filter is kept per device');
-  const sel = filt().querySelector('select.jcdsel'); sel.value = 'me'; sel.dispatchEvent(new w.Event('change', {bubbles: true}));
+  click(w, d.querySelector('#jcd-fbtn')); await until(() => d.querySelector('[role=menuitem]'));  // 2.117.0 (#2260): the phone icon opens the menu
+  check(d.querySelector('#jcd-fbtn .jcdfdot'), 'the icon carries a dot while the filter is not All');
+  click(w, [...d.querySelectorAll('[role=menuitem]')].find(x => /Only me/.test(x.textContent)));
   await until(() => !card() && /plain answer/.test(box().textContent));
   check(!card() && /plain answer/.test(box().textContent) && box().querySelector(':scope > .cmsg.me') && d.querySelector(`#chat-msgs [data-mid="a:${mq}"]`), 'Only me and the agent (the menu): no card, the plain answer, my message, the open question');
   // a search hit in a job's message: the filter steps aside and the card unfolds
@@ -129,8 +131,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'css', 'agentchat.css'), 'utf8');
   const blk = css.slice(css.indexOf('/* 2.96.0 C (#2015)'));
   const rule = sel2 => (new RegExp(sel2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\{([^}]*)\\}').exec(blk) || [])[1] || '';
-  check(/min-height:2\.75rem/.test(rule('.jcdh')) && /min-height:2\.75rem/.test(rule('.jcdsel')) && /min-height:2\.75rem/.test(rule('.jcdmore')), 'card, menu and "Show more": min-height 2.75rem (44 px)');
-  check(/@media \(pointer:coarse\)\{ \.jcdseg button\{min-height:2\.75rem\} \}/.test(blk) && /@media \(max-width:40rem\)\{ \.jcdseg\{display:none\} \.jcdsel\{display:block\} \}/.test(blk), 'touch: filter buttons 2.75rem; a narrow phone: the menu');
+  check(/min-height:2\.75rem/.test(rule('.jcdh')) && /min-height:2\.75rem/.test(rule('.jcdfbtn')) && /min-height:2\.75rem/.test(rule('.jcdmore')), 'card, menu and "Show more": min-height 2.75rem (44 px)');
+  check(/@media \(pointer:coarse\)\{ \.jcdseg button\{min-height:2\.75rem\} \}/.test(blk) && /@media \(max-width:40rem\)\{ \.jcdfilt\{display:none\} \.jcdfbtn\{display:inline-flex\} \}/.test(blk), 'touch: filter buttons 2.75rem; a narrow phone: the header icon');
   const plain = blk.replace(/\/\*[\s\S]*?\*\//g, '').replace('max(1rem,16px)', '').replace(/linear-gradient\(#000 70%,transparent\)/g, '');  // the mask's black is no colour
   check(!/(?<![\d.])([3-9]|\d{2,})px/.test(plain) && !/#[0-9a-f]{3,6}\b/i.test(plain), 'CSS: rem sizes, no new colours');
 
