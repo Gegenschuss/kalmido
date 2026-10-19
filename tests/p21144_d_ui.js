@@ -33,6 +33,15 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
   await call(CF, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   check(((await call(CF, 'GET', '/api/state')).me?.workspaces || []).length === 0, 'frida is in no organisation');
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
+  // 2.114.4 (#2286): the travel tab now and then stays away after a user switch on the Mac runner - one fresh load more
+  const travelTab = async (nav, ev) => {
+    for (let k = 0; k < 2; k++) {
+      await nav(B + 'static/icon.svg');  // fresh page: no dialog or stale hash state left over
+      await nav(B + '#office/travel');
+      if (await ready(ev, `!!document.querySelector('#rk-year')`, 80)) return true;
+    }
+    return false;
+  };
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
   const noScroll = `document.documentElement.scrollWidth <= window.innerWidth + 1`;
 
@@ -64,13 +73,11 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
       await shot(`p21144-d-dialog-${u}-${w}.png`);
       await ev(`document.querySelector('.modal [data-m="close"]')?.click()`);
       // ---- #2286 year without receipts
-      await nav(B + 'static/icon.svg');  // fresh page: no dialog or stale hash state left over
-      await nav(B + '#office/travel');
-      check(await ready(ev, `!!document.querySelector('#rk-year')`, 80), tag + 'the travel tab');
+      check(await travelTab(nav, ev), tag + 'the travel tab');
       await ev(`(() => { const s = document.querySelector('#rk-year'); s.value = '2024'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
       check(await ready(ev, `document.querySelectorAll('.rklist .ofcrow').length === 1`, 80), tag + 'the trip of 2024');
       check(await ev(`!document.querySelector('.rklist .rkrc') && /28\\.00|56\\.00|Per diem without amount|–/.test(document.querySelector('.rklist .rkpd')?.textContent || '')`), tag + '#2286: no receipts -> no receipts column, the per diem is the main amount ' + await ev(`document.querySelector('.rklist .ofcrow')?.textContent`));
-      check(await ev(`!!document.querySelector('.rklist .rkpd b') && !/0\\.00/.test(document.querySelector('.rklist .ofcrow').textContent)`), tag + '#2286: no 0.00 in the row');
+      check(await ev(`!!document.querySelector('.rklist .rkpd b') && !/0\\.00|\\$/.test(document.querySelector('.rklist .ofcrow').textContent)`), tag + '#2286: no 0.00 and no stray $ in the row');  // 2.114.4 review: $${...} slip
       check(await ev(noScroll), tag + 'no horizontal scrolling');
       await shot(`p21144-d-list-${u}-${w}.png`);
     }
@@ -87,8 +94,7 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
       await nav(B + 'static/icon.svg');
       await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
       await signIn(ev, u);
-      await nav(B + '#office/travel');
-      check(await ready(ev, `!!document.querySelector('#rk-year')`, 80), tag + 'the travel tab');
+      check(await travelTab(nav, ev), tag + 'the travel tab');
       await ev(`(() => { const s = document.querySelector('#rk-year'); s.value = '2025'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
       check(await ready(ev, `document.querySelectorAll('.rklist .ofcrow').length === 2`, 80), tag + 'the trips of 2025');
       check(await ev(`[...document.querySelectorAll('.rklist .ofcrow')].every(r => r.querySelector('.rkpd') && r.querySelector('.rkrc'))`), tag + '#2286: with receipts every row has both columns');
