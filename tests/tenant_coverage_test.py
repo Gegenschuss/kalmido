@@ -240,6 +240,9 @@ ROUTES = {
     "GET /api/office/letter-blocks": "office", "GET /api/office/letter-blocks/starters": "office", "POST /api/office/letter-blocks": "office",
     "PATCH /api/office/letter-blocks/{}": "office", "DELETE /api/office/letter-blocks/{}": "office", "POST /api/office/letter-blocks/{}/restore": "office",
     # 2.106.0 D (#2031): agents and letters (p2106_d_api_test.py) - routes below this line
+    "GET /api/v1/office/letters": "office", "POST /api/v1/office/letters": "office", "GET /api/v1/office/letters/{}": "office",
+    "PATCH /api/v1/office/letters/{}": "office", "POST /api/v1/office/letters/{}/links": "office",
+    "GET /api/office/letters/doc/{}/agents": "office", "POST /api/office/letters/doc/{}/ask-agent": "office",
     # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
     "GET /api/bookmarks": "bookmark", "POST /api/bookmarks": "bookmark", "GET /api/bookmarks/{}": "bookmark",
     "PATCH /api/bookmarks/{}": "bookmark", "DELETE /api/bookmarks/{}": "bookmark", "POST /api/bookmarks/{}/restore": "bookmark",
