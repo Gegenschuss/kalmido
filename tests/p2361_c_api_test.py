@@ -118,7 +118,7 @@ S_LIC = svc("Nutzungsrechte Musik", "Music licence", 100, cat="Buyout", tax="red
 CL = A.post(B + "/api/clients", json={"name": "Beispielkunde AG", "contact": "z. Hd. Max Mustermann", "address": "Marktstraße 5\n50667 Köln"}).json()["id"]
 
 # ---------------------------------------------------------------- create: defaults from the settings
-r = A.post(B + D, json={"project_title": "Imagefilm Herbstkampagne", "client_id": CL, "project_ref": "PO-4711"})
+r = A.post(B + D, json={"project_title": "Imagefilm Herbstkampagne", "client_id": CL, "project_ref": "PO-4711", "producing_on": 1})  # 2.113.1 (#2251): the office setting no longer switches producing on for a new quotation (only a pack option does); the document does
 check(r.status_code == 201, "a new quotation " + r.text[:200])
 d = r.json()
 DOC = d["id"]

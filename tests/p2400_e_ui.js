@@ -102,10 +102,11 @@ const FEAT = 'cal,comments,collab,office,clients';
 
     // ================= #1379 producing / raw data off
     const hid = sel => `getComputedStyle(document.querySelector('${sel}')).display === 'none'`;
-    check(await ev(`${hid('.ofcrule[data-rule="prod"]')} && ${hid('.ofcrule[data-rule="raw"]')} && !document.getElementById('os-prod-on').checked`), '#1379 off: the producing / raw data fields are hidden');
-    await ev(`(() => { const c = document.getElementById('os-prod-on'); c.click(); return 1; })()`);
-    check(await ev(`!(${hid('.ofcrule[data-rule="prod"]')}) && ${hid('.ofcrule[data-rule="raw"]')}`), '#1379: switching on shows its fields at once');
-    await ev(`(() => { document.getElementById('os-prod-on').click(); return 1; })()`);  // 2.113.0 (#2247): off again (each click saves)
+    // 2.113.1 (#2251): producing is an option of an industry pack now: without one the settings have no producing rule at all
+    check(await ev(`!document.querySelector('.ofcrule[data-rule="prod"]') && ${hid('.ofcrule[data-rule="raw"]')} && !document.getElementById('os-prod-on')`), '#1379/#2251 off: no producing rule without a pack, the raw data fields are hidden');
+    await ev(`(() => { const c = document.getElementById('os-raw-on'); c.click(); return 1; })()`);
+    check(await ev(`!(${hid('.ofcrule[data-rule="raw"]')})`), '#1379: switching on shows its fields at once');
+    await ev(`(() => { document.getElementById('os-raw-on').click(); return 1; })()`);  // 2.113.0 (#2247): off again (each click saves)
     await ev(`(() => { ofcModal('services', {...(ofcRow('services', ${SV}) || {id: ${SV}, name_de: 'Dreh'}), producing: 0, raw_fee: 0}); return 1; })()`);
     await ready(ev, `!!document.querySelector('.modal.ofcdlg #of-name_de')`);
     check(await ev(`(() => { const p = document.querySelector('.modal.ofcdlg #of-producing'); const q = document.querySelector('.modal.ofcdlg #of-raw_fee'); return !!p && !p.closest('.row').hidden && !!q && !q.closest('.row').hidden; })()`), '#1645: the service dialog always shows the producing / raw data flags');  // 2.47.0 (#1645): was hidden while off
@@ -113,7 +114,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ev(`(() => { location.hash = '#office/offers/${offer.id}'; return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.ofdeditor .ofdits')`, 60), 'the quotation editor');
     // 2.47.0 (#1645): the switches of the quotation and the flags are always shown; off = no automatic line
-    check(await ev(`!!document.querySelector('#ofd-raw_mode') && !!document.querySelector('#ofd-producing_on') && !document.querySelector('#ofd-producing_on').checked && !document.querySelector('#ofd-prod_quotient') && !document.querySelector('.ofdautos .ofdauto') && !!document.querySelector('.ofdeditor [data-k="producing"]') && !!document.querySelector('.ofdeditor [data-k="raw_fee"]')`),
+    // 2.113.1 (#2251): the producing switch and flag only with a pack option (or a quotation computing producing already)
+    check(await ev(`!!document.querySelector('#ofd-raw_mode') && !document.querySelector('#ofd-producing_on') && !document.querySelector('#ofd-prod_quotient') && !document.querySelector('.ofdautos .ofdauto') && !document.querySelector('.ofdeditor [data-k="producing"]') && !!document.querySelector('.ofdeditor [data-k="raw_fee"]')`),
       '#1645 off: no producing / raw data line, the switches and flags are there');
     await shot('p2400-e-editor-off.png');
 

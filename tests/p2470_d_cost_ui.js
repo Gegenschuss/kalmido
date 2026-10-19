@@ -48,9 +48,12 @@ const FEAT = 'cal,comments,collab,office,clients';
     await nav(B + `#office/offers/${offer.id}`);
     check(await ready(ev, `document.querySelectorAll('.ofdeditor .ofdits .ofdit').length >= 3`, 80), 'the quotation editor (admin)');
     // ================= #1645
-    check(await ev(`!!document.querySelector('#ofd-producing_on') && !document.querySelector('#ofd-producing_on').checked && !!document.querySelector('#ofd-raw_mode') && document.querySelectorAll('.ofdeditor [data-k="producing"]').length === 3`),
-      '#1645: the producing switch (off), the raw data choice and the flags are there although the default is off');
-    await ev(`(() => { document.getElementById('ofd-producing_on').click(); return 1; })()`);
+    // 2.113.1 (#2251): without a pack option the producing switch / flags are hidden; a quotation computing producing shows them
+    check(await ev(`!document.querySelector('#ofd-producing_on') && !!document.querySelector('#ofd-raw_mode') && document.querySelectorAll('.ofdeditor [data-k="producing"]').length === 0`),
+      '#1645/#2251: the raw data choice is there, producing (off, no pack) is not');
+    await call(CA, 'PATCH', `/api/office/docs/${offer.id}`, {producing_on: 1});
+    await nav(B + 'static/icon.svg'); await nav(B + `#office/offers/${offer.id}`);  // a fresh load with the document's new switch
+    await ready(ev, `document.querySelectorAll('.ofdeditor [data-k="producing"]').length === 3`, 80);
     check(await ready(ev, `[...document.querySelectorAll('.ofdautos .ofdauto')].some(x => /Producing/.test(x.textContent)) && document.getElementById('ofd-producing_on').checked && !!document.querySelector('#ofd-prod_quotient')`),
       '#1645: switched on in the quotation, the producing line appears');
     // ================= #1649 admin
