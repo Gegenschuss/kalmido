@@ -17,6 +17,7 @@ usage: p2115_b_api_test.py <datadir>      (a fresh container; P2115B_NOSTART=1 =
 import base64
 import email
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -209,8 +210,9 @@ check(not DB.execute("SELECT 1 FROM users WHERE email LIKE 'x_@example.com'").fe
 r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "Nina.New@example.com", "role": "admin"})
 j = r.json() if r.ok else {}
 inv = j.get("invitation") or {}
-check(r.ok and j.get("invited") and inv.get("link", "").startswith("https://kalmido.example/#invite/") and inv.get("sent"),
-      "a new address: account + invitation, mailed, the link in the answer " + r.text[:300])
+# 2.115.0 review (M2): once mailed, the link is only in the mail, not in the admin's answer
+check(r.ok and j.get("invited") and inv.get("sent") and "link" not in inv and "#invite/" not in r.text,
+      "a new address: account + invitation, mailed, no link in the answer " + r.text[:300])
 NU = j.get("user_id")
 u = DB.execute("SELECT username, password_hash, email, disabled FROM users WHERE id=?", (NU,)).fetchone()
 check(u and u["username"] == "nina.new" and not u["password_hash"] and u["email"] == "Nina.New@example.com" and not u["disabled"],
@@ -221,7 +223,10 @@ check(not DB.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (
 ml = until(lambda: [x for x in mails() if "Nina.New@example.com" in x["to"] or "nina.new@example.com" in x["to"].lower()])
 msg = email.message_from_string(ml[0]["raw"]) if ml else None
 txt = "".join(p.get_payload(decode=True).decode() for p in msg.walk() if p.get_content_type() == "text/plain") if msg else ""
-check(inv.get("link", "-") in txt, f"the invitation mail with the link ({len(ml)} mail(s))")
+LINK_RE = re.compile(r"https://kalmido\.example/#invite/[A-Za-z0-9_-]+")
+mlink = LINK_RE.search(txt)
+check(mlink, f"the invitation mail with the link ({len(ml)} mail(s))")
+inv["link"] = mlink.group(0) if mlink else ""
 r = Bo.get(B + f"/api/orgs/{ORG}/invites")
 iv = r.json()["invites"] if r.ok else []
 check(len(iv) == 1 and iv[0]["user_id"] == NU and iv[0]["role"] == "admin" and iv[0]["state"] == "invited", f"the open invitation is listed: {iv}")
@@ -236,8 +241,14 @@ check(DB.execute("SELECT COUNT(*) FROM users WHERE lower(email)='carol@example.c
 old_tok = inv["link"].split("#invite/")[1]
 check(Fk.post(B + f"/api/orgs/{ORG}/invites/{NU}/resend").status_code == 404 and C.post(B + f"/api/orgs/{ORG}/invites/{NU}/resend").status_code == 403,
       "resend: other organisation 404, member 403")
+n_mails = len(mails())
 r = Bo.post(B + f"/api/orgs/{ORG}/invites/{NU}/resend")
-new_link = (r.json().get("invitation") or {}).get("link", "") if r.ok else ""
+check(r.ok and "#invite/" not in r.text, "resend: mailed, no link in the answer")
+ml2 = until(lambda: mails()[n_mails:] if len(mails()) > n_mails else [])
+txt2 = "".join(p.get_payload(decode=True).decode() for p in email.message_from_string(ml2[-1]["raw"]).walk()
+               if p.get_content_type() == "text/plain") if ml2 else ""
+m2 = LINK_RE.search(txt2)
+new_link = m2.group(0) if m2 else ""
 check(r.ok and new_link and new_link != inv["link"], "resend: a new link")
 check(s0.post(B + "/api/auth/invite/check", json={"token": old_tok}).status_code == 404, "the old link stops working")
 

@@ -273,6 +273,14 @@ check(bool(w) and w[0]["data"]["calendar"]["id"] == OC and "description" not in 
 check(bool(got("/alice", "event.created", lambda d: d["event"]["title"] == "Dentist")), "the private event at the personal webhook")
 check(none_after("/org", "event.created", lambda d: d["event"]["title"] == "Dentist", 2), "the private event never at the organisation's")
 check(none_after("/alice", "event.created", lambda d: d["event"]["title"] == "Org shoot", 0), "the organisation's event not at the personal one")
+# 2.115.0 review (M3): an organisation calendar the webhook's admin is no member of stays out (like tasks)
+r = Bo.post(B + "/api/evcals", json={"name": "Bob closed", "org_id": ORG})
+if r.ok:
+    Bo.post(B + "/api/events", json={"title": "Closed shoot", "cal_id": r.json()["id"], "start": f"{D}T10:00", "end": f"{D}T11:00"})
+    check(none_after("/org", "event.created", lambda d: d["event"]["title"] == "Closed shoot", 2),
+          "an organisation calendar the admin does not see: never at the organisation's webhook")
+else:
+    print("note: a member cannot add an organisation calendar here (" + str(r.status_code) + "), M3 case not reachable")
 A.patch(B + f"/api/events/{e1['id']}", json={"title": "Org shoot moved"})
 check(bool(got("/org", "event.updated", lambda d: d["event"]["title"] == "Org shoot moved")), "event.updated")
 A.delete(B + f"/api/events/{e1['id']}")
