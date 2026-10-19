@@ -453,7 +453,7 @@ function renderDetail0() {
   const mdOpen = !tlkR && !ck && t.content && /^\s*[-*]\s+\[ \]\s*\S/m.test(t.content) && depthOf(t) < 2;
   // 2.0.2 (#242): the comments sit right below the description, folded to the newest one (per device); long descriptions
   // fold after ~8 lines. 2.31.0 (#1054): no "Details | Comments" tabs on phones any more, a small jump to the comments instead
-  const mdLong = mdMode && mdIsLong(t.content), mdClamp = mdLong && !(S.mdMore || new Set()).has(t.id);
+  const mdLong = mdMode && mdIsLong(t.content), mdClamp = mdLong && !LS.get('mdOpen', false);  // 2.101.0 (#2157): one device setting for all tasks
   // 2.31.0 (#1054): the assignee once, as the chip under the title (people, agents, groups, "Take it"; no select below)
   const whoOn = !ck && t.id > 0 && collab() && (shared || t.assignee_id);
   const jump = cm === 'full' && !split ? `<button type="button" class="linkbtn djump" data-act="d-jump-cm" aria-controls="d-tl">${ic('down', 's')}<span>${tr('To the comments')}</span><span class="c" id="d-jump-count">${ncm || ''}</span></button>` : '';

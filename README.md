@@ -16,10 +16,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 <p align="center"><b>Coming soon: Kalmido hosted.</b> No server of your own, we run it for you, on servers in Germany and GDPR-compliant. Self-hosting stays free.</p>
 
 > **Language:** the interface is **English** by default, with **German** included and **French, Spanish, Italian and Dutch** in beta (machine-translated, corrections welcome); switch under *Settings > General > Language*. More languages are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md#translations) and [TRANSLATING.md](TRANSLATING.md). Kalmido = calm + the Japanese -do (道, “the way”, as in aikido or judo): the calm way of getting things done.
-> Kalmido is an independent project and not affiliated with any other task app.
+> Kalmido is an independent project and not affiliated with or endorsed by any of the products or companies named here; their names are trademarks of their respective owners and are used only to describe compatibility (import, calendar, export, agents).
 
 ## What's new
 
+- **2.101.0** (2026-10-19): *Show more* on a long description keeps the next tasks unfolded too until *Show less*
+  (per device); a trademark note in Settings > About.
 - **2.99.0** (2026-10-19): files on knowledge pages (PDFs, pictures) and a ZIP import that keeps them, one "…" menu on
   knowledge pages, the acceptance note on quotations accepted online, a short sidebar group Exchange (pinned people),
   a name addition for clients and a company name on up to three lines, 44 px fields in the document editor, aligned chat icons.
@@ -413,6 +415,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - Drop files from the desktop on a list: one new task per file, with the file attached
 - Subtasks up to three levels, drag and drop between lists and levels
 - Priorities, tags, pinned tasks (the smart list *Pinned* collects them from every list, 2.16), Markdown notes, attachments (images, PDFs, documents)
+- Long descriptions fold to a few lines; *Show more* keeps the following tasks unfolded too until *Show less* (per device, 2.101).
 - A website link per task, shown as a small domain chip (paste a URL in quick add or share a page from Android)
 - Quick add with two extra buttons (2.14): *Add and open details* creates the task and opens it at once, the paper clip creates it with files attached (the file name is the title when none is typed)
 - Natural-language quick add in English and German, whatever the interface language, plus French, Spanish, Italian or Dutch when the app runs in that language: `Dentist tomorrow 3pm !high #private ~Work`, `Zahnarzt morgen 15 Uhr !hoch #privat ~Arbeit`, `Dentiste demain 15h !!! #privé`
