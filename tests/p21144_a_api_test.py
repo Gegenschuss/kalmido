@@ -130,7 +130,8 @@ def scenario(S, who):
     allt = "\n".join(pg)
     page_rule(pg, who + " quotation")
     check(number and number in pg[0], f"{who}: the number still in the footer / head {number}")
-    for want in (IBAN_PRINT, "E-Mail post@musterfilm.example", "Steuernummer 12/345/67890", "BIC BYLADEM1001", "Tel. +49 30 123456789"):
+    # 2.114.5 (#2300): "E-Mail:" with a colon
+    for want in (IBAN_PRINT, "E-Mail: post@musterfilm.example", "Steuernummer 12/345/67890", "BIC BYLADEM1001", "Tel. +49 30 123456789"):
         check(one_line(pg, want), f"{who}: #2271 #2272 {want!r} whole on one line")
     check("+4930123456789" not in allt, f"{who}: #2272 no unspaced phone in the PDF")
     check("Alle Preise zuzüglich 19 % MwSt." in allt and "7 % bzw." not in allt, f"{who}: #2274 the VAT note names 19 % only")
@@ -160,14 +161,14 @@ def scenario(S, who):
     r = S.get(B + O + f"/gen-docs/{r.json().get('id')}/pdf")
     check(r.ok and r.content.startswith(b"%PDF"), f"{who}: the document PDF {r.status_code}")
     pgd = pages(r.content)
-    for want in (IBAN_PRINT, "Steuernummer 12/345/67890", "Beispielbank Berlin", "E-Mail post@musterfilm.example", "Tel. +49 30 123456789"):
+    for want in (IBAN_PRINT, "Steuernummer 12/345/67890", "Beispielbank Berlin", "E-Mail: post@musterfilm.example", "Tel. +49 30 123456789"):
         check(one_line(pgd, want), f"{who}: #2284 the document footer has {want!r} on one line")
     page_rule(pgd, who + " document")
     # ------------------------------------------------ without bank data: no empty column, no IBAN word
     bare = {k: "" for k in ("iban", "bic", "bank_name", "tax_number", "register_court", "register_no", "managing_directors")}
     check(S.put(B + O + "/settings", json={"company_fields": bare}).ok, f"{who}: bank and register data removed")
     pgb = pages(S.get(B + f"{D}/{doc}/pdf").content)
-    check("IBAN" not in "\n".join(pgb) and "Steuernummer" not in "\n".join(pgb) and one_line(pgb, "E-Mail post@musterfilm.example"),
+    check("IBAN" not in "\n".join(pgb) and "Steuernummer" not in "\n".join(pgb) and one_line(pgb, "E-Mail: post@musterfilm.example"),
           f"{who}: #2284 without bank data the footer keeps address + contact only")
 
 
