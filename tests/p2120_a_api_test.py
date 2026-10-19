@@ -255,7 +255,7 @@ check(Ca.post(B + f"{D}/{OFF}/invoice", json={"inv_type": "final"}).status_code 
 check(requests.get(B + f"{D}/{OFF}/progress", headers=AGH).status_code == 403, "rights: an agent token 403")
 check(A.get(B + f"{D}/{PS[0]}/progress").status_code == 409, "an invoice has no progress list (409)")
 check(A.post(B + f"{D}/{OFF}/invoice", json={"inv_type": "partial"}).status_code == 400, "an unknown inv_type 400")
-r = Bo.post(B + f"{D}/{OFF}/invoice", json={"inv_type": "progress", "pct": 1})
+r = Bo.post(B + f"{D}/{q_plan}/invoice", json={"inv_type": "progress", "pct": 1})  # 2.120.0 review M3: OFF has its final invoice
 check(r.status_code == 201, "rights: a member with the office drafts a progress invoice " + r.text[:200])
 
 # ================================================================== a person without organisation (personal office)
