@@ -517,6 +517,11 @@ rate to the fixed costs; documents (payments, open invoices, quotations, credit 
 net share on the net basis; purchases and travel receipts have no rate here and count the same on both. The start page
 figures use gross.
 
+**Receipts** (2.114.1): the receipts of the tab Bookkeeping go out on the same day as in the income/expense statement - their
+payment day (set by matching them to a bank booking), else their document date. A receipt matched to a booking counts with
+the booking's amount; net takes the receipt's VAT rate off. A fixed cost or purchase entered for the same thing as a
+receipt counts twice - leave one of them out.
+
 **Quotations in the plan** (2.88): sent and accepted quotations count as planned income on the end of their period of
 service (else its start, else their date); a sent one is marked **open quotation** (a dashed entry, the month shows its
 share apart). "Duplicate" on a quotation makes the copy its next **version** (`version_of` = the first quotation of the

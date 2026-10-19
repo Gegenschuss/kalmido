@@ -106,6 +106,21 @@ const tinyPdf = text => {
     check(await ready(ev, `${shown} === ${JSON.stringify(before)} && ${profitIs}.then(p => p !== false)`), `#2016: after "Undo match" the old figures again (${await ev(shown)})`);
     await ev(tab('#office/cashflow'));
     check(await ready(ev, `RKF.data && !(RKF.data.entries || []).some(e => e.kind === 'payment' && e.doc_id === ${inv.id})`, 60), '#2016: the cash flow drops the payment again');
+    // #2018: the money out matched to the receipt in the bank tab -> the cash flow lists it under "Out" as a receipt
+    await ev(tab('#office/bank'));
+    await ready(ev, `!!document.querySelector('[data-bnk="state"][data-v="open"]')`);
+    await ev(`(() => { document.querySelector('[data-bnk="state"][data-v="open"]').click(); return 1; })()`);
+    const out = `[...document.querySelectorAll('.bnkrow')].find(e => /Software Beispiel/.test(e.textContent))`;
+    check(await ready(ev, `!!(${out})?.querySelector('.bnksug [data-bnk="match"]')`), 'the money out suggests the receipt');
+    await ev(`(() => { ${out}.querySelector('.bnksug [data-bnk="match"]').click(); return 1; })()`);
+    check(await ready(ev, `!(${out})`), 'the money out is matched');
+    await ev(tab('#office/cashflow'));
+    const k = `${today.slice(0, 7)}|out|actual`;
+    check(await ready(ev, `!!document.querySelector('.rkcfv[data-k="${k}"]')`, 60), '#2018: the month has money out');
+    await ev(`(() => { document.querySelector('.rkcfv[data-k="${k}"]').click(); return 1; })()`);
+    check(await ready(ev, `[...document.querySelectorAll('.rkcfents .ofcrow')].some(a => /Receipt/.test(a.textContent) && /Software Abo/.test(a.textContent) && a.getAttribute('href') === '#docs/${nid}')`),
+      '#2018: the receipt is listed under "Out" and opens the document ' + await ev(`document.querySelector('.rkcfents')?.textContent || ''`));
+    await shot('p21141-b-cashflow.png');
   }, false);
 
   console.log(`p21141_b_ui: ${ok} ok, ${F.length} failed`);
