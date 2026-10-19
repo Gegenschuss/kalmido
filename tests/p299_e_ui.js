@@ -74,7 +74,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   const pinBtn = uid => d.querySelector(`.modal.sbpmd .mrow[data-uid="${uid}"] [data-sbp="pin"]`);
   click(w, pinBtn(P[2]));
   check(await until(() => team().querySelector(`.sbpw [data-go="who/${P[2]}"]`)), 'Person 3 pinned: in the sidebar');
-  check(pinBtn(P[2])?.getAttribute('aria-pressed') === 'true', 'the pin shows pressed');
+  check(await until(() => pinBtn(P[2])?.getAttribute('aria-pressed') === 'true'), 'the pin shows pressed');
   check(team().querySelector(`.sbpw .sbdm[aria-label="Message Person 3"]`), 'the row has the message bubble');
   check((await call('GET', '/api/state')).settings.side_people === String(P[2]), 'stored as side_people');
   await w.eval(`histStep('undo')`);
@@ -118,7 +118,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   // ================= agents: pinned or working
   await call('PATCH', '/api/settings', {side_agents: String(AG2.id), side_people: [P[2], ZED].join(',')});
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
-  check(await until(() => d.querySelector(`#side .sg-team [data-aid="${AG2.id}"]`)), 'a pinned agent stands there');
+  check(await until(() => d.querySelector(`#side .sg-team [data-aid="${AG2.id}"]`)), 'a pinned agent stands there ' + w.eval(`S.settings.side_agents + ' | ' + JSON.stringify((S.agents || []).map(a => [a.id, a.name])) + ' | ' + shownAgents().map(a => a.id)`));
   check(!d.querySelector(`#side .sg-team [data-aid="${AG1.id}"]`), 'an idle agent without anything unread not');
   check(!/Zed/.test(d.querySelector('#side').textContent) && d.querySelector(`#side .sg-team [data-go="who/${P[2]}"]`), 'a pinned person without a shared list drops out (no name), the others stay');
   await tcall('PUT', '/agent/status', AG1.tok, {status: 'working', text: 'Sorting'});
