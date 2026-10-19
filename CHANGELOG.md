@@ -18,6 +18,7 @@ Office fixes, drag a task under another, chat "Show more".
 - Office: fixed costs and subscriptions without VAT show one amount with "without VAT" instead of the same net and gross amount twice (#2333).
 - Tasks: a single task dropped onto the middle of another becomes its subtask, with the mouse and with the finger, one undo step; milestones and its own subtasks are no target (#2334).
 - Chat: "Show more" of a shortened message sits right under the cut text, before steps, suggestion and time (#2340).
+
 ## [2.120.0] - 2026-10-19
 
 Office: progress and final invoices, cash discount, client portal with documents, delivery notes, DATEV input side, own letterhead.
