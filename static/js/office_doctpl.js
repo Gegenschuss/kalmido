@@ -78,7 +78,7 @@ function dtTplsHtml(seg) {
   const ts = DT.data.templates || [];
   const bar = `<div class="ofcbar dtp-bar">${seg}<span class="spacer"></span><button class="btn sm" data-dt="starters">${ic('copy', 's')}<span>${tr('Use sample')}</span></button><button class="btn sm pri" data-dt="tnew">${ic('plus', 's')}<span>${tr('New template')}</span></button></div>`;
   const rows = ts.map(t => `<li><button type="button" class="ofcrow" data-dt="topen" data-id="${t.id}"><span class="ofcn"><b>${esc(t.name)}</b><small class="muted">${esc([t.kind_label, (t.lang || '').toUpperCase(), t.sign ? tr('can be signed') : ''].filter(Boolean).join(' · '))}</small></span>${ic('chev', 's')}</button></li>`).join('');
-  return bar + (rows ? `<ul class="ofclist dtp-list" role="list">${rows}</ul>` : `<div class="empty nempty eact">${ic('file')}<span>${tr('No templates yet. Take over a sample (contract, order confirmation, NDA) and adapt it.')}</span><button class="btn pri" data-dt="starters">${tr('Use sample')}</button></div>`)
+  return bar + (rows ? `<ul class="ofclist dtp-list" role="list">${rows}</ul>` : `<div class="empty nempty eact">${ic('file')}<span>${tr('No templates yet. Take over a sample (letter, reminder, contract and more) and adapt it.')}</span><button class="btn pri" data-dt="starters">${tr('Use sample')}</button></div>`)
     + `<p class="muted ofchint">${esc(tr('These templates are for documents. Task templates stay in the lists.'))}</p>`;
 }
 function dtDocHtml(d) {
@@ -192,12 +192,13 @@ function dtTplModal(t) {
     <label for="dt-tbody" class="dtp-lab">${tr('Text')}</label>${dtVarBar('dt-tbody')}<textarea id="dt-tbody" class="dtp-ta" rows="14" maxlength="60000">${esc(t?.body || '')}</textarea>${dtHint()}
     <p class="muted ofchint">${esc(d.note || tr('Sample text, no legal advice.'))}</p>
     <div class="aerr" role="alert"></div>
-    <div class="foot">${t ? `<button class="btn danger" data-m="del">${tr('Archive')}</button>` : ''}${t && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? `<button class="btn" data-m="move">${ic('brief', 's')} ${tr('Move to another workspace…')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${t ? tr('Save') : tr('Add')}</button></div>`);
+    <div class="foot">${t ? `<button class="btn danger" data-m="del">${tr('Archive')}</button>` : `<button class="btn" data-m="starters">${ic('copy', 's')}<span>${tr('Start from a sample')}</span></button>`}${t && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? `<button class="btn" data-m="move">${ic('brief', 's')} ${tr('Move to another workspace…')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${t ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg', 'dtp-dlg');
   const close = fgModal(md);
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
+    if (b.dataset.m === 'starters') { md.remove(); dtStartersModal(); return; }  // 2.117.0 B (#2283)
     try {
       if (b.dataset.m === 'move') {  // 2.97.0 C (#2049)
         md.remove(); ofm_move({what: 'templates', ids: [t.id], from: ofm_officeFrom(), label: qn(t.name), after: async () => dtReload()});
@@ -226,7 +227,7 @@ async function dtStartersModal() {
   try { j = await api('GET', '/api/office/doc-templates/starters'); } catch (x) { toast(x.message || ''); return; }
   const md = modal(`<h3>${tr('Use sample')}</h3><p class="muted">${esc(j.note || '')}</p>
     ${ofcRowF('dt-slang', tr('Language'), ofcSel('dt-slang', j.lang, [['de', 'Deutsch'], ['en', 'English']]))}
-    <ul class="ofclist dtp-starters" role="list">${j.starters.map(s => `<li><div class="ofcrow dtp-srow"><span class="ofcn"><b>${esc(s.name)}</b><small class="muted">${esc(s.kind_label)}</small></span><button type="button" class="btn sm pri" data-m="take" data-k="${esc(s.key)}">${tr('Take over')}</button></div></li>`).join('')}</ul>
+    <ul class="ofclist dtp-starters" role="list">${j.starters.map(s => `<li><div class="ofcrow dtp-srow"><span class="ofcn"><b>${esc(s.name)}</b><small class="muted">${esc([s.kind !== 'other' ? s.kind_label : '', s.legal ? tr('Legal text: please have it checked') : ''].filter(Boolean).join(' · '))}</small></span><button type="button" class="btn sm pri" data-m="take" data-k="${esc(s.key)}">${tr('Take over')}</button></div></li>`).join('')}</ul>
     <div class="aerr" role="alert"></div><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('ofcdlg');
   const close = fgModal(md);

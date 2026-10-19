@@ -64,6 +64,7 @@ TABLES = (
     "sched_polls",  # 2.98.0 A (#1953): scheduling polls (NULL = private, the app checks user_id; options / votes hang on poll_id)
     "office_agreements",  # 2.92.0 A (#1925): business contracts and insurances of an office area
     "bookmarks",  # 2.97.0 A (#1950): bookmarks (NULL = private, the app checks user_id)
+    "office_contract_files",  # 2.117.0 B (#2285): PDF files of a framework contract
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"
