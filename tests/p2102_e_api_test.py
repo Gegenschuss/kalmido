@@ -242,7 +242,8 @@ check(made < 4, f"carol's reports past 5 per minute are dropped ({made} new of 4
 FID, Fr = freelancer(B, A)
 n0 = len(tickets())
 check(report(Fr, msg="Freelancer error", line=300).status_code == 204 and len(tickets()) == n0 + 1, "freelancer: the report arrives")
-check(Fr.get(B + f"/api/lists/{P}").status_code in (403, 404), "freelancer: sees nothing of the list")
+check(Fr.get(B + f"/api/lists/{P}/error-hook").status_code in (403, 404)
+      and P not in [x["id"] for x in Fr.get(B + "/api/state").json().get("lists", [])], "freelancer: sees nothing of the list")
 check(Fr.get(B + "/api/about").json().get("client_errors") is True and "client_errors_lists" not in Fr.get(B + "/api/about").json(),
       "freelancer: only the flag")
 # error reports off in the list stops it
