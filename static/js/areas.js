@@ -96,7 +96,7 @@ const ofm_all = () => typeof OFC_TABS === 'undefined' ? OFM_ITEMS : [...OFM_ITEM
   .map(t => ({key: t[0], go: 'office/' + t[0], icon: t[1], name: t[2], group: OFM_GROUPS.some(g => g[0] === t[5]) ? t[5] : 'admin', on: ofm_ofc, adm: t[3]}))];
 // 2.98.0 C (#2180): the order inside the groups (a part not named here keeps its place at the end of its group);
 // tpl = a tab under Settings, not in the menu
-const OFR_ORDER = ['pipeline', 'offers', 'clients', 'contacts', 'gendocs', 'contracts', 'cashflow', 'kpi', 'bank', 'books', 'subs', 'travel', 'equipment', 'agreements', 'settings'];
+const OFR_ORDER = ['pipeline', 'offers', 'clients', 'contacts', 'gendocs', 'contracts', 'cashflow', 'kpi', 'bank', 'books', 'subs', 'travel', 'meals', 'equipment', 'agreements', 'settings'];
 const ofr_rank = i => { const n = OFR_ORDER.indexOf(i.key); return n < 0 ? OFR_ORDER.length : n; };
 const ofm_items = () => ofm_all().filter(i => !i.tpl && i.on() && (!i.adm || ofm_adm())).sort((a, b) => ofr_rank(a) - ofr_rank(b));
 // the point shown: the office's tab (import sits under Settings; no tab = the start page on a phone, quotations on a computer)

@@ -47,9 +47,9 @@ from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same
 from .ledger import ofx_log
 from .model import OFFICE_ADMIN_ONLY, office_gate, office_role, pb_owner, pb_personal
 
-OFM_WHAT = ("clients", "drafts", "travel", "templates")
-OFM_TABLE = {"drafts": "office_docs", "travel": "office_trips", "templates": "office_doc_templates"}
-OFM_ADMIN = ("travel", "templates")  # their routes are for the office's admins only (travel.py, doctpl.py)
+OFM_WHAT = ("clients", "drafts", "travel", "templates", "meals")  # 2.119.0 A (#2288): + entertainment receipts (drafts)
+OFM_TABLE = {"drafts": "office_docs", "travel": "office_trips", "templates": "office_doc_templates", "meals": "office_meals"}
+OFM_ADMIN = ("travel", "templates", "meals")  # their routes are for the office's admins only (travel.py, doctpl.py, meals.py)
 OFM_MAX = 200  # objects named in one move (a client's drafts and contact persons come on top, SMV_MAX in all)
 OFM_ONLY = N_("Only who created it or an admin of the organisation can move it out of it")
 OFM_RO = N_("This is a read-only copy of an issued document")
@@ -173,6 +173,27 @@ def ofm_trip_hold(c, r):
     return None
 
 
+def ofm_meal_hold(c, r):
+    """2.119.0 A (#2288): None when entertainment receipt r may move (a draft, not in the trash), else 'issued'."""
+    return "issued" if r["status"] == "approved" or r["deleted_at"] else None
+
+
+def ofm_meal_people(c, uid, r, src, dst):
+    """2.119.0 A (#2288): host / guests of meal row r for office dst: a person of the old office who is no person of the new
+    one stays as a free name (sealed for dst)."""
+    from .travel import rk_people
+    d = oc_dec_fields(c, src, "office_meals", r)
+    known = {p["id"] for p in rk_people(c, dst, uid)}
+    def keep(p):
+        return p if not isinstance(p, dict) or not p.get("id") or p["id"] in known else {"name": p.get("name") or "", "extra": ""}
+    try:
+        host, guests = json.loads(d.get("host") or "{}"), json.loads(d.get("guests") or "[]")
+    except ValueError:
+        return {}
+    return oc_enc_fields(c, dst, "office_meals", {"host": json.dumps(keep(host), ensure_ascii=False),
+                                                  "guests": json.dumps([keep(g) for g in guests if isinstance(g, dict)], ensure_ascii=False)})
+
+
 def ofm_need(c, uid, what, ids):
     """(source area, rows) of the objects to move: all visible to uid in ONE office (404 / 400)."""
     if what == "clients":
@@ -217,7 +238,7 @@ def ofm_plan(c, uid, what, src, rows, own=False):
     """{docs: [movable draft rows], keep: {why: n}, clients: [{row, mode: move | copy, refs, issued, contacts, docs}],
     trips, tpls} -- what would move and what stays. own: only uid's own drafts leave (a plain member out of an
     organisation: the drafts of the others stay with the client there)."""
-    p = {"docs": [], "keep": {}, "clients": [], "trips": [], "tpls": [], "detach": 0, "unclient": 0}
+    p = {"docs": [], "keep": {}, "clients": [], "trips": [], "tpls": [], "meals": [], "detach": 0, "unclient": 0}
     def keep(k, n=1):
         p["keep"][k] = p["keep"].get(k, 0) + n
     if what == "drafts":
@@ -237,6 +258,12 @@ def ofm_plan(c, uid, what, src, rows, own=False):
                 p["unclient"] += 1 if r["client_id"] else 0
     elif what == "contracts":  # 2.119.1 C (#2298)
         rmv_plan(c, p, rows)
+    elif what == "meals":  # 2.119.0 A (#2288)
+        for r in rows:
+            if ofm_meal_hold(c, r):
+                keep("meal")
+            else:
+                p["meals"].append(r)
     elif what == "templates":
         p["tpls"] = list(rows)
         q = ",".join("?" * len(rows))
@@ -290,6 +317,8 @@ def ofm_notes(c, what, p, copy):
         notes.append(trn("{0} trip moves with its receipts", "{0} trips move with their receipts", len(p["trips"])))
         if p["unclient"]:
             notes.append(trn("{0} trip loses its client", "{0} trips lose their client", p["unclient"]))
+    if p["meals"]:  # 2.119.0 A (#2288)
+        notes.append(trn("{0} entertainment receipt moves with its bill", "{0} entertainment receipts move with their bills", len(p["meals"])))
     if p["tpls"]:
         notes.append(trn("{0} template moves", "{0} templates move", len(p["tpls"])))
         if p["detach"]:
@@ -305,7 +334,9 @@ def ofm_notes(c, what, p, copy):
         notes.append(trn("{0} draft stays: it has payments, a sign-off link or billed receipts there", "{0} drafts stay: they have payments, sign-off links or billed receipts there", k["linked"]))
     if k.get("trip"):
         notes.append(trn("{0} trip stays: receipts of it are in DATEV or billed", "{0} trips stay: receipts of them are in DATEV or billed", k["trip"]))
-    if not (p["clients"] or p["docs"] or p["trips"] or p["tpls"] or p.get("ctr")):
+    if k.get("meal"):  # 2.119.0 A (#2288)
+        notes.append(trn("{0} entertainment receipt stays: it is approved (retention)", "{0} entertainment receipts stay: they are approved (retention)", k["meal"]))
+    if not (p["clients"] or p["docs"] or p["trips"] or p["tpls"] or p["meals"] or p.get("ctr")):
         block = tr("Nothing here can move: issued documents and receipts stay where they were issued")
     return notes, block
 
@@ -454,14 +485,14 @@ def ofm_move_space():
     copy = b.get("copy_issued") in (1, True, "1")
     plain = pb_owner(c, src) is None and office_role(c, uid, src) != "admin"  # a plain member out of an organisation
     p = ofm_plan(c, uid, what, src, rows, own=plain)
-    if sum(len(x["contacts"]) + 1 for x in p["clients"]) + len(p["docs"]) + len(p["trips"]) + len(p["tpls"]) + len(p.get("ctr", ())) > SMV_MAX:
+    if sum(len(x["contacts"]) + 1 for x in p["clients"]) + len(p["docs"]) + len(p["trips"]) + len(p["tpls"]) + len(p["meals"]) + len(p.get("ctr", ())) > SMV_MAX:
         raise BadInput(tr("Too many at once"))
     notes, block = ofm_notes(c, what, p, copy and not plain)
     if copy and plain:  # copies of an organisation's issued documents: its office admin only
         notes.append(tr("Only an admin of the organisation can take copies of its issued documents along"))
         copy = False
     counts = {"clients": len(p["clients"]), "copied": sum(1 for x in p["clients"] if x["mode"] == "copy"), "drafts": len(p["docs"]),
-              "trips": len(p["trips"]), "templates": len(p["tpls"]), "contacts": sum(len(x["contacts"]) for x in p["clients"]),
+              "trips": len(p["trips"]), "templates": len(p["tpls"]), "meals": len(p["meals"]), "contacts": sum(len(x["contacts"]) for x in p["clients"]),
               "issued": sum(len(x["issued"]) + len(x["arch"]) for x in p["clients"]) + p["keep"].get("issued", 0),
               "stay": sum(p["keep"].values()), "contracts": len(p.get("ctr", ()))}
     if b.get("dry"):
@@ -475,7 +506,7 @@ def ofm_move_space():
         o = c.execute("SELECT name FROM orgs WHERE id=?", (frm_ws,)).fetchone()
         org_name = o["name"] if o else ""
     frm = {"from": ofm_ws_key(frm_ws), "name": org_name}
-    rec, made, files = [], [], []
+    rec, made, files, old_files = [], [], [], []
     try:
         cmap, kmap = {}, {}
         if what == "clients":
@@ -489,6 +520,16 @@ def ofm_move_space():
         if p["trips"]:  # 2.117.0 A (#2292): the own purposes of the moved trips are offered in the new office too
             from .travel import rka_purposes_adopt
             rka_purposes_adopt(c, dst, uid, [r["purpose"] for r in p["trips"]])
+        for r in p["meals"]:  # 2.119.0 A (#2288): the draft, its bill (sealed anew for the target) and its log
+            from .meals import bw_file_copy, bw_path
+            ofm_move_row(c, rec, "office_meals", r, src, dst, dst, {**ofm_meal_people(c, uid, r, src, dst), "updated_at": ts})
+            for f in c.execute("SELECT * FROM office_meal_files WHERE meal_id=? AND org_id=? ORDER BY id", (r["id"], src)).fetchall():
+                new = bw_file_copy(c, src, dst, f["file"])
+                files.append(bw_path(dst, new))
+                old_files.append(bw_path(src, f["file"]))
+                ofm_move_row(c, rec, "office_meal_files", f, src, dst, dst, {"file": new})
+            for lg in c.execute("SELECT * FROM office_meal_log WHERE meal_id=? AND org_id=? ORDER BY id", (r["id"], src)).fetchall():
+                ofm_move_row(c, rec, "office_meal_log", lg, src, dst, dst)
         for r in p["tpls"]:
             ofm_move_row(c, rec, "office_doc_templates", r, src, dst, dst, {"updated_at": ts})
             ofm_detach(c, rec, "office_gen_docs", "template_id", r["id"], "office_doc_templates")
@@ -511,6 +552,11 @@ def ofm_move_space():
             except OSError:
                 pass
         raise
+    for f in old_files:  # 2.119.0 A (#2288): the bills now live (sealed anew) in the target; the undo writes them back
+        try:
+            os.unlink(f)
+        except OSError:
+            pass
     return jsonify(smv_answer(notes, None, ok=True, move_id=mid, count=counts, space=ofm_ws_key(to), from_space=ofm_ws_key(frm_ws),
                               clients={str(k): v for k, v in cmap.items()}))
 
@@ -553,10 +599,10 @@ def rmv_undo_run(c, uid, mid, files):
     cfiles = {r["id"] for r in d.get("rows") or [] if r["t"] == "office_contract_files"}
     # 2.97.0 review (H1): a draft issued in the target since, or a trip billed / in DATEV there, never moves back
     for r in d.get("rows") or []:
-        if r["t"] in ("office_docs", "office_trips") and not r.get("detach") and not r.get("src"):
+        if r["t"] in ("office_docs", "office_trips", "office_meals") and not r.get("detach") and not r.get("src"):
             cur = c.execute(f"SELECT * FROM {r['t']} WHERE id=?", (r["id"],)).fetchone()
-            if cur and (cur["org_id"] or None) == (r.get("org") or None) \
-                    and (ofm_doc_hold(c, cur) if r["t"] == "office_docs" else ofm_trip_hold(c, cur)):
+            hold = ofm_doc_hold if r["t"] == "office_docs" else ofm_trip_hold if r["t"] == "office_trips" else ofm_meal_hold  # 2.119.0 A (#2288)
+            if cur and (cur["org_id"] or None) == (r.get("org") or None) and hold(c, cur):
                 raise Denied(409, tr("Cannot be undone: a document was issued in the target since"))
     for r in reversed(d.get("rows") or []):
         t, rid, old = r["t"], r["id"], dict(r.get("old") or {})  # the detail is the server's own record
@@ -582,6 +628,10 @@ def rmv_undo_run(c, uid, mid, files):
             gone.append(rmv_path(dst, cur["file"]))
         if r.get("area"):
             old.update(ofm_reseal(c, t, cur, dst, src))
+        if t == "office_meal_files" and old.get("file") and old["file"] != cur["file"]:  # 2.119.0 A (#2288): the bill back
+            from .meals import bw_file_copy, bw_path
+            bw_file_copy(c, dst, src, cur["file"], old["file"])
+            gone.append(bw_path(dst, cur["file"]))
         if t == "office_docs" and old.get("number"):
             if c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (src, old["number"], rid)).fetchone() \
                     or fi_number_taken(c, src, old["number"]):

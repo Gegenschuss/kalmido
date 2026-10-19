@@ -382,4 +382,6 @@ button.jcdh{cursor:pointer}
 /* 2.102.0 B (#2204): the key hint next to the send button (the team chat and the agent / job chat) */
 .chcomp .chkh{flex:none;align-self:center;font-size:var(--fs-s);white-space:nowrap}
 .chcomp .chkh:empty{display:none}
-@media (max-width:40rem){.chcomp .chkh{display:none}}
+/* 2.119.0 B (#2302): the hint is a small line under the field (own row), so it also shows in the narrow side panel and split windows */
+.chcomp:has(> .chkh:not(:empty)){flex-wrap:wrap}
+.chcomp > .chkh:not(:empty){flex:0 0 100%;order:9;margin-top:-.25rem;text-align:right;font-size:.6875rem}

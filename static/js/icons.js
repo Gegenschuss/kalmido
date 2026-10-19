@@ -45,7 +45,7 @@ const P = {
   chev: icPath('M5 7.5L10 12.5L15 7.5'),
   left: icPath('M12.5 4.5L7 10L12.5 15.5'),
   right: icPath('M7.5 4.5L13 10L7.5 15.5'),
-  flag: icPath('M4.5 17.5V3.5M4.5 4H15L12.5 8L15 12H4.5') + icDot(15.5, 16.5, 1.6),
+  flag: icPath('M4.5 17.5V3.5M4.5 4H15L12.5 8L15 12H4.5Z') + icDot(15.5, 16.5, 1.6),
   bell: icPath('M5 14V9A5 5 0 0 1 15 9V14M3 14H17') + icDot(10, 17.5),
   belloff: icPath('M5 14V9A5 5 0 0 1 12.5 4.7M15 9V14M3 14H17M3 3L17 17') + icDot(10, 17.5),
   bellring: icPath('M5 14V9A5 5 0 0 1 15 9V14M3 14H17M2 7A7.5 7.5 0 0 1 4 3M18 7A7.5 7.5 0 0 0 16 3') + icDot(10, 17.5),
@@ -71,6 +71,8 @@ const P = {
   upload: icPath('M3 13V16H17V13M10 3.5V12M6 7.5L10 3.5L14 7.5'),
   download: icPath('M3 13V16H17V13M10 3.5V12M6 8L10 12L14 8'),
   arrow: icPath('M4 10H16M11 5L16 10L11 15'),
+  // 2.119.0 B (#2301): pinf = the pinned state, a closed head the CSS can fill (pin stays the open outline)
+  pinf: icPath('M7 3H13V8L14.5 13.5H5.5L7 8ZM10 13.5V18'),
   pin: icPath('M10 13.5V18M5.5 13.5H14.5M7 3H13M8 3V8L5.5 13.5M12 3V8L14.5 13.5'),
   mappin: icPath('M16 8.5C16 13 10 18 10 18S4 13 4 8.5A6 6 0 0 1 16 8.5') + icDot(10, 8.5),
   select: icPath('M16 10.5V15A2 2 0 0 1 14 17H5A2 2 0 0 1 3 15V5A2 2 0 0 1 5 3H11M7 9.5L10 12.5L17 4'),
@@ -104,7 +106,7 @@ const P = {
   chart: icPath('M3 3V17H17M7 14V10M11 14V6') + icDot(15, 12, 1.8),
   phone: icPath('M6 4A2 2 0 0 1 8 2H12A2 2 0 0 1 14 4V16A2 2 0 0 1 12 18H8A2 2 0 0 1 6 16Z') + icDot(10, 15, 1.2),
   copy: icPath('M8 8H16V16H8ZM12 5V4H4V12H5'),
-  lock: icPath('M4.5 9H15.5V17H4.5ZM7 9V6.5A3 3 0 0 1 13 6.5V9') + icDot(10, 13, 1.6),
+  lock: '<path class="lkb" d="M4.5 9H15.5V17H4.5Z"/><path d="M7 9V6.5A3 3 0 0 1 13 6.5V9"/>' + icDot(10, 13, 1.6),  // 2.119.0 B (#2301): body and shackle apart, so the body can be filled
   pulse: icPath('M2 10H5.5L8 4L12 16L14.5 10H15') + icDot(17.5, 10, 1.6),
   columns: icPath('M3 3H17V17H3ZM8 3V17M12.5 3V17'),
   sheet: icPath('M3 3H17V17H3ZM3 7.5H17M3 12.25H17M8 3V17') + icDot(12.5, 14.6),  // 2.89.0 (#1916): tables

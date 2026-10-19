@@ -70,7 +70,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   // ================= "All people …": pin Person 3 (one undo step)
   click(w, allRow);
   const md = await until(() => d.querySelector('.modal.sbpmd'));
-  check(md && md.querySelectorAll('.sbpl .mrow').length === 8 && !/Zed/.test(md.textContent), 'the dialog lists the 8 people I share a list with, not Zed');
+  check(md && md.querySelectorAll('.sbpl .mrow[data-uid]').length === 8 && !/Zed/.test(md.textContent), 'the dialog lists the 8 people I share a list with, not Zed');
   const pinBtn = uid => d.querySelector(`.modal.sbpmd .mrow[data-uid="${uid}"] [data-sbp="pin"]`);
   click(w, pinBtn(P[2]));
   check(await until(() => team().querySelector(`.sbpw [data-go="who/${P[2]}"]`)), 'Person 3 pinned: in the sidebar');
