@@ -1100,7 +1100,7 @@ fresh; run p294_a_ui node p294_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p294_b_api "$PY" p294_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p294_b_ui node p294_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p294_c_ui node p294_c_ui.js "$KALMIDO_TEST_DATA"
-shard 12  # 2.99.0: the 2.99 suites run in shard 12 (shard 13 ran past the 45 min CI limit in runs 210 / 212)
+shard 4  # 2.99.0: the 2.99 suites run in shard 4 (23 min in run 212; shard 12 got the 2.98 suites, shard 13 ran past the 45 min CI limit)
 # 2.99.0 part A: wiki ZIP import keeps PDFs and images as page attachments (#2182)
 fresh; run p299_a_api "$PY" p299_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.99.0 part B: one ... menu on wiki pages, chat composer icons aligned (#2183 #2185)
