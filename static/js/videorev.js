@@ -106,7 +106,7 @@ function vdr_playerHtml(v, title) {
     const src = v.embed + (v.provider === 'youtube' ? '&origin=' + encodeURIComponent(location.origin) : '');
     return `<div class="vdrplay" data-prov="${v.provider}"><iframe src="${esc(src)}" title="${esc(title)}" allow="fullscreen; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`;
   }
-  if (v.provider === 'file') return `<div class="vdrplay" data-prov="file"><video src="${esc(v.embed)}" controls playsinline preload="metadata"></video></div>`;
+  if (v.provider === 'file') return `<div class="vdrplay" data-prov="file"><video src="${esc(v.embed)}" controls playsinline preload="none"></video></div>`;
   return `<div class="vdrnolink">${ic('info', 's')}<p>${esc(tr('This link has no time control: it opens in a new tab, comments get no timecode.'))}</p>
     <a class="btn sm" href="${esc(v.url)}" target="_blank" rel="noopener noreferrer">${ic('link', 's')} ${tr('Open the video')}</a></div>`;
 }

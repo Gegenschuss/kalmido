@@ -43,7 +43,7 @@ VDR_FILE_RE = re.compile(r"\.(mp4|m4v|webm|mov)$", re.I)
 VDR_YT_RE = re.compile(r"[A-Za-z0-9_-]{11}")
 VDR_VIMEO_RE = re.compile(r"[0-9]{1,12}")
 VDR_VIMEO_H_RE = re.compile(r"[0-9a-f]{6,20}")
-VDR_YT_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be", "youtube-nocookie.com", "www.youtube-nocookie.com"}
+VDR_YT_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "youtube-nocookie.com", "www.youtube-nocookie.com"}
 VDR_VIMEO_HOSTS = {"vimeo.com", "www.vimeo.com", "player.vimeo.com"}
 VDR_FRAME = {"youtube": "https://www.youtube-nocookie.com", "vimeo": "https://player.vimeo.com"}  # the player origins (CSP frame-src)
 VDR_HTTPS = N_("Please paste a link that starts with https://")
@@ -68,7 +68,7 @@ def vdr_parse(raw):
         raise BadInput(tr(VDR_HTTPS))
     seg = [s for s in u.path.split("/") if s]
     q = parse_qs(u.query)
-    if host in VDR_YT_HOSTS and not port:
+    if host in VDR_YT_HOSTS and port in (None, 443):  # 2.99.1 review L6: an explicit :443 is the same host
         vid = ""
         if host.endswith("youtu.be"):
             vid = seg[0] if seg else ""
@@ -78,10 +78,12 @@ def vdr_parse(raw):
             vid = seg[1]
         if VDR_YT_RE.fullmatch(vid):
             return {"url": url, "provider": "youtube", "embed_id": vid}
-    if host in VDR_VIMEO_HOSTS and not port:
+    if host in VDR_VIMEO_HOSTS and port in (None, 443):
         ids = [i for i, s in enumerate(seg) if VDR_VIMEO_RE.fullmatch(s)]
         if ids and (host != "player.vimeo.com" or seg[:1] == ["video"]):
             i = ids[0]
+            if "video" in seg[:-1] and VDR_VIMEO_RE.fullmatch(seg[seg.index("video") + 1]):  # review L6: /showcase/1/video/2 -> 2
+                i = seg.index("video") + 1
             h = (q.get("h") or [""])[0] or (seg[i + 1] if i + 1 < len(seg) else "")
             return {"url": url, "provider": "vimeo", "embed_id": seg[i] + (":" + h if VDR_VIMEO_H_RE.fullmatch(h) else "")}
     if VDR_FILE_RE.search(u.path):
@@ -240,6 +242,15 @@ def vdr_space_key(oid):
     return f"org:{oid}" if oid else "private"
 
 
+def vdr_full(c, uid, r):
+    """The signer's e-mail / address / device only for the review's creator, the org admin or the private owner
+    (2.99.1 review M1, like sig_offer_list: office admins only)."""
+    from ..accounts.orgs import is_org_admin
+    if r["created_by"] == uid:
+        return True
+    return bool(is_org_admin(c, uid, r["org_id"])) if r["org_id"] else r["owner_id"] == uid
+
+
 def vdr_dict(c, r, uid, full=False):
     """A review for the app: place, state, versions, open comments; full = with the comments and the approval links."""
     vs = vdr_versions(c, r["id"])
@@ -258,7 +269,8 @@ def vdr_dict(c, r, uid, full=False):
         d["comments"] = [vdr_comment_dict(x, names) for x in cm]
         if d["can_write"]:
             rows = c.execute("SELECT * FROM office_signoffs WHERE video_id=? AND kind='video' ORDER BY id DESC LIMIT 20", (r["id"],)).fetchall()
-            d["signoffs"] = [sig_public(c, s) for s in rows]
+            adm = vdr_full(c, uid, r)
+            d["signoffs"] = [sig_public(c, s, adm) for s in rows]
         else:
             d["signoffs"] = []
     return d
@@ -564,21 +576,21 @@ def vdr_sig_new(vid):
     write_lock(c, f"office_signoff_video_{int(vid)}")
     row, tok = sig_create(c, r["org_id"], "video", r["title"], vdr_sig_hash(r), uid, exp, video_id=vid)
     c.commit()
-    return jsonify(sig_public(c, row))
+    return jsonify(sig_public(c, row, vdr_full(c, uid, r)))
 
 
 @app.post("/api/videos/<int:vid>/signoffs/<int:sid>/revoke")
 def vdr_sig_revoke(vid, sid):
     from ..office.signoff import sig_public
     c, uid = db(), me()
-    vdr_need(c, vid, write=True)
+    r = vdr_need(c, vid, write=True)
     s = c.execute("SELECT * FROM office_signoffs WHERE id=? AND video_id=? AND kind='video'", (sid, vid)).fetchone()
     if not s:
         raise Denied(404)
     if s["state"] == "open" and not s["revoked_at"]:
         c.execute("UPDATE office_signoffs SET revoked_at=? WHERE id=?", (iso(now_utc()), sid))
         c.commit()
-    return jsonify(sig_public(c, c.execute("SELECT * FROM office_signoffs WHERE id=?", (sid,)).fetchone()))
+    return jsonify(sig_public(c, c.execute("SELECT * FROM office_signoffs WHERE id=?", (sid,)).fetchone(), vdr_full(c, uid, r)))
 
 
 def vdr_sig_row(c, s):
@@ -619,7 +631,7 @@ def vdr_player_html(v, origin, title):
         return (f'<div class="vdr-player" data-prov="{v["provider"]}" data-origin="{VDR_FRAME[v["provider"]]}"><iframe src="{e(src)}" title="{e(title)}" '
                 'allow="fullscreen; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" loading="lazy"></iframe></div>')
     if v["provider"] == "file" and src:
-        return f'<div class="vdr-player" data-prov="file"><video src="{e(src)}" controls playsinline preload="metadata"></video></div>'
+        return f'<div class="vdr-player" data-prov="file"><video src="{e(src)}" controls playsinline preload="none"></video></div>'
     return ""
 
 
@@ -695,8 +707,9 @@ def vdr_pub_comment(token):
                         f'<div class="msg"><p class="err">{html.escape(tr("There is a newer version. Please look at it first.", lg=lg))}</p>{back}</div>', lg, 409)
     try:
         at = vdr_at(request.form.get("at") or None)
-    except BadInput:
-        at = None
+    except BadInput:  # 2.99.1 review L8: say it instead of dropping the time
+        bad_at = tr("Invalid value: {0}", tr("Timecode", lg=lg), lg=lg)
+        return pub_html(bad_at, f'<div class="msg"><p class="err">{html.escape(bad_at)}</p>{back}</div>', lg, 400)
     vdr_comment_add(c, r, None, {"body": text, "version_id": v["id"], "at_sec": at}, ext_name=name)
     push = vdr_pub_notify(c, s, r, name, text)
     c.commit()
@@ -706,14 +719,16 @@ def vdr_pub_comment(token):
     return pub_headers(redirect(f"{SIG_PREFIX}{token}?sent=1#vdr-f", 303))
 
 
+VDR_PUSHED = {}  # review id -> time of the last customer-comment push (per process)
+
+
 def vdr_pub_notify(c, s, r, name, text):
     """Push to the link's creator like the decisions (notification switch "approval"), at most one per review and 10 minutes."""
     uid = s["created_by"]
     if not uid:
         return None
-    n = c.execute("SELECT COUNT(*) FROM video_comments WHERE review_id=? AND ext_name IS NOT NULL AND created_at > ?",
-                  (r["id"], iso(now_utc() - timedelta(minutes=10)))).fetchone()[0]
-    if n > 1:
+    import time  # 2.99.1 review L4: one push per review and 10 minutes (counting comments swallowed all while they kept coming)
+    if time.time() - VDR_PUSHED.get(r["id"], 0) < 600:
         return None
     try:
         from ..collab.news import notif_ok
@@ -723,6 +738,7 @@ def vdr_pub_notify(c, s, r, name, text):
             return None
     except Exception:
         return None
+    VDR_PUSHED[r["id"]] = time.time()
     from ..notify.push import notify
     lg = st.get("lang") or "en"
     click = vdr_click(r)
@@ -811,6 +827,8 @@ def vdr_move_space(vid):
                 new = dict(zip(("task_id", "list_id", "client_id"), ids))
         except (Denied, BadInput):
             pass
+    if not any(new.values()):  # 2.99.1 review L2: the old place no longer fits -> a project in the target, no review at nothing
+        return jsonify(smv_answer(notes, tr("Choose a project in the target workspace"), count=1))
     c.execute("UPDATE video_reviews SET org_id=?, owner_id=?, task_id=?, list_id=?, client_id=?, updated_at=? WHERE id=?",
               (to, None if to else uid, new["task_id"], new["list_id"], new["client_id"], ts, vid))
     c.execute("UPDATE video_versions SET org_id=? WHERE review_id=?", (to, vid))
@@ -831,3 +849,20 @@ def vdr_move_space(vid):
     c.commit()
     return jsonify(smv_answer(notes, None, ok=True, move_id=mid, from_space=vdr_space_key(r["org_id"]), space=vdr_space_key(to),
                               review=vdr_dict(c, vdr_reload(c, vid), uid, full=True), revived=revived))
+
+
+VDR_TRASH_DAYS = 30
+VDR_PRUNE = {"at": 0.0}
+
+
+def vdr_trash_prune(c):
+    """2.99.1 review M3: reviews and comments in the trash longer than VDR_TRASH_DAYS go for good (versions, comments and
+    approval links of a review with it, FK cascade). The watchdog calls it, at most hourly (system context: every workspace)."""
+    import time
+    if time.time() - VDR_PRUNE["at"] < 3600:
+        return
+    VDR_PRUNE["at"] = time.time()
+    cut = iso(now_utc() - timedelta(days=VDR_TRASH_DAYS))
+    c.execute("DELETE FROM video_comments WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,))
+    c.execute("DELETE FROM video_reviews WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,))
+    c.commit()

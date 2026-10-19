@@ -592,6 +592,12 @@ def sig_decide(token):
     if cur["state"] != "open" or cur["revoked_at"] or sig_check(c, cur):
         c.rollback()
         return redirect(SIG_PREFIX + token, 303)
+    if r["kind"] == "video":  # 2.99.1 (#1959) review L1: a version added meanwhile (its lock) -> the newer one first
+        write_lock(c, f"video_review_{int(cur['video_id'])}")
+        nv = vdr_sig_newest(c, cur)
+        if not nv or str(nv["id"]) != (request.form.get("v") or ""):
+            c.rollback()
+            return sig_page(c, r, token, lg, tr("There is a newer version. Please look at it first.", lg=lg), 409)
     st = "accepted" if do == "accept" else "declined"
     ts = iso(now_utc())
     ua = (request.headers.get("User-Agent") or "")[:UA_MAX]
