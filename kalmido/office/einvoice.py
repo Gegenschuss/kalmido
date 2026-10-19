@@ -12,6 +12,11 @@ E (exempt, small business) by the document's vat_note. A foreign currency (USD) 
 tax in EUR) from totals.tax_eur. A credit note is type 381 with positive amounts and the invoice it cancels in BT-25.
 The KoSIT validator (Schematron EN 16931 + XRechnung) and veraPDF run in CI on the files tests/office_einvoice_test.py
 writes (tools/einvoice_validate.sh)."""
+# Adding a format (#1961): see CONTRIBUTING.md, "Contributing national e-invoice formats".
+# A new format is an entry in EIN_FORMATS and EIN_PROFILE, its own branch in ein_build, the key in pdfweb.epdf_format,
+# example invoices in tests/office_einvoice_test.py and an official validator run in CI (tools/einvoice_validate.sh).
+# It needs a source of the specification (link + version) and a maintainer; formats that submit invoices to an authority
+# are agreed in an issue first. No plugins or scripts run on the server: formats ship with Kalmido.
 import re
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from xml.etree import ElementTree as ET

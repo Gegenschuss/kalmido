@@ -38,6 +38,46 @@ Bookmarks, a display name for customers, office data and locked wiki spaces betw
 ### Security
 - Security fix: link previews and moves between workspaces (organisation boundary).
 
+## [2.96.3] - 2026-10-19
+
+### Fixed
+- Video sign-off (CI 2.96.2): the agents' route for a comment names its second id like the API description, the browser demo
+  answers the video list, and the task detail keeps the comment box's focus (push button "Reply") when the section arrives (#1959).
+
+## [2.96.2] - 2026-10-19
+
+Video sign-off with comments at the time code (links only), and an invitation to contribute national e-invoice formats.
+
+### Added
+- Video sign-off at tasks, projects and clients: paste a link from Vimeo, YouTube (also unlisted) or a direct video file
+  (MP4, WebM, MOV over https, e.g. from your own cloud or NAS). Kalmido stores no videos. Comments sit at the second the
+  player paused, show as marks on a time line and jump there with a tap; answers, done, versions v1, v2 ... with the old
+  comments kept at their version. Links without time control (e.g. a share page) open in a new tab, comments go without
+  a time code (#1959).
+- A customer link without an account, on the existing approval flow: the customer types a name, comments at the time code
+  and chooses "Approve" or "Request changes"; the decision is a line in the comments, the push follows the "approval"
+  switch. Internal team comments stay internal (#1959).
+- Comments as CSV or as text for the edit; a video sign-off moves between the private space and an organisation (one
+  undo); usable without an organisation in the private space (#1959).
+- Agents read the video sign-offs of shared tasks and lists and comment at the time code, answer and tick comments off:
+  `GET /api/v1/videos`, `GET /api/v1/videos/{id}`, `POST /api/v1/videos/{id}/comments`,
+  `PATCH /api/v1/videos/{id}/comments/{comment_id}`; MCP `list_video_reviews`, `get_video_review`, `add_video_comment`,
+  `set_video_comment_done` (scope comments for writing). The customer link never comes through the API (#1959).
+- CONTRIBUTING: "Contributing national e-invoice formats" - how `einvoice.py` is laid out, what every format needs
+  (invented example invoices, a pinned validator run in CI, the specification source), clearance countries only after an
+  issue; a pull request checklist and an issue template "E-invoice format proposal" (#1961).
+
+### Security
+- The players are embedded without any script of the provider (YouTube through youtube-nocookie.com, control by
+  postMessage with origin checks); the app's CSP allows frames of these two players only and `media-src https:` for
+  video files, which load only when played. The customer page has its own CSP; comments over it are rate-limited.
+  Sign-offs in the trash are deleted for good after 30 days (#1959).
+
+## [2.96.1] - 2026-10-19
+
+### Fixed
+- Moving a table: the scan for formulas that name another workspace runs on Postgres too (CI 2.96.0) (#1941).
+
 ## [2.96.0] - 2026-10-18
 
 Moving data between your private space and an organisation, and one card per job in the agent chat.

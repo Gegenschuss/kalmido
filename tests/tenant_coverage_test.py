@@ -85,6 +85,9 @@ KINDS = {
     "stats": ("matrix", "p2300_tenant_test.py: statistics count only own / visible tasks"),
     "publiclink": ("matrix", "p2300_tenant_test.py: the public link of another person's list by id"),
     # 2.50.0 (#329, #1200): files / logo of a customer view, approval links of quotations and lists (and their customer pages)
+    "video": ("matrix", "p2991_a_api_test.py: a video sign-off of another organisation / person / task / client by id: 404 (read, change, versions, "
+              "comments, export, customer link, move); 2.99.1 A (#1959); p2991_c_api_test.py: the API v1 for agents -- "
+              "only reviews at a task / list shared with the agent, never another workspace, a client's review or a health list"),
     "signoff": ("matrix", "p250_c_api_test.py: approval links of another organisation's quotation / another person's list by id, "
                           "files of other lists through a link"),
     # 2.89.0 C (#1916): tables through the REST API and as files: an agent sees only tables attached to a list shared with it
@@ -579,6 +582,16 @@ ROUTES = {
     "POST /api/lists/{}/public-link/regenerate": "publiclink", "DELETE /api/lists/{}/public-link": "publiclink",
     # 2.50.0 (#329, #1200)
     "GET /s/{}/file/{}": "signoff", "GET /s/{}/logo": "signoff", "POST /s/{}/feedback": "signoff", "GET /s/q/{}": "signoff", "GET /s/q/{}/pdf": "signoff", "POST /s/q/{}": "signoff",
+    "POST /s/q/{}/comments": "signoff",  # 2.99.1 A (#1959): a customer's comment on a video sign-off
+    # 2.99.1 A (#1959): video sign-offs (videos/review.py; p2991_a_api_test.py)
+    "GET /api/videos": "video", "POST /api/videos": "video", "GET /api/videos/{}": "video", "PATCH /api/videos/{}": "video",
+    "DELETE /api/videos/{}": "video", "POST /api/videos/{}/restore": "video", "POST /api/videos/{}/versions": "video",
+    "DELETE /api/videos/{}/versions/{}": "video", "POST /api/videos/{}/comments": "video", "PATCH /api/videos/{}/comments/{}": "video",
+    "DELETE /api/videos/{}/comments/{}": "video", "POST /api/videos/{}/comments/{}/restore": "video", "GET /api/videos/{}/export": "video",
+    "POST /api/videos/{}/signoff": "video", "POST /api/videos/{}/signoffs/{}/revoke": "video", "POST /api/videos/{}/move-space": "video",
+    # 2.99.1 C (#1959): video sign-offs for agents (videos/v1.py; p2991_c_api_test.py)
+    "GET /api/v1/videos": "video", "GET /api/v1/videos/{}": "video", "POST /api/v1/videos/{}/comments": "video",
+    "PATCH /api/v1/videos/{}/comments/{}": "video",
     "GET /api/lists/{}/signoffs": "signoff", "POST /api/lists/{}/signoffs": "signoff", "POST /api/lists/{}/signoffs/{}/revoke": "signoff",
     "GET /api/office/docs/{}/signoffs": "signoff", "POST /api/office/docs/{}/signoff": "signoff", "POST /api/office/signoffs/{}/revoke": "signoff",
     # ---- stats (2)

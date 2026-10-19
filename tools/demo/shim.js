@@ -882,6 +882,8 @@
   // 2.84.0 (#1198): filed e-mails - the demo has no mailbox, so the sections stay empty and offer no address
   on('GET', '/api/hubmail/mails', () => ({enabled: false, address: '', can_address: false, total: 0, mails: []}));
   on('GET', '/api/hubmail/inbox', () => ({enabled: false, spaces: [], total: 0, mails: []}));
+  // 2.96.3 (#1959): video sign-offs - the demo has none (creating one gets the calm "not in the demo" notice)
+  on('GET', '/api/videos', () => ({reviews: []}));
   // ---- the office
   const ofInfo = () => ({settings: ofSettings(), company_fields: {...OF().company}, org_id: 1, role: 'admin', personal: 1, org_offices: [], can_move: false, industry: [],
     pack: {code: 'DE', name: 'Deutschland', tax: {...TAX}, currency: 'EUR', formats: {}}, number_preview: `KVA-${today().slice(0, 4)}-${String((OF().counters['offer:' + today().slice(0, 4)] || 0) + 1).padStart(3, '0')}`});
