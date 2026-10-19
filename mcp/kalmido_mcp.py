@@ -306,6 +306,30 @@ def t_request_chat_approval(api, a):
     return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=b)
 
 
+def _b64_files(a):
+    """[{name, base64, mime?}] of a tool call -> [(name, mime, bytes)] for a multipart message (2.113.1: team chat too)."""
+    files = []
+    for f in a.get("files") or []:
+        if not isinstance(f, dict) or not isinstance(f.get("name"), str) or not isinstance(f.get("base64"), str):
+            raise ApiError(400, "files: each entry needs name and base64")
+        try:
+            data = base64.b64decode(f["base64"], validate=True)
+        except ValueError:
+            raise ApiError(400, f"files: {f['name']} is not valid base64") from None
+        files.append((f["name"], f.get("mime") or "application/octet-stream", data))
+    return files
+
+
+def t_post_team_message(api, a):
+    """2.113.1 (#2059): a team chat message; files = [{name, base64, mime?}] -> multipart (the body may then be empty)."""
+    path = f"/team/rooms/{int(a['room_id'])}/messages"
+    if a.get("files"):
+        return api.call("POST", path, multipart=(_pick(a, ("body", "task_id", "reply_to")), _b64_files(a)))
+    if not a.get("body"):
+        raise ApiError(400, "body (or files) is required")
+    return api.call("POST", path, body=_pick(a, ("body", "task_id", "reply_to")))
+
+
 def t_get_attachment(api, a):
     """2.13.1 (#465): one file as base64 (source task = task / comment attachment, chat = a chat message's file), at most
     max_bytes (default 5 MB). Images also come as an MCP image item, so the model sees them."""
@@ -315,7 +339,8 @@ def t_get_attachment(api, a):
             raise ApiError(400, "list_id is required for source project")
         path = f"/lists/{int(a['list_id'])}/files/{int(a['attachment_id'])}"
     else:
-        path = (f"/chat-attachments/{int(a['attachment_id'])}" if a.get("source") == "chat" else f"/attachments/{int(a['attachment_id'])}")
+        path = (f"/chat-attachments/{int(a['attachment_id'])}" if a.get("source") == "chat" else
+                f"/team/files/{int(a['attachment_id'])}" if a.get("source") == "team" else f"/attachments/{int(a['attachment_id'])}")  # 2.113.1 (#2059): team
     r = api.call("GET", path, binary_cap=cap)
     return {"id": int(a["attachment_id"]), "source": a.get("source") or "task", "name": r["name"], "mime": r["mime"],
             "size": len(r["bytes"]), "base64": base64.b64encode(r["bytes"]).decode()}
@@ -733,11 +758,12 @@ TOOLS = [
                          "comments. Read one with get_attachment.",
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("GET", f"/tasks/{int(a['task_id'])}/attachments")),
     ("get_attachment", "Read one file: a task / comment attachment (source task, ids from list_attachments, get_task or comment "
-                       "events), a chat file (source chat, ids from a chat message's attachments) or a project file (source project "
+                       "events), a chat file (source chat, ids from a chat message's attachments), a team chat file (source team, 2.113.1: ids "
+                       "from a team chat message's attachments) or a project file (source project "
                        "+ list_id, ids from list_project_files). Returns name, mime, size and the "
                        "content as base64; images are also returned as an image you can look at. Use it when someone asks about a "
                        "screenshot. max_bytes caps the size (default 5 MB, at most 20 MB).",
-     _obj({"attachment_id": S_ID, "source": {"type": "string", "enum": ["task", "chat", "project"]}, "list_id": S_ID,
+     _obj({"attachment_id": S_ID, "source": {"type": "string", "enum": ["task", "chat", "team", "project"]}, "list_id": S_ID,
            "max_bytes": {"type": "integer", "minimum": 1, "maximum": ATT_CAP_MAX}}, ["attachment_id"]), t_get_attachment),
     ("read_attachment", "Read a task / comment file as text (2.34.0): a PDF's text layer (read on the server; pages separated by "
                         "a blank line), a Word .docx / Excel .xlsx file (2.92.0: headings '# ', rows 'a | b', '## <sheet>') or a text file, at most max_chars characters (default and maximum 200000; truncated: true when "
@@ -1374,7 +1400,7 @@ TOOLS += [
      lambda api, a: api.call("PATCH", f"/notes/{int(a['note_id'])}", body=_pick(a, ("title", "body", "tags", "pinned", "list_id", "expect_updated_at")))),
     ("delete_note", "2.17.0: delete a note.", _obj({"note_id": S_ID}, ["note_id"]), lambda api, a: api.call("DELETE", f"/notes/{int(a['note_id'])}")),
     ("list_team_chats", "2.17.0: the team chat conversations you take part in: one channel per shared list you are a member of "
-                        "(people + agents), with unread counts. Agents cannot open direct messages; people talk to you in your own "
+                        "(people + agents), with unread counts; 2.113.1: also the channels (kind channel) a person added you to. Agents cannot open direct messages; people talk to you in your own "
                         "chat (send_chat). You get the event team_message when someone @mentions you in a channel (2.46.1: in a list where "
                         "you listen in, every message a person writes there).",
      _obj({}), lambda api, a: api.call("GET", "/team/rooms")),
@@ -1383,9 +1409,18 @@ TOOLS += [
      _obj({"room_id": S_ID, "before": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 100}}, ["room_id"]),
      lambda api, a: api.call("GET", f"/team/rooms/{int(a['room_id'])}/messages", _pick(a, ("before", "limit")))),
     ("post_team_message", "2.17.0: write in a team chat channel (Markdown; mention people as <@user id>; task_id links a task). "
-                          "reply_to (2.33.0): the id of a message of the same conversation you answer.",
-     _obj({"room_id": S_ID, "body": {"type": "string", "maxLength": 8000}, "task_id": S_ID, "reply_to": S_ID}, ["room_id", "body"]),
-     lambda api, a: api.call("POST", f"/team/rooms/{int(a['room_id'])}/messages", body=_pick(a, ("body", "task_id", "reply_to")))),
+                          "reply_to (2.33.0): the id of a message of the same conversation you answer. files (2.113.1): up to 10 "
+                          "[{name, base64, mime?}] sent with the message (body may then be ''; not in end-to-end encrypted "
+                          "conversations). Messages carry attachments [{id, name, mime, size, url}]: read one with get_attachment source team.",
+     _obj({"room_id": S_ID, "body": {"type": "string", "maxLength": 8000}, "task_id": S_ID, "reply_to": S_ID,
+           "files": {"type": "array", "maxItems": 10, "items": {"type": "object", "properties": {
+               "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}},
+          ["room_id", "body"]), t_post_team_message),
+    ("list_team_channels", "2.113.1 (#2059): the team chat channels you are a member of (people open them and add agents of their "
+                           "organisation; you cannot open channels or groups yourself).", _obj({}), lambda api, a: api.call("GET", "/team/channels")),
+    ("leave_team_channel", "2.113.1 (#2059): leave a team chat channel a person added you to (user_id = your own user id).",
+     _obj({"room_id": S_ID, "user_id": S_ID}, ["room_id", "user_id"]),
+     lambda api, a: api.call("DELETE", f"/team/rooms/{int(a['room_id'])}/members/{int(a['user_id'])}")),
     ("edit_team_message", "2.17.0: change your own team chat message.", _obj({"message_id": S_ID, "body": {"type": "string"}}, ["message_id", "body"]),
      lambda api, a: api.call("PATCH", f"/team/messages/{int(a['message_id'])}", body={"body": a["body"]})),
     ("delete_team_message", "2.17.0: delete your own team chat message.", _obj({"message_id": S_ID}, ["message_id"]),
@@ -1958,6 +1993,7 @@ TOOL_SCOPES["time"] += ("check_time_entries", "time_from_events", "propose_time_
 TOOL_SCOPES["calendar"] += ("get_dispo", "get_dispo_free", "propose_shoot")  # 2.51.0 (#1355)
 TOOL_SCOPES["layouts"] = ("list_layout_blocks", "get_view_layout", "propose_layout")  # 2.55.0 (#1066)
 TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
+TOOL_SCOPES["comments"] += ("leave_team_channel",)  # 2.113.1 (#2059)
 TOOL_SCOPES["import"] = ("propose_import",)  # 2.68.0 (#1839)
 TOOL_SCOPES["agent"] += ("propose_contract_notice",)  # 2.70.0 C (#1359)
 TOOL_SCOPES["structure"] += ("propose_rule",)  # 2.71.0 A (#1457)

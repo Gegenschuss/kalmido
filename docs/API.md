@@ -413,6 +413,16 @@ reopens a task that was closed by mistake.
 | `PATCH /team/messages/{id}` · `DELETE` | comments | your own messages (list owners / admins may delete any in their channel) |
 | `POST /team/messages/{id}/reactions` | comments | `{emoji: up\|down\|heart or one emoji, on?}` |
 | `POST /team/rooms/{id}/read` | comments | `{last_id?, muted?}` |
+| `GET /team/channels` | read | 2.113.1: the channels you see or manage (yours, the open ones of your organisations with `joined`, archived ones you may restore) and whom you may add (`orgs[].people` / `agents`, `people`, `agents`) |
+| `POST /team/channels` | comments | 2.113.1: `{name, org_id?, open?, members?}` — a channel of an organisation (`open`: every person of it sees it and may join) or of your own space (`org_id` null: invited only, people you work with); people only |
+| `POST /team/groups` | comments | 2.113.1: `{members, name?}` — a group conversation with at least two other people who all work with each other; people only |
+| `PATCH /team/rooms/{id}` | comments | 2.113.1: `{name?, open?, archived?}` — a channel: its creator or an organisation admin (archived = read-only, restorable); a group: every member (name only) |
+| `POST /team/rooms/{id}/members` · `DELETE …/members/{user id}` | comments | 2.113.1: add someone (channel: its managers; group: every member) or join an open channel with your own id; leave with your own id, managers remove others from a channel |
+| `GET /team/files/{id}` | read | 2.113.1: a file of a team chat message (`attachments[].url` of the message); everyone who sees the conversation |
+
+2.113.1: `POST /team/rooms/{id}/messages` also takes `multipart/form-data` with `body`, `task_id`, `reply_to` and up to 10
+fields `file` (the body may then be empty; the same size and type limits as task attachments). An end-to-end encrypted
+conversation refuses files (`409`). Deleting a message removes its files for good.
 
 ## Family (2.19.0)
 

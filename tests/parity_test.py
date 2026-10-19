@@ -165,6 +165,10 @@ APP_TO_API = {
     "DELETE /api/notes/{}": ["DELETE /notes/{}"],
     # 2.17.0 (#419): team chat
     "GET /api/team": ["GET /team/rooms"], "POST /api/team/dm": ["POST /team/dm"],
+    # 2.113.1 (#2059): channels, groups, files
+    "GET /api/team/channels": ["GET /team/channels"], "POST /api/team/channels": ["POST /team/channels"], "POST /api/team/groups": ["POST /team/groups"],
+    "PATCH /api/team/rooms/{}": ["PATCH /team/rooms/{}"], "POST /api/team/rooms/{}/members": ["POST /team/rooms/{}/members"],
+    "DELETE /api/team/rooms/{}/members/{}": ["DELETE /team/rooms/{}/members/{}"], "GET /api/team/files/{}": ["GET /team/files/{}"],
     "GET /api/team/rooms/{}/messages": ["GET /team/rooms/{}/messages"], "POST /api/team/rooms/{}/messages": ["POST /team/rooms/{}/messages"],
     "POST /api/team/rooms/{}/read": ["POST /team/rooms/{}/read"], "PATCH /api/team/messages/{}": ["PATCH /team/messages/{}"],
     "DELETE /api/team/messages/{}": ["DELETE /team/messages/{}"], "POST /api/team/messages/{}/reactions": ["POST /team/messages/{}/reactions"],
@@ -619,7 +623,7 @@ def sample(schema):
 
 TOOL_VARIANTS = {  # extra arguments that reach other routes of the same tool
     "list_files": [{"folder_id": 1}], "read_file": [{"as": "base64"}], "write_file": [{"file_id": 1}],  # 2.48.0 (#1207)
-    "get_attachment": [{"source": "chat"}, {"source": "project", "list_id": 1}],
+    "get_attachment": [{"source": "chat"}, {"source": "project", "list_id": 1}, {"source": "team"}],  # 2.113.1 (#2059): team
     "react": [{"remove": True}],
     "upload_attachment": [],
 }
@@ -664,6 +668,10 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "GET /lists/{}/error-hook": "2.18.0: the error-report webhook carries a secret URL; agents are refused (403), people manage it",
     "PATCH /lists/{}/error-hook": "2.18.0: the error-report webhook carries a secret URL; agents are refused (403), people manage it",
     "POST /team/dm": "direct messages are between people; agents cannot open them (403), people talk to an agent in its own chat",
+    "POST /team/channels": "2.113.1 (#2059): people open channels; agents are refused (403) and only added by people",
+    "POST /team/groups": "2.113.1 (#2059): group conversations are between people; agents are refused (403)",
+    "PATCH /team/rooms/{}": "2.113.1 (#2059): renaming / archiving a channel is for its creator or an organisation admin (people; agents 403)",
+    "POST /team/rooms/{}/members": "2.113.1 (#2059): people add members (agents only by their owner / an organisation admin; agents 403)",
     "POST /me/purpose": "2.19.0: the modules of the account (scope account): never for agents",
 }
 none = sorted(r for r in API if r not in reached and r not in API_ONLY)

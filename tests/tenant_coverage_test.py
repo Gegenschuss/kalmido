@@ -727,6 +727,12 @@ ROUTES = {
     "PATCH /api/v1/team/messages/{}": "team", "DELETE /api/v1/team/messages/{}": "team",
     "POST /api/v1/team/messages/{}/reactions": "team", "POST /api/v1/team/rooms/{}/read": "team",
     "POST /api/team/messages/{}/pin": "team", "POST /api/v1/team/messages/{}/pin": "team",  # 2.62.0 (#1848): also p262_a_api_test.py
+    # 2.113.1 B (#2059): channels, groups, files: p2113b_b_api_test.py (another organisation's person / agent 404 / 400)
+    "GET /api/team/channels": "team", "POST /api/team/channels": "team", "POST /api/team/groups": "team",
+    "PATCH /api/team/rooms/{}": "team", "POST /api/team/rooms/{}/members": "team", "DELETE /api/team/rooms/{}/members/{}": "team",
+    "GET /api/team/files/{}": "team", "GET /api/v1/team/channels": "team", "POST /api/v1/team/channels": "team",
+    "POST /api/v1/team/groups": "team", "PATCH /api/v1/team/rooms/{}": "team", "POST /api/v1/team/rooms/{}/members": "team",
+    "DELETE /api/v1/team/rooms/{}/members/{}": "team", "GET /api/v1/team/files/{}": "team",
     # ---- template (12)
     "GET /api/v1/templates": "template", "POST /api/v1/templates": "template", "PATCH /api/v1/templates/{}": "template",
     "DELETE /api/v1/templates/{}": "template", "POST /api/v1/templates/{}/apply": "template",

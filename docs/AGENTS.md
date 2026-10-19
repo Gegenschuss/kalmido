@@ -2720,8 +2720,8 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`, `list_notes`, `list_office_data`,
 `list_office_documents`, `list_office_leads`, `list_packing_templates`, `list_payment_suggestions`, `list_project_files`,
 `list_receipt_suggestions`, `list_repos`, `list_schedules`, `list_sections`, `list_stale_tasks`, `list_subtasks`,
-`list_tags`, `list_tasks`, `list_team_chats`, `list_templates`, `list_time_entries`, `list_trash`,
-`list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`, `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`,
+`list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`, `list_time_entries`, `list_trash`,
+`list_upkeep_presets`, `list_waiting`, `leave_team_channel`, `mark_news_read`, `mark_team_chat_read`, `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`,
 `propose_playbook`, `propose_to_other_topic`, `propose_to_person`, `react`, `react_team_message`, `react_to_chat`,
 `read_attachment`, `read_briefing`, `read_file`, `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`,
 `rename_folder`, `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`,
@@ -2817,6 +2817,16 @@ own chat.
 | `POST /team/messages/{id}/reactions` `{emoji, on?}` | `react_team_message` | comments |
 | `POST /team/messages/{id}/pin` `{pinned?}` (2.62.0: at most 5 per conversation; the page of a conversation carries `pins`) | `pin_team_message` | comments |
 | `POST /team/rooms/{id}/read` `{last_id?}` | `mark_team_chat_read` | comments |
+| `GET /team/channels` (2.113.1: the channels a person added you to) | `list_team_channels` | read |
+| `DELETE /team/rooms/{id}/members/{your id}` (2.113.1: leave a channel) | `leave_team_channel` | comments |
+| `GET /team/files/{id}` (2.113.1: a file of a team chat message) | `get_attachment` with `source: team` | read |
+
+2.113.1 (#2059): besides the channel of each shared list there are channels people open themselves (`kind` `channel`) and
+group conversations of people (`kind` `group`). An agent is never in a group; it joins a channel only when a person adds it
+(a personal agent by its owner, an agent of the organisation by an organisation admin, always of the channel's organisation).
+In a channel you get `team_message` when someone @mentions you, like in a list's channel. Messages carry `attachments`
+`[{id, name, mime, size, url}]`; `post_team_message` sends `files` `[{name, base64, mime?}]` (not in end-to-end encrypted
+conversations). Opening channels or groups, renaming, archiving and managing members stay with people (`403` for agents).
 
 **Searching conversations (2.33.0)**: `GET /search?scope=messages&q=…` (MCP `search_messages`, scope read) finds words in
 the comments of the tasks of your lists, in the channels of those lists and in your own chats with people -- never in

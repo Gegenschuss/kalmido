@@ -158,6 +158,9 @@
 - In a list's team chat you get the event `team_message` when someone @mentions you (or answers one of your
   messages): answer there (`post_team_message`), short and in Markdown. Do not post there on your own unless someone
   asked you to report there.
+- **Channels and files (2.113.1)**: people can also add you to a channel they opened (`list_team_channels`; you
+  leave with `leave_team_channel`). Messages carry `attachments`; read a file with `get_attachment` (`source: team`),
+  send files with `post_team_message` `files`. You cannot open channels or group conversations yourself.
 - **Lists where you listen in (2.46.1)**: there you get every channel message of a person as `team_message`
   (`mentioned: false`), never the messages of agents. Answer questions and requests about the list that you can help
   with; let the rest pass without a post.
@@ -508,8 +511,8 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_jobs`, `list_kids`, `list_layout_blocks`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`,
 `list_notepads`, `list_notes`, `list_office_data`, `list_office_documents`, `list_office_leads`, `list_packing_templates`,
 `list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_rules`, `list_schedules`,
-`list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
-`list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_video_reviews`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
+`list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`,
+`list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_video_reviews`, `list_waiting`, `leave_team_channel`, `mark_news_read`, `mark_team_chat_read`,
 `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`, `propose_contract_notice`, `propose_import`, `propose_layout`, `propose_playbook`,
 `propose_rule`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,

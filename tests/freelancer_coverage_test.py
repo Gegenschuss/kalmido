@@ -39,7 +39,8 @@ KINDS = {
     "agents": ("matrix", SUITE + ": the freelancer's own agent (my agents, its token, chat, jobs, share of a private list) and "
                          "the agent API with that agent's token"),
     "team": ("matrix", SUITE + ": the people list, direct messages and discovery without an organisation (no team rooms of "
-                       "an organisation, nothing of another workspace)"),
+                       "an organisation, nothing of another workspace); p2113b_b_api_test.py: a private channel with files, "
+                       "rename / archive / restore as its own admin, groups only with people one works with (2.113.1)"),
     "hub": ("matrix", SUITE + ", p2125_a_api_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
                       "2.125.0: the own vacation account and working week, never a vacation request"),
     "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature"),
@@ -651,6 +652,12 @@ ROUTES = {
     "POST /api/users/{}/signin-link": "team", "POST /api/v1/team/dm": "team", "POST /api/v1/team/messages/{}/pin": "team",
     "POST /api/v1/team/messages/{}/reactions": "team", "POST /api/v1/team/rooms/{}/messages": "team",
     "POST /api/v1/team/rooms/{}/read": "team", "PUT /api/disc": "team", "PUT /api/e2e/keys": "team",
+    # 2.113.1 B (#2059): channels, groups, files of the team chat (p2113b_b_api_test.py, a private channel of a freelancer)
+    "GET /api/team/channels": "team", "POST /api/team/channels": "team", "POST /api/team/groups": "team",
+    "PATCH /api/team/rooms/{}": "team", "POST /api/team/rooms/{}/members": "team", "DELETE /api/team/rooms/{}/members/{}": "team",
+    "GET /api/team/files/{}": "team", "GET /api/v1/team/channels": "team", "POST /api/v1/team/channels": "team",
+    "POST /api/v1/team/groups": "team", "PATCH /api/v1/team/rooms/{}": "team", "POST /api/v1/team/rooms/{}/members": "team",
+    "DELETE /api/v1/team/rooms/{}/members/{}": "team", "GET /api/v1/team/files/{}": "team",
     # ---- time (28)
     "DELETE /api/habits/{}": "time", "DELETE /api/time/entries/{}": "time", "DELETE /api/v1/habits/{}": "time",
     "DELETE /api/v1/time/entries/{}": "time", "DELETE /api/v1/time/timer": "time", "GET /api/time/entries": "time",

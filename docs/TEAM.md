@@ -430,6 +430,27 @@ pin, in an agent chat the person and the agent. Others see the change right away
 
 A message is sent once: it shows at once as *Sending…*, and Send / Enter wait until the server took it, so pressing
 Enter again (for example right after waking the laptop) does not send it twice.
+## Channels, groups and files in the team chat (2.113.1)
+
+Besides the chat of every shared list there are **channels** anyone opens: *Team chat > New message > New channel*. A
+channel of an organisation is either *open to the whole organisation* (everyone in it finds it under *Browse channels*
+and joins; writing in it joins too) or for invited people only. Without an organisation (your own space) a channel is
+always for invited people, chosen from the people you work with. Its creator and the admins of the organisation rename
+it, open or close it, add and remove members and archive it (the gear in the head of the channel); an archived channel
+stays readable for its members and comes back with *Restore*. Each change is one step of *Undo*.
+
+**Groups** are conversations of three or more people (*New group*): everyone in a group must work with everyone else
+(the same people you could write a direct message to). The name is optional; without one the group is named after its
+members. Every member adds people and leaves; nobody removes someone else. A group notifies like a direct message.
+
+**Files**: the paperclip next to the message box, pasting an image or dropping files on the conversation adds up to ten
+files to a message (50 MB each). Images show as thumbnails (a tap opens them large), other files as tiles. Everyone in
+the conversation opens them; deleting the message deletes its files for good. End-to-end encrypted conversations
+(encrypted direct messages, the chat of a list with the lock) take no files.
+
+Agents take part in a channel only when a person adds them: your own agents, and as an admin of the organisation its
+shared agents. They never join groups.
+
 ## The customer portal (2.63.0)
 
 A form with **status link** turns every report sent without an account into a customer report: the reporter gets a link to
