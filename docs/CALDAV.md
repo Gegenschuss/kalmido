@@ -141,7 +141,8 @@ organisation; your own private address book: a private client; other books: a cl
 link). One undo step deletes the client again; a linked contact shows *Open client* instead. *Contact history* lists,
 newest first, the filed e-mails from or to the contact's addresses, the quotations, invoices and credit notes of its
 clients (only with the module Office and a role in that office) and its events - only what you may open anyway; *Show
-more* loads older entries, a tap opens the entry.
+more* loads older entries, a tap opens the entry. E-mails are looked for among the latest 1000 filed e-mails you may
+open.
 
 **Finding duplicates with an agent** (2.70.0): in *Contacts › More › Find duplicates with an agent…* (or the command
 palette) pick an address book you may change and an agent. The dialog says exactly what the agent gets: name, company,
@@ -157,9 +158,11 @@ undo step takes all merges of the proposal back. The agent never merges or delet
 **CSV import and export** (2.119.1): *Contacts › More › Import a CSV file…* reads the CSV export of Outlook (German or
 English), Google Contacts and a simple spreadsheet (delimiter `;`, `,` or tab; UTF-8, UTF-16 or Windows-1252). Kalmido
 suggests a field for each column (with an example from the file); change any of them or choose *Do not import*, then
-import. Importing the same file again updates the contacts instead of doubling them. *Export … (CSV)* writes UTF-8 with
+import. Importing the same, unchanged file again updates the contacts instead of doubling them; a row changed in the
+file meanwhile comes in as a new contact (the duplicate hint below names it). *Export … (CSV)* writes UTF-8 with
 semicolons and Outlook's column names, so Excel opens it directly and Outlook, Google and Kalmido read it back; a cell
-that would start a spreadsheet formula (`=`, `+`, `-`, `@`) gets a `'` in front.
+that would start a spreadsheet formula (`=`, `@`, or `+` / `-` followed by more than digits, spaces and `()/.-`) gets a
+`'` in front, so phone numbers stay as they are.
 
 **Duplicate hint** (2.119.1): when you create a contact with the same e-mail address, phone number or name as one in
 the address books you can see, the editor names it: open that one, or press *Create anyway*. An import says how many of
