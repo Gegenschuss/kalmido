@@ -476,6 +476,7 @@ Reminders are minutes before the start (all day: before midnight, so `-540` = 9:
 Reply-To = the inviting person) to the new external attendees (addresses, contacts) and, when time, place, title, repeat or
 status changed, to all of them; default `false` (nothing is mailed). Removed or deleted: who had an invitation gets a
 cancellation. At most 200 invitation mails per person and day (`429`), see [CALDAV.md](CALDAV.md).
+Agent tokens get `403` with `send_invites: true`: invitations go out in the person's name, so only people send them.
 
 ## Contacts (2.21.0)
 

@@ -268,6 +268,24 @@ check(A.delete(B + f"/api/evcals/{CAL}/members/{BOB}").ok, "stop sharing with bo
 check(pub.get(B + feed_path(UB)).status_code == 404, "the link of someone who no longer sees the calendar: 404")
 UA = A.post(B + f"/api/evcals/{CAL}/feed", json={"action": "create"}).json()["url"]
 check(pub.get(B + feed_path(UA)).status_code == 200, "the owner's new link works")
+# 2.111.0 review: the events module switched off ends the links too; a body that is no object is a 400, no 500
+A.patch(B + "/api/settings", json={"features": ",".join(x for x in FEAT.split(",") if x != "events")})
+check(pub.get(B + feed_path(UA)).status_code == 404, "events module off: the link answers 404")
+A.patch(B + "/api/settings", json={"features": FEAT})
+check(pub.get(B + feed_path(UA)).status_code == 200, "module on again: the link works again")
+check(A.post(B + f"/api/evcals/{CAL}/feed", json=["create"]).status_code == 400, "a list as body: 400")
+# 2.111.0 review: an agent never mails invitations (a prompt injection would mail in the owner's name)
+ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "calendar"], "username": "evhelper", "display_name": "Ev Helper"}).json()
+A.put(B + f"/api/evcals/{CAL}/members", json={"user_id": ag["id"], "role": "edit"})
+AH = {"Authorization": "Bearer " + ag["token"]}
+r = requests.post(B + "/api/v1/events", headers=AH, json={"cal_id": CAL, "title": "Agent", "start": f"{D}T07:00", "end": f"{D}T07:30",
+                                                         "attendees": [{"email": "agent-ext@example.com"}], "send_invites": True})
+check(r.status_code == 403, f"an agent with send_invites: 403 ({r.status_code} {r.text[:150]})")
+r = requests.post(B + "/api/v1/events", headers=AH, json={"cal_id": CAL, "title": "Agent", "start": f"{D}T07:00", "end": f"{D}T07:30",
+                                                         "attendees": [{"email": "agent-ext@example.com"}]})
+check(r.status_code == 201, f"an agent without the flag: 201 ({r.status_code} {r.text[:150]})")
+time.sleep(1)
+check(not mails("agent-ext@example.com"), "no mail from an agent")
 # deleting the calendar: invited attendees get the cancellation, the link ends
 n3 = len(mails("ext3@example.com"))
 check(A.delete(B + f"/api/evcals/{CAL}").ok, "delete the calendar")

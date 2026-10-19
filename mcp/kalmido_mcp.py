@@ -816,10 +816,7 @@ EV_IN = {"cal_id": S_ID, "title": {"type": "string"}, "location": {"type": "stri
          "status": {"type": "string", "enum": ["confirmed", "tentative", "cancelled"]}, "busy": {"type": "boolean"},
          "url": {"type": ["string", "null"]}, "task_id": {"type": ["integer", "null"]},
          "attendees": {"type": "array", "items": {"type": "object", "properties": {"user_id": S_ID, "contact_id": S_ID, "email": {"type": "string"},
-                                                                                 "name": {"type": "string"}}}},
-         # 2.111.0 (#2056): mail the invitation to the external attendees; only when the person asked for it
-         "send_invites": {"type": "boolean", "description": "2.111.0: e-mail the invitation (.ics) to new external attendees (addresses, contacts), "
-                                                            "to all of them when time, place, title or repeat changed; default false. Only when your person asked for it"}}
+                                                                                 "name": {"type": "string"}}}}}
 EV_KEYS = tuple(EV_IN)
 OCC = {"occurrence": {"type": "string", "description": "only this date of a repeating event (its original start, Occurrence.occ)"}}
 CT_IN = {"book_id": S_ID, "kind": {"type": "string", "enum": ["individual", "org", "group"]},

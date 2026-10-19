@@ -281,7 +281,7 @@ it. A repeating event goes as one invitation with its rule and its changed or le
   (method CANCEL) to everyone who got an invitation. Undo of a delete invites them again.
 - Only who may change the event sends invitations. At most 100 attendees per event and 200 invitation mails per person and
   day. Without mail sending on the server nothing is sent and the editor says so.
-- Agents send invitations only with `send_invites: true` (default off), see [API.md](API.md#events-2210).
+- Agents never send invitations (`send_invites` from an agent token is refused with 403), see [API.md](API.md#events-2210).
 
 **Subscription link.** In the calendars list (Calendar > Calendars, the menu of a calendar) *Subscription link* makes a
 secret link (`…/ical/ev/<id>.<secret>.ics`) for calendar apps that only read: copy it, open it in the calendar app, make a
