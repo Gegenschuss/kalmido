@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.119.1** (2026-10-19): contacts import and export CSV (Outlook, Google, Excel), load beyond 500, hint on duplicates,
+  manage groups, a contact history and "Create client" on the card, addresses as map links; framework contracts move
+  between private and organisation; undo of a list delete keeps the list active.
 - **2.119.0** (2026-10-19): entertainment receipts as an office module (form with pick lists, lock with logged unlock,
   PDF receipt, 70/30 report with filters), filled icon buttons when switched on, pin agents in "All people …".
 - **2.118.0** (2026-10-19): quotation numbers per client or project (e.g. KV-ACME-2026-03) and a `{version}` block
