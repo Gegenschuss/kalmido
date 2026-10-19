@@ -56,7 +56,7 @@ def vdr_v1_comments(c, d):
 
 def vdr_v1_dict(c, r, full=False):
     d = vdr_dict(c, r, me(), full=full, signoffs=False)  # 2.99.1 review C-L1: the customer links are never built here
-    for k in ("signoffs", "org_id", "client_id", "deleted", "space"):  # review C-L2: app-only keys (not in the schema)
+    for k in ("signoffs", "org_id", "client_id", "deleted"):  # review C-L2: app-only keys (not in the schema)
         d.pop(k, None)
     d["can_write"] = vdr_may(c, me(), r, write=True, api=True)
     d["url"] = f"/api/v1/videos/{r['id']}"
