@@ -1188,6 +1188,13 @@ fresh; run p293_a_ui node p293_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p293_b_api "$PY" p293_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p293_b_ui node p293_b_ui.js "$KALMIDO_TEST_DATA"
 shard 13  # 2.98.1: new suites go here, above this line
+# 2.114.1 part A: bank button "Match" wording + 44 px buttons, empty heading, producing checkbox (#2017 #2254 #2255)
+fresh; run p21141_a_ui node p21141_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.114.1 part B: books reload after bank match, matched receipts in the cash flow (#2016 #2018)
+fresh; run p21141_b_api "$PY" p21141_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21141_b_ui node p21141_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.114.1 part C: transfer of rights on its own last page of the quotation PDF (#2258)
+fresh; run p21141_c_api "$PY" p21141_c_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
