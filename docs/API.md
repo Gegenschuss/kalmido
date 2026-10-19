@@ -791,7 +791,24 @@ with them; with collaboration switched off only their own). What they cannot see
 | `task.deleted` | moved to the trash (`permanent: false`) or deleted for good (`permanent: true`) |
 | `comment.created` | someone commented (only if the webhook's owner has collaboration on) |
 | `list.shared` | a list was shared: sent to the owner and to the person it was shared with |
+| `event.created`, `event.updated`, `event.deleted` | 2.115.0: a calendar event was created, changed or moved to the trash; `data.event` `{id, title, location, all_day, start, end, status, deleted}`, `data.calendar` `{id, name}` |
+| `file.created` | 2.115.0: a file was uploaded to the file store or the documents; `data.file` `{id, name, mime, size, folder_id, created_at}` |
+| `invoice.created`, `invoice.sent`, `invoice.paid` | 2.115.0: an invoice or credit note was created (also from a quotation or as a copy), marked sent / mailed, paid (by hand or when the payments reach the total); `data.invoice` `{id, kind, number, status, date, currency, net, gross, client_id, sent_at, paid_at}` -- never bank data |
+| `time.created` | 2.115.0: a time entry was added (timer started, entered by hand); `data.time` `{id, user_id, task_id, start, end, seconds, source}`, `data.list` |
 | `ping` | the *Send test* button |
+
+**Which objects (2.115.0).** Task, comment and list events reach a personal webhook for every list its owner sees, as
+before. The newer events (calendar, files, invoices, time) reach a personal webhook only from its owner's **private
+area** (private calendars, own files, the personal office, private lists); what belongs to an organisation goes to the
+organisation's webhooks (below). A person without an organisation gets all of them from their own area.
+
+**Webhooks of an organisation (2.115.0).** Admins of an organisation add up to 10 webhooks under **Settings >
+Organisation > Webhooks** (`GET/POST /api/orgs/{id}/webhooks`, `PATCH/DELETE /api/orgs/{id}/webhooks/{wid}`, `.../secret`,
+`.../test`, `.../log`; members get 403). Same events, payloads, signature, retries and URL rules as a personal webhook,
+but for everything the organisation owns: its lists (as the admin who set it up sees them), calendars, files, office and
+the time booked on its lists -- **never** anything of a member's private area. The admin who set it up (or switched it on
+again) must stay an admin of the organisation; otherwise the webhook turns itself off (`disabled_reason: "admin"`) and
+another admin can switch it on again (and then owns it).
 
 The changes of one request are combined: creating a task sends `task.created` (not also `task.updated`); completing
 sends `task.completed` only.
@@ -816,7 +833,7 @@ sends `task.completed` only.
 - `id` = the delivery id, also in the `X-Kalmido-Delivery` header, **the same for every retry**: use it to ignore
   duplicates.
 - `actor` = who made the change (`null` for someone using a public list link), `via` = `web` (the app), `api`,
-  `public_link` or (2.9.0) `caldav` (a calendar app).
+  `public_link`, (2.9.0) `caldav` (a calendar app) or (2.115.0) `webhook` (an inbound webhook of a list).
 - `data.task` has the same fields as the API, as the webhook's owner sees the task (their own tags). `data.changes`
   (for `task.updated`), `data.permanent` (for `task.deleted`), `data.comment` (`{id, author_id, text, created_at,
   files}` for `comment.created`), `data.member` and `data.role` (for `list.shared`).
@@ -1546,3 +1563,48 @@ themselves and have their own proposals API); child accounts get `403`.
   or an answer; kept `KALMIDO_AUDIT_DAYS` days.
 - `GET /api/admin/assistant` (admins) -> `{provider, host, model, timeout_s, max_chars, today: {calls, errors}, days: [{day,
   calls, errors, chars_in, chars_out}]}` for 30 days, without people.
+
+## Inbound webhook of a list (2.115.0)
+
+Tools like n8n, Make, Zapier or Home Assistant create tasks through a secret URL, without a login. The owner or an
+admin of a list adds one under **List settings > Inbound webhook** (up to 10 per list; not in the basket, health,
+budget or locked lists). The URL `https://kalmido.example.com/api/hooks/in/<token>` is shown **once** (Kalmido stores
+only its SHA-256); *New URL* stops the old one at once, *Delete* too (undo brings the same URL back for 30 days).
+
+Each `POST` creates **one task in exactly this list**, through the normal way of creating a task (history line "via
+webhook", pushes, agent events, outgoing webhooks, list rules), with the rights of the person who set the webhook up.
+If that person can no longer write in the list (left it, became a viewer, was deactivated), the webhook answers `403`
+and pauses itself; the owner or a list admin resumes it with their own rights (`PATCH /api/hooks-in/{id}`
+`{"resume": true}`).
+
+| Body | |
+|---|---|
+| `application/json` | `{"title": "..." (required), "notes", "due": "YYYY-MM-DD" or an ISO date-time (with an offset: converted to the server's time zone), "priority": "none" \| "low" \| "medium" \| "high", "tags": [list tags], "fields": {"field name or id": value}}` |
+| form fields | the same names, `tags` comma separated |
+| `text/plain` (or anything else) | the first line is the title, the rest the notes |
+
+Answers: `201 {"id", "url", "ignored"?}`; `400` with a short message (no title, an invalid date / priority / field
+value); `404` for an unknown, rotated or deleted token; `403` paused; `409` archived list; `413` above 64 KB; `429`
+above 60 requests per minute or 1000 per day and webhook. Keys Kalmido does not know, tags the list does not have and
+fields of other lists are **ignored** (never created) and named in `ignored`, so a flow keeps running when the list
+changes.
+
+```bash
+curl -X POST -H 'Content-Type: application/json' \
+  -d '{"title": "Washing machine done", "due": "2026-11-02", "priority": "high", "tags": ["Home"]}' \
+  'https://kalmido.example.com/api/hooks/in/khi_...'
+```
+
+Home Assistant (`configuration.yaml`):
+
+```yaml
+rest_command:
+  kalmido_task:
+    url: "https://kalmido.example.com/api/hooks/in/khi_..."
+    method: POST
+    content_type: "application/json"
+    payload: '{"title": "{{ title }}"}'
+```
+
+n8n: an *HTTP Request* node, method POST, the URL, body JSON with `title` (and the other keys). Behind a login proxy
+(forward auth, single sign-on) the path `/api/hooks/` must bypass the proxy login, like the other inbound hooks.

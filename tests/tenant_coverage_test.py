@@ -84,7 +84,7 @@ KINDS = {
     # 2.75.0 (#1411): the built-in assistant: a person's shares of visible lists, tasks only of shared lists / the own basket
     "assistant": ("matrix", "p275_a_api_test.py: another person's task / basket item / list 404 or left out; shares of lists the person no longer sees dropped; the log only own rows; agents never"),
     "receipt": ("matrix", "p248_d_receipts_api_test.py: receipt data and suggestions only on a visible document; projects of another workspace refused; outsiders 404"),
-    "webhook": ("matrix", "p2300_tenant_test.py: webhooks by id, deliveries only of visible tasks"),
+    "webhook": ("matrix", "p2300_tenant_test.py: webhooks by id, deliveries only of visible tasks; p2115_a_api_test.py: an organisation's webhooks only for its admins, never events of a member's private list"),
     "export": ("matrix", "p2300_tenant_test.py: the export has only the own data"),
     "stats": ("matrix", "p2300_tenant_test.py: statistics count only own / visible tasks"),
     "publiclink": ("matrix", "p2300_tenant_test.py: the public link of another person's list by id"),
@@ -758,6 +758,14 @@ ROUTES = {
     "GET /api/me/webhooks": "webhook", "POST /api/me/webhooks": "webhook", "PATCH /api/me/webhooks/{}": "webhook",
     "DELETE /api/me/webhooks/{}": "webhook", "POST /api/me/webhooks/{}/secret": "webhook",
     "POST /api/me/webhooks/{}/test": "webhook", "GET /api/me/webhooks/{}/log": "webhook",
+    # 2.115.0 A (#2061): webhooks of an organisation (its admins only; deliveries only of what the organisation owns) and the
+    # inbound webhooks of a list (owner / list admins; the URL creates tasks only in its own list) -- p2115_a_api_test.py
+    "GET /api/orgs/{}/webhooks": "webhook", "POST /api/orgs/{}/webhooks": "webhook", "PATCH /api/orgs/{}/webhooks/{}": "webhook",
+    "DELETE /api/orgs/{}/webhooks/{}": "webhook", "POST /api/orgs/{}/webhooks/{}/secret": "webhook",
+    "POST /api/orgs/{}/webhooks/{}/test": "webhook", "GET /api/orgs/{}/webhooks/{}/log": "webhook",
+    "POST /api/hooks/in/{}": "token", "GET /api/lists/{}/hooks-in": "list", "POST /api/lists/{}/hooks-in": "list",
+    "PATCH /api/hooks-in/{}": "list", "DELETE /api/hooks-in/{}": "list", "POST /api/hooks-in/{}/rotate": "list",
+    "POST /api/hooks-in/{}/restore": "list",
     # ---- 2.34.0 (#264 #265): the briefing (a person's own, an agent: of a person it may chat with, only shared lists) and
     # the status report of a list (p2340_a_api_test.py has the cross-tenant cases)
     "GET /api/briefing": "aggregate", "POST /api/briefing/read": "own", "GET /api/v1/briefing": "aggregate",

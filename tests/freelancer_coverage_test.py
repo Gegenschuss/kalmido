@@ -681,6 +681,14 @@ ROUTES = {
     "GET /api/time/sheets": "time", "POST /api/time/sheets": "time", "POST /api/time/sheets/decide": "time",  # 2.125.0 B (#2119)
     # ---- token (3)
     "POST /api/hooks/deploy/{}/{}": "token", "POST /api/hooks/git/{}": "token", "POST /api/hooks/issues/{}/{}": "token",
+    # 2.115.0 A (#2061): inbound webhooks of a list (p2115_a_api_test.py calls them as a person without an organisation);
+    # the hook URL itself is a secret token; the webhooks of an organisation are managed by its admins
+    "POST /api/hooks/in/{}": "token", "GET /api/lists/{}/hooks-in": "lists", "POST /api/lists/{}/hooks-in": "lists",
+    "PATCH /api/hooks-in/{}": "lists", "DELETE /api/hooks-in/{}": "lists", "POST /api/hooks-in/{}/rotate": "lists",
+    "POST /api/hooks-in/{}/restore": "lists",
+    "GET /api/orgs/{}/webhooks": "orgadmin", "POST /api/orgs/{}/webhooks": "orgadmin", "PATCH /api/orgs/{}/webhooks/{}": "orgadmin",
+    "DELETE /api/orgs/{}/webhooks/{}": "orgadmin", "POST /api/orgs/{}/webhooks/{}/secret": "orgadmin",
+    "POST /api/orgs/{}/webhooks/{}/test": "orgadmin", "GET /api/orgs/{}/webhooks/{}/log": "orgadmin",
     # ---- wiki (24)
     "DELETE /api/wiki/pages/{}": "wiki", "GET /api/wiki": "wiki", "GET /api/wiki/e2e": "wiki",
     "GET /api/wiki/e2e/todo": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki",

@@ -472,6 +472,9 @@ Every event has the same envelope, whether it arrives as a webhook or through po
 
 ### Webhooks
 
+(2.115.0: the inbound webhook of a list and the webhooks of an organisation are for other tools, set up by people; see
+[API.md](API.md#inbound-webhook-of-a-list-21150). An agent creates tasks with `POST /api/v1/tasks` and its own token.)
+
 If the agent has a webhook URL, Kalmido POSTs every event to it as JSON. The headers are the same as for [user webhooks](API.md):
 
 | Header | Value |
