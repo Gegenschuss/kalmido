@@ -57,7 +57,7 @@ async function swShell(req, url) {
   return r;
 }
 // Android share sheet (share_target POST): keep the shared files in a cache and open the app,
-// which then creates the task + uploads with the normal (Authelia) session.
+// which then creates the task + uploads with the normal (login) session.
 async function handleShare(req) {
   try {
     const fd = await req.formData();
