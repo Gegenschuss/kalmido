@@ -1216,6 +1216,10 @@ Newsletter…* an organisation's admin connects the service for the organisation
   bounced address is never subscribed again by Kalmido and stays blocked in Kalmido; if the person
   subscribes again through the service's own form, Kalmido leaves that subscription alone. Manually with
   *Sync now*, or once a day. Every run is logged (numbers and error codes, never addresses or access data).
+- **Suppression list (2.103.0):** an unsubscription or bounce is also kept as a hash (SHA-256 of the lower-case address, per
+  workspace; never the address itself), so deleting or merging the contact does not make the address mailable again, and a
+  new import marked "yes" on that address stays unsubscribed. Consent, confirmation and unsubscription are logged as well
+  (event, source, time, again only the hash) as proof of consent.
 - **Access data** are stored sealed with a key derived from `KALMIDO_SECRET_KEY` (needed) and never shown again; the
   address goes through the same SSRF guard as calendar subscriptions (an instance in the local network: allow its host,
   e.g. `KALMIDO_CALENDAR_ALLOW_HOSTS=listmonk.example.com:9000`).
