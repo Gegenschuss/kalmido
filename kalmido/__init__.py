@@ -184,6 +184,8 @@ ORDER = (
     "contacts.bulk",  # 2.46.1 (#1554): delete / move several contacts at once
     "contacts.merge",  # 2.66.0 A (#1835): merging duplicate contacts (reversible)
     "contacts.orgbooks",  # 2.52.0 C (#1438): address books an organisation owns
+    "contacts.ctxlist",  # 2.119.1 A (#2080 #2084 #2085): CSV import / export, duplicate hint, managing the groups
+    "contacts.history",  # 2.119.1 B (#2083): the history on a contact's card
     "life.model",
     "life.bookmarks",  # 2.97.0 A (#1950): bookmarks with a preview, tags and search (Karakeep fills the same store)
     "life.karakeep",

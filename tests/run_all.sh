@@ -1159,6 +1159,17 @@ fresh; run p2102_d_api "$PY" p2102_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.102.0 part E (#1995 #1998 #1999): type check, drag library, layer linter + client error report
 fresh; run p2102_e_api "$PY" p2102_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2102_e_ui node p2102_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.119.1 part A: contacts - CSV import/export, more than 500 contacts, duplicate hint, manage groups (#2080 #2081 #2084 #2085)
+fresh; run p21191_a_api "$PY" p21191_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21191_a_ui node p21191_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.119.1 part B: contact card - client from contact, history, address as map link (#2082 #2083 #2086)
+fresh; run p21191_b_api "$PY" p21191_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21191_b_ui node p21191_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.119.1 part C: framework contracts between workspaces, undo of a list delete keeps the list active (#2298 #2304)
+fresh; run p21191_c_api "$PY" p21191_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21191_c_ui node p21191_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.119.1 part D: live panel window redraw flake, 44 px select marks in documents (#2310 #2206)
+fresh; run p21191_d_ui node p21191_d_ui.js "$KALMIDO_TEST_DATA"
 shard 13  # back to shard 13 for the 2.97 suites
 # 2.97.0 part A: bookmarks (#1950)
 fresh; run p297_a_api "$PY" p297_a_api_test.py "$KALMIDO_TEST_DATA"

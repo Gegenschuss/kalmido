@@ -23,6 +23,27 @@ Office: progress and final invoices, cash discount, client portal with documents
 - Country pack de: bookkeeping export DATEV is marked ready (#2090).
 - Agents: `draft_invoice_from_offer` / POST /api/v1/office/offers/{id}/invoice take `inv_type`, `amount` and `pct` (#2087).
 
+## [2.119.2] - 2026-10-19
+
+Contacts, undo of a list delete, framework contracts between workspaces, a flaky chat test.
+
+### Added
+- Contacts: CSV import (Outlook, Google, Excel) with a column mapping step - encoding and separator are detected, the headers of Outlook (English and German) and Google are mapped for you - and a CSV export that Excel opens directly; formula cells are defused, phone numbers stay as they are (#2080).
+- Contacts: a hint on possible duplicates when you create a contact (same e-mail, phone or name; "Create anyway" or open the existing one) and after an import, with a way to the merge view; nothing is merged on its own (#2084).
+- Contacts: "Manage groups…" with the count per group, rename and delete (only the label) across all writable address books, one undo step; synced devices get the change (#2085).
+- Contact card: "Create client" in the card's menu takes over company, e-mail, phone and address and links the contact as the contact person, with undo; a linked contact shows "Open client" (#2082).
+- Contact card: a "Contact history" section with filed e-mails, quotations, invoices and appointments, newest first - only what you may see anyway (#2083).
+- Office: framework contracts move with their PDF files between the private area and an organisation ("Move to another workspace…" in the contract dialog), one step undo; a contract that issued documents point to stays archived and is created anew in the target (#2298).
+
+### Changed
+- Contacts: long address books load further pages while you scroll instead of stopping at 500; "All" in selection mode really takes every match (#2081).
+- Addresses on the contact card and the client page open the map app on a tap (Apple Maps on Apple devices, Google Maps elsewhere) (#2086).
+
+### Fixed
+- Deleting a list: "Undo" right after it brings an active list back active in its old place, not into the archive; restoring from the trash still goes to the archive (#2304).
+- Documents: the selection marks have a real 44 px touch target on phones (#2206).
+- Chat side window: unchanged parts (job filter, status, steps) are no longer redrawn on every update, and a team conversation parked right after opening loads its messages instead of staying at "Loading…" (#2310).
+
 ## [2.119.1] - 2026-10-19
 
 ### Fixed

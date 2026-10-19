@@ -263,6 +263,7 @@ function cw_tcPark() {
   cw_idsOff(cw_sec(k)); S.cw.st[k] = cw_tcGet();
   cw_tcPut(S.cw.home); S.cw.home = null; S.cw.lt = '';
   cw_idsOn($('#view .tcroom'));
+  cw_loadIf(k);  // 2.119.1 D (#2310): parked while its first load was still out (that answer is dropped): it loads parked
 }
 // teamRoute(): the phone keeps its row of open chats; the desktop's team view takes its conversation back when it opens one
 // (true: leaving the team view while a panel window is live only clears the kept state, the live window stays as it is)
@@ -285,6 +286,7 @@ function cw_act(k) {
     if (S.cw.lt) { cw_idsOff(cw_sec(S.cw.lt)); S.cw.st[S.cw.lt] = cw_tcGet(); }
     else { S.cw.home = cw_tcGet(); cw_idsOff($('#view .tcroom')); }
     const st = cw_stOf(k); cw_tcPut(st); delete S.cw.st[k]; S.cw.lt = k; cw_idsOn(cw_sec(k));
+    if (!S.tc.room) cw_tload(k);  // 2.119.1 D (#2310): live before its messages came (a parked load answers into the old state)
     if (S.tc.room?.kind === 'dm') e2eRoomDecrypt(S.tc.rid).then(() => { if (S.cw.lt === k) tcPatch(); });  // 2.42.0 (#909): encrypted DMs
     else if (le2eChanOn(S.tc.room)) le2eChanDecrypt(S.tc.rid).then(() => { if (S.cw.lt === k) tcPatch(); });  // 2.64.2 (#1817)
   }

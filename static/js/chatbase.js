@@ -90,6 +90,13 @@ function rxRefocus(sel, mid, emoji) {
   document.addEventListener('click', e => { if (!e.target.closest?.('.rxshow .chrxq, .rxshow .cmrxq')) $$('.rxshow').forEach(x => { if (!x.contains(e.target)) { x.classList.remove('rxshow'); if (S.rxOpen === rxKey(x)) S.rxOpen = null; } }); }, true);
 }
 S.jobSteps = {}; S.jobOpen = {};
+// 2.119.1 D (#2310): is el already what html draws? Its outerHTML is not the same text (boolean attributes like hidden come
+// back as hidden="", a parked chat window that takes its ids back has them last): compared as nodes, so nothing is swapped needlessly
+function wk_sameEl(el, html) {
+  if (el._h === html) return true;
+  const t = document.createElement('template'); t.innerHTML = html; const n = t.content.firstElementChild;
+  return !!n && !n.nextElementSibling && el.isEqualNode(n);
+}
 const chatNear = box => box.scrollHeight - box.scrollTop - box.clientHeight <= 3 * remPx();
 // 2.12.2 (#451): replaces only the children of box that changed, by their key (data-k) or else by position; the box itself,
 // its scroll position and anything focused outside of it stay
