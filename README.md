@@ -71,6 +71,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   with their own switch, quotation parts open in place on the title page with a colour each, unit words follow the quantity.
 - **2.113.1** (2026-10-19): team chat with files and pictures, free channels per organisation (open or invited only) and group
   conversations; industry packs bring handling costs, markup and a share by amount, own packs from the data folder.
+- **2.113.2** (2026-10-19): terms and conditions as a PDF per language in the office settings - they go with quotations
+  by e-mail and on the approval link, the quotation names their date, and the record keeps which terms were accepted.
 - **2.98.0** (2026-10-19): scheduling polls with a public vote link, questionnaires in forms (answers become a task at the
   customer), the office menu as a rail on the left, resizable tables in their own window, documents guess amounts only
   where they fit.
