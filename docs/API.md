@@ -988,6 +988,10 @@ the mails to the reporter on / off. `GET /clients/{id}` adds `tickets` (`task_id
 the person sees). The reporter's pages are server-rendered HTML without an account: `/p/{token}` (status, public answers,
 answer form, "All my reports"), `/p/{token}/stop` (mails off), `/portal/login/{token}` (one-time sign-in link by mail, 30 min)
 and `/portal` (the reporter's tickets of the same space, cookie for 7 days).
+2.120.0 (#2088): with the office setting `portal_docs` (`PUT /office/settings`, office admins, default 0) `/portal` also
+lists the sent documents of the signed-in address's clients in that space, each as `/portal/docs/{id}/pdf` (anything else:
+404); `POST /office/clients/{id}/portal-link` `{to?: "invoice" | "main"}` (members of the office) mails the client the
+sign-in link (409 when the setting or mail is off, 429 after three per address and hour). Web app only, no `/api/v1`.
 
 `GET|POST /lists/{id}/forms`, `PATCH|DELETE /forms/{id}` (`structure`; owner / list admins): a form's `url`, `access`
 (`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link. 2.63.0: `ttype` (`''` | `bug` | `feature` |
