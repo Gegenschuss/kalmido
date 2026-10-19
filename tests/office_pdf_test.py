@@ -242,7 +242,8 @@ for want in ("QUOTATION", "Quotation No.", "Valid until", "Net Total", "includin
              "in perpetuity", "worldwide except music on trade shows / live events (DE)", "Exchange rate €1: $1.09", "With best regards",
              "ORDER CONFIRMATION", "Place, date", "All prices plus 7 % or 19 % VAT."):
     check(squash(want) in squash(all_en), f"EN: text layer has {want!r}")
-check(squash("Page 1 of " + str(len(ren.pages))) in squash(Ten[0]), "EN: 'Page 1 of n'")
+# 2.114.4 (#2282): the page count only from two pages on
+check((squash("Page 1 of " + str(len(ren.pages))) in squash(Ten[0])) == (len(ren.pages) >= 2), "EN: 'Page 1 of n' (from two pages on)")
 check(squash("NO.TITLEXUNITPRICEVATTOTAL") in squash(Ten[0]), "EN: the pack's column labels")
 dinc = office_pdf(fixture(raw="included"))
 _, Tinc = texts(dinc)
