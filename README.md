@@ -69,6 +69,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   PDF, share files and folders with people without an account through a secret link (expiry, password, revoke).
 - **2.113.0** (2026-10-19): office settings in five areas that save field by field (no Save button), industry pack cards
   with their own switch, quotation parts open in place on the title page with a colour each, unit words follow the quantity.
+- **2.113.1** (2026-10-19): team chat with files and pictures, free channels per organisation (open or invited only) and group
+  conversations; industry packs bring handling costs, markup and a share by amount, own packs from the data folder.
 - **2.98.0** (2026-10-19): scheduling polls with a public vote link, questionnaires in forms (answers become a task at the
   customer), the office menu as a rail on the left, resizable tables in their own window, documents guess amounts only
   where they fit.
