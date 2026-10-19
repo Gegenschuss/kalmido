@@ -1195,6 +1195,8 @@ instances the numbers can be set and the work can be split:
 
 - **Start-up check.** When `KALMIDO_REPLICAS` x (pool + 6) is above `max_connections` minus a reserve, the log says
   `WARNING database connections: ...` with the numbers. Raise `max_connections` of the database or lower the pool.
+- **Loop locks need a direct database connection.** They are session-level advisory locks: behind a connection pooler in
+  transaction mode (for example pgbouncer `pool_mode = transaction`) they do not hold; point Kalmido at Postgres directly.
 - **A request that waits 30 s for a connection** is no longer silent: the log shows `WARNING database pool exhausted`
   with the pool's counters (at most once a minute).
 - **Health numbers.** `GET /api/admin/health` (signed in as an admin of the server) answers with the version, the role,

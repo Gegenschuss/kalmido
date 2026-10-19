@@ -246,6 +246,18 @@ check(Fr.get(B + f"/api/lists/{P}/error-hook").status_code in (403, 404)
       and P not in [x["id"] for x in Fr.get(B + "/api/state").json().get("lists", [])], "freelancer: sees nothing of the list")
 check(Fr.get(B + "/api/about").json().get("client_errors") is True and "client_errors_lists" not in Fr.get(B + "/api/about").json(),
       "freelancer: only the flag")
+# 2.102.0 review F2: an organisation's list as the target - a reporter outside that organisation still reaches its members
+ALICE = A.get(B + "/api/state").json()["me"]["id"]
+ORG = A.post(B + "/api/admin/orgs", json={"name": "Ops", "admin_id": ALICE}).json()["id"]
+A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
+PO = A.post(B + "/api/lists", json={"name": "Org errors", "kind": "project", "org_id": ORG}).json()["id"]
+check(A.patch(B + f"/api/lists/{PO}/error-hook", json={"state": "on"}).ok, "org list: error reports on")
+check(A.patch(B + "/api/admin/settings", json={"client_errors_list": PO}).ok, "org list: the admin picks it")
+check(report(Fr, msg="Freelancer org error", line=310).status_code == 204, "org list: the freelancer reports")
+tk = dbx("SELECT id FROM tasks WHERE list_id=? AND deleted_at IS NULL", (PO,))
+nw = dbx("SELECT 1 FROM notifications WHERE user_id=? AND kind='errreport' AND task_id=?", (ALICE, tk[0][0])) if tk else []
+check(len(tk) == 1 and nw, f"org list: the ticket arrives and the org's admin gets the news ({tk} {nw})")
+check(A.patch(B + "/api/admin/settings", json={"client_errors_list": P}).ok, "back to the private list")
 # error reports off in the list stops it
 check(A.patch(B + f"/api/lists/{P}/error-hook", json={"state": "off"}).ok, "error reports off in the list")
 check(A.get(B + "/api/about").json().get("client_errors") is False, "... reports are off for everyone")
