@@ -10845,5 +10845,10 @@
   "{0} moved {1} to the trash": "{0} heeft {1} naar de prullenbak verplaatst",
   "{0} restored {1} from the trash": "{0} heeft {1} uit de prullenbak hersteld",
   "{0} moved the list {1} to the trash (admin of {2})": "{0} heeft de lijst {1} naar de prullenbak verplaatst (beheerder van {2})",
-  "{0} moved your list {1} to the trash (list admin)": "{0} heeft je lijst {1} naar de prullenbak verplaatst (lijstbeheerder)"
+  "{0} moved your list {1} to the trash (list admin)": "{0} heeft je lijst {1} naar de prullenbak verplaatst (lijstbeheerder)",
+  "Copy questionnaire link for this client": "Vragenlijstlink voor deze klant kopiëren",
+  "Link for a client": "Link voor een klant",
+  "What is sent through this link lands with the client, also without a known e-mail address.": "Wat via deze link wordt verstuurd, komt bij de klant terecht, ook zonder bekend e-mailadres.",
+  "No open form in this workspace yet: create one in a list (… > Forms).": "Nog geen open formulier in deze ruimte: maak er een aan in een lijst (… > Formulieren).",
+  "This client is not in the workspace of the list": "Deze klant hoort niet bij de ruimte van de lijst"
 }

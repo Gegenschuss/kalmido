@@ -10845,5 +10845,10 @@
   "{0} moved {1} to the trash": "{0} hat {1} in den Papierkorb gelegt",
   "{0} restored {1} from the trash": "{0} hat {1} aus dem Papierkorb wiederhergestellt",
   "{0} moved the list {1} to the trash (admin of {2})": "{0} hat die Liste {1} in den Papierkorb gelegt (Admin von {2})",
-  "{0} moved your list {1} to the trash (list admin)": "{0} hat deine Liste {1} in den Papierkorb gelegt (Listen-Admin)"
+  "{0} moved your list {1} to the trash (list admin)": "{0} hat deine Liste {1} in den Papierkorb gelegt (Listen-Admin)",
+  "Copy questionnaire link for this client": "Fragebogen-Link für diesen Kunden kopieren",
+  "Link for a client": "Link für einen Kunden",
+  "What is sent through this link lands with the client, also without a known e-mail address.": "Was über diesen Link gesendet wird, landet beim Kunden, auch ohne bekannte E-Mail-Adresse.",
+  "No open form in this workspace yet: create one in a list (… > Forms).": "Noch kein offenes Formular in diesem Bereich: Lege eins in einer Liste an (… > Formulare).",
+  "This client is not in the workspace of the list": "Dieser Kunde gehört nicht zum Bereich der Liste"
 }

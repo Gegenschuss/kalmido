@@ -14,16 +14,18 @@ another space), forms.client_new (default off): an unknown address becomes a new
 "client unknown". form_entries keeps the answers by question id for the evaluation (the list of submissions and a CSV in
 the form dialog, for the people who manage the form)."""
 import csv
+import hashlib
+import hmac
 import io
 import json
 import re
 import secrets
 
-from flask import Response, jsonify
+from flask import Response, jsonify, request
 
 from ..core.config import app
 from ..core.db import db, iso, now_utc
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..personal.timetrack import BadInput, _csv_cell
 
 FQ_KINDS = ("short", "long", "choice", "multi", "date", "number", "file", "yesno")
@@ -300,6 +302,98 @@ def fq_client(c, f, email, name, lg):
                         (f["l_org"], nm, email, f["l_owner"], ts, ts))
         return cid, tr("New client created: {0} <{1}> (please check)", nm, email, lg=lg)
     return None, tr("Client unknown: {0}", email, lg=lg)
+
+
+# ---- 2.102.0 C (#2201): the client link -- the form's link with ?k=<client id>.<signature> (server key, form id, client id):
+# a send through it belongs to that client, before any e-mail matching. Only a client of the list's space counts (checked
+# again on every send, the list may have moved); a missing, forged or foreign value is ignored without a word (the page and
+# the answer stay the same), then everything goes on as before.
+FQ_CK_RE = re.compile(r"[1-9][0-9]{0,17}\.[0-9a-f]{32}")
+
+
+def fq_ck_sig(c, fid, cid):
+    from ..accounts.login import auth_key
+    return hmac.new(auth_key(c), f"kalmido-form-client|{fid}|{cid}".encode(), hashlib.sha256).hexdigest()[:32]
+
+
+def fq_ck_in():
+    """The client link value of the request (the page's ?k=, the hidden field ck of a send) when it looks like one, else ''."""
+    v = request.form.get("ck") if request.method == "POST" else request.args.get("k")
+    return v if isinstance(v, str) and FQ_CK_RE.fullmatch(v) else ""
+
+
+def fq_space_client(c, f, cid):
+    """Client row cid when it is of the space of form row f's list (the organisation of the list, or the list owner's private
+    clients), else None -- the same space as the e-mail matching."""
+    cl = c.execute("SELECT id, name, org_id, created_by FROM clients WHERE id=?", (cid,)).fetchone()
+    if cl and (cl["org_id"] or None) == (f["l_org"] or None) and (cl["org_id"] or cl["created_by"] == f["l_owner"]):
+        return cl
+    return None
+
+
+def fq_ck_client(c, f, v):
+    """(client id, note) of a signed client link value v for form row f; (None, '') when it is missing, forged, another
+    form's or of a client outside the list's space."""
+    if not v or not FQ_CK_RE.fullmatch(v):
+        return None, ""
+    cid, sig = v.split(".")
+    if not hmac.compare_digest(fq_ck_sig(c, f["id"], int(cid)), sig):
+        return None, ""
+    cl = fq_space_client(c, f, int(cid))
+    return (cl["id"], tr("Client: {0}", cl["name"], lg=lang(c, f["l_owner"]))) if cl else (None, "")
+
+
+def fq_ck_url(c, f, cid):
+    from .forms import form_url
+    return form_url(c, f) + "?k=" + f"{cid}.{fq_ck_sig(c, f['id'], cid)}"
+
+
+def fq_list_space(c, lid):
+    r = c.execute("SELECT org_id, owner_id FROM lists WHERE id=?", (lid,)).fetchone()
+    return {"l_org": r["org_id"], "l_owner": r["owner_id"]}
+
+
+@app.get("/api/forms/<int:fid>/client-link")
+def fq_client_link(fid):
+    """The link of a form for one client (?client=<id>; owner / list admins, a client of the list's space they see): {url}."""
+    from .clients import need_client
+    c = db()
+    f = _form_of(c, fid)
+    try:
+        cid = int(request.args.get("client") or "")
+    except ValueError:
+        raise BadInput(tr("Invalid value: {0}", "client")) from None
+    need_client(c, cid)
+    fs = {**dict(f), **fq_list_space(c, f["list_id"])}
+    if not fq_space_client(c, fs, cid):
+        raise BadInput(tr("This client is not in the workspace of the list"))
+    return jsonify(url=fq_ck_url(c, fs, cid))
+
+
+@app.get("/api/clients/<int:cid>/forms")
+def fq_client_forms(cid):
+    """The open forms a client's link can be copied of: forms of lists of the client's space that I manage
+    {forms: [{id, title, list_id, list_name, questions, url}]} (url = the link for this client)."""
+    from .clients import need_client
+    from .forms import _gate, need_form_manager
+    from ..core.access import Denied
+    c = db()
+    _gate()
+    cl = need_client(c, cid)
+    q = """SELECT f.*, l.org_id AS l_org, l.owner_id AS l_owner, l.name AS l_name FROM forms f JOIN lists l ON l.id=f.list_id
+           WHERE f.enabled=1 AND l.archived=0 AND """
+    rows = (c.execute(q + "l.org_id=? ORDER BY lower(l.name), f.id", (cl["org_id"],)) if cl["org_id"]
+            else c.execute(q + "l.org_id IS NULL AND l.owner_id=? ORDER BY lower(l.name), f.id", (cl["created_by"],))).fetchall()
+    out = []
+    for f in rows:
+        try:
+            need_form_manager(c, f["list_id"])
+        except (Denied, BadInput):
+            continue
+        if fq_space_client(c, f, cid):
+            out.append({"id": f["id"], "title": f["title"], "list_id": f["list_id"], "list_name": f["l_name"],
+                        "questions": len(fq_list(f)), "url": fq_ck_url(c, f, cid)})
+    return jsonify(forms=out)
 
 
 def fq_entry_save(c, tid, f, cid, sender, email, ans):

@@ -34,8 +34,31 @@ function fq_dialogHtml(f) {
       <div class="row"><label>${tr('Appearance')}</label><label class="chkl"><input type="checkbox" id="fq-step" ${f?.one_per_step ? 'checked' : ''}> ${tr('One question per step (else all on one page)')}</label></div>
       <div class="row"><label>${tr('Client')}</label><span class="fq-chks"><label class="chkl"><input type="checkbox" id="fq-cm" ${f?.client_match ? 'checked' : ''}> ${tr('Match the e-mail to a client')}</label>
         <label class="chkl"><input type="checkbox" id="fq-cn" ${f?.client_new ? 'checked' : ''} ${f?.client_match ? '' : 'disabled'}> ${tr('Unknown address: create a new client')}</label></span></div>
+      ${f ? fq_ckRowHtml(f) : ''}
       ${f ? `<div class="row"><label>${tr('Submissions')}</label><button type="button" class="btn sm" data-fq="entries">${ic('list', 's')} ${esc(trn('{0} sent', '{0} sent', f.count))}</button>
         <a class="btn sm" href="${esc(f.url)}" target="_blank" rel="noopener">${ic('eye', 's')} ${tr('Preview')}</a></div>` : ''}</div>`;
+}
+
+// 2.102.0 C (#2201): the link for one client (a client of the list's workspace): what is sent through it lands with this
+// client, also without a known e-mail address (the server signs the client into the link and checks it on every send)
+function fq_ckRowHtml(f) {
+  const l = listById(f.list_id), org = l?.org_id || null;
+  const cs = (S.clients || []).filter(c => !c.archived && (c.org_id || null) === org);
+  if (!cs.length) return '';
+  return `<div class="row fq-ck"><label for="fq-ckc">${tr('Link for a client')}</label><select id="fq-ckc"><option value="">${tr('Choose a client')}</option>${cs.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
+      <button type="button" class="btn sm" data-fq="cklink">${ic('copy', 's')} ${tr('Copy link')}</button></div>
+      <p class="muted mhint">${tr('What is sent through this link lands with the client, also without a known e-mail address.')}</p>`;
+}
+async function fq_ckCopy(url) {
+  try { await navigator.clipboard.writeText(url); toast(tr('Copied')); } catch { toast(url, null, 8000); }
+}
+// a client's "…" menu (clientpage.js): the link of an open form of the client's workspace for this client (one form: copied
+// at once, several: a menu with the forms)
+async function fq_clientLink(c, anchor) {
+  let j; try { j = await rawFetch('GET', `/api/clients/${c.id}/forms`); } catch (x) { toast(x.message || tr('Only available online.')); return; }
+  if (!j.forms.length) { toast(tr('No open form in this workspace yet: create one in a list (… > Forms).')); return; }
+  if (j.forms.length === 1) { fq_ckCopy(j.forms[0].url); return; }
+  menu(anchor, j.forms.map(f => ({label: `${f.title} · ${f.list_name}`, icon: 'copy', fn: () => fq_ckCopy(f.url)})));
 }
 
 function fq_read(ed) {  // the questions as the server takes them
@@ -69,6 +92,11 @@ function fq_bind(ed, f) {
       row.remove();
       toast(tr('Question “{0}” removed', label), () => { if (next && next.isConnected) next.before(row); else list.append(row); });
     } else if (k === 'entries') fq_entriesOpen(f);
+    else if (k === 'cklink') {  // 2.102.0 C (#2201)
+      const cid = +$('#fq-ckc', ed).value;
+      if (!cid) { $('#fq-ckc', ed).focus(); toast(tr('Choose a client')); return; }
+      rawFetch('GET', `/api/forms/${f.id}/client-link?client=${cid}`).then(j => fq_ckCopy(j.url), x => toast(x.message || tr('Only available online.')));
+    }
   });
   // dragging by the grip: mouse, pen and touch alike (pointer events; the row follows the pointer's height; touch-action
   // none on the grip keeps the page from scrolling)
