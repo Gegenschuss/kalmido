@@ -28,6 +28,7 @@ from ..core.access import Denied
 from ..core.orgcrypt import OrgCryptError, oc_active_for, oc_copy_file, oc_is_sealed_file, oc_write_file
 from ..accounts.session import me
 from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same, smv_target
+from .fstags import dt_move
 from .store import FS_DIR, DEPTH_MAX, fs_chain, fs_height, fs_log_add, fs_space, fs_visible_sql_c, need_node, safe_fs_name, _free_name, _now, _place
 
 _KEEP = object()   # an item without its own parent: the request's parent
@@ -400,6 +401,7 @@ def files_move_space():
             nm = names.get(r["id"], r["name"])
             if r["id"] not in names:
                 c.execute("UPDATE fs_nodes SET org_id=?, owner_id=?, org_access='', updated_at=? WHERE id=?", (to, owner, ts, r["id"]))
+            dt_move(c, r["id"], f"o{to}" if to else f"u{owner}")  # 2.122.0 B (#2099): tags of files / folders go along by name
             if r["kind"] == "file":
                 fsm_doc(c, r["id"], to, owner, uid, nm, new_paths, old_paths)
                 fsm_versions(c, r["id"], fs_space(to, owner), new_paths, old_paths)

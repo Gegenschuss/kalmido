@@ -201,3 +201,17 @@ li.vdr-c.done>.vdr-b{color:var(--muted);text-decoration:line-through}
 a.vdr-at{display:inline-flex;align-items:center;min-height:2rem;padding:0 .5rem;margin-right:.25rem;border-radius:.375rem;background:var(--bg3);color:var(--accent);
   text-decoration:none;font-family:var(--mono);font-size:.8125rem;font-variant-numeric:tabular-nums}
 .vdrf{margin-top:1rem}
+/* 2.122.0 A (#2097): the file request page /u/<token>: drop area, the picked files with a progress bar each */
+.frq-drop{border:2px dashed var(--line2);border-radius:.75rem;padding:1rem;transition:border-color .15s ease}
+.frq-drop.on{border-color:var(--accent)}
+.frq-drop input{border:0;background:transparent;padding:0}
+ul.frq-list{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.375rem}
+ul.frq-list li{display:grid;grid-template-columns:minmax(0,1fr) 6rem;gap:.125rem .75rem;align-items:center;font-size:.875rem}
+ul.frq-list li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ul.frq-list .bar{height:.375rem;border-radius:.1875rem;background:var(--bg3);overflow:hidden}
+ul.frq-list .bar i{display:block;width:100%;height:100%;background:var(--accent);transform:scaleX(0);transform-origin:left;transition:transform .15s ease}
+ul.frq-list small{grid-column:1/-1;color:var(--muted)}
+ul.frq-list li.bad small{color:var(--danger)}
+ul.frq-list li.bad .bar{visibility:hidden}
+.frq-done{color:var(--accent);font-weight:600}
+@media (prefers-reduced-motion:reduce){.frq-drop,ul.frq-list .bar i{transition:none}}

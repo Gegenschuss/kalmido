@@ -39,6 +39,7 @@ TABLES = (
     "wiki_spaces",  # 2.64.3 A (#1817): the lock per knowledge space (NULL = a private space, the app checks owner_id)
     "wiki_files",  # 2.99.0 A (#2182): files of knowledge pages (NULL = private, the app checks owner_id like the page)
     "fs_nodes",  # 2.48.0 (#1207): the file store (org_id NULL = a person's own tree)
+    "fs_upload_requests",  # 2.122.0 A (#2097): file requests of a folder (NULL = private, the app checks the folder)
     "doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_rules", "doc_models", "doc_cfg", "doc_mail",  # 2.48.0 (#1111): documents
     "pl_sources", "pl_imported",  # 2.48.0 (#1152): the Paperless-ngx connection + what came in
     "pl_rules",  # 2.69.0 B (#1847): where a document rule from Paperless-ngx came from

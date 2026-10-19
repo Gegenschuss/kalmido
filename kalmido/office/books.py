@@ -33,7 +33,7 @@ from .model import ofx_name1, office_gate, office_org, office_settings, pb_owner
 
 BK_NOTE = N_("No tax advice; figures without guarantee.")
 BK_VAT = ("19", "7", "0")
-PERIOD_RE = re.compile(r"^(m(0[1-9]|1[0-2])|q[1-4])$")
+PERIOD_RE = re.compile(r"^(m(0[1-9]|1[0-2])|q[1-4]|y)$")  # 2.122.0 D (#2315): y = the whole year
 DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 BK_LIST_MAX = 500  # rows behind the VAT return figures / of the receipts list
 
@@ -288,10 +288,12 @@ def bk_euer(c, oid, year):
 
 # ---------------------------------------------------------------- VAT return figures
 def bk_period(year, period):
-    """(first day, last day) of a period m01..m12 | q1..q4."""
+    """(first day, last day) of a period m01..m12 | q1..q4 | y."""
     if not PERIOD_RE.match(period or ""):
         raise BadInput(tr("Invalid value: {0}", "period"))
-    if period[0] == "m":
+    if period == "y":
+        m0, m1 = 1, 12
+    elif period[0] == "m":
         m0 = m1 = int(period[1:])
     else:
         m0 = (int(period[1]) - 1) * 3 + 1
@@ -402,7 +404,7 @@ def bk_euer_get():
 
 @app.get("/api/office/books/ustva")
 def bk_ustva_get():
-    """?year=YYYY&period=m01..m12|q1..q4 -> bk_ustva."""
+    """?year=YYYY&period=m01..m12|q1..q4|y -> bk_ustva."""
     c, uid, oid = _ctx()
     return jsonify(bk_ustva(c, oid, _year(request.args.get("year")), request.args.get("period") or ""))
 

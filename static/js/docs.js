@@ -5,7 +5,7 @@
 'use strict';
 
 const DC = {docs: null, total: 0, review: 0, waiting: 0, facets: null, err: null, loading: false, seq: 0, q: '',
-  f: {sender: '', type: '', tag: '', from: '', to: '', review: false}, more: false, poll: null, doc: null, set: null, drag: 0};
+  f: dc_f0(), more: false, poll: null, doc: null, set: null, drag: 0};
 const DC_FEATS = [['sender', N_('Sender')], ['type', N_('Document type')], ['tags', N_('Tags')], ['folder', N_('Folder')]];
 const DC_LEVELS = [['learn', N_('Learns from your documents')], ['rules', N_('Rules only')], ['agent', N_('Left to an agent')], ['off', N_('Off')]];
 const DC_KINDS = [['any', N_('contains one of the words')], ['all', N_('contains all words')], ['exact', N_('contains the exact phrase')],
@@ -27,7 +27,8 @@ const dc_fileUrl = (d, dl) => `/api/docs/${d.id}/file?v=${d.size}${dl ? '&dl=1' 
 function dc_params() {
   const p = new URLSearchParams({ws: dc_ws(), limit: '200'});
   if (DC.q.trim()) p.set('q', DC.q.trim());
-  for (const k of ['sender', 'type', 'tag', 'from', 'to']) if (DC.f[k]) p.set(k, DC.f[k]);
+  for (const k of ['tag', 'from', 'to']) if (DC.f[k]) p.set(k, DC.f[k]);
+  dc_fParams(p);  // 2.122.0 B (#2294): several values, more filters
   if (DC.f.review) p.set('review', '1');
   return p;
 }
@@ -45,7 +46,7 @@ async function dc_load() {
 }
 // 2.87.9 (#1934): a hit of the search (palette.js palSubItems): the documents filtered by one sender / type / tag
 function dc_filterGo(k, v) {
-  DC.f = {...DC.f, sender: '', type: '', tag: '', review: false, [k]: v}; DC.more = true; DC.at = 0;
+  DC.f = {...dc_f0(), from: DC.f.from, to: DC.f.to, ...(k === 'tag' ? {tg: {[v]: 'in'}} : {[k]: v})}; DC.more = true; DC.at = 0;  // 2.122.0 B (#2294)
   if (S.route.mod === 'docs') dc_load(); else go('docs');
 }
 // 2.66.1 (#1945): the workspace switch (here, or on another device) drops the list, the counters, the filters (their values
@@ -54,7 +55,7 @@ function p61b_dcReset() {
   DC.seq++; clearTimeout(DC.poll);
   Object.assign(DC, {docs: null, total: 0, review: 0, waiting: 0, facets: null, set: null, err: null, loading: false, ws: null, atWs: null, more: false,
     sel: new Map(), selOn: false,  // 2.96.0 A (#1941): a choice of the old workspace goes
-    f: {sender: '', type: '', tag: '', from: '', to: '', review: false}});
+    f: dc_f0()});  // 2.122.0 B (#2294)
   const md = $('.dc-md');
   if (md && DC.doc && !wsObjIn(DC.doc)) { if (dc_hashId()) history.replaceState(null, '', '#docs'); md.remove(); }
 }
@@ -66,6 +67,7 @@ function dc_draw() {
   if (S.route.mod !== 'docs') return;
   const el = $('#view'); if (!el) return;
   keepFocus(el, () => setHtml(el, typeof mg_wrap === 'function' ? mg_wrap('docs', viewDocs()) : viewDocs()));
+  dc_fSheetDraw();  // 2.122.0 B (#2294): the filter sheet (phones) follows the list
 }
 
 // ---- the view
@@ -78,21 +80,16 @@ function viewDocs() {
   if (!DC.loading && ((!DC.docs && !DC.err) || (open && (Date.now() - (DC.at || 0) > 3000 || DC.atWs !== dc_ws())))) setTimeout(dc_load, 0);
   const id = dc_hashId();
   if (id && (!DC.doc || DC.doc.id !== id) && !$('.dc-md')) setTimeout(() => dc_open(id), 0);
-  const fc = DC.facets || {senders: [], types: [], tags: []};
-  const sel = (k, list, label) => `<select data-dcf="${k}" aria-label="${esc(tr(label))}"><option value="">${esc(tr(label))}</option>${list.map(x => {
-    const v = x.ids.join(','); return `<option value="${esc(v)}" ${DC.f[k] === v ? 'selected' : ''}>${esc(x.name)}</option>`; }).join('')}</select>`;
-  const active = ['sender', 'type', 'tag', 'from', 'to'].some(k => DC.f[k]);
+  const active = dc_fEntries().length > 0;  // 2.122.0 B (#2294): the filters are drawn by dc_fltHtml / dc_fbarHtml
   const head = `
     <div class="dc-bar">
       <input type="search" id="dc-q" value="${esc(DC.q)}" placeholder="${esc(tr('Search in the documents…'))}" aria-label="${esc(tr('Search in the documents'))}" autocomplete="off">
       <div class="seg dc-seg" role="tablist"><button type="button" role="tab" data-dc="all" aria-selected="${!DC.f.review}">${tr('All')}</button><button type="button" role="tab" data-dc="review" aria-selected="${DC.f.review}">${tr('To review')}${DC.review ? ` <span class="dc-count">${DC.review}</span>` : ''}</button></div>
-      <button type="button" class="btn sm ${active ? 'on' : ''}" data-dc="more" aria-expanded="${DC.more || active}">${ic('search', 's')} ${tr('Filter')}</button>
+      <button type="button" class="btn sm ${active ? 'on' : ''}" data-dc="more" aria-expanded="${!!DC.more}">${ic('filter', 's')} ${tr('Filter')}${active ? ` <span class="dc-count">${dc_fEntries().length}</span>` : ''}</button>
       <span class="dc-acts2"><label class="btn pri dc-up" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span><input type="file" id="dc-file" multiple accept="application/pdf,image/*,.pdf,.txt" hidden></label>
       ${dc_smvBtn()}<button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button></span>
     </div>
-    ${DC.more || active ? `<div class="dc-filters">${sel('sender', fc.senders, N_('Sender'))}${sel('type', fc.types, N_('Document type'))}${sel('tag', fc.tags, N_('Tag'))}
-      <span class="dc-range">${tr('from')} ${dateIn('dc-ffrom', DC.f.from, {label: tr('from'), attrs: 'data-dcf="from"'})}</span><span class="dc-range">${tr('to')} ${dateIn('dc-fto', DC.f.to, {label: tr('to'), attrs: 'data-dcf="to"'})}</span>
-      ${active ? `<button type="button" class="linkbtn" data-dc="clear">${tr('Reset filters')}</button>` : ''}</div>` : ''}
+    ${DC.more && !isMobile() ? `<div class="dc-fpanel dc-flt">${dc_fltHtml()}</div>` : ''}${dc_fbarHtml()}
     ${DC.waiting ? `<p class="muted dc-wait" role="status">${ic('hourglass', 's')} ${esc(trn('{0} document is being recognised…', '{0} documents are being recognised…', DC.waiting))}</p>` : ''}`;
   let body;
   if (DC.err) body = `<div class="empty">${ic('alert')}<span>${esc(DC.err)}</span></div>`;
@@ -327,6 +324,7 @@ function dc_sDraw(md) {
     ${DC_FEATS.map(([f, n]) => `<div class="row"><label for="dcs-l-${f}">${tr(n)}</label><select id="dcs-l-${f}" data-dcl="${f}" ${dis}>${DC_LEVELS.map(([v, l]) => `<option value="${v}" ${s.levels[f] === v ? 'selected' : ''}>${tr(l)}</option>`).join('')}</select></div>`).join('')}
     <label class="chkl"><input type="checkbox" data-dcs="inbox" ${s.inbox ? 'checked' : ''} ${dis}> ${tr('Recognise files put into the folder “Dokumente/Eingang” of the file store')}</label>
     <div class="row"><label for="dcs-asn">${tr('Prefix of the archive numbers')}</label><input id="dcs-asn" data-dcs="asnprefix" value="${esc(s.asn_prefix || 'ASN')}" maxlength="10" autocomplete="off" ${dis}></div>
+    ${s.ocr_missing?.length ? `<p class="muted">${esc(tr('Text recognition is missing: {0}', s.ocr_missing.join(', ')))}</p>` : ''}
     <p class="muted">${esc(tr('Next free number: {0}. A QR code or text like {1} on a scan fills it in.', s.asn_next, `${s.asn_prefix || 'ASN'}${String(s.asn_next).padStart(5, '0')}`))}</p>
     <h4>${tr('Rules')}</h4>
     ${s.rules.length ? `<ul class="dc-rules">${s.rules.map(rule).join('')}</ul>` : `<p class="muted">${tr('No rules yet.')}</p>`}
@@ -427,14 +425,14 @@ let dc_qTimer = null;
 document.addEventListener('click', e => {
   const v = e.target.closest('.dc-view'); if (!v) return;
   const o = e.target.closest('[data-dco]');
-  if (o && DC.selOn) { dc_smvToggle(+o.dataset.dco); return; }  // 2.96.0 A (#1941): choosing, not opening
+  if (o && (DC.selOn || (e.shiftKey && typeof dt_rsMouse === 'function' && dt_rsMouse(e)))) { dc_rsClick(e, +o.dataset.dco); return; }  // 2.96.0 A (#1941): choosing, not opening; 2.122.0 B (#2295): Shift ranges
   if (o) { history.replaceState(null, '', `#docs/${o.dataset.dco}`); dc_open(+o.dataset.dco); return; }
   const b = e.target.closest('[data-dc]'); if (!b) return;
   const a = b.dataset.dc;
   if (a === 'settings') dc_settings();
   else if (a === 'all' || a === 'review') { DC.f.review = a === 'review'; dc_load(); dc_draw(); }
-  else if (a === 'more') { DC.more = !DC.more; dc_draw(); }
-  else if (a === 'clear') { Object.assign(DC.f, {sender: '', type: '', tag: '', from: '', to: ''}); dc_load(); }
+  else if (a === 'more') { if (isMobile()) dc_fSheet(); else { DC.more = !DC.more; dc_draw(); } }  // 2.122.0 B (#2294): phones: a sheet
+  else if (a === 'clear') { DC.f = {...dc_f0(), review: DC.f.review}; DC.q = ''; dc_load(); }
 });
 document.addEventListener('change', e => {
   if (!e.target.closest('.dc-view')) return;
@@ -475,7 +473,9 @@ function dc_smvBar() {
   const n = DC.sel.size, orgs = new Set(DC.sel.values()), from = orgs.size === 1 ? [...orgs][0] : null;
   return `<div class="dc-selbar" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="dc-seln" aria-live="polite">${esc(tr('{0} selected', n))}</span>
     ${n < DC.total ? `<button type="button" class="linkbtn" data-dcsel="all">${esc(tr('Select all {0}', DC.total))}</button>` : `<button type="button" class="linkbtn" data-dcsel="none">${tr('Select none')}</button>`}<span class="spacer"></span>
+    <button type="button" class="btn sm" data-dcsel="csv" ${n ? '' : 'disabled'}>${tr('Export as CSV')}</button>
     ${orgs.size <= 1 && smv_can(from) ? `<button type="button" class="btn sm" data-dcsel="space" ${n ? '' : 'disabled'}>${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''}
+    <button type="button" class="btn sm" data-dcsel="edit" aria-haspopup="menu" ${n ? '' : 'disabled'}>${ic('edit', 's')} ${tr('Edit')}</button><button type="button" class="btn sm" data-dcsel="zip" ${n ? '' : 'disabled'}>${ic('download', 's')} ${tr('ZIP')}</button>
     <button type="button" class="iconbtn" data-dcsel="off" aria-label="${esc(tr('Cancel'))}" title="${esc(tr('Cancel'))}">${ic('x')}</button></div>`;
 }
 async function dc_smvAll() {  // every document the search and the filters find (page by page, at most DC_SMV_MAX)
@@ -513,5 +513,198 @@ document.addEventListener('click', e => {
   else if (a === 'off') { DC.selOn = false; DC.sel = new Map(); dc_draw(); }
   else if (a === 'all') dc_smvAll();
   else if (a === 'none') { DC.sel = new Map(); dc_draw(); }
+  else if (a === 'csv') dcx_csv();  // 2.122.0 (#2100)
   else if (a === 'space') dc_smvMove(DC.sel, trn('{0} document', '{0} documents', DC.sel.size));
+  else if (a === 'edit') dc_bulkMenu(b);  // 2.122.0 B (#2294)
+  else if (a === 'zip') dc_zip();
 });
+
+// 2.122.0 (#2100): the chosen documents as a CSV file (the server leaves out what the person may not see)
+async function dcx_csv() {
+  const ids = [...DC.sel.keys()]; if (!ids.length) return;
+  try {
+    const r = await fetch('/api/docs/export.csv', {method: 'POST', headers: {'X-Requested-With': 'kalmido', 'Content-Type': 'application/json'}, body: JSON.stringify({ids})});
+    if (!r.ok) throw new Error(String(r.status));
+    const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = 'documents.csv';
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  } catch { toast(tr('The check failed. Please try again.')); }
+}
+// ---- 2.122.0 B (#2294): the search of an archive -- several tags (with / without, every one / one of them), several senders,
+// types, folders and file types, the document date and the date of arrival, without tag / sender, the search syntax in the
+// search field (tag:, absender:, typ:, datum:, "exact", -word; docs/dsearch.py). The filters chosen stand in a line above the
+// list (each one to take out, the number of hits); phones: the filters in a sheet. The chosen documents get tags / a type /
+// a sender at once (ONE undo step) or come as one ZIP.
+function dc_f0() {  // the empty filters (sender / type / folder: ids lists "1,7" per name; tg: {"1,7": 'in' | 'not'}; tag: the old single value)
+  return {sender: [], type: [], tag: '', tg: {}, tmode: 'any', from: '', to: '', afrom: '', ato: '', folder: [], ftype: [], notag: false, nosender: false, review: false};
+}
+const dc_arr = v => Array.isArray(v) ? v : v ? [v] : [];
+const DC_FTYPES = [['pdf', N_('PDF')], ['image', N_('Image')], ['office', N_('Office files')], ['text', N_('Text')], ['other', N_('Other')]];
+function dc_fParams(p) {
+  const f = DC.f;
+  for (const k of ['sender', 'type', 'folder']) for (const v of dc_arr(f[k])) p.append(k, v);
+  for (const [ids, st] of Object.entries(f.tg || {})) p.append(st === 'not' ? 'not_tag' : 'tag', ids);
+  if (f.tmode === 'all') p.set('tag_mode', 'all');
+  if (f.afrom) p.set('added_from', f.afrom);
+  if (f.ato) p.set('added_to', f.ato);
+  if (f.notag) p.set('no_tag', '1');
+  if (f.nosender) p.set('no_sender', '1');
+  if (dc_arr(f.ftype).length) p.set('ftype', dc_arr(f.ftype).join(','));
+}
+const dc_fName = (list, ids) => (list || []).find(x => x.ids.join(',') === ids)?.name || '?';
+function dc_fEntries() {  // the chosen filters: [{label, not, rm}]
+  const f = DC.f, fc = DC.facets || {}, out = [];
+  const multi = (k, list) => { for (const v of dc_arr(f[k])) out.push({label: dc_fName(list, v), rm: () => { f[k] = dc_arr(f[k]).filter(x => x !== v); }}); };
+  for (const [ids, st] of Object.entries(f.tg || {})) out.push({label: dc_fName(fc.tags, ids), not: st === 'not', rm: () => { delete f.tg[ids]; }});
+  if (f.tag) out.push({label: dc_fName(fc.tags, f.tag), rm: () => { f.tag = ''; }});
+  multi('sender', fc.senders); multi('type', fc.types); multi('folder', fc.folders);
+  for (const v of dc_arr(f.ftype)) out.push({label: tr(DC_FTYPES.find(x => x[0] === v)?.[1] || v), rm: () => { f.ftype = dc_arr(f.ftype).filter(x => x !== v); }});
+  for (const [k, lab] of [['from', N_('Document date from {0}')], ['to', N_('Document date to {0}')], ['afrom', N_('Arrived from {0}')], ['ato', N_('Arrived to {0}')]]) if (f[k]) out.push({label: tr(lab, dc_day(f[k])), rm: () => { f[k] = ''; }});
+  if (f.notag) out.push({label: tr('Without tag'), rm: () => { f.notag = false; }});
+  if (f.nosender) out.push({label: tr('Without sender'), rm: () => { f.nosender = false; }});
+  return out;
+}
+function dc_fbarHtml() {
+  const es = dc_fEntries(), q = DC.q.trim();
+  if (!es.length && !q) return '';
+  return `<div class="tsfbar dc-fbar" role="group" aria-label="${esc(tr('Filter'))}">${q ? `<button type="button" class="tsfx" data-dcx="q" aria-label="${esc(tr('Remove filter {0}', q))}">„${esc(q)}“ ${ic('x', 's')}</button>` : ''}
+    ${es.map((e, i) => `<button type="button" class="tsfx ${e.not ? 'not' : ''}" data-dcx="${i}" aria-label="${esc(tr('Remove filter {0}', e.label))}">${e.not ? `${tr('not')} ` : ''}${esc(e.label)} ${ic('x', 's')}</button>`).join('')}
+    ${Object.values(DC.f.tg || {}).filter(x => x === 'in').length > 1 ? `<span class="tsfn">${DC.f.tmode === 'all' ? tr('every one') : tr('one of them')}</span>` : ''}
+    ${DC.docs ? `<span class="tsfn" aria-live="polite">${esc(trn('{0} hit', '{0} hits', DC.total))}</span>` : ''}<button type="button" class="linkbtn" data-dc="clear">${tr('Reset filters')}</button></div>`;
+}
+function dc_fltHtml() {  // the filters (desktop: below the bar; phones: the sheet)
+  const f = DC.f, fc = DC.facets || {senders: [], types: [], tags: [], folders: []};
+  const st = (list, sel) => Object.fromEntries((list || []).filter(x => sel(x.ids.join(','))).map(x => [x.name, sel(x.ids.join(','))]));
+  const tagSt = st(fc.tags, ids => (f.tg || {})[ids]), on = Object.values(f.tg || {}).filter(x => x === 'in').length;
+  const two = (k, list) => dt_pills(list, st(list, ids => dc_arr(f[k]).includes(ids) ? 'in' : ''), 'dcf' + k, false);
+  const sec = (title, inner) => inner ? `<h4>${esc(tr(title))}</h4><div class="tsgrp">${inner}</div>` : '';
+  const pick = typeof dt_pills === 'function';
+  return `<div class="tsflt">
+    ${pick ? sec(N_('Tags'), dt_pills(fc.tags, tagSt, 'dcftg')) : ''}${pick && on > 1 ? `<div class="tsrow"><div class="seg" role="radiogroup" aria-label="${esc(tr('Several tags'))}">${['any', 'all'].map(m => `<button type="button" role="radio" data-dcfm="${m}" aria-checked="${(f.tmode || 'any') === m}">${m === 'all' ? tr('every one') : tr('one of them')}</button>`).join('')}</div></div>` : ''}
+    ${pick ? sec(N_('Sender'), two('sender', fc.senders)) + sec(N_('Document type'), two('type', fc.types)) + sec(N_('Folder'), two('folder', fc.folders)) : ''}
+    <h4>${tr('File type')}</h4><div class="tsgrp">${DC_FTYPES.map(([k, l]) => `<button type="button" class="tsp ${dc_arr(f.ftype).includes(k) ? 'tsp-in' : ''}" data-dcfft="${k}" aria-pressed="${dc_arr(f.ftype).includes(k)}">${esc(tr(l))}</button>`).join('')}</div>
+    <h4>${tr('Document date')}</h4><div class="tsrow"><span class="dc-range">${tr('from')} ${dateIn('dc-ffrom', f.from, {label: tr('Document date from {0}', ''), attrs: 'data-dcf2="from"'})}</span><span class="dc-range">${tr('to')} ${dateIn('dc-fto', f.to, {label: tr('Document date to {0}', ''), attrs: 'data-dcf2="to"'})}</span></div>
+    <h4>${tr('Date of arrival')}</h4><div class="tsrow"><span class="dc-range">${tr('from')} ${dateIn('dc-fafrom', f.afrom, {label: tr('Arrived from {0}', ''), attrs: 'data-dcf2="afrom"'})}</span><span class="dc-range">${tr('to')} ${dateIn('dc-fato', f.ato, {label: tr('Arrived to {0}', ''), attrs: 'data-dcf2="ato"'})}</span></div>
+    <div class="tsrow"><label><input type="checkbox" data-dcf2="notag" ${f.notag ? 'checked' : ''}> ${tr('Without tag')}</label><label><input type="checkbox" data-dcf2="nosender" ${f.nosender ? 'checked' : ''}> ${tr('Without sender')}</label></div>
+    <p class="muted dc-syn">${esc(tr('In the search field: tag:Name, absender:Name, typ:Name, datum:2025 or datum:2025-01..2025-03, "exact text", -word'))}</p></div>`;
+}
+function dc_fSheet() {  // phones: the filters in a sheet; every change applies at once, the foot shows the hits
+  $('.dc-fsheet')?.remove();
+  const md = modal(`<div class="lhdr"><h3>${tr('Filter')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div><div class="dc-flt"></div>
+    <div class="foot stfoot"><button type="button" class="btn" data-dc="clear">${tr('Reset filters')}</button><span class="spacer"></span><button type="button" class="btn pri" data-m="close"></button></div>`);
+  md.classList.add('dc-fsheet');
+  md.addEventListener('click', e => {
+    if (e.target.closest('[data-m="close"]')) { modalClose(md); return; }
+    if (e.target.closest('[data-dc="clear"]')) { DC.f = {...dc_f0(), review: DC.f.review}; dc_load(); dc_fSheetDraw(); }
+  });
+  dc_fSheetDraw();
+}
+function dc_fSheetDraw() {
+  const md = $('.dc-fsheet'); if (!md) return;
+  const box = $('.dc-flt', md), y = md.querySelector('.card')?.scrollTop || 0;
+  if (box) box.innerHTML = dc_fltHtml();
+  const ok = $('.foot [data-m="close"]', md); if (ok) ok.textContent = DC.docs ? trn('Show {0} document', 'Show {0} documents', DC.total) : tr('Done');
+  const card = md.querySelector('.card'); if (card) card.scrollTop = y;
+}
+function dc_fChanged() { DC.at = 0; dc_load(); dc_fSheetDraw(); if (!isMobile()) dc_draw(); }
+document.addEventListener('click', e => {
+  const x = e.target.closest?.('[data-dcx]');
+  if (x && x.closest('.dc-view')) {
+    if (x.dataset.dcx === 'q') DC.q = ''; else dc_fEntries()[+x.dataset.dcx]?.rm();
+    dc_fChanged(); return;
+  }
+  const box = e.target.closest?.('.dc-flt'); if (!box) return;
+  const f = DC.f, fc = DC.facets || {};
+  const b = e.target.closest('[data-dcftg], [data-dcfsender], [data-dcftype], [data-dcffolder], [data-dcfft], [data-dcfm]'); if (!b) return;
+  const ids = (list, name) => (list || []).find(x => x.name === name)?.ids.join(',');
+  if (b.dataset.dcftg != null) {
+    const k = ids(fc.tags, b.dataset.dcftg); if (!k) return;
+    f.tg = {...(f.tg || {})}; const s = f.tg[k]; if (!s) f.tg[k] = 'in'; else if (s === 'in') f.tg[k] = 'not'; else delete f.tg[k];
+    if (f.tag === k) f.tag = '';
+  } else if (b.dataset.dcfm) f.tmode = b.dataset.dcfm;
+  else if (b.dataset.dcfft) { const v = b.dataset.dcfft, a = dc_arr(f.ftype); f.ftype = a.includes(v) ? a.filter(x => x !== v) : [...a, v]; }
+  else {
+    const kind = b.dataset.dcfsender != null ? 'sender' : b.dataset.dcftype != null ? 'type' : 'folder';
+    const k = ids(fc[{sender: 'senders', type: 'types', folder: 'folders'}[kind]], b.dataset['dcf' + kind]); if (!k) return;
+    const a = dc_arr(f[kind]); f[kind] = a.includes(k) ? a.filter(x => x !== k) : [...a, k];
+  }
+  dc_fChanged();
+});
+document.addEventListener('change', e => {
+  const el = e.target.closest?.('[data-dcf2]'); if (!el || !el.closest('.dc-flt')) return;
+  const k = el.dataset.dcf2;
+  DC.f[k] = el.type === 'checkbox' ? el.checked : el.value;
+  dc_fChanged();
+});
+async function dc_filteredIds() {  // every id the search and the filters find (all pages, at most DC_SMV_MAX); the CSV export (part C) uses it
+  const p = dc_params(), out = [];
+  p.set('facets', '0'); p.set('limit', '200');
+  for (let off = 0; off < DC_SMV_MAX; off += 200) {
+    p.set('offset', String(off));
+    const j = await api('GET', '/api/docs?' + p);
+    for (const d of j.docs || []) out.push(d.id);
+    if ((j.docs || []).length < 200) break;
+  }
+  return out;
+}
+
+// ---- 2.122.0 B (#2295): Shift-click chooses a range of cards (tagsel.js dt_rsClick), Shift-click without choosing turns it on
+function dc_rsClick(e, id) {
+  if (typeof dt_rsClick !== 'function') { dc_smvToggle(id); return; }
+  if (!DC.selOn) { DC.selOn = true; DC.sel = new Map(); dt_rsReset(); }
+  const docs = DC.docs || [];
+  dt_rsClick(e, 'dc:' + dc_params(), id, docs.map(d => d.id), x => DC.sel.has(x), (x, on) => {
+    const d = docs.find(y => y.id === x);
+    if (on && d) DC.sel.set(x, d.org_id || null); else if (!on) DC.sel.delete(x);
+  });
+  dc_draw();
+}
+
+// ---- 2.122.0 B (#2294): the chosen documents at once (POST /api/docs/bulk in parts of 500; ONE undo step) and as a ZIP
+const DC_BULK = 500;
+async function dc_bulkSend(bodies) {  // [{...}] one request each -> {changed, denied, before}
+  const out = {changed: [], denied: 0, before: []};
+  for (const b of bodies) {
+    const r = await api('POST', '/api/docs/bulk', b);
+    out.changed.push(...(r.changed || [])); out.denied += r.denied || 0; out.before.push(...(r.before || []));
+  }
+  return out;
+}
+const dc_chunks = (a, n) => Array.from({length: Math.ceil(a.length / n)}, (_, i) => a.slice(i * n, i * n + n));
+async function dc_bulk(change, label) {
+  const ids = [...DC.sel.keys()]; if (!ids.length) return;
+  const req = dc_chunks(ids, DC_BULK).map(part => ({ids: part, ...change}));
+  let r; try { r = await dc_bulkSend(req); } catch { dc_load(); return; }
+  DC.facets = null; dc_load();
+  if (r.denied) toast(trn('{0} document may only be viewed by you and stays as it is', '{0} documents may only be viewed by you and stay as they are', r.denied));
+  if (!r.changed.length) { if (!r.denied) toast(tr('Nothing to change')); return; }
+  const back = dc_chunks(r.before, DC_BULK).map(part => ({restore: part}));
+  const step = bodies => async () => { try { await dc_bulkSend(bodies); } catch { /* shown */ } DC.facets = null; dc_load(); return {}; };
+  histToast(`${label}: ${trn('{0} document', '{0} documents', r.changed.length)}`, histAdd({label, undo: step(back), redo: step(req)}));
+}
+function dc_bulkMenu(anchor) {
+  menu(anchor, [{label: tr('Add tags…'), icon: 'tag', fn: () => dc_bulkTags(true)}, {label: tr('Remove tags…'), icon: 'tag', fn: () => dc_bulkTags(false)},
+    {label: tr('Set document type…'), icon: 'file', fn: () => dc_bulkSet('type')}, {label: tr('Set sender…'), icon: 'user', fn: () => dc_bulkSet('sender')}], null, null, tr('Edit'));
+}
+async function dc_bulkTags(add) {
+  const known = (DC.docs || []).filter(d => DC.sel.has(d.id)).flatMap(d => d.tags.map(t => t.name));
+  const all = add ? (DC.facets?.tags || []) : [...new Set(known)].map(name => ({name}));
+  const n = DC.sel.size;
+  const names = await dt_pick({title: add ? trn('Add tags to {0} document', 'Add tags to {0} documents', n) : trn('Remove tags from {0} document', 'Remove tags from {0} documents', n),
+    all: add ? all : (all.length ? all : DC.facets?.tags || []), cur: [], ok: add ? tr('Add') : tr('Remove')});
+  if (!names?.length) return;
+  dc_bulk(add ? {add_tags: names} : {remove_tags: names}, add ? tr('Tags added') : tr('Tags removed'));
+}
+async function dc_bulkSet(kind) {
+  const list = (kind === 'type' ? DC.facets?.types : DC.facets?.senders) || [];
+  const v = await askDialog({title: kind === 'type' ? tr('Document type of the chosen documents ({0})', DC.sel.size) : tr('Sender of the chosen documents ({0})', DC.sel.size), ok: tr('Save'),
+    input: {value: '', max: 120, placeholder: kind === 'type' ? tr('e.g. Invoice, Contract, Letter') : tr('Sender')},
+    after: md => { const i = $('#cdlg-in', md); if (!i) return; const dl = document.createElement('datalist'); dl.id = 'dc-bulkdl'; dl.innerHTML = list.map(x => `<option value="${esc(x.name)}">`).join(''); i.setAttribute('list', dl.id); i.after(dl); }});
+  if (v == null || !String(v).trim()) return;
+  dc_bulk({[kind]: String(v).trim()}, kind === 'type' ? tr('Document type set') : tr('Sender set'));
+}
+async function dc_zip() {
+  const ids = [...DC.sel.keys()]; if (!ids.length) return;
+  let r; try { r = await api('POST', '/api/docs/zip', {ids}); } catch { return; }  // too many / too large: the server's hint is the toast
+  toast(trn('The ZIP with {0} document is being prepared…', 'The ZIP with {0} documents is being prepared…', r.files));
+  const a = document.createElement('a'); a.href = r.url; a.download = ''; document.body.appendChild(a); a.click(); a.remove();
+}
