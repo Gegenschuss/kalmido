@@ -313,6 +313,13 @@ ROUTES = {
     "GET /api/office/trips/vma.pdf": "office", "GET /api/office/trips/vma.xlsx": "office",
     "GET /api/office/trips/purposes": "office", "POST /api/office/trips/purposes": "office",  # 2.117.0 A (#2292)
     "PATCH /api/office/trips/purposes/{}": "office", "DELETE /api/office/trips/purposes/{}": "office",
+    "GET /api/office/meals": "office", "POST /api/office/meals": "office", "GET /api/office/meals/{}": "office",  # 2.119.0 A (#2288): entertainment receipts
+    "PATCH /api/office/meals/{}": "office", "DELETE /api/office/meals/{}": "office", "POST /api/office/meals/{}/restore": "office",
+    "POST /api/office/meals/{}/approve": "office", "POST /api/office/meals/{}/unlock": "office", "POST /api/office/meals/{}/file": "office",
+    "GET /api/office/meals/{}/file/{}": "office", "DELETE /api/office/meals/{}/file/{}": "office",
+    "POST /api/office/meals/{}/file/{}/restore": "office", "GET /api/office/meals/{}/pdf": "office", "GET /api/office/meals/report": "office",
+    "GET /api/office/meals/choices": "office", "POST /api/office/meals/choices": "office", "PATCH /api/office/meals/choices/{}": "office",
+    "DELETE /api/office/meals/choices/{}": "office",
     "GET /api/office/{}": "office", "GET /api/office/{}/{}": "office", "GET /api/paperless": "office",
     "GET /api/paperless/preview": "office", "GET /api/paperless/zip/preview": "office", "GET /api/v1/clients": "office",
     "GET /api/v1/clients/{}": "office", "GET /api/v1/office": "office", "GET /api/v1/office/docs": "office",

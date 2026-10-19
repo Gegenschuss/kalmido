@@ -66,6 +66,9 @@ FIELDS = {
     "office_doc_parts": ("sheet",),  # 2.47.0 (#1216): the shoot calculation sheet (markups, rates of external crew = purchase)
     "office_trips": ("people", "note"),  # 2.47.3 (#1022): participants and note of a trip
     "office_trip_items": ("amount", "amount_home"),  # 2.47.3 (#1022): the amounts of a travel receipt
+    # 2.119.0 A (#2288): entertainment receipts -- place, occasion, people, amounts, the log's names and reasons
+    "office_meals": ("place_name", "place_address", "occasion", "host", "guests", "amounts", "tip", "note", "approved_name"),
+    "office_meal_choices": ("name", "extra"), "office_meal_log": ("user_name", "reason"),
     "office_fixed_costs": ("amount",),  # 2.47.3 (#1652): fixed costs of the cash flow
     "office_bank_tx": ("amount", "counterpart", "purpose", "iban"),  # 2.90.0 B (#1921): imported bank bookings
     "office_doc_templates": ("body",), "office_gen_docs": ("body",),  # 2.93.0 A (#1927): document templates, documents
@@ -100,6 +103,8 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_doc_parts": N_("Purchase prices and margins"), ("office_doc_parts", "totals"): N_("Purchase prices and margins"),
                  # 2.47.3 (#1022, #1652): travel expenses (participants, amounts) and fixed costs
                  "office_trips": N_("Travel expenses"), "office_trip_items": N_("Travel expenses"), "office_fixed_costs": N_("Fixed costs"),
+                 "office_meals": N_("Entertainment receipts"), "office_meal_choices": N_("Entertainment receipts"),  # 2.119.0 A (#2288)
+                 "office_meal_log": N_("Entertainment receipts"),
                  "office_deals": N_("Sales pipeline"),  # 2.50.0 (#1196)
                  "office_bank_tx": N_("Bank statements"),  # 2.90.0 B (#1921)
                  "office_doc_templates": N_("Document templates and documents"), "office_gen_docs": N_("Document templates and documents"),  # 2.93.0 A (#1927)

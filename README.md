@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.119.0** (2026-10-19): entertainment receipts as an office module (form with pick lists, lock with logged unlock,
+  PDF receipt, 70/30 report with filters), filled icon buttons when switched on, pin agents in "All people …".
 - **2.118.0** (2026-10-19): quotation numbers per client or project (e.g. KV-ACME-2026-03) and a `{version}` block
   for duplicates (KV-ACME-2026-03-V2); one switch for the progress line and rings in the sidebar.
 - **2.117.0** (2026-10-19): travel costs filtered by person and with own purposes, a row menu per trip, the "To"

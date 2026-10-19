@@ -30,6 +30,7 @@ TABLES = (
     "office_roles", "office_doc_parts", "office_purchases",  # 2.47.0 (#1649, #1215, #1216)
     "office_trips", "office_trip_items", "office_fixed_costs",  # 2.47.3 (#1022, #1652, part B)
     "office_trip_purposes",  # 2.117.0 A (#2292): own purposes of trips
+    "office_meals", "office_meal_files", "office_meal_choices", "office_meal_log",  # 2.119.0 A (#2288): entertainment receipts
     "office_bank_imports", "office_bank_tx",  # 2.90.0 B (#1921): bank reconciliation
     "office_inv_series", "office_sub_reminders",  # 2.91.0 A (#1923), B (#1924)
     "office_doc_templates", "office_gen_docs",  # 2.93.0 A (#1927): document templates and the documents made from them

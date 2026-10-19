@@ -642,3 +642,40 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 @media (pointer:coarse) {
   .ofdeditor select,.ofdhead select{height:var(--fld-h);line-height:1.25}
 }
+/* 2.119.0 A (#2288): entertainment receipts (office_meals.js) */
+.bwbar .bwocc{flex:0 1 12rem;min-width:7rem;min-height:2.25rem}
+.bwlist .rotag{display:inline-flex;align-items:center;gap:.25rem;flex:none}
+.bwlist .bwok{color:var(--accent)}
+.bwdlg .bwfs{border:0;margin:0;padding:0;min-width:0}
+.bwdlg .bwfs[disabled]{opacity:.85}
+.bwdlg .bwlocked{display:flex;align-items:center;gap:.5rem;margin:0 0 .75rem;padding:.5rem .75rem;border-radius:.5rem;background:var(--bg2);color:var(--accent)}
+.bwdlg .bwpaddr{margin:-.25rem 0 .5rem;white-space:pre-line}
+.bwdlg .bwpaddr:empty{display:none}
+.bwguests{display:flex;flex-direction:column;gap:.125rem;max-height:40vh;overflow:auto;flex:1;min-width:0}
+.bwguests .bwg{min-height:2.75rem;display:flex;align-items:center;gap:.5rem}
+.bwguests .bwg small{margin-left:.25rem}
+.bwgnew{display:flex;flex-wrap:wrap;gap:.25rem;margin:0 0 .75rem}
+.bwgnew input{flex:1 1 9rem;min-width:0;min-height:2.75rem}
+.bwlines{list-style:none;margin:0 0 .5rem;padding:0;display:flex;flex-direction:column;gap:.25rem;flex:1;min-width:0}
+.bwln{display:grid;grid-template-columns:minmax(0,1fr) 5.5rem 7rem 2.75rem;gap:.25rem;align-items:center}
+.bwln select,.bwln input{min-height:2.75rem;min-width:0}
+.bwln .iconbtn{width:2.75rem;height:2.75rem}
+.bwdlg .bwsum{font-weight:600;margin:.25rem 0 .5rem}
+.bwfiles{list-style:none;margin:0 0 .5rem;padding:0}
+.bwf{display:flex;align-items:center;gap:.25rem}.bwf a{display:inline-flex;align-items:center;gap:.375rem;min-height:2.75rem;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.bwf .iconbtn{width:2.75rem;height:2.75rem;flex:none}
+.bwfilebox{flex:1;min-width:0}.bwnofile{margin:0 0 .5rem}
+.bwlogbox{margin:.5rem 0}.bwlog{margin:.25rem 0 0;padding-left:1.25rem;color:var(--muted)}
+.bwfoot{flex-wrap:wrap}.bwfoot .btn{min-height:2.75rem}
+.bwcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.5rem;margin:0 0 .75rem}
+.bwcard{display:flex;flex-direction:column;gap:.125rem;padding:.625rem .75rem;border:.0625rem solid var(--line2);border-radius:.625rem}
+.bwcard b{font-size:1.125rem;font-variant-numeric:tabular-nums}.bwcard.bwmain b{color:var(--accent)}
+.bwtab{margin-bottom:.75rem}
+.bwcset h4{margin:.75rem 0 .25rem;font-size:.875rem}
+.bwclist li{display:flex;gap:.25rem}.bwclist input,.bwcadd input{flex:1;min-width:0;min-height:2.75rem}
+@media (max-width:37.5rem) {
+  .bwln{grid-template-columns:minmax(0,1fr) 4.75rem 2.75rem;grid-template-areas:"k r x" "g g g"}
+  .bwln [data-bwl="kind"]{grid-area:k}.bwln [data-bwl="rate"]{grid-area:r}.bwln [data-bwl="gross"]{grid-area:g}.bwln .iconbtn{grid-area:x}
+  .bwclist li,.bwcadd{flex-wrap:wrap}.bwclist input,.bwcadd input{flex-basis:100%}
+  .bwbar .bwocc{flex:1 1 100%}
+}
