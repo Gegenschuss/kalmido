@@ -745,6 +745,29 @@ Routes (admins of the office area; a person without an organisation in the perso
 (the report as JSON), `GET /api/office/trips/vma.pdf|vma.xlsx|vma.csv` (same parameters). Agents do not reach travel
 expenses. Kalmido does not replace tax advice.
 
+## Travel expenses: purposes, person filter, row menu (2.117)
+
+- **Own purposes**: the choice *Purpose* of a trip ends with *Add another purpose…*; a field opens right below it, Enter
+  stores the name as an own purpose of the office area and chooses it. Office -> Settings -> *Travel expenses* lists the
+  own purposes: rename in place (saved when you leave the field), remove (one undo step), add more. Trips keep the text
+  they have when a purpose is renamed or removed. The evaluation sums *by purpose* too; a spreadsheet import adopts
+  purposes it does not know yet, an occasion named like an own purpose becomes that purpose; moving trips into another
+  office offers their purposes there as well. A person without an organisation has an own list in the personal office.
+- **Person filter**: next to *All* / *Not in DATEV* a choice of the people of the office and the free names of the
+  trips (hidden when only one person occurs). It filters the trip list, the evaluation (each receipt with that person's
+  equal share of the trip) and the per diem report, and the downloads (CSV, PDF, Excel) take it over. The choice stays
+  when you switch views.
+- **Row menu**: the arrow at the right of a trip opens a menu: Open, Edit trip, Duplicate (a new trip with the same data,
+  without receipts), Move to another workspace, Delete (asks first, one undo step). A tap on the row still opens the trip.
+- **Dates**: the picker of *To* opens at the start day when it is empty, days before the start are disabled; a later start
+  moves an earlier end along. The other from / to pairs of the office (DATEV export, contracts, cash flow, subscriptions,
+  service period, invoice from time entries, recurring invoices) open the same way.
+
+Routes (admins of the office area): `GET /api/office/trips/purposes`, `POST /api/office/trips/purposes` `{name}` (201;
+the same name = the one there, a removed one comes back), `PATCH /api/office/trips/purposes/<id>` `{name}`, `DELETE
+/api/office/trips/purposes/<id>`; `GET /api/office/trips/report?...&by=purpose&person=u<id>|n:<name>`. Agents do not reach
+travel expenses.
+
 ## Web API
 
 All routes require a signed-in person with the module on; they work in the office of the shown workspace (`400` with a
