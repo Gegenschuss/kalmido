@@ -1192,6 +1192,7 @@ fresh; run p21142_a_api "$PY" p21142_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21142_a_ui node p21142_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.114.2 part B (#2264): settings field errors below the field, the field keeps its width
 fresh; run p21142_b_ui node p21142_b_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p21143_a_ui node p21143_a_ui.js "$KALMIDO_TEST_DATA"
 shard 13  # 2.98.1: new suites go here, above this line
 # 2.114.1 part A: bank button "Match" wording + 44 px buttons, empty heading, producing checkbox (#2017 #2254 #2255)
 fresh; run p21141_a_ui node p21141_a_ui.js "$KALMIDO_TEST_DATA"
