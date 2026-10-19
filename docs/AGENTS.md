@@ -800,6 +800,16 @@ free. Every task in events and in the API has `"locked": true | false`.
   they ask you to.
 - Locking and unlocking show in the task's history; existing tasks were not locked by the update.
 
+### Reminders at a fixed time (2.111.0)
+
+Besides `reminders` (minutes before the due time) a task can have **one reminder at a fixed time**: `remind_at`, the local
+date and time `YYYY-MM-DDTHH:MM` (the server's time zone, like `due` / `due_time`), also without a due date ("remind me
+on Tuesday at 9:00"). Set or clear it with `POST` / `PATCH /api/v1/tasks` (MCP `create_task` / `update_task`, `null` =
+none). It goes out once, to the same people and over the same channels as the other reminders, and follows the person's
+notification switches; on a recurring task it moves along with the due date when the task is ticked or skipped. People
+type it in the quick add ("remind me tomorrow 9am", "erinnere mich Di 9:00"); calendar apps (CalDAV) see it as an alarm
+at that time.
+
 ### Dates move the dependency chain (2.67.0)
 
 In a project list with *Move dependent tasks along* on (the default for new project lists), postponing a task's due

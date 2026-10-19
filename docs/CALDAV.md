@@ -40,7 +40,7 @@ Kalmido 2.9.0 is a CalDAV server for tasks. Every list you can see appears as a 
 | Your tags | `CATEGORIES` |
 | Subtasks | `RELATED-TO;RELTYPE=PARENT` (a child may arrive before its parent) |
 | Repeat (daily, weekly, monthly, yearly) | `RRULE`. Completing a repeating task in a client moves it to the next date, as in the app, and the done occurrence appears as a new completed task. |
-| Reminders | `VALARM` with a relative (`RELATED=END`/`START`) or absolute `TRIGGER`. For all-day tasks the offset counts from your all-day reminder time (Settings › Notifications). |
+| Reminders | `VALARM` with a relative (`RELATED=END`/`START`) or absolute `TRIGGER`. For all-day tasks the offset counts from your all-day reminder time (Settings › Notifications). 2.111.0: the reminder at a fixed time is an alarm with an absolute `TRIGGER;VALUE=DATE-TIME` (marked `X-KALMIDO-AT`); an absolute alarm on a task without a due date becomes that reminder. |
 | Link | `URL` |
 | UID | Stable. The client's UID is kept; tasks made in Kalmido get `kalmido-<id>-<instance>`. |
 

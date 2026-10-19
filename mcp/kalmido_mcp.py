@@ -155,6 +155,9 @@ TASK_FIELDS = {
     # 2.60.0 (#1511): story points
     "points": {"type": ["integer", "null"], "enum": [1, 2, 3, 5, 8, 13, None], "description": "2.60.0: story points (Fibonacci); null = none. "
                "The app shows them where the list has story points on (points_on)"},
+    # 2.111.0 (#2057): a reminder at a fixed time, with or without a due date
+    "remind_at": {"type": ["string", "null"], "description": "2.111.0: remind at a fixed local date and time YYYY-MM-DDTHH:MM (server "
+                  "time zone), also without a due date; null = none. Fires once; moves along with the due date of a recurring task"},
     "family": {"type": ["object", "null"], "description": "2.19.0: birthday / anniversary {kind, name, year?, lead?} or household deadline "
                "{kind: deadline, type, who, expires, notice, lead} data; easier: add_occasion / add_deadline"},
     # 2.35.0 (#1095): code snippets (plain code, no Markdown); the whole list is replaced

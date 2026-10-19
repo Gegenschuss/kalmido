@@ -104,6 +104,9 @@
   completing and subtasks stay free). The lock binds only the app: you can still change a locked task through the API
   (`update_task`; the field `locked` shows the state). Create a task with `locked: false` only when the person should
   edit it freely, and do not lift a lock a person set unless they ask you to.
+- **Reminder at a fixed time (2.111.0).** "Remind me on Tuesday at 9" is `remind_at: "YYYY-MM-DDTHH:MM"` (local time,
+  also without a due date; `null` removes it) in `create_task` / `update_task`; `reminders` stays the minutes before the
+  due time. It fires once and moves along with a recurring task's due date.
 - **Dates move the chain (2.67.0).** Postponing a task's due date in a project list with *Move dependent tasks along* on
   also moves every task waiting on it by the same days (the whole chain; the answer's `chain` / `chain_note` names them,
   `chain.skipped` what stayed). Mention it when you report the change. Send `shift_chain: false` only when the person

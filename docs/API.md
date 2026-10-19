@@ -339,7 +339,9 @@ reminder on), `deadline_in_today` (boolean: also on Today from the first reminde
 default; from the first reminder on, not during the person's quiet hours), `tags` (replaces your tags on the task), `list_tags` (replaces the list tags of the task; names, missing ones are
 created when you may change the list), `assignee_id` (someone who can see the list), `assignee_group_id` (2.10.0: a group the
 list is shared with; setting one clears the other), (2.11.0) `plan_start` (the day plan's slot, `YYYY-MM-DDTHH:MM` local
-time or `null`; independent of `due`), `pinned`, `fields`
+time or `null`; independent of `due`), (2.111.0) `remind_at` (a reminder at a fixed local time `YYYY-MM-DDTHH:MM` or
+`null`, also without a due date; it fires once like the reminders before the due time and moves along with the due date of a
+recurring task), `pinned`, `fields`
 (custom field values by field id), (2.36.0) `locked` (boolean, see below); `content` is accepted as an alias of `notes` (2.2.1). `tags` are personal: every user has their own tags on a shared task; `list_tags`
 belong to the list and everyone in it sees them. Attachments are
 listed (name, type, size) in the task; read them with `GET /tasks/{id}/attachments` + `GET /attachments/{id}` (`attachments:read`) and add
