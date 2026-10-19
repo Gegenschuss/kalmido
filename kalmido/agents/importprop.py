@@ -63,7 +63,7 @@ def aim_validate(b, inp):
     repeat, start, until, category, vat_rate}]}. Only the shape is checked here; every row is judged when the card is shown
     and again when it is accepted. Unknown fields of a row (an org_id, an id, created_by ...) are dropped."""
     from ..agents.proposals import _p_keys, _p_str
-    from ..office.fixedimport import FCI_NOVAT_RE, fci_num
+    from ..office.fixedimport import fci_num, fci_vat_guess
     from ..office.calc import dstr, money
     _p_keys(b, "", ("kind", "summary", "area", "title", "note", "items"))
     area = b.get("area", "fixed_costs")
@@ -84,7 +84,7 @@ def aim_validate(b, inp):
             if d is not None:
                 row["amount"] = dstr(money(d))
         if row["vat_rate"] in (None, ""):  # as the spreadsheet import: 19 %, insurances and contributions 0 %
-            row["vat_rate"] = 0 if FCI_NOVAT_RE.search(str(row["label"] or "")) or FCI_NOVAT_RE.search(str(row["category"] or "")) else 19
+            row["vat_rate"] = fci_vat_guess(row["label"], row["category"])  # 2.122.2 (#2323)
         items.append(row)
     return {"area": area, "note": _p_str(b.get("note"), "note", AIM_NOTE_MAX, line=False), "items": items}
 
