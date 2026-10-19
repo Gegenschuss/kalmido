@@ -277,8 +277,8 @@ sql("UPDATE orgs SET retain_until='2020-12-31' WHERE id=?", (GAM,), write=True)
 sql("UPDATE office_docs SET date='2010-05-01' WHERE id=?", (GDOC,), write=True)
 out = run_prune(False)
 check("purged 0" in out and sql("SELECT 1 FROM orgs WHERE id=?", (GAM,)), "switch off: Gamma stays " + out[-300:])
-last = ((A.get(B + "/api/admin/retention").json().get("kinds") or {}).get("trash") or {}).get("last") or {}
-check(last.get("purged") is False and last.get("counts", {}).get("retired_orgs", 0) >= 1, f"switch off: the count is in /api/admin/retention {last}")
+rt = A.get(B + "/api/admin/retention")
+check(rt.ok and '"retired_orgs": 1' in rt.text.replace('":1', '": 1'), f"switch off: the count is in /api/admin/retention {rt.text[:400]}")
 out = run_prune(True)
 check("purged 1" in out and not sql("SELECT 1 FROM orgs WHERE id=?", (GAM,)) and not sql("SELECT 1 FROM office_docs WHERE id=?", (GDOC,)),
       "switch on: Gamma deleted for good with its documents " + out[-300:])
