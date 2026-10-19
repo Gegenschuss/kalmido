@@ -250,11 +250,22 @@ function jcd_filtHtml() {
   if (S.chat.job || !S.jcd.n) return '<div class="jcdfilt" id="jcd-filt" hidden></div>';
   const f = jcd_filter(), a = agentById(S.chat.aid), t = tr('Filter');
   const opts = [['all', tr('All')], ['me', tr('Only me and {0}', a?.name || '')], ['jobs', tr('Jobs')]];
-  return `<div class="jcdfilt" id="jcd-filt"><div class="jcdseg" role="group" aria-label="${esc(t)}">${opts.map(([k, l]) => `<button type="button" data-jca="filt" data-f="${k}" aria-pressed="${f === k}">${esc(l)}</button>`).join('')}</div><select class="jcdsel" data-jca="filtsel" aria-label="${esc(t)}">${opts.map(([k, l]) => `<option value="${k}"${f === k ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
+  return `<div class="jcdfilt" id="jcd-filt"><div class="jcdseg" role="group" aria-label="${esc(t)}">${opts.map(([k, l]) => `<button type="button" data-jca="filt" data-f="${k}" aria-pressed="${f === k}">${esc(l)}</button>`).join('')}</div></div>`;
+}
+// 2.117.0 C (#2260): on a narrow phone the filter is an icon in the chat header (menu with the three choices; a dot while not "All")
+function jcd_fbtnHtml() {
+  if (S.chat.job || !S.jcd.n) return '<span id="jcd-fbtn" hidden></span>';
+  const t = tr('Filter');
+  return `<button type="button" class="iconbtn jcdfbtn" id="jcd-fbtn" data-jca="fmenu" aria-haspopup="menu" title="${esc(t)}" aria-label="${esc(t)}">${ic('filter')}${jcd_filter() !== 'all' ? '<i class="jcdfdot" aria-hidden="true"></i>' : ''}</button>`;
+}
+function jcd_fmenu(btn) {
+  const f = jcd_filter(), a = agentById(S.chat.aid);
+  menu(btn, [['all', tr('All')], ['me', tr('Only me and {0}', a?.name || '')], ['jobs', tr('Jobs')]].map(([k, l]) => ({label: l, on: f === k, fn: () => jcd_setFilter(k)})));
 }
 // after every chat patch (agentchat.js chatPatch): the filter follows (shown once a job is in the chat)
 function jcd_patch() {
   const b = $('#jcd-filt'), h = jcd_filtHtml(); if (b && b.outerHTML !== h) b.outerHTML = h;
+  const c = $('#jcd-fbtn'), g = jcd_fbtnHtml(); if (c && c.outerHTML !== g) c.outerHTML = g;
 }
 function jcd_setFilter(f) {
   if (!['all', 'me', 'jobs'].includes(f)) return;
@@ -283,4 +294,4 @@ document.addEventListener('click', e => {
   if (box) { box.scrollTop = top + (n ? n.getBoundingClientRect().top - y0 : 0); S.chat.pin = chatNear(box); }
   n?.focus({preventScroll: true});
 });
-document.addEventListener('change', e => { if (e.target.matches?.('select[data-jca="filtsel"]')) jcd_setFilter(e.target.value); });
+document.addEventListener('click', e => { const b = e.target.closest?.('#jcd-fbtn'); if (b) jcd_fmenu(b); });

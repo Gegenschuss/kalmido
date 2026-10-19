@@ -496,8 +496,9 @@ def pdf_write(pages, images, title="", author="", xml=None, meta=None):
     # -- PDF/A: output intent (sRGB), XMP, the embedded e-invoice
     when = meta.get("when") or datetime.datetime.now(datetime.timezone.utc).astimezone()
     d_pdf, d_xmp = _pdf_date(when)
-    producer = str(meta.get("producer") or "Kalmido")
-    creator = str(meta.get("creator") or "Kalmido")
+    from ..core.config import APP_VERSION  # 2.117.0 C (#2262): "Kalmido v<version>" in all PDFs
+    producer = str(meta.get("producer") or f"Kalmido v{APP_VERSION}")
+    creator = str(meta.get("creator") or f"Kalmido v{APP_VERSION}")
     try:
         with open(ICC_FILE, "rb") as fh:
             icc = fh.read()

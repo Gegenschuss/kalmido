@@ -160,7 +160,7 @@ def _render(c, oid, r, model=None):
             when = datetime.datetime.fromisoformat(str(r["locked_at"]).replace("Z", "+00:00")).astimezone()
         except ValueError:
             when = None
-    meta = {"when": when, "producer": f"Kalmido {APP_VERSION}", "xml_profile": "EN 16931", "doc_type": "INVOICE"}
+    meta = {"when": when, "producer": f"Kalmido v{APP_VERSION}", "xml_profile": "EN 16931", "doc_type": "INVOICE"}
     pdf = office_pdf(model, xml=xml if fmt == "zugferd" else None, meta=meta)
     return pdf, xml, fmt
 

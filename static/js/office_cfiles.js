@@ -1,3 +1,4 @@
+// @ts-check
 // 2.117.0 B (#2285): PDF files of a framework contract (the signed contract, addenda) in its dialog: upload, view, replace,
 // remove (one undo step each), a date per file; the paper clip in the contracts list. A new contract keeps the chosen files
 // until it is saved (office.js calls dmaAfterSave with its id). Admins write, members of the office only look.
@@ -55,7 +56,7 @@ async function dmaAfterSave(cid) {
   if (err) toast(err);
 }
 document.addEventListener('click', async e => {
-  const b = e.target.closest?.('[data-dma]'); if (!b || b.tagName === 'INPUT') return;
+  const b = /** @type {any} */ (e.target).closest?.('[data-dma]'); if (!b || b.tagName === 'INPUT') return;
   const md = b.closest('.modal'), box = md && $('#dma-box', md); if (!box) return;
   const cid = +box.dataset.cid, a = b.dataset.dma, fid = +b.dataset.fid, f = (DMA.items || []).find(x => x.id === fid);
   dmaErr(md, '');
@@ -86,7 +87,7 @@ document.addEventListener('click', async e => {
   }
 });
 document.addEventListener('change', async e => {
-  const inp = e.target.closest?.('input[data-dma="date"]'); if (!inp) return;
+  const inp = /** @type {any} */ (e.target).closest?.('input[data-dma="date"]'); if (!inp) return;
   const md = inp.closest('.modal'), cid = +$('#dma-box', md)?.dataset.cid, fid = +inp.dataset.fid;
   const f = (DMA.items || []).find(x => x.id === fid); if (!cid || !f || !inp.value || inp.value === f.date) return;
   const old = f.date;

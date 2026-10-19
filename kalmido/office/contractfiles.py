@@ -92,6 +92,25 @@ def dma_purge(c, oid):
     return len(rows)
 
 
+def dma_purge_tick(c):
+    """Watchdog (review 2.117.0): the trash goes after DMA_PURGE_DAYS also in office areas nobody opens."""
+    import time
+    from ..core.pg import system_ctx
+    if time.time() - DMA_TICK["at"] < 6 * 3600:
+        return 0
+    DMA_TICK["at"] = time.time()
+    old = iso(now_utc() - timedelta(days=DMA_PURGE_DAYS))
+    with system_ctx(c):  # trashed rows of every office area (ids and stored names only, no content is read)
+        oids = [r["org_id"] for r in c.execute("SELECT DISTINCT org_id FROM office_contract_files WHERE deleted_at IS NOT NULL "
+                                               "AND deleted_at<?", (old,)).fetchall()]
+        n = sum(dma_purge(c, oid) for oid in oids)
+    c.commit()
+    return n
+
+
+DMA_TICK = {"at": 0.0}
+
+
 def dma_counts(c, oid, rows):
     """The contracts list (office/web.py): files = the number of live PDFs per contract (the paper clip); purges the trash."""
     if dma_purge(c, oid):
@@ -194,7 +213,8 @@ def dma_file_get(cid, fid):
     if not p or not os.path.isfile(p):
         raise Denied(404)
     resp = Response(oc_read_file(c, p), mimetype="application/pdf")
-    resp.headers["Content-Disposition"] = "attachment; filename*=UTF-8''" + urllib.parse.quote(r["name"])
+    ascii_name = re.sub(r'[^A-Za-z0-9._ -]', "_", r["name"]) or "contract.pdf"  # review 2.117.0: fallback for old clients
+    resp.headers["Content-Disposition"] = f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'' + urllib.parse.quote(r["name"])
     resp.headers["Cache-Control"] = "no-store"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Content-Security-Policy"] = "sandbox"
