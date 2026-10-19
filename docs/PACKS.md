@@ -155,8 +155,7 @@ industry packs from its data folder: `<data folder>/packs/industry/<code>.json` 
 `/data/packs/industry/` in Docker). Such a file is checked like a shipped pack (same validator, at most 512 KB, the code
 must match the file name) and then appears in the office settings like any other industry pack (source "local"). A file
 whose code is the code of a shipped pack is refused (log line `own industry pack <code> refused: ...`), the shipped pack
-stays. A changed file is read again at the next request; nothing of it lands in the repository or in a backup of the
-code. This is the place for packs only one business needs (own rates, own wording).
+stays. A changed file is read again at the next request; it never lands in the repository. This is the place for packs only one business needs (own rates, own wording).
 
 ### Calculation options of an industry pack (`calc`, optional)
 
