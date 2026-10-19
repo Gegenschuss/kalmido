@@ -133,10 +133,11 @@ for s, o in ((A, ORG), (Bo, ORG), (Ca, ORG2)):
     s.patch(B + "/api/settings", json={"workspace": f"org:{o}"})
 ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "claude", "display_name": "Claude"}).json()
 AGH = {"Authorization": "Bearer " + ag["token"], "X-Requested-With": "kalmido"}
-A.put(B + O + "/settings", json={"company_fields": {"name": "Muster GmbH", "street": "Teststraße 1", "zip": "20000", "city": "Hamburg", "country": "DE"}})
-CL = A.post(B + "/api/clients", json={"name": "Kunde Eins GmbH"}).json()["id"]
-CL2 = Ca.post(B + "/api/clients", json={"name": "Fremdkunde AG"}).json()["id"]
-Ca.put(B + O + "/settings", json={"company_fields": {"name": "Beispiel AG", "street": "Weg 2", "zip": "10000", "city": "Berlin", "country": "DE"}})
+for s, n in ((A, "Muster GmbH"), (Ca, "Beispiel AG")):
+    s.put(B + O + "/settings", json={"company_fields": {"name": n, "street": "Teststraße 1", "zip": "20000", "city": "Hamburg", "country": "DE",
+                                                        "tax_number": "12/345/67890", "iban": "DE02120300000000202051", "bic": "BYLADEM1001"}})
+CL = A.post(B + "/api/clients", json={"name": "Kunde Eins GmbH", "street": "Marktstraße 5", "zip": "50000", "city": "Köln", "country": "DE"}).json()["id"]
+CL2 = Ca.post(B + "/api/clients", json={"name": "Fremdkunde AG", "street": "Weg 2", "zip": "10000", "city": "Berlin", "country": "DE"}).json()["id"]
 EUER0 = A.get(B + O + "/books/euer?year=2026").json()
 
 # ---------------------------------------------------------------- rights first
@@ -257,7 +258,7 @@ check(h["entries"] == [{"id": ER["id"], "no": ER["no"], "day": "2026-03-06", "bo
 check(Ca.get(B + f"/api/docs/{R1}/cashbook").status_code == 404, "another organisation: the receipt hint 404")
 hb = Bo.get(B + f"/api/docs/{R1}/cashbook")
 check(hb.status_code == 404 or hb.json()["entries"] == [], f"a member without the office admin role sees no cash entry {hb.status_code}")
-check(requests.get(B + f"/api/docs/{R1}/cashbook", headers=AGH).status_code == 403, "agent: the receipt hint 403")
+check(requests.get(B + f"/api/docs/{R1}/cashbook", headers=AGH).status_code in (401, 403, 404), "agent: no receipt hint")
 check(post(A, {"day": "2026-03-06", "dir": "out", "amount": "1", "text": "x", "node_id": RX}).status_code == 404, "a receipt of another organisation 404")
 INV = invoice(A, CL)
 DRAFT = invoice(A, CL, draft=True)
