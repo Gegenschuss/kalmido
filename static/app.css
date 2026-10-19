@@ -4460,6 +4460,28 @@ button.lkchip:hover{border-color:var(--accent)}
 .qrbox img{width:15rem;height:15rem;max-width:100%;height:auto;border-radius:.5rem;background:#fff;padding:.5rem}
 .suorg{width:100%;margin:0 0 .25rem}
 .fmrow.off .n b{color:var(--muted)}
+/* 2.98.0 B (#1954): the own questions of a form (formq.js): a row per question, the grip drags it (touch too) */
+.fq-ed{margin:.25rem 0 .75rem;padding:.75rem 0 0;border-top:1px solid var(--line)}
+.fq-head{display:flex;flex-direction:column;gap:.125rem;margin-bottom:.5rem}
+.fq-head .muted{font-size:var(--fs-s)}
+.fq-list{display:flex;flex-direction:column;gap:.5rem}
+.fqe{display:flex;gap:.375rem;align-items:flex-start;padding:.5rem;border:1px solid var(--line2);border-radius:.5rem;background:var(--bg2)}
+.fqe.dragging{opacity:.55;border-color:var(--accent)}
+.fqe-grip{cursor:grab;touch-action:none;flex:none}
+.fqe-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:.375rem}
+.fqe-top{display:flex;gap:.5rem;align-items:center}
+.fqe-kind{flex:none;font-size:var(--fs-s);color:var(--accent)}
+.fqe-main input:not([type=checkbox]),.fqe-main textarea{width:100%;min-width:0}
+.fqe-btns{display:flex;flex-direction:column;flex:none}
+.fq-add{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.5rem 0 .75rem}
+.fq-chks{display:flex;flex-direction:column;gap:.375rem}
+.fq-entries{display:flex;flex-direction:column;gap:.375rem;max-height:60vh;overflow:auto}
+.fqen{border:1px solid var(--line2);border-radius:.5rem;padding:.5rem .75rem}
+.fqen summary{cursor:pointer;min-height:2.75rem;display:flex;align-items:center}
+.fqen dl{margin:.5rem 0;display:grid;grid-template-columns:minmax(0,1fr);gap:.125rem}
+.fqen dt{font-size:var(--fs-s);color:var(--muted);margin-top:.375rem}
+.fqen dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+@media (pointer:coarse){ .fqe-btns .iconbtn,.fqe-grip{width:2.75rem;height:2.75rem} }
 @media (pointer:coarse){ .wlcap{min-height:2.75rem} .tvclient .iconbtn{width:2.75rem;height:2.75rem} }
 .cltable a,.clcard h2 a,.tvclient a{color:var(--text)}
 /* 2.23.0 (#823): the quick reactions of a chat message behind the smiley again (open: .rxshow); 👍 / 👎 of an open
@@ -5651,33 +5673,47 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .mgtabs .recdot{margin-left:.125rem}
 .modrow.mgarea .mgparts>.modlist{margin:.375rem 0 0 .75rem;padding-left:.75rem;border-left:2px solid var(--line2)}
 @media (max-width:640px){.mgtabs{margin:.25rem 0 .75rem}.mgtabs button{min-height:2.75rem;padding:.25rem .5rem}}
-/* 2.87.9 (#1917): the office menu -- computer: the four groups side by side, each with its points (sticky, the point shown
-   in the accent); phone: the path "Office › group" (back to the start tiles) and the group's points (they wrap, never
-   scroll: #1830); the start page tiles;
-   the path of a detail page as grey text */
-.ofmenu{position:sticky;top:0;z-index:3;display:flex;flex-wrap:wrap;gap:.5rem 1.5rem;max-width:72rem;margin:0 auto .875rem;padding:.5rem 0;background:var(--bg);border-bottom:1px solid var(--line)}
-.ofmg{display:flex;flex-direction:column;gap:.125rem;min-width:0}
-.ofmgh{display:flex;align-items:center;gap:.375rem;padding:0 .625rem;font-size:var(--fs-xs);font-weight:600;color:var(--muted)}
-.ofmgi,.ofmsib{display:flex;flex-wrap:wrap;gap:.125rem}
-.ofmi{display:inline-flex;align-items:center;gap:.375rem;min-height:2.25rem;padding:.25rem .625rem;border:0;border-radius:var(--r-s);background:none;color:var(--text2);font:inherit;white-space:nowrap;cursor:pointer}
-.ofmi:hover{background:var(--bg3);color:var(--text)}
-.ofmi.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
-.ofmbar{position:sticky;top:0;z-index:3;display:flex;flex-direction:column;gap:.25rem;margin:0 0 .75rem;padding:.375rem 0 .5rem;background:var(--bg);border-bottom:1px solid var(--line)}
-.ofmpath,.ofmcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:.375rem;font-size:var(--fs-s);color:var(--muted);min-width:0}
-.ofmhome{border:0;background:none;padding:.25rem 0;min-height:2.75rem;color:var(--accent);font:inherit;font-weight:600;cursor:pointer}
-.ofmsib .ofmi{min-height:2.75rem;flex:none}
-.ofmcrumb{max-width:72rem;margin:-.375rem auto .625rem}
+/* 2.98 (#2180): the office rail on the left (computer; replaces the menu bar of 2.87.9, #1917), a phone's start list
+   and its path "< Office · group" with the group's points as one row of underlined tabs (no wrap, it scrolls sideways);
+   the path of a detail page stays grey text */
+.ofwrap{display:grid;grid-template-columns:15rem minmax(0,1fr);gap:0 2.25rem;max-width:72rem;margin:0 auto;align-items:start}
+.ofrail{position:sticky;top:0;display:flex;flex-direction:column;gap:1.125rem;padding:.125rem 1.25rem 1rem 0;border-right:1px solid var(--line)}
+.ofrg{display:flex;flex-direction:column;gap:.0625rem}
+.ofrh,.oflg h3{padding:0 .625rem .375rem;font-size:var(--fs-xs);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ofri{display:flex;align-items:center;gap:.625rem;width:100%;min-height:2.125rem;padding:.3125rem .625rem;border:0;border-radius:var(--radius);background:none;color:var(--text2);font:inherit;font-size:var(--fs-b);text-align:left;cursor:pointer}
+.ofri svg{width:1rem;height:1rem;color:var(--faint);flex:none}
+.ofri span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ofri:hover{background:var(--bg2);color:var(--text)}
+.ofri.on{background:var(--accent-soft);color:var(--accent);font-weight:500}
+.ofri.on svg{color:var(--accent)}
+.ofri:focus-visible,.ofpt2:focus-visible,.ofpback:focus-visible,.oflr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ofbody{min-width:0}
+.ofpt{margin:.125rem 0 .875rem;font-size:var(--fs-l);font-weight:600;color:var(--text)}
+.ofbody .ofmcrumb{margin:.125rem 0 .875rem}
+@media (max-width:1099px){.ofwrap{grid-template-columns:12rem minmax(0,1fr);gap:0 1.5rem}.ofri{font-size:var(--fs-m)}}
+.ofpb{position:sticky;top:0;z-index:3;display:flex;flex-direction:column;margin:0 0 .75rem;background:var(--bg);border-bottom:1px solid var(--line)}
+.ofpback{display:inline-flex;align-items:center;gap:.25rem;align-self:flex-start;min-height:2.75rem;padding:0 .25rem 0 0;border:0;border-radius:var(--radius);background:none;color:var(--muted);font:inherit;font-size:var(--fs-s);cursor:pointer}
+.ofpback svg{width:.875rem;height:.875rem;transform:rotate(90deg)}
+.ofpts{display:flex;flex-wrap:nowrap;gap:1.25rem;overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain}
+.ofpts::-webkit-scrollbar{display:none}
+.ofpt2{display:inline-flex;align-items:center;gap:.375rem;flex:none;min-height:2.75rem;padding:0 .125rem;border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);font:inherit;font-size:var(--fs-b);font-weight:500;white-space:nowrap;cursor:pointer}
+.ofpt2 svg{width:1rem;height:1rem}
+.ofpt2.on{color:var(--text);border-bottom-color:var(--accent)}
+.ofpt2.on svg{color:var(--accent)}
+.ofmcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:.375rem;max-width:72rem;margin:-.375rem auto .625rem;font-size:var(--fs-s);color:var(--muted);min-width:0}
 .ofmcrumb span:last-child{color:var(--text2)}
 .ofmstart{display:flex;flex-direction:column;gap:.875rem;max-width:72rem;margin:0 auto}
-.ofmtiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));gap:.75rem}
-.ofmtile{display:flex;flex-direction:column;gap:.25rem;padding:.75rem;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r-l)}
-.ofmtile h3{display:flex;align-items:center;gap:.5rem;margin:0 0 .25rem;font-size:var(--fs-m)}
-.ofmtile h3 svg{color:var(--accent)}
-.ofmti{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.75rem;padding:.25rem .5rem;border:0;border-radius:var(--r-s);background:none;color:var(--text);font:inherit;text-align:left;cursor:pointer}
-.ofmti:hover{background:var(--bg3)}
-.ofmti svg{color:var(--muted)}
 .ofmfig{padding:.75rem;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r-l)}
-@media (max-width:899px){.ofmtiles{grid-template-columns:1fr 1fr;gap:.5rem}.ofmtile{padding:.625rem .5rem}}
+.ofl{display:flex;flex-direction:column;gap:1rem}
+.oflg h3{margin:0;padding-top:.25rem}
+.oflc{display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r-l);overflow:hidden}
+.oflr{display:flex;align-items:center;gap:.75rem;width:100%;min-height:2.875rem;padding:.375rem .875rem;border:0;border-top:1px solid var(--line);background:none;color:var(--text);font:inherit;font-size:var(--fs-b);text-align:left;cursor:pointer}
+.oflr:first-child{border-top:0}
+.oflr:hover{background:var(--bg3)}
+.oflr>svg:first-child{width:1.125rem;height:1.125rem;color:var(--accent);flex:none}
+.oflr>span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.oflr>svg:last-child{width:1rem;height:1rem;color:var(--faint);transform:rotate(-90deg);flex:none}
+.ofrset{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;margin:0 0 .875rem}
 /* 2.45.0 D (#1504): the start page -- one sentence on top, Today with a box to add, compact News, slim empty cards, two
    columns (wide main, narrow side; every column stacks on its own), the app font everywhere, links without underline */
 .hpsum{margin:-.5rem 0 1.125rem;color:var(--text2);font-size:var(--fs-b)}
@@ -5852,7 +5888,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 @keyframes an_popout{from{opacity:1;transform:none}to{opacity:0;transform:scale(.8)}}
 @keyframes an_hint{from{opacity:0}to{opacity:1}}
 .trow.an-rowout{opacity:0;transform:translateX(.75rem);transition:opacity .18s ease-in,transform .18s ease-in;pointer-events:none}
-.trow.an-rowin{animation:an_rowin .2s ease-out}
+.trow.an-rowin{animation:an_rowin .3s ease-out}  /* 2.98.0 D (#2163): .2 s -> .3 s */
 @media (max-width:899px){
   #fab:not(.gone){animation:an_pop .2s ease-out}
   #fab.gone.an-out{display:grid!important;animation:an_popout .18s ease-in forwards;pointer-events:none}
@@ -7317,7 +7353,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .o3c-ring{flex:none;width:.875rem;height:.875rem;border-radius:50%;background:conic-gradient(var(--accent) calc(var(--p) * 1%),var(--bg4) 0);-webkit-mask:radial-gradient(farthest-side,transparent 58%,#000 62%);mask:radial-gradient(farthest-side,transparent 58%,#000 62%)}
 /* ticking off: the circle pops (transform + opacity only, 200 ms); none with reduced motion */
 @keyframes o3c-pop{0%{transform:scale(.7);opacity:.4}60%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:1}}
-.chk.o3c-pop{animation:o3c-pop .2s ease-out}
+.chk.o3c-pop{animation:o3c-pop .35s ease-out}  /* 2.98.0 D (#2163): .2 s -> .35 s (sheetmotion.js UI_POP_MS keeps the row's exit behind it) */
 @media (prefers-reduced-motion: reduce){ .chk.o3c-pop{animation:none} }
 /* empty pages: the K as a calm line drawing, its dot in the accent */
 .empty svg.o3c-k{width:7.5rem;height:5.625rem;opacity:1;margin:0 auto .75rem;color:var(--text2);stroke-width:2.4}

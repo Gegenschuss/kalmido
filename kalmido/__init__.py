@@ -79,6 +79,7 @@ ORDER = (
     "calendars.subscriptions",
     "calendars.davwrite",  # 2.52.0 B (#1128): writing into CalDAV subscriptions
     "calendars.apptbook",  # 2.94.0 B (#1929): appointment booking by customers (public page, no login)
+    "calendars.polls",  # 2.98.0 A (#1953): scheduling polls (vote through a link, the winning time becomes an event)
     "admin.backup",
     "api.v1",
     "notify.caps",  # 2.33.0 (#927)
@@ -227,6 +228,7 @@ ORDER = (
     "team.approvals",
     "tasks.review",  # 2.60.0 C (#1512): review step (reviewer, gate, list setting, API v1)
     "team.forms",
+    "team.formq",  # 2.98.0 B (#1954): questionnaires (own questions in forms, answers become a task at the customer)
     "team.portal",  # 2.63.0 (#1513): customer reports (status link) and the customer portal
     "team.v1",
     "accounts.signup",

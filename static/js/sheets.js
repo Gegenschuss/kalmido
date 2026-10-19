@@ -65,7 +65,9 @@ async function shvLoad(id, force) {
     SHV.err = e.status === 404 || e.status === 403 ? tr('This table does not exist or you cannot see it.') : e instanceof Offline ? tr('Tables are only available online.') : e.message;
     if (SHV.sh?.id === id) SHV.sh = null;
   } finally { SHV.busy['s' + id] = false; }
-  if (SHV.again) { SHV.again = false; return shvLoad(id, true); }
+  // 2.98.0 C (#2181): the load asked for meanwhile runs, and this load's change is still drawn (the second load found
+  // nothing new and drew nothing: a table opened while a draw asked for it again stayed on "Loading…")
+  if (SHV.again) { SHV.again = false; await shvLoad(id, true); }
   if (S.route.mod === 'sheets' && S.route.sh === id && changed) shvRender();
 }
 const shvKalSig = sh => (sh?.cells || []).filter(c => c.origin === 'kalmido' || c.error).map(c => c.id + '=' + c.display + c.error).join('|');
@@ -155,18 +157,19 @@ function shvSheetHtml(sh) {
   const top = `<div class="shvtop">${back}<h2 class="shvh"><button type="button" class="shvtitle" data-shv="rename" ${w ? '' : 'disabled'} title="${esc(w ? tr('Rename…') : '')}">${esc(sh.title || tr('Untitled table'))}</button></h2>
     ${w ? '' : `<span class="shvro">${ic('eye', 's')}${tr('Read only')}</span>`}<span class="spacer"></span>
     ${nf ? `<button type="button" class="btn sm" data-shv="unfilter" title="${esc(tr('Reset filters'))}">${ic('filter', 's')}${trn('{0} filter', '{0} filters', nf)}${ic('x', 's')}</button>` : ''}
-    <button type="button" class="btn sm ${SHV.deps ? 'on' : ''}" data-shv="deps" aria-haspopup="menu" aria-pressed="${!!SHV.deps}">${ic('deps', 's')}<span class="shvbk">${tr('Dependencies')}</span></button>
+    <button type="button" class="btn sm ${SHV.deps ? 'on' : ''}" data-shv="deps" aria-haspopup="menu" aria-pressed="${!!SHV.deps}">${ic('deps', 's')}<span class="shvbk">${tr('Dependencies')}</span></button>${typeof shz_btnsHtml === 'function' ? shz_btnsHtml(sh) : ''}
     <button type="button" class="iconbtn" data-shv="menu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button></div>`;
   const c0 = SHV.cur && sh._col.has(SHV.cur.c) && sh._rowNo.has(SHV.cur.r) ? SHV.cur : null, cc = c0 && shvCell(c0.r, c0.c, sh);
   const bar = `<div class="shvbar"><span class="shvaddr" id="shv-addr" aria-live="polite">${c0 ? esc(cc?.name || shvAddr(c0.r, c0.c, sh)) : ''}</span><span class="shvfx" aria-hidden="true">fx</span>
     <input id="shv-in" value="${esc(cc?.raw || '')}" autocomplete="off" spellcheck="false" ${w && c0 ? '' : 'readonly'} aria-label="${esc(tr('Content of the cell'))}" placeholder="${esc(c0 ? (w ? tr('Value or =formula') : '') : tr('Choose a cell'))}"></div>`;
-  const colgroup = `<colgroup><col class="shvrhc">${cols.map(c => `<col data-c="${c.id}" style="width:${shvW(c) / 16}rem">`).join('')}${w ? '<col class="shvaddcc">' : ''}</colgroup>`;
-  const head = `<thead><tr><th class="shvcorner" scope="col"><span class="sr">${tr('Row')}</span></th>${cols.map(c => shvTh(sh, c, filt)).join('')}${w ? `<th class="shvaddc"><button type="button" class="iconbtn" data-shv="coladd" title="${esc(tr('Add column'))}" aria-label="${esc(tr('Add column'))}">${ic('plus', 's')}</button></th>` : ''}</tr></thead>`;
-  const body = `<tbody>${rows.map(r => shvTr(sh, r)).join('')}</tbody>`;
+  const shz = typeof shz_plan === 'function' && shz_plan(sh);  // 2.98.0 C (#2181): sheetsize.js
+  const colgroup = `<colgroup><col class="shvrhc">${cols.map(c => `<col data-c="${c.id}" style="width:${shvW(c) / 16}rem">`).join('')}${w ? '<col class="shvaddcc">' : ''}${shz ? shz_colsHtml(sh) : ''}</colgroup>`;  // 2.98.0 C (#2181): + the empty columns that fill the frame
+  const head = `<thead><tr><th class="shvcorner" scope="col"><span class="sr">${tr('Row')}</span></th>${cols.map(c => shvTh(sh, c, filt)).join('')}${w ? `<th class="shvaddc"><button type="button" class="iconbtn" data-shv="coladd" title="${esc(tr('Add column'))}" aria-label="${esc(tr('Add column'))}">${ic('plus', 's')}</button></th>` : ''}${shz ? shz_headHtml(sh) : ''}</tr></thead>`;
+  const body = `<tbody>${rows.map(r => shvTr(sh, r)).join('')}</tbody>${shz ? shz_bodyHtml(sh) : ''}`;
   const foot = `<div class="shvfoot">${w ? `<button type="button" class="btn sm" data-shv="rowadd">${ic('plus', 's')}${tr('Add row')}</button>` : ''}${nf ? `<span class="muted">${tr('{0} of {1} rows shown', rows.length, all)}</span>` : ''}</div>`;
   return `<div class="shvwrap shvsheet" data-k="shv-${sh.id}">${top}${pres}${bar}
-    <div class="shvbody"><div class="shvgridw"><div class="shvscroll" id="shv-scroll" tabindex="0" role="grid" aria-label="${esc(sh.title || tr('Table'))}" aria-rowcount="${all + 1}" aria-colcount="${cols.length + 1}" aria-multiselectable="true" ${c0 ? `aria-activedescendant="shv-c-${c0.r}-${c0.c}"` : ''}>
-      <table class="shvgrid" role="presentation">${colgroup}${head}${body}</table><svg class="shvdeps" id="shv-deps" aria-hidden="true"></svg></div>${foot}</div>
+    <div class="shvbody"><div class="shvgridw"><div class="shzbox"${typeof shz_boxAttr === 'function' ? shz_boxAttr(sh) : ''}><div class="shvscroll" id="shv-scroll" tabindex="0" role="grid" aria-label="${esc(sh.title || tr('Table'))}" aria-rowcount="${all + 1}" aria-colcount="${cols.length + 1}" aria-multiselectable="true" ${c0 ? `aria-activedescendant="shv-c-${c0.r}-${c0.c}"` : ''}>
+      <table class="shvgrid" role="presentation">${colgroup}${head}${body}</table><svg class="shvdeps" id="shv-deps" aria-hidden="true"></svg></div>${typeof shz_gripHtml === 'function' ? shz_gripHtml(sh) : ''}</div>${foot}</div>
     <aside class="shvside" id="shv-side" aria-label="${esc(tr('Cell details'))}">${shvSideHtml(sh)}</aside></div></div>`;
 }
 function shvPresHtml(sh) {  // "Anna is editing B4" (others only)
@@ -188,7 +191,7 @@ function shvRowColor(sh, r) {  // the first selection column that colours the wh
 }
 function shvTr(sh, r) {
   const rc = shvRowColor(sh, r), n = sh._rowNo.get(r.id);
-  return `<tr data-id="${r.id}" class="${rc ? 'shvrc' : ''}" ${rc ? `style="--shr:${rc}"` : ''} role="row" aria-rowindex="${n + 1}"><th class="shvrh" scope="row" data-r="${r.id}"><button type="button" data-shv="row" data-r="${r.id}" aria-haspopup="menu" title="${esc(tr('Row {0}', n))}">${n}</button>${(SHV_HOOKS.row || []).map(f => { try { return f(sh, r) || ''; } catch (er) { console.error(er); return ''; } }).join('')}</th>${sh.columns.map(c => shvTd(sh, r.id, c)).join('')}${sh.can_write ? '<td class="shvpad" aria-hidden="true"></td>' : ''}</tr>`;
+  return `<tr data-id="${r.id}" class="${rc ? 'shvrc' : ''}" ${rc ? `style="--shr:${rc}"` : ''} role="row" aria-rowindex="${n + 1}"><th class="shvrh" scope="row" data-r="${r.id}"><button type="button" data-shv="row" data-r="${r.id}" aria-haspopup="menu" title="${esc(tr('Row {0}', n))}">${n}</button>${(SHV_HOOKS.row || []).map(f => { try { return f(sh, r) || ''; } catch (er) { console.error(er); return ''; } }).join('')}</th>${sh.columns.map(c => shvTd(sh, r.id, c)).join('')}${sh.can_write ? '<td class="shvpad" aria-hidden="true"></td>' : ''}${typeof shz_rowTail === 'function' ? shz_rowTail(sh, r) : ''}</tr>`;
 }
 const shvOpt = (col, cell) => { if (!cell) return null; const os = col.options || [], k = cell.option ?? cell.raw; return os.find(o => o.id === k) || os.find(o => String(o.label || '').toLowerCase() === String(k ?? '').toLowerCase()) || null; };
 function shvTd(sh, rid, col) {
@@ -321,7 +324,7 @@ function shvBarSync() {
   if (document.activeElement !== inp && !(SHV.ed && SHV.ed.bar)) { inp.value = SHV.ed ? SHV.ed.val ?? '' : c?.raw || ''; inp.readOnly = !sh.can_write || !cur; inp.placeholder = cur ? (sh.can_write ? tr('Value or =formula') : '') : tr('Choose a cell'); }
 }
 function shvSideSync() { const s = $('#shv-side'); if (s && SHV.sh && !s.contains(document.activeElement)) s.innerHTML = shvSideHtml(SHV.sh); }
-function shvAfter() { shvBarSync(); shvDepsDraw(); }
+function shvAfter() { shvBarSync(); shvDepsDraw(); if (typeof shz_fill === 'function') shz_fill(); }  // 2.98.0 C (#2181): the empty cells that fill the frame
 // after a write: the changed cells and the rows they colour are drawn in place (an open editor stays)
 function shvPatchAll() {
   const sh = SHV.sh, tb = $('#shv-scroll tbody'); if (!sh || !tb) return;

@@ -719,6 +719,22 @@ def thumb_drop(rel):
             pass
 
 
+RECEIPT_TYPE = re.compile(r"rechnung|beleg|quittung|kassenbon|bon\b|invoice|receipt|bill\b", re.I)
+
+RECEIPT_TEXT = re.compile(r"rechnung|invoice|quittung|kassenbon|receipt", re.I)
+
+
+def doc_guesses(c, m, ws, type_id, text=""):
+    """2.98.0 D (#2178): amount and due date are guessed only for a receipt photo (an amount typed in before the first run) or a
+    document of type invoice / receipt (the type label, or the word in the first lines of the text); an import (paperless) never gets a guess."""
+    if m["source"] == "paperless":
+        return False
+    if m["amount"] and not m["method"]:
+        return True
+    name = label_name(c, ws, "type", type_id) if type_id else None
+    return bool(name and RECEIPT_TYPE.search(name)) or bool(RECEIPT_TEXT.search(text[:3000]))
+
+
 def process(c, nid):
     """The recognition run of one document: text (text layer / OCR), preview, date / due date / amount, sorting, index.
     Returns the new state. Runs in the background queue (docs/ingest.py) -- never inside a request."""
@@ -751,7 +767,10 @@ def process(c, nid):
         if n and not asn_taken(c, ws, n, nid):
             c.execute("UPDATE doc_meta SET asn=? WHERE node_id=?", (n, nid))
             given = {**given, "_asn": True}
-    ex = EX.extract(text)
+    ex = EX.extract(text, guess=False)
+    if m["source"] == "paperless":           # an import keeps due date and amount empty (only a monetary field fills them)
+        ex["due"] = ex["amount"] = ex["currency"] = None
+    #     # 2.98.0 D (#2178): the amount / due date are guessed below, once the type is known
     vals = {"doc_date": given.get("date") or ex["date"], "due_date": given.get("due") or ex["due"],
             "amount": str(given.get("amount") or ex["amount"] or ""), "currency": str(given.get("currency") or ex["currency"] or "")[:8]}
     if m["doc_date"]:
@@ -780,6 +799,11 @@ def process(c, nid):
     newv, sug, auto = classify(c, m, node, text, given=fixed)
     apply_values(c, m, node, newv, auto)
     auto_all.update({f: (next(iter(a.values()), "rule") if isinstance(a, dict) else a) for f, a in auto.items()})
+    if not given.get("text") and doc_guesses(c, m, ws, newv.get("type") or cur["type"], text):  # 2.98.0 D (#2178)
+        ex = EX.extract(text)
+        vals["due_date"] = given.get("due") or ex["due"]
+        vals["amount"] = str(given.get("amount") or ex["amount"] or vals["amount"] or "")
+        vals["currency"] = str(given.get("currency") or ex["currency"] or vals["currency"] or "")[:8]
     node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
     m2 = meta_row(c, nid)
     review = 1 if sug or not (m2["sender_id"] or m2["type_id"]) else 0

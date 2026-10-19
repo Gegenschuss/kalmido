@@ -147,7 +147,7 @@ async function o3c_folderSet(f, st, undo) {
 }
 
 // ---- small moments
-// ticking off: the circle pops softly (transform / opacity, 200 ms; app.css turns it off with prefers-reduced-motion).
+// ticking off: the circle pops softly (transform / opacity, 350 ms, #2163; app.css turns it off with prefers-reduced-motion).
 // The row is often drawn anew right after the click: the mark is set on the click and once more on the next render.
 let o3c_tick = null;  // {id, at}
 document.addEventListener('click', e => {

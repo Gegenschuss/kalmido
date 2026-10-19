@@ -511,7 +511,8 @@ function evTaskHtml(t, ro) {  // the events a task prepares + "Schedule as an ev
   const evs = (S.evlinks || {})[t.id] || [];
   const when = e => e.all_day ? fmtDayAbs(e.start.slice(0, 10)) : `${fmtDayAbs(e.start.slice(0, 10))} ${fmtTimeLoc(e.start.slice(11, 16))}`;
   return `<div class="lkgrp"><span class="lklab">${tr('Events')}</span><div class="lkitems">${evs.map(e => `<button type="button" class="lkchip" data-evopen="${e.id}">${ic('cal', 's')}<span>${esc(e.title)}</span><span class="muted">${esc(when(e))}</span></button>`).join('')}
-    ${ro ? '' : `<button type="button" class="attadd" data-act="ev-from-task">${ic('plus', 's')}<span>${tr('Schedule as an event')}</span></button>`}</div></div>`;
+    ${ro ? '' : `<button type="button" class="attadd" data-act="ev-from-task">${ic('plus', 's')}<span>${tr('Schedule as an event')}</span></button>`}
+    ${ro || typeof tpo_on !== 'function' || !tpo_on() ? '' : `<button type="button" class="attadd" data-act="tpo-task">${ic('users', 's')}<span>${tr('Find a date')}</span></button>`}</div></div>`;  // 2.98.0 A (#1953)
 }
 document.addEventListener('click', e => {
   const o = e.target.closest('[data-evopen]');

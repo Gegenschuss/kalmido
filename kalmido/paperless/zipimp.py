@@ -503,7 +503,7 @@ def plh_zip_run(c, rid):
                             c.commit()
                             with c.savepoint():
                                 res = P.plh_store(c, t, uid, _src(r), d, data, d["mime"] or None, d["original_file_name"], labels,
-                                                  lambda d=d: P._doc_text(d, d["notes"], scan["fields"]))
+                                                  lambda d=d: P._doc_text(d, d["notes"], scan["fields"]), scan["fields"])
                 except PlhError as e:
                     if e.code == "zip_gone":  # the parts are gone: nothing more can come; a damaged member only fails its document
                         raise

@@ -61,6 +61,7 @@ TABLES = (
     "hub_tokens", "hub_mails",  # 2.84.0 A (#1198): hub mail addresses + filed mails (NULL = private, the app checks owner / client / list)
     "office_archive_log",  # 2.81.0 B (#1834): the history of an archived document (org_id like the entry)
     "sheets",  # 2.89.0 (#1916): tables (NULL = private, the app checks owner_id; parts hang on sheet_id)
+    "sched_polls",  # 2.98.0 A (#1953): scheduling polls (NULL = private, the app checks user_id; options / votes hang on poll_id)
     "office_agreements",  # 2.92.0 A (#1925): business contracts and insurances of an office area
     "bookmarks",  # 2.97.0 A (#1950): bookmarks (NULL = private, the app checks user_id)
 )
