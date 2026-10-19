@@ -1335,7 +1335,7 @@ owner). Office records (invoices, receipts, bookings, agreements) never go with 
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `KALMIDO_TRASH_DAYS` | `30` | the trash period in days (shared with the other trash periods) |
+| `KALMIDO_TRASH_DAYS` | `30` | the trash period in days (shared with the other trash periods); `0` switches the task trash run off |
 | `KALMIDO_PURGE_TRASH` | (unset) | `1` = the trash runs delete, `0` = they only count; wins over the general switch |
 | `KALMIDO_RETENTION_PURGE` | (unset) | `1` = every retention run deletes |
 
