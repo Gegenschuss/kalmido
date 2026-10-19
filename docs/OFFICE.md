@@ -1063,6 +1063,20 @@ at finalising), the live client only when the snapshot has none. Documents witho
 business never with a tax key). Foreign currency documents are booked in EUR by the document's rate. The export is in
 the office log (`export`, target `datev`).
 
+Receipts and travel expenses in the batch (2.120.0, #2090): with `in_on` (default on; the download dialog can leave it
+out, `?in=0`) the same batch also books the input side, Belegfeld 1 stays unique (`B<receipt>`, `R<trip>-<receipt>`,
+`V<trip>`). Every receipt of the office's documents with an amount (by its document date) is one line: expense account
+of its category (own assignment `cat_accounts` {category: account}, else a default per chart found by words in the
+category, e.g. software 4964 / 6837, office supplies 4930 / 6815, phone 4920 / 6805, else other expenses 4900 / 6300 or
+`in_other`) against the collective creditor (`creditor`, default 70000) or, with `in_counter: "bank"`, the bank account;
+input tax key 9 for 19 % and 8 for 7 % (`bu_in`), none for 0 %, an unknown rate or a small business. Every travel
+receipt is one line on the travel account of its category and the per diem of a trip one line on its last day, both
+without input tax (`travel` {fares, hotel, vma, other}; defaults for an organisation 4663 / 4666 / 4664 / 4660 resp.
+6663 / 6660 / 6664 / 6650, for a personal office the owner's accounts 4673 / 4676 / 4674 / 4676 resp. 6673 / 6680 /
+6674 / 6680). `check=1` also answers `hints`: receipts without an amount (not exported), without a category (booked on
+the other expenses account), without a VAT rate (booked without input tax). `GET /api/office/datev/accounts` (admin)
+lists the receipt categories with their default and own account and the travel accounts for the settings page.
+
 Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit_scheme`, `reminder_scheme`,
 `payment_days` (14), `reminder_fee` (0), `reminder_deadline_days` (10), `einvoice_format`, `datev_email`, `datev_auto`,
 `invoice_closing_de/en`, `reminder_text_de/en` (empty = the country pack's texts).
