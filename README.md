@@ -1,4 +1,4 @@
-<p align="center"><img src="static/icon.svg" width="112" alt="Kalmido logo: a heron standing on one leg at the water, a violet sun on the horizon"></p>
+<p align="center"><img src="static/icon.svg" width="112" alt="Kalmido logo: a friendly bot with two eyes and an antenna on a violet tile"></p>
 
 <h1 align="center">Kalmido</h1>
 
