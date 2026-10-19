@@ -62,6 +62,9 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     check(await ev(`(() => { const rows = [...document.querySelectorAll('.ofcco .row')], at = id => rows.findIndex(r => r.querySelector('#' + id)); return at('osc-address_extra') > 0 && at('osc-address_extra') === at('osc-street') + 1; })()`),
       '#2188: the extra address line right under the street');
     // #2188: the client form has the name addition right under the name
+    // review 2 H2: city and country are in the company form (a comment had swallowed them)
+    check(await ev(`!!document.querySelector('#osc-city') && !!document.querySelector('#osc-country') && !!document.querySelector('#osc-zip')`),
+      '#2188: the company form has postcode, city and country');
     const nx = await ev(`(() => { if (typeof clientModal !== 'function') return 'no clientModal'; clientModal(null); const n = document.querySelector('#cl-name'), x = document.querySelector('#cl-nx');
       const r = !!(n && x && n.closest('.row').nextElementSibling === x.closest('.row')) && Math.round(x.getBoundingClientRect().height) >= 44; document.querySelector('.modal [data-m="close"]')?.click(); return String(r); })()`);
     check(nx === 'true', '#2188: the client form: the name addition under the name, 44 px: ' + nx);
