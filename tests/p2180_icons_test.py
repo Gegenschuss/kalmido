@@ -95,7 +95,9 @@ if im:
 im = img("apple-touch-icon.png")
 if im:
     check(im.size == (180, 180), "apple-touch-icon: 180 px")
-    check(im.mode == "RGB" or (im.mode == "RGBA" and im.getextrema()[3][0] == 255), f"apple-touch-icon: opaque ({im.mode})")
+    # 2.136.0 (#2193): the flat bot icon has few colours, the export's PNG pass stores it as a palette (P) without transparency
+    check(im.mode == "RGB" or (im.mode == "RGBA" and im.getextrema()[3][0] == 255) or (im.mode == "P" and "transparency" not in im.info),
+          f"apple-touch-icon: opaque ({im.mode})")
 
 # ---- favicons
 for n, z in (("favicon-16.png", 16), ("favicon-32.png", 32)):
