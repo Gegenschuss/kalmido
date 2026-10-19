@@ -20,7 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
-- **2.121.0** (2026-10-19): receipts - the recognition reads supplier, VAT rate, net / gross and invoice number as a
+- **2.121.0** (2026-10-20): receipts - the recognition reads supplier, VAT rate, net / gross and invoice number as a
   suggestion, categories with their SKR03 / SKR04 account, receipts billed on to clients as outlays, a cash book (gapless
   numbers, day closing, cancellation instead of delete, CSV / PDF), agents may suggest amount and VAT rate.
 - **2.120.0** (2026-10-19): progress and final invoices with cash discount, the client portal shows quotations, invoices

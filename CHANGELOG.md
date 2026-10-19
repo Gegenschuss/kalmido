@@ -7,7 +7,7 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
-## [2.121.0] - 2026-10-19
+## [2.121.0] - 2026-10-20
 
 Receipts: recognition of supplier, VAT and invoice number, accounts per category, billing on to clients, cash book,
 agents suggest amount and VAT.
