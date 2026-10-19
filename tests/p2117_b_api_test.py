@@ -125,7 +125,7 @@ for s_ in st["starters"] + ste["starters"]:
     check(used and used <= VARS, f"#2283: {s_['key']}/{s_['lang']} uses known variables only {used - VARS}")
     check(s_["body"].startswith("# "), f"#2283: {s_['key']}/{s_['lang']} starts with its heading")
 leg = {x["key"]: x["legal"] for x in st["starters"]}
-check(leg["dunning"] and leg["termination"] and leg["authority"] and leg["contract"] and not leg["letter"] and not leg["reminder"],
+check(leg["dunning"] and leg["termination"] and leg["authority"] and leg["contract"] and leg["nda"] and not leg["confirmation"] and not leg["letter"] and not leg["reminder"],
       f"#2283: legal samples marked {leg}")
 check(st["note"], "#2283: the note: sample text, no legal advice")
 r = A.post(B + TP, json={"starter": "reminder"})
