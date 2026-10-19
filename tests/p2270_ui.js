@@ -133,7 +133,7 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   check(!/Who comes along|Take turns/.test(d.querySelector('#detail')?.textContent || ''), '#975: a project: none');
   w.eval('closeDetail()');
   // #990 + Section in an empty list, Add section… in the menu
-  w.eval(`go('l/${EMPTY}')`); await until(() => d.querySelector('#view .heron, #view .hempty, #view .empty'));
+  w.eval(`go('l/${EMPTY}')`); await until(() => d.querySelector('#view .bot, #view .hempty, #view .empty'));
   check(d.querySelector('#view [data-act="section-new"]'), '#990: "+ Section" in an empty list');
   const lm = w.eval(`listMenuItems(${EMPTY}, document.querySelector('#top h1')).map(x => x.label || x)`);
   check(lm.includes('Add section…'), '#990: "Add section…" in the list\'s menu');

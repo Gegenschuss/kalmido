@@ -51,6 +51,19 @@ on accepted quotations, a short sidebar group Exchange, the rest of the fixed re
 - Chat composer: the paperclip and the meeting (list) icon sit on one line; the width grip's label shows to its left and
   no longer covers the send button (#2185).
 
+## [2.136.0] - 2026-10-19
+
+A new face: the Kalmido bot replaces the heron in the app icon and everywhere in the app.
+
+### Changed
+- New app icon, favicons, store and shortcut icons: the Kalmido bot (two eyes, an antenna) on the violet tile; the push
+  badge on Android is its white silhouette. iPhone / iPad: remove the web app from the home screen and add it again to
+  get the new icon - iOS keeps the old one otherwise (#2193).
+- The bot instead of the heron in empty views, search without results, "all done", the celebration (it pops up and hops),
+  the welcome screen, the loading screen and the error pages; a running agent job shows the bot at work, a job waiting
+  for your approval the bot waiting. Calm and gentle motion, none with "reduce motion" (#2193).
+- The sidebar and the sign-in screens show the new word mark, dark on light and light on dark (#2193).
+
 ## [2.98.1] - 2026-10-19
 
 ### Fixed
