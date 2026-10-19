@@ -132,7 +132,7 @@ office tab without one appears at the end of its group (`OFC_TABS` field 5, else
 - **Bookkeeping** (admins, 2.90) - income/expense statement, VAT return figures, tax reserve, receipt photo and tax
   dates, see below.
 - **Bank** (admins, 2.90) - bank reconciliation, see below.
-- **Settings** - company name and address lines, contact / register / bank lines (printed in the footer), logo,
+- **Settings** - company name and address lines, contact / register / bank lines (printed in the footer), logo, own letterhead PDF (2.120, see "Own letterhead"),
   brand colour (accent in the print only), document language (de / en), currency (EUR / USD + rate), number scheme with
   a live preview, producing quotient and rate, raw data factor, days a quotation stays valid, default text blocks,
   default rights, country pack with its tax rates, and the import / export of the master data.
@@ -1241,6 +1241,32 @@ at most 1600 px width and stores it as PNG below `<data>/office/<org_id>/logo.pn
 `DELETE /api/office/logo` removes it. For a sharp print upload a PNG at least 600 px wide; SVG is not accepted (the PDF
 writer has no SVG renderer). The folder is part of the backups and restores like the attachments. Internal figures
 (costs, margin) are never printed.
+
+### Own letterhead (2.120)
+
+Settings -> Letterhead takes a PDF that goes behind every quotation, invoice, credit note, reminder and every later
+document kind: its page 1 behind the first page, its page 2 behind the following pages (a one-page PDF goes behind all
+of them). A4 portrait, up to 10 MB. The pages are copied into the document as they are (vector graphics, pictures and
+the letterhead's own fonts), so the print stays sharp. A PDF that cannot be read safely (password protected, an unknown
+compression, rotated or landscape pages) is refused at the upload with a short message; a document is never printed
+from a half read letterhead.
+
+- Margins in mm for page 1 and for the following pages (top, right, bottom, left). On page 1 "top" is where the address
+  field begins (DIN 5008: 45 mm). The defaults are the normal layout. The text column takes the narrower of the two pages.
+- "Leave out our own head" drops the logo / company name and the fold marks; "Leave out our own footer" drops the footer
+  columns (number and page stay, below the text). Both are on after an upload, because a letterhead usually has them.
+- "Preview" shows a two-page sample invoice with the letterhead. Every change is saved at once and can be undone in the
+  message that follows; removing the letterhead can be undone the same way (the previous file is kept for that one step,
+  older ones are deleted).
+- Finalising freezes the letterhead with the sender (a copy `lhs-<hash>.pdf`), so a finalised document looks the same
+  later; documents finalised before stay as they were. The e-invoice XML inside a ZUGFeRD PDF and the PDF/A metadata
+  stay as they are. Without a letterhead the PDF is exactly the one of before.
+- Organisation admins (and a person without organisation in the personal office) upload and change it; members see the
+  state and the preview. The file is stored sealed like the documents below `<data>/office/<org_id>/`.
+
+Routes: `GET / POST / PUT / DELETE /api/office/letterhead` (state, multipart `file`, `{m1, m2, hide_head, hide_footer}`
+with `m1` / `m2` = `[top, right, bottom, left]` in mm, removal), `POST /api/office/letterhead/restore` (`{file}`: the
+previous file again, the undo) and `GET /api/office/letterhead/preview` (the sample as PDF).
 
 ## Database
 

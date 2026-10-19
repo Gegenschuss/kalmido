@@ -364,6 +364,9 @@ ROUTES = {
     # ---- office (D, 2.36.1 #1021): the quotation PDF and the organisation's logo (4)
     "GET /api/office/docs/{}/pdf": "office", "GET /api/office/logo": "office", "POST /api/office/logo": "office",
     "DELETE /api/office/logo": "office",
+    # 2.120.0 E (#2091): the own letterhead PDF (6)
+    "GET /api/office/letterhead": "office", "POST /api/office/letterhead": "office", "PUT /api/office/letterhead": "office",
+    "DELETE /api/office/letterhead": "office", "POST /api/office/letterhead/restore": "office", "GET /api/office/letterhead/preview": "office",
     # ---- office (E, 2.36.2 #1021 / #1142): finalising a document, its history and the organisation's office log (3)
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
     "GET /api/office/docs/{}/log": "office", "GET /api/office/log": "office",
