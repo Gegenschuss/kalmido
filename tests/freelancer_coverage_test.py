@@ -547,7 +547,7 @@ ROUTES = {
     "GET /api/dayplan": "tasks", "GET /api/dayplan/review": "tasks", "GET /api/deps": "tasks", "GET /api/export.json": "tasks",
     "GET /api/ical": "tasks", "GET /api/imports": "tasks", "GET /api/news": "tasks", "GET /api/notes": "tasks",
     "GET /api/notes/{}": "tasks", "GET /api/occurrences": "tasks", "GET /api/pomo/stats": "tasks", "GET /api/roadmap": "tasks",
-    "GET /api/search/messages": "tasks", "GET /api/sprints/{}": "tasks", "GET /api/stale": "tasks", "GET /api/state": "tasks",
+    "GET /api/search": "tasks", "GET /api/search/messages": "tasks", "GET /api/sprints/{}": "tasks", "GET /api/stale": "tasks", "GET /api/state": "tasks",
     "GET /api/state/delta": "tasks", "GET /api/stats": "tasks", "GET /api/tags/count": "tasks", "GET /api/tasks": "tasks",
     "GET /api/tasks/{}": "tasks", "GET /api/tasks/{}/bell": "tasks", "GET /api/tasks/{}/deps": "tasks",
     "GET /api/tasks/{}/enc-note": "tasks", "GET /api/tasks/{}/events": "tasks", "GET /api/tasks/{}/milestone": "tasks",

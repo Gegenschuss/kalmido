@@ -2660,7 +2660,7 @@ with the scope it needs). The tools:
   `share_list_with_group`, `unshare_list_from_group`, `list_folders`, `rename_folder`, `delete_folder`
 - sections: `list_sections`, `create_section`, `rename_section`, `reorder_sections`, `delete_section`
 - tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact),
-  `search_tasks` (2.59.0: `semantic: true` = also tasks of similar meaning), `related_tasks` (2.59.0: up to 5 related tasks, `dup` = probably a duplicate), `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
+  `search_tasks` (2.59.0: `semantic: true` = also tasks of similar meaning; 2.116.0: `fulltext: true` = ranked, also finds a task by its comments, with a snippet), `related_tasks` (2.59.0: up to 5 related tasks, `dup` = probably a duplicate), `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
   `move_task` (list / section / parent + `before_id` / `after_id` / `position`), `link_task_to_list` /
   `unlink_task_from_list` (2.71.0: a task also in another list, see below), `batch_tasks`, `skip_occurrence`,
   `take_task`, `list_subtasks`, `add_subtask`, `list_trash`, `restore_task`, `empty_trash`, `list_tags`, `get_roadmap`

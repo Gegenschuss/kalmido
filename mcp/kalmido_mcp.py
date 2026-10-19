@@ -475,10 +475,13 @@ TOOLS = [
      _obj({"date": {"type": "string", "description": "YYYY-MM-DD, default today"}}),
      lambda api, a: api.call("GET", "/dayplan/review", _pick(a, ("date",)))),
     ("search_tasks", "Full-text search in titles, notes, links and custom fields of visible tasks. 2.59.0: semantic=true adds "
-                     "tasks of similar meaning after the text hits (flag similar; needs the server's embedding service).",
+                     "tasks of similar meaning after the text hits (flag similar; needs the server's embedding service). "
+                     "2.116.0: fulltext=true ranks the hits (title before notes) and also finds tasks by their comments; each task "
+                     "once with match {where: title|notes|comment|field|file, snippet, comment_id}, at most 50 per page (cursor).",
      _obj({"q": {"type": "string", "minLength": 1}, "limit": {"type": "integer", "minimum": 1, "maximum": 500},
-           "semantic": {"type": "boolean"}}, ["q"]),
-     lambda api, a: api.call("GET", "/search", {**_pick(a, ("q", "limit")), **({"semantic": "1"} if a.get("semantic") else {})})),
+           "semantic": {"type": "boolean"}, "fulltext": {"type": "boolean"}, "cursor": {"type": "string"}}, ["q"]),
+     lambda api, a: api.call("GET", "/search", {**_pick(a, ("q", "limit", "cursor")), **({"semantic": "1"} if a.get("semantic") else {}),
+                                                **({"fulltext": "1"} if a.get("fulltext") else {})})),
     ("related_tasks", "2.59.0: up to 5 tasks close in meaning to a task (local text vectors on the server, similar titles, "
                       "#references), only tasks you may see: {enabled, pending, items: [{id, title, list_id, done, score, dup, ref}]}. "
                       "dup = probably a duplicate, ref = named by #number in either direction. enabled false = the server has no embedding service; pending = not computed yet. "

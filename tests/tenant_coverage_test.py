@@ -506,6 +506,7 @@ ROUTES = {
     "GET /api/lists/{}/notify-template": "list", "PUT /api/lists/{}/notify-template": "list",
     "GET /api/folders/people/diff": "folder", "GET /api/folders/groups/{}/diff": "folder",  # 2.46.0 (#1606): roles set per list
     "GET /api/v1/lists/{}/notify-template": "list", "POST /api/notify-templates/asked": "own",
+    "GET /api/search": "aggregate",  # 2.116.0 B (#2065): full-text search, the visibility of the task search (p2116_b_api_test.py)
     "GET /api/search/messages": "aggregate",  # 2.33.0 (#1080): only what the person may read (vis_sql, rooms, own agent chats)
     "GET /api/admin/client-ip": "admin",  # 2.33.0 (#834)
     "GET /api/admin/health": "admin",  # 2.102.0 D (#1994): numbers only (pool, threads, role, loops), no user data
