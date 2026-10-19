@@ -57,9 +57,11 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
     await ev(setv('#dv-cred', '71000'));
     check(await ready(ev, `${getJ('/api/office/settings')}.then(j => j.settings.datev_extf.creditor === '71000')`), 'the creditor saved on change');
     check(await ev(`!document.querySelector('#ofc-set > .fgbar')`), 'no save bar for the field');
+    await ev(`(() => { document.querySelector('.dvset')?.scrollIntoView({block: 'start'}); return 1; })()`); await sleep(300);
     await shot('p2120-c-settings.png');
     await ev(clk('#toast button'));
     check(await ready(ev, `${getJ('/api/office/settings')}.then(j => j.settings.datev_extf.creditor === '')`), 'one undo step brings the old value back');
+    await ready(ev, `!!document.querySelector('.dvset input[data-dv="travel"][data-name="hotel"]')`, 60);  // the undo redraws the section
     await ev(setv('.dvset input[data-dv="travel"][data-name="hotel"]', '4676'));
     check(await ready(ev, `${getJ('/api/office/settings')}.then(j => j.settings.datev_extf.travel.hotel === '4676')`), 'a travel account saved');
     await ev(setv('#dv-cred', '7x'));
@@ -79,6 +81,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
     await nav(B + '#office/settings');
     check(await ready(ev, openDx, 80) && await ready(ev, `!!document.querySelector('.dvset #dv-on')`), 'phone: the section');
     check(await ev(noSide), 'phone: nothing sticks out at the side');
+    await ev(`(() => { document.querySelector('.dvset')?.scrollIntoView({block: 'start'}); return 1; })()`); await sleep(300);
     await shot('p2120-c-phone.png');
 
     // ---- a person without an organisation
