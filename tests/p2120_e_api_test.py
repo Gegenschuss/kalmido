@@ -173,6 +173,15 @@ def page_forms(rd, i):
 def x(v):
     return f"{v:.2f}"
 
+def foot_rule(ops):
+    """2.120.0 (2.114.5 #2300): the footer rule's height follows the footer lines now (12 mm .. 22 mm above the bottom
+    margin): a line starting at the left margin that low."""
+    for m in re.finditer(rb"%s (\d+(?:\.\d+)?) m " % x(25 * MM).encode(), ops):
+        if 24 * MM - 0.5 <= float(m.group(1)) <= 34 * MM + 0.5:
+            return True
+    return False
+
+
 
 if not (os.environ.get("P2120E_NOSTART") or os.environ.get("KMT_NOSTART")):
     env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + f" -e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}")
@@ -238,7 +247,7 @@ r0 = reader(P0)
 check(len(r0.pages) >= 2 and not page_forms(r0, 0) and not page_forms(r0, 1), "#2091: without a letterhead no form XObject")
 ops0 = page_ops(r0, 0)
 check(f"{x(5 * MM)} {x(A4[1] - 105 * MM)} m".encode() in ops0, "#2091: without a letterhead the fold marks stay")
-check(f"{x(25 * MM)} ".encode() in ops0 and f" {x(12 * MM + 20 * MM)} m ".encode() in ops0, "#2091: the normal left margin and footer rule")
+check(f"{x(25 * MM)} ".encode() in ops0 and foot_rule(ops0), "#2091: the normal left margin and footer rule")
 
 # ================================================================ upload: refused files
 for data, what in ((b"not a pdf at all", "rubbish"), (b"%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\n%%EOF", "no pages"),
@@ -285,7 +294,7 @@ check("/F1" in (f0["/BP1"].get("/Resources") or {}).get("/Font", {}), "#2091: th
 ops1, ops1b = page_ops(r1, 0), page_ops(r1, 1)
 check(ops1.startswith(b"q /BP1 Do Q") and ops1b.startswith(b"q /BP2 Do Q"), "#2091: the letterhead is drawn first (the document on top)")
 check(f"{x(5 * MM)} {x(A4[1] - 105 * MM)} m".encode() not in ops1, "#2091: hide_head: no fold marks of our own")
-check(f" {x(12 * MM + 20 * MM)} m ".encode() not in ops1, "#2091: hide_footer: no footer of our own")
+check(not foot_rule(ops1), "#2091: hide_footer: no footer of our own")
 txt = r1.pages[0].extract_text() or ""
 check("Kunde Eins GmbH" in txt, "#2091: the document's text is still there")
 check(Ca.get(B + f"{O}/docs/{D1}/pdf").status_code == 404, "#2091: the other organisation does not get the document")
@@ -302,7 +311,7 @@ sender_y = A4[1] - 60 * MM - 7 * 0.78
 check(f"{x(35 * MM)} {x(sender_y)} Td".encode() in ops2, "#2091: page 1: left 35 mm, the address field 60 mm from the top")
 check(f"q 1 0 0 1 {x(-5 * MM)} 0 cm".encode() in ops2b, "#2091: following pages moved by the left margin difference")
 check(f"{x(5 * MM)} {x(A4[1] - 105 * MM)} m".encode() in ops2, "#2091: hide_head off: the fold marks again")
-check(f" {x(12 * MM + 20 * MM)} m ".encode() in ops2, "#2091: hide_footer off: our footer again")
+check(foot_rule(ops2), "#2091: hide_footer off: our footer again")
 for bad in ({"m1": [60, 80, 40, 80]}, {"m1": [1, 2, 3]}, {"m2": [10, 10, -1, 10]}, {"m2": ["x", 1, 1, 1]}, {"m1": [200, 20, 20, 20]}):
     check(A.put(B + LH, json=bad).status_code == 400, f"#2091: invalid margins 400 {bad}")
 check(A.get(B + LH).json()["letterhead"]["m1"] == [60, 20, 40, 35], "#2091: an invalid value changes nothing")
