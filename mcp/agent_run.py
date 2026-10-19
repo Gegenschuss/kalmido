@@ -240,7 +240,7 @@ class Api:
         except ApiError as e:
             if e.status == 400 and "reply_to" in b and "reply_to" in e.body:  # before 2.33: no reply_to
                 return self._post_chat(uid, {k: v for k, v in b.items() if k != "reply_to"})
-            if e.status in (400, 404, 409) and "job_id" in b:  # 2.107.0 (#1962): the job is gone / not for this person
+            if "job_id" in b and (e.status == 404 or (e.status in (400, 409) and "job_id" in e.body)):  # 2.107.0 (#1962): the job is gone / not for this person
                 return self._post_chat(uid, {k: v for k, v in b.items() if k != "job_id"})
             raise
 
@@ -739,7 +739,8 @@ def job_chat_hint(x):
     in data.job). The reference starter's background jobs cannot take messages while they run: the chat run answers it as
     a message about that job, and the answer goes into that job's chat (job_id)."""
     j = x.get("job") or {}
-    return [f"This message was written in the own chat of your job #{(x.get('message') or {}).get('job_id')} \"{j.get('title') or ''}\" "
+    title = " ".join(str(j.get("title") or "").replace("<<<", "< < <").split())[:120]
+    return [f"This message was written in the own chat of your job #{(x.get('message') or {}).get('job_id')} \"{title}\" "
             f"(state {j.get('state') or '?'}). It is about that job: a running background job cannot read it, so answer it here "
             "as a message about this job; your answer goes into the job's chat. Stop and start the job again only when asked."]
 
@@ -1506,7 +1507,7 @@ class Runner:
                         last = i == len(parts) - 1
                         r = self.api.chat(uid, part or (appr["title"] if appr else ""), approval=appr if last else None,
                                           reply_to=reply_to if i == 0 else None, suggest=sugg if last else None,
-                                          job_id=ans_job if i == 0 else None)
+                                          **({"job_id": ans_job} if ans_job else {}))  # every part stays in the job's chat
                         if last and appr and isinstance(r, dict) and r.get("id"):
                             with self.state.lock:
                                 self.approvals[str(r["id"])] = {"uid": uid, **appr, "at": time.time()}

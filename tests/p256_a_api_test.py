@@ -185,21 +185,25 @@ JB = job("Clara: Bob's run", task_id=T, user_id=BOB)
 mb = post(Bo, "Clara: bob writes to her too")  # bob's own conversation: never in alice's history
 r = A.get(B + f"/api/agents/{CL}/chat?job={JC}")
 check(r.ok, "#1793: alice reads the job's history " + r.text[:200])
-got = [m["id"] for m in r.json().get("messages", [])] if r.ok else []
+# 2.107.0 (#1962): a job created for a person starts with its start line (a notice) -- the first row of its history
+nid = lambda r: [m["id"] for m in r.json().get("messages", []) if m.get("job_msg") != "start"]  # noqa: E731
+starts = lambda r: [m["id"] for m in r.json().get("messages", []) if m.get("job_msg") == "start"]  # noqa: E731
+check(r.ok and len(starts(r)) == 1 and r.json()["messages"][0]["job_msg"] == "start", "2.107.0: the job's start line opens its history")
+got = nid(r) if r.ok else []
 check(got == [m1, m3, m4, m5, m6, m10], f"#1793: only the job's messages, oldest first {got} vs {[m1, m3, m4, m5, m6, m10]}")
 check(mb not in got and m8 not in got and m7 not in got and m2 not in got and m9 not in got, "#1793: nothing else")
 r = A.get(B + f"/api/agents/{CL}/chat?job={JF}")
-check([m["id"] for m in r.json()["messages"]] == [m2, m7], "#1793: Frida's history")
+check(nid(r) == [m2, m7], "#1793: Frida's history")
 r = A.get(B + f"/api/agents/{CL}/chat?job={JC}&limit=2")
 check([m["id"] for m in r.json()["messages"]] == [m6, m10] and r.json().get("has_more") is True, "#1793: ?limit= gives the newest + has_more")
 r = A.get(B + f"/api/agents/{CL}/chat?job={JC}&before={m5}")
-check([m["id"] for m in r.json()["messages"]] == [m1, m3, m4] and r.json().get("has_more") is False, "#1793: ?before= pages " + str([m["id"] for m in r.json()["messages"]]))
+check(nid(r) == [m1, m3, m4] and r.json().get("has_more") is False, "#1793: ?before= pages " + str([m["id"] for m in r.json()["messages"]]))
 r = A.get(B + f"/api/agents/{CL}/chat?job={JC}&after={m5}")
 check([m["id"] for m in r.json()["messages"]] == [m6, m10], "#1793: ?after= only newer ones (the refresh) " + str([m["id"] for m in r.json()["messages"]]))
 r = Bo.get(B + f"/api/agents/{CL}/chat?job={JC}")
 check(r.status_code == 404, "#1793: bob cannot open a job that is not for him (and not on a task he sees) " + str(r.status_code))
 r = Bo.get(B + f"/api/agents/{CL}/chat?job={JB}")
-check(r.ok and [m["id"] for m in r.json()["messages"]] == [mb], "#1793: bob's job history = his own conversation only")
+check(r.ok and nid(r) == [mb], "#1793: bob's job history = his own conversation only")
 r = A.get(B + f"/api/agents/{CL}/chat?job={JB}")
 check(r.ok and mb not in [m["id"] for m in r.json()["messages"]], "#1793: alice (admin) opens bob's job but sees none of bob's messages")
 JO = job("Otto: Elsewhere", h=OTH, user_id=1)

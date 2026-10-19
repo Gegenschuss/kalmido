@@ -168,7 +168,8 @@ print("ok")
 """)
 x = chat(Bo).get(m1["id"], {})
 check(x.get("job_id") == PART and x.get("job_name") is None and x.get("job_parent") is None, f"a job bob may not see: no name {str(x)[:200]}")
-check(not any(m.get("job_name") for m in chat(Ca).values()), "carol's own chat holds none of bob's messages")
+# 2.107.0 (#1962): carol's chat holds the start lines of her own jobs (notices), never one of bob's messages
+check(not any(m.get("job_name") for m in chat(Ca).values() if m.get("job_msg") != "start"), "carol's own chat holds none of bob's messages")
 
 print(f"p259_c_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

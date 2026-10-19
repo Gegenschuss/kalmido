@@ -74,9 +74,13 @@ def agent(name):
 CL, CLH = agent("claude")
 OT, OTH = agent("otto")
 W = A.post(B + "/api/lists", json={"name": "Work", "org_id": ORG}).json()["id"]
-for m in (CL, OT, BOB, CAROL):
+for m in (CL, BOB, CAROL):
     check(A.put(B + f"/api/lists/{W}/members", json={"user_id": m, "role": "edit"}).ok, f"setup: {m} in the list")
-A.patch(B + f"/api/lists/{W}", json={"agent_members": True})
+W2 = A.post(B + "/api/lists", json={"name": "Otto", "org_id": ORG}).json()["id"]
+for m in (OT, BOB):
+    check(A.put(B + f"/api/lists/{W2}/members", json={"user_id": m, "role": "edit"}).ok, f"setup: {m} in otto's list")
+for lid in (W, W2):
+    A.patch(B + f"/api/lists/{lid}", json={"agent_members": True})
 
 
 def job(hdr, title, who=BOB, base=V, **kw):
