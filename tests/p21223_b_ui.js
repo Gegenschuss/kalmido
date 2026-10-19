@@ -97,6 +97,7 @@ const rowBox = el => { el.getBoundingClientRect = () => ({top: 100, bottom: 140,
   check(await until(() => row(T2) && row(T3)), 'phone: the list renders');
   let under = null;
   d.elementFromPoint = () => under;
+  if (!w.visualViewport) w.visualViewport = {height: 844};  // jsdom has none (the edge scroll of the finger's drag reads it)
   calls = spy(w);
   touch(w, row(T2), 'touchstart'); await sleep(420);
   check(row(T2).classList.contains('dragging'), 'phone: the long press lifts the row');
