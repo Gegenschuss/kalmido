@@ -82,6 +82,8 @@ needs no permission. Agents created before 2.15.0 keep everything they could do 
 
 - `GET /api/v1/me` shows `token.effective_scopes`; the MCP server lists only the tools the token may use.
 - A request without its permission gets `403` with `error.required_scope`: ask a person to grant it, never work around it.
+- **Trash period (2.116.0).** A task in the trash (`delete_task`, `list_trash`) is deleted for good by the server after the
+  trash period (`KALMIDO_TRASH_DAYS`, 30 days, when the operator has the retention switch on); restore it before then.
 - Optional: **Only from** limits the agent's token to IP addresses / networks; a new token can **expire** (30 / 90 / 365
   days, never by default). Every request is in the [audit log](#audit-log) with the permission it needed.
 - **Only these lists (2.30.0).** An agent (its dialog; a personal agent: the permissions dialog) and every personal API

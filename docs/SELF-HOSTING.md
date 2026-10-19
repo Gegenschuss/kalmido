@@ -34,6 +34,7 @@ addresses and paths to your setup.
 - [Several servers in one app (2.73)](#several-servers-in-one-app-273)
 - [Capacity, health and a worker process (2.102)](#capacity-health-and-a-worker-process-2102)
 - [Moving to a new server](#moving-to-a-new-server)
+- [Trash period of tasks (2.116)](#trash-period-of-tasks-2116)
 - [Production updates](#production-updates)
 - [Support Kalmido (supporter licence)](#support-kalmido-supporter-licence)
 
@@ -1324,6 +1325,26 @@ Notes:
 5. **Tell people what to redo,** because it is bound to the old server or name: passkeys (if the name changed), the
    installed app and push permissions (reinstall), calendar and contact accounts (CalDAV / CardDAV), shortcut URLs for
    sharing, and calendar subscription (ICS) links.
+
+## Trash period of tasks (2.116)
+
+A task in the trash is deleted for good once it has been there for the trash period: with its subtasks, comments,
+field values, history and the attachment files on disk. The server checks at most once an hour, in portions of 500
+tasks. The run covers every trash, also tasks in shared lists of other owners (which "Empty trash" leaves to the list
+owner). Office records (invoices, receipts, bookings, agreements) never go with a task: they only lose the link.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `KALMIDO_TRASH_DAYS` | `30` | the trash period in days (shared with the other trash periods) |
+| `KALMIDO_PURGE_TRASH` | (unset) | `1` = the trash runs delete, `0` = they only count; wins over the general switch |
+| `KALMIDO_RETENTION_PURGE` | (unset) | `1` = every retention run deletes |
+
+**Dry run by default:** while neither switch is on, the run only counts what it would delete and writes the numbers
+to the server log (`retention: trash/tasks would delete (dry run): tasks=…`), so an update never deletes anything by
+surprise. Read the counts, then switch it on. The app tells people the period in the trash either way.
+
+**Privacy policy:** if you publish one for your server, name the period, for example: "Tasks you delete stay in the
+trash for 30 days and are then deleted for good, with their comments and attachments."
 
 ## Production updates
 
