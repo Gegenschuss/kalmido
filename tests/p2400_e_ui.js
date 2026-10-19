@@ -130,7 +130,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     // building blocks at the caret, the preview with a plain error, then a valid one
     await ev(`(() => { const el = document.getElementById('os-inv-scheme'); el.focus(); el.value = 'RE-'; el.setSelectionRange(3, 3); el.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
     await ev(`(() => { document.querySelector('[data-ofc="bb"][data-for="os-inv-scheme"][data-bb="{yyyy}"]').click(); return 1; })()`);
-    check(await ev(`document.getElementById('os-inv-scheme').value === 'RE-{yyyy}' && document.activeElement.id === 'os-inv-scheme' && document.activeElement.selectionStart === 9`), '#1382: a building block goes in at the caret ' + await ev(`document.getElementById('os-inv-scheme').value`));
+    check(await ev(`document.getElementById('os-inv-scheme').value === 'RE-{yyyy}' && document.activeElement.id === 'os-inv-scheme' && document.activeElement.selectionStart === 9`), '#1382: a building block goes in at the caret ' + await ev(`document.getElementById('os-inv-scheme').value + ' / ' + document.activeElement.id + ' / ' + document.activeElement.selectionStart`));
     check(await ready(ev, `/running number is missing/.test(document.getElementById('os-inv-scheme-pv').textContent)`), '#1382: the preview says in plain words what is missing ' + await ev(`document.getElementById('os-inv-scheme-pv').textContent`));
     await ev(`(() => { document.querySelector('[data-ofc="bb"][data-for="os-inv-scheme"][data-bb="{seq:03}"]').click(); return 1; })()`);
     const Y = new Date().getFullYear();

@@ -47,7 +47,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     const as = u => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
     await as('alice');
-    await nav(B + '#office/settings');
+    await nav(B + 'static/icon.svg'); await nav(B + '#office/settings');  // (a real reload)
     check(await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub]') && !!document.getElementById('os-name')`, 80), 'the settings page');
 
     // ================= #2247 the areas
@@ -69,7 +69,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ev(`!!document.querySelector('#ofc-set [data-ostp="packs"] #pkc') && !!document.querySelector('#ofc-set [data-ostp="access"] [data-ofc="log"]')`), '#2247: the packs in Packs, the access log in Access');
     // remembered per device, also after a reload
     await ev(tab('packs'));
-    await nav(B + '#office/settings');
+    await nav(B + 'static/icon.svg'); await nav(B + '#office/settings');  // (a real reload)
     check(await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub]')`, 80) && await ev(shown) === 'packs', '#2247: the area is remembered after a reload ' + await ev(shown));
 
     // ================= #2247 a field saves itself
@@ -115,7 +115,7 @@ const FEAT = 'cal,comments,collab,office,clients';
 
     // ================= 390 px: the strip scrolls sideways
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
-    await nav(B + '#office/settings');
+    await nav(B + 'static/icon.svg'); await nav(B + '#office/settings');  // (a real reload)
     await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub]')`, 80);
     await ev(tab('company')); await sleep(300);
     const st = await ev(`(() => { const s = document.querySelector('#ofc-set .ostsub'); return {sw: s.scrollWidth, cw: s.clientWidth, ox: getComputedStyle(s).overflowX, h: Math.round(s.querySelector('button').getBoundingClientRect().height), pw: document.documentElement.scrollWidth}; })()`);
@@ -127,7 +127,7 @@ const FEAT = 'cal,comments,collab,office,clients';
 
     // ================= a member: every field locked, nothing saved (tenant-matrix: office)
     await as('bob');
-    await nav(B + '#office/settings');
+    await nav(B + 'static/icon.svg'); await nav(B + '#office/settings');  // (a real reload)
     check(await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub]') && !!document.getElementById('os-currency')`, 80), 'member: the settings page');
     check(await ev(`document.getElementById('os-currency').matches(':disabled') && document.getElementById('os-prod-on').matches(':disabled') && document.getElementById('os-name').disabled`), 'member: fields locked (choices and boxes too)');
     await ev(tab('packs'));
