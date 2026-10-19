@@ -370,6 +370,10 @@ APP_ONLY = [
      "shown once to people; agents read them (list_environments) and record deployments (set_deployment)",
      ("* /api/lists/{}/envs", "* /api/envs/", "POST /api/hooks/deploy/")),
     ("external calendar subscriptions and the calendar feed link: personal settings", ("* /api/calendars", "* /api/ical")),
+    # 2.111.0 (#2056): the secret subscription link of an event calendar is a person's own credential (like the task feed
+    # link), and the editor's invitation info only serves the switch; agents send invitations with send_invites on the events
+    ("2.111.0 (#2056): the subscription link of an event calendar (a secret of the person) and the editor's invitation info",
+     ("* /api/evcals/{}/feed", "GET /api/evinvite")),
     ("2.19.0: address books (CardDAV) for birthdays: their passwords are entered by people, like calendar subscriptions", ("* /api/family/contacts",)),
     ("2.49.0 (#1551): the parents' PIN of a child account: a secret people type in the app (the parent sets it, the child opens "
      "its settings with it), never an agent", ("* /api/family/kids/{}/pin", "* /api/me/pin/")),

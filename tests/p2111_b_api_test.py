@@ -184,6 +184,11 @@ m2 = wait_mail("ext2@example.com", 3)
 check(len(m2) == 3 and "METHOD:CANCEL" in parts(m2[-1])[2] and parts(m2[-1])[0].startswith("Cancelled: "), "the removed attendee gets a cancellation")
 check(len(wait_mail("ext3@example.com", 1)) == 1, "the address that had none gets its invitation now")
 
+r = A.post(B + "/api/events", json={"cal_id": CAL, "title": "Liste", "start": f"{D}T08:00", "end": f"{D}T08:30", "send_invites": True,
+                                    "attendees": [{"email": "evil,ext9@example.com"}]})
+time.sleep(1)
+check(r.status_code == 201 and not mails("ext9@example.com"), "an address with a comma is never mailed (no second recipient) " + r.text[:120])
+
 # a repeating event: one invitation with the rule and its left-out date
 r = A.post(B + "/api/events", json={"cal_id": CAL, "title": "Jour fixe", "start": f"{D}T09:00", "end": f"{D}T09:30", "tz": "Europe/Berlin",
                                     "rrule": "FREQ=WEEKLY;COUNT=6", "send_invites": True, "attendees": [{"email": "serie@example.com"}]})
