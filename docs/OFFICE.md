@@ -60,7 +60,9 @@ dialog names what moves and what stays before anything changes:
 - drafts lose their number - the target numbers them in its own range when they are issued; links into the old office end
   (framework contract, project, catalogue service of a position); a draft moved alone keeps the address but not the client;
 - trips move with their receipts as long as none is ticked "in DATEV" or billed; templates move, documents made from them
-  stay with their text;
+  stay with their text; entertainment receipts (2.119) move while they are drafts, with their restaurant bill (sealed anew
+  for the target) and their approval log; a host or guest who is no person of the target stays as a free name, approved
+  receipts stay (retention);
 - **issued documents never move** (retention): invoices, credit notes, reminders, sent quotations, number ranges and the
   archive stay where they were issued. A client that issued documents (or projects, trips, deals) still point to stays
   archived in the old office and is created anew in the target. The tick box *Take issued documents along as a read-only
@@ -69,7 +71,7 @@ dialog names what moves and what stays before anything changes:
 Rights: the right to work in both offices (travel expenses and templates: the admin of both); out of an organisation only
 its office admin or who created the client / draft - a plain member takes only own drafts along and no copies. Agents
 never move office data. Undo takes the whole move back in one step (copies and a newly created client go again, unless the
-target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates, ids, to:
+target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates|meals, ids, to:
 "private"|"org:<id>", dry, copy_issued}` -> `{notes, block, count, move_id}`; `{undo: move_id}` takes it back.
 
 **Small business (section 19 UStG)**: the setting `small_business` (Settings tab, "Invoices"; a setting of every office
@@ -82,7 +84,7 @@ with this exemption reason.
 The area Office (office, clients, contacts) has one menu with three groups instead of tab rows:
 
 - **Sell** - Pipeline, Quotes & invoices, Clients, Contacts, Documents, Framework contracts
-- **Money** - Cash flow, Figures, Bank, Bookkeeping, Subscriptions & tools, Travel expenses
+- **Money** - Cash flow, Figures, Bank, Bookkeeping, Subscriptions & tools, Travel expenses, Entertainment receipts
 - **Administration** - Equipment, Contracts & insurance, Settings
 
 Services and text blocks are no menu points any more: they are the tab **Templates** under **Settings** (Settings has the
@@ -790,6 +792,48 @@ Routes (admins of the office area): `GET /api/office/trips/purposes`, `POST /api
 the same name = the one there, a removed one comes back), `PATCH /api/office/trips/purposes/<id>` `{name}`, `DELETE
 /api/office/trips/purposes/<id>`; `GET /api/office/trips/report?...&by=purpose&person=u<id>|n:<name>`. Agents do not reach
 travel expenses.
+
+## Entertainment receipts (2.119)
+
+Office -> Money -> **Entertainment receipts** (Bewirtungsbelege, section 4 (5) no. 2 EStG; admins of the office area, a
+person without an organisation in the personal office). A receipt is entered as a mask:
+
+- **Date**, **place** (choose one or *New place…* with the name and address of the restaurant), **occasion** (required and
+  concrete - "business meal" alone is refused), **host** (choose, default: you; or *New person…* with company / function)
+  and the **guests** (tick people of the office or of the choice list, *New person…* adds one with company / function).
+- **Amounts** as on the bill: gross per line, split into food / drinks and the VAT rate (19 %, 7 %, 0 %; *Add line*), the
+  **tip** on its own (not on the bill, no VAT). The total, the VAT in it and the deductible 70 % are shown live; from
+  250 € gross a hint says the bill must be made out to the company.
+- The **restaurant bill** can be attached (PDF, JPEG or PNG, one file; replace and remove with one undo step). It is stored
+  encrypted with the office area's key like the other office files.
+- **Save draft** keeps it changeable. **Approve** checks the required fields (date, place with address, occasion, host, at
+  least one guest, an amount), takes new places and people into the choice lists and **locks** the receipt: it cannot be
+  changed or deleted any more; the approval is the host's digital confirmation (name and time, printed on the PDF).
+  **Undo approval…** (row menu or the receipt) asks for an optional reason and makes it a draft again; every approval and
+  every undo stays in the receipt's **approval log** (who, when, why), also when it is approved again, and in the office's
+  access log.
+- **PDF**: the own receipt (Eigenbeleg) with the details block, the amounts per rate with VAT and net, the tip, 70 / 30,
+  the host's confirmation and the log; a draft is marked as such.
+- **Row menu**: Open, PDF, Duplicate (a new draft with the same data, without the bill), Move to another workspace
+  (drafts), Undo approval (approved ones), Delete (drafts; one undo step).
+- **Filters** like the travel expenses: year, person (host or guest; hidden when only one person occurs) and occasion
+  (part of the text). They apply to the list, the **evaluation** and its downloads.
+- **Evaluation** (approved receipts only; drafts are counted apart): gross, input VAT (100 %), 70 % deductible / 30 % not
+  deductible of the net amount incl. the tip, food / drinks / tip, input VAT per rate and the months; **CSV** (one row
+  per receipt, safe against spreadsheet formulas) and **PDF** for the tax adviser.
+- **Choice lists**: Office -> Settings -> *Entertainment receipts* lists the places (with address) and people (with
+  company / function): rename in place, remove (one undo step), add. Receipts keep the text they have.
+- **Deleting and retention**: a draft that was never approved goes to the trash (undo) and is deleted for good with its
+  bill after 30 days. A receipt that was approved once is kept until the end of the 8th year after its year (it cannot be
+  deleted before). The organisation export contains the receipts, choices, logs and the bills.
+
+Routes (admins of the office area; members 403, another office area 404, agents never): `GET /api/office/meals?year=`,
+`POST /api/office/meals`, `GET/PATCH/DELETE /api/office/meals/<id>`, `POST /api/office/meals/<id>/restore`,
+`POST /api/office/meals/<id>/approve`, `POST /api/office/meals/<id>/unlock` `{reason?}`, `POST /api/office/meals/<id>/file`
+(multipart `file`), `GET/DELETE /api/office/meals/<id>/file/<fid>`, `POST /api/office/meals/<id>/file/<fid>/restore`,
+`GET /api/office/meals/<id>/pdf`, `GET /api/office/meals/report?year=|from=&to=&person=u<id>|n:<name>&occasion=&format=csv|pdf`,
+`GET/POST /api/office/meals/choices`, `PATCH/DELETE /api/office/meals/choices/<id>`. A locked receipt answers `409` to
+changes, deleting and a new bill.
 
 ## Web API
 

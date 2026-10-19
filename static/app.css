@@ -7465,3 +7465,11 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .abselbar .btn,.abselbar .iconbtn{min-height:2.75rem}
 /* 2.102.0 B (#2206): while choosing, room below the list as high as the sticky bar, so the last row stays tappable */
 .ablist.abselon{padding-bottom:7.5rem}
+
+/* 2.119.0 B (#2301): switched on = filled shape in the accent (or priority) colour, off = outline (like the star .hfav) */
+.iconbtn[data-act="pin"].on svg.i path,.iconbtn[data-fpin].on svg.i path,.iconbtn.bell.on svg.i path,.iconbtn.tbl-b.on:not(.off) svg.i path,
+.iconbtn[data-act="prio"][class*="flag-"] svg.i path,.iconbtn.tlkb.on svg.i path.lkb{fill:currentColor}
+.iconbtn.tlkb.on svg.i .d{fill:var(--bg)}
+/* 2.119.0 B (#2210): the Agents section of the dialog "All people …" */
+.sbpmd .sbph{margin:.75rem 0 .25rem;font-size:.75rem;font-weight:600;color:var(--muted);text-transform:none}
+.sbpmd .mrow[data-aid] .sdot{flex:none}

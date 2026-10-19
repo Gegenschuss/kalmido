@@ -34,6 +34,20 @@ File store and documents: file request links, tags everywhere, a stronger search
 
 ### Not yet
 - Documents: saved searches and sorting by relevance with highlighted matches follow later (#2294).
+## [2.119.0] - 2026-10-19
+
+Entertainment receipts, filled icon buttons, agents in "All people".
+
+### Added
+- Office: new module "Entertainment receipts" (under Money, next to travel costs). A form with pick lists for place, host and further guests (new places and people join the lists when a receipt is approved), gross amounts per VAT rate split into food and drinks, the tip as its own field and the restaurant bill as a file (a note from 250 EUR gross: the bill must be made out to the company) (#2288).
+- Entertainment receipts: approving locks the receipt and records the host's digital confirmation; unlocking is possible and logged with who, when and why. A clean PDF receipt of your own, a yearly report (input VAT 100 %, 70 % deductible / 30 % not), filters by person, period and occasion like the travel costs, export as CSV and PDF; drafts move between the private office and an organisation, approved receipts are kept 8 years (#2288).
+- "All people …" has an "Agents" section with a pin, so agents can be pinned to the sidebar on the iPhone too (#2210).
+
+### Changed
+- Icon buttons that are switched on (pin, priority, lock, bells) show a filled shape in the accent or priority colour instead of only a colour change; off stays an outline (#2301).
+
+### Fixed
+- Agent chat: the hint "Ctrl+Enter sends" (Mac: "Cmd+Enter sends") shows as a small line under the field, also in the narrow side panel next to a task and in split windows; the same in the team and job chat, not on phones (#2302).
 
 ## [2.118.0] - 2026-10-19
 
