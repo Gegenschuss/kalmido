@@ -7,6 +7,8 @@ hbm_can lets the person read it (never one filed with a health or budget list), 
 and a role in the client's office area (an organisation's office: its members; a private client: the person's own
 personal office) and only of clients the person may open (ckl_contact_clients), events only when need_event allows them.
 People only: agents and kid accounts get 403 (no v1 route, no MCP tool)."""
+import re
+
 from flask import g, jsonify, request
 
 from ..core.config import app
@@ -16,7 +18,7 @@ from ..core.i18n import tr
 from ..accounts.session import me
 
 CTK_PAGE = 20           # entries per page (the card's "More" asks for the next one)
-CTK_MAILS_SCAN = 1000   # newest filed mails looked at for the contact's addresses (their addresses are sealed: no SQL match)
+CTK_MAILS_SCAN = 1000   # newest filed mails uid may reach, looked at for the contact's addresses (sealed: no SQL match)
 CTK_SOURCE_MAX = 200    # entries per source (mails, documents, events) at most
 CTK_DOC_KINDS = ("offer", "invoice", "credit")
 
@@ -26,8 +28,18 @@ def ctk_mails(c, uid, emails):
     if not emails:
         return []
     from ..hub.hubmail import _open, hbm_can
-    rows = c.execute("SELECT * FROM hub_mails WHERE deleted_at IS NULL ORDER BY COALESCE(sent_at, created_at) DESC, id DESC LIMIT ?",
-                     (CTK_MAILS_SCAN,)).fetchall()
+    from ..team.clients import client_rows
+    # 2.119.1 review F1 (#2083): only the mails uid can reach at all (own, of a visible client, of a list with a possible
+    # role; never health / budget lists) are read and opened; hbm_can below stays the real check
+    cids = [r["id"] for r in client_rows(c, uid)]
+    q = ("SELECT * FROM hub_mails WHERE deleted_at IS NULL AND (owner_id=? OR list_id IN (SELECT l.id FROM lists l "
+         "WHERE l.deleted_at IS NULL AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND (l.owner_id=? "
+         "OR l.id IN (SELECT list_id FROM list_members WHERE user_id=?) OR l.org_id IN (SELECT org_id FROM org_members WHERE user_id=?)))")
+    args = [uid, uid, uid, uid]
+    if cids:
+        q += f" OR client_id IN ({','.join('?' * len(cids))})"
+        args += cids
+    rows = c.execute(q + ") ORDER BY COALESCE(sent_at, created_at) DESC, id DESC LIMIT ?", [*args, CTK_MAILS_SCAN]).fetchall()
     lists, out = {}, []
     for m in rows:
         if m["list_id"]:
@@ -40,8 +52,9 @@ def ctk_mails(c, uid, emails):
             continue
         d = _open(c, m)
         frm = (d["from_addr"] or "").strip().lower()
-        to = (d["to_addrs"] or "").lower()
-        if frm not in emails and not any(e in to for e in emails):
+        # 2.119.1 review F6 (#2083): whole addresses, not substrings ("a@b.de" is not in "mia@b.de")
+        tos = {x.strip("<>\"'") for x in re.split(r"[,;\s]+", (d["to_addrs"] or "").lower()) if "@" in x}
+        if frm not in emails and not (emails & tos):
             continue
         out.append({"kind": "mail", "id": m["id"], "title": d["subject"] or "", "sub": d["from_name"] or d["from_addr"] or "",
                     "at": m["sent_at"] or m["created_at"], "incoming": frm in emails})

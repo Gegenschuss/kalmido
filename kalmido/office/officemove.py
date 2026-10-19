@@ -516,6 +516,17 @@ def ofm_move_space():
 
 
 def ofm_undo(c, uid, mid):
+    """2.119.1 review F7 (#2298): the undo below; on an error the PDF copies it made are removed again (as ofm_move_space)."""
+    files = []
+    try:
+        return rmv_undo_run(c, uid, mid, files)
+    except BaseException:
+        c.rollback()
+        rmv_unlink(files)
+        raise
+
+
+def rmv_undo_run(c, uid, mid, files):
     """Takes move mid of uid back (one step; 409 when it was taken back already or does not fit any more)."""
     if isinstance(mid, bool) or not isinstance(mid, int):
         raise BadInput(tr("Invalid value: {0}", "undo"))
@@ -539,6 +550,7 @@ def ofm_undo(c, uid, mid):
     ts = iso(now_utc())
     back, kept, gone = 0, 0, []
     from .legacyimport import fi_number_taken
+    cfiles = {r["id"] for r in d.get("rows") or [] if r["t"] == "office_contract_files"}
     # 2.97.0 review (H1): a draft issued in the target since, or a trip billed / in DATEV there, never moves back
     for r in d.get("rows") or []:
         if r["t"] in ("office_docs", "office_trips") and not r.get("detach") and not r.get("src"):
@@ -566,7 +578,7 @@ def ofm_undo(c, uid, mid):
             if old.get(col) and not c.execute(f"SELECT 1 FROM {ref} WHERE id=?", (old[col],)).fetchone():
                 old[col] = None
         if r.get("cfile"):  # 2.119.1 C (#2298): the PDF back into the source's folder, sealed with its key
-            old["file"] = rmv_file_copy(c, cur, dst, src, cur["contract_id"], [])
+            old["file"] = rmv_file_copy(c, cur, dst, src, cur["contract_id"], files)
             gone.append(rmv_path(dst, cur["file"]))
         if r.get("area"):
             old.update(ofm_reseal(c, t, cur, dst, src))
@@ -578,6 +590,17 @@ def ofm_undo(c, uid, mid):
             old["updated_at"] = ts
         ofm_set(c, t, rid, old)
         back += 1
+        if t == "office_contracts" and not r.get("src"):
+            # 2.119.1 review F8 (#2298): PDFs added in the target since go back with the contract (copied into the source's
+            # folder with its key); the deleted ones stay in the target's trash, where its purge removes them
+            for f in c.execute("SELECT * FROM office_contract_files WHERE org_id=? AND contract_id=? AND deleted_at IS NULL ORDER BY id",
+                               (dst, rid)).fetchall():
+                if f["id"] in cfiles:
+                    continue
+                name = rmv_file_copy(c, f, dst, src, rid, files)
+                c.execute("UPDATE office_contract_files SET org_id=?, file=? WHERE id=?", (src, name, f["id"]))
+                if name != f["file"]:
+                    gone.append(rmv_path(dst, f["file"]))
     for m in reversed(d.get("made") or []):
         if m["t"] == "office_archive":
             r = c.execute("SELECT file FROM office_archive WHERE id=? AND org_id=? AND copy_of IS NOT NULL", (m["id"], dst)).fetchone()
@@ -603,6 +626,7 @@ def ofm_undo(c, uid, mid):
     ofx_log(c, src, "move_in", target="space", detail=dict(log, **{"from": ofm_ws_key(x["to_org"])}))
     bump(c)
     c.commit()
+    files.clear()  # committed: the copies stay
     for f in gone:
         try:
             os.unlink(f)

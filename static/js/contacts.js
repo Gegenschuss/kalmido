@@ -634,7 +634,7 @@ const ctx_F = () => {
     ['prefix', tr('Name prefix')], ['suffix', tr('Name suffix')], ['nickname', tr('Nickname')], ['org', tr('Company')], ['dept', tr('Department')], ['title', tr('Job title')],
     ['email:home', ty('email', 'Home')], ['email:work', ty('email', 'Work')], ['email:other', ty('email', 'Other')],
     ['phone:cell', ty('phone', 'Mobile')], ['phone:home', ty('phone', 'Home')], ['phone:work', ty('phone', 'Work')], ['phone:fax', tr('Fax')], ['phone:other', ty('phone', 'Other')],
-    ...[['home', 'Home'], ['work', 'Work'], ['other', 'Other']].flatMap(([t, n]) => [['street', 'Street'], ['code', 'Postcode'], ['city', 'City'], ['region', 'Region'], ['country', 'Country']].map(([p, pn]) => [`adr:${t}:${p}`, ad(n, pn)])),
+    ...[['home', 'Home'], ['work', 'Work'], ['other', 'Other']].flatMap(([t, n]) => [['street', 'Street'], ['code', 'Postcode'], ['city', 'City'], ['region', N_('Region')], ['country', 'Country']].map(([p, pn]) => [`adr:${t}:${p}`, ad(n, pn)])),
     ['url', tr('Website')], ['bday', tr('Birthday')], ['anniversary', tr('Anniversary')], ['note', tr('Notes')], ['groups', tr('Groups')]];
 };
 async function ctx_csvMap(bid, f) {

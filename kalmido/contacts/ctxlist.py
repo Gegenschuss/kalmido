@@ -139,7 +139,7 @@ def ctx_guess(headers):
 def ctx_decode(raw):
     """The bytes of a text file -> (text, encoding name)."""
     if raw.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
-        return raw.decode("utf-16"), "utf-16"
+        return raw.decode("utf-16", "replace"), "utf-16"  # 2.119.1 review F4 (#2080): a cut file is no 500
     if raw.startswith(codecs.BOM_UTF8):
         return raw[3:].decode("utf-8", "replace"), "utf-8"
     try:
@@ -167,7 +167,10 @@ def ctx_read(raw):
     if "\x00" in text:
         raise BadInput(tr("This is not a contacts file (vCard or CSV)"))
     d = ctx_delim(text)
-    rows = [r for r in csv.reader(io.StringIO(text), delimiter=d) if any(x.strip() for x in r)]
+    try:
+        rows = [r for r in csv.reader(io.StringIO(text), delimiter=d) if any(x.strip() for x in r)]
+    except csv.Error:  # 2.119.1 review F11 (#2080): e.g. a cell over csv.field_size_limit -> 400, not 500
+        raise BadInput(tr("This is not a contacts file (vCard or CSV)"))
     if len(rows) < 2:
         raise BadInput(tr("This is not a contacts file (vCard or CSV)"))
     headers = [h.strip() for h in rows[0]]
@@ -331,6 +334,8 @@ CTX_OUT = ("Name", "First Name", "Middle Name", "Last Name", "Title", "Suffix", 
 def ctx_safe(v):
     """CSV injection: a cell a spreadsheet would read as a formula gets a ' in front."""
     v = str(v or "")
+    if v[:1] in "+-" and re.fullmatch(r"[+-][\d\s()/.-]*", v):  # 2.119.1 review F3 (#2080): a phone number stays as it is
+        return v
     return "'" + v if v[:1] in ("=", "+", "-", "@", "\t", "\r") else v
 
 
@@ -464,6 +469,9 @@ def ctx_import_dupes(c, uid, bid, since):
     books = my_book_ids(c, uid)
     if bid not in books:
         return {"dupes": 0, "dupe_groups": []}
+    # 2.119.1 review F10 (#2084): only the books of the import's workspace (a merge never crosses it), not every book
+    books = [r[0] for r in c.execute(f"SELECT id FROM books WHERE id IN ({','.join('?' * len(books))}) AND org_id IS NOT DISTINCT FROM "
+                                     "(SELECT org_id FROM books WHERE id=?)", [*books, bid])]
     q = ",".join("?" * len(books))
     idx, new, names = {}, [], {}
     for r in c.execute(f"SELECT id, book_id, fn, emails, phones FROM contacts WHERE book_id IN ({q}) AND kind!='group' ORDER BY id", list(books)):
@@ -566,7 +574,8 @@ def ctx_groups_change(c, uid, b):
         if g2 != g:
             rows[r["id"]] = r
             todo[r["id"]] = {"groups": json.dumps(g2[:ITEMS_MAX], ensure_ascii=False)}
-            undo.append({"id": r["id"], "groups": g})
+            # 2.119.1 review F5 (#2085): the undo value as bulk restore will take it (strings, ITEMS_MAX, no commas)
+            undo.append({"id": r["id"], "groups": ms_groups([x for x in g if isinstance(x, str)][:ITEMS_MAX], "groups")})
     if not todo and not skipped:
         raise Denied(404)
     bk_gate(c, N_("Change {0} contacts at once"), len(todo))
