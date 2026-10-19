@@ -73,6 +73,11 @@ for fn, d in (("example_share.json", pack("example_share", "Beispiel Anteil", {"
               ("film.json", pack("film", "Falscher Film", {}))):
     with open(os.path.join(IND, fn), "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False)
+# 2.113.1 (#2252, review): a symlink in the folder is not read (regular files only), even when its target is a valid pack
+with open(os.path.join(DATA, "packs", "linked_src.json"), "w", encoding="utf-8") as f:
+    json.dump(pack("linked_share", "Verlinkt", {"share": SHARE}), f, ensure_ascii=False)
+if not os.path.lexists(os.path.join(IND, "linked_share.json")):
+    os.symlink("../linked_src.json", os.path.join(IND, "linked_share.json"))
 for root, dirs, files in os.walk(os.path.join(DATA, "packs")):
     os.chmod(root, 0o755)
     for x in files:
@@ -119,6 +124,7 @@ def line(doc, kind, slot=None):
 ind = {x["code"]: x for x in A.get(B + O + "/packs").json()["industry"]}
 check("example_share" in ind and ind["example_share"]["source"] == "local", "#2252: the own pack of the data folder is listed " + str(list(ind)))
 check("broken_share" not in ind, "#2252: the validator refuses a pack with a factor out of range")
+check("linked_share" not in ind, "#2252: a symlinked pack file is not read")
 check(ind.get("film", {}).get("name") == "Film & Video" and ind["film"]["source"] == "builtin", "#2252: a data folder file with a shipped code is refused, the shipped pack stays")
 
 # ---------------------------------------------------------------- an older quotation: quantities / quotient
@@ -223,6 +229,9 @@ r = A.post(B + f"{D}/{QS['id']}/signoff", json={})
 check(r.ok and r.json().get("url"), "an approval link " + r.text[:120])
 pg = requests.get(B + "/s/q/" + r.json()["url"].split("/s/q/")[1], allow_redirects=False).text if r.ok else ""
 check("Production Fee" in pg and "and the handling costs" not in pg and "4 % on the marked" not in pg, "#2251: the approval page has the line, not its calculation")
+# 2.113.1 (#2251, review): the link is hashed with the calculation text (as links sent before 2.113.1), so it stays valid
+tok = r.json()["url"].split("/s/q/")[1] if r.ok else ""
+check(requests.get(B + "/s/q/" + tok, allow_redirects=False).text == pg, "#2251: the approval link is stable (same page on a second call)")
 try:
     from pypdf import PdfReader
     pdf = A.get(B + f"{D}/{QS['id']}/pdf")
