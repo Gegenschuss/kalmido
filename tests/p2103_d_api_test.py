@@ -236,7 +236,9 @@ r = A.post(B + f"/api/tasks/{TS}/restore")
 check(r.ok and sql("SELECT deleted_at FROM tasks WHERE id=?", (TS,))[0][0] is None, "#2173: its owner restores it")
 
 # ================================================================== #2175 the agent chat
+assert A.put(B + "/api/admin/agent-policy", json={"user_agents": True, "max_per_user": 2}).ok
 ag = Fr.post(B + "/api/my/agents", json={"username": "fridabot2", "display_name": "Frida's bot", "scopes": ["read", "tasks:write", "comments"]}).json()
+assert "id" in ag, ("my/agents answered", ag)
 AID, AGH = ag["id"], {"Authorization": "Bearer " + ag["token"], **H}
 m1 = Fr.post(B + f"/api/agents/{AID}/chat", json={"body": "First question"}).json()["id"]
 r = Fr.post(B + f"/api/agents/{AID}/chat", data={"body": "With a picture"}, files={"file": ("pic.txt", b"picture\n" * 5, "text/plain")})
