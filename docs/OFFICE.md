@@ -52,28 +52,54 @@ settings, master data, files and the private clients go with it; "Private" is a 
 Only where organisations can be created (an instance admin, not in the mode `shared`). Moving into an existing
 organisation is not offered yet. `POST /api/office/move` `{name, confirm: true}` -> `{org_id, name, clients}`.
 
+**Moving office data into another workspace** (2.97.0, both ways between the personal office and an organisation's office,
+or between two organisations): **Move to another workspace…** in a client's menu (Office > Clients, also for several
+selected clients), in the menu of a draft quotation / invoice, in the dialog of a trip and of a document template. The
+dialog names what moves and what stays before anything changes:
+- a client takes its contact persons and its drafts along (their links to the address book end; the address books stay);
+- drafts lose their number - the target numbers them in its own range when they are issued; links into the old office end
+  (framework contract, project, catalogue service of a position); a draft moved alone keeps the address but not the client;
+- trips move with their receipts as long as none is ticked "in DATEV" or billed; templates move, documents made from them
+  stay with their text;
+- **issued documents never move** (retention): invoices, credit notes, reminders, sent quotations, number ranges and the
+  archive stay where they were issued. A client that issued documents (or projects, trips, deals) still point to stays
+  archived in the old office and is created anew in the target. The tick box *Take issued documents along as a read-only
+  copy* files a copy of each of them into the target's archive: view and PDF only, no number of its own, never edited,
+  and not part of the target's bookkeeping, EÜR, VAT, DATEV export or archive sums (marked "Read-only copy from …").
+Rights: the right to work in both offices (travel expenses and templates: the admin of both); out of an organisation only
+its office admin or who created the client / draft - a plain member takes only own drafts along and no copies. Agents
+never move office data. Undo takes the whole move back in one step (copies and a newly created client go again, unless the
+target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates, ids, to:
+"private"|"org:<id>", dry, copy_issued}` -> `{notes, block, count, move_id}`; `{undo: move_id}` takes it back.
+
 **Small business (section 19 UStG)**: the setting `small_business` (Settings tab, "Invoices"; a setting of every office
 area, also of an organisation): new quotations and invoices are made without VAT and with the note "Gemäß § 19 UStG
 wird keine Umsatzsteuer berechnet." (`vat_mode` `novat`, `vat_note` `small`); the e-invoice gets the tax category `E`
 with this exemption reason.
 
-## The office menu (2.87.9)
+## The office menu (2.87.9, a rail on the left since 2.98.0)
 
-The area Office (office, clients, contacts) has one menu with four groups instead of tab rows:
+The area Office (office, clients, contacts) has one menu with three groups instead of tab rows:
 
-- **Sell** - Pipeline, Quotes & invoices, Clients, Contacts
-- **Money** - Cash flow, Figures
-- **On the road** - Travel expenses
-- **Administration** - Services, Equipment, Framework contracts, Text blocks, Settings
+- **Sell** - Pipeline, Quotes & invoices, Clients, Contacts, Documents, Framework contracts
+- **Money** - Cash flow, Figures, Bank, Bookkeeping, Subscriptions & tools, Travel expenses
+- **Administration** - Equipment, Contracts & insurance, Settings
 
-On a computer the groups stand side by side above the page and stay there while scrolling; the point shown is in the
-accent colour. On a phone `#office` (or `#office/start`) opens a start page with a tile per group and, for admins of the
-office, the key figures; every other page shows the path "Office › group" (a tap goes back to the tiles) and the points of
-its group. Points for admins only (pipeline, cash flow, figures, travel expenses) and groups without a point are hidden;
-a person without an organisation is the admin of the personal office and sees all of them. Detail pages show a grey path
-("Clients › Example Ltd"), text only. Every old address keeps working (`#office/offers`, `#office/import` under Settings,
-`#clients`, `#client/<id>`, `#contacts` …). A new part of the office joins a group with an entry in `OFM_ITEMS`
-(`static/js/areas.js`, field `group`); an office tab without one appears under Administration.
+Services and text blocks are no menu points any more: they are the tab **Templates** under **Settings** (Settings has the
+tabs *General* and *Templates*; Templates switches between *Services* and *Text blocks*, the one used last opens).
+
+On a computer the menu is a narrow column left of the page (15 rem, 12 rem below 1100 px): the groups as small capitals,
+their points below each other, the point shown in the accent colour (`aria-current="page"`); it stays while scrolling.
+The page starts with its own heading (the name of the point), a detail page with its grey path ("Clients › Example Ltd",
+text only) instead. Arrow up / down, Home and End move inside the column. On a phone `#office` (or `#office/start`) opens
+a start page with, for admins of the office, the key figures and then one list per group in a single column; every other
+page shows "‹ Office · group" (back to the start page) and the points of its group as one row of tabs that scrolls
+sideways and never wraps (arrow left / right inside it). Points for admins only (pipeline, cash flow, figures, travel
+expenses, ...) and groups without a point are hidden; a person without an organisation is the admin of the personal
+office and sees all of them. Every old address keeps working (`#office/offers`, `#office/services` and `#office/texts`
+open the tab Templates, `#office/import` sits under Settings, `#clients`, `#client/<id>`, `#contacts` ...). A new part of
+the office joins a group with an entry in `OFM_ITEMS` (`static/js/areas.js`, field `group`, its place in `OFR_ORDER`); an
+office tab without one appears at the end of its group (`OFC_TABS` field 5, else Administration).
 
 ## Tabs
 
@@ -384,7 +410,7 @@ e-mail* (the server's mailbox, see SELF-HOSTING.md "Mail"); without it the addre
 
 ## Travel expenses: taking over a per diem spreadsheet (2.95)
 
-Office -> On the road -> Travel expenses -> **Take over from Excel** (shown while the trip list is empty and in the
+Office -> Money -> Travel expenses -> **Take over from Excel** (shown while the trip list is empty and in the
 evaluation) reads a per diem spreadsheet you kept so far (.xlsx, up to 2 MB, at most 30 sheets with 500 rows each).
 Nothing is stored before you confirm.
 
@@ -490,6 +516,11 @@ have 0 % and keep their amounts.
 rate to the fixed costs; documents (payments, open invoices, quotations, credit notes) are gross and take their
 net share on the net basis; purchases and travel receipts have no rate here and count the same on both. The start page
 figures use gross.
+
+**Receipts** (2.114.1): the receipts of the tab Bookkeeping go out on the same day as in the income/expense statement - their
+payment day (set by matching them to a bank booking), else their document date. A receipt matched to a booking counts with
+the booking's amount; net takes the receipt's VAT rate off. A fixed cost or purchase entered for the same thing as a
+receipt counts twice - leave one of them out.
 
 **Quotations in the plan** (2.88): sent and accepted quotations count as planned income on the end of their period of
 service (else its start, else their date); a sent one is marked **open quotation** (a dashed entry, the month shows its
@@ -760,6 +791,21 @@ amount. When a quotation becomes "accepted" its purchase is stored for the cash 
 position with a purchase and per part, amount encrypted at rest, dated at the start of the period of service, else the
 day of acceptance), stored anew when the accepted quotation changes and removed when it leaves that status.
 
+## Recipient and client names (2.97.0)
+
+- A client has its name (printed on quotations, invoices, the e-invoice) and an optional **display name** for the pickers
+  and lists ("Foo Switzerland" / "Foo Germany"). Without one, two clients of one workspace with the same name show the
+  city in brackets, the country when the city is the same too. The client search finds both names.
+- The address is kept in fixed fields only: street, address extra (c/o, building), postcode, city, country. The old free
+  "Address" text left the form; where it was the only address, street / postcode / city were filled from it once (the
+  text stays in the database, nothing is overwritten).
+- A quotation or invoice with a client shows the recipient read-only next to the client (name, attn., street, extra line,
+  postcode city, the country when it is foreign) with "Edit client"; a missing street / postcode / city shows "Address
+  missing - add it at the client". A document without a client offers "Add client" (name + address), which then becomes
+  its client. Drafts always read the client's current address; finalising (or sending) freezes it, later changes at the
+  client leave issued documents alone. Old documents with free address lines keep them. With the clients module off the
+  free recipient fields stay.
+
 ## Finalising
 
 A document can be finalised (button "Finalise" in the editor, after a confirmation; any member of the organisation).
@@ -777,6 +823,20 @@ the logo, the services, the client or the country pack do not change it. Changin
 and deleting answer `409` with a reason; the status of a quotation can still change. "Duplicate" makes a new open draft
 (a new version) without the snapshot. Quotations do not have to be finalised; it is an optional step for them. Since
 2.38.0 a quotation with status "sent" is locked the same way (a business letter is kept as sent; a new version = duplicate).
+
+Since 2.114.2 a finalised **quotation that never left the house** can be taken back by the organisation's admin (a
+person without an organisation in the personal office, too; members get `403`): it is still in status "draft", was never
+sent (no `sent_at`, no logged e-mail), the customer did not decide on an approval link, and no invoice or order
+confirmation was made from it. Then the "More" menu offers:
+
+- **Undo finalising** (`POST /api/office/docs/<id>/unlock`): back to an open draft; the number stays and is kept when it
+  is finalised again; the snapshot is made anew then. The history shows "finalising undone" with the number.
+- **Delete**: the number stays used and the office log keeps the delete entry with the number (`locked: true`), so the
+  gap stays traceable. Open approval links go with it, a sales opportunity loses its link to the quotation, the later
+  versions of a deleted first quotation stay in their chain.
+
+Everything else answers `409` with the reason (sent, accepted, declined, signed, invoiced); invoices, credit notes and
+reminders stay strictly locked. The list rows carry `can_delete` / `can_unlock` for the admin.
 
 ## Parts of a quotation
 
@@ -1118,9 +1178,11 @@ Layout (DIN 5008 form B, the usual German business letter):
 - The raw data option in its own dashed box below the totals, the transfer of rights as its own section (duration,
   territory, media, exceptions, exclusivity, note), closing text, greeting with the signer's name, an order confirmation
   area (place / date, signature) and a footer in up to four columns (company, contact, registration, bank; empty
-  columns are left out). The company colour is the only accent (rules, title underline, category headings).
-- Page breaks: following pages carry a small head (logo, title, number, recipient) and repeat the table head; every
-  page says "Page x of y"; a category heading never stays alone at the end of a page, text blocks and the rights block
+  columns are left out). Since 2.114.4 the order confirmation area can be switched off: the office setting `accept_on`
+  (default on) and per quotation `accept_on` (empty = like the setting, 1 = on, 0 = off, "Order confirmation with
+  signature line" in the texts section of the editor); a finalised quotation keeps the value it was finalised with. The company colour is the only accent (rules, title underline, category headings).
+- Page breaks: following pages carry a small head (logo, title, number, recipient) and repeat the table head; from
+  two pages on the footer says "Page x of y" (a one-page PDF has no page line); a category heading never stays alone at the end of a page, text blocks and the rights block
   are not torn, and the totals never stand alone on a page (the last position comes along). No carry-over lines.
 
 Logo: `POST /api/office/logo` (organisation admin, multipart `file`) accepts PNG, JPEG or WebP up to 4 MB, scales it to

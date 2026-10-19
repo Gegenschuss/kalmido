@@ -11,7 +11,7 @@ const rk_home = () => RK.data?.currency || ofcCur();
 const rk_amt = (n, cur) => !cur || cur === rk_home() ? ofcMoney(n) : `${fmtNum(+n, 2)} ${esc(cur)}`;
 const rk_trip = id => (RK.data?.trips || []).find(t => t.id === id);
 const rk_span = t => t.date_to && t.date_to !== t.date_from ? `${fmtDateLoc(t.date_from)} – ${fmtDateLoc(t.date_to)}` : fmtDateLoc(t.date_from);
-const rk_client = id => (RK.data?.clients || []).find(c => c.id === id)?.name || '';
+const rk_client = id => cdn_label((RK.data?.clients || []).find(c => c.id === id));  // 2.97.0 B (#1951)
 const rk_purpose = t => [t.purpose === 'acquisition' ? tr('Acquisition / research') : '', rk_client(t.client_id), t.project].filter(Boolean).join(' · ');
 
 async function rk_load() {
@@ -49,9 +49,10 @@ function rk_listHtml() {
   let trips = RK.data.trips || [];
   if (RK.filter === 'missing') trips = trips.filter(t => t.missing);
   if (!trips.length) return `<div class="empty nempty eact">${ic('plane')}<span>${RK.filter === 'missing' ? tr('Every receipt is ticked as in DATEV.') : tr('No trips yet. Add the first one with its receipts.')}</span>${RK.filter === 'missing' ? '' : rk_impBtn()}</div>`;
+  const rec = (RK.data.trips || []).some(t => (t.items || []).length);  // 2.114.4 D (#2286): receipt column only when there are receipts
   return `<ul class="ofclist rklist" role="list">${trips.map(t => `<li><button type="button" class="ofcrow" data-rk="open" data-id="${t.id}"><span class="ofcn"><b>${esc(t.dest || tr('Trip'))}</b>
     <small class="muted">${esc([rk_span(t), rk_purpose(t), (t.people || []).map(p => p.name).join(', ')].filter(Boolean).join(' · '))}</small></span>
-    ${t.missing ? `<span class="rotag rkmiss">${esc(trn('{0} not in DATEV', '{0} not in DATEV', t.missing))}</span>` : ''}${rk_vmaTag(t)}<span class="rksum">${ofcMoney(t.total)}</span>${ic('chev', 's')}</button></li>`).join('')}</ul>`;
+    ${t.missing ? `<span class="rotag rkmiss">${esc(trn('{0} not in DATEV', '{0} not in DATEV', t.missing))}</span>` : ''}${rk_vmaCols(t, rec)}${ic('chev', 's')}</button></li>`).join('')}</ul>`;
 }
 function rk_tripHtml(t) {
   const its = RK.filter === 'missing' ? t.items.filter(i => !i.datev) : t.items;
@@ -76,6 +77,7 @@ function rk_reportHtml() {
   const by = `<div class="seg wrap" role="group" aria-label="${esc(tr('Sums by'))}">${RK_BY.map(([k, n]) => `<button type="button" data-rk="by" data-v="${k}" class="${k === RK.by ? 'on' : ''}" aria-pressed="${k === RK.by}">${tr(n)}</button>`).join('')}</div>`;
   const lab = g => RK.by === 'month' ? rk_month(g.label) : RK.by === 'category' ? rk_cat(g.key) : g.label;
   const rows = RK.rep.rows.map(g => `<tr><td>${esc(lab(g))}</td><td class="num muted">${g.count}</td><td class="num">${ofcMoney(g.amount)}</td></tr>`).join('');
+  if (!RK.rep.count) return rk_vmaRepHtml();  // 2.114.4 D (#2286): no receipts in the period -> no receipts block
   return rk_vmaRepHtml() + `<div class="ofcbar">${by}<span class="spacer"></span><a class="btn sm" href="/api/office/trips/report?${esc(q)}&format=csv" download>${ic('download', 's')} CSV</a></div>`
     + (RK.rep.rows.length ? `<table class="rktab"><thead><tr><th>${tr(RK_BY.find(x => x[0] === RK.by)[1])}</th><th class="num">${tr('Receipts')}</th><th class="num">${tr('Amount')}</th></tr></thead><tbody>${rows}</tbody>
       <tfoot><tr><th>${tr('Total')}</th><th class="num">${RK.rep.count}</th><th class="num">${ofcMoney(RK.rep.total)}</th></tr></tfoot></table>${RK.by === 'person' ? `<p class="muted ofchint">${tr('A receipt is shared equally between the participants of its trip.')}</p>` : ''}`
@@ -95,19 +97,21 @@ function rk_tripModal(t) {
     <div class="row"><span class="rklab">${tr('Participants')}</span><div class="rkppl">${(d.people || []).map(p => `<label class="chkl"><input type="checkbox" data-pid="${p.id}" ${ppl.has(p.id) ? 'checked' : ''}> ${esc(p.name)}</label>`).join('')}</div></div>
     ${ofcRowF('rk-free', tr('Other people'), ofcIn('rk-free', free, {max: 600, ph: tr('Names, separated by commas')}))}
     ${ofcRowF('rk-purpose', tr('Purpose'), ofcSel('rk-purpose', t?.purpose || 'job', [['job', tr('Job for a client / project')], ['acquisition', tr('Acquisition / research')]]))}
-    ${ofcRowF('rk-client', tr('Client'), ofcSel('rk-client', t?.client_id || '', (d.clients || []).map(c => [c.id, c.name]), tr('none')))}
+    ${ofcRowF('rk-client', tr('Client'), ofcSel('rk-client', t?.client_id || '', (d.clients || []).map(c => [c.id, cdn_label(c)]), tr('none')))}
     ${ofcRowF('rk-project', tr('Project'), ofcIn('rk-project', t?.project, {list: 'rk-projs'}))}<datalist id="rk-projs">${(d.projects || []).map(p => `<option value="${esc(p)}">`).join('')}</datalist>
     ${ofcRowF('rk-km', tr('Kilometres'), ofcIn('rk-km', t?.km != null ? fmtNum(+t.km, 0) : '', {num: true, ph: tr('optional')}))}
     <div class="row"><label for="rk-note">${tr('Note')}</label><textarea id="rk-note" rows="2" maxlength="2000">${esc(t?.note || '')}</textarea></div>
     <div class="aerr" role="alert"></div>
     <div class="foot">${t ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${t ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg');
+  if (t && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom())) $('.foot .spacer', md)?.insertAdjacentHTML('beforebegin', `<button class="btn" data-m="move">${ic('brief', 's')} ${esc(tr('Move to another workspace…'))}</button>`);  // 2.97.0 C (#2049)
   const close = fgModal(md);
   rk_vmaDlgWire(md, t);  // 2.95.0 A (#1932)
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
     try {
+      if (b.dataset.m === 'move') { md.remove(); ofm_move({what: 'travel', ids: [t.id], from: ofm_officeFrom(), label: qn(t.dest || rk_span(t)), after: async () => { RK.open = null; rk_reload(); }}); return; }  // 2.97.0 C (#2049)
       if (b.dataset.m === 'del') {
         if (!await askConfirm(tr('Delete the trip “{0}” with its receipts?', t.dest || rk_span(t)), '', {ok: tr('Delete'), danger: true})) return;
         const j = await api('DELETE', `/api/office/trips/${t.id}`); md.remove(); RK.open = null; rk_reload();
@@ -317,6 +321,13 @@ function rk_vmaTag(t) {  // the trip list: the per diem of all participants next
   const v = t.vma; if (!v || t.vma_off) return '';
   if (v.total == null) return `<span class="rkv-tag rkv-none">${esc(tr('Per diem without amount'))}</span>`;
   return +v.total ? `<span class="rkv-tag" title="${esc(tr('Per diem'))}">${esc(tr('Per diem'))} ${rk_vmaEur(v.total)}</span>` : '';
+}
+function rk_vmaCols(t, rec) {  // 2.114.4 D (#2286): per diem as main amount, receipts column only when the year has receipts
+  const v = !t.vma_off && t.vma, none = '<span class="muted">–</span>';
+  const pd = !v ? none : v.total == null ? `<span class="rkv-none" title="${esc(tr('Per diem without amount'))}" aria-label="${esc(tr('Per diem without amount'))}">– <small>${esc(tr('Per diem without amount'))}</small></span>` : rk_vmaEur(v.total);
+  const rc = (t.items || []).length ? ofcMoney(t.total) : none;
+  if (!rec) return `<span class="rksum rkpd"><b>${pd}</b></span>`;
+  return `<span class="rksum rkpd" title="${esc(tr('Per diem'))}"><small class="muted">${esc(tr('Per diem'))}</small> <b>${pd}</b></span><span class="rksum rkrc" title="${esc(tr('Receipts'))}"><small class="muted">${esc(tr('Receipts'))}</small> <b>${rc}</b></span>`;
 }
 function rk_vmaCard(t) {  // the trip view: amount per person (x participants), breakdown, hints, source, "Edit days"
   const v = t.vma || {}, hints = (v.hints || []).filter(h => h.key !== 'off');

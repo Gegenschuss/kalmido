@@ -232,7 +232,8 @@ def ofx_company_print(fields, free, lang="de", pack=None):
     addr = [x for x in (f.get("street"), " ".join(y for y in (f.get("zip"), f.get("city")) if y)) if x]
     if f.get("country") and f["country"] != home and addr:
         addr.append(f["country"])
-    contact = [x for x in (f"{W['phone']} {f['phone']}" if f.get("phone") else "", f"{W['email']} {f['email']}" if f.get("email") else "") if x]
+    from .pdf import pdf_phone  # 2.114.4 A (#2272): grouped for print, the stored value stays
+    contact = [x for x in (f"{W['phone']} {pdf_phone(f['phone'])}" if f.get("phone") else "", f"{W['email']} {f['email']}" if f.get("email") else "") if x]
     reg = []
     if f.get("register_court") or f.get("register_no"):
         reg.append(" ".join(x for x in (W["register"] + ":" if f.get("register_court") else "", f.get("register_court"), f.get("register_no")) if x))
@@ -253,6 +254,12 @@ def ofx_company_print(fields, free, lang="de", pack=None):
     return {"name": f.get("name") or free.get("name") or "", "lines": addr or list(free.get("lines") or []),
             "contact_lines": contact or list(free.get("contact_lines") or []),
             "register_lines": reg or list(free.get("register_lines") or []), "bank_lines": bank or list(free.get("bank_lines") or [])}
+
+
+def ofx_sender_line(co):
+    """2.97.1 (#2224): the sender line above the address field, "Company · Street · Postcode City" (as the document
+    templates print it); a name that is already one of the lines is not doubled. The PDF shortens it to the field width."""
+    return " · ".join(dict.fromkeys(str(x).strip() for x in [co.get("name") or ""] + list(co.get("lines") or []) if str(x).strip()))
 
 
 # ---------------------------------------------------------------- finalising
@@ -318,13 +325,21 @@ def ofx_finalize(c, oid, uid, did):
     fields = ofx_company(c, oid)
     sender = {"company": ofx_company_print(fields, s.get("company") or {}, lang, pack), "fields": fields, "color": color,
               "logo": logo, "logo_sha256": sha, "pack": pack.get("code") or s["pack"]}
-    rec = _j(r["recipient"], {})
+    sender["company"]["sender_line"] = ofx_sender_line(sender["company"])  # 2.97.1 (#2224): frozen with the rest
+    from .docs import cdn_doc_recipient, bwb_accept_on
+    if r["kind"] == "offer":  # 2.114.4 B (#2270): the order confirmation block frozen with the rest (a later setting never changes it)
+        sender["accept_on"] = bwb_accept_on(r, s)
+    rec = cdn_doc_recipient(c, oid, r)  # 2.97.0 B (#1951): the client's address as it is now, frozen below
+    if r["client_id"] and rec.get("lines") is not None:
+        c.execute("UPDATE office_docs SET recipient=? WHERE id=? AND org_id=?",
+                  (json.dumps({k: v for k, v in rec.items() if k != "missing"}, ensure_ascii=False), did, oid))
     rsnap = {"name": rec.get("name") or "", "lines": rec.get("lines") or []}
     if r["client_id"]:
         cl = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (r["client_id"],)).fetchone()
         if cl:
             for k in ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days"):
                 rsnap[k] = cl[k] if k in cl.keys() else None
+            rsnap["extra"] = cl["address_extra"] if "address_extra" in cl.keys() else ""  # 2.97.0 B (#1951)
             from .docs import fk_doc_contact
             k = fk_doc_contact(c, r["client_id"], r["contact_id"] if "contact_id" in r.keys() else None)  # 2.40.0 (#1380)
             rsnap["contact"] = {"name": k["name"], "email": k["email"], "phone": k["phone"]} if k else None
@@ -391,6 +406,31 @@ def ofx_finalize_post(did):
     bump(c)
     c.commit()
     return jsonify(doc_public(c, oid, r, office_role(c, uid, oid) == "admin"))
+
+
+@app.post("/api/office/docs/<int:did>/unlock")
+def ofx_unlock_post(did):
+    """2.114.2 A (#2263): the organisation's admin (members: 403) takes a finalised quotation back to a draft while it was
+    never sent nor answered by the client and nothing was made from it (docs.bga_offer_block; else 409: a new version =
+    duplicate). Invoices, credit notes and the rest: 409. The number stays (finalising again keeps it); the frozen copies go
+    and are made anew then. Not finalised: the document as it is."""
+    from .docs import bga_offer_block, doc_public, doc_row
+    c, uid, oid = _ctx()
+    write_lock(c, f"office_mail_{int(oid)}")  # 2.114.2 (#2263 review): a parallel mail send sees the lock (sent_at) first
+    write_lock(c, f"office_doc_{int(did)}")
+    r = doc_row(c, oid, did)
+    if office_role(c, uid, oid) != "admin":
+        raise Denied(403, tr("Only an admin of this organisation can do this"))
+    if ofx_locked(r):
+        why = bga_offer_block(c, oid, r)
+        if why:
+            raise Denied(409, tr(why))
+        c.execute("UPDATE office_docs SET locked_at=NULL, locked_by=NULL, sender=NULL, recipient_snapshot=NULL, tax_snapshot=NULL, "
+                  "updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), did, oid))
+        ofx_log(c, oid, "unlock", doc_id=did, detail={"number": r["number"]})
+        bump(c)
+        c.commit()
+    return jsonify(doc_public(c, oid, doc_row(c, oid, did), True))
 
 
 @app.get("/api/office/docs/<int:did>/log")

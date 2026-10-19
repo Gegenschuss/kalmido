@@ -6,7 +6,7 @@ own container (start.sh). Invented names only.
  - a name taken in the target: 409 with the names (the dry run: block)
  - out of an organisation: a plain member may not move a page somebody else created (403), the organisation's admin may
  - another organisation (not a member): 409; a page of somebody else: 404; an agent: refused (tenant-matrix: wiki)
- - a space with the lock: refused with a clear message (dry run: block; the move: 409)
+ - a space with the lock while it is being encrypted: refused with a clear message (dry run: block; the move: 409)
  - a table attached to a private list: private -> organisation ends the attachment (named), the move back (undo) restores it;
    a formula naming a private list is named; plain member 403, another organisation 409, an agent refused (tenant-matrix: sheet)
  - the last move shows on the page / the table (both sides)
@@ -130,8 +130,9 @@ check(op.get("Moved/Plan/One") == ONE and op.get("Moved/Plan/Two") == TWO, "a me
 check("Plan/One" not in paths(Bo, "private") and "Other" in paths(Bo, "private"), "gone from the private space, Other stays")
 g = A.get(B + f"/api/wiki/pages/{ONE}").json()
 check(g["body"] == "See [[Moved/Plan/Two]] and [[Other]]", "the link between the moved pages follows, the other stays as text: " + g["body"])
-check(g.get("moved") and g["moved"]["from"] == "private" and g["moved"]["to"] == SP and g["moved"]["by_name"] == "Bob",
-      "the page shows its last move " + str(g.get("moved")))
+# 2.97.0 (#2051): alice reads it -- bob's private space shows without key or person, her organisation by name
+check(g.get("moved") and g["moved"]["from"] is None and g["moved"]["from_name"] == "private space" and g["moved"]["to"] == SP
+      and g["moved"]["to_name"] == "Alpha" and g["moved"]["by_name"] == "Bob", "the page shows its last move " + str(g.get("moved")))
 check(Ca.get(B + f"/api/wiki/pages/{ONE}").ok, "another member reads it")
 check(Fr.get(B + f"/api/wiki/pages/{ONE}").status_code == 404, "another organisation: 404")
 
@@ -163,14 +164,15 @@ check(r.status_code in (401, 403), "an agent: refused " + str(r.status_code))
 check(paths(Bo, "private").get("Other") == OTHER, "after all refusals Other is still bob's")
 
 # a space with the lock: refused with a clear message
+# 2.97.0 (#2050): spaces with the lock move now (re-encrypted in the browser, p297_d_api); while the switch runs: busy
 SEC = page(Ca, "Secret", "")
 assert Ca.put(B + "/api/e2e/keys", json=e2e_keys()).ok
 r = Ca.post(B + "/api/wiki/e2e/start", json={"space": "private", "keys": [{"user_id": uid["carol"], "wrapped": {"v": 1, "iv": b64(12), "ct": b64(48)}}]})
 check(r.ok, "carol locks her private space " + r.text[:200])
 r = mv(Ca, pages=[SEC], space="private", to=SP, dry=1)
-check(r.ok and "lock" in (r.json().get("block") or ""), "the lock: the dry run blocks with a clear message " + r.text[:200])
+check(r.ok and "being encrypted" in (r.json().get("block") or ""), "the lock: the dry run blocks with a clear message " + r.text[:200])
 r = mv(Ca, pages=[SEC], space="private", to=SP)
-check(r.status_code == 409 and "lock" in r.json().get("error", ""), "the lock: the move 409 " + r.text[:200])
+check(r.status_code == 409 and "being encrypted" in r.json().get("error", ""), "the lock: the move 409 " + r.text[:200])
 check(not paths(A, SP).get("Secret"), "nothing of the locked space reached the organisation")
 
 
@@ -196,7 +198,9 @@ d = r.json() if r.ok else {}
 check(r.ok and d.get("space") == SP and d["sheet"]["list_id"] is None and d.get("move_id"), "private -> organisation, detached " + r.text[:300])
 g = A.get(B + f"/api/sheets/{SID}")
 check(g.ok and g.json()["space"] == SP, "a member of the organisation reads the table")
-check(g.ok and (g.json().get("moved") or {}).get("from") == "private", "the table shows its last move " + str(g.json().get("moved") if g.ok else ""))
+# 2.97.0 (#2051): alice did not move it -- bob's private space shows without its key or person
+check(g.ok and (g.json().get("moved") or {}).get("from") is None and g.json()["moved"].get("from_name") == "private space",
+      "the table shows its last move " + str(g.json().get("moved") if g.ok else ""))
 check(Fr.get(B + f"/api/sheets/{SID}").status_code == 404, "another organisation: 404")
 check(smv(Ca, SID, to="private").status_code == 403, "a plain member may not take bob's table out of the organisation")
 check(smv(Bo, SID, to=f"org:{BETA}").status_code == 409, "an organisation bob is not in: 409")

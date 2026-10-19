@@ -14,7 +14,8 @@ const MG_AREAS = [
   ['review', 'journal', N_('Review|area'), [['review', 'journal', N_('Review & journal'), () => feat('review'), () => ['review']], ['stats', 'chart', N_('Statistics'), () => feat('stats'), () => ['stats']]]],
   ['life', 'home', N_('Home|area'), [['life', 'home', N_('Home & life'), () => lifeOn(), () => LIFE_MODS], ['family', 'family', N_('Family'), () => famOn(), () => ['family']],
     ['budget', 'wallet', N_('Budget'), () => feat('budget'), () => ['budget']],  // 2.72.0 (#1333): the household budget (budget.js)
-    ['feeds', 'news', N_('Feeds'), () => feat('feeds'), () => ['feeds']]]],  // 2.85.0 B (#1162): feeds (feeds.js)
+    ['feeds', 'news', N_('Feeds'), () => feat('feeds'), () => ['feeds']],  // 2.85.0 B (#1162): feeds (feeds.js)
+    ['bookmarks', 'bookmark', N_('Bookmarks'), () => feat('reading'), () => ['reading']]]],  // 2.97.0 A (#1950): bookmarks (bookmarks.js, module reading)
   // 2.48.0 (#1207, #1111): the file store with its parts files (ablage.js) and documents (docs.js)
   ['ablage', 'folder', N_('File store|area'), [['ablage', 'folder', N_('Files'), () => ab_on(), () => ['files']],
     ['docs', 'file', N_('Documents'), () => typeof viewDocs === 'function' && feat('docs'), () => ['docs']]]]];
@@ -41,17 +42,20 @@ const mg_title = mod => { const a = mg_areaOf(mod); return a && mg_parts(a).leng
 function mg_tabsHtml(mod) {
   const a = mg_areaOf(mod); if (!a || S.me?.kid) return '';
   mg_seen(mod);
-  if (a[0] === 'office') return ofm_menuHtml(mod);  // 2.87.9 (#1917): the office menu with its four groups
+  if (a[0] === 'office') { setTimeout(ofr_after, 0); return ofm_menuHtml(mod); }  // 2.87.9 (#1917): the office menu (a phone's; 2.98.0 C: the computer's rail = ofr_wrap)
   const ps = mg_parts(a); if (ps.length < 2) return '';
   return `<div class="seg mgtabs" role="tablist" aria-label="${esc(tr(a[2]))}" data-mgtabs="${a[0]}">${ps.map(([m, i, n]) => `<button type="button" role="tab" data-go="${m}" aria-selected="${m === mod}" class="${m === mod ? 'on' : ''}">${ic(i, 's')}<span>${esc(tr(n))}</span>${m === 'time' && S.timer || m === 'pomo' && S.pomo ? '<span class="recdot"></span>' : ''}</button>`).join('')}</div>`;
 }
-const mg_wrap = (mod, html) => mg_tabsHtml(mod) + html;
+// 2.98.0 C (#2180): the office on a computer = the office rail on the left, the page with its own heading on the right
+const mg_wrap = (mod, html) => mg_areaOf(mod)?.[0] === 'office' && !isMobile() && !S.me?.kid ? ofr_wrap(mod, html) : mg_tabsHtml(mod) + html;
 // ---- 2.87.9 (#1917): the office menu. The area Office is four groups (Sell, Money, On the road, Administration) instead of
 // two tab rows; a part joins its group with an entry {key, go, icon, name, group, on, adm} (adm = admins of the office only).
 // Empty groups and points without rights stay hidden. Computer: the groups side by side on top (sticky); phone: the start
 // page office/start with four tiles and the figures, on every other page the path "Office › group" (back to the tiles) and
 // the group's points. The old routes stay (#office/offers, #clients, #contacts …); the path on detail pages is text only.
-const OFM_GROUPS = [['sell', 'tag', N_('Sell|office')], ['money', 'wallet', N_('Money|office')], ['road', 'car', N_('On the road|office')], ['admin', 'sliders', N_('Administration|office')]];
+// 2.98.0 C (#2180): three groups (On the road is gone: travel expenses -> Money, framework contracts -> Sell); services and
+// text blocks are no menu points any more but the tab "Templates" under Settings (ofr_setTabsHtml), their routes stay
+const OFM_GROUPS = [['sell', 'tag', N_('Sell|office')], ['money', 'wallet', N_('Money|office')], ['admin', 'sliders', N_('Administration|office')]];
 const ofm_ofc = () => officeOn();
 const OFM_ITEMS = [
   {key: 'pipeline', go: 'office/pipeline', icon: 'target', name: N_('Pipeline'), group: 'sell', on: ofm_ofc, adm: 1},
@@ -60,11 +64,11 @@ const OFM_ITEMS = [
   {key: 'contacts', go: 'contacts', icon: 'users', name: N_('Contacts'), group: 'sell', on: () => feat('contacts')},
   {key: 'cashflow', go: 'office/cashflow', icon: 'trend', name: N_('Cash flow'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'kpi', go: 'office/kpi', icon: 'chart', name: N_('Figures'), group: 'money', on: ofm_ofc, adm: 1},
-  {key: 'travel', go: 'office/travel', icon: 'plane', name: N_('Travel expenses'), group: 'road', on: ofm_ofc, adm: 1},
-  {key: 'services', go: 'office/services', icon: 'list', name: N_('Services'), group: 'admin', on: ofm_ofc},
+  {key: 'travel', go: 'office/travel', icon: 'plane', name: N_('Travel expenses'), group: 'money', on: ofm_ofc, adm: 1},
+  {key: 'services', go: 'office/services', icon: 'list', name: N_('Services'), group: 'admin', on: ofm_ofc, tpl: 1},
   {key: 'equipment', go: 'office/equipment', icon: 'camera', name: N_('Equipment'), group: 'admin', on: ofm_ofc},
-  {key: 'contracts', go: 'office/contracts', icon: 'file', name: N_('Framework contracts'), group: 'admin', on: ofm_ofc},
-  {key: 'texts', go: 'office/texts', icon: 'note', name: N_('Text blocks'), group: 'admin', on: ofm_ofc},
+  {key: 'contracts', go: 'office/contracts', icon: 'file', name: N_('Framework contracts'), group: 'sell', on: ofm_ofc},
+  {key: 'texts', go: 'office/texts', icon: 'note', name: N_('Text blocks'), group: 'admin', on: ofm_ofc, tpl: 1},
   {key: 'settings', go: 'office/settings', icon: 'gear', name: N_('Settings'), group: 'admin', on: ofm_ofc}];
 // admin of the office shown: from the office's settings once loaded, before that the last answer for this workspace (LS),
 // so the contacts / clients pages need not load the office. The server checks every admin route on its own.
@@ -90,11 +94,15 @@ function ofm_admSeen(adm) { const o = LS.get('ofmAdm', {}) || {}; if (!!o[ofm_ws
 // ([5], else Administration) once the office is loaded, so a new office part is never out of reach
 const ofm_all = () => typeof OFC_TABS === 'undefined' ? OFM_ITEMS : [...OFM_ITEMS, ...OFC_TABS.filter(t => !OFM_ITEMS.some(i => i.key === t[0]))
   .map(t => ({key: t[0], go: 'office/' + t[0], icon: t[1], name: t[2], group: OFM_GROUPS.some(g => g[0] === t[5]) ? t[5] : 'admin', on: ofm_ofc, adm: t[3]}))];
-const ofm_items = () => ofm_all().filter(i => i.on() && (!i.adm || ofm_adm()));
+// 2.98.0 C (#2180): the order inside the groups (a part not named here keeps its place at the end of its group);
+// tpl = a tab under Settings, not in the menu
+const OFR_ORDER = ['pipeline', 'offers', 'clients', 'contacts', 'gendocs', 'contracts', 'cashflow', 'kpi', 'bank', 'books', 'subs', 'travel', 'equipment', 'agreements', 'settings'];
+const ofr_rank = i => { const n = OFR_ORDER.indexOf(i.key); return n < 0 ? OFR_ORDER.length : n; };
+const ofm_items = () => ofm_all().filter(i => !i.tpl && i.on() && (!i.adm || ofm_adm())).sort((a, b) => ofr_rank(a) - ofr_rank(b));
 // the point shown: the office's tab (import sits under Settings; no tab = the start page on a phone, quotations on a computer)
 function ofm_cur(mod) {
   if (mod !== 'office') return mod;
-  const t = S.route.tab === 'import' ? 'settings' : S.route.tab;
+  const t = ['import', 'services', 'texts'].includes(S.route.tab) ? 'settings' : S.route.tab;  // 2.98.0 C (#2180): + the templates
   return t === 'start' || ofm_all().some(i => i.key === t && i.go.startsWith('office/')) ? t : isMobile() ? 'start' : 'offers';
 }
 const ofm_btn = (i, cur, cls) => `<button type="button" class="${cls} ${i.key === cur ? 'on' : ''}" data-go="${i.go}" data-ofm="${i.key}"${i.key === cur ? ' aria-current="page"' : ''}>${ic(i.icon, 's')}<span>${esc(tr(i.name))}</span></button>`;
@@ -109,19 +117,61 @@ function ofm_detail(mod) {
 }
 function ofm_menuHtml(mod) {
   const cur = ofm_cur(mod), its = ofm_items(), crumb = ofm_detail(mod);
-  if (its.length < 2) return crumb;
+  if (its.length < 2 || cur === 'start') return crumb;  // the start page's list is the menu
   const grp = g => its.filter(i => i.group === g[0]);
-  if (!isMobile()) return `<nav class="ofmenu" aria-label="${esc(tr('Office|area'))}" data-mgtabs="office">${OFM_GROUPS.map(g => grp(g).length ? `<div class="ofmg" data-ofmg="${g[0]}"><span class="ofmgh">${ic(g[1], 's')}<span>${esc(tr(g[2]))}</span></span><div class="ofmgi">${grp(g).map(i => ofm_btn(i, cur, 'ofmi')).join('')}</div></div>` : '').join('')}</nav>${crumb}`;
-  if (cur === 'start') return '';  // the tiles are the menu
+  // 2.98.0 C (#2180): a phone's sub page = "< Office · group" (back to the start list) and the group's points as one row
+  // of underlined tabs that never wraps (it scrolls sideways; ofr_after shows the active one)
   const g = OFM_GROUPS.find(x => x[0] === ofm_all().find(i => i.key === cur)?.group); if (!g) return crumb;
-  const home = officeOn() ? `<button type="button" class="ofmhome" data-go="office/start">${esc(tr('Office|area'))}</button>` : `<span>${esc(tr('Office|area'))}</span>`;
-  return `<nav class="ofmbar" aria-label="${esc(tr('Office|area'))}" data-mgtabs="office"><div class="ofmpath">${home}<span aria-hidden="true">›</span><span>${esc(tr(g[2]))}</span></div>${grp(g).length > 1 ? `<div class="ofmsib">${grp(g).map(i => ofm_btn(i, cur, 'ofmi')).join('')}</div>` : ''}</nav>${crumb}`;
+  const lbl = `${esc(tr('Office|area'))} · ${esc(tr(g[2]))}`;
+  const home = officeOn() ? `<button type="button" class="ofpback" data-go="office/start">${ic('chev', 's')}<span>${lbl}</span></button>` : `<span class="ofpback">${lbl}</span>`;
+  return `<nav class="ofpb" aria-label="${esc(tr('Office|area'))}" data-mgtabs="office">${home}${grp(g).length > 1 ? `<div class="ofpts">${grp(g).map(i => ofm_btn(i, cur, 'ofpt2')).join('')}</div>` : ''}</nav>${crumb}`;
 }
-// the office start page (office/start, a phone's way in): the figures (admins) and a tile per group with its points
+// ---- 2.98.0 C (#2180): the office rail (computer). A second, narrow column left of the page: the groups as small caps
+// headings, their points below each other, the active one in the accent; the page starts with its own heading (.ofpt),
+// a detail page with its path instead. The routes stay; data-go as before.
+function ofr_railHtml(cur) {
+  const its = ofm_items();
+  return `<nav class="ofrail" aria-label="${esc(tr('Office|area'))}" data-mgtabs="office">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<div class="ofrg" data-ofmg="${g[0]}"><div class="ofrh">${esc(tr(g[2]))}</div>${gi.map(i => ofm_btn(i, cur, 'ofri')).join('')}</div>` : ''; }).join('')}</nav>`;
+}
+function ofr_wrap(mod, html) {
+  mg_seen(mod);
+  const cur = ofm_cur(mod), its = ofm_items(), crumb = ofm_detail(mod), it = its.find(i => i.key === cur);
+  const head = crumb || (it ? `<h2 class="ofpt">${esc(tr(it.name))}</h2>` : '');
+  if (its.length < 2) return head + html;  // nothing to choose from: no rail
+  return `<div class="ofwrap">${ofr_railHtml(cur)}<div class="ofbody">${head}${html}</div></div>`;
+}
+// up / down (Home / End) inside the rail, left / right inside a phone's tab row; Tab keeps the reading order
+function ofr_key(e) {
+  const b = e.target.closest?.('.ofrail .ofri, .ofpb .ofpt2'); if (!b) return false;
+  const rail = b.classList.contains('ofri'), ks = rail ? ['ArrowUp', 'ArrowDown', 'Home', 'End'] : ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+  if (!ks.includes(e.key) || e.altKey || e.ctrlKey || e.metaKey) return false;
+  const all = $$(rail ? '.ofri' : '.ofpt2', b.closest('nav')), i = all.indexOf(b); if (i < 0) return false;
+  const j = e.key === 'Home' ? 0 : e.key === 'End' ? all.length - 1 : Math.max(0, Math.min(all.length - 1, i + (e.key === ks[1] ? 1 : -1)));
+  all[j].focus(); e.preventDefault(); return true;
+}
+document.addEventListener('keydown', e => { if (ofr_key(e)) e.stopPropagation(); }, true);
+// after a draw: the active tab of a phone's row in sight (the row scrolls sideways)
+function ofr_after(root) {
+  const b = $('.ofpb .ofpt2.on', root || document); if (!b) return;
+  const row = b.parentElement, r = row.getBoundingClientRect(), x = b.getBoundingClientRect();  // sideways only, the page stays
+  if (x.left < r.left || x.right > r.right) row.scrollLeft += x.left - r.left - Math.max(0, (r.width - x.width) / 2);
+}
+// the tabs of the office's Settings: General | Templates; Templates = services and text blocks (their routes office/services
+// and office/texts lead here, the last one used on this device opens)
+function ofr_setTabsHtml(tab) {
+  const tpl = tab === 'services' || tab === 'texts', last = LS.get('ofrTpl', 'services') === 'texts' ? 'texts' : 'services';
+  if (tpl && last !== tab) LS.set('ofrTpl', tab);
+  const b = (go, on, n) => `<button type="button" role="tab" data-go="office/${go}" aria-selected="${on}" class="${on ? 'on' : ''}">${esc(tr(n))}</button>`;
+  return `<div class="ofrset"><div class="seg ofrseg" role="tablist" aria-label="${esc(tr('Settings'))}">${b('settings', !tpl, 'General')}${b(tpl ? tab : last, tpl, 'Templates')}</div>`
+    + (tpl ? `<div class="seg ofrseg2" role="tablist" aria-label="${esc(tr('Templates'))}">${b('services', tab === 'services', 'Services')}${b('texts', tab === 'texts', 'Text blocks')}</div>` : '') + '</div>';
+}
+// the office start page (office/start, a phone's way in): the figures (admins), then per group a small caps heading and a
+// card with one row per point (2.98.0 C, #2180: one column, was a tile per group)
 function ofm_startHtml() {
   const its = ofm_items();
   const fig = ofm_adm() && typeof kp_tile === 'function' ? kp_tile(c => `<section class="ofmfig">${c}</section>`) : '';
-  return `<div class="ofmstart">${fig}<div class="ofmtiles">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<section class="ofmtile" data-ofmg="${g[0]}"><h3>${ic(g[1])}<span>${esc(tr(g[2]))}</span></h3><div class="ofmtl">${gi.map(i => ofm_btn(i, '', 'ofmti')).join('')}</div></section>` : ''; }).join('')}</div></div>`;
+  const row = i => `<button type="button" class="oflr" data-go="${i.go}" data-ofm="${i.key}">${ic(i.icon)}<span>${esc(tr(i.name))}</span>${ic('chev', 's')}</button>`;
+  return `<div class="ofmstart">${fig}<div class="ofl">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<section class="oflg" data-ofmg="${g[0]}"><h3>${esc(tr(g[2]))}</h3><div class="oflc">${gi.map(row).join('')}</div></section>` : ''; }).join('')}</div></div>`;
 }
 // ---- the sidebar row of an area. Hidden (Settings > Appearance > Sidebar) while every part is ("e:<route>" of each part,
 // so an arrangement from before 2.44.0 that hid both still hides the area, and 2.43.1 reads what this one writes)

@@ -1432,14 +1432,14 @@ def v1_admin_status():
 
 @app.errorhandler(404)
 def not_found(e):
-    from ..lists.public import HERON_ERROR, pub_gone, pub_html
+    from ..lists.public import BOT_ERROR, pub_gone, pub_html
     if request.path.startswith(API_PREFIX):
         return v1_err(404, tr("Not found"))
     if request.path.startswith(PUB_PREFIX):
         return pub_gone()
     if request.method == "GET" and "text/html" in (request.headers.get("Accept") or "") and not request.path.startswith("/static/"):
-        lg = _accept_lang()  # 2.14.0: a page that does not exist: the heron + a way back (no user data, like /s/)
-        r = pub_html(tr("Page not found", lg=lg), f'<div class="msg">{HERON_ERROR}<h1>{html.escape(tr("Page not found", lg=lg))}</h1>'
+        lg = _accept_lang()  # 2.14.0: a page that does not exist: the figure (2.136.0: the bot) + a way back (no user data, like /s/)
+        r = pub_html(tr("Page not found", lg=lg), f'<div class="msg">{BOT_ERROR}<h1>{html.escape(tr("Page not found", lg=lg))}</h1>'
                      f'<p>{html.escape(tr("This address does not exist.", lg=lg))}</p><p><a class="btn" href="/">'
                      f'{html.escape(tr("Open {0}", APP_NAME, lg=lg))}</a></p></div>', lg, 404, foot=False)
         return r

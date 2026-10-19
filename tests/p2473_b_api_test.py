@@ -247,6 +247,7 @@ for st in ("sent", "accepted"):
     A.post(B + f"{D}/{Q2['id']}/status", json={"status": st})
 INV = A.post(B + f"{D}/{Q2['id']}/invoice").json()
 G1 = A.put(B + f"{D}/{INV['id']}/items", json={"items": [{"kind": "service", "title": "Dreh Teil 1", "qty": 1, "unit": "day", "rate": 1000}]}).json()["totals"]["gross"]
+A.patch(B + f"/api/clients/{CL}", json={"street": "Weg 2", "zip": "10115", "city": "Berlin"})  # 2.97.0 B (#1951): a draft's recipient comes from its client (a given one is ignored)
 A.patch(B + f"{D}/{INV['id']}", json={"recipient": {"name": "Kunde Eins GmbH", "lines": ["Weg 2", "10115 Berlin"]}, "service_from": M0 + "-01", "service_to": M0 + "-02"})
 r = A.post(B + f"{D}/{INV['id']}/finalize")
 check(r.ok, "the part invoice is finalised " + r.text[:200])

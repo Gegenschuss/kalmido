@@ -18,7 +18,15 @@ async function bnkImpLoad(draw = true) {
   try { BNK.imports = (await api('GET', '/api/office/bank/imports')).items || []; } catch (x) { BNK.imports = []; }
   if (draw) ofcDraw();
 }
-const bnkReload = () => { BNK.data = null; BNK.imports = BNK.showImp ? BNK.imports : null; BNK.other = null; BNK.cand = null; ofcDraw(); };
+// 2.114.1 B (#2016): every bank write (match, unmatch, their undo/redo, an import taken back / restored) changes the books, the cash
+// flow, the key figures and the paid state of invoices: their loaded data goes, each tab loads again when it is opened
+const bfbBooksStale = () => {
+  if (typeof BK === 'object') { BK.info = null; BK.euer = null; BK.ustva = null; }
+  if (typeof RKF === 'object') RKF.data = null;
+  if (typeof KPS === 'object') KPS.data = null;
+  if (typeof OFD === 'object') OFD.list = null;
+};
+const bnkReload = () => { BNK.data = null; BNK.imports = BNK.showImp ? BNK.imports : null; BNK.other = null; BNK.cand = null; bfbBooksStale(); ofcDraw(); };
 const bnkAmt = v => `${+v > 0 ? '+' : '−'}${ofcMoney(Math.abs(+v))}`;
 
 function bnkHtml() {
@@ -47,7 +55,7 @@ function bnkRow(t) {
   } else {
     const s = (t.suggestions || [])[0];
     const sug = s ? `<div class="bnksug"><span class="bnksn"><small class="muted">${tr('Suggestion')}</small><b>${esc(tr(BNK_KIND[s.kind]))} · ${esc(s.label)}</b><small class="muted">${esc(s.reason)}</small></span>
-      <button class="btn sm pri" data-bnk="match" data-id="${t.id}" data-kind="${s.kind}" data-mid="${s.id}">${tr('Match')}</button></div>`
+      <button class="btn sm pri" data-bnk="match" data-id="${t.id}" data-kind="${s.kind}" data-mid="${s.id}">${tr('Assign match')}</button></div>`
       : !inn ? `<p class="muted bnkmiss">${tr('Receipt missing? Upload it in the documents of the office, then match it here.')}</p>` : '';
     act = `${sug}<div class="bnkacts"><button class="btn sm" data-bnk="other" data-id="${t.id}" aria-expanded="${BNK.other === t.id}">${ic('search', 's')}<span>${inn ? tr('Other invoice…') : tr('Other receipt…')}</span></button>
       <button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="private">${tr('Private')}</button><button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="ignored">${tr('Ignore')}</button></div>

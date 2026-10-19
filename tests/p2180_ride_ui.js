@@ -258,6 +258,8 @@ const LONG = 'Website relaunch 2026 for the client';
     }
     // the agent chat: visible reactions, one tap toggles (real taps)
     await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(800);
+    // 2.98.1: wait for the agent's message (CI shard 7 under load: e was null after the fixed 800 ms)
+    await until(() => ev(`!!document.querySelector('#chat-msgs .cmsg[data-mid="a:${q1.id}"]')`), 80);
     // 2.23.0 (#823): the agent's messages show the smiley (and an open question 👍 / 👎), the rest one tap away
     const rr = await ev(`(() => { const out = []; for (const m of document.querySelectorAll('#chat-msgs .cmsg.ag')) { const bs = [...m.querySelectorAll('.rxrow .rx')].filter(b => b.offsetWidth); const r = bs.map(b => b.getBoundingClientRect()); out.push({n: bs.length, w: Math.round(Math.min(...r.map(x => x.width))), h: Math.round(Math.min(...r.map(x => x.height))), l: Math.round(Math.min(...r.map(x => x.left))), r: Math.round(Math.max(...r.map(x => x.right))), op: Math.min(...bs.map(b => +getComputedStyle(b).opacity))}); } return out; })()`);
     // 2.32.0 (#1062, owner decision): the smiley only after a long press -- before it nothing tappable under the agent's messages

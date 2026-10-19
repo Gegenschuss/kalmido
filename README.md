@@ -1,4 +1,4 @@
-<p align="center"><img src="static/icon.svg" width="112" alt="Kalmido logo: a heron standing on one leg at the water, a violet sun on the horizon"></p>
+<p align="center"><img src="static/icon.svg" width="112" alt="Kalmido logo: a friendly bot with two eyes and an antenna on a violet tile"></p>
 
 <h1 align="center">Kalmido</h1>
 
@@ -16,10 +16,27 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 <p align="center"><b>Coming soon: Kalmido hosted.</b> No server of your own, we run it for you, on servers in Germany and GDPR-compliant. Self-hosting stays free.</p>
 
 > **Language:** the interface is **English** by default, with **German** included and **French, Spanish, Italian and Dutch** in beta (machine-translated, corrections welcome); switch under *Settings > General > Language*. More languages are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md#translations) and [TRANSLATING.md](TRANSLATING.md). Kalmido = calm + the Japanese -do (道, “the way”, as in aikido or judo): the calm way of getting things done.
-> Kalmido is an independent project and not affiliated with any other task app.
+> Kalmido is an independent project and not affiliated with or endorsed by any of the products or companies named here; their names are trademarks of their respective owners and are used only to describe compatibility (import, calendar, export, agents).
 
 ## What's new
 
+- **2.114.4** (2026-10-19): office fixes 4 - a calmer quotation PDF (footer without breaks, page number only from
+  two pages, only the VAT rates that occur), the order confirmation optional, documents with PDF preview and the same
+  footer, travel costs with the per diem as the main amount.
+- **2.114.2** (2026-10-19): office fixes 2 - a finalised quotation that never left the house can be deleted or
+  taken back to a draft (same number), number scheme errors under the field with a reset button.
+- **2.114.1** (2026-10-19): office fixes - the transfer of rights as the last page of the quotation PDF, receipts in
+  the cash flow, books up to date right after a bank match, clearer bank buttons on phones.
+- **2.136.0** (2026-10-19): a new face - the Kalmido bot replaces the heron in the app icon, the empty views, the
+  celebration and the loading screen; on iPhone / iPad add the web app to the home screen again for the new icon.
+- **2.98.0** (2026-10-19): scheduling polls with a public vote link, questionnaires in forms (answers become a task at the
+  customer), the office menu as a rail on the left, resizable tables in their own window, documents guess amounts only
+  where they fit.
+- **2.101.0** (2026-10-19): *Show more* on a long description keeps the next tasks unfolded too until *Show less*
+  (per device); a trademark note in Settings > About.
+- **2.97.0** (2026-10-19): bookmarks with preview, tags and search (Karakeep fills the same store), a display name for
+  customers and the recipient always from the customer, office data and wiki spaces with a lock move between the private
+  space and an organisation.
 - **2.96.2** (2026-10-19): video sign-off at tasks, projects and clients - links from Vimeo, YouTube or a video file (no
   hosting), comments at the time code with marks, versions, a customer link with Approve / Request changes, export for
   the edit, agent access; how to contribute national e-invoice formats ([CONTRIBUTING.md](CONTRIBUTING.md)).
@@ -404,6 +421,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - Drop files from the desktop on a list: one new task per file, with the file attached
 - Subtasks up to three levels, drag and drop between lists and levels
 - Priorities, tags, pinned tasks (the smart list *Pinned* collects them from every list, 2.16), Markdown notes, attachments (images, PDFs, documents)
+- Long descriptions fold to a few lines; *Show more* keeps the following tasks unfolded too until *Show less* (per device, 2.101).
 - A website link per task, shown as a small domain chip (paste a URL in quick add or share a page from Android)
 - Quick add with two extra buttons (2.14): *Add and open details* creates the task and opens it at once, the paper clip creates it with files attached (the file name is the title when none is typed)
 - Natural-language quick add in English and German, whatever the interface language, plus French, Spanish, Italian or Dutch when the app runs in that language: `Dentist tomorrow 3pm !high #private ~Work`, `Zahnarzt morgen 15 Uhr !hoch #privat ~Arbeit`, `Dentiste demain 15h !!! #privé`
@@ -605,7 +623,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   add syntax; Enter when nothing else matches); `#123` jumps to task 123; keyboard shortcuts (`?` shows them all: arrows, Space to complete, E to rename in the list; calendar 1-4 / ← → / `.`; multi-select Ctrl/Cmd+A, Shift+↓ ↑, Shift+X, then Space, M or D for the selection; D / M open the date / list field of the multi-edit panel), compact, comfortable or custom density (the sidebar and the task rows each on their own); your account sits as your picture at the right of the *Kalmido* row (Account, Settings, Log out)
 - New accounts start with a "Getting started" list and a short welcome tour
 - A **sample project** to try things out: an image film for a client with phases, dates, dependencies, custom fields and a packing checklist, offered in the setup and the tour, removed again in one click (Settings > Data)
-- When Today is clear or a list is done, the heron celebrates (with one of 50 dry one-liners). Can be switched off.
+- When Today is clear or a list is done, the Kalmido bot celebrates (with one of 50 dry one-liners). Can be switched off.
 
 **Everywhere**
 - Installable web app (PWA) for phone and desktop, works offline: changes queue up and sync later, with conflict detection
@@ -1153,8 +1171,10 @@ calendar, CalDAV, sharing and the API work as everywhere.
 - **Review & journal**: your day or week (done, still open, moved, coming up) and a private journal with a mood.
 - **Travel**: *Trip* creates a list with the dates, sections for bookings and things to do before you leave, a packing
   list from a template and, with Events on, an all-day event.
-- **Read later**: a reading list; *Connect Karakeep…* with your own address and API key (stored encrypted) turns
-  bookmarks into tasks with their link and archives the ticked ones in Karakeep.
+- **Read later**: a reading list and **Bookmarks** (2.97.0): links with a preview, tags, a note and search, saved from the
+  share target, by pasting or with a browser button ([docs/BOOKMARKS.md](docs/BOOKMARKS.md)); *Connect Karakeep…* with
+  your own address and API key (stored encrypted) brings Karakeep's links in as bookmarks (notes stay tasks) and archives
+  the archived ones in Karakeep.
 - **Feeds** (2.85.0; its own module, off by default): follow RSS / Atom feeds (up to 100, fetched hourly by the server,
   articles kept 30 days), unread first, *Read later* turns an article into a task of your reading list; OPML import and
   export. Private to you; agents and API tokens do not see feeds.
@@ -2308,10 +2328,10 @@ Python (Flask, waitress, python-dateutil, cryptography for Web Push, the stored 
 
 | File | Use |
 |---|---|
-| `static/icon.svg` | The app icon: dark tile, white heron, violet sun |
-| `static/logo-white.svg` | White heron and horizon with the violet sun, transparent, for dark backgrounds |
-| `static/icon-light.svg` | White tile, dark heron, violet sun |
-| `static/favicon.svg` | Favicon without a tile: the heron is dark in a light browser and white in a dark one |
+| `static/icon.svg` | The app icon: the Kalmido bot (two eyes, an antenna) on the violet tile |
+| `static/logo-white.svg` | The white bot, transparent, for dark backgrounds |
+| `static/icon-light.svg` | White tile, dark bot |
+| `static/favicon.svg` | Favicon without a tile: the bot is dark in a light browser and white in a dark one |
 
 ## Limits
 

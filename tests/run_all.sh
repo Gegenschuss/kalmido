@@ -1132,6 +1132,7 @@ fresh; run p296_c_ui node p296_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p296_d_api "$PY" p296_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.96.0 part E (#1941): the separation after a move between private and organisation; moved documents are learned by the target
 fresh; run p296_e_api "$PY" p296_e_api_test.py "$KALMIDO_TEST_DATA"
+shard 4  # 2.102.0: the 2.102 suites run in shard 4 (shard 13 near the 45 min limit, shard 4 took 18 min)
 # 2.102.0 part A (#1988 #2003 #2006): organisation trash for deleted lists, calendar invitations
 fresh; run p2102_a_api "$PY" p2102_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2102_a_ui node p2102_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1145,8 +1146,35 @@ fresh; run p2102_d_api "$PY" p2102_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.102.0 part E (#1995 #1998 #1999): type check, drag library, layer linter + client error report
 fresh; run p2102_e_api "$PY" p2102_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2102_e_ui node p2102_e_ui.js "$KALMIDO_TEST_DATA"
+shard 13  # back to shard 13 for the 2.97 suites
+# 2.97.0 part A: bookmarks (#1950)
+fresh; run p297_a_api "$PY" p297_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p297_a_ui node p297_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.97.0 part B: customer display name, address from the customer (#1951)
+fresh; run p297_b_api "$PY" p297_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p297_b_ui node p297_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.97.1: the sender line with the company name (#2224)
+fresh; run p2971_api "$PY" p2971_api_test.py "$KALMIDO_TEST_DATA"
+# 2.97.0 part C: office data between the personal office and an organisation (#2049)
+fresh; run p297_c_api "$PY" p297_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p297_c_ui node p297_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.97.0 part D: locked wiki spaces re-keyed in the browser on a move, orphan clean-up (#2050 #2051)
+fresh; run p297_d_api "$PY" p297_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p297_d_ui node p297_d_ui.js "$KALMIDO_TEST_DATA"
+shard 12  # 2.98.1: the 2.98 suites run in shard 12 (shard 13 ran past the 45 min CI job limit with them, shard 12 took 18 min)
+# 2.98.0 part A: scheduling polls (#1953)
+fresh; run p298_a_api "$PY" p298_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p298_a_ui node p298_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.98.0 part B: questionnaires (#1954)
+fresh; run p298_b_api "$PY" p298_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p298_b_ui node p298_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.98.0 part C: office menu as a rail on the left, resizable tables + own window (#2180 #2181)
+fresh; run p298_c_ui node p298_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.98.0 part D: longer tick / create animation, document guesses only where they fit, comment names (#2163 #2178 #2184)
+fresh; run p298_d_api "$PY" p298_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.87.9 part E (#1914 #1920 #1909 #1933 #1937 #1952 #1963): polish
 fresh; run p287b_e_ui node p287b_e_ui.js "$KALMIDO_TEST_DATA"
+shard 11  # 2.98.1: the 2.90-2.93 and 2.99.1 suites run in shard 11 (shard 13 over 45 min, shard 11 took 18 min)
 # 2.90.0 part A (#1921): bookkeeping light (EUeR, VAT return figures, tax reserve, receipt photo)
 fresh; run p290_a_api "$PY" p290_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p290_a_ui node p290_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1174,6 +1202,30 @@ fresh; run p293_a_api "$PY" p293_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p293_a_ui node p293_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p293_b_api "$PY" p293_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p293_b_ui node p293_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.114.2 part A (#2263): a finalised quotation that was never sent can be deleted by an admin
+fresh; run p21142_a_api "$PY" p21142_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21142_a_ui node p21142_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.114.2 part B (#2264): settings field errors below the field, the field keeps its width
+fresh; run p21142_b_ui node p21142_b_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p21143_a_ui node p21143_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.114.4 part A: quotation / document PDF layout - footer, phone, page line, VAT note, option sum, producing row (#2271-#2277 #2282 #2284)
+fresh; run p21144_a_api "$PY" p21144_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.114.4 part B (#2270): order confirmation block in the quotation optional (setting + per quotation)
+fresh; run p21144_b_api "$PY" p21144_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21144_b_ui node p21144_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.114.4 part C: documents - PDF preview, variable buttons, finish with empty variables (#2278 #2280 #2281)
+fresh; run p21144_c_api "$PY" p21144_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21144_c_ui node p21144_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.114.4 part D: invoice from quotation dialog texts, travel costs allowance as main amount (#2269 #2286)
+fresh; run p21144_d_ui node p21144_d_ui.js "$KALMIDO_TEST_DATA"
+shard 13  # 2.98.1: new suites go here, above this line
+# 2.114.1 part A: bank button "Match" wording + 44 px buttons, empty heading, producing checkbox (#2017 #2254 #2255)
+fresh; run p21141_a_ui node p21141_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.114.1 part B: books reload after bank match, matched receipts in the cash flow (#2016 #2018)
+fresh; run p21141_b_api "$PY" p21141_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21141_b_ui node p21141_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.114.1 part C: transfer of rights on its own last page of the quotation PDF (#2258)
+fresh; run p21141_c_api "$PY" p21141_c_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

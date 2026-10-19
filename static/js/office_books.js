@@ -38,7 +38,7 @@ async function bkLoadUstva() {
   catch (x) { toast(x.message || tr('unknown')); }
   ofcDraw();
 }
-const bkReload = () => { BK.info = null; BK.euer = null; ofcDraw(); };
+const bkReload = () => { BK.info = null; BK.euer = null; if (typeof RKF === 'object') RKF.data = null; ofcDraw(); };  // 2.114.1 B (#2018): receipts count in the cash flow
 
 function bkTabHtml() {
   if (BK.oid !== OFC.info?.org_id || !BK.period) bkReset();  // another office area

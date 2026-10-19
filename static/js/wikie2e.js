@@ -882,3 +882,71 @@ function wkeScopeBox() {
 function wkeNewsText(it, who, q) {
   return tr('{0} released the key for the knowledge pages of {1} to you', who, q(it.data?.name || tr('Organisation')));
 }
+
+// ------------------------------------------------------------------ 2.97.0 D (#2050): to another workspace with the lock
+// A move between the private space and an organisation where one side (or both) has the lock: the server cannot read or
+// re-encrypt, so this browser opens path and text of every page (the source's key, or the plain text of an open space),
+// lets links between the moved pages follow, and encrypts both for the target (its current generation) or sends the plain
+// text when the target is open. plan = [{id, path}] with the new plain paths; the undo is the same call back with the old ones.
+const wkr_rx = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function wkr_relink(text, pairs) {
+  let t = String(text ?? '');
+  for (const [o, n] of pairs) t = t.replace(new RegExp('\\[\\[\\s*' + wkr_rx(o) + '\\s*(?=[\\]|#])', 'gi'), () => '[[' + n);
+  return t;
+}
+// names in the target compared here (a locked target cannot do it on the server): the taken ones
+function wkr_taken(dst, plan) {
+  const mine = new Set(plan.map(x => x.id)), seen = new Set(), out = [];
+  for (const x of plan) {
+    const k = x.path.toLowerCase(), o = wk_byPath(dst, x.path);
+    if (seen.has(k) || (o && !mine.has(o.id))) out.push(x.path);
+    seen.add(k);
+  }
+  return out;
+}
+// the dialog's check: the server's (rights, keys, generations) plus the names here
+async function wkr_check(src, dst, plan) {
+  await wk_load(dst);
+  const r = await rawFetch('POST', '/api/wiki/move-space', {pages: plan.map(x => x.id), space: src, to: dst, dry: 1});
+  const taken = wkr_taken(dst, plan);
+  if (!r.block && taken.length) r.block = tr('A page with this name already exists') + ': ' + taken.slice(0, 5).join(', ');
+  return r;
+}
+async function wkr_text(src, id, ix) {
+  let x = ix.get(id);
+  if (!x || typeof x.body !== 'string' || x._wke) x = await wkePage(await rawFetch('GET', '/api/wiki/pages/' + id));
+  if (!x || x._wke) throw wkeErr(tr('The space key could not be opened.'), 'wiki_e2e_key');
+  return x;
+}
+async function wkr_run(src, dst, plan, tries = 2) {
+  if ((wkeOn(src) || wkeOn(dst)) && !await e2eEnsure()) throw wkeErrLocked();
+  const chk = await rawFetch('POST', '/api/wiki/move-space', {pages: plan.map(x => x.id), space: src, to: dst, dry: 1});
+  if (chk.block) throw wkeErr(chk.block, 'wiki_e2e_block');
+  const e = chk.e2e || {}, to = e.to || {};
+  if (e.from?.mode) { await wkeInfo(src, true); await wkeKeys(src, true); }
+  if (to.mode) {
+    await wkeInfo(dst, true); await wkeKeys(dst, true);
+    const s = WKE.st[dst];
+    if (!s || s.gen !== to.gen || s.space_id !== to.space_id || !wkeReady(dst)) throw wkeErrLocked();
+  }
+  await wk_load(dst, true);
+  if (wkr_taken(dst, plan).length) throw wkeTaken();  // opened now: the names of a locked target
+  await wk_load(src, true);
+  const ix = new Map(wk_pages(src).map(x => [x.id, x])), rows = [];
+  for (const x of plan) rows.push([x, await wkr_text(src, x.id, ix)]);
+  const pairs = rows.filter(([x, p]) => x.path.toLowerCase() !== p.path.toLowerCase()).map(([x, p]) => [p.path, x.path]);
+  const pages = [];
+  for (const [x, p] of rows) {
+    const body = wkr_relink(p.body, pairs);
+    pages.push(to.mode ? {id: x.id, path: await wkeEnc(dst, 'path', wkeClean(x.path)), body: await wkeEnc(dst, 'body', body)}
+      : {id: x.id, path: wkeDefuse('path', x.path), body: wkeDefuse('body', body)});
+  }
+  try {
+    const r = await rawFetch('POST', '/api/wiki/move-space', {pages, space: src, to: dst, gens: {from: e.from?.gen || 0, to: to.gen || 0}});
+    r.moved = rows.map(([x, p]) => ({id: x.id, from: p.path, to: x.path}));  // plain names, known only here
+    return r;
+  } catch (er) {
+    if (er?.data?.code === 'wiki_e2e_gen' && tries > 1) return wkr_run(src, dst, plan, tries - 1);
+    throw er;
+  }
+}

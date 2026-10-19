@@ -47,6 +47,13 @@ function dtBlocks(text) {  // the same rules as doctpl.py dt_blocks (for the fro
   flush();
   return out;
 }
+// 2.114.4 C (#2278): the page preview (PDF, like the quotations) as a prominent button above the quick text preview
+const dtPvBtn = id => `<button type="button" class="btn pri dtp-pvbtn" data-dt="pvpdf" data-id="${id}">${ic('eye', 's')}<span>${esc(tr('Preview (PDF)'))}</span></button>`;
+async function dtPdfPreview(d) {
+  if (!await dtSave(d, true)) return;
+  const u = `/api/office/gen-docs/${d.id}/pdf`;
+  typeof pdfView === 'function' ? pdfView({url: u, name: (d.title || 'document') + '.pdf', dlUrl: u}) : window.open(u, '_blank', 'noopener');
+}
 const dtVarBar = target => `<div class="dtp-vars" role="group" aria-label="${esc(tr('Insert a variable'))}">${(DT.data?.vars || []).map(v => `<button type="button" class="btn sm ghost" data-dt="var" data-k="${esc(v.key)}" data-t="${target}" title="{{${esc(v.key)}}}">${ic('plus', 's')}<span>${esc(v.label)}</span></button>`).join('')}</div>`;
 const dtHint = () => `<p class="muted ofchint">${esc(tr('Headings start with #, list items with -. Variables are filled from the client, project, quotation and your company.'))}</p>`;
 
@@ -72,7 +79,7 @@ function dtDocsHtml(seg) {
     <span class="spacer"></span><button class="btn sm pri" data-dt="new">${ic('plus', 's')}<span>${tr('New document')}</span></button></div>`;
   if (!docs.length) return bar + `<div class="empty nempty eact">${ic('file')}<span>${(d.docs || []).length ? tr('No documents match the filter.') : (d.templates || []).length ? tr('No documents yet. Create one from a template for a client.') : tr('No documents yet. Start with a template: take over a sample under Templates.')}</span>${!(d.templates || []).length ? `<button class="btn" data-dt="view" data-v="templates">${tr('Templates')}</button>` : ''}</div>`;
   return bar + `<ul class="ofclist dtp-list" role="list">${docs.map(x => `<li><button type="button" class="ofcrow" data-dt="open" data-id="${x.id}"><span class="ofcn"><b>${esc(x.title || x.kind_label)}</b>
-    <small class="muted">${esc([x.client_name, x.list_name, x.kind_label, fmtDateLoc((x.final_at || x.created_at || '').slice(0, 10))].filter(Boolean).join(' · '))}</small></span>${dtStTag(x)}${ic('chev', 's')}</button></li>`).join('')}</ul>`;
+    <small class="muted">${esc([cdn_name(x.client_id, x.client_name), x.list_name, x.kind_label, fmtDateLoc((x.final_at || x.created_at || '').slice(0, 10))].filter(Boolean).join(' · '))}</small></span>${dtStTag(x)}${ic('chev', 's')}</button></li>`).join('')}</ul>`;
 }
 function dtTplsHtml(seg) {
   const ts = DT.data.templates || [];
@@ -85,7 +92,7 @@ function dtDocHtml(d) {
   const draft = d.status === 'draft', back = `<button class="btn sm ghost" data-dt="back">${ic('back', 's')}<span>${tr('All documents')}</span></button>`;
   const pdf = `/api/office/gen-docs/${d.id}/pdf`, spdf = pdf + '?signed=1';
   const pdfBtn = (u, label) => `<a class="btn sm" href="${u}" download data-dt="pdf"${typeof pv_attr === 'function' ? pv_attr({url: u, name: (d.title || 'document') + '.pdf', dlUrl: u}) : ''}>${ic('pdf', 's')}<span>${esc(label)}</span></a>`;
-  const meta = [d.client_name ? `${ic('brief', 's')} <a href="#client/${d.client_id}">${esc(d.client_name)}</a>` : '', d.list_id ? `${ic('list', 's')} <a href="#l/${d.list_id}">${esc(d.list_name || tr('Project'))}</a>` : '',
+  const meta = [d.client_name ? `${ic('brief', 's')} <a href="#client/${d.client_id}">${esc(cdn_name(d.client_id, d.client_name))}</a>` : '', d.list_id ? `${ic('list', 's')} <a href="#l/${d.list_id}">${esc(d.list_name || tr('Project'))}</a>` : '',
     d.doc_id ? `${ic('receipt', 's')} <a href="#office/offers/${d.doc_id}">${esc(d.offer_number || tr('Quotation'))}</a>` : '', esc(d.kind_label)].filter(Boolean).join('<span class="muted"> · </span>');
   const head = `<div class="ofcbar">${back}<span class="spacer"></span>${draft ? '' : pdfBtn(pdf, 'PDF')}${d.status === 'signed' ? pdfBtn(spdf, tr('Signed PDF')) : ''}<button class="iconbtn" data-dt="more" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>
     <div class="dtp-head"><h3>${esc(d.title || d.kind_label)} ${dtStTag(d)}</h3><p class="dtp-meta">${meta}</p></div>`;
@@ -100,7 +107,7 @@ function dtDocHtml(d) {
         <div class="aerr" role="alert" id="dt-err"></div>
         <div class="foot dtp-acts"><button class="btn danger ghost" data-dt="arch" data-id="${d.id}">${ic('archive', 's')}<span>${tr('Archive')}</span></button><span class="spacer"></span>
           <button class="btn" data-dt="save" data-id="${d.id}">${tr('Save')}</button><button class="btn pri" data-dt="final" data-id="${d.id}">${ic('check', 's')}<span>${tr('Finish')}</span></button></div></div>
-      <section class="dtp-pv" aria-label="${esc(tr('Preview'))}"><h4 class="muted">${tr('Preview')}</h4>${pv ? `${pv.missing.length ? `<p class="dtp-warn" role="status">${esc(tr('Without a value (stays empty in the PDF): {0}', pv.missing.map(k => '{{' + k + '}}').join(', ')))}</p>` : ''}<div class="dtp-doc">${dtBlocksHtml(pv.blocks)}</div>` : `<p class="muted">${tr('Loading…')}</p>`}</section></div>`;
+      <section class="dtp-pv" aria-label="${esc(tr('Preview'))}"><h4 class="muted">${tr('Preview')}</h4>${dtPvBtn(d.id)}${pv ? `${pv.missing.length ? `<p class="dtp-warn" role="status">${esc(tr('Without a value (stays empty in the PDF): {0}', pv.missing.map(k => '{{' + k + '}}').join(', ')))}</p>` : ''}<div class="dtp-doc">${dtBlocksHtml(pv.blocks)}</div>` : `<p class="muted">${tr('Loading…')}</p>`}</section></div>`;
   }
   const sg = d.sign && d.status !== 'draft' ? dtSigHtml(d) : '';
   return head + `<div class="dtp-doc dtp-final">${dtBlocksHtml(dtBlocks(d.body))}</div>
@@ -109,7 +116,7 @@ function dtDocHtml(d) {
 }
 function dtRefsHtml(cid, lid, did) {
   const d = DT.data, offers = (d.offers || []).filter(o => o.client_id === +cid);
-  return `${ofcRowF('dt-client', tr('Client'), ofcSel('dt-client', cid || '', (d.clients || []).map(c => [c.id, c.name]), tr('Choose a client')))}
+  return `${ofcRowF('dt-client', tr('Client'), ofcSel('dt-client', cid || '', (d.clients || []).map(c => [c.id, cdn_label(c)]), tr('Choose a client')))}
     ${ofcRowF('dt-list', tr('Project'), ofcSel('dt-list', lid || '', (d.lists || []).map(l => [l.id, l.name]), tr('none')))}
     ${ofcRowF('dt-offer', tr('Quotation'), ofcSel('dt-offer', did || '', offers.map(o => [o.id, [o.number || tr('Draft'), o.project_title].filter(Boolean).join(' · ')]), tr('none')))}`;
 }
@@ -126,7 +133,7 @@ async function dtPreview(id, bodyText) {
   const box = $('.dtp-pv');
   if (box && bodyText != null) {  // only the preview pane (the text field keeps focus and cursor)
     const pv = DT.pv;
-    box.innerHTML = `<h4 class="muted">${tr('Preview')}</h4>${pv.missing.length ? `<p class="dtp-warn" role="status">${esc(tr('Without a value (stays empty in the PDF): {0}', pv.missing.map(k => '{{' + k + '}}').join(', ')))}</p>` : ''}<div class="dtp-doc">${dtBlocksHtml(pv.blocks)}</div>`;
+    box.innerHTML = `<h4 class="muted">${tr('Preview')}</h4>${dtPvBtn(id)}${pv.missing.length ? `<p class="dtp-warn" role="status">${esc(tr('Without a value (stays empty in the PDF): {0}', pv.missing.map(k => '{{' + k + '}}').join(', ')))}</p>` : ''}<div class="dtp-doc">${dtBlocksHtml(pv.blocks)}</div>`;
   } else ofcDraw();
 }
 let dtPvTimer = null;
@@ -192,13 +199,17 @@ function dtTplModal(t) {
     <label for="dt-tbody" class="dtp-lab">${tr('Text')}</label>${dtVarBar('dt-tbody')}<textarea id="dt-tbody" class="dtp-ta" rows="14" maxlength="60000">${esc(t?.body || '')}</textarea>${dtHint()}
     <p class="muted ofchint">${esc(d.note || tr('Sample text, no legal advice.'))}</p>
     <div class="aerr" role="alert"></div>
-    <div class="foot">${t ? `<button class="btn danger" data-m="del">${tr('Archive')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${t ? tr('Save') : tr('Add')}</button></div>`);
+    <div class="foot">${t ? `<button class="btn danger" data-m="del">${tr('Archive')}</button>` : ''}${t && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? `<button class="btn" data-m="move">${ic('brief', 's')} ${tr('Move to another workspace…')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${t ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg', 'dtp-dlg');
   const close = fgModal(md);
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
     try {
+      if (b.dataset.m === 'move') {  // 2.97.0 C (#2049)
+        md.remove(); ofm_move({what: 'templates', ids: [t.id], from: ofm_officeFrom(), label: qn(t.name), after: async () => dtReload()});
+        return;
+      }
       if (b.dataset.m === 'del') {
         await api('DELETE', `/api/office/doc-templates/${t.id}`); md.remove(); dtReload();
         toast(tr('Archived'), async () => { await api('POST', `/api/office/doc-templates/${t.id}/restore`); dtReload(); });
@@ -238,9 +249,15 @@ async function dtStartersModal() {
 }
 function dtInsertVar(btn) {
   const ta = document.getElementById(btn.dataset.t); if (!ta) return;
-  const ins = `{{${btn.dataset.k}}}`, a = ta.selectionStart ?? ta.value.length, z = ta.selectionEnd ?? a;
+  const k = btn.dataset.k, a = ta.selectionStart ?? ta.value.length, z = ta.selectionEnd ?? a;
+  // 2.114.4 C (#2280): spaced from the text around it; an address variable gets its own line
+  const pre = ta.value.slice(0, a), post = ta.value.slice(z), line = /address$/.test(k);
+  const lead = !pre || (line ? /\n$/ : /\s$/).test(pre) ? '' : line ? '\n' : ' ';
+  const trail = !post || (line ? /^\n/ : /^\s/).test(post) ? '' : line ? '\n' : ' ';
+  const ins = lead + `{{${k}}}` + trail;
   ta.focus();
   ta.setRangeText(ins, a, z, 'end');
+  ta.setSelectionRange(a + lead.length + k.length + 4, a + lead.length + k.length + 4);
   ta.dispatchEvent(new Event('input', {bubbles: true}));
 }
 const dtDraftBody = () => ({title: $('#dt-title')?.value ?? '', body: $('#dt-body')?.value ?? '', client_id: +$('#dt-client')?.value || null, list_id: +$('#dt-list')?.value || null,
@@ -276,9 +293,14 @@ document.addEventListener('click', async e => {
   else if (a === 'topen') { const t = dtTpl(+b.dataset.id); if (t) dtTplModal(t); }
   else if (a === 'starters') dtStartersModal();
   else if (a === 'var') dtInsertVar(b);
+  else if (a === 'pvpdf' && d) dtPdfPreview(d);
   else if (a === 'save' && d) dtSave(d);
   else if (a === 'final' && d) {
     if (!await dtSave(d, true)) return;
+    // 2.114.4 C (#2281): empty variables are named before the text is frozen (the server preview of the saved draft)
+    let miss = [];
+    try { miss = (await api('POST', '/api/office/gen-docs/preview', {gen_doc_id: d.id})).missing || []; } catch {}
+    if (miss.length && !await askConfirm(tr('Finish this document?'), tr('Without a value (stays empty in the PDF): {0}', miss.map(k => '{{' + k + '}}').join(', ')), {ok: tr('Continue'), cancel: tr('Back')})) return;
     if (!await askConfirm(tr('Finish this document?'), tr('The variables are filled in, the text is frozen and the PDF is filed with the client. Afterwards it can only be copied.'), {ok: tr('Finish')})) return;
     try { await api('POST', `/api/office/gen-docs/${d.id}/final`); toast(tr('Finished and filed')); dtReload(); } catch (x) { toast(x.message || tr('unknown')); }
   } else if (a === 'arch' && d) {
@@ -288,7 +310,7 @@ document.addEventListener('click', async e => {
   } else if (a === 'more' && d) {
     menu(b, [
       d.status !== 'draft' ? {label: tr('Edit a copy'), icon: 'copy', fn: () => b.closest('#view')?.querySelector('[data-dt="copy"]')?.click()} : null,
-      d.status === 'draft' ? {label: tr('Preview (PDF)'), icon: 'eye', fn: async () => { if (await dtSave(d, true)) { const u = `/api/office/gen-docs/${d.id}/pdf`; typeof pdfView === 'function' ? pdfView({url: u, name: (d.title || 'document') + '.pdf', dlUrl: u}) : window.open(u, '_blank', 'noopener'); } }} : null,
+      d.status === 'draft' ? {label: tr('Preview (PDF)'), icon: 'eye', fn: () => dtPdfPreview(d)} : null,
       {label: tr('Archive'), icon: 'archive', cls: 'danger', fn: async () => {
         try { await api('DELETE', `/api/office/gen-docs/${d.id}`); DT.data = null; go('office/gendocs'); toast(tr('Archived'), async () => { await api('POST', `/api/office/gen-docs/${d.id}/restore`); DT.data = null; go(`office/gendocs/${d.id}`); }); } catch (x) { toast(x.message || tr('unknown')); }
       }}]);

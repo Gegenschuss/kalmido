@@ -130,6 +130,31 @@ stamp in the page (sent sooner than 3 seconds after loading or more than 24 hour
 at most 5 reports per e-mail address, form and hour, at most 3 confirmation mails per address and hour (plus the server's
 mails per address and day) and at most 5 links in the text.
 
+## Questionnaires: own questions in forms (2.98.0)
+
+A form can ask its own questions instead of subject and description (form dialog, **Questions**): short text, long
+text, a choice (one or several options), date, number, a file upload and yes / no; each with a help text and the switch
+**Required**. Drag a question by its grip to reorder it (touch too), or use the up / down buttons. A form without own
+questions stays the classic form.
+
+- **One question per step**: the page shows one question at a time with Back / Next and the progress; else all questions
+  on one page. Both work without scripts. Required answers, numbers, dates and choices are checked on the server; a send
+  with a problem shows the page again with the typed answers and opens the step of the first problem (files have to be
+  chosen again).
+- **Files**: at most three file questions per form, one file each, at most 10 MB; pictures, PDF, office formats and text
+  only. They become attachments of the new task (sealed, scanned and counted like every attachment).
+- **The task**: in the form's list (and section) as before, titled with the form and the sender; the answers stand in
+  its description as Markdown, a heading per question.
+- **Client**: with **Match the e-mail to a client** the sender's address is looked up among the clients of the list's
+  space only (the list's own client first, else the one client of the list's organisation, or of the owner's private
+  space, with that address or a contact person with it). Found: the task names the client; unknown: the task says
+  "Client unknown". **Unknown address: create a new client** (off by default) creates one there instead (at most 20 per
+  form and day).
+- **Submissions**: the form dialog lists the tasks the form made with their answers (only those still in its list and
+  not deleted) and downloads them as CSV, a column per question. Only the people who manage the form see them.
+- Moving the list into the other workspace takes its forms and their questions along; a client of the old workspace is
+  then no longer named in the submissions.
+
 ## Tracked time of a project and templates (2.63.0)
 
 - **Who sees whose time.** In the window "Tracked time" of a project, the time reports and the CSV, the owner of the list,

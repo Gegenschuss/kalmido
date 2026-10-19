@@ -7,6 +7,168 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.114.4] - 2026-10-19
+
+Office fixes 4 (quotation PDF, documents, travel costs).
+
+### Added
+- Quotations: the order confirmation block (place, date, signature of the client) is optional - an office setting
+  (default on) and a choice per quotation (like the setting / on / off); a finalised quotation keeps the state it was
+  finalised with (#2270).
+- Documents: a large "Preview (PDF)" button in the draft opens the pages like in quotations (#2278).
+
+### Changed
+- Quotation and invoice PDF: the footer columns follow their content, IBAN, BIC, e-mail and tax number never break;
+  phone numbers are printed grouped (+49 221 ...); the page number stands only in the footer and only from two pages
+  on, also in documents (#2271 #2272 #2273 #2282).
+- Quotation PDF: the VAT note names only the rates that occur; the option sum reads "Net total with option raw data";
+  the producing line gets a position number and "1 day", its formula shows only in the app; the "Client" row in the
+  head is gone, the name stands in the address (#2274 #2275 #2276 #2277).
+- Documents: the footer has the same columns as the quotation (address, contact, register, bank) (#2284).
+- Documents: variable buttons insert at the cursor with a space, the client address on lines of its own; finishing
+  with empty variables names them and asks first (#2280 #2281).
+- Travel costs: without receipts in the year the per diem is the main amount, with receipts there are two columns
+  "Per diem" and "Receipts", a missing value shows a dash (#2286).
+
+### Fixed
+- Invoice from a quotation with parts: the choice texts stand right next to their radio buttons again (#2269).
+
+## [2.114.3] - 2026-10-19
+
+### Changed
+- Quotations: the producing calculation is visible -- a hint at the switch, "like the document" or "own setting" in a part, "incl. producing 1.5 days" on each part line of the title page and a marked producing tick at the positions; the sums do not change (#2266).
+
+## [2.114.2] - 2026-10-19
+
+Office fixes 2.
+
+### Changed
+- Quotations: an admin (or a person without an organisation in their own space) can delete a finalised quotation that
+  was never sent and has no decision of the client; its number stays as a traceable gap in the office log. Sent,
+  accepted, declined or signed quotations and all invoices, credit notes and reminders stay locked (#2263).
+- Quotations: "Undo finalising" takes such a quotation back to a draft; it keeps its number and the office log notes
+  the step (#2263).
+
+### Fixed
+- Office settings: the error of a number scheme shows under the field, which keeps its full width (also on phones); a
+  "Reset" button below it brings back the last saved scheme (#2264).
+
+## [2.114.1] - 2026-10-19
+
+Office fixes.
+
+### Changed
+- Quotation PDF: the transfer of rights moves to a calm appendix on its own last page, after the part pages; above the
+  signature a short line points to it (German and English, quotations and order confirmations) (#2258).
+- Cash flow: receipts of the books count as an outgoing payment like in the profit statement, on their payment day, else
+  their document date; one matched to a bank booking counts with the booking's amount (#2018).
+
+### Fixed
+- Books, cash flow, key figures and the invoice list show the new numbers after a bank booking is matched, unmatched or
+  undone, without reloading the page (#2016).
+- Bank: the button on a suggestion reads "Assign" (German "Zuordnen"), the secondary buttons are 44 px high on phones (#2017).
+- Quotations and parts: adding a heading or a text block no longer shows an error first; it is saved with its first
+  text (#2254).
+- Calculation values: the "Calculate producing" checkbox has its normal size again (#2255).
+
+## [2.136.0] - 2026-10-19
+
+A new face: the Kalmido bot replaces the heron in the app icon and everywhere in the app.
+
+### Changed
+- New app icon, favicons, store and shortcut icons: the Kalmido bot (two eyes, an antenna) on the violet tile; the push
+  badge on Android is its white silhouette. iPhone / iPad: remove the web app from the home screen and add it again to
+  get the new icon - iOS keeps the old one otherwise (#2193).
+- The bot instead of the heron in empty views, search without results, "all done", the celebration (it pops up and hops),
+  the welcome screen, the loading screen and the error pages; a running agent job shows the bot at work, a job waiting
+  for your approval the bot waiting. Calm and gentle motion, none with "reduce motion" (#2193).
+- The sidebar and the sign-in screens show the new word mark, dark on light and light on dark (#2193).
+
+## [2.98.1] - 2026-10-19
+
+### Fixed
+- Scheduling polls: the proposed times and the end of voting use the app's own date and time pickers instead of the browser's (2.98.0 CI).
+
+## [2.98.0] - 2026-10-19
+
+Scheduling polls, questionnaires in forms, the office menu as a rail on the left, resizable tables and polish.
+
+### Added
+- Scheduling polls: propose 2 to 20 times, send a link, people vote without an account (yes / maybe / no, their own vote
+  can be changed later); the best time is highlighted and becomes an event with one click, in a Kalmido calendar or a
+  writable CalDAV calendar, an invitation mail only when you tick it. Start from the calendar, a task or a customer. Polls
+  live in the private space or an organisation and move between them. The link is unguessable, can be renewed, switched
+  off or expire; votes are limited per address and poll, no outside service (#1953).
+- Questionnaires: forms get own questions (short and long text, single and multiple choice, date, number, file, yes / no)
+  with "required" and a help text, sorted by dragging; on one page or one question per step, without scripts. A submission
+  becomes a task with the answers as Markdown and the files as attachments; on request the sender's e-mail is matched to a
+  customer of the same workspace. Submissions are listed in the form dialog and download as CSV (#1954).
+- Tables: the frame can be resized freely, also when the table is empty (kept per device); empty cells fill it and typing
+  into one creates the row or column. "Open in own window" and full screen next to "Dependencies" (#2181).
+
+### Changed
+- Office: the menu is a rail on the left with three groups (Sell, Money, Administration); every page has its own heading.
+  Services and text blocks are a "Templates" tab under Settings; travel expenses moved to Money, framework contracts to Sell.
+  On phones the office start lists the groups one below the other, and a page shows "‹ Office · group" with one swipeable
+  tab row (#2180).
+- Ticking off and creating a task animate a little longer; a ticked row leaves only after its animation (#2163).
+- Documents: amount and due date are only guessed for invoices and receipts with a total line (and for "to pay by" lines of
+  tax notices); the Paperless import takes only money fields; empty amount / due fields are hidden in the document view (#2178).
+
+### Fixed
+- A table could stay on "Loading…" when it was loaded twice at the same time (#2181).
+- Code comments no longer carry the name of another product (#2184).
+
+## [2.101.0] - 2026-10-19
+
+### Changed
+- **"Show more" for all tasks** (#2157): pressing *Show more* on a long description keeps the next tasks unfolded too, until *Show less*; a setting per device that stays after logging out.
+- **Trademark note** (#1964): Settings > About and the README say that named products are trademarks of their owners and Kalmido is not affiliated with or endorsed by them; names only, no logos.
+
+## [2.97.1] - 2026-10-19
+
+### Fixed
+- Quotations and invoices: the sender line above the address field starts with the company name ("Company · Street ·
+  Postcode City"); finalised documents keep the line they were printed with (#2224).
+- Quotations show the customer number in the key data, like invoices (#2224).
+
+## [2.97.0] - 2026-10-19
+
+Bookmarks, a display name for customers, office data and locked wiki spaces between your private space and an organisation.
+
+### Added
+- Bookmarks (Home & life, module "Read later"): save links with a preview (title, description, picture), tags, a note and
+  read / archived; cards or a list, search over everything including the page's reading text. Save from the share target,
+  by pasting, or with a browser button that asks before saving. Karakeep links arrive as bookmarks. Bookmarks move between
+  the private space and an organisation. No screenshots, no whole pages, no automatic tags (#1950).
+- Customers: an optional display name for pickers and lists (e.g. "Foo Switzerland" / "Foo Germany"); customers with the
+  same name show their city automatically. Invoices and e-invoices keep the legal name. New field "Address line 2" (#1951).
+- Office data moves between the personal office and an organisation: customers with their contact persons and drafts,
+  travel-expense drafts and document templates. Issued invoices, closed receipts, number ranges and the archive always stay
+  where they are; on request a read-only copy goes along ("copy from …", not counted in the target's figures). The target
+  numbers drafts in its own range. One step undoes it (#2049).
+- Wiki spaces with a lock: pages move between the private space and an organisation; your browser re-encrypts them for the
+  target (a warning comes before they go into an open space). One step undoes it (#2050).
+
+### Changed
+- Quotations and invoices take the recipient from the customer (name, attn., street, address line 2, postcode, city,
+  country): the document head shows it read-only with "Edit customer" and "Address missing"; without a customer you create
+  one right there. The address is frozen when a document is finalised; older documents stay as they are. The free-text
+  address of a customer is no longer in the form; where the fixed fields were empty it was taken over once (#1951).
+- "Moved out of …" under a page or table names a workspace only to its members, others see a neutral word (#2051).
+
+### Fixed
+- Files left behind by an interrupted move between workspaces are cleaned up at night (#2051).
+
+### Security
+- Security fix: link previews and moves between workspaces (organisation boundary).
+
+## [2.96.3] - 2026-10-19
+
+### Fixed
+- Video sign-off (CI 2.96.2): the agents' route for a comment names its second id like the API description, the browser demo
+  answers the video list, and the task detail keeps the comment box's focus (push button "Reply") when the section arrives (#1959).
+
 ## [2.96.2] - 2026-10-19
 
 Video sign-off with comments at the time code (links only), and an invitation to contribute national e-invoice formats.

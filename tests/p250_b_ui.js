@@ -54,7 +54,7 @@ const today = TC.today();
     await nav(B + '#office/pipeline');
     // 2.94.0 (#1930): + the column "Leads" first
     check(await ready(ev, `document.querySelectorAll('.pipcols .pipcol').length === 5`, 80), '#1196: the pipeline with five columns (leads first)');
-    check(await ev(`!!document.querySelector('.ofmenu [data-go="office/pipeline"]') && !!document.querySelector('.ofmenu [data-go="office/kpi"]')`), '#1196 #1197: both tabs for the admin');  // 2.87.9 (#1917): the office menu
+    check(await ev(`!!document.querySelector('.ofrail [data-go="office/pipeline"]') && !!document.querySelector('.ofrail [data-go="office/kpi"]')`), '#1196 #1197: both tabs for the admin');  // 2.87.9 (#1917): the office menu; 2.98.0 (#2180): the office rail
     check(await ev(`/14,000\\.00/.test(document.querySelector('.pptiles').textContent) && /4,000\\.00/.test(document.querySelector('.pptiles').textContent)`),
       '#1196: open sum and weighted sum on top ' + await ev(`document.querySelector('.pptiles')?.textContent`));
     check(await ev(`document.querySelectorAll('.ppfcl li').length === 6 && document.querySelectorAll('.ppfcl li.next').length === 1`), '#1196: the months ahead with the next one marked');
@@ -117,8 +117,8 @@ const today = TC.today();
     check(await ev(`!document.querySelector('.dc-kpi')`), '#1197: no block "Figures" for a member');
     await nav(B + 'static/icon.svg');
     await nav(B + '#office/offers');
-    check(await ready(ev, `!!document.querySelector('.ofmenu [data-go="office/offers"]') && !!OFC.info`, 80), 'the office (member)');  // 2.87.9 (#1917): the office menu (the role known)
-    check(await ev(`!document.querySelector('.ofmenu [data-go="office/pipeline"]') && !document.querySelector('.ofmenu [data-go="office/kpi"]')`), '#1196 #1197: a member sees neither tab');
+    check(await ready(ev, `!!document.querySelector('.ofrail [data-go="office/offers"]') && !!OFC.info`, 80), 'the office (member)');  // 2.87.9 (#1917): the office menu; 2.98.0 (#2180): the office rail (the role known)
+    check(await ev(`!document.querySelector('.ofrail [data-go="office/pipeline"]') && !document.querySelector('.ofrail [data-go="office/kpi"]')`), '#1196 #1197: a member sees neither tab');  // 2.98.0 (#2180): the office rail
   }, false);
 
   console.log(`p250_b_ui: ${ok} ok, ${F.length} failed`);

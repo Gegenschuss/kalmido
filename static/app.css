@@ -1353,12 +1353,11 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .tfoot .tskip{background:transparent;border-color:transparent;color:var(--muted)}
 .tfoot .tskip:hover{color:var(--text)}
 :root[data-theme="light"] .tring{box-shadow:0 0 0 2px var(--accent),0 0 0 9999px rgba(20,26,32,.42)}
-/* celebration (2.22.0, #688): the heron flies across the screen with slow wing beats; checkmark confetti falls behind it */
+/* celebration (2.22.0, #688; 2.136.0, #2193): the bot figure pops up in the middle and hops; checkmark confetti bursts */
 .cele{position:fixed;inset:0;z-index:96;overflow:hidden;color:var(--accent);cursor:pointer;touch-action:none}  /* 2.39.1 (#1292): a tap ends it */
-.cbird{position:absolute;left:0;top:0;width:8rem;will-change:transform}
-.cbird .cheron{width:100%;height:auto;aspect-ratio:7/4;filter:drop-shadow(0 .375rem 1rem rgba(0,0,0,.35))}
-.cwing{transform-box:view-box;transform-origin:50% 56.25%;will-change:transform}
-.cheron{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 .375rem 1rem rgba(0,0,0,.35))}
+.cbot{position:absolute;left:0;top:0;width:8rem;aspect-ratio:1;transform-origin:50% 100%;will-change:transform,opacity}
+.cbot .bot{width:100%;height:100%;filter:drop-shadow(0 .375rem 1rem rgba(0,0,0,.35))}
+.cbot .bot .b-hop{animation:none}
 .cconf{position:absolute;left:-.375rem;top:-.25rem;width:.75rem;height:.5rem;opacity:0;background:var(--cc,var(--accent));border-radius:.125rem;will-change:transform,opacity}
 .cconf.c{width:.625rem;height:.625rem;border-radius:50%}
 .cconf.k{left:-.625rem;top:-.625rem;width:1.25rem;height:1.25rem;background:none}
@@ -1371,7 +1370,7 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .cele-quip div{display:flex;flex-direction:column;gap:2px;min-width:0}
 .cele-quip b{font-size:var(--fs-s);font-weight:500;color:var(--accent);font-family:var(--mono)}
 .cele-quip span{font-size:var(--fs-b);color:var(--text)}
-.cele-quip .cheron{width:2.25rem;height:3rem;flex:none;color:var(--accent);filter:none}
+.cele-quip .bot{width:2.5rem;height:2.5rem}
 .cele-quip.calm{transition:none}
 @media (prefers-reduced-motion: reduce){.tring{transition:none}.cele-quip{transition:none}.flash{animation:none}}
 
@@ -2035,7 +2034,8 @@ button.tvr-task:hover{color:var(--accent)}
 .agjh{display:flex;align-items:center;gap:.5rem;margin-top:.5rem}.agjh h2{font-size:var(--fs-l);margin:0}
 .jobs{display:flex;flex-direction:column;gap:.5rem}
 .job{padding:.625rem .75rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);display:flex;flex-direction:column;gap:.375rem}
-.jobh{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}.jobh .muted{font-size:var(--fs-s)}
+.jobh{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.jobh .bot.bjob{width:1.5rem;height:1.5rem}  /* 2.136.0 (#2193): arbeitet / wartet */.jobh .muted{font-size:var(--fs-s)}
 .jst{font:500 var(--fs-xs) var(--mono);padding:0 .375rem;border-radius:var(--r-s);background:var(--bg3);color:var(--text2);line-height:1.125rem}
 .job.st-running .jst{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
 .job.st-waiting{border-color:color-mix(in srgb,var(--p3) 55%,transparent)}.job.st-waiting .jst{background:color-mix(in srgb,var(--p3) 18%,transparent);color:var(--p3)}
@@ -3221,6 +3221,11 @@ body.qsheet-open #fab{display:none}
 /* P16: the logo follows the accent */
 svg.logo{color:var(--acc-d,var(--accent));flex:none}
 .sbrand svg.logo{width:1.25rem;height:1.25rem}
+/* 2.136.0 (#2193): the word mark of the design file (icons.js wordSvg): light on dark, dark on light */
+svg.kword{display:block;height:.82em;width:auto;aspect-ratio:371.8/81;color:#EEEDF3;flex:none}
+:root[data-theme="light"] svg.kword{color:#18171D}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] svg.kword,:root:not([data-theme]) svg.kword{color:#18171D} }
+.sbrand .sbtxt > span:has(> svg.kword),.alogo b:has(> svg.kword){display:flex;align-items:center;min-height:1.2em}
 .authscreen .alogo svg.logo{width:2.125rem;height:2.125rem}
 /* P20: settings search (every tab), the phone's tab row shows that it scrolls */
 .shdr{position:relative}
@@ -3478,20 +3483,40 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 .colmv:disabled{opacity:.3}
 .colmv .cup{transform:rotate(180deg)}
 .colmd .foot{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
-/* 2.14.0: the heron (empty states, welcome, offline, errors): lines in the text colour, the sun = the accent */
-.heron{display:block;width:7.5rem;height:7.5rem;color:var(--text2);overflow:visible;flex:none}
-.heron path{vector-effect:non-scaling-stroke}
-.heron .hr-eye{fill:currentColor;stroke:none}
-.heron .hr-sun{fill:var(--accent);stroke:none}
-.heron .hr-sun.dim{opacity:.3}
-.empty svg.heron{width:7.5rem;height:7.5rem;opacity:1;margin:0 auto .75rem;stroke-width:1.6}
+/* 2.136.0 (#2193): the bot figure (render.js botFig; empty states, search, done, agents, welcome, offline, errors) instead of
+   the heron: the variants of the design file, dunkel = dark plate + white body, hell = light plate + dark body; the eyes
+   are drawn in the plate's colour, the antenna is the accent. Motion: CSS only, gentle, once (a blink, a glance, a hop),
+   a loop only for the agent states (arbeitet: the antenna sways, wartet: it bobs); nothing moves with reduced motion */
+.bot{display:block;width:7.5rem;height:7.5rem;flex:none;overflow:visible;--b-plate:#18171D;--b-body:#ffffff}
+:root[data-theme="light"] .bot{--b-plate:#F1F0F5;--b-body:#2B2A31}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] .bot,:root:not([data-theme]) .bot{--b-plate:#F1F0F5;--b-body:#2B2A31} }
+.bot .b-plate{fill:var(--b-plate)}
+.bot .b-body{fill:var(--b-body)}
+.bot .b-eyes path{stroke:var(--b-plate)}
+.bot .b-ant{stroke:var(--accent);fill:none}
+.bot.b-offline .b-ant,.bot.b-arbeitet .b-ant{opacity:.4}
+.bot .b-hop,.bot .b-eyes,.bot .b-ant{transform-box:fill-box;transform-origin:50% 50%}
+.bot .b-hop,.bot .b-ant{transform-origin:50% 100%}
+@media (prefers-reduced-motion: no-preference){
+  .bot.b-ruhig .b-eyes{animation:b-blink .36s ease-in-out .9s 1}
+  .bot.b-schaut .b-eyes{animation:b-look .7s cubic-bezier(.3,.7,.4,1) .25s 1 both}
+  .bot.b-erledigt .b-hop{animation:b-hop .75s cubic-bezier(.3,.7,.4,1) .15s 1}
+  .bot.b-arbeitet .b-ant{animation:b-sway 1.6s ease-in-out infinite}
+  .bot.b-wartet .b-ant{animation:b-bob 2.4s ease-in-out infinite}
+}
+@keyframes b-blink{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.15)}}
+@keyframes b-look{from{transform:translate(-7px,2px)}to{transform:none}}
+@keyframes b-hop{0%,100%{transform:none}35%{transform:translateY(-9px) scaleY(1.03)}62%{transform:translateY(0) scaleY(.95)}82%{transform:scaleY(1.01)}}
+@keyframes b-sway{0%,100%{transform:rotate(-14deg);opacity:.45}50%{transform:rotate(14deg);opacity:1}}
+@keyframes b-bob{0%,100%{transform:none}50%{transform:translateY(-3px)}}
+.empty svg.bot{width:6.5rem;height:6.5rem;opacity:1;margin:0 auto .75rem}
 .empty.hempty{display:flex;flex-direction:column;align-items:center;gap:.25rem;padding:2.5rem 1rem}
 .empty.hempty b{color:var(--text);font-weight:600}
 .empty.hempty span{font-size:var(--fs-s);max-width:24rem}
 .authscreen .alogo.hwelc{flex-direction:column;align-items:center;gap:.25rem}
-.authscreen .heron.hwel{width:5rem;height:5rem}
-.tcard h3 .heron.htour{width:4rem;height:4rem;margin:0 0 .5rem}
-@media (max-width:899px){ .empty svg.heron{width:6rem;height:6rem} .empty.hempty{padding:2rem 1rem} }
+.authscreen .bot.hwel{width:4.5rem;height:4.5rem}
+.tcard h3 .bot.htour{width:3.5rem;height:3.5rem;margin:0 0 .5rem}
+@media (max-width:899px){ .empty svg.bot{width:5.25rem;height:5.25rem} .empty.hempty{padding:2rem 1rem} }
 /* 2.14.0 (#425, review): rows of a list with its own columns: title, then a second line with the rest (never squeezed
    behind a long title); the cells sit level with the title's first line */
 .trow.haslc .lcols{align-self:flex-start;min-height:calc(var(--row-fs) * 1.45)}
@@ -4460,6 +4485,28 @@ button.lkchip:hover{border-color:var(--accent)}
 .qrbox img{width:15rem;height:15rem;max-width:100%;height:auto;border-radius:.5rem;background:#fff;padding:.5rem}
 .suorg{width:100%;margin:0 0 .25rem}
 .fmrow.off .n b{color:var(--muted)}
+/* 2.98.0 B (#1954): the own questions of a form (formq.js): a row per question, the grip drags it (touch too) */
+.fq-ed{margin:.25rem 0 .75rem;padding:.75rem 0 0;border-top:1px solid var(--line)}
+.fq-head{display:flex;flex-direction:column;gap:.125rem;margin-bottom:.5rem}
+.fq-head .muted{font-size:var(--fs-s)}
+.fq-list{display:flex;flex-direction:column;gap:.5rem}
+.fqe{display:flex;gap:.375rem;align-items:flex-start;padding:.5rem;border:1px solid var(--line2);border-radius:.5rem;background:var(--bg2)}
+.fqe.dragging{opacity:.55;border-color:var(--accent)}
+.fqe-grip{cursor:grab;touch-action:none;flex:none}
+.fqe-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:.375rem}
+.fqe-top{display:flex;gap:.5rem;align-items:center}
+.fqe-kind{flex:none;font-size:var(--fs-s);color:var(--accent)}
+.fqe-main input:not([type=checkbox]),.fqe-main textarea{width:100%;min-width:0}
+.fqe-btns{display:flex;flex-direction:column;flex:none}
+.fq-add{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.5rem 0 .75rem}
+.fq-chks{display:flex;flex-direction:column;gap:.375rem}
+.fq-entries{display:flex;flex-direction:column;gap:.375rem;max-height:60vh;overflow:auto}
+.fqen{border:1px solid var(--line2);border-radius:.5rem;padding:.5rem .75rem}
+.fqen summary{cursor:pointer;min-height:2.75rem;display:flex;align-items:center}
+.fqen dl{margin:.5rem 0;display:grid;grid-template-columns:minmax(0,1fr);gap:.125rem}
+.fqen dt{font-size:var(--fs-s);color:var(--muted);margin-top:.375rem}
+.fqen dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+@media (pointer:coarse){ .fqe-btns .iconbtn,.fqe-grip{width:2.75rem;height:2.75rem} }
 @media (pointer:coarse){ .wlcap{min-height:2.75rem} .tvclient .iconbtn{width:2.75rem;height:2.75rem} }
 .cltable a,.clcard h2 a,.tvclient a{color:var(--text)}
 /* 2.23.0 (#823): the quick reactions of a chat message behind the smiley again (open: .rxshow); 👍 / 👎 of an open
@@ -5207,6 +5254,12 @@ section.ofdsec h3{min-height:2.5rem;display:flex;align-items:center}
 .ofdit .ofdlt{margin-left:auto;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:6rem;text-align:right}
 .ofdit .ofdflags{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;font-size:var(--fs-s)}
 .ofdit .ofdflags .chkl{display:inline-flex;align-items:center;gap:.25rem;min-height:1.75rem}
+/* 2.114.3 (#2266): producing visible -- the ticked producing flag, the hint at the switch, a part's source, the note on a part line */
+.ofdit .ofdflags .chkl.ofdprodf.on{color:var(--accent);background:var(--accent-soft);border-radius:9999px;padding:0 .5rem;font-weight:600}
+.ofdrules .ofdprodhint{display:block;margin-top:.25rem}
+.tpprodsrc{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.375rem}
+.tpprodsrc.own .rotag{color:var(--accent)}
+.tppl .tpprod{font-size:var(--fs-s)}
 .ofdit .ofdcost input{width:5rem;margin-left:.25rem}
 .ofdit .ofdmv{display:flex;flex-direction:column;gap:.125rem;flex:0 0 auto}
 .ofdit .ofdmv .ib{min-width:1.75rem;min-height:1.75rem}
@@ -5390,17 +5443,19 @@ html.mini #side,html.mini #tabs,html.mini #top .menu,html.mini #chatfab,html.min
 html.mini #app{grid-template-columns:minmax(0,1fr)}
 html.mini .qdock{display:block;bottom:0;padding-bottom:.75rem}
 html.mini #app.detail-open{grid-template-columns:minmax(0,1fr) var(--detW,25.5rem)}
-/* 2.39.1 (#1213): the loading screen of a cold start (index.html #boot): the heron and a running bar in the accent colour;
+/* 2.39.1 (#1213): the loading screen of a cold start (index.html #boot): the app icon and a running bar in the accent colour
+   (2.136.0, #2193: the bot figure, its antenna sways while the app loads);
    it fades out once the first state is drawn (main.js bootDone), never over the sign-in screen, not on reloads in a session */
 #boot{position:fixed;inset:0;z-index:65;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.75rem;background:var(--bg);transition:opacity .2s ease}
 #boot svg{width:6rem;height:6rem;border-radius:1.375rem}
+#boot .bant{transform-box:fill-box;transform-origin:50% 100%;animation:b-sway 1.6s ease-in-out infinite}
 #boot .bootbar{position:relative;width:8.5rem;height:.1875rem;border-radius:62.4375rem;background:color-mix(in srgb,var(--text) 14%,transparent);overflow:hidden}
 #boot .bootbar::after{content:"";position:absolute;inset:0;width:40%;border-radius:inherit;background:var(--accent);animation:bootrun 1.1s ease-in-out infinite}
 @keyframes bootrun{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
 #boot.out{opacity:0;pointer-events:none}
 .rebooting #boot,body:has(.authscreen) #boot{display:none}
 @media (prefers-color-scheme: light){ :root:not([data-theme]) #boot{background:#ffffff} }
-@media (prefers-reduced-motion: reduce){ #boot{transition:none} #boot .bootbar::after{animation:none;width:100%;opacity:.7} }
+@media (prefers-reduced-motion: reduce){ #boot{transition:none} #boot .bootbar::after{animation:none;width:100%;opacity:.7} #boot .bant{animation:none} }
 /* 2.39.1 (#1182): office legacy import (office_import.js) -- cards instead of a wide table, also on desktop */
 .oimgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.375rem}
 .oimfl{display:flex;flex-direction:column;gap:.125rem;font-size:var(--fs-s);color:var(--muted);min-width:0}
@@ -5651,33 +5706,47 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .mgtabs .recdot{margin-left:.125rem}
 .modrow.mgarea .mgparts>.modlist{margin:.375rem 0 0 .75rem;padding-left:.75rem;border-left:2px solid var(--line2)}
 @media (max-width:640px){.mgtabs{margin:.25rem 0 .75rem}.mgtabs button{min-height:2.75rem;padding:.25rem .5rem}}
-/* 2.87.9 (#1917): the office menu -- computer: the four groups side by side, each with its points (sticky, the point shown
-   in the accent); phone: the path "Office › group" (back to the start tiles) and the group's points (they wrap, never
-   scroll: #1830); the start page tiles;
-   the path of a detail page as grey text */
-.ofmenu{position:sticky;top:0;z-index:3;display:flex;flex-wrap:wrap;gap:.5rem 1.5rem;max-width:72rem;margin:0 auto .875rem;padding:.5rem 0;background:var(--bg);border-bottom:1px solid var(--line)}
-.ofmg{display:flex;flex-direction:column;gap:.125rem;min-width:0}
-.ofmgh{display:flex;align-items:center;gap:.375rem;padding:0 .625rem;font-size:var(--fs-xs);font-weight:600;color:var(--muted)}
-.ofmgi,.ofmsib{display:flex;flex-wrap:wrap;gap:.125rem}
-.ofmi{display:inline-flex;align-items:center;gap:.375rem;min-height:2.25rem;padding:.25rem .625rem;border:0;border-radius:var(--r-s);background:none;color:var(--text2);font:inherit;white-space:nowrap;cursor:pointer}
-.ofmi:hover{background:var(--bg3);color:var(--text)}
-.ofmi.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
-.ofmbar{position:sticky;top:0;z-index:3;display:flex;flex-direction:column;gap:.25rem;margin:0 0 .75rem;padding:.375rem 0 .5rem;background:var(--bg);border-bottom:1px solid var(--line)}
-.ofmpath,.ofmcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:.375rem;font-size:var(--fs-s);color:var(--muted);min-width:0}
-.ofmhome{border:0;background:none;padding:.25rem 0;min-height:2.75rem;color:var(--accent);font:inherit;font-weight:600;cursor:pointer}
-.ofmsib .ofmi{min-height:2.75rem;flex:none}
-.ofmcrumb{max-width:72rem;margin:-.375rem auto .625rem}
+/* 2.98 (#2180): the office rail on the left (computer; replaces the menu bar of 2.87.9, #1917), a phone's start list
+   and its path "< Office · group" with the group's points as one row of underlined tabs (no wrap, it scrolls sideways);
+   the path of a detail page stays grey text */
+.ofwrap{display:grid;grid-template-columns:15rem minmax(0,1fr);gap:0 2.25rem;max-width:72rem;margin:0 auto;align-items:start}
+.ofrail{position:sticky;top:0;display:flex;flex-direction:column;gap:1.125rem;padding:.125rem 1.25rem 1rem 0;border-right:1px solid var(--line)}
+.ofrg{display:flex;flex-direction:column;gap:.0625rem}
+.ofrh,.oflg h3{padding:0 .625rem .375rem;font-size:var(--fs-xs);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ofri{display:flex;align-items:center;gap:.625rem;width:100%;min-height:2.125rem;padding:.3125rem .625rem;border:0;border-radius:var(--radius);background:none;color:var(--text2);font:inherit;font-size:var(--fs-b);text-align:left;cursor:pointer}
+.ofri svg{width:1rem;height:1rem;color:var(--faint);flex:none}
+.ofri span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ofri:hover{background:var(--bg2);color:var(--text)}
+.ofri.on{background:var(--accent-soft);color:var(--accent);font-weight:500}
+.ofri.on svg{color:var(--accent)}
+.ofri:focus-visible,.ofpt2:focus-visible,.ofpback:focus-visible,.oflr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ofbody{min-width:0}
+.ofpt{margin:.125rem 0 .875rem;font-size:var(--fs-l);font-weight:600;color:var(--text)}
+.ofbody .ofmcrumb{margin:.125rem 0 .875rem}
+@media (max-width:1099px){.ofwrap{grid-template-columns:12rem minmax(0,1fr);gap:0 1.5rem}.ofri{font-size:var(--fs-m)}}
+.ofpb{position:sticky;top:0;z-index:3;display:flex;flex-direction:column;margin:0 0 .75rem;background:var(--bg);border-bottom:1px solid var(--line)}
+.ofpback{display:inline-flex;align-items:center;gap:.25rem;align-self:flex-start;min-height:2.75rem;padding:0 .25rem 0 0;border:0;border-radius:var(--radius);background:none;color:var(--muted);font:inherit;font-size:var(--fs-s);cursor:pointer}
+.ofpback svg{width:.875rem;height:.875rem;transform:rotate(90deg)}
+.ofpts{display:flex;flex-wrap:nowrap;gap:1.25rem;overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain}
+.ofpts::-webkit-scrollbar{display:none}
+.ofpt2{display:inline-flex;align-items:center;gap:.375rem;flex:none;min-height:2.75rem;padding:0 .125rem;border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);font:inherit;font-size:var(--fs-b);font-weight:500;white-space:nowrap;cursor:pointer}
+.ofpt2 svg{width:1rem;height:1rem}
+.ofpt2.on{color:var(--text);border-bottom-color:var(--accent)}
+.ofpt2.on svg{color:var(--accent)}
+.ofmcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:.375rem;max-width:72rem;margin:-.375rem auto .625rem;font-size:var(--fs-s);color:var(--muted);min-width:0}
 .ofmcrumb span:last-child{color:var(--text2)}
 .ofmstart{display:flex;flex-direction:column;gap:.875rem;max-width:72rem;margin:0 auto}
-.ofmtiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));gap:.75rem}
-.ofmtile{display:flex;flex-direction:column;gap:.25rem;padding:.75rem;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r-l)}
-.ofmtile h3{display:flex;align-items:center;gap:.5rem;margin:0 0 .25rem;font-size:var(--fs-m)}
-.ofmtile h3 svg{color:var(--accent)}
-.ofmti{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.75rem;padding:.25rem .5rem;border:0;border-radius:var(--r-s);background:none;color:var(--text);font:inherit;text-align:left;cursor:pointer}
-.ofmti:hover{background:var(--bg3)}
-.ofmti svg{color:var(--muted)}
 .ofmfig{padding:.75rem;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r-l)}
-@media (max-width:899px){.ofmtiles{grid-template-columns:1fr 1fr;gap:.5rem}.ofmtile{padding:.625rem .5rem}}
+.ofl{display:flex;flex-direction:column;gap:1rem}
+.oflg h3{margin:0;padding-top:.25rem}
+.oflc{display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r-l);overflow:hidden}
+.oflr{display:flex;align-items:center;gap:.75rem;width:100%;min-height:2.875rem;padding:.375rem .875rem;border:0;border-top:1px solid var(--line);background:none;color:var(--text);font:inherit;font-size:var(--fs-b);text-align:left;cursor:pointer}
+.oflr:first-child{border-top:0}
+.oflr:hover{background:var(--bg3)}
+.oflr>svg:first-child{width:1.125rem;height:1.125rem;color:var(--accent);flex:none}
+.oflr>span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.oflr>svg:last-child{width:1rem;height:1rem;color:var(--faint);transform:rotate(-90deg);flex:none}
+.ofrset{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;margin:0 0 .875rem}
 /* 2.45.0 D (#1504): the start page -- one sentence on top, Today with a box to add, compact News, slim empty cards, two
    columns (wide main, narrow side; every column stacks on its own), the app font everywhere, links without underline */
 .hpsum{margin:-.5rem 0 1.125rem;color:var(--text2);font-size:var(--fs-b)}
@@ -5852,7 +5921,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 @keyframes an_popout{from{opacity:1;transform:none}to{opacity:0;transform:scale(.8)}}
 @keyframes an_hint{from{opacity:0}to{opacity:1}}
 .trow.an-rowout{opacity:0;transform:translateX(.75rem);transition:opacity .18s ease-in,transform .18s ease-in;pointer-events:none}
-.trow.an-rowin{animation:an_rowin .2s ease-out}
+.trow.an-rowin{animation:an_rowin .3s ease-out}  /* 2.98.0 D (#2163): .2 s -> .3 s */
 @media (max-width:899px){
   #fab:not(.gone){animation:an_pop .2s ease-out}
   #fab.gone.an-out{display:grid!important;animation:an_popout .18s ease-in forwards;pointer-events:none}
@@ -7317,12 +7386,8 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .o3c-ring{flex:none;width:.875rem;height:.875rem;border-radius:50%;background:conic-gradient(var(--accent) calc(var(--p) * 1%),var(--bg4) 0);-webkit-mask:radial-gradient(farthest-side,transparent 58%,#000 62%);mask:radial-gradient(farthest-side,transparent 58%,#000 62%)}
 /* ticking off: the circle pops (transform + opacity only, 200 ms); none with reduced motion */
 @keyframes o3c-pop{0%{transform:scale(.7);opacity:.4}60%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:1}}
-.chk.o3c-pop{animation:o3c-pop .2s ease-out}
+.chk.o3c-pop{animation:o3c-pop .35s ease-out}  /* 2.98.0 D (#2163): .2 s -> .35 s (sheetmotion.js UI_POP_MS keeps the row's exit behind it) */
 @media (prefers-reduced-motion: reduce){ .chk.o3c-pop{animation:none} }
-/* empty pages: the K as a calm line drawing, its dot in the accent */
-.empty svg.o3c-k{width:7.5rem;height:5.625rem;opacity:1;margin:0 auto .75rem;color:var(--text2);stroke-width:2.4}
-.o3c-k .o3c-kdot{fill:var(--accent);stroke:none}
-@media (max-width:899px){ .empty svg.o3c-k{width:6rem;height:4.5rem} }
 /* 2.84.0 A (#1198) e-mail as an input of the hub: the section "E-mails" (client card, project page), the reading view, the inbox */
 .hbmwrap{display:flex;flex-direction:column;gap:.5rem}
 .hbmq{display:flex;align-items:center;gap:.375rem;background:var(--bg3);border:1px solid var(--line2);border-radius:var(--radius);padding:0 .5rem}
@@ -7383,6 +7448,8 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .smv .smv-notes ul{margin:0;padding-left:1.125rem}
 .smv .smv-notes li{margin:.125rem 0}
 .smv .smv-block{display:flex;gap:.375rem;align-items:flex-start;color:var(--danger, #c0392b);margin:0 0 .375rem}
+/* 2.97.0 C (#2049): the tick box of a move (copies of issued documents) */
+.smv .smv-opt{min-height:2.75rem;gap:.5rem;cursor:pointer}
 /* 2.96.0 A (#1941): choosing rows in the file store (to move them, also into the other workspace) */
 .absel{display:flex;align-items:center;justify-content:center;flex:0 0 2.75rem;min-height:2.75rem;cursor:pointer}
 .absel input{width:1.25rem;height:1.25rem;accent-color:var(--accent)}

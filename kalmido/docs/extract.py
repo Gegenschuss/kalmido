@@ -203,11 +203,7 @@ def doc_amount(text):
             best = cand
     if best:
         return {"amount": best[2], "currency": best[3] or _doc_currency(text)}
-    with_cur = [(float(v), v, cur) for ln in lines for v, cur, dec in find_amounts(ln) if cur and dec]
-    if with_cur:
-        _, v, cur = max(with_cur)
-        return {"amount": v, "currency": cur}
-    return None
+    return None      # 2.98.0 D (#2178): no total line, no guess (the largest amount with a currency is gone)
 
 
 def _doc_currency(text):
@@ -215,13 +211,46 @@ def _doc_currency(text):
     return CUR_CODE.get(m.group(0).lower()) if m else None
 
 
-def extract(text, today=None):
-    """{'date': 'YYYY-MM-DD' | None, 'due': .. | None, 'amount': '12.34' | None, 'currency': 'EUR' | None}."""
+PAY_RE = re.compile(r"(?:nach|zu)\s*zu?zahl\w*|nachzahlung|zahlbetrag", re.I)
+PAY_BY = re.compile(r"\b(?:bis(?:\s+zum)?|sp(?:ä|ae)testens(?:\s+(?:bis|am|zum))?|am|zum)\s*", re.I)
+
+
+def pay_line(text, today=None):
+    """2.98.0 D (#2178): (due date | None, amount | None) of a line like 'Nachzahlung 123,45 EUR zu zahlen bis 15.11.2026' (a tax
+    notice that is no invoice); both come from that one line (the amount may sit on the next line)."""
+    lines = [ln.strip() for ln in _clean(_fold(text)[:TEXT_CAP]).splitlines() if ln.strip()]
+    for i, ln in enumerate(lines):
+        m = PAY_RE.search(ln)
+        if not m or NOT_TOTAL.search(ln.lower()):
+            continue
+        due = None
+        for s, _e, d in find_dates(ln):
+            if s > m.start() and plausible(d, today) and PAY_BY.search(ln[:s]):
+                due = d
+                break
+        if not due:
+            continue
+        bare = ln
+        for s0, e0, _d in reversed(find_dates(ln)):      # a date is no amount ("03.11" would read as 3.11)
+            bare = bare[:s0] + " " * (e0 - s0) + bare[e0:]
+        am = find_amounts(bare) or (find_amounts(lines[i + 1]) if i + 1 < len(lines) and len(ln) < 60 else [])
+        v, cur = (am[-1][0], am[-1][1]) if am else (None, None)
+        return due, ({"amount": v, "currency": cur or _doc_currency(ln)} if v else None)
+    return None, None
+
+
+def extract(text, today=None, guess=True):
+    """{'date': 'YYYY-MM-DD' | None, 'due': .. | None, 'amount': '12.34' | None, 'currency': 'EUR' | None}. guess False (a
+    document that is no invoice / receipt): the due date and amount only from a 'to pay until' line (pay_line)."""
     d = doc_date(text or "", today)
-    due = due_date(text or "", d, today)
+    if guess:
+        due = due_date(text or "", d, today)
+        a = doc_amount(text or "") or {}
+    else:
+        due, a = pay_line(text or "", today)
+        a = a or {}
     if due and d and due < d:
         due = None
-    a = doc_amount(text or "") or {}
     return {"date": d.isoformat() if d else None, "due": due.isoformat() if due else None,
             "amount": a.get("amount"), "currency": a.get("currency")}
 

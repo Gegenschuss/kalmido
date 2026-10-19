@@ -35,6 +35,14 @@ budget against the time booked, or plain lists (equipment, shooting plan, contac
   deleted source *Source deleted* with the last value you saw.
 - **Team.** Changes of others appear within seconds; the cell you are editing is never overwritten, and *Anna is editing B4*
   shows who works where. Changes made by an agent are marked and can be taken back per call in the panel.
+- **The frame (2.98.0).** On a computer the grip at the bottom right corner of the grid makes the frame wider / narrower
+  and higher / lower, also while the table is empty (or focus the grip and use the arrow keys, Shift for bigger steps);
+  the size is kept per table on this device, a double click on the grip (or Home) goes back to the automatic size. Empty
+  columns and rows fill the frame; they are only shown, nothing is created until you type into one of them: then the
+  missing rows and columns are added and the value written, one undo step. *Open in its own window* (next to
+  *Dependencies*) opens the table alone in a window of its own (no sidebar), for working next to the app or on a second
+  screen; changes show in both windows within seconds. The button next to it switches full screen on and off (Esc leaves
+  it). A phone shows the grid as before, without these buttons.
 - **Undo.** Every action (a cell, a paste, sorting, a column, a row, creating, renaming, deleting) is one step back (the
   arrow on top, Ctrl/Cmd+Z, the toast). Deleted tables, columns and rows can be restored.
 

@@ -52,3 +52,38 @@
 .apb-main span{overflow-wrap:anywhere}
 .apb-st{font-size:var(--fs-xs);color:var(--accent)}
 @media (max-width:40rem){.apb-hm .dpbtn{min-width:5.5rem}.apb-day .chkl{min-width:100%}}
+/* 2.98.0 A (#1953): scheduling polls (polls.js): the list, the times of the form, one card per proposed time with its bar (yes
+   in the accent, maybe lighter), the best / chosen time marked, the link row; phones: everything one column, large targets */
+.tpo-dlg .card{max-width:34rem}
+.tpo-list{display:flex;flex-direction:column;gap:.375rem;margin:.5rem 0}
+.tpo-li{display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;text-align:left;padding:.625rem .75rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);min-height:2.75rem}
+.tpo-li:hover,.tpo-li:focus-visible{border-color:var(--accent)}
+.tpo-li.tpo-closed .tpo-lt{color:var(--text2)}
+.tpo-lt{font-weight:600;overflow-wrap:anywhere}
+.tpo-ls{font-size:var(--fs-xs)}
+.tpo-times{border:0;padding:0;margin:.5rem 0;min-width:0}
+.tpo-times legend{font-size:var(--fs-xs);color:var(--muted);margin-bottom:.25rem}
+.tpo-rows{display:flex;flex-direction:column;gap:.375rem}
+.tpo-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,7rem) auto;gap:.375rem;align-items:center}
+.tpo-row .dpbtn{min-height:2.5rem;width:100%}
+.tpo-sub{margin:.125rem 0 .5rem;font-size:var(--fs-xs)}
+.tpo-link{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.375rem;align-items:center;margin:.25rem 0}
+.tpo-link input{min-height:2.5rem;font:var(--fs-xs) var(--mono)}
+.tpo-link input.tpo-off{opacity:.55}
+.tpo-qr{display:flex;justify-content:center;margin:.5rem 0}
+.tpo-qr img{width:11rem;height:11rem;border-radius:.375rem;background:#fff}
+.tpo-desc{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text2);margin:.5rem 0}
+.tpo-opts{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.5rem}
+.tpo-o{border:1px solid var(--line2);border-radius:var(--radius);padding:.625rem .75rem;display:flex;flex-direction:column;gap:.375rem;background:var(--bg2)}
+.tpo-o.tpo-best,.tpo-o.tpo-chosen{border-color:var(--accent);background:var(--accent-soft)}
+.tpo-oh{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
+.tpo-ow{font-weight:600}
+.tpo-tag{font-size:var(--fs-xs);color:var(--accent);border:1px solid var(--accent);border-radius:1rem;padding:0 .5rem}
+.tpo-bar{display:flex;height:.375rem;border-radius:.25rem;background:var(--bg4);overflow:hidden}
+.tpo-by{background:var(--accent)}
+.tpo-bm{background:color-mix(in srgb,var(--accent) 40%,var(--bg4))}
+.tpo-oc,.tpo-on{font-size:var(--fs-xs)}
+.tpo-on{display:flex;flex-direction:column;gap:.125rem;color:var(--text2);overflow-wrap:anywhere}
+.tpo-o .btn{align-self:flex-start;min-height:2.5rem}
+.tpo-dw{font-size:1.0625rem;margin:.25rem 0}
+@media (max-width:40rem){.tpo-row{grid-template-columns:minmax(0,1fr) minmax(0,6rem) auto}.tpo-o .btn{align-self:stretch;justify-content:center}}

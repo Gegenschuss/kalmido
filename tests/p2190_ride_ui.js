@@ -128,9 +128,16 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
     check(await until(() => ev(`!!document.querySelector('.palette') && !document.querySelector('#side.open')`), 30), `${tag}: one tap: the drawer closes, search opens`);
     await ev(`(() => { closePalette(); return 1; })()`);
     // the chat "+" with a real tap
-    await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(800);
-    await ev(`(() => { document.querySelector('#chat-msgs .cmsg[data-mid="a:${q1.id}"] .rxrow .rxtog')?.click(); return 1; })()`); await sleep(300);  // 2.23.0 (#823): behind the smiley
-    const pb = await ev(`(() => { const e = document.querySelector('#chat-msgs .cmsg[data-mid="a:${q1.id}"] .rxrow [data-act="rx-more"]'); e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height}; })()`);
+    await o.nav(B + '#agents/' + AG); await ready(ev);
+    // 2.98.1: in CI the navigation to the same page with only a new #fragment sometimes stays on the list (#l/4, no chat):
+    // set the hash in the page as well, so the app's router opens the agent chat
+    await ev(`(() => { if (location.hash !== '#agents/${AG}') location.hash = '#agents/${AG}'; return 1; })()`);
+    // 2.101.0: the agent chat loads on demand (#1823) - wait for the message instead of a fixed pause (CI is slower than the Mac)
+    const MSG = `#chat-msgs .cmsg[data-mid="a:${q1.id}"]`;
+    check(await until(() => ev(`!!document.querySelector('${MSG} .rxrow .rxtog')`), 60), `${tag}: the agent chat shows the message with its smiley ` + await ev(`(() => location.hash + ' msgs=' + document.querySelectorAll('#chat-msgs .cmsg').length)()`));
+    await ev(`(() => { document.querySelector('${MSG} .rxrow .rxtog')?.click(); return 1; })()`);  // 2.23.0 (#823): behind the smiley
+    check(await until(() => ev(`!!document.querySelector('${MSG} .rxrow [data-act="rx-more"]')`), 40), `${tag}: the smiley opens the reactions with "+"`);
+    const pb = await ev(`(() => { const e = document.querySelector('${MSG} .rxrow [data-act="rx-more"]'); if (!e) return {w: 0, h: 0}; e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height}; })()`);
     check(pb.w >= 43.5 && pb.h >= 43.5, `${tag}: "+" is a 44 px target ` + JSON.stringify(pb));
     await tap(pb.x, pb.y);
     check(await until(() => ev(`!!document.querySelector('#pop:not(.hidden) .rxgrid')`), 30), `${tag}: one tap opens the emoji grid`);

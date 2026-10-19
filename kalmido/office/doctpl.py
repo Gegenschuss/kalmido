@@ -264,15 +264,14 @@ def dt_offer(c, oid, did, cid):
     return r
 
 
-def _addr(cl):
-    """The client's address in one line: the billing fields (street, zip city, country) or the free address."""
-    parts = [x for x in ((cl.get("street") or "").strip(), " ".join(y for y in ((cl.get("zip") or "").strip(), (cl.get("city") or "").strip()) if y))
-             if x]
+def _addr(cl, sep=", "):
+    """The client's address in one line: street, extra line, zip city, country (2.97.0 B #1951: the fixed fields only; the
+    old free address was split into them, see team/clients.cdn_backfill)."""
+    parts = [x for x in ((cl.get("street") or "").strip(), (cl.get("address_extra") or "").strip(),
+                         " ".join(y for y in ((cl.get("zip") or "").strip(), (cl.get("city") or "").strip()) if y)) if x]
     if parts and (cl.get("country") or "").strip() and (cl.get("country") or "").strip().upper() != "DE":
         parts.append(cl["country"].strip())
-    if not parts:
-        parts = [x.strip() for x in (cl.get("address") or "").replace("\r", "").split("\n") if x.strip()]
-    return ", ".join(parts)
+    return sep.join(parts)  # 2.114.4 C (#2280): sep="\n" for the document variable (own lines)
 
 
 def dt_values(c, oid, lang, client_id=None, list_id=None, doc_id=None):
@@ -290,7 +289,7 @@ def dt_values(c, oid, lang, client_id=None, list_id=None, doc_id=None):
         cl = dt_client(c, oid, client_id)
         k = fk_contact(c, cl["id"])
         v["client.name"] = cl["name"] or ""
-        v["client.address"] = _addr(cl)
+        v["client.address"] = _addr(cl, "\n")  # 2.114.4 C (#2280): street / zip city on own lines
         v["client.contact"] = (k["name"] if k else "") or cl.get("contact") or ""
         if doc_id:
             r = dt_offer(c, oid, doc_id, cl["id"])
@@ -306,7 +305,9 @@ def dt_values(c, oid, lang, client_id=None, list_id=None, doc_id=None):
         v["project.title"] = dt_list_ok(c, oid, list_id)["name"] or ""
     # a value never brings variables of its own (no second round of replacing) nor markup: "# ", "- ", "* " at its start
     # get a non-breaking space (looks the same, dt_blocks reads no heading / list item)
-    return {k: re.sub(r"^([#*-]+) ", "\\1\u00a0", " ".join(str(x).replace("{{", "{").replace("}}", "}").split())) for k, x in v.items()}
+    # 2.114.4 C (#2280): line breaks in a value stay (each line cleaned on its own, the markup guard applies per line)
+    return {k: "\n".join(re.sub(r"^([#*-]+) ", "\\1\u00a0", " ".join(ln.split())) for ln in str(x).replace("{{", "{").replace("}}", "}").splitlines() if ln.strip())
+            for k, x in v.items()}
 
 
 def dt_fill(text, values, mark=False):
@@ -492,13 +493,10 @@ def dt_pdf(c, oid, d, signed=None, client=None):
         page.text(P.PDF_L + 10, yy + 2, tr("Signed through a customer link of {0}.", co.get("name") or "", lg=lang), 7.6, False, P.C_INK2)
         y += bh
     total = len(pages)
-    foot = " · ".join(str(x) for x in [co.get("name") or ""] + list(co.get("lines") or []) + list(co.get("contact_lines") or []) if str(x).strip())
+    foot = P.pdf_footer_cols(co)  # 2.114.4 A (#2284): the same columns as a quotation (address, contact, register, bank)
     for n, p in enumerate(pages, 1):
-        top = P.A4_H - 12 * P.MM - P.PDF_FOOT_H
-        p.line(P.PDF_L, top, P.PDF_L + P.PDF_CW, top, 0.5, P.C_RULE)
-        for j, s in enumerate(P.pdf_wrap(foot, 6.9, P.PDF_CW)[:3]):
-            p.text(P.PDF_L, top + 5 + j * 9.6, s, 6.9, False, P.C_INK2)
-        p.text(P.PDF_L + P.PDF_CW, P.A4_H - 9 * P.MM, tr("Page {0} of {1}", n, total, lg=lang), 6.8, False, P.C_INK2, align="r")
+        # 2.114.4 A (#2282): the page count only from two pages on
+        P.pdf_draw_footer(p, foot, tr("Page {0} of {1}", n, total, lg=lang) if total >= 2 else "")
     meta = {"when": datetime.now(timezone.utc), "producer": f"Kalmido {APP_VERSION}"}
     return P.pdf_write(pages, images, title=title, author=co.get("name") or "", meta=meta)
 

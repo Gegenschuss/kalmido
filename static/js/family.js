@@ -112,7 +112,7 @@ function viewKid() {
   return `<div class="kidv"><div class="kidtop"><h2>${esc(hi < 11 ? tr('Good morning, {0}', S.me.display_name) : hi < 18 ? tr('Hello, {0}', S.me.display_name) : tr('Good evening, {0}', S.me.display_name))}</h2>
     <div class="kidbal" role="status" aria-label="${esc(trn('You have {0} star', 'You have {0} stars', k.stars))}"><span aria-hidden="true">★</span><b>${k.stars}</b></div></div>
     <h3 class="kidsec">${tr('My tasks')}</h3>
-    ${own.length ? ul(own) : mine.length || shared.length ? `<p class="muted kd_empty">${tr('Nothing to do right now.')}</p>` : heronEmpty('done', tr('Nothing to do right now.'), '')}
+    ${own.length ? ul(own) : mine.length || shared.length ? `<p class="muted kd_empty">${tr('Nothing to do right now.')}</p>` : botEmpty('erledigt', tr('Nothing to do right now.'), '')}
     ${shared.map(l => { const ts = mine.filter(t => t.list_id === l.id);
       return `<section class="kd_list" data-kd-list="${l.id}"><h3 class="kidsec">${esc(lname(l))}</h3>${ts.length ? ul(ts) : `<p class="muted kd_empty">${tr('Nothing here for you right now.')}</p>`}</section>`; }).join('')}
     ${todo.length || !mine.length ? '' : `<p class="kidyay">${tr('All done. Great job!')}</p>`}

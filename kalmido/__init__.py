@@ -94,6 +94,7 @@ ORDER = (
     "calendars.subscriptions",
     "calendars.davwrite",  # 2.52.0 B (#1128): writing into CalDAV subscriptions
     "calendars.apptbook",  # 2.94.0 B (#1929): appointment booking by customers (public page, no login)
+    "calendars.polls",  # 2.98.0 A (#1953): scheduling polls (vote through a link, the winning time becomes an event)
     "admin.backup",
     "api.v1",
     "notify.caps",  # 2.33.0 (#927)
@@ -183,6 +184,7 @@ ORDER = (
     "contacts.merge",  # 2.66.0 A (#1835): merging duplicate contacts (reversible)
     "contacts.orgbooks",  # 2.52.0 C (#1438): address books an organisation owns
     "life.model",
+    "life.bookmarks",  # 2.97.0 A (#1950): bookmarks with a preview, tags and search (Karakeep fills the same store)
     "life.karakeep",
     "life.web",
     "life.v1",
@@ -241,6 +243,7 @@ ORDER = (
     "team.approvals",
     "tasks.review",  # 2.60.0 C (#1512): review step (reviewer, gate, list setting, API v1)
     "team.forms",
+    "team.formq",  # 2.98.0 B (#1954): questionnaires (own questions in forms, answers become a task at the customer)
     "team.portal",  # 2.63.0 (#1513): customer reports (status link) and the customer portal
     "team.v1",
     "accounts.signup",
@@ -285,6 +288,7 @@ ORDER = (
     "office.fixedimport",  # 2.67.0 A (#1838): fixed costs from a spreadsheet + the monthly check task of the cash flow
     "office.recurring",  # 2.91.0 A (#1923): invoice series (a template invoice every month / quarter / year, drafts or sent)
     "office.subs",  # 2.91.0 B (#1924): subscriptions and tools (fixed costs with notice period, users, renewal reminder)
+    "office.officemove",  # 2.97.0 C (#2049): office data between the personal office and an organisation's office
     "agents.importprop",  # 2.68.0 A (#1839): agents propose old data for the office (fixed costs), the person takes it over
     "agents.meetprop",  # 2.70.0 A (#1354): a meeting becomes tasks (extract with photos, the chat's cards)
     "agents.dupprop",  # 2.70.0 B (#1357): duplicate contacts as a proposal (no routes)

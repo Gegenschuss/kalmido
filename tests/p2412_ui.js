@@ -102,7 +102,8 @@ const lc = (w, id) => w.eval(`listById(${id})?.color || ''`);
   w.__sDelay = 0; await w.eval(`load()`); w.__sDelay = 4000;
   // 2.93.1: the 4 s change poll (core.js) may load the state on its own when it sees the server version of the calls above;
   // it is held for this check (CI red twice), the write itself must not fetch the state
-  w.eval('td_polling = true');
+  // 2.98.1 (CI red again): a poll already on the way could still load the state - hold it only once none is running
+  await until(() => w.eval('td_polling ? false : (td_polling = true)'), 80);
   st1 = w.__st;
   w.eval(`optWrite(ltagPut(${L}, 'urgent', 'soon'), () => api('PATCH', '/api/list-tags/${TG}', {name: 'soon'}))`);
   await sleep(250);

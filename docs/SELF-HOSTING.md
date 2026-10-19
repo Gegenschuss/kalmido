@@ -429,6 +429,10 @@ docker compose up -d kalmido
       bind:
         create_host_path: false
   ```
+- **Leftover file versions (2.97.0).** Once a night the server compares the file store folders (`attachments/files/<id>/`)
+  with the versions in the database and removes stored files no version names and that are older than a day (left behind
+  when the server stopped in the middle of a move between workspaces); at most 200 folders per watchdog tick, the server log
+  names the number (`files cleanup: N stored file(s) without a version removed`).
 - **After a move, check the attachments.** Compare the number and the total size of the files in the data folder's
   `attachments/` with the old server, not only the database (a copy that stopped half-way still starts fine).
 - **Encryption at rest.** Put the data disk on LUKS (or your platform's disk encryption) and keep the key off the
@@ -1047,6 +1051,8 @@ the security model: [PACKS.md](PACKS.md)). Without a catalogue Kalmido makes no 
 
 - `KALMIDO_PACKS_CATALOG=https://example.com/kalmido-packs/index.json` - the index file; empty (default) = only the
   shipped packs.
+- `KALMIDO_BOOKMARK_ALLOW_HOSTS=wiki.example.com:8080` (2.97.0) - internal hosts the bookmark preview may fetch (empty =
+  public addresses only; the calendar allow-list does not apply to bookmarks).
 - `KALMIDO_PACKS_ALLOW_HOSTS=mirror.example.com:8080` - hosts that may be internal addresses and may use `http://` (an
   own mirror); every other host: `https://` and a public address only.
 - Installations are stored per office area in the database (table `office_pack_installs`) and travel with backups;

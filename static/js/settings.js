@@ -202,7 +202,7 @@ const MOD_DESC = {office: N_('Quotations with a calculator, services and rates, 
   health: N_('Appointments, check-ups, vaccinations and medication reminders in a private list, never visible to agents'),
   review: N_('Your day and week in review (done, still open, coming up) with a private journal'),
   travel: N_('Trips as lists with dates, bookings, things to do before you leave and a packing list'),
-  reading: N_('A “Read later” list, filled from Karakeep if you like (bookmarks become tasks)'),
+  reading: N_('Bookmarks with a preview, tags and search, and a “Read later” list; Karakeep can fill both'),  // 2.97.0 A (#1950)
   budget: N_('A household budget: income and expenses per month with categories, recurring entries, CSV import from your bank file and receipts; shareable with the family, never visible to agents'),  // 2.72.0 (#1333)
   feeds: N_('Follow blogs and news sites: new articles in one list, fetched by your server about once an hour; “Read later” saves one as a task. Private, never visible to agents')};  // 2.85.0 B (#1162)
 // 2.25.0 (UX-20): Integrations start with what people want to do, in plain words; a tap jumps to the part that does it
@@ -582,7 +582,7 @@ function settingsModal(focus) {
       <div class="row">${chk('s-dateok', s.date_confirm === '1', tr('Confirm changes of the date with OK'))}</div>
       ${hint(tr('Off: a new day, time, start, repeat or reminder is saved as soon as you pick it; “Undo” in the message takes the whole change back. On: changes wait for OK.'))}
       <div class="row">${chk('s-celebrate', s.celebrate !== '0', tr('Celebrate completions'))}</div>
-      ${hint(tr('When Today is cleared or a list or project is complete, the heron flies by with a one-liner. With reduced motion (system setting) it just says hello.'))}
+      ${hint(tr('When Today is cleared or a list or project is complete, the Kalmido figure hops by with a one-liner. With reduced motion (system setting) it just says hello.'))}
       <div class="row">${chk('s-progsub', s.progress_subtasks === '1', tr('Count subtasks in the progress of a list'))}</div>
       <div class="row">${chk('s-mdpen', td_mdPenOnly(), tr('Edit the description only with the pen'))}</div>
       ${hint(tr('On this device a tap on the formatted description does not open the editor (handy while scrolling); the small pen next to it does. On by default on touch screens.'))}
@@ -1223,11 +1223,12 @@ function aboutVerRows(a) {
   const off = srv && app !== srv;
   return `<div class="row aboutapp${off ? ' off' : ''}"><label>${tr('App in this window')}</label><span>v${esc(app)}${off ? ` · <b>${esc(tr('Server: v{0}', srv))}</b> <button type="button" class="btn sm pri" data-nv="go">${esc(tr('Reload'))}</button>` : ` · <span class="muted">${esc(tr('up to date'))}</span>`}</span></div>`;
 }
-// Settings > Help: the version (2.46.6 (#1710): the admins' update check result moved to Administration > Server, ad_updHtml)
+// Settings > Help: the version, 2.101.0 (#1964): the trademark note (2.46.6 (#1710): the admins' update check result moved to Administration > Server, ad_updHtml)
 function aboutHtml(chk, hint) {
   const a = S.about || {};
   let h = `<h4 id="s-about-h">${tr('About')}</h4><div class="row"><label>${tr('Version')}</label><span class="aboutver">Kalmido v${esc(a.version || '?')}</span></div>${aboutVerRows(a)}
     <div class="row aboutcopy"><label>©</label><span class="muted">2026 Gegenschuss Doberenz Enders Grund eGbR · AGPL-3.0</span></div>
+    <div class="row aboutmarks"><label></label><span class="muted">${tr('Product and company names mentioned in Kalmido are trademarks of their respective owners. Kalmido is an independent project, not affiliated with or endorsed by them.')}</span></div>
     <div class="row aboutlinks"><label></label>${ABOUT_LINKS.map(([u, n, i]) => `<a class="btn sm" href="${u}" target="_blank" rel="noopener noreferrer">${ic(i, 's')} ${tr(n)}</a>`).join('')}</div>`;
   h += sup_aboutHtml();  // 2.74.0 (#338): "Support Kalmido" (self-hosted only)
   return h;

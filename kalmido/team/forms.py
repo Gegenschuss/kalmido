@@ -20,7 +20,7 @@ from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_feat, need_l
 from ..tasks.validation import log_act
 from ..personal.timetrack import BadInput
 from ..api.v1 import hit_limit
-from ..lists.public import HERON_ERROR, pub_html, public_links_on
+from ..lists.public import BOT_ERROR, pub_html, public_links_on
 
 
 # ---------------------------------------------------------------- 2.23.0 (#463 / #341): forms -> tasks
@@ -92,11 +92,12 @@ def form_url(c, r):
 
 
 def form_public(c, r):
+    from .formq import fq_public
     return {"id": r["id"], "list_id": r["list_id"], "title": r["title"], "intro": r["intro"], "access": r["access"],
             "section_id": r["section_id"], "ask_email": bool(r["ask_email"]), "enabled": bool(r["enabled"]), "count": r["count"],
             "last_at": r["last_at"], "created_at": r["created_at"], "url": form_url(c, r),
             "ttype": r["ttype"] or "", "files": bool(r["files"]), "portal": bool(r["portal"]),  # 2.63.0 (#1513)
-            "live": bool(r["enabled"]) and (r["access"] != "public" or public_links_on(c))}
+            "live": bool(r["enabled"]) and (r["access"] != "public" or public_links_on(c)), **fq_public(r)}  # 2.98.0 B (#1954)
 
 
 def clean_form(c, lid, b, new=False):
@@ -131,6 +132,8 @@ def clean_form(c, lid, b, new=False):
             if not isinstance(b[k], bool):
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = 1 if b[k] else 0
+    from .formq import fq_clean_form
+    fq_clean_form(b, out)  # 2.98.0 B (#1954): the own questions, steps, client matching
     return out
 
 
@@ -253,7 +256,7 @@ def _lang(c, f):
 
 def _gone(lg=None):
     lg = lg or _accept_lang()
-    return pub_html(tr("Form not available", lg=lg), f'<div class="msg">{HERON_ERROR}<h1>{html.escape(tr("Form not available", lg=lg))}</h1>'
+    return pub_html(tr("Form not available", lg=lg), f'<div class="msg">{BOT_ERROR}<h1>{html.escape(tr("Form not available", lg=lg))}</h1>'
                     f'<p>{html.escape(tr("This form does not exist or is no longer open.", lg=lg))}</p></div>', lg, 404, foot=False)
 
 
@@ -315,16 +318,18 @@ def r81c_stamp_once(c, v):
     return c.execute("INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO NOTHING", (f"fs:{sig}", last)).rowcount == 1
 
 
-def _page(c, f, token, lg, vals=None, error=""):
+def _page(c, f, token, lg, vals=None, error="", qvals=None, cur=None):
+    from .formq import fq_fields, fq_file_count, fq_list
     e = html.escape
     v = vals or {}
+    qs = fq_list(f)  # 2.98.0 B (#1954): own questions instead of subject and description
     t = lambda s, *a: tr(s, *a, lg=lg)  # noqa: E731
     me_row = g.user
     who = ""
     if me_row:
         who = f'<p class="sub">{e(tr("Sent as {0}", me_row["display_name"] or me_row["username"], lg=lg))}</p>'
-    fields = [f'<label for="ff-subject">{e(t("Subject"))}</label><input id="ff-subject" name="subject" required maxlength="{FORM_SUBJECT_MAX}" value="{e(v.get("subject", ""))}">',
-              f'<label for="ff-text">{e(t("Description"))}</label><textarea id="ff-text" name="text" rows="6" maxlength="{FORM_TEXT_MAX}">{e(v.get("text", ""))}</textarea>']
+    fields = [] if qs else [f'<label for="ff-subject">{e(t("Subject"))}</label><input id="ff-subject" name="subject" required maxlength="{FORM_SUBJECT_MAX}" value="{e(v.get("subject", ""))}">',
+                            f'<label for="ff-text">{e(t("Description"))}</label><textarea id="ff-text" name="text" rows="6" maxlength="{FORM_TEXT_MAX}">{e(v.get("text", ""))}</textarea>']
     if not me_row:
         fields.append(f'<label for="ff-name">{e(t("Your name"))}</label><input id="ff-name" name="name" autocomplete="name" maxlength="{FORM_NAME_MAX}" value="{e(v.get("name", ""))}">')
         if f["portal"]:  # 2.63.0 (#1513): the status link goes to this address
@@ -335,7 +340,16 @@ def _page(c, f, token, lg, vals=None, error=""):
     if f["files"]:  # 2.63.0 (#1513): one file (a screenshot, a log)
         fields.append(f'<label for="ff-file">{e(tr("Attachment (optional, at most {0} MB)", FRM_FILE_MAX // (1024 * 1024), lg=lg))}</label><input id="ff-file" name="file" type="file">')
     hp = '<div class="hp" aria-hidden="true"><label for="ff-web">Website</label><input id="ff-web" name="website" tabindex="-1" autocomplete="off"></div>'
-    enc = ' enctype="multipart/form-data"' if f["files"] else ""  # 2.63.0 (#1513): the file field
+    enc = ' enctype="multipart/form-data"' if f["files"] or fq_file_count(qs) else ""  # 2.63.0 (#1513): the file field
+    step = bool(qs) and bool(f["one_per_step"])
+    if qs:  # 2.98.0 B (#1954): the questions (on one page or one per step), then name / e-mail / file and the button
+        inner = fq_fields(qs, lg, qvals or {}, step, "".join(fields) + hp + f'<button type="submit">{e(t("Send"))}</button>', cur)
+        cls = "fform fq-form" + (" fq-steps" if step else "")
+        main = (f'<header><h1>{e(f["title"])}</h1>{who}</header>'
+                + (f'<div class="intro">{"".join(f"<p>{e(p)}</p>" for p in f["intro"].split(chr(10)) if p.strip())}</div>' if f["intro"] else "")
+                + (f'<p class="err" role="alert">{e(error)}</p>' if error else "")
+                + f'<form method="post" action="/f/{e(token)}" class="{cls}"{enc}{" novalidate" if step else ""}>{inner}</form>')
+        return pub_html(f["title"], main, lg, 400 if error else 200, foot=True)
     main = (f'<header><h1>{e(f["title"])}</h1>{who}</header>'
             + (f'<div class="intro">{"".join(f"<p>{e(p)}</p>" for p in f["intro"].split(chr(10)) if p.strip())}</div>' if f["intro"] else "")
             + (f'<p class="err" role="alert">{e(error)}</p>' if error else "")
@@ -371,31 +385,41 @@ def form_send(token):
     bad = _may_use(c, f)
     if bad:
         return bad
+    from .formq import FqRefused, fq_client, fq_entry_save, fq_file_count, fq_list, fq_markdown, fq_read, fq_text_of, fq_vals
+    qs = fq_list(f)  # 2.98.0 B (#1954): a questionnaire (own questions instead of subject / description)
     if hit_limit("forms:" + rate_ip(), FORM_SEND_RATE) or hit_limit(f"formh:{f['id']}", FORM_SEND_HOUR, 3600):
         return _msg(tr("Too many requests", lg=lg), tr("Please wait a minute and try again.", lg=lg), lg, 429)
     # 2.86.0 (N22): a body longer than one file + the text fields is refused before it is read
-    if (request.content_length or 0) > (FRM_FILE_MAX if f["files"] else 0) + 256 * 1024:
+    if (request.content_length or 0) > (FRM_FILE_MAX if f["files"] else 0) + fq_file_count(qs) * FRM_FILE_MAX + 256 * 1024:
         return _msg(tr("File too large", lg=lg), tr("The file is too large (at most {0} MB).", FRM_FILE_MAX // (1024 * 1024), lg=lg), lg, 413)
     fv = request.form
     vals = {k: (fv.get(k) or "").strip() for k in ("subject", "text", "name", "email")}
+    qv = fq_vals(fv) if qs else None
+    again = lambda msg, cur="": _page(c, f, token, lg, vals, msg, qv, cur)  # noqa: E731  (the page again, typed values kept; cur "" = the last step)
     if fv.get("website"):  # the honeypot: a bot filled the hidden field -> pretend it worked
         return _msg(tr("Thank you!", lg=lg), tr("Your request has been sent.", lg=lg), lg)
     anon = not g.user
     if anon:  # 2.63.0 (#1513): the page's signed stamp: not sooner than FRM_MIN_S, not later than FRM_MAX_S after loading
         age = frm_stamp_age(c, f["id"], fv.get("stamp"))
         if age is None or not FRM_MIN_S <= age <= FRM_MAX_S or not r81c_stamp_once(c, fv.get("stamp")):
-            return _page(c, f, token, lg, vals, tr("Please send the form once more: it was sent very quickly or the page was open for a long time.", lg=lg))
+            return again(tr("Please send the form once more: it was sent very quickly or the page was open for a long time.", lg=lg))
     subject = re.sub(r"\s+", " ", vals["subject"])[:FORM_SUBJECT_MAX]
-    if not subject:
-        return _page(c, f, token, lg, vals, tr("Please enter a subject.", lg=lg))
+    if not subject and not qs:
+        return again(tr("Please enter a subject.", lg=lg))
     email = vals["email"][:200]
     if email and (not re.fullmatch(r"[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+", email) or re.search(r"[,;\"'()\[\]\\]", email)):
-        return _page(c, f, token, lg, vals, tr("Please check the e-mail address.", lg=lg))  # 2.63.0 (#1513): one address only (it may get a mail)
+        return again(tr("Please check the e-mail address.", lg=lg))  # 2.63.0 (#1513): one address only (it may get a mail)
     portal = bool(f["portal"]) and anon
     if portal and not email:
-        return _page(c, f, token, lg, vals, tr("Please enter your e-mail address: the link to the status of your report goes there.", lg=lg))
-    if len(re.findall(r"https?://", subject + " " + vals["text"], re.I)) > FRM_LINKS_MAX:
-        return _page(c, f, token, lg, vals, tr("Please include at most {0} links.", FRM_LINKS_MAX, lg=lg))
+        return again(tr("Please enter your e-mail address: the link to the status of your report goes there.", lg=lg))
+    answers, q_ups = {}, []
+    if qs:  # 2.98.0 B (#1954): required answers, values, file types and sizes checked here (the page may be in steps)
+        try:
+            answers, q_ups = fq_read(qs, fv, request.files, lg, anon, f["id"])
+        except FqRefused as x:
+            return again(str(x), x.qid)
+    if len(re.findall(r"https?://", subject + " " + vals["text"] + " " + fq_text_of(qs, answers), re.I)) > FRM_LINKS_MAX:
+        return again(tr("Please include at most {0} links.", FRM_LINKS_MAX, lg=lg))
     upload = None
     if f["files"]:  # 2.63.0 (#1513): one file, hard size limit, a clean name, the type from the name (never the sender's)
         from ..tasks.attachments import safe_name, unexec_name
@@ -403,7 +427,7 @@ def form_send(token):
         if fs and fs.filename:
             data = fs.read(FRM_FILE_MAX + 1)
             if len(data) > FRM_FILE_MAX:
-                return _page(c, f, token, lg, vals, tr("The file is too large (at most {0} MB).", FRM_FILE_MAX // (1024 * 1024), lg=lg))
+                return again(tr("The file is too large (at most {0} MB).", FRM_FILE_MAX // (1024 * 1024), lg=lg))
             if data and anon and h6d_form_bytes(f["id"], len(data)):
                 return _msg(tr("Too many requests", lg=lg), tr("This form takes no more files right now. Please try again later or send your report without a file.", lg=lg), lg, 429)
             if data:
@@ -420,11 +444,18 @@ def form_send(token):
     meta = tr("Sent with the form “{0}” by {1}", f["title"], sender, lg=olg) + (f" <{email}>" if email and not g.user else "")
     if portal:
         meta += " · " + tr("the sender has a status link", lg=olg)
-    content = (vals["text"][:FORM_TEXT_MAX] + "\n\n" if vals["text"] else "") + "— " + meta
+    if qs:  # 2.98.0 B (#1954): the title names the form and the sender, the answers as Markdown
+        subject = re.sub(r"\s+", " ", f"{f['title']} – {sender if g.user or name else (email or sender)}")[:FORM_SUBJECT_MAX]
+        content = fq_markdown(qs, answers, olg) + "\n\n— " + meta
+    else:
+        content = (vals["text"][:FORM_TEXT_MAX] + "\n\n" if vals["text"] else "") + "— " + meta
     lid = f["list_id"]
     from ..collab.liste2eguard import LE2B_OFF_MSG, le2b_list_locked
     if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): a form cannot write plain texts into a list with the lock
-        return _page(c, f, token, lg, vals, tr(LE2B_OFF_MSG, lg=lg))
+        return again(tr(LE2B_OFF_MSG, lg=lg))
+    cid, cnote = fq_client(c, f, email, name, olg) if f["client_match"] else (None, "")  # 2.98.0 B (#1954): only the list's space
+    if cnote:
+        content += "\n\n" + cnote
     srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
     ts = iso(now_utc())
     sec = f["section_id"] if f["section_id"] and c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (f["section_id"], lid)).fetchone() else None
@@ -435,10 +466,15 @@ def form_send(token):
     if upload:
         from ..core.pages import save_attachment_bytes
         save_attachment_bytes(c, tid, *upload, owner=None if uid else f["l_owner"])
+    if qs:  # 2.98.0 B (#1954): the answers for the evaluation, the files as attachments (sealed, scanned, counted)
+        from ..core.pages import save_attachment_bytes
+        fq_entry_save(c, tid, f, cid, sender if g.user or name else "", email if not g.user else "", answers)
+        for up in q_ups:
+            save_attachment_bytes(c, tid, *up, owner=None if uid else f["l_owner"])
     status_url = ""
     if portal:  # 2.63.0 (#1513): the report becomes a ticket with a status link (team/portal.py)
         from .portal import pt_create, pt_status_url
-        status_url = pt_status_url(pt_create(c, tid, {"id": lid, "org_id": f["l_org"], "owner_id": f["l_owner"]}, f["id"], name, email)[1])
+        status_url = pt_status_url(pt_create(c, tid, {"id": lid, "org_id": f["l_org"], "owner_id": f["l_owner"]}, f["id"], name, email, client_id=cid)[1])
     if not g.user:
         from ..lists.public import PUB_ACTOR
         g.user, g.auth_via = PUB_ACTOR, "public"  # "someone via the form" in the history, News and pushes

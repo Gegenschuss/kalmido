@@ -1,4 +1,4 @@
-"""2.49.0 (#1199): knowledge pages -- a small wiki per organisation ("SilverBullet lite").
+"""2.49.0 (#1199): knowledge pages -- a small wiki per organisation.
 
 A page = Markdown with a path as its name ("Processes/Shoot day/Checklist"; the folders come from the paths). It lives in
 a space: an organisation (org_id; every member reads and writes it, like the organisation's lists) or the private space

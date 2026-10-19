@@ -28,7 +28,8 @@ const LD_MODS = {
   playbook: ['playbook'],
   timeline: ['timeline', 'roadmap'],
   feeds: ['feeds'],  // 2.85.0 B (#1162)
-  sheets: ['sheets', 'sheets2', 'sheetsio'],  // 2.89.0 (#1916); D: sheets2.js (step 2), C: sheetsio.js (import/export)
+  bookmarks: ['bookmarks'],  // 2.97.0 A (#1950)
+  sheets: ['sheets', 'sheets2', 'sheetsio', 'sheetsize'],  // 2.89.0 (#1916); D: sheets2.js (step 2), C: sheetsio.js (import/export); 2.98.0 C (#2181): sheetsize.js (the frame)
   videos: ['videorev'],  // 2.99.1 A (#1959): video sign-offs
   pubvideo: ['pubvideo'],  // 2.99.1 A (#1959): only the customer page of a video sign-off loads it (/s/q/<token>), the app never
 };
@@ -44,7 +45,8 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
     'chatModeMenu', 'stepsAlways', 'stepsLive', 'chatEditStart', 'chatOlder', 'chatSend', 'chatBottom', 'chatDraw', 'agModal', 'agDraw', 'aiuLoad', 'ains_setupModal'],
   pdf: ['pdfView', 'dpvOpen', 'dpvSumMount'], calendar: ['calColorPop', 'cg_commit', 'apbOpen'], docs: ['dc_shareFiles', 'dc_filterGo', 'pl_importActive', 'pl_openSettings'],  // 2.87.9 (#1934); 2.94.0 B (#1929): apbOpen
   life: ['contractModal', 'deviceModal', 'upkeepModal', 'healthModal', 'tripModal'], integrations: ['pubWire'],
-  playbook: ['pbMount', 'pbOpen', 'pbNewsOpen'], timeline: ['rmSet']};
+  playbook: ['pbMount', 'pbOpen', 'pbNewsOpen'], timeline: ['rmSet'],
+  bookmarks: ['bm_shareSave', 'bm_confirmSave', 'bm_bookmarkletHelp']};  // 2.97.0 A (#1950)
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)
 const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 'chatTypers', 'chatStHtml'], timeline: ['tlKbSync', 'tlAfterRender', 'rmAfterRender']};
 // drawing functions: the stand-in draws "Loading…" (views) or nothing (parts of another view), loads, and redraws the view
@@ -52,7 +54,7 @@ const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 
 // them next to the scripts and resolves only once they apply (no unstyled flash when the area opens)
 const LD_CSS = {settings: ['settings'], contacts: ['contacts'], office: ['office'], agentchat: ['agentchat'], pdf: ['pdf'], mindmap: ['mindmap'],
   wiki: ['wiki'], stats: ['stats'], calendar: ['calendar'], docs: ['docs'], life: ['life'],
-  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], sheets: ['sheets'], videos: ['videorev']};  // 2.85.0 B (#1162): + feeds
+  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev']};  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
 const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office'],
   // 2.65.0 (#1823)
   chatViewHtml: ['agentchat', 1], jobStepsHtml: ['agentchat'], aiuCardHtml: ['agentchat'], aiuNewsText: ['agentchat'], chatInner: ['agentchat'],
@@ -60,6 +62,7 @@ const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_ti
   mm_blockHtml: ['mindmap'], viewStats: ['stats', 1], viewCal: ['calendar', 1], viewDocs: ['docs', 1], viewLife: ['life', 1], viewReview: ['life', 1], pbNewsText: ['playbook'], viewTimeline: ['timeline', 1], viewRoadmap: ['timeline', 1],
   tlNdBtn: ['timeline'], tlNdOn: ['timeline'],
   viewFeeds: ['feeds', 1], rss_homeCard: ['feeds'],  // 2.85.0 B (#1162)
+  viewBookmarks: ['bookmarks', 1],  // 2.97.0 A (#1950)
   viewSheets: ['sheets', 1]};  // 2.89.0 (#1916)
 // stays at start (core.js modOn, areas, dashboard, the client page ask it before anything of the office is loaded)
 const officeOn = () => feat('office') && !S.me?.kid;
@@ -157,7 +160,7 @@ window.oa_switchLoad = md => !officeOn() ? Promise.resolve() : loadModule('offic
 window.wk_palAdd = () => { if (feat('wiki')) loadModule('wiki').catch(() => {}); };
 // 2.99.1 A (#1959): video sign-offs (videorev.js, module videos): a task's panel, a project's overview and a client's card load
 // the module when they are drawn and draw again once it is there
-window.vdr_taskHtml = t => { if (t?.id > 0) loadModule('videos').then(() => { if (S.sel === t.id) renderDetail(); }, () => {}); return ''; };
+window.vdr_taskHtml = t => { if (t?.id > 0) loadModule('videos').then(() => { if (S.sel === t.id && vdr_rows('task_id', t.id, () => vdr_redrawTask(t.id))) vdr_redrawTask(t.id); }, () => {}); return ''; };  // 2.96.3: one redraw, focus kept
 window.vdr_projHtml = window.vdr_clientHtml = () => { ld_later('videos'); return ''; };
 window.wk_mentionHtml = t => { if (feat('wiki') && t?.id > 0) loadModule('wiki').then(() => { if (S.sel === t.id) renderDetail(); }, () => {}); return ''; };
 // 2.65.0 (#1823) the PDF preview (pdfview.js, module pdf): its links are drawn at start, a click loads the module (moved here

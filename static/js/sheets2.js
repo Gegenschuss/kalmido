@@ -83,7 +83,7 @@ async function sh2ToOffer(sh) {
     ${sh2Field('sh2-qty', tr('Quantity'), sh2ColOpts(sh, sh2Find(sh, ['number'], /menge|anzahl|stunden|tage|qty|quant|hours|days/i), true))}
     ${sh2Field('sh2-unit', tr('Unit'), sh2ColOpts(sh, sh2Find(sh, [], /einheit|unit/i), true))}
     ${sh2Field('sh2-price', tr('Unit price'), sh2ColOpts(sh, sh2Find(sh, ['currency'], /preis|satz|price|rate/i), true))}
-    ${sh2Field('sh2-client', tr('Client'), `<option value="">${esc(tr('No client'))}</option>` + (d.clients || []).map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join(''))}
+    ${sh2Field('sh2-client', tr('Client'), `<option value="">${esc(tr('No client'))}</option>` + (d.clients || []).map(c => `<option value="${c.id}">${esc(cdn_label(c))}</option>`).join(''))}
     ${sh2RowsChoice(sh, chosen)}<p class="muted mhint">${esc(tr('A draft is created in the office; check and send it there. Nothing is finalised.'))}</p>`;
   const v = await sh2Ask(tr('Take over as a quotation'), html, tr('Create draft'), md => ({desc_col: sh2Val(md, 'sh2-desc'), qty_col: sh2Val(md, 'sh2-qty'),
     unit_col: sh2Val(md, 'sh2-unit'), price_col: sh2Val(md, 'sh2-price'), client_id: sh2Val(md, 'sh2-client'), rows: sh2RowsOf(md, chosen)}));

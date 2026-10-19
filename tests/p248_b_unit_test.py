@@ -75,9 +75,9 @@ check([d for _s, _e, d in X.find_dates("am 12/25/2025")] == [date(2025, 12, 25)]
 check(X.parse_number("1.234,56") == "1234.56" and X.parse_number("1,234.56") == "1234.56" and X.parse_number("1 234,56") == "1234.56",
       "number formats")
 check(X.parse_number("0,00") is None, "zero is no amount")
-# without a total word: the largest amount with a currency, never a bare number
+# 2.98.0 D (#2178): without a total word no amount at all (no fallback to the largest amount with a currency)
 r = X.extract("Bestellung 12345\nArtikel A 9,99 €\nArtikel B 19,99 €", TODAY)
-check(r["amount"] == "19.99", f"largest with currency {r}")
+check(r["amount"] is None, f"no total line, no amount {r}")
 
 # archive serial numbers: QR text / recognised text, the prefix, no match inside other words, never 0
 check(X.find_asn("ASN", ["ASN00042"]) == 42 and X.find_asn("ASN", ["", "Archiv asn 7 hier"]) == 7, "archive number from a code / the text")

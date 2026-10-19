@@ -261,6 +261,8 @@ def ein_build(model, fmt="zugferd"):
     _party(ag, "ram:SellerTradeParty", sf.get("name") or (m.get("company") or {}).get("name"), sf, lang, home, contact=True,
            email=sf.get("email"), legal_id=sf.get("register_no"))
     rfields = {"street": rc.get("street"), "zip": rc.get("zip"), "city": rc.get("city"), "country": rc.get("country"), "vat_id": rc.get("vat_id")}
+    if rc.get("extra"):  # 2.97.0 B (#1951): the client's extra address line (BT-51)
+        rfields["line2"] = rc["extra"]
     if not rfields["street"] and not rfields["city"]:  # only free address lines (2.40.0 #1368: see fd_split_address)
         lines = [str(x) for x in (rc.get("lines") or []) if str(x).strip() and str(x).strip() != str(rc.get("name") or "").strip()]
         sp = fd_split_address(lines)

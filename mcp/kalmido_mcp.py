@@ -1483,7 +1483,8 @@ TOOLS += [
      _obj({}), lambda api, a: api.call("POST", "/life/karakeep/sync")),
 ]
 # 2.23.0 (#463): package "Team, family, clients": clients, workload, approvals, forms
-_CLIENT = {"name": {"type": "string"}, "icon": {"type": "string"}, "color": {"type": "string"}, "contact": {"type": "string"},
+_CLIENT = {"name": {"type": "string"}, "display_name": {"type": "string", "description": "2.97.0: the name pickers and lists show (documents keep name)"},
+           "icon": {"type": "string"}, "color": {"type": "string"}, "contact": {"type": "string"},
            "email": {"type": "string"}, "phone": {"type": "string"}, "address": {"type": "string"}, "note": {"type": "string"},
            "rate": {"type": "number"}, "budget_h": {"type": "number"}, "budget_amount": {"type": "number"}, "org_id": {"type": "integer"},
            "archived": {"type": "boolean"},
@@ -1495,7 +1496,14 @@ _FORM = {"title": {"type": "string"}, "intro": {"type": "string"}, "access": {"t
          "section_id": {"type": "integer"}, "ask_email": {"type": "boolean"},
          # 2.63.0 (#1513): a report form: the task type, one file, a status link for a sender without an account
          "ttype": {"type": "string", "enum": ["", "bug", "feature", "task"]}, "files": {"type": "boolean"},
-         "portal": {"type": "boolean", "description": "2.63.0: a sender without an account gets a status link (page + one mail); turns ask_email on"}}
+         "portal": {"type": "boolean", "description": "2.63.0: a sender without an account gets a status link (page + one mail); turns ask_email on"},
+         # 2.98.0 B (#1954): a questionnaire -- own questions instead of subject / description
+         "questions": {"type": "array", "maxItems": 30, "description": "2.98.0: own questions [{id?, kind: short|long|choice|multi|date|number|"
+                       "file|yesno, label, help?, required?, options? (choice / multi: at least two)}]; replaces the old list, a known id "
+                       "keeps earlier answers mapped; [] = the classic form", "items": {"type": "object"}},
+         "one_per_step": {"type": "boolean", "description": "2.98.0: one question per step (else all on one page)"},
+         "client_match": {"type": "boolean", "description": "2.98.0: match the sender's e-mail to a client of the list's space"},
+         "client_new": {"type": "boolean", "description": "2.98.0: an unknown address becomes a new client (default off)"}}
 TOOLS += [
     ("list_clients", "2.23.0 (module clients): the clients of the user's organisation with their lists, hours (this month / in total), "
                      "amounts and budget level (ok / warn at 80 % / over); 2.40.0: contacts = the contact persons, the default first.", _obj({"month": {"type": "string", "description": "YYYY-MM"},
@@ -1547,7 +1555,8 @@ TOOLS += [
     ("list_forms", "2.23.0 (module forms): the forms of a list (owner / list admins) with their links.", _obj({"list_id": S_ID}, ["list_id"]),
      lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/forms")),
     ("create_form", "2.23.0: a form for a list: a link whose page creates a task (subject, description, name, e-mail); access org = "
-                    "signed-in people of the organisation, public = anyone with the link.", _obj({"list_id": S_ID, **_FORM}, ["list_id", "title"]),
+                    "signed-in people of the organisation, public = anyone with the link. 2.98.0: questions = a questionnaire (own "
+                    "questions instead of subject / description; the answers land in the task's description).", _obj({"list_id": S_ID, **_FORM}, ["list_id", "title"]),
      lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/forms", body=_pick(a, tuple(_FORM)))),
     ("update_form", "2.23.0: change a form (enabled false = closed; regenerate true = a new link).",
      _obj({"form_id": S_ID, **_FORM, "enabled": {"type": "boolean"}, "regenerate": {"type": "boolean"}}, ["form_id"]),

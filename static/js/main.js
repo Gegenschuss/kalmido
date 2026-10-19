@@ -25,7 +25,7 @@ function bootDone() {
   const sil = location.hash.match(/^#signin\/([A-Za-z0-9_-]{20,100})$/);  // 2.23.0 (#444): a sign-in link (QR code)
   if (sil) { bootDone(); await i18nLoad(uiLang()); await signinScreen(sil[1]); return; }
   const i18nBoot = i18nLoad(uiLang());  // last used language (localStorage), in parallel with the state
-  try { await load(); if (!S.lists.length) throw new Error('no state'); } catch (e) { bootDone(); if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = heronEmpty(navigator.onLine === false ? 'offline' : 'error', tr('Server not reachable.'), tr('Reload the page once the server is reachable again.')).replace(/<\/div>$/, `<button type="button" class="btn pri" id="boot-retry">${ic('sync', 's')} ${tr('Try again')}</button></div>`); $('#boot-retry')?.addEventListener('click', () => location.reload()); return; }
+  try { await load(); if (!S.lists.length) throw new Error('no state'); } catch (e) { bootDone(); if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = botEmpty(navigator.onLine === false ? 'offline' : 'schaut', tr('Server not reachable.'), tr('Reload the page once the server is reachable again.')).replace(/<\/div>$/, `<button type="button" class="btn pri" id="boot-retry">${ic('sync', 's')} ${tr('Try again')}</button></div>`); $('#boot-retry')?.addEventListener('click', () => location.reload()); return; }
   await i18nBoot; await i18nLoad(uiLang()); S.booted = true;
   setTimeout(msvvBoot, 0);  // 2.73.0 C (#661): the other servers (msvview.js), after the own state
   setTimeout(chatFabDraw, 0);  // 2.29.0 (#363)
@@ -34,7 +34,7 @@ function bootDone() {
   setTimeout(() => { if (!document.hidden && !S.setupPending && !S.me?.kid) lc_favSuggest(); }, 8000);  /* 2.49.0 (#1537): not for a child */  // 2.46.1 (#1361): a favourite suggestion, once  // 2.19.0 (#668): opening the app tidies the shade  // render in the server-side language
   // 2.13.0 (#453 A16): the first-run step 2 ("What do you want to use?") was not finished (tab reloaded / closed after the
   // admin account was created): it comes back until "Start" is pressed
-  if (S.setupPending && !$('.authscreen')) { const el = document.createElement('div'); el.className = 'modal authscreen'; document.body.appendChild(el); $('#app')?.setAttribute('inert', ''); setupChoices(el, `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div>`); }
+  if (S.setupPending && !$('.authscreen')) { const el = document.createElement('div'); el.className = 'modal authscreen'; document.body.appendChild(el); $('#app')?.setAttribute('inert', ''); setupChoices(el, `<div class="alogo">${logoSvg(40)}<b>${wordSvg()}</b></div>`); }
   if (new URLSearchParams(location.search).get('share') === 'err') {
     history.replaceState(null, '', '/#inbox'); await route();
     toast(tr('Share: the file could not be received'));
@@ -60,8 +60,10 @@ function bootDone() {
     // default); the files + text then wait in that agent's chat box, ready to send
     const ags = agentsOn() ? (S.agents || []).filter(a => a.enabled) : [];
     const docs = files.length && typeof dc_shareOk === 'function' && dc_shareOk();  // 2.48.0 (#1111): "File as document"
-    const dest = (ags.length || docs) && (files.length || meta.text || meta.url || meta.title) ? await shareDest(ags, docs) : 'task';
+    const bmU = !files.length && feat('reading') ? shareLink(meta.text, meta.url)[0] : '';  // 2.97.0 A (#1950): a shared link -> "Save as bookmark"
+    const dest = (ags.length || docs || bmU) && (files.length || meta.text || meta.url || meta.title) ? await shareDest(ags, docs, !!bmU) : 'task';
     if (dest === 'doc') await dc_shareFiles(files);
+    else if (dest === 'bookmark') await bm_shareSave(bmU, meta.title);
     else if (dest !== 'task') {
       const txt = [meta.title, meta.text, meta.url && !(meta.text || '').includes(meta.url) ? meta.url : ''].map(x => (x || '').trim()).filter(Boolean).join('\n');
       if (txt) S.drafts['chat:' + dest] = txt;
@@ -79,7 +81,11 @@ function bootDone() {
     history.replaceState(null, '', '/#inbox');
     await route();
     const [u, rest] = shareLink(text, (q.get('url') || '').trim());
-    openQuickSheet((q.get('title') || '').trim() || rest || (u ? urlTitle(u) : ''), {url: u, list_id: inbox().id, ...(S.me ? {assignee_id: S.me.id} : {})});  // 2.27.0 (#1001): yours
+    // 2.97.0 A (#1950): the bookmark button of the browser (?bm=1) saves a bookmark; a shared link offers "Save as bookmark"
+    const bmU = /^https?:\/\//i.test(u) ? u.slice(0, 2000) : '';
+    if (bmU && q.get('bm') === '1') bm_confirmSave(bmU, (q.get('title') || '').trim().slice(0, 300));
+    else if (bmU && feat('reading') && await shareDest([], false, true) === 'bookmark') await bm_shareSave(bmU, (q.get('title') || '').trim());
+    else openQuickSheet((q.get('title') || '').trim() || rest || (u ? urlTitle(u) : ''), {url: u, list_id: inbox().id, ...(S.me ? {assignee_id: S.me.id} : {})});  // 2.27.0 (#1001): yours
   } else if (new URLSearchParams(location.search).get('action') === 'new') {  // app shortcut "New task"
     history.replaceState(null, '', '/' + (location.hash || ''));
     await route();

@@ -21,8 +21,8 @@ from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, RAW_MODES, TAX_KEYS, dec, fmt_m
 from .packs import office_pack
 from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, office_number_next, office_role, office_settings,
                     office_seed_texts)
-from .ledger import (ofx_company, ofx_company_print, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
-                     ofx_number_at_finalize, ofx_snapshot_pack)
+from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
+                     ofx_number_at_finalize, ofx_snapshot_pack, OFX_LOCKED)
 from .invoices import (INV_KINDS, INV_STATUSES, STATE_TXT, inv_apply_client, inv_manual_number, inv_money_fields, inv_new_row, inv_paid_map, inv_payments,
                        inv_reminder_totals, inv_render, inv_scheme, inv_state)
 
@@ -173,18 +173,43 @@ def _service(c, oid, sid):
 def _client(c, oid, cid):
     if not cid:
         return None
-    r = c.execute(f"SELECT id, name, contact, address, email FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (_iid(cid),)).fetchone()
+    r = c.execute(f"SELECT id, name, contact, address, email, street, address_extra, zip, city, country FROM clients WHERE id=? AND "
+                  f"{pb_cl_sql(c, oid)}", (_iid(cid),)).fetchone()  # 2.97.0 B (#1951): the fixed address fields
     return dict(r) if r else None
 
 
-def _recipient_from_client(cl, contact=None):
-    """contact (2.40.0 #1380): the chosen contact person's name ("" = none; None = the client's default)."""
+def _recipient_from_client(cl, contact=None, home="DE"):
+    """contact (2.40.0 #1380): the chosen contact person's name ("" = none; None = the client's default).
+    2.97.0 B (#1951): the address comes from the client's fixed fields only (name, attn., street, extra line, postcode city,
+    the country when it is not home = the company's, as the invoice prints it); the fields themselves travel along (the
+    e-invoice reads them, no parsing of lines). missing: street, postcode or city empty."""
+    g_ = lambda k: re.sub(r"\s+", " ", str(cl.get(k) or "")).strip()
     lines = [cl["name"]]
     contact = cl.get("contact") if contact is None else contact
     if contact:
         lines.append(contact)
-    lines += [x.strip() for x in (cl.get("address") or "").replace("\r", "").split("\n") if x.strip()]
-    return {"name": cl["name"], "lines": lines[:12]}
+    country = g_("country").upper()
+    lines += [x for x in (g_("street"), g_("address_extra"), " ".join(x for x in (g_("zip"), g_("city")) if x),
+                          country if country and country != (home or "DE").upper() else "") if x]
+    return {"name": cl["name"], "lines": lines[:12], "street": g_("street"), "extra": g_("address_extra"), "zip": g_("zip"),
+            "city": g_("city"), "country": country, "missing": not all(g_(k) for k in ("street", "zip", "city"))}
+
+
+def cdn_home(c, oid):
+    """The company's country (the recipient's country line is left out when it is the same)."""
+    return (ofx_company(c, oid).get("country") or "DE").upper()
+
+
+def cdn_doc_recipient(c, oid, r, stored=None):
+    """2.97.0 B (#1951): the recipient of document row r: a draft with a client reads it from the client (now), a finished /
+    sent one or one without a client keeps what is stored (old free lines stay as they are)."""
+    rec = stored if stored is not None else _j(r["recipient"], {})
+    if not r["client_id"] or ofx_locked(r) or r["status"] == "sent":
+        return rec
+    cl = _client(c, oid, r["client_id"])
+    if not cl:
+        return rec
+    return _recipient_from_client(cl, fk_doc_contact_name(c, cl["id"], _cur_val(r, "contact_id")), cdn_home(c, oid))
 
 
 # 2.40.0 (#1380): the contact person of a document (office_docs.contact_id): NULL = the client's default, 0 = none, else
@@ -296,6 +321,8 @@ def doc_public(c, oid, r, admin, items=True):
     d = oc_dec_fields(c, oid, "office_docs", r)  # 2.42.0 (#828)
     for k, dflt in (("recipient", {}), ("rights", {}), ("fields", []), ("totals", {})):
         d[k] = _j(d.get(k), dflt)
+    d["recipient"] = dict(cdn_doc_recipient(c, oid, r, d["recipient"]))  # 2.97.0 B (#1951): a draft shows its client's address now
+    d["recipient_missing"] = bool(d["recipient"].pop("missing", False))  # street, postcode or city missing at the client
     pm = inv_paid_map(c, oid, [r["id"]]) if r["kind"] in ("invoice", "credit") else {}
     d["state"] = inv_state(r, pm)  # 2.38.0: the derived state (partial / overdue) next to the stored status
     d["status_text"] = tr(STATUS_TXT.get(d["state"], d["state"]))
@@ -340,6 +367,8 @@ def doc_public(c, oid, r, admin, items=True):
             d["contract"] = {k: d["contract"][k] for k in ("id", "name", "raw_included", "rates", "rights_time_id", "rights_territory_id",
                                                              "rights_media_id", "rights_note_de", "rights_note_en", "closing_de", "closing_en", "date")}
     locked = ofx_locked(r)
+    if items and r["kind"] == "offer":  # 2.114.4 B (#2270): what the PDF prints (a finalised quotation: its frozen value)
+        d["accept_print"] = bwb_accept_on(r, office_settings(c, oid), _j(d.get("sender"), {}) if locked else None)
     for k in ("sender", "recipient_snapshot", "tax_snapshot"):
         d.pop(k, None)  # the frozen copies stay on the server (the print model shows them)
     d["locked"] = locked
@@ -348,7 +377,8 @@ def doc_public(c, oid, r, admin, items=True):
         u = c.execute("SELECT display_name, username FROM users WHERE id=?", (r["locked_by"],)).fetchone()
         d["locked_by_name"] = (u["display_name"] or u["username"]) if u else ""
     d["can_edit"] = not locked and r["status"] != "sent"  # 2.38.0: sent documents are locked as well
-    d["can_delete"] = bool(admin) and not locked and r["status"] != "sent"
+    d["can_unlock"] = bool(admin) and locked and not bga_offer_block(c, oid, r)  # 2.114.2 A (#2263): back to a draft, or delete
+    d["can_delete"] = d["can_unlock"] if locked else bool(admin) and r["status"] != "sent"
     d["number_at_finalize"] = ofx_number_at_finalize(office_settings(c, oid), r["kind"])
     from .agentdocs import ofa_doc_extra
     ofa_doc_extra(c, d)  # 2.51.0 A (#1348): "drafted by agent X", the project list
@@ -509,10 +539,16 @@ def clean_doc(c, oid, b, cur, admin):
             if not cl:
                 raise Denied(404)
             f["client_id"] = cl["id"]
-            if not b.get("recipient") and (not _j(cur["recipient"], {}).get("name") or b.get("recipient_from_client")):
-                f["recipient"] = json.dumps(_recipient_from_client(cl, fk_doc_contact_name(c, cl["id"], b.get("contact_id"))), ensure_ascii=False)
     fk_doc_contact_clean(c, oid, b, cur, f)
-    if "recipient" in b and b.get("recipient") is not None:
+    ncid = f["client_id"] if "client_id" in f else _cur_val(cur, "client_id")
+    if ncid:  # 2.97.0 B (#1951): a draft with a client: the recipient is the client's (a given "recipient" is ignored)
+        kid = f["contact_id"] if "contact_id" in f else _cur_val(cur, "contact_id")
+        cl = _client(c, oid, ncid)
+        if cl:
+            rec = _recipient_from_client(cl, fk_doc_contact_name(c, cl["id"], kid), cdn_home(c, oid))
+            rec.pop("missing", None)
+            f["recipient"] = json.dumps(rec, ensure_ascii=False)
+    elif "recipient" in b and b.get("recipient") is not None:
         f["recipient"] = json.dumps(_recipient_clean(b["recipient"]), ensure_ascii=False)
     for k, mx in (("project_title", NAME_MAX), ("project_ref", 80), ("intro", TEXT_MAX), ("closing", TEXT_MAX), ("order_ref", 80)):
         if k in b:
@@ -544,6 +580,8 @@ def clean_doc(c, oid, b, cur, admin):
         f["raw_mode"] = _choice(b.get("raw_mode"), "raw_mode", RAW_MODES)
     if "producing_on" in b:  # 2.47.0 (#1645): producing per document (the office setting is only the default)
         f["producing_on"] = 0 if b.get("producing_on") in (0, False, "0", "false", None, "") else 1
+    if "accept_on" in b:  # 2.114.4 B (#2270): order confirmation block per quotation (None = like the office setting)
+        f["accept_on"] = None if b.get("accept_on") in (None, "", "default") else (0 if b.get("accept_on") in (0, False, "0", "false") else 1)
     for k, lo, hi, dflt in (("raw_factor", 0, 10, 0.25), ("prod_quotient", 0.01, 1000, 3), ("producing_rate", 0, 1e7, 600), ("discount_pct", 0, 100, 0)):
         if k in b:
             v = _num(b.get(k), k, lo, hi)
@@ -752,6 +790,17 @@ def _put_items(c, oid, r, items, admin, flags=None):
 
 
 # ---------------------------------------------------------------- the print model
+def bwb_accept_on(r, s, snd=None):
+    """2.114.4 B (#2270): 1 when a quotation prints the order confirmation block: the document's own value, else the office
+    setting (default on). snd = the sender snapshot of a finalised document: its frozen value (none = finalised before = on)."""
+    if snd is not None:
+        return 0 if snd.get("accept_on") == 0 else 1
+    v = r["accept_on"] if "accept_on" in r.keys() else None
+    if v is None:
+        v = s.get("accept_on", 1)
+    return 0 if v in (0, False, "0") else 1
+
+
 def odoc_render(c, doc_id, oid):
     """The print model of a document (dict, see docs/OFFICE.md and tests/fixtures): everything in the document's language
     and formats, nothing of the signed-in person. oid: the organisation the caller works in (required; foreign document =
@@ -786,14 +835,25 @@ def odoc_render(c, doc_id, oid):
             if ln.get("rate") is not None:
                 ln["rate_text"] = fmt_money(ln["rate"], lang, cur)
     rec = _j(r["recipient_snapshot"] if locked and r["recipient_snapshot"] else r["recipient"], {})
+    if not locked:
+        rec = cdn_doc_recipient(c, oid, r, rec)  # 2.97.0 B (#1951): a draft prints its client's address as it is now
     rec = {"name": rec.get("name") or "", "lines": rec.get("lines") or []}
     rights = _j(r["rights"], {})
     if not re.match(r"^#[0-9a-fA-F]{6}$", color):
         color = "#2f5d8a"
     valid_text = _fmt_date(r["valid_until"], pack)
     meta = [[L.get("offer_no", "Angebot Nr."), r["number"]], [L.get("date", "Datum"), _fmt_date(r["date"], pack)]]
-    if rec["name"]:
-        meta.append([L.get("client", "Kunde"), rec["name"]])
+    # 2.114.4 A (#2277): no "Kunde" row any more, the name heads the address field (pdf.py adds it when the lines lack it)
+    # 2.97.1 (#2224): the customer number as on the invoice; a document finalised before prints as it did
+    if locked and "sender_line" in co:
+        cno = _j(r["recipient_snapshot"], {}).get("customer_no") if r["recipient_snapshot"] else ""
+    elif not locked and r["client_id"]:
+        cl = c.execute(f"SELECT customer_no FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (r["client_id"],)).fetchone()
+        cno = cl["customer_no"] if cl else ""
+    else:
+        cno = ""
+    if cno:
+        meta.append([L.get("customer_no", "Customer no." if lang == "en" else "Kunden-Nr."), cno])
     if r["project_ref"]:
         meta.append([L.get("ref", "Ref./PO-Nr."), r["project_ref"]])
     if r["valid_until"]:
@@ -819,6 +879,8 @@ def odoc_render(c, doc_id, oid):
     labels["units"] = L.get("units") or {}
     labels["page_of"] = L.get("page_of") or ("Page {x} of {y}" if lang == "en" else "Seite {x} von {y}")
     role = office_role(c, g.user["id"], oid) if getattr(g, "user", None) is not None else None
+    # 2.97.1 (#2224): with the company name; a document finalised before keeps the line it was printed with
+    sender_line = co["sender_line"] if locked and "sender_line" in co else (" · ".join(x for x in (co.get("lines") or []) if x) if locked else ofx_sender_line(co))
     m = {
         "kind": r["kind"], "lang": lang, "locked": locked, "locked_at": r["locked_at"] if locked else None,
         "pack_version": (r["pack_version"] or "") if locked else str(pack.get("version") or ""),
@@ -828,7 +890,7 @@ def odoc_render(c, doc_id, oid):
         "project_title": r["project_title"], "project_ref": r["project_ref"],
         "company": {"name": co.get("name") or "", "lines": co.get("lines") or [], "contact_lines": co.get("contact_lines") or [],
                     "register_lines": co.get("register_lines") or [], "bank_lines": co.get("bank_lines") or [],
-                    "sender_line": " · ".join(x for x in (co.get("lines") or []) if x), "logo_path": logo_path, "color": color},
+                    "sender_line": sender_line, "logo_path": logo_path, "color": color},
         "recipient": rec, "meta": meta, "intro": r["intro"] or "", "lines": t["lines"],
         "totals": {"net": t["net"], "net_text": fmt_money(t["net"], lang, cur), "tax_lines": t["tax_lines"], "tax_total": t["tax_total"],
                    "gross": t["gross"], "net_incl_raw": t.get("net_incl_raw"),
@@ -843,6 +905,7 @@ def odoc_render(c, doc_id, oid):
         "valid_note": valid_note, "fields": _j(r["fields"], []), "labels": labels, "formats": pack.get("formats") or {},
         "internal": {"costs": t["costs"], "margin": t["margin"]} if role == "admin" else None,
     }
+    m["accept_on"] = bwb_accept_on(r, s, snd if locked else None)  # 2.114.4 B (#2270)
     if r["kind"] == "offer":  # 2.47.0 (#1215): the printed parts as own pages
         from .parts import tp_render
         tp_render(c, oid, r, m, pack, lang, locked)
@@ -870,13 +933,19 @@ def odoc_list():
         sql += " AND (number ILIKE ? ESCAPE '\\' OR project_title ILIKE ? ESCAPE '\\' OR project_ref ILIKE ? ESCAPE '\\' OR recipient ILIKE ? ESCAPE '\\')"
         args += [like, like, like, like]
     pm = inv_paid_map(c, oid) if kind in ("invoice", "credit") else {}
-    rows = [doc_brief(r, pm) for r in c.execute(sql + " ORDER BY date DESC, id DESC LIMIT 500", args)]
+    raw = c.execute(sql + " ORDER BY date DESC, id DESC LIMIT 500", args).fetchall()
+    rows = [doc_brief(r, pm) for r in raw]
+    role = office_role(c, uid, oid)
+    if kind == "offer" and role == "admin":  # 2.114.2 A (#2263): which finalised quotations the row menu may delete
+        for b, r in zip(rows, raw):
+            if b["locked"] and r["status"] == "draft":
+                b["can_delete"] = b["can_unlock"] = not bga_offer_block(c, oid, r)
     if kind in ("invoice", "reminder"):  # 2.40.0 (#1368 points 8 + 9): open reminder fees, settled reminders ("done")
         from .invoices import fd_reminder_extra
         fd_reminder_extra(c, oid, rows)
     if st in ("partial", "overdue"):  # derived states: filtered after the fact
         rows = [x for x in rows if x["state"] == st]
-    return jsonify(docs=rows, role=office_role(c, uid, oid), org_id=oid)
+    return jsonify(docs=rows, role=role, org_id=oid)
 
 
 @app.post("/api/office/docs")
@@ -909,7 +978,8 @@ def odoc_get(did):
 @app.patch("/api/office/docs/<int:did>")
 def odoc_update(did):
     """Head fields (partial); contract_id (changed) presets raw data / rights / closing unless apply_contract: false;
-    client_id fills an empty recipient (recipient_from_client: true overwrites it). Returns the document with totals.
+    client_id fills the recipient from the client (2.97.0 B #1951: always, a given recipient is ignored while the document
+    has a client; it is read from the client until the document is finalised / sent). Returns the document with totals.
     A finalised document: 409."""
     c, uid, oid = _ctx()
     admin = office_role(c, uid, oid) == "admin"
@@ -1064,17 +1134,49 @@ def odoc_duplicate(did):
     return jsonify(doc_public(c, oid, n, admin)), 201
 
 
+# 2.114.2 A (#2263): a finalised quotation that never left the house may go (decision of 2026-10-19)
+BGA_SENT = N_("This quotation was sent to the client; the record is kept")
+BGA_USED = N_("An invoice or a document was made from this quotation; the record is kept")
+
+
+def bga_offer_block(c, oid, r):
+    """2.114.2 A (#2263): why finalised document r cannot be deleted (None = it can): only a quotation still in draft that
+    was never sent (sent_at, a logged mail), never answered by the client (signoffs) and that nothing was made from (an
+    invoice's source_doc_id, an order confirmation in office_gen_docs). Open signoff links go with it (ON DELETE CASCADE)."""
+    if r["kind"] != "offer" or r["status"] != "draft":
+        return OFX_LOCKED
+    if r["sent_at"] or c.execute("SELECT 1 FROM office_doc_log WHERE org_id=? AND doc_id=? AND action='send' LIMIT 1",
+                                 (oid, r["id"])).fetchone():
+        return BGA_SENT
+    if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (r["id"], oid)).fetchone():
+        return N_("The customer has signed this quotation; the record is kept")
+    if c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND source_doc_id=? LIMIT 1", (oid, r["id"])).fetchone() or \
+            c.execute("SELECT 1 FROM office_gen_docs WHERE org_id=? AND doc_id=? LIMIT 1", (oid, r["id"])).fetchone():
+        return BGA_USED
+    return None
+
+
 @app.delete("/api/office/docs/<int:did>")
 def odoc_delete(did):
-    """The organisation's admin only (members: 403); a finalised document: 409."""
+    """The organisation's admin only (members: 403); a finalised document: 409 (2.114.2 A, #2263: except a finalised
+    quotation that was never sent, see bga_offer_block)."""
     c, uid, oid = _ctx()
+    write_lock(c, f"office_mail_{int(oid)}")  # 2.114.2 (#2263 review): no mail send / unlock / finalise in between
+    write_lock(c, f"office_doc_{int(did)}")
     r = doc_row(c, oid, did)
     if office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this organisation can do this"))
-    ofx_need_editable(r)
+    locked = ofx_locked(r)
+    if locked:
+        why = bga_offer_block(c, oid, r)
+        if why:
+            raise Denied(409, tr(why))
+    else:
+        ofx_need_editable(r)
     if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (did, oid)).fetchone():
         raise Denied(409, tr("The customer has signed this quotation; the record is kept"))  # 2.50.0 (#1200 review)
-    ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net")})
+    ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net"),
+                                                  **({"locked": True} if locked else {})})  # 2.114.2 A (#2263): the number gap stays traceable
     c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
     bump(c)
     c.commit()

@@ -46,7 +46,7 @@ const items = d => [...d.querySelectorAll('#pop [role="menuitem"], .menu-list [r
   const moved = await until(async () => { const g = await call('GET', '/api/wiki/pages/' + P.id); return g.space === SP && g; });
   check(moved && moved.path === 'Plan/Idea', 'the folder moved into the organisation ' + JSON.stringify(moved).slice(0, 200));
   w.location.hash = 'wiki/' + P.id; w.eval('WK.pg = null; renderView()');
-  check(await until(() => /Moved from/.test(d.querySelector('#view .wksmv')?.textContent || '')), 'the page shows its last move');
+  check(await until(() => /Moved out of/.test(d.querySelector('#view .wksmv')?.textContent || '')), 'the page shows its last move');  // 2.97.0 (#2051): "Moved out of <name>"
   await w.eval(`histStep('undo')`);
   const back = await until(async () => { const g = await call('GET', '/api/wiki/pages/' + P.id); return g.space === 'private' && g; });
   check(back && back.path === 'Plan/Idea', 'Undo: back in the private space at the old path ' + JSON.stringify(back).slice(0, 200));

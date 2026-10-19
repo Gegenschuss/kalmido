@@ -423,7 +423,7 @@ async function inviteScreen(tok) {
   const el = document.createElement('div');
   el.className = 'modal authscreen';
   lg_decor(el);  // 2.49.0 (#1553)
-  const logo = `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div>`;
+  const logo = `<div class="alogo">${logoSvg(40)}<b>${wordSvg()}</b></div>`;
   if (info.error) {
     el.innerHTML = `<div class="card">${logo}<p role="alert">${esc(info.error)}</p><button class="btn pri" type="button" data-au="login">${tr('To the login')}</button></div>`;
   } else {
@@ -480,8 +480,8 @@ async function authScreen(j) {
   const el = document.createElement('div');
   el.className = 'modal authscreen';
   lg_decor(el);  // 2.49.0 (#1553)
-  // 2.14.0: the first account (welcome) shows the heron instead of the small mark
-  const logo = kind === 'setup' ? `<div class="alogo hwelc">${heron('welcome', 'hwel')}<b>${APP_NAME}</b></div>` : `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b>${info.org ? `<small class="aorg">${esc(info.org)}</small>` : ''}</div>`;  // 2.22.0 (#752): the organisation
+  // 2.14.0: the first account (welcome) shows the figure instead of the small mark (2.136.0, #2193: the bot, happy eyes)
+  const logo = kind === 'setup' ? `<div class="alogo hwelc">${botFig('erledigt', 'hwel')}<b>${wordSvg()}</b></div>` : `<div class="alogo">${logoSvg(40)}<b>${wordSvg()}</b>${info.org ? `<small class="aorg">${esc(info.org)}</small>` : ''}</div>`;  // 2.22.0 (#752): the organisation
   if (kind === 'no_account' || kind === 'disabled') {
     el.innerHTML = `<div class="card">${logo}<p>${kind === 'disabled' ? esc(tr('The account “{0}” is disabled.', j.login || '')) : esc(tr('There is no {0} account for “{1}” yet.', APP_NAME, j.login || ''))}</p><p class="muted">${tr('Please ask the admin to create one (or to enable it).')}</p></div>`;
   } else {

@@ -141,8 +141,8 @@ const PH = {mobile: true};  // a phone for jsdom
 
   // ================= #1637: the tab name, jsdom
   w = await boot({hash: 'office/offers'}); d = w.document;
-  await until(() => d.querySelector('#view .ofmenu'), 60);  // 2.87.9 (#1917): the office menu instead of the tab row
-  const tab1 = d.querySelector('#view .ofmenu [data-go="office/offers"]');
+  await until(() => d.querySelector('#view .ofrail'), 60);  // 2.87.9 (#1917): the office menu instead of the tab row; 2.98.0 (#2180): the rail
+  const tab1 = d.querySelector('#view .ofrail [data-go="office/offers"]');
   check(/^\s*Quotes & invoices\s*$/.test(tab1?.textContent || ''), '#1637: the point is named "Quotes & invoices": ' + (tab1?.textContent || ''));
   check(!d.querySelector('.office .ofchead h2'), '#1637: no second "Office & finance" heading above the tabs');
   await until(() => d.querySelector('.office .ofdbar'), 60);
@@ -196,7 +196,7 @@ const PH = {mobile: true};  // a phone for jsdom
     check(await ffLogin(o) === 200, 'office: login');
     const ready = async (n = 40) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('.office .ofdbar')`).catch(() => false)); i++) await sleep(300); await sleep(600); };
     const office = `(() => { ${rect} const q = s => document.querySelector(s); const empty = q('.office .empty'), btn = empty && empty.querySelector('[data-ofd="new"]'), txt = empty && empty.querySelector(':scope > span'), srch = q('.office .ofdbar .ctsearch'), sel = q('.office .ofdbar select');
-      return JSON.stringify({mg: R(q('#view .ofmi')), l2: R(q('.office .ofcbody')), l3: R(q('.office .ofdkinds button')), srch: R(srch), sel: R(sel), btn: R(btn), txt: R(txt), news: document.querySelectorAll('.office [data-ofd="new"]').length, h2: !!q('.office .ofchead h2'), over: document.documentElement.scrollWidth > innerWidth + 1}); })()`;
+      return JSON.stringify({mg: R(q('#view .ofpt') || q('#view .ofpb .ofpback')), l2: R(q('.office .ofcbody')), l3: R(q('.office .ofdkinds button')), srch: R(srch), sel: R(sel), btn: R(btn), txt: R(txt), news: document.querySelectorAll('.office [data-ofd="new"]').length, h2: !!q('.office .ofchead h2'), over: document.documentElement.scrollWidth > innerWidth + 1}); })()`;
     for (const [wd, tag] of [[1345, '1345'], [390, '390']]) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: wd, height: 850}});
       await o.nav(B + '#office/offers'); await ready();
@@ -204,6 +204,7 @@ const PH = {mobile: true};  // a phone for jsdom
       check(g.news === 1 && !g.h2, `#1637 ${tag}: one "New quotation", no heading above the tabs ` + JSON.stringify(g));
       check(g.btn && g.txt && g.btn.t >= g.txt.b - 1, `#1637 ${tag}: the button is below the text ` + JSON.stringify([g.btn, g.txt]));
       // 2.87.9 (#1917): the office menu (computer: groups, phone: the group's points) and the document kinds start at the same edge
+      // 2.98.0 (#2180): the rail sits left of the page; the page's heading (computer) / the way back (phone) is the edge now
       check(g.mg && g.l2 && g.l3 && Math.abs(g.mg.l - g.l2.l) <= 4 && Math.abs(g.l2.l - g.l3.l) <= 6, `#1637 ${tag}: menu and document kinds start at the same edge ` + JSON.stringify([g.mg, g.l2, g.l3]));
       check(g.srch && g.sel && Math.abs(g.srch.h - g.sel.h) <= 2, `#1637 ${tag}: search field and filter share one height ` + JSON.stringify([g.srch, g.sel]));
       check(!g.over, `#1637 ${tag}: no horizontal overflow`);

@@ -101,6 +101,11 @@ KINDS = {
     # the list decides; Kalmido variables in formulas are evaluated per viewer (a source they may not see: "denied", no name / value)
     "sheet": ("matrix", "p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
                         "trash, presence, completion); a formula's source of another workspace cannot be chosen and shows no value"),
+    # 2.97.0 A (#1950): bookmarks belong to one organisation (every member reads, the owner / its admins change) or one person
+    "bookmark": ("matrix", "p297_a_api_test.py: a bookmark of another organisation / person: 404 (read, change, delete, picture, move)"),
+    # 2.98.0 A (#1953): scheduling polls belong to one organisation (every member reads, the owner / its admins change) or one person
+    "poll": ("matrix", "p298_a_api_test.py: a poll of another organisation / person: 404 (read, change, delete, choose, move, list); "
+                       "the public link reads inside the poll's organisation only"),
     # ---- not relevant for the boundary between organisations (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account (before a session or about the session's own person)"),
     "own": ("n/a", "the person's own rows only (settings, devices, tokens, habits, time, filters, imports, Home & life, their own "
@@ -168,6 +173,24 @@ ROUTES = {
     "GET /api/agents/jobs": "agent", "POST /api/agents/jobs/{}/action": "agent",
     "POST /api/agents/{}/chat/{}/choice": "agent", "PUT /api/agents/{}/permission-mode": "agent",
     "GET /api/agents/{}/chat": "agent", "POST /api/agents/{}/chat": "agent",
+    # 2.98.0 A (#1953): scheduling polls (p298_a_api_test.py) - routes below this line
+    "GET /api/polls": "poll", "POST /api/polls": "poll", "GET /api/polls/{}": "poll", "PATCH /api/polls/{}": "poll",
+    "DELETE /api/polls/{}": "poll", "POST /api/polls/{}/restore": "poll", "POST /api/polls/{}/decide": "poll",
+    "POST /api/polls/{}/reopen": "poll", "POST /api/polls/{}/move-space": "poll", "GET /s/v/{}": "poll", "POST /s/v/{}": "poll",
+    "GET /s/v/time.js": "public",
+    # (2.98.0 spacer A)
+    # 2.98.0 B (#1954): questionnaires (p298_b_api_test.py) - routes below this line
+    "GET /api/forms/{}/entries": "form", "GET /api/forms/{}/entries.csv": "form",
+    # (2.98.0 spacer B)
+    # 2.98.0 C (#2180 #2181): office menu, tables (p298_c_ui.js) - routes below this line
+    # (2.98.0 spacer C)
+    # 2.98.0 D (#2163 #2178 #2184): polish (p298_d_api_test.py) - routes below this line
+    # (2.98.0 spacer D)
+    # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
+    "GET /api/bookmarks": "bookmark", "POST /api/bookmarks": "bookmark", "GET /api/bookmarks/{}": "bookmark",
+    "PATCH /api/bookmarks/{}": "bookmark", "DELETE /api/bookmarks/{}": "bookmark", "POST /api/bookmarks/{}/restore": "bookmark",
+    "POST /api/bookmarks/{}/refresh": "bookmark", "GET /api/bookmarks/{}/image": "bookmark",
+    "POST /api/bookmarks/move-space": "bookmark",
     # 2.96.0 C (#2015): job cards in the agent chat (p296_c_api_test.py)
     "POST /api/agents/{}/chat/{}/reactions": "agent", "POST /api/agents/{}/wake": "agent",
     "GET /api/proposals/agents": "agent", "POST /api/proposals": "agent", "GET /api/proposals/{}": "agent",
@@ -336,7 +359,8 @@ ROUTES = {
     "GET /api/office/docs/{}/pdf": "office", "GET /api/office/logo": "office", "POST /api/office/logo": "office",
     "DELETE /api/office/logo": "office",
     # ---- office (E, 2.36.2 #1021 / #1142): finalising a document, its history and the organisation's office log (3)
-    "POST /api/office/docs/{}/finalize": "office", "GET /api/office/docs/{}/log": "office", "GET /api/office/log": "office",
+    "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
+    "GET /api/office/docs/{}/log": "office", "GET /api/office/log": "office",
     # ---- office (F1, 2.38.0 #1021): invoices, credit notes, reminders, payments, sending, DATEV inbox (11)
     "POST /api/office/docs/{}/invoice": "office", "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/from-time": "office",
     "POST /api/office/docs/reminder": "office", "GET /api/office/docs/{}/payments": "office", "POST /api/office/docs/{}/payments": "office",
@@ -400,6 +424,7 @@ ROUTES = {
     "POST /api/family/kids/{}/rewards": "family", "PATCH /api/family/rewards/{}": "family",
     "DELETE /api/family/rewards/{}": "family", "POST /api/family/rewards/{}/request": "family",
     "POST /api/family/rewards/{}/decide": "family",
+    # 2.97.0 B (#1951): customers (p297_b_api_test.py) - routes below this line
     # 2.49.0 (#1551): the parents' PIN of a child account (set / removed by its parents, opened by the child for its session)
     "PUT /api/family/kids/{}/pin": "family", "DELETE /api/family/kids/{}/pin": "family",
     "POST /api/me/pin/unlock": "family", "POST /api/me/pin/lock": "family",
@@ -633,6 +658,8 @@ ROUTES = {
     "POST /api/lists/{}/e2e/bulk": "list", "POST /api/lists/{}/e2e/finish": "list", "POST /api/lists/{}/e2e/stop": "list",
     "POST /api/lists/{}/e2e/keys": "list",
     "POST /api/lists/{}/e2e/rotate": "list",  # 2.64.2 A (#1817): key change of a list with the lock
+    # 2.97.0 C (#2049): office moves (p297_c_api_test.py) - routes below this line
+    "POST /api/office/move-space": "office",
     # 2.64.2 B (#1817): list files -- need_task (+ own comment) / need_list, people in the app only (p264b_b_api_test.py)
     "POST /api/tasks/{}/list-attachments": "attachment", "POST /api/lists/{}/e2e/files/{}": "list",
     "GET /api/tasks/{}/note-lock": "task", "PUT /api/tasks/{}/note-lock": "task", "DELETE /api/tasks/{}/note-lock": "task", "GET /api/v1/team/rooms": "team", "POST /api/v1/team/dm": "team",
@@ -765,6 +792,7 @@ ROUTES = {
     # 2.59.0 B (#1375): related tasks (tasks/related.py)
     "GET /api/tasks/{}/related": "related", "GET /api/v1/tasks/{}/related": "related", "POST /api/tasks/similar": "related",
     "GET /api/related/config": "public", "GET /api/admin/related": "admin", "PUT /api/admin/related": "admin",
+    # 2.97.0 D (#2050 #2051): locked spaces / clean-up (p297_d_api_test.py) - routes below this line
     # 2.60.0 B (#1511): the velocity of a list (need_list read; p260_b_api_test.py: a stranger / another organisation's agent 404)
     "GET /api/lists/{}/velocity": "list", "GET /api/v1/lists/{}/velocity": "list",
     # 2.60.0 C (#1512): the review step (need_task / need_list of the task's list; p260_c_api_test.py: a stranger 404, a viewer 403)

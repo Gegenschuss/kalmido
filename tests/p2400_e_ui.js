@@ -85,9 +85,10 @@ const FEAT = 'cal,comments,collab,office,clients';
     // Discard puts the saved values back, Save stores the draft
     await typ('osc-city', 'Hamburg');
     await ev(`(() => { document.querySelector('#ofc-set > .fgbar [data-fgb="save"]').click(); return 1; })()`);
-    let saved = null;
-    for (let i = 0; i < 40 && !saved; i++) { const j = await call(CA, 'GET', '/api/office/settings'); if (j.company_fields?.street === 'Hafenstraße 12') saved = j; else await sleep(250); }
-    check(saved && saved.company_fields.city === 'Hamburg' && saved.settings.offer_valid_days === 21, '#1371: Save in the bar stores the input ' + JSON.stringify(saved?.company_fields || {}).slice(0, 120));
+    let saved = null, last = null;
+    for (let i = 0; i < 40 && !saved; i++) { const j = await call(CA, 'GET', '/api/office/settings'); if (j.company_fields?.street === 'Hafenstraße 12' && j.company_fields?.city === 'Hamburg' && j.settings?.offer_valid_days === 21) saved = j; else { last = j; await sleep(250); } }
+    saved = saved || last;
+    check(saved && saved.company_fields.city === 'Hamburg' && saved.settings.offer_valid_days === 21, '#1371: Save in the bar stores the input ' + JSON.stringify(saved?.company_fields || {}).slice(0, 120) + ' valid ' + saved?.settings?.offer_valid_days);
     check(await ready(ev, `!document.querySelector('#ofc-set > .fgbar')`) && !(await ev(unload)), '#1371: saved: no bar, no question on closing');
     await typ('os-valid', '5');
     await ev(`(() => { document.querySelector('#ofc-set > .fgbar [data-fgb="discard"]').click(); return 1; })()`);
