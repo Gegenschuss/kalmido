@@ -158,10 +158,11 @@ def rc_set(c, node, ws, lid, cat, uid, vat=_KEEP, keep=False):
     """Write the assignment of a receipt (people only); returns the previous (list_id, category). 2.90.0 A (#1921): vat =
     the VAT rate (left as it is when not given); the row stays while a VAT rate or a payment day is set, or with keep (the
     bookkeeping's receipt sheet: a receipt without category and rate is still a receipt)."""
-    old = c.execute("SELECT list_id, category, vat_pct, paid_at FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone()
+    old = c.execute("SELECT list_id, category, vat_pct, paid_at, billed_doc_id FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone()
     prev = (old["list_id"], old["category"]) if old else (None, "")
     vat = (old["vat_pct"] if old else None) if vat is _KEEP else vat
-    if not keep and not lid and not cat and vat is None and not (old and old["paid_at"]):
+    # 2.121.0 review N5: a receipt billed on to a client (#2094) stays a receipt like one with a payment day
+    if not keep and not lid and not cat and vat is None and not (old and (old["paid_at"] or old["billed_doc_id"])):
         c.execute("DELETE FROM rc_receipts WHERE node_id=?", (node["id"],))
     elif old:
         c.execute("UPDATE rc_receipts SET list_id=?, category=?, vat_pct=?, set_by=?, set_at=? WHERE node_id=?",
@@ -266,7 +267,7 @@ def rc_accept(sid):
                   (S.doc_seal(c, m["ws"], "doc_meta.amount", amt or pa), ccy or pc, n["id"]))
     if vat is not _KEEP:
         pv = (cur["vat_pct"] if cur else None) or "-"
-    prev = rc_set(c, n, m["ws"], lid, cat, uid, vat)
+    prev = rc_set(c, n, m["ws"], lid, cat, uid, vat, keep=bool(cur))  # 2.121.0 review M2: an amount-only accept keeps the receipt
     c.execute("UPDATE rc_suggest SET state='accepted', decided_by=?, decided_at=?, prev_list_id=?, prev_category=?, prev_amount=?, prev_currency=?, "
               "prev_vat_pct=? WHERE id=?",
               (uid, _now(), prev[0], prev[1], S.doc_seal(c, m["ws"], "rc_suggest.prev_amount", pa), pc, pv, sid))
@@ -301,7 +302,9 @@ def rc_reopen(sid):
     s, n, m = _need_sug(c, sid)
     if s["state"] == "accepted":
         vat = _KEEP if s["prev_vat_pct"] is None else (None if s["prev_vat_pct"] == "-" else s["prev_vat_pct"])
-        rc_set(c, n, m["ws"], s["prev_list_id"], s["prev_category"] or "", uid, vat)
+        only_money = not s["list_id"] and not s["category"]  # 2.121.0 review M2: its accept never created / removed the row
+        rc_set(c, n, m["ws"], s["prev_list_id"], s["prev_category"] or "", uid, vat, keep=only_money and bool(
+            c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (n["id"],)).fetchone()))
         if s["prev_amount"] is not None or s["prev_currency"] is not None:  # 2.121.0 C (#2096): the amount before the accept
             pa = S.doc_open(c, m["ws"], "rc_suggest.prev_amount", s["prev_amount"]) or ""
             c.execute("UPDATE doc_meta SET amount=?, currency=? WHERE node_id=?",

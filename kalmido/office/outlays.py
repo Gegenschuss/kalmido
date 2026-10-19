@@ -43,10 +43,13 @@ def au_billed(c, oid, ids):
     ids = [int(x) for x in ids]
     if not ids:
         return {}
-    rows = c.execute(f"SELECT r.node_id, r.billed_at, d.id AS doc_id, d.number, d.kind FROM rc_receipts r JOIN office_docs d "
-                     f"ON d.id=r.billed_doc_id AND d.org_id=? WHERE r.ws=? AND r.node_id IN ({','.join('?' * len(ids))})",
-                     [oid, bk_ws(c, oid)] + ids).fetchall()
-    return {r["node_id"]: {"doc_id": r["doc_id"], "number": r["number"], "kind": r["kind"], "billed_at": r["billed_at"]} for r in rows}
+    # 2.121.0 review N4: a receipt moved here from another office after its billing stays billed (never twice), without the
+    # other office's document details
+    rows = c.execute(f"SELECT r.node_id, r.billed_at, d.id AS doc_id, d.number, d.kind, d.org_id FROM rc_receipts r JOIN office_docs d "
+                     f"ON d.id=r.billed_doc_id WHERE r.ws=? AND r.node_id IN ({','.join('?' * len(ids))})",
+                     [bk_ws(c, oid)] + ids).fetchall()
+    return {r["node_id"]: ({"doc_id": r["doc_id"], "number": r["number"], "kind": r["kind"], "billed_at": r["billed_at"]} if r["org_id"] == oid
+                           else {"doc_id": None, "number": None, "kind": None, "billed_at": r["billed_at"]}) for r in rows}
 
 
 def au_title(x, lg):
@@ -129,14 +132,15 @@ def au_unbill_post():
     q = ",".join("?" * len(ids))
     docs = {x[0] for x in c.execute(f"SELECT billed_doc_id FROM rc_receipts WHERE ws=? AND node_id IN ({q}) AND billed_doc_id IS NOT NULL", [ws] + ids)}
     c.execute(f"UPDATE rc_receipts SET billed_doc_id=NULL, billed_at=NULL WHERE ws=? AND node_id IN ({q}) AND NOT EXISTS "
-              "(SELECT 1 FROM office_docs d WHERE d.id=rc_receipts.billed_doc_id AND d.locked_at IS NOT NULL AND d.locked_at != '')", [ws] + ids)
+              "(SELECT 1 FROM office_docs d WHERE d.id=rc_receipts.billed_doc_id AND ((d.locked_at IS NOT NULL AND d.locked_at != '') OR d.status='sent'))",
+              [ws] + ids)  # 2.121.0 review M1: a sent document counts as final like in bill (ofx_need_editable)
     removed = 0
     for did in docs:
         r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
-        if not r or r["locked_at"] or not pids:
+        if not r or r["locked_at"] or r["status"] == "sent" or not pids:  # 2.121.0 review M1
             continue
         before = ofx_items_brief(doc_items(c, did, oid))
-        n = c.execute(f"DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND id IN ({','.join('?' * len(pids))})",
+        n = c.execute(f"DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND intext='extern' AND id IN ({','.join('?' * len(pids))})",
                       [did, oid] + pids).rowcount
         if n:
             removed += n

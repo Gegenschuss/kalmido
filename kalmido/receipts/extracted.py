@@ -56,6 +56,14 @@ def rx_sender_find(c, ws, det, nid=None):
     return None, name or None
 
 
+def _differs(amount, gross):
+    """2.121.0 review N1: an amount of an import may be any text ("12,34") -- unreadable counts as different, never a 500."""
+    try:
+        return abs(float(str(amount).replace(",", ".")) - float(gross)) >= 0.005
+    except (TypeError, ValueError):
+        return True
+
+
 def rx_view(c, m, rc_vat=None, is_receipt=False):
     """The suggestion for the client / an agent: the values, 'new' = the fields Take over would change (amount, vat_pct,
     sender; empty = the line stays hidden), 'hidden' = dismissed. None without one."""
@@ -65,7 +73,7 @@ def rx_view(c, m, rc_vat=None, is_receipt=False):
     ws = m["ws"]
     new = []
     amount = S.doc_open(c, ws, "doc_meta.amount", m["amount"]) or ""
-    if det.get("gross") and (not amount or abs(float(amount) - float(det["gross"])) >= 0.005):
+    if det.get("gross") and (not amount or _differs(amount, det["gross"])):
         new.append("amount")
     if det.get("vat_pct") and det["vat_pct"] != rc_vat:
         new.append("vat_pct")
@@ -119,7 +127,7 @@ def rx_post(nid):
         S.meta_set_json(c, nid, ws, "extracted", det)
     elif act == "apply":
         want = b.get("fields") or list(RX_FIELDS)
-        if not isinstance(want, list) or set(want) - set(RX_FIELDS):
+        if not isinstance(want, list) or not all(isinstance(x, str) for x in want) or set(want) - set(RX_FIELDS):  # review N2
             return err(tr("Invalid value: {0}", "fields"))
         r = _rc_row(c, nid)
         before = {"amount": S.doc_open(c, ws, "doc_meta.amount", m["amount"]) or "", "currency": m["currency"] or "",
