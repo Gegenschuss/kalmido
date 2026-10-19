@@ -96,7 +96,7 @@ const FEAT = 'cal,comments,collab,events,files,time';
   await until(() => d.querySelector('#wh-evs .whevg'));
   const groups = [...d.querySelectorAll('#wh-evs .whevg > b')].map(x => x.textContent);
   check(['Tasks', 'Calendar', 'Files', 'Invoices', 'Time tracking'].every(g => groups.includes(g)), '#2061: the events in groups ' + JSON.stringify(groups));
-  check(/never the members’ private areas/.test(d.querySelector('.modal')?.textContent || ''), '#2061: the dialog says: never the private areas');
+  check(/never the members’ private areas/.test([...d.querySelectorAll('.modal')].pop()?.textContent || ''), '#2061: the dialog says: never the private areas');
   w.close();
   const wb = await boot({user: 'bob'});
   wb.eval(`settingsModal('org')`); await sleep(1500);
