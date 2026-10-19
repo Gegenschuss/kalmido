@@ -117,6 +117,17 @@ function ms_clCard(c) {
   </article>`;
 }
 
+// ---- 2.120.0 B (#2088): "Send portal link": the client gets the sign-in link of the customer portal by mail (office/portaldocs.py;
+// the office setting "Show documents in the customer portal" must be on, else the server says so)
+function kp_menuItem(c) {
+  const to = c.billing?.email_invoice || c.email || '';
+  if (!to || typeof officeOn !== 'function' || !officeOn() || S.me?.kid) return null;
+  return {label: tr('Send portal link'), icon: 'mail', fn: async () => {
+    if (!await askConfirm(tr('Send the portal link to {0}?', to), tr('The client sees the sent quotations, invoices and their payment status. The link is valid for 30 minutes.'), {ok: tr('Send|mail')})) return;
+    try { const j = await rawFetch('POST', `/api/office/clients/${c.id}/portal-link`, {}); toast(tr('Portal link sent to {0}', j.to || to)); } catch (x) { toast(x.message || ''); }
+  }};
+}
+
 // ---- #1733: several clients at once (the selection bar of the contacts, multisel.js): Edit (rate, budget, colour,
 // a note appended), Archive / Restore, Delete (a client in use is archived instead); one undo step each except Delete
 function ms_clBar() {
@@ -237,7 +248,8 @@ document.addEventListener('click', e => {
       if (j.changed) ms_hist(msg, msg, async () => { await ms_clSend({action: 'restore', items: j.undo}); await ms_clAfter(); }, async () => { await ms_clSend({action: c.archived ? 'unarchive' : 'archive', ids: [c.id]}); await ms_clAfter(); });
     }}, ofm_can(c.org_id ?? null) ? {label: tr('Move to another workspace…'), icon: 'brief', fn: () => ofm_clients([c.id])} : null,  // 2.97.0 C (#2049)
     typeof tpo_on === 'function' && tpo_on() ? {label: tr('Find a date…'), icon: 'users', fn: () => tpo_forClient(c)} : null,  // 2.98.0 A (#1953)
-    formsOn() && !S.me?.kid ? {label: tr('Copy questionnaire link for this client'), icon: 'copy', fn: () => fq_clientLink(c, b)} : null]);  // 2.102.0 C (#2201)
+    formsOn() && !S.me?.kid ? {label: tr('Copy questionnaire link for this client'), icon: 'copy', fn: () => fq_clientLink(c, b)} : null,  // 2.102.0 C (#2201)
+    kp_menuItem(c)]);  // 2.120.0 B (#2088)
   }
 });
 document.addEventListener('keydown', e => {  // capture: before the global Esc (an open menu / dialog closes first)

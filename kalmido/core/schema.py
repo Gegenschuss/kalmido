@@ -2533,6 +2533,15 @@ MIGRATIONS = [
     # 2.102.0 A (#1988): a deleted list stays in the trash with everything (tasks, fields, tags, chat) until the purge
     ("lists", "deleted_at", "ALTER TABLE lists ADD COLUMN deleted_at TEXT"),
     ("lists", "deleted_by", "ALTER TABLE lists ADD COLUMN deleted_by BIGINT REFERENCES users(id) ON DELETE SET NULL"),
+    # 2.120.0 D (#2089): delivery notes (kind 'delivery'); delivery_title '' = "Lieferschein", 'service' = "Leistungsnachweis". 2.117 never reads it
+    ("office_docs", "delivery_title", "ALTER TABLE office_docs ADD COLUMN delivery_title TEXT NOT NULL DEFAULT ''"),
+    # 2.120.0 A (#2087): progress / final invoices (inv_type '' | progress | final, abs_refs = the progress invoices a final
+    # one deducts) and the cash discount of an invoice (skonto_pct / skonto_days, NULL = none). Older versions never read them
+    ("office_docs", "inv_type", "ALTER TABLE office_docs ADD COLUMN inv_type TEXT NOT NULL DEFAULT ''"),
+    ("office_docs", "abs_refs", "ALTER TABLE office_docs ADD COLUMN abs_refs TEXT NOT NULL DEFAULT '[]'"),
+    ("office_docs", "skonto_pct", "ALTER TABLE office_docs ADD COLUMN skonto_pct NUMERIC(14,4)"),
+    ("office_docs", "skonto_days", "ALTER TABLE office_docs ADD COLUMN skonto_days BIGINT"),
+    # (2.120.0 A end)
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

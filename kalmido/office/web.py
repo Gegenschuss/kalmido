@@ -101,7 +101,7 @@ def office_number_preview():
     yearly = the counter starts again every year)."""
     c, uid, oid = _ctx()
     kind = request.args.get("kind") or "offer"
-    if kind not in ("offer", "invoice", "credit", "reminder"):
+    if kind not in ("offer", "invoice", "credit", "reminder", "delivery"):  # 2.120.0 D (#2089)
         kind = "offer"
     try:
         scheme = office_scheme_clean(request.args.get("scheme") or "", offer=kind == "offer")  # 2.118.0 A (#2265): {version} only here

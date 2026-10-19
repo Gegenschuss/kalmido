@@ -25,6 +25,7 @@ function dx_settingsHtml(s, dis) {
     ${ofcRowF('dx-debtor', tr('Collective debtor'), num('dx-debtor', st.debtor, 9, dx_ph(st, 'debtor')), tr('a client whose customer number is a debtor number gets its own'))}
     ${ofcRowF('dx-bank', tr('Bank account'), num('dx-bank', st.bank, 8, dx_ph(st, 'bank')), tr('payments by transfer or card'))}
     ${ofcRowF('dx-cash', tr('Cash account'), num('dx-cash', st.cash, 8, dx_ph(st, 'cash')), tr('payments in cash'))}
+    ${typeof ofcAdmin === 'function' && ofcAdmin() && !dis ? dv_settingsHtml(st) : ''}
   </details>`;
 }
 function dx_settingsBody(form) {
@@ -43,12 +44,63 @@ function dx_dialog() {
   const md = ofdDlg(tr('DATEV export'), `<p class="muted ofchint">${tr('Finalised invoices, credit notes and payments of the period as a DATEV booking batch (CSV) for your tax advisor.')}</p>
     <div class="row"><label id="dx-fl">${tr('From')}</label>${dateIn('dx-from', dx_iso(from), {label: tr('From'), clear: false})}</div>
     <div class="row"><label id="dx-tl">${tr('To')}</label>${dateIn('dx-to', dx_iso(to), {label: tr('To'), clear: false, after: 'dx-from'})}</div>
+    ${ofcChk('dx-in', tr('Include receipts and travel expenses'), (OFC.info?.settings?.datev_extf || {}).in_on ?? 1)}
     <p class="muted" id="dx-res" aria-live="polite"></p>`, tr('Download'), async m => {
-    const q = `from=${encodeURIComponent($('#dx-from', m).value)}&to=${encodeURIComponent($('#dx-to', m).value)}`;
+    const q = `from=${encodeURIComponent($('#dx-from', m).value)}&to=${encodeURIComponent($('#dx-to', m).value)}${$('#dx-in', m)?.checked ? '' : '&in=0'}`;
     const j = await api('GET', `/api/office/datev/extf?${q}&check=1`);
     const a = document.createElement('a'); a.href = `/api/office/datev/extf?${q}`; a.download = j.file || ''; document.body.appendChild(a); a.click(); a.remove();
-    toast(j.count === 1 ? tr('1 booking exported') : tr('{0} bookings exported', j.count));
+    toast([j.count === 1 ? tr('1 booking exported') : tr('{0} bookings exported', j.count), ...(j.hints || []).map(h => h.text)].join('. '));  // 2.120.0 C (#2090)
   });
   return md;
 }
 document.addEventListener('click', e => { const b = e.target.closest?.('[data-dx="extf"]'); if (b) dx_dialog(); });
+
+// 2.120.0 C (#2090): the input side of the batch (receipts, travel expenses): its own section, every field saves itself on
+// change (one undo step in the toast), the accounts of the receipt categories come from the server
+const DV_TRAVEL = [['fares', N_('Travel: fares')], ['hotel', N_('Travel: hotel')], ['vma', N_('Per diem')], ['other', N_('Travel: other costs')]];
+const DV = {acc: null, oid: null};
+async function dv_load() {
+  try { DV.acc = await api('GET', '/api/office/datev/accounts'); } catch (x) { DV.acc = {categories: [], travel: [], error: x.message || tr('unknown')}; }
+  const box = $('#dv-acc'); if (box) box.innerHTML = dv_accHtml();
+}
+function dv_accHtml() {
+  const a = DV.acc; if (!a) return `<p class="muted">${tr('Loading…')}</p>`;
+  if (a.error) return `<p class="muted">${esc(a.error)}</p>`;
+  const num = (k, name, v, ph, label) => `<input value="${esc(v || '')}" inputmode="numeric" maxlength="8" class="numin" data-dv="${k}" data-name="${esc(name)}" placeholder="${esc(ph)}" aria-label="${esc(label)}">`;
+  const cats = a.categories.length ? a.categories.map(c => `<div class="row"><label>${esc(c.name)}</label>${num('cat', c.name, c.account, c.default, tr('Expense account for {0}', c.name))}</div>`).join('')
+    : `<p class="muted ofchint">${tr('No receipt categories yet.')}</p>`;
+  return `<h4>${tr('Expense accounts of the receipt categories')}</h4>${cats}
+    <h4>${tr('Travel expenses')}</h4>${a.travel.map(t => `<div class="row"><label>${esc(tr((DV_TRAVEL.find(x => x[0] === t.key) || [, t.key])[1]))}</label>${num('travel', t.key, t.account, t.default, tr((DV_TRAVEL.find(x => x[0] === t.key) || [, t.key])[1]))}</div>`).join('')}`;
+}
+function dv_settingsHtml(st) {
+  if (DV.oid !== OFC.info?.org_id || !DV.acc) { DV.oid = OFC.info?.org_id; DV.acc = null; setTimeout(dv_load, 0); }
+  const bu = st.bu_in || {}, num = (id, k, v, mx, ph) => `<input id="${id}" value="${esc(String(v ?? ''))}" inputmode="numeric" maxlength="${mx}" class="numin" data-dv="${k}" ${ph ? `placeholder="${esc(ph)}"` : ''}>`;
+  const ph = (n, plus) => n.padEnd((+st.acct_len || 4) + (plus || 0), '0');
+  return `<section class="dvset" data-fg-skip aria-labelledby="dv-h"><h4 id="dv-h">${tr('Receipts and travel expenses')}</h4>
+    <p class="muted ofchint">${tr('Receipts with an amount and travel expenses go into the same booking batch. Changes here are saved at once.')}</p>
+    <div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="dv-on" data-dv="in_on" ${st.in_on ?? 1 ? 'checked' : ''}> ${tr('Include receipts and travel expenses')}</label></div>
+    ${ofcRowF('dv-counter', tr('Counter account of the receipts'), `<select id="dv-counter" data-dv="in_counter">${[['creditor', tr('Collective creditor')], ['bank', tr('Bank account')]].map(([v, n]) => `<option value="${v}" ${(st.in_counter || 'creditor') === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`)}
+    ${ofcRowF('dv-cred', tr('Collective creditor'), num('dv-cred', 'creditor', st.creditor, 9, ph('7', 1)))}
+    ${ofcRowF('dv-other', tr('Other expenses'), num('dv-other', 'in_other', st.in_other, 8, ph(st.chart === 'SKR04' ? '63' : '49')), tr('receipts without a category or a known one'))}
+    ${ofcRowF('dv-bu19', tr('Input tax key 19 %'), num('dv-bu19', 'bu19', bu['19'], 4, '9'))}
+    ${ofcRowF('dv-bu7', tr('Input tax key 7 %'), num('dv-bu7', 'bu7', bu['7'], 4, '8'))}
+    <div id="dv-acc">${dv_accHtml()}</div>
+    <p class="aerr" role="alert" id="dv-err"></p></section>`;
+}
+function dv_body(el) {
+  const k = el.dataset.dv, v = el.type === 'checkbox' ? (el.checked ? 1 : 0) : el.value.trim(), st = OFC.info?.settings?.datev_extf || {};
+  if (k === 'cat') return {cat_accounts: Object.assign({}, st.cat_accounts || {}, {[el.dataset.name.toLowerCase()]: v})};
+  if (k === 'travel') return {travel: Object.assign({}, st.travel || {}, {[el.dataset.name]: v})};
+  if (k === 'bu19' || k === 'bu7') return {bu_in: Object.assign({}, st.bu_in || {}, {[k.slice(2)]: v})};
+  return {[k]: v};
+}
+async function dv_save(el) {
+  const err = $('#dv-err'), before = JSON.parse(JSON.stringify(OFC.info?.settings?.datev_extf || {})), b = dv_body(el);
+  const old = Object.fromEntries(Object.keys(b).map(k => [k, before[k] ?? (typeof b[k] === 'object' ? {} : '')]));
+  const put = async x => { const j = await api('PUT', '/api/office/settings', {datev_extf: x}); OFC.info.settings = j.settings; };
+  try {
+    await put(b); if (err) err.textContent = '';
+    toast(tr('Saved'), async () => { await put(old); DV.acc = null; ofcDraw(); });
+  } catch (x) { if (err) err.textContent = x.message || tr('unknown'); }
+}
+document.addEventListener('change', e => { const el = e.target; if (el.dataset?.dv && el.closest?.('.dvset')) dv_save(el); });

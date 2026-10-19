@@ -134,10 +134,11 @@ def _model(c, oid, did):
     if not model.get("locked"):  # 2.36.2: a finalised document prints the logo of its snapshot (set by odoc_render)
         lp = opdf_logo_path(oid)
         co["logo_path"] = lp if (office_settings(c, oid).get("logo") and os.path.isfile(lp)) else None
-        if model.get("kind") in ("invoice", "credit", "reminder"):  # 2.38.0: a draft invoice is marked as such
+        if model.get("kind") in ("invoice", "credit", "reminder", "delivery"):  # 2.38.0: a draft invoice is marked as such
             model["draft_mark"] = tr("Draft", lg=model.get("lang") or "de")
     model.pop("internal", None)  # never printed
-    return model
+    from .letterhead import bp_model
+    return bp_model(c, oid, did, model)  # 2.120.0 E (#2091): the own letterhead (a finalised document: the one frozen with it)
 
 
 def epdf_format(c, oid, r):

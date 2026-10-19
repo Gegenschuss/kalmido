@@ -1271,6 +1271,21 @@ fresh; run p21141_b_api "$PY" p21141_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21141_b_ui node p21141_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.114.1 part C: transfer of rights on its own last page of the quotation PDF (#2258)
 fresh; run p21141_c_api "$PY" p21141_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.120.0 part A: progress and final invoices, cash discount (#2087)
+fresh; run p2120_a_api "$PY" p2120_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2120_a_ui node p2120_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.120.0 part B: client portal with quotations, invoices and payment state (#2088)
+fresh; run p2120_b_api "$PY" p2120_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2120_b_ui node p2120_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.120.0 part C: DATEV export with incoming receipts and travel costs (#2090)
+fresh; run p2120_c_api "$PY" p2120_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2120_c_ui node p2120_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.120.0 part D: delivery note / proof of work, timesheet as invoice attachment (#2089)
+fresh; run p2120_d_api "$PY" p2120_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2120_d_ui node p2120_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.120.0 part E: own letterhead as background PDF (#2091)
+fresh; run p2120_e_api "$PY" p2120_e_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2120_e_ui node p2120_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.122.3 part A: office - one amount at 0 % VAT, import/export on the settings page, empty areas link there (#2333 #2335)
 fresh; run p21223_a_api "$PY" p21223_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21223_a_ui node p21223_a_ui.js "$KALMIDO_TEST_DATA"
