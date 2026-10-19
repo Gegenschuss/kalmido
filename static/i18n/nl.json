@@ -10824,5 +10824,9 @@
   "Use the values of the document": "Waarden van het document gebruiken",
   "incl. producing ({0})": "incl. producing ({0})",
   "incl. producing 1 day": "incl. producing 1 dag",
-  "incl. producing {0} days": "incl. producing {0} dagen"
+  "incl. producing {0} days": "incl. producing {0} dagen",
+  "Like the settings ({0})": "Zoals in de instellingen ({0})",
+  "Order confirmation with signature line": "Opdrachtbevestiging met handtekeningregel",
+  "Print the order confirmation with signature line": "Opdrachtbevestiging met handtekeningregel afdrukken",
+  "Default for quotations, can be changed in each quotation": "Standaard voor offertes, per offerte aan te passen"
 }
