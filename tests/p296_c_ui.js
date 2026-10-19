@@ -103,7 +103,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
 
   // ================= the filter
   const filt = () => d.querySelector('#jcd-filt');
-  check(filt() && !filt().hidden && filt().querySelectorAll('.jcdseg button').length === 3 && d.querySelector('#jcd-fbtn.jcdfbtn:not([hidden])'), 'with a job: the filter (buttons + a header icon for the phone)'  // 2.117.0 (#2260));
+  check(filt() && !filt().hidden && filt().querySelectorAll('.jcdseg button').length === 3 && d.querySelector('#jcd-fbtn.jcdfbtn:not([hidden])'), 'with a job: the filter (buttons + a header icon for the phone)');  // 2.117.0 (#2260)
   check(/Only me and Dev Bot/.test(filt().textContent), 'the filter names the agent ' + filt().textContent);
   click(w, filt().querySelector('[data-f="jobs"]'));
   await until(() => !/plain answer/.test(box().textContent));
