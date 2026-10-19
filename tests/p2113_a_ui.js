@@ -38,6 +38,7 @@ const FEAT = 'cal,comments,collab,office,clients';
   const vis = id => `(() => { const e = document.getElementById('${id}'); return !!e && !!e.getClientRects().length; })()`;
   const tab = k => `(() => { document.querySelector('#ofc-set [data-ostsub="${k}"]').click(); return 1; })()`;
   const typ = (id, v) => `(() => { const el = document.getElementById('${id}'); el.focus(); el.value = ${JSON.stringify(v)}; el.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`;
+  const leave = id => `(() => { document.getElementById('${id}').dispatchEvent(new FocusEvent('focusout', {bubbles: true})); return 1; })()`;  // (a background window gets no focus events)
   const row = id => `document.getElementById('${id}')?.closest('.row')?.querySelector('.ostok')`;
 
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
@@ -75,19 +76,19 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ev(tab('docs'));
     await ev(typ('os-paydays', '28'));
     check(!(await ev(`!!document.querySelector('#ofc-set .fgbar')`)), '#2247: typing shows no bar');
-    await ev(`(() => { document.getElementById('os-valid').focus(); return 1; })()`);
+    await ev(leave('os-paydays'));
     const s1 = await srv(j => j.settings?.payment_days === 28);
     check(!!s1 && s1.settings.company.name === 'Studio Nordlicht GmbH' && s1.company_fields.city === 'Köln' && s1.settings.lang === 'en', '#2247: leaving the field saved it, nothing else changed');
     check(await ready(ev, `(() => { const m = ${row('os-paydays')}; return !!m && m.classList.contains('on') && /Saved/.test(m.textContent) && !!m.querySelector('[data-ost-undo]'); })()`), '#2247: "Saved" with Undo at the field');
     await shot('p2113-a-saved.png');
     // a wrong value stays in the field with the error
     await ev(typ('os-paydays', 'many'));
-    await ev(`(() => { document.getElementById('os-valid').focus(); return 1; })()`);
+    await ev(leave('os-paydays'));
     check(await ready(ev, `(() => { const m = ${row('os-paydays')}; return !!m && m.classList.contains('err') && document.getElementById('os-paydays').hasAttribute('aria-invalid'); })()`), '#2247: a wrong value: the field is marked with the error');
     check(await ev(`document.getElementById('os-paydays').value === 'many'`) && (await call(CA, 'GET', '/api/office/settings')).settings.payment_days === 28, '#2247: the wrong value stays in the field, nothing saved');
     check(await ev(`(() => { const e = new Event('beforeunload', {cancelable: true}); window.dispatchEvent(e); return e.defaultPrevented; })()`), '#2247: closing the page asks while a value could not be saved');
     await ev(typ('os-paydays', '14'));
-    await ev(`(() => { document.getElementById('os-paydays').blur(); return 1; })()`);
+    await ev(leave('os-paydays'));
     check(!!(await srv(j => j.settings?.payment_days === 14)) && await ready(ev, `!document.getElementById('os-paydays').hasAttribute('aria-invalid') && !${row('os-paydays')}.classList.contains('err')`), '#2247: corrected: saved, the error gone');
     // one undo step per field
     await ev(`(() => { ${row('os-paydays')}.querySelector('[data-ost-undo]').click(); return 1; })()`);

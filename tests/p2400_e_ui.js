@@ -63,7 +63,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ready(ev, `!!document.querySelector('#ofc-set #osc-street')`);
     const typ = (id, v) => ev(`(() => { const el = document.getElementById('${id}'); el.focus(); el.value = ${JSON.stringify(v)}; el.dispatchEvent(new Event('input', {bubbles: true})); return el.value; })()`);
     const srv = async (f, n = 40) => { for (let i = 0; i < n; i++) { const j = await call(CA, 'GET', '/api/office/settings'); if (f(j)) return j; await sleep(250); } return null; };
-    await typ('osc-street', 'Hafenstraße 12'); await typ('os-valid', '21');
+    const leave = id => ev(`(() => { document.getElementById('${id}').dispatchEvent(new FocusEvent('focusout', {bubbles: true})); return 1; })()`);  // (a background window gets no focus events: leaving a field by hand)
+    await typ('osc-street', 'Hafenstraße 12'); await leave('osc-street'); await typ('os-valid', '21');
     check(!(await ev(`!!document.querySelector('#ofc-set .fgbar')`)), '#2247: no bar "Unsaved changes" on the settings');
     check(!!(await srv(j => j.company_fields?.street === 'Hafenstraße 12')), '#2247: leaving a field saves it');
     const unload = `(() => { const e = new Event('beforeunload', {cancelable: true}); window.dispatchEvent(e); return e.defaultPrevented; })()`;
@@ -76,7 +77,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `!!document.querySelector('#ofc-set #osc-street')`, 60), '#1371: back on the settings');
     check(await ev(`document.getElementById('osc-street').value === 'Hafenstraße 12' && document.getElementById('os-valid').value === '21' && !document.querySelector('#ofc-set .fgbar')`),
       '#1371: the typed values are back after the view change ' + await ev(`document.getElementById('osc-street').value + ' / ' + document.getElementById('os-valid').value`));
-    await ev(`(() => { const v = document.getElementById('os-valid'); v.focus(); v.blur(); return 1; })()`);  // 2.113.0 (#2247): the restored draft saves when left
+    await leave('os-valid');  // 2.113.0 (#2247): the restored draft saves when left
     // live events while typing in a field: a comment from another session, ofcInfo(true), render()
     await ev(`(() => { const el = document.getElementById('osc-city'); el.focus(); el.value = 'Ham'; el.setSelectionRange(3, 3); el.dispatchEvent(new Event('input', {bubbles: true})); window.__rv = 0; const o = renderView; renderView = (...a) => { __rv++; return o(...a); }; return 1; })()`);
     await call(CA2, 'POST', `/api/tasks/${task.id}/comments`, {body: 'Passt der Dienstag?'});
@@ -88,7 +89,7 @@ const FEAT = 'cal,comments,collab,office,clients';
       `#1371: live events (comment ${live ? 'arrived' : 'not seen'}, ofcInfo(true), render) keep the input, the focus and the caret ` + JSON.stringify(after));
     // leaving the field stores it; nothing is left to ask about
     await typ('osc-city', 'Hamburg');
-    await ev(`(() => { document.getElementById('osc-city').blur(); return 1; })()`);
+    await leave('osc-city');
     const saved = await srv(j => j.company_fields?.city === 'Hamburg');
     check(saved && saved.company_fields.street === 'Hafenstraße 12' && saved.settings.offer_valid_days === 21, '#2247: every field stored by itself ' + JSON.stringify(saved?.company_fields || {}).slice(0, 120));
     check(await ready(ev, `!document.querySelector('#ofc-set .fgbar') && !Object.keys(FG.d['ofc-set:' + OFC.info.org_id]?.f || {}).length`) && !(await ev(unload)), '#2247: saved: no bar, no question on closing');
@@ -124,6 +125,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     let md = '';
     for (let i = 0; i < 40 && md !== 'owner_f'; i++) { md = (await call(CA, 'GET', '/api/office/settings')).company_fields?.md_label; if (md !== 'owner_f') await sleep(250); }
     check(md === 'owner_f', '#1377: the choice is saved ' + md);
+    await sleep(1200);  // 2.113.0 (#2247): the live redraw after the save settles before typing on
     await ready(ev, `!document.querySelector('#ofc-set > .fgbar')`);
     // building blocks at the caret, the preview with a plain error, then a valid one
     await ev(`(() => { const el = document.getElementById('os-inv-scheme'); el.focus(); el.value = 'RE-'; el.setSelectionRange(3, 3); el.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
