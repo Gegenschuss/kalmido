@@ -169,7 +169,10 @@ In the area Packs, every industry pack's card says **Switched on** or **Off** an
   (`producing_on` 0/1, raw data via `raw_mode`, "none" = off), always shown; the flags of services and positions are
   always kept, the spreadsheet import always reads those columns, a framework contract always presets raw data;
   existing and finalised documents keep what they hold, documents of 2.46 and older get `producing_on` once at start-up
-  (1 when a position counts towards producing, else the default), so their sums stay. The company data choose the word before the
+  (1 when a position counts towards producing, else the default), so their sums stay. Since 2.113.1 a new quotation computes producing only
+  through an industry pack that offers "share by amount" (see docs/PACKS.md, calculation options); without such a pack
+  new quotations start without producing and the switch, the fields and the marks are hidden. Older quotations keep
+  their calculation by quantities / quotient (and show their switch to turn it off). The company data choose the word before the
   management's names in the footer (`md_label`: Geschäftsführung, Gesellschafter, Inhaber, Inhaberin, Vorstand, Partner;
   German or English by the document's language). Unsaved input of these pages survives a change of the view and live
   updates until it is saved or discarded.

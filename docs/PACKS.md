@@ -147,3 +147,33 @@ the folder on any static https host (for example GitHub Pages) and set `KALMIDO_
 
 An own mirror: copy the published folder to a host in your network, build the index again with your base address, and
 set both variables (`KALMIDO_PACKS_ALLOW_HOSTS=mirror.example.com:8080` when it is internal or http).
+
+## Own packs of an instance (2.113.1)
+
+Besides the shipped packs (`kalmido/office/packs/industry/*.json`) and the catalogue, an instance can load its own
+industry packs from its data folder: `<data folder>/packs/industry/<code>.json` (the folder next to the database,
+`/data/packs/industry/` in Docker). Such a file is checked like a shipped pack (same validator, at most 512 KB, the code
+must match the file name) and then appears in the office settings like any other industry pack (source "local"). A file
+whose code is the code of a shipped pack is refused (log line `own industry pack <code> refused: ...`), the shipped pack
+stays. A changed file is read again at the next request; nothing of it lands in the repository or in a backup of the
+code. This is the place for packs only one business needs (own rates, own wording).
+
+### Calculation options of an industry pack (`calc`, optional)
+
+```json
+"calc": {
+  "share":    {"label": {"de": "...", "en": "..."}, "rate": 500, "factor": 0.5},
+  "handling": {"label": {"de": "Handlungskosten", "en": "Handling costs"}, "pct": 4, "on": true},
+  "markup":   {"label": {"de": "Markup", "en": "Markup"}, "pct": 10, "on": false, "stacked": false}
+}
+```
+
+- `share` ("share by amount"): a line computed from the amount (net, quantity x rate, before discount, without raw data)
+  of the positions marked for it: amount / day rate x factor, rounded to half days, times the day rate (amount and rate
+  in the document's currency). `rate` > 0, `factor` 0.01..10. The office settings may set their own day rate / factor.
+- `handling`: a percentage (0..100) on the positions marked "in handling costs".
+- `markup`: a percentage on the positions marked "in markup"; `stacked` = also on the handling costs.
+- Order in a quotation: positions, share, handling costs, markup, then discount (positions only) and raw data as before.
+- Only when a pack switched on offers an option does a new quotation get it (switch, fields, marks per position). Each
+  quotation keeps its own values and can rename the line titles. Quotations made before keep their calculation, also
+  when a pack is switched off later. The shipped pack "Film & Video" offers handling costs (4 %, on) and markup (10 %, off).
