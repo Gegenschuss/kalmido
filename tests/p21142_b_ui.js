@@ -37,7 +37,7 @@ const call = async (method, url, body, ck) => { const r = await fetch(B + url.re
     await nav(B + '#office/settings');
     for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#os-inv-scheme')`).catch(() => false)); i++) await sleep(300);
     await sleep(800);
-    const geo = () => ev(`(() => { const i = document.querySelector('#os-inv-scheme').getBoundingClientRect(), p = document.querySelector('#os-inv-scheme-pv'), pr = p.getBoundingClientRect(), b = document.querySelector('#os-inv-scheme-rs'); return {w: Math.round(i.width), bottom: i.bottom, ptop: pr.top, err: p.classList.contains('err'), text: p.textContent, rs: !b.hidden && b.getBoundingClientRect().height > 0, rtop: b.getBoundingClientRect().top, over: document.documentElement.scrollWidth > window.innerWidth + 1, val: document.querySelector('#os-inv-scheme').value}; })()`);
+    const geo = () => ev(`(() => { const i = document.querySelector('#os-inv-scheme').getBoundingClientRect(), p = document.querySelector('#os-inv-scheme-pv'), pr = p.getBoundingClientRect(), b = document.querySelector('#os-inv-scheme-rs') || {hidden: true, getBoundingClientRect: () => ({top: 0, height: 0})}; return {w: Math.round(i.width), bottom: i.bottom, ptop: pr.top, err: p.classList.contains('err'), text: p.textContent, rs: !b.hidden && b.getBoundingClientRect().height > 0, rtop: b.getBoundingClientRect().top, over: document.documentElement.scrollWidth > window.innerWidth + 1, val: document.querySelector('#os-inv-scheme').value}; })()`);
     const before = await geo();
     check(before.val === good && !before.err && !before.rs, tag + 'valid: no message, no reset button ' + JSON.stringify(before));
     await ev(`(() => { const i = document.querySelector('#os-inv-scheme'); i.value = 'RE-{initial}-{seq}'; i.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
@@ -46,7 +46,8 @@ const call = async (method, url, body, ck) => { const r = await fetch(B + url.re
     check(g.w === before.w && g.w >= (width < 500 ? 150 : 250), tag + 'field keeps its width ' + before.w + ' -> ' + g.w);
     check(g.ptop >= g.bottom - 1 && g.rs && g.rtop >= g.ptop, tag + 'message under the field, reset button below ' + JSON.stringify(g));
     check(!g.over, tag + 'no horizontal overflow');
-    if (o.shot) await o.shot(`2264-nachher-${user}-${width}.png`);
+    // the field in view; without the reset button (an export without #2264) the shots are the old layout
+    if (o.shot) { await ev(`document.querySelector('#os-inv-scheme').scrollIntoView({block: 'center'})`); await sleep(300); await o.shot(`2264-${(await ev(`!!document.querySelector('#os-inv-scheme-rs')`)) ? 'nachher' : 'vorher'}-${user}-${width}.png`); }
     await ev(`document.querySelector('#os-inv-scheme-rs').click()`);
     for (let i = 0; i < 30; i++) { g = await geo(); if (!g.err && g.val === good) break; await sleep(200); }
     check(g.val === good && !g.err && !g.rs, tag + 'reset: last saved scheme back, message gone ' + JSON.stringify(g));
