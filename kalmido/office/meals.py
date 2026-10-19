@@ -262,7 +262,7 @@ def bw_rows(c, oid, year=None, mid=None, deleted=False):
 
 
 def bw_people(c, oid, uid):
-    """2.119.2 (#2288): the people for host / guests without agents (an agent does not eat out)."""
+    """2.119.1 (#2288): the people for host / guests without agents (an agent does not eat out)."""
     ag = {r["id"] for r in c.execute("SELECT u.id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND u.kind='agent'", (oid,)).fetchall()}
     return [p for p in rk_people(c, oid, uid) if p["id"] not in ag]
 

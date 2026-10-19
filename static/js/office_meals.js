@@ -126,7 +126,7 @@ function bw_hostOpts(m) {
 function bw_guestPool(m) {  // key -> {id} | {name, extra}: the people of the office, the choices, the meal's own guests
   const pool = new Map();
   for (const p of BW.data?.people || []) pool.set(rk_pkey(p), {id: p.id, name: p.name});
-  for (const c of BW.data?.choices?.persons || []) { const k = rk_pkey({name: c.name}); if (!pool.has(k)) pool.set(k, {name: c.name, extra: c.extra || ''}); }  // 2.119.2 (#2288): a choice's own id is no user id
+  for (const c of BW.data?.choices?.persons || []) { const k = rk_pkey({name: c.name}); if (!pool.has(k)) pool.set(k, {name: c.name, extra: c.extra || ''}); }  // 2.119.1 (#2288): a choice's own id is no user id
   for (const g of m?.guests || []) pool.set(rk_pkey(g), g);
   return pool;
 }
