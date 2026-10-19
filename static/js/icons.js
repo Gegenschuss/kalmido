@@ -382,7 +382,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#iitip:
 document.addEventListener('scroll', () => iiHide(true), true);
 const hintK = t => `<div class="shint keep">${t}</div>`;  // 2.13.0: a helper line that stays inline (security, data loss, a state)
 const kt = (label, keys) => isTouch() ? label : `${label} (${kbText(keys)})`;  // a label with its keyboard shortcut
-const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.densSideV', 'tasks.densRowsV', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.cwins', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold', 'tasks.pack', 'tasks.headShow', 'tasks.rings']);  // 2.83.0 C (#1427): + theme, header pictures, rings
+const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.densSideV', 'tasks.densRowsV', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.cwins', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold', 'tasks.mdOpen', 'tasks.pack', 'tasks.headShow', 'tasks.rings']);  // 2.83.0 C (#1427): + theme, header pictures, rings
 function clearLocal() {
   try {
     const ks = [];
