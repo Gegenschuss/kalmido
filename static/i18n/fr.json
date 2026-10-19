@@ -10815,5 +10815,18 @@
   "Back to a draft?": "Revenir au brouillon ?",
   "The quotation can be changed again and keeps its number {0}.": "Le devis peut à nouveau être modifié et garde son numéro {0}.",
   "Back to a draft": "De retour en brouillon",
-  "finalising undone": "finalisation annulée"
+  "finalising undone": "finalisation annulée",
+  "Applies to the positions of this page with a producing tick. Parts without an own setting take over the switch and calculate their producing themselves.": "S’applique aux positions de cette page cochées producing. Les parties sans réglage propre reprennent l’interrupteur et calculent elles-mêmes leur producing.",
+  "Applies to the positions with a producing tick.": "S’applique aux positions cochées producing.",
+  "Applies to the positions of this part with a producing tick.": "S’applique aux positions de cette partie cochées producing.",
+  "own setting": "réglage propre",
+  "like the document": "comme le document",
+  "Use the values of the document": "Reprendre les valeurs du document",
+  "incl. producing ({0})": "producing inclus ({0})",
+  "incl. producing 1 day": "producing inclus 1 jour",
+  "incl. producing {0} days": "producing inclus {0} jours",
+  "Like the settings ({0})": "Comme dans les réglages ({0})",
+  "Order confirmation with signature line": "Bon pour accord avec ligne de signature",
+  "Print the order confirmation with signature line": "Imprimer le bon pour accord avec ligne de signature",
+  "Default for quotations, can be changed in each quotation": "Par défaut pour les devis, modifiable dans chaque devis"
 }

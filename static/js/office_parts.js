@@ -32,11 +32,19 @@ function tpPatch(body) {
 }
 const tpMoney = (v, d) => ofdMoney(v || 0, d);
 
+// 2.114.3 (#2266): the producing inside a part's net (display only: its days, a shoot part its share line); '' = none
+function tpProdNote(p) {
+  const t = p?.totals || {};
+  if (p?.kind === 'shoot') { const s = (t.lines || []).find(l => l?.block === 'share'); return s && +s.total > 0 ? tr('incl. producing ({0})', s.detail || '') : ''; }
+  const days = +t.producing_days || 0;
+  return days > 0 ? (days === 1 ? tr('incl. producing 1 day') : tr('incl. producing {0} days', ofdNumIn(days))) : '';
+}
 // ---- the title page: a part line (title, quantity x the part's net, open)
 function tpItemRow(it, i, d, line, mv) {
-  const p = tpPart(d, it.ref_part_id);
+  const p = tpPart(d, it.ref_part_id), pn = tpProdNote(p);
   return `<li class="ofdit tppl"><span class="ofdpos">${line?.pos || ''}</span>
     <div class="ofditb"><input class="ofdtt" data-i="${i}" data-k="title" value="${esc(it.title)}" maxlength="500" placeholder="${esc(p?.title || tr('Part'))}" aria-label="${esc(tr('Part'))}">
+    ${pn ? `<small class="muted tpprod">${esc(pn)}</small>` : ''}
     <span class="ofdnums"><input data-i="${i}" data-k="qty" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.qty))}" aria-label="${esc(tr('Quantity'))}">
     <span class="muted">× ${esc(tpMoney(p?.totals?.net ?? it.rate, d))}</span>
     <b class="ofdlt">${line ? esc(line.total_text || ofdMoney(line.total, d)) : ''}</b></span>
@@ -51,7 +59,7 @@ function tpPartsHtml(d, adm) {
   if (OFD.open.parts == null) OFD.open.parts = ps.length > 0;
   const rows = ps.map((p, i) => `<li class="ofdit tprow">
     <a href="#" role="button" class="tpopen" data-ofd="tp-open" data-pid="${p.id}"><span class="ofcn"><b>${esc(p.title || tr('Part'))}</b><small class="muted">${esc([p.kind === 'shoot' ? tr('Shoot calculation') : tr('{0} positions', (p.items || []).filter(x => x.kind === 'service').length),
-      p.used ? (p.used > 1 ? tr('{0} times on the title page', p.used) : '') : '', p.print ? '' : tr('not printed')].filter(Boolean).join(' · '))}</small>${p.used ? '' : `<small class="tpunused">${esc(tr('not on the title page: does not count'))}</small>`}</span>
+      tpProdNote(p), p.used ? (p.used > 1 ? tr('{0} times on the title page', p.used) : '') : '', p.print ? '' : tr('not printed')].filter(Boolean).join(' · '))}</small>${p.used ? '' : `<small class="tpunused">${esc(tr('not on the title page: does not count'))}</small>`}</span>
       <b class="ofdlt">${esc(tpMoney(p.totals?.net, d))}</b></a>
     <label class="chkl tpprint"><input type="checkbox" data-tp="print" data-pid="${p.id}" ${p.print ? 'checked' : ''}> ${tr('Print')}</label>
     <span class="ofdmv"><button type="button" class="ib" data-ofd="tp-up" data-pid="${p.id}" ${i === 0 ? 'disabled' : ''} aria-label="${esc(tr('Move up'))}">${ic('up', 's')}</button><button type="button" class="ib" data-ofd="tp-down" data-pid="${p.id}" ${i === ps.length - 1 ? 'disabled' : ''} aria-label="${esc(tr('Move down'))}">${ic('down', 's')}</button><button type="button" class="ib" data-ofd="tp-del" data-pid="${p.id}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></span></li>`).join('');
@@ -95,6 +103,7 @@ async function tpClick(a, b) {
   }
   const ps = d.parts || [], i = ps.findIndex(p => p.id === pid), p = ps[i];
   if (!p) return;
+  if (a === 'tp-prod-doc') { await ofdSave('PATCH', `/api/office/docs/${d.id}/parts/${pid}`, {settings: {producing_on: null, prod_quotient: null, producing_rate: null}}); return; }  // 2.114.3 (#2266)
   if (a === 'tp-del') {
     if (!await askConfirm(tr('Remove part "{0}"?', p.title || tr('Part')), tr('Its positions and its lines on the title page are removed as well.'), {ok: tr('Remove'), danger: true})) return;
     if (tpOpenId(d) === pid) TP.open = null;

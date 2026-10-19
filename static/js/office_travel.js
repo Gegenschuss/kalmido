@@ -63,9 +63,10 @@ function rk_listHtml() {
   if (RK.filter === 'missing') trips = trips.filter(t => t.missing);
   if (RK.person) { trips = trips.filter(t => (t.people || []).some(p => rk_pkey(p) === RK.person)); if (!trips.length) return `<div class="empty nempty">${tr('No trips of this person.')}</div>`; }  // 2.117.0 A (#2291)
   if (!trips.length) return `<div class="empty nempty eact">${ic('plane')}<span>${RK.filter === 'missing' ? tr('Every receipt is ticked as in DATEV.') : tr('No trips yet. Add the first one with its receipts.')}</span>${RK.filter === 'missing' ? '' : rk_impBtn()}</div>`;
+  const rec = (RK.data.trips || []).some(t => (t.items || []).length);  // 2.114.4 D (#2286): receipt column only when there are receipts
   return `<ul class="ofclist rklist" role="list">${trips.map(t => `<li><button type="button" class="ofcrow" data-rk="open" data-id="${t.id}"><span class="ofcn"><b>${esc(t.dest || tr('Trip'))}</b>
     <small class="muted">${esc([rk_span(t), rk_purpose(t), (t.people || []).map(p => p.name).join(', ')].filter(Boolean).join(' · '))}</small></span>
-    ${t.missing ? `<span class="rotag rkmiss">${esc(trn('{0} not in DATEV', '{0} not in DATEV', t.missing))}</span>` : ''}${rk_vmaTag(t)}<span class="rksum">${ofcMoney(t.total)}</span></button>${rk_rowBtn(t)}</li>`).join('')}</ul>`;
+    ${t.missing ? `<span class="rotag rkmiss">${esc(trn('{0} not in DATEV', '{0} not in DATEV', t.missing))}</span>` : ''}${rk_vmaCols(t, rec)}</button>${rk_rowBtn(t)}</li>`).join('')}</ul>`;
 }
 function rk_tripHtml(t) {
   const its = RK.filter === 'missing' ? t.items.filter(i => !i.datev) : t.items;
@@ -90,6 +91,7 @@ function rk_reportHtml() {
   const by = `<div class="seg wrap" role="group" aria-label="${esc(tr('Sums by'))}">${RK_BY.map(([k, n]) => `<button type="button" data-rk="by" data-v="${k}" class="${k === RK.by ? 'on' : ''}" aria-pressed="${k === RK.by}">${tr(n)}</button>`).join('')}</div>`;
   const lab = g => RK.by === 'month' ? rk_month(g.label) : RK.by === 'category' ? rk_cat(g.key) : g.label;
   const rows = RK.rep.rows.map(g => `<tr><td>${esc(lab(g))}</td><td class="num muted">${g.count}</td><td class="num">${ofcMoney(g.amount)}</td></tr>`).join('');
+  if (!RK.rep.count) return rk_vmaRepHtml();  // 2.114.4 D (#2286): no receipts in the period -> no receipts block
   return rk_vmaRepHtml() + `<div class="ofcbar">${by}<span class="spacer"></span><a class="btn sm" href="/api/office/trips/report?${esc(q)}&format=csv" download>${ic('download', 's')} CSV</a></div>`
     + (RK.rep.rows.length ? `<table class="rktab"><thead><tr><th>${tr(RK_BY.find(x => x[0] === RK.by)[1])}</th><th class="num">${tr('Receipts')}</th><th class="num">${tr('Amount')}</th></tr></thead><tbody>${rows}</tbody>
       <tfoot><tr><th>${tr('Total')}</th><th class="num">${RK.rep.count}</th><th class="num">${ofcMoney(RK.rep.total)}</th></tr></tfoot></table>${RK.by === 'person' || RK.person ? `<p class="muted ofchint">${tr('A receipt is shared equally between the participants of its trip.')}</p>` : ''}`
@@ -446,6 +448,13 @@ function rk_vmaTag(t) {  // the trip list: the per diem of all participants next
   const v = t.vma; if (!v || t.vma_off) return '';
   if (v.total == null) return `<span class="rkv-tag rkv-none">${esc(tr('Per diem without amount'))}</span>`;
   return +v.total ? `<span class="rkv-tag" title="${esc(tr('Per diem'))}">${esc(tr('Per diem'))} ${rk_vmaEur(v.total)}</span>` : '';
+}
+function rk_vmaCols(t, rec) {  // 2.114.4 D (#2286): per diem as main amount, receipts column only when the year has receipts
+  const v = !t.vma_off && t.vma, none = '<span class="muted">–</span>';
+  const pd = !v ? none : v.total == null ? `<span class="rkv-none" title="${esc(tr('Per diem without amount'))}" aria-label="${esc(tr('Per diem without amount'))}">– <small>${esc(tr('Per diem without amount'))}</small></span>` : rk_vmaEur(v.total);
+  const rc = (t.items || []).length ? ofcMoney(t.total) : none;
+  if (!rec) return `<span class="rksum rkpd"><b>${pd}</b></span>`;
+  return `<span class="rksum rkpd" title="${esc(tr('Per diem'))}"><small class="muted">${esc(tr('Per diem'))}</small> <b>${pd}</b></span><span class="rksum rkrc" title="${esc(tr('Receipts'))}"><small class="muted">${esc(tr('Receipts'))}</small> <b>${rc}</b></span>`;
 }
 function rk_vmaCard(t) {  // the trip view: amount per person (x participants), breakdown, hints, source, "Edit days"
   const v = t.vma || {}, hints = (v.hints || []).filter(h => h.key !== 'off');

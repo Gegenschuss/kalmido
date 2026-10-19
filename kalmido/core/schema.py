@@ -2477,6 +2477,9 @@ MIGRATIONS = [
     # (2.98.0 spacer B/C)
     # 2.98.0 C/D (#2180 #2181 #2178): (new columns below this line)
     # (2.98.0 end)
+    # 2.114.4 B (#2270): the order confirmation block of a quotation per document (NULL = the office setting accept_on,
+    # 0 / 1 = off / on); a finalised document prints the value frozen in its sender snapshot. Older versions never read it
+    ("office_docs", "accept_on", "ALTER TABLE office_docs ADD COLUMN accept_on BIGINT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

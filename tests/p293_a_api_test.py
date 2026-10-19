@@ -195,7 +195,7 @@ G = r.json()["id"]
 check(str(sql("SELECT body FROM office_gen_docs WHERE id=?", (G,))[0][0]).startswith("kenc1:"), "the document's text is encrypted at rest")
 pv = A.post(B + GD + "/preview", json={"gen_doc_id": G}).json()
 t = pv["text"]
-check("Vereinbarung Kunde Eins GmbH" in t and "Beispiel Film GmbH, Musterweg 1, 12345 Musterstadt" in t and "Kundenweg 5, 20000 Hamburg" in t
+check("Vereinbarung Kunde Eins GmbH" in t and "Beispiel Film GmbH, Musterweg 1, 12345 Musterstadt" in t and "Kundenweg 5\n20000 Hamburg" in t  # 2.114.4 (#2280): the client address on own lines
       and "Ansprechpartner: Erika Beispiel" in t and "Projekt: Imagefilm Frühling" in t, f"preview: client, company, address, contact, project {t[:300]}")
 check(f"Angebot {OFN['number']} vom" in t and "1.190,00" in t, f"preview: quotation number and total (gross) {OFN.get('number')}")
 check("[{{client.shoesize}}]" in t and pv["missing"] == ["client.shoesize"], f"preview: the unknown variable stays marked {pv['missing']}")
@@ -383,7 +383,7 @@ check(r.status_code == 201 and r.json()["list_name"] == "Dora Projekt", f"person
 GP = r.json()["id"]
 check(str(sql("SELECT body FROM office_gen_docs WHERE id=?", (GP,))[0][0]).startswith("kenc1:"), "personal office: encrypted at rest")
 pv = Do.post(B + GD + "/preview", json={"gen_doc_id": GP}).json()
-check("Privatkunde Eins, Weg 1, 10000 Berlin" in pv["text"] and "Dora Projekt" in pv["text"] and "Dora Film" in pv["text"], "personal office: the preview")
+check("Privatkunde Eins, Weg 1\n10000 Berlin" in pv["text"] and "Dora Projekt" in pv["text"] and "Dora Film" in pv["text"], "personal office: the preview")
 F = Do.post(B + f"{GD}/{GP}/final").json()
 check(F["status"] == "final" and F["node_id"], "personal office: finished")
 n = sql("SELECT n.org_id, n.owner_id, p.name FROM fs_nodes n JOIN fs_nodes p ON p.id=n.parent_id WHERE n.id=?", (F["node_id"],))

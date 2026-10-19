@@ -11,6 +11,7 @@ office_calc(doc, items, pack) -> dict reproduces the rules of the spreadsheet te
  - tax per position through the country pack (standard / reduced / exempt); vat_mode "novat" = no tax at all
 Money is Decimal, rounded half up to 2 places at every step the template rounds; the result holds floats (JSON).
 """
+import re
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 
 Q2 = Decimal("0.01")
@@ -21,20 +22,20 @@ RAW_MODES = ("optional", "included", "none")
 # (pack["labels"][lang][key]); these are the defaults so the calculator works without a pack
 LABELS = {
     "de": {
-        "producing": "Producing", "producing_detail": "{days} Tage = {qty} Produktionstage / {quot}, auf halbe Tage gerundet",
+        "producing": "Producing", "producing_detail": "{days} {day_word} = {qty} {prod_word} / {quot}, auf halbe Tage gerundet",  # 2.114.4 A (#2276): singular for 1
         "raw_optional": "Optional: Bereitstellung der Rohdaten", "raw_included": "Bereitstellung der Rohdaten",
         "raw_detail": "{pct} % der Positionen mit Rohdaten", "discount": "Rabatt", "discount_detail": "{pct} % auf die markierten Positionen",
-        "net": "Summe Netto", "net_incl_raw": "inklusive Rohdaten", "net_excl_raw": "ohne Rohdaten", "gross": "Gesamt Brutto",
+        "net": "Summe Netto", "net_incl_raw": "Summe netto mit Option Rohdaten", "net_excl_raw": "ohne Rohdaten", "gross": "Gesamt Brutto",  # 2.114.4 A (#2275)
         "tax_standard": "MwSt. {pct} %", "tax_reduced": "MwSt. {pct} %", "tax_exempt": "steuerfrei",
         "vat_note": "Alle Preise zuzüglich 7 % bzw. 19 % MwSt.", "novat_note": "Nicht im Inland steuerbar / Reverse-Charge-Verfahren.",
         "fx_note": "Wechselkurs 1 €: {rate} $",
         "unit_day": "Tage", "unit_hour": "Std.", "unit_piece": "Stk.", "unit_minute": "Min.", "unit_flat": "pauschal",
     },
     "en": {
-        "producing": "Producing", "producing_detail": "{days} days = {qty} production days / {quot}, rounded to half days",
+        "producing": "Producing", "producing_detail": "{days} {day_word} = {qty} {prod_word} / {quot}, rounded to half days",
         "raw_optional": "Optional: Delivery of raw data", "raw_included": "Delivery of raw data",
         "raw_detail": "{pct} % of the positions with raw data", "discount": "Discount", "discount_detail": "{pct} % on the marked positions",
-        "net": "Net Total", "net_incl_raw": "including raw data", "net_excl_raw": "excluding raw data", "gross": "Gross Total",
+        "net": "Net Total", "net_incl_raw": "Net total with option raw data", "net_excl_raw": "excluding raw data", "gross": "Gross Total",
         "tax_standard": "VAT {pct} %", "tax_reduced": "VAT {pct} %", "tax_exempt": "tax exempt",
         "vat_note": "All prices plus 7 % or 19 % VAT.", "novat_note": "Not taxable domestically / reverse charge.",
         "fx_note": "Exchange rate €1: ${rate}",
@@ -243,10 +244,13 @@ def office_calc(doc, items, pack=None):
     prod_total = money(days * prod_rate_doc) if days > 0 else Decimal(0)
     if days > 0:
         base["standard"] += prod_total
-        lines.append({"kind": "producing", "title": label(pack, lang, "producing"), "qty": _num(days), "qty_text": fmt_qty(days, lang),
+        en = (lang or "de").lower().startswith("en")  # 2.114.4 A (#2276): a position number like the positions above, "1 Tag"
+        lines.append({"kind": "producing", "pos": pos + 1, "title": label(pack, lang, "producing"), "qty": _num(days), "qty_text": fmt_qty(days, lang),
                       "unit": "day", "unit_text": unit_text(pack, lang, "day", days), "rate": _num(prod_rate_doc), "tax": "standard",
                       "tax_pct": _num(rates["standard"]), "total": _num(prod_total),
-                      "detail": label(pack, lang, "producing_detail", days=fmt_qty(days, lang), qty=fmt_qty(prod_qty, lang), quot=fmt_qty(quot, lang))})
+                      "detail": label(pack, lang, "producing_detail", days=fmt_qty(days, lang), qty=fmt_qty(prod_qty, lang), quot=fmt_qty(quot, lang),
+                                      day_word=unit_text(pack, lang, "day", days),
+                                      prod_word=("production day" if en else "Produktionstag") if prod_qty == 1 else ("production days" if en else "Produktionstage"))})
 
     # raw data
     raw_amount = money(raw_base * raw_factor) if raw_mode != "none" else Decimal(0)
@@ -293,10 +297,33 @@ def office_calc(doc, items, pack=None):
         "net_excl_raw": _num(net - raw_amount) if raw_mode == "included" and raw_base > 0 else None,
         "costs": _num(costs), "margin": _num(net - costs),
         "vat_note": label(pack, lang, ("vat_note_small" if str(doc.get("vat_note") or "") == "small" else "novat_note") if novat else "vat_note"),  # 2.47.3 (#1360)
+        # 2.114.4 A (#2274): only the rates that occur in the document ("7 % bzw. 19 %" -> "19 %")
         "lines": lines,
         "labels": {k: label(pack, lang, k) for k in ("net", "net_incl_raw", "net_excl_raw", "gross", "producing", "discount")},
     }
+    if not novat:
+        out["vat_note"] = bwa_vat_note(out["vat_note"], [rates[k] for k in TAX_KEYS if base[k] != 0 and rates[k] > 0], lang)
     return out
+
+
+def bwa_vat_note(note, pcts, lang="de"):
+    """2.114.4 A (#2274): the VAT note naming only the rates of the document: a list of rates in the note ("7 % bzw.
+    19 %", "7 % or 19 %", also an own text of the pack) becomes the rates that occur; no rate or a note without a
+    list stays as it is."""
+    pcts = sorted(set(Decimal(str(p)) for p in pcts))
+    if not pcts:
+        return note
+    rx = r"\d+(?:[.,]\d+)?\s?%(?:\s*(?:,|/|bzw\.|oder|und|or|and)\s*\d+(?:[.,]\d+)?\s?%)+"
+    m = re.search(rx, str(note or ""))
+    if not m:
+        return note
+    join = " bzw. " if not (lang or "de").lower().startswith("en") else " or "
+    for w in (" bzw. ", " oder ", " und ", " or ", " and ", " / ", ", "):
+        if w in m.group(0):
+            join = w
+            break
+    sp = " %" if " %" in m.group(0) else "%"
+    return note[:m.start()] + join.join(fmt_qty(p, lang) + sp for p in pcts) + note[m.end():]
 
 
 def _flag(v):

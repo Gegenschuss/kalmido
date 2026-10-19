@@ -5255,6 +5255,12 @@ section.ofdsec h3{min-height:2.5rem;display:flex;align-items:center}
 .ofdit .ofdlt{margin-left:auto;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:6rem;text-align:right}
 .ofdit .ofdflags{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;font-size:var(--fs-s)}
 .ofdit .ofdflags .chkl{display:inline-flex;align-items:center;gap:.25rem;min-height:1.75rem}
+/* 2.114.3 (#2266): producing visible -- the ticked producing flag, the hint at the switch, a part's source, the note on a part line */
+.ofdit .ofdflags .chkl.ofdprodf.on{color:var(--accent);background:var(--accent-soft);border-radius:9999px;padding:0 .5rem;font-weight:600}
+.ofdrules .ofdprodhint{display:block;margin-top:.25rem}
+.tpprodsrc{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.375rem}
+.tpprodsrc.own .rotag{color:var(--accent)}
+.tppl .tpprod{font-size:var(--fs-s)}
 .ofdit .ofdcost input{width:5rem;margin-left:.25rem}
 .ofdit .ofdmv{display:flex;flex-direction:column;gap:.125rem;flex:0 0 auto}
 .ofdit .ofdmv .ib{min-width:1.75rem;min-height:1.75rem}

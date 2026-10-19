@@ -729,11 +729,11 @@
   const fmtM = (c, lang, cur) => { const en = lang === 'en', neg = c < 0n, [w, f] = cs(neg ? -c : c).split('.'), g = w.replace(/\B(?=(\d{3})+(?!\d))/g, en ? ',' : '.'), sym = cur === 'USD' ? '$' : '€';
     return en ? `${neg ? '-' : ''}${sym}${g}.${f}` : `${neg ? '-' : ''}${g},${f} ${sym}`; };
   const fmtQ = (q, lang) => { const s = String(+(+q || 0).toFixed(4)); return lang === 'en' ? s : s.replace('.', ','); };
-  const LBL = {de: {net: 'Summe Netto', gross: 'Gesamt Brutto', discount: 'Rabatt', producing: 'Producing', net_incl_raw: 'inklusive Rohdaten', net_excl_raw: 'ohne Rohdaten',
+  const LBL = {de: {net: 'Summe Netto', gross: 'Gesamt Brutto', discount: 'Rabatt', producing: 'Producing', net_incl_raw: 'Summe netto mit Option Rohdaten', net_excl_raw: 'ohne Rohdaten',
     tax: p => `MwSt. ${p} %`, exempt: 'steuerfrei', vat_note: 'Alle Preise zuzüglich 7 % bzw. 19 % MwSt.', novat_note: 'Nicht im Inland steuerbar / Reverse-Charge-Verfahren.',
     units: {day: 'Tage', hour: 'Std.', piece: 'Stk.', minute: 'Min.', flat: 'pauschal'}, producing_detail: (d, q, k) => `${d} Tage = ${q} Produktionstage / ${k}, auf halbe Tage gerundet`,
     raw_optional: 'Optional: Bereitstellung der Rohdaten', raw_included: 'Bereitstellung der Rohdaten', raw_detail: p => `${p} % der Positionen mit Rohdaten`, discount_detail: p => `${p} % auf die markierten Positionen`},
-  en: {net: 'Net Total', gross: 'Gross Total', discount: 'Discount', producing: 'Producing', net_incl_raw: 'including raw data', net_excl_raw: 'excluding raw data',
+  en: {net: 'Net Total', gross: 'Gross Total', discount: 'Discount', producing: 'Producing', net_incl_raw: 'Net total with option raw data', net_excl_raw: 'excluding raw data',
     tax: p => `VAT ${p} %`, exempt: 'tax exempt', vat_note: 'All prices plus 7 % or 19 % VAT.', novat_note: 'Not taxable domestically / reverse charge.',
     units: {day: 'days', hour: 'h', piece: 'pcs', minute: 'min', flat: 'flat'}, producing_detail: (d, q, k) => `${d} days = ${q} production days / ${k}, rounded to half days`,
     raw_optional: 'Optional: Delivery of raw data', raw_included: 'Delivery of raw data', raw_detail: p => `${p} % of the positions with raw data`, discount_detail: p => `${p} % on the marked positions`}};

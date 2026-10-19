@@ -73,6 +73,10 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
       'the preview fills the client and marks the unknown variable ' + await ev(`document.querySelector('.dtp-pv')?.textContent`));
     await shot('p293-a-draft.png');
     await ev(`(() => { document.querySelector('[data-dt="final"]').click(); return 1; })()`);
+    // 2.114.4 (#2281): the unknown variable is named first (Continue), then the usual question
+    check(await ready(ev, `/unbekannt/.test(document.querySelector('.modal')?.textContent || '')`), 'finish names the empty fields first');
+    await ev(`(() => { document.querySelector('.modal [data-cd="yes"]').click(); return 1; })()`);
+    await sleep(400);
     check(await ready(ev, `!!document.querySelector('.modal [data-cd="yes"]')`), 'finish asks first');
     await ev(`(() => { document.querySelector('.modal [data-cd="yes"]').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.dtp-final') && !document.querySelector('#dt-body')`, 60), 'finished: the frozen text, no editor');

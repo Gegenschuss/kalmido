@@ -367,6 +367,8 @@ def doc_public(c, oid, r, admin, items=True):
             d["contract"] = {k: d["contract"][k] for k in ("id", "name", "raw_included", "rates", "rights_time_id", "rights_territory_id",
                                                              "rights_media_id", "rights_note_de", "rights_note_en", "closing_de", "closing_en", "date")}
     locked = ofx_locked(r)
+    if items and r["kind"] == "offer":  # 2.114.4 B (#2270): what the PDF prints (a finalised quotation: its frozen value)
+        d["accept_print"] = bwb_accept_on(r, office_settings(c, oid), _j(d.get("sender"), {}) if locked else None)
     for k in ("sender", "recipient_snapshot", "tax_snapshot"):
         d.pop(k, None)  # the frozen copies stay on the server (the print model shows them)
     d["locked"] = locked
@@ -578,6 +580,8 @@ def clean_doc(c, oid, b, cur, admin):
         f["raw_mode"] = _choice(b.get("raw_mode"), "raw_mode", RAW_MODES)
     if "producing_on" in b:  # 2.47.0 (#1645): producing per document (the office setting is only the default)
         f["producing_on"] = 0 if b.get("producing_on") in (0, False, "0", "false", None, "") else 1
+    if "accept_on" in b:  # 2.114.4 B (#2270): order confirmation block per quotation (None = like the office setting)
+        f["accept_on"] = None if b.get("accept_on") in (None, "", "default") else (0 if b.get("accept_on") in (0, False, "0", "false") else 1)
     for k, lo, hi, dflt in (("raw_factor", 0, 10, 0.25), ("prod_quotient", 0.01, 1000, 3), ("producing_rate", 0, 1e7, 600), ("discount_pct", 0, 100, 0)):
         if k in b:
             v = _num(b.get(k), k, lo, hi)
@@ -786,6 +790,17 @@ def _put_items(c, oid, r, items, admin, flags=None):
 
 
 # ---------------------------------------------------------------- the print model
+def bwb_accept_on(r, s, snd=None):
+    """2.114.4 B (#2270): 1 when a quotation prints the order confirmation block: the document's own value, else the office
+    setting (default on). snd = the sender snapshot of a finalised document: its frozen value (none = finalised before = on)."""
+    if snd is not None:
+        return 0 if snd.get("accept_on") == 0 else 1
+    v = r["accept_on"] if "accept_on" in r.keys() else None
+    if v is None:
+        v = s.get("accept_on", 1)
+    return 0 if v in (0, False, "0") else 1
+
+
 def odoc_render(c, doc_id, oid):
     """The print model of a document (dict, see docs/OFFICE.md and tests/fixtures): everything in the document's language
     and formats, nothing of the signed-in person. oid: the organisation the caller works in (required; foreign document =
@@ -828,8 +843,7 @@ def odoc_render(c, doc_id, oid):
         color = "#2f5d8a"
     valid_text = _fmt_date(r["valid_until"], pack)
     meta = [[L.get("offer_no", "Angebot Nr."), r["number"]], [L.get("date", "Datum"), _fmt_date(r["date"], pack)]]
-    if rec["name"]:
-        meta.append([L.get("client", "Kunde"), rec["name"]])
+    # 2.114.4 A (#2277): no "Kunde" row any more, the name heads the address field (pdf.py adds it when the lines lack it)
     # 2.97.1 (#2224): the customer number as on the invoice; a document finalised before prints as it did
     if locked and "sender_line" in co:
         cno = _j(r["recipient_snapshot"], {}).get("customer_no") if r["recipient_snapshot"] else ""
@@ -891,6 +905,7 @@ def odoc_render(c, doc_id, oid):
         "valid_note": valid_note, "fields": _j(r["fields"], []), "labels": labels, "formats": pack.get("formats") or {},
         "internal": {"costs": t["costs"], "margin": t["margin"]} if role == "admin" else None,
     }
+    m["accept_on"] = bwb_accept_on(r, s, snd if locked else None)  # 2.114.4 B (#2270)
     if r["kind"] == "offer":  # 2.47.0 (#1215): the printed parts as own pages
         from .parts import tp_render
         tp_render(c, oid, r, m, pack, lang, locked)
