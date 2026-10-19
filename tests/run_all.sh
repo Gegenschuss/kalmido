@@ -1132,6 +1132,19 @@ fresh; run p296_c_ui node p296_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p296_d_api "$PY" p296_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.96.0 part E (#1941): the separation after a move between private and organisation; moved documents are learned by the target
 fresh; run p296_e_api "$PY" p296_e_api_test.py "$KALMIDO_TEST_DATA"
+# 2.102.0 part A (#1988 #2003 #2006): organisation trash for deleted lists, calendar invitations
+fresh; run p2102_a_api "$PY" p2102_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2102_a_ui node p2102_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.102.0 part B (#2204 #2206 #2208 #2210): chat send hint, selection bar padding, lazy polls/forms, pin agents
+fresh; run p2102_b_ui node p2102_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.102.0 part C (#2197 #2201): news bundles and counts, questionnaire customer link
+fresh; run p2102_c_api "$PY" p2102_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2102_c_ui node p2102_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.102.0 part D (#1994 #1996 #1997): pool from env + health, migrations table, background worker
+fresh; run p2102_d_api "$PY" p2102_d_api_test.py "$KALMIDO_TEST_DATA"
+# 2.102.0 part E (#1995 #1998 #1999): type check, drag library, layer linter + client error report
+fresh; run p2102_e_api "$PY" p2102_e_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2102_e_ui node p2102_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.87.9 part E (#1914 #1920 #1909 #1933 #1937 #1952 #1963): polish
 fresh; run p287b_e_ui node p287b_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.90.0 part A (#1921): bookkeeping light (EUeR, VAT return figures, tax reserve, receipt photo)
