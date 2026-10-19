@@ -143,14 +143,14 @@ LINKS = [
     ("https://youtube.com/shorts/ZyXwVuTsR01", "youtube", "https://www.youtube-nocookie.com/embed/ZyXwVuTsR01?enablejsapi=1&rel=0&playsinline=1"),
     ("https://cloud.example.com/s/Ab12/download/Schnitt_v3.MP4", "file", "https://cloud.example.com/s/Ab12/download/Schnitt_v3.MP4"),
     ("https://www.dropbox.com/scl/fi/xyz/clip.mov?rlkey=k1&dl=0", "file", "https://www.dropbox.com/scl/fi/xyz/clip.mov?rlkey=k1&raw=1"),
-    ("https://drive.example.com/file/d/xyz/view", "link", None),
-    ("https://www.youtube.com/watch?v=short", "link", None),
-    ("https://evil.example.com/player.vimeo.com/video/1", "link", None),
-    ("https://vimeo.com.evil.example/123456789", "link", None),
     # 2.99.1 review L6: an explicit :443, the video of a showcase
     ("https://www.youtube.com:443/watch?v=AbCdEfGhI-9", "youtube", "https://www.youtube-nocookie.com/embed/AbCdEfGhI-9?enablejsapi=1&rel=0&playsinline=1"),
     ("https://vimeo.com/showcase/1234567/video/76979871", "vimeo", "https://player.vimeo.com/video/76979871?dnt=1&playsinline=1"),
     ("https://www.youtube.com:8443/watch?v=AbCdEfGhI-9", "link", None),
+    ("https://drive.example.com/file/d/xyz/view", "link", None),
+    ("https://www.youtube.com/watch?v=short", "link", None),
+    ("https://evil.example.com/player.vimeo.com/video/1", "link", None),
+    ("https://vimeo.com.evil.example/123456789", "link", None),
 ]
 for url, prov, emb in LINKS:
     r = A.post(B + f"{V}/{VID}/versions", json={"url": url})
