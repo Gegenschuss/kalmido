@@ -48,11 +48,11 @@ function tpo_defTimes() {  // three proposals: the next three working days at 10
   while (out.length < 3) { d = new Date(d.getTime() + 864e5); if (d.getDay() % 6) out.push({start: `${ds(d)}T10:00`}); }
   return out;
 }
-let TPO_N = 0;
-function tpo_rowHtml(o = {}) {  // 2.99.0 (#1953, CI 2.98.0): the app's own date / time pickers (no native inputs, ux1_ui U23)
-  const n = ++TPO_N;
-  return `<div class="tpo-row" data-id="${o.id || ''}">${dateIn('tpo-d' + n, (o.start || '').slice(0, 10), {label: tr('Date'), clear: false, attrs: 'class="tpo-d"'})}
-    ${timeIn('tpo-t' + n, (o.start || '').slice(11, 16), {label: tr('Time'), clear: false, attrs: 'class="tpo-t"'})}
+let tpo_n = 0;
+function tpo_rowHtml(o = {}) {  // 2.98.1: the app's own date / time pickers (U23), no native inputs
+  const n = ++tpo_n;
+  return `<div class="tpo-row" data-id="${o.id || ''}">${dateIn(`tpo-d${n}`, (o.start || '').slice(0, 10), {label: tr('Date'), clear: false, attrs: 'class="tpo-d"'})}
+    ${timeIn(`tpo-t${n}`, (o.start || '').slice(11, 16), {label: tr('Time'), clear: false, attrs: 'class="tpo-t"'})}
     <button type="button" class="iconbtn" data-tpo="rm" aria-label="${esc(tr('Remove'))}" title="${esc(tr('Remove'))}">${ic('x', 's')}</button></div>`;
 }
 async function tpo_edit(p = null, o = {}) {
@@ -70,7 +70,7 @@ async function tpo_edit(p = null, o = {}) {
     <fieldset class="tpo-times"${closed ? ' disabled' : ''}><legend>${esc(tr('Proposed times'))}</legend><div class="tpo-rows">${times.map(tpo_rowHtml).join('')}</div>
       <button type="button" class="attadd" data-tpo="add">${ic('plus', 's')}<span>${esc(tr('Add a time'))}</span></button>
       ${closed ? `<p class="muted mhint">${esc(tr('The poll is closed: reopen it to change the times'))}</p>` : ''}</fieldset>
-    <div class="row"><label for="tpo-exp">${esc(tr('Voting ends'))}</label>${dateIn('tpo-exp', p?.expires_at ? ds(new Date(p.expires_at)) : '', {label: tr('Voting ends'), min: today()})}</div>
+    <div class="row"><label for="tpo-exp">${esc(tr('Voting ends'))}</label>${dateIn('tpo-exp', p?.expires_at ? ds(new Date(p.expires_at)) : '', {label: tr('Voting ends')})}</div>
     <label class="chkl"><input type="checkbox" id="tpo-names" ${p ? (p.show_votes ? 'checked' : '') : 'checked'}> ${esc(tr('Voters see the names and answers of the others'))}</label>
     <p class="tpo-err err" role="alert" hidden></p>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-tpo="close">${esc(tr('Cancel'))}</button><button type="submit" class="btn pri">${esc(p ? tr('Save') : tr('Create'))}</button></div></form>`);
@@ -83,7 +83,7 @@ async function tpo_edit(p = null, o = {}) {
       if ($$('.tpo-row', rows).length >= 20) { fail(tr('Please propose between {0} and {1} times', 2, 20)); return; }
       const last = $$('.tpo-row', rows).pop(), d = last ? $('.tpo-d', last).value : '', t = last ? $('.tpo-t', last).value : '10:00';
       rows.insertAdjacentHTML('beforeend', tpo_rowHtml({start: d ? `${addDays(d, 1)}T${t || '10:00'}` : ''}));
-      $('.tpo-row:last-child .dpbtn', rows)?.focus();
+      $('.tpo-row:last-child [data-dpfor]', rows)?.focus();
     } else { const r = e.target.closest('[data-tpo="rm"]'); if (r && $$('.tpo-row', rows).length > 2) r.closest('.tpo-row').remove(); }
   });
   $('form', md).addEventListener('submit', async e => {

@@ -51,6 +51,11 @@ on accepted quotations, a short sidebar group Exchange, the rest of the fixed re
 - Chat composer: the paperclip and the meeting (list) icon sit on one line; the width grip's label shows to its left and
   no longer covers the send button (#2185).
 
+## [2.98.1] - 2026-10-19
+
+### Fixed
+- Scheduling polls: the proposed times and the end of voting use the app's own date and time pickers instead of the browser's (2.98.0 CI).
+
 ## [2.98.0] - 2026-10-19
 
 Scheduling polls, questionnaires in forms, the office menu as a rail on the left, resizable tables and polish.

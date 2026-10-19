@@ -40,6 +40,7 @@ const WS_VIEWS = {
   'static/js/agents.js': 'draw',              // agents of the workspace (p2280_ui)
   'static/js/bookmarks.js': 'draw',           // 2.97.0 (#1950): bookmarks load the shown workspace (bm_sp) unless one is picked in the view
   'static/js/agentchat.js': 'helper',         // the default workspace of a new agent
+  'static/js/polls.js': 'helper',             // 2.98.1: the default workspace of a new poll (the dialog shows all polls, with their workspace)
   'static/js/palette.js': 'draw',
   'static/js/areas.js': 'draw',               // 2.87.0: private areas hidden in an organisation's view (o3a_hid while drawing, #1845)
   'static/js/tagsview.js': 'draw',
@@ -47,7 +48,6 @@ const WS_VIEWS = {
   'static/js/favtiles.js': 'draw',
   'static/js/dupprop.js': 'helper',
   'static/js/newsletter.js': 'helper',        // a dialog with its own workspace choice
-  'static/js/polls.js': 'helper',             // 2.99.0 (#1953, CI 2.98.0): the polls dialog lists all polls with their space; the workspace only preselects a new poll's space
   'static/js/workspace.js': 'helper',         // the switch itself
   'static/js/wscolor.js': 'helper',
   // 2.87.9: files that read the shown workspace since 2.85 / 2.87.9
