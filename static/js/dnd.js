@@ -373,6 +373,7 @@ function tdKill() {
   $('#tdmove')?.remove();
   $$('#view .trow.dragging, #view .ev.dragging, #view .wev.dragging').forEach(x => x.classList.remove('dragging'));
   $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
+  dgs_touchMark(null);  // 2.122.3 B (#2334): the middle mark goes too
   document.body.classList.remove('tdrag');
 }
 function tdCancel() {
@@ -415,7 +416,7 @@ function tdScroll(x, y, at = document.elementFromPoint(x, y)) {
     const step = () => {
       if (!lp || !lp.active || !lp.sv) { if (lp) lp.sraf = 0; return; }
       const b = sc.scrollTop; sc.scrollTop = b + lp.sv;
-      if (sc.scrollTop !== b) markDrop(document.elementFromPoint(lp.sx, lp.sy), lp.id, lp.sy);
+      if (sc.scrollTop !== b) { const at = document.elementFromPoint(lp.sx, lp.sy); if (!dgs_touchMark(at, lp.id, lp.sy)) markDrop(at, lp.id, lp.sy); }  // 2.122.3 B (#2334): the middle = subtask
       lp.sraf = requestAnimationFrame(step);
     };
     lp.sraf = requestAnimationFrame(step);
@@ -478,7 +479,7 @@ const tdFrame = rafThrottle((x, y) => {
   if (mv) mv.classList.toggle('on', onMv);
   const at = document.elementFromPoint(x, y);
   if (onMv) { mdLast = null; $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop')); }
-  else markDrop(at, lp.id, y);
+  else if (!dgs_touchMark(at, lp.id, y)) markDrop(at, lp.id, y);  // 2.122.3 B (#2334): the middle of a row = its subtask (dragmulti.js)
   // hold at the left edge: open the list drawer so the task can be dropped on another list
   if (isMobile() && x < 26 && !$('#side').classList.contains('open')) {
     if (!lp.edge) lp.edge = setTimeout(() => { $('#side').classList.add('open'); if (S.sel) $('#detail').style.visibility = 'hidden'; lp && (lp.opened = true); }, 450);
@@ -502,7 +503,7 @@ function kbEdge(x, y) {
     const step = () => {
       if (!lp || !lp.active || !lp.kv || !k.isConnected) { if (lp) lp.kraf = 0; return; }
       const before = k.scrollLeft; k.scrollLeft = before + lp.kv;
-      if (k.scrollLeft !== before) markDrop(document.elementFromPoint(lp.kx, lp.ky), lp.id, lp.ky);
+      if (k.scrollLeft !== before) { const at = document.elementFromPoint(lp.kx, lp.ky); if (!dgs_touchMark(at, lp.id, lp.ky)) markDrop(at, lp.id, lp.ky); }  // 2.122.3 B (#2334)
       lp.kraf = requestAnimationFrame(step);
     };
     lp.kraf = requestAnimationFrame(step);
@@ -539,6 +540,7 @@ function endTouchDrag(e) {
   swiped = true; setTimeout(() => { swiped = false; }, 400);
   if (el && isKanban() && !el.closest(DROP_SEL) && el.closest('#view')) el = kbColAt(st.lx) || el;  // #453 A4
   $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
+  if (el && dgs_touchDrop(el, st.id, st.ly)) return;  // 2.122.3 B (#2334): onto the middle of a row = its subtask
   if (el) dropTask(st.id, el, st.ly);
   else if (st.ly == null && st.r.closest('#view') && isKanban() && S.sections.some(x => x.list_id === S.tasks.get(st.id)?.list_id)) sectionPicker(st.r, st.id);  // held without moving: "Move to column…"
   else if (st.ly == null && st.r.matches('#view .trow') && !isKanban() && !st.grip) {
