@@ -170,6 +170,7 @@ ROUTES = {
     "POST /api/files/links": "files", "POST /api/files/nodes/{}/restore": "files", "POST /api/files/nodes/{}/shares": "files",
     "POST /api/files/nodes/{}/versions": "files", "POST /api/files/nodes/{}/versions/{}/restore": "files",
     "POST /api/files/upload": "files", "POST /api/v1/documents/{}/receipt-suggestion": "files", "POST /api/v1/files": "files",
+    "POST /api/docs/{}/extracted": "files",  # 2.121.0 A (#2092): take over / discard the recognised receipt values
     "POST /api/v1/files/{}/versions": "files", "PUT /api/docs/settings": "files", "PUT /api/docs/{}/receipt": "files",
     # ---- hub (27)
     "DELETE /api/hubmail/address": "hub", "DELETE /api/hubmail/mails/{}": "hub", "DELETE /api/team/absences/{}": "hub",

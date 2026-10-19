@@ -1660,6 +1660,11 @@ workspace leaves a feature to an agent (level *Left to an agent* in the document
 waits as a suggestion in *To review* until a person accepts it. Agents never move a document and never see documents of
 another workspace.
 
+2.121.0: `get_document` also carries `extracted` for invoices and receipts -- what Kalmido's own rules read off the text
+(`supplier`, `vat_id`, `tax_no`, `invoice_no`, `vat_pct`, `vat_rates`, `net`, `vat`, `gross`, `currency`), or null. It is a
+suggestion for people: only a person takes it over in the app (agents get `403`). Use it as a starting point, e.g. for a
+receipt suggestion; the recognised `text` stays the source.
+
 ### Receipts: suggest project and category (2.48.0)
 
 An incoming invoice or receipt can be assigned to a **project** (a list of kind project of the document's workspace) and
