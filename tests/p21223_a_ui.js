@@ -58,7 +58,7 @@ const CSV = 'Name;Company;E-mail\\nErika Beispiel;Beispiel Studio;erika@example.
     check(await ready(ev, `!!${row(f0.id)} && !!${row(f19.id)}`, 80), tag + ': the fixed costs');
     check(await ev(`(() => { const b = ${row(f0.id)}, s = b.querySelector('.fcisum'); return /without VAT/.test(b.textContent) && !/VAT 0 %/.test(b.textContent) && !/\\bnet\\b|gross/.test(s.textContent) && /900\\.00/.test(s.textContent) && s.children.length === 1; })()`),
       tag + ': 0 % = one amount, "without VAT" ' + await ev(`${row(f0.id)}.textContent`));
-    check(await ev(`(() => { const b = ${row(f19.id)}; return /100\\.00/.test(b.textContent) && /119\\.00/.test(b.textContent) && /\\bnet\\b/.test(b.textContent) && /gross/.test(b.textContent) && /VAT 19 %/.test(b.textContent); })()`), tag + ': 19 % = net and gross');
+    check(await ev(`(() => { const b = ${row(f19.id)}; return /100\\.00/.test(b.textContent) && /119\\.00/.test(b.textContent) && /€ net/.test(b.textContent) && /€ gross/.test(b.textContent) && /VAT 19 %/.test(b.textContent); })()`), tag + ': 19 % = net and gross ' + await ev(`${row(f19.id)}.textContent`));
     // ---- #2335: no import buttons in the bar, a quiet link at the end
     check(await ev(`!document.querySelector('.fcibar [data-rkf="fimp"]') && !document.querySelector('.fcibar a[href*="import/template"]') && !!document.querySelector('.fcibar [data-rkf="fnew"]')`), tag + ': the bar keeps only "New fixed cost"');
     check(await ev(`(() => { const a = document.querySelector('.oimlink:not(.e) a[href="#office/import/fixed"]'); return !!a && /Import…/.test(a.textContent); })()`), tag + ': "Import…" at the end of the fixed costs');
@@ -88,11 +88,13 @@ const CSV = 'Name;Company;E-mail\\nErika Beispiel;Beispiel Studio;erika@example.
     await ev(`(() => { document.querySelector('#oim-leads [data-lead="import"]').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.modal .lead-pv') && /Erika Beispiel/.test(document.querySelector('.modal .lead-pv').textContent)`), tag + ': the leads preview');
     await ev(`(() => { document.querySelector('.modal [data-li="close"]').click(); return 1; })()`);
+    await ready(ev, `!document.querySelector('.modal')`); await sleep(600);  // on a phone the dialog's history entry goes first
     // ---- leads: no "Import CSV" in the toolbar, the empty column links to the import
     await nav(B + '#office/pipeline');
-    check(await ready(ev, `!!document.querySelector('[data-pp="newlead"]')`, 80), tag + ': the pipeline');
-    check(await ev(`!document.querySelector('.ofcbar [data-lead="import"]') && !!document.querySelector('.ppnone .oimlink.e a[href="#office/import/leads"]')`), tag + ': leads link to the CSV import');
-    check(await ev(`/Import from CSV/.test(document.querySelector('.ppnone .oimlink').textContent)`), tag + ': the CSV wording');
+    check(await ready(ev, `!!document.querySelector('[data-pp="newlead"]')`, 80), tag + ': the pipeline ' + await ev(`location.hash + ' ' + (document.querySelector('.modal')?.textContent || '').slice(0, 80) + ' | ' + (document.querySelector('.office')?.textContent || '').slice(0, 200)`));
+    // no deal yet: the empty pipeline links to the leads section
+    check(await ev(`!document.querySelector('.ofcbar [data-lead="import"]') && !!document.querySelector('.office .nempty .oimlink.e a[href="#office/import/leads"]')`), tag + ': leads link to the CSV import');
+    check(await ev(`/Import from CSV/.test(document.querySelector('.office .nempty .oimlink')?.textContent || '')`), tag + ': the CSV wording');
     // ---- clients (outside the office module): the empty list links too
     await nav(B + '#clients');
     check(await ready(ev, `!!document.querySelector('.msclempty .oimlink a[href="#office/import/master"]')`, 80), tag + ': empty clients link to the import');
