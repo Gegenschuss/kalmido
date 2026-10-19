@@ -40,9 +40,9 @@ if (!process.env.P21224C_NOSTART) execFileSync('bash', [path.join(__dirname, 'st
       out.mk = [probe(mk, 0, 0), probe(mk, 0, 20), probe(mk, 0, -20), probe(mk, 20, 0), probe(mk, -20, 0)];
       const th = tc.getBoundingClientRect().height; out.tc = [th, probe(tc, 0, th / 2 + 3), probe(tc, 0, -th / 2 - 3)];
       out.vs = c.querySelector('select').getBoundingClientRect().height; c.remove();
-      const d = add('<div class="modal bmdlg"><div class="card"><div class="row"><label for="t4">Description</label><textarea id="t4" rows="2"></textarea></div><div class="bmtags"><button class="bmtag">tag</button></div></div></div>');
+      const d = add('<div class="bmdlg"><div class="card" style="box-sizing:border-box;width:100%;padding:1.25rem"><div class="row"><label for="t4">Description</label><textarea id="t4" rows="2"></textarea></div><div class="bmtags"><button class="bmtag">tag</button></div></div></div>');
       out.ta = [d.querySelector('textarea').getBoundingClientRect().width, d.querySelector('.card').getBoundingClientRect().width];
-      d.style.zIndex = 9001; const tg = d.querySelector('.bmtag'), tr = tg.getBoundingClientRect();
+      const tg = d.querySelector('.bmtag'), tr = tg.getBoundingClientRect();
       out.tag = [tr.height, probe(tg, 0, tr.height / 2 + 3), probe(tg, 0, -tr.height / 2 - 3)];
       return out; })()`);
     check(g.sel >= 43.5, `${tag}: #2326 office select is 44 px ` + JSON.stringify(g.sel));
@@ -51,7 +51,7 @@ if (!process.env.P21224C_NOSTART) execFileSync('bash', [path.join(__dirname, 'st
     check(g.tc[0] < 40 && g.tc[1] && g.tc[2], `${tag}: #2217 time button target grows without growing the look ` + JSON.stringify(g.tc));
     check(g.vs >= 43.5, `${tag}: #2217 version select 44 px ` + JSON.stringify(g.vs));
     check(g.ta[0] >= g.ta[1] - 60, `${tag}: #2223 description uses the full width ` + JSON.stringify(g.ta));
-    check(g.tag[1] && g.tag[2], `${tag}: #2223 tag target reaches 44 px ` + JSON.stringify(g.tag));
+    check(g.tag[1] && g.tag[2], `${tag}: #2223 tag target reaches 44 px ` + JSON.stringify(g.tag) + JSON.stringify(g.dbg));
   }, true);
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
