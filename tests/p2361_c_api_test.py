@@ -190,7 +190,8 @@ A.patch(B + f"{D}/{DOC}", json={"rights": {"time": {"id": T_UNL}, "exceptions": 
 # ---------------------------------------------------------------- render (the print model)
 rd = A.get(B + f"{D}/{DOC}/render").json()
 check(rd["kind"] == "offer" and rd["lang"] == "de" and rd["title"] == "Kostenvoranschlag" and rd["number"] == d["number"] and rd["company"]["name"] == "Studio Nordlicht GmbH", f"render head: {rd.get('title')} {rd.get('number')}")
-check(rd["totals"]["net_text"] == "20.380,00 €" and rd["totals"]["net_incl_raw_text"] == "23.802,50 €" and rd["totals"]["rows"] == [["Summe Netto", "20.380,00 €"], ["inklusive Rohdaten", "23.802,50 €"]], f"render totals: {rd['totals']['rows']}")
+# 2.114.4 (#2275): the option total reads "Summe netto mit Option Rohdaten"
+check(rd["totals"]["net_text"] == "20.380,00 €" and rd["totals"]["net_incl_raw_text"] == "23.802,50 €" and rd["totals"]["rows"] == [["Summe Netto", "20.380,00 €"], ["Summe netto mit Option Rohdaten", "23.802,50 €"]], f"render totals: {rd['totals']['rows']}")
 # 2.114.4 (#2274): the note names only the rates of the document
 check(rd["totals"]["vat_note"] == "Alle Preise zuzüglich 19 % MwSt." and rd["totals"]["show_tax_lines"] is False, "the offer shows the VAT note only")
 check(rd["rights"]["title"] == "Rechteübertragung" and rd["rights"]["rows"] == [["Zeitliche Auswertung", "unbegrenzt"], ["Räumliche Auswertung", "weltweit außer Musik auf Messe/Event (DE)"], ["Mediale Auswertung", "intern, web, unpaid media"]] and rd["rights"]["note"] == "Im Übrigen gelten unsere AGB.", f"KV02 rights texts DE: {rd['rights']}")
@@ -203,7 +204,8 @@ check(rd["internal"] == {"costs": 3750, "margin": 16630} and rd["fx_note"] == ""
 # EN + USD
 d = A.patch(B + f"{D}/{DOC}", json={"lang": "en", "currency": "USD", "rights": {"time": {"id": T_UNL}, "territory": {"id": T_WEM}, "media": {"id": T_IWU}}}).json()
 rd = A.get(B + f"{D}/{DOC}/render").json()
-check(rd["title"] == "Quotation" and rd["totals"]["rows"][0][0] == "Net Total" and rd["totals"]["rows"][1][0] == "including raw data" and rd["totals"]["net_text"] == "$22,214.20", f"EN / USD render: {rd['title']} {rd['totals']['rows']}")
+# 2.114.4 (#2275): "Net total with option raw data"
+check(rd["title"] == "Quotation" and rd["totals"]["rows"][0][0] == "Net Total" and rd["totals"]["rows"][1][0] == "Net total with option raw data" and rd["totals"]["net_text"] == "$22,214.20", f"EN / USD render: {rd['title']} {rd['totals']['rows']}")
 check(rd["rights"]["rows"] == [["Duration of License", "in perpetuity"], ["Territorial Rights", "worldwide except music on trade shows / live events (DE)"], ["Rights by Medium", "internal use, web, unpaid media"]], f"KV02 rights texts EN: {rd['rights']['rows']}")
 # 2.114.4 (#2274): the note names only the rates of the document
 check(rd["fx_note"] == "Exchange rate €1: $1.09" and rd["fx_rate"] == 1.09 and rd["totals"]["vat_note"] == "All prices plus 19 % VAT.", f"USD shows the exchange rate: {rd['fx_note']}")

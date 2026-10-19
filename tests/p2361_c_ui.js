@@ -67,7 +67,8 @@ const FEAT = 'cal,comments,collab,office,clients';
   doc = await call('GET', `/api/office/docs/${doc.id}`);
   check(doc.totals.net === 980 + 980 + 75 + 300 && doc.totals.producing_days === 0.5, 'server: 3 positions (qty 1) + producing 0.5 day x 600 = 2335: ' + doc.totals.net);
   check(/2\.335,00 €/.test(d.querySelector('#ofd-totals .tr-net dd')?.textContent || ''), 'the totals block shows the net sum 2.335,00 €: ' + d.querySelector('#ofd-totals .tr-net dd')?.textContent);
-  check(/inklusive Rohdaten/.test(d.querySelector('#ofd-totals')?.textContent || '') && /2\.580,00 €/.test(d.querySelector('#ofd-totals')?.textContent || ''), 'including raw data 2.580,00 € (980 x 0,25 on top)');
+  // 2.114.4 (#2275): the option total reads "Summe netto mit Option Rohdaten"
+  check(/Summe netto mit Option Rohdaten/.test(d.querySelector('#ofd-totals')?.textContent || '') && /2\.580,00 €/.test(d.querySelector('#ofd-totals')?.textContent || ''), 'including raw data 2.580,00 € (980 x 0,25 on top)');
   const prod = d.querySelector('.ofdautos .ofdauto');
   check(!!prod && /Producing/.test(prod.textContent) && /0,5 Tage = 1 Produktionstage \/ 3/.test(prod.textContent) && /300,00 €/.test(prod.textContent), 'the producing line with its explanation: ' + prod?.textContent);
   // a changed quantity with a comma
