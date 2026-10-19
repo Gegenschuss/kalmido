@@ -127,7 +127,8 @@ for s in (A, Bo, Ca, Da):
     s.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
 
 # ==== the freelancer: nothing preset, fields of every type
-check(Fr.get(B + "/api/docs/settings?ws=private").json().get("fields") == [], "nothing preset: no fields")
+S0 = Fr.get(B + "/api/docs/settings?ws=private").json()
+check(S0.get("fields") == [] and "levels" in S0 and "inbox" in S0, f"nothing preset: no fields; the rest of the settings unchanged ({sorted(S0)})")
 D1 = doc(Fr, "private", "vertrag.txt", "Mietvertrag Beispielstrasse 1 Sonnenweg")
 check(cf(Fr, D1) == {}, "a document without fields has none")
 F = {}
