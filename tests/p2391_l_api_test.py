@@ -141,7 +141,7 @@ r = requests.patch(V + f"/lists/{L2}", headers=VC, json={"archived": True})
 check(r.ok, "#1188 v1: the list admin archives " + r.text[:120])
 check(requests.delete(V + f"/lists/{L2}", headers=VD).status_code == 403, "#1188 v1: an editor cannot delete")
 r = requests.delete(V + f"/lists/{L2}", headers=VC)
-check(r.status_code == 204 and not dbx("SELECT 1 FROM lists WHERE id=?", (L2,)), "#1188 v1: the list admin deletes " + str(r.status_code) + r.text[:120])
+check(r.status_code == 204 and dbx("SELECT deleted_at IS NOT NULL FROM lists WHERE id=?", (L2,)) == [(1,)], "#1188 v1: the list admin deletes (2.102.0 #1988: into the trash) " + str(r.status_code) + r.text[:120])
 
 # ================================================================== #1188 Lists of the organisation: the rule of 11.10. 21:39
 OSH = Bo.post(B + "/api/lists", json={"name": "Org shared", "org_id": ORG, "folder": "Clients/Muster"}).json()["id"]
