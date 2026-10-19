@@ -32,6 +32,8 @@ const LD_MODS = {
   sheets: ['sheets', 'sheets2', 'sheetsio', 'sheetsize'],  // 2.89.0 (#1916); D: sheets2.js (step 2), C: sheetsio.js (import/export); 2.98.0 C (#2181): sheetsize.js (the frame)
   videos: ['videorev'],  // 2.99.1 A (#1959): video sign-offs
   pubvideo: ['pubvideo'],  // 2.99.1 A (#1959): only the customer page of a video sign-off loads it (/s/q/<token>), the app never
+  polls: ['polls'],  // 2.102.0 C (#2208): scheduling polls (#1953), on the first "Find a date"
+  formq: ['formq'],  // 2.102.0 C (#2208): questionnaires (#1954), with the forms dialog of a list
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
@@ -46,7 +48,8 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   pdf: ['pdfView', 'dpvOpen', 'dpvSumMount'], calendar: ['calColorPop', 'cg_commit', 'apbOpen'], docs: ['dc_shareFiles', 'dc_filterGo', 'pl_importActive', 'pl_openSettings'],  // 2.87.9 (#1934); 2.94.0 B (#1929): apbOpen
   life: ['contractModal', 'deviceModal', 'upkeepModal', 'healthModal', 'tripModal'], integrations: ['pubWire'],
   playbook: ['pbMount', 'pbOpen', 'pbNewsOpen'], timeline: ['rmSet'],
-  bookmarks: ['bm_shareSave', 'bm_confirmSave', 'bm_bookmarkletHelp']};  // 2.97.0 A (#1950)
+  bookmarks: ['bm_shareSave', 'bm_confirmSave', 'bm_bookmarkletHelp'],  // 2.97.0 A (#1950)
+  polls: ['tpo_list', 'tpo_edit', 'tpo_forClient'], formq: ['fq_clientLink']};  // 2.102.0 C (#2208)
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)
 const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 'chatTypers', 'chatStHtml'], timeline: ['tlKbSync', 'tlAfterRender', 'rmAfterRender']};
 // drawing functions: the stand-in draws "Loading…" (views) or nothing (parts of another view), loads, and redraws the view
@@ -64,6 +67,17 @@ const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_ti
   viewFeeds: ['feeds', 1], rss_homeCard: ['feeds'],  // 2.85.0 B (#1162)
   viewBookmarks: ['bookmarks', 1],  // 2.97.0 A (#1950)
   viewSheets: ['sheets', 1]};  // 2.89.0 (#1916)
+// 2.102.0 C (#2208) scheduling polls (polls.js, module polls): the switch and the start points' clicks stay at start (moved
+// here): "Find a date" in the calendar bar and in a task (calevents.js), a client's "…" menu (tpo_forClient, a stand-in)
+const tpo_on = () => feat('events') && S.me?.kind !== 'agent';
+document.addEventListener('click', e => {
+  const el = /** @type {HTMLElement} */ (e.target);
+  if (el.closest?.('[data-act="tpo-list"]')) { tpo_list(); return; }
+  if (el.closest?.('[data-act="tpo-task"]')) {
+    const t = taskById(S.sel); if (!t) return;
+    tpo_edit(null, {task_id: t.id, title: t.title, space: wsOf(listById(t.list_id))});
+  }
+});
 // stays at start (core.js modOn, areas, dashboard, the client page ask it before anything of the office is loaded)
 const officeOn = () => feat('office') && !S.me?.kid;
 
