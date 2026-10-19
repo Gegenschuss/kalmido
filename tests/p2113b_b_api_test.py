@@ -382,7 +382,8 @@ check(A.get(B + f"/api/team/files/{FG}").status_code in (404, 410), "review: gin
 check(DBC.execute("SELECT COUNT(*) FROM tchat_files WHERE id=?", (FG,)).fetchone()[0] == 0, "review: its row is gone")
 check(Bo.get(B + f"/api/team/files/{FGC}").content == b"for the channel", "review: her file in the organisation's channel stays")
 if gbefore is not None:
-    check(gbefore == 1 and len(os.listdir(gdisk)) == 0, f"review: the DM file left the disk ({gbefore} -> {len(os.listdir(gdisk))})")
+    gafter = len(os.listdir(gdisk)) if os.path.isdir(gdisk) else 0  # an emptied folder may go too
+    check(gbefore == 1 and gafter == 0, f"review: the DM file left the disk ({gbefore} -> {gafter})")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed", flush=True)
 if FAILS:
