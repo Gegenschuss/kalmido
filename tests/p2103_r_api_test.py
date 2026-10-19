@@ -7,6 +7,8 @@ Invented accounts only (example.com).
  - numbers only: no user names or mail addresses in the answer
  - #2166 (built in 2.102.0 A): a deleted list keeps fields + values and its chat in the trash; the purge after the period
    takes them along (no orphan rows of list_fields, task_field_values, tchat_rooms / tchat_msgs)
+ - #2164 review F1: a person without an organisation is deleted while a booked receipt sits in the private document store:
+   the receipt moves into the retired office and stays READABLE (re-sealed for the office before the account key goes)
  - #2167: a retired organisation opens no public link any more (acx_anon_bind, the bind of every org-bound public path:
    shared lists, forms, sign-offs, the customer portal, hooks) -> 404; an active one still binds
 usage: p2103_r_api_test.py <datadir>      (a fresh server on KALMIDO_TEST_PORT)
@@ -125,6 +127,29 @@ check("bound" in out.stdout, "#2167: an active organisation binds its public lin
 sql("UPDATE orgs SET retired_at=?, retain_until=? WHERE id=?", ("2026-10-19T07:00:00+00:00", "2036-12-31", OA), write=True)
 out = run()
 check("denied 404" in out.stdout, "#2167: a retired organisation's public link: 404 " + (out.stdout + out.stderr)[-300:])
+
+# ---- #2164 review F1: a booked private receipt of a deleted person stays readable in the retired office
+G, Gr = freelancer(B, A, name="greta")
+r = Gr.post(B + "/api/docs", data={"ws": "private"}, files={"files": ("beleg.txt", b"Beleg 4711 Software", "text/plain")})
+check(r.status_code == 201, "#2164 setup: a private receipt " + r.text[:200])
+RN = r.json()["ids"][0] if r.status_code == 201 else 0
+Gr.patch(B + f"/api/docs/{RN}", json={"amount": "119.00", "date": "2026-10-01"})
+r = Gr.put(B + f"/api/docs/{RN}/receipt", json={"category": "Software", "vat_pct": "19", "keep": True})
+check(r.ok, "#2164 setup: booked (VAT rate) " + r.text[:200])
+r = A.delete(B + f"/api/users/{G}")
+check(r.ok, f"#2164: the person with a booked private receipt is deleted {r.status_code} {r.text[:300]}")
+row = sql("SELECT n.org_id, o.retired_at FROM fs_nodes n JOIN orgs o ON o.id=n.org_id WHERE n.id=?", (RN,))
+check(row and row[0][1], f"#2164: the receipt sits in the retired office {row}")
+out = subprocess.run(["docker", "exec", CT, "python", "-c",
+                      "import app, os\nfrom kalmido.core.db import connect\nfrom kalmido.core.config import ATT_DIR\n"
+                      "from kalmido.core.orgcrypt import oc_read_file\nfrom kalmido.core.pg import system_ctx\nc = connect()\n"
+                      "with system_ctx(c):\n"
+                      "    ps = [p for (p,) in c.execute('SELECT path FROM fs_versions WHERE node_id=%d', ()).fetchall()]\n"
+                      "    print('versions', len(ps))\n"
+                      "    for p in ps:\n        print(oc_read_file(c, os.path.join(ATT_DIR, p))[:40])\nc.close()" % RN],
+                     capture_output=True, text=True)
+check("versions 1" in out.stdout and "Beleg 4711" in out.stdout, "#2164 F1: the receipt is readable after the account key went "
+      + (out.stdout + out.stderr)[-400:])
 
 print(f"p2103_r_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
