@@ -19,6 +19,17 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
 - **Frontmatter.** A leading block of `key: value` lines between `---` lines is shown as small fields above the text.
 - **Templates.** Pages under `Templates/` are offered as the start of a new page.
 - **Saving** is automatic. When someone else saved the page in between, you choose which version stays.
+- **History (2.123.0).** *History* in the menu of a page lists its saved versions with date and person (saves of one
+  person within ten minutes are one version, at most 100 per page, the oldest go). A version opens with a line
+  comparison to the current text; *Restore* makes its text the current one again (a new version, the name stays) and can
+  be undone. Whoever may read the page reads its history, restoring needs the right to change it. The history goes with
+  the page (trash, moving to another workspace) and is deleted with it. Encrypted spaces (see below) keep no history.
+- **Search (2.123.0).** *Find a page* filters the names at once; from two characters the pages whose text has the words
+  follow under *Found in the text* (whole words and word beginnings, names first, then the newest), 30 at a time with
+  *Show more*. The server searches a word index of keyed hashes, not the text itself.
+- **Encrypted at rest (2.123.0).** The text of every page and of its versions is stored encrypted with the key of its
+  space (the organisation's key, for private pages your account key), like the office data; names (paths) stay plain
+  because links and the tree need them. Nothing changes in use. See *Encryption at rest* in the self-hosting guide.
 - **Undo.** Creating, renaming, deleting and importing are one step each (the arrow on top, Ctrl/Cmd+Z, the toast).
 - **Files (2.99.0).** A page can carry PDFs and pictures (PNG, JPEG, GIF, WebP, SVG): *Attach files* below the text,
   at most 25 MB each. The type is checked by the content, not by the name; an SVG is cleaned (no scripts, no outside
