@@ -54,6 +54,7 @@ const WS_VIEWS = {
   'static/js/areas.js': 'draw',               // private-only modules hidden in an organisation's view, the office menu per workspace (#1917)
   'static/js/paperless.js': 'draw',           // Settings > Integrations: the Paperless section takes the shown workspace when drawn (#1936)
   'static/js/settings.js': 'helper',          // the task import's default target (#1940, confirmed in the dialog)
+  'static/js/listadmin.js': 'draw',           // 2.102.0 A (#1988): the deleted lists of the trash filtered by wsObjIn while drawing
   'kalmido/hub/absence.py': 'check:absences', // abs_org: the area of the saved setting; absences and disposition load again
                                               // with the state that follows the saved setting (core.js)
   'kalmido/office/model.py': 'check:office',  // office_org: the saved setting
