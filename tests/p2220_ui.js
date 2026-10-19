@@ -262,6 +262,7 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   check(d.querySelector('.cele .cbot svg.bot.b-erledigt') && !d.querySelector('.cele .cbird, .cele .cwing, .cele .cvine'), '#2193: the happy bot figure, no heron, no vine');
   const fr = [0.05, 0.5, 0.95].map(p => { d.querySelectorAll('.cele,.cele-quip').forEach(x => x.remove()); w.eval(`celebrate('today', {frame: ${p}, force: true})`); const st = d.querySelector('.cele .cbot').style; return {x: parseFloat(st.transform.match(/translate\(([-\d.]+)px/)[1]), o: +st.opacity}; });
   check(fr[0].o < 1 && fr[1].o === 1 && fr[2].o < 1 && fr[0].x === fr[1].x && fr[1].x === fr[2].x, '#2193: it appears, stays in the middle, fades out ' + JSON.stringify(fr));
+  d.querySelectorAll('.cele,.cele-quip').forEach(x => x.remove()); w.eval(`celebrate('today', {frame: 0.5, force: true})`);  // 2.136.0: at 0.95 the confetti is gone
   const conf = [...d.querySelectorAll('.cele .cconf')].filter(c => +c.style.opacity > 0).length;
   check(conf > 0, '#688: checkmark confetti falls behind it');
   w.close();
