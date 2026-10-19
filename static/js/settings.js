@@ -87,7 +87,7 @@ const SETS = {  // control id -> [setting key, label, kind]
 // 2.62.0 (#1854): comments by agents: all | only replies to me (people's comments stay as the matrix says)
 const bl9SetHtml = (s, hint) => collab() && feat('agents') ? `<div class="row"><label for="s-bl9ac">${tr('Comments by agents')}</label><select id="s-bl9ac">${[['all', N_('All')], ['replies', N_('Only replies to me')]].map(([v, n]) => `<option value="${v}" ${(s.agent_comments || 'all') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
       ${hint(tr('Only replies to me: a comment by an agent reaches you (News and push) only when it answers your comment, follows right after your comment or mentions you. Comments by people are not affected.'))}` : '';
-const SET_RENDER = ['sidebar', 'row_icons', 'row_icons_custom', 'side_count', 'side_dots', 'side_share', 'prio_bg', 'person_colors', 'list_color_dot', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
+const SET_RENDER = ['sidebar', 'row_icons', 'row_icons_custom', 'side_count', 'side_dots', 'side_share', 'prio_bg', 'person_colors', 'list_color_dot', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden', 'side_people', 'side_agents'];
 const SET_SLOW = ['lang', 'features', 'nav_order'];  // 2.41.2 (#1501): drawn once their language file / state is there
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
   const v = el.value;

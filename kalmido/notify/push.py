@@ -593,6 +593,8 @@ def watchdog_tick(c):
     _wd_section(c, "virus scan", sc_tick)  # 2.61.0 (#1818): the uploads the scanner could not check yet
     from ..files.fsmove import fsm_orphans_gc
     _wd_section(c, "files cleanup", fsm_orphans_gc)  # 2.97.0 D (#2051): stored versions without a row, once a night
+    from ..wiki.wikiatt import wka_tick
+    _wd_section(c, "wiki files", wka_tick)  # 2.99.0 (#2182): files in the trash for good after 30 days
     _wd_section(c, "admin alerts", aa_tick)
 
 

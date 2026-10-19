@@ -27,6 +27,7 @@ SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_
                         "brief_sent", "brief_read",  # 2.34.0 (#264)
                         "fav_asked")  # 2.46.1 (#1361): lists already offered as a favourite
 SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "areas", "team")  # 2.25.0 (UX-03); 2.39.1 (#1185): areas
+SIDE_PEOPLE_MAX = 5  # 2.99.0 E (#2187): people pinned to the sidebar (static/js/sbnav.js SB_PINS)
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family", "kpi")  # 2.17.0 (#475), 2.19.0; 2.55.1: kpi (2.50.0 #1197, office admins)
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "celebrate", "cal_today",
                   "date_confirm", "digest_mail", "mail_from_me", "mail_trim_fwd", "mail_trim_eml",  # 2.49.0 (#971)
@@ -94,9 +95,11 @@ def clean_setting(k, v):
         if sv and not valid_hm(sv):
             raise bad
         return sv
-    if k in ("hide_progress", "show_progress", "fav_lists", "agents_hidden"):  # 2.40.0: show_progress (#1190), fav_lists (#1361)
+    if k in ("hide_progress", "show_progress", "fav_lists", "agents_hidden", "side_people", "side_agents"):  # 2.40.0: show_progress (#1190), fav_lists (#1361)
         ids = [x.strip() for x in sv.split(",") if x.strip()]
         if len(ids) > 500 or not all(x.isdigit() and len(x) < 12 for x in ids):
+            raise bad
+        if k == "side_people" and len(dict.fromkeys(ids)) > SIDE_PEOPLE_MAX:  # 2.99.0 E (#2187): at most 5 pinned people
             raise bad
         return ",".join(dict.fromkeys(ids))
     if k == "roadmap":

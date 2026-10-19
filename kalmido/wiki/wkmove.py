@@ -124,6 +124,8 @@ def wiki_move_space():
                           (to, None if to else uid, n, uid, ts, r["id"]))
     except IntegrityError:
         return jsonify(error=tr("A page with this name already exists"), taken=[]), 409
+    from .wikiatt import wka_move_files
+    wka_move_files(c, ids, to, uid)  # 2.99.0 (#2182): the pages' files go along, sealed with the target's key
     relinked = 0
     for r, n in moves:
         nb = wkm_relink(r["body"], {k: v for k, v in ren.items() if k != v})
@@ -233,6 +235,9 @@ def wkr_move(c, uid, src, to, b, dry):
     block = wkr_block(c, uid, sst, tst)
     e2e = {"from": sst, "to": tst}
     notes = [trn("{0} page moves", "{0} pages move", len(rows)), tr(WKR_PLAIN) if sst["mode"] and not tst["mode"] else ""]
+    from .wikiatt import wka_pages_have_files
+    if not block and tst["mode"] and wka_pages_have_files(c, [r["id"] for r in rows]):  # 2.99.0 (#2182): no plain files
+        block = tr("The pages of this space have files. Files cannot be encrypted in the browser yet: delete them first.")
     if dry:
         return jsonify(smv_answer(notes, block, count=len(rows), e2e=e2e, taken=[]))
     if block:

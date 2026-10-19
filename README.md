@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.99.0** (2026-10-19): files on knowledge pages (PDFs, pictures) and a ZIP import that keeps them, one "…" menu on
+  knowledge pages, the acceptance note on quotations accepted online, a short sidebar group Exchange (pinned people),
+  a name addition for clients and a company name on up to three lines, 44 px fields in the document editor, aligned chat icons.
 - **2.102.0** (2026-10-19): a trash for deleted lists (organisation lists in the organisation's trash, 30 days),
   questionnaire links per client, calmer news counts, the send hint in chats, background work once per instance.
 - **2.114.4** (2026-10-19): office fixes 4 - a calmer quotation PDF (footer without breaks, page number only from

@@ -334,6 +334,9 @@ def wke_start():
         return jsonify(wke_info(c, oid, uid))
     if sp and sp["e2e"]:
         return err(tr("The space is already encrypted in the browser."), 409)
+    from .wikiatt import wka_space_has_files  # 2.99.0 A (#2182): page files cannot be encrypted in the browser yet
+    if wka_space_has_files(c, oid, uid):
+        return err(tr("The pages of this space have files. Files cannot be encrypted in the browser yet: delete them first."), 409)
     mine = e2e_keys_of(c, uid)
     if not mine:
         return err(tr("Set up end-to-end encryption first (Settings > Account)."), 409)
@@ -371,8 +374,12 @@ def wke_start():
     for p in people:
         if p["user_id"] not in given:
             c.execute("INSERT INTO wiki_key_pending(space_id,user_id,since) VALUES(?,?,?) ON CONFLICT DO NOTHING", (sp["id"], p["user_id"], ts))
+    from .wikiatt import wka_drop_trashed
+    from ..core.serializers import unlink_files
+    gone = wka_drop_trashed(c, oid, uid)  # 2.99.0 (#2182, review M2): no plain file in the trash of an encrypted space
     bump(c)
     c.commit()
+    unlink_files(gone)
     return jsonify(wke_info(c, oid, uid))
 
 

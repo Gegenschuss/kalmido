@@ -946,6 +946,15 @@ company's) until they are finalised or sent; a `recipient` sent for such a draft
 and `recipient_missing` is `true` while street, postcode or city is missing. A document without a client keeps the
 `recipient` it is given. Finalising freezes the recipient with the fixed fields; the e-invoice takes them directly
 (`address_extra` = LineTwo), older documents with free lines only are parsed as before.
+2.99.0 (#2188): `name_extra` (up to 120 characters, empty = none) is a second name line of the client (e.g. the legal form
+or the partners): documents print it as its own line under the name, the e-invoice joins it to the buyer name (BT-44,
+`name - name_extra`), lists and the `label` show `name - name_extra` on one line. The recipient of a document carries it
+(`recipient.name_extra`, older finalised documents without it stay as they are). The buyer e-mail (BT-49) is the client's
+`email_invoice`, else its `email`. Office settings: `company_fields.name` may have up to three lines (`\n`; more = `400`),
+the letterhead and the footer print them one under the other, the sender line, mails and the e-invoice (BT-27) on one
+line; `company_fields.address_extra` is the company's extra address line (BT-36). While street, postcode and city of the
+company are empty, a plain free address (`company.lines`: street, postcode + city, maybe a country) is read into them in
+the answer; saving the settings keeps them, the free lines stay.
 A list's client: `PATCH /lists/{id}` `{client_id}`. The timesheet of a client is the time report of its lists:
 `GET /time/entries?lists=1,2&from=&to=` (web) or `/api/time/export.csv`.
 

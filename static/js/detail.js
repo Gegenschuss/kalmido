@@ -131,9 +131,21 @@ function placeGrips() {
     g.setAttribute('aria-label', tr(GRIP_LAB[k]));
     g.setAttribute('aria-valuenow', String(v)); g.setAttribute('aria-valuemin', String(PW[k][1])); g.setAttribute('aria-valuemax', String(Math.round(panelMax(k) * 4) / 4));
     g.setAttribute('aria-valuetext', tr('{0} rem', String(v)));
-    g.title = tr(GRIP_LAB[k]) + ' · ' + tr('drag; double-click = standard width');
+    g.dataset.tip = tr(GRIP_LAB[k]) + ' · ' + tr('drag; double-click = standard width');  // 2.99.0 B (#2185): own label (w299_gripTip), no native title
   }
 }
+// 2.99.0 B (#2185): label left of / above the grip so it never covers the send button
+function w299_gripTip(g, on) {
+  let t = $('#griptip');
+  if (!on || !g?.dataset.tip) { if (t) t.classList.add('hidden'); return; }
+  if (!t) { t = document.createElement('div'); t.id = 'griptip'; t.setAttribute('role', 'tooltip'); document.body.appendChild(t); }
+  t.textContent = g.dataset.tip; t.classList.remove('hidden');
+  const r = g.getBoundingClientRect();
+  t.style.left = Math.max(t.offsetWidth + 8, Math.round(r.left - 4)) + 'px'; t.style.top = Math.max(8, Math.round(r.top + 8)) + 'px';
+}
+document.addEventListener('mouseover', e => { const g = e.target.closest?.('.pgrip'); if (g) w299_gripTip(g, true); });
+document.addEventListener('mouseout', e => { if (e.target.closest?.('.pgrip')) w299_gripTip(null, false); });
+document.addEventListener('mousedown', e => { if (e.target.closest?.('.pgrip')) w299_gripTip(null, false); }, true);
 const gripEl = k => k === 'det' ? $('#detail') : k === 'side' ? $('#side') : $('#achat');
 function gripWire(g) {
   const k = g.dataset.k;

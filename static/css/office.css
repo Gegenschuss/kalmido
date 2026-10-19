@@ -56,12 +56,15 @@
   .ofcset .row label{min-width:100%}
   .ofcbar .chkl{font-size:var(--fs-s)}
   .ofcrow{min-height:2.75rem}
+  /* 2.117.0 (#2287 #2286): with the row menu button the per diem / receipts labels stand above their amounts, the row may wrap */
+  .rklist .ofcrow{flex-wrap:wrap;justify-content:flex-end;gap:.25rem .5rem}.rklist .ofcrow .ofcn{flex:1 1 8rem}
+  .rklist .rkpd,.rklist .rkrc{display:flex;flex-direction:column;align-items:flex-end;line-height:1.2}
 }
 .ofdrow .ofdsum{display:flex;flex-direction:column;align-items:flex-end;gap:.125rem;flex:0 0 auto}
 .ofdrow .ofdsum b{font-variant-numeric:tabular-nums;white-space:nowrap}
 .ofdhead{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 .75rem}
 .ofdhead .ofdnum{display:flex;align-items:center;gap:.5rem;font-size:var(--fs-l)}
-.ofdhead .ofdstat{min-height:2.25rem}
+.ofdhead .ofdstat{min-height:var(--fld-h)}
 .ofdhead .ofdsave{font-size:var(--fs-s)}
 .ofdeditor{display:flex;flex-direction:column;gap:.75rem}
 .ofdsecb{padding:.25rem 0 .5rem}
@@ -94,9 +97,9 @@
 .ofdsecb .row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;min-height:2.5rem;margin:.125rem 0}
 .ofdsecb .row label{min-width:9rem;color:var(--muted);font-size:var(--fs-s)}
 .ofdsecb .row input,.ofdsecb .row select,.ofdsecb .row textarea{flex:1;min-width:8rem}
-.ofdsecb .row.ofdtxt select{min-height:2.25rem}
+.ofdsecb .row.ofdtxt select{min-height:var(--fld-h)}
 .ofdsecb .row .ofdtxt{flex:1;min-width:0;display:flex}
-.ofdsecb .row .ofdtxt select{width:100%;max-width:100%;min-width:0;min-height:2.25rem}
+.ofdsecb .row .ofdtxt select{width:100%;max-width:100%;min-width:0;min-height:var(--fld-h)}
 .ofdsecb textarea{width:100%;resize:vertical;margin-bottom:.5rem}
 .ofdfld{display:flex;gap:.5rem;align-items:center}
 .ofdfld input{flex:1;min-width:6rem}
@@ -602,3 +605,8 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .dma-up{align-self:flex-start;min-height:2.75rem}
 .dma-clip{display:inline-flex;align-items:center;gap:.125rem;color:var(--text2);flex:none}
 .dma-clip small{font-size:var(--fs-xs)}
+/* 2.99.0 (#2025): iOS Safari ignores min-height on a select - on touch screens every select of the document editor gets the
+   shared field height as its height, so selects and text fields are the same 44 px */
+@media (pointer:coarse) {
+  .ofdeditor select,.ofdhead select{height:var(--fld-h);line-height:1.25}
+}

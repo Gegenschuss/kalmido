@@ -264,6 +264,7 @@ OX_AREAS = (
     ("office/import_runs.json", "office_import_runs", "org_id=?"),
     ("office/log.json", "office_doc_log", "org_id=?"),
     ("wiki/pages.json", "wiki_pages", "org_id=?"),  # 2.49.0 (#1199): knowledge pages
+    ("wiki/files.json", "wiki_files", "org_id=?"),  # 2.99.0 A (#2182): their PDFs and pictures (the bytes under files/wiki/)
     ("sheets/sheets.json", "sheets", "org_id=?"),  # 2.89.0 (#1916): tables with their columns, rows and cells
     ("sheets/columns.json", "sheet_columns", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
     ("sheets/rows.json", "sheet_rows", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
@@ -384,6 +385,11 @@ def ox_build(c, oid, out, by=None):
                 nm = c.execute("SELECT name FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
                 if full and nm:
                     _put_bytes(zf, man, f"files/store/{int(r['node_id'])}-v{int(r['no'])}-{_safe_part(nm[0])}", _read(c, full))
+        if "wiki_files" in have:  # 2.99.0 A (#2182): the files of the knowledge pages (decrypted like the attachments)
+            for r in _rows(c, oid, "wiki_files", "org_id=?", (oid,)):
+                full = _under(ATT_DIR, r.get("path"))
+                if full:
+                    _put_bytes(zf, man, f"files/wiki/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
         odir = os.path.join(OFFICE_DIR, str(int(oid)))
         if os.path.isdir(odir):
             for root, dirs, files in os.walk(odir):

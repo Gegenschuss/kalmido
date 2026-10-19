@@ -37,7 +37,7 @@ async function ms_clGdLoad(id) {
 }
 function ms_clDraw() { if (S.route.mod === 'clients') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('clients', viewClients()))); } }
 const ms_clDirty = () => { MSC.items = null; MSC.inv = null; };
-const ms_clShown = () => (MSC.items || []).filter(c => (MSC.arch || !c.archived) && (!MSC.q.trim() || [c.name, c.display_name, c.label, c.contact, c.email, c.phone, c.note, c.billing?.customer_no]
+const ms_clShown = () => (MSC.items || []).filter(c => (MSC.arch || !c.archived) && (!MSC.q.trim() || [c.name, c.name_extra, c.display_name, c.label, c.contact, c.email, c.phone, c.note, c.billing?.customer_no]
   .some(v => (v || '').toLowerCase().includes(MSC.q.trim().toLowerCase()))));
 const ms_clAv = (c, big) => `<span class="avatar ctav mscav ${big ? 'big' : ''}" style="${cssColor(c.color) ? '--cc:' + cssColor(c.color) : ''}" aria-hidden="true">${c.icon ? esc(c.icon) : ic('brief', big ? '' : 's')}</span>`;
 const ms_tag = (kind) => kind === 'client' ? `<span class="mstag mstag-cl">${ic('brief', 's')}${tr('Client')}</span>` : `<span class="mstag">${ic('user', 's')}${tr('Contact')}</span>`;

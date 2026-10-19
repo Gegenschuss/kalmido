@@ -23,9 +23,9 @@ from ..personal.timetrack import BadInput
 # see, so two people of one organisation may see different sums. The amount uses the list's hourly rate, else the
 # client's. Budget: hours and / or an amount; 80 % turns the bar amber, 100 % red. The timesheet is the time report
 # filtered to the client's lists (CSV, printable page).
-CLIENT_FIELDS = ("name", "display_name", "icon", "color", "contact", "email", "phone", "address", "note", "rate", "budget_h", "budget_amount",
+CLIENT_FIELDS = ("name", "name_extra", "display_name", "icon", "color", "contact", "email", "phone", "address", "note", "rate", "budget_h", "budget_amount",
                  "org_id", "archived")
-CLIENT_TEXT_MAX = {"name": 80, "display_name": 80, "icon": 8, "color": 20, "contact": 120, "email": 200, "phone": 60, "address": 500, "note": 4000}
+CLIENT_TEXT_MAX = {"name": 80, "name_extra": 120, "display_name": 80, "icon": 8, "color": 20, "contact": 120, "email": 200, "phone": 60, "address": 500, "note": 4000}
 # 2.36.2 (#1021, E): structured billing fields (office & finance; people only, never in agent answers)
 CLIENT_BILLING = ("street", "address_extra", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days")
 CLIENT_BILLING_MAX = {"street": 200, "address_extra": 200, "zip": 20, "city": 120, "country": 2, "vat_id": 20, "customer_no": 40, "buyer_reference": 60,
@@ -205,7 +205,7 @@ def client_public(c, uid, r, stats=False, month=None):
     lids = client_lists(c, uid, r["id"])
     org = c.execute("SELECT name FROM orgs WHERE id=?", (r["org_id"],)).fetchone() if r["org_id"] else None
     u = _user(c, uid)
-    d = {k: r[k] for k in ("id", "name", "display_name", "icon", "color", "contact", "email", "phone", "address", "note", "rate", "budget_h",
+    d = {k: r[k] for k in ("id", "name", "name_extra", "display_name", "icon", "color", "contact", "email", "phone", "address", "note", "rate", "budget_h",
                            "budget_amount", "org_id", "created_by", "created_at", "updated_at")}
     d.update(archived=bool(r["archived"]), org_name=org[0] if org else "", lists=lids,
              can_delete=bool(u and (u["is_admin"] or r["created_by"] == uid)), label=cdn_label(c, uid, r))
@@ -229,7 +229,7 @@ def clients_brief(c, uid):
         return []
     rows = client_rows(c, uid)
     labels = cdn_labels(rows)  # 2.97.0 B (#1951): the name pickers show
-    return [{"id": r["id"], "name": r["name"], "display_name": r["display_name"], "label": labels[r["id"]], "icon": r["icon"],
+    return [{"id": r["id"], "name": r["name"], "name_extra": r["name_extra"], "display_name": r["display_name"], "label": labels[r["id"]], "icon": r["icon"],
              "color": r["color"], "org_id": r["org_id"], "archived": bool(r["archived"]), "lists": client_lists(c, uid, r["id"])}
             for r in rows]
 
@@ -394,10 +394,10 @@ def cdn_labels(rows):
     out, groups = {}, {}
     for r in rows:
         dn = (r["display_name"] if "display_name" in r.keys() else "") or ""
-        out[r["id"]] = dn or r["name"]
+        out[r["id"]] = dn or cdn_name1(r)
         if not dn:
             area = r["org_id"] if r["org_id"] is not None else ("p", r["created_by"])
-            groups.setdefault((area, (r["name"] or "").strip().lower()), []).append(r)
+            groups.setdefault((area, cdn_name1(r).strip().lower()), []).append(r)
     for rs in groups.values():
         if len(rs) < 2:
             continue
@@ -409,8 +409,14 @@ def cdn_labels(rows):
             extra = city if city and len(twin) == 1 else country if country and \
                 sum(1 for x in twin if (x["country"] or "").strip() == country) == 1 else city or country
             if extra:
-                out[r["id"]] = f"{r['name']} ({extra})"
+                out[r["id"]] = f"{cdn_name1(r)} ({extra})"
     return out
+
+
+def cdn_name1(r):
+    """2.99.0 D (#2188): the client's name on one line: "name - name addition" (lists, search, the e-invoice buyer name BT-44)."""
+    ex = ((r["name_extra"] if "name_extra" in r.keys() else "") or "").strip()
+    return f"{r['name']} - {ex}" if ex else r["name"]
 
 
 def cdn_label(c, uid, r):

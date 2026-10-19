@@ -96,7 +96,8 @@ KINDS = {
                            "(list, read, export, cells, rows, columns, undo), an agent without a shared list sees nothing, a variable "
                            "of a list not shared with the agent is denied, an import into another workspace 404"),
     # 2.49.0 (#1199 / #1201): knowledge pages belong to one organisation (every member) or one person (org_id NULL, owner_id)
-    "wiki": ("matrix", "p249_c_api_test.py: a page of another organisation / person: 404 (read, change, delete, move, trash, search, export, mentions)"),
+    "wiki": ("matrix", "p249_c_api_test.py: a page of another organisation / person: 404 (read, change, delete, move, trash, search, export, mentions); "
+                       "p299_a_api_test.py: page files (read, upload, delete, trash)"),
     # 2.89.0 (#1916): tables belong to one organisation (every member) or one person (org_id NULL, owner_id); attached to a list
     # the list decides; Kalmido variables in formulas are evaluated per viewer (a source they may not see: "denied", no name / value)
     "sheet": ("matrix", "p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
@@ -731,6 +732,9 @@ ROUTES = {
     # 2.96.0 B (#1941): wiki pages / folders to the other workspace (p296_b_api_test.py)
     "POST /api/wiki/move-space": "wiki",
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
+    # 2.99.0 A (#2182): files of knowledge pages (a file of another organisation / person: 404, p299_a_api_test.py)
+    "GET /api/wiki/files/{}": "wiki", "GET /api/wiki/files/{}/{}": "wiki", "DELETE /api/wiki/files/{}": "wiki",
+    "POST /api/wiki/pages/{}/files": "wiki",
     # 2.64.3 A (#1817): the lock per knowledge space (wiki_space: a space of another organisation 404, p264c_a_api_test.py)
     "GET /api/wiki/e2e": "wiki", "POST /api/wiki/e2e/start": "wiki", "GET /api/wiki/e2e/todo": "wiki",
     "POST /api/wiki/e2e/bulk": "wiki", "POST /api/wiki/e2e/finish": "wiki", "POST /api/wiki/e2e/stop": "wiki",

@@ -1100,6 +1100,19 @@ fresh; run p294_a_ui node p294_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p294_b_api "$PY" p294_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p294_b_ui node p294_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p294_c_ui node p294_c_ui.js "$KALMIDO_TEST_DATA"
+shard 4  # 2.99.0: the 2.99 suites run in shard 4 (23 min in run 212; shard 12 got the 2.98 suites, shard 13 ran past the 45 min CI limit)
+# 2.99.0 part A: wiki ZIP import keeps PDFs and images as page attachments (#2182)
+fresh; run p299_a_api "$PY" p299_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.99.0 part B: one ... menu on wiki pages, chat composer icons aligned (#2183 #2185)
+fresh; run p299_b_ui node p299_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.99.0 part C: the quotation PDF after the online acceptance carries the acceptance note (#2195)
+fresh; run p299_c_api "$PY" p299_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.99.0 part D: office documents - fixed recipient fields rest (name addition, own company fields, 3-line company name), 44 px fields (#2188 #2025)
+fresh; run p299_d_api "$PY" p299_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p299_d_ui node p299_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.99.0 part E: the sidebar group Exchange stays short (recent chats, pinned people / agents, "All people") (#2187)
+fresh; run p299_e_ui node p299_e_ui.js "$KALMIDO_TEST_DATA"
+shard 13  # back to shard 13 for the suites after this block
 # 2.86.0 (#1896): hardening from audit #476 part 1, groups A-E
 fresh; run p286_a_api "$PY" p286_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_b_api "$PY" p286_b_api_test.py "$KALMIDO_TEST_DATA"

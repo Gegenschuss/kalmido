@@ -34,3 +34,69 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-sb="dm"]'); if (!b) return;
   e.preventDefault(); e.stopPropagation(); closeSide(); dmOpen(+b.dataset.uid, personNameAny(+b.dataset.uid));
 }, true);
+
+// ---- 2.99.0 E (#2187): the "Conversations" group does not grow with every person a list is shared with: people only while
+// pinned (at most 5; one already standing there as a conversation is not shown twice), agents only while pinned, unread or
+// working (the others under "Agents"), at the end "All people …" (a dialog: their tasks, a message, pin). The pins are the
+// person's settings side_people / side_agents (every device); a person no longer shared with drops out quietly.
+const SB_PINS = 5;
+const sbp_ids = k => String(S.settings?.[k] || '').split(',').filter(x => /^\d+$/.test(x)).map(Number);
+const sbp_is = (k, id) => sbp_ids(k).includes(+id);
+function sbp_people() {
+  const tp = new Map(teamPeople().map(p => [p.id, p])), dm = new Set(sb_rooms().filter(r => r.kind === 'dm').map(r => r.user_id));
+  return sbp_ids('side_people').filter(id => tp.has(id) && !dm.has(id)).map(id => tp.get(id));
+}
+function sbp_agents() {
+  const pin = new Set(sbp_ids('side_agents'));
+  return shownAgents().filter(a => pin.has(a.id) || a.waiting || a.chat_unread || a.approvals_open || agentHst(a) === 'working');
+}
+// pin / unpin: ONE undo step (setApply); ids that are no longer mine (sharing ended, agent removed) are dropped on the way
+async function sbp_pin(k, id, on, name) {
+  const mine = new Set(k === 'side_people' ? teamPeople().map(p => p.id) : (S.agents || []).map(a => a.id));
+  const ids = sbp_ids(k).filter(x => mine.has(x) && x !== +id);
+  if (on) {
+    if (k === 'side_people' && ids.length >= SB_PINS) { toast(tr('At most {0} people in the sidebar: unpin one first', SB_PINS)); return false; }
+    ids.push(+id);
+  }
+  return setApply({[k]: ids.join(',')}, `${on ? tr('Pin to the sidebar') : tr('Unpin from the sidebar')} · ${name}`);
+}
+const sbp_item = (k, id, name) => sbp_is(k, id) ? {label: tr('Unpin from the sidebar'), icon: 'pin', fn: () => sbp_pin(k, id, false, name)}
+  : {label: tr('Pin to the sidebar'), icon: 'pin', fn: () => sbp_pin(k, id, true, name)};
+// the pin entry of a sidebar row's menu (chatwins.js: agents and conversations; favtiles.js fv2_rowMenu: people)
+function sbp_menuRow(el) {
+  if (!el.closest?.('#side')) return [];
+  const who = /^who\/(\d+)$/.exec(el.dataset.go || ''), p = who && teamPeople().find(x => x.id === +who[1]);
+  if (p) return [sbp_item('side_people', p.id, p.name)];
+  if (el.dataset.aid) { const a = agentById(+el.dataset.aid); return a ? [sbp_item('side_agents', a.id, a.name)] : []; }
+  const r = /^team\/(\d+)$/.exec(el.dataset.go || '') && (S.tc.rooms || []).find(x => x.id === +el.dataset.go.split('/')[1]);
+  if (r && r.kind === 'dm' && r.user_id && teamPeople().some(p => p.id === r.user_id)) return [sbp_item('side_people', r.user_id, roomName(r))];
+  return [];
+}
+const sbp_allRow = () => collab() && teamPeople().length ? `<button class="srow smore sbpall" data-act="sb-people" title="${esc(tr('Their tasks, a message, pin to the sidebar'))}">${ic('users')}<span class="n">${esc(tr('All people …'))}</span></button>` : '';
+// "All people …": everyone I share a list with; a row = their tasks, the bubble = a message, the pin = in the sidebar or not
+function sbp_dialog() {
+  const md = modal(`<h3>${esc(tr('People'))}</h3>
+    ${teamPeople().length > 8 ? `<input type="search" class="sbpq" placeholder="${esc(tr('Search people'))}" aria-label="${esc(tr('Search people'))}">` : ''}
+    <div class="members sbpl"></div>
+    <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Close')}</button></div>`);
+  md.classList.add('sbpmd');
+  const draw = () => {
+    const q = ($('.sbpq', md)?.value || '').trim().toLowerCase(), ps = teamPeople().filter(p => !q || p.name.toLowerCase().includes(q));
+    $('.sbpl', md).innerHTML = ps.map(p => {
+      const on = sbp_is('side_people', p.id), pl = on ? tr('Unpin from the sidebar') : tr('Pin to the sidebar'), ml = tr('Message {0}', p.name);
+      return `<div class="mrow" data-uid="${p.id}">${av(p.id, p.name)}<button type="button" class="n sbpgo" data-sbp="go" title="${esc(tr('Tasks of {0}', p.name))}">${esc(p.name)}</button>`
+        + (teamOn() ? `<button type="button" class="iconbtn" data-sbp="dm" title="${esc(ml)}" aria-label="${esc(ml)}">${ic('comment', 's')}</button>` : '')
+        + `<button type="button" class="iconbtn sbppin ${on ? 'on' : ''}" data-sbp="pin" aria-pressed="${on}" title="${esc(pl)}" aria-label="${esc(pl + ' · ' + p.name)}">${ic('pin', 's')}</button></div>`;
+    }).join('') || `<div class="muted mhint">${esc(tr('Nobody to show.'))}</div>`;
+  };
+  draw();
+  $('.sbpq', md)?.addEventListener('input', draw);
+  md.addEventListener('click', async e => {
+    if (e.target.closest('[data-m="close"]')) { md.remove(); return; }
+    const b = e.target.closest('[data-sbp]'); if (!b) return;
+    const id = +b.closest('[data-uid]').dataset.uid, p = teamPeople().find(x => x.id === id); if (!p) return;
+    if (b.dataset.sbp === 'go') { md.remove(); closeSide(); go('who/' + id); }
+    else if (b.dataset.sbp === 'dm') { md.remove(); closeSide(); dmOpen(id, p.name); }
+    else { await sbp_pin('side_people', id, !sbp_is('side_people', id), p.name); draw(); }
+  });
+}

@@ -85,7 +85,8 @@ BK_PG_TIMEOUT = _env_int("KALMIDO_BACKUP_PG_TIMEOUT", 6 * 3600)   # s for one pg
 # they were left out of the archive before)
 # 2.79.0 (#476 M8): + attachments/chat/<agent>-<person>/<file> (agent chat files), attachments/budget/<list>/<file> (household
 # budget receipts) and attachments/docthumbs/<file> (document previews): their rows were in the dump, the files were not
-BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|avatars|listicons|docthumbs|(?:files|lists|budget)/\d{1,12}|chat/\d{1,12}-\d{1,12})"
+# 2.99.0 (#2182, review H1): + attachments/wiki/<page>/<file> (the files of knowledge pages)
+BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|avatars|listicons|docthumbs|(?:files|lists|budget|wiki)/\d{1,12}|chat/\d{1,12}-\d{1,12})"
                           r"/([^/\\\x00-\x1f]{1,255})")
 BK_ERR = {"busy": N_("Another backup or restore is running, please try again in a moment."),
           "disk": N_("Not enough free disk space for the backup."),
@@ -364,7 +365,8 @@ def bk_create(kind="manual", c=None, keep_dump=None):
                 if not os.path.isdir(base):
                     continue
                 for root, dirs, fns in os.walk(base):
-                    dirs[:] = sorted(d for d in dirs if not os.path.islink(os.path.join(root, d)))
+                    dirs[:] = sorted(d for d in dirs if not os.path.islink(os.path.join(root, d))
+                                     and not (root == base and d == ".wikitmp"))  # 2.99.0 (#2182): a wiki export being written
                     for fn in sorted(fns):
                         full = os.path.join(root, fn)
                         rel = prefix + os.path.relpath(full, base).replace(os.sep, "/")
@@ -1204,7 +1206,10 @@ def storage_check():
                                     "JOIN agent_chat m ON m.id=f.message_id LEFT JOIN users u ON u.id=m.agent_id"),
                       # 2.72.0 (#1333): receipts of the household budget (where = the budget list's name)
                       ("budget_file", "SELECT f.id, f.list_id AS owner, f.name, f.size, f.path, l.name AS where_ FROM budget_files f "
-                                      "LEFT JOIN lists l ON l.id=f.list_id")):
+                                      "LEFT JOIN lists l ON l.id=f.list_id"),
+                      # 2.99.0 A (#2182): files of knowledge pages (where = the page's name; a locked space's name is a ciphertext)
+                      ("wiki_file", "SELECT f.id, f.page_id AS owner, f.name, f.size, f.path, CASE WHEN left(p.path, 5)='e2e1:' THEN '' "
+                                    "ELSE p.path END AS where_ FROM wiki_files f LEFT JOIN wiki_pages p ON p.id=f.page_id")):
         for r in c.execute(sql):
             n += 1
             full = os.path.join(ATT_DIR, r["path"] or "")

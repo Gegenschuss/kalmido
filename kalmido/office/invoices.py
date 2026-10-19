@@ -605,14 +605,15 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     m["service_period_text"] = (fmt_date(sf, pack) if sf == st or not st else (fmt_date(st, pack) if not sf else f"{fmt_date(sf, pack)} – {fmt_date(st, pack)}")) if (sf or st) else ""
     snd = _j(r["sender"], {}) if ofx_locked(r) else {}
     fields = snd.get("fields") if snd else ofx_company(c, oid)
-    m["sender_fields"] = {k: (fields or {}).get(k) or "" for k in ("name", "street", "zip", "city", "country", "email", "phone", "tax_number", "vat_id",
-                                                                   "iban", "bic", "bank_name", "register_court", "register_no", "managing_directors")}
+    m["sender_fields"] = {k: (fields or {}).get(k) or "" for k in ("name", "street", "address_extra", "zip", "city", "country", "email", "phone", "tax_number", "vat_id",
+                                                                   "iban", "bic", "bank_name", "register_court", "register_no", "managing_directors")}  # 2.99.0 D (#2188): + address_extra (BT-36)
     rec = _j(r["recipient_snapshot"], {}) if ofx_locked(r) and r["recipient_snapshot"] else {}
     if not rec and r["client_id"]:
         cl = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (r["client_id"],)).fetchone()
         if cl is not None:
             rec = {k: (cl[k] if k in cl.keys() else "") for k in ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice")}
             rec["extra"] = cl["address_extra"] if "address_extra" in cl.keys() else ""  # 2.97.0 B (#1951): the extra address line
+            rec["email_invoice"] = rec["email_invoice"] or cl["email"] or ""  # 2.99.0 D (#2188): BT-49 falls back to the client's e-mail
     for k in ("street", "extra", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice"):
         m["recipient"][k] = rec.get(k) or ""
     # 2.40.0 (#1380): the buyer's contact person (e-invoice BT-56) -- the snapshot's, else the chosen / default one
