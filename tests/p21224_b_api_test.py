@@ -87,6 +87,8 @@ def scenario(S, who):
     check(used1 - used0 >= len(PDFB), f"{who}: storage used rises by the bill ({used0} -> {used1})")
 
     # #2317: formula guard in the CSV
+    r = S.post(B + f"{M}/{mid}/approve")  # drafts are not part of the report
+    check(r.ok, f"{who}: meal approved {r.status_code} {r.text[:200]}")
     r = S.get(B + M + "/report?year=2025&format=csv")
     check(r.status_code == 200, f"{who}: meals csv {r.status_code}")
     body = r.content.decode("utf-8-sig", "replace")
