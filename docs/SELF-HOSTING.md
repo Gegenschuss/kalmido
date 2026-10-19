@@ -545,6 +545,31 @@ trash periods. Legal retention wins: a booked receipt or the logbook is locked u
 
 Expired credentials (sessions, tokens, codes past their end) are no data of a person any more and go without the switch.
 
+**Logs (`KALMIDO_LOG_DAYS`).** Once a day: the activity of tasks and lists, the file store's log, the log of organisation
+lists and the change log of tables after the period; admin alerts and the admin sign-in addresses after a year; finished
+agent jobs after 180 days. The office logs (documents, logbook, archive) belong to the bookkeeping and stay as long as
+their document.
+
+**Files (`KALMIDO_ORPHAN_DAYS`).** Once a week: stored attachment and agent chat files that no row names any more (older
+than the period), and file store versions beyond the newest 20 per file. A file that could not be removed is logged and
+tried again by this run.
+
+**Agent chat (`KALMIDO_CHAT_KEEP_DAYS`).** Optional day limit on top of the count limit. People can delete single
+messages and their whole history with an agent themselves at any time.
+
+**Retired organisations.** An organisation (or the personal office of a deleted account) that must keep invoices,
+archived documents, booked receipts, travel receipts in DATEV or a logbook by law is retired instead of deleted: no
+members, nothing visible in the app, export for instance admins only, public links answer 404. After the legal period
+(books 10 years, receipts and the logbook 8 years, from the end of the calendar year) the trash run deletes it for good.
+
+**Locks instead of deletion.** Booked receipts (paid or with a VAT rate), travel receipts in DATEV or billed on a finalised
+document, payments of finalised invoices (a reversal line instead), the logbook (closed after 7 days or per month,
+corrections as a new entry with a reason) and the archive import's undo (only within 24 hours, untouched) cannot be
+deleted for good while their period runs.
+
+**Database references.** On every start the server adds missing foreign keys for references to tasks, lists and people
+(`fk_ensure`); references to rows that no longer exist are cleared first, their number is logged once.
+
 ## Encryption of organisation data
 
 Since 2.42 the server encrypts the sensitive data of every organisation **at rest** with a key of its own (AES-256-GCM).
