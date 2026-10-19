@@ -7,6 +7,11 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.114.3] - 2026-10-19
+
+### Changed
+- Quotations: the producing calculation is visible -- a hint at the switch, "like the document" or "own setting" in a part, "incl. producing 1.5 days" on each part line of the title page and a marked producing tick at the positions; the sums do not change (#2266).
+
 ## [2.114.2] - 2026-10-19
 
 Office fixes 2.
