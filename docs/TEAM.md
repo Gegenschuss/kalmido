@@ -327,6 +327,21 @@ For software teams working on a board. Everything is off until you switch it on.
 - **Velocity**: with sprints and story points on, the project page offers the block *Velocity*: the completed points of
   the last (up to six) closed sprints as bars and their average as a planning aid for the next sprint.
 - Agents read and set the same through the API and MCP (`points`, `set_wip_limit`, `get_velocity`, see AGENTS.md).
+
+## Swimlanes on the board (2.114.0)
+
+The button *Swimlanes* above a kanban board groups the cards into horizontal lanes: by **person** (the people with tasks
+on the board, then *Nobody assigned*), by **priority** (High, Medium, Low, No priority) or by a **custom field** of the
+list (a select field: its options, then *No value*; a checkbox: yes / no). *None* shows the board as before.
+
+- The column heads (count, WIP limit, points, the column menu, dragging a column) stay in one row on top; each lane has
+  its own head with name and count and folds with a tap (it stays folded).
+- Dragging a card into another lane sets that lane's value (priority, field or person; a person replaces the previous
+  one); a move into another column at the same time is one undo step. Only people who may edit the list can drag.
+- *+ Task* in a lane creates the task with the lane's value.
+- On a phone the lanes stand below each other and the board swipes sideways as a whole; a long press drags a card into
+  another lane.
+- The choice is remembered per list on your account in this browser; other members choose their own.
 ## Photo metadata on upload (2.61.0)
 
 Photos keep a lot about where and how they were taken: the place (GPS), the camera and its serial number, the capture
