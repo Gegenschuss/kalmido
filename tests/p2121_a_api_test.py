@@ -356,6 +356,13 @@ check(raw.startswith("kenc1:") and "Druck" not in raw, "org: stored sealed")
 check(ex(Ca, D4, {"do": "apply"}).status_code == 404 and Ca.get(B + f"/api/docs/{D4}").status_code == 404, "another organisation: 404")
 r = ex(A, D4, {"do": "apply"})
 check(r.ok and rc(A, D4)["vat_pct"] == "19" and (r.json()["doc"].get("sender") or {}).get("name") == "Muster Druck GmbH", "org admin takes over")
+# the document into the private space: the values move along (sealed for the new workspace)
+r = A.post(B + "/api/files/move-space", json={"ids": [D4], "to": "private", "parent": None})
+check(r.ok, f"move into the private space {r.status_code} {r.text[:200]}")
+A.patch(B + "/api/settings", json={"workspace": "private"})
+d4 = A.get(B + f"/api/docs/{D4}").json()
+raw2 = dbx("SELECT extracted FROM doc_meta WHERE node_id=?", (D4,))[0][0]
+check((d4.get("extracted") or {}).get("invoice_no") == "D-0815" and raw2.startswith("kenc1:") and raw2 != raw, f"moved: the values open in the new workspace {d4.get('extracted')}")
 
 print(f"p2121_a_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
