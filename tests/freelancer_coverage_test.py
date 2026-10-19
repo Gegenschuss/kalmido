@@ -147,6 +147,7 @@ ROUTES = {
     "PATCH /api/agents/{}/color": "agents", "PATCH /api/my/agents/{}": "agents", "PATCH /api/v1/agent/jobs/{}": "agents",
     "POST /api/agent-schedules/{}/run": "agents", "POST /api/agents/jobs/{}/action": "agents",
     "POST /api/agents/{}/chat": "agents", "POST /api/agents/{}/chat/{}/choice": "agents",
+    "DELETE /api/agents/{}/chat": "agents", "DELETE /api/agents/{}/chat/{}": "agents",  # 2.103.0 D (#2175): p2103_d_api_test.py
     "POST /api/agents/{}/chat/{}/pin": "agents", "POST /api/agents/{}/chat/{}/reactions": "agents",
     "POST /api/agents/{}/meeting-images": "agents", "POST /api/agents/{}/schedules": "agents",
     "POST /api/agents/{}/share-all": "agents", "POST /api/agents/{}/wake": "agents", "POST /api/assistant/run": "agents",
