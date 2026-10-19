@@ -64,6 +64,7 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
       await shot(`p21144-d-dialog-${u}-${w}.png`);
       await ev(`document.querySelector('.modal [data-m="close"]')?.click()`);
       // ---- #2286 year without receipts
+      await nav(B + 'static/icon.svg');  // fresh page: no dialog or stale hash state left over
       await nav(B + '#office/travel');
       check(await ready(ev, `!!document.querySelector('#rk-year')`, 80), tag + 'the travel tab');
       await ev(`(() => { const s = document.querySelector('#rk-year'); s.value = '2024'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
