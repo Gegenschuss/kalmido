@@ -255,6 +255,12 @@ def ofx_company_print(fields, free, lang="de", pack=None):
             "register_lines": reg or list(free.get("register_lines") or []), "bank_lines": bank or list(free.get("bank_lines") or [])}
 
 
+def ofx_sender_line(co):
+    """2.97.1 (#2224): the sender line above the address field, "Company · Street · Postcode City" (as the document
+    templates print it); a name that is already one of the lines is not doubled. The PDF shortens it to the field width."""
+    return " · ".join(dict.fromkeys(str(x).strip() for x in [co.get("name") or ""] + list(co.get("lines") or []) if str(x).strip()))
+
+
 # ---------------------------------------------------------------- finalising
 def _dtext(v):
     return format(Decimal(str(v)).quantize(Q2, rounding=ROUND_HALF_UP), "f")
@@ -318,6 +324,7 @@ def ofx_finalize(c, oid, uid, did):
     fields = ofx_company(c, oid)
     sender = {"company": ofx_company_print(fields, s.get("company") or {}, lang, pack), "fields": fields, "color": color,
               "logo": logo, "logo_sha256": sha, "pack": pack.get("code") or s["pack"]}
+    sender["company"]["sender_line"] = ofx_sender_line(sender["company"])  # 2.97.1 (#2224): frozen with the rest
     from .docs import cdn_doc_recipient
     rec = cdn_doc_recipient(c, oid, r)  # 2.97.0 B (#1951): the client's address as it is now, frozen below
     if r["client_id"] and rec.get("lines") is not None:

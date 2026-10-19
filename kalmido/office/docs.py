@@ -21,7 +21,7 @@ from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, RAW_MODES, TAX_KEYS, dec, fmt_m
 from .packs import office_pack
 from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, office_number_next, office_role, office_settings,
                     office_seed_texts)
-from .ledger import (ofx_company, ofx_company_print, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
+from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
                      ofx_number_at_finalize, ofx_snapshot_pack)
 from .invoices import (INV_KINDS, INV_STATUSES, STATE_TXT, inv_apply_client, inv_manual_number, inv_money_fields, inv_new_row, inv_paid_map, inv_payments,
                        inv_reminder_totals, inv_render, inv_scheme, inv_state)
@@ -829,6 +829,16 @@ def odoc_render(c, doc_id, oid):
     meta = [[L.get("offer_no", "Angebot Nr."), r["number"]], [L.get("date", "Datum"), _fmt_date(r["date"], pack)]]
     if rec["name"]:
         meta.append([L.get("client", "Kunde"), rec["name"]])
+    # 2.97.1 (#2224): the customer number as on the invoice; a document finalised before prints as it did
+    if locked and "sender_line" in co:
+        cno = _j(r["recipient_snapshot"], {}).get("customer_no") if r["recipient_snapshot"] else ""
+    elif not locked and r["client_id"]:
+        cl = c.execute(f"SELECT customer_no FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (r["client_id"],)).fetchone()
+        cno = cl["customer_no"] if cl else ""
+    else:
+        cno = ""
+    if cno:
+        meta.append([L.get("customer_no", "Customer no." if lang == "en" else "Kunden-Nr."), cno])
     if r["project_ref"]:
         meta.append([L.get("ref", "Ref./PO-Nr."), r["project_ref"]])
     if r["valid_until"]:
@@ -854,6 +864,8 @@ def odoc_render(c, doc_id, oid):
     labels["units"] = L.get("units") or {}
     labels["page_of"] = L.get("page_of") or ("Page {x} of {y}" if lang == "en" else "Seite {x} von {y}")
     role = office_role(c, g.user["id"], oid) if getattr(g, "user", None) is not None else None
+    # 2.97.1 (#2224): with the company name; a document finalised before keeps the line it was printed with
+    sender_line = co["sender_line"] if locked and "sender_line" in co else (" · ".join(x for x in (co.get("lines") or []) if x) if locked else ofx_sender_line(co))
     m = {
         "kind": r["kind"], "lang": lang, "locked": locked, "locked_at": r["locked_at"] if locked else None,
         "pack_version": (r["pack_version"] or "") if locked else str(pack.get("version") or ""),
@@ -863,7 +875,7 @@ def odoc_render(c, doc_id, oid):
         "project_title": r["project_title"], "project_ref": r["project_ref"],
         "company": {"name": co.get("name") or "", "lines": co.get("lines") or [], "contact_lines": co.get("contact_lines") or [],
                     "register_lines": co.get("register_lines") or [], "bank_lines": co.get("bank_lines") or [],
-                    "sender_line": " · ".join(x for x in (co.get("lines") or []) if x), "logo_path": logo_path, "color": color},
+                    "sender_line": sender_line, "logo_path": logo_path, "color": color},
         "recipient": rec, "meta": meta, "intro": r["intro"] or "", "lines": t["lines"],
         "totals": {"net": t["net"], "net_text": fmt_money(t["net"], lang, cur), "tax_lines": t["tax_lines"], "tax_total": t["tax_total"],
                    "gross": t["gross"], "net_incl_raw": t.get("net_incl_raw"),
