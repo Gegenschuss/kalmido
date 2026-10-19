@@ -14,6 +14,7 @@ tenant-matrix: calendar, ical
 freelancer-matrix: pim
 usage: p2111_b_api_test.py <datadir>"""
 import email as _em
+import email.policy  # noqa: F401  (_em.policy)
 import json
 import os
 import re
@@ -84,13 +85,14 @@ def wait_mail(to, n, secs=10):
 
 def parts(m):
     """(subject, plain text, ics text, reply-to) of a mail of the sink."""
-    msg = _em.message_from_string(m["raw"])
+    msg = _em.message_from_string(m["raw"], policy=_em.policy.default)
     text, ics = "", ""
     for x in msg.walk():
         if x.get_content_type() == "text/plain" and not x.get_filename():
-            text += x.get_payload(decode=True).decode()
+            text += x.get_content()
         elif x.get_content_type() == "text/calendar":
-            ics += x.get_payload(decode=True).decode()
+            c = x.get_content()
+            ics += c.decode("utf-8") if isinstance(c, bytes) else c
     return str(msg["Subject"]), text, re.sub(r"\r\n[ \t]", "", ics), str(msg["Reply-To"] or "")
 
 
@@ -112,7 +114,6 @@ A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True, "modules"
 for u, n in (("bob", "Bob Member"), ("carol", "Carol Other")):
     r = A.post(B + "/api/users", json={"username": u, "display_name": n, "password": "password123", "email": f"{u}@example.com"})
     assert r.ok, r.text
-A.patch(B + "/api/account", json={"email": "alice@example.com"})
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
 Bo, Ca = sess("bob"), sess("carol")
 BOB = Bo.get(B + "/api/state").json()["me"]["id"]

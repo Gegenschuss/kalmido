@@ -29,7 +29,7 @@ const waitMail = async (to, n) => { for (let i = 0; i < 50; i++) { if (mails(to)
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice Beispiel', password: 'password123'})});
   check(r.ok, 'setup');
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
-  const call = (ev, method, url, body) => ev(`fetch('${url}', {method: '${method}', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}${body ? `, body: JSON.stringify(${JSON.stringify(body)})` : ''}}).then(r => r.json())`);
+  const call = (ev, method, url, body) => ev(`fetch('${url}', {method: '${method}', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}${body ? `, body: JSON.stringify(${JSON.stringify(body)})` : ''}}).then(r => r.text()).then(t => { try { return JSON.parse(t); } catch { return null; } })`);
   const noSide = sel => `(() => { const W = document.documentElement.clientWidth; return [...document.querySelectorAll('${sel} *')].filter(e => e.getClientRects().length).every(e => e.getBoundingClientRect().right <= W + 1); })()`;
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
@@ -38,7 +38,7 @@ const waitMail = async (to, n) => { for (let i = 0; i < 50; i++) { if (mails(to)
     await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
     await call(ev, 'POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal', 'comments']});
     await call(ev, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,comments,events,contacts'});
-    await call(ev, 'PATCH', '/api/account', {email: 'alice@example.com'});
+    execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, "UPDATE users SET email='alice@example.com' WHERE username='alice'"]);
     const cal = await call(ev, 'POST', '/api/evcals', {name: 'Alice Termine'});
     await nav(B + '#cal');
     check(await ready(ev, `!!document.querySelector('#view .calbar [data-act="ev-cals"]')`, 80), 'the calendar view');
