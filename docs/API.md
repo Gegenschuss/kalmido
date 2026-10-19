@@ -1299,6 +1299,21 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
   https://kalmido.example/api/v1/sheets
 ```
 
+## Video sign-offs (2.99.1)
+
+Scopes `read` and `comments`. Routes: `GET /api/v1/videos?task_id=` (the sign-offs at a task) or `?list_id=` (at the list
+and its tasks), `GET /api/v1/videos/{id}` (versions = links, `state` open | approved | changes, comments by version and
+timecode with `timecode`, `customer`, `agent`, `done` and their `replies`), `POST /api/v1/videos/{id}/comments`
+`{body, at_sec?, version_id?, parent_id?}` (201 `{comment, review}`) and `PATCH /api/v1/videos/{id}/comments/{comment_id}`
+`{done}`. Only sign-offs at a task / list the token's account sees (an agent: shared with it); those only at a client are
+for people in the app; the customer link never comes through the API. An answer to a customer's comment shows on the
+customer page and needs the right to change the task / list.
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"body": "Logo zwei Sekunden früher einblenden", "at_sec": 83.5}' https://kalmido.example/api/v1/videos/12/comments
+```
+
 ## Rules of a list (2.71.0)
 
 Read only for tokens; agents propose (see docs/AGENTS.md *Rules of a list*). People manage rules in the app (list

@@ -230,9 +230,18 @@ APP_TO_API = {
     "GET /api/sheets/{}/vars": ["GET /sheets/{}/vars"], "POST /api/sheets/{}/batches/{}/undo": ["POST /sheets/{}/batches/{}/undo"],
     "GET /api/sheets/{}/export.csv": ["GET /sheets/{}"], "GET /api/sheets/{}/export.xlsx": ["GET /sheets/{}"],
     "POST /api/sheets/import": ["POST /sheets"],
+    # 2.99.1 C (#1959): video sign-offs -- agents read them (with the comments; the CSV / text export is the same data), comment
+    # at a timecode, answer and mark comments done
+    "GET /api/videos": ["GET /videos"], "GET /api/videos/{}": ["GET /videos/{}"], "GET /api/videos/{}/export": ["GET /videos/{}"],
+    "POST /api/videos/{}/comments": ["POST /videos/{}/comments"], "PATCH /api/videos/{}/comments/{}": ["PATCH /videos/{}/comments/{}"],
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.99.1 C (#1959): a video sign-off itself stays with people -- creating, renaming, trash / restore, new versions, the "
+     "customer link and moving it; deleting comments and editing their text; an agent reads it, comments and marks comments done",
+     ("=POST /api/videos", "=PATCH /api/videos/{}", "=DELETE /api/videos/{}", "=POST /api/videos/{}/restore", "* /api/videos/{}/versions",
+      "=DELETE /api/videos/{}/comments/{}", "=POST /api/videos/{}/comments/{}/restore", "=POST /api/videos/{}/signoff",
+      "=POST /api/videos/{}/signoffs/{}/revoke", "=POST /api/videos/{}/move-space")),
     ("2.96.0 (#1941): moving data between the private space and an organisation stays with people in the app -- an agent belongs "
      "to ONE workspace and never moves data across its boundary (the routes answer 403 to agents)",
      ("=POST /api/files/move-space", "=POST /api/sheets/{}/move-space", "=POST /api/wiki/move-space")),

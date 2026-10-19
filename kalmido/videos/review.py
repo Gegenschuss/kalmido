@@ -9,7 +9,7 @@ is built from the id, never from the pasted URL (vdr_embed). The app loads no sc
 through its postMessage protocol (static/js/videorev.js, static/pubvideo.js). Rights like the neighbours: who sees the
 task / list (full roles) / client sees and comments the review (viewers may comment, like task comments); changing it,
 new versions, the customer link, moving and deleting need the right to write there. Agents: not through these routes
-(their API comes separately); private = owner_id. Texts are stored plain like the task comments.
+(their API: videos/v1.py, part C); private = owner_id. Texts are stored plain like the task comments.
 The customer link is an approval link of office/signoff.py (kind video): the customer page shows the newest version, the
 customer's own comments and the team's answers to them (the team's other comments stay internal), takes comments with a
 timecode (POST /s/q/<token>/comments) and "Approve" / "Request changes".
@@ -152,9 +152,12 @@ def vdr_client_ok(c, uid, cid):
     return any(x["id"] == cid for x in client_rows(c, uid))
 
 
-def vdr_may(c, uid, r, write=False):
-    """May person uid see (write: change) review r? The task / list / client it hangs at decides, else the workspace."""
-    if not uid or vdr_is_agent(c, uid) or not acx_org_ok(c, uid, r["org_id"]):
+def vdr_may(c, uid, r, write=False, api=False):
+    """May person uid see (write: change) review r? The task / list / client it hangs at decides, else the workspace.
+    2.99.1 C (#1959): api = the REST API (videos/v1.py): an agent there sees only reviews at a task / list shared with it."""
+    if not uid or not acx_org_ok(c, uid, r["org_id"]):
+        return False
+    if vdr_is_agent(c, uid) and not (api and (r["task_id"] or r["list_id"])):
         return False
     if r["task_id"]:
         t = c.execute("SELECT deleted_at FROM tasks WHERE id=?", (r["task_id"],)).fetchone()
@@ -343,7 +346,7 @@ def vdr_create():
     """{title?, url, task_id | list_id | client_id} -> a new review with its first version."""
     c, uid = db(), me()
     if vdr_is_agent(c, uid):
-        raise Denied(403)
+        raise Denied(404)  # 2.99.1 C (#1959): like every other route of the app for agents (their API: videos/v1.py, no creating)
     b = body()
     b = b if isinstance(b, dict) else {}
     oid, tid, lid, cid = vdr_target(c, uid, b)
