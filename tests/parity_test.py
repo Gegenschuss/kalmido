@@ -281,7 +281,7 @@ APP_ONLY = [
       "=GET /api/files/folders")),
     ("2.48.0 (#1111): documents -- a person's own steps (upload by hand / share sheet, review and accept, recognise again, the "
      "preview image, a task for the due date, the workspace's levels / rules / labels / mail address); agents read and set fields "
-     "with /documents and add files with /files", ("=POST /api/docs", "=POST /api/docs/{}/accept", "=POST /api/docs/{}/review",
+     "with /documents and add files with /files; 2.122.0 (#2098): create_document; (#2100) the CSV of chosen documents is a person's download", ("=POST /api/docs", "=POST /api/docs/export.csv", "=POST /api/docs/{}/accept", "=POST /api/docs/{}/review",
                                                    "=POST /api/docs/{}/redo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
                                                    "* /api/docs/{}/task", "* /api/docs/settings", "* /api/docs/rules", "* /api/docs/labels/",
                                                    "* /api/docs/mail")),

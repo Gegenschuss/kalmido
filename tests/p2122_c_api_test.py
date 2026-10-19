@@ -182,7 +182,7 @@ check(not any(x["id"] == DF for x in A.get(B + "/api/docs").json()["docs"]), "pr
 
 # ---- #2100: CSV
 done(TA, D1)
-r = TA.post(B + "/api/v1/documents", json={"name": "e.pdf", "content_base64": b64(["Evil"]), "title": '=HYPERLINK("http://example.com")',
+r = TA.post(B + "/api/v1/documents", json={"name": "e.pdf", "content_base64": b64(["Evil"]), "title": '=SUM(1;2)',
                                            "sender": "@evil", "amount": "-5.00", "currency": "EUR"})
 DE = r.json()["id"]
 done(TA, DE)
@@ -195,7 +195,7 @@ lines = [x for x in txt.split("\r\n") if x]
 check(lines[0] == "Date,Received,Title,Sender,Type,Tags,Amount,Currency,Folder,File name,To review", f"header ({lines[0][:90]})")
 check(len(lines) == 3, f"only the visible ones (the organisation's and the unknown id are left out): {len(lines)} lines")
 check("Stromrechnung Oktober" in txt and "Stadtwerke Musterstadt" in txt and "119.00" in txt and "Energie" in txt, "the fields of a document")
-check("'=HYPERLINK" in txt and "'@evil" in txt, "formula text gets a ' in front")
+check("'=SUM(1;2)" in txt and "'@evil" in txt, f"formula text gets a ' in front ({txt[-300:]!r})")
 check(",-5.00," in txt, "a plain negative number stays a number")
 check(Bo.post(B + "/api/docs/export.csv", json={"ids": [D1]}).text.strip().count("\n") == 0, "bob gets nothing of alice's document")
 check(AGS.post(B + "/api/docs/export.csv", json={"ids": [D1]}).status_code in (401, 403), "no agent on the web route")
