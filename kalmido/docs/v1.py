@@ -102,7 +102,11 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "auto": {"type": "object", "description": "Feature -> how it was set automatically: rule, learn, agent, import, code, photo"},
         "suggest": {"type": "object", "description": "Feature -> a suggestion waiting for review"}, "review": {"type": "boolean"},
         "text": {"type": "string", "description": "The recognised text (single document only)"}, "url": {"type": "string"},
-        "content_url": {"type": "string"}, "asn": {"type": ["integer", "null"], "description": "Archive serial number (unique per workspace)"}}}
+        "content_url": {"type": "string"}, "asn": {"type": ["integer", "null"], "description": "Archive serial number (unique per workspace)"},
+        # 2.121.0 A (#2092)
+        "extracted": {"type": ["object", "null"], "description": "Single document only: what the recognition read off an invoice / receipt, "
+                      "a suggestion a person takes over (supplier, vat_id, tax_no, invoice_no, vat_pct 19|7|0, vat_rates [{pct, net, vat}], "
+                      "net, vat, gross, currency; new = fields a take-over would change, hidden = dismissed)"}}}
     schemas["DocumentPage"] = {"type": "object", "properties": {"data": {"type": "array", "items": ref("Document")},
                                                                 "next_cursor": {"type": ["string", "null"]}}}
     T = "Documents"
