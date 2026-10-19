@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.114.2** (2026-10-19): office fixes 2 - a finalised quotation that never left the house can be deleted or
+  taken back to a draft (same number), number scheme errors under the field with a reset button.
 - **2.114.1** (2026-10-19): office fixes - the transfer of rights as the last page of the quotation PDF, receipts in
   the cash flow, books up to date right after a bank match, clearer bank buttons on phones.
 - **2.136.0** (2026-10-19): a new face - the Kalmido bot replaces the heron in the app icon, the empty views, the
