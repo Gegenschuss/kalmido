@@ -26,6 +26,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer, FEATURES  # noqa: E402
+import dbx as dbxm  # noqa: E402
 
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -213,7 +214,8 @@ check(r.status_code in (400, 401, 403), f"#2080: the REST API's import stays vCa
 
 # ================================================================ #2080 CSV export
 j = by_name(A, "Herr Jürgen Möller", BK)
-A.patch(B + f"/api/contacts/{j['id']}", json={"note": '=HYPERLINK("https://example.com","x")', "phones": [{"value": "+49 170 1234567", "type": ["cell"]}]})
+A.patch(B + f"/api/contacts/{j['id']}", json={"note": '=HYPERLINK("https://example.com","x")', "phones": [{"value": "+49 170 1234567", "type": ["cell"]}],
+                                             "title": "-2+3+cmd|' /C calc'!A0"})
 r = A.get(B + f"/api/books/{BK}/export.csv")
 check(r.ok and r.headers.get("content-type", "").startswith("text/csv") and "attachment" in r.headers.get("content-disposition", ""),
       f"#2080 export: a CSV download ({r.status_code} {r.headers.get('content-type')})")
@@ -223,7 +225,12 @@ text = raw.decode("utf-8-sig")
 head = text.split("\r\n", 1)[0].split(";")
 check(head[:4] == ["Name", "First Name", "Middle Name", "Last Name"] and "E-mail Address" in head and "Categories" in head,
       f"#2080 export: semicolons + Outlook's header names ({head[:6]})")
-check("'=HYPERLINK" in text and "'+49 170 1234567" in text and ";=HYPERLINK" not in text, "#2080 export: formulas defused (')")
+# 2.119.1 review F3: a phone number stays without the ' (Outlook / Google keep it), a "+" / "-" cell with more is defused
+check("'=HYPERLINK" in text and ";=HYPERLINK" not in text and "'-2+3+cmd" in text, "#2080 export: formulas defused (')")
+check(";+49 170 1234567" in text and "'+49 170 1234567" not in text, "#2080 F3 export: a phone number stays as it is")
+# 2.119.1 review F4: a cut UTF-16 file (odd length) is a 400, not a 500
+check(imp(A, BK, codecs.BOM_UTF16_LE + "Name\tE-mail".encode("utf-16-le") + b"x", "cut.txt").status_code == 400,
+      "#2080 F4: a cut UTF-16 file: 400")
 check(Ca.get(B + f"/api/books/{SH}/export.csv").ok, "#2080 export: a view-only member may export")
 check(Da.get(B + f"/api/books/{BK}/export.csv").status_code == 404, "#2080 export: another organisation's person: 404")
 RT = book(A, "Roundtrip")
@@ -279,6 +286,16 @@ for _ in range(60):
 check(r.status_code == 202 and st.get("state") == "done" and st.get("created") == 121 and st.get("dupes") == 1,
       f"#2084: a background import tells its likely duplicates too ({r.status_code} {str(st)[:300]})")
 
+# 2.119.1 review F10: the import's look-alikes only in the books of its workspace (a merge never crosses it)
+PDB = book(A, "Private dups", org_id=None)
+ODB = book(A, "Org dups", org_id=ALPHA)
+A.post(B + "/api/contacts", json={"book_id": ODB, "given": "Zed", "family": "Zulu", "emails": [{"value": "zed@example.com"}]})
+CSV_Z = "First Name;Last Name;E-mail Address\r\nZed;Zulu;zed@example.com\r\n"
+r = imp(A, PDB, CSV_Z.encode(), "z.csv")
+check(r.ok and r.json().get("created") == 1 and r.json().get("dupes") == 0, f"#2084 F10: no look-alike from another workspace ({r.text[:200]})")
+r = imp(A, book(A, "Org dups 2", org_id=ALPHA), CSV_Z.encode(), "z.csv")
+check(r.ok and r.json().get("dupes") == 1, f"#2084 F10: ... but from the same one ({r.text[:200]})")
+
 # ================================================================ #2085 groups
 gs = {g["name"]: g for g in A.get(B + "/api/contacts/groups").json()["items"]}
 check(gs.get("Kunden", {}).get("count") == 4 and gs["Kunden"]["writable"] == 4 and "Friends" in gs and "Clients" in gs,
@@ -314,6 +331,18 @@ check(r.ok and r.json()["changed"] == 0 and r.json()["skipped"] == 1 and by_name
       f"#2085: in a read-only address book nothing changes (counted) ({r.text[:200]})")
 check(Da.post(B + "/api/contacts/groups", json={"action": "delete", "name": "Kunden"}).status_code == 404, "#2085: another organisation's person: 404")
 check(contacts(A, group="Kunden")["items"], "#2085: ... and Alice's group is still there")
+# 2.119.1 review F5: the undo value is one the bulk restore takes (an old import: more than 30 labels, a comma in one)
+G5 = A.post(B + "/api/contacts", json={"book_id": BK, "given": "Many", "family": "Labels"}).json()["id"]
+c5 = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+c5.execute("UPDATE contacts SET groups=? WHERE id=?", (json.dumps(["Grp5", "a,b"] + [f"L{i}" for i in range(33)]), G5))
+c5.commit()
+c5.close()
+r = A.post(B + "/api/contacts/groups", json={"action": "rename", "name": "Grp5", "to": "Grp6"})
+u5 = r.json().get("undo") or [{}]
+check(r.ok and r.json()["changed"] == 1 and len(u5[0].get("groups") or []) <= 30 and "a b" in (u5[0].get("groups") or []),
+      f"#2085 F5: the undo value is normalised ({r.text[:300]})")
+r = A.post(B + "/api/contacts/bulk", json={"action": "restore", "items": u5})
+check(r.ok and "Grp5" in A.get(B + f"/api/contacts/{G5}").json()["groups"], f"#2085 F5: ... and the undo step goes through ({r.text[:200]})")
 
 # ================================================================ the freelancer (no organisation)
 FID, Fr = freelancer(B, A)

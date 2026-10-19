@@ -139,6 +139,10 @@ tg = {t["id"]: t for t in Fr.get(B + O + "/texts").json().get("items") or []}
 check(cg and cg.get("rights_time_id") and cg["rights_time_id"] != T1 and tg.get(cg["rights_time_id"], {}).get("text_en") == "Five years from acceptance.",
       "move: the rights text block is copied into the organisation " + str(cg)[:300])
 T1G = cg.get("rights_time_id") if cg else None
+# 2.119.1 review F8: a PDF added in the target after the move goes back with the undo (readable in private again)
+r = up(Fr, CF, pdf("added"), "Nachtrag.pdf")
+check(r.status_code == 201, "F8: a PDF added in the organisation " + r.text[:200])
+FN = r.json().get("id") if r.ok else 0
 ws(Fr, "private")
 check(Fr.get(B + f"{D}/{DF}").json().get("contract_id") is None, "move: the draft lost the link")
 check(files(Fr, CF) is None, "move: the personal office no longer reaches the contract's files (404)")
@@ -147,6 +151,7 @@ r = mv(Fr, undo=M1)
 check(r.ok and r.json().get("undone") == M1, "undo " + r.text[:300])
 check(CF in contracts(Fr) and contracts(Fr)[CF].get("rights_time_id") == T1, "undo: the contract is back with its rights text block")
 check(content(Fr, CF, FF) == pdf("signed"), "undo: the PDF is readable in private again")
+check(FN in [f["id"] for f in files(Fr, CF) or []] and content(Fr, CF, FN) == pdf("added"), "undo F8: the PDF added since comes along " + str(files(Fr, CF))[:200])
 check(Fr.get(B + f"{D}/{DF}").json().get("contract_id") == CF, "undo: the draft points at it again")
 ws(Fr, GS)
 check(CF not in contracts(Fr) and T1G not in {t["id"] for t in Fr.get(B + O + "/texts").json().get("items") or []},
