@@ -4,7 +4,7 @@
 // here, with a repeat. Server: kalmido/office/cashflow.py. No bank access.
 const RKF = {data: null, q: '', months: 3, from: '', open: null, fixed: null, agr: null, err: null, oid: null, basis: LS.get('cfBasis', 'gross') === 'net' ? 'net' : 'gross', check: null};  // 2.67.0 (#1838): basis, check
 const RK_CF_KINDS = {payment: N_('Payment'), credit: N_('Refund on a credit note'), invoice: N_('Invoice'), offer: N_('Quotation, not yet invoiced'),
-  purchase: N_('Purchase'), trip: N_('Travel expenses'), fixed: N_('Fixed cost'), series: N_('Invoice series|cashflow'), agreement: N_('Contract or insurance')};  // 2.91.0 A (#1923): series; 2.92.0 A (#1925): agreement
+  purchase: N_('Purchase'), trip: N_('Travel expenses'), fixed: N_('Fixed cost'), series: N_('Invoice series|cashflow'), agreement: N_('Contract or insurance'), receipt: N_('Receipt')};  // 2.91.0 A (#1923): series; 2.92.0 A (#1925): agreement; 2.114.1 B (#2018): receipt
 const RK_CF_REPEATS = [['monthly', N_('monthly')], ['quarterly', N_('quarterly')], ['yearly', N_('yearly')], ['once', N_('once')]];
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['cashflow', 'trend', N_('Cash flow'), 1, () => rk_cashflowHtml()]);  // admins only
 
@@ -52,7 +52,7 @@ const bk_cfReserveRows = r => r.reserve == null ? '' : `<tr class="bk-cfres"><th
 function rk_cfEntries(k) {
   const [mo, dir, st] = k.split('|');
   const es = (RKF.data.entries || []).filter(e => e.month === mo && e.dir === dir && e.state === st);
-  const go = e => e.doc_id ? `href="#office/offers/${e.doc_id}"` : e.series_id ? `href="#office/offers" data-rin-go="${e.series_id}"` : e.trip_id ? `href="#office/travel" data-rkf="trip" data-id="${e.trip_id}"` : e.fixed_id ? `href="#" data-rkf="fixed" data-id="${e.fixed_id}"` : e.agreement_id ? `href="#office/agreements/${e.agreement_id}"` : '';  // 2.92.0 A (#1925)
+  const go = e => e.doc_id ? `href="#office/offers/${e.doc_id}"` : e.series_id ? `href="#office/offers" data-rin-go="${e.series_id}"` : e.trip_id ? `href="#office/travel" data-rkf="trip" data-id="${e.trip_id}"` : e.fixed_id ? `href="#" data-rkf="fixed" data-id="${e.fixed_id}"` : e.agreement_id ? `href="#office/agreements/${e.agreement_id}"` : e.node_id ? `href="#docs/${e.node_id}"` : '';  // 2.92.0 A (#1925); 2.114.1 B (#2018): a receipt opens the document
   // 2.88.0 (#1915): a sent quotation = an open quotation (dashed, lighter); a chain with an invoice no longer shows a rest
   return `<ul class="ofclist rkcfents" role="list">${es.map(e => `<li${e.open_offer ? ' class="rkcfopen"' : ''}><a class="ofcrow" ${go(e)}><span class="ofcn"><b>${esc(e.open_offer ? tr('Open quotation|cashflow') : tr(RK_CF_KINDS[e.kind] || e.kind))}${e.number ? ` ${esc(e.number)}` : ''}</b>
     <small class="muted">${esc([fmtDateLoc(e.date), e.label, e.overdue ? tr('Overdue') : ''].filter(Boolean).join(' · '))}</small></span><span class="rksum">${ofcMoney(e.amount)}</span>${ic('chev', 's')}</a></li>`).join('')}</ul>`;

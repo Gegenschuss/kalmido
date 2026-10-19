@@ -51,6 +51,24 @@ on accepted quotations, a short sidebar group Exchange, the rest of the fixed re
 - Chat composer: the paperclip and the meeting (list) icon sit on one line; the width grip's label shows to its left and
   no longer covers the send button (#2185).
 
+## [2.114.1] - 2026-10-19
+
+Office fixes.
+
+### Changed
+- Quotation PDF: the transfer of rights moves to a calm appendix on its own last page, after the part pages; above the
+  signature a short line points to it (German and English, quotations and order confirmations) (#2258).
+- Cash flow: receipts of the books count as an outgoing payment like in the profit statement, on their payment day, else
+  their document date; one matched to a bank booking counts with the booking's amount (#2018).
+
+### Fixed
+- Books, cash flow, key figures and the invoice list show the new numbers after a bank booking is matched, unmatched or
+  undone, without reloading the page (#2016).
+- Bank: the button on a suggestion reads "Assign" (German "Zuordnen"), the secondary buttons are 44 px high on phones (#2017).
+- Quotations and parts: adding a heading or a text block no longer shows an error first; it is saved with its first
+  text (#2254).
+- Calculation values: the "Calculate producing" checkbox has its normal size again (#2255).
+
 ## [2.136.0] - 2026-10-19
 
 A new face: the Kalmido bot replaces the heron in the app icon and everywhere in the app.

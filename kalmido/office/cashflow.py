@@ -5,8 +5,10 @@ In:  payments of invoices on their day (actual); the open rest of finalised invo
      the current month); quotations (2.88.0, #1915: sent = an open quotation, and accepted ones; one version per chain, see
      cf8_counting; a chain with a finalised invoice is left out) on the end of the period of service (else its start, else
      the day of the quotation; past = the current month; planned).
-Out: purchases of accepted quotations (office_purchases, #1649), travel receipts (#1022) and fixed costs entered by hand
-     (office_fixed_costs, once / monthly / quarterly / yearly) -- on or before today actual, later planned.
+Out: purchases of accepted quotations (office_purchases, #1649), travel receipts (#1022), fixed costs entered by hand
+     (office_fixed_costs, once / monthly / quarterly / yearly) and receipts of the books (2.114.1, #2018: on their payment
+     day, else their document date, as the EUeR; matched to a bank booking = its amount) -- on or before today actual,
+     later planned.
 Amounts in the office currency (documents in another currency through their rate), gross for documents. The artists'
 social insurance is not booked as an outflow by itself (an open question).
 Every route: office_gate + office_org with the admin of the office area; fixed costs encrypted at rest (orgcrypt)."""
@@ -291,8 +293,8 @@ def cf8_chain(c, oid, r):
 
 def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
     """{from, months, currency, today, basis, rows: [{month, in: {actual, plan}, out: {actual, plan}, balance}], entries: [...]}.
-    An entry: {month, dir in|out, state actual|plan, kind payment|invoice|offer|series|purchase|trip|fixed|agreement, date, amount,
-    label, number, doc_id | trip_id | fixed_id | agreement_id (2.92.0 A, #1925), overdue} (kind credit = a refund paid on a credit note, out; kind offer carries
+    An entry: {month, dir in|out, state actual|plan, kind payment|invoice|offer|series|purchase|trip|fixed|agreement|receipt, date, amount,
+    label, number, doc_id | trip_id | fixed_id | agreement_id (2.92.0 A, #1925) | node_id (receipt, 2.114.1 B, #2018), overdue} (kind credit = a refund paid on a credit note, out; kind offer carries
     open_offer: true for a sent quotation not yet accepted, 2.88.0, #1915).
     2.67.0 (#1838): basis gross (default; the start page too) | net. Fixed costs are entered net with a VAT rate: gross adds
     it. Documents (payments, open invoices, quotations, credit notes) are gross; net takes their share net / gross of the
@@ -384,6 +386,19 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
             if first <= day < last:
                 put(day, "out", "actual" if day <= today else "plan", "trip", dec(it["amount_home"]),
                     " · ".join(x for x in (t["dest"], it["text"]) if x), trip_id=t["id"], category=it["category"])
+    # out: 2.114.1 B (#2018): the receipts of the books as the statement counts them (books.bk_receipts: the payment day --
+    # set by the bank match -- else the document date); one matched to a bank booking with the booking's amount. Travel
+    # receipts are no documents (never twice); a purchase or fixed cost entered as well for the same thing does count twice
+    from .books import bk_receipts
+    bfb_paid = {}
+    for t in c.execute("SELECT match_id, amount, currency FROM office_bank_tx WHERE org_id=? AND deleted_at IS NULL AND match_kind='receipt'", (oid,)):
+        t = oc_dec_fields(c, oid, "office_bank_tx", t)
+        if (t["currency"] or home).upper() == home:
+            bfb_paid[t["match_id"]] = abs(dec(t["amount"], "0"))
+    for rc in bk_receipts(c, oid, first, _add_months(last_month, 1) + "-00"):
+        g_ = bfb_paid.get(rc["node_id"]) or rc["amount"]
+        put(rc["date"], "out", "actual" if rc["date"] <= today else "plan", "receipt", g_ * rc["net"] / rc["amount"] if net and rc["amount"] else g_,
+            " · ".join(x for x in (rc["title"], rc["category"]) if x), node_id=rc["node_id"], category=rc["category"])
     # out: fixed costs
     for f in rk_fixed(c, oid):
         for day in rk_fixed_days(f, first, _add_months(last_month, 1) + "-00"):

@@ -5583,6 +5583,7 @@
   "Also send it as a push to everyone (once)": "Zusätzlich einmal als Push an alle senden",
   "Another day…": "Anderer Tag…",
   "Assign": "Zuweisen",
+  "Assign match": "Zuordnen",
   "At most {0} characters": "Höchstens {0} Zeichen",
   "Contact support": "Support kontaktieren",
   "Counts every file a person uploaded. From 80 % they see a warning, at 100 % new uploads are refused (nothing is deleted) and they can contact support. Empty = the server default ({0}).": "Zählt jede Datei, die eine Person hochgeladen hat. Ab 80 % sieht sie eine Warnung, bei 100 % werden neue Uploads abgelehnt (nichts wird gelöscht) und sie kann den Support kontaktieren. Leer = Vorgabe des Servers ({0}).",

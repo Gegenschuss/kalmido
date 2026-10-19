@@ -5583,6 +5583,7 @@
   "Also send it as a push to everyone (once)": "Ook één keer als pushmelding naar iedereen sturen",
   "Another day…": "Andere dag…",
   "Assign": "Toewijzen",
+  "Assign match": "Koppelen",
   "At most {0} characters": "Hoogstens {0} tekens",
   "Contact support": "Contact opnemen met support",
   "Counts every file a person uploaded. From 80 % they see a warning, at 100 % new uploads are refused (nothing is deleted) and they can contact support. Empty = the server default ({0}).": "Telt elk bestand dat iemand heeft geüpload. Vanaf 80 % ziet die een waarschuwing, bij 100 % worden nieuwe uploads geweigerd (er wordt niets verwijderd) en kan die contact opnemen met support. Leeg = de standaard van de server ({0}).",
