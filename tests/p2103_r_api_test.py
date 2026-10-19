@@ -7,6 +7,8 @@ Invented accounts only (example.com).
  - numbers only: no user names or mail addresses in the answer
  - #2166 (built in 2.102.0 A): a deleted list keeps fields + values and its chat in the trash; the purge after the period
    takes them along (no orphan rows of list_fields, task_field_values, tchat_rooms / tchat_msgs)
+ - #2167: a retired organisation opens no public link any more (acx_anon_bind, the bind of every org-bound public path:
+   shared lists, forms, sign-offs, the customer portal, hooks) -> 404; an active one still binds
 usage: p2103_r_api_test.py <datadir>      (a fresh server on KALMIDO_TEST_PORT)
 freelancer-matrix: admin"""
 import os
@@ -107,6 +109,22 @@ gone = (sql("SELECT COUNT(*) FROM list_fields WHERE list_id=?", (L,))[0][0], sql
         sql("SELECT COUNT(*) FROM tchat_rooms WHERE list_id=?", (L,))[0][0],
         sql("SELECT COUNT(*) FROM tchat_msgs WHERE room_id=?", (room["id"],))[0][0] if room else 0)
 check(gone == (0, 0, 0, 0), f"#2166: field, value, chat room and messages are gone with the purge {gone}")
+
+# ---- #2167: public links of a retired organisation
+ALICE = sql("SELECT id FROM users WHERE username='alice'")[0][0]
+OA = A.post(B + "/api/admin/orgs", json={"name": "Retired Ltd", "admin_id": ALICE}).json().get("id")
+check(OA, "#2167 setup: an organisation")
+code = ("import app\nfrom kalmido.core.config import app as fa\nfrom kalmido.core.db import connect\n"
+        "from kalmido.core.access import acx_anon_bind, Denied\nc = connect()\n"
+        "with fa.test_request_context('/s/x'):\n"
+        "    try:\n        acx_anon_bind(c, %d)\n        print('bound')\n"
+        "    except Denied as e:\n        print('denied', e.args[0] if e.args else '')\nc.close()" % (OA or 0))
+run = lambda: subprocess.run(["docker", "exec", CT, "python", "-c", code], capture_output=True, text=True)  # noqa: E731
+out = run()
+check("bound" in out.stdout, "#2167: an active organisation binds its public link " + (out.stdout + out.stderr)[-300:])
+sql("UPDATE orgs SET retired_at=?, retain_until=? WHERE id=?", ("2026-10-19T07:00:00+00:00", "2036-12-31", OA), write=True)
+out = run()
+check("denied 404" in out.stdout, "#2167: a retired organisation's public link: 404 " + (out.stdout + out.stderr)[-300:])
 
 print(f"p2103_r_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
