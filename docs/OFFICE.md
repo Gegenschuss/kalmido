@@ -1323,6 +1323,36 @@ Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit
 - A finalised document whose stored PDF or XML is missing answers 409 (logged as `store_missing`) instead of being
   rendered again from the snapshot; drafts are always rendered.
 
+## Terms and conditions as PDF (2.113)
+
+*Settings > Terms and conditions (PDF)* holds the office's terms and conditions as a PDF file per language (German,
+English) with the date they apply from ("as of"). The admin of the office uploads, replaces and removes them (removing
+is one undo step); members see and open them. Each file is stored once by its content (`terms-<lang>-<hash>.pdf` in the
+office folder, sealed like the stored documents, part of the backups); an older state is never overwritten, so what went
+out with a quotation stays readable.
+
+- **Finalising** a document notes the state of its language (date, SHA-256); a draft follows the current state. A
+  quotation prints the line "Es gelten unsere AGB (Stand ...), siehe Anhang." / "Our terms and conditions (as of ...)
+  apply, see attachment." - only when terms exist in the document's language (terms in the other language only: no line,
+  no attachment). Replacing the terms later does not change a finalised quotation, its line or its attachment.
+- **Sending**: finalised quotations can be mailed too (status `sent`). The send dialog has the tick *Attach terms and
+  conditions* - ticked for quotations, unticked for invoices, credit notes and reminders - when the document's language
+  has terms. The file goes along as `AGB-Stand-<date>.pdf` / `Terms-<date>.pdf`; the log entry "send" names the state
+  (language, date, SHA-256) and the document's history shows "with terms and conditions as of ...". The DATEV copy never
+  carries them.
+- **Approval link**: the customer page of a quotation offers the terms for download next to the PDF
+  (`/s/q/<token>/terms`, the same rules as the PDF); the decision record (`signoff_accepted` / `signoff_declined`) names
+  the state and the confirmation page says "Terms and conditions as of ...". Contracts and order confirmations made from
+  templates keep the state when they are finished and offer it on their signature link (they have no mail dispatch).
+
+Routes (office members read, the office's admin writes; a personal office works the same): `GET /api/office/terms`
+(`{terms: {de, en}, admin, max_mb}`), `POST /api/office/terms/<lang>` (multipart `file` - a PDF up to 10 MB - and
+`date` YYYY-MM-DD, default today), `GET /api/office/terms/<lang>/file` (`?inline=1`), `DELETE /api/office/terms/<lang>`
+(answers `removed` for the undo; the file stays), `POST /api/office/terms/<lang>/restore` `{sha256, date, name}` (only a
+state stored in this office) and `GET /api/office/docs/<id>/terms` (the state the document prints / sends, `default` = the
+tick of the send dialog; `?file=1` downloads it). `POST /api/office/docs/<id>/send` takes `terms: true|false` (missing =
+on for quotations). A document's answer carries `terms` (`{lang, date, sha256, name}` or null).
+
 ## Company fields
 
 Settings > Company holds the company as single fields: name, street, postcode, city, country (ISO code), e-mail, phone,
