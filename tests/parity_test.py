@@ -393,6 +393,11 @@ APP_ONLY = [
      "never answer; the state comes with GET /tasks/{id}/comments", ("POST /api/comments/{}/choice", "GET /api/comments/{}/choice")),
     ("2.41.0 (#1437): the app's progress of a vCard import in the background; the REST import answers when it is done",
      ("GET /api/books/imports/{}",)),
+    # 2.119.1 A (#2080 #2084 #2085): app-side helpers of the contacts list
+    ("2.119.1 A: the CSV export of an address book is the app's spreadsheet download (agents read and write vCard / JSON via "
+     "/address-books/{id}/export and /contacts); the duplicate hint while a person creates a contact (agents propose merges, "
+     "#1357); the groups dialog (agents change groups with POST /contacts/bulk action set)",
+     ("=GET /api/books/{}/export.csv", "=POST /api/contacts/dupcheck", "=GET /api/contacts/groups", "=POST /api/contacts/groups")),
     ("2.52.0 (#1438): handing an address book over to its organisation (and back), the members' role: organisation admins "
      "only, and agents are never organisation admins; agents see an organisation's address book only through a share",
      ("* /api/books/{}/org",)),
