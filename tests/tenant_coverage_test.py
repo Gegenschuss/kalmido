@@ -70,10 +70,12 @@ KINDS = {
     "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p290_a_api_test.py (bookkeeping light), p290_b_api_test.py (bank reconciliation), p290_c_api_test.py (tax dates), p291_a_api_test.py (invoice series), p291_b_api_test.py (subscriptions and tools), p292_a_api_test.py (business contracts and insurances), p292_b_api_test.py (equipment value, insurance list), p293_a_api_test.py (document templates, signature), p293_b_api_test.py (logbook), p294_a_api_test.py (leads), p295_a_api_test.py (per diem, its report), p295_b_api_test.py (per diem spreadsheet import)"),
     # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
     # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
-    "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share"),
+    "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share; "
+                           "p2122_b_api_test.py (2.122.0): bulk change, ZIP and the new filters / search syntax never reach another workspace"),
     # 2.48.0 (#1207 / #1152 / #1356): the file store (fs_role / need_node / fs_visible_sql, org boundary before shares), the
     # Paperless-ngx connection of one workspace, receipt data / agent suggestions on a visible document
-    "file": ("matrix", "p248_a_api_test.py: a node of another organisation / person: 404 (read, list, content, versions, share, move); shares only to people and agents of the node's workspace"),
+    "file": ("matrix", "p248_a_api_test.py: a node of another organisation / person: 404 (read, list, content, versions, share, move); shares only to people and agents of the node's workspace; "
+                       "p2122_b_api_test.py (2.122.0): tags of a node and the tag filter of a space"),
     "paperless": ("matrix", "p248_d_paperless_api_test.py: the connection of another workspace: 404; organisation admins only change it; agents never"),
     # 2.55.0 (#1455): the newsletter connection of one workspace (segments, log, sync) + the consent of a contact
     "newsletter": ("matrix", "p255_e_api_test.py: the connection, segments, log and sync of another workspace: 404 / 403; organisation admins only; agents never; consent only on writable contacts; address books of other workspaces refused in a segment"),
@@ -763,6 +765,10 @@ ROUTES = {
     "PATCH /api/docs/labels/{}/{}": "document", "DELETE /api/docs/labels/{}/{}": "document", "POST /api/docs/labels/{}": "document", "POST /api/docs/mail": "document",
     "DELETE /api/docs/mail": "document", "GET /api/v1/documents": "document", "GET /api/v1/documents/{}": "document",
     "PATCH /api/v1/documents/{}": "document",
+    # 2.122.0 B (#2294 #2099): the chosen documents at once / as a ZIP; tags of files and folders (p2122_b_api_test.py: another
+    # organisation / person: nothing changed, nothing in the ZIP, 404 on the tags of a node, no hit in the tag filter)
+    "POST /api/docs/bulk": "document", "POST /api/docs/zip": "document", "GET /api/docs/zip/{}": "document",
+    "GET /api/files/nodes/{}/tags": "file", "PUT /api/files/nodes/{}/tags": "file", "GET /api/files/tags": "file", "GET /api/files/tagged": "file",
     # 2.48.0 (#1207 / #1152 / #1356)
     "DELETE /api/files/nodes/{}": "file", "DELETE /api/files/shares/{}": "file", "DELETE /api/paperless": "paperless",
     "GET /api/docs/{}/receipt": "receipt", "GET /api/files": "file", "GET /api/files/folders": "file",

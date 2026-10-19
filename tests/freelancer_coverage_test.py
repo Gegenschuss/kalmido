@@ -29,7 +29,8 @@ KINDS = {
     "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
                          "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0)"),
-    "files": ("matrix", SUITE + ": the own file store (folders, upload, content, versions) and documents; every GET"),
+    "files": ("matrix", SUITE + ", p2122_b_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
+                        "2.122.0: tags of files / folders, the tag filter, the documents' filters, bulk change and ZIP"),
     "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private space (create, change, search, export, trash; "
                        "2.99.0: page files, ZIP import with PDFs / pictures)"),
     "pim": ("matrix", SUITE + ", p294_b_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password"),
@@ -169,7 +170,10 @@ ROUTES = {
     "POST /api/docs/{}/review": "files", "POST /api/docs/{}/task": "files", "POST /api/files/folders": "files",
     "POST /api/files/links": "files", "POST /api/files/nodes/{}/restore": "files", "POST /api/files/nodes/{}/shares": "files",
     "POST /api/files/nodes/{}/versions": "files", "POST /api/files/nodes/{}/versions/{}/restore": "files",
-    "POST /api/files/upload": "files", "POST /api/v1/documents/{}/receipt-suggestion": "files", "POST /api/v1/files": "files",
+    "POST /api/files/upload": "files",
+    # 2.122.0 B (#2099 #2294)
+    "GET /api/files/nodes/{}/tags": "files", "PUT /api/files/nodes/{}/tags": "files", "GET /api/files/tags": "files", "GET /api/files/tagged": "files",
+    "POST /api/docs/bulk": "files", "POST /api/docs/zip": "files", "GET /api/docs/zip/{}": "files", "POST /api/v1/documents/{}/receipt-suggestion": "files", "POST /api/v1/files": "files",
     "POST /api/v1/files/{}/versions": "files", "PUT /api/docs/settings": "files", "PUT /api/docs/{}/receipt": "files",
     # ---- hub (27)
     "DELETE /api/hubmail/address": "hub", "DELETE /api/hubmail/mails/{}": "hub", "DELETE /api/team/absences/{}": "hub",
