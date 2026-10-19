@@ -159,9 +159,9 @@ function o3c_tickAfter() {
   if (!o3c_tick || Date.now() - o3c_tick.at > 600) { o3c_tick = null; return; }
   $(`#view .trow[data-id="${o3c_tick.id}"] .chk`)?.classList.add('o3c-pop');
 }
-// empty pages (an empty list, an empty Today): the Kalmido K as a calm line drawing (no animal), the dot in the accent
-const o3c_mark = () => `<svg class="o3c-k" viewBox="0 0 96 72" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 62H82" opacity=".45"/><path d="M34 14V62"/><path d="M44 38L64 14"/><path d="M44 38L66 62"/><circle class="o3c-kdot" cx="66" cy="26" r="5"/></svg>`;
-const o3c_empty = (title, sub = '') => `<div class="empty hempty o3c-empty">${o3c_mark()}<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
+// empty pages (an empty list, an empty Today): 2.136.0 (#2193): the bot figure (calm, or happy when Today is done)
+// instead of the Kalmido K line drawing of 2.83.0
+const o3c_empty = (title, sub = '', st = 'ruhig') => `<div class="empty hempty o3c-empty">${botFig(st)}<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
 // progress rings in the sidebar: done / all of the list's tasks (the numbers the state already brings, list.progress);
 // not where a project shows its progress bar, not for the inbox
 function o3c_ring(l, bar) {

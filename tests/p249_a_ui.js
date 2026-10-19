@@ -40,7 +40,7 @@ const GREET = ['Good morning, nice to have you here.', 'Welcome back, nice to ha
     const rgb = s => (s.match(/[\\d.]+/g) || []).slice(0, 3).map(x => /^color\\(/.test(s) ? Number(x) * 255 : Number(x));  // color-mix() gives color(srgb 0..1)
     return {w: innerWidth, h: innerHeight, sw: document.documentElement.scrollWidth, cl: cr.left, cr: innerWidth - cr.right, cw: cr.width, ct: cr.top, cb: cr.bottom, rad: parseFloat(cs.borderTopLeftRadius),
       shadow: cs.boxShadow, bg: rgb(cs.backgroundColor), grad: bs.backgroundImage, anim: gb.animationName, foot: ga.content, lgx: el.style.getPropertyValue('--lgx'),
-      hello: document.querySelector('.lghello')?.textContent || '', heron: !!c.querySelector('.heron'), logo: !!c.querySelector('.alogo svg'),
+      hello: document.querySelector('.lghello')?.textContent || '', heron: !!c.querySelector('.heron, svg.bot'),  /* 2.136.0 (#2193): no figure either */ logo: !!c.querySelector('.alogo svg'),
       row: rem && fg ? Math.abs((rem.top + rem.height / 2) - (fg.top + fg.height / 2)) : 99, fgh: fg ? fg.height : 0,
       btn: getComputedStyle(c.querySelector('.btn.pri')).backgroundImage}; })()`);
 
@@ -50,7 +50,7 @@ const GREET = ['Good morning, nice to have you here.', 'Welcome back, nice to ha
     await page(o, 'dark', 1280, 860);
     let L = await look(ev);
     check(GREET.includes(L.hello), '#1553: a greeting by the time of day: ' + L.hello);
-    check(L.logo && !L.heron, '#1553: the logo only, no heron');
+    check(L.logo && !L.heron, '#1553: the logo only, no heron / figure');
     check(/linear-gradient/.test(L.grad), '#1553: a soft gradient behind the card');
     check(L.anim === 'lgpulse', '#1553: the glow pulses: ' + L.anim);
     check(/Tasks, team and office in one place\./.test(L.foot), '#1553: the line under the card: ' + L.foot);

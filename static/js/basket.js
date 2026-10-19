@@ -151,7 +151,7 @@ function kbSortDraw() {
   const t = kbCur();
   if (!t) {
     const left = kbBasketOpen().length;
-    box.innerHTML = `<div class="kbend">${heronEmpty('done', left ? tr('Done for now') : tr('Basket empty'), left ? trn('{0} item is still to sort.', '{0} items are still to sort.', left) : tr('Everything is sorted.'))}</div>
+    box.innerHTML = `<div class="kbend">${botEmpty('erledigt', left ? tr('Done for now') : tr('Basket empty'), left ? trn('{0} item is still to sort.', '{0} items are still to sort.', left) : tr('Everything is sorted.'))}</div>
       <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-kbs="end">${tr('Close')}</button></div>`;
     $('[data-kbs="end"]', box)?.focus();
     return;

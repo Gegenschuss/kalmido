@@ -38,7 +38,7 @@ from ..accounts.login import auth_key, seal, unseal
 from ..core.access import Denied, acx_anon_bind, acx_org_ok, need_feat
 from ..personal.timetrack import BadInput
 from ..api.v1 import hit_limit
-from ..lists.public import HERON_ERROR, PUB_CSP, pub_html, public_links_on
+from ..lists.public import BOT_ERROR, PUB_CSP, pub_html, public_links_on
 from ..events.model import ev_zone, tz_ok, wall, wall_s
 
 TPO_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{20,64}")
@@ -704,7 +704,7 @@ def tpo_headers(resp):
 
 def tpo_gone(lg=None):
     lg = lg or _accept_lang()
-    return pub_html(tr(TPO_GONE, lg=lg), f'<div class="msg">{HERON_ERROR}<h1>{html.escape(tr(TPO_GONE, lg=lg))}</h1>'
+    return pub_html(tr(TPO_GONE, lg=lg), f'<div class="msg">{BOT_ERROR}<h1>{html.escape(tr(TPO_GONE, lg=lg))}</h1>'
                     f'<p>{html.escape(tr("This poll does not exist or is no longer open.", lg=lg))}</p></div>', lg, 404, foot=False)
 
 

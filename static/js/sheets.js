@@ -140,7 +140,7 @@ function shvOverview(lid) {
     ${hooks ? `<button type="button" class="iconbtn" data-shv="omenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
     ${!lid || (l && canEditList(lid)) ? `<button type="button" class="btn sm pri" data-shv="new">${ic('plus', 's')}${tr('New table')}</button>` : ''}</div>`;
   if (!d?.items) return `<div class="shvwrap shvov">${head}<p class="muted lempty" role="status">${d?.err ? esc(d.err) : tr('Loading…')}</p></div>`;
-  if (!items.length) return `<div class="shvwrap shvov">${head}${heronEmpty('empty', lid ? tr('No tables attached yet.') : tr('No tables yet.'), tr('Lists and calculations like in a spreadsheet, and every cell can fetch figures from Kalmido: hours booked, budget, open tasks.'))}</div>`;
+  if (!items.length) return `<div class="shvwrap shvov">${head}${botEmpty('ruhig', lid ? tr('No tables attached yet.') : tr('No tables yet.'), tr('Lists and calculations like in a spreadsheet, and every cell can fetch figures from Kalmido: hours booked, budget, open tasks.'))}</div>`;
   const card = x => `<li class="shvcard" data-id="${x.id}"><a href="#sheets/${x.id}" class="shvcl">${ic('sheet')}<span class="shvct"><b>${esc(x.title || tr('Untitled table'))}</b>
       <span class="muted">${x.list_title && !lid ? esc(x.list_title) + ' · ' : ''}${x.updated_at ? esc(relTime(x.updated_at)) : ''}${x.updated_by_name ? ' · ' + esc(x.updated_by_name) : ''}${x.agent ? ' · ' + esc(tr('changed by an agent')) : ''}</span></span></a>
     <button type="button" class="iconbtn" data-shv="cmenu" data-id="${x.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More') + ': ' + (x.title || ''))}">${ic('dots')}</button></li>`;

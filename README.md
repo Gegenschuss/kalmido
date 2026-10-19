@@ -1,4 +1,4 @@
-<p align="center"><img src="static/icon.svg" width="112" alt="Kalmido logo: a heron standing on one leg at the water, a violet sun on the horizon"></p>
+<p align="center"><img src="static/icon.svg" width="112" alt="Kalmido logo: a friendly bot with two eyes and an antenna on a violet tile"></p>
 
 <h1 align="center">Kalmido</h1>
 
@@ -22,6 +22,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 - **2.114.1** (2026-10-19): office fixes - the transfer of rights as the last page of the quotation PDF, receipts in
   the cash flow, books up to date right after a bank match, clearer bank buttons on phones.
+- **2.136.0** (2026-10-19): a new face - the Kalmido bot replaces the heron in the app icon, the empty views, the
+  celebration and the loading screen; on iPhone / iPad add the web app to the home screen again for the new icon.
 - **2.98.0** (2026-10-19): scheduling polls with a public vote link, questionnaires in forms (answers become a task at the
   customer), the office menu as a rail on the left, resizable tables in their own window, documents guess amounts only
   where they fit.
@@ -616,7 +618,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   add syntax; Enter when nothing else matches); `#123` jumps to task 123; keyboard shortcuts (`?` shows them all: arrows, Space to complete, E to rename in the list; calendar 1-4 / ← → / `.`; multi-select Ctrl/Cmd+A, Shift+↓ ↑, Shift+X, then Space, M or D for the selection; D / M open the date / list field of the multi-edit panel), compact, comfortable or custom density (the sidebar and the task rows each on their own); your account sits as your picture at the right of the *Kalmido* row (Account, Settings, Log out)
 - New accounts start with a "Getting started" list and a short welcome tour
 - A **sample project** to try things out: an image film for a client with phases, dates, dependencies, custom fields and a packing checklist, offered in the setup and the tour, removed again in one click (Settings > Data)
-- When Today is clear or a list is done, the heron celebrates (with one of 50 dry one-liners). Can be switched off.
+- When Today is clear or a list is done, the Kalmido bot celebrates (with one of 50 dry one-liners). Can be switched off.
 
 **Everywhere**
 - Installable web app (PWA) for phone and desktop, works offline: changes queue up and sync later, with conflict detection
@@ -2321,10 +2323,10 @@ Python (Flask, waitress, python-dateutil, cryptography for Web Push, the stored 
 
 | File | Use |
 |---|---|
-| `static/icon.svg` | The app icon: dark tile, white heron, violet sun |
-| `static/logo-white.svg` | White heron and horizon with the violet sun, transparent, for dark backgrounds |
-| `static/icon-light.svg` | White tile, dark heron, violet sun |
-| `static/favicon.svg` | Favicon without a tile: the heron is dark in a light browser and white in a dark one |
+| `static/icon.svg` | The app icon: the Kalmido bot (two eyes, an antenna) on the violet tile |
+| `static/logo-white.svg` | The white bot, transparent, for dark backgrounds |
+| `static/icon-light.svg` | White tile, dark bot |
+| `static/favicon.svg` | Favicon without a tile: the bot is dark in a light browser and white in a dark one |
 
 ## Limits
 
