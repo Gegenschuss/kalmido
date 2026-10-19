@@ -90,9 +90,11 @@ def scenario(S, who):
     r = S.get(B + M + "/report?year=2025&format=csv")
     check(r.status_code == 200, f"{who}: meals csv {r.status_code}")
     body = r.content.decode("utf-8-sig", "replace")
-    check("'\t=1+1" in body, f"{who}: TAB-led place gets a ' in front")
-    check("'\r=cmd" in body, f"{who}: CR-led occasion gets a ' in front")
-    check('\t=1+1' not in body.replace("'\t=1+1", ""), f"{who}: no unguarded TAB-led cell")
+    # the input cleaning may drop the leading TAB / CR; either way no cell may start with a formula character
+    cells = [x.strip('"') for line in body.replace("\r", "\n").split("\n") for x in line.split(";")]
+    check("'=1+1" in body or "'\t=1+1" in body, f"{who}: the TAB-led place gets a ' in front")
+    check("'=cmd" in body or "'\r=cmd" in body, f"{who}: the CR-led occasion gets a ' in front")
+    check(not any(x.startswith(("=", "+", "@", "\t")) for x in cells), f"{who}: no cell starts with a formula character")
 
 
 scenario(A, "org")
