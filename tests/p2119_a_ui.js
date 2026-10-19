@@ -126,6 +126,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `${getJ('/api/office/meals?year=' + y)}.then(j => j.meals.length === 3)`), 'one undo step brings it back');
 
     // ---- the filters + the evaluation
+    await ready(ev, `!!document.querySelector('#bw-occf') && document.querySelectorAll('.bwlist .ofcrow').length === 3`);  // 2.119.1: CI redraws the list after the undo a bit later
     await ev(setv('#bw-occf', 'trade fair'));
     check(await ready(ev, `document.querySelectorAll('.bwlist .ofcrow').length === 1`), 'the occasion filter');
     await ev(setv('#bw-occf', ''));
@@ -150,6 +151,9 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `!!document.querySelector('.modal #bw-place')`), 'the mask on a phone');
     check(await ev(noSide('.modal')), 'nothing sticks out to the side');
     check(await ev(`[...document.querySelectorAll('.modal .bwln select, .modal .bwln input, .modal .bwg, .modal [data-bwm="approve"]')].every(e => e.getBoundingClientRect().height >= 43)`), 'the fields are 44 px targets');
+    // 2.119.1 (#2288): the kind of an amount line was squeezed to 20 px next to the label; a saved person whose choice id equals a user id was missing
+    check(await ev(`[...document.querySelectorAll('.modal .bwln select[data-bwl="kind"]')].every(e => e.getBoundingClientRect().width >= 70)`), 'phone: the kind of an amount line is usable');
+    check(await ev(`${getJ('/api/office/meals/choices')}.then(j => j.persons.every(p => [...document.querySelectorAll('.modal [data-bwg]')].some(x => x.closest('label').textContent.includes(p.name))))`), 'every saved person is among the guests of a new receipt');
     await shot('p2119-a-phone.png');
     await ev(`(() => { document.querySelector('.modal').remove(); return 1; })()`);
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});

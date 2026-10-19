@@ -126,7 +126,7 @@ function bw_hostOpts(m) {
 function bw_guestPool(m) {  // key -> {id} | {name, extra}: the people of the office, the choices, the meal's own guests
   const pool = new Map();
   for (const p of BW.data?.people || []) pool.set(rk_pkey(p), {id: p.id, name: p.name});
-  for (const c of BW.data?.choices?.persons || []) if (!pool.has(rk_pkey(c))) pool.set(rk_pkey(c), {name: c.name, extra: c.extra || ''});
+  for (const c of BW.data?.choices?.persons || []) { const k = rk_pkey({name: c.name}); if (!pool.has(k)) pool.set(k, {name: c.name, extra: c.extra || ''}); }  // 2.119.1 (#2288): a choice's own id is no user id
   for (const g of m?.guests || []) pool.set(rk_pkey(g), g);
   return pool;
 }
@@ -164,7 +164,7 @@ function bw_modal(m0) {
     <div class="bwhnew" hidden>${ofcRowF('bw-hname', tr('Name'), ofcIn('bw-hname', m?.host && !m.host.id ? m.host.name : '', {max: 120}))}${ofcRowF('bw-hextra', tr('Company or function'), ofcIn('bw-hextra', m?.host && !m.host.id ? m.host.extra : '', {max: 200}))}</div>
     <div class="row"><span class="rklab" id="bw-gl">${tr('Guests')}</span><div class="bwguests" role="group" aria-labelledby="bw-gl">${[...pool].map(([k, p]) => bw_guestHtml(k, p, on.has(k))).join('')}</div></div>
     ${ro ? '' : `<div class="bwgnew"><input id="bw-gname" maxlength="120" autocomplete="off" placeholder="${esc(tr('New person…'))}" aria-label="${esc(tr('Name of a new person'))}"><input id="bw-gextra" maxlength="200" autocomplete="off" placeholder="${esc(tr('Company or function'))}" aria-label="${esc(tr('Company or function'))}"><button type="button" class="btn sm" data-bwm="addguest">${ic('plus', 's')}<span>${tr('Add')}</span></button></div>`}
-    <div class="row"><span class="rklab">${tr('Amounts (gross, as on the bill)')}</span><ul class="bwlines" role="list">${lines.map(bw_lineHtml).join('')}</ul>
+    <div class="row bwamt"><span class="rklab">${tr('Amounts (gross, as on the bill)')}</span><ul class="bwlines" role="list">${lines.map(bw_lineHtml).join('')}</ul>
       ${ro ? '' : `<button type="button" class="btn sm" data-bwm="addline">${ic('plus', 's')}<span>${tr('Add line')}</span></button>`}</div>
     ${ofcRowF('bw-tip', tr('Tip'), ofcIn('bw-tip', m && +m.tip ? fmtNum(+m.tip, 2) : '', {num: true, ph: tr('optional')}), tr('Not on the bill, no VAT; deductible like the bill.'))}
     <p class="bwsum" aria-live="polite"></p><p class="muted ofchint bw250" hidden>${tr('From 250 € gross the restaurant bill must be made out to the company.')}</p>

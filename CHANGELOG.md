@@ -7,6 +7,11 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.119.1] - 2026-10-19
+
+### Fixed
+- Entertainment receipts: the amount lines use the full width on phones, saved people always show among the guests, agents are no host or guest; the keep period counts from the last approval; CI: office menu tests know the new point, start CSS budget (#2288).
+
 ## [2.119.0] - 2026-10-19
 
 Entertainment receipts, filled icon buttons, agents in "All people".
