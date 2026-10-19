@@ -336,14 +336,16 @@ sql("UPDATE doc_meta SET task_id=999999 WHERE node_id=?", (R_BOOKED,), write=Tru
 HB = A.post(B + "/api/habits", json={"name": "Lesen"})
 if HB.ok:
     sql("UPDATE habits SET user_id=999999 WHERE id=?", (HB.json()["id"],), write=True)
-out = in_app("from kalmido.core.fkeys import fk_ensure\nprint('done', sorted(fk_ensure(c).items()))\nc.commit()")
+FK_RUN = ("from kalmido.core.db import DATABASE_URL\nfrom kalmido.core.pg import connect_direct\nfrom kalmido.core.fkeys import fk_ensure\n"
+          "o = connect_direct(DATABASE_URL)\nprint('done', sorted(fk_ensure(o).items()))\no.commit()\no.close()")  # the login role, like init_db
+out = in_app(FK_RUN)
 check("('doc_meta.task_id', 1)" in out and "('habits.user_id', " + ("1)" if HB.ok else "0)") in out, "#2174: fk_ensure cleans the orphans and adds the keys " + out[-400:])
 check(sql("SELECT task_id FROM doc_meta WHERE node_id=?", (R_BOOKED,)) == [(None,)], "#2174: the orphaned task reference is emptied")
 check(not HB.ok or not sql("SELECT 1 FROM habits WHERE id=?", (HB.json()["id"],)), "#2174: the habit of a gone person is deleted (CASCADE)")
 check(fk_name("doc_meta", "task_id") == "fk2103_doc_meta_task_id" and fk_name("habits", "user_id") == "fk2103_habits_user_id", "#2174: the keys are back")
 g = sql("SELECT value FROM settings WHERE key='fk2103_orphans'")
 check(g and json.loads(g[0][0]).get("doc_meta.task_id") == 1, f"#2174: the counts in fk2103_orphans {g}")
-check("done []" in in_app("from kalmido.core.fkeys import fk_ensure\nprint('done', sorted(fk_ensure(c).items()))\nc.commit()"), "#2174: a second run does nothing")
+check("done []" in in_app(FK_RUN), "#2174: a second run does nothing")
 sql("UPDATE doc_meta SET task_id=? WHERE node_id=?", (TK, R_BOOKED), write=True)
 sql("DELETE FROM tasks WHERE id=?", (TK,), write=True)
 check(sql("SELECT task_id FROM doc_meta WHERE node_id=?", (R_BOOKED,)) == [(None,)], "#2174: deleting the task empties the reference (ON DELETE SET NULL)")
