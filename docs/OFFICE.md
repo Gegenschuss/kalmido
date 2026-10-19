@@ -1736,6 +1736,27 @@ posts a card in your chat with it (*Open in the office*). You check, sign and se
 or deletes a letter, and it sees only the letters it made. People's routes: `GET /api/office/letters/doc/<id>/agents`,
 `POST /api/office/letters/doc/<id>/ask-agent` `{agent_id, note?}`; agents: docs/AGENTS.md *Letter drafts*.
 
+## Letters by e-mail and text blocks (2.106)
+
+A draft letter can go out by e-mail: **Send by e-mail** (only shown when the server has a mail server,
+`KALMIDO_SMTP_HOST`) opens a form with the recipient (the letter's e-mail address), Cc, subject and a short covering
+text. The letter's PDF is attached, the letter is marked as sent with the channel e-mail. Nothing is sent without this
+button; the day's limits of the office mails apply (like invoices).
+
+Answers find their way back: when you have a **document address** for the documents space of this office (Documents >
+settings > mail address), the mail carries it as Reply-To. An answer to that address becomes a document, and because it
+names the letter's Message-ID (In-Reply-To / References), the document is linked to the letter as its reply. Only a
+letter of the same office (the same organisation, or your personal office) is ever linked. Without a document address
+answers go to the company e-mail and are assigned to the letter by hand. A reply without a PDF or image attachment
+creates no document (as every mail to the document address).
+
+**Text blocks** are reusable paragraphs per office: **Insert text block** above the letter text opens a searchable list
+and puts the chosen block at the cursor. New, change and delete (with undo) in the same list; four samples (cancellation,
+objection, payment reminder, request for an extension; German and English) can be taken over. Sample text, no legal
+advice. API: `GET/POST /api/office/letter-blocks`, `PATCH/DELETE /api/office/letter-blocks/<id>`, `POST .../<id>/restore`,
+`GET .../starters`; `GET /api/office/letters/mail-info`, `GET /api/office/letters/<id>/mail-draft`,
+`POST /api/office/letters/<id>/send-mail` (admins of the office, like every letter route).
+
 ## PDF layout
 
 `GET /api/office/docs/<id>/pdf` returns the quotation as a PDF file (`?inline=1` opens it in the browser instead of
