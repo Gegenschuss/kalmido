@@ -1141,6 +1141,9 @@ fresh; run p296_b_ui node p296_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.96.0 part C (#2015): one thread card per job in the agent chat, the chat filter
 fresh; run p296_c_api "$PY" p296_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p296_c_ui node p296_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.107.0 (#1962): a chat of its own per job (job_id on a person's message, start line, progress in the job's chat)
+fresh; run p2107_api "$PY" p2107_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2107_ui node p2107_ui.js "$KALMIDO_TEST_DATA"
 # 2.96.0 part D (#1941 / #1918): an organisation's export into the private space, the own absence area in "Private"
 fresh; run p296_d_api "$PY" p296_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.96.0 part E (#1941): the separation after a move between private and organisation; moved documents are learned by the target

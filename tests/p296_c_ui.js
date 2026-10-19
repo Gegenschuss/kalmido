@@ -2,8 +2,8 @@
 // - three messages of a job = ONE card (name, version, state, the newest first line); folded by default, a tap unfolds the
 //   three messages (indented), the state is kept per device
 // - a new message of the job updates the card in place (last line), the card stays unfolded; the state follows the job
-// - the end result ("✅ …" without job_msg = recognised from the text) and an error stay visible under the card, a long
-//   result is cut to 5 lines with "Show more"; a message with buttons (an approval / a question) is never inside a card
+// - the end result ("✅ …" without job_msg = recognised from the text) and an error stay visible under the card as one
+//   short line each (2.107.0, #1962: the whole text folded in the card); a message with buttons is never inside a card
 // - the filter All / Only me and <agent> / Jobs (buttons + a menu for the phone), kept per device; no job = no filter
 // - a search hit in a folded card unfolds it (jcd_reveal); hit areas >= 2.75rem (44 px) on the phone (CSS)
 const {execFileSync} = require('child_process');
@@ -85,21 +85,19 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   await v1('PATCH', `/agent/jobs/${J}`, {state: 'done'});
   await w.eval('chatLoad()');
   await until(() => card()?.querySelector('.jcdst.st-done') && d.querySelector(`#chat-msgs [data-mid="a:${mq}"]`));
-  const res = card()?.querySelector(`.jcdres [data-mid="a:${mr}"]`)?.closest('.jcdres');
-  check(res && !res.closest('.jcdhist'), '"✅ …" without job_msg = the end result, visible under the card');
-  check(res?.classList.contains('jcdclamp') && res.querySelector('.jcdmore')?.textContent === 'Show more', 'a long result: cut (5 lines) with "Show more"');
+  // 2.107.0 (#1962): the end result is a short line under the card (a tap opens the job's chat), the whole text stays
+  // folded in the card -- no 5-line block with "Show more" any more
+  const res = card()?.querySelector(':scope > .jcsl.k-result');
+  check(res && res.querySelector('span')?.textContent === '✅ Knox: release ready', '"✅ …" without job_msg = the end result, one short line under the card');
+  check(card().querySelector(`.jcdhist [data-mid="a:${mr}"]`) && !card().querySelector('.jcdres'), 'the whole result is folded in the card');
   check(card().querySelector('.jcdst.st-done')?.textContent === 'finished', 'the state follows the job: finished');
   const q = d.querySelector(`#chat-msgs [data-mid="a:${mq}"]`);
   check(q && q.parentElement === box() && !q.closest('.jcd'), 'a question with buttons of the job stays its own row (never in the card)');
-  click(w, res.querySelector('.jcdmore'));
-  await until(() => !card()?.querySelector('.jcdres.jcdclamp'));
-  const res2 = card().querySelector(`[data-mid="a:${mr}"]`).closest('.jcdres');
-  check(!res2.classList.contains('jcdclamp') && res2.querySelector('.jcdmore')?.textContent === 'Show less', '"Show more" shows the whole result');
   const me2 = (await say('⚠️ Knox: upload failed', {job_id: J})).id;
   await w.eval('chatLoad()');
-  await until(() => card()?.querySelector(`.jcdres.jcdx [data-mid="a:${me2}"]`));
-  check(card()?.querySelector(`.jcdres.jcdx [data-mid="a:${me2}"]`), '"⚠️ …" = an error, visible under the card');
-  check(hist().querySelectorAll(':scope > .cmsg').length === 4, 'result and error are not repeated in the folded history');
+  await until(() => card()?.querySelector(':scope > .jcsl.k-error'));
+  check(/upload failed/.test(card()?.querySelector(':scope > .jcsl.k-error')?.textContent || ''), '"⚠️ …" = an error, a short line under the card');
+  check(hist().querySelectorAll(':scope > .cmsg').length === 6, '2.107.0 (#1962): result and error are folded in the history too');
 
   // ================= the filter
   // 2.144.0 (#2419): no filter row any more, the header icon (menu) on every width
