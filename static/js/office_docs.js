@@ -120,7 +120,7 @@ function ofdEditorHtml() {
   const texts = kind => ofcRows('texts').filter(x => x.kind === kind && !x.archived);
   const txtOpt = kind => texts(kind).map(x => [x.id, (x.key ? x.key + ': ' : '') + (lg === 'en' && !x.text_en && x.text_de ? tr('(no English text)') + ' ' : '') + ((lg === 'en' ? x.text_en || x.text_de : x.text_de || x.text_en) || '').slice(0, 70)]);  // 2.40.0 (#1381): no silent German
   const contracts = ofcRows('contracts').filter(x => !x.archived || x.id === d.contract_id).map(x => [x.id, x.name]);
-  const clients = typeof clientsOn === 'function' && clientsOn() ? (S.clients || []).filter(c => (!c.archived && (c.org_id || null) === pb_clOrg()) || c.id === d.client_id).map(c => [c.id, c.name]) : [];
+  const clients = typeof clientsOn === 'function' && clientsOn() ? (S.clients || []).filter(c => (!c.archived && (c.org_id || null) === pb_clOrg()) || c.id === d.client_id).map(c => [c.id, cdn_label(c)]) : [];
   const lk = !!d.locked, inv = ofdIsInv(d), kind = d.kind, ro = !d.can_edit;
   const numTxt = d.number || (d.number_at_finalize ? tr('Draft') : tr('(no number)'));
   const stOpts = kind === 'offer' ? OFD_STATUS : OFD_INV_STATUS[kind].map(v => [v, OFD_STATE[v]]);
@@ -154,10 +154,10 @@ function ofdEditorHtml() {
     ${d.currency === 'USD' ? ofdF('fx_rate', tr('Exchange rate'), ofdIn('fx_rate', ofdNumIn(d.fx_rate), {num: true, max: 12}), tr('1 € in USD; rates stay in EUR and are converted')) : ''}
     ${kind !== 'reminder' ? ofdF('vat_mode', tr('VAT'), ofdSel('vat_mode', d.vat_mode, [['vat', tr('with VAT')], ['novat', tr('without VAT (reverse charge / abroad)')]])) : ''}
     ${kind !== 'reminder' ? ofdF('contract_id', tr('Framework contract'), ofdSel('contract_id', d.contract_id, contracts, tr('none|contract')), d.contract ? tr('presets raw data, rights and closing; special rates apply to new positions') : '') : ''}
-    ${clients.length ? ofdF('client_id', tr('Client'), ofdSel('client_id', d.client_id, clients, tr('free recipient'))) : typeof clientsOn === 'function' && clientsOn() ? `<div class="row fx8a_nocl"><label>${esc(tr('Client'))}</label><span class="muted">${esc(tr('No clients in this area yet'))}</span>${ro ? '' : `<button type="button" class="btn sm" data-ofd="client-new">${ic('plus', 's')}<span>${tr('Add client')}</span></button>`}</div>` : ''}
+    ${clients.length ? ofdF('client_id', tr('Client'), ofdSel('client_id', d.client_id, clients, cdn_on() ? tr('No client') : tr('free recipient'))) : typeof clientsOn === 'function' && clientsOn() ? `<div class="row fx8a_nocl"><label>${esc(tr('Client'))}</label><span class="muted">${esc(tr('No clients in this area yet'))}</span>${ro ? '' : `<button type="button" class="btn sm" data-ofd="client-new">${ic('plus', 's')}<span>${tr('Add client')}</span></button>`}</div>` : ''}
     ${d.client_id && (d.client_contacts || []).length ? ofdF('contact_id', tr('Contact person'), ofdSel('contact_id', d.contact_id ?? d.client_contacts[0].id, [...d.client_contacts.map(k => [k.id, k.name + (k.role ? ` (${k.role})` : '') + (k.is_default ? ' · ' + tr('default') : '')]), [0, tr('no contact person')]]), tr('the attention line of the address follows the choice')) : ''}
-    ${ofdF('recipient_name', tr('Recipient'), ofdIn('recipient_name', d.recipient?.name, {ph: tr('Company or name')}))}
-    ${ofdF('recipient_lines', tr('Address lines'), ofdTa('recipient_lines', (d.recipient?.lines || []).join('\n'), 3, {ph: tr('one line each: name, attention, street, place')}))}
+    ${cdn_on() ? cdn_recHtml(d, ro) : `${ofdF('recipient_name', tr('Recipient'), ofdIn('recipient_name', d.recipient?.name, {ph: tr('Company or name')}))}
+    ${ofdF('recipient_lines', tr('Address lines'), ofdTa('recipient_lines', (d.recipient?.lines || []).join('\n'), 3, {ph: tr('one line each: name, attention, street, place')}))}`}
     ${ofdF('project_title', tr('Project title'), ofdIn('project_title', d.project_title))}
     ${kind === 'offer' ? ofdF('project_ref', tr('Ref. / PO no.'), ofdIn('project_ref', d.project_ref, {max: 80})) : ''}
     ${ofdF('date', tr('Date'), dateIn('ofd-date', d.date, {label: tr('Date'), clear: false, attrs: 'data-f="date"'}))}
@@ -380,6 +380,8 @@ function ofdMoreItems(d, inList) {
       {label: tr('Preview (PDF)'), icon: 'eye', fn: () => typeof pdfView === 'function' ? pdfView({url: ofdPdfUrl(d.id, true), name: (d.number || tr('Document')) + '.pdf', dlUrl: ofdPdfUrl(d.id)}) : window.open(ofdPdfUrl(d.id, true), '_blank', 'noopener')},  // 2.40.0 (#1364): the PDF, not the JSON print model
       ofdIsInv(d) && d.kind !== 'reminder' && d.locked ? {label: tr('E-invoice XML'), icon: 'download', fn: () => window.open(`/api/office/docs/${d.id}/xml`, '_blank', 'noopener')} : null,
       ofdIsInv(d) && d.kind !== 'reminder' && d.locked ? {label: tr('Send to the DATEV inbox'), icon: 'send', fn: async () => { const j = await ofdSave('POST', `/api/office/docs/${d.id}/datev`); if (j) toast(tr('Sent to the DATEV inbox')); }} : null,
+      d.status === 'draft' && !d.locked && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? {label: tr('Move to another workspace…'), icon: 'brief',  // 2.97.0 C (#2049)
+        fn: () => ofm_move({what: 'drafts', ids: [d.id], from: ofm_officeFrom(), label: qn(d.number || d.project_title || ofdKindName(d.kind, true)), after: async () => gone()})} : null,
       d.can_delete ? '-' : null,
       d.can_delete ? {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
         if (!await askConfirm(tr('Delete {0}?', d.number || ofdKindName(d.kind, true)), tr('Its number stays used.'), {ok: tr('Delete'), danger: true})) return;
@@ -448,15 +450,32 @@ async function ofdClick(e) {
   }
   if (a === 'it-del') { d.items.splice(+b.dataset.i, 1); await ofdPutItems(); return; }
   if (a === 'it-up' || a === 'it-down') { const i = +b.dataset.i, j = a === 'it-up' ? i - 1 : i + 1; if (j < 0 || j >= d.items.length) return; [d.items[i], d.items[j]] = [d.items[j], d.items[i]]; await ofdPutItems(); setTimeout(() => $(`.ofdits [data-ofd="${a}"][data-i="${j}"]`)?.focus(), 0); return; }
-  if (a === 'client-new') { if (typeof clientModal === 'function') clientModal(null, {org_id: pb_clOrg(), stay: true}); return; }  // 2.80.0 (#1842)
+  if (a === 'client-new') { if (typeof clientModal === 'function') clientModal(null, {org_id: pb_clOrg(), stay: true, quick: true, done: r => ofdPatch({client_id: r.id})}); return; }  // 2.80.0 (#1842); 2.97.0 B (#1951): set as the document's client
+  if (a === 'client-edit') { await cdn_editClient(d); return; }
   if (a === 'fld-add') { d.fields = [...(d.fields || []), {name: '', value: ''}]; OFD.open.fields = true; ofdDraw(); setTimeout(() => $(`#ofd-fields [data-fld="${d.fields.length - 1}"][data-k="name"]`)?.focus(), 0); return; }
   if (a === 'fld-del') { d.fields.splice(+b.dataset.i, 1); await ofdPatch({fields: d.fields}); return; }
+}
+// 2.97.0 B (#1951): the recipient comes from the client (name, attn., street, extra line, postcode city, country): the head
+// shows it read-only with "Edit client"; without a client "Add client" makes one and sets it. A finished / sent document
+// shows what was frozen; an old one with free lines keeps them. With the client module off the free fields stay.
+const cdn_on = () => typeof clientsOn === 'function' && clientsOn();
+function cdn_recHtml(d, ro) {
+  const r = d.recipient || {}, lines = (r.lines || []).filter(x => String(x).trim());
+  const addr = lines.length ? `<address class="cdnadr">${lines.map(x => esc(String(x))).join('<br>')}</address>` : '';
+  if (!d.client_id) return `<div class="row cdnrec"><label>${esc(tr('Recipient'))}</label><div class="cdnrecb">${addr || `<span class="muted">${esc(tr('No client chosen'))}</span>`}${ro ? '' : `<button type="button" class="btn sm" data-ofd="client-new">${ic('plus', 's')}<span>${tr('Add client')}</span></button>`}</div></div>`;
+  const miss = d.recipient_missing && !ro ? `<p class="cdnmiss" role="status">${ic('info', 's')} ${esc(tr('Address missing - add it at the client'))}</p>` : '';
+  return `<div class="row cdnrec"><label>${esc(tr('Address'))}</label><div class="cdnrecb">${addr}${miss}${ro ? '' : `<button type="button" class="linkbtn" data-ofd="client-edit">${ic('edit', 's')} ${tr('Edit client')}</button>`}</div></div>`;
+}
+async function cdn_editClient(d) {
+  if (typeof clientModal !== 'function' || !d.client_id) return;
+  let c; try { c = await api('GET', `/api/clients/${d.client_id}`); } catch (x) { toast(x.message || tr('unknown')); return; }
+  clientModal(c, {stay: true, done: () => ofdLoadDoc(d.id, true)});
 }
 // 2.38.0 (#1021, F1): creating, payments, sending, reminders (small dialogs; the server validates)
 async function ofdCreate(body) {
   try { const j = await rawFetch('POST', '/api/office/docs', body); OFD.doc = j; OFD.list = null; OFD.kind = j.kind; go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); }
 }
-const ofdClientOpts = () => typeof clientsOn === 'function' && clientsOn() ? (S.clients || []).filter(c => !c.archived && (c.org_id || null) === pb_clOrg()).map(c => [c.id, c.name]) : [];
+const ofdClientOpts = () => typeof clientsOn === 'function' && clientsOn() ? (S.clients || []).filter(c => !c.archived && (c.org_id || null) === pb_clOrg()).map(c => [c.id, cdn_label(c)]) : [];
 function ofdDlg(title, body, okLabel, onOk) {
   const md = modal(`<h3>${esc(title)}</h3><div class="ofddlg">${body}</div><div class="foot"><span class="aerr" role="alert"></span><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button type="button" class="btn pri" data-m="ok">${esc(okLabel)}</button></div>`);
   md.addEventListener('click', async e => {

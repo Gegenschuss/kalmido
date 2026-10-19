@@ -59,7 +59,7 @@ def ntfy(title, msg, prio="4", click=None, topic=None, actions=None, admin=False
         hdr["Click"] = click
     if NTFY_TOKEN:
         hdr["Authorization"] = f"Bearer {NTFY_TOKEN}"
-    if actions:  # view actions open the browser (login cookie), http actions could not pass a login proxy
+    if actions:  # view actions open the browser (Authelia cookie), http actions could not pass the gate
         hdr["Actions"] = "; ".join(f"view, {label}, {url}" for label, url in actions)
     try:
         req = urllib.request.Request(f"{NTFY_URL}/{topic}", data=msg.encode("utf-8"), headers=hdr)
@@ -571,6 +571,8 @@ def watchdog_tick(c):
     _wd_section(c, "read later", _wd_reading, users, S, LG, now)  # 2.22.0 (#663)
     from ..life.rss import _wd_feeds
     _wd_section(c, "feeds", _wd_feeds, users, S, LG, now)  # 2.85.0 B (#1162): fetch due feeds, drop articles after 30 days
+    from ..life.bookmarks import _wd_bookmarks
+    _wd_section(c, "bookmarks", _wd_bookmarks, users, S, LG, now)  # 2.97.0 A (#1950): pending previews, purge of deleted bookmarks
     from ..newsletter.sync import nwl_tick
     _wd_section(c, "newsletter", nwl_tick)  # 2.55.0 (#1455): the daily sync of connections with "auto" (own threads)
     from ..office.recurring import rin_tick
@@ -585,6 +587,8 @@ def watchdog_tick(c):
     _wd_section(c, "security watch", sev_scan)  # 2.36.2 (#1133): new admins / org admins / agents / agent tokens
     from ..files.scan import sc_tick
     _wd_section(c, "virus scan", sc_tick)  # 2.61.0 (#1818): the uploads the scanner could not check yet
+    from ..files.fsmove import fsm_orphans_gc
+    _wd_section(c, "files cleanup", fsm_orphans_gc)  # 2.97.0 D (#2051): stored versions without a row, once a night
     from ..wiki.wikiatt import wka_tick
     _wd_section(c, "wiki files", wka_tick)  # 2.99.0 (#2182): files in the trash for good after 30 days
     _wd_section(c, "admin alerts", aa_tick)

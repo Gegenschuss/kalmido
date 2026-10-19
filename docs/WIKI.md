@@ -73,6 +73,28 @@ organisation.
 
 See *Exporting encrypted content* in the self-hosting guide for backups, moving servers and lost keys.
 
+## Moving pages to another workspace (2.96.0)
+
+A page, or its folder with everything below it, moves between the private space and an organisation (both ways): page menu
+*Move to another workspace…* / *Move folder to another workspace…* (only when there is another workspace: a person without an
+organisation never sees it). The dialog names source and target, lets you pick a folder in the target and first shows what
+the check found: a name that is already taken there (then nothing moves; `409` with the names), links between a moved page
+and one that stays (they stay as text: `[[links]]` only work inside one space), pages that link files of the file store (the
+files stay where they are). Links between pages that move together follow their new paths. Out of an organisation only the
+person who created the pages or an admin of the organisation may move them. Undo moves them back to the old place in one step;
+below the page both sides see the last move (where from, when, who; a workspace you do not belong to shows only as
+"Organisation" or "private space", 2.97.0). Agents never move data between workspaces; the person does that in the app.
+Route: `POST /api/wiki/move-space {pages: [id] | folder, space, to, dest, dry}`.
+
+**With the lock (2.97.0).** Pages also move when the source, the target or both are encrypted in the browser: your browser
+opens name and text with the key of the source, lets the links between the moved pages follow, and encrypts both for the
+target (its current key) -- or sends the plain text when the target is open. In that case the check says *The pages are no
+longer end-to-end encrypted in the target.* and a second question asks before anything moves. You need your encryption
+unlocked and a key of every locked space involved (without the target's key the check stops: an admin of the organisation
+releases it). Names in a locked target are compared in the browser. Undo moves the pages back, encrypted again for the old
+space. If a key changes between the check and the move, the server refuses it (`409`) and the browser tries once more. The
+server never sees a plain name or text of a locked space; the history of such a move keeps no page names.
+
 ## Mind map (2.49.0)
 
 Every list (not the inbox) can be shown as a **Mind map**, next to List, Kanban and Timeline (the view switch in the list

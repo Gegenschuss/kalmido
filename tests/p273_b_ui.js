@@ -126,7 +126,10 @@ async function dataPane(w) {
   click(w, md.querySelector('[data-umz="key"]'));
   await until(() => md.querySelector('#s-umz-imp .umzbox [data-umz="go"]'), 100);
   const ob = md.querySelector('#s-umz-imp .umzbox');
-  check(ob && /Organisation export of Kalmido/.test(ob.textContent) && !/Private/.test(md.querySelector('#s-umz-tgt')?.textContent || 'Private'), 'opened: preview, organisations only as target');
+  // 2.96.0 (#1941): an organisation export may go into the private space too; the tick's words follow the target
+  const tg = md.querySelector('#s-umz-tgt');
+  check(ob && /Organisation export of Kalmido/.test(ob.textContent) && /Private/.test(tg?.textContent || '') && tg.options.length > 1, 'opened: preview, private + organisations as target');
+  if (tg && tg.options.length > 1) { tg.value = tg.options[1].value; tg.dispatchEvent(new w.Event('change', {bubbles: true})); }
   check(!ob.querySelector('[data-k="share"]') || /Add to the organisation/.test(ob.textContent), 'the tick adds to the organisation');
   click(w, ob.querySelector('[data-umz="cancel"]')); await sleep(400);
   check(!md.querySelector('#s-umz-imp .umzbox'), 'cancel');

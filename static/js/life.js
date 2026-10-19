@@ -78,7 +78,8 @@ function viewLife() {
     const body = (r.items.length ? `<ul class="flist">${r.items.slice(0, 8).map(x => `<li class="frow"><a ${open(x.task_id)} class="ft"><b>${esc(x.title)}</b>${x.url ? `<span class="muted lurl">${esc(x.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 60))}</span>` : ''}</a>${x.url ? `<a class="iconbtn" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" title="${esc(tr('Open the link'))}" aria-label="${esc(tr('Open {0}', x.title))}">${ic('link', 's')}</a>` : ''}</li>`).join('')}</ul>${r.count > 8 ? `<p class="muted">${esc(trn('and {0} more', 'and {0} more', r.count - 8))}</p>` : ''}`
       : `<p class="muted">${tr('Nothing to read yet. Links you add to a “Read later” list, or bookmarks from Karakeep, show up here.')}</p>`)
       + (kk.connected ? `<p class="muted lkk">${ic(kk.error ? 'alert' : 'sync', 's')} ${esc(kk.error ? tr('Karakeep: {0}', kk.error) : kk.synced_at ? tr('Karakeep, fetched {0}', fmtDateLoc(kk.synced_at.slice(0, 10))) : tr('Karakeep connected'))}</p>` : '');
-    const acts = (r.lists.length ? `<a class="btn sm" href="#l/${r.lists[0]}">${ic('book', 's')}<span>${tr('Reading list')}</span></a>` : '')
+    const acts = `<a class="btn sm" href="#bookmarks">${ic('bookmark', 's')}<span>${tr('Bookmarks')}</span></a>`  // 2.97.0 A (#1950): the bookmarks (bookmarks.js)
+      + (r.lists.length ? `<a class="btn sm" href="#l/${r.lists[0]}">${ic('book', 's')}<span>${tr('Reading list')}</span></a>` : '')
       + (kk.connected ? btn('life-kksync', 'sync', tr('Fetch now')) : '') + btn('life-kk', 'link', kk.connected ? tr('Karakeep…') : tr('Connect Karakeep…'));
     cards.push(card('reading', 'book', tr('Read later'), body, acts, r.count || ''));
   }
@@ -271,7 +272,7 @@ async function kkModal() {
   try { cur = await api('GET', '/api/life/karakeep'); } catch { return; }
   const rl = S.lists.filter(l => l.life === 'reading' && !l.archived && canEditList(l.id));
   const md = lifeModal(`<h3>${ic('book', 's')} ${tr('Karakeep')}</h3>
-    <p class="muted">${tr('Bookmarks you save in Karakeep become tasks of your “Read later” list; ticked ones are archived in Karakeep.')}</p>
+    <p class="muted">${tr('Links you save in Karakeep become bookmarks, notes become tasks of your “Read later” list; archived bookmarks and ticked tasks are archived in Karakeep.')}</p>
     <div class="row"><label for="kk-url">${tr('Address')}</label><input id="kk-url" type="url" inputmode="url" autocomplete="off" value="${esc(cur.url || '')}" placeholder="https://karakeep.example.com"></div>
     <div class="row"><label for="kk-tok">${tr('API key')}</label><input id="kk-tok" type="password" autocomplete="new-password" placeholder="${esc(cur.token_set ? tr('saved – enter a new one to replace it') : tr('Karakeep > Settings > API keys'))}"></div>
     ${rl.length > 1 ? `<div class="row"><label for="kk-list">${tr('List')}</label><select id="kk-list">${rl.map(l => `<option value="${l.id}" ${l.id === cur.list_id ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}

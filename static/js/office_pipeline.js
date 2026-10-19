@@ -44,7 +44,7 @@ function pp_html() {
   return top + sw + `<div class="pipcols">${cols}</div><p class="muted ofchint">${tr('Drag a card into another column to change its stage. Values net, in the office currency.')}</p>`;
 }
 function pp_card(x) {
-  const who = x.client_name || x.contact;
+  const who = cdn_name(x.client_id, x.client_name) || x.contact;  // 2.97.0 B (#1951)
   const offer = x.offer_id ? `<span class="rotag ${x.offer_status === 'declined' ? 'ppdecl' : `st-${esc(x.offer_status)}`}">${esc(tr('Quotation {0}', x.offer_number || ''))}${x.offer_status === 'declined' ? ' · ' + tr('declined') : ''}</span>` : '';
   return `<li><div role="button" tabindex="0" class="ppcard${x.offer_status === 'declined' && x.stage !== 'lost' ? ' warn' : ''}" draggable="true" data-pp="open" data-id="${x.id}">
     <span class="pptitle">${esc(x.title)}</span>${who ? `<small class="muted">${esc(who)}</small>` : ''}

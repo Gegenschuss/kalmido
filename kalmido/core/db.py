@@ -600,6 +600,11 @@ def init_db(guard=True, load=None):
             counts = repair_data(c)
             gset(c, "migr_auditfix", "1")
             print("audit migration: Paperless access granted to", n, "admin(s); repaired:", counts, flush=True)
+        # 2.97.0 B (#1951): clients with only a free address get street / postcode / city split from it (idempotent)
+        from ..team.clients import cdn_backfill
+        n = cdn_backfill(c)
+        if n:
+            print("clients: address fields filled from the free address for", n, "client(s)", flush=True)
         from ..collab.msgsearch import msg_index_init
         msg_index_init(c)  # 2.33.0 (#1080) / 2.37.0: the message search (kalmido_fold + trigram GIN indexes)
         from .rls import apply as rls_apply, OFF_HELP

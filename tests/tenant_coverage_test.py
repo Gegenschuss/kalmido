@@ -99,6 +99,8 @@ KINDS = {
     # the list decides; Kalmido variables in formulas are evaluated per viewer (a source they may not see: "denied", no name / value)
     "sheet": ("matrix", "p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
                         "trash, presence, completion); a formula's source of another workspace cannot be chosen and shows no value"),
+    # 2.97.0 A (#1950): bookmarks belong to one organisation (every member reads, the owner / its admins change) or one person
+    "bookmark": ("matrix", "p297_a_api_test.py: a bookmark of another organisation / person: 404 (read, change, delete, picture, move)"),
     # ---- not relevant for the boundary between organisations (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account (before a session or about the session's own person)"),
     "own": ("n/a", "the person's own rows only (settings, devices, tokens, habits, time, filters, imports, Home & life, their own "
@@ -163,6 +165,12 @@ ROUTES = {
     "GET /api/agents/jobs": "agent", "POST /api/agents/jobs/{}/action": "agent",
     "POST /api/agents/{}/chat/{}/choice": "agent", "PUT /api/agents/{}/permission-mode": "agent",
     "GET /api/agents/{}/chat": "agent", "POST /api/agents/{}/chat": "agent",
+    # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
+    "GET /api/bookmarks": "bookmark", "POST /api/bookmarks": "bookmark", "GET /api/bookmarks/{}": "bookmark",
+    "PATCH /api/bookmarks/{}": "bookmark", "DELETE /api/bookmarks/{}": "bookmark", "POST /api/bookmarks/{}/restore": "bookmark",
+    "POST /api/bookmarks/{}/refresh": "bookmark", "GET /api/bookmarks/{}/image": "bookmark",
+    "POST /api/bookmarks/move-space": "bookmark",
+    # 2.96.0 C (#2015): job cards in the agent chat (p296_c_api_test.py)
     "POST /api/agents/{}/chat/{}/reactions": "agent", "POST /api/agents/{}/wake": "agent",
     "GET /api/proposals/agents": "agent", "POST /api/proposals": "agent", "GET /api/proposals/{}": "agent",
     "POST /api/proposals/{}/apply": "agent", "POST /api/proposals/{}/discard": "agent",
@@ -391,6 +399,7 @@ ROUTES = {
     "POST /api/family/kids/{}/rewards": "family", "PATCH /api/family/rewards/{}": "family",
     "DELETE /api/family/rewards/{}": "family", "POST /api/family/rewards/{}/request": "family",
     "POST /api/family/rewards/{}/decide": "family",
+    # 2.97.0 B (#1951): customers (p297_b_api_test.py) - routes below this line
     # 2.49.0 (#1551): the parents' PIN of a child account (set / removed by its parents, opened by the child for its session)
     "PUT /api/family/kids/{}/pin": "family", "DELETE /api/family/kids/{}/pin": "family",
     "POST /api/me/pin/unlock": "family", "POST /api/me/pin/lock": "family",
@@ -534,6 +543,7 @@ ROUTES = {
     "GET /api/account/export/file": "own", "GET /api/account/import": "own", "POST /api/account/import": "own",
     "GET /api/account/import/{}": "own", "PUT /api/account/import/{}": "own", "DELETE /api/account/import/{}": "own",
     "POST /api/account/import/{}/run": "own", "POST /api/account/import/{}/key": "own",
+    # 2.96.0 D (#1941 / #1918): an organisation export into the private space (p296_d_api_test.py)
     "POST /api/me/mail/token": "own", "DELETE /api/me/mail/token": "own", "POST /api/me/mail/test": "own",
     "GET /api/v1/life": "own", "GET /api/v1/life/upkeep-presets": "own",
     "POST /api/v1/life/contracts": "own", "POST /api/v1/life/devices": "own", "POST /api/v1/life/upkeep": "own",
@@ -612,6 +622,8 @@ ROUTES = {
     "POST /api/lists/{}/e2e/bulk": "list", "POST /api/lists/{}/e2e/finish": "list", "POST /api/lists/{}/e2e/stop": "list",
     "POST /api/lists/{}/e2e/keys": "list",
     "POST /api/lists/{}/e2e/rotate": "list",  # 2.64.2 A (#1817): key change of a list with the lock
+    # 2.97.0 C (#2049): office moves (p297_c_api_test.py) - routes below this line
+    "POST /api/office/move-space": "office",
     # 2.64.2 B (#1817): list files -- need_task (+ own comment) / need_list, people in the app only (p264b_b_api_test.py)
     "POST /api/tasks/{}/list-attachments": "attachment", "POST /api/lists/{}/e2e/files/{}": "list",
     "GET /api/tasks/{}/note-lock": "task", "PUT /api/tasks/{}/note-lock": "task", "DELETE /api/tasks/{}/note-lock": "task", "GET /api/v1/team/rooms": "team", "POST /api/v1/team/dm": "team",
@@ -675,6 +687,8 @@ ROUTES = {
     "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki",
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
+    # 2.96.0 B (#1941): wiki pages / folders to the other workspace (p296_b_api_test.py)
+    "POST /api/wiki/move-space": "wiki",
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
     # 2.99.0 A (#2182): files of knowledge pages (a file of another organisation / person: 404, p299_a_api_test.py)
     "GET /api/wiki/files/{}": "wiki", "GET /api/wiki/files/{}/{}": "wiki", "DELETE /api/wiki/files/{}": "wiki",
@@ -685,6 +699,8 @@ ROUTES = {
     "POST /api/wiki/e2e/keys": "wiki", "POST /api/wiki/e2e/rotate": "wiki",
     # 2.89.0 (#1916): tables (sheets/web.py; p289_a_api_test.py)
     "GET /api/sheets": "sheet", "POST /api/sheets": "sheet", "GET /api/sheets/{}": "sheet", "PATCH /api/sheets/{}": "sheet",
+    # 2.96.0 B (#1941): a table to the other workspace (p296_b_api_test.py)
+    "POST /api/sheets/{}/move-space": "sheet",
     "DELETE /api/sheets/{}": "sheet", "POST /api/sheets/{}/restore": "sheet", "PUT /api/sheets/{}/cells": "sheet",
     "POST /api/sheets/{}/cells/{}/freeze": "sheet", "POST /api/sheets/{}/cells/{}/name": "sheet",
     "POST /api/sheets/{}/columns": "sheet", "PATCH /api/sheets/{}/columns/{}": "sheet", "DELETE /api/sheets/{}/columns/{}": "sheet",
@@ -714,6 +730,8 @@ ROUTES = {
     "GET /api/paperless/preview": "paperless", "GET /api/v1/files": "file", "GET /api/v1/files/{}": "file",
     "GET /api/v1/files/{}/content": "file", "GET /api/v1/files/{}/text": "file", "GET /api/v1/receipt-suggestions": "receipt",
     "PATCH /api/files/nodes/{}": "file", "PATCH /api/files/shares/{}": "file", "POST /api/files/folders": "file",
+    # 2.96.0 A (#1941): files / folders / documents to the other workspace (p296_a_api_test.py)
+    "POST /api/files/move-space": "file",
     "POST /api/files/links": "file", "POST /api/files/nodes/{}/restore": "file", "POST /api/files/nodes/{}/shares": "file",
     "POST /api/files/nodes/{}/versions": "file", "POST /api/files/nodes/{}/versions/{}/restore": "file",
     "POST /api/files/upload": "file", "POST /api/paperless/import": "paperless", "POST /api/paperless/stop": "paperless",
@@ -741,6 +759,7 @@ ROUTES = {
     # 2.59.0 B (#1375): related tasks (tasks/related.py)
     "GET /api/tasks/{}/related": "related", "GET /api/v1/tasks/{}/related": "related", "POST /api/tasks/similar": "related",
     "GET /api/related/config": "public", "GET /api/admin/related": "admin", "PUT /api/admin/related": "admin",
+    # 2.97.0 D (#2050 #2051): locked spaces / clean-up (p297_d_api_test.py) - routes below this line
     # 2.60.0 B (#1511): the velocity of a list (need_list read; p260_b_api_test.py: a stranger / another organisation's agent 404)
     "GET /api/lists/{}/velocity": "list", "GET /api/v1/lists/{}/velocity": "list",
     # 2.60.0 C (#1512): the review step (need_task / need_list of the task's list; p260_c_api_test.py: a stranger 404, a viewer 403)

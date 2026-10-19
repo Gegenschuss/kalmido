@@ -41,6 +41,7 @@ async function wsSet(ws) {
   const ol = S.route?.mod === 'tasks' && String(S.route.key || '').startsWith('l:') ? listById(+S.route.key.slice(2)) : null;
   if (ol && !inWs(ol, wsCur())) go(keyToHash(START_KEY)); else render();
   try { await api('PATCH', '/api/settings', {workspace: ws}); } catch { /* api() said it */ }
+  if (typeof AB2 !== 'undefined') { AB2.org = null; ab2_reload(); }  // 2.96.0 D (#1941): absences follow the switch (server reads it)
   if (typeof pb_wsChanged === 'function') pb_wsChanged(false);
   p61b_wsRun(true);  // 2.66.1 (#1945)
 }

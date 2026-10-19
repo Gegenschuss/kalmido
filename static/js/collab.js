@@ -840,6 +840,7 @@ async function msgJump(o = {}) {
   for (let n = 0; n < 60 && !S.chat.msgs.some(m => m.id === id) && S.chat.more && S.chat.msgs[0].id > id; n++) { await chatOlder(); if (S.chat.aid !== aid) return false; }
   if (!S.chat.msgs.some(m => m.id === id)) return msgMissing();
   S.chat.pin = false;
+  if (typeof jcd_reveal === 'function') jcd_reveal(id);  // 2.96.0 C (#2015): unfold its job card / leave the filter
   return msgHit(await msgWait(() => $('#chat-msgs ' + sel), 3000)) || msgMissing();
 }
 window.msgJump = msgJump;

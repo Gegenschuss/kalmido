@@ -1339,6 +1339,12 @@ def _archive_public(r, names=None):
     d["amount"] = float(r["amount"]) if r["amount"] is not None else None
     d["paid"] = int(r["paid"] or 0)
     d["archive"] = True
+    if "copy_of" in r.keys() and r["copy_of"]:  # 2.97.0 C (#2049): a read-only copy taken along by a move between offices
+        try:
+            cp = json.loads(r["copy_of"])
+        except ValueError:
+            cp = {}
+        d["copy"] = {k: cp.get(k) or "" for k in ("from", "name", "kind", "number")} if isinstance(cp, dict) else {}
     if names is not None and r["client_id"]:
         d["client"] = names.get(r["client_id"]) or ""
     from .archiveedit import r81b_public
@@ -1781,8 +1787,9 @@ def fi_archive_get():
     except ValueError:
         cid = 0
     rows = fi_archive_rows(c, oid, request.args.get("kind") or "", cid)
-    tot = sum(Decimal(str(r["amount"])) for r in rows if r["amount"] is not None and r["kind"] == "invoice")
-    paid = sum(Decimal(str(r["amount"])) for r in rows if r["amount"] is not None and r["kind"] == "invoice" and r["paid"])
+    own = [r for r in rows if not r.get("copy")]  # 2.97.0 C (#2049): copies of another office's documents count there, not here
+    tot = sum(Decimal(str(r["amount"])) for r in own if r["amount"] is not None and r["kind"] == "invoice")
+    paid = sum(Decimal(str(r["amount"])) for r in own if r["amount"] is not None and r["kind"] == "invoice" and r["paid"])
     return jsonify(items=rows, sum_invoices=float(tot), sum_paid=float(paid), admin=office_role(c, uid, oid) == "admin")
 
 

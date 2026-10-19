@@ -173,18 +173,43 @@ def _service(c, oid, sid):
 def _client(c, oid, cid):
     if not cid:
         return None
-    r = c.execute(f"SELECT id, name, contact, address, email FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (_iid(cid),)).fetchone()
+    r = c.execute(f"SELECT id, name, contact, address, email, street, address_extra, zip, city, country FROM clients WHERE id=? AND "
+                  f"{pb_cl_sql(c, oid)}", (_iid(cid),)).fetchone()  # 2.97.0 B (#1951): the fixed address fields
     return dict(r) if r else None
 
 
-def _recipient_from_client(cl, contact=None):
-    """contact (2.40.0 #1380): the chosen contact person's name ("" = none; None = the client's default)."""
+def _recipient_from_client(cl, contact=None, home="DE"):
+    """contact (2.40.0 #1380): the chosen contact person's name ("" = none; None = the client's default).
+    2.97.0 B (#1951): the address comes from the client's fixed fields only (name, attn., street, extra line, postcode city,
+    the country when it is not home = the company's, as the invoice prints it); the fields themselves travel along (the
+    e-invoice reads them, no parsing of lines). missing: street, postcode or city empty."""
+    g_ = lambda k: re.sub(r"\s+", " ", str(cl.get(k) or "")).strip()
     lines = [cl["name"]]
     contact = cl.get("contact") if contact is None else contact
     if contact:
         lines.append(contact)
-    lines += [x.strip() for x in (cl.get("address") or "").replace("\r", "").split("\n") if x.strip()]
-    return {"name": cl["name"], "lines": lines[:12]}
+    country = g_("country").upper()
+    lines += [x for x in (g_("street"), g_("address_extra"), " ".join(x for x in (g_("zip"), g_("city")) if x),
+                          country if country and country != (home or "DE").upper() else "") if x]
+    return {"name": cl["name"], "lines": lines[:12], "street": g_("street"), "extra": g_("address_extra"), "zip": g_("zip"),
+            "city": g_("city"), "country": country, "missing": not all(g_(k) for k in ("street", "zip", "city"))}
+
+
+def cdn_home(c, oid):
+    """The company's country (the recipient's country line is left out when it is the same)."""
+    return (ofx_company(c, oid).get("country") or "DE").upper()
+
+
+def cdn_doc_recipient(c, oid, r, stored=None):
+    """2.97.0 B (#1951): the recipient of document row r: a draft with a client reads it from the client (now), a finished /
+    sent one or one without a client keeps what is stored (old free lines stay as they are)."""
+    rec = stored if stored is not None else _j(r["recipient"], {})
+    if not r["client_id"] or ofx_locked(r) or r["status"] == "sent":
+        return rec
+    cl = _client(c, oid, r["client_id"])
+    if not cl:
+        return rec
+    return _recipient_from_client(cl, fk_doc_contact_name(c, cl["id"], _cur_val(r, "contact_id")), cdn_home(c, oid))
 
 
 # 2.40.0 (#1380): the contact person of a document (office_docs.contact_id): NULL = the client's default, 0 = none, else
@@ -296,6 +321,8 @@ def doc_public(c, oid, r, admin, items=True):
     d = oc_dec_fields(c, oid, "office_docs", r)  # 2.42.0 (#828)
     for k, dflt in (("recipient", {}), ("rights", {}), ("fields", []), ("totals", {})):
         d[k] = _j(d.get(k), dflt)
+    d["recipient"] = dict(cdn_doc_recipient(c, oid, r, d["recipient"]))  # 2.97.0 B (#1951): a draft shows its client's address now
+    d["recipient_missing"] = bool(d["recipient"].pop("missing", False))  # street, postcode or city missing at the client
     pm = inv_paid_map(c, oid, [r["id"]]) if r["kind"] in ("invoice", "credit") else {}
     d["state"] = inv_state(r, pm)  # 2.38.0: the derived state (partial / overdue) next to the stored status
     d["status_text"] = tr(STATUS_TXT.get(d["state"], d["state"]))
@@ -509,10 +536,16 @@ def clean_doc(c, oid, b, cur, admin):
             if not cl:
                 raise Denied(404)
             f["client_id"] = cl["id"]
-            if not b.get("recipient") and (not _j(cur["recipient"], {}).get("name") or b.get("recipient_from_client")):
-                f["recipient"] = json.dumps(_recipient_from_client(cl, fk_doc_contact_name(c, cl["id"], b.get("contact_id"))), ensure_ascii=False)
     fk_doc_contact_clean(c, oid, b, cur, f)
-    if "recipient" in b and b.get("recipient") is not None:
+    ncid = f["client_id"] if "client_id" in f else _cur_val(cur, "client_id")
+    if ncid:  # 2.97.0 B (#1951): a draft with a client: the recipient is the client's (a given "recipient" is ignored)
+        kid = f["contact_id"] if "contact_id" in f else _cur_val(cur, "contact_id")
+        cl = _client(c, oid, ncid)
+        if cl:
+            rec = _recipient_from_client(cl, fk_doc_contact_name(c, cl["id"], kid), cdn_home(c, oid))
+            rec.pop("missing", None)
+            f["recipient"] = json.dumps(rec, ensure_ascii=False)
+    elif "recipient" in b and b.get("recipient") is not None:
         f["recipient"] = json.dumps(_recipient_clean(b["recipient"]), ensure_ascii=False)
     for k, mx in (("project_title", NAME_MAX), ("project_ref", 80), ("intro", TEXT_MAX), ("closing", TEXT_MAX), ("order_ref", 80)):
         if k in b:
@@ -786,6 +819,8 @@ def odoc_render(c, doc_id, oid):
             if ln.get("rate") is not None:
                 ln["rate_text"] = fmt_money(ln["rate"], lang, cur)
     rec = _j(r["recipient_snapshot"] if locked and r["recipient_snapshot"] else r["recipient"], {})
+    if not locked:
+        rec = cdn_doc_recipient(c, oid, r, rec)  # 2.97.0 B (#1951): a draft prints its client's address as it is now
     rec = {"name": rec.get("name") or "", "lines": rec.get("lines") or []}
     rights = _j(r["rights"], {})
     if not re.match(r"^#[0-9a-fA-F]{6}$", color):
@@ -909,7 +944,8 @@ def odoc_get(did):
 @app.patch("/api/office/docs/<int:did>")
 def odoc_update(did):
     """Head fields (partial); contract_id (changed) presets raw data / rights / closing unless apply_contract: false;
-    client_id fills an empty recipient (recipient_from_client: true overwrites it). Returns the document with totals.
+    client_id fills the recipient from the client (2.97.0 B #1951: always, a given recipient is ignored while the document
+    has a client; it is read from the client until the document is finalised / sent). Returns the document with totals.
     A finalised document: 409."""
     c, uid, oid = _ctx()
     admin = office_role(c, uid, oid) == "admin"

@@ -212,6 +212,8 @@ def wiki_get(pid):
     d = wiki_dict(r, names=user_names(c, [r["updated_by"]]))
     from .wikie2e import wke_page_mode  # 2.64.3 A (#1817): a locked space finds its backlinks in the browser
     d["backlinks"] = [] if wke_page_mode(c, r) else [{"id": x["id"], "path": x["path"]} for x in back]
+    from .wkmove import wkm_last  # 2.96.0 B (#1941): the last move between workspaces (both sides see it)
+    d["moved"] = wkm_last(c, pid)
     from .wikiatt import wka_list
     d["files"] = wka_list(c, r)  # 2.99.0 A (#2182): the page's PDFs and pictures
     return jsonify(d)

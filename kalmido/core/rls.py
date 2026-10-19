@@ -62,6 +62,7 @@ TABLES = (
     "office_archive_log",  # 2.81.0 B (#1834): the history of an archived document (org_id like the entry)
     "sheets",  # 2.89.0 (#1916): tables (NULL = private, the app checks owner_id; parts hang on sheet_id)
     "office_agreements",  # 2.92.0 A (#1925): business contracts and insurances of an office area
+    "bookmarks",  # 2.97.0 A (#1950): bookmarks (NULL = private, the app checks user_id)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

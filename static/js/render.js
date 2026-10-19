@@ -465,6 +465,7 @@ function renderTop0() {
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
   if (!title && m === 'budget') title = tr('Budget');  // 2.72.0 (#1333)
   if (!title && m === 'feeds') title = tr('Feeds');  // 2.85.0 B (#1162)
+  if (!title && m === 'bookmarks') title = tr('Bookmarks');  // 2.97.0 A (#1950)
   if (!title && (m === 'ablage' || m === 'docs')) title = tr(m === 'ablage' ? 'File store' : 'Documents');  // 2.48.0 (#1207, #1111)
   if (m === 'msv') title = msvvTitle();  // 2.73.0 C (#661)
   if (mg_title(m) && !S.me?.kid) title = mg_title(m);  // 2.44.0 (#1187): the area's name, its tabs below
@@ -895,6 +896,7 @@ function renderView0() {
   else if (m === 'life') setHtml(el, mg_wrap(m, viewLife()));  // 2.22.0 (#663)
   else if (m === 'budget') setHtml(el, mg_wrap(m, viewBudget()));  // 2.72.0 (#1333)
   else if (m === 'feeds') setHtml(el, mg_wrap(m, viewFeeds()));  // 2.85.0 B (#1162)
+  else if (m === 'bookmarks') setHtml(el, mg_wrap(m, viewBookmarks()));  // 2.97.0 A (#1950)
   else if (m === 'review') setHtml(el, mg_wrap(m, viewReview()));
   else if (m === 'clients') setHtml(el, mg_wrap(m, viewClients()));  // 2.23.0 (#463)
   else if (m === 'workload') setHtml(el, viewWorkload());

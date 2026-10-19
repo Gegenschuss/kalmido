@@ -2,7 +2,7 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v209';
+const CACHE = 'tasks-shell-v211';
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
@@ -10,7 +10,7 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/fonts/AtkinsonHyperlegible-Regular.woff2', '/static/fonts/AtkinsonHyperlegible-Bold.woff2',
   // 2.20.0 (#646): the web client in modules, the same list and order as the script tags in index.html
   // (tools/check_layout.py compares them)
-  '/static/js/reloadguard.js', '/static/js/icons.js', '/static/js/core.js', '/static/js/lazyload.js', '/static/js/lyopts.js', '/static/js/workspace.js', '/static/js/sharews.js', '/static/js/quickadd.js', '/static/js/views.js', '/static/js/render.js', '/static/js/vlist.js', '/static/js/calendar.js', '/static/js/habits.js',
+  '/static/js/reloadguard.js', '/static/js/icons.js', '/static/js/core.js', '/static/js/lazyload.js', '/static/js/lyopts.js', '/static/js/workspace.js', '/static/js/sharews.js', '/static/js/spacemove.js', '/static/js/quickadd.js', '/static/js/views.js', '/static/js/render.js', '/static/js/vlist.js', '/static/js/calendar.js', '/static/js/habits.js',
   '/static/js/detail.js', '/static/js/collab.js', '/static/js/attachments.js', '/static/js/mdtitle.js', '/static/js/undo.js', '/static/js/popovers.js', '/static/js/dialogs.js', '/static/js/dlgmove.js', '/static/js/setcore.js', '/static/js/custview.js', '/static/js/signoff.js', '/static/js/account.js', '/static/js/servers.js',
   '/static/js/templates.js', '/static/js/time.js', '/static/js/projects.js', '/static/js/envs.js', '/static/js/sprints.js', '/static/js/projtime.js', '/static/js/events.js', '/static/js/sidebar.js', '/static/js/sharedlg.js', '/static/js/dnd.js', '/static/js/secdrag.js', '/static/js/dragmulti.js', '/static/js/palette.js',
   '/static/js/backclose.js', '/static/js/agents.js', '/static/js/cleanup.js', '/static/js/dayplan.js', '/static/js/choicecard.js', '/static/js/chatbase.js', '/static/js/jobchat.js', '/static/js/agentview.js', '/static/js/propkinds2.js', '/static/js/listedit.js', '/static/js/git.js', '/static/js/chat.js', '/static/js/refs.js',
@@ -24,11 +24,11 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
 // compares): cached right after the shell, so they open offline too; a failure there does not drop the install
 const LAZY = ['/static/js/acctset.js', '/static/js/settings.js', '/static/js/contacts.js', '/static/js/newsletter.js', '/static/js/office.js', '/static/js/office_docs.js', '/static/js/office_import.js', '/static/js/office_sheet.js', '/static/js/office_parts.js', '/static/js/office_travel.js', '/static/js/office_cashflow.js', '/static/js/office_doctpl.js', '/static/js/office_logbook.js', '/static/js/office_pipeline.js', '/static/js/office_kpi.js',
   '/static/js/office_datev.js', '/static/js/officeagents.js', '/static/js/office_packs.js', '/static/js/office_books.js', '/static/js/office_bank.js', '/static/js/office_taxdates.js', '/static/js/office_recurring.js', '/static/js/office_subs.js', '/static/js/office_agreements.js', '/static/js/office_assets.js', '/static/js/office_leads.js', '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/pdfview.js', '/static/js/docpreview.js', '/static/js/mindmap.js', '/static/js/wiki.js', '/static/js/stats.js', '/static/js/calview.js', '/static/js/caldrag.js', '/static/js/apptbook.js', '/static/js/docs.js', '/static/js/paperless.js',
-  '/static/js/receipts.js', '/static/js/life.js', '/static/js/integrations.js', '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js', '/static/js/sheets.js', '/static/js/sheets2.js', '/static/js/sheetsio.js'];
+  '/static/js/receipts.js', '/static/js/life.js', '/static/js/integrations.js', '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js', '/static/js/bookmarks.js', '/static/js/sheets.js', '/static/js/sheets2.js', '/static/js/sheetsio.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell
 // 2.65.0 (#1824): the stylesheets of the modules loaded on demand (static/css/, LD_CSS in lazyload.js, same order)
-const LAZY_CSS = ['/static/css/settings.css', '/static/css/contacts.css', '/static/css/office.css', '/static/css/agentchat.css', '/static/css/pdf.css', '/static/css/mindmap.css', '/static/css/wiki.css', '/static/css/stats.css', '/static/css/calendar.css', '/static/css/docs.css', '/static/css/life.css', '/static/css/integrations.css', '/static/css/playbook.css', '/static/css/timeline.css', '/static/css/feeds.css', '/static/css/sheets.css'];
+const LAZY_CSS = ['/static/css/settings.css', '/static/css/contacts.css', '/static/css/office.css', '/static/css/agentchat.css', '/static/css/pdf.css', '/static/css/mindmap.css', '/static/css/wiki.css', '/static/css/stats.css', '/static/css/calendar.css', '/static/css/docs.css', '/static/css/life.css', '/static/css/integrations.css', '/static/css/playbook.css', '/static/css/timeline.css', '/static/css/feeds.css', '/static/css/bookmarks.css', '/static/css/sheets.css'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).then(() => c.addAll(LAZY.concat(LAZY_CSS)).catch(() => 0))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(swCleanup().then(() => self.clients.claim())); });
 async function swCleanup() {

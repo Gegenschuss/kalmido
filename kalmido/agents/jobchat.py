@@ -4,6 +4,8 @@ action 'message') and the job's own history in the person's chat with the agent 
 The history is the person's own conversation only, narrowed to: the agent's messages that belong to the job (job_id),
 the person's messages addressed to it ("Clara: ...", "Job 82: ...", "#82: ..." -- the way the agent's service reads
 them) and the agent's direct answers to those (reply_to)."""
+import re
+
 from flask import jsonify
 
 from ..core.i18n import tr
@@ -71,3 +73,34 @@ def jc_chat_rows(c, aid, jid, before, limit, after=0):
                                       f"({','.join('?' * len(asked))}) AND id>?", (aid, uid, *asked, after)).fetchall() if r["id"] not in have]
     rows.sort(key=lambda r: r["id"])
     return rows, more
+
+
+# ---- 2.96.0 C (#2015): one card per job in the chat. A job message carries its kind (job_msg, set by the agent's chat
+# post; NULL = unknown, the app derives it from the text) and the chat answer carries the jobs of its messages, so the
+# app draws name, version and state of each card without an extra call.
+JCD_KINDS = ("say", "question", "result", "error")
+JCD_VERSION_RE = re.compile(r"\d+\.\d+(?:\.\d+)?[a-z]?")
+
+
+def jcd_jobs(c, aid, msgs, uid):
+    """{str(id): {id, agent_id, user_id, name, title, version, state, parent_id, parent_name, updated_at}} of the jobs of the chat messages
+    msgs (dicts with job_id / job_parent) -- only jobs of agent aid that uid may see (job_visible), like the names."""
+    ids = sorted({int(i) for m in msgs for i in (m.get("job_id"), m.get("job_parent")) if i})
+    if not ids:
+        return {}
+    rows = {j["id"]: j for j in c.execute(f"SELECT * FROM agent_jobs WHERE agent_id=? AND id IN ({','.join('?' * len(ids))})", (aid, *ids))}
+    pids = sorted({j["parent_id"] for j in rows.values() if j["parent_id"]} - set(rows))
+    if pids:
+        rows.update({j["id"]: j for j in c.execute(f"SELECT * FROM agent_jobs WHERE agent_id=? AND id IN ({','.join('?' * len(pids))})", (aid, *pids))})
+    seen = {i: j for i, j in rows.items() if job_visible(c, j, uid)}
+    out = {}
+    for i in ids:
+        j = seen.get(i)
+        if not j:
+            continue
+        par = seen.get(j["parent_id"]) if j["parent_id"] else None
+        v = JCD_VERSION_RE.search(j["title"] or "")
+        out[str(i)] = {"id": i, "agent_id": j["agent_id"], "user_id": j["user_id"], "name": jc_job_name(j["title"], j["name"]), "title": j["title"], "version": v.group(0) if v else "",
+                       "state": j["state"], "parent_id": par["id"] if par else None,
+                       "parent_name": jc_job_name(par["title"], par["name"]) if par else None, "updated_at": j["updated_at"]}
+    return out

@@ -52,7 +52,7 @@ async function leadConvert(x, md) {
   };
   if (!(j.matches || []).length) return go2(null);
   const pick = modal(`<h3>${tr('Convert into a client')}</h3><p class="muted">${tr('There is already a client that fits this lead:')}</p>
-    <ul class="ofclist lead-match" role="list">${j.matches.map(m => `<li><button class="btn lead-mbtn" data-lm="${m.id}">${ic('user', 's')}<span>${esc(m.name)}${m.email ? ` <small class="muted">${esc(m.email)}</small>` : ''}</span></button></li>`).join('')}</ul>
+    <ul class="ofclist lead-match" role="list">${j.matches.map(m => `<li><button class="btn lead-mbtn" data-lm="${m.id}">${ic('user', 's')}<span>${esc(cdn_label(m))}${m.email ? ` <small class="muted">${esc(m.email)}</small>` : ''}</span></button></li>`).join('')}</ul>
     <div class="foot"><span class="spacer"></span><button class="btn" data-lm="close">${tr('Cancel')}</button><button class="btn pri" data-lm="new">${tr('Add as new client')}</button></div>`);
   const close = fgModal(pick);
   pick.addEventListener('click', async e => {
