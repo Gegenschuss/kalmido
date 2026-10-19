@@ -426,7 +426,19 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
   name, `keys()`, `dict()`), and offers `insert_id()` (`RETURNING id`), `write_lock()` (advisory lock for check-then-write),
   `savepoint()`, `heal()` (rollback after an aborted transaction), `like_escape()` and `system_ctx()`.
   `db()` / `connect()` in `core/db.py` lend a connection from a pool (4 to 56, `KALMIDO_DB_POOL_MAX`; every lend is
-  checked, so a restarted database costs no errors).
+  checked, so a restarted database costs no errors). 2.102: the pool follows `KALMIDO_THREADS` (threads x 3 + 8), a
+  wait that runs out is logged with the pool's counters, `GET /api/admin/health` shows them (`admin/worker.py`).
+- **Migrations (2.102).** `MIGRATIONS` in `core/schema.py` stays a list of additive steps (append at the end). Each step
+  gets a stable id from table + column (`tasks.pinned`, a second step for the same column `lists.tap_done#2`), so its
+  place in the list does not matter. `init_db` (`mig_apply`) runs the steps whose column is missing and records every step
+  in the table `kalmido_migrations` (applied / present / again, with the time). The one-shot data migrations keep their
+  settings flag (`migr_*`, read by older versions after a rollback) and are recorded there as `flag:migr_*`.
+  `SCHEMA_VERSION` only gates restores of newer backups.
+- **Process roles (2.102).** `KALMIDO_ROLE=all` (default) runs web and background loops in one process; `web` runs no
+  loop; `worker` (`python app.py worker`) runs only the loops. Every loop thread (by its name, `admin/worker.py`
+  `WRK_LOOPS`) takes a session-level `pg_try_advisory_lock` of its own before its rounds -- the check sits in
+  `GATE.bg()` -- so one process of the instance runs each loop. New loops: start them with `wrk_start(name, fn)` in
+  `startup.py`, or give an on-demand queue thread a name and add it to `WRK_LAZY`.
 - **Session limits.** Every connection runs with `statement_timeout` 30 s, `idle_in_transaction_session_timeout`
   5 min and `jit=off`. Network calls (mail, calendar and contact sync, Web Push) run outside open transactions.
   `init_db` and the backup lift the statement limit for themselves.
