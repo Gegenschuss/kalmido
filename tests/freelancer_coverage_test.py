@@ -291,6 +291,9 @@ ROUTES = {
     "DELETE /api/office/deals/{}": "office", "DELETE /api/office/docs/{}": "office",
     "DELETE /api/office/docs/{}/parts/{}": "office", "DELETE /api/office/docs/{}/payments/{}": "office",
     "DELETE /api/office/fixed-costs/{}": "office", "DELETE /api/office/logo": "office",
+    # 2.120.0 E (#2091): the own letterhead PDF
+    "GET /api/office/letterhead": "office", "POST /api/office/letterhead": "office", "PUT /api/office/letterhead": "office",
+    "DELETE /api/office/letterhead": "office", "POST /api/office/letterhead/restore": "office", "GET /api/office/letterhead/preview": "office",
     "DELETE /api/office/packs/installed/{}/{}": "office", "DELETE /api/office/trips/{}": "office",
     "DELETE /api/office/trips/{}/items/{}": "office", "DELETE /api/office/{}/{}": "office", "DELETE /api/paperless": "office",
     "DELETE /api/paperless/zip": "office", "DELETE /api/v1/clients/{}": "office", "GET /api/clients": "office",
