@@ -200,8 +200,9 @@ check(any(x["data"]["action"] == "owner" and x["data"].get("to") == "Carol" for 
 # ---- the history, the account export
 log = A.get(B + f"/api/orgs/{ORG}/lists").json()["log"]
 acts = [x["action"] for x in log]
-check(acts[:2] == ["owner", "delete"] and "archive" in acts and "restore" in acts and log[0]["by"] == "Alice" and log[0]["to"] == "Carol"
-      and log[1]["list_name"] == "Bob Team" and log[1]["owner"] == "Bob", "#1101: the history, newest first " + json.dumps(log[:2]))
+# 2.102.0 (#1988): the delete is "trash", the restore after it "undelete"
+check(acts[:3] == ["owner", "undelete", "trash"] and "archive" in acts and "restore" in acts and log[0]["by"] == "Alice" and log[0]["to"] == "Carol"
+      and log[1]["list_name"] == "Bob Team" and log[1]["owner"] == "Bob", "#1101: the history, newest first " + json.dumps(log[:3]))
 ex = A.get(B + "/api/export.json").json()
 check(len(ex.get("org_list_actions", [])) == len(log), "#1101: the account export holds my actions as an organisation admin")
 

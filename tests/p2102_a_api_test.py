@@ -147,7 +147,7 @@ tb = tb.get("tasks", tb) if isinstance(tb, dict) else tb
 check(not {T1, T2} & {t["id"] for t in tb}, "bob's task trash does not show them (only the list trash)")
 check(LT not in {x["id"] for x in A.get(B + f"/api/orgs/{ORG}/lists").json()["lists"]}, "the org admin's overview leaves it out")
 check(requests.get(B + f"/api/v1/lists/{LT}", headers=AGH).status_code in (403, 404), "the agent API does not reach it")
-check(Bo.get(B + f"/api/lists/{LT}/fields").status_code in (403, 404), "a list route answers 404")
+check(Bo.get(B + f"/api/lists/{LT}/notes").status_code in (403, 404), "a list route answers 404")
 # a single task never comes back on its own (and never into the private space)
 r = Bo.post(B + f"/api/tasks/{T1}/restore")
 check(r.status_code in (403, 409) and sql("SELECT deleted_at IS NOT NULL, list_id FROM tasks WHERE id=?", (T1,))[0] == (1, LT),
