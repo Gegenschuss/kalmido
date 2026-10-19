@@ -82,7 +82,7 @@ function bkReceiptsHtml() {
 
 function bkTable(rows, total, count) {
   const th = `<thead><tr><th>${tr('Group')}</th>${count ? `<th class="num">${tr('Receipts')}</th>` : ''}<th class="num">${tr('Net')}</th><th class="num">${tr('VAT')}</th><th class="num">${tr('Gross')}</th></tr></thead>`;
-  const td = (r, b) => `<tr${b ? ' class="bk-tot"' : ''}><th scope="row">${esc(r.label)}</th>${count ? `<td class="num" data-l="${esc(tr('Receipts'))}">${r.count ?? ''}</td>` : ''}<td class="num" data-l="${esc(tr('Net'))}">${ofcMoney(r.net)}</td><td class="num" data-l="${esc(tr('VAT'))}">${ofcMoney(r.vat)}</td><td class="num" data-l="${esc(tr('Gross'))}">${ofcMoney(r.gross)}</td></tr>`;
+  const td = (r, b) => `<tr${b ? ' class="bk-tot"' : ''}><th scope="row">${esc(r.label)}${r.account ? ` <small class="muted">${esc(r.account)}</small>` : ''}</th>${count ? `<td class="num" data-l="${esc(tr('Receipts'))}">${r.count ?? ''}</td>` : ''}<td class="num" data-l="${esc(tr('Net'))}">${ofcMoney(r.net)}</td><td class="num" data-l="${esc(tr('VAT'))}">${ofcMoney(r.vat)}</td><td class="num" data-l="${esc(tr('Gross'))}">${ofcMoney(r.gross)}</td></tr>`;
   return `<table class="bk-tab">${th}<tbody>${rows.length ? rows.map(r => td(r)).join('') : `<tr><td colspan="${count ? 5 : 4}" class="muted">${tr('None')}</td></tr>`}${td({...total, label: tr('Total')}, true)}</tbody></table>`;
 }
 function bkEuerHtml() {
@@ -165,7 +165,8 @@ async function bkSheet(id, fresh) {
   const wait = doc.state === 'wait' || doc.state === 'run';
   const md = modal(`<h3>${tr('Receipt')}</h3><p class="muted bk-sname">${esc(doc.name)}</p><div class="bk-rx"></div>
     <p class="muted bk-rec" role="status">${wait ? tr('Being recognised…') : ''}</p>
-    ${ofcRowF('bk-cat', tr('Category'), ofcIn('bk-cat', r.category, {max: 60, list: 'bk-cats', ph: tr('e.g. Travel, Material, Software')}) + `<datalist id="bk-cats">${cats.map(k => `<option value="${esc(k)}">`).join('')}</datalist>`)}
+    ${ofcRowF('bk-cat', tr('Category'), ofcIn('bk-cat', r.category, {max: 60, list: 'bk-cats', ph: tr('e.g. Travel, Material, Software')}) + `<datalist id="bk-cats">${cats.map(k => `<option value="${esc(k)}"${bkAcct(k) ? ` label="${esc(bkAcct(k).account)}"` : ''}>`).join('')}</datalist>`)}
+    <div class="bk-acct muted" aria-live="polite"></div>
     ${ofcRowF('bk-vat', tr('VAT rate'), ofcSel('bk-vat', r.vat_pct ?? '', BK_VATS, tr('unknown')))}
     ${ofcRowF('bk-amount', tr('Amount (gross)'), ofcIn('bk-amount', doc.amount ? fmtNum(+doc.amount, 2) : '', {num: true}), ofcCur())}
     <div class="row"><label id="bk-datel">${tr('Date')}</label>${dateIn('bk-date', doc.date || '', {label: tr('Date')})}</div>
@@ -180,9 +181,13 @@ async function bkSheet(id, fresh) {
   md.addEventListener('input', e => { if (e.target.id) touched.add(e.target.id); });
   md.addEventListener('change', e => { if (e.target.id) touched.add(e.target.id); });
   if (wait) bkPoll(id, md, touched, 0);
+  bkAcctLine(md);
+  $('#bk-cat', md)?.addEventListener('input', () => bkAcctLine(md));
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
+    if (b.dataset.m === 'acct') { bkAcctEdit(md); return; }
+    if (b.dataset.m === 'acct-save') { bkAcctSave(md); return; }
     if (b.dataset.m === 'bill') { close(); bkBillModal([id]); return; }
     const v = s => $(s, md)?.value ?? '';
     const amt = ofcNum(v('#bk-amount'));
@@ -196,6 +201,42 @@ async function bkSheet(id, fresh) {
     histToast(label, histAdd({label, undo: () => bkSave(id, before), redo: () => bkSave(id, after)}));
   });
   if (fresh) setTimeout(() => $('#bk-cat', md)?.focus(), 0);
+}
+// 2.121.0 (#2093): the SKR03 / SKR04 account of a receipt category (the one the DATEV export books on); changed here through
+// the office settings (datev_extf.cat_accounts), one undo step. BK.info.accounts is null without the DATEV input side.
+const bkAcct = cat => {
+  const a = BK.info?.accounts, k = (cat || '').toLowerCase();
+  if (!a || !k) return null;
+  const n = Object.keys(a.categories).find(x => x.toLowerCase() === k);
+  return n ? a.categories[n] : null;
+};
+function bkAcctLine(md) {
+  const el = $('.bk-acct', md), a = BK.info?.accounts, cat = ($('#bk-cat', md)?.value || '').trim();
+  if (!el) return;
+  if (!a || !cat) { el.innerHTML = ''; return; }
+  const x = bkAcct(cat);
+  el.innerHTML = x ? `<span>${esc(tr('Account {0} ({1})', x.account, a.chart))}${x.own ? '' : ' · ' + esc(tr('default account'))}</span> <button type="button" class="btn sm ghost" data-m="acct">${tr('Change account')}</button>`
+    : `<span>${esc(tr('New category: account after saving'))}</span>`;
+}
+function bkAcctEdit(md) {
+  const el = $('.bk-acct', md), cat = ($('#bk-cat', md)?.value || '').trim(), x = bkAcct(cat);
+  if (!el || !x) return;
+  el.innerHTML = `${ofcIn('bk-acctin', x.own ? x.account : '', {num: true, max: 9, ph: x.default})}<button type="button" class="btn sm" data-m="acct-save">${tr('Save')}</button>`;
+  $('#bk-acctin', md)?.focus();
+}
+async function bkAcctPut(own) {
+  await api('PUT', '/api/office/settings', {datev_extf: {cat_accounts: own}});
+  BK.info = null; BK.euer = null;
+}
+async function bkAcctSave(md) {
+  const cat = ($('#bk-cat', md)?.value || '').trim(), val = ($('#bk-acctin', md)?.value || '').replace(/\D/g, '');
+  const from = {...(BK.info?.accounts?.own || {})}, to = {...from};
+  if (val) to[cat.toLowerCase()] = val; else delete to[cat.toLowerCase()];
+  try { await bkAcctPut(to); } catch (x) { $('.aerr', md).textContent = x.message || ''; return; }
+  try { BK.info = await api('GET', `/api/office/books?year=${BK.year}`); } catch (x) { /* drawn on the next visit */ }
+  bkAcctLine(md);
+  const label = tr('Changed account');
+  histToast(label, histAdd({label, undo: async () => { await bkAcctPut(from); ofcDraw(); return {}; }, redo: async () => { await bkAcctPut(to); ofcDraw(); return {}; }}));
 }
 // 2.121.0 C (#2094): bill receipts on to a client (positions "external costs"; one undo step)
 async function bkBillModal(pre) {
