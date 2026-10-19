@@ -190,7 +190,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   w.eval(`go('l/${WORK}')`); await sleep(300);
   click(w, d.querySelector('#top [data-act="top-more"]')); await sleep(80);
   const lab = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent);
-  check(lab.includes('Restore list from the archive') && lab.includes('Delete list permanently…') && !lab.includes('Archive list'), 'archived list menu: restore / delete permanently: ' + lab);
+  check(lab.includes('Restore list from the archive') && lab.includes('Delete list…') && !lab.includes('Archive list'), 'archived list menu: restore / delete (2.102.0 #1988: into the trash): ' + lab);
   w.eval('closePop()');
   // delete for good: the dialog names what is lost; Esc = no
   let p = w.eval(`listDeleteForGood(${WORK})`); await sleep(100);
