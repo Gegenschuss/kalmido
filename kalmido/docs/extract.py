@@ -239,9 +239,10 @@ def pay_line(text, today=None):
     return None, None
 
 
-def extract(text, today=None, guess=True):
+def extract(text, today=None, guess=True, details=False):
     """{'date': 'YYYY-MM-DD' | None, 'due': .. | None, 'amount': '12.34' | None, 'currency': 'EUR' | None}. guess False (a
-    document that is no invoice / receipt): the due date and amount only from a 'to pay until' line (pay_line)."""
+    document that is no invoice / receipt): the due date and amount only from a 'to pay until' line (pay_line). 2.121.0 A
+    (#2092): details=True adds 'details' = ex_details (supplier, VAT, net / gross, invoice number; only with guess)."""
     d = doc_date(text or "", today)
     if guess:
         due = due_date(text or "", d, today)
@@ -251,8 +252,11 @@ def extract(text, today=None, guess=True):
         a = a or {}
     if due and d and due < d:
         due = None
-    return {"date": d.isoformat() if d else None, "due": due.isoformat() if due else None,
-            "amount": a.get("amount"), "currency": a.get("currency")}
+    out = {"date": d.isoformat() if d else None, "due": due.isoformat() if due else None,
+           "amount": a.get("amount"), "currency": a.get("currency")}
+    if details:
+        out["details"] = ex_details(text) if guess else None
+    return out
 
 
 def find_asn(prefix, texts):
@@ -267,3 +271,268 @@ def find_asn(prefix, texts):
         if m and int(m.group(1)) > 0:
             return int(m.group(1))
     return None
+
+
+# ---- 2.121.0 A (#2092): supplier, VAT, net / VAT / gross and the invoice number of a receipt (a suggestion the person
+# confirms; nothing of it is set on its own). Rules only, German and English.
+RX_FORM = re.compile(r"(?<![\w&])(?:gGmbH|GmbH(?:\s*&\s*Co\.?\s*KG(?:aA)?)?|mbH|UG(?:\s*\(haftungsbeschr(?:ä|ae)nkt\))?|AG|KGaA|KG|OHG|GbR|"
+                     r"e\.\s?K(?:fm|fr)?\.|e\.\s?V\.|PartG(?:\s*mbB)?|SE|Ltd\.?|Limited|Inc\.?|LLC|LLP|Corp\.?|B\.V\.|S\.A\.|S\.A\.S\.|"
+                     r"S\.?r\.?l\.?|ApS|AB|Oy)(?![\w])")
+RX_NOT_NAME = re.compile(r"amtsgericht|registergericht|handelsregister|\bHR[AB]\b|gesch(?:ä|ae)ftsf(?:ü|ue)hr|vorstand|"
+                         r"aufsichtsrat|sitz der|registered|director|\bbank\b|\biban\b|\bbic\b|swift|\bust\b|\bvat\b|steuer|\btax\b|@|www\.|https?:|"
+                         r"\bseite\b|\bpage\b|telefon|\btel\b|fax|e-?mail", re.I)
+RX_TO = re.compile(r"^\s*(?:an|to|bill(?:ed)?\s+to|invoice\s+to|sold\s+to|ship\s+to|deliver(?:y|ed)?\s+to|rechnung\s+an|"
+                   r"rechnungs(?:empf(?:ä|ae)nger|anschrift|adresse)|empf(?:ä|ae)nger|lieferanschrift|lieferadresse|kunde|customer|"
+                   r"recipient|buyer|käufer|kaeufer)\b\s*:?", re.I)
+RX_ZIP = re.compile(r"(?<!\d)(?:D-|A-|CH-)?\d{4,5}\s+[A-ZÄÖÜ][a-zäöüß]")
+RX_STREET = re.compile(r"(?:stra(?:ß|ss)e|str\.|weg|allee|platz|gasse|ring|damm|ufer|chaussee|park|markt|street|st\.|road|rd\.|avenue|ave\.)"
+                       r"\s*\d", re.I)
+RX_DOC_WORD = re.compile(r"^(?:rechnung|invoice|quittung|receipt|beleg|kassenbon|bon|gutschrift|credit\s+note|angebot|"
+                         r"lieferschein|seite|page|datum|date|kopie|copy|original|duplikat)\b", re.I)
+RX_VAT_ID = re.compile(r"(?<![A-Z0-9])(DE\s?\d{3}\s?\d{3}\s?\d{3}|ATU\s?\d{8}|(?:BE|NL|FR|IT|ES|LU|DK|PL|CZ|SE|FI|IE|PT|SK|SI|HU|"
+                       r"RO|BG|HR|LT|LV|EE|GR|EL|CY|MT|CHE)[-\s]?[0-9A-Z][0-9A-Z.\s]{6,13}[0-9A-Z])(?![A-Z0-9])")
+RX_VAT_ID_LABEL = re.compile(r"ust\.?\s*-?\s*id(?:ent)?\.?\s*-?\s*(?:nr|nummer)?|umsatzsteuer-?\s*id|vat\s*(?:id|reg|no|number)|"
+                             r"\buid\b|tva|btw|\bp\.?\s?iva", re.I)
+RX_TAX_NO = re.compile(r"(?:steuer\s*-?\s*(?:nummer|nr\.?)|st\.?\s*-?\s*nr\.?)\s*[:.]?\s*(\d{2,3}/\d{3,4}/\d{4,5}|\d{10,13})", re.I)
+RX_THEIR = re.compile(r"\b(?:ihre|your|kunden?|customer|buyer|empf(?:ä|ae)nger|leistungsempf(?:ä|ae)nger|recipient)\b", re.I)
+RX_INV_NO = re.compile(r"(?<![a-zäöü])(?:rechnungs?\s*-?\s*(?:nummer|nr\.?|no\.?)|rg\.?\s*-?\s*nr\.?|re\.?\s*-?\s*nr\.?|"
+                       r"rechnung\s+(?:nr\.?|no\.?|nummer|#)|beleg\s*-?\s*(?:nummer|nr\.?)|quittungs?\s*-?\s*(?:nummer|nr\.?|no\.?)|"
+                       r"quittung\s+(?:nr\.?|no\.?|#)|bon\s*-?\s*(?:nummer|nr\.?)|invoice\s*(?:no\.?|number|nr\.?|#|id)|"
+                       r"receipt\s*(?:no\.?|number|#)|bill\s*(?:no\.?|number|#))\s*[:#.]?\s*", re.I)
+RX_INV_VAL = re.compile(r"[A-Za-z0-9][A-Za-z0-9\-/._]{0,30}")
+RX_PCT = re.compile(r"(?<![\d,.])(\d{1,2})(?:[.,]0{1,2})?\s*%")
+RX_VAT_WORD = re.compile(r"(?<![a-zäöü])(?:mwst|mehrwertsteuer|ust|umsatzsteuer|vat|tax|steuer|tva|btw)(?![a-zäöü])", re.I)
+RX_NET_WORD = re.compile(r"(?<![a-zäöü])(?:netto(?:betrag|summe|wert)?|summe\s+netto|gesamt\s+netto|zwischensumme|warenwert|"
+                         r"subtotal|sub-total|net\s+amount|net\s+total|total\s+net|amount\s+net|total\s+excl\.?|net)(?![a-zäöü])", re.I)
+RX_ZERO = re.compile(r"§\s*19\s*(?:abs\.?\s*1\s*)?ustg|kleinunternehmer|steuerfrei|umsatzsteuerfrei|reverse\s+charge|"
+                     r"steuerschuldnerschaft\s+des\s+leistungsempf|innergemeinschaftlich|intra-community|§\s*13b\s*ustg|"
+                     r"tax\s+exempt|vat\s+exempt|exempt\s+from\s+vat|ohne\s+(?:mwst|umsatzsteuer|ust)|"
+                     r"(?<![\d,.])0\s*%\s*(?:mwst|ust|vat)", re.I)
+RX_VAT_SUM = re.compile(r"(?:summe|gesamt|total)\s+(?:mwst|ust|vat|tax|steuer)|(?:mwst|ust|vat|tax)[\s.-]*(?:betrag|gesamt|summe|total)", re.I)
+
+
+def _cents(v):
+    return int(round(float(v) * 100)) if v else None
+
+
+def _mon(c):
+    return f"{c // 100}.{c % 100:02d}" if c is not None and c > 0 else None
+
+
+def ex_lines(text):
+    """The cleaned lines (blank lines kept: they bound the address blocks)."""
+    return [ln.strip() for ln in _fold(text or "")[:TEXT_CAP].splitlines()]
+
+
+def _rx_blocked(lines):
+    """Indexes of the lines in the recipient's address block ("An", "Rechnung an", "Bill to" ... up to a blank line, at
+    most 6 lines) -- the supplier is never the recipient."""
+    out = set()
+    for i, ln in enumerate(lines):
+        if not RX_TO.match(ln):
+            continue
+        rest = RX_TO.sub("", ln, count=1).strip()
+        if rest:
+            out.add(i)
+        for j in range(i + 1, min(i + 7, len(lines))):
+            if not lines[j]:
+                if j > i + 1:
+                    break
+                continue
+            out.add(j)
+    return out
+
+
+def _rx_name(part):
+    part = re.sub(r"\s+", " ", part).strip(" ,;:-·|•")
+    if not (2 < len(part) <= 80) or RX_NOT_NAME.search(part) or RX_ZIP.search(part) or RX_STREET.search(part):
+        return None
+    if sum(ch.isdigit() for ch in part) > len(part) // 3 or not re.search(r"[A-Za-zÄÖÜäöüß]{2}", part):
+        return None
+    return part
+
+
+def ex_supplier(text):
+    """The supplier's company name: a line (or the first part of a return-address line "Muster GmbH · Weg 1 · 12345 Ort")
+    with a legal form, looked for in the head (first 20 lines), then in the foot; without one the first sensible line
+    before the first address line. Never a line of the recipient's address block. None when nothing fits."""
+    lines = ex_lines(text)
+    blocked = _rx_blocked(lines)
+    head = [(i, ln) for i, ln in enumerate(lines[:20]) if ln and i not in blocked]
+    foot = [(i, ln) for i, ln in enumerate(lines) if ln and i >= 20 and i not in blocked][-25:]
+    for part_of in (head, foot):
+        for _i, ln in part_of:
+            for part in re.split(r"\s+[·|•–—/]\s+|\s{3,}|\s+-\s+|,\s+(?=\S)", ln):
+                m = RX_FORM.search(part)
+                if m:
+                    name = _rx_name(part[:m.end()])
+                    if name:
+                        return name
+    cands = []
+    for _i, ln in head[:8]:
+        if RX_ZIP.search(ln) or RX_STREET.search(ln):
+            return cands[0] if cands else None  # the first address: the name stands before it
+        if RX_DOC_WORD.search(ln) or RX_TO.match(ln) or find_dates(ln) or find_amounts(ln):
+            continue
+        name = _rx_name(re.split(r"\s+[·|•–—]\s+", ln)[0])
+        if name:
+            cands.append(name)
+    return None
+
+
+def ex_vat_id(text):
+    """The supplier's VAT id ("DE123456789", "ATU12345678", ...): a labelled one not marked as the customer's ("Ihre
+    USt-IdNr."), else the first one. Spaces removed."""
+    lines = ex_lines(text)
+    blocked = _rx_blocked(lines)
+    first = None
+    for i, ln in enumerate(lines):
+        for m in RX_VAT_ID.finditer(ln):
+            v = re.sub(r"[\s.-]", "", m.group(1))
+            if len(v) < 9 or not re.search(r"\d{6}", v):
+                continue
+            pre = ln[:m.start()]
+            if i in blocked or RX_THEIR.search(pre[-40:]):
+                continue
+            if RX_VAT_ID_LABEL.search(pre[-40:]):
+                return v
+            first = first or v
+    return first
+
+
+def ex_tax_no(text):
+    for ln in ex_lines(text):
+        m = RX_TAX_NO.search(ln)
+        if m and not RX_THEIR.search(ln[:m.start()][-40:]):
+            return m.group(1)
+    return None
+
+
+def ex_invoice_no(text):
+    """The invoice / receipt number after its label ("Rechnungsnummer", "Rg.-Nr.", "Invoice No.", "Quittung Nr.", the value
+    on the same line or alone on the next one); never a date, an IBAN, a customer / order number (other labels)."""
+    lines = [ln for ln in ex_lines(text) if ln]
+    for i, ln in enumerate(lines):
+        for m in RX_INV_NO.finditer(ln):
+            rest = ln[m.end():]
+            if not re.search(r"\d", rest) and i + 1 < len(lines):
+                rest = lines[i + 1]     # a table head ("Rechnungsnummer   Datum"): the value starts the next line
+            v = RX_INV_VAL.match(rest.strip())
+            if not v:
+                continue
+            val = v.group(0).rstrip(".-/_")
+            if not re.search(r"\d", val) or len(val) < 2 or IBAN_RE.fullmatch(val):
+                continue
+            if any(s == 0 and e >= len(val) for s, e, _d in find_dates(val)):
+                continue                # a date, not a number ("Rechnungsdatum" is no label; this guards "Nr.: 01.10.2026")
+            if re.fullmatch(r"(?:kunden|kd|auftrags?|bestell|order|customer)\w*", val, re.I):
+                continue
+            return val[:40]
+    return None
+
+
+def _rx_amounts(ln):
+    """The amounts of a line without its percent figures ("19,00 %" is no amount)."""
+    bare = RX_PCT.sub(lambda m: " " * len(m.group(0)), ln)
+    for s0, e0, _d in reversed(find_dates(bare)):
+        bare = bare[:s0] + " " * (e0 - s0) + bare[e0:]
+    return [_cents(v) for v, _cur, dec in find_amounts(bare) if dec or _cur]
+
+
+def ex_vat(text):
+    """{'rates': [{'pct': '19', 'net': '100.00' | None, 'vat': '19.00'}], 'zero': bool, 'vat_sum': cents | None} -- the VAT
+    lines with a rate ("zzgl. 19 % MwSt 19,00", "enthaltene MwSt 7 %: 1,40", "19% 100,00 19,00 119,00"); 'zero': the
+    document says it charges no VAT (§ 19 UStG, reverse charge, intra-community, tax exempt)."""
+    lines = [ln for ln in ex_lines(_clean(text or "")) if ln]
+    rates = {}
+    vat_sum = None
+    for i, ln in enumerate(lines):
+        low = ln.lower()
+        if not RX_VAT_WORD.search(low) and not (RX_PCT.search(ln) and re.search(r"(?<![a-zäöü])(?:mwst|ust|vat|tax)", " ".join(lines[max(0, i - 3):i]).lower())):
+            continue
+        pcts = [int(p) for p in RX_PCT.findall(ln)]
+        ams = _rx_amounts(ln)
+        if not ams and i + 1 < len(lines) and len(ln) < 50:
+            ams = _rx_amounts(lines[i + 1])
+        if not pcts:
+            if RX_VAT_SUM.search(low) and ams:
+                vat_sum = ams[-1]
+            continue
+        p = pcts[0]
+        if len(pcts) > 1 or not (0 < p < 30) or not ams:
+            continue
+        net = vat = None
+        for a in ams:                   # a net / VAT pair: vat = net * p / 100 (one cent each way)
+            for b in ams:
+                if a != b and abs(round(a * p / 100) - b) <= 2:
+                    net, vat = a, b
+                    break
+            if vat:
+                break
+        if vat is None:
+            vat = ams[-1]
+            base = next((a for a in ams if a != vat and abs(round(a * p / (100 + p)) - vat) <= 2), None)  # "7 % von 21,40: 1,40"
+            if base:
+                net = base - vat
+        if net is not None and vat > net:
+            continue
+        r = rates.setdefault(p, {"net": None, "vat": None})
+        if r["vat"] is None:
+            r.update(net=net, vat=vat)
+    return {"rates": [{"pct": str(p), "net": _mon(r["net"]), "vat": _mon(r["vat"])} for p, r in sorted(rates.items(), reverse=True)],
+            "zero": bool(RX_ZERO.search(_fold(text or "")[:TEXT_CAP])), "vat_sum": vat_sum}
+
+
+def ex_net(text):
+    """The net total from a "Netto" / "Zwischensumme" / "Subtotal" line (the last such line: a total after the items), cents."""
+    lines = [ln for ln in ex_lines(_clean(text or "")) if ln]
+    out = None
+    for i, ln in enumerate(lines):
+        m = RX_NET_WORD.search(ln)
+        if not m or (RX_PCT.search(ln) and RX_VAT_WORD.search(ln[:m.start()])):
+            continue
+        ams = _rx_amounts(ln[m.end():]) or (_rx_amounts(lines[i + 1]) if i + 1 < len(lines) and len(ln) < 40 else [])
+        if ams:
+            out = ams[0] if RX_VAT_WORD.search(ln[m.end():]) else ams[-1]
+    return out
+
+
+def ex_details(text):
+    """2.121.0 A (#2092): {'supplier', 'vat_id', 'tax_no', 'invoice_no', 'vat_pct' ('19' | '7' | '0' | None: the rate with the
+    largest base), 'vat_rates' [{pct, net, vat}], 'net', 'vat', 'gross' ('12.34' | None), 'currency'} of an invoice or a
+    receipt. Net + VAT must give the gross (the total of doc_amount) within two cents; when they do not, only what is
+    sure stays (the gross, the rate). Every key is there (None when not found)."""
+    text = text or ""
+    a = doc_amount(text) or {}
+    gross = _cents(a.get("amount"))
+    v = ex_vat(text)
+    rates = v["rates"]
+    net = ex_net(text)
+    vat = sum(_cents(r["vat"]) for r in rates) if rates else v["vat_sum"]
+    if rates and len(rates) > 1 and all(r["net"] for r in rates) and net is None:
+        net = sum(_cents(r["net"]) for r in rates)
+    if len(rates) == 1 and rates[0]["net"] and net is None:
+        net = _cents(rates[0]["net"])
+    if gross is not None and vat is not None and net is None and vat < gross:
+        net = gross - vat               # a receipt with "enthaltene MwSt": the net is what is left
+    if gross is None and net is not None and vat is not None:
+        gross = net + vat
+    if net is not None and vat is not None and gross is not None and abs(net + vat - gross) > 2:
+        net = vat = None                # does not add up: only the sure gross
+        rates = [{"pct": r["pct"], "net": None, "vat": None} for r in rates]
+    if net is not None and vat is None and gross is not None and not rates:
+        net = None                      # a net without any VAT figure proves nothing
+    pct = None
+    if rates:
+        def base(r):
+            n, t = _cents(r["net"]), _cents(r["vat"])
+            return n if n is not None else (t * 100 // int(r["pct"]) if t else 0)
+        top = max(rates, key=base)["pct"]
+        pct = top if top in ("19", "7") else None
+    elif v["zero"]:
+        pct = "0"
+        if gross is not None:
+            net, vat = gross, None
+    return {"supplier": ex_supplier(text), "vat_id": ex_vat_id(text), "tax_no": ex_tax_no(text), "invoice_no": ex_invoice_no(text),
+            "vat_pct": pct, "vat_rates": rates, "net": _mon(net), "vat": _mon(vat) if vat else ("0.00" if pct == "0" and gross else None),
+            "gross": _mon(gross), "currency": a.get("currency")}

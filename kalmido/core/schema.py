@@ -2516,6 +2516,9 @@ MIGRATIONS = [
     ("rc_suggest", "prev_vat_pct", "ALTER TABLE rc_suggest ADD COLUMN prev_vat_pct TEXT"),
     ("rc_receipts", "billed_doc_id", "ALTER TABLE rc_receipts ADD COLUMN billed_doc_id BIGINT"),
     ("rc_receipts", "billed_at", "ALTER TABLE rc_receipts ADD COLUMN billed_at TEXT"),
+    # 2.121.0 A (#2092): what the recognition read off a receipt (supplier, VAT ids, rate, net / VAT / gross, invoice number)
+    # as a suggestion the person takes or drops; JSON sealed like doc_meta.suggest. Older versions never read it
+    ("doc_meta", "extracted", "ALTER TABLE doc_meta ADD COLUMN extracted TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

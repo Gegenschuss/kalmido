@@ -286,6 +286,8 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths):
               (new, to, S.doc_seal(c, new, "doc_meta.text", text), S.doc_seal(c, new, "doc_meta.amount", amount),
                S.label_id(c, new, "sender", sender) if sender else None, S.label_id(c, new, "type", typ) if typ else None,
                asn, _now(), nid))
+    if m["extracted"]:  # 2.121.0 A (#2092): the recognised receipt values move along, sealed for the new workspace
+        S.meta_set_json(c, nid, new, "extracted", S.meta_json(c, m, "extracted", {}))
     new_tags = {t["id"]: S.label_id(c, new, "tag", t["name"]) for t in tags}
     S.set_tags(c, nid, [x for x in new_tags.values() if x], {new_tags[t["id"]]: t["auto"] for t in tags if new_tags[t["id"]]})
     # 2.96.0 (#1941): the target's models learn the document at once (sender, type, folder, tags as

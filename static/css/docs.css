@@ -112,3 +112,10 @@
 /* 2.102.0 B (#2206): room below the grid as high as the sticky bar; the choosing mark gets a 2.75rem touch target (the circle stays 1.75rem) */
 .dc-grid.dc-selon{padding-bottom:7.5rem}
 .dc-selmark::after{content:"";position:absolute;inset:-.5rem}
+/* 2.121.0 A (#2092): the recognised values of a receipt (receipts.js rx_html) */
+.rx-slot { display: grid; gap: .4rem; margin: .5rem 0; }
+.rx-sug { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem .6rem;
+  border-radius: .5rem; background: var(--accent-soft); overflow-wrap: anywhere; }
+.rx-no { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem; font-size: var(--fs-s); }
+.rx-nov { font-variant-numeric: tabular-nums; user-select: all; overflow-wrap: anywhere; }
+.rx-no .linkbtn { min-height: 2.5rem; }
