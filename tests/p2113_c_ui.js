@@ -38,11 +38,11 @@ const FEAT = 'cal,comments,collab,office,clients';
     const type = v => { q.focus(); q.value = v; q.dispatchEvent(new w.Event('input', {bubbles: true})); };
     const [one, many, hone, hmany] = lang === 'de' ? ['Tag', 'Tage', 'Stunde', 'Stunden'] : ['day', 'days', 'hour', 'hours'];
     const tag = ' (' + lang + ')';
-    check(txt('day').toLowerCase() === one.toLowerCase() || txt('day').toLowerCase().startsWith(one.toLowerCase()), 'qty 1: singular day: ' + txt('day') + tag);
-    type('5'); check(/^(Tage|days)$/i.test(txt('day')) && /^(Stunden|hours?)$/i.test(txt('hour')) && d.activeElement === q, 'qty 5: plural, focus stays: ' + txt('day') + tag);
-    type('1,5'); check(/^(Tage|days)$/i.test(txt('day')) && d.activeElement === q, 'qty 1,5: plural' + tag);
-    type(''); check(/^(Tage|days)$/i.test(txt('day')), 'empty: plural' + tag);
-    type('1'); check(/^(Tag|day)$/i.test(txt('day')) && /^(Stunde|hour)$/i.test(txt('hour')), 'qty 1 again: singular ' + txt('hour') + tag);
+    check(/^(Tag|Day|day)$/.test(txt('day')), 'qty 1: singular day: ' + txt('day') + tag);  // no pack labels in this fixture: the UI language (en) words
+    type('5'); check(/^(Tage|Days|days)$/i.test(txt('day')) && /^(Stunden|Hours|hours?)$/i.test(txt('hour')) && d.activeElement === q, 'qty 5: plural, focus stays: ' + txt('day') + tag);
+    type('1,5'); check(/^(Tage|Days|days)$/i.test(txt('day')) && d.activeElement === q, 'qty 1,5: plural' + tag);
+    type(''); check(/^(Tage|Days|days)$/i.test(txt('day')), 'empty: plural' + tag);
+    type('1'); check(/^(Tag|Day|day)$/i.test(txt('day')) && /^(Stunde|Hour|hour)$/i.test(txt('hour')), 'qty 1 again: singular ' + txt('hour') + tag);
     const fl = txt('flat'); type('5'); check(fl === txt('flat') && fl !== '', 'flat rate unchanged: ' + fl + tag);
     check(sel.value === 'day' && d.querySelector('.ofdits [data-k="qty"]') === q, 'selection and field node unchanged' + tag);
   }
