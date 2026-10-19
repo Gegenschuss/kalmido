@@ -32,7 +32,7 @@ KINDS = {
     "files": ("matrix", SUITE + ": the own file store (folders, upload, content, versions) and documents; every GET"),
     "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private space (create, change, search, export, trash; "
                        "2.99.0: page files, ZIP import with PDFs / pictures)"),
-    "pim": ("matrix", SUITE + ", p294_b_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password"),
+    "pim": ("matrix", SUITE + ", p294_b_api_test.py, p21191_a_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password"),
     "time": ("matrix", SUITE + ": time entries, the timer, habits"),
     "agents": ("matrix", SUITE + ": the freelancer's own agent (my agents, its token, chat, jobs, share of a private list) and "
                          "the agent API with that agent's token"),
@@ -457,8 +457,11 @@ ROUTES = {
     "DELETE /api/v1/address-books/{}": "pim", "DELETE /api/v1/address-books/{}/members/{}": "pim",
     "DELETE /api/v1/contacts/{}": "pim", "DELETE /api/v1/event-calendars/{}": "pim",
     "DELETE /api/v1/event-calendars/{}/members/{}": "pim", "DELETE /api/v1/events/{}": "pim", "GET /api/books": "pim",
-    "GET /api/books/imports/{}": "pim", "GET /api/books/{}/export.vcf": "pim", "GET /api/calendars": "pim",
-    "GET /api/calendars/events": "pim", "GET /api/contacts": "pim", "GET /api/contacts/{}": "pim", "GET /api/evcals": "pim",
+    "GET /api/books/imports/{}": "pim", "GET /api/books/{}/export.vcf": "pim",
+    "GET /api/books/{}/export.csv": "pim", "POST /api/contacts/dupcheck": "pim", "GET /api/contacts/groups": "pim",  # 2.119.1 A (#2080 #2084 #2085)
+    "POST /api/contacts/groups": "pim", "GET /api/calendars": "pim",
+    "GET /api/calendars/events": "pim", "GET /api/contacts": "pim", "GET /api/contacts/{}": "pim", "GET /api/contacts/{}/history": "pim",  # 2.119.1 B (#2083)
+    "GET /api/evcals": "pim",
     "GET /api/evcals/{}/export.ics": "pim", "GET /api/events": "pim", "GET /api/events/{}": "pim",
     "GET /api/v1/address-books": "pim", "GET /api/v1/address-books/{}/export": "pim", "GET /api/v1/contacts": "pim",
     "GET /api/v1/contacts/{}": "pim", "GET /api/v1/event-calendars": "pim", "GET /api/v1/event-calendars/{}/export": "pim",

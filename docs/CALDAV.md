@@ -133,6 +133,17 @@ come back with their links. Contacts of a synced external account cannot be merg
 of an organisation's address book only merge with contacts of the same organisation; personal address books only
 with books of the same owner (not into a book someone shared with you).
 
+**On the contact's card** (2.119.1): an address opens your map app on a tap (Apple Maps on Apple devices, else Google
+Maps; nothing is loaded before the tap). *More › Create as client* (with the module Clients) makes a client from the
+contact: its company (else its name), first e-mail, phone and address, and the contact as the client's default contact
+person, linked to the contact when the address book fits the client (an organisation's address book: a client of that
+organisation; your own private address book: a private client; other books: a client of the book's workspace without the
+link). One undo step deletes the client again; a linked contact shows *Open client* instead. *Contact history* lists,
+newest first, the filed e-mails from or to the contact's addresses, the quotations, invoices and credit notes of its
+clients (only with the module Office and a role in that office) and its events - only what you may open anyway; *Show
+more* loads older entries, a tap opens the entry. E-mails are looked for among the latest 1000 filed e-mails you may
+open.
+
 **Finding duplicates with an agent** (2.70.0): in *Contacts › More › Find duplicates with an agent…* (or the command
 palette) pick an address book you may change and an agent. The dialog says exactly what the agent gets: name, company,
 e-mail addresses and phone numbers of that book's contacts, nothing else (no notes, addresses, birthdays). The agent
@@ -140,6 +151,27 @@ proposes groups that belong together; you get a notification and review each gro
 are now, the agent's reason, the contact that stays (switchable), each group with its own tick. *Merge* merges the ticked
 groups exactly like merging by hand; a group with a contact that was deleted or changed in the meantime is skipped. One
 undo step takes all merges of the proposal back. The agent never merges or deletes anything itself.
+
+**Long address books** (2.119.1): the list shows the first 500 contacts and loads the next ones while you scroll down
+(or with *Show more*). *All* in the selection mode ticks every contact of the search, also those not loaded yet.
+
+**CSV import and export** (2.119.1): *Contacts › More › Import a CSV file…* reads the CSV export of Outlook (German or
+English), Google Contacts and a simple spreadsheet (delimiter `;`, `,` or tab; UTF-8, UTF-16 or Windows-1252). Kalmido
+suggests a field for each column (with an example from the file); change any of them or choose *Do not import*, then
+import. Importing the same, unchanged file again updates the contacts instead of doubling them; a row changed in the
+file meanwhile comes in as a new contact (the duplicate hint below names it). *Export … (CSV)* writes UTF-8 with
+semicolons and Outlook's column names, so Excel opens it directly and Outlook, Google and Kalmido read it back; a cell
+that would start a spreadsheet formula (`=`, `@`, or `+` / `-` followed by more than digits, spaces and `()/.-`) gets a
+`'` in front, so phone numbers stay as they are.
+
+**Duplicate hint** (2.119.1): when you create a contact with the same e-mail address, phone number or name as one in
+the address books you can see, the editor names it: open that one, or press *Create anyway*. An import says how many of
+its new contacts look like one already there; *Check* lists them, each with *Merge* (the merge view above). Nothing is
+merged by itself, and contacts of address books you cannot see are never compared.
+
+**Managing groups** (2.119.1): *Manage groups…* in the group filter (or *More*) lists every group with its number of
+contacts. *Rename* and *Delete* change the group label of all contacts in the address books you may change (the contacts
+stay; read-only address books keep theirs). Each change is one undo step; the phones get the change on their next sync.
 
 ## Writing into subscribed calendars
 

@@ -91,7 +91,8 @@ const css = f => { for (const base of [path.join(__dirname, '..', 'static'), pat
   w.close();
   const dcss = css('css/docs.css'), acss = css('app.css');
   check(/\.dc-grid\.dc-selon\{padding-bottom:7\.5rem\}/.test(dcss) && /\.ablist\.abselon\{padding-bottom:7\.5rem\}/.test(acss), 'the CSS rules for the room in rem');
-  check(/\.dc-selmark::after\{[^}]*inset:-\.5rem/.test(dcss) && /\.dc-selmark\{[^}]*width:1\.75rem/.test(dcss), 'the choosing mark: 1.75rem circle + 2.75rem touch target');
+  // 2.119.1 (#2206): -.625rem (the pseudo box starts inside the .125rem border; -.5rem made only 2.5rem), measured in p21191_d_ui
+  check(/\.dc-selmark::after\{[^}]*inset:-\.625rem/.test(dcss) && /\.dc-selmark\{[^}]*width:1\.75rem/.test(dcss), 'the choosing mark: 1.75rem circle + 2.75rem touch target');
 
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

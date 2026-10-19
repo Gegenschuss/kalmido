@@ -63,15 +63,19 @@ dialog names what moves and what stays before anything changes:
   stay with their text; entertainment receipts (2.119) move while they are drafts, with their restaurant bill (sealed anew
   for the target) and their approval log; a host or guest who is no person of the target stays as a free name, approved
   receipts stay (retention);
+- framework contracts (2.119.1, in the contract's dialog) move with their PDF files, sealed with the target's key; the
+  rights text blocks they name are copied into the target, their client stays behind, drafts pointing at them lose the
+  link. A contract that issued documents still point to stays archived in the old office and is created anew in the
+  target with copies of its files;
 - **issued documents never move** (retention): invoices, credit notes, reminders, sent quotations, number ranges and the
   archive stay where they were issued. A client that issued documents (or projects, trips, deals) still point to stays
   archived in the old office and is created anew in the target. The tick box *Take issued documents along as a read-only
   copy* files a copy of each of them into the target's archive: view and PDF only, no number of its own, never edited,
   and not part of the target's bookkeeping, EÜR, VAT, DATEV export or archive sums (marked "Read-only copy from …").
-Rights: the right to work in both offices (travel expenses and templates: the admin of both); out of an organisation only
+Rights: the right to work in both offices (travel expenses, templates and framework contracts: the admin of both); out of an organisation only
 its office admin or who created the client / draft - a plain member takes only own drafts along and no copies. Agents
 never move office data. Undo takes the whole move back in one step (copies and a newly created client go again, unless the
-target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates|meals, ids, to:
+target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates|meals|contracts, ids, to:
 "private"|"org:<id>", dry, copy_issued}` -> `{notes, block, count, move_id}`; `{undo: move_id}` takes it back.
 
 **Small business (section 19 UStG)**: the setting `small_business` (Settings tab, "Invoices"; a setting of every office

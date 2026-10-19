@@ -138,11 +138,13 @@ async function otr_load(force) {
   try { const j = await api('GET', '/api/trash/lists'); S.otr.items = j.lists || []; S.otr.days = j.days || 30; } catch { S.otr.items = S.otr.items || []; return; }
   if (S.route.key === 'trash') renderView();
 }
-function otr_offerUndo(id, nm) {
+// 2.119.1 C (#2304): `active` = the list was not archived before the delete (archived first by it): the undo brings it back
+// active (folder and position stay with the row), the redo archives it again first; restoring from the trash page stays archive
+function otr_offerUndo(id, nm, active = false) {
   S.otr.at = 0;
   offerUndo(tr('“{0}” moved to the trash', nm), histAdd({label: tr('Delete “{0}”', nm),
-    undo: async () => { await api('POST', `/api/trash/lists/${id}/restore`); S.otr.at = 0; return {}; },
-    redo: async () => { await api('DELETE', '/api/lists/' + id); S.otr.at = 0; return {}; }}));
+    undo: async () => { await api('POST', `/api/trash/lists/${id}/restore`); if (active) await api('PATCH', '/api/lists/' + id, {archived: 0}); S.otr.at = 0; return {}; },
+    redo: async () => { if (active) await api('PATCH', '/api/lists/' + id, {archived: 1}); await api('DELETE', '/api/lists/' + id); S.otr.at = 0; return {}; }}));
 }
 function otr_html() {
   otr_load();
