@@ -104,9 +104,6 @@
   completing and subtasks stay free). The lock binds only the app: you can still change a locked task through the API
   (`update_task`; the field `locked` shows the state). Create a task with `locked: false` only when the person should
   edit it freely, and do not lift a lock a person set unless they ask you to.
-- **Reminder at a fixed time (2.111.0).** "Remind me on Tuesday at 9" is `remind_at: "YYYY-MM-DDTHH:MM"` (local time,
-  also without a due date; `null` removes it) in `create_task` / `update_task`; `reminders` stays the minutes before the
-  due time. It fires once and moves along with a recurring task's due date.
 - **Dates move the chain (2.67.0).** Postponing a task's due date in a project list with *Move dependent tasks along* on
   also moves every task waiting on it by the same days (the whole chain; the answer's `chain` / `chain_note` names them,
   `chain.skipped` what stayed). Mention it when you report the change. Send `shift_chain: false` only when the person
@@ -361,6 +358,11 @@ In lists with story points on (`points_on`) a task can carry `points` (1, 2, 3, 
 when the list's rules or a person ask, never overwrite a person's estimate. A section's `wip_limit` (`set_wip_limit`) is a hint
 for the kanban column, moving stays allowed. `get_velocity` gives the completed points of the last closed sprints and their
 average: a planning aid, never a measure of a person.
+
+### Reminders at a fixed time (2.111.0)
+"Remind me on Tuesday at 9" is `remind_at: "YYYY-MM-DDTHH:MM"` (local time, also without a due date; `null` removes it) in
+`create_task` / `update_task`; `reminders` stays the minutes before the due time. It fires once and moves along with a
+recurring task's due date.
 
 ### Arrangements of views (2.55.0)
 With the right `layouts` (off until a person turns it on for you) you may PROPOSE how a view of the person you work for is
