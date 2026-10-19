@@ -51,7 +51,7 @@ KINDS = {
     "team": ("matrix", "p2280_api_test.py: team chat rooms and direct messages"),
     "agent": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: agents, their chat, events and jobs"),
     "people": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: the user list, user changes, invitations / sign-in links by id"),
-    "org": ("matrix", "p2280_api_test.py: organisations, their members and admins"),
+    "org": ("matrix", "p2280_api_test.py: organisations, their members and admins; p2115_b_api_test.py: invitations by e-mail (2.115.0)"),
     "calendar": ("matrix", "p2300_tenant_test.py: calendars by id, sharing (B2), workspace (B3); p294_b_api_test.py (the booking page: types / bookings of another person 404, the public pages); "
                  "p2111_b_api_test.py (invitation marks and subscription links of another person's calendar 404, a link ends with the sharing)"),
     "event": ("matrix", "p2300_tenant_test.py: events by id, ranges, invitations"),
@@ -261,6 +261,8 @@ ROUTES = {
     "POST /api/me/2fa/totp": "auth", "POST /api/me/2fa/totp/confirm": "auth", "POST /api/me/2fa/totp/disable": "auth",
     "POST /api/me/2fa/recovery": "auth", "POST /api/me/passkeys/options": "auth", "POST /api/me/passkeys": "auth",
     "PATCH /api/me/passkeys/{}": "auth", "DELETE /api/me/passkeys/{}": "auth", "GET /api/auth/oidc/start": "auth",
+    # 2.115.0 B (#2062): the own sessions (user_id = me; p2115_b_api_test.py: a foreign session id is 404)
+    "GET /api/me/sessions": "auth", "DELETE /api/me/sessions/{}": "auth", "POST /api/me/sessions/others": "auth",
     "GET /api/auth/oidc/callback": "auth", "POST /api/auth/signup": "auth", "POST /api/auth/link": "auth",
     # ---- book (16)
     "GET /api/v1/address-books": "book", "POST /api/v1/address-books": "book", "PATCH /api/v1/address-books/{}": "book",
@@ -588,6 +590,9 @@ ROUTES = {
      "POST /api/admin/orgs": "org", "PATCH /api/admin/orgs/{}": "org",
     "DELETE /api/admin/orgs/{}": "org", "PUT /api/admin/orgs/visibility": "org", "GET /api/orgs": "org",
     "PATCH /api/orgs/{}": "org", "PUT /api/orgs/{}/members": "org", "DELETE /api/orgs/{}/members/{}": "org",
+    # 2.115.0 B (#2062): an organisation's invitations by e-mail (p2115_b_api_test.py: other organisation 404, member 403)
+    "GET /api/orgs/{}/invites": "org", "POST /api/orgs/{}/invites": "org", "POST /api/orgs/{}/invites/{}/resend": "org",
+    "DELETE /api/orgs/{}/invites/{}": "org",
     # 2.35.0 (#1101): an organisation admin's lists of the organisation (p2350_c_api_test.py: other organisation, private list, member 403)
     "GET /api/orgs/{}/lists": "org", "POST /api/orgs/{}/lists/{}/archive": "org", "DELETE /api/orgs/{}/lists/{}": "org",
     "POST /api/orgs/{}/lists/{}/owner": "org",

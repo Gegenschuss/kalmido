@@ -159,6 +159,8 @@ ROUTES = {
     "POST /api/auth/setup": "auth", "POST /api/auth/signup": "auth", "POST /api/me/2fa/recovery": "auth",
     "POST /api/me/2fa/totp": "auth", "POST /api/me/2fa/totp/confirm": "auth", "POST /api/me/2fa/totp/disable": "auth",
     "POST /api/me/passkeys": "auth", "POST /api/me/passkeys/options": "auth",
+    # 2.115.0 B (#2062): active sessions (p2115_b_api_test.py as a person without an organisation)
+    "GET /api/me/sessions": "own", "DELETE /api/me/sessions/{}": "own", "POST /api/me/sessions/others": "own",
     # ---- files (51)
     "DELETE /api/docs/labels/{}/{}": "files", "DELETE /api/docs/mail": "files", "DELETE /api/docs/rules/{}": "files",
     "DELETE /api/docs/{}/task": "files", "DELETE /api/files/nodes/{}": "files", "DELETE /api/files/shares/{}": "files",
@@ -408,6 +410,9 @@ ROUTES = {
     "POST /api/orgs/{}/lists/{}/archive": "orgadmin", "POST /api/orgs/{}/lists/{}/icon": "orgadmin",
     "POST /api/orgs/{}/lists/{}/owner": "orgadmin", "PUT /api/admin/orgs/visibility": "orgadmin",
     "PUT /api/orgs/{}/lists/{}/icon": "orgadmin", "PUT /api/orgs/{}/members": "orgadmin",
+    # 2.115.0 B (#2062): inviting into an organisation needs one (a person without one has no members)
+    "GET /api/orgs/{}/invites": "orgadmin", "POST /api/orgs/{}/invites": "orgadmin", "POST /api/orgs/{}/invites/{}/resend": "orgadmin",
+    "DELETE /api/orgs/{}/invites/{}": "orgadmin",
     # ---- own (61)
     "DELETE /api/account/export": "own", "DELETE /api/account/import/{}": "own", "DELETE /api/me/app-passwords/{}": "own",
     "DELETE /api/me/avatar": "own", "DELETE /api/me/mail/token": "own", "DELETE /api/me/tokens/{}": "own",
