@@ -123,6 +123,9 @@ on their own, the DATEV booking export as one group), so fields of the other are
 server refuses stays in the field, marked with the error, until it is corrected; closing the page asks meanwhile.
 Members see every field locked.
 
+In the area Packs, every industry pack's card says **Switched on** or **Off** and has its own switch; it changes
+`industry_packs` at once, like the box of the same pack in the calculation rules.
+
 ## Tabs
 
 - **Quotations** - the documents (number, recipient, project, date, net total, status) and the editor.
@@ -1071,6 +1074,12 @@ reminders stay strictly locked. The list rows carry `can_delete` / `can_unlock` 
 like a service: a position of kind `part` with a quantity ("Interactive module x 5"); the title page can also have direct
 positions. A part may stand on the title page several times or not at all (then it counts nothing and is not printed; the
 editor marks it).
+
+(2.113.) In the editor a part opens **in place** on the title page (tap its line under Parts; several may be open at
+once). Every part has a colour of its own by its place in the list: a dot on its line and on the title page's line that
+uses it, a coloured frame and head ("Part 2 of 3") on the open part. Sent and finalised quotations open the same way,
+with locked fields. The unit choice of a position follows its quantity like the PDF does ("1 Day", "5 Days"; decimals
+count as plural).
 
 - **Calculation**: a part line = the part's net x quantity; its tax bases per rate x quantity (a part with 7 % and 19 %
   positions stays exact), its raw data x quantity (optional stays optional, included stays included) and its external
