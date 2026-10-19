@@ -5,6 +5,7 @@
 //   "… saved · Undo" for 10 seconds, its button brings back the values from the opening
 // - left again after a change, then someone else changes it: the button refuses with the reason, their change stays
 // - "Finalise" ends the way back (no hint when leaving)
+// - a table: a changed cell, leaving shows the hint, its button empties the cell again
 // - the client dialog: after "Save" the same hint, its button brings back the old name
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -16,7 +17,7 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2111A_NOSTART && !process.env.KMT_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };
-const FEAT = 'cal,comments,collab,office,clients';
+const FEAT = 'cal,comments,collab,office,clients,sheets';
 
 (async () => {
   await sleep(600);
@@ -85,6 +86,18 @@ const FEAT = 'cal,comments,collab,office,clients';
     await back(ev);
     await sleep(1200);
     check(!await ev(toastOn), 'after finalising: no hint');
+    // a table: a cell, then leaving -> the hint, Undo -> the cell is empty again
+    const sh = await call(CA, 'POST', '/api/sheets', {title: 'Budget sheet'});
+    check(sh.http === 201, 'a table ' + sh.http);
+    const cellOf = async () => ((await call(CA, 'GET', `/api/sheets/${sh.id}`)).cells || []).find(c => c.raw === 'Forty-two');
+    await nav(B + `#sheets/${sh.id}`);
+    check(await ready(ev, `typeof SHV !== 'undefined' && SHV.sh?.id === ${sh.id} && typeof oun_tag === 'function'`, 80), 'the table opens');
+    await ev(`shvPut([{row_id: SHV.sh.rows[0].id, col_id: SHV.sh.columns[0].id, raw: 'Forty-two'}]).then(() => 1)`);
+    check(await until(async () => !!await cellOf()), 'the cell is saved');
+    await ev(`(() => { go('office/offers'); return 1; })()`);
+    check(await ready(ev, toastOn), 'leaving the table: "… saved · Undo"');
+    await ev(`(() => { document.querySelector('#toast button:not(.tx)').click(); return 1; })()`);
+    check(await until(async () => !await cellOf()), 'Undo: the cell is empty again');
     // the client dialog: "Save" -> the hint, Undo -> the old name
     await nav(B + '#office/offers');
     await ready(ev, `typeof clientModal === 'function' && (S.clients || []).some(c => c.id === ${cl.id})`, 80);
