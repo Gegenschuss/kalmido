@@ -79,6 +79,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const sec = md?.querySelector('#s-sup');
   check(sec && md.querySelector('#s-about-h') && /Support Kalmido/.test(sec.textContent), 'the section under About');
   check(/unlocks nothing/.test(sec?.textContent || ''), 'the explanation');
+  // 2.101.0 (#1964): the trademark note under About
+  check(/trademarks of their respective owners/.test(md?.querySelector('.aboutmarks')?.textContent || ''), '#1964: trademark note under About');
   const a = sec?.querySelector('a[href="https://pay.example.com/kalmido"]');
   check(a && a.target === '_blank', 'the payment link opens in a new tab');
   check(!sec?.querySelector('#s-supnudge'), 'a member has no hint switch');
