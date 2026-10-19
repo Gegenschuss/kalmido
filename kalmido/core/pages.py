@@ -21,8 +21,11 @@ from ..core.access import my_inbox
 
 # ---------------------------------------------------------------- pages
 
+# 2.99.1 A (#1959): frames only of the two video players (the embed URL is built from a checked id: videos/review.py vdr_embed),
+# media over https (a video sign-off's direct file link); no script of theirs is loaded (script-src stays 'self')
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
        "img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; "
+       "frame-src 'self' https://player.vimeo.com https://www.youtube-nocookie.com; media-src 'self' https:; "
        "frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'")
 PERMISSIONS_POLICY = ("camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), "
                       "midi=(), hid=(), magnetometer=(), gyroscope=(), accelerometer=(), display-capture=(), "

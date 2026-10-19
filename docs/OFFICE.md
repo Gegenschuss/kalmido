@@ -1018,6 +1018,9 @@ This is a **simple electronic signature**: usually enough to accept a quotation 
 that the law requires in written form (they need a qualified signature). Kalmido gives no legal advice and builds no
 advanced or qualified signature. The same flow confirms the **acceptance** of a project, a section or a milestone from the
 list's Share dialog > Public link (*Request acceptance*); the customer's list page shows the open request.
+2.99.1: a **video sign-off** (kind `video`, see [TEAM.md](TEAM.md) *Video sign-off*) uses the same link: the page shows the
+newest version's player and the customer's comments at a timecode (`POST /s/q/<token>/comments`, limited per client address
+and per link, a form check value of its own) and *Approve* / *Request changes*; the decision names the version shown.
 
 ## Documents from templates (2.93.0)
 

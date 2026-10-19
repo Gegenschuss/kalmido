@@ -41,7 +41,12 @@ SIG_POST_RATE = 10          # decisions per client address and minute
 SIG_BAD_LIMIT = 30          # unknown / expired tokens per address within the fail window (shared with the list links)
 SIG_LINK_HOUR = 20          # decision attempts per link and hour
 NAME_MAX, EMAIL_MAX, REASON_MAX, UA_MAX = 120, 200, 1000, 300
-SIG_KINDS = ("offer", "acceptance", "document")  # 2.93.0 A (#1927): document = a document made from a template (office/doctpl.py)
+SIG_KINDS = ("offer", "acceptance", "document", "video")  # 2.93.0 A (#1927): document = a document made from a template (office/doctpl.py)
+# 2.99.1 A (#1959): video = a video sign-off (videos/review.py; accept = "Approve", decline = "Request changes"); its page shows
+# the player (no script of the provider, only static/pubvideo.js) and takes comments: its own CSP
+SIG_VIDEO_CSP = ("default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; script-src 'self'; "
+                 "frame-src https://player.vimeo.com https://www.youtube-nocookie.com; media-src https:; form-action 'self'; "
+                 "frame-ancestors 'none'; base-uri 'none'")
 LOG_TEXT = {"accepted": "signoff_accepted", "declined": "signoff_declined"}
 SIG_PDF_KEEP_DAYS = 30      # 2.86.0 (N17): a decided quotation's PDF stays downloadable this long when the link has no expiry
 SIG_NOTE = N_("Simple electronic signature: usually enough to accept a quotation or confirm an acceptance; not for contracts that the law requires in written form (they need a qualified signature). This is not legal advice.")  # noqa: E501
@@ -56,6 +61,8 @@ def sig_token_new(c, purpose):
 def sig_purpose(r):
     if r["kind"] == "document":  # 2.93.0 A (#1927)
         return f"signoff:document:{r['gen_doc_id'] or 0}"
+    if r["kind"] == "video":  # 2.99.1 A (#1959)
+        return f"signoff:video:{r['video_id'] or 0}"
     return f"signoff:{r['kind']}:{r['doc_id'] or 0}:{r['list_id'] or 0}"
 
 
@@ -108,6 +115,10 @@ def sig_list_tasks(c, r):
 def sig_crypt_org(c, r):
     """2.50.0 (#1200 review): the organisation whose key protects the signer's data of approval r: its own, or for a
     private list's sign-off the personal office of the list's owner (None without one: stored plain like other private data)."""
+    if not r["org_id"] and r["kind"] == "video" and r["video_id"]:  # 2.99.1 A (#1959): a private review: its owner's personal office
+        with system_ctx(c):  # as below
+            x = c.execute("SELECT o.id FROM video_reviews v JOIN orgs o ON o.personal_of=v.owner_id WHERE v.id=?", (r["video_id"],)).fetchone()
+        return x[0] if x else None
     if r["org_id"] or not r["list_id"]:
         return r["org_id"]
     with system_ctx(c):  # the public page reads as "anon" without an organisation; only the key holder is resolved here
@@ -142,7 +153,7 @@ def sig_public(c, r, full=True):
     (2.50.0 #1200 review: personal data of the customer only for the admins / the list's owner)."""
     d = sig_dec(c, r)
     live = d["state"] == "open" and not d["revoked_at"] and not (d["expires_at"] and parse_iso(d["expires_at"]) <= now_utc())
-    return {"id": d["id"], "kind": d["kind"], "doc_id": d["doc_id"], "gen_doc_id": d.get("gen_doc_id"), "list_id": d["list_id"], "section_id": d["section_id"],
+    return {"id": d["id"], "kind": d["kind"], "doc_id": d["doc_id"], "gen_doc_id": d.get("gen_doc_id"), "video_id": d.get("video_id"), "list_id": d["list_id"], "section_id": d["section_id"],
             "task_id": d["task_id"], "title": d["title"], "state": d["state"], "expires_at": d["expires_at"], "revoked_at": d["revoked_at"],
             "signer_name": d["signer_name"], "signer_email": d["signer_email"], "reason": d["reason"], "signed_at": d["signed_at"],
             "ip": d["ip"], "user_agent": d["user_agent"], "doc_hash": d["doc_hash"], "created_at": d["created_at"], "created_by": d["created_by"],
@@ -158,7 +169,12 @@ def sig_notify(c, r, st, name):
     try:
         from ..collab.news import notif_ok
         s = usettings(c, uid)
-        if not notif_ok(c, uid, s, "approval", "push", r["list_id"]):
+        lid = r["list_id"]
+        if r["kind"] == "video":  # 2.99.1 A (#1959): the list of the review's task / project (its mute switch)
+            from ..videos.review import vdr_list_of, vdr_sig_row
+            v = vdr_sig_row(c, r)
+            lid = vdr_list_of(c, v) if v else None
+        if not notif_ok(c, uid, s, "approval", "push", lid):
             return None
     except Exception:
         return None
@@ -170,25 +186,33 @@ def sig_notify(c, r, st, name):
         title = tr("Signed by the customer", lg=lg)
     msg = f"{name}: {what}"
     click = f"#office/offers/{r['doc_id']}" if r["doc_id"] else f"#office/gendocs/{r['gen_doc_id']}" if r["kind"] == "document" else f"#l/{r['list_id']}"
+    if r["kind"] == "video":  # 2.99.1 A (#1959)
+        from ..videos.review import vdr_click, vdr_sig_row
+        v = vdr_sig_row(c, r)
+        click = vdr_click(v) if v else "#"
+        title = tr("Video approved by the customer", lg=lg) if st == "accepted" else tr("Changes requested by the customer", lg=lg)
     return lambda: notify(uid, title, msg, prio="4", click=click, s=s)
 
 
 # ---------------------------------------------------------------- managing (members of the organisation / list owner)
-def sig_create(c, oid, kind, title, doc_hash, uid, expires, doc_id=None, list_id=None, section_id=None, task_id=None, gen_doc_id=None):
+def sig_create(c, oid, kind, title, doc_hash, uid, expires, doc_id=None, list_id=None, section_id=None, task_id=None, gen_doc_id=None,
+               video_id=None):
     """A new link (an open link of the same object is revoked first: one live link per object). -> (row, token)."""
     ts = iso(now_utc())
-    if gen_doc_id:  # 2.93.0 A (#1927): a document made from a template
+    if video_id:  # 2.99.1 A (#1959): a video sign-off
+        c.execute("UPDATE office_signoffs SET revoked_at=? WHERE video_id=? AND state='open' AND revoked_at IS NULL", (ts, video_id))
+    elif gen_doc_id:  # 2.93.0 A (#1927): a document made from a template
         c.execute("UPDATE office_signoffs SET revoked_at=? WHERE gen_doc_id=? AND state='open' AND revoked_at IS NULL", (ts, gen_doc_id))
     elif doc_id:
         c.execute("UPDATE office_signoffs SET revoked_at=? WHERE doc_id=? AND state='open' AND revoked_at IS NULL", (ts, doc_id))
     else:
         c.execute("UPDATE office_signoffs SET revoked_at=? WHERE list_id=? AND kind='acceptance' AND state='open' AND revoked_at IS NULL "
                   "AND section_id IS NOT DISTINCT FROM ? AND task_id IS NOT DISTINCT FROM ?", (ts, list_id, section_id, task_id))
-    proto = {"kind": kind, "doc_id": doc_id, "list_id": list_id, "gen_doc_id": gen_doc_id}
+    proto = {"kind": kind, "doc_id": doc_id, "list_id": list_id, "gen_doc_id": gen_doc_id, "video_id": video_id}
     tok, h, sealed = sig_token_new(c, sig_purpose(proto))
-    sid = insert_id(c, "INSERT INTO office_signoffs(org_id, kind, doc_id, list_id, section_id, task_id, gen_doc_id, title, token_hash, token, expires_at, "
-                       "state, doc_hash, created_by, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'open',?,?,?)",
-                    (oid, kind, doc_id, list_id, section_id, task_id, gen_doc_id, title[:300], h, sealed, expires, doc_hash, uid, ts))
+    sid = insert_id(c, "INSERT INTO office_signoffs(org_id, kind, doc_id, list_id, section_id, task_id, gen_doc_id, video_id, title, token_hash, token, "
+                       "expires_at, state, doc_hash, created_by, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'open',?,?,?)",
+                    (oid, kind, doc_id, list_id, section_id, task_id, gen_doc_id, video_id, title[:300], h, sealed, expires, doc_hash, uid, ts))
     return c.execute("SELECT * FROM office_signoffs WHERE id=?", (sid,)).fetchone(), tok
 
 
@@ -340,6 +364,9 @@ def sig_check(c, r):
     if r["kind"] == "document":  # 2.93.0 A (#1927): the document is finished, not archived, its text unchanged
         from .doctpl import dt_sig_valid
         return None if dt_sig_valid(c, r) else True
+    if r["kind"] == "video":  # 2.99.1 A (#1959): the review is there (not in the trash) and has a version
+        from ..videos.review import vdr_sig_valid
+        return None if vdr_sig_valid(c, r) else True
     lr = c.execute("SELECT l.id FROM lists l JOIN users u ON u.id=l.owner_id WHERE l.id=? AND u.disabled=0", (r["list_id"],)).fetchone()
     if not lr or sig_list_hash(c, r) != r["doc_hash"]:
         return True
@@ -417,6 +444,8 @@ def sig_page(c, r, token, lg, error=None, code=200):
         d = sig_dec(c, r)
         doc = r["kind"] == "document"  # 2.93.0 A (#1927)
         h = (tr("Signed", lg=lg) if doc else tr("Accepted", lg=lg)) if d["state"] == "accepted" else tr("Declined", lg=lg)
+        if r["kind"] == "video":  # 2.99.1 A (#1959)
+            h = tr("Approved|video", lg=lg) if d["state"] == "accepted" else tr("Changes requested", lg=lg)
         when = d["signed_at"] or ""
         pdf_t = tr("Download the signed document (PDF)", lg=lg) if doc else tr("Download the quotation (PDF)", lg=lg)
         main = (f'<div class="msg"><h1>{e(h)}</h1><p>{e(r["title"])}</p><p>{e(tr("By {0} on {1} (UTC).", d["signer_name"] or "", when[:16].replace("T", " "), lg=lg))}</p>'
@@ -424,26 +453,38 @@ def sig_page(c, r, token, lg, error=None, code=200):
                    if (r["kind"] == "offer" or (doc and d["state"] == "accepted")) and h6c_sig_pdf_ok(c, r) else "")  # 2.86.0 (N17)
                 + f'<p class="sub">{e(tr("Thank you. You can close this page.", lg=lg))}</p></div>')
         return pub_html(h, main, lg)
+    vid = r["kind"] == "video"  # 2.99.1 A (#1959)
     if r["kind"] == "document":  # 2.93.0 A (#1927)
         from .doctpl import dt_sig_html
         head = dt_sig_html(c, r, lg, token, SIG_PREFIX)
+    elif vid:
+        from ..videos.review import vdr_sig_html
+        head = vdr_sig_html(c, r, lg, token, SIG_PREFIX)
     else:
         head = sig_offer_html(c, r, lg, token) if r["kind"] == "offer" else sig_list_html(c, r, lg)
     acc = (tr("I accept the quotation", lg=lg) if r["kind"] == "offer" else tr("I sign this document", lg=lg) if r["kind"] == "document"
-           else tr("I confirm the acceptance", lg=lg))
-    go = tr("Sign bindingly", lg=lg) if r["kind"] == "document" else tr("Accept bindingly", lg=lg)
+           else tr("I approve this version of the video", lg=lg) if vid else tr("I confirm the acceptance", lg=lg))
+    go = tr("Sign bindingly", lg=lg) if r["kind"] == "document" else tr("Approve|video", lg=lg) if vid else tr("Accept bindingly", lg=lg)
+    no = tr("Request changes", lg=lg) if vid else tr("Decline", lg=lg)
+    ver = ""
+    if vid:
+        from ..videos.review import vdr_sig_newest
+        ver = f'<input type="hidden" name="v" value="{vdr_sig_newest(c, r)["id"]}">'
     form = (f'<form method="post" action="{SIG_PREFIX}{e(token)}" class="fform sigf">'
-            f'<input type="hidden" name="f" value="{sig_form_key(c, r)}">'
+            f'<input type="hidden" name="f" value="{sig_form_key(c, r)}">{ver}'
             f'<label for="sg-name">{e(tr("Your name", lg=lg))}</label><input id="sg-name" name="name" maxlength="{NAME_MAX}" autocomplete="name" required>'
             f'<label for="sg-mail">{e(tr("E-mail (optional)", lg=lg))}</label><input id="sg-mail" name="email" type="email" maxlength="{EMAIL_MAX}" autocomplete="email">'
             f'<label class="ok"><input type="checkbox" name="ok" value="1"> {e(acc)}</label>'
             f'<button type="submit" name="do" value="accept">{e(go)}</button>'
-            f'<details class="decl"><summary>{e(tr("Decline", lg=lg))}</summary>'
+            f'<details class="decl"><summary>{e(no)}</summary>'
             f'<label for="sg-why">{e(tr("Reason (optional)", lg=lg))}</label><textarea id="sg-why" name="reason" rows="3" maxlength="{REASON_MAX}"></textarea>'
-            f'<button type="submit" name="do" value="decline" class="sec">{e(tr("Decline", lg=lg))}</button></details>'
+            f'<button type="submit" name="do" value="decline" class="sec">{e(no)}</button></details>'
             + (f'<p class="err" role="alert">{e(error)}</p>' if error else "")
             + f'</form><p class="signote">{note}</p>')
-    return pub_html(f"{r['title']} · {APP_NAME}", head + form, lg, code)
+    resp = pub_html(f"{r['title']} · {APP_NAME}", head + form, lg, code)
+    if vid:
+        resp.headers["Content-Security-Policy"] = SIG_VIDEO_CSP
+    return resp
 
 
 @app.get("/s/q/<token>")
@@ -539,6 +580,11 @@ def sig_decide(token):
         return sig_page(c, r, token, lg, tr("Please type your name.", lg=lg), 400)
     if email and ("@" not in email or " " in email):
         return sig_page(c, r, token, lg, tr("Please check the e-mail address.", lg=lg), 400)
+    if r["kind"] == "video":  # 2.99.1 A (#1959): the decision names the version that was shown (a newer one: look at it first)
+        from ..videos.review import vdr_sig_newest
+        nv = vdr_sig_newest(c, r)
+        if not nv or str(nv["id"]) != (request.form.get("v") or ""):
+            return sig_page(c, r, token, lg, tr("There is a newer version. Please look at it first.", lg=lg), 409)
     if do == "accept" and request.form.get("ok") != "1":
         return sig_page(c, r, token, lg, tr("Please tick the box to sign.", lg=lg) if r["kind"] == "document" else tr("Please tick the box to accept.", lg=lg), 400)
     write_lock(c, f"office_signoff_{int(r['id'])}")  # two decisions at once: the second sees the first
@@ -576,6 +622,10 @@ def sig_decide(token):
         if not done:  # archived meanwhile: nothing recorded, the same answer as a void link
             c.rollback()
             return pub_gone()
+    elif r["kind"] == "video":  # 2.99.1 A (#1959): the review's state follows (approved | changes)
+        from ..videos.review import vdr_sig_decided
+        proto["version"] = {"id": nv["id"], "n": nv["n"], "url": nv["url"]}
+        vdr_sig_decided(c, r, st, nv, name, reason, lg)
     elif r["list_id"]:
         proto["tasks"] = [[t["id"], t["title"], t["status"]] for t in sig_list_tasks(c, r)]
         c.execute("INSERT INTO list_activity(list_id, user_id, kind, data, created_at) VALUES(?,?,?,?,?)",
