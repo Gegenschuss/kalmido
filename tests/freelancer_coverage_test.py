@@ -292,12 +292,15 @@ ROUTES = {
     "DELETE /api/office/deals/{}": "office", "DELETE /api/office/docs/{}": "office",
     "DELETE /api/office/docs/{}/parts/{}": "office", "DELETE /api/office/docs/{}/payments/{}": "office",
     "DELETE /api/office/fixed-costs/{}": "office", "DELETE /api/office/logo": "office",
+    # 2.120.0 E (#2091): the own letterhead PDF
+    "GET /api/office/letterhead": "office", "POST /api/office/letterhead": "office", "PUT /api/office/letterhead": "office",
+    "DELETE /api/office/letterhead": "office", "POST /api/office/letterhead/restore": "office", "GET /api/office/letterhead/preview": "office",
     "DELETE /api/office/packs/installed/{}/{}": "office", "DELETE /api/office/trips/{}": "office",
     "DELETE /api/office/trips/{}/items/{}": "office", "DELETE /api/office/{}/{}": "office", "DELETE /api/paperless": "office",
     "DELETE /api/paperless/zip": "office", "DELETE /api/v1/clients/{}": "office", "GET /api/clients": "office",
     "GET /api/clients/{}": "office", "GET /api/clients/{}/book-contacts": "office", "GET /api/newsletter": "office",
     "GET /api/newsletter/lists": "office", "GET /api/office/agents/{}": "office", "GET /api/office/cashflow": "office",
-    "GET /api/office/cashflow/check": "office", "GET /api/office/catalog": "office", "GET /api/office/datev/extf": "office",
+    "GET /api/office/cashflow/check": "office", "GET /api/office/catalog": "office", "GET /api/office/datev/extf": "office", "GET /api/office/datev/accounts": "office",  # 2.120.0 C (#2090)
     "GET /api/office/deals": "office", "GET /api/office/deals/summary": "office", "GET /api/office/docs": "office",
     "GET /api/office/docs/{}": "office", "GET /api/office/docs/{}/log": "office", "GET /api/office/docs/{}/payments": "office",
     "GET /api/office/docs/{}/pdf": "office", "GET /api/office/docs/{}/render": "office",
@@ -338,10 +341,12 @@ ROUTES = {
     "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/docs": "office",
     "POST /api/office/docs/from-time": "office", "POST /api/office/docs/reminder": "office",
+    "POST /api/office/docs/{}/delivery": "office", "GET /api/office/docs/{}/timesheet.pdf": "office",  # 2.120.0 D (#2089)
     "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/{}/datev": "office",
     "POST /api/office/docs/{}/cashflow": "office", "POST /api/office/docs/{}/duplicate": "office", "POST /api/office/docs/{}/fee": "office",
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
     "POST /api/office/docs/{}/invoice": "office",
+    "GET /api/office/docs/{}/progress": "office",  # 2.120.0 A (#2087): progress invoices of a quotation (p2120_a_api_test.py)
     "POST /api/office/docs/{}/number": "office", "POST /api/office/docs/{}/parts": "office",
     "POST /api/office/docs/{}/payments": "office", "POST /api/office/docs/{}/send": "office",
     "POST /api/office/docs/{}/signoff": "office", "POST /api/office/docs/{}/status": "office",
@@ -694,6 +699,8 @@ ROUTES = {
     "GET /api/office/contracts/{}/files": "office", "POST /api/office/contracts/{}/files": "office",
     "GET /api/office/contracts/{}/files/{}": "office", "PATCH /api/office/contracts/{}/files/{}": "office",
     "DELETE /api/office/contracts/{}/files/{}": "office", "POST /api/office/contracts/{}/files/{}/restore": "office",
+    # 2.120.0 B (#2088): documents in the customer portal of a freelancer's personal office (p2120_b_api_test.py)
+    "GET /portal/docs/{}/pdf": "link", "POST /api/office/clients/{}/portal-link": "office",
 }
 
 

@@ -138,7 +138,7 @@ office tab without one appears at the end of its group (`OFC_TABS` field 5, else
 - **Bookkeeping** (admins, 2.90) - income/expense statement, VAT return figures, tax reserve, receipt photo and tax
   dates, see below.
 - **Bank** (admins, 2.90) - bank reconciliation, see below.
-- **Settings** - company name and address lines, contact / register / bank lines (printed in the footer), logo,
+- **Settings** - company name and address lines, contact / register / bank lines (printed in the footer), logo, own letterhead PDF (2.120, see "Own letterhead"),
   brand colour (accent in the print only), document language (de / en), currency (EUR / USD + rate), number scheme with
   a live preview, producing quotient and rate, raw data factor, days a quotation stays valid, default text blocks,
   default rights, country pack with its tax rates, and the import / export of the master data.
@@ -1107,6 +1107,31 @@ the invoice stay unchanged; the fee does not keep an invoice from being `paid`. 
 all paid or cancelled has the derived state `done` ("Settled", `settled: true`, never stored); the list shows settled
 reminders below the open ones.
 
+## Progress and final invoices, cash discount (2.120)
+
+**Create invoice** on a quotation asks for the type: full invoice (as before), **progress invoice** or **final invoice**.
+Both are ordinary invoices of the invoice number series (`inv_type` `progress` / `final`, no own series); the list and the
+document head show the type, the PDF prints "Abschlagsrechnung" / "Schlussrechnung".
+
+- **Progress invoice:** a net amount or a percentage of the quotation's net. The amount is split onto the quotation's VAT
+  rates in proportion (one position per rate, "Progress payment no. n on quotation X"). All progress invoices of a
+  quotation (drafts included) never exceed its net. E-invoice type code 326 (partial invoice).
+- **Final invoice:** all positions of the quotation, then, under a heading, one negative position per finalised, not
+  cancelled progress invoice and VAT rate (its net, VAT, gross and whether it is paid in the description). The VAT is
+  therefore computed on the remaining amount per rate, which keeps the e-invoice valid (a prepaid amount, BT-113, would
+  take off gross without the VAT). The last total row reads "Amount remaining". E-invoice type code 380. Finalising checks
+  that the progress invoices are still the ones deducted; a progress invoice cancelled or finalised in the meantime asks
+  for the final invoice to be created anew.
+- **Cash discount (Skonto):** percent and days per invoice (default in the office settings, empty = none). The PDF adds
+  "When paid by <date> <pct> % cash discount (= amount), payable <amount>" under the payment terms; the e-invoice carries
+  the XRechnung line `#SKONTO#TAGE=14#PROZENT=2.00#` in the payment terms (BT-20). Payments dated within the period that
+  reach the gross less the discount (credit notes count) mark the invoice paid; otherwise the difference stays open.
+
+API: `POST /api/office/docs/<offer id>/invoice` takes `{inv_type: "progress", amount | pct}` or `{inv_type: "final"}`;
+`GET /api/office/docs/<offer id>/progress` lists the progress invoices with the quotation's net and what is left to bill;
+`PATCH /api/office/docs/<id>` takes `skonto_pct`, `skonto_days`, `inv_type` on invoice drafts; the office settings
+`skonto_pct` / `skonto_days`. Agents: `draft_invoice_from_offer` with `inv_type`, `amount`, `pct`.
+
 ## Invoice series (2.91)
 
 An invoice can be repeated as a series: in the editor of an invoice choose "Repeat as series", pick the interval (monthly,
@@ -1167,6 +1192,20 @@ length + 1, first digit 1-6); 2.81.0 (#1867): a finalised document uses the cust
 at finalising), the live client only when the snapshot has none. Documents without VAT go by their VAT note (reverse charge, abroad, small business; small
 business never with a tax key). Foreign currency documents are booked in EUR by the document's rate. The export is in
 the office log (`export`, target `datev`).
+
+Receipts and travel expenses in the batch (2.120.0, #2090): with `in_on` (default on; the download dialog can leave it
+out, `?in=0`) the same batch also books the input side, Belegfeld 1 stays unique (`B<receipt>`, `R<trip>-<receipt>`,
+`V<trip>`). Every receipt of the office's documents with an amount (by its document date) is one line: expense account
+of its category (own assignment `cat_accounts` {category: account}, else a default per chart found by words in the
+category, e.g. software 4964 / 6837, office supplies 4930 / 6815, phone 4920 / 6805, else other expenses 4900 / 6300 or
+`in_other`) against the collective creditor (`creditor`, default 70000) or, with `in_counter: "bank"`, the bank account;
+input tax key 9 for 19 % and 8 for 7 % (`bu_in`), none for 0 %, an unknown rate or a small business. Every travel
+receipt is one line on the travel account of its category and the per diem of a trip one line on its last day, both
+without input tax (`travel` {fares, hotel, vma, other}; defaults for an organisation 4663 / 4666 / 4664 / 4660 resp.
+6663 / 6660 / 6664 / 6650, for a personal office the owner's accounts 4673 / 4676 / 4674 / 4676 resp. 6673 / 6680 /
+6674 / 6680). `check=1` also answers `hints`: receipts without an amount (not exported), without a category (booked on
+the other expenses account), without a VAT rate (booked without input tax). `GET /api/office/datev/accounts` (admin)
+lists the receipt categories with their default and own account and the travel accounts for the settings page.
 
 Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit_scheme`, `reminder_scheme`,
 `payment_days` (14), `reminder_fee` (0), `reminder_deadline_days` (10), `einvoice_format`, `datev_email`, `datev_auto`,
@@ -1233,6 +1272,12 @@ list's Share dialog > Public link (*Request acceptance*); the customer's list pa
 newest version's player and the customer's comments at a timecode (`POST /s/q/<token>/comments`, limited per client address
 and per link, a form check value of its own) and *Approve* / *Request changes*; the decision names the version shown.
 
+## Documents in the customer portal (2.120.0)
+
+*Settings > Invoices > Show documents in the customer portal* (off by default) lets clients see their sent quotations,
+invoices with the payment state and credit notes in the customer portal; *Send portal link* in the client's menu mails them
+the sign-in link. Details: [TEAM.md](TEAM.md) *The customer portal*.
+
 ## Documents from templates (2.93.0)
 
 Tab *Documents* (admins of the office area; members `403`, agents `403`, another area `404`; a person without an
@@ -1282,6 +1327,20 @@ a sample), `GET /api/office/doc-templates/starters?lang=`, `PATCH/DELETE /api/of
 `GET /api/office/gen-docs/<id>/pdf` (`?signed=1`), `POST /api/office/gen-docs/<id>/signoff`,
 `GET /api/office/gen-docs/<id>/signoffs`; a link is stopped with `POST /api/office/signoffs/<sid>/revoke`. Template and
 document texts are encrypted at rest in organisations with encryption.
+
+## Delivery notes and the timesheet (2.120.0)
+
+- **Delivery note / proof of service** (document kind `delivery`, tab "Delivery notes"): made from a quotation or an invoice
+  (`POST /api/office/docs/<id>/delivery`, positions without prices, discounts left out) or empty. Own number series
+  (`delivery_scheme`, default `LS-{yyyy}-{seq:03}`, set at finalising). `delivery_title` picks the title: "" = Lieferschein,
+  `service` = Leistungsnachweis. The PDF shows no prices, sums, tax or payment details and ends with the box "received /
+  accepted" (place, date, signature). It has no e-invoice, no payment state and is not counted in revenue, cash flow, DATEV or
+  reminders. Finalising needs a recipient (with address) and one position; sending works like other documents.
+- **Timesheet of an invoice** (`GET /api/office/docs/<id>/timesheet.pdf`, `?inline=1`): for an invoice with a client and a
+  period of service, the time entries of the client's lists in that period (date, person, activity, hours per list, total),
+  rounded like the time report. Only entries the signed-in person may see in the time report; made on demand, never stored.
+  `POST .../send` takes `timesheet: true` to attach it as a second file (the invoice's own PDF / ZUGFeRD file is unchanged;
+  the DATEV copy never gets it). The document answer has `timesheet_ok`.
 
 ## Access log
 
@@ -1352,6 +1411,34 @@ at most 1600 px width and stores it as PNG below `<data>/office/<org_id>/logo.pn
 writer has no SVG renderer). The folder is part of the backups and restores like the attachments. Internal figures
 (costs, margin) are never printed.
 
+### Own letterhead (2.120)
+
+Settings -> Letterhead takes a PDF that goes behind every quotation, invoice, credit note, reminder and every later
+document kind: its page 1 behind the first page, its page 2 behind the following pages (a one-page PDF goes behind all
+of them). A4 portrait, up to 10 MB. The pages are copied into the document as they are (vector graphics, pictures and
+the letterhead's own fonts), so the print stays sharp. A PDF that cannot be read safely (password protected, an unknown
+compression, rotated or landscape pages) is refused at the upload with a short message; a document is never printed
+from a half read letterhead.
+
+- Margins in mm for page 1 and for the following pages (top, right, bottom, left). On page 1 "top" is where the address
+  field begins (DIN 5008: 45 mm). The defaults are the normal layout. The text column takes the narrower of the two pages.
+- "Leave out our own head" drops the logo / company name and the fold marks; "Leave out our own footer" drops the footer
+  columns (number and page stay, below the text). Both are on after an upload, because a letterhead usually has them.
+- "Preview" shows a two-page sample invoice with the letterhead. Every change is saved at once and can be undone in the
+  message that follows; removing the letterhead can be undone the same way (the previous file is kept for that one step,
+  older ones are deleted).
+- Finalising freezes the letterhead with the sender (a copy `lhs-<hash>.pdf`), so a finalised document looks the same
+  later; documents finalised before stay as they were. The e-invoice XML inside a ZUGFeRD PDF and the PDF/A metadata
+  stay as they are. Without a letterhead the PDF is exactly the one of before.
+- PDF/A: the letterhead's fonts are copied as they are. Export the letterhead with embedded fonts (the default of most
+  programs); a letterhead with fonts that are not embedded still prints, but the invoice is then no strict PDF/A file.
+- Organisation admins (and a person without organisation in the personal office) upload and change it; members see the
+  state and the preview. The file is stored sealed like the documents below `<data>/office/<org_id>/`.
+
+Routes: `GET / POST / PUT / DELETE /api/office/letterhead` (state, multipart `file`, `{m1, m2, hide_head, hide_footer}`
+with `m1` / `m2` = `[top, right, bottom, left]` in mm, removal), `POST /api/office/letterhead/restore` (`{file}`: the
+previous file again, the undo) and `GET /api/office/letterhead/preview` (the sample as PDF).
+
 ## Database
 
 New tables, all additive and keyed by `org_id` with `ON DELETE CASCADE`: `office_settings`, `office_services`,
@@ -1389,6 +1476,8 @@ texts encrypted at rest, archived = removed and restorable), the column `gen_doc
 link of such a document), and `office_vehicles`, `office_drives` and `office_drive_log` (the logbook; under row-level security, the
 plate, start / destination / purpose and the logged values encrypted at rest, `deleted_at` = deleted and restorable) and
 the settings keys `km_rate` / `km_rates` (rate per year); 2.92 runs on with them.
+Since 2.120.0 also the columns `inv_type` (text, default empty), `abs_refs` (text, default `[]`), `skonto_pct` and
+`skonto_days` (nullable) of `office_docs` and the settings keys `skonto_pct` / `skonto_days`; 2.117 runs on with them.
 
 ## E-invoices (ZUGFeRD / XRechnung) and PDF/A-3
 

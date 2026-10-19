@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.120.0** (2026-10-19): progress and final invoices with cash discount, the client portal shows quotations, invoices
+  and their payment state, delivery notes and a timesheet attachment, DATEV with receipts and travel costs, an own letterhead PDF.
 - **2.119.2** (2026-10-19): contacts import and export CSV (Outlook, Google, Excel), load beyond 500, hint on duplicates,
   manage groups, a contact history and "Create client" on the card, addresses as map links; framework contracts move
   between private and organisation; undo of a list delete keeps the list active.

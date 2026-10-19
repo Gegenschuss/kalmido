@@ -7,6 +7,22 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.120.0] - 2026-10-19
+
+Office: progress and final invoices, cash discount, client portal with documents, delivery notes, DATEV input side, own letterhead.
+
+### Added
+- Invoices: progress invoices from a quotation (amount or percentage of its net, split onto its VAT rates, e-invoice type 326) and a final invoice that deducts every finalised, not cancelled progress invoice per VAT rate (type 380); a second final invoice or a progress invoice after the final one is refused; the cash flow plan keeps the rest of the quotation after a progress invoice (#2087).
+- Invoices: cash discount (Skonto) per invoice with a default in the office settings - a line under the payment terms in the PDF, the XRechnung discount line in BT-20, a payment of the discounted amount within the period settles the invoice (#2087).
+- Client portal: clients see their sent quotations, invoices with payment state and due date and credit notes and download the PDF as it was sent (office setting "Show documents in the client portal", off by default); "Send portal link" in the client menu mails the sign-in link - no account, no password (#2088).
+- Delivery notes / proofs of service as a document kind of their own (number series LS-, positions without prices, a receipt box for signature, from a quotation or invoice); a timesheet PDF for invoices with a client and service period, optionally attached when sending (#2089).
+- DATEV booking batch: incoming receipts (expense account per category, input tax key, collective creditor or bank) and travel costs incl. per diem; hints before the download for receipts without amount, category or VAT rate; travel receipts already marked "in DATEV" are not exported again; new settings "Receipts and travel costs" that save at once (#2090).
+- Own letterhead: upload a PDF (page 1 behind the first page, page 2 behind the following ones), margins per page, switch off the own head and footer, preview, every change undoable; finalised documents keep their letterhead, the ZUGFeRD XML stays embedded, without a letterhead the PDF is unchanged (#2091).
+
+### Changed
+- Country pack de: bookkeeping export DATEV is marked ready (#2090).
+- Agents: `draft_invoice_from_offer` / POST /api/v1/office/offers/{id}/invoice take `inv_type`, `amount` and `pct` (#2087).
+
 ## [2.119.2] - 2026-10-19
 
 Contacts, undo of a list delete, framework contracts between workspaces, a flaky chat test.
