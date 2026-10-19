@@ -162,7 +162,7 @@ async function firefox(fn) {
   check(w.eval('S.sel') === T2, 'the #id opens the task');
   await v1(ag.token, 'PUT', '/agent/status', {status: 'waiting'});
   w.eval('load().then(render)'); await sleep(800);
-  check(/waiting for you/.test(st().textContent) && st().querySelector('.adot.st-waiting'), 'waiting for you');
+  check(await until(() => /waiting for you/.test(st().textContent) && st().querySelector('.adot.st-waiting')), 'waiting for you');  // 2.98.1: CI under load: wait instead of the fixed 800 ms
   w.eval(`agentById(${ag.id}).online = true; agentById(${ag.id}).poll_age = 290; agentById(${ag.id}).contact_age = 290; S.agentsAt = Date.now() - 20000; agentLive()`);
   check(/not connected/.test(st().textContent) && st().querySelector('.adot.st-offline'), 'not connected (2.6.0, K08; was "offline"): 5 minutes without contact (counted on the client)');
   await call('PATCH', `/api/admin/agents/${ag.id}`, {limits: {period: 'day', metric: 'tokens', hard: 10}});
@@ -172,7 +172,7 @@ async function firefox(fn) {
   check(/limit reached/.test(st().textContent) && st().classList.contains('st-limit'), 'limit reached: ' + st().textContent);
   await call('PATCH', `/api/admin/agents/${ag.id}`, {limits: null, enabled: false});
   w.eval('load().then(render)'); await sleep(800);
-  check(/paused/.test(st().textContent), 'paused');
+  check(await until(() => /paused/.test(st().textContent)), 'paused');  // 2.98.1: as above
   await call('PATCH', `/api/admin/agents/${ag.id}`, {enabled: true});
   await v1(ag.token, 'PUT', '/agent/status', {status: 'idle'});
   w.eval('chatClose()');
@@ -240,7 +240,7 @@ async function firefox(fn) {
       check(good(m2, false), `${W}px: Share dialog with Tidy up by fits ${JSON.stringify(m2)}`);
       await shot(`p241-tidyagent-${W}.png`);
       await ev(`document.querySelector('.modal').remove()`);
-      if (W < 900) { await nav(B + '#agents/' + ag.id); await sleep(2500); }
+      if (W < 900) { await nav(B + '#agents/' + ag.id); await ev(`(() => { if (location.hash !== '#agents/${ag.id}') location.hash = '#agents/${ag.id}'; return 1; })()`); await sleep(2500); }  // 2.98.1: a fragment-only navigation may stay put in CI (as p2190_ride_ui)
       else { await ev(`chatOpen(${ag.id})`); await sleep(1200); }
       for (let i = 0; i < 60 && !(await ev(`!!document.querySelector('${W < 900 ? '#view .chath' : '#achat .chath'}')`).catch(() => false)); i++) await sleep(250);  // 2.80.3: slow CI
       if (!(await ev(`!!document.querySelector('${W < 900 ? '#view .chath' : '#achat .chath'}')`).catch(() => false))) {  // 2.87.0: CI - open the chat once more, then say what the page shows

@@ -1100,6 +1100,7 @@ fresh; run p294_a_ui node p294_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p294_b_api "$PY" p294_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p294_b_ui node p294_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p294_c_ui node p294_c_ui.js "$KALMIDO_TEST_DATA"
+shard 12  # 2.99.0: the 2.99 suites run in shard 12 (shard 13 ran past the 45 min CI limit in runs 210 / 212)
 # 2.99.0 part A: wiki ZIP import keeps PDFs and images as page attachments (#2182)
 fresh; run p299_a_api "$PY" p299_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.99.0 part B: one ... menu on wiki pages, chat composer icons aligned (#2183 #2185)
@@ -1111,6 +1112,7 @@ fresh; run p299_d_api "$PY" p299_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p299_d_ui node p299_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.99.0 part E: the sidebar group Exchange stays short (recent chats, pinned people / agents, "All people") (#2187)
 fresh; run p299_e_ui node p299_e_ui.js "$KALMIDO_TEST_DATA"
+shard 13  # back to shard 13 for the suites after this block
 # 2.86.0 (#1896): hardening from audit #476 part 1, groups A-E
 fresh; run p286_a_api "$PY" p286_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_b_api "$PY" p286_b_api_test.py "$KALMIDO_TEST_DATA"
@@ -1157,6 +1159,7 @@ fresh; run p297_c_ui node p297_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.97.0 part D: locked wiki spaces re-keyed in the browser on a move, orphan clean-up (#2050 #2051)
 fresh; run p297_d_api "$PY" p297_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p297_d_ui node p297_d_ui.js "$KALMIDO_TEST_DATA"
+shard 12  # 2.98.1: the 2.98 suites run in shard 12 (shard 13 ran past the 45 min CI job limit with them, shard 12 took 18 min)
 # 2.98.0 part A: scheduling polls (#1953)
 fresh; run p298_a_api "$PY" p298_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p298_a_ui node p298_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1169,6 +1172,7 @@ fresh; run p298_c_ui node p298_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p298_d_api "$PY" p298_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.87.9 part E (#1914 #1920 #1909 #1933 #1937 #1952 #1963): polish
 fresh; run p287b_e_ui node p287b_e_ui.js "$KALMIDO_TEST_DATA"
+shard 11  # 2.98.1: the 2.90-2.93 and 2.99.1 suites run in shard 11 (shard 13 over 45 min, shard 11 took 18 min)
 # 2.90.0 part A (#1921): bookkeeping light (EUeR, VAT return figures, tax reserve, receipt photo)
 fresh; run p290_a_api "$PY" p290_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p290_a_ui node p290_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1196,6 +1200,7 @@ fresh; run p293_a_api "$PY" p293_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p293_a_ui node p293_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p293_b_api "$PY" p293_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p293_b_ui node p293_b_ui.js "$KALMIDO_TEST_DATA"
+shard 13  # 2.98.1: new suites go here, above this line
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
