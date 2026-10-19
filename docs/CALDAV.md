@@ -141,6 +141,25 @@ are now, the agent's reason, the contact that stays (switchable), each group wit
 groups exactly like merging by hand; a group with a contact that was deleted or changed in the meantime is skipped. One
 undo step takes all merges of the proposal back. The agent never merges or deletes anything itself.
 
+**Long address books** (2.119.1): the list shows the first 500 contacts and loads the next ones while you scroll down
+(or with *Show more*). *All* in the selection mode ticks every contact of the search, also those not loaded yet.
+
+**CSV import and export** (2.119.1): *Contacts › More › Import a CSV file…* reads the CSV export of Outlook (German or
+English), Google Contacts and a simple spreadsheet (delimiter `;`, `,` or tab; UTF-8, UTF-16 or Windows-1252). Kalmido
+suggests a field for each column (with an example from the file); change any of them or choose *Do not import*, then
+import. Importing the same file again updates the contacts instead of doubling them. *Export … (CSV)* writes UTF-8 with
+semicolons and Outlook's column names, so Excel opens it directly and Outlook, Google and Kalmido read it back; a cell
+that would start a spreadsheet formula (`=`, `+`, `-`, `@`) gets a `'` in front.
+
+**Duplicate hint** (2.119.1): when you create a contact with the same e-mail address, phone number or name as one in
+the address books you can see, the editor names it: open that one, or press *Create anyway*. An import says how many of
+its new contacts look like one already there; *Check* lists them, each with *Merge* (the merge view above). Nothing is
+merged by itself, and contacts of address books you cannot see are never compared.
+
+**Managing groups** (2.119.1): *Manage groups…* in the group filter (or *More*) lists every group with its number of
+contacts. *Rename* and *Delete* change the group label of all contacts in the address books you may change (the contacts
+stay; read-only address books keep theirs). Each change is one undo step; the phones get the change on their next sync.
+
 ## Writing into subscribed calendars
 
 Calendars of other services that you subscribed to under **Settings › Calendars** are read-only at first. For a
