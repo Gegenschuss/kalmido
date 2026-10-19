@@ -33,7 +33,8 @@ KINDS = {
                          "file requests of a private folder, tags of files / folders, the tag filter, the documents' filters, bulk change, ZIP, CSV, documents via the API (2.122.0)"),
     "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private space (create, change, search, export, trash; "
                        "2.99.0: page files, ZIP import with PDFs / pictures; 2.123.0: p2123_b_api_test.py shares of pages / folders, p2123_a_api_test.py page history, text search)"),
-    "pim": ("matrix", SUITE + ", p294_b_api_test.py, p21191_a_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password"),
+    "pim": ("matrix", SUITE + ", p294_b_api_test.py, p21191_a_api_test.py, p2111_b_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password; "
+                    "invitation mails and the subscription link of an own calendar (2.111.0)"),
     "time": ("matrix", SUITE + ": time entries, the timer, habits"),
     "agents": ("matrix", SUITE + ": the freelancer's own agent (my agents, its token, chat, jobs, share of a private list) and "
                          "the agent API with that agent's token"),
@@ -198,7 +199,7 @@ ROUTES = {
     "GET /api/team/leave": "hub", "PUT /api/team/leave/quota": "hub", "PUT /api/team/leave/approval": "hub",
     "PUT /api/team/leave/worktime/{}": "hub", "POST /api/team/absences/{}/decide": "hub",
     # ---- link (22)
-    "GET /f/{}": "link", "GET /ical/{}.ics": "link", "GET /p/{}": "link", "GET /p/{}/stop": "link", "GET /portal": "link",
+    "GET /f/{}": "link", "GET /ical/{}.ics": "link", "GET /ical/ev/{}.ics": "link", "GET /p/{}": "link", "GET /p/{}/stop": "link", "GET /portal": "link",
     "GET /portal/login/{}": "link", "GET /s/q/{}": "link", "GET /s/q/{}/pdf": "link", "POST /s/q/{}/comments": "link", "GET /s/{}": "link",
     "GET /s/{}/file/{}": "link", "GET /s/{}/logo": "link", "POST /f/{}": "link", "POST /p/{}/comment": "link",
     "POST /p/{}/login": "link", "POST /p/{}/notify": "link", "POST /p/{}/stop": "link", "POST /portal/login/{}": "link",
@@ -481,6 +482,7 @@ ROUTES = {
     "POST /api/contacts/groups": "pim", "GET /api/calendars": "pim",
     "GET /api/calendars/events": "pim", "GET /api/contacts": "pim", "GET /api/contacts/{}": "pim", "GET /api/contacts/{}/history": "pim",  # 2.119.1 B (#2083)
     "GET /api/evcals": "pim",
+    "GET /api/evinvite": "pim", "GET /api/evcals/{}/feed": "pim", "POST /api/evcals/{}/feed": "pim",  # 2.111.0 B (#2056)
     "GET /api/evcals/{}/export.ics": "pim", "GET /api/events": "pim", "GET /api/events/{}": "pim",
     "GET /api/v1/address-books": "pim", "GET /api/v1/address-books/{}/export": "pim", "GET /api/v1/contacts": "pim",
     "GET /api/v1/contacts/{}": "pim", "GET /api/v1/event-calendars": "pim", "GET /api/v1/event-calendars/{}/export": "pim",

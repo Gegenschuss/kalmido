@@ -1768,6 +1768,10 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
   updated ..." and may edit or delete it as usual; the next run overwrites only the agent's own block. An agent keeps at
   most 3 notepads per project (its status block included); they do not count against the 20 of people. A blocker in a list
   the agent does not see appears only as `hidden: true` (no title, id or assignee, not in `waits` / `people`).
+- **Invitations by e-mail (2.111.0).** `create_event` / `update_event` with `send_invites: true` mail the invitation to the
+  external attendees (addresses, contacts); an agent without an own address invites with the address of the
+  calendar's owner (replies go there). Default off. Only set it when your person
+  asked for it; deleting an event that had invitations sends the cancellations by itself.
 - **Time check.** `user_id` = a person who may chat with the agent (a personal agent: its owner by default). Only entries and
   tasks of lists both see, events only of calendars shared with the agent, bookings only of the agent's workspace. Events
   and bookings only with the scope `calendar`; a booking of a list the agent does not see appears as "Booked"

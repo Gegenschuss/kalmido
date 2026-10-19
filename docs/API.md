@@ -472,6 +472,10 @@ after the last day), like iCalendar. Scope `calendar` for every operation.
 `attendees`: `[{user_id}]` (a person of this server: sees that event, and only that one, gets News + a push and
 answers), `[{contact_id}]` (a contact you see), `[{email, name?}]`; each with `partstat` and `role` (`req`, `opt`).
 Reminders are minutes before the start (all day: before midnight, so `-540` = 9:00 on the day).
+2.111.0: `send_invites: true` on `POST /events` / `PATCH /events/{id}` mails the invitation (an `.ics` with METHOD:REQUEST,
+Reply-To = the inviting person) to the new external attendees (addresses, contacts) and, when time, place, title, repeat or
+status changed, to all of them; default `false` (nothing is mailed). Removed or deleted: who had an invitation gets a
+cancellation. At most 200 invitation mails per person and day (`429`), see [CALDAV.md](CALDAV.md).
 
 ## Contacts (2.21.0)
 

@@ -52,12 +52,13 @@ KINDS = {
     "agent": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: agents, their chat, events and jobs"),
     "people": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: the user list, user changes, invitations / sign-in links by id"),
     "org": ("matrix", "p2280_api_test.py: organisations, their members and admins"),
-    "calendar": ("matrix", "p2300_tenant_test.py: calendars by id, sharing (B2), workspace (B3); p294_b_api_test.py (the booking page: types / bookings of another person 404, the public pages)"),
+    "calendar": ("matrix", "p2300_tenant_test.py: calendars by id, sharing (B2), workspace (B3); p294_b_api_test.py (the booking page: types / bookings of another person 404, the public pages); "
+                 "p2111_b_api_test.py (invitation marks and subscription links of another person's calendar 404, a link ends with the sharing)"),
     "event": ("matrix", "p2300_tenant_test.py: events by id, ranges, invitations"),
     "book": ("matrix", "p2300_tenant_test.py: address books by id, sharing (B2), workspace (B3)"),
     "contact": ("matrix", "p2300_tenant_test.py: contacts by id, links to tasks"),
     "dav": ("matrix", "p2300_tenant_test.py: CalDAV / CardDAV collections of others"),
-    "ical": ("matrix", "p2300_tenant_test.py: the calendar feed has only visible tasks"),
+    "ical": ("matrix", "p2300_tenant_test.py: the calendar feed has only visible tasks; p2111_b_api_test.py: the event calendar feed only while its person sees the calendar"),
     "group": ("matrix", "p2300_tenant_test.py: groups without a visible member stay unknown (B1)"),
     "template": ("matrix", "p2300_tenant_test.py: templates by id, from / into lists of others"),
     "form": ("matrix", "p2300_tenant_test.py: forms by id, the form page for another organisation"),
@@ -273,6 +274,7 @@ ROUTES = {
     "GET /api/v1/event-calendars/{}/export": "calendar", "GET /api/evcals": "calendar", "POST /api/evcals": "calendar",
     "PATCH /api/evcals/{}": "calendar", "DELETE /api/evcals/{}": "calendar", "PUT /api/evcals/{}/members": "calendar",
     "DELETE /api/evcals/{}/members/{}": "calendar", "GET /api/evcals/{}/export.ics": "calendar",
+    "GET /api/evinvite": "calendar", "GET /api/evcals/{}/feed": "calendar", "POST /api/evcals/{}/feed": "calendar",  # 2.111.0 B (#2056)
     # ---- chatfile (4)
     "GET /api/chat-files/{}": "chatfile", "DELETE /api/chat-files/{}": "chatfile",
     "POST /api/chat-save": "chatsave",  # 2.37.0 (#1159)
@@ -510,7 +512,7 @@ ROUTES = {
     "PUT /api/admin/groups/{}/avatar": "group", "POST /api/admin/groups/{}/avatar": "group",  # 2.46.0 (#1605): group pictures
     "DELETE /api/admin/groups/{}/avatar": "group", "GET /api/group-avatar/{}/{}.jpg": "group",  # (p2460_c_api_test.py: outside 404)
     # ---- ical (3)
-    "GET /ical/{}.ics": "ical", "GET /api/ical": "ical", "POST /api/ical": "ical",
+    "GET /ical/{}.ics": "ical", "GET /ical/ev/{}.ics": "ical", "GET /api/ical": "ical", "POST /api/ical": "ical",
     # ---- list (100)
     "GET /api/lists/{}/agent-access": "list",  # 2.30.0 (#919): the agents' access log of a list (its members)
     "PUT /api/lists/{}/favorite": "list", "DELETE /api/lists/{}/favorite": "list", "PUT /api/lists/{}/in-mine": "list",  # 2.41.0 (#1365)
