@@ -36,7 +36,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); await sleep(50);
   check(!d.querySelector('.modal'), 'Escape closes');
   w.eval(`settingsModal('tabbar')`); await sleep(200); md = d.querySelector('.smodal');
-  check(md.querySelector('.snav .on').dataset.sec === 'look' && md.querySelector('#s-tabadd option'), 'settingsModal(tabbar) -> Appearance (tab bar)');
+  check(md.querySelector('.snav .on').dataset.sec === 'look' && md.querySelector('#s-tabadd'), 'settingsModal(tabbar) -> Appearance (tab bar)');
   md.remove();
   w.eval(`settingsModal('account')`); await sleep(200); md = d.querySelector('.smodal');
   check(md.querySelector('.snav .on').dataset.sec === 'account', 'settingsModal(account) -> Account');
@@ -46,8 +46,17 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   click(w, md.querySelector('[data-look="theme"][data-v="light"]')); await sleep(50);
   check(w.__store['tasks.theme'] === '"light"' && d.documentElement.dataset.theme === 'light', 'theme applies immediately');
   click(w, md.querySelector('[data-look="theme"][data-v="dark"]'));
-  const sel = md.querySelector('#s-tabadd'); sel.value = 's:tomorrow'; sel.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(50);
-  check(JSON.stringify(w.eval(`LS.get('tabbar')`)).includes('s:tomorrow'), 'tab bar applies immediately');
+  // 2.122.2 (#2329): "+ Add tab …" opens a sheet (search, folded sections, tabs in the bar left out); a tap adds and closes
+  click(w, md.querySelector('#s-tabadd')); await sleep(80);
+  let tp = d.querySelector('.modal.tapick');
+  check(tp && tp.querySelector('#ta-q') && tp.querySelectorAll('.tapick-g').length >= 3 && tp.querySelectorAll('.tapick-g.on').length === 1, 'tab sheet: search, sections, one open');
+  const inBar = w.eval('tabIds()');
+  check(!w.eval(`tabAddGroups().flatMap(g => g.items).map(x => x.id)`).some(v => inBar.includes(v)), 'tab sheet: tabs of the bar are left out');
+  const qi = tp.querySelector('#ta-q'); qi.value = w.eval(`tr(SMART.tomorrow.name)`).slice(0, 4); qi.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(30);
+  const hit = tp.querySelector('[data-tabadd="s:tomorrow"]');
+  check(hit && !tp.querySelector('[data-tabadd="m:tasks"]'), 'tab sheet: the search finds the smart list at once, across sections');
+  click(w, hit); await sleep(50);
+  check(JSON.stringify(w.eval(`LS.get('tabbar')`)).includes('s:tomorrow') && !d.querySelector('.modal.tapick'), 'tab bar applies immediately, the sheet closes');
   click(w, md.querySelector('[data-m="tab-reset"]')); await sleep(50);
   check(w.eval(`LS.get('tabbar', null)`) === null, 'tab bar back to default');
   md.remove();
@@ -94,7 +103,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   w = await boot({user: 'eve'}); d = w.document;
   w.eval(`settingsModal('modules')`); await sleep(300); md = d.querySelector('.smodal');
   check(md.querySelector('[data-feat="collab"]') && !md.querySelector('[data-feat="collab"]').checked, 'collab off: switch visible, unchecked');
-  check(![...md.querySelectorAll('#s-tabadd option')].some(o => ['news', 's:assigned'].includes(o.value)), 'collab off: no News / Assigned tab options');
+  check(!w.eval(`tabAddGroups().flatMap(g => g.items).map(x => x.id)`).some(v => ['news', 's:assigned'].includes(v)), 'collab off: no News / Assigned tab options');  // 2.122.2 (#2329)
   w.close();
   console.log(`\n${ok} ok, ${F.length} failed`);
   if (errs.length) console.log('JS ERRORS', [...new Set(errs)]);

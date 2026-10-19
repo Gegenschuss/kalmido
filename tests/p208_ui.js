@@ -221,7 +221,7 @@ async function swTests() {
   w.close();
   w = await boot({user: 'alice', mobile: true, hash: 'today'}); d = w.document;
   w.eval(`settingsModal('look')`); await sleep(600);
-  const ts = d.querySelector('.modal #s-tabadd');
+  const ts = d.querySelector('.modal select');  // 2.122.2 (#2329): "+ Add tab" is a sheet now, any select of the dialog
   if (ts && ts.options.length >= 2) { mdown(w, ts); await sleep(50); check(d.querySelector('#pop.selpop') && d.querySelector('#pop').classList.contains('overmodal'), 'settings select: the sheet above the dialog'); }
   w.close();
 
