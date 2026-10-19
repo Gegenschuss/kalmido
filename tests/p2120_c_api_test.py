@@ -177,8 +177,10 @@ R7 = receipt(A, WSO, "naechstes-jahr.pdf", "30.00", "2027-01-02", "Software", "1
 r = A.post(B + "/api/office/trips", json={"date_from": "2026-03-10", "date_to": "2026-03-11", "dest": "Drehort Köln", "overnight": 1, "country": "DE",
                                           "items": [{"date": "2026-03-10", "category": "train", "amount": 89.9},
                                                     {"date": "2026-03-10", "category": "hotel", "amount": 120},
-                                                    {"date": "2026-03-11", "category": "parking", "amount": 12}]})
-check(r.status_code == 201, "a trip with three travel receipts " + r.text[:160])
+                                                    {"date": "2026-03-11", "category": "parking", "amount": 12},
+                                                    # 2.120.0 (#2090): already in DATEV (number set) = booked there, not twice
+                                                    {"date": "2026-03-11", "category": "taxi", "amount": 31, "datev": 1, "datev_no": "DT-77"}]})
+check(r.status_code == 201, "a trip with four travel receipts " + r.text[:160])
 TRIP = r.json()
 TID = TRIP["id"]
 ITEMS = {x["category"]: x["id"] for x in TRIP["items"]}
@@ -205,6 +207,7 @@ hk = {h["key"]: h for h in ch.get("hints", [])}
 check(hk.get("no_amount", {}).get("count") == 1 and "not exported" in hk["no_amount"]["text"], f"hint: one receipt without amount not exported {ch.get('hints')}")
 check(hk.get("no_category", {}).get("count") == 1 and "4900" in hk["no_category"]["text"], f"hint: one receipt without category on 4900 {ch.get('hints')}")
 check(hk.get("no_vat", {}).get("count") == 1, f"hint: one receipt without VAT rate {ch.get('hints')}")
+check(hk.get("in_datev", {}).get("count") == 1 and "already in DATEV" in hk["in_datev"]["text"], f"hint: one travel receipt already in DATEV {ch.get('hints')}")
 raw, lines, rows = batch(A, P)
 check(ch["count"] == len(rows) == 1 + 4 + 3 + (1 if VMA and Decimal(VMA) else 0), f"the batch: invoice + 4 receipts + 3 travel receipts + per diem ({ch['count']}, {len(rows)}, vma {VMA})")
 check(raw.endswith(b"\r\n") and b"\r\n" in raw and b"\n" not in raw.replace(b"\r\n", b""), "CRLF only")
@@ -220,6 +223,7 @@ check(x and x[6] == "4940" and x[8] == '"8"', f"receipt 7 %: literature 4940, ke
 x = bb.get(f"B{R3}")
 check(x and x[6] == "4900" and x[8] == "", f"receipt without category and rate: 4900, no key {x and x[:11]}")
 check(f"B{R5}" not in bb and f"B{R6}" not in bb and f"B{R7}" not in bb, "no receipt without amount, of April or of the next year")
+check(f"R{TID}-{ITEMS['taxi']}" not in bb, "a travel receipt already in DATEV is not booked again")
 x = bb.get(f"R{TID}-{ITEMS['train']}")
 check(x and x[0] == "89,90" and x[6] == "4663" and x[7] == "70000" and x[8] == "" and x[9] == "1003", f"train: fares 4663, no key {x and x[:11]}")
 x = bb.get(f"R{TID}-{ITEMS['hotel']}")
