@@ -20,7 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
-- **2.119.1** (2026-10-19): contacts import and export CSV (Outlook, Google, Excel), load beyond 500, hint on duplicates,
+- **2.119.2** (2026-10-19): contacts import and export CSV (Outlook, Google, Excel), load beyond 500, hint on duplicates,
   manage groups, a contact history and "Create client" on the card, addresses as map links; framework contracts move
   between private and organisation; undo of a list delete keeps the list active.
 - **2.119.0** (2026-10-19): entertainment receipts as an office module (form with pick lists, lock with logged unlock,

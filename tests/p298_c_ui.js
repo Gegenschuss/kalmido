@@ -64,7 +64,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     await nav(B + '#office/offers');
     check(await ready(ev, `!!document.querySelector('#view .ofwrap > .ofrail') && typeof OFC === 'object' && !!OFC.info`, 80), '#2180: the rail left of the page');
     const pts = await ev(`[...document.querySelectorAll('#view .ofrail .ofrg')].map(g => g.dataset.ofmg + ':' + [...g.querySelectorAll('.ofri')].map(b => b.dataset.ofm).join('+')).join(' ')`);
-    check(pts === 'sell:pipeline+offers+clients+contacts+gendocs+contracts money:cashflow+kpi+bank+books+subs+travel admin:equipment+agreements+settings', '#2180: groups and points in order (P4: all of them) ' + pts);
+    check(pts === 'sell:pipeline+offers+clients+contacts+gendocs+contracts money:cashflow+kpi+bank+books+subs+travel+meals admin:equipment+agreements+settings', '#2180: groups and points in order (P4: all of them) ' + pts);  // 2.119.0 (#2288): + meals (entertainment receipts) under Money
     check(await ev(`[...document.querySelectorAll('#view .ofrail .ofrh')].map(h => h.textContent.trim()).join('|') === 'Sell|Money|Administration' && !document.querySelector('#view .ofrail .ofrh svg')`), '#2180: three small caps headings without icons');
     check(await ev(`(() => { const n = document.querySelector('#view .ofrail'); return n.tagName === 'NAV' && n.getAttribute('aria-label') === 'Office' && [...n.querySelectorAll('.ofri')].every(b => b.tagName === 'BUTTON' && !b.getAttribute('role')); })()`), '#2180: a nav "Office" of buttons, no tabs');
     check(await ev(`(() => { const on = [...document.querySelectorAll('#view .ofrail [aria-current="page"]')]; return on.length === 1 && on[0].dataset.ofm === 'offers' && on[0].classList.contains('on'); })()`), '#2180: the active point (aria-current)');
@@ -122,7 +122,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     await nav(B + 'static/icon.svg'); await nav(B + '#office');
     check(await ready(ev, `document.querySelectorAll('#view .ofmstart .ofl .oflg').length === 3`, 80), '#2180 phone: the start page lists three groups');
     check(await ev(`!document.querySelector('#view .ofrail') && !document.querySelector('#view .ofpb') && !document.querySelector('#view .ofmtiles')`), '#2180 phone: the list is the menu, no tiles');
-    check(await ev(`(() => { const rs = [...document.querySelectorAll('#view .oflc .oflr')], l = new Set(rs.map(b => Math.round(b.getBoundingClientRect().left))), w = new Set(rs.map(b => Math.round(b.getBoundingClientRect().width))); return rs.length === 15 && l.size === 1 && w.size === 1 && rs.every(b => b.getBoundingClientRect().height >= 45); })()`), '#2180 phone: one column, 15 rows of at least 2.875 rem');
+    check(await ev(`(() => { const rs = [...document.querySelectorAll('#view .oflc .oflr')], l = new Set(rs.map(b => Math.round(b.getBoundingClientRect().left))), w = new Set(rs.map(b => Math.round(b.getBoundingClientRect().width))); return rs.length === 16 && l.size === 1 && w.size === 1 && rs.every(b => b.getBoundingClientRect().height >= 45); })()`), '#2180 phone: one column, 16 rows of at least 2.875 rem');  // 2.119.0 (#2288): + meals (entertainment receipts) under Money
     check(await ev(`[...document.querySelectorAll('#view .oflg h3')].map(h => h.textContent.trim()).join('|') === 'Sell|Money|Administration'`), '#2180 phone: the group headings');
     check(await ev(noSide), '#2180 phone: nothing sticks out to the side (start)');
     await shot('p298c-phone-start.png');
@@ -133,7 +133,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
       const first = [...bar.querySelectorAll('button,a,[tabindex]')].find(x => x.tabIndex >= 0);
       return JSON.stringify({n: ts.length, rows: new Set(ts.map(t => Math.round(t.getBoundingClientRect().top))).size, wrap: getComputedStyle(row).flexWrap, ox: getComputedStyle(row).overflowX, onSeen: on.left >= rb.left - 1 && on.right <= rb.right + 1,
         back: first?.classList.contains('ofpback') && first.dataset.go === 'office/start', label: bar.querySelector('.ofpback').textContent.trim(), sticky: getComputedStyle(bar).position, th: Math.min(...ts.map(t => t.getBoundingClientRect().height))}); })()`));
-    check(pb.n === 6 && pb.rows === 1 && pb.wrap === 'nowrap' && pb.ox === 'auto', '#2180 phone: the six points of Money in ONE row that scrolls ' + JSON.stringify(pb));
+    check(pb.n === 7 && pb.rows === 1 && pb.wrap === 'nowrap' && pb.ox === 'auto', '#2180 phone: the seven points of Money in ONE row that scrolls ' + JSON.stringify(pb));  // 2.119.0 (#2288): + meals (entertainment receipts) under Money
     check(pb.onSeen, '#2180 phone: the active tab is in sight ' + JSON.stringify(pb));
     check(pb.back && /^Office\s*·\s*Money$/.test(pb.label) && pb.sticky === 'sticky' && pb.th >= 43, '#2180 phone: the way back "Office · Money" first, sticky, large tabs ' + JSON.stringify(pb));
     check(await ev(noSide), '#2180 phone: nothing sticks out to the side (sub page)');

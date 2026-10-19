@@ -7,7 +7,7 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
-## [2.119.1] - 2026-10-19
+## [2.119.2] - 2026-10-19
 
 Contacts, undo of a list delete, framework contracts between workspaces, a flaky chat test.
 
@@ -27,6 +27,11 @@ Contacts, undo of a list delete, framework contracts between workspaces, a flaky
 - Deleting a list: "Undo" right after it brings an active list back active in its old place, not into the archive; restoring from the trash still goes to the archive (#2304).
 - Documents: the selection marks have a real 44 px touch target on phones (#2206).
 - Chat side window: unchanged parts (job filter, status, steps) are no longer redrawn on every update, and a team conversation parked right after opening loads its messages instead of staying at "Loading…" (#2310).
+
+## [2.119.1] - 2026-10-19
+
+### Fixed
+- Entertainment receipts: the amount lines use the full width on phones, saved people always show among the guests, agents are no host or guest; the keep period counts from the last approval; CI: office menu tests know the new point, start CSS budget (#2288).
 
 ## [2.119.0] - 2026-10-19
 
