@@ -3,15 +3,24 @@
 const RC = {id: null, d: null, seq: 0};
 
 function rc_slot(doc) {
-  if (RC.id !== doc.id) { RC.id = doc.id; RC.d = null; rc_load(); }
-  return `<div class="rc-slot">${rc_html()}</div>`;
+  if (RC.id !== doc.id) { RC.id = doc.id; RC.d = null; RC.cb = null; rc_load(); }
+  return `<div class="rc-slot">${rc_html()}</div><p class="rc-cb muted" ${RC.cb?.length ? '' : 'hidden'}>${esc(rc_cbText())}</p>`;  // 2.121.0 B (#2095): + the cash book hint
 }
 async function rc_load() {
   const id = RC.id, seq = ++RC.seq;
   let d = null; try { d = await rawFetch('GET', `/api/docs/${id}/receipt`); } catch { d = null; }
   if (seq !== RC.seq) return;
   RC.d = d; rc_draw();
+  if (d) rc_cbHint(id, seq);
 }
+// 2.121.0 B (#2095): "In the cash book no. X" under the receipt (the server answers office admins only; else an empty list)
+async function rc_cbHint(id, seq) {
+  let j = null; try { j = await rawFetch('GET', `/api/docs/${id}/cashbook`); } catch { j = null; }
+  if (seq !== RC.seq) return;
+  RC.cb = j?.entries || [];
+  const el = $('.rc-cb'); if (el) { el.hidden = !RC.cb.length; el.textContent = rc_cbText(); }
+}
+const rc_cbText = () => (RC.cb || []).map(e => tr('In the cash book {0} no. {1}', e.book, e.no)).join(' · ');
 function rc_draw() { const el = $('.rc-slot'); if (el) el.innerHTML = rc_html(); }
 function rc_html() {
   const d = RC.d; if (!d) return '';
