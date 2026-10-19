@@ -112,7 +112,7 @@ function rk_fixedModal(f) {
     ${ofcRowF('cf-vat', tr('VAT rate'), ofcSel('cf-vat', f?.vat_rate ?? 0, FCI_VATS.map(v => [v, `${v} %`])), tr('The amount is net.'))}
     ${ofcRowF('cf-repeat', tr('Repeat'), ofcSel('cf-repeat', f?.repeat || 'monthly', RK_CF_REPEATS.map(([k, n]) => [k, tr(n)])))}
     <div class="row"><label id="cf-startl">${tr('First due date')}</label>${dateIn('cf-start', f?.start || new Date().toISOString().slice(0, 10), {label: tr('First due date'), clear: false})}</div>
-    <div class="row"><label id="cf-untill">${tr('Ends on')}</label>${dateIn('cf-until', f?.until || '', {label: tr('Ends on'), empty: tr('open-ended')})}</div>
+    <div class="row"><label id="cf-untill">${tr('Ends on')}</label>${dateIn('cf-until', f?.until || '', {label: tr('Ends on'), empty: tr('open-ended'), after: 'cf-start'})}</div>
     <div class="aerr" role="alert"></div>
     <div class="foot">${f ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${f ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg');

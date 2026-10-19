@@ -76,7 +76,7 @@ function aboModal(f) {
     ${ofcRowF('abo-repeat', tr('Repeat'), ofcSel('abo-repeat', f?.repeat || 'monthly', RK_CF_REPEATS.map(([k, n]) => [k, tr(n)])))}
     ${ofcRowF('abo-category', tr('Category'), ofcIn('abo-category', f ? f.category : tr('Software'), {max: 100}))}
     <div class="row"><label id="abo-startl">${tr('First due date')}</label>${dateIn('abo-start', f?.start || new Date().toISOString().slice(0, 10), {label: tr('First due date'), clear: false})}</div>
-    <div class="row"><label id="abo-untill">${tr('Ends on')}</label>${dateIn('abo-until', f?.until || '', {label: tr('Ends on'), empty: tr('open-ended')})}</div>
+    <div class="row"><label id="abo-untill">${tr('Ends on')}</label>${dateIn('abo-until', f?.until || '', {label: tr('Ends on'), empty: tr('open-ended'), after: 'abo-start'})}</div>
     <div class="row"><label for="abo-notice">${tr('Notice period (days)')}</label><span class="abo-notice"><input id="abo-notice" type="number" inputmode="numeric" min="0" max="730" step="1" value="${+f?.notice_days || 0}">
       ${[[30, tr('approx. 1 month')], [90, tr('approx. 3 months')]].map(([n, l]) => `<button type="button" class="btn sm ghost" data-abo-nd="${n}">${esc(l)}</button>`).join('')}</span><span class="muted ofchint">${tr('Days before the renewal; 0 = none.')}</span></div>
     <div class="row"><label>${tr('Users')}</label><div class="abo-seats">${ppl.map(p => seat(p.id, p.name)).join('')}${gone.map(i => seat(i, tr('former member'))).join('')}</div></div>

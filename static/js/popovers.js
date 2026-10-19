@@ -399,7 +399,7 @@ function dpInner(kind, v, o) {
 function dpField(kind, id, v, o = {}) {
   v = v || '';
   const lab = o.label || '';
-  return `<span class="dpw" id="${id}-w" ${o.hidden ? 'hidden' : ''}><input type="hidden" id="${id}" value="${esc(v)}" data-dp="${kind}" ${o.min ? `data-min="${esc(o.min)}"` : ''} ${o.max ? `data-max="${esc(o.max)}"` : ''} ${o.clear === false ? 'data-noclear="1"' : ''} data-label="${esc(lab)}" data-empty="${esc(o.empty || '')}" ${o.ro ? 'disabled' : ''} ${o.attrs || ''}><button type="button" class="dpbtn" data-dpfor="${id}" aria-haspopup="dialog" aria-expanded="false" aria-label="${esc(lab ? `${lab}: ${(kind === 'date' ? fmtDateLoc(v) : fmtTimeLoc(v)) || o.empty || tr('none')}` : '')}" ${o.ro ? 'disabled' : ''}>${dpInner(kind, v, o)}</button></span>`;
+  return `<span class="dpw" id="${id}-w" ${o.hidden ? 'hidden' : ''}><input type="hidden" id="${id}" value="${esc(v)}" data-dp="${kind}" ${o.min ? `data-min="${esc(o.min)}"` : ''} ${o.max ? `data-max="${esc(o.max)}"` : ''} ${o.after ? `data-after="${esc(o.after)}"` : ''} ${o.clear === false ? 'data-noclear="1"' : ''} data-label="${esc(lab)}" data-empty="${esc(o.empty || '')}" ${o.ro ? 'disabled' : ''} ${o.attrs || ''}><button type="button" class="dpbtn" data-dpfor="${id}" aria-haspopup="dialog" aria-expanded="false" aria-label="${esc(lab ? `${lab}: ${(kind === 'date' ? fmtDateLoc(v) : fmtTimeLoc(v)) || o.empty || tr('none')}` : '')}" ${o.ro ? 'disabled' : ''}>${dpInner(kind, v, o)}</button></span>`;
 }
 const dateIn = (id, v, o) => dpField('date', id, v, o);
 const timeIn = (id, v, o) => dpField('time', id, v, o);
@@ -429,7 +429,7 @@ function dpOpen(anchor, o) {
   document.body.appendChild(el);
   DP.el = el; DP.anchor = anchor; anchor?.setAttribute?.('aria-expanded', 'true');
   const v = o.value || '';
-  DP.st = {...o, cur: o.kind === 'date' ? (v || (o.min && o.min > today() ? o.min : today())) : v, sel: v};
+  DP.st = {...o, cur: o.kind === 'date' ? (v || o.ref || (o.min && o.min > today() ? o.min : today())) : v, sel: v};  // 2.117.0 A (#2290): ref = the anchor day (also in the past)
   o.kind === 'date' ? dpDrawDate() : dpDrawTime();
   dpPlace();
   el.addEventListener('keydown', dpKey);
@@ -462,7 +462,7 @@ function dpDrawDate() {
     let cells = '';
     for (let i = 0; i < 7; i++) {
       const d = addDays(start, w * 7 + i), x = pd(d), out = x.getMonth() !== m - 1;
-      cells += `<button type="button" role="gridcell" class="dpd ${out ? 'out' : ''} ${d === t0 ? 'today' : ''} ${d === st.sel ? 'sel' : ''}" data-d="${d}" tabindex="${d === st.cur ? 0 : -1}" aria-selected="${d === st.sel}" ${ok(d) ? '' : 'disabled aria-disabled="true"'} aria-label="${esc(fmtDay('year', x))}${d === t0 ? ' · ' + esc(tr('Today')) : ''}">${x.getDate()}</button>`;
+      cells += `<button type="button" role="gridcell" class="dpd ${out ? 'out' : ''} ${d === t0 ? 'today' : ''} ${d === st.sel ? 'sel' : ''} ${d === st.ref && !st.sel ? 'ref' : ''}" data-d="${d}" tabindex="${d === st.cur ? 0 : -1}" aria-selected="${d === st.sel}" ${ok(d) ? '' : 'disabled aria-disabled="true"'} aria-label="${esc(fmtDay('year', x))}${d === t0 ? ' · ' + esc(tr('Today')) : ''}">${x.getDate()}</button>`;
     }
     rows += `<div role="row" class="dpr">${cells}</div>`;
     if (w >= 3 && pd(addDays(start, w * 7 + 7)).getMonth() !== m - 1) break;
@@ -547,7 +547,9 @@ document.addEventListener('click', e => {  // a field button opens its picker
   e.preventDefault(); e.stopPropagation();
   if (DP.el && DP.anchor === b) { dpClose(true); return; }
   const inp = document.getElementById(b.dataset.dpfor); if (!inp) return;
-  dpOpen(b, {kind: inp.dataset.dp, value: inp.value, min: inp.dataset.min, max: inp.dataset.max, clear: !inp.dataset.noclear, label: inp.dataset.label, empty: inp.dataset.empty,
+  const a = inp.dataset.after ? document.getElementById(inp.dataset.after)?.value || '' : '', ref = /^\d{4}-\d{2}-\d{2}$/.test(a) ? a : '';  // 2.117.0 A (#2290): an end field (after = its start field) opens at the start, days before it disabled
+  const min = ref && !(inp.dataset.min > ref) ? ref : inp.dataset.min;
+  dpOpen(b, {kind: inp.dataset.dp, value: inp.value, ref, min, max: inp.dataset.max, clear: !inp.dataset.noclear, label: inp.dataset.label, empty: inp.dataset.empty,
     onPick: v => { if (inp.isConnected) dpSet(inp, v); }});
 }, true);
 document.addEventListener('pointerdown', e => { if (DP.el && !DP.el.contains(e.target) && !(DP.anchor && DP.anchor.contains?.(e.target))) dpClose(false); }, true);
