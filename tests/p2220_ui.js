@@ -10,7 +10,7 @@
 // Firefox: a phone (390 touch), the Fold unfolded upright (690 x 829, touch), a desktop (1440, mouse): nothing sideways,
 // 44 px targets on touch, axe (WCAG 2.2 A + AA) over the view, the review and the contract dialog; the sidebar folders as a
 // tree (#680), one focus ring while a title is edited in the list (#683), the settings dialog on a computer (#679), the
-// heron mid-flight. Screenshots with P2220_SHOTS=<dir>.
+// bot figure mid-celebration (2.136.0, #2193). Screenshots with P2220_SHOTS=<dir>.
 const {execFileSync} = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -256,12 +256,12 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   w.close();
   check((await call('GET', '/api/users')).users.find(u => u.username === 'newbie')?.invite === 'invited', '#697: still invited');
 
-  // ================= #688 the heron flies
+  // ================= #688 the celebration; 2.136.0 (#2193): the bot figure (erledigt) pops up, hops, lifts off (no heron)
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
   w.eval(`celebrate('today', {frame: 0.5, force: true})`);
-  check(d.querySelector('.cele .cbird .cfly .cwing') && !d.querySelector('.cele .cvine'), '#688: a flying heron with a wing, no vine');
-  const xs = [0.1, 0.5, 0.9].map(p => { d.querySelectorAll('.cele,.cele-quip').forEach(x => x.remove()); w.eval(`celebrate('today', {frame: ${p}, force: true})`); return parseFloat(d.querySelector('.cele .cbird').style.transform.match(/translate\(([-\d.]+)px/)[1]); });
-  check(xs[0] < xs[1] && xs[1] < xs[2], '#688: it flies from left to right ' + xs.join(' '));
+  check(d.querySelector('.cele .cbot svg.bot.b-erledigt') && !d.querySelector('.cele .cbird, .cele .cwing, .cele .cvine'), '#2193: the happy bot figure, no heron, no vine');
+  const fr = [0.05, 0.5, 0.95].map(p => { d.querySelectorAll('.cele,.cele-quip').forEach(x => x.remove()); w.eval(`celebrate('today', {frame: ${p}, force: true})`); const st = d.querySelector('.cele .cbot').style; return {x: parseFloat(st.transform.match(/translate\(([-\d.]+)px/)[1]), o: +st.opacity}; });
+  check(fr[0].o < 1 && fr[1].o === 1 && fr[2].o < 1 && fr[0].x === fr[1].x && fr[1].x === fr[2].x, '#2193: it appears, stays in the middle, fades out ' + JSON.stringify(fr));
   const conf = [...d.querySelectorAll('.cele .cconf')].filter(c => +c.style.opacity > 0).length;
   check(conf > 0, '#688: checkmark confetti falls behind it');
   w.close();
@@ -351,11 +351,11 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
       await ev(`(() => { const c = document.querySelector('#u-kid'); c.click(); return 1; })()`); await sleep(300);
       const k1 = await ev(`(() => { const c = document.querySelector('#u-kid'), r = document.querySelector('#u-parrow'); return {disp: getComputedStyle(r).display, exp: c.getAttribute('aria-expanded')}; })()`);
       check(k0.disp === 'none' && k0.exp === 'false' && k1.disp !== 'none' && k1.exp === 'true', '#696: child options hidden until ticked, aria-expanded ' + JSON.stringify([k0, k1]));
-      // #688: the heron mid-flight (the suite's Firefox prefers reduced motion: the motion version is forced for the picture)
+      // #688 / 2.136.0 (#2193): the bot figure mid-celebration (the suite's Firefox prefers reduced motion: the motion version is forced for the picture)
       await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); window.matchMedia = q => ({matches: false, addEventListener() {}, addListener() {}}); celebrate('today', {frame: 0.5, force: true}); return 1; })()`); await sleep(200);
-      const b = await ev(`(() => { const r = document.querySelector('.cele .cbird').getBoundingClientRect(); return {x: Math.round(r.left + r.width / 2), y: Math.round(r.top), w: Math.round(r.width)}; })()`);
-      check(Math.abs(b.x - vw / 2) < 120 && b.y > 0 && b.y < vh / 2 && b.w >= 100, '#688: mid-flight the heron is in the upper middle ' + JSON.stringify(b));
-      await shot(`p2220-${vw}-${th}-heron.png`);
+      const b = await ev(`(() => { const r = document.querySelector('.cele .cbot').getBoundingClientRect(); return {x: Math.round(r.left + r.width / 2), y: Math.round(r.top), w: Math.round(r.width)}; })()`);
+      check(Math.abs(b.x - vw / 2) < 120 && b.y > 0 && b.y < vh / 2 && b.w >= 90, '#2193: the bot figure is in the upper middle ' + JSON.stringify(b));
+      await shot(`p2220-${vw}-${th}-bot.png`);
     }
   }, touch);
 

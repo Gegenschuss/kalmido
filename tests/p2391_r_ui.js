@@ -2,7 +2,7 @@
 // - #1220: the dialog "Add service" covers the whole window, also after the window got bigger or smaller (its class no
 //   longer picks up the 40vh rule of a list); the card sits in the middle; the empty state links to the Services tab
 // - #1213: the loading screen (#boot) is gone once the app is drawn; a reload in the same session skips it
-// - #1292: the celebration: the heron about a quarter of the width in the middle, a big check, colourful confetti to all
+// - #1292: the celebration (2.136.0, #2193: the bot figure instead of the heron) in the middle, a big check, colourful confetti to all
 //   sides, three levels (today < list < project: size and amount), a tap ends it at once
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -68,7 +68,7 @@ const FEAT = 'cal,comments,collab,office,clients';
 
     // ================= #1292 the celebration
     const frame = kind => ev(`(() => { document.querySelectorAll('.cele,.cele-quip').forEach(x => x.remove()); celebrate('${kind}', {frame: 0.5, force: true, name: 'Demo'});
-      const el = document.querySelector('.cele'), b = el.querySelector('.cbird').getBoundingClientRect(), k = el.querySelector('.ccheck'), cs = [...el.querySelectorAll('.cconf')];
+      const el = document.querySelector('.cele'), b = el.querySelector('.cbot').getBoundingClientRect(), k = el.querySelector('.ccheck'), cs = [...el.querySelectorAll('.cconf')];
       const pos = cs.map(c => c.getBoundingClientRect()).filter((r, i) => +getComputedStyle(cs[i]).opacity > 0).map(r => [r.left + r.width / 2, r.top + r.height / 2]);
       return {bw: Math.round(b.width), bx: Math.round(b.left + b.width / 2), by: Math.round(b.top + b.height / 2), n: cs.length, vis: pos.length,
         colors: new Set(cs.map(c => c.style.getPropertyValue('--cc'))).size, kop: +getComputedStyle(k).opacity, kw: Math.round(k.getBoundingClientRect().width),
@@ -76,13 +76,13 @@ const FEAT = 'cal,comments,collab,office,clients';
         vw: innerWidth, vh: innerHeight, kind: el.dataset.kind}; })()`);
     const t = await frame('today'), l = await frame('list'), p = await frame('project');
     await shot('p2391-r-celebration-project.png');
-    check(Math.abs(l.bw - l.vw * 0.25) < 8 && Math.abs(l.bx - l.vw / 2) < 4 && l.by < l.vh / 2, '#1292: the heron about a quarter of the width, in the middle ' + JSON.stringify(l));
+    check(Math.abs(l.bw - Math.min(200, Math.max(110, l.vw * 0.16))) < 8 && Math.abs(l.bx - l.vw / 2) < 4 && l.by < l.vh / 2, '#1292 / 2.136.0 (#2193): the bot figure (up to 200 px), in the middle ' + JSON.stringify(l));
     check(t.bw < l.bw && l.bw < p.bw && t.n < l.n && l.n < p.n, '#1292: three levels today < list < project (size, amount) ' + JSON.stringify([t.bw, l.bw, p.bw, t.n, l.n, p.n]));
     check(p.kop > 0.9 && p.kw > p.bw * 0.3, '#1292: a big check has popped up ' + JSON.stringify([p.kop, p.kw]));
     check(p.colors >= 5, '#1292: colourful confetti ' + p.colors);
     check(p.vis > 20 && p.left > 5 && p.right > 5 && p.up > 3, '#1292: the confetti bursts to all sides ' + JSON.stringify([p.vis, p.left, p.right, p.up]));
-    const fl = await ev(`(() => { const xs = [0.1, 0.5, 0.9].map(f => { document.querySelectorAll('.cele,.cele-quip').forEach(x => x.remove()); celebrate('today', {frame: f, force: true}); const r = document.querySelector('.cele .cbird').getBoundingClientRect(); return Math.round(r.left); }); return xs; })()`);
-    check(fl[0] < fl[1] && fl[1] < fl[2], '#1292: in from the left, off to the right ' + fl);
+    const fl = await ev(`(() => [0.05, 0.5, 0.95].map(f => { document.querySelectorAll('.cele,.cele-quip').forEach(x => x.remove()); celebrate('today', {frame: f, force: true}); const e = document.querySelector('.cele .cbot'), r = e.getBoundingClientRect(); return [Math.round(r.left + r.width / 2), +getComputedStyle(e).opacity]; }))()`);
+    check(fl.every(x => Math.abs(x[0] - fl[1][0]) < 2) && fl[0][1] < 1 && fl[1][1] === 1 && fl[2][1] < 1, '#2193: the figure pops up in the middle, hops there and fades (was: the heron flew across) ' + JSON.stringify(fl));
     // a tap ends the running celebration at once
     await ev(`(() => { document.querySelectorAll('.cele,.cele-quip').forEach(x => x.remove()); celebrate('list', {force: true, name: 'Demo'}); return 1; })()`);
     await sleep(500);
