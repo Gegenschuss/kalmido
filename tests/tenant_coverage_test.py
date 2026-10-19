@@ -762,7 +762,7 @@ ROUTES = {
     "POST /api/docs/rules": "document", "PATCH /api/docs/rules/{}": "document", "DELETE /api/docs/rules/{}": "document",
     "PATCH /api/docs/labels/{}/{}": "document", "DELETE /api/docs/labels/{}/{}": "document", "POST /api/docs/labels/{}": "document", "POST /api/docs/mail": "document",
     "DELETE /api/docs/mail": "document", "GET /api/v1/documents": "document", "GET /api/v1/documents/{}": "document",
-    "PATCH /api/v1/documents/{}": "document",
+    "PATCH /api/v1/documents/{}": "document", "POST /api/v1/documents": "document", "POST /api/docs/export.csv": "document",  # 2.122.0 (#2098)
     # 2.48.0 (#1207 / #1152 / #1356)
     "DELETE /api/files/nodes/{}": "file", "DELETE /api/files/shares/{}": "file", "DELETE /api/paperless": "paperless",
     "GET /api/docs/{}/receipt": "receipt", "GET /api/files": "file", "GET /api/files/folders": "file",
