@@ -123,6 +123,12 @@ office tab without one appears at the end of its group (`OFC_TABS` field 5, else
   The first call of the module copies the country pack's catalogue into the organisation's text blocks.
 - **Framework contracts** - one per agency or client: date, raw data included, default rights (three catalogue entries),
   rights note, closing text, special rates per service. A document can pick a contract and deviate from it.
+  The signed contract and its addenda can be attached as PDF files in the contract's dialog ("Contract (PDF)": upload,
+  open, replace, remove, a date per file; the list shows a paper clip). Only PDFs, the usual upload size limit; stored
+  encrypted with the office area's key like the stored quotation PDFs. Members of the office open them, admins change
+  them. Deleting the contract moves its files into the trash; after 30 days they are deleted for good, file included.
+  API: `GET|POST /api/office/contracts/<id>/files` (multipart `file`, `date?`, `replace?`),
+  `GET|PATCH|DELETE /api/office/contracts/<id>/files/<file id>`, `POST .../<file id>/restore`.
 - **Bookkeeping** (admins, 2.90) - income/expense statement, VAT return figures, tax reserve, receipt photo and tax
   dates, see below.
 - **Bank** (admins, 2.90) - bank reconciliation, see below.
