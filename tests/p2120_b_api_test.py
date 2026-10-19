@@ -122,6 +122,8 @@ def sign_in(to, n_before):
     s.headers.update(EN)
     if not m:
         return s
+    pg = s.get(B + f"/portal/login/{m.group(1)}")  # 2.120.0 (#2088): the button page names documents (documents are on here)
+    check(pg.ok and "Show my documents" in pg.text and "Show my reports" not in pg.text, f"#2088: the sign-in button page names documents ({to})")
     r = s.post(B + f"/portal/login/{m.group(1)}", allow_redirects=False)
     check(r.status_code == 303 and "kalmido_portal=" in r.headers.get("Set-Cookie", ""), f"#2088: the mailed link signs in ({to})")
     return s
