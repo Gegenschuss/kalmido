@@ -285,6 +285,12 @@ APP_ONLY = [
                                                    "=POST /api/docs/{}/redo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
                                                    "* /api/docs/{}/task", "* /api/docs/settings", "* /api/docs/rules", "* /api/docs/labels/",
                                                    "* /api/docs/mail")),
+    # 2.122.0 B (#2294 #2099)
+    ("2.122.0 (#2294, #2099): a person's own steps on many documents at once (bulk tags / type / sender with its undo, the ZIP of a "
+     "selection for the browser) and the tags of files / folders in the file store app; agents filter with /documents (the same "
+     "filters and search syntax), set a document's tags one by one there and read files with /files",
+     ("=POST /api/docs/bulk", "=POST /api/docs/zip", "=GET /api/docs/zip/{}", "* /api/files/nodes/{}/tags", "=GET /api/files/tags",
+      "=GET /api/files/tagged")),
     # 2.51.0 (#1348, #1350): agents get drafts only, through /office (v1 + MCP); the rest of the office stays with people
     ("2.36.1 (#1021) / 2.51.0 (#1348): Office & finance -- people finalise, number, send, delete, book payments and keep master data and "
      "settings; agents (two switches) read and draft through /api/v1/office (quotation / invoice / reminder drafts, payment suggestions); "
