@@ -43,7 +43,7 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
     // ---- #2017
     await nav(B + '#office/bank');
     check(await ready(ev, `document.querySelectorAll('.bnklist .bnkrow').length === 2`, 80), 'the bank tab lists two bookings');
-    check(await ev(`document.querySelector('.bnksug [data-bnk="match"]')?.textContent.trim() === 'Zuordnen'`), '#2017: the suggestion button says "Zuordnen"');
+    check(await ev(`document.querySelector('.bnksug [data-bnk="match"]')?.textContent.trim() === 'Zuordnen'`), '#2017: the suggestion button says "Zuordnen": ' + JSON.stringify(await ev(`[document.querySelector('.bnksug [data-bnk="match"]')?.textContent, document.documentElement.lang, [...document.querySelectorAll('.bnkrow')].length, document.querySelector('.bnkrow')?.innerHTML.slice(0, 400)]`)));
     check(await ev(`(() => { const b = [...document.querySelectorAll('.bnkacts .btn')]; return b.length > 0 && b.every(x => x.getBoundingClientRect().height >= 43.5); })()`), '#2017: second buttons >= 44 px at 390 px');
     await shot('p21141-a-bank.png');
     // ---- #2254
