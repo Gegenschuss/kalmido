@@ -113,6 +113,21 @@ colour, without needing a role in the list. That is all: tasks, sections, member
 list's admins. Private lists are never shown or changed, agents cannot use these functions, every change lands in the
 dialog's history (old and new value) and the owner and the members get a News entry.
 
+**Inviting by e-mail (2.115).** An organisation's admin can invite somebody who has no account yet: *Settings >
+Organisation > Invite by e-mail* (address and role). Kalmido creates an account without a password (the user name is made
+from the address), makes it a member of that organisation in the chosen role and mails the invitation link (the link is
+shown, too, to pass on without mail). An address that already has an account is added as with *Add by e-mail address*.
+Open invitations are listed below with *Resend* (a new link, the old one stops working) and *Withdraw* (deletes the account,
+only while it never signed in and belongs to this organisation alone). Limits: 20 new invitations per inviting person and
+day, plus the daily mail budget. Instance admins switch it off under *Settings > Users > Registration on the login page*
+(*Organisation admins may invite new people by e-mail*, on by default); adding existing accounts stays possible.
+
+**Active sessions (2.115).** *Settings > Account > Active sessions* lists every browser and app a person is signed in with:
+browser and system (read from the User-Agent, nothing else about the device and no address is stored), how they signed in,
+since when and the last activity (written at most every five minutes). *Log out* ends one session, *Log out everywhere
+else* all but the current one; push notifications subscribed in an ended session stop with it. Agent tokens and app
+passwords are not sessions and stay as they are. A child account with the parents' PIN needs the PIN first.
+
 **Finding people by e-mail (2.49).** Under *Settings > Account > Find people* a person can find someone by their full
 e-mail address and send a connection request; once it is accepted, both see each other like after sharing a list. Only
 accounts that switched on *Findable by e-mail* (off by default) and confirmed their address with a mailed link can be
