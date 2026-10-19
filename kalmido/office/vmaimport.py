@@ -476,6 +476,13 @@ def vmi_preview_post():
     known = rk_people(c, oid, uid)
     out = vmi_parse(raw, known, vmi_seen(c, oid))
     out["people"] = known
+    from .travel import rka_purposes  # 2.117.0 A (#2292): an occasion named like an own purpose becomes that purpose
+    own = {p["name"].casefold(): p["name"] for p in rka_purposes(c, oid)}
+    for sh in out.get("sheets") or []:
+        for r in sh.get("rows") or []:
+            n = own.get(" ".join((r.get("project") or "").split()).casefold()) if r.get("purpose") == "job" else None
+            if n:
+                r["purpose"], r["project"] = n, ""
     return jsonify(out)
 
 
@@ -506,6 +513,8 @@ def vmi_import_post():
         except BadInput as x:
             raise BadInput(tr("Row {0}: {1}", i + 1, str(x.args[0] if x.args else x))) from None
     ts, ids = iso(now_utc()), []
+    from .travel import rka_purposes_adopt
+    rka_purposes_adopt(c, oid, uid, [r["purpose"] for r in rows])  # 2.117.0 A (#2292): unknown purposes become own ones
     for row in rows:
         row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)
         row = oc_enc_fields(c, oid, "office_trips", row)

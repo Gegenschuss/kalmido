@@ -10,6 +10,11 @@
 .ofdli>.ofdrow{flex:1;min-width:0}
 .ofdrmore{flex:none;width:2.75rem;min-height:2.75rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2);color:var(--muted);display:inline-flex;align-items:center;justify-content:center}
 .ofdrmore:hover,.ofdrmore:focus-visible{border-color:var(--accent);color:var(--text)}
+.rklist>li{display:flex;align-items:stretch;gap:.25rem}.rklist>li>.ofcrow{flex:1;min-width:0}  /* 2.117.0 A (#2287): the arrow = the row menu */
+.rkbar .rkperson{max-width:12rem;text-overflow:ellipsis}  /* 2.117.0 A (#2291) */
+.rkplist{list-style:none;margin:0 0 .5rem;padding:0;display:flex;flex-direction:column;gap:.25rem}  /* 2.117.0 A (#2292): own purposes */
+.rkplist li,.rkpset .lacts{display:flex;align-items:center;gap:.25rem}.rkplist input,.rkpset #rkp-new{flex:1;min-width:0;min-height:2.75rem}
+.rkplist .iconbtn{flex:none;width:2.75rem;height:2.75rem}
 .ofcrow:hover,.ofcrow:focus-visible{border-color:var(--accent)}
 .ofcrow.arch{opacity:.6}
 .ofcrow .ofcn{flex:1;min-width:0;display:flex;flex-direction:column}

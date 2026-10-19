@@ -252,6 +252,7 @@ OX_AREAS = (
     ("office/signoffs.json", "office_signoffs", "org_id=?"),  # 2.50.0 (#1200): approval links + protocol (the token never)
     ("office/trips.json", "office_trips", "org_id=?"),  # 2.47.3 (#1022): travel expenses (decrypted like the others)
     ("office/trip_items.json", "office_trip_items", "org_id=?"),
+    ("office/trip_purposes.json", "office_trip_purposes", "org_id=?"),  # 2.117.0 A (#2292): own purposes of trips
     ("office/fixed_costs.json", "office_fixed_costs", "org_id=?"),  # 2.47.3 (#1652): fixed costs of the cash flow
     ("office/sub_reminders.json", "office_sub_reminders", "org_id=?"),  # 2.91.0 B (#1924): reminder tasks before a subscription renews
     ("office/agreements.json", "office_agreements", "org_id=?"),  # 2.92.0 A (#1925): business contracts and insurances

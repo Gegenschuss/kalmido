@@ -32,12 +32,13 @@ RK_CATS = (("car", N_("Car / fuel")), ("train", N_("Train")), ("flight", N_("Fli
            ("other", N_("Other|travel")))
 RK_CAT_KEYS = tuple(k for k, _ in RK_CATS)
 RK_PURPOSES = ("job", "acquisition")  # job = for a client / project; acquisition = acquisition / research
-RK_BY = ("month", "year", "person", "project", "client", "category")
+RK_BY = ("month", "year", "person", "project", "client", "category", "purpose")  # 2.117.0 A (#2292): + purpose
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 CUR_RE = re.compile(r"^[A-Z]{3}$")
 CTRL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 MAX_PEOPLE = 20
 MAX_ITEMS = 200
+RKA_MAX_PURPOSES = 200  # 2.117.0 A (#2292): own purposes per office area
 
 
 def _ctx():
@@ -168,8 +169,8 @@ def rk_trip_clean(c, oid, uid, b, cur=None):
         out["people"] = json.dumps(_people_clean(b.get("people"), known), ensure_ascii=False)
     if "purpose" in b or not cur:
         p = b.get("purpose") or "job"
-        if p not in RK_PURPOSES:
-            raise BadInput(tr("Invalid value: {0}", "purpose"))
+        if p not in RK_PURPOSES:  # 2.117.0 A (#2292): an own purpose is kept as its text
+            p = rka_purpose_name(p)
         out["purpose"] = p
     if "client_id" in b or not cur:
         out["client_id"] = _client_ok(c, oid, b.get("client_id"))
@@ -389,7 +390,8 @@ def rk_trips_get():
                c.execute(f"SELECT id, name FROM clients WHERE {rk_cl_where(c, oid)[0]} AND archived=0 ORDER BY lower(name)", rk_cl_where(c, oid)[1])]
     projects = [r[0] for r in c.execute("SELECT DISTINCT project_title FROM office_docs WHERE org_id=? AND project_title<>'' ORDER BY 1", (oid,))][:300]
     return jsonify(trips=trips, people=rk_people(c, oid, uid), clients=clients, projects=projects, currency=rk_home_cur(c, oid),
-                   categories=[{"key": k, "label": tr(n)} for k, n in RK_CATS], missing=missing)
+                   categories=[{"key": k, "label": tr(n)} for k, n in RK_CATS], missing=missing,
+                   purposes=rka_purposes(c, oid))  # 2.117.0 A (#2292)
 
 
 @app.post("/api/office/trips")
@@ -504,28 +506,148 @@ def rk_item_delete(tid, iid):
     return jsonify(trip=_one(c, oid, tid), item=old)
 
 
+# ---------------------------------------------------------------- 2.117.0 A (#2292): own purposes
+def rka_purpose_name(v):
+    """A clean own purpose (1-120 characters, not one of the built-in keys) or 400."""
+    n = " ".join(_text(v, "purpose", 200).split())
+    if not n or len(n) > 120 or n.casefold() in RK_PURPOSES:
+        raise BadInput(tr("Invalid value: {0}", "purpose"))
+    return n
+
+
+def rka_purposes(c, oid):
+    """The own purposes of the office area [{id, name}] by name."""
+    rows = c.execute("SELECT id, name FROM office_trip_purposes WHERE org_id=? AND deleted_at IS NULL", (oid,)).fetchall()
+    return sorted(({"id": r["id"], "name": r["name"]} for r in rows), key=lambda x: x["name"].casefold())
+
+
+def rka_purpose_add(c, oid, uid, name):
+    """Adds an own purpose (or restores a removed one of the same name); -> (row {id, name}, created). Same name = the one there."""
+    ts = iso(now_utc())
+    for r in c.execute("SELECT id, name, deleted_at FROM office_trip_purposes WHERE org_id=? ORDER BY deleted_at IS NOT NULL, id", (oid,)).fetchall():
+        if r["name"].casefold() == name.casefold():
+            if r["deleted_at"] is None:
+                return {"id": r["id"], "name": r["name"]}, False
+            c.execute("UPDATE office_trip_purposes SET deleted_at=NULL, name=?, updated_at=? WHERE id=? AND org_id=?", (name, ts, r["id"], oid))
+            return {"id": r["id"], "name": name}, True
+    if c.execute("SELECT COUNT(*) FROM office_trip_purposes WHERE org_id=? AND deleted_at IS NULL", (oid,)).fetchone()[0] >= RKA_MAX_PURPOSES:
+        raise BadInput(tr("Too many entries"))
+    pid = insert_id(c, "INSERT INTO office_trip_purposes(org_id, name, created_by, created_at, updated_at) VALUES(?,?,?,?,?)", (oid, name, uid, ts, ts))
+    return {"id": pid, "name": name}, True
+
+
+def rka_purposes_adopt(c, oid, uid, names):
+    """The own purposes among names (trip purposes of an import / a move) added to the office area where missing."""
+    for n in {x for x in names if isinstance(x, str) and x and x not in RK_PURPOSES}:
+        try:
+            rka_purpose_add(c, oid, uid, rka_purpose_name(n))
+        except BadInput:
+            pass  # an odd old text or the limit: the trip keeps it anyway
+
+
+def _purpose(c, oid, pid):
+    r = c.execute("SELECT id, name FROM office_trip_purposes WHERE id=? AND org_id=? AND deleted_at IS NULL", (pid, oid)).fetchone()
+    if not r:
+        raise Denied(404)
+    return r
+
+
+@app.get("/api/office/trips/purposes")
+def rka_purposes_get():
+    """The own purposes of the office area {purposes: [{id, name}]} (office admins, like the trips)."""
+    c, uid, oid = _ctx()
+    return jsonify(purposes=rka_purposes(c, oid))
+
+
+@app.post("/api/office/trips/purposes")
+def rka_purpose_post():
+    """{name} -> 201 {id, name} a new own purpose (a removed one of the same name comes back: the undo of a removal);
+    200 when it is there already."""
+    c, uid, oid = _ctx()
+    b = body()
+    if not isinstance(b, dict):
+        raise BadInput(tr("Invalid data"))
+    row, made = rka_purpose_add(c, oid, uid, rka_purpose_name(b.get("name")))
+    if made:
+        bump(c)
+        c.commit()
+    return jsonify(row), 201 if made else 200
+
+
+@app.patch("/api/office/trips/purposes/<int:pid>")
+def rka_purpose_patch(pid):
+    """{name} renames an own purpose; the trips keep the text they have."""
+    c, uid, oid = _ctx()
+    _purpose(c, oid, pid)
+    b = body()
+    name = rka_purpose_name(b.get("name") if isinstance(b, dict) else None)
+    for r in c.execute("SELECT id, name FROM office_trip_purposes WHERE org_id=? AND deleted_at IS NULL AND id<>?", (oid, pid)).fetchall():
+        if r["name"].casefold() == name.casefold():
+            raise BadInput(tr("This purpose already exists"))
+    c.execute("UPDATE office_trip_purposes SET name=?, updated_at=? WHERE id=? AND org_id=?", (name, iso(now_utc()), pid, oid))
+    bump(c)
+    c.commit()
+    return jsonify(id=pid, name=name)
+
+
+@app.delete("/api/office/trips/purposes/<int:pid>")
+def rka_purpose_delete(pid):
+    """Removes an own purpose from the choice (the trips keep their text); the undo posts the name again."""
+    c, uid, oid = _ctx()
+    r = _purpose(c, oid, pid)
+    ts = iso(now_utc())
+    c.execute("UPDATE office_trip_purposes SET deleted_at=?, updated_at=? WHERE id=? AND org_id=?", (ts, ts, pid, oid))
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, purpose={"id": r["id"], "name": r["name"]})
+
+
+def rka_purpose_label(p):
+    return tr("Acquisition / research") if p == "acquisition" else tr("Job for a client / project") if p == "job" or not p else p
+
+
 # ---------------------------------------------------------------- evaluation
-def rk_report(c, oid, by, date_from="", date_to="", missing=False):
+def rka_pkey(p):
+    """2.117.0 A (#2291): the key of a participant (like the per diem report): u<id> = a person of the office, n:<name> = a free name."""
+    return ("u%s" % p["id"]) if p.get("id") else ("n:" + (p.get("name") or "").lower())
+
+
+def rka_person_arg():
+    """2.117.0 A (#2291): ?person=u<id>|n:<name> -> the key or None."""
+    v = request.args.get("person") or None
+    if v is not None and (len(v) > 200 or not re.fullmatch(r"u\d{1,12}|n:.+", v, re.S)):
+        raise BadInput(tr("Invalid value: {0}", "person"))
+    return v
+
+
+def rk_report(c, oid, by, date_from="", date_to="", missing=False, person=None):
     """Sums of the receipts (office currency) grouped by month | year | person | project | client | category, receipt date
     (else the trip's start) within [date_from, date_to]. By person every receipt is shared equally between the trip's
-    participants (the sum stays the sum of the receipts; trips without participants under "No person")."""
+    participants (the sum stays the sum of the receipts; trips without participants under "No person"). 2.117.0 A (#2291):
+    person = a participant's key: only the trips with that person, each receipt with that person's equal share."""
     w, wa = rk_cl_where(c, oid)
     clients = {r["id"]: r["name"] for r in c.execute(f"SELECT id, name FROM clients WHERE {w}", wa)}
     groups = {}
     total, n = dec(0), 0
     for t in rk_trips(c, oid):
+        if person and person not in [rka_pkey(p) for p in t["people"]]:  # 2.117.0 A (#2291)
+            continue
         for it in t["items"]:
             day = it["date"] or t["date_from"]
             if (date_from and day < date_from) or (date_to and day > date_to) or (missing and it["datev"]):
                 continue
             amt = dec(it["amount_home"])
+            if person:
+                amt = amt / len(t["people"])
             total += amt
             n += 1
             if by == "person":
                 ppl = t["people"] or [{"name": ""}]
-                share = amt / len(ppl)
+                share = amt if person else amt / len(ppl)
                 keys = [(("u%s" % p["id"]) if p.get("id") else ("n:" + (p.get("name") or "").lower()), p.get("name") or tr("No person")) for p in ppl]
                 for k, lab in keys:
+                    if person and k != person:
+                        continue
                     g = groups.setdefault(k, {"key": k, "label": lab, "amount": dec(0), "count": 0})
                     g["amount"] += share
                     g["count"] += 1
@@ -535,11 +657,13 @@ def rk_report(c, oid, by, date_from="", date_to="", missing=False):
             elif by == "year":
                 k, lab = day[:4], day[:4]
             elif by == "project":
-                k = t["project"] or ("" if t["purpose"] == "job" else "~acq")
+                k = t["project"] or ("~acq" if t["purpose"] == "acquisition" else "")  # 2.117.0 A (#2292): own purposes = no project
                 lab = t["project"] or (tr("Acquisition / research") if t["purpose"] == "acquisition" else tr("No project"))
             elif by == "client":
-                k = str(t["client_id"] or ("" if t["purpose"] == "job" else "~acq"))
+                k = str(t["client_id"] or ("~acq" if t["purpose"] == "acquisition" else ""))  # 2.117.0 A (#2292)
                 lab = clients.get(t["client_id"]) or (tr("Acquisition / research") if t["purpose"] == "acquisition" else tr("No client"))
+            elif by == "purpose":  # 2.117.0 A (#2292)
+                k, lab = t["purpose"] or "job", rka_purpose_label(t["purpose"])
             else:
                 k, lab = it["category"], rk_cat_label(it["category"])
             g = groups.setdefault(k, {"key": k, "label": lab, "amount": dec(0), "count": 0})
@@ -557,7 +681,7 @@ def rk_report(c, oid, by, date_from="", date_to="", missing=False):
 
 @app.get("/api/office/trips/report")
 def rk_report_get():
-    """?by=month|year|person|project|client|category&from=YYYY-MM-DD&to=YYYY-MM-DD&missing=1&format=csv -> the sums
+    """?by=month|year|person|project|client|category|purpose&from=YYYY-MM-DD&to=YYYY-MM-DD&missing=1&person=KEY&format=csv -> the sums
     (JSON {by, rows: [{key, label, amount, count}], total, count, currency}) or a CSV file (semicolon, like the other
     office exports: one row per group, then the total)."""
     c, uid, oid = _ctx()
@@ -566,17 +690,18 @@ def rk_report_get():
         raise BadInput(tr("Invalid value: {0}", "by"))
     df = _date(request.args.get("from"), "from")
     dt = _date(request.args.get("to"), "to")
-    rep = rk_report(c, oid, by, df, dt, request.args.get("missing") == "1")
+    person = rka_person_arg()  # 2.117.0 A (#2291)
+    rep = rk_report(c, oid, by, df, dt, request.args.get("missing") == "1", person)
     cur = rk_home_cur(c, oid)
     if request.args.get("format") == "csv":
         buf = io.StringIO()
         w = csv.writer(buf, delimiter=";")
-        head = {"month": tr("Month"), "year": tr("Year"), "person": tr("Person"), "project": tr("Project"), "client": tr("Client"), "category": tr("Category")}[by]
+        head = {"month": tr("Month"), "year": tr("Year"), "person": tr("Person"), "project": tr("Project"), "client": tr("Client"), "category": tr("Category"), "purpose": tr("Purpose")}[by]
         w.writerow([head, tr("Receipts"), tr("Amount") + f" ({cur})"])
         for g in rep["rows"]:
             w.writerow([_csv_safe(g["label"]), g["count"], g["amount"].replace(".", ",")])
         w.writerow([tr("Total"), rep["count"], rep["total"].replace(".", ",")])
-        name = f"travel-{by}-{df or 'all'}-{dt or 'all'}.csv"
+        name = f"travel-{by}-{df or 'all'}-{dt or 'all'}{'-' + re.sub(r'[^a-z0-9]+', '-', person.lower()).strip('-') if person else ''}.csv"
         return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{name}"'})
     return jsonify(dict(rep, currency=cur))
 

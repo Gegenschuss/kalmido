@@ -1711,6 +1711,7 @@ body.tdrag .sdrop{display:flex}
 .dpd.out{color:var(--muted)}
 .dpd.today{box-shadow:inset 0 0 0 1px var(--accent);color:var(--accent);font-weight:600}
 .dpd.sel{background:var(--accent);color:var(--accent-ink);box-shadow:none}
+.dpd.ref{background:var(--accent-soft);color:var(--accent);font-weight:600}  /* 2.117.0 A (#2290): the start day in an empty end picker */
 .dpd:disabled{opacity:.3;cursor:default}
 .dpd:focus-visible{outline:2px solid var(--accent);outline-offset:1px;position:relative;z-index:1}
 .dpf{display:flex;align-items:center;gap:.375rem;margin-top:.5rem;flex-wrap:wrap}

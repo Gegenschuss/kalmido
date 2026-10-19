@@ -42,7 +42,7 @@ function dx_dialog() {
   const n = new Date(), from = new Date(n.getFullYear(), n.getMonth() - 1, 1), to = new Date(n.getFullYear(), n.getMonth(), 0);
   const md = ofdDlg(tr('DATEV export'), `<p class="muted ofchint">${tr('Finalised invoices, credit notes and payments of the period as a DATEV booking batch (CSV) for your tax advisor.')}</p>
     <div class="row"><label id="dx-fl">${tr('From')}</label>${dateIn('dx-from', dx_iso(from), {label: tr('From'), clear: false})}</div>
-    <div class="row"><label id="dx-tl">${tr('To')}</label>${dateIn('dx-to', dx_iso(to), {label: tr('To'), clear: false})}</div>
+    <div class="row"><label id="dx-tl">${tr('To')}</label>${dateIn('dx-to', dx_iso(to), {label: tr('To'), clear: false, after: 'dx-from'})}</div>
     <p class="muted" id="dx-res" aria-live="polite"></p>`, tr('Download'), async m => {
     const q = `from=${encodeURIComponent($('#dx-from', m).value)}&to=${encodeURIComponent($('#dx-to', m).value)}`;
     const j = await api('GET', `/api/office/datev/extf?${q}&check=1`);
