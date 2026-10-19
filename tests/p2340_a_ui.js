@@ -24,7 +24,7 @@ const day = n => new Date(Date.now() + n * 86400000).toLocaleDateString('sv', {t
   check(r.ok, 'setup');
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ['cal', 'comments']});
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT, work_end: '23:59'});  // 2.122.4 (#1910): no evening review card, whatever the clock says
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob Baker', password: 'password123'})).id;
   const BCK = await login('bob');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT}, BCK);
