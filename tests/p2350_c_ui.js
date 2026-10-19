@@ -139,7 +139,7 @@ const FEAT = 'cal,comments,collab,agents';
   check((await call('GET', '/api/news', null, CB)).items.some(x => x.kind === 'orglist'), '#1101: bob got a News entry');
   w.close();
   const wb = await boot({user: 'bob', hash: 'news'}); await sleep(500);
-  check(/Alice deleted the list Bob Team for good \(admin of /.test(wb.document.body.textContent), '#1101: bob reads who deleted his list');
+  check(/Alice moved the list Bob Team to the trash \(admin of /.test(wb.document.body.textContent), '#1101: bob reads who deleted his list');  // 2.102.0 (#1988)
   wb.close();
   void BP;
 
