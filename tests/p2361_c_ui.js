@@ -70,7 +70,8 @@ const FEAT = 'cal,comments,collab,office,clients';
   // 2.114.4 (#2275): the option total reads "Summe netto mit Option Rohdaten"
   check(/Summe netto mit Option Rohdaten/.test(d.querySelector('#ofd-totals')?.textContent || '') && /2\.580,00 €/.test(d.querySelector('#ofd-totals')?.textContent || ''), 'including raw data 2.580,00 € (980 x 0,25 on top)');
   const prod = d.querySelector('.ofdautos .ofdauto');
-  check(!!prod && /Producing/.test(prod.textContent) && /0,5 Tage = 1 Produktionstage \/ 3/.test(prod.textContent) && /300,00 €/.test(prod.textContent), 'the producing line with its explanation: ' + prod?.textContent);
+  // 2.114.4 (#2276): singular for one production day
+  check(!!prod && /Producing/.test(prod.textContent) && /0,5 Tage = 1 Produktionstag \/ 3/.test(prod.textContent) && /300,00 €/.test(prod.textContent), 'the producing line with its explanation: ' + prod?.textContent);
   // a changed quantity with a comma
   const qty = its[1].querySelector('[data-k="qty"]');
   qty.value = '4,5'; qty.dispatchEvent(new w.Event('change', {bubbles: true}));
