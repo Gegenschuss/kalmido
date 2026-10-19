@@ -25,6 +25,23 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   references). In the text, `![label](/api/wiki/files/<id>/<name>)` shows a picture and `[label](…)` opens a file; the
   link button next to a file copies that line. The files have the rights of their page: whoever may read the page may
   open them. Deleting a file or its page can be undone. An encrypted space (see below) takes no files yet.
+- **Pictures and files in the editor (2.123.0).** *Insert picture or file* above the text uploads files to the page (also
+  pasting a picture or dropping files into the text) or picks a file of the **file store** of the same space
+  (*From the file store…*: browse its folders or search). A file of the file store is referenced, not copied:
+  `![label](/api/files/nodes/<id>/content)` shows a picture, `[label](…)` opens the file. A reader sees it only with the
+  right to open that file in the file store; everyone else sees *File not available*, without its name. Only files of the
+  page's own space are offered and shown (an organisation's page: that organisation's file store; a private page: your own
+  private one). After a move to another workspace such references stay as text and show as not available.
+- **Links to files and tables (2.123.0).** `[[datei:Folder/Contract.pdf]]` (a path of the file store from its top, or the
+  file's number) links a file, `[[tabelle:Budget]]` (its title or number) links a table of the same space; `|label` sets the
+  text. Typing `[[datei:` or `[[tabelle:` suggests them. A reader without access sees plain text. The file details in the
+  file store list the pages under *Mentioned in*. The export keeps these links as they are.
+- **Check boxes as tasks (2.123.0).** In reading mode an open check box line `- [ ] …` has a **+** button; with several
+  open lines *Open items as tasks* takes them all. The dialog chooses the list (the basket first); dates, `#tags` and
+  priorities in the line are read like in quick add. The line then ends with the task link `#123`, which shows the task's
+  state (struck through when done); ticking the box in the page does not change the task. Creating the tasks and changing
+  the line are one undo step. In an encrypted space this works as well, but the task titles are stored with the lock of
+  the chosen list (a hint says so when that list has none).
 - **Export / import.** The "…" menu in the header (section *Space*) exports a space as a ZIP of `.md` files in folders (the format of
   SilverBullet and similar tools) and imports such a ZIP: at most 2000 files, 1 MB per page, 25 MB per PDF or picture and
   500 MB in total; pages with an existing name are skipped unless you replace them. Paths with `..` are refused.
