@@ -582,7 +582,7 @@ function settingsModal(focus) {
       <div class="row">${chk('s-dateok', s.date_confirm === '1', tr('Confirm changes of the date with OK'))}</div>
       ${hint(tr('Off: a new day, time, start, repeat or reminder is saved as soon as you pick it; “Undo” in the message takes the whole change back. On: changes wait for OK.'))}
       <div class="row">${chk('s-celebrate', s.celebrate !== '0', tr('Celebrate completions'))}</div>
-      ${hint(tr('When Today is cleared or a list or project is complete, the heron flies by with a one-liner. With reduced motion (system setting) it just says hello.'))}
+      ${hint(tr('When Today is cleared or a list or project is complete, the Kalmido figure hops by with a one-liner. With reduced motion (system setting) it just says hello.'))}
       <div class="row">${chk('s-progsub', s.progress_subtasks === '1', tr('Count subtasks in the progress of a list'))}</div>
       <div class="row">${chk('s-mdpen', td_mdPenOnly(), tr('Edit the description only with the pen'))}</div>
       ${hint(tr('On this device a tap on the formatted description does not open the editor (handy while scrolling); the small pen next to it does. On by default on touch screens.'))}

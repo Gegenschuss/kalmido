@@ -492,8 +492,9 @@ function jobHtml(j) {
     jc_cardBtn(j),  // 2.56.0 (#1791): Message to a running job
     j.can_stop && ['running', 'waiting'].includes(j.state) && `<button class="btn sm danger" data-act="job-do" data-jid="${j.id}" data-a="stop">${ic('stop', 's')} ${tr('Stop')}</button>`].filter(Boolean).join('');
   const last = String(j.log || '').trim().split('\n').pop();
+  // 2.136.0 (#2193): a running job shows the bot at work (the antenna sways), one waiting for me the bot waiting (antenna up)
   const fo = S.jobFocus === j.id;  // 2.36.2 (#1141): opened by a "Job #id" link: highlighted, log + history unfolded
-  return `<div class="job st-${esc(j.state)}${fo ? ' jfocus' : ''}" id="job-${j.id}"${fo ? ' tabindex="-1"' : ''}><div class="jobh"><span class="jst">${esc(tr(JOB_ST[j.state] || j.state))}</span><b>${esc(j.title)}</b><span class="spacer"></span><span class="muted">${ac_mk(j.agent_id) ? `<i class="acjob"${ac_mk(j.agent_id)} aria-hidden="true"></i>` : ''}${esc(j.kind && j.agent_id === j.user_id ? tr('Assistant') : j.agent_name)} · ${esc(relTime(j.updated_at))}</span></div>
+  return `<div class="job st-${esc(j.state)}${fo ? ' jfocus' : ''}" id="job-${j.id}"${fo ? ' tabindex="-1"' : ''}><div class="jobh">${j.state === 'running' || j.state === 'waiting' ? botFig(j.state === 'running' ? 'arbeitet' : 'wartet', 'bjob') : ''}<span class="jst">${esc(tr(JOB_ST[j.state] || j.state))}</span><b>${esc(j.title)}</b><span class="spacer"></span><span class="muted">${ac_mk(j.agent_id) ? `<i class="acjob"${ac_mk(j.agent_id)} aria-hidden="true"></i>` : ''}${esc(j.kind && j.agent_id === j.user_id ? tr('Assistant') : j.agent_name)} · ${esc(relTime(j.updated_at))}</span></div>
     ${j.task_id ? `<button class="runtask" data-act="open-id" data-id="${j.task_id}">${ic('arrow', 's')}<span>${esc(j.task_title || '')}</span></button>` : ''}
     ${j.log ? `<details class="joblog" data-jid="${j.id}"${S.jobLogOpen[j.id] ?? fo ? ' open' : ''}><summary>${esc(last.slice(0, 140))}</summary><pre>${esc(j.log)}</pre></details>` : ''}
     ${jth_html(j)}
@@ -522,7 +523,7 @@ function viewAgents() {
     return `<div class="agview">${S.ly.view === 'agents' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('agents')}</div>`}${lyHtml('agents', P)}</div>`;
   }
   return `<div class="agview">
-    ${ags.length ? `<div class="agcards">${ags.map(card).join('')}</div>` : `<div class="empty hempty">${heron('agent')}<b>${tr('No agent is available to you yet.')}</b><span>${tr('The owner of a list can let its members use the list’s agent (Share › Agents). You can also connect an agent of your own.')}</span><button type="button" class="btn" data-act="ag-setup">${ic('bot', 's')} ${tr('Connect your own agent…')}</button></div>`}
+    ${ags.length ? `<div class="agcards">${ags.map(card).join('')}</div>` : `<div class="empty hempty">${botFig('ruhig')}<b>${tr('No agent is available to you yet.')}</b><span>${tr('The owner of a list can let its members use the list’s agent (Share › Agents). You can also connect an agent of your own.')}</span><button type="button" class="btn" data-act="ag-setup">${ic('bot', 's')} ${tr('Connect your own agent…')}</button></div>`}
     ${ags.length ? aiuCardHtml() : ''}
     <div class="agjh"><h2>${tr('Jobs')}</h2><span class="spacer"></span><div class="seg" role="group"><button class="${S.jobs.f === 'open' ? 'on' : ''}" data-act="jobs-f" data-f="open">${tr('Open|jobs')}</button><button class="${S.jobs.f === 'all' ? 'on' : ''}" data-act="jobs-f" data-f="all">${tr('All')}</button></div></div>
     ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}

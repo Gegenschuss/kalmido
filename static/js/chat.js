@@ -69,7 +69,7 @@ function viewTeam() {
       ${roomIcon(r)}<span class="tcmain"><span class="tcn">${esc(roomName(r))}${r.kind === 'list' ? `<span class="tck">${ic('users', 's')}${r.members}</span>` : ''}</span>
       <span class="tclast">${r.last ? esc((r.last.user_id === S.me?.id ? tr('You') + ': ' : r.kind === 'list' ? uname(r.last.user_id, S.tc.users) + ': ' : '') + (e2eBriefText(r.last) ?? mdBrief(r.last.text))) : `<span class="muted">${tr('No messages yet')}</span>`}</span></span>
       <span class="tcside">${r.last_at ? `<time>${esc(relTime(r.last_at))}</time>` : ''}${r.unread ? `<span class="nbadge ${r.mention ? 'ment' : ''}" aria-label="${esc(trn('{0} unread', '{0} unread', r.unread))}">${r.mention ? '@' : ''}${r.unread}</span>` : ''}${r.muted ? `<span class="tcmute" title="${esc(tr('Muted'))}">${ic('belloff', 's')}</span>` : ''}</span></button>`).join('')
-    : `<div class="empty tcempty">${heron('empty')}<b>${tr('No conversations yet')}</b><span>${S.tc.people.length || (S.tc.rooms || []).length ? tr('Write to someone you work with, or share a list: every shared list gets its own chat.') : tr('Share a list with someone: every shared list gets its own chat.')}</span>${S.tc.people.length || (S.tc.rooms || []).length ? `<button type="button" class="btn sm pri" data-act="tc-new">${ic('plus', 's')}${tr('Start a conversation')}</button>` : ''}</div>`}
+    : `<div class="empty tcempty">${botFig('ruhig')}<b>${tr('No conversations yet')}</b><span>${S.tc.people.length || (S.tc.rooms || []).length ? tr('Write to someone you work with, or share a list: every shared list gets its own chat.') : tr('Share a list with someone: every shared list gets its own chat.')}</span>${S.tc.people.length || (S.tc.rooms || []).length ? `<button type="button" class="btn sm pri" data-act="tc-new">${ic('plus', 's')}${tr('Start a conversation')}</button>` : ''}</div>`}
   </nav>`;
   return `<div class="tcwrap"><div class="tcview ${rid ? 'inroom' : ''}">${list}${rid ? `<section class="tcroom" aria-label="${esc(roomName(S.tc.room ? {...S.tc.room, name: (rooms.find(x => x.id === rid) || {}).name} : rooms.find(x => x.id === rid)))}">${tcRoomHtml()}</section>` : (isMobile() ? '' : `<section class="tcroom tcnone"><div class="empty">${ic('comment')}<span>${tr('Pick a conversation.')}</span></div></section>`)}</div></div>`;
 }
@@ -342,7 +342,7 @@ function noteRoute(lid, id) {
 function viewNotes() {
   if (!S.nt.lid) return sb_notesView();  // 2.45.0 (#1516)
   const l = listById(S.nt.lid);
-  if (!l) return heronEmpty('empty', tr('This list does not exist (any more).'));
+  if (!l) return botEmpty('ruhig', tr('This list does not exist (any more).'));
   const ns = S.nt.notes;
   if (!ns) return `<div class="muted mhint">${S.nt.err ? esc(S.nt.err) : tr('Loading…')}</div>`;
   const q = S.nt.q.trim().toLowerCase();
@@ -361,7 +361,7 @@ function ntCardsHtml(vis, q, cur) {
         <span class="ntt">${n.pinned ? `<span class="ntpin" title="${esc(tr('Pinned'))}">${ic('pin', 's')}</span>` : ''}${esc(n.title)}</span>
         <span class="ntx">${esc(n.body.replace(/^#{1,6}\s+/gm, '').replace(/[*_`>\[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, 140))}</span>
         <span class="ntm">${n.tags.map(t => `<span class="tag">#${esc(t)}</span>`).join('')}<time title="${esc(fmtWhen(n.updated_at))}">${esc(relTime(n.updated_at))}</time>${n.updated_by_name ? `<span class="muted">· ${esc(n.updated_by_name)}</span>` : ''}</span></a></li>`).join('')}</ul>`
-      : q ? `<div class="empty">${tr('No notes match.')}</div>` : heronEmpty('empty', tr('No notes yet.'), S.nt.mayWrite ? tr('Meeting notes, briefings, decisions: write them next to the tasks.') : '')}`;
+      : q ? `<div class="empty">${tr('No notes match.')}</div>` : botEmpty('ruhig', tr('No notes yet.'), S.nt.mayWrite ? tr('Meeting notes, briefings, decisions: write them next to the tasks.') : '')}`;
 }
 function noteEditHtml(n) {
   const ro = !S.nt.mayWrite, edit = S.nt.edit && !ro;

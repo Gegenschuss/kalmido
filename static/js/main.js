@@ -25,7 +25,7 @@ function bootDone() {
   const sil = location.hash.match(/^#signin\/([A-Za-z0-9_-]{20,100})$/);  // 2.23.0 (#444): a sign-in link (QR code)
   if (sil) { bootDone(); await i18nLoad(uiLang()); await signinScreen(sil[1]); return; }
   const i18nBoot = i18nLoad(uiLang());  // last used language (localStorage), in parallel with the state
-  try { await load(); if (!S.lists.length) throw new Error('no state'); } catch (e) { bootDone(); if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = heronEmpty(navigator.onLine === false ? 'offline' : 'error', tr('Server not reachable.'), tr('Reload the page once the server is reachable again.')).replace(/<\/div>$/, `<button type="button" class="btn pri" id="boot-retry">${ic('sync', 's')} ${tr('Try again')}</button></div>`); $('#boot-retry')?.addEventListener('click', () => location.reload()); return; }
+  try { await load(); if (!S.lists.length) throw new Error('no state'); } catch (e) { bootDone(); if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = botEmpty(navigator.onLine === false ? 'offline' : 'schaut', tr('Server not reachable.'), tr('Reload the page once the server is reachable again.')).replace(/<\/div>$/, `<button type="button" class="btn pri" id="boot-retry">${ic('sync', 's')} ${tr('Try again')}</button></div>`); $('#boot-retry')?.addEventListener('click', () => location.reload()); return; }
   await i18nBoot; await i18nLoad(uiLang()); S.booted = true;
   setTimeout(msvvBoot, 0);  // 2.73.0 C (#661): the other servers (msvview.js), after the own state
   setTimeout(chatFabDraw, 0);  // 2.29.0 (#363)
@@ -34,7 +34,7 @@ function bootDone() {
   setTimeout(() => { if (!document.hidden && !S.setupPending && !S.me?.kid) lc_favSuggest(); }, 8000);  /* 2.49.0 (#1537): not for a child */  // 2.46.1 (#1361): a favourite suggestion, once  // 2.19.0 (#668): opening the app tidies the shade  // render in the server-side language
   // 2.13.0 (#453 A16): the first-run step 2 ("What do you want to use?") was not finished (tab reloaded / closed after the
   // admin account was created): it comes back until "Start" is pressed
-  if (S.setupPending && !$('.authscreen')) { const el = document.createElement('div'); el.className = 'modal authscreen'; document.body.appendChild(el); $('#app')?.setAttribute('inert', ''); setupChoices(el, `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div>`); }
+  if (S.setupPending && !$('.authscreen')) { const el = document.createElement('div'); el.className = 'modal authscreen'; document.body.appendChild(el); $('#app')?.setAttribute('inert', ''); setupChoices(el, `<div class="alogo">${logoSvg(40)}<b>${wordSvg()}</b></div>`); }
   if (new URLSearchParams(location.search).get('share') === 'err') {
     history.replaceState(null, '', '/#inbox'); await route();
     toast(tr('Share: the file could not be received'));

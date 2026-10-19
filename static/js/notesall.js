@@ -22,7 +22,7 @@ function sb_notesItems() {
 function sb_noteCardsHtml() {
   const vis = sb_notesItems(), q = S.sbn.q.trim();
   if (vis === null) return `<div class="muted mhint">${tr('Loading…')}</div>`;
-  if (!vis.length) return q || S.sbn.lid ? `<div class="empty">${tr('No notes match.')}</div>` : heronEmpty('empty', tr('No notes yet.'), sb_noteWritable().length ? tr('Meeting notes, briefings, decisions: write them next to the tasks.') : '');
+  if (!vis.length) return q || S.sbn.lid ? `<div class="empty">${tr('No notes match.')}</div>` : botEmpty('ruhig', tr('No notes yet.'), sb_noteWritable().length ? tr('Meeting notes, briefings, decisions: write them next to the tasks.') : '');
   return `<ul class="ntcards" aria-label="${esc(tr('Notes'))}">${vis.map(n => {
     const l = listById(n.list_id), ex = n.excerpt ?? S.sbn.ex[n.id] ?? '';
     return `<li><a href="#note/${n.id}" class="ntcard sbncard">
