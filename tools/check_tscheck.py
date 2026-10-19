@@ -14,16 +14,16 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# the client files without // @ts-check on 2.96.2 (+ 2.102.0); remove a name once its file starts with // @ts-check
+# the client files without // @ts-check on 2.96.2 (+ 2.102.0, + bookmarks / formq / polls / sheetsize from 2.97-2.114 merged); remove a name once its file starts with // @ts-check
 BASE = {
     "ablage.js", "absence.js", "account.js", "acctset.js", "agentchat.js", "agentplan.js", "agents.js", "agentsetup.js",
     "agentview.js", "apptbook.js", "areas.js", "assistant.js", "attachments.js", "backclose.js", "basket.js",
-    "budget.js", "caldrag.js", "calendar.js", "calevents.js", "calview.js", "cfnew.js", "chat.js", "chatbase.js",
+    "bookmarks.js", "budget.js", "caldrag.js", "calendar.js", "calevents.js", "calview.js", "cfnew.js", "chat.js", "chatbase.js",
     "chatplus.js", "chatwin.js", "chatwins.js", "choicecard.js", "cleanup.js", "clientpage.js", "clients.js",
     "collab.js", "contacts.js", "contractprop.js", "core.js", "countries.js", "cryptscope.js", "ctlinks.js",
     "custview.js", "dashboard.js", "davwrite.js", "dayplan.js", "depchain.js", "detail.js", "dialogs.js", "discover.js",
     "dispo.js", "dlgmove.js", "dnd.js", "docpreview.js", "docs.js", "dragmulti.js", "dupprop.js", "e2e.js", "envs.js",
-    "events.js", "family.js", "favorites.js", "favtiles.js", "feeds.js", "filetext.js", "formguard.js", "formula.js",
+    "events.js", "family.js", "favorites.js", "favtiles.js", "feeds.js", "filetext.js", "formguard.js", "formq.js", "formula.js",
     "git.js", "habits.js", "hubmail.js", "icons.js", "importprop.js", "integrations.js", "jobchat.js", "life.js",
     "listadmin.js", "listcolor.js", "liste2e.js", "liste2echan.js", "liste2efile.js", "liste2eui.js", "listedit.js",
     "listhead.js", "liveparts.js", "lyopts.js", "lyprop.js", "lysets.js", "main.js", "mdtitle.js", "meetprop.js",
@@ -33,11 +33,11 @@ BASE = {
     "office_import.js", "office_kpi.js", "office_leads.js", "office_logbook.js", "office_packs.js", "office_parts.js",
     "office_pipeline.js", "office_recurring.js", "office_sheet.js", "office_subs.js", "office_taxdates.js",
     "office_travel.js", "officeagents.js", "orgcrypt.js", "orgexport.js", "orgvis.js", "palette.js", "paperless.js",
-    "pdfview.js", "photometa.js", "pinboard.js", "playbook.js", "points.js", "popovers.js", "portal.js", "projects.js",
+    "pdfview.js", "photometa.js", "pinboard.js", "playbook.js", "points.js", "polls.js", "popovers.js", "portal.js", "projects.js",
     "projtime.js", "propkinds2.js", "pubvideo.js", "purposemods.js", "quickadd.js", "receipts.js", "refs.js",
     "related.js", "reloadguard.js", "render.js", "review.js", "richcopy.js", "roadmap.js", "rowsym.js", "rules.js",
     "sbnav.js", "secdrag.js", "servers.js", "setcore.js", "settings.js", "sharedlg.js", "sharews.js", "sheetdrag.js",
-    "sheetgrid.js", "sheetmotion.js", "sheets.js", "sheets2.js", "sheetsio.js", "sidebar.js", "signoff.js",
+    "sheetgrid.js", "sheetmotion.js", "sheets.js", "sheets2.js", "sheetsio.js", "sheetsize.js", "sidebar.js", "signoff.js",
     "spacemove.js", "sprints.js", "stats.js", "supporter.js", "tablecells.js", "tagsview.js", "tapdone.js",
     "taskbell.js", "templates.js", "time.js", "timeline.js", "undo.js", "videorev.js", "views.js", "vlist.js",
     "widgets.js", "wiki.js", "wikie2e.js", "wip.js", "workspace.js", "wscolor.js",

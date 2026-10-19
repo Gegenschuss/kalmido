@@ -45,6 +45,8 @@ KNOWN = {
     ("tasks.snippets", "api.v1"), ("tasks.stale", "api.v1"), ("team.forms", "api.v1"), ("team.v1", "api.v1"),
     ("videos.v1", "api.v1"), ("accounts.servers", "calendars.subscriptions"), ("accounts.invite", "integrations.mail"),
     ("accounts.pwreset", "integrations.mail"),
+    # from the releases merged after 2.96.2 (2.98.0 scheduling polls)
+    ("calendars.polls", "api.v1"),
 }
 
 
