@@ -352,7 +352,10 @@ row = sql("SELECT org_id, owner_id, task_id, list_id FROM video_reviews WHERE id
 check(r.ok and r.json()["ok"] and tuple(row) == (None, ALICE, None, LP), f"moved to the private project {tuple(row)}")
 check(sql("SELECT COUNT(*) FROM video_comments WHERE review_id=? AND org_id IS NOT NULL", (VID,))[0][0] == 0
       and sql("SELECT COUNT(*) FROM video_versions WHERE review_id=? AND org_id IS NOT NULL", (VID,))[0][0] == 0, "versions and comments follow")
-check(sql("SELECT COUNT(*) FROM office_signoffs WHERE video_id=?", (VID,))[0][0] == 0 and anon("/s/q/" + T6K).text == UNKNOWN.text,
+# 2.122.4 (#2215 L3): the records keep video_id (were emptied) and stay out of the private review's list
+check(sql("SELECT COUNT(*) FROM office_signoffs WHERE video_id=? AND org_id IS NULL", (VID,))[0][0] == 0
+      and sql("SELECT COUNT(*) FROM office_signoffs WHERE video_id=?", (VID,))[0][0] >= 1
+      and A.get(B + f"{V}/{VID}").json()["signoffs"] == [] and anon("/s/q/" + T6K).text == UNKNOWN.text,
       "the customer links stay in the old workspace (the open one stopped)")
 check(Bo.get(B + f"{V}/{VID}").status_code == 404 and A.get(B + f"{V}?list_id={LP}").json()["reviews"][0]["id"] == VID, "now private: Bob no longer sees it")
 r = A.post(B + f"{V}/{VID}/move-space", json={"to": f"org:{ORG}", "undo": MID})
