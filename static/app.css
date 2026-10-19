@@ -3509,7 +3509,7 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 @keyframes b-hop{0%,100%{transform:none}35%{transform:translateY(-9px) scaleY(1.03)}62%{transform:translateY(0) scaleY(.95)}82%{transform:scaleY(1.01)}}
 @keyframes b-sway{0%,100%{transform:rotate(-14deg);opacity:.45}50%{transform:rotate(14deg);opacity:1}}
 @keyframes b-bob{0%,100%{transform:none}50%{transform:translateY(-3px)}}
-.empty svg.bot{width:6.5rem;height:6.5rem;margin:0 auto .75rem}
+.empty svg.bot{width:6.5rem;height:6.5rem;opacity:1;margin:0 auto .75rem}
 .empty.hempty{display:flex;flex-direction:column;align-items:center;gap:.25rem;padding:2.5rem 1rem}
 .empty.hempty b{color:var(--text);font-weight:600}
 .empty.hempty span{font-size:var(--fs-s);max-width:24rem}
