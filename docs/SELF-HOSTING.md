@@ -903,6 +903,12 @@ local text recognition Tesseract (German and English) with `pdftoppm` -- both ar
 Nothing leaves the server, no external service and no language model is involved. An image without them (an older own
 build) keeps working: such documents show *Text recognition is not available on this server*.
 
+2.121.0: for invoices and receipts the same local rules also read the supplier (company name with its legal form, VAT id,
+tax number), the VAT rate (19 %, 7 % or 0 % for small businesses, reverse charge, intra-community supplies), net, VAT and
+gross (they must add up, else only the gross stays) and the invoice number. They are only a suggestion: the document
+sheet and the office's receipt sheet show one line *Recognised: ...* with *Take over* (sender, VAT rate and amount, one
+undo step) and *Discard*; the invoice number stays visible with a copy button.
+
 Each tool runs as a short-lived process with limits; tune them for small hosts:
 
 | Variable | Default | Meaning |
