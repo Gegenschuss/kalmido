@@ -829,6 +829,16 @@ def odoc_render(c, doc_id, oid):
     meta = [[L.get("offer_no", "Angebot Nr."), r["number"]], [L.get("date", "Datum"), _fmt_date(r["date"], pack)]]
     if rec["name"]:
         meta.append([L.get("client", "Kunde"), rec["name"]])
+    # 2.97.1 (#2224): the customer number as on the invoice; a document finalised before prints as it did
+    if locked and "sender_line" in co:
+        cno = _j(r["recipient_snapshot"], {}).get("customer_no") if r["recipient_snapshot"] else ""
+    elif not locked and r["client_id"]:
+        cl = c.execute(f"SELECT customer_no FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (r["client_id"],)).fetchone()
+        cno = cl["customer_no"] if cl else ""
+    else:
+        cno = ""
+    if cno:
+        meta.append([L.get("customer_no", "Customer no." if lang == "en" else "Kunden-Nr."), cno])
     if r["project_ref"]:
         meta.append([L.get("ref", "Ref./PO-Nr."), r["project_ref"]])
     if r["valid_until"]:

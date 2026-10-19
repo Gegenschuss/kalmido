@@ -5,6 +5,8 @@
  - a name that is already one of the free company lines is not doubled
  - finalising freezes the line (in the sender snapshot); a later change of the company leaves it alone
  - a document finalised before 2.97.1 (snapshot without the line) keeps the line it was printed with (no name)
+ - the quotation's key data carry the client's customer number like the invoice (draft: live; finalised: frozen;
+   finalised before 2.97.1: as printed then)
  - the PDF of a draft quotation is written (the shortening to the field width happens there)
  - a person without an organisation (the personal office) works the same
 freelancer-matrix: office
@@ -77,7 +79,7 @@ r = A.put(B + O + "/settings", json={"company": {"name": "Studio Nordlicht GmbH"
                                      "company_fields": COMPANY, "payment_days": 14})
 check(r.ok, "setup: office settings " + r.text[:200])
 r = A.post(B + "/api/clients", json={"org_id": ORG, "name": "Foo AG", "street": "Unter den Linden 2", "zip": "10117", "city": "Berlin",
-                                     "country": "DE"})
+                                     "country": "DE", "customer_no": "K-1001"})
 assert r.status_code == 201, r.text
 CL = r.json()["id"]
 LINE = "Studio Nordlicht GmbH · Hafenstraße 12 · 20457 Hamburg"
@@ -94,6 +96,13 @@ r = A.post(B + D, json={"project_title": "Imagefilm", "client_id": CL, "items": 
 check(r.status_code == 201, "a quotation draft " + r.text[:160])
 OFF = r.json()["id"]
 check(sender_line(A, OFF) == LINE, f"quotation draft: the company name leads the sender line: {sender_line(A, OFF)!r}")
+
+
+def meta(s, did):
+    return {k: v for k, v in s.get(B + f"{D}/{did}/render").json()["meta"]}
+
+
+check(meta(A, OFF).get("Kunden-Nr.") == "K-1001", f"quotation draft: the customer number in the key data: {meta(A, OFF)}")
 r = A.get(B + f"{D}/{OFF}/pdf")
 check(r.ok and r.content[:5] == b"%PDF-", "quotation draft: the PDF is written " + str(r.status_code))
 r = A.post(B + D, json={"kind": "invoice", "client_id": CL, "service_from": "2030-05-01", "items": [{"title": "Beratung", "qty": 1, "rate": 100}]})
@@ -105,6 +114,8 @@ check(sender_line(A, INV) == LINE, f"invoice draft: the same sender line: {sende
 r = A.post(B + f"{D}/{OFF}/finalize")
 check(r.ok and r.json()["locked"] is True, "quotation finalised " + r.text[:200])
 check(sender_line(A, OFF) == LINE, "finalised quotation: the line with the name")
+A.patch(B + f"/api/clients/{CL}", json={"customer_no": "K-2002"})
+check(meta(A, OFF).get("Kunden-Nr.") == "K-1001", f"finalised quotation: the customer number frozen: {meta(A, OFF)}")
 row = dbx("SELECT sender FROM office_docs WHERE id=?", (OFF,))[0]
 snap = json.loads(row[0])
 check(snap["company"].get("sender_line") == LINE, f"the line is part of the sender snapshot: {snap['company'].get('sender_line')!r}")
@@ -116,6 +127,7 @@ check(sender_line(A, INV) == "Nordlicht Neu GmbH · Kai 1 · 20457 Hamburg", f"t
 del snap["company"]["sender_line"]
 dbx("UPDATE office_docs SET sender=? WHERE id=?", (json.dumps(snap, ensure_ascii=False), OFF))
 check(sender_line(A, OFF) == "Hafenstraße 12 · 20457 Hamburg", f"an older finalised document: printed as before: {sender_line(A, OFF)!r}")
+check("Kunden-Nr." not in meta(A, OFF), "an older finalised quotation: no customer number added afterwards")
 
 # ---------------------------------------------------------------- the name already in the free lines: not doubled
 r = A.put(B + O + "/settings", json={"company_fields": {"name": "", "street": "", "zip": "", "city": ""}, "company": {"name": "Atelier Süd", "lines": ["Atelier Süd", "Weg 3", "80331 München"]}})
