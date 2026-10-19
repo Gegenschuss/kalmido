@@ -197,6 +197,19 @@ def bw_keep_until(d):
     return f"{y + BW_KEEP_YEARS + 1}-01-01"
 
 
+def bw_kept_from(date, approvals):
+    """2.119.0 (#2288, review): the keep period counts from the later of the meal date and its last approval, so moving the date of an
+    unlocked meal back cannot shorten it. None = never approved."""
+    if not approvals:
+        return None
+    return bw_keep_until(max([date or ""] + [a[:10] for a in approvals if a]))
+
+
+def bw_kept(c, oid, mid, date):
+    return bw_kept_from(date, [r["at"] for r in c.execute(
+        "SELECT at FROM office_meal_log WHERE meal_id=? AND org_id=? AND action='approve'", (mid, oid)).fetchall()])
+
+
 def bw_logs(c, oid, ids):
     """{meal id: [{action, at, user, reason}]} oldest first."""
     if not ids:
@@ -228,7 +241,7 @@ def bw_public(c, oid, r, logs=None, files=None):
             "host": host or None, "guests": guests, "amounts": lines, "tip": d["tip"] or "0.00", "currency": d["currency"], "note": d.get("note") or "",
             "status": d["status"], "locked": d["status"] == "approved", "approved_at": d.get("approved_at"), "approved_by": d.get("approved_by"),
             "approved_name": d.get("approved_name") or "", "calc": bw_calc(lines, d["tip"]), "log": lg,
-            "files": (files or {}).get(d["id"], []), "kept_until": bw_keep_until(d["date"]) if any(x["action"] == "approve" for x in lg) else None,
+            "files": (files or {}).get(d["id"], []), "kept_until": bw_kept_from(d["date"], [x["at"] for x in lg if x["action"] == "approve"]),
             "deleted": 1 if d.get("deleted_at") else 0, "created_at": d["created_at"], "updated_at": d["updated_at"]}
 
 
@@ -270,10 +283,18 @@ def bw_purge(c, oid):
     gone = c.execute("SELECT id FROM office_meals WHERE org_id=? AND deleted_at IS NOT NULL AND deleted_at<?", (oid, old)).fetchall()
     ids = [r["id"] for r in gone]
     q = ",".join("?" * len(ids)) or "NULL"
-    files = c.execute(f"SELECT id, file FROM office_meal_files WHERE org_id=? AND ((deleted_at IS NOT NULL AND deleted_at<?) OR meal_id IN ({q}))",
+    files = c.execute(f"SELECT id, meal_id, file FROM office_meal_files WHERE org_id=? AND ((deleted_at IS NOT NULL AND deleted_at<?) OR meal_id IN ({q}))",
                       [oid, old] + ids).fetchall()
-    n = 0
+    n, today, kept = 0, local_now().date().isoformat(), {}
     for f in files:
+        # 2.119.0 (#2288, review): a removed / replaced bill of an ever approved meal stays as long as the meal is kept
+        if f["meal_id"] not in ids:
+            if f["meal_id"] not in kept:
+                m = c.execute("SELECT date FROM office_meals WHERE id=? AND org_id=?", (f["meal_id"], oid)).fetchone()
+                k = bw_kept(c, oid, f["meal_id"], m["date"]) if m else None
+                kept[f["meal_id"]] = bool(k and today < k)
+            if kept[f["meal_id"]]:
+                continue
         p = bw_path(oid, f["file"])
         try:
             if p and os.path.isfile(p):
@@ -468,6 +489,7 @@ def bw_meal_post():
 @app.patch("/api/office/meals/<int:mid>")
 def bw_meal_patch(mid):
     c, uid, oid = _ctx()
+    write_lock(c, f"office_meal_{int(mid)}")  # 2.119.0 (#2288, review): no change slips past a parallel approval
     r = _meal(c, oid, mid)
     _need_draft(r)
     b = body()
@@ -487,10 +509,11 @@ def bw_meal_patch(mid):
 def bw_meal_delete(mid):
     """A draft into the trash (undo: POST .../restore). Approved: 409; ever approved: kept for BW_KEEP_YEARS (409)."""
     c, uid, oid = _ctx()
+    write_lock(c, f"office_meal_{int(mid)}")  # 2.119.0 (#2288, review): no change slips past a parallel approval
     r = _meal(c, oid, mid)
     _need_draft(r)
-    if c.execute("SELECT 1 FROM office_meal_log WHERE meal_id=? AND org_id=? AND action='approve' LIMIT 1", (mid, oid)).fetchone():
-        keep = bw_keep_until(r["date"])
+    keep = bw_kept(c, oid, mid, r["date"])
+    if keep:
         if local_now().date().isoformat() < keep:
             raise Denied(409, tr(BW_KEPT, keep))
     ts = iso(now_utc())
@@ -603,6 +626,7 @@ def bw_file_post(mid):
     201 the meal. Locked meal: 409."""
     from ..admin.hosting import quota_guard
     c, uid, oid = _ctx()
+    write_lock(c, f"office_meal_{int(mid)}")  # 2.119.0 (#2288, review): no change slips past a parallel approval
     r = _meal(c, oid, mid)
     _need_draft(r)
     f = request.files.get("file")
@@ -670,6 +694,7 @@ def bw_file_get(mid, fid):
 def bw_file_delete(mid, fid):
     """The bill into the trash (undo: POST .../restore). Locked meal: 409."""
     c, uid, oid = _ctx()
+    write_lock(c, f"office_meal_{int(mid)}")  # 2.119.0 (#2288, review): no change slips past a parallel approval
     _need_draft(_meal(c, oid, mid))
     _file(c, oid, mid, fid)
     ts = iso(now_utc())
@@ -683,6 +708,7 @@ def bw_file_delete(mid, fid):
 def bw_file_restore(mid, fid):
     """The undo of a removal / a replacement: this file is the live one again (another live one goes into the trash)."""
     c, uid, oid = _ctx()
+    write_lock(c, f"office_meal_{int(mid)}")  # 2.119.0 (#2288, review): no change slips past a parallel approval
     _need_draft(_meal(c, oid, mid))
     _file(c, oid, mid, fid, deleted=True)
     ts = iso(now_utc())
