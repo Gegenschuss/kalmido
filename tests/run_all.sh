@@ -1271,6 +1271,13 @@ fresh; run p21141_b_api "$PY" p21141_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21141_b_ui node p21141_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.114.1 part C: transfer of rights on its own last page of the quotation PDF (#2258)
 fresh; run p21141_c_api "$PY" p21141_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.122.3 part A: office - one amount at 0 % VAT, import/export on the settings page, empty areas link there (#2333 #2335)
+fresh; run p21223_a_api "$PY" p21223_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21223_a_ui node p21223_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.122.3 part B: drag a single task onto another = subtask (#2334)
+fresh; run p21223_b_ui node p21223_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.122.3 part C: chat - "Show more" right under the shortened message (#2340)
+fresh; run p21223_c_ui node p21223_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
