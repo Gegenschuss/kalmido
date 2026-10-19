@@ -425,15 +425,15 @@ async function signinScreen(tok) {
   history.replaceState(null, '', location.pathname);
   const el = document.createElement('div');
   el.className = 'modal authscreen';
-  el.innerHTML = `<div class="card"><div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div><p role="status">${tr('Signing in…')}</p></div>`;
+  el.innerHTML = `<div class="card"><div class="alogo">${logoSvg(40)}<b>${wordSvg()}</b></div><p role="status">${tr('Signing in…')}</p></div>`;
   document.body.appendChild(el);
   $('#app')?.setAttribute('inert', '');
   try {
     const r = await fetch('/api/auth/link', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({token: tok})});
     const res = await r.json().catch(() => ({}));
     if (r.ok && res.ok) { location.replace('/'); return; }
-    if (res.twofa) { await authTwofa(el, `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div>`, res.methods || ['totp']); return; }
-    if (res.enrol) { await authEnrol(el, `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div>`); return; }  // 2.86.0 (N4): the admin's 2FA policy
+    if (res.twofa) { await authTwofa(el, `<div class="alogo">${logoSvg(40)}<b>${wordSvg()}</b></div>`, res.methods || ['totp']); return; }
+    if (res.enrol) { await authEnrol(el, `<div class="alogo">${logoSvg(40)}<b>${wordSvg()}</b></div>`); return; }  // 2.86.0 (N4): the admin's 2FA policy
     $('.card p', el).textContent = res.error || tr('Error {0}', r.status);
   } catch { $('.card p', el).textContent = tr('Server not reachable.'); }
   $('.card', el).insertAdjacentHTML('beforeend', `<button class="btn pri" type="button" data-au="login">${tr('To the login')}</button>`);

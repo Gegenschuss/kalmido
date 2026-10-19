@@ -20,7 +20,7 @@ from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_feat, need_l
 from ..tasks.validation import log_act
 from ..personal.timetrack import BadInput
 from ..api.v1 import hit_limit
-from ..lists.public import HERON_ERROR, pub_html, public_links_on
+from ..lists.public import BOT_ERROR, pub_html, public_links_on
 
 
 # ---------------------------------------------------------------- 2.23.0 (#463 / #341): forms -> tasks
@@ -256,7 +256,7 @@ def _lang(c, f):
 
 def _gone(lg=None):
     lg = lg or _accept_lang()
-    return pub_html(tr("Form not available", lg=lg), f'<div class="msg">{HERON_ERROR}<h1>{html.escape(tr("Form not available", lg=lg))}</h1>'
+    return pub_html(tr("Form not available", lg=lg), f'<div class="msg">{BOT_ERROR}<h1>{html.escape(tr("Form not available", lg=lg))}</h1>'
                     f'<p>{html.escape(tr("This form does not exist or is no longer open.", lg=lg))}</p></div>', lg, 404, foot=False)
 
 

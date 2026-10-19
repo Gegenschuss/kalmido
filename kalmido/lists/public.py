@@ -112,18 +112,19 @@ def pub_html(title, main, lg, code=200, foot=True):
     return pub_headers(Response(doc, status=code, mimetype="text/html"))
 
 
-# 2.14.0: the heron of the error pages (same drawing as in the app: lines in the text colour, the sun = the accent)
-HERON_ERROR = ('<svg class="heron" viewBox="0 0 120 120" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" '
-               'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle class="hr-sun" cx="77" cy="108" r="2.6"/><path d="M34 64L24 70"/>'
-               '<path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M72 63C73 53 79 46 85 48C88 49 89 53 87 57"/>'
-               '<circle class="hr-eye" cx="84.5" cy="51.5" r="1.6"/><path d="M87.5 56L95 74"/><path d="M60 76V106"/>'
-               '<path d="M60 88L52 84L57 79"/><path d="M30 108H71M83 108L100 104.5M48 113H66"/></svg>')
+# 2.14.0: the figure of the error pages; 2.136.0 (#2193): the bot figure, state "schaut" (looks), same drawing and
+# colours as in the app (render.js botFig, public.css .bot: plate + body after the colour scheme, the antenna = the accent)
+BOT_ERROR = ('<svg class="bot b-schaut" viewBox="0 0 100 100" aria-hidden="true" focusable="false">'
+             '<rect class="b-plate" width="100" height="100" rx="22.5"/><g transform="translate(50 50) scale(.9) translate(-50 -40)">'
+             '<path class="b-body" d="M50 22C74 22 78 26 78 50S74 78 50 78 22 74 22 50 26 22 50 22Z"/>'
+             '<g class="b-eyes" fill="none" stroke-linecap="round"><path d="M48 42V54" stroke-width="6.5"/>'
+             '<path d="M66 48V48.1" stroke-width="8.5"/></g><path class="b-ant" d="M58 6V15" stroke-width="7" stroke-linecap="round"/></g></svg>')
 
 
 def pub_gone(lg=None):
     """The same answer for unknown, expired, revoked and switched-off links (no oracle)."""
     lg = lg or _accept_lang()
-    return pub_html(tr("Link not available", lg=lg), f'<div class="msg">{HERON_ERROR}<h1>{html.escape(tr("Link not available", lg=lg))}</h1>'
+    return pub_html(tr("Link not available", lg=lg), f'<div class="msg">{BOT_ERROR}<h1>{html.escape(tr("Link not available", lg=lg))}</h1>'
                     f'<p>{html.escape(tr("This link does not exist or is no longer shared.", lg=lg))}</p></div>', lg, 404)
 
 

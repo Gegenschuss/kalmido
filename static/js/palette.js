@@ -545,7 +545,7 @@ function tourGo(i) {
   const card = $('.tcard', el), ring = $('.tring', el);
   el.dataset.step = st.id; el.dataset.sel = st.sel || '';
   card.innerHTML = `<div class="tstep"><span>${TOUR.i + 1}/${n}</span><span class="tdots">${TOUR.steps.map((_, j) => `<i class="${j === TOUR.i ? 'on' : j < TOUR.i ? 'past' : ''}"></i>`).join('')}</span></div>
-    <h3>${TOUR.i === 0 ? heron('stand', 'htour') : ''}${tr(st.t)}</h3><p>${esc(tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
+    <h3>${TOUR.i === 0 ? botFig('ruhig', 'htour') : ''}${tr(st.t)}</h3><p>${esc(tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
     ${last && TOUR.sample && !TOUR.sampleSent ? `<label class="tsample"><input type="checkbox" id="t-sample" ${TOUR.sampleOn ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small>${tr('A small video production with dates, dependencies and a packing list. Remove it any time under Settings > Data.')}</small></span></label>` : ''}
     ${last ? pk2_setupHtml() : ''}
     <div class="tfoot"><button class="btn sm tskip" data-tour="skip">${tr('Skip tour')}</button><span class="spacer"></span>${TOUR.i ? `<button class="btn sm" data-tour="back">${tr('Back')}</button>` : ''}<button class="btn sm pri" data-tour="next">${last ? tr('Done') : tr('Next')}</button></div>`;
@@ -583,7 +583,7 @@ async function tourEnd(skipped) {
 }
 window.addEventListener('resize', () => { if (TOUR.on) tourGo(TOUR.i); });
 
-// ---- completion celebration: the heron flies across the screen, checkmark confetti falls behind it, a dry one-liner
+// ---- completion celebration: the bot figure pops up and hops (happy eyes), checkmark confetti bursts, a dry one-liner
 const QUIPS = {data: null, last: -1};
 async function quipsLoad() {
   if (QUIPS.data) return QUIPS.data;
@@ -599,44 +599,31 @@ function nextQuip() {
   return arr[i];
 }
 QUIPS.last = LS.get('quipLast', -1);
-// the small standing heron of the app icon: the calm variant (reduced motion) next to its line
-const HERON_SWING_SVG = `<svg class="cheron" viewBox="-90 -10 150 200" aria-hidden="true"><g transform="translate(48 -3) scale(2.2) translate(-77 -26)" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M24 50C34 42 52 43 62 51C55 58 40 60 30 55"/><path d="M54 48C51 39 49 32 51 25C53 20 58 19 61 22"/><path d="M61 22L77 26"/>
-  <path d="M44 58V84"/><path d="M44 68L37 64L41 60" stroke-width="3.6"/></g></svg>`;
-// 2.22.0 (#688): the heron in flight, in the line style of the icon: neck tucked in (an S onto the shoulders), the long beak
-// ahead, the legs straight out behind, one broad wing that beats slowly (the wing group scales around the shoulder)
-const HERON_FLY_SVG = `<svg class="cheron cfly" viewBox="0 0 140 80" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M44 48C55 41 77 39 92 43C84 50 62 54 47 52Z"/><path d="M91 43C97 42 100 38 98 34C96 30 99 27 104 28"/><path d="M104 28L127 33"/>
-  <path d="M47 50L13 55M49 52L15 59" stroke-width="2.2"/><path d="M13 55L8 53M15 59L10 60" stroke-width="1.8"/>
-  <g class="cwing"><path d="M58 45C55 27 70 11 99 3C92 15 88 29 83 45"/><path d="M66 41C66 29 74 19 89 11" stroke-width="1.8"/></g></g>
-  <circle class="d" cx="103" cy="30" r="1.6" fill="currentColor"/></svg>`;
 const CHECK_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.5 6 12.5 14 3.5"/></svg>';
 const reducedMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
-// 2.39.1 (#1292, decided 12.10.): more punch. The heron (about a quarter of the screen wide) flies in, hovers in the middle
-// with big wing beats while a big check pops up and colourful confetti bursts to all sides, then it flies off up to the
-// right. Three levels: today < list < project (size, amount, length); a short vibration on phones; a tap ends it at once.
-// Only transform / opacity move. The calm variant (reduced motion) stays.
+// 2.39.1 (#1292, decided 12.10.): more punch: a big check pops up and colourful confetti bursts to all sides. Three
+// levels: today < list < project (size, amount, length); a short vibration on phones; a tap ends it at once.
+// 2.136.0 (#2193): the bot figure (state erledigt) instead of the flying heron: it pops up in the middle, hops twice,
+// then lifts off and fades. Only transform / opacity move. The calm variant (reduced motion) stays: the still figure.
 const CELE_TIER = {today: {ms: 2600, s: 0.85, n: 44, vib: 30}, list: {ms: 3000, s: 1, n: 64, vib: 45}, project: {ms: 3400, s: 1.15, n: 96, vib: 60}};
 const CELE_COLORS = ['#f03e3e', '#f59f00', '#fcc419', '#37b24d', '#1c7ed6', '#ae3ec9', 'var(--accent)'];
 const CELE_MS = 2600;  // (today; the others: CELE_TIER)
-const CELE_IN = 0.28, CELE_OUT = 0.72, CELE_BURST = 0.3;  // arrives / leaves / the burst, as progress of the whole
+const CELE_IN = 0.2, CELE_OUT = 0.78, CELE_BURST = 0.24;  // arrives / leaves / the burst, as progress of the whole
+const CELE_HOPS = 2;
 const celeLerp = (a, b, t) => a + (b - a) * t;
 const celeEase = t => 1 - Math.pow(1 - t, 3), celeEaseIn = t => t * t * t;
-const celeBirdW = (vw, tier) => Math.round(Math.min(380, Math.max(150, vw * 0.25)) * tier.s);
-function celeCenter(vw, vh, bw) { return {x: vw / 2 - bw / 2, y: vh * 0.4 - bw * 2 / 7}; }  // the bird box (7:4) in the middle
-// the flight at progress p (0..1): in from the left edge, hovering in the middle, off to the upper right
-function flyAt(p, vw, vh, bw = 150) {
+const celeBotW = (vw, tier) => Math.round(Math.min(200, Math.max(110, vw * 0.16)) * tier.s);
+function celeCenter(vw, vh, bw) { return {x: vw / 2 - bw / 2, y: vh * 0.4 - bw / 2}; }  // the figure's box (1:1) in the middle
+// the figure at progress p (0..1): pops up (from small, below), hops in the middle, lifts off and fades
+function botAt(p, vw, vh, bw = 150) {
   const c = celeCenter(vw, vh, bw);
-  let x, y, tilt;
-  if (p < CELE_IN) { const t = celeEase(p / CELE_IN); x = celeLerp(-bw - 20, c.x, t); y = celeLerp(vh * 0.12, c.y, t); tilt = celeLerp(8, 0, t); }
-  else if (p <= CELE_OUT) { const t = (p - CELE_IN) / (CELE_OUT - CELE_IN); x = c.x; y = c.y - Math.sin(Math.PI * 2 * 3 * t) * bw * 0.035; tilt = 0; }
-  else { const t = celeEaseIn((p - CELE_OUT) / (1 - CELE_OUT)); x = celeLerp(c.x, vw + 30, t); y = celeLerp(c.y, -bw, t); tilt = celeLerp(0, -14, t); }
-  return {transform: `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${tilt.toFixed(2)}deg)`};
+  let y, sc, op;
+  if (p < CELE_IN) { const t = celeEase(p / CELE_IN); y = celeLerp(c.y + bw * 0.25, c.y, t); sc = celeLerp(0.5, 1, t); op = Math.min(1, t * 1.6); }
+  else if (p <= CELE_OUT) { const t = (p - CELE_IN) / (CELE_OUT - CELE_IN); y = c.y - Math.abs(Math.sin(Math.PI * CELE_HOPS * t)) * bw * 0.14; sc = 1; op = 1; }
+  else { const t = celeEaseIn((p - CELE_OUT) / (1 - CELE_OUT)); y = celeLerp(c.y, c.y - bw * 0.35, t); sc = celeLerp(1, 0.85, t); op = 1 - t; }
+  return {transform: `translate(${c.x.toFixed(1)}px,${y.toFixed(1)}px) scale(${sc.toFixed(3)})`, opacity: +op.toFixed(3)};
 }
-// wing beats: calm on the way, big and quicker while it hovers (scaleY around the shoulder, down to a full flip)
-const WINGS = 9;
-const wingAt = p => { const big = p >= CELE_IN && p <= CELE_OUT; const a = big ? 1 : 0.8; return {transform: `scaleY(${(1 - a + a * Math.cos(Math.PI * 2 * WINGS * p)).toFixed(3)})`}; };
-function checkAt(p) {  // the big check: pops (overshoot) right after the arrival, stays, fades before the flight off
+function checkAt(p) {  // the big check: pops (overshoot) right after the arrival, stays, fades before the figure lifts off
   const k = [[0, 0.2, 0], [CELE_BURST, 0.2, 0], [CELE_BURST + 0.06, 1.18, 1], [CELE_BURST + 0.12, 1, 1], [CELE_OUT + 0.06, 1, 1], [0.9, 0.85, 0], [1, 0.85, 0]];
   let i = 0; while (i < k.length - 2 && p > k[i + 1][0]) i++;
   const [p0, s0, o0] = k[i], [p1, s1, o1] = k[i + 1], t = p1 > p0 ? Math.min(1, Math.max(0, (p - p0) / (p1 - p0))) : 1;
@@ -650,24 +637,24 @@ function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   const tier = CELE_TIER[kind] || CELE_TIER.list;
   const q = document.createElement('div');
   q.className = 'cele-quip'; q.setAttribute('role', 'status');
-  q.innerHTML = `${reducedMotion() ? HERON_SWING_SVG : ''}<div><b>${esc(title)}</b><span>${esc(quip)}</span></div>`;
+  q.innerHTML = `${reducedMotion() ? botFig('erledigt', 'cbotfig') : ''}<div><b>${esc(title)}</b><span>${esc(quip)}</span></div>`;
   try { if (frame === null && navigator.vibrate && matchMedia('(pointer: coarse)').matches) navigator.vibrate(tier.vib); } catch { /* not allowed */ }
-  if (reducedMotion()) {  // calm variant: small heron + line, no motion
+  if (reducedMotion()) {  // calm variant: the small still figure + line, no motion
     q.classList.add('calm'); q.dataset.kind = kind;
     document.body.appendChild(q);
     if (frame === null) CELE.timers.push(setTimeout(() => q.remove(), 4200));
     q.addEventListener('pointerdown', celeEnd);
     return q;
   }
-  const vw = innerWidth || 1440, vh = innerHeight || 900, dur = tier.ms, bw = celeBirdW(vw, tier);
+  const vw = innerWidth || 1440, vh = innerHeight || 900, dur = tier.ms, bw = celeBotW(vw, tier);
   const el = document.createElement('div');
   el.className = 'cele'; el.dataset.kind = kind; el.setAttribute('aria-hidden', 'true');
-  el.innerHTML = `<div class="ccheck">${CHECK_SVG}</div><div class="cbird">${HERON_FLY_SVG}</div>`;
+  el.innerHTML = `<div class="cbot">${botFig('erledigt', 'cbotfig')}</div><div class="ccheck">${CHECK_SVG}</div>`;
   document.body.appendChild(el); document.body.appendChild(q);
-  const bird = $('.cbird', el), wing = $('.cwing', el), chk = $('.ccheck', el);
-  bird.style.width = bw + 'px';
+  const fig = $('.cbot', el), chk = $('.ccheck', el);
+  fig.style.width = bw + 'px';
   const cy = vh * 0.4;
-  Object.assign(chk.style, {left: vw / 2 + 'px', top: (cy + bw * 0.3) + 'px', width: Math.round(bw * 0.42) + 'px', height: Math.round(bw * 0.42) + 'px'});
+  Object.assign(chk.style, {left: (vw / 2 + bw * 0.42) + 'px', top: (cy + bw * 0.36) + 'px', width: Math.round(bw * 0.4) + 'px', height: Math.round(bw * 0.4) + 'px'});  // at the figure's lower right
   // confetti: bursts from the middle to all sides (colourful: decided 12.10.), falls with gravity, spins, fades
   const pieces = [], sp = Math.max(vw, vh) * 0.75 * tier.s;
   for (let i = 0; i < tier.n; i++) {
@@ -686,15 +673,14 @@ function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   el.addEventListener('pointerdown', celeEnd); q.addEventListener('pointerdown', celeEnd);
   if (frame !== null || !el.animate) {  // a still frame (screenshots, tests, browsers without Web Animations)
     const p = frame ?? 0.5;
-    Object.assign(bird.style, flyAt(p, vw, vh, bw)); Object.assign(wing.style, wingAt(p)); Object.assign(chk.style, checkAt(p));
+    Object.assign(fig.style, botAt(p, vw, vh, bw)); Object.assign(chk.style, checkAt(p));
     for (const pc of pieces) Object.assign(pc.c.style, confAt(pc, (p - CELE_BURST) * dur / 1000));
     q.classList.add('on');
     if (frame === null) CELE.timers.push(setTimeout(celeEnd, dur + 600));
     return el;
   }
   const K = 60, steps = [...Array(K + 1)].map((_, i) => i / K);
-  bird.animate(steps.map(p => ({...flyAt(p, vw, vh, bw), offset: p})), {duration: dur, easing: 'linear', fill: 'both'});
-  wing.animate(steps.map(p => ({...wingAt(p), offset: p})), {duration: dur, easing: 'linear', fill: 'both'});
+  fig.animate(steps.map(p => ({...botAt(p, vw, vh, bw), offset: p})), {duration: dur, easing: 'linear', fill: 'both'});
   chk.animate(steps.map(p => ({...checkAt(p), offset: p})), {duration: dur, easing: 'linear', fill: 'both'});
   for (const pc of pieces) {
     const ks = [...Array(13)].map((_, i) => i / 12);

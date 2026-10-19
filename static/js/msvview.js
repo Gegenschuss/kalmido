@@ -188,13 +188,13 @@ function msvvSide() {
 function msvvTitle() { const {sid, lid} = S.route; return msvvList(sid, lid)?.name || msvvName(sid); }
 function msvvViewList() {
   const {sid, lid} = S.route, l = msvvLink(sid), d = S.msvv.data[sid];
-  if (!l) return heronEmpty('empty', S.msvv.loaded ? tr('This server is not connected (any more).') : tr('Loading…'));
+  if (!l) return botEmpty('ruhig', S.msvv.loaded ? tr('This server is not connected (any more).') : tr('Loading…'));
   const lst = msvvList(sid, lid);
   const ts = d ? msvvRoots(d.tasks.filter(t => t.list_id === lid && t.status === 0)).sort(msvvRowKey) : [];
   const head = `<div class="msvvhead">${msvvBadge(sid)}<span>${esc(l.name || '')}${lst ? ' · ' + esc(lst.name || '') : ''}</span>${l.base_url && msvvUrl(l.base_url) ? `<a class="btn sm" href="${esc(msvvUrl(l.base_url))}" target="_blank" rel="noopener noreferrer">${ic('link', 's')}${esc(tr('Open on {0}', l.name || '?'))}</a>` : ''}</div>`;
   const add = lst?.can_write ? `<div class="qadd dock msvvqa"><div class="box"><span class="qplus" aria-hidden="true">${ic('plus', 's')}</span><input id="msvv-in" type="text" autocomplete="off" enterkeyhint="done" data-form-type="other" data-lpignore="true" aria-label="${esc(tr('Add a task to {0} on {1}', lst.name || '', l.name || ''))}" placeholder="${esc(tr('Add task…'))}"></div></div>` : '';
-  const body = !d ? `<div class="empty">${tr('Loading…')}</div>` : !lst ? heronEmpty('empty', tr('This list does not exist or you cannot see it.'))
-    : ts.length ? ts.map(t => msvvRow(sid, t)).join('') : heronEmpty('empty', tr('No tasks.'));
+  const body = !d ? `<div class="empty">${tr('Loading…')}</div>` : !lst ? botEmpty('ruhig', tr('This list does not exist or you cannot see it.'))
+    : ts.length ? ts.map(t => msvvRow(sid, t)).join('') : botEmpty('ruhig', tr('No tasks.'));
   return `<div class="lwrap msvvlist">${head}${msvvErrLine(sid)}${add}${body}</div>`;
 }
 

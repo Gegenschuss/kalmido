@@ -91,10 +91,10 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   // ================= heron on the server pages
   const nf = await fetch(B + 'no/such/page', {headers: {Accept: 'text/html', Cookie: CK}});
   const nfh = await nf.text();
-  check(nf.status === 404 && /class="heron"/.test(nfh) && /Page not found/.test(nfh) && /href="\/"/.test(nfh) && !/Shared with/.test(nfh), '404 page: heron, title, a way back, no "Shared with" footer');
-  check(!/<svg class="heron"[^>]*aria-label/.test(nfh) && !/<title>[^<]*<\/title><\/svg>/.test(nfh), 'the heron is decorative (no label of its own)');
+  check(nf.status === 404 && /class="bot b-schaut"/.test(nfh) && /Page not found/.test(nfh) && /href="\/"/.test(nfh) && !/Shared with/.test(nfh), '404 page: the bot figure, title, a way back, no "Shared with" footer');  // 2.136.0 (#2193): the bot instead of the heron
+  check(!/<svg class="bot[^>]*aria-label/.test(nfh) && /<svg class="bot[^>]*aria-hidden="true"/.test(nfh) && !/<title>[^<]*<\/title><\/svg>/.test(nfh), 'the figure is decorative (no label of its own)');
   const pg = await (await fetch(B + 's/nonexistenttoken0000000000', {headers: {Accept: 'text/html'}})).text();
-  check(/class="heron"/.test(pg) && /Link not available/.test(pg), 'public link gone: heron');
+  check(/class="bot b-schaut"/.test(pg) && /Link not available/.test(pg), 'public link gone: the bot figure');
   const api404 = await fetch(B + 'api/v1/nothing', {headers: {Accept: 'text/html', Authorization: 'Bearer ' + TOK}});
   check(api404.status === 404 && /json/.test(api404.headers.get('content-type') || ''), 'API 404 stays JSON');
 
@@ -152,26 +152,26 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   w.eval(`fieldModal(${P}, fieldById(${FB.id}))`); await sleep(150);
   check(d.querySelector('#fd-pin')?.closest('.row')?.hidden === true, 'field dialog: "show as a chip" hidden in a list with columns');
   d.querySelectorAll('.modal').forEach(x => x.remove());
-  // heron: empty list, search without hits, Today
+  // 2.136.0 (#2193) the bot figure: empty list, search without hits, Today
   await w.eval(`go('l/${EMPTY}')`); await sleep(500);
   let he = d.querySelector('#view .empty.hempty');
-  check(he && he.querySelector('svg.o3c-k[aria-hidden="true"] .o3c-kdot') && /No tasks/.test(he.textContent) && /field below/.test(he.textContent), 'empty list: the K line drawing + a hint');  // 2.83.0 (#1427): the K instead of the heron (no animal)
-  check([...d.querySelectorAll('svg.heron')].every(x => x.getAttribute('aria-hidden') === 'true' && !x.querySelector('title')), 'the heron is decorative (aria-hidden, no title)');
+  check(he && he.querySelector('svg.bot.b-ruhig[aria-hidden="true"] .b-ant') && /No tasks/.test(he.textContent) && /field below/.test(he.textContent), 'empty list: the calm bot figure + a hint');  // 2.136.0 (#2193): the bot instead of the K (2.83.0)
+  check([...d.querySelectorAll('svg.bot')].every(x => x.getAttribute('aria-hidden') === 'true' && !x.querySelector('title')) && !d.querySelector('svg.heron'), 'the figure is decorative (aria-hidden, no title), no heron');
   w.eval(`S.searchQ = 'zzzqqq'; S.searchRes = []; go('search')`); await sleep(400);
   he = d.querySelector('#view .empty.hempty');
-  check(he && /No results/.test(he.textContent), 'search without hits: the heron');
+  check(he && /No results/.test(he.textContent) && he.querySelector('svg.bot.b-schaut'), 'search without hits: the bot looks (schaut)');
   w.close();
   // Today: nothing / all done (a fresh user)
   await call('POST', '/api/users', {username: 'dora', display_name: 'Dora', password: 'password123'});
   const CD = await login('dora'); await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'}, CD);
   w = await boot({user: 'dora', hash: 'today'}); d = w.document;
-  check(/Nothing left for today/.test(d.querySelector('#view .hempty')?.textContent || '') && d.querySelector('#view .hempty .o3c-k'), 'Today without tasks: the K line drawing');  // 2.83.0 (#1427): the K instead of the heron
+  check(/Nothing left for today/.test(d.querySelector('#view .hempty')?.textContent || '') && d.querySelector('#view .hempty svg.bot.b-ruhig'), 'Today without tasks: the calm bot figure');  // 2.136.0 (#2193): the bot instead of the K
   w.close();
   const dt = await call('POST', '/api/tasks', {title: 'Done today', due: day(0)}, CD);
   await call('PATCH', `/api/tasks/${dt.id}`, {status: 2}, CD);
   w = await boot({user: 'dora', hash: 'today', ls: {'tasks.showDone': 'true'}}); d = w.document;
   const he2 = d.querySelector('#view .hempty');
-  check(!he2 || /All done for today/.test(he2.textContent) || d.querySelector('#view .trow'), 'Today with everything done: "All done for today." ' + (he2?.textContent || ''));
+  check(!he2 || (/All done for today/.test(he2.textContent) && he2.querySelector('svg.bot.b-erledigt')) || d.querySelector('#view .trow'), 'Today with everything done: "All done for today." + the happy bot ' + (he2?.textContent || ''));
   w.close();
   // editor: read-only dialog, German
   w = await boot({user: 'bob', hash: 'l/' + P}); d = w.document;
@@ -245,11 +245,11 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   check(w.eval('S.settings.hide_progress') === '777', 'a state answer overtaken by a save does not undo it locally: ' + w.eval('S.settings.hide_progress'));
   await call('PATCH', '/api/settings', {hide_progress: ''});
   w.close();
-  // unreachable server at the start: the heron
+  // unreachable server at the start: the bot figure (offline / schaut)
   w = await boot({user: 'alice', hash: 'today', setup: x => { x.__offline = true; }}); d = w.document;
   await sleep(500);
   const off = d.querySelector('#view .hempty');
-  check(!off || off.querySelector('.heron'), 'start without a server: the heron (when the start page shows) ' + (off?.textContent || 'no start page'));
+  check(!off || off.querySelector('svg.bot'), 'start without a server: the bot figure (when the start page shows) ' + (off?.textContent || 'no start page'));
   w.close();
   check(!errs.length, 'jsdom: no JS errors ' + errs.join(' | '));
 
@@ -276,11 +276,11 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   const DLG = `(() => { const c = document.querySelector('.colmd .card'); if (!c) return null; const r = c.getBoundingClientRect();
     const small = [...c.querySelectorAll('.colmv, .colr .chkl, .colnum, .foot .btn')].filter(e => e.offsetWidth).map(e => e.getBoundingClientRect()).filter(b => b.height < 43.5).length;
     return {fits: r.left >= 0 && r.right <= innerWidth + .5 && r.top >= 0 && r.bottom <= innerHeight + .5, small, over: c.scrollWidth - c.clientWidth}; })()`;
-  // 2.83.0 (#1427): the empty list shows the K line drawing; its dot is the accent (was the heron's sun)
-  const SUN = `(() => { const s = document.querySelector('#view .o3c-k .o3c-kdot'); if (!s) return null; const acc = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  // 2.136.0 (#2193): the empty list shows the bot figure; its antenna is the accent (was the K's dot, before the heron's sun)
+  const SUN = `(() => { const s = document.querySelector('#view svg.bot .b-ant'); if (!s) return null; const acc = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
     const probe = document.createElement('span'); probe.style.color = 'var(--accent)'; document.body.appendChild(probe); const want = getComputedStyle(probe).color; probe.remove();
-    const h = document.querySelector('#view .o3c-k').getBoundingClientRect();
-    return {fill: getComputedStyle(s).fill, want, acc, w: Math.round(h.width), line: getComputedStyle(document.querySelector('#view .o3c-k')).color}; })()`;
+    const h = document.querySelector('#view svg.bot').getBoundingClientRect();
+    return {fill: getComputedStyle(s).stroke, want, acc, w: Math.round(h.width), line: getComputedStyle(document.querySelector('#view svg.bot .b-body')).fill}; })()`;
   const layout = async ({cmd, ev, nav, ctx, shot}, vw, vh, tag, phone) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await nav(B + '#l/' + P); await ready(ev);
@@ -315,7 +315,7 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
     check(qb.n === 2 && qb.inside && (!phone || (qb.minW >= 43.5 && qb.minH >= 43.5)), `${tag}: quick add shows the paper clip + "Add and open"` + (phone ? ' with 44 px targets ' : ' ') + JSON.stringify(qb));
     await sleep(300);
     const s = await ev(SUN);
-    check(s && s.fill === s.want && s.w >= 90 && s.line !== s.fill, `${tag}: the K's dot is the accent colour, lines in the text colour ` + JSON.stringify(s));
+    check(s && s.fill === s.want && s.w >= 80 && s.line !== s.fill, `${tag}: the bot's antenna is the accent colour, the body in the theme colour ` + JSON.stringify(s));
     await shot(`p2140-${tag}-empty.png`);
   };
   // phones (touch)
