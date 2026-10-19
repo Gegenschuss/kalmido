@@ -90,8 +90,12 @@ async function receipt(ck, ws, name, amount, day, category, vat) {
     check(await ready(ev, `${rows} === 2 && document.querySelector('#rcl-cat').value === 'Software'`, 60), 'the filters stay when coming back');
     // phone width
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
-    await ev(`(() => { RCL.open = null; ofcDraw(); return 1; })()`);
-    await sleep(400);
+    await ev(`(() => { RCL.open = null; return 1; })()`);  // a fresh visit on a phone (a details the person opened stays open on a redraw)
+    await nav(B + '#office/books');
+    await ready(ev, `!!document.querySelector('.bk-all a')`, 60);
+    await nav(B + '#office/books/receipts');
+    await ready(ev, `${rows} === 2`, 60);
+    await sleep(300);
     check(await ev(`!document.querySelector('.rcl-filters').open`), 'on a phone the filters are folded away');
     check(await ev(noSide), 'on a phone nothing sticks out to the side');
     check(await ev(`document.querySelector('#rcl-zip').getBoundingClientRect().height >= 44 && document.querySelector('.rcl-filters summary').getBoundingClientRect().height >= 44`), 'on a phone the targets are large');
