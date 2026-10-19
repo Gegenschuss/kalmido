@@ -112,7 +112,7 @@ Ca.patch(B + "/api/settings", json={"workspace": f"org:{ORG2}"})
 # ---- a quotation: three steps, undo / redo / all / redoall
 r = Bo.post(B + "/api/office/docs", json={"project_title": "Spring campaign"})
 check(r.status_code == 201, f"bob creates a quotation ({r.status_code} {r.text[:200]})")
-D = r.json()["id"]
+D, I0 = r.json()["id"], r.json()["intro"]  # the standard intro of a new quotation
 ITEMS = [{"kind": "service", "title": "Shoot day", "qty": 2, "unit": "day", "rate": 500}]
 check(Bo.patch(B + f"/api/office/docs/{D}", json={"project_title": "Spring film"}, headers=U(T1)).ok, "step 1: title")
 check(Bo.patch(B + f"/api/office/docs/{D}", json={"intro": "Dear team"}, headers=U(T1)).ok, "step 2: intro")
@@ -125,7 +125,7 @@ r = undo(Bo, "doc", D, T1, "redo")
 check(r.ok and len(r.json().get("items") or []) == 1 and r.json()["totals"].get("net") == 1000, f"redo: the position is back, net 1000 ({r.text[:200]})")
 r = undo(Bo, "doc", D, T1, "all")
 d = doc(Bo, D)
-check(r.ok and d["project_title"] == "Spring campaign" and d["intro"] == "" and d["items"] == [], f"all: as opened ({r.status_code} {d.get('project_title')!r} {d.get('intro')!r})")
+check(r.ok and d["project_title"] == "Spring campaign" and d["intro"] == I0 and d["items"] == [], f"all: as opened ({r.status_code} {d.get('project_title')!r} {d.get('intro')!r})")
 check((d["totals"].get("net") or 0) == 0, "all: the sums follow (net 0)")
 r = undo(Bo, "doc", D, T1, "undo")
 check(r.status_code == 409, f"nothing left to undo: 409 ({r.status_code})")
