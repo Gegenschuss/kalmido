@@ -10839,5 +10839,14 @@
   "Back to a draft?": "¿Volver a borrador?",
   "The quotation can be changed again and keeps its number {0}.": "El presupuesto se puede volver a modificar y conserva su número {0}.",
   "Back to a draft": "De vuelta a borrador",
-  "finalising undone": "finalización deshecha"
+  "finalising undone": "finalización deshecha",
+  "Applies to the positions of this page with a producing tick. Parts without an own setting take over the switch and calculate their producing themselves.": "Se aplica a las posiciones de esta página marcadas con producing. Las partes sin ajuste propio adoptan el interruptor y calculan su propio producing.",
+  "Applies to the positions with a producing tick.": "Se aplica a las posiciones marcadas con producing.",
+  "Applies to the positions of this part with a producing tick.": "Se aplica a las posiciones de esta parte marcadas con producing.",
+  "own setting": "ajuste propio",
+  "like the document": "como el documento",
+  "Use the values of the document": "Usar los valores del documento",
+  "incl. producing ({0})": "incl. producing ({0})",
+  "incl. producing 1 day": "incl. producing 1 día",
+  "incl. producing {0} days": "incl. producing {0} días"
 }

@@ -10839,5 +10839,14 @@
   "Back to a draft?": "Zurück in den Entwurf?",
   "The quotation can be changed again and keeps its number {0}.": "Das Angebot lässt sich wieder ändern und behält seine Nummer {0}.",
   "Back to a draft": "Zurück im Entwurf",
-  "finalising undone": "Festschreiben rückgängig gemacht"
+  "finalising undone": "Festschreiben rückgängig gemacht",
+  "Applies to the positions of this page with a producing tick. Parts without an own setting take over the switch and calculate their producing themselves.": "Gilt für die Positionen dieser Seite mit Producing-Haken. Teilangebote ohne eigene Einstellung übernehmen den Schalter und rechnen ihr Producing selbst.",
+  "Applies to the positions with a producing tick.": "Gilt für die Positionen mit Producing-Haken.",
+  "Applies to the positions of this part with a producing tick.": "Gilt für die Positionen dieses Teils mit Producing-Haken.",
+  "own setting": "eigene Einstellung",
+  "like the document": "wie Dokument",
+  "Use the values of the document": "Werte vom Dokument übernehmen",
+  "incl. producing ({0})": "inkl. Producing ({0})",
+  "incl. producing 1 day": "inkl. Producing 1 Tag",
+  "incl. producing {0} days": "inkl. Producing {0} Tage"
 }
