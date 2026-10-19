@@ -45,6 +45,7 @@ APP_TO_API = {
     "GET /api/me/storage": ["GET /me/storage"],  # 2.24.0 (#910)
     "GET /api/tasks": ["GET /tasks", "GET /search", "GET /trash"],
     "GET /api/search/messages": ["GET /search"],  # 2.33.0 (#1080): ?scope=messages
+    "GET /api/search": ["GET /search"],  # 2.116.0 B (#2065): ?fulltext=1
     "GET /api/tasks/{}": ["GET /tasks/{}"],
     "POST /api/tasks": ["POST /tasks", "POST /tasks/{}/subtasks"],
     "PATCH /api/tasks/{}": ["PATCH /tasks/{}"],
