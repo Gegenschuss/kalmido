@@ -1699,6 +1699,44 @@ document texts are encrypted at rest in organisations with encryption.
   `POST .../send` takes `timesheet: true` to attach it as a second file (the invoice's own PDF / ZUGFeRD file is unchanged;
   the DATEV copy never gets it). The document answer has `timesheet_ok`.
 
+## Correspondence: letters (2.106.0)
+
+Tab *Correspondence* (admins of the office area; members `403`, agents `403`, another area `404`; a person without an
+organisation writes in the personal office). For letters to authorities, insurers, landlords or clients.
+
+**Writing**: *New letter* (from a letter template, optionally for a client: its variables are filled) opens the editor.
+The recipient search offers the clients of the office (also with a contact person as "z. Hd.") and the address book
+contacts the person sees in the office's space (an organisation's office: the organisation's address books; a personal
+office: the private ones). Picking one copies name, address lines and e-mail into the letter; they stay free to edit and
+do not change when the client changes later. Further fields: date (today), reference line (e.g. "Your letter of …"),
+subject, text (paragraphs separated by an empty line, `-` starts a list item), greeting and name (from the own
+*Signature*), *Use the signature picture*, channel (post, e-mail, registered mail with tracking number, fax) and the
+follow-up in days. A draft saves itself while typing; *Save* saves at once with an undo step.
+
+**PDF**: DIN 5008 form B like the other office PDFs: letterhead (logo or company name), fold marks, the sender line and
+the recipient in the window, the date on the right, then reference line, subject (bold), text, greeting, the signature
+picture and the name; following pages with a small head; the footer with the company fields. A draft says *ENTWURF*
+(*DRAFT*).
+
+**Sending**: *Mark as sent* asks for the channel (tracking number with registered mail) and the follow-up (suggested: 14
+days). The letter is then fixed: its PDF is written once and filed into the office documents space, in the folder of the
+client (without a client in the folder *Correspondence*). A change afterwards = *Edit a copy* (a new draft). *Delivered*
+marks the arrival (undo possible). *Save as template* makes a document template of kind *Letter* from the text; the tab
+*Documents* shows it too. *Delete* archives the letter (undo restores it; a filed PDF stays). The client page lists the
+client's letters.
+
+**Signature**: per person and office area a greeting, a name and optionally a picture of the handwritten signature (PNG
+or JPEG, at most 300 KB). New letters take greeting and name from it; the picture is only printed in the letters of the
+person it belongs to.
+
+Routes (office admins only): `GET/POST /api/office/letters` (`?status=&client_id=&q=&archived=1&brief=1`; `POST` with
+`{copy_of: id}`, `{template_id, client_id?}` or `{answers: <document id>}`), `GET /api/office/letters/recipients?q=`,
+`GET/PUT /api/office/letters/profile`, `DELETE /api/office/letters/profile/image`,
+`GET/PATCH/DELETE /api/office/letters/<id>` (`PATCH` of a sent letter `409`), `POST /api/office/letters/<id>/restore`,
+`GET /api/office/letters/<id>/pdf` (`?dl=1` download), `POST /api/office/letters/<id>/sent`,
+`POST/DELETE /api/office/letters/<id>/delivered`, `POST /api/office/letters/<id>/template`. Recipient, subject, text,
+reference line and the signature picture are encrypted at rest in areas with encryption.
+
 ## Access log
 
 Every change and every read of documents and master data is written to the office log (`office_doc_log`): who, when,
