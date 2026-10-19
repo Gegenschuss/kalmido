@@ -169,7 +169,7 @@ ROUTES = {
     "POST /api/docs/{}/review": "files", "POST /api/docs/{}/task": "files", "POST /api/files/folders": "files",
     "POST /api/files/links": "files", "POST /api/files/nodes/{}/restore": "files", "POST /api/files/nodes/{}/shares": "files",
     "POST /api/files/nodes/{}/versions": "files", "POST /api/files/nodes/{}/versions/{}/restore": "files",
-    "POST /api/files/upload": "files", "POST /api/v1/documents/{}/receipt-suggestion": "files", "POST /api/v1/files": "files", "POST /api/v1/documents": "files",  # 2.122.0 (#2098)
+    "POST /api/files/upload": "files", "POST /api/v1/documents/{}/receipt-suggestion": "files", "POST /api/v1/files": "files", "POST /api/v1/documents": "files", "POST /api/docs/export.csv": "files",  # 2.122.0 (#2098)
     "POST /api/v1/files/{}/versions": "files", "PUT /api/docs/settings": "files", "PUT /api/docs/{}/receipt": "files",
     # ---- hub (27)
     "DELETE /api/hubmail/address": "hub", "DELETE /api/hubmail/mails/{}": "hub", "DELETE /api/team/absences/{}": "hub",
