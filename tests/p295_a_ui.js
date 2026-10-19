@@ -47,7 +47,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `!!document.querySelector('#rk-year')`, 80), 'the travel tab');
     await ev(`(() => { const s = document.querySelector('#rk-year'); s.value = '2025'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('.rklist .ofcrow').length === 1`, 80), 'the trip of 2025 in the list');
-    check(await ev(`/112\\.00/.test(document.querySelector('.rklist .rkv-tag')?.textContent || '')`), 'the list shows the per diem of both participants ' + await ev(`document.querySelector('.rklist .ofcrow')?.textContent`));
+// 2.114.4 D (#2286): the per diem is now .rkpd
+    check(await ev(`/112\\.00/.test(document.querySelector('.rklist .rkpd')?.textContent || '')`), 'the list shows the per diem of both participants ' + await ev(`document.querySelector('.rklist .ofcrow')?.textContent`));
     // the trip view
     await ev(`(() => { document.querySelector('.rklist .ofcrow').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.rkv-card')`), 'the per diem card');

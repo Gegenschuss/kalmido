@@ -50,7 +50,8 @@ const today = TC.today();
     await nav(B + '#office/travel');
     check(await ready(ev, `document.querySelectorAll('.rklist .ofcrow').length === 1`, 80), '#1022: the travel tab lists the trip');
     check(await ev(`!!document.querySelector('.ofrail [data-go="office/travel"]') && !!document.querySelector('.ofrail [data-go="office/cashflow"]')`), '#1022 #1652: both tabs for the admin');  // 2.87.9 (#1917): the office menu; 2.98.0 (#2180): the office rail
-    check(await ev(`/2 not in DATEV/.test(document.querySelector('.rklist .ofcrow').textContent) && /349\\.90/.test(document.querySelector('.rklist .rksum').textContent)`),
+    // 2.114.4 D (#2286): receipts column is .rkrc
+    check(await ev(`/2 not in DATEV/.test(document.querySelector('.rklist .ofcrow').textContent) && /349\\.90/.test(document.querySelector('.rklist .rkrc').textContent)`),
       '#1022: the trip row shows the sum and the receipts not in DATEV ' + await ev(`document.querySelector('.rklist .ofcrow')?.textContent`));
     await ev(`(() => { document.querySelector('.rklist .ofcrow').click(); return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('.rkits .rkit').length === 2`), '#1022: the trip with its receipts');
