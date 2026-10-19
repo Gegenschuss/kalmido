@@ -9,7 +9,8 @@ freelancer-matrix: agents
    session goes without the switch
  - #2173 files: a failing unlink is counted and queued; an old orphan file goes only with the switch, a young one and a
    referenced one stay; version 21 of a file replaces version 1 (switch); the undo of an account import takes the
-   attachment files along; a subtask in a foreign list lands in the trash of its list when its parent is deleted for good
+   attachment files along; a subtask in a foreign list stays alive there, detached, when its parent is deleted for good
+   (2.103.0 review F2: whoever deletes the parent must not remove work of a list they do not own)
  - #2175 agent chat: own message / whole history deleted for good with the files; another person's conversation 404
 usage: p2103_d_api_test.py <datadir>      (P2103D_NOSTART=1: a running server on KALMIDO_TEST_PORT)
 """
@@ -224,14 +225,14 @@ r = Fr.post(B + f"/api/imports/{iid}/undo")
 check(r.ok, f"#2173: undo of the import {r.status_code} {r.text[:150]}")
 check(not os.path.exists(os.path.join(DATA, "attachments", rel_imp)), "#2173: ... its attachment file is gone from the disk")
 
-# a subtask in a foreign list goes to the trash of its list when the parent is deleted for good
+# 2.103.0 review F2: a subtask in a foreign list stays in its list (detached, not in the trash) when the parent is deleted for good
 TP = Fr.post(B + "/api/tasks", json={"title": "Parent"}).json()["id"]
 TS = A.post(B + "/api/tasks", json={"title": "Foreign subtask"}).json()["id"]
 sql("UPDATE tasks SET parent_id=? WHERE id=?", (TP, TS), write=True)
 r = Fr.delete(B + f"/api/tasks/{TP}?hard=1")
 check(r.ok, f"#2173: the parent is deleted for good {r.status_code}")
 row = sql("SELECT parent_id, deleted_at FROM tasks WHERE id=?", (TS,))
-check(row and row[0][0] is None and row[0][1] is not None, f"#2173: the foreign subtask is in the trash of its list, not detached silently {row}")
+check(row and row[0][0] is None and row[0][1] is None, f"#2173 review F2: the foreign subtask stays in its list, detached {row}")
 r = A.post(B + f"/api/tasks/{TS}/restore")
 check(r.ok and sql("SELECT deleted_at FROM tasks WHERE id=?", (TS,))[0][0] is None, "#2173: its owner restores it")
 
