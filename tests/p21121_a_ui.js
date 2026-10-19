@@ -23,7 +23,7 @@ const upload = async (ck, name, text, form) => {
   const r = await fetch(B + 'api/files/upload', {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: ck}, body: fd});
   return (await r.json()).items[0].id;
 };
-const isDeleted = async id => (await call('GET', `/api/files/nodes/${id}`)).status === 404;
+const isDeleted = async id => (await fetch(B + `api/files/nodes/${id}/content`, {headers: {...H, Cookie: CK}})).status === 404;  // the details stay readable for who may restore
 // a plain PNG of one colour (no library)
 const CRC = Array.from({length: 256}, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
 const crc32 = b => { let c = 0xFFFFFFFF; for (const x of b) c = CRC[(c ^ x) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };

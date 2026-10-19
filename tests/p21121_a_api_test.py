@@ -208,7 +208,7 @@ check(r.ok and not any(deleted(x) for x in (A1, B1, UNTER)), f"the undo brings a
 check(Ca.get(B + f"/api/files/nodes/{C1}/content").content == b"Gamma drei", "the file inside the restored folder reads again")
 r = Ca.post(B + "/api/files/trash", json={"ids": [PROJ, A1]})
 check(r.ok and r.json().get("ids") == [PROJ] and deleted(PROJ) and not deleted(A1), f"a chosen file inside a chosen folder rides along ({r.text[:200]})")
-check(Ca.get(B + f"/api/files/nodes/{A1}").status_code == 404, "... and is gone with the folder")
+check(Ca.get(B + f"/api/files/nodes/{A1}/content").status_code == 404, "... and cannot be opened while the folder is in the trash")
 r = Da.post(B + "/api/files/restore", json={"ids": [PROJ]})
 check(r.status_code == 404 and deleted(PROJ), f"dave cannot restore carol's folder ({r.status_code})")
 check(Ca.post(B + "/api/files/restore", json={"ids": [PROJ]}).ok and not deleted(PROJ), "carol restores the folder")
