@@ -64,7 +64,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
             return {pin: fl(q('[data-act="pin"]')), pinOn: !!q('[data-act="pin"].on'), prio: fl(q('[data-act="prio"]')), doc: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1}; })()`);
           check(f.pinOn && f.pin !== 'none' && f.prio !== 'none' && f.doc, `${vw}px ${theme}: the pin and the priority flag are filled ${JSON.stringify(f)}`);
           await call('PATCH', `/api/tasks/${T}`, {pinned: 0, priority: 0});
-          await ev(`(() => { openDetail(${T}); return 1; })()`); await sleep(800);
+          await ev(`load().then(() => { render(); openDetail(${T}); return 1; })`); await sleep(800);
           const g = await ev(`(() => { const e = document.querySelector('#detail [data-act="pin"] svg path'); return e ? getComputedStyle(e).fill : 'x'; })()`);
           check(g === 'none' || g === 'x', `${vw}px ${theme}: unpinned = outline ${g}`);
           await call('PATCH', `/api/tasks/${T}`, {pinned: 1, priority: 5});
