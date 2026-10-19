@@ -7,6 +7,11 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.96.1] - 2026-10-19
+
+### Fixed
+- Moving a table: the scan for formulas that name another workspace runs on Postgres too (CI 2.96.0) (#1941).
+
 ## [2.96.0] - 2026-10-18
 
 Moving data between your private space and an organisation, and one card per job in the agent chat.
