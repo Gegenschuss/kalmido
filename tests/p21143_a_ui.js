@@ -86,6 +86,7 @@ const near = (a, b) => Math.abs(+a - +b) < 0.005;
     check(await ev(`[...document.querySelectorAll('.ofdits .ofdflags .ofdprodf')].every(l => l.classList.contains('on') === !!l.querySelector('input').checked)`), 'only ticked producing flags are marked');
     check(await ev(`/Modul Dreh[\\s\\S]*inkl\\. Producing 1,5 Tage/.test(document.querySelector('.tplist')?.textContent || '')`), 'the parts list names the producing days too');
     check(await ev(noScroll), 'title page: no horizontal scrolling on the phone');
+    await ev(`(() => { (${line(pa.id)})?.scrollIntoView({block: 'start'}); return 1; })()`); await sleep(300);
     await shot('p21143-a-title.png');
     // part A: takes over the document
     await ev(`(() => { document.querySelector('[data-ofd="tp-open"][data-pid="${pa.id}"]').click(); return 1; })()`);
@@ -98,6 +99,7 @@ const near = (a, b) => Math.abs(+a - +b) < 0.005;
     await ev(`(() => { document.querySelector('[data-ofd="tp-open"][data-pid="${pb.id}"]').click(); return 1; })()`);
     check(await ready(ev, `(document.querySelector('.tpprodsrc.own .rotag')?.textContent || '').trim() === 'eigene Einstellung' && !!document.querySelector('[data-ofd="tp-prod-doc"]')`), 'part B: "eigene Einstellung" with the reset button');
     check(await ev(noScroll), 'part B: no horizontal scrolling on the phone');
+    await ev(`(() => { document.querySelector('.ofdits .ofdflags')?.scrollIntoView({block: 'start'}); return 1; })()`); await sleep(300);
     await shot('p21143-a-part.png');
     await ev(`(() => { document.querySelector('[data-ofd="tp-prod-doc"]').click(); return 1; })()`);
     check(await ready(ev, `(document.querySelector('.tpprodsrc .rotag')?.textContent || '').trim() === 'wie Dokument'`), 'part B after the reset: "wie Dokument"');
