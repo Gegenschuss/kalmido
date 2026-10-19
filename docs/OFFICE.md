@@ -1708,6 +1708,31 @@ minutes are written once. Organisation admins see the history of a document in i
 entries under Settings > Access log. The log is never part of alerts. An agent token on `/api/office/*` gets `403` without
 content; every request of an agent on `/api/v1/office` is one line in the log (2.51.0).
 
+## Letters and incoming documents: reference, history, deadlines (2.106)
+
+Letters of the tab "Correspondence" and documents of the documents area can be linked in both directions:
+
+- **Write an answer** at an incoming document (documents area, detail) opens a new letter with the recipient (the
+  client whose name is the sender's, with address and e-mail; otherwise the sender's name), the subject "Your letter of
+  <date>" and the reference line prefilled, linked as "Answer to". The block "Correspondence" there lists the linked
+  letters.
+- At a letter, **Choose a reference** links a document of the office's documents space ("Answer to"); after sending,
+  **Assign an answer** links the document that answers it. Links can be removed (one undo step each); deleting a
+  document only removes the link, a document in the bin is not shown.
+- **Reference line (DIN 5008):** made from the answered document: "Your reference" (the sender's "Unser Zeichen",
+  "Aktenzeichen", "Az.", "Geschäftszeichen", "Our ref"), "Your message of <date>", "Our reference" (the sender's "Ihr
+  Zeichen") and numbers such as policy, customer or tax number. Filled in at a draft without a reference line, or by the
+  button "Reference line from the reference".
+- **History:** all letters and documents connected over links, in time order; per client all such histories.
+- **Deadlines:** a date after "bis zum", "spätestens", "Frist", "no later than", or "innerhalb von 14 Tagen" / "within two
+  weeks" counted from the document date, becomes a task with that due date in one click (the document linked in the
+  task). Payment terms stay the due date of the documents area. Plain rules, no language model.
+- **Follow-up:** a letter sent with a follow-up (e.g. 14 days) that has no answer linked by then gets a task
+  "Follow-up: <subject>" in the inbox of the person who wrote it, once. An answer that comes later leaves the task alone.
+
+Rights: admins of the office area (a person without organisation: the own personal office and the own private
+documents). A letter links only documents of its office's documents space that the person sees.
+
 ## Agents (2.51.0)
 
 An agent prepares, a person decides. Three things must be on (all off by default): the token's scope `office`, the

@@ -138,6 +138,9 @@ ROUTES = {
     "POST /api/office/letters/{}/sent": "office", "POST /api/office/letters/{}/delivered": "office",
     "DELETE /api/office/letters/{}/delivered": "office", "POST /api/office/letters/{}/template": "office",
     # 2.106.0 B (#2028): letter links (p2106_b_api_test.py) - routes below this line
+    "GET /api/office/letters/{}/links": "office", "POST /api/office/letters/{}/links": "office", "DELETE /api/office/letters/{}/links/{}": "office",
+    "GET /api/office/letters/{}/thread": "office", "GET /api/office/letters/threads": "office", "GET /api/office/letters/doc/{}": "office",
+    "POST /api/office/letters/doc/{}/deadline-task": "office",
     # 2.106.0 C (#2029 #2030): letter mail, text blocks (p2106_c_api_test.py) - routes below this line
     "GET /api/office/letters/mail-info": "office", "GET /api/office/letters/{}/mail-draft": "office", "POST /api/office/letters/{}/send-mail": "office",
     "GET /api/office/letter-blocks": "office", "GET /api/office/letter-blocks/starters": "office", "POST /api/office/letter-blocks": "office",
