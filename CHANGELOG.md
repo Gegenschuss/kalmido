@@ -7,6 +7,11 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.117.1] - 2026-10-19
+
+### Fixed
+- PDF metadata: the PDF module finds the version also when it is loaded on its own (#2262).
+
 ## [2.117.0] - 2026-10-19
 
 Travel costs, document samples, small fixes.
