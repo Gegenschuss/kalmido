@@ -92,17 +92,18 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   w.close();
 
   // ================= #1509 the messenger in the sidebar
+  await call('PATCH', '/api/settings', {side_people: String(BOB)});  // 2.99.0 (#2187): people only while pinned
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
   const msg = await until(() => d.querySelector('#side .sg-team .sbmsg[data-go="team"]'));
   check(msg && /Messages/.test(msg.textContent) && msg.querySelector('.c.nunread')?.textContent.startsWith('2'), '#1509: "Messages" with 2 unread ' + msg?.textContent);
   check(d.querySelector('#side .sg-team').firstElementChild.nextElementSibling === msg, '#1509: on top of Conversations');
   const conv = await until(() => d.querySelectorAll('#side .sbconv').length === 2 && [...d.querySelectorAll('#side .sbconv')]);
   check(conv && conv.every(b => b.classList.contains('sbun')) && conv.some(b => b.dataset.go === `team/${DM}`) && conv.some(b => b.dataset.go === `team/${CH}`), '#1509: the 2 conversations, unread (bold)');
-  // a bubble at Bob opens the direct message; the row itself his tasks
-  const bob = [...d.querySelectorAll('#side .sbpw')].find(x => /Bob/.test(x.textContent));
-  check(bob && bob.querySelector('.srow.steam').dataset.go === `who/${BOB}` && bob.querySelector('.sbdm[aria-label="Message Bob"]'), '#1509: Bob\'s row goes to his tasks, the bubble writes to him');
-  click(w, bob.querySelector('.sbdm'));
-  check(await until(() => w.eval(`S.route.mod === 'team' && S.tc.rid === ${DM}`)), '#1509: the bubble opens the direct message');
+  // 2.99.0 (#2187): Bob stands there as a conversation, so not a second time as a person (pinned or not); the person row with
+  // its bubble is checked in p299_e_ui.js
+  check(![...d.querySelectorAll('#side .sbpw')].some(x => /Bob/.test(x.textContent)), '#2187: Bob only once (as the conversation)');
+  click(w, d.querySelector(`#side .sbconv[data-go="team/${DM}"]`));
+  check(await until(() => w.eval(`S.route.mod === 'team' && S.tc.rid === ${DM}`)), '#1509: the conversation row opens the direct message');
   await until(() => !d.querySelector(`#side .sbconv[data-go="team/${DM}"]`)?.classList.contains('sbun'));
   check(d.querySelector(`#side .sbconv[data-go="team/${DM}"]`)?.classList.contains('on') && !d.querySelector(`#side .sbconv[data-go="team/${DM}"]`).classList.contains('sbun'), '#1509: the open conversation lit, read');
   // live: a new message raises the count (the version poll calls teamChanged)

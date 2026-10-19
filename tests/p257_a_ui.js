@@ -57,6 +57,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   check((await items()).join() === 'folder:Job,v:today', 'a renamed folder stays a favourite ' + (await items()).join());
   await call('POST', '/api/folders/rename', {old: 'Job', new: 'Work'});
   await call('PATCH', '/api/settings', {fav_items: []});
+  // 2.99.0 (#2187): a person / an idle agent only stands in the sidebar while pinned
+  await call('PATCH', '/api/settings', {side_people: String(BOB), side_agents: AG ? String(AG) : ''});
 
   // ================= stars from the row menus
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
