@@ -331,7 +331,7 @@ check(A.post(B + LH + "/restore", json={"file": ""}).json()["letterhead"]["on"] 
 check(A.delete(B + LH).ok, "#2091: remove (nothing there) stays fine")
 
 # ================================================================ a person without organisation (freelancer-matrix: office)
-r = up(Fr, L2)
+r = up(Fr, mk_pdf(["FRIDA-ONE", "FRIDA-TWO"]))  # own bytes: the file name is content-addressed (per office folder)
 check(r.ok and r.json()["letterhead"]["pages"] == 2, "freelancer: upload " + r.text[:200])
 FF = r.json()["letterhead"]["file"]
 check(Fr.put(B + LH, json={"m1": [50, 20, 32, 25]}).ok and Fr.get(B + LH).json()["letterhead"]["m1"] == [50, 20, 32, 25], "freelancer: margins")
