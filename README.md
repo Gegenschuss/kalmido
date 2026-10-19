@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.114.1** (2026-10-19): office fixes - the transfer of rights as the last page of the quotation PDF, receipts in
+  the cash flow, books up to date right after a bank match, clearer bank buttons on phones.
 - **2.136.0** (2026-10-19): a new face - the Kalmido bot replaces the heron in the app icon, the empty views, the
   celebration and the loading screen; on iPhone / iPad add the web app to the home screen again for the new icon.
 - **2.98.0** (2026-10-19): scheduling polls with a public vote link, questionnaires in forms (answers become a task at the
