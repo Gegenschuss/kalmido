@@ -1374,6 +1374,13 @@ fresh; run p21121_a_ui node p21121_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.112.1 part B (#2058): external share links for files and folders
 fresh; run p21121_b_api "$PY" p21121_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21121_b_ui node p21121_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.113.0 part A: office settings in sections, autosave, industry pack switch (#2247 #2246)
+fresh; run p2113_a_api "$PY" p2113_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2113_a_ui node p2113_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.113.0 part B: offer parts fold open on the title page with a colour each (#2248)
+fresh; run p2113_b_ui node p2113_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.113.0 part C: unit select follows the quantity (#2249)
+fresh; run p2113_c_ui node p2113_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
