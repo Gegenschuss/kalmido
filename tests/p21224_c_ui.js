@@ -26,6 +26,7 @@ if (!process.env.P21224C_NOSTART) execFileSync('bash', [path.join(__dirname, 'st
     await o.nav(B + '#bookmarks');
     for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#view')`).catch(() => false)); i++) await sleep(300);
     await sleep(500);
+    await ev(`Promise.all(['office', 'contacts', 'videorev', 'bookmarks'].map(f => loadCss(f))).then(() => 1)`);
     const g = await ev(`(() => {
       const add = h => { const d = document.createElement('div'); d.innerHTML = h; document.body.appendChild(d); return d; };
       const out = {};
