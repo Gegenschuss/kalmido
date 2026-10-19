@@ -72,7 +72,7 @@ function jc_send(body) {
 // after every chat patch: the bar and the box follow the job's state (fetched at most every 15 s)
 function jc_patch() {
   if (!S.chat.job) return;
-  const b = $('#jc-bar'), h = jc_barHtml(); if (b && b.outerHTML !== h) b.outerHTML = h;
+  const b = $('#jc-bar'), h = jc_barHtml(); if (b && !wk_sameEl(b, h)) b.outerHTML = h;  // 2.119.1 D (#2310)
   const ci = $('#chat-in'), ph = jc_ph(agentById(S.chat.aid) || {}); if (ci && ci.placeholder !== ph) { ci.placeholder = ph; ci.setAttribute('aria-label', ph); }
   if (!S.jc.busy && Date.now() - S.jc.at > 15000) jc_sync().then(() => { if (S.chat.job) jc_patch(); });
 }
@@ -264,8 +264,8 @@ function jcd_fmenu(btn) {
 }
 // after every chat patch (agentchat.js chatPatch): the filter follows (shown once a job is in the chat)
 function jcd_patch() {
-  const b = $('#jcd-filt'), h = jcd_filtHtml(); if (b && b.outerHTML !== h) b.outerHTML = h;
-  const c = $('#jcd-fbtn'), g = jcd_fbtnHtml(); if (c && c.outerHTML !== g) c.outerHTML = g;
+  const b = $('#jcd-filt'), h = jcd_filtHtml(); if (b && !wk_sameEl(b, h)) b.outerHTML = h;  // 2.119.1 D (#2310): hidden came back as hidden="": swapped on every patch
+  const c = $('#jcd-fbtn'), g = jcd_fbtnHtml(); if (c && !wk_sameEl(c, g)) c.outerHTML = g;
 }
 function jcd_setFilter(f) {
   if (!['all', 'me', 'jobs'].includes(f)) return;
