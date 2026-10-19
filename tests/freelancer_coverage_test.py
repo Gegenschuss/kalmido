@@ -130,6 +130,10 @@ ROUTES = {
     # 2.111.0 A (#2233): undo of the office editors (p2111_a_api_test.py) - routes below this line
     "POST /api/office/undo/{}/{}": "office",
     # (2.111.0 spacer A)
+    # 2.106.0 A (#2028): letters (p2106_a_api_test.py) - routes below this line
+    # 2.106.0 B (#2028): letter links (p2106_b_api_test.py) - routes below this line
+    # 2.106.0 C (#2029 #2030): letter mail, text blocks (p2106_c_api_test.py) - routes below this line
+    # 2.106.0 D (#2031): agents and letters (p2106_d_api_test.py) - routes below this line
     # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
     "GET /api/bookmarks": "bookmarks", "POST /api/bookmarks": "bookmarks", "GET /api/bookmarks/{}": "bookmarks",
     "PATCH /api/bookmarks/{}": "bookmarks", "DELETE /api/bookmarks/{}": "bookmarks",

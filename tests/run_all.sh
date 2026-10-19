@@ -1141,6 +1141,18 @@ fresh; run p296_b_ui node p296_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.96.0 part C (#2015): one thread card per job in the agent chat, the chat filter
 fresh; run p296_c_api "$PY" p296_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p296_c_ui node p296_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.106.0 part A: correspondence -- letters, PDF, signature, status (#2028)
+fresh; run p2106_a_api "$PY" p2106_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2106_a_ui node p2106_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.106.0 part B: letter <-> document links, history, deadline task, follow-up, reference line (#2028)
+fresh; run p2106_b_api "$PY" p2106_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2106_b_ui node p2106_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.106.0 part C: letters by e-mail with the answer linked, text blocks (#2029 #2030)
+fresh; run p2106_c_api "$PY" p2106_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2106_c_ui node p2106_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.106.0 part D: agents draft letters (#2031)
+fresh; run p2106_d_api "$PY" p2106_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2106_d_ui node p2106_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.96.0 part D (#1941 / #1918): an organisation's export into the private space, the own absence area in "Private"
 fresh; run p296_d_api "$PY" p296_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.96.0 part E (#1941): the separation after a move between private and organisation; moved documents are learned by the target
