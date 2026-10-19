@@ -86,6 +86,9 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
 
   // ================= the invoice: the form is chosen
   click(w, d.querySelector('[data-ofd="to-invoice"]'));
+  // 2.120.0 (#2087): first the type of invoice (full invoice preselected), then the form of a quotation with parts
+  await until(() => d.querySelector('.modal input[name="abs-type"]'));
+  click(w, d.querySelector('.modal [data-m="ok"]'));
   await until(() => d.querySelector('input[name="tp-mode"]'));
   const modes = [...d.querySelectorAll('input[name="tp-mode"]')];
   check(modes.map(x => x.value).join() === 'full,title,summary' && modes[0].checked, 'the invoice choice: like the quotation (preset), title page, summary');

@@ -1236,7 +1236,7 @@ number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENT
 | `GET /office/docs/{id}/pdf` | office | The PDF preview of a draft (marked as a draft); `409` for others |
 | `POST /office/offers` | office | `{client_id?, title, intro?, items: [{service_id?, text?, detail?, qty?, unit?, price?, discount?, kind?}], list_id?, notify?}` -> `201 {doc, chat_message_id?}` |
 | `PATCH /office/offers/{id}` | office | The agent's own draft while it is a draft (`items` replaces the list; 2.88: `cashflow` auto / yes / no = its share in the cash flow plan once sent); `403` for a person's draft, `409` once sent |
-| `POST /office/offers/{id}/invoice` | office | An accepted quotation -> `201 {doc}` an invoice draft (`parts_mode?`, `notify?`) |
+| `POST /office/offers/{id}/invoice` | office | An accepted quotation -> `201 {doc}` an invoice draft (`parts_mode?`, `notify?`; 2.120.0: `inv_type?` `progress` with `amount?` (net) or `pct?` of the quotation's net, or `final` = the whole quotation less its finalised progress invoices) |
 | `POST /office/reminders` | office | `{invoice_ids, level?: 1-3, notify?}` -> `201 {doc}` a reminder draft over open invoices of one client |
 | `POST /office/payment-suggestions` | office | `{invoice_id, amount, date?, reference?, confidence?: high\|medium\|low, note?}` -> `201` an open suggestion (`exceeds_open` when above the open amount) |
 | `GET /office/payment-suggestions` | office | `?state=open` (default) `\| accepted \| rejected \| all`: the agent's own suggestions |
