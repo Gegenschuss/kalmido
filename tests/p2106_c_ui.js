@@ -13,7 +13,7 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2106C_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
-const call = async (method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: CK}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
+const call = async (method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: CK}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), http: r.status}; };
 const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 
@@ -25,11 +25,11 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   await call('PATCH', '/api/settings', {tour: 'done', lang: 'en', features: 'clients,office,docs', workspace: 'private'});
   const k1 = await call('POST', '/api/office/letter-blocks', {name: 'Grußformel', body: 'Mit freundlichen Grüßen'});
   const k2 = await call('POST', '/api/office/letter-blocks', {starter: 'extension', lang: 'de'});
-  check(k1.status === 201 && k2.status === 201, 'setup: two blocks ' + k1.status + ' ' + k2.status);
+  check(k1.http === 201 && k2.http === 201, 'setup: two blocks ' + k1.http + ' ' + k2.http);
   const L = await call('POST', '/api/office/letters', {rcpt_name: 'Amt', subject: 'Antrag'});
-  check(L.status === 201, 'setup: a draft letter ' + L.status);
+  check(L.http === 201, 'setup: a draft letter ' + L.http);
   const info = await call('GET', '/api/office/letters/mail-info');
-  check(info.status === 200 && info.mail_on === false && info.reply_address === '', 'mail-info: no mail server here ' + JSON.stringify(info));
+  check(info.http === 200 && info.mail_on === false && info.reply_address === '', 'mail-info: no mail server here ' + JSON.stringify(info));
 
   const w = await boot({user: 'alice', hash: 'office', mobile: true}), d = w.document;
   check(await until(() => w.eval("typeof ltmBlocksModal === 'function' && typeof LT_HOOKS === 'object'")), 'part C is loaded with the office');
