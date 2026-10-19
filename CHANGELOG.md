@@ -7,11 +7,6 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
-## [2.101.0] - 2026-10-19
-
-### Changed
-- **"Show more" for all tasks** (#2157): pressing *Show more* on a long description keeps the next tasks unfolded too, until *Show less*; a setting per device that stays after logging out.
-- **Trademark note** (#1964): Settings > About and the README say that named products are trademarks of their owners and Kalmido is not affiliated with or endorsed by them; names only, no logos.
 ## [2.99.0] - 2026-10-19
 
 Files on knowledge pages and a ZIP import that keeps PDFs and pictures, one "…" menu on knowledge pages, the acceptance note
@@ -85,6 +80,12 @@ Scheduling polls, questionnaires in forms, the office menu as a rail on the left
 ### Fixed
 - A table could stay on "Loading…" when it was loaded twice at the same time (#2181).
 - Code comments no longer carry the name of another product (#2184).
+
+## [2.101.0] - 2026-10-19
+
+### Changed
+- **"Show more" for all tasks** (#2157): pressing *Show more* on a long description keeps the next tasks unfolded too, until *Show less*; a setting per device that stays after logging out.
+- **Trademark note** (#1964): Settings > About and the README say that named products are trademarks of their owners and Kalmido is not affiliated with or endorsed by them; names only, no logos.
 
 ## [2.97.1] - 2026-10-19
 
