@@ -413,6 +413,7 @@ def ofx_unlock_post(did):
     and are made anew then. Not finalised: the document as it is."""
     from .docs import bga_offer_block, doc_public, doc_row
     c, uid, oid = _ctx()
+    write_lock(c, f"office_mail_{int(oid)}")  # 2.114.2 (#2263 review): a parallel mail send sees the lock (sent_at) first
     write_lock(c, f"office_doc_{int(did)}")
     r = doc_row(c, oid, did)
     if office_role(c, uid, oid) != "admin":

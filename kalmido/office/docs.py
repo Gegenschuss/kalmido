@@ -1146,6 +1146,8 @@ def odoc_delete(did):
     """The organisation's admin only (members: 403); a finalised document: 409 (2.114.2 A, #2263: except a finalised
     quotation that was never sent, see bga_offer_block)."""
     c, uid, oid = _ctx()
+    write_lock(c, f"office_mail_{int(oid)}")  # 2.114.2 (#2263 review): no mail send / unlock / finalise in between
+    write_lock(c, f"office_doc_{int(did)}")
     r = doc_row(c, oid, did)
     if office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this organisation can do this"))

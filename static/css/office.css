@@ -32,6 +32,12 @@
 .ofcbb{display:flex;flex-wrap:wrap;gap:.375rem;margin:-.25rem 0 .75rem 10.625rem}
 .ofcbb .btn{min-height:2.25rem}
 .ofcpv.err{color:var(--danger,#c0392b)}
+/* 2.114.2 (#2264): the message sits under the field, which keeps its width */
+.ofcscheme{display:flex;flex:1 1 16rem;flex-wrap:wrap}
+.ofcscheme input{flex:1 1 12rem;min-width:0}
+.ofcscheme .ofcpv{flex:0 0 100%}
+.ofcscheme .ofcrs{min-height:2.25rem}
+.ofcscheme .ofcrs[hidden]{display:none}
 @media (max-width:599px) {
   .ofcbb{margin-left:0}
 }

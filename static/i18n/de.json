@@ -10807,5 +10807,13 @@
   "At most {0} feeds": "Höchstens {0} Feeds",
   "Article": "Artikel",
   "Not a valid OPML file": "Keine gültige OPML-Datei",
-  "Read|done": "Gelesen"
+  "Read|done": "Gelesen",
+  "This quotation was sent to the client; the record is kept": "Dieses Angebot wurde an den Kunden gesendet; das Protokoll bleibt erhalten",
+  "An invoice or a document was made from this quotation; the record is kept": "Aus diesem Angebot wurde schon eine Rechnung oder ein Dokument erstellt; das Protokoll bleibt erhalten",
+  "Its number stays used and shows as a gap in the office log.": "Die Nummer bleibt vergeben und steht als Lücke im Büro-Protokoll.",
+  "Undo finalising": "Festschreiben rückgängig",
+  "Back to a draft?": "Zurück in den Entwurf?",
+  "The quotation can be changed again and keeps its number {0}.": "Das Angebot lässt sich wieder ändern und behält seine Nummer {0}.",
+  "Back to a draft": "Zurück im Entwurf",
+  "finalising undone": "Festschreiben rückgängig gemacht"
 }
