@@ -385,6 +385,21 @@ organisation uses requests in the own folders the same way.
 Whoever asked gets one News item (and a push) per request when files arrive; more files within ten minutes raise its
 count instead of sending again. *Files from file requests* in the notification settings switches News and push off.
 
+## Several files at once, ZIP download, scanning with the phone (2.112.1)
+
+In the file store, **Select** (check boxes, also on the phone) and the bar now also offer **Download** and **Move to the
+trash**. Download of one file gives the file itself; several items or a folder become one ZIP that keeps the folder
+structure (a doubled name gets " (2)"). A folder's menu (its row or the open folder's "…") has **Download as ZIP**. The ZIP
+holds only what you may see: nothing from the trash, no links to task or project files, no file the virus scanner locked
+or has not checked yet. Moving several items into the trash is one undo step that brings all of them back. On a phone the
+moves of the bar sit in its "…" menu.
+
+**Scan** next to *Upload* (and in *Documents*) opens the scan dialog: take a photo per page with the camera (on a computer:
+choose pictures), turn a page by 90 degrees, change the order, remove a page, then **Save as PDF**. *Black and white
+(document)* (on by default) gives a clean grey page. Kalmido builds one PDF on your own server -- at most 30 pages, every page
+scaled to about 2000 pixels, without the photo's metadata or location -- and stores it like an upload: the storage limit,
+the virus scan and the text recognition apply. From *Documents* the PDF becomes a document of the workspace there.
+
 ## Pinned chat messages (2.62.0)
 
 Important messages stay in view: in the team chat and in the chat with an agent, *Pin* in the menu of a message (on a
