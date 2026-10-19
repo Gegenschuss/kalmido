@@ -825,6 +825,32 @@ chart SKR03 or SKR04 (Settings → DATEV) it is booked on - the default the expo
 6837), or your own. **Change account** sets your own account for this category (empty = the default again; one undo step); the
 DATEV batch and the lines of the income/expense statement use the same account.
 
+
+### All receipts and the export for the tax adviser (2.153)
+
+**All receipts** below "Receipts this month" opens the receipts of every month (`#office/books/receipts`). Filters: the
+period (this / last year, quarter, month, or two dates of your own), paid / not paid (paid = a payment day is set, e.g. by
+the bank reconciliation), category, supplier (the document's sender), project, only receipts without a VAT rate, and a search
+in title, supplier and invoice number. The day of a receipt is its **receipt date** (the tax adviser books by it); switch
+to the **payment date** to see what was paid in a period. Below the list: the number of receipts and the sums (net, VAT,
+gross). On a phone the filters are folded away. The filters stay while the app is open.
+
+**CSV** and **ZIP for the tax adviser** export exactly the filtered list (shown while the country pack has the export
+switched on, like the booking list of the year). The CSV follows the pack's number format (decimal comma: semicolon
+separated, dates as DD.MM.YYYY; else comma separated, decimal point, ISO dates) and has one row per receipt: receipt date,
+paid on, supplier, VAT ID and invoice number (of an incoming e-invoice only), e-invoice yes/no, title, category, project,
+net, VAT rate, VAT, gross, currency, the original amount and currency of a receipt in a foreign currency, the file name in
+the ZIP and the Kalmido ID. The ZIP holds this CSV as `belege.csv` and the original files in `belege/` as uploaded (an
+e-invoice as its XML or PDF), named `YYYY-MM-DD_supplier_gross_id.ext`; the limits of a ZIP of the file store apply (choose
+a shorter period for more). Only receipts you see, nothing from the trash; every export is noted in the office log. The
+booking list with invoices, payments and travel expenses stays the export of the year above (2.147). Routes:
+`GET /api/office/books/receipts`, `/receipts.csv`, `/receipts.zip` with the same query (`from`, `to`, `by=doc|paid`,
+`status=all|paid|open`, `category`, `supplier`, `project`, `novat=1`, `q`; the list also `limit`, `offset`); people only,
+agents get 403.
+
+An **incoming e-invoice** (XRechnung / ZUGFeRD) that lands in the documents of an office area becomes a receipt the first
+time it is read, with the VAT rate of the invoice; an invoice the office issued itself (same VAT ID, tax number or company
+name) does not. The amount of a credit note is negative.
 ## Bank reconciliation (2.90)
 
 The tab **Bank** (admins of the office area; in a personal office its owner) matches the bookings of your account with
