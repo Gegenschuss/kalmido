@@ -441,6 +441,9 @@ APP_ONLY = [
     ("2.48.0 (#1356): a receipt's project / category is set and agents' suggestions are accepted / rejected / reopened by people "
      "only; agents suggest with POST /documents/{id}/receipt-suggestion",
      ("* /api/docs/{}/receipt", "* /api/receipt-suggestions/")),
+    # 2.121.0 (#2092): the recognised receipt values are taken over / discarded by people; agents read them with GET /documents/{id}
+    ("2.121.0 (#2092): the values the recognition read off a receipt (supplier, VAT, net / gross, invoice number) are taken over or "
+     "discarded by people only; agents read them as `extracted` of GET /documents/{id}", ("=POST /api/docs/{}/extracted",)),
     # 2.55.0 (#1455): the newsletter connection holds access data of an outside service and decides who gets mail: people only
     ("2.55.0 (#1455): the newsletter connection, segments, sync and the consent of contacts are set by people (admins / the "
      "person); agents read the consent with the contact (field newsletter), no new agent rights", ("* /api/newsletter",)),
