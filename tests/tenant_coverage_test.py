@@ -353,7 +353,8 @@ ROUTES = {
     "GET /api/office/docs/{}/pdf": "office", "GET /api/office/logo": "office", "POST /api/office/logo": "office",
     "DELETE /api/office/logo": "office",
     # ---- office (E, 2.36.2 #1021 / #1142): finalising a document, its history and the organisation's office log (3)
-    "POST /api/office/docs/{}/finalize": "office", "GET /api/office/docs/{}/log": "office", "GET /api/office/log": "office",
+    "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
+    "GET /api/office/docs/{}/log": "office", "GET /api/office/log": "office",
     # ---- office (F1, 2.38.0 #1021): invoices, credit notes, reminders, payments, sending, DATEV inbox (11)
     "POST /api/office/docs/{}/invoice": "office", "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/from-time": "office",
     "POST /api/office/docs/reminder": "office", "GET /api/office/docs/{}/payments": "office", "POST /api/office/docs/{}/payments": "office",
