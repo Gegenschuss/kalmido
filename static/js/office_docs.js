@@ -163,7 +163,7 @@ function ofdEditorHtml() {
     ${ofdF('date', tr('Date'), dateIn('ofd-date', d.date, {label: tr('Date'), clear: false, attrs: 'data-f="date"'}))}
     ${kind === 'offer' ? ofdF('valid_until', tr('Valid until'), dateIn('ofd-valid_until', d.valid_until, {label: tr('Valid until'), attrs: 'data-f="valid_until"'})) : ''}
     ${kind !== 'reminder' ? ofdF('service_from', tr('Service from'), dateIn('ofd-service_from', d.service_from || '', {label: tr('Service from'), attrs: 'data-f="service_from"'})) : ''}
-    ${kind !== 'reminder' ? ofdF('service_to', tr('Service until'), dateIn('ofd-service_to', d.service_to || '', {label: tr('Service until'), attrs: 'data-f="service_to"'})) : ''}
+    ${kind !== 'reminder' ? ofdF('service_to', tr('Service until'), dateIn('ofd-service_to', d.service_to || '', {label: tr('Service until'), attrs: 'data-f="service_to"', after: 'ofd-service_from'})) : ''}
     ${invFields}${remFields}
     </div>${kind === 'credit' && d.cancels ? `<p class="muted ofchint">${esc(tr('Credit note for invoice {0}', d.cancels.number || '#' + d.cancels.id))} <a href="#office/offers/${d.cancels.id}">${tr('open')}</a></p>` : ''}`);
   const items = kind === 'reminder' ? ofdRefsHtml(d, t) : ofdItemsHtml(d, adm);
@@ -515,7 +515,7 @@ function ofdFromTimeDialog() {
   if (!cl.length) { toast(tr('No clients in this organisation yet')); return; }
   const today = new Date(), first = new Date(today.getFullYear(), today.getMonth(), 1), iso = x => x.toISOString().slice(0, 10);
   ofdDlg(tr('Invoice from time entries'), ofdF('ft-client', tr('Client'), ofcSel('ofd-ft-client', '', cl)) + ofdF('ft-from', tr('From'), dateIn('ofd-ft-from', iso(first), {label: tr('From'), clear: false}))
-    + ofdF('ft-to', tr('Until'), dateIn('ofd-ft-to', iso(today), {label: tr('Until'), clear: false})) + `<p class="muted ofchint">${tr('One position per list with the hours of the period; the rate comes from the client or is filled in afterwards.')}</p>`,
+    + ofdF('ft-to', tr('Until'), dateIn('ofd-ft-to', iso(today), {label: tr('Until'), clear: false, after: 'ofd-ft-from'})) + `<p class="muted ofchint">${tr('One position per list with the hours of the period; the rate comes from the client or is filled in afterwards.')}</p>`,
     tr('Create'), async md => { const j = await rawFetch('POST', '/api/office/docs/from-time', {client_id: +$('#ofd-ft-client', md).value, from: $('#ofd-ft-from', md).value, to: $('#ofd-ft-to', md).value}); OFD.list = null; OFD.kind = 'invoice'; OFD.doc = j; go(`office/offers/${j.id}`); });
 }
 function ofdPaymentDialog(d) {

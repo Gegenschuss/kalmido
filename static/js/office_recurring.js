@@ -96,7 +96,7 @@ function rinSheet(d, s) {
   const body = ofdF('rin-title', tr('Name'), `<input id="ofd-rin-title" value="${esc(v.title || '')}" maxlength="200">`)
     + ofdF('rin-every', tr('Interval'), `<div class="seg rin-every" role="radiogroup" aria-label="${esc(tr('Interval'))}">${RIN_EVERY.map(([k, n]) => `<button type="button" role="radio" data-rin-every="${k}" aria-checked="${v.every === k}" class="${v.every === k ? 'on' : ''}">${esc(tr(n))}</button>`).join('')}</div>`)
     + ofdF('rin-start', tr('First period of service from'), dateIn('ofd-rin-start', v.start, {label: tr('First period of service from'), clear: false}))
-    + ofdF('rin-until', tr('Last period from (optional)'), dateIn('ofd-rin-until', v.until || '', {label: tr('Last period from (optional)')}))
+    + ofdF('rin-until', tr('Last period from (optional)'), dateIn('ofd-rin-until', v.until || '', {label: tr('Last period from (optional)'), after: 'ofd-rin-start'}))
     + `<div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" id="ofd-rin-auto" ${v.auto_send ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('Send automatically')}</span></label>
       <span class="muted ofchint">${tr('Finalised and mailed to the client on the day of the period. Otherwise a draft is made that you check and send.')}</span></div>` + ph;
   const md = ofdDlg(s ? tr('Edit invoice series') : tr('Repeat as series'), body, s ? tr('Save') : tr('Create'), async m => {

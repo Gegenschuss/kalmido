@@ -310,6 +310,8 @@ ROUTES = {
     "GET /api/office/trips": "office", "GET /api/office/trips/bill-docs": "office", "GET /api/office/trips/report": "office",
     "GET /api/office/trips/vma": "office", "GET /api/office/trips/vma-rates": "office", "GET /api/office/trips/vma.csv": "office",  # 2.95.0 A (#1932)
     "GET /api/office/trips/vma.pdf": "office", "GET /api/office/trips/vma.xlsx": "office",
+    "GET /api/office/trips/purposes": "office", "POST /api/office/trips/purposes": "office",  # 2.117.0 A (#2292)
+    "PATCH /api/office/trips/purposes/{}": "office", "DELETE /api/office/trips/purposes/{}": "office",
     "GET /api/office/{}": "office", "GET /api/office/{}/{}": "office", "GET /api/paperless": "office",
     "GET /api/paperless/preview": "office", "GET /api/paperless/zip/preview": "office", "GET /api/v1/clients": "office",
     "GET /api/v1/clients/{}": "office", "GET /api/v1/office": "office", "GET /api/v1/office/docs": "office",
@@ -671,6 +673,10 @@ ROUTES = {
     "POST /api/office/deals/{}/unconvert": "office", "POST /api/office/leads/import": "office",
     "POST /api/office/leads/import/undo": "office", "POST /api/v1/office/leads": "office", "POST /s/b/c/{}": "link",
     "POST /s/b/x/{}": "link", "POST /s/b/{}/{}/{}": "link", "PUT /api/appt/page": "pim",
+    # 2.117.0 B (#2285): PDF files of a framework contract (personal office of a freelancer in p2117_b_api_test.py)
+    "GET /api/office/contracts/{}/files": "office", "POST /api/office/contracts/{}/files": "office",
+    "GET /api/office/contracts/{}/files/{}": "office", "PATCH /api/office/contracts/{}/files/{}": "office",
+    "DELETE /api/office/contracts/{}/files/{}": "office", "POST /api/office/contracts/{}/files/{}/restore": "office",
 }
 
 

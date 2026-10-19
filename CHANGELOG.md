@@ -7,6 +7,30 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.117.0] - 2026-10-19
+
+Travel costs, document samples, small fixes.
+
+### Added
+- Travel costs: filter by person next to "All / Not in DATEV" (members and free names from the trips); it filters the list, the report, the per diem report and the CSV / PDF / Excel export, stays when you switch the view and hides when only one person occurs (#2291).
+- Travel costs: own purposes - "Add another purpose…" at the end of the purpose list, rename or remove them under office settings > Travel costs (trips keep their text), report grouped by purpose, the import takes unknown purposes over; per organisation or private space (#2292).
+- Documents: seven more samples in German and English (cover letter, payment reminder, dunning letter, termination, power of attorney, handover record, credit note letter), also via "Start from a sample" when you create a template; legal samples carry a note to have them checked (#2283).
+- Framework contracts: attach the signed contract and addenda as PDF - open, replace, remove, a date per file; stored encrypted, a paper clip in the list; deleting the contract moves its PDFs to the trash, they go for good after 30 days (#2285).
+
+### Changed
+- Travel costs: the arrow of a trip opens a row menu (open, edit, duplicate, move, delete with undo), like the quotations; a tap on the row still opens the trip (#2287).
+- PDF metadata: producer and creator of every generated PDF read "Kalmido v<version>" (#2262).
+- Agent chat: on phones the filter All / Only me / Jobs is a filter icon in the chat head with a dot while a filter is on, no extra row (#2260).
+
+### Fixed
+- Travel costs: the calendar of "To" opens in the month of the start date, days before it are locked, and "To" follows a later "From"; the same for the other from / to pairs in the office (#2290).
+
+## [2.102.1] - 2026-10-19
+
+### Fixed
+- After a database restart the first request no longer waits 30 s and fails: a broken pooled connection makes the pool
+  test all idle ones at once instead of one by one with a growing pause (2.102.0 #1994 follow-up).
+
 ## [2.99.0] - 2026-10-19
 
 Files on knowledge pages and a ZIP import that keeps PDFs and pictures, one "…" menu on knowledge pages, the acceptance note

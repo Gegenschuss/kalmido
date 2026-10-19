@@ -166,6 +166,9 @@ def office_rows_get(kind):
     if kind == "equipment" and adm:  # 2.92.0 B (#1931): + depreciation, book / new / current value (admins only)
         from .assets import ast_enrich
         ast_enrich(c, oid, rows)
+    if kind == "contracts":  # 2.117.0 B (#2285): files = the attached PDFs (the paper clip in the list)
+        from .contractfiles import dma_counts
+        dma_counts(c, oid, rows)
     return jsonify(items=rows)
 
 

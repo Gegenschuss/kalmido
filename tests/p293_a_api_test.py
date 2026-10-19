@@ -146,7 +146,8 @@ check(Bo.post(B + TP, json={"starter": "nda"}).status_code == 403 and requests.p
 
 # ---------------------------------------------------------------- templates
 st = A.get(B + TP + "/starters").json()
-check([x["key"] for x in st["starters"]] == ["contract", "confirmation", "nda"] and st["lang"] == "de" and "Vertrag" in st["starters"][0]["body"]
+# 2.117.0 (#2283): the letter samples follow the three contract samples
+check([x["key"] for x in st["starters"]][:3] == ["contract", "confirmation", "nda"] and st["lang"] == "de" and "Vertrag" in st["starters"][0]["body"]
       and st["note"], f"samples in the office's document language (de) {[x['name'] for x in st['starters']]}")
 ste = A.get(B + TP + "/starters?lang=en").json()
 check(ste["lang"] == "en" and ste["starters"][2]["name"] == "Non-disclosure agreement" and "{{client.name}}" in ste["starters"][2]["body"], "samples in English")

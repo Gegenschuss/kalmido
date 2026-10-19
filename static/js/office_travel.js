@@ -2,9 +2,9 @@
 // their receipts (Kalmido keeps no receipt images: they live in DATEV, only the tick "in DATEV" + an optional DATEV number),
 // the receipts still missing the tick, an evaluation by month / year / person / project / client / category (CSV) and billing
 // receipts on to a draft quotation / invoice (purchase = amount, never twice). Server: kalmido/office/travel.py.
-const RK = {data: null, loading: false, err: null, year: String(new Date().getFullYear()), filter: 'all', open: null, view: 'trips', by: 'month', rep: null, sel: new Set()};
+const RK = {data: null, loading: false, err: null, year: String(new Date().getFullYear()), filter: 'all', person: '', open: null, view: 'trips', by: 'month', rep: null, sel: new Set()};
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['travel', 'plane', N_('Travel expenses'), 1, () => rk_travelHtml()]);  // admins only
-const RK_BY = [['month', N_('Month')], ['year', N_('Year')], ['person', N_('Person')], ['project', N_('Project')], ['client', N_('Client')], ['category', N_('Category')]];
+const RK_BY = [['month', N_('Month')], ['year', N_('Year')], ['person', N_('Person')], ['project', N_('Project')], ['client', N_('Client')], ['category', N_('Category')], ['purpose', N_('Purpose')]];  // 2.117.0 A (#2292): + purpose
 const rk_reload = () => { RK.data = null; RK.rep = null; ofcDraw(); };
 const rk_cat = k => (RK.data?.categories || []).find(c => c.key === k)?.label || k;
 const rk_home = () => RK.data?.currency || ofcCur();
@@ -12,25 +12,38 @@ const rk_amt = (n, cur) => !cur || cur === rk_home() ? ofcMoney(n) : `${fmtNum(+
 const rk_trip = id => (RK.data?.trips || []).find(t => t.id === id);
 const rk_span = t => t.date_to && t.date_to !== t.date_from ? `${fmtDateLoc(t.date_from)} – ${fmtDateLoc(t.date_to)}` : fmtDateLoc(t.date_from);
 const rk_client = id => cdn_label((RK.data?.clients || []).find(c => c.id === id));  // 2.97.0 B (#1951)
-const rk_purpose = t => [t.purpose === 'acquisition' ? tr('Acquisition / research') : '', rk_client(t.client_id), t.project].filter(Boolean).join(' · ');
+// 2.117.0 A (#2291): the person filter: key u<id> (a person of the office) | n:<name> (a free name), like the server's
+const rk_pkey = p => p.id ? `u${p.id}` : `n:${(p.name || '').toLowerCase()}`;
+const rk_pq = () => RK.person ? `&person=${encodeURIComponent(RK.person)}` : '';
+function rk_persons() {  // the people of the office + the free names of the loaded trips (+ the chosen one), by name
+  const m = new Map((RK.data?.people || []).map(p => [rk_pkey(p), p.name]));
+  for (const t of RK.data?.trips || []) for (const p of t.people || []) if (!m.has(rk_pkey(p))) m.set(rk_pkey(p), p.name);
+  if (RK.person && !m.has(RK.person)) m.set(RK.person, RK.personName || RK.person.replace(/^[un]:?/, ''));
+  return [...m].sort((a, b) => a[1].localeCompare(b[1], LOCALE()));
+}
+function rk_personSel() {  // hidden when only one person occurs (a person without an organisation, alone)
+  const ps = rk_persons(); if (ps.length < 2) return '';
+  return `<select id="rk-person" class="rkperson" aria-label="${esc(tr('Person'))}"><option value="">${esc(tr('All people'))}</option>${ps.map(([k, n]) => `<option value="${esc(k)}" ${k === RK.person ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
+}
+const rk_purpose = t => [t.purpose === 'acquisition' ? tr('Acquisition / research') : t.purpose && t.purpose !== 'job' ? t.purpose : '', rk_client(t.client_id), t.project].filter(Boolean).join(' · ');
 
 async function rk_load() {
   if (RK.loading) return;
   RK.loading = true;
-  try { RK.data = await api('GET', '/api/office/trips' + (RK.year ? `?year=${RK.year}` : '')); RK.err = null; }
+  try { RK.data = await api('GET', '/api/office/trips' + (RK.year ? `?year=${RK.year}` : '')); RK.err = null; if (RK.person && rk_persons().length < 2) RK.person = ''; }
   catch (x) { RK.data = null; RK.err = x.message || tr('unknown'); }
   RK.loading = false;
   ofcDraw();
 }
 async function rk_loadReport() {
-  const y = RK.year, q = `by=${RK.by}` + (y ? `&from=${y}-01-01&to=${y}-12-31` : '') + (RK.filter === 'missing' ? '&missing=1' : '');
+  const y = RK.year, q = `by=${RK.by}` + (y ? `&from=${y}-01-01&to=${y}-12-31` : '') + (RK.filter === 'missing' ? '&missing=1' : '') + rk_pq();
   try { RK.rep = Object.assign(await api('GET', '/api/office/trips/report?' + q), {q}); } catch (x) { RK.rep = {error: x.message || tr('unknown'), q}; }
   ofcDraw();
 }
 
 // ---- the tab
 function rk_travelHtml() {
-  if (RK.oid !== OFC.info?.org_id) Object.assign(RK, {oid: OFC.info?.org_id, data: null, rep: null, open: null, err: null, sel: new Set()});  // another office area
+  if (RK.oid !== OFC.info?.org_id) Object.assign(RK, {oid: OFC.info?.org_id, data: null, rep: null, open: null, err: null, sel: new Set(), person: ''});  // another office area (2.117.0 A #2291: + the person filter)
   if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see travel expenses.')}</div>`;
   if (RK.err) return `<div class="empty">${esc(RK.err)}</div>`;
   if (!RK.data) { if (!RK.loading) setTimeout(rk_load, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
@@ -41,18 +54,19 @@ function rk_travelHtml() {
   const miss = RK.data.missing || 0;
   const bar = `<div class="ofcbar rkbar"><select id="rk-year" aria-label="${esc(tr('Year'))}"><option value="">${tr('All years')}</option>${years.map(y => `<option ${y === RK.year ? 'selected' : ''}>${y}</option>`).join('')}</select>
     <div class="seg" role="group" aria-label="${esc(tr('Show'))}"><button type="button" data-rk="filter" data-v="all" class="${RK.filter === 'all' ? 'on' : ''}" aria-pressed="${RK.filter === 'all'}">${tr('All')}</button><button type="button" data-rk="filter" data-v="missing" class="${RK.filter === 'missing' ? 'on' : ''}" aria-pressed="${RK.filter === 'missing'}">${tr('Not in DATEV')}${miss ? ` <span class="rkbadge">${miss}</span>` : ''}</button></div>
-    ${views}
+    ${rk_personSel()}${views}
     <span class="spacer"></span><button class="btn sm pri" data-rk="new">${ic('plus', 's')}<span>${tr('New trip')}</span></button></div>`;
   return bar + (RK.view === 'report' ? rk_reportHtml() : rk_listHtml());
 }
 function rk_listHtml() {
   let trips = RK.data.trips || [];
   if (RK.filter === 'missing') trips = trips.filter(t => t.missing);
+  if (RK.person) { trips = trips.filter(t => (t.people || []).some(p => rk_pkey(p) === RK.person)); if (!trips.length) return `<div class="empty nempty">${tr('No trips of this person.')}</div>`; }  // 2.117.0 A (#2291)
   if (!trips.length) return `<div class="empty nempty eact">${ic('plane')}<span>${RK.filter === 'missing' ? tr('Every receipt is ticked as in DATEV.') : tr('No trips yet. Add the first one with its receipts.')}</span>${RK.filter === 'missing' ? '' : rk_impBtn()}</div>`;
   const rec = (RK.data.trips || []).some(t => (t.items || []).length);  // 2.114.4 D (#2286): receipt column only when there are receipts
   return `<ul class="ofclist rklist" role="list">${trips.map(t => `<li><button type="button" class="ofcrow" data-rk="open" data-id="${t.id}"><span class="ofcn"><b>${esc(t.dest || tr('Trip'))}</b>
     <small class="muted">${esc([rk_span(t), rk_purpose(t), (t.people || []).map(p => p.name).join(', ')].filter(Boolean).join(' · '))}</small></span>
-    ${t.missing ? `<span class="rotag rkmiss">${esc(trn('{0} not in DATEV', '{0} not in DATEV', t.missing))}</span>` : ''}${rk_vmaCols(t, rec)}${ic('chev', 's')}</button></li>`).join('')}</ul>`;
+    ${t.missing ? `<span class="rotag rkmiss">${esc(trn('{0} not in DATEV', '{0} not in DATEV', t.missing))}</span>` : ''}${rk_vmaCols(t, rec)}</button>${rk_rowBtn(t)}</li>`).join('')}</ul>`;
 }
 function rk_tripHtml(t) {
   const its = RK.filter === 'missing' ? t.items.filter(i => !i.datev) : t.items;
@@ -71,7 +85,7 @@ function rk_tripHtml(t) {
     + (rows ? `<ul class="ofclist rkits" role="list">${rows}</ul><p class="muted ofchint">${tr('Receipts themselves stay in DATEV; tick them here once they are uploaded there.')}</p>` : `<div class="empty nempty">${tr('No receipts yet.')}</div>`);
 }
 function rk_reportHtml() {
-  const q = `by=${RK.by}` + (RK.year ? `&from=${RK.year}-01-01&to=${RK.year}-12-31` : '') + (RK.filter === 'missing' ? '&missing=1' : '');
+  const q = `by=${RK.by}` + (RK.year ? `&from=${RK.year}-01-01&to=${RK.year}-12-31` : '') + (RK.filter === 'missing' ? '&missing=1' : '') + rk_pq();
   if (!RK.rep || RK.rep.q !== q) { setTimeout(rk_loadReport, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   if (RK.rep.error) return `<div class="empty">${esc(RK.rep.error)}</div>`;
   const by = `<div class="seg wrap" role="group" aria-label="${esc(tr('Sums by'))}">${RK_BY.map(([k, n]) => `<button type="button" data-rk="by" data-v="${k}" class="${k === RK.by ? 'on' : ''}" aria-pressed="${k === RK.by}">${tr(n)}</button>`).join('')}</div>`;
@@ -80,9 +94,115 @@ function rk_reportHtml() {
   if (!RK.rep.count) return rk_vmaRepHtml();  // 2.114.4 D (#2286): no receipts in the period -> no receipts block
   return rk_vmaRepHtml() + `<div class="ofcbar">${by}<span class="spacer"></span><a class="btn sm" href="/api/office/trips/report?${esc(q)}&format=csv" download>${ic('download', 's')} CSV</a></div>`
     + (RK.rep.rows.length ? `<table class="rktab"><thead><tr><th>${tr(RK_BY.find(x => x[0] === RK.by)[1])}</th><th class="num">${tr('Receipts')}</th><th class="num">${tr('Amount')}</th></tr></thead><tbody>${rows}</tbody>
-      <tfoot><tr><th>${tr('Total')}</th><th class="num">${RK.rep.count}</th><th class="num">${ofcMoney(RK.rep.total)}</th></tr></tfoot></table>${RK.by === 'person' ? `<p class="muted ofchint">${tr('A receipt is shared equally between the participants of its trip.')}</p>` : ''}`
+      <tfoot><tr><th>${tr('Total')}</th><th class="num">${RK.rep.count}</th><th class="num">${ofcMoney(RK.rep.total)}</th></tr></tfoot></table>${RK.by === 'person' || RK.person ? `<p class="muted ofchint">${tr('A receipt is shared equally between the participants of its trip.')}</p>` : ''}`
       : `<div class="empty nempty">${tr('No receipts in this period.')}</div>`);
 }
+// 2.117.0 A (#2287): the arrow of a trip row opens the row menu (like the quotations); a tap on the row still opens the trip
+const rk_rowBtn = t => `<button type="button" class="iconbtn ofdrmore rkmore" data-rk="rowmore" data-id="${t.id}" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('chev', 's')}</button>`;
+function rk_rowMenu(id, anchor) {
+  const t = rk_trip(+id); if (!t) return;
+  const label = t.dest || rk_span(t), can = ofcAdmin();
+  menu(anchor, [
+    {label: tr('Open'), icon: 'eye', fn: () => { RK.open = t.id; RK.sel.clear(); ofcDraw(); }},
+    can ? {label: tr('Edit trip'), icon: 'edit', fn: () => rk_tripModal(t)} : null,
+    can ? {label: tr('Duplicate'), icon: 'copy', fn: () => rk_dup(t)} : null,
+    can && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? {label: tr('Move to another workspace…'), icon: 'brief',
+      fn: () => ofm_move({what: 'travel', ids: [t.id], from: ofm_officeFrom(), label: qn(label), after: async () => { RK.open = null; rk_reload(); }})} : null,
+    can ? '-' : null,
+    can ? {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
+      if (!await askConfirm(tr('Delete the trip “{0}” with its receipts?', label), '', {ok: tr('Delete'), danger: true})) return;
+      try {
+        const j = await api('DELETE', `/api/office/trips/${t.id}`); rk_reload();
+        toast(tr('Deleted'), async () => { await api('POST', '/api/office/trips', j.trip); rk_reload(); });
+      } catch (x) { toast(x.message || tr('unknown')); }
+    }} : null]);
+}
+async function rk_dup(t) {  // a new trip with the same data, without the receipts; opens it
+  const keys = ['date_from', 'date_to', 'dest', 'overnight', 'people', 'purpose', 'client_id', 'project', 'km', 'note', 'country', 'place', 't_start', 't_end', 'vma_days', 'vma_off'];
+  try {
+    const j = await api('POST', '/api/office/trips', Object.fromEntries(keys.map(k => [k, t[k]])));
+    RK.open = j.id; RK.sel.clear(); rk_reload();
+    toast(tr('Copy created'), async () => { await api('DELETE', `/api/office/trips/${j.id}`); RK.open = null; rk_reload(); });
+  } catch (x) { toast(x.message || tr('unknown')); }
+}
+document.addEventListener('contextmenu', e => {  // right click on a trip row: the same menu
+  const r = e.target.closest?.('.rklist .ofcrow[data-rk="open"]'); if (!r) return;
+  e.preventDefault(); rk_rowMenu(r.dataset.id, r);
+});
+// 2.117.0 A (#2292): own purposes. The choice: the two built-in ones, the own ones of the office (+ an old text of the trip),
+// last "Add another purpose…" -> a field right below, Enter stores it as an own purpose and chooses it
+function rk_purposeOpts(cur) {
+  const own = (RK.data?.purposes || []).map(p => [p.name, p.name]);
+  if (cur && !['job', 'acquisition'].includes(cur) && !own.some(o => o[0] === cur)) own.push([cur, cur]);
+  return [['job', tr('Job for a client / project')], ['acquisition', tr('Acquisition / research')], ...own.sort((a, b) => a[1].localeCompare(b[1], LOCALE())), ['__add', tr('Add another purpose…')]];
+}
+const rk_purposeNewHtml = () => `<div class="row rkpnew" hidden><label for="rk-pnew">${tr('New purpose')}</label><input id="rk-pnew" maxlength="120" enterkeyhint="done" autocomplete="off" placeholder="${esc(tr('e.g. Trade fair'))}"></div>`;
+function rk_purposeWire(md) {
+  const sel = $('#rk-purpose', md), row = $('.rkpnew', md), inp = $('#rk-pnew', md); if (!sel || !row) return;
+  sel.dataset.prev = sel.value;
+  sel.addEventListener('change', () => { if (sel.value === '__add') { row.hidden = false; inp.focus(); } else { sel.dataset.prev = sel.value; row.hidden = true; } });
+  inp.addEventListener('keydown', async e => {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); row.hidden = true; inp.value = ''; sel.value = sel.dataset.prev; sel.focus(); return; }
+    if (e.key !== 'Enter' || e.isComposing) return;
+    e.preventDefault(); e.stopPropagation();
+    try { if (await rk_purposeTake(md)) sel.focus(); } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+  });
+}
+async function rk_purposeTake(md) {  // the typed name -> an own purpose of the office, chosen in the dialog; '' when nothing is typed
+  const sel = $('#rk-purpose', md), inp = $('#rk-pnew', md), name = inp.value.trim(); if (!name) return '';
+  const j = await api('POST', '/api/office/trips/purposes', {name});
+  if (RK.data) RK.data.purposes = [...(RK.data.purposes || []).filter(p => p.id !== j.id), {id: j.id, name: j.name}];
+  if (![...sel.options].some(o => o.value === j.name)) $('option[value="__add"]', sel).insertAdjacentHTML('beforebegin', `<option value="${esc(j.name)}">${esc(j.name)}</option>`);
+  sel.value = sel.dataset.prev = j.name; $('.rkpnew', md).hidden = true; inp.value = '';
+  return j.name;
+}
+async function rk_purposeVal(md) {  // the purpose to save (a name still in the field is taken over)
+  const v = $('#rk-purpose', md).value;
+  return v !== '__add' ? v : (await rk_purposeTake(md)) || $('#rk-purpose', md).dataset.prev || 'job';
+}
+// the section "Travel expenses" in the office settings (admins): the own purposes, rename in place (saved on leaving the
+// field), remove with undo, add with Enter; no save button
+const RKP = {list: null, oid: null};
+async function rk_purposesLoad() {
+  RKP.oid = OFC.info?.org_id; RKP.list = [];
+  try { RKP.list = (await api('GET', '/api/office/trips/purposes')).purposes || []; } catch (x) { RKP.list = []; toast(x.message || tr('unknown')); }
+  const sec = $('.rkpset'); if (sec) sec.outerHTML = rk_settingsHtml();  // only this section: the settings form keeps what is typed there
+}
+function rk_settingsHtml() {
+  if (!ofcAdmin()) return '';
+  if (RKP.oid !== OFC.info?.org_id) { RKP.oid = OFC.info?.org_id; RKP.list = null; setTimeout(rk_purposesLoad, 0); }
+  const ls = RKP.list;
+  return `<section class="rkpset" data-fg-skip aria-labelledby="rkp-h"><h3 id="rkp-h">${tr('Travel expenses')}</h3>
+    <p class="muted ofchint">${tr('Own purposes for trips, besides “Job for a client / project” and “Acquisition / research”. Trips keep the text they have when you rename or remove one.')}</p>
+    ${!ls ? `<p class="muted">${tr('Loading…')}</p>` : `<ul class="rkplist" role="list">${ls.map(p => `<li><input value="${esc(p.name)}" maxlength="120" data-rkp="name" data-id="${p.id}" aria-label="${esc(tr('Purpose'))}"><button type="button" class="iconbtn" data-rkp="del" data-id="${p.id}" aria-label="${esc(tr('Remove {0}', p.name))}" title="${esc(tr('Remove'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>
+    <div class="lacts"><input id="rkp-new" maxlength="120" enterkeyhint="done" autocomplete="off" placeholder="${esc(tr('Add another purpose…'))}" aria-label="${esc(tr('New purpose'))}"><button type="button" class="btn sm" data-rkp="add">${ic('plus', 's')}<span>${tr('Add')}</span></button></div>`}</section>`;
+}
+async function rk_purposeAct(a, el) {
+  const sec = el.closest('.rkpset');
+  try {
+    if (a === 'add') {
+      const inp = $('#rkp-new', sec), name = inp.value.trim(); if (!name) { inp.focus(); return; }
+      const j = await api('POST', '/api/office/trips/purposes', {name}); RK.data = null; await rk_purposesLoad(); $('#rkp-new')?.focus();
+      toast(tr('Added'), async () => { await api('DELETE', `/api/office/trips/purposes/${j.id}`); RK.data = null; rk_purposesLoad(); });
+    } else if (a === 'del') {
+      const j = await api('DELETE', `/api/office/trips/purposes/${el.dataset.id}`); RK.data = null; await rk_purposesLoad();
+      toast(tr('Removed'), async () => { await api('POST', '/api/office/trips/purposes', {name: j.purpose.name}); RK.data = null; rk_purposesLoad(); });
+    } else if (a === 'name') {
+      const old = (RKP.list || []).find(p => p.id === +el.dataset.id), name = el.value.trim(); if (!old || name === old.name) return;
+      if (!name) { el.value = old.name; return; }
+      const was = old.name;
+      await api('PATCH', `/api/office/trips/purposes/${old.id}`, {name}); RK.data = null; old.name = name;
+      toast(tr('Saved'), async () => { await api('PATCH', `/api/office/trips/purposes/${old.id}`, {name: was}); RK.data = null; rk_purposesLoad(); });
+    }
+  } catch (x) { if (a === 'name') { const o = (RKP.list || []).find(p => p.id === +el.dataset.id); if (o) el.value = o.name; } toast(x.message || tr('unknown')); }
+}
+document.addEventListener('click', e => { const b = e.target.closest?.('button[data-rkp]'); if (!b) return; e.preventDefault(); rk_purposeAct(b.dataset.rkp, b); });
+document.addEventListener('change', e => { if (e.target.dataset?.rkp === 'name') rk_purposeAct('name', e.target); });
+document.addEventListener('keydown', e => {
+  const x = e.target; if (e.key !== 'Enter' || e.isComposing || !(x.id === 'rkp-new' || x.dataset?.rkp === 'name') || !x.closest?.('.rkpset')) return;
+  e.preventDefault(); e.stopPropagation();  // never the settings form's submit
+  if (x.id === 'rkp-new') rk_purposeAct('add', x); else x.blur();
+}, true);
 const rk_month = ym => { const [y, m] = String(ym).split('-').map(Number); return y && m ? new Date(y, m - 1, 1).toLocaleDateString(LOCALE(), {month: 'long', year: 'numeric'}) : ym; };
 
 // ---- dialogs
@@ -90,13 +210,13 @@ function rk_tripModal(t) {
   const d = RK.data, ppl = new Set((t?.people || []).filter(p => p.id).map(p => p.id)), free = (t?.people || []).filter(p => !p.id).map(p => p.name).join(', ');
   const md = modal(`<h3>${t ? tr('Edit trip') : tr('New trip')}</h3>
     <div class="row"><label id="rk-fl">${tr('From')}</label>${dateIn('rk-from', t?.date_from || new Date().toISOString().slice(0, 10), {label: tr('From'), clear: false})}</div>
-    <div class="row"><label id="rk-tl">${tr('To')}</label>${dateIn('rk-to', t?.date_to || '', {label: tr('To'), empty: tr('same day')})}</div>
+    <div class="row"><label id="rk-tl">${tr('To')}</label>${dateIn('rk-to', t?.date_to || '', {label: tr('To'), empty: tr('same day'), after: 'rk-from'})}</div>
     ${ofcRowF('rk-dest', tr('Destination / route'), ofcIn('rk-dest', t?.dest, {max: 300, ph: tr('e.g. Hamburg – Berlin')}))}
     ${ofcChk('rk-over', tr('Overnight stay'), t?.overnight)}
     ${rk_vmaDlgHtml(t)}
     <div class="row"><span class="rklab">${tr('Participants')}</span><div class="rkppl">${(d.people || []).map(p => `<label class="chkl"><input type="checkbox" data-pid="${p.id}" ${ppl.has(p.id) ? 'checked' : ''}> ${esc(p.name)}</label>`).join('')}</div></div>
     ${ofcRowF('rk-free', tr('Other people'), ofcIn('rk-free', free, {max: 600, ph: tr('Names, separated by commas')}))}
-    ${ofcRowF('rk-purpose', tr('Purpose'), ofcSel('rk-purpose', t?.purpose || 'job', [['job', tr('Job for a client / project')], ['acquisition', tr('Acquisition / research')]]))}
+    ${ofcRowF('rk-purpose', tr('Purpose'), ofcSel('rk-purpose', t?.purpose || 'job', rk_purposeOpts(t?.purpose)))}${rk_purposeNewHtml()}
     ${ofcRowF('rk-client', tr('Client'), ofcSel('rk-client', t?.client_id || '', (d.clients || []).map(c => [c.id, cdn_label(c)]), tr('none')))}
     ${ofcRowF('rk-project', tr('Project'), ofcIn('rk-project', t?.project, {list: 'rk-projs'}))}<datalist id="rk-projs">${(d.projects || []).map(p => `<option value="${esc(p)}">`).join('')}</datalist>
     ${ofcRowF('rk-km', tr('Kilometres'), ofcIn('rk-km', t?.km != null ? fmtNum(+t.km, 0) : '', {num: true, ph: tr('optional')}))}
@@ -107,6 +227,11 @@ function rk_tripModal(t) {
   if (t && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom())) $('.foot .spacer', md)?.insertAdjacentHTML('beforebegin', `<button class="btn" data-m="move">${ic('brief', 's')} ${esc(tr('Move to another workspace…'))}</button>`);  // 2.97.0 C (#2049)
   const close = fgModal(md);
   rk_vmaDlgWire(md, t);  // 2.95.0 A (#1932)
+  rk_purposeWire(md);  // 2.117.0 A (#2292)
+  md.addEventListener('change', e => {  // 2.117.0 A (#2290): an end before the new start moves to the start
+    if (e.target.id !== 'rk-from') return;
+    const to = $('#rk-to', md), f = e.target.value; if (to && to.value && f && to.value < f) dpSet(to, f);
+  });
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
@@ -120,7 +245,7 @@ function rk_tripModal(t) {
       }
       const v = id => $(id, md)?.value ?? '';
       const people = [...$$('[data-pid]', md).filter(x => x.checked).map(x => ({id: +x.dataset.pid})), ...v('#rk-free').split(',').map(s => s.trim()).filter(Boolean).map(name => ({name}))];
-      const body = {date_from: v('#rk-from'), date_to: v('#rk-to'), dest: v('#rk-dest'), overnight: $('#rk-over', md).checked ? 1 : 0, people, purpose: v('#rk-purpose'),
+      const body = {date_from: v('#rk-from'), date_to: v('#rk-to'), dest: v('#rk-dest'), overnight: $('#rk-over', md).checked ? 1 : 0, people, purpose: await rk_purposeVal(md),
         client_id: +v('#rk-client') || null, project: v('#rk-project'), km: ofcNum(v('#rk-km')), note: v('#rk-note'), ...rk_vmaDlgBody(md)};
       if (t) {
         const old = {date_from: t.date_from, date_to: t.date_to, dest: t.dest, overnight: t.overnight, people: t.people, purpose: t.purpose, client_id: t.client_id, project: t.project, km: t.km, note: t.note,
@@ -213,6 +338,7 @@ document.addEventListener('click', e => {
   const a = b.dataset.rk, t = RK.open ? rk_trip(RK.open) : null;
   if (a === 'new') rk_tripModal(null);
   else if (a === 'open') { RK.open = +b.dataset.id; RK.sel.clear(); ofcDraw(); }
+  else if (a === 'rowmore') rk_rowMenu(b.dataset.id, b);  // 2.117.0 A (#2287)
   else if (a === 'back') { RK.open = null; RK.sel.clear(); ofcDraw(); }
   else if (a === 'edit' && t) rk_tripModal(t);
   else if (a === 'add' && t) rk_itemModal(t, null);
@@ -227,6 +353,7 @@ document.addEventListener('click', e => {
 document.addEventListener('change', async e => {
   const x = e.target;
   if (x.id === 'rk-year') { RK.year = x.value; RK.open = null; rk_reload(); return; }
+  if (x.id === 'rk-person') { RK.person = x.value; RK.personName = x.selectedOptions[0]?.textContent || ''; RK.rep = null; ofcDraw(); $('#rk-person')?.focus(); return; }  // 2.117.0 A (#2291)
   if (x.dataset?.rk === 'sel') { if (x.checked) RK.sel.add(+x.dataset.id); else RK.sel.delete(+x.dataset.id); ofcDraw(); return; }
   if (x.dataset?.rk !== 'datev' || !RK.open) return;
   const tid = RK.open, iid = +x.dataset.id, on = x.checked ? 1 : 0;
@@ -381,17 +508,18 @@ async function rk_vmaDaysModal(t) {  // per day: country (+ city) and the meals 
   });
 }
 async function rk_vmaLoad(y) {
-  RKV.src = RK.data; RKV.rep = {y, loading: true};
-  try { RKV.rep = Object.assign(await api('GET', `/api/office/trips/vma?year=${y}`), {y}); } catch (x) { RKV.rep = {y, error: x.message || tr('unknown')}; }
+  const p = RK.person;  // 2.117.0 A (#2291)
+  RKV.src = RK.data; RKV.rep = {y, p, loading: true};
+  try { RKV.rep = Object.assign(await api('GET', `/api/office/trips/vma?year=${y}${rk_pq()}`), {y, p}); } catch (x) { RKV.rep = {y, p, error: x.message || tr('unknown')}; }
   ofcDraw();
 }
 function rk_vmaRepHtml() {  // the evaluation: per diem per person of the year (all years -> the current one), PDF / Excel / CSV
   const y = RK.year || String(new Date().getFullYear());
-  if (!RKV.rep || RKV.rep.y !== y || RKV.src !== RK.data) { if (!RKV.rep?.loading || RKV.rep.y !== y) setTimeout(() => rk_vmaLoad(y), 0); return `<section class="rkv-rep"><p class="muted">${tr('Loading…')}</p></section>`; }
+  if (!RKV.rep || RKV.rep.y !== y || RKV.rep.p !== RK.person || RKV.src !== RK.data) { if (!RKV.rep?.loading || RKV.rep.y !== y || RKV.rep.p !== RK.person) setTimeout(() => rk_vmaLoad(y), 0); return `<section class="rkv-rep"><p class="muted">${tr('Loading…')}</p></section>`; }
   const d = RKV.rep;
   if (d.loading) return `<section class="rkv-rep"><p class="muted">${tr('Loading…')}</p></section>`;
   if (d.error) return `<section class="rkv-rep"><div class="empty">${esc(d.error)}</div></section>`;
-  const dl = ext => `<a class="btn sm" href="/api/office/trips/vma.${ext}?year=${y}" download>${ic('download', 's')}<span>${ext === 'xlsx' ? 'Excel' : ext.toUpperCase()}</span></a>`;
+  const dl = ext => `<a class="btn sm" href="/api/office/trips/vma.${ext}?year=${y}${esc(rk_pq())}" download>${ic('download', 's')}<span>${ext === 'xlsx' ? 'Excel' : ext.toUpperCase()}</span></a>`;
   const trip = x => `<li><span class="ofcn"><b>${esc([rk_span(x), x.dest].filter(Boolean).join(' · '))}</b><small class="muted">${esc(x.purpose || '')}</small>
     ${(x.amount != null ? x.breakdown : x.hints.map(rk_vmaHint)).map(l => `<small class="${x.amount != null ? '' : 'muted'}">${esc(l)}</small>`).join('')}</span>
     <span class="rksum">${x.amount != null ? rk_vmaEur(x.amount) : '–'}</span></li>`;
@@ -439,7 +567,7 @@ function rk_impModal(j, name) {
   const amt = v => v == null ? '–' : ofcMoney(v);
   const rowHtml = (r, si, i) => {
     const sub = [r.date_to && r.date_to !== r.date_from ? `${fmtDateLoc(r.date_from)} – ${fmtDateLoc(r.date_to)}` : (r.date_from ? fmtDateLoc(r.date_from) : tr('Row {0}', r.row)),
-      r.t_start && r.t_end ? `${r.t_start}–${r.t_end}` : '', r.purpose === 'acquisition' ? tr('Acquisition / research') : r.project].filter(Boolean).join(' · ');
+      r.t_start && r.t_end ? `${r.t_start}–${r.t_end}` : '', r.purpose === 'acquisition' ? tr('Acquisition / research') : r.purpose && r.purpose !== 'job' ? r.purpose : r.project].filter(Boolean).join(' · ');
     const why = (r.reasons || []).join(' · ');
     if (r.status === 'error') return `<li class="fcirow err"><span class="fcick" aria-hidden="true">${ic('x', 's')}</span><span class="ofcn"><b>${esc(r.dest || tr('Row {0}', r.row))}</b><small>${esc(tr('Row {0}', r.row))} · ${esc(why)}</small></span></li>`;
     return `<li class="fcirow rki-row ${r.sel ? 'on' : ''} ${r.status}"><label class="fcick"><input type="checkbox" data-rki="sel" data-s="${si}" data-i="${i}" ${r.sel ? 'checked' : ''} aria-label="${esc(tr('Take over {0}', r.dest || tr('Trip')))}"></label>

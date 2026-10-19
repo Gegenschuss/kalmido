@@ -1231,6 +1231,15 @@ fresh; run p21144_c_api "$PY" p21144_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21144_c_ui node p21144_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.114.4 part D: invoice from quotation dialog texts, travel costs allowance as main amount (#2269 #2286)
 fresh; run p21144_d_ui node p21144_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.117.0 part A: travel costs - to-date calendar anchor, row menu with delete, person filter, own purposes (#2290 #2287 #2291 #2292)
+fresh; run p2117_a_api "$PY" p2117_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2117_a_ui node p2117_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.117.0 part B: documents sample templates, framework contract PDF attachments (#2283 #2285)
+fresh; run p2117_b_api "$PY" p2117_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2117_b_ui node p2117_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.117.0 part C: PDF metadata "Kalmido v<version>", agent chat filter compact on phones (#2262 #2260)
+fresh; run p2117_c_api "$PY" p2117_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2117_c_ui node p2117_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.118.0 part A (#2265): quotation counter per client / project, building block {version}
 fresh; run p2118_a_api "$PY" p2118_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2118_a_ui node p2118_a_ui.js "$KALMIDO_TEST_DATA"

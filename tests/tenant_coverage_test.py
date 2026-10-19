@@ -294,6 +294,9 @@ ROUTES = {
     "GET /api/office/trips/vma.xlsx": "office", "GET /api/office/trips/vma.csv": "office",
     # 2.95.0 B (#1932): the import of a per diem spreadsheet, office admins (p295_b_api_test.py)
     "POST /api/office/trips/import/preview": "office", "POST /api/office/trips/import": "office", "POST /api/office/trips/delete": "office",
+    # 2.117.0 A (#2292): own purposes of trips, office admins (p2117_a_api_test.py)
+    "GET /api/office/trips/purposes": "office", "POST /api/office/trips/purposes": "office", "PATCH /api/office/trips/purposes/{}": "office",
+    "DELETE /api/office/trips/purposes/{}": "office",
     "POST /api/office/fixed-costs": "office", "PATCH /api/office/fixed-costs/{}": "office", "DELETE /api/office/fixed-costs/{}": "office",
     # 2.67.0 (#1838): the import of fixed costs, its template, the undo of an import, the monthly check task (office admins)
     "POST /api/office/fixed-costs/import/preview": "office", "POST /api/office/fixed-costs/import": "office", "GET /api/office/fixed-costs/import/template": "office",
@@ -861,6 +864,10 @@ ROUTES = {
     # of the same space, people only; p289_d_api_test.py)
     "GET /api/sheets/{}/links": "sheet", "POST /api/sheets/{}/to-tasks": "sheet", "POST /api/sheets/{}/to-offer": "sheet",
     "POST /api/sheets/{}/rows-from-list": "sheet", "POST /api/sheets/{}/links/{}/undo": "sheet", "POST /api/sheets/{}/links/{}/redo": "sheet",
+    # 2.117.0 B (#2285): PDF files of a framework contract (office area: members read, admins write, another area 404; p2117_b_api_test.py)
+    "GET /api/office/contracts/{}/files": "office", "POST /api/office/contracts/{}/files": "office",
+    "GET /api/office/contracts/{}/files/{}": "office", "PATCH /api/office/contracts/{}/files/{}": "office",
+    "DELETE /api/office/contracts/{}/files/{}": "office", "POST /api/office/contracts/{}/files/{}/restore": "office",
 }
 
 # ---- 1. every route is classified, nothing stale

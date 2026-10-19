@@ -475,6 +475,9 @@ def ofm_move_space():
             ofm_move_row(c, rec, "office_trips", r, src, dst, dst, {"client_id": None, "updated_at": ts})
             for it in c.execute("SELECT * FROM office_trip_items WHERE trip_id=? ORDER BY id", (r["id"],)).fetchall():
                 ofm_move_row(c, rec, "office_trip_items", it, src, dst, dst, {"updated_at": ts})
+        if p["trips"]:  # 2.117.0 A (#2292): the own purposes of the moved trips are offered in the new office too
+            from .travel import rka_purposes_adopt
+            rka_purposes_adopt(c, dst, uid, [r["purpose"] for r in p["trips"]])
         for r in p["tpls"]:
             ofm_move_row(c, rec, "office_doc_templates", r, src, dst, dst, {"updated_at": ts})
             ofm_detach(c, rec, "office_gen_docs", "template_id", r["id"], "office_doc_templates")

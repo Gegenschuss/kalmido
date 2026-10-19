@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.117.0** (2026-10-19): travel costs filtered by person and with own purposes, a row menu per trip, the "To"
+  calendar starts at the start date; seven document samples, PDFs attached to framework contracts, a compact chat filter on phones.
 - **2.99.0** (2026-10-19): files on knowledge pages (PDFs, pictures) and a ZIP import that keeps them, one "…" menu on
   knowledge pages, the acceptance note on quotations accepted online, a short sidebar group Exchange (pinned people),
   a name addition for clients and a company name on up to three lines, 44 px fields in the document editor, aligned chat icons.

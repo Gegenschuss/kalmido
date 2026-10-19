@@ -29,6 +29,7 @@ TABLES = (
     "office_client_contacts",  # 2.40.0 (#1380): contact persons of a client (org_id like the client)
     "office_roles", "office_doc_parts", "office_purchases",  # 2.47.0 (#1649, #1215, #1216)
     "office_trips", "office_trip_items", "office_fixed_costs",  # 2.47.3 (#1022, #1652, part B)
+    "office_trip_purposes",  # 2.117.0 A (#2292): own purposes of trips
     "office_bank_imports", "office_bank_tx",  # 2.90.0 B (#1921): bank reconciliation
     "office_inv_series", "office_sub_reminders",  # 2.91.0 A (#1923), B (#1924)
     "office_doc_templates", "office_gen_docs",  # 2.93.0 A (#1927): document templates and the documents made from them
@@ -65,6 +66,7 @@ TABLES = (
     "sched_polls",  # 2.98.0 A (#1953): scheduling polls (NULL = private, the app checks user_id; options / votes hang on poll_id)
     "office_agreements",  # 2.92.0 A (#1925): business contracts and insurances of an office area
     "bookmarks",  # 2.97.0 A (#1950): bookmarks (NULL = private, the app checks user_id)
+    "office_contract_files",  # 2.117.0 B (#2285): PDF files of a framework contract
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

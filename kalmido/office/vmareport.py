@@ -77,6 +77,8 @@ def vmr_purpose(t, clients):
     """The trip's occasion like the spreadsheet: acquisition / research, else the project (else the client)."""
     if t["purpose"] == "acquisition":
         return tr("Acquisition / research")
+    if t["purpose"] and t["purpose"] != "job":  # 2.117.0 A (#2292): an own purpose (+ the project)
+        return " · ".join(x for x in (t["purpose"], t["project"]) if x)
     return t["project"] or clients.get(t["client_id"]) or ""
 
 

@@ -136,7 +136,7 @@ function ofcListHtml(kind) {
     const sets = ofcRows('sets').filter(r => hit(r) && (OFC.arch || !r.archived));
     list += `<h3 class="ofcgrp">${tr('Sets')}</h3>` + (sets.length ? `<ul class="ofclist" role="list">${sets.map(r => ofcRowBtn('sets', r, r.name, [trn('{0} device', '{0} devices', (r.items || []).length), r.discount_pct ? tr('{0} % discount', fmtNum(r.discount_pct, 1)) : ''].filter(Boolean).join(' · '))).join('')}</ul>` : `<p class="muted lempty">${tr('No sets yet. A set bundles devices with one discount.')}</p>`);
   } else if (kind === 'texts') list = ofcGrouped(rows, r => tr(OFC_TEXT_KINDS.find(k => k[0] === r.kind)?.[1] || r.kind), r => ofcRowBtn('texts', r, r.key || (r.text_de || r.text_en).slice(0, 60), (r.text_de && !r.text_en ? tr('no English text stored') + ' · ' : '') + (r.key ? [r.text_de, r.text_en].filter(Boolean).join(' / ').slice(0, 120) : (r.text_en || '').slice(0, 80))), OFC_TEXT_KINDS.map(k => tr(k[1])));
-  else list = rows.length ? `<ul class="ofclist" role="list">${rows.map(r => ofcRowBtn('contracts', r, r.name, [r.date ? fmtDateLoc(r.date) : '', r.raw_included ? tr('raw data included') : '', r.client_id && cdn_label((S.clients || []).find(c => c.id === r.client_id))].filter(Boolean).join(' · '))).join('')}</ul>` : '';
+  else list = rows.length ? `<ul class="ofclist" role="list">${rows.map(r => ofcRowBtn('contracts', r, r.name, [r.date ? fmtDateLoc(r.date) : '', r.raw_included ? tr('raw data included') : '', r.client_id && cdn_label((S.clients || []).find(c => c.id === r.client_id))].filter(Boolean).join(' · '), typeof dmaClip === 'function' ? dmaClip(r.files) : '')).join('')}</ul>` : '';
   if (!rows.length && !list) list = `<div class="empty nempty eact">${ic(kind === 'texts' ? 'note' : 'list')}<span>${q ? tr('Nothing matches.') : adm ? tr('Nothing here yet. Add the first entry or import a file under Settings.') : tr('Nothing here yet.')}</span></div>`;
   return bar + list + (kind === 'services' ? sr_roleSections(hit) : '');  // 2.47.0 (#1649)
 }
@@ -161,7 +161,7 @@ function ofcGrouped(rows, keyOf, rowHtml, order) {
   const keys = order ? [...order.filter(k => g.has(k)), ...[...g.keys()].filter(k => !order.includes(k))] : [...g.keys()];
   return keys.map(k => `<h3 class="ofcgrp">${esc(k)}<span class="c muted">${g.get(k).length}</span></h3><ul class="ofclist" role="list">${g.get(k).map(rowHtml).join('')}</ul>`).join('');
 }
-const ofcRowBtn = (kind, r, title, sub) => `<li><button type="button" class="ofcrow ${r.archived ? 'arch' : ''}" data-ofc="open" data-kind="${kind}" data-id="${r.id}"><span class="ofcn"><b>${esc(title)}</b>${sub ? `<small class="muted">${esc(sub)}</small>` : ''}</span>${r.archived ? `<span class="rotag">${ic('archive', 's')}${tr('Archived')}</span>` : ''}${ic('chev', 's')}</button></li>`;
+const ofcRowBtn = (kind, r, title, sub, extra = '') => `<li><button type="button" class="ofcrow ${r.archived ? 'arch' : ''}" data-ofc="open" data-kind="${kind}" data-id="${r.id}"><span class="ofcn"><b>${esc(title)}</b>${sub ? `<small class="muted">${esc(sub)}</small>` : ''}</span>${extra}${r.archived ? `<span class="rotag">${ic('archive', 's')}${tr('Archived')}</span>` : ''}${ic('chev', 's')}</button></li>`;  // 2.117.0 B (#2285): extra = the paper clip of a contract
 
 // ---- the dialogs (one per kind; members get a read-only view)
 const ofcSel = (id, cur, opts, empty) => `<select id="${id}">${empty != null ? `<option value="">${esc(empty)}</option>` : ''}${opts.map(([v, n]) => `<option value="${esc(v)}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
@@ -220,6 +220,7 @@ function ofcModal(kind, r) {
     f = ofcRowF('of-name', tr('Name'), ofcIn('of-name', r?.name, {ph: tr('e.g. framework contract with Beispielkunde AG')}))
       + (cl.length ? ofcRowF('of-client_id', tr('Client'), ofcSel('of-client_id', r?.client_id, cl, tr('none'))) : '')
       + `<div class="row"><label id="of-datel">${tr('Date')}</label>${dateIn('of-date', r?.date || '', {label: tr('Date'), empty: tr('optional')})}</div>`
+      + (typeof dmaRowHtml === 'function' ? dmaRowHtml(r) : '')  // 2.117.0 B (#2285): the contract's PDF files, right under its date
       + ofcChk('of-raw_included', tr('Raw data always included (no option line)'), r?.raw_included)  // 2.47.0 (#1645): always shown
       + ofcRowF('of-rights_time_id', tr('Rights: duration'), ofcSel('of-rights_time_id', r?.rights_time_id, ofcTextOpts('rights_time'), tr('none')))
       + ofcRowF('of-rights_territory_id', tr('Rights: territory'), ofcSel('of-rights_territory_id', r?.rights_territory_id, ofcTextOpts('rights_territory'), tr('none')))
@@ -239,6 +240,7 @@ function ofcModal(kind, r) {
   const close = fgModal(md);  // 2.40.0 (#1371): Cancel / Esc / backdrop ask before unsaved input is lost
   if (!adm) for (const el of $$('input,select,textarea,button[data-dpfor]', md)) el.disabled = true;
   if (kind === 'equipment') astBind(md, r);  // 2.92.0 B (#1931)
+  if (kind === 'contracts' && typeof dmaLoad === 'function') dmaLoad(md);  // 2.117.0 B (#2285)
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     const m = b.dataset.m;
@@ -266,8 +268,9 @@ function ofcModal(kind, r) {
         if ($('#of-client_id', md)) body.client_id = +v('#of-client_id') || null;
       }
       if ($('#of-archived', md)) body.archived = $('#of-archived', md).checked ? 1 : 0;
-      await api(r ? 'PATCH' : 'POST', r ? `/api/office/${kind}/${r.id}` : `/api/office/${kind}`, body);
+      const sv = await api(r ? 'PATCH' : 'POST', r ? `/api/office/${kind}/${r.id}` : `/api/office/${kind}`, body);
       md.remove(); ofcReload(kind);
+      if (kind === 'contracts' && !r && sv?.id && typeof dmaAfterSave === 'function') dmaAfterSave(sv.id);  // 2.117.0 B (#2285): the chosen PDFs
       if (kind === 'equipment' && r && ofcAdmin()) astUndo(r, body); else toast(r ? tr('Saved') : tr('Added'));  // 2.92.0 B (#1931): one undo step
     } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
@@ -347,6 +350,7 @@ function ofcSettingsHtml() {
     ${typeof oa_settingsHtml === 'function' ? oa_settingsHtml(s, dis) : ''}
     ${adm ? `<div class="foot stfoot"><span class="aerr" role="alert"></span><span class="spacer"></span><button type="submit" class="btn pri" data-ofc="save-settings">${tr('Save')}</button></div>` : ''}
     ${typeof pkc_html === 'function' ? pkc_html() : ''}
+    ${typeof rk_settingsHtml === 'function' ? rk_settingsHtml() : ''}
     <h3>${tr('Master data file')}</h3>
     <p class="muted">${tr('Export writes services, equipment, sets, text blocks, contracts and these settings into one JSON file; import reads such a file (also one made from a spreadsheet) and adds what is missing.')}</p>
     <div class="lacts"><a class="btn sm" href="/api/office/export" download="office-master-data.json">${ic('download', 's')} ${tr('Export')}</a>
