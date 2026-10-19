@@ -260,6 +260,9 @@ had been made in the app. Webhooks fire too.
 | `GET /time/entries` | read | Time entries (time tracking), newest first: `from`, `to`, `scope=mine|all`, `list_id`, `task_id`. 2.63.0: with `scope=all` a person's token gets other people's entries only in lists the person owns or administers (list admin, admin of the list's organisation); elsewhere only their own. With `task_id` everyone's entries of that task as before; agents unchanged |
 | `POST /time/entries` | time | Add one: `{task_id or list_id, start, end or minutes, note?}` |
 | `GET /habits` | read | The user's habits with today's count and the last 30 days |
+| `GET /habits/{id}/stats` | read | 2.116.0 (#2067): current and best streak (`streak_unit` days or weeks), `rate_percent` of the last 30 scheduled days (last 4 full weeks for "x times a week"), `total_days` |
+| `GET /focus` · `GET /focus/stats` | read | 2.116.0 (#2067): focus sessions (pomodoro, breaks, stopwatch), newest first with the running one (`running`, `paused`, `elapsed_minutes`), `limit` / `cursor`; the statistics are the app's (today, 7 days, per day, per task, recent). **Private to a person:** only a person's own token, an agent token (team or personal) always gets `403` |
+| `POST /focus/start` · `POST /focus/{id}/stop` · `/pause` · `/resume` | time | 2.116.0 (#2067): `{kind?: focus\|short\|long\|stopwatch, minutes?, task_id?}`; a running session ends first; a session on a task becomes a time entry when it ends. Same rule as above: persons only |
 | `POST /habits/{id}/checkin` | tasks:write | `{date?, count?, note?}`: without `count` one more for the day |
 | `POST /import/{source}` | structure | Import an export file (multipart), see [Import](#import) |
 | `POST /imports/{id}/undo` | delete | Undo an import within 24 hours |
@@ -332,7 +335,7 @@ had been made in the app. Webhooks fire too.
 
 Writable fields for `POST /tasks` and `PATCH /tasks/{id}`: `title` (required on create), `notes`, `list_id`,
 `section_id`, `parent_id`, `priority`, `due`, `due_time`, `start`, `duration` (minutes), `reminders` (minutes before the
-due time, up to 366 days = 527040), `repeat` (an RRULE body such as `FREQ=WEEKLY;BYDAY=MO`, daily or longer), `repeat_from` (`due` / `done`),
+due time, up to 366 days = 527040), `repeat` (an RRULE body such as `FREQ=WEEKLY;BYDAY=MO`, daily or longer; 2.116.0: `FREQ=DAILY;TIMES=0800,1300,2000` = daily at several times, `TIMES` = sorted HHMM list, at most 12, only with `FREQ=DAILY`; completing a time moves `due_time` to the next one of the day, after the last one to the first time of the next matching day; CalDAV / iCal export it as `BYHOUR` / `BYMINUTE` when the times form a full hours-x-minutes grid, else as the plain daily rule), `repeat_from` (`due` / `done`),
 `url` (a web address `http(s)://…` or, 2.35.0, a file link `smb://`, `afp://`, `nfs://`, `webdav(s)://`, `file://` or `\\server\share\…`; never `javascript:` / `data:`), (2.7.0) `deadline` (boolean: the due date is a deadline, the app counts down and highlights it from the first
 reminder on), `deadline_in_today` (boolean: also on Today from the first reminder on; `true` sets `deadline` too), `nag`
 (repeat the reminder until done: `5`, `10`, `15`, `30`, `60` (minutes) or `1d`; `off` = never, empty = the list's

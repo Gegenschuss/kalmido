@@ -2680,7 +2680,7 @@ with the scope it needs). The tools:
   `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`,
   `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `list_repos`, `list_environments` (2.60.0), `set_deployment` (2.60.0)
 - time and habits: `get_timer`, `start_timer`, `stop_timer`, `list_time_entries`, `get_time_gaps` (2.34.0), `add_time_entry`, `update_time_entry`,
-  `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`
+  `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`, `get_habit_stats` (2.116.0)
 - News: `list_news`, `mark_news_read`
 - day plans: `get_day_plan`, `get_day_review`
 - family (2.19.0): `get_family`, `add_occasion`, `list_deadline_types`, `add_deadline`, `ingredients_to_shopping`,
@@ -2715,7 +2715,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `delete_task`, `delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`,
 `draft_reminder`, `duplicate_list`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
 `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`,
-`get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_life`, `get_list`, `get_me`,
+`get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_habit_stats`, `get_job`, `get_life`, `get_list`, `get_me`,
 `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_playbook`,
 `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`,
 `get_timer`, `get_usage`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`, `ingredients_to_shopping`,

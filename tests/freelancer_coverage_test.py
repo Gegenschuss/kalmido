@@ -35,7 +35,7 @@ KINDS = {
                        "2.99.0: page files, ZIP import with PDFs / pictures; 2.123.0: p2123_b_api_test.py shares of pages / folders, p2123_a_api_test.py page history, text search)"),
     "pim": ("matrix", SUITE + ", p294_b_api_test.py, p21191_a_api_test.py, p2111_b_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password; "
                     "invitation mails and the subscription link of an own calendar (2.111.0)"),
-    "time": ("matrix", SUITE + ": time entries, the timer, habits"),
+    "time": ("matrix", SUITE + ", p2116_d_api_test.py: time entries, the timer, habits; focus sessions and habit statistics over the API v1 (2.116.0)"),
     "agents": ("matrix", SUITE + ": the freelancer's own agent (my agents, its token, chat, jobs, share of a private list) and "
                          "the agent API with that agent's token"),
     "team": ("matrix", SUITE + ": the people list, direct messages and discovery without an organisation (no team rooms of "
@@ -672,6 +672,9 @@ ROUTES = {
     "DELETE /api/v1/time/entries/{}": "time", "DELETE /api/v1/time/timer": "time", "GET /api/time/entries": "time",
     "GET /api/time/export.csv": "time", "GET /api/time/export.xlsx": "time", "GET /api/workload/export.xlsx": "tasks",  # 2.125.0 C (#2122)
     "GET /api/time/gaps": "time", "GET /api/time/report": "time",
+    "GET /api/v1/habits/{}/stats": "time", "GET /api/v1/focus": "time", "GET /api/v1/focus/stats": "time",  # 2.116.0 D (#2067)
+    "POST /api/v1/focus/start": "time", "POST /api/v1/focus/{}/stop": "time", "POST /api/v1/focus/{}/pause": "time",
+    "POST /api/v1/focus/{}/resume": "time",
     "GET /api/v1/habits": "time", "GET /api/v1/time/check": "time", "GET /api/v1/time/entries": "time",
     "GET /api/v1/time/from-events": "time", "GET /api/v1/time/gaps": "time", "GET /api/v1/time/timer": "time",
     "PATCH /api/habits/{}": "time", "PATCH /api/time/entries/{}": "time", "PATCH /api/v1/habits/{}": "time",

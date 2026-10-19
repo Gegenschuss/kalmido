@@ -1368,6 +1368,8 @@ TOOLS += [
     ("check_in_habit", "Check in a habit (date YYYY-MM-DD, default today; count = absolute count, default one more; note).",
      _obj({"habit_id": S_ID, "date": {"type": "string"}, "count": {"type": "integer", "minimum": 0}, "note": {"type": "string"}}, ["habit_id"]),
      lambda api, a: api.call("POST", f"/habits/{_id(a, 'habit_id')}/checkin", body=_without(a, "habit_id"))),
+    ("get_habit_stats", "Streaks and hit rate of one habit (current and best streak in days or weeks, share of the last 30 scheduled days, days done).",
+     _obj({"habit_id": S_ID}, ["habit_id"]), lambda api, a: api.call("GET", f"/habits/{_id(a, 'habit_id')}/stats")),
     # ---- News, agents, export
     ("list_news", "Your News (mentions, assignments, comments, shares, approvals ...), newest first; filter mentions | me.",
      _obj({"filter": {"type": "string", "enum": ["mentions", "me"]}}), lambda api, a: api.call("GET", "/news", a)),

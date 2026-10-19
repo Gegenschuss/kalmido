@@ -623,6 +623,9 @@ ROUTES = {
     "DELETE /api/me/tokens/{}": "own", "GET /api/v1/me": "own", "GET /api/v1/me/app-passwords": "own",
     "POST /api/v1/me/app-passwords": "own", "DELETE /api/v1/me/app-passwords/{}": "own",
     "PATCH /api/v1/me/notifications": "own", "GET /api/v1/time/entries": "own", "POST /api/v1/time/entries": "own",
+    "GET /api/v1/habits/{}/stats": "own", "GET /api/v1/focus": "own", "GET /api/v1/focus/stats": "own",  # 2.116.0 D (#2067)
+    "POST /api/v1/focus/start": "own", "POST /api/v1/focus/{}/stop": "own", "POST /api/v1/focus/{}/pause": "own",
+    "POST /api/v1/focus/{}/resume": "own",
     "GET /api/v1/habits": "own", "POST /api/v1/habits/{}/checkin": "own", "POST /api/v1/import/{}": "own",
     "POST /api/v1/imports/{}/undo": "own", "GET /api/me/app-passwords": "own", "POST /api/me/app-passwords": "own",
     "DELETE /api/me/app-passwords/{}": "own", "GET /api/calendars": "own", "POST /api/calendars/discover": "own",

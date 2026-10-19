@@ -500,7 +500,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`, `draft_reminder`, `duplicate_list`,
 `edit_team_message`, `empty_trash`, `export_data`, `export_ics`, `export_vcards`, `get_absences`, `get_agent`,
 `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`, `get_dependencies`,
-`get_dispo`, `get_dispo_free`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_key_figures`,
+`get_dispo`, `get_dispo_free`, `get_document`, `get_event`, `get_family`, `get_group`, `get_habit_stats`, `get_job`, `get_key_figures`,
 `get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`,
 `get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`,
 `get_usage`, `get_velocity`, `get_video_review`, `get_view_layout`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`,

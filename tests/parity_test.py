@@ -392,7 +392,8 @@ APP_ONLY = [
      "its settings with it), never an agent", ("* /api/family/kids/{}/pin", "* /api/me/pin/")),
     ("the app's personal settings, onboarding and sample data", ("PATCH /api/settings", "POST /api/briefing/read", "POST /api/onboarding", "* /api/sample")),
     ("2.32.0 (#1063, #983): how a person arranges their views and the project page: people only, never agents", ("* /api/lists/{}/layout",)),
-    ("the focus timer is a personal on-screen timer; time is tracked with /time/timer", ("* /api/pomo/",)),
+    ("the focus timer is a personal on-screen timer; time is tracked with /time/timer; 2.116.0 (#2067): persons' scripts reach it "
+     "as /api/v1/focus (agent tokens are refused)", ("* /api/pomo/",)),
     # 2.83.0 (#1427): the header strip is how the app draws a list (agents read header_style in GET /lists)
     ("2.83.0 (#1427): the header strip of a list (style, own picture) and of a person's folder is set by people in the app; "
      "agents read header_style in GET /lists", ("* /api/lists/{}/header", "GET /api/list-header/", "* /api/folder-heads")),
@@ -676,6 +677,12 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "POST /team/groups": "2.113.1 (#2059): group conversations are between people; agents are refused (403)",
     "PATCH /team/rooms/{}": "2.113.1 (#2059): renaming / archiving a channel is for its creator or an organisation admin (people; agents 403)",
     "POST /team/rooms/{}/members": "2.113.1 (#2059): people add members (agents only by their owner / an organisation admin; agents 403)",
+    "GET /focus": "2.116.0 (#2067): focus sessions are private to a person; agent tokens get 403, so no tool (scripts with a personal token use it)",
+    "GET /focus/stats": "2.116.0 (#2067): as GET /focus",
+    "POST /focus/start": "2.116.0 (#2067): as GET /focus",
+    "POST /focus/{}/stop": "2.116.0 (#2067): as GET /focus",
+    "POST /focus/{}/pause": "2.116.0 (#2067): as GET /focus",
+    "POST /focus/{}/resume": "2.116.0 (#2067): as GET /focus",
     "POST /me/purpose": "2.19.0: the modules of the account (scope account): never for agents",
 }
 none = sorted(r for r in API if r not in reached and r not in API_ONLY)
