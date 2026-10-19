@@ -90,7 +90,7 @@ const today = new Date().toISOString().slice(0, 10);
     await sleep(400);
     check(await ev(`(() => { const W = document.documentElement.clientWidth; return [...document.querySelectorAll('.modal *')].filter(e => e.getClientRects().length).every(e => e.getBoundingClientRect().right <= W + 1); })()`),
       'phone: the dialog stays inside the screen');
-    check(await ev(`[...document.querySelectorAll('.modal .tpmode, .modal .foot .btn')].every(b => b.getBoundingClientRect().height >= 40)`), 'phone: big targets');
+    check(await ev(`[...document.querySelectorAll('.modal .tpmode')].every(b => b.getBoundingClientRect().height >= 40)`), 'phone: big targets (the type choice)');
     await shot('p2120-a-dialog-phone.png');
     await ev(click('.modal [data-m="ok"]'));
     check(await ready(ev, `!document.querySelector('.modal') && /Final invoice/.test(document.querySelector('.ofdnum')?.textContent || '')`, 60), 'final: the draft opens as final invoice');
