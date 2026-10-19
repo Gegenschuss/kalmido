@@ -201,7 +201,7 @@ for i in range(2, 22):
         break
     nv += 1
 cnt = sql("SELECT COUNT(*) FROM fs_versions WHERE node_id=?", (NID,))[0][0] if NID else 0
-check(cnt in (20, 21, 1), f"(versions: {cnt} stored of {nv} uploads)")
+check(nv == 21 and cnt == 21, f"#2173: switch off at upload: all {nv} uploads stay as versions ({cnt})")
 if NID and cnt >= 20:
     if cnt == 21:
         box("from kalmido.admin.dataretention import orf_prune_versions\nprint(orf_prune_versions(c, %d, False))" % NID)
