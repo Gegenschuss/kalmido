@@ -32,6 +32,8 @@ jobs:
         run: for f in static/*.js static/js/*.js tests/*.js tools/demo/*.js; do node --check "$f"; done
       - name: Module lists agree (index.html / sw.js / static/js, kalmido/__init__.py / the package)
         run: python tools/check_layout.py
+      - name: Server layers (module-level imports only from the own or a lower layer)
+        run: python tools/check_layers.py -v
       - name: Performance budget
         run: python tools/perf_budget.py
       - name: Translations complete

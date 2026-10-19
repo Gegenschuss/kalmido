@@ -239,6 +239,11 @@ The most used helpers:
    imported inside functions (see above). The folder `__init__.py` files stay empty.
 3. Database changes are additive migrations (`MIGRATIONS` in `core/schema.py`, run by `init_db` in `core/db.py`).
 4. `python3 tools/check_layout.py` checks that `ORDER` and the files agree (CI runs it).
+5. Layers (2.102.0): every package sits in one of five layers, lowest first -- `core`, `accounts`, `domain` (tasks,
+   lists, calendars, office, ...), `integrations` (api, admin, mail, webhooks, importers, ...) and `agents` (`LAYERS` in
+   `kalmido/__init__.py`, `LAYER_OF` for a single module). At module level a module imports only from its own or a lower
+   layer; a higher one inside the function. `python3 tools/check_layers.py -v` checks it in CI; the upward imports the
+   code already had stand in its `KNOWN` list, which may only shrink.
 
 ## Web client: `static/js/`
 
