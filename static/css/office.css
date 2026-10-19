@@ -657,6 +657,8 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .bwgnew{display:flex;flex-wrap:wrap;gap:.25rem;margin:0 0 .75rem}
 .bwgnew input{flex:1 1 9rem;min-width:0;min-height:2.75rem}
 .bwlines{list-style:none;margin:0 0 .5rem;padding:0;display:flex;flex-direction:column;gap:.25rem;flex:1;min-width:0}
+/* 2.119.1 (#2288): the amount lines get the full width under their label, so kind / rate / gross stay usable on phones */
+.bwdlg .row.bwamt{flex-direction:column;align-items:stretch}.bwdlg .row.bwamt>.btn{align-self:flex-start}
 .bwln{display:grid;grid-template-columns:minmax(0,1fr) 5.5rem 7rem 2.75rem;gap:.25rem;align-items:center}
 .bwln select,.bwln input{min-height:2.75rem;min-width:0}
 .bwln .iconbtn{width:2.75rem;height:2.75rem}
