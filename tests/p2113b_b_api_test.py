@@ -222,6 +222,17 @@ r = requests.get(V + "/team/channels", headers=CLH)
 check(r.ok and any(x["id"] == GEN for x in r.json()["data"]), "agent: lists its channels through the REST API")
 r = requests.delete(V + f"/team/rooms/{GEN}/members/{CL}", headers=CLH)
 check(r.status_code == 204 and requests.get(V + f"/team/rooms/{GEN}/messages", headers=CLH).status_code == 404, "agent: leaves the channel")
+# a personal agent of bob in his channel: added by bob only, mentions reach it from bob only
+r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "comments"], "username": "bobbot", "display_name": "Bobbot", "owner_id": BOB, "org_id": ORG})
+BB, BBH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
+check(Ca.post(B + f"/api/team/rooms/{GEN}/members", json={"user_id": BB}).status_code in (400, 403), "personal agent: not added by somebody else")
+check(Bo.post(B + f"/api/team/rooms/{SEC}/members", json={"user_id": BB}).ok, "personal agent: bob adds his own agent to his channel")
+cur = requests.get(V + "/agent/events?since=latest", headers=BBH).json()["cursor"]
+Ca.post(B + f"/api/team/rooms/{SEC}/messages", json={"body": f"<@{BB}> do something"})
+Bo.post(B + f"/api/team/rooms/{SEC}/messages", json={"body": f"<@{BB}> summarise please"})
+ev = [e for e in requests.get(V + f"/agent/events?since={cur}&limit=50", headers=BBH).json()["data"] if e.get("event") == "team_message"]
+check(len(ev) == 1 and "summarise" in ev[0]["data"]["message"]["text"] and ev[0]["data"]["room"]["kind"] == "channel",
+      "personal agent: only its owner's mention arrives " + str([e["data"]["message"]["text"] for e in ev])[:200])
 # REST API for people (token-less session also reaches v1 through the app? use the app routes; v1 create through a person token)
 tok = A.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read", "comments"]})
 if tok.ok and tok.json().get("token"):
