@@ -261,6 +261,12 @@ def bw_rows(c, oid, year=None, mid=None, deleted=False):
     return [bw_public(c, oid, r, logs, files) for r in rows]
 
 
+def bw_people(c, oid, uid):
+    """2.119.2 (#2288): the people for host / guests without agents (an agent does not eat out)."""
+    ag = {r["id"] for r in c.execute("SELECT u.id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND u.kind='agent'", (oid,)).fetchall()}
+    return [p for p in rk_people(c, oid, uid) if p["id"] not in ag]
+
+
 def _meal(c, oid, mid, deleted=False):
     r = c.execute("SELECT * FROM office_meals WHERE id=? AND org_id=?" + ("" if deleted else " AND deleted_at IS NULL"), (mid, oid)).fetchone()
     if not r:
@@ -457,7 +463,7 @@ def bw_meals_get():
         raise BadInput(tr("Invalid value: {0}", "year"))
     if bw_purge(c, oid):
         c.commit()
-    return jsonify(meals=bw_rows(c, oid, year=y or None), people=rk_people(c, oid, uid), choices=bw_choices(c, oid),
+    return jsonify(meals=bw_rows(c, oid, year=y or None), people=bw_people(c, oid, uid), choices=bw_choices(c, oid),
                    currency=rk_home_cur(c, oid), me=uid, company=bw_company(c, oid))
 
 
