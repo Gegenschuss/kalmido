@@ -10725,7 +10725,6 @@
   "High contrast": "Alto contrasto",
   "A theme sets the background tones and the look of cards. Paper switches to the light scheme, Night to the dark one; your accent colour, density and font stay.": "Un tema imposta i toni dello sfondo e l’aspetto delle schede. Carta passa allo schema chiaro, Notte a quello scuro; colore di accento, densità e carattere restano.",
   "Show header pictures": "Mostra le intestazioni",
-  "Progress rings in the sidebar": "Anelli di avanzamento nella barra laterale",
   "The header of a list or folder is set in its settings and is the same for everyone. Here you only choose whether this device shows it.": "L’intestazione di una lista o cartella si imposta nelle sue impostazioni ed è uguale per tutti. Qui scegli solo se questo dispositivo la mostra.",
   "None|header": "Nessuna",
   "Gradient": "Sfumatura",
@@ -10891,5 +10890,15 @@
   "Upload PDF": "Carica PDF",
   "Only PDF files can be attached": "Si possono allegare solo file PDF",
   "Replaced": "Sostituito",
-  "No templates yet. Take over a sample (letter, reminder, contract and more) and adapt it.": "Ancora nessun modello. Riprendi un esempio (lettera, sollecito di pagamento, contratto e altro) e adattalo."
+  "No templates yet. Take over a sample (letter, reminder, contract and more) and adapt it.": "Ancora nessun modello. Riprendi un esempio (lettera, sollecito di pagamento, contratto e altro) e adattalo.",
+  "Counter for quotations": "Contatore dei preventivi",
+  "one for all quotations": "uno per tutti i preventivi",
+  "per organisation": "per organizzazione",
+  "per client": "per cliente",
+  "per project": "per progetto",
+  "{version}: the first quotation is 1, each duplicate of it the next version with the same running number.": "{version}: il primo preventivo è 1, ogni duplicato la versione successiva con lo stesso numero progressivo.",
+  "Per client or per project each one counts on its own, e.g. KV-{client}-{yyyy}-{seq:02} gives KV-ACME-2026-03. A new quotation gets its number once the client or project is set. Invoices always keep one counter.": "Per cliente o per progetto ognuno conta per conto proprio, ad es. KV-{client}-{yyyy}-{seq:02} dà KV-ACME-2026-03. Un nuovo preventivo riceve il numero non appena sono indicati cliente o progetto. Le fatture mantengono sempre un solo contatore.",
+  "{version} is only possible in quotation numbers: invoices, credit notes and reminders count without gaps": "{version} è possibile solo nei numeri dei preventivi: fatture, note di credito e solleciti contano senza buchi",
+  "Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {initials} {version}": "Elemento sconosciuto {0}. Possibili: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {initials} {version}",
+  "Applies to the thin line and the progress rings, on all your devices.": "Vale per la linea sottile e gli anelli di avanzamento, su tutti i tuoi dispositivi."
 }
