@@ -3,11 +3,14 @@
 //   as hidden="" and was replaced on every patch; a parked window that takes its ids back has them last in its attributes)
 // - #2310: a team window in the chat panel that is parked (or made live again) while its first load is still out loads
 //   its messages anyway (it stayed at "Loading…" for good)
+// Firefox (real layout, phone 390 x 844, touch):
+// - #2206 the choosing mark in Documents has a 44 x 44 px touch target (the circle stays 1.75rem, the row no higher)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const firefox = require('./ff')({tag: 'p21191_d_ui', check, shots: 'P21191D_SHOTS'});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P21191D_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
@@ -91,6 +94,33 @@ const watch = async (w, fn, ms = 400) => {
   await until(() => w.eval('!!S.tc.room') && sec(d, 't:' + RID)?.textContent.includes('Hello studio'));
   check(w.eval(`S.tc.rid === ${RID} && !!S.tc.room`) && sec(d, 't:' + RID)?.textContent.includes('Hello studio'), '#2310: live again before its messages came: they come');
   w.close();
+
+  // ================= #2206 Firefox: the choosing mark in Documents, measured
+  const fd = new FormData(); fd.append('ws', 'private'); fd.append('files', new Blob(['Rechnung Beispiel 12,50 EUR']), 'beleg.txt');
+  await fetch(B + 'api/docs', {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: CK}, body: fd});
+  await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+    await nav(B + 'static/icon.svg');
+    await ev(`(() => { localStorage.clear(); return 1; })()`);
+    check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'Firefox: login');
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
+    await nav(B + '#docs');
+    for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('[data-dcsel="mode"]')`).catch(() => false)); i++) await sleep(300);
+    const rowH = () => ev(`Math.round(document.querySelector('.dc-card')?.getBoundingClientRect().height || 0)`);
+    const h0 = await rowH();
+    await ev(`(document.querySelector('[data-dcsel="mode"]').click(), 1)`);
+    for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('.dc-selmark')`)); i++) await sleep(200);
+    await sleep(300);
+    // the target = the mark's padding box grown by its ::after insets; and a tap 21 px off its centre still lands on the mark
+    const m = await ev(`(() => { const k = document.querySelector('.dc-selmark'); if (!k) return null; const r = k.getBoundingClientRect(), c = getComputedStyle(k), a = getComputedStyle(k, '::after');
+      const bw = parseFloat(c.borderLeftWidth) + parseFloat(c.borderRightWidth), bh = parseFloat(c.borderTopWidth) + parseFloat(c.borderBottomWidth);
+      const x = r.left + r.width / 2, y = r.top + r.height / 2, hit = [[-21, 0], [21, 0], [0, -21], [0, 21], [-20, -20], [20, 20]].map(([dx, dy]) => document.elementFromPoint(x + dx, y + dy) === k);
+      return {mark: Math.round(r.width), w: r.width - bw - parseFloat(a.left) - parseFloat(a.right), h: r.height - bh - parseFloat(a.top) - parseFloat(a.bottom), hit}; })()`);
+    check(m && m.w >= 44 && m.h >= 44, '#2206: the choosing mark in Documents has a 44 x 44 px touch target ' + JSON.stringify(m));
+    check(m && m.hit.every(Boolean), '#2206: ... a tap 21 px off its centre still hits the mark ' + JSON.stringify(m?.hit));
+    check(m && m.mark === 28, '#2206: ... the circle itself stays 1.75rem ' + m?.mark);
+    check(await rowH() === h0, '#2206: ... the card is no higher ' + h0);
+    await shot('p21191-d-docs-select.png');
+  }, true);
 
   console.log(`p21191_d_ui: ${ok} passed, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
