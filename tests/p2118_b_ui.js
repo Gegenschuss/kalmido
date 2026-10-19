@@ -30,7 +30,6 @@ const settings = async () => (await call('GET', '/api/state')).settings;
   // settings: no device switch, one account switch; off -> no line, no ring at once
   w.eval(`settingsModal('look')`); await sleep(400);
   check(!d.querySelector('#s-o3c-rings'), 'no device switch for the rings any more');
-  w.eval(`settingsModal('sidebar')`); await sleep(400);
   const c = d.querySelector('.smodal #s-sideprog');
   check(c && c.checked, 'account switch is on');
   c.checked = false; c.dispatchEvent(new w.Event('change', {bubbles: true}));
