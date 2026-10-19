@@ -444,6 +444,10 @@ APP_ONLY = [
     # 2.121.0 (#2092): the recognised receipt values are taken over / discarded by people; agents read them with GET /documents/{id}
     ("2.121.0 (#2092): the values the recognition read off a receipt (supplier, VAT, net / gross, invoice number) are taken over or "
      "discarded by people only; agents read them as `extracted` of GET /documents/{id}", ("=POST /api/docs/{}/extracted",)),
+    # 2.121.0 (#2095): the hint on a receipt which cash entries point at it -- part of the cash book, which is office admins only
+    # (no agent API for the cash book in 2.121, like the rest of /api/office)
+    ("2.121.0 (#2095): the cash book hint on a receipt (office admins only, like the cash book itself)",
+     ("=GET /api/docs/{}/cashbook",)),
     # 2.55.0 (#1455): the newsletter connection holds access data of an outside service and decides who gets mail: people only
     ("2.55.0 (#1455): the newsletter connection, segments, sync and the consent of contacts are set by people (admins / the "
      "person); agents read the consent with the contact (field newsletter), no new agent rights", ("* /api/newsletter",)),

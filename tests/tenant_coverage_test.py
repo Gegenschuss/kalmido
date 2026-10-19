@@ -333,6 +333,12 @@ ROUTES = {
     "POST /api/office/drives/{}/restore": "office", "GET /api/office/drives/{}/log": "office", "POST /api/office/drives/{}/trip": "office",
     "GET /api/office/logbook/report": "office", "GET /api/office/logbook.csv": "office", "GET /api/office/logbook.pdf": "office",
     "PUT /api/office/logbook/settings": "office",
+    # 2.121.0 B (#2095): the cash book, the personal office of a freelancer in p2121_b_api_test.py
+    "GET /api/office/cashbooks": "office", "POST /api/office/cashbooks": "office", "GET /api/office/cashbooks/links": "office",
+    "PATCH /api/office/cashbooks/{}": "office", "GET /api/office/cashbooks/{}/entries": "office", "POST /api/office/cashbooks/{}/entries": "office",
+    "PATCH /api/office/cash-entries/{}": "office", "POST /api/office/cash-entries/{}/cancel": "office", "GET /api/office/cash-entries/{}/log": "office",
+    "GET /api/office/cashbooks/{}/closing": "office", "POST /api/office/cashbooks/{}/closing": "office", "GET /api/office/cashbooks/{}/log": "office",
+    "GET /api/docs/{}/cashbook": "office", "GET /api/office/cashbook.csv": "office", "GET /api/office/cashbook.pdf": "office",
     # 2.50.0 (#1196, #1197): the sales pipeline and the business figures, admins of the office area only (p250_b_api_test.py: other org 404, member 403)
     "GET /api/office/deals": "office", "POST /api/office/deals": "office", "PATCH /api/office/deals/{}": "office", "DELETE /api/office/deals/{}": "office",
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
