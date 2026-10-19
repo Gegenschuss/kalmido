@@ -146,9 +146,11 @@ check(Pr.get(B + "/api/v1/focus?bogus=1").status_code == 400, "unknown query par
 TK = A.post(B + "/api/tasks", json={"title": "Geheim", "list_id": L}).json()["id"]
 Pr.post(B + "/api/v1/focus/start", json={"task_id": TK})
 Pr.post(B + f"/api/v1/focus/{Pr.get(B + '/api/v1/focus').json()['data'][0]['id']}/stop")
-Pc.post(B + "/api/v1/focus/start", json={"task_id": TK})
+# 2.116.0 review F7: a task the person cannot see is refused (404) instead of a silent session without a task
+rc = Pc.post(B + "/api/v1/focus/start", json={"task_id": TK})
+check(rc.status_code == 404, f"focus start on a foreign task: 404 ({rc.status_code})")
 carols = Pc.get(B + "/api/v1/focus").json()["data"]
-check(carols and carols[0]["task_id"] is None and carols[0]["task_title"] is None, f"a foreign task is not named: {carols}")
+check(not any(x.get("task_title") == "Geheim" for x in carols), f"a foreign task is never named: {carols}")
 # agents: team agent, personal agent -> 403 everywhere
 for name, kw in (("teambot", {}), ("alicebot", {})):
     body = {"scopes": ["read", "time", "tasks:write"], "username": name, "display_name": name.title()}
