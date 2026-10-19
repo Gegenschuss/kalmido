@@ -183,7 +183,8 @@ settings(A, offer_scheme=KV)
 old, _ = offer(A, BETA)
 settings(A, offer_scheme=KV + "-V{version}")
 r = A.post(B + f"{D}/{old}/duplicate")
-check(r.status_code == 201 and re.fullmatch(r"KV-BETA-2030-\d\d-V2", r.json()["number"] or ""), "an older first quotation: next number, V2 " + r.text[:200])
+check(r.status_code == 201 and re.fullmatch(r"KV-BETA-\d{4}-\d\d-V2", r.json()["number"] or ""),  # (a duplicate is dated today)
+      "an older first quotation: next number, V2 " + (r.json().get("number") or r.text[:200]))
 
 # ================================================================== the preview
 j = A.get(B + "/api/office/number-preview", params={"kind": "offer", "scheme": KV + "-V{version}", "counter": "client"}).json()
@@ -198,6 +199,7 @@ check(r.status_code == 400 and "{version}" in r.text, "{version} in the invoice 
 j = A.get(B + "/api/office/number-preview", params={"kind": "invoice", "scheme": "RE-{yyyy}-{seq:03}-V{version}"}).json()
 check(not j.get("valid") and "{version}" in (j.get("error") or ""), f"invoice preview refuses {{version}} {j}")
 A.put(B + f"{D}/{root}/items", json={"items": [{"title": "Shoot", "qty": 1, "rate": 900}]})
+A.patch(B + f"{D}/{root}", json={"service_from": "2030-02-01", "service_to": "2030-02-28"})
 check(A.post(B + f"{D}/{root}/finalize").ok, "the quotation finalised")
 r = A.post(B + f"{D}/{root}/invoice")
 check(r.status_code == 201, "an invoice from it " + r.text[:200])
