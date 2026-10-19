@@ -17,6 +17,7 @@ addresses and paths to your setup.
 - [Database (PostgreSQL)](#database-postgresql)
 - [Upgrade to 2.37 (PostgreSQL required)](#upgrade-to-237-postgresql-required)
 - [Backup and encryption](#backup-and-encryption)
+- [Deletion periods (2.103)](#deletion-periods-2103)
 - [Encryption of organisation data](#encryption-of-organisation-data)
 - [Encryption of private files](#encryption-of-private-files)
 - [Encryption in the browser (2.64)](#encryption-in-the-browser-264)
@@ -508,6 +509,41 @@ docker compose up -d kalmido
   - Restoring from the target: download the backup there and use *Restore from a file* (or copy it into the backup folder).
 - **Old snapshots contain plain text.** Filesystem, VM or provider snapshots taken before you switched on encryption
   still hold the data unencrypted: delete them.
+- **Backup retention and deleted accounts (2.103).** Weekly backups are kept for at most 52 weeks (an older, higher setting
+  reads as 52). The rotation runs once a day even while the automatic backups are switched off. Safety backups (written
+  before every restore) go after `KALMIDO_SAFETY_BACKUP_DAYS` days (30), also among the last three, once the deletion runs
+  are switched on (see [Deletion periods](#deletion-periods-2103)). Every deleted account is noted in a journal (the account
+  id and salted hashes of its e-mail and user name, no plain text); after a restore, accounts the backup brought back are
+  deleted again, and one that still owns lists is disabled for the admin to decide (an admin alert gives the numbers). The
+  archive now also holds the list header pictures (`attachments/listheads/`). Hosting for others:
+  `KALMIDO_BACKUP_ENCRYPT_REQUIRED=1` writes no backup without a passphrase (an admin alert says so); off by default.
+
+## Deletion periods (2.103)
+
+Data whose period ran out is deleted for good by background runs of the watchdog. Every run first **counts**: by default
+the switch is off and nothing is deleted (a dry run), so an update never removes anything by surprise. The admin reads the
+last result of every run as numbers only (no content) with `GET /api/admin/retention` (instance admins), and in the server
+log (`retention: trash would delete (dry run): files=3, wiki=1`).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `KALMIDO_RETENTION_PURGE` | off | `1` switches every deletion run on |
+| `KALMIDO_PURGE_TRASH`, `_LOGS`, `_BACKUPS`, `_FILES`, `_CHAT` | (general switch) | `1` / `0` for one run, wins over the general switch |
+| `KALMIDO_TRASH_DAYS` | 30 | days in a trash before deleted for good |
+| `KALMIDO_LOG_DAYS` | 400 | days of the activity and change logs |
+| `KALMIDO_SAFETY_BACKUP_DAYS` | 30 | days of a safety backup |
+| `KALMIDO_ORPHAN_DAYS` | 1 | age of a stored file without a row before the sweep removes it |
+| `KALMIDO_CHAT_KEEP_DAYS` | 0 | days of agent chat messages (0 = no day limit) |
+
+**Trash (`KALMIDO_TRASH_DAYS`).** At most hourly the run deletes what lies in a trash longer than the period: folders and
+files of the file store (every version, preview, recognised text, with the stored files on the disk), wiki pages, filed
+hub mails (with their word index; the mail's folder goes into the file store's trash and follows there), tables and the
+deleted rows and columns of a table, pipeline deals, invoice series, the placeholders of deleted team chat messages and
+the emptied rows of deleted comments. The file store's trash names the period. Lists, tasks and events have their own
+trash periods. Legal retention wins: a booked receipt or the logbook is locked until its period ends, never deleted early
+(such a node stays in the trash and is counted as `files_locked`).
+
+Expired credentials (sessions, tokens, codes past their end) are no data of a person any more and go without the switch.
 
 ## Encryption of organisation data
 
