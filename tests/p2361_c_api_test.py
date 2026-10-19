@@ -210,7 +210,8 @@ check(rd["title"] == "Quotation" and rd["totals"]["rows"][0][0] == "Net Total" a
 check(rd["rights"]["rows"] == [["Duration of License", "in perpetuity"], ["Territorial Rights", "worldwide except music on trade shows / live events (DE)"], ["Rights by Medium", "internal use, web, unpaid media"]], f"KV02 rights texts EN: {rd['rights']['rows']}")
 # 2.114.4 (#2274): the note names only the rates of the document
 check(rd["fx_note"] == "Exchange rate €1: $1.09" and rd["fx_rate"] == 1.09 and rd["totals"]["vat_note"] == "All prices plus 19 % VAT.", f"USD shows the exchange rate: {rd['fx_note']}")
-check([l for l in rd["lines"] if l["kind"] == "producing"][0]["detail"] == "4.5 days = 14 production days / 3, rounded to half days", "EN producing explanation")
+# 2.113.1 (#2251): the explanation stays in the editor (totals), the customer's print model has the title and amount only
+check([l for l in rd["lines"] if l["kind"] == "producing"][0]["detail"] == "" and [l for l in A.get(B + f"{D}/{DOC}").json()["totals"]["lines"] if l["kind"] == "producing"][0]["detail"] == "4.5 days = 14 production days / 3, rounded to half days", "EN producing explanation only in the editor")
 # the positions keep the DE titles they were saved with (snapshot); a new position in EN takes the EN name
 d = A.put(B + f"{D}/{DOC}/items", json={"items": [{"service_id": S_STORY, "qty": 1}]}).json()
 check(d["items"][0]["title"] == "Storyboard creation" and d["items"][0]["rate"] == 980, f"EN document: the service's English name, rate in EUR: {d['items'][0]}")
@@ -295,7 +296,7 @@ bd = Bo.get(B + f"{D}/{DOC}").json()
 # 2.47.0 (#1649): a member gets no purchase field at all (was None)
 check("costs" not in bd["totals"] and "margin" not in bd["totals"] and "cost" not in bd["items"][4] and bd["can_delete"] is False, "a member sees no costs / margin and cannot delete")
 check(Bo.get(B + f"{D}/{DOC}/render").json()["internal"] is None, "render: no internal block for a member")
-r = Bo.post(B + D, json={"project_title": "Bobs Angebot"})
+r = Bo.post(B + D, json={"project_title": "Bobs Angebot", "producing_on": 1})  # 2.113.1 (#2251): producing per quotation, no longer from the setting
 check(r.status_code == 201, "a member creates")
 BD = r.json()["id"]
 r = Bo.put(B + f"{D}/{BD}/items", json={"items": [{"service_id": S_ANIM, "qty": 2, "cost": 500}]})

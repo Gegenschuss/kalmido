@@ -14,6 +14,7 @@ Invented companies, people and figures only. freelancer-matrix: office
  - a person without an organisation does the same in their own office
 usage: p2113b_a_api_test.py <datadir>"""
 import hashlib
+import io
 import json
 import os
 import re
@@ -143,6 +144,8 @@ pl = line(j, "producing")
 check(pl and pl["qty"] == 10 and pl["total"] == 5000 and pl["title"] == "Organisation", "#2251: 10.000 / 500 x 0,5 = 10 days = 5.000 " + str(pl))
 check(pl and pl["detail"].startswith("10.000,00 € / 500,00 € x 0,5 = 10 Tage"), "#2251: the line explains the calculation " + str(pl and pl["detail"]))
 check(j["totals"]["net"] == 10000 + 300 + 5000, "#2251: the net with the share line " + str(j["totals"]["net"]))
+rd = A.get(B + f"{D}/{Q1['id']}/render").json()
+check([x["detail"] for x in rd["lines"] if x["kind"] == "producing"] == [""], "#2251: the print model has the share line without its calculation")
 j = items(A, Q1["id"], [{"kind": "service", "service_id": SV, "qty": 1, "rate": 1300}])
 check(line(j, "producing")["qty"] == 1.5 and line(j, "producing")["total"] == 750, "#2251: 1.300 / 500 x 0,5 = 1,3 -> 1,5 days (half days)")
 j = items(A, Q1["id"], [{"kind": "service", "service_id": SV, "qty": 10}])
@@ -211,9 +214,26 @@ j = A.patch(B + f"{D}/{Q3['id']}", json={"discount_pct": 10}).json()
 check(j["totals"]["discount"] == 250 and j["totals"]["net"] == 2500 + 80 + 208 - 250, "#2252: the discount takes in the positions only " + str(j["totals"]["net"]))
 rd = A.get(B + f"{D}/{Q3['id']}/render").json()
 check(sum(1 for x in rd.get("lines") or [] if x.get("kind") == "surcharge" and x.get("total_text")) == 2, "#2252: both lines in the print model")
+# Moritz 19.10.2026: how a line was computed stays internal: the editor shows it, the customer's documents do not
+check(all(x.get("detail") == "" for x in rd["lines"] if x["kind"] in ("producing", "surcharge")) and line(j, "surcharge", "markup")["detail"],
+      "#2251: the print model has no calculation text, the editor has")
+QS = A.post(B + f"{D}/{Q3['id']}/duplicate").json()
+check(A.post(B + f"{D}/{QS['id']}/status", json={"status": "sent"}).ok, "the copy sent")
+r = A.post(B + f"{D}/{QS['id']}/signoff", json={})
+check(r.ok and r.json().get("url"), "an approval link " + r.text[:120])
+pg = requests.get(B + "/s/q/" + r.json()["url"].split("/s/q/")[1], allow_redirects=False).text if r.ok else ""
+check("Production Fee" in pg and "marked positions" not in pg and "markierten Positionen" not in pg, "#2251: the approval page has the line, not its calculation")
+try:
+    from pypdf import PdfReader
+    pdf = A.get(B + f"{D}/{QS['id']}/pdf")
+    txt = " ".join(x.extract_text() or "" for x in PdfReader(io.BytesIO(pdf.content)).pages)
+    check(pdf.ok and "Production Fee" in txt and "marked positions" not in txt, "#2251: the PDF has the line, not its calculation")
+except ImportError:
+    print("pypdf missing: PDF text not checked")
 r = A.post(B + f"{D}/{Q3['id']}/invoice")
 titles = [x["title"] for x in r.json().get("items") or []] if r.ok else []
 check(r.status_code == 201 and "Handling costs" in titles and "Production Fee" in titles, "#2252: the invoice from the quotation has both lines " + str(titles))
+check(r.ok and all(not x.get("detail") for x in r.json()["items"] if x["title"] in ("Handling costs", "Production Fee")), "#2251: the invoice positions without the calculation")
 j = A.patch(B + f"{D}/{Q3['id']}", json={"handling_pct": None, "markup_pct": None}).json()
 check(line(j, "surcharge") is None and j["totals"]["net"] == 2250, "#2252: both switched off, no line")
 
