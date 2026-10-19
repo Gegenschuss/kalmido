@@ -59,7 +59,7 @@ def ntfy(title, msg, prio="4", click=None, topic=None, actions=None, admin=False
         hdr["Click"] = click
     if NTFY_TOKEN:
         hdr["Authorization"] = f"Bearer {NTFY_TOKEN}"
-    if actions:  # view actions open the browser (Authelia cookie), http actions could not pass the gate
+    if actions:  # view actions open the browser (login cookie), http actions could not pass a login proxy
         hdr["Actions"] = "; ".join(f"view, {label}, {url}" for label, url in actions)
     try:
         req = urllib.request.Request(f"{NTFY_URL}/{topic}", data=msg.encode("utf-8"), headers=hdr)
