@@ -22,7 +22,7 @@ from .packs import office_pack
 from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, office_number_next, office_role, office_settings,
                     office_seed_texts)
 from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
-                     ofx_number_at_finalize, ofx_snapshot_pack)
+                     ofx_number_at_finalize, ofx_snapshot_pack, OFX_LOCKED)
 from .invoices import (INV_KINDS, INV_STATUSES, STATE_TXT, inv_apply_client, inv_manual_number, inv_money_fields, inv_new_row, inv_paid_map, inv_payments,
                        inv_reminder_totals, inv_render, inv_scheme, inv_state)
 
@@ -377,7 +377,8 @@ def doc_public(c, oid, r, admin, items=True):
         u = c.execute("SELECT display_name, username FROM users WHERE id=?", (r["locked_by"],)).fetchone()
         d["locked_by_name"] = (u["display_name"] or u["username"]) if u else ""
     d["can_edit"] = not locked and r["status"] != "sent"  # 2.38.0: sent documents are locked as well
-    d["can_delete"] = bool(admin) and not locked and r["status"] != "sent"
+    d["can_unlock"] = bool(admin) and locked and not bga_offer_block(c, oid, r)  # 2.114.2 A (#2263): back to a draft, or delete
+    d["can_delete"] = d["can_unlock"] if locked else bool(admin) and r["status"] != "sent"
     d["number_at_finalize"] = ofx_number_at_finalize(office_settings(c, oid), r["kind"])
     from .agentdocs import ofa_doc_extra
     ofa_doc_extra(c, d)  # 2.51.0 A (#1348): "drafted by agent X", the project list
@@ -919,13 +920,19 @@ def odoc_list():
         sql += " AND (number ILIKE ? ESCAPE '\\' OR project_title ILIKE ? ESCAPE '\\' OR project_ref ILIKE ? ESCAPE '\\' OR recipient ILIKE ? ESCAPE '\\')"
         args += [like, like, like, like]
     pm = inv_paid_map(c, oid) if kind in ("invoice", "credit") else {}
-    rows = [doc_brief(r, pm) for r in c.execute(sql + " ORDER BY date DESC, id DESC LIMIT 500", args)]
+    raw = c.execute(sql + " ORDER BY date DESC, id DESC LIMIT 500", args).fetchall()
+    rows = [doc_brief(r, pm) for r in raw]
+    role = office_role(c, uid, oid)
+    if kind == "offer" and role == "admin":  # 2.114.2 A (#2263): which finalised quotations the row menu may delete
+        for b, r in zip(rows, raw):
+            if b["locked"] and r["status"] == "draft":
+                b["can_delete"] = b["can_unlock"] = not bga_offer_block(c, oid, r)
     if kind in ("invoice", "reminder"):  # 2.40.0 (#1368 points 8 + 9): open reminder fees, settled reminders ("done")
         from .invoices import fd_reminder_extra
         fd_reminder_extra(c, oid, rows)
     if st in ("partial", "overdue"):  # derived states: filtered after the fact
         rows = [x for x in rows if x["state"] == st]
-    return jsonify(docs=rows, role=office_role(c, uid, oid), org_id=oid)
+    return jsonify(docs=rows, role=role, org_id=oid)
 
 
 @app.post("/api/office/docs")
@@ -1114,17 +1121,49 @@ def odoc_duplicate(did):
     return jsonify(doc_public(c, oid, n, admin)), 201
 
 
+# 2.114.2 A (#2263): a finalised quotation that never left the house may go (decision of 2026-10-19)
+BGA_SENT = N_("This quotation was sent to the client; the record is kept")
+BGA_USED = N_("An invoice or a document was made from this quotation; the record is kept")
+
+
+def bga_offer_block(c, oid, r):
+    """2.114.2 A (#2263): why finalised document r cannot be deleted (None = it can): only a quotation still in draft that
+    was never sent (sent_at, a logged mail), never answered by the client (signoffs) and that nothing was made from (an
+    invoice's source_doc_id, an order confirmation in office_gen_docs). Open signoff links go with it (ON DELETE CASCADE)."""
+    if r["kind"] != "offer" or r["status"] != "draft":
+        return OFX_LOCKED
+    if r["sent_at"] or c.execute("SELECT 1 FROM office_doc_log WHERE org_id=? AND doc_id=? AND action='send' LIMIT 1",
+                                 (oid, r["id"])).fetchone():
+        return BGA_SENT
+    if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (r["id"], oid)).fetchone():
+        return N_("The customer has signed this quotation; the record is kept")
+    if c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND source_doc_id=? LIMIT 1", (oid, r["id"])).fetchone() or \
+            c.execute("SELECT 1 FROM office_gen_docs WHERE org_id=? AND doc_id=? LIMIT 1", (oid, r["id"])).fetchone():
+        return BGA_USED
+    return None
+
+
 @app.delete("/api/office/docs/<int:did>")
 def odoc_delete(did):
-    """The organisation's admin only (members: 403); a finalised document: 409."""
+    """The organisation's admin only (members: 403); a finalised document: 409 (2.114.2 A, #2263: except a finalised
+    quotation that was never sent, see bga_offer_block)."""
     c, uid, oid = _ctx()
+    write_lock(c, f"office_mail_{int(oid)}")  # 2.114.2 (#2263 review): no mail send / unlock / finalise in between
+    write_lock(c, f"office_doc_{int(did)}")
     r = doc_row(c, oid, did)
     if office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this organisation can do this"))
-    ofx_need_editable(r)
+    locked = ofx_locked(r)
+    if locked:
+        why = bga_offer_block(c, oid, r)
+        if why:
+            raise Denied(409, tr(why))
+    else:
+        ofx_need_editable(r)
     if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (did, oid)).fetchone():
         raise Denied(409, tr("The customer has signed this quotation; the record is kept"))  # 2.50.0 (#1200 review)
-    ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net")})
+    ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net"),
+                                                  **({"locked": True} if locked else {})})  # 2.114.2 A (#2263): the number gap stays traceable
     c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
     bump(c)
     c.commit()

@@ -51,6 +51,26 @@ on accepted quotations, a short sidebar group Exchange, the rest of the fixed re
 - Chat composer: the paperclip and the meeting (list) icon sit on one line; the width grip's label shows to its left and
   no longer covers the send button (#2185).
 
+## [2.114.3] - 2026-10-19
+
+### Changed
+- Quotations: the producing calculation is visible -- a hint at the switch, "like the document" or "own setting" in a part, "incl. producing 1.5 days" on each part line of the title page and a marked producing tick at the positions; the sums do not change (#2266).
+
+## [2.114.2] - 2026-10-19
+
+Office fixes 2.
+
+### Changed
+- Quotations: an admin (or a person without an organisation in their own space) can delete a finalised quotation that
+  was never sent and has no decision of the client; its number stays as a traceable gap in the office log. Sent,
+  accepted, declined or signed quotations and all invoices, credit notes and reminders stay locked (#2263).
+- Quotations: "Undo finalising" takes such a quotation back to a draft; it keeps its number and the office log notes
+  the step (#2263).
+
+### Fixed
+- Office settings: the error of a number scheme shows under the field, which keeps its full width (also on phones); a
+  "Reset" button below it brings back the last saved scheme (#2264).
+
 ## [2.114.1] - 2026-10-19
 
 Office fixes.

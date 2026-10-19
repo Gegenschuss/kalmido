@@ -325,7 +325,8 @@ ROUTES = {
     "POST /api/office/docs/from-time": "office", "POST /api/office/docs/reminder": "office",
     "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/{}/datev": "office",
     "POST /api/office/docs/{}/cashflow": "office", "POST /api/office/docs/{}/duplicate": "office", "POST /api/office/docs/{}/fee": "office",
-    "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/invoice": "office",
+    "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
+    "POST /api/office/docs/{}/invoice": "office",
     "POST /api/office/docs/{}/number": "office", "POST /api/office/docs/{}/parts": "office",
     "POST /api/office/docs/{}/payments": "office", "POST /api/office/docs/{}/send": "office",
     "POST /api/office/docs/{}/signoff": "office", "POST /api/office/docs/{}/status": "office",

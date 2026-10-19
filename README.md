@@ -23,6 +23,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **2.99.0** (2026-10-19): files on knowledge pages (PDFs, pictures) and a ZIP import that keeps them, one "…" menu on
   knowledge pages, the acceptance note on quotations accepted online, a short sidebar group Exchange (pinned people),
   a name addition for clients and a company name on up to three lines, 44 px fields in the document editor, aligned chat icons.
+- **2.114.2** (2026-10-19): office fixes 2 - a finalised quotation that never left the house can be deleted or
+  taken back to a draft (same number), number scheme errors under the field with a reset button.
 - **2.114.1** (2026-10-19): office fixes - the transfer of rights as the last page of the quotation PDF, receipts in
   the cash flow, books up to date right after a bank match, clearer bank buttons on phones.
 - **2.136.0** (2026-10-19): a new face - the Kalmido bot replaces the heron in the app icon, the empty views, the

@@ -10831,5 +10831,13 @@
   "At most {0} feeds": "Como máximo {0} feeds",
   "Article": "Artículo",
   "Not a valid OPML file": "No es un archivo OPML válido",
-  "Read|done": "Leído"
+  "Read|done": "Leído",
+  "This quotation was sent to the client; the record is kept": "Este presupuesto se envió al cliente; el registro se conserva",
+  "An invoice or a document was made from this quotation; the record is kept": "A partir de este presupuesto ya se creó una factura o un documento; el registro se conserva",
+  "Its number stays used and shows as a gap in the office log.": "Su número queda usado y figura como hueco en el registro de la oficina.",
+  "Undo finalising": "Deshacer la finalización",
+  "Back to a draft?": "¿Volver a borrador?",
+  "The quotation can be changed again and keeps its number {0}.": "El presupuesto se puede volver a modificar y conserva su número {0}.",
+  "Back to a draft": "De vuelta a borrador",
+  "finalising undone": "finalización deshecha"
 }

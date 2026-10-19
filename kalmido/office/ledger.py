@@ -429,6 +429,31 @@ def ofx_finalize_post(did):
     return jsonify(doc_public(c, oid, r, office_role(c, uid, oid) == "admin"))
 
 
+@app.post("/api/office/docs/<int:did>/unlock")
+def ofx_unlock_post(did):
+    """2.114.2 A (#2263): the organisation's admin (members: 403) takes a finalised quotation back to a draft while it was
+    never sent nor answered by the client and nothing was made from it (docs.bga_offer_block; else 409: a new version =
+    duplicate). Invoices, credit notes and the rest: 409. The number stays (finalising again keeps it); the frozen copies go
+    and are made anew then. Not finalised: the document as it is."""
+    from .docs import bga_offer_block, doc_public, doc_row
+    c, uid, oid = _ctx()
+    write_lock(c, f"office_mail_{int(oid)}")  # 2.114.2 (#2263 review): a parallel mail send sees the lock (sent_at) first
+    write_lock(c, f"office_doc_{int(did)}")
+    r = doc_row(c, oid, did)
+    if office_role(c, uid, oid) != "admin":
+        raise Denied(403, tr("Only an admin of this organisation can do this"))
+    if ofx_locked(r):
+        why = bga_offer_block(c, oid, r)
+        if why:
+            raise Denied(409, tr(why))
+        c.execute("UPDATE office_docs SET locked_at=NULL, locked_by=NULL, sender=NULL, recipient_snapshot=NULL, tax_snapshot=NULL, "
+                  "updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), did, oid))
+        ofx_log(c, oid, "unlock", doc_id=did, detail={"number": r["number"]})
+        bump(c)
+        c.commit()
+    return jsonify(doc_public(c, oid, doc_row(c, oid, did), True))
+
+
 @app.get("/api/office/docs/<int:did>/log")
 def ofx_doc_log_get(did):
     """The organisation's admin: the history of one document (newest first)."""
