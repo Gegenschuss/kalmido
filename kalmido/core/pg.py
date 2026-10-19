@@ -444,7 +444,7 @@ def pool(url):
             # check: a cheap test of every borrowed connection, so a database restart costs no failed requests
             p = ConnectionPool(url, min_size=POOL_MIN, max_size=POOL_MAX, timeout=POOL_WAIT_S, open=False, configure=_configure,
                                kwargs={**_new_conn_kwargs(), "context": _ctx_for_adapters()},
-                               check=ConnectionPool.check_connection,
+                               check=_check_borrowed,
                                reset=lambda pg: pg.rollback() if pg.info.transaction_status != TransactionStatus.IDLE else None)
             p.open(wait=False)
             _POOL["p"] = p
@@ -458,6 +458,23 @@ def _ctx_for_adapters():
 class _AdaptCtx:
     adapters = ADAPTERS
     connection = None
+
+
+def _check_borrowed(pg):
+    """The pool's test of a borrowed connection. 2.102.1: a broken one usually means the server dropped them all (a database
+    restart): then every idle connection is tested at once (pool.check: the broken ones go, new ones are opened), else the
+    borrow would walk the dead ones one by one with the pool's growing pause between them (1 + 2 + 4 + 8 + 16 s, past the
+    30 s wait with six dead connections)."""
+    try:
+        ConnectionPool.check_connection(pg)
+    except Exception:
+        p = _POOL["p"]
+        if p is not None:
+            try:
+                p.check()
+            except Exception:  # noqa: BLE001 - the borrow goes on with its own retry
+                pass
+        raise
 
 
 def connect_pooled(url):
