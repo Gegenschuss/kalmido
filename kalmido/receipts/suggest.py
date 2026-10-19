@@ -266,7 +266,7 @@ def rc_accept(sid):
         c.execute("UPDATE doc_meta SET amount=?, currency=? WHERE node_id=?",
                   (S.doc_seal(c, m["ws"], "doc_meta.amount", amt or pa), ccy or pc, n["id"]))
     if vat is not _KEEP:
-        pv = (cur["vat_pct"] if cur else None) or "-"
+        pv = ((cur["vat_pct"] or "-") if cur else "x")  # 2.121.0 review M2: "x" = there was no receipt row before
     prev = rc_set(c, n, m["ws"], lid, cat, uid, vat, keep=bool(cur))  # 2.121.0 review M2: an amount-only accept keeps the receipt
     c.execute("UPDATE rc_suggest SET state='accepted', decided_by=?, decided_at=?, prev_list_id=?, prev_category=?, prev_amount=?, prev_currency=?, "
               "prev_vat_pct=? WHERE id=?",
@@ -301,9 +301,9 @@ def rc_reopen(sid):
     uid = me()
     s, n, m = _need_sug(c, sid)
     if s["state"] == "accepted":
-        vat = _KEEP if s["prev_vat_pct"] is None else (None if s["prev_vat_pct"] == "-" else s["prev_vat_pct"])
+        vat = _KEEP if s["prev_vat_pct"] is None else (None if s["prev_vat_pct"] in ("-", "x") else s["prev_vat_pct"])
         only_money = not s["list_id"] and not s["category"]  # 2.121.0 review M2: its accept never created / removed the row
-        rc_set(c, n, m["ws"], s["prev_list_id"], s["prev_category"] or "", uid, vat, keep=only_money and bool(
+        rc_set(c, n, m["ws"], s["prev_list_id"], s["prev_category"] or "", uid, vat, keep=only_money and s["prev_vat_pct"] != "x" and bool(
             c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (n["id"],)).fetchone()))
         if s["prev_amount"] is not None or s["prev_currency"] is not None:  # 2.121.0 C (#2096): the amount before the accept
             pa = S.doc_open(c, m["ws"], "rc_suggest.prev_amount", s["prev_amount"]) or ""

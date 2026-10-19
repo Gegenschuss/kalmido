@@ -50,7 +50,15 @@ def _ctx():
 
 
 def _today():
-    return date.today().isoformat()
+    from ..core.db import local_now  # 2.121.0 review N2: the instance's day, like the year (books)
+    return local_now().date().isoformat()
+
+
+def _not_future(day):
+    """2.121.0 review M1: an entry (also a cancellation) lies at most one day ahead (time zones), never in the future."""
+    if day > (date.fromisoformat(_today()) + timedelta(days=1)).isoformat():
+        raise BadInput(tr("A cash entry cannot lie in the future."))
+    return day
 
 
 def _amount(v, name="amount", zero=False):
@@ -61,9 +69,12 @@ def _amount(v, name="amount", zero=False):
         d = dec(v.strip() if isinstance(v, str) else v, "NaN")
     except Exception:
         raise BadInput(tr("Invalid value: {0}", name))
-    if d.is_nan() or not d.is_finite() or d < 0 or (d == 0 and not zero) or d > MAX_AMOUNT:
+    if d.is_nan() or not d.is_finite():
         raise BadInput(tr("Invalid value: {0}", name))
-    return money(d)
+    d = money(d)  # 2.121.0 review M2: rounded first, so 0.004 is no entry of 0,00
+    if d < 0 or (d == 0 and not zero) or d > MAX_AMOUNT:
+        raise BadInput(tr("Invalid value: {0}", name))
+    return d
 
 
 def _de(v):
@@ -169,7 +180,7 @@ def cb_links_get():
     client)}: what an entry may point at."""
     from .books import bk_receipts
     c, uid, oid = _ctx()
-    to = date.today()
+    to = date.fromisoformat(_today())
     rcs = bk_receipts(c, oid, (to - timedelta(days=400)).isoformat(), (to + timedelta(days=1)).isoformat(), uid)
     rcs = [{"node_id": r["node_id"], "title": r["title"], "date": r["date"], "amount": dstr(r["amount"])} for r in reversed(rcs)][:300]
     inv = [{"id": r["id"], "number": r["number"], "date": r["date"], "client": r["name"] or ""} for r in c.execute(
@@ -227,7 +238,7 @@ def cb_book_patch(bid):
         return jsonify(_book_public(c, oid, bid))
     rows = _rows(c, oid, bid)
     if ("opening" in prev or "opening_day" in prev) and cb_last_closed(c, bid):
-        raise _locked("The opening balance cannot change after a day closing.")
+        raise _locked(N_("The opening balance cannot change after a day closing."))
     if "opening_day" in prev and rows and rows[0]["day"] < row["opening_day"]:
         raise BadInput(tr("There are entries before this day."))
     if "opening" in prev:
@@ -291,9 +302,7 @@ def _entry_clean(c, oid, uid, b, cur=None):
     new = cur is None
     out = {}
     if "day" in b or new:
-        out["day"] = _day(b.get("day") or _today())
-        if out["day"] > (date.today() + timedelta(days=1)).isoformat():
-            raise BadInput(tr("A cash entry cannot lie in the future."))
+        out["day"] = _not_future(_day(b.get("day") or _today()))
     if "dir" in b or new:
         if b.get("dir") not in CB_DIRS:
             raise BadInput(tr("Invalid value: {0}", "dir"))
@@ -326,7 +335,7 @@ def _entry_clean(c, oid, uid, b, cur=None):
 def _day_rules(c, book, day):
     last = cb_last_closed(c, book["id"])
     if last and day <= last:
-        raise _locked("This day is closed already: book on a later day, or cancel the entry.")
+        raise _locked(N_("This day is closed already: book on a later day, or cancel the entry."))
     if day < book["opening_day"]:
         raise BadInput(tr("The day lies before the opening balance of the cash box ({0}).", book["opening_day"]))
 
@@ -429,7 +438,7 @@ def cb_entry_post(bid):
     write_lock(c, f"office_cash_{bid}")
     book = _book(c, oid, bid)
     if book["archived"]:
-        raise _locked("This cash box is archived.")
+        raise _locked(N_("This cash box is archived."))
     _day_rules(c, book, row["day"])
     rows = _rows(c, oid, bid)
     no = (c.execute("SELECT MAX(no) FROM office_cash_entries WHERE book_id=?", (bid,)).fetchone()[0] or 0) + 1
@@ -453,13 +462,15 @@ def cb_entry_patch(eid):
     bid = _entry(c, oid, eid)["book_id"]
     write_lock(c, f"office_cash_{bid}")
     book = _book(c, oid, bid)
+    if book["archived"]:  # 2.121.0 review N1: an archived box takes no changes (like no new entries)
+        raise _locked(N_("This cash box is archived."))
     cur = oc_dec_fields(c, oid, "office_cash_entries", _entry(c, oid, eid))
     last = cb_last_closed(c, bid)
     if last and cur["day"] <= last:
-        raise _locked("This entry lies on a closed day and cannot change any more; cancel it instead.")
+        raise _locked(N_("This entry lies on a closed day and cannot change any more; cancel it instead."))
     rows = _rows(c, oid, bid)
     if cur.get("storno_of") or any(r.get("storno_of") == eid for r in rows):
-        raise _locked("A cancelled entry or a cancellation cannot change.")
+        raise _locked(N_("A cancelled entry or a cancellation cannot change."))
     row = _entry_clean(c, oid, uid, _body(), cur)
     before, after = _vals(cur), _vals(dict(cur, **row))
     prev = {k: before[k] for k in CB_FIELDS if before[k] != after[k]}
@@ -484,13 +495,15 @@ def cb_entry_cancel(eid):
     c, uid, oid = _ctx()
     bid = _entry(c, oid, eid)["book_id"]
     b = _body()
-    day = _day(b.get("day") or _today())
+    day = _not_future(_day(b.get("day") or _today()))
     write_lock(c, f"office_cash_{bid}")
     book = _book(c, oid, bid)
+    if book["archived"]:  # 2.121.0 review N1
+        raise _locked(N_("This cash box is archived."))
     cur = oc_dec_fields(c, oid, "office_cash_entries", _entry(c, oid, eid))
     rows = _rows(c, oid, bid)
     if cur.get("storno_of") or any(r.get("storno_of") == eid for r in rows):
-        raise _locked("This entry is cancelled already or is itself a cancellation.")
+        raise _locked(N_("This entry is cancelled already or is itself a cancellation."))
     if day < cur["day"]:
         day = cur["day"]
     _day_rules(c, book, day)
@@ -561,7 +574,7 @@ def _close_day(c, book, b):
     day = _day(b.get("day") or _today())
     last = cb_last_closed(c, book["id"])
     if last and day <= last:
-        raise _locked("This day is closed already.")
+        raise _locked(N_("This day is closed already."))
     if day > _today():
         raise BadInput(tr("Only days up to today can be closed."))
     if day < book["opening_day"]:
