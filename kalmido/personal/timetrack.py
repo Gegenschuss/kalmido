@@ -709,8 +709,8 @@ def time_report_api():
 
 
 def _csv_cell(v):
-    v = str(v or "")
-    return "'" + v if v[:1] in ("=", "+", "-", "@", "\t", "\r") else v
+    from ..core.serializers import csv_cell  # 2.122.4 B (#2317): one shared helper
+    return csv_cell(v)
 
 
 @app.get("/api/time/export.csv")

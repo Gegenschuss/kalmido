@@ -612,6 +612,10 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 @media (pointer:coarse) {
   .ofdeditor select,.ofdhead select{height:var(--fld-h);line-height:1.25}
 }
+/* 2.122.4 C (#2326): same for the office settings - iOS ignores min-height on a select, so it was 36 px there */
+@media (pointer:coarse) {
+  .ofcset select{height:var(--fld-h);line-height:1.25}
+}
 /* 2.119.0 A (#2288): entertainment receipts (office_meals.js) */
 .bwbar .bwocc{flex:0 1 12rem;min-width:7rem;min-height:2.25rem}
 .bwlist .rotag{display:inline-flex;align-items:center;gap:.25rem;flex:none}

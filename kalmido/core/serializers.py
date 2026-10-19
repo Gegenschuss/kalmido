@@ -217,3 +217,9 @@ def unlink_files(paths):
 def running_pomo(c, uid=None):
     r = c.execute("SELECT * FROM pomos WHERE \"end\" IS NULL AND user_id=? ORDER BY id DESC LIMIT 1", (uid or me(),)).fetchone()
     return dict(r) if r else None
+
+
+def csv_cell(s):
+    """2.122.4 B (#2317): free text for a CSV cell, no formulas in spreadsheet programs (= + - @ TAB CR LF at the start)."""
+    s = str(s or "")
+    return "'" + s if s[:1] in ("=", "+", "-", "@", "\t", "\r", "\n") else s

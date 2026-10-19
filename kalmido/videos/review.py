@@ -152,6 +152,17 @@ def vdr_client_ok(c, uid, cid):
     return any(x["id"] == cid for x in client_rows(c, uid))
 
 
+def rg4_client_write(c, uid, cid):
+    """2.122.4 A (#2215 L9): change / delete / customer link of a review at a client, like the office's own routes: an
+    organisation's client needs an office role there (admin | member), a private client is its creator's (seeing the
+    client alone, e.g. an instance admin's overview, is not enough)."""
+    from ..office.model import office_role
+    cl = c.execute("SELECT org_id, created_by FROM clients WHERE id=?", (cid,)).fetchone()
+    if not cl:
+        return False
+    return office_role(c, uid, cl["org_id"]) in ("admin", "member") if cl["org_id"] else cl["created_by"] == uid
+
+
 def vdr_may(c, uid, r, write=False, api=False):
     """May person uid see (write: change) review r? The task / list / client it hangs at decides, else the workspace.
     2.99.1 C (#1959): api = the REST API (videos/v1.py): an agent there sees only reviews at a task / list shared with it."""
@@ -165,7 +176,7 @@ def vdr_may(c, uid, r, write=False, api=False):
     if r["list_id"]:
         return list_role(c, r["list_id"], uid) in (WRITE_ROLES if write else FULL_ROLES)
     if r["client_id"]:
-        return vdr_client_ok(c, uid, r["client_id"])
+        return vdr_client_ok(c, uid, r["client_id"]) and (not write or rg4_client_write(c, uid, r["client_id"]))
     if r["org_id"] is None:
         return r["owner_id"] == uid
     from ..accounts.orgs import user_orgs
@@ -211,6 +222,8 @@ def vdr_target(c, uid, b):
         return l["org_id"], None, i, None
     if not vdr_client_ok(c, uid, i):
         raise Denied(404)
+    if not rg4_client_write(c, uid, i):  # 2.122.4 A (#2215 L9)
+        raise Denied(403)
     return c.execute("SELECT org_id FROM clients WHERE id=?", (i,)).fetchone()["org_id"], None, None, i
 
 
@@ -235,8 +248,27 @@ def vdr_comments(c, vid, version_id=None, public=False):
     return rows
 
 
+# 2.122.4 A (#2217): the customer's decision is stored neutral (a control character no comment input keeps, vdr_clean) and
+# put into the reader's language when shown; comments stored before stay as they are
+RG4_DEC = "\x1edec:"
+RG4_DEC_TEXT = {"accepted": N_("Approved|video"), "declined": N_("Changes requested")}
+
+
+def rg4_dec_store(st, reason):
+    return f"{RG4_DEC}{st}\x1e{reason or ''}"
+
+
+def rg4_dec_text(body, lg=None):
+    """A comment's text for reading: a stored decision in the reader's language (lg: the customer page), else unchanged."""
+    if not (body or "").startswith(RG4_DEC):
+        return body
+    st, _, reason = body[len(RG4_DEC):].partition("\x1e")
+    text = tr(RG4_DEC_TEXT.get(st, RG4_DEC_TEXT["declined"]), lg=lg)
+    return f"{text}: {reason}" if reason else text
+
+
 def vdr_comment_dict(x, names):
-    return {"id": x["id"], "version_id": x["version_id"], "parent_id": x["parent_id"], "at_sec": x["at_sec"], "body": x["body"],
+    return {"id": x["id"], "version_id": x["version_id"], "parent_id": x["parent_id"], "at_sec": x["at_sec"], "body": rg4_dec_text(x["body"]),
             "author_id": x["author_id"], "author": x["ext_name"] or names.get(x["author_id"]) or "", "customer": bool(x["ext_name"]),
             "done": bool(x["done"]), "created_at": x["created_at"]}
 
@@ -272,7 +304,9 @@ def vdr_dict(c, r, uid, full=False, signoffs=True):
         names = user_names(c, [x["author_id"] for x in cm])
         d["comments"] = [vdr_comment_dict(x, names) for x in cm]
         if d["can_write"] and signoffs:
-            rows = c.execute("SELECT * FROM office_signoffs WHERE video_id=? AND kind='video' ORDER BY id DESC LIMIT 20", (r["id"],)).fetchall()
+            # 2.122.4 A (#2215 L3): the records keep their review across a move; only those of its current workspace show
+            rows = c.execute("SELECT * FROM office_signoffs WHERE video_id=? AND kind='video' AND org_id IS NOT DISTINCT FROM ? ORDER BY id DESC LIMIT 20",
+                             (r["id"], r["org_id"])).fetchall()
             adm = vdr_full(c, uid, r)
             d["signoffs"] = [sig_public(c, s, adm) for s in rows]
         else:
@@ -524,13 +558,13 @@ def vdr_export_rows(c, r, version_id=None):
     for x in sorted(top, key=lambda x: (ns.get(x["version_id"], 0), x["at_sec"] is None, x["at_sec"] or 0, x["id"])):
         for y in [x] + [k for k in cm if k["parent_id"] == x["id"]]:
             out.append((f"v{ns.get(y['version_id'], '')}", vdr_tc(y["at_sec"] if y is x else x["at_sec"]), y["ext_name"] or names.get(y["author_id"]) or "",
-                        y["body"], bool(x["done"]), y is not x))
+                        rg4_dec_text(y["body"]), bool(x["done"]), y is not x))  # 2.122.4 A (#2217)
     return out
 
 
 def vdr_csv_cell(s):
-    s = str(s or "")
-    return "'" + s if s[:1] in ("=", "+", "-", "@", "\t") else s  # no formulas in spreadsheet programs
+    from ..core.serializers import csv_cell  # 2.122.4 B (#2317): one shared helper
+    return csv_cell(s)
 
 
 @app.get("/api/videos/<int:vid>/export")
@@ -588,7 +622,8 @@ def vdr_sig_revoke(vid, sid):
     from ..office.signoff import sig_public
     c, uid = db(), me()
     r = vdr_need(c, vid, write=True)
-    s = c.execute("SELECT * FROM office_signoffs WHERE id=? AND video_id=? AND kind='video'", (sid, vid)).fetchone()
+    s = c.execute("SELECT * FROM office_signoffs WHERE id=? AND video_id=? AND kind='video' AND org_id IS NOT DISTINCT FROM ?",
+                  (sid, vid, r["org_id"])).fetchone()  # 2.122.4 A (#2215 L3): never one of the old workspace
     if not s:
         raise Denied(404)
     if s["state"] == "open" and not s["revoked_at"]:
@@ -617,9 +652,9 @@ def vdr_sig_decided(c, s, st, version, name, reason, lg):
     """The customer decided: the review's state follows (approved | changes) and the decision stands in the comments of
     the version shown (with the reason), so the team reads it next to the other notes."""
     c.execute("UPDATE video_reviews SET state=?, updated_at=? WHERE id=?", ("approved" if st == "accepted" else "changes", iso(now_utc()), s["video_id"]))
-    text = tr("Approved|video", lg=lg) if st == "accepted" else tr("Changes requested", lg=lg)
+    text = rg4_dec_store(st, reason)  # 2.122.4 A (#2217): neutral, shown in the reader's language (was the customer's)
     insert_id(c, "INSERT INTO video_comments(review_id, version_id, org_id, parent_id, at_sec, body, author_id, ext_name, done, created_at) "
-                 "VALUES(?,?,?,NULL,NULL,?,NULL,?,?,?)", (s["video_id"], version["id"], s["org_id"], f"{text}: {reason}" if reason else text, name,
+                 "VALUES(?,?,?,NULL,NULL,?,NULL,?,?,?)", (s["video_id"], version["id"], s["org_id"], text, name,
                                                           1 if st == "accepted" else 0, iso(now_utc())))
 
 
@@ -659,7 +694,7 @@ def vdr_sig_html(c, s, lg, token, prefix):
     def one(x, reply=False):
         who = x["ext_name"] or names.get(x["author_id"]) or ""
         at = "" if reply or x["at_sec"] is None else f'<a class="vdr-at" href="#t={int(x["at_sec"])}" data-at="{x["at_sec"]}">{e(vdr_tc(x["at_sec"]))}</a> '
-        return (f'<li class="vdr-c{" done" if x["done"] else ""}">{at}<b>{e(who)}</b> <span class="vdr-b">{e(x["body"])}</span>'
+        return (f'<li class="vdr-c{" done" if x["done"] else ""}">{at}<b>{e(who)}</b> <span class="vdr-b">{e(rg4_dec_text(x["body"], lg))}</span>'
                 + (f'<ul class="vdr-re">{"".join(one(k, True) for k in kids[x["id"]])}</ul>' if x["id"] in kids else "") + "</li>")
     top = [x for x in cm if not x["parent_id"]]
     marks = "".join(f'<span class="vdr-mk" data-at="{x["at_sec"]}" title="{e(vdr_tc(x["at_sec"]))}"></span>' for x in top if x["at_sec"] is not None)
@@ -839,14 +874,13 @@ def vdr_move_space(vid):
     c.execute("UPDATE video_comments SET org_id=? WHERE review_id=?", (to, vid))
     if live:
         c.execute(f"UPDATE office_signoffs SET revoked_at=? WHERE id IN ({','.join('?' * len(live))})", [ts, *live])
-    if sigs:
-        c.execute("UPDATE office_signoffs SET video_id=NULL WHERE video_id=?", (vid,))
+    # 2.122.4 A (#2215 L3): the records keep video_id (were emptied and vanished from every list); the lists filter by workspace
     revived = 0
     if back and back.get("sigs"):
         ids = [i for i in back["sigs"] if isinstance(i, int) and not isinstance(i, bool)][:200]
         if ids:
-            revived = c.execute(f"UPDATE office_signoffs SET video_id=? WHERE id IN ({','.join('?' * len(ids))}) AND video_id IS NULL "
-                                "AND kind='video' AND org_id IS NOT DISTINCT FROM ?", [vid, *ids, to]).rowcount
+            revived = c.execute(f"UPDATE office_signoffs SET video_id=? WHERE id IN ({','.join('?' * len(ids))}) AND (video_id IS NULL "
+                                "OR video_id=?) AND kind='video' AND org_id IS NOT DISTINCT FROM ?", [vid, *ids, vid, to]).rowcount  # 2.122.4 A (#2215 L3)
     detail = {"place": place, "place_id": r[place] if place else None, "sigs": [s["id"] for s in sigs]}
     mid = insert_id(c, "INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('video',?,?,?,?,?,?)",
                     (vid, r["org_id"], to, uid, ts, json.dumps(detail)))

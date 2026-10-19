@@ -12,7 +12,8 @@
 .bmbar select{min-height:2.75rem;max-width:100%}
 .bmseg button{min-width:2.75rem;min-height:2.75rem}
 .bmtags{display:flex;flex-wrap:wrap;gap:.375rem}
-.bmtag{border:1px solid var(--line2);background:var(--bg2);color:inherit;border-radius:1.25rem;padding:.375rem .75rem;min-height:2.25rem;cursor:pointer;font:inherit;font-size:.8125rem}
+.bmtag{border:1px solid var(--line2);background:var(--bg2);color:inherit;border-radius:1.25rem;padding:.375rem .75rem;min-height:2.25rem;cursor:pointer;font:inherit;font-size:.8125rem;position:relative}
+.bmtag::before{content:"";position:absolute;inset:-.25rem -.125rem}  /* 2.122.4 C (#2223): 44 px target, look unchanged */
 .bmtag.on{border-color:var(--accent);color:var(--accent)}
 .bmgrid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));gap:.75rem}
 .bmcard{border:1px solid var(--line2);border-radius:var(--r-l);background:var(--bg2);overflow:hidden;display:flex;flex-direction:column;min-width:0}
@@ -46,3 +47,9 @@
 @media (max-width:40rem){ .bmgrid{grid-template-columns:1fr} .bmdfoot .btn{flex:1 1 auto;justify-content:center} }
 .bmconf .bmctitle{margin:.25rem 0 0;overflow-wrap:anywhere}
 .bmconf .bmcurl{margin:.25rem 0 .75rem;font-size:.8125rem;overflow-wrap:anywhere}
+/* 2.122.4 C (#2223): on a phone the label sits above the field, so description and note use the full width; the save bar stays reachable above the keyboard */
+@media (max-width:40rem){
+  .bmdlg .row label{flex:1 0 100%;min-width:0}
+  .bmdlg .row input,.bmdlg .row select,.bmdlg .row textarea{flex:1 1 100%;min-width:0;width:100%;box-sizing:border-box}
+  .bmdlg .bmdfoot{position:sticky;bottom:-1.25rem;background:var(--bg2);padding:.5rem 0 .25rem;margin-bottom:-.25rem}
+}

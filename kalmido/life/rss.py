@@ -11,7 +11,7 @@ from html.parser import HTMLParser
 
 from ..core.i18n import N_, tr
 from ..core.db import connect, iso, now_utc, parse_iso
-from ..core.pg import insert_id
+from ..core.pg import IntegrityError, insert_id
 from ..core.access import Denied, task_visible
 from ..tasks.validation import as_int, TITLE_MAX
 from ..personal.timetrack import BadInput
@@ -338,10 +338,11 @@ def rss_add(c, uid, b):
     if not cal_rate(uid):
         raise Denied(429, tr("Too many attempts, please wait a few minutes"))
     if old:  # a deleted one comes back with its articles
-        c.execute("UPDATE rss_feeds SET deleted_at=NULL WHERE id=?", (old["id"],))
-        fid = old["id"]
-    else:
-        fid = insert_id(c, "INSERT INTO rss_feeds(user_id,url,created_at) VALUES(?,?,?)", (uid, url, iso(now_utc())))
+        fid = old["id"] if rg4_feed_restore(c, old["id"]) else None
+    else:  # 2.122.4 A (#1906): a parallel request (double tap) that inserted first wins (unique index rss_feeds_live)
+        fid = insert_id(c, "INSERT INTO rss_feeds(user_id,url,created_at) VALUES(?,?,?) ON CONFLICT DO NOTHING", (uid, url, iso(now_utc())))
+    if not fid:
+        raise BadInput(tr("You already follow this feed"))
     f = c.execute("SELECT * FROM rss_feeds WHERE id=?", (fid,)).fetchone()
     new, code = rss_fetch(c, f)
     if code:
@@ -372,7 +373,8 @@ def rss_restore(c, uid, fid):
             raise BadInput(tr("You already follow this feed"))
         if _count(c, uid) >= RSS_MAX_FEEDS:
             raise BadInput(tr("At most {0} feeds", RSS_MAX_FEEDS))
-        c.execute("UPDATE rss_feeds SET deleted_at=NULL WHERE id=?", (fid,))
+        if not rg4_feed_restore(c, fid):  # 2.122.4 A (#1906): followed again in parallel
+            raise BadInput(tr("You already follow this feed"))
     return {"feed": rss_feed_out(rss_own(c, uid, fid))}
 
 
@@ -463,6 +465,32 @@ def rss_opml_export(c, uid):
             f'  <body>\n{body}  </body>\n</opml>\n')
 
 
+def rg4_feed_restore(c, fid):
+    """2.122.4 A (#1906): a deleted feed comes back -> False when the same address is followed again meanwhile (the unique
+    index rss_feeds_live refuses a second live row)."""
+    try:
+        with c.savepoint():
+            c.execute("UPDATE rss_feeds SET deleted_at=NULL WHERE id=?", (fid,))
+        return True
+    except IntegrityError:
+        return False
+
+
+def rg4_feed_unique(c):
+    """2.122.4 A (#1906), at start: one followed feed per address and person (partial unique index, additive). A database
+    that already holds such duplicates keeps them (nothing is deleted) and only gets the index once they are gone."""
+    if c.execute("SELECT 1 FROM pg_indexes WHERE indexname='rss_feeds_live'").fetchone():
+        return
+    if c.execute("SELECT 1 FROM rss_feeds WHERE deleted_at IS NULL GROUP BY user_id, url HAVING COUNT(*) > 1 LIMIT 1").fetchone():
+        print("feeds (#1906): duplicate followed feeds found, the unique index waits until they are removed", flush=True)
+        return
+    try:
+        with c.savepoint():
+            c.execute("CREATE UNIQUE INDEX IF NOT EXISTS rss_feeds_live ON rss_feeds(user_id, url) WHERE deleted_at IS NULL")
+    except IntegrityError:
+        print("feeds (#1906): the unique index could not be built (duplicates)", flush=True)
+
+
 def rss_opml_import(c, uid, raw):
     """The feeds of an OPML file (nested outlines too) are subscribed without fetching (the background does that) ->
     {added, skipped, errors}; at most RSS_MAX_FEEDS in all."""
@@ -477,7 +505,8 @@ def rss_opml_import(c, uid, raw):
         raise BadInput(tr("Not a valid OPML file")) from None
     if _ln(root) != "opml":
         raise BadInput(tr("Not a valid OPML file"))
-    have = {r[0]: r[1] for r in c.execute("SELECT url, deleted_at FROM rss_feeds WHERE user_id=?", (uid,)).fetchall()}
+    # 2.122.4 A (#1906): a followed feed wins over a deleted one with the same address (live rows last)
+    have = {r[0]: r[1] for r in c.execute("SELECT url, deleted_at FROM rss_feeds WHERE user_id=? ORDER BY deleted_at IS NULL, id", (uid,)).fetchall()}
     n = _count(c, uid)
     added = skipped = errors = 0
     ts = iso(now_utc())
@@ -499,11 +528,16 @@ def rss_opml_import(c, uid, raw):
             errors += 1
             continue
         title = rss_text(o.get("title") or o.get("text") or "", RSS_TITLE_MAX)
-        if url in have:  # deleted before: back
-            c.execute("UPDATE rss_feeds SET deleted_at=NULL WHERE user_id=? AND url=? AND deleted_at IS NOT NULL", (uid, url))
-        else:
-            c.execute("INSERT INTO rss_feeds(user_id,url,title,site_url,created_at) VALUES(?,?,?,?,?)",
-                      (uid, url, title, rss_url(o.get("htmlUrl") or ""), ts))
+        if url in have:  # deleted before: back (2.122.4 A (#1906): the newest one only, never twice)
+            r = c.execute("SELECT MAX(id) FROM rss_feeds WHERE user_id=? AND url=? AND deleted_at IS NOT NULL", (uid, url)).fetchone()
+            done = bool(r and r[0]) and rg4_feed_restore(c, r[0])
+        else:  # 2.122.4 A (#1906): a parallel import / add of the same address keeps one feed
+            done = insert_id(c, "INSERT INTO rss_feeds(user_id,url,title,site_url,created_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
+                             (uid, url, title, rss_url(o.get("htmlUrl") or ""), ts))
+        if not done:
+            have[url] = None
+            skipped += 1
+            continue
         have[url] = None
         n += 1
         added += 1
