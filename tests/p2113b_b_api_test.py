@@ -9,6 +9,8 @@ Invented names only.
    (members only) read and send them through the REST API; an end-to-end encrypted DM refuses files
  - search, reply quotes, "save as task" and pushes keep working in the new rooms; agents cannot open channels / groups
  - a person without an organisation: a private channel with the people they work with (freelancer-matrix: team)
+ - review fixes: a files-only message edited without text; a personal agent leaves with its owner; a removed creator no
+   longer manages; a list channel's file follows its list out of the organisation; a deleted account takes its DM files along
 usage: p2113b_b_api_test.py <datadir>      (a fresh container; P2113BB_NOSTART=1 = the server already runs)"""
 import base64
 import os
@@ -328,6 +330,59 @@ check(r.status_code == 400, "freelancer: a group only with people who work with 
 check(Fi.delete(B + f"/api/team/rooms/{FCH}/members/{FIO}").ok, "freelancer: fiona leaves")
 rr = Fr.get(B + "/api/team")
 check(rr.ok and any(x["id"] == FCH for x in rr.json()["rooms"]), "freelancer: the channel in the own conversations")
+
+# ================================================================== 2.113.1 review fixes (#2059)
+# editing a files-only message: the text may stay empty (the files are the message); a text-only one may not
+r = Bo.patch(B + f"/api/team/messages/{MF}", json={"body": ""})
+check(r.ok and j(r).get("body") == "" and len(j(r).get("attachments") or []) == 1, "review: a files-only message is edited without text " + r.text[:200])
+TXT = j(Bo.post(B + f"/api/team/rooms/{GEN}/messages", json={"body": "Text only"})).get("id")
+check(Bo.patch(B + f"/api/team/messages/{TXT}", json={"body": " "}).status_code == 400, "review: a text-only message still needs text")
+# a personal agent leaves with its owner; the creator manages the channel only while a member
+check(requests.get(V + f"/team/rooms/{SEC}/messages", headers=BBH).status_code == 200, "review: bobbot reads bob's channel")
+r = A.delete(B + f"/api/team/rooms/{SEC}/members/{BOB}")
+check(r.ok and j(r).get("members") == 1, "review: alice (admin) removes bob, his agent goes along " + r.text[:200])
+check(requests.get(V + f"/team/rooms/{SEC}/messages", headers=BBH).status_code == 404, "review: bobbot reads bob's former channel no more")
+check(DBC.execute("SELECT COUNT(*) FROM tchat_members WHERE room_id=? AND user_id=?", (SEC, BB)).fetchone()[0] == 0, "review: bobbot's member row is gone")
+check(Bo.patch(B + f"/api/team/rooms/{SEC}", json={"name": "Back"}).status_code in (403, 404), "review: bob (creator, removed) no longer renames it")
+check(Bo.post(B + f"/api/team/rooms/{SEC}/members", json={"user_id": BOB}).status_code in (403, 404), "review: bob cannot add himself back")
+DBC.execute("INSERT INTO tchat_members(room_id,user_id,added_by,created_at) VALUES(?,?,?,?)", (SEC, BB, BOB, "2026-10-19T08:00:00"))
+check(requests.get(V + f"/team/rooms/{SEC}/messages", headers=BBH).status_code == 404, "review: a left-over agent row without its owner reads nothing")
+DBC.execute("DELETE FROM tchat_members WHERE room_id=? AND user_id=?", (SEC, BB))
+# a list channel's file follows the list out of the organisation
+MV = A.post(B + "/api/lists", json={"name": "Moving", "org_id": ORG}).json()["id"]
+assert A.put(B + f"/api/lists/{MV}/members", json={"user_id": BOB, "role": "edit"}).ok
+LR = next((x["id"] for x in A.get(B + "/api/team").json()["rooms"] if x.get("list_id") == MV), None)
+r = files_post(A, LR, [("brief.txt", b"list brief", "text/plain")], body="Brief")
+FL = (j(r).get("attachments") or [{}])[0].get("id")
+check(r.status_code == 201 and Bo.get(B + f"/api/team/files/{FL}").content == b"list brief", "review: a file in a list channel " + r.text[:200])
+r = A.patch(B + f"/api/lists/{MV}", json={"org_id": None})
+check(r.ok, "review: the list moves into alice's own space " + r.text[:200])
+check(A.get(B + f"/api/team/files/{FL}").content == b"list brief", "review: the list channel's file still opens for its owner")
+check(Bo.get(B + f"/api/team/files/{FL}").content == b"list brief", "review: ... and for bob (member of the list)")
+check(Ev.get(B + f"/api/team/files/{FL}").status_code == 404, "review: ... not for eve")
+check(DBC.execute("SELECT org_id FROM tchat_files WHERE id=?", (FL,)).fetchone()[0] is None, "review: a list channel's file row has no organisation")
+# deleting an account deletes its files sealed with its key (DM); its files in an organisation's channel stay
+r = A.post(B + "/api/users", json={"orgs": [ORG], "username": "gina", "display_name": "Gina", "password": "password123", "email": "gina@example.com"})
+GINA = r.json()["id"]
+assert A.put(B + f"/api/lists/{TEAM}/members", json={"user_id": GINA, "role": "edit"}).ok
+Gi = sess("gina")
+Gi.patch(B + "/api/settings", json={"lang": "en"})
+GDM = Gi.post(B + "/api/team/dm", json={"user_id": ALICE}).json()["id"]
+r = files_post(Gi, GDM, [("cv.txt", b"gina's file", "text/plain")], body="For you")
+FG = (j(r).get("attachments") or [{}])[0].get("id")
+check(r.status_code == 201 and A.get(B + f"/api/team/files/{FG}").content == b"gina's file", "review: gina sends alice a file " + r.text[:200])
+r = files_post(Gi, GEN, [("open.txt", b"for the channel", "text/plain")], body="Channel file")
+FGC = (j(r).get("attachments") or [{}])[0].get("id")
+check(r.status_code == 201, "review: gina posts a file in the open channel " + r.text[:200])
+gdisk = os.path.join(DATA, "attachments", "tchat", str(GDM)) if DATA else ""
+gbefore = len(os.listdir(gdisk)) if gdisk and os.path.isdir(gdisk) else None
+r = A.delete(B + f"/api/users/{GINA}")
+check(r.ok, "review: alice deletes gina's account " + r.text[:200])
+check(A.get(B + f"/api/team/files/{FG}").status_code in (404, 410), "review: gina's DM file is gone with her account")
+check(DBC.execute("SELECT COUNT(*) FROM tchat_files WHERE id=?", (FG,)).fetchone()[0] == 0, "review: its row is gone")
+check(Bo.get(B + f"/api/team/files/{FGC}").content == b"for the channel", "review: her file in the organisation's channel stays")
+if gbefore is not None:
+    check(gbefore == 1 and len(os.listdir(gdisk)) == 0, f"review: the DM file left the disk ({gbefore} -> {len(os.listdir(gdisk))})")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed", flush=True)
 if FAILS:
