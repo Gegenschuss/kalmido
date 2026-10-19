@@ -1286,6 +1286,17 @@ fresh; run p2120_d_ui node p2120_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.120.0 part E: own letterhead as background PDF (#2091)
 fresh; run p2120_e_api "$PY" p2120_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2120_e_ui node p2120_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.121.0 part A: receipt extraction: supplier, VAT rate, net / gross, invoice number (#2092)
+fresh; run p2121_a_api "$PY" p2121_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2121_a_ui node p2121_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.121.0 part B: cash book (#2095)
+fresh; run p2121_b_api "$PY" p2121_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2121_b_ui node p2121_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.121.0 part C: bill a receipt on to a client (#2094), agents suggest amount and VAT (#2096)
+fresh; run p2121_c_api "$PY" p2121_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2121_c_ui node p2121_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.121.0 lead: receipt categories with an SKR03 / SKR04 account (#2093)
+fresh; run p2121_d_api "$PY" p2121_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.122.3 part A: office - one amount at 0 % VAT, import/export on the settings page, empty areas link there (#2333 #2335)
 fresh; run p21223_a_api "$PY" p21223_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21223_a_ui node p21223_a_ui.js "$KALMIDO_TEST_DATA"

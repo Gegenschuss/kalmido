@@ -286,6 +286,8 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths):
               (new, to, S.doc_seal(c, new, "doc_meta.text", text), S.doc_seal(c, new, "doc_meta.amount", amount),
                S.label_id(c, new, "sender", sender) if sender else None, S.label_id(c, new, "type", typ) if typ else None,
                asn, _now(), nid))
+    if m["extracted"]:  # 2.121.0 A (#2092): the recognised receipt values move along, sealed for the new workspace
+        S.meta_set_json(c, nid, new, "extracted", S.meta_json(c, m, "extracted", {}))
     new_tags = {t["id"]: S.label_id(c, new, "tag", t["name"]) for t in tags}
     S.set_tags(c, nid, [x for x in new_tags.values() if x], {new_tags[t["id"]]: t["auto"] for t in tags if new_tags[t["id"]]})
     # 2.96.0 (#1941): the target's models learn the document at once (sender, type, folder, tags as
@@ -317,6 +319,10 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths):
             c.execute("DELETE FROM rc_suggest WHERE id=?", (r["id"],))  # an agent outside the target never sees it again
             continue
         note = fsm_open(c, old, "rc_suggest.note", r["note"]) or ""
+        amt = fsm_open(c, old, "rc_suggest.amount", r["amount"]) or ""  # 2.121.0 C (#2096)
+        pamt = fsm_open(c, old, "rc_suggest.prev_amount", r["prev_amount"])
+        c.execute("UPDATE rc_suggest SET amount=?, prev_amount=? WHERE id=?",
+                  (S.doc_seal(c, new, "rc_suggest.amount", amt), S.doc_seal(c, new, "rc_suggest.prev_amount", pamt), r["id"]))
         c.execute("UPDATE rc_suggest SET ws=?, org_id=?, note=?, list_id=?, prev_list_id=? WHERE id=?",
                   (new, to, S.doc_seal(c, new, "rc_suggest.note", note),
                    r["list_id"] if fsm_list_ok(c, r["list_id"], to, uid) else None,

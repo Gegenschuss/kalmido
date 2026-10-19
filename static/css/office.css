@@ -529,6 +529,38 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
   .lgb-list .lgb-row{align-items:flex-start;padding:.625rem .75rem}
   .lgb-bar select{max-width:100%;flex:1 1 8rem}
 }
+/* 2.121.0 B (#2095): the cash book (prefix cb-) */
+.cb-bar select{max-width:14rem}
+.cb-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin:.5rem 0 .25rem}
+.cb-head>div{display:flex;flex-direction:column;gap:.125rem}
+.cb-bal{font-size:1.5rem;font-variant-numeric:tabular-nums}
+.cb-euer{margin:0 0 .75rem}
+.cb-quick{display:grid;gap:.5rem;background:var(--bg2);border:.0625rem solid var(--line2);border-radius:var(--radius);padding:.75rem;margin:0 0 1rem}
+.cb-quick input,.cb-quick select{min-height:2.75rem}
+.cb-dir button{flex:1 1 0;min-height:2.75rem}
+.cb-amount{font-size:1.25rem;font-variant-numeric:tabular-nums}
+.cb-qrow{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+.cb-qrow>*{flex:1 1 8rem;min-width:0}
+.cb-go{min-height:2.75rem;justify-self:end}
+.cb-row{align-items:center}
+.cb-no{flex:none;min-width:2rem;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
+.cb-row .ofcn small{overflow-wrap:anywhere;white-space:normal}
+.cb-ref{color:var(--accent)}
+.cb-x .ofcn b{text-decoration:line-through;text-decoration-thickness:.0625rem}
+.cb-lock{flex:none;color:var(--muted);display:inline-flex}
+.cb-amt{flex:none;display:flex;flex-direction:column;align-items:flex-end;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cb-in{color:var(--accent)}
+.cb-books{display:grid;gap:1rem}
+.cb-bk{background:var(--bg2);border:.0625rem solid var(--line2);border-radius:var(--radius);padding:.75rem}
+.cb-bk h3{margin:0 0 .5rem}
+.cb-arch{opacity:.7}
+.cb-fs{border:0;margin:0;padding:0;min-width:0}
+.cb-plan .lgb-dl{margin:.5rem 0}
+@media (max-width:599px) {
+  .cb-bar select{max-width:100%;flex:1 1 8rem}
+  .cb-go{justify-self:stretch}
+  .cb-foot .btn{flex:1 1 auto;min-height:2.75rem}
+}
 /* 2.94.0 A (#1930): leads (prefix lead-) */
 .pipcols{grid-template-columns:repeat(5,minmax(0,1fr))}
 .lead-card .lead-next{display:flex;gap:.25rem;align-items:flex-start;font-size:.875rem;overflow-wrap:anywhere}

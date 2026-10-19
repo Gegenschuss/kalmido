@@ -88,7 +88,7 @@ with this exemption reason.
 The area Office (office, clients, contacts) has one menu with three groups instead of tab rows:
 
 - **Sell** - Pipeline, Quotes & invoices, Clients, Contacts, Documents, Framework contracts
-- **Money** - Cash flow, Figures, Bank, Bookkeeping, Subscriptions & tools, Travel expenses, Entertainment receipts
+- **Money** - Cash flow, Figures, Bank, Bookkeeping, Cash book (2.121), Subscriptions & tools, Travel expenses, Entertainment receipts
 - **Administration** - Equipment, Contracts & insurance, Settings
 
 Services and text blocks are no menu points any more: they are the tab **Templates** under **Settings** (Settings has the
@@ -613,6 +613,18 @@ section lists the figures (fields 81, 86, 21, 45, 66, 83) for a month or quarter
 small businesses get no return. A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
 as "Tax reserve" and "Freely available". No tax advice; figures without guarantee. Kalmido sends nothing to the tax office.
 
+**Billing receipts on to a client (2.121):** under the receipts of the month, **Bill receipts on to a client …** (or **Bill on to a
+client …** in a receipt's sheet) puts the ticked receipts as positions "external costs" on a quotation or invoice in draft: the
+amount is the purchase price, the markup in % makes the price (one position per receipt or one for all). A receipt with a VAT rate
+is billed net (the input tax stays yours), without a rate or in a small business gross. The row then says "billed on …"; a receipt
+is never billed twice, and Undo takes the positions back while the document is a draft. Agents may suggest amount, currency and VAT
+rate of a receipt as well; you change them in the suggestion card before you accept (Undo brings the old values back).
+
+**Accounts per category (2.121):** with the DATEV export set up, a receipt's sheet shows under the category the account of the
+chart SKR03 or SKR04 (Settings → DATEV) it is booked on - the default the export finds for the category (e.g. Software 4964 /
+6837), or your own. **Change account** sets your own account for this category (empty = the default again; one undo step); the
+DATEV batch and the lines of the income/expense statement use the same account.
+
 ## Bank reconciliation (2.90)
 
 The tab **Bank** (admins of the office area; in a personal office its owner) matches the bookings of your account with
@@ -748,6 +760,37 @@ Routes (office admins only; members 403, other areas 404, agents 403): `GET|POST
 `PATCH|DELETE /api/office/drives/<id>`, `POST /api/office/drives/<id>/restore`, `GET /api/office/drives/<id>/log`,
 `POST /api/office/drives/<id>/trip`, `GET /api/office/logbook/report?year=&vehicle_id=`,
 `GET /api/office/logbook.csv|pdf?year=&vehicle_id=`, `PUT /api/office/logbook/settings` `{km_rate, year}`.
+
+## Cash book (2.121)
+
+The menu group **Money** has the point **Cash book** (admins of the office area; without an organisation your personal
+office) for cash income and expenses. Every office has a **default cash box** (made on the first look, opening balance 0
+from that day); more boxes can be added under **Cash boxes** (name, opening balance, the day of the opening balance; saved
+on change). Boxes are archived, never deleted; the default box stays.
+
+- **Quick entry** on top (phone first): income or expense, amount, text, date (today), VAT rate 19 / 7 / 0 %, category
+  (the receipt categories as suggestion, free text allowed). Every entry gets the **next number of its box, without
+  gaps**, also when several people book at the same moment. The balance never drops below zero: such an entry is refused
+  with a clear message (also when it would only be negative on an earlier day).
+- An entry can point at a **receipt** of the office's documents (the receipt then shows "In the cash book ... no. X") or
+  at an **issued invoice** paid in cash.
+- **Nothing is deleted.** An entry is taken back only by **cancelling**: a counter entry with a new number that names the
+  original ("Cancels no. X"); the original shows "Cancelled by no. Y", both stay. The undo of a booking is such a
+  cancellation. Entries of an open day can still be changed; every change is logged with the values before ("History").
+- **Close day**: shows the opening balance, income, expense and closing balance (and closes earlier open days with
+  entries too). Closing is **final** - there is no undo: afterwards no entry up to that day changes, none is booked on or
+  before it, corrections only by cancellation on a later day, and the opening balance of the box is fixed.
+- **Export** as CSV (semicolon, decimal comma) or PDF for a year or a period: number, date, text, income, expense, VAT,
+  balance, cancellation link, receipt / invoice, the day closings and the change log.
+- The cash book is a record of the cash and its balance; it does **not** count in the income/expense statement (the
+  receipts and invoice payments do, as before), so nothing counts twice. No tax advice; figures without guarantee.
+
+Routes (office admins only; members 403, other areas 404, agents 403; no agent API): `GET|POST /api/office/cashbooks`,
+`PATCH /api/office/cashbooks/<id>` (name, opening, opening_day, archived), `GET /api/office/cashbooks/links`,
+`GET|POST /api/office/cashbooks/<id>/entries` (`?year=` or `?from=&to=`), `PATCH /api/office/cash-entries/<id>`,
+`POST /api/office/cash-entries/<id>/cancel` `{day}`, `GET /api/office/cash-entries/<id>/log`,
+`GET|POST /api/office/cashbooks/<id>/closing` `{day}`, `GET /api/office/cashbooks/<id>/log`,
+`GET /api/office/cashbook.csv|pdf?book_id=&year=`, `GET /api/docs/<id>/cashbook` (the hint on a receipt).
 
 ## Travel expenses: per diem (2.95)
 
