@@ -247,7 +247,8 @@ def cf8_key(r):
 
 def cf8_invoiced(inv):
     """The quotations with a finalised invoice (not a draft, not cancelled: the rows of rk_cashflow's inv) by source_doc_id."""
-    return {r["source_doc_id"] for r in inv if r["source_doc_id"]}
+    # 2.120.0 (#2087, review M1): a progress invoice does not settle its quotation -- the rest stays in the plan (rk_cashflow)
+    return {r["source_doc_id"] for r in inv if r["source_doc_id"] and (r["inv_type"] or "") != "progress"}
 
 
 def cf8_counting(docs, invoiced):
@@ -282,7 +283,7 @@ def cf8_chain(c, oid, r):
                      "AND (id=? OR version_of=?) ORDER BY id", (oid, root, root)).fetchall()
     rows = [x for x in rows if cf8_key(x) == cf8_key(r)]
     inv = c.execute("SELECT source_doc_id FROM office_docs WHERE org_id=? AND kind='invoice' AND locked_at IS NOT NULL AND locked_at<>'' "
-                    "AND status NOT IN ('draft', 'cancelled') AND source_doc_id IN (%s)" % ",".join("?" * len(rows)),
+                    "AND status NOT IN ('draft', 'cancelled') AND COALESCE(inv_type, '')<>'progress' AND source_doc_id IN (%s)" % ",".join("?" * len(rows)),
                     (oid, *[x["id"] for x in rows])).fetchall() if rows else []
     invoiced = {x["source_doc_id"] for x in inv}
     counting = cf8_counting(rows, invoiced)
@@ -367,10 +368,14 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
     # in: quotations (plan). 2.88.0 (#1915): sent ones too (open quotation), one version per chain (cf8_counting); a chain with
     # an invoice is left out as a whole (was: the rest after the invoiced part; the invoice is in the plan by itself)
     counting = cf8_counting(docs, cf8_invoiced(inv))
+    prog = {}  # 2.120.0 (#2087, review M1): finalised progress invoices per quotation, deducted from its planned amount
+    for x in inv:
+        if (x["inv_type"] or "") == "progress" and x["source_doc_id"]:
+            prog[x["source_doc_id"]] = prog.get(x["source_doc_id"], 0) + dec(_j(x["totals"]).get("gross") or 0) / _fx(x, home)
     for r in docs:
         if r["id"] not in counting:
             continue
-        gross = dec(_j(r["totals"]).get("gross") or 0) / _fx(r, home)
+        gross = dec(_j(r["totals"]).get("gross") or 0) / _fx(r, home) - prog.get(r["id"], 0)
         day = plan_day(r["service_to"] or r["service_from"] or r["date"] or "")
         put(day, "in", "plan", "offer", gross * nf(r), r["project_title"] or "", res=gross * netf(r), number=r["number"], doc_id=r["id"],
             open_offer=r["status"] == "sent")

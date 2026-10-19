@@ -87,7 +87,8 @@ def dx_settings(s):
         for k in DX_DEFAULTS:
             if k in v and v[k] is not None:
                 out[k] = v[k]
-    return out
+    from .datevin import dv_settings  # 2.120.0 C (#2090): the input side (receipts, travel expenses)
+    return dv_settings(v, out)
 
 
 def _digits(v, name, lo, hi, empty_ok=True):
@@ -142,7 +143,8 @@ def dx_settings_clean(v, cur):
     for k, mx in (("debtor", n + 1), ("bank", n), ("cash", n)):
         if k in v:
             out[k] = _digits(v[k], k, 1, mx)
-    return out
+    from .datevin import dv_settings_clean  # 2.120.0 C (#2090)
+    return dv_settings_clean(v, out)
 
 
 def _acct(st, key):
@@ -214,8 +216,9 @@ def _case(r, s):
     return "exempt"  # 2.47.3 (review S2): the document's own note decides, never today's switch (documents already exported keep their account)
 
 
-def dx_rows(c, oid, d_from, d_to, s=None):
-    """The booking lines (dicts of DX_COLUMNS names) of the period [d_from, d_to] (ISO dates)."""
+def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
+    """The booking lines (dicts of DX_COLUMNS names) of the period [d_from, d_to] (ISO dates). 2.120.0 C (#2090): inside =
+    with the input side (when switched on in the settings); hints_out (a list) gets its hints."""
     s = s if s is not None else office_settings(c, oid)
     st = dx_settings(s)
     out = []
@@ -273,6 +276,12 @@ def dx_rows(c, oid, d_from, d_to, s=None):
                     "Belegdatum": _ddmm(r["p_date"]), "Belegfeld 1": BELEG_RE.sub("-", r["number"] or "")[:36],
                     "Buchungstext": ("Zahlung " + (r["number"] or "") + " " + name).strip()[:60], "Festschreibung": "0",
                     "_date": r["p_date"], "_kind": "payment"})
+    if inside:  # 2.120.0 C (#2090): receipts and travel expenses in the same batch (office/datevin.py)
+        from .datevin import dv_rows
+        rows, hints = dv_rows(c, oid, d_from, d_to, st, s)
+        out += rows
+        if hints_out is not None:
+            hints_out += hints
     out.sort(key=lambda x: x["_date"] or "")
     return out
 
@@ -286,12 +295,12 @@ def dx_check(st, d_from, d_to):
         raise BadInput(tr(DX_FY_SPAN, a.strftime("%d.%m.%Y"), b.strftime("%d.%m.%Y")))
 
 
-def dx_extf(c, oid, d_from, d_to, by="", s=None, now=None):
+def dx_extf(c, oid, d_from, d_to, by="", s=None, now=None, inside=True, hints_out=None):
     """The batch file as bytes (Windows-1252) + the number of booking lines."""
     s = s if s is not None else office_settings(c, oid)
     st = dx_settings(s)
     dx_check(st, d_from, d_to)
-    rows = dx_rows(c, oid, d_from, d_to, s)
+    rows = dx_rows(c, oid, d_from, d_to, s, inside=inside, hints_out=hints_out)
     now = now or local_now()
     fy = dx_fiscal_year(date.fromisoformat(d_from), int(st["fy_start"]))[0]
     head = ['"EXTF"', "700", "21", '"Buchungsstapel"', "13", now.strftime("%Y%m%d%H%M%S") + f"{now.microsecond // 1000:03d}", "",
@@ -333,17 +342,18 @@ def _period():
 @app.get("/api/office/datev/extf")
 def dx_extf_get():
     """Org admin: ?from=YYYY-MM-DD&to=YYYY-MM-DD (default: the previous month) -> the EXTF booking batch as a CSV download;
-    ?check=1 -> {count, from, to, file} only (the client checks before the download and shows errors as text)."""
+    ?check=1 -> {count, from, to, file, hints} only (the client checks before the download and shows errors as text)."""
     c = db()
     uid = office_gate(c)
     oid = office_org(c, uid, admin=True)
     d_from, d_to = _period()
     u = g.user
     by = (u["display_name"] if "display_name" in u.keys() else "") or u["username"]
-    data, n = dx_extf(c, oid, d_from, d_to, by=by)
+    hints = []  # 2.120.0 C (#2090): ?in=0 leaves the input side out; the check names what the input side could not book
+    data, n = dx_extf(c, oid, d_from, d_to, by=by, inside=request.args.get("in") != "0", hints_out=hints)
     fname = f"EXTF_Buchungsstapel_{d_from.replace('-', '')}_{d_to.replace('-', '')}.csv"
     if request.args.get("check"):
-        return jsonify(count=n, **{"from": d_from, "to": d_to}, file=fname)
+        return jsonify(count=n, **{"from": d_from, "to": d_to}, file=fname, hints=hints)
     ofx_log(c, oid, "export", target="datev", detail={"from": d_from, "to": d_to, "count": n})
     c.commit()
     return Response(data, mimetype="text/csv; charset=windows-1252", headers={"Content-Disposition": f"attachment; filename=\"{fname}\""})

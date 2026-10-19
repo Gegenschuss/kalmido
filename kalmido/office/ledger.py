@@ -40,7 +40,7 @@ from .packs import office_pack
 
 # P2: does a document of this kind get its number only when it is finalised? (quotations: at creation, unless the
 # organisation chose otherwise; invoices / credit notes of a later release: always at finalising)
-OFX_NUMBER_AT_FINALIZE = {"offer": False, "invoice": True, "credit": True, "reminder": True}
+OFX_NUMBER_AT_FINALIZE = {"offer": False, "invoice": True, "credit": True, "reminder": True, "delivery": True}  # 2.120.0 D (#2089)
 OFX_LOCKED = N_("This document is finalised and cannot be changed. Duplicate it to make a new version.")
 OFX_DETAIL_MAX = 60000
 Q2 = Decimal("0.01")
@@ -348,6 +348,10 @@ def ofx_finalize(c, oid, uid, did):
     sender = {"company": ofx_company_print(fields, s.get("company") or {}, lang, pack), "fields": fields, "color": color,
               "logo": logo, "logo_sha256": sha, "pack": pack.get("code") or s["pack"]}
     sender["company"]["sender_line"] = ofx_sender_line(sender["company"])  # 2.97.1 (#2224): frozen with the rest
+    from .letterhead import bp_snapshot
+    lhs = bp_snapshot(c, oid, s)  # 2.120.0 E (#2091): the own letterhead frozen with the rest (only when there is one)
+    if lhs:
+        sender["letterhead"] = lhs
     from .docs import cdn_doc_recipient, bwb_accept_on
     if r["kind"] == "offer":  # 2.114.4 B (#2270): the order confirmation block frozen with the rest (a later setting never changes it)
         sender["accept_on"] = bwb_accept_on(r, s)
