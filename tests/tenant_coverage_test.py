@@ -950,6 +950,8 @@ ROUTES = {
     # 2.120.0 B (#2088): the customer's documents in the portal (cookie address + space + client, another client / space /
     # a draft 404) and the office's "Send portal link" (a client of the office area only; p2120_b_api_test.py)
     "GET /portal/docs/{}/pdf": "portal", "POST /api/office/clients/{}/portal-link": "office",
+    # 2.138.0 D (#2256): number ranges of the office area one works in, admins write (p2138_d_api_test.py)
+    "GET /api/office/number-ranges": "office", "POST /api/office/number-ranges/{}": "office",
 }
 
 # ---- 1. every route is classified, nothing stale

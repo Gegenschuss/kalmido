@@ -181,6 +181,24 @@ each duplicate in its chain of versions the next number. A duplicate keeps the r
 and does not move the counter: `KV-{client}-{yyyy}-{seq:02}-V{version}` gives `KV-ACME-2026-03-V1`, then
 `KV-ACME-2026-03-V2`. When the first quotation's number does not follow today's scheme, the duplicate takes the next
 number with its version.
+### Number ranges: the next running number (2.138.0)
+
+Under the number schemes the settings show **Next running number** for every series (quotation, invoice, credit note,
+reminder, delivery note), with the finished number as a preview. Only an office admin changes it (members read it, agents never), and
+only upwards: never to or below the last number given. With a year in the scheme it applies to the current year ("applies
+to 2026"). A jump in the invoice or credit note series needs a reason (GoBD); every change, with its reason, goes into the
+office log. Typical use: continue the numbers of a previous program (e.g. start invoices at 1001). Quotations
+counted per client or project have no single series and are not listed.
+
+- `GET /api/office/number-ranges` -> `{ranges: [{kind, scheme, period, yearly, last, next, min_next, preview, reason_needed}], admin}`
+- `POST /api/office/number-ranges/<kind>` `{next, reason?}` (admin; 400 below `min_next` or without a needed reason)
+
+A draft's number can be changed in the document editor (the pencil next to the number; `POST /api/office/docs/<id>/number`
+`{number, reason?}`): unique per office area, never for a sent or finalised document (409). Invoices, credit notes,
+reminders and delivery notes get their number only when finalised (no gaps), so the pencil shows on quotation drafts (and
+not when quotations are numbered at finalising too); a quotation's own number leaves the counter as it is. The document
+list shows the new number at once. Both routes are session routes of the office (no API
+v1 / MCP tool), the same in the personal office of a person without an organisation.
 
 ## Country packs
 
