@@ -153,6 +153,7 @@ HRS = field(A, L3, "Hours", "number")
 FX = field(A, L3, "Double", "formula", formula="{Hours} * 2")
 rule(A, L3, "formula", {"kind": "field", "field_id": FX["id"]}, {"kind": "priority", "priority": "low"}, 400)
 rule(A, L3, "bad option", {"kind": "field", "field_id": ST["id"], "value": "nope"}, {"kind": "priority", "priority": "low"}, 400)
+rule(A, L3, "bad checkbox", {"kind": "field", "field_id": OK["id"], "value": "yes"}, {"kind": "priority", "priority": "low"}, 400)  # 2.114.0 (#2060, review): no checkbox value
 rule(A, L3, "bad number", {"kind": "created"}, {"kind": "field", "field_id": HRS["id"], "value": "abc"}, 400)
 rule(A, L3, "set formula", {"kind": "created"}, {"kind": "field", "field_id": FX["id"], "value": "1"}, 400)
 R4 = rule(A, L3, "Won", {"kind": "field", "field_id": ST["id"], "value": OPT["Won"]}, {"kind": "priority", "priority": "high"})
