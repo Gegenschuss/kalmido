@@ -1226,6 +1226,8 @@ fresh; run p21144_a_api "$PY" p21144_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.114.4 part B (#2270): order confirmation block in the quotation optional (setting + per quotation)
 fresh; run p21144_b_api "$PY" p21144_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21144_b_ui node p21144_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.114.5 (#2300 #2270): quotation PDF page 1 tightened - order confirmation at the end, VAT column, option rows, footer
+fresh; run p21145_api "$PY" p21145_api_test.py "$KALMIDO_TEST_DATA"
 # 2.114.4 part C: documents - PDF preview, variable buttons, finish with empty variables (#2278 #2280 #2281)
 fresh; run p21144_c_api "$PY" p21144_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21144_c_ui node p21144_c_ui.js "$KALMIDO_TEST_DATA"
