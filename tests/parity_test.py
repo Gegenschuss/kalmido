@@ -292,6 +292,9 @@ APP_ONLY = [
      ("=GET /api/state/delta",)),
     ("2.34.0 (#368): the briefing field reads a PDF the person picks (nothing stored); agents read stored files with GET /attachments/{id}/text",
      ("=POST /api/pdf-text",)),
+    # 2.102.0 (#1999): the web app reports its own unexpected errors; a service reports to a list's error hook (token)
+    ("2.102.0 (#1999): the web app's own unexpected errors (window.onerror) -- agents and services use the error hook of a list",
+     ("=POST /api/client-errors",)),
     ("2.92.0 C (#1926): which agents a person may ask for a summary of a file (the preview's button); the request is a comment that mentions the agent",
      ("=GET /api/attachments/{}/agents",)),
     ("sign-in, sessions, two-factor, passkeys, OIDC: a person in a browser", ("* /api/auth/", "* /api/me/2fa", "* /api/me/passkeys", "=PATCH /api/me", "=GET /api/me")),

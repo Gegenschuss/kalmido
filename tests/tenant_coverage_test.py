@@ -106,6 +106,9 @@ KINDS = {
     "own": ("n/a", "the person's own rows only (settings, devices, tokens, habits, time, filters, imports, Home & life, their own "
                    "connections): read and written as user_id = me, never shared; a task / list named in them is checked with "
                    "need_task / need_list (covered by the task / list matrix)"),
+    # 2.102.0 (#1999)
+    "clienterr": ("n/a", "the web app's own unexpected error (message cut of data, place in the code, version, area): written as "
+                         "nobody into the one project list the server operator chose, nothing is read back or answered"),
     "admin": ("n/a", "the operator's administration (need_admin): server settings, backups, alerts, agents, integrations; the operator "
                      "is trusted with the whole server (architecture review 2.1 / B4); people in it are filtered by visible_people"),
     "public": ("n/a", "pages and facts without data of a person (app shell, health, version, robots, manifest, QR code of a given text)"),
@@ -564,7 +567,7 @@ ROUTES = {
     "GET /api/users/{}/delete-info": "people", "POST /api/users/bulk": "people",
     "GET /api/avatar/{}/{}.jpg": "people",
     # ---- public (15)
-    "GET /api/v1/announcement": "public", "GET /api/v1/openapi.json": "public", "GET /api/about": "public",
+    "GET /api/v1/announcement": "public", "GET /api/v1/openapi.json": "public", "GET /api/about": "public", "POST /api/client-errors": "clienterr",
     "GET /": "public", "GET /capture": "public", "GET /share": "public", "POST /share": "public", "POST /drop": "public",
     "POST /drop/drop": "public", "GET /robots.txt": "public", "GET /manifest.json": "public", "GET /sw.js": "public",
     "GET /api/health": "public", "GET /api/version": "public", "POST /api/qr": "public",

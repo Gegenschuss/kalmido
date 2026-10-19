@@ -25,6 +25,7 @@ addresses and paths to your setup.
 - [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom)
 - [Server hardening](#server-hardening)
 - [Intrusion alerts](#intrusion-alerts)
+- [Errors in the browser (2.102)](#errors-in-the-browser-2102)
 - [Mail](#mail)
 - [Virus scan of uploads](#virus-scan-of-uploads)
 - [Documents: text recognition](#documents-text-recognition)
@@ -813,7 +814,24 @@ or a push service, not only to the server itself:
 
 Trigger every alert once on purpose after setting it up, the dead man's switch too.
 
-## Mail
+## Errors in the browser (2.102)
+
+An unexpected error in the web app (an unhandled script error or a rejected promise) can become a bug ticket, so it
+does not vanish in a browser console nobody opens. Off until an admin picks a list: *Settings > Administration > Server >
+Errors in the browser > Report to* offers the project lists the admin manages that have **error reports** switched on
+(list dialog > Repository > Error reports). Switching error reports off in that list, or choosing *Off*, stops it at once;
+the browsers then send nothing.
+
+- **What is sent:** the error message, the place in the code (`/static/js/file.js:line:column`), a short stack of such
+  places (at most 2 KB), the client's and the server's version, the name of the open area (`tasks`, `office`, ...) and
+  whether it was an error or a rejected promise. The server cuts the message once more: quoted texts that are no plain
+  names, e-mail addresses, links and long numbers or ids become placeholders. No task texts, form values, user names or
+  addresses with ids; the ticket is created by nobody.
+- **Who may send:** people signed in (no agents, no public pages), at most 5 reports per person and minute and 60 per
+  hour, at most 20 per page load, the same error once per page load. The list's own limits apply as for every error
+  report: the same error again only counts up at its open ticket, at most 30 new tickets per hour.
+- **Reports from every workspace** of the server go into this one list, without any person's name. Pick a list only the
+  people who look after the server see.
 
 - **Give *Tasks by e-mail* its own mailbox.** Kalmido marks every mail it reads as read and imports it as a task; a
   mailbox you also use yourself gets mixed up.
