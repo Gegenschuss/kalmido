@@ -265,13 +265,12 @@ def dt_offer(c, oid, did, cid):
 
 
 def _addr(cl):
-    """The client's address in one line: the billing fields (street, zip city, country) or the free address."""
-    parts = [x for x in ((cl.get("street") or "").strip(), " ".join(y for y in ((cl.get("zip") or "").strip(), (cl.get("city") or "").strip()) if y))
-             if x]
+    """The client's address in one line: street, extra line, zip city, country (2.97.0 B #1951: the fixed fields only; the
+    old free address was split into them, see team/clients.cdn_backfill)."""
+    parts = [x for x in ((cl.get("street") or "").strip(), (cl.get("address_extra") or "").strip(),
+                         " ".join(y for y in ((cl.get("zip") or "").strip(), (cl.get("city") or "").strip()) if y)) if x]
     if parts and (cl.get("country") or "").strip() and (cl.get("country") or "").strip().upper() != "DE":
         parts.append(cl["country"].strip())
-    if not parts:
-        parts = [x.strip() for x in (cl.get("address") or "").replace("\r", "").split("\n") if x.strip()]
     return ", ".join(parts)
 
 

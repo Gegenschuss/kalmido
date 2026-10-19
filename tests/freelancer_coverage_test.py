@@ -26,9 +26,9 @@ KINDS = {
     "tasks": ("matrix", SUITE + ": tasks, comments, subtasks, attachments, tags, notes, search, trash, day plan, roadmap, export "
                         "and import in the private space; every GET of the area as the freelancer (no 403 / 5xx)"),
     "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET"),
-    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py: the personal office (the freelancer is its admin): settings, company "
+    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
-                         "templates with signature, logbook (2.93.0)"),
+                         "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0)"),
     "files": ("matrix", SUITE + ": the own file store (folders, upload, content, versions) and documents; every GET"),
     "wiki": ("matrix", SUITE + ": knowledge pages in the private space (create, change, search, export, trash)"),
     "pim": ("matrix", SUITE + ", p294_b_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password"),
@@ -299,6 +299,8 @@ ROUTES = {
     "GET /api/office/mail-status": "office", "GET /api/office/number-preview": "office", "GET /api/office/packs": "office",
     "GET /api/office/packs/{}": "office", "GET /api/office/pay-props": "office", "GET /api/office/settings": "office",
     "GET /api/office/trips": "office", "GET /api/office/trips/bill-docs": "office", "GET /api/office/trips/report": "office",
+    "GET /api/office/trips/vma": "office", "GET /api/office/trips/vma-rates": "office", "GET /api/office/trips/vma.csv": "office",  # 2.95.0 A (#1932)
+    "GET /api/office/trips/vma.pdf": "office", "GET /api/office/trips/vma.xlsx": "office",
     "GET /api/office/{}": "office", "GET /api/office/{}/{}": "office", "GET /api/paperless": "office",
     "GET /api/paperless/preview": "office", "GET /api/paperless/zip/preview": "office", "GET /api/v1/clients": "office",
     "GET /api/v1/clients/{}": "office", "GET /api/v1/office": "office", "GET /api/v1/office/docs": "office",
@@ -334,6 +336,7 @@ ROUTES = {
     "POST /api/office/packs/installed/{}/{}/restore": "office", "POST /api/office/packs/validate": "office",
     "POST /api/office/pay-props/{}": "office", "POST /api/office/signoffs/{}/revoke": "office",
     "POST /api/office/trips": "office", "POST /api/office/trips/bill": "office", "POST /api/office/trips/unbill": "office",
+    "POST /api/office/trips/delete": "office", "POST /api/office/trips/import": "office", "POST /api/office/trips/import/preview": "office",  # 2.95.0 B (#1932)
     "POST /api/office/trips/{}/items": "office", "POST /api/office/{}": "office", "POST /api/paperless/import": "office",
     "POST /api/paperless/stop": "office", "POST /api/paperless/zip": "office", "POST /api/paperless/zip/import": "office",
     "POST /api/paperless/zip/part": "office", "POST /api/paperless/zip/stop": "office",

@@ -501,7 +501,7 @@ def umz_preview(c, uid, man, data, can_invite):
         "encrypted": {"attachments": len(ce.get("attachments") or []) if isinstance(ce.get("attachments"), list) else 0,
                       "locked_notes": ce.get("locked_notes") if isinstance(ce.get("locked_notes"), int) else 0},
         "not_taken": skipped, "again": again, "export_id": eid, "kind": "org" if org_kind else "account",
-        "targets": [t for t in umz_targets(c, uid) if not org_kind or t["id"] != "private"],
+        "targets": umz_targets(c, uid),  # 2.96.0 D (#1941): an organisation export may go into the private space too
     }
 
 
@@ -927,6 +927,8 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             run.step()
             if table == "books" and org_kind and _oid(r.get("owner_org_id")):
                 fixed = {**fixed, "owner_org_id": org}  # an address book of the organisation itself (2.52.0 C, #1438)
+                if not org:  # 2.96.0 D (#1941): into the private space it becomes the person's own address book
+                    run.warning(N_("An address book of the organisation became your own address book: {0}"), _txt(r.get("name"), 80))
             d = umz_row(c, table, r, {**fixed, "updated_at": ts, "changed_at": ts}, ts)
             nid = umz_insert(c, table, d) if d else None
             if not nid:
@@ -1115,6 +1117,8 @@ def umz_run(uid, iid, opts):
             eid = st.get("export_id") or secrets.token_hex(8)
             run = _Run(uid, iid, eid, opts["org"], total)
             run.kind = man.get("kind") or "account"
+            if run.kind == "org" and not run.org:  # 2.96.0 D (#1941): an organisation export into the private space
+                run.warning(N_("Imported into your private space: nobody joins an organisation, lists are only shared with the people you ticked."))
             c.commit()
             try:
                 umz_write(c, run, uid, man, zf, files, data, people)
@@ -1503,8 +1507,6 @@ def umz_go(iid):
     c = db()
     tg = b.get("target", "private")
     org = None
-    if tg == "private" and (st.get("preview") or {}).get("kind") == "org":
-        return err(tr("An organisation export goes into an organisation: choose one you administer."))
     if tg != "private":
         if not isinstance(tg, int) or isinstance(tg, bool):
             return err(tr("Invalid value: {0}", "target"))

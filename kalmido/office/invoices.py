@@ -182,7 +182,8 @@ def inv_missing(c, oid, r, s, pack, items):
     if not (rec.get("name") or "").strip():
         miss.append(tr("recipient name"))
     addr_ok = cl is not None and all((cl[k] if k in cl.keys() else "") for k in ("street", "zip", "city"))
-    if not addr_ok and len([x for x in (rec.get("lines") or []) if x.strip()]) < 2:
+    # 2.97.0 B (#1951): with a client only its fields count (its name + attn. line are no address)
+    if not addr_ok and (cl is not None or len([x for x in (rec.get("lines") or []) if x.strip()]) < 2):
         miss.append(tr("recipient address (street, postcode and city)"))
     if not r["date"]:
         miss.append(tr("date"))
@@ -451,7 +452,7 @@ def inv_credit_of(c, oid, uid, inv_):
 def inv_from_time(c, oid, uid, b):
     """{client_id, from, to, project_id?}: an invoice draft from the finished time entries of the client's lists in the
     period, one position per list (project) with the hours; rate = the client's hourly rate when set, else 0 (to fill in)."""
-    from .docs import _date, _recipient_from_client
+    from .docs import _date, _recipient_from_client, cdn_home
     cid = b.get("client_id")
     try:
         cid = int(cid)
@@ -480,7 +481,7 @@ def inv_from_time(c, oid, uid, b):
     groups = c.execute(f"SELECT e.list_id, l.name AS lname, SUM(e.seconds) AS secs {sql} GROUP BY e.list_id, l.name ORDER BY l.name", args).fetchall()
     s = office_settings(c, oid)
     row = inv_new_row(c, oid, s, "invoice", s.get("lang") or "de")
-    row.update(client_id=cid, recipient=json.dumps(_recipient_from_client(dict(cl)), ensure_ascii=False), service_from=d_from, service_to=d_to,
+    row.update(client_id=cid, recipient=json.dumps({k: v for k, v in _recipient_from_client(dict(cl), None, cdn_home(c, oid)).items() if k != "missing"}, ensure_ascii=False), service_from=d_from, service_to=d_to,
                project_title=cl["name"])
     if "payment_terms_days" in cl.keys() and cl["payment_terms_days"]:
         row["payment_days"] = int(cl["payment_terms_days"])
@@ -611,7 +612,8 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
         cl = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (r["client_id"],)).fetchone()
         if cl is not None:
             rec = {k: (cl[k] if k in cl.keys() else "") for k in ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice")}
-    for k in ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice"):
+            rec["extra"] = cl["address_extra"] if "address_extra" in cl.keys() else ""  # 2.97.0 B (#1951): the extra address line
+    for k in ("street", "extra", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice"):
         m["recipient"][k] = rec.get(k) or ""
     # 2.40.0 (#1380): the buyer's contact person (e-invoice BT-56) -- the snapshot's, else the chosen / default one
     if ofx_locked(r) and r["recipient_snapshot"]:

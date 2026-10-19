@@ -20,6 +20,15 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.97.0** (2026-10-19): bookmarks with preview, tags and search (Karakeep fills the same store), a display name for
+  customers and the recipient always from the customer, office data and wiki spaces with a lock move between the private
+  space and an organisation.
+- **2.96.0** (2026-10-18): files, folders, documents, wiki pages and tables move between your private space and an
+  organisation, both ways (sealed again, shares that do not hold end, one undo); an organisation export can go into the
+  private space; one card per background job in the agent chat with a filter.
+- **2.95.0** (2026-10-18): the per diem of business trips with the German flat rates per year (BMF 2025 / 2026; country,
+  city, times and meals per day; a year without rates shows a hint), its report per person as PDF / Excel / CSV, and the
+  import of a per diem spreadsheet with a preview.
 - **2.94.0** (2026-10-18): a public booking page for customers (free times from your calendar, mail confirmation,
   event + contact + lead), leads before the sales pipeline (follow-up, convert to client, CSV import, agents), and Enter in
   the chats makes a new line.
@@ -1144,8 +1153,10 @@ calendar, CalDAV, sharing and the API work as everywhere.
 - **Review & journal**: your day or week (done, still open, moved, coming up) and a private journal with a mood.
 - **Travel**: *Trip* creates a list with the dates, sections for bookings and things to do before you leave, a packing
   list from a template and, with Events on, an all-day event.
-- **Read later**: a reading list; *Connect Karakeep…* with your own address and API key (stored encrypted) turns
-  bookmarks into tasks with their link and archives the ticked ones in Karakeep.
+- **Read later**: a reading list and **Bookmarks** (2.97.0): links with a preview, tags, a note and search, saved from the
+  share target, by pasting or with a browser button ([docs/BOOKMARKS.md](docs/BOOKMARKS.md)); *Connect Karakeep…* with
+  your own address and API key (stored encrypted) brings Karakeep's links in as bookmarks (notes stay tasks) and archives
+  the archived ones in Karakeep.
 - **Feeds** (2.85.0; its own module, off by default): follow RSS / Atom feeds (up to 100, fetched hourly by the server,
   articles kept 30 days), unread first, *Read later* turns an article into a task of your reading list; OPML import and
   export. Private to you; agents and API tokens do not see feeds.

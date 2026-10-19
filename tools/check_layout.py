@@ -113,6 +113,7 @@ TENANT_EXEMPT = {
     "sheet_cells": "2.89.0 (#1916): a cell of a table (bound through sheet_id -> sheets.org_id)",
     "sheet_changes": "2.89.0 (#1916): the trail of an agent call on a table (bound through sheet_id -> sheets.org_id)",
     "sheet_lastvals": "2.89.0 (#1916): the last value of a cell one person saw (their own rows, bound through the cell's sheet)",
+    "space_moves": "2.96.0 (#1941): a page / table moved between workspaces (both sides; read only through the object's visibility: wiki/wkmove.py, sheets/shmove.py)",
     "folder_people": "the owner's folder shared with people: every list share goes through the workspace rule (_folder_member_add)",
     "folder_agents": "2.41.0 (#1420): the agents of an owner's folder; every list share goes through the workspace rule (folder_apply / list_agent_set)",
     "folder_notif": _OWN + " (2.33.0 #927: the owner's notification template of a folder; it only limits pushes of people already in its lists)",

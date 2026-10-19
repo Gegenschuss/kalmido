@@ -21,7 +21,8 @@ from ..life.model import _dump, life_list, need_life
 # only where an admin allowed them). A sync (by hand, else about every hour in the background) adds every bookmark that
 # is not archived (optionally only those of one Karakeep list) as a task of the person's reading list (title + link);
 # a ticked bookmark task is archived in Karakeep (switchable). A bookmark comes in once: deleting its task does not bring
-# it back. Agents have no connection.
+# it back. Agents have no connection. 2.97.0 A (#1950): links come in as bookmarks (life/bookmarks.py, private, src
+# karakeep) instead of tasks; an archived one is archived in Karakeep; notes / files of Karakeep stay tasks.
 KK_PAGE, KK_PAGES = 100, 5
 KK_ARCHIVE_MAX = 50
 KK_EVERY = 3600            # s between background syncs of one connection
@@ -174,6 +175,7 @@ def kk_sync(c, uid):
     """Bookmarks -> tasks, ticked ones -> archived in Karakeep. {added, archived}; the error is stored in the connection
     (and raised as BadInput for a request)."""
     from ..life.model import _insert
+    from ..life.bookmarks import bm_create, bm_kick
     r = kk_row(c, uid)
     if not r:
         raise BadInput(tr("Karakeep is not connected"))
@@ -185,6 +187,9 @@ def kk_sync(c, uid):
             c.execute("UPDATE kk_conns SET list_id=? WHERE user_id=?", (lid, uid))
         seen = {(json.loads(x[0]) or {}).get("bid") for x in c.execute(
             "SELECT fam FROM tasks WHERE created_by=? AND fam ILIKE '%\"kind\":\"bookmark\"%'", (uid,))}
+        # 2.97.0 A (#1950): links come in as bookmarks (life/bookmarks.py); a bookmark comes in once, deleted or not
+        seen |= {x[0] for x in c.execute("SELECT src_id FROM bookmarks WHERE user_id=? AND src='karakeep'", (uid,))}
+        new_bm = []
         cursor = None
         base = f"/lists/{r['source']}/bookmarks" if r["source"] else "/bookmarks"
         for _ in range(KK_PAGES):
@@ -193,11 +198,26 @@ def kk_sync(c, uid):
                 q["cursor"] = cursor
             page = kk_req(c, r, base + "?" + urllib.parse.urlencode(q)) or {}
             for bm in page.get("bookmarks") or []:
+                if not isinstance(bm, dict) or not isinstance(bm.get("content") or {}, dict):
+                    continue  # 2.97.0 review (L6): a malformed entry is skipped, not a crash of the sync
                 bid = str(bm.get("id") or "")
                 if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", bid) or bid in seen or bm.get("archived"):
                     continue
                 title, url = _bm_title_url(bm)
-                _insert(c, uid, lid, title, url=url or None, fam={"kind": "bookmark", "src": "karakeep", "bid": bid})
+                if url:  # 2.97.0 A (#1950): a link -> a private bookmark (preview from Karakeep's fields, else fetched)
+                    ct = bm.get("content") or {}
+                    desc = ct.get("description") if isinstance(ct.get("description"), str) else ""
+                    img = ct.get("imageUrl") if isinstance(ct.get("imageUrl"), str) else ""
+                    row, existed = bm_create(c, uid, {"url": url, "title": title if (bm.get("title") or ct.get("title")) else "",
+                                                      "description": desc, "image_url": img},
+                                             src="karakeep", src_id=bid, preview="image" if img else "ok" if desc else "pending")
+                    if existed:
+                        if not row["src"]:
+                            c.execute("UPDATE bookmarks SET src='karakeep', src_id=? WHERE id=?", (bid, row["id"]))
+                    else:
+                        new_bm.append(row["id"])
+                else:  # a note / a file of Karakeep stays a task of the reading list
+                    _insert(c, uid, lid, title, url=None, fam={"kind": "bookmark", "src": "karakeep", "bid": bid})
                 seen.add(bid)
                 added += 1
             cursor = page.get("nextCursor")
@@ -215,7 +235,20 @@ def kk_sync(c, uid):
                 f["arch"] = 1
                 c.execute("UPDATE tasks SET fam=? WHERE id=?", (_dump(f), t["id"]))
                 archived += 1
+            # 2.97.0 A (#1950): archived bookmarks from Karakeep are archived there too
+            for b in c.execute("""SELECT id, src_id FROM bookmarks WHERE user_id=? AND src='karakeep' AND state='archived' AND kk_arch=0
+                                  AND deleted_at IS NULL LIMIT ?""", (uid, KK_ARCHIVE_MAX)).fetchall():
+                try:
+                    kk_req(c, r, f"/bookmarks/{b['src_id']}", "PATCH", {"archived": True})
+                except KkError as e:
+                    if not str(e).startswith("http 404"):
+                        raise
+                c.execute("UPDATE bookmarks SET kk_arch=1 WHERE id=?", (b["id"],))
+                archived += 1
         c.execute("UPDATE kk_conns SET synced_at=?, error='' WHERE user_id=?", (iso(now_utc()), uid))
+        if new_bm:
+            c.commit()
+            bm_kick(new_bm)
     except KkError as e:
         c.execute("UPDATE kk_conns SET synced_at=?, error=? WHERE user_id=?", (iso(now_utc()), str(e)[:40], uid))
         c.commit()

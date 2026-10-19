@@ -23,12 +23,12 @@ from ..personal.timetrack import BadInput
 # see, so two people of one organisation may see different sums. The amount uses the list's hourly rate, else the
 # client's. Budget: hours and / or an amount; 80 % turns the bar amber, 100 % red. The timesheet is the time report
 # filtered to the client's lists (CSV, printable page).
-CLIENT_FIELDS = ("name", "icon", "color", "contact", "email", "phone", "address", "note", "rate", "budget_h", "budget_amount",
+CLIENT_FIELDS = ("name", "display_name", "icon", "color", "contact", "email", "phone", "address", "note", "rate", "budget_h", "budget_amount",
                  "org_id", "archived")
-CLIENT_TEXT_MAX = {"name": 80, "icon": 8, "color": 20, "contact": 120, "email": 200, "phone": 60, "address": 500, "note": 4000}
+CLIENT_TEXT_MAX = {"name": 80, "display_name": 80, "icon": 8, "color": 20, "contact": 120, "email": 200, "phone": 60, "address": 500, "note": 4000}
 # 2.36.2 (#1021, E): structured billing fields (office & finance; people only, never in agent answers)
-CLIENT_BILLING = ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days")
-CLIENT_BILLING_MAX = {"street": 200, "zip": 20, "city": 120, "country": 2, "vat_id": 20, "customer_no": 40, "buyer_reference": 60,
+CLIENT_BILLING = ("street", "address_extra", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days")
+CLIENT_BILLING_MAX = {"street": 200, "address_extra": 200, "zip": 20, "city": 120, "country": 2, "vat_id": 20, "customer_no": 40, "buyer_reference": 60,
                       "email_invoice": 200}
 COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
 
@@ -205,10 +205,10 @@ def client_public(c, uid, r, stats=False, month=None):
     lids = client_lists(c, uid, r["id"])
     org = c.execute("SELECT name FROM orgs WHERE id=?", (r["org_id"],)).fetchone() if r["org_id"] else None
     u = _user(c, uid)
-    d = {k: r[k] for k in ("id", "name", "icon", "color", "contact", "email", "phone", "address", "note", "rate", "budget_h",
+    d = {k: r[k] for k in ("id", "name", "display_name", "icon", "color", "contact", "email", "phone", "address", "note", "rate", "budget_h",
                            "budget_amount", "org_id", "created_by", "created_at", "updated_at")}
     d.update(archived=bool(r["archived"]), org_name=org[0] if org else "", lists=lids,
-             can_delete=bool(u and (u["is_admin"] or r["created_by"] == uid)))
+             can_delete=bool(u and (u["is_admin"] or r["created_by"] == uid)), label=cdn_label(c, uid, r))
     from ..office.contacts_cl import fk_contacts
     d["contacts"] = fk_contacts(c, r["id"])  # 2.40.0 (#1380): the contact persons, the default first ("contact" = its name)
     if u and (u["kind"] or "user") == "agent":  # 2.81.0 (#1466): agents get name / role only per contact person, no mail / phone / link
@@ -227,8 +227,11 @@ def clients_brief(c, uid):
     2.56.3 (#1842): org_id too - the office's client picker keeps only the clients of the office's org (null = private)."""
     if not clients_on(c, uid):
         return []
-    return [{"id": r["id"], "name": r["name"], "icon": r["icon"], "color": r["color"], "org_id": r["org_id"],
-             "archived": bool(r["archived"]), "lists": client_lists(c, uid, r["id"])} for r in client_rows(c, uid)]
+    rows = client_rows(c, uid)
+    labels = cdn_labels(rows)  # 2.97.0 B (#1951): the name pickers show
+    return [{"id": r["id"], "name": r["name"], "display_name": r["display_name"], "label": labels[r["id"]], "icon": r["icon"],
+             "color": r["color"], "org_id": r["org_id"], "archived": bool(r["archived"]), "lists": client_lists(c, uid, r["id"])}
+            for r in rows]
 
 
 def _gate(c):
@@ -290,6 +293,8 @@ def client_create():
     f.update(created_by=uid, created_at=ts, updated_at=ts)
     cid = insert_id(c, f"INSERT INTO clients({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values()))
     _contacts_from_body(c, cid, f.get("org_id"), body(), f)
+    if f.get("address"):
+        cdn_fill_address(c, cid)
     bump(c)
     c.commit()
     return jsonify(client_public(c, uid, need_client(c, cid, uid), stats=True)), 201
@@ -325,6 +330,8 @@ def client_update(cid):
             if _org_boundary(c):  # 2.86.0 (N11): the lists of the old workspace stay there and lose the client
                 c.execute("UPDATE lists SET client_id=NULL WHERE client_id=? AND org_id IS DISTINCT FROM ?", (cid, f["org_id"]))
     _contacts_from_body(c, cid, need_client(c, cid, uid)["org_id"], body(), f)
+    if f.get("address"):
+        cdn_fill_address(c, cid)
     bump(c)
     c.commit()
     return jsonify(client_public(c, uid, need_client(c, cid, uid), stats=True))
@@ -374,3 +381,82 @@ def list_client_set(c, lid, cid):
             raise Denied(409, tr("The client belongs to another workspace than this list"))
     c.execute("UPDATE lists SET client_id=? WHERE id=?", (cid, lid))
 
+
+
+# ---------------------------------------------------------------- 2.97.0 B (#1951): display name, the address from fixed fields
+# display_name is the name in pickers and lists only; documents, e-invoices and the letterhead always print "name". Without
+# a display name, clients of one workspace with the same name get their city appended ("Foo (Basel)"), the country when
+# the cities are the same too. The free address text left the client form: a client with it and no street / postcode /
+# city gets those split from it once (start and every write of "address", which old API callers still send); the text
+# itself stays in its column.
+def cdn_labels(rows):
+    """{client id: label} of the rows (the clients one person sees)."""
+    out, groups = {}, {}
+    for r in rows:
+        dn = (r["display_name"] if "display_name" in r.keys() else "") or ""
+        out[r["id"]] = dn or r["name"]
+        if not dn:
+            area = r["org_id"] if r["org_id"] is not None else ("p", r["created_by"])
+            groups.setdefault((area, (r["name"] or "").strip().lower()), []).append(r)
+    for rs in groups.values():
+        if len(rs) < 2:
+            continue
+        cities = [((r["city"] if "city" in r.keys() else "") or "").strip() for r in rs]
+        lows = [x.lower() for x in cities]
+        for r, city in zip(rs, cities):
+            country = ((r["country"] if "country" in r.keys() else "") or "").strip()
+            twin = [rs[i] for i, x in enumerate(lows) if x == city.lower()]
+            extra = city if city and len(twin) == 1 else country if country and \
+                sum(1 for x in twin if (x["country"] or "").strip() == country) == 1 else city or country
+            if extra:
+                out[r["id"]] = f"{r['name']} ({extra})"
+    return out
+
+
+def cdn_label(c, uid, r):
+    """The label of client row r for uid (the labels of all their clients, once per request)."""
+    try:
+        cache = g.setdefault("cdn_labels", {})
+    except RuntimeError:  # outside a request
+        cache = {}
+    if uid not in cache:
+        cache[uid] = cdn_labels(client_rows(c, uid))
+    dn = (r["display_name"] if "display_name" in r.keys() else "") or ""
+    return cache[uid].get(r["id"]) or dn or r["name"]
+
+
+def cdn_split_free(r):
+    """{street, zip, city, country?} split from the free address of client row r (the empty ones left out)."""
+    from ..office.countries import fk_country_code
+    from ..office.legacyimport import fi_split_address
+    lines = [x.strip() for x in (r["address"] or "").replace("\r", "").split("\n") if x.strip()]
+    if not lines:
+        return {}
+    name = (r["name"] or "").strip()
+    if lines[0].lower() != name.lower():
+        lines.insert(0, name)  # the parser reads a whole address block, the name on top
+    sp = fi_split_address("\n".join(lines))
+    f = {k: re.sub(r"\s+", " ", sp.get(k) or "").strip()[:CLIENT_BILLING_MAX[k]] for k in ("street", "zip", "city")}
+    f = {k: v for k, v in f.items() if v}
+    cc = fk_country_code(sp.get("country"))
+    if f and cc and not (r["country"] or "").strip():
+        f["country"] = cc
+    return f
+
+
+def cdn_fill_address(c, cid):
+    """Client cid: street / postcode / city from its free address when all three are empty. -> True when filled."""
+    r = c.execute("SELECT id, name, address, street, zip, city, country FROM clients WHERE id=?", (cid,)).fetchone()
+    if not r or any((r[k] or "").strip() for k in ("street", "zip", "city")) or not (r["address"] or "").strip():
+        return False
+    f = cdn_split_free(r)
+    if not f:
+        return False
+    c.execute(f"UPDATE clients SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), cid])
+    return True
+
+
+def cdn_backfill(c):
+    """Start: every client with a free address and no street / postcode / city (idempotent; nothing filled is touched)."""
+    ids = [r[0] for r in c.execute("SELECT id FROM clients WHERE address<>'' AND street='' AND zip='' AND city=''")]
+    return sum(1 for cid in ids if cdn_fill_address(c, cid))

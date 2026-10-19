@@ -344,14 +344,22 @@ def v1_office_master(kind):
     aid, oid, uid = _v1ctx(c, a.get("requested_by"), target=kind)
     q = (a.get("q") or "").strip()[:100]
     if kind == "clients":
-        sql = (f"SELECT id, name, contact, email, address, street, zip, city, country, vat_id, customer_no FROM clients WHERE "
-               f"{pb_cl_sql(c, oid)} AND archived=0")
+        # 2.97.0 B (#1951): display_name + label (the name pickers show), address_extra; q finds both names
+        sql = (f"SELECT id, name, display_name, contact, email, address, street, address_extra, zip, city, country, vat_id, customer_no, "
+               f"org_id, created_by FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0")
         args = []
-        if q:
+        if q:  # 2.97.0 review (L4): filtered in SQL, so clients past the first 500 are found too
             from ..core.pg import like_escape
-            sql += " AND name ILIKE ? ESCAPE '\\'"
-            args.append(f"%{like_escape(q)}%")
+            sql += " AND (name ILIKE ? ESCAPE '\\' OR display_name ILIKE ? ESCAPE '\\')"
+            args += [f"%{like_escape(q)}%"] * 2
         rows = [dict(r) for r in c.execute(sql + " ORDER BY lower(name), id LIMIT 500", args)]
+        from ..team.clients import cdn_labels
+        labels = cdn_labels(rows)
+        for r in rows:
+            r["label"] = labels[r["id"]]
+        for r in rows:
+            r.pop("org_id", None)
+            r.pop("created_by", None)
     else:
         rows = [sr_public(kind, r, False) for r in office_rows(c, oid, kind, archived=False, q=q)]
         for r in rows:  # never purchase prices or markups (members' view), whatever the master holds

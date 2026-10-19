@@ -37,7 +37,7 @@ async function ms_clGdLoad(id) {
 }
 function ms_clDraw() { if (S.route.mod === 'clients') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('clients', viewClients()))); } }
 const ms_clDirty = () => { MSC.items = null; MSC.inv = null; };
-const ms_clShown = () => (MSC.items || []).filter(c => (MSC.arch || !c.archived) && (!MSC.q.trim() || [c.name, c.contact, c.email, c.phone, c.note, c.billing?.customer_no]
+const ms_clShown = () => (MSC.items || []).filter(c => (MSC.arch || !c.archived) && (!MSC.q.trim() || [c.name, c.display_name, c.label, c.contact, c.email, c.phone, c.note, c.billing?.customer_no]
   .some(v => (v || '').toLowerCase().includes(MSC.q.trim().toLowerCase()))));
 const ms_clAv = (c, big) => `<span class="avatar ctav mscav ${big ? 'big' : ''}" style="${cssColor(c.color) ? '--cc:' + cssColor(c.color) : ''}" aria-hidden="true">${c.icon ? esc(c.icon) : ic('brief', big ? '' : 's')}</span>`;
 const ms_tag = (kind) => kind === 'client' ? `<span class="mstag mstag-cl">${ic('brief', 's')}${tr('Client')}</span>` : `<span class="mstag">${ic('user', 's')}${tr('Contact')}</span>`;
@@ -66,19 +66,19 @@ function ms_clView() {
   const list = items === null ? `<div class="muted ctempty">${tr('Loading…')}</div>`
     : !MSC.items.length ? `<div class="empty nempty eact msclempty">${ic('brief')}<span>${tr('Clients are companies for quotations and invoices, with hours and budget. Private people belong in Contacts.')}</span><button class="btn pri" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button>${feat('contacts') ? `<a class="btn" href="#contacts">${ic('users', 's')} ${tr('Contacts')}</a>` : ''}</div>`
     : !items.length ? `<div class="empty">${ic('brief')}${tr('No client matches.')}</div>`
-    : `<ul class="ctlist" role="list" aria-label="${esc(tr('Clients'))}">${items.map(c => `<li><button type="button" class="ctrow ${c.id === id ? 'on' : ''} ${MSC.pick?.has(c.id) ? 'picked' : ''} ${c.archived ? 'msarch' : ''}" data-clopen="${c.id}" ${MSC.pick ? `aria-pressed="${MSC.pick.has(c.id)}"` : `aria-current="${c.id === id}"`}>${MSC.pick ? `<span class="ctchk ${MSC.pick.has(c.id) ? 'on' : ''}" aria-hidden="true">${MSC.pick.has(c.id) ? ic('check', 's') : ''}</span>` : ''}${ms_clAv(c)}<span class="ctn"><b>${esc(c.name)}</b><small class="muted">${esc([c.archived ? tr('archived') : '', c.contact, c.email].filter(Boolean).join(' · '))}</small></span>${c.budget && c.budget.level !== 'none' ? `<i class="msbud lv-${c.budget.level}" title="${esc(tr(BUDGET_TXT[c.budget.level]))}"></i>` : ''}</button></li>`).join('')}</ul>`;
+    : `<ul class="ctlist" role="list" aria-label="${esc(tr('Clients'))}">${items.map(c => `<li><button type="button" class="ctrow ${c.id === id ? 'on' : ''} ${MSC.pick?.has(c.id) ? 'picked' : ''} ${c.archived ? 'msarch' : ''}" data-clopen="${c.id}" ${MSC.pick ? `aria-pressed="${MSC.pick.has(c.id)}"` : `aria-current="${c.id === id}"`}>${MSC.pick ? `<span class="ctchk ${MSC.pick.has(c.id) ? 'on' : ''}" aria-hidden="true">${MSC.pick.has(c.id) ? ic('check', 's') : ''}</span>` : ''}${ms_clAv(c)}<span class="ctn"><b>${esc(cdn_label(c))}</b><small class="muted">${esc([cdn_label(c) !== c.name ? c.name : '', c.archived ? tr('archived') : '', c.contact, c.email].filter(Boolean).join(' · '))}</small></span>${c.budget && c.budget.level !== 'none' ? `<i class="msbud lv-${c.budget.level}" title="${esc(tr(BUDGET_TXT[c.budget.level]))}"></i>` : ''}</button></li>`).join('')}</ul>`;
   return `<div class="ctview msclients ${id ? 'withcard' : ''} ${MSC.pick ? 'ctpicking' : ''}">${mob && id ? '' : head}${MSC.pick && !(mob && id) ? ms_clBar() : ''}${mob && id ? '' : bar}<div class="ctcols">${mob && id ? '' : `<div class="ctlistw">${list}</div>`}${card}</div></div>`;
 }
 function ms_clCard(c) {
   const b = c.billing || {}, cur = S.settings.time_currency || '€';
   const ii = k => typeof ux_info === 'function' ? ux_info(k) : '';  // 2.47.3 (D, #1382): the (i) explanations of the office
   const f = (icon, label, val, k) => val ? `<div class="ctf">${ic(icon, 's')}<span class="ctfl muted">${esc(label)}</span><span>${val}</span></div>${k ? ii(k) : ''}` : '';
-  const adr = [b.street, [b.zip, b.city].filter(Boolean).join(' '), b.country].filter(Boolean).join(', ') || c.address || '';
+  const adr = cdn_addrLine(c);  // 2.97.0 B (#1951): the fixed fields only (with the extra line)
   const bud = [c.budget_h ? `${fmtNum(c.budget_h, 1)} h` : '', c.budget_amount ? `${fmtNum(c.budget_amount, 2)} ${cur}` : ''].filter(Boolean).join(' · ');
   const inv = (MSC.inv || []).filter(x => x.client_id === c.id && x.open > 0 && !['draft', 'cancelled'].includes(x.status));
   const ks = (c.contacts || []).filter(k => k.name);
   return `<article class="ctcard msclcard" aria-labelledby="mscl-h">
-    <div class="cthead">${isMobile() ? `<button class="iconbtn" data-mscl="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ms_clAv(c, true)}<div class="cthn"><h3 id="mscl-h">${esc(c.name)}</h3><div class="mstags">${ms_tag('client')}${c.archived ? `<span class="rotag">${tr('Archived')}</span>` : ''}${c.org_name ? `<span class="muted">${esc(c.org_name)}</span>` : ''}</div></div>
+    <div class="cthead">${isMobile() ? `<button class="iconbtn" data-mscl="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ms_clAv(c, true)}<div class="cthn"><h3 id="mscl-h">${esc(cdn_label(c))}</h3>${cdn_label(c) !== c.name ? `<small class="muted cdnlegal">${esc(c.name)}</small>` : ''}<div class="mstags">${ms_tag('client')}${c.archived ? `<span class="rotag">${tr('Archived')}</span>` : ''}${c.org_name ? `<span class="muted">${esc(c.org_name)}</span>` : ''}</div></div>
       <span class="ctacts"><button class="btn sm" data-act="client-edit" data-id="${c.id}">${ic('edit', 's')} ${tr('Edit')}</button><button class="iconbtn" data-mscl="cmenu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></span></div>
     <div class="mscly msclstats cldetail">${S.ly.view === 'clients' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('clients')}</div>`}${lyHtml('clients', {  // 2.55.0 (#1067): the card's sections are blocks of the view builder
       details: `<div class="ctfields">
@@ -107,7 +107,8 @@ function ms_clBar() {
   const n = MSC.pick.size, sel = (MSC.items || []).filter(c => MSC.pick.has(c.id)), allArch = sel.length && sel.every(c => c.archived);
   const shown = ms_clShown(), allOn = n && shown.every(c => MSC.pick.has(c.id));
   return ms_barHtml('ct-sbar', 'clb', n, tr('Tap clients'), [['all', 'all', allOn ? tr('Select none') : tr('All')], ['edit', 'edit', tr('Edit')],
-    ['arch', allArch ? 'undo' : 'archive', allArch ? tr('Restore') : tr('Archive')], ['merge', 'collapse', tr('Merge'), '', 2], ['del', 'trash', tr('Delete'), 'danger']]);  // 2.66.0 (#1835): merge from two clients on (min 2)
+    ['arch', allArch ? 'undo' : 'archive', allArch ? tr('Restore') : tr('Archive')], ['merge', 'collapse', tr('Merge'), '', 2],
+    ...(ofm_can(sel[0]?.org_id ?? null) ? [['move', 'brief', tr('Move to another workspace…')]] : []), ['del', 'trash', tr('Delete'), 'danger']]);  // 2.97.0 C (#2049)  // 2.66.0 (#1835): merge from two clients on (min 2)
 }
 function ms_clClick(id, shift) {
   if (!MSC.pick) { MSC.pick = new Set(); MSC.last = null; }
@@ -139,6 +140,7 @@ async function ms_clAct(k) {
     toast([trn('{0} deleted', '{0} deleted', j.deleted), j.archived ? trn('{0} archived (in use)', '{0} archived (in use)', j.archived) : '', j.skipped ? trn('{0} skipped (only the creator or an admin may delete it)', '{0} skipped (only the creator or an admin may delete them)', j.skipped) : ''].filter(Boolean).join(' · '));
   } else if (k === 'edit') ms_clEdit(ids);
   else if (k === 'merge') clm_merge(ids);  // 2.66.0 B (#1835)
+  else if (k === 'move') ofm_clients(ids);  // 2.97.0 C (#2049)
 }
 // 2.66.0 B (#1835): merging duplicate clients (multisel.js ms_merge; server team/clientmerge.py): per differing field the value
 // that stays, the contact persons are joined; the overview comes from the server (dry); one undo step (and Undo in the history)
@@ -148,13 +150,13 @@ function clm_merge(ids) {
   const cur = S.settings.time_currency || '€', num = (v, d, u) => v == null || v === '' ? '' : `${fmtNum(v, d)}${u ? ' ' + u : ''}`;
   const val = (k, fn) => Object.fromEntries(sel.map(c => [c.id, String(fn(c) ?? '')]));
   const fields = [['name', tr('Name'), c => c.name], ['contact', tr('Default contact person'), c => c.contact], ['email', tr('E-mail'), c => c.email],
-    ['phone', tr('Phone'), c => c.phone], ['address', tr('Address'), c => c.address],
+    ['phone', tr('Phone'), c => c.phone],  // 2.97.0 B (#1951): no free address any more (street etc. below)
     ['rate', tr('Hourly rate'), c => num(c.rate, 2, cur)], ['budget_h', tr('Budget in hours'), c => num(c.budget_h, 1, 'h')],
     ['budget_amount', tr('Budget as an amount'), c => num(c.budget_amount, 2, cur)], ['note', tr('Note'), c => c.note],
     ...OFX_CL_FIELDS.map(([k, n]) => [k, tr(n), c => (c.billing || {})[k]])].map(([k, label, fn]) => ({k, label, vals: val(k, fn)}));
   const send = (target, pick, dry) => rawFetch('POST', '/api/clients/merge', {target, ids, pick, dry});
   ms_merge({title: trn('Merge {0} client', 'Merge {0} clients', sel.length),
-    recs: sel.map(c => ({id: c.id, label: c.name, sub: [c.org_name, c.archived ? tr('Archived') : ''].filter(Boolean).join(' · ')})),
+    recs: sel.map(c => ({id: c.id, label: cdn_label(c), sub: [c.org_name, c.archived ? tr('Archived') : ''].filter(Boolean).join(' · ')})),
     fields, lists: [{k: 'contacts', label: tr('Contact persons'), vals: Object.fromEntries(sel.map(c => [c.id, (c.contacts || []).map(k => k.name)]))}],
     preview: (target, pick) => send(target, pick, true),
     run: async (target, pick) => {
@@ -217,9 +219,42 @@ document.addEventListener('click', e => {
       await ms_clAfter();
       const msg = c.archived ? trn('{0} client restored', '{0} clients restored', 1) : trn('{0} client archived', '{0} clients archived', 1);
       if (j.changed) ms_hist(msg, msg, async () => { await ms_clSend({action: 'restore', items: j.undo}); await ms_clAfter(); }, async () => { await ms_clSend({action: c.archived ? 'unarchive' : 'archive', ids: [c.id]}); await ms_clAfter(); });
-    }}]);
+    }}, ofm_can(c.org_id ?? null) ? {label: tr('Move to another workspace…'), icon: 'brief', fn: () => ofm_clients([c.id])} : null]);  // 2.97.0 C (#2049)
   }
 });
 document.addEventListener('keydown', e => {  // capture: before the global Esc (an open menu / dialog closes first)
   if (e.key === 'Escape' && MSC.pick && S.route.mod === 'clients' && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); ms_clEnd(); }
 }, true);
+
+// ---- 2.97.0 C (#2049): office data into another workspace (office/officemove.py, POST /api/office/move-space): clients (with
+// their contact persons and drafts), drafts, trips, templates. Issued documents stay where they were issued; on request a
+// read-only copy goes into the target's archive. One undo step (the same move back); redo = the move again.
+const ofm_on = () => typeof officeOn === 'function' && officeOn() && S.me?.kind !== 'agent';
+const ofm_can = from => ofm_on() && smv_can(from);
+function ofm_officeFrom() {  // the workspace of the office shown (org id | null = the personal office)
+  if (typeof OFC !== 'undefined' && OFC.info?.personal) return null;
+  const w = typeof wsCur === 'function' ? wsCur() : 'private', ws = S.me?.workspaces || [];
+  return w.startsWith('org:') ? +w.slice(4) : w === 'all' && ws.length === 1 ? ws[0].id : null;
+}
+async function ofm_move({what, ids, from, label, after}) {
+  const req = (to, extra) => rawFetch('POST', '/api/office/move-space', {what, ids, to: smv_ws(to), ...extra});
+  const r = await smv_open({what: label, from, option: what === 'clients' ? {label: tr('Take issued documents along as a read-only copy')} : null,
+    check: (to, _pl, opt) => req(to, {dry: 1, copy_issued: opt ? 1 : 0}),
+    run: async (to, _pl, opt) => { try { return {...await req(to, {copy_issued: opt ? 1 : 0}), to, opt}; } catch (e) { toast(e.message); throw e; } }});
+  if (!r || !r.ok) return null;
+  let mid = r.move_id;
+  await after();
+  const e = histAdd({label: tr('Moved {0}', label), ids: [], snaps: [], lids: [], wsp: r.space,
+    undo: async () => { await rawFetch('POST', '/api/office/move-space', {undo: mid}); await after(); return {skipped: []}; },
+    redo: async () => { const b = await req(r.to, {copy_issued: r.opt ? 1 : 0}); mid = b.move_id; await after(); return {skipped: []}; }});
+  histToast(tr('Moved to {0}', wsName(r.space)), e);
+  return r;
+}
+function ofm_clients(ids) {
+  const sel = ids.map(i => (MSC.items || []).find(c => c.id === i) || (CLV.data?.id === i ? CLV.data : null)).filter(Boolean);
+  if (!sel.length) return;
+  const from = sel[0].org_id ?? null;
+  if (sel.some(c => (c.org_id ?? null) !== from)) { toast(tr('Choose items of one workspace')); return; }
+  ofm_move({what: 'clients', ids: sel.map(c => c.id), from, label: sel.length === 1 ? qn(sel[0].name) : trn('{0} client', '{0} clients', sel.length),
+    after: async () => { if (MSC.pick) ms_clEnd(); await ms_clAfter(); }});
+}

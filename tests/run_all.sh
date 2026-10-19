@@ -798,6 +798,11 @@ fresh; run p2473_d_ui node p2473_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.47.3 part B: travel expenses (#1022) + cash flow (#1652) in the office
 fresh; run p2473_b_api "$PY" p2473_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2473_b_ui node p2473_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.95.0 (#1932): the per diem of a trip (BMF rates per year), its report (PDF / Excel / CSV), the spreadsheet import
+fresh; run p295_a_api "$PY" p295_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p295_a_ui node p295_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p295_b_api "$PY" p295_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p295_b_ui node p295_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.47.3 part A: Office & finance without an organisation (#1360)
 fresh; run p2473_a_api "$PY" p2473_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2473_a_ui node p2473_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1125,6 +1130,8 @@ fresh; run p296_c_api "$PY" p296_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p296_c_ui node p296_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.96.0 part D (#1941 / #1918): an organisation's export into the private space, the own absence area in "Private"
 fresh; run p296_d_api "$PY" p296_d_api_test.py "$KALMIDO_TEST_DATA"
+# 2.96.0 part E (#1941): the separation after a move between private and organisation; moved documents are learned by the target
+fresh; run p296_e_api "$PY" p296_e_api_test.py "$KALMIDO_TEST_DATA"
 # 2.97.0 part A: bookmarks (#1950)
 fresh; run p297_a_api "$PY" p297_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p297_a_ui node p297_a_ui.js "$KALMIDO_TEST_DATA"

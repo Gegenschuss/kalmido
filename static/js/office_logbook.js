@@ -8,7 +8,7 @@ const lbYear = () => RK.year || String(new Date().getFullYear());
 const lbReload = (all) => { if (all) LB.base = null; LB.drives = null; LB.rep = null; ofcDraw(); };
 const lbVeh = id => (LB.base?.vehicles || []).find(v => v.id === id);
 const lbKind = k => (LB.base?.kinds || []).find(x => x.key === k)?.label || k;
-const lbClient = id => (LB.base?.clients || []).find(c => c.id === id)?.name || '';
+const lbClient = id => cdn_label((LB.base?.clients || []).find(c => c.id === id));  // 2.97.0 B (#1951)
 const lbKm = v => v == null || v === '' ? '' : fmtNum(+v, +v % 1 ? 1 : 0);
 const lbRoute = d => [d.start_place, d.dest].filter(Boolean).join(' – ');
 const lbWarn = w => !w ? '' : w.kind === 'gap' ? tr('Gap of {0} km to the previous drive', lbKm(w.km)) : tr('Overlap of {0} km with the previous drive', lbKm(w.km));
@@ -124,7 +124,7 @@ function lbDriveModal(d) {
     ${d?.trip_hint ? `<p class="lgb-warn lgb-trip">${ic('alert', 's')} ${esc(d.trip_hint)}</p>` : ''}
     <p class="lgb-warn" id="lgb-w" aria-live="polite">${d?.warn ? `${ic('alert', 's')} ${esc(lbWarn(d.warn))}` : ''}</p>
     ${ofcRowF('lgb-kind', tr('Kind'), ofcSel('lgb-kind', d?.kind || 'business', base.kinds.map(k => [k.key, k.label])))}
-    ${ofcRowF('lgb-client', tr('Client'), ofcSel('lgb-client', d?.client_id || '', base.clients.map(c => [c.id, c.name]), tr('none')))}
+    ${ofcRowF('lgb-client', tr('Client'), ofcSel('lgb-client', d?.client_id || '', base.clients.map(c => [c.id, cdn_label(c)]), tr('none')))}
     ${ofcRowF('lgb-project', tr('Project'), ofcIn('lgb-project', d?.project, {list: 'lgb-projs'}))}<datalist id="lgb-projs">${base.projects.map(p => `<option value="${esc(p)}">`).join('')}</datalist>
     ${ofcRowF('lgb-driver', tr('Driver'), ofcSel('lgb-driver', d?.user_id || base.me, base.people.map(p => [p.id, p.name])))}
     <div class="aerr" role="alert"></div>

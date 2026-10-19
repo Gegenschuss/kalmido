@@ -117,7 +117,7 @@ const hbm_send = (id, t) => api('POST', `/api/hubmail/mails/${id}/assign`, {clie
 async function hbm_assign(m) {
   let t; try { t = await api('GET', `/api/hubmail/targets?mail=${m.id}`); } catch { return; }
   $('.hbmadlg')?.remove();
-  const row = (k, x, icn) => `<li><button type="button" class="hbmpick" data-hbmt="${k}:${x.id}">${ic(icn, 's')}<span>${esc(x.name)}</span></button></li>`;
+  const row = (k, x, icn) => `<li><button type="button" class="hbmpick" data-hbmt="${k}:${x.id}">${ic(icn, 's')}<span>${esc(k === 'client' ? cdn_label(x) : x.name)}</span></button></li>`;
   const back = m.mine && (m.client_id || m.list_id) ? `<li><button type="button" class="hbmpick" data-hbmt="none:0">${ic('inbox', 's')}<span>${tr('Not assigned')}</span></button></li>` : '';
   const md = modal(`<div class="lhdr"><h3>${tr('Assign the e-mail')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <div class="hbmq">${ic('search', 's')}<input type="search" id="hbm-tq" placeholder="${esc(tr('Search clients and projects'))}" aria-label="${esc(tr('Search clients and projects'))}" autocomplete="off"></div>

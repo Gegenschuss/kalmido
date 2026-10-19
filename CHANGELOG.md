@@ -7,6 +7,91 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.97.0] - 2026-10-19
+
+Bookmarks, a display name for customers, office data and locked wiki spaces between your private space and an organisation.
+
+### Added
+- Bookmarks (Home & life, module "Read later"): save links with a preview (title, description, picture), tags, a note and
+  read / archived; cards or a list, search over everything including the page's reading text. Save from the share target,
+  by pasting, or with a browser button that asks before saving. Karakeep links arrive as bookmarks. Bookmarks move between
+  the private space and an organisation. No screenshots, no whole pages, no automatic tags (#1950).
+- Customers: an optional display name for pickers and lists (e.g. "Foo Switzerland" / "Foo Germany"); customers with the
+  same name show their city automatically. Invoices and e-invoices keep the legal name. New field "Address line 2" (#1951).
+- Office data moves between the personal office and an organisation: customers with their contact persons and drafts,
+  travel-expense drafts and document templates. Issued invoices, closed receipts, number ranges and the archive always stay
+  where they are; on request a read-only copy goes along ("copy from …", not counted in the target's figures). The target
+  numbers drafts in its own range. One step undoes it (#2049).
+- Wiki spaces with a lock: pages move between the private space and an organisation; your browser re-encrypts them for the
+  target (a warning comes before they go into an open space). One step undoes it (#2050).
+
+### Changed
+- Quotations and invoices take the recipient from the customer (name, attn., street, address line 2, postcode, city,
+  country): the document head shows it read-only with "Edit customer" and "Address missing"; without a customer you create
+  one right there. The address is frozen when a document is finalised; older documents stay as they are. The free-text
+  address of a customer is no longer in the form; where the fixed fields were empty it was taken over once (#1951).
+- "Moved out of …" under a page or table names a workspace only to its members, others see a neutral word (#2051).
+
+### Fixed
+- Files left behind by an interrupted move between workspaces are cleaned up at night (#2051).
+
+### Security
+- Security fix: link previews and moves between workspaces (organisation boundary).
+
+## [2.96.0] - 2026-10-18
+
+Moving data between your private space and an organisation, and one card per job in the agent chat.
+
+### Added
+- Files, folders with everything in them and documents move between the private space and an organisation, both ways
+  ("Move to another workspace…"). Sender, document type, tags, recognised text and the Paperless-ngx origin go along; the
+  files are sealed again with the target's key. Shares that do not hold in the target end - the dialog names them, and
+  duplicates, first. One step undoes it; a moved document is learned by the target's suggestions at once (#1941).
+- The file store and Documents have a multiple selection ("Select"); Documents can select all hits of a search or filter
+  (up to 2,000) in one go (#1941).
+- Wiki pages and whole folders with their sub-pages move between the private space and an organisation; links between pages
+  that move together follow, links into the other workspace are named before. Spaces with a lock cannot move yet (clear
+  message) (#1941).
+- Tables move between the private space and an organisation; a binding to a list of the old workspace ends and comes back
+  with the undo. The last move shows under a page and in a table's side panel (#1941).
+- An organisation export can be imported into your own private space: nobody joins an organisation, lists are shared only
+  with the people you tick (#1941, #1918).
+- Agent chat: every background job shows as one card with name, version, state and its last line; tapping it shows the whole
+  history. The final result, errors and approvals stay visible, long results are cut to five lines with "Show more". A
+  filter in the chat head: All / Only me and the agent / Jobs (#2015).
+- Agent API: optional `job_msg` (say | question | result | error) on job messages; the chat answer carries `jobs` with state
+  and version. MCP `send_chat` and the reference starter send it (#2015).
+
+### Changed
+- Absences follow the workspace switch "Private": your own area instead of the first organisation (#1941, #1918).
+- Agents never move data between workspaces; that stays with people in the app.
+
+## [2.95.0] - 2026-10-18
+
+The per diem of business trips with the German flat rates per year, its report as PDF / Excel / CSV and the import of a
+per diem spreadsheet.
+
+### Added
+- Travel expenses compute the per diem (*Verpflegungsmehraufwand*) of every trip per participant: Germany 28 / 14 EUR,
+  abroad the rates of the BMF letter of the year (2025: 2 December 2024, 2026: 5 December 2025, taken over line by line),
+  country and city per day (where you are before midnight), start and end time for single days (more than 8 hours), meals
+  provided per day (breakfast 20 %, lunch / dinner 40 % of the full rate). A year without a table shows a hint, never an
+  estimate (#1932).
+- The evaluation shows *Per diem allowances <year>* per person with the breakdown "country: n x rate", as PDF (a section per
+  person), Excel (one sheet per person) and CSV (#1932).
+- *Take over from Excel* imports a per diem spreadsheet: one sheet = one person, one row = one trip, cell comments become
+  the note and set the countries of the days; a preview compares every row with the spreadsheet before anything is stored,
+  undo removes the import again (#1932).
+
+### Fixed
+- An unclosed phone block in the office stylesheet (since 2.91) made the later office styles (invoice series, equipment
+  value, travel expenses) apply on phones only (#1932).
+
+## [2.94.1] - 2026-10-18
+
+### Fixed
+- Booking page settings: the opening hours use the app's own time picker instead of the browser's time field; CI fixes of 2.94.0 (#1929).
+
 ## [2.94.0] - 2026-10-18
 
 Appointment booking for customers, leads before the sales pipeline, Enter in the chats makes a new line.

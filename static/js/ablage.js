@@ -54,7 +54,7 @@ function viewAblage() {
   const spaces = `<nav class="abspaces" aria-label="${esc(tr('File store'))}">${ab_spaces().map(s => `<button type="button" class="abspace ${!r.nid && s === sp ? 'on' : ''}" data-ab="space" data-sp="${esc(s)}" ${!r.nid && s === sp ? 'aria-current="page"' : ''}>${ab_spaceIcon(s)}<span>${esc(ab_spaceName(s))}</span></button>${r.nid && s === (sp || 'shared') ? treeHtml : ''}`).join('')}</nav>`;
   const trash = !r.nid && sp === 'trash', canAdd = r.nid ? ab_canWrite(d?.node?.role) : (sp === 'private' || (sp || '').startsWith('org:'));
   const crumbs = r.nid && d ? `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}"><button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp === 'shared' || !sp ? 'shared' : sp)}" data-abdrop="top">${esc(ab_spaceName(sp || 'shared'))}</button>${(d.crumbs || []).map((c, i, a) => `<span class="abcsep" aria-hidden="true">/</span>${i === a.length - 1 ? `<span class="abccur" aria-current="page">${esc(c.name)}</span>` : `<button type="button" class="linkbtn" data-go="ablage/${c.id}" data-abdrop="${c.id}">${esc(c.name)}</button>`}`).join('')}</nav>` : `<h3 class="abtitle">${esc(ab_spaceName(sp))}</h3>`;
-  const tools = trash ? '' : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button><input type="file" id="ab-file" multiple hidden>` : ''}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
+  const tools = trash ? '' : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button><input type="file" id="ab-file" multiple hidden>` : ''}${ab_smvTools(d)}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
   let body;
   if (AB.err && AB.key === key) body = `<div class="empty">${ic('folder')}<span>${esc(AB.err)}</span><button type="button" class="btn" data-ab="space" data-sp="private">${tr('My files')}</button></div>`;
   else if (!d) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
@@ -63,7 +63,7 @@ function viewAblage() {
   const search = !trash && typeof ftxtBox === 'function' ? ftxtBox() : '';  // 2.61.0 (#1820): names + recognised text
   if (search && ftxtActive()) body = ftxtResults();
   const hint = !r.nid && sp === 'private' && d && !d.items.length ? `<p class="muted abhint">${tr('Share a folder with a person or an agent: they see exactly that folder, nothing else.')}</p>` : '';
-  return `<div class="abview ${canAdd ? 'abdropok' : ''}" data-abzone="${r.nid || ''}">${spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools}${body}${search && ftxtActive() ? '' : hint}</div></div>`;
+  return `<div class="abview ${canAdd ? 'abdropok' : ''}" data-abzone="${r.nid || ''}">${spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools}${body}${search && ftxtActive() ? '' : hint + (trash ? '' : ab_smvBar())}</div></div>`;
 }
 function ab_rowHtml(n, trash) {
   const meta = [n.kind === 'folder' ? '' : fmtSize(n.size || 0), ab_when(trash ? n.deleted_at : n.updated_at), n.created_by_name && n.created_by !== S.me?.id ? n.created_by_name : ''].filter(Boolean).join(' · ');
@@ -75,7 +75,7 @@ function ab_rowHtml(n, trash) {
     : `<button type="button" class="abopen" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''}>${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button>`;  // abmeta2: the details below the name on phones
   const acts = trash ? `<button type="button" class="btn sm" data-ab="restore" data-id="${n.id}">${ic('undo', 's')} ${tr('Restore')}</button>`
     : `<button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>`;
-  return `<div class="abrow" role="listitem" data-abid="${n.id}" ${!trash && ab_canWrite(n.role) ? 'draggable="true"' : ''}>${main}<span class="abmeta muted">${esc(meta)}</span><span class="abbadges">${badges}</span>${acts}</div>`;
+  return `<div class="abrow" role="listitem" data-abid="${n.id}" ${!trash && ab_canWrite(n.role) ? 'draggable="true"' : ''}>${trash ? '' : ab_smvBox(n)}${main}<span class="abmeta muted">${esc(meta)}</span><span class="abbadges">${badges}</span>${acts}</div>`;
 }
 const ab_item = id => (AB.data?.items || []).find(x => x.id === +id) || (AB.data?.node?.id === +id ? AB.data.node : null) || (typeof ftxtItem === 'function' ? ftxtItem(id) : null);  // 2.61.0 (#1820): + search hits
 
@@ -177,6 +177,7 @@ function ab_menu(anchor, n) {
     w && n.kind === 'file' ? {label: tr('Upload a new version…'), icon: 'upload', fn: () => ab_newVersion(n)} : null,
     w ? {label: tr('Rename…'), icon: 'edit', fn: () => ab_rename(n)} : null,
     w ? {label: tr('Move to…'), icon: 'arrow', fn: () => ab_moveDlg(n)} : null,
+    ab_smvOk(n) && smv_can(n.org_id) ? {label: tr('Move to another workspace…'), icon: 'building', fn: () => ab_smvSpace([n])} : null,  // 2.96.0 A (#1941)
     '-',
     w && (n.parent_id || own) ? {label: tr('Move to the trash'), icon: 'trash', cls: 'danger', fn: () => ab_delete(n)} : null], null, null, n.name);
 }
@@ -185,7 +186,8 @@ function ab_menu(anchor, n) {
 const AB_ACT = {list: N_('opened the folder'), read: N_('read'), download: N_('downloaded'), text: N_('read the text'), meta: N_('looked at the details'),
   write: N_('created'), upload: N_('uploaded'), version: N_('uploaded a new version'), restore_version: N_('restored a version'), rename: N_('renamed'),
   move: N_('moved'), trash: N_('moved to the trash'), restore: N_('restored'), share: N_('shared'), share_change: N_('changed a share'),
-  unshare: N_('stopped sharing'), org_access: N_('changed who in the organisation sees it'), create: N_('created'), link: N_('linked')};
+  unshare: N_('stopped sharing'), org_access: N_('changed who in the organisation sees it'), create: N_('created'), link: N_('linked'),
+  moved_space: N_('moved to another workspace')};  // 2.96.0 A (#1941)
 async function ab_details(id) {
   let n; try { n = await api('GET', `/api/files/nodes/${id}`); } catch { return; }
   $('.abdlg')?.remove();
@@ -327,3 +329,75 @@ document.addEventListener('click', e => {
   const [k, id, org] = b.dataset.ablink.split(':');
   ab_linkFile(k, +id, +org || null);
 }, true);
+
+// ---- 2.96.0 A (#1941): choose several rows (checkboxes, big targets on phones) and move them -- within the space ("Move to…")
+// or into the other workspace (private <-> organisation, the shared dialog of spacemove.js). Each action = ONE undo step.
+const ab_smvOk = n => !!n && n.kind !== 'link' && !n.agent_id && ab_canWrite(n.role);
+const ab_smvSel = () => (AB.data?.items || []).filter(n => AB.sel.has(n.id));
+const ab_smvTools = d => d?.items?.length && !(typeof ftxtActive === 'function' && ftxtActive()) ? `<button type="button" class="btn sm ${AB.selOn ? 'on' : ''}" data-absel="mode" aria-pressed="${!!AB.selOn}">${ic('check', 's')} ${tr('Select')}</button>` : '';
+const ab_smvBox = n => AB.selOn ? `<label class="absel" title="${esc(tr('Select {0}', n.name))}"><input type="checkbox" data-absel="one" data-id="${n.id}" ${AB.sel.has(n.id) ? 'checked' : ''} aria-label="${esc(tr('Select {0}', n.name))}"></label>` : '';
+function ab_smvBar() {
+  if (!AB.selOn) return '';
+  const ns = ab_smvSel(), all = (AB.data?.items || []).length, ok = ns.length > 0 && ns.every(ab_smvOk), from = ns[0]?.org_id || null;
+  return `<div class="abselbar" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="absn" aria-live="polite">${esc(tr('{0} selected', ns.length))}</span>
+    <button type="button" class="linkbtn" data-absel="all">${ns.length === all ? tr('Select none') : tr('Select all')}</button><span class="spacer"></span>
+    <button type="button" class="btn sm" data-absel="move" ${ok ? '' : 'disabled'}>${ic('arrow', 's')} ${tr('Move to…')}</button>
+    ${smv_can(from) ? `<button type="button" class="btn sm" data-absel="space" ${ok ? '' : 'disabled'}>${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''}
+    <button type="button" class="iconbtn" data-absel="off" aria-label="${esc(tr('Cancel'))}" title="${esc(tr('Cancel'))}">${ic('x')}</button></div>`;
+}
+const ab_smvEnd = () => { AB.sel.clear(); AB.selOn = false; };
+// several rows into one folder of the same space (the server refuses another tree / a folder into itself)
+async function ab_smvMoveDlg(ns) {
+  let fs; try { fs = (await api('GET', '/api/files/folders')).folders; } catch { return; }
+  const n0 = ns[0], ids = new Set(ns.map(n => n.id));
+  const ok = fs.filter(f => (f.org_id || null) === (n0.org_id || null) && f.owner_id === n0.owner_id && !ids.has(f.id));
+  const go2 = async target => {
+    const done = [];
+    for (const n of ns) {
+      if ((n.parent_id ?? null) === (target || null)) continue;
+      try { await api('PATCH', `/api/files/nodes/${n.id}`, {parent_id: target || null}); done.push({id: n.id, was: n.parent_id ?? null}); } catch { break; }
+    }
+    ab_smvEnd(); ab_reload();
+    if (!done.length) return;
+    const all = async to => { for (const x of done) await ab_req('PATCH', `/api/files/nodes/${x.id}`, {parent_id: to(x)}); return {}; };
+    offerUndo(trn('{0} item moved', '{0} items moved', done.length), histAdd({label: tr('Move to…'), undo: () => all(x => x.was), redo: () => all(() => target || null)}));
+  };
+  const items = [{label: tr('Top level'), icon: 'up', fn: () => go2(null)}, ...ok.map(f => ({label: f.path, icon: 'folder', fn: () => go2(f.id)}))];
+  menu($('[data-absel="move"]') || document.body, [{head: tr('Move to …')}, ...items.slice(0, 60)], null, null, tr('Move to …'));
+}
+async function ab_smvPlaces(to) {
+  const fs = (await api('GET', '/api/files/folders')).folders || [];
+  return fs.filter(f => (f.org_id || null) === (to || null) && (to || f.owner_id === S.me?.id)).map(f => ({id: f.id, label: f.path}));
+}
+async function ab_smvDry(b) {  // the dry run: an error of the server is the dialog's block (no toast)
+  try { return await rawFetch('POST', '/api/files/move-space', {...b, dry: 1}); } catch (x) { return {block: x.message || tr('The check failed. Please try again.')}; }
+}
+async function ab_smvSpace(ns) {
+  ns = (ns || []).filter(ab_smvOk); if (!ns.length) return;
+  const from = ns[0].org_id || null;
+  if (ns.some(n => (n.org_id || null) !== from)) { toast(tr('Choose items of one workspace')); return; }
+  const ids = ns.map(n => n.id), req = (to, p) => ({ids, to: smv_ws(to), parent: p ? +p : null});
+  let last = null;
+  const r = await smv_open({what: ns.length === 1 ? `“${ns[0].name}”` : trn('{0} item', '{0} items', ns.length), from, places: ab_smvPlaces,
+    check: (to, p) => ab_smvDry(req(to, p)), run: (to, p) => { last = req(to, p); return api('POST', '/api/files/move-space', last); }});
+  if (!r?.moved || !last) return;
+  ab_smvEnd();
+  if (S.route.nid && ids.includes(S.route.nid)) go(r.moved[0].parent_was ? 'ablage/' + r.moved[0].parent_was : 'ablage'); else ab_reload();
+  const back = {items: r.moved.map(m => ({id: m.id, parent: m.parent_was, name: m.name_was})), to: smv_ws(r.org_was)}, again = last;
+  offerUndo(tr('Moved to {0}', wsName(r.to)), histAdd({label: tr('Move to another workspace'),
+    undo: () => ab_req('POST', '/api/files/move-space', back), redo: () => ab_req('POST', '/api/files/move-space', again)}));
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-absel]'); if (!b || !b.closest('.abview') || b.dataset.absel === 'one') return;
+  const a = b.dataset.absel, items = AB.data?.items || [];
+  if (a === 'mode') { AB.selOn = !AB.selOn; AB.sel.clear(); ab_draw(); }
+  else if (a === 'off') { ab_smvEnd(); ab_draw(); }
+  else if (a === 'all') { const all = ab_smvSel().length === items.length; AB.sel = new Set(all ? [] : items.map(n => n.id)); ab_draw(); }
+  else if (a === 'move') ab_smvMoveDlg(ab_smvSel());
+  else if (a === 'space') ab_smvSpace(ab_smvSel());
+});
+document.addEventListener('change', e => {
+  const b = e.target.closest?.('[data-absel="one"]'); if (!b) return;
+  const id = +b.dataset.id; if (b.checked) AB.sel.add(id); else AB.sel.delete(id);
+  ab_draw();
+});

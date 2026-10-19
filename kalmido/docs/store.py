@@ -3,7 +3,8 @@ and the training of the learning classifier.
 
 A document is a file of the file store (kalmido/files/store.py, fs_nodes) plus its doc_meta row. Its workspace (ws) is the
 one of its node: 'o<org id>' for an organisation's tree, 'u<owner id>' for a person's own tree. Senders, types, tags, rules,
-models and the word index belong to exactly one workspace; nothing here ever moves a document into another workspace.
+models and the word index belong to exactly one workspace; nothing here moves a document into another workspace -- 2.96.0 A
+(#1941): files/fsmove.py does (its labels are found / made by name in the target, its values sealed again).
 
 Encryption at rest: documents are the most sensitive data. The recognised text, the amount, sender names, rules, models and
 suggestions are sealed (AES-256-GCM, "kenc1:") with the workspace key: the organisation's key (core/orgcrypt.py) or, for a

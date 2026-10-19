@@ -58,6 +58,7 @@ ORDER = (
     "accounts.onboarding",
     "accounts.users",
     "accounts.orgs",
+    "accounts.spacemove",  # 2.96.0 (#1941): the shared rules of moving data between the private space and an organisation (no routes)
     "accounts.tenancy",
     "accounts.orglists",  # 2.35.0 (#1101)
     "accounts.useradmin",  # 2.88.0 (#1980)
@@ -125,6 +126,7 @@ ORDER = (
     "sheets.core",  # 2.89.0 (#1916): sheets, columns, rows, cells, agent batches (no routes; used by sheets.web and part C/D)
     "sheets.web",  # 2.89.0 (#1916): the routes of the tables area (/api/sheets)
     "sheets.step2",  # 2.89.0 (#1916, D): step 2 -- rows to tasks / quotation, a list as rows (by button)
+    "sheets.shmove",  # 2.96.0 B (#1941): a table to the other workspace (private <-> organisation)
     "collab.teamchat",
     "collab.msgsearch",  # 2.33.0 (#1080)
     "collab.chatsave",  # 2.37.0 (#1159)
@@ -138,9 +140,11 @@ ORDER = (
     "collab.liste2efile",  # 2.64.2 B (#1817): files of lists with the lock, encrypted with the list key
     "collab.liste2echan",  # 2.64.2 C (#1817): the list channel (team chat of a list) with the lock
     "wiki.wikie2e",  # 2.64.3 (#1817): the lock per knowledge space (path + text encrypted in the browser)
+    "wiki.wkmove",  # 2.96.0 B (#1941): wiki pages and folders to the other workspace (private <-> organisation)
     "files.store",  # 2.48.0 (#1207): the file store (Ablage): tree, roles, versions (no routes; the interface of docs / import)
     "files.scan",  # 2.61.0 (#1818): virus scan of uploads (clamd), the later scan, the admin's scanner state
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
+    "files.fsmove",  # 2.96.0 A (#1941): files, folders and documents to the other workspace (private <-> organisation)
     "files.v1",  # 2.48.0 (#1207): the file store in the REST API (files:read / files:write)
     "files.photometa",  # 2.61.0 B (#1819): photo metadata (GPS, camera) removed on upload (no routes; files/upsafe.py)
     "files.upsafe",  # 2.61.0 (#1818 #1819 #1820): the shared upload path - scan, metadata, text recognition (no routes)
@@ -164,6 +168,7 @@ ORDER = (
     "contacts.merge",  # 2.66.0 A (#1835): merging duplicate contacts (reversible)
     "contacts.orgbooks",  # 2.52.0 C (#1438): address books an organisation owns
     "life.model",
+    "life.bookmarks",  # 2.97.0 A (#1950): bookmarks with a preview, tags and search (Karakeep fills the same store)
     "life.karakeep",
     "life.web",
     "life.v1",
@@ -201,6 +206,9 @@ ORDER = (
     "office.archiveedit",  # 2.81.0 B (#1834): correct an archived document afterwards (client, tax lines, paid) + its history
     "office.parts",  # 2.47.0 (#1215): parts of a quotation (Teilangebote): routes, title page calculation, invoice modes
     "office.travel",  # 2.47.3 (#1022, part B): travel expenses (trips, receipts, evaluation, billing on)
+    "office.vma",  # 2.95.0 (#1932): the per diem rates (BMF tables per year) and its calculation (pure functions)
+    "office.vmareport",  # 2.95.0 A (#1932): the per diem report per person and year (JSON, PDF, Excel, CSV), the rates
+    "office.vmaimport",  # 2.95.0 B (#1932): the import of a per diem spreadsheet (preview, import, undo)
     "office.cashflow",  # 2.47.3 (#1652, part B): cash flow per month + fixed costs
     "office.pipeline",  # 2.50.0 B (#1196): the sales pipeline
     "office.leads",  # 2.94.0 A (#1930): leads before the pipeline (stage lead): convert, CSV import, agents
@@ -261,6 +269,7 @@ ORDER = (
     "office.fixedimport",  # 2.67.0 A (#1838): fixed costs from a spreadsheet + the monthly check task of the cash flow
     "office.recurring",  # 2.91.0 A (#1923): invoice series (a template invoice every month / quarter / year, drafts or sent)
     "office.subs",  # 2.91.0 B (#1924): subscriptions and tools (fixed costs with notice period, users, renewal reminder)
+    "office.officemove",  # 2.97.0 C (#2049): office data between the personal office and an organisation's office
     "agents.importprop",  # 2.68.0 A (#1839): agents propose old data for the office (fixed costs), the person takes it over
     "agents.meetprop",  # 2.70.0 A (#1354): a meeting becomes tasks (extract with photos, the chat's cards)
     "agents.dupprop",  # 2.70.0 B (#1357): duplicate contacts as a proposal (no routes)

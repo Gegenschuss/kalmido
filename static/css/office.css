@@ -525,3 +525,51 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .lead-match{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.375rem}
 .lead-mbtn{width:100%;justify-content:flex-start;min-height:2.75rem;text-align:left}
 @media (max-width:899px){.pipcols{grid-template-columns:1fr}.ofcbar .lead-tb{min-height:2.75rem}}
+
+/* 2.95.0 A (#1932): the per diem of a trip, its report (rkv-) */
+.rkv-sec{border:1px solid var(--line2);border-radius:.75rem;padding:.5rem .75rem .25rem;margin:.5rem 0}
+.rkv-sec legend{padding:0 .25rem;font-weight:600}
+.rkv-tag{font-size:.8rem;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.rkv-tag.rkv-none{opacity:.75}
+.rkv-card{border:1px solid var(--line2);border-radius:.75rem;padding:.75rem;margin:0 0 .75rem}
+.rkv-top{display:flex;align-items:center;gap:.5rem}
+.rkv-card p{margin:.25rem 0}
+.rkv-br,.rkv-hints{list-style:none;margin:.375rem 0;padding:0;display:flex;flex-direction:column;gap:.125rem;font-variant-numeric:tabular-nums}
+.rkv-hints li{color:var(--muted);font-size:.875rem}
+.rkv-src{font-size:.8rem}
+.rkv-act{margin-top:.5rem}
+.rkv-days{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.5rem;max-height:60vh;overflow:auto}
+.rkv-day{border-bottom:1px solid var(--line2);padding:.5rem 0;display:flex;flex-direction:column;gap:.375rem}
+.rkv-dsel{display:flex;flex-wrap:wrap;gap:.5rem}
+.rkv-dsel select{flex:1 1 10rem;min-height:2.75rem}
+.rkv-meals{display:flex;flex-wrap:wrap;gap:.25rem 1rem}
+.rkv-days .rkv-meal{min-height:2.75rem;display:inline-flex;align-items:center;gap:.375rem}
+.rkv-rep{margin:0 0 1.25rem}
+.rkv-people{list-style:none;margin:.25rem 0;padding:0}
+.rkv-people>li{border-bottom:1px solid var(--line2)}
+.rkv-people summary{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;padding:.375rem 0;cursor:pointer;list-style:none}
+.rkv-people summary::-webkit-details-marker{display:none}
+.rkv-people summary .ofcn{flex:1;display:flex;flex-direction:column}
+.rkv-trips{list-style:none;margin:0 0 .5rem;padding:0 0 0 .75rem;border-left:2px solid var(--accent)}
+.rkv-trips li{display:flex;gap:.5rem;align-items:flex-start;padding:.375rem 0}
+.rkv-trips .ofcn{flex:1;display:flex;flex-direction:column;gap:.125rem;min-width:0}
+.rkv-total{display:flex;align-items:center;gap:.5rem;padding:.5rem 0}
+
+/* 2.95.0 B (#1932): the import of a per diem spreadsheet (rki-) */
+.rki-sheet{margin:.75rem 0 0}
+.rki-head{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem .625rem}
+.rki-pl{font-weight:600}
+.rki-head select{min-height:2.75rem;max-width:100%}
+.rki-sum{flex:1 1 100%}
+.rki-list{max-height:none}
+.rki-dlg .card{max-height:90vh;overflow-y:auto}
+.fcirow .ofcn .rki-why{color:var(--muted);white-space:normal}
+.fcirow.warn .ofcn .rki-why{color:var(--accent)}
+@media (max-width:40rem){.rki-head select{flex:1 1 100%}.rki-row .ofcn{flex:1 1 calc(100% - 3.5rem)}}
+
+/* 2.97.0 B (#1951): the recipient from the client, read-only in the document head */
+.ofdgrid .row.cdnrec{align-items:flex-start;padding:.375rem 0}
+.cdnrecb{display:flex;flex-direction:column;align-items:flex-start;gap:.25rem;flex:1;min-width:8rem}
+.cdnadr{font-style:normal;line-height:1.45}
+.cdnmiss{margin:0;color:var(--warn,var(--muted));font-size:var(--fs-s);display:flex;align-items:center;gap:.25rem}
+.cdnlegal{display:block}

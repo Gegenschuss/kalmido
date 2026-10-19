@@ -173,6 +173,10 @@ CHECKS = {
                    "JOIN lists l ON l.id=t.list_id WHERE k.kind IN ('task', 'row') AND k.undone_at IS NULL AND l.org_id IS DISTINCT FROM s.org_id"),
     "hub_token_person": ("SELECT m.org_id, m.user_id FROM hub_tokens m JOIN users u ON u.id=m.user_id WHERE m.org_id IS NOT NULL AND "
                          + _PERSON.format(o="m", m="m")),
+    # 2.97.0 A (#1950): a bookmark of an organisation held by an agent or by a person outside it (the read layer needs the
+    # membership: life/bookmarks.py bm_get; counted only) -- (bookmark, owner)
+    "bookmark_owner": ("SELECT b.id, b.user_id FROM bookmarks b JOIN users u ON u.id=b.user_id WHERE b.org_id IS NOT NULL AND "
+                       "b.deleted_at IS NULL AND (u.kind='agent' OR " + _PERSON.format(o="b", m="b") + ")"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 
