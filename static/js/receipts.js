@@ -18,7 +18,8 @@ function rc_html() {
   const r = d.receipt, w = d.can_edit;
   const sug = d.suggestions.map(s => `<div class="rc-sug" role="group" aria-label="${esc(tr('Suggestion of {0}', s.agent?.name || ''))}">
       <span><span class="muted">${esc(tr('Suggestion of {0}', s.agent?.name || tr('an agent')))}:</span> ${[s.project && `<b>${esc(s.project.name || tr('Project #{0}', s.project.id))}</b>`, s.category && `<b>${esc(s.category)}</b>`].filter(Boolean).join(' · ')}
-      ${s.note ? `<br><span class="muted">${esc(s.note)}</span>` : ''}</span>
+      ${s.note ? `<br><span class="muted">${esc(s.note)}</span>` : ''}
+      ${rc_money(s, w)}</span>
       ${w ? `<span class="rc-acts"><button type="button" class="btn sm" data-rc="reject:${s.id}">${tr('Reject')}</button><button type="button" class="btn sm pri" data-rc="accept:${s.id}">${tr('Accept')}</button></span>` : ''}</div>`).join('');
   const projOpts = `<option value="">${tr('No project')}</option>` + d.projects.map(p => `<option value="${p.id}" ${r.project?.id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')
     + (r.project && !d.projects.some(p => p.id === r.project.id) ? `<option value="${r.project.id}" selected>${esc(r.project.name || tr('Project #{0}', r.project.id))}</option>` : '');
@@ -26,6 +27,20 @@ function rc_html() {
     <div class="row"><label for="rc-proj">${tr('Project')}</label><select id="rc-proj" data-rcf="project" ${w ? '' : 'disabled'}>${projOpts}</select></div>
     <div class="row"><label for="rc-cat">${tr('Category')}</label><input id="rc-cat" data-rcf="category" value="${esc(r.category || '')}" maxlength="60" list="rc-cl" autocomplete="off" placeholder="${esc(tr('e.g. Travel, Material, Software'))}" ${w ? '' : 'disabled'}><datalist id="rc-cl">${d.categories.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
     <div class="row"><label for="rc-vat">${tr('VAT rate')}</label><select id="rc-vat" data-rcf="vat" ${w ? '' : 'disabled'}><option value="">${tr('unknown')}</option>${['19', '7', '0'].map(v => `<option value="${v}" ${r.vat_pct === v ? 'selected' : ''}>${v} %</option>`).join('')}</select></div>`;  // 2.90.0 A (#1921)
+}
+// 2.121.0 C (#2096): amount, currency and VAT rate of a suggestion, changeable before Accept
+function rc_money(s, w) {
+  if (!s.amount && !s.vat_pct && !s.currency) return '';
+  if (!w) return `<br><b>${esc([s.amount, s.currency].filter(Boolean).join(' '))}</b>${s.vat_pct ? ` · ${esc(s.vat_pct)} %` : ''}`;
+  return `<span class="rc-money"><input inputmode="decimal" data-rcs="amount" value="${esc(s.amount || '')}" aria-label="${esc(tr('Amount'))}" placeholder="${esc(tr('Amount'))}" autocomplete="off">
+    <input data-rcs="currency" value="${esc(s.currency || '')}" maxlength="3" aria-label="${esc(tr('Currency'))}" placeholder="${esc(tr('Currency'))}" autocomplete="off">
+    <select data-rcs="vat_pct" aria-label="${esc(tr('VAT rate'))}"><option value="">${tr('unknown')}</option>${['19', '7', '0'].map(v => `<option value="${v}" ${s.vat_pct === v ? 'selected' : ''}>${v} %</option>`).join('')}</select></span>`;
+}
+function rc_accBody(b) {
+  const box = b.closest('.rc-sug'), o = {};
+  if (!box) return o;
+  box.querySelectorAll('[data-rcs]').forEach(f => { o[f.dataset.rcs] = f.value.trim(); });
+  return o;
 }
 const rc_cur = () => ({project_id: RC.d?.receipt?.project?.id || null, category: RC.d?.receipt?.category || '', vat_pct: RC.d?.receipt?.vat_pct ?? null});  // 2.90.0 A (#1921): + VAT rate
 async function rc_put(id, v) {
@@ -52,7 +67,8 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('.rc-slot [data-rc]'); if (!b) return;
   const [act, sid] = b.dataset.rc.split(':'), id = RC.id;
   b.disabled = true;
-  try { await rc_post(id, +sid, act, act === 'accept' ? {} : undefined); } catch { b.disabled = false; return; }
+  const body = act === 'accept' ? rc_accBody(b) : undefined;
+  try { await rc_post(id, +sid, act, body); } catch { b.disabled = false; return; }
   const label = act === 'accept' ? tr('Suggestion accepted') : tr('Suggestion rejected');
-  histToast(label, histAdd({label, undo: () => rc_post(id, +sid, 'reopen'), redo: () => rc_post(id, +sid, act, act === 'accept' ? {} : undefined)}));
+  histToast(label, histAdd({label, undo: () => rc_post(id, +sid, 'reopen'), redo: () => rc_post(id, +sid, act, body)}));
 });

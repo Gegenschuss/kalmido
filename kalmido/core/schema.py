@@ -2505,6 +2505,17 @@ MIGRATIONS = [
     # 2.102.0 A (#1988): a deleted list stays in the trash with everything (tasks, fields, tags, chat) until the purge
     ("lists", "deleted_at", "ALTER TABLE lists ADD COLUMN deleted_at TEXT"),
     ("lists", "deleted_by", "ALTER TABLE lists ADD COLUMN deleted_by BIGINT REFERENCES users(id) ON DELETE SET NULL"),
+    # 2.121.0 C (#2096): an agent's suggestion may carry an amount (sealed like the note), currency and VAT rate; prev_* = what the
+    # document had before an accept (NULL = the accept did not touch it; prev_vat_pct "-" = it was unknown), for the undo.
+    # 2.121.0 C (#2094): a receipt billed on to a client (the document and the day); 2.120 and older never read any of them
+    ("rc_suggest", "amount", "ALTER TABLE rc_suggest ADD COLUMN amount TEXT NOT NULL DEFAULT ''"),
+    ("rc_suggest", "currency", "ALTER TABLE rc_suggest ADD COLUMN currency TEXT NOT NULL DEFAULT ''"),
+    ("rc_suggest", "vat_pct", "ALTER TABLE rc_suggest ADD COLUMN vat_pct TEXT"),
+    ("rc_suggest", "prev_amount", "ALTER TABLE rc_suggest ADD COLUMN prev_amount TEXT"),
+    ("rc_suggest", "prev_currency", "ALTER TABLE rc_suggest ADD COLUMN prev_currency TEXT"),
+    ("rc_suggest", "prev_vat_pct", "ALTER TABLE rc_suggest ADD COLUMN prev_vat_pct TEXT"),
+    ("rc_receipts", "billed_doc_id", "ALTER TABLE rc_receipts ADD COLUMN billed_doc_id BIGINT"),
+    ("rc_receipts", "billed_at", "ALTER TABLE rc_receipts ADD COLUMN billed_at TEXT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

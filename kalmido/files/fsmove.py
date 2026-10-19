@@ -317,6 +317,10 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths):
             c.execute("DELETE FROM rc_suggest WHERE id=?", (r["id"],))  # an agent outside the target never sees it again
             continue
         note = fsm_open(c, old, "rc_suggest.note", r["note"]) or ""
+        amt = fsm_open(c, old, "rc_suggest.amount", r["amount"]) or ""  # 2.121.0 C (#2096)
+        pamt = fsm_open(c, old, "rc_suggest.prev_amount", r["prev_amount"])
+        c.execute("UPDATE rc_suggest SET amount=?, prev_amount=? WHERE id=?",
+                  (S.doc_seal(c, new, "rc_suggest.amount", amt), S.doc_seal(c, new, "rc_suggest.prev_amount", pamt), r["id"]))
         c.execute("UPDATE rc_suggest SET ws=?, org_id=?, note=?, list_id=?, prev_list_id=? WHERE id=?",
                   (new, to, S.doc_seal(c, new, "rc_suggest.note", note),
                    r["list_id"] if fsm_list_ok(c, r["list_id"], to, uid) else None,

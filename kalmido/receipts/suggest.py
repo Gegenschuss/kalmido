@@ -8,6 +8,8 @@ the document goes to "To review" and a person accepts (optionally changed) or re
 agent never sets, moves or deletes anything: there is no API route that writes rc_receipts, and the project must be a
 project the agent may see itself (its list restriction, the document's workspace -- never across an organisation).
 The travel costs / receipts of the office (2.47b) can later hang their receipts on rc_receipts.node_id."""
+import re
+
 from flask import g, jsonify, request
 
 from ..core.config import app
@@ -23,6 +25,7 @@ RC_CAT_MAX = 60
 RC_NOTE_MAX = 500
 RC_OPEN_MAX = 5          # open suggestions of one document (one per agent; the oldest go)
 RC_VAT = ("19", "7", "0")  # 2.90.0 A (#1921): the VAT rates of a receipt (None = unknown)
+RC_AMOUNT_MAX = 100_000_000  # as docs.extract.MAX_AMOUNT
 _KEEP = object()
 
 
@@ -75,6 +78,35 @@ def rc_clean(b, agent=False):
     return lid, cat
 
 
+def rc_amount_clean(v):
+    """2.121.0 C (#2096): "123.45" ('' = none) from a decimal text or a number > 0 with at most two decimals; raises BadInput."""
+    from decimal import Decimal, InvalidOperation
+    if v in (None, ""):
+        return ""
+    if isinstance(v, bool) or not isinstance(v, (int, float, str)):
+        raise BadInput(tr("Invalid value: {0}", "amount"))
+    t = str(v).strip().replace(",", ".")
+    if not re.fullmatch(r"\d{1,12}(\.\d{1,2})?", t):
+        raise BadInput(tr("Invalid value: {0}", "amount"))
+    try:
+        d = Decimal(t)
+    except InvalidOperation:
+        raise BadInput(tr("Invalid value: {0}", "amount"))
+    if d <= 0 or d > RC_AMOUNT_MAX:
+        raise BadInput(tr("Invalid value: {0}", "amount"))
+    return format(d.quantize(Decimal("0.01")), "f")
+
+
+def rc_currency_clean(v):
+    """2.121.0 C (#2096): three capital letters or '' (not given)."""
+    if v in (None, ""):
+        return ""
+    t = v.strip().upper() if isinstance(v, str) else ""
+    if not re.fullmatch(r"[A-Z]{3}", t):
+        raise BadInput(tr("Invalid value: {0}", "currency"))
+    return t
+
+
 def rc_categories(c, ws):
     rows = c.execute("SELECT DISTINCT category FROM rc_receipts WHERE ws=? AND category<>'' UNION "
                      "SELECT DISTINCT category FROM rc_suggest WHERE ws=? AND category<>'' AND state='accepted'", (ws, ws)).fetchall()
@@ -95,7 +127,8 @@ def rc_sug_json(c, s, uid=None):
     vis = lambda lid: lid and (uid is None or list_role(c, lid, uid))  # noqa: E731 -- a person sees a project name only when they see the project
     return {"id": s["id"], "document_id": s["node_id"], "agent": _who(c, s["agent_id"]), "state": s["state"],
             "project": {"id": s["list_id"], "name": _list_name(c, s["list_id"]) if vis(s["list_id"]) else None} if s["list_id"] else None,
-            "category": s["category"] or None, "note": S.doc_open(c, s["ws"], "rc_suggest.note", s["note"]) or "",
+            "category": s["category"] or None, "amount": S.doc_open(c, s["ws"], "rc_suggest.amount", s["amount"]) or None,
+            "currency": s["currency"] or None, "vat_pct": s["vat_pct"], "note": S.doc_open(c, s["ws"], "rc_suggest.note", s["note"]) or "",
             "created_at": s["created_at"], "decided_at": s["decided_at"]}
 
 
@@ -212,15 +245,31 @@ def rc_accept(sid):
     if s["state"] != "open":
         return err(tr("This suggestion was already decided"), 409)
     b = body()
+    cur = c.execute("SELECT list_id, category, vat_pct FROM rc_receipts WHERE node_id=?", (n["id"],)).fetchone()
+    # 2.121.0 C (#2096): a suggestion of only amount / VAT rate leaves the project and category as they are
+    only_money = not s["list_id"] and not s["category"]
+    dl, dc = (cur["list_id"], cur["category"]) if (only_money and cur) else (s["list_id"], s["category"])
     try:
-        lid, cat = rc_clean({"project_id": b.get("project_id", s["list_id"]), "category": b.get("category", s["category"])})
+        lid, cat = rc_clean({"project_id": b.get("project_id", dl), "category": b.get("category", dc)})
+        amt = rc_amount_clean(b["amount"] if "amount" in b else S.doc_open(c, s["ws"], "rc_suggest.amount", s["amount"]))
+        ccy = rc_currency_clean(b["currency"] if "currency" in b else s["currency"])
+        vat = rc_vat_clean(b["vat_pct"]) if "vat_pct" in b else (s["vat_pct"] or _KEEP)
     except BadInput as e:
         return err(str(e))
     if lid and not rc_project_ok(c, lid, n, uid):
         return err(tr("Choose a project of this workspace"))
-    prev = rc_set(c, n, m["ws"], lid, cat, uid)
-    c.execute("UPDATE rc_suggest SET state='accepted', decided_by=?, decided_at=?, prev_list_id=?, prev_category=? WHERE id=?",
-              (uid, _now(), prev[0], prev[1], sid))
+    pa = pc = pv = None
+    if amt or ccy:
+        dm = c.execute("SELECT amount, currency FROM doc_meta WHERE node_id=?", (n["id"],)).fetchone()
+        pa, pc = S.doc_open(c, m["ws"], "doc_meta.amount", dm["amount"]) or "", dm["currency"] or ""
+        c.execute("UPDATE doc_meta SET amount=?, currency=? WHERE node_id=?",
+                  (S.doc_seal(c, m["ws"], "doc_meta.amount", amt or pa), ccy or pc, n["id"]))
+    if vat is not _KEEP:
+        pv = (cur["vat_pct"] if cur else None) or "-"
+    prev = rc_set(c, n, m["ws"], lid, cat, uid, vat)
+    c.execute("UPDATE rc_suggest SET state='accepted', decided_by=?, decided_at=?, prev_list_id=?, prev_category=?, prev_amount=?, prev_currency=?, "
+              "prev_vat_pct=? WHERE id=?",
+              (uid, _now(), prev[0], prev[1], S.doc_seal(c, m["ws"], "rc_suggest.prev_amount", pa), pc, pv, sid))
     rc_review(c, n["id"])
     fs_log_add(c, n["id"], "receipt", "accepted")
     bump(c)
@@ -251,7 +300,12 @@ def rc_reopen(sid):
     uid = me()
     s, n, m = _need_sug(c, sid)
     if s["state"] == "accepted":
-        rc_set(c, n, m["ws"], s["prev_list_id"], s["prev_category"] or "", uid)
+        vat = _KEEP if s["prev_vat_pct"] is None else (None if s["prev_vat_pct"] == "-" else s["prev_vat_pct"])
+        rc_set(c, n, m["ws"], s["prev_list_id"], s["prev_category"] or "", uid, vat)
+        if s["prev_amount"] is not None or s["prev_currency"] is not None:  # 2.121.0 C (#2096): the amount before the accept
+            pa = S.doc_open(c, m["ws"], "rc_suggest.prev_amount", s["prev_amount"]) or ""
+            c.execute("UPDATE doc_meta SET amount=?, currency=? WHERE node_id=?",
+                      (S.doc_seal(c, m["ws"], "doc_meta.amount", pa), s["prev_currency"] or "", n["id"]))
     c.execute("UPDATE rc_suggest SET state='open', decided_by=NULL, decided_at=NULL WHERE id=?", (sid,))
     rc_review(c, n["id"])
     bump(c)
@@ -265,7 +319,7 @@ def rc_reopen(sid):
 def v1_rc_suggest(nid):
     """An agent suggests project and / or category of a receipt shared with it; a person confirms in the app."""
     b = v1_json()
-    extra = sorted(k for k in b if k not in ("project_id", "category", "note"))
+    extra = sorted(k for k in b if k not in ("project_id", "category", "note", "amount", "currency", "vat_pct"))
     if extra:
         raise UnknownFields(extra)
     if not _is_agent():
@@ -273,7 +327,12 @@ def v1_rc_suggest(nid):
     c = db()
     aid = me()
     n, m = rc_doc(c, nid)
-    lid, cat = rc_clean(b, agent=True)
+    lid, cat = rc_clean(b)
+    amt = rc_amount_clean(b.get("amount"))  # 2.121.0 C (#2096): amount, currency and VAT rate may be suggested as well
+    ccy = rc_currency_clean(b.get("currency"))
+    vat = rc_vat_clean(b.get("vat_pct"))
+    if not (lid or cat or amt or vat):
+        raise BadInput(tr("Suggest a project, a category, an amount or a VAT rate"))
     if lid and not rc_project_ok(c, lid, n, aid, agent=True):
         raise BadInput(tr("Choose a project of this workspace"))
     note = b.get("note") or ""
@@ -282,8 +341,10 @@ def v1_rc_suggest(nid):
     c.execute("DELETE FROM rc_suggest WHERE node_id=? AND agent_id=? AND state='open'", (nid, aid))
     for x in c.execute("SELECT id FROM rc_suggest WHERE node_id=? AND state='open' ORDER BY id DESC OFFSET ?", (nid, RC_OPEN_MAX - 1)).fetchall():
         c.execute("DELETE FROM rc_suggest WHERE id=?", (x[0],))
-    sid = insert_id(c, "INSERT INTO rc_suggest(node_id, org_id, ws, agent_id, list_id, category, note, state, created_at) VALUES(?,?,?,?,?,?,?,?,?)",
-                    (nid, n["org_id"], m["ws"], aid, lid, cat, S.doc_seal(c, m["ws"], "rc_suggest.note", note.strip()), "open", _now()))
+    sid = insert_id(c, "INSERT INTO rc_suggest(node_id, org_id, ws, agent_id, list_id, category, note, state, created_at, amount, currency, vat_pct) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (nid, n["org_id"], m["ws"], aid, lid, cat, S.doc_seal(c, m["ws"], "rc_suggest.note", note.strip()), "open", _now(),
+                     S.doc_seal(c, m["ws"], "rc_suggest.amount", amt), ccy, vat))
     c.execute("UPDATE doc_meta SET review=1 WHERE node_id=?", (nid,))
     fs_log_add(c, nid, "suggest", "receipt")
     bump(c)
@@ -327,16 +388,20 @@ def rc_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "id": {"type": "integer"}, "document_id": {"type": "integer"}, "agent": {"type": ["object", "null"]},
         "state": {"type": "string", "enum": ["open", "accepted", "rejected"]},
         "project": {"type": ["object", "null"], "properties": {"id": {"type": "integer"}, "name": {"type": ["string", "null"]}}},
-        "category": {"type": ["string", "null"]}, "note": {"type": "string"}, "created_at": {"type": "string"},
+        "category": {"type": ["string", "null"]}, "amount": {"type": ["string", "null"]}, "currency": {"type": ["string", "null"]},
+        "vat_pct": {"type": ["string", "null"], "enum": ["19", "7", "0", None]}, "note": {"type": "string"}, "created_at": {"type": "string"},
         "decided_at": {"type": ["string", "null"]}}}
     T = "Documents"
     paths["/documents/{id}/receipt-suggestion"] = {"post": op(
-        "Suggest project and category of a receipt (2.48.0)", T, {"201": {"description": "The suggestion",
+        "Suggest project, category, amount and VAT rate of a receipt (2.48.0)", T, {"201": {"description": "The suggestion",
                                                                           "content": {"application/json": {"schema": ref("ReceiptSuggestion")}}}}
         | errs("400", "403", "404"), [pid("id", "Document (file) id")],
         body={"type": "object", "properties": {
             "project_id": {"type": ["integer", "null"], "description": "A list of kind project you can see, in the document's workspace"},
             "category": {"type": "string", "description": f"Short text (max {RC_CAT_MAX}), e.g. Travel, Material, Software"},
+            "amount": {"type": ["string", "number"], "description": "Gross amount of the receipt, more than 0, at most two decimals (2.121.0)"},
+            "currency": {"type": "string", "description": "Three letters, e.g. EUR (optional)"},
+            "vat_pct": {"type": "string", "enum": ["19", "7", "0"], "description": "VAT rate of the receipt in percent"},
             "note": {"type": "string", "description": "Why (shown to the person who decides)"}}},
         scope="files:read",
         desc="Agents only. The document must be shared with you. The suggestion waits in To review until a person accepts or "

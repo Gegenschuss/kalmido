@@ -587,6 +587,13 @@ section lists the figures (fields 81, 86, 21, 45, 66, 83) for a month or quarter
 small businesses get no return. A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
 as "Tax reserve" and "Freely available". No tax advice; figures without guarantee. Kalmido sends nothing to the tax office.
 
+**Billing receipts on to a client (2.121):** under the receipts of the month, **Bill receipts on to a client …** (or **Bill on to a
+client …** in a receipt's sheet) puts the ticked receipts as positions "external costs" on a quotation or invoice in draft: the
+amount is the purchase price, the markup in % makes the price (one position per receipt or one for all). A receipt with a VAT rate
+is billed net (the input tax stays yours), without a rate or in a small business gross. The row then says "billed on …"; a receipt
+is never billed twice, and Undo takes the positions back while the document is a draft. Agents may suggest amount, currency and VAT
+rate of a receipt as well; you change them in the suggestion card before you accept (Undo brings the old values back).
+
 ## Bank reconciliation (2.90)
 
 The tab **Bank** (admins of the office area; in a personal office its owner) matches the bookings of your account with
