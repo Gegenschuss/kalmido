@@ -967,6 +967,29 @@ amount. When a quotation becomes "accepted" its purchase is stored for the cash 
 position with a purchase and per part, amount encrypted at rest, dated at the start of the period of service, else the
 day of acceptance), stored anew when the accepted quotation changes and removed when it leaves that status.
 
+## Undo in the editors (2.111.0)
+
+Documents (quotations, invoices, credit notes, reminders and the parts of a quotation), clients, the master data
+(services, texts, contracts, sets, roles) and tables keep saving every change at once. Every own saved change is one
+step of the app's history: Ctrl+Z (Mac: Cmd+Z) takes it back while the focus is not in a text field (there the field's
+own text undo works). Leaving a changed document or table (Back, the menu, a link, another document) turns its steps
+into one entry and shows "... saved · Undo" for 10 seconds; its button brings back everything since the document was
+opened. Leaving without a change shows nothing. The client and master data dialogs keep their Save button; after a save
+the same hint brings back the values from before the dialog. Equipment, document templates and documents made from
+templates keep their own undo.
+
+Never undone: finalising, sending, payments, a status change, a number, the reminder fee and DATEV keep their dialogs
+and end the way back for the open document. The server refuses an undo (409 with the reason) when someone else changed
+the object in the meantime (their change stays), when the document was finalised or sent meanwhile, or when a client
+moved to another workspace. Tables check the table's revision the same way.
+
+How it works: the editor sends its saves with the header `X-Kalmido-Undo: <session token>`; the write routes keep a
+copy of the stored rows before the step and a fingerprint of the state after it (table `office_undo`, one day).
+`POST /api/office/undo/<doc|client|services|texts|contracts|sets|roles|crew>/<id>` with `{sess, op}` (`undo` = the newest
+step, `all` = back to the opening, `redo`, `redoall`) writes a copy back in one transaction, only while the object is
+exactly as this person's last step left it; rights as for the normal change. Saves without the header (agents, the
+API, other apps) record nothing.
+
 ## Recipient and client names (2.97.0)
 
 - A client has its name (printed on quotations, invoices, the e-invoice) and an optional **display name** for the pickers
@@ -1491,6 +1514,8 @@ Since 2.36.2 also `office_company` and `office_doc_log`, the columns `locked_at`
 `tax_pct`, `net`, `tax_amount` of `office_doc_items` (positions written without `org_id` get it at the next start) and
 the billing columns of `clients` - all nullable or with a default, so the previous release runs on with them.
 Unfinished logo uploads (`*.tmp`) are not part of backups.
+Since 2.111.0 also `office_undo` (the copies for the editors' undo, see "Undo in the editors"; `org_id` nullable for a
+private client, rows live one day); 2.110 runs on with it.
 Since 2.37.0 (PostgreSQL) amounts, rates and quantities are `NUMERIC(14,4)` (exact decimals; read back as numbers as
 before), and every `office_*` table is under row-level security by `org_id`: a request only ever gets rows of its own
 organisations, even if a route forgot a check.
