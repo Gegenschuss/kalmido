@@ -249,6 +249,7 @@ ROUTES = {
     "PATCH /api/books/{}": "book", "DELETE /api/books/{}": "book", "PUT /api/books/{}/members": "book",
     "DELETE /api/books/{}/members/{}": "book", "POST /api/books/{}/import": "book", "GET /api/books/imports/{}": "own",  # 2.41.0 (#1437): only the starter's own import
     "GET /api/books/{}/export.vcf": "book",
+    "GET /api/books/{}/export.csv": "book",  # 2.119.1 A (#2080): like the vCard export (p21191_a_api_test.py)
     "POST /api/books/{}/org": "book", "PATCH /api/books/{}/org": "book", "DELETE /api/books/{}/org": "book",  # 2.52.0 (#1438)
     # ---- calendar (16)
     "POST /api/evcals/{}/import": "calendar", "GET /api/v1/event-calendars": "calendar",
@@ -397,6 +398,8 @@ ROUTES = {
     "GET /api/contacts": "contact", "GET /api/contacts/{}": "contact", "POST /api/contacts": "contact",
     "PATCH /api/contacts/{}": "contact", "DELETE /api/contacts/{}": "contact", "POST /api/tasks/{}/contacts": "contact",
     "DELETE /api/tasks/{}/contacts/{}": "contact", "PUT /api/v1/contacts/{}/care": "contact",
+    # 2.119.1 A (#2084 #2085): only the address books one sees (p21191_a_api_test.py)
+    "POST /api/contacts/dupcheck": "contact", "GET /api/contacts/groups": "contact", "POST /api/contacts/groups": "contact",
     "PUT /api/contacts/{}/care": "contact",
     "POST /api/contacts/bulk": "contact", "POST /api/v1/contacts/bulk": "contact",  # 2.46.1 (#1554): every id checked first (p2461_c_api_test.py)
     # 2.66.0 (#1835): every id checked (write), one scope only, undo checks the target + every book (p266_a_api_test.py)
