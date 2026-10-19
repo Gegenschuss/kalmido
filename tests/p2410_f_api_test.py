@@ -74,7 +74,9 @@ Bo = sess("bob")
 BK = A.post(B + "/api/books", json={"name": "Big"}).json()["id"]
 small = vcards(20, prefix="sm")
 r = A.post(B + f"/api/books/{BK}/import?background=1", files={"file": ("s.vcf", small, "text/vcard")})
-check(r.status_code == 200 and r.json() == {"created": 20, "updated": 0, "unchanged": 0, "errors": 0},
+# 2.119.1 (#2084): the answer also names the likely duplicates (dupes, dupe_groups)
+check(r.status_code == 200 and {k: v for k, v in r.json().items() if k not in ("dupes", "dupe_groups")} == {"created": 20, "updated": 0, "unchanged": 0, "errors": 0}
+      and r.json().get("dupes") == 0,
       f"#1437: a small file is answered at once in the old format {r.status_code} {r.text[:200]}")
 
 

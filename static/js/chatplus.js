@@ -60,7 +60,7 @@ function cpnBarHtml(k) {
 }
 // the bars on the screen follow the state (called by tcPatch / chatPatch and after a pin)
 function cpnSync() {
-  for (const el of document.querySelectorAll('[data-cpn]')) { const h = cpnBarHtml(el.dataset.cpn); if (el._h !== h) { const t = document.createElement('template'); t.innerHTML = h; const n = t.content.firstElementChild; n._h = h; el.replaceWith(n); } }
+  for (const el of document.querySelectorAll('[data-cpn]')) { const h = cpnBarHtml(el.dataset.cpn); if (!wk_sameEl(el, h)) {  /* 2.119.1 D (#2310): a freshly drawn bar has no _h yet */ const t = document.createElement('template'); t.innerHTML = h; const n = t.content.firstElementChild; n._h = h; el.replaceWith(n); } }
   cpnUndoDrop();
 }
 // the small pin in a pinned message's line

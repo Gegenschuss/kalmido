@@ -172,6 +172,10 @@ ul.ptall li{display:flex;align-items:center;gap:.75rem;padding:.625rem 0;border-
 ul.ptall a{flex:1;min-width:0;display:flex;flex-direction:column;text-decoration:none;min-height:2.75rem;justify-content:center}
 ul.ptall a b{color:var(--text);font-weight:500;overflow-wrap:anywhere}
 ul.ptall .ptst{margin:0;flex:0 0 auto}
+/* 2.120.0 B (#2088) the customer's documents in the portal: the approval button of an open quotation, overdue invoices */
+ul.kpdocs li{flex-wrap:wrap}
+ul.kpdocs a.kpgo{flex:0 0 auto;flex-direction:row;align-items:center;min-height:2.75rem;padding:0 .875rem;border:1px solid var(--accent);border-radius:.5rem;font-size:.875rem}
+.ptst-late{color:var(--text);border-color:var(--text)}
 .ptout{margin-top:1.5rem}
 .ptout button{background:transparent;color:var(--text);border:1px solid var(--line2);border-radius:.5rem;padding:.5rem 1rem;font:inherit;min-height:2.75rem;cursor:pointer}
 main>.ok{color:var(--accent);margin:.5rem 0}

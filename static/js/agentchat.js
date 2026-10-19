@@ -663,7 +663,7 @@ function chatPatch(o = {}) {
   apvPinSync();  // 2.35.0 (#1103)
   cpnSync();  // 2.62.0 (#1848)
   chatHeadSync(a);  // 2.32.0 (#1079): the host may report another model / mode while the chat is open
-  const sl = $('#chat-steps'), slh = chatStepsLiveHtml(); if (sl && sl._h !== slh && sl.outerHTML !== slh) { sl.outerHTML = slh; const n = $('#chat-steps'); if (n) n._h = slh; }
+  const sl = $('#chat-steps'), slh = chatStepsLiveHtml(); if (sl && !wk_sameEl(sl, slh)) {  /* 2.119.1 D (#2310) */ sl.outerHTML = slh; const n = $('#chat-steps'); if (n) n._h = slh; }
   if (chatRO && !box._ro) { box._ro = 1; chatRO.observe(box); }
   const ms = S.chat.msgs, nl = ms.length ? ms[ms.length - 1].id : 0; box.dataset.last = nl;
   if (o.keep) box.scrollTop = top + box.scrollHeight - h;

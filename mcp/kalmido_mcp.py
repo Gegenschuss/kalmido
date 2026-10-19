@@ -1714,9 +1714,12 @@ TOOLS += [
      _obj({"doc_id": S_ID, **_ODRAFT, **_OCF}, ["doc_id"]),
      lambda api, a: api.call("PATCH", f"/office/offers/{int(a['doc_id'])}", body=_pick(a, tuple(_ODRAFT) + tuple(_OCF)))),
     ("draft_invoice_from_offer", "2.51.0: an invoice DRAFT from an accepted quotation (like a person's \"Create invoice\"; parts_mode for a quotation "
-                                 "with parts). A person finalises and sends it. The event offer_accepted tells you when a quotation was accepted.",
-     _obj({"offer_id": S_ID, "parts_mode": {"type": "string", "enum": ["full", "title", "summary"]}, "notify": {"type": "boolean"}, **_RB}, ["offer_id"]),
-     lambda api, a: api.call("POST", f"/office/offers/{int(a['offer_id'])}/invoice", body=_pick(a, ("parts_mode", "notify", "requested_by")))),
+                                 "with parts). A person finalises and sends it. The event offer_accepted tells you when a quotation was accepted. "
+                                 "2.120.0: inv_type progress = a progress invoice of amount (net) or pct of the quotation's net; final = the whole "
+                                 "quotation less its finalised progress invoices.",
+     _obj({"offer_id": S_ID, "parts_mode": {"type": "string", "enum": ["full", "title", "summary"]}, "notify": {"type": "boolean"},
+           "inv_type": {"type": "string", "enum": ["", "progress", "final"]}, "amount": {"type": "number"}, "pct": {"type": "number"}, **_RB}, ["offer_id"]),
+     lambda api, a: api.call("POST", f"/office/offers/{int(a['offer_id'])}/invoice", body=_pick(a, ("parts_mode", "notify", "inv_type", "amount", "pct", "requested_by")))),
     ("draft_reminder", "2.51.0: a reminder DRAFT over open, finalised invoices of one client (level 1 payment reminder, 2 reminder, 3 final reminder). "
                        "Never sent by you: a person checks and sends it.",
      _obj({"invoice_ids": {"type": "array", "items": S_ID, "minItems": 1}, "level": {"type": "integer", "enum": [1, 2, 3]}, "notify": {"type": "boolean"}, **_RB}, ["invoice_ids"]),

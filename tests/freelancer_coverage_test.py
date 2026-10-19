@@ -33,7 +33,7 @@ KINDS = {
                          "file requests of a private folder, tags of files / folders, the tag filter, the documents' filters, bulk change, ZIP, CSV, documents via the API (2.122.0)"),
     "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private space (create, change, search, export, trash; "
                        "2.99.0: page files, ZIP import with PDFs / pictures)"),
-    "pim": ("matrix", SUITE + ", p294_b_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password"),
+    "pim": ("matrix", SUITE + ", p294_b_api_test.py, p21191_a_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password"),
     "time": ("matrix", SUITE + ": time entries, the timer, habits"),
     "agents": ("matrix", SUITE + ": the freelancer's own agent (my agents, its token, chat, jobs, share of a private list) and "
                          "the agent API with that agent's token"),
@@ -300,12 +300,15 @@ ROUTES = {
     "DELETE /api/office/deals/{}": "office", "DELETE /api/office/docs/{}": "office",
     "DELETE /api/office/docs/{}/parts/{}": "office", "DELETE /api/office/docs/{}/payments/{}": "office",
     "DELETE /api/office/fixed-costs/{}": "office", "DELETE /api/office/logo": "office",
+    # 2.120.0 E (#2091): the own letterhead PDF
+    "GET /api/office/letterhead": "office", "POST /api/office/letterhead": "office", "PUT /api/office/letterhead": "office",
+    "DELETE /api/office/letterhead": "office", "POST /api/office/letterhead/restore": "office", "GET /api/office/letterhead/preview": "office",
     "DELETE /api/office/packs/installed/{}/{}": "office", "DELETE /api/office/trips/{}": "office",
     "DELETE /api/office/trips/{}/items/{}": "office", "DELETE /api/office/{}/{}": "office", "DELETE /api/paperless": "office",
     "DELETE /api/paperless/zip": "office", "DELETE /api/v1/clients/{}": "office", "GET /api/clients": "office",
     "GET /api/clients/{}": "office", "GET /api/clients/{}/book-contacts": "office", "GET /api/newsletter": "office",
     "GET /api/newsletter/lists": "office", "GET /api/office/agents/{}": "office", "GET /api/office/cashflow": "office",
-    "GET /api/office/cashflow/check": "office", "GET /api/office/catalog": "office", "GET /api/office/datev/extf": "office",
+    "GET /api/office/cashflow/check": "office", "GET /api/office/catalog": "office", "GET /api/office/datev/extf": "office", "GET /api/office/datev/accounts": "office",  # 2.120.0 C (#2090)
     "GET /api/office/deals": "office", "GET /api/office/deals/summary": "office", "GET /api/office/docs": "office",
     "GET /api/office/docs/{}": "office", "GET /api/office/docs/{}/log": "office", "GET /api/office/docs/{}/payments": "office",
     "GET /api/office/docs/{}/pdf": "office", "GET /api/office/docs/{}/render": "office",
@@ -346,10 +349,12 @@ ROUTES = {
     "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/docs": "office",
     "POST /api/office/docs/from-time": "office", "POST /api/office/docs/reminder": "office",
+    "POST /api/office/docs/{}/delivery": "office", "GET /api/office/docs/{}/timesheet.pdf": "office",  # 2.120.0 D (#2089)
     "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/{}/datev": "office",
     "POST /api/office/docs/{}/cashflow": "office", "POST /api/office/docs/{}/duplicate": "office", "POST /api/office/docs/{}/fee": "office",
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
     "POST /api/office/docs/{}/invoice": "office",
+    "GET /api/office/docs/{}/progress": "office",  # 2.120.0 A (#2087): progress invoices of a quotation (p2120_a_api_test.py)
     "POST /api/office/docs/{}/number": "office", "POST /api/office/docs/{}/parts": "office",
     "POST /api/office/docs/{}/payments": "office", "POST /api/office/docs/{}/send": "office",
     "POST /api/office/docs/{}/signoff": "office", "POST /api/office/docs/{}/status": "office",
@@ -465,8 +470,11 @@ ROUTES = {
     "DELETE /api/v1/address-books/{}": "pim", "DELETE /api/v1/address-books/{}/members/{}": "pim",
     "DELETE /api/v1/contacts/{}": "pim", "DELETE /api/v1/event-calendars/{}": "pim",
     "DELETE /api/v1/event-calendars/{}/members/{}": "pim", "DELETE /api/v1/events/{}": "pim", "GET /api/books": "pim",
-    "GET /api/books/imports/{}": "pim", "GET /api/books/{}/export.vcf": "pim", "GET /api/calendars": "pim",
-    "GET /api/calendars/events": "pim", "GET /api/contacts": "pim", "GET /api/contacts/{}": "pim", "GET /api/evcals": "pim",
+    "GET /api/books/imports/{}": "pim", "GET /api/books/{}/export.vcf": "pim",
+    "GET /api/books/{}/export.csv": "pim", "POST /api/contacts/dupcheck": "pim", "GET /api/contacts/groups": "pim",  # 2.119.1 A (#2080 #2084 #2085)
+    "POST /api/contacts/groups": "pim", "GET /api/calendars": "pim",
+    "GET /api/calendars/events": "pim", "GET /api/contacts": "pim", "GET /api/contacts/{}": "pim", "GET /api/contacts/{}/history": "pim",  # 2.119.1 B (#2083)
+    "GET /api/evcals": "pim",
     "GET /api/evcals/{}/export.ics": "pim", "GET /api/events": "pim", "GET /api/events/{}": "pim",
     "GET /api/v1/address-books": "pim", "GET /api/v1/address-books/{}/export": "pim", "GET /api/v1/contacts": "pim",
     "GET /api/v1/contacts/{}": "pim", "GET /api/v1/event-calendars": "pim", "GET /api/v1/event-calendars/{}/export": "pim",
@@ -693,6 +701,8 @@ ROUTES = {
     "GET /api/office/contracts/{}/files": "office", "POST /api/office/contracts/{}/files": "office",
     "GET /api/office/contracts/{}/files/{}": "office", "PATCH /api/office/contracts/{}/files/{}": "office",
     "DELETE /api/office/contracts/{}/files/{}": "office", "POST /api/office/contracts/{}/files/{}/restore": "office",
+    # 2.120.0 B (#2088): documents in the customer portal of a freelancer's personal office (p2120_b_api_test.py)
+    "GET /portal/docs/{}/pdf": "link", "POST /api/office/clients/{}/portal-link": "office",
 }
 
 

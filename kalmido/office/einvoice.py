@@ -209,7 +209,7 @@ def ein_build(model, fmt="zugferd"):
     _e(_e(ctx, "ram:GuidelineSpecifiedDocumentContextParameter"), "ram:ID", EIN_PROFILE[fmt])
     doc = _e(root, "rsm:ExchangedDocument")
     _e(doc, "ram:ID", m.get("number") or "")
-    _e(doc, "ram:TypeCode", "381" if kind == "credit" else "380")
+    _e(doc, "ram:TypeCode", "381" if kind == "credit" else (m.get("type_code") or "380"))  # 2.120.0 A (#2087): 326 progress invoice
     _date_el(doc, "ram:IssueDateTime", m.get("date"))
     notes = [str(x) for x in (m.get("vat_note_text") or (tot.get("vat_note") if novat else ""), m.get("project_title") and
              (("Projekt: " if lang == "de" else "Project: ") + str(m["project_title"]))) if x and str(x).strip()]
@@ -316,7 +316,10 @@ def ein_build(model, fmt="zugferd"):
         _date_el(bp, "ram:StartDateTime", m.get("service_from") or m.get("service_to"))
         _date_el(bp, "ram:EndDateTime", m.get("service_to") or m.get("service_from"))
     pt = _e(se, "ram:SpecifiedTradePaymentTerms")
-    if pay.get("text"):
+    if pay.get("skonto_bt20"):  # 2.120.0 A (#2087): the XRechnung cash discount line (BT-20), the printed text before it
+        first = str(pay.get("text") or "").split("\n")[0][:400]
+        _e(pt, "ram:Description", (first + "\n" if first else "") + pay["skonto_bt20"])
+    elif pay.get("text"):
         _e(pt, "ram:Description", str(pay["text"])[:500])
     if m.get("due_date"):
         _date_el(pt, "ram:DueDateDateTime", m.get("due_date"))
@@ -393,8 +396,8 @@ def ein_check(xml_bytes):
     for name, (el, path) in req.items():
         if not _text(el, path):
             out.append(f"{name} missing")
-    if _text(doc, "ram:TypeCode") not in ("380", "381"):
-        out.append("BT-3 type must be 380 or 381")
+    if _text(doc, "ram:TypeCode") not in ("380", "381", "326"):  # 2.120.0 A (#2087): 326 progress invoice
+        out.append("BT-3 type must be 380, 381 or 326")
     for d in root.iterfind(".//udt:DateTimeString", NS):
         if not re.fullmatch(r"\d{8}", d.text or "") or d.get("format") != "102":
             out.append(f"date not YYYYMMDD / format 102: {d.text}")

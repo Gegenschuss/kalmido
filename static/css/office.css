@@ -84,6 +84,8 @@
 .ofdauto .ofcn small{font-size:var(--fs-s)}
 .ofdauto .ofdlt{font-variant-numeric:tabular-nums;white-space:nowrap}
 .ofdrules{margin-top:.5rem}
+/* 2.120.0 D (#2089): a delivery note shows no prices (rate, tax, line total) */
+.ofdls .ofdrate,.ofdls .ofdit .ofdlt,.ofdls .ofdnums>.muted,.ofdls .ofdnums select[data-k="tax"],.ofdls .ofdpctof{display:none}
 .ofdtotals{margin-top:.75rem;padding:.5rem .75rem;border-top:2px solid var(--accent)}
 .ofdtotals dl{margin:0;display:flex;flex-direction:column;gap:.125rem;max-width:28rem;margin-left:auto}
 .ofdtotals .ofdtr{display:flex;justify-content:space-between;gap:1rem;min-height:1.75rem;align-items:center}
@@ -625,6 +627,8 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .bwgnew{display:flex;flex-wrap:wrap;gap:.25rem;margin:0 0 .75rem}
 .bwgnew input{flex:1 1 9rem;min-width:0;min-height:2.75rem}
 .bwlines{list-style:none;margin:0 0 .5rem;padding:0;display:flex;flex-direction:column;gap:.25rem;flex:1;min-width:0}
+/* 2.119.1 (#2288): the amount lines get the full width under their label, so kind / rate / gross stay usable on phones */
+.bwdlg .row.bwamt{flex-direction:column;align-items:stretch}.bwdlg .row.bwamt>.btn{align-self:flex-start}
 .bwln{display:grid;grid-template-columns:minmax(0,1fr) 5.5rem 7rem 2.75rem;gap:.25rem;align-items:center}
 .bwln select,.bwln input{min-height:2.75rem;min-width:0}
 .bwln .iconbtn{width:2.75rem;height:2.75rem}

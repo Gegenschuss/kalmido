@@ -21,6 +21,14 @@ async function ms_clInvLoad() {
   MSC.invLoading = false;
   ms_clDraw();
 }
+// 2.119.1 B (#2086): an address opens the map app on a tap (Apple devices: Apple Maps, else Google Maps); nothing is
+// embedded or fetched before the tap (here: the contacts module loads on demand, the client card uses it too)
+function ctk_mapLink(t) {
+  if (!t) return '';
+  const q = encodeURIComponent(t), apple = /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent);
+  const url = apple ? `https://maps.apple.com/?q=${q}` : `https://www.google.com/maps/search/?api=1&query=${q}`;
+  return `<a class="ctmap" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(tr('Show on the map'))}">${esc(t)}</a>`;
+}
 // 2.93.0 A (#1927): the client's documents made from templates (office/doctpl.py; admins of the office only, else no section)
 function ms_clGdHtml(c) {
   if (typeof officeOn !== 'function' || !officeOn()) return '';
@@ -86,7 +94,7 @@ function ms_clCard(c) {
       ${f('chart', tr('Budget'), esc(bud))}
       ${f('at', tr('E-mail'), c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}
       ${f('phone', tr('Phone'), c.phone ? `<a href="tel:${esc(c.phone.replace(/[^\d+]/g, ''))}">${esc(c.phone)}</a>` : '')}
-      ${f('mappin', tr('Address'), esc(adr))}
+      ${f('mappin', tr('Address'), ctk_mapLink(adr))}${''/* 2.119.1 B (#2086): a map link */}
       ${f('hash', tr('Customer number'), esc(b.customer_no || ''), 'cl_customer_no')}
       ${f('receipt', tr('VAT ID'), esc(b.vat_id || ''), 'cl_vat_id')}
       ${f('tag', tr('Buyer reference (e.g. routing ID)'), esc(b.buyer_reference || ''), 'cl_buyer_reference')}
@@ -99,6 +107,17 @@ function ms_clCard(c) {
       gendocs: ms_clGdHtml(c),  // 2.93.0 A (#1927): the documents made from templates (office admins)
       ...clientDetailParts(c)})}${clm_histHtml(c)}${typeof hbm_clientHtml === 'function' ? hbm_clientHtml(c) : ''}${typeof vdr_clientHtml === 'function' ? vdr_clientHtml(c) : ''}${''/* 2.99.1 A (#1959): video sign-offs */}</div>
   </article>`;
+}
+
+// ---- 2.120.0 B (#2088): "Send portal link": the client gets the sign-in link of the customer portal by mail (office/portaldocs.py;
+// the office setting "Show documents in the customer portal" must be on, else the server says so)
+function kp_menuItem(c) {
+  const to = c.billing?.email_invoice || c.email || '';
+  if (!to || typeof officeOn !== 'function' || !officeOn() || S.me?.kid) return null;
+  return {label: tr('Send portal link'), icon: 'mail', fn: async () => {
+    if (!await askConfirm(tr('Send the portal link to {0}?', to), tr('The client sees the sent quotations, invoices and their payment status. The link is valid for 30 minutes.'), {ok: tr('Send|mail')})) return;
+    try { const j = await rawFetch('POST', `/api/office/clients/${c.id}/portal-link`, {}); toast(tr('Portal link sent to {0}', j.to || to)); } catch (x) { toast(x.message || ''); }
+  }};
 }
 
 // ---- #1733: several clients at once (the selection bar of the contacts, multisel.js): Edit (rate, budget, colour,
@@ -221,7 +240,8 @@ document.addEventListener('click', e => {
       if (j.changed) ms_hist(msg, msg, async () => { await ms_clSend({action: 'restore', items: j.undo}); await ms_clAfter(); }, async () => { await ms_clSend({action: c.archived ? 'unarchive' : 'archive', ids: [c.id]}); await ms_clAfter(); });
     }}, ofm_can(c.org_id ?? null) ? {label: tr('Move to another workspace…'), icon: 'brief', fn: () => ofm_clients([c.id])} : null,  // 2.97.0 C (#2049)
     typeof tpo_on === 'function' && tpo_on() ? {label: tr('Find a date…'), icon: 'users', fn: () => tpo_forClient(c)} : null,  // 2.98.0 A (#1953)
-    formsOn() && !S.me?.kid ? {label: tr('Copy questionnaire link for this client'), icon: 'copy', fn: () => fq_clientLink(c, b)} : null]);  // 2.102.0 C (#2201)
+    formsOn() && !S.me?.kid ? {label: tr('Copy questionnaire link for this client'), icon: 'copy', fn: () => fq_clientLink(c, b)} : null,  // 2.102.0 C (#2201)
+    kp_menuItem(c)]);  // 2.120.0 B (#2088)
   }
 });
 document.addEventListener('keydown', e => {  // capture: before the global Esc (an open menu / dialog closes first)

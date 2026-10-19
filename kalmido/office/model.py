@@ -67,12 +67,13 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "offer_counter": "org",  # 2.118.0 A (#2265): quotation counter per "org" | "client" | "project" (OFFER_COUNTERS)
                      # 2.38.0 (#1021, F1): invoices -- number schemes per kind (defaults from the pack), payment terms, reminders,
                      # the e-invoice format and the DATEV document inbox (one e-mail address; PDF + XML are mailed there)
-                     "invoice_scheme": "", "credit_scheme": "", "reminder_scheme": "", "payment_days": 14, "reminder_fee": 0,
+                     "invoice_scheme": "", "credit_scheme": "", "reminder_scheme": "", "delivery_scheme": "", "payment_days": 14, "reminder_fee": 0,
                      "reminder_deadline_days": 10, "einvoice_format": "zugferd", "datev_email": "", "datev_auto": 0,
                      "invoice_closing_de": "", "invoice_closing_en": "", "reminder_text_de": "", "reminder_text_en": "",
                      # 2.40.0 (#1379): producing (markup by production days) and the raw data surcharge are switched on per
                      # organisation; new organisations start without them, fe_office_rules_migrate keeps them for those using them
                      "producing_on": 0, "raw_on": 0,
+                     "portal_docs": 0,  # 2.120.0 B (#2088): sent documents show in the customer portal (office/portaldocs.py)
                      "accept_on": 1,  # 2.114.4 B (#2270): quotations print the order confirmation block (per document: docs.accept_on)
                      # 2.47.3 (#1360): small business (section 19 UStG): new documents without VAT + the note (also orgs)
                      "small_business": 0,
@@ -98,7 +99,11 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # office/logbook.py)
                      "km_rate": "0.30",
                      # 2.93.0 B (#1928 review): the rate per year {"2026": "0.30"}; km_rate stays the default of years without one
-                     "km_rates": {}}
+                     "km_rates": {},
+                     # 2.120.0 A (#2087): the default cash discount of new invoices (0 = none; office/abschlag.py)
+                     "skonto_pct": 0, "skonto_days": 0,
+                     # 2.120.0 E (#2091): the own letterhead PDF + margins (set only by its own routes, office/letterhead.py)
+                     "letterhead": {}}
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 
 
@@ -250,7 +255,7 @@ def office_settings(c, oid):
         out["currency"] = out["currency"] or pack["currency"]
         if not out.get("offer_scheme"):
             out["offer_scheme"] = (pack.get("numbering") or {}).get("offer") or SETTINGS_DEFAULTS["offer_scheme"]
-        for k, dflt in (("invoice", "RE-{yyyy}-{seq:03}"), ("credit", "GS-{yyyy}-{seq:03}"), ("reminder", "MA-{yyyy}-{seq:03}")):  # 2.38.0
+        for k, dflt in (("invoice", "RE-{yyyy}-{seq:03}"), ("credit", "GS-{yyyy}-{seq:03}"), ("reminder", "MA-{yyyy}-{seq:03}"), ("delivery", "LS-{yyyy}-{seq:03}")):  # 2.38.0; 2.120.0 D (#2089)
             if not out.get(k + "_scheme"):
                 out[k + "_scheme"] = (pack.get("numbering") or {}).get(k) or dflt
     return out
@@ -329,8 +334,11 @@ def office_settings_clean(c, oid, b, cur):
             out["currency"] = v
         elif k == "fx_usd":
             out["fx_usd"] = round(_num(v, "fx_usd", 0.0001, 1000), 4)
-        elif k in ("offer_scheme", "invoice_scheme", "credit_scheme", "reminder_scheme"):
+        elif k in ("offer_scheme", "invoice_scheme", "credit_scheme", "reminder_scheme", "delivery_scheme"):
             out[k] = office_scheme_clean(v, FE_SCHEME_NAMES.get(k), offer=k == "offer_scheme")
+        elif k in ("skonto_pct", "skonto_days"):  # 2.120.0 A (#2087)
+            from .abschlag import abs_settings_clean
+            abs_settings_clean(k, v, out)
         elif k in ("payment_days", "reminder_deadline_days"):  # 2.38.0 (#1021, F1)
             out[k] = int(_num(v, k, 0, 365))
         elif k == "reminder_fee":
@@ -347,7 +355,7 @@ def office_settings_clean(c, oid, b, cur):
         elif k == "industry_packs":  # 2.47.0 (#1216)
             from .sheet import dk_packs_clean
             out[k] = dk_packs_clean(v)
-        elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on"):  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
+        elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs"):  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k in ("invoice_closing_de", "invoice_closing_en", "reminder_text_de", "reminder_text_en"):
             out[k] = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""
@@ -441,7 +449,7 @@ def office_logo_set(c, oid, name):
 # ---------------------------------------------------------------- number scheme
 # 2.40.0 (#1382): plain-language errors of a number scheme, with the name of the scheme
 FE_SCHEME_NAMES = {"offer_scheme": N_("Quotation numbers"), "invoice_scheme": N_("Invoice numbers"), "credit_scheme": N_("Credit note numbers"),
-                   "reminder_scheme": N_("Reminder numbers")}
+                   "reminder_scheme": N_("Reminder numbers"), "delivery_scheme": N_("Delivery note numbers")}  # 2.120.0 D (#2089)
 
 
 def office_scheme_clean(v, name=None, offer=True):

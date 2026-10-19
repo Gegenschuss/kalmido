@@ -106,10 +106,5 @@
 .dc-selbar .btn,.dc-selbar .iconbtn{min-height:2.75rem}
 /* 2.102.0 B (#2206): room below the grid as high as the sticky bar; the choosing mark gets a 2.75rem touch target (the circle stays 1.75rem) */
 .dc-grid.dc-selon{padding-bottom:7.5rem}
-.dc-selmark::after{content:"";position:absolute;inset:-.5rem}
-/* 2.122.0 B (#2294): the filter panel below the bar (desktop; phones: the sheet .dc-fsheet), the line of chosen filters */
-.dc-fpanel{margin:.25rem 0 .5rem;padding:.75rem;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--bg2)}
-.dc-fpanel .tsgrp{max-height:9rem}
-.dc-flt .dc-range{display:inline-flex;align-items:center;gap:.375rem}
-.dc-syn{margin:.75rem 0 0;font-size:var(--fs-xs)}
-.dc-fbar{padding-top:0}
+/* 2.119.1 D (#2206): the pseudo box starts inside the .125rem border: -.625rem makes the 2.75rem (44 px), -.5rem was 2.5rem (40 px) */
+.dc-selmark::after{content:"";position:absolute;inset:-.625rem}
