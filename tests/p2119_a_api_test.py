@@ -141,7 +141,14 @@ check([(e["action"], e["user"], e["reason"]) for e in lg] == [("approve", "Alice
       f"the log keeps who, when, why {lg}")
 A.post(B + f"{M}/{MID}/unlock", json={"reason": "check"})
 r = A.delete(B + f"{M}/{MID}")
-check(r.status_code == 409 and "2034" in r.text, "a receipt approved once is kept 8 years after its year (409) " + r.text[:200])
+# 2.119.0 (#2288, review): the keep period counts from the later of meal date and approval, so the year of the approval counts here
+import datetime as _dt
+KEEP = str(max(2025, _dt.date.today().year) + 9)
+check(r.status_code == 409 and KEEP in r.text, "a receipt approved once is kept 8 years after its year (409) " + r.text[:200])
+check(A.patch(B + f"{M}/{MID}", json={"date": "2010-01-01"}).ok, "an unlocked receipt may get another date")
+r = A.delete(B + f"{M}/{MID}")
+check(r.status_code == 409 and KEEP in r.text, "moving the date back does not shorten the keep period (409) " + r.text[:200])
+check(A.patch(B + f"{M}/{MID}", json={"date": "2025-05-14"}).ok, "date back")
 A.post(B + f"{M}/{MID}/approve")
 
 # ---------------------------------------------------------------- a draft: trash + restore, duplicate
