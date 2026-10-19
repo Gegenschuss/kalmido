@@ -1192,6 +1192,15 @@ fresh; run p21142_a_api "$PY" p21142_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21142_a_ui node p21142_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.114.2 part B (#2264): settings field errors below the field, the field keeps its width
 fresh; run p21142_b_ui node p21142_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.117.0 part A: travel costs - to-date calendar anchor, row menu with delete, person filter, own purposes (#2290 #2287 #2291 #2292)
+fresh; run p2117_a_api "$PY" p2117_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2117_a_ui node p2117_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.117.0 part B: documents sample templates, framework contract PDF attachments (#2283 #2285)
+fresh; run p2117_b_api "$PY" p2117_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2117_b_ui node p2117_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.117.0 part C: PDF metadata "Kalmido v<version>", agent chat filter compact on phones (#2262 #2260)
+fresh; run p2117_c_api "$PY" p2117_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2117_c_ui node p2117_c_ui.js "$KALMIDO_TEST_DATA"
 shard 13  # 2.98.1: new suites go here, above this line
 # 2.114.1 part A: bank button "Match" wording + 44 px buttons, empty heading, producing checkbox (#2017 #2254 #2255)
 fresh; run p21141_a_ui node p21141_a_ui.js "$KALMIDO_TEST_DATA"
