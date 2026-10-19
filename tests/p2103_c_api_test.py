@@ -339,7 +339,9 @@ if HB.ok:
 FK_RUN = ("from kalmido.core.db import DATABASE_URL\nfrom kalmido.core.pg import connect_direct\nfrom kalmido.core.fkeys import fk_ensure\n"
           "o = connect_direct(DATABASE_URL)\nprint('done', sorted(fk_ensure(o).items()))\no.commit()\no.close()")  # the login role, like init_db
 out = in_app(FK_RUN)
-check("('doc_meta.task_id', 1)" in out and "('habits.user_id', " + ("1)" if HB.ok else "0)") in out, "#2174: fk_ensure cleans the orphans and adds the keys " + out[-400:])
+# loading the app runs init_db, which runs fk_ensure (the start path); the call after it then finds nothing to do
+check(("('doc_meta.task_id', 1)" in out or "doc_meta.task_id=1" in out) and (not HB.ok or "('habits.user_id', 1)" in out or "habits.user_id=1" in out),
+      "#2174: fk_ensure (at the start) cleans the orphans and adds the keys " + out[-400:])
 check(sql("SELECT task_id FROM doc_meta WHERE node_id=?", (R_BOOKED,)) == [(None,)], "#2174: the orphaned task reference is emptied")
 check(not HB.ok or not sql("SELECT 1 FROM habits WHERE id=?", (HB.json()["id"],)), "#2174: the habit of a gone person is deleted (CASCADE)")
 check(fk_name("doc_meta", "task_id") == "fk2103_doc_meta_task_id" and fk_name("habits", "user_id") == "fk2103_habits_user_id", "#2174: the keys are back")
