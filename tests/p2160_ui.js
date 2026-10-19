@@ -150,9 +150,12 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   w.eval('openPalette()'); await sleep(150);
   check(d.querySelector('.palette .phints') && !d.querySelector('.palette .phints kbd'), '#644: phone: the hints without key symbols');
   w.eval('closePalette()');
-  // #447: the heron's sun on the horizon
-  const hs = w.eval(`heron('stand')`), hw = w.eval(`heron('welcome')`), ho = w.eval(`heron('offline')`);
-  check([hs, hw, ho].every(x => /class="hr-sun[^"]*" d="M89 108A9 9 0 0 1 107 108Z"/.test(x) && !/cx="88" cy="28"/.test(x) && /M42 108H112/.test(x)), '#447: standing / welcome / offline: a half sun on the horizon, away from the beak');
+  // 2.136.0 (#2193): the bot figure replaces the heron (#447 sun on the horizon is gone with it): every state its own eyes,
+  // "wartet" with the antenna up, an unknown state falls back to "ruhig", decorative (aria-hidden)
+  const BS = ['ruhig', 'schaut', 'erledigt', 'arbeitet', 'wartet'], bf = BS.map(st => w.eval(`botFig('${st}')`));
+  check(bf.every((x, i) => x.includes(`class="bot b-${BS[i]}"`) && /aria-hidden="true"/.test(x) && /class="b-ant"/.test(x)) && new Set(bf.map(x => x.match(/class="b-eyes"[^>]*>(.*?)<\/g>/)[1])).size === 5,
+    '#2193: five states, each with its own eyes, decorative ' + bf.length);
+  check(/d="M58 1V15"/.test(bf[4]) && /d="M58 6V15"/.test(bf[0]) && w.eval(`botFig('nope')`).includes('b-ruhig') && !w.eval(`typeof heron`).includes('function'), '#2193: wartet raises the antenna, unknown = ruhig, no heron helper left');
   w.close();
 
   // #648: "Pinned" across all lists, the pin button next to Priority, the API filter

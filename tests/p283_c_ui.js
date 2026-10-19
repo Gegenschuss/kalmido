@@ -4,7 +4,7 @@
 // - a folder's strip (sidebar folder menu, per owner) in the folder view
 // - progress rings in the sidebar (done / all of the state's numbers), switchable per device
 // - ticking off: the circle gets the pop (transform / opacity only, none with reduced motion)
-// - empty list / empty Today: the K line drawing (no heron), its dot in the accent
+// - empty list / empty Today: the K line drawing (no heron), its dot in the accent (2.136.0, #2193: now the bot figure)
 // - Firefox: Paper and Night with a header strip (desktop + phone); screenshots with P283C_SHOTS=<dir>
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -79,10 +79,10 @@ const FEAT = 'collab,comments,progress';
   // the folder view
   w.eval(`go('folder/Home')`); await sleep(600);
   check(d.querySelector('#o3c-head.o3c-h-lines'), 'folder view: the folder strip (lines)');
-  // empty pages: the K, no heron
+  // empty pages: 2.136.0 (#2193): the calm bot figure instead of the K, no heron
   w.eval(`go('l/${E}')`); await sleep(400);
   const em = d.querySelector('#view .empty.o3c-empty');
-  check(em && em.querySelector('svg.o3c-k[aria-hidden="true"] .o3c-kdot') && !d.querySelector('#view svg.heron') && /No tasks/.test(em.textContent), 'empty list: the K line drawing + hint, no heron');
+  check(em && em.querySelector('svg.bot.b-ruhig[aria-hidden="true"] .b-ant') && !d.querySelector('#view svg.heron, #view svg.o3c-k') && /No tasks/.test(em.textContent), 'empty list: the bot figure + hint, no heron, no K');
   // this device: no header pictures, no rings
   w.eval(`go('l/${L}')`); await sleep(300);
   w.eval(`settingsModal('look')`); await sleep(400);
@@ -108,7 +108,7 @@ const FEAT = 'collab,comments,progress';
   await call('POST', '/api/users', {username: 'dora', display_name: 'Dora', password: 'password123'});
   const CD = await login('dora'); await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT}, CD);
   w = await boot({user: 'dora', hash: 'today'}); d = w.document;
-  check(/Nothing left for today/.test(d.querySelector('#view .o3c-empty')?.textContent || '') && d.querySelector('#view .o3c-empty .o3c-k'), 'Today without tasks: the K');
+  check(/Nothing left for today/.test(d.querySelector('#view .o3c-empty')?.textContent || '') && d.querySelector('#view .o3c-empty svg.bot'), 'Today without tasks: the K');
   w.close();
 
   // ---- Firefox: Paper (desktop) and Night (phone) with a strip
