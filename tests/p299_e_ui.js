@@ -120,7 +120,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
   check(await until(() => d.querySelector(`#side .sg-team [data-aid="${AG2.id}"]`)), 'a pinned agent stands there ' + w.eval(`S.settings.side_agents + ' | ' + JSON.stringify((S.agents || []).map(a => [a.id, a.name])) + ' | ' + shownAgents().map(a => a.id)`));
   check(!d.querySelector(`#side .sg-team [data-aid="${AG1.id}"]`), 'an idle agent without anything unread not');
-  check(await until(() => d.querySelector(`#side .sg-team [data-go="who/${P[2]}"]`)) && !/Zed/.test(d.querySelector('#side').textContent), 'a pinned person without a shared list drops out (no name), the others stay');
+  // 2.99.0 (#2187): both in one wait - the sidebar draws again once the shared people are loaded (flaky as two steps)
+  check(await until(() => d.querySelector(`#side .sg-team [data-go="who/${P[2]}"]`) && !/Zed/.test(d.querySelector('#side').textContent)), 'a pinned person without a shared list drops out (no name), the others stay');
   await tcall('PUT', '/agent/status', AG1.tok, {status: 'working', text: 'Sorting'});
   await w.eval('load().then(render)');
   check(await until(() => d.querySelector(`#side .sg-team [data-aid="${AG1.id}"]`)), 'a working agent shows up');
