@@ -597,8 +597,8 @@ of a self-employed person. **Photograph receipt** opens the camera on a phone (t
 receipt goes into your documents, amount and date are recognised in the background, and you add the category and the VAT
 rate (19 / 7 / 0 % or unknown). The **income/expense statement** of a year counts payments received on your invoices
 (cash principle, split by VAT rate) against your receipts and travel expenses, with export as CSV or PDF. The **VAT return**
-section lists the figures (fields 81, 86, 21, 45, 66, 83) for a month or quarter to type into ELSTER, on cash or accrual basis;
-small businesses get no return. A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
+section lists the figures (fields 81, 86, 21, 45, 66, 83) for a month, a quarter or the whole year to type into ELSTER, on cash
+or accrual basis; with the yearly tax dates setting the whole previous year is preselected (2.122); small businesses get no return. A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
 as "Tax reserve" and "Freely available". No tax advice; figures without guarantee. Kalmido sends nothing to the tax office.
 
 ## Bank reconciliation (2.90)
@@ -633,11 +633,14 @@ Tables `office_bank_imports`, `office_bank_tx` (see Database).
 
 ## Tax dates as tasks (2.90)
 
-At the bottom of **Bookkeeping**, **Tax dates** keeps the usual German deadlines in view: the VAT return (none, monthly
-or quarterly, optionally with the permanent extension), the income tax prepayments (10 March, June, September, December)
+At the bottom of **Bookkeeping**, **Tax dates** keeps the usual German deadlines in view: the VAT return (none, monthly,
+quarterly or yearly, optionally with the permanent extension), the income tax prepayments (10 March, June, September, December)
 and the trade tax prepayments (15 February, May, August, November). Each kind switched on becomes ONE recurring task in
 the basket of the person chosen (an admin of the office; in a personal office its owner), due on the deadline minus the
 lead time (default 3 days); the title names the real deadline, the VAT task links to the VAT return figures.
+**Yearly (annual return only)** (2.122) is for businesses that file no advance returns: instead of the advance return one
+yearly task "Submit the annual VAT return" (31 July of the following year; with a tax adviser the deadline is usually later,
+so please agree it with them); the permanent extension does not apply there.
 Switching a kind off or changing it ends the old task (done, never deleted) and creates a new one when needed; a task
 completed or deleted by hand comes back on the next save. A deadline on a weekend or holiday moves to the next working
 day (Kalmido does not shift it). No tax advice; figures without guarantee.
