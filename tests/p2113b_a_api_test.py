@@ -214,7 +214,7 @@ j = A.patch(B + f"{D}/{Q3['id']}", json={"discount_pct": 10}).json()
 check(j["totals"]["discount"] == 250 and j["totals"]["net"] == 2500 + 80 + 208 - 250, "#2252: the discount takes in the positions only " + str(j["totals"]["net"]))
 rd = A.get(B + f"{D}/{Q3['id']}/render").json()
 check(sum(1 for x in rd.get("lines") or [] if x.get("kind") == "surcharge" and x.get("total_text")) == 2, "#2252: both lines in the print model")
-# Moritz 19.10.2026: how a line was computed stays internal: the editor shows it, the customer's documents do not
+# 2.113.1 (#2251): how a line was computed stays internal: the editor shows it, the customer's documents do not
 check(all(x.get("detail") == "" for x in rd["lines"] if x["kind"] in ("producing", "surcharge")) and line(j, "surcharge", "markup")["detail"],
       "#2251: the print model has no calculation text, the editor has")
 QS = A.post(B + f"{D}/{Q3['id']}/duplicate").json()
@@ -222,12 +222,13 @@ check(A.post(B + f"{D}/{QS['id']}/status", json={"status": "sent"}).ok, "the cop
 r = A.post(B + f"{D}/{QS['id']}/signoff", json={})
 check(r.ok and r.json().get("url"), "an approval link " + r.text[:120])
 pg = requests.get(B + "/s/q/" + r.json()["url"].split("/s/q/")[1], allow_redirects=False).text if r.ok else ""
-check("Production Fee" in pg and "marked positions" not in pg and "markierten Positionen" not in pg, "#2251: the approval page has the line, not its calculation")
+check("Production Fee" in pg and "and the handling costs" not in pg and "4 % on the marked" not in pg, "#2251: the approval page has the line, not its calculation")
 try:
     from pypdf import PdfReader
     pdf = A.get(B + f"{D}/{QS['id']}/pdf")
     txt = " ".join(x.extract_text() or "" for x in PdfReader(io.BytesIO(pdf.content)).pages)
-    check(pdf.ok and "Production Fee" in txt and "marked positions" not in txt, "#2251: the PDF has the line, not its calculation")
+    check(pdf.ok and "Production Fee" in txt and "and the handling costs" not in txt and "4 % on the marked" not in txt,
+          "#2251: the PDF has the line, not its calculation (the discount keeps its note) " + txt[:600].replace("\n", " | "))
 except ImportError:
     print("pypdf missing: PDF text not checked")
 r = A.post(B + f"{D}/{Q3['id']}/invoice")
