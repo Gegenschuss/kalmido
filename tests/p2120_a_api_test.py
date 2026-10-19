@@ -232,6 +232,21 @@ check(re.search(r"<ram:DuePayableAmount>7773\.72</ram:DuePayableAmount>", x) is 
       (re.search(r"<ram:DuePayableAmount>[^<]*", x) or [""])[0])
 check(any(i.get("inv_type") == "final" for i in A.get(B + D, params={"kind": "invoice"}).json().get("docs", [])), "list: the type is in the list rows")
 
+# ================================================================== 2.120.0 review M3 + M1
+r = A.post(B + f"{D}/{OFF}/invoice", json={"inv_type": "final"})
+check(r.status_code == 400, f"review M3: no second final invoice once one is finalised {r.status_code}")
+r = A.post(B + f"{D}/{OFF}/invoice", json={"inv_type": "progress", "pct": 5})
+check(r.status_code == 400, f"review M3: no progress invoice after the final one {r.status_code}")
+cl_plan = client(A, "Kunde Plan GmbH")
+q_plan = offer(A, cl_plan)
+check(A.post(B + f"{D}/{q_plan}/status", json={"status": "accepted"}).ok, "review M1: quotation accepted")
+r = A.post(B + f"{D}/{q_plan}/invoice", json={"inv_type": "progress", "pct": 50})
+check(r.status_code == 201 and A.post(B + f"{D}/{r.json()['id']}/finalize").ok, "review M1: progress invoice 50 % finalised")
+pg = dd(A.get(B + f"{D}/{r.json()['id']}").json()["totals"]["gross"])
+cfj = A.get(B + O + f"/cashflow?from={TODAY.isoformat()[:7]}&months=1&basis=gross").json()
+plan = [dd(e["amount"]) for e in cfj.get("entries", []) if e.get("kind") == "offer" and e.get("doc_id") == q_plan]
+check(plan == [Decimal("11660.00") - pg], f"review M1: the quotation stays in the cash flow plan with the rest after the progress invoice {plan} (progress {pg})")
+
 # ================================================================== rights
 check(Ev.get(B + f"{D}/{OFF}/progress").status_code == 403, "rights: a member without the office 403")
 check(Ev.post(B + f"{D}/{OFF}/invoice", json={"inv_type": "progress", "pct": 5}).status_code == 403, "rights: no progress invoice without the office")
