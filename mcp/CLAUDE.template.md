@@ -299,6 +299,8 @@
   2.147: `get_office` also names the area's `country_pack` and its `features` (`books.datev`, `docs.einvoice`,
   `books.vat_return`, `books.tax_dates`, `books.export_csv`: true / false). Leave out what is off - no DATEV hints, no
   XRechnung, no VAT return figures in an office that does not use them.
+  Letters (2.106.0) the same way: after the event `letter_draft_requested` ONE `create_letter_draft` (`answers` = the
+  document); a person checks, signs and sends it.
 
 ### Usage
 - Report your model usage with the hook `mcp/claude_usage_hook.py`, registered as **Stop and SubagentStop** hook in
@@ -417,6 +419,18 @@ switches as the office tools and for a person who is an **admin** of the office:
 note; source `agent` by default) and `update_office_lead` (only the next step, the follow-up day and the note, only while
 it is a lead). A person converts a lead into a client; you never convert, delete or move it to another stage.
 
+### Letter drafts (2.106.0)
+
+Correspondence of the office (letters to authorities, insurers, clients): you **draft**, a person checks, signs and sends.
+Same switches as the office tools, for a person who is an **admin** of the office. When a person presses *Let an agent
+draft the answer* at an incoming document shared with you, the event `letter_draft_requested` brings `node_id`, `title`,
+`requested_by` and an optional `note`: read the document (`get_document`), then create ONE `create_letter_draft` with
+`answers` = the `node_id` and `requested_by`: subject and text in the language of the document (no greeting line, no
+signature; recipient and reference line are prefilled from the document). `list_letter_drafts` shows the letters you made,
+`update_letter_draft` changes your own draft while it is one, `link_letter_document` links it with another document shared
+with you (`answers` or `reply`). You never send a letter, mark it as sent or delete one; a document that is not shared with
+you cannot be answered (ask the person to share it). Kalmido itself never phrases a letter: the formulation is yours.
+
 ### Importing old data into the office (2.68.0)
 With the right `import` (off until a person turns it on for you) you may read the person's old data (today: fixed costs, in
 whatever format they give you) and send it with `propose_import` as ONE proposal: `area` `fixed_costs`, `items` = one row per
@@ -527,6 +541,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
   two lines what was done until then; nothing running = confirm only; only the run for that `user` (or the owner's Stop),
   someone else's run keeps going
 - `contract_notice`: a shared contract's last day to cancel is near (once per deadline): answer with ONE `propose_contract_notice`
+- `letter_draft_requested`: an office admin asks you to draft an answer to a document shared with you (`node_id`, `title`, `requested_by`, `note`): ONE `create_letter_draft` with `answers`
 
 Related tasks (2.59.0): task events may carry `task.related` = up to 5 tasks close in meaning `[{id, title, score}]` (only
 tasks you may see; missing while the server has not computed the task yet or runs without its embedding service). Before
@@ -540,7 +555,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `chat_typing`, `check_in_habit`, `check_time_entries`, `clear_plan_usage`, `clear_waiting`, `client_id`,
 `comment_typing`, `complete_task`, `confirm_abort`, `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`,
 `create_event_calendar`, `create_field`, `create_file_folder`, `create_filter`, `create_form`, `create_habit`,
-`create_job`, `create_list`, `create_list_tag`, `create_note`, `create_notepad`, `create_offer_draft`, `create_office_lead`,
+`create_job`, `create_letter_draft`, `create_list`, `create_list_tag`, `create_note`, `create_notepad`, `create_offer_draft`, `create_office_lead`,
 `create_packing_list`, `create_section`, `create_task`, `create_template`, `create_text_file`, `create_trip`,
 `decide_reward`, `delete_address_book`, `delete_attachment`, `delete_chat_attachment`, `delete_client`,
 `delete_comment`, `delete_contact`, `delete_event`, `delete_event_calendar`, `delete_field`, `delete_filter`,
@@ -553,11 +568,11 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`,
 `get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`,
 `get_usage`, `get_velocity`, `get_video_review`, `get_view_layout`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`,
-`ingredients_to_shopping`, `link_contact`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_environments`,
+`ingredients_to_shopping`, `link_contact`, `link_letter_document`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_environments`,
 `set_deployment`,
 `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`,
 `list_events`, `list_fields`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`,
-`list_jobs`, `list_kids`, `list_layout_blocks`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`,
+`list_jobs`, `list_kids`, `list_layout_blocks`, `list_letter_drafts`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`,
 `list_notepads`, `list_notes`, `list_office_data`, `list_office_documents`, `list_office_leads`, `list_packing_templates`,
 `list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_rules`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`,
@@ -577,7 +592,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `time_from_events`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`, `unshare_list`,
 `unshare_list_from_group`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,
 `update_document`, `update_event`, `update_event_calendar`, `update_field`, `update_filter`, `update_form`,
-`update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_notepad`,
+`update_habit`, `update_job`, `update_letter_draft`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_notepad`,
 `update_offer_draft`, `update_office_lead`, `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`,
 `upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`,
 `write_file`, `write_journal`, `write_status_pad`

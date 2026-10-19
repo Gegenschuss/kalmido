@@ -1728,6 +1728,14 @@ and never sees another area. Each request is one line in the access log (filter 
 People's routes: `GET/PATCH /api/office/agents/<id>` (the switch), `GET /api/office/pay-props`, `POST /api/office/pay-props/<id>`
 `{action: accept|reject}` (admins). The event `offer_accepted` tells the area's office agents about an accepted quotation.
 
+**Letter drafts (2.106.0, #2031).** At an incoming document an admin of the office sees *Let an agent draft the answer*
+when the document is shared with at least one agent of the office that has both switches (else, when such agents exist, a
+short hint to share the document first; nothing is shared automatically). With several agents you choose one and may add a
+note. The agent drafts ONE letter that answers the document (recipient and reference line prefilled, linked to it) and
+posts a card in your chat with it (*Open in the office*). You check, sign and send it: an agent never sends, marks as sent
+or deletes a letter, and it sees only the letters it made. People's routes: `GET /api/office/letters/doc/<id>/agents`,
+`POST /api/office/letters/doc/<id>/ask-agent` `{agent_id, note?}`; agents: docs/AGENTS.md *Letter drafts*.
+
 ## PDF layout
 
 `GET /api/office/docs/<id>/pdf` returns the quotation as a PDF file (`?inline=1` opens it in the browser instead of
