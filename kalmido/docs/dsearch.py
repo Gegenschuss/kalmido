@@ -167,8 +167,8 @@ def dsr_filters(c, args, where, params, base_where, base_params):
         where.append(_in("n.parent_id", fol, params))
     ft = [x for x in str(args.get("ftype") or "").split(",") if x in DSR_FTYPES]
     if ft:
-        kinds = {"pdf": "n.mime = 'application/pdf'", "image": "n.mime LIKE 'image/%'", "text": "n.mime LIKE 'text/%'",
-                 "office": "(n.mime LIKE 'application/vnd.%' OR n.mime LIKE 'application/msword%')"}
+        kinds = {"pdf": "n.mime = 'application/pdf'", "image": "n.mime ILIKE 'image/%'", "text": "n.mime ILIKE 'text/%'",
+                 "office": "(n.mime ILIKE 'application/vnd.%' OR n.mime ILIKE 'application/msword%')"}
         other = "NOT (" + " OR ".join(f"COALESCE({v}, FALSE)" for v in kinds.values()) + ")"
         where.append("(" + " OR ".join(kinds.get(x, other) for x in ft) + ")")
     p = dsr_parse(args.get("q"))

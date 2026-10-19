@@ -64,8 +64,8 @@ def dt_values(c, ws, raw):
         if isinstance(t, int) and not isinstance(t, bool):
             if S.label_ok(c, ws, "tag", t):
                 out.append(t)
-        elif str(t).strip():
-            out.append(S.label_id(c, ws, "tag", str(t)))
+        elif isinstance(t, str) and t.strip():  # review: only text names (no str() of objects)
+            out.append(S.label_id(c, ws, "tag", t))
     return list(dict.fromkeys(t for t in out if t))
 
 
@@ -125,8 +125,10 @@ def files_node_tags(nid):
     _no_agent()
     n = need_node(c, nid)
     ws = dt_ws(n)
-    return jsonify(tags=[{"id": t["id"], "name": t["name"]} for t in S.node_tags(c, nid)], all=S.labels(c, ws, "tag"),
-                   ws=("org:%d" % n["org_id"]) if n["org_id"] else "private", can=n["role"] in ("owner", "edit"))
+    can = n["role"] in ("owner", "edit")
+    # review: the whole tag list of the workspace only for those who may tag here (a view share of one private file shows no other names)
+    return jsonify(tags=[{"id": t["id"], "name": t["name"]} for t in S.node_tags(c, nid)], all=S.labels(c, ws, "tag") if can else [],
+                   ws=("org:%d" % n["org_id"]) if n["org_id"] else "private", can=can)
 
 
 @app.put("/api/files/nodes/<int:nid>/tags")
@@ -191,6 +193,13 @@ def files_tagged():
     rows = c.execute(f"SELECT n.* FROM fs_nodes n WHERE {' AND '.join(where)} ORDER BY lower(n.name), n.id LIMIT {DT_HITS + 1}", params).fetchall()
     more = len(rows) > DT_HITS
     items = _items(c, rows[:DT_HITS])
-    for x in items:  # where it lies: the path above it
-        x["path"] = " / ".join(r["name"] for r in reversed(fs_chain(c, x["id"])[1:]))
+    from .store import fs_visible_ids
+    vis = fs_visible_ids(c, me())
+    for x in items:  # where it lies: the path above it, cut at the first folder the asker cannot see (review: like _crumbs)
+        up = []
+        for r in fs_chain(c, x["id"])[1:]:
+            if r["id"] not in vis:
+                break
+            up.append(r["name"])
+        x["path"] = " / ".join(reversed(up))
     return jsonify(items=items, more=more)

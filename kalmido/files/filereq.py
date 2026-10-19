@@ -34,7 +34,7 @@ from flask import g, jsonify, request, Response
 
 from ..core.config import app, MAX_FILE_MB, PUBLIC_URL
 from ..core.pg import insert_id, system_ctx
-from ..core.i18n import lang, LANGS, tr, trn
+from ..core.i18n import lang, LANGS, N_, tr, trn
 from ..core.db import body, bump, db, err, iso, now_utc, write_lock
 from ..core.access import acx_anon_bind, Denied
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
@@ -75,6 +75,11 @@ FRQ_MAGIC = {"pdf": ("application/pdf",), "jpg": ("image/jpeg",), "jpeg": ("imag
              "docx": ("application/zip",), "xlsx": ("application/zip",), "pptx": ("application/zip",), "odt": ("application/zip",),
              "ods": ("application/zip",), "odp": ("application/zip",)}
 
+
+
+# the page's texts that go through the local t() helper (marked so the translation check sees them)
+FRQ_PAGE_TEXTS = (N_("Not uploaded"), N_("Thank you! Your files have arrived."), N_("The link works until {0}."),
+                  N_("this file type is not accepted"), N_("too large"), N_("Your name (optional)"))
 
 def frq_ext(name):
     n = (name or "").lower()
@@ -442,15 +447,17 @@ def frq_page(token):
     return _page(c, r, token, frq_lang(c, r))
 
 
-def frq_day_full(c, rid, n):
+def frq_day_full(c, rid, n, book=True):
     """True (= refuse) when n more bytes would pass FRQ_DAY_MB of the request today; else they are counted (mail_counts,
-    one row per request; the caller commits)."""
+    one row per request; the caller commits). book=False: only the check (review: refused files do not use up the day)."""
     day = now_utc().strftime("%Y-%m-%d")
     k = f"frqd:{rid}"
     cur = c.execute("SELECT n, day FROM mail_counts WHERE k=?", (k,)).fetchone()
     used = cur[0] if cur and cur[1] == day else 0
     if used + n > FRQ_DAY_MB * 1024 * 1024:
         return True
+    if not book:
+        return False
     c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,?) ON CONFLICT(k) DO UPDATE SET
                  n=CASE WHEN mail_counts.day=excluded.day THEN mail_counts.n+excluded.n ELSE excluded.n END, day=excluded.day""", (k, day, n))
     return False
@@ -482,6 +489,9 @@ def frq_send(token):
     With the header X-Kalmido-Upload: 1 the answer is JSON ({ok, n} or {error}), else a page."""
     from .upsafe import H6D_SLACK, UploadRefused, h6d_read
     from ..admin.hosting import QuotaExceeded
+    if hit_limit("frqs:" + rate_ip(), FRQ_SEND_RATE):  # review: before the token lookup (no unbounded database work per request)
+        lg0 = _accept_lang()
+        return _msg(tr("Too many requests", lg=lg0), tr("Please wait a minute and try again.", lg=lg0), lg0, 429)
     c = db()
     r = frq_find(c, token)
     if not r:
@@ -489,7 +499,7 @@ def frq_send(token):
     lg = frq_lang(c, r)
     if request.headers.get("Sec-Fetch-Site", "") == "cross-site":
         return _msg(tr("Not allowed", lg=lg), tr("Please upload the files from the page of the link.", lg=lg), lg, 403)
-    if hit_limit("frqs:" + rate_ip(), FRQ_SEND_RATE) or hit_limit(f"frqh:{r['id']}", FRQ_SEND_HOUR, 3600):
+    if hit_limit(f"frqh:{r['id']}", FRQ_SEND_HOUR, 3600):
         return _msg(tr("Too many requests", lg=lg), tr("Please wait a minute and try again.", lg=lg), lg, 429)
     left = _left(r)
     if not left:
@@ -539,7 +549,7 @@ def frq_send(token):
         if not room:
             bad.append(tr("{0}: there is no room for more files right now.", nm, lg=lg))
             break
-        if frq_day_full(c, r["id"], len(data)):
+        if frq_day_full(c, r["id"], len(data), book=False):
             bad.append(tr("{0}: this link takes no more files today. Please try again tomorrow.", nm, lg=lg))
             break
         try:
@@ -556,6 +566,7 @@ def frq_send(token):
         except Denied:
             c.rollback()
             return frq_gone(lg)
+        frq_day_full(c, r["id"], len(data))  # counted only once the file is stored
         _log(c, nid, r["created_by"], "frq_upload", r["title"] + (f" · {name}" if name else ""))
         saved.append(nid)
         size += len(data)

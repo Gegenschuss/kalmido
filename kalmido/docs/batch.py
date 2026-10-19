@@ -177,6 +177,8 @@ def docs_zip_ticket():
     now = time.time()
     with DSR_LOCK:
         _tickets_gc(now)
+        for k in [k for k, v in DSR_TICKETS.items() if v[0] == uid][:-2]:  # review: at most three open tickets per account (memory)
+            DSR_TICKETS.pop(k, None)
         DSR_TICKETS[tok] = (uid, [r["id"] for r in rows], now + DSR_TICKET_S)
     return jsonify(files=len(rows), size=sum(int(r["size"] or 0) for r in rows), url=f"/api/docs/zip/{tok}")
 
@@ -192,6 +194,8 @@ def docs_zip_get(tok):
         t = DSR_TICKETS.get(str(tok))
         if not t or t[0] != uid:  # another account's request leaves the ticket alone
             raise Denied(404)
+        if DSR_BUSY.locked():  # review: a busy server keeps the ticket for the next try
+            raise Denied(429, tr("Too many requests"))
         DSR_TICKETS.pop(str(tok), None)
     rows = dsr_visible(c, uid, t[1])
     if not rows:
