@@ -1644,6 +1644,17 @@ TOOLS += [
      lambda api, a: api.call("PATCH", f"/documents/{int(a['document_id'])}", body=_pick(a, tuple(_DOC)))),
 ]
 
+TOOLS += [
+    ("create_document", "2.122.0: put a new document (scan, invoice, letter) into the documents: name + base64 (the file), into folder_id "
+                        "(role edit) or, without it, your own result folder. Kalmido recognises it like an upload (text, date, amount, "
+                        "sorting); title / sender / type / tags / date / due / amount / currency are optional and taken as given.",
+     _obj({"name": {"type": "string", "minLength": 1}, "base64": {"type": "string"}, "mime": {"type": "string"}, "title": {"type": "string"},
+           "folder_id": S_ID, "sender": {"type": "string"}, "type": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string"}},
+           "date": D, "due": D, "amount": {"type": "string"}, "currency": {"type": "string"}}, ["name", "base64"]),
+     lambda api, a: api.call("POST", "/documents", body={"content_base64": a["base64"], **_pick(a, ("name", "mime", "title", "sender", "type", "tags", "date", "due", "amount", "currency")),
+                                                          **({"parent_id": int(a["folder_id"])} if a.get("folder_id") else {})})),
+]
+
 # 2.48.0 (#1356): receipts -- an agent suggests project and category of a document shared with it; a person confirms
 TOOLS += [
     ("suggest_receipt", "2.48.0: suggest the project (project_id: a project list you can see, in the document's workspace) and / or "
@@ -1899,7 +1910,7 @@ TOOL_SCOPES = {
                  "delete_contact", "bulk_contacts", "link_contact", "unlink_contact", "set_contact_care"),
     "private": ("add_health_entry", "write_journal"),
     "files:read": ("list_files", "read_file", "search_files", "suggest_receipt", "list_receipt_suggestions"),  # 2.48.0 (#1207, #1356)
-    "files:write": ("write_file", "create_file_folder"),
+    "files:write": ("write_file", "create_file_folder", "create_document"),
     "office": ("get_office", "list_office_data", "list_office_documents", "get_office_document", "create_offer_draft", "update_offer_draft",
                "draft_invoice_from_offer", "draft_reminder", "suggest_payment", "list_payment_suggestions",
                "list_office_leads", "create_office_lead", "update_office_lead"),  # 2.51.0 (#1348, #1350); 2.94.0 (#1930): leads
