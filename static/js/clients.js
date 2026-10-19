@@ -111,6 +111,8 @@ function clientSheet(c) {  // the time view of the client's month, then its prin
 function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's area, null = private), o.stay (no jump to the client)
   const md = modal(`<h3>${c ? tr('Edit client') : tr('New client')}</h3>
     <div class="row"><label for="cl-name">${tr('Name')}</label><input id="cl-name" maxlength="80" value="${esc(c?.name || '')}" autocomplete="organization"></div>
+    <div class="row"><label for="cl-nx">${tr('Name addition')}</label><input id="cl-nx" maxlength="120" value="${esc(c?.name_extra || '')}" autocomplete="off" placeholder="${esc(tr('optional'))}" aria-describedby="cl-nx-h"></div>
+    <div class="shint lhint keep" id="cl-nx-h">${tr('Printed as its own line under the name, e.g. the legal form or the partners.')}</div>
     ${o.quick ? '' : `<div class="row"><label for="cl-dname">${tr('Display name (optional)')}</label><input id="cl-dname" maxlength="80" value="${esc(c?.display_name || '')}" autocomplete="off" aria-describedby="cl-dname-h"></div>
     <div class="shint lhint keep" id="cl-dname-h">${tr('Shown in pickers and lists, not on the invoice.')}</div>`}
     ${o.quick ? cdn_addrHtml({}) : `<div class="row"><label for="cl-icon">${tr('Symbol')}</label><input id="cl-icon" maxlength="8" class="numin" value="${esc(c?.icon || '')}" placeholder="🏢"></div>
@@ -139,7 +141,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
         await api('DELETE', `/api/clients/${c.id}`); md.remove(); await load(); if (S.route.client === c.id) go('clients'); else render(); clReload(); return;
       }
       const v = s => $(s, md)?.value ?? '';  // 2.97.0 B (#1951): the quick dialog (a document's "Add client") has name + address only
-      const body = o.quick ? {name: v('#cl-name')} : {name: v('#cl-name'), icon: v('#cl-icon'), contacts: clkValue(md), email: v('#cl-email'),
+      const body = o.quick ? {name: v('#cl-name'), name_extra: v('#cl-nx')} : {name: v('#cl-name'), name_extra: v('#cl-nx'), icon: v('#cl-icon'),  // 2.99.0 D (#2188) contacts: clkValue(md), email: v('#cl-email'),
         phone: v('#cl-phone'), display_name: v('#cl-dname'), note: v('#cl-note')};
       if (!c && 'org_id' in o) body.org_id = o.org_id;
       if ($('#cl-rate', md)) Object.assign(body, {rate: num($('#cl-rate', md).value), budget_h: num($('#cl-bh', md).value), budget_amount: num($('#cl-ba', md).value)});

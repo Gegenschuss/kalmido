@@ -2394,6 +2394,10 @@ MIGRATIONS = [
     # (2.97.0 spacer C/D)
     # 2.97.0 D (#2050 #2051): locked spaces / clean-up (new columns below this line)
     # (2.97.0 end)
+    # 2.99.0 D (#2188): name_extra = a second name line of a client (printed under the name, " - " joined in the e-invoice
+    # buyer name BT-44); office_company.address_extra = the company's extra address line (BT-36). 2.97 never reads them
+    ("clients", "name_extra", "ALTER TABLE clients ADD COLUMN name_extra TEXT NOT NULL DEFAULT ''"),
+    ("office_company", "address_extra", "ALTER TABLE office_company ADD COLUMN address_extra TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

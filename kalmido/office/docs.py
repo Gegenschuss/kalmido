@@ -173,7 +173,7 @@ def _service(c, oid, sid):
 def _client(c, oid, cid):
     if not cid:
         return None
-    r = c.execute(f"SELECT id, name, contact, address, email, street, address_extra, zip, city, country FROM clients WHERE id=? AND "
+    r = c.execute(f"SELECT id, name, name_extra, contact, address, email, street, address_extra, zip, city, country FROM clients WHERE id=? AND "
                   f"{pb_cl_sql(c, oid)}", (_iid(cid),)).fetchone()  # 2.97.0 B (#1951): the fixed address fields
     return dict(r) if r else None
 
@@ -185,13 +185,15 @@ def _recipient_from_client(cl, contact=None, home="DE"):
     e-invoice reads them, no parsing of lines). missing: street, postcode or city empty."""
     g_ = lambda k: re.sub(r"\s+", " ", str(cl.get(k) or "")).strip()
     lines = [cl["name"]]
+    if g_("name_extra"):  # 2.99.0 D (#2188): the name addition is its own line under the name
+        lines.append(g_("name_extra"))
     contact = cl.get("contact") if contact is None else contact
     if contact:
         lines.append(contact)
     country = g_("country").upper()
     lines += [x for x in (g_("street"), g_("address_extra"), " ".join(x for x in (g_("zip"), g_("city")) if x),
                           country if country and country != (home or "DE").upper() else "") if x]
-    return {"name": cl["name"], "lines": lines[:12], "street": g_("street"), "extra": g_("address_extra"), "zip": g_("zip"),
+    return {"name": cl["name"], "name_extra": g_("name_extra"), "lines": lines[:12], "street": g_("street"), "extra": g_("address_extra"), "zip": g_("zip"),
             "city": g_("city"), "country": country, "missing": not all(g_(k) for k in ("street", "zip", "city"))}
 
 
@@ -821,7 +823,7 @@ def odoc_render(c, doc_id, oid):
     rec = _j(r["recipient_snapshot"] if locked and r["recipient_snapshot"] else r["recipient"], {})
     if not locked:
         rec = cdn_doc_recipient(c, oid, r, rec)  # 2.97.0 B (#1951): a draft prints its client's address as it is now
-    rec = {"name": rec.get("name") or "", "lines": rec.get("lines") or []}
+    rec = {"name": rec.get("name") or "", "name_extra": rec.get("name_extra") or "", "lines": rec.get("lines") or []}  # 2.99.0 D (#2188)
     rights = _j(r["rights"], {})
     if not re.match(r"^#[0-9a-fA-F]{6}$", color):
         color = "#2f5d8a"
@@ -861,9 +863,9 @@ def odoc_render(c, doc_id, oid):
         "raw_mode": t["raw_mode"], "status": r["status"], "number": r["number"], "date": r["date"], "date_text": _fmt_date(r["date"], pack),
         "valid_until": r["valid_until"], "valid_until_text": valid_text, "title": L.get("offer", "Kostenvoranschlag" if lang == "de" else "Quotation"),
         "project_title": r["project_title"], "project_ref": r["project_ref"],
-        "company": {"name": co.get("name") or "", "lines": co.get("lines") or [], "contact_lines": co.get("contact_lines") or [],
+        "company": {"name": co.get("name") or "", "name_lines": co.get("name_lines") or [], "lines": co.get("lines") or [], "contact_lines": co.get("contact_lines") or [],
                     "register_lines": co.get("register_lines") or [], "bank_lines": co.get("bank_lines") or [],
-                    "sender_line": " · ".join(x for x in (co.get("lines") or []) if x), "logo_path": logo_path, "color": color},
+                    "sender_line": " · ".join(x for x in (co.get("lines") or []) if x), "logo_path": logo_path, "color": color},  # 2.99.0 D (#2188): name_lines
         "recipient": rec, "meta": meta, "intro": r["intro"] or "", "lines": t["lines"],
         "totals": {"net": t["net"], "net_text": fmt_money(t["net"], lang, cur), "tax_lines": t["tax_lines"], "tax_total": t["tax_total"],
                    "gross": t["gross"], "net_incl_raw": t.get("net_incl_raw"),

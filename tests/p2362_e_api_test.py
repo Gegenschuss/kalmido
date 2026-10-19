@@ -100,7 +100,9 @@ r = A.put(B + O + "/settings", json={"company": {"name": "Studio Nordlicht GmbH"
                                      "producing_on": 1, "raw_on": 1})  # 2.40.0 (#1379)
 check(r.ok, "settings saved " + r.text[:200])
 st = A.get(B + O + "/settings").json()
-check(st.get("company_fields", {}).get("street") == "" and st["settings"].get("offer_number_at") == "create", "settings: empty company fields, numbers at creation by default")
+# 2.99.0 (#2188): a plain free company address (street, postcode + city) is read into the empty fields of the answer
+check(st.get("company_fields", {}).get("street") == "Hafenstraße 12" and st["company_fields"].get("city") == "Hamburg" and
+      st["settings"].get("offer_number_at") == "create", "settings: the free address read into the empty company fields, numbers at creation by default")
 S1 = A.post(B + O + "/services", json={"name_de": "Schnitt", "name_en": "Editing", "category": "Video", "daily_rate": 1000, "raw_fee": 1, "producing": 1}).json()["id"]
 S2 = A.post(B + O + "/services", json={"name_de": "Nutzungsrechte Musik", "name_en": "Music licence", "category": "Buyout", "daily_rate": 100,
                                        "unit": "flat", "tax": "reduced"}).json()["id"]
