@@ -369,6 +369,7 @@ ROUTES = {
     "GET /api/office/docs/{}/log": "office", "GET /api/office/log": "office",
     # ---- office (F1, 2.38.0 #1021): invoices, credit notes, reminders, payments, sending, DATEV inbox (11)
     "POST /api/office/docs/{}/invoice": "office", "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/from-time": "office",
+    "GET /api/office/docs/{}/progress": "office",  # 2.120.0 A (#2087): progress invoices of a quotation (p2120_a_api_test.py)
     "POST /api/office/docs/reminder": "office", "GET /api/office/docs/{}/payments": "office", "POST /api/office/docs/{}/payments": "office",
     "DELETE /api/office/docs/{}/payments/{}": "office", "POST /api/office/docs/{}/send": "office", "POST /api/office/docs/{}/fee": "office", "POST /api/office/docs/{}/datev": "office",
     "GET /api/office/mail-status": "office", "GET /api/office/docs/{}/xml": "office",  # F2: the e-invoice XML of a finalised document

@@ -1002,6 +1002,31 @@ the invoice stay unchanged; the fee does not keep an invoice from being `paid`. 
 all paid or cancelled has the derived state `done` ("Settled", `settled: true`, never stored); the list shows settled
 reminders below the open ones.
 
+## Progress and final invoices, cash discount (2.120)
+
+**Create invoice** on a quotation asks for the type: full invoice (as before), **progress invoice** or **final invoice**.
+Both are ordinary invoices of the invoice number series (`inv_type` `progress` / `final`, no own series); the list and the
+document head show the type, the PDF prints "Abschlagsrechnung" / "Schlussrechnung".
+
+- **Progress invoice:** a net amount or a percentage of the quotation's net. The amount is split onto the quotation's VAT
+  rates in proportion (one position per rate, "Progress payment no. n on quotation X"). All progress invoices of a
+  quotation (drafts included) never exceed its net. E-invoice type code 326 (partial invoice).
+- **Final invoice:** all positions of the quotation, then, under a heading, one negative position per finalised, not
+  cancelled progress invoice and VAT rate (its net, VAT, gross and whether it is paid in the description). The VAT is
+  therefore computed on the remaining amount per rate, which keeps the e-invoice valid (a prepaid amount, BT-113, would
+  take off gross without the VAT). The last total row reads "Amount remaining". E-invoice type code 380. Finalising checks
+  that the progress invoices are still the ones deducted; a progress invoice cancelled or finalised in the meantime asks
+  for the final invoice to be created anew.
+- **Cash discount (Skonto):** percent and days per invoice (default in the office settings, empty = none). The PDF adds
+  "When paid by <date> <pct> % cash discount (= amount), payable <amount>" under the payment terms; the e-invoice carries
+  the XRechnung line `#SKONTO#TAGE=14#PROZENT=2.00#` in the payment terms (BT-20). Payments dated within the period that
+  reach the gross less the discount (credit notes count) mark the invoice paid; otherwise the difference stays open.
+
+API: `POST /api/office/docs/<offer id>/invoice` takes `{inv_type: "progress", amount | pct}` or `{inv_type: "final"}`;
+`GET /api/office/docs/<offer id>/progress` lists the progress invoices with the quotation's net and what is left to bill;
+`PATCH /api/office/docs/<id>` takes `skonto_pct`, `skonto_days`, `inv_type` on invoice drafts; the office settings
+`skonto_pct` / `skonto_days`. Agents: `draft_invoice_from_offer` with `inv_type`, `amount`, `pct`.
+
 ## Invoice series (2.91)
 
 An invoice can be repeated as a series: in the editor of an invoice choose "Repeat as series", pick the interval (monthly,
@@ -1279,6 +1304,8 @@ texts encrypted at rest, archived = removed and restorable), the column `gen_doc
 link of such a document), and `office_vehicles`, `office_drives` and `office_drive_log` (the logbook; under row-level security, the
 plate, start / destination / purpose and the logged values encrypted at rest, `deleted_at` = deleted and restorable) and
 the settings keys `km_rate` / `km_rates` (rate per year); 2.92 runs on with them.
+Since 2.120.0 also the columns `inv_type` (text, default empty), `abs_refs` (text, default `[]`), `skonto_pct` and
+`skonto_days` (nullable) of `office_docs` and the settings keys `skonto_pct` / `skonto_days`; 2.117 runs on with them.
 
 ## E-invoices (ZUGFeRD / XRechnung) and PDF/A-3
 
