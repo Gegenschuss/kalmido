@@ -37,19 +37,26 @@ function o3c_packPick(md, v) {
   const cur = get();
   setLocal(tr('Theme'), get, put, {pack: v === LOOK.pack[0][0] ? null : v, theme: O3C_PACK_SCHEME[v] || cur.theme});
 }
-// ---- device switches: header pictures and progress rings (on by default; only "off" is stored)
+// ---- device switch: header pictures (on by default; only "off" is stored)
 const o3c_headOn = () => LS.get('headShow', true) !== false;
-const o3c_ringsOn = () => LS.get('rings', true) !== false;
+// 2.118.0 (#2297): the rings follow the account switch side_progress (one switch for line and ring, all devices)
+const o3c_ringsOn = () => S.settings?.side_progress !== '0';
+// a device that had the old rings switch off hands it to the account once, then forgets the key
+function o3c_ringsMigrate() {
+  if (LS.get('rings', true) !== false) return;
+  if (!S.settings || S.settings.side_progress === '0') { LS.del('rings'); return; }
+  S.settings.side_progress = '0';  // the device key goes only once the account holds the value (offline: next load tries again)
+  api('PATCH', '/api/settings', {side_progress: '0'}).then(() => LS.del('rings')).catch(() => {});
+}
 function o3c_lookHtml() {
   return `<h4>${tr('Lists')}</h4>
     <div class="row"><label class="chkl"><input type="checkbox" id="s-o3c-head" ${o3c_headOn() ? 'checked' : ''}> ${tr('Show header pictures')}</label></div>
-    <div class="row"><label class="chkl"><input type="checkbox" id="s-o3c-rings" ${o3c_ringsOn() ? 'checked' : ''}> ${tr('Progress rings in the sidebar')}</label></div>
     <div class="shint">${tr('The header of a list or folder is set in its settings and is the same for everyone. Here you only choose whether this device shows it.')}</div>`;
 }
 document.addEventListener('change', e => {
-  const k = {'s-o3c-head': 'headShow', 's-o3c-rings': 'rings'}[e.target?.id]; if (!k) return;
+  const k = {'s-o3c-head': 'headShow'}[e.target?.id]; if (!k) return;
   e.stopPropagation();
-  setLocal(k === 'rings' ? tr('Progress rings in the sidebar') : tr('Show header pictures'), () => LS.get(k, true) !== false,
+  setLocal(tr('Show header pictures'), () => LS.get(k, true) !== false,
     on => { if (on) LS.del(k); else LS.set(k, false); const c = document.getElementById(e.target.id); if (c) c.checked = on; render(); }, e.target.checked);
 }, true);
 

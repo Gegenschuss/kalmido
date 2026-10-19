@@ -30,7 +30,7 @@ INTEXT = ("intern", "extern", "shooting")  # 2.47.0 (#1216): shooting = only in 
 CREW_INTEXT = ("intern", "extern")  # 2.47.0 (#1649): the Drehpersonal
 TEXT_KINDS = ("rights_time", "rights_territory", "rights_media", "intro", "closing", "note", "block", "raw_note")
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
-SCHEME_RE = re.compile(r"\{(yyyy|yy|seq(?::0?(\d{1,2}))?|project|client|date|initials)\}")
+SCHEME_RE = re.compile(r"\{(yyyy|yy|seq(?::0?(\d{1,2}))?|project|client|date|initials|version)\}")  # 2.118.0 A (#2265): version
 NAME_MAX = 200
 # 2.99.0 D (#2188, decision 18.10.2026): the own company name may have up to three lines (stored with line breaks); the
 # letterhead and the footer print them one under the other, the sender line, mails and the e-invoice (BT-27) on one line
@@ -64,6 +64,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "offer_valid_days": 30, "intro_text_id": {"de": None, "en": None}, "closing_text_id": {"de": None, "en": None},
                      "rights_default": {"time_id": None, "territory_id": None, "media_id": None},
                      "offer_number_at": "create",  # 2.36.2 (P2): "create" | "finalize" (see ledger.OFX_NUMBER_AT_FINALIZE)
+                     "offer_counter": "org",  # 2.118.0 A (#2265): quotation counter per "org" | "client" | "project" (OFFER_COUNTERS)
                      # 2.38.0 (#1021, F1): invoices -- number schemes per kind (defaults from the pack), payment terms, reminders,
                      # the e-invoice format and the DATEV document inbox (one e-mail address; PDF + XML are mailed there)
                      "invoice_scheme": "", "credit_scheme": "", "reminder_scheme": "", "payment_days": 14, "reminder_fee": 0,
@@ -329,7 +330,7 @@ def office_settings_clean(c, oid, b, cur):
         elif k == "fx_usd":
             out["fx_usd"] = round(_num(v, "fx_usd", 0.0001, 1000), 4)
         elif k in ("offer_scheme", "invoice_scheme", "credit_scheme", "reminder_scheme"):
-            out[k] = office_scheme_clean(v, FE_SCHEME_NAMES.get(k))
+            out[k] = office_scheme_clean(v, FE_SCHEME_NAMES.get(k), offer=k == "offer_scheme")
         elif k in ("payment_days", "reminder_deadline_days"):  # 2.38.0 (#1021, F1)
             out[k] = int(_num(v, k, 0, 365))
         elif k == "reminder_fee":
@@ -367,6 +368,10 @@ def office_settings_clean(c, oid, b, cur):
             out[k] = v
         elif k == "offer_number_at":
             if v not in ("create", "finalize"):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = v
+        elif k == "offer_counter":  # 2.118.0 A (#2265)
+            if v not in OFFER_COUNTERS:
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = v
         elif k == "prod_quotient":
@@ -439,7 +444,7 @@ FE_SCHEME_NAMES = {"offer_scheme": N_("Quotation numbers"), "invoice_scheme": N_
                    "reminder_scheme": N_("Reminder numbers")}
 
 
-def office_scheme_clean(v, name=None):
+def office_scheme_clean(v, name=None, offer=True):
     def bad(msg, *a):
         m = tr(msg).replace("{0}", a[0]) if a else tr(msg)  # (no str.format: the texts name the building blocks in braces)
         raise BadInput(f"{tr(name)}: {m}" if name else m)
@@ -448,9 +453,13 @@ def office_scheme_clean(v, name=None):
     v = v.strip()[:80]
     if "{seq" not in v:
         bad(N_("The running number is missing: add {seq} (or {seq:03} for 001)"))
+    if not offer and "{version}" in v:  # 2.118.0 A (#2265): invoices, credit notes and reminders keep one gapless counter
+        bad(N_("{version} is only possible in quotation numbers: invoices, credit notes and reminders count without gaps"))
     rest = SCHEME_RE.sub("", v)
     if "{" in rest or "}" in rest:
         m = re.search(r"\{[^{}]*\}?", rest)
+        if offer:  # 2.118.0 A (#2265): + {version}
+            bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {initials} {version}"), m.group(0) if m else "{")
         bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {initials}"), m.group(0) if m else "{")
     if re.search(r"[\\/<>\"'&\x00-\x1f]", rest):  # 2.36.1 review: no markup characters in numbers
         bad(N_("These characters cannot be part of a number: \\ / < > \" ' &"))
@@ -463,7 +472,7 @@ def office_scheme_period(scheme, d=None):
     return str(d.year) if ("{yyyy}" in scheme or "{yy}" in scheme) else ""
 
 
-def office_number_format(scheme, seq, d=None, project="", client="", initials=""):
+def office_number_format(scheme, seq, d=None, project="", client="", initials="", version=1):
     d = d or date.today()
 
     def rep(m):
@@ -483,6 +492,8 @@ def office_number_format(scheme, seq, d=None, project="", client="", initials=""
             return d.strftime("%Y%m%d")
         if t == "initials":
             return _slug(initials)
+        if t == "version":  # 2.118.0 A (#2265)
+            return str(version)
         return m.group(0)
     return SCHEME_RE.sub(rep, scheme)
 
@@ -492,16 +503,138 @@ def _slug(s):
     return s[:40]
 
 
-def office_number_next(c, oid, kind, scheme, d=None, peek=False, **ctx):
-    """Reserves (or peeks at) the next number of kind for organisation oid: counter per (org, kind, period)."""
+def office_number_next(c, oid, kind, scheme, d=None, peek=False, start=0, **ctx):
+    """Reserves (or peeks at) the next number of kind for organisation oid: counter per (org, kind, period).
+    2.118.0 A (#2265): start = the value a counter row that does not exist yet starts from (onc_next)."""
     period = office_scheme_period(scheme, d)
     if peek:
         r = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (oid, kind, period)).fetchone()
-        seq = (r["last"] if r else 0) + 1
+        seq = (r["last"] if r else start) + 1
     else:  # one atomic statement: two parallel requests never get the same counter value
-        seq = c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,?,1) ON CONFLICT(org_id, kind, period) "
-                        "DO UPDATE SET last=office_numbers.last+1 RETURNING last", (oid, kind, period)).fetchone()[0]
+        seq = c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,?,?) ON CONFLICT(org_id, kind, period) "
+                        "DO UPDATE SET last=office_numbers.last+1 RETURNING last", (oid, kind, period, start + 1)).fetchone()[0]
     return office_number_format(scheme, seq, d, **ctx), seq
+
+
+# 2.118.0 A (#2265): the quotation counter per organisation (as before), client or project. The scope sits in the
+# counter's kind (no migration): "offer" (organisation), "offer:c<client id>", "offer:n<recipient name>" (no client),
+# "offer:p<list id>", "offer:t<project title>" (no list). Invoices, credit notes and reminders keep one counter.
+OFFER_COUNTERS = ("org", "client", "project")
+
+
+def onc_key(s, r):
+    """The counter kind of quotation row r under settings s; '' = its client / project is not known yet."""
+    mode = s.get("offer_counter") or "org"
+    if mode == "client":
+        if r["client_id"]:
+            return f"offer:c{int(r['client_id'])}"
+        try:
+            rec = json.loads(r["recipient"] or "{}")
+        except ValueError:
+            rec = {}
+        name = _slug(rec.get("name") if isinstance(rec, dict) and isinstance(rec.get("name"), str) else "").lower()
+        return f"offer:n{name}" if name else ""
+    if mode == "project":
+        if r["list_id"]:
+            return f"offer:p{int(r['list_id'])}"
+        t = _slug(r["project_title"] or "").lower()
+        return f"offer:t{t}" if t else ""
+    return "offer"
+
+
+def onc_ready(s, r):
+    """False while a quotation counted per client / project has neither yet (it gets its number once it has one, at the
+    latest when finalised: then from the organisation's counter)."""
+    return r["kind"] != "offer" or (s.get("offer_counter") or "org") == "org" or bool(onc_key(s, r))
+
+
+def onc_parse(scheme, num):
+    """(seq, version) number num carries under scheme; None each when it does not follow the scheme / has no such block."""
+    pat, pos, names = "", 0, []
+    for m in SCHEME_RE.finditer(scheme):
+        pat += re.escape(scheme[pos:m.start()])
+        t = m.group(1)
+        if t.startswith("seq") or t == "version":
+            pat += r"(\d+)"
+            names.append("version" if t == "version" else "seq")
+        else:
+            pat += {"yyyy": r"\d{4}", "yy": r"\d{2}", "date": r"\d{8}"}.get(t, r".+?")
+        pos = m.end()
+    pat += re.escape(scheme[pos:])
+    m = re.fullmatch(pat, num or "")
+    if not m:
+        return None, None
+    got = {}
+    for n, v in zip(names, m.groups()):
+        got.setdefault(n, int(v))
+    return got.get("seq"), got.get("version")
+
+
+def onc_start(c, oid, s, r, key, scheme, d=None):
+    """The highest running number the organisation's quotations of counter key (and the period of date d) already carry
+    under scheme: a new client / project counter continues from it (existing numbers stay as they are)."""
+    period = office_scheme_period(scheme, d)
+    high = 0
+    for x in c.execute("SELECT id, kind, number, date, client_id, list_id, project_title, recipient FROM office_docs "
+                       "WHERE org_id=? AND kind='offer' AND number<>'' AND id<>?", (oid, r["id"])).fetchall():
+        if (period and (x["date"] or "")[:4] != period) or onc_key(s, x) != key:
+            continue
+        seq = onc_parse(scheme, x["number"])[0]
+        if seq and seq > high:
+            high = seq
+    return high
+
+
+def onc_next(c, oid, s, r, scheme, d=None, peek=False, **ctx):
+    """office_number_next for document row r: a quotation counts per organisation, client or project (settings s)."""
+    if r["kind"] != "offer":
+        return office_number_next(c, oid, r["kind"], scheme, d, peek, **ctx)
+    key = onc_key(s, r) or "offer"
+    start = 0
+    if key != "offer" and not c.execute("SELECT 1 FROM office_numbers WHERE org_id=? AND kind=? AND period=?",
+                                        (oid, key, office_scheme_period(scheme, d))).fetchone():
+        start = onc_start(c, oid, s, r, key, scheme, d)
+    return office_number_next(c, oid, key, scheme, d, peek, start=start, **ctx)
+
+
+def onc_version(c, oid, r, scheme, ctx_of):
+    """(version, number) of quotation r in its chain of duplicates (version_of, 2.88.0 #1915) when scheme holds {version}:
+    version = the highest of the chain + 1 (the first one is 1); number = the first quotation's number with only the
+    version changed (its running number stays, the counter does not move) or None (no chain / its running number cannot
+    be read under today's scheme: the caller takes the next number). ctx_of(row) -> project / client / initials."""
+    if r["kind"] != "offer" or "{version}" not in scheme or not r["version_of"]:
+        return 1, None
+    from .legacyimport import fi_number_taken
+    root = r["version_of"]
+    rows = c.execute("SELECT id, number, date, created_by, project_title, recipient, client_id FROM office_docs WHERE org_id=? "
+                     "AND kind='offer' AND (id=? OR version_of=?) ORDER BY id", (oid, root, root)).fetchall()
+    high, first = 0, None
+    for i, x in enumerate(rows):
+        if x["id"] == r["id"]:
+            continue
+        if x["id"] == root:
+            first = x
+        v = onc_parse(scheme, x["number"])[1] if x["number"] else None
+        high = max(high, v or (1 if x["id"] == root else i + 1))  # an older number without the block: its place in the chain
+    ver = high + 1
+    seq = onc_parse(scheme, first["number"])[0] if first is not None and first["number"] else None
+    if seq is None:
+        return ver, None
+    d = date.fromisoformat(first["date"]) if first["date"] else date.today()
+    for _ in range(50):
+        num = office_number_format(scheme, seq, d, version=ver, **ctx_of(first))
+        if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, r["id"])).fetchone() \
+                and not fi_number_taken(c, oid, num):
+            return ver, num
+        ver += 1
+    return ver, None
+
+
+def onc_preview(c, oid, s, scheme, counter=None, **ctx):
+    """The next quotation number shown on the settings page: per client / project an example one starts at 1."""
+    if (counter or s.get("offer_counter") or "org") != "org":
+        return office_number_format(scheme, 1, **ctx)
+    return office_number_next(c, oid, "offer", scheme, peek=True, **ctx)[0]
 
 
 # ---------------------------------------------------------------- master data (generic CRUD per table)

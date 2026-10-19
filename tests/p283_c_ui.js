@@ -88,14 +88,13 @@ const FEAT = 'collab,comments,progress';
   w.eval(`settingsModal('look')`); await sleep(400);
   md = d.querySelector('.modal.smodal');
   const pane = md.querySelector('[data-pane="look"]');
-  check(pane.querySelector('#s-pack') && pane.querySelector('#s-o3c-head')?.checked && pane.querySelector('#s-o3c-rings')?.checked, 'Appearance: themes, header pictures and rings (on)');
+  check(pane.querySelector('#s-pack') && pane.querySelector('#s-o3c-head')?.checked && !pane.querySelector('#s-o3c-rings'), 'Appearance: themes, header pictures (on); the rings switch moved to the account (2.118.0, #2297)');
   const sw = async (id, on) => { const c = pane.querySelector('#' + id); c.checked = on; c.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(200); };
   await sw('s-o3c-head', false);
   check(!d.querySelector('#o3c-head') && w.__store['tasks.headShow'] === 'false', 'header pictures off: no strip on this device, stored');
-  await sw('s-o3c-rings', false);
-  check(!d.querySelector('#side .o3c-ring') && w.__store['tasks.rings'] === 'false', 'rings off: none in the sidebar');
-  await sw('s-o3c-head', true); await sw('s-o3c-rings', true);
-  check(d.querySelector('#o3c-head') && d.querySelector('#side .o3c-ring') && !('tasks.headShow' in w.__store), 'both on again (nothing stored)');
+  // 2.118.0 (#2297): rings follow the account setting side_progress (see p2118_b_ui)
+  await sw('s-o3c-head', true);
+  check(d.querySelector('#o3c-head') && d.querySelector('#side .o3c-ring') && !('tasks.headShow' in w.__store), 'header pictures on again (nothing stored)');
   md.remove();
   w.close();
   // a reader: the strip yes, the dialog row no
