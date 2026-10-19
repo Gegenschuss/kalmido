@@ -1811,7 +1811,7 @@ TOOLS += [
 # (any format) and send it in this one shape; the person checks the preview and takes it over -- you never write the office
 _IMPORT_ROW = {"type": "object", "description": "{label, amount (net euros > 0: number or \"1.200,50\"), repeat monthly|quarterly|yearly|once "
                                                "(default monthly), start YYYY-MM-DD, until? YYYY-MM-DD, category?, vat_rate? 0|7|19 "
-                                               "(left out: 19, insurances / contributions 0)}"}
+                                               "(left out: 19, insurances / contributions / bank / taxes / memberships 0)}"}
 TOOLS += [
     ("propose_import", "2.68.0 (scope import): ONE import proposal of old data for the person's office, today area fixed_costs (at most 500 "
                        "rows). Read the old data yourself (spreadsheet, PDF, mail), one row per fixed cost; put rows you could not read "
