@@ -1256,6 +1256,7 @@ fresh; run p2120_b_api "$PY" p2120_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2120_b_ui node p2120_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.120.0 part C: DATEV export with incoming receipts and travel costs (#2090)
 fresh; run p2120_c_api "$PY" p2120_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2120_c_ui node p2120_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.120.0 part D: delivery note / proof of work, timesheet as invoice attachment (#2089)
 fresh; run p2120_d_api "$PY" p2120_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2120_d_ui node p2120_d_ui.js "$KALMIDO_TEST_DATA"
