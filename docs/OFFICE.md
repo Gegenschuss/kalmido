@@ -123,6 +123,12 @@ office tab without one appears at the end of its group (`OFC_TABS` field 5, else
   The first call of the module copies the country pack's catalogue into the organisation's text blocks.
 - **Framework contracts** - one per agency or client: date, raw data included, default rights (three catalogue entries),
   rights note, closing text, special rates per service. A document can pick a contract and deviate from it.
+  The signed contract and its addenda can be attached as PDF files in the contract's dialog ("Contract (PDF)": upload,
+  open, replace, remove, a date per file; the list shows a paper clip). Only PDFs, the usual upload size limit; stored
+  encrypted with the office area's key like the stored quotation PDFs. Members of the office open them, admins change
+  them. Deleting the contract moves its files into the trash; after 30 days they are deleted for good, file included.
+  API: `GET|POST /api/office/contracts/<id>/files` (multipart `file`, `date?`, `replace?`),
+  `GET|PATCH|DELETE /api/office/contracts/<id>/files/<file id>`, `POST .../<file id>/restore`.
 - **Bookkeeping** (admins, 2.90) - income/expense statement, VAT return figures, tax reserve, receipt photo and tax
   dates, see below.
 - **Bank** (admins, 2.90) - bank reconciliation, see below.
@@ -1117,9 +1123,14 @@ language (de / en), text and *Documents from it can be signed by the customer*. 
 `{{name}}` and inserted with the button bar: `{{client.name}}`, `{{client.address}}`, `{{client.contact}}`,
 `{{project.title}}`, `{{offer.number}}`, `{{offer.date}}`, `{{offer.total}}`, `{{company.name}}`, `{{company.address}}`,
 `{{today}}`. They are replaced by a plain text search, never evaluated; an unknown name stays as it is in the preview
-(marked) and is left empty in the PDF. *Use sample* takes over one of three short samples (service agreement, order
-confirmation, non-disclosure agreement) in the office's document language (or the other one) as an own template.
-Samples are sample text, no legal advice.
+(marked) and is left empty in the PDF. *Use sample* (also *Start from a sample* in the new template dialog) takes over
+one of ten short samples in the office's document language (or the other one) as an own, freely editable template of
+the current area (organisation or private): service agreement, order confirmation, non-disclosure agreement, cover
+letter, payment reminder, dunning letter, notice of termination, power of attorney, handover record and credit note
+cover letter. What no variable knows (an invoice number, a deadline) stays as `[placeholder]` in square brackets.
+Samples are sample text, no legal advice; the picker marks the legal ones (contracts, dunning, termination, power of
+attorney) to be checked before use. The samples live in the code (`kalmido/office/doctpl_samples.py`), never in the
+database.
 
 **Documents** (`office_gen_docs`): made from a template for a client (required), optionally a project list (one the
 admin sees, of the same office area) and a quotation of the same client. A draft keeps the text with its variables; the
@@ -1141,7 +1152,7 @@ time in UTC, the SHA-256 of the text and *Simple electronic signature*) is filed
 the documents next. Archiving a document or changing its text stops its link. This is a simple electronic signature:
 not for contracts that the law requires in written form.
 
-Routes (office admins only): `GET/POST /api/office/doc-templates` (`{starter: contract|confirmation|nda, lang?}` takes over
+Routes (office admins only): `GET/POST /api/office/doc-templates` (`{starter: contract|confirmation|nda|letter|reminder|dunning|termination|authority|handover|credit, lang?}` takes over
 a sample), `GET /api/office/doc-templates/starters?lang=`, `PATCH/DELETE /api/office/doc-templates/<id>`,
 `POST /api/office/doc-templates/<id>/restore`, `GET/POST /api/office/gen-docs` (`?client_id=&list_id=&status=&archived=1`;
 `{copy_of: id}` = edit a copy), `GET/PATCH/DELETE /api/office/gen-docs/<id>` (`PATCH` of a finished document `409`),

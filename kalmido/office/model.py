@@ -858,6 +858,9 @@ def office_delete(c, oid, kind, rid):
         c.execute(f"UPDATE {m['table']} SET archived=1 WHERE id=? AND org_id=?", (r["id"], oid))
         return "archived"
     c.execute(f"DELETE FROM {m['table']} WHERE id=? AND org_id=?", (r["id"], oid))
+    if kind == "contracts":  # 2.117.0 B (#2285): its PDF files go into the trash (purged after DMA_PURGE_DAYS)
+        from .contractfiles import dma_trash_contract
+        dma_trash_contract(c, oid, r["id"])
     if kind == "services":
         s = office_settings(c, oid)
         if s.get("producing_service_id") == r["id"]:

@@ -31,6 +31,7 @@ from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, need_list, vis_sql
 from ..personal.timetrack import BadInput
 from .model import office_gate, office_org, office_settings, pb_cl_sql, pb_owner
+from .doctpl_samples import DMA_SAMPLES  # 2.117.0 B (#2283)
 
 DT_KINDS = (("contract", N_("Contract")), ("confirmation", N_("Order confirmation")), ("nda", N_("Non-disclosure agreement")),
             ("other", N_("Other")))
@@ -614,23 +615,30 @@ def dt_starters_get():
     """?lang=de|en (default: the office's document language) -> {starters: [{key, kind, name, lang, body}], note}."""
     c, uid, oid = _ctx()
     lg = dt_lang(c, oid, request.args.get("lang") or None)
-    return jsonify(starters=[{"key": k, "kind": k, "kind_label": dt_kind_label(k), "name": v[lg][0], "lang": lg, "body": v[lg][1]}
-                             for k, v in DT_STARTERS.items()], note=tr(DT_NOTE), lang=lg)
+    # 2.117.0 B (#2283): the letters of doctpl_samples after the contract samples; legal = the picker says to check it
+    return jsonify(starters=[{"key": k, "kind": k, "kind_label": dt_kind_label(k), "name": v[lg][0], "lang": lg, "body": v[lg][1], "legal": int(k != "confirmation")}
+                             for k, v in DT_STARTERS.items()] +
+                   [{"key": k, "kind": v["kind"], "kind_label": dt_kind_label(v["kind"]), "name": v[lg][0], "lang": lg, "body": v[lg][1],
+                     "legal": v["legal"]} for k, v in DMA_SAMPLES.items()], note=tr(DT_NOTE), lang=lg)
 
 
 @app.post("/api/office/doc-templates")
 def dt_tpl_post():
-    """{kind, name, lang, body, sign} or {starter: contract|confirmation|nda, lang?} (a sample as own template) -> 201."""
+    """{kind, name, lang, body, sign} or {starter: contract|confirmation|nda|<a key of DMA_SAMPLES>, lang?} (a sample as own template) -> 201."""
     c, uid, oid = _ctx()
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     if b.get("starter") is not None:
         st = DT_STARTERS.get(b.get("starter")) if isinstance(b.get("starter"), str) else None
-        if not st:
+        sm = DMA_SAMPLES.get(b.get("starter")) if isinstance(b.get("starter"), str) and not st else None  # 2.117.0 B (#2283)
+        if not st and not sm:
             raise BadInput(tr("Invalid value: {0}", "starter"))
         lg = dt_lang(c, oid, b.get("lang"))
-        b = {"kind": b["starter"], "name": st[lg][0], "lang": lg, "body": st[lg][1], "sign": 0 if b["starter"] == "confirmation" else 1}
+        if sm:
+            b = {"kind": sm["kind"], "name": sm[lg][0], "lang": lg, "body": sm[lg][1], "sign": sm["sign"]}
+        else:
+            b = {"kind": b["starter"], "name": st[lg][0], "lang": lg, "body": st[lg][1], "sign": 0 if b["starter"] == "confirmation" else 1}
     row = dt_tpl_clean(c, oid, b)
     ts = iso(now_utc())
     row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)

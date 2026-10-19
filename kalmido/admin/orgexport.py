@@ -240,6 +240,7 @@ OX_AREAS = (
     ("office/packages.json", "office_sets", "org_id=?"),
     ("office/texts.json", "office_texts", "org_id=?"),
     ("office/contracts.json", "office_contracts", "org_id=?"),
+    ("office/contract_files.json", "office_contract_files", "org_id=?"),  # 2.117.0 B (#2285): the files themselves come with OFFICE_DIR
     ("office/client_contacts.json", "office_client_contacts", "org_id=?"),
     ("office/numbers.json", "office_numbers", "org_id=?"),
     ("office/documents.json", "office_docs", "org_id=?"),

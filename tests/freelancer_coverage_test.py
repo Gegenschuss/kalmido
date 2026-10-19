@@ -661,6 +661,10 @@ ROUTES = {
     "POST /api/office/deals/{}/unconvert": "office", "POST /api/office/leads/import": "office",
     "POST /api/office/leads/import/undo": "office", "POST /api/v1/office/leads": "office", "POST /s/b/c/{}": "link",
     "POST /s/b/x/{}": "link", "POST /s/b/{}/{}/{}": "link", "PUT /api/appt/page": "pim",
+    # 2.117.0 B (#2285): PDF files of a framework contract (personal office of a freelancer in p2117_b_api_test.py)
+    "GET /api/office/contracts/{}/files": "office", "POST /api/office/contracts/{}/files": "office",
+    "GET /api/office/contracts/{}/files/{}": "office", "PATCH /api/office/contracts/{}/files/{}": "office",
+    "DELETE /api/office/contracts/{}/files/{}": "office", "POST /api/office/contracts/{}/files/{}/restore": "office",
 }
 
 
