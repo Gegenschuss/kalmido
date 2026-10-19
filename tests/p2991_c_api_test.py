@@ -202,7 +202,9 @@ check(all(x in (401, 403, 404) for x in web), f"an agent through the app's route
 check(ag.post(B + V1, json={"task_id": T, "url": "https://vimeo.com/1"}).status_code in (403, 404, 405), "no creating through the API")
 check(ag.delete(B + f"{V1}/{RT['id']}").status_code in (403, 404, 405), "no deleting through the API")
 # the list limit of an agent
-r = A.patch(B + f"/api/admin/agents/{AG}", json={"list_ids": [LV]})
+LA = A.post(B + "/api/lists", json={"name": "Anderes Projekt", "org_id": ORG}).json()["id"]
+share(A, LA, AG)
+r = A.patch(B + f"/api/admin/agents/{AG}", json={"list_ids": [LA]})
 check(r.ok, f"setup: the agent limited to another list {r.status_code} {r.text[:200]}")
 check(ag.get(B + f"{V1}/{RT['id']}").status_code == 404 and ag.get(B + V1, params={"list_id": L}).json()["data"] == [], "outside the list limit: 404")
 A.patch(B + f"/api/admin/agents/{AG}", json={"list_ids": []})
