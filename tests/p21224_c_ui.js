@@ -28,7 +28,7 @@ if (!process.env.P21224C_NOSTART) execFileSync('bash', [path.join(__dirname, 'st
     await sleep(500);
     await ev(`Promise.all(['office', 'contacts', 'videorev', 'bookmarks'].map(f => loadCss(f))).then(() => 1)`);
     const g = await ev(`(() => {
-      const add = h => { const d = document.createElement('div'); d.innerHTML = h; if (d.firstElementChild.classList.contains('modal')) { document.body.appendChild(d.firstElementChild); return document.body.lastElementChild; } d.style.cssText = 'position:fixed;top:0;left:0;width:100%;z-index:60;background:#fff'; document.body.appendChild(d); return d; };
+      const add = h => { const d = document.createElement('div'); d.innerHTML = h; if (d.firstElementChild.classList.contains('modal')) { document.body.appendChild(d.firstElementChild); return document.body.lastElementChild; } d.style.cssText = 'position:fixed;top:0;left:0;width:100%;z-index:9000;background:#fff'; document.body.appendChild(d); return d; };
       const out = {};
       const a = add('<div class="ofcset"><div class="row"><label for="t1">x</label><select id="t1"><option>a</option></select></div></div>');
       out.sel = a.querySelector('select').getBoundingClientRect().height; a.remove();
@@ -42,7 +42,7 @@ if (!process.env.P21224C_NOSTART) execFileSync('bash', [path.join(__dirname, 'st
       out.vs = c.querySelector('select').getBoundingClientRect().height; c.remove();
       const d = add('<div class="modal bmdlg"><div class="card"><div class="row"><label for="t4">Description</label><textarea id="t4" rows="2"></textarea></div><div class="bmtags"><button class="bmtag">tag</button></div></div></div>');
       out.ta = [d.querySelector('textarea').getBoundingClientRect().width, d.querySelector('.card').getBoundingClientRect().width];
-      const tg = d.querySelector('.bmtag'), tr = tg.getBoundingClientRect();
+      d.style.zIndex = 9001; const tg = d.querySelector('.bmtag'), tr = tg.getBoundingClientRect();
       out.tag = [tr.height, probe(tg, 0, tr.height / 2 + 3), probe(tg, 0, -tr.height / 2 - 3)];
       return out; })()`);
     check(g.sel >= 43.5, `${tag}: #2326 office select is 44 px ` + JSON.stringify(g.sel));
