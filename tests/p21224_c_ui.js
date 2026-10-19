@@ -43,7 +43,7 @@ if (!process.env.P21224C_NOSTART) execFileSync('bash', [path.join(__dirname, 'st
       const d = add('<div class="bmdlg"><div class="card" style="box-sizing:border-box;width:100%;padding:1.25rem"><div class="row"><label for="t4">Description</label><textarea id="t4" rows="2"></textarea></div><div class="bmtags"><button class="bmtag">tag</button></div></div></div>');
       out.ta = [d.querySelector('textarea').getBoundingClientRect().width, d.querySelector('.card').getBoundingClientRect().width];
       const tg = d.querySelector('.bmtag'), tr = tg.getBoundingClientRect();
-      out.tag = [tr.height, probe(tg, 0, tr.height / 2 + 3), probe(tg, 0, -tr.height / 2 - 3)];
+      out.tag = [tr.height, probe(tg, 0, tr.height / 2 + 2), probe(tg, 0, -tr.height / 2 - 2)];
       return out; })()`);
     check(g.sel >= 43.5, `${tag}: #2326 office select is 44 px ` + JSON.stringify(g.sel));
     check(g.zi[0] < g.zi[1], `${tag}: #2348 import notice below the dialog ` + JSON.stringify(g.zi));
