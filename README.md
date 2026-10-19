@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.118.0** (2026-10-19): quotation numbers per client or project (e.g. KV-ACME-2026-03) and a `{version}` block
+  for duplicates (KV-ACME-2026-03-V2); one switch for the progress line and rings in the sidebar.
 - **2.117.0** (2026-10-19): travel costs filtered by person and with own purposes, a row menu per trip, the "To"
   calendar starts at the start date; seven document samples, PDFs attached to framework contracts, a compact chat filter on phones.
 - **2.99.0** (2026-10-19): files on knowledge pages (PDFs, pictures) and a ZIP import that keeps them, one "…" menu on

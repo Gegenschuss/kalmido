@@ -7,6 +7,24 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.118.0] - 2026-10-19
+
+Quotation counter per client or project, one progress switch.
+
+### Added
+- Office: a new setting "Counter for quotations" - per organisation (as before), per client or per project. Each
+  client / project counts on its own, per year when the scheme holds the year, e.g. `KV-{client}-{yyyy}-{seq:02}`
+  gives KV-ACME-2026-03. Existing numbers stay as they are; a new counter continues from the highest number the
+  client / project already has. In these modes a new quotation gets its number once the client or project is set
+  (at the latest when it is finalised). Invoices, credit notes and reminders keep one gapless counter (#2265).
+- Office: the building block `{version}` for quotation numbers - the first quotation is 1, each duplicate keeps the
+  running number and counts only the version on, e.g. KV-ACME-2026-03-V2 (#2265).
+
+### Fixed
+- Sidebar: "Progress in the sidebar" now switches the line and the progress rings together, kept in the account for
+  all devices; the separate device switch for the rings is gone, a device that had it off hands that to the account
+  once (#2297).
+
 ## [2.117.0] - 2026-10-19
 
 Travel costs, document samples, small fixes.
