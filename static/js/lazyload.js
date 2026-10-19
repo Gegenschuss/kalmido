@@ -156,7 +156,7 @@ window.oa_switchLoad.ld = 1;
 window.wk_palAdd = () => { if (feat('wiki')) loadModule('wiki').catch(() => {}); };
 // 2.99.1 A (#1959): video sign-offs (videorev.js, module videos): a task's panel, a project's overview and a client's card load
 // the module when they are drawn and draw again once it is there
-window.vdr_taskHtml = t => { if (t?.id > 0) loadModule('videos').then(() => { if (S.sel === t.id) renderDetail(); }, () => {}); return ''; };
+window.vdr_taskHtml = t => { if (t?.id > 0) loadModule('videos').then(() => { if (S.sel === t.id && vdr_rows('task_id', t.id, () => vdr_redrawTask(t.id))) vdr_redrawTask(t.id); }, () => {}); return ''; };  // 2.96.3: one redraw, focus kept
 window.vdr_projHtml = window.vdr_clientHtml = () => { ld_later('videos'); return ''; };
 window.wk_mentionHtml = t => { if (feat('wiki') && t?.id > 0) loadModule('wiki').then(() => { if (S.sel === t.id) renderDetail(); }, () => {}); return ''; };
 // 2.65.0 (#1823) the PDF preview (pdfview.js, module pdf): its links are drawn at start, a click loads the module (moved here
