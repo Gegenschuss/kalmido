@@ -283,7 +283,7 @@ const ekPctHtml = (it, i, line, d) => `<input data-i="${i}" data-k="rate" inputm
 
 // ---- the history (organisation admins; office log of this document)
 const OFD_ACTIONS = {create: N_('created'), update: N_('changed'), items: N_('positions changed'), number: N_('number set'), status: N_('status changed'),
-  finalize: N_('finalised'), duplicate: N_('created as a copy'), cashflow: N_('cash flow choice changed'), delete: N_('deleted'), open: N_('opened'), pdf: N_('PDF opened'), render: N_('preview opened'),
+  finalize: N_('finalised'), unlock: N_('finalising undone'), duplicate: N_('created as a copy'), cashflow: N_('cash flow choice changed'), delete: N_('deleted'), open: N_('opened'), pdf: N_('PDF opened'), render: N_('preview opened'),
   export: N_('exported'), import: N_('imported'), archive: N_('archived'), upload: N_('uploaded'),
   payment: N_('payment recorded'), payment_delete: N_('payment removed'), send: N_('sent by e-mail'), datev: N_('sent to the DATEV inbox'), undo: N_('import undone'), reminder_fee: N_('reminder fee waived / paid / open again'), recovery_key: N_('recovery key shown'),
   agent_read: N_('read (agent)'), agent_write: N_('drafted (agent)'), from_sheet: N_('created from a table')};  // 2.89.0 (#1916, D): + from_sheet  // 2.51.0 A (#1348)  // 2.42.0 (#828): + recovery_key  // 2.39.1 (#1182): + undo; 2.40.0 (#1368): + reminder_fee
@@ -382,9 +382,13 @@ function ofdMoreItems(d, inList) {
       ofdIsInv(d) && d.kind !== 'reminder' && d.locked ? {label: tr('Send to the DATEV inbox'), icon: 'send', fn: async () => { const j = await ofdSave('POST', `/api/office/docs/${d.id}/datev`); if (j) toast(tr('Sent to the DATEV inbox')); }} : null,
       d.status === 'draft' && !d.locked && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? {label: tr('Move to another workspace…'), icon: 'brief',  // 2.97.0 C (#2049)
         fn: () => ofm_move({what: 'drafts', ids: [d.id], from: ofm_officeFrom(), label: qn(d.number || d.project_title || ofdKindName(d.kind, true)), after: async () => gone()})} : null,
+      d.can_unlock ? {label: tr('Undo finalising'), icon: 'undo', fn: async () => {  // 2.114.2 A (#2263): a finalised quotation never sent
+        if (!await askConfirm(tr('Back to a draft?'), tr('The quotation can be changed again and keeps its number {0}.', d.number || ''), {ok: tr('Undo finalising')})) return;
+        try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/unlock`); OFD.list = null; OFD.log = null; if (inList) ofdLoadList(true); else { OFD.doc = j; ofdDraw(); } toast(tr('Back to a draft')); } catch (x) { toast(x.message || tr('unknown')); }
+      }} : null,
       d.can_delete ? '-' : null,
       d.can_delete ? {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
-        if (!await askConfirm(tr('Delete {0}?', d.number || ofdKindName(d.kind, true)), tr('Its number stays used.'), {ok: tr('Delete'), danger: true})) return;
+        if (!await askConfirm(tr('Delete {0}?', d.number || ofdKindName(d.kind, true)), d.locked ? tr('Its number stays used and shows as a gap in the office log.') : tr('Its number stays used.'), {ok: tr('Delete'), danger: true})) return;  // 2.114.2 A (#2263)
         try { await api('DELETE', `/api/office/docs/${d.id}`); gone(); toast(tr('Deleted')); } catch (x) { toast(x.message || tr('unknown')); }
       }} : null];
   return inList ? [{label: tr('Open'), icon: 'edit', fn: () => go(`office/offers/${d.id}`)}, ...items] : items;
@@ -392,7 +396,7 @@ function ofdMoreItems(d, inList) {
 // 2.87.9 (#1920): right click / long press on a row opens the same menu as the dots button
 function ofdRowMenu(id, anchor) {
   const r = (OFD.list || []).find(x => String(x.id) === String(id)); if (!r) return;
-  menu(anchor, ofdMoreItems({...r, can_delete: OFD.role === 'admin' && !r.locked && r.status !== 'sent'}, true));
+  menu(anchor, ofdMoreItems({...r, can_delete: OFD.role === 'admin' && (r.can_delete || (!r.locked && r.status !== 'sent'))}, true));  // 2.114.2 A (#2263): the server marks the finalised quotations that may go
 }
 function ofdCtx(e) { const b = e.target.closest('.ofdrow'); if (!b) return; e.preventDefault(); ofdRowMenu(b.dataset.id, b); }
 async function ofdClick(e) {

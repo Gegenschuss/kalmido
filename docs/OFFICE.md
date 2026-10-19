@@ -819,6 +819,20 @@ and deleting answer `409` with a reason; the status of a quotation can still cha
 (a new version) without the snapshot. Quotations do not have to be finalised; it is an optional step for them. Since
 2.38.0 a quotation with status "sent" is locked the same way (a business letter is kept as sent; a new version = duplicate).
 
+Since 2.114.2 a finalised **quotation that never left the house** can be taken back by the organisation's admin (a
+person without an organisation in the personal office, too; members get `403`): it is still in status "draft", was never
+sent (no `sent_at`, no logged e-mail), the customer did not decide on an approval link, and no invoice or order
+confirmation was made from it. Then the "More" menu offers:
+
+- **Undo finalising** (`POST /api/office/docs/<id>/unlock`): back to an open draft; the number stays and is kept when it
+  is finalised again; the snapshot is made anew then. The history shows "finalising undone" with the number.
+- **Delete**: the number stays used and the office log keeps the delete entry with the number (`locked: true`), so the
+  gap stays traceable. Open approval links go with it, a sales opportunity loses its link to the quotation, the later
+  versions of a deleted first quotation stay in their chain.
+
+Everything else answers `409` with the reason (sent, accepted, declined, signed, invoiced); invoices, credit notes and
+reminders stay strictly locked. The list rows carry `can_delete` / `can_unlock` for the admin.
+
 ## Parts of a quotation
 
 (2.47.0.) A quotation may have **parts**: own pages behind the title page, each with its own positions and calculation
