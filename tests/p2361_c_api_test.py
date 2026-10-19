@@ -315,7 +315,9 @@ r = Ca.post(B + "/api/clients", json={"name": "Fremder Kunde"})
 if r.status_code == 201:
     check(A.patch(B + f"{D}/{DOC}", json={"client_id": r.json()["id"]}).status_code == 404, "a client of another organisation: 404")
 # deleting the organisation's client keeps the document (SET NULL)
-check(A.delete(B + f"/api/clients/{CL}").ok and A.get(B + f"{D}/{DOC}").json()["client_id"] is None and A.get(B + f"{D}/{DOC}").json()["recipient"]["name"] == "Beispielkunde AG", "client deleted: the document keeps its recipient snapshot")
+# 2.103.0 (#2168): a client with documents is archived instead of deleted; the document keeps it
+r = A.delete(B + f"/api/clients/{CL}")
+check(r.ok and r.json().get("archived") is True and A.get(B + f"{D}/{DOC}").json()["client_id"] == CL and A.get(B + f"{D}/{DOC}").json()["recipient"]["name"] == "Beispielkunde AG", "client in use: archived, the document keeps it " + r.text[:160])
 # a used service is archived, not deleted, and the position keeps its title
 r = A.delete(B + f"/api/office/services/{S_STORY}")
 check(r.ok and A.get(B + f"{D}/{DOC}").json()["items"][1]["title"] == "Storyboard-Erstellung", "a service in use is archived; the position keeps its snapshot " + r.text[:80])

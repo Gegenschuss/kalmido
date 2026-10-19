@@ -991,7 +991,7 @@ Requests to `/api/v1/` without a token then still get the login page of your pro
 Modules `clients`, `workload`, `forms` (per person, 409 while off); everything within the token user's organisation.
 `GET /clients` (`?month=YYYY-MM`, `?archived=1`) returns the clients with `lists`, `stats` (`seconds`, `amount`,
 `month_seconds`, `month_amount`, `estimate_min`) and `budget` (`pct_h`, `pct_amount`, `level`: ok / warn / over);
-`GET /clients/{id}` adds `per_list` (estimate vs. actual). `POST /clients`, `PATCH|DELETE /clients/{id}` (`structure`).
+`GET /clients/{id}` adds `per_list` (estimate vs. actual). `POST /clients`, `PATCH|DELETE /clients/{id}` (`structure`; 2.103.0: `DELETE` archives a client used in quotations, invoices or contracts instead and answers `archived: true`).
 2.47.3 (#1733): `POST /clients/bulk` `{ids, action: delete|archive|unarchive|set|restore}` several clients at once (up to 1000;
 one id you do not see: `404`, nothing changes). `delete`: a client used in quotations, invoices or framework contracts is archived
 instead, only its creator or an admin deletes (the others: `skipped`); `set`: `rate`, `budget_h`, `budget_amount`, `color` (`null`

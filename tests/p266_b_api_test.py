@@ -250,7 +250,11 @@ dbx("UPDATE office_docs SET client_id=? WHERE id=?", (M, I2), write=True)
 # ---- undo after the target was deleted
 r = A.post(M_URL, json={"target": T, "ids": [M]})
 RID3 = r.json()["run_id"]
-check(A.delete(B + f"/api/clients/{T}").ok, "deleted: the target deleted after the merge")
+# 2.103.0 (#2168): a client with documents is archived instead of deleted -> the target goes by hand (as an org delete would)
+r = A.delete(B + f"/api/clients/{T}")
+check(r.ok and r.json().get("archived") is True, "the target in use: archived instead of deleted " + r.text[:160])
+dbx("UPDATE lists SET client_id=NULL WHERE client_id=?", (T,), write=True)
+dbx("DELETE FROM clients WHERE id=?", (T,), write=True)
 r = A.post(undo_url(RID3))
 check(r.ok and r.json().get("target_gone") is True and r.json().get("target") is None, f"deleted: undo brings the others back ({r.text[:200]})")
 check(A.get(B + f"/api/clients/{M}").ok and one("SELECT client_id FROM office_docs WHERE id=?", (I1,)) == M
