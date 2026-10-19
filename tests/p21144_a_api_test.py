@@ -55,6 +55,19 @@ def pages(data):
     return [p.extract_text() or "" for p in PdfReader(io.BytesIO(data)).pages]
 
 
+ONE_PAGE = []
+
+
+def page_rule(pg, what, fmt="Seite {0} von {1}"):
+    """#2273 / #2282: one page -> no page count at all; more -> "x of n" once on every page (the footer)."""
+    n = len(pg)
+    if n == 1:
+        ONE_PAGE.append(what)
+        check(not re.search(r"(Seite|Page)\s*1\s*(von|of)\s*1", pg[0]), f"{what}: #2282 no page count on a one-page PDF")
+    else:
+        check(all(squash(pg[i]).count(squash(fmt.format(i + 1, n))) == 1 for i in range(n)), f"{what}: #2273 'x of {n}' once on every page")
+
+
 def one_line(pg, want):
     """want stands whole on one line of the text layer (not broken)."""
     return any(want in ln for t in pg for ln in t.splitlines())
@@ -115,8 +128,7 @@ def scenario(S, who):
     check(r.status_code == 200 and r.content.startswith(b"%PDF"), f"{who}: the PDF {r.status_code}")
     pg = pages(r.content)
     allt = "\n".join(pg)
-    check(len(pg) == 1, f"{who}: one page ({len(pg)})")
-    check(not re.search(r"Seite\s*1\s*von", allt), f"{who}: #2273 #2282 no 'Seite 1 von 1' on a one-page quotation")
+    page_rule(pg, who + " quotation")
     check(number and number in pg[0], f"{who}: the number still in the footer / head {number}")
     for want in (IBAN_PRINT, "E-Mail post@musterfilm.example", "Steuernummer 12/345/67890", "BIC BYLADEM1001", "Tel. +49 30 123456789"):
         check(one_line(pg, want), f"{who}: #2271 #2272 {want!r} whole on one line")
@@ -133,7 +145,7 @@ def scenario(S, who):
     check("All prices plus 7 % or 19 % VAT." in all2, f"{who}: #2274 both rates occur -> both named")
     check("Net total with option raw data" in all2 and "including raw data" not in all2, f"{who}: #2275 English option total")
     check(re.search(r"1\s*day\b", all2) and "production day" not in all2, f"{who}: #2276 '1 day', no formula")
-    check(not re.search(r"Page\s*1\s*of\s*1\b", all2), f"{who}: #2282 no 'Page 1 of 1'")
+    page_rule(pg2, who + " quotation en", "Page {0} of {1}")
     # ------------------------------------------------ a long quotation: page x of y in the footer of every page
     doc3 = quotation(S, who, cl, "de", [{"title": f"Zusatzleistung Nr. {i + 1}", "qty": 1, "unit": "flat", "rate": 100} for i in range(40)])
     pg3 = pages(S.get(B + f"{D}/{doc3}/pdf").content)
@@ -150,8 +162,7 @@ def scenario(S, who):
     pgd = pages(r.content)
     for want in (IBAN_PRINT, "Steuernummer 12/345/67890", "Beispielbank Berlin", "E-Mail post@musterfilm.example", "Tel. +49 30 123456789"):
         check(one_line(pgd, want), f"{who}: #2284 the document footer has {want!r} on one line")
-    if len(pgd) == 1:
-        check(not re.search(r"Seite\s*1\s*von\s*1", "\n".join(pgd)), f"{who}: #2282 no 'Seite 1 von 1' on a one-page document")
+    page_rule(pgd, who + " document")
     # ------------------------------------------------ without bank data: no empty column, no IBAN word
     bare = {k: "" for k in ("iban", "bic", "bank_name", "tax_number", "register_court", "register_no", "managing_directors")}
     check(S.put(B + O + "/settings", json={"company_fields": bare}).ok, f"{who}: bank and register data removed")
@@ -169,5 +180,6 @@ o = F.get(B + O + "/settings").json()
 check(o.get("personal") == 1, f"freelancer: the personal office {o.get('personal')}")
 scenario(F, "freelancer")
 
+check(len(ONE_PAGE) >= 2, f"#2282: at least two one-page PDFs checked {ONE_PAGE}")
 print(f"p21144_a_api: {OKS[0]} passed, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
