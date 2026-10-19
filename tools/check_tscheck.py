@@ -31,7 +31,7 @@ BASE = {
     "newsletter.js", "notelock.js", "notesall.js", "office.js", "office_agreements.js", "office_assets.js",
     "office_bank.js", "office_books.js", "office_cashflow.js", "office_datev.js", "office_docs.js", "office_doctpl.js",
     "office_import.js", "office_kpi.js", "office_leads.js", "office_logbook.js", "office_packs.js", "office_parts.js",
-    "office_pipeline.js", "office_recurring.js", "office_sheet.js", "office_subs.js", "office_taxdates.js",
+    "office_pipeline.js", "office_recurring.js", "office_sheet.js", "office_subs.js", "office_taxdates.js", "office_letterhead.js",
     "office_travel.js", "officeagents.js", "orgcrypt.js", "orgexport.js", "orgvis.js", "palette.js", "paperless.js",
     "pdfview.js", "photometa.js", "pinboard.js", "playbook.js", "points.js", "polls.js", "popovers.js", "portal.js", "projects.js",
     "projtime.js", "propkinds2.js", "pubvideo.js", "purposemods.js", "quickadd.js", "receipts.js", "refs.js",
