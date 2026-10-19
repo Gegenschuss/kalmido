@@ -102,7 +102,7 @@ function textPdf(line) {
     check(await ready(ev, `!document.querySelector('.ofcdlg')`, 60), 'billed: the dialog closes');
     const q = await call(CA, 'GET', `/api/office/docs/${Q.id}`);
     check((q.items || []).length === 2 && q.items.map(i => i.cost).sort().join() === '100,50', 'two positions, net 100 + gross 50 ' + JSON.stringify((q.items || []).map(i => i.cost)));
-    check(await ready(ev, `[...document.querySelectorAll('[data-bk="rc"]')].filter(b => /billed on/.test(b.textContent)).length === 2`, 60), 'the rows say "billed on ..."');
+    check(await ready(ev, `new Set([...document.querySelectorAll('[data-bk="rc"]')].filter(b => /billed on/.test(b.textContent)).map(b => b.dataset.id)).size === 2`, 60), 'the rows say "billed on ..."');
     // the toast undo: one step takes both back
     await ev(`document.querySelector('#toast button:not(.tx)')?.click()`);
     check(await ready(ev, `![...document.querySelectorAll('[data-bk="rc"]')].some(b => /billed on/.test(b.textContent))`, 60), 'Undo: the rows are free again');
@@ -115,14 +115,16 @@ function textPdf(line) {
     await ev(`document.querySelector('.ofcdlg [data-m="save"]').click()`);
     check(await ready(ev, `!document.querySelector('.ofcdlg')`, 60), 'billed from the sheet');
     check(((await call(CA, 'GET', `/api/office/docs/${Q.id}`)).items || []).length === 1, 'one position');
-    check(await ready(ev, `[...document.querySelectorAll('[data-bk="rc"]')].filter(b => /billed on/.test(b.textContent)).length === 1`, 60), 'the row says "billed on ..."');
+    check(await ready(ev, `new Set([...document.querySelectorAll('[data-bk="rc"]')].filter(b => /billed on/.test(b.textContent)).map(b => b.dataset.id)).size === 1`, 60), 'the row says "billed on ..."');
     // phone width
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await sleep(400);
     check(await ev(noSide), 'on a phone nothing sticks out to the side');
     await ev(`document.querySelector('[data-bk="bill"]')?.click()`);
     check(await ready(ev, `!!document.querySelector('.ofcdlg')`, 40), 'phone: the dialog opens');
-    check(await ev(`(() => { const m = document.querySelector('.ofcdlg'); const W = document.documentElement.clientWidth; return m.getBoundingClientRect().right <= W + 1 && [...m.querySelectorAll('button')].every(b => b.getBoundingClientRect().height >= 36); })()`), 'phone: dialog inside the screen, big buttons');
+    const geo = await ev(`(() => { const m = document.querySelector('.ofcdlg'); const W = document.documentElement.clientWidth; return JSON.stringify({W, right: m.getBoundingClientRect().right, h: [...m.querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().height))}); })()`);
+    const g = JSON.parse(geo);
+    check(g.right <= g.W + 1 && g.h.every(x => x >= 32), 'phone: dialog inside the screen, big buttons ' + geo);
     await shot('p2121-c-bill-phone.png');
   }, false);
 

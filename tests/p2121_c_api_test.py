@@ -285,7 +285,8 @@ r = Fr.post(B + RB + "/bill", json={"doc_id": FQ["id"], "node_ids": [FR], "marku
 check(r.ok and len(r.json()["positions"]) == 1 and Fr.get(B + f"{D}/{FQ['id']}").json()["items"][0]["cost"] == 100.0, "freelancer: billed on in the personal office " + r.text[:160])
 check(Fr.post(B + RB + "/bill", json={"doc_id": FQ["id"], "node_ids": [FR]}).status_code == 409, "freelancer: never twice")
 check(Fr.get(B + RB + f"/billed?ids={FR}").json()["billed"].get(str(FR), {}).get("doc_id") == FQ["id"], "freelancer: the billed list")
-check(A.post(B + RB + "/bill", json={"doc_id": Q["id"], "node_ids": [FR]}).status_code == 404, "freelancer: the organisation's admin does not reach the receipt")
+Q2 = A.post(B + D, json={"project_title": "Film zwei", "client_id": CL}).json()
+check(A.post(B + RB + "/bill", json={"doc_id": Q2["id"], "node_ids": [FR]}).status_code == 404, "freelancer: the organisation's admin does not reach the receipt")
 r = Fr.post(B + RB + "/unbill", json={"node_ids": [FR], "positions": r.json()["positions"]})
 check(r.ok and r.json()["removed"] == 1 and Fr.get(B + f"{D}/{FQ['id']}").json()["items"] == [], "freelancer: unbill")
 
