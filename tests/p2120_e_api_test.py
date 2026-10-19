@@ -176,8 +176,8 @@ def x(v):
 def foot_rule(ops):
     """2.120.0 (2.114.5 #2300): the footer rule's height follows the footer lines now (12 mm .. 22 mm above the bottom
     margin): a line starting at the left margin that low."""
-    for m in re.finditer(rb"%s (\d+(?:\.\d+)?) m " % x(25 * MM).encode(), ops):
-        if 24 * MM - 0.5 <= float(m.group(1)) <= 34 * MM + 0.5:
+    for m in re.finditer(rb"(\d+(?:\.\d+)?) (\d+(?:\.\d+)?) m ", ops):  # any left margin (letterhead margins move it)
+        if float(m.group(1)) <= 45 * MM and 24 * MM - 0.5 <= float(m.group(2)) <= 34 * MM + 0.5:
             return True
     return False
 
