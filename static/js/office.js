@@ -307,6 +307,7 @@ function ofcSettingsHtml() {
     ${ofcRowF('os-currency', tr('Currency'), `<span class="lacts">${ofcSel('os-currency', s.currency, [['EUR', 'EUR'], ['USD', 'USD']])}<label for="os-fx" class="muted">${tr('1 € in USD')}</label><input id="os-fx" value="${esc(fmtNum(s.fx_usd, 4))}" inputmode="decimal" class="numin" ${dis}></span>`)}${ofcII('currency')}
     ${ofcSchemeHtml('os-scheme', 'offer', tr('Number scheme'), s.offer_scheme, dis)}
     ${ofcRowF('os-numat', tr('Quotation number'), ofcSel('os-numat', s.offer_number_at || 'create', [['create', tr('when the quotation is created')], ['finalize', tr('when it is finalised')]]))}${ofcII('numat')}
+    ${ofcRowF('os-counter', tr('Counter for quotations'), ofcSel('os-counter', s.offer_counter || 'org', [['org', OFC.info.personal ? tr('one for all quotations') : tr('per organisation')], ['client', tr('per client')], ['project', tr('per project')]]))}${ofcII('counter')}
     ${ofcRowF('os-valid', tr('Quotation valid for'), `<span class="lacts"><input id="os-valid" value="${esc(String(s.offer_valid_days ?? 30))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}${ofcII('valid')}
     ${ofcChk('os-accept-on', tr('Print the order confirmation with signature line'), s.accept_on ?? 1)}<p class="muted ofchint">${tr('Default for quotations, can be changed in each quotation')}</p>
     <h3>${tr('Invoices')}</h3>
@@ -392,16 +393,19 @@ const ofcMdLabelHtml = (cf, dis) => ofcRowF('osc-md_label', tr('Printed as'), `<
 // the next number of each scheme with its counter (restarts every year or never), errors in plain words from the server
 const OFC_BB = [['{yyyy}', N_('Year'), '2026'], ['{yy}', N_('Year, short'), '26'], ['{seq:03}', N_('Running number, 3 digits'), '001'], ['{seq}', N_('Running number'), '1'],
   ['{project}', N_('Project'), 'Imagefilm'], ['{client}', N_('Client'), 'Beispiel-AG'], ['{date}', N_('Date'), '20261014'], ['{initials}', N_('Initials'), 'AB']];
+const OFC_BB_VER = ['{version}', N_('Version'), '2'];  // 2.118.0 A (#2265): quotations only (the duplicate of a quotation = the next version)
 OFC.pv = OFC.pv || {};
 function ofcSchemeHtml(id, kind, label, val, dis) {
   const pv = OFC.pv[kind], cur = val || '';
   if (!pv || pv.scheme !== cur) setTimeout(() => { const el = $('#' + id); if (el && !OFC.pv[kind]?.busy) ofcSchemePv(el, true); }, 0);
   const pvText = pv && pv.scheme === cur ? pv.text : kind === 'offer' && OFC.info.number_preview ? tr('next: {0}', OFC.info.number_preview) : '';
-  const table = tr('Building blocks of a number:') + '\n' + OFC_BB.map(([b, n, ex]) => `${b} = ${tr(n)} (${ex})`).join('\n') + '\n' + tr('Examples: RE-{yyyy}-{seq:03} gives RE-2026-001; {yyyy}-{seq:04} gives 2026-0001; R{yy}{seq:03} gives R26001.')
-    + '\n' + tr('With a year in the scheme the counter starts again at 1 every year; without one it simply counts on.') + (kind === 'invoice' ? '\n' + tr('Invoices get their number only when they are finalised, one after the other without gaps.') : '');
+  const bbs = kind === 'offer' ? [...OFC_BB, OFC_BB_VER] : OFC_BB;  // 2.118.0 A (#2265)
+  const table = tr('Building blocks of a number:') + '\n' + bbs.map(([b, n, ex]) => `${b} = ${tr(n)} (${ex})`).join('\n') + '\n' + tr('Examples: RE-{yyyy}-{seq:03} gives RE-2026-001; {yyyy}-{seq:04} gives 2026-0001; R{yy}{seq:03} gives R26001.')
+    + '\n' + tr('With a year in the scheme the counter starts again at 1 every year; without one it simply counts on.') + (kind === 'invoice' ? '\n' + tr('Invoices get their number only when they are finalised, one after the other without gaps.') : '')
+    + (kind === 'offer' ? '\n' + tr('{version}: the first quotation is 1, each duplicate of it the next version with the same running number.') : '');
   return ofcRowF(id, label, `<span class="lacts ofcscheme"><input id="${id}" data-scheme="${kind}" value="${esc(cur)}" maxlength="80" autocomplete="off" spellcheck="false" ${dis}><span class="muted ofcpv" id="${ofcPvId(id)}" aria-live="polite">${esc(pvText)}</span><button type="button" class="btn sm ofcrs" id="${id}-rs" data-ofc="scheme-reset" data-for="${id}" data-kind="${kind}" hidden>${esc(tr('Reset'))}</button></span>`,  // 2.114.2 (#2264): error under the field + reset
     kind === 'invoice' ? tr('the number comes only when the invoice is finalised; the series has no gaps') : '')
-    + (dis ? '' : `<div class="ofcbb" role="group" aria-label="${esc(tr('Building blocks'))}">${OFC_BB.filter(x => x[0] !== '{seq}').map(([b, n]) => `<button type="button" class="btn sm" data-ofc="bb" data-for="${id}" data-bb="${b}" title="${esc(b)}">${esc(tr(n))}</button>`).join('')}</div>`)
+    + (dis ? '' : `<div class="ofcbb" role="group" aria-label="${esc(tr('Building blocks'))}">${bbs.filter(x => x[0] !== '{seq}').map(([b, n]) => `<button type="button" class="btn sm" data-ofc="bb" data-for="${id}" data-bb="${b}" title="${esc(b)}">${esc(tr(n))}</button>`).join('')}</div>`)
     + `<div class="shint pl">${esc(table)}</div>`;
 }
 const ofcPvId = id => id === 'os-scheme' ? 'os-preview' : id + '-pv';  // (the quotation's preview keeps its id)
@@ -411,7 +415,8 @@ function ofcSchemePv(inp, now) {
   clearTimeout(OFC['pvT' + kind]);
   OFC['pvT' + kind] = setTimeout(async () => {
     let text;
-    try { const j = await api('GET', `/api/office/number-preview?kind=${kind}&scheme=${encodeURIComponent(v)}`);
+    const cnt = kind === 'offer' && $('#os-counter') ? `&counter=${encodeURIComponent($('#os-counter').value)}` : '';  // 2.118.0 A (#2265)
+    try { const j = await api('GET', `/api/office/number-preview?kind=${kind}&scheme=${encodeURIComponent(v)}${cnt}`);
       text = j.valid ? tr('next: {0}', j.preview) + ' · ' + (j.yearly ? tr('starts again every year') : tr('counts on without a restart')) : (j.error || tr('Invalid value: {0}', tr('Number scheme'))); }
     catch { text = ''; }
     OFC.pv[kind] = {scheme: v, text};
@@ -421,6 +426,7 @@ function ofcSchemePv(inp, now) {
 // 2.40.0 (#1382): (i) explanations of the technical terms (one sentence + an example); shown behind the (i) of the row above
 const OFC_II = {
   numat: N_('At once: the draft shows its number. When finalised: drafts have no number, so discarded drafts leave no gaps.'),
+  counter: N_('Per client or per project each one counts on its own, e.g. KV-{client}-{yyyy}-{seq:02} gives KV-ACME-2026-03. A new quotation gets its number once the client or project is set. Invoices always keep one counter.'),  // 2.118.0 A (#2265)
   paydays: N_('Payment terms: the days a client has to pay an invoice, printed as the due date (e.g. 14 days). A client\'s own payment terms win.'),
   rmdays: N_('Payment deadline: the new, shorter period a reminder gives, counted from its date (e.g. 10 days).'),
   einv: N_('ZUGFeRD is a normal PDF with the invoice data inside, fine for most clients. XRechnung is pure XML, required by public authorities (they give you a routing ID, the Leitweg-ID).'),
@@ -479,6 +485,7 @@ async function ofcSaveSettings(form) {
   if ($('#osc-md_label', form)) cof.md_label = v('#osc-md_label');  // 2.40.0 (#1377)
   const body = {company: {name: v('#os-name'), lines: lines('#os-lines'), contact_lines: lines('#os-contact'), register_lines: lines('#os-register'), bank_lines: lines('#os-bank')},
     company_fields: cof, offer_number_at: v('#os-numat') || 'create',
+    ...($('#os-counter', form) ? {offer_counter: v('#os-counter') || 'org'} : {}),  // 2.118.0 A (#2265)
     color: v('#os-color').trim(), lang: v('#os-lang'), currency: v('#os-currency'), fx_usd: ofcNum(v('#os-fx')), offer_scheme: v('#os-scheme'), offer_valid_days: ofcNum(v('#os-valid')),
     prod_quotient: ofcNum(v('#os-pq')), producing_service_id: +v('#os-ps') || null, producing_rate: ofcNum(v('#os-pr')), raw_factor: ofcNum(v('#os-rf')),
     producing_on: $('#os-prod-on', form)?.checked ? 1 : 0, raw_on: $('#os-raw-on', form)?.checked ? 1 : 0,
@@ -543,4 +550,5 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'ofc-arch') { OFC.arch = t.checked; ofcDraw(); }
   else if (t.id === 'os-logo') { ofcLogoUpload(t.files[0]); t.value = ''; }
+  else if (t.id === 'os-counter') { const sc = $('#os-scheme'); if (sc) ofcSchemePv(sc, true); }  // 2.118.0 A (#2265): the preview of the counter chosen
 });

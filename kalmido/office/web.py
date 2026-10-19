@@ -15,7 +15,7 @@ from .packs import office_pack, office_pack_codes, office_pack_validate
 from .model import (
     MD_KINDS, office_create, office_delete, office_export, office_gate, office_import, office_org, office_role, office_row,
     office_rows, office_seed_texts, office_settings, office_settings_clean, office_settings_save, office_update, office_number_format,
-    office_number_next, office_scheme_clean, office_scheme_period, sr_public, pb_info,
+    office_number_next, office_scheme_clean, office_scheme_period, sr_public, pb_info, onc_preview, OFFER_COUNTERS,
 )
 from .ledger import ofx_company, ofx_company_clean, ofx_company_save, ofx_diff, ofx_log
 
@@ -44,7 +44,7 @@ def office_settings_get():
         s, cf = h6c_member_settings(s), {k: ("" if k in H6C_BANK_COLS else v) for k, v in cf.items()}
     return jsonify(settings=s, company_fields=cf, org_id=oid, role=role, pack={"code": pack["code"], "name": pack["name"], "tax": pack["tax"],
                                                                                "formats": pack["formats"], "currency": pack["currency"]},
-                   number_preview=office_number_next(c, oid, "offer", s["offer_scheme"], peek=True)[0],
+                   number_preview=onc_preview(c, oid, s, s["offer_scheme"]),  # 2.118.0 A (#2265): onc_preview
                    industry=_industry(s), **pb_info(c, uid, oid))
 
 
@@ -91,7 +91,7 @@ def office_settings_put():
     if diff["after"]:
         ofx_log(c, oid, "update", target="settings", detail=diff)
     c.commit()
-    return jsonify(settings=office_settings(c, oid), company_fields=ofx_company(c, oid), number_preview=office_number_next(c, oid, "offer", new["offer_scheme"], peek=True)[0])
+    return jsonify(settings=office_settings(c, oid), company_fields=ofx_company(c, oid), number_preview=onc_preview(c, oid, new, new["offer_scheme"]))  # 2.118.0 A (#2265)
 
 
 @app.get("/api/office/number-preview")
@@ -104,10 +104,14 @@ def office_number_preview():
     if kind not in ("offer", "invoice", "credit", "reminder"):
         kind = "offer"
     try:
-        scheme = office_scheme_clean(request.args.get("scheme") or "")
+        scheme = office_scheme_clean(request.args.get("scheme") or "", offer=kind == "offer")  # 2.118.0 A (#2265): {version} only here
     except BadInput as e:
         return jsonify(preview="", valid=False, error=str(e))
-    pv = office_number_next(c, oid, kind, scheme, peek=True, project=tr("Project"), client=tr("Client"), initials="AB")[0]
+    if kind == "offer":  # 2.118.0 A (#2265): ?counter=org|client|project (the choice on the page), example client / project from 1
+        cnt = request.args.get("counter")
+        pv = onc_preview(c, oid, office_settings(c, oid), scheme, cnt if cnt in OFFER_COUNTERS else None, project=tr("Project"), client=tr("Client"), initials="AB")
+    else:
+        pv = office_number_next(c, oid, kind, scheme, peek=True, project=tr("Project"), client=tr("Client"), initials="AB")[0]
     return jsonify(preview=pv, valid=True, yearly=bool(office_scheme_period(scheme)))
 
 

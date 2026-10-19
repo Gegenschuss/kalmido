@@ -1120,7 +1120,7 @@ function orphWire(md) {
   });
 }
 // Settings > Appearance: all per-device visual settings, applied instantly (no Save), with a live preview
-const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent', 'pack', 'headShow', 'rings'];  // 2.18.0: densSideV / densRowsV; 2.83.0 C (#1427): theme, header pictures, rings
+const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent', 'pack', 'headShow'];  // 2.18.0: densSideV / densRowsV; 2.83.0 C (#1427): theme, header pictures, rings
 const THEMES = [['auto', N_('Automatic')], ['dark', N_('Dark')], ['light', N_('Light')]];
 const DENSITIES = [['compact', N_('Compact')], ['comfortable', N_('Comfortable')], ['custom', N_('Custom|density')]];
 const FSIZE_ORDER = ['s', 'm', 'l', 'xl'];

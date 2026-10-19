@@ -19,7 +19,7 @@ from ..personal.timetrack import BadInput
 from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
 from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, RAW_MODES, TAX_KEYS, dec, fmt_money, inv_calc, office_calc
 from .packs import office_pack
-from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, office_number_next, office_role, office_settings,
+from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts)
 from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
                      ofx_number_at_finalize, ofx_snapshot_pack, OFX_LOCKED)
@@ -731,7 +731,7 @@ def doc_create(c, oid, uid, b, admin, number=True):
     f = clean_doc(c, oid, {k: v for k, v in b.items() if k != "kind"}, cur, admin)
     row.update(f)
     did = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
-    if number and not ofx_number_at_finalize(s, kind):  # 2.36.2 (P2): kinds numbered at finalising stay without a number as drafts
+    if number and not ofx_number_at_finalize(s, kind) and onc_ready(s, doc_row(c, oid, did)):  # 2.36.2 (P2): kinds numbered at finalising stay without a number as drafts; 2.118.0 A (#2265): onc_ready
         _assign_number(c, oid, did, s)
     if isinstance(b.get("items"), list):
         _put_items(c, oid, doc_row(c, oid, did), b["items"], admin)
@@ -753,9 +753,13 @@ def _assign_number(c, oid, did, s=None, manual=None, reason=""):
     else:
         rec = _j(r["recipient"], {})
         d = date.fromisoformat(r["date"]) if r["date"] else local_now().date()
-        for _ in range(50):  # a scheme without {seq} uniqueness (e.g. only {date}): keep counting until free
-            num, _seq = office_number_next(c, oid, r["kind"], inv_scheme(s, r["kind"]), d, project=r["project_title"], client=rec.get("name") or "",
-                                           initials=_initials(c, r["created_by"]))
+        # 2.118.0 A (#2265): a quotation's duplicate keeps the first one's running number with the next {version};
+        # quotations count per organisation, client or project (onc_next)
+        ver, num = onc_version(c, oid, r, inv_scheme(s, r["kind"]), lambda x: {"project": x["project_title"], "client": _j(x["recipient"], {}).get("name") or "",
+                                                                             "initials": _initials(c, x["created_by"])})
+        for _ in range(0 if num else 50):  # a scheme without {seq} uniqueness (e.g. only {date}): keep counting until free
+            num, _seq = onc_next(c, oid, s, r, inv_scheme(s, r["kind"]), d, project=r["project_title"], client=rec.get("name") or "",
+                                 initials=_initials(c, r["created_by"]), version=ver)
             if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone() \
                     and not fi_number_taken(c, oid, num):  # 2.39.1 (#1182): nor a number of the legacy archive
                 break
@@ -1000,6 +1004,11 @@ def odoc_update(did):
         if diff["after"]:
             ofx_log(c, oid, "update", doc_id=did, detail=diff)
     fd_put_titles(c, oid, did, titles)
+    n = doc_row(c, oid, did)  # 2.118.0 A (#2265): a quotation counted per client / project gets its number once it has one
+    if n["kind"] == "offer" and not n["number"] and not r["number"] and f:
+        s = office_settings(c, oid)
+        if (s.get("offer_counter") or "org") != "org" and not ofx_number_at_finalize(s, "offer") and onc_ready(s, n):
+            _assign_number(c, oid, did, s)
     recalc(c, oid, did)
     bump(c)
     c.commit()
@@ -1126,7 +1135,7 @@ def odoc_duplicate(did):
     if r["kind"] == "offer":  # 2.47.0 (#1215): the parts with their positions
         from .parts import tp_duplicate
         tp_duplicate(c, oid, did, nid)
-    if not ofx_number_at_finalize(s, r["kind"]):
+    if not ofx_number_at_finalize(s, r["kind"]) and onc_ready(s, doc_row(c, oid, nid)):  # 2.118.0 A (#2265): onc_ready
         _assign_number(c, oid, nid, s)
     recalc(c, oid, nid)
     n = doc_row(c, oid, nid)

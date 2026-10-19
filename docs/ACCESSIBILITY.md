@@ -59,8 +59,8 @@ the app has not yet been tested by people who use a screen reader every day (see
   *Header*: a gradient from the list colour, dots, lines, a grid or an own picture, JPEG / PNG / WebP up to 2 MB; the same
   for everyone in the list; set by the owner and the list admins; a locked list offers no picture), a folder too (its
   menu > *Header…*, only for you). The strip is decorative and hidden from screen readers; *Settings > Appearance >
-  Show header pictures* turns it off on a device. *Progress rings in the sidebar* show done / all of a list's tasks
-  (with a text label for screen readers) and can be turned off. Ticking a task off makes its circle pop for 0.2 s (none
+  Show header pictures* turns it off on a device. Progress rings in the sidebar show done / all of a list's tasks
+  (with a text label for screen readers); *Progress in the sidebar* turns them off for all your devices. Ticking a task off makes its circle pop for 0.2 s (none
   with reduced motion); empty lists and an empty Today show a calm line drawing of the K.
 - **Dragging is never the only way.** Tasks: *Move up / Move down* in the task menu or Alt+↑ / Alt+↓, *Move to
   section…*, *Move to list* (m), the date picker; the panels and columns that can be resized by dragging have a grip

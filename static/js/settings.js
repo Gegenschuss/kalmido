@@ -569,6 +569,7 @@ function settingsModal(focus) {
       <div class="row" style="margin-top:.5rem"><span class="spacer"></span><button class="btn sm" data-m="side-reset">${tr('Default')}</button></div>
       <div class="row"><label for="s-sideic">${tr('List icons')}</label><select id="s-sideic">${[['line', N_('Lines')], ['emoji', N_('Emoji')], ['dot', N_('Dot')]].map(([v, n]) => `<option value="${v}" ${(s.side_icons || 'line') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
       <div class="row">${chk('s-sideprog', s.side_progress !== '0', tr('Progress in the sidebar'))}</div>
+      ${hint(tr('Applies to the thin line and the progress rings, on all your devices.')) /* 2.118.0 (#2297) */}
       ${hint(tr('Lines: a calm grey icon for the emoji at the start of a list name (the emoji stays in the name), its dot in the list colour. Dot: only the list colour. A project can also hide its progress in its own settings. For all your devices.'))}
       ${rsy_sideSetHtml(chk) /* 2.56.1 (#1799) */}${lc_favSetHtml(chk, hint)}`,
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
