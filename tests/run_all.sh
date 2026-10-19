@@ -1387,6 +1387,9 @@ fresh; run p2113b_a_ui node p2113b_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.113.1 part B: team chat attachments, free channels, group DMs (#2059)
 fresh; run p2113b_b_api "$PY" p2113b_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2113b_b_ui node p2113b_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.113.2: terms (AGB) as a PDF with quotations (#2253)
+fresh; run p2113c_a_api "$PY" p2113c_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2113c_a_ui node p2113c_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
