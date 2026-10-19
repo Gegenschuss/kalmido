@@ -7,6 +7,18 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.122.3] - 2026-10-20
+
+Office fixes, drag a task under another, chat "Show more".
+
+### Changed
+- Office: one-off imports (fixed costs from Excel, leads from CSV) moved from the lists to Settings > Import legacy data, each with its own section; empty lists link there with "Already have a list? Import from Excel", filled ones with a quiet "Import…" at the end (#2335).
+
+### Fixed
+- Office: fixed costs and subscriptions without VAT show one amount with "without VAT" instead of the same net and gross amount twice (#2333).
+- Tasks: a single task dropped onto the middle of another becomes its subtask, with the mouse and with the finger, one undo step; milestones and its own subtasks are no target (#2334).
+- Chat: "Show more" of a shortened message sits right under the cut text, before steps, suggestion and time (#2340).
+
 ## [2.119.2] - 2026-10-19
 
 Contacts, undo of a list delete, framework contracts between workspaces, a flaky chat test.
