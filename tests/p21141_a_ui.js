@@ -24,7 +24,7 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
   check(r.ok, 'setup');
   const CA = await login('alice');
   await call(CA, 'PATCH', '/api/settings', {lang: 'de', tour: 'done', features: FEAT});
-  await call(CA, 'PUT', '/api/office/settings', {company_fields: {name: 'Beispiel Film', street: 'Musterweg 1', zip: '12345', city: 'Musterstadt', country: 'DE', iban: 'DE02120300000000202051', bic: 'BYLADEM1001'}, producing_on: 1});
+  await call(CA, 'PUT', '/api/office/settings', {company_fields: {name: 'Beispiel Film', street: 'Musterweg 1', zip: '12345', city: 'Musterstadt', country: 'DE', vat_id: 'DE123456789', iban: 'DE02120300000000202051', bic: 'BYLADEM1001'}, producing_on: 1});
   const cl = await call(CA, 'POST', '/api/clients', {name: 'Kunde Eins GmbH', street: 'Weg 2', zip: '10115', city: 'Berlin', country: 'DE'});
   const inv = await call(CA, 'POST', '/api/office/docs', {kind: 'invoice', client_id: cl.id, service_from: day(20), items: [{title: 'Schnitt', qty: 1, rate: 1000}]});
   const fin = await call(CA, 'POST', `/api/office/docs/${inv.id}/finalize`);
