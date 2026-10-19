@@ -204,6 +204,9 @@ ROUTES = {
     # (2.98.0 spacer C)
     # 2.98.0 D (#2163 #2178 #2184): polish (p298_d_api_test.py) - routes below this line
     # (2.98.0 spacer D)
+    # 2.111.0 A (#2233): undo of the office editors (p2111_a_api_test.py) - routes below this line
+    "POST /api/office/undo/{}/{}": "office",
+    # (2.111.0 spacer A)
     # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
     "GET /api/bookmarks": "bookmark", "POST /api/bookmarks": "bookmark", "GET /api/bookmarks/{}": "bookmark",
     "PATCH /api/bookmarks/{}": "bookmark", "DELETE /api/bookmarks/{}": "bookmark", "POST /api/bookmarks/{}/restore": "bookmark",

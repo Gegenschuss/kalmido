@@ -26,9 +26,9 @@ KINDS = {
     "tasks": ("matrix", SUITE + ": tasks, comments, subtasks, attachments, tags, notes, search, trash, day plan, roadmap, export "
                         "and import in the private space; every GET of the area as the freelancer (no 403 / 5xx)"),
     "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET"),
-    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
+    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
-                         "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0)"),
+                         "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0); undo of the editors (2.111.0)"),
     "files": ("matrix", SUITE + ", p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
                          "file requests of a private folder, tags of files / folders, the tag filter, the documents' filters, bulk change, ZIP, CSV, documents via the API (2.122.0)"),
     "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private space (create, change, search, export, trash; "
@@ -112,6 +112,9 @@ ROUTES = {
     # (2.98.0 spacer C)
     # 2.98.0 D (#2163 #2178 #2184): polish (p298_d_api_test.py) - routes below this line
     # (2.98.0 spacer D)
+    # 2.111.0 A (#2233): undo of the office editors (p2111_a_api_test.py) - routes below this line
+    "POST /api/office/undo/{}/{}": "office",
+    # (2.111.0 spacer A)
     # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
     "GET /api/bookmarks": "bookmarks", "POST /api/bookmarks": "bookmarks", "GET /api/bookmarks/{}": "bookmarks",
     "PATCH /api/bookmarks/{}": "bookmarks", "DELETE /api/bookmarks/{}": "bookmarks",
