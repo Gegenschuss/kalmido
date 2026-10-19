@@ -47,7 +47,7 @@ def shm_foreign_formulas(c, sid, to):
     if not to:
         return 0
     n, cache = 0, {}
-    for r in c.execute("SELECT raw FROM sheet_cells WHERE sheet_id=? AND raw LIKE '%{%:%}%'", (sid,)).fetchall():
+    for r in c.execute("SELECT raw FROM sheet_cells WHERE sheet_id=? AND raw ILIKE '%{%:%}%'", (sid,)).fetchall():
         if any(shm_ref_org(c, m.group(1), int(m.group(2)), cache) not in (False, to) for m in SHM_REF_RE.finditer(r["raw"] or "")):
             n += 1
     return n
