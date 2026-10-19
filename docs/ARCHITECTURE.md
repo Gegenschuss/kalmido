@@ -285,7 +285,9 @@ registering the ones of its area.
 | `habits.js` | The Eisenhower matrix, habits and the pomodoro timer. |
 | `detail.js` | The detail panel of a task. |
 | `multiedit.js` | 2.26.0: several selected tasks edited at once in the task panel (common values, "Mixed", one undo step). |
-| `sheetdrag.js` | 2.39.1: bottom sheets on phones (menus, date picker, quick add, dialogs) dragged taller / shorter at their grip and swiped down to close. |
+| `sheetdrag.js` | 2.39.1: bottom sheets on phones (menus, date picker, quick add, dialogs) dragged taller / shorter at their grip and swiped down to close (2.102.0: on `drag.js`). |
+| `drag.js` | 2.102.0 (#1998): the shared core of dragging (touch, mouse, pen; threshold, long press, ghost, auto-scroll, Esc), see "Dragging" below. |
+| `clienterr.js` | 2.102.0 (#1999): the browser's own unhandled errors to `POST /api/client-errors` (only when the server operator chose a list), loaded right after `reloadguard.js`. |
 | `notelock.js` | 2.48.0 (#1642): lock a task's note with one's own password (the keys of `e2e.js`): "Lock note" under the description (own, unshared lists), the locked placeholder, unlocked editing (saved as ciphertext), "Remove lock"; drops undo steps that still hold the old text. |
 | `e2e.js` | 2.42.0 (#828, #909): end-to-end encryption with WebCrypto: set up / unlock / lock / change / reset the keys (Settings > Account), the encrypted note in the task detail, encrypted files (*Attach encrypted*), encrypted DMs (lock in the DM head, safety number). |
 | `miniwin.js` | 2.39.1: a list in its own small browser window (double / middle click in the sidebar, list menu); the window (`/?mini=1#l/<id>`) shows only the list and keeps its UI state to itself. 2.43.0 (#1500): a task in its own window too (`/?mini=1#t/<id>`, middle click on the row, task menu, button in the task panel). |
@@ -374,6 +376,17 @@ python3 tools/check_tscheck.py && npx --yes -p typescript@6.0.3 tsc -p jsconfig.
 
 Switching an older file on: add `// @ts-check` as its first line, fix what tsc reports (mostly a JSDoc type or cast
 `/** @type {HTMLElement} */ (e.target)`; never a change of behaviour), remove the name from `BASE`.
+
+### Dragging (2.102.0)
+
+`drag.js` is the shared core of dragging: `drg_attach(root, opts)` lets presses inside `root` start drags (`opts.start`
+decides per press), `drg_begin(el, x, y, opts)` starts one at once after a long press the caller detected. The core
+follows the input (touch events for fingers -- a pointer would be cancelled once the browser pans --, pointer events with
+capture for mouse and pen), waits for the threshold (`threshold`, or `accept` for an own rule), moves a ghost by
+`transform`, scrolls the scroller at its top / bottom edge (`scroll`, also while the pointer stays still), cancels on Esc,
+a second finger or a cancel event, and swallows the click after a drag. The caller keeps what is its own: `onStart`,
+`onMove`, `onDrop`, `onCancel`, `onTap` (let go before the drag started). Sections (`secdrag.js`, the long press of
+`dnd.js`) and bottom sheets (`sheetdrag.js`) use it; caldrag, roadmap, timeline, dnd / dragmulti and mindmap follow.
 
 ### Long lists (2.65.0)
 

@@ -48,6 +48,9 @@ KINDS = {
     # ---- nothing to check without an organisation (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account: the same for every person, before any workspace"),
     "public": ("n/a", "pages and facts without data of a person (app shell, health, version, manifest, share target, QR code)"),
+    # 2.102.0 (#1999)
+    "clienterr": ("n/a", "the web app's own unexpected error (message cut of data, place in the code, version, area): written as "
+                         "nobody into the one project list the server operator chose, nothing is read back or answered"),
     "admin": ("n/a", "the server operator's administration (need_admin): no organisation involved -- a freelancer running the "
                      "own server is its operator with exactly these pages (p2473_a_api_test.py sets up a server without any "
                      "organisation)"),
@@ -442,7 +445,7 @@ ROUTES = {
     "PUT /api/contacts/{}/care": "pim", "PUT /api/evcals/{}/members": "pim", "PUT /api/v1/address-books/{}/members/{}": "pim",
     "PUT /api/v1/contacts/{}/care": "pim", "PUT /api/v1/event-calendars/{}/members/{}": "pim",
     # ---- public (19)
-    "GET /": "public", "GET /agent-setup.ps1": "public", "GET /agent-setup.sh": "public", "GET /api/about": "public",
+    "GET /": "public", "GET /agent-setup.ps1": "public", "GET /agent-setup.sh": "public", "GET /api/about": "public", "POST /api/client-errors": "clienterr",
     "GET /api/health": "public", "GET /api/layouts/std": "public", "GET /api/related/config": "public",
     "GET /api/v1/announcement": "public", "GET /api/v1/openapi.json": "public", "GET /api/version": "public",
     "GET /capture": "public", "GET /manifest.json": "public", "GET /robots.txt": "public", "GET /share": "public",
