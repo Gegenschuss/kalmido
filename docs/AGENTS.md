@@ -1650,7 +1650,7 @@ a folder above it) is shared with it, and every access is written into the file'
 
 | What | Endpoint | MCP |
 |---|---|---|
-| Documents shared with you (`q` = words of the text, `review=1` = waiting in *To review*) | `GET /api/v1/documents` | `list_documents` |
+| Documents shared with you (`q` = words of the text, `review=1` = waiting in *To review*; 2.122.0: `q` takes `tag:Name`, `sender:Name`, `type:Name`, `date:2025-01..2025-03`, `"exact phrase"`, `-word`; filters `tag` / `not_tag` / `tag_mode`, `sender`, `type`, `folder`, `added_from` / `added_to`, `no_tag`, `no_sender`, `ftype`) | `GET /api/v1/documents` | `list_documents` |
 | One document with its fields, open suggestions and the recognised text | `GET /api/v1/documents/{id}` | `get_document` |
 | Set fields (role *edit*): `date`, `due`, `amount`, `currency`, `sender`, `type`, `tags` (names) | `PATCH /api/v1/documents/{id}` | `update_document` |
 | The file itself | `GET /api/v1/files/{id}/content` | -- |

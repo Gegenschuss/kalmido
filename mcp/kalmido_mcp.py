@@ -1629,11 +1629,23 @@ _DOC = {"date": D, "due": D, "amount": {"type": "string", "description": "Decima
         "tags": {"type": "array", "items": {"type": "string"}}, "text": {"type": "string", "description": "Only while none was recognised"}}
 TOOLS += [
     ("list_documents", "2.48.0: documents shared with you (scanned letters, invoices, contracts) with date, amount, sender, type, "
-                       "tags and their state. q = words of the text; review = only those waiting in To review.",
+                       "tags and their state. q = words of the text; review = only those waiting in To review. 2.122.0: q takes a search "
+                       "syntax: tag:Name (several = every one), sender:Name, type:Name, date:2025 | 2025-03 | 2025-01..2025-06 | >2025-01-01, "
+                       "added:<date> (arrival), \"exact phrase\", -word, -tag:Name; filters by ids: tag (\"1,7;3\" = two tags), tag_mode "
+                       "all|any, not_tag, sender, type, folder; added_from / added_to, no_tag, no_sender, no_type, ftype (pdf,image,office,text,other).",
      _obj({"q": {"type": "string"}, "review": {"type": "boolean"}, "state": {"type": "string", "enum": ["wait", "run", "done", "failed"]},
-           "from": D, "to": D, "limit": {"type": "integer"}, "cursor": {"type": "string"}}),
-     lambda api, a: api.call("GET", "/documents", {**_pick(a, ("q", "state", "from", "to", "limit", "cursor")),
-                                                   **({"review": "1"} if a.get("review") else {})})),
+           "from": D, "to": D, "limit": {"type": "integer"}, "cursor": {"type": "string"},
+           # 2.122.0 B (#2294)
+           "tag": {"type": "string", "description": "Tag ids; \"1,7;3\" = (1 or 7) and/or 3, see tag_mode"},
+           "tag_mode": {"type": "string", "enum": ["any", "all"]}, "not_tag": {"type": "string", "description": "Tag ids the documents must not have"},
+           "sender": {"type": "string", "description": "Sender ids (one of them)"}, "type": {"type": "string", "description": "Document type ids (one of them)"},
+           "folder": {"type": "string", "description": "Folder ids"}, "added_from": D, "added_to": D,
+           "no_tag": {"type": "boolean"}, "no_sender": {"type": "boolean"}, "no_type": {"type": "boolean"},
+           "ftype": {"type": "string", "description": "Comma-separated: pdf, image, office, text, other"}}),
+     lambda api, a: api.call("GET", "/documents", {**_pick(a, ("q", "state", "from", "to", "limit", "cursor", "tag", "tag_mode", "not_tag", "sender",
+                                                               "type", "folder", "added_from", "added_to", "ftype")),
+                                                   **({"review": "1"} if a.get("review") else {}),
+                                                   **{k: "1" for k in ("no_tag", "no_sender", "no_type") if a.get(k)}})),
     ("get_document", "2.48.0: one document with its fields, open suggestions and the recognised text (OCR / text layer).",
      _obj({"document_id": S_ID}, ["document_id"]),
      lambda api, a: api.call("GET", f"/documents/{int(a['document_id'])}")),
