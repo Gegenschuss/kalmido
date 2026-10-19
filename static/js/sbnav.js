@@ -72,7 +72,7 @@ function sbp_menuRow(el) {
   if (r && r.kind === 'dm' && r.user_id && teamPeople().some(p => p.id === r.user_id)) return [sbp_item('side_people', r.user_id, roomName(r))];
   return [];
 }
-const sbp_allRow = () => collab() && teamPeople().length ? `<button class="srow smore sbpall" data-act="sb-people" title="${esc(tr('Their tasks, a message, pin to the sidebar'))}">${ic('users')}<span class="n">${esc(tr('All people …'))}</span></button>` : '';
+const sbp_allRow = () => collab() && (teamPeople().length || shownAgents().length) ? `<button class="srow smore sbpall" data-act="sb-people" title="${esc(tr('Their tasks, a message, pin to the sidebar'))}">${ic('users')}<span class="n">${esc(tr('All people …'))}</span></button>` : '';
 // "All people …": everyone I share a list with; a row = their tasks, the bubble = a message, the pin = in the sidebar or not
 function sbp_dialog() {
   const md = modal(`<h3>${esc(tr('People'))}</h3>
@@ -86,14 +86,28 @@ function sbp_dialog() {
       const on = sbp_is('side_people', p.id), pl = on ? tr('Unpin from the sidebar') : tr('Pin to the sidebar'), ml = tr('Message {0}', p.name);
       return `<div class="mrow" data-uid="${p.id}">${av(p.id, p.name)}<button type="button" class="n sbpgo" data-sbp="go" title="${esc(tr('Tasks of {0}', p.name))}">${esc(p.name)}</button>`
         + (teamOn() ? `<button type="button" class="iconbtn" data-sbp="dm" title="${esc(ml)}" aria-label="${esc(ml)}">${ic('comment', 's')}</button>` : '')
-        + `<button type="button" class="iconbtn sbppin ${on ? 'on' : ''}" data-sbp="pin" aria-pressed="${on}" title="${esc(pl)}" aria-label="${esc(pl + ' · ' + p.name)}">${ic('pin', 's')}</button></div>`;
-    }).join('') || `<div class="muted mhint">${esc(tr('Nobody to show.'))}</div>`;
+        + `<button type="button" class="iconbtn sbppin ${on ? 'on' : ''}" data-sbp="pin" aria-pressed="${on}" title="${esc(pl)}" aria-label="${esc(pl + ' · ' + p.name)}">${ic(on ? 'pinf' : 'pin', 's')}</button></div>`;
+    }).join('') || (shownAgents().length ? '' : `<div class="muted mhint">${esc(tr('Nobody to show.'))}</div>`);
+    // 2.119.0 B (#2210): the agents I may see (the sidebar's source), pin = side_agents; the same bearing as the people (no long press on iPhone)
+    const ags = shownAgents().filter(a => !q || a.name.toLowerCase().includes(q));
+    $('.sbpl', md).innerHTML += ags.length ? `<h4 class="sbph">${esc(tr('Agents'))}</h4>` + ags.map(a => {
+      const on = sbp_is('side_agents', a.id), pl = on ? tr('Unpin from the sidebar') : tr('Pin to the sidebar');
+      return `<div class="mrow" data-aid="${a.id}"><span class="sdot"${ac_mk(a.id)}>${hdot(agentHst(a))}</span><button type="button" class="n sbpgo" data-sbp="ago" title="${esc(agentHstLine(a))}">${esc(a.name)}</button>`
+        + `<button type="button" class="iconbtn sbppin ${on ? 'on' : ''}" data-sbp="apin" aria-pressed="${on}" title="${esc(pl)}" aria-label="${esc(pl + ' · ' + a.name)}">${ic(on ? 'pinf' : 'pin', 's')}</button></div>`;
+    }).join('') : '';
   };
   draw();
   $('.sbpq', md)?.addEventListener('input', draw);
   md.addEventListener('click', async e => {
     if (e.target.closest('[data-m="close"]')) { md.remove(); return; }
     const b = e.target.closest('[data-sbp]'); if (!b) return;
+    const ar = b.closest('[data-aid]');  // 2.119.0 B (#2210): an agent row
+    if (ar) {
+      const ag = agentById(+ar.dataset.aid); if (!ag) return;
+      if (b.dataset.sbp === 'ago') { md.remove(); closeSide(); if (ag.enabled) chatOpen(ag.id); else go('agents'); }
+      else { await sbp_pin('side_agents', ag.id, !sbp_is('side_agents', ag.id), ag.name); draw(); }
+      return;
+    }
     const id = +b.closest('[data-uid]').dataset.uid, p = teamPeople().find(x => x.id === id); if (!p) return;
     if (b.dataset.sbp === 'go') { md.remove(); closeSide(); go('who/' + id); }
     else if (b.dataset.sbp === 'dm') { md.remove(); closeSide(); dmOpen(id, p.name); }
