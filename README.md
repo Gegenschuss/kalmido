@@ -59,6 +59,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   footer, travel costs with the per diem as the main amount.
 - **2.114.2** (2026-10-19): office fixes 2 - a finalised quotation that never left the house can be deleted or
   taken back to a draft (same number), number scheme errors under the field with a reset button.
+- **2.115.0** (2026-10-19): an inbound webhook per list (n8n, Make, Home Assistant create tasks), webhooks of an
+  organisation with events for calendar, files, invoices and time; active sessions with sign-out everywhere;
+  organisation admins invite people by e-mail.
 - **2.114.1** (2026-10-19): office fixes - the transfer of rights as the last page of the quotation PDF, receipts in
   the cash flow, books up to date right after a bank match, clearer bank buttons on phones.
 - **2.136.0** (2026-10-19): a new face - the Kalmido bot replaces the heron in the app icon, the empty views, the
