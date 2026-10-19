@@ -28,6 +28,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const ag = await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'devbot', display_name: 'Dev Bot'});
   const CL = ag.id; TOK = ag.token;
   await call('PATCH', `/api/admin/agents/${CL}`, {org_id: ORG});
+  const W = (await call('POST', '/api/lists', {name: 'Work', org_id: ORG})).id;
+  await call('PUT', `/api/lists/${W}/members`, {user_id: CL, role: 'edit'});
   const J = (await v1('POST', '/agent/jobs', {title: 'Knox: Release 2.117 filter', user_id: me.id, state: 'running'})).id;
   check(J, 'setup: a job');
   await call('POST', `/api/agents/${CL}/chat`, {body: 'Please build the release'});
