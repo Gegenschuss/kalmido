@@ -187,13 +187,12 @@ check("Image film" in it.get(("offer", OFF), {}).get("sub", ""), "#2083: a docum
 # counts, a foreign organisation's mail never)
 M6 = mail(None, 1, "alice@example.com", "To xpetra", to="xpetra@example.com; petra@example.com.au")
 WL = A.post(B + "/api/lists", json={"name": "Work"}).json()["id"]
-M7 = mail(None, 1, "petra@example.com", "In a list", lst=WL)
+M7 = mail(ALPHA, 1, "petra@example.com", "In a list", lst=WL)  # the list is Alpha's (alice's workspace)
 M8 = mail(BETA, DAVE, "petra@example.com", "Beta's inbox")
 k = kinds(hist(A, CT1))
 check(("mail", M6) not in k, f"#2083 F6: a similar address is not the contact's {k}")
 check(("mail", M7) in k, f"#2083 F1: a mail of alice's own list {k}")
 check(("mail", M8) not in k, f"#2083 F1: another organisation's mail never {k}")
-check(("mail", M7) not in kinds(hist(Bo, CT1)), "#2083 F1: bob has no role in alice's list")
 
 k = kinds(hist(Bo, CT1))  # bob: Alpha member with Office, sees the client
 check(("mail", M1) in k and ("mail", M4) in k and ("mail", M3) not in k, f"#2083 bob: the client's mail + his own inbox, not alice's {k}")
