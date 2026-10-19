@@ -95,6 +95,32 @@ releases it). Names in a locked target are compared in the browser. Undo moves t
 space. If a key changes between the check and the move, the server refuses it (`409`) and the browser tries once more. The
 server never sees a plain name or text of a locked space; the history of such a move keeps no page names.
 
+## Sharing a page or a folder, read only (2.123.0)
+
+Page menu *Share…* (this page) or *Share folder…* (the page's folder: its own page, every page below it, also pages you add
+later; "Customer A" never includes "Customer AB"). Whoever may write in the space shares; in the private space that is you.
+
+- **People** (private space only): a person with an account reads the pages in the app under *Shared with me* in the side
+  bar of the knowledge pages -- only what you shared, never the rest of your space (no index, search, backlinks or mentions).
+  Choose the person or type an e-mail address (the answer never tells whether an account has it). Pages of an organisation
+  are read by all its members anyway; people outside get a public link (no person shares across the organisation boundary).
+  Agents never get a share.
+- **Public link**: a secret address `/s/w/<token>` that opens a plain read-only page without an account and without the app
+  (no scripts): the page, or the list of the folder's pages. Pictures and files of the shared pages come along; a
+  `[[link]]` to a page that is not shared shows as plain text, task numbers stay text. Optional *Valid until*; several links
+  per page are possible (one per customer). *Turn off* ends a link at once; Undo brings the same link back. Unknown,
+  expired and turned-off links all answer "Link not available". The pages are `noindex`, never cached, rate limited like
+  the public list links, and the server switch for public links (*Settings > Users > Whole server*, `KALMIDO_PUBLIC_LINKS=0`)
+  turns these off too. Only the SHA-256 of a token is looked up; the token itself is kept sealed so you can copy it again.
+- Renaming a page or a folder takes its shares along; a page in the trash is not shared (Undo brings it back); moving pages
+  to the other workspace ends their shares. A space encrypted in the browser cannot share (the server cannot read its text);
+  links of a space that gets locked stop working. Shared pages carry a small people mark in the tree and in the title.
+
+Routes: `GET /api/wiki/shares?page=<id> | space=&folder=`, `POST /api/wiki/shares {page_id | space + folder, kind: person |
+link, user_id | email, expires}`, `PATCH /api/wiki/shares/<id> {expires}`, `DELETE /api/wiki/shares/<id>` (revoke),
+`POST /api/wiki/shares/<id>/restore`; the guest: `GET /api/wiki/shared`, `GET /api/wiki/shared/pages/<id>`,
+`GET /api/wiki/shared/files/<id>`; the public page: `GET /s/w/<token>`, `/s/w/<token>/p/<id>`, `/s/w/<token>/file/<id>`.
+
 ## Mind map (2.49.0)
 
 Every list (not the inbox) can be shown as a **Mind map**, next to List, Kanban and Timeline (the view switch in the list

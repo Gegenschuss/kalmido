@@ -97,7 +97,8 @@ KINDS = {
                            "of a list not shared with the agent is denied, an import into another workspace 404"),
     # 2.49.0 (#1199 / #1201): knowledge pages belong to one organisation (every member) or one person (org_id NULL, owner_id)
     "wiki": ("matrix", "p249_c_api_test.py: a page of another organisation / person: 404 (read, change, delete, move, trash, search, export, mentions); "
-                       "p299_a_api_test.py: page files (read, upload, delete, trash)"),
+                       "p299_a_api_test.py: page files (read, upload, delete, trash); p2123_b_api_test.py: shares of pages / folders (list, "
+                       "create, change, revoke, restore, the guest routes; the public page only through its token)"),
     # 2.89.0 (#1916): tables belong to one organisation (every member) or one person (org_id NULL, owner_id); attached to a list
     # the list decides; Kalmido variables in formulas are evaluated per viewer (a source they may not see: "denied", no name / value)
     "sheet": ("matrix", "p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
@@ -763,6 +764,11 @@ ROUTES = {
     # 2.99.0 A (#2182): files of knowledge pages (a file of another organisation / person: 404, p299_a_api_test.py)
     "GET /api/wiki/files/{}": "wiki", "GET /api/wiki/files/{}/{}": "wiki", "DELETE /api/wiki/files/{}": "wiki",
     "POST /api/wiki/pages/{}/files": "wiki",
+    # 2.123.0 B (#2104): shares of knowledge pages / folders (another organisation / person: 404, p2123_b_api_test.py)
+    "GET /api/wiki/shares": "wiki", "POST /api/wiki/shares": "wiki", "PATCH /api/wiki/shares/{}": "wiki", "DELETE /api/wiki/shares/{}": "wiki",
+    "POST /api/wiki/shares/{}/restore": "wiki", "GET /api/wiki/shared": "wiki", "GET /api/wiki/shared/pages/{}": "wiki",
+    "GET /api/wiki/shared/files/{}": "wiki", "GET /api/wiki/shared/files/{}/{}": "wiki",
+    "GET /s/w/{}": "wiki", "GET /s/w/{}/p/{}": "wiki", "GET /s/w/{}/file/{}": "wiki",
     # 2.64.3 A (#1817): the lock per knowledge space (wiki_space: a space of another organisation 404, p264c_a_api_test.py)
     "GET /api/wiki/e2e": "wiki", "POST /api/wiki/e2e/start": "wiki", "GET /api/wiki/e2e/todo": "wiki",
     "POST /api/wiki/e2e/bulk": "wiki", "POST /api/wiki/e2e/finish": "wiki", "POST /api/wiki/e2e/stop": "wiki",
