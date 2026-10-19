@@ -63,7 +63,7 @@ check(r["net_incl_raw"] == 23802.5 and r["net_excl_raw"] is None, f"KV02 parity:
 check(r["costs"] == 3750 and r["margin"] == 16630, f"KV02: costs 3750 / margin 16630, got {r['costs']} / {r['margin']}")
 check(r["tax_lines"] == [{"rate_key": "standard", "pct": 19, "base": 20380, "amount": 3872.2, "label": "MwSt. 19 %"}], f"KV02: one 19 % line on 20380 = 3872.20, got {r['tax_lines']}")
 check(r["gross"] == 24252.2, f"KV02: gross 24252.20, got {r['gross']}")
-check(r["vat_note"] == "Alle Preise zuzüglich 7 % bzw. 19 % MwSt.", "KV02: the offer's VAT note (DE)")
+check(r["vat_note"] == "Alle Preise zuzüglich 19 % MwSt.", "KV02: the offer's VAT note (DE) names only 19 %")  # 2.114.4 (#2274)
 kinds = [l["kind"] for l in r["lines"]]
 check(kinds == ["item"] * 12 + ["producing", "raw"], f"KV02: 12 positions, then Producing and the raw data option: {kinds}")
 raw = r["lines"][-1]
@@ -77,7 +77,7 @@ check(r["fx_rate"] is None and r["fx_note"] == "", "EUR: no exchange rate shown"
 
 # ---------------------------------------------------------------- EN words
 e = office_calc({**DOC, "lang": "en"}, KV02, PACK)
-check(e["net"] == 20380 and e["lines"][-1]["title"] == "Optional: Delivery of raw data" and e["lines"][-2]["qty_text"] == "4.5" and e["vat_note"] == "All prices plus 7 % or 19 % VAT.", f"EN: same figures, English words: {e['lines'][-1]['title']} / {e['vat_note']}")
+check(e["net"] == 20380 and e["lines"][-1]["title"] == "Optional: Delivery of raw data" and e["lines"][-2]["qty_text"] == "4.5" and e["vat_note"] == "All prices plus 19 % VAT.", f"EN: same figures, English words: {e['lines'][-1]['title']} / {e['vat_note']}")
 check(e["lines"][-2]["detail"] == "4.5 days = 14 production days / 3, rounded to half days", f"EN producing explanation: {e['lines'][-2]['detail']}")
 p2 = {**PACK, "labels": {"en": {"raw_optional": "Optional: raw data hand-over"}}}
 check(office_calc({**DOC, "lang": "en"}, KV02, p2)["lines"][-1]["title"] == "Optional: raw data hand-over", "the pack's labels override the built-in words")
@@ -98,6 +98,7 @@ check(d["discount"] == 23 and d["net"] == 280 - 23, f"discount 10 % on A (200) +
 dl = [l for l in d["lines"] if l["kind"] == "discount"][0]
 check(dl["total"] == -23 and dl["pct"] == 10 and dl["title"] == "Rabatt", f"the discount line {dl}")
 check(d["tax_lines"] == [{"rate_key": "standard", "pct": 19, "base": 230, "amount": 43.7, "label": "MwSt. 19 %"}, {"rate_key": "reduced", "pct": 7, "base": 27, "amount": 1.89, "label": "MwSt. 7 %"}], f"discount reduces each tax base: {d['tax_lines']}")
+check(d["vat_note"] == "Alle Preise zuzüglich 7 % bzw. 19 % MwSt.", f"2.114.4 (#2274): both rates occur, the note names both: {d['vat_note']}")
 check(d["gross"] == 257 + 43.7 + 1.89, f"gross {d['gross']}")
 check([l["kind"] for l in d["lines"]] == ["item", "item", "heading", "item", "discount"], f"headings pass through in order: {[l['kind'] for l in d['lines']]}")
 check(office_calc({**DOC, "discount_pct": 0}, KV02, PACK)["discount"] == 0 and "discount" not in [l["kind"] for l in r["lines"]], "0 %: no discount line")
