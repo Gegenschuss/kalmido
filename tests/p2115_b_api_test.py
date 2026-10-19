@@ -267,6 +267,12 @@ check(DB.execute("SELECT 1 FROM users WHERE id=?", (uid["frank"],)).fetchone() a
       "nobody else is deleted")
 r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "otto@example.com"})
 check(r.ok and r.json().get("invited"), "the undo: the same address invited again")
+r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "rita@example.com"})
+RU = r.json().get("user_id") if r.ok else None
+check(RU and Bo.delete(B + f"/api/orgs/{ORG}/members/{RU}").ok, "an invited person removed from the organisation")
+check(Bo.delete(B + f"/api/orgs/{ORG}/invites/{RU}").status_code == 404 and DB.execute("SELECT 1 FROM users WHERE id=?", (RU,)).fetchone()
+      and not any(v["user_id"] == RU for v in Bo.get(B + f"/api/orgs/{ORG}/invites").json()["invites"]),
+      "no longer a member: no withdraw (the account stays), not listed")
 
 # ---- the daily limit
 n_today = DB.execute("SELECT COUNT(*) FROM org_invites WHERE created_by=?", (uid["bob"],)).fetchone()[0]
