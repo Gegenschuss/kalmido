@@ -2603,6 +2603,9 @@ USER_DEFAULTS = {
     "quiet_from": "22:00", "quiet_to": "07:00",
     # 2.6.1 (#402): comma list of agent ids whose status dot this user hid in the header ('' = every agent shown)
     "agents_hidden": "",
+    # 2.99.0 E (#2187): comma lists of the people (at most 5) and agents pinned to the sidebar's "Conversations" group; ids
+    # only - a person no longer shared with drops out on the client, no name is ever sent for them
+    "side_people": "", "side_agents": "",
     # D3: the roadmap ("All" as a timeline), json: {v: list|timeline, z: week|month|quarter, po: projects only (null = auto),
     # hd: hide done, who: assignee filter, ls: list ids (empty = all), def: auto|c|e (collapse default), t: {group: 0|1},
     # nd (2.0.6): "No date" rows in open lists (default on)}

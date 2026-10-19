@@ -5731,6 +5731,13 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 #side .sbconv .sbav{width:1.125rem;height:1.125rem;font-size:.5625rem;flex:none;margin:0 .0625rem}
 #side .sbconv.sbun .n{font-weight:600;color:var(--text)}
 @media (pointer:coarse){#side .sbpw .sbdm{min-width:2.75rem;min-height:2.75rem;opacity:1}}
+/* 2.99.0 E (#2187): "All people …" - everyone I share a list with: their tasks, a message, pinned to the sidebar or not */
+.sbpmd .sbpq{width:100%;margin-bottom:.5rem}
+.sbpmd .sbpl{max-height:60vh;overflow:auto}
+.sbpmd .sbpgo{background:none;border:0;padding:0;text-align:left;color:inherit;font:inherit;cursor:pointer}
+.sbpmd .sbppin{color:var(--muted)}
+.sbpmd .sbppin.on{color:var(--accent)}
+@media (pointer:coarse){.sbpmd .iconbtn{min-width:2.75rem;min-height:2.75rem}}
 .sbnbar{flex-wrap:wrap}
 .sbnbar .sbnsel{flex:0 1 14rem;min-width:0;min-height:2.25rem}
 .sbncard .sbnl{display:inline-flex;align-items:center;gap:.25rem;color:var(--text2);font-weight:500}

@@ -391,13 +391,14 @@ function renderSide() {
   const modIn = keys => keys.map(x => MG_IDS.includes(x) ? mg_sideRow(x, hid) : modRows.find(h => modKey(h) === x) || '').join('');  // 2.44.0 (#1187): one row per area
   const views = modIn(SIDE_VIEW_KEYS), areas = modIn(SIDE_AREA_KEYS);
   // Team: the people I share lists with (their tasks) and the agents (status dot; a click opens the chat)
-  const ags = shownAgents(), ppl = teamPeople().slice(0, 12);
-  // 2.10.0 (#441): my groups (admins: every group with a task); a click shows the tasks assigned to the group
-  const grps = collab() ? (S.groups || []).filter(gr => myGroup(gr.id) || [...S.tasks.values()].some(t => t.status === 0 && t.assignee_group_id === gr.id)) : [];
+  // 2.99.0 E (#2187): people only while pinned, agents only while pinned / unread / working, "All people …" at the end (sbnav.js)
+  const ags = sbp_agents(), ppl = sbp_people();
+  // 2.10.0 (#441): my groups; 2.99.0 E (#2187): only the ones I am a member of (admins no longer see every group with a task)
+  const grps = collab() ? (S.groups || []).filter(gr => myGroup(gr.id)) : [];
   const gcount = gid => [...S.tasks.values()].filter(t => t.status === 0 && !t.deleted_at && t.assignee_group_id === gid).length;
   const team = convo + [...grps.map(gr => `<button class="srow steam sgrp ${onTasks && k === 'grp:' + gr.id ? 'on' : ''}" data-go="grp/${gr.id}" title="${esc(tr('Tasks of the group {0}', gr.name))}">${ic('users')}<span class="n">${esc(gr.name)}</span><span class="sk">${tr('Group')}</span>${gcount(gr.id) ? `<span class="c">${gcount(gr.id)}</span>` : ''}</button>`),
     ...ppl.map(p => sb_personRow(p, onTasks && k === 'who:' + p.id)),  // 2.24.0 (UX-08): no "Person" under every name; 2.45.0 (#1509): + a bubble for a direct message
-    ...ags.map(a => `<button class="srow steam" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="sdot"${ac_mk(a.id)}>${hdot(agentHst(a))}</span><span class="n">${esc(a.name)}</span><span class="sk">${tr('Agent')}</span>${a.approvals_open ? `<span class="c apvc" title="${esc(apvCount(a.approvals_open))}">${ic('lock', 's')}${a.approvals_open}<span class="sr"> ${esc(apvCount(a.approvals_open))}</span></span>` : ''}${a.waiting || a.chat_unread ? `<span class="c nunread">${a.waiting + a.chat_unread}</span>` : ''}</button>`)].join('');
+    ...ags.map(a => `<button class="srow steam" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="sdot"${ac_mk(a.id)}>${hdot(agentHst(a))}</span><span class="n">${esc(a.name)}</span><span class="sk">${tr('Agent')}</span>${a.approvals_open ? `<span class="c apvc" title="${esc(apvCount(a.approvals_open))}">${ic('lock', 's')}${a.approvals_open}<span class="sr"> ${esc(apvCount(a.approvals_open))}</span></span>` : ''}${a.waiting || a.chat_unread ? `<span class="c nunread">${a.waiting + a.chat_unread}</span>` : ''}</button>`), sbp_allRow()].join('');
   // a group folded by default (Views) keeps its rows in the page, hidden: what they show (a running timer's dot, a count)
   // stays current and the keyboard / screen readers skip them until it is opened
   const grp = (g, label, body, acts = '', n = '', tip = '') => `<div class="sgroup sg-${g}">${head(g, label, acts, n, tip, !sideOpen(g) && /class="srow[^"]*\bon\b/.test(body))}${sideOpen(g) ? body : SIDE_FOLDED.includes(g) ? `<div class="sgfold" hidden>${body}</div>` : ''}</div>`;

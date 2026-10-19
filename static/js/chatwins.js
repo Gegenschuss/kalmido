@@ -441,7 +441,7 @@ document.addEventListener('contextmenu', e => {
   const el = e.target.closest?.('[data-act="chat-open"][data-aid], [data-act="team-agent"][data-aid], #view .tcrow[data-rid], #side .sbconv[data-go^="team/"]'), k = el && cw_target(el); if (!k) return;
   e.preventDefault();
   menu(el, [{label: tr('Open'), icon: 'comment', fn: () => el.click()}, {label: tr('Open in split window'), icon: 'panel', keys: IS_MAC ? 'Cmd+Click' : 'Ctrl+Click', fn: () => cw_split(k)},
-    ...(el.closest('#side .srow') ? fv2_menuRow(fv2_rowKey(el)) : [])]);  // 2.57.0 (#1798): an agent in the sidebar can be a favourite
+    ...(el.closest('#side .srow') ? [...fv2_menuRow(fv2_rowKey(el)), ...sbp_menuRow(el)] : [])]);  // 2.99.0 E (#2187): pin to the sidebar  // 2.57.0 (#1798): an agent in the sidebar can be a favourite
 });
 
 // ---- phones / tablets: no split; the open chats as a row of buttons above the chat (chatViewHtml, tcRoomHtml ask)

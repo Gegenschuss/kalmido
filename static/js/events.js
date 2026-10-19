@@ -513,6 +513,7 @@ document.addEventListener('click', async e => {
     case 'team-agent': { closeSide(); const ag = agentById(a.dataset.aid); if (ag && ag.enabled) chatOpen(ag.id); else go('agents'); break; }
     case 'lists-reorder': S.listReorder = !S.listReorder; renderSide(); break;
     case 'side-more': closeSide(); settingsModal('sidebar'); break;  // 2.25.0 (UX-03 / UX-26)
+    case 'sb-people': closeSide(); sbp_dialog(); break;  // 2.99.0 E (#2187): "All people …" (sbnav.js)
     case 'list-menu': listMenu(a, id); break;
     case 'top-more': menu(a, topMoreItems()); break;
     case 'fview': if (a.classList.contains('on')) break; if (a.dataset.k === 'matrix') { mxSet({scope: 'folder:' + a.dataset.f}); go('matrix'); } else go('folder/' + encodeURIComponent(a.dataset.f)); break;  // 2.4.2 (#390)

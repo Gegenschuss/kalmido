@@ -651,6 +651,10 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     # -- footer (every page), four columns; empty ones are left out
     cols = [list(dict.fromkeys((co_lines or [""]) + [str(x) for x in (co.get("lines") or [])])), list(co.get("contact_lines") or []),
             list(co.get("register_lines") or []), list(co.get("bank_lines") or [])]
+    foot_bold = n_bold
+    if n_bold > 1 and len(cols[0]) > 6:  # 2.99.0 (#2188, review L3): a long first column keeps the name on one line
+        cols[0] = [" ".join(co_lines)] + cols[0][n_bold:]
+        foot_bold = 1
     cols = [c for c in cols if any(str(x).strip() for x in c)]
 
     def draw_footer(p, n, total):
@@ -673,7 +677,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     x += cws[i - 1] + 8
                 cw = cws[i]
                 yy = top + 5
-                shown = [(w, j < n_bold) for j, ln in enumerate(c) for w in pdf_wrap(str(ln), 6.9, cw - 2, bold=(i == 0 and j < n_bold))][:6]
+                shown = [(w, j < foot_bold) for j, ln in enumerate(c) for w in pdf_wrap(str(ln), 6.9, cw - 2, bold=(i == 0 and j < foot_bold))][:6]
                 for ln, first in shown:
                     p.text(x, yy, ln, 6.9, bold=(i == 0 and first), color=C_INK if (i == 0 and first) else C_INK2)
                     yy += 9.6

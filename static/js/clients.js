@@ -141,8 +141,8 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
         await api('DELETE', `/api/clients/${c.id}`); md.remove(); await load(); if (S.route.client === c.id) go('clients'); else render(); clReload(); return;
       }
       const v = s => $(s, md)?.value ?? '';  // 2.97.0 B (#1951): the quick dialog (a document's "Add client") has name + address only
-      const body = o.quick ? {name: v('#cl-name'), name_extra: v('#cl-nx')} : {name: v('#cl-name'), name_extra: v('#cl-nx'), icon: v('#cl-icon'),  // 2.99.0 D (#2188) contacts: clkValue(md), email: v('#cl-email'),
-        phone: v('#cl-phone'), display_name: v('#cl-dname'), note: v('#cl-note')};
+      const body = o.quick ? {name: v('#cl-name'), name_extra: v('#cl-nx')} : {name: v('#cl-name'), name_extra: v('#cl-nx'), icon: v('#cl-icon'), contacts: clkValue(md), email: v('#cl-email'),
+        phone: v('#cl-phone'), display_name: v('#cl-dname'), note: v('#cl-note')};  // 2.99.0 D (#2188): + name_extra
       if (!c && 'org_id' in o) body.org_id = o.org_id;
       if ($('#cl-rate', md)) Object.assign(body, {rate: num($('#cl-rate', md).value), budget_h: num($('#cl-bh', md).value), budget_amount: num($('#cl-ba', md).value)});
       if ($('#cl-arch', md)) body.archived = $('#cl-arch', md).checked;

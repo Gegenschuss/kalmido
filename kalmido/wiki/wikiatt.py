@@ -28,7 +28,7 @@ from ..core.i18n import tr
 from ..core.db import bump, db, err, insert_id, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.access import Denied
-from ..core.orgcrypt import oc_read_file, oc_send_file, oc_user_space, oc_write_file
+from ..core.orgcrypt import OrgCryptError, oc_read_file, oc_send_file, oc_user_space, oc_write_file
 from ..core.serializers import unlink_files
 from ..personal.timetrack import BadInput
 from ..tasks.attachments import file_ext, safe_name, send_stored
@@ -328,9 +328,9 @@ def wka_move_files(c, page_ids, to, uid):
         full = os.path.join(ATT_DIR, r["path"])
         try:
             data = oc_read_file(c, full)
-        except OSError:
-            continue  # a missing file stays missing (the storage check reports it)
-        oc_write_file(c, space, full, data)
+        except (OSError, OrgCryptError):
+            continue  # a missing / unreadable file stays as it is (the storage check reports it)
+        oc_write_file(c, space, full, data, fresh=True)  # review 2 L1: plain bytes that look sealed get an outer layer
     if rows:
         q = ",".join("?" * len(rows))
         fids = [r["id"] for r in rows]

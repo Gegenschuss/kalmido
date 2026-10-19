@@ -194,7 +194,8 @@ def cv_brand(c, link):
     try:
         from ..office.model import office_settings
         s = office_settings(c, oid)
-        name = ((s.get("company") or {}).get("name") or "").strip() or name
+        from ..office.model import ofx_name1
+        name = ofx_name1((s.get("company") or {}).get("name") or "").strip() or name  # 2.99.0 (#2188): one line
         if s.get("logo"):
             p = os.path.join(OFFICE_DIR, str(int(oid)), os.path.basename(s["logo"]))
             logo = p if os.path.isfile(p) else None
