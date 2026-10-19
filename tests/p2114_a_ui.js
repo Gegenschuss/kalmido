@@ -16,7 +16,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 const change = (w, el, v) => { if (!el) return; el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
-const FEAT = 'cal,comments,collab,fields,kanban';
+const FEAT = 'cal,comments,collab,fields';
 
 (async () => {
   await sleep(600);
@@ -26,7 +26,7 @@ const FEAT = 'cal,comments,collab,fields,kanban';
   await call('POST', '/api/admin/setup', {org_name: 'Kalmido', lang: 'en', collab_all: true, modules: ['cal', 'comments']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const ORG = (await call('GET', '/api/state')).me.workspaces[0].id;
-  const L = (await call('POST', '/api/lists', {name: 'Work', org_id: ORG, kind: 'project'})).id;
+  const L = (await call('POST', '/api/lists', {name: 'Work', org_id: ORG})).id;
   const OKF = (await call('POST', `/api/lists/${L}/fields`, {name: 'Signed', type: 'checkbox'})).id;
   const HRS = (await call('POST', `/api/lists/${L}/fields`, {name: 'Hours', type: 'number'})).id;
   await call('POST', `/api/lists/${L}/tags`, {name: 'hot'});
@@ -74,8 +74,9 @@ const FEAT = 'cal,comments,collab,fields,kanban';
   const t = await call('POST', '/api/tasks', {list_id: L, title: 'Fresh lead'});
   check(t.priority === 5 || (await call('GET', `/api/tasks/${t.id}`)).priority === 5, '#2060: the rule set priority high');
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
-  const chk = await until(() => d.querySelector(`.chk[data-id="${t.id}"]`));
-  check(chk && chk.classList.contains('p5'), '#2060: the task shows the high priority in the list ' + (chk?.className || 'missing'));
+  const row = await until(() => d.querySelector(`#view .trow[data-id="${t.id}"]`));
+  check(row && row.classList.contains('pr5') && row.querySelector('.chk.p5'), '#2060: the task shows the high priority in the list '
+    + (row?.className || `missing (${d.querySelectorAll('#view .trow').length} rows, hash ${w.location.hash})`));
   w.close();
 
   console.log(`p2114_a_ui: ${ok} ok, ${F.length} failed`);
