@@ -129,6 +129,9 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
     await ev(`(() => { closePalette(); return 1; })()`);
     // the chat "+" with a real tap
     await o.nav(B + '#agents/' + AG); await ready(ev);
+    // 2.98.1: in CI the navigation to the same page with only a new #fragment sometimes stays on the list (#l/4, no chat):
+    // set the hash in the page as well, so the app's router opens the agent chat
+    await ev(`(() => { if (location.hash !== '#agents/${AG}') location.hash = '#agents/${AG}'; return 1; })()`);
     // 2.101.0: the agent chat loads on demand (#1823) - wait for the message instead of a fixed pause (CI is slower than the Mac)
     const MSG = `#chat-msgs .cmsg[data-mid="a:${q1.id}"]`;
     check(await until(() => ev(`!!document.querySelector('${MSG} .rxrow .rxtog')`), 60), `${tag}: the agent chat shows the message with its smiley ` + await ev(`(() => location.hash + ' msgs=' + document.querySelectorAll('#chat-msgs .cmsg').length)()`));
