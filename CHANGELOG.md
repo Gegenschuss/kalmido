@@ -7,6 +7,12 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.102.1] - 2026-10-19
+
+### Fixed
+- After a database restart the first request no longer waits 30 s and fails: a broken pooled connection makes the pool
+  test all idle ones at once instead of one by one with a growing pause (2.102.0 #1994 follow-up).
+
 ## [2.99.0] - 2026-10-19
 
 Files on knowledge pages and a ZIP import that keeps PDFs and pictures, one "…" menu on knowledge pages, the acceptance note
