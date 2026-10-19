@@ -77,7 +77,7 @@ def scenario(S, who):
     # #2316: the bill of an entertainment receipt counts for the quota
     used0 = S.get(B + "/api/me/storage").json().get("used", 0)
     r = S.post(B + M, json={"date": "2025-05-14", "place_name": "\t=1+1", "place_address": "Beispielweg 1", "occasion": "\r=cmd|' /C calc'!A0",
-                            "host": {"name": "Gina Gast", "extra": ""}, "guests": [],
+                            "host": {"name": "Gina Gast", "extra": ""}, "guests": [{"name": "Hans Gast", "extra": "Example GmbH"}],
                             "amounts": [{"kind": "food", "rate": 19, "gross": "119.00"}], "tip": "0"})
     check(r.status_code == 201, f"{who}: meal created {r.status_code} {r.text[:200]}")
     mid = r.json().get("id")
