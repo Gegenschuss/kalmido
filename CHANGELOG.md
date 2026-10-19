@@ -81,6 +81,13 @@ Scheduling polls, questionnaires in forms, the office menu as a rail on the left
 - A table could stay on "Loading…" when it was loaded twice at the same time (#2181).
 - Code comments no longer carry the name of another product (#2184).
 
+## [2.97.1] - 2026-10-19
+
+### Fixed
+- Quotations and invoices: the sender line above the address field starts with the company name ("Company · Street ·
+  Postcode City"); finalised documents keep the line they were printed with (#2224).
+- Quotations show the customer number in the key data, like invoices (#2224).
+
 ## [2.97.0] - 2026-10-19
 
 Bookmarks, a display name for customers, office data and locked wiki spaces between your private space and an organisation.
