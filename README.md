@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.99.0** (2026-10-19): files on knowledge pages (PDFs, pictures) and a ZIP import that keeps them, one "…" menu on
+  knowledge pages, the acceptance note on quotations accepted online, a short sidebar group Exchange (pinned people),
+  a name addition for clients and a company name on up to three lines, 44 px fields in the document editor, aligned chat icons.
 - **2.98.0** (2026-10-19): scheduling polls with a public vote link, questionnaires in forms (answers become a task at the
   customer), the office menu as a rail on the left, resizable tables in their own window, documents guess amounts only
   where they fit.
