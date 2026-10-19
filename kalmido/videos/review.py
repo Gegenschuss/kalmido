@@ -818,6 +818,7 @@ def vdr_move_space(vid):
     smv_refuse_agent()
     c, uid = db(), me()
     r = vdr_need(c, vid, write=True)
+    write_lock(c, f"video_review_{int(vid)}")  # 2.122.4 (#2215): a customer decision does not land in the old workspace mid-move
     b = body()
     b = b if isinstance(b, dict) else {}
     to = smv_target(c, uid, b.get("to"))

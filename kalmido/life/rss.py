@@ -109,7 +109,7 @@ def rss_text(s, n):
 def rss_url(u, base=""):
     """An absolute http(s) link (relative ones against base), else ''."""
     u = str(u or "").strip()
-    if not u or len(u) > RSS_URL_MAX:
+    if not u or len(u.encode()) > RSS_URL_MAX:  # 2.122.4 (#1906): bytes, the unique index caps a row
         return ""
     if base:
         try:

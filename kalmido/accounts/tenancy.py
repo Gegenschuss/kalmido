@@ -369,6 +369,8 @@ def rg4_oa_obj_ws(c, table, oid_, mine):
         return None
     if table == "events":
         r = c.execute("SELECT k.org_id FROM events e JOIN ev_cals k ON k.id=e.cal_id WHERE e.id=?", (oid_,)).fetchone()
+    elif table == "books":  # a book_org finding: org_id may be empty while owner_org_id names the organisation (review 2.122.4)
+        r = c.execute("SELECT COALESCE(org_id, owner_org_id) FROM books WHERE id=?", (oid_,)).fetchone()
     else:
         r = c.execute(f"SELECT org_id FROM {table} WHERE id=?", (oid_,)).fetchone()
     return (r[0] in mine) if r and r[0] else None
