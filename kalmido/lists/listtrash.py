@@ -26,7 +26,6 @@ OTR_PRUNE = {"at": 0.0}
 
 def otr_trash(c, lid, uid):
     """Moves list lid (archived, checked by the caller) into the trash: the list and its tasks that are not in the trash yet."""
-    from ..integrations.gitfolder import gf_before_list_delete
     t = now_utc()
     ts = iso(t)
     for i in range(1, 60):  # the stamp marks what the restore brings back: never the one of a task trashed in the same second
@@ -35,6 +34,7 @@ def otr_trash(c, lid, uid):
         ts = iso(t + timedelta(seconds=i))
     c.execute("UPDATE lists SET deleted_at=?, deleted_by=? WHERE id=?", (ts, uid, lid))
     c.execute("UPDATE tasks SET deleted_at=? WHERE list_id=? AND deleted_at IS NULL", (ts, lid))
+    from ..integrations.gitfolder import gf_before_list_delete
     gf_before_list_delete(c, lid)  # 2.33.0 (#934): a folder repository keeps syncing into a live list of its folder
     return ts
 
@@ -73,6 +73,10 @@ def otr_hard(c, lid):
     """Deletes the (deleted) list lid for good with all its tasks. Returns (icon, file paths) to drop after the commit."""
     from ..tasks.tasks import hard_delete
     from .lists import list_purge
+    # 2.102.0 review F1: lock the row and look again - a restore committed meanwhile wins (it waits on this lock, then finds nothing)
+    r = c.execute("SELECT deleted_at FROM lists WHERE id=? FOR UPDATE", (lid,)).fetchone()
+    if not r or not r[0]:
+        return None
     files = hard_delete(c, [x[0] for x in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))], lists={lid})
     icon, lfiles = list_purge(c, lid, None)  # no task is left to move: list_purge only drops the list row + its files
     return icon, lfiles + files
@@ -109,8 +113,10 @@ def otr_restore(lid):
     """Brings the list back (archived, same organisation / private space) with its tasks, fields, tags, chat."""
     c = db()
     r = otr_need(c, lid)
+    # 2.102.0 review F1/F7: only a list still in the trash comes back (not one purged or restored meanwhile)
+    if c.execute("UPDATE lists SET deleted_at=NULL, deleted_by=NULL WHERE id=? AND deleted_at=?", (lid, r["deleted_at"])).rowcount != 1:
+        raise Denied(404)
     c.execute("UPDATE tasks SET deleted_at=NULL WHERE list_id=? AND deleted_at=?", (lid, r["deleted_at"]))
-    c.execute("UPDATE lists SET deleted_at=NULL, deleted_by=NULL WHERE id=?", (lid,))
     if r["org_id"]:
         from ..accounts.orglists import _ol_log
         _ol_log(c, r["org_id"], r, "undelete")
@@ -124,7 +130,10 @@ def otr_delete(lid):
     """Deletes a list in the trash for good (the client asks first)."""
     c = db()
     r = otr_need(c, lid)
-    icon, files = otr_hard(c, lid)
+    got = otr_hard(c, lid)
+    if got is None:  # 2.102.0 review F1: restored meanwhile
+        raise Denied(404)
+    icon, files = got
     if r["org_id"]:
         from ..accounts.orglists import _ol_log
         _ol_log(c, r["org_id"], r, "purge")
@@ -143,7 +152,11 @@ def otr_prune(c, force=False):
     cut = iso(now_utc() - timedelta(days=OTR_TRASH_DAYS))
     n = 0
     for (lid,) in c.execute("SELECT id FROM lists WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,)).fetchall():
-        icon, files = otr_hard(c, lid)
+        got = otr_hard(c, lid)
+        if got is None:  # 2.102.0 review F1: restored meanwhile
+            c.commit()
+            continue
+        icon, files = got
         c.commit()
         otr_drop_files(lid, icon, files)
         n += 1

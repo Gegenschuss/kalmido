@@ -88,6 +88,22 @@ def wrk_hold(name):
             return False
 
 
+def wrk_release(name):
+    """Gives the loop's lock back (its thread ended)."""
+    _STATE[name] = "stopped"
+    if not WRK_LOCKS_ON:
+        return
+    with _LLK:
+        if name not in _HELD or _LCONN["c"] is None:
+            return
+        _HELD.discard(name)
+        try:
+            _LCONN["c"].execute("SELECT pg_advisory_unlock(?, hashtext(?))", (WRK_LOCK_CLASS, "loop:" + name)).fetchone()
+            _LCONN["c"].commit()
+        except Exception as e:  # noqa: BLE001 - a lost connection released it already
+            print("background loops: unlock", name, type(e).__name__, flush=True)
+
+
 def wrk_turn():
     """GATE.bg() calls this first: in a loop thread it waits until this process may run the loop's round."""
     name = threading.current_thread().name
@@ -113,8 +129,11 @@ def wrk_start(name, fn, *args):
     _STATE[name] = "waiting"
 
     def run():
-        wrk_turn()
-        fn(*args)
+        try:
+            wrk_turn()
+            fn(*args)
+        finally:  # 2.102.0 review F8: a loop that died gives its lock back, another process may take the loop over
+            wrk_release(name)
     threading.Thread(target=run, daemon=True, name=name).start()
 
 

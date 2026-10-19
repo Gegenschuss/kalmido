@@ -439,7 +439,10 @@ def cer_report():
            "url": "", "level": "error", "fid": "", "body": info + ("\n" + stack if stack else ""),
            # the same error = the same message at the same place (line, not column: minified or not, one ticket)
            "fp": "cl:" + hashlib.sha256((msg + "\n" + re.sub(r":\d+$", "", place)).encode()).hexdigest()[:32]}
-    acx_anon_bind(c, r["org_id"])  # from here on as nobody inside the chosen list's organisation (like errhook_in)
+    # 2.102.0 review F2: the context hook prefers g.user (whose organisations may not include the list's), so drop it first
+    # like a public form (team/forms.py) - from here on as nobody inside the chosen list's organisation (like errhook_in)
+    g.user = None
+    acx_anon_bind(c, r["org_id"])
     if not err_rate_ok(lid):
         return "", 204
     err_take(c, lid, r, rep)

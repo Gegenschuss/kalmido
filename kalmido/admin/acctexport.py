@@ -239,7 +239,7 @@ def umz_email_hash(email):
 
 def umz_people(c, uid):
     """The people of my lists (members, comment authors, assignees) with name + e-mail hash: the mapping on import."""
-    own = "(SELECT id FROM lists WHERE owner_id=?)"
+    own = "(SELECT id FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL))"  # 2.102.0 review F3: an organisation's list in its trash is the organisation's
     out = {}
     for r in c.execute(f"""SELECT m.user_id, m.list_id, m.role, u.display_name, u.username, u.email, COALESCE(u.kind,'user') AS kind
                            FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id IN {own}""", (uid,)):
@@ -259,7 +259,7 @@ def umz_people(c, uid):
 
 
 def umz_extra_queries(uid):
-    own = "(SELECT id FROM lists WHERE owner_id=?)"
+    own = "(SELECT id FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL))"  # 2.102.0 review F3: an organisation's list in its trash is the organisation's
     shared = "(SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.owner_id!=?)"
     sheets = "org_id IS NULL AND owner_id=?"
     return {

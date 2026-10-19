@@ -573,10 +573,10 @@ def push_test():
 
 def umz_export_queries(uid):
     """2.73.0 B (#1473): the tables of "my data" (GET /api/export.json and the account export) -> {name: (sql, args)}."""
-    own = "(SELECT id FROM lists WHERE owner_id=?)"
+    own = "(SELECT id FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL))"  # 2.102.0 review F3: an organisation's list in its trash is the organisation's
     task_ids = f"(SELECT id FROM tasks WHERE list_id IN {own})"
     q = {
-        "lists": ("SELECT * FROM lists WHERE owner_id=?", (uid,)),
+        "lists": ("SELECT * FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL)", (uid,)),
         "list_members": (f"SELECT * FROM list_members WHERE list_id IN {own}", (uid,)),
         "sections": (f"SELECT * FROM sections WHERE list_id IN {own}", (uid,)),
         "list_envs": (f"SELECT id, list_id, name, sort, auto_close, created_at, deleted_at FROM list_envs WHERE list_id IN {own}", (uid,)),  # 2.60.0 (#1514): never the hook token
