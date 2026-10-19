@@ -120,6 +120,8 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
       if (setup) setup(w);  // extra browser APIs for one suite (webpush_ui.js: Notification, PushManager, ...)
     }});
   await new Promise(r => setTimeout(r, wait));
+  // 2.98.0: a slow place may still be loading the start scripts after `wait` (appearance_ui saw calendar.js not yet run): up to 15 s more until all ran
+  for (let i = 0; i < 150 && dom.window.document.readyState !== 'complete'; i++) await new Promise(r => setTimeout(r, 100));
   if (!lazy && typeof dom.window.ld_all === 'function') await dom.window.ld_all().catch(e => console.log('ld_all:', e.message));
   dom.window.__cookie = cookie; dom.window.__store = store;
   const close = dom.window.close.bind(dom.window), realmTE = dom.window.TypeError;
