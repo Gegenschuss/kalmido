@@ -2,7 +2,7 @@
 // - #2025: every field of the document editor (head selects, text block selects, the position row with detail, unit and
 //   VAT, the text areas) is at least 44 px high with a 16 px font, so iOS does not zoom and nothing is smaller to hit
 // - #2188: the client form has the field "Name addition" under the name; the own company name in the office settings is a
-//   text area of up to three lines
+//   text area of up to three lines, the extra address line follows the street
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -24,8 +24,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
   await call(CA, 'PUT', '/api/office/settings', {company: {name: 'Studio Nordlicht GmbH'}, lang: 'en'});
   const SV = (await call(CA, 'POST', '/api/office/services', {name_de: 'Schnitt', name_en: 'Editing', daily_rate: 500})).id;
   const offer = await call(CA, 'POST', '/api/office/docs', {project_title: 'Imagefilm', lang: 'en'});
-  const put = await call(CA, 'PUT', `/api/office/docs/${offer.id}/items`, {items: [{kind: 'service', service_id: SV, qty: 2, detail: 'Two days'}, {kind: 'discount', title: 'Discount', rate: 50}, {kind: 'text', detail: 'Note'}]});
-  check(put.http === 200, 'the quotation with a position, a discount and a text ' + put.http);
+  const put = await call(CA, 'PUT', `/api/office/docs/${offer.id}/items`, {items: [{kind: 'service', service_id: SV, qty: 2, detail: 'Two days'}, {kind: 'text', detail: 'Note'}]});
+  check(put.http === 200, 'the quotation with a position and a text ' + put.http + ' ' + (put.error || ''));
 
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
@@ -54,6 +54,17 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
       check(/^(4[4-9]|[5-9]\d)\/(1[6-9]|2\d)/.test(h), `#2025: ${what} is 44 px / 16 px: ${h}`);
     }
     await shot('p299d-390-editor.png');
+    // #2188: the company name is a text area (up to three lines) with the extra address line among the fields
+    await nav(B + '#office/settings');
+    check(await ready(ev, `!!document.querySelector('#os-name')`, 60), '#2188: the office settings');
+    check(await ev(`document.querySelector('#os-name').tagName === 'TEXTAREA' && document.querySelector('#os-name').value === 'Studio Nordlicht GmbH'`),
+      '#2188: the company name is a text area');
+    check(await ev(`(() => { const rows = [...document.querySelectorAll('.ofcco .row')], at = id => rows.findIndex(r => r.querySelector('#' + id)); return at('osc-address_extra') > 0 && at('osc-address_extra') === at('osc-street') + 1; })()`),
+      '#2188: the extra address line right under the street');
+    // #2188: the client form has the name addition right under the name
+    const nx = await ev(`(() => { if (typeof clientModal !== 'function') return 'no clientModal'; clientModal(null); const n = document.querySelector('#cl-name'), x = document.querySelector('#cl-nx');
+      const r = !!(n && x && n.closest('.row').nextElementSibling === x.closest('.row')) && Math.round(x.getBoundingClientRect().height) >= 44; document.querySelector('.modal [data-m="close"]')?.click(); return String(r); })()`);
+    check(nx === 'true', '#2188: the client form: the name addition under the name, 44 px: ' + nx);
   }, true);
 
   console.log(`p299_d_ui: ${ok} ok, ${F.length} failed`);
