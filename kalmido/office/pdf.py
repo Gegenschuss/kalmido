@@ -599,6 +599,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     fmt = m.get("formats") or {}
     cur = m.get("currency") or "EUR"
     co = m.get("company") or {}
+    # 2.99.0 D (#2188): the company name's lines (up to three) for the letterhead and the footer; "name" is the one-line form
+    co_lines = [str(x).strip() for x in (co.get("name_lines") or str(co.get("name") or "").split("\n")) if str(x).strip()][:3]
+    n_bold = max(1, len(co_lines))
     rc = m.get("recipient") or {}
     accent = co.get("color") or "#2f5d8a"
     number = str(m.get("number") or "")
@@ -628,8 +631,10 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             w, h = logo_box(PDF_LOGO_MAX_W, PDF_LOGO_MAX_H)
             p.image("Logo", A4_W - PDF_R - w, PDF_TOP + 2 * MM, w, h)
         else:
-            p.text(PDF_L + PDF_CW, PDF_TOP + 4 * MM, co.get("name") or "", 15, True, C_INK, align="r", spacing=1.2)
-            p.rect(A4_W - PDF_R - 12 * MM, PDF_TOP + 4 * MM + 24, 12 * MM, 2.2, accent)
+            nl = co_lines or [""]  # 2.99.0 D (#2188): up to three name lines, one under the other
+            for i, ln in enumerate(nl):
+                p.text(PDF_L + PDF_CW, PDF_TOP + 4 * MM + i * 18, ln, 15, True, C_INK, align="r", spacing=1.2)
+            p.rect(A4_W - PDF_R - 12 * MM, PDF_TOP + 4 * MM + 24 + (len(nl) - 1) * 18, 12 * MM, 2.2, accent)
         for y in (105 * MM, 148.5 * MM, 210 * MM):  # fold and punch marks (DIN 5008 form B)
             p.line(5 * MM, y, 9 * MM, y, 0.4, C_RULE)
 
@@ -644,7 +649,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         p.line(PDF_L, 24.5 * MM, PDF_L + PDF_CW, 24.5 * MM, 0.5, accent)
 
     # -- footer (every page), four columns; empty ones are left out
-    cols = [list(dict.fromkeys([co.get("name") or ""] + [str(x) for x in (co.get("lines") or [])])), list(co.get("contact_lines") or []),
+    cols = [list(dict.fromkeys((co_lines or [""]) + [str(x) for x in (co.get("lines") or [])])), list(co.get("contact_lines") or []),
             list(co.get("register_lines") or []), list(co.get("bank_lines") or [])]
     cols = [c for c in cols if any(str(x).strip() for x in c)]
 
@@ -668,7 +673,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     x += cws[i - 1] + 8
                 cw = cws[i]
                 yy = top + 5
-                shown = [(w, j == 0) for j, ln in enumerate(c) for w in pdf_wrap(str(ln), 6.9, cw - 2, bold=(i == 0 and j == 0))][:6]
+                shown = [(w, j < n_bold) for j, ln in enumerate(c) for w in pdf_wrap(str(ln), 6.9, cw - 2, bold=(i == 0 and j < n_bold))][:6]
                 for ln, first in shown:
                     p.text(x, yy, ln, 6.9, bold=(i == 0 and first), color=C_INK if (i == 0 and first) else C_INK2)
                     yy += 9.6

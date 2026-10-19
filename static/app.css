@@ -5197,9 +5197,9 @@ section.ofdsec h3{min-height:2.5rem;display:flex;align-items:center}
 .ofdit{display:flex;align-items:flex-start;gap:.5rem;padding:.5rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg)}
 .ofdit .ofdpos{flex:0 0 1.75rem;min-height:2.25rem;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;color:var(--muted)}
 .ofdit .ofditb{flex:1;min-width:0;display:flex;flex-direction:column;gap:.375rem}
-.ofdit input,.ofdit select,.ofdit textarea{min-height:2.25rem}
+.ofdit input,.ofdit select,.ofdit textarea{min-height:var(--fld-h)}  /* 2.99.0 (#2025): the shared field height (44 px on touch screens) */
 .ofdit .ofdtt{font-weight:500;width:100%}
-.ofdit .ofddt{width:100%;font-size:var(--fs-s)}
+.ofdit .ofddt{width:100%;font-size:var(--fld-fs)}  /* 2.99.0 (#2025): 16 px on touch screens like every field */
 .ofdit .ofdnums{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}
 .ofdit .ofdnums input.numin{width:5rem;flex:0 0 5rem}
 .ofdit .ofdnums input.ofdrate{width:6.5rem;flex-basis:6.5rem}

@@ -393,8 +393,10 @@ def dt_pdf(c, oid, d, signed=None, client=None):
                 sc = min(P.PDF_LOGO_MAX_W / logo[0], P.PDF_LOGO_MAX_H / logo[1])
                 p.image("Logo", P.A4_W - P.PDF_R - logo[0] * sc, P.PDF_TOP + 2 * P.MM, logo[0] * sc, logo[1] * sc)
             else:
-                p.text(P.PDF_L + P.PDF_CW, P.PDF_TOP + 4 * P.MM, co.get("name") or "", 15, True, P.C_INK, align="r", spacing=1.2)
-                p.rect(P.A4_W - P.PDF_R - 12 * P.MM, P.PDF_TOP + 4 * P.MM + 24, 12 * P.MM, 2.2, accent)
+                nl = (co.get("name_lines") or [co.get("name") or ""])[:3]  # 2.99.0 D (#2188): the name lines one under the other
+                for i, ln in enumerate(nl):
+                    p.text(P.PDF_L + P.PDF_CW, P.PDF_TOP + 4 * P.MM + i * 18, ln, 15, True, P.C_INK, align="r", spacing=1.2)
+                p.rect(P.A4_W - P.PDF_R - 12 * P.MM, P.PDF_TOP + 4 * P.MM + 24 + (len(nl) - 1) * 18, 12 * P.MM, 2.2, accent)
             for y in (105 * P.MM, 148.5 * P.MM, 210 * P.MM):
                 p.line(5 * P.MM, y, 9 * P.MM, y, 0.4, P.C_RULE)
             if draft:

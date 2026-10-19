@@ -30,7 +30,7 @@ from ..core.db import body, bump, db, iso, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .calc import dec, dstr, money
-from .model import office_gate, office_org, office_settings, office_settings_save
+from .model import ofx_name1, office_gate, office_org, office_settings, office_settings_save
 
 LB_VEH_KINDS = ("private", "company")
 LB_KINDS = (("business", N_("Business")), ("private", N_("Private|drive")), ("commute", N_("Home - workplace")))
@@ -713,7 +713,7 @@ def lb_pdf_bytes(c, oid, y, vs, clients, drives, log, rep, lang):
     from .ledger import ofx_company
     from .pdf import A4_H, A4_W, C_INK2, C_RULE, _Page, pdf_money, pdf_write
     s = office_settings(c, oid)
-    company = (ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name") or "").strip()
+    company = ofx_name1(ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name"))  # 2.99.0 D (#2188): one line
     lg = "de" if lang == "de" else "en"
     cur = (s.get("currency") or "EUR").upper()
     x0, x1 = 40, A4_W - 40

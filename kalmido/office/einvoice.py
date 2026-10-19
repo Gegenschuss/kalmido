@@ -253,18 +253,19 @@ def ein_build(model, fmt="zugferd"):
     ag = _e(tx, "ram:ApplicableHeaderTradeAgreement")
     if buyer_ref:
         _e(ag, "ram:BuyerReference", buyer_ref)
-    _party(ag, "ram:SellerTradeParty", sf.get("name") or (m.get("company") or {}).get("name"), sf, lang, home, contact=True,
+    _party(ag, "ram:SellerTradeParty", " ".join(str(sf.get("name") or (m.get("company") or {}).get("name") or "").split()), {**sf, "line2": sf.get("address_extra") or ""}, lang, home, contact=True,  # 2.99.0 D (#2188): BT-27 on one line, BT-36
            email=sf.get("email"), legal_id=sf.get("register_no"))
     rfields = {"street": rc.get("street"), "zip": rc.get("zip"), "city": rc.get("city"), "country": rc.get("country"), "vat_id": rc.get("vat_id")}
     if rc.get("extra"):  # 2.97.0 B (#1951): the client's extra address line (BT-51)
         rfields["line2"] = rc["extra"]
     if not rfields["street"] and not rfields["city"]:  # only free address lines (2.40.0 #1368: see fd_split_address)
-        lines = [str(x) for x in (rc.get("lines") or []) if str(x).strip() and str(x).strip() != str(rc.get("name") or "").strip()]
+        lines = [str(x) for x in (rc.get("lines") or []) if str(x).strip() and str(x).strip() not in (str(rc.get("name") or "").strip(), str(rc.get("name_extra") or "").strip())]
         sp = fd_split_address(lines)
         if rfields.get("country"):
             sp.pop("country", None)
         rfields.update(sp)
-    _party(ag, "ram:BuyerTradeParty", rc.get("name"), rfields, lang, home, email=rc.get("email_invoice"),
+    bname = " - ".join(x for x in (str(rc.get("name") or "").strip(), str(rc.get("name_extra") or "").strip()) if x)  # 2.99.0 D (#2188): BT-44 + the name addition
+    _party(ag, "ram:BuyerTradeParty", bname, rfields, lang, home, email=rc.get("email_invoice"),
            person=rc.get("contact") if isinstance(rc.get("contact"), dict) else None)
     if m.get("order_ref"):
         _e(_e(ag, "ram:BuyerOrderReferencedDocument"), "ram:IssuerAssignedID", m["order_ref"])
