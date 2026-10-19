@@ -173,6 +173,16 @@ check(DA and dbx("SELECT 1 FROM fs_log WHERE node_id=? AND agent=1 AND action='u
 check(DA in [x["id"] for x in A.get(B + "/api/docs").json()["docs"]], "alice sees the agent's document")
 r = AGS.post(B + "/api/v1/documents", json={"name": "own.pdf", "content_base64": b64(["Agent result"])})
 check(r.status_code in (201, 409), f"agent without parent_id: its own result folder ({r.status_code})")
+# review (2.122.0): an agent's sender on level "agent" is a suggestion to review, not a set value (like PATCH)
+check(A.put(B + "/api/docs/settings", json={"ws": "private", "levels": {"sender": "agent"}}).ok, "level sender = agent")
+r = AGS.post(B + "/api/v1/documents", json={"name": "s.pdf", "content_base64": b64(["Agent sender"]), "parent_id": root, "sender": "Agentur Muster"})
+DS = r.json().get("id") if r.ok else 0
+check(DS and done(AGS, DS), f"agent creates with a sender ({r.status_code})")
+row = dbx("SELECT sender_id, review FROM doc_meta WHERE node_id=?", (DS,))
+check(row and row[0][0] is None and row[0][1] == 1, f"level agent: the sender waits for review ({row})")
+check(A.put(B + "/api/docs/settings", json={"ws": "private", "levels": {"sender": "learn"}}).ok, "level sender back")
+check(TA.post(B + "/api/v1/documents", json={"name": "w.pdf", "content_base64": b64(["w"]), "parent_id": root, "ws": "private"}).status_code == 400,
+      "ws together with parent_id: 400")
 # a person without an organisation
 r = TF.post(B + "/api/v1/documents", json={"name": "f.pdf", "content_base64": b64(["Freelancer paper"]), "title": "Belegfreiberuf"})
 check(r.status_code == 201, f"freelancer creates with a person token ({r.status_code} {r.text[:120]})")
