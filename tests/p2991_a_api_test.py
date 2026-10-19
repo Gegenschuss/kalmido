@@ -73,7 +73,8 @@ def app_log():
     print(text[i:i + 4000] if i >= 0 else text[-2000:], flush=True)
 
 
-def anon(path, **kw):
+def anon(path, **kw):  # 2.99.1: the customer page in English (it falls back to German without Accept-Language)
+    kw.setdefault("headers", {}).setdefault("Accept-Language", "en")
     return requests.get(B + path, allow_redirects=False, **kw)
 
 
@@ -84,7 +85,7 @@ def keys(html):
 
 
 def ppost(path, **d):
-    hd = {"User-Agent": "TestBrowser/1.0"}
+    hd = {"User-Agent": "TestBrowser/1.0", "Accept-Language": "en"}
     hd.update(d.pop("_h", {}))
     return requests.post(B + path, data=d, allow_redirects=False, headers=hd)
 
@@ -290,10 +291,10 @@ r = ppost("/s/q/" + TOK, f=fk2[1], v=vk2[0], do="decline", name="Erika Beispiel"
 check(r.status_code == 303, f"Request changes {r.status_code}")
 R = A.get(B + f"{V}/{CV}").json()
 check(R["state"] == "changes" and any(x["customer"] and x["body"] == "Changes requested: Musik tauschen" for x in R["comments"])
-      and R["signoffs"][0]["state"] == "declined" and R["signoffs"][0]["signer_name"] == "Erika Beispiel", "the review's state + the decision as a comment line")
+      and R["signoffs"][0]["state"] == "declined" and R["signoffs"][0]["signer_name"] == "Erika Beispiel", f"the review's state + the decision as a comment line {R.get('state')} {[(x['customer'], x['body']) for x in R.get('comments', [])][-3:]} {R.get('signoffs', [{}])[:1]}")
 pg = anon("/s/q/" + TOK)
 check(pg.status_code == 200 and "Changes requested" in pg.text and 'name="text"' not in pg.text and "frame-src" not in pg.headers.get("Content-Security-Policy", ""),
-      "after the decision: the confirmation only (no form, the strict CSP)")
+      f"after the decision: the confirmation only (no form, the strict CSP) {pg.status_code} {pg.headers.get('Content-Security-Policy', '')[:120]} {'name=\"text\"' in pg.text} {'Changes requested' in pg.text}")
 check(ppost(f"/s/q/{TOK}/comments", f=CF, v=vk2[0], name="Erika", text="noch was").status_code == 303
       and len(sql("SELECT 1 FROM video_comments WHERE review_id=? AND body='noch was'", (CV,))) == 0, "no comments after the decision")
 enc = sql("SELECT signer_name FROM office_signoffs WHERE id=?", (S1["id"],))[0][0]
@@ -328,7 +329,7 @@ T6K = S6["url"].split("/s/q/")[1]
 pg = anon("/s/q/" + T6K)
 fk6, vk6 = keys(pg.text)
 check("Schnitt hier zu hart" not in pg.text and "no time control" in pg.text and 'name="at"' not in pg.text,
-      "internal comments stay internal; a link without time control: the hint, no timecode field")
+      f"internal comments stay internal; a link without time control: the hint, no timecode field {'Schnitt hier zu hart' in pg.text} {'no time control' in pg.text} {'name=\"at\"' in pg.text}")
 codes = [ppost(f"/s/q/{T6K}/comments", f=fk6[0], v=vk6[0], name="Erika", text=f"Nr {i}").status_code for i in range(12)]
 check(429 in codes, f"customer comments are limited per address {codes}")
 
