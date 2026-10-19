@@ -46,8 +46,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   const GIN = (await call('POST', '/api/admin/groups', {name: 'Office', members: [ALICE, P[2]]})).id;
   const GOUT = (await call('POST', '/api/admin/groups', {name: 'Field', members: [P[3]]})).id;
   await call('POST', '/api/tasks', {title: 'Fix the fence', list_id: L, assignee_group_id: GOUT});
-  // agents in the list: an idle one, one to pin
-  const mkAgent = async (u, n) => { const a = await call('POST', '/api/admin/agents', {scopes: ['write'], username: u, display_name: n}); await call('PUT', `/api/lists/${L}/members`, {user_id: a.id, role: 'edit'}); return {id: a.id, tok: a.token}; };
+  // agents, each in a list of its own (one agent per list): an idle one, one to pin
+  const mkAgent = async (u, n) => { const a = await call('POST', '/api/admin/agents', {scopes: ['write'], username: u, display_name: n}); const l = (await call('POST', '/api/lists', {name: 'Work of ' + n})).id; await call('PUT', `/api/lists/${l}/members`, {user_id: a.id, role: 'edit'}); return {id: a.id, tok: a.token}; };
   const AG1 = await mkAgent('quietbot', 'QuietBot'), AG2 = await mkAgent('pinbot', 'PinBot');
 
   // ================= the server: side_people / side_agents
