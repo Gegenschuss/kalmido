@@ -123,10 +123,11 @@ def vdr_v1_comment_new(vid):
     return jsonify(comment=one, review=d), 201
 
 
-@app.patch("/api/v1/videos/<int:vid>/comments/<int:cid>")
+@app.patch("/api/v1/videos/<int:vid>/comments/<comment_id>")  # second id as text like /tasks/<tid>/links/<list_id>: the spec says {comment_id}
 @v1_view
-def vdr_v1_comment_patch(vid, cid):
+def vdr_v1_comment_patch(vid, comment_id):
     """{done: bool}: its author or who may change the review (like the app)."""
+    cid = vdr_v1_id(comment_id, "comment_id")
     v1_args(())
     b = v1_json()
     reject_unknown(b, ("done",))

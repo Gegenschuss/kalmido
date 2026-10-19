@@ -36,7 +36,14 @@ function vdr_listHtml(rows, k, id, add) {
   return (li ? `<ul class="vdrrows" role="list">${li}</ul>` : '')
     + (add ? `<button type="button" class="btn sm vdradd" data-vdr="new" data-k="${k}" data-i="${id}">${ic('plus', 's')} ${tr('Add video link')}</button>` : '');
 }
-function vdr_redrawTask(tid) { if (S.sel === tid && typeof renderDetail === 'function') renderDetail(); }
+// 2.96.3 (#1959): the section arrives after the detail - redraw it without taking the focus (comment box of #reply/<id>)
+function vdr_redrawTask(tid) {
+  if (S.sel !== tid || typeof renderDetail !== 'function') return;
+  const a = document.activeElement, id = a?.id, ss = a?.selectionStart, se = a?.selectionEnd;
+  renderDetail();
+  const n = id && document.getElementById(id);
+  if (n && n !== document.activeElement) { n.focus({preventScroll: true}); try { if (ss != null) n.setSelectionRange(ss, se); } catch (e) { /* not a text field */ } }
+}
 function vdr_redrawView() { if (S.route.mod === 'clients' && typeof ms_clDraw === 'function') ms_clDraw(); else renderView(); }
 function vdr_taskHtml(t, ro) {
   if (!t || !(t.id > 0) || t.context) return '';

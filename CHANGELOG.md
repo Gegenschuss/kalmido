@@ -38,6 +38,12 @@ Bookmarks, a display name for customers, office data and locked wiki spaces betw
 ### Security
 - Security fix: link previews and moves between workspaces (organisation boundary).
 
+## [2.96.3] - 2026-10-19
+
+### Fixed
+- Video sign-off (CI 2.96.2): the agents' route for a comment names its second id like the API description, the browser demo
+  answers the video list, and the task detail keeps the comment box's focus (push button "Reply") when the section arrives (#1959).
+
 ## [2.96.2] - 2026-10-19
 
 Video sign-off with comments at the time code (links only), and an invitation to contribute national e-invoice formats.
