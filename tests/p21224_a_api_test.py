@@ -152,6 +152,13 @@ check(foreign and foreign["name"] == "" and foreign["user"] == "" and foreign["t
       f"#1724: another organisation's finding: ids only, still fixable {foreign}")
 check("Secret plans" not in json.dumps(bd), "#1724: no name of the other organisation anywhere in the answer")
 check(Ca.get(B + "/api/admin/orgs").status_code == 403, "#1724: an organisation admin is no instance admin (403)")
+# 2.122.4 review: a book_org finding (org_id empty, owner_org_id = the other organisation, owner without organisation) stays unnamed
+dbx("INSERT INTO books(owner_id, name, owner_org_id, created_at, changed_at) VALUES(?, 'Secret book', ?, '2026-10-20T10:00:00Z', '2026-10-20T10:00:00Z')",
+    (FID, OTHER))
+bd2 = A.get(B + "/api/admin/orgs").json()["boundary"]
+check(any(x["kind"] == "book_org" for x in bd2.get("details") or []) and "Secret book" not in json.dumps(bd2),
+      f"#1724: an address book of another organisation is not named {[x for x in bd2.get('details') or [] if x['kind'] == 'book_org']}")
+dbx("DELETE FROM books WHERE name='Secret book'")
 
 # ================================================================== #1724 (2): editing needs a shared organisation
 lo, hi = sorted((ALICE, DAN))
