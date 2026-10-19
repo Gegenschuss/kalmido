@@ -93,7 +93,7 @@ function ctCardHtml(c) {
   const b = ctBook(c.book_id), w = ctWrite(b);
   const it = (k, icon, href) => (c[k] || []).map(x => `<div class="ctf">${ic(icon, 's')}<span class="ctfl muted">${esc(ctTypeWord(k, x))}</span>${href(x)}</div>`).join('');
   const adr = (c.addresses || []).map(a => { const t = [a.street, [a.code, a.city].filter(Boolean).join(' '), a.region, a.country].filter(Boolean).join(', ');
-    return `<div class="ctf">${ic('mappin', 's')}<span class="ctfl muted">${esc(ctTypeWord('addresses', a))}</span><span>${esc(t)}</span></div>`; }).join('');
+    return `<div class="ctf">${ic('mappin', 's')}<span class="ctfl muted">${esc(ctTypeWord('addresses', a))}</span>${ctk_mapLink(t)}</div>`; }).join('');  // 2.119.1 B (#2086): a map link
   const kinds = Object.fromEntries(CT_LINK);
   return `<article class="ctcard" aria-labelledby="ct-h">
     <div class="cthead">${isMobile() ? `<button class="iconbtn" data-ct="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ctAv(c, 'avatar ctav big')}<div class="cthn"><h3 id="ct-h">${esc(c.fn || c.org || '?')}</h3>${feat('clients') ? `<div class="mstags">${ms_tag('contact')}</div>` : ''}${[c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).length ? `<div class="muted">${esc([c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).join(' · '))}</div>` : ''}</div>
@@ -115,8 +115,83 @@ function ctCardHtml(c) {
     ${(c.clients || []).length ? `<div class="ctsec cklsec"><h4>${tr('Contact person at')}</h4><ul class="ctlinks">${c.clients.map(x => `<li><a class="linkbtn" href="#client/${x.client_id}">${ic('brief', 's')} ${esc(x.name)}</a>${x.role ? `<span class="muted"> · ${esc(x.role)}</span>` : ''}</li>`).join('')}</ul></div>` : ''}${''/* 2.59.0 (#1735): the clients this contact is a contact person of (only who may open them) */}
     <div class="ctsec"><h4>${tr('Tasks')}</h4>${(c.tasks || []).length ? `<ul class="ctlinks">${c.tasks.map(t => `<li><button type="button" class="linkbtn ${t.status ? 'done' : ''}" data-cttask="${t.task_id}">${ic(t.status ? 'done' : 'list', 's')} ${esc(t.title)}</button><span class="muted"> · ${esc(tr(kinds[t.kind] || 'About'))}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No linked tasks yet: “Link a contact” in a task’s panel.')}</p>`}</div>
     ${(c.events || []).length ? `<div class="ctsec"><h4>${tr('Events')}</h4><ul class="ctlinks">${c.events.map(e => `<li><button type="button" class="linkbtn" data-evopen="${e.event_id}">${ic('cal', 's')} ${esc(e.title)}</button><span class="muted"> · ${esc(e.all_day ? fmtDayAbs(e.start.slice(0, 10)) : fmtDayAbs(e.start.slice(0, 10)) + ' ' + fmtTimeLoc(e.start.slice(11, 16)))}</span></li>`).join('')}</ul></div>` : ''}
+    ${ctk_histHtml(c)}
     ${w && (c.merges || []).length ? ctm_histHtml(c) : ''}
   </article>`;
+}
+// 2.119.1 B (#2083): "History" on the card -- filed mails from / to the contact, the quotations / invoices / credit notes of
+// its clients and its events, newest first (GET /api/contacts/<id>/history, only what the person may see; "Show more"
+// fetches the next page). Loaded once per opened card (a new card object = a new load); hidden while empty.
+const CTK = {card: null, items: [], more: false, loading: false};
+function ctk_histHtml(c) {
+  if (S.me?.kid || S.me?.kind === 'agent') return '';
+  if (CTK.card !== c) { CTK.card = c; CTK.items = []; CTK.more = false; setTimeout(() => ctk_histLoad(c, 0), 0); return `<div class="ctsec ctkhist" data-ctkh hidden></div>`; }
+  if (!CTK.items.length) return `<div class="ctsec ctkhist" data-ctkh hidden></div>`;
+  const icon = {mail: 'mail', offer: 'file', invoice: 'receipt', credit: 'receipt', event: 'cal'};
+  const word = {mail: tr('E-mail'), offer: tr('Quotation'), invoice: tr('Invoice'), credit: tr('Credit note'), event: tr('Appointment')};
+  const when = x => !x.at ? '' : x.kind === 'event' && !x.all_day && x.at.length > 10 ? `${fmtDayAbs(x.at.slice(0, 10))} ${fmtTimeLoc(x.at.slice(11, 16))}` : fmtDayAbs(x.at.slice(0, 10));
+  const title = x => x.title || (x.kind === 'mail' ? tr('(no subject)') : x.kind === 'event' ? '?' : tr('Draft'));
+  const open = x => x.kind === 'event' ? `<button type="button" class="linkbtn" data-evopen="${x.id}">` : x.kind === 'mail' ? `<button type="button" class="linkbtn" data-ctkmail="${x.id}">`
+    : `<a class="linkbtn" href="#office/offers/${x.id}">`;
+  return `<div class="ctsec ctkhist" data-ctkh><h4>${tr('Contact history')}</h4><ul class="ctlinks">${CTK.items.map(x => `<li>${open(x)}${ic(icon[x.kind] || 'file', 's')} ${esc(title(x))}${x.kind === 'event' || x.kind === 'mail' ? '</button>' : '</a>'}<span class="muted"> · ${esc([word[x.kind], x.sub, when(x)].filter(Boolean).join(' · '))}</span></li>`).join('')}</ul>
+    ${CTK.more ? `<button type="button" class="linkbtn" data-ctkmore ${CTK.loading ? 'disabled' : ''}>${tr('Show more')}</button>` : ''}</div>`;
+}
+async function ctk_histLoad(c, offset) {
+  CTK.loading = true;
+  let j; try { j = await rawFetch('GET', `/api/contacts/${c.id}/history?offset=${offset}`); } catch { j = null; }  // quiet: no section
+  CTK.loading = false;
+  if (CTK.card !== c || !j) return;
+  CTK.items = offset ? [...CTK.items, ...j.items] : j.items; CTK.more = !!j.more;
+  const el = $('#view [data-ctkh]'); if (el) el.outerHTML = ctk_histHtml(c);
+}
+// 2.119.1 B (#2082): "Create as client" in the card's menu (people with the module Clients): a client with the contact's
+// company (else its name), first e-mail, phone and address, and the contact as its default contact person, linked when
+// the address book fits the client (POST /api/clients checks it, office/contacts_cl.py ckl_book_fits: an organisation's
+// book -> a client of that organisation, an own private book -> a private client). Other books (a personal book in an
+// organisation's workspace, one shared by somebody else): the client of the book's workspace without the link. One undo
+// step (delete the client again). A linked contact shows "Open client" instead.
+function ctk_clientItem(c, b) {
+  if (typeof clientsOn !== 'function' || !clientsOn() || S.me?.kid || S.me?.kind === 'agent' || c.kind === 'group') return false;
+  const cl = (c.clients || [])[0];
+  if (cl) return {label: tr('Open client'), icon: 'brief', fn: () => go('client/' + cl.client_id)};
+  return {label: tr('Create as client'), icon: 'brief', fn: () => ctk_makeClient(c, b)};
+}
+function ctk_cty(v) {  // a contact's country (a code or a name in any app language) -> its ISO code, '' when unknown
+  const s = String(v || '').trim(); if (!s || typeof ctyValid !== 'function') return '';
+  if (s.length <= 3 && ctyValid(s)) return ctyCode(s);
+  const f = ctyFold(s);
+  return Object.entries(ctyNames()).find(([, n]) => ctyFold(n) === f)?.[0] || '';
+}
+function ctk_clientBody(c, b, link) {
+  const pick = (k, pref) => { const xs = (c[k] || []).filter(x => (x.value || '').trim()); return (xs.find(x => (x.type || []).includes(pref)) || xs[0])?.value?.trim() || ''; };
+  const okMail = v => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) ? v : '';
+  const email = okMail(pick('emails', 'work')), phone = pick('phones', 'work');
+  const as = c.addresses || [], a = as.find(x => (x.type || []).includes('work')) || as[0] || {};
+  const name = (c.org || c.fn || '').trim().slice(0, 80);
+  const body = {name, email: email.slice(0, 200), phone: phone.slice(0, 60), street: (a.street || '').slice(0, 200), zip: (a.code || '').slice(0, 20),
+    city: (a.city || '').slice(0, 120), org_id: link ? (b.org_owned ? b.org_id : null) : (b?.org_id ?? null),
+    contacts: [{name: (c.fn || c.org || name).trim().slice(0, 120), role: (c.title || '').slice(0, 120), email: email.slice(0, 200), phone: phone.slice(0, 60),
+      is_default: true, contact_id: link ? c.id : null}]};
+  const cty = ctk_cty(a.country); if (cty) body.country = cty;
+  return body;
+}
+async function ctk_makeClient(c, b) {
+  const link = !!b && (b.org_owned ? !!b.org_id : !b.org_id && b.owner_id === S.me?.id);
+  const body = ctk_clientBody(c, b, link);
+  if (!body.name) return;
+  let id = 0;
+  const after = async () => { await load().catch(() => {}); if (CT.card?.id === c.id) await ctOpen(c.id); if (typeof clReload === 'function') clReload(); };
+  const make = async () => {
+    let r;
+    try { r = await rawFetch('POST', '/api/clients', body); }
+    catch (x) {  // the contact went away / its book no longer fits: the client without the link
+      if (x.data?.code !== 'contact_gone') throw x;
+      body.contacts[0].contact_id = null; r = await rawFetch('POST', '/api/clients', body);
+    }
+    id = r.id; await after(); return r;
+  };
+  let r; try { r = await make(); } catch (x) { toast(x.message || ''); return; }
+  offerUndo(tr('Added: {0}', r.name), histAdd({label: tr('Create as client'), undo: async () => { await api('DELETE', `/api/clients/${id}`); await after(); }, redo: make}));
 }
 document.addEventListener('input', e => {
   if (e.target.id !== 'ct-q') return;
@@ -136,6 +211,9 @@ document.addEventListener('click', async e => {
   if (o && (CT.pick || (ms_modClick(e) && !isMobile() && bk_canPick()))) { e.preventDefault(); if (!ms_lpRecent(bk_lpS)) bk_click(+o.dataset.ctopen, e.shiftKey); return; }  // 2.46.1 (#1554): the selection mode; 2.47.3 (#1733): Shift- / Cmd-click
   if (o && ms_lpRecent(bk_lpS)) { e.preventDefault(); return; }  // the click that ends a long press
   if (o) { e.preventDefault(); if (isMobile()) go('contacts/' + o.dataset.ctopen); else ctOpen(+o.dataset.ctopen); return; }
+  const hm = e.target.closest('[data-ctkmail]');  // 2.119.1 B (#2083): a mail of the card's history
+  if (hm) { if (typeof hbm_open === 'function') hbm_open(+hm.dataset.ctkmail); return; }
+  if (e.target.closest('[data-ctkmore]') && CTK.card && !CTK.loading) { ctk_histLoad(CTK.card, CTK.items.length); return; }
   const tk = e.target.closest('[data-cttask]');
   if (tk) { e.preventDefault(); const id = +tk.dataset.cttask; if (taskById(id)) openDetail(id); else go('t/' + id); return; }
   const gp = e.target.closest('[data-ctgroup]');
@@ -160,7 +238,8 @@ document.addEventListener('click', async e => {
       try { await api('DELETE', `/api/contacts/${c.id}`); } catch { return; }
       CT.sel = null; CT.card = null; toast(tr('Contact deleted')); await load().catch(() => {}); if (isMobile()) go('contacts'); ctLoad(); }},
       feat('events') && {label: tr('Invite to a new event'), icon: 'cal', fn: () => evEditor({attendees: [{contact_id: c.id, name: c.fn, email: c.emails?.[0]?.value || '', partstat: 'needs-action'}]})},
-      typeof nwl_ctItem === 'function' && nwl_ctItem(c, w, b)]);  // 2.55.0 (#1455): the newsletter consent
+      typeof nwl_ctItem === 'function' && nwl_ctItem(c, w, b),  // 2.55.0 (#1455): the newsletter consent
+      ctk_clientItem(c, ctBook(c.book_id))]);  // 2.119.1 B (#2082): create a client from the contact / open its client
   }
 });
 

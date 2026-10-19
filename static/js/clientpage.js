@@ -21,6 +21,14 @@ async function ms_clInvLoad() {
   MSC.invLoading = false;
   ms_clDraw();
 }
+// 2.119.1 B (#2086): an address opens the map app on a tap (Apple devices: Apple Maps, else Google Maps); nothing is
+// embedded or fetched before the tap (here: the contacts module loads on demand, the client card uses it too)
+function ctk_mapLink(t) {
+  if (!t) return '';
+  const q = encodeURIComponent(t), apple = /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent);
+  const url = apple ? `https://maps.apple.com/?q=${q}` : `https://www.google.com/maps/search/?api=1&query=${q}`;
+  return `<a class="ctmap" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(tr('Show on the map'))}">${esc(t)}</a>`;
+}
 // 2.93.0 A (#1927): the client's documents made from templates (office/doctpl.py; admins of the office only, else no section)
 function ms_clGdHtml(c) {
   if (typeof officeOn !== 'function' || !officeOn()) return '';
@@ -86,7 +94,7 @@ function ms_clCard(c) {
       ${f('chart', tr('Budget'), esc(bud))}
       ${f('at', tr('E-mail'), c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}
       ${f('phone', tr('Phone'), c.phone ? `<a href="tel:${esc(c.phone.replace(/[^\d+]/g, ''))}">${esc(c.phone)}</a>` : '')}
-      ${f('mappin', tr('Address'), esc(adr))}
+      ${f('mappin', tr('Address'), ctk_mapLink(adr))}${''/* 2.119.1 B (#2086): a map link */}
       ${f('hash', tr('Customer number'), esc(b.customer_no || ''), 'cl_customer_no')}
       ${f('receipt', tr('VAT ID'), esc(b.vat_id || ''), 'cl_vat_id')}
       ${f('tag', tr('Buyer reference (e.g. routing ID)'), esc(b.buyer_reference || ''), 'cl_buyer_reference')}

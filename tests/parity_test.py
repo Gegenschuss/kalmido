@@ -237,6 +237,9 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.119.1 B (#2083): the history on a contact's card stays with people -- it gathers filed mails, office documents and "
+     "events, which agents do not read through one route (agent access to filed mails comes as its own step; the route answers 403)",
+     ("=GET /api/contacts/{}/history",)),
     ("2.102.0 A (#1988): the trash of deleted lists stays with people -- restoring a list or deleting it for good is the owner's, "
      "a list admin's or the organisation admins' decision (the routes answer 404 to agents); an agent's delete lands there too",
      ("=GET /api/trash/lists", "=POST /api/trash/lists/{}/restore", "=DELETE /api/trash/lists/{}")),
