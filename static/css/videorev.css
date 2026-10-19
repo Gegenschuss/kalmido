@@ -1,0 +1,56 @@
+/* Kalmido web client: the styles of the module "videos" (2.99.1 A, #1959: video sign-offs), loaded with it (static/js/lazyload.js
+   LD_CSS). One accent: timecodes, marks and the state "approved" in the accent; done comments grey; large targets (2.75rem). */
+.vdrrows{list-style:none;margin:0 0 .5rem;padding:0;display:flex;flex-direction:column;gap:.25rem}
+.vdrrow{display:flex;align-items:center;gap:.625rem;width:100%;min-height:2.75rem;padding:.375rem .625rem;border:1px solid var(--line);border-radius:var(--r-m,.625rem);
+  background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.vdrrow:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.vdrrt{display:flex;flex-direction:column;min-width:0;flex:1}
+.vdrrt b{font-weight:550;overflow-wrap:anywhere}
+.vdrst{width:.625rem;height:.625rem;border-radius:50%;border:2px solid var(--muted);flex:0 0 auto}
+.vdrst.st-approved{background:var(--accent);border-color:var(--accent)}
+.vdrst.st-changes{border-color:var(--accent)}
+.vdrpov .vdrrows,.vdrcl .vdrrows{max-width:40rem}
+.vdrform label{display:block;margin:.75rem 0 .25rem;font-size:.8125rem;color:var(--text2)}
+.vdrform input{width:100%}
+/* the review view: wide on a desktop, the whole screen on a phone */
+.vdrdlg .card{width:min(56rem,100%)}
+.vdrhd{display:flex;align-items:center;gap:.375rem}
+.vdrhd h3{margin:0;min-width:0;overflow-wrap:anywhere}
+.vdrv1{font-variant-numeric:tabular-nums;color:var(--text2);padding:0 .5rem}
+.vdrvsel select{min-height:2.25rem}
+.vdrstate{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.5rem 0}
+.vdrchip{display:inline-flex;align-items:center;padding:.125rem .625rem;border-radius:62.5rem;border:1px solid var(--line2);font-size:.8125rem;font-weight:600;color:var(--text2)}
+.vdrchip.st-approved{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
+.vdrchip.st-changes{border-color:var(--accent);color:var(--accent)}
+.vdrplay{position:relative;aspect-ratio:16/9;background:#000;border-radius:var(--r-m,.625rem);overflow:hidden}
+.vdrplay iframe,.vdrplay video{position:absolute;inset:0;width:100%;height:100%;border:0}
+.vdrnolink{display:flex;align-items:flex-start;gap:.5rem;flex-wrap:wrap;padding:.75rem;border:1px dashed var(--line2);border-radius:var(--r-m,.625rem);color:var(--text2)}
+.vdrnolink p{margin:0;flex:1 1 14rem}
+.vdrtl{position:relative;height:1.75rem;margin:.375rem 0;border-radius:.5rem;background:var(--bg3);border:1px solid var(--line)}
+.vdrmk{position:absolute;top:.125rem;width:1.25rem;height:1.375rem;margin-left:-.625rem;padding:0;border:0;background:transparent;cursor:pointer}
+.vdrmk::after{content:"";position:absolute;left:.375rem;top:.125rem;width:.5rem;height:1.125rem;border-radius:.25rem;background:var(--accent)}
+.vdrmk.done::after{background:var(--muted)}
+.vdrmk:focus-visible{outline:2px solid var(--accent)}
+.vdrcmp{margin:.75rem 0 .5rem}
+.vdrrep{display:flex;align-items:center;gap:.375rem;font-size:.8125rem;margin-bottom:.25rem}
+.vdrin{display:flex;align-items:flex-end;gap:.375rem}
+.vdrin textarea{flex:1;min-width:0;resize:vertical;min-height:2.75rem}
+.vdrat{display:inline-flex;align-items:center;gap:.25rem;min-height:2.75rem;padding:0 .625rem;border:1px solid var(--line2);border-radius:var(--r-m,.625rem);
+  background:transparent;color:var(--text2);font:inherit;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer}
+.vdrat.on{border-color:var(--accent);color:var(--accent)}
+.vdrin .btn{min-height:2.75rem}
+.vdrcms{list-style:none;margin:0;padding:0}
+.vdrc{padding:.5rem 0;border-bottom:1px solid var(--line)}
+.vdrch{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;min-height:2.25rem}
+.vdrch small{white-space:nowrap}
+.vdrtc{min-height:2.25rem;min-width:3.5rem;padding:0 .5rem;border:0;border-radius:.375rem;background:var(--accent-soft,var(--bg3));color:var(--accent);
+  font-family:var(--mono,monospace);font-size:.8125rem;font-variant-numeric:tabular-nums;cursor:pointer}
+.vdrcb{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:.125rem}
+.vdrc.done>.vdrcb{color:var(--muted);text-decoration:line-through}
+.vdrdone.on{color:var(--accent)}
+.vdrre{list-style:none;margin:.375rem 0 0 1rem;padding:0 0 0 .75rem;border-left:2px solid var(--line2)}
+.vdrre .vdrc{border-bottom:0;padding:.25rem 0}
+.vdrempty{padding:.75rem 0}
+.vdrsig{margin-top:1rem}
+.vdrsig h4{margin:0 0 .25rem}
+@media (max-width:899px){.vdrdlg .card{width:100%}.vdrin{flex-wrap:wrap}.vdrin textarea{flex-basis:100%;order:-1}}

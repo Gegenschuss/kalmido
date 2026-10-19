@@ -1838,6 +1838,26 @@ TOOLS += [
      lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/rules/proposals",
                              body=_pick(a, ("name", "trigger", "action", "summary", "title", "user_id")))),
 ]
+# 2.99.1 C (#1959): video sign-offs (links only) at tasks / lists shared with you: read the feedback, comment at a timecode
+TOOLS += [
+    ("list_video_reviews", "2.99.1: the video sign-offs at a task (task_id) or at a list and its tasks (list_id): title, state open | approved | "
+                           "changes (the customer's decision), versions (links), open_comments. Only reviews whose task / list is shared with you.",
+     _obj({"task_id": S_ID, "list_id": S_ID}), lambda api, a: api.call("GET", "/videos", _pick(a, ("task_id", "list_id")))),
+    ("get_video_review", "2.99.1: one video sign-off with its versions and ALL comments by version and timecode (timecode mm:ss, author, "
+                         "customer = written by the customer, done, replies). Use it to sum up the feedback for the edit.",
+     _obj({"review_id": S_ID}, ["review_id"]), lambda api, a: api.call("GET", f"/videos/{_id(a, 'review_id')}")),
+    ("add_video_comment", "2.99.1 (scope comments): a comment on a video sign-off, optionally at at_sec (seconds; the newest version unless "
+                          "version_id), or an answer to a comment (parent_id; it takes that comment's version and timecode). Your comments "
+                          "stay internal; an ANSWER to a customer's comment shows on the customer page (needs the right to change the task "
+                          "/ list) -- answer the customer only when the person asked you to.",
+     _obj({"review_id": S_ID, "body": {"type": "string", "minLength": 1, "maxLength": 2000}, "at_sec": {"type": "number", "minimum": 0, "maximum": 86400},
+           "version_id": S_ID, "parent_id": S_ID}, ["review_id", "body"]),
+     lambda api, a: api.call("POST", f"/videos/{_id(a, 'review_id')}/comments", body=_pick(a, ("body", "at_sec", "version_id", "parent_id")))),
+    ("set_video_comment_done", "2.99.1 (scope comments): mark a comment of a video sign-off done (done: true) or open again (false); "
+                               "your own comments, or all when you may change the task / list.",
+     _obj({"review_id": S_ID, "comment_id": S_ID, "done": {"type": "boolean"}}, ["review_id", "comment_id", "done"]),
+     lambda api, a: api.call("PATCH", f"/videos/{_id(a, 'review_id')}/comments/{_id(a, 'comment_id')}", body={"done": bool(a.get("done"))})),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -1886,6 +1906,7 @@ TOOL_SCOPES["agent"] += ("propose_contract_notice",)  # 2.70.0 C (#1359)
 TOOL_SCOPES["structure"] += ("propose_rule",)  # 2.71.0 A (#1457)
 TOOL_SCOPES["sheets:read"] = ("sheets_list", "sheet_read", "sheet_vars")  # 2.89.0 C (#1916)
 TOOL_SCOPES["sheets:write"] = ("sheet_create", "sheet_update", "sheet_set_cells", "sheet_append_rows", "sheet_add_column", "sheet_undo_batch")
+TOOL_SCOPES["comments"] += ("add_video_comment", "set_video_comment_done")  # 2.99.1 C (#1959)
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
               "private", "files:read", "files:write", "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts; 2.68.0 (#1839): + import; 2.89.0 C (#1916): + sheets

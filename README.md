@@ -23,6 +23,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **2.97.0** (2026-10-19): bookmarks with preview, tags and search (Karakeep fills the same store), a display name for
   customers and the recipient always from the customer, office data and wiki spaces with a lock move between the private
   space and an organisation.
+- **2.96.2** (2026-10-19): video sign-off at tasks, projects and clients - links from Vimeo, YouTube or a video file (no
+  hosting), comments at the time code with marks, versions, a customer link with Approve / Request changes, export for
+  the edit, agent access; how to contribute national e-invoice formats ([CONTRIBUTING.md](CONTRIBUTING.md)).
 - **2.96.0** (2026-10-18): files, folders, documents, wiki pages and tables move between your private space and an
   organisation, both ways (sealed again, shares that do not hold end, one undo); an organisation export can go into the
   private space; one card per background job in the agent chat with a filter.
