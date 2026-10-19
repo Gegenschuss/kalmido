@@ -1106,6 +1106,9 @@ fresh; run p299_a_api "$PY" p299_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p299_b_ui node p299_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.99.0 part C: the quotation PDF after the online acceptance carries the acceptance note (#2195)
 fresh; run p299_c_api "$PY" p299_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.99.0 part D: office documents - fixed recipient fields rest (name addition, own company fields, 3-line company name), 44 px fields (#2188 #2025)
+fresh; run p299_d_api "$PY" p299_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p299_d_ui node p299_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.86.0 (#1896): hardening from audit #476 part 1, groups A-E
 fresh; run p286_a_api "$PY" p286_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p286_b_api "$PY" p286_b_api_test.py "$KALMIDO_TEST_DATA"
