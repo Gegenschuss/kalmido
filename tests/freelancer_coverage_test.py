@@ -679,6 +679,10 @@ ROUTES = {
     "POST /api/office/drives/{}/restore": "office", "GET /api/office/drives/{}/log": "office", "POST /api/office/drives/{}/trip": "office",
     "GET /api/office/logbook/report": "office", "GET /api/office/logbook.csv": "office", "GET /api/office/logbook.pdf": "office",
     "PUT /api/office/logbook/settings": "office",
+    # 2.123.0 D (#2341): the account balance of the cash flow, office admins; the personal office of a freelancer in p2123_d_api_test.py
+    "GET /api/office/cashflow/start": "office", "PUT /api/office/cashflow/start": "office", "DELETE /api/office/cashflow/start": "office",
+    "POST /api/office/cashflow/adjust": "office", "PATCH /api/office/cashflow/adjust/{}": "office", "DELETE /api/office/cashflow/adjust/{}": "office",
+    "PUT /api/office/cashflow/actual": "office",
     # 2.121.0 B (#2095): the cash book, the personal office of a freelancer in p2121_b_api_test.py
     "GET /api/office/cashbooks": "office", "POST /api/office/cashbooks": "office", "GET /api/office/cashbooks/links": "office",
     "PATCH /api/office/cashbooks/{}": "office", "GET /api/office/cashbooks/{}/entries": "office", "POST /api/office/cashbooks/{}/entries": "office",
