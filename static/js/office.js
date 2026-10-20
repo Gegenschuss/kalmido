@@ -70,8 +70,9 @@ function ofcPaint(el, force) {
     OFCP.stale = true; return;
   }
   clearTimeout(OFCP.t); OFCP.t = 0; OFCP.stale = false;
-  const top = el.scrollTop; setHtml(el, html); OFCP.key = key;
+  const top = el.scrollTop, btop = $('.ofbody', el)?.scrollTop || 0; setHtml(el, html); OFCP.key = key;
   if (same && el.scrollTop !== top) el.scrollTop = top;
+  const ob = $('.ofbody', el); if (same && ob && btop && ob.scrollTop !== btop) ob.scrollTop = btop;  // 2.144.1 A (#2445): touch tablets scroll the page in .ofbody
   const r = OFCP.replay; OFCP.replay = null;
   if (r && same) { const b = el.querySelector(r); if (b) setTimeout(() => b.click(), 0); }
 }
