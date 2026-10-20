@@ -47,19 +47,20 @@ function dlToOffice(tid) {
     <p class="muted shint" id="dl-neth">${esc(tr('Without VAT. The device shows what you paid; please check the net price.'))}</p>
     <div class="aerr" role="alert"></div><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Add')}</button></div>`);
   md.classList.add('dldlg');
+  const mdq = /** @type {any} */ (md);  // $() takes a root element; tsc reads its parameter as a Document
   md.addEventListener('click', async e => {
     const b = /** @type {any} */ (e.target).closest?.('button'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     if (b.dataset.m !== 'save') return;
     b.disabled = true;
-    const net = String($('#dl-net', md).value || '').trim().replace(/\s/g, '');
-    const body = {office_id: +$('#dl-off', md).value || 0, name: $('#dl-name', md).value, ...(net ? {purchase_net: net.replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')} : {})};
+    const net = String($('#dl-net', mdq).value || '').trim().replace(/\s/g, '');
+    const body = {office_id: +$('#dl-off', mdq).value || 0, name: $('#dl-name', mdq).value, ...(net ? {purchase_net: net.replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')} : {})};
     try { DL.byTask[tid] = {link: (await rawFetch('POST', `/api/life/devices/${tid}/to-office`, body)).link, offices: []}; }
-    catch (er) { const x = $('.aerr', md); if (x) x.textContent = er.message || ''; b.disabled = false; return; }
+    catch (er) { const x = $('.aerr', mdq); if (x) x.textContent = er.message || ''; b.disabled = false; return; }
     md.remove(); dlLoad(tid);
     toast(tr('Added to the office equipment'));
   });
-  setTimeout(() => $('#dl-name', md)?.focus(), 30);
+  setTimeout(() => $('#dl-name', mdq)?.focus(), 30);
 }
 
 // to the equipment: the office of its workspace, then its editor
