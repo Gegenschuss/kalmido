@@ -54,6 +54,7 @@ async function evPop(anchor, e) {
     ${att.length ? `<div class="cevm evatt">${ic('users', 's')}<span>${att.slice(0, 8).map(a => `<span class="evap ps-${esc(a.partstat)}" title="${esc(tr(EV_PS_WORD[a.partstat] || ''))}">${esc(a.name || a.email)}</span>`).join(', ')}${att.length > 8 ? ' …' : ''}</span></div>` : ''}
     ${ev.reminders?.length ? `<div class="cevm">${ic('bell', 's')}<span>${esc(ev.reminders.map(m => evRemLabel(m, ev.all_day)).join(', '))}</span></div>` : ''}
     ${desc ? `<div class="cevdesc">${cevLinkify(desc)}</div>` : ''}
+    ${typeof hbm_linkHtml === 'function' ? hbm_linkHtml('event', ev.id) : ''}${''/* 2.141.0 B (#2139): the e-mail the event was made from (hubmail.js) */}
     ${t ? `<button class="linkbtn evtask" data-evp="task">${ic('done', 's')} ${esc(tr('Preparation: {0}', t.title))}</button>` : ''}
     ${me ? `<div class="evrsvp" role="group" aria-label="${esc(tr('Your answer'))}">${EV_PS.map(([k, n, i]) => `<button class="btn sm ${me.partstat === k ? 'on' : ''}" data-evps="${k}" aria-pressed="${me.partstat === k}">${ic(i, 's')} ${tr(n)}</button>`).join('')}</div>` : ''}
     ${w && ev.status === 'tentative' && !e.recurring ? `<div class="cevact apdraftact"><button class="btn sm pri" data-evp="apok">${ic('check', 's')} ${tr('Confirm')}</button><button class="btn sm" data-evp="del">${ic('x', 's')} ${tr('Discard')}</button></div>` : ''}

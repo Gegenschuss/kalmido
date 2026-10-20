@@ -489,6 +489,15 @@ e-mail* (the server's mailbox, see SELF-HOSTING.md "Mail"); without it the addre
   project / see the client (taking a mail back to *Not assigned*: its recipient). Both are one undo step each; a deleted
   mail can be restored with Undo. The attachments of a mail can be opened by everybody who sees the mail.
 - **Search**: subject, sender and text (a hashed word index, no plain index).
+- **HTML view** (2.141): a mail with an HTML part opens in that view (*Text / HTML* switches). The HTML is cleaned on the
+  server (scripts, frames, forms, event attributes and script links removed) and shown in a sandboxed frame without scripts
+  under its own strict content security policy. External images stay blocked until *Load images* (for this view only);
+  embedded images show at once. Links open in a new tab. A damaged or unreadable original falls back to the text.
+- **Task / event from a mail** (2.141): *Task from it* / *Event from it* in the reading view - a list or calendar of the
+  mail's workspace where you may write; title = the subject without Re / Fwd, description = the start of the text and the
+  sender. The task / event shows *E-mail: subject* (a tap opens the mail) - only to people who may read the mail, everybody
+  else sees just *E-mail*. The mail lists the tasks / events made from it. Such tasks are normal tasks for agents too; the
+  mail itself stays invisible to them.
 - **Agents** have no access to filed mails in 2.84 (no API route, no MCP tool).
 
 ## Travel expenses: taking over a per diem spreadsheet (2.95)

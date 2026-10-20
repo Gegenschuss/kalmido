@@ -70,6 +70,7 @@ TABLES = (
     "list_rules",  # 2.71.0 A (#1457): rules of a list (org_id follows the list, NULL = a private list)
     "office_pack_installs",  # 2.76.0 A (#1023): packs installed from the catalogue per office area
     "hub_tokens", "hub_mails",  # 2.84.0 A (#1198): hub mail addresses + filed mails (NULL = private, the app checks owner / client / list)
+    "hub_mail_links",  # 2.141.0 B (#2139): tasks / events made from a filed mail (org_id like the mail, NULL = private, the app checks)
     "office_archive_log",  # 2.81.0 B (#1834): the history of an archived document (org_id like the entry)
     "tchat_rooms", "tchat_files",  # 2.113.1 B (#2059): team chat channels of an organisation + their files (NULL = DMs, list channels, own space; the app checks members)
     "sheets",  # 2.89.0 (#1916): tables (NULL = private, the app checks owner_id; parts hang on sheet_id)

@@ -41,8 +41,8 @@ KINDS = {
     "team": ("matrix", SUITE + ": the people list, direct messages and discovery without an organisation (no team rooms of "
                        "an organisation, nothing of another workspace); p2113b_b_api_test.py: a private channel with files, "
                        "rename / archive / restore as its own admin, groups only with people one works with (2.113.1)"),
-    "hub": ("matrix", SUITE + ", p2125_a_api_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
-                      "2.125.0: the own vacation account and working week, never a vacation request"),
+    "hub": ("matrix", SUITE + ", p2125_a_api_test.py, p2141_b_api_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
+                      "2.125.0: the own vacation account and working week, never a vacation request; 2.141.0 B: HTML view, task / event from a private mail"),
     "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature"),
     "videos": ("matrix", "p2991_a_api_test.py: video sign-offs (2.99.1) at a private task / list / client of a person without an "
                "organisation: create, comments, versions, customer link, export, delete + restore; p2991_c_api_test.py: the own agent "
@@ -204,7 +204,9 @@ ROUTES = {
     "GET /api/team/dispo": "hub", "GET /api/team/dispo/export": "hub", "GET /api/team/dispo/free": "hub", "GET /api/v1/absences": "hub", "GET /api/v1/dispo": "hub",
     "GET /api/v1/dispo/free": "hub", "PATCH /api/team/absences/{}": "hub", "PATCH /api/team/dispo/bookings/{}": "hub",
     "POST /api/hubmail/address": "hub", "POST /api/hubmail/mails/{}/assign": "hub",
-    "POST /api/hubmail/mails/{}/restore": "hub", "POST /api/team/absences": "hub", "POST /api/team/absences/{}/restore": "hub",
+    "POST /api/hubmail/mails/{}/restore": "hub",
+    "GET /api/hubmail/mails/{}/html": "hub", "GET /api/hubmail/mails/{}/make": "hub", "POST /api/hubmail/mails/{}/task": "hub",  # 2.141.0 B (#2140, #2139)
+    "POST /api/hubmail/mails/{}/event": "hub", "GET /api/hubmail/links": "hub", "POST /api/team/absences": "hub", "POST /api/team/absences/{}/restore": "hub",
     "POST /api/team/dispo/bookings": "hub", "POST /api/team/dispo/bookings/restore": "hub",
     "PUT /api/team/absences/holidays": "hub",
     # 2.125.0 A (#2117, #2118): vacation account, requests, the working week
