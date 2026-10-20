@@ -12,6 +12,7 @@ from .calendars.subscriptions import cal_loop, CAL_ON
 from .admin.backup import backup_loop, BK_ON_ENV
 from .api.v1 import WH_ON
 from .integrations.webhooks import wh_loop
+from .notify.channels import chn_loop, CH_ON
 from .integrations.git import git_loop
 from .integrations.mail import MAIL_IN_ON, mail_loop
 from .events.model import migrate_family_events
@@ -50,6 +51,8 @@ if os.environ.get("TASKS_WATCHDOG", "1") == "1" and WRK_ROLE != "web":
         wrk_start("backup", backup_loop)
     if WH_ON:  # webhook deliveries (queue + retries)
         wrk_start("webhooks", wh_loop)
+    if CH_ON:  # 2.142.0 A (#2145): notification channels (Slack, Matrix, Telegram, Signal)
+        wrk_start("channels", chn_loop)
     if MAIL_IN_ON:  # 2.17.0 (#443): new tasks by e-mail (one mailbox, polled)
         wrk_start("mail-in", mail_loop)
     wrk_start("git", git_loop)  # 2.2.0 (#271): repositories of project lists (idle without any)

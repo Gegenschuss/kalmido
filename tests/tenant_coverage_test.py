@@ -85,6 +85,8 @@ KINDS = {
     "assistant": ("matrix", "p275_a_api_test.py: another person's task / basket item / list 404 or left out; shares of lists the person no longer sees dropped; the log only own rows; agents never"),
     "receipt": ("matrix", "p248_d_receipts_api_test.py: receipt data and suggestions only on a visible document; projects of another workspace refused; outsiders 404"),
     "webhook": ("matrix", "p2300_tenant_test.py: webhooks by id, deliveries only of visible tasks; p2115_a_api_test.py: an organisation's webhooks only for its admins, never events of a member's private list"),
+    "channel": ("matrix", "p2142_a_api_test.py (2.142.0): a channel of another person / organisation by id: 404; an organisation's channels only for its admins; "
+                          "its messages never of a private list, a list shared only with some, another organisation or the words of a locked list"),
     "export": ("matrix", "p2300_tenant_test.py: the export has only the own data"),
     "stats": ("matrix", "p2300_tenant_test.py: statistics count only own / visible tasks"),
     "publiclink": ("matrix", "p2300_tenant_test.py: the public link of another person's list by id"),
@@ -770,6 +772,12 @@ ROUTES = {
     "GET /api/orgs/{}/webhooks": "webhook", "POST /api/orgs/{}/webhooks": "webhook", "PATCH /api/orgs/{}/webhooks/{}": "webhook",
     "DELETE /api/orgs/{}/webhooks/{}": "webhook", "POST /api/orgs/{}/webhooks/{}/secret": "webhook",
     "POST /api/orgs/{}/webhooks/{}/test": "webhook", "GET /api/orgs/{}/webhooks/{}/log": "webhook",
+    # 2.142.0 A (#2145): notification channels of a person / of an organisation (its admins; messages only of lists open to every
+    # member) -- p2142_a_api_test.py
+    "GET /api/me/channels": "channel", "POST /api/me/channels": "channel", "PATCH /api/me/channels/{}": "channel",
+    "DELETE /api/me/channels/{}": "channel", "POST /api/me/channels/{}/test": "channel",
+    "GET /api/orgs/{}/channels": "channel", "POST /api/orgs/{}/channels": "channel", "PATCH /api/orgs/{}/channels/{}": "channel",
+    "DELETE /api/orgs/{}/channels/{}": "channel", "POST /api/orgs/{}/channels/{}/test": "channel",
     "POST /api/hooks/in/{}": "token", "GET /api/lists/{}/hooks-in": "list", "POST /api/lists/{}/hooks-in": "list",
     "PATCH /api/hooks-in/{}": "list", "DELETE /api/hooks-in/{}": "list", "POST /api/hooks-in/{}/rotate": "list",
     "POST /api/hooks-in/{}/restore": "list",

@@ -699,6 +699,12 @@ ROUTES = {
     "GET /api/orgs/{}/webhooks": "orgadmin", "POST /api/orgs/{}/webhooks": "orgadmin", "PATCH /api/orgs/{}/webhooks/{}": "orgadmin",
     "DELETE /api/orgs/{}/webhooks/{}": "orgadmin", "POST /api/orgs/{}/webhooks/{}/secret": "orgadmin",
     "POST /api/orgs/{}/webhooks/{}/test": "orgadmin", "GET /api/orgs/{}/webhooks/{}/log": "orgadmin",
+    # 2.142.0 A (#2145): a person's notification channels (p2142_a_api_test.py as a person without an organisation, with the
+    # private area's own list events); an organisation's channels are managed by its admins
+    "GET /api/me/channels": "own", "POST /api/me/channels": "own", "PATCH /api/me/channels/{}": "own",
+    "DELETE /api/me/channels/{}": "own", "POST /api/me/channels/{}/test": "own",
+    "GET /api/orgs/{}/channels": "orgadmin", "POST /api/orgs/{}/channels": "orgadmin", "PATCH /api/orgs/{}/channels/{}": "orgadmin",
+    "DELETE /api/orgs/{}/channels/{}": "orgadmin", "POST /api/orgs/{}/channels/{}/test": "orgadmin",
     # ---- wiki (24)
     "DELETE /api/wiki/pages/{}": "wiki", "GET /api/wiki": "wiki", "GET /api/wiki/e2e": "wiki",
     "GET /api/wiki/e2e/todo": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki",

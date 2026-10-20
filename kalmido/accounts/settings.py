@@ -25,7 +25,8 @@ from .layouts import LAYOUT_KEYS
 SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share",
                         "purpose", "evcals_hidden", "care_sent",
                         "brief_sent", "brief_read",  # 2.34.0 (#264)
-                        "fav_asked")  # 2.46.1 (#1361): lists already offered as a favourite
+                        "fav_asked",  # 2.46.1 (#1361): lists already offered as a favourite
+                        "evmail_at", "evmail_day")  # 2.142.0 A (#2146): the bundled event mails sent
 SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "areas", "team")  # 2.25.0 (UX-03); 2.39.1 (#1185): areas
 SIDE_PEOPLE_MAX = 5  # 2.99.0 E (#2187): people pinned to the sidebar (static/js/sbnav.js SB_PINS)
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family", "kpi")  # 2.17.0 (#475), 2.19.0; 2.55.1: kpi (2.50.0 #1197, office admins)
@@ -111,6 +112,10 @@ def clean_setting(k, v):
     if k == "tz":  # 2.125.0 B (#2120): my time zone of time tracking ('' = the server's)
         from ..personal.timesheet import tz_clean
         return tz_clean(sv)
+    if k in ("mail_assign", "mail_mention"):  # 2.142.0 A (#2146): off | only without a push device | always
+        if sv not in ("off", "nopush", "always"):
+            raise bad
+        return sv
     if k == "agent_comments":  # 2.62.0 (#1854): comments by agents: all | only replies to me
         if sv not in ("all", "replies"):
             raise bad

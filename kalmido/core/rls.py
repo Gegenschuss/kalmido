@@ -83,6 +83,7 @@ TABLES = (
     "fs_ext_links",  # 2.112.1 B (#2058): external share links of the file store (org_id = the node's, NULL = private)
     "org_invites",  # 2.115.0 B (#2062): accounts an organisation invited by e-mail (always an organisation's)
     "webhooks",  # 2.115.0 A (#2061): outgoing webhooks (NULL = a person's own / an agent's, else its organisation's admins)
+    "notify_channels",  # 2.142.0 A (#2145): notification channels (NULL = a person's own, else its organisation's admins)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"
