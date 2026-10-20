@@ -7213,7 +7213,6 @@
   "Create export": "Crear exportación",
   "Delete the export now?": "¿Eliminar la exportación ahora?",
   "The archive is removed from the server. You can create a new one at any time.": "El archivo se elimina del servidor. Puedes crear uno nuevo en cualquier momento.",
-  "Only comments of agents can be saved as a task": "Solo los comentarios de agentes se pueden guardar como tarea",
   "Comment on {0}": "Comentario en {0}",
   "Open the comment in the task": "Abrir el comentario en la tarea",
   "The task gets the whole comment, its files and a link back to it.": "La tarea recibe el comentario completo, sus archivos y un enlace de vuelta.",

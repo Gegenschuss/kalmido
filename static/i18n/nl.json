@@ -7213,7 +7213,6 @@
   "Create export": "Export maken",
   "Delete the export now?": "Export nu verwijderen?",
   "The archive is removed from the server. You can create a new one at any time.": "Het archief wordt van de server verwijderd. Je kunt op elk moment een nieuw maken.",
-  "Only comments of agents can be saved as a task": "Alleen opmerkingen van agents kunnen als taak worden bewaard",
   "Comment on {0}": "Opmerking bij {0}",
   "Open the comment in the task": "Opmerking in de taak openen",
   "The task gets the whole comment, its files and a link back to it.": "De taak krijgt de hele opmerking, de bestanden en een link terug.",
