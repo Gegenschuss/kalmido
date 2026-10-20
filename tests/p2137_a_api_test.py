@@ -331,7 +331,11 @@ ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write"], "u
 AGH = {"Authorization": "Bearer " + ag.get("token", ""), "X-Requested-With": "kalmido"}
 check(requests.post(B + f"/api/v1/orgs/{PB}/export", headers=AGH).status_code in (403, 404), "an agent cannot export a personal office")
 Fr.post(B + "/api/lists", json={"name": "Frida Privatliste"})
-PX, PRK = export(Fr, PB)
+# 2.137.0 (#2344, with 2.138.0 #1972): the own personal office is organisation 0; its hidden id is never used from outside
+check(Fr.get(B + f"/api/orgs/{PB}/export").status_code == 404, "the owner: the hidden id itself 404 (0 = mine)")
+check(requests.post(B + "/api/v1/orgs/0/export", headers=TKH).status_code in (403, 404), "an API token of the owner cannot export it (0)")
+check(requests.post(B + "/api/v1/orgs/0/export", headers=AGH).status_code in (403, 404), "an agent cannot export it (0)")
+PX, PRK = export(Fr, 0)
 iid, pv = opened(Do, PX, PRK)
 j = run(Do, iid, ORG3)
 check(j.get("state") == "done", f"personal office into an organisation {j.get('error')} {warnings(j)}")
