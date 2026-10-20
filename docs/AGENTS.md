@@ -1913,6 +1913,13 @@ The proposal goes to the list's owner (or `user_id`: an owner / admin of the lis
 person's rights; it belongs to them, never to the agent. The answer comes as the event `job` (approve / reject). At most 20
 rule proposals per agent and day.
 
+2.138.0 (#2060): new triggers `created` (a task is created in the list), `assigned` (`user_id`: only that person, null =
+anybody; fires only when the person is new on the task) and `field` (`field_id` of the list's custom fields; `value` = only
+when set to that option id / `"1"` checked / `"0"` unchecked, null = any change; formula fields never trigger). New actions
+`priority` (`priority` none / low / medium / high), `tag` (`tag_id`: adds a tag of this list; personal tags never) and `field`
+(`field_id` + `value`, checked like a normal field value, null clears it). A deleted field or list tag pauses the rule
+(`paused_reason` `field` / `tag`). The loop protection stays: a value set by a rule never triggers a `field` rule.
+
 ### Table rows as tasks (2.126.1)
 
 Step 2 of the tables (*rows -> tasks*, `POST /api/sheets/{id}/to-tasks`) stays a button for people: agents get 403 there.

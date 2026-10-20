@@ -327,6 +327,21 @@ For software teams working on a board. Everything is off until you switch it on.
 - **Velocity**: with sprints and story points on, the project page offers the block *Velocity*: the completed points of
   the last (up to six) closed sprints as bars and their average as a planning aid for the next sprint.
 - Agents read and set the same through the API and MCP (`points`, `set_wip_limit`, `get_velocity`, see AGENTS.md).
+
+## Swimlanes on the board (2.138.0)
+
+The button *Swimlanes* above a kanban board groups the cards into horizontal lanes: by **person** (the people with tasks
+on the board, then *Nobody assigned*), by **priority** (High, Medium, Low, No priority) or by a **custom field** of the
+list (a select field: its options, then *No value*; a checkbox: yes / no). *None* shows the board as before.
+
+- The column heads (count, WIP limit, points, the column menu, dragging a column) stay in one row on top; each lane has
+  its own head with name and count and folds with a tap (it stays folded).
+- Dragging a card into another lane sets that lane's value (priority, field or person; a person replaces the previous
+  one); a move into another column at the same time is one undo step. Only people who may edit the list can drag.
+- *+ Task* in a lane creates the task with the lane's value.
+- On a phone the lanes stand below each other and the board swipes sideways as a whole; a long press drags a card into
+  another lane.
+- The choice is remembered per list on your account in this browser; other members choose their own.
 ## Photo metadata on upload (2.61.0)
 
 Photos keep a lot about where and how they were taken: the place (GPS), the camera and its serial number, the capture
@@ -514,6 +529,17 @@ workspace).
 - The history of the task and the comment show "Rule <name>".
 - Health lists, the basket and locked lists have no rules. Copying a list or making a template does not copy its rules.
 - Agents read rules and can only propose one; the owner or an admin accepts it with 👍.
+
+2.138.0 adds three triggers and three actions:
+
+- *A task is created* (also by an agent, the API or an import step), *A task is assigned* (to a chosen person or to anyone;
+  only when the person is new on the task) and *A custom field changes* (any change, or for selection and checkbox fields
+  only a chosen value: an option, checked, unchecked). Formula fields are calculated and never start a rule.
+- *Set the priority* (none, low, medium, high), *Add a list tag* (only tags of this list: the rule belongs to everyone in
+  the list, personal tags stay personal) and *Set a custom field* (a fixed value, checked like a value you type; empty
+  clears the field).
+- A deleted custom field or list tag pauses the rules that use it. A value set by a rule never starts a "field changes"
+  rule (the same loop protection as above).
 
 ## An own picture as the organisation's symbol (2.87.9)
 

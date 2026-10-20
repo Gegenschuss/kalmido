@@ -170,19 +170,21 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   w.eval(`settingsModal('share')`); await sleep(700);
   check(d.querySelector('#s-dropurl').value === 'https://kalmido.example' && /Without \/drop/.test(d.querySelector('#sp-integr').textContent), 'server address without /drop + hint');
   check(/server address above followed by \/drop/.test(d.querySelector('#sp-integr').textContent), 'guide: by hand, /drop goes after the server address');
-  const tok0 = (await call('alice', 'GET', '/api/me')).drop_token;
-  d.querySelector('[data-m="drop-new-tok"]').click(); await sleep(1000);
-  const tok1 = (await call('alice', 'GET', '/api/me')).drop_token;
-  check(tok1 && tok1 !== tok0 && d.querySelector('#s-droptok').value === tok1 && d.querySelector('#s-droptok').type === 'text', 'New token in "Share from your phone": field shows the new one');
+  // 2.138.0 (#1907): the token is shown once, right after "New token" (the server keeps only a hash)
+  const tok0 = d.querySelector('#s-droptok')?.value || '';
+  d.querySelector('[data-m="drop-new-tok"]').click(); await sleep(600);
+  d.querySelector('[data-cd="yes"]')?.click(); await sleep(800);
+  const tok1 = d.querySelector('#s-droptok')?.value || '';
+  check(tok1.length >= 20 && tok1 !== tok0 && (await call('alice', 'GET', '/api/me')).drop_token_set === true, 'New token in "Share from your phone": field shows the new one');
   d.querySelector('[data-m="close"]').click(); await sleep(200);
   w.eval(`settingsModal('share')`); await sleep(700);
-  d.querySelector('[data-m="drop-copy-tok"]').click(); await sleep(500);  // loads the real token into the field
+  check(!d.querySelector('#s-droptok') && /Active/.test(d.querySelector('#s-dropw')?.textContent || ''), 'reopened: no token, only "Active since"');
   // 2.7.0 (#405 S3): the upload token lives only under Share from your phone; Account links there
   w.eval(`settingsModal('account')`); await sleep(500);
   const sm = d.querySelector('.modal');
   check(!sm.querySelector('[data-acc="token-new"]') && sm.querySelector('[data-pane="account"] [data-m="go-share"]'), 'Account: no second "New token", a link to Share from your phone');
   sm.querySelector('[data-m="go-share"]').click(); await sleep(200);
-  check(sm.querySelector('.snav [data-sec="integr"]').classList.contains('on') && sm.querySelector('#s-droptok'), 'the link opens Share from your phone');
+  check(sm.querySelector('.snav [data-sec="integr"]').classList.contains('on') && sm.querySelector('#s-dropw'), 'the link opens Share from your phone');  // 2.138.0 (#1907): #s-dropw
   sm.querySelector('[data-m="close"]').click(); await sleep(200);
 
   // ---- #299 "Claude is writing …" (2.13.2 #478 F6: "working" on a task without a typing signal = "is working on it")

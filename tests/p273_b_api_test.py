@@ -39,7 +39,7 @@ H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
 FAILS, OKS = [], [0]
 SECRET = {"password_hash", "password", "token", "token_hash", "secret", "hook_secret", "totp_secret", "p256dh", "auth", "endpoint",
-          "api_key", "access_token", "refresh_token", "drop_token", "ical_token", "code_hash", "webauthn_handle", "oidc_subject", "token_enc"}
+          "api_key", "access_token", "refresh_token", "drop_token", "ical_token", "drop_token_hash", "ical_token_hash", "code_hash", "webauthn_handle", "oidc_subject", "token_enc"}  # 2.138.0 (#1907): + hashes
 
 
 def EH(email):  # review M1: other people's addresses only as this hash

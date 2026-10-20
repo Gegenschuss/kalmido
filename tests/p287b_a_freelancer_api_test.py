@@ -251,7 +251,7 @@ for route, kind in sorted(cov.ROUTES.items()):
         if r.status_code == 403 and "Only agent accounts" in r.text:  # the agent side of the office / layouts: the own agent's token
             r = requests.get(B + url, headers=AT)
     else:
-        r = F.get(B + url)
+        r = F.get(B + url, headers={"Sec-Fetch-Site": "same-origin"})  # 2.138.0 (#1907): as a browser does (downloads of the own page only)
     swept += 1
     if r.status_code in (401, 403) and route in ALLOW:
         continue

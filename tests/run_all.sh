@@ -1385,6 +1385,20 @@ fresh; run p2125_c_api "$PY" p2125_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2125_c_ui node p2125_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.125.0 part D: browser demo like a new account, all modules (#1653) (no container)
        run p2125_d_demo node p2125_d_demo_test.js
+# 2.138.0 part A: office quotations - unit in percent rows, part rename on the title page, wrapped part headings, unit words by quantity; service worker other origins (#2236 #2239 #2240 #2249 #2257)
+fresh; run p2138_a_api "$PY" p2138_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2138_a_ui node p2138_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.138.0 part B: sidebar search docked at the bottom, head with the workspace button (#2161)
+fresh; run p2138_b_ui node p2138_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.138.0 part C: security fixes - upload / calendar tokens, organisation recovery key (#1907 #1972)
+fresh; run p2138_c_api "$PY" p2138_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2138_c_ui node p2138_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.138.0 part D: office number ranges with a start number; more rule triggers / actions, Kanban swimlanes (#2256 #2060)
+fresh; run p2138_d_api "$PY" p2138_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2138_d_ui node p2138_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.138.0 part E: resizable dialogs, quotation next step, service import order, PDF closing together, import undo archives, GbR partners (#2234 #2235 #2237 #2238 #2241 #2242)
+fresh; run p2138_e_api "$PY" p2138_e_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2138_e_ui node p2138_e_ui.js "$KALMIDO_TEST_DATA"
 shard 18  # 20.10.2026 (job #692): the parked releases 2.111-2.113.0 (new suites still go to shard 17 above)
 # 2.111.0: Buero-Rueckgaengig (a), Termin-Einladungen + Abo-Link (b), Schnellerfassung (c)
 fresh; run p2111_a_api "$PY" p2111_a_api_test.py "$KALMIDO_TEST_DATA"

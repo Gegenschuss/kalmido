@@ -52,16 +52,19 @@ for u in ("bob", "carol"):
     assert A.put(B + f"/api/lists/{L}/members", json={"user_id": ids[u], "role": "edit"}).ok
 
 # ================================================================== share from your phone
+OWN = {"Sec-Fetch-Site": "same-origin"}  # 2.138.0 (#1907): the zip only from the app's own pages
 st = A.get(B + "/api/state").json()
 check(st["share"]["drop_url"] == "https://kalmido.example/drop" and st["share"]["ios_shortcut"] == "", f"state.share {st.get('share')}")
 check(sess().get(B + "/api/me/share/httpshortcuts.zip").status_code in (401, 403), "zip needs a login")
-r = A.get(B + "/api/me/share/httpshortcuts.zip")
+r = A.get(B + "/api/me/share/httpshortcuts.zip", headers=OWN)
 check(r.ok and r.headers["Content-Type"] == "application/zip" and "attachment" in r.headers.get("Content-Disposition", "")
       and r.headers.get("Cache-Control") == "no-store", f"zip headers {r.status_code} {dict(r.headers)}")
 z = zipfile.ZipFile(io.BytesIO(r.content))
 names = z.namelist()
 sj = json.loads(z.read("shortcuts.json"))
-tok = A.get(B + "/api/me").json()["drop_token"]
+# 2.138.0 (#1907): the token is only in the zip (stored as a hash, /api/me only says whether one is set)
+tok = sj["categories"][0]["shortcuts"][0]["headers"][0]["value"][len("Bearer "):]
+check(A.get(B + "/api/me").json().get("drop_token_set") is True and "drop_token" not in A.get(B + "/api/me").json(), "/api/me: only drop_token_set")
 cat = sj["categories"][0]
 scs = cat["shortcuts"]
 check(sj["compatibilityVersion"] == 90 and sj["version"] >= 1 and len(scs) == 2, f"format {sj.get('compatibilityVersion')} {len(scs)}")
@@ -79,11 +82,15 @@ check(ts["parameters"] == [{"key": "text", "type": "string", "value": "{{" + var
 check(var["isShareText"] is True and var["type"] == "constant" and var["key"] == "kalmido_shared_text", f"share-text variable {var}")
 allids = [cat["id"], fs["id"], ts["id"], var["id"]]
 check(all(str(uuid.UUID(x)) == x for x in allids) and len(set(allids)) == 4, "fresh UUIDs")
-sj2 = json.loads(zipfile.ZipFile(io.BytesIO(A.get(B + "/api/me/share/httpshortcuts.zip").content)).read("shortcuts.json"))
+sj2 = json.loads(zipfile.ZipFile(io.BytesIO(A.get(B + "/api/me/share/httpshortcuts.zip", headers=OWN).content)).read("shortcuts.json"))
 check(sj2["categories"][0]["shortcuts"][0]["id"] != fs["id"], "a new download has new ids")
-btok = Bb.get(B + "/api/me").json()["drop_token"]
-bz = json.loads(zipfile.ZipFile(io.BytesIO(Bb.get(B + "/api/me/share/httpshortcuts.zip").content)).read("shortcuts.json"))
-check(bz["categories"][0]["shortcuts"][0]["headers"][0]["value"] == "Bearer " + btok and btok != tok, "per user token")
+# 2.138.0 (#1907): every download carries a new token, the old one stops at once
+tok2 = sj2["categories"][0]["shortcuts"][0]["headers"][0]["value"][len("Bearer "):]
+check(tok2 != tok and requests.post(B + "/drop", headers={"Authorization": "Bearer " + tok}, data={"text": "old"}).status_code in (401, 403, 404), "a new download replaces the token")
+tok = tok2
+bz = json.loads(zipfile.ZipFile(io.BytesIO(Bb.get(B + "/api/me/share/httpshortcuts.zip", headers=OWN).content)).read("shortcuts.json"))
+btok = bz["categories"][0]["shortcuts"][0]["headers"][0]["value"][len("Bearer "):]  # 2.138.0 (#1907)
+check(btok and btok != tok, "per user token")
 # the two requests as HTTP Shortcuts sends them
 r = requests.post(B + "/drop", headers={"Authorization": "Bearer " + tok}, files=[("file", ("a.txt", b"hi")), ("file", ("b.txt", b"ho"))])
 check(r.ok and "2 files" in r.text, f"file shortcut request works {r.status_code} {r.text}")
@@ -91,10 +98,10 @@ r = requests.post(B + "/drop", headers={"Authorization": "Bearer " + tok}, files
 check(r.ok and "Read later" in r.text, f"text shortcut request works {r.text}")
 inbox = [t for t in A.get(B + "/api/state").json()["tasks"] if t["title"] == "Read later"]
 check(len(inbox) == 1 and inbox[0]["url"] == "https://example.org/x", "text share -> inbox task with link")
-check(C.get(B + "/api/me").json()["drop_token"], "carol has an own token too")
+check(C.post(B + "/api/me/drop-token").json()["drop_token"], "carol has an own token too")  # 2.138.0 (#1907): created, shown once
 # German names
 A.patch(B + "/api/settings", json={"lang": "de"})
-dz = json.loads(zipfile.ZipFile(io.BytesIO(A.get(B + "/api/me/share/httpshortcuts.zip").content)).read("shortcuts.json"))
+dz = json.loads(zipfile.ZipFile(io.BytesIO(A.get(B + "/api/me/share/httpshortcuts.zip", headers=OWN).content)).read("shortcuts.json"))
 check(dz["categories"][0]["shortcuts"][1]["name"] == "Kalmido Text", "shortcut names in the user's language")
 A.patch(B + "/api/settings", json={"lang": "en"})
 

@@ -401,6 +401,31 @@ def tp_clean_item(c, oid, r, it, i, prev):
             "discountable": 0 if it.get("discountable") in (0, False, "0", "false") else 1}
 
 
+def kva_keep_unseen_parts(c, oid, r, before, known):
+    """2.138.0 A (#2239): a title page save whose list was built before a part was added (the editor sends the ids of the
+    parts it knew, parts_known) keeps the title page line of every part it did not know. Without parts_known (API,
+    older clients) the list is taken as it is."""
+    from .docs import DUP_ITEM_SKIP
+    if r["kind"] != "offer" or not isinstance(known, list):
+        return
+    known = {int(x) for x in known if (isinstance(x, int) and not isinstance(x, bool)) or (isinstance(x, str) and x.isdigit())}
+    have = {x["ref_part_id"] for x in c.execute("SELECT ref_part_id FROM office_doc_items WHERE doc_id=? AND org_id=? AND kind='part' "
+                                                "AND part_id IS NULL", (r["id"], oid)).fetchall()}
+    parts = {x["id"] for x in c.execute("SELECT id FROM office_doc_parts WHERE doc_id=? AND org_id=?", (r["id"], oid)).fetchall()}
+    mx = c.execute("SELECT MAX(sort) FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL", (r["id"], oid)).fetchone()[0]
+    sort = (mx if mx is not None else -1) + 1
+    for it in before:
+        pid = it.get("ref_part_id")
+        if it.get("kind") != "part" or pid in known or pid in have or pid not in parts:
+            continue
+        row = {k: v for k, v in it.items() if k not in DUP_ITEM_SKIP}
+        row.update(sort=sort, doc_id=r["id"], org_id=oid)
+        row = oc_item_store(c, oid, row)
+        c.execute(f"INSERT INTO office_doc_items({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+        have.add(pid)
+        sort += 1
+
+
 # ---------------------------------------------------------------- the API answer
 def tp_public(c, oid, r, admin, totals=None):
     """parts: [{id, kind, title, print, sort, settings, items, totals, used, sheet?, calc?}] -- costs / margin / position
@@ -771,6 +796,9 @@ def tp_part_patch(did, pid):
         diff = ofx_diff(before, f)
         f["updated_at"] = iso(now_utc())
         c.execute(f"UPDATE office_doc_parts SET {','.join(k + '=?' for k in f)} WHERE id=? AND org_id=?", [*f.values(), pid, oid])
+        if f.get("title") and f["title"] != p["title"]:  # 2.138.0 A (#2239): the title page lines of the part follow a rename (own texts stay)
+            c.execute("UPDATE office_doc_items SET title=? WHERE doc_id=? AND org_id=? AND kind='part' AND ref_part_id=? AND part_id IS NULL "
+                      "AND (title=? OR title='' OR title IS NULL)", (f["title"], did, oid, pid, p["title"] or ""))
         if "sheet" in f:
             diff.setdefault("after", {})["sheet"] = "changed"  # the sheet itself stays out of the log
         if diff.get("after"):

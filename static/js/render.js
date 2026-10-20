@@ -423,13 +423,14 @@ function renderSide() {
   const oldAcct = $('#side .sbacct');  // 2.47.0 (#1654): keep the account node (same <img>) when nothing about it changed
   $('#side').innerHTML = `
     <div class="sbfix">${'' /* 2.57.0 (#1798): the fixed head (brand, workspace, search, favourites) stays while the rest scrolls */}
-    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Start|home'))}" aria-label="${esc(APP_NAME + ': ' + tr('Start|home'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span class="sbtxt"><span>${wordSvg()}</span></span></button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${kbFoldAllBtn()}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}${netDotHtml()}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
-    <div class="sbsrch">${'' /* 2.87.9 (#1933): search and workspace in one line */}<button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>${wsBarHtml()}</div>
+    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Start|home'))}" aria-label="${esc(APP_NAME + ': ' + tr('Start|home'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span class="sbtxt"><span>${wordSvg()}</span></span></button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}${netDotHtml()}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
+    <div class="sbsrch">${'' /* 2.138.0 B (#2161): row 2 = workspace button + fold-all; the search sits in the bottom dock */}${wsBarHtml()}<span class="spacer"></span>${kbFoldAllBtn()}</div>
     ${favSideHtml(lists, listRow, head)}</div>
     ${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('')}
     <div class="sgroup sfoot">
       <button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>
-    </div>`;
+    </div>
+    <div class="sbdock"><button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button></div>`;  // 2.138.0 B (#2161)
   const newAcct = $('#side .sbacct');
   if (oldAcct && newAcct && oldAcct.innerHTML === newAcct.innerHTML && oldAcct.title === newAcct.title) newAcct.replaceWith(oldAcct);
   sideRove();
@@ -876,7 +877,7 @@ function renderView0() {
   const sai = $('#view .secadd-in'), saiF = !!sai && document.activeElement === sai;
   // 2.12.2 (#453 B2): any other focused field of the view (Kanban "+ Task", search, …) comes back with its text, caret and focus
   const fa = document.activeElement, fk = fa && el.contains(fa) && editFocused() && fa !== qi && fa !== tin && fa !== sai
-    ? (fa.id ? () => document.getElementById(fa.id) : 'kadd' in fa.dataset ? () => [...el.querySelectorAll('[data-kadd]')].find(x => x.dataset.kadd === fa.dataset.kadd) : null) : null;
+    ? (fa.id ? () => document.getElementById(fa.id) : 'kadd' in fa.dataset ? () => [...el.querySelectorAll('[data-kadd]')].find(x => x.dataset.kadd === fa.dataset.kadd && x.dataset.swl === fa.dataset.swl) : null) : null;
   const fv = fk && fa.value, fs = fk && [fa.selectionStart, fa.selectionEnd];
   if (sai && S.secAdd) S.secAdd.v = sai.value;
   if (m !== 'cal') el.classList.remove('calfit');

@@ -13,26 +13,51 @@ function ocStateHtml(j) {
   if (j.key_ok === false) return `<div class="shint keep">${ic('alert', 's')} ${esc(tr('The server key does not match this organisation’s key. Ask the server admin (SELF-HOSTING.md, recovery key).'))}</div>`;
   const when = x => x ? new Date(x).toLocaleDateString(I18N.code || 'en') : '';
   // 2.46.0 (#1563): one text, so one "More information" link
+  // 2.138.0 C (#1972): show (the same key again) or make a new one (the earlier one stops working); the full renewal of the
+  // organisation's key runs on the server's command line (orgcrypt_cli rotate); a key of the earlier kind counts until then
   return `<div class="shint">${esc(j.active ? tr('On: bank and tax data, purchase prices, framework contract rates and the files of the organisation’s lists and documents are stored encrypted with the organisation’s own key. Everyone who may see them sees them as before.')
       : tr('Paused by the server admin: new data is stored unencrypted, encrypted data stays readable.'))} ${esc(tr('The recovery key opens the organisation’s data if the server key is ever lost. Keep it offline, e.g. printed in a safe. Without the server key and without the recovery key the encrypted data is lost for good.'))}</div>
-    <div class="row"><button type="button" class="btn sm" data-oc="show">${ic('key', 's')} ${tr('Show recovery key')}</button>${j.recovery_shown_at ? `<span class="muted">${esc(tr('last shown {0}', when(j.recovery_shown_at)))}</span>` : ''}</div>`;
+    ${j.rotating ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('The organisation’s key is being renewed on the server. The recovery key can be shown again when that is finished.'))}</div>`
+      : `<div class="row"><button type="button" class="btn sm" data-oc="show">${ic('key', 's')} ${tr('Show recovery key')}</button><button type="button" class="btn sm" data-oc="new">${ic('sync', 's')} ${tr('New recovery key')}</button>${j.recovery_shown_at ? `<span class="muted">${esc(tr('last shown {0}', when(j.recovery_shown_at)))}</span>` : ''}</div>`}
+    ${j.recovery_stale && !j.rotating ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('The recovery key cannot be shown with the current server key. The one you kept stays valid; “New recovery key” makes a new one.'))}</div>` : ''}
+    ${!j.recovery && j.recovery_shown_at && !j.rotated_at ? `<div class="mhint muted">${esc(tr('A recovery key of the earlier kind (13 groups without “R2-”) was shown before. It stays valid until the server admin renews the organisation’s key.'))}</div>` : ''}
+    <div class="mhint muted">${esc(tr('The server admin can renew the organisation’s key completely on the command line, see SELF-HOSTING.md. All earlier recovery keys stop working on this server then; older exports and backups stay readable with the key of their time.'))}</div>`;
+}
+// 2.138.0 C (#1972): News item "orgkey" (collab.js newsText): who showed / made new the recovery key, or the key was renewed
+function ocNewsText(d, who, q) {
+  const org = q(d.org || tr('Organisation'));
+  if (d.action === 'rotated') return tr('The key of {0} was renewed on the server. Earlier recovery keys no longer work.', org);
+  return d.action === 'new' ? tr('{0} made a new recovery key for {1}', who, org) : tr('{0} looked at the recovery key of {1}', who, org);
 }
 async function ocLoad(box) {
   const oid = +box.dataset.ocorg, st = $('.ocst', box);
-  let j; try { j = await api('GET', `/api/orgs/${oid}/encryption`); } catch { st.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
+  let j; try { j = oid ? await api('GET', `/api/orgs/${oid}/encryption`) : await rawFetch('GET', '/api/orgs/0/encryption'); } catch { if (!oid) box.hidden = true; else st.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
+  if (!oid && !j.has_key) { box.hidden = true; return; }  // 2.138.0 C (#1972): the personal office, once it holds encrypted data
   box._j = j;
   st.innerHTML = ocStateHtml(j) + (st.closest('.ocadm') ? '' : pm_cryptScopeHtml(j.scope));  // 2.46.1 (#1641): once per page
 }
-async function ocShowRecovery(oid, needPw) {
-  let pw = '';
-  if (needPw) {
-    const p = await pwPrompt(tr('Show recovery key'), {text: esc(tr('Confirm with your password. Showing the key is noted in the office log.'))});
-    if (!p) return;
-    pw = p.password;
-  }
-  let j; try { j = await api('POST', `/api/orgs/${oid}/encryption/recovery`, {password: pw}); } catch { return; /* api() showed it */ }
+// 2.138.0 C (#1972): the step-up the server asks (status "step"): password, + code of the app / a recovery code (totp), + the
+// passkey (passkey); without a password a fresh sign-in (fresh); signed in by the login proxy: only the server admin (proxy)
+async function ocStepUp(oid, step, title) {
+  if (step === 'proxy') { toast(tr('You are signed in through the server’s login proxy. Ask the server admin for the recovery key (command line, SELF-HOSTING.md).')); return null; }
+  if (step === 'fresh') return {};
+  const p = await pwPrompt(title, {code: step === 'totp', text: esc(step === 'password' ? tr('Confirm with your password. Showing the key is noted in the office log.')
+    : tr('Confirm with your password and your second factor. Showing the key is noted in the office log and the other admins are told.'))});
+  if (!p) return null;
+  const b = {password: p.password};
+  if (step === 'totp') b.code = p.code;
+  if (step === 'passkey') { try { b.credential = await pkGet(await api('POST', `/api/orgs/${oid}/encryption/recovery/passkey`)); } catch (e) { if (e?.name) toast(pkErr(e)); return null; } }
+  return b;
+}
+async function ocShowRecovery(oid, st, isNew = false) {
+  const step = st?.step || (st?.password === false ? 'fresh' : 'password');
+  if (isNew && !await askConfirm(tr('Make a new recovery key?'), tr('The current recovery key stops working at once. Keep the new one offline, e.g. printed in a safe.'), {ok: tr('New recovery key')})) return;
+  const b = await ocStepUp(oid, step, isNew ? tr('New recovery key') : tr('Show recovery key'));
+  if (!b) return;
+  let j; try { j = await api('POST', `/api/orgs/${oid}/encryption/recovery`, {...b, new: isNew}); } catch { return; /* api() showed it */ }
   const md = modal(`<h3>${tr('Recovery key')}</h3>
     <p class="shint keep">${ic('alert', 's')} ${esc(tr('Anyone with this key and a copy of the data can read the organisation’s encrypted data. Keep it offline and never send it by e-mail or chat. Without the server key and without this key the data is lost.'))}</p>
+    ${j.new ? `<p class="mhint">${esc(tr('This is a new recovery key: earlier ones no longer work.'))}</p>` : ''}
     <div class="row"><code class="topic ocrk" id="oc-rk">${esc(j.recovery_key)}</code></div>
     <div class="foot"><button type="button" class="btn" data-m="copy">${ic('copy', 's')} ${tr('Copy')}</button><span class="spacer"></span><button type="button" class="btn pri" data-m="close">${tr('Done')}</button></div>`);
   md.addEventListener('click', async e => {
@@ -48,7 +73,7 @@ function ocDraw(root) {
   root.addEventListener('click', async e => {
     const b = e.target.closest('[data-oc]'); if (!b) return;
     const box = b.closest('.ocbox'), oid = +box.dataset.ocorg;
-    if (b.dataset.oc === 'show') { await ocShowRecovery(oid, box._j?.password !== false); ocLoad(box); }
+    if (b.dataset.oc === 'show' || b.dataset.oc === 'new') { await ocShowRecovery(oid, box._j, b.dataset.oc === 'new'); ocLoad(box); }  // 2.138.0 C (#1972)
   });
 }
 // Administration > Organisation: the instance switch (with the boxes of the organisations I administer)

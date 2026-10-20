@@ -1,7 +1,5 @@
 """The subscribable ICS calendar feed of a user's tasks."""
-import hmac
 import re
-import secrets
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -12,6 +10,7 @@ from flask import jsonify, Response
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
 from ..core.i18n import LANGS, md_plain, tr
 from ..core.db import body, db, err, inbox_default, local_now, now_utc, parse_iso, usettings
+from ..core.tokenhash import tkh_match, tkh_set_ical
 from ..accounts.session import _rate_blocked, _rate_fail, client_ip, me, rate_ip
 from ..core.access import tvis, vis_sql
 from ..tasks.validation import rmd_export, rr_feasible, rr_norm
@@ -240,7 +239,7 @@ def ical_feed(token):
     u = None
     if uid_s.isdigit() and secret:
         r = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (int(uid_s),)).fetchone()
-        if r and r["ical_token"] and hmac.compare_digest(r["ical_token"].encode(), secret.encode()):
+        if r and tkh_match(secret, r["ical_token_hash"]):  # 2.138.0 C (#1907): compared with the stored hash
             u = r
     if not u:
         _rate_fail(keys)
@@ -253,28 +252,35 @@ def ical_feed(token):
                              "X-Robots-Tag": "noindex"})
 
 
-def ical_url(u):
-    return f"{PUBLIC_URL}/ical/{u['id']}.{u['ical_token']}.ics" if u["ical_token"] else None
+def ical_url(uid, secret):
+    return f"{PUBLIC_URL}/ical/{uid}.{secret}.ics"
+
+
+def tkh_ical_state(c, uid):
+    """2.138.0 C (#1907): whether a feed address exists and since when (the address itself is shown only once)."""
+    u = c.execute("SELECT ical_token_hash, ical_token_at FROM users WHERE id=?", (uid,)).fetchone()
+    return {"active": bool(u and u["ical_token_hash"]), "created_at": (u["ical_token_at"] or "") if u else ""}
 
 
 @app.get("/api/ical")
 def ical_info():
-    u = db().execute("SELECT id, ical_token FROM users WHERE id=?", (me(),)).fetchone()
-    return jsonify(url=ical_url(u))
+    """2.138.0 C (#1907): {active, created_at, url: null}; the secret address is in the answer of create / rotate only."""
+    return jsonify(url=None, **tkh_ical_state(db(), me()))
 
 
 @app.post("/api/ical")
 def ical_set():
-    """{action: create | rotate | off}: create keeps an existing link, rotate replaces it (the old URL
-    stops working at once), off removes it."""
+    """{action: create | rotate | off}: create makes a link when there is none, rotate replaces it (the old URL
+    stops working at once), off removes it. 2.138.0 C (#1907): only the hash is stored, so the new address is in this
+    answer once (url); create with an existing link answers url null (the link keeps working)."""
     a = body().get("action")
     c = db()
-    u = c.execute("SELECT id, ical_token FROM users WHERE id=?", (me(),)).fetchone()
+    st, url = tkh_ical_state(c, me()), None
     if a == "off":
-        c.execute("UPDATE users SET ical_token=NULL WHERE id=?", (me(),))
-    elif a == "rotate" or (a == "create" and not u["ical_token"]):
-        c.execute("UPDATE users SET ical_token=? WHERE id=?", (secrets.token_urlsafe(32), me()))
+        c.execute("UPDATE users SET ical_token=NULL, ical_token_hash=NULL, ical_token_at=NULL WHERE id=?", (me(),))
+    elif a == "rotate" or (a == "create" and not st["active"]):
+        url = ical_url(me(), tkh_set_ical(c, me()))
     elif a != "create":
         return err(tr("unknown"))
     c.commit()
-    return jsonify(url=ical_url(c.execute("SELECT id, ical_token FROM users WHERE id=?", (me(),)).fetchone()))
+    return jsonify(url=url, **tkh_ical_state(c, me()))

@@ -52,6 +52,9 @@ KINDS = {
                          "p2124_c_api_test.py: sharing a private table (2.124.0)"),
     "bookmarks": ("matrix", "p297_a_api_test.py: bookmarks (2.97.0) in the private space of a person without an organisation"),  # 2.97.0 A (#1950)
     "polls": ("matrix", "p298_a_api_test.py: scheduling polls (2.98.0) in the private space of a person without an organisation"),  # 2.98.0 A (#1953)
+    # 2.138.0 (#1972): the recovery key of the own personal office (organisation id 0 in the route)
+    "orgcrypt": ("matrix", "p2138_c_api_test.py: the encryption state and the recovery key (step-up) of the personal office of a "
+                           "person without an organisation"),
     "own": ("matrix", SUITE + ": the own settings, profile, tokens, app passwords, push, account export / import"),
     # ---- nothing to check without an organisation (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account: the same for every person, before any workspace"),
@@ -385,6 +388,7 @@ ROUTES = {
     "POST /api/office/legacy/archive/run": "office", "POST /api/office/legacy/counter": "office",
     "POST /api/office/legacy/import": "office", "POST /api/office/legacy/preview": "office",
     "POST /api/office/legacy/runs/{}/undo": "office", "POST /api/office/legacy/split": "office",
+    "POST /api/office/legacy/runs/{}/tidy": "office", "POST /api/office/services/renumber": "office",  # 2.138.0 E (#2241, #2237): p2138_e_api_test.py
     "POST /api/office/logo": "office", "POST /api/office/move": "office", "POST /api/office/packs/install": "office",
     "POST /api/office/packs/installed/{}/{}/restore": "office", "POST /api/office/packs/validate": "office",
     "POST /api/office/pay-props/{}": "office", "POST /api/office/signoffs/{}/revoke": "office",
@@ -404,11 +408,12 @@ ROUTES = {
     "GET /api/org-icon/{}/{}.png": "orgadmin", "POST /api/orgs/{}/icon": "orgadmin", "DELETE /api/orgs/{}/icon": "orgadmin",  # 2.87.9 (#1913)
     "DELETE /api/admin/orgs/{}": "orgadmin", "DELETE /api/orgs/{}/export": "orgadmin",
     "DELETE /api/orgs/{}/lists/{}": "orgadmin", "DELETE /api/orgs/{}/lists/{}/icon": "orgadmin",
-    "DELETE /api/orgs/{}/members/{}": "orgadmin", "GET /api/admin/orgs": "orgadmin", "GET /api/orgs/{}/encryption": "orgadmin",
+    "DELETE /api/orgs/{}/members/{}": "orgadmin", "GET /api/admin/orgs": "orgadmin", "GET /api/orgs/{}/encryption": "orgcrypt",
     "GET /api/orgs/{}/export": "orgadmin", "GET /api/orgs/{}/export/file": "orgadmin", "GET /api/orgs/{}/lists": "orgadmin",
     "PATCH /api/admin/orgs/{}": "orgadmin", "PATCH /api/orgs/{}": "orgadmin", "PATCH /api/orgs/{}/lists/{}": "orgadmin",
     "POST /api/admin/orgs": "orgadmin", "POST /api/admin/orgs/boundary/repair": "orgadmin",
-    "POST /api/orgs/{}/encryption/recovery": "orgadmin", "POST /api/orgs/{}/export": "orgadmin",
+    "POST /api/orgs/{}/encryption/recovery": "orgcrypt", "POST /api/orgs/{}/encryption/recovery/passkey": "orgcrypt",  # 2.138.0 (#1972)
+    "POST /api/orgs/{}/export": "orgadmin",
     "POST /api/orgs/{}/lists/{}/archive": "orgadmin", "POST /api/orgs/{}/lists/{}/icon": "orgadmin",
     "POST /api/orgs/{}/lists/{}/owner": "orgadmin", "PUT /api/admin/orgs/visibility": "orgadmin",
     "PUT /api/orgs/{}/lists/{}/icon": "orgadmin", "PUT /api/orgs/{}/members": "orgadmin",
@@ -783,6 +788,8 @@ ROUTES = {
     "POST /api/files/ext-links/{}/regenerate": "files", "DELETE /api/files/ext-links/{}": "files",
     "POST /api/files/ext-links/{}/restore": "files", "GET /s/f/{}": "link", "POST /s/f/{}/unlock": "link",
     "GET /s/f/{}/d/{}": "link", "GET /s/f/{}/v/{}": "link", "GET /s/f/{}/zip": "link",
+    # 2.138.0 D (#2256): number ranges of the office (p2138_d_api_test.py)
+    "GET /api/office/number-ranges": "office", "POST /api/office/number-ranges/{}": "office",
 }
 
 

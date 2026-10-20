@@ -67,7 +67,7 @@ function wsBadge(l) {
 function wsBarHtml() {
   // 2.87.9 (#1933, P4): without an organisation the button stays and shows the private space (its menu has only that)
   const cur = wsOn() ? wsCur() : 'private';
-  return `<button type="button" class="wsbar ${cur === 'all' ? '' : 'on'}" data-act="ws-menu" aria-haspopup="menu" aria-label="${esc(tr('Workspace') + ': ' + wsName(cur))}" title="${esc(tr('Workspace') + ' · ' + tr('Only this workspace is shown'))}"${wsp_attr(cur) /* 2.53.0 (#1474), 2.57.0 B (#1807) */}>${ic('brief', 's') /* 2.87.9 (#1933): a round icon button beside the search, the dot marks the shown workspace */}${cur === 'all' ? '' : wsp_dot(cur)}<span class="sr">${esc(wsName(cur))}</span></button>`;
+  return `<button type="button" class="wsbar ${cur === 'all' ? '' : 'on'}" data-act="ws-menu" aria-haspopup="menu" aria-label="${esc(tr('Workspace') + ': ' + wsName(cur))}" title="${esc(tr('Workspace') + ' · ' + tr('Only this workspace is shown'))}"${wsp_attr(cur) /* 2.53.0 (#1474), 2.57.0 B (#1807) */}>${cur === 'all' ? ic('brief', 's') : wsp_dot(cur) /* 2.138.0 B (#2161): colour dot (or the icon for "All") in front of the name */}<span class="wsn">${esc(wsName(cur))}</span>${ic('chev', 's') /* 2.138.0 B (#2161): name + arrow */}</button>`;
 }
 // the chip in the header while one workspace is shown (a click opens the switch as a menu)
 function wsChip() {

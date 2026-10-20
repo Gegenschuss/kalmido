@@ -439,6 +439,7 @@ ROUTES = {
     "POST /api/office/legacy/counter": "office",
     "POST /api/office/legacy/archive/address": "office",  # 2.40.0 (#1421): the address of an archived PDF (p2400_k_api_test.py)
     "GET /api/office/legacy/archive/{}": "office",  # 2.81.0 B (#1834): one archived document + its history (p281_b_api_test.py)
+    "POST /api/office/legacy/runs/{}/tidy": "office", "POST /api/office/services/renumber": "office",  # 2.138.0 E (#2241, #2237): p2138_e_api_test.py
     # ---- comment (9)
     "POST /api/comments/{}/decide": "comment", "POST /api/v1/comments/{}/reactions": "comment",
     "DELETE /api/v1/comments/{}/reactions/{}": "comment", "PATCH /api/v1/comments/{}": "comment",
@@ -604,6 +605,7 @@ ROUTES = {
     # 2.42.0 (#828): an organisation's encryption state + recovery key (its admins only; p2420_b_api_test.py: member 403, other
     # organisation 404, agent refused); the instance switch org_encrypt is the operator's
     "GET /api/orgs/{}/encryption": "org", "POST /api/orgs/{}/encryption/recovery": "org",
+    "POST /api/orgs/{}/encryption/recovery/passkey": "org",  # 2.138.0 (#1972): the passkey challenge of the step-up (p2138_c_api_test.py)
     "GET /api/admin/orgcrypt": "admin", "PUT /api/admin/orgcrypt": "admin",
     # 2.42.0 (#833): the organisation export (its admins only; p2420_c_api_test.py: member 403, other organisation 404, agent refused)
     "GET /api/orgs/{}/export": "org", "POST /api/orgs/{}/export": "org", "DELETE /api/orgs/{}/export": "org", "GET /api/orgs/{}/export/file": "org",
@@ -992,6 +994,8 @@ ROUTES = {
     "POST /api/files/ext-links/{}/regenerate": "fileextlink", "DELETE /api/files/ext-links/{}": "fileextlink",
     "POST /api/files/ext-links/{}/restore": "fileextlink", "GET /s/f/{}": "fileextlink", "POST /s/f/{}/unlock": "fileextlink",
     "GET /s/f/{}/d/{}": "fileextlink", "GET /s/f/{}/v/{}": "fileextlink", "GET /s/f/{}/zip": "fileextlink",
+    # 2.138.0 D (#2256): number ranges of the office area one works in, admins write (p2138_d_api_test.py)
+    "GET /api/office/number-ranges": "office", "POST /api/office/number-ranges/{}": "office",
 }
 
 # ---- 1. every route is classified, nothing stale

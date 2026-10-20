@@ -283,8 +283,9 @@ check(k.get("name_en") == "Camera" and k.get("category") == "Video" and k.get("r
       and k.get("role") == "Motion Designer" and k.get("role_id") == R["Motion Designer"]["id"] and k.get("sort", 0) > 0,
       f"import: only the empty fields of the service filled, the set daily rate kept, the role resolved {k}")
 s5 = S.get("Schnitt", {})
-check((s5.get("name_en"), s5.get("category"), s5.get("daily_rate"), s5.get("raw_fee"), s5.get("sort"), s5.get("role_id")) == ("Edit", "Post", 500, 1, 5, CUT),
-      f"import: a full service is unchanged {s5}")
+# 2.138.0 (#2237): the order of an existing service follows the file now (renumbered 1..n), every other field stays
+check((s5.get("name_en"), s5.get("category"), s5.get("daily_rate"), s5.get("raw_fee"), s5.get("role_id")) == ("Edit", "Post", 500, 1, CUT) and s5.get("sort", 0) >= 1,
+      f"import: a full service is unchanged (except its order) {s5}")
 check(S.get("Künstlersozialkasse", {}).get("unit") == "percent" and S["Künstlersozialkasse"].get("daily_rate") == 5, "import: Künstlersozialkasse as percent")
 check(S.get("Drehtag Kamera", {}).get("intext") == "shooting", "import: a shooting service")
 C = {x["name_de"]: x for x in A.get(B + O + "/crew").json()["items"]}
@@ -305,8 +306,9 @@ A.patch(B + O + f"/services/{KAM}", json={"category": "Film"})  # changed after 
 r = A.post(B + L + f"/runs/{RUN}/undo", json={"kinds": ["services"]})
 check(r.ok and r.json()["removed"]["services"] == 4 and r.json()["removed"]["filled"] == 1, "undo services " + r.text[:300])
 k = A.get(B + O + f"/services/{KAM}").json()
-check((k.get("name_en"), k.get("category"), k.get("raw_fee"), k.get("producing"), k.get("role"), k.get("role_id"), k.get("sort"), k.get("daily_rate"))
-      == ("", "Film", 0, 0, "", None, 0, 700), f"undo services: the filled fields empty again, a field changed since stays {k}")
+# 2.138.0 (#2237): the order stays renumbered (no longer emptied by the undo)
+check((k.get("name_en"), k.get("category"), k.get("raw_fee"), k.get("producing"), k.get("role"), k.get("role_id"), k.get("daily_rate"))
+      == ("", "Film", 0, 0, "", None, 700) and k.get("sort", 0) >= 1, f"undo services: the filled fields empty again, a field changed since stays {k}")
 check("Motion Designer" in {x["name_de"] for x in A.get(B + O + "/roles").json()["items"]}, "undo services: the roles stay")
 r = A.post(B + L + f"/runs/{RUN}/undo")
 check(r.ok and r.json()["removed"]["roles"] == 2 and r.json()["removed"]["crew"] == 2, "undo the rest " + r.text[:300])

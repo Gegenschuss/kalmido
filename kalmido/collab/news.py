@@ -65,7 +65,8 @@ NEWS_FOR_ME += ("wiki_shared",)  # 2.126.2 B (#2355)
 
 
 def news_to_me(kind, actor_id, data, agents, s=None):
-    if kind in ("upscan", "filereq"):  # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me
+    # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
+    if kind in ("upscan", "filereq", "orgkey"):
         return True
     if not actor_id:
         return False
@@ -466,6 +467,14 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             pass
         elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
             if not sees(r["list_id"]):
+                continue
+        elif kind == "orgkey":  # 2.138.0 C (#1972): the recovery key of an organisation, while I administer it
+            from ..accounts.orgs import is_org_admin
+            try:
+                ko = int(json.loads(r["data"] or "{}").get("org_id") or 0)
+            except (ValueError, TypeError, AttributeError):
+                ko = 0
+            if not ko or not is_org_admin(c, uid, ko):
                 continue
         elif kind == "wiki_e2e_key":  # 2.64.3 (#1817): the key of a knowledge space, while I am in its organisation
             from ..accounts.orgs import user_orgs

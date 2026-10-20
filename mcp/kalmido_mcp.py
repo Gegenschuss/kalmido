@@ -1942,9 +1942,14 @@ TOOLS += [
 ]
 # 2.71.0 A (#1457): rules of a list (When ... then ...): read them, propose one (the owner / an admin accepts it)
 _RULE_TRIG = {"type": "object", "description": "{kind: section (a task comes into column section_id) | done | reopen | ltag (gets the list "
-                                               "tag tag_id) | due (its due day is today), section_id?, tag_id?}"}
+                                               "tag tag_id) | due (its due day is today) | created (2.138.0: a task is created in the list) | "
+                                               "assigned (2.138.0: user_id = only that person, null = anybody) | field (2.138.0: custom field "
+                                               "field_id changes; value = option id / \"1\" checked / \"0\" unchecked, null = any change), "
+                                               "section_id?, tag_id?, user_id?, field_id?, value?}"}
 _RULE_ACT = {"type": "object", "description": "{kind: assign (user_id, a person of the list) | due (days from today 0..365, null = clear) | "
-                                              "comment (text, at most 2000 characters) | move (list_id and / or section_id)}"}
+                                              "comment (text, at most 2000 characters) | move (list_id and / or section_id) | priority "
+                                              "(2.138.0: priority none / low / medium / high) | tag (2.138.0: tag_id, a list tag) | field "
+                                              "(2.138.0: field_id + value of a custom field, null = clear)}"}
 TOOLS += [
     ("list_rules", "2.71.0: the rules of a list you may change (trigger, action, active, paused_reason, who set it up). A rule runs with the rights "
                    "of the person who set it up; a change made by a rule never triggers another rule.",

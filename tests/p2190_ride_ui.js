@@ -120,9 +120,11 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
     await tap(mb.x, mb.y);
     check(await until(() => ev(`!!document.querySelector('#side.open')`), 30), `${tag}: one tap opens the drawer`);
     await sleep(400);
-    const s = await ev(SS);
-    check(s && s.vis && s.w >= 43.5 && s.h >= 43.5 && s.l >= s.sideR && s.r <= s.iw && s.onTop && s.lab === 'Search and commands',
-      `${tag}: the magnifier next to the open drawer: 44 px, on screen, not under the drawer, tappable ` + JSON.stringify(s));
+    // 2.104.0 (#2161): the drawer carries its own docked search field; the round button next to it steps aside
+    const s0 = await ev(SS);
+    check(!s0 || !s0.vis, `${tag}: no second magnifier next to the open drawer`);
+    const s = await ev(`(() => { const r = document.querySelector('#side .scmd').getBoundingClientRect(); return {l: r.left, t: r.top, w: r.width, h: r.height, ok: r.height >= 43.5 && r.bottom <= innerHeight && r.right <= document.querySelector('#side').getBoundingClientRect().right + 1}; })()`);
+    check(s && s.ok, `${tag}: the docked search field in the open drawer: 44 px, on screen ` + JSON.stringify(s));
     await shot(`p2190r-${vw}x${vh}-${th}-drawer.png`);
     await tap(s.l + s.w / 2, s.t + s.h / 2);
     check(await until(() => ev(`!!document.querySelector('.palette') && !document.querySelector('#side.open')`), 30), `${tag}: one tap: the drawer closes, search opens`);

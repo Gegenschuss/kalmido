@@ -14,6 +14,9 @@ background thread) and the command line for the server admin:
         (FILE "-" = stdin: the earlier KALMIDO_SECRET_KEY, base64; never as an argument)
     python -m kalmido.admin.orgcrypt_cli rewrap --org N --recovery-file FILE [--force]   (FILE "-" = stdin; never as an argument;
         the key is tested on the organisation's encrypted data first, --force only when there is none)
+    python -m kalmido.admin.orgcrypt_cli rotate --org N [--recovery-out FILE]   # 2.138.0 C (#1972): a new key for the organisation
+    python -m kalmido.admin.orgcrypt_cli recovery --org N [--new] [--recovery-out FILE]   # 2.138.0 C: show / renew its recovery key
+        (the recovery key goes to stdout or into a new file with mode 0600, never into the log)
 
 Every run is idempotent and restartable: values carry the prefix "kenc1:", files the magic b"KENC1\\n", so a half-done
 run simply continues; files are replaced atomically (tmp + os.replace), rows are updated only while they still hold the
@@ -53,7 +56,7 @@ FIELD_JOBS = [("office_company", "org_id", col, "text") for col in oc.FIELDS["of
 ]
 # 2.126.0 A (#1971): (table, id column, column, sealing context) of the documents' values: sealed per workspace (column ws)
 # by docs/store.py doc_seal, the organisation's key or the person's own key
-DOC_JOBS = [("doc_meta", "node_id", col, f"doc_meta.{col}") for col in ("text", "amount", "suggest", "trained", "extracted")] + [
+DOC_JOBS = [("doc_meta", "node_id", col, f"doc_meta.{col}") for col in ("text", "amount", "suggest", "trained", "extracted", "summary")] + [  # 2.138.0: + summary (2.126.1 #2123)
     ("doc_senders", "id", "name", "doc_senders.name"),
     ("doc_rules", "id", "data", "doc_rules.data"),
     ("doc_models", "id", "data", "doc_models.data"),
@@ -763,7 +766,8 @@ def status(c):
     for oid in _org_ids(c):
         st = oc.oc_status(c, oid)
         out["orgs"].append({"org": oid, "has_key": st["has_key"], "key_ok": st["key_ok"], "migrated_at": st["migrated_at"],
-                            "fields": fields_count(c, oid), "files": files_count(c, oid)})
+                            "fields": fields_count(c, oid), "files": files_count(c, oid),
+                            "recovery": st["recovery"], "rotating": st["rotating"], "rotated_at": st["rotated_at"]})  # 2.138.0 C (#1972)
     return out
 
 
@@ -942,10 +946,273 @@ def rewrap_probe(c, oid, key):
     return None
 
 
+# ---- 2.138.0 C (#1972): rotate -- a new key for one organisation, everything of it re-encrypted ------------------------
+# Every place that holds values sealed with an organisation's key: FIELDS (+ JSON_KEYS, cost_enc) with the row's org_id
+# (the household budget: sid), the values of the documents / paperless / newsletter areas sealed per workspace ("o<id>",
+# docs/store.py doc_seal: ctx "<table.column>|<ws>"), the stored files (header = org id; paperless upload parts with their
+# own ctx) and the task vectors (dropped, the worker computes them again). New places that seal with an org key belong here.
+ROT_WS = (("doc_rules", "id", "data", "doc_rules.data"), ("doc_models", "id", "data", "doc_models.data"),
+          ("doc_senders", "id", "name", "doc_senders.name"), ("rc_suggest", "id", "note", "rc_suggest.note"),
+          ("doc_meta", "node_id", "text", "doc_meta.text"), ("doc_meta", "node_id", "amount", "doc_meta.amount"),
+          ("doc_meta", "node_id", "suggest", "doc_meta.suggest"), ("file_text", "id", "text", "file_text.text"),
+          ("pl_sources", "id", "mapping", "pl_sources.mapping"), ("pl_sources", "id", "token", ("pl_sources.token.v2", "pl_sources.token")),
+          ("pl_uploads", "id", "info", "pl_uploads.info"), ("nl_conns", "id", "secret", "nl_conns.secret.v1"),
+          # 2.138.0 C (#1972): sealed per workspace since 2.97 (receipt recognition / suggestions) or missed before (trained)
+          ("doc_meta", "node_id", "trained", "doc_meta.trained"), ("doc_meta", "node_id", "extracted", "doc_meta.extracted"),
+          ("rc_suggest", "id", "amount", "rc_suggest.amount"), ("rc_suggest", "id", "prev_amount", "rc_suggest.prev_amount"),
+          ("doc_meta", "node_id", "summary", "doc_meta.summary"),  # 2.138.0 (#1972): document summaries of 2.126.1 (#2123)
+          ("pl_uploads", "id", "mapping", "pl_sources.mapping"))  # 2.138.0 (#1972): the mapping chosen for an uploaded export
+ROT_SETTLE = float(os.environ.get("KALMIDO_ORGCRYPT_ROT_SETTLE", "5"))  # seconds after the key switch (requests that hold the old key end)
+
+
+# 2.138.0 C (#1972): tables with one row per organisation (no id column; office_cf_start since 2.123)
+ROT_ORG_ROWS = ("office_company", "office_settings", "office_cf_start")
+
+
+def _rot_jobs(oid):
+    """(table, id column, column, AAD org column, kind, ctx) of every value the rotation re-encrypts."""
+    out = []
+    for t, cols in oc.FIELDS.items():
+        idc = "org_id" if t in ROT_ORG_ROWS else "id"
+        oc_col = "sid" if t.startswith("budget_") else "org_id"
+        out += [(t, idc, col, oc_col, "text", f"{t}.{col}") for col in cols]
+    out.append(("office_doc_items", "id", "cost_enc", "org_id", "text", "office_doc_items.cost_enc"))
+    for (t, col), keys in oc.JSON_KEYS.items():
+        out.append((t, "org_id" if t in ROT_ORG_ROWS else "id", col, "org_id", "json", f"{t}.{col}"))
+    out += [(t, idc, col, "ws", "ws", ctx) for t, idc, col, ctx in ROT_WS]
+    # 2.138.0 C (#1972, review F6): page texts (wiki_pages / wiki_versions .body) come with oc.FIELDS
+    return out
+
+
+def _rot_value(k1, k2, oid, kind, ctx, ws, v, bad):
+    if not isinstance(v, str) or oc.PREFIX not in v:
+        return v
+    try:
+        if kind == "json":
+            j = json.loads(v)
+            if not isinstance(j, dict):
+                return v
+            changed = False
+            for k in oc.JSON_KEYS[tuple(ctx.split(".", 1))]:
+                if oc.oc_is_enc(j.get(k)):
+                    n = oc.rck_rekey(k1, k2, oid, f"{ctx}.{k}", j[k])
+                    changed, j[k] = changed or n != j[k], n
+            return json.dumps(j, ensure_ascii=False) if changed else v
+        if kind == "ws":  # 2.138.0 C (#1972): a tuple = the column holds values of earlier ctxs too (the current one first)
+            *first, last = ctx if isinstance(ctx, tuple) else (ctx,)
+            for x in first:
+                try:
+                    return oc.rck_rekey(k1, k2, oid, f"{x}|{ws}", v)
+                except oc.OrgCryptError:
+                    pass
+            return oc.rck_rekey(k1, k2, oid, f"{last}|{ws}", v)
+        return oc.rck_rekey(k1, k2, oid, ctx, v)
+    except (oc.OrgCryptError, ValueError):
+        bad[0] += 1
+        return v
+
+
+def rot_fields(c, oid, k1, k2, stop=None):
+    """Re-encrypt every value of organisation oid from k1 to k2 (compare and set, in batches). -> (changed, unreadable)."""
+    n, bad = 0, [0]
+    ws = f"o{int(oid)}"
+    for table, idc, col, ocol, kind, ctx in _rot_jobs(oid):
+        last = None
+        while True:
+            if stop and stop():
+                return n, bad[0]
+            with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+                write_lock(c, "orgcrypt")
+                sql = f"SELECT {idc} AS rid, {col} AS v FROM {table} WHERE {ocol}=? AND {col} LIKE ?"  # pg-ok: the prefix is case-exact
+                args = [ws if kind == "ws" else oid, "%" + oc.PREFIX + "%"]
+                if last is not None:
+                    sql += f" AND {idc} > ?"
+                    args.append(last)
+                rows = c.execute(sql + f" ORDER BY {idc} LIMIT {BATCH}", args).fetchall()
+                for r in rows:
+                    new = _rot_value(k1, k2, oid, kind, ctx, ws, r["v"], bad)
+                    if new != r["v"]:
+                        n += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {ocol}=? AND {col}=?",
+                                       (new, r["rid"], args[0], r["v"])).rowcount
+            c.commit()
+            if len(rows) < BATCH:
+                break
+            last = rows[-1]["rid"]
+    return n, bad[0]
+
+
+def _rot_dirs():
+    from ..paperless.zipimp import PLH_DIR
+    return [d for d in (ATT_DIR, OFFICE_DIR, PLH_DIR) if os.path.isdir(d)]
+
+
+def rot_files(c, oid, k1, k2, stop=None):
+    """Reseal every stored file whose header names organisation oid (all of the data folders, whatever refers to them)
+    from k1 to k2. -> (changed, unreadable)."""
+    from ..paperless.zipimp import _CTX as PL_CTX
+    ctxs = (oc.FILE_CTX, PL_CTX + f"o{int(oid)}".encode())
+    n = bad = 0
+    for top in _rot_dirs():
+        for d, dirs, names in os.walk(top):
+            dirs[:] = [x for x in dirs if not os.path.islink(os.path.join(d, x))]
+            for name in names:
+                if stop and stop():
+                    return n, bad
+                p = os.path.join(d, name)
+                if name.endswith((".tmp", ".part")) or ".oc-" in name or os.path.islink(p):
+                    continue
+                h = _head(p)
+                if not h or h[:len(oc.MAGIC)] != oc.MAGIC or oc.oc_file_org(h) != oid:
+                    continue
+                try:
+                    st = os.stat(p)
+                    with open(p, "rb") as f:
+                        data = f.read()
+                    new = oc.rck_rekey_file(k1, k2, data, ctxs)
+                    if new is None:
+                        continue
+                    def same(p=p, st=st):  # 2.138.0 C (#1972): asked again after the new bytes are written, right before the replace
+                        s2 = os.stat(p)
+                        return (s2.st_ino, s2.st_mtime_ns, s2.st_size) == (st.st_ino, st.st_mtime_ns, st.st_size)
+                    if not same() or not oc.oc_reseal_file(p, new, check=same):
+                        continue  # written meanwhile (then with the new key); the next round looks again
+                    n += 1
+                except oc.OrgCryptError:
+                    bad += 1
+                except OSError as e:
+                    bad += 1
+                    print(TAG, "cannot reseal a file:", type(e).__name__, flush=True)
+    return n, bad
+
+
+def rot_indexes(c, oid):
+    """2.138.0 C (#1972): the keyed indexes derived from the organisation's key made again with the new one: the word
+    indexes of documents, recognised file texts and filed mails (docs/store.py _index_key) and the duplicate check of the
+    household budget (life/budget.py bud_dkey). A value that does not open is left out (its row keeps no words). -> rows."""
+    from ..docs import store as S
+    from ..files.textscan import _index as ft_index
+    from ..hub.hubmail import _index as hub_index
+    from ..life.budget import bud_dec, bud_dkey
+    ws, n = f"o{int(oid)}", 0
+    with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+        for m in c.execute("SELECT * FROM doc_meta WHERE ws=? ORDER BY node_id", (ws,)).fetchall():
+            node = c.execute("SELECT name FROM fs_nodes WHERE id=?", (m["node_id"],)).fetchone()
+            if node:
+                S.doc_index(c, m["node_id"], ws, S.index_text(c, dict(m), node["name"], S.meta_text(c, m)))
+                n += 1
+        for r in c.execute("SELECT id, text FROM file_text WHERE ws=? AND state='found' ORDER BY id", (ws,)).fetchall():
+            v = S.doc_open(c, ws, "file_text.text", r["text"], default=None)
+            if v is not None:
+                ft_index(c, r["id"], ws, v)
+                n += 1
+        for m in c.execute("SELECT * FROM hub_mails WHERE org_id=? AND ws=? ORDER BY id", (oid, ws)).fetchall():
+            try:
+                hub_index(c, m["id"], ws, oc.oc_dec_fields(c, oid, "hub_mails", m))
+                n += 1
+            except oc.OrgCryptError:
+                pass
+        for r in c.execute("SELECT * FROM budget_entries WHERE sid=? ORDER BY id", (oid,)).fetchall():
+            try:
+                d = bud_dec(c, "budget_entries", r)
+            except oc.OrgCryptError:
+                continue
+            c.execute("UPDATE budget_entries SET dkey=? WHERE id=?", (bud_dkey(c, d["list_id"], oid, d["day"], d["amount"], d["kind"], d["title"]), r["id"]))
+            n += 1
+        # 2.138.0 C (#1972): the word index of the knowledge pages (wiki/wksearch.py, keyed per space like the documents)
+        from ..wiki.wkhist import wkh_body
+        from ..wiki.wksearch import wks_index
+        c.execute("DELETE FROM wiki_words WHERE page_id IN (SELECT id FROM wiki_pages WHERE org_id=?)", (oid,))
+        for r in c.execute("SELECT id, org_id, owner_id, body, updated_at FROM wiki_pages WHERE org_id=? AND deleted_at IS NULL "
+                           "AND left(path, 5)<>'e2e1:' ORDER BY id", (oid,)).fetchall():
+            try:
+                wks_index(c, r["id"], r["org_id"], r["owner_id"], wkh_body(c, r), r["updated_at"])
+                n += 1
+            except oc.OrgCryptError:
+                pass  # no words: the next search indexes it again (wks_catch_up)
+    c.commit()
+    return n
+
+
+def rotate_org(c, oid, stop=None, rounds=3, force=False):
+    """orgcrypt_cli rotate --org N: a new key K2 for organisation oid; every value / file re-encrypted from K1 to K2, the
+    task vectors dropped; while it runs the server reads with K2 and falls back to K1 (core/orgcrypt.py _ROT). Restartable
+    after an abort (the row keeps K1 in wrapped_rot until the end). One run at a time (a session lock). -> counts and the
+    new recovery secret (key "secret", 32 bytes: the caller shows it, never logs it); finished False when K1 must stay:
+    still changing, or values / files that open with neither key (force: finish anyway, they stay unreadable)."""
+    with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+        got = c.execute("SELECT pg_try_advisory_lock(hashtext(?))", ("orgcrypt-rotate",)).fetchone()[0]
+    c.commit()
+    if not got:
+        raise oc.OrgCryptError("a key rotation runs already")
+    try:
+        k1, k2, started = oc.rck_rot_begin(c, oid)
+        if started and ROT_SETTLE > 0:
+            time.sleep(ROT_SETTLE)
+        out = {"org": oid, "fields": 0, "files": 0, "unreadable": 0, "finished": False, "secret": None}
+        for _ in range(rounds):
+            nf, bf = rot_fields(c, oid, k1, k2, stop)
+            ns, bs = rot_files(c, oid, k1, k2, stop)
+            out["fields"] += nf
+            out["files"] += ns
+            out["unreadable"] = bf + bs
+            if stop and stop():
+                return out
+            if not nf and not ns:
+                break
+        else:
+            return out  # still changing: K1 stays, the next run continues
+        if out["unreadable"] and not force:
+            return out  # K1 stays: nothing that might still need it is dropped without the admin's word
+        from ..tasks.related import emb_drop_org
+        emb_drop_org(c, oid, sealed=True)  # the worker computes the sealed task vectors again with K2
+        c.commit()
+        out["indexes"] = rot_indexes(c, oid)  # 2.138.0 C (#1972): before K1 goes (a rerun repeats it while K1 stays)
+        out["secret"] = oc.rck_rot_finish(c, oid)
+        out["finished"] = True
+        return out
+    finally:
+        with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+            c.execute("SELECT pg_advisory_unlock(hashtext(?))", ("orgcrypt-rotate",))
+        c.commit()
+
+
+def rot_announce(c, oid, what):
+    """Office log entry + News for the organisation's admins (no person signed in: the command line)."""
+    from ..core.config import app
+    from ..office.ledger import ofx_log
+    with app.app_context(), system_ctx(c):  # orgcrypt: the command line writes the organisation's log entry (no person)
+        ofx_log(c, oid, "recovery_key", target="org", detail={what: 1})
+    oc.rck_tell(c, oid, None, what)
+    c.commit()
+
+
+def _write_secret(path, text):
+    """The recovery key into a new file with mode 0600 (never over an existing one)."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text + "\n")
+
+
 # ---- command line -----------------------------------------------------------------------------------------------------
 def _read_recovery(src):
+    """2.138.0 C (#1972): rck_parse -> ("secret", R) or ("key", the raw org key of the earlier format)."""
     data = sys.stdin.read() if src == "-" else open(src, encoding="utf-8").read()
-    return oc.oc_parse_recovery(data.strip().splitlines()[0] if data.strip() else "")
+    return oc.rck_parse(data.strip().splitlines()[0] if data.strip() else "")
+
+
+def _give_secret(sec, out):
+    """The recovery key to stdout, or into the new file out (0600). -> exit code."""
+    text = oc.rck_format(sec)
+    if not out:
+        print(text, flush=True)
+        return 0
+    try:
+        _write_secret(out, text)
+    except OSError as e:
+        print(TAG, "cannot write the recovery key file:", type(e).__name__, "- an existing file is never overwritten", flush=True)
+        return 1
+    print(TAG, "recovery key written to the file (mode 0600)", flush=True)
+    return 0
 
 
 def main(argv):
@@ -968,6 +1235,14 @@ def main(argv):
     rw.add_argument("--org", type=int, required=True)
     rw.add_argument("--recovery-file", required=True, help='a file holding the recovery key, "-" = stdin')
     rw.add_argument("--force", action="store_true", help="store it although the organisation has nothing encrypted to test the key on")
+    ro = sub.add_parser("rotate", help="2.138.0: a new key for an organisation, its data re-encrypted (restartable), a new recovery key")
+    ro.add_argument("--org", type=int, required=True)
+    ro.add_argument("--recovery-out", help="write the new recovery key into this new file (mode 0600) instead of stdout")
+    ro.add_argument("--force", action="store_true", help="finish although some values / files open with neither key")
+    rc_ = sub.add_parser("recovery", help="2.138.0: show (or with --new renew) an organisation's recovery key")
+    rc_.add_argument("--org", type=int, required=True)
+    rc_.add_argument("--new", action="store_true", help="make a new recovery key (the earlier one stops working)")
+    rc_.add_argument("--recovery-out", help="write the recovery key into this new file (mode 0600) instead of stdout")
     a = ap.parse_args(argv)
     if not oc.oc_enabled():
         print(TAG, "KALMIDO_SECRET_KEY is not set (or invalid): organisation encryption is off, nothing to do", flush=True)
@@ -1040,7 +1315,7 @@ def main(argv):
                 return 1
         elif a.cmd == "rewrap":
             try:
-                key = _read_recovery(a.recovery_file)
+                parsed = _read_recovery(a.recovery_file)
             except (OSError, ValueError):
                 print(TAG, "rewrap: that is not a recovery key", flush=True)
                 return 2
@@ -1048,6 +1323,17 @@ def main(argv):
                 if not c.execute("SELECT 1 FROM orgs WHERE id=?", (a.org,)).fetchone():
                     print(TAG, "rewrap: no organisation", a.org)
                     return 2
+            # 2.138.0 C (#1972): a recovery key "R2-..." opens the copy of the key in the (restored) database; the earlier
+            # format is the key itself and counts only until the organisation's key was rotated
+            rr = oc.rck_row(c, a.org)
+            if parsed[0] == "key" and rr is not None and (rr["rotated_at"] or rr["wrapped_rot"]):
+                print(TAG, "rewrap: the organisation's key was renewed (rotate) - this earlier recovery key no longer counts, nothing changed", flush=True)
+                return 1
+            try:
+                key = oc.rck_resolve(parsed, a.org, rr["recovery_wrapped"] if rr is not None else None)
+            except oc.OrgCryptError:
+                print(TAG, "rewrap: this recovery key does not open the organisation's key (typo? an earlier one?) - nothing changed", flush=True)
+                return 1
             ok = rewrap_probe(c, a.org, key)
             if ok is False:
                 print(TAG, "rewrap: this recovery key does not open the organisation's encrypted data (typo?) - nothing changed", flush=True)
@@ -1056,8 +1342,55 @@ def main(argv):
                 print(TAG, "rewrap: organisation", a.org, "has nothing encrypted to test the key on - check it and repeat with --force", flush=True)
                 return 1
             changed = oc.oc_rewrap(c, a.org, key)
+            if parsed[0] == "secret":
+                oc.rck_keep_secret(c, a.org, parsed[1])  # 2.138.0 C (#1972): showable again under the current server key
+            elif changed:
+                oc.rck_drop_secret(c, a.org)  # 2.138.0 C (#1972): its copy of R lay under the earlier server key
             c.commit()
             print(TAG, "rewrap: organisation", a.org, "key stored with the current server key" if changed else "key was already usable (unchanged)")
+        elif a.cmd == "rotate":
+            with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+                if not c.execute("SELECT 1 FROM org_keys WHERE org_id=?", (a.org,)).fetchone():
+                    print(TAG, "rotate: organisation", a.org, "has no key", flush=True)
+                    return 2
+            if a.recovery_out and os.path.exists(a.recovery_out):
+                print(TAG, "rotate: the file for the recovery key exists already - nothing changed", flush=True)
+                return 2
+            print(TAG, "rotate: do not go back to a version before 2.138 until this has finished - it reads the organisation's data only after the end", flush=True)  # 2.138.0 C (#1972, review F5)
+            t = rotate_org(c, a.org, force=a.force, rounds=0 if os.environ.get("KALMIDO_TEST_ROT_ABORT") == "1" else 3)  # tests: stop after the key switch
+            sec = t.pop("secret")
+            print(TAG, "rotate:", json.dumps(t), flush=True)
+            if not t["finished"]:
+                print(TAG, "rotate: not finished - run it again (the server reads with both keys meanwhile)" if not t["unreadable"] else
+                      "rotate: not finished - some values / files open with neither key; check them, then repeat (--force: finish anyway)", flush=True)
+                return 1
+            rot_announce(c, a.org, "rotated")
+            print(TAG, "rotate: the earlier recovery keys no longer count on this server (older exports / backups stay readable with the "
+                  "key of their time). The new recovery key:", flush=True)
+            return _give_secret(sec, a.recovery_out)
+        elif a.cmd == "recovery":
+            if a.recovery_out and os.path.exists(a.recovery_out):
+                print(TAG, "recovery: the file exists already - nothing changed", flush=True)
+                return 2
+            with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+                if not c.execute("SELECT 1 FROM orgs WHERE id=?", (a.org,)).fetchone():
+                    print(TAG, "recovery: no organisation", a.org)
+                    return 2
+            write_lock(c, f"orgkey-recovery-{a.org}")
+            try:
+                sec, made = oc.rck_secret(c, a.org, new=a.new)
+            except oc.RckStale:  # 2.138.0 C (#1972)
+                print(TAG, "recovery: the recovery key cannot be shown with the current server key - make a new one with --new "
+                      "(the earlier one stops working then), nothing changed", flush=True)
+                return 1
+            if sec is None:
+                print(TAG, "recovery: not possible now (no key, or a rotation is not finished)", flush=True)
+                return 1
+            with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+                c.execute("UPDATE org_keys SET recovery_shown_at=? WHERE org_id=?", (_now(), a.org))
+            c.commit()
+            rot_announce(c, a.org, "new" if made else "shown")
+            return _give_secret(sec, a.recovery_out)
         return 0
     except oc.OrgCryptError as e:
         print(TAG, "error:", e, flush=True)

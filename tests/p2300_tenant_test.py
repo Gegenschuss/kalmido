@@ -373,8 +373,8 @@ for name, s in (("carol", Ca), ("dave", Da)):
     no(s.patch(B + f"/api/agent-schedules/{SCH}", json={"enabled": False}), f"matrix {name}: planned job PATCH")
     no(s.post(B + f"/api/agent-schedules/{SCH}/run"), f"matrix {name}: planned job run now")
     no(s.delete(B + f"/api/agent-schedules/{SCH}"), f"matrix {name}: planned job DELETE")
-    s.post(B + "/api/ical", json={"action": "create"})
-    hidden(requests.get(B + s.get(B + "/api/ical").json()["url"].replace("https://kalmido.example", "")), f"matrix {name}: calendar feed")
+    # 2.138.0 (#1907): the feed link is only in the answer of create / rotate
+    hidden(requests.get(B + s.post(B + "/api/ical", json={"action": "rotate"}).json()["url"].replace("https://kalmido.example", "")), f"matrix {name}: calendar feed")
     # people: invitations / sign-in links are no way to reach somebody of another organisation
     uname = "carol" if s is Ca else "dave"
     pw = s.post(B + "/api/me/app-passwords", json={"name": "phone"}).json()

@@ -287,6 +287,8 @@ def state():
         v=v0,
         me={**user_public(u), "orgs": _org_names(c, u["id"]), "is_admin": bool(u["is_admin"]), "auth": g.auth_via, "has_password": bool(u["password_hash"]),
             "ntfy_inbox": bool(NTFY_IN["token"]) and inbox_user(c) == uid,
+            # 2.138.0 C (#1907): only whether an upload token is set (the token itself is shown once, when created)
+            "drop_token_set": bool(not u["kid"] and u["drop_token_hash"]), "drop_token_at": "" if u["kid"] else (u["drop_token_at"] or ""),
             "workspaces": workspaces_for(c, uid)},  # 2.28.0 (#935): my organisations [{id, name, icon, role}]
         workspaces=has_workspaces(c),  # 2.28.0 (#935): lists / agents have a workspace (private | an organisation)
         ws_mismatches={str(k): v for k, v in ws_mismatches(c, uid).items()},  # 2.28.0: agents of another workspace in my lists

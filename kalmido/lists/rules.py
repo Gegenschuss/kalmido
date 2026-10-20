@@ -2,7 +2,8 @@
 
 A rule has ONE trigger (a task comes into column X, is completed, is opened again, gets the list tag Y, its due day is
 today) and ONE action (assign it to a person of the list, set / clear the due date relative to today, write a fixed
-comment, move it to a list and / or column). It runs with the rights of the person who created it (created_by), checked
+comment, move it to a list and / or column). 2.138.0 D (#2060): triggers created / assigned / field (a custom field changes),
+actions priority / tag (a list tag) / field (a custom field gets a fixed value). It runs with the rights of the person who created it (created_by), checked
 again every time it runs: that person must still be owner / admin of the list, and a move needs write access to the target
 list too (same organisation / private as the source, never a health list, never a locked list). If a right is missing the
 rule does not run and pauses itself (paused_reason), it never goes on with other rights.
@@ -37,8 +38,9 @@ RUL_TEXT_MAX = 2000         # the fixed comment
 RUL_DAYS_MAX = 365          # due date: today + 0..365 days
 RUL_DUE_BATCH = 500         # tasks per watchdog tick (due date reached)
 RUL_PROP_DAY_MAX = 20       # rule proposals of one agent per 24 hours
-RUL_TRIGGERS = ("section", "done", "reopen", "ltag", "due")
-RUL_ACTIONS = ("assign", "due", "comment", "move")
+RUL_TRIGGERS = ("section", "done", "reopen", "ltag", "due", "created", "assigned", "field")  # 2.138.0 D (#2060): + created, assigned, field
+RUL_ACTIONS = ("assign", "due", "comment", "move", "priority", "tag", "field")  # 2.138.0 D (#2060): + priority, tag, field
+RUL_PRIO = {"none": 0, "low": 1, "medium": 3, "high": 5}  # 2.138.0 D (#2060): action priority (names as in API v1)
 RUL_PAUSE = {  # paused_reason -> the text the settings show
     "creator": N_("the person who set it up has no access to the list any more"),
     "role": N_("the person who set it up is no longer owner or admin of the list"),
@@ -47,6 +49,8 @@ RUL_PAUSE = {  # paused_reason -> the text the settings show
     "locked": N_("the list or the target list is locked"),
     "section": N_("the target column no longer exists"),  # 2.71.0 (#1457, review N2)
     "list": N_("rules are no longer available in this list"),  # 2.71.0 (#1457, review N4)
+    "field": N_("the custom field or its value no longer exists"),  # 2.138.0 D (#2060)
+    "tag": N_("the list tag no longer exists"),  # 2.138.0 D (#2060)
 }
 _NEW = {"new": True}  # rul_fire: the task was just created
 
@@ -121,7 +125,7 @@ def rul_clean(c, lid, b, partial=None, see_only=False):
         t = b.get("trigger")
         if not isinstance(t, dict) or t.get("kind") not in RUL_TRIGGERS:
             raise BadInput(tr("Invalid value: {0}", "trigger"))
-        reject_unknown(t, ("kind", "section_id", "tag_id"))
+        reject_unknown(t, ("kind", "section_id", "tag_id", "user_id", "field_id", "value"))
         val = ""
         if t["kind"] == "section":
             sid = _int(t.get("section_id"), "trigger.section_id")
@@ -133,6 +137,8 @@ def rul_clean(c, lid, b, partial=None, see_only=False):
             if not c.execute("SELECT 1 FROM list_tags WHERE id=? AND list_id=?", (tag, lid)).fetchone():
                 raise BadInput(tr("Invalid value: {0}", "trigger.tag_id"))
             val = str(tag)
+        elif t["kind"] in ("assigned", "field"):
+            val = rul_trig_clean(c, lid, t)
         out["trig"], out["trig_val"] = t["kind"], val
     if "action" in b or partial is None:
         a = b.get("action")
@@ -162,6 +168,8 @@ def rul_clean(c, lid, b, partial=None, see_only=False):
             if len(text) > RUL_TEXT_MAX:
                 raise BadInput(tr("The comment is too long (max. {0} characters)", RUL_TEXT_MAX))
             v = {"text": text.strip()}
+        elif k in ("priority", "tag", "field"):
+            v = rul_act_clean(c, lid, a)
         else:  # move: into a list and / or a column (the column belongs to the target list)
             reject_unknown(a, ("kind", "list_id", "section_id"))
             dst = _int(a["list_id"], "action.list_id") if a.get("list_id") not in (None, "", 0) else lid
@@ -181,12 +189,134 @@ def rul_clean(c, lid, b, partial=None, see_only=False):
     return out
 
 
+# ---------------------------------------------------------------- 2.138.0 D (#2060): created / assigned / field, priority / tag / field
+def _field_row(c, lid, fid):
+    return c.execute("SELECT * FROM list_fields WHERE id=? AND list_id=?", (fid, lid)).fetchone()
+
+
+def rul_trig_clean(c, lid, t):
+    """trig_val of the triggers assigned ({user_id?}: "" = anybody, else that person of the list) and field ({field_id,
+    value?}: "<id>" = any change; "<id>=<option id>" = set to that option of a selection field; checkbox "<id>=1" = checked,
+    "<id>=" = unchecked). Formula fields are computed, they never trigger."""
+    if t["kind"] == "assigned":
+        if t.get("user_id") in (None, "", 0):
+            return ""
+        uid = _int(t["user_id"], "trigger.user_id")
+        if uid not in list_people(c, lid):
+            raise BadInput(tr("Invalid value: {0}", "trigger.user_id"))
+        return str(uid)
+    fid = _int(t.get("field_id"), "trigger.field_id")
+    f = _field_row(c, lid, fid)
+    if not f or f["type"] == "formula":
+        raise BadInput(tr("Invalid value: {0}", "trigger.field_id"))
+    v = t.get("value")
+    if v is None or v == "":
+        return str(fid)
+    if f["type"] == "checkbox":
+        if v in (True, 1, "1", "true") or v in (False, 0, "0", "false"):  # 2.138.0 D (#2060, review): anything else is no checkbox value
+            return f"{fid}={'1' if v in (True, 1, '1', 'true') else ''}"
+        raise BadInput(tr("Invalid value: {0}", "trigger.value"))
+    if f["type"] == "select" and str(v) in {o["id"] for o in json.loads(f["options"] or "{}").get("options", [])}:
+        return f"{fid}={v}"
+    raise BadInput(tr("Invalid value: {0}", "trigger.value"))
+
+
+def rul_act_clean(c, lid, a):
+    """act_val of the actions priority ({priority: none | low | medium | high}), tag ({tag_id}: adds a tag of THIS list --
+    the rule belongs to everybody in the list, so never personal tags) and field ({field_id, value}: null clears it; checked
+    against the field type like the normal field route)."""
+    from .fields import field_value
+    k = a["kind"]
+    if k == "priority":
+        reject_unknown(a, ("kind", "priority"))
+        if a.get("priority") not in RUL_PRIO:
+            raise BadInput(tr("Invalid value: {0}", "action.priority"))
+        return {"priority": a["priority"]}
+    if k == "tag":
+        reject_unknown(a, ("kind", "tag_id"))
+        tag = _int(a.get("tag_id"), "action.tag_id")
+        if not c.execute("SELECT 1 FROM list_tags WHERE id=? AND list_id=?", (tag, lid)).fetchone():
+            raise BadInput(tr("Invalid value: {0}", "action.tag_id"))
+        return {"tag_id": tag}
+    reject_unknown(a, ("kind", "field_id", "value"))
+    fid = _int(a.get("field_id"), "action.field_id")
+    f = _field_row(c, lid, fid)
+    if not f or f["type"] == "formula":
+        raise BadInput(tr("Invalid value: {0}", "action.field_id"))
+    return {"field_id": fid, "value": field_value(c, f, a.get("value"), lid)}
+
+
+def rul_trig_val(t):
+    """The stored trig_val of a (checked) trigger dict -- the proposal card builds a rule row from it."""
+    t = t or {}
+    if t.get("kind") == "field" and t.get("field_id"):
+        v = t.get("value")
+        return str(t["field_id"]) + ("" if v is None or v == "" else "=" + ("" if v in (False, 0, "0", "false") else "1" if v is True else str(v)))
+    return str(t.get("section_id") or t.get("tag_id") or t.get("user_id") or "")
+
+
+def rul_val_name(c, f, v):
+    """The readable value of a field rule (option / person name); None for a checkbox (the client words it)."""
+    from .fields import field_act
+    if not f or v is None or f["type"] == "checkbox":
+        return None
+    return field_act(c, f, v)["v"]
+
+
+def rul_ref_gone(c, r):
+    """The pause reason when the custom field / list tag a rule refers to was deleted, else None."""
+    a = json.loads(r["act_val"] or "{}")
+    tv = (r["trig_val"] or "").split("=")[0]
+    if (r["trig"] == "field" and tv.isdigit() and not _field_row(c, r["list_id"], int(tv))) or \
+            (r["act"] == "field" and not _field_row(c, r["list_id"], a.get("field_id") or 0)):
+        return "field"
+    tags = [int(tv)] if r["trig"] == "ltag" and tv.isdigit() else []
+    tags += [a.get("tag_id") or 0] if r["act"] == "tag" else []
+    if any(not c.execute("SELECT 1 FROM list_tags WHERE id=? AND list_id=?", (x, r["list_id"])).fetchone() for x in tags):
+        return "tag"
+    return None
+
+
+def rul_fvals(c, tid, lid):
+    """{field id: value} of task tid when list lid has an active rule "field changed", else None (normal changes stay cheap)."""
+    k = _cache().setdefault("fl", {})
+    if lid not in k:
+        k[lid] = bool(c.execute("SELECT 1 FROM list_rules WHERE list_id=? AND trig='field' AND active=1 AND deleted_at IS NULL LIMIT 1",
+                                (lid,)).fetchone())
+    if not k[lid]:
+        return None
+    return {r[0]: r[1] for r in c.execute("SELECT field_id, value FROM task_field_values WHERE task_id=?", (tid,))}
+
+
+def rul_new_events(c, t, before, new):
+    """The events of the new triggers: created, assigned (only when the person is new on the task), field (a value of the
+    list's own fields changed, compared within the same list)."""
+    ev = {("created", "")} if new else set()
+    if t["assignee_id"] and (new or t["assignee_id"] != before.get("assignee")):
+        ev |= {("assigned", ""), ("assigned", str(t["assignee_id"]))}
+    if new or (t["list_id"] == before["list_id"] and before.get("fields") is not None):
+        cur = rul_fvals(c, t["id"], t["list_id"]) or {}
+        old = {} if new else before["fields"]
+        for fid in set(old) | set(cur):
+            if old.get(fid) != cur.get(fid):
+                ev |= {("field", str(fid)), ("field", f"{fid}={cur.get(fid) or ''}")}
+    return ev
+
+
 # ---------------------------------------------------------------- output
 def rul_rows(c, lid):
     """The live rules of list lid (oldest first). 2.71.0 A: read as "system" -- only after the caller checked the list (the
     rules of a list that moved between private and an organisation keep their old org_id until rul_sync)."""
     rul_sync(c, lid)
-    return c.execute("SELECT * FROM list_rules WHERE list_id=? AND deleted_at IS NULL ORDER BY id", (lid,)).fetchall()
+    rows = c.execute("SELECT * FROM list_rules WHERE list_id=? AND deleted_at IS NULL ORDER BY id", (lid,)).fetchall()
+    gone = [(r, rul_ref_gone(c, r)) for r in rows if r["active"]]  # 2.138.0 D (#2060): deleted field / tag -> paused
+    if any(w for _, w in gone):
+        for r, w in gone:
+            if w:
+                rul_pause(c, r, w)
+        c.commit()  # the GET routes (rules_get / v1_rules_get) only read otherwise
+        rows = c.execute("SELECT * FROM list_rules WHERE list_id=? AND deleted_at IS NULL ORDER BY id", (lid,)).fetchall()
+    return rows
 
 
 def rul_sync(c, lid):
@@ -209,6 +339,15 @@ def rul_dict(c, r):
         trig["tag_id"] = int(r["trig_val"])
         s = c.execute("SELECT name FROM list_tags WHERE id=?", (trig["tag_id"],)).fetchone()
         names["tag"] = s[0] if s else None
+    elif r["trig"] == "assigned":  # 2.138.0 D (#2060)
+        trig["user_id"] = int(r["trig_val"]) if r["trig_val"] else None
+        names["trig_user"] = user_names(c, [trig["user_id"]]).get(trig["user_id"]) if trig["user_id"] else None
+    elif r["trig"] == "field" and r["trig_val"]:
+        fid, eq, v = r["trig_val"].partition("=")
+        f = _field_row(c, r["list_id"], int(fid))
+        trig["field_id"], trig["value"] = int(fid), (("1" if v else "0") if f and f["type"] == "checkbox" else v) if eq else None
+        names["field"] = f["name"] if f else None
+        names["value"] = rul_val_name(c, f, v) if eq else None
     act = {"kind": r["act"], **a}
     if r["act"] == "assign":
         names["user"] = user_names(c, [a.get("user_id")]).get(a.get("user_id"))
@@ -221,6 +360,13 @@ def rul_dict(c, r):
         if a.get("section_id") and see:
             s = c.execute("SELECT name FROM sections WHERE id=?", (a["section_id"],)).fetchone()
             names["section_to"] = s[0] if s else None
+    elif r["act"] == "tag":  # 2.138.0 D (#2060)
+        s = c.execute("SELECT name FROM list_tags WHERE id=?", (a.get("tag_id"),)).fetchone()
+        names["tag_to"] = s[0] if s else None
+    elif r["act"] == "field":
+        f = _field_row(c, r["list_id"], a.get("field_id") or 0)
+        names["field_to"], names["value_to"] = (f["name"] if f else None), rul_val_name(c, f, a.get("value"))
+        names["field_type"] = f["type"] if f else None
     by = r["created_by"]
     return {"id": r["id"], "list_id": r["list_id"], "name": r["name"], "trigger": trig, "action": act, "names": names,
             "active": bool(r["active"]), "paused_reason": r["paused_reason"] or None,
@@ -347,11 +493,12 @@ def rul_snap(c, tid):
     """What rul_fire compares with after a change ({} = nothing to do: no rules, or a rule is running = depth 0)."""
     if (has_request_context() and g.get("rul_run")) or not _any_rules(c):
         return {}
-    t = c.execute("SELECT list_id, section_id, status FROM tasks WHERE id=?", (tid,)).fetchone()
+    t = c.execute("SELECT list_id, section_id, status, assignee_id FROM tasks WHERE id=?", (tid,)).fetchone()
     if not t:
         return {}
     return {"list_id": t["list_id"], "section_id": t["section_id"], "status": t["status"],
-            "tags": {x[0] for x in c.execute("SELECT tag_id FROM task_list_tags WHERE task_id=?", (tid,))}}
+            "tags": {x[0] for x in c.execute("SELECT tag_id FROM task_list_tags WHERE task_id=?", (tid,))},
+            "assignee": t["assignee_id"], "fields": rul_fvals(c, tid, t["list_id"])}  # 2.138.0 D (#2060)
 
 
 def rul_snap_new(c):
@@ -364,7 +511,7 @@ def rul_fire(c, tid, before):
     task's list (as their creators). Never raises: a rule that fails is skipped (or paused when a right is missing)."""
     if not before or not has_request_context() or g.get("rul_run"):
         return  # outside a request (a repository closing a task in the background): no rules -- nobody to run them as safely
-    t = c.execute("SELECT id, list_id, section_id, status, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
+    t = c.execute("SELECT id, list_id, section_id, status, deleted_at, assignee_id FROM tasks WHERE id=?", (tid,)).fetchone()
     if not t or t["deleted_at"]:
         return
     tags = {x[0] for x in c.execute("SELECT tag_id FROM task_list_tags WHERE task_id=?", (tid,))}
@@ -378,6 +525,7 @@ def rul_fire(c, tid, before):
         ev.add(("reopen", ""))
     for x in tags - (set() if new or t["list_id"] != before["list_id"] else before["tags"]):
         ev.add(("ltag", str(x)))
+    ev |= rul_new_events(c, t, before, new)  # 2.138.0 D (#2060)
     if not ev:
         return
     rul_run_matching(c, t, ev)
@@ -390,7 +538,7 @@ def rul_fire_done(c, tid, copy_id, before):
 
 def rul_run_matching(c, t, ev):
     rul_sync(c, t["list_id"])
-    rows = c.execute("""SELECT * FROM list_rules WHERE list_id=? AND active=1 AND deleted_at IS NULL AND trig IN ('section','done','reopen','ltag')
+    rows = c.execute("""SELECT * FROM list_rules WHERE list_id=? AND active=1 AND deleted_at IS NULL AND trig<>'due'
                         ORDER BY id""", (t["list_id"],)).fetchall()
     n = 0
     for r in rows:
@@ -426,6 +574,7 @@ def rul_pause(c, r, why):
     with pg_system(c):  # 2.71.0 A (#1457): system on purpose: pausing exactly this rule (also from the watchdog, no person)
         c.execute("UPDATE list_rules SET active=0, paused_reason=?, updated_at=? WHERE id=?", (why, iso(now_utc()), r["id"]))
     _cache().pop("any", None)
+    _cache().pop("fl", None)  # 2.138.0 D (#2060)
 
 
 def rul_check(c, r, tid):
@@ -455,6 +604,15 @@ def rul_check(c, r, tid):
                 return "target"
         except Denied:
             return "target"
+    why = rul_ref_gone(c, r)  # 2.138.0 D (#2060): the field / list tag of the rule was deleted
+    if why:
+        return why
+    if r["act"] == "field":  # the fixed value must still fit (an option removed, a person left the list)
+        from .fields import field_value
+        try:
+            field_value(c, _field_row(c, r["list_id"], a["field_id"]), a.get("value"), r["list_id"])
+        except BadInput:
+            return "field"
     if r["act"] == "assign" and (a.get("user_id") not in list_people(c, r["list_id"]) or check_assignee(c, r["list_id"], a.get("user_id"))):
         return "assignee"
     return None
@@ -483,10 +641,19 @@ def rul_exec(c, r, tid):
                     else:
                         if r["act"] == "assign":
                             b = {"assignee_id": a["user_id"]}
+                        elif r["act"] == "priority":  # 2.138.0 D (#2060)
+                            b = {"priority": RUL_PRIO.get(a.get("priority"), 0)}
+                        elif r["act"] == "tag":
+                            from ..collab.reactions import ltag_names
+                            b = {"ltags": ltag_names(c, tid) + [c.execute("SELECT name FROM list_tags WHERE id=?", (a["tag_id"],)).fetchone()[0]]}
+                        elif r["act"] == "field":
+                            b = {"fields": {str(a["field_id"]): a.get("value")}}
                         elif r["act"] == "due":
                             b = {"due": None if a.get("days") is None else (local_now().date() + timedelta(days=a["days"])).isoformat()}
-                        else:
+                        elif r["act"] == "move":
                             b = {"list_id": a.get("list_id") or r["list_id"], **({"section_id": a["section_id"]} if a.get("section_id") else {})}
+                        else:  # 2.138.0 D (#2060, review): an action this version does not know does nothing (never a move)
+                            return False
                         e = apply_update(c, tid, b)
                         if e:
                             raise BadInput(e)
@@ -665,7 +832,7 @@ def rul_prop_extra(c, j):
         return {}
     rr = p.get("rule") or {}
     fake = {"id": 0, "list_id": lid, "name": rr.get("name") or "", "trig": (rr.get("trigger") or {}).get("kind"),
-            "trig_val": str((rr.get("trigger") or {}).get("section_id") or (rr.get("trigger") or {}).get("tag_id") or ""),
+            "trig_val": rul_trig_val(rr.get("trigger")),  # 2.138.0 D (#2060)
             "act": (rr.get("action") or {}).get("kind"), "act_val": json.dumps({k: v for k, v in (rr.get("action") or {}).items() if k != "kind"}),
             "active": 1, "paused_reason": "", "created_by": None, "created_at": j["created_at"], "updated_at": j["created_at"]}
     name = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()
@@ -703,15 +870,24 @@ def rul_spec(paths, schemas, op, ok, errs, ref, pid):
     schemas["ListRule"] = {"type": "object", "properties": {
         "id": {"type": "integer"}, "list_id": {"type": "integer"}, "name": {"type": "string", "maxLength": RUL_NAME_MAX},
         "trigger": {"type": "object", "description": "kind: section (a task comes into column section_id), done (completed), "
-                    "reopen (opened again), ltag (gets the list tag tag_id), due (its due day is today)",
+                    "reopen (opened again), ltag (gets the list tag tag_id), due (its due day is today), created (a task is created "
+                    "in the list), assigned (a person is newly assigned; user_id = only that person, null = anybody), field (a value "
+                    "of the list's custom field field_id changes; value = only when set to that option id of a selection field / "
+                    "\"1\" checked, \"0\" unchecked of a checkbox field, null = any change; formula fields never trigger)",
                     "properties": {"kind": {"type": "string", "enum": list(RUL_TRIGGERS)}, "section_id": {"type": "integer"},
-                                   "tag_id": {"type": "integer"}}},
+                                   "tag_id": {"type": "integer"}, "user_id": {"type": ["integer", "null"]},
+                                   "field_id": {"type": "integer"}, "value": {"type": ["string", "null"]}}},
         "action": {"type": "object", "description": "kind: assign (user_id, a person of the list), due (days from today 0.."
-                   f"{RUL_DAYS_MAX}, null = clear), comment (text, at most {RUL_TEXT_MAX} characters), move (list_id and / or section_id)",
+                   f"{RUL_DAYS_MAX}, null = clear), comment (text, at most {RUL_TEXT_MAX} characters), move (list_id and / or section_id), "
+                   "priority (priority none | low | medium | high), tag (adds the list tag tag_id), field (sets the list's custom "
+                   "field field_id to value, checked like a normal field value; null = clear it)",
                    "properties": {"kind": {"type": "string", "enum": list(RUL_ACTIONS)}, "user_id": {"type": "integer"},
                                   "days": {"type": ["integer", "null"]}, "text": {"type": "string"}, "list_id": {"type": "integer"},
-                                  "section_id": {"type": ["integer", "null"]}}},
-        "names": {"type": "object", "description": "Names of what the rule refers to (section, tag, user, list, section_to)"},
+                                  "section_id": {"type": ["integer", "null"]}, "priority": {"type": "string", "enum": list(RUL_PRIO)},
+                                  "tag_id": {"type": "integer"}, "field_id": {"type": "integer"},
+                                  "value": {"type": ["string", "null"]}}},
+        "names": {"type": "object", "description": "Names of what the rule refers to (section, tag, trig_user, field, value, user, list, "
+                  "section_to, tag_to, field_to, value_to, field_type)"},
         "active": {"type": "boolean"}, "paused_reason": {"type": ["string", "null"], "enum": [None, *RUL_PAUSE]},
         "created_by": {"type": ["integer", "null"], "description": "The rule runs with this person's rights"},
         "created_at": {"type": "string"}, "updated_at": {"type": "string"}}}

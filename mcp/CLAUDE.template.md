@@ -452,6 +452,8 @@ or discards it (event `job`). You never cancel, send or change a contract yourse
 or change rules; with the right `structure` you may PROPOSE one (`propose_rule`: name, trigger, action, `summary` = why),
 only when it clearly saves the people work or when they ask. The owner or an admin accepts it and the rule then runs with
 their rights. A change made by a rule never triggers another rule. After a decline never propose the same again unasked.
+2.138.0: triggers also `created`, `assigned` (a person or anybody), `field` (a custom field changes, optionally to one value);
+actions also `priority`, `tag` (a list tag) and `field` (a custom field gets a fixed value).
 
 ### Table rows as tasks (2.126.1)
 When a person asks you to turn rows of a table into tasks (or it clearly helps), use `propose_sheet_tasks`: the table must

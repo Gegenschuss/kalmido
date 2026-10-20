@@ -131,6 +131,7 @@ async function tpClick(a, b) {
   }
   if (!d.can_edit) return;
   if (a === 'tp-add') {
+    for (let n = 0; OFD.saving && n < 50; n++) await new Promise(r => setTimeout(r, 100));  // 2.138.0 A (#2239): a running save of the title page first
     const j = await ofdSave('POST', `/api/office/docs/${d.id}/parts`, {kind: b.dataset.kind || 'items'});
     if (j?.part) { tpf_set(d, j.part.id, true); OFD.open.parts = true; ofdDraw(); setTimeout(() => { const el = $(`.tpfbox[data-pid="${j.part.id}"] .tptitle`); el?.focus(); el?.select?.(); }, 0); }  // 2.113.0 (#2248)
     return;

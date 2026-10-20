@@ -916,6 +916,7 @@ function settingsModal(focus) {
   if (S.me) accountWire(md);
   mailWire(md);  // 2.17.0 (#443)
   md.addEventListener('click', async e => {
+    const hz = e.target.closest('#s-hszip'); if (hz) { tkh_zipClick(e, hz, md); return; }  // 2.138.0 C (#1907)
     const b = e.target.closest('button'); if (!b) return;
     const trow = b.closest('[data-tab]');
     if (trow && (b.dataset.tmove || 'tdel' in b.dataset)) {
@@ -972,7 +973,7 @@ function settingsModal(focus) {
     if (a === 'drop-new-tok') { dropTokenNew(md); return; }
     if (a === 'drop-copy-url' || a === 'drop-copy-tok') {
       const i = $(a === 'drop-copy-url' ? '#s-dropurl' : '#s-droptok', md);
-      if (a === 'drop-copy-tok' && !i.dataset.real) { try { const j = await api('GET', '/api/me'); i.value = j.drop_token || ''; i.type = 'text'; i.dataset.real = '1'; } catch { return; } }
+      if (!i) return;  // 2.138.0 C (#1907): the token field exists only right after creating a token
       try { await navigator.clipboard.writeText(i.value); toast(tr('Copied')); } catch { i.focus(); i.select(); toast(tr('Copy the selected text')); }
       return;
     }
@@ -1278,9 +1279,13 @@ async function adminSwitch(md, el, fromHist) {
 async function icalDraw(md, j) {
   const box = $('#s-ical', md); if (!box) return;
   if (!j) { try { j = await api('GET', '/api/ical'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; } }
-  if (!j.url) { box.innerHTML = `<div class="row"><button class="btn sm pri" data-m="ical-create">${ic('cal', 's')} ${tr('Create subscription link')}</button></div>`; return; }
+  // 2.138.0 C (#1907): the server keeps only a hash: the link is in the answer of create / rotate once, later only "active since"
+  if (!j.url && !j.active) { box.innerHTML = `<div class="row"><button class="btn sm pri" data-m="ical-create">${ic('cal', 's')} ${tr('Create subscription link')}</button></div>`; return; }
+  const at = j.created_at ? new Date(j.created_at) : null, btns = `<button class="btn sm" data-m="ical-rotate">${ic('key', 's')} ${tr('New link')}</button><button class="btn sm danger" data-m="ical-off">${tr('Turn off')}</button>`;
+  if (!j.url) { box.innerHTML = `<div class="row"><span class="muted" id="s-icalact">${at && !isNaN(at) ? esc(tr('Subscription link active since {0}', at.toLocaleDateString(LOCALE()))) : tr('Subscription link active')}</span></div><div class="row">${btns}</div>`; return; }
   box.innerHTML = `<div class="row icalrow"><input id="s-icalurl" readonly value="${esc(j.url)}" aria-label="${tr('Subscription link')}"><button class="btn sm pri" data-m="ical-copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
-    <div class="row"><a class="btn sm" href="${esc(j.url.replace(/^https?:/, 'webcal:'))}">${ic('cal', 's')} ${tr('Open in calendar app')}</a><button class="btn sm" data-m="ical-rotate">${ic('key', 's')} ${tr('New link')}</button><button class="btn sm danger" data-m="ical-off">${tr('Turn off')}</button></div>`;
+    <div class="shint keep" role="status">${tr('Only visible now: copy it now. If you lose it, create a new one.')}</div>
+    <div class="row"><a class="btn sm" href="${esc(j.url.replace(/^https?:/, 'webcal:'))}">${ic('cal', 's')} ${tr('Open in calendar app')}</a>${btns}</div>`;
 }
 async function icalAction(md, a) {
   if (a === 'copy') {

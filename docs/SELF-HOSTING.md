@@ -263,6 +263,12 @@ to *deny* and allow each app per group, so a new account does not open every app
   (placeholders) for the server address and the token, never with your own token inside.
 - **The upload token is not an API token.** *Share from your phone* uses each person's upload token for `/drop` only;
   scripts need a personal access token ([API.md](API.md#personal-access-tokens)).
+- **Upload token and calendar feed link are shown once.** Kalmido stores both only as a hash: the token and the link
+  appear right after they are created (and inside a freshly downloaded HTTP Shortcuts import, which always carries a new
+  token). Lost one? Create a new one under *Settings > Integrations*; the old one stops working at once. Tokens from
+  before 2.138 keep working (they are converted to hashes at start-up). `TASKS_DROP_TOKEN` is stored the same way.
+  Going back to a version before 2.138 keeps the data, but there every upload token and calendar feed link has to be
+  created anew (and shortcuts and calendar subscriptions set up again with them): the older version cannot read the hashes.
 
 ## Database (PostgreSQL)
 
@@ -497,7 +503,14 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
 - **Keep the master key apart from the backups.** A backup contains the wrapped organisation keys but never
   `KALMIDO_SECRET_KEY`: backup + master key restore everything; a backup alone does not reveal the encrypted data.
 - **Recovery key.** An organisation's admins can show its recovery key in *Settings > Organisation > Encryption*
-  (after their password; the showing is noted in the office log). Store it offline. If the master key is lost: set a
+  (2.138: `R2-` and 13 groups of four characters). It is not the organisation's key itself but a separate secret that
+  unlocks a copy of that key stored in the database, so it works with any master key. Showing it asks for a second
+  step: the password and, when set up, the authenticator app code or the passkey; accounts without a password
+  (single sign-on) need a sign-in from the last ten minutes, accounts signed in by a login proxy ask the server admin
+  (`orgcrypt_cli recovery --org <id>`). Every showing is noted in the office log, and the organisation's other admins
+  get a notice in their News (who and when, never the key). *New recovery key* replaces it: the earlier one stops
+  working at once. A person without an organisation finds the recovery key of the personal office under
+  *Settings > Organisation* as soon as the office holds encrypted data. Store the key offline. If the master key is lost: set a
   new `KALMIDO_SECRET_KEY`, start, then for each organisation
 
   ```
@@ -509,8 +522,31 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
   any encrypted data needs `--force`. The replaced wrapped key stays in the key row, so an old master key that turns up
   later still opens it. Without the master key **and** without the
   recovery key the encrypted data is lost. A wrong master key never shows garbage: the app answers with a clear error.
+  Recovery keys of the earlier format (13 groups without `R2-`, shown before 2.138) still work for `rewrap` until the
+  organisation's key is renewed. After a `rewrap` with the earlier format the app can no longer show the current
+  recovery key (its stored copy belonged to the old master key): the one you keep stays valid, *New recovery key*
+  replaces it. Kalmido never replaces a recovery key on its own.
+- **Renewing an organisation's key** (2.138), e.g. after a recovery key got into the wrong hands:
+
+  ```
+  docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli rotate --org <id> --recovery-out /data/rk-<id>.txt
+  ```
+
+  A new key is made, every encrypted value and file of the organisation is encrypted again with it, then the old key
+  is removed and a new recovery key is written (to stdout, or with `--recovery-out` into a new file with mode 0600: move
+  it offline and delete the file). On this server all earlier recovery keys, including the earlier format, stop
+  working. Older organisation exports and backups stay readable with the recovery key and master key of their time
+  (they hold the old key): the renewal protects only what is stored from then on. The search index of documents, files,
+  mails and knowledge pages and the duplicate check of the budget are made again with the new key at the end of the run (until then the
+  search may miss some of the organisation's documents). The app keeps
+  running meanwhile: until the run ends it reads with both keys. An interrupted run is simply started again. Values or
+  files that open with neither key stop the run before the old key is removed (check them; `--force` finishes anyway).
+  Run it with the master key the server uses, and finish it before changing `KALMIDO_SECRET_KEY`. Version 2.137 and
+  earlier read the organisation's data only after the renewal has finished.
 - **Commands:** `python -m kalmido.admin.orgcrypt_cli status` (per organisation: key, encrypted / plain fields and
-  files), `encrypt-all`, `decrypt-all`, `rewrap`. All of them can be repeated and print counts only.
+  files, recovery key, renewal), `encrypt-all`, `decrypt-all`, `rewrap`, `rotate`, `recovery --org <id> [--new]
+  [--recovery-out FILE]`. All of them can be repeated and print counts only (`rotate` and `recovery` print the recovery key
+  unless it goes into a file).
 - **Before a downgrade below 2.42** run `decrypt-all` (it switches the encryption off first, then turns every field and
   file back into plain text and exits with 0 only when nothing is left encrypted); then start the older image.
 - **Deleting an organisation** deletes its key and its office folder: whatever of it is left encrypted can no longer
@@ -665,7 +701,8 @@ and download is written to the office log (who, when, size).
   the archive (the archive itself is encrypted). Content encrypted in the browser by its author (encrypted task notes
   and files) stays ciphertext; the manifest lists it under `client_encrypted`.
 - **Opening it.** The archive is encrypted with AES-256-GCM under the organisation's key. You need the organisation's
-  recovery key (*Settings > Organisation > Encryption*) and the tool `tools/kalmido_export_decrypt.py` from the
+  recovery key that was valid when the archive was made (*Settings > Organisation > Encryption*; the archive carries
+  the copy of the key that this recovery key unlocks, a later *New recovery key* does not open it) and the tool `tools/kalmido_export_decrypt.py` from the
   repository (Python 3.8+ and the package `cryptography`):
 
   ```sh

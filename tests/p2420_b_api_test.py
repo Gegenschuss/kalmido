@@ -241,7 +241,8 @@ check(Bo.post(B + f"/api/orgs/{ORG}/encryption/recovery", json={"password": "pas
 check(Ca.post(B + f"/api/orgs/{ORG}/encryption/recovery", json={"password": "password123"}).status_code == 404, "recovery key: other organisation 404")
 r = A.post(B + f"/api/orgs/{ORG}/encryption/recovery", json={"password": "password123"})
 RK = r.json().get("recovery_key", "") if r.ok else ""
-check(r.ok and len(RK.replace("-", "")) == 52 and RK.count("-") == 12 and r.headers.get("Cache-Control") == "no-store", "recovery key: 13 groups of base32, not cached")
+# 2.138.0 (#1972): "R2-" + 13 groups (the recovery secret that wraps the organisation key, no longer the key itself)
+check(r.ok and RK.startswith("R2-") and len(RK.replace("-", "")) == 54 and RK.count("-") == 13 and r.headers.get("Cache-Control") == "no-store", "recovery key: R2- + 13 groups of base32, not cached")
 lg = A.get(B + O + "/log").json()["log"]
 check(any(x["action"] == "recovery_key" for x in lg) and RK not in json.dumps(lg), "recovery key: shown -> office log entry without the value")
 check(one("SELECT recovery_shown_at FROM org_keys WHERE org_id=?", (ORG,)) is not None, "recovery key: recovery_shown_at noted")
@@ -313,7 +314,7 @@ rc, out, err_ = cli("rewrap", "--org", str(ORG), "--recovery-file", "-", stdin="
 check(rc == 2 and "not a recovery key" in out, "rewrap: a wrong recovery key is refused")
 # 2.42.0 review: a typo in the recovery key (still 32 valid bytes) is tested on the organisation's data first -> exit 1, nothing changed
 row0 = tuple(dbx("SELECT wrapped, kek_check FROM org_keys WHERE org_id=?", (ORG,))[0])
-WRONG = ("B" if RK[0] != "B" else "C") + RK[1:]
+WRONG = RK[:3] + ("B" if RK[3] != "B" else "C") + RK[4:]  # 2.138.0 (#1972): a typo after "R2-"
 rc, out, err_ = cli("rewrap", "--org", str(ORG), "--recovery-file", "-", stdin=WRONG + "\n")
 check(rc == 1 and "nothing changed" in out and WRONG not in out, f"rewrap: a mistyped recovery key is refused {out[-200:]}")
 check(tuple(dbx("SELECT wrapped, kek_check FROM org_keys WHERE org_id=?", (ORG,))[0]) == row0, "rewrap: a refused key leaves the key row unchanged")

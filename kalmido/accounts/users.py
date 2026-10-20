@@ -457,7 +457,9 @@ def me_get():
     return jsonify({**user_public(u), "is_admin": bool(u["is_admin"]), "auth": g.auth_via,
                     "via": "proxy" if g.auth_via == "proxy" else session_via(c), "twofa": twofa_methods(c, u),
                     "has_password": bool(u["password_hash"]), "proxy_login": u["proxy_login"] or "",
-                    "drop_token": "" if u["kid"] else (u["drop_token"] or ""),  # 2.86.0 (N3): /drop takes no child account
+                    # 2.138.0 C (#1907): the upload token is shown only when created (POST /api/me/drop-token); here only
+                    # whether one is set and since when. 2.86.0 (N3): /drop takes no child account
+                    "drop_token_set": bool(not u["kid"] and u["drop_token_hash"]), "drop_token_at": "" if u["kid"] else (u["drop_token_at"] or ""),
                     "ntfy_topic": usettings(c, u["id"])["ntfy_topic"]})
 
 
@@ -524,11 +526,11 @@ def me_update():
 def me_drop_token():
     if g.user["kid"]:  # 2.86.0 (N3 review): a child account has no upload token (also if KID_WRITE ever widens)
         return err(tr("Not possible with a child account"), 403)
+    from ..core.tokenhash import tkh_set_drop
     c = db()
-    tok = secrets.token_urlsafe(24)
-    c.execute("UPDATE users SET drop_token=? WHERE id=?", (tok, me()))
+    tok = tkh_set_drop(c, me())  # 2.138.0 C (#1907): only the hash is stored; this answer is the one time the token is shown
     c.commit()
-    return jsonify(drop_token=tok)
+    return jsonify(drop_token=tok, drop_token_at=c.execute("SELECT drop_token_at FROM users WHERE id=?", (me(),)).fetchone()[0])
 
 
 def httpshortcuts_zip(url, token, lg):
@@ -562,16 +564,34 @@ def httpshortcuts_zip(url, token, lg):
     return out.getvalue()
 
 
+def tkh_own_page():
+    """2.138.0 C (#1907): a GET with an effect only from this app's own pages: Sec-Fetch-Site none / same-origin; a
+    browser without that header must name this host in Origin or Referer (the app sends Referrer-Policy same-origin)."""
+    sfs = request.headers.get("Sec-Fetch-Site", "")
+    if sfs:
+        return sfs in ("none", "same-origin")
+    from urllib.parse import urlsplit
+    hosts = {request.host.lower(), (urlsplit(PUBLIC_URL).netloc or "").lower()} - {""}
+    for h in ("Origin", "Referer"):
+        v = (request.headers.get(h) or "").strip()
+        if v and v != "null":
+            return (urlsplit(v).netloc or "").lower() in hosts
+    return False
+
+
 @app.get("/api/me/share/httpshortcuts.zip")
 def me_share_httpshortcuts():
-    """1.9.0: my ready-made HTTP Shortcuts import (address + my upload token inside: treat it like a password)."""
+    """1.9.0: my ready-made HTTP Shortcuts import (address + my upload token inside: treat it like a password).
+    2.138.0 C (#1907): the token is stored only as a hash, so every download carries a NEW token (the old one and the
+    shortcuts made with it stop working; the settings say so before). Only from this app's own pages (not cross-site)."""
+    if g.user["kid"]:
+        return err(tr("Not possible with a child account"), 403)
+    if not tkh_own_page():
+        return err(tr("Not allowed"), 403)
+    from ..core.tokenhash import tkh_set_drop
     c = db()
-    u = c.execute("SELECT drop_token FROM users WHERE id=?", (me(),)).fetchone()
-    tok = u["drop_token"] if u else ""
-    if not tok:  # a user from before per-user tokens: create one now
-        tok = secrets.token_urlsafe(24)
-        c.execute("UPDATE users SET drop_token=? WHERE id=?", (tok, me()))
-        c.commit()
+    tok = tkh_set_drop(c, me())
+    c.commit()
     data = httpshortcuts_zip(PUBLIC_URL.rstrip("/") + "/drop", tok, lang(c, me()))
     r = Response(data, mimetype="application/zip")
     r.headers["Content-Disposition"] = 'attachment; filename="kalmido-http-shortcuts.zip"'

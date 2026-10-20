@@ -56,8 +56,8 @@ def dbx(sql, args=(), write=False):
 
 
 def feed(s):
-    s.post(B + "/api/ical", json={"action": "create"})
-    return requests.get(B + s.get(B + "/api/ical").json()["url"].replace("https://kalmido.example", "")).text
+    # 2.138.0 (#1907): the feed link is only in the answer of create / rotate
+    return requests.get(B + s.post(B + "/api/ical", json={"action": "rotate"}).json()["url"].replace("https://kalmido.example", "")).text
 
 
 def dav_of(s, user):
