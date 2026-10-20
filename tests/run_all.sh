@@ -1451,6 +1451,15 @@ fresh; run p2116_c_ui node p2116_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.116.0 part D (#2066 #2067: several times a day, focus/habits in API v1)
 fresh; run p2116_d_api "$PY" p2116_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2116_d_ui node p2116_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.141.0 part A: mailbox (IMAP + SMTP) per workspace, reply / send from the mail store (#2141 #2138)
+fresh; run p2141_a_api "$PY" p2141_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2141_a_ui node p2141_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.141.0 part B: HTML mails in a sandbox, mail -> task / event with a link back (#2140 #2139)
+fresh; run p2141_b_api "$PY" p2141_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2141_b_ui node p2141_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.141.0 part C: dispatch export CSV / ICS, newsletter consent import (#2142 #2143)
+fresh; run p2141_c_api "$PY" p2141_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2141_c_ui node p2141_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
