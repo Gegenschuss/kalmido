@@ -25,6 +25,11 @@ Agent chat with a stop button, agent colours and a quieter filter; the home bloc
 - Agent chat: the filter is the icon in the chat header on every width, the filter row above the messages is gone (#2419).
 - Agent chat: a job card whose only message is the final result shows it below the card, its unfolding is remembered (#2365).
 
+## [2.138.5] - 2026-10-20
+
+### Fixed
+- Quotation parts: a part with its own producing setting "off" shows the switch and "Use the values of the document" again; tests follow the parts that open in place and the film pack defaults (#2266 #2248 #2251 #2252).
+
 ## [2.138.4] - 2026-10-20
 
 Phone fixes for office, tables, documents and bookmarks; the agent chat keeps an open edit; hardening leftovers of 2.126.0.
