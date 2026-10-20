@@ -446,6 +446,8 @@ check(one("SELECT iban FROM office_company WHERE org_id=?", (ORG,)) == ENC0, "no
 check(iban(A) == TEST_IBAN and A.get(B + f"/api/attachments/{AID}").content == BODY, "during the rotation the server reads field + file (falls back to the earlier key)")
 check(A.get(B + f"/api/orgs/{ORG}/encryption").json().get("rotating"), "state: rotating")
 check(show(A, ORG).status_code == 409, "recovery key while the rotation runs: 409")
+r = A.post(B + f"/api/orgs/{ORG}/export")  # 2.138.0 (#1972, review F2)
+check(r.status_code == 409, f"organisation export while the rotation runs: 409 {r.status_code} {r.text[:120]}")
 # a value written during the rotation is sealed with the new key and stays readable
 A.put(B + O + "/settings", json={"company_fields": {"name": "Studio Nordlicht GmbH", "iban": TEST_IBAN, "bic": "DEUTDEFFXXX"}})
 ENC1 = one("SELECT iban FROM office_company WHERE org_id=?", (ORG,))

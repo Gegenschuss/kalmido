@@ -899,8 +899,12 @@ def rck_wrapped(c, org_id):
     """recovery_wrapped for an export header (made when there is none yet; one that cannot be shown is kept as it is: it
     still opens with the R it was made with); None without one (no server key, rotation)."""
     try:
-        if rck_secret(c, org_id)[0] is None:
+        sec, made = rck_secret(c, org_id)
+        if sec is None:
             return None
+        if made:  # 2.138.0 C (#1972, review F4): a key made for the export is noted like one made in the settings
+            from ..office.ledger import ofx_log
+            ofx_log(c, org_id, "recovery_key", target="org", detail={"new": 1, "export": 1})
     except RckStale:
         pass
     r = rck_row(c, org_id)
@@ -1164,7 +1168,7 @@ def rck_stepup(c, u, b):
     cred, code = b.get("credential"), b.get("code") if isinstance(b.get("code"), str) else ""
     if isinstance(cred, dict):
         p = pend_take(f"rck:{u['id']}")
-        ok = bool(p) and wa_auth_verify(c, cred, p.get("chal"), p.get("rp"), uid=u["id"]) == u["id"]
+        ok = bool(p) and wa_auth_verify(c, cred, p.get("chal"), p.get("rp"), uid=u["id"], uv=True) == u["id"]
     elif code and u["totp_secret"]:
         try:
             secret = unseal(c, f"totp:{u['id']}", u["totp_secret"])
@@ -1231,7 +1235,7 @@ def oc_route_recovery_passkey(oid):
     _org_admin(c, oid)
     if not c.execute("SELECT 1 FROM webauthn_creds WHERE user_id=?", (g.user["id"],)).fetchone():
         return err(tr("No passkey is set up"), 409)
-    chal, rp, opts = wa_auth_options(c, g.user["id"])
+    chal, rp, opts = wa_auth_options(c, g.user["id"], uv=True)  # 2.138.0 C (#1972, review F3): PIN / biometrics
     pend_set(f"rck:{g.user['id']}", chal=chal, rp=rp)
     return jsonify(opts)
 

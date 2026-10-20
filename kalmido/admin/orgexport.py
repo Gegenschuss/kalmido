@@ -498,6 +498,8 @@ def ox_run(oid, uid):
             u = c.execute("SELECT id, display_name, username FROM users WHERE id=?", (uid,)).fetchone()
             when = now_utc()
             from ..core.orgcrypt import rck_wrapped
+            if c.execute("SELECT 1 FROM org_keys WHERE org_id=? AND rot_started_at IS NOT NULL", (oid,)).fetchone():
+                raise RuntimeError("key renewal running")  # 2.138.0 C (#1972, review F2)
             rw = rck_wrapped(c, oid)  # 2.138.0 C (#1972): the recovery key opens the archive (made when there is none yet)
             c.commit()
             head, fk, prefix = ox_header(oid, org["name"], okey, iso(when), rw)
@@ -620,6 +622,9 @@ def ox_start(oid):
     c = db()
     if not _need(c, oid):
         return err(tr(OX_NO_KEY), 409)
+    from ..core.orgcrypt import oc_status
+    if oc_status(c, oid).get("rotating"):  # 2.138.0 C (#1972, review F2): the archive's recovery header needs the finished key
+        return err(tr("The organisation’s key is being renewed on the server. Try again when that is finished."), 409)
     with _OX_LOCK:
         if _running(oid):
             return err(tr("An export of this organisation is already running"), 409)
