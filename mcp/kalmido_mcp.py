@@ -515,7 +515,8 @@ TOOLS = [
            "multi": {"type": "boolean", "description": "2.41.0: the person may pick several buttons"},
            "portal": {"type": "boolean", "description": "2.63.0: a public answer to the customer of a customer report (the task has a "
                       "ticket, you may change the task): the customer sees it on the status page and gets it by mail. Write it for the "
-                      "customer: factual, friendly, no internal details, no names of other people. Default false = internal"}},
+                      "customer: factual, friendly, no internal details, no names of other people. Default false = internal. 2.126.0: "
+                      "it waits for a person's approval (202 + a waiting job)"}},
           ["task_id", "body"]), t_add_comment),
     ("request_comment_approval", "2.41.0: ask for an approval in a task comment (task_id): a card 'Approval needed' with Yes / No under "
                                  "your comment, shown on the task's row until answered. title = what is to be approved, what = what happens "

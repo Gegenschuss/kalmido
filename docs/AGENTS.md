@@ -1083,10 +1083,12 @@ Some changes by an agent never happen at once, whatever its permissions:
 - batches of 10 or more tasks (`POST /tasks/batch`; an agent's batches within 10 minutes count together)
 - moving a list it owns into another folder, renaming or removing folders
 - sharing: with a person or a group, and ending a share
+- 2.126.0: an answer to the customer of a customer report (`POST /tasks/{id}/comments` with `portal: true`)
 
 The API answers `202` with `{approval_required: true, job, message}`: the request is stored as a **waiting job** with
 a readable title ("Delete the list “Old” for good"). The same request again returns the same job (do not repeat it).
-The approver is the agent's owner (personal agents) or the owner of the list it concerns; admins always can. They see
+The approver is the agent's owner (personal agents) or the owner of the list it concerns; admins always can.
+2.126.0: list owners and list admins approve only when they may address the agent; the assignee of the task alone cannot. They see
 *Approve* / *Reject* in the Agents tab, in Today and in News (and get the usual push). *Approve* runs the stored request
 as the agent with its permissions and rights **at that moment** (paused meanwhile, access gone: the job fails); the job
 ends `done` or `failed` and the agent gets a `job` event with `action` and `result {status, body}`. *Reject* stops the
