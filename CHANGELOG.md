@@ -7,6 +7,30 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.137.0] - 2026-10-20
+
+Moving a whole organisation between servers; the personal office into an organisation.
+
+### Added
+- Organisation move: the import of an organisation export takes over every area, not only lists, tasks, calendars and
+  address books - office (master data, quotations and invoices with their items, payments, series, cash book, trips,
+  meals, contracts, archive, bank data, logbook, the stored PDFs; finalised invoices stay finalised with their numbers),
+  clients, file store with all versions, documents, knowledge pages with pictures and history, tables with formulas and
+  file cells, video sign-offs, team chat, absences and vacation accounts, bookings, filed e-mails, newsletter, customer
+  reports, forms with their answers, playbooks, project notes, notepads, rules, sprints, time entries and timesheets.
+  References between the areas point at the new entries; fields and files are sealed again with the target's key; the
+  preview lists what is taken over; one undo removes it all (#2344).
+- The organisation export also contains the office tables that were missing (bank statements, document templates,
+  vehicles and logbook), the page history of knowledge pages and the projects / categories of receipts (#2344).
+- Freelancers: the owner of a personal office exports it (Office > Settings), and the import of such a file goes into
+  the personal office (#2344).
+- Office: the personal office moves into an existing organisation the person administers, with a preview of what goes
+  along, what stays (company and bank data, number ranges, absences) and who sees it afterwards; finalised invoices keep
+  their numbers and stay locked, a number the organisation already uses stops the move (#1981).
+
+### Security
+- Security fix: organisation import (links of video sign-offs, number ranges, logo copies).
+
 ## [2.126.0] - 2026-10-20
 
 Security release: fixes from the internal audit (office, documents, agents, sync, offline). Please update.

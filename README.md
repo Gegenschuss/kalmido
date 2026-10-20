@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.137.0** (2026-10-20): a whole organisation moves between two Kalmido servers - the import of an organisation export
+  now takes over every area (office with finalised invoices and cash book, clients, file store, documents, knowledge
+  pages, tables, video sign-offs, team chat, absences, newsletter, forms, notes, time entries), with the references
+  between them; a freelancer exports their personal office and moves it into an organisation they administer.
 - **2.126.0** (2026-10-20): security release - fixes from the internal audit for office, documents, agents, sync and
   offline; private document data on the account key; ESLint in CI.
 - **2.125.0** (2026-10-20): vacation requests with approval and vacation accounts, working days and weekly hours per

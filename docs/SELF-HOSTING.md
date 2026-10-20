@@ -661,8 +661,22 @@ and download is written to the office log (who, when, size).
   manifest.
 - **Without `KALMIDO_SECRET_KEY`** the organisation data is not encrypted and the export is refused: set the server key
   first (see the section on the encryption of the organisation data).
-- **Import** (2.73, stage 1): see [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom) -- an admin of an
-  organisation on the other server uploads the archive under *Settings > Data* and opens it with the recovery key.
+- **Import** (2.73; every area since 2.137): see [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom) -- an
+  admin of an organisation on the other server uploads the archive under *Settings > Data* and opens it with the recovery
+  key. Best into a new, empty organisation. Since 2.137 the whole organisation moves: lists and tasks, office (master
+  data, documents with items and stored PDFs, payments, series, cash book, trips, meals, contracts, archive, bank data,
+  logbook; finalised invoices stay finalised with their numbers), clients, file store with all versions, documents,
+  knowledge pages, tables, video sign-offs, team chat, absences, vacation accounts, bookings, filed e-mails, newsletter
+  (connect it again), customer reports and forms (new links), playbooks, notes, rules, sprints, time entries and
+  timesheets. References between the areas point at the new entries, fields and files are sealed again with the
+  target's key, rows of single people (absences, time entries, shares) come only for the people ticked in the preview,
+  and one *Undo* removes it all. A number range, settings or company data the target already has are kept (named in the
+  report). Not moved: public links and upload links (new ones are made where needed), open agent proposals, the learnt
+  models and word indexes (rebuilt on the target), knowledge pages of a space locked in the browser (export them as
+  Markdown from the unlocked space), scheduling polls and bookmarks (personal).
+- **A personal office** (2.137): its owner exports it the same way (*Office > Settings > Export the office*: the office and
+  the owner's private clients, nothing else); the import of such a file into the private space goes into the personal
+  office of the importing person.
 
 ## Moving from and to app.kalmido.com
 
