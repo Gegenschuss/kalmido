@@ -68,7 +68,7 @@ def item(title, qty, rate, unit="day"):
 
 
 def start(key=KEY, keep=False):
-    extra = ["-e KALMIDO_ORGCRYPT_DELAY=0", "-e KALMIDO_ORGCRYPT_PAUSE=0", "-e KALMIDO_SECRET_KEY=" + key]
+    extra = ["-e KALMIDO_ORGCRYPT_DELAY=0", "-e KALMIDO_ORGCRYPT_PAUSE=0"] + (["-e KALMIDO_SECRET_KEY=" + key] if key else [])
     env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " " + " ".join(extra), **({"KEEP": "1"} if keep else {}))
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
@@ -88,7 +88,7 @@ def status():
 
 
 if os.environ.get("P2126A_NOSTART") != "1":
-    start()
+    start(key=None)  # first without a server key (#1979 L5), the documents' part restarts with one
 s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice Admin", "password": "password123"}).ok
@@ -107,7 +107,8 @@ BOB = Bo.get(B + "/api/state").json()["me"]["id"]
 for s in (A, Bo):
     s.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 A.put(B + O + "/settings", json={"lang": "de", "currency": "EUR", "company_fields": {"name": "Beispiel Studio GmbH", "street": "Musterweg 1",
-                                                                                   "zip": "12345", "city": "Musterstadt", "country": "DE"}})
+                                                                                   "zip": "12345", "city": "Musterstadt", "country": "DE",
+                                                                                   "tax_number": "12/345/67890", "iban": "DE02120300000000202051"}})
 CL = A.post(B + "/api/clients", json={"name": "Kunde Eins GmbH", "street": "Kundenweg 5", "zip": "20000", "city": "Beispielstadt", "country": "DE"}).json()["id"]
 FID, Fr = freelancer(B, A)
 FC = Fr.post(B + "/api/clients", json={"name": "Privatkunde", "street": "Weg 1", "zip": "20000", "city": "Beispielstadt", "country": "DE"}).json()["id"]
@@ -176,7 +177,56 @@ if r.status_code == 201:
 check(Fr.post(B + D + "/from-time", json={"client_id": CL, "from": "2026-05-01", "to": "2026-05-31"}).status_code == 404, "freelancer: an organisation's client 404")
 
 
+# ================================================================ #1979 F5-F7, L1, L4, L5, L7
+r = A.post(B + f"{D}/{INV1}/finalize")
+check(r.ok and r.json()["locked"], "F5: an invoice with a manual number is finalised " + r.text[:200])
+# F6: a copy starts with a fresh reminder fee state and without the agent's marks
+sql("UPDATE office_docs SET reminder_fee_state='paid', agent_id=?, list_id=? WHERE id=?", (ALICE, LA, INV1), write=True)
+r = A.post(B + f"{D}/{INV1}/duplicate")
+check(r.status_code == 201, "F6: duplicate " + r.text[:120])
+row = sql("SELECT reminder_fee_state, agent_id, list_id, number FROM office_docs WHERE id=?", (r.json()["id"],))[0]
+check(row[0] == "" and row[1] is None and row[2] is None and row[3] == "", f"F6: the copy starts fresh {list(row)}")
+A.delete(B + f"{D}/{r.json()['id']}")
+# F7: a client with finalised documents stays in the organisation
+r = A.patch(B + f"/api/clients/{CL}", json={"org_id": None})
+check(r.status_code == 409 and r.json().get("error"), "F7: a client with a finalised invoice is not moved to private (409) " + r.text[:160])
+check(sql("SELECT org_id FROM clients WHERE id=?", (CL,))[0][0] == ORG, "F7: it is still in the organisation")
+CL2 = A.post(B + "/api/clients", json={"name": "Kunde Zwei GmbH", "city": "Beispielstadt", "country": "DE"}).json()["id"]
+r = A.patch(B + f"/api/clients/{CL2}", json={"org_id": None})
+check(r.ok and sql("SELECT org_id FROM clients WHERE id=?", (CL2,))[0][0] is None, "F7: a client without finalised documents moves as before " + r.text[:120])
+# L4: a rule's position must be a finite number
+r = Fr.post(B + "/api/docs/rules", json={"ws": "private", "kind": "any", "match": "Probe", "sender": "Probe"})
+RID = r.json()["id"]
+for bad in ("Infinity", "NaN", "-Infinity"):
+    r = Fr.patch(B + f"/api/docs/rules/{RID}", data='{"pos": %s}' % bad, headers={"Content-Type": "application/json"})
+    check(r.status_code == 400, f"L4: pos {bad} = 400 ({r.status_code})")
+check(Fr.patch(B + f"/api/docs/rules/{RID}", json={"pos": 3}).ok, "L4: a normal position")
+Fr.delete(B + f"/api/docs/rules/{RID}")
+# L5: without a server key a file that starts like a sealed one is refused at once (it could never be opened)
+FPL = Fr.post(B + "/api/lists", json={"name": "Privat"}).json()["id"]
+FT = Fr.post(B + "/api/tasks", json={"list_id": FPL, "title": "Unterlagen"}).json()["id"]
+r = Fr.post(B + f"/api/tasks/{FT}/attachments", files={"file": ("x.bin", b"KENC1\n" + b"\0" * 40, "application/octet-stream")})
+check(r.status_code == 400 and r.json().get("error"), "L5: refused with a clear message (400) " + r.text[:160])
+r = Fr.post(B + f"/api/tasks/{FT}/attachments", files={"file": ("a.txt", b"plain file\n", "text/plain")})
+check(r.ok, "L5: a normal file is stored " + r.text[:120])
+# L1: a household receipt the scanner locked is not handed out
+r = Fr.post(B + "/api/budget/lists", json={})
+BL = r.json()["list_id"]
+E = Fr.post(B + f"/api/budget/{BL}/entries", json={"day": "2026-09-03", "amount": 10, "kind": "out", "title": "Bäckerei"}).json()["id"]
+r = Fr.post(B + f"/api/budget/entries/{E}/files", files=[("file", ("beleg.txt", b"receipt\n", "text/plain"))])
+BF = r.json()["files"][0]["id"]
+check(Fr.get(B + f"/api/budget/files/{BF}").content == b"receipt\n", "L1: the receipt downloads")
+sql("INSERT INTO upload_scan(kind, ref_id, ver, org_id, state, sig, why, created_at) VALUES('budget', ?, 0, NULL, 'infected', 'Test-Signature', '', '2026-10-20T00:00:00Z')",
+    (BF,), write=True)
+r = Fr.get(B + f"/api/budget/files/{BF}")
+check(r.status_code == 403, f"L1: a locked receipt is not handed out ({r.status_code})")
+# L7: a person's list of receipt suggestions (only documents they see)
+r = Fr.get(B + "/api/v1/receipt-suggestions?state=all")
+check(r.status_code in (200, 401, 403) and (r.status_code != 200 or r.json()["data"] == []), f"L7: the person's list answers ({r.status_code}) " + r.text[:120])
+
 # ================================================================ #1971 / #1970 the documents' values (freelancer-matrix: files)
+start(keep=True)  # now with a server key
+A, Bo, Fr = sess("alice"), sess("bob"), sess("frida")
 def doc_view(S, ws):
     j = S.get(B + "/api/docs/settings", params={"ws": ws}).json()
     return {"rules": [{k: v for k, v in x.items() if k not in ("id", "pos")} for x in j.get("rules") or []],
@@ -244,6 +294,11 @@ for _ in range(40):
     time.sleep(0.25)
 check(st["docs"]["private"]["server_key"] == 0 and st["docs"]["private"]["account_key"] >= 6, f"start-up pass: private values on the account key {st['docs']['private']}")
 check(doc_view(Fr, "private") == FV, "start-up pass: the same content")
+# ================================================================ #1979 L2: a damaged key row is a clear key error
+sql("UPDATE org_keys SET wrapped='v1.@@@' WHERE org_id=?", (ORG,), write=True)
+r = A.get(B + O + "/settings")
+check(r.status_code == 500 and (r.headers.get("content-type", "").startswith("application/json") and r.json().get("code") == "orgcrypt"),
+      f"L2: the key error with its clear message, no crash ({r.status_code}) " + r.text[:160])
 # a new server key: the account keys are stored again (rewrap-accounts), the private documents' values stay readable
 start(key=KEY2, keep=True)
 rc, out = cli("rewrap-accounts", "--old-key-file", "-", stdin=KEY + "\n")
@@ -251,6 +306,7 @@ check(rc == 0, "rewrap-accounts " + out[-300:])
 Fr = sess("frida")
 check(doc_view(Fr, "private") == FV, "new server key: the freelancer's document values are still there")
 check(KEY not in out and KEY2 not in out, "no key in the output")
+
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
