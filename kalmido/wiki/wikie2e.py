@@ -179,14 +179,15 @@ def wke_pending(c, sp, people):
 
 
 # ---------------------------------------------------------------- what is still to convert
-def _wke_cond(mode, gen):
-    """SQL condition on wiki_pages of the pages not yet in the target format of mode (gen = the target generation)."""
+def _wke_cond(mode, gen, fields=("path", "body")):
+    """SQL condition on wiki_pages of the pages not yet in the target format of mode (gen = the target generation; fields =
+    the columns checked, 2.139.0 C #2386: one of them alone)."""
     if mode == "encrypting":
-        return f"({_LE2A_PLAIN.format('path')} OR {_LE2A_PLAIN.format('body')})"
+        return "(" + " OR ".join(_LE2A_PLAIN.format(f) for f in fields) + ")"
     if mode == "decrypting":
-        return f"({_LE2A_CIPHER.format('path')} OR {_LE2A_CIPHER.format('body')})"
+        return "(" + " OR ".join(_LE2A_CIPHER.format(f) for f in fields) + ")"
     old = _LE2A_OLD.replace("{1}", str(int(gen)))  # 'on': plain texts (there should be none) and older generations
-    return f"({_LE2A_PLAIN.format('path')} OR {_LE2A_PLAIN.format('body')} OR {old.format('path')} OR {old.format('body')})"
+    return "(" + " OR ".join(f"{_LE2A_PLAIN.format(f)} OR {old.format(f)}" for f in fields) + ")"
 
 
 def _wke_todo_val(mode, gen, v):
@@ -207,15 +208,42 @@ def wke_left(c, sp, limit=None):
         return [], {"pages": 0}
     w, a = wke_space_sql(sp["org_id"], sp["owner_id"])
     cond = _wke_cond(mode, gen)
-    n = c.execute(f"SELECT COUNT(*) FROM wiki_pages WHERE {w} AND {cond}", a).fetchone()[0]
+    # 2.139.0 C (#2386): a text sealed at rest whose key is missing cannot go to the browser -- the page is skipped (its text
+    # stays as it is, it can only be deleted) and named; once only that text is left it no longer counts
+    lost = _wke_lost(c, mode, gen, w, a)
+    n = c.execute(f"SELECT COUNT(*) FROM wiki_pages WHERE {w} AND {cond}", a).fetchone()[0] - len(lost)
     if limit is None:
         return None, {"pages": int(n)}
+    out, skipped = [], list(lost)
+    from .wkhist import WikiUnreadable, wkh_body  # 2.123.0 A (#2105): a text sealed at rest goes out plain (the browser encrypts it)
+    nl = f" AND id NOT IN ({','.join('?' * len(lost))})" if lost else ""
+    for r in c.execute(f"SELECT id, org_id, owner_id, path, body FROM wiki_pages WHERE {w} AND {cond}{nl} ORDER BY id LIMIT ?",
+                       [*a, *[x["id"] for x in lost], limit]).fetchall():
+        body = None
+        if _wke_todo_val(mode, gen, r["body"]):
+            try:
+                body = wkh_body(c, r)
+            except WikiUnreadable:
+                skipped.append({"id": r["id"], "path": r["path"]})
+        out.append({"id": r["id"], "path": r["path"] if _wke_todo_val(mode, gen, r["path"]) else None, "body": body})
+    return out, {"pages": int(n), "skipped": skipped[:200]}
+
+
+def _wke_lost(c, mode, gen, w, a):
+    """2.139.0 C (#2386): [{id, path}] of the pages whose name is converted but whose text (sealed at rest) cannot be opened."""
+    if mode == "decrypting":
+        return []  # the texts still to convert are the browser's ciphertexts, never sealed at rest
+    from ..core.orgcrypt import oc_is_enc
+    from .wkhist import WikiUnreadable, wkh_body
     out = []
-    from .wkhist import wkh_body  # 2.123.0 A (#2105): a text sealed at rest goes out plain (the browser encrypts it)
-    for r in c.execute(f"SELECT id, org_id, owner_id, path, body FROM wiki_pages WHERE {w} AND {cond} ORDER BY id LIMIT ?", [*a, limit]).fetchall():
-        out.append({"id": r["id"], "path": r["path"] if _wke_todo_val(mode, gen, r["path"]) else None,
-                    "body": wkh_body(c, r) if _wke_todo_val(mode, gen, r["body"]) else None})
-    return out, {"pages": int(n)}
+    for r in c.execute(f"SELECT id, org_id, owner_id, path, body FROM wiki_pages WHERE {w} AND {_wke_cond(mode, gen, ('body',))} "
+                       f"AND NOT {_wke_cond(mode, gen, ('path',))} ORDER BY id LIMIT 1000", a).fetchall():
+        if oc_is_enc(r["body"]):
+            try:
+                wkh_body(c, r)
+            except WikiUnreadable:
+                out.append({"id": r["id"], "path": r["path"]})
+    return out
 
 
 # ---------------------------------------------------------------- the answers
