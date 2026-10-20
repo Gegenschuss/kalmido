@@ -427,7 +427,6 @@ def _pt_mail_html(lines, url, button, foot=""):
               f'text-decoration:none">{e(button)}</a></p>' + (f'<p style="color:#777;font-size:.85rem">{foot}</p>' if foot else "") + "</div>")
 
 
-@app.post("/p/<token>/login")
 def pt_limit_note(c, org_id, owner_id):
     """2.138.3 C (#2380): the space's budget of sign-in mails (ptls) is used up: a News item for its admins (an organisation)
     or its owner (the private space), at most once per window and process; no push, no mail. Caller commits."""
@@ -451,6 +450,7 @@ def pt_limit_note(c, org_id, owner_id):
     return len(ids)
 
 
+@app.post("/p/<token>/login")
 def pt_login_ask(token):
     from flask import redirect, request
     from ..core.i18n import tr

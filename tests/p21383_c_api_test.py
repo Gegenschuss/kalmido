@@ -15,6 +15,7 @@ usage: p21383_c_api_test.py <datadir>      (a fresh container with the mail stub
 import base64
 import json
 import os
+import secrets
 import subprocess
 import sys
 import time
@@ -238,6 +239,9 @@ check(all(x < 300 for x in codes[:2]) and codes[2] == 429 and len(nf) == 1 and n
 check(len(news(A, "ptlimit")) == 1, "#2380: the other space's budget is its own")
 psrc = open(os.path.join(N, "..", "kalmido", "team", "portal.py"), encoding="utf-8").read()
 check(psrc.count("pt_limit_note(c, p[") == 1, "#2380: the portal's own sign-in form tells the owner too")
+# 2.138.3 (#2380, review): the sign-in route stays on its handler - an unknown portal token is no server error
+r = requests.post(B + "/p/" + secrets.token_urlsafe(24) + "/login", data={"email": "kunde@example.com"}, allow_redirects=False)
+check(r.status_code < 500, f"#2380: POST /p/<token>/login answers without a server error {r.status_code}")
 
 # ============================================================ #2381: the error-report token in a header
 P = A.post(B + "/api/lists", json={"name": "App", "kind": "project"}).json()["id"]
