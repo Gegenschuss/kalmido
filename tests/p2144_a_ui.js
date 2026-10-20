@@ -5,6 +5,8 @@
 // - #2412: while the agent works a Stop button next to Send (tooltip names the keys); a press / Esc sends the event abort
 //   (the agent sees it), the button waits; the agent's confirmation hides it; Ctrl+C with a selection stays Copy; an open
 //   menu keeps its Esc; in a job's history Stop carries the job_id
+// - 2.144.0 A2 (#2412): Stop only for a run for me ("working" alone, with no typing to me and no message of mine waiting,
+//   is someone else's run: no button); Esc in the open message search closes the search, not the answer
 const {execFileSync} = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -84,12 +86,16 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   // ================= #2412 Stop
   const stopB = () => d.querySelector('#chat-stop'), ci = () => d.querySelector('#chat-in');
   check(stopB() && stopB().hidden, 'idle: the Stop button is hidden');
-  const working = async () => { await v1('PUT', '/agent/status', {status: 'working', text: 'Answering in the chat'}); w.eval('agentPoll()'); await until(() => stopB() && !stopB().hidden, 40); };
+  // 2.144.0 A2 (#2412): a run for me = "working" + its typing signal to me (what the launcher sends while it answers)
+  const working = async () => { await v1('PUT', '/agent/status', {status: 'working', text: 'Answering in the chat'}); await v1('POST', '/agent/typing', {chat_user_id: me.id}); w.eval('agentPoll()'); await until(() => stopB() && !stopB().hidden, 40); };
   const aborts = async () => ((await v1('GET', '/agent/events?since=0')).data || []).filter(e => e.event === 'abort');
   // "working" while a job of the agent runs is the job's: no Stop in the main chat
   await v1('PUT', '/agent/status', {status: 'working', text: 'Job: Knox'}); await w.eval('jc_sync(true)'); w.eval('agentPoll()'); await sleep(1500);
   check(stopB() && stopB().hidden, 'a job runs: its "working" shows no Stop in the main chat');
   await v1('PATCH', `/agent/jobs/${J}`, {state: 'done'}); await w.eval('jc_sync(true)');
+  // 2.144.0 A2: "working" without typing to me and without a message of mine waiting = someone else's run: no Stop
+  await v1('PUT', '/agent/status', {status: 'working', text: 'Answering in the chat'}); w.eval('agentPoll()'); await sleep(1500);
+  check(stopB() && stopB().hidden && w.eval(`chatBusy(agentById(${CL}))`) === false, 'working for someone else: no Stop for me (#2412 A2)');
   await working();
   check(stopB() && !stopB().hidden && !stopB().disabled, 'working: the Stop button shows next to Send');
   check(stopB().closest('.chcomp') && /Esc/.test(stopB().title) && /Ctrl\+C/.test(stopB().title) && stopB().querySelector('svg, .i, i'), 'Stop: an icon, the tooltip names the keys');
@@ -124,6 +130,10 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   key(w, d.querySelector('[role=menuitem]'), 'Escape'); await sleep(600);
   check((await aborts()).length === 3, 'an open menu: Esc closes the menu, no abort');
   ci().value = '';
+  // 2.144.0 A2: Esc in the open message search closes the search, the agent keeps working
+  click(w, d.querySelector('.chath [data-act="ms-toggle"]')); await until(() => d.querySelector('#ms-q'));
+  key(w, d.querySelector('#ms-q'), 'Escape'); await sleep(600);
+  check((await aborts()).length === 3 && !d.querySelector('#ms-q'), 'Esc in the message search: the search closes, no abort');
   // in a job's history the abort carries the job
   const J2 = (await v1('POST', '/agent/jobs', {title: 'Lena: Release 2.144 stop', user_id: me.id, state: 'running'})).id;
   await w.eval('jc_sync(true)');

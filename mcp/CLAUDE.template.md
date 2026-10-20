@@ -139,7 +139,8 @@
   run sets working without `task_id`.
 - **Stop** (event `abort`, 2.144.0): the person pressed Stop in the chat. End what you are working on at once (in a
   job's history only that job's current step), confirm with `confirm_abort` and say in one or two lines what was done until
-  then. Never pick the work up again on your own.
+  then. Never pick the work up again on your own. Stop only the run for THAT person (`user`) or when the agent's owner
+  pressed it; a Stop from someone else for another person's run is ignored (no confirmation, nothing written).
 - With the status of each run, report what you **really** run with: `model` (the model as people know it, e.g.
   "Opus 5.5"), `permission_mode` (ask | auto: what this run uses) and `host_permission_mode` (your host's own default).
   The chat header shows them.
@@ -512,7 +513,8 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
   (the current pins of a conversation: `pins` in `GET /agent/chats?user_id=`)
 - `abort` (2.144.0): the person pressed **Stop** in your chat (`user`, `job_id` when it was in a job's history): end the answer
   you are working on at once (a job: only its current step, the job stays), confirm with `confirm_abort` and say in one or
-  two lines what was done until then; nothing running = confirm only
+  two lines what was done until then; nothing running = confirm only; only the run for that `user` (or the owner's Stop),
+  someone else's run keeps going
 - `contract_notice`: a shared contract's last day to cancel is near (once per deadline): answer with ONE `propose_contract_notice`
 
 Related tasks (2.59.0): task events may carry `task.related` = up to 5 tasks close in meaning `[{id, title, score}]` (only

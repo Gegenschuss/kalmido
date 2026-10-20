@@ -473,7 +473,9 @@ chat messages of one person that arrive together: one run). It does what a hoste
 - **Status and typing dots** while a run lasts, idle afterwards, error when it failed.
 - **Stop** (2.144.0): the Stop button in the chat (or Esc / Ctrl+C there) sends the event `abort`; the launcher ends the
   running command with everything it started, confirms with `POST /api/v1/agent/aborted` and writes one short line into
-  the chat. A Stop in a job's history is passed on as a note only (stop the job itself with Stop on its card).
+  the chat. A Stop in a job's history is passed on as a note only (stop the job itself with Stop on its card). Only the person the
+  running answer is for (or the agent's owner / `KALMIDO_OWNER_IDS` / `KALMIDO_PERM_USER`) can stop it; another person's
+  Stop is ignored.
 - **Plan usage ring** from the stream, with the time it was measured (step 10).
 - **Reply reference**: when the person answers an older message, its quote goes into the prompt.
 - **Approvals**: an answer that ends in a block ` ```approval ` (the fence at the start of a line, 2.40.0: a mention in
