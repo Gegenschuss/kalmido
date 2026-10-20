@@ -47,7 +47,7 @@ async function swShell(req, url) {
   const opt = {ignoreSearch: url.pathname === '/' || url.pathname.startsWith('/static/js/')};  // 2.53.0 (#1410): modules on demand come with ?v=
   let r = null;
   try { r = await fetch(req); } catch { r = null; }
-  if (r && r.ok && !r.redirected && r.type === 'basic') { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return r; }
+  if (r && r.ok && !r.redirected && r.type === 'basic') { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); return r; }  // 2.138.0 A (#2257): a refused put is no uncaught error
   // network error or 5xx (server restarting): any cached copy beats a broken answer; 2.4.0 (#187): the quick capture page is the app shell too
   if (!r || r.status >= 500) {
     const hit = (await swAnyCache(req, opt)) || (url.pathname === '/capture' ? await swAnyCache('/', {ignoreSearch: true}) : undefined);
@@ -78,6 +78,7 @@ async function handleShare(req) {
 }
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+  if (url.origin !== self.location.origin) return;  // 2.138.0 A (#2257): extensions (chrome-extension://) and other origins: the browser handles them
   if (e.request.method === 'POST' && url.pathname === '/share') { e.respondWith(handleShare(e.request)); return; }
   // /s/ = public list links: never cached (no-store pages of one list; the service worker stays out of them)
   // 2.63.0 (#1513): the same for the forms, a report's status page and the customer portal
@@ -94,7 +95,7 @@ self.addEventListener('fetch', e => {
 async function swI18n(req) {
   try {
     const r = await fetch(req);
-    if (r.ok && !r.redirected && r.type === 'basic' && /json/.test(r.headers.get('content-type') || '')) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+    if (r.ok && !r.redirected && r.type === 'basic' && /json/.test(r.headers.get('content-type') || '')) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); }  // 2.138.0 A (#2257): a refused put is no uncaught error
     return r;
   } catch (err) {
     const hit = await caches.match(req);
