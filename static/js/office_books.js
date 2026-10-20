@@ -63,7 +63,8 @@ function bkTabHtml() {
     <div class="bk-photo"><label class="btn pri bk-shot">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="bk-file" accept="image/*,application/pdf" capture="environment" hidden></label>
     <span class="muted bk-photohint">${tr('The receipt goes into the documents; amount and date are recognised.')}</span></div>`;
   const txd = typeof txdSectionHtml === 'function' ? txdSectionHtml() : '';  // part C: the tax dates
-  return head + bkReceiptsHtml() + bkEuerHtml() + bkUstvaHtml() + bkSettingsHtml() + txd;
+  const dob = typeof dimp_obHtml === 'function' ? dimp_obHtml(BK.year) : '';  // 2.148.0 D (#2458): opening balances of the DATEV import
+  return head + bkReceiptsHtml() + bkEuerHtml() + bkUstvaHtml() + bkSettingsHtml() + txd + dob;
 }
 
 function bkRcRow(r) {

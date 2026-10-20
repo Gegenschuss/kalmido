@@ -1039,6 +1039,9 @@ def fi_undo(c, oid, uid, rid, kinds=None):
     takes the areas that are left."""
     write_lock(c, f"office_import_{int(oid)}")
     r = _run_row(c, oid, rid)
+    if r["kind"] == "datev":  # 2.148.0 D (#2458): a DATEV import run (office/datevimp.py) has its own undo
+        from .datevimp import di_undo
+        return di_undo(c, oid, uid, r)
     if r["undone_at"]:
         raise Denied(409, tr("This import has already been undone"))
     detail = bk_detail(r)

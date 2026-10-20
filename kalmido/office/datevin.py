@@ -195,20 +195,49 @@ def _no_amount(c, oid, d_from, d_to):
     return n
 
 
+def dv_supplier_accounts(c, oid, st, node_ids):
+    """2.148.0 D (#2458): {receipt node id: creditor account} of the receipts whose supplier (the document's sender, else the
+    recognised supplier text) matches exactly one supplier of the DATEV import (office/datevimp.py; names compared without
+    legal form, case and punctuation). Only while the counter account is the creditor (not the bank account)."""
+    if st.get("in_counter") == "bank" or not node_ids:
+        return {}
+    from .datevimp import di_creditor_map
+    from .legacyimport import fi_norm
+    accts = di_creditor_map(c, oid)
+    if not accts:
+        return {}
+    from ..docs import store as S
+    from .books import bk_ws
+    ws = bk_ws(c, oid)
+    senders = {x["id"]: x["name"] for x in S.labels(c, ws, "sender")}
+    out = {}
+    for nid in node_ids:
+        m = c.execute("SELECT * FROM doc_meta WHERE node_id=? AND ws=?", (nid, ws)).fetchone()
+        if not m:
+            continue
+        name = senders.get(m["sender_id"]) or (S.meta_json(c, m, "extracted", {}) if m["extracted"] else {}).get("supplier") or ""
+        a = accts.get(fi_norm(name)) if name else None
+        if a:
+            out[nid] = a
+    return out
+
+
 def dv_receipt_rows(c, oid, d_from, d_to, st, s):
     from .books import bk_receipts
     small = bool(s.get("small_business"))
     gegen = dv_counter(st)
+    receipts = bk_receipts(c, oid, d_from, d_to, by="doc")
+    own = dv_supplier_accounts(c, oid, st, [rc["node_id"] for rc in receipts])  # 2.148.0 D (#2458)
     bu_in = {**DV_BU_IN, **(st.get("bu_in") or {})}
     rows, no_cat, no_vat = [], 0, 0
-    for rc in bk_receipts(c, oid, d_from, d_to, by="doc"):
+    for rc in receipts:
         amount = _eur(rc["amount"], s)
         if amount == 0:
             continue
         no_cat += not rc["category"]
         no_vat += rc["vat_pct"] is None and not small
         bu = "" if small else bu_in.get(rc["vat_pct"] or "", "")
-        rows.append(_line(amount, dv_cat_account(st, rc["category"]), gegen, bu, rc["date"], f"B{rc['node_id']}",
+        rows.append(_line(amount, dv_cat_account(st, rc["category"]), own.get(rc["node_id"], gegen), bu, rc["date"], f"B{rc['node_id']}",
                           (rc["category"] + " " + rc["title"]) if rc["category"] else rc["title"]))
     hints = []
     na = _no_amount(c, oid, d_from, d_to)
