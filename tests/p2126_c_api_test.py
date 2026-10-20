@@ -11,7 +11,7 @@
  - #1986: one background contacts import per person at a time (a second one = 409)
  - #1992 K4: a change of the place keeps the sent reminders, a change of the time resets them
  - #1992 K5: an imported (mirrored) address book is read only over CardDAV
- - #1992 K6: a changed occurrence the moved series no longer has is dropped
+ - #1992 K6: changed occurrences follow a moved series; a new rule drops the ones it no longer has
  - #1992 K8: two UIDs that differ only in characters a resource name cannot carry get two names
  - #1992 K10: a person without an organisation links a contact of a private book shared with them to a private client
 freelancer-matrix: pim, own, office
@@ -259,11 +259,15 @@ r = A.patch(B + f"/api/events/{K6['id']}?occ={y}-04-13T09:00", json={"title": "S
 check(r.ok and len(r.json()["overrides"]) == 1, "#1992 K6: setup: one changed occurrence")
 r = A.patch(B + f"/api/events/{K6['id']}", json={"title": "Standup", "start": f"{y}-04-06T09:00", "end": f"{y}-04-06T09:15"})
 check(r.ok and len(r.json()["overrides"]) == 1, "#1992 K6: an edit without a new time keeps it")
-r = A.patch(B + f"/api/events/{K6['id']}", json={"start": f"{y}-04-07T09:00", "end": f"{y}-04-07T09:15"})
-check(r.ok and r.json()["overrides"] == [], f"#1992 K6: the series moves to another weekday: the old change is dropped {r.text[:200]}")
-its = A.get(B + f"/api/events?from={y}-04-01&to={y}-05-10&calendar_id={KC}").json().get("items", [])
-check(len([x for x in its if x["eid"] == K6["id"]]) == 4 and not any(x["title"] == "Standup (long)" for x in its),
-      "#1992 K6: four dates, no leftover single date")
+# 2.126.0 review (#1992 K6): a moved series takes its changed occurrence along; a new rule drops the ones it no longer has
+r = A.patch(B + f"/api/events/{K6['id']}", json={"start": f"{y}-04-07T10:00", "end": f"{y}-04-07T10:15"})
+ov = r.json().get("overrides") if r.ok else None
+check(ov and len(ov) == 1 and ov[0]["rid"] == f"{y}-04-14T10:00", f"#1992 K6: the series moves: the change moves along {r.text[:200]}")
+r = A.patch(B + f"/api/events/{K6['id']}", json={"rrule": "FREQ=MONTHLY;COUNT=2"})
+check(r.ok and r.json()["overrides"] == [], f"#1992 K6: a new rule without that date: the old change is dropped {r.text[:200]}")
+its = A.get(B + f"/api/events?from={y}-04-01&to={y}-06-10&calendar_id={KC}").json().get("items", [])
+check(len([x for x in its if x["eid"] == K6["id"]]) == 2 and not any(x["title"] == "Standup (long)" for x in its),
+      "#1992 K6: two dates, no leftover single date")
 
 # ============================================================ #1992 K8: unusual UIDs get distinct resource names
 ICS = vcal(comp("VEVENT", "UID:k8:probe", "DTSTAMP:20261020T100000Z", "SUMMARY:One", f"DTSTART:{y}0601T100000Z", f"DTEND:{y}0601T110000Z"),
