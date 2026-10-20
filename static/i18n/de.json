@@ -11963,5 +11963,20 @@
   "Times per day": "Uhrzeiten pro Tag",
   "Daily at {0}": "Täglich um {0}",
   "Repeat: at most 12 times a day": "Wiederholung: höchstens 12 Uhrzeiten am Tag",
-  "Focus sessions are private to a person": "Fokus-Sitzungen gehören einer Person"
+  "Focus sessions are private to a person": "Fokus-Sitzungen gehören einer Person",
+  "Stop the answer": "Antwort abbrechen",
+  "Stop the answer ({0})": "Antwort abbrechen ({0})",
+  "Stop sent to {0}": "Abbruch an {0} geschickt",
+  "Fold long messages": "Lange Nachrichten einklappen",
+  "Show events": "Termine zeigen",
+  "({0} job)": ["({0} Job)", "({0} Jobs)"],
+  "{0} overdue in {1}": ["{0} überfällig in {1}", "{0} überfällig in {1}"],
+  "{0} overdue in other workspaces": ["{0} überfällig in anderen Arbeitsbereichen", "{0} überfällig in anderen Arbeitsbereichen"],
+  "Group by": "Gruppieren nach",
+  "Sections|group by": "Abschnitten",
+  "Grouped by {0}": "Gruppiert nach {0}",
+  "Grouped by sections": "Wieder nach Abschnitten gegliedert",
+  "{0} once": "{0} einmalig",
+  "Prices include VAT. Pay once, no subscription.": "Preise inklusive Mehrwertsteuer. Einmal zahlen, kein Abo.",
+  "The setup code is fixed on this server": "Der Einrichtungscode ist auf diesem Server fest eingestellt"
 }

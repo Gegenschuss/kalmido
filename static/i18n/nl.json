@@ -11963,5 +11963,20 @@
   "Times per day": "Tijden per dag",
   "Daily at {0}": "Dagelijks om {0}",
   "Repeat: at most 12 times a day": "Herhaling: maximaal 12 tijden per dag",
-  "Focus sessions are private to a person": "Focussessies zijn van één persoon"
+  "Focus sessions are private to a person": "Focussessies zijn van één persoon",
+  "Stop the answer": "Antwoord stoppen",
+  "Stop the answer ({0})": "Antwoord stoppen ({0})",
+  "Stop sent to {0}": "Stop naar {0} gestuurd",
+  "Fold long messages": "Lange berichten inklappen",
+  "Show events": "Afspraken tonen",
+  "({0} job)": ["({0} job)", "({0} jobs)"],
+  "{0} overdue in {1}": ["{0} te laat in {1}", "{0} te laat in {1}"],
+  "{0} overdue in other workspaces": ["{0} te laat in andere werkruimten", "{0} te laat in andere werkruimten"],
+  "Group by": "Groeperen op",
+  "Sections|group by": "Secties",
+  "Grouped by {0}": "Gegroepeerd op {0}",
+  "Grouped by sections": "Weer per sectie",
+  "{0} once": "{0} eenmalig",
+  "Prices include VAT. Pay once, no subscription.": "Prijzen inclusief btw. Eenmalig betalen, geen abonnement.",
+  "The setup code is fixed on this server": "De installatiecode staat vast op deze server"
 }
