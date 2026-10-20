@@ -180,7 +180,8 @@ for what, rx in (("heron path", r"M24 50C34 42|M34 64C46 55"), ("heron class", r
     check(not hits, f"no {what} left: {hits[:3]}")
 
 # ---- no sloth in public files
-WORDS = re.compile(r"sloth|faultier|paresseux|perezoso|bradipo|luiaard", re.I)
+# 2.138.1: \b so identifiers like ast_slotHtml (slot + Html) do not count
+WORDS = re.compile(r"\bsloth|faultier|paresseux|perezoso|bradipo|luiaard", re.I)
 pub = SERVER + CLIENT + ["static/app.css", "static/public.css", "static/index.html", "static/quips.json",
        "static/manifest.json"] + [os.path.relpath(p, ROOT) for p in glob.glob(os.path.join(ST, "i18n", "*.json"))
                                   + glob.glob(os.path.join(ST, "avatars", "*.svg"))]
