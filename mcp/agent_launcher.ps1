@@ -78,6 +78,7 @@ if ($env:KALMIDO_EVENTS -eq '1') { $Events = $true }
 # kalmido-capability: customer_comment (2.63.0: a customer's comment / public answers of a customer report, in mcp/agent_run.py)
 # kalmido-capability: meeting_images (2.70.0: the photos of a meeting request, looked at with get_attachment, in mcp/agent_run.py)
 # kalmido-capability: merge_proposal (2.70.0: duplicate contacts as a proposal, in mcp/agent_run.py)
+# kalmido-capability: text_proposal (2.126.1: an office text, a document summary, a client report as a proposal, in mcp/agent_run.py)
 # kalmido-capability: contract_notice (2.70.0: a contract's notice deadline -> ONE propose_contract_notice, in mcp/agent_run.py)
 # (2.44.0: agent_run.py; perm_relay and session_resume only when COMMAND is Claude Code)
 # (event mode: mcp/agent_run.py does them for both launchers, so .sh and .ps1 cannot drift apart)

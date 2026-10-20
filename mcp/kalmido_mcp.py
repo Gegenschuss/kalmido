@@ -633,7 +633,7 @@ TOOLS = [
            "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]}, "log": {"type": "string"}}, ["title"]),
      lambda api, a: api.call("POST", "/agent/jobs", body=a)),
     ("get_job", "One of the agent's jobs. A proposal job (event job_request) also carries kind (project | subtasks | triage | "
-                "extract | dayplan | cleanup | inquiry | setup | merge), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
+                "extract | dayplan | cleanup | inquiry | setup | merge | office_text | doc_summary | report), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
      _obj({"job_id": S_ID}, ["job_id"]), lambda api, a: api.call("GET", f"/agent/jobs/{int(a['job_id'])}")),
     ("submit_proposal", "Answer a job_request with ONE structured proposal; the person reviews, edits and applies it. Never create "
                         "the lists / tasks yourself. proposal by kind -- project: {name, folder?, sections: [names], tasks: [{title, "
@@ -660,6 +660,11 @@ TOOLS = [
                         "emails, phones): {groups: [{target_id, ids: [2-10 contact ids, target included], reason?}]} -- only ids "
                         "from input.contacts, each in one group at most, at most 200 groups; only clear duplicates (same e-mail / "
                         "phone, a name variant with a shared detail); none found = {groups: []}. "
+                        "office_text (2.126.1, the introduction or closing of an office draft): {field (= input.field), text}; "
+                        "doc_summary (a document / receipt): {text} (at most 4000 characters); report (a client report from "
+                        "input.report and its fixed input.report.markdown): {text} (Markdown). For these three: word the text from "
+                        "the input only (and input.wish), invent nothing, no placeholders for unknown facts, in the language of the "
+                        "document (input.doc.lang) / input.lang; the person edits and takes it over, nothing is sent. "
                         "Every kind may add summary (a short explanation). Dates YYYY-MM-DD, priority none | low | medium | high. "
                         "At most 200 entries; resubmitting replaces the proposal until the person applied or discarded it.",
      _obj({"job_id": S_ID, "proposal": {"type": "object"}}, ["job_id", "proposal"]), t_submit_proposal),

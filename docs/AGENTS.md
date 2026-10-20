@@ -2169,7 +2169,32 @@ explanation, Markdown, at most 2,000 characters) and `kind` (must match the job)
 {"summary": "Two people are in the book twice.",
  "groups": [{"target_id": 12, "ids": [12, 31], "reason": "same e-mail address"},   // 12 stays, 31 is merged into it
             {"target_id": 40, "ids": [40, 41, 57], "reason": "same phone, name variants"}]}   // none found: {"groups": []}
+// office_text (2.126.1): field = input.field (intro | closing); doc_summary: text at most 4000 characters; report: Markdown
+{"field": "intro", "text": "Thank you for your inquiry. As discussed, we offer you ..."}
+{"text": "Hotel invoice for two nights during the trade fair, 19 % VAT ..."}
 ```
+
+**Texts worded by an agent (2.126.1, kinds `office_text`, `doc_summary`, `report`).** Kalmido never runs a model for
+these: a person asks one of their agents, the agent words the text and the person edits, takes over or discards it.
+Nothing is sent to a client, nothing changes before *Take over* (one undo step, as the person).
+- `office_text`: on an office draft (quotation, invoice, reminder; not finalised, not sent) in *Introduction and closing*,
+  "Draft text with an agent". Only agents of the office area with their switch *May draft office documents* on, only
+  while the area's *Agents may read office data* is on, only for a person who works in that office (a personal agent: its
+  owner). `input`: `doc` (id, kind, number, title, lang, currency, date, valid_until, due_date), `client` (name, recipient,
+  address lines), `items` (kind, title, detail, qty, unit, rate, tax -- never purchase prices), `totals` (net, vat, gross),
+  `field`, `text` (the current one), `other_text`, `wish`; a reminder also `reminder` {level, fee, deadline_days, invoices
+  [{number, date, due_date, gross, open, days_overdue}]}. Answer `{field, text}`; taking it over writes the field (409 once
+  the document is finalised or sent). The request is one line in the office log (agent_read, no contents).
+- `doc_summary`: on a document / receipt the person may change, "Summarise with an agent": the same office switches, and
+  the agent must see the file itself (shared with it). `input.document` = what `GET /documents/{id}` shows the agent (name,
+  date, due, amount, currency, sender, type, tags, the recognised text up to 20000 characters, `extracted`, the summary so
+  far) + `wish`. Answer `{text}`; taking it over stores it as the document's summary (shown in the document sheet).
+- `report`: in the status report dialog of a list shared with the agent, "Word the report with an agent". `input.report`
+  = the status report of the period as the agent sees the list (no comments, notes or names; tracked time as totals only)
+  with its fixed text `markdown`, `lang`, `wish`. Answer `{text}` (Markdown); taking it over shows the text in the dialog
+  instead of the fixed one (copy / share as before); undo goes back to the fixed text.
+- Word the text from the input only: invent nothing, no placeholders for unknown facts, in the document's language.
+  Unknown fields: 400; the office switches off (or the list no longer shared) when you submit: 403.
 
 **Tidy up contacts (2.70.0, kind `merge`).** The person picks one address book they may change (a synced external book
 cannot be merged) and an agent; an organisation's book only goes to an agent of that organisation, an agent limited to
