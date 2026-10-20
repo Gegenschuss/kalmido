@@ -419,6 +419,11 @@ APP_ONLY = [
      ("* /api/folders/agents", "* /api/folders/public-links", "POST /api/folders/owner")),
     ("2.22.0 (#663): the Karakeep connection: its API key is entered by the person; the sync is in the API",
      ("=GET /api/life/karakeep", "=PUT /api/life/karakeep", "=DELETE /api/life/karakeep", "GET /api/life/karakeep/lists")),
+    # 2.140.0 B (#2136): a private device taken over into the office equipment and back, with a link -- the office side never
+    # reaches an agent (office_gate) and the API v1 has devices but no office equipment
+    ("2.140.0 (#2136): taking a private device over into the office equipment (and back) and its link are a person's steps: "
+     "office routes never reach agents, the API v1 knows devices (POST /life/devices) but no office equipment",
+     ("* /api/life/devices/", "* /api/life/device-links/")),
     ("2.23.0 (#463): a person's hours per week (their own setting / an admin's) and a QR code image for the screen",
      ("PUT /api/workload/capacity/", "POST /api/qr")),
     ("2.28.0 (#935): a person's organisations (workspaces) and their admins' member management: people only (agents 403)",

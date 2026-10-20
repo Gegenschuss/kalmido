@@ -646,6 +646,8 @@ def umz_export_queries(uid):
         # 2.22.0 (#663): my journal, whom I stay in touch with, my Karakeep connection (without the API key)
         "journal": ("SELECT day, text, mood, updated_at FROM journal WHERE user_id=? ORDER BY day", (uid,)),
         "contact_care": ("SELECT contact_id, every_days, last, note, updated_at FROM contact_care WHERE user_id=?", (uid,)),
+        # 2.140.0 B (#2136): my links of a private device with office equipment (ids only)
+        "device_links": ("SELECT task_id, office_id, equipment_id, origin, created_at, updated_at FROM life_device_links WHERE user_id=?", (uid,)),
         # 2.66.0 A (#1835): my merges of contacts / clients (the history lines, without the undo snapshot)
         "merge_runs": ("SELECT id, kind, target_id, merged_ids, summary, created_at, undone_at FROM merge_runs WHERE user_id=?", (uid,)),
         "karakeep": ("SELECT url, list_id, source, archive, synced_at, created_at FROM kk_conns WHERE user_id=?", (uid,)),

@@ -25,7 +25,7 @@ const LD_MODS = {
   stats: ['stats'],
   calendar: ['calview', 'caldrag', 'apptbook'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings
   docs: ['docs', 'paperless', 'receipts'],
-  life: ['life'],
+  life: ['life', 'devlink'],  // 2.140.0 B (#2136): devlink.js = a device <-> office equipment
   integrations: ['integrations'],
   playbook: ['playbook'],
   timeline: ['timeline', 'roadmap'],
