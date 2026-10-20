@@ -11,6 +11,7 @@ from flask import Response
 from ..core.config import app, TZ
 from ..core.i18n import tr
 from ..core.db import db, local_now
+from ..core.serializers import csv_cell
 from ..accounts.session import me
 
 _WD = {"MO": "monday", "TU": "tuesday", "WE": "wednesday", "TH": "thursday", "FR": "friday", "SA": "saturday", "SU": "sunday"}
@@ -109,7 +110,7 @@ def ex_sections(secs, rows):
 def ex_todoist_csv(c, uid, lst):
     secs, rows, tags = ex_tasks(c, uid, lst["id"])
     out = io.StringIO()
-    w = csv.writer(out, lineterminator="\n")
+    w = csv.writer(out, lineterminator="\n")  # 2.142.0 review: free text through csv_cell (no formulas in spreadsheets)
     w.writerow(TD_HEAD)
     notes = {}
     for r in c.execute("SELECT m.task_id, m.body, u.display_name FROM comments m LEFT JOIN users u ON u.id=m.user_id "
@@ -117,7 +118,7 @@ def ex_todoist_csv(c, uid, lst):
         notes.setdefault(r["task_id"], []).append((re.sub(r"<@\d+>", "@", r["body"] or ""), r["display_name"] or ""))
     for sec, srows in ex_sections(secs, rows):
         if sec is not None:
-            w.writerow(["section", sec, "", "", "", "", "", "", "", ""])
+            w.writerow(["section", csv_cell(sec), "", "", "", "", "", "", "", ""])
         for t, d in ex_tree(srows, lambda r: r["status"] == 0):
             title = (t["title"] or "").replace("\n", " ")
             label = "".join(" @" + re.sub(r"\s+", "_", g) for g in tags.get(t["id"], []))
@@ -125,10 +126,10 @@ def ex_todoist_csv(c, uid, lst):
             desc = t["content"] or ""
             if extra:
                 desc = (desc + "\n" if desc else "") + "Repeats: " + extra  # plain text, the file is for other tools
-            w.writerow(["task", title + label, desc, TD_PRIO.get(t["priority"], "4"), min(d + 1, 4), "", t["who"] or "", date,
+            w.writerow(["task", csv_cell(title + label), csv_cell(desc), TD_PRIO.get(t["priority"], "4"), min(d + 1, 4), "", csv_cell(t["who"]), date,
                         "en" if date else "", str(TZ.key) if date else ""])
             for body, who in notes.get(t["id"], []):
-                w.writerow(["note", body, "", "", "", who, "", "", "", ""])
+                w.writerow(["note", csv_cell(body), "", "", "", csv_cell(who), "", "", "", ""])
     return out.getvalue()
 
 

@@ -104,12 +104,15 @@ def _fetch_att(c, r, base, token, allow):
             return None
         try:
             _st, _h, data, _u = cal_http(u, headers={"Authorization": f"Bearer {token}"} if token else {}, allow=allow,
-                                         max_bytes=MAX_FILE_MB * 1024 * 1024, timeout=60, deadline=120)
+                                         max_bytes=MAX_FILE_MB * 1024 * 1024, timeout=20, deadline=30)  # 2.142.0 review: short, one slow server never holds the round
         except CalError as e:
             print("ntfy inbox (person): attachment download failed:", e.stored(), flush=True)
             return None
         return data
     return fetch
+
+
+NI_PERSON_S = 60  # 2.142.0 review: seconds per person and round
 
 
 def ni_poll_one(c, r):
@@ -128,10 +131,10 @@ def ni_poll_one(c, r):
         last[0] = mid
         c.execute("UPDATE ntfy_inboxes SET since=? WHERE user_id=?", (mid, uid))
     who = {"uid": uid, "fetch": _fetch_att(c, r, base, token, allow), "since": put_since}
-    n = 0
+    n, t_end = 0, time.monotonic() + NI_PERSON_S
     for line in data.splitlines():
-        if n >= NI_MAX_MSGS:
-            break
+        if n >= NI_MAX_MSGS or time.monotonic() > t_end:
+            break  # 2.142.0 review: time budget per person and round - the rest follows next round (since moves per message)
         try:
             m = json.loads(line or b"{}")
         except ValueError:

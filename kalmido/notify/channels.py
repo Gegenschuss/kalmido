@@ -679,13 +679,14 @@ def evm_user(c, uid, s, lg, now):
     q = c.execute("SELECT * FROM notify_mail_queue WHERE user_id=? ORDER BY id", (uid,)).fetchall()
     if not q:
         return
-    c.execute("DELETE FROM notify_mail_queue WHERE user_id=? AND id<=?", (uid, q[-1]["id"]))
+    drop = lambda: c.execute("DELETE FROM notify_mail_queue WHERE user_id=? AND id<=?", (uid, q[-1]["id"]))
     day = now.date().isoformat()
     d, _, k = str(s.get("evmail_day") or "").partition(":")
     sent_today = int(k) if d == day and k.isdigit() else 0
     u = c.execute("SELECT email, kind, disabled FROM users WHERE id=?", (uid,)).fetchone()
     to = (u["email"] or "").strip() if u else ""
     if not MAIL_OUT_ON or not to or u["kind"] == "agent" or u["disabled"] or sent_today >= EVM_DAY_MAX:
+        drop()
         c.commit()
         return
     names = user_names(c, list({x["actor_id"] for x in q if x["actor_id"]}))
@@ -703,9 +704,14 @@ def evm_user(c, uid, s, lg, now):
         lname = tr("Basket", lg=lg) if t["is_inbox"] and inbox_default(t["lname"]) else t["lname"]
         what = tr("{0} assigned you: {1}", who, title, lg=lg) if x["kind"] == "assign" else tr("{0} mentioned you: {1}", who, title, lg=lg)
         lines.append((what, lname, f"{PUBLIC_URL}/#t/{t['id']}"))
-    if not lines or not mail_budget(c, None, to):
+    if not lines:
+        drop()
         c.commit()
         return
+    if not mail_budget(c, None, to):  # 2.142.0 review: the mail budget is used up - the entries wait for the next round
+        c.commit()
+        return
+    drop()
     uset(c, uid, "evmail_at", str(int(time.time())))
     uset(c, uid, "evmail_day", f"{day}:{sent_today + 1}")
     c.commit()

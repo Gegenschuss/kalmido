@@ -1825,7 +1825,7 @@ def _cu_checklists(v):
     """ClickUp checklists as JSON ({name: [items]} or [{name, items}]) -> [(name, [(text, done)])]; None = not JSON."""
     try:
         j = json.loads(v) if len(v) < 200000 else None
-    except ValueError:
+    except (ValueError, RecursionError):  # 2.142.0 review: a deeply nested cell is no 500
         return None
     if isinstance(j, dict):
         j = [{"name": k, "items": x} for k, x in j.items()]
