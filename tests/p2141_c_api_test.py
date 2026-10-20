@@ -104,6 +104,8 @@ Bo.delete(B + f"/api/team/dispo/bookings/{b3}")
 q = {"start": "2026-11-16", "days": 7}
 r = Bo.get(E, params={**q, "format": "csv"})
 t = r.text
+if r.status_code == 500:  # show the server's traceback
+    print(subprocess.run(["docker", "logs", "--tail", "40", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")], capture_output=True, text=True).stderr[-3000:])
 check(r.ok and r.headers["Content-Type"].startswith("text/csv") and "attachment" in r.headers.get("Content-Disposition", ""), f"csv: download ({r.status_code})")
 check(t.startswith("﻿") and t.splitlines()[0].lstrip("﻿").split(",")[0] == "Resource", f"csv: BOM + header ({t[:60]!r})")
 check("Shoot day" in t and "Interview" in t and "Gone" not in t and "Later" not in t and "Beta job" not in t,
@@ -173,6 +175,8 @@ CSV = ("E-Mail;Datum;Quelle\n"
 IM = B + "/api/newsletter/consent/import"
 r = Bo.post(IM, json={"ws": WA, "csv": CSV, "filename": "consents.csv"})
 j = r.json() if r.ok else {}
+if r.status_code == 500:
+    print(subprocess.run(["docker", "logs", "--tail", "40", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")], capture_output=True, text=True).stderr[-3000:])
 check(r.ok and j["rows"] == 10 and j["valid"] == 5 and j["errors_count"] == 5, f"preview counts ({r.status_code} {r.text[:300]})")
 check({(x["line"], x["code"]) for x in j.get("errors", [])} == {(7, "email"), (8, "date"), (9, "future"), (10, "dup"), (11, "email")},
       f"preview: line numbers + reasons ({j.get('errors')})")

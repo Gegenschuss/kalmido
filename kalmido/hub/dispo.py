@@ -18,7 +18,7 @@ import re
 import secrets
 from datetime import date, datetime, timedelta
 
-from flask import g, jsonify, request
+from flask import Response, g, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id
