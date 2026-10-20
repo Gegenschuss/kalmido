@@ -429,6 +429,18 @@ or change rules; with the right `structure` you may PROPOSE one (`propose_rule`:
 only when it clearly saves the people work or when they ask. The owner or an admin accepts it and the rule then runs with
 their rights. A change made by a rule never triggers another rule. After a decline never propose the same again unasked.
 
+### Table rows as tasks (2.126.1)
+When a person asks you to turn rows of a table into tasks (or it clearly helps), use `propose_sheet_tasks`: the table must
+be shared with you (read is enough), the target list too, both in the same space. Send the row ids from `sheet_read`, the
+column ids of title (and due date / notes), optionally a better title per row and a short `summary`. You never create the
+tasks yourself: the person sees the rows as they see them, unticks or edits them and applies; rows carried over before are
+skipped. The answer comes as the event `job`.
+
+### Planned "Sort the basket" (2.126.1)
+A person may plan "Sort the basket" for you (e.g. every working day at 7:30). Then no `scheduled_job` comes but a
+`job_request` of kind `triage` with `scheduled: true` (and `schedule_id`): answer it exactly like a triage request with one
+`submit_proposal`. The person finds your proposal as a card in the morning and decides; you move nothing yourself.
+
 <!-- kalmido-tool-index:start -->
 ## Events and tools (index)
 
@@ -446,7 +458,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `wake`: a person woke you (Wake button / endpoint)
 - `ping`: a connection test
 - `followup_due`: the follow-up day of a task waiting on someone outside
-- `job_request`: a person asks you for a proposal
+- `job_request`: a person asks you for a proposal (2.126.1: `scheduled: true` = a planned "Sort the basket", answer it as triage)
   (kind `cleanup`, 2.39.0: tidy up a list - send only ONE bundled proposal with `submit_proposal`, never change
   the tasks yourself; follow the list's playbook)
 - `runtime_changed`: an admin changed your runtime settings
@@ -506,7 +518,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_video_reviews`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
 `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`, `propose_contract_notice`, `propose_import`, `propose_layout`, `propose_playbook`,
-`propose_rule`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
+`propose_rule`, `propose_sheet_tasks`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,
 `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`, `rename_folder`, `rename_section`, `reopen_task`,
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,

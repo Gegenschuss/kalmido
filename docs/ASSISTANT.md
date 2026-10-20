@@ -37,7 +37,9 @@ Proposals open in the same dialog as the proposals of agents (named "Assistant")
 ## What it does not do
 
 - No long tasks, no programming, no research on the web, no files: for that, set up [your own agent](AGENTS.md).
-- It does not act on its own, on a schedule or on events; it only answers when you ask.
+- It does not act on its own, on a schedule or on events; it only answers when you ask. Sorting the basket every morning
+  goes through a planned job of your own agent (2.126.1, Agents > the agent's card > *Plans* > Kind *Sort the basket*, see
+  [Planned jobs](AGENTS.md#planned-jobs-2340)): you find its proposal as a card and decide.
 - It never changes anything directly: no proposal is applied without your tap.
 - Office data (documents, invoices, bookkeeping) is not part of the assistant in 2.75.0.
 
@@ -78,6 +80,8 @@ Settings > Administration > Server.
 |-|--------------------|----------------|
 | Set up | operator sets three variables | a program on a computer you control, a token |
 | Starts | only on your tap | events, schedules, chat, mentions |
+| Sorts the basket every morning | no | yes, as a planned job (a proposal card for you, 2.126.1) |
+| Turns table rows into tasks | no | yes, as a proposal you apply (2.126.1) |
 | Can | the six kinds above | anything its program can (code, research, long jobs) |
 | Sees | lists you share with the assistant | lists shared with the agent (its own member) |
 | Changes | only through proposals you apply | through the API, within its permissions |

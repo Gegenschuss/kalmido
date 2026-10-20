@@ -171,6 +171,10 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
 10. Rules of a list (2.71.0): an agent with the permission *Structure* may propose a rule for a list shared with it; the
    list's owner or an admin accepts it with 👍 and the rule then runs with their rights
    ([AGENTS.md](AGENTS.md#rules-of-a-list-2710)).
+11. Tables and the basket (2.126.1): with *Read tables* the agent may propose rows of a table shared with it as tasks of a
+   list shared with it (`propose_sheet_tasks`; the person applies the card, [AGENTS.md](AGENTS.md#table-rows-as-tasks-21261)).
+   A person may plan *Sort the basket* for the agent (Agents > *Plans* > Kind): it then gets a `job_request` of kind triage
+   with `scheduled: true` and answers it like any triage request. The reference starter needs no change for either.
 
 ### 2. A Linux user without sudo
 

@@ -1410,6 +1410,8 @@ groups, reason at most 300 characters; `{groups: []}` = none found). `GET /api/p
 (`merged`, `skipped`), `.../undo` and `.../redo` take all of them back / again.
 | `GET /lists/{id}/rules` | read | people: owner / list admin (like the web), agents: write access to the list (else 403); `trigger` {kind section / done / reopen / ltag / due, section_id, tag_id}, `action` {kind assign / due / comment / move, user_id, days, text, list_id, section_id}, `names`, `active`, `paused_reason`, `created_by` |
 | `POST /lists/{id}/rules/proposals` | structure | agents only: `name`, `trigger`, `action`, `summary`, `title`, `user_id`; 201 = a ready proposal job (kind `rule`) |
+| `POST /agent/proposals/sheet-tasks` | sheets:read | 2.126.1: agents only: `sheet_id`, `rows` (row ids or `{row_id, title}`, at most 200), `list_id`, `title_col`, `due_col`, `notes_col`, `summary`, `for_user_id`; the table and the list shared with the agent, same space; 201 = a ready proposal job (kind `sheet_tasks`) + `skipped` (rows carried over before; all of them = 409). `GET /api/proposals/{id}` adds `sheet`, `list`, `sheet_rows` (`key, row_id, n, title, cell_title, due, notes, state: "" \| done \| gone \| empty`); apply `{select, edits: {"0": {title, due}}}` runs the table's rows -> tasks as the person (`created`, `skipped`), undo / redo = that batch |
+| `GET /agent/schedules` | read | 2.126.1: each plan has `action` `chat` (event `scheduled_job`) \| `triage` (a planned *Sort the basket*: event `job_request` kind `triage` with `scheduled: true`, `schedule_id`); `last_state` also `empty` / `pending` / `busy` |
 
 ## Pin board, time check and shoot planning for agents (2.51.0)
 
