@@ -462,7 +462,7 @@ function bg_cmpDiff(v, pct, kind) {
 function bg_cmpCard(c, months) {
   const name = c.name ?? (c.key.startsWith('total') ? (c.kind === 'in' ? tr('Received') : tr('Spent')) : tr('No category'));
   const max = Math.max(1, ...c.months.map(x => Math.max(+x.ist, +x.soll)));
-  const bars = `<div class="bgcmpbars" role="img" aria-label="${esc(c.months.map(x => `${bg_monthName(x.month)}: ${bg_money(x.ist)}`).join(', '))}">${c.months.map((x, i) => `<span class="bgcmpm ${i === months.length - 1 ? 'on' : ''}"><i style="transform:scaleY(${(+x.ist / max).toFixed(3)})"></i></span>`).join('')}</div>`;
+  const bars = !c.months.some(x => +x.ist) ? '' : `<div class="bgcmpbars" role="img" aria-label="${esc(c.months.map(x => `${bg_monthName(x.month)}: ${bg_money(x.ist)}`).join(', '))}">${c.months.map((x, i) => `<span class="bgcmpm ${i === months.length - 1 ? 'on' : ''}"><i style="transform:scaleY(${(+x.ist / max).toFixed(3)})"></i></span>`).join('')}</div>`;
   const line = (label, v) => v ? `<div class="bgcmpl"><span class="muted">${esc(label)}</span>${v}</div>` : '';
   return `<li class="bgcmpc ${c.kind}"><div class="bgcl"><b>${esc(name)}</b><span class="bgamt ${c.kind}">${esc(bg_money(c.ist))}</span></div>
     ${+c.soll ? line(tr('Plan'), `<span>${esc(bg_money(c.soll))}</span>`) : ''}

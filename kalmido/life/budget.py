@@ -790,19 +790,21 @@ def _pct(cur, base):
 def bud_compare(c, uid, lid, month, n):
     """2.140.0 B (#2134): the month comparison -- month against the n - 1 months before it, per category: ist / soll of
     every month (from the entries and the plan as bud_totals makes it), the difference to the month before and to the
-    average of the earlier months (absolute and in percent; None when there is nothing to compare with)."""
+    average of the earlier months that have any entry at all (months before the budget was used do not pull the average
+    down; absolute and in percent; None when there is nothing to compare with)."""
     bud_need_on(c, uid)
     bud_need_list(c, uid, lid)
     if n not in BUD_COMPARE:
         raise BadInput(tr("Invalid value: {0}", "months"))
     months = [_mstr(i) for i in range(_mi(month) - n + 1, _mi(month) + 1)]
     per = {m: bud_totals(c, lid, m) for m in months}
+    active = [i for i, m in enumerate(months[:-1]) if per[m]["totals"]["ist_in"] or per[m]["totals"]["ist_out"]]
     cats = []
 
     def entry(key, name, kind, ist_of, soll_of):
         ist = [ist_of(m) for m in months]
         soll = [soll_of(m) for m in months]
-        cur, prev, earlier = ist[-1], ist[-2] if n > 1 else None, ist[:-1]
+        cur, prev, earlier = ist[-1], ist[-2] if n > 1 else None, [ist[i] for i in active]
         avg = (sum(earlier, Decimal(0)) / len(earlier)).quantize(Decimal("0.01")) if earlier else None
         return {"key": key, "name": name, "kind": kind,
                 "months": [{"month": m, "ist": _f(i), "soll": _f(sl)} for m, i, sl in zip(months, ist, soll)],

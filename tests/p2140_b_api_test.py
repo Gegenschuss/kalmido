@@ -147,6 +147,9 @@ check(nocat.get("ist") == 59.5 and nocat.get("name") is None, f"compare: entries
 check(j["totals"]["out"]["ist"] == 179.5 and j["totals"]["in"]["ist"] == 1000.0 and j["totals"]["out"]["months"][0]["ist"] == 100.0,
       f"compare: the totals {j['totals']['out']['ist']} {j['totals']['in']['ist']}")
 check(not any(x["key"] == CATS["Housing"] for x in j["cats"]), "compare: a category without anything in the period is left out")
+j6 = A.get(B + f"/api/budget/{L}/compare", params={"month": "2026-09", "months": 6}).json()
+g6 = next((x for x in j6["cats"] if x["key"] == CATS["Groceries"]), {})
+check(g6.get("avg") == 125.0 and len(g6.get("months", [])) == 6, f"compare: months before the budget was used do not count for the average {g6.get('avg')}")
 check(len(A.get(B + f"/api/budget/{L}/compare", params={"month": "2026-09", "months": 12}).json()["months"]) == 12, "compare: 12 months")
 check(A.get(B + f"/api/budget/{L}/compare", params={"months": 6}).json()["n"] == 6, "compare: default month = this month")
 check(A.get(B + f"/api/budget/{L}/compare", params={"month": "2026-09", "months": 5}).status_code == 400, "compare: 5 months = 400")
