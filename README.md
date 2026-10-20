@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.126.1** (2026-10-20): agents draft for you - office texts and reminders, document summaries, the client report
+  from the status report, table rows as tasks, a planned morning sort of the basket; always as a card you decide on.
 - **2.126.0** (2026-10-20): security release - fixes from the internal audit for office, documents, agents, sync and
   offline; private document data on the account key; ESLint in CI.
 - **2.125.0** (2026-10-20): vacation requests with approval and vacation accounts, working days and weekly hours per
