@@ -13,7 +13,7 @@ from ..tasks.validation import (
     as_int, clean_task, log_act, log_changes, RR_OCC_PER_TASK, RR_OCC_SECONDS, RR_OCC_TOTAL, rr_rule,
 )
 from ..tasks.tasks import check_move, dep_shift, move_subtree, ms_cleanup, one_task
-from ..tasks.lifecycle import _norm, apply_update, do_complete, do_delete, restore_task, signed, undo_status
+from ..tasks.lifecycle import _norm, apply_update, complete_stale, do_complete, do_delete, restore_task, signed, undo_status
 from ..tasks.attachments import need_attachment
 
 
@@ -39,12 +39,16 @@ def task_reorder():
     c = db()
     ts = iso(now_utc())
     items = []
+    if len(body().get("items") or []) > BATCH_MAX:  # 2.126.0 D (#1992 A8)
+        return err(tr("At most {0} tasks at once", BATCH_MAX))
     for it in body().get("items", []):
         if not isinstance(it, dict) or not it.get("id"):
             continue
-        r = c.execute("SELECT list_id FROM tasks WHERE id=?", (int(it["id"]),)).fetchone()
+        r = c.execute("SELECT list_id, deleted_at FROM tasks WHERE id=?", (int(it["id"]),)).fetchone()
         if not r or not list_role(c, r[0]) or not task_visible(c, int(it["id"]), me()):
             continue  # unknown (e.g. deleted elsewhere, or not visible): nothing to do
+        if r["deleted_at"]:
+            continue  # 2.126.0 D (#1992 A3): in the trash: stays where it is
         role = need_task(c, int(it["id"]))
         from ..tasks.validation import lock_problem  # 2.36.0 (#1118): dragging a locked task to another list / day / priority
         e = lock_problem(c, c.execute("SELECT * FROM tasks WHERE id=?", (int(it["id"]),)).fetchone(),
@@ -56,6 +60,11 @@ def task_reorder():
                 raise Denied(403, tr("Participants cannot move tasks to another list"))
             need_list(c, as_int(it["list_id"], "list_id", 1))
             check_move(c, r[0], int(it["list_id"]))
+            cur = c.execute("SELECT * FROM tasks WHERE id=?", (int(it["id"]),)).fetchone()
+            if int(it["list_id"]) != r[0] and cur["status"] == 0:  # 2.126.0 D (#1992 A7): as PATCH, a task waiting for its approval keeps its list
+                from ..tasks.review import _gate_holds, rvw_gate, rvw_may
+                if _gate_holds(c, cur) and not rvw_may(c, cur, me()):
+                    raise Denied(409, rvw_gate(c, int(it["id"])) or tr("Waiting for approval"))
             from ..collab.liste2e import LE2EDenied, le2a_moving
             if le2a_moving(c, r[0], int(it["list_id"])):  # 2.64.1 (#1817): into / out of a list with the lock only with the texts (PATCH)
                 raise LE2EDenied("list_e2e_move")
@@ -82,6 +91,9 @@ def task_reorder():
             rb = rul_snap(c, int(it["id"]))  # 2.71.0 A (#1457): dragging into a column / list starts its rules too
             c.execute(f"UPDATE tasks SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), it["id"]])
             log_changes(c, it["id"], before)
+            if "section_id" in f or "list_id" in f:  # 2.126.0 D (#1992 A7): the review section / reviewer as with PATCH
+                from ..tasks.review import rvw_on_move
+                rvw_on_move(c, int(it["id"]), before)
             if "list_id" in f:
                 move_subtree(c, int(it["id"]), f["list_id"])
                 if f["list_id"] != before["list_id"]:  # 2.23.0 (#795)
@@ -94,6 +106,9 @@ def task_reorder():
     bump(c)
     c.commit()
     return jsonify(ok=True, shifted=shifted)
+
+
+BATCH_MAX = 1000  # 2.126.0 D (#1992 A8): tasks per batch / reorder call
 
 
 @app.post("/api/tasks/batch")
@@ -120,6 +135,8 @@ def task_batch():
         ids = [int(i) for i in b.get("ids", [])]
     except (TypeError, ValueError):
         return err(tr("Invalid data"))
+    if len(ids) > BATCH_MAX:  # 2.126.0 D (#1992 A8)
+        return err(tr("At most {0} tasks at once", BATCH_MAX))
     action, data = b.get("action"), b.get("data") or {}
     if not isinstance(data, dict):
         return err(tr("Invalid data"))
@@ -138,7 +155,12 @@ def task_batch():
     def conflict(tid, field, server=None, mine=None, title=None):
         t = c.execute("SELECT title FROM tasks WHERE id=?", (tid,)).fetchone()
         conflicts.append({"id": tid, "title": title if title is not None else t[0] if t else "", "field": field, "server": server, "mine": mine})
-    for tid in ids:
+    def back():  # 2.126.0 D (#1992 A8): a task that fails is left as it was (not half changed)
+        c.execute("ROLLBACK TO SAVEPOINT batch_one")
+    for n, tid in enumerate(ids):
+        if n:
+            c.execute("RELEASE SAVEPOINT batch_one")
+        c.execute("SAVEPOINT batch_one")
         deleted = c.execute("SELECT deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
         if not deleted or (deleted[0] and action != "restore") or (not deleted[0] and action == "restore"):
             continue
@@ -150,6 +172,7 @@ def task_batch():
                 e = apply_update(c, tid, data, lock=True)
                 if e:
                     errors.append(e)
+                    back()  # 2.126.0 D (#1992 A8): this task keeps all of its values
                     if e == lock_msg:
                         skipped.append(tid)
                     continue
@@ -162,6 +185,7 @@ def task_batch():
                     conflict(tid, x["field"], x["server"], x["mine"], title)
                 if e:
                     errors.append(e)
+                    back()  # 2.126.0 D (#1992 A8): this task keeps all of its values
                     if e == lock_msg:
                         skipped.append(tid)
                     continue
@@ -175,6 +199,8 @@ def task_batch():
                     continue  # already completed: nothing to do (and nothing to undo)
                 if str(tid) in expect and _norm(expect[str(tid)]) != _norm(row["due"]):
                     conflict(tid, "due", row["due"], expect[str(tid)])
+                    continue
+                if complete_stale(c, tid, row["due"]):  # 2.126.0 D (#1987): ticked at the same moment elsewhere
                     continue
                 if st == 2:  # 2.60.0 C (#1512): waiting for a review approval -> this one is left open
                     from ..tasks.review import rvw_gate
@@ -193,6 +219,7 @@ def task_batch():
                 e = undo_status(c, tid, per.get(str(tid)))
                 if e:
                     errors.append(e)
+                    back()  # 2.126.0 D (#1992 A8): this task keeps all of its values
                     conflict(tid, "status")
                     continue
             elif action == "reopen":
@@ -219,8 +246,10 @@ def task_batch():
             done += 1
         except Denied as e:
             errors.append(e.text())
+            back()
         except BadInput as e:
             errors.append(str(e))
+            back()
     unblock_events(c, finished)
     bump(c)
     c.commit()

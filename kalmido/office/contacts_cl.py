@@ -155,7 +155,8 @@ def ckl_book_fits(cl, b):
     """Is address book b (org_id, owner_org_id, owner_id) one the contact persons of client cl may link to?"""
     if cl["org_id"]:
         return b["owner_org_id"] == cl["org_id"] and b["org_id"] == cl["org_id"]
-    return not b["owner_org_id"] and not b["org_id"] and b["owner_id"] == cl["created_by"]
+    # 2.126.0 C (#1992 K10): a private client like an organisation's: any private book the person reads (shared ones too)
+    return not b["owner_org_id"] and not b["org_id"]
 
 
 def ckl_contact_ok(c, uid, cl, kid):

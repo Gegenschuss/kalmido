@@ -115,8 +115,11 @@ def pb_effective(c, lid):
     parts = [x["text"] for x in fl] + ([own["body"]] if own and own["body"] else [])
     text = PB_SEP.join(parts)
     times = [x["updated_at"] for x in fl] + ([own["created_at"]] if own else [])
+    # 2.126.0 B (#1978): who wrote the parts (a version without an author: the list's owner)
+    authors = sorted({r["author_id"] or lr["owner_id"] for _, r in folders if r["body"]} | ({own["author_id"] or lr["owner_id"]} if own and own["body"] else set()))
     return {"text": text, "list_text": own["body"] if own else "", "list_version": own["version"] if own else 0,
-            "list_row": own, "folders": fl, "updated_at": max(times) if times else None, "key": pb_key(text), "life": lr["life"]}
+            "list_row": own, "folders": fl, "updated_at": max(times) if times else None, "key": pb_key(text), "life": lr["life"],
+            "authors": authors}
 
 
 def pb_event(c, lid):
@@ -128,9 +131,21 @@ def pb_event(c, lid):
     e = pb_effective(c, lid)
     out = None
     if e and e["text"] and e["life"] != "health":
-        out = {"text": e["text"], "version": e["key"], "updated_at": e["updated_at"], "list_id": lid}
+        out = {"text": e["text"], "version": e["key"], "updated_at": e["updated_at"], "list_id": lid, "authors": e["authors"]}
     cache[lid] = out
     return out
+
+
+def pb_for_agent(c, pb, aid):
+    """2.126.0 B (#1978): the playbook part of an event for agent aid with its authors ({id, name}) and foreign: true when one
+    of them is not the agent's operator (a personal agent: its owner; a team agent: the list's owner / admins). The launcher
+    then shows it as information about the list, not as rules to follow."""
+    from ..agents.admin import agent_owner
+    ids = list(pb.get("authors") or [])
+    o = agent_owner(c, aid)
+    foreign = any(a != o for a in ids) if o is not None else any(list_role(c, pb["list_id"], a) not in MANAGE_ROLES for a in ids)
+    names = user_names(c, ids)
+    return {**pb, "authors": [{"id": a, "name": names.get(a, "")} for a in ids], "foreign": foreign}
 
 
 def pb_flags(c, rows):

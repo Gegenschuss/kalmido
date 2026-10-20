@@ -2,7 +2,7 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v282';
+const CACHE = 'tasks-shell-v283';  // app 2.126.0 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
@@ -58,7 +58,14 @@ async function swShell(req, url) {
 }
 // Android share sheet (share_target POST): keep the shared files in a cache and open the app,
 // which then creates the task + uploads with the normal (login) session.
+// 2.126.0 D (#1992 O6): only the system's share sheet (no referrer) or the app itself fills the capture form
+function shareFromOutside(req) {
+  const site = req.headers.get('Sec-Fetch-Site');
+  if (site && site !== 'none' && site !== 'same-origin') return true;
+  try { return !!req.referrer && req.referrer !== 'about:client' && new URL(req.referrer).origin !== self.location.origin; } catch { return true; }
+}
 async function handleShare(req) {
+  if (shareFromOutside(req)) return Response.redirect('/', 303);
   try {
     const fd = await req.formData();
     const cache = await caches.open('tasks-share');
@@ -82,7 +89,8 @@ self.addEventListener('fetch', e => {
   // /s/ = public list links: never cached (no-store pages of one list; the service worker stays out of them)
   // 2.63.0 (#1513): the same for the forms, a report's status page and the customer portal
   // 2.122.0 A (#2097): and the file requests (/u/)
-  if (e.request.method !== 'GET' || url.pathname.startsWith('/api/') || /^\/(s|f|p|u)\/|^\/portal(\/|$)/.test(url.pathname)) return;
+  // 2.126.0 D (#1992 O4): and the calendar feed / sync addresses (private data, never kept on the device)
+  if (e.request.method !== 'GET' || url.pathname.startsWith('/api/') || /^\/(s|f|p|u|ical|dav)\/|^\/portal(\/|$)|^\/\.well-known\//.test(url.pathname)) return;
   // 2.35.0 (#1094): language files come with the version of the code (?v=). Offline only the exact version is served as is;
   // a copy of another version is marked (X-Kalmido-I18n-Stale) so the client uses it as a stopgap and fetches it again later.
   // A response that is no JSON (a sign-in page) is never cached for a language file.

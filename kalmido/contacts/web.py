@@ -242,6 +242,9 @@ def lv_import_public(st):
     return d
 
 
+IMP_RUNNING_MAX = 4  # 2.126.0 C (#1986): background imports at once in this process
+
+
 def lv_import_start(c, uid, bid, cards, since=None):
     iid = secrets.token_urlsafe(12)
     st = {"import_id": iid, "user_id": uid, "book_id": bid, "state": "running", "total": min(len(cards), CONTACTS_PER_BOOK), "done": 0,
@@ -250,6 +253,11 @@ def lv_import_start(c, uid, bid, cards, since=None):
     with _IMP_LOCK:
         for k in [k for k, v in _IMP.items() if v["ended_at"] and now - v["ended_at"] > 3600]:
             _IMP.pop(k, None)
+        running = [v for v in _IMP.values() if not v["ended_at"]]  # 2.126.0 C (#1986): one per person, a few per process
+        if any(v["user_id"] == uid for v in running):
+            raise Denied(409, tr("An import is already running"))
+        if len(running) >= IMP_RUNNING_MAX:
+            raise Denied(429, tr("Too many imports, please wait a few minutes"))
         _IMP[iid] = st
     ctx = c.ctx  # the starter's row-level-security context goes with the thread
     threading.Thread(target=lv_import_run, args=(st, ctx, uid, bid, cards, since), daemon=True).start()

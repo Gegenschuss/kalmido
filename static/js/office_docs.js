@@ -217,7 +217,7 @@ function ofdPaymentsHtml(d, adm) {
   return list + sum + cr + (adm ? `<button type="button" class="btn sm" data-ofd="pay">${ic('plus', 's')}<span>${tr('Record payment')}</span></button>` : `<p class="muted ofchint">${tr('Only an admin of this organisation can record payments')}</p>`);  // 2.39.1 (#1210 N3)
 }
 function ofdItemsHtml(d, adm) {
-  const its = d.items || [], lg = ofdLang(d), inv = ofdIsInv(d);
+  const its = d.items || [], inv = ofdIsInv(d);
   const taxes = OFC_TAXES.map(([v, n]) => [v, ofcTax(v)]);
   const rows = its.map((it, i) => {
     const mv = `<span class="ofdmv"><button type="button" class="ib" data-ofd="it-up" data-i="${i}" ${i === 0 ? 'disabled' : ''} aria-label="${esc(tr('Move up'))}">${ic('up', 's')}</button><button type="button" class="ib" data-ofd="it-down" data-i="${i}" ${i === its.length - 1 ? 'disabled' : ''} aria-label="${esc(tr('Move down'))}">${ic('down', 's')}</button><button type="button" class="ib" data-ofd="it-del" data-i="${i}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></span>`;
@@ -608,7 +608,7 @@ async function ofdReminderDialog() {
 }
 // the service picker: search the catalogue, tap = a new position with the service's name (document language), rate and flags
 function ofdServicePicker() {
-  const d = typeof tpCur === 'function' ? tpCur() : OFD.doc, lg = ofdLang(d);  // 2.47.0 (#1215): into an open part
+  const d = typeof tpCur === 'function' ? tpCur() : OFD.doc;  // 2.47.0 (#1215): into an open part
   const md = modal(`<h3>${tr('Add service')}</h3><div class="ctsearch">${ic('search', 's')}<input id="ofd-sq" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search services'))}" autocomplete="off"></div><div id="ofd-slist" class="ofdslist"></div>
     <div class="foot"><button type="button" class="btn" data-m="free">${tr('Free position')}</button><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('ofdpick');
