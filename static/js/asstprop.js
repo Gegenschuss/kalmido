@@ -35,10 +35,10 @@ function ast_agents(kind, q) {
 }
 /** @param {string} kind @param {string} q */
 function ast_redraw(kind, q) {
-  ast$$(`[data-ast-slot="${kind}?${q}"]`).forEach(el => { el.outerHTML = ast_slotHtml(kind, q, el.dataset.astLabel || ''); });
+  ast$$(`[data-ast-slot="${kind}?${q}"]`).forEach(el => { el.outerHTML = ast_btnHtml(kind, q, el.dataset.astLabel || ''); });
 }
 /** @param {string} kind @param {string} q @param {string} label */
-function ast_slotHtml(kind, q, label) {
+function ast_btnHtml(kind, q, label) {
   const ags = ast_agents(kind, q);
   const btn = ags?.length ? `<button type="button" class="btn sm ast-ask" data-ast-ask="${kind}" data-ast-q="${esc(q)}">${ic('bot', 's')}<span>${esc(label)}</span></button>` : '';
   return `<span class="ast-slot" data-ast-slot="${kind}?${esc(q)}" data-ast-label="${esc(label)}">${btn}</span>`;
@@ -49,14 +49,14 @@ const ast_forget = (/** @type {string} */ kind, /** @type {string} */ q) => { de
 /** @param {any} d */
 function ast_ofdBtn(d) {
   if (!d || !d.can_edit || !['offer', 'invoice', 'reminder'].includes(d.kind)) return '';
-  return `<div class="row ast-row">${ast_slotHtml('office_text', 'doc_id=' + d.id, tr('Draft text with an agent'))}</div>`;
+  return `<div class="row ast-row">${ast_btnHtml('office_text', 'doc_id=' + d.id, tr('Draft text with an agent'))}</div>`;
 }
 // docs.js (the document sheet): the summary taken over + the button
 /** @param {any} d */
 function ast_docSlot(d) {
   if (!d) return '';
   const sum = d.summary ? `<div class="ast-sum"><span class="muted">${esc(tr('Summary'))}</span><div class="md">${renderMd(d.summary, true)}</div></div>` : '';
-  const btn = d.role && d.role !== 'view' ? `<div class="ast-row">${ast_slotHtml('doc_summary', 'doc_id=' + d.id, tr('Summarise with an agent'))}</div>` : '';
+  const btn = d.role && d.role !== 'view' ? `<div class="ast-row">${ast_btnHtml('doc_summary', 'doc_id=' + d.id, tr('Summarise with an agent'))}</div>` : '';
   return sum || btn ? `<div class="ast-doc">${sum}${btn}</div>` : '';
 }
 // projects.js (the status report dialog): the button in the foot; a text taken over replaces the fixed text
@@ -66,7 +66,7 @@ function ast_rpt(md, st, j, lid) {
   const k = 'list_id=' + lid;
   AST.agents['report?' + k] = j.agents || [];
   const foot = ast$('.foot', md), old = ast$('[data-ast-slot]', foot);
-  const html = ast_slotHtml('report', k, tr('Word the report with an agent'));
+  const html = ast_btnHtml('report', k, tr('Word the report with an agent'));
   if (old) old.outerHTML = html; else foot?.insertAdjacentHTML('afterbegin', html);
   ast_rptShow(md, st);
 }

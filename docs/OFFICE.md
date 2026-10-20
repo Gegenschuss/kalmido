@@ -169,7 +169,7 @@ In the area Packs, every industry pack's card says **Switched on** or **Off** an
   (`producing_on` 0/1, raw data via `raw_mode`, "none" = off), always shown; the flags of services and positions are
   always kept, the spreadsheet import always reads those columns, a framework contract always presets raw data;
   existing and finalised documents keep what they hold, documents of 2.46 and older get `producing_on` once at start-up
-  (1 when a position counts towards producing, else the default), so their sums stay. Since 2.113.1 a new quotation computes producing only
+  (1 when a position counts towards producing, else the default), so their sums stay. Since 2.138.1 a new quotation computes producing only
   through an industry pack that offers "share by amount" (see docs/PACKS.md, calculation options); without such a pack
   new quotations start without producing and the switch, the fields and the marks are hidden. Older quotations keep
   their calculation by quantities / quotient (and show their switch to turn it off). The company data choose the word before the
@@ -1018,7 +1018,7 @@ amount. When a quotation becomes "accepted" its purchase is stored for the cash 
 position with a purchase and per part, amount encrypted at rest, dated at the start of the period of service, else the
 day of acceptance), stored anew when the accepted quotation changes and removed when it leaves that status.
 
-## Undo in the editors (2.111.0)
+## Undo in the editors (2.138.1)
 
 Documents (quotations, invoices, credit notes, reminders and the parts of a quotation), clients, the master data
 (services, texts, contracts, sets, roles) and tables keep saving every change at once. Every own saved change is one
@@ -1612,7 +1612,7 @@ Since 2.36.2 also `office_company` and `office_doc_log`, the columns `locked_at`
 `tax_pct`, `net`, `tax_amount` of `office_doc_items` (positions written without `org_id` get it at the next start) and
 the billing columns of `clients` - all nullable or with a default, so the previous release runs on with them.
 Unfinished logo uploads (`*.tmp`) are not part of backups.
-Since 2.111.0 also `office_undo` (the copies for the editors' undo, see "Undo in the editors"; `org_id` nullable for a
+Since 2.138.1 also `office_undo` (the copies for the editors' undo, see "Undo in the editors"; `org_id` nullable for a
 private client, rows live one day); 2.110 runs on with it.
 Since 2.37.0 (PostgreSQL) amounts, rates and quantities are `NUMERIC(14,4)` (exact decimals; read back as numbers as
 before), and every `office_*` table is under row-level security by `org_id`: a request only ever gets rows of its own

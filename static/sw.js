@@ -2,7 +2,7 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v286';  // app 2.126.2 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
+const CACHE = 'tasks-shell-v289';  // app 2.138.1 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
@@ -18,12 +18,12 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/js/calevents.js', '/static/js/evinvite.js', '/static/js/davwrite.js', '/static/js/multisel.js', '/static/js/ctlinks.js', '/static/js/formguard.js', '/static/js/liveparts.js', '/static/js/countries.js', '/static/js/clients.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js', '/static/js/agentplan.js', '/static/js/lyprop.js', '/static/js/clientpage.js',
   '/static/js/hubmail.js', '/static/js/portal.js', '/static/js/areas.js', '/static/js/multiedit.js', '/static/js/basket.js', '/static/js/sbnav.js', '/static/js/notesall.js', '/static/js/favorites.js', '/static/js/favtiles.js', '/static/js/mineorder.js', '/static/js/tablecells.js', '/static/js/sheetgrid.js', '/static/js/formula.js',
   '/static/js/listadmin.js', '/static/js/orgexport.js', '/static/js/move.js', '/static/js/orgcrypt.js', '/static/js/cryptscope.js', '/static/js/sheetdrag.js', '/static/js/sheetmotion.js', '/static/js/miniwin.js', '/static/js/chatwin.js', '/static/js/chatwins.js', '/static/js/chatplus.js', '/static/js/taskbell.js', '/static/js/e2e.js',
-  '/static/js/notelock.js', '/static/js/related.js', '/static/js/liste2e.js', '/static/js/liste2eui.js', '/static/js/liste2efile.js', '/static/js/liste2echan.js', '/static/js/wikie2e.js', '/static/js/orgvis.js', '/static/js/discover.js', '/static/js/ablage.js', '/static/js/listcolor.js', '/static/js/wscolor.js', '/static/js/rowsym.js',
-  '/static/js/review.js', '/static/js/wip.js', '/static/js/points.js', '/static/js/photometa.js', '/static/js/ablinks.js', '/static/js/filetext.js', '/static/js/depchain.js', '/static/js/importprop.js', '/static/js/meetprop.js', '/static/js/dupprop.js', '/static/js/contractprop.js', '/static/js/multilist.js', '/static/js/rules.js', '/static/js/budget.js', '/static/js/msvview.js', '/static/js/supporter.js', '/static/js/assistant.js', '/static/js/main.js'];
+  '/static/js/notelock.js', '/static/js/related.js', '/static/js/liste2e.js', '/static/js/liste2eui.js', '/static/js/liste2efile.js', '/static/js/liste2echan.js', '/static/js/wikie2e.js', '/static/js/orgvis.js', '/static/js/discover.js', '/static/js/ablage.js', '/static/js/listcolor.js', '/static/js/wscolor.js', '/static/js/rowsym.js', '/static/js/review.js',
+  '/static/js/wip.js', '/static/js/swimlanes.js', '/static/js/points.js', '/static/js/photometa.js', '/static/js/ablinks.js', '/static/js/filetext.js', '/static/js/depchain.js', '/static/js/importprop.js', '/static/js/meetprop.js', '/static/js/dupprop.js', '/static/js/contractprop.js', '/static/js/multilist.js', '/static/js/rules.js', '/static/js/budget.js', '/static/js/msvview.js', '/static/js/supporter.js', '/static/js/assistant.js', '/static/js/main.js'];
 // 2.53.0 (#1410): the modules loaded on demand (static/js/lazyload.js LD_MODS; no script tag in index.html, tools/check_layout.py
 // compares): cached right after the shell, so they open offline too; a failure there does not drop the install
 const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinvview.js', '/static/js/settings.js', '/static/js/contacts.js', '/static/js/newsletter.js', '/static/js/office.js', '/static/js/office_docs.js', '/static/js/office_import.js', '/static/js/office_sheet.js', '/static/js/office_parts.js', '/static/js/office_travel.js', '/static/js/office_cashflow.js', '/static/js/office_doctpl.js', '/static/js/office_logbook.js', '/static/js/office_cashbook.js',
-  '/static/js/office_pipeline.js', '/static/js/office_kpi.js', '/static/js/office_datev.js', '/static/js/officeagents.js', '/static/js/office_packs.js', '/static/js/office_books.js', '/static/js/office_bank.js', '/static/js/office_taxdates.js', '/static/js/office_recurring.js', '/static/js/office_subs.js', '/static/js/office_agreements.js', '/static/js/office_assets.js', '/static/js/office_meals.js', '/static/js/office_leads.js', '/static/js/office_cfiles.js', '/static/js/office_letterhead.js', '/static/js/office_terms.js', '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/pdfview.js', '/static/js/docpreview.js', '/static/js/mindmap.js', '/static/js/wiki.js', '/static/js/wkshare.js', '/static/js/wkhist.js', '/static/js/wkembed.js', '/static/js/stats.js', '/static/js/calview.js', '/static/js/caldrag.js',
+  '/static/js/office_pipeline.js', '/static/js/office_kpi.js', '/static/js/office_datev.js', '/static/js/officeagents.js', '/static/js/office_packs.js', '/static/js/office_books.js', '/static/js/office_bank.js', '/static/js/office_taxdates.js', '/static/js/office_recurring.js', '/static/js/office_subs.js', '/static/js/office_agreements.js', '/static/js/office_assets.js', '/static/js/office_meals.js', '/static/js/office_leads.js', '/static/js/office_cfiles.js', '/static/js/office_letterhead.js', '/static/js/office_numranges.js', '/static/js/office_terms.js', '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/pdfview.js', '/static/js/docpreview.js', '/static/js/mindmap.js', '/static/js/wiki.js', '/static/js/wkshare.js', '/static/js/wkhist.js', '/static/js/wkembed.js', '/static/js/stats.js', '/static/js/calview.js', '/static/js/caldrag.js',
   '/static/js/apptbook.js', '/static/js/docs.js', '/static/js/paperless.js', '/static/js/receipts.js', '/static/js/life.js', '/static/js/integrations.js', '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js', '/static/js/bookmarks.js', '/static/js/asstprop.js', '/static/js/sheetprop.js', '/static/js/sheets.js', '/static/js/sheets2.js', '/static/js/sheetsio.js', '/static/js/sheetsize.js', '/static/js/sheetshare.js', '/static/js/sheetchart.js', '/static/js/sheetkinds.js', '/static/js/sheetbook.js', '/static/js/tagsel.js', '/static/js/filereq.js', '/static/js/videorev.js', '/static/js/abscan.js', '/static/js/pubvideo.js', '/static/js/hookin.js', '/static/js/polls.js', '/static/js/formq.js', '/static/js/office_undo.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell
@@ -47,7 +47,7 @@ async function swShell(req, url) {
   const opt = {ignoreSearch: url.pathname === '/' || url.pathname.startsWith('/static/js/')};  // 2.53.0 (#1410): modules on demand come with ?v=
   let r = null;
   try { r = await fetch(req); } catch { r = null; }
-  if (r && r.ok && !r.redirected && r.type === 'basic') { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return r; }
+  if (r && r.ok && !r.redirected && r.type === 'basic') { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); return r; }  // 2.138.0 A (#2257): a refused put is no uncaught error
   // network error or 5xx (server restarting): any cached copy beats a broken answer; 2.4.0 (#187): the quick capture page is the app shell too
   if (!r || r.status >= 500) {
     const hit = (await swAnyCache(req, opt)) || (url.pathname === '/capture' ? await swAnyCache('/', {ignoreSearch: true}) : undefined);
@@ -85,6 +85,7 @@ async function handleShare(req) {
 }
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+  if (url.origin !== self.location.origin) return;  // 2.138.0 A (#2257): extensions (chrome-extension://) and other origins: the browser handles them
   if (e.request.method === 'POST' && url.pathname === '/share') { e.respondWith(handleShare(e.request)); return; }
   // /s/ = public list links: never cached (no-store pages of one list; the service worker stays out of them)
   // 2.63.0 (#1513): the same for the forms, a report's status page and the customer portal
@@ -102,7 +103,7 @@ self.addEventListener('fetch', e => {
 async function swI18n(req) {
   try {
     const r = await fetch(req);
-    if (r.ok && !r.redirected && r.type === 'basic' && /json/.test(r.headers.get('content-type') || '')) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+    if (r.ok && !r.redirected && r.type === 'basic' && /json/.test(r.headers.get('content-type') || '')) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); }  // 2.138.0 A (#2257): a refused put is no uncaught error
     return r;
   } catch (err) {
     const hit = await caches.match(req);

@@ -400,7 +400,7 @@ organisation uses requests in the own folders the same way.
 Whoever asked gets one News item (and a push) per request when files arrive; more files within ten minutes raise its
 count instead of sending again. *Files from file requests* in the notification settings switches News and push off.
 
-## Several files at once, ZIP download, scanning with the phone (2.112.1)
+## Several files at once, ZIP download, scanning with the phone (2.138.1)
 
 In the file store, **Select** (check boxes, also on the phone) and the bar now also offer **Download** and **Move to the
 trash**. Download of one file gives the file itself; several items or a folder become one ZIP that keeps the folder
@@ -415,7 +415,7 @@ choose pictures), turn a page by 90 degrees, change the order, remove a page, th
 scaled to about 2000 pixels, without the photo's metadata or location -- and stores it like an upload: the storage limit,
 the virus scan and the text recognition apply. From *Documents* the PDF becomes a document of the workspace there.
 
-## Links for external people (2.112.1)
+## Links for external people (2.138.1)
 
 A file or a folder of the file store can go to people without an account through a secret link: **Link for external
 people…** in a row's menu, or **Create link** in its details. Choose how long it is valid (1 day, 7 days, 30 days, until a
@@ -445,7 +445,7 @@ pin, in an agent chat the person and the agent. Others see the change right away
 
 A message is sent once: it shows at once as *Sending…*, and Send / Enter wait until the server took it, so pressing
 Enter again (for example right after waking the laptop) does not send it twice.
-## Channels, groups and files in the team chat (2.113.1)
+## Channels, groups and files in the team chat (2.138.1)
 
 Besides the chat of every shared list there are **channels** anyone opens: *Team chat > New message > New channel*. A
 channel of an organisation is either *open to the whole organisation* (everyone in it finds it under *Browse channels*

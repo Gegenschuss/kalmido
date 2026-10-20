@@ -20,6 +20,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.138.1** (2026-10-20): six releases from 19.10. brought onto today's code - office undo, invitation mails
+  and calendar subscription links, quick add with @person and reminders at a time; file store ZIP, phone scan and
+  external links; office settings in areas, quotation parts in colour, terms as PDF; team chat files, channels and
+  groups; producing by amount, handling costs and markup; inbound and organisation webhooks, active sessions,
+  invitations by e-mail; trash period, list CSV / print, full-text search, repeats several times a day.
 - **2.138.0** (2026-10-20): office - start number per number range, the quotation bar shows the next step, quotation
   fixes (units by quantity, renamed parts on the title page, wrapping PDF headings, closing kept together), import order
   and undo; resizable dialogs; rule triggers / actions and Kanban swimlanes; sidebar search at the bottom; security fixes.
@@ -68,23 +73,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   footer, travel costs with the per diem as the main amount.
 - **2.114.2** (2026-10-19): office fixes 2 - a finalised quotation that never left the house can be deleted or
   taken back to a draft (same number), number scheme errors under the field with a reset button.
-- **2.115.0** (2026-10-19): an inbound webhook per list (n8n, Make, Home Assistant create tasks), webhooks of an
-  organisation with events for calendar, files, invoices and time; active sessions with sign-out everywhere;
-  organisation admins invite people by e-mail.
 - **2.114.1** (2026-10-19): office fixes - the transfer of rights as the last page of the quotation PDF, receipts in
   the cash flow, books up to date right after a bank match, clearer bank buttons on phones.
 - **2.136.0** (2026-10-19): a new face - the Kalmido bot replaces the heron in the app icon, the empty views, the
   celebration and the loading screen; on iPhone / iPad add the web app to the home screen again for the new icon.
-- **2.111.0** (2026-10-19): office editors save with an undo when you leave, invitations by e-mail with .ics to external
-  attendees, secret subscription links for event calendars, quick add with @person, duration and reminders at a fixed time.
-- **2.112.1** (2026-10-19): file store - download several files or a folder as a ZIP, scan pages with the phone into one
-  PDF, share files and folders with people without an account through a secret link (expiry, password, revoke).
-- **2.113.0** (2026-10-19): office settings in five areas that save field by field (no Save button), industry pack cards
-  with their own switch, quotation parts open in place on the title page with a colour each, unit words follow the quantity.
-- **2.113.1** (2026-10-19): team chat with files and pictures, free channels per organisation (open or invited only) and group
-  conversations; industry packs bring handling costs, markup and a share by amount, own packs from the data folder.
-- **2.113.2** (2026-10-19): terms and conditions as a PDF per language in the office settings - they go with quotations
-  by e-mail and on the approval link, the quotation names their date, and the record keeps which terms were accepted.
 - **2.98.0** (2026-10-19): scheduling polls with a public vote link, questionnaires in forms (answers become a task at the
   customer), the office menu as a rail on the left, resizable tables in their own window, documents guess amounts only
   where they fit.

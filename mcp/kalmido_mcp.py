@@ -156,8 +156,8 @@ TASK_FIELDS = {
     # 2.60.0 (#1511): story points
     "points": {"type": ["integer", "null"], "enum": [1, 2, 3, 5, 8, 13, None], "description": "2.60.0: story points (Fibonacci); null = none. "
                "The app shows them where the list has story points on (points_on)"},
-    # 2.111.0 (#2057): a reminder at a fixed time, with or without a due date
-    "remind_at": {"type": ["string", "null"], "description": "2.111.0: remind at a fixed local date and time YYYY-MM-DDTHH:MM (server "
+    # 2.138.1 (#2057): a reminder at a fixed time, with or without a due date
+    "remind_at": {"type": ["string", "null"], "description": "2.138.1: remind at a fixed local date and time YYYY-MM-DDTHH:MM (server "
                   "time zone), also without a due date; null = none. Fires once; moves along with the due date of a recurring task"},
     "family": {"type": ["object", "null"], "description": "2.19.0: birthday / anniversary {kind, name, year?, lead?} or household deadline "
                "{kind: deadline, type, who, expires, notice, lead} data; easier: add_occasion / add_deadline"},
@@ -308,7 +308,7 @@ def t_request_chat_approval(api, a):
 
 
 def _b64_files(a):
-    """[{name, base64, mime?}] of a tool call -> [(name, mime, bytes)] for a multipart message (2.113.1: team chat too)."""
+    """[{name, base64, mime?}] of a tool call -> [(name, mime, bytes)] for a multipart message (2.138.1: team chat too)."""
     files = []
     for f in a.get("files") or []:
         if not isinstance(f, dict) or not isinstance(f.get("name"), str) or not isinstance(f.get("base64"), str):
@@ -322,7 +322,7 @@ def _b64_files(a):
 
 
 def t_post_team_message(api, a):
-    """2.113.1 (#2059): a team chat message; files = [{name, base64, mime?}] -> multipart (the body may then be empty)."""
+    """2.138.1 (#2059): a team chat message; files = [{name, base64, mime?}] -> multipart (the body may then be empty)."""
     path = f"/team/rooms/{int(a['room_id'])}/messages"
     if a.get("files"):
         return api.call("POST", path, multipart=(_pick(a, ("body", "task_id", "reply_to")), _b64_files(a)))
@@ -341,7 +341,7 @@ def t_get_attachment(api, a):
         path = f"/lists/{int(a['list_id'])}/files/{int(a['attachment_id'])}"
     else:
         path = (f"/chat-attachments/{int(a['attachment_id'])}" if a.get("source") == "chat" else
-                f"/team/files/{int(a['attachment_id'])}" if a.get("source") == "team" else f"/attachments/{int(a['attachment_id'])}")  # 2.113.1 (#2059): team
+                f"/team/files/{int(a['attachment_id'])}" if a.get("source") == "team" else f"/attachments/{int(a['attachment_id'])}")  # 2.138.1 (#2059): team
     r = api.call("GET", path, binary_cap=cap)
     return {"id": int(a["attachment_id"]), "source": a.get("source") or "task", "name": r["name"], "mime": r["mime"],
             "size": len(r["bytes"]), "base64": base64.b64encode(r["bytes"]).decode()}
@@ -477,7 +477,7 @@ TOOLS = [
      lambda api, a: api.call("GET", "/dayplan/review", _pick(a, ("date",)))),
     ("search_tasks", "Full-text search in titles, notes, links and custom fields of visible tasks. 2.59.0: semantic=true adds "
                      "tasks of similar meaning after the text hits (flag similar; needs the server's embedding service). "
-                     "2.116.0: fulltext=true ranks the hits (title before notes) and also finds tasks by their comments; each task "
+                     "2.138.1: fulltext=true ranks the hits (title before notes) and also finds tasks by their comments; each task "
                      "once with match {where: title|notes|comment|field|file, snippet, comment_id}, at most 50 per page (cursor).",
      _obj({"q": {"type": "string", "minLength": 1}, "limit": {"type": "integer", "minimum": 1, "maximum": 500},
            "semantic": {"type": "boolean"}, "fulltext": {"type": "boolean"}, "cursor": {"type": "string"}}, ["q"]),
@@ -768,7 +768,7 @@ TOOLS = [
                          "comments. Read one with get_attachment.",
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("GET", f"/tasks/{int(a['task_id'])}/attachments")),
     ("get_attachment", "Read one file: a task / comment attachment (source task, ids from list_attachments, get_task or comment "
-                       "events), a chat file (source chat, ids from a chat message's attachments), a team chat file (source team, 2.113.1: ids "
+                       "events), a chat file (source chat, ids from a chat message's attachments), a team chat file (source team, 2.138.1: ids "
                        "from a team chat message's attachments) or a project file (source project "
                        "+ list_id, ids from list_project_files). Returns name, mime, size and the "
                        "content as base64; images are also returned as an image you can look at. Use it when someone asks about a "
@@ -1427,7 +1427,7 @@ TOOLS += [
      lambda api, a: api.call("PATCH", f"/notes/{int(a['note_id'])}", body=_pick(a, ("title", "body", "tags", "pinned", "list_id", "expect_updated_at")))),
     ("delete_note", "2.17.0: delete a note.", _obj({"note_id": S_ID}, ["note_id"]), lambda api, a: api.call("DELETE", f"/notes/{int(a['note_id'])}")),
     ("list_team_chats", "2.17.0: the team chat conversations you take part in: one channel per shared list you are a member of "
-                        "(people + agents), with unread counts; 2.113.1: also the channels (kind channel) a person added you to. Agents cannot open direct messages; people talk to you in your own "
+                        "(people + agents), with unread counts; 2.138.1: also the channels (kind channel) a person added you to. Agents cannot open direct messages; people talk to you in your own "
                         "chat (send_chat). You get the event team_message when someone @mentions you in a channel (2.46.1: in a list where "
                         "you listen in, every message a person writes there).",
      _obj({}), lambda api, a: api.call("GET", "/team/rooms")),
@@ -1436,16 +1436,16 @@ TOOLS += [
      _obj({"room_id": S_ID, "before": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 100}}, ["room_id"]),
      lambda api, a: api.call("GET", f"/team/rooms/{int(a['room_id'])}/messages", _pick(a, ("before", "limit")))),
     ("post_team_message", "2.17.0: write in a team chat channel (Markdown; mention people as <@user id>; task_id links a task). "
-                          "reply_to (2.33.0): the id of a message of the same conversation you answer. files (2.113.1): up to 10 "
+                          "reply_to (2.33.0): the id of a message of the same conversation you answer. files (2.138.1): up to 10 "
                           "[{name, base64, mime?}] sent with the message (body may then be ''; not in end-to-end encrypted "
                           "conversations). Messages carry attachments [{id, name, mime, size, url}]: read one with get_attachment source team.",
      _obj({"room_id": S_ID, "body": {"type": "string", "maxLength": 8000}, "task_id": S_ID, "reply_to": S_ID,
            "files": {"type": "array", "maxItems": 10, "items": {"type": "object", "properties": {
                "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}},
           ["room_id", "body"]), t_post_team_message),
-    ("list_team_channels", "2.113.1 (#2059): the team chat channels you are a member of (people open them and add agents of their "
+    ("list_team_channels", "2.138.1 (#2059): the team chat channels you are a member of (people open them and add agents of their "
                            "organisation; you cannot open channels or groups yourself).", _obj({}), lambda api, a: api.call("GET", "/team/channels")),
-    ("leave_team_channel", "2.113.1 (#2059): leave a team chat channel a person added you to (user_id = your own user id).",
+    ("leave_team_channel", "2.138.1 (#2059): leave a team chat channel a person added you to (user_id = your own user id).",
      _obj({"room_id": S_ID, "user_id": S_ID}, ["room_id", "user_id"]),
      lambda api, a: api.call("DELETE", f"/team/rooms/{int(a['room_id'])}/members/{int(a['user_id'])}")),
     ("edit_team_message", "2.17.0: change your own team chat message.", _obj({"message_id": S_ID, "body": {"type": "string"}}, ["message_id", "body"]),
@@ -2025,7 +2025,7 @@ TOOL_SCOPES["time"] += ("check_time_entries", "time_from_events", "propose_time_
 TOOL_SCOPES["calendar"] += ("get_dispo", "get_dispo_free", "propose_shoot")  # 2.51.0 (#1355)
 TOOL_SCOPES["layouts"] = ("list_layout_blocks", "get_view_layout", "propose_layout")  # 2.55.0 (#1066)
 TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
-TOOL_SCOPES["comments"] += ("leave_team_channel",)  # 2.113.1 (#2059)
+TOOL_SCOPES["comments"] += ("leave_team_channel",)  # 2.138.1 (#2059)
 TOOL_SCOPES["import"] = ("propose_import",)  # 2.68.0 (#1839)
 TOOL_SCOPES["agent"] += ("propose_contract_notice",)  # 2.70.0 C (#1359)
 TOOL_SCOPES["structure"] += ("propose_rule",)  # 2.71.0 A (#1457)

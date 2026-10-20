@@ -7,6 +7,35 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.138.1] - 2026-10-20
+
+Six releases that were built on 19.10. but never reached main (2.111-2.116 under their old numbers), brought onto
+today's code.
+
+### Added
+- 2.111 (old): office editors keep an undo per own step and offer "Undo" for 10 s when you leave; invitation mails
+  (.ics) to external attendees and a secret subscription link per event calendar; the quick add understands @person,
+  a duration and reminders, reminders at a fixed time of day (#2233 #2056 #2057).
+- 2.112 (old): file store - select several files to download as a ZIP or move to the trash, a folder as ZIP, scan
+  pages with the phone into one PDF, external share links for files and folders (expiry, password, revoke) (#2058).
+- 2.113 (old): office settings in five areas that save field by field, industry pack cards with their own switch,
+  quotation parts open in place on the title page with a colour each (#2246 #2247 #2248).
+- 2.113b (old): team chat with files, free channels per organisation and group conversations; producing by amount,
+  handling costs and markup through the film pack, own industry packs from the data folder (#2059 #2251 #2252).
+- 2.113c (old): terms and conditions as a PDF per language - with quotations by mail and on the approval link, frozen at
+  finalising; finalised quotations can be mailed (#2253).
+- 2.115 (old): an inbound webhook per list, webhooks of an organisation with more events; active sessions with sign-out
+  everywhere; organisation admins invite new accounts by e-mail (#2061 #2062).
+- 2.116 (old): tasks in the trash are deleted for good after the trash period, list CSV export and print view,
+  server full-text search of tasks and comments, repeats several times a day, focus sessions and habit stats in API v1
+  (#2063 #2064 #2065 #2066 #2067 #2068).
+
+### Fixed
+- Brought in with the merge: an organisation invitation always goes by mail (the link never to the admin), the daily
+  invitation limit counts before the address lookup (#2062); a restore leaves out the full-text indexes and builds them
+  again (#2065); surcharge lines are numbered like producing; the per-field settings save knows the producing-by-amount
+  fields (#2247 #2251).
+
 ## [2.138.0] - 2026-10-20
 
 Office: start number per number range, quotation bar with the next step, quotation fixes (units, parts, PDF headings);

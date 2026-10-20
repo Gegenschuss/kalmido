@@ -148,7 +148,7 @@ the folder on any static https host (for example GitHub Pages) and set `KALMIDO_
 An own mirror: copy the published folder to a host in your network, build the index again with your base address, and
 set both variables (`KALMIDO_PACKS_ALLOW_HOSTS=mirror.example.com:8080` when it is internal or http).
 
-## Own packs of an instance (2.113.1)
+## Own packs of an instance (2.138.1)
 
 Besides the shipped packs (`kalmido/office/packs/industry/*.json`) and the catalogue, an instance can load its own
 industry packs from its data folder: `<data folder>/packs/industry/<code>.json` (the folder next to the database,

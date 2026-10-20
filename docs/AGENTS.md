@@ -82,7 +82,7 @@ needs no permission. Agents created before 2.15.0 keep everything they could do 
 
 - `GET /api/v1/me` shows `token.effective_scopes`; the MCP server lists only the tools the token may use.
 - A request without its permission gets `403` with `error.required_scope`: ask a person to grant it, never work around it.
-- **Trash period (2.116.0).** A task in the trash (`delete_task`, `list_trash`) is deleted for good by the server after the
+- **Trash period (2.138.1).** A task in the trash (`delete_task`, `list_trash`) is deleted for good by the server after the
   trash period (`KALMIDO_TRASH_DAYS`, 30 days, when the operator has the retention switch on); restore it before then.
 - Optional: **Only from** limits the agent's token to IP addresses / networks; a new token can **expire** (30 / 90 / 365
   days, never by default). Every request is in the [audit log](#audit-log) with the permission it needed.
@@ -474,7 +474,7 @@ Every event has the same envelope, whether it arrives as a webhook or through po
 
 ### Webhooks
 
-(2.115.0: the inbound webhook of a list and the webhooks of an organisation are for other tools, set up by people; see
+(2.138.1: the inbound webhook of a list and the webhooks of an organisation are for other tools, set up by people; see
 [API.md](API.md#inbound-webhook-of-a-list-21150). An agent creates tasks with `POST /api/v1/tasks` and its own token.)
 
 If the agent has a webhook URL, Kalmido POSTs every event to it as JSON. The headers are the same as for [user webhooks](API.md):
@@ -807,7 +807,7 @@ free. Every task in events and in the API has `"locked": true | false`.
   they ask you to.
 - Locking and unlocking show in the task's history; existing tasks were not locked by the update.
 
-### Reminders at a fixed time (2.111.0)
+### Reminders at a fixed time (2.138.1)
 
 Besides `reminders` (minutes before the due time) a task can have **one reminder at a fixed time**: `remind_at`, the local
 date and time `YYYY-MM-DDTHH:MM` (the server's time zone, like `due` / `due_time`), also without a due date ("remind me
@@ -1784,7 +1784,7 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
   updated ..." and may edit or delete it as usual; the next run overwrites only the agent's own block. An agent keeps at
   most 3 notepads per project (its status block included); they do not count against the 20 of people. A blocker in a list
   the agent does not see appears only as `hidden: true` (no title, id or assignee, not in `waits` / `people`).
-- **Invitations by e-mail (2.111.0).** Agents do not send invitation mails: `send_invites` is refused for agent tokens
+- **Invitations by e-mail (2.138.1).** Agents do not send invitation mails: `send_invites` is refused for agent tokens
   (`403`), because the mail goes out in the person's name. Add the attendees and tell your person to send the invitation
   in the app; deleting an event that already had invitations still sends the cancellations by itself.
 - **Time check.** `user_id` = a person who may chat with the agent (a personal agent: its owner by default). Only entries and
@@ -2727,7 +2727,7 @@ with the scope it needs). The tools:
   `share_list_with_group`, `unshare_list_from_group`, `list_folders`, `rename_folder`, `delete_folder`
 - sections: `list_sections`, `create_section`, `rename_section`, `reorder_sections`, `delete_section`
 - tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact),
-  `search_tasks` (2.59.0: `semantic: true` = also tasks of similar meaning; 2.116.0: `fulltext: true` = ranked, also finds a task by its comments, with a snippet), `related_tasks` (2.59.0: up to 5 related tasks, `dup` = probably a duplicate), `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
+  `search_tasks` (2.59.0: `semantic: true` = also tasks of similar meaning; 2.138.1: `fulltext: true` = ranked, also finds a task by its comments, with a snippet), `related_tasks` (2.59.0: up to 5 related tasks, `dup` = probably a duplicate), `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
   `move_task` (list / section / parent + `before_id` / `after_id` / `position`), `link_task_to_list` /
   `unlink_task_from_list` (2.71.0: a task also in another list, see below), `batch_tasks`, `skip_occurrence`,
   `take_task`, `list_subtasks`, `add_subtask`, `list_trash`, `restore_task`, `empty_trash`, `list_tags`, `get_roadmap`
@@ -2747,7 +2747,7 @@ with the scope it needs). The tools:
   `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`,
   `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `list_repos`, `list_environments` (2.60.0), `set_deployment` (2.60.0)
 - time and habits: `get_timer`, `start_timer`, `stop_timer`, `list_time_entries`, `get_time_gaps` (2.34.0), `add_time_entry`, `update_time_entry`,
-  `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`, `get_habit_stats` (2.116.0)
+  `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`, `get_habit_stats` (2.138.1)
 - News: `list_news`, `mark_news_read`
 - day plans: `get_day_plan`, `get_day_review`
 - family (2.19.0): `get_family`, `add_occasion`, `list_deadline_types`, `add_deadline`, `ingredients_to_shopping`,
@@ -2895,11 +2895,11 @@ own chat.
 | `POST /team/messages/{id}/reactions` `{emoji, on?}` | `react_team_message` | comments |
 | `POST /team/messages/{id}/pin` `{pinned?}` (2.62.0: at most 5 per conversation; the page of a conversation carries `pins`) | `pin_team_message` | comments |
 | `POST /team/rooms/{id}/read` `{last_id?}` | `mark_team_chat_read` | comments |
-| `GET /team/channels` (2.113.1: the channels a person added you to) | `list_team_channels` | read |
-| `DELETE /team/rooms/{id}/members/{your id}` (2.113.1: leave a channel) | `leave_team_channel` | comments |
-| `GET /team/files/{id}` (2.113.1: a file of a team chat message) | `get_attachment` with `source: team` | read |
+| `GET /team/channels` (2.138.1: the channels a person added you to) | `list_team_channels` | read |
+| `DELETE /team/rooms/{id}/members/{your id}` (2.138.1: leave a channel) | `leave_team_channel` | comments |
+| `GET /team/files/{id}` (2.138.1: a file of a team chat message) | `get_attachment` with `source: team` | read |
 
-2.113.1 (#2059): besides the channel of each shared list there are channels people open themselves (`kind` `channel`) and
+2.138.1 (#2059): besides the channel of each shared list there are channels people open themselves (`kind` `channel`) and
 group conversations of people (`kind` `group`). An agent is never in a group; it joins a channel only when a person adds it
 (a personal agent by its owner, an agent of the organisation by an organisation admin, always of the channel's organisation).
 In a channel you get `team_message` when someone @mentions you, like in a list's channel. Messages carry `attachments`
