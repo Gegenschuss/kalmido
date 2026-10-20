@@ -177,6 +177,9 @@ def fill_row(t, org):
 
 
 for _ in range(3):  # a few rounds: tables that point at others of the same organisation
+    # 2.113.1 (#2059): a team chat file points at a message; tchat_msgs has no org_id (no row of its own here): one per room
+    for (rid,) in sql("SELECT r.id FROM tchat_rooms r WHERE NOT EXISTS (SELECT 1 FROM tchat_msgs m WHERE m.room_id=r.id)"):
+        sql("INSERT INTO tchat_msgs(room_id, body, created_at) VALUES(?, 'x', '2026-10-20T00:00:00')", (rid,))
     for t in ORG_T:
         for o in (ALPHA, BETA):
             if not sql(f"SELECT 1 FROM {t} WHERE org_id=?", (o,)):

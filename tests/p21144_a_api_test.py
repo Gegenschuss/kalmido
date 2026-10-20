@@ -101,7 +101,7 @@ def setup(S, who):
 
 
 def quotation(S, who, cl, lang, items):
-    r = S.post(B + D, json={"project_title": f"Imagefilm {who} {lang}", "client_id": cl, "lang": lang})
+    r = S.post(B + D, json={"project_title": f"Imagefilm {who} {lang}", "client_id": cl, "lang": lang, "producing_on": 1})  # 2.113.1 (#2251): producing per quotation (the office setting no longer switches it on)
     check(r.status_code == 201, f"{who} {lang}: a quotation {r.status_code} {r.text[:200]}")
     doc = r.json().get("id")
     r = S.put(B + f"{D}/{doc}/items", json={"items": items})

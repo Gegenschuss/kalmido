@@ -744,6 +744,9 @@ _TOC_SKIP = ("DATABASE PROPERTIES", "ROW SECURITY", "DEFAULT ACL", "STDSTRINGS",
              "ENCODING", "TRIGGER", "COMMENT", "DATABASE", "POLICY", "SCHEMA", "ACL")
 _TOC_KINDS = tuple(sorted(_TOC_KEEP + _TOC_SKIP, key=len, reverse=True))
 _TOC_LINE = re.compile(r"(\d+); (\d+) (\d+) (.*)")
+# 2.116.0 (#2065, job #692): the full-text indexes (tasks/ftsearch.py) call to_tsvector / setweight / "left": not in the
+# call list of _calls_ok, and they need not be: a restore leaves them out and init_db creates them again (fts_index_init)
+_TOC_REBUILT = {"fts_tasks", "fts_comments"}
 
 
 def bk_toc(dump):
@@ -775,6 +778,8 @@ def bk_toc(dump):
         elif kind == "COMMENT" and rest[:2] in (["public", "TABLE"], ["public", "COLUMN"]):
             keep.append(ln)  # a comment on a table / column (plain text, checked below like everything else)
             continue
+        elif kind == "INDEX" and len(rest) >= 2 and rest[0] == "public" and rest[1] in _TOC_REBUILT:
+            continue  # rebuilt by init_db after the restore (its expression calls functions a dump statement may not have)
         elif kind in _TOC_KEEP:  # (a name with a space would split: refused, Kalmido has none)
             ok = len(rest) >= 2 and rest[0] == "public" and (kind != "TABLE" or len(rest) <= 3)
             if ok:

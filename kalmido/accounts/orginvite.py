@@ -87,6 +87,11 @@ def org_invite_new(oid):
         return err(tr("Please enter a valid e-mail address"))
     if b.get("lang") is not None and b.get("lang") not in LANGS:
         return err(tr("Invalid value: {0}", "lang"))
+    from ..api.v1 import hit_limit
+    # 2.115.0 review (L1): a withdraw deletes the row, this counter stays. Job #692 review: counted before the address lookup,
+    # so trying addresses (an existing one takes the add path below, a new one gets an invitation) is limited the same way
+    if hit_limit(f"oinv:{me()}", OINV_DAY, 86400):
+        return err(tr("Too many invitations today (at most {0}). Try again tomorrow.", OINV_DAY), 429)
     write_lock(c, "accounts")  # user names and addresses are checked and taken in one go
     if c.execute("SELECT 1 FROM users WHERE lower(email)=lower(?)", (email,)).fetchone():
         c.rollback()
@@ -94,10 +99,6 @@ def org_invite_new(oid):
         return org_member_put(oid)  # the existing path with the same body, unchanged (its answer says nothing more)
     since = iso(now_utc() - timedelta(days=1))
     if c.execute("SELECT COUNT(*) FROM org_invites WHERE created_by=? AND created_at>?", (me(), since)).fetchone()[0] >= OINV_DAY:
-        c.rollback()
-        return err(tr("Too many invitations today (at most {0}). Try again tomorrow.", OINV_DAY), 429)
-    from ..api.v1 import hit_limit
-    if hit_limit(f"oinv:{me()}", OINV_DAY, 86400):  # 2.115.0 review (L1): a withdraw deletes the row, this counter stays
         c.rollback()
         return err(tr("Too many invitations today (at most {0}). Try again tomorrow.", OINV_DAY), 429)
     name = re.sub(r"\s+", " ", str(b.get("name") or "")).strip()[:60]
@@ -112,7 +113,7 @@ def org_invite_new(oid):
     ensure_inbox(c, uid)
     org_member_add(c, oid, uid, role)
     c.execute("INSERT INTO org_invites(user_id,org_id,role,created_by,created_at) VALUES(?,?,?,?,?)", (uid, oid, role, me(), iso(now_utc())))
-    inv = _no_link_if_sent(invite_new(c, uid, me(), send=b.get("send", True) is not False))
+    inv = _no_link_if_sent(invite_new(c, uid, me(), send=True))  # job #692 review: always by mail (no "send": false - the link would go to the admin)
     bump(c)
     c.commit()
     print("organisation invitation:", username, "into organisation", oid, "by", g.user["username"], flush=True)

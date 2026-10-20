@@ -37,6 +37,8 @@ const call = async (method, url, body, ck) => { const r = await fetch(B + url.re
     check((await call('PUT', '/api/office/settings', {offer_scheme: KV, offer_counter: 'org'}, ck)).status === 200, tag + 'scheme + org counter saved first');
     await nav(B + '#office/settings');
     for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#os-counter')`).catch(() => false)); i++) await sleep(300);
+    await ev(`(() => { document.querySelector('[data-ostsub="docs"]')?.click(); return 1; })()`);  // 2.113.0 (#2247): the numbering is in the area Documents
+    await sleep(400);
     await sleep(800);
     const sel = await ev(`(() => { const s = document.querySelector('#os-counter'); if (!s) return null; const r = s.getBoundingClientRect(); return {opts: [...s.options].map(x => x.value), val: s.value, label: document.querySelector('label[for=os-counter]')?.textContent || '', w: r.width, vis: r.height > 0}; })()`);
     check(sel && sel.vis && sel.val === 'org' && sel.opts.join() === 'org,client,project', tag + 'the counter choice is there ' + JSON.stringify(sel));
@@ -57,6 +59,7 @@ const call = async (method, url, body, ck) => { const r = await fetch(B + url.re
     const over = await ev(`document.documentElement.scrollWidth > window.innerWidth + 1`);
     check(!over, tag + 'no horizontal overflow');
     if (o.shot) { await ev(`document.querySelector('#os-counter').scrollIntoView({block: 'center'})`); await sleep(300); await o.shot(`2265-${user}-${width}.png`); }
+    await ev(`(() => { document.querySelector('#os-scheme').dispatchEvent(new FocusEvent('focusout', {bubbles: true})); return 1; })()`);  // 2.113.0 (#2247): a field saves itself when left
     await ev(`(() => { const f = document.querySelector('#ofc-set'); if (f.requestSubmit) f.requestSubmit(); else f.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true})); return 1; })()`);
     let s; for (let i = 0; i < 30; i++) { s = (await call('GET', '/api/office/settings', null, ck)).settings || {}; if (s.offer_counter === 'client') break; await sleep(300); }
     check(s.offer_counter === 'client' && s.offer_scheme === KV + '-V{version}', tag + 'saved: per client + the scheme ' + JSON.stringify({c: s.offer_counter, sc: s.offer_scheme}));
