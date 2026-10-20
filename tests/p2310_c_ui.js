@@ -142,7 +142,7 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
     await ev(`(() => { closePop(); return 1; })()`); await sleep(300);
     // the drawer: no search field, nothing behind it tappable (the header lies under the dimming)
     await tap(o, '#top [data-act="side"]'); await sleep(700);
-    check(await ev(`(() => { const s = document.querySelector('#side .scmd'); return !s || getComputedStyle(s).display === 'none'; })()`), `${tag}: #1057 no search field in the drawer`);
+    check(await ev(`(() => { const s = document.querySelector('#side .scmd'); return !!s && s.getBoundingClientRect().bottom <= innerHeight; })()`), `${tag}: 2.104.0 (#2161) the drawer's search field sits docked at the bottom`);
     check(await ev(`(() => { const s = document.querySelector('#scrim .sidesearch'); return !s || getComputedStyle(s).display === 'none'; })()`), `${tag}: #1057 no search button next to the drawer`);
     const behind = await ev(`(() => { const out = []; for (const sel of ['#top .bell', '#top [data-act="top-more"]', '#top .cmdbar', '#tabs button']) { const b = document.querySelector(sel); if (!b) continue; const r = b.getBoundingClientRect(); if (!r.width) continue; const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (e && (e === b || b.contains(e))) out.push(sel); } return out; })()`);
     check(behind.length === 0, `${tag}: #1057 with the drawer open nothing behind it can be tapped ` + behind.join(','));

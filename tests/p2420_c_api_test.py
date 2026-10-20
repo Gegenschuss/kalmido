@@ -269,7 +269,7 @@ check({m["id"]: m["role"] for m in mem}.get(ALICE) == "admin" and {m["id"] for m
 check(all(set(m) <= {"id", "username", "display_name", "email", "kind", "disabled", "color", "role"} for m in mem), "members: no other user fields")
 secrets_db = [x[0] for x in dbx("SELECT password_hash FROM users WHERE password_hash IS NOT NULL")] + [x[0] for x in dbx("SELECT token_hash FROM sessions")] \
     + [x[0] for x in dbx("SELECT token_hash FROM api_tokens")]
-leaks = [n for n in ("password_hash", "token_hash", "totp_secret", "pw_hash", "p256dh", "hook_secret", "drop_token", "ical_token") if f'"{n}"' in text]
+leaks = [n for n in ("password_hash", "token_hash", "totp_secret", "pw_hash", "p256dh", "hook_secret", "drop_token", "ical_token", "drop_token_hash", "ical_token_hash") if f'"{n}"' in text]  # 2.138.0 (#1907): + the hashes
 check(not leaks, f"no secret field names: {leaks}")
 check(not any(s and s in text for s in secrets_db) and AG_TOKEN not in text and KEY not in text
       and RK not in text and RK.replace("-", "") not in text, "no password hash, session / token hash, agent token, server key or recovery key")

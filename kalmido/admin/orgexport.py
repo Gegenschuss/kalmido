@@ -25,8 +25,9 @@ File format (tools/kalmido_export_decrypt.py reads it):
     block i = AES-GCM(file key, nonce = nonce_prefix (8 bytes) | i (4 bytes BE), plaintext <= block bytes,
                       aad = SHA-256(magic | length | header) | i (8 bytes BE) | last (1 byte))
 Every block but the last holds exactly `block` bytes; the last one (maybe empty) carries the marker, so cutting, dropping or
-reordering blocks fails the authentication. The organisation's recovery key (Settings > Organisation > Encryption) is the
-organisation key itself: with it the tool opens the archive on any machine."""
+reordering blocks fails the authentication. The organisation's recovery key (Settings > Organisation > Encryption) opens the
+archive on any machine: 2.138.0 C (#1972) the header carries recovery_wrapped (the org key wrapped with the recovery key
+valid at the time of the export, core/orgcrypt.py rck_wrap); a recovery key of the earlier format is the org key itself."""
 import base64
 import hashlib
 import json
@@ -63,7 +64,8 @@ OX_NO_KEY = N_("The organisation export needs the server key KALMIDO_SECRET_KEY 
 # never in an archive, whatever table they are in (credentials, secrets, hashes of them, push keys, 2FA)
 OX_SECRET_COLS = frozenset((
     "password_hash", "password", "pw_hash", "pw_rev", "token", "token_hash", "secret", "hook_secret", "totp_secret", "totp_step",
-    "drop_token", "ical_token", "p256dh", "auth", "code_hash", "webauthn_handle", "oidc_subject", "proxy_login", "endpoint",
+    "drop_token", "ical_token", "drop_token_hash", "ical_token_hash", "p256dh",  # 2.138.0 C (#1907): the hashes too
+    "auth", "code_hash", "webauthn_handle", "oidc_subject", "proxy_login", "endpoint",
     "etags", "api_key", "access_token", "refresh_token",
     "hint"))  # 2.55.0 (#1455): the last characters of a newsletter connection's access data (nl_conns)
 
@@ -105,14 +107,15 @@ class OxWriter:
         self.size += len(ct)
 
 
-def ox_header(oid, org_name, okey, created_at):
-    """(header bytes incl. magic + length, file key, nonce prefix)."""
+def ox_header(oid, org_name, okey, created_at, recovery_wrapped=None):
+    """(header bytes incl. magic + length, file key, nonce prefix). 2.138.0 C (#1972): + recovery_wrapped when given."""
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     fk, prefix, n = os.urandom(32), os.urandom(8), os.urandom(12)
     wrapped = n + AESGCM(okey).encrypt(n, fk, OX_FK_AAD + str(int(oid)).encode())
     head = json.dumps({"format": "kalmido-org-export", "v": OX_FORMAT, "org_id": int(oid), "org": org_name, "created_at": created_at,
                        "kalmido_version": APP_VERSION, "alg": "AES-256-GCM", "block": OX_BLOCK,
-                       "nonce_prefix": base64.b64encode(prefix).decode(), "wrapped_fk": base64.b64encode(wrapped).decode()},
+                       "nonce_prefix": base64.b64encode(prefix).decode(), "wrapped_fk": base64.b64encode(wrapped).decode(),
+                       **({"recovery_wrapped": recovery_wrapped} if recovery_wrapped else {})},
                       ensure_ascii=False, sort_keys=True).encode()
     return OX_MAGIC + struct.pack(">I", len(head)) + head, fk, prefix
 
@@ -552,7 +555,12 @@ def ox_run(oid, uid):
                 raise RuntimeError("no organisation key")
             u = c.execute("SELECT id, display_name, username FROM users WHERE id=?", (uid,)).fetchone()
             when = now_utc()
-            head, fk, prefix = ox_header(oid, org["name"], okey, iso(when))
+            from ..core.orgcrypt import rck_wrapped
+            if c.execute("SELECT 1 FROM org_keys WHERE org_id=? AND rot_started_at IS NOT NULL", (oid,)).fetchone():
+                raise RuntimeError("key renewal running")  # 2.138.0 C (#1972, review F2)
+            rw = rck_wrapped(c, oid)  # 2.138.0 C (#1972): the recovery key opens the archive (made when there is none yet)
+            c.commit()
+            head, fk, prefix = ox_header(oid, org["name"], okey, iso(when), rw)
             name = ox_file_name(org["name"], oid, when)
             part = os.path.join(_odir(oid), secrets.token_hex(8) + ".part")
             fd = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -686,6 +694,9 @@ def ox_start(oid):
     c = db()
     if not _need(c, oid):
         return err(tr(OX_NO_KEY), 409)
+    from ..core.orgcrypt import oc_status
+    if oc_status(c, oid).get("rotating"):  # 2.138.0 C (#1972, review F2): the archive's recovery header needs the finished key
+        return err(tr("The organisation’s key is being renewed on the server. Try again when that is finished."), 409)
     with _OX_LOCK:
         if _running(oid):
             return err(tr("An export of this organisation is already running"), 409)

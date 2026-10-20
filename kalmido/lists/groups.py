@@ -505,6 +505,8 @@ def task_take(c, tid, uid):
         raise Denied(404)
     if not t["assignee_group_id"] or t["assignee_group_id"] not in grp_of_user(c, uid):
         return tr("This task is not assigned to one of your groups")
+    from .rules import rul_fire, rul_snap
+    rb = rul_snap(c, tid)  # 2.138.0 D (#2060): taking it = assigned (rule trigger)
     c.execute("UPDATE tasks SET assignee_id=?, assignee_group_id=NULL, assigned_by=?, reminded='[]', updated_at=? WHERE id=?",
               (uid, uid, iso(now_utc()), tid))
     log_act(c, tid, "take", {"group": grp_name(c, t["assignee_group_id"])})
@@ -512,6 +514,7 @@ def task_take(c, tid, uid):
         if m != uid and task_visible(c, tid, m, full=True):
             news_add(c, m, "take", task_id=tid, data={"group": grp_name(c, t["assignee_group_id"])})
     agent_assign_event(c, tid, "assigned", uid)
+    rul_fire(c, tid, rb)
     return None
 
 

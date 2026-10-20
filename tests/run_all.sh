@@ -1313,6 +1313,12 @@ fresh; run p2123_b_ui node p2123_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2123_c_api "$PY" p2123_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2123_c_ui node p2123_c_ui.js "$KALMIDO_TEST_DATA"
 shard 17  # 2.124.2: new suites go here (shard 13 keeps the 2.99-2.123 C suites above)
+# 2.126.2 part A: page suggestions above the phone keyboard, checkbox "+" without overlap, search edge case (#2363), "Mentioned in" on sheets (#2357)
+fresh; run p21262_a_api "$PY" p21262_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21262_a_ui node p21262_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.126.2 part B: link of a gone creator shown as ended, unreadable sealed text is an error (#2358), news entry for shared pages (#2355)
+fresh; run p21262_b_api "$PY" p21262_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21262_b_ui node p21262_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.123.0 part D: cash flow: opening balance, manual corrections, reconciliation (#2341); installment list number format (#2351)
 fresh; run p2123_d_api "$PY" p2123_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2123_d_ui node p2123_d_ui.js "$KALMIDO_TEST_DATA"
@@ -1347,6 +1353,12 @@ fresh; run p2126_d_ui node p2126_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.126.0 part E: ESLint in CI (#1993)
 fresh; run p2126_e_api "$PY" p2126_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2126_e_ui node p2126_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.126.1 part A: agent drafts - office texts, receipt summary, client report (#2123 #2124)
+fresh; run p21261_a_api "$PY" p21261_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21261_a_ui node p21261_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.126.1 part B: table rows -> tasks as an agent proposal, planned inbox sorting (#2125 #2126)
+fresh; run p21261_b_api "$PY" p21261_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21261_b_ui node p21261_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.137.0 part A: organisation import - office + clients (#2344)
 fresh; run p2137_a_api "$PY" p2137_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.137.0 part B: organisation import - file store, documents, knowledge pages, tables, videos (#2344)
@@ -1381,6 +1393,20 @@ fresh; run p2125_c_api "$PY" p2125_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2125_c_ui node p2125_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.125.0 part D: browser demo like a new account, all modules (#1653) (no container)
        run p2125_d_demo node p2125_d_demo_test.js
+# 2.138.0 part A: office quotations - unit in percent rows, part rename on the title page, wrapped part headings, unit words by quantity; service worker other origins (#2236 #2239 #2240 #2249 #2257)
+fresh; run p2138_a_api "$PY" p2138_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2138_a_ui node p2138_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.138.0 part B: sidebar search docked at the bottom, head with the workspace button (#2161)
+fresh; run p2138_b_ui node p2138_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.138.0 part C: security fixes - upload / calendar tokens, organisation recovery key (#1907 #1972)
+fresh; run p2138_c_api "$PY" p2138_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2138_c_ui node p2138_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.138.0 part D: office number ranges with a start number; more rule triggers / actions, Kanban swimlanes (#2256 #2060)
+fresh; run p2138_d_api "$PY" p2138_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2138_d_ui node p2138_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.138.0 part E: resizable dialogs, quotation next step, service import order, PDF closing together, import undo archives, GbR partners (#2234 #2235 #2237 #2238 #2241 #2242)
+fresh; run p2138_e_api "$PY" p2138_e_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2138_e_ui node p2138_e_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

@@ -100,6 +100,8 @@ def doc_json(c, m, node, full=False, role=None):
         d["text"] = S.meta_text(c, m)
         from ..receipts.extracted import rx_doc_view
         d["extracted"] = rx_doc_view(c, m)  # 2.121.0 A (#2092): what the recognition read off a receipt (a suggestion)
+        from ..agents.asstprop import ast_doc_extra
+        ast_doc_extra(c, d, m)  # 2.126.1 A (#2123): the summary a person took over from an agent
     return d
 
 

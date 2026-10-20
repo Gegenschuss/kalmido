@@ -55,7 +55,7 @@ document.addEventListener('drop', async e => {
   dropTask(id, e.target, e.clientY);
 });
 // one drop = one history step (a subtask made standalone and moved counts once)
-function dropTask(id, el, clientY) { return histGroup(() => dropTask0(id, el, clientY)); }
+function dropTask(id, el, clientY) { return histGroup(async () => { if (await swlDrop(id, el)) return dropTask0(id, el, clientY); }); }  // 2.138.0 D (#2060): a swimlane's value first (same step)
 async function dropTask0(id, el, clientY) {
   const t = S.tasks.get(id); if (!t || !el) return;
   if (!canEdit(t) && !ml_in(t, ml_viewList())) { roToast(); return; }  // 2.71.0 B (#1459): a further list's writer moves the link
@@ -511,8 +511,8 @@ function kbEdge(x, y) {
 }
 function kbEdgeEnd(st) { if (st.kraf) cancelAnimationFrame(st.kraf); $('#view .kanban.kbscroll')?.classList.remove('kbscroll'); }
 // a drop beside the cards of a Kanban column (the gap, the board's padding, the edge) lands in the column under the finger
-function kbColAt(x) {
-  const cols = $$('#view .kanban .kcol'); if (!cols.length) return null;
+function kbColAt(x, y) {
+  const cols = swlColsAt(y) || $$('#view .kanban .kcol'); if (!cols.length) return null;  // 2.138.0 D (#2060): with swimlanes the lane under the finger
   let best = null, bd = Infinity;
   for (const c of cols) { const r = c.getBoundingClientRect(); if (r.right < 0 || r.left > innerWidth) continue; const d = x < r.left ? r.left - x : x > r.right ? x - r.right : 0; if (d < bd) { bd = d; best = c; } }
   return best;
@@ -538,7 +538,7 @@ function endTouchDrag(e) {
   if (e?.type === 'touchcancel') { if (st.opened) setTimeout(() => { closeSide(); $('#detail').style.visibility = ''; }, 150); return; }
   if (st.opened) setTimeout(() => { closeSide(); $('#detail').style.visibility = ''; }, 150);
   swiped = true; setTimeout(() => { swiped = false; }, 400);
-  if (el && isKanban() && !el.closest(DROP_SEL) && el.closest('#view')) el = kbColAt(st.lx) || el;  // #453 A4
+  if (el && isKanban() && !el.closest(DROP_SEL) && el.closest('#view')) el = kbColAt(st.lx, st.ly) || el;  // #453 A4
   $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   if (el && dgs_touchDrop(el, st.id, st.ly)) return;  // 2.122.3 B (#2334): onto the middle of a row = its subtask
   if (el) dropTask(st.id, el, st.ly);

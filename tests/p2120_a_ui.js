@@ -36,6 +36,7 @@ const today = new Date().toISOString().slice(0, 10);
     const cl = await call(ck, 'POST', '/api/clients', {name: 'Kunde Eins GmbH', street: 'Kundenweg 5', zip: '20000', city: 'Beispielstadt', country: 'DE'});
     const q = await call(ck, 'POST', '/api/office/docs', {project_title: 'Imagefilm', client_id: cl.id, service_from: today, service_to: today});
     await call(ck, 'PUT', `/api/office/docs/${q.id}/items`, {items: [{title: 'Shoot', qty: 2, unit: 'day', rate: 4000, tax: 'standard'}, {title: 'Script', qty: 1, unit: 'flat', rate: 2000, tax: 'reduced'}]});
+    await call(ck, 'POST', `/api/office/docs/${q.id}/status`, {status: 'accepted'});  // 2.138.0 (#2235): "Create invoice" in the bar once accepted
     return q.id;
   };
   const OFF = await quote(CA);

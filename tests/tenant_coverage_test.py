@@ -426,6 +426,7 @@ ROUTES = {
     "POST /api/office/legacy/counter": "office",
     "POST /api/office/legacy/archive/address": "office",  # 2.40.0 (#1421): the address of an archived PDF (p2400_k_api_test.py)
     "GET /api/office/legacy/archive/{}": "office",  # 2.81.0 B (#1834): one archived document + its history (p281_b_api_test.py)
+    "POST /api/office/legacy/runs/{}/tidy": "office", "POST /api/office/services/renumber": "office",  # 2.138.0 E (#2241, #2237): p2138_e_api_test.py
     # ---- comment (9)
     "POST /api/comments/{}/decide": "comment", "POST /api/v1/comments/{}/reactions": "comment",
     "DELETE /api/v1/comments/{}/reactions/{}": "comment", "PATCH /api/v1/comments/{}": "comment",
@@ -586,6 +587,7 @@ ROUTES = {
     # 2.42.0 (#828): an organisation's encryption state + recovery key (its admins only; p2420_b_api_test.py: member 403, other
     # organisation 404, agent refused); the instance switch org_encrypt is the operator's
     "GET /api/orgs/{}/encryption": "org", "POST /api/orgs/{}/encryption/recovery": "org",
+    "POST /api/orgs/{}/encryption/recovery/passkey": "org",  # 2.138.0 (#1972): the passkey challenge of the step-up (p2138_c_api_test.py)
     "GET /api/admin/orgcrypt": "admin", "PUT /api/admin/orgcrypt": "admin",
     # 2.42.0 (#833): the organisation export (its admins only; p2420_c_api_test.py: member 403, other organisation 404, agent refused)
     "GET /api/orgs/{}/export": "org", "POST /api/orgs/{}/export": "org", "DELETE /api/orgs/{}/export": "org", "GET /api/orgs/{}/export/file": "org",
@@ -891,6 +893,8 @@ ROUTES = {
     "POST /api/tasks/{}/chain/pull": "task",
     # 2.68.0 (#1839): an agent proposes old data for its person's office (only a card; p268_a_api_test.py: other person / org 404)
     "POST /api/v1/agent/proposals/import": "agent",
+    # 2.126.1 B (#2125): an agent proposes table rows as tasks (a card; p21261_b_api_test.py: not shared table / list, other org 404)
+    "POST /api/v1/agent/proposals/sheet-tasks": "agent",
     # 2.69.0 A (#1846): the uploaded Paperless-ngx export of one workspace (p269_a_api_test.py: member 403, outsider 404, agent refused)
     "POST /api/paperless/zip": "paperless", "POST /api/paperless/zip/part": "paperless", "GET /api/paperless/zip/preview": "paperless",
     "POST /api/paperless/zip/import": "paperless", "POST /api/paperless/zip/stop": "paperless", "DELETE /api/paperless/zip": "paperless",
@@ -949,6 +953,8 @@ ROUTES = {
     # 2.120.0 B (#2088): the customer's documents in the portal (cookie address + space + client, another client / space /
     # a draft 404) and the office's "Send portal link" (a client of the office area only; p2120_b_api_test.py)
     "GET /portal/docs/{}/pdf": "portal", "POST /api/office/clients/{}/portal-link": "office",
+    # 2.138.0 D (#2256): number ranges of the office area one works in, admins write (p2138_d_api_test.py)
+    "GET /api/office/number-ranges": "office", "POST /api/office/number-ranges/{}": "office",
 }
 
 # ---- 1. every route is classified, nothing stale

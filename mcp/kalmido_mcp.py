@@ -635,7 +635,7 @@ TOOLS = [
            "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]}, "log": {"type": "string"}}, ["title"]),
      lambda api, a: api.call("POST", "/agent/jobs", body=a)),
     ("get_job", "One of the agent's jobs. A proposal job (event job_request) also carries kind (project | subtasks | triage | "
-                "extract | dayplan | cleanup | inquiry | setup | merge), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
+                "extract | dayplan | cleanup | inquiry | setup | merge | office_text | doc_summary | report), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
      _obj({"job_id": S_ID}, ["job_id"]), lambda api, a: api.call("GET", f"/agent/jobs/{int(a['job_id'])}")),
     ("submit_proposal", "Answer a job_request with ONE structured proposal; the person reviews, edits and applies it. Never create "
                         "the lists / tasks yourself. proposal by kind -- project: {name, folder?, sections: [names], tasks: [{title, "
@@ -662,6 +662,11 @@ TOOLS = [
                         "emails, phones): {groups: [{target_id, ids: [2-10 contact ids, target included], reason?}]} -- only ids "
                         "from input.contacts, each in one group at most, at most 200 groups; only clear duplicates (same e-mail / "
                         "phone, a name variant with a shared detail); none found = {groups: []}. "
+                        "office_text (2.126.1, the introduction or closing of an office draft): {field (= input.field), text}; "
+                        "doc_summary (a document / receipt): {text} (at most 4000 characters); report (a client report from "
+                        "input.report and its fixed input.report.markdown): {text} (Markdown). For these three: word the text from "
+                        "the input only (and input.wish), invent nothing, no placeholders for unknown facts, in the language of the "
+                        "document (input.doc.lang) / input.lang; the person edits and takes it over, nothing is sent. "
                         "Every kind may add summary (a short explanation). Dates YYYY-MM-DD, priority none | low | medium | high. "
                         "At most 200 entries; resubmitting replaces the proposal until the person applied or discarded it.",
      _obj({"job_id": S_ID, "proposal": {"type": "object"}}, ["job_id", "proposal"]), t_submit_proposal),
@@ -778,7 +783,9 @@ TOOLS = [
     ("list_schedules", "2.34.0: your planned jobs -- people who may chat with you plan them in the app (title, prompt = what to do, "
                        "rhythm, optional list_id, next_at, last_state). When one is due you get the event scheduled_job {schedule_id, "
                        "title, prompt, list_id, list, by, chat_with, due_at, late, manual}: do what the prompt says with lists shared with "
-                       "you and answer with send_chat to by.id, starting with the title. You cannot create or change plans.", _obj({}),
+                       "you and answer with send_chat to by.id, starting with the title. You cannot create or change plans. 2.126.1: a "
+                       "plan with action triage (sort the basket) sends no scheduled_job but a job_request of kind triage with "
+                       "scheduled: true -- answer it like any triage request with submit_proposal.", _obj({}),
      lambda api, a: api.call("GET", "/agent/schedules")),
     ("read_briefing", "2.34.0: the morning briefing of a person who may chat with you (user_id), only from the lists they share "
                       "with you: counts {today, overdue, blocked, changed, stale} and the rows today (due today / overdue), blocked "
@@ -985,6 +992,19 @@ TOOLS += [
      _obj({"sheet_id": S_ID, "name": {"type": "string", "maxLength": 100}, "columns": {"type": "array", "items": _SH_COL, "maxItems": 200},
            "rows": _SH_ROWS}, ["sheet_id"]),
      lambda api, a: api.call("POST", f"/sheets/{_id(a, 'sheet_id')}/tabs", body=_pick(a, ("name", "columns", "rows")))),
+    # 2.126.1 B (#2125): rows of a table as tasks -- only as a proposal the person applies
+    ("propose_sheet_tasks", "2.126.1 (scope sheets:read): PROPOSE rows of a table shared with you as tasks of a list shared with you (same "
+                            "space): sheet_id (one sheet of the table), rows (row ids from sheet_read; an item may be {row_id, title} with a "
+                            "better task title), list_id, title_col, due_col?, notes_col? (column ids), summary?, for_user_id? (default: "
+                            "who shared the table with you). The person sees the rows as they see them, unticks / edits and applies; the "
+                            "tasks are theirs, the rows get the mark \"carried over\", one undo step. Rows carried over before are skipped. "
+                            "At most 200 rows, 50 proposals a day; the answer comes as the event job. You never create the tasks yourself.",
+     _obj({"sheet_id": S_ID, "rows": {"type": "array", "maxItems": 200, "items": {"oneOf": [S_ID, {"type": "object", "properties": {
+         "row_id": S_ID, "title": {"type": "string", "maxLength": 300}}, "required": ["row_id"]}]}},
+           "list_id": S_ID, "title_col": S_ID, "due_col": S_ID, "notes_col": S_ID, "summary": {"type": "string"}, "for_user_id": S_ID},
+          ["sheet_id", "rows", "list_id", "title_col"]),
+     lambda api, a: api.call("POST", "/agent/proposals/sheet-tasks",
+                             body=_pick(a, ("sheet_id", "rows", "list_id", "title_col", "due_col", "notes_col", "summary", "for_user_id")))),
 ]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
@@ -1879,9 +1899,14 @@ TOOLS += [
 ]
 # 2.71.0 A (#1457): rules of a list (When ... then ...): read them, propose one (the owner / an admin accepts it)
 _RULE_TRIG = {"type": "object", "description": "{kind: section (a task comes into column section_id) | done | reopen | ltag (gets the list "
-                                               "tag tag_id) | due (its due day is today), section_id?, tag_id?}"}
+                                               "tag tag_id) | due (its due day is today) | created (2.138.0: a task is created in the list) | "
+                                               "assigned (2.138.0: user_id = only that person, null = anybody) | field (2.138.0: custom field "
+                                               "field_id changes; value = option id / \"1\" checked / \"0\" unchecked, null = any change), "
+                                               "section_id?, tag_id?, user_id?, field_id?, value?}"}
 _RULE_ACT = {"type": "object", "description": "{kind: assign (user_id, a person of the list) | due (days from today 0..365, null = clear) | "
-                                              "comment (text, at most 2000 characters) | move (list_id and / or section_id)}"}
+                                              "comment (text, at most 2000 characters) | move (list_id and / or section_id) | priority "
+                                              "(2.138.0: priority none / low / medium / high) | tag (2.138.0: tag_id, a list tag) | field "
+                                              "(2.138.0: field_id + value of a custom field, null = clear)}"}
 TOOLS += [
     ("list_rules", "2.71.0: the rules of a list you may change (trigger, action, active, paused_reason, who set it up). A rule runs with the rights "
                    "of the person who set it up; a change made by a rule never triggers another rule.",
@@ -1963,6 +1988,7 @@ TOOL_SCOPES["structure"] += ("propose_rule",)  # 2.71.0 A (#1457)
 TOOL_SCOPES["sheets:read"] = ("sheets_list", "sheet_read", "sheet_vars", "sheet_tabs")  # 2.89.0 C (#1916); 2.124.0 E (#2116): + sheet_tabs
 TOOL_SCOPES["sheets:write"] = ("sheet_create", "sheet_update", "sheet_set_cells", "sheet_append_rows", "sheet_add_column", "sheet_undo_batch",
                                "sheet_add_tab")  # 2.124.0 E (#2116): + sheet_add_tab
+TOOL_SCOPES["sheets:read"] += ("propose_sheet_tasks",)  # 2.126.1 B (#2125)
 TOOL_SCOPES["comments"] += ("add_video_comment", "set_video_comment_done")  # 2.99.1 C (#1959)
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",

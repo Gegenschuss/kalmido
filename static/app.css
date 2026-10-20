@@ -333,6 +333,16 @@ a.btn{color:inherit;text-decoration:none}
 .modal{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:rgba(4,6,9,.4);padding:calc(var(--vvt,0px) + 1rem) 1rem calc(var(--vvb,0px) + 1rem);box-sizing:border-box}
 body>.modal{position:fixed;inset:0;max-height:none;max-width:none;margin:0}  /* 2.39.1 (#1220): an extra class on a dialog never shrinks its backdrop */
 .modal .card{background:var(--bg2);border-radius:var(--r-l);box-shadow:var(--shadow);width:min(32.5rem,100%);max-height:min(90dvh,calc(var(--vvh,100dvh) - 2rem));overflow-y:auto;padding:1.25rem}
+/* 2.138.0 E (#2234): resizable dialogs (desktop only, see dlg_resizable): the grip, and lists that grow with the height */
+.dlggrip{display:none;position:sticky;bottom:.25rem;margin:-1rem -.75rem 0 auto;width:1rem;height:1rem;cursor:nwse-resize;touch-action:none;z-index:3;
+  background:linear-gradient(135deg,transparent 0 50%,var(--muted) 50% 58%,transparent 58% 72%,var(--muted) 72% 80%,transparent 80%);opacity:.6;border-radius:0 0 .25rem 0}
+.dlggrip:hover{opacity:1}
+@media (min-width:900px) and (pointer:fine){ .dlggrip{display:block} }
+.modal .card.dlg-sized{display:flex;flex-direction:column;max-height:none}
+.modal .card.dlg-sized>.dlggrip{flex:none;margin-top:-1rem;align-self:flex-end}
+.modal.ofdpick .ofdslist{flex:1 1 auto;min-height:0;overflow-y:auto}
+.modal .card.dlg-sized>.ofdslist{flex:1 1 auto;min-height:0;overflow-y:auto}
+.modal .card.dlg-sized>.foot{margin-top:auto}
 .modal h3{margin:0 0 .875rem;font-size:var(--fs-l);font-weight:600;letter-spacing:-.01em}
 .modal h4{margin:1.25rem 0 .5rem;font-size:var(--fs-m);color:var(--text);font-weight:600}
 .modal .row{display:flex;gap:.625rem;align-items:center;margin-bottom:.625rem;flex-wrap:wrap}
@@ -364,6 +374,30 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .kcards .trow:hover{background:var(--bg3)}
 .kadd input{width:100%;margin-top:.375rem;background:transparent;border-style:dashed}
 .knew{flex:0 0 13.75rem;padding:.5rem}
+/* 2.138.0 D (#2060): Kanban swimlanes (swimlanes.js); a mouse shows a lane's "+ Task" on pointing at its cell */
+.swlbar{display:flex;justify-content:flex-end;margin:0 0 .5rem}
+.swlbtn.on{color:var(--accent);border-color:var(--accent)}
+.kanban.swl{display:block}
+.kanban.swl>*{width:max-content;min-width:100%}
+.swlrow{display:flex;gap:.75rem}
+.swlhrow{align-items:flex-start}
+.swlhc,.swlc{max-height:none}
+.swlhc{padding-bottom:0}
+.swlhc .khead{padding-bottom:.25rem}
+.swlc{min-height:3.5rem}
+.swlc .kcards{overflow:visible}
+.swlane{margin-top:.75rem}
+.swlh{position:sticky;left:0;display:inline-flex;align-items:center;gap:.375rem;max-width:calc(100vw - 2.5rem);min-height:2.25rem;padding:.25rem .5rem;margin-bottom:.375rem;background:none;border:0;border-radius:var(--radius);color:var(--text2);font-weight:600;font-size:var(--fs-s);cursor:pointer}
+.swlh:hover{background:var(--bg3)}
+.swlh>svg:first-child{transition:transform .15s;color:var(--muted)}
+.swlane.closed .swlh>svg:first-child{transform:rotate(-90deg)}
+.swln{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.swlh .c{font:500 var(--fs-xs)/1 var(--mono);color:var(--muted)}
+.swlh .flag-0{color:var(--muted)}
+.swldot{--fc:var(--muted);width:.625rem;height:.625rem;border-radius:50%;background:var(--fc);flex:none}
+.swlav{width:1.25rem;height:1.25rem;font-size:.5625rem;flex:none}
+@media (hover:hover){.swlc .kadd{opacity:0;transition:opacity .15s}.swlc:hover .kadd,.swlc .kadd:focus-within{opacity:1}}
+@media (prefers-reduced-motion:reduce){.swlh>svg:first-child,.swlc .kadd{transition:none}}
 
 /* ---------- calendar ---------- */
 .calbar{display:flex;align-items:center;gap:.5rem;margin-bottom:.625rem}
@@ -4272,6 +4306,9 @@ button.lkchip:hover{border-color:var(--accent)}
 .tapick-n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tapick-h{display:flex;align-items:center;gap:.5rem;margin-top:.5rem;padding:.375rem .5rem .25rem calc(.5rem + var(--d,0) * 1.25rem);font-size:var(--fs-xs);font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-top:1px solid var(--line2)}
 .tabaddb{justify-content:flex-start}
+/* 2.138.0 E (#2234): the magnifier sits inside the field and there is one frame only (no second ring around the input on focus) */
+.ctsearch>svg,.ctsearch>.ic{flex:none}
+.ctsearch input:focus,.ctsearch input:focus-visible{border:0;box-shadow:none}
 .ctcols{display:grid;grid-template-columns:minmax(16rem,22rem) 1fr;gap:1rem;min-height:0;flex:1}
 .ctlistw{overflow:auto;min-height:0}
 .ctlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
@@ -4930,7 +4967,7 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 /* 2.31.0 (#1057): phones with "Search" in the tab bar: one search (the tab); the header magnifier, the drawer's search field
    and the search button next to the open drawer step aside (without the tab they stay) */
 @media (max-width:899px){
-  body.tab-search #top .cmdbar,body.tab-search #side .scmd,body.tab-search #scrim .sidesearch{display:none!important}
+  body.tab-search #top .cmdbar{display:none!important}  /* 2.138.0 B (#2161): the drawer's search dock and the side button stay */
 }
 /* 2.31.0 (#1046): sub-tabs (Settings > Agents, Administration) keep their real width; the strip scrolls sideways instead of
    letting the labels run into each other */
@@ -7177,6 +7214,15 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .ctr-f .muted{font-size:.75rem}
 .ppm .card:has(.ctr-head) .foot{flex-wrap:wrap;gap:.5rem}
 .ppm .card:has(.ctr-head) .foot .btn{min-height:2.75rem}
+/* 2.126.1 A (#2123 #2124) texts worded by an agent (asstprop.js): the card's text field, the summary, the report note */
+.ast-head{font-size:.8125rem;margin:.125rem 0 .5rem}
+.ast-text{width:100%;min-height:8rem;resize:vertical}
+.ast-was{margin:.5rem 0;font-size:.875rem;white-space:pre-wrap}
+.ast-row{margin:.5rem 0}
+.ast-row .btn,.ppm .card:has(.ast-head) .foot .btn{min-height:2.75rem}
+.ppm .card:has(.ast-head) .foot{flex-wrap:wrap;gap:.5rem}
+.ast-sum{margin:.5rem 0;padding:.5rem .75rem;border-left:.1875rem solid var(--accent);background:var(--accent-soft);border-radius:.375rem}
+.ast-rptnote{margin:.25rem 0}
 /* 2.71.0 B (#1459) a task in several lists: the row's "also in" / "from" mark, quiet like the other row details */
 .meta .mlm{display:inline-flex;align-items:center;gap:.25rem;min-width:0;max-width:11rem;color:var(--muted)}
 .meta .mlm .mll{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -7529,3 +7575,23 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 /* 2.119.0 B (#2210): the Agents section of the dialog "All people …" */
 .sbpmd .sbph{margin:.75rem 0 .25rem;font-size:.75rem;font-weight:600;color:var(--muted);text-transform:none}
 .sbpmd .mrow[data-aid] .sdot{flex:none}
+
+/* 2.138.0 B (#2161): search docked at the bottom of the sidebar; head = logo + avatar, then workspace button + fold-all */
+#side{display:flex;flex-direction:column;padding-bottom:0}
+#side>*{flex:none}
+#side .sbdock{position:sticky;bottom:0;z-index:3;margin-top:auto;padding:.5rem 0 calc(.5rem + var(--safe-b,0px));background:var(--sbbg,var(--bg2));box-shadow:0 -1px 0 var(--line)}
+#side .sbdock::before{content:"";position:absolute;inset:0 -.75rem;background:inherit;z-index:-1}
+#side .sbdock .scmd{margin:0;height:2.75rem}
+#side .sbsrch{align-items:center;margin:0 0 .375rem}
+#side .sbsrch .spacer{flex:1}
+#side .wsbar{width:auto;max-width:70%;min-height:2rem;padding:0 .625rem;gap:.375rem;font-size:var(--fs-s,.8125rem);border-radius:1rem;flex:0 1 auto;min-width:0}
+#side .wsbar .wsn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#side .wsbar > svg:last-child{flex:none;opacity:.6}
+#side .wsbar .wsp-dot{position:static;flex:none;box-shadow:none;width:.5rem;height:.5rem}
+#side .sbsrch .kbfoldall{flex:none;opacity:.65}
+@media (pointer:coarse){ #side .wsbar{min-height:2.75rem} }
+@media (max-width:899px){ body:has(#side.open) #scrim .sidesearch{display:none} }
+:root #side .sbdock .scmd{height:2.75rem}
+:root #side .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .wsbar{width:auto;min-height:2rem}
+@media (pointer:coarse){ :root #side .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .wsbar{width:auto;min-height:2.75rem} }
+:root #side .sbsrch,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sbsrch{margin-bottom:.5rem}  /* room above the first group heading */

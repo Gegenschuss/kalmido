@@ -249,6 +249,33 @@ def pdf_wrap(text, size, width, bold=False):
     return out
 
 
+def pb_wrap(text, size, width, bold=False, spacing=0.0):
+    """2.138.0 A (#2240): pdf_wrap for a spaced heading line (the character spacing counts into the width)."""
+    if not spacing:
+        return pdf_wrap(text, size, width, bold)
+    out = []
+
+    def emit(line):
+        while len(line) > 1 and pdf_text_width(line, size, bold, spacing) > width:  # one long word: cut by characters
+            k = len(line) - 1
+            while k > 1 and pdf_text_width(line[:k], size, bold, spacing) > width:
+                k -= 1
+            out.append(line[:k])
+            line = line[k:]
+        out.append(line)
+    for ln in pdf_wrap(text, size, width, bold):
+        line = ""
+        for w in ln.split(" "):
+            cand = (line + " " + w) if line else w
+            if not line or pdf_text_width(cand, size, bold, spacing) <= width:
+                line = cand
+                continue
+            emit(line)
+            line = w
+        emit(line)
+    return out
+
+
 def _rgb(hexcol):
     h = (hexcol or "").strip().lstrip("#")
     if not re.fullmatch(r"[0-9a-fA-F]{6}", h):
@@ -854,8 +881,10 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     # -- blocks: (height, draw(page, y), keep_next, keep_prev, table)
     blocks = []
 
-    def block(h, fn, keep_next=False, keep_prev=False, table=False, brk=False):  # 2.47.0 (#1215): brk = starts a new page
-        blocks.append({"h": h, "draw": fn, "keep_next": keep_next, "keep_prev": keep_prev, "table": table, "brk": brk})
+    # 2.138.0 E (#2238): tail = part of the closing (totals .. order confirmation) that stays with the block before it as long as the
+    # whole closing fits on one page; sq = points of its top gap that may be given up so that a group still fits on the page
+    def block(h, fn, keep_next=False, keep_prev=False, table=False, brk=False, tail=False, sq=0):  # 2.47.0 (#1215): brk = starts a new page
+        blocks.append({"h": h, "draw": fn, "keep_next": keep_next, "keep_prev": keep_prev, "table": table, "brk": brk, "tail": tail, "sq": sq, "sq_used": 0.0})
 
     body = 9.6
     lh = body * 1.42
@@ -912,10 +941,15 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
 
     # -- title line, project title, intro
 
+    # 2.138.0 A (#2240): a long title wraps over the full width (the page count sits in the footer); the accent line under its last line
+    t_lines = pb_wrap(title.upper(), 16, PDF_CW, True, 1.0)
+
     def draw_title(p, y):
-        p.text(PDF_L, y + 6, title.upper(), 16, True, C_INK, spacing=1.0)
-        p.line(PDF_L, y + 6 + 22, PDF_L + 14 * MM, y + 6 + 22, 1.6, accent)
-    block(34, draw_title, keep_next=True)
+        for j, s in enumerate(t_lines):
+            p.text(PDF_L, y + 6 + j * 20, s, 16, True, C_INK, spacing=1.0)
+        ly = y + 6 + (len(t_lines) - 1) * 20 + 22
+        p.line(PDF_L, ly, PDF_L + 14 * MM, ly, 1.6, accent)
+    block(34 + (len(t_lines) - 1) * 20, draw_title, keep_next=True)
     if m.get("project_title"):
         pt = str(m["project_title"])
         n = len(pdf_wrap(pt, 10.4, PDF_CW, True))
@@ -1117,7 +1151,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             p.text(PDF_L, ny, s, 8.4, False, C_INK2)
             ny += 8.4 * 1.42
     if not (np_ and not (isinstance(tot.get("rows"), list) and tot["rows"])):  # 2.120.0 D (#2089): a delivery note has no totals
-        block(sum_h, draw_sum, keep_prev=last_item_idx is not None)
+        block(sum_h, draw_sum, keep_prev=last_item_idx is not None, sq=4)
 
     # -- 2.38.0 (#1021): payment information of an invoice (due text + bank line) right below the totals
     pay = m.get("payment") if isinstance(m.get("payment"), dict) else None
@@ -1137,7 +1171,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             for t_ in pb_lines:
                 p.text(PDF_L, yy, t_, 8.4, False, C_INK2)
                 yy += 8.4 * 1.42
-        block(pay_h, draw_pay, keep_prev=True)
+        block(pay_h, draw_pay, keep_prev=True, tail=True)
 
     # -- rights block (not torn); 2.114.1 C (#2258): printed as an appendix on its own last page, see below
     bfc_rights, bfc_seen = [], []
@@ -1185,23 +1219,23 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                         p3a_ref.append((p, len(p.ops), y + 8 + q * 8.6 * 1.45, t))  # filled in at this place of the stream
                     else:
                         p.text(PDF_L, y + 8 + q * 8.6 * 1.45, t, 8.6, False, C_INK2)
-            block(len(ref) * 8.6 * 1.45 + 8, draw_ref, keep_next=True)
+            block(len(ref) * 8.6 * 1.45 + 8, draw_ref, keep_next=True, tail=True)
 
     # -- closing text, signature, order confirmation; 2.114.5 (#2300): the greeting set closer
     if m.get("closing"):
         ct = str(m["closing"])
         n = len(pdf_wrap(ct, body, PDF_CW))
-        block(n * lh + 10, lambda p, y, t=ct: p.para(PDF_L, y + 8, t, body, PDF_CW), keep_next=bool(m.get("signature")))
+        block(n * lh + 10, lambda p, y, t=ct: p.para(PDF_L, y + 8, t, body, PDF_CW), keep_next=bool(m.get("signature")), tail=True, sq=4)
     if m.get("signature") or (m.get("kind") or "offer") == "offer":
         bfc_see_ref()
     if m.get("signature"):
         sg = str(m["signature"])
         sl = [sg] + [str(x) for x in (m.get("signature_name"), co.get("name")) if x]
         block((len(sl) - 1) * lh + 0.6 * lh + lh + 10, lambda p, y, sl=sl: [p.text(PDF_L, y + 8 + i * lh + (0.6 * lh if i else 0), s, body, bold=(i == 1))
-                                                                             for i, s in enumerate(sl)])
+                                                                             for i, s in enumerate(sl)], tail=True, sq=4)
     if (m.get("kind") or "offer") == "offer" and acc:  # 2.99.0 C (#2195): accepted online -> the signature box instead of the empty lines
         acc_rows = [(str(x[0]), str(x[1])) for x in acc.get("rows") or [] if isinstance(x, (list, tuple)) and len(x) >= 2]
-        block(8 + qac_sig_block_h(acc_rows), lambda p, y: qac_sig_block(p, y + 8, acc_rows, str(acc.get("head") or ""), str(acc.get("foot") or ""), accent))
+        block(8 + qac_sig_block_h(acc_rows), lambda p, y: qac_sig_block(p, y + 8, acc_rows, str(acc.get("head") or ""), str(acc.get("foot") or ""), accent), tail=True, sq=4)
     half = (PDF_CW - 28) / 2
 
     def draw_accept(p, y):
@@ -1213,7 +1247,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         p.line(PDF_L + half + 28, yl, PDF_L + PDF_CW, yl, 0.6, C_INK)
         p.text(PDF_L + half + 28, yl + 3, L["sign"], 7.6, False, C_INK2)
     if (p3a_on and not p3a_end) or (m.get("kind") == "delivery" and np_):  # 2.120.0 D (#2089): the receipt box of a delivery note
-        block(16 + 40 + 16, draw_accept)
+        block(16 + 40 + 16, draw_accept, tail=True, sq=8)
     bfc_see_ref()  # no signature, no order confirmation: the line ends the main pages
 
     # -- 2.47.0 (#1215): every printed part of a quotation on its own page(s): part title + number, its rows, its sums
@@ -1223,12 +1257,20 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         ptitle = str(part.get("title") or "")
         psub = " · ".join(x for x in (f"{L['number']} {number}" if number else "", str(m.get("project_title") or "")) if x)
 
-        def draw_part_head(p, y, ptitle=ptitle, psub=psub):
-            p.text(PDF_L, y + 6, ptitle.upper(), 14, True, C_INK, spacing=0.8)
-            p.line(PDF_L, y + 6 + 20, PDF_L + 14 * MM, y + 6 + 20, 1.6, accent)
-            if psub:
-                p.text(PDF_L + PDF_CW, y + 8, psub, 8.6, False, C_INK2, align="r")
-        block(34, draw_part_head, keep_next=True, brk=True)
+        # 2.138.0 A (#2240): number + project as a small line above the title (was right beside it, a long title ran over it);
+        # the title wraps over the full width, the accent line under its last line
+        pt_lines = pb_wrap(ptitle.upper(), 14, PDF_CW, True, 0.8)
+        ps_lines = pdf_wrap(psub, 8.6, PDF_CW) if psub else []
+        pt_top = 4 + 12 * len(ps_lines) if ps_lines else 6
+        pt_line = pt_top + (len(pt_lines) - 1) * 17.5 + 20
+
+        def draw_part_head(p, y, pt_lines=pt_lines, ps_lines=ps_lines, pt_top=pt_top, pt_line=pt_line):
+            for j, s in enumerate(ps_lines):
+                p.text(PDF_L, y + 2 + j * 12, s, 8.6, False, C_INK2)
+            for j, s in enumerate(pt_lines):
+                p.text(PDF_L, y + pt_top + j * 17.5, s, 14, True, C_INK, spacing=0.8)
+            p.line(PDF_L, y + pt_line, PDF_L + 14 * MM, y + pt_line, 1.6, accent)
+        block(pt_line + 8, draw_part_head, keep_next=True, brk=True)
         for hr in part.get("head") or []:
             if isinstance(hr, (list, tuple)) and len(hr) >= 2:
                 block(lh, lambda p, y, a=str(hr[0]), b=str(hr[1]): (p.text(PDF_L, y, a, 9, False, C_INK2), p.text(PDF_L + 112, y, b, 9)), keep_next=True)
@@ -1270,6 +1312,26 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     first_on_page = True
     i = 0
     n_blocks = len(blocks)
+
+    def group_end(i, soft):
+        j = i
+        while j + 1 < n_blocks and (blocks[j]["keep_next"] or blocks[j + 1]["keep_prev"] or (soft and blocks[j + 1]["tail"])):
+            j += 1
+        return j
+
+    def need(i, j, fresh):  # height of blocks i..j incl. the table heads they bring (2.138.0 E #2238: also inside the group)
+        h = 0.0
+        for k in range(i, j + 1):
+            h += blocks[k]["h"] - blocks[k]["sq_used"]
+            if blocks[k]["table"] and ((fresh and k == i) or (k > 0 and not blocks[k - 1]["table"])):
+                h += thead_h
+        return h
+
+    def room_sq(i, j):
+        return sum(blocks[k]["sq"] - blocks[k]["sq_used"] for k in range(i, j + 1))
+
+    def page_bottom(later):  # 2.120.0 E (#2091): the body ends above the letterhead's footer
+        return (BP["bottom"][later] if BP["hide_footer"] else min(BP["bottom"][later], body_bottom)) if BP else body_bottom
     while i < n_blocks:
         b = blocks[i]
         if b.get("brk") and not first_on_page:  # 2.47.0 (#1215): a part starts on a new page
@@ -1279,13 +1341,21 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             y = PDF_NEXT_TOP
             first_on_page = True
             continue
-        # the group that must stay together with b: keep_next chains forward, keep_prev of the follower
-        j = i
-        while j + 1 < n_blocks and (blocks[j]["keep_next"] or blocks[j + 1]["keep_prev"]):
-            j += 1
-        group_h = sum(blocks[k]["h"] for k in range(i, j + 1))
-        need = group_h + (thead_h if b["table"] and (first_on_page or not blocks[i - 1]["table"]) else 0)
-        if y + need > ((BP["bottom"][len(pages) > 1] if BP["hide_footer"] else min(BP["bottom"][len(pages) > 1], body_bottom)) if BP else body_bottom) and not first_on_page:  # 2.120.0 E (#2091)
+        bot = page_bottom(len(pages) > 1)
+        # the group that must stay together with b: keep_next chains forward, keep_prev of the follower; 2.138.0 E (#2238): plus the
+        # rest of the closing (tail) as long as that group fits on an empty page (else the closing may break between its blocks)
+        j = group_end(i, True)
+        if j > i and need(i, j, True) - room_sq(i, j) > page_bottom(True) - PDF_NEXT_TOP:
+            j = group_end(i, False)
+        nd = need(i, j, first_on_page)
+        sqa = room_sq(i, j)
+        if y + nd > bot + 0.01 and sqa > 0 and y + nd - sqa <= bot + 0.01:
+            # 2.138.0 E (#2238): set the group a little tighter (top gaps only, same font sizes) instead of breaking the page
+            cut = (y + nd - bot) / sqa
+            for k in range(i, j + 1):
+                blocks[k]["sq_used"] += (blocks[k]["sq"] - blocks[k]["sq_used"]) * cut
+            nd = need(i, j, first_on_page)
+        if y + nd > bot + 0.01 and not first_on_page:
             # does b alone fit together with everything that must precede the break? no: new page
             page = _Page()
             draw_small_head(page)
@@ -1296,8 +1366,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         if b["table"] and (first_on_page or not blocks[i - 1]["table"]):
             draw_thead(page, y)
             y += thead_h
-        b["draw"](page, y)
-        y += b["h"]
+        b["draw"](page, y - b["sq_used"])
+        y += b["h"] - b["sq_used"]
         first_on_page = False
         i += 1
     total = len(pages)

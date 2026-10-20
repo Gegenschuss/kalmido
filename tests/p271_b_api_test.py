@@ -169,8 +169,7 @@ r = Da.get(B + "/api/tasks", params={"scope": "search", "q": "zq7"})
 check(TITLE not in r.text, "#1459: dave's search does not find it")
 check(TITLE not in Da.get(B + "/api/export.json").text and "Comment zq7" not in Da.get(B + "/api/export.json").text, "#1459: dave's export")
 check(task_in(Gi, T) is None, "#1459: gina (participant of O2) does not get it")
-Da.post(B + "/api/ical", json={"action": "create"})
-feed = re.sub(r"^https?://[^/]+", "", Da.get(B + "/api/ical").json().get("url") or "")
+feed = re.sub(r"^https?://[^/]+", "", Da.post(B + "/api/ical", json={"action": "rotate"}).json().get("url") or "")  # 2.138.0 (#1907): the feed link is only in the answer of create / rotate
 if feed:
     check(TITLE not in requests.get(B + feed).text, "#1459: dave's calendar feed does not have it")
 v0 = state(Da)["v"]

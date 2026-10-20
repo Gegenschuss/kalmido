@@ -108,7 +108,7 @@ check(os.path.isfile(p2) and A.delete(B + f"/api/lists/{L2}").ok and os.path.isf
       and not os.path.exists(p2), "list deleted for good: icon file gone")
 
 # ================================================================== /drop and /drop/drop
-dt = A.get(B + "/api/me").json()["drop_token"]
+dt = A.post(B + "/api/me/drop-token").json()["drop_token"]  # 2.138.0 (#1907): the token is shown once, when created
 for path_ in ("/drop", "/drop/drop"):
     r = requests.post(B + path_, headers={"Authorization": "Bearer " + dt}, data={"text": "Shared via " + path_})
     check(r.ok and "Shared via" in r.text, f"POST {path_} with the token: {r.status_code} {r.text[:60]}")

@@ -198,8 +198,10 @@ def _report(lid, a):
 
 @app.get("/api/lists/<int:lid>/status-report")
 def list_status_report(lid):
-    """2.34.0 (#265): ?from=&to= | ?days=N (default 7), ?lang= -> the data + the Markdown text."""
-    return jsonify(_report(lid, request.args))
+    """2.34.0 (#265): ?from=&to= | ?days=N (default 7), ?lang= -> the data + the Markdown text. 2.126.1 A (#2124): + agents,
+    agent_text (agents/asstprop.py)."""
+    from ..agents.asstprop import ast_report_extra
+    return jsonify(ast_report_extra(db(), _report(lid, request.args), lid, g.user["id"]))
 
 
 @app.get("/api/v1/lists/<int:lid>/status-report")

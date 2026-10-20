@@ -14,7 +14,47 @@ function modal(html) {
   onRemove(m, () => { const dc = m.ownerDocument; if (dc && dc.body && !dc.querySelector('.modal')) dc.body.classList.remove('modal-open'); });
   vvSync();
   modalA11y(m);
+  queueMicrotask(() => dlg_resizable(m));  // after the caller added its classes (they name the dialog kind)
   return m;
+}
+// 2.138.0 E (#2234): desktop: a grip at the bottom right resizes the dialog (pointer events: mouse + pen); the size is kept per
+// dialog kind (its own classes; none = not kept); double click on the grip = back to the default size. Phones: no grip.
+const DLG_SKIP = /^(modal|cdlg|authscreen|shopmode|smodal|lmodal|fgrqdlg|hidden|open|closing)$/;
+const dlg_key = m => { const c = [...m.classList].filter(x => !DLG_SKIP.test(x)).sort().join('.'); return c ? 'kalmido.dlgsize.' + c : ''; };
+const dlg_wide = () => { try { return matchMedia('(min-width: 900px) and (pointer: fine)').matches; } catch { return false; } };
+function dlg_resizable(m) {
+  const card = m.querySelector(':scope > .card');
+  if (!card || !m.isConnected || !dlg_wide() || m.classList.contains('authscreen') || m.classList.contains('cdlg') || m.classList.contains('shopmode') || m.classList.contains('smodal') || m.classList.contains('lmodal')) return;
+  const key = dlg_key(m);
+  const mk = () => { const g = document.createElement('div'); g.className = 'dlggrip'; g.setAttribute('role', 'separator'); g.setAttribute('aria-label', tr('Drag to resize · double-click: default size')); g.title = tr('Drag to resize · double-click: default size'); return g; };
+  card.style.transition = 'none';  // a size change must not glide (a drag follows the pointer, a reset is at once)
+  let grip = mk(); card.appendChild(grip);
+  const base = card.getBoundingClientRect();  // the default size = the minimum
+  const lim = () => ({w: window.innerWidth - 32, h: (window.visualViewport?.height || window.innerHeight) - 32});
+  const apply = (w, h) => {
+    const L = lim(); w = Math.round(Math.max(base.width, Math.min(w, L.w))); h = Math.round(Math.max(base.height, Math.min(h, L.h)));
+    card.style.width = w + 'px'; card.style.height = h + 'px'; card.classList.add('dlg-sized'); return [w, h];
+  };
+  const reset = () => { card.style.width = card.style.height = ''; card.classList.remove('dlg-sized'); if (key) try { localStorage.removeItem(key); } catch { /* private mode */ } };
+  if (key) try { const v = JSON.parse(localStorage.getItem(key) || 'null'); if (v && v.w > 0 && v.h > 0) apply(v.w, v.h); } catch { /* bad value */ }
+  card.addEventListener('pointerdown', e => {
+    if (!e.target.closest?.('.dlggrip') || e.button) return;
+    e.preventDefault();
+    const x0 = e.clientX, y0 = e.clientY, r0 = card.getBoundingClientRect(), pid = e.pointerId;
+    try { e.target.setPointerCapture(pid); } catch { /* gone */ }
+    // the card is centred: its edges move half the growth each way, so the grip follows the pointer at twice the speed
+    const mv = ev => { if (ev.pointerId === pid) apply(r0.width + (ev.clientX - x0) * 2, r0.height + (ev.clientY - y0) * 2); };
+    const up = ev => {
+      if (ev.pointerId !== pid) return;
+      document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
+      const r = card.getBoundingClientRect();
+      if (key && card.classList.contains('dlg-sized')) try { localStorage.setItem(key, JSON.stringify({w: Math.round(r.width), h: Math.round(r.height)})); } catch { /* private mode */ }
+    };
+    document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
+  });
+  card.addEventListener('dblclick', e => { if (e.target.closest?.('.dlggrip')) reset(); });
+  // a dialog that redraws its card's content keeps its grip
+  new MutationObserver(() => { if (!grip.isConnected) { grip = mk(); card.appendChild(grip); } }).observe(card, {childList: true});
 }
 // 2.38.0 (#1170): touch: a button in a dialog's foot (Save, Cancel ...) does not take the focus from the field being typed in, like
 // Send in the chat (#478): on iOS the first tap otherwise only closed the keyboard, the dialog moved and the tap missed Save

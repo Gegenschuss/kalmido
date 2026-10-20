@@ -7,6 +7,45 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.138.0] - 2026-10-20
+
+Office: start number per number range, quotation bar with the next step, quotation fixes (units, parts, PDF headings);
+resizable dialogs; more rule triggers and Kanban swimlanes; sidebar search at the bottom; security fixes.
+
+### Added
+- Office: a start number per number range (quotation, invoice, credit note, reminder, delivery note) in the office
+  settings; it only goes up, a jump for invoices and credit notes needs a reason (office log); a draft's number can be
+  changed in the editor (#2256).
+- Rules: new triggers "created", "assigned" and "field changed", new actions "priority", "list tag" and "set field" (#2060).
+- Board: swimlanes by person, priority or a custom field; moving a card to another lane takes its value, with one undo
+  step (#2060).
+- Dialogs on a desktop can be resized at a grip and keep their size per kind (#2234).
+- Company data: the form "Partners (GbR)" (#2242).
+
+### Changed
+- Quotations: the bar shows the next step (finalise, mark as sent, accepted / declined, create invoice); an invoice before
+  the acceptance sits in the "..." menu with one question; the PDF button reads "Preview" (#2235).
+- Office import: existing services take the file's order, a "Renumber" button; undoing an import archives entries in use
+  (with where they are used and "Restore") and can tidy leftovers (#2237 #2241).
+- Sidebar: the search field sits as a fixed bar at the bottom of the sidebar (phone menu and desktop); the head shows logo
+  and avatar, below it the workspace button with its name and "Collapse all". Mod+K still opens the search (#2161).
+- Quotation items: the unit choice follows the quantity ("5 days", singular only for exactly 1), in all languages (#2249).
+
+### Fixed
+- Quotations: a percent item keeps its unit choice, switching back to a unit sets quantity 1 if it was empty (#2236).
+- Quotation parts: renaming a part also renames its line on the title page (own texts there stay); saving the title page
+  no longer drops the line of a part added meanwhile (#2239).
+- Quotation PDF: long part and title headings wrap, the quotation number line sits above the part title (#2240).
+- The service worker leaves requests of other origins (e.g. browser extensions) alone (#2257).
+- Quotation PDF: the closing (totals, greeting, signature, confirmation) stays on one page, set a little tighter before a
+  page break; no heading alone at a page end (#2238).
+
+### Security
+- Security fix (upload and calendar subscription tokens): the link is shown once when it is created; existing shortcuts
+  and subscriptions keep working (#1907).
+- Security fix (organisation recovery key): showing the key asks for password and second factor, the other admins are
+  told; server admins can renew an organisation's key with `orgcrypt_cli rotate --org <id>` (#1972).
+
 ## [2.137.0] - 2026-10-20
 
 Moving a whole organisation between servers; the personal office into an organisation.
@@ -32,6 +71,47 @@ Moving a whole organisation between servers; the personal office into an organis
 - Security fix: organisation import (links of video sign-offs, number ranges, logo copies).
 - Security fix: feeds (database connection) (#2408).
 
+## [2.126.3] - 2026-10-20
+
+### Fixed
+- CI of 2.126.1 / 2.126.2: a client function name no longer trips the icon check, the browser demo answers which agents may draft (#2123 #2124) and the table backlinks (#2357).
+
+## [2.126.2] - 2026-10-20
+
+Pages: suggestions above the phone keyboard, a news entry when someone shares pages with you, "Mentioned in" on tables.
+
+### Added
+- Pages: when someone shares a page or folder with you, the news show "X shared the page ... with you"; a tap opens
+  "Shared with me". It follows the existing "Sharing" row of the notification settings, no new push or mail (#2355).
+- Tables: a "Mentioned in" line lists the pages that link the table with [[tabelle:...]] (#2357).
+
+### Fixed
+- Pages on phones: the suggestion list after [[datei: / [[tabelle: stays above the on-screen keyboard; the "+" at
+  checkbox lines no longer overlap (hit area grows to the right only); a search hit only in a page name no longer shows
+  an empty "Found in the text" section (#2363).
+- Pages: a public link of an organisation page whose creator left the organisation is shown as ended and no longer
+  counts as an active share. A sealed page text whose key is missing is never shown or saved as text: the page is
+  "not readable" (409), search, history and export skip it (#2358).
+
+## [2.126.1] - 2026-10-20
+
+Agents draft for you: office texts, document summaries, the client report, table rows as tasks and a planned morning
+sort of the basket. Kalmido calls no language model for this; the connected agent words it and you decide on a card.
+
+### Added
+- Office: "Draft text with an agent" for the introduction and closing text of quotation, invoice and reminder drafts.
+  The agent gets the document without purchase prices; you edit the text on the proposal card and take it over (one
+  undo step); nothing is sent, a finalised or sent document is never changed (#2123).
+- Documents: "Summarise with an agent" saves a summary on the document (sealed like the recognised text), shown in the
+  document sheet and in the API (#2123).
+- Projects: "Word the report with an agent" in the status report - the agent gets the report of the period without
+  comments, notes and names; the text you take over replaces the fixed text for copying and sharing (#2124).
+- Agents can propose rows of a table shared with them as tasks of a shared list (`POST /api/v1/agent/proposals/sheet-tasks`,
+  MCP `propose_sheet_tasks`); you untick rows, edit titles and apply the card as yourself (#2125).
+- Planned agent jobs have a kind: "Sort the basket (proposal)" sends your basket to the agent at the planned time
+  (suggested: weekdays 7:30) like the button, you find the proposal card in the morning; an empty basket sends nothing (#2126).
+- Agent API / MCP: new proposal kinds `office_text`, `doc_summary`, `report`, `sheet_tasks`; `job_request` of a planned sort
+  carries `scheduled: true`; `GET /api/v1/agent/schedules` shows the plan's `action`.
 ## [2.126.0] - 2026-10-20
 
 Security release: fixes from the internal audit (office, documents, agents, sync, offline). Please update.

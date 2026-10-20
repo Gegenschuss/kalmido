@@ -226,8 +226,12 @@ check("templates" in A.get(B + "/api/export.json").json(), "export contains temp
 check(A.get(B + "/api/ical").json()["url"] is None, "no feed link until created")
 url = A.post(B + "/api/ical", json={"action": "create"}).json()["url"]
 check(url and url.startswith("https://kalmido.example/ical/1.") and url.endswith(".ics"), "feed link created: " + str(url))
-check(A.post(B + "/api/ical", json={"action": "create"}).json()["url"] == url, "create keeps an existing link")
 path = url.split("kalmido.example", 1)[1]
+# 2.138.0 (#1907): create with an existing link keeps it working and shows it no more (only active + since when)
+keep = A.post(B + "/api/ical", json={"action": "create"}).json()
+check(keep["url"] is None and keep["active"] is True and keep["created_at"] and requests.get(B + path).ok, f"create keeps an existing link {keep}")
+gi = A.get(B + "/api/ical").json()
+check(gi["url"] is None and gi["active"] is True, f"GET /api/ical: only active, no link {gi}")
 tricky = mk(A, title="Comma, semi; back\\slash 🎉 " + "x" * 80, list_id=WORK, due=D(1), due_time="15:30", content="line1\nline2; a,b",
             reminders="0,15", priority=5)
 allday = mk(A, title="Allday", list_id=WORK, due=D(2), reminders="0")
@@ -304,7 +308,7 @@ check("BOB SECRET" in requests.get(B + bob_url.split("kalmido.example", 1)[1]).t
 new = A.post(B + "/api/ical", json={"action": "rotate"}).json()["url"]
 check(new != url and requests.get(B + path).status_code == 404 and requests.get(B + new.split("kalmido.example", 1)[1]).ok, "rotate: old URL dead, new works")
 A.post(B + "/api/ical", json={"action": "off"})
-check(requests.get(B + new.split("kalmido.example", 1)[1]).status_code == 404 and A.get(B + "/api/ical").json()["url"] is None, "off: feed gone")
+check(requests.get(B + new.split("kalmido.example", 1)[1]).status_code == 404 and A.get(B + "/api/ical").json()["active"] is False, "off: feed gone")
 A.patch(B + "/api/users/" + str(BOB), json={"disabled": True})
 check(requests.get(B + bob_url.split("kalmido.example", 1)[1]).status_code == 404, "disabled user's feed -> 404")
 A.patch(B + "/api/users/" + str(BOB), json={"disabled": False})

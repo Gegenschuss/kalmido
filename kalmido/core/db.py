@@ -174,10 +174,12 @@ def create_user(c, username, display_name="", password=None, proxy_login=None, i
     """Inserts a user with settings (+ inbox unless the caller adopts an existing one). Returns the id.
     Paperless access defaults to admins only."""
     pl = is_admin if paperless_access is None else paperless_access
-    uid = insert_id(c, """INSERT INTO users(username,display_name,password_hash,proxy_login,is_admin,drop_token,created_at,
-                                         paperless_access) VALUES(?,?,?,?,?,?,?,?)""",
+    # 2.138.0 C (#1907): no upload token until the person creates one (shown once); a seeded one (TASKS_DROP_TOKEN) as hash
+    from ..core.tokenhash import tkh_hash
+    uid = insert_id(c, """INSERT INTO users(username,display_name,password_hash,proxy_login,is_admin,drop_token_hash,drop_token_at,
+                                         created_at,paperless_access) VALUES(?,?,?,?,?,?,?,?,?)""",
                     (username, display_name or username, generate_password_hash(password) if password else None,
-                     proxy_login or None, 1 if is_admin else 0, drop_token or secrets.token_urlsafe(24),
+                     proxy_login or None, 1 if is_admin else 0, tkh_hash(drop_token), iso(now_utc()) if drop_token else None,
                      iso(now_utc()), 1 if pl else 0))
     vals = dict(USER_DEFAULTS)
     # chosen in the first-run setup ("What do you want to use?"): modules + language of new users
@@ -387,6 +389,8 @@ def init_db(guard=True, load=None):
                 c.execute(stmt)
         from ..life.rss import rg4_feed_unique
         rg4_feed_unique(c)  # 2.122.4 A (#1906): one followed feed per address (skipped while old duplicates exist)
+        from ..core.tokenhash import tkh_migrate
+        tkh_migrate(c)  # 2.138.0 C (#1907): plain upload / calendar tokens become hashes
         from ..office.ledger import ofx_migrate
         ofx_migrate(c)  # 2.36.2 (#1142, E): office positions carry their organisation
         from ..office.contacts_cl import fk_migrate

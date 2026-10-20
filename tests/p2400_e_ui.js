@@ -120,7 +120,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     // ================= #1377 + #1382 on the settings page
     await ev(`(() => { location.hash = '#office/settings'; return 1; })()`);
     await ready(ev, `!!document.querySelector('#ofc-set #osc-street')`, 60);
-    check(await ev(`document.querySelectorAll('#osc-md_label option').length === 6 && document.getElementById('osc-md_label').value === ''`), '#1377: the word before the names, default Geschäftsführung');
+    // 2.138.0 (#2242): 7 options now (Gesellschafter (GbR) added)
+    check(await ev(`document.querySelectorAll('#osc-md_label option').length === 7 && document.getElementById('osc-md_label').value === ''`), '#1377: the word before the names, default Geschäftsführung');
     await ev(`(() => { const s = document.getElementById('osc-md_label'); s.value = 'owner_f'; s.dispatchEvent(new Event('change', {bubbles: true})); document.querySelector('#ofc-set > .fgbar [data-fgb="save"]').click(); return 1; })()`);
     let md = '';
     for (let i = 0; i < 40 && md !== 'owner_f'; i++) { md = (await call(CA, 'GET', '/api/office/settings')).company_fields?.md_label; if (md !== 'owner_f') await sleep(250); }

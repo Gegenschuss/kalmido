@@ -9,13 +9,33 @@
 // shortcut that asks for both on import is linked when the server has one, KALMIDO_IOS_SHORTCUT_URL).
 const dropBase = sh => String(sh.drop_url || location.origin + '/drop').replace(/\/drop\/?$/, '');
 // 2.0.2: a new upload token from Account or from "Share from your phone"; every field of the open dialog shows it at once
+// 2.138.0 C (#1907): the server keeps only a hash of the token, so it is visible right after creating it and never again
 async function dropTokenNew(md) {
-  if (!await askConfirm(tr('Create a new upload token?'), tr('The old one stops working. Update the iPhone shortcut and the HTTP Shortcuts import afterwards.'), {ok: tr('New token'), danger: true})) return;
+  if (S.me?.drop_token_set && !await askConfirm(tr('Create a new upload token?'), tr('The old one stops working. Update the iPhone shortcut and the HTTP Shortcuts import afterwards.'), {ok: tr('New token'), danger: true})) return;
   let j;
   try { j = await api('POST', '/api/me/drop-token'); } catch { return; }
-  const tok = j.drop_token || '';
-  const i = $('#s-droptok', md); if (i) { i.value = tok; i.type = 'text'; i.dataset.real = '1'; }
+  if (S.me) Object.assign(S.me, {drop_token_set: true, drop_token_at: j.drop_token_at || ''});
+  tkh_dropDraw(md, j.drop_token || '');
   toast(tr('New upload token created: update the shortcuts on your phones'));
+}
+// 2.138.0 C (#1907): the upload token row: the token itself only right after creating it (tok), otherwise since when it is set
+function tkh_dropHtml(tok) {
+  const at = S.me?.drop_token_at ? new Date(S.me.drop_token_at) : null;
+  if (tok) return `<div class="row"><label for="s-droptok">${tr('Upload token')}</label><input id="s-droptok" readonly value="${esc(tok)}"><button class="btn sm pri" data-m="drop-copy-tok">${ic('copy', 's')} ${tr('Copy')}</button></div>
+    <div class="shint keep" role="status">${tr('Only visible now: copy it now. If you lose it, create a new one.')}</div>`;
+  if (!S.me?.drop_token_set) return `<div class="row"><label>${tr('Upload token')}</label><button class="btn sm pri" data-m="drop-new-tok">${ic('key', 's')} ${tr('Create upload token')}</button></div>`;
+  return `<div class="row"><label>${tr('Upload token')}</label><span class="muted">${at && !isNaN(at) ? esc(tr('Active since {0}', at.toLocaleDateString(LOCALE()))) : tr('Active')}</span><button class="btn sm" data-m="drop-new-tok" title="${esc(tr('The old token stops working'))}">${ic('key', 's')} ${tr('New token')}</button></div>`;
+}
+function tkh_dropDraw(md, tok) { const w = $('#s-dropw', md); if (w) w.innerHTML = tkh_dropHtml(tok); }
+// 2.138.0 C (#1907): every HTTP Shortcuts download carries a new token (the server cannot read the old one back)
+async function tkh_zipClick(e, a, md) {
+  if (a.dataset.ok) { delete a.dataset.ok; } else {
+    e.preventDefault();
+    if (S.me?.drop_token_set && !await askConfirm(tr('Download a new HTTP Shortcuts import?'), tr('The file contains a new upload token. The previous shortcut stops working then (also the one on the iPhone).'), {ok: tr('Download')})) return;
+    a.dataset.ok = '1'; a.click(); return;
+  }
+  if (S.me) Object.assign(S.me, {drop_token_set: true, drop_token_at: new Date().toISOString()});
+  setTimeout(() => tkh_dropDraw(md), 0);
 }
 function shareHtml(hint) {
   const sh = S.share || {}, ios = /^https:\/\//.test(sh.ios_shortcut || '') ? sh.ios_shortcut : '';
@@ -29,11 +49,12 @@ function shareHtml(hint) {
       <li>${tr('Then in any app: Share > HTTP Shortcuts > <b>Kalmido</b> for photos and files (also several), <b>Kalmido text</b> for links and text.')}</li>
     </ol>
     ${hintK(tr('The file contains your personal upload token: keep it to yourself like a password. Links and text also work with Share > Kalmido once the app is installed.'))}
+    ${S.me?.drop_token_set ? hint(tr('Each download contains a new upload token: the previous shortcut stops working then.')) : ''}
     <h5 class="ssub">${ic('phone', 's')}iPhone / iPad</h5>
     ${ios ? `<div class="row"><a class="btn sm" href="${esc(ios)}" target="_blank" rel="noopener noreferrer">${ic('plus', 's')} ${tr('Add the Kalmido shortcut')}</a></div>` : ''}
     <div class="row"><label for="s-dropurl">${tr('Server address')}</label><input id="s-dropurl" readonly value="${esc(dropBase(sh))}"><button class="btn sm" data-m="drop-copy-url">${ic('copy', 's')} ${tr('Copy')}</button></div>
     <div class="shint">${tr('Without /drop: the shortcut adds it. (An address ending in /drop works too.)')}</div>
-    <div class="row"><label for="s-droptok">${tr('Upload token')}</label><input id="s-droptok" readonly type="password" value="••••••••••••" autocomplete="new-password"><button class="btn sm" data-m="drop-copy-tok">${ic('copy', 's')} ${tr('Copy')}</button><button class="btn sm" data-m="drop-new-tok" title="${esc(tr('The old token stops working'))}">${ic('key', 's')} ${tr('New token')}</button></div>
+    <div id="s-dropw">${tkh_dropHtml()}</div>
     ${hint(tr('After a new token: paste it into the iPhone shortcut (or set the shortcut up again) and download the HTTP Shortcuts import again.'))}
     <details class="shelp sdet"><summary>${tr('Set it up in the Shortcuts app')}</summary><ol class="slist">
       ${ios ? `<li>${tr('Easiest: tap “Add the Kalmido shortcut” above, then Add Shortcut. It asks two questions: paste the server address (without /drop), then the upload token (copy them here first).')}</li>` : ''}

@@ -35,6 +35,7 @@ EXCEPT = {
     ("admin/migrate.py", "FROM sqlite_master"): "2.37 migrate-sqlite: runs against the old SQLite file, not Postgres",
     ("files/scan.py", "s.ver="): "2.61.0: ver={cur} is a number expression; the stand-in TRUE makes it bigint = boolean",
     ("files/scan.py", "AND ver="): "2.61.0: ver={cur} is a number expression; the stand-in TRUE makes it bigint = boolean",
+    ("admin/orgcrypt_cli.py", "AND TRUE LIKE ?"): "2.138.0 (#1972): {col} is a text column name; the stand-in TRUE makes it boolean LIKE text",
 }
 
 def excepted(rel, sql):

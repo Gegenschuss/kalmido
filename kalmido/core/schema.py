@@ -2741,6 +2741,29 @@ MIGRATIONS = [
     # one); nullable, 2.125 and older never set or read it, the index only covers rows that carry one
     ("tasks", "client_ref", "ALTER TABLE tasks ADD COLUMN client_ref TEXT"),
     ("tasks", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS tasks_client_ref ON tasks(created_by, client_ref) WHERE client_ref IS NOT NULL"),
+    # 2.126.1 B (#2126): what a planned agent job does when due: chat (the event scheduled_job, every plan so far) | triage (a
+    # proposal request "Sort the basket" for the plan's person, agents/schedules.py). Older versions never read it (they send
+    # scheduled_job for a triage plan too, with its prefilled prompt)
+    ("agent_schedules", "action", "ALTER TABLE agent_schedules ADD COLUMN action TEXT NOT NULL DEFAULT 'chat'"),
+    # 2.126.1 A (#2123): a document's summary, taken over by a person from an agent's draft (agents/asstprop.py); sealed with
+    # the workspace key like the recognised text. Older versions never read it
+    ("doc_meta", "summary", "ALTER TABLE doc_meta ADD COLUMN summary TEXT NOT NULL DEFAULT ''"),
+    # 2.138.0 C (#1907): upload token / calendar feed secret only as a SHA-256 hash (core/tokenhash.py), *_at = when created.
+    # The plain columns drop_token / ical_token stay and are NULL; the version before runs on (shortcuts / feed made anew)
+    ("users", "drop_token_hash", "ALTER TABLE users ADD COLUMN drop_token_hash TEXT"),
+    ("users", "drop_token_at", "ALTER TABLE users ADD COLUMN drop_token_at TEXT"),
+    ("users", "ical_token_hash", "ALTER TABLE users ADD COLUMN ical_token_hash TEXT"),
+    ("users", "ical_token_at", "ALTER TABLE users ADD COLUMN ical_token_at TEXT"),
+    # 2.138.0 C (#1972): the recovery key wraps the organisation key (core/orgcrypt.py): recovery_wrapped = the org key under
+    # a key derived from the recovery secret, recovery_secret = that secret under the server key (shown again); during
+    # orgcrypt_cli rotate wrapped_rot / kek_check_rot hold the earlier key (reading falls back to it), rot_started_at /
+    # rotated_at the state. 2.125 runs on with them (it shows the org key itself and reads only after a finished rotation)
+    ("org_keys", "recovery_wrapped", "ALTER TABLE org_keys ADD COLUMN recovery_wrapped TEXT"),
+    ("org_keys", "recovery_secret", "ALTER TABLE org_keys ADD COLUMN recovery_secret TEXT"),
+    ("org_keys", "wrapped_rot", "ALTER TABLE org_keys ADD COLUMN wrapped_rot TEXT"),
+    ("org_keys", "kek_check_rot", "ALTER TABLE org_keys ADD COLUMN kek_check_rot TEXT"),
+    ("org_keys", "rot_started_at", "ALTER TABLE org_keys ADD COLUMN rot_started_at TEXT"),
+    ("org_keys", "rotated_at", "ALTER TABLE org_keys ADD COLUMN rotated_at TEXT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -2748,6 +2771,7 @@ INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
 CREATE INDEX IF NOT EXISTS tasks_assignee ON tasks(assignee_id);
 CREATE INDEX IF NOT EXISTS habits_user ON habits(user_id);
+CREATE INDEX IF NOT EXISTS users_drop_token_hash ON users(drop_token_hash) WHERE drop_token_hash IS NOT NULL;
 CREATE INDEX IF NOT EXISTS pomos_user ON pomos(user_id);
 CREATE INDEX IF NOT EXISTS filters_user ON filters(user_id);
 CREATE INDEX IF NOT EXISTS task_tags_user ON task_tags(user_id, tag);

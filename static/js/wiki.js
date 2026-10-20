@@ -305,6 +305,7 @@ function wk_acUpdate(ta) {
 function wk_acDraw(box) {
   box.innerHTML = WK.ac.hits.map((p, i) => `<button type="button" role="option" class="${i === WK.ac.i ? 'on' : ''}" aria-selected="${i === WK.ac.i}" data-wk="ac" data-i="${i}">${ic(p._ic || 'note', 's')}<span>${esc(p._label || p.path)}</span></button>`).join('');
   box.classList.remove('hidden');
+  if (typeof wem_acPlace === 'function') wem_acPlace(box);  // 2.126.2 A (#2363): stay above the on-screen keyboard
 }
 function wk_acPick(i) {
   const ta = $('#wk-body'), a = WK.ac; if (!ta || !a) return;

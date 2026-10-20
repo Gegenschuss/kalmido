@@ -628,9 +628,9 @@ function actField(d) {
 // ---- 2.34.0 (#265): the status report of a project for a period (default the last 7 days): a preview of the plain text
 // the server builds from fixed sentences (done, in progress, blocked, overdue, next dates, tracked time; no comments, notes
 // or names), to copy or share with a client.
-function rptModal(lid) {
+function rptModal(lid, per) {  // 2.126.1 A (#2124): per = {from, to} (the period of an agent's report taken over)
   const l = listById(lid); if (!l) return;
-  const st = {days: 7, from: '', to: '', md: '', seq: 0};
+  const st = {days: 7, from: per?.from || '', to: per?.to || '', md: '', seq: 0};
   const md = modal(`<h3>${esc(tr('Status report'))}: ${esc(lname(l))}</h3>
     <div class="row rptper"><div class="seg" role="group" aria-label="${esc(tr('Period'))}">${[7, 14, 30].map(n => `<button type="button" data-rpt="days" data-n="${n}" aria-pressed="${n === 7}" class="${n === 7 ? 'on' : ''}">${esc(trn('{0} day', '{0} days', n))}</button>`).join('')}</div></div>
     <div class="row rptdates"><label for="rpt-from">${tr('From')}</label>${dateIn('rpt-from', '', {label: tr('From'), clear: false})}<label for="rpt-to">${tr('To')}</label>${dateIn('rpt-to', '', {label: tr('To'), clear: false})}</div>
@@ -638,6 +638,7 @@ function rptModal(lid) {
     <p class="muted rpthint">${tr('Without comments, notes and names. Edit the text before you send it.')}</p>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button>${navigator.share ? `<button class="btn" data-rpt="share">${ic('send', 's')} ${tr('Share')}</button>` : ''}<button class="btn pri" data-rpt="copy">${ic('copy', 's')} ${tr('Copy')}</button></div>`);
   md.classList.add('rptmodal');
+  md._rptSt = st;  // 2.126.1 A (#2124): asstprop.js (the agent's text, reload after taking it over)
   const load = async () => {
     const seq = ++st.seq, q = st.from || st.to ? `from=${st.from || st.to}&to=${st.to || st.from}` : `days=${st.days}`;
     let j; try { j = await rawFetch('GET', `/api/lists/${lid}/status-report?${q}&lang=${encodeURIComponent(S.settings?.lang || 'en')}`); }
@@ -645,7 +646,9 @@ function rptModal(lid) {
     if (seq !== st.seq) return;
     st.md = j.markdown; for (const [k, v] of [['#rpt-from', j.from], ['#rpt-to', j.to]]) { const x = $(k, md); x.value = v; dpSync(x); }  // own date picker (U23)
     $('#rpt-prev', md).innerHTML = renderMd(j.markdown, true);
+    if (typeof ast_rpt === 'function') ast_rpt(md, st, j, lid);  // 2.126.1 A (#2124): "Word the report with an agent", its text
   };
+  md._rptLoad = load;
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-rpt],[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }

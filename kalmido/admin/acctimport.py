@@ -1278,6 +1278,12 @@ def umz_org_decrypt(path, key, size, okey, out):
         w = base64.b64decode(h["wrapped_fk"])
         prefix = base64.b64decode(h["nonce_prefix"])
         block = int(h["block"])
+        if isinstance(okey, tuple):  # 2.138.0 C (#1972): core/orgcrypt.py rck_parse; a recovery key opens the header's copy
+            from ..core.orgcrypt import OrgCryptError, rck_resolve
+            try:
+                okey = rck_resolve(okey, int(h["org_id"]), h.get("recovery_wrapped"))
+            except OrgCryptError:
+                raise UmzWrongKey() from None
         fk = AESGCM(okey).decrypt(w[:12], w[12:], OX_FK_AAD + str(int(h["org_id"])).encode())
     except InvalidTag:
         raise UmzWrongKey() from None
@@ -1556,9 +1562,9 @@ def umz_key_route(iid):
     st = _need(uid, iid)
     if st.get("state") != "key":
         return err(tr("The file is not ready for the import"), 409)
-    from ..core.orgcrypt import oc_parse_recovery
+    from ..core.orgcrypt import rck_parse
     try:
-        okey = oc_parse_recovery(body().get("recovery_key"))
+        okey = rck_parse(body().get("recovery_key"))  # 2.138.0 C (#1972): ("secret" | "key", 32 bytes), umz_org_decrypt
     except ValueError:
         return err(tr("This is not a recovery key (52 characters A-Z and 2-7, in groups of 4)."))
     _set(uid, iid, state="checking")

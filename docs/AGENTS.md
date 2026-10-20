@@ -686,7 +686,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `reset` | 2.4.1: an admin pressed *Reset now*: the host should restart the agent with a fresh session | `reset_seq`, `runtime`, `user` |
 | `ping` | the "Send test" button in the admin settings | `message` |
 | `team_message` | 2.17.0: someone @mentions the agent in a list's team chat (the agent is a member of the channel of every list shared with it); 2.46.1: in a list where the agent listens in, every message of a person in its channel, without an @mention (`mentioned` false; never a message of an agent) | `room` `{id, kind, list_id}`, `mentioned`, `listening` (2.46.1), `message` `{id, text, user_id, task_id, created_at, reply_to, reply}`, `user` `{id, name}`; 2.33.0: also when someone answers one of the agent's channel messages (`reply_to`, see [Replies](#replies-to-one-message-2330)); answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`) |
-| `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}`; 2.39.0 kind `cleanup` ([Tidy up a list](#tidy-up-a-list-2390)): + `list_id` (and the list's `playbook`); 2.70.0 kind `extract`: `input.images` = photos of the meeting ([A meeting becomes tasks](#a-meeting-becomes-tasks-2700)) |
+| `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}`; 2.39.0 kind `cleanup` ([Tidy up a list](#tidy-up-a-list-2390)): + `list_id` (and the list's `playbook`); 2.70.0 kind `extract`: `input.images` = photos of the meeting ([A meeting becomes tasks](#a-meeting-becomes-tasks-2700)); 2.126.1 kind `triage` from a [planned *Sort the basket*](#planned-jobs-2340): + `scheduled: true`, `schedule_id`, `due_at`, `late`, `manual`, `hint` (`input.schedule_id` too) |
 | `task_added` | 2.23.0 (#795): a top-level task was created in, or moved into, a list shared with the agent (not for its own tasks); 2.30.0: only when the agent [listens in](#agent-listens-in-2300) there | `task`, `list`, `how`: `created` or `moved`, `moved_from` `{id, name}` (only when the agent sees that list), `source`: `form`, `mail`, `errors`, `proposal` (when not made in the app); 2.63.0: a form's report also carries `ttype` (when the form sets one) and `portal: true` (the sender has a status link and sees only the answers meant for them, never internal comments); 2.98.0: a questionnaire's task has the answers in its description (a Markdown heading per question) and, when the form matches clients, a last line naming the client or "client unknown" |
 | `chat_choice` | 2.28.0 (#1005): the person pressed an answer button of one of the agent's chat messages (see *Answer buttons*); 2.30.0: also a 👍 / 👎 on a permission question (2.87.9: no longer, only the buttons) | `message_id`, `choice_ids`, `labels`, `message`, `user` `{id, name}`; + `task`, `list` when the message was about a task; permission questions: `permission: true`, `approval`, `via`: `button` or `reaction`; 2.35.0 approval requests (`request_chat_approval`): `approval`, `approval_request` `{title, what}`, `via` |
 | `followup_due` | 2.1.0: the follow-up day of a task *waiting on someone* (at the all-day reminder time of the person it is for), once per date, to every agent that follows the task (assigned, creator, commented) | `task` (with `task.waiting`), `list`, `waiting` `{note, until, since, by}` |
@@ -889,6 +889,13 @@ with that person (`send_chat` with `user_id` = `by.id`, MCP `send_chat`). Start 
 - Templates in the app point at the data tools: *Morning briefing* (`read_briefing`), *Weekly project status*
   (`read_project_status`), *Follow up on stale tasks* (`list_stale_tasks`), *Check time tracking* (`get_time_gaps`, `list_time_entries`).
   The text stays the person's; treat it as their instruction for this one job, within your usual rules.
+- **Kind** (2.126.1, `action`): `chat` (every plan before, the default: the event `scheduled_job` as above) or `triage`
+  (*Sort the basket (proposal)*, suggested as every working day at 7:30). A triage plan needs no text and has no list.
+  When it is due Kalmido asks you for a proposal exactly like the button *Sort the basket*: the event `job_request` of kind
+  `triage` with the person's open basket items and lists (the same input and limits), plus `scheduled: true` and
+  `schedule_id`. Answer it like any triage request (`submit_proposal`); the person finds the card in the morning and gets
+  the usual *Proposal ready* notification (switchable). Nothing is sent when the basket is empty (`last_state` `empty`),
+  while the plan's last proposal is still open (`pending`) or the person has too many open requests (`busy`).
 
 Example `scheduled_job`:
 
@@ -1888,6 +1895,36 @@ The proposal goes to the list's owner (or `user_id`: an owner / admin of the lis
 person's rights; it belongs to them, never to the agent. The answer comes as the event `job` (approve / reject). At most 20
 rule proposals per agent and day.
 
+2.138.0 (#2060): new triggers `created` (a task is created in the list), `assigned` (`user_id`: only that person, null =
+anybody; fires only when the person is new on the task) and `field` (`field_id` of the list's custom fields; `value` = only
+when set to that option id / `"1"` checked / `"0"` unchecked, null = any change; formula fields never trigger). New actions
+`priority` (`priority` none / low / medium / high), `tag` (`tag_id`: adds a tag of this list; personal tags never) and `field`
+(`field_id` + `value`, checked like a normal field value, null clears it). A deleted field or list tag pauses the rule
+(`paused_reason` `field` / `tag`). The loop protection stays: a value set by a rule never triggers a `field` rule.
+
+### Table rows as tasks (2.126.1)
+
+Step 2 of the tables (*rows -> tasks*, `POST /api/sheets/{id}/to-tasks`) stays a button for people: agents get 403 there.
+An agent proposes instead. It needs the table shared with it (a share, read is enough; or a table attached to a list it
+sees; or its own) and the target list shared with it, both in the same space (a private table: lists without organisation).
+Never a health / budget list, never a list with the lock, never across organisations.
+
+| What | Endpoint | MCP | Scope |
+|---|---|---|---|
+| Propose rows as tasks (kind `sheet_tasks`) | `POST /api/v1/agent/proposals/sheet-tasks` | `propose_sheet_tasks` | sheets:read |
+
+- **The format**: `{sheet_id, rows, list_id, title_col, due_col?, notes_col?, summary?, for_user_id?}`. `sheet_id` is one
+  sheet of the table, `rows` the row ids from `GET /api/v1/sheets/{id}` (`rows[].id`); an item may be `{row_id, title}` with
+  a better task title (empty = the cell). Column ids from the same answer. At most 200 rows, 50 proposals per agent and day.
+- **Whose card**: `for_user_id`, else the person who shared the table with the agent, else its owner / creator - always
+  someone who may write the table through its space or list (a share is not enough) and write the list; nobody = 400.
+- **Rows carried over before** are skipped (`skipped` in the answer); only such rows = 409.
+- **The card** shows the rows as the PERSON sees them now (title, due date, notes; the agent's title above the cell's).
+  They untick rows, edit titles and dates and apply: the same check as the button (table writable through its space, list
+  writable, same space), the tasks are theirs, the history says "carried over from a table, from a proposal by <agent>",
+  the rows get the mark *Carried over*. One undo step (the tasks go to the trash, the marks with them). The answer comes
+  as the event `job` (`created`, `skipped`).
+
 ## Behaviour rules template (2.13.1)
 
 `mcp/CLAUDE.template.md` ("Kalmido agent behaviour rules", English with a German note) is the rule block every agent's
@@ -2149,7 +2186,32 @@ explanation, Markdown, at most 2,000 characters) and `kind` (must match the job)
 {"summary": "Two people are in the book twice.",
  "groups": [{"target_id": 12, "ids": [12, 31], "reason": "same e-mail address"},   // 12 stays, 31 is merged into it
             {"target_id": 40, "ids": [40, 41, 57], "reason": "same phone, name variants"}]}   // none found: {"groups": []}
+// office_text (2.126.1): field = input.field (intro | closing); doc_summary: text at most 4000 characters; report: Markdown
+{"field": "intro", "text": "Thank you for your inquiry. As discussed, we offer you ..."}
+{"text": "Hotel invoice for two nights during the trade fair, 19 % VAT ..."}
 ```
+
+**Texts worded by an agent (2.126.1, kinds `office_text`, `doc_summary`, `report`).** Kalmido never runs a model for
+these: a person asks one of their agents, the agent words the text and the person edits, takes over or discards it.
+Nothing is sent to a client, nothing changes before *Take over* (one undo step, as the person).
+- `office_text`: on an office draft (quotation, invoice, reminder; not finalised, not sent) in *Introduction and closing*,
+  "Draft text with an agent". Only agents of the office area with their switch *May draft office documents* on, only
+  while the area's *Agents may read office data* is on, only for a person who works in that office (a personal agent: its
+  owner). `input`: `doc` (id, kind, number, title, lang, currency, date, valid_until, due_date), `client` (name, recipient,
+  address lines), `items` (kind, title, detail, qty, unit, rate, tax -- never purchase prices), `totals` (net, vat, gross),
+  `field`, `text` (the current one), `other_text`, `wish`; a reminder also `reminder` {level, fee, deadline_days, invoices
+  [{number, date, due_date, gross, open, days_overdue}]}. Answer `{field, text}`; taking it over writes the field (409 once
+  the document is finalised or sent). The request is one line in the office log (agent_read, no contents).
+- `doc_summary`: on a document / receipt the person may change, "Summarise with an agent": the same office switches, and
+  the agent must see the file itself (shared with it). `input.document` = what `GET /documents/{id}` shows the agent (name,
+  date, due, amount, currency, sender, type, tags, the recognised text up to 20000 characters, `extracted`, the summary so
+  far) + `wish`. Answer `{text}`; taking it over stores it as the document's summary (shown in the document sheet).
+- `report`: in the status report dialog of a list shared with the agent, "Word the report with an agent". `input.report`
+  = the status report of the period as the agent sees the list (no comments, notes or names; tracked time as totals only)
+  with its fixed text `markdown`, `lang`, `wish`. Answer `{text}` (Markdown); taking it over shows the text in the dialog
+  instead of the fixed one (copy / share as before); undo goes back to the fixed text.
+- Word the text from the input only: invent nothing, no placeholders for unknown facts, in the document's language.
+  Unknown fields: 400; the office switches off (or the list no longer shared) when you submit: 403.
 
 **Tidy up contacts (2.70.0, kind `merge`).** The person picks one address book they may change (a synced external book
 cannot be merged) and an agent; an organisation's book only goes to an agent of that organisation, an agent limited to

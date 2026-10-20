@@ -3,7 +3,8 @@
 
 usage: kalmido_export_decrypt.py ARCHIVE.kalmido-export -o org.zip [--key-file FILE]
 
-The recovery key (Settings > Organisation > Encryption, 13 groups of 4 characters) is read from --key-file or from stdin
+The recovery key (Settings > Organisation > Encryption: "R2-" and 13 groups of 4 characters; exports of older versions
+also open with the earlier format, 13 groups without "R2-") is read from --key-file or from stdin
 (typed or piped) -- never from the command line, where other users of the machine could see it in the process list.
 The tool checks every block (AES-256-GCM: a wrong key, a damaged, shortened or reordered file is refused), writes the ZIP
 and then checks the SHA-256 of every entry against its manifest.json. Needs Python 3.8+ and the package "cryptography"
@@ -31,11 +32,36 @@ class Bad(Exception):
 
 
 def parse_key(text):
-    """The 32 key bytes of a recovery key (base32 without padding; spaces, dashes and case do not matter)."""
+    """("secret" | "key", 32 bytes) of a recovery key (base32 without padding; spaces, dashes and case do not matter).
+    "R2-..." = the recovery secret (it opens the header's recovery_wrapped), else the earlier format = the org key."""
     s = re.sub(r"[\s\-]", "", str(text or "")).upper()
+    kind = "key"
+    if len(s) == 54 and s.startswith("R2"):
+        kind, s = "secret", s[2:]
     if not re.fullmatch(r"[A-Z2-7]{52}", s):
-        raise Bad("this is not a recovery key (expected 52 characters A-Z and 2-7, in groups of 4)")
-    return base64.b32decode(s + "=" * (-len(s) % 8))
+        raise Bad("this is not a recovery key (expected R2- and 52 characters A-Z and 2-7, in groups of 4)")
+    return kind, base64.b32decode(s + "=" * (-len(s) % 8))
+
+
+def org_key(h, parsed):
+    """The organisation key: the earlier format is the key; a recovery secret opens the header's recovery_wrapped
+    (AES-256-GCM under HKDF-SHA256(secret, info "kalmido-orgkey-recovery-v1"), AAD binds the organisation)."""
+    from cryptography.exceptions import InvalidTag
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+    kind, b = parsed
+    if kind == "key":
+        return b
+    w = str(h.get("recovery_wrapped") or "")
+    if not w.startswith("r1."):
+        raise Bad("this archive was made before the recovery key was set up: use the recovery key of that time")
+    try:
+        raw = base64.urlsafe_b64decode(w[3:] + "=" * (-len(w[3:]) % 4))
+        k = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"kalmido-orgkey-recovery-v1").derive(b)
+        return AESGCM(k).decrypt(raw[:12], raw[12:], b"kalmido-orgkey-recovery|%d" % int(h["org_id"]))
+    except (InvalidTag, ValueError, KeyError, TypeError):
+        raise Bad("wrong recovery key (or the archive belongs to another organisation, or the key was renewed since)") from None
 
 
 def read_header(f):
@@ -69,7 +95,7 @@ def decrypt(src, dst, key):
             w = base64.b64decode(h["wrapped_fk"])
             prefix = base64.b64decode(h["nonce_prefix"])
             block = int(h["block"])
-            fk = AESGCM(key).decrypt(w[:12], w[12:], FK_AAD + str(int(h["org_id"])).encode())
+            fk = AESGCM(org_key(h, key) if isinstance(key, tuple) else key).decrypt(w[:12], w[12:], FK_AAD + str(int(h["org_id"])).encode())
         except InvalidTag:
             raise Bad("wrong recovery key (or the archive belongs to another organisation)") from None
         except (KeyError, ValueError, TypeError):

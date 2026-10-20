@@ -193,7 +193,9 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
         # 2.121.0 A (#2092)
         "extracted": {"type": ["object", "null"], "description": "Single document only: what the recognition read off an invoice / receipt, "
                       "a suggestion a person takes over (supplier, vat_id, tax_no, invoice_no, vat_pct 19|7|0, vat_rates [{pct, net, vat}], "
-                      "net, vat, gross, currency; new = fields a take-over would change, hidden = dismissed)"}}}
+                      "net, vat, gross, currency; new = fields a take-over would change, hidden = dismissed)"},
+        # 2.126.1 A (#2123)
+        "summary": {"type": "string", "description": "Single document only: the summary a person took over from an agent's draft ('' = none)"}}}
     schemas["DocumentPage"] = {"type": "object", "properties": {"data": {"type": "array", "items": ref("Document")},
                                                                 "next_cursor": {"type": ["string", "null"]}}}
     T = "Documents"

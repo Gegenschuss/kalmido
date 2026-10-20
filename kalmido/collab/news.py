@@ -45,6 +45,7 @@ NEWS_KINDS += ("e2e_key",)  # 2.64.1 (#1817): someone handed me the key of a lis
 NEWS_KINDS += ("filereq",)  # 2.122.0 A (#2097): a client uploaded files through my file request (row "filereq", files/filereq.py)
 NEWS_KINDS += ("leavereq", "leavedecide")  # 2.125.0 A (#2117): a vacation request for the admins / their decision (row "leave", hub/leave.py)
 NEWS_KINDS += ("tsheet",)  # 2.125.0 B (#2119): a member closed a month / an admin approved or sent back mine (row "timesheet", personal/timesheet.py)
+NEWS_KINDS += ("wiki_shared",)  # 2.126.2 B (#2355): someone shared knowledge pages with me (row "share", wiki/wkshare.py)
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
@@ -60,10 +61,12 @@ NEWS_FOR_ME += ("review",)  # 2.60.0 C (#1512)
 NEWS_FOR_ME += ("e2e_key",)  # 2.64.1 (#1817)
 NEWS_FOR_ME += ("leavereq", "leavedecide")  # 2.125.0 A (#2117)
 NEWS_FOR_ME += ("tsheet",)  # 2.125.0 B (#2119)
+NEWS_FOR_ME += ("wiki_shared",)  # 2.126.2 B (#2355)
 
 
 def news_to_me(kind, actor_id, data, agents, s=None):
-    if kind in ("upscan", "filereq"):  # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me
+    # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
+    if kind in ("upscan", "filereq", "orgkey"):
         return True
     if not actor_id:
         return False
@@ -165,6 +168,7 @@ KIND_ROW["review"] = "review"  # 2.60.0 C (#1512)
 KIND_ROW["filereq"] = "filereq"  # 2.122.0 A (#2097)
 KIND_ROW["leavereq"] = KIND_ROW["leavedecide"] = "leave"  # 2.125.0 A (#2117): its own row (switchable)
 KIND_ROW["tsheet"] = "timesheet"  # 2.125.0 B (#2119)
+KIND_ROW["wiki_shared"] = "share"  # 2.126.2 B (#2355): switched with the sharing row (News on, no push by default)
 
 
 def notif_stored(s):
@@ -459,8 +463,18 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             from ..personal.timesheet import tsl_news_live
             if not tsl_news_live(c, uid, r["data"]):
                 continue
+        elif kind == "wiki_shared":  # 2.126.2 B (#2355): stays after a revoke (it opens "Shared with me"); only path + kind in data
+            pass
         elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
             if not sees(r["list_id"]):
+                continue
+        elif kind == "orgkey":  # 2.138.0 C (#1972): the recovery key of an organisation, while I administer it
+            from ..accounts.orgs import is_org_admin
+            try:
+                ko = int(json.loads(r["data"] or "{}").get("org_id") or 0)
+            except (ValueError, TypeError, AttributeError):
+                ko = 0
+            if not ko or not is_org_admin(c, uid, ko):
                 continue
         elif kind == "wiki_e2e_key":  # 2.64.3 (#1817): the key of a knowledge space, while I am in its organisation
             from ..accounts.orgs import user_orgs

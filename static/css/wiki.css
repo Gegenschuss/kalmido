@@ -64,7 +64,8 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wemref{color:var(--muted)}
 .wkmd .tref.wemdone{text-decoration:line-through;opacity:.7}
-.md li.cb .wemcb{order:1;margin-left:auto;flex:none;min-width:2.75rem;min-height:2.75rem;margin-top:-.625rem;margin-bottom:-.625rem}
+.md li.cb .wemcb{order:1;margin-left:auto;flex:none;position:relative;min-width:1.5rem;min-height:1.5rem;width:1.5rem;height:1.5rem;padding:0;margin:0}  /* 2.126.2 A (#2363): row-sized; the hit area grows to the right only */
+.md li.cb .wemcb::after{content:"";position:absolute;top:0;bottom:0;left:0;right:-1.25rem}
 .wemcbbar{display:flex;justify-content:flex-end;margin-bottom:.5rem}
 .wemcbl{list-style:none;margin:0 0 .5rem;padding:0;display:flex;flex-direction:column;gap:.25rem;max-height:40vh;overflow:auto}
 .wemcbl label{display:flex;align-items:flex-start;gap:.5rem;min-height:2.25rem}

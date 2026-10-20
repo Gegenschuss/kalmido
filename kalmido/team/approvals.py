@@ -87,11 +87,14 @@ def approval_apply(c, tid, b):
             raise BadInput(tr("The approver must be a person of this list"))  # 2.86.0 (N12): a viewer cannot decide
         old = t["assignee_id"]
         ts = iso(now_utc())
+        from ..lists.rules import rul_fire, rul_snap
+        rb = rul_snap(c, tid)  # 2.138.0 D (#2060): the approver becomes the assignee (rule trigger "assigned")
         c.execute("""UPDATE tasks SET approval='pending', approver_id=?, assignee_id=?, assignee_group_id=NULL, assigned_by=?,
                      reminded='[]', updated_at=? WHERE id=?""", (ap, ap, uid, ts, tid))
         log_act(c, tid, "apstate", {"state": "pending", "approver": ap, **({"note": note} if note else {})})
         if old != ap:
             assignment_events(c, tid, old, ap)
+        rul_fire(c, tid, rb)
         return one_task(c, tid)
     if act == "cancel":
         need_task(c, tid, write=False, full=True)  # 2.36.2 (#1142): former members cannot withdraw (404)
@@ -127,8 +130,11 @@ def approval_apply(c, tid, b):
         log_act(c, tid, "wont")
         unblock_events(c, completed_ids(c, tid))
     elif asker and asker in list_people(c, t["list_id"]) and not _is_agent(asker, c):
+        from ..lists.rules import rul_fire, rul_snap
+        rb = rul_snap(c, tid)  # 2.138.0 D (#2060): back to the asker (rule trigger "assigned")
         c.execute("UPDATE tasks SET assignee_id=?, assigned_by=? WHERE id=?", (asker, uid, tid))
         assignment_events(c, tid, t["assignee_id"], asker)
+        rul_fire(c, tid, rb)
     approval_notify(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), state, note, asker)
     return one_task(c, tid)
 

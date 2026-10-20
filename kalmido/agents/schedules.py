@@ -19,7 +19,7 @@ from flask import g, jsonify
 
 from ..core.config import app, TZ
 from ..core.pg import insert_id
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso
 from ..core.access import Denied, list_role
 from ..accounts.session import me
@@ -36,6 +36,15 @@ SCHED_LATE_S = 15 * 60         # a run sent later than this after its due time i
 SCHED_RUN_GAP_S = 600          # "Run now": at most once per plan within this many seconds
 SCHED_TICK_MAX = 200           # due plans handled per watchdog tick
 SCHED_FIELDS = ("title", "prompt", "freq", "days", "time", "tz", "list_id", "enabled")
+# 2.126.1 B (#2126): what a plan does when due -- chat: the event scheduled_job (every plan before 2.126.1); triage: Kalmido
+# asks the agent for a proposal "Sort the basket" for the plan's person, exactly like the button (proposals.py prop_input,
+# the same limits and rights), job_request with scheduled: true; the person finds the card in the morning. An empty basket
+# sends nothing (last_state empty); an open proposal of the plan not decided yet sends nothing new (pending).
+SCHED_FIELDS += ("action",)
+SCHED_ACTIONS = ("chat", "triage")
+SCHED_TRIAGE_ERR = {"empty": N_("The basket is empty"), "pending": N_("The last proposal of this plan is still open"),
+                    "busy": N_("You have {0} open proposal requests: apply or discard some first")}
+SCHED_TRIAGE_PROMPT = N_("Sort my basket: propose for every item the list (and column) where it belongs.")
 
 
 def sched_zone(name):
@@ -106,7 +115,17 @@ def sched_in(c, aid, uid, b, cur=None):
     if unknown:
         raise BadInput(tr("Invalid value: {0}", ", ".join(unknown)))
     f = {}
+    act = b.get("action", (cur["action"] if "action" in cur.keys() else "chat") if cur else "chat")  # 2.126.1 B (#2126)
+    if act not in SCHED_ACTIONS or (act == "triage" and cur is not None and cur["list_check"]):
+        raise BadInput(tr("Invalid value: {0}", "action"))
+    if act == "triage" and cur is not None and cur["user_id"] != uid and (cur["action"] if "action" in cur.keys() else "chat") != "triage":
+        raise Denied(403)  # 2.126.1 review: only the plan's person turns it into sorting their basket (a manager never)
+    f["action"] = act
+    if act == "triage" and (cur is None or "prompt" in b) and not (isinstance(b.get("prompt"), str) and b["prompt"].strip()):
+        f["prompt"] = tr(SCHED_TRIAGE_PROMPT)  # optional for triage (older versions send it as the plan's text)
     for k in ("title", "prompt"):
+        if k == "prompt" and "prompt" in f:
+            continue
         if k in b or cur is None:
             v = b.get(k)
             if not isinstance(v, str) or not v.strip():
@@ -154,6 +173,8 @@ def sched_in(c, aid, uid, b, cur=None):
             # a manager changing someone else's plan: the list must work for the plan's person
             sched_list_ok(c, aid, cur["user_id"] if cur else uid, lid)
             f["list_id"] = lid
+    if act == "triage":  # 2.126.1 B (#2126): the basket is the person's own, no list
+        f["list_id"] = None
     if "enabled" in b:
         if not isinstance(b["enabled"], bool):
             raise BadInput(tr("Invalid value: {0}", "enabled"))
@@ -170,6 +191,7 @@ def sched_dict(c, r, uid=None, names=None):
             "user_id": r["user_id"], "by_name": names.get(r["user_id"], ""), "mine": uid is not None and r["user_id"] == uid,
             "title": r["title"], "prompt": r["prompt"], "freq": r["freq"], "days": sched_days(r), "time": r["at_time"], "tz": r["tz"],
             "list_id": r["list_id"], "list_name": lname, "enabled": bool(r["enabled"]),
+            "action": (r["action"] if "action" in r.keys() else "chat") or "chat",  # 2.126.1 B (#2126)
             "list_check": bool(r["list_check"]),  # 2.39.0 (#1168): a scheduled check of a list (made in its Playbook view)
             "next_at": r["next_at"] if r["enabled"] else None, "last_at": r["last_at"], "last_state": r["last_state"] or None,
             "created_at": r["created_at"], "updated_at": r["updated_at"]}
@@ -215,9 +237,16 @@ def sched_fire(c, r, now, manual=False, manual_by=None):
         from ..lists.playbook import chk_ok
         if not r["list_id"] or not chk_ok(c, r):
             state = "no_list"
+    triage = ("action" in r.keys() and r["action"] == "triage")  # 2.126.1 B (#2126)
+    if not state and triage:
+        from ..agents.proposals import prop_agent_ok
+        if not prop_agent_ok(c, a, uid) and agent_active(a):  # the person may no longer ask the agent for proposals
+            state = "no_access"
     if state:  # the plan cannot work any more: it switches itself off (the person sees why)
         c.execute("UPDATE agent_schedules SET enabled=0, next_at=NULL, last_state=?, updated_at=? WHERE id=?", (state, iso(now), r["id"]))
         return state
+    if triage:
+        return ast2_sched_triage(c, r, a, now, manual)
     due = r["next_at"] if not manual and r["next_at"] else iso(now)
     late = not manual and (now - parse_iso(due)).total_seconds() > SCHED_LATE_S
     name = user_names(c, [uid]).get(uid, "")
@@ -234,6 +263,63 @@ def sched_fire(c, r, now, manual=False, manual_by=None):
         chk_event(c, r, data)
     seq = agent_emit(c, aid, "scheduled_job", data) if agent_active(a) else None
     state = ("late" if late else "sent") if seq else "skipped"
+    c.execute("UPDATE agent_schedules SET last_at=?, last_state=?, last_seq=? WHERE id=?", (iso(now), state, seq, r["id"]))
+    return state
+
+
+def ast2_sched_triage(c, r, a, now, manual):
+    """2.126.1 B (#2126): a due "Sort the basket" plan -> a triage proposal request for its person, as the button makes it
+    (proposals.py: the same input, PROP_TRIAGE_MAX / PROP_OPEN_MAX, prop_agent_ok checked by sched_fire), job_request with
+    scheduled: true. Nothing is sent for an empty basket (empty), while the plan's last proposal is still open (pending), at
+    the open-request limit (busy) or for a switched-off agent / one at its usage limit (skipped). Returns last_state."""
+    import json
+    from ..agents.core import JOB_TITLE_MAX, job_dict
+    from ..agents.proposals import PROP_LIMITS, PROP_OPEN_MAX, prop_input
+    from ..agents.usage import usage_block
+    from ..collab.liste2eguard import le2b_list_locked
+    aid, uid = r["agent_id"], r["user_id"]
+    due = r["next_at"] if not manual and r["next_at"] else iso(now)
+    late = not manual and (now - parse_iso(due)).total_seconds() > SCHED_LATE_S
+    state = None
+    if not agent_active(a) or usage_block(c, aid):
+        state = "skipped"
+    elif c.execute("SELECT 1 FROM agent_jobs WHERE user_id=? AND agent_id=? AND kind='triage' AND state IN ('running','waiting') "
+                   "AND prop_state IN ('requested','ready') AND (CASE WHEN kind='triage' THEN input::jsonb->>'schedule_id' END) = ? LIMIT 1", (uid, aid, str(r["id"]))).fetchone():
+        state = "pending"
+    elif c.execute("SELECT COUNT(*) FROM agent_jobs WHERE user_id=? AND kind IS NOT NULL AND state IN ('running','waiting')",
+                   (uid,)).fetchone()[0] >= PROP_OPEN_MAX:
+        state = "busy"
+    if not state:
+        try:
+            inp, title, tid, lid = prop_input(c, uid, "triage", {"agent_id": aid, "kind": "triage"})
+        except (BadInput, Denied):
+            inp = lid = None
+            state = "empty"  # nothing open in the basket: nothing to sort, no event
+        if lid and le2b_list_locked(c, lid):
+            state = "skipped"
+    if state:
+        c.execute("UPDATE agent_schedules SET last_at=?, last_state=? WHERE id=?", (iso(now), state, r["id"]))
+        return state
+    ids = [x["id"] for x in inp["lists"]]
+    if ids:  # unattended: never a health / budget list (nor its name) as a target, whatever the person's view holds
+        priv = {x[0] for x in c.execute(f"SELECT id FROM lists WHERE id IN ({','.join('?' * len(ids))}) AND life IN ('health', 'budget')", ids)}
+        inp["lists"] = [x for x in inp["lists"] if x["id"] not in priv]
+    inp["schedule_id"] = r["id"]  # finds the plan's open proposal (pending); the agent sees which plan asked
+    ts = iso(now)
+    jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id)
+                       VALUES(?,NULL,?,?,'running','',?,?,'triage',?,'requested',?)""",
+                    (aid, uid, (title or r["title"])[:JOB_TITLE_MAX], ts, ts, json.dumps(inp, ensure_ascii=False), lid))
+    j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
+    seq = agent_emit(c, aid, "job_request", {"job": job_dict(c, j), "kind": "triage", "input": inp, "limits": PROP_LIMITS,
+                                             "requested_by": {"id": uid, "name": user_names(c, [uid]).get(uid, "")},
+                                             "scheduled": True, "schedule_id": r["id"], "due_at": due, "late": late, "manual": manual,
+                                             "hint": "A planned \"Sort the basket\" of this person: answer it like any triage request "
+                                                     "(submit_proposal). They find your proposal as a card and decide."}, actor=None)
+    state = ("late" if late else "sent") if seq else "skipped"
+    if not seq:  # not delivered: no job waits for an answer that never comes
+        c.execute("DELETE FROM agent_jobs WHERE id=?", (jid,))
+    else:
+        print("scheduled triage", jid, "agent", aid, "for user", uid, flush=True)
     c.execute("UPDATE agent_schedules SET last_at=?, last_state=?, last_seq=? WHERE id=?", (iso(now), state, seq, r["id"]))
     return state
 
@@ -284,10 +370,10 @@ def agent_schedule_create(aid):
     if c.execute("SELECT COUNT(*) FROM agent_schedules WHERE agent_id=? AND user_id=? AND list_check=0", (aid, uid)).fetchone()[0] >= SCHED_MAX:
         return err(tr("At most {0} plans per agent", SCHED_MAX), 409)
     ts = iso(now_utc())
-    sid = insert_id(c, """INSERT INTO agent_schedules(agent_id,user_id,title,prompt,freq,days,at_time,tz,list_id,enabled,created_at,updated_at)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+    sid = insert_id(c, """INSERT INTO agent_schedules(agent_id,user_id,title,prompt,freq,days,at_time,tz,list_id,enabled,created_at,updated_at,action)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (aid, uid, f["title"], f["prompt"], f["freq"], f["days"], f["at_time"], f["tz"], f.get("list_id"),
-                     f.get("enabled", 1), ts, ts))
+                     f.get("enabled", 1), ts, ts, f["action"]))  # 2.126.1 B (#2126): action
     _sched_set_next(c, sid)
     c.commit()
     return jsonify(sched_dict(c, sched_row(c, sid), uid)), 201
@@ -324,6 +410,8 @@ def agent_schedule_run(sid):
     """Run now: the event goes out at once (manual: true); the plan's rhythm stays as it is."""
     c, uid = db(), me()
     r = sched_need(c, sid, uid)
+    if (r["action"] if "action" in r.keys() else "chat") == "triage" and uid != r["user_id"]:
+        raise Denied(403)  # 2.126.1 review: a manager never sends another person's basket to the agent
     now = now_utc()
     if r["last_at"] and (now - parse_iso(r["last_at"])).total_seconds() < SCHED_RUN_GAP_S and r["last_state"] in ("sent", "late", "manual"):
         return err(tr("This plan just ran. Try again in a few minutes."), 429)
@@ -335,6 +423,9 @@ def agent_schedule_run(sid):
     c.commit()
     if st in ("no_access", "no_list"):
         return err(tr("This plan cannot run any more: the agent no longer sees its list or you."), 409)
+    if st in SCHED_TRIAGE_ERR:  # 2.126.1 B (#2126): "Sort the basket" sent nothing (the state is kept)
+        from ..agents.proposals import PROP_OPEN_MAX
+        return err(tr(SCHED_TRIAGE_ERR[st], PROP_OPEN_MAX), 409)
     return jsonify(sched_dict(c, sched_row(c, sid), uid))
 
 
@@ -366,10 +457,14 @@ def sched_spec(paths, schemas, op, ok, errs, ref, pid, nul):
         "days": {"type": "array", "items": {"type": "integer"}, "description": "weekly: ISO weekdays 1 (Monday) - 7; monthly: [day of month]"},
         "time": {"type": "string", "description": "HH:MM in tz"}, "tz": {"type": "string", "description": "IANA time zone of the person"},
         "list_id": nul("integer"), "list_name": nul("string"), "list": nul("object"), "enabled": {"type": "boolean"},
+        "action": {"type": "string", "enum": list(SCHED_ACTIONS), "description": "2.126.1: chat = the event scheduled_job (answer in the "
+                   "chat); triage = Sort the basket: no scheduled_job, a job_request of kind triage with scheduled: true and schedule_id "
+                   "(answer it like any triage request with your proposal)"},
         "list_check": {"type": "boolean", "description": "2.39.0: a scheduled check of the list against its Playbook (event scheduled_job "
                                                          "with list_check: true, open_task_ids and playbook)"},
         "next_at": nul("string", format="date-time"), "last_at": nul("string", format="date-time"),
-        "last_state": nul("string", description="sent | late | manual | skipped (you were switched off) | no_access | no_list (switched itself off)"),
+        "last_state": nul("string", description="sent | late | manual | skipped (you were switched off) | no_access | no_list (switched itself off); "
+                                                "2.126.1 triage plans: empty (basket empty) | pending (its last proposal still open) | busy (the person has too many open requests)"),
         "created_at": {"type": "string", "format": "date-time"}, "updated_at": {"type": "string", "format": "date-time"}}}
     paths["/agent/schedules"] = {"get": op(
         "2.34.0 (#272): your planned jobs (agent tokens only). People who may chat with you plan them in the app; when one is due "

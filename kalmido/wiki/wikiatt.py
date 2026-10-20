@@ -685,13 +685,15 @@ def wka_export_zip(c, oid, uid):
             return f"![[{p}]]"
         lb = m.group(2)
         return f"[[{p}]]" if not lb or lb == r["name"] else f"[[{p}|{lb.replace('|', '/')}]]"
-    from .wkhist import wkh_body
+    from .wkhist import wsb_body_or
     os.makedirs(WKA_TMP, mode=0o700, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix="export-", suffix=".zip", dir=WKA_TMP)
     try:
         with os.fdopen(fd, "wb") as out, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
             for r in pages:
-                z.writestr(r["path"] + ".md", WKA_URL_RE.sub(back, wkh_body(c, r) or ""))  # 2.123.0 A (#2105): opened
+                text = wsb_body_or(c, r, None)  # 2.126.2 B (#2358): an unreadable page is left out, never its ciphertext
+                if text is not None:
+                    z.writestr(r["path"] + ".md", WKA_URL_RE.sub(back, text or ""))  # 2.123.0 A (#2105): opened
             for p, r in zpath.values():
                 try:
                     data = oc_read_file(c, os.path.join(ATT_DIR, r["path"]))

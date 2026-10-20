@@ -27,6 +27,7 @@ ORDER = (
     "core.i18n",
     "core.pg",  # 2.37.0 (#1150): the Postgres layer (core.db re-exports it)
     "core.db",
+    "core.tokenhash",  # 2.138.0 C (#1907): upload / calendar tokens as hashes
     "core.rls",  # 2.37.0 (#1150): row-level security, applied by init_db
     "core.orgcrypt",  # 2.42.0 (#828): keys per organisation, encryption at rest
     "admin.migrate",  # 2.37.0 (#1150): the move from SQLite (migrate-sqlite), used by init_db
@@ -330,10 +331,13 @@ ORDER = (
     "office.subs",  # 2.91.0 B (#1924): subscriptions and tools (fixed costs with notice period, users, renewal reminder)
     "office.officemove",  # 2.97.0 C (#2049): office data between the personal office and an organisation's office
     "office.pbtransfer",  # 2.137.0 D (#1981): the personal office into an existing organisation (after office.officemove)
+    "office.numranges",  # 2.138.0 D (#2256): the next running number of every number series (office admin)
     "agents.importprop",  # 2.68.0 A (#1839): agents propose old data for the office (fixed costs), the person takes it over
+    "agents.sheetprop",  # 2.126.1 B (#2125): table rows -> tasks as an agent's proposal (after api.v1, sheets.step2)
     "agents.meetprop",  # 2.70.0 A (#1354): a meeting becomes tasks (extract with photos, the chat's cards)
     "agents.dupprop",  # 2.70.0 B (#1357): duplicate contacts as a proposal (no routes)
     "agents.contractprop",  # 2.70.0 C (#1359): contract_notice + the proposal kind notice (no routes of its own)
+    "agents.asstprop",  # 2.126.1 A (#2123 #2124): office texts, document summaries, client reports by an agent (no routes of its own)
     "lists.rules",  # 2.71.0 A (#1457): rules of a list (When ... then ...), after api.v1
     "admin.supporter",  # 2.74.0 (#338): the supporter licence (self-hosted only, a badge, unlocks nothing)
     "assistant.core",  # 2.75.0 (#1411): the built-in assistant -- configuration, model call, prompts (off unless configured)

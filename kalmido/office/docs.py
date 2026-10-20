@@ -1035,8 +1035,12 @@ def odoc_items_put(did):
     ofx_need_editable(r)
     b = body()
     items = b.get("items") if isinstance(b, dict) else b
-    before = ofx_items_brief(doc_items(c, did, oid))
+    rows_before = doc_items(c, did, oid)
+    before = ofx_items_brief(rows_before)
     _put_items(c, oid, r, items, admin)
+    if isinstance(b, dict) and "parts_known" in b:  # 2.138.0 A (#2239): a list built before a part was added keeps its line
+        from .parts import kva_keep_unseen_parts
+        kva_keep_unseen_parts(c, oid, r, rows_before, b.get("parts_known"))
     after = ofx_items_brief(doc_items(c, did, oid))
     if before != after:
         ofx_log(c, oid, "items", doc_id=did, detail={"before": before, "after": after})
