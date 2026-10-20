@@ -194,9 +194,9 @@ counted per client or project have no single series and are not listed.
 - `POST /api/office/number-ranges/<kind>` `{next, reason?}` (admin; 400 below `min_next` or without a needed reason)
 
 A draft's number can be changed in the document editor (the pencil next to the number; `POST /api/office/docs/<id>/number`
-`{number, reason?}`): unique per office area, never for a sent or finalised document (409). Invoices, credit notes,
-reminders and delivery notes get their number only when finalised (no gaps), so the pencil shows on quotation drafts (and
-not when quotations are numbered at finalising too); a quotation's own number leaves the counter as it is. The document
+`{number, reason?}`): unique per office area, never for a sent or finalised document (409). For invoices, credit notes,
+reminders and delivery notes the series continues from the new number (a gap needs a reason) and a draft numbered this
+way can no longer be deleted (no gaps); a quotation's own number leaves the counter as it is. The document
 list shows the new number at once. Both routes are session routes of the office (no API
 v1 / MCP tool), the same in the personal office of a person without an organisation.
 

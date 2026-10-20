@@ -1,23 +1,29 @@
-// 2.114.0 C (#2256) UI tests: number ranges (office_numranges.js), own container (start.sh), jsdom, invented data.
+// 2.138.0 D UI tests, own container (start.sh, a fresh one per section), jsdom, invented data.
+// (taken over from the 2.114.0 A / B / C suites, only the cases of #2256 #2060)
+// ---- numranges:
+// number ranges (office_numranges.js), own container (start.sh), jsdom, invented data.
 // The settings page shows the next running number of every series below the number schemes: the preview follows the
 // input, an invoice jump asks for a reason, "Apply" saves (confirm) and the scheme's "next: …" follows. The document editor:
 // a click on the pencil next to the number opens the field; after saving the head AND the document list show the new
 // number at once; a change made elsewhere (the console) reaches an open list with the next state load.
-const {execFileSync} = require('child_process');
+// P2138D_NOSTART=1: a running server, no start.sh - then only one section, P2138D_PART=<name> (default the first)
 const path = require('path');
+const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
-if (!process.env.P2114C_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
-let CK;
-const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); j.http = r.status; return j; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
-const Y = String(new Date().getFullYear());
-const range = async k => (await call('GET', '/api/office/number-ranges')).ranges.find(x => x.kind === k);
+const NOSTART = !!process.env.P2138D_NOSTART;
+const start = () => { if (!NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}); };
 
-(async () => {
+async function part_numranges() {
+  start();
+  let CK;
+  const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); j.http = r.status; return j; };
+  const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+  const Y = String(new Date().getFullYear());
+  const range = async k => (await call('GET', '/api/office/number-ranges')).ranges.find(x => x.kind === k);
   await sleep(600);
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
@@ -31,7 +37,7 @@ const range = async k => (await call('GET', '/api/office/number-ranges')).ranges
   const w = await boot({hash: 'office/settings'}); const d = w.document;
   w.confirm = () => true;
   check(!!await until(() => d.querySelector('#onum-invoice'), 80), 'the block "Next running number" is there');
-  check(d.querySelectorAll('#onum-box .onumrow').length === 4, 'four series: quotation, invoice, credit note, reminder');
+  check(d.querySelectorAll('#onum-box .onumrow').length === 5, 'five series: quotation, invoice, credit note, reminder, delivery note');
   check(!d.querySelector('#onum-box input[id^="os-"]') && d.querySelector('#onum-box').hasAttribute('data-fg-skip'), 'not part of the settings save (no os- ids, form guard skipped)');
   const rowI = () => d.querySelector('.onumrow[data-kind="invoice"]');
   check(new RegExp('applies to ' + Y).test(rowI().textContent) && /at least 1/.test(rowI().textContent), 'invoice: "applies to <year>", smallest value');
@@ -104,7 +110,11 @@ const range = async k => (await call('GET', '/api/office/number-ranges')).ranges
   await w2.eval('load()');
   check(await until(() => (d2.querySelector('.ofdlist')?.textContent || '').includes('A-555'), 60), 'the open list follows a change made elsewhere');
   w2.close();
+}
 
-  console.log(`${ok} ok, ${F.length} failed`);
+const PARTS = {numranges: part_numranges};
+(async () => {
+  for (const n of NOSTART ? [process.env.P2138D_PART || 'numranges'] : Object.keys(PARTS)) await PARTS[n]();
+  console.log(`p2138_d_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });
