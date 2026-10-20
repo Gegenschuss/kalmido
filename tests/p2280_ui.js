@@ -280,7 +280,7 @@ const V = B + 'api/v1';
     await o.nav(B + '#today'); await ready(ev);
     await ev(`(() => { document.querySelector('#top [data-act="side"]').click(); return 1; })()`); await sleep(600);
     // 2.87.9 (#1933): the switch is a round icon button beside the search
-    check(await ev(`(() => { const b = document.querySelector('#side .wsbar'); return !!b && b.getBoundingClientRect().width > 30 && b.parentElement.classList.contains('sbsrch'); })()`), `${tag}: #935 the switch in the drawer, beside the search (2.87.9 #1933)`);
+    check(await ev(`(() => { const b = document.querySelector('#side .wsbar'); return !!b && b.getBoundingClientRect().width > 30 && b.parentElement.classList.contains('sbhead'); })()`), `${tag}: #935 the switch in the drawer, the head of the sidebar (2.138.1 #2392)`);  // 2.138.1 (#2392): the switch is the sidebar's heading
     await shot('p2280-light-390-drawer.png');
     await ev(`(() => { wsSet('private'); return 1; })()`); await sleep(700);
     check(await ev(`!!document.querySelector('#top .wschip')`), `${tag}: #935 the chip on the phone`);

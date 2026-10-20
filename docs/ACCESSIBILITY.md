@@ -46,6 +46,15 @@ the app has not yet been tested by people who use a screen reader every day (see
   sidebar lightly (also the phone drawer; never under *All workspaces*), the switch and its menu show a dot in front of
   each workspace (a ring when it has no colour), and your tone replaces the organisation's colour in the stripes and
   the header's sign. Text on the tinted sidebar keeps at least 4.5:1 in light and dark; every change is one Undo step.
+- **Workspace stripe and a calmer sidebar head (2.138.1).** The tint and the stripe in the list header are gone: the
+  shown workspace is a 4 px stripe across the top of the sidebar (3 px on top of the header while the sidebar is
+  closed, on phones and in the folded-away rail). The setting is called *Workspace colour*: your choice, else the
+  organisation's colour, else Kalmido purple for Private (also without an organisation, on the account page); *All
+  workspaces* and *No color* show a grey stripe. The head has no logo: its first row is the workspace switch (dot,
+  name, arrow), the buttons to fold all groups or fold the sidebar away show on hover and keyboard focus (always on
+  touch screens). The account picture sits next to the search at the bottom without dots; the connection dot only
+  appears offline or while changes go out (its state stays in the picture's name and the account menu), the update dot
+  only at Settings. *Start* is in the account menu and in the search (Mod+K).
 - **Calmer rows (2.56.1).** *Settings > Appearance > Task rows > Symbols in the row* sets how many small symbols a task
   row shows: *All*, *Important* (the default: due date, reminder, person, approvals and locks), *Calm* (only the title,
   the status circle and the due date) or *Custom* (a box per symbol, in groups). Overdue tasks, an agent waiting for
