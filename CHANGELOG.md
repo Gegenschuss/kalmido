@@ -7,6 +7,10 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.142.1] - 2026-10-20
+
+- Meal plan: on a narrow phone the week switcher moves under the title, the next-week arrow stays on screen (#2132); the restore check of the sign-in suite waits for the restore instead of a fixed pause.
+
 ## [2.142.0] - 2026-10-20
 
 Notifications to Slack, Matrix, Telegram and Signal, e-mail on assignments and mentions, importers for Notion, Google Tasks, ClickUp, Jira, CSV and Markdown, export as Todoist CSV or Markdown.
