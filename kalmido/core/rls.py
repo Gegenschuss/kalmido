@@ -57,6 +57,7 @@ TABLES = (
     "video_reviews", "video_versions", "video_comments",  # 2.99.1 A (#1959): video sign-offs (NULL = private, the app checks owner / task / list / client)
     "office_pay_props",  # 2.51.0 A (#1350): payment suggestions of agents
     "task_bell",  # 2.53.0 C (#1424): the bell of one task per person (NULL = a private list's task)
+    "time_sheets",  # 2.125.0 B (#2119): monthly timesheets (NULL = a person without organisation, the app checks user_id)
     "nl_conns", "nl_segments", "nl_members", "nl_runs",  # 2.55.0 E (#1455): the newsletter connection (NULL = a person's own)
     "task_vectors",  # 2.59.0 B (#1375): the text vectors of related tasks (NULL = a private list's task)
     "upload_scan",  # 2.61.0 A (#1818): unchecked / infected uploads (NULL = a private file; files/scan.py)

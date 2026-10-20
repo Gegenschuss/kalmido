@@ -235,6 +235,7 @@ function newsText(it, U) {
     case 'errreport': return d.title ? tr('New error reported: {0}', q(d.title)) : tr('A new error was reported');  // 2.18.0
     case 'approval': return tr('{0} is waiting for your approval', who);
     case 'review': return rvw_newsText(it, d, who, q);  // 2.60.0 C (#1512)
+    case 'tsheet': return tsl_newsText(it, d, who, q);  // 2.125.0 B (#2119)
     case 'apdecide': return {approved: tr('{0} approved {1}', who, q(it.task_title || '')), changes: tr('{0} asks for changes to {1}', who, q(it.task_title || '')),
       rejected: tr('{0} rejected {1}', who, q(it.task_title || ''))}[d.state] || tr('{0} decided on your approval request', who);  // 2.23.0 (#463)
     case 'signup': return tr('{0} registered and waits for your approval', q(d.name || d.username || ''));  // 2.23.0 (#711)
@@ -407,6 +408,7 @@ async function newsOpen(i, opts) {
   if (it.kind === 'approval' && !it.task_id && feat('agents') && agentsOn()) { go('agents'); return; }
   if (it.kind === 'upscan' && it.data?.where === 'fs') { go('ablage/' + it.data.ref); return; }  // 2.61.0 (#1818): the locked file
   if (it.kind === 'filereq' && it.data?.node) { go('ablage/' + it.data.node); return; }  // 2.122.0 A (#2097): the folder the files went into
+  if (it.kind === 'tsheet') { tsl_open(it.data); return; }  // 2.125.0 B (#2119): the time page on that month
   if (it.kind === 'upscan' && it.data?.where === 'chat') { if (feat('agents') && agentsOn()) go('agents'); return; }
   if (it.kind === 'signup') { settingsModal('users'); return; }  // 2.23.0 (#711): approve it under Users  // 2.15.0 (#479): an agent's request
   if (!it.task_id) { if (it.list_id && listById(it.list_id)) go('l/' + it.list_id); return; }

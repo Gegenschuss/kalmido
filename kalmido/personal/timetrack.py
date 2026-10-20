@@ -39,6 +39,10 @@ from ..personal.habits import pomo_elapsed
 # - Days: an entry belongs to the local day (server time zone) on which it starts; entries crossing
 #   midnight are not split. Durations are real elapsed time (UTC), so DST changes are exact. Periods are
 #   local days, weeks start on Monday.
+#   2.125.0 B (#2120): "local" = the person's own time zone (setting tz, '' = the server's); an entry over midnight counts on
+#   each day with its share in the report's days, the CSV and the timesheet (setting time_split_midnight, default on; the entry
+#   itself stays one entry, personal/timesheet.py). 2.125.0 B (#2119): entries in a closed month (timesheet) are locked: every
+#   write path calls tsl_check (409 month_closed).
 # - Rounding (per user, reports / CSV / timesheet only): every entry is rounded UP to N minutes, stored
 #   durations stay exact. Amount = rounded hours x hourly rate of the list (set by the list owner).
 TIME_BACK_DAYS = 7
@@ -116,8 +120,8 @@ def bad_input(e):
     return err(str(e), 400)
 
 
-def parse_when(v):
-    """ISO date-time from the client (Z / offset; naive = server time zone) -> aware UTC (whole seconds)."""
+def parse_when(v, tz=None):
+    """ISO date-time from the client (Z / offset; naive = server time zone, 2.125.0 B (#2120): or the person's tz) -> aware UTC (whole seconds)."""
     if not v or not isinstance(v, str):
         return None
     try:
@@ -125,7 +129,7 @@ def parse_when(v):
     except ValueError:
         raise BadInput(tr("Invalid date or time")) from None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=TZ)
+        dt = dt.replace(tzinfo=tz or TZ)
     return dt.astimezone(timezone.utc).replace(microsecond=0)
 
 
@@ -391,6 +395,8 @@ def time_start():
     note = str(b.get("note") or "").strip()[:500]
     stopped, end = None, None
     run = c.execute("SELECT * FROM time_entries WHERE user_id=? AND \"end\" IS NULL", (uid,)).fetchone()
+    from .timesheet import tsl_check
+    tsl_check(c, uid, at, run["start"] if run else None)  # 2.125.0 B (#2119): no new time in / change of a closed month
     if run:
         if parse_iso(run["start"]) <= at:
             stopped = {"id": run["id"], "seconds": stop_timer(c, run, at, ts), "task_id": run["task_id"]}
@@ -426,6 +432,8 @@ def time_stop():
         return err(tr("unknown"), 404)
     sec = None
     if r["end"] is None or (r["source"] == "timer" and at < parse_iso(r["end"])):
+        from .timesheet import tsl_check
+        tsl_check(c, uid, r["start"])  # 2.125.0 B (#2119)
         sec = stop_timer(c, r, at, iso(ref))
     if sec == 0:  # started and stopped within the same second (misclick): nothing to keep
         c.execute("DELETE FROM time_entries WHERE id=?", (r["id"],))
@@ -434,10 +442,10 @@ def time_stop():
     return jsonify(entry=one_entry(c, r["id"]), timer=time_running(c, uid), discarded=sec == 0)
 
 
-def entry_times(b, start, end, sec):
+def entry_times(b, start, end, sec, tz=None):
     """start / end / minutes (or seconds) of a manual entry or an edit -> (start, end, seconds)."""
     if "start" in b:
-        start = parse_when(b.get("start"))
+        start = parse_when(b.get("start"), tz)
     if not start:
         raise BadInput(tr("Start missing"))
     if b.get("minutes") not in (None, ""):
@@ -447,7 +455,7 @@ def entry_times(b, start, end, sec):
             raise BadInput(tr("Duration: number of minutes expected")) from None
         end = start + timedelta(seconds=sec)
     elif "end" in b and b.get("end"):
-        end = parse_when(b.get("end"))
+        end = parse_when(b.get("end"), tz)
         full = int((end - start).total_seconds())
         try:  # focus entry (restored by undo): its duration without pauses
             sec = min(full, int(b["seconds"])) if b.get("seconds") not in (None, "") else full
@@ -475,7 +483,9 @@ def time_create():
     c = db()
     uid, ts = me(), iso(now_utc())
     tid, lid, title = time_target(c, b)
-    start, end, sec = entry_times(b, None, None, 0)
+    from .timesheet import tsl_check, tz_of
+    start, end, sec = entry_times(b, None, None, 0, tz_of(c, uid))
+    tsl_check(c, uid, start)  # 2.125.0 B (#2119)
     src = b.get("source") if b.get("source") in TIME_SOURCES else "manual"
     eid = insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,created_at,updated_at)
                        VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
@@ -494,6 +504,9 @@ def time_update(eid):
     r = need_entry(c, eid)
     if not isinstance(r, Row):
         return r
+    from .timesheet import tsl_check, tz_of
+    zone = tz_of(c, r["user_id"])
+    tsl_check(c, r["user_id"], r["start"], zone=zone)  # 2.125.0 B (#2119): nothing changes in a closed month
     sets, args = [], []
     if "note" in b:
         sets.append("note=?")
@@ -504,13 +517,15 @@ def time_update(eid):
         args += [tid, lid, title]
     if r["end"] is None:  # running
         if "start" in b:
-            st = parse_when(b.get("start"))
+            st = parse_when(b.get("start"), zone)
             if not st or st > now_utc():
                 raise BadInput(tr("Invalid date or time"))
+            tsl_check(c, r["user_id"], st, zone=zone)  # 2.125.0 B (#2119): nor moves into one
             sets.append("start=?")
             args.append(iso(st))
     elif any(k in b for k in ("start", "end", "minutes")):
-        start, end, sec = entry_times(b, parse_iso(r["start"]), parse_iso(r["end"]), r["seconds"])
+        start, end, sec = entry_times(b, parse_iso(r["start"]), parse_iso(r["end"]), r["seconds"], zone)
+        tsl_check(c, r["user_id"], start, zone=zone)  # 2.125.0 B (#2119)
         sets += ["start=?", "\"end\"=?", "seconds=?"]
         args += [iso(start), iso(end), sec]
     if sets:
@@ -527,6 +542,8 @@ def time_delete(eid):
     r = need_entry(c, eid)
     if not isinstance(r, Row):
         return r
+    from .timesheet import tsl_check
+    tsl_check(c, r["user_id"], r["start"])  # 2.125.0 B (#2119)
     old = one_entry(c, eid)
     c.execute("DELETE FROM time_entries WHERE id=?", (eid,))
     bump(c)
@@ -552,16 +569,20 @@ def focus_to_entry(c, pid):
     if c.execute("SELECT 1 FROM time_entries WHERE user_id=? AND source='timer' AND start<? AND (\"end\" IS NULL OR \"end\">?)",
                  (uid, p["end"], p["start"])).fetchone():
         return None  # a timer ran at the same time: it already counts this time
+    from .timesheet import tsl_is_locked
+    if tsl_is_locked(c, uid, p["start"]):
+        return None  # 2.125.0 B (#2119): a closed month gets no new entries
     ts = iso(now_utc())
     return insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,source,pomo_id,created_at,updated_at)
                         VALUES(?,?,?,?,?,?,?,'focus',?,?,?)""",
                      (uid, p["task_id"], t["list_id"], t["title"], p["start"], p["end"], sec, pid, ts, ts))
 
 
-def local_bounds(d1, d2):
-    """Local days d1..d2 (inclusive) -> UTC ISO [lo, hi)."""
+def local_bounds(d1, d2, tz=None):
+    """Local days d1..d2 (inclusive) -> UTC ISO [lo, hi). 2.125.0 B (#2120): tz = the person's time zone (None = the server's)."""
     d3 = d2 + timedelta(days=1)
-    return (iso(datetime(d1.year, d1.month, d1.day, tzinfo=TZ)), iso(datetime(d3.year, d3.month, d3.day, tzinfo=TZ)))
+    tz = tz or TZ
+    return (iso(datetime(d1.year, d1.month, d1.day, tzinfo=tz)), iso(datetime(d3.year, d3.month, d3.day, tzinfo=tz)))
 
 
 def time_rows(c, uid, a, own=None):
@@ -577,12 +598,14 @@ def time_rows(c, uid, a, own=None):
         raise BadInput(tr("Invalid date or time")) from None
     if f and t and t < f:
         f, t = t, f
+    from .timesheet import tz_of
+    zone = tz_of(c, uid)  # 2.125.0 B (#2120): the periods are the viewer's local days
     if f:
         where.append("e.start>=?")
-        args.append(local_bounds(f, f)[0])
+        args.append(local_bounds(f, f, zone)[0])
     if t:
         where.append("e.start<?")
-        args.append(local_bounds(t, t)[1])
+        args.append(local_bounds(t, t, zone)[1])
     if a.get("scope", "mine") == "mine":
         where.append("e.user_id=?")
         args.append(uid)
@@ -622,6 +645,8 @@ def time_list():
     out = [entry_out(r, uid, vis, ref, rm) for r in rows]
     if wanted is not None:
         out = [e for e in out if (e["list_id"] or 0) in wanted]
+    from .timesheet import tsl_mark
+    tsl_mark(c, uid, out)  # 2.125.0 B (#2119): my entries of a closed month
     out.reverse()
     return jsonify(entries=out[:int(request.args.get("limit", 2000))], seconds=sum(e["seconds"] for e in out),
                    mine=sum(e["seconds"] for e in out if e["mine"]))
@@ -633,6 +658,8 @@ def time_report(c, uid, a, own=None):
     lists = {l["id"]: l for l in visible_lists(c, uid)}
     crates = {r[0]: r[1] for r in c.execute("SELECT id, rate FROM clients WHERE rate IS NOT NULL")}  # 2.23.0 (#463)
     rows, f, t, wanted = time_rows(c, uid, a, own)
+    from .timesheet import tsl_mark, tz_of_s, tz_split, tz_split_on
+    zone, split = tz_of_s(s), tz_split_on(s)  # 2.125.0 B (#2120): my time zone; entries over midnight split per day
     L, D, U, entries = {}, {}, {}, []
     tot = {"seconds": 0, "rounded": 0, "amount": 0.0, "count": 0}
 
@@ -649,7 +676,12 @@ def time_report(c, uid, a, own=None):
         rate = l["rate"] if l and l.get("rate") else (crates.get(l.get("client_id")) if l else None) or None  # else the client's rate
         amt = e["rounded"] / 3600 * rate if rate else 0.0
         e["amount"] = round(amt, 2) if rate else None
-        e["day"] = parse_iso(e["start"]).astimezone(TZ).date().isoformat()
+        e["day"] = parse_iso(e["start"]).astimezone(zone).date().isoformat()
+        if split:  # 2.125.0 B (#2120): the day shares (seconds / rounded split by elapsed time, they add up to the entry's)
+            parts = tz_split(parse_iso(e["start"]), parse_iso(e["end"]) if e["end"] else ref, e["seconds"], e["rounded"], zone)
+            if len(parts) > 1:
+                e["parts"] = [{"day": x["day"], "start": iso(x["start"]), "end": iso(x["end"]), "seconds": x["seconds"],
+                               "rounded": x["rounded"]} for x in parts]
         entries.append(e)
         add(tot, e, amt)
         tot["count"] += 1
@@ -663,8 +695,9 @@ def time_report(c, uid, a, own=None):
         add(tk, e, amt)
         tk["users"][e["user_name"]] = tk["users"].get(e["user_name"], 0) + e["rounded"]
         grp["users"][e["user_name"]] = grp["users"].get(e["user_name"], 0) + e["rounded"]
-        dd = D.setdefault(e["day"], {"date": e["day"], "seconds": 0, "rounded": 0})
-        add(dd, e, 0)
+        for x in e.get("parts") or [e]:
+            dd = D.setdefault(x["day"], {"date": x["day"], "seconds": 0, "rounded": 0})
+            add(dd, x, 0)
         uu = U.setdefault(e["user_id"], {"id": e["user_id"], "name": e["user_name"], "seconds": 0, "rounded": 0})
         add(uu, e, 0)
     out_lists = []
@@ -679,15 +712,24 @@ def time_report(c, uid, a, own=None):
         d.pop("amount", None)
     for u in U.values():
         u.pop("amount", None)
-    today = local_now().date()
-    lo, hi = local_bounds(today, today)
-    mine_today = sum(entry_secs(r, ref) for r in c.execute(
-        "SELECT start, \"end\", seconds FROM time_entries WHERE user_id=? AND start>=? AND start<?",
-        (uid, lo, hi)))
+    today = ref.astimezone(zone).date()  # 2.125.0 B (#2120): my today
+    lo, hi = local_bounds(today, today, zone)
+    if split:  # 2.125.0 B (#2120): today's share of every entry that touches today (also last night's)
+        mine_today = sum(x["seconds"] for r in c.execute(
+            "SELECT start, \"end\", seconds FROM time_entries WHERE user_id=? AND start>=? AND start<? AND (\"end\" IS NULL OR \"end\">?)",
+            (uid, iso(parse_iso(lo) - timedelta(days=TIME_BACK_DAYS + 1)), hi, lo))
+            for x in tz_split(parse_iso(r["start"]), parse_iso(r["end"]) if r["end"] else ref, entry_secs(r, ref), 0, zone)
+            if x["day"] == today.isoformat())
+    else:
+        mine_today = sum(entry_secs(r, ref) for r in c.execute(
+            "SELECT start, \"end\", seconds FROM time_entries WHERE user_id=? AND start>=? AND start<?",
+            (uid, lo, hi)))
+    tsl_mark(c, uid, entries, zone)  # 2.125.0 B (#2119): my entries of a closed month
     return {"from": f.isoformat() if f else None, "to": t.isoformat() if t else None, "scope": a.get("scope", "mine"),
             "rounding": rm, "currency": s.get("time_currency") or "", "total": tot, "lists": out_lists,
             "days": sorted(D.values(), key=lambda x: x["date"]), "users": sorted(U.values(), key=lambda x: -x["seconds"]),
             "entries": entries, "now": iso(ref), "today": {"seconds": mine_today, "target_h": _num(s.get("time_target"))},
+            "tz": s.get("tz") or "", "split": split,  # 2.125.0 B (#2120)
             "me": user_public(g.user),
             # 2.63.0 (#1523): only my own entries of (some of) the wanted lists are in here -> the client says "Your time"
             "own_only": own is not None and a.get("scope", "mine") != "mine" and bool(
@@ -728,18 +770,27 @@ def time_csv():
     w = csv.writer(buf, delimiter=";" if de else ",", lineterminator="\r\n")
     w.writerow([tr("List"), tr("Task"), tr("User"), tr("Start|time"), tr("End|time"), tr("Duration (h)"),
                 tr("Duration (h:mm)"), tr("Rounded (h)"), tr("Amount ({0})", rep["currency"]), tr("Note")])
+    from .timesheet import tz_of
+    zone = tz_of(c, uid)  # 2.125.0 B (#2120): times in my time zone
     for e in rep["entries"]:
         lid = e["list_id"] if e["list_id"] in names else 0
         ln = names.get(lid, "")
         lst = next((x for x in rep["lists"] if x["id"] == lid), None)
         ln = tr("Basket") if lst and lst["is_inbox"] and inbox_default(ln) else (ln or tr("No list"))
-        s0 = parse_iso(e["start"]).astimezone(TZ)
-        en = parse_iso(e["end"]).astimezone(TZ) if e["end"] else None
-        sec, rs = e["seconds"], e["rounded"]
-        w.writerow([_csv_cell(ln), _csv_cell(e["title"] or tr("No task")), _csv_cell(e["user_name"]),
-                    s0.strftime("%Y-%m-%d %H:%M"), en.strftime("%Y-%m-%d %H:%M") if en else tr("running"),
-                    num(sec / 3600), f"{sec // 3600}:{sec % 3600 // 60:02d}", num(rs / 3600),
-                    num(e["amount"]) if e["amount"] is not None else "", _csv_cell(e["note"])])
+        # 2.125.0 B (#2120): an entry over midnight = one row per day (its share; the amount split like the rounded time)
+        parts = e.get("parts") or [e]
+        amts = [e["amount"]] * len(parts)
+        if len(parts) > 1 and e["amount"] is not None:
+            cum = [round(e["amount"] * sum(y["rounded"] for y in parts[:k + 1]) / e["rounded"], 2) if e["rounded"] else 0.0 for k in range(len(parts))]
+            amts = [round(cum[k] - (cum[k - 1] if k else 0.0), 2) for k in range(len(parts))]
+        for k, x in enumerate(parts):
+            s0 = parse_iso(x["start"]).astimezone(zone)
+            en = parse_iso(x["end"]).astimezone(zone) if x["end"] and (e["end"] or k < len(parts) - 1) else None
+            sec, rs, amt = x["seconds"], x["rounded"], amts[k]
+            w.writerow([_csv_cell(ln), _csv_cell(e["title"] or tr("No task")), _csv_cell(e["user_name"]),
+                        s0.strftime("%Y-%m-%d %H:%M"), en.strftime("%Y-%m-%d %H:%M") if en else tr("running"),
+                        num(sec / 3600), f"{sec // 3600}:{sec % 3600 // 60:02d}", num(rs / 3600),
+                        num(amt) if amt is not None else "", _csv_cell(e["note"])])
     name = f"{tr('timesheet|file')}-{rep['from'] or 'all'}-{rep['to'] or local_now().date().isoformat()}.csv"
     name = re.sub(r"[^A-Za-z0-9._-]", "_", name)
     return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
@@ -762,6 +813,7 @@ def time_watchdog(c, users, S, LG):
 
 def _time_watch_one(c, r, users, S, LG, ref):
     from ..notify.push import notify, push_prio
+    from .timesheet import tz_zone  # 2.125.0 B (#2120): the stop time in the person's time zone
     uid = r["user_id"]
     if uid not in users:
         return
@@ -784,7 +836,7 @@ def _time_watch_one(c, r, users, S, LG, ref):
         if n:
             notify(uid, tr("Timer stopped automatically", lg=lg),
                    tr("{0} ran {1} h and was stopped at {2}. Correct the end time if needed.", label, fnum(stop_h),
-                      end.astimezone(TZ).strftime("%H:%M"), lg=lg), push_prio(s, 4), f"{PUBLIC_URL}/#time", s=s)
+                      end.astimezone(tz_zone(s.get("tz") or "")).strftime("%H:%M"), lg=lg), push_prio(s, 4), f"{PUBLIC_URL}/#time", s=s)
     elif rem_h > 0 and hrs >= rem_h and not r["reminded"]:
         c.execute("UPDATE time_entries SET reminded=1 WHERE id=?", (r["id"],))
         c.commit()

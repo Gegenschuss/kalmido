@@ -282,6 +282,7 @@ ORDER = (
     "admin.clientip",  # 2.33.0 (#834)
     "tasks.stale",  # 2.34.0 (#266)
     "personal.timegaps",  # 2.34.0 (#269)
+    "personal.timesheet",  # 2.125.0 B (#2119, #2120): monthly timesheets + the person's time zone of time tracking
     "agents.agentpin",  # 2.51.0 C (#1352): agents on the pin board + the weekly status of a project
     "agents.agenttime",  # 2.51.0 C (#1353): agents check time tracking + propose entries from events
     "agents.lyprop",  # 2.55.0 B (#1066): agents propose arrangements of views (the person accepts)
