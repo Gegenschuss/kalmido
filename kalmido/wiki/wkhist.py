@@ -91,10 +91,8 @@ def wsb_unreadable_text(private):
     """2.139.0 C (#2386): the message names the way out -- the recovery key, else only deleting (save, rename and move are
     refused so the sealed text is never lost)."""
     if private:
-        return tr("This page cannot be read: the key of its encryption is missing. It opens again once the server key of this "
-                  "installation is restored; otherwise it can only be deleted.")
-    return tr("This page cannot be read: the key of its encryption is missing. The recovery key of the organisation opens it "
-              "again; otherwise it can only be deleted.")
+        return tr("This page cannot be read: the key of its encryption is missing. It opens again once the server key of this installation is restored; otherwise it can only be deleted.")
+    return tr("This page cannot be read: the key of its encryption is missing. The recovery key of the organisation opens it again; otherwise it can only be deleted.")
 
 
 @app.errorhandler(WikiUnreadable)
