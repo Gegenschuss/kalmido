@@ -138,6 +138,7 @@ APP_TO_API = {
     "DELETE /api/time/entries/{}": ["DELETE /time/entries/{}"],
     "GET /api/time/report": ["GET /time/entries"],
     "GET /api/time/export.csv": ["GET /time/entries"],
+    "GET /api/time/export.xlsx": ["GET /time/entries"], "GET /api/workload/export.xlsx": ["GET /workload"],  # 2.125.0 C (#2122): Excel = the same data as the API
     "GET /api/time/gaps": ["GET /time/gaps"],  # 2.34.0 (#269)
     "GET /api/stale": ["GET /stale"],  # 2.34.0 (#266)
     "GET /api/news": ["GET /news"],
