@@ -1408,6 +1408,15 @@ fresh; run p21383_a_ui node p21383_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21383_b_api "$PY" p21383_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21383_b_ui node p21383_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21383_c_api "$PY" p21383_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.142.0 part A: notification channels Slack/Matrix/Telegram/Signal, e-mail on single events (#2145 #2146)
+fresh; run p2142_a_api "$PY" p2142_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2142_a_ui node p2142_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.142.0 part B: importers Notion, Google Tasks, ClickUp, Jira, generic CSV / Markdown (#2147)
+fresh; run p2142_b_api "$PY" p2142_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2142_b_ui node p2142_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.142.0 part C: export to Todoist CSV / Markdown, admin "fetch mail now", ntfy share inbox per person (#2148 #2149 #2150)
+fresh; run p2142_c_api "$PY" p2142_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2142_c_ui node p2142_c_ui.js "$KALMIDO_TEST_DATA"
 shard 18  # 20.10.2026 (job #692): the parked releases 2.111-2.113.0 (new suites still go to shard 17 above)
 # 2.111.0: Buero-Rueckgaengig (a), Termin-Einladungen + Abo-Link (b), Schnellerfassung (c)
 fresh; run p2111_a_api "$PY" p2111_a_api_test.py "$KALMIDO_TEST_DATA"
