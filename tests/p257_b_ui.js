@@ -112,7 +112,7 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
   const vars = sel => { const m = css.match(new RegExp(sel.replace(/[[\]()"=]/g, '\\$&') + '\\{([^}]*)\\}')); const o = {}; if (m) for (const [, k, v] of m[1].matchAll(/--([\w-]+):([^;]+)/g)) o[k] = v.trim(); return o; };
   const dark = vars(':root'), light = vars(':root[data-theme="light"]');
   // 2.138.1 (#2389): the tint is gone -- the sidebar keeps bg2 in every workspace, so its text contrast is the theme's own
-  check(!/#side\.wsp-on\{--wsc/.test(css) && /#side \.sbstripe\{[^}]*height:\.25rem[^}]*background:var\(--wbc\)/.test(css), '#1807 / #2389: no tint rule any more, a 4 px stripe instead');
+  check(!/#side\.wsp-on\{--wsc/.test(css) && /#side\{border-top:\.25rem solid var\(--wbc\)\}/.test(css), '#1807 / #2389: no tint rule any more, a 4 px stripe instead');
   check(/#side\{background:var\(--sbbg,var\(--bg2\)\)\}/.test(css), '#1807: #side takes --sbbg (the fixed head shares it)');
 
   // ---- the real browser: the computed background of #side differs from bg2 (desktop dark + light, the phone drawer)
@@ -129,12 +129,12 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
       await nav(B + '#today');
       await ready(ev, `typeof S !== 'undefined' && !!S.booted && !!document.querySelector('#side .wsbar')`);
       await ready(ev, `document.querySelector('#app').classList.contains('wsb-on')`);
-      const tinted = await ev(bgOf), stripe = await ev(`getComputedStyle(document.querySelector('#side .sbstripe')).backgroundColor`);
+      const tinted = await ev(bgOf), stripe = await ev(`getComputedStyle(document.querySelector('#side')).borderTopColor`);
       await ev(`(() => { S.settings.workspace = 'all'; render(); return 1; })()`);
       await sleep(400);  // Firefox restyles the sidebar after the script that changed it returned
       const plain = await ev(bgOf);
       const bg2 = await ev(`(() => { const e = document.createElement('div'); e.style.background = 'var(--bg2)'; document.body.append(e); const c = getComputedStyle(e).backgroundColor; e.remove(); return c; })()`);
-      const stripeAll = await ev(`getComputedStyle(document.querySelector('#side .sbstripe')).backgroundColor`);
+      const stripeAll = await ev(`getComputedStyle(document.querySelector('#side')).borderTopColor`);
       check(tinted && plain && tinted === plain && plain === bg2, `#1807 ${theme}: 2.138.1 (#2389): no tint, the sidebar stays bg2 (${tinted} vs ${plain})`);
       check(stripe && stripeAll && stripe !== stripeAll && stripe !== 'rgba(0, 0, 0, 0)', `#2389 ${theme}: the stripe takes my tone, grey under "All" (${stripe} / ${stripeAll})`);
       // the phone: the drawer shows the same tint
@@ -143,7 +143,7 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
       await sleep(300);
       await ev(`(() => { sideOpenDrawer(); return 1; })()`);
       await ready(ev, `document.querySelector('#side').classList.contains('open')`, 20);
-      check(await ev(`document.querySelector('#side').classList.contains('open') && ${bgOf} === ${JSON.stringify(tinted)} && getComputedStyle(document.querySelector('#side .sbstripe')).backgroundColor === ${JSON.stringify(stripe)}`), `#1807 ${theme}: 390 px drawer: no tint, the same stripe`);
+      check(await ev(`document.querySelector('#side').classList.contains('open') && ${bgOf} === ${JSON.stringify(tinted)} && getComputedStyle(document.querySelector('#side')).borderTopColor === ${JSON.stringify(stripe)}`), `#1807 ${theme}: 390 px drawer: no tint, the same stripe`);
     });
   }
 

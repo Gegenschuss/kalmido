@@ -34,7 +34,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   let w = await boot({hash: 'inbox'}), d = w.document;
   await until(() => d.querySelector('#side .sbhead .wsbar'), 60);
   const fix = d.querySelector('#side .sbfix');
-  check(fix && fix.firstElementChild?.classList.contains('sbstripe') && fix.children[1]?.classList.contains('sbhead'), '#2389 / #2392: the stripe, then the head, at the top of the fixed part');
+  check(fix && fix.firstElementChild?.classList.contains('sbhead'), '#2392: the head opens the fixed part (the stripe is #side\'s top border)');
   check(!d.querySelector('#side .sbrand') && !d.querySelector('#side svg.logo') && !d.querySelector('#side .sbhome'), '#2392: no logo, no app name in the sidebar');
   const bar = d.querySelector('#side .sbhead .wsbar');
   check(bar && bar === d.querySelector('#side .sbhead button') && bar.dataset.act === 'ws-menu' && /Private/.test(bar.querySelector('.wsn')?.textContent || '') && bar.querySelector('.wsp-dot') && bar.querySelector('svg.i:last-child'), '#2392: row 1 = the workspace switch: dot + name + arrow');
@@ -85,7 +85,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   // CSS: no stripe in the list header, no tint, 4 px / 3 px
   const css = await (await fetch(B + 'static/app.css')).text();
   check(!/#main\.wsc-on #top\{box-shadow/.test(css) && !/#side\.wsp-on\{--wsc/.test(css), '#2389: the list header stripe and the tint are gone (CSS)');
-  check(/#side \.sbstripe\{[^}]*height:\.25rem/.test(css) && /#app\.side-rail #top\{box-shadow:inset 0 \.1875rem 0 var\(--wbc\)\}/.test(css), '#2389: 4 px stripe in the sidebar, 3 px on top of the header (rail / phone)');
+  check(/#side\{border-top:\.25rem solid var\(--wbc\)\}/.test(css) && /#app\.side-rail #top\{box-shadow:inset 0 \.1875rem 0 var\(--wbc\)\}/.test(css), '#2389: 4 px stripe in the sidebar, 3 px on top of the header (rail / phone)');
   check(/@media \(hover:none\)\{ #side \.sbhead \.sbtools\{opacity:1\} \}/.test(css) && /#side \.sbhead:hover \.sbtools,#side \.sbhead:focus-within \.sbtools\{opacity:1\}/.test(css), '#2392: the tools on hover, keyboard focus and touch screens');
   w.close();
 
@@ -116,9 +116,9 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
   const ready = async ev => { for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(250); await sleep(800); };
-  const GEO = `(() => { const q = s => document.querySelector(s), r = e => e && e.getBoundingClientRect(), sd = r(q('#side')), st = r(q('#side .sbstripe')), h = r(q('#side .sbhead')), ws = r(q('#side .wsbar')), a = r(q('#side .sbacct')), s = r(q('#side .scmd')), nd = r(q('#side .sbhead .netdot'));
+  const GEO = `(() => { const q = s => document.querySelector(s), r = e => e && e.getBoundingClientRect(), sd = r(q('#side')), h = r(q('#side .sbhead')), ws = r(q('#side .wsbar')), a = r(q('#side .sbacct')), s = r(q('#side .scmd')), nd = r(q('#side .sbhead .netdot'));
     const acc = (() => { const e = document.createElement('div'); e.style.background = 'var(--accent)'; document.body.append(e); const c = getComputedStyle(e).backgroundColor; e.remove(); return c; })();
-    return {sdt: sd && Math.round(sd.top), sdw: sd && Math.round(sd.width), stt: st && Math.round(st.top), sth: st && Math.round(st.height * 10) / 10, stw: st && Math.round(st.width), stc: getComputedStyle(q('#side .sbstripe')).backgroundColor, acc,
+    return {sdt: sd && Math.round(sd.top), sdw: sd && Math.round(sd.width), sth: parseFloat(getComputedStyle(q('#side')).borderTopWidth), stc: getComputedStyle(q('#side')).borderTopColor, stw: sd && Math.round(sd.width), acc,
       wy: ws && Math.round(ws.top), hy: h && Math.round(h.top), ay: a && Math.round(a.top), sy: s && Math.round(s.top), ndw: nd && nd.width, tools: getComputedStyle(q('#side .sbtools')).opacity,
       top: getComputedStyle(q('#top')).boxShadow, over: document.documentElement.scrollWidth - innerWidth}; })()`;
   for (const theme of ['dark', 'light']) {
@@ -129,11 +129,13 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
       await o.nav(B + '#inbox'); await ready(ev);
       await ev(`(() => { document.querySelectorAll('.authscreen').forEach(e => e.remove()); document.querySelector('#app')?.removeAttribute('inert'); return 1; })()`);
       let g = await ev(GEO);
-      check(g.stt === g.sdt && g.sth === 4 && g.stw >= g.sdw - 2 && g.stc === g.acc, `1280 ${theme}: #2389 a 4 px stripe in purple across the top of the sidebar ` + JSON.stringify(g));
+      check(g.sth === 4 && g.stc === g.acc, `1280 ${theme}: #2389 a 4 px stripe in purple across the top of the sidebar ` + JSON.stringify(g));
       check(g.wy - g.sdt < 60 && g.ay > g.wy && Math.abs(g.ay - g.sy) < 24 && !g.ndw && g.over <= 0, `1280 ${theme}: #2392 workspace on top, avatar beside the search, no connection dot online ` + JSON.stringify(g));
       check(g.top === 'none' && +g.tools === 0, `1280 ${theme}: no header stripe while the sidebar is open; the tools hidden without hover ` + JSON.stringify(g));
       await ev(`(() => { document.querySelector('#side .kbfoldall').focus(); return 1; })()`); await sleep(350);
-      check(+(await ev(`getComputedStyle(document.querySelector('#side .sbtools')).opacity`)) === 1, `1280 ${theme}: #2392 keyboard focus shows the tools`);
+      // headless Firefox without window focus may not match :focus-within -- then the CSS rule (checked in jsdom) has to do
+      const fw = await ev(`(() => ({fw: document.querySelector('#side .sbhead').matches(':focus-within'), op: +getComputedStyle(document.querySelector('#side .sbtools')).opacity}))()`);
+      check(!fw.fw || fw.op === 1, `1280 ${theme}: #2392 keyboard focus shows the tools ` + JSON.stringify(fw));
       await ev(`(() => { document.activeElement?.blur(); return 1; })()`);
       await shot(`p21381c-1280-${theme}.png`);
       // an organisation: its colour

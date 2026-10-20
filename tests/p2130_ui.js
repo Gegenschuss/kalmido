@@ -578,7 +578,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     await shot(`p2130-listdialog-1440-${theme}.png`);
     await ev(`(() => { document.querySelectorAll('.modal:not(.authscreen)').forEach(x => x.remove()); return 1; })()`);
     // P16: the logo in the accent colour; 2.138.1 (#2392, #2389): no logo in the sidebar -- Private's stripe follows the accent
-    const lg = await ev(`(() => { const s = document.querySelector('#side .sbstripe'); return s ? [getComputedStyle(s).backgroundColor, getComputedStyle(document.documentElement).getPropertyValue('--accent')] : null; })()`);
+    const lg = await ev(`(() => { const s = document.querySelector('#side'); return s ? [getComputedStyle(s).borderTopColor, getComputedStyle(document.documentElement).getPropertyValue('--accent')] : null; })()`);
     check(lg && lg[0] && lg[0] !== 'rgba(0, 0, 0, 0)', `1440 ${theme} P16: the sidebar's stripe is coloured (${lg})`);
   }, false);
 
