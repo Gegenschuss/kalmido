@@ -1399,6 +1399,16 @@ fresh; run p2138_d_ui node p2138_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.138.0 part E: resizable dialogs, quotation next step, service import order, PDF closing together, import undo archives, GbR partners (#2234 #2235 #2237 #2238 #2241 #2242)
 fresh; run p2138_e_api "$PY" p2138_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2138_e_ui node p2138_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.138.2 part A: office documents - PDF of a draft asks to finalise, DRAFT watermark, no e-invoice from drafts; number scheme {isodate} (#2393 #2391)
+fresh; run p21381_a_api "$PY" p21381_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21381_a_ui node p21381_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.138.2 part B: office PDF layout - rights annex spacing and sizes, multi-line company name bold in the footer; company name field grows (#2388 #2397 #2395)
+fresh; run p21381_b_api "$PY" p21381_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21381_b_ui node p21381_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.138.2 part C: sidebar head with the workspace on top, workspace colour stripe (#2392 #2389)
+fresh; run p21381_c_ui node p21381_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.138.2 part D: notifications - read entries muted, open ones on top, counters match (#2405)
+fresh; run p21381_d_ui node p21381_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.138.3 part A: a decided approval marks its notifications read (#2406)
 fresh; run p21382_a_api "$PY" p21382_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.138.3 part B: edit organisation - members as a searchable list with member / admin boxes (#2407)

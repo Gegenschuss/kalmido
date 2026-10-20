@@ -10,9 +10,10 @@ const ONUM_SCHEME_IDS = {offer: 'os-scheme', invoice: 'os-inv-scheme', credit: '
 // a number of the scheme with example values (the same building blocks the server knows, office/model.py)
 function onumFmt(scheme, seq) {
   const d = new Date(), y = String(d.getFullYear()), p2 = n => String(n).padStart(2, '0');
-  return String(scheme || '').replace(/\{(yyyy|yy|seq(?::0?(\d+))?|project|client|date|initials)\}/g, (m, t, w) =>
+  return String(scheme || '').replace(/\{(yyyy|yy|seq(?::0?(\d+))?|project|client|date|isodate|initials)\}/g, (m, t, w) =>
     t === 'yyyy' ? y : t === 'yy' ? y.slice(2) : t.startsWith('seq') ? String(seq).padStart(+w || 0, '0')
-      : t === 'project' ? tr('Project') : t === 'client' ? tr('Client') : t === 'date' ? y + p2(d.getMonth() + 1) + p2(d.getDate()) : 'AB');
+      : t === 'project' ? tr('Project') : t === 'client' ? tr('Client') : t === 'date' ? y + p2(d.getMonth() + 1) + p2(d.getDate())
+      : t === 'isodate' ? y + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) : 'AB');  // 2.138.2 (#2391)
 }
 
 async function onumLoad() {
@@ -37,7 +38,7 @@ function onumHtml() {
     const pv = n >= 1 ? tr('next: {0}', onumFmt(r.scheme, n)) : '';
     const hint = [tr('at least {0}', r.min_next), r.yearly ? tr('applies to {0}', r.period) : ''].filter(Boolean).join(' · ');
     return `<div class="row onumrow" data-kind="${r.kind}"><label for="${id}">${esc(tr(ONUM_NAMES[r.kind]))}</label>
-      <span class="lacts"><input id="${id}" data-onum-in="${r.kind}" type="number" inputmode="numeric" min="${r.min_next}" step="1" value="${esc(v)}" class="numin" aria-describedby="${id}-h">
+      <span class="lacts"><input id="${id}" data-onum-in="${r.kind}" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${esc(v)}" class="numin" aria-describedby="${id}-h">
       <span class="muted ofcpv" id="${id}-pv" aria-live="polite">${esc(pv)}</span>
       <button type="button" class="btn sm" data-onum="set" data-kind="${r.kind}" ${n > r.next ? '' : 'disabled'}>${tr('Apply')}</button></span>
       ${r.reason_needed && jump ? `<span class="lacts onumwhy"><input id="${id}-why" data-onum-why="${r.kind}" value="${esc(ONUM['w' + r.kind] || '')}" maxlength="300" placeholder="${esc(tr('Reason for the jump (kept in the office log)'))}" aria-label="${esc(tr('Reason'))}"></span>` : ''}
@@ -138,7 +139,7 @@ document.addEventListener('input', e => {
     const n = parseInt(t.value, 10), row = t.closest('.onumrow');
     const pv = $('#onum-' + k + '-pv'); if (pv) pv.textContent = n >= 1 ? tr('next: {0}', onumFmt(r.scheme, n)) : '';
     const btn = row?.querySelector('[data-onum="set"]'); if (btn) btn.disabled = !(n > r.next);
-    if (r.reason_needed && (n > r.min_next) !== !!$('#onum-' + k + '-why')) { onumRedraw(); const i = $('#onum-' + k); if (i) { i.focus(); } }
+    if (r.reason_needed && (n > r.min_next) !== !!$('#onum-' + k + '-why')) { onumRedraw(); const i = /** @type {HTMLInputElement|null} */ ($('#onum-' + k)); if (i) { i.focus(); const e = i.value.length; i.setSelectionRange(e, e); } }  // 2.138.0 (#2256): the caret stays at the end after the redraw (device test: 1001 became 0110; a text field, number fields have no caret API)
   } else if (t.dataset?.onumWhy) ONUM['w' + t.dataset.onumWhy] = t.value;
   else if (t.id === 'onum-doc' && ONUM.doc) ONUM.doc.val = t.value;
   else if (t.id === 'onum-doc-why' && ONUM.doc) ONUM.doc.why = t.value;
