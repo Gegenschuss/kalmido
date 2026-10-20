@@ -295,6 +295,7 @@ def field_delete(fid):
     need_field(c, fid)
     n = c.execute("DELETE FROM task_field_values WHERE field_id=?", (fid,)).rowcount
     c.execute("DELETE FROM list_fields WHERE id=?", (fid,))
+    c.execute("UPDATE lists SET group_field='' WHERE group_field=?", (f"cf:{fid}",))  # 2.144.0 A2 (#2414): no grouping by a gone field
     bump(c)
     c.commit()
     return jsonify(ok=True, values=n)

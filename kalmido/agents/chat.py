@@ -1186,6 +1186,42 @@ def agent_wake(aid):
     return jsonify(ok=bool(seq), agent_id=aid)
 
 
+# 2.144.0 A (#2412): Stop in the agent chat (the button, Esc / Ctrl+C): the event 'abort' asks the agent to end the answer
+# it is working on; in a job's history only that job's current step (the job itself stays, its card has Stop for that).
+# Who may write the agent may stop it; a job also needs the right to stop it. The agent confirms with POST /api/v1/agent/aborted.
+ABORT_LIMIT = 30  # per person and 10 minutes
+
+
+@app.post("/api/agents/<int:aid>/abort")
+def agent_abort(aid):
+    """{job_id?} -- an 'abort' event for the agent {user, source: chat, job_id?, job?}."""
+    c = db()
+    a = need_chat_agent(c, aid)
+    if not agent_active(a):
+        return err(tr("This agent is paused"), 409)
+    b = body()
+    if not isinstance(b, dict):  # 2.144.0 A2 (#2412): an array / number as body is a bad request, not a 500
+        return err(tr("The body must be a JSON object"))
+    jid = b.get("job_id")
+    data = {"user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")}, "source": "chat"}
+    if jid is not None:
+        if isinstance(jid, bool) or not isinstance(jid, int):
+            return err(tr("Invalid value: {0}", "job_id"))
+        j = c.execute("SELECT * FROM agent_jobs WHERE id=? AND agent_id=?", (jid, aid)).fetchone()
+        if not j or not job_visible(c, j, me()):
+            raise Denied(404)
+        if not job_may_act(c, j, me(), "stop"):
+            raise Denied(403, tr("Only the list owner, a list admin, the assignee or the person the job is for can do this"))
+        if j["state"] in ("done", "failed", "stopped"):
+            return err(tr("This job has already ended"), 409)
+        data.update(job_id=jid, job=job_dict(c, j))
+    if hit_limit(f"abort:{me()}", ABORT_LIMIT, 600):
+        raise Denied(429, tr("Too many requests, please slow down"))
+    seq = agent_emit(c, aid, "abort", data)
+    c.commit()
+    return jsonify(ok=bool(seq), agent_id=aid, seq=seq)
+
+
 # ---- 2.22.0 (#693): "<name> is writing …" in a task's comments, for people and agents alike (like the chat's typing). A
 # signal lasts TASK_TYPING_S seconds (send it again while writing); kept in memory only (one process, nothing to store).
 # Everyone who sees the task's comments learns it with their next GET /api/version (field ty), never their own signal.

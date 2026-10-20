@@ -2961,6 +2961,9 @@ MIGRATIONS = [
     # versions never read it
     ("notes", "client_ref", "ALTER TABLE notes ADD COLUMN client_ref TEXT"),
     ("notes", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS notes_client_ref ON notes(created_by, client_ref) WHERE client_ref IS NOT NULL"),
+    # 2.144.0 C (#2414): the list view grouped by a custom field (text / select) for every member, like sort_mode:
+    # '' = the sections as before, 'cf:<field id>' = one group per value (2.143 ignores it)
+    ("lists", "group_field", "ALTER TABLE lists ADD COLUMN group_field TEXT NOT NULL DEFAULT ''"),
     # 2.146.0 B (#2452): duplicates of documents. raw_sha = sha256 of the bytes as uploaded (before metadata was cut; the
     # plain digest like fs_versions.sha256), the same file in the same workspace is not stored twice. dup_of = an older
     # document that looks like the same invoice (supplier + invoice number, or supplier + amount + date), dup_ok = 1 when a

@@ -67,6 +67,9 @@ KINDS = {
     "admin": ("n/a", "the server operator's administration (need_admin): no organisation involved -- a freelancer running the "
                      "own server is its operator with exactly these pages (p2473_a_api_test.py sets up a server without any "
                      "organisation)"),
+    # 2.144.0 D (#797)
+    "operator": ("n/a", "the hosting operator's interface (a token from a file, off by default, never a person or a session): "
+                        "instance-wide numbers and operating actions only, no content of any person or organisation (p2144_d_api_test.py)"),
     "orgadmin": ("n/a", "managing an organisation (members, admins, its lists, export, encryption): only for its members and "
                         "admins; without an organisation there is nothing to manage (the personal office is reached under "
                         "office, the private space under every other area)"),
@@ -101,6 +104,8 @@ ROUTES = {
     "POST /api/admin/backups/{}/verify": "admin", "POST /api/admin/groups": "admin",
     "POST /api/admin/groups/{}/avatar": "admin", "POST /api/admin/mail/poll": "admin", "POST /api/admin/oidc/check": "admin",
     "POST /api/admin/setup": "admin", "PUT /api/admin/agent-policy": "admin", "PUT /api/admin/announcement": "admin",
+    # 2.144.0 D (#797): the hosting operator's interface (a token from a file, off by default)
+    "GET /api/operator/status": "operator", "POST /api/operator/setup-code": "operator", "PUT /api/operator/notice": "operator",
     "PUT /api/admin/groups/{}/avatar": "admin", "PUT /api/admin/oidc": "admin", "PUT /api/admin/orgcrypt": "admin",
     "PUT /api/admin/related": "admin", "PUT /api/layouts/std/{}": "admin", "PUT /api/v1/admin/announcement": "admin",
     # ---- agents (72)
@@ -821,6 +826,8 @@ ROUTES = {
     "GET /s/f/{}/d/{}": "link", "GET /s/f/{}/v/{}": "link", "GET /s/f/{}/zip": "link",
     # 2.138.0 D (#2256): number ranges of the office (p2138_d_api_test.py)
     "GET /api/office/number-ranges": "office", "POST /api/office/number-ranges/{}": "office",
+    # 2.144.0 A (#2412): Stop in the agent chat and the agent's confirmation (p2144_a_api_test.py)
+    "POST /api/agents/{}/abort": "agents", "POST /api/v1/agent/aborted": "agents",
 }
 
 

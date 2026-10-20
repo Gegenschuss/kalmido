@@ -133,6 +133,9 @@ KINDS = {
                          "nobody into the one project list the server operator chose, nothing is read back or answered"),
     "admin": ("n/a", "the operator's administration (need_admin): server settings, backups, alerts, agents, integrations; the operator "
                      "is trusted with the whole server (architecture review 2.1 / B4); people in it are filtered by visible_people"),
+    # 2.144.0 D (#797)
+    "operator": ("n/a", "the hosting operator's interface (a token from a file, off by default, never a person or a session): "
+                        "instance-wide numbers and operating actions only, no content of any person or organisation (p2144_d_api_test.py)"),
     "public": ("n/a", "pages and facts without data of a person (app shell, health, version, robots, manifest, QR code of a given text)"),
     "family": ("n/a", "the household of the Family module: private by definition (kid_parents), never an organisation's object"),
     "pure": ("n/a", "a pure transformation of the request body (an outline file into a tree): no stored data is read or written"),
@@ -183,6 +186,8 @@ ROUTES = {
     "GET /api/admin/backups/offsite": "admin", "PATCH /api/admin/backups/offsite": "admin",
     "POST /api/admin/backups/offsite/test": "admin", "POST /api/admin/backups/offsite/upload": "admin",
     "PUT /api/admin/announcement": "admin",
+    # 2.144.0 D (#797): the hosting operator's interface (a token from a file, off by default)
+    "GET /api/operator/status": "operator", "POST /api/operator/setup-code": "operator", "PUT /api/operator/notice": "operator",
     "PUT /api/v1/admin/announcement": "admin", "GET /api/admin/agents": "admin", "POST /api/admin/agents": "admin",
     "PATCH /api/admin/agents/{}": "admin", "POST /api/admin/agents/{}/reset": "admin",
     "POST /api/admin/agents/{}/avatar": "admin", "POST /api/admin/agents/{}/token": "admin",
@@ -1035,6 +1040,8 @@ ROUTES = {
     "GET /s/f/{}/d/{}": "fileextlink", "GET /s/f/{}/v/{}": "fileextlink", "GET /s/f/{}/zip": "fileextlink",
     # 2.138.0 D (#2256): number ranges of the office area one works in, admins write (p2138_d_api_test.py)
     "GET /api/office/number-ranges": "office", "POST /api/office/number-ranges/{}": "office",
+    # 2.144.0 A (#2412): Stop in the agent chat (who may write the agent) and the agent's confirmation (p2144_a_api_test.py)
+    "POST /api/agents/{}/abort": "agent", "POST /api/v1/agent/aborted": "agent",
 }
 
 # ---- 1. every route is classified, nothing stale

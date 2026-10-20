@@ -188,10 +188,23 @@ function jcd_addr(body) {
 }
 // the job card a message belongs to (0 = a row of its own)
 function jcd_jobOf(m, byId) {
-  if (m.from !== 'agent' || m.kind === 'notice' || m.choices) return 0;
+  if (m.choices) return 0;
+  return jcd_jobNo(m, byId);
+}
+// 2.144.0 A (#2416): the job an agent message comes from, buttons or not (a job's result mostly carries the suggestion
+// buttons, since 2.122.1 also approval cards): the filter asks this, the card keeps a message with buttons as its own row
+function jcd_jobNo(m, byId) {
+  if (m.from !== 'agent' || m.kind === 'notice') return 0;
   const jb = ux_jobOf(m); if (jb) return jb.no;
   const q = m.reply_to && byId.get(m.reply_to);
   return q && q.from !== 'agent' ? jcd_addr(q.body) : 0;
+}
+// 2.144.0 A (#2416): a row through the filter. "Only me and <agent>": my messages and the main agent's, of the jobs only
+// open approvals / permission questions that wait for me. "Jobs": the job rows and my messages addressed to a job.
+function jcd_pass(m, f, no) {
+  if (f === 'all') return true;
+  if (f === 'me') return !no || (apvHeld(m) && chatChoiceSt(m) === 'open');
+  return !!no || (m.from !== 'agent' && m.kind !== 'notice' && !!jcd_addr(m.body));
 }
 const jcd_filter = () => S.chat.job || !S.jcd.n ? 'all' : LS.get('jcdFilt', 'all');
 const jcd_open = no => !!LS.get('jcdOpen', {})[no];
@@ -204,18 +217,19 @@ function jcd_setOpen(no, on) {
 function jcd_rows(a, row) {
   const ms = S.chat.msgs;
   if (S.chat.job) { S.jcd.map = new Map(); return ms.map(row); }
-  const byId = new Map(ms.map(m => [m.id, m])), of = new Map(), per = new Map(), last = new Map();
+  const byId = new Map(ms.map(m => [m.id, m])), of = new Map(), per = new Map(), last = new Map(), jn = new Map();
   ms.forEach((m, i) => {
-    const no = jcd_jobOf(m, byId); if (!no) return;
+    const no = jcd_jobNo(m, byId); if (!no) return;
+    jn.set(m.id, no); if (m.choices) return;  // 2.144.0 A (#2416): a row of its own, but still a job's
     of.set(m.id, no); if (!per.has(no)) per.set(no, []); per.get(no).push(m); last.set(no, i);
   });
-  S.jcd.map = of; S.jcd.n = per.size;
-  if (!per.size) return ms.map(row);
+  S.jcd.map = of; S.jcd.n = new Set(jn.values()).size;
+  if (!S.jcd.n) return ms.map(row);
   const f = jcd_filter(), out = [];
   ms.forEach((m, i) => {
     const no = of.get(m.id);
     if (no) { if (f !== 'me' && last.get(no) === i) out.push(jcd_cardHtml(no, per.get(no), row)); return; }
-    if (f === 'all' || m.choices || (f === 'me' ? true : m.from !== 'agent' && m.kind !== 'notice' && jcd_addr(m.body))) out.push(row(m));
+    if (jcd_pass(m, f, jn.get(m.id) || 0)) out.push(row(m));
   });
   if (!out.length) out.push(`<div class="muted cmempty" data-k="jcdempty">${esc(tr('No messages yet.'))}</div>`);
   return out;
@@ -243,9 +257,42 @@ function jcd_cardHtml(no, list, row) {
 }
 // the end result / an error under the card: 5 lines, "Show more" for longer ones
 function jcd_resHtml(m, row) {
-  const b = String(m.body || ''), long = b.split('\n').length > 5 || b.length > 400, more = S.jcd.more.has(m.id);
+  const long = jcf_long(m), more = S.jcd.more.has(m.id);
   return `<div class="jcdres${long && !more ? ' jcdclamp' : ''}${jcd_kind(m) === 'error' ? ' jcdx' : ''}">${long ? jcm_inBubble(row(m), `<button type="button" class="linkbtn jcdmore" data-jca="more" data-jm="${m.id}" aria-expanded="${more}">${esc(tr(more ? 'Show less' : 'Show more'))}</button>`) : row(m)}</div>`;
 }
+// 2.144.0 B (#2417): "Fold long messages" for every message at once (a header icon, kept per device). Folded = the cut of the
+// job result (jcd_resHtml: 5 lines + "Show more"); a message opened on its own stays open (S.jcd.more, the last 200 ids, kept
+// per device); "Show less" on a single message switches the mode on for all.
+const JCF_MAX = 200;
+try { S.jcd.more = new Set(LS.get('jcfOpen', [])); } catch (e) { /* storage not readable: nothing open */ }
+const jcf_on = () => LS.get('jcfOn', '') === '1';
+const jcf_long = m => { const b = String(m.body || ''); return b.split('\n').length > 5 || b.length > 400; };
+function jcf_save() {
+  const a = [...S.jcd.more]; if (a.length > JCF_MAX) S.jcd.more = new Set(a.slice(-JCF_MAX));
+  LS.set('jcfOpen', [...S.jcd.more]);
+}
+function jcf_more(id) { if (S.jcd.more.has(id)) S.jcd.more.delete(id); else S.jcd.more.add(id); jcf_save(); }
+function jcf_fold(id) { S.jcd.more.delete(id); jcf_save(); jcf_set(true); }
+function jcf_set(on) { LS.set('jcfOn', on ? '1' : ''); document.querySelectorAll('.jcfbtn').forEach(b => { b.setAttribute('aria-pressed', on); }); }
+function jcf_btnHtml() {
+  const t = tr('Fold long messages');
+  return `<button type="button" class="iconbtn jcfbtn" data-jca="foldall" aria-pressed="${jcf_on()}" title="${esc(t)}" aria-label="${esc(t)}">${ic('collapse')}</button>`;
+}
+// the row of a message with the cut (long messages only; a job result in a card is cut by jcd_resHtml)
+function jcf_wrap(m, html) {
+  if (m.kind === 'notice' || m.choices || S.chat.edit === m.id || !jcf_long(m)) return html;
+  if (S.jcd.map.has(m.id) && JCD_SHOW.has(jcd_kind(m))) return html;
+  const on = jcf_on(), more = S.jcd.more.has(m.id), cut = on && !more;
+  const btn = `<button type="button" class="linkbtn jcdmore" data-jca="${on ? 'more' : 'fold'}" data-jm="${m.id}"${on ? ` aria-expanded="${more}"` : ''}>${esc(tr(cut ? 'Show more' : 'Show less'))}</button>`;
+  const h = jcm_inBubble(html, btn);
+  return cut ? h.replace('class="cmsg ', 'class="cmsg jcfcut ') : h;
+}
+const jcf_row = fn => m => jcf_wrap(m, fn(m));
+function jcf_toggle(btn) {
+  jcf_set(!jcf_on()); chatPatch({keep: true});
+  btn?.focus?.({preventScroll: true});
+}
+document.addEventListener('click', e => { const b = e.target.closest?.('.jcfbtn'); if (b) jcf_toggle(b); });
 // 2.122.3 jcm (#2340): put the button right after the message text (end of the .cbub div), before steps / suggestion / time
 function jcm_inBubble(html, btn) {
   const st = html.indexOf('<div class="cbub'); if (st < 0) return html + btn;
@@ -256,13 +303,10 @@ function jcm_inBubble(html, btn) {
   }
   return html + btn;
 }
-function jcd_filtHtml() {
-  if (S.chat.job || !S.jcd.n) return '<div class="jcdfilt" id="jcd-filt" hidden></div>';
-  const f = jcd_filter(), a = agentById(S.chat.aid), t = tr('Filter');
-  const opts = [['all', tr('All')], ['me', tr('Only me and {0}', a?.name || '')], ['jobs', tr('Jobs')]];
-  return `<div class="jcdfilt" id="jcd-filt"><div class="jcdseg" role="group" aria-label="${esc(t)}">${opts.map(([k, l]) => `<button type="button" data-jca="filt" data-f="${k}" aria-pressed="${f === k}">${esc(l)}</button>`).join('')}</div></div>`;
-}
-// 2.117.0 C (#2260): on a narrow phone the filter is an icon in the chat header (menu with the three choices; a dot while not "All")
+// 2.144.0 A (#2419): no filter row above the messages any more, on every width the icon in the header (jcd_fbtnHtml)
+function jcd_filtHtml() { return ''; }
+// 2.117.0 C (#2260): the filter is an icon in the chat header (menu with the three choices; a dot while not "All"),
+// 2.144.0 A (#2419) on every width
 function jcd_fbtnHtml() {
   if (S.chat.job || !S.jcd.n) return '<span id="jcd-fbtn" hidden></span>';
   const t = tr('Filter');
@@ -272,9 +316,8 @@ function jcd_fmenu(btn) {
   const f = jcd_filter(), a = agentById(S.chat.aid);
   menu(btn, [['all', tr('All')], ['me', tr('Only me and {0}', a?.name || '')], ['jobs', tr('Jobs')]].map(([k, l]) => ({label: l, on: f === k, fn: () => jcd_setFilter(k)})));
 }
-// after every chat patch (agentchat.js chatPatch): the filter follows (shown once a job is in the chat)
+// after every chat patch (agentchat.js chatPatch): the filter icon follows (shown once a job is in the chat)
 function jcd_patch() {
-  const b = $('#jcd-filt'), h = jcd_filtHtml(); if (b && !wk_sameEl(b, h)) b.outerHTML = h;  // 2.119.1 D (#2310): hidden came back as hidden="": swapped on every patch
   const c = $('#jcd-fbtn'), g = jcd_fbtnHtml(); if (c && !wk_sameEl(c, g)) c.outerHTML = g;
 }
 function jcd_setFilter(f) {
@@ -287,16 +330,17 @@ function jcd_reveal(id) {
   let ch = false;
   if (jcd_filter() !== 'all' && m) { const r = document.querySelector(`#chat-msgs [data-mid="a:${+id}"]`); if (!r) { LS.set('jcdFilt', 'all'); ch = true; } }
   if (no && m && !JCD_SHOW.has(jcd_kind(m)) && !jcd_open(no)) { jcd_setOpen(no, true); ch = true; }
+  if (m && jcf_long(m) && (jcf_on() || (no && JCD_SHOW.has(jcd_kind(m)))) && !S.jcd.more.has(m.id)) { S.jcd.more.add(m.id); jcf_save(); ch = true; }  // 2.144.0 B (#2417): the target is unfolded
   if (ch) { chatPatch({keep: true}); jcd_patch(); }
 }
 document.addEventListener('click', e => {
-  const b = e.target.closest?.('[data-jca]'); if (!b || b.tagName === 'SELECT' || !b.closest('#chat-msgs, #jcd-filt')) return;
+  const b = e.target.closest?.('[data-jca]'); if (!b || b.tagName === 'SELECT' || !b.closest('#chat-msgs')) return;
   const box = $('#chat-msgs');
-  if (b.dataset.jca === 'filt') return jcd_setFilter(b.dataset.f);
   // unfold / fold / more: the tapped card stays where it is on the screen (no jump to the bottom)
   const k = b.dataset.jca === 'tog' ? `.jcdh[data-jcd="${b.dataset.jcd}"]` : `.jcdmore[data-jm="${b.dataset.jm}"]`, y0 = b.getBoundingClientRect().top;
   if (b.dataset.jca === 'tog') jcd_setOpen(+b.dataset.jcd, !jcd_open(+b.dataset.jcd));
-  else if (b.dataset.jca === 'more') { const id = +b.dataset.jm; if (S.jcd.more.has(id)) S.jcd.more.delete(id); else S.jcd.more.add(id); }
+  else if (b.dataset.jca === 'more') { const id = +b.dataset.jm; jcf_more(id); }
+  else if (b.dataset.jca === 'fold') jcf_fold(+b.dataset.jm);
   else return;
   const top = box ? box.scrollTop : 0;
   chatPatch({keep: true});
