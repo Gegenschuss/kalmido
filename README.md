@@ -24,6 +24,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   recipes onto the shopping list and the meal plan beyond one week, journal history with search, export and mood
   statistics, budget month comparison and one bank statement reader with the office, several reminder times per habit,
   devices linked with the office equipment, birthdays written back to the address book.
+- **2.139.1** (2026-10-20): a whole organisation moves between two Kalmido servers - the import of an organisation export
+  now takes over every area (office with finalised invoices and cash book, clients, file store, documents, knowledge
+  pages, tables, video sign-offs, team chat, absences, newsletter, forms, notes, time entries), with the references
+  between them; a freelancer exports their personal office and moves it into an organisation they administer.
 - **2.139.0** (2026-10-20): team chat threads, voice messages with their own player and "Read by" (can be switched
   off); every task comment can become a task; unreadable pages back in the search once their key returns; proposal
   cards with the app thumb and larger check boxes.

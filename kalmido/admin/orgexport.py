@@ -199,7 +199,9 @@ OX_AREAS = (
     ("lists/notes.json", "notes", f"list_id IN ({LSQ})"),
     ("lists/files.json", "list_files", f"list_id IN ({LSQ})"),
     ("lists/forms.json", "forms", f"list_id IN ({LSQ})"),
+    ("lists/form_entries.json", "form_entries", f"form_id IN (SELECT id FROM forms WHERE list_id IN ({LSQ}))"),  # 2.137.0 C (#2344): answers of form entries
     ("lists/playbooks.json", "playbooks", f"list_id IN ({LSQ})"),
+    ("lists/sprints.json", "sprints", f"list_id IN ({LSQ})"),  # 2.137.0 C (#2344): sprints of the lists (tasks.sprint_id)
     # 2.81.0 (#1866): customer reports of those lists (team/portal.py): the address in plain text, never the status link
     ("portal/tickets.json", "portal_tickets", f"list_id IN ({LSQ})"),
     ("lists/admin_log.json", "org_list_log", "org_id=?"),
@@ -208,10 +210,12 @@ OX_AREAS = (
     ("tasks/field_values.json", "task_field_values", f"task_id IN ({TSQ})"),
     ("tasks/tags.json", "task_list_tags", f"task_id IN ({TSQ})"),
     ("tasks/people.json", "task_people", f"task_id IN ({TSQ})"),
+    ("tasks/links.json", "task_links", f"task_id IN ({TSQ})"),  # 2.137.0 C (#2344): a task placed in a further list
     ("tasks/history.json", "activity", f"task_id IN ({TSQ})"),
     ("tasks/encrypted_notes.json", "task_enc_notes", f"task_id IN ({TSQ})"),  # 2.42.0 (#828, agent A): browser-encrypted, as stored
     ("tasks/locked_notes.json", "task_note_locks", f"task_id IN ({TSQ})"),  # 2.48.0 (#1642): locked notes, browser-encrypted, as stored
     ("time_entries.json", "time_entries", f"list_id IN ({LSQ})"),
+    ("time_sheets.json", "time_sheets", "org_id=?"),  # 2.137.0 C (#2344): monthly timesheets (note decrypted like the others)
     ("comments.json", "comments", f"task_id IN ({TSQ})"),
     ("comments/reactions.json", "comment_reactions", f"comment_id IN (SELECT id FROM comments WHERE task_id IN ({TSQ}))"),
     ("attachments.json", "attachments", f"task_id IN ({TSQ})"),
@@ -222,6 +226,7 @@ OX_AREAS = (
     ("store/history.json", "fs_log", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
     ("chat/channels.json", "tchat_rooms", f"kind='list' AND list_id IN ({LSQ})"),
     ("chat/messages.json", "tchat_msgs", f"room_id IN (SELECT id FROM tchat_rooms WHERE kind='list' AND list_id IN ({LSQ}))"),
+    ("chat/reactions.json", "tchat_rx", f"message_id IN (SELECT m.id FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id WHERE r.kind='list' AND r.list_id IN ({LSQ}))"),  # 2.137.0 C (#2344)
     ("calendars.json", "ev_cals", "org_id=?"),
     ("calendars/members.json", "ev_cal_members", "cal_id IN (SELECT id FROM ev_cals WHERE org_id=?)"),
     ("events.json", "events", "cal_id IN (SELECT id FROM ev_cals WHERE org_id=?)"),
@@ -270,6 +275,15 @@ OX_AREAS = (
     ("office/cashflow_adjust.json", "office_cf_adjust", "org_id=?"),
     ("office/cashflow_actual.json", "office_cf_actual", "org_id=?"),
     ("office/bank_balances.json", "office_bank_balances", "org_id=?"),  # 2.124.0 D (#2342): balances of the imported statements
+    # 2.137.0 A (#2344): the rest of the office (the statement imports the balances hang on, their bookings, document
+    # templates and documents made from them, the logbook)
+    ("office/bank_imports.json", "office_bank_imports", "org_id=?"),
+    ("office/bank_tx.json", "office_bank_tx", "org_id=?"),
+    ("office/doc_templates.json", "office_doc_templates", "org_id=?"),
+    ("office/gen_docs.json", "office_gen_docs", "org_id=?"),
+    ("office/vehicles.json", "office_vehicles", "org_id=?"),
+    ("office/drives.json", "office_drives", "org_id=?"),
+    ("office/drive_log.json", "office_drive_log", "org_id=?"),
     ("office/sub_reminders.json", "office_sub_reminders", "org_id=?"),  # 2.91.0 B (#1924): reminder tasks before a subscription renews
     ("office/agreements.json", "office_agreements", "org_id=?"),  # 2.92.0 A (#1925): business contracts and insurances
     ("office/deals.json", "office_deals", "org_id=?"),  # 2.50.0 (#1196): the sales pipeline
@@ -280,6 +294,7 @@ OX_AREAS = (
     ("office/log.json", "office_doc_log", "org_id=?"),
     ("wiki/pages.json", "wiki_pages", "org_id=?"),  # 2.49.0 (#1199): knowledge pages
     ("wiki/files.json", "wiki_files", "org_id=?"),  # 2.99.0 A (#2182): their PDFs and pictures (the bytes under files/wiki/)
+    ("wiki/versions.json", "wiki_versions", "org_id=?"),  # 2.137.0 B (#2344): the history of the pages (texts decrypted)
     ("sheets/sheets.json", "sheets", "org_id=?"),  # 2.89.0 (#1916): tables with their columns, rows and cells
     ("sheets/columns.json", "sheet_columns", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
     ("sheets/rows.json", "sheet_rows", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
@@ -300,6 +315,7 @@ OX_AREAS = (
     ("documents/document_tags.json", "doc_node_tags", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),  # 2.122.0 B (#2099): + files / folders
     ("documents/rules.json", "doc_rules", "org_id=?"),
     ("documents/settings.json", "doc_cfg", "org_id=?"),
+    ("documents/receipts.json", "rc_receipts", "org_id=?"),  # 2.137.0 B (#2344): project and category of receipts (set by people)
     ("hub/absences.json", "hub_absences", "org_id=?"),  # 2.50.0 (#1195): absences (kind + note decrypted like the others)
     ("hub/bookings.json", "hub_bookings", "org_id=?"),  # 2.50.0 (#1194): bookings of the disposition
     ("hub/leave_quota.json", "hub_leave_quota", "org_id=?"),  # 2.125.0 A (#2117): vacation accounts
@@ -371,6 +387,8 @@ def ox_build(c, oid, out, by=None):
     man = _Man()
     have = {r[0] for r in c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema()")}
     org = c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone()
+    if org and "personal_of" in org.keys() and org["personal_of"]:  # 2.137.0 A (#2344): a person's own office
+        return ox_build_personal(c, oid, out, org, have, by)
     with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         o = _clean(c, oid, "orgs", org)
         if str(o.get("icon") or "").startswith("u:"):  # 2.87.9 (#1913): the picture file is not in the ZIP -> no dead link
@@ -451,6 +469,46 @@ def ox_build(c, oid, out, by=None):
             "client_encrypted": {**man.client_enc, "note": "Encrypted in the browser by their author: stored here as ciphertext, only the author can open them."},
             "decrypted": "Fields and files the server encrypts with the organisation key are in plain text here; the archive itself is encrypted.",
             "not_included": list(OX_NOT_INCLUDED),
+        }
+        _put_bytes(zf, man, "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode())
+    return manifest
+
+
+# 2.137.0 A (#2344): the export of a personal office (office/model.py pb_personal) by its owner: only the office and the
+# owner's private clients with their contact persons (org_id NULL, created by the owner: model.py pb_cl_sql) -- no lists,
+# no other areas of the private space, nobody else. The import takes it into an organisation or into a personal office.
+OX_PB_CLIENTS = {"clients": "org_id IS NULL AND created_by=?",
+                 "office_client_contacts": "org_id IS NULL AND client_id IN (SELECT id FROM clients WHERE org_id IS NULL AND created_by=?)"}
+
+
+def ox_build_personal(c, oid, out, org, have, by=None):
+    man = _Man()
+    owner = int(org["personal_of"])
+    with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+        o = _clean(c, oid, "orgs", org)
+        o["icon"] = ""
+        _put_json(zf, man, "organisation.json", [o])
+        _put_json(zf, man, "members.json", [])
+        for name, table, where in OX_AREAS:
+            if table not in have or not (name.startswith("office/") or name == "clients.json"):
+                continue
+            if table in OX_PB_CLIENTS:
+                _put_json(zf, man, name, _rows(c, oid, table, OX_PB_CLIENTS[table], (owner,)))
+            else:
+                _put_json(zf, man, name, _rows(c, oid, table, where, (oid,) * where.count("?")))
+        odir = os.path.join(OFFICE_DIR, str(int(oid)))
+        if os.path.isdir(odir):
+            for fn in sorted(os.listdir(odir)):  # the office keeps its files in one folder (no sub folders)
+                full = os.path.join(odir, fn)
+                if os.path.islink(full) or not os.path.isfile(full):
+                    continue
+                _put_bytes(zf, man, "files/office/" + _safe_part(fn), _read(c, full))
+        manifest = {
+            "format": "kalmido-org-export", "format_version": OX_FORMAT, "kalmido_version": APP_VERSION,
+            "org": {"id": int(oid), "name": org["name"]}, "created_at": iso(now_utc()), "created_by": by, "personal_office": 1,
+            "counts": man.counts, "files": man.files, "client_encrypted": {"note": "none"},
+            "decrypted": "Fields and files the server encrypts with the office key are in plain text here; the archive itself is encrypted.",
+            "not_included": ["everything of the private space but the office and its clients", *OX_NOT_INCLUDED[1:2]],
         }
         _put_bytes(zf, man, "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode())
     return manifest
@@ -601,18 +659,32 @@ def ox_cleanup(c=None, force=False):
 
 
 # ---------------------------------------------------------------- routes (people only: /api/orgs is APP_ONLY, agents 403)
-def _need(c, oid):
+def _need(c, oid, own=False):
     from ..accounts.orgs import _need_org_admin
-    _need_org_admin(c, oid)
+    if not own:  # 2.137.0 A (#2344): own = the person's own personal office, reached as organisation 0 (_ox_area)
+        _need_org_admin(c, oid)
     from ..core.orgcrypt import oc_enabled
     return oc_enabled()
+
+
+def _ox_area(c, oid):
+    """2.137.0 A (#2344): (area id, own). Organisation 0 = the signed-in person's own personal office (2.138.0 #1972: its
+    hidden id is never used from outside); never for agents or API tokens."""
+    if oid != 0:
+        return oid, False
+    from flask import g
+    if getattr(g, "auth_via", None) == "token":
+        raise Denied(403)
+    from ..core.orgcrypt import _org_admin
+    return _org_admin(c, 0), True
 
 
 @app.get("/api/orgs/<int:oid>/export")
 def ox_get(oid):
     """The state of the organisation's export: none | running | done (file, bytes, expires_at) | failed (error)."""
     c = db()
-    on = _need(c, oid)
+    oid, own = _ox_area(c, oid)
+    on = _need(c, oid, own)
     return jsonify(enabled=on, keep_hours=OX_KEEP_H, **ox_status(oid))
 
 
@@ -620,7 +692,8 @@ def ox_get(oid):
 def ox_start(oid):
     """Starts the export in the background (one at a time per organisation; 409 while one runs, or without the server key)."""
     c = db()
-    if not _need(c, oid):
+    oid, own = _ox_area(c, oid)
+    if not _need(c, oid, own):
         return err(tr(OX_NO_KEY), 409)
     from ..core.orgcrypt import oc_status
     if oc_status(c, oid).get("rotating"):  # 2.138.0 C (#1972, review F2): the archive's recovery header needs the finished key
@@ -638,7 +711,8 @@ def ox_start(oid):
 @app.get("/api/orgs/<int:oid>/export/file")
 def ox_download(oid):
     c = db()
-    _need(c, oid)
+    oid, own = _ox_area(c, oid)
+    _need(c, oid, own)
     st = ox_status(oid)
     if st.get("state") != "done":
         raise Denied(404)
@@ -653,7 +727,8 @@ def ox_download(oid):
 def ox_delete(oid):
     """Removes the finished archive now (instead of waiting OX_KEEP_H hours)."""
     c = db()
-    _need(c, oid)
+    oid, own = _ox_area(c, oid)
+    _need(c, oid, own)
     if _running(oid):
         return err(tr("An export of this organisation is already running"), 409)
     shutil.rmtree(_odir(oid), ignore_errors=True)
