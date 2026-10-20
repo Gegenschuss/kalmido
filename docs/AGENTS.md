@@ -2928,7 +2928,10 @@ a table the call created too. A wrong formula changes nothing (400 with the reas
 - **Inputs**: numbers `1,5` or `1.5`, dates `DD.MM.YYYY` or `YYYY-MM-DD`, a select cell its label (a new label becomes a
   new choice). Formulas start with `=`: `A1`, ranges `B2:B9`, cell names, column names (all cells of the column but the
   formula's own), `+ - * /`, `&`, `19%`, comparisons, `SUMME`/`SUM`, `MITTELWERT`/`AVERAGE`, `MIN`, `MAX`, `ANZAHL`/`COUNT`,
-  `WENN`/`IF`, `RUNDEN`/`ROUND`, `HEUTE`/`TODAY`, `TAGE`/`DAYS`; arguments with `;` (`,` works too).
+  `WENN`/`IF`, `RUNDEN`/`ROUND`, `HEUTE`/`TODAY`, `TAGE`/`DAYS`, `SUMMEWENN`/`SUMIF`, `ZÄHLENWENN`/`COUNTIF`,
+  `SVERWEIS`/`VLOOKUP`, `XVERWEIS`/`XLOOKUP`, `LINKS`/`LEFT`, `RECHTS`/`RIGHT`, `TEIL`/`MID`, `LÄNGE`/`LEN`,
+  `VERKETTEN`/`CONCAT`, `GLÄTTEN`/`TRIM`, `GROSS`/`UPPER`, `KLEIN`/`LOWER`, `DATUM`/`DATE`, `JAHR`/`YEAR`, `MONAT`/`MONTH`,
+  `TAG`/`DAY`, `EDATUM`/`EDATE`; arguments with `;` (`,` works too). A lookup that finds nothing gives the error `na`.
 - **Columns** (`sheet_create`, `sheet_add_column`): `{title, kind text|number|currency|percent|date|select, options?:
   [{label, color?: "#rrggbb"}], color_mode?: cell|row}`. Colours: best the app's palette (the colours of list fields).
 - **Kalmido variables**: `projekt.<name>.<field>`, `liste.<name>.<field>` (fields `zeit_gesamt` hours, `aufgaben`, `offen`,

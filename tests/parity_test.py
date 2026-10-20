@@ -261,6 +261,9 @@ APP_ONLY = [
       "=POST /api/sheets/{}/columns/{}/restore", "=DELETE /api/sheets/{}/rows/{}", "=POST /api/sheets/{}/rows/{}/restore",
       "=POST /api/sheets/{}/rows/order", "=POST /api/sheets/{}/cells/{}/freeze", "=POST /api/sheets/{}/cells/{}/name",
       "=POST /api/sheets/{}/presence")),
+    ("2.124.0 A (#2115): the chart of a table is how a person looks at it in the app (kind and columns of the drawing); an agent "
+     "reads it with the table (GET /sheets/{id} answers chart) and works on the values, the drawing itself stays with people",
+     ("=PUT /api/sheets/{}/chart",)),
     ("2.98.0 B (#1954): the evaluation of a questionnaire (all submissions with the senders' names, addresses and answers, "
      "their CSV) stays with the people who manage the form in the app; an agent gets each submission as its task (task_added, "
      "the answers in the description) and sets the questions through the form's fields",

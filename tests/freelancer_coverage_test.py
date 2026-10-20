@@ -598,6 +598,7 @@ ROUTES = {
     # 2.124.0 C (#2113): shares of one table (p2124_c_api_test.py)
     "GET /api/sheets/{}/shares": "sheets", "POST /api/sheets/{}/shares": "sheets",
     "PATCH /api/sheets/{}/shares/{}": "sheets", "DELETE /api/sheets/{}/shares/{}": "sheets",
+    "PUT /api/sheets/{}/chart": "sheets",  # 2.124.0 A (#2115): the chart of a table (p2124_a_api_test.py)
     "PATCH /api/sheets/{}/columns/{}": "sheets", "PATCH /api/v1/sheets/{}": "sheets", "POST /api/sheets": "sheets",
     "POST /api/sheets/{}/batches/{}/undo": "sheets", "POST /api/sheets/{}/cells/{}/freeze": "sheets",
     "POST /api/sheets/{}/cells/{}/name": "sheets", "POST /api/sheets/{}/columns": "sheets",

@@ -922,7 +922,9 @@ _SH_COL = {"type": "object", "description": "{title (also its name in formulas),
 _SH_ROWS = {"type": "array", "items": {"type": "array"}, "description": "Rows of inputs in the order of the columns: numbers (1,5 or 1.5), "
                                                                       "dates DD.MM.YYYY or YYYY-MM-DD, a select cell its label, formulas start with "
                                                                       "= (A1, B2:B9, cell / column names, SUMME, MITTELWERT, MIN, MAX, ANZAHL, WENN, "
-                                                                      "RUNDEN, HEUTE, TAGE, projekt.<name>.<field>, liste.<name>.<field>, "
+                                                                      "RUNDEN, HEUTE, TAGE, SUMMEWENN, ZÄHLENWENN, SVERWEIS, XVERWEIS, LINKS, RECHTS, "
+                                                                      "TEIL, LÄNGE, VERKETTEN, GLÄTTEN, GROSS, KLEIN, DATUM, JAHR, MONAT, TAG, EDATUM "
+                                                                      "(English names too), projekt.<name>.<field>, liste.<name>.<field>, "
                                                                       "kunde.<name>.<field>, hier.<field>; arguments with ;)"}
 TOOLS += [
     ("sheets_list", "2.89.0 (scope sheets:read): the tables you may read (id, title, space, attached list). space private | org:<id> | all, "
