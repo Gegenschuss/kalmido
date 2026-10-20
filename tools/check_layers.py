@@ -47,6 +47,8 @@ KNOWN = {
     ("accounts.pwreset", "integrations.mail"),
     # from the releases merged after 2.96.2 (2.98.0 scheduling polls)
     ("calendars.polls", "api.v1"),
+    # 2.124.1: the sheet routes of API v1 (decorators at module level, as sheets.v1)
+    ("sheets.shbook", "api.v1"),
 }
 
 

@@ -1,3 +1,4 @@
+// @ts-check
 /* Kalmido web client: file requests (2.122.0 A, #2097). A folder of the file store gets a public link /u/<token>: a client
    uploads documents into it without an account (never sees what is in the folder). The folder's menu "Request files…"
    opens the list of its requests (active / over / stopped, how many files arrived, copy the link, QR code, extend, stop,
@@ -15,6 +16,7 @@ const frq_dayPlus = n => { const d = new Date(); d.setDate(d.getDate() + n); ret
 async function frq_open(n) {
   let j; try { j = await api('GET', `/api/files/nodes/${n.id}/requests`); } catch { return; }
   $('.frqdlg')?.remove();
+  /** @type {any} */
   const md = modal(`<div class="lhdr"><h3 id="frq-t">${ic('upload')} ${esc(tr('Request files'))}</h3><span class="spacer"></span><button class="iconbtn" data-frq="close" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x')}</button></div>
     <div class="muted abpath">${esc(n.name)}</div><div class="frq-body"></div>`);
   md.classList.add('frqdlg'); md.setAttribute('aria-labelledby', 'frq-t');
@@ -32,8 +34,8 @@ async function frq_open(n) {
   const patch = (rid, b) => api('PATCH', `/api/files/requests/${rid}`, b).then(reload);
   draw();
   md.addEventListener('click', async e => {
-    const k = e.target.closest('[data-frq]')?.dataset.frq; if (!k) return;
-    const r = j.requests.find(x => x.id === +e.target.closest('[data-rid]')?.dataset.rid);
+    const k = /** @type {any} */ (e.target).closest('[data-frq]')?.dataset.frq; if (!k) return;
+    const r = j.requests.find(x => x.id === +/** @type {any} */ (e.target).closest('[data-rid]')?.dataset.rid);
     if (k === 'close') { modalClose(md); return; }
     if (k === 'new') { frq_new(n, j.limits, reload); return; }
     if (!r) return;
@@ -43,10 +45,10 @@ async function frq_open(n) {
       if (!box.hidden) { box.hidden = true; return; }
       try { const q = await api('POST', '/api/qr', {text: r.url}); box.innerHTML = `<img src="${esc(q.qr)}" alt="${esc(tr('QR code of the link'))}" width="240" height="240">`; box.hidden = false; } catch { /* the toast said it */ }
     } else if (k === 'menu') {
-      const b = e.target.closest('[data-frq="menu"]'), was = r.expires_at;
+      const b = /** @type {any} */ (e.target).closest('[data-frq="menu"]'), was = r.expires_at;
       const ext = r.state === 'active' || r.state === 'expired';
       menu(b, [ext ? {label: tr('Extend by {0} days', 14), icon: 'clock', fn: async () => {
-        const to = frq_dayPlus(Math.min(j.limits.days, Math.max(0, Math.ceil((new Date(was) - Date.now()) / 864e5)) + 14));
+        const to = frq_dayPlus(Math.min(j.limits.days, Math.max(0, Math.ceil((+new Date(was) - Date.now()) / 864e5)) + 14));
         try { await patch(r.id, {expires_at: to, tz: evTz()}); } catch { return; }
         offerUndo(tr('Open until {0}', frq_until(j.requests.find(x => x.id === r.id)?.expires_at)), histAdd({label: tr('Extend “{0}”', r.title),
           undo: async () => { try { await patch(r.id, {expires_at: was}); } catch { /* shown */ } return {}; }, redo: async () => { try { await patch(r.id, {expires_at: to, tz: evTz()}); } catch { /* shown */ } return {}; }}));
@@ -70,6 +72,7 @@ async function frq_open(n) {
 
 function frq_new(n, lim, done) {
   const kinds = FRQ_KINDS.filter(([k]) => lim.types.includes(k));
+  /** @type {any} */
   const md = modal(`<form class="frq-form" novalidate><div class="lhdr"><h3 id="frq-nt">${esc(tr('New file request'))}</h3><span class="spacer"></span><button type="button" class="iconbtn" data-frq="cancel" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
     <div class="row"><label for="frq-title">${esc(tr('Title'))}</label><input id="frq-title" maxlength="120" required value="${esc(tr('Files for {0}', n.name))}"></div>
     <div class="row"><label for="frq-note">${esc(tr('Note for the client'))}</label><textarea id="frq-note" rows="3" maxlength="2000" placeholder="${esc(tr('e.g. Please upload your logo and the signed contract.'))}"></textarea></div>
@@ -83,7 +86,7 @@ function frq_new(n, lim, done) {
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-frq="cancel">${esc(tr('Cancel'))}</button><button type="submit" class="btn pri">${esc(tr('Create link'))}</button></div></form>`);
   md.classList.add('frqnew'); md.setAttribute('aria-labelledby', 'frq-nt');
   const fail = t => { const x = $('.frq-err', md); x.textContent = t; x.hidden = !t; };
-  md.addEventListener('click', e => { if (e.target.closest('[data-frq="cancel"]')) modalClose(md); });
+  md.addEventListener('click', e => { if (/** @type {any} */ (e.target).closest('[data-frq="cancel"]')) modalClose(md); });
   $('form', md).addEventListener('submit', async e => {
     e.preventDefault();
     const types = $$('.frq-kinds input:checked', md).map(x => x.value), mb = +$('#frq-mb', md).value, nf = +$('#frq-n', md).value;
