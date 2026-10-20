@@ -71,8 +71,9 @@ for nullable in (True, False):
           f"rule({nullable}): organisations from app.org_ids, empty = none")
     check(("org_id IS NULL" in r) == nullable, f"rule({nullable}): private rows only where org_id may be NULL")
 own = ns["OWN_RULES"]
-check(set(own) == {"orgs", "org_members"} and "id = ANY" in own["orgs"] and "user_id = NULLIF(current_setting('app.user_id', true), '')::bigint" in own["org_members"],
-      "orgs: own organisations; org_members: own rows + rows of the own organisations")
+# 2.125.0 (#2119): + time_sheets (the general rule or the own rows)
+check(set(own) == {"orgs", "org_members", "time_sheets"} and own["time_sheets"] == ns["rule"](True) + " OR user_id = NULLIF(current_setting('app.user_id', true), '')::bigint" and "id = ANY" in own["orgs"] and "user_id = NULLIF(current_setting('app.user_id', true), '')::bigint" in own["org_members"],
+      "orgs: own organisations; org_members, time_sheets: own rows + rows of the own organisations")
 check("FORCE ROW LEVEL SECURITY" in rls_src and "WITH CHECK" in rls_src, "ENABLE + FORCE, the same rule for writing (WITH CHECK)")
 check("NOBYPASSRLS" in rls_src and "SET ROLE" in read("kalmido/core/pg.py"),
       "a login role that bypasses row-level security: the app works as the role without bypass")

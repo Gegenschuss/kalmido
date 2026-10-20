@@ -180,6 +180,22 @@ check(Bo.post(B + "/api/time/start", json={"list_id": L}).ok, "the timer runs")
 check(Bo.post(B + "/api/time/sheets", json={"month": CUR, "action": "close"}).status_code == 409, "closing with a running timer of it: 409")
 Bo.post(B + "/api/time/stop", json={})
 
+# 2.125.0 R (#2119): carol's approved month stays locked after she left the organisation; closing again is no 500
+CL = Ca.post(B + "/api/lists", json={"name": "Carol private", "time_tracking": True, "org_id": None}).json()["id"]
+CE = Ca.post(B + "/api/time/entries", json={"list_id": CL, "start": iso(IN_M), "minutes": 30}).json()["id"]
+r = Ca.post(B + "/api/time/sheets", json={"month": M, "action": "close"})
+check(r.ok and r.json()["sheet"]["org_id"] == ORG, "carol closes in the organisation " + r.text[:200])
+check(A.post(B + "/api/time/sheets/decide", json={"user_id": uid["carol"], "month": M, "action": "approve"}).ok, "alice approves carol's month")
+check(A.delete(B + f"/api/orgs/{ORG}/members/{uid['carol']}").ok, "carol leaves the organisation")
+j = Ca.get(B + "/api/time/sheets", params={"month": M}).json()
+check(j["sheet"]["state"] == "approved" and M in j["locked"] and j["can"]["reopen"], "left: her sheet stays approved " + str(j)[:300])
+check(Ca.delete(B + f"/api/time/entries/{CE}").status_code == 409, "left: the entry stays locked")
+r = Ca.post(B + "/api/time/sheets", json={"month": M, "action": "close"})
+check(r.status_code == 409, f"left: closing again is 409, never 500 ({r.status_code})")
+check(Ca.post(B + "/api/time/sheets", json={"month": M, "action": "reopen"}).ok, "left: she reopens it herself")
+r = Ca.post(B + "/api/time/sheets", json={"month": M, "action": "close"})
+check(r.ok and r.json()["sheet"]["org_id"] is None, "left: closing again works, now without an organisation " + r.text[:200])
+
 # ================================================================ a person without an organisation
 # freelancer-matrix: time
 FID, Fr = freelancer(B, A)
