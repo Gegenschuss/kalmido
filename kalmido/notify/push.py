@@ -403,8 +403,10 @@ def push_channel(s):
 
 
 def push_reachable(c, uid, s):
-    """The user can receive pushes at all: an ntfy topic or at least one subscribed device."""
-    return bool(s.get("ntfy_topic")) or webpush_count(c, uid) > 0
+    """The user can receive pushes at all: an ntfy topic or at least one subscribed device
+    (2.142.0 A (#2145): or a notification channel switched on -- notify() forwards there)."""
+    from .channels import chn_reachable
+    return bool(s.get("ntfy_topic")) or webpush_count(c, uid) > 0 or chn_reachable(c, uid)
 
 
 def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=None, due=None):
@@ -432,10 +434,12 @@ def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=N
     return p
 
 
-def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None, task=None, due=None, ttl=86400):
+def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None, task=None, due=None, ttl=86400, kind=None):
     """One push to one user over the channel of their settings (push_channel):
     ntfy = the ntfy topic; webpush = every subscribed device, and the ntfy topic instead while no device is
-    subscribed or none accepted it; both = both. Returns True when at least one channel accepted it."""
+    subscribed or none accepted it; both = both. Returns True when at least one channel accepted it.
+    2.142.0 A (#2145): kind (reminder | assign | comment | digest | other) also goes to the person's notification channels
+    that want it (Slack, Matrix, Telegram, Signal; notify/channels.py); without kind it is guessed from tag / origin."""
     from ..notify.alerts import aa_count
     if s is None:
         c = connect()
@@ -448,6 +452,8 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
     from ..core.i18n import LANGS
     lg = s.get("lang") if s.get("lang") in LANGS else "en"
     title, msg = le2b_net(title, lg), le2b_net(msg, lg)  # 2.64.2 D (#1817): the neutral word in the recipient's language
+    from .channels import chn_kind, chn_push
+    queued = chn_push(uid, title, msg, prio, click, chn_kind(kind, tag), s)  # 2.142.0 A (#2145): queued, sent in the background
     ch = push_channel(s)
     sent = 0
     if WEBPUSH_ON and ch in ("webpush", "both"):
@@ -458,7 +464,7 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
         if not sent and st.get("subs"):  # devices exist but none accepted it (admin alert, counted per window)
             aa_count("webpush", "fallback", uid)
     if ch in ("ntfy", "both") or not sent:
-        return ntfy(title, msg, prio, click, topic=s.get("ntfy_topic"), actions=actions) or sent > 0
+        return ntfy(title, msg, prio, click, topic=s.get("ntfy_topic"), actions=actions) or sent > 0 or queued
     return True
 
 
@@ -507,6 +513,15 @@ def fx2_office_log_prune(c, force=False):
 
 
 def watchdog_tick(c):
+    from .channels import _CH_TL
+    _CH_TL.wd = True  # 2.142.0 A (#2145): the pushes of this tick are reminders for the channels (unless tagged otherwise)
+    try:
+        _watchdog_tick(c)
+    finally:
+        _CH_TL.wd = False
+
+
+def _watchdog_tick(c):
     from ..notify.alerts import aa_tick
     from ..tasks.dayplan import _wd_review
     from ..agents.chat import chat_files_gc
@@ -576,6 +591,8 @@ def watchdog_tick(c):
     _wd_section(c, "focus", _wd_focus, users, S, LG)
     _wd_section(c, "habits", _wd_habits, users, S, LG, now)
     _wd_section(c, "digest", _wd_digest, users, S, LG, now)
+    from .channels import evm_tick
+    _wd_section(c, "event mails", evm_tick, users, S, LG, now)  # 2.142.0 A (#2146): assignments / mentions bundled by e-mail
     _wd_section(c, "review", _wd_review, users, S, LG, now)  # 2.10.0 (#440)
     from ..tasks.briefing import _wd_briefing
     _wd_section(c, "briefing", _wd_briefing, users, S, LG, now)  # 2.34.0 (#264)

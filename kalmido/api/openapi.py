@@ -438,7 +438,10 @@ def openapi_spec():
                                                                                 "tasks": {"type": "integer"}, "skipped": {"type": "integer"}, "sections": {"type": "integer"}}}},
             "samples": {"type": "array", "items": {"type": "object"}},
             "warnings": {"type": "array", "items": {"type": "object", "properties": {"text": {"type": "string"}, "count": {"type": "integer"},
-                                                                                   "examples": {"type": "array", "items": {"type": "string"}}}}}}},
+                                                                                   "examples": {"type": "array", "items": {"type": "string"}}}}},
+            # 2.142.0 B (#2147)
+            "columns": {"type": "array", "description": "Only source csv: which column of the file went into which field (notes = unknown columns)",
+                        "items": {"type": "object", "properties": {"column": {"type": "string"}, "field": {"type": "string"}}}}}},
         "ImportUndone": {"type": "object", "properties": {k: {"type": "integer"} for k in ("tasks", "lists", "sections", "kept_lists", "kept_tasks")}},
         "AppPassword": {"type": "object", "properties": {
             "id": {"type": "integer"}, "name": {"type": "string"}, "created_at": {"type": "string", "format": "date-time"},
@@ -658,7 +661,12 @@ def openapi_spec():
                                            [{"name": "source", "in": "path", "required": True, "description": "Source format",
                                              "schema": {"type": "string", "enum": list(IMPORT_SOURCES)}}], scope="write",
                                            desc="Todoist (CSV, backup ZIP, Sync API JSON), Trello (board JSON), Asana (CSV), mstodo (Outlook / Microsoft To Do CSV or ICS), "
-                                                "ics (VTODO). Idempotent: tasks imported before are skipped. Nothing inside the file is fetched."),
+                                                "ics (VTODO), "
+                                                # 2.142.0 B (#2147)
+                                                "notion (export ZIP Markdown & CSV, also a single CSV / Markdown file), gtasks (Google Takeout ZIP or Tasks.json), "
+                                                "clickup (CSV), jira (CSV), csv (any CSV, columns detected, see columns in the answer), markdown (checklists). "
+                                                "People in a file are never matched to accounts by these six (their names go into the notes). "
+                                                "Idempotent: tasks imported before are skipped. Nothing inside the file is fetched."),
                                         "requestBody": {"required": True, "content": {"multipart/form-data": {"schema": ref("ImportInput")}}}}},
         "/imports/{id}/undo": {"post": op(f"Undo an import (within {IMPORT_UNDO_HOURS} hours): removes what it created", "Import",
                                           ok(ref("ImportUndone")) | errs("404", "409"), [pid("id", "Import id")], scope="write")},

@@ -609,7 +609,7 @@ def _journal_where(uid, q=None, mood=None, lo=None, hi=None, before=None):
         where.append("mood=?"), args.append(mood)
     if q:
         like = "%" + q.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        where.append("LOWER(text) LIKE ? ESCAPE '\\'"), args.append(like)
+        where.append("LOWER(text) ILIKE ? ESCAPE '\\'"), args.append(like)
     return " AND ".join(where), args
 
 

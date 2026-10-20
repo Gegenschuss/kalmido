@@ -106,6 +106,7 @@ ORDER = (
     "api.v1",
     "notify.caps",  # 2.33.0 (#927)
     "notify.taskbell",  # 2.53.0 C (#1424): the bell of one task per person
+    "notify.channels",  # 2.142.0 A (#2145, #2146): Slack / Matrix / Telegram / Signal, e-mails for single events
     "tasks.dayplan",
     "tasks.briefing",  # 2.34.0 (#264)
     "lists.report",  # 2.34.0 (#265)
@@ -189,6 +190,8 @@ ORDER = (
     "files.upsafe",  # 2.61.0 (#1818 #1819 #1820): the shared upload path - scan, metadata, text recognition (no routes)
     "files.filereq",  # 2.122.0 A (#2097): file requests - a public link /u/<token> through which a client uploads files
     "integrations.mail",
+    "integrations.ntfyin",  # 2.142.0 C (#2150)
+    "integrations.exporters",  # 2.142.0 C (#2148)
     "accounts.invite",
     "accounts.sessions",  # 2.115.0 B (#2062): active sessions
     "accounts.orginvite",  # 2.115.0 B (#2062): organisation admins invite accounts by e-mail
@@ -233,6 +236,8 @@ ORDER = (
     "hub.dispo",  # 2.50.0 A (#1194): resources and disposition (bookings of crew and equipment)
     "hub.agentdispo",  # 2.51.0 C (#1355): shoot planning by agents (event drafts, options), the disposition in the REST API
     "hub.hubmail",  # 2.84.0 A (#1198): e-mail as an input of the hub (mails filed with clients / projects)
+    "hub.mailview",  # 2.141.0 B (#2140, #2139): the HTML view of a filed mail, a task / an event made from it
+    "hub.mailbox",  # 2.141.0 A (#2141, #2138): the own mailbox of a workspace, sending from the e-mail filing
     "office.packs",  # 2.36.1 (#1021): country packs (data), used by office.model
     "office.model",  # 2.36.1 (#1021): office & finance (B); C/D append office.calc, office.docs, office.pdf
     "office.web",

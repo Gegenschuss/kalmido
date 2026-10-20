@@ -113,7 +113,7 @@ TENANT_EXEMPT = {
     "fs_versions": "2.48.0 (#1207): the versions of a file store node, bound through the node (need_node)",
     "fs_shares": "2.48.0 (#1207): shares of a file store node, bound through the node; share targets are checked against its workspace (tenancy CHECKS)",
     "fs_log": "2.48.0 (#1207): the access history of a file store node, bound through the node (shown to its owners and editors)",
-    "filters": _OWN, "user_settings": _OWN, "sessions": _OWN, "push_subs": _OWN, "templates": _OWN, "cal_subs": _OWN,
+    "filters": _OWN, "user_settings": _OWN, "sessions": _OWN, "push_subs": _OWN, "ntfy_inboxes": _OWN, "templates": _OWN, "cal_subs": _OWN,
     "recovery_codes": _OWN, "webauthn_creds": _OWN, "api_tokens": _OWN,
     "imports": _OWN, "sample_items": _OWN, "app_passwords": _OWN, "dav_sync2": _OWN, "journal": _OWN, "contact_care": _OWN,
     "life_device_links": _OWN + " (2.140.0 B #2136: the link of a private device with office equipment; each side is checked on reading)",
@@ -157,6 +157,7 @@ TENANT_EXEMPT = {
     "msv_links": "2.73.0 A (#661): the accounts of one person on other Kalmido servers (accounts/servers.py); only the person sees them",
     "ev_cal_feeds": _CAL + " (2.111.0 B #2056: a person's subscription link; every fetch checks that the person still sees the calendar)",
     "ev_invite_day": _OWN + " (2.111.0 B #2056: the person's count of invitation mails per day)",
+    "notify_mail_queue": _OWN + " (2.142.0 A #2146: the person's events waiting for their bundled mail; ids only, each task is checked with task_visible when sending)",
 }
 schema_src = re.sub(r"--[^\n]*", "", read("kalmido", "core", "schema.py"))
 tables = {m.group(1): m.group(2) for m in re.finditer(r"CREATE TABLE IF NOT EXISTS (\w+)\s*\((.*?)\);", schema_src, re.S)}

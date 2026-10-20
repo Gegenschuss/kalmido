@@ -152,7 +152,7 @@ The most used helpers:
 | `personal/stats.py` | Statistics (module "stats"). |
 | `calendars/icalfeed.py` | The subscribable ICS calendar feed of a user's tasks. |
 | `calendars/caldav.py` | CalDAV server for tasks (VTODO) with app passwords; the /dav/ entry point for event calendars and CardDAV too. |
-| `integrations/importers.py` | Importers: TickTick, Todoist, Trello, Asana, Microsoft To Do, ICS / VTODO (preview, dry run, undo). |
+| `integrations/importers.py` | Importers: TickTick, Todoist, Trello, Asana, Microsoft To Do, ICS / VTODO, Notion, Google Tasks, ClickUp, Jira, any CSV, Markdown checklists (preview, dry run, undo). |
 | `notify/push.py` | Notifications: ntfy, Web Push (RFC 8030 / 8291 / 8292), reminders and nags, the watchdog tick and loop. |
 | `notify/alerts.py` | Admin alerts via ntfy (recording, sending, settings). |
 | `notify/caps.py` | 2.33.0 (#927): the owner's notification template of a list / shared folder (read, work, all, custom; per person), a ceiling for pushes checked in `notif_ok`; the one-time question to owners of lists shared before. |
@@ -193,6 +193,8 @@ The most used helpers:
 | `collab/chatsave.py` | 2.37.0 (#1159): a chat message (agent chat, team chat) saved as a task by a person: text, file copies, link back (`#msg/...`); `chat_saves` per person, `saved_task_id` in the chat pages. 2.42.0 (#1383): also an agent's comment on a task (kind `comment`: a subtask of the task or a new task in its list). |
 | `collab/replies.py` | 2.33.0: replies to one message (comments, team chat, agent chat): `reply_to` checks and the short quotes. |
 | `integrations/mail.py` | Tasks by e-mail (IMAP) and the daily summary by e-mail (SMTP). |
+| `integrations/ntfyin.py` | 2.142.0 (#2150): the ntfy share inbox per person (`GET/PUT /api/me/ntfy-inbox`, table `ntfy_inboxes`): topic, optional own server + sealed read token; `ni_loop` polls the topics of all people who switched it on into their own basket. |
+| `integrations/exporters.py` | 2.142.0 (#2148): `GET /api/export/todoist.zip` and `/api/export/markdown.zip`: one Todoist-template CSV / Markdown checklist per own list. |
 | `integrations/mailtrim.py` | 2.49.0 (#971): `md_trim_forward(text)`, a pure function: a forwarded mail becomes one line "From <sender>, <date>" + the message without signature, legal notice and older quoted replies. Used by *Tasks by e-mail* when the person switches *Shorten forwarded mails* on (`mail_trim_fwd`, off by default; the original stays as `.eml` unless `mail_trim_eml` is `0`). |
 | `accounts/orgs.py` | Organisations (#752): people in 1..n organisations and whom a person may see (all / own organisation / own contacts). |
 | `accounts/invite.py` | Invitations and reset links (#697): a one-time link by e-mail with which a person sets their own password. |
