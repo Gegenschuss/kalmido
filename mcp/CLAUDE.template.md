@@ -270,7 +270,7 @@
   should read (reports, drafts, patches) go into your own result folder (`write_file` without `folder_id`), not into a local
   work folder. Every access you make is listed in the file's history for its owner.
 - **Documents and receipts (2.48.0).** Documents are files of the file store with recognised text and fields (date, due,
-  amount, sender, type, tags): `list_documents`, `get_document`, and where you may edit `update_document`. Kalmido sorts
+  amount, sender, type, tags): `list_documents`, `get_document`, where you may edit `update_document`, and `create_document` (a new file into a folder you may edit, or your own result folder). Kalmido sorts
   them in without you; your values are marked as set by an agent and may wait in *To review*. For a receipt or incoming
   invoice only **suggest** project, category, amount and VAT rate (`suggest_receipt`, event `document_added`); a person accepts it, you never
   set, move or delete it yourself.
@@ -477,7 +477,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_shop_areas`, `add_snippet`,
 `add_subtask`, `add_time_entry`, `add_upkeep`, `add_video_comment`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
 `chat_typing`, `check_in_habit`, `check_time_entries`, `clear_plan_usage`, `clear_waiting`, `client_id`,
-`comment_typing`, `complete_task`, `create_address_book`, `create_client`, `create_contact`, `create_event`,
+`comment_typing`, `complete_task`, `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`,
 `create_event_calendar`, `create_field`, `create_file_folder`, `create_filter`, `create_form`, `create_habit`,
 `create_job`, `create_list`, `create_list_tag`, `create_note`, `create_notepad`, `create_offer_draft`, `create_office_lead`,
 `create_packing_list`, `create_section`, `create_task`, `create_template`, `create_text_file`, `create_trip`,

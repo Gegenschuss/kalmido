@@ -1650,8 +1650,9 @@ a folder above it) is shared with it, and every access is written into the file'
 
 | What | Endpoint | MCP |
 |---|---|---|
-| Documents shared with you (`q` = words of the text, `review=1` = waiting in *To review*) | `GET /api/v1/documents` | `list_documents` |
+| Documents shared with you (`q` = words of the text, `review=1` = waiting in *To review*; 2.122.0: `q` takes `tag:Name`, `sender:Name`, `type:Name`, `date:2025-01..2025-03`, `"exact phrase"`, `-word`; filters `tag` / `not_tag` / `tag_mode`, `sender`, `type`, `folder`, `added_from` / `added_to`, `no_tag`, `no_sender`, `ftype`) | `GET /api/v1/documents` | `list_documents` |
 | One document with its fields, open suggestions and the recognised text | `GET /api/v1/documents/{id}` | `get_document` |
+| A new document (2.122.0: `content_base64` + `name`, or multipart `file`; optional `title`, `parent_id`, `sender`, `type`, `tags`, `date`, `due`, `amount`, `currency`; without `parent_id` an agent writes into its own result folder) | `POST /api/v1/documents` | `create_document` |
 | Set fields (role *edit*): `date`, `due`, `amount`, `currency`, `sender`, `type`, `tags` (names) | `PATCH /api/v1/documents/{id}` | `update_document` |
 | The file itself | `GET /api/v1/files/{id}/content` | -- |
 
@@ -2681,7 +2682,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_shop_areas`, `add_snippet`,
 `add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
 `chat_typing`, `check_in_habit`, `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`,
-`create_address_book`, `create_client`, `create_contact`, `create_event`, `create_event_calendar`, `create_field`,
+`create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`, `create_event_calendar`, `create_field`,
 `create_file_folder`, `create_filter`, `create_form`, `create_habit`, `create_job`, `create_list`, `create_list_tag`,
 `create_note`, `create_offer_draft`, `create_office_lead`, `create_packing_list`, `create_section`, `create_task`, `create_template`,
 `create_text_file`, `create_trip`, `decide_reward`, `delete_address_book`, `delete_attachment`,

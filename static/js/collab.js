@@ -244,6 +244,7 @@ function newsText(it, U) {
     case 'usage': return aiuNewsText(d);  // 2.1.1 (#326)
     case 'proposal': return tr('{0} has a proposal for you: {1}', d.assistant ? q(tr('Assistant')) : who, q(d.title || ''));  // 2.3.0; 2.75.0 (#1411): the built-in assistant has no person
     case 'upscan': return tr('The virus scanner found {0} in your file {1}. The file is locked.', esc(d.sig || '?'), q(d.name || ''));  // 2.61.0 (#1818)
+    case 'filereq': { const d = it.data || {}; return trn('{0} file arrived through {1}', '{0} files arrived through {1}', d.n || 1, q(d.title || '')) + (d.name ? ' · ' + q(d.name) : ''); }  // 2.122.0 A (#2097)
     case 'playbook_proposal': return pbNewsText(it, who, q);  // 2.39.0 (#1168)
     case 'evinvite': case 'evshare': return evNewsText(it, who, q);  // 2.21.0 (#659)
     case 'abshare': return d.role === 'edit' ? tr('{0} shared the address book {1} with you', who, q(d.name || '')) : tr('{0} shared the address book {1} with you (view only)', who, q(d.name || ''));  // 2.21.0 (#658)
@@ -390,7 +391,7 @@ async function newsDismiss(i) {
   }, {passive: true});
   document.addEventListener('click', e => { const n = e.target.closest?.('.nitem[data-swiped]'); if (n) { e.stopPropagation(); e.preventDefault(); } }, true);
 })();
-async function newsOpen(i) {
+async function newsOpen(i, opts) {
   const it = (S.nf.items || [])[i]; if (!it) return;
   if (!it.read) { it.read = true; it.keep = true; if (it.to_me && S.news) { S.news.unread_me = Math.max(0, (S.news.unread_me || 0) - 1); renderTop(); } newsRead({ids: it.ids}); }
   if (/comment|mention/.test(it.kind || '')) S.tlScroll = it.task_id;  // 2.0.6: opened for a comment: show the newest
@@ -405,6 +406,7 @@ async function newsOpen(i) {
   if (it.kind === 'usage') { if (feat('agents') && agentsOn()) go('agents'); else settingsModal('usage'); return; }  // 2.1.1 (#326)
   if (it.kind === 'approval' && !it.task_id && feat('agents') && agentsOn()) { go('agents'); return; }
   if (it.kind === 'upscan' && it.data?.where === 'fs') { go('ablage/' + it.data.ref); return; }  // 2.61.0 (#1818): the locked file
+  if (it.kind === 'filereq' && it.data?.node) { go('ablage/' + it.data.node); return; }  // 2.122.0 A (#2097): the folder the files went into
   if (it.kind === 'upscan' && it.data?.where === 'chat') { if (feat('agents') && agentsOn()) go('agents'); return; }
   if (it.kind === 'signup') { settingsModal('users'); return; }  // 2.23.0 (#711): approve it under Users  // 2.15.0 (#479): an agent's request
   if (!it.task_id) { if (it.list_id && listById(it.list_id)) go('l/' + it.list_id); return; }
@@ -412,8 +414,70 @@ async function newsOpen(i) {
     try { (S.extra ||= []).push(await rawFetch('GET', `/api/tasks/${it.task_id}`)); }
     catch (e) { toast(e instanceof Offline ? tr('News are only available online.') : tr('Task not found')); return; }
   }
-  openDetail(it.task_id);
+  S.nswId = it.id; S.nswTask = it.task_id;  // 2.122.0 (#2314): the open task came from this news item: a sideways swipe goes on
+  openDetail(it.task_id, opts);
 }
+
+// ---- 2.122.0 (#2314): phones: a sideways swipe on the task opened from the news goes to the next (left) / previous (right)
+// UNREAD news in the order and with the filter (tab, kind, workspace) of the list; it is marked read like on opening. None left:
+// a short notice, the view stays. Same exceptions as the swipe on tasks (detail.js, #1071); the swipe on the list rows stays.
+const NSW_SKIP = /^(proposal|playbook_proposal|evinvite|evshare|abshare|connreq|connok|lytpl|dispo|usage|upscan|signup)$/;
+const nswOn = () => !!S.nswTask && S.sel === S.nswTask;
+function nswTarget(dir) {
+  const its = S.nf.items || [], cur = its.findIndex(x => x.id === S.nswId);
+  if (cur < 0) return -1;
+  const ok = it => !it.read && it.task_id && !NSW_SKIP.test(it.kind || '') && newsInWs(it) && newsKindOk(it)
+    && (newsTab() === 'all' || (newsTab() === 'me') === newsForMe(it));
+  for (let i = cur + dir; i >= 0 && i < its.length; i += dir) if (ok(its[i])) return i;
+  return -1;
+}
+let nsw = null;
+document.addEventListener('touchstart', e => {
+  nsw = null;
+  if (!nswOn() || !isMobile() || e.touches.length !== 1 || $('.modal') || $('#pop:not(.hidden)')) return;
+  const d = $('#detail'), el = e.target;
+  if (!d || d.classList.contains('multi') || !el.closest?.('#detail .dbody, #detail .dtop') || dswBlocked(el)) return;
+  const t0 = e.touches[0];
+  if (t0.clientX < DSW_EDGE || t0.clientX > innerWidth - DSW_EDGE) return;
+  const sel = getSelection?.(); if (sel && !sel.isCollapsed && String(sel).trim()) return;
+  nsw = {x: t0.clientX, y: t0.clientY, dx: 0, lock: null, d};
+  document.addEventListener('touchmove', nswTouchMove, {passive: false});
+}, {passive: true});
+function nswTouchMove(e) {
+  if (!nsw) return;
+  const t = e.touches[0], dx = t.clientX - nsw.x, dy = t.clientY - nsw.y;
+  if (!nsw.lock) {
+    if (Math.hypot(dx, dy) < 10) return;
+    nsw.lock = Math.abs(dx) > Math.abs(dy) * 1.5 ? 'x' : 'y';
+    if (nsw.lock === 'y') { nsw = null; return; }
+    nsw.d.classList.add('dswipe');
+  }
+  if (e.cancelable) e.preventDefault();
+  const none = nswTarget(dx < 0 ? 1 : -1) < 0;
+  nsw.raw = dx; nsw.dx = none ? dx / 3 : dx;  // with no further unread one it only gives a little
+  dswMove(nsw.d, nsw.dx);
+}
+async function nswEnd() {
+  const st = nsw; nsw = null;
+  document.removeEventListener('touchmove', nswTouchMove, {passive: false});
+  if (!st || st.lock !== 'x') return;
+  st.d.classList.remove('dswipe');
+  dswAt = Date.now();
+  const dir = st.raw < -DSW_MIN ? 1 : st.raw > DSW_MIN ? -1 : 0, i = dir ? nswTarget(dir) : -1;
+  if (i < 0) { dswMove(st.d, 0, true); if (dir) toast(tr('No more unread news')); return; }
+  const w = innerWidth, slow = !reducedMotion();
+  dswMove(st.d, -dir * w, true);
+  setTimeout(async () => {
+    await flushSaves();
+    await newsOpen(i, {replace: true});
+    const d = $('#detail'); if (!d) return;
+    dswMove(d, dir * w * .35); d.offsetWidth;
+    dswMove(d, 0, true);
+    setTimeout(() => dswMove(d, 0), 220);
+  }, slow ? 170 : 0);
+}
+document.addEventListener('touchend', () => { nswEnd(); });
+document.addEventListener('touchcancel', () => { document.removeEventListener('touchmove', nswTouchMove, {passive: false}); if (nsw?.lock === 'x') { nsw.d.classList.remove('dswipe'); dswMove(nsw.d, 0, true); } nsw = null; });
 
 // ------------------------------------------------------------------ comments + activity (module "collab")
 // Loaded per task when the detail panel opens (GET /timeline), refreshed when the version changes.

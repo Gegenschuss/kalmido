@@ -15,12 +15,13 @@ const bkNote = () => `<p class="muted bk-note">${esc(tr('No tax advice; figures 
 const bkVatLabel = v => v == null ? tr('VAT rate unknown') : tr('VAT {0} %', v);
 function bkDefaultPeriod(mode) {  // the period one files now: the last month / quarter
   const d = new Date(); d.setDate(1);
+  if (mode === 'year') return {year: d.getFullYear() - 1, period: 'y'};  // 2.122.0 D (#2315): the annual return of last year
   if (mode === 'month') { d.setMonth(d.getMonth() - 1); return {year: d.getFullYear(), period: 'm' + String(d.getMonth() + 1).padStart(2, '0')}; }
   const q = Math.floor(d.getMonth() / 3); return q ? {year: d.getFullYear(), period: 'q' + q} : {year: d.getFullYear() - 1, period: 'q4'};
 }
 function bkReset() {
   const m = OFC.info?.settings?.tax_dates?.ustva;
-  BK.mode = m === 'month' ? 'month' : 'quarter';
+  BK.mode = m === 'month' ? 'month' : m === 'year' ? 'year' : 'quarter';
   const p = bkDefaultPeriod(BK.mode);
   Object.assign(BK, {oid: OFC.info?.org_id, info: null, euer: null, ustva: null, err: null, period: p.period, pyear: p.year, jumped: false});
 }
@@ -106,8 +107,8 @@ function bkPeriods(mode) {
 function bkUstvaHtml() {
   const d = BK.ustva, yNow = new Date().getFullYear(), years = [];
   for (let y = yNow; y >= yNow - 3; y--) years.push([y, String(y)]);
-  const bar = `<div class="ofcbar bk-ubar"><div class="seg" role="group" aria-label="${esc(tr('Period'))}">${[['month', tr('Month')], ['quarter', tr('Quarter')]].map(([k, n]) => `<button type="button" data-bk="mode" data-v="${k}" class="${BK.mode === k ? 'on' : ''}" aria-pressed="${BK.mode === k}">${esc(n)}</button>`).join('')}</div>
-    ${ofcSel('bk-period', BK.period, bkPeriods(BK.mode))}${ofcSel('bk-pyear', BK.pyear, years)}</div>`;
+  const bar = `<div class="ofcbar bk-ubar"><div class="seg" role="group" aria-label="${esc(tr('Period'))}">${[['month', tr('Month')], ['quarter', tr('Quarter')], ['year', tr('Whole year')]].map(([k, n]) => `<button type="button" data-bk="mode" data-v="${k}" class="${BK.mode === k ? 'on' : ''}" aria-pressed="${BK.mode === k}">${esc(n)}</button>`).join('')}</div>
+    ${BK.mode === 'year' ? '' : ofcSel('bk-period', BK.period, bkPeriods(BK.mode))}${ofcSel('bk-pyear', BK.pyear, years)}</div>`;
   let body;
   if (d.small_business) body = `<p class="bk-warn">${tr('Small business: no VAT return')}</p>`;
   else {
