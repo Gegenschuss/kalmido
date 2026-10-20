@@ -570,11 +570,14 @@ function bkoWire(md) {
     const b = e.target.closest?.('[data-bko]'); if (!b || !b.closest('#s-bko')) return;
     const k = b.dataset.bko;
     if (k === 'copy') { const v = $('#bko-pub', md)?.value || ''; try { await navigator.clipboard.writeText(v); toast(tr('Copied')); } catch { toast(v); } return; }
+    // 2.143.0 B (#2152, review): "Remove target" deletes the addresses, the saved credentials and the SFTP key pair
+    if (k === 'remove' && !await askConfirm(tr('Remove the target?'), tr('The saved address, credentials and key pair are deleted. Backups already on the target stay there.'), {ok: tr('Remove target'), danger: true})) return;
     if (k === 'newkey' && !await askConfirm(tr('Make a new key pair?'), tr('The old key no longer works: add the new public key on the server.'), {ok: tr('New key pair')})) return;
     b.disabled = true;
     try {
       if (k === 'newkey') await put({sftp: {new_key: true}});
       if (k === 'forget') await put({sftp: {forget_host: true}});
+      if (k === 'remove') await put({remove: true});
       if (k === 'upload') { await bkoDraw(md, await api('POST', '/api/admin/backups/offsite/upload')); toast(tr('Upload started')); }
       if (k === 'test') {
         b.textContent = tr('Testing…');

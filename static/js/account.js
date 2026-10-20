@@ -921,7 +921,7 @@ async function bkoDraw(md, j) {
     }
     h += `<div class="row"><label for="bko-keep">${tr('Keep')}</label><input type="number" class="aanum" id="bko-keep" min="1" max="365" value="${j.keep}"><span class="muted">${tr('newest backups on the target')}</span></div>
       <div class="featgrid"><label class="wide"><input type="checkbox" id="bko-on" ${j.on ? 'checked' : ''} ${j.encrypt_ready ? '' : 'disabled'}><span>${tr('Upload backups to the target')}</span></label></div>
-      <div class="row"><button type="button" class="btn sm" data-bko="test">${ic('check', 's')} ${tr('Test connection')}</button><button type="button" class="btn sm" data-bko="upload" ${j.on && !j.running ? '' : 'disabled'}>${ic('upload', 's')} ${tr('Upload now')}</button></div>`;
+      <div class="row"><button type="button" class="btn sm" data-bko="test">${ic('check', 's')} ${tr('Test connection')}</button><button type="button" class="btn sm" data-bko="upload" ${j.on && !j.running ? '' : 'disabled'}>${ic('upload', 's')} ${tr('Upload now')}</button><button type="button" class="btn sm" data-bko="remove">${ic('trash', 's')} ${tr('Remove target')}</button></div>`;
     const st = j.running ? tr('Uploading…') : j.last_ok ? tr('Last upload: {0}, {1}.', esc(aaWhen(j.last_ok)), fmtBytes(j.last_size)) : tr('No upload yet.');
     h += hint(st);
     if (j.last_error) h += `<div class="shint cnote bkoerr">${tr('The last upload failed ({0}): {1}', esc(aaWhen(j.last_error_at)), esc(j.last_error))}</div>`;

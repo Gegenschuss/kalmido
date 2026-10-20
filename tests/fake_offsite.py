@@ -12,7 +12,9 @@ import hmac
 import json
 import os
 import re
+import shutil
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qsl, quote, unquote, urlsplit
 from xml.sax.saxutils import escape
@@ -142,6 +144,10 @@ class H(BaseHTTPRequestHandler):
         if self.command == "PUT":
             if fail_once():
                 return self.reply(500)
+            try:  # 2.143.0 B (#2152, review): a slow target (seconds in <mode>.slow)
+                time.sleep(float(open(ROOT + ".slow").read().strip() or 0))
+            except (OSError, ValueError):
+                pass
             os.makedirs(os.path.dirname(p), exist_ok=True)
             with open(p, "wb") as f:
                 f.write(data)
@@ -149,7 +155,7 @@ class H(BaseHTTPRequestHandler):
         if self.command == "DELETE":
             if not os.path.exists(p):
                 return self.reply(404)
-            os.remove(p)
+            shutil.rmtree(p) if os.path.isdir(p) else os.remove(p)  # a collection goes with its content (as WebDAV does)
             return self.reply(204)
         if self.command == "PROPFIND":
             if not os.path.exists(p):
@@ -158,7 +164,8 @@ class H(BaseHTTPRequestHandler):
             if os.path.isdir(p) and self.headers.get("Depth") == "1":
                 items += [(u.path.rstrip("/") + "/" + quote(n), os.path.join(p, n)) for n in sorted(os.listdir(p))]
             rs = "".join(f"<d:response><d:href>{escape(h)}</d:href><d:propstat><d:prop>"
-                         + (f"<d:getcontentlength>{os.path.getsize(f)}</d:getcontentlength>" if os.path.isfile(f) else "")
+                         + (f"<d:getcontentlength>{os.path.getsize(f)}</d:getcontentlength>" if os.path.isfile(f)
+                            else "<d:resourcetype><d:collection/></d:resourcetype>")
                          + "</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>" for h, f in items)
             return self.reply(207, f'<?xml version="1.0"?><d:multistatus xmlns:d="DAV:">{rs}</d:multistatus>'.encode())
         return self.reply(405)

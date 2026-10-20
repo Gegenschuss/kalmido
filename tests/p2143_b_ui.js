@@ -57,6 +57,7 @@ const SECRET = 'ui-test-secret-value-42', DAVPW = 'ui-test-dav-password-17';
   check(!!pub && pub.readOnly, 'SFTP: the public key (read only) to copy');
   check(!!md.querySelector('[data-bko="copy"]') && !!md.querySelector('[data-bko="newkey"]') && !!md.querySelector('#bko-sftp-host'), 'SFTP: copy, new key pair, server field');
   check(!/PRIVATE KEY/.test(md.innerHTML), 'SFTP: the private key is never in the page');
+  check(!!md.querySelector('[data-bko="remove"]'), 'review: "Remove target" offered');  // 2.143.0 B (#2152, review)
   w.close();
 
   // ---- knowledge pages: the trash
