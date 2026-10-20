@@ -199,6 +199,25 @@ Your password for the calendar stays encrypted on the server, every request goes
 you subscribed to (the same address checks as for reading), and only you can write into your subscriptions; agents
 have no access to them.
 
+## Birthdays back into a connected address book (2.140.0)
+
+Address books connected in the family view (**Birthdays from your contacts**, CardDAV: Nextcloud, iCloud, Radicale,
+mailbox.org …) are only read at first. Per address book you can switch on **Write changes back to the address book**:
+
+- Off by default; address books connected before stay off.
+- Only what you change in the **Family** section of a birthday or anniversary task from that address book goes back:
+  the **Date** field and the **Year of birth** / **Since** field. Moving or snoozing the task (its due date), editing the
+  title or the name, removing the year and deleting the task write nothing. A contact without a birthday gets none.
+- Only that one date of the contact changes (`BDAY`, `ANNIVERSARY` or Apple's labelled date). The rest of the contact
+  stays byte for byte as it was, also the style of the date (with or without dashes, a date without year like `--0512`).
+- The change is written at the next sync, which starts right away; only the owner of the address book connection writes
+  (a change by another list member or an agent stays in Kalmido).
+- **Changed elsewhere:** if the contact was changed in the address book in the meantime (or the server answers `412`),
+  Kalmido overwrites nothing: the task takes the address book's date and the connection shows a note.
+- **Read only:** an address book you may only read (for example one of Kalmido's own address books copied from a
+  connection, a mirror) shows a note instead of the switch; a server that answers `403` is treated the same way.
+  Servers with weak version tags (`W/`) are never written to. A network problem is tried again at the next sync.
+
 ## Booking page: customers book an appointment (2.94.0)
 
 Customers can book a time with you on a public page without an account. Open **Calendar › Calendars › Booking page…**:

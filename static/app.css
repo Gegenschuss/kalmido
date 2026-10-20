@@ -4146,6 +4146,8 @@ a.frow:hover,.frow a:hover{background:var(--bg3)}
 .frow .ft{display:flex;flex-direction:column;min-width:0;flex:1;color:inherit;text-decoration:none}
 .frow .ft b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .frow .ft .muted{font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frow .ft .ctwb{display:flex;align-items:center;gap:.5rem;margin-top:.25rem;font-size:var(--fs-s)}  /* 2.140.0 D (#2137) */
+.frow .ft .ctwb-note{white-space:normal;font-size:var(--fs-s)}
 .fem{font-size:1.25rem;line-height:1;width:1.5rem;text-align:center;flex:none}
 /* 2.87.9 (#1913): an organisation's own picture as its symbol (orgIconHtml): the size of the emoji it replaces */
 .orgic{width:1.125rem;height:1.125rem;border-radius:.25rem;object-fit:cover;flex:none;vertical-align:middle}

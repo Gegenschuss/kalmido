@@ -2881,6 +2881,15 @@ MIGRATIONS = [
     # one for 2.139), reminded_hm = the latest slot already reminded on reminded_on
     ("habits", "remind_times", "ALTER TABLE habits ADD COLUMN remind_times TEXT NOT NULL DEFAULT ''"),
     ("habits", "reminded_hm", "ALTER TABLE habits ADD COLUMN reminded_hm TEXT NOT NULL DEFAULT ''"),
+    # 2.140.0 D (#2137): an address book source may write changed birthday / anniversary dates back (writeback, off by
+    # default); wb_ro = short hashes of its address books that refuse writing (a mirror: privilege set or 403), wb_books =
+    # how many books the last sync saw, wb_err = the last write-back problem (conflict, read only). Older versions ignore them
+    ("contact_srcs", "writeback", "ALTER TABLE contact_srcs ADD COLUMN writeback BIGINT NOT NULL DEFAULT 0"),
+    ("contact_srcs", "wb_ro", "ALTER TABLE contact_srcs ADD COLUMN wb_ro TEXT NOT NULL DEFAULT ''"),
+    ("contact_srcs", "wb_books", "ALTER TABLE contact_srcs ADD COLUMN wb_books BIGINT NOT NULL DEFAULT 0"),
+    ("contact_srcs", "wb_err", "ALTER TABLE contact_srcs ADD COLUMN wb_err TEXT NOT NULL DEFAULT ''"),
+    # 2.140.0 D (#2137): what the owner set in Kalmido and the next sync writes into the vCard (JSON {mo, dy, y}; '' = nothing)
+    ("contact_links", "want", "ALTER TABLE contact_links ADD COLUMN want TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
