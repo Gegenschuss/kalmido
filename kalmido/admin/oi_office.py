@@ -191,7 +191,7 @@ def _p_doc(c, run, src, d, ctx):
         run.warning(N_("A document number already exists in the target office, the document was skipped: {0}"), d.get("number"))
         return None
     for col in ("ref_doc_ids", "abs_refs"):  # set by the finish pass (other documents)
-        if col in d:
+        if col in d and d[col] is not None:  # an empty value stays empty (the round trip compares them)
             d[col] = "[]"
     if "rights" in d:
         d["rights"] = json.dumps(_oi_ids(run, _oi_json(src.get("rights"), {})), ensure_ascii=False)
