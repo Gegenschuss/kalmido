@@ -741,6 +741,8 @@ ROUTES = {
     "POST /api/lists/{}/e2e/rotate": "list",  # 2.64.2 A (#1817): key change of a list with the lock
     # 2.97.0 C (#2049): office moves (p297_c_api_test.py) - routes below this line
     "POST /api/office/move-space": "office",
+    # 2.137.0 D (#1981): the personal office into an organisation the person is an admin of (p2137_d_api_test.py)
+    "GET /api/office/move/check": "office", "POST /api/office/move/org": "office",
     # 2.64.2 B (#1817): list files -- need_task (+ own comment) / need_list, people in the app only (p264b_b_api_test.py)
     "POST /api/tasks/{}/list-attachments": "attachment", "POST /api/lists/{}/e2e/files/{}": "list",
     "GET /api/tasks/{}/note-lock": "task", "PUT /api/tasks/{}/note-lock": "task", "DELETE /api/tasks/{}/note-lock": "task", "GET /api/v1/team/rooms": "team", "POST /api/v1/team/dm": "team",

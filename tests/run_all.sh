@@ -1359,6 +1359,14 @@ fresh; run p21261_a_ui node p21261_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.126.1 part B: table rows -> tasks as an agent proposal, planned inbox sorting (#2125 #2126)
 fresh; run p21261_b_api "$PY" p21261_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21261_b_ui node p21261_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.137.0 part A: organisation import - office + clients (#2344)
+fresh; run p2137_a_api "$PY" p2137_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.137.0 part B: organisation import - file store, documents, knowledge pages, tables, videos (#2344)
+fresh; run p2137_b_api "$PY" p2137_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.137.0 part C: organisation import - chat, absences, forms, notes, time entries, round trip (#2344)
+fresh; run p2137_c_api "$PY" p2137_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.137.0 part D: personal office into an organisation (#1981)
+fresh; run p2137_d_api "$PY" p2137_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.124.0 part A: formulas, chart (#2109 #2115)
 fresh; run p2124_a_api "$PY" p2124_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2124_a_ui node p2124_a_ui.js "$KALMIDO_TEST_DATA"

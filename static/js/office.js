@@ -412,6 +412,8 @@ function ofcSettingsHtml() {
     ${adm ? `<h3>${tr('Access log')}</h3><p class="muted">${tr('Who opened, printed, changed or exported documents and master data of this organisation.')}</p>${ofcLogHtml()}` : ''}
     </fieldset>${ost_p('data')}
     ${adm && OFC.info.personal && OFC.info.can_move ? `<h3>${tr('Move into an organisation')}</h3><p class="muted">${tr('Turns this personal office into a new organisation with you as its admin: documents, numbers, settings, master data and your private clients go with it. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-move">${ic('building', 's')} ${tr('Create organisation…')}</button></div>` : ''}
+    ${adm && OFC.info.personal && OFC.info.move_orgs?.length ? `<h3>${tr('Transfer into an organisation')}</h3><p class="muted">${tr('Moves documents, clients, master data and files of this personal office into an organisation in which you are an admin. Finalised invoices stay locked and keep their numbers. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-transfer">${ic('building', 's')} ${tr('Transfer into an organisation…')}</button></div>` : ''}
+    ${adm && OFC.info.personal && typeof ox_pbBoxHtml === 'function' ? ox_pbBoxHtml(0) : ''}${''/* 2.137.0 A (#2344): export of the personal office */}
     </fieldset>
   </form>`;
 }
@@ -425,6 +427,33 @@ async function pb_move() {
     await refreshMe(); S.workspaces = true; S.settings.workspace = 'org:' + j.org_id; LS.set('ws', S.settings.workspace);
     pb_reset(true); OFC.ws = typeof wsCur === 'function' ? wsCur() : ''; render();
     toast(tr('The organisation “{0}” now holds your office', j.name));
+  } catch (x) { toast(x.message || tr('unknown')); }
+}
+// 2.137.0 D (#1981): the personal office into an organisation the person is an admin of (one way: preview with the
+// conflicts, then the confirmation; GET /api/office/move/check, POST /api/office/move/org)
+async function pb_transfer() {
+  const orgs = OFC.info?.move_orgs || []; if (!orgs.length) return;
+  let org = orgs[0].id, pv = null;
+  const ul = a => a?.length ? `<ul>${a.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
+  const show = async md => {
+    const box = $('#pbt-pv', md), ok = $('[data-cd="yes"]', md), want = org;
+    pv = null; ok.disabled = true; box.innerHTML = `<p class="muted">${esc(tr('Loading…'))}</p>`;
+    let j; try { j = await api('GET', `/api/office/move/check?org=${encodeURIComponent(want)}`); } catch (x) { if (want === org) box.innerHTML = `<p class="aerr">${esc(x.message || tr('unknown'))}</p>`; return; }
+    if (want !== org) return;
+    pv = j;
+    box.innerHTML = (j.conflicts.length ? `<p><b>${esc(tr('Cannot be transferred'))}</b></p>${ul(j.conflicts)}` : '')
+      + `<p><b>${esc(tr('Goes along'))}</b></p>${ul(j.moves)}<p><b>${esc(tr('Stays in your personal office'))}</b></p>${ul(j.keeps)}${ul(j.notes)}<p>${esc(j.who)}</p><p class="muted">${esc(tr('This cannot be undone.'))}</p>`;
+    ok.disabled = !j.ok;
+  };
+  const html = (orgs.length > 1 ? `<label>${esc(tr('Organisation'))} <select id="pbt-org">${orgs.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select></label>` : `<p>${esc(tr('Into “{0}”', orgs[0].name))}</p>`) + '<div id="pbt-pv"></div>';
+  const yes = await askDialog({title: tr('Transfer into an organisation'), html, ok: tr('Transfer'), danger: true,
+    after: md => { $('#pbt-org', md)?.addEventListener('change', e => { org = +e.target.value; show(md); }); show(md); }});
+  if (!yes || !pv?.ok) return;
+  try {
+    const j = await api('POST', '/api/office/move/org', {org, confirm: true});
+    await refreshMe(); S.settings.workspace = 'org:' + j.org_id; LS.set('ws', S.settings.workspace);
+    pb_reset(true); OFC.ws = typeof wsCur === 'function' ? wsCur() : ''; render();
+    toast(tr('Your office is now in “{0}”', j.name));
   } catch (x) { toast(x.message || tr('unknown')); }
 }
 // 2.36.2 (#1021 P4): the company as single fields (print lines are made from them; the free lines stay the fallback)
@@ -695,6 +724,7 @@ document.addEventListener('click', async e => {
   const b = e.target.closest?.('[data-ofc]'); if (!b) return;
   const a = b.dataset.ofc;
   if (a === 'pb-move') { pb_move(); return; }  // 2.47.3 (#1360)
+  if (a === 'pb-transfer') { pb_transfer(); return; }  // 2.137.0 D (#1981)
   if (a === 'pb-ws') { if (typeof wsSet === 'function') wsSet(b.dataset.ws); return; }  // 2.47.3 (#1360)
   if (a === 'new') { e.preventDefault(); ofcModal(b.dataset.kind, null); }
   else if (a === 'open') { e.preventDefault(); const r = ofcRow(b.dataset.kind, +b.dataset.id); if (r) ofcModal(b.dataset.kind, r); }
