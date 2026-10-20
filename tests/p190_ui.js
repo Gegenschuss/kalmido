@@ -33,7 +33,8 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   check(pane && !pane.classList.contains('hidden') && d.querySelector('#s-share-h')?.textContent === 'Share from your phone', 'Settings > Integrations > Share from your phone');
   const zip = d.querySelector('#s-hszip');
   check(zip && zip.getAttribute('href') === '/api/me/share/httpshortcuts.zip' && zip.hasAttribute('download'), 'HTTP Shortcuts download link');
-  const zr = await fetch(B + 'api/me/share/httpshortcuts.zip', {headers: {Cookie: cks.alice}});
+  // 2.138.0 (#1907): the download makes a new token, so only same-origin (a browser sends Sec-Fetch-Site)
+  const zr = await fetch(B + 'api/me/share/httpshortcuts.zip', {headers: {Cookie: cks.alice, 'Sec-Fetch-Site': 'same-origin'}});
   check(zr.ok && zr.headers.get('content-type') === 'application/zip', 'the link delivers the ZIP');
   check(d.querySelector('#s-dropurl').value === 'https://kalmido.example', 'server address shown (2.0.2: without /drop, the shortcut adds it)');
   // 2.138.0 (#1907): the token is stored as a hash: no token field until one is created, then shown once

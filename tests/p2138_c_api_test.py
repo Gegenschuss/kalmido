@@ -443,7 +443,7 @@ ENC1 = one("SELECT iban FROM office_company WHERE org_id=?", (ORG,))
 rc, out, err_ = cli("rotate", "--org", str(ORG), env=("KALMIDO_ORGCRYPT_ROT_SETTLE=0",))
 lines = [x.strip() for x in out.splitlines() if x.strip().startswith("R2-")]
 RN = lines[0] if lines else ""
-check(rc == 0 and RN and RN not in err_, f"rotate finished, the new recovery key on stdout {rc} {out[-300:]} {err_[-300:]}")
+check(rc == 0 and RN and RN not in err_, f"rotate finished, the new recovery key on stdout {rc} {out[-300:]} {err_[-2500:]}")
 check(one("SELECT wrapped_rot FROM org_keys WHERE org_id=?", (ORG,)) is None and one("SELECT rotated_at FROM org_keys WHERE org_id=?", (ORG,))
       and one("SELECT wrapped_prev FROM org_keys WHERE org_id=?", (ORG,)) is None, "after the rotation: earlier key gone, rotated_at noted")
 check(one("SELECT iban FROM office_company WHERE org_id=?", (ORG,)) == ENC1, "a value written during the rotation (new key) is left as it is")
