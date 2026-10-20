@@ -352,8 +352,8 @@ async function bk_barAct(k, el) {
   }
 }
 async function bk_send(body, ids) {  // one request per 5000 (the server's limit; an address book holds up to 20000)
-  const out = {moved: 0, conflicts: []};
-  for (let i = 0; i < ids.length; i += 5000) { const j = await api('POST', '/api/contacts/bulk', {...body, ids: ids.slice(i, i + 5000)}); out.moved += j.moved || 0; out.conflicts.push(...(j.conflicts || [])); }
+  const out = {moved: 0, copied: 0, conflicts: []};  // 2.138.3 C (#2378): copied = out of an imported (mirrored) address book
+  for (let i = 0; i < ids.length; i += 5000) { const j = await api('POST', '/api/contacts/bulk', {...body, ids: ids.slice(i, i + 5000)}); out.moved += j.moved || 0; out.copied += j.copied || 0; out.conflicts.push(...(j.conflicts || [])); }
   return out;
 }
 // 2.47.3 (#1731): properties of the selected contacts at once (groups added / removed, company, department, kind, a note
@@ -397,7 +397,7 @@ async function bk_set(body, ids, items) {  // 5000 per request; restore sends th
 async function bk_move(ids, b) {
   let j; try { j = await bk_send({action: 'move', book_id: b.id}, ids); } catch (e) { if (e.data?.code === 'partial') { bk_end(); await load().catch(() => {}); ctLoad(); } return; }  // 2.58.0 (#1656)
   const conf = (j.conflicts || []).length;
-  toast([trn('{0} contact moved to {1}', '{0} contacts moved to {1}', j.moved, b.name), conf ? trn('{0} was there already and stayed', '{0} were there already and stayed', conf) : ''].filter(Boolean).join(' · '));
+  toast([j.moved || !j.copied ? trn('{0} contact moved to {1}', '{0} contacts moved to {1}', j.moved, b.name) : '', j.copied ? trn('{0} copied from an imported address book', '{0} copied from imported address books', j.copied) : '', conf ? trn('{0} was there already and stayed', '{0} were there already and stayed', conf) : ''].filter(Boolean).join(' · '));
   bk_end(); await load().catch(() => {}); ctLoad(); if (CT.sel) ctOpen(CT.sel);
 }
 document.addEventListener('keydown', e => {  // capture: before the global Esc (an open menu / dialog closes first)
@@ -483,7 +483,7 @@ async function ctEditor(c) {
       const r = c ? await api('PATCH', `/api/contacts/${c.id}`, {...body, expect: c.updated_at}) : await api('POST', '/api/contacts', body);
       LS.set('ctBook', body.book_id);
       md.remove(); CT.sel = r.id; CT.card = r;
-      toast(c ? tr('Contact saved') : tr('Contact created'));
+      toast(r.copied ? tr('Copied from the imported address book') : c ? tr('Contact saved') : tr('Contact created'));  // 2.138.3 C (#2378)
       await load().catch(() => {}); ctLoad();
       if (S.route.mod === 'contacts' && isMobile() && !c) go('contacts/' + r.id);
     } catch { /* api() showed it */ }

@@ -119,7 +119,7 @@ function repoBoxHtml(l) {
 function repoWire(md, lid, folder) {
   const box = $('#l-repos', md); if (!box) return;
   const isProj = () => !!folder || listById(lid)?.kind === 'project';
-  let j = null, edit = null, secret = null, errUrl = null;
+  let j = null, edit = null, secret = null, errUrl = null, errHdr = null;
   const provSel = `<select id="rp-prov" aria-label="${esc(tr('Provider'))}">${GIT_PROV.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select>`;
   const draw = () => {
     if (!md.isConnected) return;
@@ -170,11 +170,13 @@ function repoWire(md, lid, folder) {
       : `<button class="btn sm" data-rp="err-on">${tr('Turn on')}</button>`;
     return `<div class="errhook" id="rp-err"><div class="mrow reporow errrow">${ic('bug', 's')}<span class="n"><b>${tr('Error reports')}</b><span class="muted rpm">${esc(st)}</span></span>${ctl}</div>
       <div class="shint lhint">${tr('Sentry or any service that sends JSON: a new error becomes a bug ticket, the same error again only counts up at its open ticket.')}</div>
-      ${errUrl ? `<div class="shint lhint rpsec" role="status">${esc(tr('Webhook URL (shown only now, keep it secret):'))} <code>${esc(errUrl)}</code> <button class="linkbtn" data-rp="err-copy">${ic('copy', 's')} ${tr('Copy')}</button></div>` : ''}</div>`;
+      ${errUrl && errHdr ? `<div class="shint lhint rpsec" role="status">${esc(tr('Webhook URL:'))} <code>${esc(errHdr.hook_url)}</code><br>${esc(tr('Header (shown only now, keep it secret):'))} <code>${esc('Authorization: Bearer ' + errHdr.token)}</code> <button class="linkbtn" data-rp="err-copy" data-v="h">${ic('copy', 's')} ${tr('Copy')}</button></div>
+      <div class="shint lhint" role="status">${esc(tr('Services that cannot send a header (Sentry): this URL with the token works as before:'))} <code>${esc(errUrl)}</code> <button class="linkbtn" data-rp="err-copy">${ic('copy', 's')} ${tr('Copy')}</button></div>`
+      : errUrl ? `<div class="shint lhint rpsec" role="status">${esc(tr('Webhook URL (shown only now, keep it secret):'))} <code>${esc(errUrl)}</code> <button class="linkbtn" data-rp="err-copy">${ic('copy', 's')} ${tr('Copy')}</button></div>` : ''}</div>`;  // 2.138.3 C (#2381): the header form first
   };
   const errSet = async state => {
     let x; try { x = await api('PATCH', `/api/lists/${lid}/error-hook`, {state}); } catch { return; }
-    errUrl = x.url || null; j.errors = x; draw();
+    errUrl = x.url || null; errHdr = x.hook_url && x.token ? {hook_url: x.hook_url, token: x.token} : null; j.errors = x; draw();
     (errUrl ? $('#rp-err [data-rp="err-copy"]', box) : $('#rp-err [data-rp="err-on"]', box))?.focus();
   };
   const provHint = () => {
@@ -217,7 +219,8 @@ function repoWire(md, lid, folder) {
     } else if (k === 'err-on') {
       await errSet('on');
     } else if (k === 'err-copy') {
-      try { await navigator.clipboard.writeText(errUrl || ''); toast(tr('Copied')); } catch { toast(errUrl || ''); }
+      const v = b.dataset.v === 'h' && errHdr ? 'Authorization: Bearer ' + errHdr.token : errUrl || '';  // 2.138.3 C (#2381)
+      try { await navigator.clipboard.writeText(v); toast(tr('Copied')); } catch { toast(v); }
     } else if (k === 'err-menu') {
       menu(b, [{label: tr('New URL (the old one stops working)'), icon: 'sync', fn: () => errSet('rotate')},
         '-', {label: tr('Turn error reports off'), icon: 'x', cls: 'flag-5', fn: () => errSet('off')}]);

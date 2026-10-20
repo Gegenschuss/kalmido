@@ -11746,5 +11746,12 @@
   "Contact history": "Cronologia del contatto",
   "{0} framework contract moves with its PDF files": ["{0} contratto quadro viene spostato con i suoi file PDF", "{0} contratti quadro vengono spostati con i loro file PDF"],
   "{0} draft loses its framework contract": ["{0} bozza perde il suo contratto quadro", "{0} bozze perdono il loro contratto quadro"],
-  "{0} framework contract loses its client (clients stay in their workspace)": ["{0} contratto quadro perde il suo cliente (i clienti restano nel loro spazio di lavoro)", "{0} contratti quadro perdono il loro cliente (i clienti restano nel loro spazio di lavoro)"]
+  "{0} framework contract loses its client (clients stay in their workspace)": ["{0} contratto quadro perde il suo cliente (i clienti restano nel loro spazio di lavoro)", "{0} contratti quadro perdono il loro cliente (i clienti restano nel loro spazio di lavoro)"],
+  "Copied from the imported address book": "Copiato dalla rubrica importata",
+  "{0} copied from an imported address book": ["{0} copiato da una rubrica importata", "{0} copiati da rubriche importate"],
+  "The customer portal of {0} reached its limit of {1} sign-in mails per hour. Further customers get a link again later.": "Il portale clienti di {0} ha raggiunto il limite di {1} e-mail di accesso all’ora. Gli altri clienti riceveranno un link più tardi.",
+  "Your customer portal reached its limit of {0} sign-in mails per hour. Further customers get a link again later.": "Il tuo portale clienti ha raggiunto il limite di {0} e-mail di accesso all’ora. Gli altri clienti riceveranno un link più tardi.",
+  "Webhook URL:": "URL del webhook:",
+  "Header (shown only now, keep it secret):": "Intestazione (mostrata solo ora, tienila segreta):",
+  "Services that cannot send a header (Sentry): this URL with the token works as before:": "Servizi che non possono inviare un’intestazione (Sentry): questo URL con il token continua a funzionare:"
 }

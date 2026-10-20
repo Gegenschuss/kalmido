@@ -17,7 +17,7 @@ from ..tasks.validation import as_int
 from ..personal.timetrack import BadInput, UnknownFields
 from ..contacts.model import (
     book_create, book_fields, book_member_set, book_public, book_touch, books_for, contact_brief, contact_dict, contact_fields,
-    contact_store, contacts_query, CT_KEYS, default_book, import_vcards, link_remove, link_set, my_book_ids, need_book, need_contact,
+    contact_copy, contact_store, contacts_query, CT_KEYS, default_book, import_vcards, link_remove, link_set, my_book_ids, need_book, need_contact,
     occ_sync, render_vcard, split_vcards, CONTACTS_PER_BOOK, IMPORT_BATCH,
 )
 
@@ -175,6 +175,12 @@ def op_contact_edit(c, uid, cid, b):
             raise Denied(409, tr("An imported address book is updated from its source; contacts cannot be moved into it"))
         if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND (uid=? OR href=?)", (nb, r["uid"], r["href"])).fetchone():
             raise Denied(409, tr("The address book has this contact already"))
+        if c.execute("SELECT src_id FROM books WHERE id=?", (r["book_id"],)).fetchone()[0]:  # 2.138.3 C (#2378): out of a mirror = a copy
+            ncid = contact_copy(c, uid, cid, nb)
+            contact_store(c, uid, nb, contact_fields({k: v for k, v in b.items() if k != "book_id"}, r), cid=ncid)
+            book_touch(c, nb)
+            c.commit()
+            return {**op_contact(c, uid, ncid), "copied": True}
         nbk = c.execute("SELECT occ_list_id FROM books WHERE id=?", (nb,)).fetchone()
         if c.execute("SELECT occ_list_id FROM books WHERE id=?", (r["book_id"],)).fetchone()[0] != nbk[0]:
             from ..contacts.bulk import bk_occ_drop  # 2.46.1 (#1554): another birthday list: the old tasks go, contact_store makes new ones
@@ -266,17 +272,30 @@ def lv_import_start(c, uid, bid, cards, since=None):
 
 
 def lv_import_run(st, ctx, uid, bid, cards, since=None):
-    def prog(done, total, res):
-        with _IMP_LOCK:
-            st.update(done=done, **res)
+    # 2.138.3 C (#2377): a pool connection per batch (taken, given back after the batch's commit) instead of one for the
+    # whole run, each with the starter's row-level-security context; the photo budget and the counts run across the batches.
+    cards = cards[:CONTACTS_PER_BOOK]
+    res = {"created": 0, "updated": 0, "unchanged": 0, "errors": 0}
+    t_end = time.monotonic() + 900
     c = None
     try:
-        c = connect()
-        c.set_ctx(*ctx)
-        res = import_vcards(c, uid, bid, None, batch=IMPORT_BATCH, progress=prog, cards=cards, photos=900)
-        c.commit()
+        for i in range(0, len(cards), IMPORT_BATCH):
+            c = connect()
+            c.set_ctx(*ctx)
+            # batch: a block that hits the book's limit keeps what it stored; photos > 0: a used-up budget keeps old pictures
+            part = import_vcards(c, uid, bid, None, batch=IMPORT_BATCH, cards=cards[i:i + IMPORT_BATCH],
+                                 photos=max(1e-3, t_end - time.monotonic()))
+            c.commit()
+            c.close()
+            c = None
+            for k in res:
+                res[k] += part[k]
+            with _IMP_LOCK:
+                st.update(done=min(i + IMPORT_BATCH, len(cards)), **res)
         if since is not None:  # 2.119.1 A (#2084): the new contacts that look like one already there
             from ..contacts.ctxlist import ctx_import_dupes
+            c = connect()
+            c.set_ctx(*ctx)
             res.update(ctx_import_dupes(c, uid, bid, since))
         with _IMP_LOCK:
             st.update(state="done", done=st["total"], **res)

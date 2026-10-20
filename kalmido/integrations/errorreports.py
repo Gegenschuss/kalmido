@@ -2,6 +2,7 @@
 import hashlib
 import hmac
 import json
+import logging
 import re
 import secrets
 import threading
@@ -131,6 +132,35 @@ def err_rate_ok(lid):
     return True
 
 
+# 2.138.3 C (#2381): the token in a header (Authorization: Bearer … or X-Kalmido-Token) keeps it out of the access logs of
+# proxies; the path form stays for senders that cannot set a header (Sentry's webhooks). The app's own log lines (Flask's
+# unhandled-error line, the web server's) mask the token part of the path (ERR_LOG_MASK).
+ERR_LOG_MASK = re.compile(r"(/api/hooks/(?:issues|deploy)/[0-9]+/)[^/\s?\]\"']+")
+
+
+class _ErrTokenMask(logging.Filter):
+    def filter(self, record):
+        try:
+            msg = record.getMessage()
+        except Exception:  # noqa: BLE001  (a broken format: leave the record as it is)
+            return True
+        if "/api/hooks/" in msg:  # the deploy hook's token too
+            record.msg, record.args = ERR_LOG_MASK.sub(r"\1***", msg), ()
+        return True
+
+
+for _lg in (app.logger, logging.getLogger("waitress")):
+    _lg.addFilter(_ErrTokenMask())
+
+
+@app.post("/api/hooks/issues/<int:lid>")
+def errhook_in_hdr(lid):
+    """2.138.3 C (#2381): the same webhook with the token in a header."""
+    a = request.headers.get("Authorization") or ""
+    token = a[7:].strip() if a[:7].lower() == "bearer " else (request.headers.get("X-Kalmido-Token") or "").strip()
+    return errhook_in(lid, token)
+
+
 @app.post("/api/hooks/issues/<int:lid>/<token>")
 def errhook_in(lid, token):
     """Inbound error report (Sentry or generic JSON) -> a bug ticket, or a count on the open one of the same error."""
@@ -138,7 +168,7 @@ def errhook_in(lid, token):
     with system_ctx(c):  # 2.37.0 (#1150): resolve the token (one row) across organisations ...
         r = c.execute("SELECT h.*, l.owner_id, l.tickets, l.archived, l.org_id FROM issue_hooks h JOIN lists l ON l.id=h.list_id "
                       "WHERE h.list_id=?", (lid,)).fetchone()
-    if not r or len(token) > 200 or not hmac.compare_digest(r["token_hash"], hashlib.sha256(token.encode()).hexdigest()):
+    if not r or not token or len(token) > 200 or not hmac.compare_digest(r["token_hash"], hashlib.sha256(token.encode()).hexdigest()):
         return err(tr("unknown"), 404)
     acx_anon_bind(c, r["org_id"])  # ... then read and write as nobody, inside exactly the list's organisation
     if (request.content_length or 0) > ERR_MAX_BYTES:
@@ -279,6 +309,7 @@ def errhook_set(lid):
                      ON CONFLICT(list_id) DO UPDATE SET token_hash=excluded.token_hash, created_by=excluded.created_by,
                      created_at=excluded.created_at""", (lid, hashlib.sha256(tok.encode()).hexdigest(), me(), iso(now_utc())))
         out["url"] = f"{PUBLIC_URL.rstrip('/')}/api/hooks/issues/{lid}/{tok}"  # the only time it is shown
+        out["hook_url"], out["token"] = f"{PUBLIC_URL.rstrip('/')}/api/hooks/issues/{lid}", tok  # 2.138.3 C (#2381): token as a header
     bump(c)
     c.commit()
     return jsonify({**errhook_public(c, lid, True), **out})
@@ -329,7 +360,10 @@ def git_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
         "open": {"type": "integer", "description": "Open tickets created from reports"}, "may": {"type": "boolean"},
         "per_hour": {"type": "integer", "description": "New tickets per hour at most; later reports are only counted"},
         "url": {"type": "string", "description": "Only in the answer of state on / rotate: POST Sentry webhooks or "
-                                                 "{title, body?, url?, fingerprint?, level?} to it"}}}
+                                                 "{title, body?, url?, fingerprint?, level?} to it (the token in the path)"},
+        "hook_url": {"type": "string", "description": "2.138.3: only in the answer of state on / rotate: the same without the token; "
+                                                      "send it as Authorization: Bearer <token> or X-Kalmido-Token"},
+        "token": {"type": "string", "description": "2.138.3: only in the answer of state on / rotate: the token for the header"}}}
     schemas["ErrorHook"] = hook
     paths["/lists/{id}/error-hook"] = {
         "get": op("Is the error-report webhook of a list on (never its URL)", "Lists", ok(ref("ErrorHook")) | errs("404"), [pid("id", "List id")]),

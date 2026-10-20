@@ -10,6 +10,8 @@ background thread) and the command line for the server admin:
     python -m kalmido.admin.orgcrypt_cli encrypt-wiki           #   (wiki_encrypt=0, before running 2.122 or older) / sealed again
     python -m kalmido.admin.orgcrypt_cli docs-to-server-key     # 2.126.0 A (#1970): the private documents' values on the
     python -m kalmido.admin.orgcrypt_cli docs-to-account-key    #   server-derived key (before running 2.125 or older) / back
+    python -m kalmido.admin.orgcrypt_cli reindex-private        # 2.138.3 C (#2382): after a new server key: the private
+                                                                #   documents' word index again, unreadable previews made again
     python -m kalmido.admin.orgcrypt_cli rewrap-accounts --old-key-file FILE   # 2.64.0: account keys after a new server key
         (FILE "-" = stdin: the earlier KALMIDO_SECRET_KEY, base64; never as an argument)
     python -m kalmido.admin.orgcrypt_cli rewrap --org N --recovery-file FILE [--force]   (FILE "-" = stdin; never as an argument;
@@ -534,6 +536,74 @@ def docs_forms(c):
     return out
 
 
+# 2.138.3 C (#2382): what stays on the server key in the private spaces: the Paperless token (pl_sources.token, also an
+# organisation's) and the word index / previews of private documents. After a new server key (and rewrap-accounts) the
+# token has to be entered again (counted here, the settings say so) and reindex-private rebuilds the index with the new key.
+DOCS_INDEX_MARK = "docs_private_index_key"  # settings: a fingerprint of the server key the private index was last built with
+
+
+def _index_mark():
+    import hashlib
+    import hmac
+    from ..core.config import SECRET_KEY
+    return hmac.new(SECRET_KEY, b"kalmido-docs-index-mark-v1", hashlib.sha256).hexdigest()[:16] if SECRET_KEY else ""
+
+
+def pl_tokens(c):
+    """{"ok": n, "unreadable": n} over the stored Paperless tokens (status; each is opened, never shown)."""
+    from ..paperless.ngx import pl_token_lost
+    out = {"ok": 0, "unreadable": 0}
+    with system_ctx(c):  # orgcrypt: counts only
+        for r in c.execute("SELECT id, ws, token FROM pl_sources WHERE COALESCE(token, '')<>''").fetchall():
+            out["unreadable" if pl_token_lost(c, r) else "ok"] += 1
+    return out
+
+
+def reindex_private(c, stop=None):
+    """The word index of every private document again with the current server key, and the previews that no longer open
+    removed so the preview catch-up (docs/thumbfill.py) makes them again. Texts, labels and files stay. Batches with a
+    commit each. -> {"indexed": n, "previews": n, "failed": n}."""
+    import json as _json
+    from ..core.config import ATT_DIR
+    from ..core.db import gset
+    from ..docs.thumbfill import FILL_KEY
+    S = _ds()
+    out = {"indexed": 0, "previews": 0, "failed": 0}
+    last = 0
+    while True:
+        if stop and stop():
+            return out
+        with system_ctx(c):  # orgcrypt: server-side bulk work over the private workspaces, never content handed to a person
+            rows = c.execute("SELECT d.*, n.name AS n_name FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id "
+                             "WHERE d.ws LIKE 'u%' AND d.node_id > ? ORDER BY d.node_id LIMIT ?", (last, BATCH)).fetchall()  # pg-ok: ws prefix u is case-exact
+            for m in rows:
+                txt = S.meta_text(c, m)
+                if m["text"] and not txt:  # the text itself does not open (an account key not rewrapped): keep the old index
+                    out["failed"] += 1
+                    continue
+                try:
+                    with c.savepoint():  # one broken document never stops the run
+                        S.doc_index(c, m["node_id"], m["ws"], S.index_text(c, dict(m), m["n_name"], txt))
+                        out["indexed"] += 1
+                        if m["thumb"]:
+                            try:
+                                S.thumb_read(c, m["ws"], os.path.join(ATT_DIR, m["thumb"]))
+                            except OSError:
+                                S.thumb_drop(m["thumb"])
+                                c.execute("UPDATE doc_meta SET thumb='' WHERE node_id=?", (m["node_id"],))
+                                out["previews"] += 1
+                except Exception:  # noqa: BLE001 -- counted; the document keeps its old index
+                    out["failed"] += 1
+            if len(rows) < BATCH:
+                gset(c, DOCS_INDEX_MARK, _index_mark())
+                if out["previews"]:
+                    gset(c, FILL_KEY, _json.dumps({}))  # the catch-up runs once more over the documents without a preview
+        c.commit()
+        if len(rows) < BATCH:
+            return out
+        last = rows[-1]["node_id"]
+
+
 def docs_count(c):
     """{"enc": n, "plain": n} over the documents' values of every workspace (status)."""
     out = {"enc": 0, "plain": 0}
@@ -754,6 +824,11 @@ def status(c):
     out["docs"] = docs_count(c)  # 2.126.0 A (#1971): the documents' values of every workspace
     out["docs_account_key"] = _ds().docs_ukey_on(c)  # 2.126.0 A (#1970)
     out["docs"]["private"] = docs_forms(c)
+    from ..core.db import gsetting
+    with system_ctx(c):  # 2.138.3 C (#2382): an instance setting
+        mk = gsetting(c, DOCS_INDEX_MARK) or ""
+    out["docs"]["private_index"] = "unknown" if not mk else "current" if mk == _index_mark() else "other_server_key"
+    out["paperless_tokens"] = pl_tokens(c)
     for oid in _org_ids(c):
         st = oc.oc_status(c, oid)
         out["orgs"].append({"org": oid, "has_key": st["has_key"], "key_ok": st["key_ok"], "migrated_at": st["migrated_at"],
@@ -1220,6 +1295,8 @@ def main(argv):
     sub.add_parser("encrypt-wiki", help="2.123.0: seal the knowledge pages' texts and history again, wiki_encrypt=1")
     sub.add_parser("docs-to-server-key", help="2.126.0: the private documents' values back on the server-derived key (before running 2.125 or older)")
     sub.add_parser("docs-to-account-key", help="2.126.0: the private documents' values on the persons' account keys again")
+    sub.add_parser("reindex-private", help="2.138.3: after a new server key: the private documents' word index again, "
+                                           "previews that no longer open are made again")
     ra = sub.add_parser("rewrap-accounts", help="2.64.0: store the account keys again with the current server key (needs the earlier one)")
     ra.add_argument("--old-key-file", required=True, help='a file holding the earlier KALMIDO_SECRET_KEY, "-" = stdin')
     rw = sub.add_parser("rewrap", help="store an organisation's key again (new KALMIDO_SECRET_KEY) from its recovery key")
@@ -1284,6 +1361,11 @@ def main(argv):
             print(TAG, a.cmd + ":", json.dumps({**t, **left}), "(wiki_encrypt is now", "1)" if on else "0)")
             if t["failed"] or (not on and left["sealed"]):
                 return 1
+        elif a.cmd == "reindex-private":  # 2.138.3 C (#2382)
+            t = reindex_private(c)
+            print(TAG, "reindex-private:", json.dumps(t))
+            if t["failed"]:
+                return 1
         elif a.cmd in ("docs-to-server-key", "docs-to-account-key"):  # 2.126.0 A (#1970): the switch first, then the pass
             t = docs_switch(c, a.cmd == "docs-to-account-key")
             print(TAG, a.cmd + ":", json.dumps(t), "(docs_account_key is now", "1)" if a.cmd == "docs-to-account-key" else "0)")
@@ -1302,6 +1384,8 @@ def main(argv):
             t = oc.oc_rewrap_accounts(c, old)
             c.commit()
             print(TAG, "rewrap-accounts:", json.dumps(t))
+            pt = pl_tokens(c)  # 2.138.3 C (#2382): what stays on the server key
+            print(TAG, "next: reindex-private (the private documents' search index); Paperless tokens to enter again:", pt["unreadable"])
             if t["other"]:
                 return 1
         elif a.cmd == "rewrap":

@@ -66,7 +66,7 @@ NEWS_FOR_ME += ("wiki_shared",)  # 2.126.2 B (#2355)
 
 def news_to_me(kind, actor_id, data, agents, s=None):
     # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
-    if kind in ("upscan", "filereq", "orgkey"):
+    if kind in ("upscan", "filereq", "orgkey", "ptlimit"):  # 2.138.3 C (#2380): ptlimit = the portal's sign-in mails used up
         return True
     if not actor_id:
         return False
