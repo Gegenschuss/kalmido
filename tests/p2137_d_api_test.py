@@ -226,8 +226,13 @@ j = r.json()
 check(r.ok and j["ok"] is True and j["org"]["id"] == KAP and not j["conflicts"], "preview: no conflict " + r.text[:300])
 check(len(j["moves"]) >= 3 and len(j["keeps"]) >= 2 and "Kappa" in j["who"], f"preview: what goes, what stays, who sees it {j}")
 check(Fr.post(B + MV, json={"org": KAP}).status_code == 400, "no confirmation: 400")
+n_src = {(x[0], x[1]): x[2] for x in sql("SELECT kind, period, last FROM office_numbers WHERE org_id=?", (PB,))}
+sql("INSERT INTO office_numbers(org_id, kind, period, last) SELECT ?, kind, period, 0 FROM office_numbers WHERE org_id=? "
+    "ON CONFLICT(org_id, kind, period) DO NOTHING", (KAP, PB))  # 2.137.0 review M2: the target has its own, lower counters
 r = Fr.post(B + MV, json={"org": KAP, "confirm": True})
 check(r.ok and r.json().get("org_id") == KAP, "the transfer " + r.text[:300])
+n_dst = {(x[0], x[1]): x[2] for x in sql("SELECT kind, period, last FROM office_numbers WHERE org_id=?", (KAP,))}
+check(n_src and all(n_dst.get(k, 0) >= v for k, v in n_src.items()), f"the target's counters continue after the moved numbers {n_src} {n_dst}")
 
 # the organisation's office (the app switched the workspace)
 check(Fr.get(B + O + "/settings").json().get("org_id") == KAP, "afterwards the organisation's office is shown")
