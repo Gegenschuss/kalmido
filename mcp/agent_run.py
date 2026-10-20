@@ -1845,6 +1845,8 @@ class Runner:
     def ensure_perm_watch(self):
         if self.perm_thread or not PERM_RELAY or not self.is_claude():
             return
+        if not self.perm_operators():  # 2.126.0 review (#1973): say it once at start instead of only denying later
+            log("permission questions: no operator known (set KALMIDO_PERM_USER or KALMIDO_OWNER_IDS) - every question is denied")
 
         def watch():
             while True:
