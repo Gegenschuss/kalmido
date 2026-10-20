@@ -1396,6 +1396,18 @@ fresh; run p2115_a_ui node p2115_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.115.0 part B (#2062): active sessions, sign out everywhere, organisation admins invite accounts
 fresh; run p2115_b_api "$PY" p2115_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2115_b_ui node p2115_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.116.0 part A (#2063: trash period)
+fresh; run p2116_a_api "$PY" p2116_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2116_a_ui node p2116_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.116.0 part B (#2065: full-text search)
+fresh; run p2116_b_api "$PY" p2116_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2116_b_ui node p2116_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.116.0 part C (#2064 #2068: list CSV/print, snippets in the UI)
+fresh; run p2116_c_api "$PY" p2116_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2116_c_ui node p2116_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.116.0 part D (#2066 #2067: several times a day, focus/habits in API v1)
+fresh; run p2116_d_api "$PY" p2116_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2116_d_ui node p2116_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
