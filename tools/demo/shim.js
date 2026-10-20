@@ -1311,6 +1311,35 @@
   on('PATCH', '/api/team/absences/(\\d+)', (q, b, id) => { const a = mfind('absences', id); absSet(a, b); return absOut(a); });
   on('DELETE', '/api/team/absences/(\\d+)', (q, b, id) => { mfind('absences', id).deleted_at = iso(); return {ok: true}; });
   on('POST', '/api/team/absences/(\\d+)/restore', (q, b, id) => { const a = mfind('absences', id); a.deleted_at = null; return absOut(a); });
+  // 2.125.0 (#2117 #2118): the vacation account + the working week of the one person (a personal area: its own admin, no
+  // requests -- every vacation is approved at once, like kalmido/hub/leave.py for a person without an organisation)
+  const wtDays = () => (MD().workdays ?? '0,1,2,3,4').split(',').filter(x => x !== '').map(Number);
+  const lvCount = (s, e, half, wd, hol) => { let n = 0; for (let d = s; d <= e; d = addD(d, 1)) { const w = (new Date(d + 'T12:00:00Z').getUTCDay() + 6) % 7;
+    if (wd.includes(w) && !hol.has(d)) n += half ? 0.5 : 1; } return n; };
+  const lvAcc = year => { const y0 = `${year}-01-01`, y1 = `${year}-12-31`, q = (MD().quota || {})[year] || null, hol = new Set(holidays(y0, y1).map(h => h.date));
+    const taken = mcol('absences').filter(a => !a.deleted_at && (a.kind || 'vacation') === 'vacation' && a.end_date >= y0 && a.start_date <= y1)
+      .reduce((s, a) => s + lvCount(a.start_date < y0 ? y0 : a.start_date, a.end_date > y1 ? y1 : a.end_date, a.half_day, wtDays(), hol), 0);
+    return {quota: q, taken, requested: 0, rest: q ? q.days + (q.carry || 0) - taken : null}; };
+  const capH = () => +(DB.settings?.capacity_h || MD().capacity_h || 0) || 40;
+  on('GET', '/api/team/leave', q => { const year = +(q.get('year') || today().slice(0, 4));
+    return {org_id: null, year, admin: true, personal: true, approval: false, pending: [],
+      people: [{id: 1, display_name: DB.me.display_name || DB.me.username, own: true, workdays: wtDays(), capacity_h: capH(), capacity_set: !!MD().capacity_h, ...lvAcc(year)}]}; });
+  on('PUT', '/api/team/leave/quota', (q, b) => { const year = +b.year, m = MD().quota = MD().quota || {};
+    if (b.days === null || b.days === '' || b.days === undefined) delete m[year]; else m[year] = {days: +b.days || 0, carry: +b.carry || 0};
+    return {org_id: null, user_id: 1, year, quota: m[year] || null}; });
+  on('PUT', '/api/team/leave/approval', () => bad(tx('Only admins of the organisation can change this')));
+  on('PUT', '/api/team/leave/worktime/(\\d+)', (q, b) => { if ('workdays' in b) MD().workdays = Array.isArray(b.workdays) ? b.workdays.join(',') : String(b.workdays || '');
+    if ('hours' in b) MD().capacity_h = b.hours === null ? '' : String(b.hours); return {id: 1, workdays: wtDays(), capacity_h: capH(), capacity_set: !!MD().capacity_h}; });
+  on('POST', '/api/team/absences/(\\d+)/decide', (q, b, id) => absOut(mfind('absences', id)));
+  // 2.125.0 (#2119): the monthly timesheet of the one person (no organisation: closing locks, no approval step)
+  const tslOut = m => { const r = (MD().sheets || {})[m]; return r ? {state: r.state, note: '', closed_at: r.closed_at, decided_at: null, decided_by: null,
+    decided_by_name: '', org_id: null, org_name: '', log: [], user_id: 1} : {state: 'open', note: '', closed_at: null, decided_at: null, decided_by: null, decided_by_name: '', org_id: null, org_name: '', log: []}; };
+  on('GET', '/api/time/sheets', q => { const m = /^\d{4}-\d\d$/.test(q.get('month') || '') ? q.get('month') : today().slice(0, 7), st = tslOut(m).state;
+    return {month: m, sheet: tslOut(m), locked: Object.keys(MD().sheets || {}).sort(), can: {close: st === 'open' && m <= today().slice(0, 7), reopen: st !== 'open'}, org: false, review: []}; });
+  on('POST', '/api/time/sheets', (q, b) => { const m = b.month, s = MD().sheets = MD().sheets || {};
+    if (!/^\d{4}-\d\d$/.test(m || '')) bad(tx('Invalid value: {0}').replace('{0}', 'month'));
+    if (b.action === 'close') s[m] = {state: 'closed', closed_at: iso()}; else delete s[m]; return {ok: true, month: m, sheet: tslOut(m)}; });
+  on('POST', '/api/time/sheets/decide', () => bad(tx('Only admins of the organisation can change this')));
   // disposition (kalmido/hub/dispo.py): the person, the contacts and the office's equipment as resources
   const dpRes = () => ({people: [{kind: 'user', id: 1, name: DB.me.display_name, avatar: ''}], contacts: liveCt().slice(0, 50).map(c => ({kind: 'contact', id: c.id, name: ctFn(c)})),
     equipment: mcol('of_equipment').filter(x => !x.deleted_at && !x.archived).map(x => ({kind: 'equipment', id: x.id, name: x.name, category: x.category || ''})),
