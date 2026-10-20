@@ -52,8 +52,8 @@ def otr_can(c, uid, r):
         return False
     if r["org_id"]:
         role = org_role(c, uid, r["org_id"])
-        if not role:
-            return False
+        if not role or role in ("guest", "readonly", "accounting"):
+            return False  # 2.143.0 A (#2151): the limited roles restore / delete nothing of the organisation
         if role == "admin":
             return True
     if r["owner_id"] == uid:

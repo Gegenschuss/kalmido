@@ -101,7 +101,9 @@ def wiki_space(c, uid, v, write=False):
         raise BadInput(tr("Invalid value: {0}", "space"))
     if oid not in user_orgs(c, uid):
         raise Denied(404)
-    return oid  # every member writes (org roles: member | admin); a read-only role would be checked here (write)
+    from ..accounts.orgroles import need_org_area
+    need_org_area(c, uid, oid, write=bool(write))  # 2.143.0 A (#2151): guests / accounting 404, read-only only reads
+    return oid
 
 
 def wiki_space_key(oid):
@@ -111,8 +113,8 @@ def wiki_space_key(oid):
 def wiki_may_read(c, uid, r):
     if r["org_id"] is None:
         return r["owner_id"] == uid
-    from ..accounts.orgs import user_orgs
-    return r["org_id"] in user_orgs(c, uid)
+    from ..accounts.orgroles import org_sees_all
+    return org_sees_all(c, uid, r["org_id"])  # 2.143.0 A (#2151): not guests / accounting
 
 
 def wiki_need(c, pid, write=False, deleted=False):
@@ -208,7 +210,8 @@ def wiki_index():
             d["body"] = bodies.get(d["id"], "")
     from .wkshare import wsh_mark  # 2.123.0 B (#2104): pages a share covers get their mark
     wsh_mark(c, oid, uid, pages)
-    return jsonify(space=wiki_space_key(oid), may_write=True, pages=pages, e2e=e2e)
+    from ..accounts.orgroles import org_writes
+    return jsonify(space=wiki_space_key(oid), may_write=org_writes(c, uid, oid), pages=pages, e2e=e2e)  # 2.143.0 A (#2151)
 
 
 @app.get("/api/wiki/pages/<int:pid>")
@@ -447,7 +450,8 @@ def wiki_search():
     if request.args.get("space") not in (None, ""):
         spaces = [wiki_space(c, uid, request.args.get("space"))]
     else:
-        spaces = [None, *user_orgs(c, uid)]
+        from ..accounts.orgroles import user_orgs_full
+        spaces = [None, *[o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]]  # 2.143.0 A (#2151)
     rows, total = wks_search(c, uid, spaces, q, limit, offset)
     return jsonify(pages=[wiki_dict(r, full=False) for r in rows], total=total, offset=offset, more=offset + len(rows) < total)
 
@@ -464,7 +468,8 @@ def wiki_mentions():
         tid = 0
     if not tid or not task_visible(c, tid, uid):
         raise Denied(404)
-    orgs = user_orgs(c, uid)
+    from ..accounts.orgroles import user_orgs_full
+    orgs = [o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]  # 2.143.0 A (#2151)
     from .wikie2e import wke_open_sql  # 2.64.3 A (#1817): mentions in a locked space are found in the browser
     rows = c.execute("SELECT DISTINCT p.id, p.org_id, p.path FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.to_task=? "
                      f"AND {wke_open_sql('p')} AND p.deleted_at IS NULL AND ((p.org_id IS NULL AND p.owner_id=?)"

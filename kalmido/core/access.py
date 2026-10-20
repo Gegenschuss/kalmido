@@ -287,6 +287,7 @@ def acx_drop():
     if has_request_context():
         g.pop("acx", None)
         g.pop("acx_users", None)
+        g.pop("org_roles", None)  # 2.143.0 A (#2151): accounts/orgroles.py
 
 
 def acx_session_apply(ctx=None):
@@ -337,7 +338,8 @@ def _ov_sql(write=False):
             + (" AND l.org_edit=1" if write else "")
             + " AND NOT EXISTS (SELECT 1 FROM agents a WHERE a.user_id=p.u)"
             " AND EXISTS (SELECT 1 FROM users ou WHERE ou.id=p.u AND COALESCE(ou.kind, '')!='agent')"
-            " AND EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=l.org_id AND om.user_id=p.u))")
+            " AND EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=l.org_id AND om.user_id=p.u"
+            + (" AND om.role IN ('admin', 'member')))" if write else " AND om.role IN ('admin', 'member', 'readonly')))"))  # 2.143.0 A (#2151)
 
 
 def ov_open(row):
@@ -359,7 +361,10 @@ def ov_role(c, lid, uid, row=None):
         return None
     if not c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (row["org_id"], uid)).fetchone():
         return None
-    return "edit" if row["org_edit"] else "view"
+    from ..accounts.orgroles import org_sees_all, org_writes
+    if not org_sees_all(c, uid, row["org_id"]):
+        return None  # 2.143.0 A (#2151): guests / accounting see only what is shared with them personally
+    return "edit" if row["org_edit"] and org_writes(c, uid, row["org_id"]) else "view"
 
 
 def otr_live(a="l"):
@@ -376,6 +381,9 @@ def acx_lists_sql(write=False, req=True, ov=True):
     through "Everyone in the organisation" (2.46.0, #1603: calendars, briefing, channels follow the joined lists)."""
     roles = " AND role IN ('edit', 'admin')" if write else ""
     org = f" AND (NOT ({_boundary_sql()}) OR {_ORG_SCOPE_SQL})" if _boundary_on() else ""
+    if write and _boundary_on():  # 2.143.0 A (#2151): a read-only member changes no list of the organisation (also their own)
+        org += (" AND (l.org_id IS NULL OR NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=l.org_id AND om.user_id=p.u"
+                " AND om.role='readonly'))")
     return (f"(SELECT l.id FROM lists l, (SELECT CAST(? AS INTEGER) AS u, CAST(? AS INTEGER) AS v) p "
             f"WHERE {otr_live()} AND (l.owner_id=p.u OR l.id IN (SELECT list_id FROM list_members WHERE user_id=p.v{roles}{_members_on()}){_ov_sql(write) if ov else ''}){org}"
             f"{_req_filters_sql() if req else ''})")
@@ -480,6 +488,8 @@ def task_visible(c, tid, uid, write=False, full=False):
         access_note(r[0], True)
     if role == "participant":
         vis, wr, _ = pvis(c, uid, r[0])
+        if write and not _org_list_writes(c, r[0], uid):
+            return False  # 2.143.0 A (#2151): read-only in the list's organisation
         return tid in (wr if write or full else vis)
     return bool(role) and (not write or role in WRITE_ROLES)
 
@@ -492,6 +502,13 @@ def acx_task_ok(c, tid, uid):
     if not c.execute("SELECT 1 FROM tasks WHERE id=?", (tid,)).fetchone():
         return True
     return task_visible(c, tid, uid)
+
+
+def _org_list_writes(c, lid, uid):
+    """2.143.0 A (#2151): may uid change anything in list lid as far as its organisation is concerned (read-only: no)?"""
+    r = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()
+    from ..accounts.orgroles import org_writes
+    return not r or org_writes(c, uid, r[0])
 
 
 def list_role(c, lid, uid=None):
@@ -514,6 +531,9 @@ def list_role(c, lid, uid=None):
         role = m[0] if m and collab_all() else None
         if not m:
             role = ov_role(c, lid, uid, r)  # 2.46.0 (#1603): a reader of an organisation-wide list (not shared with them)
+    if role and r[2]:
+        from ..accounts.orgroles import cap_list_role
+        role = cap_list_role(c, uid, r[2], role)  # 2.143.0 A (#2151): read-only in the organisation -> view
     if role and has_request_context() and g.get("audit_aid") == uid:
         access_note(lid)  # 2.30.0 (#919): the agents' list access log
     return role
@@ -565,7 +585,7 @@ def need_task(c, tid, write=True, full=False):
         vis, wr, ctx = pvis(c, me(), r[0])
         if tid not in vis or (full and tid in ctx):
             raise Denied(404)
-        if write and tid not in wr:
+        if write and (tid not in wr or not _org_list_writes(c, r[0], me())):
             raise Denied(403)
         return role
     return need_list(c, r[0], write)
