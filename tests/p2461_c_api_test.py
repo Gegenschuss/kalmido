@@ -101,7 +101,8 @@ big = ids_of(A, A1)
 t0 = time.time()
 r = bulk(A, action="move", ids=big, book_id=A3)
 dt = time.time() - t0
-check(r.ok and r.json() == {"action": "move", "moved": 1400, "unchanged": 0, "conflicts": []}, f"#1554: 1,400 moved {r.status_code} {r.text[:200]}")
+# 2.139.1 (#2378): the answer also counts the contacts copied out of a mirrored address book
+check(r.ok and r.json() == {"action": "move", "moved": 1400, "unchanged": 0, "conflicts": [], "copied": 0}, f"#1554: 1,400 moved {r.status_code} {r.text[:200]}")
 check(dt < 15, f"#1554: moving 1,400 contacts takes {dt:.1f}s (< 15s)")
 print(f"#1554: move 1400 in {dt:.2f}s", flush=True)
 check(ids_of(A, A1) == [] and ids_of(A, A3) == big, "#1554: they are all in the target now")
