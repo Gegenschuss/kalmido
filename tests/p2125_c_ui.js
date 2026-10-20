@@ -1,5 +1,5 @@
 // 2.125.0 part C UI tests (#2121 #2122; own container, start.sh). jsdom:
-// - the app shortcut /?action=timer: starts the timer (on the basket) and opens the time view, the parameter leaves the URL;
+// - the app shortcut /?action=timer: starts the timer (on the list of the latest entry, else the first list with time tracking) and opens the time view, the parameter leaves the URL;
 //   the same shortcut again stops it; with the module "time" off nothing starts
 // - the "Excel (XLSX)" buttons: time view (same query as the CSV button), workload view (weeks / start / org)
 const {execFileSync} = require('child_process');
@@ -26,6 +26,8 @@ const call = async (method, url, body) => {
   await call('POST', '/api/admin/setup', {lang: 'en', time_all: true, modules: ['cal']});
   const FEAT = 'cal,time,workload';
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
+  const L = (await call('POST', '/api/lists', {name: 'Billable', time_tracking: true})).id;  // time is a switch of each list
+  check(L > 0, 'setup: a list with time tracking');
 
   // ---- the shortcut starts the timer
   let w = await boot({user: 'alice', path: '?action=timer'}), d = w.document;
@@ -52,7 +54,8 @@ const call = async (method, url, body) => {
   const a1 = d.querySelector('a[href^="/api/time/export.xlsx"]'), c1 = d.querySelector('a[href^="/api/time/export.csv"]');
   check(a1 && c1 && a1.getAttribute('href').split('?')[1] === c1.getAttribute('href').split('?')[1], 'time view: XLSX button with the query of the CSV button');
   check(a1 && /Excel/.test(a1.textContent), 'time view: the label says Excel');
-  w.location.hash = '#workload'; await sleep(1200);
+  w.location.hash = '#workload';
+  for (let i = 0; i < 20 && !d.querySelector('a[href^="/api/workload/export.xlsx"]'); i++) await sleep(300);
   const a2 = d.querySelector('a[href^="/api/workload/export.xlsx"]');
   check(a2 && /weeks=4/.test(a2.getAttribute('href')), 'workload view: XLSX button ' + (a2 && a2.getAttribute('href')));
   w.close();

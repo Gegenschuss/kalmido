@@ -96,7 +96,7 @@ ALICE = 1
 T0 = testclock.today()
 
 # ================================================================== a shared list, entries of alice and bob
-L = A.post(B + "/api/lists", json={"name": "Project X", "kind": "project"}).json()["id"]
+L = A.post(B + "/api/lists", json={"name": "Project X", "kind": "project", "time_tracking": True}).json()["id"]
 check(A.put(B + f"/api/lists/{L}/members", json={"user_id": BOB, "role": "edit"}).ok, "bob is an editor of the list")
 t1 = A.post(B + "/api/tasks", json={"title": "Design", "list_id": L, "assignee_id": ALICE, "duration": 90, "due": T0.isoformat()}).json()["id"]
 t2 = A.post(B + "/api/tasks", json={"title": "Build", "list_id": L, "assignee_id": BOB, "duration": 30, "due": T0.isoformat()}).json()["id"]
@@ -157,8 +157,7 @@ A.patch(B + "/api/settings", json={"features": FEAT})
 # ================================================================== a person without an organisation
 # freelancer-matrix: time, tasks
 FID, Fr = freelancer(B, A)
-inbox = Fr.get(B + "/api/state").json()["lists"]
-lid = next(x["id"] for x in inbox if x.get("is_inbox"))
+lid = Fr.post(B + "/api/lists", json={"name": "Own work", "time_tracking": True}).json()["id"]
 r = Fr.post(B + "/api/time/entries", json={"list_id": lid, "start": (now - timedelta(hours=2)).isoformat(), "minutes": 20, "note": "solo"})
 check(r.ok, "freelancer: an own entry " + r.text[:200])
 rows, _ = xlsx(Fr.get(B + "/api/time/export.xlsx", params=Q))
