@@ -590,8 +590,4 @@ def _rss_run(on):
     except Exception as e:  # noqa: BLE001
         print("feeds run error:", type(e).__name__, flush=True)
     finally:
-        _RSS_RUN.release()
-        done += 1
-    c.execute("DELETE FROM rss_items WHERE published<?", (iso(nu - timedelta(days=RSS_KEEP_DAYS)),))
-    c.execute("DELETE FROM rss_feeds WHERE deleted_at IS NOT NULL AND deleted_at<?", (iso(nu - timedelta(days=RSS_TRASH_DAYS)),))
-    c.commit()
+        _RSS_RUN.release()  # 2.137.0 (#2408): no statement after c.close() -- the clean-up runs in _wd_feeds on its own connection
