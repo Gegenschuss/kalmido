@@ -111,7 +111,8 @@ def abs_org(c, uid, want=None, create=True):
     organisation the personal area (pb_personal)."""
     from ..accounts.orgs import user_orgs
     from ..office.model import pb_personal
-    orgs = user_orgs(c, uid)
+    from ..accounts.orgroles import user_orgs_full
+    orgs = [o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]  # 2.143.0 A (#2151): not guests / accounting
     if want is not None:
         if want in orgs or want == pb_personal(c, uid, create=False):
             return want
@@ -311,7 +312,8 @@ def abs_list():
     st = abs_state(c, oid)
     from ..accounts.orgs import user_orgs
     from ..office.model import pb_personal
-    mine = user_orgs(c, uid)
+    from ..accounts.orgroles import user_orgs_full
+    mine = [o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]  # 2.143.0 A (#2151)
     with_org = [{"id": r[0], "name": r[1]} for r in c.execute(
         "SELECT id, name FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id") if r[0] in mine]
     # 2.96.0 D (#1941): the personal area (when there is one) is offered next to the organisations

@@ -134,6 +134,7 @@ const V = B + 'api/v1';
   // ================= Firefox: swipe (390 touch) and the desktop (1440)
   const ffLogin = async ({ev, nav}) => {
     await nav(B + 'static/icon.svg');
+    await call('PATCH', '/api/settings', {look: ''});  // 2.143.0 (#2155): the account's appearance from the jsdom boots above would win over this device's
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };

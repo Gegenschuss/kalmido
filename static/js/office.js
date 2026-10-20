@@ -10,7 +10,8 @@ const OFC_TAXES = [['standard', N_('standard rate')], ['reduced', N_('reduced ra
 const OFC_TEXT_KINDS = [['rights_time', N_('Rights: duration')], ['rights_territory', N_('Rights: territory')], ['rights_media', N_('Rights: media')],
   ['intro', N_('Introduction')], ['closing', N_('Closing')], ['note', N_('Note|office')], ['block', N_('Text block between positions')], ['raw_note', N_('Raw data note')]];
 // 2.53.0 (#1410): officeOn lives in lazyload.js (asked at start, before the office is loaded)
-const ofcAdmin = () => OFC.info?.role === 'admin';
+// 2.143.0 A (#2151): the organisation role accounting reads the admins' bookkeeping too (the server refuses every change)
+const ofcAdmin = () => OFC.info?.role === 'admin' || OFC.info?.role === 'accounting';
 const pb_clOrg = () => OFC.info?.personal ? null : (OFC.info?.org_id || null);  // 2.47.3 (#1360): a personal office's clients are the private ones
 const ofcWs = () => pb_clOrg() ? 'org:' + pb_clOrg() : 'private';  // 2.87.9 (#1940): the workspace of the shown office (importTargetConfirm)
 const ofcTab = () => OFC_TABS.some(t => t[0] === S.route.tab) ? S.route.tab : S.route.tab === 'import' ? 'settings'
@@ -106,7 +107,8 @@ function viewOffice() {
   else if (typeof OFC_TABS.find(t => t[0] === tab)?.[4] === 'function') body = OFC_TABS.find(t => t[0] === tab)[4]();  // 2.47.3 (B, #1022 #1652): tabs of their own module, [3] = admins only
   else body = ofcListHtml(tab);
   if (OFC.info && !OFC.infoErr && ['settings', 'services', 'texts'].includes(tab)) body = ofr_setTabsHtml(tab) + body;  // 2.98.0 C (#2180): General | Templates
-  const html = `<div class="dash office" data-ofctab="${tab}"><div class="ofchead">${OFC.info ? `<span class="muted ofcorg">${esc(OFC.info.settings?.company?.name || (OFC.info.personal ? tr('Private|workspace') : orgLabelOf(OFC.info.org_id)))}${OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ''}</span>` : ''}</div><div class="ofcbody"${tab === 'offers' && !body ? ' data-fl-fill' : ''}>${body}</div></div>`;
+  const ro = ['readonly', 'accounting'].includes(OFC.info?.role);  // 2.143.0 A (#2151): reads only (create / delete hidden in app.css)
+  const html = `<div class="dash office" data-ofctab="${tab}"${ro ? ' data-ofcro="1"' : ''}><div class="ofchead">${OFC.info ? `<span class="muted ofcorg">${esc(OFC.info.settings?.company?.name || (OFC.info.personal ? tr('Private|workspace') : orgLabelOf(OFC.info.org_id)))}${OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ro ? ` · ${esc(oinvRoleSel.label(OFC.info.role))}` : ''}</span>` : ''}</div><div class="ofcbody"${tab === 'offers' && !body ? ' data-fl-fill' : ''}>${body}</div></div>`;
   if (tab === 'offers' && OFC.info && typeof ofdOffersTab === 'function') setTimeout(() => { const el = $('.office .ofcbody .pboffers') || $('.office .ofcbody'); if (el && ofcTab() === 'offers') ofdOffersTab(el); }, 0);  // 2.47.3 (#1360): below the hint
   return html;
 }
@@ -659,7 +661,7 @@ const ost_redraw = (part, pk) => pk ? ofcInfo(true) : ('currency' in part || 'in
 const OST = {q: Promise.resolve()};
 function ost_save(el) {
   const form = el.closest?.('#ofc-set');
-  if (!form || !ofcAdmin() || el.disabled || (el.closest('[data-fg-skip]') && !el.dataset.pkcOn) || el.type === 'file') return;
+  if (!form || OFC.info?.role !== 'admin' || el.disabled || (el.closest('[data-fg-skip]') && !el.dataset.pkcOn) || el.type === 'file') return;
   let part = null; try { part = ost_part(el, ofcSettingsBody(form)); } catch { part = null; }
   if (!part) return;
   const v = fgVal(el); if (el._ostV === v) return;  // (change and focusout of the same edit)
@@ -738,7 +740,7 @@ document.addEventListener('click', async e => {
     inp.value = inp.value.slice(0, p0) + t + inp.value.slice(p1); inp.focus(); inp.setSelectionRange(p0 + t.length, p0 + t.length); inp.dispatchEvent(new Event('input', {bubbles: true})); }
   else if (a === 'logo-del') { e.preventDefault(); try { await api('DELETE', '/api/office/logo'); await ofcInfo(true); toast(tr('Removed')); } catch (x) { toast(x.message || ''); } }
 });
-document.addEventListener('submit', e => { const f = e.target.closest?.('#ofc-set'); if (!f) return; e.preventDefault(); if (ofcAdmin()) ofcSaveSettings(f); });
+document.addEventListener('submit', e => { const f = e.target.closest?.('#ofc-set'); if (!f) return; e.preventDefault(); if (OFC.info?.role === 'admin') ofcSaveSettings(f); });
 // 2.113.0 (#2247): an area of the settings; a field saves on its change (boxes, choices, the country) or when it is left
 document.addEventListener('click', e => {
   const b = e.target.closest?.('#ofc-set [data-ostsub]'); if (b) { e.preventDefault(); ost_show(b.dataset.ostsub, true); return; }

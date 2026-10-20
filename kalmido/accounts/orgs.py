@@ -60,7 +60,7 @@ ORG_NAME_MAX = 60
 INSTANCE_MODES = ("shared", "workspaces")  # 2.46.0 (#1592): "organisation" is ignored
 INSTANCE_ENV = os.environ.get("KALMIDO_INSTANCE_MODE", "").strip().lower()
 ORG_NAME_ENV = re.sub(r"\s+", " ", os.environ.get("KALMIDO_ORG_NAME", "")).strip()[:ORG_NAME_MAX]
-ORG_ROLES = ("member", "admin")
+ORG_ROLES = ("member", "admin", "guest", "readonly", "accounting")  # 2.143.0 A (#2151): see accounts/orgroles.py
 # folder names (the top folder of a list's owner) that mark a list as private when the workspaces arrive (ws_migrate)
 PRIVATE_FOLDER_RE = re.compile(r"^(privat|private|pers[öo]nlich|personal|familie|family|zuhause|zu hause|home|haushalt|household|privé|prive|privado|personale|privato|thuis)$", re.I)
 WS_MSG_PERSON = N_("{0} is not a member of the organisation {1}: share this list privately instead, or let an organisation admin add the person")
@@ -155,12 +155,16 @@ def org_names(c, uid):
 
 
 def org_role(c, uid, oid):
-    """2.28.0 (#935): member | admin | None -- the person's role in organisation oid."""
+    """2.28.0 (#935): member | admin | None -- the person's role in organisation oid. 2.143.0 A (#2151): also guest | readonly |
+    accounting (what each may do: accounts/orgroles.py; is_org_admin and == "admin" checks stay as they are)."""
     if not oid or oid not in user_orgs(c, uid):
         return None
     with system_ctx(c):  # 2.37.0 (#1150): membership structure (also asked for other people)
         r = c.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
-    return (r["role"] if r["role"] in ORG_ROLES else "member") if r else None
+    if not r:
+        return None
+    from .orgroles import role_known
+    return role_known(r["role"], oid, uid)  # 2.143.0 A (#2151, review): unknown -> guest
 
 
 def is_org_admin(c, uid, oid):
@@ -197,8 +201,11 @@ def _visible_people(c, uid):
         orgs = user_orgs(c, uid)
         ids = set()
         if orgs:
+            # 2.143.0 A (#2151): in an organisation where uid is a guest / accounting only its admins (+ connections below)
+            from .orgroles import user_orgs_full
+            full = [o for o in user_orgs_full(c, uid) if o in orgs]
             q = ",".join("?" * len(orgs))
-            ids = {r[0] for r in c.execute(f"SELECT user_id FROM org_members WHERE org_id IN ({q})", orgs)}
+            ids = {r[0] for r in c.execute(f"SELECT user_id FROM org_members WHERE org_id IN ({q}) AND (role='admin' OR org_id IN ({','.join(str(int(o)) for o in full) or 'NULL'}))", orgs)}
         elif not c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL LIMIT 1").fetchone():
             return None  # 2.46.0 (#1592): an instance without any organisation (a household): everyone, as before
         return ids | _connections(c, uid) | {uid}
@@ -310,6 +317,13 @@ def ws_check_member(c, lid, uid, org_id=None):
         raise Denied(409, p)
 
 
+def _orgs_w(c, uid):
+    """2.143.0 A (#2151): uid's organisations in which they may add content (member / admin)."""
+    from .orgroles import user_orgs_full
+    mine = set(user_orgs(c, uid))
+    return [o for o in user_orgs_full(c, uid, write=True) if o in mine]
+
+
 def ws_obj_default(c, uid):
     """2.30.0 (#1036): the workspace of a new calendar / address book when the client names none: an agent's own workspace,
     else the person's first organisation (as for a new list), else private."""
@@ -318,7 +332,7 @@ def ws_obj_default(c, uid):
     u = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
     if u and (u["kind"] or "user") == "agent":
         return agent_org(c, uid)
-    mine = user_orgs(c, uid)
+    mine = _orgs_w(c, uid)  # 2.143.0 A (#2151): never into an organisation where uid only reads / is a guest
     return mine[0] if mine else None
 
 
@@ -358,6 +372,8 @@ def clean_org_id(c, v, uid):
         raise Denied(400, tr("Invalid value: {0}", "org_id")) from None
     if oid not in user_orgs(c, uid):
         raise Denied(409, tr(WS_MSG_OWNER))
+    from .orgroles import need_org_write
+    need_org_write(c, uid, oid)  # 2.143.0 A (#2151): guests / read-only / accounting add nothing to the organisation
     return oid
 
 
@@ -401,9 +417,9 @@ def ws_default_org(c, uid, folder=""):
         rows = c.execute("SELECT DISTINCT org_id FROM lists WHERE owner_id=? AND is_inbox=0 AND (folder=? OR folder ILIKE ? ESCAPE '\\')",
                          (uid, folder, like_escape(folder.split("/", 1)[0]) + "/%")).fetchall()
         oids = {r[0] for r in rows}
-        if len(oids) == 1:
+        if len(oids) == 1 and (None in oids or oids <= set(_orgs_w(c, uid))):  # 2.143.0 A (#2151)
             return oids.pop()
-    mine = user_orgs(c, uid)
+    mine = _orgs_w(c, uid)
     return mine[0] if mine else None
 
 
@@ -615,9 +631,12 @@ def org_update(oid):
             if not isinstance(b["admins"], list) or not all(isinstance(x, int) and not isinstance(x, bool) for x in b["admins"]):
                 c.rollback()
                 return err(tr("Invalid value: {0}", "admins"))
-            c.execute("UPDATE org_members SET role='member' WHERE org_id=?", (oid,))
+            # 2.143.0 A (#2151): only former admins become members; guest / read-only / accounting keep their role
+            c.execute("UPDATE org_members SET role='member' WHERE org_id=? AND role='admin'", (oid,))
             for x in b["admins"]:
                 c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND user_id IN (SELECT id FROM users WHERE kind!='agent')", (oid, x))
+            from ..core.access import acx_drop
+            acx_drop()  # 2.143.0 A (#2151, review): the request's cached roles follow
         bump(c)
         c.commit()
         return jsonify(org_public(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone()))
@@ -727,14 +746,21 @@ def _need_org_admin(c, oid):
 def org_mine_dict(c, r, uid):
     from ..collab.comments import user_names
     mem = c.execute("SELECT m.user_id, m.role, u.kind, u.disabled FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? ORDER BY lower(u.display_name), u.id", (r["id"],)).fetchall()
+    from .orgroles import org_sees_all, org_writes, roles_public
+    full = org_sees_all(c, uid, r["id"])
+    if not full:  # 2.143.0 A (#2151): a guest / accounting sees only the people they share something with (and the admins)
+        near = _connections(c, uid) | {uid}
+        mem = [m for m in mem if m["user_id"] in near or m["role"] == "admin"]
     names = user_names(c, [m["user_id"] for m in mem])
     return {"id": r["id"], "name": r["name"], **org_icon_fields(r), "color": r["color"] or "", "domains": r["domains"],  # 2.87.9 (#1913)
             "photo_meta_strip": bool(r["photo_meta_strip"]),  # 2.61.0 B (#1819)
             "ext_links": bool(r["ext_links"]),  # 2.112.1 B (#2058): external share links of the file store allowed
             "role": org_role(c, uid, r["id"]) or "member",
-            "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "member",
+            "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "guest",
                          "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
-            "lists": c.execute("SELECT COUNT(*) FROM lists WHERE org_id=? AND deleted_at IS NULL", (r["id"],)).fetchone()[0]}
+            "lists": c.execute("SELECT COUNT(*) FROM lists WHERE org_id=? AND deleted_at IS NULL", (r["id"],)).fetchone()[0] if full else 0,
+            "limited": not full or not org_writes(c, uid, r["id"]),  # 2.143.0 A (#2151): guest / read-only / accounting
+            "roles": roles_public(c)}  # 2.143.0 A (#2151): the roles an admin hands out, with their explanation
 
 
 @app.get("/api/orgs")
@@ -854,7 +880,7 @@ def org_icon_get(oid, tok):
 
 @app.put("/api/orgs/<int:oid>/members")
 def org_member_put(oid):
-    """2.28.0 (#935): {user_id | email, role?: member | admin} -- an organisation admin adds a person (one they may see, or by
+    """2.28.0 (#935): {user_id | email, role?: member | admin | guest | readonly | accounting (2.143.0 A, #2151)} -- an organisation admin adds a person (one they may see, or by
     e-mail address: the answer never says whether the address has an account) or changes a member's role."""
     c, b = db(), body()
     _need_org_admin(c, oid)
@@ -882,6 +908,8 @@ def org_member_put(oid):
         return err(tr("The last admin of an organisation cannot step down: make somebody else an admin first"), 409)
     if cur:
         c.execute("UPDATE org_members SET role=? WHERE org_id=? AND user_id=?", (role, oid, uid))
+        from ..core.access import acx_drop
+        acx_drop()  # 2.143.0 A (#2151): the cached roles of this request
     else:
         org_member_add(c, oid, uid, role)
         from ..collab.news import news_add

@@ -217,6 +217,10 @@ def task_create():
         role = list_role(c, f["list_id"])
         if role != "participant":
             need_list(c, f["list_id"])
+        else:
+            from ..core.access import _org_list_writes
+            if not _org_list_writes(c, f["list_id"], me()):
+                raise Denied(403)  # 2.143.0 A (#2151): read-only in the list's organisation
     else:
         role, f["list_id"] = "owner", my_inbox(c)
     if role == "participant":  # 1.10.0: a participant's new task is theirs (else it would vanish from their view)

@@ -2,7 +2,7 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v302';  // app 2.142.3 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
+const CACHE = 'tasks-shell-v303';  // app 2.143.0 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
@@ -64,6 +64,16 @@ function shareFromOutside(req) {
   if (site && site !== 'none' && site !== 'same-origin') return true;
   try { return !!req.referrer && req.referrer !== 'about:client' && new URL(req.referrer).origin !== self.location.origin; } catch { return true; }
 }
+// 2.143.0 C (#2154): every kind of file can be shared now: the name is cleaned (no path, no control characters, as the server's
+// safe_name), a type that could run in the page (HTML, SVG, XML, scripts) is kept as a plain download (the server checks the
+// bytes again on upload and never shows such a file inline)
+const shareName = n => String(n || '').replace(/\\/g, '/').split('/').pop().replace(/[\x00-\x1f:*?"<>|]/g, '_').trim().slice(0, 150);
+const shareType = t => { t = String(t || '').toLowerCase().split(';')[0].trim(); return !/^[\w.+-]+\/[\w.+-]+$/.test(t) || /^(text\/html|application\/xhtml\+xml|image\/svg\+xml|(text|application)\/(xml|javascript|ecmascript|x-javascript))$/.test(t) ? '' : t; };
+// 2.143.0 C2 (#2154): the upload limit per file comes with the manifest (kept in the shell cache); 50 MB = the server's default
+const SHARE_MAX_FILES = 20;
+async function shareMaxMb() {
+  try { const r = await caches.match('/manifest.json') || await fetch('/manifest.json'); const n = +(await r.json()).kalmido_max_file_mb; return n > 0 ? n : 50; } catch { return 50; }
+}
 async function handleShare(req) {
   if (shareFromOutside(req)) return Response.redirect('/', 303);
   try {
@@ -71,11 +81,13 @@ async function handleShare(req) {
     const cache = await caches.open('tasks-share');
     for (const k of await cache.keys()) await cache.delete(k);
     const files = [...fd.values()].filter(f => typeof f !== 'string' && f.size);  // any field name
-    const meta = {title: fd.get('title') || '', text: fd.get('text') || '', url: fd.get('url') || '', files: []};
+    const meta = {title: fd.get('title') || '', text: fd.get('text') || '', url: fd.get('url') || '', files: [], refused: [], max_mb: await shareMaxMb(), max_files: SHARE_MAX_FILES};
+    // 2.143.0 C2 (#2154): a file above the server's upload limit or beyond the first SHARE_MAX_FILES is not kept (the app names it)
     for (let i = 0; i < files.length; i++) {
-      const f = files[i];
-      await cache.put(`/share-inbox/${i}`, new Response(f, {headers: {'Content-Type': f.type || 'application/octet-stream'}}));
-      meta.files.push({name: f.name || `datei-${i + 1}`, type: f.type || '', size: f.size});
+      const f = files[i], type = shareType(f.type), name = shareName(f.name) || `datei-${i + 1}`;
+      if (meta.files.length >= SHARE_MAX_FILES || f.size > meta.max_mb * 1048576) { meta.refused.push({name, size: f.size}); continue; }
+      await cache.put(`/share-inbox/${meta.files.length}`, new Response(f, {headers: {'Content-Type': type || 'application/octet-stream'}}));
+      meta.files.push({name, type, size: f.size});
     }
     await cache.put('/share-inbox/meta', new Response(JSON.stringify(meta), {headers: {'Content-Type': 'application/json'}}));
     return Response.redirect('/?share=1', 303);
@@ -217,5 +229,70 @@ async function resubscribe(oldSub, newSub) {
   }
   await fetch('/api/push/subs', {method: 'POST', credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido', 'Content-Type': 'application/json'},
     body: JSON.stringify({...sub.toJSON(), replaces: oldSub ? oldSub.endpoint : undefined})});
+}
+// 2.143.0 C (#2153): Background Sync of the offline queue (static/js/core.js, IndexedDB "kalmido-outbox"). An open tab sends it
+// itself (with its whole conflict handling): it is only asked to. Without a tab the worker sends the entries of the user that is
+// signed in on this device, in order, with the app's own request header and the session cookie, under the same Web Lock as the
+// tabs. It stops at the first answer it cannot handle alone (an error, a sign-in page): that entry and the rest wait for the
+// app. Ids of new tasks / notes, conflicts and skipped repeats are kept for the app (meta swmap / swres).
+self.addEventListener('sync', e => { if (e.tag === 'kalmido-outbox') e.waitUntil(swOutbox()); });
+const swReq = r => new Promise((ok, no) => { r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+function swIdb() {
+  return new Promise((ok, no) => {
+    const r = indexedDB.open('kalmido-outbox', 1);
+    r.onupgradeneeded = () => { const d = r.result; if (!d.objectStoreNames.contains('ops')) d.createObjectStore('ops', {keyPath: 'k'}); if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', {keyPath: 'k'}); };
+    r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error);
+  });
+}
+const swMeta = async (db, k) => (await swReq(db.transaction('meta').objectStore('meta').get(k)))?.v;
+const swPut = (db, st, v) => swReq(db.transaction(st, 'readwrite').objectStore(st).put(v));
+async function swOutbox() {
+  const wins = await self.clients.matchAll({type: 'window'});
+  if (wins.length) { for (const w of wins) w.postMessage({type: 'outbox-flush'}); return; }
+  if (!self.indexedDB) return;
+  const locks = self.navigator && self.navigator.locks;
+  return locks ? locks.request('kalmido-outbox', {ifAvailable: true}, l => l ? swOutboxSend() : null) : swOutboxSend();
+}
+const SW_OBX_URL = /^\/api\/(?!v1\/)[\w/-]+(\?[\w=&%.,-]*)?$/, SW_OBX_METHODS = ['POST', 'PATCH', 'PUT', 'DELETE'];
+async function swOutboxSend() {
+  const db = await swIdb(), uid = await swMeta(db, 'uid');
+  if (!uid) return;
+  const me = await fetch('/api/me', {credentials: 'same-origin', redirect: 'manual', headers: {'X-Requested-With': 'kalmido'}});  // offline: throws = tried again later
+  if (!me.ok || !/json/.test(me.headers.get('content-type') || '') || (await me.json()).id !== uid) return;  // signed out / someone else
+  const idm = {...(await swMeta(db, 'idmap') || {})}, swmap = {...(await swMeta(db, 'swmap') || {})}, res = [...(await swMeta(db, 'swres') || [])];
+  Object.assign(idm, swmap);
+  const fix = v => (typeof v === 'number' && v < 0 && idm[v]) ? idm[v] : v;
+  const ch = typeof BroadcastChannel === 'function' ? new BroadcastChannel('kalmido-outbox') : null;
+  const rows = (await swReq(db.transaction('ops').objectStore('ops').getAll())).sort((a, b) => a.n - b.n);
+  try {
+    for (const e of rows) {
+      if (e.uid && e.uid !== uid) continue;  // another user's entry: the app drops it
+      // 2.143.0 C2 (#2153): only the app's own write routes are sent again (no API v1, no other origin, no GET)
+      if (typeof e.url !== 'string' || !SW_OBX_URL.test(e.url) || !SW_OBX_METHODS.includes(e.method)) break;
+      const url = e.url.replace(/\/(-\d+)(?=\/|$)/, (_, n) => '/' + (idm[n] || n));
+      let body = e.body;
+      if (body && typeof body === 'object') {
+        body = {...body};
+        if (body.parent_id) body.parent_id = fix(body.parent_id);
+        if (body.task_id) body.task_id = fix(body.task_id);
+        if (body.items) body.items = body.items.map(it => ({...it, id: fix(it.id)}));
+        if (body.ids) body.ids = body.ids.map(fix);
+        if (body.data && typeof body.data === 'object') {
+          const d = {...body.data};
+          for (const k of ['items', 'expect', 'guard']) if (d[k] && !Array.isArray(d[k])) d[k] = Object.fromEntries(Object.entries(d[k]).map(([id, v]) => [fix(+id), v]));
+          body.data = d;
+        }
+      }
+      const opt = {method: e.method, credentials: 'same-origin', redirect: 'manual', headers: {'X-Requested-With': 'kalmido'}};
+      if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
+      const r = await fetch(url, opt);  // offline again: throws, the browser tries again later
+      if (!r.ok || !/json/.test(r.headers.get('content-type') || '')) break;  // for the app (its own handling of errors)
+      const j = await r.json().catch(() => ({}));
+      if (e.tmp && j.id) { idm[e.tmp] = j.id; swmap[e.tmp] = j.id; await swPut(db, 'meta', {k: 'swmap', v: swmap}); }
+      if ((j.conflicts && j.conflicts.length) || j.skipped) { res.push({id: j.id, title: j.title || '', conflicts: j.conflicts || [], skipped: !!j.skipped}); await swPut(db, 'meta', {k: 'swres', v: res}); }
+      await swReq(db.transaction('ops', 'readwrite').objectStore('ops').delete(e.k));
+      if (ch) ch.postMessage({del: [e.k], sw: true});
+    }
+  } finally { if (ch) ch.close(); }
 }
 self.addEventListener('pushsubscriptionchange', e => { e.waitUntil(resubscribe(e.oldSubscription, e.newSubscription).catch(() => {})); });

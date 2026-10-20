@@ -2957,6 +2957,10 @@ MIGRATIONS = [
     ("contact_srcs", "wb_err", "ALTER TABLE contact_srcs ADD COLUMN wb_err TEXT NOT NULL DEFAULT ''"),
     # 2.140.0 D (#2137): what the owner set in Kalmido and the next sync writes into the vCard (JSON {mo, dy, y}; '' = nothing)
     ("contact_links", "want", "ALTER TABLE contact_links ADD COLUMN want TEXT NOT NULL DEFAULT ''"),
+    # 2.143.0 C (#2153): the device's id of a note written offline (a repeated POST from the outbox = the same note). Older
+    # versions never read it
+    ("notes", "client_ref", "ALTER TABLE notes ADD COLUMN client_ref TEXT"),
+    ("notes", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS notes_client_ref ON notes(created_by, client_ref) WHERE client_ref IS NOT NULL"),
     # 2.144.0 C (#2414): the list view grouped by a custom field (text / select) for every member, like sort_mode:
     # '' = the sections as before, 'cf:<field id>' = one group per value (2.143 ignores it)
     ("lists", "group_field", "ALTER TABLE lists ADD COLUMN group_field TEXT NOT NULL DEFAULT ''"),
@@ -3242,6 +3246,8 @@ USER_DEFAULTS = {
     # 2.57.0 B (#1807): my own colour per workspace, json {"private" | "org:<id>": tone key of LP_TONES | "none"};
     # a missing key = the default (an organisation: its admins' colour, Private: neutral). Only I see it.
     "ws_colors": "{}",
+    # 2.143.0 D (#2155): the appearance of all devices, json {LOOK_KEYS key: value}; '' = never saved (the first device uploads its own)
+    "look": "",
     # 2.57.0 A (#1798): the sidebar's favourites of every kind in the person's order, json list of keys: "l:<list id>" (the
     # star itself stays in fav_lists), "folder:<path>", "v:<view>" (today, tomorrow, ...), "m:<module or area>", "f:<filter id>",
     # "tag:<name>", "p:<user id>", "g:<group id>", "a:<agent id>"; synced to every device like the other settings

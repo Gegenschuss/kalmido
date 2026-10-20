@@ -120,6 +120,7 @@ const FEAT = 'collab,comments,progress';
   const look = async (o, vw, vh, pack, theme) => {
     const {cmd, ev, nav, shot} = o, tag = `${vw} ${pack}`;
     await cmd('browsingContext.setViewport', {context: o.ctx, viewport: {width: vw, height: vh}});
+    await call('PATCH', '/api/settings', {look: ''});  // 2.143.0 (#2155): the account follows the first device -> each run starts never saved
     check(await ffLogin(o, pack, theme) === 200, tag + ': login');
     await nav(B + '#l/' + L);
     for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#o3c-head')`).catch(() => false)); i++) await sleep(250);

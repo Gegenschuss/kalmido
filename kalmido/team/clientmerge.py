@@ -242,8 +242,8 @@ def clm_run_scope_ok(c, uid, d):
     or private: the person who merged."""
     u = _user(c, uid)
     if d["org_id"] is not None:
-        from ..accounts.orgs import user_orgs
-        return d["org_id"] in user_orgs(c, uid) or bool(u and u["is_admin"] and not _org_boundary(c))
+        from ..accounts.orgroles import org_sees_all  # 2.143.0 A (#2151, review): not guests / accounting
+        return org_sees_all(c, uid, d["org_id"]) or bool(u and u["is_admin"] and not _org_boundary(c))
     return d["user_id"] == uid
 
 

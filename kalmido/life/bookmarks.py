@@ -159,10 +159,16 @@ def bm_space(c, uid, v):
         raise BadInput(tr("Invalid value: {0}", "space")) from None
     if oid not in user_orgs(c, uid):
         raise Denied(404)
+    from ..accounts.orgroles import need_org_area
+    need_org_area(c, uid, oid)  # 2.143.0 A (#2151): guests / accounting 404, read-only only reads
     return oid
 
 
 def bm_may_write(c, uid, r):
+    if r["org_id"]:
+        from ..accounts.orgroles import org_writes
+        if not org_writes(c, uid, r["org_id"]):
+            return False  # 2.143.0 A (#2151)
     return r["user_id"] == uid if not r["org_id"] else (r["user_id"] == uid or is_org_admin(c, uid, r["org_id"]))
 
 
@@ -174,7 +180,7 @@ def bm_get(c, uid, bid, write=False, deleted=False):
     if r["org_id"] is None:
         if r["user_id"] != uid:
             raise Denied(404)
-    elif r["org_id"] not in user_orgs(c, uid):
+    elif r["org_id"] not in user_orgs(c, uid) or r["org_id"] not in _bm_full(c, uid):  # 2.143.0 A (#2151)
         raise Denied(404)
     if write and not bm_may_write(c, uid, r):
         raise Denied(403, tr(BM_ONLY))
@@ -203,10 +209,15 @@ def _like(q):
     return "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
+def _bm_full(c, uid):
+    from ..accounts.orgroles import user_orgs_full
+    return user_orgs_full(c, uid)
+
+
 def bm_where(c, uid, space):
     """SQL + args of the bookmarks uid sees in a space ("all" = every space)."""
     if space in (None, "", "all"):
-        orgs = list(user_orgs(c, uid))
+        orgs = [o for o in user_orgs(c, uid) if o in _bm_full(c, uid)]  # 2.143.0 A (#2151)
         if not orgs:
             return "(b.org_id IS NULL AND b.user_id=?)", [uid]
         return f"((b.org_id IS NULL AND b.user_id=?) OR b.org_id IN ({','.join('?' * len(orgs))}))", [uid, *orgs]

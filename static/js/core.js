@@ -298,6 +298,7 @@ const OUT = {q: LS.get('outbox', []), online: true, flushing: false};
 // elsewhere counts as done), outSave changes the fresh copy and writes it back, and only one tab replays (flush, Web Locks)
 const outKey = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 function outSync() {
+  if (OBX.on) { obxAdopt(); return OUT.q; }  // 2.143.0 C (#2153): the other tabs' changes arrive on the channel
   const mine = new Map(OUT.q.map(x => [x.k, x])), q = LS.get('outbox', []);
   let fix = false;
   OUT.q = q.map(x => {
@@ -311,8 +312,106 @@ function outSync() {
   if (fix) LS.set('outbox', OUT.q);
   return OUT.q;
 }
-function outSave(fn) { outSync(); fn(); LS.set('outbox', OUT.q); }
+function outSave(fn) {
+  if (OBX.on) { obxSave(fn); return; }
+  outSync(); fn(); LS.set('outbox', OUT.q);
+}
 window.addEventListener('storage', ev => { if (ev.key === 'tasks.outbox') { outSync(); if (S.booted) renderTop(); } });
+// 2.143.0 C (#2153): the queue lives in IndexedDB (database "kalmido-outbox": store "ops" = one record per entry, key k, order n;
+// store "meta" = the user of the queue, the id map), so the service worker can send it by Background Sync while no tab is
+// open. In memory OUT.q stays the working copy (every caller stays synchronous); outSave writes only the changed entries and
+// tells the other tabs on the BroadcastChannel "kalmido-outbox" (put / del by key), the service worker uses the same channel.
+// A queue of an earlier version in localStorage is taken over once at the start (and later, should an old tab still write
+// one). Without IndexedDB (old browser, private mode, jsdom) everything stays in localStorage as before.
+const OBX = {on: false, st: null, ch: null, c: 0, ready: null};
+const obxSeq = () => Date.now() * 1000 + (OBX.c = (OBX.c + 1) % 1000);
+const obxRec = x => { const {done, res, ...r} = x; return JSON.parse(JSON.stringify(r, typeof le2eRepl === 'function' ? le2eRepl() : undefined)); };  // like LS.set: ciphers only
+const obxReq = r => new Promise((ok, no) => { r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+// the small store over IndexedDB: all(), write(put, del), meta(k), setMeta(k, v), clear(); tests hand in their own (__obxStore)
+function obxIdb() {
+  if (!globalThis.indexedDB) return null;
+  let dbp = null;
+  const db = () => dbp ||= new Promise((ok, no) => {
+    const r = indexedDB.open('kalmido-outbox', 1);
+    r.onupgradeneeded = () => { const d = r.result; if (!d.objectStoreNames.contains('ops')) d.createObjectStore('ops', {keyPath: 'k'}); if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', {keyPath: 'k'}); };
+    r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); r.onblocked = () => no(new Error('blocked'));
+  });
+  const tx = async (st, mode, fn) => { const t = (await db()).transaction(st, mode), out = fn(t); await new Promise((ok, no) => { t.oncomplete = ok; t.onerror = t.onabort = () => no(t.error); }); return out instanceof IDBRequest ? out.result : out; };
+  return {
+    all: async () => obxReq((await db()).transaction('ops').objectStore('ops').getAll()),
+    write: (put, del) => tx('ops', 'readwrite', t => { const o = t.objectStore('ops'); for (const r of put) o.put(r); for (const k of del) o.delete(k); }),
+    meta: async k => (await obxReq((await db()).transaction('meta').objectStore('meta').get(k)))?.v,
+    setMeta: (k, v) => tx('meta', 'readwrite', t => { const o = t.objectStore('meta'); if (v === undefined) o.delete(k); else o.put({k, v}); }),
+    clear: () => tx(['ops', 'meta'], 'readwrite', t => { t.objectStore('ops').clear(); t.objectStore('meta').clear(); }),
+  };
+}
+async function outOpen() {
+  return OBX.ready ||= (async () => {
+    const st = globalThis.__obxStore || obxIdb(); if (!st) return;
+    let rows;
+    try { rows = await st.all(); } catch { return; }  // no IndexedDB (private mode): localStorage as before
+    OBX.st = st; OBX.on = true;
+    const mine = new Map(OUT.q.map(x => [x.k, x]));
+    OUT.q = rows.sort((a, b) => a.n - b.n).map(r => mine.has(r.k) ? Object.assign(mine.get(r.k), r) : r);
+    obxAdopt();
+    try { OBX.ch = new BroadcastChannel('kalmido-outbox'); OBX.ch.onmessage = ev => obxRecv(ev.data || {}); } catch { /* no BroadcastChannel: each tab on its own */ }
+    await obxDrain();
+  })();
+}
+// entries an earlier version left in localStorage: into IndexedDB (before anything new), then out of localStorage
+function obxAdopt() {
+  const old = LS.get('outbox', null);
+  if (!Array.isArray(old) || !old.length) return;
+  const have = new Set(OUT.q.map(x => x.k)), n0 = Math.min(obxSeq(), ...OUT.q.map(x => x.n));
+  const add = old.map((x, i) => ({...x, k: x.k || outKey(), n: n0 - old.length + i})).filter(x => !have.has(x.k));
+  OUT.q = [...add, ...OUT.q];
+  obxWrite(add.map(obxRec), []).then(() => LS.del('outbox'), () => {});
+}
+function obxSave(fn) {
+  obxAdopt();
+  const before = new Map(OUT.q.map(x => [x.k, JSON.stringify(obxRec(x))]));
+  fn();
+  const put = [];
+  for (const x of OUT.q) {
+    if (!x.k) x.k = outKey();
+    if (x.n == null) x.n = obxSeq();
+    const r = obxRec(x);
+    if (before.get(x.k) !== JSON.stringify(r)) put.push(r);
+    before.delete(x.k);
+  }
+  if (put.length || before.size) obxWrite(put, [...before.keys()]);
+}
+function obxWrite(put, del) {
+  return OBX.st.write(put, del).then(() => { try { OBX.ch?.postMessage({put, del}); } catch { /* closed */ } },
+    e => { console.warn('outbox: IndexedDB write failed', e); LS.set('outbox', OUT.q.map(obxRec)); });  // the next start takes it over
+}
+// what another tab (or the service worker) wrote: the same merge as outSync (an entry keeps its object; gone elsewhere = done)
+function obxRecv(d) {
+  if (d.clear) { for (const o of OUT.q) o.done = true; OUT.q = []; }
+  const by = new Map(OUT.q.map(x => [x.k, x]));
+  for (const k of d.del || []) { const o = by.get(k); if (o) { o.done = true; by.delete(k); } }
+  for (const r of d.put || []) { const o = by.get(r.k); if (o) { if (!r.sending) delete o.sending; Object.assign(o, r); } else by.set(r.k, r); }
+  OUT.q = [...by.values()].sort((a, b) => a.n - b.n);
+  if (d.sw) obxDrain();
+  if (S.booted) renderTop();
+}
+// what the service worker sent while no tab was open: its new task ids, conflicts and skipped repeats (shown here)
+async function obxDrain() {
+  if (!OBX.on) return;
+  let map, res;
+  try { [map, res] = [await OBX.st.meta('swmap'), await OBX.st.meta('swres')]; } catch { return; }
+  if (map && Object.keys(map).length) { const idm = LS.get('idmap', {}); Object.assign(idm, map); Object.assign(HIST.ids, map); LS.set('idmap', idm); OBX.st.setMeta('swmap', undefined).catch(() => {}); }
+  if (res?.length) {
+    OBX.st.setMeta('swres', undefined).catch(() => {});
+    setTimeout(() => { for (const j of res) if (j.conflicts?.length) addConflicts(j.id, j.conflicts, j.title); if (res.some(j => j.skipped)) toast(tr('Recurring task was already checked off, not advanced twice')); }, 0);
+  }
+}
+const obxMeta = (k, v) => { if (OBX.on) OBX.st.setMeta(k, v).catch(() => {}); };
+// logout / another user in this browser (clearLocal): the queue goes with the rest of the local data
+function obxClear() { if (!OBX.on) return Promise.resolve(); for (const o of OUT.q) o.done = true; OUT.q = []; return OBX.st.clear().then(() => { try { OBX.ch?.postMessage({clear: true}); } catch { /* closed */ } }, () => {}); }  // 2.143.0 C2 (#2153): a Promise (awaited before leaving the page)
+// Background Sync: the service worker sends the queue once the device is online again (it leaves it to an open tab)
+function obxSyncReg() { if (OBX.on && navigator.serviceWorker?.ready) navigator.serviceWorker.ready.then(r => r.sync?.register('kalmido-outbox')).catch(() => {}); }
+if (globalThis.navigator?.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data?.type === 'outbox-flush' && OUT.q.length) flush(); });
 // 2.21.0 (#673): before the first render there is no top bar to update (renderTop on an empty state threw, so a start while
 // the server was down showed the error page instead of the cached data); the boot's render shows the state
 function setOnline(b) { if (OUT.online !== b) { OUT.online = b; if (S.booted) renderTop(); if (b) flush(); setTimeout(() => typeof staleDraw === 'function' && staleDraw(), 0); } }
@@ -401,11 +500,12 @@ function enqueue(method, url, body) {
   const tk = pm && body ? Object.keys(body).filter(k => !k.startsWith('_')) : [];
   if (tk.length === 1 && (tk[0] === 'title' || tk[0] === 'content')) {
     const q = outSync().find((x, i) => (i > 0 || !OUT.flushing) && !x.sending && x.method === 'PATCH' && x.url === url && !x.done && Object.keys(x.body || {}).filter(k => !k.startsWith('_')).join() === tk[0]);  // 2.126.0 D (#1989): sending = on its way from another tab
-    if (q) { q.body = {...q.body, [tk[0]]: body[tk[0]]}; LS.set('outbox', OUT.q); return applyLocal({method, url, body}); }
+    if (q) { outSave(() => { q.body = {...q.body, [tk[0]]: body[tk[0]]}; }); return applyLocal({method, url, body}); }  // 2.143.0 C (#2153): outSave (IndexedDB)
   }
   const e = {method, url, body, uid: S.me?.id, k: outKey()};
-  if (method === 'POST' && url === '/api/tasks') e.tmp = -Date.now() - Math.floor(Math.random() * 1000);
+  if (method === 'POST' && (url === '/api/tasks' || /^\/api\/lists\/\d+\/notes$/.test(url))) e.tmp = -Date.now() - Math.floor(Math.random() * 1000);  // 2.143.0 C (#2153): + a note
   outSave(() => OUT.q.push(e));  // 2.126.0 D (#1989)
+  obxSyncReg();  // 2.143.0 C (#2153)
   renderTop();
   if (OUT.online) setTimeout(flush, 50);
   const r = applyLocal(e);
@@ -417,6 +517,7 @@ function applyLocal(e) {
   const m = url.match(/^\/api\/tasks\/(-?\d+)(?:\/(\w+))?/);
   const nowIso = new Date().toISOString();
   if (url.startsWith('/api/time/')) return timeLocal(e);
+  if (typeof ntLocal === 'function' && NT_URL.test(url)) return ntLocal(e);  // 2.143.0 C (#2153): notes (chat.js)
   if (method === 'POST' && url === '/api/tasks') {
     const par = body.parent_id && S.tasks.get(body.parent_id);
     const t = {id: e.tmp, list_id: body.list_id || (par ? par.list_id : inbox().id), section_id: body.section_id ?? null, parent_id: body.parent_id ?? null,
@@ -490,7 +591,8 @@ async function outFlush() {
       try {
         const j = await rawFetch(e.method, url, body);
         sent++;
-        if (e.tmp) { idmap[e.tmp] = j.id; HIST.ids[e.tmp] = j.id; LS.set('idmap', idmap); if (S.sel === e.tmp) S.sel = j.id; }
+        if (typeof ntSent === 'function' && NT_URL.test(e.url)) ntSent(e, j);  // 2.143.0 C (#2153): notes (chat.js)
+        if (e.tmp) { idmap[e.tmp] = j.id; HIST.ids[e.tmp] = j.id; LS.set('idmap', idmap); obxMeta('idmap', idmap); if (S.sel === e.tmp) S.sel = j.id; }  // 2.143.0 C (#2153): the service worker maps with it too
         if (j && j.conflicts?.length) {
           // 2.13.0: a "conflict" with a text this device sent itself (its answer got lost) is replayed on top of it
           const own = j.conflicts.filter(c => ownVal(j.id + ':' + c.field, c.server) && body && c.field in body);
@@ -510,6 +612,7 @@ async function outFlush() {
       e.done = true;
     }
     LS.set('idmap', Object.fromEntries(Object.entries(idmap).filter(([k]) => -k > Date.now() - 600000)));  // 2.126.0 D (#1989): another tab may still hold a new task's temporary id for a while
+    obxMeta('idmap', LS.get('idmap', {}));  // 2.143.0 C (#2153)
   } finally {
     OUT.flushing = false;
     if (sent && !OUT.q.length && globalThis.document) { S.syncOk = Date.now(); staleDraw(); }  // 2.25.0 (UX-55): the "waiting" chip goes at once
@@ -567,11 +670,12 @@ function addConflicts(tid, list, title) {
 // its text waits in the conflicts dialog with the reason, to copy
 function outReject(e, err) {
   const b = e.body && typeof e.body === 'object' ? e.body : {};
-  const txt = Object.entries(b).filter(([k, v]) => !k.startsWith('_') && k !== 'client_ref' && v != null && v !== '' && typeof v !== 'object')
-    .map(([k, v]) => k === 'title' || k === 'content' ? String(v) : `${k}: ${v}`).join('\n');
+  const txt = Object.entries(b).filter(([k, v]) => !k.startsWith('_') && k !== 'client_ref' && k !== 'expect_updated_at' && v != null && v !== '' && typeof v !== 'object')
+    .map(([k, v]) => k === 'title' || k === 'content' || k === 'body' ? String(v) : `${k}: ${v}`).join('\n');  // 2.143.0 C (#2153): + a note's text
   if (!txt) return;
   const id = +((e.url.match(/^\/api\/tasks\/(\d+)/) || [])[1]) || 0;
-  S.conflicts.push({tid: id, title: b.title || S.tasks.get(id)?.title || '', field: 'rejected', server: err?.message || '', mine: txt, at: Date.now()});
+  const nt = !id && (S.nt?.notes || S.notes || []).find(n => '/api/notes/' + n.id === e.url);  // 2.143.0 C (#2153)
+  S.conflicts.push({tid: id, title: b.title || S.tasks.get(id)?.title || nt?.title || '', field: 'rejected', server: err?.message || '', mine: txt, at: Date.now()});
   LS.set('conflicts', S.conflicts);
 }
 // the calm bar under a field that was changed elsewhere while it was being edited (2.13.0)
@@ -654,6 +758,7 @@ function applyState(j) {
   S.lists = j.lists; S.inboxNames = j.inbox_names || []; S.sections = j.sections; S.habits = j.habits; S.pomo = j.pomo;
   S.notes = j.notes || []; S.team = j.team || {enabled: false, unread: 0};  // 2.17.0 (#442 #419)
   S.pomoToday = j.pomo_today; S.avatars = j.avatars || {}; S.colors = j.colors || {}; S.share = j.share || null; S.settings = j.settings; S.mineOrder = moFromState(j); S.languages = j.languages || [{code: 'en', name: 'English'}]; LS.set('lang', j.settings.lang || 'en'); document.documentElement.lang = j.settings.lang || 'en'; S.counts = j.counts; S.v = j.v; S.ntfyUrl = j.ntfy_url;
+  lookAdopt();  // 2.143.0 D (#2155)
   o3c_ringsMigrate();  // 2.118.0 (#2297): old device switch for rings -> account setting, once
   foldSync();  // 2.4.0 (#361): folded folders follow the user (all devices)
   S.tasks = new Map(j.tasks.map(t => [t.id, t]));
@@ -729,6 +834,7 @@ async function load() {
       if ((S.wseq || 0) === w0) break;
     }
     OUT.me = j?.me?.id;  // 2.126.0 D (#1992 O5)
+    if (OUT.me && OBX.uid !== OUT.me) { OBX.uid = OUT.me; obxMeta('uid', OUT.me); }  // 2.143.0 C (#2153): the service worker sends only this user's entries
   }
   catch (e) {
     if (!(e instanceof Offline)) throw e;

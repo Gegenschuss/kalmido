@@ -4813,6 +4813,14 @@ button.lkchip:hover{border-color:var(--accent)}
 #savedok.on{opacity:1}
 @media (prefers-reduced-motion:reduce){ #savedok{transition:none} }
 @media (max-width:899px){ #savedok{bottom:calc(env(safe-area-inset-bottom,0px) + 4.75rem)} }
+/* 2.143.0 C (#2153): the install hint (setcore.js pwa_hint): a small card at the bottom, fades in */
+#pwahint{position:fixed;right:1rem;bottom:calc(env(safe-area-inset-bottom,0px) + 1rem);z-index:56;display:flex;align-items:flex-start;gap:.625rem;max-width:min(26rem,calc(100vw - 2rem));padding:.75rem .75rem .75rem 1rem;border-radius:.75rem;border:1px solid var(--line2);background:var(--bg3);box-shadow:0 .5rem 1.5rem rgba(0,0,0,.18);opacity:0;transform:translateY(.5rem);transition:opacity .2s,transform .2s}
+#pwahint.on{opacity:1;transform:none}
+#pwahint .pwaic{color:var(--accent);padding-top:.125rem}
+#pwahint .pwatx{display:flex;flex-direction:column;gap:.25rem;min-width:0;flex:1}
+#pwahint .pwabtns{display:flex;flex-wrap:wrap;gap:.375rem;margin-top:.375rem}
+@media (max-width:899px){ #pwahint{left:1rem;right:1rem;max-width:none;bottom:calc(env(safe-area-inset-bottom,0px) + 4.75rem)} }
+@media (prefers-reduced-motion:reduce){ #pwahint{transition:none;transform:none} }
 /* 2.25.0 review: the task's title on top of a menu stays readable (it is a disabled button only for the keyboard) */
 .menu-list button.mhead:disabled{opacity:1;color:var(--text)}
 /* review: Settings > Appearance > Sidebar: every row the same shape; 44 px targets on touch screens */
@@ -7777,6 +7785,15 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 :root #side .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .wsbar{width:auto;min-height:2rem}
 @media (pointer:coarse){ :root #side .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .wsbar{width:auto;min-height:2.75rem} }
 :root #side .sbsrch,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sbsrch{margin-bottom:.5rem}  /* room above the first group heading */
+/* 2.143.0 D (#2156): activity per organisation (Administration > Organisation) */
+.actwrap{overflow-x:auto}
+.acttbl{border-collapse:collapse;width:100%;font-size:var(--fs-s,.8125rem)}
+.acttbl th,.acttbl td{padding:.375rem .5rem;text-align:right;border-bottom:1px solid var(--line2);white-space:nowrap}
+.acttbl th:first-child{text-align:left;font-weight:500}
+.acttbl thead th{color:var(--muted);font-weight:500;font-size:var(--fs-xs)}
+/* 2.143.0 A (#2151): read-only / accounting in an organisation's office: no create or delete buttons (the server refuses them) */
+.dash.office[data-ofcro] :is([data-ofc="new"], [data-ofd^="new"], .iconbtn.danger, .btn.danger) { display: none; }
+.orgrolehelp ul { margin: .25rem 0 0; padding-left: 1.1rem; }
 /* 2.139.0 B (#2128): voice messages in the team chat (voice.js): the recording bar over the composer, the player of an audio file */
 .tvcrec{position:absolute;inset:0;z-index:3;display:flex;align-items:center;gap:.5rem;padding:0 .75rem;background:var(--bg);border-top:1px solid var(--line)}
 .tvcrec .tvcclock{font-variant-numeric:tabular-nums;font-size:var(--fs-m);min-width:2.75rem}

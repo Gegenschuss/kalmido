@@ -72,10 +72,28 @@ def obk_org_role(c, uid, oid, org_role):
     r = om_role(c, uid, oid)
     if r == "admin":
         return "owner"
+    if r in ("guest", "accounting"):
+        return None  # 2.143.0 A (#2151): only books shared with them personally
+    if r == "readonly" and org_role in BOOK_ROLES:
+        return "view"  # 2.143.0 A (#2151)
     return org_role if r and collab_all() and org_role in BOOK_ROLES else None
 
 
 def book_role(c, uid, b):
+    """2.143.0 A (#2151): read-only in the book's organisation -> view."""
+    role = _book_role(c, uid, b)
+    return _bk_ro(c, uid, b["org_id"] if role and "org_id" in b.keys() else None, role)
+
+
+def _bk_ro(c, uid, oid, role):
+    if role and oid and role != "view":
+        from ..accounts.orgroles import org_readonly
+        if org_readonly(c, uid, oid):
+            return "view"
+    return role
+
+
+def _book_role(c, uid, b):
     if b is None:
         return None
     if "org_id" in b.keys() and not acx_org_ok(c, uid, b["org_id"]):  # 2.36.2 (#1142): organisation books: members only
@@ -129,6 +147,10 @@ def my_book_ids(c, uid):
             if acx_org_ok(c, uid, r[2]) and (not r[3] or r[3] == r[2]):  # 2.36.2 (#1142): organisation books only for its members
                 if BOOK_RANK.get(r[1], 0) > BOOK_RANK.get(out.get(r[0]), 0):  # 2.52.0 C (#1438): the better of share + organisation role
                     out[r[0]] = r[1]
+    from ..accounts.orgroles import org_roles_of
+    if out and "readonly" in org_roles_of(c, uid).values():  # 2.143.0 A (#2151)
+        orgs = {r[0]: r[1] for r in c.execute(f"SELECT id, org_id FROM books WHERE id IN ({','.join(str(int(k)) for k in out)})")}
+        out = {k: _bk_ro(c, uid, orgs.get(k), v) for k, v in out.items()}
     return out
 
 

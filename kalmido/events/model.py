@@ -85,7 +85,18 @@ def wall_s(dt):
 
 # ---- calendars and rights
 def ev_role(c, uid, cal):
-    """owner | edit | view | None of uid for the calendar row (members only while collaboration is on)."""
+    """owner | edit | view | None of uid for the calendar row (members only while collaboration is on). 2.143.0 A (#2151):
+    read-only in the calendar's organisation -> view."""
+    role = _ev_role(c, uid, cal)
+    oid = cal["org_id"] if role and "org_id" in cal.keys() else None
+    if oid:
+        from ..accounts.orgroles import org_readonly
+        if org_readonly(c, uid, oid):
+            return "view"
+    return role
+
+
+def _ev_role(c, uid, cal):
     if cal is None:
         return None
     if "org_id" in cal.keys() and not acx_org_ok(c, uid, cal["org_id"]):  # 2.36.2 (#1142): organisation calendars: members only
@@ -123,6 +134,11 @@ def my_cal_ids(c, uid, hidden=True):
                            "JOIN users u ON u.id=k.owner_id WHERE m.user_id=? AND u.disabled=0", (uid,)):
             if (hidden or not r["hidden"]) and acx_org_ok(c, uid, r["org_id"]):  # 2.36.2 (#1142)
                 out.setdefault(r[0], r[1])
+    from ..accounts.orgroles import org_roles_of
+    if "readonly" in org_roles_of(c, uid).values():  # 2.143.0 A (#2151): read-only in an organisation -> its calendars view
+        ro = {r[0] for r in c.execute(f"SELECT id FROM ev_cals WHERE id IN ({','.join(str(int(k)) for k in out) or '0'}) AND org_id IN "
+                                      f"({','.join(str(int(o)) for o, rk in org_roles_of(c, uid).items() if rk == 'readonly')})")}
+        out = {k: ("view" if k in ro else v) for k, v in out.items()}
     if not hidden:
         hid = set(json.loads(usettings(c, uid).get("evcals_hidden") or "[]") or [])
         out = {k: v for k, v in out.items() if k not in hid}

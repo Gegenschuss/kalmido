@@ -108,6 +108,11 @@ organisation admin adds and removes members. A server without any organisation l
 once there is one, people see the members of their organisations and the people they share something with; private lists
 reach anybody else by e-mail address.
 
+**Activity per organisation (2.143).** Instance admins see under *Settings > Administration > Organisation* one table with, per
+organisation, the members, the date of the last sign-in, the storage used, and the numbers of lists and tasks, plus a row
+"Without organisation" (the private spaces of people who belong to none). Numbers only: no people, no contents. The same data is
+`GET /api/v1/admin/orgs/activity` (scope `admin-read`).
+
 **Lists of the organisation (2.35, 2.56).** Organisation admins find the organisation's shared lists under *Settings >
 Organisation > Lists of the organisation*: names, owners and numbers, never the contents. They can archive, restore, delete
 from the archive and hand a list over to another member; since 2.56 also *Edit* its name, icon (emoji or picture) and
@@ -255,7 +260,15 @@ to *deny* and allow each app per group, so a new account does not open every app
 - **A new version on the phone:** close the app completely (or reload it), then check the version under *Settings >
   Help*. An old cached app shows old screens.
 - **Offline changes live in the browser** until they are synced: do not clear the site data while you have unsynced
-  changes.
+  changes. Tasks, habits, time entries, the timer and notes can be changed offline; deleting or moving a note needs a
+  connection, and so do the notes of a list with end-to-end encryption.
+- **Install hint.** Once per start (not in the first half minute) the app may offer to install itself: on Android and
+  desktop browsers with the browser's own install question, on iPhone / iPad with the steps (*Share > Add to Home
+  Screen*). *Not now* asks again after two weeks, *Don't show again* never on that device; the installed app never shows it.
+- **Sharing into Kalmido.** The installed app is a share target for every file type (pictures, PDFs, Office files, ZIP,
+  audio, video, ...): a shared file becomes a new task with the file attached. Contact cards (`.vcf`) can also go into
+  the contacts, calendar files (`.ics`) into a calendar (the existing imports). Files are stored as attachments and
+  downloaded, never shown inline, except pictures and PDFs.
 - **Only Web Push?** Then remove ntfy topics you do not use: a topic on the public `ntfy.sh` can be read by anyone who
   knows its name.
 - **Your own ntfy server:** for the phone's battery set the server's `keepalive-interval` to about 3 minutes, use the
@@ -473,6 +486,26 @@ docker compose up -d kalmido
   example with clevis / tang), so a stolen disk alone is unreadable.
 - **Offsite backups by pull.** Let a second machine pull the backups (the server cannot delete them), encrypt them
   there (for example with `age`, or Kalmido's own *Encrypt backups*), and run a restore test now and then.
+- **Off-site target (2.143.0).** Settings > Administration > Server > *Off-site backup*: one target per server --
+  S3-compatible storage (endpoint, region, bucket, folder, access key and secret key; requests signed with Signature V4;
+  path-style addresses by default, switch them off for `bucket.s3.example.com`), WebDAV (an `https://` address -- plain
+  `http://` only to `localhost` --, user name, password) or
+  SFTP (server, port, user name, folder without `* ? [ ] { }`). For SFTP Kalmido makes an ed25519 key pair and shows the public key: add it to
+  `~/.ssh/authorized_keys` of that user; the first *Test connection* shows the server's fingerprint and saves it, after that
+  only this host key is accepted (*Forget fingerprint* after a planned change of the server). The image ships the `sftp`
+  program (openssh-client); a server run outside the image needs it on the `PATH`.
+  - Only encrypted backups are uploaded: the target cannot be switched on without *Encrypt backups* and its passphrase.
+  - After every backup (automatic or *Back up now*; not the safety copies of a restore) the backup thread uploads the
+    newest one, checks its size on the target (S3: also `Content-MD5` and the signed SHA-256 of the body) and keeps the
+    newest N backups there (default: the daily count kept locally); older files of Kalmido's backup name pattern are
+    deleted, nothing else in the folder (sub-folders are left alone). The upload runs beside the backup thread, so a
+    slow target delays neither the schedule nor a restore. A failed upload is tried again up to 4 times (5, 10, 20 minutes apart), then
+    the admins get an alert; the next backup or *Upload now* starts again. `KALMIDO_OFFSITE_TIMEOUT` (seconds per
+    network step, default 120) and `KALMIDO_OFFSITE_RETRY_S` (first pause, default 300) tune it.
+  - The credentials (keys, password, the SFTP private key) are sealed with the server key and never shown again; the
+    page only says whether they are set. *Test connection* writes a small file to the target and deletes it.
+    *Remove target* deletes the address, the credentials and the SFTP key pair (the backups on the target stay).
+  - Restoring from the target: download the backup there and use *Restore from a file* (or copy it into the backup folder).
 - **Old snapshots contain plain text.** Filesystem, VM or provider snapshots taken before you switched on encryption
   still hold the data unencrypted: delete them.
 

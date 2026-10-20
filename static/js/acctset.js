@@ -552,7 +552,44 @@ function bkRestore(md, src) {
     setTimeout(() => $('#bkr-pass', m)?.focus() || $('#bkr-word', m)?.focus(), 50);
   });
 }
+// 2.143.0 B (#2152): the off-site target: every field saved on change (credentials sent once, then only "set")
+function bkoWire(md) {
+  const put = async v => { const box = $('#s-bko', md); try { await bkoDraw(md, await api('PATCH', '/api/admin/backups/offsite', v)); setSaved(null); } catch { await bkoDraw(md); } return box; };
+  md.addEventListener('change', async e => {
+    const el = e.target; if (!el.closest?.('#s-bko')) return;
+    const j = $('#s-bko', md)._j || {}, t = j.type;
+    if (el.id === 'bko-type') return put({type: el.value});
+    if (el.id === 'bko-on') return put({on: el.checked});
+    if (el.id === 'bko-keep') return put({keep: Math.max(1, Math.min(365, +el.value || 1))});
+    if (el.id === 'bko-s3-path') return put({s3: {path_style: el.checked}});
+    const k = el.dataset.bkof; if (!k || !t) return;
+    if (el.dataset.secret && !el.value) return;
+    await put({[t]: {[k]: k === 'port' ? Math.max(1, Math.min(65535, +el.value || 22)) : el.value}});
+  });
+  md.addEventListener('click', async e => {
+    const b = e.target.closest?.('[data-bko]'); if (!b || !b.closest('#s-bko')) return;
+    const k = b.dataset.bko;
+    if (k === 'copy') { const v = $('#bko-pub', md)?.value || ''; try { await navigator.clipboard.writeText(v); toast(tr('Copied')); } catch { toast(v); } return; }
+    // 2.143.0 B (#2152, review): "Remove target" deletes the addresses, the saved credentials and the SFTP key pair
+    if (k === 'remove' && !await askConfirm(tr('Remove the target?'), tr('The saved address, credentials and key pair are deleted. Backups already on the target stay there.'), {ok: tr('Remove target'), danger: true})) return;
+    if (k === 'newkey' && !await askConfirm(tr('Make a new key pair?'), tr('The old key no longer works: add the new public key on the server.'), {ok: tr('New key pair')})) return;
+    b.disabled = true;
+    try {
+      if (k === 'newkey') await put({sftp: {new_key: true}});
+      if (k === 'forget') await put({sftp: {forget_host: true}});
+      if (k === 'remove') await put({remove: true});
+      if (k === 'upload') { await bkoDraw(md, await api('POST', '/api/admin/backups/offsite/upload')); toast(tr('Upload started')); }
+      if (k === 'test') {
+        b.textContent = tr('Testing…');
+        const r = await api('POST', '/api/admin/backups/offsite/test');
+        await bkoDraw(md, r.state);
+        toast(r.ok ? (r.fingerprint ? tr('Connection works. Server fingerprint: {0}', r.fingerprint) : tr('Connection works.')) : r.error);
+      }
+    } catch { if (k === 'test') await bkoDraw(md); /* api() showed it */ } finally { b.disabled = false; }
+  });
+}
 function bkWire(md) {
+  bkoWire(md);  // 2.143.0 B (#2152)
   md.addEventListener('change', async e => {  // settings saved at once (U03)
     if (!e.target.closest('#s-bk') || e.target.id === 'bk-file') return;
     if (e.target.id === 'bk-pass') {

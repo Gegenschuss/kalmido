@@ -180,6 +180,16 @@ async function orgsDraw(md) {
   if (bd && j.orgs.length) box.insertAdjacentHTML('beforeend', oa_boundaryHtml(bd));  // 2.46.0 (#1563): unfoldable, with "Clean up"
   const vs = $('#a-vis', md); if (vs) vs.innerHTML = VIS_UI.map(([k, n]) => `<option value="${k}" ${k === j.visibility ? 'selected' : ''}>${esc(tr(n))}</option>`).join('');
 }
+// 2.143.0 D (#2156): Administration > Organisation: activity per organisation (numbers only; + one row for people without one)
+const actHtml = () => `<h4 id="s-act-h">${tr('Activity per organisation')}</h4><div id="s-act" class="shint">${tr('Loading…')}</div>`;
+async function actDraw(md) {
+  const box = $('#s-act', md); if (!box) return;
+  let j; try { j = await api('GET', '/api/admin/orgs/activity'); } catch { box.innerHTML = ''; return; }
+  const row = (n, o) => `<tr><th scope="row">${esc(n)}</th><td>${o.members}</td><td>${o.last_login ? esc(o.last_login) : '–'}</td><td>${esc(fmtBytes(o.storage_bytes))}</td><td>${o.lists}</td><td>${o.tasks}</td></tr>`;
+  box.className = 'actwrap';
+  box.innerHTML = `<table class="acttbl"><thead><tr><th>${tr('Organisation')}</th><th>${tr('Members')}</th><th>${tr('Last sign-in')}</th><th>${tr('Storage')}</th><th>${tr('Lists')}</th><th>${tr('Tasks')}</th></tr></thead><tbody>${
+    j.orgs.map(o => row(o.name, o)).join('')}${row(tr('Without organisation'), j.private)}</tbody></table>`;
+}
 // ---- 2.28.0 (#935): Settings > Workspaces -- my organisations; an organisation's admin adds / removes members and sets their
 // role (also when not an admin of the server), renames it, sets its e-mail domains
 const wsPaneOn = () => wsOn() && !S.me?.kid;
@@ -188,8 +198,9 @@ async function wsPaneDraw(md) {
   let j; try { j = await api('GET', '/api/orgs'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box._j = j;
   const mm = Object.keys(j.mismatches || {}).length;
-  const org = o => `<details class="sdet wsorg" data-oid="${o.id}" ${j.orgs.length === 1 ? 'open' : ''}><summary>${o.icon_url ? orgIconHtml(o) : `<span class="fem" aria-hidden="true">${esc(o.icon || '🏢')}</span>`}<b>${esc(o.name)}</b> <span class="muted">${esc(trn('{0} member', '{0} members', o.members.length))} · ${esc(trn('{0} list', '{0} lists', o.lists))}${o.role === 'admin' ? ' · ' + esc(tr('you are an admin')) : ''}</span></summary>
-    ${o.members.map(m => `<div class="mrow ${m.disabled ? 'off' : ''}">${av(m.id, m.name)}<span class="n">${esc(m.name)}${m.agent ? ' ' + agentBadge() : ''}${m.id === S.me?.id ? ' ' + tr('(me)') : ''}</span>${o.role === 'admin' && j.manage && !m.agent ? `<select data-wsrole="${m.id}" aria-label="${esc(tr('Role of {0}', m.name))}"><option value="member" ${m.role !== 'admin' ? 'selected' : ''}>${tr('Member')}</option><option value="admin" ${m.role === 'admin' ? 'selected' : ''}>${tr('Admin')}</option></select><button class="iconbtn" data-wsrm="${m.id}" title="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove from the organisation'))}" aria-label="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove {0} from the organisation', m.name))}">${ic('x', 's')}</button>${m.id !== S.me?.id ? `<button class="iconbtn danger" data-wsdel="${m.id}" title="${esc(tr('Delete account'))}" aria-label="${esc(tr('Delete the account of {0}', m.name))}">${ic('trash', 's')}</button>` : ''/* 2.88.0 (#1980) */}` : `<span class="muted">${m.agent ? tr('Agent') : m.role === 'admin' ? tr('Admin') : tr('Member')}</span>`}</div>`).join('')}
+  const org = o => `<details class="sdet wsorg" data-oid="${o.id}" ${j.orgs.length === 1 ? 'open' : ''}><summary>${o.icon_url ? orgIconHtml(o) : `<span class="fem" aria-hidden="true">${esc(o.icon || '🏢')}</span>`}<b>${esc(o.name)}</b> <span class="muted">${esc(trn('{0} member', '{0} members', o.members.length))} · ${esc(trn('{0} list', '{0} lists', o.lists))}${o.role === 'admin' ? ' · ' + esc(tr('you are an admin')) : o.role && o.role !== 'member' ? ' · ' + esc(tr('your role: {0}', oinvRoleSel.label(o.role))) : ''}</span></summary>
+    ${o.members.map(m => `<div class="mrow ${m.disabled ? 'off' : ''}">${av(m.id, m.name)}<span class="n">${esc(m.name)}${m.agent ? ' ' + agentBadge() : ''}${m.id === S.me?.id ? ' ' + tr('(me)') : ''}</span>${o.role === 'admin' && j.manage && !m.agent ? `${oinvRoleSel('', m.role, o.roles || [], `data-wsrole="${m.id}" aria-label="${esc(tr('Role of {0}', m.name))}"`)}${''/* 2.143.0 A (#2151) */}<button class="iconbtn" data-wsrm="${m.id}" title="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove from the organisation'))}" aria-label="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove {0} from the organisation', m.name))}">${ic('x', 's')}</button>${m.id !== S.me?.id ? `<button class="iconbtn danger" data-wsdel="${m.id}" title="${esc(tr('Delete account'))}" aria-label="${esc(tr('Delete the account of {0}', m.name))}">${ic('trash', 's')}</button>` : ''/* 2.88.0 (#1980) */}` : `<span class="muted">${m.agent ? tr('Agent') : esc(oinvRoleSel.label(m.role))}</span>`}</div>`).join('')}
+    ${o.role === 'admin' && j.manage ? oinvRoleSel.help(o.roles || []) : ''}
     ${o.role === 'admin' && j.manage ? `<div class="row wsadd"><input id="ws-add-${o.id}" type="email" placeholder="${esc(tr('Add by e-mail address'))}" aria-label="${esc(tr('Add by e-mail address'))}" autocomplete="off"><button class="btn sm" data-wsadd="${o.id}">${ic('plus', 's')} ${tr('Add')}</button></div>
     <div class="row"><label for="ws-name-${o.id}">${tr('Name')}</label><input id="ws-name-${o.id}" value="${esc(o.name)}" maxlength="60"><label for="ws-dom-${o.id}">${tr('E-mail domains')}</label><input id="ws-dom-${o.id}" value="${esc(o.domains || '')}" placeholder="example.com"><button class="btn sm" data-wssave="${o.id}">${tr('Save')}</button></div>` : ''}
     ${o.role === 'admin' && j.manage ? `<div class="row wsic"><label>${tr('Symbol')}</label><span class="wsicprev">${orgIconHtml(o)}</span><button type="button" class="btn sm" data-wsic="up">${ic('picture', 's')} ${tr('Upload a picture…')}</button>${o.icon_url ? `<button type="button" class="btn sm" data-wsic="rm">${tr('Remove the picture')}</button>` : ''}</div>` : ''}${''/* 2.87.9 (#1913) */}
@@ -475,7 +486,7 @@ async function logout() {
   await e2eForget();  // 2.42.0 (#828): keys remembered on this device go
   try { await fetch('/api/auth/logout', {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}); } catch { /* offline */ }
   try { for (const k of await caches.keys()) await caches.delete(k); } catch { /* no Cache Storage */ }  // 2.126.0 D (#1992 O4): the app loads again from the server
-  clearLocal(); location.replace('/');
+  await Promise.race([clearLocal(), new Promise(r => setTimeout(r, 1500))]); location.replace('/');  // 2.143.0 C2 (#2153): the IndexedDB queue is empty before the page goes
 }
 // login / first-run setup / "no account" screen (built-in login; with single sign-on the proxy logs in)
 async function authScreen(j) {
@@ -854,7 +865,7 @@ async function stoCheck(md) {
   box.innerHTML = !j.problems.length ? `<div class="muted mhint">${esc(trn('{0} file checked, all fine', '{0} files checked, all fine', j.checked))}</div>`
     : `<div class="mhint warn">${esc(trn('{0} damaged or missing file', '{0} damaged or missing files', j.problems.length))}</div><ul class="stol">${j.problems.map(p => `<li><b>${esc(p.name)}</b> <span class="muted">${esc(p.where)} · ${esc(tr(P[p.problem]))}</span>${p.kind === 'attachment' && p.owner ? ` <button class="linkbtn" data-act="open-id" data-id="${p.owner}">${tr('Open')}</button>` : ''}</li>`).join('')}</ul>`;
 }
-const bkHtml = () => `<h4 id="s-bk-h">${tr('Backups')}</h4><div class="shint">${tr('The server key KALMIDO_SECRET_KEY is not part of a backup: keep it separately. A backup restores the encrypted organisation data only with that key (or with the organisations’ recovery keys).')}</div><div id="s-bk"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+const bkHtml = () => `<h4 id="s-bk-h">${tr('Backups')}</h4><div class="shint">${tr('The server key KALMIDO_SECRET_KEY is not part of a backup: keep it separately. A backup restores the encrypted organisation data only with that key (or with the organisations’ recovery keys).')}</div><div id="s-bk"><div class="muted mhint">${tr('Loading…')}</div></div><h4 id="s-bko-h">${tr('Off-site backup')}</h4><div id="s-bko"></div>`;  // 2.143.0 B (#2152): + the off-site target
 const BK_KIND = {auto: N_('automatic'), manual: N_('manual'), safety: N_('before a restore')};
 const fmtBytes = n => n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : n >= 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round((n || 0) / 1e3)) + ' kB';
 async function bkDraw(md, j) {
@@ -881,7 +892,44 @@ async function bkDraw(md, j) {
     ${hint(tr('Larger files: copy them into the backup folder on the server instead, they then show up in the list.'))}`;
   box.innerHTML = h;
   box._body = bkBody(md);
+  if (!$('#s-bko', md)?._j) bkoDraw(md);  // 2.143.0 B (#2152)
   if (j.running && !box._poll) box._poll = setTimeout(async () => { box._poll = null; if (md.isConnected) await bkDraw(md); }, 1500);
+}
+// 2.143.0 B (#2152): the off-site target (admin/offsite.py): S3, WebDAV or SFTP; credentials are only ever shown as "set"
+const BKO_TYPES = [['', N_('None|target')], ['s3', N_('S3-compatible storage')], ['webdav', N_('WebDAV')], ['sftp', N_('SFTP')]];
+const BKO_FIELDS = {s3: [['endpoint', N_('Endpoint'), 'url', 'https://s3.example.com'], ['region', N_('Region'), 'text', 'us-east-1'], ['bucket', N_('Bucket'), 'text', ''], ['prefix', N_('Folder'), 'text', 'kalmido'],
+  ['key', N_('Access key'), 'secret', 'key_set'], ['secret', N_('Secret key'), 'secret', 'secret_set']],
+  webdav: [['url', N_('Address'), 'url', 'https://dav.example.com/backups'], ['user', N_('User name'), 'text', ''], ['password', N_('Password'), 'secret', 'password_set']],
+  sftp: [['host', N_('Server'), 'text', 'backup.example.com'], ['port', N_('Port'), 'number', '22'], ['user', N_('User name'), 'text', ''], ['path', N_('Folder'), 'text', 'backups']]};
+async function bkoDraw(md, j) {
+  const box = $('#s-bko', md); if (!box) return;
+  if (!j) { try { j = await api('GET', '/api/admin/backups/offsite'); } catch { box.innerHTML = ''; return; } }
+  box._j = j;
+  const t = j.type, x = j[t] || {}, hint = h => `<div class="shint">${h}</div>`;
+  const field = ([k, label, kind, ph]) => `<div class="row"><label for="bko-${t}-${k}">${tr(label)}</label>${kind === 'secret'
+    ? `<input type="password" id="bko-${t}-${k}" data-bkof="${k}" data-secret="1" autocomplete="new-password" placeholder="${x[ph] ? tr('set (unchanged)') : ''}">`
+    : `<input type="${kind === 'number' ? 'number' : kind === 'url' ? 'url' : 'text'}" id="bko-${t}-${k}" data-bkof="${k}" ${kind === 'number' ? 'min="1" max="65535" class="aanum"' : ''} value="${esc(String(x[k] ?? ''))}" placeholder="${esc(ph)}" spellcheck="false" autocomplete="off">`}</div>`;
+  let h = hint(tr('After every backup a copy goes to storage outside this server. Only encrypted backups are uploaded: the backup is encrypted with your passphrase before it leaves the server.'));
+  if (!j.encrypt_ready) h += `<div class="shint cnote">${tr('Switch on “Encrypt backups” with a passphrase first.')}</div>`;
+  h += `<div class="row"><label for="bko-type">${tr('Target')}</label><select id="bko-type">${BKO_TYPES.map(([k, n]) => `<option value="${k}" ${k === t ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>`;
+  if (t) {
+    h += (BKO_FIELDS[t] || []).map(field).join('');
+    if (t === 's3') h += `<div class="featgrid"><label class="wide"><input type="checkbox" id="bko-s3-path" ${x.path_style ? 'checked' : ''}><span>${tr('Path-style addresses')}<small class="muted">${tr('Most self-hosted storage needs this; switch it off for addresses like bucket.s3.example.com.')}</small></span></label></div>`;
+    if (t === 'sftp') {
+      h += `<div class="row bkokey"><label for="bko-pub">${tr('Public key')}</label><input type="text" id="bko-pub" readonly value="${esc(x.public_key || '')}"><button type="button" class="iconbtn" data-bko="copy" title="${tr('Copy')}" aria-label="${tr('Copy')}">${ic('copy', 's')}</button></div>`
+        + hint(tr('Add this key to the file ~/.ssh/authorized_keys of the user on the server. Kalmido signs in only with this key.'))
+        + hint(x.fingerprint ? tr('Server fingerprint (saved): {0}', `<code>${esc(x.fingerprint)}</code>`) : tr('The first test shows the server’s fingerprint and saves it; after that only this server is accepted.'))
+        + `<div class="row"><button type="button" class="btn sm" data-bko="newkey">${ic('key', 's')} ${tr('New key pair')}</button>${x.fingerprint ? `<button type="button" class="btn sm" data-bko="forget">${tr('Forget fingerprint')}</button>` : ''}</div>`;
+    }
+    h += `<div class="row"><label for="bko-keep">${tr('Keep')}</label><input type="number" class="aanum" id="bko-keep" min="1" max="365" value="${j.keep}"><span class="muted">${tr('newest backups on the target')}</span></div>
+      <div class="featgrid"><label class="wide"><input type="checkbox" id="bko-on" ${j.on ? 'checked' : ''} ${j.encrypt_ready ? '' : 'disabled'}><span>${tr('Upload backups to the target')}</span></label></div>
+      <div class="row"><button type="button" class="btn sm" data-bko="test">${ic('check', 's')} ${tr('Test connection')}</button><button type="button" class="btn sm" data-bko="upload" ${j.on && !j.running ? '' : 'disabled'}>${ic('upload', 's')} ${tr('Upload now')}</button><button type="button" class="btn sm" data-bko="remove">${ic('trash', 's')} ${tr('Remove target')}</button></div>`;
+    const st = j.running ? tr('Uploading…') : j.last_ok ? tr('Last upload: {0}, {1}.', esc(aaWhen(j.last_ok)), fmtBytes(j.last_size)) : tr('No upload yet.');
+    h += hint(st);
+    if (j.last_error) h += `<div class="shint cnote bkoerr">${tr('The last upload failed ({0}): {1}', esc(aaWhen(j.last_error_at)), esc(j.last_error))}</div>`;
+  }
+  box.innerHTML = h;
+  if (j.running && !box._poll) box._poll = setTimeout(async () => { box._poll = null; if (md.isConnected) await bkoDraw(md); }, 2000);
 }
 const bkBody = md => $('#bk-on', md) ? {on: $('#bk-on', md).checked, time: $('#bk-time', md).value || '03:30', keep_daily: Math.max(1, +$('#bk-daily', md).value || 14), keep_weekly: Math.max(0, +$('#bk-weekly', md).value || 0), encrypt: $('#bk-enc', md).checked} : null;
 const PURPOSES = [['me', 'user', N_('For me'), N_('Your own tasks: lists, reminders and the calendar. More views any time under Settings > Modules.')],

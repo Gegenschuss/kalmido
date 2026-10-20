@@ -229,6 +229,8 @@ def clean_setting(k, v):
         return lp_clean_folder_colors(v)
     if k == "ws_colors":  # 2.57.0 B (#1807): my own colour per workspace
         return wsp_clean_ws_colors(v)
+    if k == "look":  # 2.143.0 D (#2155): the appearance of all devices
+        return clean_look_pref(v)
     if k == "show_done_views":
         return clean_done_views(v)
     if k == "wgstd_hide":  # 2.46.2 (#1726): {view key: short signature}
@@ -423,6 +425,35 @@ def wsp_clean_ws_colors(v):
         if not isinstance(key, str) or not WSP_KEY_RE.fullmatch(key) or tone not in (*WSP_TONES, "none"):
             raise bad
     return json.dumps(o, ensure_ascii=False, separators=(",", ":"))
+
+
+# 2.143.0 D (#2155): the keys of LOOK_KEYS (dialogs.js); the client decides what a value means, the server only bounds it
+LOOK_KEYS = ("theme", "density", "densitySide", "densityRows", "densSideV", "densRowsV", "fsize", "font", "accent", "pack", "headShow")
+
+
+def clean_look_pref(v):
+    """2.143.0 D (#2155): the appearance json {key: short text | number | bool} -> stored json; unknown keys are dropped,
+    a wrong value is BadInput; '' / null = never saved."""
+    bad = BadInput(tr("Invalid value: {0}", "look"))
+    if v in (None, ""):
+        return ""
+    try:
+        o = json.loads(v) if isinstance(v, str) else v
+    except ValueError:
+        raise bad from None
+    if not isinstance(o, dict) or len(json.dumps(o)) > 2000:
+        raise bad
+    out = {}
+    for k, x in o.items():
+        if k not in LOOK_KEYS:
+            continue
+        if isinstance(x, bool) or (isinstance(x, str) and len(x) <= 40 and x.isprintable()):
+            out[k] = x
+        elif isinstance(x, (int, float)) and abs(x) < 10 ** 6:
+            out[k] = x
+        else:
+            raise bad
+    return json.dumps(out, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
 
 @app.patch("/api/settings")

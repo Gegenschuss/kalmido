@@ -675,7 +675,7 @@ def ofa_agent_get(aid):
     c, uid = _person()
     a, oid = _agent_area(c, aid)
     role = office_role(c, uid, oid) if oid else None
-    if not role:
+    if not role or role == "guest":  # 2.143.0 A (#2151, review): guests have no office
         raise Denied(404)
     return jsonify(office_drafts=bool(a["office_drafts"]), can_set=role == "admin", agents_read=bool(office_settings(c, oid).get("agents_read")),
                    personal=pb_owner(c, oid) is not None, area_id=oid)
