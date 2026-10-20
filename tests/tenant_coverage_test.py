@@ -1036,6 +1036,9 @@ ROUTES = {
     # 2.148.0 C (#2472): the procedure documentation of the office area one works in, admins save versions (p2148_c_api_test.py)
     "GET /api/office/procdoc": "office", "PUT /api/office/procdoc": "office", "GET /api/office/procdoc/versions": "office",
     "GET /api/office/procdoc.md": "office", "GET /api/office/procdoc.pdf": "office",
+    # 2.148.0 A (#2471): locked periods + the export for the tax auditor; B (#2470): DATEV batch with receipt images (p2148_a_api_test.py / p2148_b_api_test.py)
+    "GET /api/office/periods": "office", "POST /api/office/periods/lock": "office", "GET /api/office/gobd/export": "office",
+    "GET /api/office/datev/zip": "office",
 }
 
 # ---- 1. every route is classified, nothing stale
