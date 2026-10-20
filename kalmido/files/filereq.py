@@ -39,7 +39,6 @@ from ..core.db import body, bump, db, err, iso, now_utc, write_lock
 from ..core.access import acx_anon_bind, Denied
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
-from ..api.v1 import hit_limit
 from ..lists.public import BOT_ERROR, PUB_CSP, pub_html, public_links_on
 from .store import fs_chain, fs_deleted, fs_role, fs_put, safe_fs_name, _free_name, _now, _place
 
@@ -439,6 +438,7 @@ def _page(c, r, token, lg, error="", name=""):
 @app.get("/u/<token>")
 def frq_page(token):
     c = db()
+    from ..api.v1 import hit_limit  # 2.124.1: inside (layers: files is a domain module)
     if hit_limit("frqv:" + rate_ip(), FRQ_VIEW_RATE):
         return _msg(tr("Too many requests"), tr("Please wait a minute and try again."), _accept_lang(), 429)
     r = frq_find(c, token)
@@ -489,6 +489,7 @@ def frq_send(token):
     With the header X-Kalmido-Upload: 1 the answer is JSON ({ok, n} or {error}), else a page."""
     from .upsafe import H6D_SLACK, UploadRefused, h6d_read
     from ..admin.hosting import QuotaExceeded
+    from ..api.v1 import hit_limit  # 2.124.1: inside (layers)
     if hit_limit("frqs:" + rate_ip(), FRQ_SEND_RATE):  # review: before the token lookup (no unbounded database work per request)
         lg0 = _accept_lang()
         return _msg(tr("Too many requests", lg=lg0), tr("Please wait a minute and try again.", lg=lg0), lg0, 429)

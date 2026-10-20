@@ -7,6 +7,18 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.124.2] - 2026-10-20
+
+### Fixed
+- CI of 2.122-2.124: new client files are type-checked, file requests import the API helpers inside their routes, the
+  start budget is raised on purpose, the lazy lists keep polls / formq last, German cash flow texts no longer use the old
+  name of the basket, a sheet tab ignores drops without data (#2341 #2116).
+
+## [2.124.1] - 2026-10-20
+
+### Fixed
+- Office: a tap on a view that is still reloading after a save (e.g. "Add receipt", a pipeline card) is no longer lost; it is carried out as soon as the new content is there (#2327).
+
 ## [2.124.0] - 2026-10-20
 
 Tables: more functions, new column kinds, rows and columns kept in view, print, history, sharing, charts and several

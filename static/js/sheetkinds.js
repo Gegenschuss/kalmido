@@ -1,3 +1,4 @@
+// @ts-check
 /* Kalmido web client: tables, 2.124.0 B (#2110, #2111, #2112) -- more column kinds, rows / columns kept in view, print and
    the history of the cells. Loaded with sheets.js (lazyload.js, module "sheets"); hooks into sheets.js through shk_td (a cell's
    content), shk_edit (Enter / a second tap on a cell), shk_after (after each redraw) and SHV_HOOKS (menus, panel).
@@ -73,6 +74,7 @@ async function shk_personMenu(r, c) {
 }
 function shk_fileMenu(r, c) {
   const sh = SHV.sh, col = sh._col.get(c), cell = shvCell(r, c), fid = shk_fileId(cell), addr = shvAddr(r, c);
+  /** @type {any[]} */
   const items = [{label: fid ? tr('Replace file…') : tr('Upload file…'), icon: 'upload', fn: () => shk_pick(r, c)}];
   if (fid) items.push({label: tr('Open'), icon: 'file', fn: () => window.open(shk_fileUrl(sh.id, fid), '_blank', 'noopener')},
     {label: tr('Download'), icon: 'download', fn: () => { location.href = shk_fileUrl(sh.id, fid, true); }},
@@ -97,7 +99,7 @@ async function shk_upload(r, c, f) {
 }
 // a tap / click on a checkbox ticks it at once (window capture: before the grid's own tap handling)
 window.addEventListener('click', e => {
-  const b = e.target.closest?.('#shv-scroll [data-shkbox]'); if (!b) return;
+  const b = /** @type {any} */ (e.target).closest?.('#shv-scroll [data-shkbox]'); if (!b) return;
   const td = b.closest('td.shvc[data-r]'), sh = SHV.sh; if (!td || !sh) return;
   e.preventDefault(); e.stopPropagation();
   const r = +td.dataset.r, c = +td.dataset.c;
@@ -105,9 +107,9 @@ window.addEventListener('click', e => {
   if (sh.can_write) shk_toggle(r, c); else roToast();
 }, true);
 // a file dropped on a file cell goes into it (computer)
-document.addEventListener('dragover', e => { const td = e.target.closest?.('#shv-scroll td.shvc.k-file'); if (td && SHV.sh?.can_write && e.dataTransfer?.types?.includes('Files')) e.preventDefault(); });
+document.addEventListener('dragover', e => { const td = /** @type {any} */ (e.target).closest?.('#shv-scroll td.shvc.k-file'); if (td && SHV.sh?.can_write && e.dataTransfer?.types?.includes('Files')) e.preventDefault(); });
 document.addEventListener('drop', e => {
-  const td = e.target.closest?.('#shv-scroll td.shvc.k-file'); if (!td || !SHV.sh?.can_write) return;
+  const td = /** @type {any} */ (e.target).closest?.('#shv-scroll td.shvc.k-file'); if (!td || !SHV.sh?.can_write) return;
   const f = e.dataTransfer?.files?.[0]; if (!f) return;
   e.preventDefault(); shk_upload(+td.dataset.r, +td.dataset.c, f);
 });
@@ -180,19 +182,20 @@ async function shh_open(cell) {
   let j; try { j = await rawFetch('GET', url); } catch (e) { toast(e.message); return; }
   const es = j.entries || [];
   const val = v => v === '' || v == null ? `<span class="muted">${tr('(empty)')}</span>` : `<span class="shhv">${esc(v)}</span>`;
+  /** @type {any} */
   const md = modal(`<h3>${cell ? esc(tr('History of cell {0}', cell.addr || '')) : tr('Recent changes')}</h3>
     ${es.length ? `<ul class="shhlist">${es.map(x => `<li><div class="shhwho">${x.agent ? ic('bot', 's') : av(x.user_id, x.user_name, 'avatar shkav')}<b>${esc(x.user_name || '')}</b><span class="muted">${esc(relTime(x.at))}</span>${!cell && x.addr ? `<button type="button" class="linkbtn" data-shh-go="${x.row_id}:${x.col_id}">${esc(x.addr)}${x.col_title ? ' · ' + esc(x.col_title) : ''}</button>` : !cell ? `<span class="muted">${tr('Cell removed')}</span>` : ''}</div>
       <div class="shhchg">${val(x.old)}<span class="shharr" aria-label="${esc(tr('becomes'))}">→</span>${val(x.new)}</div></li>`).join('')}</ul>` : `<p class="muted mhint">${tr('No changes recorded yet.')}</p>`}
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('shhmd');
   md.addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
+    const b = /** @type {any} */ (e.target).closest('button'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     if (b.dataset.shhGo) { const [r, c] = b.dataset.shhGo.split(':').map(Number); md.remove(); if (SHV.sh?._col.has(c) && SHV.sh._rowNo.has(r)) { shvSelect(r, c); $('#shv-scroll')?.focus({preventScroll: true}); } }
   });
 }
 document.addEventListener('click', e => {
-  const b = e.target.closest?.('[data-shh]'); if (!b || !SHV.sh) return;
+  const b = /** @type {any} */ (e.target).closest?.('[data-shh]'); if (!b || !SHV.sh) return;
   e.preventDefault();
   if (b.dataset.shh === 'cell') { const c = SHV.cur && shvCell(SHV.cur.r, SHV.cur.c); if (c) shh_open(c); } else shh_open(null);
 });
@@ -202,4 +205,4 @@ document.addEventListener('click', e => {
 });
 SHV_HOOKS.menu.push(sh => [{label: tr('Recent changes'), icon: 'clock', fn: () => shh_open(null)}, {label: tr('Print / PDF…'), icon: 'printer', fn: shk_print},
   ...(sh.can_write && (sh.freeze_rows || sh.freeze_cols) ? [{label: tr('Release the kept rows and columns'), icon: 'pin', fn: () => shk_fixSet({rows: 0, cols: 0}, tr('Rows and columns released'))}] : [])]);
-window.addEventListener('dblclick', e => { if (e.target.closest?.('#shv-scroll [data-shkbox]')) e.stopPropagation(); }, true);  // two clicks on a box = two ticks, no third
+window.addEventListener('dblclick', e => { if (/** @type {any} */ (e.target).closest?.('#shv-scroll [data-shkbox]')) e.stopPropagation(); }, true);  // two clicks on a box = two ticks, no third

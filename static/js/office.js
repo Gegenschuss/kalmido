@@ -58,19 +58,30 @@ function ofcDraw() { if (S.route.mod !== 'office') return; const el = $('#view')
 // 2.122.2 (#2327): a reload of the same office view (save, archive switch, year) keeps the old content until the new data
 // is there -- no short "Loading…" page that made the browser lose the scroll position -- and the scroll position stays.
 // A view that is still loading after 4 s is drawn anyway (a part that never loads must not freeze the old page).
-const OFCP = {key: null, t: 0};
+// A tap on the old content while it waits (its data is already gone) is held and repeated on the same button of the new
+// content (2.122.2 CI: "Add receipt" / a pipeline card did nothing right after a save).
+const OFCP = {key: null, t: 0, stale: false, replay: null};
 function ofcPaint(el, force) {
   const key = [OFC.info?.org_id ?? '-', S.route.tab || '', S.route.id || ''].join('|');
   const html = mg_wrap('office', viewOffice()), same = OFCP.key === key && !!el.querySelector('.dash.office .ofcbody');
   const wait = `<p class="muted lempty">${tr('Loading…')}</p>`;
   if (!force && same && html.includes(wait) && ![...el.querySelectorAll('.dash.office .ofcbody p.lempty')].some(p => p.textContent === tr('Loading…'))) {
     if (!OFCP.t) OFCP.t = setTimeout(() => { OFCP.t = 0; if (S.route.mod === 'office') { const v = $('#view'); if (v) keepFocus(v, () => ofcPaint(v, true)); } }, 4000);
-    return;
+    OFCP.stale = true; return;
   }
-  clearTimeout(OFCP.t); OFCP.t = 0;
+  clearTimeout(OFCP.t); OFCP.t = 0; OFCP.stale = false;
   const top = el.scrollTop; setHtml(el, html); OFCP.key = key;
   if (same && el.scrollTop !== top) el.scrollTop = top;
+  const r = OFCP.replay; OFCP.replay = null;
+  if (r && same) { const b = el.querySelector(r); if (b) setTimeout(() => b.click(), 0); }
 }
+document.addEventListener('click', e => {
+  const v = $('#view'); if (!OFCP.stale || !v || !v.contains(e.target) || !v.querySelector('.dash.office')) return;
+  let b = e.target; while (b && b !== v && ![...b.attributes].some(a => a.name.startsWith('data-'))) b = b.parentElement;
+  if (!b || b === v) return;
+  const sel = b.tagName.toLowerCase() + [...b.attributes].filter(a => a.name.startsWith('data-')).map(a => `[${a.name}="${CSS.escape(a.value)}"]`).join('');
+  e.preventDefault(); e.stopPropagation(); OFCP.replay = sel;
+}, true);
 const ofcReload = kind => { if (kind) delete OFC.data[kind]; else OFC.data = {}; if (S.route.mod === 'office') ofcDraw(); };
 const ofcRows = kind => Array.isArray(OFC.data[kind]) ? OFC.data[kind] : [];
 const ofcRow = (kind, id) => ofcRows(kind).find(r => r.id === id);

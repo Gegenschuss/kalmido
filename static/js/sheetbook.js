@@ -101,7 +101,7 @@ document.addEventListener('dragover', e => {
 });
 document.addEventListener('drop', e => {
   const a = /** @type {any} */ (e.target).closest?.('[data-shb="tab"]'), sh = SHV.sh;
-  const tid = +(e.dataTransfer?.getData('text/x-kalmido-sheet') || 0);
+  const dt = e.dataTransfer, tid = typeof dt?.getData === 'function' ? +(dt.getData('text/x-kalmido-sheet') || 0) : 0;  // 2.124.2: synthetic drops have no getData
   if (!a || !sh || !tid) return;
   e.preventDefault();
   shbMove(sh, tid, shbTabs().findIndex(t => t.id === +a.dataset.id));

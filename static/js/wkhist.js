@@ -1,3 +1,4 @@
+// @ts-check
 /* Kalmido web client: 2.123.0 A (#2102, #2106) -- the history of a knowledge page and the text search of the page list.
    History: "History" in the page's "…" menu lists the saved states (date, person; saves of one person within ten minutes
    are one state), a state opens with a line comparison to the current text, "Restore" makes its text the current one
@@ -40,6 +41,7 @@ function wkh_diffHtml(a, b) {
 const wkh_items = p => S.me?.kind === 'agent' ? [] : [{label: tr('History'), icon: 'clock', fn: () => wkh_dlg(p)}];
 async function wkh_dlg(p) {
   await wk_flush();
+  /** @type {any} */
   const md = modal(`<h3>${esc(tr('History'))} · ${esc(wk_base(p.path))}</h3><div class="wkhbody" id="wkh-b"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-wkh="close">${esc(tr('Close'))}</button></div>`);
   md.classList.add('wkhdlg');
@@ -55,7 +57,7 @@ async function wkh_dlg(p) {
     vs = j.versions || []; list();
   } catch (e) { box.innerHTML = `<div class="muted mhint">${esc(e.message)}</div>`; return; }
   md.addEventListener('click', async e => {
-    const a = e.target.closest('[data-wkh]'); if (!a) return;
+    const a = /** @type {any} */ (e.target).closest('[data-wkh]'); if (!a) return;
     const k = a.dataset.wkh;
     if (k === 'close') modalClose(md);
     else if (k === 'list') list();
@@ -109,6 +111,6 @@ async function wks_load(more) {
   if (el.innerHTML) el.parentElement?.querySelector(':scope > .empty')?.remove();  // "No page matches." only when the text has none either
 }
 document.addEventListener('click', e => {
-  const a = e.target.closest?.('[data-wks="more"]'); if (!a || !$('#view')?.contains(a)) return;
+  const a = /** @type {any} */ (e.target).closest?.('[data-wks="more"]'); if (!a || !$('#view')?.contains(a)) return;
   a.disabled = true; wks_load(true);
 });

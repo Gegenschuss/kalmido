@@ -1,3 +1,4 @@
+// @ts-check
 /* Kalmido web client: 2.123.0 C (#2103, #2107, #2108) -- files of the file store, tables and tasks in knowledge pages (wiki.js).
    - In the editor: "Insert picture or file" uploads to the page (also pasting / dropping files into the text) or picks a
      file of the file store of the SAME space: ![name](/api/files/nodes/<id>/content) / [name](…) -- a reference, no copy.
@@ -97,6 +98,7 @@ async function wem_cbDlg(p, ks) {
   if (!pick.length) return;
   const ls = wem_lists(), lock = wk_e2e(p.space);
   const lockHint = lid => lock && !listById(lid)?.e2e;
+  /** @type {any} */
   const md = modal(`<h3>${ic('check', 's')} ${esc(tr('Create tasks'))}</h3>
     ${pick.length > 1 ? `<ul class="wemcbl">${pick.map((L, i) => `<li><label><input type="checkbox" data-wemi="${i}" checked> <span>${esc(L.text)}</span></label></li>`).join('')}</ul>` : `<p class="wemcb1">${esc(pick[0].text)}</p>`}
     <div class="row"><label for="wem-list">${esc(tr('List'))}</label><select id="wem-list">${ls.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select></div>
@@ -107,7 +109,7 @@ async function wem_cbDlg(p, ks) {
   const sel = $('#wem-list', md);
   sel.addEventListener('change', () => { $('.wemlock', md).hidden = !lockHint(+sel.value); });
   md.addEventListener('click', async e => {
-    const b = e.target.closest('button[data-m]'); if (!b) return;
+    const b = /** @type {any} */ (e.target).closest('button[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { modalClose(md); return; }
     const use = pick.length > 1 ? pick.filter((_, i) => $(`[data-wemi="${i}"]`, md)?.checked) : pick;
     if (!use.length) return;
@@ -184,6 +186,7 @@ const wem_md = n => `${(n.mime || '').startsWith('image/') ? '!' : ''}[${String(
 // the file store of the page's space: browse folders or search, a click inserts the reference
 function wem_pick(p, at) {
   const st = {parent: null, q: '', n: 0};
+  /** @type {any} */
   const md = modal(`<div class="lhdr"><h3>${ic('folder', 's')} ${esc(tr('From the file store'))}</h3><span class="spacer"></span><button type="button" class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x')}</button></div>
     <div class="ssearch">${ic('search', 's')}<input id="wem-q" type="search" placeholder="${esc(tr('Find a file'))}" aria-label="${esc(tr('Find a file'))}" autocomplete="off"></div>
     <nav class="wemcrumbs" id="wem-crumbs" aria-label="${esc(tr('Path'))}"></nav>
@@ -206,9 +209,9 @@ function wem_pick(p, at) {
   let qt = 0;
   $('#wem-q', md).addEventListener('input', e => { clearTimeout(qt); qt = setTimeout(() => { st.q = e.target.value.trim(); load(); }, 250); });
   md.addEventListener('click', e => {
-    if (e.target.closest('[data-m="close"]')) { modalClose(md); return; }
-    const c = e.target.closest('[data-wemc]'); if (c) { st.parent = +c.dataset.wemc || null; load(); return; }
-    const b = e.target.closest('[data-wemn]'); if (!b) return;
+    if (/** @type {any} */ (e.target).closest('[data-m="close"]')) { modalClose(md); return; }
+    const c = /** @type {any} */ (e.target).closest('[data-wemc]'); if (c) { st.parent = +c.dataset.wemc || null; load(); return; }
+    const b = /** @type {any} */ (e.target).closest('[data-wemn]'); if (!b) return;
     const x = (list._its || []).find(i => i.id === +b.dataset.wemn); if (!x) return;
     if (x.kind === 'folder') { st.parent = x.id; load(); return; }
     modalClose(md);
@@ -254,7 +257,7 @@ function wem_ac(ta, box, q, from) {
 }
 // ---- events (own listeners: data-wem)
 document.addEventListener('click', e => {
-  const a = e.target.closest?.('[data-wem]'); if (!a || !$('#view')?.contains(a)) return;
+  const a = /** @type {any} */ (e.target).closest?.('[data-wem]'); if (!a || !$('#view')?.contains(a)) return;
   const p = WK.pg; if (!p) return;
   const k = a.dataset.wem;
   if (k === 'ins') wem_insMenu(a, p);
@@ -262,13 +265,13 @@ document.addEventListener('click', e => {
   else if (k === 'cbs') wem_cbDlg(p, wem_cbLines(p.body).map((_, i) => i));
 });
 document.addEventListener('paste', e => {
-  if (e.target.id !== 'wk-body') return;
+  if (/** @type {any} */ (e.target).id !== 'wk-body') return;
   const fs = [...(e.clipboardData?.files || [])]; if (!fs.length) return;
   e.preventDefault(); wem_upload(WK.pg, fs);
 });
-document.addEventListener('dragover', e => { if (e.target.id === 'wk-body' && [...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+document.addEventListener('dragover', e => { if (/** @type {any} */ (e.target).id === 'wk-body' && [...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
 document.addEventListener('drop', e => {
-  if (e.target.id !== 'wk-body') return;
+  if (/** @type {any} */ (e.target).id !== 'wk-body') return;
   const fs = [...(e.dataTransfer?.files || [])]; if (!fs.length) return;
   e.preventDefault(); wem_upload(WK.pg, fs);
 });
