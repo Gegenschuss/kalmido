@@ -30,8 +30,8 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files,reading,sheets';
   for (const [u, ck] of [['alice', CA], ['frida', CF]]) {
     const s = await call(ck, 'POST', '/api/sheets', {title: 'Small table', space: 'private'});
     const b1 = await call(ck, 'POST', '/api/bookmarks', {url: 'https://example.com/one', title: 'One', tags: ['recipes', 'travel']});
-    data[u] = {sheet: s.id, bm: b1.id};
-    check(s.id && b1.id, `${u}: a table and a bookmark ${s.http} ${b1.http}`);
+    data[u] = {sheet: s.id, bm: b1.bookmark?.id};
+    check(s.id && b1.bookmark?.id, `${u}: a table and a bookmark ${s.http} ${b1.http}`);
   }
 
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
