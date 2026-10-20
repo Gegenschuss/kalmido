@@ -7,6 +7,34 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.140.0] - 2026-10-20
+
+Private space: shopping, recipes, journal, budget, habits, devices and birthdays.
+
+### Added
+- Shopping lists: quantity, unit and price per item (shown in the task row and large in the shopping mode, with the
+  sums "still to buy" and "in the cart"); a clear leading quantity like "500 g flour" moves into the quantity field; the
+  shopping mode works offline - ticks and new items wait in the outbox and go out when the connection is back (#2131).
+- Recipes as their own list kind: servings, ingredients with a selection and scaling onto a shopping list (the same
+  open item gets the quantity added instead of a duplicate), a recipe on any day of the meal plan; the meal plan pages
+  through any week and date; API `GET /api/family?days=` up to 62 days, `to-shopping` with `servings` / `preview` (#2132).
+- Journal: a history tab with search, mood filter, Markdown / CSV export and mood statistics over 30 / 90 / 365 days;
+  older days can be edited (#2133).
+- Budget: month comparison per category over 3, 6 or 12 months (actual, plan, difference to the previous month and the
+  average); budget and office bank import read statements with one shared module - CAMT now also in the budget, common
+  bank formats are recognised (#2134).
+- Habits: up to six reminder times per habit (the old single time stays the first) and a clear "3 of 5 this week"
+  progress bar on the phone; API v1 habits carry `remind_times` (#2135).
+- A private device can be taken into the office equipment and back, linked on both sides (jump, update fields,
+  unlink); a link to an office you can no longer reach shows a note instead of an error (#2136).
+- Birthdays from address books: per address book you can switch on that a date or year changed in Kalmido is written
+  back to the contact (CardDAV, If-Match); only that date changes, the rest of the vCard stays byte for byte; changes in
+  the address book meanwhile are never overwritten; read-only books and mirrors show a note instead of the switch (#2137).
+
+### Changed
+- Database: new columns `habits.remind_times`, `habits.reminded_hm`, `contact_srcs.writeback` / `wb_ro` / `wb_books` /
+  `wb_err`, `contact_links.want` and the table `life_device_links` (all additive, 2.139 runs on with them).
+
 ## [2.138.1] - 2026-10-20
 
 Six releases that were built on 19.10. but never reached main (2.111-2.116 under their old numbers), brought onto

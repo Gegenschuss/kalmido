@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.140.0** (2026-10-20): private space - shopping items with quantity and price and an offline shopping mode,
+  recipes onto the shopping list and the meal plan beyond one week, journal history with search, export and mood
+  statistics, budget month comparison and one bank statement reader with the office, several reminder times per habit,
+  devices linked with the office equipment, birthdays written back to the address book.
 - **2.138.1** (2026-10-20): six releases from 19.10. brought onto today's code - office undo, invitation mails
   and calendar subscription links, quick add with @person and reminders at a time; file store ZIP, phone scan and
   external links; office settings in areas, quotation parts in colour, terms as PDF; team chat files, channels and
