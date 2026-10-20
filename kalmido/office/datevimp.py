@@ -449,7 +449,7 @@ def _apply21(c, oid, rid, plan, ts):
     replaced = []
     for y, a in keys:
         for r in c.execute("SELECT * FROM office_opening_balances WHERE org_id=? AND year=? AND account=?", (oid, y, a)).fetchall():
-            replaced.append({"year": r["year"], "account": r["account"], "label": r["label"], "amount": format(Decimal(str(r["amount"])), "f"),
+            replaced.append({"year": r["year"], "account": r["account"], "label": r["label"], "amount": _cents(r["amount"]),
                              "side": r["side"], "import_run_id": r["import_run_id"], "created_at": r["created_at"]})
         c.execute("DELETE FROM office_opening_balances WHERE org_id=? AND year=? AND account=?", (oid, y, a))
     for x in plan:
@@ -459,14 +459,18 @@ def _apply21(c, oid, rid, plan, ts):
     return {"replaced": replaced}
 
 
+def _cents(v):
+    return format(Decimal(str(v or 0)).quantize(Decimal("0.01")), "f")
+
+
 def di_opening(c, oid, year):
     """The opening balances of office area oid in year: [{id, account, label, amount, side}] + debit / credit sums."""
     rows = c.execute("SELECT * FROM office_opening_balances WHERE org_id=? AND year=? ORDER BY account, id", (oid, year)).fetchall()
-    out = [{"id": r["id"], "account": r["account"], "label": r["label"], "amount": format(Decimal(str(r["amount"])), "f"), "side": r["side"]}
+    out = [{"id": r["id"], "account": r["account"], "label": r["label"], "amount": _cents(r["amount"]), "side": r["side"]}
            for r in rows]
     s = sum((Decimal(x["amount"]) for x in out if x["side"] == "S"), Decimal(0))
     h = sum((Decimal(x["amount"]) for x in out if x["side"] == "H"), Decimal(0))
-    return out, format(s, "f"), format(h, "f")
+    return out, _cents(s), _cents(h)
 
 
 # ---------------------------------------------------------------- check, import, undo
