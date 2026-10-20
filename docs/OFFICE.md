@@ -605,6 +605,16 @@ Amounts and notes are encrypted at rest; the same for organisations and for free
 `PUT /api/office/cashflow/actual` (`{month, amount}`; null removes it). The cash flow answer adds `start`, `adjust` and per
 month `account`, `manual {in, out}`, `real`, `diff` - only when they are set.
 
+**Balance according to the bank** (2.124): the balances of the imported bank statements (tab **Bank**) appear in the cash
+flow as "Account balance according to the bank on DD.MM.YYYY", marked "from the bank reconciliation", with the
+**difference to the computed balance** (the running balance above at the end of that day; only with a starting balance).
+Several accounts are added up (per account its newest closing balance; the date is the oldest of them); each month card
+shows the balance of the statements inside it. Without a starting balance **Use as starting balance** takes it over; per
+month **Use as real balance** fills the real balance of that month - both go through the routes above and are one undo
+step. A starting balance or a real balance entered by hand always wins; the bank only suggests. Without balances the
+cash flow looks exactly as before. The cash flow answer adds `bank {day, amount, accounts[], computed?, diff?,
+suggest_start}` and per month `bank {day, amount, computed?, diff?}` - only when an active import has balances.
+
 Routes (office admins, people only; agents get 403): `GET /api/office/cashflow?from=YYYY-MM&months=1..12&basis=gross|net`,
 `GET/POST /api/office/fixed-costs`, `PATCH/DELETE /api/office/fixed-costs/<id>` (`category`, `vat_rate` 0/7/19; the answer
 adds `gross`), `POST /api/office/fixed-costs/import/preview` (multipart `file`), `POST /api/office/fixed-costs/import`
@@ -658,12 +668,19 @@ invoices and receipts. Kalmido has no bank access: you import the file you downl
   undo those matches first); its undo brings them back.
 - Amounts, counterparts, purposes and IBANs are encrypted at rest when the encryption of the organisation is on. The
   DATEV export is unchanged. Agents have no access to the bank reconciliation.
+- **Balances** (2.124): a CAMT file brings the opening balance (OPBD / PRCD) and the closing balance (CLBD, else CLAV) of
+  each account (its IBAN) with their day; balances in another currency than the office are left out. A CSV can name an
+  optional **balance** column (guessed from "Saldo" / "Kontostand" / "Balance"): the balance of the chronologically last
+  booking counts (on the newest day the last row, or the first one when the file runs newest first, as most banks
+  export). The account is the IBAN of an optional own-account column (e.g. "Auftragskonto") or the name typed in the
+  dialog (default "Main account"). The preview names the balances; they count in the cash flow while the import is not
+  taken back. Amount and account are encrypted at rest.
 
 Routes (office admins only; members 403, other areas 404, agents 403): `POST /api/office/bank/import/preview`,
 `POST /api/office/bank/import`, `GET /api/office/bank/imports`, `POST /api/office/bank/imports/<id>/undo|restore`,
 `GET /api/office/bank/tx?state=open|matched|all&from&to`, `GET /api/office/bank/tx/<id>/candidates?q=`,
 `POST /api/office/bank/tx/<id>/match` `{kind: invoice|receipt|private|ignored, id?}`, `POST /api/office/bank/tx/<id>/unmatch`.
-Tables `office_bank_imports`, `office_bank_tx` (see Database).
+Tables `office_bank_imports`, `office_bank_tx`, `office_bank_balances` (2.124, see Database).
 
 ## Tax dates as tasks (2.90)
 
@@ -1487,6 +1504,8 @@ Since 2.50.0 also `office_deals` (the sales pipeline; under row-level security, 
 Since 2.90.0 also `office_bank_imports` and `office_bank_tx` (the bank reconciliation; under row-level security,
 `amount`, `counterpart`, `purpose` and `iban` encrypted at rest, `deleted_at` = taken back and restorable) and the nullable
 columns `vat_pct` and `paid_at` of `rc_receipts` (VAT rate and payment day of a receipt); 2.87.0 runs on with them.
+Since 2.124.0 also `office_bank_balances` (the balances of an imported statement per import: account, day, amount, kind
+open | close; under row-level security, `amount` and `account` encrypted at rest); 2.123 runs on with it.
 Since 2.93.0 also `office_doc_templates` and `office_gen_docs` (document templates and the documents made from them; the
 texts encrypted at rest, archived = removed and restorable), the column `gen_doc_id` of `office_signoffs` (a signature
 link of such a document), and `office_vehicles`, `office_drives` and `office_drive_log` (the logbook; under row-level security, the
