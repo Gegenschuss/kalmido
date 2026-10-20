@@ -325,12 +325,18 @@ sk = socket.socket()
 sk.bind(("127.0.0.1", 0))
 port = sk.getsockname()[1]
 sk.close()
-hp = subprocess.Popen([sys.executable, MCP, "--http", "--port", str(port)], env={**ENV, "MCP_HTTP_TOKEN": "mcpsecret"},
+# 2.126.0 (#1979 G2): --http needs MCP_HTTP_TOKEN (16+ characters)
+nt = subprocess.run([sys.executable, MCP, "--http", "--port", str(port)], env={k: v for k, v in ENV.items() if k != "MCP_HTTP_TOKEN"},
+                    capture_output=True, text=True, timeout=20)
+check(nt.returncode == 2 and "MCP_HTTP_TOKEN" in nt.stderr, f"http: no MCP_HTTP_TOKEN -> does not start ({nt.returncode})")
+nt = subprocess.run([sys.executable, MCP, "--http", "--port", str(port)], env={**ENV, "MCP_HTTP_TOKEN": "short"}, capture_output=True, text=True, timeout=20)
+check(nt.returncode == 2, "http: a too short MCP_HTTP_TOKEN -> does not start")
+hp = subprocess.Popen([sys.executable, MCP, "--http", "--port", str(port)], env={**ENV, "MCP_HTTP_TOKEN": "mcpsecret-0123456789"},
                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 U = f"http://127.0.0.1:{port}/mcp"
 
 
-def post(obj, token="mcpsecret", origin=None, url=U):
+def post(obj, token="mcpsecret-0123456789", origin=None, url=U):
     h = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
     if token:
         h["Authorization"] = "Bearer " + token

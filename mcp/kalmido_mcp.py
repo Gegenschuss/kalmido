@@ -18,6 +18,7 @@ See mcp/README.md and docs/AGENTS.md.
 """
 import argparse
 import base64
+import hmac
 import json
 import os
 import sys
@@ -2144,7 +2145,8 @@ def make_http_handler(api, token):
             if origin and (urllib.parse.urlsplit(origin).hostname or "") not in LOCAL_ORIGINS:
                 self._send(403, {"error": "origin not allowed"})
                 return False
-            if token and self.headers.get("Authorization", "") != "Bearer " + token:
+            # 2.126.0 B (#1979 G2): the bearer token is required (never served without one)
+            if not token or not hmac.compare_digest(self.headers.get("Authorization", "").encode("utf-8", "replace"), ("Bearer " + token).encode()):
                 self._send(401, {"error": "unauthorized"}, {"WWW-Authenticate": "Bearer"})
                 return False
             return True
@@ -2181,6 +2183,9 @@ def main(argv=None):
     api = Kalmido(os.environ.get("KALMIDO_URL", ""), os.environ.get("KALMIDO_TOKEN", ""))
     if not api.base or not api.token:
         print("kalmido-mcp: KALMIDO_URL and KALMIDO_TOKEN must be set", file=sys.stderr)
+    if a.http and len(os.environ.get("MCP_HTTP_TOKEN", "")) < 16:  # 2.126.0 B (#1979 G2)
+        print("kalmido-mcp: --http needs MCP_HTTP_TOKEN (at least 16 characters, e.g. openssl rand -hex 24)", file=sys.stderr)
+        return 2
     if a.http:
         srv = ThreadingHTTPServer((a.host, a.port), make_http_handler(api, os.environ.get("MCP_HTTP_TOKEN", "")))
         print(f"kalmido-mcp: listening on http://{a.host}:{srv.server_port}/mcp", file=sys.stderr, flush=True)
@@ -2193,4 +2198,4 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
