@@ -3,11 +3,14 @@ only the server's log shows (whoever reaches a fresh server first no longer beco
 serving process at start (app.py) or on the first request that needs it, kept only as a SHA-256 hash in memory, compared
 in constant time and dropped once the first account exists. Wrong codes count against a rate limit per address like
 logins. A restart prints a new code. KALMIDO_SETUP_CODE=<code> sets a fixed code, KALMIDO_SETUP_CODE=off turns the check
-off (only for tests and automation that create the first account themselves)."""
+off (only for tests and automation that create the first account themselves).
+2.144.0 D2 (#797): a code the hosting operator asks for (admin/operator.py) is kept as a hash with an end (24 h) in the
+database (settings), so every web process of the instance knows it; it is deleted with the first account."""
 import hmac
 import os
 import secrets
 import threading
+import time
 
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip
 
@@ -23,9 +26,29 @@ def sh_code_required():
     return not SH_CODE_OFF
 
 
+SH_OP_TTL = 24 * 3600  # 2.144.0 D2 (#797): lifetime of an operator's code
+SH_OP_HASH, SH_OP_UNTIL = "setup_code_op_hash", "setup_code_op_until"  # settings keys
+
+
+def _sh_make():
+    return "-".join("".join(secrets.choice(SH_CODE_ALPHABET) for _ in range(4)) for _ in range(3))
+
+
+def sh_code_op_new(c):
+    """2.144.0 D2 (#797): the operator's code -- hash + end in the database (the caller commits), not printed; it
+    replaces this process's start code (other processes keep theirs, as before)."""
+    from ..core.db import gset
+    code = _sh_make()
+    gset(c, SH_OP_HASH, _token_hash(code.replace("-", "")))
+    gset(c, SH_OP_UNTIL, str(int(time.time()) + SH_OP_TTL))
+    with _SH_LOCK:
+        _SH["hash"] = ""
+    return code
+
+
 def sh_code_new():
     """A fresh code (3 x 4 characters, ~59 bits); printed to the log, only its hash is kept."""
-    code = "-".join("".join(secrets.choice(SH_CODE_ALPHABET) for _ in range(4)) for _ in range(3))
+    code = _sh_make()
     with _SH_LOCK:
         _SH["hash"] = _token_hash(code.replace("-", ""))
     bar = "=" * 64
@@ -70,11 +93,28 @@ def sh_code_check(c, code):
     keys = [("setupcode:ip:" + rate_ip(), SH_CODE_RATE)]
     if _rate_blocked(keys):
         return tr("Too many failed attempts, please wait a few minutes"), 429
-    sh_code_ensure(c)
-    want = _token_hash(sh_norm(SH_CODE_ENV)) if SH_CODE_ENV else _SH["hash"]
+    from ..core.db import gsetting
     code = sh_norm(code) if isinstance(code, str) else ""
     got = _token_hash(code) if code else ""
-    if not got or not want or not hmac.compare_digest(got, want):
+    if SH_CODE_ENV:  # a fixed code: unchanged, the operator's code does not apply
+        wants = [_token_hash(sh_norm(SH_CODE_ENV))]
+        op_hash = ""
+    else:
+        op_hash = gsetting(c, SH_OP_HASH)  # 2.144.0 D2 (#797): the operator's code, valid in every process
+        if not op_hash:
+            sh_code_ensure(c)
+        wants = [_SH["hash"], op_hash]
+    if got and op_hash and hmac.compare_digest(got, op_hash):
+        try:
+            until = int(gsetting(c, SH_OP_UNTIL) or 0)
+        except ValueError:
+            until = 0
+        if until < time.time():
+            print("first setup: an expired operator setup code from", client_ip(), flush=True)
+            return tr("This setup code has expired. Ask your hoster for a new one."), 403
+        c.execute("DELETE FROM settings WHERE key IN (?,?)", (SH_OP_HASH, SH_OP_UNTIL))  # used once: goes with the commit
+        return None
+    if not got or not any(w and hmac.compare_digest(got, w) for w in wants):
         _rate_fail(keys)
         print("first setup: wrong or missing setup code from", client_ip(), flush=True)
         return tr("Wrong setup code. It is in the server log (docker compose logs kalmido)."), 403

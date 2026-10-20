@@ -45,6 +45,11 @@ def _op_load():
     except OSError as e:
         print("operator interface off: the token file cannot be read (", type(e).__name__, ")", flush=True)
         return ""
+    try:  # 2.144.0 D2 (#797): only a warning -- container mounts often carry a foreign owner / mode
+        if os.stat(path).st_mode & 0o077:
+            print("operator interface: warning, the token file is readable by others (chmod 600 recommended)", flush=True)
+    except OSError:
+        pass
     if not OP_TOKEN_MIN <= len(tok) <= OP_TOKEN_MAX or any(ch.isspace() for ch in tok):
         print(f"operator interface off: the token must be {OP_TOKEN_MIN}-{OP_TOKEN_MAX} characters without blanks", flush=True)
         return ""
@@ -73,16 +78,19 @@ def op_gate(action):
     if not OP_HASH:
         abort(404)  # exactly like a route that does not exist
     keys = [("operator:ip:" + rate_ip(), OP_RATE)]
-    if _rate_blocked(keys):
-        raise OpDenied(429)
     auth = request.headers.get("Authorization") or ""
     tok = auth[7:].strip() if auth[:7].lower() == "bearer " else ""
     got = hashlib.sha256(tok.encode()).hexdigest() if tok and len(tok) <= OP_TOKEN_MAX else ""
-    if not got or not hmac.compare_digest(got, OP_HASH):
+    ok = bool(got) and hmac.compare_digest(got, OP_HASH)
+    # 2.144.0 D2 (#797): the limit only turns WRONG tokens away; the right one always passes, so strangers sharing the
+    # address (NAT, a proxy not in KALMIDO_TRUSTED_PROXIES) cannot lock the console out
+    if not ok:
+        if _rate_blocked(keys):
+            raise OpDenied(429)
         _rate_fail(keys)
         print("operator: refused", action, "from", client_ip(), flush=True)
         raise OpDenied(401)
-    print("operator:", action, "from", client_ip(), flush=True)
+    print("operator:", action, "from", client_ip(), "(address over the failure limit)" if _rate_blocked(keys) else "", flush=True)
 
 
 def _count(c, sql, args=()):
@@ -153,17 +161,31 @@ def operator_setup_code():
     """A fresh one-time code for the first setup page (the customer creates the first admin with it). Only while the
     instance has no account at all; afterwards 409. Not possible with a fixed code or the check turned off (409)."""
     op_gate("setup-code")
-    from ..accounts.setupcode import SH_CODE_ENV, SH_CODE_OFF, sh_code_new
+    from ..accounts.setupcode import SH_CODE_ENV, SH_CODE_OFF, SH_OP_TTL, sh_code_op_new
     from ..core.pg import system_ctx
     c = db()
+    code = ""
     with system_ctx(c):
         exists = c.execute("SELECT 1 FROM users LIMIT 1").fetchone()
+        if not exists and not (SH_CODE_OFF or SH_CODE_ENV):
+            # 2.144.0 D2 (#797): hash + end (24 h) in the database, valid in every web process; replaces the
+            # previous operator code and this process's start code; valid once
+            code = sh_code_op_new(c)
+    if code:
+        c.commit()
     if exists:
         return jsonify(error=tr("Setup is already done"), code="setup_done"), 409
     if SH_CODE_OFF or SH_CODE_ENV:
         return jsonify(error=tr("The setup code is fixed on this server"), code="setup_code_fixed"), 409
-    code = sh_code_new()  # replaces the code printed at start; valid once
-    return jsonify(setup_code=code, url=PUBLIC_URL + "/")
+    return jsonify(setup_code=code, url=PUBLIC_URL + "/", valid_hours=SH_OP_TTL // 3600)
+
+
+def _notice_error(e):
+    """2.144.0 D2 (#797): only the known validation messages go back to the operator, never free text."""
+    from .hosting import ANN_TEXT_MAX
+    known = {tr("At most {0} characters", ANN_TEXT_MAX), tr("The end must be after the start")}
+    known |= {tr("Invalid value: {0}", k) for k in ("level", "starts_at", "ends_at", "minutes")}
+    return e if e in known else tr("Invalid value: {0}", "notice")
 
 
 @app.put("/api/operator/notice")
@@ -183,6 +205,6 @@ def operator_notice():
             bump(c)
     if e:
         c.rollback()
-        return jsonify(error=e), 400
+        return jsonify(error=_notice_error(e), code="invalid_notice"), 400
     c.commit()
     return jsonify(notice=_notice(c))
