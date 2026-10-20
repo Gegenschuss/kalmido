@@ -37,6 +37,7 @@ O = "/api/office"
 D = O + "/docs"
 CBS = O + "/cashbooks"
 CHK, MV = O + "/move/check", O + "/move/org"
+MAIN = ("office_docs", "office_doc_items", "office_payments", "office_cash_entries", "office_cash_closings")  # the log grows by reading
 KEEP = ("office_settings", "office_company", "office_cf_start", "office_cf_actual", "office_numbers")
 
 
@@ -101,8 +102,11 @@ def invoice(s, client, cost=None):
 
 
 def docs(s):
-    r = s.get(B + D)
-    return {x["id"]: x for x in (r.json().get("docs") or [])} if r.ok else {}
+    out = {}
+    for kind in ("offer", "invoice"):
+        r = s.get(B + D + f"?kind={kind}")
+        out.update({x["id"]: x for x in (r.json().get("docs") or [])} if r.ok else {})
+    return out
 
 
 def head_org(path):
@@ -159,6 +163,7 @@ NUM = Fr.get(B + f"{D}/{INV}").json()["number"]
 r = Fr.post(B + f"{D}/{INV}/payments", json={"date": "2026-03-10", "amount": "119.00"})
 check(r.status_code == 201, "personal office: the payment " + r.text[:200])
 BK = Fr.get(B + CBS).json()["books"][0]["id"]
+assert Fr.patch(B + f"{CBS}/{BK}", json={"opening": "100", "opening_day": "2026-01-01"}).ok
 r = Fr.post(B + f"{CBS}/{BK}/entries", json={"day": "2026-03-01", "dir": "in", "amount": "50", "text": "Barverkauf Messe", "vat_pct": "19"})
 check(r.status_code == 201, "personal office: a cash entry " + r.text[:200])
 CE = r.json()["id"]
@@ -201,7 +206,7 @@ check(Fi.post(B + MV, json={"org": DEL, "confirm": True}).status_code == 409, "a
 # ================================================================ a number the target uses already
 ws(Fr, f"org:{GAM}")
 company(Fr, "Gamma Studio")
-CLG = Fr.post(B + "/api/clients", json={"name": "Kunde Sued AG", "street": "Weg 2", "zip": "10000", "city": "Berlin", "country": "DE"}).json()["id"]
+CLG = Fr.post(B + "/api/clients", json={"org_id": GAM, "name": "Kunde Sued AG", "street": "Weg 2", "zip": "10000", "city": "Berlin", "country": "DE"}).json()["id"]
 INVG = invoice(Fr, CLG)
 NUMG = Fr.get(B + f"{D}/{INVG}").json()["number"]
 check(NUMG == NUM, f"setup: the same number in the organisation {NUMG} {NUM}")
@@ -210,7 +215,8 @@ j = Fr.get(B + CHK + f"?org={GAM}").json()
 check(j.get("ok") is False and NUM in (j.get("numbers") or []), f"preview: the number used in the target {j.get('numbers')}")
 r = Fr.post(B + MV, json={"org": GAM, "confirm": True})
 check(r.status_code == 409 and NUM in (r.json().get("numbers") or []), "a number conflict: 409 with the list " + r.text[:200])
-check(office_rows(PB) == BEFORE and INV in docs(Fr), "after the refusal nothing moved")
+now = office_rows(PB)
+check(all(now.get(t) == BEFORE.get(t) for t in MAIN) and INV in docs(Fr), f"after the refusal nothing moved {now}")
 
 # ================================================================ preview and transfer
 assert Fr.put(B + f"/api/orgs/{KAP}/members", json={"email": "bob@example.com", "role": "member"}).ok
@@ -224,7 +230,7 @@ r = Fr.post(B + MV, json={"org": KAP, "confirm": True})
 check(r.ok and r.json().get("org_id") == KAP, "the transfer " + r.text[:300])
 
 # the organisation's office (the app switched the workspace)
-check(Fr.get(B + "/api/settings").json().get("workspace") == f"org:{KAP}", "afterwards the organisation's workspace")
+check(Fr.get(B + O + "/settings").json().get("org_id") == KAP, "afterwards the organisation's office is shown")
 dk = docs(Fr)
 check(INV in dk and OFF in dk, f"the documents are in the organisation with their ids {sorted(dk)}")
 d = Fr.get(B + f"{D}/{INV}").json()
