@@ -20,7 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
-- **2.144.1** (2026-10-20): office fixes - the bank import takes several statements or a ZIP at once and says which
+- **2.144.1** (2026-10-21): office fixes - the bank import takes several statements or a ZIP at once and says which
   file to export from online banking (CAMT.053 recommended), the cash flow opens it next to the bank balance; the office
   side bar stays put on touch tablets.
 - **2.144.0** (2026-10-20): agent chat - a **stop button** (Esc, Ctrl+C without a selection) for a running answer,

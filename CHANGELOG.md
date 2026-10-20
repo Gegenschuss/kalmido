@@ -7,7 +7,7 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
-## [2.144.1] - 2026-10-20
+## [2.144.1] - 2026-10-21
 
 Office fixes: the office side bar stays put on touch tablets, the bank import says which file to take and reads several statements or a ZIP at once.
 
