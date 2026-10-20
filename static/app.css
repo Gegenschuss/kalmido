@@ -6756,6 +6756,9 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .nwl-err { color: var(--danger, #c0392b); margin: .3rem 0; }
 .nwl-err:empty { display: none; }
 .nwl-prev { font-size: .85rem; color: var(--muted); border-left: .1875rem solid var(--accent); padding: .2rem .6rem; margin: 0; }
+.nwl-imp-sum { margin: .4rem 0; }
+.nwl-imp-err { list-style: none; margin: .2rem 0; padding: 0; max-height: 10rem; overflow: auto; font-size: .85rem; }
+.nwl-imp-err li { padding: .1rem 0; }
 .nwl-tag { font-size: .75rem; padding: .05rem .45rem; border-radius: 9999px; border: 1px solid var(--accent); color: var(--accent); }
 .nwl-segs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
 .nwl-segs li { display: flex; align-items: center; gap: .4rem; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: .625rem; min-height: 2.75rem; }

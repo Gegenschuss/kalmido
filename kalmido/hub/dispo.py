@@ -11,16 +11,18 @@ never blocks. Booking: the module "dispo" on (Settings > Modules, off by default
 have no guest role; people outside see nothing). The booked people see their own bookings (GET /api/team/bookings/mine,
 also without the module); a firm booking puts a News entry in their feed (event "assigned to me", their switch).
 Deleting sets deleted_at (Undo restores)."""
+import csv
+import io
 import json
 import re
 import secrets
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id
-from ..core.i18n import tr
+from ..core.i18n import dec_comma, lang, tr
 from ..core.db import body, bump, db, iso, local_now, now_utc
 from ..core.access import Denied, need_feat
 from ..accounts.session import me, user_public
@@ -233,6 +235,83 @@ def dsp_get():
         resources=res, bookings=[dsp_public(r, conf.get(r["id"])) for r in rows],
         away={str(k): v for k, v in gone.items()},
         holidays=[{"date": k, "name": v} for k, v in sorted(abs_holidays(abs_state(c, oid), first, last).items())])
+
+
+# 2.141.0 C (#2142): the visible disposition (period, filter and area like the view) as CSV or ICS
+def _export_rows(c, uid, a):
+    oid = _area(c, uid, a.get("org"))
+    try:
+        first = date.fromisoformat(a["start"]) if a.get("start") else local_now().date()
+        n = max(1, min(DSP_DAYS_MAX, int(a.get("days") or 7)))
+    except ValueError:
+        raise BadInput(tr("Invalid data")) from None
+    last = first + timedelta(days=n - 1)
+    kinds = {"people": ("user", "contact"), "tech": ("equipment", "set")}.get(a.get("filter"))
+    rows = [r for r in c.execute("SELECT * FROM hub_bookings WHERE org_id=? AND deleted_at IS NULL AND start<=? AND \"end\">=? "
+                                  "ORDER BY start, id", (oid, last.isoformat() + "T99", first.isoformat()))
+            if not kinds or r["resource_kind"] in kinds]
+    return first, last, rows
+
+
+def _hours(r):
+    if "T" not in r["start"] or "T" not in r["end"]:
+        return ""  # whole days carry no hours
+    h = (datetime.fromisoformat(r["end"]) - datetime.fromisoformat(r["start"])).total_seconds() / 3600
+    return f"{h:.2f}".rstrip("0").rstrip(".")
+
+
+@app.get("/api/team/dispo/export")
+def dsp_export():
+    """?format=csv|ics &start=YYYY-MM-DD &days=1..62 &org= &filter=all|people|tech: the bookings the view shows. CSV: resource, kind,
+    booking, project, status, start, end, hours (timed bookings), note; ICS: one VEVENT per booking."""
+    c, uid = _gate()
+    a = request.args
+    fmt = a.get("format") or "csv"
+    if fmt not in ("csv", "ics"):
+        raise BadInput(tr("Invalid value: {0}", "format"))
+    first, last, rows = _export_rows(c, uid, a)
+    name = f"dispo-{first.isoformat()}-{last.isoformat()}.{fmt}"
+    hdr = {"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"}
+    if fmt == "csv":
+        from ..core.serializers import csv_cell as cell
+        lists = {}
+        for r in rows:
+            if r["list_id"] and r["list_id"] not in lists:
+                x = c.execute("SELECT name, e2e FROM lists WHERE id=?", (r["list_id"],)).fetchone()  # row-level security: lists I may see
+                lists[r["list_id"]] = "" if not x or x["e2e"] else x["name"]
+        kind = {"user": tr("Person"), "contact": tr("Contact"), "equipment": tr("Equipment"), "set": tr("Equipment set")}
+        status = {"option": tr("Option"), "firm": tr("Firm")}
+        buf = io.StringIO()
+        w = csv.writer(buf, delimiter=";" if dec_comma(lang()) else ",", lineterminator="\r\n")
+        w.writerow([tr("Resource"), tr("Kind"), tr("Booking"), tr("Project"), tr("Status"), tr("Start"), tr("End"), tr("Hours"), tr("Note")])
+        for r in rows:
+            h = _hours(r)
+            w.writerow([cell(r["res_label"]), kind.get(r["resource_kind"], ""), cell(r["title"]), cell(lists.get(r["list_id"], "")),
+                        status.get(r["status"], ""), r["start"].replace("T", " "), r["end"].replace("T", " "),
+                        h.replace(".", ",") if dec_comma(lang()) else h, cell(r["note"])])
+        return Response("\ufeff" + buf.getvalue(), mimetype="text/csv; charset=utf-8", headers=hdr)
+    from ..calendars.icalfeed import ics_fold, ics_text, ics_utc
+    from ..core.config import APP_NAME
+    stamp = ics_utc(now_utc())
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", f"PRODID:-//{APP_NAME}//Disposition//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"]
+    for r in rows:
+        allday = "T" not in r["start"]
+        end = r["end"]
+        if allday:
+            e = date.fromisoformat(end[:10]) + timedelta(days=1)
+            dt = [f"DTSTART;VALUE=DATE:{r['start'][:10].replace('-', '')}", f"DTEND;VALUE=DATE:{e.isoformat().replace('-', '')}"]
+        else:
+            if "T" not in end:
+                end = end[:10] + "T23:59"
+            dt = [f"DTSTART:{r['start'].replace('-', '').replace(':', '')}00", f"DTEND:{end.replace('-', '').replace(':', '')}00"]
+        lines += ["BEGIN:VEVENT", f"UID:dispo-{r['id']}@kalmido", f"DTSTAMP:{stamp}", *dt,
+                  f"SUMMARY:{ics_text(r['title'] + (' – ' + r['res_label'] if r['res_label'] else ''))}",
+                  f"STATUS:{'CONFIRMED' if r['status'] == 'firm' else 'TENTATIVE'}"]
+        if r["note"]:
+            lines.append(f"DESCRIPTION:{ics_text(r['note'])}")
+        lines.append("END:VEVENT")
+    lines.append("END:VCALENDAR")
+    return Response("\r\n".join(ics_fold(x) for x in lines) + "\r\n", mimetype="text/calendar; charset=utf-8", headers=hdr)
 
 
 @app.get("/api/team/dispo/free")

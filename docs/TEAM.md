@@ -68,6 +68,9 @@ Book crew and equipment for shoot days and see who and what is free.
 - **My bookings** lists your own bookings; a firm booking also shows up in your News (event "assigned to me", with
   its usual switch in the notification settings).
 - Changing or deleting a booking applies to the whole job (one shoot day); deleting can be undone.
+- **Export (2.141.0):** the buttons *CSV* and *ICS* next to *Book* download the bookings the view shows (same period, filter and
+  organisation). CSV: resource, kind, booking, project, status, start, end, hours (timed bookings only), note. ICS: one event per
+  booking, whole days as all-day events, an option as tentative. Your own bookings also appear in your calendar.
 
 ## Agents plan with you (2.51.0)
 
