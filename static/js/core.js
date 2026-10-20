@@ -902,13 +902,13 @@ function viewSafeRender() { if ((editing() && $('#view')?.contains(document.acti
   const view = () => $('#view'), max = () => 4.5 * parseFloat(getComputedStyle(document.documentElement).fontSize || 16);
   document.addEventListener('touchstart', e => {
     const v = view(); y0 = null;
-    if (!v || !v.contains(e.target) || e.touches.length !== 1 || v.scrollTop > 0 || !sharedRoute() || S.multiMode || $('.modal') || e.target.closest('input,textarea,select,[draggable="true"],.trow.drag')) return;
+    if (!v || !v.contains(e.target) || e.touches.length !== 1 || v.scrollTop > 0 || e.target.closest('.ofbody')?.scrollTop > 0 || !sharedRoute() || S.multiMode || $('.modal') || e.target.closest('input,textarea,select,[draggable="true"],.trow.drag')) return;
     y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; pull = 0;
   }, {passive: true});
   document.addEventListener('touchmove', e => {
     if (y0 === null) return;
     const dy = e.touches[0].clientY - y0, dx = Math.abs(e.touches[0].clientX - x0);
-    if (dy <= 0 || dx > dy || view().scrollTop > 0) { if (el) el.classList.remove('on'); pull = 0; return; }
+    if (dy <= 0 || dx > dy || view().scrollTop > 0 || $('.ofbody')?.scrollTop > 0) { if (el) el.classList.remove('on'); pull = 0; return; }
     pull = dy;
     if (!el) { el = document.createElement('div'); el.className = 'ptr'; el.setAttribute('aria-hidden', 'true'); el.innerHTML = ic('sync', 's'); $('#main').style.position ||= 'relative'; $('#main').appendChild(el); }
     const k = Math.min(1, dy / max());
