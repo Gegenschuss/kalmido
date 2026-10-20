@@ -334,6 +334,17 @@ with open(APATH, "rb") as f:
     check(f.read(6) == b"KENC1\n", "attachment sealed")
 ENC0 = one("SELECT iban FROM office_company WHERE org_id=?", (ORG,))
 check(str(ENC0).startswith("kenc1:"), "IBAN encrypted at rest")
+# 2.138.0 (#1972): an organisation export before any recovery key makes one in the export thread (noted in the office log)
+r = Da.post(B + f"/api/orgs/{ORG2}/export")
+st = {}
+for _ in range(120):
+    st = Da.get(B + f"/api/orgs/{ORG2}/export").json()
+    if st.get("state") in ("done", "failed", "none") and r.status_code == 202:
+        break
+    time.sleep(0.5)
+check(r.status_code == 202 and st.get("state") == "done", f"org export without a recovery key yet: done {r.status_code} {st}")
+check(Da.get(B + f"/api/orgs/{ORG2}/encryption").json().get("recovery") is True, "the export made the recovery copy")
+check(one("SELECT COUNT(*) FROM office_doc_log WHERE org_id=? AND action='recovery_key'", (ORG2,)) == 1, "office log: the key made by the export")
 
 # ---------------------------------------------------------------- showing, step-up, News
 st = A.get(B + f"/api/orgs/{ORG}/encryption").json()
