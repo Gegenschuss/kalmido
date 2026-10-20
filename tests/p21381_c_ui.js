@@ -26,7 +26,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   await sleep(600);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {org_name: 'Studio', lang: 'en', collab_all: true});
+  await call('POST', '/api/admin/setup', {org_name: 'Studio', lang: 'en', collab_all: true, modules: ['comments']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', workspace: 'private', ws_colors: '{}'});
   await call('POST', '/api/lists', {name: 'Home'});
 
