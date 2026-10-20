@@ -28,7 +28,7 @@ from ..tasks.lifecycle import task_restore, task_skip, trash_empty
 from ..tasks.attachments import attachment_upload, text_attachment_create, TEXT_MAX
 from ..tasks.batch import attachment_delete, task_batch
 from ..collab.comments import collab_user, comment_delete, comment_update, lang_of, user_names
-from ..collab.news import news_add, news_list, news_read
+from ..collab.news import news_add, news_list, news_read, news_read_job
 from ..personal.habits import habit_create, habit_delete, habit_update
 from ..personal.timetrack import (
     BadInput, reject_unknown, time_delete, time_running, time_start, time_stop, time_update, UnknownFields,
@@ -342,7 +342,7 @@ def need_approval(c, title, args=(), list_id=None, task_id=None, detail=None):
     if approver and not task_id:  # job_notify only adds News for task jobs: the approver hears of it anyway
         s = collab_user(c, approver, None)
         if s:
-            news_add(c, approver, "approval", list_id=list_id, data={"title": j["title"][:200]}, actor=aid, s=s)
+            news_add(c, approver, "approval", list_id=list_id, data={"title": j["title"][:200], "job": jid}, actor=aid, s=s)
     bump(c)
     c.commit()
     print("agent", aid, "approval needed: job", jid, request.method, request.path, flush=True)
@@ -410,6 +410,7 @@ def approval_run(c, j):
     agent_emit(c, j["agent_id"], "job", {"job": job_dict(c, j2), "action": "approve",
                                         "user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")},
                                         "result": {"status": res["status"], "body": body_j if body_j is not None else res["body"][:2000]}})
+    news_read_job(c, j2)  # 2.138.2 A (#2406)
     bump(c)
     c.commit()
     print("approval job", j["id"], "of agent", j["agent_id"], "approved by", g.user["username"], "->", res["status"], flush=True)

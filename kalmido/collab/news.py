@@ -345,6 +345,17 @@ def news_add(c, uid, kind, task_id=None, list_id=None, comment_id=None, data=Non
                                           json.dumps(data or {}, ensure_ascii=False), iso_ms(now_utc())))
 
 
+def news_read_job(c, j, ts=None):
+    """2.138.2 A (#2406): a decided approval job is done for everybody it was shown to: its unread approval News turn read
+    (by job number; older entries without one by task / list + title). Caller commits and bumps."""
+    ts = ts or iso(now_utc())
+    c.execute("UPDATE notifications SET read_at=? WHERE kind='approval' AND read_at IS NULL AND data->>'job' = ?", (ts, str(j["id"])))
+    where, args = ("task_id=?", [j["task_id"]]) if j["task_id"] else ("task_id IS NULL AND list_id=?", [j["list_id"]])
+    if j["task_id"] or j["list_id"]:
+        c.execute(f"UPDATE notifications SET read_at=? WHERE kind='approval' AND read_at IS NULL AND data->>'job' IS NULL "
+                  f"AND {where} AND data->>'title' = ?", (ts, *args, (j["title"] or "")[:200]))
+
+
 def news_sig(c, uid):
     """Cheap change marker of my unread items (in /api/version): clients reload the state when it moves."""
     r = c.execute("SELECT COUNT(*), COALESCE(MAX(id),0) FROM notifications WHERE user_id=? AND read_at IS NULL",
