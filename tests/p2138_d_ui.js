@@ -62,6 +62,7 @@ async function part_numranges() {
   check(await until(() => d.querySelector('#onum-invoice-why')), 'a jump in the invoice series asks for a reason');
   check(d.querySelector('#onum-invoice-pv').textContent.includes(`RE-${Y}-1001`), 'the preview shows the finished number: ' + d.querySelector('#onum-invoice-pv').textContent);
   check(d.activeElement && d.activeElement.id === 'onum-invoice', 'the focus stays in the field');
+  check(d.activeElement.selectionStart === d.activeElement.value.length, 'the caret stays at the end after the redraw (device test: typing 1001 gave 0110)');  // 2.138.0 (#2256)
   check(!rowI().querySelector('[data-onum="set"]').disabled, 'Apply on');
   // without a reason: the server's error at the row
   rowI().querySelector('[data-onum="set"]').click();
