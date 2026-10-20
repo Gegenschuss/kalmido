@@ -77,6 +77,8 @@ def tz_bounds(d1, d2, zone):
 def tz_split(start, end, sec, rnd, zone):
     """An entry [start, end) (aware) with its seconds / rounded seconds -> its parts per local day of zone:
     [{"day", "start", "end", "seconds", "rounded"}] (one part when it stays within a day)."""
+    # 2.125.1 (#2120): a stored time without offset (older / imported rows) counts like astimezone() reads it elsewhere
+    start, end = (x.astimezone() if x.tzinfo is None else x for x in (start, end))
     cuts, cur = [], start
     while cur < end and len(cuts) < 20:
         d = cur.astimezone(zone).date() + timedelta(days=1)

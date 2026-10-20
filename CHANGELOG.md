@@ -35,6 +35,11 @@ Security release: fixes from the internal audit (office, documents, agents, sync
   agent's owner); the MCP server in `--http` mode needs `MCP_HTTP_TOKEN` (at least 16 characters).
 - Numbered invoice and credit note drafts can no longer be deleted (finalise and cancel instead).
 - CI checks the web client with ESLint (#1993).
+## [2.125.1] - 2026-10-20
+
+### Fixed
+- CI of 2.125.0: the vacation client passes the type check, the notification tests count the new rows "Vacation requests" and "Timesheets" (#2117 #2119).
+- The client list could fail (error 500) when a time entry was stored without a time zone offset and entries are split at midnight (#2120).
 
 ## [2.125.0] - 2026-10-20
 
