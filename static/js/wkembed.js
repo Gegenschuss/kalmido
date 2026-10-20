@@ -225,6 +225,24 @@ function wem_insMenu(a, p) {
   menu(a, [...(wk_e2e(p.space) ? [] : [{label: tr('Upload from this device…'), icon: 'upload', fn: () => wem_device(p, at)}]),
     ...(feat('files') ? [{label: tr('From the file store…'), icon: 'folder', fn: () => wem_pick(p, at)}] : [])]);
 }
+// 2.126.2 A (#2363): with the on-screen keyboard open the list sits just above it (fixed to the visual viewport); desktop keeps the CSS place
+function wem_acPlace(box) {
+  const vv = window.visualViewport; if (!vv) return;
+  const keyb = window.innerHeight - vv.height - vv.offsetTop > 80;
+  if (!keyb) { box.style.position = box.style.left = box.style.right = box.style.bottom = ''; return; }
+  const wr = box.parentElement?.getBoundingClientRect(); if (!wr) return;
+  box.style.position = 'fixed';
+  box.style.left = Math.max(wr.left, 0) + 8 + 'px';
+  box.style.right = Math.max(window.innerWidth - wr.right, 0) + 8 + 'px';
+  box.style.bottom = Math.max(window.innerHeight - (vv.offsetTop + vv.height), 0) + 8 + 'px';
+  if (!box._wemvv) {
+    const f = () => {
+      if (!box.isConnected || box.classList.contains('hidden')) { vv.removeEventListener('resize', f); vv.removeEventListener('scroll', f); box._wemvv = null; return; }
+      wem_acPlace(box);
+    };
+    box._wemvv = f; vv.addEventListener('resize', f); vv.addEventListener('scroll', f);
+  }
+}
 // ---- [[datei: / [[tabelle: suggestions (wiki.js wk_acUpdate hands over what follows [[)
 const WEM_AC = {n: 0, sheets: {}};
 function wem_ac(ta, box, q, from) {

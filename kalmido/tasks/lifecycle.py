@@ -7,7 +7,7 @@ from datetime import date, datetime
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, gsetting, iso, local_now, now_utc, parse_iso
 from ..accounts.session import me
@@ -331,6 +331,12 @@ def rr_with_count(repeat, n):
     return re.sub(r"(^|;)COUNT=\d+", lambda m: f"{m.group(1)}COUNT={n}", repeat)
 
 
+def need_live(c, tid):
+    """2.126.0 D (#1992 A3): a task in the trash is not changed (it is restored first)."""
+    if c.execute("SELECT deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()[0]:
+        raise Denied(409, tr("The task is in the trash"))
+
+
 @app.post("/api/tasks/<int:tid>/complete")
 def task_complete(tid):
     from ..collab.comments import task_event
@@ -338,10 +344,12 @@ def task_complete(tid):
     from ..notify.push import push_handled
     c = db()
     need_task(c, tid)
+    need_live(c, tid)  # 2.126.0 D (#1992 A3)
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     b = body()
     # the same recurring task ticked on two devices (one offline): only the first tick advances it
-    if t["repeat"] and b.get("expect_due") and t["status"] == 0 and (b["expect_due"] != t["due"] or (
+    # 2.126.0 D (#1987): also without expect_due (API, agents) and for two ticks at the same moment
+    if t["repeat"] and t["status"] == 0 and (complete_stale(c, tid, b.get("expect_due") or t["due"]) or (
             "TIMES=" in t["repeat"] and b.get("expect_time") and b["expect_time"] != t["due_time"])):  # 2.116.0 D (#2066)
         return jsonify({**one_task(c, tid), "next_due": None, "skipped": True})
     st = int(b.get("status", 2))
@@ -358,10 +366,19 @@ def task_complete(tid):
     return jsonify({**one_task(c, tid), "next_due": nxt, "undo": signed(tid, undo)})
 
 
+def complete_stale(c, tid, due, status=0):
+    """2.126.0 D (#1987): takes the task's completion lock; True when another tick changed its status / due since the
+    caller read (status, due)."""
+    write_lock(c, f"task-{tid}")
+    t = c.execute("SELECT status, due FROM tasks WHERE id=?", (tid,)).fetchone()
+    return t is None or t["status"] != status or _norm(t["due"]) != _norm(due)
+
+
 def do_complete(c, tid, status=2, undo=None):
     """undo (dict, filled in): what POST /api/tasks/<id>/undo needs to take this completion back."""
     from ..collab.comments import assignment_events
     from ..family.family import _jparse, FAM_OCC, rot_next, stars_earn, stars_revoke
+    write_lock(c, f"task-{tid}")  # 2.126.0 D (#1987): one completion of a task at a time (the row below is then current)
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     if status == 2 and t["status"] != 2:  # 2.60.0 C (#1512): "done only after approval" -- every way of completing ends here
         from ..tasks.review import rvw_gate
@@ -388,7 +405,7 @@ def do_complete(c, tid, status=2, undo=None):
         c.execute("UPDATE tasks SET repeat='' WHERE id=?", (tid,))
     if nxt:
         # keep a completed copy in the history, move the original forward
-        cols = [k for k in t.keys() if k not in ("id", "tt_id")]
+        cols = [k for k in t.keys() if k not in ("id", "tt_id", "client_ref")]  # 2.126.0 D (#1990): client_ref
         vals = {k: t[k] for k in cols}
         vals.update(status=2, repeat="", completed_at=ts, updated_at=ts, reminded="[]", completed_by=who, rotation="")
         cur_id = insert_id(c, f"INSERT INTO tasks({','.join(cols)}) VALUES({','.join('?' * len(cols))})",
@@ -571,6 +588,7 @@ def task_skip(tid):
     """'Skip this occurrence': move a recurring task to its next date without a done copy."""
     c = db()
     need_task(c, tid)
+    need_live(c, tid)  # 2.126.0 D (#1992 A3)
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     if not t["repeat"] or not t["due"]:
         return err(tr("Not a recurring task"))
@@ -605,6 +623,7 @@ def task_reopen(tid):
     from ..family.family import stars_revoke
     c = db()
     need_task(c, tid)
+    need_live(c, tid)  # 2.126.0 D (#1992 A3)
     old = c.execute("SELECT status, completed_at, completed_by FROM tasks WHERE id=?", (tid,)).fetchone()
     from ..lists.rules import rul_fire, rul_snap
     rb = rul_snap(c, tid)  # 2.71.0 A (#1457)

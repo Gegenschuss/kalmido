@@ -241,3 +241,4 @@ html.mini-sheet .shvtop>a.btn{display:none}
 .shbtab svg.i{width:.875rem;height:.875rem}
 .shbadd{flex:none}
 @media (pointer:coarse){.shbtab{min-height:2.75rem}}
+.shvmen{padding:.25rem .5rem}  /* 2.126.2 A (#2357) */

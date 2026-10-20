@@ -1,4 +1,5 @@
 """Events (module "events"): calendars, rights, validation, repeat expansion, attendees, reminders, the family migration."""
+import hashlib
 import json
 import re
 import secrets
@@ -428,6 +429,43 @@ def occ_key(r, dt):
     return dt.date().isoformat() if r["all_day"] else wall_s(dt.astimezone(ev_zone(r["tz"])) if dt.tzinfo else dt)
 
 
+RDATE_MAX = 200
+
+
+def ev_rdates(r):
+    """2.126.0 C (#1985): the extra dates of a series (RDATE lines kept as the calendar app sent them) as occurrence keys."""
+    try:
+        extra = r["extra"] or ""
+    except (KeyError, IndexError):
+        return []
+    out = []
+    for line in extra.split("\n"):
+        if line[:6].upper() not in ("RDATE:", "RDATE;"):
+            continue
+        head, _, val = line.partition(":")
+        p = dict(x.split("=", 1) for x in head.split(";")[1:] if "=" in x)
+        tzid = p.get("TZID", "").strip('"')
+        for x in val.split(","):
+            x = x.strip().split("/")[0]  # a PERIOD counts by its start
+            try:
+                if re.fullmatch(r"\d{8}", x):
+                    k = date(int(x[:4]), int(x[4:6]), int(x[6:8])).isoformat()
+                    k = k if r["all_day"] else f"{k}T{r['start'][11:16]}"
+                else:
+                    dt = datetime.strptime(x[:15], "%Y%m%dT%H%M%S")
+                    if x.endswith("Z"):
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    elif tzid and tz_ok(tzid):
+                        dt = dt.replace(tzinfo=ev_zone(tzid))
+                    k = occ_key(r, dt)
+            except ValueError:
+                continue
+            out.append(k)
+            if len(out) >= RDATE_MAX:
+                return out
+    return out
+
+
 def _span(r, s_key, e_key=None, all_day=None):
     """(start, end) of an occurrence: dates (all day, end exclusive) or aware datetimes."""
     ad = r["all_day"] if all_day is None else all_day
@@ -478,8 +516,11 @@ def ev_expand(r, lo, hi, cap=EV_OCC_CAP):
         if d1 >= lo and d0 <= hi:
             out.append({"occ": key, "s": s, "e": e, "ov": ov, "all_day": ad})
     rule = ev_rule(r)
+    rdates = [k for k in ev_rdates(r) if k != r["start"]]  # 2.126.0 C (#1985): the series' extra dates
     if rule is None:
         add(r["start"], ovs.get(r["start"]))
+        for key in dict.fromkeys(rdates):
+            add(key, ovs.get(key))
     else:
         zone = ev_zone(r["tz"])
         dur = _span(r, r["start"])
@@ -500,6 +541,10 @@ def ev_expand(r, lo, hi, cap=EV_OCC_CAP):
                     break
         except (ValueError, TypeError, OverflowError):
             pass
+        for key in rdates:
+            if key not in seen:
+                seen.add(key)
+                add(key, ovs.get(key))
         for key, ov in ovs.items():  # changed occurrences moved into the range from outside of it
             if key not in seen and isinstance(key, str):
                 add(key, ov)
@@ -535,6 +580,12 @@ def ev_span_days(r):
         d = _ov_day(r, o)
         if d:
             first, last = min(first, d), max(last, d + timedelta(days=1))
+    for k in ev_rdates(r):  # 2.126.0 C (#1985)
+        try:
+            d0, d1 = _days(*_span(r, k), r["all_day"])
+        except (TypeError, ValueError):
+            continue
+        first, last = min(first, d0), max(last, d1)
     return first.isoformat(), last.isoformat()
 
 
@@ -689,11 +740,14 @@ def ev_store(c, uid, cal_id, f, eid=None, uid_=None, href=None, attendees=None, 
     ts = iso_ms(now_utc())  # ms: two changes in one second still differ (expect)
     from ..integrations.webhooks import who_note
     who_note("event.updated", "event", eid)  # 2.115.0 A (#2061): a change (eid None: does nothing, "event.created" below)
+    old = None
     if eid is None:
         if c.execute("SELECT COUNT(*) FROM events WHERE cal_id=? AND deleted_at IS NULL", (cal_id,)).fetchone()[0] >= EV_PER_CAL:
             raise Denied(409, tr("At most {0} events per calendar", EV_PER_CAL))
         uid_ = uid_ or ev_new_uid()
-        href = href or (re.sub(r"[^A-Za-z0-9._-]", "_", uid_)[:180] + ".ics")
+        if not href:  # 2.126.0 C (#1992 K8): a UID with other characters (or a long one) gets a hash, so two never share a name
+            base = re.sub(r"[^A-Za-z0-9._-]", "_", uid_)
+            href = (base if base == uid_ and len(base) <= 180 else base[:170] + "-" + hashlib.sha256(uid_.encode()).hexdigest()[:8]) + ".ics"
         cols = {"cal_id": cal_id, "uid": uid_, "href": href, "title": f.get("title") or tr("(no title)"), "location": f.get("location", ""),
                 "description": f.get("description", ""), "all_day": f.get("all_day", 0), "start": f["start"], "end": f["end"],
                 "tz": f.get("tz", ""), "rrule": f.get("rrule", ""), "exdates": f.get("exdates", ""), "overrides": f.get("overrides", ""),
@@ -703,15 +757,19 @@ def ev_store(c, uid, cal_id, f, eid=None, uid_=None, href=None, attendees=None, 
         who_note("event.created", "event", eid)
     else:
         f = {k: v for k, v in f.items() if k not in ("id", "uid", "created_by", "created_at")}
+        old = c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone()
         if f:
             f["updated_at"] = ts
             c.execute(f"UPDATE events SET {','.join(pgb_col(k) + '=?' for k in f)}, seq=seq+1 WHERE id=?", [*f.values(), eid])
     r = c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone()
+    # 2.126.0 C (#1992 K4): sent reminders count again only when the time, the rule or the reminders really changed
+    timing = ("start", "all_day", "tz", "rrule", "overrides", "reminders")
+    retime = old is None or any(k in f and str(old[k] or "") != str(r[k] or "") for k in timing)
     a, b_ = ev_span_days(r)
     c.execute("UPDATE events SET first_day=?, last_day=? WHERE id=?", (a, b_, eid))
     if attendees is not None:
         att_set(c, eid, attendees, r)
-    if "start" in f or "reminders" in f or "rrule" in f:
+    if retime and ("start" in f or "reminders" in f or "rrule" in f):
         c.execute("DELETE FROM ev_reminded WHERE event_id=?", (eid,))
     cal_touch(c, r["cal_id"])
     bump(c)
@@ -839,6 +897,8 @@ def ev_delete(c, r):
 
 def is_occ(r, occ):
     """occ is a date the series really has (its original start)."""
+    if occ in ev_rdates(r):  # 2.126.0 C (#1985): an extra date of the series
+        return True
     rule = ev_rule(r)
     if rule is None:
         return occ == r["start"]
@@ -848,6 +908,52 @@ def is_occ(r, occ):
     except (ValueError, TypeError, OverflowError, AttributeError):
         return False
     return hit is not None and occ_key(r, hit) == occ
+
+
+def ev_ov_tidy(r, f):
+    """2.126.0 C (#1992 K6): the series r gets the changed columns f: changed / left-out occurrences the new start or rule
+    no longer has are dropped (else they stay as single events beside the series). Adds overrides / exdates to f."""
+    if not any(k in f and str(f[k] or "") != str(r[k] or "") for k in ("start", "all_day", "tz", "rrule")):
+        return
+    nr = {**dict(r), **f}
+    move = ev_ov_shift(r, nr)
+
+    def fit(k):  # 2.126.0 review: a moved series takes its changed / left-out occurrences along (same shift)
+        if not isinstance(k, str):
+            return None
+        k2 = move(k)
+        if k2 and is_occ(nr, k2):
+            return k2
+        return k if is_occ(nr, k) else None
+    ovs, keep, moved = ov_list(nr), [], False
+    for o in ovs:
+        k = fit(o.get("rid")) if isinstance(o, dict) else None
+        if k:
+            moved = moved or k != o["rid"]
+            keep.append({**o, "rid": k})
+    if moved or len(keep) != len(ovs):
+        f["overrides"] = json.dumps(keep, ensure_ascii=False) if keep else ""
+    ex = [x for x in (nr["exdates"] or "").split(",") if x]
+    ex2 = [k for k in (fit(x) for x in ex) if k]
+    if ex2 != ex:
+        f["exdates"] = ",".join(ex2)
+
+
+def ev_ov_shift(r, nr):
+    """2.126.0 review (#1992 K6): occurrence key -> the same occurrence after the series start moved from r to nr (same
+    all-day kind), else None."""
+    try:
+        if bool(r["all_day"]) != bool(nr["all_day"]) or str(r["tz"] or "") != str(nr["tz"] or ""):
+            return lambda k: None
+        if nr["all_day"]:
+            d = date.fromisoformat(str(nr["start"])[:10]) - date.fromisoformat(str(r["start"])[:10])
+            return lambda k: (date.fromisoformat(k[:10]) + d).isoformat() if valid_date(k[:10]) else None
+        a, b = wall(str(r["start"])[:16]), wall(str(nr["start"])[:16])
+        if not a or not b:
+            return lambda k: None
+        return lambda k: wall_s(wall(k) + (b - a)) if wall(k) else None
+    except (ValueError, TypeError, KeyError):
+        return lambda k: None
 
 
 def ev_occ_change(c, r, occ, b):
@@ -891,8 +997,9 @@ def _wd_events(c, users, S, LG, now):
     for r in rows:
         try:
             cal = c.execute("SELECT * FROM ev_cals WHERE id=?", (r["cal_id"],)).fetchone()
-            who = {cal["owner_id"]} | ({m[0] for m in c.execute("SELECT user_id FROM ev_cal_members WHERE cal_id=?", (cal["id"],))}
-                                         if collab_all() else set())
+            # 2.126.0 C (#1992 K7): members as ev_role sees them: none while the owner is disabled, only inside the organisation
+            who = {cal["owner_id"]} | ({m[0] for m in c.execute("SELECT user_id FROM ev_cal_members WHERE cal_id=?", (cal["id"],))
+                                        if ev_att_ok(c, m[0], cal["org_id"])} if collab_all() and cal["owner_id"] in users else set())
             if collab_all():
                 who |= {a[0] for a in c.execute("SELECT user_id FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL "
                                                 "AND partstat!='declined'", (r["id"],)) if ev_att_ok(c, a[0], cal["org_id"])}  # 2.87.0 (#1983)

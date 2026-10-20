@@ -277,14 +277,16 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths):
         return
     text = fsm_open(c, old, "doc_meta.text", m["text"]) or ""
     amount = fsm_open(c, old, "doc_meta.amount", m["amount"]) or ""
+    summary = fsm_open(c, old, "doc_meta.summary", m["summary"]) or "" if "summary" in m.keys() else ""  # 2.126.1 A review (#2123)
     S.untrain(c, nid)  # the source's models forget it
     sender = S.label_name(c, old, "sender", m["sender_id"])
     typ = S.label_name(c, old, "type", m["type_id"])
     tags = S.node_tags(c, nid)
     asn = m["asn"] if m["asn"] and not S.asn_taken(c, new, m["asn"], nid) else None
-    c.execute("""UPDATE doc_meta SET ws=?, org_id=?, text=?, amount=?, sender_id=?, type_id=?, suggest='', trained='', asn=?, updated_at=?
+    c.execute("""UPDATE doc_meta SET ws=?, org_id=?, text=?, amount=?, summary=?, sender_id=?, type_id=?, suggest='', trained='', asn=?, updated_at=?
                  WHERE node_id=?""",
               (new, to, S.doc_seal(c, new, "doc_meta.text", text), S.doc_seal(c, new, "doc_meta.amount", amount),
+               S.doc_seal(c, new, "doc_meta.summary", summary) if summary else "",
                S.label_id(c, new, "sender", sender) if sender else None, S.label_id(c, new, "type", typ) if typ else None,
                asn, _now(), nid))
     if m["extracted"]:  # 2.121.0 A (#2092): the recognised receipt values move along, sealed for the new workspace

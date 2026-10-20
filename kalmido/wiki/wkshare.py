@@ -72,10 +72,27 @@ def wsh_url(c, r):
         return ""
 
 
-def wsh_dict(c, r, names, target=None):
+# 2.126.2 B (#2358): a link of an organisation's page works only while its maker is an active member (wsh_find) -- SQL for
+# the live rows (wsh_rows) and the ended mark (wsh_gone); a = wiki_shares. Private spaces: unchanged.
+WSH_MAKER = ("({a}.org_id IS NULL OR EXISTS (SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id={a}.org_id "
+             "AND m.user_id={a}.created_by AND u.disabled=0))")
+
+
+def wsh_gone(c, rows):
+    """2.126.2 B (#2358): ids of the organisation links whose maker left the organisation / was deleted / disabled (one query)."""
+    org = [r for r in rows if r["org_id"] is not None]
+    if not org:
+        return set()
+    q = ",".join("?" * len(org))
+    ok = {x[0] for x in c.execute(f"SELECT id FROM wiki_shares WHERE id IN ({q}) AND {WSH_MAKER.format(a='wiki_shares')}", [r["id"] for r in org])}
+    return {r["id"] for r in org if r["id"] not in ok}
+
+
+def wsh_dict(c, r, names, target=None, gone=()):
     d = {"id": r["id"], "kind": r["kind"], "space": wiki_space_key(r["org_id"]), "path": r["path"], "folder": bool(r["is_folder"]),
          "expires_at": r["expires_at"], "expired": wsh_expired(r), "revoked": bool(r["revoked_at"]), "created_at": r["created_at"],
-         "created_by": r["created_by"], "created_by_name": names.get(r["created_by"], ""), "views": r["views"], "last_used_at": r["last_used_at"]}
+         "created_by": r["created_by"], "created_by_name": names.get(r["created_by"], ""), "views": r["views"], "last_used_at": r["last_used_at"],
+         "ended": r["id"] in gone}  # 2.126.2 B (#2358): its maker is no longer in the organisation -- the link does not work
     if r["kind"] == "person" and r["token"]:  # 2.123.0 (#2104): shared by e-mail address -- show the typed address, never the account
         from ..accounts.login import unseal
         try:
@@ -95,8 +112,8 @@ def wsh_dict(c, r, names, target=None):
 def wsh_rows(c, oid, owner, live=True):
     w = "COALESCE(org_id,0)=? AND COALESCE(owner_id,0)=? AND revoked_at IS NULL"
     a = [oid or 0, 0 if oid else owner]
-    if live:
-        w += " AND (expires_at IS NULL OR expires_at>?)"
+    if live:  # 2.126.2 B (#2358): a link whose maker left the organisation counts as ended too (mark, WSH_MAX)
+        w += " AND (expires_at IS NULL OR expires_at>?) AND " + WSH_MAKER.format(a="wiki_shares")
         a.append(iso(now_utc()))
     return c.execute(f"SELECT * FROM wiki_shares WHERE {w} ORDER BY id LIMIT {WSH_MAX * 2}", a).fetchall()
 
@@ -198,7 +215,7 @@ def wsh_need(c, sid):
 
 def wsh_one(c, sid):
     r = c.execute("SELECT * FROM wiki_shares WHERE id=?", (sid,)).fetchone()
-    return wsh_dict(c, r, user_names(c, {r["created_by"], r["user_id"]} - {None}))
+    return wsh_dict(c, r, user_names(c, {r["created_by"], r["user_id"]} - {None}), gone=wsh_gone(c, [r]))
 
 
 @app.get("/api/wiki/shares")
@@ -216,8 +233,9 @@ def wsh_list():
         rows = [r for r in rows if wsh_covers(r, path) or (folder and r["path"].lower().startswith(path.lower() + "/"))]
     names = user_names(c, ({r["created_by"] for r in rows} | {r["user_id"] for r in rows}) - {None})
     locked = wsh_locked(c, oid, owner)
+    gone = wsh_gone(c, rows)
     return jsonify(enabled=public_links_on(c), locked=locked, person=oid is None and not locked, space=wiki_space_key(oid),
-                   shares=[] if locked else [wsh_dict(c, r, names, (path, folder) if path is not None else None) for r in rows])
+                   shares=[] if locked else [wsh_dict(c, r, names, (path, folder) if path is not None else None, gone) for r in rows])
 
 
 @app.post("/api/wiki/shares")
@@ -259,7 +277,7 @@ def wsh_create():
             return jsonify(ok=True, by_email=True)
         old = c.execute("SELECT id FROM wiki_shares WHERE kind='person' AND org_id IS NULL AND owner_id=? AND user_id=? AND lower(path)=lower(?) "
                         f"AND is_folder=? AND {wsh_live('wiki_shares')}", (owner, who, path, 1 if folder else 0, ts)).fetchone()
-        if old:
+        if old:  # 2.126.2 B (#2355): the same live share again: no second News item
             c.execute("UPDATE wiki_shares SET expires_at=? WHERE id=?", (exp, old["id"]))
             sid = old["id"]
         else:
@@ -267,6 +285,10 @@ def wsh_create():
             sid = insert_id(c, "INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,user_id,token,expires_at,created_by,created_at) "
                                "VALUES(NULL,?,?,?,'person',?,?,?,?,?)", (owner, path, 1 if folder else 0, who,
                                                                        seal(c, WSH_SEAL + "mail", str(b["email"]).strip()[:200]) if by_mail else "", exp, uid, ts))
+            # 2.126.2 B (#2355): a News item for exactly that person (the sharing row of their settings; no push); only the
+            # path they may read now
+            from ..collab.news import news_add
+            news_add(c, who, "wiki_shared", data={"path": path, "folder": bool(folder)})
     bump(c)
     c.commit()
     if kind != "link" and by_mail:  # the same answer as for an unknown address: whether an account exists stays hidden
@@ -519,7 +541,11 @@ def wsh_pub_page(token, pid=None):
     wsh_seen(c, s)
     same = {p["path"].lower(): p["id"] for p in pages}
     files = wsh_files_of(c, list(same.values()))
-    d = wiki_dict(r)
+    from .wkhist import WikiUnreadable
+    try:
+        d = wiki_dict(r)
+    except WikiUnreadable:  # 2.126.2 B (#2358): a text that cannot be opened -- the page is gone for the link
+        return pub_gone(lg)
     md = wsh_md(d["body"], lambda p: f"{base}/p/{same[p.lower()]}" if p.lower() in same else None,
                 lambda fid: (f"{base}/file/{fid}", files[fid]["mime"].startswith("image/")) if fid in files else None)
     own = [f for f in files.values() if f["page_id"] == pid]

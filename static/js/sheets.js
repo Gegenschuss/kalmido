@@ -49,6 +49,20 @@ async function shvLoadIdx(key, force) {
   finally { d.v = S.v; SHV.busy['i' + key] = false; }
   if (S.route.mod === 'sheets') viewSafeRender();
 }
+// 2.126.2 A (#2357): the pages that link this table ([[tabelle:…]]), asked once per opening (not on every cell change)
+const SHV_REFS = {id: 0, pages: []};
+async function shvRefs(id) {
+  if (SHV_REFS.id === id) return;
+  SHV_REFS.id = id; SHV_REFS.pages = [];
+  let ps; try { ps = (await rawFetch('GET', '/api/wiki/refs?sheet=' + id)).pages || []; } catch { return; }
+  if (SHV_REFS.id !== id || !ps.length) return;
+  SHV_REFS.pages = ps;
+  if (S.route.mod === 'sheets' && S.route.sh === id) shvRender();
+}
+function shvRefsHtml(sh) {
+  const ps = SHV_REFS.id === sh.id ? SHV_REFS.pages : [];
+  return ps.length ? `<div class="dsec wkmen shvmen">${ic('book', 's')}<span class="muted">${tr('Mentioned in')}</span>${ps.map(p => `<a href="#wiki/${p.id}">${esc(p.path)}</a>`).join('<span class="muted">,</span>')}</div>` : '';
+}
 async function shvLoad(id, force) {
   if (SHV.busy['s' + id]) { SHV.again = true; return; }
   if (!force && SHV.sh && SHV.sh.id === id && SHV.sh._v === S.v) return;
@@ -59,6 +73,7 @@ async function shvLoad(id, force) {
     if (SHV.sh?.id !== id) { SHV.cur = SHV.anc = null; SHV.ed = null; }
     changed = !SHV.sh || SHV.sh.id !== id || SHV.sh.rev !== sh.rev || JSON.stringify(SHV.sh.presence || []) !== JSON.stringify(sh.presence || []) || shvKalSig(SHV.sh) !== shvKalSig(sh);
     shvPrep(sh); sh._v = S.v; SHV.sh = sh; SHV.err = ''; SHV.errFor = null;
+    shvRefs(id);
   } catch (e) {
     if (e.message === 'auth') return;
     SHV.errFor = id + ':' + S.v; changed = true;
@@ -167,7 +182,7 @@ function shvSheetHtml(sh) {
   const head = `<thead><tr><th class="shvcorner" scope="col"><span class="sr">${tr('Row')}</span></th>${cols.map(c => shvTh(sh, c, filt)).join('')}${w ? `<th class="shvaddc"><button type="button" class="iconbtn" data-shv="coladd" title="${esc(tr('Add column'))}" aria-label="${esc(tr('Add column'))}">${ic('plus', 's')}</button></th>` : ''}${shz ? shz_headHtml(sh) : ''}</tr></thead>`;
   const body = `<tbody>${rows.map(r => shvTr(sh, r)).join('')}</tbody>${shz ? shz_bodyHtml(sh) : ''}`;
   const foot = `<div class="shvfoot">${w ? `<button type="button" class="btn sm" data-shv="rowadd">${ic('plus', 's')}${tr('Add row')}</button>` : ''}${nf ? `<span class="muted">${tr('{0} of {1} rows shown', rows.length, all)}</span>` : ''}</div>`;
-  return `<div class="shvwrap shvsheet" data-k="shv-${sh.id}">${top}${pres}${typeof shc_html === 'function' ? shc_html(sh) : ''}${bar}
+  return `<div class="shvwrap shvsheet" data-k="shv-${sh.id}">${top}${pres}${shvRefsHtml(sh)}${typeof shc_html === 'function' ? shc_html(sh) : ''}${bar}
     <div class="shvbody"><div class="shvgridw"><div class="shzbox"${typeof shz_boxAttr === 'function' ? shz_boxAttr(sh) : ''}><div class="shvscroll" id="shv-scroll" tabindex="0" role="grid" aria-label="${esc(sh.title || tr('Table'))}" aria-rowcount="${all + 1}" aria-colcount="${cols.length + 1}" aria-multiselectable="true" ${c0 ? `aria-activedescendant="shv-c-${c0.r}-${c0.c}"` : ''}>
       <table class="shvgrid" role="presentation">${colgroup}${head}${body}</table><svg class="shvdeps" id="shv-deps" aria-hidden="true"></svg></div>${typeof shz_gripHtml === 'function' ? shz_gripHtml(sh) : ''}</div>${foot}${typeof shb_barHtml === 'function' ? shb_barHtml(sh) : ''}</div>
     <aside class="shvside" id="shv-side" aria-label="${esc(tr('Cell details'))}">${shvSideHtml(sh)}</aside></div></div>`;

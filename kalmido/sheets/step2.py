@@ -14,8 +14,9 @@
 - POST /api/sheets/<id>/links/<batch>/undo | redo: one button press = one undo step (tasks to the trash, rows / columns
   of "list as rows" to the trash, the quotation draft deleted when the office allows it).
 
-People only: agents get 403 (they have no approval pattern for this in the agent API; the table tools of part C stay
-inside the sheet). Every route needs the right to write the sheet AND the target (list / office), the source visible and
+People only: agents get 403 (the table tools of part C stay inside the sheet). 2.126.1 B (#2125): an agent proposes rows
+instead (POST /api/v1/agent/proposals/sheet-tasks, agents/sheetprop.py); the person applies the card and sh2_to_tasks runs
+as them, with the same checks. Every route needs the right to write the sheet AND the target (list / office), the source visible and
 the same space."""
 import secrets
 
@@ -164,7 +165,10 @@ def _linked(c, sid, kind, rows=None):
 
 
 # ---------------------------------------------------------------- rows -> tasks
-def sh2_to_tasks(c, sheet, uid, b):
+def sh2_to_tasks(c, sheet, uid, b, titles=None, dues=None, via=None):
+    """The core of POST .../to-tasks, without the request (the caller checked uid may write the sheet: _gate). People only:
+    uid is the person; an agent's rows come as a proposal (agents/sheetprop.py) that the person applies, then via =
+    {agent_id} names the agent in the history. 2.126.1 B (#2125): titles / dues = {row id: the person's edit of the card}."""
     from ..tasks.validation import log_act
     from ..agents.core import agent_added_events
     from ..tasks.dependencies import newtask_events
@@ -180,6 +184,7 @@ def sh2_to_tasks(c, sheet, uid, b):
     items, skipped = [], 0
     for rid in rows:
         _, title = _cell(book, res, rid, tcol)
+        title = ((titles or {}).get(rid) or title or "").strip()  # 2.126.1 B (#2125): a title edited on the proposal card
         if not title or rid in done:
             skipped += 1
             continue
@@ -188,6 +193,8 @@ def sh2_to_tasks(c, sheet, uid, b):
             v, d = _cell(book, res, rid, dcol)
             dd = sh_parse_date(str(v)) if v not in (None, "") else None
             due = dd.isoformat() if dd else None
+        if dues and rid in dues:  # 2.126.1 B (#2125): the date of the proposal card (None = none)
+            due = dues[rid]
         notes = _cell(book, res, rid, ncol)[1] if ncol else ""
         items.append((rid, title[:300], due, notes[:20000]))
     if not items:
@@ -200,8 +207,9 @@ def sh2_to_tasks(c, sheet, uid, b):
     for i, (rid, title, due, notes) in enumerate(items):
         tid = insert_id(c, "INSERT INTO tasks(list_id,title,content,due,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?,?)",
                         (l["id"], title, notes, due, base + i, ts, ts, uid))
-        log_act(c, tid, "created", {"sheet": sheet["id"]})  # the history: "carried over from a table" + link (no table name)
-        agent_added_events(c, tid)
+        # the history: "carried over from a table" + link (no table name); 2.126.1 B (#2125): + "from a proposal by <agent>"
+        log_act(c, tid, "created", {"sheet": sheet["id"], **({"agent": via["agent_id"], "proposal": True} if via else {})})
+        agent_added_events(c, tid, source="proposal" if via else None)
         newtask_events(c, tid)
         rul_fire(c, tid, rul_snap_new(c))
         _link(c, sheet["id"], "task", tid, batch, uid, row_id=rid, list_id=l["id"])

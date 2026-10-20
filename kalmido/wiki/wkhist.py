@@ -19,6 +19,7 @@ Spaces with the lock keep no history (the server cannot read their texts; switch
 space, wikie2e.py wke_start). The rows go with their page (trash -> final deletion), its organisation or its owner.
 """
 import os
+import re
 from datetime import datetime
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -38,6 +39,7 @@ WKH_CTX, WKH_VCTX = "wiki_pages.body", "wiki_versions.body"
 WKH_MERGE = 600     # seconds: saves of the same person within this time share a version
 WKH_KEEP = 100      # versions per page
 WKH_BATCH = 200
+WSB_SEALED_RE = re.compile(r"[A-Za-z0-9_-]+")  # 2.126.2 B (#2358): base64url without padding (orgcrypt._b64u)
 
 
 def wkh_sid(oid, owner):
@@ -76,23 +78,51 @@ def wkh_seal(c, oid, owner, text, ctx=WKH_CTX):
     return _seal(key, sid, ctx, text) if key else text
 
 
+class WikiUnreadable(OrgCryptError):
+    """2.126.2 B (#2358): a sealed page text that cannot be opened (its key is gone) -- 409 wiki_unreadable, never the
+    ciphertext as text (a save would write it down as the page)."""
+
+
+@app.errorhandler(WikiUnreadable)
+def wsb_unreadable(e):
+    return jsonify(error=tr("This page cannot be read: the key of its encryption is missing."), code="wiki_unreadable"), 409
+
+
+def wsb_sealed_shape(value):
+    """2.126.2 B (#2358): the value has the whole shape of a sealed text ("kenc1:" + base64url of nonce, at least one byte and
+    the tag, nothing else) -- a plain text that only starts with "kenc1:" (spaces, line breaks, short) does not."""
+    v = value[len(PREFIX):]
+    return len(v) >= 39 and WSB_SEALED_RE.fullmatch(v) is not None
+
+
 def wkh_open(c, oid, owner, value, ctx=WKH_CTX):
-    """The plain text of a stored value (a plain value unchanged). OrgCryptError when a sealed one cannot be opened -- except
-    while sealing is off for the space: then a plain text that happens to start like a sealed one is shown as it is."""
+    """The plain text of a stored value (a plain value unchanged). WikiUnreadable when a sealed one cannot be opened -- except
+    while sealing is off for the space and the value is not shaped like a sealed text: then a plain text that happens to
+    start like a sealed one is shown as it is."""
     if not oc_is_enc(value):
         return value
     sid = wkh_sid(oid, owner)
     try:
         return oc_dec_k(oc_key(c, sid, create=False), sid, ctx, value)
-    except OrgCryptError:
-        if wkh_on(c, sid):
-            raise
+    except OrgCryptError as e:
+        if wkh_on(c, sid) or wsb_sealed_shape(value):  # 2.126.2 B (#2358): an error, not the ciphertext as the page's text
+            raise WikiUnreadable(str(e)) from None
         return value
 
 
 def wkh_body(c, r):
     """The plain text of page row r."""
     return wkh_open(c, r["org_id"], r["owner_id"], r["body"])
+
+
+def wsb_body_or(c, r, default=""):
+    """2.126.2 B (#2358): wkh_body for read-only passes over many pages (search index, export): an unreadable page gives
+    default instead of failing the whole pass."""
+    try:
+        return wkh_body(c, r)
+    except WikiUnreadable:
+        print("wiki page unreadable, skipped", r["id"], flush=True)
+        return default
 
 
 def _vbody(c, v):
@@ -125,7 +155,10 @@ def wkh_note(c, pid, uid, ts, prev=None, fresh=False):
     text = wkh_body(c, r)
     last = c.execute("SELECT id, org_id, owner_id, path, body, created_by, created_at FROM wiki_versions WHERE page_id=? "
                      "ORDER BY id DESC LIMIT 1", (pid,)).fetchone()
-    ltext = _vbody(c, last) if last else None
+    try:
+        ltext = _vbody(c, last) if last else None
+    except WikiUnreadable:  # 2.126.2 B (#2358): an unreadable last version: the new state gets a version of its own
+        last, ltext = None, None
     if prev is not None and prev[0] and prev[0] != ltext and not le2e_is_cipher(prev[0]):
         # the state before was saved outside this path (or before 2.123); a page without history that the same person saved
         # a moment ago (a new page, an import) starts with this save
@@ -265,9 +298,18 @@ def wkh_list(pid):
     rows = c.execute("SELECT id, org_id, owner_id, path, body, size, created_by, created_at, updated_at FROM wiki_versions "
                      "WHERE page_id=? ORDER BY id DESC LIMIT ?", (pid, WKH_KEEP)).fetchall()
     names = user_names(c, {x["created_by"] for x in rows})
-    cur = wkh_body(c, r)
+    try:  # 2.126.2 B (#2358): an unreadable page still lists its history (no version is marked current)
+        cur = wkh_body(c, r)
+    except WikiUnreadable:
+        cur = None
+
+    def same(x):
+        try:
+            return cur is not None and _vbody(c, x) == cur
+        except WikiUnreadable:
+            return False
     out = [{"id": x["id"], "path": x["path"], "size": x["size"], "created_at": x["created_at"], "updated_at": x["updated_at"],
-            "by_name": names.get(x["created_by"], ""), "current": i == 0 and x["path"] == r["path"] and _vbody(c, x) == cur}
+            "by_name": names.get(x["created_by"], ""), "current": i == 0 and x["path"] == r["path"] and same(x)}
            for i, x in enumerate(rows)]
     return jsonify(versions=out, e2e=False)
 

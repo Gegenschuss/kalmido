@@ -949,6 +949,9 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                  f"shoot_days[{{title, date, end_date?, start_time?, end_time?, location?, notes?}}] (event drafts), offer?{{title?, intro?, "
                                  f"items[{{service_id?, text, qty, unit?, price?, discount?}}]}} (a quotation draft; only with input.office.ok; never with input.offer)}}; "
                                  f"setup (2.51.0): {{modules[{{key, on}}], lists[{{name, color?, folder?, sections[]}}], project?{{type, name}}}}. "
+                                 # 2.126.1 A (#2123 #2124): texts worded by the agent, only data of input, nothing invented
+                                 f"office_text (2.126.1): {{field (= input.field: intro | closing), text}}; doc_summary: {{text}} (at most 4000 characters); "
+                                 f"report: {{text}} (Markdown). "
                                  f"At most {PROP_MAX_ITEMS} entries, {PROP_MAX_BYTES // 1024} KB."})},
         "/agent/chats": {"get": op("Chat messages after a cursor", AG, ok(ref("ChatPage")) | errs("400", "403"),
                                    [q("since", "Message id", {"type": "integer"}), q("user_id", "One person", {"type": "integer"}), q("limit", "At most 500", {"type": "integer"})])},

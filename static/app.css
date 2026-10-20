@@ -7216,6 +7216,15 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .ctr-f .muted{font-size:.75rem}
 .ppm .card:has(.ctr-head) .foot{flex-wrap:wrap;gap:.5rem}
 .ppm .card:has(.ctr-head) .foot .btn{min-height:2.75rem}
+/* 2.126.1 A (#2123 #2124) texts worded by an agent (asstprop.js): the card's text field, the summary, the report note */
+.ast-head{font-size:.8125rem;margin:.125rem 0 .5rem}
+.ast-text{width:100%;min-height:8rem;resize:vertical}
+.ast-was{margin:.5rem 0;font-size:.875rem;white-space:pre-wrap}
+.ast-row{margin:.5rem 0}
+.ast-row .btn,.ppm .card:has(.ast-head) .foot .btn{min-height:2.75rem}
+.ppm .card:has(.ast-head) .foot{flex-wrap:wrap;gap:.5rem}
+.ast-sum{margin:.5rem 0;padding:.5rem .75rem;border-left:.1875rem solid var(--accent);background:var(--accent-soft);border-radius:.375rem}
+.ast-rptnote{margin:.25rem 0}
 /* 2.71.0 B (#1459) a task in several lists: the row's "also in" / "from" mark, quiet like the other row details */
 .meta .mlm{display:inline-flex;align-items:center;gap:.25rem;min-width:0;max-width:11rem;color:var(--muted)}
 .meta .mlm .mll{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
