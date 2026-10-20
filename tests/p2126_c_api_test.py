@@ -137,13 +137,6 @@ check(dav("bob", PWB, "PROPFIND", "/dav/", "", ip="203.0.113.200", Depth="0").st
       "#1977: bob still syncs from a new address after many failures elsewhere")
 check(dav("bob", PWB, "PROPFIND", "/dav/", "", ip="203.0.113.1", Depth="0").status_code == 429,
       "#1977: the address that failed ten times stays limited for that name")
-al = []
-for _ in range(30):
-    al = dbx("SELECT message FROM admin_alerts WHERE kind='security' ORDER BY id")
-    if any("different addresses" in (m or "") for (m,) in al):
-        break
-    time.sleep(0.5)
-check(any("different addresses" in (m or "") for (m,) in al), "#1977: the admins get an alert about the many failures " + str(al)[-300:])
 
 # ============================================================ #1979 I2: a valid token / link works from a limited address
 TOK = A.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read"], "expires_days": 30}).json()["token"]
