@@ -54,7 +54,7 @@ function astFields(r) {
     ${ofcRowF('of-new_value', tr('New value'), ofcIn('of-new_value', astM(r?.new_value), {num: true, ph: astM(r?.purchase_net)}), tr('Default: the purchase price'))}
     ${ofcRowF('of-current_value', tr('Current value'), ofcIn('of-current_value', astM(r?.current_value), {num: true, ph: astM(r?.book_value)}), tr('Current value = book value, unless you enter an own value.'))}
     ${ofcRowF('of-agreement_id', tr('Insured by'), ofcSel('of-agreement_id', r?.agreement_id, r?.agreement_id ? [[r.agreement_id, r.agreement_name || `#${r.agreement_id}`]] : [], tr('none')))}
-    ${astNote()}</details>`;
+    ${astNote()}</details>${r?.id ? `<div class="astlink dlbox" id="ast-link" data-eq="${r.id}"></div>` : ''}`;  // 2.140.0 B (#2136): the private device link
 }
 // fills the policy choice, wires the receipt picker
 function astBind(md, r) {
@@ -65,8 +65,10 @@ function astBind(md, r) {
     sel.innerHTML = `<option value="">${esc(tr('none'))}</option>` + (j.items || []).filter(a => !a.archived || String(a.id) === cur)
       .map(a => `<option value="${a.id}" ${String(a.id) === cur ? 'selected' : ''}>${esc(a.name + (a.provider ? ` (${a.provider})` : ''))}</option>`).join('');
   }).catch(() => {});
+  if (r?.id) astLinkLoad(md, r.id);  // 2.140.0 B (#2136)
   md.addEventListener('click', e => {
     const b = e.target.closest('[data-ast]'); if (!b || !md.contains(b)) return;
+    if (b.dataset.ast.startsWith('dl-')) { astLinkAct(md, b); return; }
     if (b.dataset.ast === 'unlink') { $('#of-receipt_node_id', md).value = ''; $('#ast-rcname', md).innerHTML = `<span class="muted">${esc(tr('none'))}</span>`; b.hidden = true; }
     else if (b.dataset.ast === 'pick') modalSub(md, () => astPick(md));
   });
@@ -125,4 +127,37 @@ function astUndo(r, body) {
   for (const k of Object.keys(body)) old[k] = r[k] ?? null;
   const go = b => api('PATCH', url, b).then(() => ofcReload('equipment'));
   offerUndo(tr('Saved'), histAdd({label: tr('Edit device'), undo: () => go(old), redo: () => go(body)}));
+}
+
+// ---- 2.140.0 B (#2136): the own private device linked with this piece of equipment (life/devlink.py; the device side is
+// devlink.js). Only the person's own link ever shows; "Take over as a private device" needs the module "home".
+async function astLinkLoad(md, id) {
+  const box = $('#ast-link', md); if (!box) return;
+  let j; try { j = await rawFetch('GET', `${AST_URL}/${id}/link`); } catch { box.innerHTML = ''; return; }
+  const l = j.link, o = l?.other, row = v => `<div class="row"><label>${esc(tr('Private'))}</label><span class="lacts">${v}</span></div>`;
+  const rm = l ? `<button type="button" class="btn sm" data-ast="dl-unlink" data-link="${l.id}">${ic('x', 's')}<span>${tr('Remove link')}</span></button>` : '';
+  box.innerHTML = !l ? (j.can_take ? row(`<button type="button" class="btn sm" data-ast="dl-take" data-eq="${id}">${ic('tool', 's')}<span>${tr('Take over as a private device')}</span></button>`) : '')
+    : o.state !== 'ok' ? row(`<span class="muted dlhint">${ic('alert', 's')} ${esc(tr('The linked private device does not exist any more.'))}</span>${rm}`)
+      : row(`<span class="dllink">${ic('link', 's')} ${esc(tr('Linked with your private device “{0}”', o.name))}</span>
+        <button type="button" class="btn sm" data-ast="dl-open" data-task="${o.task_id}">${ic('right', 's')}<span>${tr('Open')}</span></button>
+        <button type="button" class="btn sm" data-ast="dl-pull" data-link="${l.id}">${ic('repeat', 's')}<span>${tr('Update from there')}</span></button>${rm}`);
+}
+async function astLinkAct(md, b) {
+  const a = b.dataset.ast, id = +$('#ast-link', md)?.dataset.eq;
+  if (a === 'dl-open') {  // the editor closes the usual way (it asks before unsaved input is lost), then the device opens
+    const tid = +b.dataset.task, wait = setInterval(() => { if (!md.isConnected) { clearInterval(wait); go(`t/${tid}`); } }, 100);
+    setTimeout(() => clearInterval(wait), 30000);
+    $('[data-m="close"]', md)?.click();
+    return;
+  }
+  if (a === 'dl-pull' && !await askConfirm(tr('Update from the private device?'), tr('Name, serial number and purchase date are taken over from there; the prices stay.'), {ok: tr('Update')})) return;
+  if (a === 'dl-unlink' && !await askConfirm(tr('Remove the link?'), tr('The device and the office equipment both stay; only the link goes.'), {ok: tr('Remove link')})) return;
+  b.disabled = true;
+  try {
+    if (a === 'dl-take') { const j = await rawFetch('POST', `${AST_URL}/${id}/to-device`, {}); toast(tr('Added as a private device'), () => go(`t/${j.task.id}`), 0, tr('Open')); }
+    else if (a === 'dl-pull') { await rawFetch('POST', `/api/life/device-links/${+b.dataset.link}/pull`, {into: 'equipment'}); toast(tr('Updated')); ofcReload('equipment'); }
+    else if (a === 'dl-unlink') await rawFetch('DELETE', `/api/life/device-links/${+b.dataset.link}`);
+  } catch (er) { toast(er.message || tr('unknown')); }
+  b.disabled = false;
+  astLinkLoad(md, id);
 }

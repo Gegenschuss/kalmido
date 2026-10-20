@@ -315,6 +315,9 @@ function lifeDetailHtml(t, l, ro) {
     if (f.model) rows.push(row(tr('Model'), esc(f.model)));
     if (f.bought) rows.push(row(tr('Bought on'), esc(fmtDateLoc(f.bought))));
     if (f.warranty) rows.push(row(tr('Warranty until'), esc(fmtDateLoc(f.warranty))));
+    if (f.serial) rows.push(row(tr('Serial number'), esc(f.serial)));  // 2.140.0 B (#2136): serial, price, the office link (devlink.js)
+    if (f.price != null) rows.push(row(tr('Price'), esc(fmtMoney(f.price))));
+    if (typeof dlDeviceHtml === 'function') rows.push(dlDeviceHtml(t, ro));
   } else if (k === 'upkeep') {
     const rn = lifeRenew(t.repeat); if (rn) rows.push(row(tr('Every'), esc(trn('{0} month', '{0} months', rn))));
   } else if (k === 'health') {

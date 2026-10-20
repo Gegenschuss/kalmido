@@ -476,7 +476,11 @@ ROUTES = {
     "POST /api/family/rewards/{}/decide": "personal", "POST /api/family/rewards/{}/request": "personal",
     "POST /api/feeds": "personal", "POST /api/feeds/items/{}/later": "personal", "POST /api/feeds/opml": "personal",
     "POST /api/feeds/read": "personal", "POST /api/feeds/{}/restore": "personal", "POST /api/life/contracts": "personal",
-    "POST /api/life/devices": "personal", "POST /api/life/health": "personal", "POST /api/life/karakeep/sync": "personal",
+    "POST /api/life/devices": "personal",
+    # 2.140.0 B (#2134, #2136): the budget's month comparison, a device <-> the own office (p2140_b_api_test.py)
+    "GET /api/budget/{}/compare": "personal", "GET /api/life/devices/{}/link": "personal", "POST /api/life/devices/{}/to-office": "personal",
+    "POST /api/life/device-links/{}/pull": "personal", "DELETE /api/life/device-links/{}": "personal",
+    "GET /api/office/equipment/{}/link": "office", "POST /api/office/equipment/{}/to-device": "office", "POST /api/life/health": "personal", "POST /api/life/karakeep/sync": "personal",
     "POST /api/life/trips": "personal", "POST /api/life/upkeep": "personal", "POST /api/servers": "personal",
     "POST /api/servers/code": "personal", "POST /api/servers/move": "personal", "POST /api/servers/{}/news/read": "personal",
     "POST /api/servers/{}/restore": "personal", "POST /api/servers/{}/tasks": "personal",

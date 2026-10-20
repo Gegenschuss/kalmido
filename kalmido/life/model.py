@@ -109,7 +109,7 @@ def life_clean_fam(v):
     k = v.get("kind")
     bad = BadInput(tr("Invalid value: {0}", "family"))
     allowed = {"contract": {"kind", "name", "provider", "cost", "per", "notice", "nu", "start", "account", "lead", "office_agreement"},
-               "device": {"kind", "name", "model", "bought", "warranty", "lead"},
+               "device": {"kind", "name", "model", "bought", "warranty", "lead", "serial", "price"},  # 2.140.0 B (#2136): + serial, price
                "upkeep": {"kind", "item", "lead"},
                "health": {"kind", "type", "who", "lead"},
                "bookmark": {"kind", "src", "bid", "arch"}}[k]
@@ -139,9 +139,12 @@ def life_clean_fam(v):
             out["office_agreement"] = as_int(v["office_agreement"], "office_agreement", 1)
     elif k == "device":
         out["name"] = _name(v.get("name"))
-        for f in ("model",):
+        for f in ("model", "serial"):  # 2.140.0 B (#2136): the serial number (from / for the office equipment)
             if v.get(f):
                 out[f] = _name(v[f], f)
+        price = _cost(v.get("price"))  # 2.140.0 B (#2136): the purchase price (gross, what the person paid)
+        if price is not None:
+            out["price"] = price
         for f in ("bought", "warranty"):
             if v.get(f):
                 out[f] = _date(v[f], f)
@@ -282,12 +285,16 @@ UPKEEP_PRESETS = (("heating", N_("Service the heating"), 12), ("smoke", N_("Test
 
 
 def device_create(c, uid, b):
-    """{name, model?, bought?, warranty? (YYYY-MM-DD), lead_days? (30), list_id?} -> the new task id (due when the
-    warranty ends, without a warranty date a plain entry)."""
+    """{name, model?, bought?, warranty? (YYYY-MM-DD), lead_days? (30), list_id?, serial?, price?, note?} -> the new task id
+    (due when the warranty ends, without a warranty date a plain entry). 2.140.0 B (#2136): serial, price, note (the task's
+    text) -- what a piece of office equipment hands over (life/devlink.py)."""
     need_life(c, uid, "home")
     name = _name(b.get("name"), need=True)
     f = json.loads(life_clean_fam({"kind": "device", "name": name, "model": b.get("model"), "bought": b.get("bought"),
-                                   "warranty": b.get("warranty")}))
+                                   "warranty": b.get("warranty"), "serial": b.get("serial"), "price": b.get("price")}))
+    note = b.get("note") or ""
+    if not isinstance(note, str):
+        raise BadInput(tr("Invalid value: {0}", "note"))
     lead = as_int(b.get("lead_days", 30), "lead_days", 0, LEAD_MAX)
     f["lead"] = lead
     if f.get("bought") and f.get("warranty") and f["warranty"] < f["bought"]:
@@ -295,8 +302,9 @@ def device_create(c, uid, b):
     lid = _target_list(c, uid, b, "home")
     lg = lang(c, uid)
     if f.get("warranty"):
-        return _insert(c, uid, lid, tr("Warranty ends: {0}", name, lg=lg), f["warranty"], rem=_reminders(lead), fam=f, deadline=2)
-    return _insert(c, uid, lid, name, fam=f)
+        return _insert(c, uid, lid, tr("Warranty ends: {0}", name, lg=lg), f["warranty"], rem=_reminders(lead), fam=f, deadline=2,
+                       content=note[:5000])
+    return _insert(c, uid, lid, name, fam=f, content=note[:5000])
 
 
 def upkeep_create(c, uid, b):
