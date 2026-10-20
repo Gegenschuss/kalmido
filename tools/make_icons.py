@@ -12,12 +12,14 @@ rsvg-convert + ImageMagick (metadata and time chunks stripped), so the same draw
   static/icon-192.png / -512    manifest icons, purpose "any" (rounded plate, transparent corners)
   static/icon-maskable-512.png  manifest icon, purpose "maskable": plate full-bleed, figure inside the inner 80 % circle
   static/apple-touch-icon.png   180 px, square and opaque (iOS rounds the corners itself; design file icon-ios-180)
+  static/apple-touch-icon-1024.png  1024 px for the Mac dock (Safari "Add to Dock" takes the largest touch icon):
+                                full-bleed square, macOS cuts its own shape, the figure larger (about 80 % of the height)
   static/favicon.svg            browser tab: the figure a little larger with thicker eyes, reads at 16 px
   static/favicon-16.png / -32   PNG fallbacks (both from the favicon drawing)
   static/badge-96.png           push badge (Android): the silhouette in one colour (white) on transparent, eyes cut out
   static/shortcuts/*-96/-192    long-press shortcut icons: the app's line icon in the icon's colours
   --site DIR                    also the website assets: icon.svg, icon-192/512.png, apple-touch-icon.png,
-                                favicon.svg, favicon-32.png, kalmido-logo.svg / kalmido-logo-light.svg (icon + word mark)
+                                apple-touch-icon-1024.png, favicon.svg, favicon-32.png, kalmido-logo.svg / kalmido-logo-light.svg (icon + word mark)
 
 The word mark is the outlined path of the design file (wortmarke-*.svg), so the lockup does not depend on fonts.
 
@@ -100,6 +102,9 @@ LOGO_WHITE = svg(bot(WHITE, ant=ANT_DARK, cid="e"), label="Kalmido")
 # maskable: the safe zone is the circle of radius 40 around the centre; the design file scales the figure to .84
 MASKABLE = svg(plate(rx=0) + bot(scale=0.84))
 APPLE = svg(plate(rx=0) + bot())
+# 2.138.1 (#2396): Mac dock icon - no own corners (a rounded or transparent edge puts it into a grey frame on macOS 26)
+# and the figure at about 80 % of the height, so it reads as large as the native icons next to it
+MAC = svg(plate(rx=0) + bot(scale=1.05))
 FAVICON = svg(plate() + bot(scale=1.08, bold=1), label="Kalmido")
 # push badge: Android shows only the alpha channel, so one colour, eyes cut out, a little larger with thick strokes
 BADGE = svg(bot(WHITE, ant=WHITE, scale=1.05, bold=1.5, cid="b"))
@@ -173,6 +178,7 @@ def build(static, site, tmp):
     png(ICON, 512, os.path.join(static, "icon-512.png"))
     png(MASKABLE, 512, os.path.join(static, "icon-maskable-512.png"), OPAQUE)
     png(APPLE, 180, os.path.join(static, "apple-touch-icon.png"), OPAQUE)
+    png(MAC, 1024, os.path.join(static, "apple-touch-icon-1024.png"), OPAQUE)
     png(FAVICON, 16, os.path.join(static, "favicon-16.png"))
     png(FAVICON, 32, os.path.join(static, "favicon-32.png"))
     png(BADGE, 96, os.path.join(static, "badge-96.png"), ONECOLOUR)
@@ -188,6 +194,7 @@ def build(static, site, tmp):
         png(ICON, 192, os.path.join(a, "icon-192.png"))
         png(ICON, 512, os.path.join(a, "icon-512.png"))
         png(APPLE, 180, os.path.join(a, "apple-touch-icon.png"), OPAQUE)
+        png(MAC, 1024, os.path.join(a, "apple-touch-icon-1024.png"), OPAQUE)
         png(FAVICON, 32, os.path.join(a, "favicon-32.png"))
     return out
 

@@ -20,7 +20,7 @@ function newsGroups(items) {
     // 2.25.0 (UX-45): a comment that names me (@me) needs me too, like a mention
     const toMe = it.kind === 'comment' && S.me && (it.excerpt || '').includes(`<@${S.me.id}>`);
     // 2.66.1 (#1943): what the server marks "For you" (the bell's number: replies to me, an agent's comments that reach me) needs me too
-    g.items.push([it, i]); if (NEWS_NEEDS.includes(it.kind) || toMe || it.to_me) g.needs = true; if (!it.read) g.unread++;
+    g.items.push([it, i]); if (!it.read && (NEWS_NEEDS.includes(it.kind) || toMe || it.to_me)) g.needs = true; if (!it.read) g.unread++;  // 2.138.1 D (#2405): only unread bundles need me
   }
   // 2.102.0 B (#2197): unread lines first (the sort is stable: the server's order stays inside)
   return [...groups.values()].sort((a, b) => (b.unread > 0) - (a.unread > 0));
@@ -42,7 +42,7 @@ function newsGroupHtml(g, pop) {
   const ids = g.items.flatMap(([it]) => it.ids || [it.id]);
   const open = g.items.length === 1 ? (pop ? 'data-bp="open"' : 'data-act="news-open"') + ` data-i="${g.items[0][1]}"` : `data-act="news-group" data-g="${esc(g.key)}"`;
   const exp = S.nf.openG === g.key;
-  return `<div class="ngroup ${g.unread ? 'unread' : ''} ${g.needs ? 'needs' : ''}" data-gk="${esc(g.key)}">
+  return `<div class="ngroup ${g.unread ? 'unread' : 'read'} ${g.needs ? 'needs' : ''}" data-gk="${esc(g.key)}">
     <div class="nghead"><div class="ngav">${actors.map(a => av(a, uname(a, U), 'avatar sm')).join('')}</div>
       <div class="ngmain" role="button" tabindex="0" ${open} ${g.items.length > 1 ? `aria-expanded="${exp}"` : ''}><div class="ngt">${title}${g.items.length > 1 && g.unread ? `<span class="ngn" title="${esc(tr('Unread'))}">${g.unread}</span>` : ''}</div><div class="ngs muted">${esc(newsSummaryLine(g))} · <time>${esc(relTime(g.at))}</time></div>${(() => {  // 2.25.0 (UX-45): what was written, one line
         const ex = g.items.map(([it]) => it).find(it => (it.kind === 'mention' || it.kind === 'comment') && it.excerpt);
@@ -50,11 +50,14 @@ function newsGroupHtml(g, pop) {
       ${g.unread ? `<button type="button" class="iconbtn" data-act="news-gread" data-ids="${ids.join(',')}" title="${esc(tr('Mark read'))}" aria-label="${esc(tr('Mark read') + ': ' + title.replace(/<[^>]+>/g, ''))}">${ic('check', 's')}</button>` : ''}</div>
     ${exp && g.items.length > 1 ? `<div class="nlist ngitems">${g.items.map(([it, i]) => newsItemHtml(it, i, pop)).join('')}</div>` : ''}</div>`;
 }
-function newsBundledHtml(vis, pop) {
-  // 2.18.0 (#652): the two sections are h2 (the page's h1 is the header title; the bell's panel has no heading above them)
-  const gs = newsGroups(vis), needs = gs.filter(g => g.needs), info = gs.filter(g => !g.needs);
-  return (needs.length ? `<section class="nsect" aria-labelledby="ns-need"><h2 id="ns-need" class="nsh">${tr('Needs you')}<span class="c">${needs.length}</span></h2>${needs.map(g => newsGroupHtml(g, pop)).join('')}</section>` : '')
-    + (info.length ? `<section class="nsect" aria-labelledby="ns-info"><h2 id="ns-info" class="nsh">${tr('For your information')}<span class="c">${info.length}</span></h2>${info.map(g => newsGroupHtml(g, pop)).join('')}</section>` : '');
+function newsBundledHtml(vis, pop, pre = '') {
+  // 2.18.0 (#652): the sections are h2 (the page's h1 is the header title; the bell's panel has no heading above them)
+  // 2.138.1 D (#2405): For you (unread + to me, the bell's number) / Also new (other unread) / Read (below, newest first)
+  const gs = newsGroups(vis), needs = gs.filter(g => g.needs), info = gs.filter(g => !g.needs && g.unread), done = gs.filter(g => !g.unread);
+  const sect = (id, title, n, body, cls) => `<section class="nsect ${cls}" aria-labelledby="${id}"><h2 id="${id}" class="nsh">${title}${n ? `<span class="c">${n}</span>` : ''}</h2>${body}</section>`;
+  return (needs.length || pre ? sect('ns-need', tr('For you'), bellCount(), pre + needs.map(g => newsGroupHtml(g, pop)).join(''), 'me') : '')
+    + (info.length ? sect('ns-info', tr('Also new'), info.length, info.map(g => newsGroupHtml(g, pop)).join(''), 'also') : '')
+    + (done.length ? sect('ns-read', tr('Read'), 0, done.map(g => newsGroupHtml(g, pop)).join(''), 'done') : '');
 }
 async function newsGroupRead(ids) {
   try { await rawFetch('POST', '/api/news/read', {ids}); } catch (e) { toast(e.message); return; }
