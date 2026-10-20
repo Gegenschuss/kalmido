@@ -159,7 +159,7 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check(!d.querySelector('#l-members') && !/Sharing/.test(d.querySelector('.modal').textContent), 'collab off: no sharing section in the list dialog');
   d.querySelector('.modal').remove();
   w.eval('settingsModal()'); await sleep(200);
-  const tabopts = [...d.querySelectorAll('#s-tabadd option')].map(o => o.value);
+  const tabopts = w.eval(`tabAddGroups().flatMap(g => g.items).map(x => x.id)`);  // 2.122.2 (#2329): a sheet instead of the select
   check(!tabopts.includes('s:assigned'), 'collab off: tab bar cannot pin "Assigned to me"');
   const cb = d.querySelector('[data-feat="collab"]');
   check(cb && !cb.checked && !d.querySelector('[data-feat="links"]'), 'settings: collab unchecked, no links switch any more');

@@ -37,7 +37,7 @@ function closeDetail(fromPop) {
   flushSaves();
   const was = S.sel, a = document.activeElement, back = was && (!a || a === document.body || $('#detail').contains(a) || a.matches?.('.pgrip'));
   if (back) setTimeout(() => { if (!document) return; const t = $(`#view .trow[data-id="${was}"] .ttl[data-kt]`); const b = document.activeElement; if (t && !S.sel && (!b || b === document.body || !b.isConnected || $('#detail').contains(b) || b.matches?.('.pgrip'))) { rowRove(t); try { t.focus({preventScroll: true}); } catch { t.focus(); } } }, isMobile() ? 260 : 0);
-  S.sel = null; S.tl = {id: null}; S.cedit = null; S.editLink = false; mentionClose();
+  S.sel = null; S.nswTask = null; S.tl = {id: null}; S.cedit = null; S.editLink = false; mentionClose();
   if ($('#stale.indet')) staleDraw();  // 2.13.2 (#478 F8): back to the bottom edge
   const d = $('#detail');
   d.classList.remove('open');
@@ -635,7 +635,7 @@ function dswBlocked(el) {
 }
 document.addEventListener('touchstart', e => {
   dsw = null;
-  if (!S.sel || !isMobile() || e.touches.length !== 1 || $('.modal') || $('#pop:not(.hidden)')) return;
+  if (!S.sel || !isMobile() || e.touches.length !== 1 || $('.modal') || $('#pop:not(.hidden)') || (typeof nswOn === 'function' && nswOn())) return;  // 2.122.0 (#2314): opened from the news: collab.js swipes
   const d = $('#detail'), el = e.target;
   if (!d || d.classList.contains('multi') || !el.closest?.('#detail .dbody, #detail .dtop') || dswBlocked(el)) return;
   const t0 = e.touches[0];

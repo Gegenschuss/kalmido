@@ -554,7 +554,7 @@ function settingsModal(focus) {
       <h4 id="s-tabbar-h">${tr('Tab bar')}${dev}</h4>
       ${hint(tr('At the bottom on a phone (the desktop shows every module in the sidebar). A phone fits {0} tabs, the rest goes under “More”.', TAB_MAX))}
       <div class="navlist" id="s-tabbar"></div>
-      <div class="row" style="margin-top:.5rem"><select id="s-tabadd" style="flex:1" aria-label="${tr('+ Add tab …')}"></select><button class="btn sm" data-m="tab-reset">${tr('Default')}</button></div>
+      <div class="row" style="margin-top:.5rem"><button type="button" class="btn sm tabaddb" id="s-tabadd" data-m="tab-add" style="flex:1" aria-haspopup="dialog">${tr('+ Add tab …')}</button><button class="btn sm" data-m="tab-reset">${tr('Default')}</button></div>
       <h4 id="s-prbg-h">${tr('Task rows')}</h4>
       <div class="row"><label for="s-prbg">${tr('Priority as background')}</label><select id="s-prbg">${[['', N_('Off')], ['soft', N_('Subtle')], ['strong', N_('Strong')]].map(([v, n]) => `<option value="${v}" ${(s.prio_bg || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
       ${hint(tr('Tasks with a priority get a light background in its colour (high red, medium orange, low blue) in lists, Today and on boards; the bar at the edge stays.'))}
@@ -884,16 +884,6 @@ function settingsModal(focus) {
   const tabDraw = () => {
     const ids = tabIds(), box = $('#s-tabbar', md); if (!box) return;
     box.innerHTML = ids.map(tabItem).map((t, i) => t ? `<div class="navrow" data-tab="${esc(t.id)}">${t.icon}<span>${esc(t.label)}</span>${i === TAB_MAX - 1 && ids.length > TAB_MAX ? `<span class="muted" style="font-size:var(--fs-xs)">${tr('from here on “More”')}</span>` : ''}<button class="iconbtn" data-tmove="-1" title="${tr('move forward')}" aria-label="${esc(tr('move forward') + ': ' + t.label)}">${ic('chev', 's up')}</button><button class="iconbtn" data-tmove="1" title="${tr('move back')}" aria-label="${esc(tr('move back') + ': ' + t.label)}">${ic('chev', 's')}</button><button class="iconbtn" data-tdel title="${tr('remove')}" aria-label="${esc(tr('remove') + ': ' + t.label)}">${ic('x', 's')}</button></div>` : '').join('') || `<div class="muted" style="font-size:var(--fs-m)">${tr('Empty: only “More”')}</div>`;
-    const opt = (id, n) => ids.includes(id) ? '' : `<option value="${esc(id)}">${esc(n)}</option>`;
-    const grp = (n, o) => o ? `<optgroup label="${tr(n)}">${o}</optgroup>` : '';
-    $('#s-tabadd', md).innerHTML = `<option value="">${tr('+ Add tab …')}</option>` +
-      grp(N_('Sections'), MODS.filter(([m]) => m === 'tasks' || feat(m)).map(([m, , n]) => opt('m:' + m, tr(n))).join('')) +
-      grp(N_('Smart lists'), SMART_TABS.filter(k => k !== 'assigned' || collab()).map(k => opt('s:' + k, tr(SMART[k].name))).join('')) +
-      grp(N_('Lists'), S.lists.filter(l => !l.is_inbox && !l.archived).map(l => opt('l:' + l.id, listName(l.name))).join('')) +
-      grp(N_('Filters'), S.filters.map(f => opt('f:' + f.id, f.name)).join('')) +
-      grp(N_('Folders'), folderNames().map(f => opt('folder:' + f, fDisp(f))).join('')) +
-      grp(N_('Tags'), Object.keys(counts().tags).sort((a, b) => a.localeCompare(b, 'de')).map(t => opt('tag:' + t, '#' + t)).join('')) +
-      grp(N_('Other'), opt('home', tr('Start|home')) + (teamOn() ? opt('team', tr('Team chat')) : '') + (collab() ? opt('news', tr('News')) : '') + (feat('agents') && agentsOn() ? opt('agents', tr('Agents')) : '') + (overviewOn() ? opt('overview', tr('Project status')) : '') + mg_tabOpts(opt) /* 2.44.0 (#1187) */ + (feat('wiki') ? opt('wiki', tr('Knowledge pages')) : '') /* 2.49.0 (#1199) */ + opt('search', tr('Search')) + opt('lists', tr('Lists')) + opt('settings', tr('Settings')));
   };
   md._tabDraw = tabDraw;
   // 2.25.0 (UX-03): the sidebar: groups up / down, an eye per group, check boxes for the entries of Plan and Views
@@ -916,7 +906,6 @@ function settingsModal(focus) {
   const tabApply = ids => { if (ids) LS.set('tabbar', ids); else LS.set('tabbar', null); tabDraw(); renderTabs(); };
   const tabSet = ids => setLocal(tr('Tab bar'), () => LS.get('tabbar', null), tabApply, ids);
   tabDraw();
-  $('#s-tabadd', md).addEventListener('change', e => { if (e.target.value) tabSet([...tabIds(), e.target.value]); });
   if (S.me) accountWire(md);
   mailWire(md);  // 2.17.0 (#443)
   md.addEventListener('click', async e => {
@@ -930,6 +919,7 @@ function settingsModal(focus) {
     }
     if (b.dataset.m === 's-undo') { const el = $('.ssaved', md); if (el?._e && HIST.undo[HIST.undo.length - 1] === el._e) { el.classList.remove('on'); histStep('undo'); } return; }
     if (b.dataset.m === 'tab-reset') { tabSet(null); return; }
+    if (b.dataset.m === 'tab-add') { tabAddSheet(id => { tabSet([...tabIds(), id]); $('#s-tabadd', md)?.focus(); }); return; }  // 2.122.2 (#2329)
     if (b.dataset.m === 'sync-now') { b.disabled = true; try { if (OUT.q.length) await flush(); await refreshNow(); } finally { b.disabled = false; const st = $('#s-synced', md); if (st) st.textContent = syncedTxt(); } return; }  // 2.25.0 (UX-56)
     if (b.dataset.m === 'wp-on') { const c = $('#s-wpdev', md); if (c && !c.checked) c.click(); return; }  // 2.25.0 (UX-46)
     if (b.dataset.jump) { const t = $(b.dataset.jump, md); if (t) { t.scrollIntoView?.({block: 'start'}); t.classList.add('flash'); setTimeout(() => t.classList.remove('flash'), 1600); } return; }  // 2.25.0 (UX-20)
@@ -1295,4 +1285,57 @@ async function icalAction(md, a) {
   if (a === 'off' && !await askConfirm(tr('Turn the calendar feed off?'), tr('Subscribed calendars stop updating.'), {ok: tr('Turn off'), danger: true})) return;
   try { icalDraw(md, await api('POST', '/api/ical', {action: a})); } catch { /* api() showed it */ }
   if (a === 'rotate') toast(tr('New link created, the old one no longer works'));
+}
+
+// 2.122.2 (#2329): "+ Add tab …" as a sheet instead of one long select: a search on top, the sections (areas, smart lists,
+// lists, filters, folders, tags, other) folded except one, the lists below their folder, the app's icons (a list its own
+// sign); tabs already in the bar are left out; a tap adds the tab and closes the sheet.
+function tabAddGroups() {
+  const ids = tabIds(), out = [];
+  const it = (id, label, x = {}) => ids.includes(id) ? null : {id, label, icon: tabItem(id)?.icon || ic(x.ic || 'plus', 'l'), ...x};
+  const grp = (k, n, items) => { items = items.filter(Boolean); if (items.some(x => !x.head)) out.push({k, n: tr(n), items}); };
+  const mg = []; mg_tabOpts((id, n) => { mg.push(it(id, n)); return ''; });
+  grp('m', N_('Sections'), [...MODS.filter(([m]) => m === 'tasks' || feat(m)).map(([m, , n]) => it('m:' + m, tr(n))), ...mg]);
+  grp('s', N_('Smart lists'), SMART_TABS.filter(k => k !== 'assigned' || collab()).map(k => it('s:' + k, tr(SMART[k].name))));
+  const ls = S.lists.filter(l => !l.is_inbox && !l.archived), li = (l, d) => it('l:' + l.id, listName(l.name), {d, f: l.folder || ''});
+  grp('l', N_('Lists'), [...ls.filter(l => !l.folder).map(l => li(l, 0)), ...folderNames().flatMap(f => {
+    const sub = ls.filter(l => l.folder === f).map(l => li(l, fDepth(f))).filter(Boolean);
+    return sub.length ? [{head: true, label: fDisp(f), d: fDepth(f) - 1, f}, ...sub] : [];
+  })]);
+  grp('f', N_('Filters'), S.filters.map(f => it('f:' + f.id, f.name, {ic: 'filter'})));
+  grp('folder', N_('Folders'), folderNames().map(f => it('folder:' + f, fDisp(f), {ic: 'folder'})));
+  grp('tag', N_('Tags'), Object.keys(counts().tags).sort((a, b) => a.localeCompare(b, 'de')).map(t => it('tag:' + t, '#' + t, {ic: 'tag'})));
+  grp('o', N_('Other'), [it('home', tr('Start|home')), teamOn() && it('team', tr('Team chat')), collab() && it('news', tr('News')), feat('agents') && agentsOn() && it('agents', tr('Agents')),
+    overviewOn() && it('overview', tr('Project status')), feat('wiki') && it('wiki', tr('Knowledge pages')), it('search', tr('Search')), it('lists', tr('Lists')), it('settings', tr('Settings'))]);
+  return out;
+}
+function tabAddSheet(onPick) {
+  const groups = tabAddGroups();
+  let open = groups[0]?.k || '';
+  const md = modal(`<h3>${tr('Add tab')}</h3><div class="ctsearch">${ic('search', 's')}<input id="ta-q" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" autocomplete="off"></div><div class="tapick-l"></div>
+    <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Close')}</button></div>`);
+  md.classList.add('tapick');
+  const row = x => x.head ? `<li class="tapick-h" style="--d:${x.d}">${ic('folder', 's')}<span>${esc(x.label)}</span></li>`
+    : `<li><button type="button" class="tapick-i" data-tabadd="${esc(x.id)}" style="--d:${x.d || 0}"><span class="tapick-ic" aria-hidden="true">${x.icon}</span><span class="tapick-n">${esc(x.label)}</span></button></li>`;
+  const draw = () => {
+    const q = ($('#ta-q', md)?.value || '').trim().toLocaleLowerCase();
+    const hit = x => !x.head && x.label.toLocaleLowerCase().includes(q);
+    const html = groups.map(g => {
+      const items = q ? g.items.filter(x => x.head ? g.items.some(y => !y.head && y.f === x.f && hit(y)) : hit(x)) : g.items;  // a folder head stays above its hits
+      if (q && !items.some(x => !x.head)) return '';
+      const on = !!q || g.k === open, n = items.filter(x => !x.head).length;
+      return `<section class="tapick-g ${on ? 'on' : ''}" data-tag="${esc(g.k)}"><button type="button" class="tapick-gh" data-tagrp="${esc(g.k)}" aria-expanded="${on}"><b>${esc(g.n)}</b><span class="muted">${n}</span><span class="spacer"></span>${ic('chev', 's ' + (on ? 'up' : 'down'))}</button>${on ? `<ul role="list">${items.map(row).join('')}</ul>` : ''}</section>`;
+    }).join('');
+    $('.tapick-l', md).innerHTML = html || `<p class="muted lempty">${tr('Nothing matches.')}</p>`;
+  };
+  draw();
+  setTimeout(() => { if (!matchMedia('(pointer:coarse)').matches) $('#ta-q', md)?.focus(); }, 0);
+  md.addEventListener('input', e => { if (e.target.id === 'ta-q') draw(); });
+  md.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    if (b.dataset.tagrp) { open = open === b.dataset.tagrp && !$('#ta-q', md).value.trim() ? '' : b.dataset.tagrp; $('#ta-q', md).value = ''; draw(); $(`[data-tagrp="${b.dataset.tagrp}"]`, md)?.focus(); return; }
+    if (b.dataset.tabadd) { md.remove(); onPick(b.dataset.tabadd); }
+  });
+  return md;
 }

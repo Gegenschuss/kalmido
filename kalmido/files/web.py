@@ -79,7 +79,8 @@ def _items(c, rows, parent_role=None):
                 x.update(name=tr("Linked file (no access)"), size=0, mime="", ref_id=None, no_access=True)
         out.append(x)
     out.sort(key=lambda x: (x["kind"] != "folder", x["name"].lower()))
-    return out
+    from .fstags import dt_attach  # 2.122.0 B (#2099): the tags of each row
+    return dt_attach(c, out)
 
 
 def _crumbs(c, chain, vis=None):
@@ -291,6 +292,8 @@ def files_node_get(nid):
     out = fs_node_json(c, n, n["role"], shared=bool(_shared_flags(c, [nid])) or bool(n["org_access"]))
     out["crumbs"] = _crumbs(c, chain)
     out["in_trash"] = fs_deleted(chain)
+    from .fstags import dt_attach  # 2.122.0 B (#2099)
+    dt_attach(c, [out])
     if n["kind"] == "file":
         out["versions"] = _versions(c, nid)
     if n["role"] == "owner":

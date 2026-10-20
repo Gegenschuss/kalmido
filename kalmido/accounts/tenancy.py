@@ -156,6 +156,11 @@ CHECKS = {
     # 2.99.0 A (#2182): a file of a knowledge page that lies in another space than its page (org / owner) -- (file, who stored it)
     "wiki_file": ("SELECT f.id, f.created_by FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id WHERE "
                   "COALESCE(f.org_id,0)<>COALESCE(p.org_id,0) OR (p.org_id IS NULL AND f.owner_id IS DISTINCT FROM p.owner_id)"),
+    # 2.122.0 A (#2097): a file request in another workspace than its folder, or of an organisation's folder made by a person
+    # outside that organisation (the link stops anyway: files/filereq.py frq_alive) -- (request, its creator); counted only
+    "file_request": ("SELECT q.id, q.created_by FROM fs_upload_requests q JOIN fs_nodes n ON n.id=q.node_id WHERE q.deleted_at IS NULL "
+                     "AND (COALESCE(q.org_id,0)<>COALESCE(n.org_id,0) OR (n.org_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM org_members om "
+                     "WHERE om.org_id=n.org_id AND om.user_id=q.created_by)))"),
     # 2.71.0 B (#1459): a task shown in a list of another workspace (the trigger kalmido_ml_prune drops such links on every
     # move; the read layer ignores them: tasks/multilist.py ml_fill) -- (further list, who linked it)
     "list_task_link": ("SELECT k.list_id, k.added_by FROM task_links k JOIN tasks t ON t.id=k.task_id JOIN lists o ON o.id=t.list_id "
