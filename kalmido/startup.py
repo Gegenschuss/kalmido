@@ -14,6 +14,7 @@ from .api.v1 import WH_ON
 from .integrations.webhooks import wh_loop
 from .integrations.git import git_loop
 from .integrations.mail import MAIL_IN_ON, mail_loop
+from .hub.mailbox import mbx_loop
 from .events.model import migrate_family_events
 
 
@@ -52,6 +53,7 @@ if os.environ.get("TASKS_WATCHDOG", "1") == "1" and WRK_ROLE != "web":
         wrk_start("webhooks", wh_loop)
     if MAIL_IN_ON:  # 2.17.0 (#443): new tasks by e-mail (one mailbox, polled)
         wrk_start("mail-in", mail_loop)
+    wrk_start("mailboxes", mbx_loop)  # 2.141.0 A (#2141): the own mailboxes of the workspaces (idle without any)
     wrk_start("git", git_loop)  # 2.2.0 (#271): repositories of project lists (idle without any)
     if NTFY_IN["token"] and NTFY_IN["url"]:
         if ntfy_inbox_allowed():

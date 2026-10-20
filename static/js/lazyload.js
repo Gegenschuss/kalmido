@@ -42,6 +42,7 @@ const LD_MODS = {
   polls: ['polls'],  // 2.102.0 C (#2208): scheduling polls (#1953), on the first "Find a date"
   formq: ['formq'],  // 2.102.0 C (#2208): questionnaires (#1954), with the forms dialog of a list
   ofundo: ['office_undo'],  // 2.111.0 A (#2233): undo of the office editors, clients and tables (office, sheets and the client dialog load it)
+  hubmailbox: ['hubmailbox'],  // 2.141.0 A (#2141, #2138): the mailbox of a workspace + writing from the e-mail filing (hubmail.js draws its buttons)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
@@ -60,7 +61,8 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   asstprop: ['ast_rpt'],  // 2.126.1 A (#2124): the status report dialog (projects.js)
   polls: ['tpo_list', 'tpo_edit', 'tpo_forClient'], formq: ['fq_clientLink'],  // 2.102.0 C (#2208)
   abscan: ['abm_scanOpen'],  // 2.112.1 (#2058)
-  hookin: ['whiMount']};  // 2.115.0 (#2061)
+  hookin: ['whiMount'],  // 2.115.0 (#2061)
+  hubmailbox: ['hmb_dialog', 'hmb_compose']};  // 2.141.0 A (#2141, #2138)
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)
 const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 'chatTypers', 'chatStHtml'], timeline: ['tlKbSync', 'tlAfterRender', 'rmAfterRender']};
 // drawing functions: the stand-in draws "Loading…" (views) or nothing (parts of another view), loads, and redraws the view
@@ -77,7 +79,8 @@ const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_ti
   tlNdBtn: ['timeline'], tlNdOn: ['timeline'],
   viewFeeds: ['feeds', 1], rss_homeCard: ['feeds'],  // 2.85.0 B (#1162)
   viewBookmarks: ['bookmarks', 1],  // 2.97.0 A (#1950)
-  viewSheets: ['sheets', 1]};  // 2.89.0 (#1916)
+  viewSheets: ['sheets', 1],  // 2.89.0 (#1916)
+  hmb_hubSection: ['hubmailbox'], hmb_newBtn: ['hubmailbox'], hmb_replyBtn: ['hubmailbox']};  // 2.141.0 A (#2141, #2138): parts of the e-mail filing
 // 2.102.0 C (#2208) scheduling polls (polls.js, module polls): the switch and the start points' clicks stay at start (moved
 // here): "Find a date" in the calendar bar and in a task (calevents.js), a client's "…" menu (tpo_forClient, a stand-in)
 const tpo_on = () => feat('events') && S.me?.kind !== 'agent';

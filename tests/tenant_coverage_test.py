@@ -158,7 +158,9 @@ KINDS = {
     # 2.73.0 A (#661): the accounts of one person on other Kalmido servers (accounts/servers.py) -- private per person
     "servers": ("matrix", "p273_a_api_test.py: the server accounts of another person 404 (read, change, delete, restore, data, tasks, move); agents 403; nothing of another person's tasks moves"),
     # 2.84.0 A (#1198): mails filed with a client / project (hub/hubmail.py hbm_can: the client / list / recipient, always in the mail's workspace)
-    "hubmail": ("matrix", "p284_a_api_test.py: a mail / attachment / address of another organisation or a private client of another person 404, a forged sender finds only the recipient's workspace, after leaving nothing, assigning across workspaces refused, agents 403; 2.141.0 B: p2141_b_api_test.py the HTML view / task / event from a mail of another organisation 404, into a list / calendar of another workspace 409, the mail of a task only with the mail's rights"),
+    "hubmail": ("matrix", "p284_a_api_test.py: a mail / attachment / address of another organisation or a private client of another person 404, a forged sender finds only the recipient's workspace, after leaving nothing, assigning across workspaces refused, agents 403; "
+                "p2141_a_api_test.py (2.141.0): another organisation's mailbox 404, a member 403, a workspace mailbox files into its own workspace only (a foreign token counts as none), compose / send for another organisation's mail or client 404, agents 403; "
+                "2.141.0 B: p2141_b_api_test.py the HTML view / task / event from a mail of another organisation 404, into a list / calendar of another workspace 409, the mail of a task only with the mail's rights"),
     # 2.112.1 B (#2058): external share links of the file store (files/extlinks.py)
     "fileextlink": ("matrix", "p21121_b_api_test.py: the links of another organisation's / person's node 404 (list, create, renew, revoke, "
                               "restore); a link serves only its own tree (other ids 404); dead when the creator leaves / loses the right"),
@@ -975,6 +977,9 @@ ROUTES = {
     # 2.141.0 B (#2140, #2139): the HTML view, a task / an event from a mail (only into lists / calendars of the mail's workspace), the mail of a task / event
     "GET /api/hubmail/mails/{}/html": "hubmail", "GET /api/hubmail/mails/{}/make": "hubmail", "POST /api/hubmail/mails/{}/task": "hubmail",
     "POST /api/hubmail/mails/{}/event": "hubmail", "GET /api/hubmail/links": "hubmail",
+    # 2.141.0 A (#2141, #2138): the mailbox of a workspace (its admins / the own private space), compose + send (hbm_can write)
+    "GET /api/hubmail/mailboxes": "hubmail", "GET /api/hubmail/mailbox": "hubmail", "PUT /api/hubmail/mailbox": "hubmail", "DELETE /api/hubmail/mailbox": "hubmail",
+    "POST /api/hubmail/mailbox/check": "hubmail", "POST /api/hubmail/mailbox/poll": "hubmail", "GET /api/hubmail/compose": "hubmail", "POST /api/hubmail/send": "hubmail",
     # 2.85.0 B (#1162): feeds, a person's own (no organisation, never an agent's; p285_b_api_test.py: another person gets 404)
     "GET /api/feeds": "own", "POST /api/feeds": "own", "DELETE /api/feeds/{}": "own", "POST /api/feeds/{}/restore": "own",
     "GET /api/feeds/items": "own", "POST /api/feeds/read": "own", "POST /api/feeds/items/{}/later": "own",

@@ -1,5 +1,6 @@
 """2.84.0 A (#1198): e-mail as an input of the hub -- mails filed with a client or a project (filed, assigned, searchable;
-no mail client: nothing is sent, answered, synchronised or rendered as HTML).
+no mail client: nothing is synchronised or rendered as HTML). 2.141.0 A (#2141, #2138): the own mailbox of a workspace and
+replies / new mails from the filing (direction out) live in hub/mailbox.py.
 
 Addresses (hub_tokens, plus addresses of the mail input of #971): one per client ("the client's e-mail address"), one per
 project and one hub inbox per person and workspace (an organisation or the private space). A mail to a client / project
@@ -239,6 +240,8 @@ def hbm_public(c, m, full=False):
            "list_name": ln, "from_addr": d["from_addr"], "from_name": d["from_name"], "subject": d["subject"],
            "sent_at": m["sent_at"], "created_at": m["created_at"], "files": len(_files(m)), "note": m["note"] or "",
            "mine": m["owner_id"] == me(), "deleted": bool(m["deleted_at"])}
+    from .mailbox import mbx_state  # 2.141.0 A (#2138): a mail sent from the filing (dir out, to = its recipients; state sending / failed)
+    out.update(dir=m["direction"] or "in", state=mbx_state(m), **({"to_list": d["to_addrs"]} if m["direction"] == "out" else {}))
     if full:
         from ..files.store import fs_role
         out["body"] = d["body"]
@@ -328,8 +331,11 @@ def hbm_mails():
     q = (request.args.get("q") or "").strip()
     if q:
         rows = _search(c, rows, q)
+    from .mailbox import mbx_can_send  # 2.141.0 A (#2138): "New e-mail" from a client's / project's filing
+    org = cl["org_id"] if a.get("client_id") else l["org_id"] if a.get("list_id") else None
+    send = bool(can) and not request.args.get("unassigned") and mbx_can_send(c, org or None, uid)
     return jsonify(enabled=hbm_on(), address=addr if hbm_on() else "", can_address=bool(can) and hbm_on(), total=len(rows),
-                   mails=[hbm_public(c, m) for m in rows[:HBM_PAGE]])
+                   mails=[hbm_public(c, m) for m in rows[:HBM_PAGE]], can_send=send)
 
 
 @app.get("/api/hubmail/inbox")

@@ -1,8 +1,8 @@
 /* Kalmido web client: 2.84.0 A (#1198) e-mail as an input of the hub -- the section "E-mails" of a client's card and of a
    project page (list, search, the reading view, "Copy address") and the hub inbox (#mailhub, from Office > Clients): the
    own filing address per workspace and the mails "Not assigned" with Assign / Delete. Server: kalmido/hub/hubmail.py.
-   No mail client: nothing is sent or answered, the text is shown as plain text. Assign and Delete = one undo step each.
-   2.141.0 B (#2140, #2139): the HTML view (sandboxed frame of the server's cleaned page) and Task / Event from a mail.
+   Assign and Delete = one undo step each. 2.141.0 A (#2141, #2138): the mailbox of a workspace + Reply / New e-mail in
+   hubmailbox.js. 2.141.0 B (#2140, #2139): the HTML view (sandboxed frame of the server's cleaned page), Task / Event from a mail.
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
@@ -40,8 +40,9 @@ const hbm_state = key => {
 
 function hbm_headHtml(key) {
   const j = HBM.s[key]?.j;
-  if (!j || key.startsWith('inbox') || !j.can_address) return '';
-  return `<button type="button" class="btn sm" data-hbma="copy" data-hbmk="${key}" title="${esc(tr('Mails to this address are filed here'))}">${ic('copy', 's')}<span>${tr('Copy address')}</span></button>${j.address ? `<button type="button" class="iconbtn" data-hbma="menu" data-hbmk="${key}" aria-haspopup="menu" aria-label="${esc(tr('Address'))}" title="${esc(tr('Address'))}">${ic('dots', 's')}</button>` : ''}`;
+  const nw = typeof hmb_newBtn === 'function' ? hmb_newBtn(key, j) : '';  // 2.141.0 A (#2138): hubmailbox.js
+  if (!j || key.startsWith('inbox') || !j.can_address) return nw;
+  return `${nw}<button type="button" class="btn sm" data-hbma="copy" data-hbmk="${key}" title="${esc(tr('Mails to this address are filed here'))}">${ic('copy', 's')}<span>${tr('Copy address')}</span></button>${j.address ? `<button type="button" class="iconbtn" data-hbma="menu" data-hbmk="${key}" aria-haspopup="menu" aria-label="${esc(tr('Address'))}" title="${esc(tr('Address'))}">${ic('dots', 's')}</button>` : ''}`;
 }
 function hbm_listHtml(key) {
   const s = HBM.s[key], j = s?.j, inbox = key.startsWith('inbox');
@@ -51,7 +52,7 @@ function hbm_listHtml(key) {
   const more = j.total > j.mails.length ? `<p class="muted">${tr('{0} more: search to narrow them down', j.total - j.mails.length)}</p>` : '';
   return `<ul class="hbmlist" role="list">${j.mails.map(m => `<li class="hbmrow">
     <button type="button" class="hbmopen" data-hbmopen="${m.id}" data-hbmk="${key}">
-      <span class="hbmtop"><b class="hbmfrom">${esc(m.from_name || m.from_addr || tr('Unknown sender'))}</b>${m.files ? `<span class="hbmclip muted" title="${esc(trn('{0} attachment', '{0} attachments', m.files))}">${ic('clip', 's')}${m.files}</span>` : ''}<time class="muted">${esc(fmtWhen(m.sent_at || m.created_at))}</time></span>
+      <span class="hbmtop"><b class="hbmfrom">${m.dir === 'out' ? `${ic('send', 's')} ${esc(tr('To {0}', m.to_list || ''))}` : esc(m.from_name || m.from_addr || tr('Unknown sender'))}</b>${m.state === 'failed' ? `<span class="hmbtag bad">${tr('Not sent')}</span>` : m.state === 'sending' ? `<span class="hmbtag">${tr('Sending…')}</span>` : m.dir === 'out' ? `<span class="hmbtag">${tr('Sent')}</span>` : ''}${m.files ? `<span class="hbmclip muted" title="${esc(trn('{0} attachment', '{0} attachments', m.files))}">${ic('clip', 's')}${m.files}</span>` : ''}<time class="muted">${esc(fmtWhen(m.sent_at || m.created_at))}</time></span>
       <span class="hbmsubj">${esc(m.subject || tr('(no subject)'))}</span>
       ${key.startsWith('client') && m.list_name ? `<span class="muted hbmproj">${ic('brief', 's')} ${esc(m.list_name)}</span>` : ''}
     </button>
@@ -67,13 +68,13 @@ function hbm_bodyHtml(key) {
 // mail input is off and nothing is filed
 function hbm_clientHtml(c) {
   const key = 'client:' + c.id, j = hbm_state(key).j;
-  if (!j || (!j.enabled && !j.total && !(HBM.s[key].q || '').trim())) return '';  // shown once loaded
+  if (!j || (!j.enabled && !j.can_send && !j.total && !(HBM.s[key].q || '').trim())) return '';  // shown once loaded (2.141.0 A: or sending works)
   return `<div class="ctsec hbmsec"><h4>${ic('mail', 's')} ${tr('E-mails')}</h4>${hbm_bodyHtml(key)}</div>`;
 }
 function hbm_projHtml(l) {
   if (!l || l.kind !== 'project' || l.e2e) return '';
   const key = 'list:' + l.id, j = hbm_state(key).j;
-  if (!j || (!j.enabled && !j.total && !(HBM.s[key].q || '').trim())) return '';  // shown once loaded
+  if (!j || (!j.enabled && !j.can_send && !j.total && !(HBM.s[key].q || '').trim())) return '';  // shown once loaded (2.141.0 A: or sending works)
   return `<section class="povs hbmsec hbmpov" id="pov-mails"><div class="povh"><h3>${tr('E-mails')}</h3></div>${hbm_bodyHtml(key)}</section>`;
 }
 // the entry in Office > Clients
@@ -86,7 +87,7 @@ function hbm_hubView() {
   const intro = !j ? '' : j.enabled ? `<p class="muted">${tr('Forward e-mails to your filing address (or send it a copy): a mail from the address of a client or of one of its contact persons is filed with that client, everything else waits here until you assign it.')}</p>`
     : `<p class="muted">${tr('Receiving e-mail is not set up on this server (an admin sets up the mailbox).')}</p>`;
   return `<div class="ctview hbmhub"><h2 class="msclh"><a href="#clients" class="linkbtn">${ic('back', 's')}<span>${tr('Clients')}</span></a><span class="muted" aria-hidden="true">›</span><span>${tr('E-mail filing')}</span></h2>
-    ${intro}${sp ? `<h4>${tr('Your filing addresses')}</h4><ul class="hbmspaces" role="list">${sp}</ul>` : ''}
+    ${intro}${sp ? `<h4>${tr('Your filing addresses')}</h4><ul class="hbmspaces" role="list">${sp}</ul>` : ''}${typeof hmb_hubSection === 'function' ? hmb_hubSection() : ''}
     <h4>${tr('Not assigned')}</h4>${hbm_bodyHtml(key)}</div>`;
 }
 
@@ -104,7 +105,7 @@ async function hbm_open(id, key) {
     ${hbm_viewHtml(m, key)}
     ${att ? `<h4>${tr('Attachments')}</h4><ul class="hbmatt" role="list">${att}</ul>` : ''}
     ${m.folder_id ? `<p><a class="linkbtn" href="#ablage/${m.folder_id}" data-m="close">${ic('folder', 's')}<span>${tr('Attachments in the file store')}</span></a></p>` : ''}
-    <div class="foot">${m.can_write ? `<button type="button" class="btn danger" data-hbmd="del">${ic('trash', 's')} ${tr('Delete')}</button><button type="button" class="btn" data-hbmd="asg">${tr('Assign…')}</button>` : ''}<span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
+    <div class="foot">${typeof hmb_replyBtn === 'function' ? hmb_replyBtn(m) : ''}${m.can_write ? `<button type="button" class="btn danger" data-hbmd="del">${ic('trash', 's')} ${tr('Delete')}</button><button type="button" class="btn" data-hbmd="asg">${tr('Assign…')}</button>` : ''}<span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
   md.classList.add('hbmdlg');
   md.addEventListener('click', e => {
     if (e.target.closest('[data-m="close"]')) { modalClose(md); return; }

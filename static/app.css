@@ -7585,6 +7585,19 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .hbmmkd{display:flex;gap:.75rem;flex-wrap:wrap}
 .hbmlnk{display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;font-size:var(--fs-s)}
 .hbmlnk:empty{display:none}
+/* 2.141.0 A (#2141, #2138): the mailbox of a workspace + writing from the e-mail filing (hubmailbox.js) */
+.hmberr{display:flex;align-items:center;gap:.25rem;color:var(--danger)}
+.hmbtag{font-size:var(--fs-xs,.75rem);padding:0 .375rem;border-radius:var(--r-s);background:var(--bg3);color:var(--muted);white-space:nowrap}
+.hmbtag.bad{color:var(--danger)}
+.hmbcheck{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.25rem;font-size:var(--fs-s)}
+.hmbcheck li{display:flex;align-items:center;gap:.375rem}
+.hmbok{color:var(--ok)}
+.hmbbad,.hmb-err{color:var(--danger)}
+.hmb-err:empty{display:none}
+.hmbsug{display:flex;flex-wrap:wrap;gap:.375rem;margin:-.25rem 0 .625rem}
+.hmbtext{width:100%;min-height:12rem;resize:vertical;font:inherit;font-size:var(--fs-s);padding:.625rem;border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg2);color:var(--text)}
+.hmbcdlg .card,.hmbdlg .card{max-height:90vh;overflow:auto}
+.hmbnote{font-size:var(--fs-s)}
 
 /* 2.81.0 B (#1834) correct an archived document: tax lines, client filter, history */
 .r81b-dlg .r81b-ln{display:flex;gap:.5rem;align-items:center;margin-bottom:.375rem}
