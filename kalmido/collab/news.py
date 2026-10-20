@@ -465,6 +465,8 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 continue
         elif kind == "wiki_shared":  # 2.126.2 B (#2355): stays after a revoke (it opens "Shared with me"); only path + kind in data
             pass
+        elif kind == "ptlimit":  # 2.138.3 C (#2380): the portal's sign-in mails of my space were used up (no task, no list)
+            pass
         elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
             if not sees(r["list_id"]):
                 continue
