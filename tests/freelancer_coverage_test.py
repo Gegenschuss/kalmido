@@ -29,7 +29,7 @@ KINDS = {
     "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
                          "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0); undo of the editors (2.111.0)"),
-    "files": ("matrix", SUITE + ", p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
+    "files": ("matrix", SUITE + ", p21121_a_api_test.py, p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
                          "file requests of a private folder, tags of files / folders, the tag filter, the documents' filters, bulk change, ZIP, CSV, documents via the API (2.122.0)"),
     "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private space (create, change, search, export, trash; "
                        "2.99.0: page files, ZIP import with PDFs / pictures; 2.123.0: p2123_b_api_test.py shares of pages / folders, p2123_a_api_test.py page history, text search)"),
@@ -175,6 +175,8 @@ ROUTES = {
     "GET /u/{}": "link", "POST /u/{}": "link", "GET /u/v/up.js": "public",
     # 2.96.0 A (#1941): files / folders / documents to the other workspace
     "POST /api/files/move-space": "files",
+    # 2.112.1 A (#2058): several nodes into the trash / back, the ZIP download, the phone scan (p21121_a_api_test.py)
+    "POST /api/files/trash": "files", "POST /api/files/restore": "files", "GET /api/files/zip": "files", "POST /api/files/scan": "files",
     "POST /api/docs": "files", "POST /api/docs/labels/{}": "files", "POST /api/docs/mail": "files",
     "POST /api/docs/rules": "files", "POST /api/docs/{}/accept": "files", "POST /api/docs/{}/redo": "files",
     "POST /api/docs/{}/review": "files", "POST /api/docs/{}/task": "files", "POST /api/files/folders": "files",
