@@ -12390,5 +12390,13 @@
   "{0} once": "{0} una vez",
   "Prices include VAT. Pay once, no subscription.": "Precios con IVA incluido. Un solo pago, sin suscripción.",
   "The setup code is fixed on this server": "El código de configuración es fijo en este servidor",
-  "This setup code has expired. Ask your hoster for a new one.": "Este código de configuración ha caducado. Pide uno nuevo a tu proveedor de alojamiento."
+  "This setup code has expired. Ask your hoster for a new one.": "Este código de configuración ha caducado. Pide uno nuevo a tu proveedor de alojamiento.",
+  "Kalmido - Start": "Kalmido: inicio",
+  "Unread in other workspaces": "Sin leer en otros espacios de trabajo",
+  "1 unread in {0}": "1 sin leer en {0}",
+  "{0} unread in {1}": "{0} sin leer en {1}",
+  "Switch": "Cambiar",
+  "Tracked time (h)": "Tiempo registrado (h)",
+  "Created by": "Creado por",
+  "Completed by": "Completado por"
 }
