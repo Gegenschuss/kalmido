@@ -59,6 +59,7 @@ Team chat: threads, voice messages, "Read by"; comments become tasks.
   stopping (#2386).
 - Proposal cards: the app thumb instead of an emoji on accept / reject, larger check boxes and the whole row as the
   target; the "Your wish" field of the agent text dialog uses the full width (#2401).
+
 ## [2.138.5] - 2026-10-20
 
 ### Fixed
