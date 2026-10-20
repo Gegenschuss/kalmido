@@ -190,17 +190,19 @@ CL, CLH = r.json()["id"], hdr(r.json()["token"])
 A.patch(B + f"/api/admin/agents/{CL}", json={"org_id": ORG})
 W = A.post(B + "/api/lists", json={"name": "Work", "org_id": ORG}).json()["id"]
 for m, role in ((CL, "edit"), (BOB, "edit"), (CAROL, "admin")):
-    check(A.put(B + f"/api/lists/{W}/members", json={"user_id": m, "role": role}).ok, f"setup: {m} in Work as {role}")
+    r = A.put(B + f"/api/lists/{W}/members", json={"user_id": m, "role": role})
+    check(r.ok, f"setup: {m} in Work as {role} {r.text[:200]}")
 W3 = A.post(B + "/api/lists", json={"name": "Elsewhere", "org_id": ORG}).json()["id"]
-for m in (CL, DORA):
-    check(A.put(B + f"/api/lists/{W3}/members", json={"user_id": m, "role": "edit"}).ok, f"setup: {m} in Elsewhere")
+for m in (CL, BOB, CAROL, DORA):  # everyone of Work and one more person: a member may move there, an agent's move waits
+    r = A.put(B + f"/api/lists/{W3}/members", json={"user_id": m, "role": "edit"})
+    check(r.ok, f"setup: {m} in Elsewhere {r.text[:200]}")
 
 # ================================================================== #1974 an approval job on a task
 T = A.post(B + "/api/tasks", json={"title": "Prepare the offer", "list_id": W, "assignee_id": BOB}).json()["id"]
 r = requests.patch(V + f"/tasks/{T}", headers=CLH, json={"list_id": W3})
 check(r.status_code == 202 and (r.json().get("job") or {}).get("id"), f"#1974: the agent's move into a list with other people waits {r.status_code} {r.text[:200]}")
 J = (r.json().get("job") or {}).get("id")
-check(sql("SELECT task_id FROM agent_jobs WHERE id=?", (J,))[0][0] == T, "#1974: the job belongs to the task")
+check(J and sql("SELECT task_id FROM agent_jobs WHERE id=?", (J,))[0][0] == T, "#1974: the job belongs to the task")
 r = Bo.post(B + f"/api/agents/jobs/{J}/action", json={"action": "approve"})
 check(r.status_code in (403, 404), f"#1974: the assignee alone cannot approve it ({r.status_code})")
 check(sql("SELECT list_id FROM tasks WHERE id=?", (T,))[0][0] == W, "#1974: nothing moved")
