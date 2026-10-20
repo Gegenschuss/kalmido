@@ -11978,5 +11978,6 @@
   "Grouped by sections": "Wieder nach Abschnitten gegliedert",
   "{0} once": "{0} einmalig",
   "Prices include VAT. Pay once, no subscription.": "Preise inklusive Mehrwertsteuer. Einmal zahlen, kein Abo.",
-  "The setup code is fixed on this server": "Der Einrichtungscode ist auf diesem Server fest eingestellt"
+  "The setup code is fixed on this server": "Der Einrichtungscode ist auf diesem Server fest eingestellt",
+  "This setup code has expired. Ask your hoster for a new one.": "Dieser Einrichtungscode ist abgelaufen. Bitte deinen Hoster um einen neuen."
 }
