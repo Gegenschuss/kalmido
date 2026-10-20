@@ -321,12 +321,15 @@ UMZ_ORG_SKIP = (  # archive prefix -> what the preview names as not taken over
     ("lists/notepads.json", N_("Notepads")), ("time_entries.json", N_("Time entries")),
     ("tasks/encrypted_notes.json", N_("Encrypted notes")), ("tasks/locked_notes.json", N_("Encrypted notes")),
     ("portal/", N_("Customer reports")),  # 2.81.0 (#1866)
+    ("sheets/", N_("Tables")), ("videos/", N_("Video sign-offs")),  # 2.137.0 (#2344): named too
 )
 
 
 def umz_org_open(zf, names, man, mraw, full):
-    """-> (manifest, files, data) of an opened organisation export, in the shape of an account export."""
+    """-> (manifest, files, data) of an opened organisation export, in the shape of an account export (2.137.0, #2344: the
+    entries of admin/orgimport.py under data["oi"][entry])."""
     from .orgexport import _safe_part
+    from .orgimport import oi_covers
     fl = man.get("files")
     if man.get("format_version") != 1 or not isinstance(fl, dict) or not isinstance(man.get("org"), dict):
         raise UmzBad(N_("This export comes from a newer Kalmido version. Update this server first."))
@@ -343,13 +346,16 @@ def umz_org_open(zf, names, man, mraw, full):
             raise UmzBad(N_("The file contains a broken part: {0}"), "manifest.json")
         zi = names[p]
         files[p] = (zi, f["sha256"])
-        if p in UMZ_ORG_MAP:
+        if p in UMZ_ORG_MAP or (p.endswith(".json") and oi_covers(p)):  # 2.137.0 (#2344): + the areas of admin/orgimport.py
             rows = _json(_read_entry(zf, zi, UMZ_JSON_MAX, f["sha256"]), p)
             if not isinstance(rows, list) or not all(isinstance(x, dict) for x in rows):
                 raise UmzBad(N_("The file contains a broken part: {0}"), p)
             if len(rows) > UMZ_MAX_ROWS:  # review M2: the same limits as the account import
                 raise UmzBad(N_("The file contains a part that is too large: {0}"), p)
-            data[UMZ_ORG_MAP[p]] = rows
+            if p in UMZ_ORG_MAP:
+                data[UMZ_ORG_MAP[p]] = rows
+            else:
+                data.setdefault("oi", {})[p] = rows
         elif full or p.endswith(".json"):
             raw = _read_entry(zf, zi, UMZ_JSON_MAX if p.endswith(".json") else MAX_FILE_MB * 1024 * 1024 * 4, f["sha256"])
             what = next((w for pre, w in UMZ_ORG_SKIP if p.startswith(pre)), None)
@@ -456,6 +462,7 @@ def umz_find(c, uid, h, seen=None):
 
 
 def umz_preview(c, uid, man, data, can_invite):
+    from .orgimport import oi_counts
     tables = {k: len(v) for k, v in data.items()}
     lists = [{"name": _txt(L.get("name"), 200), "folder": _txt(L.get("folder"), 300), "inbox": bool(L.get("is_inbox")),
               "tasks": sum(1 for t in data.get("tasks", []) if t.get("list_id") == L.get("id") and not t.get("deleted_at"))}
@@ -500,7 +507,7 @@ def umz_preview(c, uid, man, data, can_invite):
         "server_links": [_txt(x.get("name"), 100) or _txt(x.get("base_url"), 200) for x in data.get("server_links", [])][:20],
         "encrypted": {"attachments": len(ce.get("attachments") or []) if isinstance(ce.get("attachments"), list) else 0,
                       "locked_notes": ce.get("locked_notes") if isinstance(ce.get("locked_notes"), int) else 0},
-        "not_taken": skipped, "again": again, "export_id": eid, "kind": "org" if org_kind else "account",
+        "not_taken": skipped, "taken_areas": oi_counts(data) if org_kind else [], "again": again, "export_id": eid, "kind": "org" if org_kind else "account",
         "targets": umz_targets(c, uid),  # 2.96.0 D (#1941): an organisation export may go into the private space too
     }
 
@@ -903,9 +910,11 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             else:
                 fixed["list_id"] = parent
             d = umz_row(c, table, r, fixed, ts)
-            if not d or not umz_insert(c, table, d):
+            nid = umz_insert(c, table, d) if d else None
+            if not nid:
                 run.warning(N_("A file could not be taken over: {0}"), name)
                 continue
+            run.put(table, r.get("id"), nid)  # 2.137.0 B (#2344): the links of the file store point at them (oi_store.py)
             if kind == "tasks":
                 run.created["files"].append(rel)
             run.count(table)
@@ -999,6 +1008,9 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         if v != (cur.get(k) or ""):
             run.created["settings"][k] = {"old": cur.get(k), "new": v}
             uset(c, uid, k, v)
+    if man.get("kind") == "org" and data.get("oi"):  # 2.137.0 (#2344): office, file store, chat ... (admin/orgimport.py)
+        from .orgimport import oi_write
+        oi_write(c, run, uid, man, zf, files, data, who)
 
 
 def umz_share(c, run, uid, data, picks, can_invite):
@@ -1113,20 +1125,23 @@ def umz_run(uid, iid, opts):
                 man["user"]["id"] = _oid(hit[0].get("user_id")) if hit else None
                 if hit and _oid(hit[0].get("user_id")) in people:
                     people.pop(_oid(hit[0].get("user_id")), None)
-            total = sum(len(v) for v in data.values())
+            total = sum(len(v) for k, v in data.items() if k != "oi") + sum(len(v) for v in (data.get("oi") or {}).values())
             eid = st.get("export_id") or secrets.token_hex(8)
             run = _Run(uid, iid, eid, opts["org"], total)
             run.kind = man.get("kind") or "account"
             if run.kind == "org" and not run.org:  # 2.96.0 D (#1941): an organisation export into the private space
                 run.warning(N_("Imported into your private space: nobody joins an organisation, lists are only shared with the people you ticked."))
             c.commit()
+            if run.kind == "org":  # 2.137.0 (#2344): the personal office for office parts going into the private space
+                from .orgimport import oi_prepare
+                oi_prepare(c, run, uid, data)
             try:
                 umz_write(c, run, uid, man, zf, files, data, people)
             except UmzStop:
                 pass
             report = {**run.stats, "export_id": eid, "tasks": run.stats.get("tasks", 0)}
             iid_db = None
-            if any(run.created[k] for k in run.created):  # recorded with the rows: whatever happens next, undo works
+            if any(run.created[k] for k in run.created):  # recorded with the rows (2.137.0, #2344: + "oi"): whatever happens next, undo works
                 from ..integrations.importers import IMPORT_KEEP
                 iid_db = insert_id(c, "INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
                                    (uid, UMZ_SOURCE, _txt(st.get("name"), 200), json.dumps(run.created), json.dumps(report), iso(now_utc())))
@@ -1346,6 +1361,8 @@ def umz_undo(c, uid, r):
     from ..core.serializers import unlink_files
     from ..lists.projects import list_purge_files, list_row_purge
     cr = json.loads(r["created"] or "{}")
+    from .orgimport import oi_undo, oi_undo_files
+    n_oi = oi_undo(c, cr)  # 2.137.0 (#2344): the areas first (they point at the lists and tasks)
     own_lists = set(cr.get("lists") or [])
     files = [p for p in cr.get("files") or [] if isinstance(p, str)]
     n_tasks = 0
@@ -1378,8 +1395,9 @@ def umz_undo(c, uid, r):
     bump(c)
     c.commit()
     unlink_files(files)
+    oi_undo_files(cr)
     list_purge_files(gone)
-    print("account import undo", r["id"], "user", uid, "tasks", n_tasks, flush=True)
+    print("account import undo", r["id"], "user", uid, "tasks", n_tasks, "area rows", n_oi, flush=True)
     return {"tasks": n_tasks, "lists": n_lists, "sections": 0, "kept_lists": 0, "kept_tasks": 0}
 
 

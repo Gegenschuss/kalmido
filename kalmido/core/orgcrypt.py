@@ -821,6 +821,9 @@ def _org_admin(c, oid):
     from ..core.access import Denied
     if g.user is None:
         raise Denied(401)
+    from ..admin.orgexport import ox_own_office
+    if ox_own_office(c, oid):  # 2.137.0 A (#2344): the owner of a personal office (its export opens with this key)
+        return
     _need_org_admin(c, oid)
 
 

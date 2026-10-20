@@ -291,6 +291,10 @@ ORDER = (
     "admin.orgexport",  # 2.42.0 (#833): organisation export (encrypted archive)
     "admin.acctexport",  # 2.73.0 B (#1473): account export (moving between servers, GDPR copy)
     "admin.acctimport",  # 2.73.0 B (#1473): account import with the mapping of people
+    "admin.orgimport",  # 2.137.0 (#2344): organisation import of the remaining areas (no routes)
+    "admin.oi_office",  # 2.137.0 (#2344): its office tables (no routes)
+    "admin.oi_store",  # 2.137.0 (#2344): its file store, documents, knowledge pages, tables (no routes)
+    "admin.oi_team",  # 2.137.0 (#2344): its chat, absences, forms and the rest (no routes)
     "admin.orgcrypt_cli",  # 2.42.0 (#828): the organisation keys' start-up pass + command line (no routes)
     "docs.extract",  # 2.48.0 (#1111): date / due date / amount from a text (no routes, standard library only)
     "docs.rules",  # 2.48.0 (#1111): sorting rules (no routes)
@@ -325,6 +329,7 @@ ORDER = (
     "office.recurring",  # 2.91.0 A (#1923): invoice series (a template invoice every month / quarter / year, drafts or sent)
     "office.subs",  # 2.91.0 B (#1924): subscriptions and tools (fixed costs with notice period, users, renewal reminder)
     "office.officemove",  # 2.97.0 C (#2049): office data between the personal office and an organisation's office
+    "office.pbtransfer",  # 2.137.0 D (#1981): the personal office into an existing organisation (after office.officemove)
     "agents.importprop",  # 2.68.0 A (#1839): agents propose old data for the office (fixed costs), the person takes it over
     "agents.meetprop",  # 2.70.0 A (#1354): a meeting becomes tasks (extract with photos, the chat's cards)
     "agents.dupprop",  # 2.70.0 B (#1357): duplicate contacts as a proposal (no routes)

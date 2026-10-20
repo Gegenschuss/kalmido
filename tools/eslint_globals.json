@@ -4177,6 +4177,7 @@
 "pb_hintHtml",
 "pb_move",
 "pb_reset",
+"pb_transfer",
 "pb_wsChanged",
 "pb_wsFollow",
 "pct",
