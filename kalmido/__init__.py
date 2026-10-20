@@ -45,6 +45,7 @@ ORDER = (
     "core.state",
     "core.csvimport",  # 2.140.0 B (#2134): the statement reader of budget and bank reconciliation
     "core.merges",  # 2.66.0 (#1835): merging contacts / clients (reversible)
+    "core.stmtfiles",  # 2.146.0 C (#2455): the uploaded statements of the bank imports (office + budget)
     "lists.lists",
     "lists.groups",
     "lists.grouppics",  # 2.46.0 (#1605)

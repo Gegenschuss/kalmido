@@ -5,7 +5,11 @@ reconciliation (office/bank.py) both read their files here; nothing is stored he
          bank exports start with a few lines about the account), csv_guess (which column holds what, the decimal separator,
          the date format; a known bank layout of CSV_PRESETS first), csv_mapping (a client's mapping checked against the
          columns), csv_row (one row with a mapping -> day, amount, kind, text, counterpart or a readable error)
-  CAMT   camt_is / camt_rows: CAMT.052 / .053 XML (no DOCTYPE / ENTITY, so no entity expansion and no external references)
+  CAMT   camt_is / camt_rows: CAMT.052 / .053 XML (no DOCTYPE / ENTITY, so no entity expansion and no external references);
+         2.146.0 C (#2469): camt_rows marks pending entries (Sts not BOOK, e.g. PDNG of a CAMT.052 day report) and keeps both
+         references (svc_ref = AcctSvcrRef, e2e = EndToEndId; NOTPROVIDED dropped), camt_version tells 052 from 053
+  refs   2.146.0 C (#2469): csv_ref_keys -- the reference keys of a booking (AcctSvcrRef / EndToEndId with the amount), the
+         duplicate check across files and imports that also finds a pending booking booked later with another day or text
   dups   csv_dup_take: "two equal rows of one file need two existing ones" -- each caller keeps its own keyed fingerprint
          (budget: per list with the space key, office: per office area), so equal bookings never meet across areas
 Limits: CSV_MAX bytes, CSV_ROWS rows; texts are cut and stripped of control characters. A CSV export of what came in goes
@@ -26,12 +30,21 @@ CSV_AMOUNT_MAX = Decimal("10000000")
 CSV_TEXT_MAX = 200
 CAMT_AMOUNT_MAX = Decimal("100000000")
 DATE_FORMATS = {"DD.MM.YYYY": r"(\d{1,2})\.(\d{1,2})\.(\d{4})", "YYYY-MM-DD": r"(\d{4})-(\d{1,2})-(\d{1,2})",
-                "DD.MM.YY": r"(\d{1,2})\.(\d{1,2})\.(\d{2})", "MM/DD/YYYY": r"(\d{1,2})/(\d{1,2})/(\d{4})"}
-MAP_KEYS = ("date", "amount", "amount_in", "amount_out", "title", "counterpart")
+                "DD.MM.YY": r"(\d{1,2})\.(\d{1,2})\.(\d{2})", "MM/DD/YYYY": r"(\d{1,2})/(\d{1,2})/(\d{4})",
+                # 2.146.0 C (#2455): two more layouts of bank exports
+                "DD-MM-YYYY": r"(\d{1,2})-(\d{1,2})-(\d{4})", "YYYYMMDD": r"(\d{4})(\d{2})(\d{2})"}
+# 2.146.0 C (#2455): sign = the column of a debit / credit mark (S/H, Soll/Haben, D/C, -/+) next to an amount without a sign
+MAP_KEYS = ("date", "amount", "amount_in", "amount_out", "title", "counterpart", "sign")
+SIGN_OUT = frozenset(("s", "soll", "d", "db", "dbit", "debit", "-", "lastschrift", "belastung"))
+REF_NONE = frozenset(("NOTPROVIDED", "NONREF", "NOTAVAILABLE", "NONE"))  # 2.146.0 C (#2469): placeholders, no reference
+SIGN_IN = frozenset(("h", "haben", "c", "cr", "crdt", "credit", "+", "gutschrift"))
 IBAN_RE = re.compile(r"^[A-Z]{2}\d{2}[A-Z0-9]{8,30}$")
 GUESS = {
     "date": ("buchungstag", "buchungsdatum", "datum", "date", "booking date", "transaction date", "valuta", "wertstellung", "value date"),
     "amount": ("betrag", "amount", "umsatz", "betrag (eur)", "betrag in eur", "value"),
+    # 2.146.0 C (#2455): before amount_in / amount_out, so "Soll/Haben" is never taken for one of them
+    "sign": ("soll/haben", "s/h", "soll-haben-kennzeichen", "soll/haben-kennzeichen", "soll / haben", "debit/credit", "d/c", "cdtdbtind",
+             "sh-kennzeichen", "kennzeichen"),
     "amount_in": ("haben", "gutschrift", "credit", "eingang", "einnahme"),
     "amount_out": ("soll", "lastschrift", "debit", "ausgang", "ausgabe"),
     "title": ("verwendungszweck", "buchungstext", "beschreibung", "description", "purpose", "memo", "reference", "text", "details"),
@@ -54,6 +67,14 @@ CSV_PRESETS = (
     {"id": "comdirect", "name": "comdirect", "decimal": ",", "date_format": "DD.MM.YYYY",
      "cols": {"date": "buchungstag", "amount": "umsatz in eur", "title": "buchungstext"},
      "also": ("wertstellung (valuta)", "vorgang")},
+    # 2.146.0 C (#2455): Volksbank / Raiffeisenbank -- the current export (a signed amount) and the older one: the amount
+    # without a sign and the mark S / H in the column right after it (sign_after; its header is often empty)
+    {"id": "volksbank", "name": "Volksbank / Raiffeisenbank", "decimal": ",", "date_format": "DD.MM.YYYY",
+     "cols": {"date": "buchungstag", "amount": "betrag", "title": "verwendungszweck", "counterpart": "name zahlungsbeteiligter"},
+     "also": ("iban zahlungsbeteiligter", "valutadatum")},
+    {"id": "volksbank_sh", "name": "Volksbank / Raiffeisenbank (S/H)", "decimal": ",", "date_format": "DD.MM.YYYY", "sign_after": "amount",
+     "cols": {"date": "buchungstag", "amount": "umsatz", "title": "vorgang/verwendungszweck", "counterpart": "empfänger/zahlungspflichtiger"},
+     "also": ("valuta",)},
 )
 
 
@@ -162,7 +183,7 @@ def csv_day(s, fmt):
     if not m:
         return None
     a, b_, y = m.groups()
-    if fmt == "YYYY-MM-DD":
+    if fmt in ("YYYY-MM-DD", "YYYYMMDD"):  # 2.146.0 C (#2455): YYYYMMDD
         y, a, b_ = a, b_, y
         dd, mm = int(b_), int(a)
     elif fmt == "MM/DD/YYYY":
@@ -182,7 +203,13 @@ def csv_preset(header):
     for p in CSV_PRESETS:
         names = list(p["cols"].values()) + list(p["also"])
         if all(n in low for n in names):
-            return p, {k: low.index(n) for k, n in p["cols"].items()}
+            cols = {k: low.index(n) for k, n in p["cols"].items()}
+            if p.get("sign_after"):  # 2.146.0 C (#2455): the mark column right after the amount
+                i = cols[p["sign_after"]] + 1
+                if i >= len(header):
+                    continue
+                cols["sign"] = i
+            return p, cols
     return None, None
 
 
@@ -200,6 +227,13 @@ def _plain_guess(header, body):
                 break
     if g_["amount"] is not None:
         g_["amount_in"] = g_["amount_out"] = None
+    # 2.146.0 C (#2455): a mark column only next to one amount column and when it holds marks; an unnamed column right
+    # after the amount holding S / H is one too (older Volksbank / Postbank exports)
+    if g_["sign"] is not None and (g_["amount"] is None or not _sign_col(body, g_["sign"])):
+        g_["sign"] = None
+    if g_["sign"] is None and g_["amount"] is not None and g_["amount"] + 1 < len(header) and g_["amount"] + 1 not in g_.values() \
+            and _sign_col(body, g_["amount"] + 1):
+        g_["sign"] = g_["amount"] + 1
     sample = [r for r in body[:50]]
     cols = [g_[k] for k in ("amount", "amount_in", "amount_out") if g_[k] is not None]
     vals = [r[i] for r in sample for i in cols if i < len(r) and r[i]]
@@ -273,6 +307,9 @@ def csv_row(r, m, title_max=CSV_TEXT_MAX, cp_max=CSV_TEXT_MAX, amount_max=CSV_AM
     amt = None
     if m.get("amount") is not None:
         amt = csv_amount(col("amount"), m["decimal"])
+        if m.get("sign") is not None and amt is not None:  # 2.146.0 C (#2455): the mark decides, the amount's own sign does not
+            mark = csv_sign(col("sign"))
+            amt = None if mark is None else abs(amt) * mark
     else:
         a_in = csv_amount(col("amount_in"), m["decimal"]) if m.get("amount_in") is not None else None
         a_out = csv_amount(col("amount_out"), m["decimal"]) if m.get("amount_out") is not None else None
@@ -284,6 +321,8 @@ def csv_row(r, m, title_max=CSV_TEXT_MAX, cp_max=CSV_TEXT_MAX, amount_max=CSV_AM
     out["title"] = re.sub(r"\s+", " ", title)[:title_max]
     if out["day"] is None:
         out["error"] = tr("The date cannot be read")
+    elif m.get("sign") is not None and m.get("amount") is not None and amt is None and csv_sign(col("sign")) is None:
+        out["error"] = tr("The debit / credit mark cannot be read")
     elif amt is None or amt == 0 or abs(amt) > amount_max:
         out["error"] = tr("The amount cannot be read")
     elif not out["title"]:
@@ -293,10 +332,52 @@ def csv_row(r, m, title_max=CSV_TEXT_MAX, cp_max=CSV_TEXT_MAX, amount_max=CSV_AM
     return out
 
 
+def csv_sign(v):
+    """2.146.0 C (#2455): a debit / credit mark -> -1 (S, Soll, D, Debit, -), 1 (H, Haben, C, Credit, +) or None."""
+    v = csv_norm(v).strip(" .")
+    return -1 if v in SIGN_OUT else 1 if v in SIGN_IN else None
+
+
+def _sign_col(body, i):
+    """2.146.0 C (#2455): column i holds debit / credit marks (at least 80 % of the filled cells of the sample)."""
+    vals = [r[i] for r in body[:50] if i < len(r) and r[i].strip()]
+    return bool(vals) and sum(1 for v in vals if csv_sign(v) is not None) >= max(1, len(vals) * 0.8)
+
+
+def csv_iban_col(header):
+    """2.146.0 C (#2455): the column of the counterpart's IBAN -- a column named IBAN; one of the own account (Auftragskonto,
+    eigene ...) only when there is no other."""
+    cols = [i for i, h in enumerate(header) if "iban" in (h or "").casefold()]
+    other = [i for i in cols if not any(w in (header[i] or "").casefold() for w in ("auftragskonto", "eigen", "own account"))]
+    return (other or cols or [None])[0]
+
+
 # ---------------------------------------------------------------- CAMT.052 / .053
 def camt_is(text):
     head = (text or "")[:4000]
     return "<Document" in head and "camt.05" in head
+
+
+def camt_version(text):
+    """2.146.0 C (#2469): "052" (account report, intraday: pending entries), "053" (statement), "054" or "" from the namespace."""
+    m = re.search(r"camt\.(05[234])\.", (text or "")[:4000])
+    return m.group(1) if m else ""
+
+
+def csv_ref_parts(row):
+    """2.146.0 C (#2469): the reference parts of a booking for the duplicate check across files and imports: the bank's
+    reference (AcctSvcrRef) and the EndToEndId, each with the signed amount (a reference alone is not always unique: an
+    EndToEndId may come back every month). Each caller keys them (HMAC) for its area -- they are never stored plain."""
+    amt = row.get("amount")
+    if amt is None:
+        return []
+    a = str(_money(Decimal(str(amt))))
+    out = []
+    for tag, k in (("a", "svc_ref"), ("e", "e2e")):
+        v = (row.get(k) or "").strip()
+        if v and v.upper() not in REF_NONE:
+            out.append(f"{tag}|{v}|{a}")
+    return out
 
 
 def camt_local(tag):
@@ -351,7 +432,12 @@ def camt_rows(text, text_max=300):
         amt_el = camt_kid(ntry, "Amt")
         row = {"day": _camt_day(camt_kid(ntry, "BookgDt")) or _camt_day(camt_kid(ntry, "ValDt")), "amount": None,
                "currency": ((amt_el.get("Ccy") if amt_el is not None else "") or "").upper()[:3], "counterpart": "", "purpose": "",
-               "iban": None, "ref": csv_clean(camt_txt(ntry, "AcctSvcrRef"), 120) or None, "error": None}
+               "iban": None, "ref": csv_clean(camt_txt(ntry, "AcctSvcrRef"), 120) or None, "error": None,
+               # 2.146.0 C (#2469): Sts (BOOK / PDNG / INFO; camt.052.001.08+: Sts/Cd) -- only booked entries count, an entry
+               # without a status (older files) is booked
+               "status": (camt_txt(ntry, "Sts", "Cd") or camt_txt(ntry, "Sts")).upper()[:4], "svc_ref": None, "e2e": None}
+        row["pending"] = bool(row["status"]) and row["status"] != "BOOK"
+        row["svc_ref"] = row["ref"]
         credit = camt_txt(ntry, "CdtDbtInd") == "CRDT"
         try:
             a = Decimal((amt_el.text or "").strip()) if amt_el is not None else None
@@ -375,6 +461,9 @@ def camt_rows(text, text_max=300):
                 row["ref"] = csv_clean(camt_txt(tx, "Refs", "AcctSvcrRef") or camt_txt(tx, "Refs", "EndToEndId"), 120) or None
             if row["ref"] == "NOTPROVIDED":
                 row["ref"] = None
+            row["svc_ref"] = row["svc_ref"] or csv_clean(camt_txt(tx, "Refs", "AcctSvcrRef"), 120) or None
+            e2e = csv_clean(camt_txt(tx, "Refs", "EndToEndId"), 120)
+            row["e2e"] = e2e if e2e and e2e.upper() != "NOTPROVIDED" else None
         if not row["purpose"]:
             row["purpose"] = csv_clean(camt_txt(ntry, "AddtlNtryInf"), text_max)
         if row["day"] is None:

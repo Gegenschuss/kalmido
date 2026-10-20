@@ -113,13 +113,19 @@ async function bnkCand(tid) {
 // (several files or one ZIP, also dropped onto the dialog). The files go as they are (multipart, field files); the server reads
 // UTF-8, else windows-1252, opens a ZIP in memory and merges everything into one preview. after = called once imported (the
 // cash flow loads again).
+// 2.146.0 C (#2455): the date formats of core/csvimport.DATE_FORMATS (the household import offers the same)
+const BNK_DATE_FORMATS = ['DD.MM.YYYY', 'DD.MM.YY', 'YYYY-MM-DD', 'MM/DD/YYYY', 'DD-MM-YYYY', 'YYYYMMDD'];
 const BNK_ACCEPT = '.xml,.csv,.txt,.zip,text/csv,text/plain,application/xml,text/xml,application/zip,application/x-zip-compressed';
 function bnkPick(after) { return bnkImpModal(null, null, after); }
 function bnkHintHtml() {
   return `<ul class="bnk-hint" role="list">
     <li class="ok">${ic('check', 's')}<span>${tr('Recommended: XML (CAMT.053), booked transactions – version V2 or V8 does not matter. Only this brings the account balance along. Several files or one ZIP work too.')}</span></li>
     <li>${ic('info', 's')}<span>${tr('Also works: CSV export (you choose the columns) – the account balance only when the CSV has a balance column.')}</span></li>
-    <li class="no">${ic('ban', 's')}<span>${tr('Do not use: pending transactions / CAMT.052 (not booked yet, they would come twice later) and MT940 / MT942 (not read).')}</span></li></ul>`;
+    <li class="no">${ic('ban', 's')}<span>${tr('Better not: CAMT.052 (day reports – pending transactions are only shown, never imported) and MT940 / MT942 (not read).')}</span></li></ul>`;
+}
+// 2.146.0 C (#2469): CAMT.052 read -- pending entries stay out, the booked version comes with a later report
+function bnk052Html() {
+  return `<p class="shint lhint keep bnk052">${ic('info', 's')} ${tr('These are day reports (CAMT.052). Pending transactions are shown but not imported; a booking that appears in several reports counts once. For the bookkeeping, better export the account statement (CAMT.053).')}</p>`;
 }
 function bnkImpModal(text, name, after) {  // text + name: one statement read already (as before); without them the start step
   const md = modal(''), card = $('.card', md), st = {p: null, mapping: null, rows: null, account: null};  // 2.124.0 D (#2342): account = the name for a CSV balance
@@ -142,18 +148,18 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
       ${st.p.guess?.preset_name ? `<p class="shint lhint keep bgpreset">${ic('check', 's')} ${esc(tr('Recognised layout: {0}', st.p.guess.preset_name))}</p>` : ''}
       ${sel('bi-date', tr('Date'), g.date)}
       <div class="row"><label>${tr('Amount')}</label><div class="seg" role="radiogroup" id="bi-am" aria-label="${esc(tr('Amount'))}"><button type="button" role="radio" data-am="one" aria-checked="${!two}" class="${two ? '' : 'on'}">${tr('One column (minus = expense)')}</button><button type="button" role="radio" data-am="two" aria-checked="${two}" class="${two ? 'on' : ''}">${tr('Income and expense apart')}</button></div></div>
-      <div class="bi-one" ${two ? 'hidden' : ''}>${sel('bi-amt', tr('Amount'), g.amount)}</div>
+      <div class="bi-one" ${two ? 'hidden' : ''}>${sel('bi-amt', tr('Amount'), g.amount)}${sel('bi-sign', tr('Debit / credit mark (S/H, optional)'), g.sign, true)}</div>
       <div class="bi-two" ${two ? '' : 'hidden'}>${sel('bi-in', tr('Income'), g.amount_in, true)}${sel('bi-out', tr('Expense'), g.amount_out, true)}</div>
       ${sel('bi-title', tr('Purpose'), g.title, true)}${sel('bi-cp', tr('Paid to / from'), g.counterpart, true)}${cfb_mapHtml(st, sel, g)}
       <div class="row"><label for="bi-dec">${tr('Decimal separator')}</label><select id="bi-dec"><option value="," ${g.decimal !== '.' ? 'selected' : ''}>${tr('comma (1.234,56)')}</option><option value="." ${g.decimal === '.' ? 'selected' : ''}>${tr('point (1,234.56)')}</option></select></div>
-      <div class="row"><label for="bi-df">${tr('Date format')}</label><select id="bi-df">${['DD.MM.YYYY', 'DD.MM.YY', 'YYYY-MM-DD', 'MM/DD/YYYY'].map(f => `<option ${g.date_format === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div>
+      <div class="row"><label for="bi-df">${tr('Date format')}</label><select id="bi-df">${BNK_DATE_FORMATS.map(f => `<option ${g.date_format === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div>
       <div class="bgtblw"><table class="bgtbl"><thead><tr>${st.p.columns.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${st.p.sample.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
       ${foot(tr('Preview'))}`;
   };
   const mapOf = () => {
     const n = id => { const v = $(id, md)?.value; return v === '' || v == null ? null : +v; }, two = $('#bi-am [aria-checked="true"]', md)?.dataset.am === 'two';
     st.account = $('#bi-accname', md)?.value.trim() || null;  // 2.124.0 D (#2342): balance + own account column (optional)
-    return {date: n('#bi-date'), amount: two ? null : n('#bi-amt'), amount_in: two ? n('#bi-in') : null, amount_out: two ? n('#bi-out') : null, title: n('#bi-title'), counterpart: n('#bi-cp'), decimal: $('#bi-dec', md).value, date_format: $('#bi-df', md).value, balance: n('#bi-bal'), account: n('#bi-acc')};
+    return {date: n('#bi-date'), amount: two ? null : n('#bi-amt'), amount_in: two ? n('#bi-in') : null, amount_out: two ? n('#bi-out') : null, sign: two ? null : n('#bi-sign'), title: n('#bi-title'), counterpart: n('#bi-cp'), decimal: $('#bi-dec', md).value, date_format: $('#bi-df', md).value, balance: n('#bi-bal'), account: n('#bi-acc')};
   };
   const start = () => {
     card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${tr('Which file from your online banking?')}</p>${bnkHintHtml()}
@@ -167,8 +173,8 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
   };
   const rowsView = () => {
     const p = st.p, many = (p.files || 1) > 1;
-    card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${esc(label())} · ${esc([many && files.length === 1 ? trn('{0} file', '{0} files', p.files) : '', trn('{0} new', '{0} new', p.count), p.dup_count ? trn('{0} already there', '{0} already there', p.dup_count) : '', p.skipped ? trn('{0} with an error', '{0} with an error', p.skipped) : ''].filter(Boolean).join(' · '))}</p>
-      ${cfb_prevHtml(p.balances)}${filesInfo(p)}<ul class="ofclist bnkprev" role="list">${p.rows.slice(0, 200).map(r => `<li class="ofcrow ${r.error || r.dup ? 'arch' : ''}"><span class="ofcn"><b>${esc(r.counterpart || r.purpose || tr('Row {0}', r.n))}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.error || (r.dup ? tr('already there') : r.purpose), many ? r.file : ''].filter(Boolean).join(' · '))}</small></span>${r.amount != null ? `<span class="bnkamt ${+r.amount > 0 ? 'in' : 'out'}">${esc(bnkAmt(r.amount))}</span>` : ''}</li>`).join('')}</ul>
+    card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${esc(label())} · ${esc([many && files.length === 1 ? trn('{0} file', '{0} files', p.files) : '', trn('{0} new', '{0} new', p.count), p.dup_count ? trn('{0} already there', '{0} already there', p.dup_count) : '', p.pending_count ? trn('{0} pending', '{0} pending', p.pending_count) : '', p.skipped ? trn('{0} with an error', '{0} with an error', p.skipped) : ''].filter(Boolean).join(' · '))}</p>
+      ${p.camt052 ? bnk052Html() : ''}${cfb_prevHtml(p.balances)}${filesInfo(p)}<ul class="ofclist bnkprev" role="list">${p.rows.slice(0, 200).map(r => `<li class="ofcrow ${r.error || r.dup || r.pending ? 'arch' : ''} ${r.pending ? 'pend' : ''}"><span class="ofcn"><b>${esc(r.counterpart || r.purpose || tr('Row {0}', r.n))}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.error || (r.pending ? tr('pending – not imported') : r.dup ? tr('already there') : r.purpose), many ? r.file : ''].filter(Boolean).join(' · '))}</small></span>${r.amount != null ? `<span class="bnkamt ${+r.amount > 0 ? 'in' : 'out'}">${esc(bnkAmt(r.amount))}</span>` : ''}</li>`).join('')}</ul>
       ${p.rows.length > 200 ? `<p class="muted">${tr('Showing the first 200 rows')}</p>` : ''}${foot(p.count ? trn('Import {0} booking', 'Import {0} bookings', p.count) : '', p.fmt === 'csv')}`;
   };
   const preview = async mapping => {

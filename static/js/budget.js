@@ -363,90 +363,158 @@ async function bg_contractsModal() {
   });
 }
 
-// ---- CSV import: file -> columns -> preview -> commit
-function bg_readFile(f) {
-  const rd = enc => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => no(r.error); r.readAsText(f, enc); });
-  return f.text().then(t => t.includes('�') ? rd('windows-1252') : t);  // UTF-8 via Blob.text(); FileReader only for the windows-1252 fallback
+// ---- CSV import: file(s) -> columns -> preview -> commit
+// 2.146.0 C (#2455 #2469): several files or one ZIP (multipart, field files, like the office's bank import; the server reads
+// UTF-8, else windows-1252, and opens a ZIP in memory), the debit / credit mark (S/H), pending CAMT.052 entries shown apart
+// and never taken over, long imports taken over in parts under one import run, and the last runs can be taken back.
+const BG_ACCEPT = '.csv,.txt,.xml,.zip,text/csv,text/plain,text/xml,application/xml,application/zip,application/x-zip-compressed';
+const BG_SHOW = 300, BG_PART = 3000, BG_UPLOAD_MAX = 20 * 1024 * 1024;
+const BG_DATE_FORMATS = ['DD.MM.YYYY', 'DD.MM.YY', 'YYYY-MM-DD', 'MM/DD/YYYY', 'DD-MM-YYYY', 'YYYYMMDD'];  // core/csvimport.DATE_FORMATS
+function bg_runsHtml(items) {
+  const live = (items || []).filter(x => x.left > 0).slice(0, 5);
+  if (!live.length) return '';
+  return `<section class="bgsec bgruns"><h4>${tr('Last imports')}</h4><ul class="bgrunl" role="list">${live.map(x => `<li class="bgrun"><span class="bgel"><b>${esc(x.label || x.fmt.toUpperCase())}</b><small class="muted">${esc([x.at ? fmtDateLoc(x.at.slice(0, 10)) : '', trn('{0} entry', '{0} entries', x.left)].filter(Boolean).join(' · '))}</small></span><button type="button" class="btn sm" data-csundo="${esc(x.id)}">${ic('undo', 's')}<span>${tr('Take this import back')}</span></button></li>`).join('')}</ul></section>`;
+}
+// takes one import run back; entries changed after the import (or with a receipt) are named and kept unless chosen too
+async function bg_runUndo(lid, run) {
+  let items; try { items = (await api('GET', `/api/budget/${lid}/import/runs`)).items; } catch { return null; }
+  const it = items.find(x => x.id === run); if (!it || !it.left) return null;
+  let all = false;
+  const ok = await askDialog({title: tr('Take this import back?'), danger: true, ok: tr('Take back'),
+    html: `<p>${esc(trn('{0} entry of this import will be deleted, with its receipts.', '{0} entries of this import will be deleted, with their receipts.', it.left - it.edited))}</p>${it.edited ? `<p>${esc(trn('{0} entry was changed after the import and stays.', '{0} entries were changed after the import and stay.', it.edited))}</p><label class="chkl"><input type="checkbox" data-csall> ${tr('Delete the changed ones too')}</label>` : ''}`,
+    after: md => md.addEventListener('change', e => { if (e.target.matches('[data-csall]')) all = e.target.checked; })});
+  if (!ok) return null;
+  const j = await api('POST', `/api/budget/${lid}/import/runs/${run}/undo`, {edited: all ? 'delete' : 'keep'});
+  toast(trn('{0} entry deleted', '{0} entries deleted', j.deleted) + (j.kept?.length ? ' · ' + trn('{0} changed entry kept: {1}', '{0} changed entries kept: {1}', j.kept.length, j.kept.slice(0, 3).map(e => e.title).join(', ')) : ''));
+  await bg_after();
+  return j;
 }
 function bg_csvModal() {
-  const lid = BG.lid, st = {text: '', p: null, rows: null, mapping: null};
+  const lid = BG.lid, st = {files: [], p: null, rows: null, mapping: null};
   const md = bg_modal(`<h3>${ic('upload', 's')} ${tr('Import a CSV file')}</h3><div class="bgcsv"></div><div class="aerr" role="alert"></div><div class="foot bgcfoot"></div>`, async () => {});
   const area = $('.bgcsv', md), foot = $('.bgcfoot', md), err = m => lifeErr(md, {message: m || ''});
   const footHtml = (ok, back) => `${back ? `<button class="btn" data-cs="back">${tr('Back')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button>${ok ? `<button class="btn pri" data-cs="next">${esc(ok)}</button>` : ''}`;
-  const step1 = () => {  // 2.140.0 B (#2134): CSV or CAMT
+  const form = mapping => { const fd = new FormData(); for (const f of st.files) fd.append('files', f, f.name); if (mapping) fd.append('mapping', JSON.stringify(mapping)); return fd; };
+  const label = () => st.files.length === 1 ? st.files[0].name : trn('{0} file', '{0} files', st.files.length);
+  const step1 = () => {  // 2.140.0 B (#2134): CSV or CAMT; 2.146.0 C (#2455): several files / a ZIP, the last imports
     area.innerHTML = `<div class="shint lhint keep">${ic('lock', 's')} ${tr('No bank access – only the file you download from your bank yourself (CSV export of your account statement).')}</div>
-      <label class="btn bgpick">${ic('upload', 's')}<span>${tr('Choose a CSV file')}</span><input type="file" accept=".csv,.txt,.xml,text/csv,text/plain,text/xml,application/xml" data-cs-file hidden></label>
-      <p class="muted bgfmts">${tr('CSV of any bank, or CAMT (XML) like in the office’s bank import.')}</p>`;
+      <label class="btn bgpick">${ic('upload', 's')}<span>${tr('Choose files')}</span><input type="file" multiple accept="${BG_ACCEPT}" data-cs-file hidden></label>
+      <p class="muted bgfmts">${tr('CSV of any bank, or CAMT (XML) like in the office’s bank import. Several files or one ZIP work too.')}</p><div class="bgrunsw"></div>`;
     foot.innerHTML = footHtml(''); err();
+    api('GET', `/api/budget/${lid}/import/runs`).then(j => { const w = $('.bgrunsw', md); if (w && !st.p) w.innerHTML = bg_runsHtml(j.items); }).catch(() => {});
   };
   const sel = (id, label, val, opt) => `<div class="row"><label for="${id}">${esc(label)}</label><select id="${id}">${opt ? `<option value="">${tr('none')}</option>` : ''}${st.p.columns.map((c, i) => `<option value="${i}" ${val === i ? 'selected' : ''}>${esc(c || tr('Column {0}', i + 1))}</option>`).join('')}</select></div>`;
-  const step2 = () => {  // 2.140.0 B (#2134): + the recognised bank layout
-    const g = st.p.guess || {}, two = g.amount == null && (g.amount_in != null || g.amount_out != null);
-    area.innerHTML = `<p class="muted">${tr('Which column holds what? Kalmido has guessed; please check.')}</p>
-      ${g.preset_name ? `<p class="shint lhint keep bgpreset">${ic('check', 's')} ${esc(tr('Recognised layout: {0}', g.preset_name))}</p>` : ''}
+  const filesInfo = p => {
+    const errs = p.file_errors || [], skip = p.skipped_files || [];
+    if (!errs.length && !skip.length) return '';
+    return `<ul class="bnk-files" role="list">${errs.map(e => `<li class="no">${ic('alert', 's')}<span><b>${esc(e.file)}</b> ${esc(e.error)}</span></li>`).join('')}${skip.length ? `<li>${ic('info', 's')}<span>${esc(tr('Skipped: {0}', skip.join(', ')))}</span></li>` : ''}</ul>`;
+  };
+  const step2 = () => {  // 2.140.0 B (#2134): + the recognised bank layout; 2.146.0 C (#2455): + the S/H mark, two date formats
+    const g = st.mapping || st.p.guess || {}, two = g.amount == null && (g.amount_in != null || g.amount_out != null);
+    area.innerHTML = `<p class="muted">${esc(label())} · ${tr('Which column holds what? Kalmido has guessed; please check.')}</p>${st.p.files > 1 ? `<p class="muted">${tr('The columns apply to every CSV file.')}</p>` : ''}${filesInfo(st.p)}
+      ${st.p.guess?.preset_name ? `<p class="shint lhint keep bgpreset">${ic('check', 's')} ${esc(tr('Recognised layout: {0}', st.p.guess.preset_name))}</p>` : ''}
       ${sel('cs-date', tr('Date'), g.date)}
       <div class="row"><label>${tr('Amount')}</label><div class="seg" role="radiogroup" id="cs-am" aria-label="${esc(tr('Amount'))}"><button type="button" role="radio" data-am="one" aria-checked="${!two}" class="${two ? '' : 'on'}">${tr('One column (minus = expense)')}</button><button type="button" role="radio" data-am="two" aria-checked="${two}" class="${two ? 'on' : ''}">${tr('Income and expense apart')}</button></div></div>
-      <div class="cs-one" ${two ? 'hidden' : ''}>${sel('cs-amt', tr('Amount'), g.amount)}</div>
+      <div class="cs-one" ${two ? 'hidden' : ''}>${sel('cs-amt', tr('Amount'), g.amount)}${sel('cs-sign', tr('Debit / credit mark (S/H, optional)'), g.sign, true)}</div>
       <div class="cs-two" ${two ? '' : 'hidden'}>${sel('cs-in', tr('Income'), g.amount_in, true)}${sel('cs-out', tr('Expense'), g.amount_out, true)}</div>
       ${sel('cs-title', tr('Text'), g.title)}${sel('cs-cp', tr('Paid to / from'), g.counterpart, true)}
       <div class="row"><label for="cs-dec">${tr('Decimal separator')}</label><select id="cs-dec"><option value="," ${g.decimal !== '.' ? 'selected' : ''}>${tr('comma (1.234,56)')}</option><option value="." ${g.decimal === '.' ? 'selected' : ''}>${tr('point (1,234.56)')}</option></select></div>
-      <div class="row"><label for="cs-df">${tr('Date format')}</label><select id="cs-df">${['DD.MM.YYYY', 'DD.MM.YY', 'YYYY-MM-DD', 'MM/DD/YYYY'].map(f => `<option ${g.date_format === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div>
+      <div class="row"><label for="cs-df">${tr('Date format')}</label><select id="cs-df">${BG_DATE_FORMATS.map(f => `<option ${g.date_format === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div>
       <div class="bgtblw"><table class="bgtbl"><thead><tr>${st.p.columns.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${st.p.sample.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
     foot.innerHTML = footHtml(tr('Preview'), true); err();
     $('#cs-am', md).addEventListener('click', e => { const b = e.target.closest('[data-am]'); if (!b) return; for (const x of $$('#cs-am [data-am]', md)) { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); } $('.cs-one', md).hidden = b.dataset.am === 'two'; $('.cs-two', md).hidden = b.dataset.am !== 'two'; });
   };
   const mapOf = () => {
     const n = id => { const v = $(id, md)?.value; return v === '' || v == null ? null : +v; }, two = $('#cs-am [aria-checked="true"]', md)?.dataset.am === 'two';
-    return {date: n('#cs-date'), amount: two ? null : n('#cs-amt'), amount_in: two ? n('#cs-in') : null, amount_out: two ? n('#cs-out') : null, title: n('#cs-title'), counterpart: n('#cs-cp'), decimal: $('#cs-dec', md).value, date_format: $('#cs-df', md).value};
+    return {date: n('#cs-date'), amount: two ? null : n('#cs-amt'), amount_in: two ? n('#cs-in') : null, amount_out: two ? n('#cs-out') : null, sign: two ? null : n('#cs-sign'), title: n('#cs-title'), counterpart: n('#cs-cp'), decimal: $('#cs-dec', md).value, date_format: $('#cs-df', md).value};
   };
-  const cnt = () => $$('[data-csr]:checked', md).length;
-  const okLabel = () => trn('Take over {0} entry', 'Take over {0} entries', cnt());
+  const takeable = r => !r.error && !r.pending;
+  const chosen = () => st.rows.map((r, i) => [r, i]).filter(([r, i]) => takeable(r) && (i < BG_SHOW ? $(`[data-csr="${i}"]`, md)?.checked : !r.dup));
+  const okLabel = () => trn('Take over {0} entry', 'Take over {0} entries', chosen().length);
   const step3 = () => {
-    const rows = st.rows, recName = id => (BG.data?.open_recurring || []).find(o => o.recurring.id === id)?.recurring.title || '';
-    area.innerHTML = `<p class="muted">${esc(trn('{0} row read', '{0} rows read', rows.length))}${st.skipped ? ' · ' + esc(trn('{0} row skipped', '{0} rows skipped', st.skipped)) : ''}</p>
-      <ul class="bgprev">${rows.map((r, i) => `<li class="bgpr ${r.error ? 'err' : r.dup ? 'dup' : ''}"><label class="bgprc"><input type="checkbox" data-csr="${i}" ${r.error || r.dup ? '' : 'checked'} ${r.error ? 'disabled' : ''} aria-label="${esc(r.title || tr('Row {0}', r.n))}"></label>
-        <span class="bgel"><b>${esc(r.title || '–')}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.counterpart].filter(Boolean).join(' · '))}</small>
+    const rows = st.rows, p = st.p, recName = id => (BG.data?.open_recurring || []).find(o => o.recurring.id === id)?.recurring.title || '';
+    const shown = rows.slice(0, BG_SHOW), pend = rows.filter(r => r.pending && !r.error), many = (p.files || 1) > 1;
+    area.innerHTML = `<p class="muted">${esc([trn('{0} row read', '{0} rows read', rows.length - pend.length), st.skipped ? trn('{0} row skipped', '{0} rows skipped', st.skipped) : '', many ? trn('{0} file', '{0} files', p.files) : ''].filter(Boolean).join(' · '))}</p>
+      ${p.camt052 ? `<p class="shint lhint keep bnk052">${ic('info', 's')} ${tr('These are day reports (CAMT.052). Pending transactions are shown but not imported; a booking that appears in several reports counts once. For the bookkeeping, better export the account statement (CAMT.053).')}</p>` : ''}${filesInfo(p)}
+      <ul class="bgprev">${shown.map((r, i) => r.pending && !r.error ? '' : `<li class="bgpr ${r.error ? 'err' : r.dup ? 'dup' : ''}"><label class="bgprc"><input type="checkbox" data-csr="${i}" ${r.error || r.dup ? '' : 'checked'} ${r.error ? 'disabled' : ''} aria-label="${esc(r.title || tr('Row {0}', r.n))}"></label>
+        <span class="bgel"><b>${esc(r.title || '–')}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.counterpart, many ? r.file : ''].filter(Boolean).join(' · '))}</small>
         ${r.error ? `<small class="bgwarn">${ic('alert', 's')} ${esc(r.error)}</small>` : r.dup ? `<small class="bgwarn">${esc(tr('Already in the budget'))}</small>` : ''}
         ${r.recurring_id ? `<label class="chkl bgrecs2"><input type="checkbox" data-csrec="${i}" checked> ${esc(tr('belongs to “{0}”', recName(r.recurring_id) || tr('recurring entry')))}</label>` : ''}
         ${r.error ? '' : `<select data-cscat="${i}" aria-label="${esc(tr('Category'))}">${bg_catOpts(r.kind, r.cat_id)}</select>`}</span>
-        ${r.amount != null ? `<span class="bgamt ${r.kind}">${r.kind === 'in' ? '+' : '−'}${esc(bg_money(r.amount))}</span>` : ''}</li>`).join('')}</ul>`;
+        ${r.amount != null ? `<span class="bgamt ${r.kind}">${r.kind === 'in' ? '+' : '−'}${esc(bg_money(r.amount))}</span>` : ''}</li>`).join('')}</ul>
+      ${rows.length > BG_SHOW ? `<p class="muted bgmore">${esc(trn('{0} more row is taken over as suggested', '{0} more rows are taken over as suggested', rows.slice(BG_SHOW).filter(r => takeable(r) && !r.dup).length))}</p>` : ''}
+      ${pend.length ? `<section class="bgsec bgpend"><h4>${esc(trn('{0} pending booking – not taken over', '{0} pending bookings – not taken over', pend.length))}</h4><p class="muted">${tr('Not booked yet: the booked version comes with a later statement.')}</p><ul class="bgpendl" role="list">${pend.slice(0, 50).map(r => `<li><span class="bgel"><b>${esc(r.title || '–')}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.counterpart].filter(Boolean).join(' · '))}</small></span>${r.amount != null ? `<span class="bgamt ${r.kind}">${r.kind === 'in' ? '+' : '−'}${esc(bg_money(r.amount))}</span>` : ''}</li>`).join('')}</ul></section>` : ''}`;
     foot.innerHTML = footHtml(okLabel(), true); err();
+  };
+  // the chosen rows in parts of at most BG_PART, the rows of one file together; one import run for all parts
+  const commit = async rows => {
+    const parts = [], byFile = new Map();
+    for (const r of rows) { if (!byFile.has(r.fi)) byFile.set(r.fi, []); byFile.get(r.fi).push(r); }
+    let cur = [];
+    for (const list of byFile.values()) {
+      if (cur.length && cur.length + list.length > BG_PART) { parts.push(cur); cur = []; }
+      for (const r of list) { if (cur.length >= BG_PART) { parts.push(cur); cur = []; } cur.push(r); }
+    }
+    if (cur.length) parts.push(cur);
+    let run = null, created = 0, dup = 0;
+    for (const part of parts) {
+      const j = await api('POST', `/api/budget/${lid}/import/commit`, {rows: part, mapping: st.mapping, columns: st.p.columns, ...(run ? {run} : {label: st.p.label || label(), fmt: st.p.fmt})});  // columns: the server remembers the mapping for this header
+      run = j.run; created += j.created; dup += j.skipped_dup;
+    }
+    return {run, created, dup};
   };
   const next = async () => {
     const b = $('[data-cs="next"]', md); if (b) b.disabled = true;
     try {
       if (st.rows) {
-        const rows = st.rows.map((r, i) => [r, i]).filter(([, i]) => $(`[data-csr="${i}"]`, md)?.checked).map(([r, i]) => ({day: r.day, amount: r.amount, kind: r.kind, title: r.title, counterpart: r.counterpart || '', cat_id: +$(`[data-cscat="${i}"]`, md)?.value || null, ...(r.recurring_id && $(`[data-csrec="${i}"]`, md)?.checked ? {recurring_id: r.recurring_id} : {})}));
+        const rows = chosen().map(([r, i]) => {
+          const cat = i < BG_SHOW ? +$(`[data-cscat="${i}"]`, md)?.value || null : r.cat_id, rec = i < BG_SHOW ? $(`[data-csrec="${i}"]`, md)?.checked : true;
+          return {day: r.day, amount: r.amount, kind: r.kind, title: r.title, counterpart: r.counterpart || '', cat_id: cat, iban: r.iban || null, ref: r.ref || null, e2e: r.e2e || null, fi: r.fi || 0, ...(r.recurring_id && rec ? {recurring_id: r.recurring_id} : {})};
+        });
         if (!rows.length) { err(tr('Nothing chosen')); return; }
         const bl = listById(lid);  // 2.87.9 (#1940): where the entries go, in words (the budget's list decides the workspace)
         if (!await importTargetConfirm({what: trn('{0} entry', '{0} entries', rows.length), ws: wsOf(bl), place: bl ? lname(bl) : ''})) return;
-        const j = await api('POST', `/api/budget/${lid}/import/commit`, {rows, mapping: st.mapping, columns: st.p.columns});  // columns: the server remembers the mapping for this header
+        let j = await commit(rows);
         md.remove(); await bg_after();
-        toast(trn('{0} entry imported', '{0} entries imported', j.created) + (j.skipped_dup ? ' · ' + trn('{0} already there', '{0} already there', j.skipped_dup) : ''));
+        const msg = trn('{0} entry imported', '{0} entries imported', j.created) + (j.dup ? ' · ' + trn('{0} already there', '{0} already there', j.dup) : '');
+        if (!j.created) { toast(msg); return; }
+        offerUndo(msg, histAdd({label: tr('Bank import'),  // 2.146.0 C (#2455): undo = this import run back (changed entries stay)
+          undo: async () => { await api('POST', `/api/budget/${lid}/import/runs/${j.run}/undo`, {edited: 'keep'}); await bg_after(); },
+          redo: async () => { j = await commit(rows); await bg_after(); }}));
         return;
       }
       st.mapping = mapOf();
       if (st.mapping.date == null || st.mapping.title == null || (st.mapping.amount == null && st.mapping.amount_in == null && st.mapping.amount_out == null)) { err(tr('Please choose the columns for date, amount and text')); return; }
-      const j = await api('POST', `/api/budget/${lid}/import/parse`, {text: st.text, mapping: st.mapping});
-      st.rows = j.rows || []; st.skipped = j.skipped || 0; step3();
+      const j = await api('POST', `/api/budget/${lid}/import/parse`, form(st.mapping));
+      st.rows = j.rows || []; st.skipped = j.skipped || 0; st.p = {...st.p, ...j, columns: st.p.columns, sample: st.p.sample, guess: st.p.guess}; step3();
     } catch (er) { err(er.message); } finally { const b2 = $('[data-cs="next"]', md); if (b2) b2.disabled = false; }
   };
-  md.addEventListener('click', e => {
+  const take = async fl => {
+    st.files = [...(fl || [])]; if (!st.files.length) return;
+    if (st.files.reduce((n, f) => n + f.size, 0) > BG_UPLOAD_MAX) { err(tr('The upload is too large (at most {0} MB)', 20)); return; }
+    Object.assign(st, {p: null, rows: null, mapping: null});
+    try { st.p = await api('POST', `/api/budget/${lid}/import/parse`, form(null)); }
+    catch (er) { err(er.message || tr('The file could not be read')); return; }
+    if (st.p.rows) { st.rows = st.p.rows; st.skipped = st.p.skipped || 0; step3(); return; }  // 2.140.0 B (#2134): CAMT -- the rows at once
+    if (!st.p.columns?.length) { err(tr('No columns found in the file')); return; }
+    step2();
+  };
+  md.addEventListener('click', async e => {
+    const u = e.target.closest('[data-csundo]');
+    if (u) { u.disabled = true; try { if (await bg_runUndo(lid, u.dataset.csundo)) step1(); } catch (er) { err(er.message); } finally { u.disabled = false; } return; }
     const b = e.target.closest('[data-cs]'); if (!b) return;
     if (b.dataset.cs === 'next') next();
     else if (b.dataset.cs === 'back') { if (st.rows && st.p?.columns) { st.rows = null; step2(); } else { st.rows = null; st.p = null; step1(); } }  // 2.140.0 B (#2134): CAMT has no column step
   });
-  md.addEventListener('change', async e => {
+  md.addEventListener('change', e => {
     if (e.target.matches('[data-csr]')) { const b = $('[data-cs="next"]', md); if (b) b.textContent = okLabel(); return; }
-    const inp = e.target.closest('[data-cs-file]'); if (!inp || !inp.files[0]) return;
-    const f = inp.files[0];
-    if (f.size > 2 * 1024 * 1024) { err(tr('The file is too big (at most 2 MB)')); return; }
-    try { st.text = await bg_readFile(f); st.p = await api('POST', `/api/budget/${lid}/import/parse`, {text: st.text}); }
-    catch (er) { err(er.message || tr('The file could not be read')); return; }
-    if (st.p.fmt === 'camt') { st.rows = st.p.rows || []; st.skipped = st.p.skipped || 0; step3(); return; }  // 2.140.0 B (#2134): the rows at once
-    if (!st.p.columns?.length) { err(tr('No columns found in the file')); return; }
-    step2();
+    const inp = e.target.closest('[data-cs-file]'); if (!inp || !inp.files?.length) return;
+    take(inp.files);
   });
+  // files dropped onto the dialog (like the office's bank import)
+  md.addEventListener('dragover', e => { if (!st.p && [...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); });
+  md.addEventListener('drop', e => { if (st.p || !e.dataTransfer?.files?.length) return; e.preventDefault(); take(e.dataTransfer.files); });
+  md.bgTake = take;  // the UI tests hand files over here
   step1();
   return md;
 }

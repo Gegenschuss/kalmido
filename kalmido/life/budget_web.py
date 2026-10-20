@@ -9,8 +9,10 @@ from ..core.db import body, bump, db, err
 from ..accounts.session import me
 from ..core.serializers import unlink_files
 from ..core.access import Denied
+from ..core.stmtfiles import stmt_req
 from ..life.budget import (
-    bud_compare, bud_contracts, bud_contracts_take, bud_files_save, bud_import_commit, bud_import_parse, bud_list_create, bud_month,
+    bud_compare, bud_contracts, bud_contracts_take, bud_files_save, bud_import_commit, bud_import_parse, bud_import_runs, bud_import_undo,
+    bud_list_create, bud_month,
     bud_month_view, bud_need_on, bud_obj, bud_overview, bud_this_month, cat_create, cat_delete, cat_update, entry_create,
     entry_delete, entry_update, rec_book, rec_create, rec_delete, rec_list, rec_update,
 )
@@ -149,16 +151,36 @@ def budget_contracts_take(lid):
 
 @app.post("/api/budget/<int:lid>/import/parse")
 def budget_import_parse(lid):
-    """{text, mapping?}: the columns + a guess, or (with a mapping) the checked rows. Nothing is stored."""
+    """{text, mapping?} or a multipart upload (2.146.0 C #2455: field files, several / a ZIP; mapping as JSON): the columns +
+    a guess, or (with a mapping / CAMT) the checked rows. Nothing is stored."""
     c = db()
-    return jsonify(bud_import_parse(c, me(), lid, body()))
+    return jsonify(bud_import_parse(c, me(), lid, stmt_req()))
 
 
 @app.post("/api/budget/<int:lid>/import/commit")
 def budget_import_commit(lid):
-    """{rows: [..], mapping?, columns?} -> {created, skipped_dup}."""
+    """{rows: [..], mapping?, columns?, run?, label?, fmt?} -> {created, skipped_dup, run}."""
     c, uid = db(), me()
     return _done(c, bud_import_commit(c, uid, lid, body()), 201)
+
+
+@app.get("/api/budget/<int:lid>/import/runs")
+def budget_import_runs(lid):
+    """2.146.0 C (#2455): the last imports of the list -> {items: [{id, at, label, fmt, count, left, edited, undone_at}]}."""
+    c = db()
+    return jsonify(bud_import_runs(c, me(), lid))
+
+
+@app.post("/api/budget/<int:lid>/import/runs/<run>/undo")
+def budget_import_undo(lid, run):
+    """2.146.0 C (#2455): {edited?: keep | delete} -> {deleted, kept}: takes one import back (its entries, with receipts)."""
+    c, uid = db(), me()
+    b = body()
+    out, paths = bud_import_undo(c, uid, lid, run, b if isinstance(b, dict) else {})
+    bump(c)
+    c.commit()
+    unlink_files(paths)
+    return jsonify(out)
 
 
 @app.post("/api/budget/entries/<int:eid>/files")
