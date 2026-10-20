@@ -324,7 +324,7 @@ function ofcSettingsHtml() {
   const dis = adm ? '' : 'disabled';
   return `<form class="ofcset" id="ofc-set" data-fg="ofc-set:${OFC.info.org_id}" autocomplete="off">
     <h3>${tr('Company')}</h3>
-    ${ofcRowF('os-name', tr('Company name'), `<textarea id="os-name" rows="${Math.min(3, Math.max(1, String(cf.name || co.name || '').split('\n').length))}" maxlength="200" ${dis}>${esc(cf.name || co.name || '')}</textarea>`, tr('up to three lines; the letterhead and the footer print them one under the other'))}
+    ${ofcRowF('os-name', tr('Company name'), `<textarea id="os-name" data-grow="3" style="overflow:hidden" rows="${Math.min(3, Math.max(1, String(cf.name || co.name || '').split('\n').length))}" maxlength="200" ${dis}>${esc(cf.name || co.name || '')}</textarea>`, tr('up to three lines; the letterhead and the footer print them one under the other'))}
     ${ofcCompanyFieldsHtml(cf, dis)}
     <details class="ofcfree"><summary>${tr('Free lines (used where the fields above are empty)')}</summary>
     ${ofcII('lines')}${ta('os-lines', tr('Address lines'), co.lines, tr('one line each: street, postcode and city'))}
@@ -581,8 +581,16 @@ document.addEventListener('click', async e => {
   else if (a === 'logo-del') { e.preventDefault(); try { await api('DELETE', '/api/office/logo'); await ofcInfo(true); toast(tr('Removed')); } catch (x) { toast(x.message || ''); } }
 });
 document.addEventListener('submit', e => { const f = e.target.closest?.('#ofc-set'); if (!f) return; e.preventDefault(); ofcSaveSettings(f); });
+// 2.138.1 B (#2395): a short multi-line field (company name) grows with its text up to `max` rows, no inner scrollbar
+function ofcGrow(ta, max = 3) {
+  ta.rows = 1;
+  const n = Math.max(1, String(ta.value).split('\n').length);
+  ta.rows = Math.min(max, n);
+  while (ta.rows < max && ta.scrollHeight > ta.clientHeight + 1) ta.rows++;
+}
 document.addEventListener('input', e => {
   const t = e.target;
+  if (t.dataset?.grow) ofcGrow(t, +t.dataset.grow || 3);
   if (t.id === 'ofc-q') { OFC.q = t.value; ofcDraw(); }
   else if (t.id === 'os-color') { const sw = $('.ofcsw'); if (sw) sw.style.background = /^#[0-9a-fA-F]{6}$/.test(t.value.trim()) ? t.value.trim() : 'var(--accent)'; }
   else if (t.dataset?.scheme) ofcSchemePv(t);  // 2.40.0 (#1382): every number scheme with its preview

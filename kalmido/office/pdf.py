@@ -669,6 +669,10 @@ def pdf_phone_in(ln):
     return re.sub(r"(?<![\w@.])(?:\+|00|0)[0-9][0-9/()\-]{5,}(?![\w@])", lambda mt: pdf_phone(mt.group(0)), str(ln))
 
 
+class _FooterCols(list):
+    n_name = 1
+
+
 def pdf_footer_cols(co):
     """2.114.4 A (#2271): the footer columns of a printed company (name + address, contact, register, bank; empty
     ones left out) -> [[(line, keep)]]; keep = the line never breaks (address, phone / email, IBAN / BIC / tax number)."""
@@ -681,7 +685,9 @@ def pdf_footer_cols(co):
         nl = [" ".join(nl)]
     cols = [[(ln, j > 0) for j, ln in enumerate(head)], [(pdf_phone_in(x), True) for x in (co.get("contact_lines") or [])],
             [(str(x), False) for x in (co.get("register_lines") or [])], [(str(x), True) for x in (co.get("bank_lines") or [])]]
-    return [p3f_three(c, len(nl) if i == 0 else 0) for i, c in enumerate(cols) if any(ln.strip() for ln, _ in c)]
+    out = _FooterCols(p3f_three(c, len(nl) if i == 0 else 0) for i, c in enumerate(cols) if any(ln.strip() for ln, _ in c))
+    out.n_name = len(nl)  # 2.138.1 B (#2397): how many leading lines of column 1 are the (bold) name
+    return out
 
 
 def p3f_three(col, n_name=0):
@@ -724,9 +730,10 @@ def p3f_fit(cols):
     that still wrap; when even that does not fit, the font shrinks a little. 2.114.5 (#2300): aims at three lines."""
     fs, cws, shown = 6.9, [], []
     ok6 = None
+    nn = max(1, getattr(cols, "n_name", 1))  # 2.138.1 B (#2397): name lines of column 1 (bold)
     if cols:
         free = PDF_CW - 8 * (len(cols) - 1)
-        bold = lambda i, j: i == 0 and j == 0  # noqa: E731
+        bold = lambda i, j: i == 0 and j < nn  # noqa: E731  2.138.1 B (#2397): every name line is bold
         # no break at all when a slightly smaller font allows it, else the narrowest font that keeps every unbreakable line
         for fs, whole in ((6.9, 1), (6.6, 1), (6.3, 1), (6.9, 0), (6.6, 0), (6.3, 0), (6.0, 0)):
             nat = [max(pdf_text_width(ln, fs, bold(i, j)) for j, (ln, _k) in enumerate(c)) + 3 for i, c in enumerate(cols)]
@@ -741,7 +748,7 @@ def p3f_fit(cols):
                 cws = [b + (free - sum(low)) * w / sum(want) for b, w in zip(low, want)]
             else:
                 cws = [free * b / sum(low) for b in low]
-            lay = lambda i, w: [(x, j == 0) for j, (ln, k) in enumerate(cols[i]) for x in bwa_wrap(ln, k, fs, w - 2, bold(i, j))]  # noqa: E731
+            lay = lambda i, w: [(x, j < nn) for j, (ln, k) in enumerate(cols[i]) for x in bwa_wrap(ln, k, fs, w - 2, bold(i, j))]  # noqa: E731
             shown = [lay(i, w) for i, w in enumerate(cws)]
             # 2.114.5 (#2300): a column over three lines takes width from the others as long as they keep their line count
             for _ in range(60):
@@ -782,7 +789,7 @@ def pdf_draw_footer(p, cols, right="", fit=None, foot_h=PDF_FOOT_H):
             if i:
                 x += cws[i - 1] + 8
             yy = top + 5
-            for ln, first in c[:6]:
+            for ln, first in c[:6]:  # 2.138.1 B (#2397): first = a name line (p3f_fit marks them)
                 p.text(x, yy, ln, fs, bold=(i == 0 and first), color=C_INK if (i == 0 and first) else C_INK2)
                 yy += fs * 1.39
     if right:
@@ -1180,22 +1187,22 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     # 2.122.4 B (#2261): exceptions / exclusive are already in rights.rows (docs.py print model), not appended again
     if r_rows or rights.get("note"):
         lab_w = 112
-        r_lines = [(a, pdf_wrap(b, 9, PDF_CW - lab_w - 12)) for a, b in r_rows]
-        rn_lines = pdf_wrap(str(rights.get("note") or ""), 8, PDF_CW) if rights.get("note") else []  # 2.114.1 C (#2258): small note
-        r_h = 14 + sum(max(1, len(b)) * 9 * 1.6 + 10 for _, b in r_lines) + (len(rn_lines) * 8 * 1.42 + 14 if rn_lines else 0)
+        r_lines = [(a, pdf_wrap(b, 10, PDF_CW - lab_w - 12)) for a, b in r_rows]  # 2.138.1 B (#2388): rows 10 pt, label = value size
+        rn_lines = pdf_wrap(str(rights.get("note") or ""), 8.5, PDF_CW) if rights.get("note") else []  # 2.114.1 C (#2258): small note
+        r_h = 14 + sum(max(1, len(b)) * 10 * 1.6 + 10 for _, b in r_lines) + (len(rn_lines) * 8.5 * 1.42 + 14 if rn_lines else 0)
 
         def draw_rights(p, y):  # 2.114.1 C (#2258): the title is the appendix heading, rows with more air
             yy = y + 14
             for a, b in r_lines:
-                p.text(PDF_L, yy, a, 9, False, C_INK2)
+                p.text(PDF_L, yy, a, 10, False, C_INK2)
                 for j, s in enumerate(b):
-                    p.text(PDF_L + lab_w, yy + j * 9 * 1.6, s, 9)
-                yy += max(1, len(b)) * 9 * 1.6 + 10
+                    p.text(PDF_L + lab_w, yy + j * 10 * 1.6, s, 10)
+                yy += max(1, len(b)) * 10 * 1.6 + 10
             if rn_lines:
                 yy += 12
                 for s in rn_lines:
-                    p.text(PDF_L, yy, s, 8, False, C_INK2)
-                    yy += 8 * 1.42
+                    p.text(PDF_L, yy, s, 8.5, False, C_INK2)
+                    yy += 8.5 * 1.42
         bfc_rights.append((r_h, draw_rights))
 
     acc = m.get("accepted") if isinstance(m.get("accepted"), dict) else None
@@ -1238,14 +1245,15 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         block(8 + qac_sig_block_h(acc_rows), lambda p, y: qac_sig_block(p, y + 8, acc_rows, str(acc.get("head") or ""), str(acc.get("foot") or ""), accent), tail=True, sq=4)
     half = (PDF_CW - 28) / 2
 
-    def draw_accept(p, y):
+    def draw_accept(p, y, gap=0):
+        # 2.138.1 B (#2388): after the rights appendix (gap > 0) a section of its own: air above, heading and captions one step larger
         p3a_at.append(p)
-        p.text(PDF_L, y + 16, str(m.get("receipt_label") or L["accept"]).upper(), 7.4, True, C_INK2, spacing=0.8)  # 2.120.0 D (#2089): + receipt label
-        yl = y + 16 + 40
+        p.text(PDF_L, y + gap + 16, str(m.get("receipt_label") or L["accept"]).upper(), 10 if gap else 7.4, True, C_INK if gap else C_INK2, spacing=0.8)  # 2.120.0 D (#2089): + receipt label
+        yl = y + gap + 16 + 40 + (6 if gap else 0)
         p.line(PDF_L, yl, PDF_L + half, yl, 0.6, C_INK)
-        p.text(PDF_L, yl + 3, L["place_date"], 7.6, False, C_INK2)
+        p.text(PDF_L, yl + 3, L["place_date"], 8.6 if gap else 7.6, False, C_INK2)
         p.line(PDF_L + half + 28, yl, PDF_L + PDF_CW, yl, 0.6, C_INK)
-        p.text(PDF_L + half + 28, yl + 3, L["sign"], 7.6, False, C_INK2)
+        p.text(PDF_L + half + 28, yl + 3, L["sign"], 8.6 if gap else 7.6, False, C_INK2)
     if (p3a_on and not p3a_end) or (m.get("kind") == "delivery" and np_):  # 2.120.0 D (#2089): the receipt box of a delivery note
         block(16 + 40 + 16, draw_accept, tail=True, sq=8)
     bfc_see_ref()  # no signature, no order confirmation: the line ends the main pages
@@ -1297,11 +1305,12 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             p.text(PDF_L, y + 6, rtitle.upper(), 14, True, C_INK, spacing=0.8)
             p.line(PDF_L, y + 6 + 20, PDF_L + 14 * MM, y + 6 + 20, 1.6, accent)
             if rsub:
-                p.text(PDF_L + PDF_CW, y + 8, rsub, 8.6, False, C_INK2, align="r")
+                p.text(PDF_L + PDF_CW, y + 8, rsub, 8, False, C_INK2, align="r")  # 2.138.1 B (#2388): not larger than the body text
         block(34 + 12, bfc_draw_rights_head, keep_next=True, brk=True)
         block(*bfc_rights[0])
     if p3a_end:  # 2.114.5 (#2300): the order confirmation behind the rights appendix (or the last part)
-        block(16 + 40 + 16, draw_accept)
+        agap = 32 if bfc_rights else 0  # 2.138.1 B (#2388)
+        block(agap + 16 + 40 + 16 + (6 + 6 if agap else 0), lambda p, y, g=agap: draw_accept(p, y, g))
 
     # -- lay the blocks out on pages
     pages = []
