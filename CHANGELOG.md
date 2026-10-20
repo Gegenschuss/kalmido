@@ -7,6 +7,37 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.123.0] - 2026-10-20
+
+Knowledge pages: history, pictures from the file store, sharing, full-text search; cash flow with an account balance.
+
+### Added
+- Knowledge pages: a history of every page - versions with date and person, a line comparison with the current text and
+  "Restore" (one undo step); saves of one person within ten minutes count as one version, at most 100 per page (#2102).
+- Knowledge pages: "Insert picture or file" in the editor - upload from the device (also by pasting or dropping into the
+  text) or pick a file from the file store; a file from the file store is only referenced, never copied, and shows only
+  for people who may open it (#2103).
+- Knowledge pages: share a page or a folder read-only - with people who have an account (private space, "Shared with
+  me") or by a public link without sign-in, with an optional expiry, revocable at any time; the public page shows only
+  the shared pages and their pictures, is not indexed and runs without scripts. Spaces encrypted in the browser cannot
+  be shared (#2104).
+- Knowledge pages: the texts and their history can be stored encrypted at rest with the key of the space (organisation
+  key, account key for private pages). Off after the update; the server admin switches it on with
+  `orgcrypt_cli encrypt-wiki`, `decrypt-wiki` is the way back before going to an older version (#2105).
+- Knowledge pages: the search uses a word index (keyed hashes, not the text) - hits in the name first, then in the text,
+  then the newest, more than 30 hits with "Show more"; in the text whole words and word beginnings count (#2106).
+- Knowledge pages: `[[datei:…]]` and `[[tabelle:…]]` link files of the file store and tables, with suggestions while
+  typing; the file store shows which pages mention a file (#2107).
+- Knowledge pages: open check box lines become tasks with one tap (quick-add syntax for date, tags and priority, list
+  of your choice, one undo step); the line then links the task and shows when it is done (#2108).
+- Office: cash flow with an account balance - an opening balance with its date in the office settings, the calculated
+  balance at the end of every month (also in the preview), corrections by hand per month ("Other income / expense" with
+  a note) and the real balance at month end with the difference; values by hand are marked, calculated ones stay as
+  they are (#2341).
+
+### Fixed
+- Office: the installment list shows the open amount in the number format of the document (#2351).
+
 ## [2.121.0] - 2026-10-20
 
 Receipts: recognition of supplier, VAT and invoice number, accounts per category, billing on to clients, cash book,
