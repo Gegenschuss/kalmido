@@ -609,7 +609,8 @@ function dc_fChanged() { DC.at = 0; dc_load(); dc_fSheetDraw(); if (!isMobile())
 document.addEventListener('click', e => {
   const x = e.target.closest?.('[data-dcx]');
   if (x && x.closest('.dc-view')) {
-    if (x.dataset.dcx === 'q') DC.q = ''; else dc_fEntries()[+x.dataset.dcx]?.rm();
+    if (x.dataset.dcx === 'q') { DC.q = ''; const qi = $('#dc-q'); if (qi) qi.value = ''; clearTimeout(dc_qTimer); }  // 2.138.3 A (#2362): a focused field keeps its text in the redraw (iOS: the tap leaves the focus there)
+    else dc_fEntries()[+x.dataset.dcx]?.rm();
     dc_fChanged(); return;
   }
   const box = e.target.closest?.('.dc-flt'); if (!box) return;
@@ -635,18 +636,6 @@ document.addEventListener('change', e => {
   DC.f[k] = el.type === 'checkbox' ? el.checked : el.value;
   dc_fChanged();
 });
-async function dc_filteredIds() {  // every id the search and the filters find (all pages, at most DC_SMV_MAX); the CSV export (part C) uses it
-  const p = dc_params(), out = [];
-  p.set('facets', '0'); p.set('limit', '200');
-  for (let off = 0; off < DC_SMV_MAX; off += 200) {
-    p.set('offset', String(off));
-    const j = await api('GET', '/api/docs?' + p);
-    for (const d of j.docs || []) out.push(d.id);
-    if ((j.docs || []).length < 200) break;
-  }
-  return out;
-}
-
 // ---- 2.122.0 B (#2295): Shift-click chooses a range of cards (tagsel.js dt_rsClick), Shift-click without choosing turns it on
 function dc_rsClick(e, id) {
   if (typeof dt_rsClick !== 'function') { dc_smvToggle(id); return; }

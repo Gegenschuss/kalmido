@@ -12,3 +12,5 @@
 .frq-nums{display:grid;grid-template-columns:1fr 6rem;gap:.375rem .75rem;align-items:center}
 .frq-kinds{border:0;padding:0;margin:.5rem 0}
 .frq-kinds .chkl{min-height:2.75rem}
+/* 2.138.3 A (#2362): the note field as wide as the fields above (a textarea was not in the row's flex rule) */
+.frq-form .row textarea{flex:1 1 100%;min-width:0;box-sizing:border-box}

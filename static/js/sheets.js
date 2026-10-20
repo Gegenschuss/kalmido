@@ -714,9 +714,11 @@ function shvAcDraw() {
   if (!box) { box = document.createElement('div'); box.id = 'shv-ac'; box.className = 'shvac'; box.setAttribute('role', 'listbox'); box.setAttribute('aria-label', tr('Suggestions')); document.body.appendChild(box); }
   box.innerHTML = a.items.map((x, i) => `<button type="button" role="option" class="${i === a.i ? 'on' : ''}" aria-selected="${i === a.i}" data-shvac="${i}" ${x.help ? `title="${esc(x.help)}"` : ''}><code>${esc(x.token)}</code><span class="shvacl">${esc(x.label || '')}</span>${x.value_display != null && x.value_display !== '' ? `<span class="shvacv">${esc(x.value_display)}</span>` : ''}</button>`).join('');
   const r = a.inp.getBoundingClientRect(), h = Math.min(box.offsetHeight || 240, 16 * 16);
-  const below = r.bottom + 4 + h < innerHeight;
+  // 2.138.3 A (#2372): the visual viewport (above the iOS keyboard), not innerHeight
+  const vv = window.visualViewport, vBot = vv ? vv.offsetTop + vv.height : innerHeight, vTop = vv ? vv.offsetTop : 0;
+  const below = r.bottom + 4 + h < vBot;
   box.style.left = Math.max(8, Math.min(r.left, innerWidth - box.offsetWidth - 8)) + 'px';
-  box.style.top = (below ? r.bottom + 4 : Math.max(8, r.top - 4 - h)) + 'px';
+  box.style.top = (below ? r.bottom + 4 : Math.max(vTop + 8, r.top - 4 - h)) + 'px';
   a.inp.setAttribute('aria-controls', 'shv-ac'); a.inp.setAttribute('aria-expanded', 'true');
   box.querySelector('.on')?.scrollIntoView?.({block: 'nearest'});
 }
