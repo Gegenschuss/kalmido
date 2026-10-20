@@ -325,6 +325,10 @@ APP_ONLY = [
      "disposition (booking crew and equipment): people only; agents read GET /absences (\"away\" only)",
      ("POST /api/team/absences", "PATCH /api/team/absences/", "DELETE /api/team/absences/", "PUT /api/team/absences/",
       "=GET /api/team/absences/check", "* /api/team/dispo", "=GET /api/team/bookings/mine")),
+    # 2.125.0 A (#2117, #2118): vacation accounts, vacation requests and their decision, the working week of a person
+    ("2.125.0 (#2117, #2118): the vacation account, deciding on vacation requests (a person's decision) and the working days / weekly "
+     "hours of a person stay with people; agents read GET /absences (approved absences only, \"away\" only)",
+     ("* /api/team/leave",)),
     ("2.27.0 (#999): the web panel says a person edits a task (tidy-up waits); agents never edit in a panel", ("=POST /api/tasks/{}/editing",)),
     ("2.42.0 (#1376): the web app's live updates (only the tasks changed since its state); agents follow their events and GET /tasks",
      ("=GET /api/state/delta",)),

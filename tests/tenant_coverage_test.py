@@ -138,7 +138,9 @@ KINDS = {
                       "(p249_e_api_test.py: no account disclosure, no probing by id, organisations unchanged)"),
     # 2.50.0 A (#1195, #1194): absences and bookings of an organisation / a personal area (row-level security + the app)
     "hub": ("matrix", "p250_a_api_test.py: absences and bookings by id of another organisation 404 (read, change, delete, restore), "
-                      "the kind of an absence only for the person and the admins, resources of another organisation cannot be booked"),
+                      "the kind of an absence only for the person and the admins, resources of another organisation cannot be booked; "
+                      "p2125_a_api_test.py (2.125.0): vacation accounts, requests, decisions and the working week of another "
+                      "organisation's people 404, requests never seen by the team or agents"),
     # 2.59.0 B (#1375): related tasks -- candidates only among the tasks the asker sees
     "related": ("matrix", "p259_b_api_test.py: related tasks, the hint while adding, search semantic=1, API v1 and agent events never "
                           "name a task of another organisation, an unshared list or a private list; another organisation's task 404"),
@@ -851,7 +853,9 @@ ROUTES = {
     # 2.50.0 A (#1195): absences; (#1194): resources and disposition
     "GET /api/team/absences": "hub", "POST /api/team/absences": "hub", "PATCH /api/team/absences/{}": "hub",
     "DELETE /api/team/absences/{}": "hub", "POST /api/team/absences/{}/restore": "hub", "PUT /api/team/absences/holidays": "hub",
-    "GET /api/team/absences/check": "hub", "GET /api/team/dispo": "hub", "GET /api/team/dispo/free": "hub",
+    "GET /api/team/absences/check": "hub", "GET /api/team/leave": "hub", "PUT /api/team/leave/quota": "hub",  # 2.125.0 A (#2117)
+    "PUT /api/team/leave/approval": "hub", "PUT /api/team/leave/worktime/{}": "hub", "POST /api/team/absences/{}/decide": "hub",
+    "GET /api/team/dispo": "hub", "GET /api/team/dispo/free": "hub",
     "POST /api/team/dispo/bookings": "hub", "PATCH /api/team/dispo/bookings/{}": "hub", "DELETE /api/team/dispo/bookings/{}": "hub",
     "POST /api/team/dispo/bookings/restore": "hub", "GET /api/team/bookings/mine": "hub", "GET /api/v1/absences": "hub",
     # 2.51.0 C (#1352 #1353 #1355): agents on the pin board, time check / proposals, the disposition + shoot proposals (p251_c_api_test.py)
