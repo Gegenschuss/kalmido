@@ -258,6 +258,11 @@ APP_ONLY = [
       "=POST /api/sheets/{}/columns/{}/restore", "=DELETE /api/sheets/{}/rows/{}", "=POST /api/sheets/{}/rows/{}/restore",
       "=POST /api/sheets/{}/rows/order", "=POST /api/sheets/{}/cells/{}/freeze", "=POST /api/sheets/{}/cells/{}/name",
       "=POST /api/sheets/{}/presence")),
+    ("2.124.0 B (#2110 #2111 #2112): uploading a file into a table cell and opening it, the people a person cell offers, the "
+     "rows / columns kept in view and the history of the cells stay with people in the app; an agent reads and writes the new "
+     "kinds through the table tools (a file cell read only: its name and id)",
+     ("=GET /api/sheets/{}/people", "=POST /api/sheets/{}/files", "=GET /api/sheets/{}/files/{}", "=GET /api/sheets/{}/files/{}/{}",
+      "=POST /api/sheets/{}/fixed", "=GET /api/sheets/{}/history", "=GET /api/sheets/{}/cells/{}/history")),
     ("2.98.0 B (#1954): the evaluation of a questionnaire (all submissions with the senders' names, addresses and answers, "
      "their CSV) stays with the people who manage the form in the app; an agent gets each submission as its task (task_added, "
      "the answers in the description) and sets the questions through the form's fields",
