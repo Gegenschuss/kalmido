@@ -3,7 +3,7 @@
 freelancer-matrix: agents
  - an agent's request that waits for approval makes an "approval" News entry (carrying the job number); deciding it
    (yes, no, stop) sets the unread entries of that job to read for every person it was shown to; the bell number drops
- - the same for an approval without a task (a list deletion), and for an old entry without a job number (matched by
+ - the same for an approval without a task or list (a personal agent emptying the trash), and for an old entry without a job number (matched by
    task / list + title)
  - a person without an organisation: the same for the own agent
 usage: p21382_a_api_test.py <datadir>      (P21382A_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
@@ -134,21 +134,10 @@ check(A.post(B + f"/api/agents/jobs/{J3}/action", json={"action": "stop"}).ok, "
 old = sql("SELECT COUNT(*) FROM notifications WHERE user_id=? AND kind='approval' AND task_id=? AND read_at IS NULL", (ALICE, T3))[0][0]
 check(old == 0, "legacy: the old entry is read by task + title")
 
-# ---- an approval without a task (deleting a custom field of a list)
-r = A.post(B + f"/api/lists/{W}/fields", json={"name": "Budget", "type": "number"})
-check(r.ok, "field: created " + r.text[:200])
-FLD = r.json()["id"]
-r = requests.delete(V + f"/fields/{FLD}", headers=CLH)
-check(r.status_code == 202, f"field: the deletion waits {r.status_code} {r.text[:200]}")
-J4 = (r.json().get("job") or {}).get("id")
-check(unread(ALICE, J4) == 1, "field: the News entry without a task is unread, with the job number")
-check(A.post(B + f"/api/agents/jobs/{J4}/action", json={"action": "reject"}).ok, "field: rejected")
-check(unread(ALICE, J4) == 0 and total(ALICE, J4) == 1, "field: the entry is read")
-
 # ---- a person without an organisation (freelancer-matrix: agents)
 FU, F = freelancer(B, A, "frida")
 F.patch(B + "/api/settings", json={"notify": {"approval": {"news": 1}}})
-r = F.post(B + "/api/my/agents", json={"username": "fridabot", "display_name": "Frida's bot", "scopes": ["read", "tasks:write", "comments"]})
+r = F.post(B + "/api/my/agents", json={"username": "fridabot", "display_name": "Frida's bot", "scopes": ["read", "tasks:write", "comments", "delete"]})
 check(r.status_code in (200, 201), "freelancer: an own agent " + r.text[:200])
 FA = r.json().get("id")
 FH = hdr(F.post(B + f"/api/my/agents/{FA}/token").json().get("token", ""))
@@ -162,6 +151,14 @@ check(unread(FU, FJ) == 1, f"freelancer: the News entry is unread {total(FU, FJ)
 r = F.post(B + f"/api/agents/jobs/{FJ}/action", json={"action": "approve"})
 check(r.ok and r.json().get("state") == "done", "freelancer: approved " + r.text[:200])
 check(total(FU, FJ) == 1 and unread(FU, FJ) == 0, "freelancer: the entry is read after the decision")
+
+# an approval without a task and without a list (emptying the trash) of a personal agent: shown to its owner
+r = requests.delete(V + "/trash", headers=FH)
+check(r.status_code == 202, f"freelancer: emptying the trash waits {r.status_code} {r.text[:200]}")
+FJ2 = (r.json().get("job") or {}).get("id")
+check(unread(FU, FJ2) == 1, "freelancer: the News entry without task and list is unread, with the job number")
+check(F.post(B + f"/api/agents/jobs/{FJ2}/action", json={"action": "reject"}).ok, "freelancer: rejected")
+check(unread(FU, FJ2) == 0 and total(FU, FJ2) == 1, "freelancer: that entry is read")
 
 print(f"p21382_a_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
