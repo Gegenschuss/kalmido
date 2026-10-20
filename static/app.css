@@ -6032,8 +6032,8 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 #side .fhead .fmenu:focus-visible{opacity:1}
 #side .fbody{margin-left:2rem}
 @media (min-width:900px) and (hover:hover){ #side .fhead:is(:hover,:focus-within) .fshr{opacity:0} }
-/* phone / touch: the "…" stays visible; 2.144.2 (#1730) the share icon sits after it at the right edge, in the lists' share column */
-@media (max-width:899px),(hover:none){ #side .fhead .fmenu{position:static;transform:none;order:1} #side .fhead .fshr{order:2} }
+/* phone / touch: the "…" stays visible at the end, the share icon sits right before it */
+@media (max-width:899px),(hover:none){ #side .fhead .fmenu{position:static;transform:none;margin-right:-.25rem} }
 /* 2.46.1 A (#1635) sections: dropped past the last one = at the end (a line below it / right of the last column); the dragged
    section folds (only its header stays) */
 #view .group.dropafter{box-shadow:inset 0 -2px 0 var(--accent)}
