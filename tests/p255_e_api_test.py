@@ -108,6 +108,11 @@ def no_secret(text, what):
 def sync(s, ws):
     """Sync now + wait until the run is done; the newest run."""
     r = s.post(B + "/api/newsletter/sync", json={"ws": ws})
+    for _ in range(40):  # 2.142.3: CI red once with 409 - the previous run of this workspace was still finishing on a slow runner
+        if r.status_code != 409:
+            break
+        time.sleep(0.5)
+        r = s.post(B + "/api/newsletter/sync", json={"ws": ws})
     check(r.status_code == 202, f"sync {ws} starts ({r.status_code} {r.text[:200]})")
     rid = r.json().get("run_id")
 
