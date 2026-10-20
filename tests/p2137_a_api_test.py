@@ -35,16 +35,20 @@ FAILS, OKS = [], [0]
 O, D = "/api/office", "/api/office/docs"
 
 
+def logs():
+    ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+    print(subprocess.run(["docker", "logs", "--tail", "80", ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         text=True).stdout[-8000:], flush=True)
+
+
 def check(cond, what):
     if cond:
         OKS[0] += 1
     else:
         FAILS.append(what)
         print("FAIL:", what, flush=True)
-        if len(FAILS) == 1:
-            ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-            print(subprocess.run(["docker", "logs", "--tail", "80", ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 text=True).stdout[-8000:], flush=True)
+        if len(FAILS) == 1 or "import done" in what:
+            logs()
 
 
 def sess(user, pw="password123"):
@@ -158,12 +162,12 @@ for s, ws in ((A, ORG), (Ca, ORG2), (Do, ORG3)):
     s.patch(B + "/api/settings", json={"lang": "en", "features": FEATURES, "tour": "done", "workspace": f"org:{ws}"})
 
 # ---------------------------------------------------------------- the office of the source organisation
-CL = A.post(B + "/api/clients", json={"name": "Kunde Beispiel", "email": "kunde@example.com", "org_id": ORG, "city": "Musterstadt",
+CL = A.post(B + "/api/clients", json={"name": "Kunde Beispiel", "email": "kunde@example.com", "org_id": ORG, "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt",
                                      "contacts": [{"name": "Petra Beispiel", "email": "petra@example.com", "is_default": True}]}).json()["id"]
 r = A.post(B + f"{O}/services", json={"name_de": "Schnitt", "name_en": "Editing", "daily_rate": 980, "unit": "day", "tax": "standard"})
 check(r.status_code == 201, "a service " + r.text[:120])
 SV = r.json().get("id")
-r = A.put(B + f"{O}/settings", json={"company_fields": {"name": "Alpha Studio GmbH", "city": "Musterstadt", "iban": "DE02120300000000202051",
+r = A.put(B + f"{O}/settings", json={"company_fields": {"name": "Alpha Studio GmbH", "street": "Hafenweg 2", "zip": "12345", "city": "Musterstadt", "iban": "DE02120300000000202051",
                                                          "tax_number": "12/345/67890"}, "lang": "en", "currency": "EUR"})
 check(r.ok, "office settings " + r.text[:120])
 LOGO = png()
@@ -199,6 +203,7 @@ C1 = A.post(B + f"{O}/contracts", json={"name": "Rahmenvertrag Beispiel", "clien
 CPDF = b"%PDF-1.4\n% vertrag beispiel " + os.urandom(8).hex().encode() + b"\n%%EOF\n"
 r = A.post(B + f"{O}/contracts/{C1}/files", files={"file": ("Vertrag.pdf", CPDF, "application/pdf")}, data={"date": "2026-03-01"})
 check(r.status_code == 201, "a contract file " + r.text[:160])
+SRC_CLOSINGS = len(A.get(B + f"{O}/cashbooks/{BK}/entries?year=2026").json().get("closings") or [])
 SRC_BEFORE = office_counts(ORG)
 SRC_CLIENTS = dbx("SELECT COUNT(*) AS n FROM clients WHERE org_id=?", (ORG,))[0]["n"]
 OX, RK = export(A, ORG)
@@ -234,7 +239,7 @@ check(len(ser) == 1 and tpl2 and ser[0].get("template_id", (ser[0].get("template
       f"the series points at its imported template {ser}")
 bk2 = Ca.get(B + f"{O}/cashbooks").json().get("books", [])
 ent = Ca.get(B + f"{O}/cashbooks/{bk2[0]['id'] if bk2 else 0}/entries?year=2026").json()
-check(len(ent.get("entries") or []) == 1 and len(ent.get("closings") or []) == 1, f"cash book entry + closing {ent.get('entries')} {ent.get('closings')}")
+check(len(ent.get("entries") or []) == 1 and len(ent.get("closings") or []) == SRC_CLOSINGS >= 1, f"cash book entry + closing {ent.get('entries')} {ent.get('closings')}")
 r = Ca.post(B + f"{O}/cashbooks/{bk2[0]['id'] if bk2 else 0}/entries", json={"day": "2026-03-01", "dir": "in", "amount": "5", "text": "Nachtrag"})
 check(r.status_code == 409, f"the closed day stays closed {r.status_code}")
 trips = Ca.get(B + f"{O}/trips?year=2025").json().get("trips", [])
