@@ -325,7 +325,7 @@ def chn_flush(resp):
 def chn_list_events(c, n):
     from ..accounts.orgs import org_role
     chans = c.execute("""SELECT id, user_id, org_id, events FROM notify_channels WHERE enabled=1
-                         AND (org_id IS NOT NULL OR events LIKE '%lists%') ORDER BY id""").fetchall()
+                         AND (org_id IS NOT NULL OR events ILIKE '%lists%') ORDER BY id""").fetchall()
     if not chans:
         return
     actor = g.user["id"] if g.get("user") and g.get("auth_via") != "public" else None
