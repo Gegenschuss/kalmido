@@ -14,7 +14,7 @@ const BROWSER = [
   'removeEventListener', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame',
   'cancelAnimationFrame', 'queueMicrotask', 'structuredClone', 'Blob', 'CSS', 'ClipboardItem', 'CustomEvent',
   'DecompressionStream', 'CompressionStream', 'Element', 'ErrorEvent', 'Event', 'File', 'FileReader', 'FormData', 'Headers',
-  'Image', 'IntersectionObserver', 'MutationObserver', 'NodeFilter', 'Notification', 'Option', 'ResizeObserver', 'Request', 'Response',
+  'Audio', 'Image', 'IntersectionObserver', 'MediaRecorder', 'MutationObserver', 'NodeFilter', 'Notification', 'Option', 'ResizeObserver', 'Request', 'Response',
   'TextDecoder', 'TextEncoder', 'URL', 'URLSearchParams', 'XMLHttpRequest', 'AbortController', 'HTMLElement', 'Node',
 ];
 const WORKER = ['self', 'caches', 'clients', 'registration', 'fetch', 'console', 'URL', 'URLSearchParams', 'Response',
