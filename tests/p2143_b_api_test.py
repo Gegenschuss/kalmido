@@ -307,7 +307,8 @@ def tick():
 # ---- the period: old pages go for good with their files, young ones stay
 old = page(A, "private", "Old/Plan")
 old_f, old_path = with_file(A, old)
-dbc.execute("INSERT INTO file_text(kind, ref_id, ws, text) SELECT 'wiki', ?, 'test', 'plan text' WHERE NOT EXISTS "
+dbc.execute("INSERT INTO file_text(kind, ref_id, ws, text, created_at, updated_at) SELECT 'wiki', ?, 'test', 'plan text', "
+            "'2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z' WHERE NOT EXISTS "
             "(SELECT 1 FROM file_text WHERE kind='wiki' AND ref_id=?)", (old_f, old_f))  # a text mark to be removed with it
 young = page(A, "private", "Young/Plan")
 young_f, young_path = with_file(A, young)
@@ -338,6 +339,10 @@ check(not gone(young) and stored(young_path), "#2211 a restored page is never pu
 # ---- delete permanently (one) and empty trash (all); a page not in the trash stays
 a1, a2, a3 = page(A, "private", "Trash/One"), page(A, "private", "Trash/Two"), page(A, "private", "Keep/Me")
 _, a1_path = with_file(A, a1)
+BOB = Bo.get(B + "/api/state").json()["me"]["id"]
+sh = A.post(B + "/api/wiki/shares", json={"page_id": a2, "kind": "person", "user_id": BOB})
+check(sh.ok, f"#2211 setup: a share of the page {sh.status_code} {sh.text[:200]}")
+SHARE = (sh.json().get("share") or sh.json()).get("id") if sh.ok else 0
 A.post(B + "/api/wiki/trash", json={"ids": [a1, a2]})
 r = A.post(B + "/api/wiki/purge", json={"space": "private", "ids": [a1, a3]})
 check(r.ok and r.json()["ids"] == [a1] and r.json()["skipped"] == [a3], f"#2211 delete permanently: the trashed page, not the live one {r.text}")
@@ -345,6 +350,8 @@ check(gone(a1) and not stored(a1_path) and not gone(a3), "#2211 its file is dele
 r = A.post(B + "/api/wiki/purge", json={"space": "private", "all": True})
 check(r.ok and r.json()["ids"] == [a2] and gone(a2) and trash_ids(A, "private") == [], f"#2211 empty trash {r.text}")
 check(A.post(B + "/api/wiki/purge", json={"space": "private", "ids": "x"}).status_code == 400, "#2211 ids must be a list")
+check(bool(SHARE) and dbc.execute("SELECT revoked_at FROM wiki_shares WHERE id=?", (SHARE,)).fetchone()[0],
+      "#2211 the share of the purged page ended (a later page of that name is not shared by it)")
 
 # ---- other people / organisations (tenant-matrix: wiki)
 o1 = page(A, SP, "Org/Old")

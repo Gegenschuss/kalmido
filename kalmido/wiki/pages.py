@@ -21,7 +21,7 @@ from flask import jsonify, request
 from ..core.config import app
 from ..core.pg import IntegrityError, insert_id
 from ..core.i18n import tr
-from ..core.db import body, bump, db, iso_ms, now_utc
+from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, task_visible
 from ..collab.comments import user_names
@@ -462,6 +462,11 @@ def wiki_purge(c, ids):
         c.execute(f"DELETE FROM upload_scan WHERE kind='wiki' AND ref_id IN ({f})", fids)
         c.execute(f"DELETE FROM file_text WHERE kind='wiki' AND ref_id IN ({f})", fids)
     c.execute(f"DELETE FROM space_moves WHERE kind='wiki' AND obj_id IN ({q})", ids)
+    # a share of exactly this page ends with it (a later page of the same name is not shared by the old link); folder shares stay
+    c.execute("UPDATE wiki_shares s SET revoked_at=? FROM wiki_pages p WHERE p.id IN (" + q + ") AND s.is_folder=0 AND s.revoked_at IS NULL "
+              "AND COALESCE(s.org_id,0)=COALESCE(p.org_id,0) AND COALESCE(s.owner_id,0)=COALESCE(p.owner_id,0) AND lower(s.path)=lower(p.path) "
+              "AND NOT EXISTS (SELECT 1 FROM wiki_pages x WHERE x.deleted_at IS NULL AND COALESCE(x.org_id,0)=COALESCE(p.org_id,0) "
+              "AND COALESCE(x.owner_id,0)=COALESCE(p.owner_id,0) AND lower(x.path)=lower(p.path))", [iso(now_utc()), *ids])
     c.execute(f"DELETE FROM wiki_pages WHERE id IN ({q})", ids)  # links, files, versions, word index: ON DELETE CASCADE
     if files:  # a stored file another row still names stays on disk
         f = ",".join("?" * len(files))
