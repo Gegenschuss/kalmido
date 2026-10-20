@@ -41,6 +41,8 @@ def _public(c, ws, uid, org):
     run = _run_public(c, "pl_sources", r, r["run_kind"], uid)
     out["conn"] = {"url": r["url"], "token_set": bool(r["token"]), "follow": bool(r["follow"]), "every_min": r["every_min"],
                    "synced_at": r["synced_at"], "error": r["error"], "error_text": P.pl_err_text(r["error"]), "run": run}
+    if not r["error"] and P.pl_token_lost(c, r):  # 2.138.3 C (#2382): after a new server key: enter the token again
+        out["conn"].update(error_text=P.pl_err_text("key"), token_lost=True)
     return out
 
 

@@ -16,7 +16,7 @@ from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
 from ..tasks.validation import as_int
 from ..personal.timetrack import BadInput, UnknownFields
 from ..api.v1 import v1_args, v1_json, v1_view
-from ..contacts.model import book_touch, contacts_on, my_book_ids, need_book, occ_sync, search_text, CONTACTS_PER_BOOK, FIELD_MAX, ITEMS_MAX, NOTE_MAX
+from ..contacts.model import book_touch, contact_copy, contacts_on, my_book_ids, need_book, occ_sync, search_text, CONTACTS_PER_BOOK, FIELD_MAX, ITEMS_MAX, NOTE_MAX
 
 BULK_MAX = 5000      # contacts in one request (an address book holds up to CONTACTS_PER_BOOK; the app sends what it shows)
 BULK_BLOCK = 200     # contacts per committed block
@@ -302,8 +302,19 @@ def op_contacts_bulk(c, uid, b):
     if mv and have + len(mv) > CONTACTS_PER_BOOK:
         raise Denied(409, tr("At most {0} contacts per address book", CONTACTS_PER_BOOK))
     occ = {r[0]: r[1] for r in c.execute(f"SELECT id, occ_list_id FROM books WHERE id IN ({bk_in(list(books))})", list(books)).fetchall()}
+    # 2.138.3 C (#2378): out of an imported (mirrored) address book = a copy, the mirror stays (its source would bring it back)
+    mir = {r[0] for r in c.execute(f"SELECT id FROM books WHERE src_id IS NOT NULL AND id IN ({bk_in(list(books))})", list(books)).fetchall()}
+    cp = [i for i in mv if rows[i]["book_id"] in mir]
+    mv = [i for i in mv if rows[i]["book_id"] not in mir]
     done = 0
     try:
+        for blk in bk_blocks(cp):
+            for i in blk:
+                contact_copy(c, uid, i, nb)
+            book_touch(c, nb)
+            bump(c)
+            c.commit()
+            done += len(blk)
         for blk in bk_blocks(mv):
             # a new birthday list: the old tasks go, the target's list gets new ones (the same list: they stay)
             drop = [i for i in blk if occ.get(rows[i]["book_id"]) != bk["occ_list_id"]]
@@ -319,8 +330,8 @@ def op_contacts_bulk(c, uid, b):
             c.commit()
             done += len(blk)
     except Exception:  # 2.58.0 (#1656): the answer tells how many moved
-        raise f8b_stop(c, "move", done, len(mv)) from None
-    return {"action": "move", "moved": len(mv), "unchanged": same, "conflicts": conflicts}
+        raise f8b_stop(c, "move", done, len(mv) + len(cp)) from None
+    return {"action": "move", "moved": len(mv), "copied": len(cp), "unchanged": same, "conflicts": conflicts}
 
 
 @app.post("/api/contacts/bulk")

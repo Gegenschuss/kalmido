@@ -664,7 +664,7 @@ ROUTES = {
     "POST /api/v1/time/timer": "time",
     "GET /api/time/sheets": "time", "POST /api/time/sheets": "time", "POST /api/time/sheets/decide": "time",  # 2.125.0 B (#2119)
     # ---- token (3)
-    "POST /api/hooks/deploy/{}/{}": "token", "POST /api/hooks/git/{}": "token", "POST /api/hooks/issues/{}/{}": "token",
+    "POST /api/hooks/deploy/{}/{}": "token", "POST /api/hooks/git/{}": "token", "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/issues/{}": "token",
     # ---- wiki (24)
     "DELETE /api/wiki/pages/{}": "wiki", "GET /api/wiki": "wiki", "GET /api/wiki/e2e": "wiki",
     "GET /api/wiki/e2e/todo": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki",
