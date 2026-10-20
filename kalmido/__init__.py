@@ -43,6 +43,7 @@ ORDER = (
     "core.pages",
     "core.instance",
     "core.state",
+    "core.csvimport",  # 2.140.0 B (#2134): the statement reader of budget and bank reconciliation
     "core.merges",  # 2.66.0 (#1835): merging contacts / clients (reversible)
     "lists.lists",
     "lists.groups",
@@ -218,6 +219,7 @@ ORDER = (
     "life.web",
     "life.v1",
     "life.budget",  # 2.72.0 (#1333): the household budget
+    "life.devlink",  # 2.140.0 B (#2136): a private device <-> office equipment
     "life.budget_web",
     "life.rss",  # 2.85.0 B (#1162): feeds
     "life.rss_web",

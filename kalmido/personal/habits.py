@@ -15,7 +15,8 @@ from ..tasks.validation import as_int, valid_hm
 
 # ---------------------------------------------------------------- habits (private per user)
 
-HABIT_FIELDS = ("name", "color", "goal", "days", "remind_at", "sort", "archived", "per_week")
+HABIT_FIELDS = ("name", "color", "goal", "days", "remind_at", "sort", "archived", "per_week", "remind_times")
+REMIND_MAX = 6  # 2.140.0 C (#2135): reminder times per habit
 
 
 def clean_habit_value(k, v):
@@ -40,11 +41,47 @@ def clean_habit_value(k, v):
         if not valid_hm(v):
             raise BadInput(tr("Invalid value: {0}", tr("Time")))
         return v
+    if k == "remind_times":
+        return clean_remind_times(v)
     if k == "sort":
         return clean_list_value("sort", v)
     if k == "archived":
         return 1 if v else 0
     return v
+
+
+def clean_remind_times(v):
+    """2.140.0 C (#2135): a list of "HH:MM" (or a comma string) -> sorted, unique, at most REMIND_MAX, as "HH:MM,HH:MM"."""
+    from ..personal.timetrack import BadInput
+    if v in (None, ""):
+        return ""
+    if isinstance(v, str):
+        v = v.split(",")
+    if not isinstance(v, list):
+        raise BadInput(tr("Invalid value: {0}", tr("Time")))
+    if not all(x in (None, "") or valid_hm(x) for x in v):
+        raise BadInput(tr("Invalid value: {0}", tr("Time")))
+    out = sorted({x for x in v if x})
+    if len(out) > REMIND_MAX:
+        raise BadInput(tr("Invalid value: {0}", tr("Time")))
+    return ",".join(out)
+
+
+def habit_times(h):
+    """The reminder times of a habit row: the list when set, else the single old time."""
+    return [x for x in (h["remind_times"] or "").split(",") if x] or ([h["remind_at"]] if h["remind_at"] else [])
+
+
+def remind_columns(b):
+    """The reminder columns to store for a body: remind_times is the list, remind_at stays its first time (older versions
+    and clients read that); a body with only remind_at (older client / API) sets both."""
+    if "remind_times" in b:
+        t = clean_remind_times(b["remind_times"])
+        return {"remind_times": t, "remind_at": t.split(",")[0]}
+    if "remind_at" in b:
+        t = clean_habit_value("remind_at", b["remind_at"])
+        return {"remind_times": t, "remind_at": t}
+    return {}
 
 
 def need_habit(c, hid):
@@ -62,9 +99,10 @@ def habit_create():
     c = db()
     srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM habits WHERE user_id=?", (me(),)).fetchone()[0]
     v = {k: clean_habit_value(k, b.get(k, d)) for k, d in (("color", ""), ("goal", 1), ("days", "1234567"),
-                                                            ("remind_at", ""), ("per_week", 0))}
-    cur_id = insert_id(c, "INSERT INTO habits(name,color,goal,days,remind_at,sort,per_week,created_at,user_id) VALUES(?,?,?,?,?,?,?,?,?)",
-                    (name[:200], v["color"], v["goal"], v["days"], v["remind_at"], srt, v["per_week"], iso(now_utc()), me()))
+                                                            ("per_week", 0))}
+    rc = {"remind_times": "", "remind_at": "", **remind_columns(b)}
+    cur_id = insert_id(c, "INSERT INTO habits(name,color,goal,days,remind_at,remind_times,sort,per_week,created_at,user_id) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (name[:200], v["color"], v["goal"], v["days"], rc["remind_at"], rc["remind_times"], srt, v["per_week"], iso(now_utc()), me()))
     bump(c)
     c.commit()
     return jsonify(id=cur_id)
@@ -75,7 +113,8 @@ def habit_update(hid):
     b = body()
     c = db()
     need_habit(c, hid)
-    vals = {k: clean_habit_value(k, b[k]) for k in HABIT_FIELDS if k in b}  # BadInput: 400, nothing stored
+    vals = {k: clean_habit_value(k, b[k]) for k in HABIT_FIELDS if k in b and k not in ("remind_at", "remind_times")}  # BadInput: 400, nothing stored
+    vals.update(remind_columns(b))  # 2.140.0 C (#2135)
     for k, v in vals.items():
         c.execute(f"UPDATE habits SET {k}=? WHERE id=?", (v, hid))
     bump(c)

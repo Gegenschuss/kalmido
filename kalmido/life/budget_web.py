@@ -10,7 +10,7 @@ from ..accounts.session import me
 from ..core.serializers import unlink_files
 from ..core.access import Denied
 from ..life.budget import (
-    bud_contracts, bud_contracts_take, bud_files_save, bud_import_commit, bud_import_parse, bud_list_create, bud_month,
+    bud_compare, bud_contracts, bud_contracts_take, bud_files_save, bud_import_commit, bud_import_parse, bud_list_create, bud_month,
     bud_month_view, bud_need_on, bud_obj, bud_overview, bud_this_month, cat_create, cat_delete, cat_update, entry_create,
     entry_delete, entry_update, rec_book, rec_create, rec_delete, rec_list, rec_update,
 )
@@ -42,6 +42,18 @@ def budget_month(lid):
     """?month=YYYY-MM (default: this month): categories with soll / ist, totals, entries, open templates, 6-month trend."""
     c = db()
     return jsonify(bud_month_view(c, me(), lid, bud_month(request.args.get("month") or bud_this_month())))
+
+
+@app.get("/api/budget/<int:lid>/compare")
+def budget_compare(lid):
+    """2.140.0 B (#2134): ?month=YYYY-MM (default: this month) &months=3|6|12 (default 6): per category ist / plan of every
+    month, the difference to the month before and to the average of the earlier months."""
+    c = db()
+    try:
+        n = int(request.args.get("months") or 6)
+    except ValueError:
+        return err(tr("Invalid value: {0}", "months"))
+    return jsonify(bud_compare(c, me(), lid, bud_month(request.args.get("month") or bud_this_month()), n))
 
 
 @app.post("/api/budget/<int:lid>/cats")

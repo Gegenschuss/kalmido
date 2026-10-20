@@ -729,11 +729,14 @@ def v1_tcx_member_add(rid):
     return jsonify(v1_call(tcx_member_add, rid, body=b))
 
 
-@app.delete("/api/v1/team/rooms/<int:rid>/members/<int:uid>")
+# 2.139.1 (#2059): the second id as <uid> like the other v1 member routes, so the route matches its documented path
+@app.delete("/api/v1/team/rooms/<int:rid>/members/<uid>")
 @v1_view
 def v1_tcx_member_del(rid, uid):
     v1_args(())
-    v1_call(tcx_member_del, rid, uid, body={})
+    if not uid.isdigit():
+        return err(tr("unknown"), 404)
+    v1_call(tcx_member_del, rid, int(uid), body={})
     return Response(status=204)
 
 

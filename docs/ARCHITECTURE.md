@@ -117,6 +117,7 @@ The most used helpers:
 | `accounts/oidc.py` | Login with a generic OpenID Connect provider (authorization code flow with PKCE). |
 | `core/access.py` | Access control: who sees / changes which list and task, module switches, list roles. |
 | `core/serializers.py` | JSON shapes of database rows (tasks, lists, users ...) as the web client and the API see them. |
+| `core/csvimport.py` | 2.140.0 (#2134): the statement reader of the household budget and the office's bank reconciliation: CSV (delimiter, header row, guess, known bank layouts, mapping, rows), CAMT.052 / .053 (no DOCTYPE / ENTITY), the duplicate count. |
 | `core/compress.py` | 2.65.0 (#1505): JSON answers from 1 KB on go out gzip-compressed when the client accepts it (not files, streams, HEAD, 304 or answers that already carry a Content-Encoding). |
 | `core/pages.py` | HTML pages, security headers, /api/version, the share target, quick capture, /drop and the ntfy share inbox. |
 | `core/instance.py` | Version, update check and instance settings (admins). |
@@ -216,6 +217,7 @@ The most used helpers:
 | `life/web.py` | Home & life: the web API (overview, contracts, devices, upkeep, health, trips, review + journal, staying in touch, Karakeep). |
 | `life/budget.py` | 2.72.0 (#1333) Home & life: the household budget (a list of kind `budget`): categories with monthly limits, entries, recurring items + taking them over from contracts, the month (planned / actual), the bank import (CSV), receipts; fields encrypted with the list's space key, `bud_settle` reseals after a move. |
 | `life/budget_web.py` | 2.72.0 (#1333): the web API of the household budget (`/api/budget...`; no REST v1 / MCP, never for agents). |
+| `life/devlink.py` | 2.140.0 (#2136): a private device <-> office equipment: take one over as the other (fields copied once), the link (`life_device_links`, the person's own row; broken = a hint), update from there, remove. |
 | `life/rss.py` | 2.85.0 (#1162): feeds of a person (module `feeds`): fetch through the SSRF guard of the calendar subscriptions (`cal_http`), RSS 2.0 / Atom / RSS 1.0 parsed without DTDs (`xml_no_dtd`), plain text only, "Read later" -> a task in the reading list, OPML, the watchdog step (hourly, 30 days). |
 | `life/rss_web.py` | 2.85.0 (#1162): the web API of the feeds (`/api/feeds...`; no REST v1 / MCP, never for agents or API tokens). |
 | `life/v1.py` | Home & life: the REST API v1 (+ MCP) and its OpenAPI part (health + journal: scope "private"). |
@@ -358,6 +360,7 @@ registering the ones of its area.
 | `leave.js` | 2.125.0 (#2118, #2117): the working week in Settings > General, the vacation account line, open requests with Approve / Reject and the admins' sheet of a person (entitlement, working days, hours) in the absences tab. |
 | `dispo.js` | 2.50.0 (#1194): the disposition tab (week grid per resource, a day list on phones, booking sheet, who is free, my bookings). |
 | `life.js` | Home & life: the view, its dialogs (contract, device, upkeep, health, trip, Karakeep), the review + journal, staying in touch on a contact's card. |
+| `devlink.js` | 2.140.0 (#2136): the office link of a device in its task panel (add to the office equipment, the link, update from there, remove); loads with `life.js`. |
 | `budget.js` | 2.72.0 (#1333): the household budget (`#budget/<list id>`, a tab of the area Home): month view with totals, six-month bars, categories with their limit, "Open this month" (recurring entries to book), entries per day; the dialogs entry (+ receipts), categories, recurring entries, taking over contracts, CSV import with column mapping; the card on Home & life; reloads on the area `budget` of `/api/version`. |
 | `feeds.js` | 2.85.0 (#1162): feeds (`#feeds`, a tab of the area Home, loaded on demand): follow a feed by its address, OPML import / export, the articles newest first (unread marked, plain text, links with noopener) with Open / Read later / Read, all read, manage feeds; the card on Home & life. |
 | `areas.js` | 2.44.0 (#1187): the areas Office, Time, Review and Home: one sidebar row / tab each, the tabs of their parts on top of the page (each part keeps its route), one switch per area in Settings > Modules. |
@@ -458,7 +461,7 @@ settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn`
 | `wiki`, `mindmap` | `wiki.js`, `mindmap.js` | knowledge pages (need `mindmap`), a list as mind map, a task's "Mentioned in" |
 | `pdf` | `pdfview.js` | a click on a preview link (`data-pview`, the listener is in `lazyload.js`) |
 | `docs` | `docs.js`, `paperless.js`, `receipts.js` | the documents view, the share sheet's "File as document" |
-| `life` | `life.js` | Home & life, the daily review, a life list's bar / a life task's details |
+| `life` | `life.js`, `devlink.js` | Home & life, the daily review, a life list's bar / a life task's details |
 | `integrations` | `integrations.js` | Settings, the agent chat (tokens, webhooks, CalDAV) |
 | `playbook` | `playbook.js` | the playbook area of a list / folder dialog, Settings |
 | `timeline` | `timeline.js`, `roadmap.js` | a list's timeline, the roadmap, the calendar's timeline |
