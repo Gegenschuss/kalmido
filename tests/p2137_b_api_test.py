@@ -148,6 +148,7 @@ for u in ("bob", "dora"):
     assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": f"{u}@example.com", "role": "member"}).ok
     assert A.put(B + f"/api/orgs/{GAM}/members", json={"email": f"{u}@example.com", "role": "member"}).ok
 SP = f"org:{ORG}"
+dbx("INSERT INTO settings(key, value) VALUES('wiki_encrypt', '1') ON CONFLICT (key) DO UPDATE SET value='1'")  # page texts sealed at rest
 
 # ---------------------------------------------------------------- the organisation's data
 LO = A.post(B + "/api/lists", json={"name": "Alpha Projekt", "org_id": ORG}).json()["id"]
@@ -175,7 +176,7 @@ check(r.ok, "a knowledge page " + r.text[:160])
 WP = r.json().get("id") or (r.json().get("page") or {}).get("id")
 r = A.post(B + f"/api/wiki/pages/{WP}/files", files={"file": ("bild.png", PNG, "image/png")})
 check(r.ok, "a picture on the page " + r.text[:160])
-WF = r.json().get("id") or (r.json().get("file") or {}).get("id")
+WF = (r.json().get("files") or [{}])[0].get("id")
 BODY = f"Ablauf mit Bild ![bild](/api/wiki/files/{WF}/bild.png) und Plan [[datei:{F1}]]"
 r = A.patch(B + f"/api/wiki/pages/{WP}", json={"body": BODY})
 check(r.ok, "the page links its picture and the file " + r.text[:160])
@@ -258,6 +259,8 @@ body = b.get("body") or (b.get("page") or {}).get("body") or ""
 check(f"/api/wiki/files/{NWF}/bild.png" in body and f"[[datei:{NF}]]" in body, f"the page links the new picture and file {body}")
 check(A.get(B + f"/api/wiki/files/{NWF}").content == PNG, "the picture is readable")
 check(dbx("SELECT body FROM wiki_pages WHERE id=?", (NP,))[0]["body"].startswith("kenc1:"), "the page text is sealed at rest")
+nv, sv = (dbx("SELECT COUNT(*) AS n FROM wiki_versions WHERE page_id=?", (x,))[0]["n"] for x in (NP, WP))
+check(nv == sv and sv >= 1, f"the page history came along {nv} {sv}")
 # tables
 ts = one("SELECT id FROM sheets WHERE org_id=? AND title='Kalkulation'", (GAM,))
 NS = ts["id"] if ts else 0
@@ -289,7 +292,7 @@ check(A.get(B + f"/api/files/nodes/{F1}/content").content == V2, "the source fil
 r = A.post(B + f"/api/imports/{IMP}/undo")
 check(r.ok, "undo " + r.text[:160])
 left = {t: dbx(f"SELECT COUNT(*) AS n FROM {t} WHERE org_id=?", (GAM,))[0]["n"]
-        for t in ("fs_nodes", "doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_rules", "wiki_pages", "wiki_files", "sheets",
+        for t in ("fs_nodes", "doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_rules", "wiki_pages", "wiki_files", "wiki_versions", "sheets",
                   "sheet_files", "video_reviews", "video_versions", "video_comments")}
 check(not any(left.values()), f"undo removes every taken-over row {left}")
 check(not dbx("SELECT 1 FROM fs_versions WHERE node_id=?", (NF,)), "and the versions")
