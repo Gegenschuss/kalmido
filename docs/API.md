@@ -569,8 +569,12 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/
 ## Import
 
 The importers of *Settings > Data > Import* are available to scripts. `source` is one of `todoist`, `trello`,
-`asana`, `mstodo` (Outlook / Microsoft To Do CSV or ICS) and `ics`. The body is `multipart/form-data` with the file
-in `file` and these optional fields:
+`asana`, `mstodo` (Outlook / Microsoft To Do CSV or ICS), `ics` and (2.142.0) `notion` (the export ZIP "Markdown & CSV",
+ZIPs inside it too, or one database CSV / page), `gtasks` (Google Takeout ZIP or its `Tasks.json`), `clickup` (CSV),
+`jira` (CSV, repeated columns such as `Labels` kept), `csv` (any CSV: columns detected by name in English and German,
+unknown columns go into the notes) and `markdown` (checklists: headings = lists / sections, `- [ ]` / `- [x]` tasks,
+indentation = subtasks). These six never match people of the file to accounts: their names go into the notes. The body
+is `multipart/form-data` with the file in `file` and these optional fields:
 
 | Field | Values | |
 |---|---|---|
@@ -592,7 +596,8 @@ curl -s -H "Authorization: Bearer $TOKEN" -F file=@board.json -F mode=lists "$KA
 The answer: `created` (`tasks`, `subtasks`, `done`, `lists`, `sections`, `assigned`), `skipped` (already imported
 before: the same id in the other app), `lists` (per target list: name, id, existing or new, counts), `samples` (the
 first rows), `warnings` (`text`, `count`, `examples`: what could not be mapped exactly and where it went instead),
-`import_id` and `undo_until`. Importing the same file again skips what is already there.
+`import_id` and `undo_until`; for `csv` also `columns` (`[{column, field}]`: which column of the file went into which
+field, `notes` for the ones without a field). Importing the same file again skips what is already there.
 `POST /imports/{import_id}/undo` removes what that import created (tasks, sections, lists that are empty then) within
 24 hours; answer `{tasks, lists, sections, kept_lists, kept_tasks}`, `409` when it was undone already or is too old.
 Limits: 20 MB and 20,000 tasks per file, 30 imports (previews included) per user within 10 minutes. Nothing inside a

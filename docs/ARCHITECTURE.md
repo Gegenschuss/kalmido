@@ -145,7 +145,7 @@ The most used helpers:
 | `personal/stats.py` | Statistics (module "stats"). |
 | `calendars/icalfeed.py` | The subscribable ICS calendar feed of a user's tasks. |
 | `calendars/caldav.py` | CalDAV server for tasks (VTODO) with app passwords; the /dav/ entry point for event calendars and CardDAV too. |
-| `integrations/importers.py` | Importers: TickTick, Todoist, Trello, Asana, Microsoft To Do, ICS / VTODO (preview, dry run, undo). |
+| `integrations/importers.py` | Importers: TickTick, Todoist, Trello, Asana, Microsoft To Do, ICS / VTODO, Notion, Google Tasks, ClickUp, Jira, any CSV, Markdown checklists (preview, dry run, undo). |
 | `notify/push.py` | Notifications: ntfy, Web Push (RFC 8030 / 8291 / 8292), reminders and nags, the watchdog tick and loop. |
 | `notify/alerts.py` | Admin alerts via ntfy (recording, sending, settings). |
 | `notify/caps.py` | 2.33.0 (#927): the owner's notification template of a list / shared folder (read, work, all, custom; per person), a ceiling for pushes checked in `notif_ok`; the one-time question to owners of lists shared before. |
