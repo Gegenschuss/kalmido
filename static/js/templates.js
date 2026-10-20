@@ -54,7 +54,7 @@ function tplUseModal(tp) {
 }
 // 2.78.0 (#1881): "Duplicate list…" (list menu, list dialog): a copy of the list as a list template used at once (server
 // POST /api/lists/{id}/duplicate): sections, tasks with their dates, notepads, page arrangement and colours; members and shares stay
-const dupOk = l => !!l && !l.is_inbox && !l.archived && !l.e2e && l.role !== 'participant';  // N35: not for locked lists
+const dupOk = l => !!l && !l.is_inbox && !l.archived && !l.e2e && canEditList(l.id);  // N35: not for locked lists; 2.126.0 D (#1992 A6): only who may edit the list
 function listDuplicate(id) {
   const l = listById(id); if (!dupOk(l)) return;
   const md = modal(`<h3>${tr('Duplicate “{0}”', esc(lname(l)))}</h3>

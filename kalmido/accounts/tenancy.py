@@ -147,10 +147,12 @@ CHECKS = {
     # 2.59.0 A (#1735): a client's contact person linked to a contact outside the client's address books (an organisation's
     # client: a book the organisation owns; a client without one: its creator's own private books). (client, its creator);
     # boundary_repair drops such a link (the contact person stays)
+    # 2.126.0 C (#1992 K10): a client without organisation: also a private book shared with its creator (as office/contacts_cl.py)
     "client_contact": ("SELECT DISTINCT cl.id, cl.created_by FROM office_client_contacts k JOIN clients cl ON cl.id=k.client_id "
                        "JOIN contacts ct ON ct.id=k.contact_id JOIN books b ON b.id=ct.book_id WHERE CASE WHEN cl.org_id IS NOT NULL "
                        "THEN b.owner_org_id IS DISTINCT FROM cl.org_id OR b.org_id IS DISTINCT FROM cl.org_id "
-                       "ELSE b.owner_org_id IS NOT NULL OR b.org_id IS NOT NULL OR b.owner_id IS DISTINCT FROM cl.created_by END"),
+                       "ELSE b.owner_org_id IS NOT NULL OR b.org_id IS NOT NULL OR (b.owner_id IS DISTINCT FROM cl.created_by "
+                       "AND NOT EXISTS (SELECT 1 FROM book_members bm WHERE bm.book_id=b.id AND bm.user_id=cl.created_by)) END"),
     # 2.60.0 C (#1512): the reviewer of an organisation's task who is neither its list's owner nor a member of the list
     "task_reviewer": ("SELECT t.id, t.reviewer_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.reviewer_id IS NOT NULL "
                       "AND l.org_id IS NOT NULL AND t.reviewer_id<>l.owner_id AND NOT EXISTS (SELECT 1 FROM list_members m "

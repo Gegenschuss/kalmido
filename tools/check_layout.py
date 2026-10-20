@@ -58,6 +58,16 @@ if tags and tags[-1] != "main.js":
     ERR.append("index.html: main.js (the start-up) must be the last script")
 if shell != tags:
     ERR.append("sw.js SHELL: the static/js/ files differ from index.html (same files, same order)")
+# 2.126.0 D (#1992 O7): every file the service worker precaches exists (addAll fails on a single 404: the new version would
+# never install), and the cache name is counted up with every version -- its line names the version it belongs to
+for name in ("SHELL", "LAZY", "LAZY_CSS"):
+    for u in re.findall(r"'/(static/[^']+)'", (re.search(name + r" = \[(.*?)\];", sw, re.S) or [None, ""])[1]):
+        if not os.path.isfile(os.path.join(ROOT, u)):
+            ERR.append(f"sw.js {name}: /{u} does not exist")
+_cache = re.search(r"const CACHE = 'tasks-shell-v\d+';\s*// app (\S+)", sw)
+_ver = read("VERSION").strip()
+if not _cache or _cache.group(1) != _ver:
+    ERR.append(f"static/sw.js: count CACHE up for version {_ver} and name it in the comment of that line (// app {_ver})")
 
 init = read("kalmido", "__init__.py")
 m = re.search(r"ORDER = \((.*?)\n\)", init, re.S)

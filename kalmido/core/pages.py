@@ -15,7 +15,7 @@ from .pg import insert_id
 from ..core.i18n import lang, N_, tr, trn
 from ..core.db import bump, connect, db, default_uid, err, gset, gsetting, iso, now_utc, usettings
 from ..accounts.session import client_ip, GATE, me
-from ..core.access import my_inbox, time_all
+from ..core.access import Denied, my_inbox, time_all
 
 
 # ---------------------------------------------------------------- pages
@@ -192,6 +192,13 @@ def save_attachment_bytes(c, tid, name, mime, data, owner=None):
     except OSError as e:
         aa_count("storage", "attachments", aa_oserr(e))
         raise
+    except Denied as e:  # 2.126.0 review (#1979 L5): a refused file -> the task comes without it (never an error), like a virus find
+        print("share / mail file skipped:", e, flush=True)
+        try:
+            os.remove(os.path.join(ATT_DIR, rel))
+        except OSError:
+            pass
+        return
     aid = insert_id(c, "INSERT INTO attachments(task_id,name,mime,size,path,created_at,user_id) VALUES(?,?,?,?,?,?,?)",
                     (tid, name, mime, len(data), rel, iso(now_utc()), who))
     up_after_store(c, "att", aid, org, info)

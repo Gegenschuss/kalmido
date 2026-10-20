@@ -29,7 +29,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from .model import office_role
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, rate_ip
 from ..accounts.login import auth_key, seal, unseal
-from ..api.v1 import hit_limit
+from ..api.v1 import hit_budget, hit_limit
 from ..notify.alerts import aa_count
 from ..personal.timetrack import BadInput
 from ..tasks.validation import valid_date
@@ -377,11 +377,11 @@ def sig_open(c, token):
     ip = rate_ip()
     if not public_links_on(c):
         return None, pub_gone()
-    bad = [("pubbad:" + ip, SIG_BAD_LIMIT)]
-    if _rate_blocked(bad):
-        return None, pub_limited(_accept_lang())
+    bad = [("pubbad:" + ip, SIG_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
     r = sig_find(c, token)
     if not r or sig_check(c, r):
+        if _rate_blocked(bad):
+            return None, pub_limited(_accept_lang())
         _rate_fail(bad)
         aa_count("security", "publink", ip)
         return None, pub_gone()
@@ -588,7 +588,7 @@ def sig_decide(token):
         return pub_html(tr("Not allowed", lg=lg), f'<div class="msg"><h1>{html.escape(tr("Not allowed", lg=lg))}</h1></div>', lg, 403)
     if r["state"] != "open":
         return redirect(SIG_PREFIX + token, 303)
-    if hit_limit("sigp:" + ip, SIG_POST_RATE) or hit_limit(f"sigl:{r['id']}", SIG_LINK_HOUR, 3600):
+    if hit_limit("sigp:" + ip, SIG_POST_RATE) or hit_budget(f"sigl:{r['id']}", SIG_LINK_HOUR, ip):  # 2.126.0 C (#1979 I1)
         return pub_limited(lg)
     do = request.form.get("do")
     name = " ".join(_clean_text(request.form.get("name"), NAME_MAX).split())

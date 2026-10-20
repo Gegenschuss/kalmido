@@ -316,7 +316,10 @@ dbq("UPDATE agents SET org_id=? WHERE user_id=?", (ORG, AG))
 check(AT.post(V + f"/tasks/{T1}/comments", json={"body": "agent", "portal": True}).status_code in (403, 404), "#1513: an agent without the list: no answer")
 assert A.put(B + f"/api/lists/{L}/members", json={"user_id": AG, "role": "edit"}).ok
 r = AT.post(V + f"/tasks/{T1}/comments", json={"body": "We fixed it in the next version.", "portal": True})
-check(r.status_code == 201 and r.json().get("portal") is True, f"#1513: an agent answers the customer in a shared list {r.status_code} {r.text[:200]}")
+# 2.126.0 (#1979 G5): an agent's answer to the customer waits for a person's approval, then it is posted
+check(r.status_code == 202 and (r.json().get("job") or {}).get("id"), f"#1513: an agent's answer to the customer waits for an approval {r.status_code} {r.text[:200]}")
+r = A.post(B + f"/api/agents/jobs/{(r.json().get('job') or {}).get('id')}/action", json={"action": "approve"})
+check(r.ok and r.json().get("state") == "done", f"#1513: approved: the agent's answer is posted {r.text[:200]}")
 check(AT.post(V + f"/tasks/{T1}/comments", json={"body": "q", "portal": True, "choices": ["a", "b"]}).status_code == 400, "#1513: no answer buttons to a customer")
 check(AT.post(V + f"/tasks/{T4}/comments", json={"body": "q", "portal": True}).status_code == 400, "#1513: the API refuses portal without a ticket")
 cs = AT.get(V + f"/tasks/{T1}/comments").json()["data"]

@@ -708,6 +708,8 @@ def openapi_spec():
     lyp_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.55.0 B (#1066)
     from ..agents.importprop import aim_spec
     aim_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.68.0 A (#1839)
+    from ..agents.sheetprop import sht_spec
+    sht_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.126.1 B (#2125)
     from ..hub.agentdispo import adz_spec
     adz_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 C (#1355)
     from ..files.v1 import files_spec

@@ -380,7 +380,7 @@ def doc_public(c, oid, r, admin, items=True):
         d["locked_by_name"] = (u["display_name"] or u["username"]) if u else ""
     d["can_edit"] = not locked and r["status"] != "sent"  # 2.38.0: sent documents are locked as well
     d["can_unlock"] = bool(admin) and locked and not bga_offer_block(c, oid, r)  # 2.114.2 A (#2263): back to a draft, or delete
-    d["can_delete"] = d["can_unlock"] if locked else bool(admin) and r["status"] != "sent"
+    d["can_delete"] = d["can_unlock"] if locked else bool(admin) and r["status"] != "sent" and not odoc_seq_numbered(r)
     d["number_at_finalize"] = ofx_number_at_finalize(office_settings(c, oid), r["kind"])
     if r["kind"] == "invoice":  # 2.120.0 D (#2089): "attach timesheet" is offered when the invoice has a client and a period
         d["timesheet_ok"] = bool(r["client_id"] and r["service_from"] and r["service_to"])
@@ -1053,12 +1053,14 @@ def odoc_items_put(did):
 @app.post("/api/office/docs/<int:did>/number")
 def odoc_number(did):
     """{number?} sets a number by hand (unique within the organisation) or reserves the next one of the scheme.
-    A finalised document: 409."""
+    A finalised document: 409. 2.126.0 A (#1966): the next number of a kind numbered at finalising only comes then (409)."""
     c, uid, oid = _ctx()
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
     b = body()
     b = b if isinstance(b, dict) else {}
+    if "number" not in b and ofx_number_at_finalize(office_settings(c, oid), r["kind"]):
+        raise Denied(409, tr("the number comes only when the invoice is finalised; the series has no gaps"))
     reason = _text(b.get("reason"), "reason", 300)
     num = _assign_number(c, oid, did, manual=b.get("number") if "number" in b else None, reason=reason)
     if num != r["number"]:
@@ -1117,7 +1119,8 @@ DUP_SKIP = {"id", "number", "status", "created_at", "updated_at", "sent_at", "cr
             "due_date", "paid_at", "pdf_sha256", "xml_sha256", "datev_sent_at",  # 2.38.0: the invoice's own marks
             "cancels_id", "ref_doc_ids", "source_doc_id",  # 2.38.0 review: a copy is a fresh document, bound to nothing
             "version_of", "cashflow",  # 2.88.0 (#1915): set below (a quotation's copy = its next version, cash flow auto)
-            "series_id", "series_period", "abs_refs"}  # 2.120.0 A (#2087): abs_refs  # 2.91.0 A (#1923): a copy is no invoice of the series (office/recurring.py sets them itself)
+            "series_id", "series_period", "abs_refs",  # 2.120.0 A (#2087): abs_refs  # 2.91.0 A (#1923): a copy is no invoice of the series (office/recurring.py sets them itself)
+            "reminder_fee_state", "agent_id", "list_id"}  # 2.126.0 A (#1979 F6): a fresh fee state, made by the person copying
 DUP_ITEM_SKIP = {"id", "tax_pct", "net", "tax_amount"}
 
 
@@ -1154,6 +1157,15 @@ def odoc_duplicate(did):
     bump(c)
     c.commit()
     return jsonify(doc_public(c, oid, n, admin)), 201
+
+
+# 2.126.0 A (#1966): kinds whose numbers form one series without gaps; a numbered draft of them stays
+ODOC_SEQ_KINDS = ("invoice", "credit")
+ODOC_SEQ_KEPT = N_("This draft already has a number of the invoice series and is kept. Finalise it and cancel it if it is not needed.")
+
+
+def odoc_seq_numbered(r):
+    return r["kind"] in ODOC_SEQ_KINDS and bool(r["number"])
 
 
 # 2.114.2 A (#2263): a finalised quotation that never left the house may go (decision of 2026-10-19)
@@ -1195,6 +1207,8 @@ def odoc_delete(did):
             raise Denied(409, tr(why))
     else:
         ofx_need_editable(r)
+        if odoc_seq_numbered(r):  # 2.126.0 A (#1966)
+            raise Denied(409, tr(ODOC_SEQ_KEPT))
     if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (did, oid)).fetchone():
         raise Denied(409, tr("The customer has signed this quotation; the record is kept"))  # 2.50.0 (#1200 review)
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net"),

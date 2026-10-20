@@ -120,7 +120,7 @@ def gate_decide_route(cid):
         raise Denied(404)
     if b.get("decision") not in ("approve", "reject") or not isinstance(b.get("skip_checklist", False), bool):
         return err(tr("Invalid value: {0}", "decision"))
-    if is_agent(g.user) or not is_approver(c, t, me()):
+    if is_agent(g.user) or not is_approver(c, t, me(), agent=k["user_id"]):  # 2.126.0 B (#1975): and may address the agent
         return err(tr("Only the list owner, a list admin, the assignee or an admin can decide"), 403)
     if sug.get("state") != "open":
         return err(tr("This request was already decided"), 409)

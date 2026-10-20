@@ -197,10 +197,10 @@ def _wrap(kek, org_id, key):
 def _unwrap(kek, org_id, wrapped):
     if not wrapped.startswith("v1."):
         raise OrgCryptError("unknown key format")
-    raw = _b64u_dec(wrapped[3:])
     try:
+        raw = _b64u_dec(wrapped[3:])  # 2.126.0 A (#1979 L2): a damaged row is a clear key error too
         return AESGCM(kek).decrypt(raw[:12], raw[12:], _wrap_ad(org_id))
-    except InvalidTag:
+    except (InvalidTag, ValueError):
         raise OrgCryptError(f"{_label(org_id)}: the key cannot be unwrapped") from None
 
 
@@ -551,10 +551,19 @@ def oc_seal(c, org_id, data, ctx=FILE_CTX, fresh=False):
         if fresh and org_id and SECRET_KEY:
             key = oc_key(c, org_id)
             return oc_seal_raw(key, org_id, data, ctx) if key is not None else data
+        if fresh:
+            _fresh_refused()
         return data
     if not org_id or not oc_active_for(c, org_id):
         return data
     return oc_seal_k(oc_key(c, org_id), org_id, data, ctx)
+
+
+def _fresh_refused():
+    """2.126.0 A (#1979 L5): bytes from outside that look like a sealed file can only be stored with an outer layer, which
+    needs the server key and a space; without them such a file is refused (it could never be opened again)."""
+    from .access import Denied
+    raise Denied(400, tr("This file cannot be stored on this server (it starts like an encrypted Kalmido file)"))
 
 
 def oc_seal_k(key, org_id, data, ctx=FILE_CTX):
@@ -667,6 +676,12 @@ def oc_seal_path(c, org_id, path, ctx=FILE_CTX, fresh=False):
     """Seal a file that was just written in plain (upload, copy) when it belongs to an organisation and the encryption is
     active; a sealed file stays as it is. True when it was sealed. 2.64.0 (#1864): org_id = a space id (oc_task_space);
     fresh = the bytes came from outside: one that already looks sealed gets an outer layer (oc_seal)."""
+    if fresh and oc_is_sealed_file(path) and not (org_id and SECRET_KEY):
+        try:  # 2.126.0 A (#1979 L5)
+            os.remove(path)
+        except OSError:
+            pass
+        _fresh_refused()
     if fresh and org_id and SECRET_KEY and oc_is_sealed_file(path):
         with open(path, "rb") as f:
             data = f.read()

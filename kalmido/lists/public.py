@@ -18,12 +18,12 @@ from ..accounts.login import auth_key, seal, unseal
 from ..core.access import acx_anon_bind, Denied, need_list
 from ..core.pg import insert_id, system_ctx
 from ..tasks.validation import log_act, valid_date
-from ..tasks.lifecycle import do_complete, trash_task
+from ..tasks.lifecycle import complete_stale, do_complete, trash_task
 from ..collab.comments import task_event
 from ..personal.timetrack import BadInput
 from ..tasks.dependencies import completed_ids, unblock_events
 from ..notify.alerts import _env_int, aa_count, aa_now
-from ..api.v1 import hit_limit, PUB_ENV
+from ..api.v1 import hit_budget, hit_limit, PUB_ENV
 from .custview import CV_FB_HOUR, CV_FB_NAME, CV_FB_RATE, CV_FB_TEXT, CV_FILE_RATE, cv_brand, cv_clean, cv_extras, cv_file, cv_options, cv_progress, cv_show, cv_size, cv_tag_sql
 
 
@@ -140,11 +140,11 @@ def pub_open(c, token):
     ip = rate_ip()
     if not public_links_on(c):
         return None, pub_gone()
-    bad = [("pubbad:" + ip, PUB_BAD_LIMIT)]
-    if _rate_blocked(bad):
-        return None, pub_limited(_accept_lang())
+    bad = [("pubbad:" + ip, PUB_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
     link = pub_find(c, token)
     if not link:
+        if _rate_blocked(bad):
+            return None, pub_limited(_accept_lang())
         _rate_fail(bad)
         aa_count("security", "publink", ip)
         return None, pub_gone()
@@ -313,7 +313,7 @@ def cv_fb_post(token):
         return pub_html(tr("Not allowed", lg=lg), f'<div class="msg"><h1>{html.escape(tr("Not allowed", lg=lg))}</h1></div>', lg, 403)
     if not pub_unlocked(c, link):
         return redirect(f"/s/{token}", 303)
-    if hit_limit("pubfb:" + rate_ip(), CV_FB_RATE) or hit_limit(f"pubfbl:{link['id']}", CV_FB_HOUR, 3600):
+    if hit_limit("pubfb:" + rate_ip(), CV_FB_RATE) or hit_budget(f"pubfbl:{link['id']}", CV_FB_HOUR, rate_ip()):  # 2.126.0 C (#1979 I1)
         return pub_limited(lg)
     try:
         tid = int(request.form.get("task") or 0)
@@ -451,7 +451,7 @@ def pub_tick(token):
         return pub_gone(lg)
     g.user, g.auth_via = PUB_ACTOR, "public"  # completion code below: attributed to "someone via the public link"
     st = visible[tid]["status"]
-    if to == "done" and st == 0:
+    if to == "done" and st == 0 and not complete_stale(c, tid, visible[tid]["due"]):  # 2.126.0 D (#1987)
         nxt = do_complete(c, tid, 2)
         log_act(c, tid, "complete", {"next": nxt} if nxt else None)
         task_event(c, tid, "complete")

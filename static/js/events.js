@@ -614,7 +614,7 @@ document.addEventListener('click', async e => {
     case 'tl-new-x': tlNewEnd(true); break;
     case 'collapse-tl': { const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); renderView(); break; }
     case 'tl-prev': case 'tl-next': S.tlStart = addDays(S.tlStart, act === 'tl-next' ? 14 : -14); renderView(); break;
-    case 'tl-today': S.tlStart = addDays(weekStartOf(today()), -7); { const tl = $('#tlscroll'); renderView(); const n = $('#tlscroll'); if (n) n.scrollLeft = 5 * tlDW(); } break;
+    case 'tl-today': S.tlStart = addDays(weekStartOf(today()), -7); { renderView(); const n = $('#tlscroll'); if (n) n.scrollLeft = 5 * tlDW(); } break;
     case 'sort': sortMenu(a); break;
     case 'sort-shared': LS.del('sort2.' + S.route.key); render(); break;  // 2.27.0 (#988)
     case 'od-move': overdueAct(a); break;

@@ -468,6 +468,7 @@ async function logout() {
   await wpDisable().catch(() => {});  // this device stops getting the pushes of the account that logs out
   await e2eForget();  // 2.42.0 (#828): keys remembered on this device go
   try { await fetch('/api/auth/logout', {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}); } catch { /* offline */ }
+  try { for (const k of await caches.keys()) await caches.delete(k); } catch { /* no Cache Storage */ }  // 2.126.0 D (#1992 O4): the app loads again from the server
   clearLocal(); location.replace('/');
 }
 // login / first-run setup / "no account" screen (built-in login; with single sign-on the proxy logs in)

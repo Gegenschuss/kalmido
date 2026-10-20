@@ -2734,6 +2734,20 @@ MIGRATIONS = [
     ("hub_absences", "decided_at", "ALTER TABLE hub_absences ADD COLUMN decided_at TEXT"),
     ("hub_absences", "decision_note", "ALTER TABLE hub_absences ADD COLUMN decision_note TEXT NOT NULL DEFAULT ''"),
     ("orgs", "hub_leave_approval", "ALTER TABLE orgs ADD COLUMN hub_leave_approval BIGINT NOT NULL DEFAULT 0"),
+    # 2.126.0 C (#1979 I3): the person whose calendar app wrote dav_meta.extra (NULL = before 2.126: sent to everyone as before);
+    # its alarms and attachments go back to that person only. Older versions never read it
+    ("dav_meta", "extra_by", "ALTER TABLE dav_meta ADD COLUMN extra_by BIGINT"),
+    # 2.126.0 D (#1990): the id the device gave a task it created (a POST /api/tasks sent again = that task, not a second
+    # one); nullable, 2.125 and older never set or read it, the index only covers rows that carry one
+    ("tasks", "client_ref", "ALTER TABLE tasks ADD COLUMN client_ref TEXT"),
+    ("tasks", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS tasks_client_ref ON tasks(created_by, client_ref) WHERE client_ref IS NOT NULL"),
+    # 2.126.1 B (#2126): what a planned agent job does when due: chat (the event scheduled_job, every plan so far) | triage (a
+    # proposal request "Sort the basket" for the plan's person, agents/schedules.py). Older versions never read it (they send
+    # scheduled_job for a triage plan too, with its prefilled prompt)
+    ("agent_schedules", "action", "ALTER TABLE agent_schedules ADD COLUMN action TEXT NOT NULL DEFAULT 'chat'"),
+    # 2.126.1 A (#2123): a document's summary, taken over by a person from an agent's draft (agents/asstprop.py); sealed with
+    # the workspace key like the recognised text. Older versions never read it
+    ("doc_meta", "summary", "ALTER TABLE doc_meta ADD COLUMN summary TEXT NOT NULL DEFAULT ''"),
     # 2.138.0 C (#1907): upload token / calendar feed secret only as a SHA-256 hash (core/tokenhash.py), *_at = when created.
     # The plain columns drop_token / ical_token stay and are NULL; the version before runs on (shortcuts / feed made anew)
     ("users", "drop_token_hash", "ALTER TABLE users ADD COLUMN drop_token_hash TEXT"),

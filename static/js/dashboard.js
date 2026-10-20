@@ -32,7 +32,7 @@ function newsSummaryLine(g) {
     unassign: () => tr('unassigned'), complete: () => tr('completed'), newtask: n => trn('{0} new task', '{0} new tasks', n), status: () => tr('status changed'),
     share: () => tr('shared with you'), approval: n => trn('{0} approval waits', '{0} approvals wait', n), proposal: () => tr('a proposal is ready'),
     followup: () => tr('follow up today'), unblock: () => tr('unblocked'), take: () => tr('taken'), role: () => tr('your role changed'), owner: () => tr('you own it now'),
-    unshare: () => tr('removed'), usage: () => tr('usage limit'), errreport: () => tr('new error'), agentjoin: () => tr('an agent joined'), review: () => tr('review')};  // 2.60.0 C (#1512): review
+    unshare: () => tr('removed'), usage: () => tr('usage limit'), errreport: () => tr('new error'), agentjoin: () => tr('an agent joined'), review: () => tr('review'), wiki_shared: () => tr('shared with you')};  // 2.60.0 C (#1512): review; 2.126.2 B (#2355): wiki_shared
   return Object.entries(c).map(([k, n]) => (L[k] || (() => k))(n)).join(' · ');
 }
 function newsGroupHtml(g, pop) {
@@ -202,7 +202,7 @@ function lyHtml(v, parts, o = {}) {
 function lyEditor(v, o = {}) {
   const d = LY[v], pr = lyPref(v, {std: S.ly.std}), {order, hidden, size, fixed} = pr, bs = lyBlocks(v), A = lyAct(v), n = order.length;
   const desk = !isMobile();
-  const rows = order.map((k, i) => { const [_, nm, icon, def] = bs.find(b => b[0] === k), sz = size(k);
+  const rows = order.map((k, i) => { const [_, nm, icon] = bs.find(b => b[0] === k), sz = size(k);
     return `<li data-k="${k}" ${desk ? 'draggable="true"' : ''} tabindex="-1">${desk ? `<span class="lyg" aria-hidden="true">${ic('grip', 's')}</span>` : ''}${ic(icon, 's')}<span class="dcl">${esc(tr(nm))}</span>
       ${d.nosize || !desk ? '' : `<button type="button" class="btn sm lysz" data-act="ly-size" data-lyv="${v}" data-k="${k}" aria-pressed="${sz === 'full'}" title="${esc(tr('Width'))}" aria-label="${esc(tr('Width') + ': ' + tr(nm) + ', ' + (sz === 'full' ? tr('full width') : tr('half width')))}">${sz === 'full' ? tr('Full') : tr('Half')}</button>`}
       <button type="button" class="iconbtn" data-act="${A}-mv" data-lyv="${v}" data-k="${k}" data-d="-1" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + tr(nm))}">${ic('up', 's')}</button>

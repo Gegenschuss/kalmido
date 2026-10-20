@@ -2,7 +2,7 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v283';
+const CACHE = 'tasks-shell-v286';  // app 2.126.2 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
@@ -24,7 +24,7 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
 // compares): cached right after the shell, so they open offline too; a failure there does not drop the install
 const LAZY = ['/static/js/acctset.js', '/static/js/settings.js', '/static/js/contacts.js', '/static/js/newsletter.js', '/static/js/office.js', '/static/js/office_docs.js', '/static/js/office_import.js', '/static/js/office_sheet.js', '/static/js/office_parts.js', '/static/js/office_travel.js', '/static/js/office_cashflow.js', '/static/js/office_doctpl.js', '/static/js/office_logbook.js', '/static/js/office_cashbook.js', '/static/js/office_pipeline.js', '/static/js/office_kpi.js',
   '/static/js/office_datev.js', '/static/js/officeagents.js', '/static/js/office_packs.js', '/static/js/office_books.js', '/static/js/office_bank.js', '/static/js/office_taxdates.js', '/static/js/office_recurring.js', '/static/js/office_subs.js', '/static/js/office_agreements.js', '/static/js/office_assets.js', '/static/js/office_meals.js', '/static/js/office_leads.js', '/static/js/office_cfiles.js', '/static/js/office_letterhead.js', '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/pdfview.js', '/static/js/docpreview.js', '/static/js/mindmap.js', '/static/js/wiki.js', '/static/js/wkshare.js', '/static/js/wkhist.js', '/static/js/wkembed.js', '/static/js/stats.js', '/static/js/calview.js', '/static/js/caldrag.js', '/static/js/apptbook.js', '/static/js/docs.js', '/static/js/paperless.js',
-  '/static/js/receipts.js', '/static/js/life.js', '/static/js/integrations.js', '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js', '/static/js/bookmarks.js', '/static/js/sheets.js', '/static/js/sheets2.js', '/static/js/sheetsio.js', '/static/js/sheetsize.js', '/static/js/sheetshare.js', '/static/js/sheetchart.js', '/static/js/sheetkinds.js', '/static/js/sheetbook.js', '/static/js/tagsel.js', '/static/js/filereq.js', '/static/js/videorev.js', '/static/js/pubvideo.js', '/static/js/polls.js', '/static/js/formq.js'];
+  '/static/js/receipts.js', '/static/js/life.js', '/static/js/integrations.js', '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js', '/static/js/bookmarks.js', '/static/js/asstprop.js', '/static/js/sheetprop.js', '/static/js/sheets.js', '/static/js/sheets2.js', '/static/js/sheetsio.js', '/static/js/sheetsize.js', '/static/js/sheetshare.js', '/static/js/sheetchart.js', '/static/js/sheetkinds.js', '/static/js/sheetbook.js', '/static/js/tagsel.js', '/static/js/filereq.js', '/static/js/videorev.js', '/static/js/pubvideo.js', '/static/js/polls.js', '/static/js/formq.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell
 // 2.65.0 (#1824): the stylesheets of the modules loaded on demand (static/css/, LD_CSS in lazyload.js, same order)
@@ -58,7 +58,14 @@ async function swShell(req, url) {
 }
 // Android share sheet (share_target POST): keep the shared files in a cache and open the app,
 // which then creates the task + uploads with the normal (login) session.
+// 2.126.0 D (#1992 O6): only the system's share sheet (no referrer) or the app itself fills the capture form
+function shareFromOutside(req) {
+  const site = req.headers.get('Sec-Fetch-Site');
+  if (site && site !== 'none' && site !== 'same-origin') return true;
+  try { return !!req.referrer && req.referrer !== 'about:client' && new URL(req.referrer).origin !== self.location.origin; } catch { return true; }
+}
 async function handleShare(req) {
+  if (shareFromOutside(req)) return Response.redirect('/', 303);
   try {
     const fd = await req.formData();
     const cache = await caches.open('tasks-share');
@@ -83,7 +90,8 @@ self.addEventListener('fetch', e => {
   // /s/ = public list links: never cached (no-store pages of one list; the service worker stays out of them)
   // 2.63.0 (#1513): the same for the forms, a report's status page and the customer portal
   // 2.122.0 A (#2097): and the file requests (/u/)
-  if (e.request.method !== 'GET' || url.pathname.startsWith('/api/') || /^\/(s|f|p|u)\/|^\/portal(\/|$)/.test(url.pathname)) return;
+  // 2.126.0 D (#1992 O4): and the calendar feed / sync addresses (private data, never kept on the device)
+  if (e.request.method !== 'GET' || url.pathname.startsWith('/api/') || /^\/(s|f|p|u|ical|dav)\/|^\/portal(\/|$)|^\/\.well-known\//.test(url.pathname)) return;
   // 2.35.0 (#1094): language files come with the version of the code (?v=). Offline only the exact version is served as is;
   // a copy of another version is marked (X-Kalmido-I18n-Stale) so the client uses it as a stopgap and fetches it again later.
   // A response that is no JSON (a sign-in page) is never cached for a language file.

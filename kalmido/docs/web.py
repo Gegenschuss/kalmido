@@ -100,6 +100,8 @@ def doc_json(c, m, node, full=False, role=None):
         d["text"] = S.meta_text(c, m)
         from ..receipts.extracted import rx_doc_view
         d["extracted"] = rx_doc_view(c, m)  # 2.121.0 A (#2092): what the recognition read off a receipt (a suggestion)
+        from ..agents.asstprop import ast_doc_extra
+        ast_doc_extra(c, d, m)  # 2.126.1 A (#2123): the summary a person took over from an agent
     return d
 
 
@@ -633,6 +635,8 @@ def docs_rule_edit(rid):
     ws = _rule_ws(c, rid)
     d = body()
     if "pos" in d and isinstance(d["pos"], (int, float)) and not isinstance(d["pos"], bool):
+        if not -1e9 < d["pos"] < 1e9:  # 2.126.0 A (#1979 L4): also no Infinity / NaN
+            return err(tr("Invalid value: {0}", "pos"))
         c.execute("UPDATE doc_rules SET pos=? WHERE id=?", (int(d["pos"]), rid))
     if "match" in d:
         _rid, e = _rule_save(c, ws, d, rid)

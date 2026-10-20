@@ -77,12 +77,63 @@ def _ws_key(c, ws, create=True):
     return k
 
 
+# 2.126.0 A (#1970): the values of a person's own documents are sealed with the person's account key (core/orgcrypt.py
+# user_keys, space -<id>), so a new server key keeps them (rewrap-accounts) like the organisations' values. Values of the
+# older form (the key derived from the server key above, space 0) stay readable; the start-up pass moves them
+# (admin/orgcrypt_cli.py docs_settle), "docs-to-server-key" moves them back before running an older version.
+def ws_user(ws):
+    return int(ws[1:]) if ws and ws[0] == "u" and ws[1:].isdigit() else None
+
+
+def docs_ukey_on(c):
+    """The instance setting docs_account_key (default on; docs-to-server-key sets "0")."""
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # orgcrypt: an instance setting, no content
+        r = c.execute("SELECT value FROM settings WHERE key='docs_account_key'").fetchone()
+    return (r[0] if r else "1") != "0"
+
+
+def _acct_key(c, ws, create):
+    uid = ws_user(ws)
+    if not uid or not SECRET_KEY:
+        return None
+    try:
+        return oc_key(c, -uid, create=create)
+    except OrgCryptError:  # an account key of another server key: the older form (never lost)
+        return None
+
+
+def doc_seal_as(c, ws, ctx, value, account):
+    """value sealed for ws in the given form (account: a person's account key, else the workspace key); unchanged without
+    a key. Used by doc_seal and the passes of admin/orgcrypt_cli.py."""
+    if account and ws_user(ws):
+        key = _acct_key(c, ws, True)
+        if key:
+            return oc_enc_k(key, -ws_user(ws), f"{ctx}|{ws}", value)
+    key = _ws_key(c, ws)
+    return oc_enc_k(key, ws_org(ws) or 0, f"{ctx}|{ws}", value) if key else value
+
+
+def doc_open_as(c, ws, ctx, value):
+    """(plain value, True when it was sealed with the account key); OrgCryptError when no key opens it."""
+    if not isinstance(value, str) or not value.startswith(PREFIX):
+        return value, False
+    uid = ws_user(ws)
+    if uid:
+        key = _acct_key(c, ws, False)
+        if key:
+            try:
+                return oc_dec_k(key, -uid, f"{ctx}|{ws}", value), True
+            except OrgCryptError:
+                pass
+    return oc_dec_k(_ws_key(c, ws, create=False), ws_org(ws) or 0, f"{ctx}|{ws}", value), False
+
+
 def doc_seal(c, ws, ctx, value):
     """value sealed with the workspace key (unchanged: empty, encryption off, no server key)."""
     if value is None or value == "" or not oc_active(c):
         return value
-    key = _ws_key(c, ws)
-    return oc_enc_k(key, ws_org(ws) or 0, f"{ctx}|{ws}", value) if key else value
+    return doc_seal_as(c, ws, ctx, value, bool(ws_user(ws)) and docs_ukey_on(c))  # 2.126.0 A (#1970)
 
 
 def doc_open(c, ws, ctx, value, default=""):
@@ -90,7 +141,7 @@ def doc_open(c, ws, ctx, value, default=""):
     if not isinstance(value, str) or not value.startswith(PREFIX):
         return value
     try:
-        return oc_dec_k(_ws_key(c, ws, create=False), ws_org(ws) or 0, f"{ctx}|{ws}", value)
+        return doc_open_as(c, ws, ctx, value)[0]  # 2.126.0 A (#1970): both forms of a person's values
     except OrgCryptError:
         return default
 
@@ -194,12 +245,15 @@ def search_ids(c, ws_nodes, query):
                 break
         if cand and check:
             ok = set()
-            for r in c.execute(f"SELECT node_id, text FROM doc_meta WHERE node_id IN ({','.join('?' * len(cand))})", tuple(cand)):
-                have = set(index_words(doc_open(c, ws, "doc_meta.text", r["text"])))
-                name = c.execute("SELECT name FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
-                have |= set(index_words(name[0] if name else ""))
-                if all(any(x.startswith(w) for x in have) for w in check):
-                    ok.add(r["node_id"])
+            ids_ = sorted(cand)
+            for i in range(0, len(ids_), 5000):  # 2.126.0 A (#1979 L3): in portions like above
+                part = ids_[i:i + 5000]
+                for r in c.execute(f"SELECT node_id, text FROM doc_meta WHERE node_id IN ({','.join('?' * len(part))})", tuple(part)).fetchall():
+                    have = set(index_words(doc_open(c, ws, "doc_meta.text", r["text"])))
+                    name = c.execute("SELECT name FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
+                    have |= set(index_words(name[0] if name else ""))
+                    if all(any(x.startswith(w) for x in have) for w in check):
+                        ok.add(r["node_id"])
             cand = ok
         hits |= cand
     return hits

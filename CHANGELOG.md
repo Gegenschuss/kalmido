@@ -7,6 +7,71 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.126.2] - 2026-10-20
+
+Pages: suggestions above the phone keyboard, a news entry when someone shares pages with you, "Mentioned in" on tables.
+
+### Added
+- Pages: when someone shares a page or folder with you, the news show "X shared the page ... with you"; a tap opens
+  "Shared with me". It follows the existing "Sharing" row of the notification settings, no new push or mail (#2355).
+- Tables: a "Mentioned in" line lists the pages that link the table with [[tabelle:...]] (#2357).
+
+### Fixed
+- Pages on phones: the suggestion list after [[datei: / [[tabelle: stays above the on-screen keyboard; the "+" at
+  checkbox lines no longer overlap (hit area grows to the right only); a search hit only in a page name no longer shows
+  an empty "Found in the text" section (#2363).
+- Pages: a public link of an organisation page whose creator left the organisation is shown as ended and no longer
+  counts as an active share. A sealed page text whose key is missing is never shown or saved as text: the page is
+  "not readable" (409), search, history and export skip it (#2358).
+
+## [2.126.1] - 2026-10-20
+
+Agents draft for you: office texts, document summaries, the client report, table rows as tasks and a planned morning
+sort of the basket. Kalmido calls no language model for this; the connected agent words it and you decide on a card.
+
+### Added
+- Office: "Draft text with an agent" for the introduction and closing text of quotation, invoice and reminder drafts.
+  The agent gets the document without purchase prices; you edit the text on the proposal card and take it over (one
+  undo step); nothing is sent, a finalised or sent document is never changed (#2123).
+- Documents: "Summarise with an agent" saves a summary on the document (sealed like the recognised text), shown in the
+  document sheet and in the API (#2123).
+- Projects: "Word the report with an agent" in the status report - the agent gets the report of the period without
+  comments, notes and names; the text you take over replaces the fixed text for copying and sharing (#2124).
+- Agents can propose rows of a table shared with them as tasks of a shared list (`POST /api/v1/agent/proposals/sheet-tasks`,
+  MCP `propose_sheet_tasks`); you untick rows, edit titles and apply the card as yourself (#2125).
+- Planned agent jobs have a kind: "Sort the basket (proposal)" sends your basket to the agent at the planned time
+  (suggested: weekdays 7:30) like the button, you find the proposal card in the morning; an empty basket sends nothing (#2126).
+- Agent API / MCP: new proposal kinds `office_text`, `doc_summary`, `report`, `sheet_tasks`; `job_request` of a planned sort
+  carries `scheduled: true`; `GET /api/v1/agent/schedules` shows the plan's `action`.
+
+## [2.126.0] - 2026-10-20
+
+Security release: fixes from the internal audit (office, documents, agents, sync, offline). Please update.
+
+### Security
+- Security fix: invoice numbers of drafts and deleting numbered invoice / credit note drafts (#1966); invoices from times in
+  the personal office (#1967); office hardening (#1979).
+- Security fix: document data encryption - encrypt-all / decrypt-all / status cover the document tables; private
+  documents use the account key (#1970 #1971); documents and receipts hardening (#1979).
+- Security fix: approvals of agent requests and approval jobs (#1974 #1975); permission questions of the agent launcher
+  (#1973); texts from outside reach agents marked as data (#1978); agent launcher, MCP http mode, git hook (#1979).
+- Security fix: rate limits (#1976 #1977), push subscriptions on the device at a change of user (#1991, client part),
+  contacts import (#1986), public links and forms (#1979).
+- Security fix: tasks and offline queue - recurring completions, repeated creates, several windows (#1987 #1989 #1990);
+  tasks in the trash, list copies, moves, batch changes, device data at logout (#1992).
+
+### Fixed
+- Calendar: extra dates of repeating events (RDATE) are kept and shown; changed occurrences follow a moved series;
+  reminders are not sent twice after an edit; alarms stay with the person who set them (#1985 #1992).
+- Offline changes the server refuses keep their text in the conflict dialog (#1992).
+
+### Upgrade notes
+- Private document data moves to the account key at the first start. Before a downgrade to 2.125 or older run
+  `python -m kalmido.admin.orgcrypt_cli docs-to-server-key` in the container (see docs/SELF-HOSTING.md).
+- Team agents: permission questions are answered only by the operator (`KALMIDO_PERM_USER` / `KALMIDO_OWNER_IDS` or the
+  agent's owner); the MCP server in `--http` mode needs `MCP_HTTP_TOKEN` (at least 16 characters).
+- Numbered invoice and credit note drafts can no longer be deleted (finalise and cancel instead).
+- CI checks the web client with ESLint (#1993).
 ## [2.125.1] - 2026-10-20
 
 ### Fixed

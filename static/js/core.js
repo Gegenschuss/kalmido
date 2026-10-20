@@ -293,6 +293,26 @@ function openTasks(ctx = false) { return [...S.tasks.values()].filter(t => t.sta
 // cached for offline start. Every queued op carries the user id: ops of another user are never replayed.
 class Offline extends Error {}
 const OUT = {q: LS.get('outbox', []), online: true, flushing: false};
+// 2.126.0 D (#1989): every tab and list window of the browser shares the queue, localStorage is the truth: outSync takes over
+// what the others wrote (an entry keeps its object, known by its key k, so undo steps still find it; one that left the queue
+// elsewhere counts as done), outSave changes the fresh copy and writes it back, and only one tab replays (flush, Web Locks)
+const outKey = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+function outSync() {
+  const mine = new Map(OUT.q.map(x => [x.k, x])), q = LS.get('outbox', []);
+  let fix = false;
+  OUT.q = q.map(x => {
+    if (!x.k) { x.k = outKey(); fix = true; }
+    const o = mine.get(x.k); mine.delete(x.k);
+    if (!o) return x;
+    if (!x.sending) delete o.sending;
+    return Object.assign(o, x);
+  });
+  for (const o of mine.values()) o.done = true;
+  if (fix) LS.set('outbox', OUT.q);
+  return OUT.q;
+}
+function outSave(fn) { outSync(); fn(); LS.set('outbox', OUT.q); }
+window.addEventListener('storage', ev => { if (ev.key === 'tasks.outbox') { outSync(); if (S.booted) renderTop(); } });
 // 2.21.0 (#673): before the first render there is no top bar to update (renderTop on an empty state threw, so a start while
 // the server was down showed the error page instead of the cached data); the boot's render shows the state
 function setOnline(b) { if (OUT.online !== b) { OUT.online = b; if (S.booted) renderTop(); if (b) flush(); setTimeout(() => typeof staleDraw === 'function' && staleDraw(), 0); } }
@@ -355,6 +375,8 @@ async function api(method, url, body) {
   // an offline edit is still applied locally at once
   const lo = typeof le2eOut === 'function' ? le2eOut(method, url, body) : body;
   if (lo instanceof Promise) { try { body = await lo; } catch (e) { if (e.message !== 'auth') toast(e.message); throw e; } } else body = lo;
+  // 2.126.0 D (#1990): a new task carries its own id from the first try on: sent again (the answer got lost) = the same task
+  if (method === 'POST' && url === '/api/tasks' && body && typeof body === 'object' && !(body instanceof FormData) && !body.client_ref) body = {...body, client_ref: Date.now().toString(36) + Math.random().toString(36).slice(2, 10)};
   if (queueable(method, url) && !(body instanceof FormData) && OUT.q.length) return enqueue(method, url, body);
   try { const j = await rawFetch(method, url, body); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return j; }
   catch (e) {
@@ -376,12 +398,12 @@ function enqueue(method, url, body) {
   // the queued one (which keeps its _prev = the base the server last confirmed), so a replay sends only the latest text
   const tk = pm && body ? Object.keys(body).filter(k => !k.startsWith('_')) : [];
   if (tk.length === 1 && (tk[0] === 'title' || tk[0] === 'content')) {
-    const q = OUT.q.find((x, i) => (i > 0 || !OUT.flushing) && x.method === 'PATCH' && x.url === url && !x.done && Object.keys(x.body || {}).filter(k => !k.startsWith('_')).join() === tk[0]);
+    const q = outSync().find((x, i) => (i > 0 || !OUT.flushing) && !x.sending && x.method === 'PATCH' && x.url === url && !x.done && Object.keys(x.body || {}).filter(k => !k.startsWith('_')).join() === tk[0]);  // 2.126.0 D (#1989): sending = on its way from another tab
     if (q) { q.body = {...q.body, [tk[0]]: body[tk[0]]}; LS.set('outbox', OUT.q); return applyLocal({method, url, body}); }
   }
-  const e = {method, url, body, uid: S.me?.id};
+  const e = {method, url, body, uid: S.me?.id, k: outKey()};
   if (method === 'POST' && url === '/api/tasks') e.tmp = -Date.now() - Math.floor(Math.random() * 1000);
-  OUT.q.push(e); LS.set('outbox', OUT.q);
+  outSave(() => OUT.q.push(e));  // 2.126.0 D (#1989)
   renderTop();
   if (OUT.online) setTimeout(flush, 50);
   const r = applyLocal(e);
@@ -433,16 +455,24 @@ function applyLocal(e) {
   return {ok: true};  // habit log: caller already updated S.habits
 }
 async function flush() {
-  if (OUT.flushing || !OUT.q.length) return;
+  if (OUT.flushing || !outSync().length) return;
+  // 2.126.0 D (#1992 O5): only once the server has said who is logged in on this page (load() comes back here)
+  if (!S.me || OUT.me !== S.me.id) { if (!OUT.meCheck) { OUT.meCheck = true; load().catch(() => {}).finally(() => { OUT.meCheck = false; }); } return; }
+  // 2.126.0 D (#1989): one tab of the browser replays the queue, the others see it shrink (without Web Locks: as before)
+  if (navigator.locks) return navigator.locks.request('kalmido-outbox', {ifAvailable: true}, l => l && !OUT.flushing ? outFlush() : null);
+  return outFlush();
+}
+async function outFlush() {
   OUT.flushing = true;
   netDotDraw();  // 2.31.0 (#378): yellow while the changes go out
   const fix = v => (typeof v === 'number' && v < 0 && idmap[v]) ? idmap[v] : v;
   const idmap = LS.get('idmap', {});
   let dropped = 0, skipped = 0, sent = 0;
   try {
-    while (OUT.q.length) {
+    while (outSync().length) {
       const e = OUT.q[0];
-      if (e.uid && S.me && e.uid !== S.me.id) { OUT.q.shift(); LS.set('outbox', OUT.q); continue; }  // another user's op
+      if (e.uid && S.me && e.uid !== S.me.id) { outSave(() => { OUT.q = OUT.q.filter(x => x !== e); }); continue; }  // another user's op
+      outSave(() => { e.sending = 1; });
       const url = e.url.replace(/\/(-\d+)(?=\/|$)/, (_, n) => '/' + (idmap[n] || n));
       let body = e.body;
       if (body && body.parent_id) body = {...body, parent_id: fix(body.parent_id)};
@@ -461,20 +491,22 @@ async function flush() {
         if (j && j.conflicts?.length) {
           // 2.13.0: a "conflict" with a text this device sent itself (its answer got lost) is replayed on top of it
           const own = j.conflicts.filter(c => ownVal(j.id + ':' + c.field, c.server) && body && c.field in body);
-          if (own.length === j.conflicts.length && !e.rebased) { e.rebased = true; e.body = {...body, _prev: Object.fromEntries(own.map(c => [c.field, c.server]))}; continue; }
+          if (own.length === j.conflicts.length && !e.rebased) { outSave(() => { e.rebased = true; e.body = {...body, _prev: Object.fromEntries(own.map(c => [c.field, c.server]))}; }); continue; }
           addConflicts(j.id, j.conflicts, j.title);
         }
         if (j && j.skipped) skipped++;
+        outSave(() => { OUT.q = OUT.q.filter(x => x !== e); });  // 2.126.0 D (#1989): out of the shared queue first
         e.res = j;
       } catch (err) {
-        if (err instanceof Offline || err.message === 'auth') { if (err instanceof Offline) flushSoon(); return; }  // 2.25.0 (UX-55): try again in 2 s
+        if (err instanceof Offline || err.message === 'auth') { outSave(() => { delete e.sending; }); if (err instanceof Offline) flushSoon(); return; }  // 2.25.0 (UX-55): try again in 2 s
         console.warn('outbox: dropped', e, err);  // e.g. 404: deleted on another device
-        dropped++; e.res = null;
+        dropped++; outReject(e, err);
+        outSave(() => { OUT.q = OUT.q.filter(x => x !== e); });
+        e.res = null;
       }
       e.done = true;
-      OUT.q.shift(); LS.set('outbox', OUT.q);
     }
-    LS.set('idmap', {});
+    LS.set('idmap', Object.fromEntries(Object.entries(idmap).filter(([k]) => -k > Date.now() - 600000)));  // 2.126.0 D (#1989): another tab may still hold a new task's temporary id for a while
   } finally {
     OUT.flushing = false;
     if (sent && !OUT.q.length && globalThis.document) { S.syncOk = Date.now(); staleDraw(); }  // 2.25.0 (UX-55): the "waiting" chip goes at once
@@ -527,6 +559,17 @@ function addConflicts(tid, list, title) {
   // 2.13.2 (#478 F7): no toast on top of the calm bar under the field (it said the same and covered "Waiting for …")
   setTimeout(() => { if (S.sel === tid && list.every(c => $(`#detail .cfbar[data-f="${c.field}"]`))) return; toast(list.length === 1 ? tr('A field was changed elsewhere in the meantime, please review') : tr('{0} fields were changed elsewhere in the meantime, please review', list.length)); }, 300);
 }
+// 2.126.0 D (#1992 O8): an offline change the server refused (deleted, no right any more, invalid) is not lost silently:
+// its text waits in the conflicts dialog with the reason, to copy
+function outReject(e, err) {
+  const b = e.body && typeof e.body === 'object' ? e.body : {};
+  const txt = Object.entries(b).filter(([k, v]) => !k.startsWith('_') && k !== 'client_ref' && v != null && v !== '' && typeof v !== 'object')
+    .map(([k, v]) => k === 'title' || k === 'content' ? String(v) : `${k}: ${v}`).join('\n');
+  if (!txt) return;
+  const id = +((e.url.match(/^\/api\/tasks\/(\d+)/) || [])[1]) || 0;
+  S.conflicts.push({tid: id, title: b.title || S.tasks.get(id)?.title || '', field: 'rejected', server: err?.message || '', mine: txt, at: Date.now()});
+  LS.set('conflicts', S.conflicts);
+}
 // the calm bar under a field that was changed elsewhere while it was being edited (2.13.0)
 function cfInline(id, field, c, mine) {
   const el = $(field === 'title' ? '#d-title' : '#d-content'); if (!el || !c) return;
@@ -565,7 +608,9 @@ function conflictModal() {
     <div id="cf-list"></div>
     <div class="foot"><button class="btn" data-m="all-server">${tr('All: keep the other version')}</button><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   const draw = () => {
-    $('#cf-list', md).innerHTML = S.conflicts.map((c, i) => `<div class="cfitem"><div class="cfh"><b>${esc(c.title)}</b><span class="muted">${esc(histFieldName(c.field))}</span></div>
+    $('#cf-list', md).innerHTML = S.conflicts.map((c, i) => c.field === 'rejected' ? `<div class="cfitem"><div class="cfh"><b>${esc(c.title)}</b><span class="muted">${esc(tr('Offline change not saved'))}</span></div>
+      <div class="cfv"><div><span>${tr('reason')}</span>${esc(c.server)}</div><div><span>${tr('your version')}</span><span style="white-space:pre-wrap">${esc(c.mine)}</span></div></div>
+      <div class="cfb"><button class="btn sm" data-cf="server" data-i="${i}">${tr('Dismiss')}</button><button class="btn sm pri" data-cf="copy" data-i="${i}">${ic('copy', 's')} ${tr('Copy')}</button></div></div>` : `<div class="cfitem"><div class="cfh"><b>${esc(c.title)}</b><span class="muted">${esc(histFieldName(c.field))}</span></div>
       <div class="cfv"><div><span>${tr('saved')}</span>${esc(fmtVal(c.field, c.server))}</div><div><span>${tr('your version')}</span>${esc(fmtVal(c.field, c.mine))}</div></div>
       <div class="cfb"><button class="btn sm" data-cf="server" data-i="${i}">${tr('Keep saved')}</button><button class="btn sm pri" data-cf="mine" data-i="${i}">${tr('Use mine')}</button></div></div>`).join('') || `<div class="muted" style="padding:.625rem 0">${tr('No open conflicts.')}</div>`;
   };
@@ -576,6 +621,7 @@ function conflictModal() {
     if (b.dataset.m === 'all-server') { S.conflicts = []; }
     if (b.dataset.cf) {
       const c = S.conflicts[+b.dataset.i];
+      if (b.dataset.cf === 'copy') { try { await navigator.clipboard.writeText(c.mine); toast(tr('Copied')); } catch { toast(c.mine); } return; }  // 2.126.0 D (#1992 O8)
       if (b.dataset.cf === 'mine') {
         try { const t = await api('PATCH', '/api/tasks/' + c.tid, c.field.startsWith('field:') ? {fields: {[c.field.slice(6)]: c.mine}} : {[c.field]: c.mine}); putTask(t); } catch { return; }
       }
@@ -589,7 +635,13 @@ function conflictModal() {
 function applyState(j) {
   if (j.me) {  // another user than last time in this browser: drop everything local of the previous one
     const last = LS.get('uid', null);
-    if (last !== null && last !== j.me.id) { clearLocal(); LS.set('uid', j.me.id); location.reload(); throw new Error('auth'); }
+    if (last !== null && last !== j.me.id) {
+      clearLocal(); LS.set('uid', j.me.id);
+      // 2.126.0 C (#1991): the previous person's push subscription and remembered keys in this browser go too
+      const gone = Promise.allSettled([typeof wpDisable === 'function' && wpDisable(), typeof e2eForget === 'function' && e2eForget()]);
+      Promise.race([gone, new Promise(r => setTimeout(r, 3000))]).finally(() => location.reload());
+      throw new Error('auth');
+    }
     if (last === null) LS.set('uid', j.me.id);
     S.me = j.me;
     const rw = LS.get('rcWarn', null);  // logged in with a recovery code, only a few left
@@ -671,6 +723,7 @@ async function load() {
       j = await api('GET', '/api/state');
       if ((S.wseq || 0) === w0) break;
     }
+    OUT.me = j?.me?.id;  // 2.126.0 D (#1992 O5)
   }
   catch (e) {
     if (!(e instanceof Offline)) throw e;
@@ -681,7 +734,7 @@ async function load() {
     return;
   }
   if (OUT.q.length) {  // flush() reloads once the queue is through
-    if (!S.tasks.size) { applyState(j); OUT.q.forEach(applyLocal); }
+    if (!S.tasks.size || j?.me?.id !== S.me?.id) { applyState(j); OUT.q.forEach(applyLocal); }  // 2.126.0 D (#1992 O5): another user = applyState's switch
     flush(); return;
   }
   applyState(j);

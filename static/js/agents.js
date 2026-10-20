@@ -647,11 +647,13 @@ function propRequest(kind, ctx = {}) {
 S.prop = null;
 function propKeys(v) {
   const p = v.proposal; if (!p) return [];
+  if (typeof sht_is === 'function' && sht_is(v)) return sht_keys(v);  // 2.126.1 B (#2125): the table rows that can still be carried over (sheetprop.js)
   if (pk2_is(v.kind)) return pk2_keys(v);  // 2.51.0 (#1351 #1358): propkinds2.js
   if (lyp_is(v) || rul_is(v)) return ['0'];  // 2.55.0 (#1066): one arrangement (lyprop.js); 2.71.0 A (#1457): one rule (rules.js)
   if (aim_is(v)) return aim_keys(v);  // 2.68.0 (#1839): the new rows of an import (importprop.js)
   if (dup_is(v)) return dup_keys(v);  // 2.70.0 B (#1357): the groups still mergeable (dupprop.js)
   if (ctr_is(v)) return ['0'];  // 2.70.0 C (#1359): one note (contractprop.js)
+  if (typeof ast_is === 'function' && ast_is(v)) return ['0'];  // 2.126.1 A (#2123 #2124): one text (asstprop.js)
   if (v.kind === 'project') return p.tasks.flatMap((t, i) => [String(i), ...t.subtasks.map((s, k) => `${i}.${k}`)]);
   if (v.kind === 'dayplan') return p.items.map((x, i) => String(i));  // 2.10.0 (#440); 2.11.0: "does not fit" entries change nothing
   return (v.kind === 'extract' ? p.tasks : p.items).map((x, i) => String(i));
@@ -663,6 +665,7 @@ async function propOpen(jid) {
   }
   if (aim_is(v) && typeof ofcMoney !== 'function') await loadModule('office').catch(() => {});  // 2.68.0 (#1839, review): the preview uses the office module (lazy)
   if (ctr_is(v) && typeof noticeWord !== 'function') await loadModule('life').catch(() => {});  // 2.70.0 C (#1359): the card uses life.js (loaded on demand since 2.65.0)
+  if (['office_text', 'doc_summary', 'report', 'sheet_tasks'].includes(v?.kind) && (typeof ast_is !== 'function' || typeof sht_is !== 'function')) await loadModule('asstprop').catch(() => {});  // 2.126.1 A (#2123 #2124): asstprop.js on demand
   if (v?.input?.assistant) v.agent = {...(v.agent || {}), name: tr('Assistant')};  // 2.75.0 (#1411): the built-in assistant, not an agent
   $('.ppm')?.remove();
   const md = modal('');
@@ -724,10 +727,12 @@ function propItemHtml(k, x, o = {}) {  // one entry: checkbox, title, date and t
 }
 function propItemsHtml() {
   const {v} = S.prop, p = v.proposal, inp = v.input;
+  if (typeof sht_is === 'function' && sht_is(v)) return '';  // 2.126.1 B (#2125): sht_draw shows it
   if (pk2_is(v.kind)) return pk2_itemsHtml();  // 2.51.0 B (#1351 #1358): propkinds2.js
   if (lyp_is(v) || rul_is(v)) return '';  // 2.55.0 (#1066): lyp_draw shows it; 2.71.0 A: rul_draw
   if (dup_is(v)) return '';  // 2.70.0 B (#1357): dup_draw shows it
   if (ctr_is(v)) return '';  // 2.70.0 C (#1359): ctr_draw shows it
+  if (typeof ast_is === 'function' && ast_is(v)) return '';  // 2.126.1 A (#2123 #2124): ast_draw shows it
   if (v.kind === 'dayplan') return propDayplanHtml();  // 2.10.0 (#440)
   if (v.kind === 'cleanup') return clnItemsHtml();  // 2.39.0 (#1151): cleanup.js
   if (AP_KINDS.includes(v.kind)) return ap_propItemsHtml();  // 2.51.0 C (#1353 #1355): agentplan.js
@@ -762,6 +767,7 @@ function propCount() {
   if (aim_is(P.v)) return aim_count();  // 2.68.0 (#1839)
   if (dup_is(P.v)) return dup_count(P);  // 2.70.0 B (#1357): groups to merge
   if (ctr_is(P.v)) return;  // 2.70.0 C (#1359): its own buttons
+  if (typeof ast_is === 'function' && ast_is(P.v)) return;  // 2.126.1 A (#2123 #2124): its own buttons
   $$('.ppcount', P.md).forEach(c => { c.textContent = tr('{0} of {1} selected', n, all); });
   if (b) { b.disabled = !n; b.innerHTML = `${ic('check', 's')} ${esc(trn('Apply {0} entry', 'Apply {0} entries', n))}`; }
 }
@@ -781,11 +787,13 @@ function propDraw() {
       <div class="shint keep">${AP_KINDS.includes(v.kind) ? ap_propHint(v) : v.kind === 'cleanup' ? tr('Applying changes the selected tasks as you. Tasks someone is editing right now or that changed since the request are skipped. One step, undo takes it back.') : v.kind === 'dayplan' ? tr('Applying sets the planned start and duration of the selected tasks as you; due dates stay as they are. One step, undo takes it back.') : v.kind === 'triage' ? tr('Applying moves and changes the selected basket items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
     // 2.5.2 (K03): the footer stays visible below the entries (sticky), with the count next to Apply
     foot = `<button class="btn danger" data-pp="discard">${tr('Discard')}</button><span class="spacer"></span><span class="muted ppcount ppfc"></span><button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply"></button>`;
+    if (typeof sht_is === 'function' && sht_is(v)) ({main, foot} = sht_draw(v));  // 2.126.1 B (#2125): table, list, one row per table row (sheetprop.js)
     if (lyp_is(v)) ({main, foot} = lyp_draw(v));  // 2.55.0 (#1066): before / after, 👍 / 👎 (lyprop.js)
     if (aim_is(v)) ({main, foot} = aim_draw(v));  // 2.68.0 (#1839): the import preview (importprop.js)
     if (dup_is(v)) ({main, foot} = dup_draw(v));  // 2.70.0 B (#1357): one row per group (dupprop.js)
     if (ctr_is(v)) ({main, foot} = ctr_draw(v));  // 2.70.0 C (#1359): the contract, the sentence, note / remind me (contractprop.js)
     if (rul_is(v)) ({main, foot} = rul_draw(v));  // 2.71.0 A (#1457): the rule in one sentence, 👍 / 👎 (rules.js)
+    if (typeof ast_is === 'function' && ast_is(v)) ({main, foot} = ast_draw(v));  // 2.126.1 A (#2123 #2124): the text to edit, copy / take over (asstprop.js)
   } else {
     main = `<div class="ppwait">${ic(st === 'applied' ? 'check' : 'x')}<p>${st === 'applied' ? (v.applied?.undone ? tr('Applied, then undone.') : tr('Applied.')) : tr('Discarded. {0} was told.', agent)}</p></div>`;
   }
@@ -802,6 +810,7 @@ async function propApply(b) {
   if (lyp_is(v)) q.use = $('#lyp-use', P.md)?.checked !== false;  // 2.55.0 (#1066)
   if (aim_is(v)) q.version = v.import?.version;  // 2.68.0 (#1839, review): 409 when the agent replaced the rows meanwhile
   if (ctr_is(v)) q.remind = b.dataset.ctrRemind === '1';  // 2.70.0 C (#1359): "Remind me"
+  if (typeof ast_is === 'function' && ast_is(v)) ast_apply(P, q);  // 2.126.1 A (#2123 #2124): the edited text
   b.disabled = true;
   let r;
   try { r = await calReq('POST', `/api/proposals/${P.jid}/apply`, q); } catch (x) { const e = $('#pp-err', P.md); e.textContent = x.message; e.hidden = false; b.disabled = false; return; }
@@ -816,6 +825,7 @@ async function propApply(b) {
     redo: async () => { const x = await api('POST', `/api/proposals/${jid}/redo`); ly(); return {skipped: x.skipped || [], none: !!x.none}; }});
   if (dup_is(v)) dup_hist(e);  // 2.70.0 B (#1357): the contacts view follows undo / redo
   if (ctr_is(v)) { histToast(ctr_toast(v, r), e); if (S.route.mod === 'agents') loadJobs(); return; }  // 2.70.0 C (#1359)
+  if (typeof ast_is === 'function' && ast_is(v)) { ast_hist(v, e); histToast(ast_toast(v), e); ast_after(v, true); if (S.route.mod === 'agents') loadJobs(); return; }  // 2.126.1 A (#2123 #2124)
   histToast(dup_is(v) ? dup_toast(r) : lyp_is(v) ? lyp_toast(v, r) : rul_is(v) ? rul_toast(v) : aim_is(v) ? aim_toast(r) : pk2_is(v.kind) ? pk2_toast(v, r) : v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} basket item sorted', '{0} basket items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e, proj ? F8C_PROJ_TOAST_MS : undefined);
   if (proj) go('l/' + r.list_id);
   if (S.route.mod === 'agents') loadJobs();
@@ -907,7 +917,10 @@ function bridgesHtml(a) {
 // "New plan" starts from a template (the text stays free to change). The next run in the language's date format.
 const SCHED_FREQ = {daily: N_('Every day'), weekdays: N_('Every working day (Mon–Fri)'), weekly: N_('Every week on'), monthly: N_('Every month on day')};
 const SCHED_LAST = {sent: N_('sent'), late: N_('sent late'), manual: N_('run by hand'), skipped: N_('skipped: the agent was switched off'),
-  no_access: N_('switched off: you no longer reach the agent'), no_list: N_('switched off: the list is no longer shared with the agent')};
+  no_access: N_('switched off: you no longer reach the agent'), no_list: N_('switched off: the list is no longer shared with the agent'),
+  empty: N_('skipped: the basket was empty'), pending: N_('skipped: the last proposal is still open'), busy: N_('skipped: too many open proposal requests')};  // 2.126.1 B (#2126)
+// 2.126.1 B (#2126): what a plan does -- a job in the chat (as before) or "Sort the basket": a proposal card in the morning
+const SCHED_ACT = {chat: N_('Job in the chat'), triage: N_('Sort the basket (proposal)')};
 // the templates point at the data tools of the agent API / MCP; the text is the person's to change
 const SCHED_TPL = [
   {k: 'brief', t: N_('Morning briefing'), freq: 'weekdays', time: '08:00',
@@ -937,7 +950,7 @@ const schedLists = aid => (S.lists || []).filter(l => !l.archived && !l.is_inbox
 function schedRowHtml(s) {
   const last = s.last_state ? tr(SCHED_LAST[s.last_state] || s.last_state) + (s.last_at ? ' · ' + schedWhen(s.last_at) : '') : '';
   return `<div class="schedrow ${s.enabled ? '' : 'off'}" data-sid="${s.id}"><div class="schedi"><b>${esc(s.title)}</b>
-      <small class="muted">${esc(schedRhythm(s))}${s.list_name ? ' · ' + esc(s.list_name) : ''}${s.mine ? '' : ' · ' + esc(tr('by {0}', s.by_name))}</small>
+      <small class="muted">${s.action === 'triage' ? esc(tr('Sort the basket')) + ' · ' : ''}${esc(schedRhythm(s))}${s.list_name ? ' · ' + esc(s.list_name) : ''}${s.mine ? '' : ' · ' + esc(tr('by {0}', s.by_name))}</small>
       <small class="${s.enabled ? '' : 'muted'}">${esc(schedNext(s))}${last ? ` <span class="muted">· ${esc(tr('last: {0}', last))}</span>` : ''}</small></div>
     <div class="schedb"><label class="chkl schedon" title="${esc(tr('Active'))}"><input type="checkbox" data-sm="toggle" ${s.enabled ? 'checked' : ''} aria-label="${esc(tr('Active: {0}', s.title))}"></label>
       <button type="button" class="btn sm" data-sm="run" ${s.enabled ? '' : 'disabled'}>${ic('play', 's')} ${tr('Run now')}</button>
@@ -986,24 +999,38 @@ async function schedOpen(aid) {
 function schedForm(md, a, s, done) {
   const box = $('.schedbody', md), ls = schedLists(a.id), isNew = !s;
   const tz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } })();
-  const v = s ? {...s} : {title: '', prompt: '', freq: 'weekly', days: [1], time: '09:00', list_id: null, enabled: true};
+  const v = s ? {action: 'chat', ...s} : {action: 'chat', title: '', prompt: '', freq: 'weekly', days: [1], time: '09:00', list_id: null, enabled: true};
   const freqOpts = Object.keys(SCHED_FREQ).map(f => `<option value="${f}" ${v.freq === f ? 'selected' : ''}>${esc(tr(SCHED_FREQ[f]))}</option>`).join('');
   box.innerHTML = `<h3>${ic('clock', 's')} ${esc(isNew ? tr('New plan for {0}', a.name) : tr('Edit plan'))}</h3>
     ${isNew ? `<div class="row ppcol"><span class="lbl">${tr('Start from a template')}</span><div class="schedtpl" role="group">${SCHED_TPL.map(t => `<button type="button" class="chip" data-tpl="${t.k}">${esc(tr(t.t))}</button>`).join('')}</div></div>` : ''}
+    ${s?.list_check ? '' : `<div class="row ppcol"><label for="sc-act">${tr('Kind')}</label><select id="sc-act">${Object.keys(SCHED_ACT).map(k => `<option value="${k}" ${v.action === k ? 'selected' : ''}>${esc(tr(SCHED_ACT[k]))}</option>`).join('')}</select></div>`}
     <div class="row ppcol"><label for="sc-title">${tr('Title')}</label><input id="sc-title" maxlength="120" value="${esc(v.title)}"></div>
-    <div class="row ppcol"><label for="sc-prompt">${tr('What should the agent do?')}</label><textarea id="sc-prompt" rows="6" maxlength="4000">${esc(v.prompt)}</textarea></div>
+    <div class="row ppcol"><label for="sc-prompt">${tr('What should the agent do?')} <span class="muted schedopt">${tr('optional')}</span></label><textarea id="sc-prompt" rows="6" maxlength="4000">${esc(v.prompt)}</textarea></div>
     <div class="row schedrh"><label for="sc-freq">${tr('Repeat')}</label><select id="sc-freq">${freqOpts}</select>
       <span class="schedwd" id="sc-wd" role="group" aria-label="${esc(tr('Weekdays'))}">${[1, 2, 3, 4, 5, 6, 7].map(i => `<label class="chkl"><input type="checkbox" data-wd="${i}" ${(v.days || []).includes(i) ? 'checked' : ''}> ${esc(schedWd(i))}</label>`).join('')}</span>
       <input id="sc-dom" type="number" min="1" max="31" value="${v.freq === 'monthly' ? (v.days || [1])[0] : 1}" aria-label="${esc(tr('Day of the month'))}">
       <label for="sc-time" class="sr">${tr('Time')}</label>${timeIn('sc-time', v.time, {label: tr('Time'), clear: false})}</div>
-    <div class="row"><label for="sc-list">${tr('List')}</label><select id="sc-list"><option value="">${tr('No list')}</option>${ls.map(l => `<option value="${l.id}" ${v.list_id === l.id ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}${v.list_id && !ls.some(l => l.id === v.list_id) ? `<option value="${v.list_id}" selected>${esc(v.list_name || '?')}</option>` : ''}</select></div>
+    <div class="row" id="sc-listrow"><label for="sc-list">${tr('List')}</label><select id="sc-list"><option value="">${tr('No list')}</option>${ls.map(l => `<option value="${l.id}" ${v.list_id === l.id ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}${v.list_id && !ls.some(l => l.id === v.list_id) ? `<option value="${v.list_id}" selected>${esc(v.list_name || '?')}</option>` : ''}</select></div>
     <div class="row"><label class="chkl"><input type="checkbox" id="sc-on" ${v.enabled ? 'checked' : ''}> ${tr('Active')}</label></div>
-    <div class="shint">${esc(tr('The agent gets title, text and list at the planned time, at most once per run; after an outage only the one missed run (marked late). Times in your time zone ({0}).', s?.tz || tz || '–'))}</div>
+    <div class="shint" id="sc-trhint" hidden>${esc(tr('At the planned time {0} gets the open items of your basket and your lists, like the button "Sort the basket", and proposes where each one belongs. You find the proposal as a card and decide; nothing is moved before. An empty basket sends nothing.', a.name))}</div>
+    <div class="shint" id="sc-chhint">${esc(tr('The agent gets title, text and list at the planned time, at most once per run; after an outage only the one missed run (marked late). Times in your time zone ({0}).', s?.tz || tz || '–'))}</div>
     <div class="calerr" role="alert" id="sc-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-sf="back">${tr('Cancel')}</button><button class="btn pri" data-sf="save">${tr('Save')}</button></div>`;
-  const vis = () => { const f = $('#sc-freq', box).value; $('#sc-wd', box).hidden = f !== 'weekly'; $('#sc-dom', box).hidden = f !== 'monthly'; };
+  const act = () => $('#sc-act', box)?.value || 'chat';
+  const vis = () => {
+    const f = $('#sc-freq', box).value, tri = act() === 'triage'; $('#sc-wd', box).hidden = f !== 'weekly'; $('#sc-dom', box).hidden = f !== 'monthly';
+    $('#sc-listrow', box).hidden = tri; $('.schedopt', box).hidden = !tri; $('#sc-trhint', box).hidden = !tri; $('#sc-chhint', box).hidden = tri;  // 2.126.1 B (#2126)
+    $('.schedtpl', box)?.closest('.row')?.toggleAttribute('hidden', tri);
+  };
   vis();
   $('#sc-freq', box).addEventListener('change', vis);
+  $('#sc-act', box)?.addEventListener('change', () => {  // 2.126.1 B (#2126): "Sort the basket" starts as every working day at 7:30
+    if (act() === 'triage' && isNew) {
+      if (!$('#sc-title', box).value.trim()) $('#sc-title', box).value = tr('Sort the basket');
+      $('#sc-freq', box).value = 'weekdays'; $('#sc-time', box).value = '07:30'; dpSync($('#sc-time', box));
+    }
+    vis();
+  });
   $('#sc-title', box).focus();
   box.onclick = async e => {
     const tb = e.target.closest('[data-tpl]');
@@ -1022,11 +1049,12 @@ function schedForm(md, a, s, done) {
     const f = $('#sc-freq', box).value;
     const d = {title: $('#sc-title', box).value.trim(), prompt: $('#sc-prompt', box).value.trim(), freq: f, time: $('#sc-time', box).value || '09:00',
       days: f === 'weekly' ? $$('[data-wd]:checked', box).map(x => +x.dataset.wd) : f === 'monthly' ? [Math.max(1, Math.min(31, +$('#sc-dom', box).value || 1))] : [],
-      list_id: +$('#sc-list', box).value || null, enabled: $('#sc-on', box).checked};
+      list_id: act() === 'triage' ? null : +$('#sc-list', box).value || null, enabled: $('#sc-on', box).checked};
+    if ($('#sc-act', box)) d.action = act();  // 2.126.1 B (#2126)
     if (isNew && tz) d.tz = tz;
     const er = $('#sc-err', box), fail = m => { er.textContent = m; er.hidden = false; };
     if (!d.title) return fail(tr('Please enter a title.'));
-    if (!d.prompt) return fail(tr('Please describe what the agent should do.'));
+    if (!d.prompt && act() !== 'triage') return fail(tr('Please describe what the agent should do.'));
     if (f === 'weekly' && !d.days.length) return fail(tr('Pick at least one weekday'));
     b.disabled = true;
     try { await rawFetch(isNew ? 'POST' : 'PATCH', isNew ? `/api/agents/${a.id}/schedules` : `/api/agent-schedules/${s.id}`, d); }

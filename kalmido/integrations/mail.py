@@ -255,6 +255,12 @@ def mail_poll_once():
                     try:
                         if mail_import(c, raw):
                             n += 1
+                    except Exception as e:  # noqa: BLE001 - 2.126.0 review: one mail that fails is skipped (marked seen), never blocks the rest
+                        print("mail: skipped one mail:", type(e).__name__, e, flush=True)
+                        try:
+                            c.rollback()
+                        except Exception:  # noqa: BLE001
+                            pass
                     finally:
                         c.close()
             M.uid("STORE", u, "+FLAGS", "(\\Seen)")
@@ -408,6 +414,14 @@ def mail_test():
     u = c.execute("SELECT email FROM users WHERE id=?", (me(),)).fetchone()
     if not u or not (u["email"] or "").strip():
         return err(tr("No e-mail address is stored for you: an admin adds it (Settings > Users)"), 409)
+    from ..admin.hosting import mail_budget
+    from ..api.v1 import hit_limit
+    if hit_limit(f"mailtest:{me()}", 5, 3600):  # 2.126.0 C (#1979 I6): a few tests an hour, counted in the daily e-mail limit
+        return err(tr("Too many tests, please wait a few minutes"), 429)
+    if not mail_budget(c, me(), u["email"]):
+        c.rollback()
+        return err(tr("Today's e-mail limit is reached. Try again tomorrow."), 429)
+    c.commit()
     lg = lang(c, me())
     m = digest_mail_content(c, me(), local_now().date().isoformat()) or (f"{APP_NAME}: " + tr("Test", lg=lg), tr("E-mails from {0} are arriving.", APP_NAME, lg=lg), None)
     try:

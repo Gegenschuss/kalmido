@@ -11,7 +11,7 @@ from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
 from ..core.i18n import LANGS, md_plain, tr
 from ..core.db import body, db, err, inbox_default, local_now, now_utc, parse_iso, usettings
 from ..core.tokenhash import tkh_match, tkh_set_ical
-from ..accounts.session import _rate_blocked, _rate_fail, client_ip, me
+from ..accounts.session import _rate_blocked, _rate_fail, client_ip, me, rate_ip
 from ..core.access import tvis, vis_sql
 from ..tasks.validation import rr_feasible, rr_norm
 from ..tasks.lifecycle import rr_count, rr_with_count
@@ -230,7 +230,7 @@ def ics_build(c, u):
 @app.get("/ical/<token>.ics")
 def ical_feed(token):
     from ..notify.alerts import aa_count
-    keys = [("ical:" + client_ip(), ICAL_FAIL_LIMIT)]
+    keys = [("ical:" + rate_ip(), ICAL_FAIL_LIMIT)]
     if _rate_blocked(keys):
         return Response("Too many requests\n", 429, content_type="text/plain; charset=utf-8")
     c = db()

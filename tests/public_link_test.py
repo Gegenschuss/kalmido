@@ -322,7 +322,8 @@ check(not any("Groceries" in m or cpath in m for (m,) in al), "the alert names n
 time.sleep(61)
 bad = [page(f"/s/{'R' * 31}{i}").status_code for i in range(10)] + [page(f"/s/{'S' * 32}").status_code for _ in range(25)]
 check(bad.count(404) <= 30 and bad[-1] == 429, f"unknown links: at most 30 per address, then 429 ({bad.count(404)} x 404)")
-check(page(cpath).status_code == 429, "then blocked for valid links too")
+# 2.126.0 (#1979 I2): only unknown links are limited, a valid link from the same address keeps opening
+check(page(cpath).status_code == 200, "a valid link from that address still opens")
 
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
