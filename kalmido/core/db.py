@@ -657,6 +657,8 @@ def init_db(guard=True, load=None):
             print("clients: address fields filled from the free address for", n, "client(s)", flush=True)
         from ..collab.msgsearch import msg_index_init
         msg_index_init(c)  # 2.33.0 (#1080) / 2.37.0: the message search (kalmido_fold + trigram GIN indexes)
+        from ..tasks.ftsearch import fts_index_init
+        fts_index_init(c)  # 2.116.0 B (#2065): full-text search of tasks + comments (GIN indexes over kalmido_fold)
         from .rls import apply as rls_apply, OFF_HELP
         rls_on = rls_apply(c)  # 2.37.0 (#1150): row-level security per organisation (policies + the app role)
         if not rls_on and guard:  # 2.37.0 (review W2-2): several organisations rely on it -> no start without it
@@ -726,7 +728,7 @@ def repair_data(c):
         if t["repeat"]:
             rep = rr_norm(t["repeat"])
             due = f.get("due", t["due"])
-            if rr_problem(rep) or (due and not rr_feasible(rep, due)):
+            if rr_problem(rep, True) or (due and not rr_feasible(rep, due)):  # 2.116.0 D (#2066): TIMES ok
                 f["repeat"] = ""
                 bump_n("repeat")
             elif rep != t["repeat"]:

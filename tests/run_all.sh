@@ -13,7 +13,7 @@ cd "$HERE"
 export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
-SHARDS_DEFINED=17
+SHARDS_DEFINED=19
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
@@ -1361,6 +1361,7 @@ fresh; run p2125_c_api "$PY" p2125_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2125_c_ui node p2125_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.125.0 part D: browser demo like a new account, all modules (#1653) (no container)
        run p2125_d_demo node p2125_d_demo_test.js
+shard 18  # 20.10.2026 (job #692): the parked releases 2.111-2.113.0 (new suites still go to shard 17 above)
 # 2.111.0: Buero-Rueckgaengig (a), Termin-Einladungen + Abo-Link (b), Schnellerfassung (c)
 fresh; run p2111_a_api "$PY" p2111_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2111_a_ui node p2111_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1381,6 +1382,7 @@ fresh; run p2113_a_ui node p2113_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2113_b_ui node p2113_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.113.0 part C: unit select follows the quantity (#2249)
 fresh; run p2113_c_ui node p2113_c_ui.js "$KALMIDO_TEST_DATA"
+shard 19  # 20.10.2026 (job #692): the parked releases 2.113.1-2.116
 # 2.113.1 part A: producing from the net amount, factor quotient, only in the film pack (#2251)
 fresh; run p2113b_a_api "$PY" p2113b_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2113b_a_ui node p2113b_a_ui.js "$KALMIDO_TEST_DATA"

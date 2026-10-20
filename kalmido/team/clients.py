@@ -315,6 +315,8 @@ def client_update(cid):
     uid = me()
     _gate(c)
     old = need_client(c, cid, uid)
+    from ..office.undo import oun_post, oun_pre
+    oun_pre(c, uid, None, "client", cid)  # 2.111.0 A (#2233): the state before, for "Saved · Undo"
     f = clean_client(c, uid, body())
     if "org_id" in f and f["org_id"] == old["org_id"]:
         f.pop("org_id")  # unchanged (the dialog sends it with every save)
@@ -333,6 +335,7 @@ def client_update(cid):
     if f.get("address"):
         cdn_fill_address(c, cid)
     bump(c)
+    oun_post(c)
     c.commit()
     return jsonify(client_public(c, uid, need_client(c, cid, uid), stats=True))
 

@@ -34,7 +34,7 @@ from ..core.access import Denied
 from ..calendars.subscriptions import CalError, cal_allow_parse, cal_host_allowed, cal_http, cal_norm_url
 from .packs import PACK_DIR, office_pack, office_pack_validate
 from .model import office_gate, office_org, office_role, office_settings
-from .sheet import IND_DIR, dk_pack, dk_pack_validate
+from .sheet import IND_DATA_DIR, IND_DIR, dk_pack, dk_pack_validate, prd_data_packs
 
 PKC_URL = os.environ.get("KALMIDO_PACKS_CATALOG", "").strip()
 PKC_ALLOW_ENV = os.environ.get("KALMIDO_PACKS_ALLOW_HOSTS", "")
@@ -350,6 +350,8 @@ def pkc_codes(kind):
 
 
 def _builtin_path(kind, code):
+    if kind == "industry" and not os.path.isfile(os.path.join(IND_DIR, code + ".json")):  # 2.113.1 (#2252): an own pack of the data folder
+        return os.path.join(IND_DATA_DIR, code + ".json")
     return os.path.join(PACK_DIR, code.lower() + ".json") if kind == "country" else os.path.join(IND_DIR, code + ".json")
 
 
@@ -366,6 +368,8 @@ def _builtin_codes(kind):
         code = pkc_code(kind, f[:-5]) if f.endswith(".json") else None
         if code and _builtin(kind, code):
             out.append(code)
+    if kind == "industry":  # 2.113.1 (#2252): + the own packs of the data folder (a shipped code is refused there)
+        out += [x for x in sorted(prd_data_packs()) if x not in out]
     return out
 
 
@@ -513,8 +517,9 @@ def pkc_packs_extra(c, oid):
         p = dk_pack(code)
         if p:
             inst = b.get(("industry", code))
+            local = not inst and code in prd_data_packs()  # 2.113.1 (#2252): an own pack of the instance
             ind.append({"code": code, "name": p["name"]["de"], "name_en": p["name"]["en"], "version": p["version"],
-                        "badge": inst["badge"] if inst else "verified", "source": "installed" if inst else "builtin"})
+                        "badge": inst["badge"] if inst else "verified", "source": "installed" if inst else "local" if local else "builtin"})
     return country, ind
 
 

@@ -207,9 +207,10 @@ def authenticate():
         return api_authenticate()  # bearer token only (package B)
     if request.path.startswith(("/dav/", "/.well-known/")) or request.path == "/dav":
         return None  # 2.9.0 (#435): CalDAV: HTTP Basic with an app password (dav_login), never a cookie or the proxy header
-    if request.path.startswith(("/api/hooks/git/", "/api/hooks/issues/", "/api/hooks/deploy/")) and request.method == "POST":
+    if request.path.startswith(("/api/hooks/git/", "/api/hooks/issues/", "/api/hooks/deploy/", "/api/hooks/in/")) and request.method == "POST":
         return None  # 2.2.0: inbound Git webhook: no user, no proxy header, the HMAC signature is the credential
         # (2.18.0: also the error-report webhook: the secret token in its URL is the credential; 2.60.0: and the deploy hook)
+        # (2.115.0 A (#2061): and the inbound webhook of a list)
     if request.path.startswith(PUB_PREFIX):
         return None  # public list link: no user; the token in the path is the credential (see "public links")
     c = db()
@@ -228,6 +229,8 @@ def authenticate():
                           (_token_hash(tok), iso(now_utc()))).fetchone()
             if r:
                 g.user, g.auth_via = r, "session"
+                from ..accounts.sessions import ses_touch
+                ses_touch(c, _token_hash(tok))  # 2.115.0 B (#2062): last activity, at most every few minutes
     path = request.path
     if request.method not in ("GET", "HEAD", "OPTIONS") and path.startswith("/api/") \
             and request.headers.get(CSRF_HEADER) != CSRF_VALUE:
@@ -329,8 +332,11 @@ def start_session(c, uid, remember, via="password"):
     tok = secrets.token_urlsafe(32)
     days = SESSION_DAYS if remember else 1
     c.execute("DELETE FROM sessions WHERE expires_at<?", (iso(now_utc()),))
-    c.execute("INSERT INTO sessions(token_hash,user_id,created_at,expires_at,via) VALUES(?,?,?,?,?)",
-              (_token_hash(tok), uid, iso(now_utc()), iso(now_utc() + timedelta(days=days)), via))
+    from flask import has_request_context
+    from ..accounts.sessions import ses_ua  # 2.115.0 B (#2062): last activity + the browser for "Active sessions"
+    c.execute("INSERT INTO sessions(token_hash,user_id,created_at,expires_at,via,last_seen_at,user_agent) VALUES(?,?,?,?,?,?,?)",
+              (_token_hash(tok), uid, iso(now_utc()), iso(now_utc() + timedelta(days=days)), via, iso(now_utc()),
+               ses_ua() if has_request_context() else ""))
     from ..admin.clientip import login_seen
     login_seen(c, uid)  # 2.33.0 (#834): many accounts from one private address = the proxy hides the client addresses
     from flask import has_request_context

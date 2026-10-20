@@ -52,6 +52,25 @@
 .ofcsw{display:inline-block;width:1.25rem;height:1.25rem;border-radius:50%;border:1px solid var(--line2)}
 .ofclogo{max-height:3rem;max-width:12rem;object-fit:contain;background:#fff;border-radius:var(--r-s);padding:.125rem}
 .ofcset .foot{display:flex;align-items:center;gap:.5rem;margin:.75rem 0}
+/* 2.113.0 (#2247): the areas of the settings (the strip of Settings > Administration; settings.css loads lazily) and "Saved" at a field */
+.ofcset .ostsub{display:flex;width:100%;margin:0 0 .875rem;overflow-x:auto;scrollbar-width:none;scroll-padding-inline:.5rem}
+.ofcset .ostsub button{flex:1 0 auto;justify-content:center;white-space:nowrap;min-height:2rem}
+.ofcset .ostp{border:0;margin:0;padding:0;min-width:0}
+.ofcset .ostp>h3:first-child{margin-top:.25rem}
+.ostok{display:inline-flex;align-items:center;gap:.375rem;font-size:var(--fs-s);color:var(--muted);opacity:0}
+.ostok.on{opacity:1}
+.ostok .i{color:var(--ok)}
+.ostok.err{color:var(--danger)}
+.ostok.err .i{color:var(--danger)}
+.ofcset [aria-invalid]{border-color:var(--danger)}
+@media (prefers-reduced-motion:no-preference) { .ostok{transition:opacity .2s} }
+@media (max-width:899px) { .ofcset .ostsub button{flex:none;padding:.25rem .375rem} }
+@media (pointer:coarse) { .ofcset .ostsub button{min-height:2.75rem} }
+/* 2.113.0 (#2246): Switched on / Off with its switch on an industry pack's card */
+.pkc-on{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.375rem;font-size:var(--fs-m)}
+.pkc-on .swl{min-height:2.25rem;cursor:pointer}
+.pkc-on:has(input:checked) .pkc-onst{color:var(--text);font-weight:600}
+@media (pointer:coarse) { .pkc-on .swl{min-height:2.75rem} }
 @media (max-width:599px) {
   .ofcset .row label{min-width:100%}
   .ofcbar .chkl{font-size:var(--fs-s)}
@@ -231,6 +250,30 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .tpmode:has(input:checked){border-color:var(--accent)}
 .tpmode input{margin-top:.2rem;flex:0 0 auto;width:auto}
 .tpmode span{flex:1;text-align:left}  /* 2.114.4 D (#2269) */
+/* 2.113.0 (#2248): parts open in place on the title page; each part has a fixed colour by its place (a mark, not a control) */
+.tpf-c0{--tpf-c:#79a3dc}.tpf-c1{--tpf-c:#4fc1b4}.tpf-c2{--tpf-c:#d6a54a}.tpf-c3{--tpf-c:#e5776e}.tpf-c4{--tpf-c:#6fcf86}.tpf-c5{--tpf-c:#e08fb4}
+:root[data-theme="light"] .tpf-c0{--tpf-c:#3565a8}:root[data-theme="light"] .tpf-c1{--tpf-c:#0f7469}:root[data-theme="light"] .tpf-c2{--tpf-c:#8a5709}:root[data-theme="light"] .tpf-c3{--tpf-c:#b3372f}:root[data-theme="light"] .tpf-c4{--tpf-c:#2b7339}:root[data-theme="light"] .tpf-c5{--tpf-c:#a8336f}
+@media (prefers-color-scheme: light) {
+  :root[data-theme="auto"] .tpf-c0{--tpf-c:#3565a8}:root[data-theme="auto"] .tpf-c1{--tpf-c:#0f7469}:root[data-theme="auto"] .tpf-c2{--tpf-c:#8a5709}:root[data-theme="auto"] .tpf-c3{--tpf-c:#b3372f}:root[data-theme="auto"] .tpf-c4{--tpf-c:#2b7339}:root[data-theme="auto"] .tpf-c5{--tpf-c:#a8336f}
+}
+.tpfdot{flex:0 0 auto;width:.625rem;height:.625rem;border-radius:50%;background:var(--tpf-c,var(--faint))}
+.tplist .tprow[class*="tpf-c"]{border-left:.25rem solid var(--tpf-c)}
+.tplist .tprow{flex-wrap:wrap}
+.tplist .tprow .tpopen{flex:1 1 12rem}
+.tpfchev{flex:0 0 auto;display:inline-flex;color:var(--muted);transition:transform .2s ease}
+.tpfon .tpfchev{transform:rotate(90deg)}
+.tplist .tprow.tpfon{border-color:var(--tpf-c);border-left-width:.25rem;padding:0;overflow:hidden}
+.tpfon>.tpopen{background:color-mix(in srgb,var(--tpf-c) 14%,var(--bg));border-radius:0;padding:.5rem .625rem}
+.tpfon>.tpopen .ofcn b{color:var(--tpf-c)}
+.tpfon>.ofdmv{background:color-mix(in srgb,var(--tpf-c) 14%,var(--bg));align-self:stretch;display:flex;align-items:center;padding-right:.375rem}
+.tpfbox{flex:1 0 100%;min-width:0;padding:.75rem;border-top:1px solid color-mix(in srgb,var(--tpf-c) 40%,var(--line2));animation:tpfin .2s ease-out}
+.tpfkick{flex-basis:100%;color:var(--tpf-c);font-size:var(--fs-s);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.tppl .btn .tpfdot{margin-right:.125rem}
+@keyframes tpfin{from{opacity:0;transform:translateY(-.375rem)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce) {
+  .tpfbox{animation:none}
+  .tpfchev{transition:none}
+}
 @media (max-width:599px) {
   .tplist .tprow{flex-wrap:wrap}
   .tplist .tpopen{flex-basis:100%}
@@ -713,3 +756,6 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 @media (prefers-reduced-motion:reduce){.oim .oimsec::after{transition:none}}
 .oimlink.e a{color:var(--accent)}
 .oimlink a{display:inline-flex;align-items:center;gap:.25rem;min-height:2.75rem}
+/* 2.113.2 (#2253): the terms and conditions rows in the settings */
+.agblist .agbrow{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.375rem 0}
+.agblist .agbrow .ofcn{flex:1 1 12rem;min-width:0}

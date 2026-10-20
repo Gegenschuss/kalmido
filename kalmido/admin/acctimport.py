@@ -589,6 +589,7 @@ UMZ_CHECK = {
     ("habit_logs", "day"): valid_date, ("events", "start"): _iso_ts, ("events", "end"): _iso_ts,
     ("time_entries", "start"): _iso_ts, ("time_entries", "end"): _iso_ts,
 }
+UMZ_CHECK[("tasks", "remind_at")] = valid_plan_start  # 2.111.0 C (#2057): local "YYYY-MM-DDTHH:MM", not a UTC time stamp
 
 
 def umz_fmt(table, k, v):
@@ -630,7 +631,7 @@ def umz_row(c, table, src, fixed, ts):
                 d.pop(k, None)
         if d.get("repeat"):
             rule = rr_norm(d["repeat"])
-            if rr_problem(rule) or (d.get("due") and not rr_feasible(rule, d["due"])):
+            if rr_problem(rule, True) or (d.get("due") and not rr_feasible(rule, d["due"])):
                 d.pop("repeat")
             else:
                 d["repeat"] = rule

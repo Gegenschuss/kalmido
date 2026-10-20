@@ -32,7 +32,7 @@ from ..agents.core import agent_ids, agent_shares, is_agent
 from ..api.v1 import API_PAGE_MAX, cursor_dec, cursor_enc, v1_args, v1_view
 
 ARTS = {"c": 1, "t": 2, "a": 3}
-CHAT_TYPES = ("task", "list", "dm", "agent")
+CHAT_TYPES = ("task", "list", "dm", "agent", "channel", "group")  # 2.113.1 (#2059): + channel, group
 MSG_CAND = 1000          # candidates per kind before the per-row checks
 MSG_TERMS = 8
 SNIP = 160               # characters of a snippet
@@ -197,20 +197,25 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
         rows = c.execute(f"""SELECT m.id, m.room_id, m.user_id, m.body, m.created_at, r.kind, r.list_id, r.a, r.b
             FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
             WHERE {mcond} AND m.deleted_at IS NULL AND m.enc IS NULL AND ((r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN {vis_sql()}
-              AND r.list_id NOT IN (SELECT id FROM lists WHERE e2e IS NOT NULL))){snd}
+              AND r.list_id NOT IN (SELECT id FROM lists WHERE e2e IS NOT NULL))
+              OR (r.kind IN ('channel','group') AND r.id IN (SELECT room_id FROM tchat_members WHERE user_id=?))){snd}
             {' AND m.room_id=?' if room is not None else ''} ORDER BY m.id DESC LIMIT {MSG_CAND}""",
-                         match + [uid, uid, uid, uid] + ([sender] if sender is not None else []) + ([room] if room is not None else [])).fetchall()
-        ok, lnames = {}, {}
+                         match + [uid, uid, uid, uid, uid] + ([sender] if sender is not None else []) + ([room] if room is not None else [])).fetchall()
+        ok, lnames, rrows = {}, {}, {}
         for r in rows:
             if r["room_id"] not in ok:
-                rr = c.execute("SELECT * FROM tchat_rooms WHERE id=?", (r["room_id"],)).fetchone()
-                ok[r["room_id"]] = tchat_room_ok(c, rr, uid) and (r["kind"] == "dm" or role(r["list_id"]) in FULL_ROLES)
+                rr = rrows[r["room_id"]] = c.execute("SELECT * FROM tchat_rooms WHERE id=?", (r["room_id"],)).fetchone()
+                ok[r["room_id"]] = tchat_room_ok(c, rr, uid) and (r["kind"] != "list" or role(r["list_id"]) in FULL_ROLES)  # 2.113.1 (#2059)
             if not ok[r["room_id"]]:
                 continue
-            d = {"art": "t", "chat_type": "dm" if r["kind"] == "dm" else "list", "id": r["id"], "room_id": r["room_id"],
+            d = {"art": "t", "chat_type": r["kind"] if r["kind"] in ("dm", "channel", "group") else "list", "id": r["id"], "room_id": r["room_id"],
                  "sender_id": r["user_id"], "created_at": r["created_at"], "_body": r["body"]}
             if r["kind"] == "dm":
                 d["_other"] = r["b"] if r["a"] == uid else r["a"]
+            elif r["kind"] in ("channel", "group"):  # 2.113.1 (#2059): the conversation's name
+                from ..collab.teamchan import tcx_group_name
+                rr = rrows[r["room_id"]]
+                d["chat_name"] = tcx_group_name(c, rr, uid) if r["kind"] == "group" else rr["name"]
             else:
                 if r["list_id"] not in lnames:
                     lnames[r["list_id"]] = (c.execute("SELECT name FROM lists WHERE id=?", (r["list_id"],)).fetchone() or ["?"])[0]

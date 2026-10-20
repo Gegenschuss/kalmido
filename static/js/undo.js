@@ -13,6 +13,7 @@
 // outbox is taken out of the queue and the local state restored (never sent); otherwise task steps are queued like
 // any other change (the buttons show the pending state). Steps on lists that became view-only refuse.
 const UNDO_FIELDS = ['list_id', 'section_id', 'parent_id', 'due', 'due_time', 'start', 'duration', 'reminders', 'repeat', 'repeat_from', 'priority', 'pinned', 'assignee_id', 'ttype', 'deadline', 'nag', 'assignee_group_id', 'plan_start', 'ms', 'milestone_id', 'locked'];  // 2.18.0: ms, milestone_id (#430)  // 2.11.0: plan_start  // 2.10.0: assignee_group_id  // 2.4.0: ttype (#340), 2.7.0: deadline, nag
+UNDO_FIELDS.push('remind_at');  // 2.111.0 C (#2057): the fixed-time reminder
 const HIST_FIELDS = [...UNDO_FIELDS, 'title', 'content', 'url', 'tags', 'fields'];
 const HIST_MAX = 30, HIST_MENU = 10;
 const HIST = {undo: [], redo: [], busy: false, group: null, gToast: null, toastE: null, sess: 0, ids: {}, secmap: new Map()};
@@ -45,6 +46,7 @@ function reverseOf(before, after, fields = UNDO_FIELDS) {
 }
 // ---- building steps
 function histAdd(e) {
+  if (typeof oun_tag === 'function') oun_tag(e);  // 2.111.0 A (#2233): a table's steps (office_undo.js)
   e.snaps = e.snaps || [];
   const ids = [...new Set([...e.snaps.map(s => s.id), ...(e.ids || [])])];
   if (!e.after) e.after = ids.map(id => snapTask(S.tasks.get(id)) || {id, _gone: true});
@@ -282,7 +284,7 @@ function histLabel(b, a) {
   if (has('plan_start') && !has('due')) return a.plan_start ? tr('Planned {0}', n) : tr('Unplanned {0}', n);  // 2.11.0
   if (has('due') || has('start') || has('due_time')) return a.due ? tr('Date of {0}: {1}', n, dayLabel(a.due)) : tr('Date of {0} removed', n);
   if (has('repeat') || has('repeat_from')) return tr('Repeat of {0}', n);
-  if (has('reminders')) return tr('Reminder of {0}', n);
+  if (has('reminders') || has('remind_at')) return tr('Reminder of {0}', n);  // 2.111.0 C (#2057): + remind_at
   return tr('Edited {0}', n);
 }
 // the few older callers: a toast with "Undo" for a step built above
@@ -329,7 +331,7 @@ async function toggleTask(id) {
   const cs = celeSnap([id]);
   const anim = ui_doneStart(id, doneToggleView() && !showDone());  // 2.49.0 (#1766): line first, then the exit when completed tasks are hidden
   UI.pend.set(id, anim);
-  const call = api('POST', `/api/tasks/${id}/complete`, t.repeat && t.due ? {expect_due: t.due} : undefined);
+  const call = api('POST', `/api/tasks/${id}/complete`, t.repeat && t.due ? {expect_due: t.due, ...(/TIMES=/.test(t.repeat) ? {expect_time: t.due_time || ''} : {})} : undefined);  // 2.116.0 review F2: + the time of a several-times-a-day rule
   anim.api = call.catch(() => {});
   let j; try { j = await call; } catch (x) { anim.cancel(); UI.pend.delete(id); an_rowsBack([id]); throw x; }
   await anim.done; await ui_idle();

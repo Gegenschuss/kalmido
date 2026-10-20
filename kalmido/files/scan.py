@@ -268,7 +268,7 @@ def _sc_file(c, kind, ref_id, ver):
         r = c.execute("""SELECT n.name, v.path, v.size FROM fs_versions v JOIN fs_nodes n ON n.id=v.node_id
                          WHERE v.node_id=? AND v.no=?""", (ref_id, ver)).fetchone()
     else:
-        tbl = {"att": "attachments", "list": "list_files", "chat": "chat_files", "wiki": "wiki_files", "sheet": "sheet_files"}.get(kind)  # 2.99.0 A (#2182); 2.124.0 B (#2110): + sheet
+        tbl = {"att": "attachments", "list": "list_files", "chat": "chat_files", "wiki": "wiki_files", "sheet": "sheet_files", "tchat": "tchat_files"}.get(kind)  # 2.113.1 (#2059): + team chat files  # 2.99.0 A (#2182); 2.124.0 B (#2110): + sheet
         if not tbl:
             return None
         r = c.execute(f"SELECT name, path, size FROM {tbl} WHERE id=?", (ref_id,)).fetchone()
@@ -397,6 +397,9 @@ def _sc_uploader(c, kind, ref_id, ver):
         uid, tid, lid = (r[0] if r else None), None, None
     elif kind in ("wiki", "sheet"):  # 2.99.0 A (#2182): a knowledge page's file -- who stored it; 2.124.0 B (#2110): a table's file
         r = c.execute(f"SELECT created_by FROM {'wiki_files' if kind == 'wiki' else 'sheet_files'} WHERE id=?", (ref_id,)).fetchone()
+        uid, tid, lid = (r[0] if r else None), None, None
+    elif kind == "tchat":  # 2.113.1 (#2059): a team chat file: its uploader
+        r = c.execute("SELECT user_id FROM tchat_files WHERE id=?", (ref_id,)).fetchone()
         uid, tid, lid = (r[0] if r else None), None, None
     else:  # chat: the person of the conversation
         r = c.execute("SELECT m.user_id FROM chat_files f JOIN agent_chat m ON m.id=f.message_id WHERE f.id=?", (ref_id,)).fetchone()

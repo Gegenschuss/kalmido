@@ -227,6 +227,10 @@ def signup_settings(c, b):
         if not isinstance(b["signup_domains"], str):
             return err(tr("Invalid value: {0}", "signup_domains"))
         gset(c, "signup_domains", ", ".join(_domains(b["signup_domains"])))
+    if "org_invites" in b:  # 2.115.0 B (#2062): organisation admins invite new accounts by e-mail
+        if not isinstance(b["org_invites"], bool):
+            return err(tr("Invalid value: {0}", "org_invites"))
+        gset(c, "org_invites", "1" if b["org_invites"] else "0")
     return None
 
 
@@ -234,7 +238,8 @@ def signup_admin(c):
     from ..accounts.orgs import instance_mode
     from ..accounts.orgs import ORG_NAME_ENV
     return {"instance_mode": instance_mode(c), "org_name_env": bool(ORG_NAME_ENV), "has_orgs": om_has_orgs(c), "signup_mode": gsetting(c, "signup_mode") if gsetting(c, "signup_mode") in SIGNUP_MODES else "off",
-            "signup_domains": gsetting(c, "signup_domains"), "signup_effective": signup_mode(c), "mail_out": _mail_on()}
+            "signup_domains": gsetting(c, "signup_domains"), "signup_effective": signup_mode(c), "mail_out": _mail_on(),
+            "org_invites": gsetting(c, "org_invites") != "0"}  # 2.115.0 B (#2062)
 
 
 # ---------------------------------------------------------------- 2.23.0 (#444): sign-in link / QR code

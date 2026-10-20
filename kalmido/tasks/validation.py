@@ -26,6 +26,7 @@ TASK_FIELDS = ("list_id", "section_id", "parent_id", "title", "content", "priori
                "snippets",  # 2.35.0 (#1095): code snippets (JSON list, tasks/snippets.py)
                "locked")  # 2.36.0 (#1118): the lock (1 = the app shows the task read-only, see lock_problem)
 TASK_FIELDS += ("points",)  # 2.60.0 (#1511): story points (POINTS; NULL = none)
+TASK_FIELDS += ("remind_at",)  # 2.111.0 C (#2057): a reminder at a fixed local time (tasks/remindat.py)
 # 2.60.0 (#1511): the allowed story points (Fibonacci); saving is always allowed, only the display follows lists.points_on
 POINTS = (1, 2, 3, 5, 8, 13)
 # 2.4.0 (#340): ticket types of a task (API v1 / MCP / events: "type"); '' = none
@@ -52,6 +53,8 @@ def log_act(c, tid, kind, data=None, uid=None):
         data = {**(data or {}), "rule": rr}
     if via:  # package B: "via API" / "via the public link" in the history
         data = {**(data or {}), "via": via}
+        if via == "webhook":  # 2.115.0 A (#2061): which inbound webhook
+            data["hook"] = g.get("whi_hook")
     if has_request_context():
         wh_note(c, tid, kind)  # webhooks: collected per request, queued after a successful response
         from ..notify.taskbell import tbl_note
@@ -210,19 +213,64 @@ RR_PROBE_DAYS = 3660          # a rule must have a date within ~10 years of its 
 RR_OCC_PER_TASK, RR_OCC_TOTAL, RR_OCC_SECONDS = 120, 5000, 3.0
 
 
+# 2.116.0 D (#2066): "daily at several times" is the own key TIMES=HHMM,HHMM (at most 12, FREQ=DAILY only) -- plain
+# BYHOUR / BYMINUTE would multiply (08:00 + 13:30 would also give 08:30), so the times stay out of the dateutil rule.
+RR_TIMES_MAX = 12
+
+
+def rmd_split(rep):
+    """-> (rule without TIMES, [HH:MM, ...] sorted, or [] when the rule has no TIMES)."""
+    out, times = [], []
+    for p in (rep or "").split(";"):
+        if p.startswith("TIMES="):
+            times = [f"{x[:2]}:{x[2:]}" for x in p[6:].split(",") if re.fullmatch(r"([01]\d|2[0-3])[0-5]\d", x)]
+        else:
+            out.append(p)
+    return ";".join(out), sorted(set(times))
+
+
+def rmd_join(rep, times):
+    """The rule with its times (normalized, sorted); no times = the plain rule."""
+    std = rmd_split(rep)[0]
+    ts = sorted({t.replace(":", "") for t in times})
+    return f"{std};TIMES={','.join(ts)}" if ts else std
+
+
+def rmd_export(rep):
+    """The rule as a standard RRULE for calendars / iCal: TIMES becomes BYHOUR / BYMINUTE when the times form
+    a full grid (hours x minutes), else the plain daily rule (the due time of the task stays the anchor)."""
+    std, times = rmd_split(rep)
+    if not times:
+        return std
+    hs = sorted({int(t[:2]) for t in times})
+    ms = sorted({int(t[3:]) for t in times})
+    if len(hs) * len(ms) != len(times):
+        return std
+    return f"{std};BYHOUR={','.join(map(str, hs))};BYMINUTE={','.join(map(str, ms))}"
+
+
 def rr_norm(rep):
     return (rep or "").strip().removeprefix("RRULE:").strip().rstrip(";") if isinstance(rep, str) else ""
 
 
 @functools.lru_cache(maxsize=4096)
-def rr_problem(rep):
-    """None if the (normalized) rule is acceptable, else an error text. Structural check + parse."""
+def rr_problem(rep, times=False):
+    """None if the (normalized) rule is acceptable, else an error text. Structural check + parse.
+    times: tasks may use TIMES (daily at several times), calendar events may not."""
     from ..calendars.icalfeed import RRULE_OK
     if len(rep) > RR_MAX_LEN or not RRULE_OK.fullmatch(rep):
         return N_("Repeat: invalid rule")
     parts = dict(p.split("=", 1) for p in rep.split(";"))
-    if len(parts) != rep.count(";") + 1 or any(k not in RR_KEYS for k in parts):
+    if len(parts) != rep.count(";") + 1 or any(k not in RR_KEYS + (("TIMES",) if times else ()) for k in parts):
         return N_("Repeat: invalid rule")
+    if "TIMES" in parts:  # 2.116.0 D (#2066)
+        tl = parts["TIMES"].split(",")
+        if parts.get("FREQ") != "DAILY" or not all(re.fullmatch(r"([01]\d|2[0-3])[0-5]\d", x) for x in tl) \
+                or len(set(tl)) != len(tl) or tl != sorted(tl):
+            return N_("Repeat: invalid rule")
+        if len(tl) > RR_TIMES_MAX:
+            return N_("Repeat: at most 12 times a day")
+        rep = rmd_split(rep)[0]
     if parts.get("FREQ") not in RR_FREQS:
         return N_("Repeat: only daily, weekly, monthly or yearly rules")
     if "INTERVAL" in parts and not (parts["INTERVAL"].isdigit() and 1 <= int(parts["INTERVAL"]) <= 999):
@@ -244,8 +292,9 @@ def rr_feasible(rep, d0):
     dateutil scans up to the year 9999 for a rule that never matches (seconds of CPU): the probe runs
     shifted by whole 400-year Gregorian cycles (same weekdays, same calendar) close to 9999, so a rule that
     never matches costs a fraction of a second, once (cached)."""
-    if rr_problem(rep):
+    if rr_problem(rep, True):
         return False
+    rep = rmd_split(rep)[0]
     try:
         d = date.fromisoformat(d0)
         base = ";".join(p for p in rep.split(";") if not p.startswith(("COUNT=", "UNTIL=")))
@@ -264,7 +313,7 @@ def rr_rule(rep, d0):
     if not rep or not valid_date(d0) or not rr_feasible(rep, d0):
         return None
     d = date.fromisoformat(d0)
-    return rrulestr(rep, dtstart=datetime(d.year, d.month, d.day))
+    return rrulestr(rmd_split(rep)[0], dtstart=datetime(d.year, d.month, d.day))
 
 
 def clean_repeat(v):
@@ -273,7 +322,12 @@ def clean_repeat(v):
     if rep is None:
         raise BadInput(tr("Repeat: invalid rule"))
     if rep:
-        e = rr_problem(rep)
+        m = re.search(r"(^|;)TIMES=([^;]*)", rep)
+        if m:  # 2.116.0 D (#2066): the times sorted, without doubles, whatever order the client sent
+            tl = m.group(2).split(",")
+            if len(tl) <= 99 and all(re.fullmatch(r"\d{4}", x) for x in tl):
+                rep = rep[:m.start(2)] + ",".join(sorted(set(tl))) + rep[m.end(2):]
+        e = rr_problem(rep, True)
         if e:
             raise BadInput(tr(e))
     return rep
@@ -368,6 +422,9 @@ def clean_task(b):
                 v = as_int(v, tr("Duration"), 1, DURATION_MAX)
             if k == "reminders":
                 v = clean_reminders(v)
+            if k == "remind_at":  # 2.111.0 C (#2057)
+                from ..tasks.remindat import rat_clean
+                v = rat_clean(v)
             if k == "repeat":
                 v = "" if v is None else clean_repeat(v)
             if k == "repeat_from":

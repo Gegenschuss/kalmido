@@ -147,15 +147,15 @@ jobs:
       - run: semgrep scan --config p/python --config p/flask --config p/javascript --metrics=off --exclude tests --exclude static/vendor app.py kalmido static tools
 
   tests:
-    # 2.2.1: the suites run as parallel shards (2.7.1: 4, 2.15.1: 5, 2.16.0: 6, 2.18.0: 7, 2.30.0: 8, 2.37.1: 9, 2.40.0: 10, 2.80.2: 11, 2.80.3: 12, 2.84.0 + 2.80.3: 13, 2.124.2: 17, tests/run_all.sh --shard N/17, ~15 min each instead of ~60 min in one
+    # 2.2.1: the suites run as parallel shards (2.7.1: 4, 2.15.1: 5, 2.16.0: 6, 2.18.0: 7, 2.30.0: 8, 2.37.1: 9, 2.40.0: 10, 2.80.2: 11, 2.80.3: 12, 2.84.0 + 2.80.3: 13, 2.124.2: 17, 20.10.2026: 19, tests/run_all.sh --shard N/19, ~15 min each instead of ~60 min in one
     # job). fail-fast off: every shard reports its own failures. The job "Test suites" below needs all of them.
-    name: Test suites ${{ matrix.shard }}/17 (API, UI, security)
+    name: Test suites ${{ matrix.shard }}/19 (API, UI, security)
     runs-on: ubuntu-latest
     timeout-minutes: 45  # 2.80.1: four shards ran into the 30 min limit on a slow runner
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -180,13 +180,13 @@ jobs:
         # the shared runners only; a suite red twice stays red
         run: |
           set +e
-          tests/run_all.sh --shard ${{ matrix.shard }}/17 | tee /tmp/run_all.log
+          tests/run_all.sh --shard ${{ matrix.shard }}/19 | tee /tmp/run_all.log
           rc=${PIPESTATUS[0]}
           [ "$rc" -eq 0 ] && exit 0
           failed=$(sed -n 's/^FAILED suites: //p' /tmp/run_all.log | tail -1)
           [ -n "$failed" ] || exit "$rc"
           echo "== rerun of the failed suites: $failed"
-          ONLY="$failed" tests/run_all.sh --shard ${{ matrix.shard }}/17
+          ONLY="$failed" tests/run_all.sh --shard ${{ matrix.shard }}/19
       - name: Container log on failure
         if: failure()
         run: docker logs kalmido-test 2>&1 | tail -100 || true

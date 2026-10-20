@@ -5,6 +5,10 @@
   "name": {"de": "Film & Video", "en": "Film & Video"},
   "part_kind": "shoot",
   "blocks": ["staff", "share", "km", "meals", "hotel", "set", "free"],
+  "calc": {
+    "handling": {"label": {"de": "Handlungskosten", "en": "Handling costs"}, "pct": 4, "on": true},
+    "markup": {"label": {"de": "Markup", "en": "Markup"}, "pct": 10, "on": false, "stacked": false}
+  },
   "defaults": {
     "shoot_days": 1, "travel_days": 0, "travel_share": 1, "prep_days": 0, "prep_share": 1, "nights": 0, "night_rate": 100,
     "meal_large": 28, "meal_small": 14, "sat_days": 0, "sat_pct": 25, "sun_days": 0, "sun_pct": 75,

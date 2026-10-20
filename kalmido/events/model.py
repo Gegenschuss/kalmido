@@ -15,7 +15,7 @@ from ..accounts.session import me
 from ..core.access import acx_org_ok, collab_all, Denied, task_visible
 from ..core.pages import valid_url
 from ..tasks.validation import (
-    as_int, clean_reminders, rr_feasible, rr_norm, rr_problem, valid_date, valid_hm,
+    as_int, clean_reminders, rmd_export, rr_feasible, rr_norm, rr_problem, valid_date, valid_hm,
 )
 from ..collab.comments import user_names
 from ..personal.timetrack import BadInput
@@ -687,6 +687,8 @@ def ev_store(c, uid, cal_id, f, eid=None, uid_=None, href=None, attendees=None, 
     """Creates (eid None) or changes an event with the validated columns f; attendees (list of dicts) replaces them.
     Returns the event id. The caller commits; the data version goes up."""
     ts = iso_ms(now_utc())  # ms: two changes in one second still differ (expect)
+    from ..integrations.webhooks import who_note
+    who_note("event.updated", "event", eid)  # 2.115.0 A (#2061): a change (eid None: does nothing, "event.created" below)
     if eid is None:
         if c.execute("SELECT COUNT(*) FROM events WHERE cal_id=? AND deleted_at IS NULL", (cal_id,)).fetchone()[0] >= EV_PER_CAL:
             raise Denied(409, tr("At most {0} events per calendar", EV_PER_CAL))
@@ -698,6 +700,7 @@ def ev_store(c, uid, cal_id, f, eid=None, uid_=None, href=None, attendees=None, 
                 "reminders": f.get("reminders", ""), "status": f.get("status", "confirmed"), "busy": f.get("busy", 1), "url": f.get("url"),
                 "task_id": f.get("task_id"), "extra": f.get("extra", ""), "created_by": uid, "created_at": ts, "updated_at": ts}
         eid = insert_id(c, f"INSERT INTO events({','.join(map(pgb_col, cols))}) VALUES({','.join('?' * len(cols))})", list(cols.values()))
+        who_note("event.created", "event", eid)
     else:
         f = {k: v for k, v in f.items() if k not in ("id", "uid", "created_by", "created_at")}
         if f:
@@ -783,7 +786,9 @@ def att_clean(c, items, eid=None, cal_id=None):
 def att_set(c, eid, rows, r=None):
     """Replaces the attendees; newly invited people get News + a push; a person's own reply is kept unless given."""
     from ..collab.news import news_add
+    from ..events.invite import evi_keep, evi_restore
     old = {a["user_id"]: a for a in c.execute("SELECT * FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL", (eid,))}
+    keep = evi_keep(c, eid)  # 2.111.0 B (#2056): who got an invitation mail stays marked
     c.execute("DELETE FROM event_attendees WHERE event_id=?", (eid,))
     r = r or c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone()
     actor = me() if has_request_context() else None
@@ -796,6 +801,7 @@ def att_set(c, eid, rows, r=None):
             news_add(c, a["user_id"], "evinvite", data={"event_id": eid, "title": r["title"][:200], "start": r["start"],
                                                          "all_day": bool(r["all_day"])}, row="assign")
             invite_push(c, a["user_id"], r)
+    evi_restore(c, eid, keep)
 
 
 def invite_push(c, uid, r):
@@ -825,6 +831,8 @@ def when_text(r, lg=None, occ=None):
 
 def ev_delete(c, r):
     c.execute("UPDATE events SET deleted_at=?, updated_at=? WHERE id=?", (iso(now_utc()), iso_ms(now_utc()), r["id"]))
+    from ..integrations.webhooks import who_note
+    who_note("event.deleted", "event", r["id"])  # 2.115.0 A (#2061)
     cal_touch(c, r["cal_id"])
     bump(c)
 
@@ -953,7 +961,7 @@ def migrate_family_events(c):
         else:
             d = date.fromisoformat(t["due"])
             f = {"all_day": 1, "start": d.isoformat(), "end": (d + timedelta(days=1)).isoformat()}
-        rule = rr_norm(t["repeat"] or "")
+        rule = rmd_export(rr_norm(t["repeat"] or ""))  # 2.116.0 D (#2066)
         f.update({"title": t["title"][:EV_TITLE_MAX], "description": (t["content"] or "")[:EV_DESC_MAX], "location": "",
                   "rrule": rule if rule and not rr_problem(rule) and rr_feasible(rule, t["due"]) else "",
                   "reminders": t["reminders"] or "", "task_id": t["id"], "url": t["url"]})

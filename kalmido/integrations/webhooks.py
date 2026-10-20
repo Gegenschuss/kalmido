@@ -46,6 +46,14 @@ from ..api.v1 import act_via, task_core, task_for, WH_ON
 # connecting); hosts on the admin allow-list (Settings > Users > Whole server) or in KALMIDO_WEBHOOK_ALLOW_HOSTS may be
 # internal, and only those may use http://. The secret is stored encrypted and shown once. KALMIDO_WEBHOOKS=0: off.
 WH_EVENTS = ("task.created", "task.updated", "task.completed", "task.reopened", "task.deleted", "comment.created", "list.shared")
+# 2.115.0 A (#2061): webhooks of an organisation (webhooks.org_id, its admins manage them: Settings > Workspaces) get the events
+# of everything the organisation owns -- never of the members' private areas; the person who set it up (user_id) must still
+# be an admin of it, else the webhook turns itself off (disabled_reason 'admin'). A personal webhook (org_id NULL) works as
+# before; the new events below reach it only from its owner's private area (no organisation needed: P4). Objects outside
+# tasks are noted per request (who_note) and built once per object at queueing time (who_obj): scope = the organisation
+# that owns it, else the person whose private area it is.
+WH_EVENTS += ("event.created", "event.updated", "event.deleted", "file.created", "invoice.created", "invoice.sent", "invoice.paid",
+              "time.created")
 WH_ALLOW_ENV = os.environ.get("KALMIDO_WEBHOOK_ALLOW_HOSTS", "")
 try:  # seconds before retry 1, 2, ... (tests shorten them); the webhook is turned off when the last one fails too
     WH_BACKOFF = [max(1, int(x)) for x in os.environ.get("KALMIDO_WEBHOOK_BACKOFF", "").split(",") if x.strip()] or [60, 300, 1800, 7200]
@@ -54,7 +62,7 @@ except ValueError:
 WH_TICK = _env_int("KALMIDO_WEBHOOK_TICK", 5)
 WH_TIMEOUT = 10
 WH_READ_MAX = 4096
-WH_MAX = 10              # per user
+WH_MAX = 10              # per user (2.115.0 A: and per organisation)
 WH_LOG_KEEP = 50         # delivery log rows per webhook
 WH_QUEUE_MAX = 500       # pending deliveries per webhook (more are dropped and logged)
 WH_BATCH = 20            # deliveries per tick
@@ -201,16 +209,22 @@ def wh_actor(c):
 def wh_enqueue(c, n):
     hooks = c.execute("""SELECT w.* FROM webhooks w JOIN users u ON u.id=w.user_id
                          WHERE w.enabled=1 AND u.disabled=0 AND w.agent=0 ORDER BY w.id""").fetchall()
+    hooks = who_admin_ok(c, hooks)  # 2.115.0 A (#2061): an organisation's webhook only while its creator is an admin there
     if not hooks:
         return
     actor, via = wh_actor(c), act_via() or "web"
-    lists, settings = {}, {}
+    lists, settings, orgs = {}, {}, {}
 
     def lst(lid):
         if lid not in lists:
-            r = c.execute("SELECT id, name, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
+            r = c.execute("SELECT id, name, is_inbox, org_id FROM lists WHERE id=?", (lid,)).fetchone()
             lists[lid] = {"id": lid, "name": tr("Basket") if r and r["is_inbox"] and inbox_default(r["name"]) else (r["name"] if r else "")}
+            orgs[lid] = r["org_id"] if r else None
         return lists[lid]
+
+    def org_ok(w, lid):  # 2.115.0 A (#2061): an organisation's webhook only for lists of that organisation
+        lst(lid)
+        return not w["org_id"] or orgs.get(lid) == w["org_id"]
 
     def sett(uid):
         if uid not in settings:
@@ -230,7 +244,7 @@ def wh_enqueue(c, n):
                 evs = [x for x in evs if x != "task.updated"]
             for w in hooks:
                 want = [x for x in evs if x in w["events"].split(",")]
-                if not want or not list_role(c, lid, w["user_id"]):
+                if not want or not org_ok(w, lid) or not list_role(c, lid, w["user_id"]):
                     continue
                 # 1.10.0: a participant's webhooks only fire for their own tasks (never for context parents)
                 sees = task_visible(c, tid, w["user_id"], full=True) if row else \
@@ -257,14 +271,106 @@ def wh_enqueue(c, n):
         elif key[0] == "list":
             _, lid, ev, member = key
             for w in hooks:
-                if ev not in w["events"].split(",") or not list_role(c, lid, w["user_id"]):
+                if ev not in w["events"].split(",") or not org_ok(w, lid) or not list_role(c, lid, w["user_id"]):
                     continue
-                if w["user_id"] not in (member, (c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone() or [None])[0]):
-                    continue  # list.shared: the owner and the person it was shared with
+                if not w["org_id"] and w["user_id"] not in (member, (c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone() or [None])[0]):
+                    continue  # list.shared: the owner and the person it was shared with (an organisation's webhook: every list of it)
                 data = {"list": lst(lid), "member": {"id": member, "name": user_names(c, [member]).get(member, "")},
                         "role": n[key].get("role")}
                 wh_queue(c, w, ev, data, actor, via)
+        elif key[0] == "obj":  # 2.115.0 A (#2061): calendar events, files, invoices, time entries
+            _, ev, kind, oid_ = key
+            if ev == "event.updated" and (("obj", "event.created", kind, oid_) in n or ("obj", "event.deleted", kind, oid_) in n):
+                continue  # one event per object and request: created / deleted wins over changed
+            if not any(ev in w["events"].split(",") for w in hooks):
+                continue
+            o = who_obj(c, kind, oid_, ev)
+            if not o:
+                continue
+            scope, owner, data = o
+            for w in hooks:
+                if ev not in w["events"].split(","):
+                    continue
+                if (w["org_id"] and scope == w["org_id"]) or (not w["org_id"] and scope is None and owner == w["user_id"]):
+                    if kind == "event" and w["org_id"] and not who_cal_sees(c, w["user_id"], data["calendar"]["id"]):
+                        continue  # 2.115.0 review (M3): an organisation calendar its admin is no member of stays out, like tasks
+                    wh_queue(c, w, ev, data, actor, via)
     c.commit()
+
+
+def who_cal_sees(c, uid, cal_id):
+    """2.115.0 review (M3): the admin who owns an organisation's webhook sees this calendar (owner or member, ev_role)."""
+    from ..core.pg import system_ctx
+    from ..events.model import ev_role
+    with system_ctx(c):  # structure: the calendar row and its members, read for the webhook's owner, not the actor
+        cal = c.execute("SELECT * FROM ev_cals WHERE id=?", (cal_id,)).fetchone()
+        return bool(ev_role(c, uid, cal))
+
+
+def who_note(event, kind, oid):
+    """2.115.0 A (#2061): an event of a calendar event / file / invoice / time entry (kind event | file | invoice | time),
+    collected while the request runs and queued after it succeeded (built then by who_obj)."""
+    if WH_ON and has_request_context() and oid:
+        g.setdefault("wh", {})[("obj", event, kind, int(oid))] = True
+
+
+def who_obj(c, kind, oid, event):
+    """(scope organisation | None, owner of the private area, payload data) of an object, None when it is gone.
+    The payload is short and never carries secrets (no bank data, no tokens, no descriptions or notes)."""
+    from ..office.model import pb_owner
+    if kind == "event":
+        r = c.execute("""SELECT e.id, e.title, e.location, e.all_day, e.start, e."end", e.status, e.deleted_at, e.cal_id, k.name AS cal_name,
+                         k.org_id, k.owner_id FROM events e JOIN ev_cals k ON k.id=e.cal_id WHERE e.id=?""", (oid,)).fetchone()
+        if not r:
+            return None
+        return r["org_id"], r["owner_id"], {"event": {"id": r["id"], "title": r["title"], "location": r["location"], "all_day": bool(r["all_day"]),
+                                                       "start": r["start"], "end": r["end"], "status": r["status"],
+                                                       "deleted": bool(r["deleted_at"])}, "calendar": {"id": r["cal_id"], "name": r["cal_name"]}}
+    if kind == "file":
+        r = c.execute("SELECT id, kind, name, mime, size, parent_id, owner_id, org_id, created_at FROM fs_nodes WHERE id=?", (oid,)).fetchone()
+        if not r or r["kind"] != "file":
+            return None
+        return r["org_id"], r["owner_id"], {"file": {"id": r["id"], "name": r["name"], "mime": r["mime"] or "", "size": r["size"] or 0,
+                                                     "folder_id": r["parent_id"], "created_at": r["created_at"]}}
+    if kind == "invoice":
+        r = c.execute("SELECT id, org_id, kind, number, status, date, currency, client_id, totals, sent_at, paid_at FROM office_docs WHERE id=?",
+                      (oid,)).fetchone()
+        if not r or r["kind"] not in ("invoice", "credit"):
+            return None
+        try:
+            t = json.loads(r["totals"] or "{}")
+        except ValueError:
+            t = {}
+        own = pb_owner(c, r["org_id"])  # a personal office is its owner's private area
+        return (None if own else r["org_id"]), own, {"invoice": {
+            "id": r["id"], "kind": r["kind"], "number": r["number"], "status": r["status"], "date": r["date"], "currency": r["currency"],
+            "net": str(t.get("net") or "0"), "gross": str(t.get("gross") or "0"), "client_id": r["client_id"], "sent_at": r["sent_at"],
+            "paid_at": r["paid_at"]}}
+    if kind == "time":
+        r = c.execute("""SELECT t.id, t.user_id, t.task_id, t.list_id, t.start, t."end", t.seconds, t.source, l.org_id, l.life
+                         FROM time_entries t LEFT JOIN lists l ON l.id=t.list_id WHERE t.id=?""", (oid,)).fetchone()
+        if not r or r["life"] in ("health", "budget"):
+            return None
+        d = {"time": {"id": r["id"], "user_id": r["user_id"], "task_id": r["task_id"], "start": r["start"], "end": r["end"],
+                      "seconds": r["seconds"], "source": r["source"]}}
+        if r["list_id"]:
+            n = c.execute("SELECT name FROM lists WHERE id=?", (r["list_id"],)).fetchone()
+            d["list"] = {"id": r["list_id"], "name": n["name"] if n else ""}
+        return r["org_id"], r["user_id"], d
+    return None
+
+
+def who_admin_ok(c, hooks):
+    """The hooks whose organisation (if any) still has their creator as an admin; the others are turned off ('admin')."""
+    from ..accounts.orgs import org_role
+    out = []
+    for w in hooks:
+        if w["org_id"] and org_role(c, w["user_id"], w["org_id"]) != "admin":
+            c.execute("DELETE FROM webhook_queue WHERE webhook_id=?", (w["id"],))
+            c.execute("UPDATE webhooks SET enabled=0, disabled_reason='admin', updated_at=? WHERE id=?", (iso(now_utc()), w["id"]))
+            continue
+        out.append(w)
+    return out
 
 
 def wh_queue(c, w, event, data, actor, via):
@@ -353,9 +459,19 @@ def wh_loop():
             aa_count("watchdog", f"webhooks|{type(e).__name__}", "tick")
 
 
-# ---- settings API (Settings > Integrations > Webhooks)
-def need_webhook(c, wid):
-    r = c.execute("SELECT * FROM webhooks WHERE id=? AND user_id=? AND agent=0", (wid, me())).fetchone()
+# ---- settings API (Settings > Integrations > Webhooks; 2.115.0 A (#2061): Settings > Workspaces > an organisation > Webhooks)
+# The same code for both: oid None = the person's own webhooks (/api/me/webhooks), else the organisation's (/api/orgs/<oid>/webhooks,
+# its admins only: every admin manages all of them; switching one on again makes that admin its owner).
+def who_need_admin(oid):
+    from ..accounts.orgs import _need_org_admin
+    _need_org_admin(db(), oid)
+
+
+def need_webhook(c, wid, oid=None):
+    if oid:
+        r = c.execute("SELECT * FROM webhooks WHERE id=? AND org_id=? AND agent=0", (wid, oid)).fetchone()
+    else:
+        r = c.execute("SELECT * FROM webhooks WHERE id=? AND user_id=? AND agent=0 AND org_id IS NULL", (wid, me())).fetchone()
     if not r:
         raise Denied(404)
     return r
@@ -391,71 +507,69 @@ def wh_fields(c, b, old=None):
     return out
 
 
-@app.get("/api/me/webhooks")
-def webhooks_list():
+def wh_scope_rows(c, oid):
+    if oid:
+        return c.execute("SELECT * FROM webhooks WHERE org_id=? AND agent=0 ORDER BY id", (oid,)).fetchall()
+    return c.execute("SELECT * FROM webhooks WHERE user_id=? AND agent=0 AND org_id IS NULL ORDER BY id", (me(),)).fetchall()
+
+
+def wh_list_do(oid=None):
     c = db()
-    return jsonify(enabled=WH_ON, events=list(WH_EVENTS), backoff=WH_BACKOFF,
-                   hooks=[wh_public(c, r) for r in c.execute("SELECT * FROM webhooks WHERE user_id=? AND agent=0 ORDER BY id", (me(),))])
+    return jsonify(enabled=WH_ON, events=list(WH_EVENTS), backoff=WH_BACKOFF, hooks=[wh_public(c, r) for r in wh_scope_rows(c, oid)])
 
 
-@app.post("/api/me/webhooks")
-def webhook_create():
-    """{name, url, events: [...]} -> the webhook + its signing secret (shown this once)."""
+def wh_create_do(oid=None):
     need_wh()
     c = db()
     f = wh_fields(c, body())
-    if c.execute("SELECT COUNT(*) FROM webhooks WHERE user_id=? AND agent=0", (me(),)).fetchone()[0] >= WH_MAX:
+    if len(wh_scope_rows(c, oid)) >= WH_MAX:
         return err(tr("At most {0} webhooks", WH_MAX), 409)
     ts, secret = iso(now_utc()), "whsec_" + secrets.token_urlsafe(32)
-    wid = insert_id(c, "INSERT INTO webhooks(user_id,name,url,events,secret,enabled,created_at,updated_at) VALUES(?,?,?,?,'',?,?,?)",
-                    (me(), f["name"], f["url"], f["events"], f.get("enabled", 1), ts, ts))
+    wid = insert_id(c, "INSERT INTO webhooks(user_id,name,url,events,secret,enabled,created_at,updated_at,org_id) VALUES(?,?,?,?,'',?,?,?,?)",
+                    (me(), f["name"], f["url"], f["events"], f.get("enabled", 1), ts, ts, oid))
     c.execute("UPDATE webhooks SET secret=? WHERE id=?", (seal(c, f"webhook:{wid}", secret), wid))
     c.commit()
-    return jsonify({**wh_public(c, need_webhook(c, wid)), "secret": secret}), 201
+    return jsonify({**wh_public(c, need_webhook(c, wid, oid)), "secret": secret}), 201
 
 
-@app.patch("/api/me/webhooks/<int:wid>")
-def webhook_update(wid):
+def wh_update_do(wid, oid=None):
     need_wh()
     c = db()
-    need_webhook(c, wid)
+    need_webhook(c, wid, oid)
     f = wh_fields(c, body(), old=True)
     if f:
         f["updated_at"] = iso(now_utc())
+        if oid and f.get("enabled") == 1:
+            f["user_id"] = me()  # the admin who switches it on owns it from now on (their admin role is checked per event)
         c.execute(f"UPDATE webhooks SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), wid])
         if f.get("enabled") == 0:
             c.execute("DELETE FROM webhook_queue WHERE webhook_id=?", (wid,))
         c.commit()
-    return jsonify(wh_public(c, need_webhook(c, wid)))
+    return jsonify(wh_public(c, need_webhook(c, wid, oid)))
 
 
-@app.delete("/api/me/webhooks/<int:wid>")
-def webhook_delete(wid):
+def wh_delete_do(wid, oid=None):
     c = db()
-    need_webhook(c, wid)
+    need_webhook(c, wid, oid)
     c.execute("DELETE FROM webhooks WHERE id=?", (wid,))
     c.commit()
     return jsonify(ok=True)
 
 
-@app.post("/api/me/webhooks/<int:wid>/secret")
-def webhook_secret(wid):
-    """A new signing secret (the old one stops at once); shown this once."""
+def wh_secret_do(wid, oid=None):
     need_wh()
     c = db()
-    need_webhook(c, wid)
+    need_webhook(c, wid, oid)
     secret = "whsec_" + secrets.token_urlsafe(32)
     c.execute("UPDATE webhooks SET secret=?, updated_at=? WHERE id=?", (seal(c, f"webhook:{wid}", secret), iso(now_utc()), wid))
     c.commit()
     return jsonify(secret=secret)
 
 
-@app.post("/api/me/webhooks/<int:wid>/test")
-def webhook_test(wid):
-    """Sends a "ping" event right now (no retries) and answers with the result; it shows in the delivery log."""
+def wh_test_do(wid, oid=None):
     need_wh()
     c = db()
-    w = need_webhook(c, wid)
+    w = need_webhook(c, wid, oid)
     keys = [(f"whtest:{me()}", WH_TEST_LIMIT)]
     if _rate_blocked(keys):
         return err(tr("Too many tests, please wait a few minutes"), 429)
@@ -470,11 +584,91 @@ def webhook_test(wid):
     return jsonify(ok=ok, status=status, ms=ms, error=errc, error_text=wh_err_text(errc, status) if errc else "")
 
 
-@app.get("/api/me/webhooks/<int:wid>/log")
-def webhook_log(wid):
+def wh_log_do(wid, oid=None):
     c = db()
-    need_webhook(c, wid)
+    need_webhook(c, wid, oid)
     return jsonify(items=[{"delivery": r["delivery"], "event": r["event"], "attempt": r["attempt"], "ok": bool(r["ok"]),
                            "status": r["status"], "error": r["error"], "error_text": wh_err_text(r["error"], r["status"]) if r["error"] else "",
                            "ms": r["ms"], "created_at": r["created_at"]}
                           for r in c.execute("SELECT * FROM webhook_log WHERE webhook_id=? ORDER BY id DESC LIMIT ?", (wid, WH_LOG_KEEP))])
+
+
+@app.get("/api/me/webhooks")
+def webhooks_list():
+    return wh_list_do()
+
+
+@app.post("/api/me/webhooks")
+def webhook_create():
+    """{name, url, events: [...]} -> the webhook + its signing secret (shown this once)."""
+    return wh_create_do()
+
+
+@app.patch("/api/me/webhooks/<int:wid>")
+def webhook_update(wid):
+    return wh_update_do(wid)
+
+
+@app.delete("/api/me/webhooks/<int:wid>")
+def webhook_delete(wid):
+    return wh_delete_do(wid)
+
+
+@app.post("/api/me/webhooks/<int:wid>/secret")
+def webhook_secret(wid):
+    """A new signing secret (the old one stops at once); shown this once."""
+    return wh_secret_do(wid)
+
+
+@app.post("/api/me/webhooks/<int:wid>/test")
+def webhook_test(wid):
+    """Sends a "ping" event right now (no retries) and answers with the result; it shows in the delivery log."""
+    return wh_test_do(wid)
+
+
+@app.get("/api/me/webhooks/<int:wid>/log")
+def webhook_log(wid):
+    return wh_log_do(wid)
+
+
+# 2.115.0 A (#2061): the webhooks of an organisation (its admins; never agents)
+@app.get("/api/orgs/<int:oid>/webhooks")
+def who_list(oid):
+    who_need_admin(oid)
+    return wh_list_do(oid)
+
+
+@app.post("/api/orgs/<int:oid>/webhooks")
+def who_create(oid):
+    who_need_admin(oid)
+    return wh_create_do(oid)
+
+
+@app.patch("/api/orgs/<int:oid>/webhooks/<int:wid>")
+def who_update(oid, wid):
+    who_need_admin(oid)
+    return wh_update_do(wid, oid)
+
+
+@app.delete("/api/orgs/<int:oid>/webhooks/<int:wid>")
+def who_delete(oid, wid):
+    who_need_admin(oid)
+    return wh_delete_do(wid, oid)
+
+
+@app.post("/api/orgs/<int:oid>/webhooks/<int:wid>/secret")
+def who_secret(oid, wid):
+    who_need_admin(oid)
+    return wh_secret_do(wid, oid)
+
+
+@app.post("/api/orgs/<int:oid>/webhooks/<int:wid>/test")
+def who_test(oid, wid):
+    who_need_admin(oid)
+    return wh_test_do(wid, oid)
+
+
+@app.get("/api/orgs/<int:oid>/webhooks/<int:wid>/log")
+def who_log(oid, wid):
+    who_need_admin(oid)
+    return wh_log_do(wid, oid)

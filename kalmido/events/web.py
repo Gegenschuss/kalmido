@@ -17,6 +17,7 @@ from ..events.model import (
     wall,
 )
 from ..events.ics import ics_export
+from ..events.invite import evi_after_delete, evi_after_restore, evi_after_save, evi_cal_cancel, evi_estimate, evi_flag, evi_precheck, evi_send, evi_snap
 
 
 def _unknown(b, allowed):
@@ -67,9 +68,11 @@ def op_cal_edit(c, uid, cid, b):
 
 def op_cal_delete(c, uid, cid):
     need_evcal(c, cid, manage=True)
+    mails = evi_cal_cancel(c, uid, cid)  # 2.111.0 B (#2056): its invited external attendees learn the events are gone
     c.execute("DELETE FROM ev_cals WHERE id=?", (cid,))
     bump(c)
     c.commit()
+    evi_send(mails)
 
 
 def op_member_set(c, uid, cid, b):
@@ -111,22 +114,31 @@ def op_event(c, uid, eid):
 
 
 def op_event_new(c, uid, b):
+    send = evi_flag(b)  # 2.111.0 B (#2056): send_invites = invitation mails to the external attendees
     _unknown(b, EV_KEYS)
     cid = b.get("cal_id")
     cid = as_int(cid, "cal_id", 1) if cid not in (None, "") else default_cal(c, uid)
     need_evcal(c, cid, write=True)
+    if send:
+        evi_precheck(c, uid, evi_estimate(c, b))
     f = ev_fields(c, uid, b)
     att = att_clean(c, b["attendees"], cal_id=cid) if "attendees" in b else None
     eid = ev_store(c, uid, cid, f, attendees=att)
     c.commit()
+    evi_after_save(c, uid, eid, None, send)
     return ev_dict(c, c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone(), uid)
 
 
 def op_event_edit(c, uid, eid, b, occ=None):
+    send = evi_flag(b)  # 2.111.0 B (#2056)
     r, role = need_event(c, eid, write=True)
+    snap = evi_snap(c, eid)
+    if send:
+        evi_precheck(c, uid, evi_estimate(c, b, eid))
     if occ:
         ev_occ_change(c, r, occ, b)
         c.commit()
+        evi_after_save(c, uid, eid, snap, send, only_invited=True)
         return ev_dict(c, c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone(), uid)
     _unknown(b, EV_KEYS + ("expect",))
     if b.get("expect") and b["expect"] != r["updated_at"]:  # the editor's copy is older: refuse instead of overwriting
@@ -151,16 +163,22 @@ def op_event_edit(c, uid, eid, b, occ=None):
     att = att_clean(c, b["attendees"], eid, r["cal_id"]) if "attendees" in b else None
     ev_store(c, uid, r["cal_id"], f, eid=eid, attendees=att)
     c.commit()
+    evi_after_save(c, uid, eid, snap, send)
     return ev_dict(c, c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone(), uid)
 
 
 def op_event_delete(c, uid, eid, occ=None):
     r, role = need_event(c, eid, write=True)
+    snap = evi_snap(c, eid)
     if occ:
         ev_occ_change(c, r, occ, {"delete": True})
     else:
         ev_delete(c, r)
     c.commit()
+    if occ:  # 2.111.0 B (#2056): who got an invitation gets the series without that date / a cancellation
+        evi_after_save(c, uid, eid, snap, True, only_invited=True)
+    else:
+        evi_after_delete(c, uid, eid)
 
 
 def op_event_restore(c, uid, eid):
@@ -169,6 +187,7 @@ def op_event_restore(c, uid, eid):
     cal_touch(c, r["cal_id"])
     bump(c)
     c.commit()
+    evi_after_restore(c, uid, eid)  # 2.111.0 B (#2056): the cancelled attendees are invited again
     return ev_dict(c, c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone(), uid)
 
 

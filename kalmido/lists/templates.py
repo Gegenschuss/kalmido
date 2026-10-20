@@ -103,7 +103,7 @@ def tpl_clean_node(n, depth, count):
     due_off = num("due_offset", 0, 3650)
     due_time = n.get("due_time") if isinstance(n.get("due_time"), str) and HHMM_RE.fullmatch(n.get("due_time")) else None
     rep = rr_norm(str(n.get("repeat") or ""))
-    if rep and rr_problem(rep):
+    if rep and rr_problem(rep, True):  # 2.116.0 review F4: a template keeps a several-times-a-day rule
         rep = ""
     rems = []
     for x in str(n.get("reminders") or "").split(","):  # keeps the valid offsets
@@ -454,7 +454,7 @@ def tpl_insert(c, n, lid, sec, parent, base, sort, uid, fmap=None, scale=1.0, ma
             f["snippets"] = snip_clean(n["snippets"])
         except Exception:  # noqa: BLE001 -- a broken template node simply has no snippets
             pass
-    if f["repeat"] and (rr_problem(rr_norm(f["repeat"])) or not rr_feasible(rr_norm(f["repeat"]), due)):
+    if f["repeat"] and (rr_problem(rr_norm(f["repeat"]), True) or not rr_feasible(rr_norm(f["repeat"]), due)):
         f["repeat"] = ""
     ts = iso(now_utc())
     cols = list(f) + ["created_at", "updated_at"]

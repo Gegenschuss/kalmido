@@ -127,6 +127,14 @@ CHECKS = {
                   "AND s.state='open' AND s.revoked_at IS NULL))"),  # 2.122.4 A (#2215 L3): a moved review keeps its old (closed) records
     "gen_doc_signoff": ("SELECT s.id, s.created_by FROM office_signoffs s JOIN office_gen_docs d ON d.id=s.gen_doc_id WHERE d.org_id IS DISTINCT FROM s.org_id"),
     "pay_prop": ("SELECT p.id, p.agent_id FROM office_pay_props p JOIN office_docs d ON d.id=p.doc_id WHERE d.org_id IS DISTINCT FROM p.org_id"),
+    # 2.113.1 B (#2059): a member of an organisation's team chat channel who is not (any more) in it, an agent of another
+    # workspace in a channel or a personal agent whose owner is not in it (the read layer ignores them: collab/teamchan.py
+    # tcx_members; boundary_repair takes the person out)
+    "tchat_person": ("SELECT m.room_id, m.user_id FROM tchat_members m JOIN tchat_rooms r ON r.id=m.room_id JOIN users u ON u.id=m.user_id "
+                     "WHERE r.org_id IS NOT NULL AND " + _PERSON.format(o="r", m="m")),
+    "tchat_agent": ("SELECT m.room_id, m.user_id FROM tchat_members m JOIN tchat_rooms r ON r.id=m.room_id JOIN agents a ON a.user_id=m.user_id "
+                    "WHERE COALESCE(a.org_id,0)!=COALESCE(r.org_id,0) OR (a.owner_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM tchat_members x "
+                    "WHERE x.room_id=m.room_id AND x.user_id=a.owner_id))"),  # 2.113.1 (#2059): + a personal agent whose owner is not in it
     # an agent of an organisation that is gone, or a personal agent working in an organisation its owner is not in
     "agent": ("SELECT a.user_id, a.owner_id FROM agents a WHERE a.org_id IS NOT NULL AND (NOT EXISTS (SELECT 1 FROM orgs o WHERE o.id=a.org_id) "
               "OR (a.owner_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=a.org_id AND om.user_id=a.owner_id)))"),
@@ -178,6 +186,10 @@ CHECKS = {
                        "JOIN lists x ON x.id=k.list_id WHERE o.org_id IS DISTINCT FROM x.org_id OR k.org_id IS DISTINCT FROM x.org_id"),
     # 2.71.0 A (#1457): a rule in another workspace than its list, or whose move goes into a list of another workspace (it
     # pauses itself when it runs: lists/rules.py rul_target_ok)
+    # 2.115.0 A (#2061): an organisation's webhook (switched on) whose owner is no admin of it any more (it turns itself off at the
+    # next event: integrations/webhooks.py who_admin_ok; counted only) -- (webhook, its owner)
+    "org_webhook": ("SELECT w.id, w.user_id FROM webhooks w WHERE w.org_id IS NOT NULL AND w.enabled=1 AND NOT EXISTS "
+                    "(SELECT 1 FROM org_members om WHERE om.org_id=w.org_id AND om.user_id=w.user_id AND om.role='admin')"),
     "list_rule": ("SELECT r.id, r.created_by FROM list_rules r JOIN lists l ON l.id=r.list_id LEFT JOIN lists t ON t.id=r.target_list_id "
                   "WHERE r.deleted_at IS NULL AND (r.org_id IS DISTINCT FROM l.org_id OR (t.id IS NOT NULL AND t.org_id IS DISTINCT FROM l.org_id))"),
     # 2.75.0 A (#1411): a list of an organisation shared with the built-in assistant by a person outside it, or by an agent
@@ -226,6 +238,9 @@ CHECKS = {
     # membership: life/bookmarks.py bm_get; counted only) -- (bookmark, owner)
     "bookmark_owner": ("SELECT b.id, b.user_id FROM bookmarks b JOIN users u ON u.id=b.user_id WHERE b.org_id IS NOT NULL AND "
                        "b.deleted_at IS NULL AND (u.kind='agent' OR " + _PERSON.format(o="b", m="b") + ")"),
+    # 2.112.1 B (#2058): an external share link whose workspace is not its node's (the page refuses it: files/extlinks.py
+    # xl_find; counted only) -- (link, creator)
+    "file_ext_link": ("SELECT x.id, x.created_by FROM fs_ext_links x JOIN fs_nodes n ON n.id=x.node_id WHERE x.org_id IS DISTINCT FROM n.org_id"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 
@@ -257,7 +272,8 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
           "task_bell_person": ("task_bell", "task_id"),  # 2.53.0 C (#1424)
           "assistant_person": ("assistant_access", "list_id"),  # 2.75.0 A (#1411)
           "hub_token_person": ("hub_tokens", "org_id"),  # 2.84.0 A (#1198)
-          "sheet_share_person": ("sheet_shares", "sheet_id")}  # 2.124.0 C (#2113)
+          "sheet_share_person": ("sheet_shares", "sheet_id"),  # 2.124.0 C (#2113)
+          "tchat_person": ("tchat_members", "room_id")}  # 2.113.1 B (#2059)
 TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Administration > Organisations")
 
 

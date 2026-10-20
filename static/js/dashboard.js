@@ -454,6 +454,7 @@ document.addEventListener('submit', async e => {
   const body = {title: r.title.slice(0, 500), due: r.due || today(), due_time: r.due_time, priority: r.priority ?? 0, tags: r.tags || [], repeat: r.repeat || ''};
   if (r.list_id) body.list_id = r.list_id;  // else the server takes the basket
   if (body.due_time && S.settings.default_reminder !== '') body.reminders = S.settings.default_reminder;
+  qa2_body(r, body);  // 2.111.0 C (#2057)
   inp.value = '';
   try { await createTask(body); } catch { const i = $('#hp-add'); if (i && !i.value) i.value = txt; return; }  // api() said it; createTask = one undo step
   $('#hp-add')?.focus();

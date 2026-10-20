@@ -49,7 +49,7 @@ function oa_flagHtml(it, i) {
 const oa_docBanner = d => d.agent_name ? `<div class="oa_by shint keep">${ic('bot', 's')} ${esc(tr('Drafted by the agent {0}', d.agent_name))}${(d.items || []).some(it => it.agent_flag) ? ' · ' + esc(tr('marked positions need your look')) : ''}${d.list_name ? ` · ${esc(tr('Project'))}: <a href="#l/${+d.list_id}">${esc(d.list_name)}</a>` : ''}</div>` : '';
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-oa="confirm"]'); if (!b || typeof OFD === 'undefined' || !OFD.doc) return;
-  const it = (OFD.doc.items || [])[+b.dataset.i]; if (!it) return;
+  const it = ((typeof tpCur === 'function' ? tpCur() : OFD.doc).items || [])[+b.dataset.i]; if (!it) return;  // 2.113.0 (#2248): a mark inside an open part
   it.confirm = true; it.agent_flag = '';
   if (typeof ofdPutItems === 'function') Promise.resolve(ofdPutItems()).then(() => { if (typeof ofdDraw === 'function') ofdDraw(); });
 });

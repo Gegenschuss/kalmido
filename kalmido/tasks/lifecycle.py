@@ -15,8 +15,8 @@ from ..core.access import collab_all, Denied, list_people, list_role, need_list,
 from ..core.serializers import attachment_files, unlink_files
 from ..lists.groups import check_group_assignee, grp_assign_events, grp_name, grp_shares_of_list
 from ..tasks.validation import (
-    check_parent, check_url, clean_task, DATE_MAX_Y, descendants, log_act, log_changes, rr_feasible, rr_norm, rr_rule,
-    ticket_template, valid_plan_start,
+    check_parent, check_url, clean_task, DATE_MAX_Y, descendants, log_act, log_changes, rr_feasible, rr_norm, rr_rule, rmd_split,
+    ticket_template, valid_hm, valid_plan_start,
 )
 from ..tasks.tasks import (
     check_assignee, check_move, hard_delete, move_subtree, ms_cleanup, ms_target, my_tags, one_task,
@@ -273,10 +273,34 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
     return None
 
 
+def rmd_next(t):
+    """2.116.0 D (#2066): next (date, HH:MM) of a rule with TIMES: the next time of the same day, after the last one
+    the first time of the next matching day. repeat_from 'done' counts from now. None if there is none."""
+    std, times = rmd_split(rr_norm(t["repeat"]))
+    if not times or not t["due"]:
+        return None
+    now = local_now()
+    day, cur = (t["due"], t["due_time"] or "00:00") if t["repeat_from"] != "done" else (now.date().isoformat(), now.strftime("%H:%M"))
+    later = [x for x in times if x > cur]
+    if later and (t["repeat_from"] != "done" or rr_day_ok(std, day)):
+        return day, later[0]
+    nd = next_due({**dict(t), "repeat": std, "due": day, "repeat_from": "due"})
+    return (nd, times[0]) if nd else None
+
+
+def rr_day_ok(std, day):
+    rule = rr_rule(std, day)
+    d = date.fromisoformat(day)
+    return bool(rule) and rule.after(datetime(d.year, d.month, d.day), inc=True).date() == d
+
+
 def next_due(t):
     """Next occurrence (date, keeps due_time) for a recurring task, or None."""
     if not t["repeat"] or not t["due"]:
         return None
+    if "TIMES=" in t["repeat"]:  # 2.116.0 D (#2066)
+        n = rmd_next(t)
+        return n[0] if n else None
     try:
         base = t["due"] if t["repeat_from"] != "done" else local_now().date().isoformat()
         rule = rr_rule(t["repeat"], base)
@@ -317,7 +341,8 @@ def task_complete(tid):
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     b = body()
     # the same recurring task ticked on two devices (one offline): only the first tick advances it
-    if t["repeat"] and b.get("expect_due") and t["status"] == 0 and b["expect_due"] != t["due"]:
+    if t["repeat"] and b.get("expect_due") and t["status"] == 0 and (b["expect_due"] != t["due"] or (
+            "TIMES=" in t["repeat"] and b.get("expect_time") and b["expect_time"] != t["due_time"])):  # 2.116.0 D (#2066)
         return jsonify({**one_task(c, tid), "next_due": None, "skipped": True})
     st = int(b.get("status", 2))
     undo = {}
@@ -349,9 +374,12 @@ def do_complete(c, tid, status=2, undo=None):
     who = (me() or None) if status != 0 else None  # 0 = public link: nobody's completion (statistics)
     cnt = rr_count(t["repeat"])
     nxt = next_due(t) if status == 2 and (cnt is None or cnt > 1) else None
+    nxt_tm = (rmd_next(t) or (0, None))[1] if nxt and "TIMES=" in t["repeat"] else None  # 2.116.0 D (#2066)
     if undo is not None:
-        undo.update(op="complete", at=ts, status=t["status"], repeat=t["repeat"], due=t["due"], start=t["start"],
+        undo.update(op="complete", at=ts, status=t["status"], repeat=t["repeat"], due=t["due"], start=t["start"], due_time=t["due_time"],
                     reminded=t["reminded"], copy_id=None, kids=[], plan_start=t["plan_start"])
+        if t["remind_at"]:
+            undo["remind_at"] = t["remind_at"]  # 2.111.0 C (#2057): the fixed reminder moves along, undo puts it back
     if status == 2 and t["status"] != 2:
         stars_earn(c, t, ts)  # 2.19.0 (#653): a kid's stars
     elif status == 0 and t["status"] == 2:
@@ -375,6 +403,10 @@ def do_complete(c, tid, status=2, undo=None):
         if start:  # timeline range moves along with the due date
             start = (date.fromisoformat(start) + (date.fromisoformat(nxt) - date.fromisoformat(t["due"]))).isoformat()
         c.execute("UPDATE tasks SET due=?, start=?, plan_start=NULL, reminded='[]', updated_at=? WHERE id=?", (nxt, start, ts, tid))
+        from ..tasks.remindat import rat_shift
+        rat_shift(c, tid, t["due"], nxt)  # 2.111.0 C (#2057)
+        if nxt_tm:
+            c.execute("UPDATE tasks SET due_time=? WHERE id=?", (nxt_tm, tid))
         if cnt:
             c.execute("UPDATE tasks SET repeat=? WHERE id=?", (rr_with_count(t["repeat"], cnt - 1), tid))
         rot = rot_next(c, t) if t["rotation"] and (_jparse(t["rotation"]) or {}).get("mode") == "done" else None
@@ -481,6 +513,10 @@ def undo_status(c, tid, u):
         ps = u.get("plan_start") if valid_plan_start(u.get("plan_start")) else None
         c.execute("UPDATE tasks SET due=?, start=?, plan_start=?, repeat=?, reminded=?, updated_at=? WHERE id=?",
                   (due, start, ps, str(u.get("repeat") or "")[:500], rem, ts, tid))
+        if u.get("remind_at") and valid_plan_start(u.get("remind_at")):  # 2.111.0 C (#2057)
+            c.execute("UPDATE tasks SET remind_at=? WHERE id=?", (u["remind_at"], tid))
+        if "TIMES=" in str(u.get("repeat") or "") and valid_hm(u.get("due_time")):  # 2.116.0 D (#2066)
+            c.execute("UPDATE tasks SET due_time=? WHERE id=?", (u["due_time"], tid))
         rot = u.get("rot")  # 2.19.0 (#653): whose turn it was (signed with the rest of the undo record)
         if isinstance(rot, list) and len(rot) == 2 and (rot[0] is None or isinstance(rot[0], int)) and isinstance(rot[1], str):
             c.execute("UPDATE tasks SET assignee_id=?, rotation=? WHERE id=?", (rot[0] if rot[0] in people else None, rot[1][:2000], tid))
@@ -554,6 +590,10 @@ def task_skip(tid):
     rep_new = rr_with_count(t["repeat"], cnt - 1) if cnt else t["repeat"]
     c.execute("UPDATE tasks SET due=?, start=?, plan_start=NULL, repeat=?, reminded='[]', updated_at=? WHERE id=?",
               (nxt, start, rep_new, iso(now_utc()), tid))
+    from ..tasks.remindat import rat_shift
+    rat_shift(c, tid, t["due"], nxt)  # 2.111.0 C (#2057)
+    if "TIMES=" in t["repeat"] and rmd_next(base):  # 2.116.0 D (#2066): skipping = the next time
+        c.execute("UPDATE tasks SET due_time=? WHERE id=?", (rmd_next(base)[1], tid))
     log_act(c, tid, "skip", {"next": nxt})
     bump(c)
     c.commit()

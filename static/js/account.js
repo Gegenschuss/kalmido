@@ -196,13 +196,17 @@ async function wsPaneDraw(md) {
     ${o.role === 'admin' ? `<div class="row"><button type="button" class="btn sm" data-oadm="${o.id}">${ic('list', 's')} ${tr('Lists of the organisation')}</button></div>` : ''}
     ${o.role === 'admin' ? ocBoxHtml(o) : ''}${''/* 2.42.0 (#828): encryption + recovery key */}
     ${o.role === 'admin' ? oxBoxHtml(o) : ''}
+    ${o.role === 'admin' ? whoBoxHtml(o) : ''}${''/* 2.115.0 A (#2061): the organisation's webhooks */}
     ${o.role !== 'admin' || !j.manage ? `<div class="row"><button class="btn sm" data-wsrm="${S.me?.id}" data-oidx="${o.id}">${ic('logout', 's')} ${tr('Leave the organisation')}</button></div>` : ''}</details>`;
   box.innerHTML = (j.orgs.length ? j.orgs.map(org).join('') : `<div class="muted mhint">${tr('You belong to no organisation: everything is private.')}</div>`)
     + (mm ? `<div class="shint keep">${ic('alert', 's')} ${esc(trn('{0} list of yours has an agent of another workspace (from before the workspaces). Open the list’s Share dialog to take it out or keep it.', '{0} lists of yours have an agent of another workspace (from before the workspaces). Open the lists’ Share dialogs to take it out or keep it.', mm))}</div>` : '');
   oxDraw(box);  // 2.42.0 (#833): the export sections of the organisations I administer
+  whoDraw(box);  // 2.115.0 A (#2061): their webhooks
   ocDraw(box);  // 2.42.0 (#828): their encryption sections
   wsc_paneDraw(box);  // 2.53.0 (#1474): each organisation's colour (its admins choose)
   pmeta_paneDraw(box);  // 2.61.0 B (#1819): whether photos lose their metadata on upload (its admins choose)
+  if (typeof xl_paneDraw === 'function') xl_paneDraw(box);  // 2.112.1 B (#2058): external share links of its files allowed
+  if (typeof oinvDraw === 'function') oinvDraw(box);  // 2.115.0 B (#2062): invite by e-mail + the open invitations
 }
 function wsPaneWire(md) {
   md.addEventListener('change', async e => {
@@ -694,12 +698,13 @@ function signupAdminHtml(a) {
     <div class="row"><label for="s-signup">${tr('Who can register')}</label><select id="s-signup">${SIGNUP_UI.map(([k, n]) => `<option value="${k}" ${k === mode ? 'selected' : ''} ${dis(k)}>${esc(tr(n))}</option>`).join('')}</select></div>
     <div class="row" id="s-sdomrow" ${mode === 'domain' ? '' : 'hidden'}><label for="s-sdom">${tr('E-mail domains')}</label><input id="s-sdom" value="${esc(a.signup_domains || '')}" placeholder="example.com, example.org" autocapitalize="off"></div>
     <div class="shint">${esc([tr('New people confirm their address with a link (or wait for an admin), choose their password and start without access to lists: share lists with them. Never an admin or a child account.'),
-      a.mail_out ? '' : tr('Without e-mail sending (SMTP) only “after an admin approves” works.'), org ? tr('This server has organisations: open registration is not possible (only their e-mail domains or with approval).') : ''].filter(Boolean).join(' '))}</div>`;
+      a.mail_out ? '' : tr('Without e-mail sending (SMTP) only “after an admin approves” works.'), org ? tr('This server has organisations: open registration is not possible (only their e-mail domains or with approval).') : ''].filter(Boolean).join(' '))}</div>
+    <label class="wide"><input type="checkbox" id="s-oinv" ${a.org_invites !== false ? 'checked' : ''}><span>${tr('Organisation admins may invite new people by e-mail')}<small class="muted">${tr('They get an account in that organisation and an e-mail to choose a password. Off: only admins of the server create accounts.')}</small></span></label>`;  // 2.115.0 B (#2062)
 }
 document.addEventListener('change', async e => {
-  const id = e.target.id; if (id !== 's-signup' && id !== 's-sdom') return;
+  const id = e.target.id; if (id !== 's-signup' && id !== 's-sdom' && id !== 's-oinv') return;
   try {
-    const j = await api('PATCH', '/api/admin/settings', id === 's-signup' ? {signup_mode: e.target.value} : {signup_domains: e.target.value});
+    const j = await api('PATCH', '/api/admin/settings', id === 's-signup' ? {signup_mode: e.target.value} : id === 's-oinv' ? {org_invites: e.target.checked} : {signup_domains: e.target.value});  // 2.115.0 B (#2062): + s-oinv
     if (j && j.version) S.about = j;
     const r = $('#s-sdomrow'); if (r) r.hidden = (S.about?.signup_mode || 'off') !== 'domain';
     if (id === 's-sdom') e.target.value = S.about?.signup_domains || '';

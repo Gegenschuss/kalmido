@@ -132,7 +132,7 @@ def ofx_diff(before, after):
     return {"before": b, "after": a}
 
 
-ITEM_LOG_KEYS = ("kind", "service_id", "title", "detail", "qty", "unit", "rate", "tax", "raw_fee", "producing", "discountable", "cost")
+ITEM_LOG_KEYS = ("kind", "service_id", "title", "detail", "qty", "unit", "rate", "tax", "raw_fee", "producing", "discountable", "cost", "in_handling", "in_markup")  # 2.113.1 (#2252): + the surcharge flags
 
 
 def ofx_items_brief(rows):
@@ -379,6 +379,8 @@ def ofx_finalize(c, oid, uid, did):
              "texts": {k: {lang: v.get(lang) or ""} for k, v in (pack.get("texts") or {}).items() if isinstance(v, dict) and isinstance(v.get(lang) or "", str)}}
     from .catalog import pkc_origin  # 2.76.0 (#1023): which pack file exactly (built in or installed from a catalogue)
     tsnap["pack_sha256"], tsnap["pack_source"] = pkc_origin("country", tsnap["pack"])
+    from .terms import agb_freeze
+    agb_freeze(c, oid, r)  # 2.113.2 (#2253): the terms of the document's language, before the stored PDF is written
     ts = iso(now_utc())
     c.execute("UPDATE office_docs SET locked_at=?, locked_by=?, sender=?, recipient_snapshot=?, tax_snapshot=?, pack_version=?, totals=?, "
               "updated_at=? WHERE id=? AND org_id=?",

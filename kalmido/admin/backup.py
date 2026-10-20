@@ -1212,7 +1212,10 @@ def storage_check():
                                     "ELSE p.path END AS where_ FROM wiki_files f LEFT JOIN wiki_pages p ON p.id=f.page_id"),
                       # 2.124.0 B (#2110): files of table cells (where = the table's title)
                       ("sheet_file", "SELECT f.id, f.sheet_id AS owner, f.name, f.size, f.path, s.title AS where_ FROM sheet_files f "
-                                     "LEFT JOIN sheets s ON s.id=f.sheet_id")):
+                                     "LEFT JOIN sheets s ON s.id=f.sheet_id"),
+                      # 2.113.1 (#2059): files in the team chat (where = the conversation's name)
+                      ("team_file", "SELECT f.id, f.room_id AS owner, f.name, f.size, f.path, r.name AS where_ FROM tchat_files f "
+                                    "LEFT JOIN tchat_rooms r ON r.id=f.room_id")):
         for r in c.execute(sql):
             n += 1
             full = os.path.join(ATT_DIR, r["path"] or "")

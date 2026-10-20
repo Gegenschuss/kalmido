@@ -7,7 +7,7 @@
 
 // module -> its files in static/js/, in load order (the same files as LAZY in sw.js)
 const LD_MODS = {
-  settings: ['acctset', 'settings'],  // 2.65.0 (#1823): acctset.js = the settings sections of account.js
+  settings: ['acctset', 'sesview', 'oinvview', 'settings'],  // 2.65.0 (#1823): acctset.js = the settings sections of account.js; 2.115.0 B (#2062): sessions, organisation invitations
   contacts: ['contacts', 'newsletter'],  // 2.65.0 (#1823): newsletter.js
   office: ['office', 'office_docs', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow', 'office_doctpl', 'office_logbook', 'office_cashbook',  // 2.93.0 (#1927, #1928); 2.121.0 B (#2095): office_cashbook
     'office_pipeline', 'office_kpi', 'office_datev', 'officeagents', 'office_packs',
@@ -16,7 +16,7 @@ const LD_MODS = {
     'office_agreements', 'office_assets',  // 2.92.0 (#1925, #1931)
     'office_meals',  // 2.119.0 A (#2288): entertainment receipts
     'office_leads', 'office_cfiles',  // 2.94.0 A (#1930), 2.117.0 B (#2285)  // 2.76.0 A (#1023): office_packs
-    'office_letterhead'],  // 2.120.0 E (#2091)
+    'office_letterhead', 'office_terms'],  // 2.120.0 E (#2091); 2.113.2 (#2253): office_terms
   // 2.65.0 (#1823): more areas load on first use (the start loads about a third less)
   agentchat: ['agentchat', 'agentsetup'],
   pdf: ['pdfview', 'docpreview'],  // 2.92.0 C (#1926): docpreview.js = the Word / Excel preview
@@ -35,14 +35,18 @@ const LD_MODS = {
   tagsel: ['tagsel'],  // 2.122.0 B (#2099 #2294 #2295): tag picker, tag filter buttons, Shift ranges (file store + documents); 2.124.2: before videos (polls / formq stay last, p2102_c_ui)
   filereq: ['filereq'],  // 2.122.0 A (#2097): file request links of a folder (dialog on demand)
   videos: ['videorev'],  // 2.99.1 A (#1959): video sign-offs
+  abscan: ['abscan'],  // 2.112.1 (#2058): the phone scan dialog of the file store and the documents
   pubvideo: ['pubvideo'],  // 2.99.1 A (#1959): only the customer page of a video sign-off loads it (/s/q/<token>), the app never
+  hookin: ['hookin'],  // 2.115.0 (#2061): inbound webhooks of a list, loaded when its settings open
   polls: ['polls'],  // 2.102.0 C (#2208): scheduling polls (#1953), on the first "Find a date"
   formq: ['formq'],  // 2.102.0 C (#2208): questionnaires (#1954), with the forms dialog of a list
+  ofundo: ['office_undo'],  // 2.111.0 A (#2233): undo of the office editors, clients and tables (office, sheets and the client dialog load it)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
 // uses the token dialogs, a knowledge page embeds mind maps; 2.87.9 (#1936): Paperless-ngx (paperless.js) is in Integrations
-const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs'], agentchat: ['integrations'], wiki: ['mindmap'], docs: ['tagsel']};  // 2.122.0 B: docs -> tagsel
+const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs'], agentchat: ['integrations'], wiki: ['mindmap'], docs: ['tagsel'],  // 2.122.0 B: docs -> tagsel
+  office: ['ofundo'], sheets: ['ofundo']};  // 2.111.0 A (#2233)
 // functions of a module that code loaded at start calls: a stand-in loads the module and then calls the real one (the
 // module's own function declaration replaces the stand-in on window)
 const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved'], contacts: ['ctRoute', 'ctEditor'], filereq: ['frq_open'],
@@ -53,7 +57,9 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   life: ['contractModal', 'deviceModal', 'upkeepModal', 'healthModal', 'tripModal'], integrations: ['pubWire'],
   playbook: ['pbMount', 'pbOpen', 'pbNewsOpen'], timeline: ['rmSet'],
   bookmarks: ['bm_shareSave', 'bm_confirmSave', 'bm_bookmarkletHelp'],  // 2.97.0 A (#1950)
-  polls: ['tpo_list', 'tpo_edit', 'tpo_forClient'], formq: ['fq_clientLink']};  // 2.102.0 C (#2208)
+  polls: ['tpo_list', 'tpo_edit', 'tpo_forClient'], formq: ['fq_clientLink'],  // 2.102.0 C (#2208)
+  abscan: ['abm_scanOpen'],  // 2.112.1 (#2058)
+  hookin: ['whiMount']};  // 2.115.0 (#2061)
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)
 const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 'chatTypers', 'chatStHtml'], timeline: ['tlKbSync', 'tlAfterRender', 'rmAfterRender']};
 // drawing functions: the stand-in draws "Loading…" (views) or nothing (parts of another view), loads, and redraws the view
@@ -61,7 +67,7 @@ const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 
 // them next to the scripts and resolves only once they apply (no unstyled flash when the area opens)
 const LD_CSS = {settings: ['settings'], contacts: ['contacts'], office: ['office'], agentchat: ['agentchat'], pdf: ['pdf'], mindmap: ['mindmap'],
   wiki: ['wiki'], stats: ['stats'], calendar: ['calendar'], docs: ['docs'], life: ['life'],
-  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq']};  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
+  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq'], abscan: ['abscan']};  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
 const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office'],
   // 2.65.0 (#1823)
   chatViewHtml: ['agentchat', 1], jobStepsHtml: ['agentchat'], aiuCardHtml: ['agentchat'], aiuNewsText: ['agentchat'], chatInner: ['agentchat'],
