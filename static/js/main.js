@@ -14,6 +14,7 @@ if (window.visualViewport) {
 // 2.39.1 (#1213): the loading screen of index.html (#boot) fades out once the first state is drawn (or a sign-in / error
 // screen took over); later reloads in the same session skip it (icons.js: html.rebooting)
 function bootDone() {
+  try { performance.mark('kalmido:drawn'); } catch { /* old browser */ }  // 2.145.0 B (#2424): the start's numbers (tests/p2145_b_ui.js)
   try { sessionStorage.setItem('kalmido.booted', '1'); } catch { /* no storage */ }
   const b = document.getElementById('boot'); if (!b || b.classList.contains('out')) return;
   b.classList.add('out'); setTimeout(() => b.remove(), 250);
@@ -25,13 +26,14 @@ function bootDone() {
   const sil = location.hash.match(/^#signin\/([A-Za-z0-9_-]{20,100})$/);  // 2.23.0 (#444): a sign-in link (QR code)
   if (sil) { bootDone(); await i18nLoad(uiLang()); await signinScreen(sil[1]); return; }
   const i18nBoot = i18nLoad(uiLang());  // last used language (localStorage), in parallel with the state
-  try { await load(); if (!S.lists.length) throw new Error('no state'); } catch (e) { bootDone(); if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = botEmpty(navigator.onLine === false ? 'offline' : 'schaut', tr('Server not reachable.'), tr('Reload the page once the server is reachable again.')).replace(/<\/div>$/, `<button type="button" class="btn pri" id="boot-retry">${ic('sync', 's')} ${tr('Try again')}</button></div>`); $('#boot-retry')?.addEventListener('click', () => location.reload()); return; }
+  try { await (MW_ON ? mw_bootLoad() : load()); if (!S.lists.length) throw new Error('no state'); } catch (e) { bootDone(); if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = botEmpty(navigator.onLine === false ? 'offline' : 'schaut', tr('Server not reachable.'), tr('Reload the page once the server is reachable again.')).replace(/<\/div>$/, `<button type="button" class="btn pri" id="boot-retry">${ic('sync', 's')} ${tr('Try again')}</button></div>`); $('#boot-retry')?.addEventListener('click', () => location.reload()); return; }
   await i18nBoot; await i18nLoad(uiLang()); S.booted = true;
-  setTimeout(msvvBoot, 0);  // 2.73.0 C (#661): the other servers (msvview.js), after the own state
+  // 2.145.0 B (#2424): an own window (miniwin.js) shows one list / task / chat: no other servers, no suggestions, no push housekeeping
+  if (!MW_ON) setTimeout(msvvBoot, 0);  // 2.73.0 C (#661): the other servers (msvview.js), after the own state
   setTimeout(chatFabDraw, 0);  // 2.29.0 (#363)
   if (LS.get('after2fa', false)) { LS.set('after2fa', false); setTimeout(() => settingsModal('account'), 400); }  // 2.22.0 (#697)
-  setTimeout(() => { if (document && !document.hidden) wpSweep(); }, 2500);
-  setTimeout(() => { if (!document.hidden && !S.setupPending && !S.me?.kid) lc_favSuggest(); }, 8000);  /* 2.49.0 (#1537): not for a child */  // 2.46.1 (#1361): a favourite suggestion, once  // 2.19.0 (#668): opening the app tidies the shade  // render in the server-side language
+  if (!MW_ON) setTimeout(() => { if (document && !document.hidden) wpSweep(); }, 2500);
+  if (!MW_ON) setTimeout(() => { if (!document.hidden && !S.setupPending && !S.me?.kid) lc_favSuggest(); }, 8000);  /* 2.49.0 (#1537): not for a child */  // 2.46.1 (#1361): a favourite suggestion, once  // 2.19.0 (#668): opening the app tidies the shade  // render in the server-side language
   // 2.13.0 (#453 A16): the first-run step 2 ("What do you want to use?") was not finished (tab reloaded / closed after the
   // admin account was created): it comes back until "Start" is pressed
   if (S.setupPending && !$('.authscreen')) { const el = document.createElement('div'); el.className = 'modal authscreen'; document.body.appendChild(el); $('#app')?.setAttribute('inert', ''); setupChoices(el, `<div class="alogo">${logoSvg(40)}<b>${wordSvg()}</b></div>`); }
@@ -122,6 +124,8 @@ function bootDone() {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
     navigator.serviceWorker.addEventListener('message', swMessage);
   }
+  // 2.145.0 B (#2424): an own window: the real state behind the first picture; push, onboarding and the tour stay with the main window
+  if (MW_ON) { mw_bootSync(); setTimeout(quipsLoad, 1500); return; }
   setTimeout(wpSync, 3000);
   // v1.1: first start of a new account: "Getting started" list (server side, in the user's language), then the tour
   // 2.24.0 (UX-22): not while the first-run setup is still open (its "Start" reloads; then the list, in the chosen language,
