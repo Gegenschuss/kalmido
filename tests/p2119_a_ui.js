@@ -44,6 +44,7 @@ const FEAT = 'cal,comments,collab,office,clients';
   const noSide = sel => `(() => { const W = document.documentElement.clientWidth; return [...document.querySelectorAll('${sel} *')].filter(e => e.getClientRects().length && !e.closest('.seg')).every(e => e.getBoundingClientRect().right <= W + 1); })()`;
   const setv = (sel, v) => `(() => { const x = document.querySelector('${sel}'); x.value = ${JSON.stringify(v)}; x.dispatchEvent(new Event('input', {bubbles: true})); x.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`;
   const clk = sel => `(() => { const x = document.querySelector('${sel}'); if (!x) return 0; x.click(); return 1; })()`;
+  const undoToast = `!document.querySelector('#toast').classList.contains('hidden') && !!document.querySelector('#toast button:not(.tx)')`;
   const menuClick = label => `(() => { const b = [...document.querySelectorAll('#pop .menu-list button')].find(b => b.textContent.trim().startsWith(${JSON.stringify(label)})); if (!b) return 0; b.click(); return 1; })()`;
   const rowMore = txt => `(() => { const l = [...document.querySelectorAll('.bwlist li')].find(l => l.textContent.includes(${JSON.stringify(txt)})); if (!l) return 0; l.querySelector('[data-bw="rowmore"]').click(); return 1; })()`;
   const meals = async ev => (await ev(`${getJ('/api/office/meals?year=' + y)}.then(j => j.meals)`));
@@ -122,6 +123,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ready(ev, `!!document.querySelector('[data-cd="yes"]')`);
     await ev(clk('[data-cd="yes"]'));
     check(await ready(ev, `${getJ('/api/office/meals?year=' + y)}.then(j => j.meals.length === 2)`), 'the draft deleted');
+    // 2.145.1 (#2439): the undo toast comes after the API answer - wait for it, else the hidden old toast's button is clicked (CI red)
+    await ready(ev, undoToast);
     await ev(clk('#toast button'));
     check(await ready(ev, `${getJ('/api/office/meals?year=' + y)}.then(j => j.meals.length === 3)`), 'one undo step brings it back');
 
@@ -166,6 +169,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ev(`${getJ('/api/office/meals/' + nid)}.then(m => m.guests.some(g => g.name === 'Rita Rot'))`), 'the receipt keeps its text');
     await ev(clk('.bwcset [data-bwc="del"]'));
     check(await ready(ev, `${getJ('/api/office/meals/choices')}.then(j => j.places.length + j.persons.length === 3)`), 'removed');
+    // 2.145.1 (#2439): the undo toast comes after the API answer - wait for it, else the hidden old toast's button is clicked (CI red)
+    await ready(ev, undoToast);
     await ev(clk('#toast button'));
     check(await ready(ev, `${getJ('/api/office/meals/choices')}.then(j => j.places.length + j.persons.length === 4)`), 'one undo step brings it back');
     check(await ev(`location.hash === '#office/settings'`), 'still the settings');
