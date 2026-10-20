@@ -12,7 +12,7 @@ Invented names only.
  - a person without organisation (freelancer) imports it privately: project notes, forms, chat come along, no rows of others
  - ROUND TRIP: export -> import into an empty organisation -> export again -> both archives compared per entry (row count,
    contents without ids / time stamps / organisation and person columns) and files (SHA-256). Differences are listed;
-   the entries of this part must be equal (P2137C_STRICT=1: every entry, after parts A and B are merged)
+   the entries of this part must be equal (every entry since parts A and B are merged; P2137C_STRICT=0: only this part)
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY (P2137C_NOSTART=1 = the server already runs like that).
 usage: p2137_c_api_test.py <datadir>"""
 # freelancer-matrix: own
@@ -464,7 +464,7 @@ iid4, _pv = opened(A, OX1, RK1)
 j = run(A, iid4, ORG4, people={EH("bob@example.com"): {"share": True}, EH("dora@example.com"): {"share": True}})
 check(j.get("state") == "done", f"import with everyone ticked done {j.get('error')}")
 OX4, RK4 = export(A, ORG4)
-strict = bool(os.environ.get("P2137C_STRICT"))
+strict = os.environ.get("P2137C_STRICT", "1") != "0"  # 2.137.0: parts A and B are merged -> every entry counts
 Z1, Z4 = open_archive(OX1, RK1), open_archive(OX4, RK4)
 diffs = compare(Z1, Z4)
 bad, other = [], []
