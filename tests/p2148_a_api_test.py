@@ -167,7 +167,8 @@ C1 = A.post(B + "/api/clients", json={"name": "Beispielkunde AG", "street": "Mar
 
 
 def draft(title, rate=1000):
-    r = A.post(B + D, json={"kind": "invoice", "client_id": C1, "items": [{"title": title, "qty": 1, "rate": rate}]})
+    r = A.post(B + D, json={"kind": "invoice", "client_id": C1, "service_from": day(1), "service_to": day(3),
+                            "items": [{"title": title, "qty": 1, "rate": rate}]})
     assert r.status_code == 201, r.text
     return r.json()["id"]
 

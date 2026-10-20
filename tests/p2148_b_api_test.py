@@ -185,7 +185,8 @@ assert r.ok, r.text
 
 # ---------------------------------------------------------------- data of month M
 C1 = A.post(B + "/api/clients", json={"name": "Beispielkunde AG", "street": "Marktstraße 5", "zip": "50000", "city": "Köln", "country": "DE"}).json()["id"]
-r = A.post(B + D, json={"kind": "invoice", "client_id": C1, "items": [{"title": "Schnitt", "qty": 1, "rate": 1000}]})
+r = A.post(B + D, json={"kind": "invoice", "client_id": C1, "service_from": day(1), "service_to": day(3),
+                        "items": [{"title": "Schnitt", "qty": 1, "rate": 1000}]})
 assert r.status_code == 201, r.text
 I1 = r.json()["id"]
 r = A.post(B + f"{D}/{I1}/finalize")
