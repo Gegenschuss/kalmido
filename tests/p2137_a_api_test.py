@@ -270,6 +270,16 @@ check(enc and str(enc[0]["iban"]).startswith("kenc1:"), "the bank data is encryp
 n1 = dbx("SELECT kind, period, last FROM office_numbers WHERE org_id=? ORDER BY kind, period", (ORG,))
 n2 = dbx("SELECT kind, period, last FROM office_numbers WHERE org_id=? ORDER BY kind, period", (ORG2,))
 check([dict(x) for x in n1] == [dict(x) for x in n2] and n1, f"the number ranges came along {n2}")
+OT = [r["table_name"] for r in dbx("""SELECT table_name FROM information_schema.columns WHERE table_schema=current_schema()
+                                      AND column_name='org_id' AND table_name LIKE 'office_%' ORDER BY table_name""")]
+diff = {}
+for t in OT:
+    if t in ("office_doc_log",):  # the export itself writes log entries
+        continue
+    n1, n2 = (dbx(f"SELECT COUNT(*) AS n FROM {t} WHERE org_id=?", (o,))[0]["n"] for o in (ORG, ORG2))
+    if n1 != n2:
+        diff[t] = (n1, n2)
+check(not diff, f"every office table has as many rows as in the source {diff}")
 check(office_counts(ORG) == SRC_BEFORE and dbx("SELECT COUNT(*) AS n FROM clients WHERE org_id=?", (ORG,))[0]["n"] == SRC_CLIENTS,
       "the source organisation is unchanged")
 check(Do.get(B + f"{D}/{INV2}").status_code in (403, 404), "an admin of a third organisation cannot read the imported invoice")
@@ -312,6 +322,14 @@ Fr.delete(B + f"/api/account/import/{iid}")
 check(A.post(B + f"/api/orgs/{PB}/export").status_code == 404, "somebody else cannot export a personal office (404)")
 check(A.post(B + f"/api/orgs/{PB}/encryption/recovery", json={"password": "password123"}).status_code == 404, "nor see its recovery key")
 check(Fr.get(B + f"/api/orgs/{ORG}/export").status_code == 404, "the person cannot export a foreign organisation")
+tk = Fr.post(B + "/api/me/tokens", json={"name": "Probe", "scopes": ["read", "write"]}).json().get("token", "")
+TKH = {"Authorization": "Bearer " + tk, "X-Requested-With": "kalmido"}
+check(tk and requests.post(B + f"/api/v1/orgs/{PB}/export", headers=TKH).status_code in (403, 404), "an API token of the owner cannot export it")
+check(requests.post(B + f"/api/v1/orgs/{PB}/encryption/recovery", headers=TKH, json={"password": "password123"}).status_code in (403, 404),
+      "nor read its recovery key")
+ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write"], "username": "probe", "display_name": "Probe"}).json()
+AGH = {"Authorization": "Bearer " + ag.get("token", ""), "X-Requested-With": "kalmido"}
+check(requests.post(B + f"/api/v1/orgs/{PB}/export", headers=AGH).status_code in (403, 404), "an agent cannot export a personal office")
 Fr.post(B + "/api/lists", json={"name": "Frida Privatliste"})
 PX, PRK = export(Fr, PB)
 iid, pv = opened(Do, PX, PRK)
