@@ -966,6 +966,8 @@ carries `capacity_h` (the person's hours of that week: absent workdays and publi
 `people` and `items` (`user_id`, `start_date`, `end_date`, `half_day` `""|am|pm`) plus the `holidays` of the
 organisation's state. Never the kind (vacation, sick leave, day off) or the note. An agent sees its own workspace only
 (a private agent: 404); entering absences and the disposition (#1194, booking crew and equipment) are the web app's.
+Since 2.125.0 (#2117) only approved absences are listed: an open or rejected vacation request never appears. Vacation
+accounts, deciding on requests and the working week of people stay in the web app.
 
 `POST /tasks/{id}/approval` (`tasks:write`): `{action: request, approver_id, note?}` / `{action: cancel}`; the approver
 (a person in the app) decides with `approve`, `changes` or `reject`. Tasks carry `approval` (`pending | approved |

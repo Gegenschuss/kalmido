@@ -6,7 +6,8 @@ Kalmido's team views live in **Workload** (sidebar, module "Workload"). Since 2.
 ## Absences (2.50.0)
 
 - Everybody enters their own absences: **Absences > Enter an absence** - vacation, sick leave, day off or other,
-  one day or a period, optionally half a day (morning / afternoon) and a note. There is no approval: entering is enough.
+  one day or a period, optionally half a day (morning / afternoon) and a note. There is no approval: entering is enough
+  (unless the organisation's admins switch on vacation requests, see below).
 - The admins of an organisation can also enter absences for its members.
 - **Which area:** the workspace switch decides (2.96): on an organisation its absences, on **Private** your own
   personal area (also as a member of organisations), on **All** the first organisation. The picker at the top switches
@@ -22,6 +23,35 @@ Kalmido's team views live in **Workload** (sidebar, module "Workload"). Since 2.
 - Deleting an absence can be undone.
 - Agents read only "away" and the period of their own organisation (`GET /api/v1/absences`, MCP `get_absences`),
   never the kind.
+
+## Working days and weekly hours (2.125.0)
+
+- **Settings > General > Working week**: the days you work (Monday to Friday by default) and your hours per week
+  (empty = 5 x the server's hours per day).
+- The workload spreads the hours per week over your working days: an absence or a public holiday on a working day lowers
+  the week by that day's share, a day off on a day you do not work costs nothing. The hint *Maybe forgotten* in the time
+  view and the vacation account count only working days.
+- An organisation's admins set the working days and hours of their members in **Absences > Vacation accounts**
+  (they are the person's own settings, so they apply in every organisation of that person).
+- Without a setting everything stays as before (Monday to Friday).
+
+## Vacation account and vacation requests (2.125.0)
+
+- **Vacation account:** per person and year an entitlement in days (half days allowed) and an optional carry-over from
+  the year before. The admins of an organisation set it for its members in **Absences > Vacation accounts**; people
+  without an organisation set their own there. The tab shows *entitlement*, *taken* (approved vacation working days of
+  the year; half days count 0.5, public holidays of the state and days you do not work do not count), *requested* (open
+  requests) and *left*. No entitlement = no account, nothing changes.
+- **Vacation requests:** off by default. An organisation's admins switch on **Vacation of members needs an approval** in
+  **Absences > Vacation accounts**. Then vacation a member enters for themselves is a request: the person and the admins
+  see it marked *requested* (striped in the grid); the team, the workload, *Plan my day*, the booking page and agents
+  treat the person as present until it is approved. Sick leave, days off and other absences never need an approval;
+  vacation an admin enters (for themselves or a member) is approved at once. People without an organisation never ask.
+- **Deciding:** the admins see **Open vacation requests** with *Approve* and *Reject* (an optional note for the person).
+  Undo opens the request again. A member who changes the period of a request or an approved vacation, or changes a
+  rejected request, asks again.
+- **Notifications:** the admins get a News item and a push about a new request, the person about the decision; the row
+  *Vacation requests* of the notification settings switches both off. The notes stay in the app.
 
 ## Disposition (2.50.0)
 
