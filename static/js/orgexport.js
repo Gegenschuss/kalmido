@@ -42,7 +42,7 @@ function oxDraw(root) {
 // 2.137.0 A (#2344): the export of a personal office by its owner (office settings): the same archive and recovery key as
 // an organisation's, with the office and the owner's private clients only (admin/orgexport.py ox_build_personal)
 function ox_pbBoxHtml(oid) {
-  if (!oid) return '';
+  if (oid == null) return '';  // 0 = the own personal office (2.138.0 #1972)
   setTimeout(() => { const r = document.querySelector('.oxpb'); if (r) { oxDraw(r); ocDraw(r); } }, 0);
   return `<section class="oxpb" data-fg-skip aria-labelledby="oxpb-h"><h3 id="oxpb-h">${tr('Export the office')}</h3>
     <p class="muted">${tr('An encrypted archive with this office and your private clients, to take them to another Kalmido server: there under Settings > Data into an organisation or into your own office. It opens with the recovery key.')}</p>

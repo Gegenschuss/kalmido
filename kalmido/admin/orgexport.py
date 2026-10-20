@@ -659,32 +659,32 @@ def ox_cleanup(c=None, force=False):
 
 
 # ---------------------------------------------------------------- routes (people only: /api/orgs is APP_ONLY, agents 403)
-def _need(c, oid):
+def _need(c, oid, own=False):
     from ..accounts.orgs import _need_org_admin
-    if not ox_own_office(c, oid):  # 2.137.0 A (#2344): the owner of a personal office exports it like an admin
+    if not own:  # 2.137.0 A (#2344): own = the person's own personal office, reached as organisation 0 (_ox_area)
         _need_org_admin(c, oid)
     from ..core.orgcrypt import oc_enabled
     return oc_enabled()
 
 
-def ox_own_office(c, oid):
-    """2.137.0 A (#2344): True when oid is the personal office of the signed-in person (never for agents or API tokens)."""
+def _ox_area(c, oid):
+    """2.137.0 A (#2344): (area id, own). Organisation 0 = the signed-in person's own personal office (2.138.0 #1972: its
+    hidden id is never used from outside); never for agents or API tokens."""
+    if oid != 0:
+        return oid, False
     from flask import g
-    from ..agents.core import is_agent
-    from ..core.pg import system_ctx
-    u = getattr(g, "user", None)
-    if u is None or is_agent(u) or getattr(g, "auth_via", None) == "token":
-        return False
-    with system_ctx(c):  # instance structure: whose personal office oid is
-        r = c.execute("SELECT personal_of FROM orgs WHERE id=?", (oid,)).fetchone()
-    return bool(r and r[0] and int(r[0]) == int(u["id"]))
+    if getattr(g, "auth_via", None) == "token":
+        raise Denied(403)
+    from ..core.orgcrypt import _org_admin
+    return _org_admin(c, 0), True
 
 
 @app.get("/api/orgs/<int:oid>/export")
 def ox_get(oid):
     """The state of the organisation's export: none | running | done (file, bytes, expires_at) | failed (error)."""
     c = db()
-    on = _need(c, oid)
+    oid, own = _ox_area(c, oid)
+    on = _need(c, oid, own)
     return jsonify(enabled=on, keep_hours=OX_KEEP_H, **ox_status(oid))
 
 
@@ -692,7 +692,8 @@ def ox_get(oid):
 def ox_start(oid):
     """Starts the export in the background (one at a time per organisation; 409 while one runs, or without the server key)."""
     c = db()
-    if not _need(c, oid):
+    oid, own = _ox_area(c, oid)
+    if not _need(c, oid, own):
         return err(tr(OX_NO_KEY), 409)
     from ..core.orgcrypt import oc_status
     if oc_status(c, oid).get("rotating"):  # 2.138.0 C (#1972, review F2): the archive's recovery header needs the finished key
@@ -710,7 +711,8 @@ def ox_start(oid):
 @app.get("/api/orgs/<int:oid>/export/file")
 def ox_download(oid):
     c = db()
-    _need(c, oid)
+    oid, own = _ox_area(c, oid)
+    _need(c, oid, own)
     st = ox_status(oid)
     if st.get("state") != "done":
         raise Denied(404)
@@ -725,7 +727,8 @@ def ox_download(oid):
 def ox_delete(oid):
     """Removes the finished archive now (instead of waiting OX_KEEP_H hours)."""
     c = db()
-    _need(c, oid)
+    oid, own = _ox_area(c, oid)
+    _need(c, oid, own)
     if _running(oid):
         return err(tr("An export of this organisation is already running"), 409)
     shutil.rmtree(_odir(oid), ignore_errors=True)

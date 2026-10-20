@@ -392,7 +392,7 @@ function ofcSettingsHtml() {
     ${typeof rk_settingsHtml === 'function' ? rk_settingsHtml() : ''}
     ${typeof bw_settingsHtml === 'function' ? bw_settingsHtml() : ''}
     ${typeof cfs_settingsHtml === 'function' ? cfs_settingsHtml() : ''}
-    ${adm && OFC.info.personal && typeof ox_pbBoxHtml === 'function' ? ox_pbBoxHtml(OFC.info.org_id) : ''}${''/* 2.137.0 A (#2344): export of the personal office */}
+    ${adm && OFC.info.personal && typeof ox_pbBoxHtml === 'function' ? ox_pbBoxHtml(0) : ''}${''/* 2.137.0 A (#2344): export of the personal office */}
     <h3>${tr('Master data file')}</h3>
     <p class="muted">${tr('Export writes services, equipment, sets, text blocks, contracts and these settings into one JSON file; import reads such a file (also one made from a spreadsheet) and adds what is missing.')}</p>
     <div class="lacts"><a class="btn sm" href="/api/office/export" download="office-master-data.json">${ic('download', 's')} ${tr('Export')}</a>
