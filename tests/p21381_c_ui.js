@@ -60,8 +60,9 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(app().classList.contains('wsb-on') && app().style.getPropertyValue('--wbd') === 'var(--accent)' && app().style.getPropertyValue('--wbl') === 'var(--accent)', '#2389: Private without a choice: the accent (Kalmido purple)');
   check(!d.querySelector('#side').classList.contains('wsp-on') && !d.querySelector('#side').style.getPropertyValue('--sbbg'), '#2389: no tint of the sidebar');
   check(bar.querySelector('.wsp-dot[data-wsc]')?.getAttribute('style')?.includes('var(--accent)'), '#2389: the dot of the switch in the same colour');
-  const ORG = w.eval(`(S.me.workspaces || [])[0]?.id`);
-  check(!!ORG, 'the fixture organisation ' + ORG);
+  const ORG = ((await call('GET', '/api/state')).me.workspaces || [])[0]?.id;
+  check(!!ORG, 'the fixture organisation ' + ORG + ' ' + w.eval(`JSON.stringify(S.me.workspaces)`));
+  if (!ORG) throw new Error('no organisation in the fixture');
   const orgTone = w.eval(`WSC_TONES[wsc_ix(wsOrg(${ORG}).color, ${ORG})]`);
   w.eval(`wsSet('org:${ORG}')`); await sleep(400);
   check(app().style.getPropertyValue('--wbd') === orgTone[0] && app().style.getPropertyValue('--wbl') === orgTone[1], '#2389: an organisation: the admins\' colour ' + app().getAttribute('style'));
