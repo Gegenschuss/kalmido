@@ -756,7 +756,12 @@ def process(c, nid):
         from ..tasks.attachtext import file_kind  # 2.66.1 (#1944): the kind all the same -> preview + QR code of an import
         res = {"text": str(given["text"])[:200_000], "method": "import", "kind": file_kind(node["name"], node["mime"], data[:2048])}
     else:
-        res = doc_text(node["name"], node["mime"], data)
+        try:
+            from ..core.i18n import lang as _lang
+            ulang = _lang(c, uid=m["created_by"])  # 2.122.0 (#2101): the person's app language picks the OCR language
+        except Exception:  # noqa: BLE001 -- the language is a hint only
+            ulang = None
+        res = doc_text(node["name"], node["mime"], data, lang=ulang)
     if res.get("error") == "busy":
         return "wait"
     thumb_store(c, m, node, data, res.get("kind"))
@@ -789,14 +794,20 @@ def process(c, nid):
             imported[f] = label_id(c, ws, f, given[f])
     if given.get("tags"):
         imported["tags"] = [t for t in (label_id(c, ws, "tag", x) for x in given["tags"]) if t]
+    how, agent_sug = "import", {}
+    if imported and given.get("_by") == "agent":  # 2.122.0 (#2098): an agent's values follow the levels like PATCH (level agent = suggestion)
+        lv_a = cfg_get(c, ws)["levels"]
+        agent_sug = {f: {"value": v, "by": "agent"} for f, v in imported.items() if lv_a.get(f) == "agent"}
+        imported, how = {f: v for f, v in imported.items() if f not in agent_sug}, "agent"
     if imported:
-        apply_values(c, m, node, imported, {}, "import")
-        auto_all.update({f: "import" for f in imported})
+        apply_values(c, m, node, imported, {f: ({t: how for t in v} if f == "tags" else how) for f, v in imported.items()} if how == "agent" else {}, how)
+        auto_all.update({f: how for f in imported})
     cur = current(c, m, node)
     fixed = {f for f in ("sender", "type", "tags") if cur[f]} | set(imported)  # a value set by hand / imported stays
     if cur["folder"]:
         fixed.add("folder")
     newv, sug, auto = classify(c, m, node, text, given=fixed)
+    sug = {**sug, **agent_sug}
     apply_values(c, m, node, newv, auto)
     auto_all.update({f: (next(iter(a.values()), "rule") if isinstance(a, dict) else a) for f, a in auto.items()})
     if not given.get("text") and doc_guesses(c, m, ws, newv.get("type") or cur["type"], text):  # 2.98.0 D (#2178)

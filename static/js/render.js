@@ -902,7 +902,7 @@ function renderView0() {
   else if (m === 'clients') setHtml(el, mg_wrap(m, viewClients()));  // 2.23.0 (#463)
   else if (m === 'workload') setHtml(el, viewWorkload());
   else if (m === 'tags') setHtml(el, viewTags());  // 2.53.0 (#446)
-  else if (m === 'office') setHtml(el, mg_wrap(m, viewOffice()));  // 2.36.1 (#1021)
+  else if (m === 'office') { if (typeof ofcPaint === 'function') ofcPaint(el); else setHtml(el, mg_wrap(m, viewOffice())); }  // 2.36.1 (#1021); 2.122.2 (#2327): keeps the old content while it reloads (office.js loads lazily: before that the stand-in)
   else if (m === 'wiki') setHtml(el, viewWiki());  // 2.49.0 (#1199)
   else if (m === 'sheets') setHtml(el, viewSheets());  // 2.89.0 (#1916)
   else if (m === 'ablage') setHtml(el, mg_wrap(m, viewAblage()));  // 2.48.0 (#1207)

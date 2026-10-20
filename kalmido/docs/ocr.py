@@ -72,6 +72,36 @@ def ocr_available():
     return _AVAIL["ok"]
 
 
+# 2.122.0 (#2101): the app language of the person adds its Tesseract language to the configured base (deu+eng)
+OCR_LANG_OF = {"de": "deu", "en": "eng", "fr": "fra", "it": "ita", "es": "spa", "nl": "nld"}
+
+
+def ocr_installed():
+    """The Tesseract languages installed in this image (cached); empty when it cannot be asked."""
+    if "have" not in _AVAIL:
+        have = set()
+        try:
+            p = _run(["tesseract", "--list-langs"], 10)
+            have = set((p.stdout + p.stderr).decode("utf-8", "replace").split())
+        except (OSError, subprocess.SubprocessError):
+            pass
+        _AVAIL["have"] = have
+    return _AVAIL["have"]
+
+
+def ocr_langs(app_lang=None, have=None):
+    """(the -l value, [missing Tesseract languages of the wanted ones]) for a person whose app language is app_lang: that
+    language first, then the base languages; only installed ones are taken, a missing one is reported, never an error."""
+    have = ocr_installed() if have is None else have
+    want = []
+    own = OCR_LANG_OF.get(str(app_lang or "").lower().split("-")[0].split("_")[0])
+    for code in ([own] if own else []) + OCR_LANGS.split("+"):
+        if code and code not in want:
+            want.append(code)
+    use = [x for x in want if x in have]
+    return "+".join(use) or OCR_LANGS, [x for x in want if x not in have]
+
+
 def _pdf_pages(path):
     try:
         p = _run(["pdfinfo", path], 20)
@@ -83,20 +113,21 @@ def _pdf_pages(path):
     return None
 
 
-def _tess(img, timeout):
-    p = _run(["tesseract", img, "stdout", "-l", OCR_LANGS, "--psm", "3"], timeout)
+def _tess(img, timeout, langs=OCR_LANGS):
+    p = _run(["tesseract", img, "stdout", "-l", langs, "--psm", "3"], timeout)
     if p.returncode != 0:
         raise RuntimeError("tesseract")
     return p.stdout.decode("utf-8", "replace")
 
 
-def ocr_bytes(data, kind):
+def ocr_bytes(data, kind, lang=None):
     """{"text", "pages", "pages_read", "truncated"} or {"error": "no_ocr" | "busy" | "too_complex" | "unreadable"}.
-    kind = "pdf" | "image". Blocks while another document is being recognised (the caller is a background worker)."""
+    kind = "pdf" | "image"; lang = the person's app language (2.122.0, #2101: read with its Tesseract language as well). Blocks while another document is being recognised (the caller is a background worker)."""
     if not ocr_available():
         return {"error": "no_ocr"}
     if not _SEM.acquire(timeout=OCR_PAGE_S * 2):
         return {"error": "busy"}
+    langs = ocr_langs(lang)[0]
     try:
         with tempfile.TemporaryDirectory(prefix="kocr-") as tmp:
             src = os.path.join(tmp, "in.pdf" if kind == "pdf" else "in.img")
@@ -104,7 +135,7 @@ def ocr_bytes(data, kind):
                 f.write(data)
             if kind != "pdf":
                 try:
-                    text = _tess(src, OCR_PAGE_S)
+                    text = _tess(src, OCR_PAGE_S, langs)
                 except subprocess.TimeoutExpired:
                     return {"error": "too_complex"}
                 except (OSError, RuntimeError):
@@ -122,7 +153,7 @@ def ocr_bytes(data, kind):
                     if r.returncode != 0 or not os.path.exists(base + ".png"):
                         out.append("")
                         continue
-                    out.append(_tess(base + ".png", OCR_PAGE_S).strip())
+                    out.append(_tess(base + ".png", OCR_PAGE_S, langs).strip())
                 except subprocess.TimeoutExpired:
                     timeouts += 1
                     out.append("")
@@ -274,7 +305,7 @@ def qr_codes(data, kind):
         return []
 
 
-def doc_text(name, mime, data, owner=None):
+def doc_text(name, mime, data, owner=None, lang=None):
     """{"text", "method": "text" | "pdf" | "ocr", "pages"?, "error"?} -- the text of one document's bytes."""
     from ..tasks.attachtext import file_kind, pdf_text, _decode  # noqa: PLC0415 -- the app's PDF text reader
     kind = file_kind(name, mime, data[:2048])
@@ -290,7 +321,7 @@ def doc_text(name, mime, data, owner=None):
             return {"error": "encrypted", "kind": kind}
     if kind not in ("pdf", "image"):
         return {"text": "", "method": "none", "kind": kind}
-    o = ocr_bytes(data, kind)
+    o = ocr_bytes(data, kind, lang)
     if o.get("error"):
         return {"error": o["error"], "kind": kind}
     return {"text": o["text"], "method": "ocr", "pages": o.get("pages"), "kind": kind}

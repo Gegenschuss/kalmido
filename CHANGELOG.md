@@ -38,6 +38,42 @@ Knowledge pages: history, pictures from the file store, sharing, full-text searc
 ### Fixed
 - Office: the installment list shows the open amount in the number format of the document (#2351).
 
+## [2.122.2] - 2026-10-20
+
+Office: scroll position, fixed cost import, tab picker.
+
+### Fixed
+- Office: saving an entry (cash flow, subscriptions, books incl. the year switch, logbook, travel costs, templates, pipeline, contracts) keeps the view and its scroll position; no short "Loading…" page any more (#2327).
+- Office: the fixed cost import fits a phone (amount and VAT rate on a second line), suggests 0 % VAT for bank and credit costs, taxes (not the tax adviser), service charge, memberships, KSK, Knappschaft and BG, finds a header row without "Name" in A1 and skips rows with only "0" (#2323).
+- Settings > Appearance: "+ Add tab …" opens a sheet with a search, folded sections, lists below their folder and the app's icons instead of one long list (#2329).
+
+## [2.122.0] - 2026-10-20
+
+File store and documents: file request links, tags everywhere, a stronger search; swiping through the news; yearly VAT.
+
+### Added
+- File store: "Request files…" on a folder creates a public upload link for clients (no account): with an expiry date
+  (at most 90 days), limits for size, number and file types, stop / reopen / extend, a QR code. Uploads land sealed in
+  the folder (optionally one subfolder per send), never overwrite and show nothing of the folder; a news item tells the
+  creator, switchable in the notification settings (#2097).
+- File store: tags on files and folders, the same tags as in Documents, with a tag filter per space (#2099).
+- Documents: several tags (every one / one of them / not), several senders, types and folders, document date and date of
+  arrival, file type, "without tag / sender"; search syntax `tag:`, `sender:`/`absender:`, `type:`/`typ:`,
+  `date:`/`datum:`, `"exact text"`, `-word`; the chosen filters in one line above the list (on phones in a sheet);
+  bulk changes of the selection (tags, type, sender, one undo step) and the selection as one ZIP (#2294).
+- File store and documents: Shift-click selects a range, Ctrl/Cmd-click toggles one item (#2295).
+- Documents: create documents via the API and MCP (`POST /api/v1/documents`, `create_document`); an agent writes only
+  into folders shared with it for editing, its sender / type / tags follow the levels like a change (#2098).
+- Documents: the selection as a CSV file (metadata, amounts; `;` and decimal comma in German) (#2100).
+- Text recognition also reads French, Italian, Spanish and Dutch, following the app language; a missing language pack
+  is shown as a note in the documents settings (#2101).
+- News on phones: swiping in an opened news item goes to the next / previous unread one (#2314).
+- Office: tax dates "Yearly (annual return only)" - one task per year for the annual VAT return (31 July of the
+  following year, with a note on the later deadline with a tax adviser); the VAT figures for the whole year, preselected
+  for the previous year in this mode (#2315).
+
+### Not yet
+- Documents: saved searches and sorting by relevance with highlighted matches follow later (#2294).
 ## [2.121.0] - 2026-10-20
 
 Receipts: recognition of supplier, VAT and invoice number, accounts per category, billing on to clients, cash book,

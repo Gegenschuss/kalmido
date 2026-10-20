@@ -787,6 +787,7 @@ A short checklist for a new server:
   | Variable | Default | What it limits |
   |---|---|---|
   | `KALMIDO_FORM_FILES_MB_HOUR` | `200` | MB of files anonymous visitors may send through one public form per hour |
+  | `KALMIDO_FILE_REQUEST_MB_DAY` | `1000` | MB clients may upload through one file request link a day (2.122.0) |
   | `KALMIDO_AGENT_PUSH_DAY` | `500` | pushes per agent and person a day (past it the message still arrives, without a push) |
   | `KALMIDO_OFFICE_MAILS_DAY_PERSON` | `150` | office document mails (invoices, quotations) one person sends a day |
   | `KALMIDO_OFFICE_MAILS_DAY_ORG` | `300` | office document mails of one organisation a day |

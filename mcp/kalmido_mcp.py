@@ -1629,11 +1629,23 @@ _DOC = {"date": D, "due": D, "amount": {"type": "string", "description": "Decima
         "tags": {"type": "array", "items": {"type": "string"}}, "text": {"type": "string", "description": "Only while none was recognised"}}
 TOOLS += [
     ("list_documents", "2.48.0: documents shared with you (scanned letters, invoices, contracts) with date, amount, sender, type, "
-                       "tags and their state. q = words of the text; review = only those waiting in To review.",
+                       "tags and their state. q = words of the text; review = only those waiting in To review. 2.122.0: q takes a search "
+                       "syntax: tag:Name (several = every one), sender:Name, type:Name, date:2025 | 2025-03 | 2025-01..2025-06 | >2025-01-01, "
+                       "added:<date> (arrival), \"exact phrase\", -word, -tag:Name; filters by ids: tag (\"1,7;3\" = two tags), tag_mode "
+                       "all|any, not_tag, sender, type, folder; added_from / added_to, no_tag, no_sender, no_type, ftype (pdf,image,office,text,other).",
      _obj({"q": {"type": "string"}, "review": {"type": "boolean"}, "state": {"type": "string", "enum": ["wait", "run", "done", "failed"]},
-           "from": D, "to": D, "limit": {"type": "integer"}, "cursor": {"type": "string"}}),
-     lambda api, a: api.call("GET", "/documents", {**_pick(a, ("q", "state", "from", "to", "limit", "cursor")),
-                                                   **({"review": "1"} if a.get("review") else {})})),
+           "from": D, "to": D, "limit": {"type": "integer"}, "cursor": {"type": "string"},
+           # 2.122.0 B (#2294)
+           "tag": {"type": "string", "description": "Tag ids; \"1,7;3\" = (1 or 7) and/or 3, see tag_mode"},
+           "tag_mode": {"type": "string", "enum": ["any", "all"]}, "not_tag": {"type": "string", "description": "Tag ids the documents must not have"},
+           "sender": {"type": "string", "description": "Sender ids (one of them)"}, "type": {"type": "string", "description": "Document type ids (one of them)"},
+           "folder": {"type": "string", "description": "Folder ids"}, "added_from": D, "added_to": D,
+           "no_tag": {"type": "boolean"}, "no_sender": {"type": "boolean"}, "no_type": {"type": "boolean"},
+           "ftype": {"type": "string", "description": "Comma-separated: pdf, image, office, text, other"}}),
+     lambda api, a: api.call("GET", "/documents", {**_pick(a, ("q", "state", "from", "to", "limit", "cursor", "tag", "tag_mode", "not_tag", "sender",
+                                                               "type", "folder", "added_from", "added_to", "ftype")),
+                                                   **({"review": "1"} if a.get("review") else {}),
+                                                   **{k: "1" for k in ("no_tag", "no_sender", "no_type") if a.get(k)}})),
     ("get_document", "2.48.0: one document with its fields, open suggestions and the recognised text (OCR / text layer).",
      _obj({"document_id": S_ID}, ["document_id"]),
      lambda api, a: api.call("GET", f"/documents/{int(a['document_id'])}")),
@@ -1642,6 +1654,17 @@ TOOLS += [
                         "in To review for a person to accept. Never moves a document.",
      _obj({"document_id": S_ID, **_DOC}, ["document_id"]),
      lambda api, a: api.call("PATCH", f"/documents/{int(a['document_id'])}", body=_pick(a, tuple(_DOC)))),
+]
+
+TOOLS += [
+    ("create_document", "2.122.0: put a new document (scan, invoice, letter) into the documents: name + base64 (the file), into folder_id "
+                        "(role edit) or, without it, your own result folder. Kalmido recognises it like an upload (text, date, amount, "
+                        "sorting); title / sender / type / tags / date / due / amount / currency are optional and taken as given.",
+     _obj({"name": {"type": "string", "minLength": 1}, "base64": {"type": "string"}, "mime": {"type": "string"}, "title": {"type": "string"},
+           "folder_id": S_ID, "sender": {"type": "string"}, "type": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string"}},
+           "date": D, "due": D, "amount": {"type": "string"}, "currency": {"type": "string"}}, ["name", "base64"]),
+     lambda api, a: api.call("POST", "/documents", body={"content_base64": a["base64"], **_pick(a, ("name", "mime", "title", "sender", "type", "tags", "date", "due", "amount", "currency")),
+                                                          **({"parent_id": int(a["folder_id"])} if a.get("folder_id") else {})})),
 ]
 
 # 2.48.0 (#1356): receipts -- an agent suggests project and category of a document shared with it; a person confirms
@@ -1818,7 +1841,7 @@ TOOLS += [
 # (any format) and send it in this one shape; the person checks the preview and takes it over -- you never write the office
 _IMPORT_ROW = {"type": "object", "description": "{label, amount (net euros > 0: number or \"1.200,50\"), repeat monthly|quarterly|yearly|once "
                                                "(default monthly), start YYYY-MM-DD, until? YYYY-MM-DD, category?, vat_rate? 0|7|19 "
-                                               "(left out: 19, insurances / contributions 0)}"}
+                                               "(left out: 19, insurances / contributions / bank / taxes / memberships 0)}"}
 TOOLS += [
     ("propose_import", "2.68.0 (scope import): ONE import proposal of old data for the person's office, today area fixed_costs (at most 500 "
                        "rows). Read the old data yourself (spreadsheet, PDF, mail), one row per fixed cost; put rows you could not read "
@@ -1906,7 +1929,7 @@ TOOL_SCOPES = {
                  "delete_contact", "bulk_contacts", "link_contact", "unlink_contact", "set_contact_care"),
     "private": ("add_health_entry", "write_journal"),
     "files:read": ("list_files", "read_file", "search_files", "suggest_receipt", "list_receipt_suggestions"),  # 2.48.0 (#1207, #1356)
-    "files:write": ("write_file", "create_file_folder"),
+    "files:write": ("write_file", "create_file_folder", "create_document"),
     "office": ("get_office", "list_office_data", "list_office_documents", "get_office_document", "create_offer_draft", "update_offer_draft",
                "draft_invoice_from_offer", "draft_reminder", "suggest_payment", "list_payment_suggestions",
                "list_office_leads", "create_office_lead", "update_office_lead"),  # 2.51.0 (#1348, #1350); 2.94.0 (#1930): leads

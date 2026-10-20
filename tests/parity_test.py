@@ -282,12 +282,21 @@ APP_ONLY = [
      ("=PATCH /api/files/nodes/{}", "=DELETE /api/files/nodes/{}", "=POST /api/files/nodes/{}/restore", "=POST /api/files/nodes/{}/versions/{}/restore",
       "=GET /api/files/nodes/{}/share-targets", "=POST /api/files/nodes/{}/shares", "* /api/files/shares/", "=POST /api/files/links",
       "=GET /api/files/folders")),
+    ("2.122.0 A (#2097): file requests stay with people -- a person asks a client for files with a public link of a folder; the "
+     "client uploads without an account; an agent sees the arriving files like any other file of a folder shared with it",
+     ("=GET /api/files/nodes/{}/requests", "=POST /api/files/nodes/{}/requests", "* /api/files/requests/")),
     ("2.48.0 (#1111): documents -- a person's own steps (upload by hand / share sheet, review and accept, recognise again, the "
      "preview image, a task for the due date, the workspace's levels / rules / labels / mail address); agents read and set fields "
-     "with /documents and add files with /files", ("=POST /api/docs", "=POST /api/docs/{}/accept", "=POST /api/docs/{}/review",
+     "with /documents and add files with /files; 2.122.0 (#2098): create_document; (#2100) the CSV of chosen documents is a person's download", ("=POST /api/docs", "=POST /api/docs/export.csv", "=POST /api/docs/{}/accept", "=POST /api/docs/{}/review",
                                                    "=POST /api/docs/{}/redo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
                                                    "* /api/docs/{}/task", "* /api/docs/settings", "* /api/docs/rules", "* /api/docs/labels/",
                                                    "* /api/docs/mail")),
+    # 2.122.0 B (#2294 #2099)
+    ("2.122.0 (#2294, #2099): a person's own steps on many documents at once (bulk tags / type / sender with its undo, the ZIP of a "
+     "selection for the browser) and the tags of files / folders in the file store app; agents filter with /documents (the same "
+     "filters and search syntax), set a document's tags one by one there and read files with /files",
+     ("=POST /api/docs/bulk", "=POST /api/docs/zip", "=GET /api/docs/zip/{}", "* /api/files/nodes/{}/tags", "=GET /api/files/tags",
+      "=GET /api/files/tagged")),
     # 2.51.0 (#1348, #1350): agents get drafts only, through /office (v1 + MCP); the rest of the office stays with people
     ("2.36.1 (#1021) / 2.51.0 (#1348): Office & finance -- people finalise, number, send, delete, book payments and keep master data and "
      "settings; agents (two switches) read and draft through /api/v1/office (quotation / invoice / reminder drafts, payment suggestions); "
