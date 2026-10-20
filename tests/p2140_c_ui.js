@@ -67,7 +67,7 @@ const ymd = n => { const d = new Date(); d.setDate(d.getDate() - n); return `${d
   click(w, d.querySelector('[data-m="save"]')); await sleep(1200);
   const h = (await call('GET', '/api/state')).habits.find(x => x.id === hid);
   check(h.remind_times === '07:30,18:00' && h.remind_at === '07:30', 'saved sorted, first in remind_at: ' + h.remind_times);
-  for (let i = 0; i < 4; i++) { await call('PATCH', `/api/habits/${hid}`, {remind_times: [...new Set([...(h.remind_times.split(',')), '09:0' + i, '10:0' + i])].slice(0, 6)}); }
+  await call('PATCH', `/api/habits/${hid}`, {remind_times: ['07:30', '09:00', '10:00', '12:00', '15:00', '18:00']});
   w.close();
   w = await boot({user: 'alice', hash: 'habits'}); d = w.document; await sleep(800);
   click(w, d.querySelector('[data-act="habit-open"]')); await sleep(500);

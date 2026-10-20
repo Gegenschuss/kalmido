@@ -245,6 +245,9 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.140.0 C (#2133): reading, searching, exporting and the mood statistics of the private journal stay with the person -- the "
+     "journal never reaches an agent (API v1 only writes an entry with the scope private)",
+     ("=GET /api/life/journal", "=GET /api/life/journal/stats", "=GET /api/life/journal/export")),
     ("2.124.0 C (#2113): sharing one table stays with people -- who may change it through its workspace decides who else sees it; "
      "an agent never shares (the routes answer 403 to agents) and sees a table shared with it in GET /api/v1/sheets",
      ("* /api/sheets/{}/shares",)),
