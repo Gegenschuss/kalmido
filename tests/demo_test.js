@@ -43,6 +43,7 @@ const srv = http.createServer((req, res) => {
   await new Promise(r => srv.listen(0, '127.0.0.1', r));
   const B = `http://127.0.0.1:${srv.address().port}/demo/`;
   const store = {}, errs = [];
+  let intros = 0;  // 2.125.0 D (#1653)
   const open = async (lang = 'de-DE', wait = 2500, width = 1280) => {
     const vc = new VirtualConsole();
     vc.on('jsdomError', e => { if (!/navigation|Not implemented|Could not load (img|link)/.test(e.message)) errs.push(e.message); });
@@ -66,12 +67,17 @@ const srv = http.createServer((req, res) => {
         w.confirm = () => true; w.prompt = () => null;
       }});
     await sleep(wait);
+    // 2.125.0 D (#1653): the first start shows the intro of a new account (language, purpose, modules): "Start" with its defaults,
+    // then the page again (the demo reloads itself after "Start")
+    const go0 = dom.window.document.querySelector('.authscreen [data-su="go"]');
+    if (go0) { intros++; go0.click(); await sleep(600); dom.window.close(); return open(lang, wait, width); }
     return dom.window;
   };
 
   // 1. first visit (German browser): a new account in German (Basket, "Getting started", the welcome tour), demo bar
   let w = await open('de-DE');
   let d = w.document;
+  check(intros === 1, 'a new account starts with the intro (purpose and modules), "Start" with the defaults');  // 2.125.0 D (#1653)
   check(w.__netFetch === 0, `browser fetch never reached (${w.__netFetch})`);
   // 2.74.0 (#1653): no sample data at the start, the onboarding of a new account
   const side0 = d.querySelector('#side')?.textContent || '';
@@ -192,6 +198,7 @@ const srv = http.createServer((req, res) => {
       for (const theme of ['light', 'dark']) {
         await nav(B); await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
         await nav(B); await sleep(2500);
+        await ev(`(async () => { const b = document.querySelector('.authscreen [data-su="go"]'); if (b) { b.click(); await new Promise(r => setTimeout(r, 800)); } return 1; })()`); await nav(B); await sleep(2500);  // 2.125.0 D (#1653): the intro first
         // 2.74.0 (#1653): a new account: close the tour, the sample on request
         await ev(`(async () => { tourEnd(true); await api('POST', '/api/sample', {}); await load(); render(); return 1; })()`); await sleep(500);
         const pid = await ev(`String(S.lists.find(l => l.kind === 'project' && l.tickets).id)`);
