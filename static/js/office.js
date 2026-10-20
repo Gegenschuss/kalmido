@@ -153,6 +153,7 @@ function ofcListHtml(kind) {
   const bar = `<div class="ofcbar"><div class="ctsearch">${ic('search', 's')}<input id="ofc-q" type="search" value="${esc(OFC.q)}" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" autocomplete="off" enterkeyhint="search"></div>
     <label class="chkl"><input type="checkbox" id="ofc-arch" ${OFC.arch ? 'checked' : ''}> ${tr('Archived')}</label><span class="spacer"></span>
     ${adm ? `<button class="btn sm pri" data-ofc="new" data-kind="${kind}">${ic('plus', 's')}<span>${kind === 'services' ? tr('New service') : kind === 'equipment' ? tr('New device') : kind === 'texts' ? tr('New text block') : tr('New contract')}</span></button>` : ''}
+    ${kind === 'services' && adm && d.length > 1 ? `<button class="btn sm" data-imr="renumber">${ic('sort', 's')}<span>${tr('Renumber')}</span></button>` : ''}
     ${kind === 'equipment' && adm ? `<button class="btn sm" data-ofc="new" data-kind="sets">${ic('plus', 's')}<span>${tr('New set')}</span></button>` : ''}</div>`;
   const rows = d.filter(r => hit(r) && (OFC.arch || !r.archived));
   let list;
@@ -195,6 +196,7 @@ const ofcRowBtn = (kind, r, title, sub, extra = '') => `<li><button type="button
 const ofcSel = (id, cur, opts, empty) => `<select id="${id}">${empty != null ? `<option value="">${esc(empty)}</option>` : ''}${opts.map(([v, n]) => `<option value="${esc(v)}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
 const ofcIn = (id, v, o = {}) => `<input id="${id}" value="${esc(v ?? '')}" maxlength="${o.max || 200}" ${o.num ? 'inputmode="decimal" class="numin"' : ''} ${o.ph ? `placeholder="${esc(o.ph)}"` : ''} ${o.list ? `list="${o.list}"` : ''}>`;
 const ofcRowF = (id, label, field, hint) => `<div class="row"><label for="${id}">${esc(label)}</label>${field}${hint ? `<span class="muted ofchint">${esc(hint)}</span>` : ''}</div>`;
+const imr_cur = () => `<span class="muted imrcur">${esc(ofcCur())}</span>`;  // 2.138.0 E (#2237)
 const ofcChk = (id, label, on) => `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${esc(label)}</label></div>`;
 // 2.40.0 (#1381): the choice shows the text in the field's language (lg); a block without English text says so
 const ofcTextOpts = (kind, lg) => ofcRows('texts').filter(t => t.kind === kind && !t.archived).map(t => [t.id, (t.key ? t.key + ': ' : '') + (lg === 'en' ? (t.text_en ? t.text_en.slice(0, 70) : tr('(no English text)') + ' ' + (t.text_de || '').slice(0, 50)) : (t.text_de || t.text_en).slice(0, 70))]);
@@ -209,7 +211,8 @@ function ofcModal(kind, r) {
     f = ofcRowF('of-name_de', tr('Name (German)'), ofcIn('of-name_de', r?.name_de)) + ofcRowF('of-name_en', tr('Name (English)'), ofcIn('of-name_en', r?.name_en))
       + ofcRowF('of-category', tr('Category'), ofcIn('of-category', r?.category, {max: 80, list: 'of-cats', ph: tr('e.g. Video, Audio, Office')})) + `<datalist id="of-cats">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`
       + ofcRowF('of-unit', tr('Unit'), ofcSel('of-unit', r?.unit || 'day', OFC_UNITS.map(([v, n]) => [v, tr(n)])))
-      + ofcRowF('of-daily_rate', tr('Daily rate'), ofcIn('of-daily_rate', rate(r?.daily_rate), {num: true}), ofcCur()) + ofcRowF('of-hourly_rate', tr('Hourly rate'), ofcIn('of-hourly_rate', rate(r?.hourly_rate), {num: true}), ofcCur())
+      // 2.138.0 E (#2237): the currency beside the field, not below it
+      + ofcRowF('of-daily_rate', tr('Daily rate'), ofcIn('of-daily_rate', rate(r?.daily_rate), {num: true}) + imr_cur()) + ofcRowF('of-hourly_rate', tr('Hourly rate'), ofcIn('of-hourly_rate', rate(r?.hourly_rate), {num: true}) + imr_cur())
       + ofcRowF('of-tax', tr('VAT'), ofcSel('of-tax', r?.tax || 'standard', OFC_TAXES.map(([v, n]) => [v, `${tr(n)} (${ofcTax(v)})`])))
       + ofcChk('of-raw_fee', tr('Counts towards the raw data amount'), r?.raw_fee) + ofcChk('of-producing', tr('Counts towards the producing days'), r?.producing)  // 2.47.0 (#1645): always shown
       + ofcRowF('of-intext', tr('Internal / external'), ofcSel('of-intext', r?.intext || 'extern', [['extern', tr('external')], ['intern', tr('internal')], ['shooting', tr('Shoot')]]),
@@ -420,7 +423,8 @@ function ofcCompanyFieldsHtml(cf, dis) {
 // 2.40.0 (#1377): the word printed before the management's names (Geschäftsführung, Gesellschafter, ...); the options show the
 // German and English print word, the document's language picks one; '' = Geschäftsführung as before
 const OFC_MD_LABELS = [['', 'Geschäftsführung', 'Managing directors'], ['shareholders', 'Gesellschafter', 'Shareholders'], ['owner_m', 'Inhaber', 'Owner'],
-  ['owner_f', 'Inhaberin', 'Owner'], ['board', 'Vorstand', 'Executive board'], ['partners', 'Partner', 'Partners']];
+  ['owner_f', 'Inhaberin', 'Owner'], ['board', 'Vorstand', 'Executive board'], ['partners', 'Partner', 'Partners'],
+  ['gbr_partners', 'Gesellschafter (GbR)', 'Partners (GbR)']];  // 2.138.0 E (#2242): prints Gesellschafter / Partners
 const ofcMdLabelHtml = (cf, dis) => ofcRowF('osc-md_label', tr('Printed as'), `<select id="osc-md_label" data-co="md_label" ${dis}>${OFC_MD_LABELS.map(([v, de, en]) => `<option value="${v}" ${(cf.md_label || '') === v ? 'selected' : ''}>${esc(de)} · ${esc(en)}</option>`).join('')}</select>`)
   + `<div class="shint">${esc(tr('The word before the names in the footer of every document. Usual: GmbH, UG → Geschäftsführung; AG → Vorstand; GbR / eGbR → Gesellschafter; sole proprietor → Inhaber / Inhaberin; partnership company → Partner. eGbR, GmbH and UG also print the register court and number.'))}</div>`;
 // 2.40.0 (#1382): the number schemes explained -- building blocks as buttons (inserted at the caret), a table behind (i),

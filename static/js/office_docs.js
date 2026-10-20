@@ -142,7 +142,7 @@ function ofdEditorHtml() {
   const stCan = v => (kind === 'offer' && (v !== 'draft' || d.status === 'draft')) || v === d.status || (lk && d.status !== 'cancelled' && (v === 'sent' || (v === 'paid' && kind === 'invoice' && adm)) && (d.status !== 'paid' || adm));  // 2.39.1 (#1210 N3): paid only by admins
   const stSel = `<select id="ofd-status" data-f="status" aria-label="${esc(tr('Status'))}" class="ofdstat st-${d.state || d.status}" ${inv && !lk ? 'disabled' : ''}>${stOpts.map(([v, n]) => `<option value="${v}" ${d.status === v ? 'selected' : ''} ${stCan(v) ? '' : 'disabled'}>${tr(n)}${v === d.status && d.state && d.state !== d.status ? ` (${tr(OFD_STATE[d.state])})` : ''}</option>`).join('')}</select>`;
   const acts = [];
-  if (kind === 'offer') acts.push(`<button type="button" class="btn sm" data-ofd="to-invoice" title="${esc(tr('An invoice draft with the positions of this quotation'))}">${ic('receipt', 's')}<span>${tr('Create invoice')}</span></button>`);
+  if (kind === 'offer') acts.push(kvaNextHtml(d, lk, ro));  // 2.138.0 E (#2235): the next step of the quotation; "Create invoice" before acceptance in "…"
   if (kind === 'invoice' && lk && d.status !== 'cancelled' && adm) acts.push(`<button type="button" class="btn sm" data-ofd="pay">${ic('plus', 's')}<span>${tr('Record payment')}</span></button>`);
   if (kind === 'offer' || kind === 'invoice') acts.push(`<button type="button" class="btn sm" data-ofd="to-ls" title="${esc(tr('A delivery note or proof of service with the positions, without prices'))}">${ic('file', 's')}<span>${tr('Delivery note')}</span></button>`);  // 2.120.0 D (#2089)
   if (inv && lk) acts.push(`<button type="button" class="btn sm" data-ofd="send">${ic('send', 's')}<span>${tr('Send|mail')}</span></button>`);
@@ -150,7 +150,7 @@ function ofdEditorHtml() {
     ${stSel}<span class="spacer"></span>
     <span class="ofdsave muted" aria-live="polite">${OFD.saving ? tr('Saving…') : OFD.err ? esc(OFD.err) : ''}</span>${acts.join('')}
     ${lk || ro ? '' : `<button type="button" class="btn sm ofdfin" data-ofd="finalize" title="${esc(tr('Freeze number, positions, sums, sender and tax rates'))}">${ic('lock', 's')}<span>${tr('Finalise')}</span></button>`}
-    <a class="btn sm ofdpdf" href="${ofdPdfUrl(d.id, true)}" target="_blank" rel="noopener" data-ofd="pdf"${typeof pv_attr === 'function' ? pv_attr({url: ofdPdfUrl(d.id, true), name: (d.number || tr('Document')) + '.pdf', dlUrl: ofdPdfUrl(d.id)}) : ''} aria-label="${esc(tr('Open PDF'))}" title="${esc(tr('Open PDF'))}">${ic('pdf', 's')}<span class="ofdpdft">PDF</span></a>
+    <a class="btn sm ofdpdf" href="${ofdPdfUrl(d.id, true)}" target="_blank" rel="noopener" data-ofd="pdf"${typeof pv_attr === 'function' ? pv_attr({url: ofdPdfUrl(d.id, true), name: (d.number || tr('Document')) + '.pdf', dlUrl: ofdPdfUrl(d.id)}) : ''} aria-label="${esc(tr('Open PDF'))}" title="${esc(tr('Open PDF'))}">${ic('pdf', 's')}<span class="ofdpdft">${tr('Preview')}</span></a>
     <a class="btn sm ofddl" href="${ofdPdfUrl(d.id)}" download data-ofd="pdf" aria-label="${esc(tr('Download PDF'))}" title="${esc(tr('Download PDF'))}">${ic('download', 's')}<span class="ofdpdft">${tr('Download')}</span></a>
     <button type="button" class="btn sm" data-ofd="more" aria-haspopup="menu" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>`;
   const invFields = inv && kind !== 'reminder' ? `
@@ -316,6 +316,20 @@ const ekUnitSel = (it, i, d) => `<select data-i="${i}" data-k="unit" aria-label=
 const ekPctHtml = (it, i, line, d) => `<input data-i="${i}" data-k="rate" inputmode="decimal" class="numin ofdrate" value="${esc(ofdNumIn(it.rate))}" aria-label="${esc(tr('Rate in percent'))}"><span class="muted">%</span>`
   + `<span class="muted ofdpctof">${esc(tr('of {0} external', ofdMoney(line?.base ?? 0, d)))}</span>`;
 
+// 2.138.0 E (#2235): the quotation's next step in the bar: draft -> Finalise (the button behind), finalised -> Mark as sent,
+// sent -> Accepted / Declined, accepted -> Create invoice. Before acceptance the invoice is in "…" and asks once (no lock).
+function kvaNextHtml(d, lk, ro) {
+  const st = (v, icon, label, cls = '') => `<button type="button" class="btn sm ofdnext${cls}" data-ofd="kva-st" data-st="${v}" aria-label="${esc(tr(label))}" title="${esc(tr(label))}">${ic(icon, 's')}<span>${tr(label)}</span></button>`;
+  if (d.status === 'accepted') return `<button type="button" class="btn sm pri ofdnext" data-ofd="to-invoice" title="${esc(tr('An invoice draft with the positions of this quotation'))}">${ic('receipt', 's')}<span>${tr('Create invoice')}</span></button>`;
+  if (d.status === 'sent') return st('accepted', 'check', N_('Accepted'), ' pri') + st('declined', 'x', N_('Declined'));
+  if (d.status === 'draft' && (lk || ro)) return st('sent', 'send', N_('Mark as sent'), ' pri');
+  return '';  // a draft that can be edited: "Finalise"; declined: nothing in front
+}
+async function kvaToInvoice(d) {
+  if (d.status !== 'accepted' && !await askConfirm(tr('The offer has not been accepted yet. Create the invoice anyway?'), '', {ok: tr('Create invoice')})) return;
+  absInvoiceDialog(d);  // 2.120.0 A (#2087): full / progress / final (a quotation with parts: full -> tpInvoiceDialog)
+}
+
 // ---- the history (organisation admins; office log of this document)
 const OFD_ACTIONS = {create: N_('created'), update: N_('changed'), items: N_('positions changed'), number: N_('number set'), status: N_('status changed'),
   finalize: N_('finalised'), unlock: N_('finalising undone'), duplicate: N_('created as a copy'), cashflow: N_('cash flow choice changed'), delete: N_('deleted'), open: N_('opened'), pdf: N_('PDF opened'), render: N_('preview opened'),
@@ -418,6 +432,7 @@ function ofdMoreItems(d, inList) {
   const items = [
       {label: tr('Duplicate'), icon: 'copy', fn: async () => { try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/duplicate`); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } }},
       d.kind === 'offer' && d.client_id && ofcAdmin() && typeof dtFromOffer === 'function' ? {label: tr('Create order confirmation'), icon: 'file', fn: () => dtFromOffer(d)} : null,  // 2.93.0 A (#1927)
+      !inList && d.kind === 'offer' && d.status !== 'accepted' ? {label: tr('Create invoice'), icon: 'receipt', fn: () => kvaToInvoice(d)} : null,  // 2.138.0 E (#2235): always reachable
       {label: tr('Preview (PDF)'), icon: 'eye', fn: () => typeof pdfView === 'function' ? pdfView({url: ofdPdfUrl(d.id, true), name: (d.number || tr('Document')) + '.pdf', dlUrl: ofdPdfUrl(d.id)}) : window.open(ofdPdfUrl(d.id, true), '_blank', 'noopener')},  // 2.40.0 (#1364): the PDF, not the JSON print model
       ...(typeof ls_moreItems === 'function' ? ls_moreItems(d, inList) : []),  // 2.120.0 D (#2089)
       ofdIsInv(d) && d.kind !== 'reminder' && d.kind !== 'delivery' && d.locked ? {label: tr('E-invoice XML'), icon: 'download', fn: () => window.open(`/api/office/docs/${d.id}/xml`, '_blank', 'noopener')} : null,
@@ -463,9 +478,8 @@ async function ofdClick(e) {
   if (a === 'remind') { ofdReminderDialog(); return; }
   if (!d) return;
   if (a.startsWith('tp-') && typeof tpClick === 'function') { await tpClick(a, b); return; }  // 2.47.0 (#1215): the parts
-  if (a === 'to-invoice') { absInvoiceDialog(d); return; }  // 2.120.0 A (#2087): full / progress / final (a quotation with parts: full -> tpInvoiceDialog)
-  if (a === 'to-invoice' && d.parts?.length && typeof tpInvoiceDialog === 'function') { tpInvoiceDialog(d); return; }  // 2.47.0 (#1215): choose the form
-  if (a === 'to-invoice') { try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/invoice`); OFD.list = null; OFD.kind = 'invoice'; OFD.doc = j; toast(tr('Invoice draft created')); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } return; }
+  if (a === 'to-invoice') { await kvaToInvoice(OFD.doc); return; }
+  if (a === 'kva-st') { await ofdSave('POST', `/api/office/docs/${OFD.doc.id}/status`, {status: b.dataset.st}); return; }  // 2.138.0 E (#2235): the answer updates OFD.doc
   if (a === 'credit') {
     if (!await askConfirm(tr('Credit note for {0}?', d.number || ''), tr('A draft with all positions is made. Shorten it for a partial credit; finalised over the full amount it cancels the invoice.'), {ok: tr('Create credit note')})) return;
     try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/credit`); OFD.list = null; OFD.kind = 'credit'; OFD.doc = j; go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } return;
