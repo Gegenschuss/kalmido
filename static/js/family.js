@@ -272,7 +272,7 @@ async function contactsModal() {
   const lists = S.lists.filter(l => !l.archived && canEditList(l.id) && !l.is_inbox);
   const bl = lists.find(l => l.family === 'birthdays') || lists.find(l => l.family === 'family');  // 2.46.1 (#1615): or the list "Family"
   const md = modal(`<h3>${ic('users', 's')} ${tr('Birthdays from your contacts')}</h3>
-    <p class="muted">${tr('Kalmido reads the birthdays and anniversaries of an address book (CardDAV: Nextcloud, iCloud, Radicale, mailbox.org …) once a day and adds them as yearly tasks. Nothing is written back. The password is stored encrypted.')}</p>
+    <p class="muted">${tr('Kalmido reads the birthdays and anniversaries of an address book (CardDAV: Nextcloud, iCloud, Radicale, mailbox.org …) once a day and adds them as yearly tasks. Changed dates go back into an address book only when you switch that on for it. The password is stored encrypted.')}</p>
     <div id="ct-list"><div class="muted">${tr('Loading…')}</div></div>
     <h4>${tr('Add an address book')}</h4>
     <div class="row"><label for="ct-url">${tr('Server address')}</label><input id="ct-url" type="url" inputmode="url" autocapitalize="off" placeholder="https://…"></div>
@@ -282,9 +282,17 @@ async function contactsModal() {
     <div class="aerr" role="alert" id="ct-err"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button><button class="btn pri" data-m="add">${ic('plus', 's')} ${tr('Connect')}</button></div>`);
   md.classList.add('famdlg');
-  const draw = j => { $('#ct-list', md).innerHTML = j.sources.length ? `<ul class="flist">${j.sources.map(s => `<li class="frow"><span class="ft"><b>${esc(s.name)}</b><span class="muted">${esc(s.url_hint)} · ${s.status === 'error' ? esc(s.error_text) : esc(trn('{0} date', '{0} dates', s.count))}${s.synced_at ? ' · ' + esc(tr('read {0}', fmtAgo(s.synced_at))) : ''}</span></span><button type="button" class="btn sm" data-ctsync="${s.id}">${ic('sync', 's')}<span>${tr('Read now')}</span></button><button type="button" class="iconbtn" data-ctdel="${s.id}" aria-label="${esc(tr('Remove {0}', s.name))}" title="${esc(tr('Remove'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('No address book connected.')}</p>`; };
+  const draw = j => { $('#ct-list', md).innerHTML = j.sources.length ? `<ul class="flist">${j.sources.map(s => `<li class="frow"><span class="ft"><b>${esc(s.name)}</b><span class="muted">${esc(s.url_hint)} · ${s.status === 'error' ? esc(s.error_text) : esc(trn('{0} date', '{0} dates', s.count))}${s.synced_at ? ' · ' + esc(tr('read {0}', fmtAgo(s.synced_at))) : ''}</span>${ctWbHtml(s)}</span><button type="button" class="btn sm" data-ctsync="${s.id}">${ic('sync', 's')}<span>${tr('Read now')}</span></button><button type="button" class="iconbtn" data-ctdel="${s.id}" aria-label="${esc(tr('Remove {0}', s.name))}" title="${esc(tr('Remove'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('No address book connected.')}</p>`; };
   const reload = async () => { try { draw(await api('GET', '/api/family/contacts')); } catch { /* offline */ } };
   reload();
+  md.addEventListener('change', async e => {  // 2.140.0 D (#2137): write-back per address book (off by default)
+    const el = e.target; if (!el.dataset?.ctwb) return;
+    const on = el.checked, errEl = $('#ct-err', md);
+    if (on && !await askConfirm(tr('Write dates back?'), tr('When you change the date or the year of a birthday or anniversary from this address book in the family section of its task, Kalmido changes it in the address book too. Only that date is changed, nothing is deleted.'), {ok: tr('Switch on')})) { el.checked = false; return; }
+    el.disabled = true;
+    try { await api('PATCH', `/api/family/contacts/${el.dataset.ctwb}`, {writeback: on}); errEl.textContent = ''; await reload(); }
+    catch (er) { el.checked = !on; el.disabled = false; errEl.textContent = er.message || ''; }
+  });
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
     const errEl = $('#ct-err', md);
@@ -304,6 +312,11 @@ async function contactsModal() {
     if (b.isConnected) b.disabled = false;
   });
 }
+// 2.140.0 D (#2137): the write-back switch of an address book; a read-only one (a mirror) gets a hint instead
+function ctWbHtml(s) {
+  if (s.writeback_avail === 'no') return `<span class="muted ctwb-note" data-ctwbro="${s.id}">${tr('Read only (for example a mirror): changes stay in Kalmido')}</span>`;
+  return `<span class="ctwb"><label class="swc"><input type="checkbox" data-ctwb="${s.id}" ${s.writeback ? 'checked' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Write changes back to the address book'))}</span></label><span aria-hidden="true">${tr('Write changes back to the address book')}</span></span>${s.writeback && s.writeback_avail === 'some' ? `<span class="muted ctwb-note">${tr('Some of its address books are read only: nothing is written there')}</span>` : ''}${s.writeback_error ? `<span class="aerr ctwb-note">${esc(s.writeback_error)}</span>` : ''}`;
+}
 const fmtAgo = iso => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 1 ? tr('just now') : m < 60 ? trn('{0} min ago', '{0} min ago', m) : m < 1440 ? trn('{0} h ago', '{0} h ago', Math.round(m / 60)) : fmtDateLoc(iso.slice(0, 10)); };
 
 // ---- the task panel: the family section (birthday / deadline data, taking turns, who comes along, stars, ingredients)
@@ -318,6 +331,8 @@ function famDetailHtml(t, l, ro) {
     const w = occWhat(t);
     out.push(`<div class="row"><label for="d-fname">${t.fam.kind === 'birthday' ? tr('Birthday of') : tr('Anniversary of')}</label><input id="d-fname" value="${esc(t.fam.name || '')}" maxlength="100" ${ro ? 'readonly' : ''}></div>
       <div class="row"><label for="d-fyear">${t.fam.kind === 'birthday' ? tr('Year of birth') : tr('Since')}</label><input id="d-fyear" class="numin" type="number" inputmode="numeric" min="1900" max="${new Date().getFullYear()}" value="${esc(t.fam.year || '')}" ${ro ? 'readonly' : ''}>${w ? `<span class="fage">${esc(w)}${t.due ? ' · ' + esc(fmtDateLoc(t.due)) : ''}</span>` : ''}</div>`);
+    // 2.140.0 D (#2137): from an address book: the date here also goes back into it (when that is on for the address book)
+    if (String(t.fam.src || '').startsWith('carddav:') && t.due) out.push(`<div class="row"><label>${tr('Date')}</label>${ro ? `<span>${esc(fmtDateLoc(t.due))}</span>` : dateIn('d-fdate', t.due, {label: tr('Date'), clear: false})}<span class="muted">${tr('also in the address book, if write-back is on')}</span></div>`);
   }
   if (isDl(t)) {
     out.push(`<div class="row"><label>${tr('Household deadline')}</label><span class="muted">${esc(dlName(t.fam.type))}${t.fam.who ? ' · ' + esc(t.fam.who) : ''}</span></div>
@@ -348,6 +363,7 @@ document.addEventListener('change', e => {
   const t = taskById(S.sel); if (!t) return;
   if (el.id === 'd-fname' || el.id === 'd-fyear') { const v = el.value.trim(); famDetailPatch(t, {fam: {...t.fam, ...(el.id === 'd-fname' ? {name: v} : {year: v ? +v : null})}}); }
   if (el.id === 'd-fexp' && el.value) famDetailPatch(t, {fam: {...t.fam, expires: el.value}});
+  if (el.id === 'd-fdate' && el.value && el.value !== t.due) patchTask(t.id, {due: el.value, _act: 'occ_date'}).catch(() => renderDetail());  // 2.140.0 D (#2137)
   if (el.id === 'd-stars') famDetailPatch(t, {stars: el.value === '' ? null : +el.value});
   if (el.id === 'd-rot') {
     if (!el.checked) { famDetailPatch(t, {rotation: null}); return; }
