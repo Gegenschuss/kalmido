@@ -26,7 +26,7 @@ from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same
 from ..personal.timetrack import BadInput
 from .pages import wiki_clean_path, wiki_need, wiki_set_links, wiki_space, wiki_space_key, wiki_space_sql
 
-WKM_FILE_RE = re.compile(r"/api/files/|/f/[A-Za-z0-9_-]{8,}|/s/[A-Za-z0-9_-]{8,}")
+WKM_FILE_RE = re.compile(r"/api/files/|/f/[A-Za-z0-9_-]{8,}|/s/[A-Za-z0-9_-]{8,}|\[\[\s*datei\s*:", re.I)  # 2.123.0 C (#2107): + [[datei:…]]
 
 
 def wkm_like(p):
@@ -105,7 +105,9 @@ def wiki_move_space():
     in_links = c.execute(f"SELECT COUNT(*) FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.to_path IN ({qp}) "
                          f"AND p.deleted_at IS NULL AND p.id NOT IN ({q}) AND p.{sw.replace(' AND ', ' AND p.')}",
                          [*ren, *ids, *sa]).fetchone()[0]
-    files = sum(1 for r, _ in moves if WKM_FILE_RE.search(r["body"] or ""))
+    from .wkhist import wkh_body, wkh_move, wkh_seal  # 2.123.0 A (#2105): the texts are sealed with the key of their space
+    plain = {r["id"]: wkh_body(c, r) for r, _ in moves}
+    files = sum(1 for r, _ in moves if WKM_FILE_RE.search(plain[r["id"]] or ""))
     notes = [trn("{0} page moves", "{0} pages move", len(moves)),
              trn("{0} link points to the other workspace (it stays as text)", "{0} links point to the other workspace (they stay as text)",
                  out_links + in_links) if out_links + in_links else "",
@@ -126,12 +128,15 @@ def wiki_move_space():
         return jsonify(error=tr("A page with this name already exists"), taken=[]), 409
     from .wikiatt import wka_move_files
     wka_move_files(c, ids, to, uid)  # 2.99.0 (#2182): the pages' files go along, sealed with the target's key
+    from .wkshare import wsh_end_moved  # 2.123.0 B (#2104): their shares end (a share never changes its space)
+    wsh_end_moved(c, src, None if src else uid, [r["path"] for r, _ in moves], wiki_clean_path(b["folder"]) if b.get("folder") not in (None, "") else None)
     relinked = 0
+    wkh_move(c, [r for r, _ in moves], to, uid)  # 2.123.0 A (#2102, #2106): the history sealed for the target, the index anew
     for r, n in moves:
-        nb = wkm_relink(r["body"], {k: v for k, v in ren.items() if k != v})
-        if nb != r["body"]:
-            c.execute("UPDATE wiki_pages SET body=? WHERE id=?", (nb, r["id"]))
+        nb = wkm_relink(plain[r["id"]], {k: v for k, v in ren.items() if k != v})
+        if nb != plain[r["id"]]:
             relinked += 1
+        c.execute("UPDATE wiki_pages SET body=? WHERE id=?", (wkh_seal(c, to, None if to else uid, nb), r["id"]))  # 2.123.0 A (#2105)
         wiki_set_links(c, r["id"], nb)
         c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('wiki',?,?,?,?,?,?)",
                   (r["id"], src, to, uid, ts, json.dumps({"from": r["path"], "to": n}, ensure_ascii=False)))
@@ -248,6 +253,7 @@ def wkr_move(c, uid, src, to, b, dry):
     if any(not isinstance(x, dict) or "path" not in x or "body" not in x for x in items):
         raise BadInput(tr("Invalid value: {0}", "pages"))
     old = {v for r in rows for v in (r["path"], r["body"]) if v}
+    from .wkhist import wkh_move, wkh_seal  # 2.123.0 A (#2105, #2102)
     got = {x["id"]: (wkr_value(x["path"], "path", tst, old), wkr_value(x["body"], "body", tst, old)) for x in items}
     if not tst["mode"]:  # an open target: its names are compared here
         tw, ta = wiki_space_sql(to, uid)
@@ -267,10 +273,13 @@ def wkr_move(c, uid, src, to, b, dry):
                 p, t = got[r["id"]]
                 attrs = "{}" if tst["mode"] else json.dumps(wiki_frontmatter(t), ensure_ascii=False)
                 c.execute("UPDATE wiki_pages SET org_id=?, owner_id=?, path=?, body=?, attrs=?, updated_by=?, updated_at=? WHERE id=?",
-                          (to, None if to else uid, p, t, attrs, uid, ts, r["id"]))
+                          (to, None if to else uid, p, t if tst["mode"] else wkh_seal(c, to, None if to else uid, t), attrs, uid, ts, r["id"]))
     except IntegrityError:
         c.rollback()
         return jsonify(error=tr("A page with this name already exists"), taken=[]), 409
+    from .wkshare import wsh_end_moved  # 2.123.0 B (#2104): their shares end (a locked source has none)
+    wsh_end_moved(c, src, None if src else uid, [r["path"] for r in rows])
+    wkh_move(c, rows, to, uid, keep=False)  # 2.123.0 A (#2102): no history across a lock (the source had none either)
     for r in rows:
         p, t = got[r["id"]]
         if tst["mode"]:

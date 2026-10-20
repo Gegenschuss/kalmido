@@ -157,6 +157,10 @@ CHECKS = {
     # 2.99.0 A (#2182): a file of a knowledge page that lies in another space than its page (org / owner) -- (file, who stored it)
     "wiki_file": ("SELECT f.id, f.created_by FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id WHERE "
                   "COALESCE(f.org_id,0)<>COALESCE(p.org_id,0) OR (p.org_id IS NULL AND f.owner_id IS DISTINCT FROM p.owner_id)"),
+    # 2.123.0 B (#2104): a live person share of a knowledge page / folder that crosses a boundary: in an organisation's space
+    # (people get shares in private spaces only), with an agent, or with the space's owner itself -- (share, person)
+    "wiki_share": ("SELECT s.id, s.user_id FROM wiki_shares s JOIN users u ON u.id=s.user_id WHERE s.kind='person' AND s.revoked_at IS NULL "
+                   "AND (s.org_id IS NOT NULL OR u.kind='agent' OR s.user_id=s.owner_id)"),
     # 2.122.0 A (#2097): a file request in another workspace than its folder, or of an organisation's folder made by a person
     # outside that organisation (the link stops anyway: files/filereq.py frq_alive) -- (request, its creator); counted only
     "file_request": ("SELECT q.id, q.created_by FROM fs_upload_requests q JOIN fs_nodes n ON n.id=q.node_id WHERE q.deleted_at IS NULL "

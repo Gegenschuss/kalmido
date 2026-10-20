@@ -28,7 +28,8 @@ from ..personal.timetrack import BadInput
 WIKI_PATH_MAX, WIKI_BODY_MAX, WIKI_DEPTH = 200, 500_000, 12
 WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, WIKI_ZIP_TOTAL = 2000, 1_000_000, 30_000_000
 WIKI_TEMPLATES = ("templates/", "vorlagen/")  # lower case; "Templates/…" (SilverBullet) and the German folder name
-WIKI_LINK_RE = re.compile(r"\[\[([^\[\]|#\n]{1,250})(?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?\]\]")
+# 2.123.0 C (#2107): [[datei:…]] / [[tabelle:…]] link the file store / a table (wkembed.py), not a page
+WIKI_LINK_RE = re.compile(r"\[\[(?!\s*(?i:datei|tabelle)\s*:)([^\[\]|#\n]{1,250})(?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?\]\]")
 WIKI_TASK_RE = re.compile(r"(?<![\w&/#])#(\d{1,12})\b")
 WIKI_BAD_CHARS = re.compile(r"[\x00-\x1f\x7f\[\]|#^\\]")
 
@@ -136,7 +137,8 @@ def wiki_dict(r, full=True, names=None):
     if r["path"].startswith("e2e1:"):  # 2.64.3 A (#1817): a page of a locked space -- the browser reads both from the plain text
         d["attrs"], d["template"] = {}, False
     if full:
-        d["body"] = r["body"]
+        from .wkhist import wkh_body  # 2.123.0 A (#2105): the text is sealed at rest
+        d["body"] = wkh_body(db(), r)
     if names is not None:
         d["updated_by_name"] = names.get(r["updated_by"], "")
     return d
@@ -145,6 +147,8 @@ def wiki_dict(r, full=True, names=None):
 def wiki_set_links(c, pid, text):
     paths, tasks = wiki_links_of(text)
     c.execute("DELETE FROM wiki_links WHERE from_id=?", (pid,))
+    from .wkembed import wem_set_links
+    wem_set_links(c, pid, text)  # 2.123.0 C (#2103, #2107): the files of the file store and the tables it shows / links
     if (text or "").startswith("e2e1:"):  # 2.64.3 A (#1817): a locked space keeps no links on the server
         return
     for p in paths[:500]:
@@ -164,14 +168,18 @@ def wiki_body(b):
 
 def wiki_insert(c, oid, uid, path, text, ts):
     """A new page; None when the path is taken in that space."""
+    from .wkhist import wkh_seal  # 2.123.0 A (#2105, #2106): the text sealed at rest, the word index
+    from .wksearch import wks_index
     try:
         with c.savepoint():
             pid = insert_id(c, "INSERT INTO wiki_pages(org_id,owner_id,path,body,attrs,created_by,updated_by,created_at,updated_at) "
                                "VALUES(?,?,?,?,?,?,?,?,?)",
-                            (oid, None if oid else uid, path, text, json.dumps(wiki_frontmatter(text), ensure_ascii=False), uid, uid, ts, ts))
+                            (oid, None if oid else uid, path, wkh_seal(c, oid, None if oid else uid, text),  # 2.123.0 A (#2105)
+                             json.dumps(wiki_frontmatter(text), ensure_ascii=False), uid, uid, ts, ts))
     except IntegrityError:
         return None
     wiki_set_links(c, pid, text)
+    wks_index(c, pid, oid, None if oid else uid, text, ts)  # 2.123.0 A (#2106)
     return pid
 
 
@@ -191,11 +199,15 @@ def wiki_index():
     names = user_names(c, {r["updated_by"] for r in rows})
     from .wikie2e import wke_index_info  # 2.64.3 A (#1817): the lock of the space; bodies=1 = the ciphertexts for the local search
     e2e = wke_index_info(c, oid, uid)
+    from .wkhist import wkh_body
     pages = [wiki_dict(r, full=False, names=names) for r in rows]
     if e2e and request.args.get("bodies") == "1":
-        bodies = {r["id"]: r["body"] for r in c.execute(f"SELECT id, body FROM wiki_pages WHERE deleted_at IS NULL AND {w}", a)}
+        bodies = {r["id"]: wkh_body(c, r)  # 2.123.0 A (#2105): a page not converted yet may still be sealed at rest
+                  for r in c.execute(f"SELECT id, org_id, owner_id, body FROM wiki_pages WHERE deleted_at IS NULL AND {w}", a)}
         for d in pages:
             d["body"] = bodies.get(d["id"], "")
+    from .wkshare import wsh_mark  # 2.123.0 B (#2104): pages a share covers get their mark
+    wsh_mark(c, oid, uid, pages)
     return jsonify(space=wiki_space_key(oid), may_write=True, pages=pages, e2e=e2e)
 
 
@@ -216,6 +228,8 @@ def wiki_get(pid):
     d["moved"] = wkm_last(c, pid)
     from .wikiatt import wka_list
     d["files"] = wka_list(c, r)  # 2.99.0 A (#2182): the page's PDFs and pictures
+    from .wkshare import wsh_count
+    d["shares"] = wsh_count(c, r)  # 2.123.0 B (#2104): live shares that cover the page
     return jsonify(d)
 
 
@@ -233,8 +247,9 @@ def wiki_create():
         path = wiki_clean_path(b.get("path"))
         text = wiki_body(b)
     if b.get("template_id") and not text:
+        from .wkhist import wkh_body
         t = wiki_need(c, int(b["template_id"]))
-        text = t["body"]
+        text = wkh_body(c, t)  # 2.123.0 A (#2105)
         if text.startswith("e2e1:"):  # 2.64.3 (#1817, review M1): a template of an encrypted space opens only in the browser
             raise BadInput(tr("Invalid value: {0}", "template_id"))
     pid = wiki_insert(c, oid, uid, path, text, iso_ms(now_utc()))
@@ -247,14 +262,17 @@ def wiki_create():
 
 def wiki_relink(c, r, old, new, uid, ts):
     """[[old]] -> [[new]] in the other pages of the space (also [[old|label]] and [[old#part]]); the number of pages changed."""
+    from .wkhist import wkh_open, wkh_seal  # 2.123.0 A (#2105)
     w, a = wiki_space_sql(r["org_id"], uid)
     rx = re.compile(r"\[\[\s*" + re.escape(old) + r"\s*(?=[\]|#])", re.I)
     n = 0
-    for p in c.execute(f"SELECT DISTINCT p.id, p.body FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.to_path=? "
+    for p in c.execute(f"SELECT DISTINCT p.id, p.org_id, p.owner_id, p.body FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.to_path=? "
                        f"AND p.deleted_at IS NULL AND p.{w.replace(' AND ', ' AND p.')}", [old.lower(), *a]).fetchall():
-        nb = rx.sub(lambda m: "[[" + new, p["body"])
-        if nb != p["body"]:
-            c.execute("UPDATE wiki_pages SET body=?, updated_by=?, updated_at=? WHERE id=?", (nb, uid, ts, p["id"]))
+        ob = wkh_open(c, p["org_id"], p["owner_id"], p["body"])  # 2.123.0 A (#2105)
+        nb = rx.sub(lambda m: "[[" + new, ob)
+        if nb != ob:
+            c.execute("UPDATE wiki_pages SET body=?, updated_by=?, updated_at=? WHERE id=?",
+                      (wkh_seal(c, p["org_id"], p["owner_id"], nb), uid, ts, p["id"]))
             wiki_set_links(c, p["id"], nb)
             n += 1
     return n
@@ -274,26 +292,38 @@ def wiki_update(pid):
         cur = wiki_dict(r, names=user_names(c, [r["updated_by"]]))
         return jsonify(error=tr("Changed in the meantime by {0}", cur.get("updated_by_name") or "?"), page=cur), 409
     f, ts, n = {}, iso_ms(now_utc()), 0
+    from .wkhist import wkh_body, wkh_note, wkh_prev, wkh_seal  # 2.123.0 A (#2105, #2102, #2106)
+    from .wksearch import wks_index
     from .wikie2e import wke_guard  # 2.64.3 A (#1817): a locked space takes ciphertexts only, its links stay in the browser
     locked = wke_guard(c, r["org_id"], r["owner_id"], b.get("path"), b.get("body"), "update")
     if "body" in b:
         f["body"] = b["body"] if locked else wiki_body(b)
         f["attrs"] = "{}" if locked else json.dumps(wiki_frontmatter(f["body"]), ensure_ascii=False)
+    plain = f.get("body")
     if "path" in b:
         path = b["path"] if locked else wiki_clean_path(b["path"])
         if path != r["path"]:
             f["path"] = path
     if f:
         f["updated_by"], f["updated_at"] = uid, ts
+        if plain is not None:
+            f["body"] = wkh_seal(c, r["org_id"], r["owner_id"], plain)  # 2.123.0 A (#2105): sealed at rest
+        prev = wkh_prev(c, r)
         try:
             with c.savepoint():
                 c.execute(f"UPDATE wiki_pages SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), pid])
         except IntegrityError:
             return wiki_taken()
         if "body" in f:
-            wiki_set_links(c, pid, f["body"])
+            wiki_set_links(c, pid, plain)
+        if not locked:  # 2.123.0 A (#2102, #2106): the history and the word index
+            wkh_note(c, pid, uid, ts, prev=prev)
+            wks_index(c, pid, r["org_id"], r["owner_id"], plain if plain is not None else wkh_body(c, r), ts)
         if "path" in f and b.get("relink", True) is not False and not locked:
             n = wiki_relink(c, r, r["path"], f["path"], uid, ts)
+        if "path" in f and not locked:
+            from .wkshare import wsh_repath  # 2.123.0 B (#2104): the page's shares follow the new name
+            wsh_repath(c, r["org_id"], r["owner_id"], r["path"], f["path"], False)
         bump(c)
         c.commit()
     d = wiki_dict(wiki_need(c, pid), names=user_names(c, [uid]))
@@ -331,6 +361,8 @@ def wiki_move():
         c.execute("UPDATE wiki_pages SET path=?, updated_by=?, updated_at=? WHERE id=?", (new, uid, ts, r["id"]))
     for r, new in moves:
         n += wiki_relink(c, r, r["path"], new, uid, ts)
+    from .wkshare import wsh_repath  # 2.123.0 B (#2104): the shares of the folder and of its pages follow
+    wsh_repath(c, oid, None if oid else uid, src, dst, True)
     bump(c)
     c.commit()
     return jsonify(ok=True, moved=[{"id": r["id"], "from": r["path"], "to": new} for r, new in moves], relinked=n)
@@ -396,23 +428,25 @@ def wiki_bulk(trash):
 
 @app.get("/api/wiki/search")
 def wiki_search():
-    """?q=words -- pages of every space one may read whose name (or text) has all words; without their text."""
+    """?q=words -- pages of every space one may read whose name (or text) has all words; without their text. 2.123.0 A
+    (#2106): over the word index (wksearch.py), ranked (words in the name, then in the text, then the newest); ?space=
+    only that space, ?limit= (default 30, at most 100) &offset= the next ones -> {pages, total, more, offset}."""
     from ..accounts.orgs import user_orgs
+    from .wksearch import WKS_LIMIT, WKS_LIMIT_MAX, wks_search
     c = db()
     uid = me()
     q = (request.args.get("q") or "").strip()[:200]
-    orgs = user_orgs(c, uid)
-    w = "deleted_at IS NULL AND ((org_id IS NULL AND owner_id=?)" + (f" OR org_id IN ({','.join(str(int(x)) for x in orgs)})" if orgs else "") + ")"
-    from .wikie2e import wke_open_sql  # 2.64.3 A (#1817): locked spaces are searched in the browser
-    w += " AND " + wke_open_sql("wiki_pages")
-    a = [uid]
-    for word in q.split()[:6]:
-        like = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        w += " AND (path ILIKE ? ESCAPE '\\' OR body ILIKE ? ESCAPE '\\')"
-        a += [like, like]
-    rows = c.execute(f"SELECT id, org_id, owner_id, path, attrs, created_by, updated_by, created_at, updated_at FROM wiki_pages "
-                     f"WHERE {w} ORDER BY updated_at DESC LIMIT 30", a).fetchall()
-    return jsonify(pages=[wiki_dict(r, full=False) for r in rows])
+    try:
+        limit = max(1, min(WKS_LIMIT_MAX, int(request.args.get("limit") or WKS_LIMIT)))
+        offset = max(0, min(100_000, int(request.args.get("offset") or 0)))
+    except ValueError:
+        raise BadInput(tr("Invalid value: {0}", "limit"))
+    if request.args.get("space") not in (None, ""):
+        spaces = [wiki_space(c, uid, request.args.get("space"))]
+    else:
+        spaces = [None, *user_orgs(c, uid)]
+    rows, total = wks_search(c, uid, spaces, q, limit, offset)
+    return jsonify(pages=[wiki_dict(r, full=False) for r in rows], total=total, offset=offset, more=offset + len(rows) < total)
 
 
 @app.get("/api/wiki/mentions")

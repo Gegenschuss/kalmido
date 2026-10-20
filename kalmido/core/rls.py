@@ -29,6 +29,7 @@ TABLES = (
     "office_client_contacts",  # 2.40.0 (#1380): contact persons of a client (org_id like the client)
     "office_roles", "office_doc_parts", "office_purchases",  # 2.47.0 (#1649, #1215, #1216)
     "office_trips", "office_trip_items", "office_fixed_costs",  # 2.47.3 (#1022, #1652, part B)
+    "office_cf_start", "office_cf_adjust", "office_cf_actual",  # 2.123.0 D (#2341): account balance of the cash flow
     "office_trip_purposes",  # 2.117.0 A (#2292): own purposes of trips
     "office_meals", "office_meal_files", "office_meal_choices", "office_meal_log",  # 2.119.0 A (#2288): entertainment receipts
     "office_bank_imports", "office_bank_tx",  # 2.90.0 B (#1921): bank reconciliation
@@ -40,6 +41,8 @@ TABLES = (
     "wiki_pages",  # 2.49.0 C (#1199): knowledge pages (NULL = private, the app checks owner_id)
     "wiki_spaces",  # 2.64.3 A (#1817): the lock per knowledge space (NULL = a private space, the app checks owner_id)
     "wiki_files",  # 2.99.0 A (#2182): files of knowledge pages (NULL = private, the app checks owner_id like the page)
+    "wiki_shares",  # 2.123.0 B (#2104): shares of knowledge pages / folders (NULL = private, the app checks owner_id)
+    "wiki_versions",  # 2.123.0 A (#2102): the history of knowledge pages (NULL = private, the app checks the page)
     "fs_nodes",  # 2.48.0 (#1207): the file store (org_id NULL = a person's own tree)
     "fs_upload_requests",  # 2.122.0 A (#2097): file requests of a folder (NULL = private, the app checks the folder)
     "doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_rules", "doc_models", "doc_cfg", "doc_mail",  # 2.48.0 (#1111): documents

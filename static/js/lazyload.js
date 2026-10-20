@@ -21,7 +21,7 @@ const LD_MODS = {
   agentchat: ['agentchat', 'agentsetup'],
   pdf: ['pdfview', 'docpreview'],  // 2.92.0 C (#1926): docpreview.js = the Word / Excel preview
   mindmap: ['mindmap'],
-  wiki: ['wiki'],
+  wiki: ['wiki', 'wkshare', 'wkhist', 'wkembed'],  // 2.123.0 B (#2104): wkshare.js = shares; A (#2102, #2106): wkhist.js = history + text search; C (#2103, #2107, #2108): wkembed.js = Ablage pictures, links, checkboxes
   stats: ['stats'],
   calendar: ['calview', 'caldrag', 'apptbook'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings
   docs: ['docs', 'paperless', 'receipts'],

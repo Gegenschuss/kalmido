@@ -193,6 +193,15 @@ const AB_ACT = {list: N_('opened the folder'), read: N_('read'), download: N_('d
   unshare: N_('stopped sharing'), org_access: N_('changed who in the organisation sees it'), create: N_('created'), link: N_('linked'),
   moved_space: N_('moved to another workspace'),  // 2.96.0 A (#1941)
   tags: N_('changed the tags')};  // 2.122.0 B (#2099)
+// 2.123.0 C (#2103, #2107): the knowledge pages (that I may read) which show or link this file
+async function ab_wikiRefs(md, id) {
+  let ps; try { ps = (await rawFetch('GET', '/api/wiki/refs?file=' + id)).pages || []; } catch { return; }
+  if (!ps.length || !md.isConnected) return;
+  const sec = document.createElement('div');
+  sec.className = 'dsec wkmen';
+  sec.innerHTML = `${ic('book', 's')}<span class="muted">${tr('Mentioned in')}</span>${ps.map(p => `<a href="#wiki/${p.id}" data-m="close">${esc(p.path)}</a>`).join('<span class="muted">,</span>')}`;
+  $('.foot', md)?.before(sec);
+}
 async function ab_details(id) {
   let n; try { n = await api('GET', `/api/files/nodes/${id}`); } catch { return; }
   $('.abdlg')?.remove();
@@ -210,6 +219,7 @@ async function ab_details(id) {
     ${n.log ? `<h4>${tr('History')}</h4><div class="ablog">${log || `<span class="muted">${tr('Nothing yet')}</span>`}</div><p class="muted abhint">${tr('Every access of an agent is listed here.')}</p>` : ''}
     <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
   md.classList.add('abdlg');
+  if (n.kind === 'file' && feat('wiki')) ab_wikiRefs(md, n.id);  // 2.123.0 C (#2107)
   md.addEventListener('click', async e => {
     if (e.target.closest('[data-m="close"]')) { modalClose(md); return; }
     const v = e.target.closest('[data-abv]');

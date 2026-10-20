@@ -292,7 +292,7 @@ def cf8_chain(c, oid, r):
                           "counts": x["id"] in counting} for x in rows]}
 
 
-def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
+def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True):
     """{from, months, currency, today, basis, rows: [{month, in: {actual, plan}, out: {actual, plan}, balance}], entries: [...]}.
     An entry: {month, dir in|out, state actual|plan, kind payment|invoice|offer|series|purchase|trip|fixed|agreement|receipt, date, amount,
     label, number, doc_id | trip_id | fixed_id | agreement_id (2.92.0 A, #1925) | node_id (receipt, 2.114.1 B, #2018), overdue} (kind credit = a refund paid on a credit note, out; kind offer carries
@@ -300,7 +300,9 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
     2.67.0 (#1838): basis gross (default; the start page too) | net. Fixed costs are entered net with a VAT rate: gross adds
     it. Documents (payments, open invoices, quotations, credit notes) are gross; net takes their share net / gross of the
     document's totals. Purchases (purchase prices of quotations) and travel receipts have no rate here: the same amount on
-    both bases."""
+    both bases.
+    2.123.0 D (#2341): cfs (default on) adds the account balance of office/cfstart.py cfs_apply (start, account, manual, real,
+    diff, adjust); off for its own inner runs."""
     from .costs import ek_purchases
     from .invoices import inv_money_fields, inv_paid_map
     st = office_settings(c, oid)
@@ -433,8 +435,12 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross"):
             res = money(max(res_in.get(mo, dec(0)), dec(0)) * reserve_pct / 100)
             cum_bal, cum_res = cum_bal + bal, cum_res + res
             rows[-1].update(reserve=dstr(res), free=dstr(money(cum_bal - cum_res)))
-    return {"from": first_month, "months": months, "currency": home, "today": today, "basis": "net" if net else "gross", "rows": rows, "entries": entries,
-            "tax_reserve_pct": reserve_pct}
+    out = {"from": first_month, "months": months, "currency": home, "today": today, "basis": "net" if net else "gross", "rows": rows, "entries": entries,
+           "tax_reserve_pct": reserve_pct}
+    if cfs:  # 2.123.0 D (#2341): start balance, corrections by hand, real balances (office/cfstart.py; nothing set = as before)
+        from .cfstart import cfs_apply
+        cfs_apply(c, oid, out, today)
+    return out
 
 
 @app.get("/api/office/cashflow")
