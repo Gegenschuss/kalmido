@@ -26,7 +26,7 @@ import shutil
 from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
-from flask import g, jsonify, request
+from flask import g, jsonify, request, has_app_context
 
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import N_, tr
@@ -101,7 +101,7 @@ def _cap(detail):
 def ofx_log(c, oid, action, target="doc", doc_id=None, detail=None, dedupe_min=0):
     """One entry of the office log of organisation oid by the signed-in person. dedupe_min: reads (open, pdf, render,
     export) of the same person on the same thing within that many minutes are written once."""
-    u = getattr(g, "user", None)
+    u = getattr(g, "user", None) if has_app_context() else None  # 2.138.0 (#1972): also from a background thread (org export)
     uid = u["id"] if u is not None else None
     at = now_utc()
     if dedupe_min:
