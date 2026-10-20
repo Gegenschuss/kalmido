@@ -1497,6 +1497,15 @@ fresh; run p2140_c_ui node p2140_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.140.0 part D: birthdays written back to CardDAV (#2137)
 fresh; run p2140_d_api "$PY" p2140_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2140_d_ui node p2140_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.141.0 part A: mailbox (IMAP + SMTP) per workspace, reply / send from the mail store (#2141 #2138)
+fresh; run p2141_a_api "$PY" p2141_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2141_a_ui node p2141_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.141.0 part B: HTML mails in a sandbox, mail -> task / event with a link back (#2140 #2139)
+fresh; run p2141_b_api "$PY" p2141_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2141_b_ui node p2141_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.141.0 part C: dispatch export CSV / ICS, newsletter consent import (#2142 #2143)
+fresh; run p2141_c_api "$PY" p2141_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2141_c_ui node p2141_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.144.0 part A: agent chat - filter only as the header icon, filter "only me" hides job results, stop a running answer (#2416 #2419 #2412)
 fresh; run p2144_a_api "$PY" p2144_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2144_a_ui node p2144_a_ui.js "$KALMIDO_TEST_DATA"

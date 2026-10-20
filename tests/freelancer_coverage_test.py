@@ -42,8 +42,8 @@ KINDS = {
     "team": ("matrix", SUITE + ": the people list, direct messages and discovery without an organisation (no team rooms of "
                        "an organisation, nothing of another workspace); p2113b_b_api_test.py: a private channel with files, "
                        "rename / archive / restore as its own admin, groups only with people one works with (2.113.1)"),
-    "hub": ("matrix", SUITE + ", p2125_a_api_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
-                      "2.125.0: the own vacation account and working week, never a vacation request"),
+    "hub": ("matrix", SUITE + ", p2125_a_api_test.py, p2141_a_api_test.py, p2141_b_api_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
+                      "2.125.0: the own vacation account and working week, never a vacation request; 2.141.0 A: the own mailbox, reply / new e-mail; 2.141.0 B: HTML view, task / event from a private mail"),
     "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature; "
                            "p2140_a_api_test.py: shopping amounts, recipes, the meal plan beyond a week (2.140.0)"),
     "videos": ("matrix", "p2991_a_api_test.py: video sign-offs (2.99.1) at a private task / list / client of a person without an "
@@ -208,10 +208,15 @@ ROUTES = {
     "DELETE /api/team/dispo/bookings/{}": "hub", "GET /api/hubmail/inbox": "hub", "GET /api/hubmail/mails": "hub",
     "GET /api/hubmail/mails/{}": "hub", "GET /api/hubmail/mails/{}/files/{}": "hub", "GET /api/hubmail/targets": "hub",
     "GET /api/team/absences": "hub", "GET /api/team/absences/check": "hub", "GET /api/team/bookings/mine": "hub",
-    "GET /api/team/dispo": "hub", "GET /api/team/dispo/free": "hub", "GET /api/v1/absences": "hub", "GET /api/v1/dispo": "hub",
+    "GET /api/team/dispo": "hub", "GET /api/team/dispo/export": "hub", "GET /api/team/dispo/free": "hub", "GET /api/v1/absences": "hub", "GET /api/v1/dispo": "hub",
     "GET /api/v1/dispo/free": "hub", "PATCH /api/team/absences/{}": "hub", "PATCH /api/team/dispo/bookings/{}": "hub",
     "POST /api/hubmail/address": "hub", "POST /api/hubmail/mails/{}/assign": "hub",
-    "POST /api/hubmail/mails/{}/restore": "hub", "POST /api/team/absences": "hub", "POST /api/team/absences/{}/restore": "hub",
+    # 2.141.0 A (#2141, #2138): the own mailbox of the private space, Reply / New e-mail (p2141_a_api_test.py, freelancer-matrix: hub)
+    "GET /api/hubmail/mailboxes": "hub", "GET /api/hubmail/mailbox": "hub", "PUT /api/hubmail/mailbox": "hub", "DELETE /api/hubmail/mailbox": "hub",
+    "POST /api/hubmail/mailbox/check": "hub", "POST /api/hubmail/mailbox/poll": "hub", "GET /api/hubmail/compose": "hub", "POST /api/hubmail/send": "hub",
+    "POST /api/hubmail/mails/{}/restore": "hub",
+    "GET /api/hubmail/mails/{}/html": "hub", "GET /api/hubmail/mails/{}/make": "hub", "POST /api/hubmail/mails/{}/task": "hub",  # 2.141.0 B (#2140, #2139)
+    "POST /api/hubmail/mails/{}/event": "hub", "GET /api/hubmail/links": "hub", "POST /api/team/absences": "hub", "POST /api/team/absences/{}/restore": "hub",
     "POST /api/team/dispo/bookings": "hub", "POST /api/team/dispo/bookings/restore": "hub",
     "PUT /api/team/absences/holidays": "hub",
     # 2.125.0 A (#2117, #2118): vacation account, requests, the working week
@@ -408,7 +413,7 @@ ROUTES = {
     "POST /api/receipt-suggestions/{}/reopen": "office", "POST /api/v1/clients": "office",
     "POST /api/v1/clients/bulk": "office", "POST /api/v1/office/offers": "office",
     "POST /api/v1/office/offers/{}/invoice": "office", "POST /api/v1/office/payment-suggestions": "office",
-    "POST /api/v1/office/reminders": "office", "PUT /api/newsletter": "office", "PUT /api/newsletter/consent": "office",
+    "POST /api/v1/office/reminders": "office", "PUT /api/newsletter": "office", "PUT /api/newsletter/consent": "office", "POST /api/newsletter/consent/import": "office",
     "PUT /api/office/cashflow/check": "office", "PUT /api/office/docs/{}/items": "office",
     "PUT /api/office/docs/{}/parts/{}/items": "office", "PUT /api/office/settings": "office", "PUT /api/paperless": "office",
     # ---- orgadmin (23; 2.137.0 A (#2344): export of the own personal office -> "office")
