@@ -37,8 +37,14 @@ O, D = "/api/office", "/api/office/docs"
 
 def logs():
     ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-    print(subprocess.run(["docker", "logs", "--tail", "80", ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                         text=True).stdout[-8000:], flush=True)
+    out = subprocess.run(["docker", "logs", "--tail", "300", ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).stdout
+    keep = [x for x in out.splitlines() if any(k in x for k in ('File "/app', "Error", "rror:", "import of user", "Killed", "Segmentation",
+                                                                 "WORKER", "Worker", "signal", "Exception"))]
+    for x in keep[-30:]:
+        print("FAIL-LOG:", x[:300], flush=True)
+
+
+sys.excepthook = lambda t, v, tb: (print("FAIL: crashed", t.__name__, str(v)[:200], flush=True), logs(), sys.exit(1))
 
 
 def check(cond, what):
