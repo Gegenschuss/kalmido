@@ -35,6 +35,37 @@ def replace(text, old, new, name, count=1, at_least=False):
     return text.replace(old, new)
 
 
+# 2.125.0 D (#1653): keeping the demo current. The client's API calls (api / rawFetch with a literal method and path) against
+# the routes of tools/demo/shim.js (on('METHOD', 'regex', ...), crud('/api/...', ...), the QUIET answers, the GATED pattern and
+# the office's gated reads): what is left is listed as a warning after every build, the build itself goes on.
+CALL_RE = re.compile(r"""(?:api|rawFetch|apiQ|apiRaw)\(\s*'(GET|POST|PATCH|PUT|DELETE)'\s*,\s*([`'"])(/api/(?:(?!\2).)*)\2""")
+
+
+def shim_unknown(js, shim):
+    """-> [(method, path, n)] of the client's API calls no route of the shim answers (path with ${...} as 1, no query)."""
+    unesc = lambda r: r.replace("\\\\", "\\")  # noqa: E731 (a JS string: \\d = the regex \d)
+    routes = [(m, re.compile("^" + unesc(r) + "$")) for m, r in re.findall(r"\bon\('(GET|POST|PATCH|PUT|DELETE)',\s*'([^']*)'", shim)]
+    for base in re.findall(r"\bcrud\('(/api/[^']*)'", shim):
+        b = unesc(base)
+        routes += [("GET", re.compile("^" + b + "$")), ("POST", re.compile("^" + b + "$"))]
+        routes += [(m, re.compile("^" + b + r"/(\d+)$")) for m in ("GET", "PATCH", "PUT", "DELETE")]
+        routes.append(("POST", re.compile("^" + b + r"/(\d+)/restore$")))
+    quiet = set(re.findall(r"'((?:GET|POST|PATCH|PUT|DELETE) /api/[^']*)'\s*:", shim))
+    g = re.search(r"const GATED = /(.*)/;", shim)
+    gated = re.compile(g.group(1).replace("\\/", "/")) if g else None
+    calls = {}
+    for m, _, p in CALL_RE.findall(js):
+        p = re.sub(r"\$\{[^}]*\}", "1", p).split("?")[0]
+        calls[(m, p)] = calls.get((m, p), 0) + 1
+    out = []
+    for (m, p), n in sorted(calls.items()):
+        if f"{m} {p}" in quiet or (gated and gated.search(p)) or p.startswith("/api/office/") and m == "GET":
+            continue
+        if not any(rm == m and r.match(p) for rm, r in routes):
+            out.append((m, p, n))
+    return out
+
+
 def main(argv):
     out, site = os.path.join(ROOT, "demo"), "../"
     args = list(argv)
@@ -67,13 +98,17 @@ def main(argv):
     app = replace(app, "/static/", "static/", "app.js", count=5, at_least=True)
     if re.search(r"""['"`]/sw\.js""", app):
         fail("app.js still references /sw.js")
+    # 2.125.0 D (#1653): the intro's "Start" (account.js setupChoices) reloads the page itself, not the site's root
+    app = replace(app, "      else return;\n      location.replace('/');", "      else return;\n      location.reload();  /* demo build: the demo page itself */", "app.js")
     write(os.path.join(st, "app.js"), app)
+    js_all = app
     # 2.53.1 (#1410): the modules loaded on demand (LAZY in sw.js, no script tag in index.html) stay own files: loadModule
     # fetches static/js/<name>.js relative to the demo page
     lazy = re.findall(r"'/static/js/([\w-]+\.js)'", (re.search(r"const LAZY = \[([^\]]*)\]", read(os.path.join(STATIC, "sw.js"))) or fail("sw.js has no LAZY list")).group(1))
     os.makedirs(os.path.join(st, "js"), exist_ok=True)
     for m in lazy:
         write(os.path.join(st, "js", m), read(os.path.join(STATIC, "js", m)))
+        js_all += "\n" + read(os.path.join(STATIC, "js", m))
     # 2.65.0 (#1824): their stylesheets (LAZY_CSS in sw.js, static/css/) stay own files as well: loadModule loads them
     # beside the module, and a missing one would stop the module from loading in the demo
     lcss = re.search(r"const LAZY_CSS = \[([^\]]*)\]", read(os.path.join(STATIC, "sw.js")))
@@ -133,6 +168,12 @@ def main(argv):
           '  Header always set X-Robots-Tag "noindex, nofollow"\n'
           '  Header always set Cache-Control "no-cache"\n'
           "</IfModule>\n")
+    unknown = shim_unknown(js_all, read(os.path.join(DEMO_SRC, "shim.js")))
+    if unknown:
+        print(f"build_demo: warning: {len(unknown)} API calls of the app have no stand-in in tools/demo/shim.js (a read answers "
+              "with the \"not in the demo yet\" line, a write with the notice; add a route there):")
+        for m, p, n in unknown:
+            print(f"  unknown: {m} {p}  ({n})")
     n = sum(len(fs) for _, _, fs in os.walk(out))
     print(f"build_demo: {out} ({n} files, languages: en {' '.join(langs)})")
 
