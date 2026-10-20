@@ -161,6 +161,8 @@ window.__secs = lid => secIds(lid).map(i => S.sections.find(s => s.id === i).nam
     const a = await ev(RECTS);
     check(Math.abs(a.hF - a.hL) <= 1 && a.hF >= 43, `${tag}: #1643: folder row as high as a list row (44 px) ` + JSON.stringify(a));
     check(a.fcar < a.sic && a.nL - a.fL >= 40, `${tag}: #1607: the arrow first, at least 40 px to tap left of the name ` + JSON.stringify(a));
+    // 2.144.2 (#1730): on the phone the "…" stays visible, the share icon sits after it in the lists' share column
+    check(Math.abs(a.fshrR - a.shrR) <= 1.5 && a.menuOp === 1, `${tag}: #1730: phone - the folder's share icon in the column of the lists' share icon ` + JSON.stringify(a));
     // a tap on the arrow folds, a tap on the name opens the folder
     const hit = await ev(`(() => { const r = document.querySelector('#side .fhead[data-folder="Family"] .fcar').getBoundingClientRect(), el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!el.closest('[data-act="folder-toggle"]') && !el.closest('.fgo, .iconbtn'); })()`);
     check(hit, `${tag}: #1607: the arrow belongs to the folding part of the row`);
