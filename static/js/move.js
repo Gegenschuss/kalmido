@@ -42,6 +42,7 @@ function umzPreviewHtml(j) {
   const notes = [p.again ? `<div class="shint warn" role="alert">${ic('alert', 's')} ${tr('You have imported this export already. Importing it again creates everything a second time.')}</div>` : '',
     p.server_links.length ? hintK(tr('Set up the connection to {0} again (Settings > Account > Servers): access keys never move along.', p.server_links.map(esc).join(', '))) : '',
     p.encrypted.attachments || p.encrypted.locked_notes ? hintK(tr('Encrypted content stays encrypted: you open it with your passwords as before.')) : '',
+    (p.taken_areas || []).length ? hintK(tr('Also taken over: {0}', p.taken_areas.map(x => `${esc(x.what)} (${x.count})`).join(', '))) : '',  // 2.137.0 (#2344)
     p.not_taken.length ? hintK(tr('Not taken over: {0}', p.not_taken.map(x => `${esc(x.what)} (${x.count})`).join(', '))) : ''].join('');
   const tgt = p.targets.length > 1 || org ? `<div class="row"><label for="s-umz-tgt">${tr('Into')}</label><select id="s-umz-tgt">${p.targets.map(t => `<option value="${esc(String(t.id))}">${esc(t.id === 'private' ? tr('Private|workspace') : t.name)}</option>`).join('')}</select></div>` : '';
   const none = org && !p.targets.length;  // 2.73.0 B (part 4): an organisation export needs an organisation I administer here

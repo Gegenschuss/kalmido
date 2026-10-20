@@ -227,6 +227,11 @@ def pb_info(c, uid, oid):
     orgs = user_orgs(c, uid)
     u = getattr(g, "user", None) if has_request_context() else None
     move = {"can_move": 1 if u is not None and u["is_admin"] and instance_mode(c) == "workspaces" else 0}  # POST /api/office/move
+    # 2.137.0 D (#1981): the organisations the person is an admin of (POST /api/office/move/org takes the office into one)
+    from ..accounts.orgs import org_role
+    adm = [o for o in orgs if org_role(c, uid, o) == "admin"]
+    move["move_orgs"] = [{"id": r["id"], "name": r["name"]} for r in c.execute(
+        f"SELECT id, name FROM orgs WHERE id IN ({','.join('?' * len(adm))}) AND personal_of IS NULL ORDER BY lower(name)", adm)] if adm else []
     used = c.execute("SELECT 1 FROM office_docs WHERE org_id=? UNION ALL SELECT 1 FROM office_services WHERE org_id=? LIMIT 1", (oid, oid)).fetchone()
     if used or not orgs:
         return {"personal": 1, "org_offices": [], **move}
