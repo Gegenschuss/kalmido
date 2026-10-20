@@ -197,38 +197,42 @@ check(r.ok, f"#2358: renaming a page beside an unreadable one (relink) works {r.
 
 # ---------------------------------------------------------------- #2355: News for the person a page is shared with
 mp = page(A, "private", "Customer/Plan", "the plan")
-r = share(A, page_id=mp, kind="person", user_id=DAVE)
+r = share(A, page_id=mp, kind="person", user_id=BOB)
 check(r.status_code == 201, "#2355: a person share " + r.text[:200])
 sid = r.json().get("id")
-it = news(Da)
+it = news(Bo)
 check(len(it) == 1 and it[0]["data"].get("path") == "Customer/Plan" and it[0]["data"].get("folder") is False and it[0]["actor_id"] == ALICE
       and it[0].get("to_me") is True, "#2355: the person gets one News item with the path " + str(it)[:300])
 check(set(it[0]["data"]) <= {"path", "folder"} if it else False, "#2355: no page content in the item")
-share(A, page_id=mp, kind="person", user_id=DAVE)
-check(len(news(Da)) == 1, "#2355: sharing the same page again (still live) adds no second item")
-check(not news(A) and not news(Bo) and not news(Ca), "#2355: nobody else gets an item (not the one who shares)")
+share(A, page_id=mp, kind="person", user_id=BOB)
+check(len(news(Bo)) == 1, "#2355: sharing the same page again (still live) adds no second item")
+check(not news(A) and not news(Ca) and not news(Da), "#2355: nobody else gets an item (not the one who shares)")
+r = share(A, page_id=mp, kind="person", email="dave@example.com")
+it = news(Da)
+check(r.ok and r.json().get("by_email") is True and len(it) == 1 and it[0]["data"].get("path") == "Customer/Plan",
+      "#2355: by e-mail address the account gets the item (the answer reveals nothing) " + str(it)[:300])
+share(A, page_id=mp, kind="person", email="dave@example.com")
+check(len(news(Da)) == 1, "#2355: by e-mail address again: no second item")
 r = share(A, space="private", folder="Customer", kind="person", email="carol@example.com")
 it = news(Ca)
-check(r.ok and r.json().get("by_email") is True and len(it) == 1 and it[0]["data"].get("folder") is True and it[0]["data"].get("path") == "Customer",
-      "#2355: by e-mail address the account gets the item (the answer reveals nothing) " + str(it)[:300])
+check(r.ok and len(it) == 1 and it[0]["data"].get("folder") is True and it[0]["data"].get("path") == "Customer", "#2355: a folder share " + str(it)[:300])
 assert A.delete(B + f"/api/wiki/shares/{sid}").ok
-check(len(news(Da)) == 1, "#2355: the item stays after a revoke")
+check(len(news(Bo)) == 1, "#2355: the item stays after a revoke")
 # the sharing row of the notification settings turns it off
 r = Bo.patch(B + "/api/settings", json={"notify": {"share": {"news": 0}}})
 check(r.ok, "#2355: the sharing row can be switched off " + r.text[:200])
-share(A, page_id=mp, kind="person", user_id=BOB)
-check(not news(Bo), "#2355: with the sharing row off no item")
+mp2 = page(A, "private", "Other/Page", "x")
+check(share(A, page_id=mp2, kind="person", user_id=BOB).status_code == 201 and len(news(Bo)) == 1, "#2355: with the sharing row off no item")
 # a person without an organisation (freelancer-matrix: wiki)
 FID, Fr = freelancer(B, A, features="cal,comments,collab,wiki")
 fp = page(Fr, "private", "Offer", "the offer")
-r = share(Fr, page_id=fp, kind="person", user_id=DAVE)
+r = share(Fr, page_id=fp, kind="person", email="dave@example.com")
 it = [x for x in news(Da) if x["actor_id"] == FID]
-check(r.status_code == 201 and len(it) == 1 and it[0]["data"].get("path") == "Offer", "#2355: a freelancer's share gives an item " + r.text[:200])
-share(A, page_id=mp, kind="person", user_id=FID)
+check(r.ok and len(it) == 1 and it[0]["data"].get("path") == "Offer", "#2355: a freelancer's share gives an item " + r.text[:200] + str(it)[:200])
+share(A, page_id=mp2, kind="person", email="frida@example.com")
 it = news(Fr)
-check(len(it) == 1 and it[0]["data"].get("path") == "Customer/Plan", "#2355: a freelancer receives the item " + str(it)[:200])
-check(Fr.get(B + "/api/wiki/shared").ok and "Customer/Plan" in [p["path"] for p in Fr.get(B + "/api/wiki/shared").json()["pages"]],
-      "#2355: the item's target (Shared with me) lists the page")
+check(len(it) == 1 and it[0]["data"].get("path") == "Other/Page", "#2355: a freelancer receives the item " + str(it)[:200])
+check("Other/Page" in [p["path"] for p in Fr.get(B + "/api/wiki/shared").json().get("pages", [])], "#2355: the item's target (Shared with me) lists the page")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
