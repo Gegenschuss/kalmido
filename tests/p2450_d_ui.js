@@ -64,7 +64,8 @@ const txt = (d, s) => (d.querySelector(s)?.textContent || '').replace(/\s+/g, ' 
   // ================= jsdom: the default start page
   w = await boot({user: 'alice', hash: 'home'}); d = w.document;
   await until(() => d.querySelectorAll('.dc-agents .djob').length >= 2 && d.querySelector('.dc-news .hpnl'));
-  check(txt(d, '.hpsum') === '4 tasks for today, 1 overdue, 1 agent working.' && d.querySelectorAll('.hpsum b').length === 3, '#1504: the sentence with the numbers: ' + txt(d, '.hpsum'));
+  // 2.144.0 (#2418): the sentence names the running jobs of the working agents too
+  check(txt(d, '.hpsum') === '4 tasks for today, 1 overdue, 1 agent working (2 jobs).' && d.querySelectorAll('.hpsum b').length === 4, '#1504: the sentence with the numbers: ' + txt(d, '.hpsum'));
   const grid = d.querySelector('.dgrid.lysix[data-ly="home"]');
   check(grid?.classList.contains('hpcols') && d.querySelector('.hpcol.hpl .dc-today') && d.querySelector('.hpcol.hpl .dc-news') && d.querySelector('.hpcol.hpr .dc-agents') && d.querySelector('.hpcol.hpr .dc-projects'), '#1504: two columns: Today + News wide, Agents + Projects narrow');
   check(!d.querySelector('.dc-search'), '#1504: Search hidden by default');

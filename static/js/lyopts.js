@@ -119,7 +119,8 @@ document.addEventListener('change', e => { const t = e.target.closest?.('#pop .l
 lyo_reg('home', 'today', [
   {name: 'n', label: N_('Number of tasks'), type: 'number', choices: [5, 8, 10, 20], default: 8},
   {name: 'mine', label: N_('Only tasks assigned to me'), type: 'bool', default: false, when: () => collab()},
-  {name: 'list', label: N_('Only this list or folder'), type: 'list', folders: true, default: null}]);
+  {name: 'list', label: N_('Only this list or folder'), type: 'list', folders: true, default: null},
+  {name: 'ev', label: N_('Show events'), type: 'bool', default: true, when: () => feat('cal')}]);  // 2.144.0 C (#2418)
 lyo_reg('home', 'projects', [
   {name: 'active', label: N_('Only active projects'), type: 'bool', default: true},
   {name: 'sort', label: N_('Order'), type: 'choice', choices: [['side', N_('As in the sidebar')], ['name', N_('By name')], ['progress', N_('By progress')]], default: 'side'},
