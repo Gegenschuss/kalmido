@@ -53,7 +53,9 @@ def zip_read(data, exts, file_max, total_max=ZIP_TOTAL_MAX, entries_max=ZIP_ENTR
     out = ZipRead()
     e = data.rfind(b"PK\x05\x06")
     cnt = struct.unpack_from("<H", data, e + 10)[0] if 0 <= e <= len(data) - 22 else None
-    if cnt is not None and cnt > entries_max:
+    size_cd = struct.unpack_from("<I", data, e + 12)[0] if cnt is not None else 0
+    # review 2.146.0: zipfile reads the central directory by its size, not by the count -- both are capped (46 bytes per entry + names)
+    if cnt is not None and (cnt > entries_max or size_cd > entries_max * 46 + 64 * 1024):
         raise ZipLimit(tr("The ZIP file holds too many entries (at most {0})", entries_max))
     if cnt is None or cnt == 0xFFFF:
         out.errors.append({"file": "", "error": tr("The ZIP file cannot be read")})

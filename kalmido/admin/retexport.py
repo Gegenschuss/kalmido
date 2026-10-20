@@ -79,7 +79,7 @@ def rx_subject(c, kind, sid):
 def rx_may_export(c, sub):
     """Only the person themself (user) or an admin of the organisation (org); people only, never an API token."""
     from ..agents.core import is_agent
-    if not g.user or is_agent(g.user) or getattr(g, "auth_via", None) == "token":
+    if not g.user or is_agent(g.user) or getattr(g, "auth_via", None) not in ("session", "proxy"):
         return False
     if sub["kind"] == "user":
         return sub["id"] == me()
@@ -483,7 +483,7 @@ def _download(sub, title):
 def _org_sub(c, oid):
     """The organisation subject for an admin of it or an instance admin (who sees only whether records exist); else 404."""
     sub = rx_subject(c, "org", oid)
-    if not rx_may_export(c, sub) and not (g.user and g.user["is_admin"] and getattr(g, "auth_via", None) != "token"):
+    if not rx_may_export(c, sub) and not (g.user and g.user["is_admin"] and getattr(g, "auth_via", None) in ("session", "proxy")):
         raise Denied(404)
     return sub
 
