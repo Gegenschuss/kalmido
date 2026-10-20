@@ -2002,7 +2002,8 @@ is tried again after 5 / 15 / 30 / 60 s, a run has a time limit (`KALMIDO_RUN_TI
 events wait in a queue on disk and a lock stops a second runner on the same state folder. A server without steps, host info, plan usage or approval cards (before 2.32 / 2.33 / 2.35) is
 detected by its answer (404 / 400) and the feature is switched off once. Keys in the env file: `KALMIDO_EVENTS=1` (same
 as `--events`), `KALMIDO_PROMPT_FILE`, `KALMIDO_STATE_DIR` (event cursor, default `~/.cache/kalmido-agent`),
-`KALMIDO_PERMISSION_MODE`, `KALMIDO_PERM_RELAY`, `KALMIDO_PERM_TIMEOUT`, `KALMIDO_PERM_USER`, `KALMIDO_APPROVAL_REMIND`,
+`KALMIDO_PERMISSION_MODE`, `KALMIDO_PERM_RELAY`, `KALMIDO_PERM_TIMEOUT`, `KALMIDO_PERM_USER` (2.126.0: with the owner and
+`KALMIDO_OWNER_IDS` the only ones who answer permission questions; anyone else chatting gets the step denied), `KALMIDO_APPROVAL_REMIND`,
 `KALMIDO_APPROVAL_TTL`, `KALMIDO_SESSION_RESUME`, `KALMIDO_SESSION_MAX_TOKENS`, `KALMIDO_SESSION_MAX_RUNS`,
 `KALMIDO_SESSION_IDLE_MIN`, `KALMIDO_RUN_TIMEOUT` (2.44.0), `KALMIDO_USAGE_LIMIT`, `KALMIDO_USAGE_FILE`, `KALMIDO_USAGE_MAX_AGE_H` (default 6: older
 values count as unknown), `KALMIDO_PYTHON`. The list of these capabilities is

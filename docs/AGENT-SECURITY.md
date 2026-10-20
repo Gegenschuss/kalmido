@@ -306,7 +306,9 @@ commands (they have no such hook); `KALMIDO_PERM_RELAY=0` switches it off. What 
 - No answer within `KALMIDO_PERM_TIMEOUT` (default 540 s = 9 minutes) is a **no**; when the runner is not running, the
   hook denies at once; a late answer gets a note and changes nothing. The question shows the tool and its command or
   file with secrets masked.
-- Only the person of that chat answers (task runs: the agent's owner, or `KALMIDO_PERM_USER`). `dontAsk` above never
+- Only the agent's operator answers (2.126.0): the owner, `KALMIDO_PERM_USER` and the ids in `KALMIDO_OWNER_IDS`. When
+  someone else chats with a team agent, a step that needs a permission is denied at once and that person gets a short
+  note (`KALMIDO_PERM_OPERATOR_ONLY`); task runs ask the operator. `dontAsk` above never
   asks anyone: keep it for agents that must never wait for a click.
 - It guards against mistakes, not against a hostile command: the hook and the runner talk through files in the state
   folder, and the command runs as the same OS user. Once a tool that can write files or run programs is allowed, the

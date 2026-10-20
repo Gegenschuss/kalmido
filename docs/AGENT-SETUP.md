@@ -490,7 +490,9 @@ chat messages of one person that arrive together: one run). It does what a hoste
   person in the chat (*Allow* / *Deny*, a thumbs up / down or *yes* / *no* while exactly one question is open). The runner
   hands each run its own settings file with a `PermissionRequest` hook (`--settings`; your own settings stay untouched;
   a command with its own `--settings` gets none). No answer in 9 minutes (`KALMIDO_PERM_TIMEOUT`, seconds) is a no; a
-  task run asks the agent's owner (or `KALMIDO_PERM_USER`). `KALMIDO_PERM_RELAY=0` switches it off; it needs a
+  task run asks the agent's owner (or `KALMIDO_PERM_USER`). Only the agent's operator answers (2.126.0): the owner,
+  `KALMIDO_PERM_USER` and the ids in `KALMIDO_OWNER_IDS`; when someone else chats with a team agent and a step needs a
+  permission, the step is denied and that person gets a short note. `KALMIDO_PERM_RELAY=0` switches it off; it needs a
   permission mode that asks (`default`). See [AGENT-SECURITY.md](AGENT-SECURITY.md#4-claude-code-project-settings).
 - **One conversation per chat** (2.44.0, Claude Code only): the runs of one person's chat go on in the same
   conversation (`--resume`) instead of starting fresh; task events and other commands still run fresh, and every person

@@ -1109,6 +1109,9 @@ NO_WORDS = ("no", "n", "nope", "deny", "nein", "ne", "nee", "ablehnen", "\U0001f
 # kalmido-capability: perm_relay -- the texts of a permission question (KALMIDO_PERM_TEXT / _LATE override them)
 PERM_TEXT = os.environ.get("KALMIDO_PERM_TEXT", "**May I run this?** ({0})")
 PERM_LATE = os.environ.get("KALMIDO_PERM_LATE", "This answer came too late: the command was denied already. Please give the order again.")
+# 2.126.0 B (#1973): a permission question of someone who is not the agent's operator is denied, with this note to them
+PERM_OPERATOR_ONLY = os.environ.get("KALMIDO_PERM_OPERATOR_ONLY", "This step needs a permission that only the operator of "
+                                    "this agent can give, so it was not run.")
 APPROVAL_EXPIRED_PRESS = os.environ.get("KALMIDO_APPROVAL_EXPIRED", "This approval has expired. Please ask again if it is still needed.")
 APPROVAL_REMINDER = os.environ.get("KALMIDO_APPROVAL_REMINDER", "Reminder: an approval is still open - {0}. Nothing happens without your yes (the card above).")
 # kalmido-capability: session_resume, notice -- the line a chat shows when the runner starts a new conversation
@@ -1165,6 +1168,8 @@ def perm_hook(argv):
                 pass
         if decision == "allow":
             return out(True)
+        if decision == "operator":  # 2.126.0 B (#1973)
+            return out(False, "only the agent's operator can allow this step and the person in the chat is not the operator")
         return out(False, "denied by the person in the chat" if decision else "no answer in the chat in time (counts as no)")
     except Exception as e:
         return out(False, f"the question could not be asked ({type(e).__name__})")
@@ -1247,6 +1252,12 @@ class Runner:
         """Who answers a permission question of a task run: KALMIDO_PERM_USER, else the agent's owner."""
         v = os.environ.get("KALMIDO_PERM_USER") or (self.agent or {}).get("owner_id")
         return int(v) if str(v or "").isdigit() else None
+
+    def perm_operators(self):
+        """2.126.0 B (#1973): who may answer a permission question: KALMIDO_PERM_USER, the agent's owner and the account ids
+        in KALMIDO_OWNER_IDS (a team agent without them: nobody; Kalmido not reached: nobody)."""
+        ids = [os.environ.get("KALMIDO_PERM_USER"), (self.agent or {}).get("owner_id")] + (os.environ.get("KALMIDO_OWNER_IDS") or "").split(",")
+        return {int(str(x).strip()) for x in ids if str(x or "").strip().isdigit()}
 
     def run_args(self, args):
         """--settings with the hook file when the command is Claude Code and has no --settings of its own."""
@@ -1781,6 +1792,15 @@ class Runner:
                 with open(os.path.join(pdir, name), encoding="utf-8") as f:
                     rq = json.load(f)
                 uid = int(rq["uid"]) if str(rq.get("uid") or "").isdigit() else self.perm_uid()
+                if uid and uid not in self.perm_operators():  # 2.126.0 B (#1973): only the operator answers
+                    try:
+                        self.api.chat(uid, PERM_OPERATOR_ONLY)
+                    except Exception:
+                        pass
+                    log("permission question of a person who is not the operator: denied")
+                    with open(os.path.join(pdir, pid + ".ans"), "w") as f:
+                        f.write("operator")
+                    continue
                 tin = rq.get("tool_input") if isinstance(rq.get("tool_input"), dict) else {}
                 detail = tin.get("command") or tin.get("file_path") or tin.get("url") or json.dumps(tin, ensure_ascii=False)
                 body = (PERM_TEXT.replace("{0}", f"{rq.get('label') or 'run'}, {rq.get('tool_name') or '?'}")

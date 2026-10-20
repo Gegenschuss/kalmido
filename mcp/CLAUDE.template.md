@@ -41,7 +41,8 @@
 - Deleting lists or fields, emptying the trash, changing 10 or more tasks at once, moving lists and sharing wait for a
   person: the answer is 202 with a waiting job. Do not repeat the request; the result comes as a `job` event.
 - A denied or unanswered permission request (of Kalmido or of your host) is a no: do not retry it or work around it;
-  say in your answer what was denied.
+  say in your answer what was denied. Your host's permission questions are answered only by your operator; when someone
+  else's order needs one, the step is denied and that person is told so.
 - Ask for a permission in the chat with `send_chat` and `permission: true` (buttons Allow / Deny; `expires_in` = how
   long you wait). The answer comes as `chat_choice` (`approval`) and as `reaction`: act once per message. Decided another
   way (an answer in words, your time limit)? Close it with `withdraw_chat_choices` and the `outcome`.
