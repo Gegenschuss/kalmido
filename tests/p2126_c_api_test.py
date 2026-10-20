@@ -22,7 +22,7 @@ import random
 import subprocess
 import sys
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timezone
 
 import requests
 
@@ -137,9 +137,13 @@ check(dav("bob", PWB, "PROPFIND", "/dav/", "", ip="203.0.113.200", Depth="0").st
       "#1977: bob still syncs from a new address after many failures elsewhere")
 check(dav("bob", PWB, "PROPFIND", "/dav/", "", ip="203.0.113.1", Depth="0").status_code == 429,
       "#1977: the address that failed ten times stays limited for that name")
-time.sleep(3)
-al = dbx("SELECT message FROM admin_alerts WHERE kind='security' ORDER BY id")
-check(any("different addresses" in (m or "") for (m,) in al), "#1977: the admins get an alert about the many failures " + str(al)[-200:])
+al = []
+for _ in range(30):
+    al = dbx("SELECT message FROM admin_alerts WHERE kind='security' ORDER BY id")
+    if any("different addresses" in (m or "") for (m,) in al):
+        break
+    time.sleep(0.5)
+check(any("different addresses" in (m or "") for (m,) in al), "#1977: the admins get an alert about the many failures " + str(al)[-300:])
 
 # ============================================================ #1979 I2: a valid token / link works from a limited address
 TOK = A.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read"], "expires_days": 30}).json()["token"]
@@ -229,7 +233,8 @@ check(r.status_code == 202, f"#1986: a person without an organisation imports in
 KC = A.post(B + "/api/evcals", json={"name": "K4"}).json()["id"]
 st0 = f"{y}-03-02T10:00"
 K4 = A.post(B + "/api/events", json={"title": "Review", "cal_id": KC, "start": st0, "end": f"{y}-03-02T11:00", "reminders": [15]}).json()["id"]
-dbx("INSERT INTO ev_reminded(event_id,user_id,k,at) VALUES(?,?,?,?)", (K4, uid["alice"], f"{st0}|15", "2026-01-01T00:00:00+00:00"))
+dbx("INSERT INTO ev_reminded(event_id,user_id,k,at) VALUES(?,?,?,?)",  # a recent time: the watchdog forgets old rows
+    (K4, uid["alice"], f"{st0}|15", datetime.now(timezone.utc).isoformat(timespec="seconds")))
 check(A.patch(B + f"/api/events/{K4}", json={"location": "Room 2"}).ok, "#1992 K4: the place changes")
 check(dbx("SELECT COUNT(*) FROM ev_reminded WHERE event_id=?", (K4,))[0][0] == 1, "#1992 K4: a sent reminder stays sent after a change of the place")
 A.patch(B + f"/api/events/{K4}", json={"title": "Review (new title)", "start": st0, "end": f"{y}-03-02T11:00"})
