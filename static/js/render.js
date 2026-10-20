@@ -428,6 +428,7 @@ function renderSide() {
     ${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('')}
     <div class="sgroup sfoot">
       <button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>
+      <button type="button" class="sbmark" data-go="home" title="${esc(tr('Kalmido - Start'))}" aria-label="${esc(tr('Kalmido - Start'))}">${logoSvg(17)}${wordSvg()}</button>${'' /* 2.145.0 A (#2437): small mark at the bottom, a tap opens Start */}
     </div>
     <div class="sbdock">${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}</button>` : '' /* 2.138.2 C (#2392): the account picture, without dots, next to the search */}<button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button></div>`;  // 2.138.0 B (#2161)
   const newAcct = $('#side .sbacct');

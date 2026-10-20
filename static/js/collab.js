@@ -304,13 +304,27 @@ function viewNews() {
   const dmh = dms.length ? `<div class="nlist ndms">${dms.map(dmRowHtml).join('')}</div>` : '';
   const chips = '';  // 2.13.0: in the one filter row of the bar
   const shown = vis.filter(([it]) => newsKindOk(it));
-  if (mine && mine.length && !vis.length && !dms.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tab === 'me' ? tr('Nothing for you right now') : tr('No unread news')}</b><span>${tab === 'me' ? tr('Mentions, assignments, replies and direct messages from people land here.') : tr('Everything is read. Switch off “Unread only” to see older news.')}</span></div>`;
+  const nelse = newsElseHtml(mine);
+  if (mine && mine.length && !vis.length && !dms.length) return bar + nelse + `<div class="empty nempty">${ic('bell')}<b>${tab === 'me' ? tr('Nothing for you right now') : tr('No unread news')}</b><span>${tab === 'me' ? tr('Mentions, assignments, replies and direct messages from people land here.') : tr('Everything is read. Switch off “Unread only” to see older news.')}</span></div>`;
   if ((!mine || !mine.length) && !dms.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No news')}</b><span>${f ? tr('No mentions or assignments.') : esc(newsWhat())}</span></div>`;
   if (!shown.length && !dms.length) return bar + chips + `<div class="empty nempty">${ic('bell')}<b>${tr('Nothing of this kind.')}</b></div>` + newsMoreHtml();
   // 2.28.0 (#987): "All" shows the two sections, what people sent me first, the activity behind it
   const listHtml = () => { if (newsBundled()) return `<div class="nbund">${newsBundledHtml(shown, false)}</div>`; if (tab !== 'all') return `<div class="nlist">${shown.map(([it, i]) => newsItemHtml(it, i)).join('')}</div>`;
     return `<div class="nlist">${newsPlainHtml(shown, dms, false, dmh)}</div>`; };
-  return bar + chips + (tab === 'all' && !newsBundled() ? '' : dmh) + listHtml() + newsMoreHtml() + `${isTouch() && !newsBundled() ? `<div class="muted nswipe">${tr('Swipe an item sideways to remove it.')}</div>` : ''}`;
+  return bar + nelse + chips + (tab === 'all' && !newsBundled() ? '' : dmh) + listHtml() + newsMoreHtml() + `${isTouch() && !newsBundled() ? `<div class="muted nswipe">${tr('Swipe an item sideways to remove it.')}</div>` : ''}`;
+}
+// 2.145.0 A (#2444): the bell counts what is meant for me in ALL workspaces, the list shows the current one: one hint row
+// per other workspace with unread items for me (counted from the loaded items) and a button that switches there
+function newsElseHtml(items) {
+  if (!wsOn() || wsCur() === 'all') return '';
+  const by = {};
+  for (const it of items || []) {
+    if (it.read || !newsForMe(it) || !it.list_id || newsInWs(it)) continue;
+    const ws = wsOf(listById(it.list_id));
+    by[ws] = (by[ws] || 0) + 1;
+  }
+  const rows = Object.entries(by).filter(([ws]) => wsOptions().includes(ws));
+  return rows.length ? `<div class="nelse" role="group" aria-label="${esc(tr('Unread in other workspaces'))}">${rows.map(([ws, n]) => `<div class="nerow"><span>${esc(n === 1 ? tr('1 unread in {0}', wsName(ws)) : tr('{0} unread in {1}', n, wsName(ws)))}</span><button type="button" class="btn sm" data-act="news-ws" data-ws="${esc(ws)}">${tr('Switch')}</button></div>`).join('')}</div>` : '';
 }
 async function loadNews() {
   if (S.nf.loading) return;
