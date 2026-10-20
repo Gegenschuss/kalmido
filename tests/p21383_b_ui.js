@@ -31,7 +31,7 @@ const rem = v => parseFloat(v) * 16;
 
   // ---- static: the 44 px targets (sheets.css, 2.138.3 B)
   const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'css', 'sheets.css'), 'utf8');
-  const mine = css.slice(css.indexOf('2.138.3 B (#2371)')).replace(/\/\*[\s\S]*?\*\//g, '');
+  const from = css.indexOf('2.138.3 B (#2371)'), mine = css.slice(from, css.indexOf('padding-right:3rem', from) + 30).replace(/\/\*[\s\S]*?\*\//g, '');
   const coarse = (mine.match(/@media \(pointer:coarse\)\{([^@]*)\}/) || [])[1] || '';
   const lnk = /\.shklnk\{width:([\d.]+)rem;height:([\d.]+)rem\}/.exec(coarse);
   check(lnk && rem(lnk[1]) >= 44 && rem(lnk[2]) >= 44, 'touch: the arrows of link / file cells are at least 44 px: ' + coarse.slice(0, 200));
@@ -56,7 +56,7 @@ const rem = v => parseFloat(v) * 16;
   const ub = await until(() => d.querySelector('#toast:not(.hidden) button'));
   check(ub && /Undo/.test(ub.textContent) && /changed/.test(d.querySelector('#toast')?.textContent || ''), 'phone: the toast offers Undo: ' + (d.querySelector('#toast')?.textContent || ''));
   click(w, ub);
-  check(await until(async () => (await cellOf(R[0], CB))?.raw === '0'), 'phone: Undo takes the tick back');
+  check(await until(async () => !((await cellOf(R[0], CB))?.raw)), 'phone: Undo takes the tick back');
   check(await until(() => !td(R[0], CB)?.querySelector('[data-shkbox].on')), 'phone: the box is empty again');
   click(w, td(R[1], CB).querySelector('[data-shkbox]'));
   check(await until(async () => (await cellOf(R[1], CB))?.raw === '1'), 'phone: a tap on the box still ticks');

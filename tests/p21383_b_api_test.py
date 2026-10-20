@@ -14,7 +14,7 @@ import subprocess
 import sys
 
 import requests
-from freelancer_fixture import freelancer
+from freelancer_fixture import FEATURES, freelancer
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1] if len(sys.argv) > 1 else ""
@@ -88,16 +88,15 @@ def run(s, space, who):
         f"=ZÄHLENWENN({rc};1)": 2,
         f"=SUMME({rc})": 2,
     }
-    cells = [{"cell": f"{f}{i}", "raw": x} for i, x in enumerate(F, 1)]
-    cells.append({"cell": f"{f}{len(F) + 1}", "raw": "=1>0"})
-    cells.append({"cell": f"{f}{len(F) + 2}", "raw": f"=ZÄHLENWENN({f}{len(F) + 1};WAHR)"})
+    cells = [{"cell": f"{f}{i}", "raw": x} for i, x in enumerate(F, 1)]  # 10 rows: a new table has 10
+    cells += [{"cell": "A5", "raw": "=1>0"}, {"cell": "A6", "raw": "=ZÄHLENWENN(A5;WAHR)"}]
     r = put(s, sid, cells)
     check(r.ok, f"{who}: the formulas " + r.text[:300])
     d = s.get(B + f"/api/sheets/{sid}").json()
     for i, (x, want) in enumerate(F.items(), 1):
         got = cell(d, f"{f}{i}")
         check(got.get("value") == want and not got.get("error"), f"{who}: {x} = {want!r} " + json.dumps(got)[:200])
-    got = cell(d, f"{f}{len(F) + 2}")
+    got = cell(d, "A6")
     check(got.get("value") == 1, f"{who}: a real truth value still hits WAHR " + json.dumps(got)[:200])
     # ticking row 2 changes the sum at once
     r = put(s, sid, [{"cell": f"{c}2", "raw": "1"}])
@@ -117,7 +116,7 @@ A.patch(B + "/api/settings", json={"features": FEAT, "lang": "en", "tour": "done
 ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
 run(A, f"org:{ORG}", "org")
 
-FID, Fr = freelancer(B, A)  # freelancer-matrix: sheets (the own table in the private space)
+FID, Fr = freelancer(B, A, features=FEATURES + ",sheets")  # freelancer-matrix: sheets (the own table in the private space)
 FS = run(Fr, "private", "freelancer")
 check(A.get(B + f"/api/sheets/{FS}").status_code in (403, 404), "someone else: the freelancer's table 404")
 
