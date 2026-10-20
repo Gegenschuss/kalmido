@@ -1409,6 +1409,10 @@ fresh; run p21381_b_ui node p21381_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21381_c_ui node p21381_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.138.2 part D: notifications - read entries muted, open ones on top, counters match (#2405)
 fresh; run p21381_d_ui node p21381_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.138.3 part A: a decided approval marks its notifications read (#2406)
+fresh; run p21382_a_api "$PY" p21382_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.138.3 part B: edit organisation - members as a searchable list with member / admin boxes (#2407)
+fresh; run p21382_b_ui node p21382_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.138.4 part A: mobile UI fixes (#2359 #2372 #2370 #2362 #2367); B: sheet checkbox cells, agent chat edit (#2371 #2189); C: hardening (#2377-#2382)
 fresh; run p21383_a_ui node p21383_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21383_b_api "$PY" p21383_b_api_test.py "$KALMIDO_TEST_DATA"

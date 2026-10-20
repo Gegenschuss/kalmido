@@ -5934,6 +5934,7 @@
 "tz_range",
 "tz_toModule",
 "tz_wipe",
+"uRowAv",
 "ua8_bulk",
 "ua8_delete",
 "ua8_orgRemove",
