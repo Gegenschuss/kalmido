@@ -5960,7 +5960,6 @@
   "You see your own sort of this shared list.": "Ves tu propio orden de esta lista compartida.",
   "A shared server with workspaces: every organisation is its own workspace with its own admins, who manage its members. People see the members of their organisations and the people they are connected with; private lists stay invisible to an organisation.": "Un servidor compartido con espacios de trabajo: cada organización es su propio espacio con sus propios administradores, que gestionan a sus miembros. Las personas ven a los miembros de sus organizaciones y a las personas con las que están conectadas; las listas privadas siguen siendo invisibles para una organización.",
   "{0} admin": ["{0} administrador", "{0} administradores"],
-  "Admins of the organisation": "Administradores de la organización",
   "Admins of an organisation manage its members, name and e-mail domains (Settings > Workspaces); they are not admins of the server.": "Los administradores de una organización gestionan sus miembros, nombre y dominios de correo (Ajustes › Espacios de trabajo); no son administradores del servidor.",
   "You become its first member and admin; add people afterwards.": "Serás su primer miembro y administrador; añade personas después.",
   "Workspaces": "Espacios de trabajo",
@@ -11746,5 +11745,8 @@
   "Contact history": "Historial del contacto",
   "{0} framework contract moves with its PDF files": ["{0} contrato marco se traslada con sus archivos PDF", "{0} contratos marco se trasladan con sus archivos PDF"],
   "{0} draft loses its framework contract": ["{0} borrador pierde su contrato marco", "{0} borradores pierden su contrato marco"],
-  "{0} framework contract loses its client (clients stay in their workspace)": ["{0} contrato marco pierde su cliente (los clientes se quedan en su espacio de trabajo)", "{0} contratos marco pierden su cliente (los clientes se quedan en su espacio de trabajo)"]
+  "{0} framework contract loses its client (clients stay in their workspace)": ["{0} contrato marco pierde su cliente (los clientes se quedan en su espacio de trabajo)", "{0} contratos marco pierden su cliente (los clientes se quedan en su espacio de trabajo)"],
+  "{0} is a member": "{0} es miembro",
+  "{0} is an admin of the organisation": "{0} es administrador de la organización",
+  "No members yet": "Aún no hay miembros"
 }
