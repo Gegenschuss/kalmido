@@ -99,6 +99,18 @@ if im:
     check(im.mode == "RGB" or (im.mode == "RGBA" and im.getextrema()[3][0] == 255) or (im.mode == "P" and "transparency" not in im.info),
           f"apple-touch-icon: opaque ({im.mode})")
 
+# 2.138.1 (#2396): the Mac dock icon - 1024 px, opaque and full-bleed (violet in all four corners), the figure large
+im = img("apple-touch-icon-1024.png")
+if im:
+    check(im.size == (1024, 1024), "apple-touch-icon-1024: 1024 px")
+    rgb = im.convert("RGBA")
+    check(rgb.getextrema()[3][0] == 255, "apple-touch-icon-1024: opaque")
+    corner = rgb.getpixel((2, 2))[:3]
+    check(all(rgb.getpixel(p)[:3] == corner for p in ((1021, 2), (2, 1021), (1021, 1021))) and corner[2] > corner[1],
+          f"apple-touch-icon-1024: full-bleed violet corners ({corner})")
+    rows = [y for y in range(0, 1024, 8) if any(rgb.getpixel((x, y))[:3] != corner for x in range(0, 1024, 8))]
+    check(rows and (rows[-1] - rows[0]) >= 0.75 * 1024, f"apple-touch-icon-1024: the figure about 80 % high ({rows and rows[-1] - rows[0]})")
+
 # ---- favicons
 for n, z in (("favicon-16.png", 16), ("favicon-32.png", 32)):
     im = img(n)
@@ -144,6 +156,8 @@ check('<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">' in htm
 check('href="/static/favicon-32.png" sizes="32x32"' in html and 'href="/static/favicon-16.png" sizes="16x16"' in html,
       "index.html: PNG favicons 32 + 16")
 check('<link rel="apple-touch-icon" href="/static/apple-touch-icon.png" sizes="180x180">' in html, "index.html: Apple touch icon")
+check('<link rel="apple-touch-icon" href="/static/apple-touch-icon-1024.png" sizes="1024x1024">' in html,
+      "index.html: Mac dock icon (#2396)")
 for m in re.findall(r'href="/static/([^"]+\.(?:png|svg))"', html):
     check(os.path.exists(os.path.join(ST, m)), f"index.html links an existing file: {m}")
 # 2.20.0 (#646): the server = app.py + kalmido/, the client = static/js/*.js
