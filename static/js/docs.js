@@ -610,7 +610,7 @@ function dc_fChanged() { DC.at = 0; dc_load(); dc_fSheetDraw(); if (!isMobile())
 document.addEventListener('click', e => {
   const x = e.target.closest?.('[data-dcx]');
   if (x && x.closest('.dc-view')) {
-    if (x.dataset.dcx === 'q') { DC.q = ''; const qi = $('#dc-q'); if (qi) qi.value = ''; clearTimeout(dc_qTimer); }  // 2.138.3 A (#2362): a focused field keeps its text in the redraw (iOS: the tap leaves the focus there)
+    if (x.dataset.dcx === 'q') { DC.q = ''; const qi = $('#dc-q'); if (qi) qi.value = ''; clearTimeout(dc_qTimer); }  // 2.138.4 A (#2362): a focused field keeps its text in the redraw (iOS: the tap leaves the focus there)
     else dc_fEntries()[+x.dataset.dcx]?.rm();
     dc_fChanged(); return;
   }

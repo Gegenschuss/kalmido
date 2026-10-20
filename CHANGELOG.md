@@ -7,6 +7,26 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.138.4] - 2026-10-20
+
+Phone fixes for office, tables, documents and bookmarks; the agent chat keeps an open edit; hardening leftovers of 2.126.0.
+
+### Fixed
+- Office: importing fixed costs on a phone - rows no longer shrink with more than five entries; amount and VAT stay inside their row (#2359).
+- Tables: on a phone a tap anywhere in a checkbox cell ticks it, followed by the "Undo" hint; the arrows in link and file cells are 44 px (#2371).
+- Tables: SUMIF/COUNTIF with the criterion TRUE/FALSE count the ticks of a checkbox column (#2371).
+- Tables: the sheet bar stays above the tab bar on phones; formula suggestions stay above the iOS keyboard (#2372).
+- Tables: print / save as PDF on Android shows the print view instead of the app (#2370).
+- Documents and office: filter chips, "New tag", the tax date level and the selection bar are touch-sized (44 px); the selection bar sits right above the tab bar; removing the search chip clears the field; the note in "Request files" is full width (#2362).
+- Bookmarks: the state selection and the tags are touch-sized (44 px) on phones (#2367).
+- Agent chat: editing your own message keeps text and focus while the chat reloads (#2189).
+
+### Security
+- Error reports: the webhook also takes its token in a header (`Authorization: Bearer` or `X-Kalmido-Token`) on `POST /api/hooks/issues/<list>`; the old URL keeps working; the app log masks hook tokens in paths (#2381).
+- Contacts: a large import takes a database connection per block instead of for the whole run (#2377); moving a contact out of a mirrored address book makes a copy (#2378).
+- Customer portal: when a space's sign-in mail budget is used up, its admins (or the owner of a private space) get one notice in the bell; the budget is set with `KALMIDO_PORTAL_LOGIN_SPACE` (#2380).
+- Server key change: the status shows unreadable Paperless tokens and the state of the private document index; new admin command `reindex-private` (#2382).
+
 ## [2.138.1] - 2026-10-20
 
 Six releases that were built on 19.10. but never reached main (2.111-2.116 under their old numbers), brought onto

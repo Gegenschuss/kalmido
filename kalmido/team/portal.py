@@ -89,7 +89,7 @@ PT_BAD_LIMIT = 30          # unknown tokens per address within FAIL_WINDOW
 PT_CMT_RATE, PT_CMT_HOUR, PT_CMT_MAX = 10, 30, 4000   # answers per address and minute / per ticket and hour / characters
 PT_LOGIN_IP, PT_LOGIN_ADDR, PT_LOGIN_SPACE = 5, 3, 200  # sign-in requests per address / per e-mail / sign-in mails per space (window below)
 PT_LOGIN_WIN = 3600
-try:  # 2.138.3 C (#2380): the space's sign-in mails per window can be set (tests use a small one)
+try:  # 2.138.4 C (#2380): the space's sign-in mails per window can be set (tests use a small one)
     PT_LOGIN_SPACE = max(1, int(os.environ.get("KALMIDO_PORTAL_LOGIN_SPACE") or PT_LOGIN_SPACE))
 except ValueError:
     pass
@@ -428,7 +428,7 @@ def _pt_mail_html(lines, url, button, foot=""):
 
 
 def pt_limit_note(c, org_id, owner_id):
-    """2.138.3 C (#2380): the space's budget of sign-in mails (ptls) is used up: a News item for its admins (an organisation)
+    """2.138.4 C (#2380): the space's budget of sign-in mails (ptls) is used up: a News item for its admins (an organisation)
     or its owner (the private space), at most once per window and process; no push, no mail. Caller commits."""
     import json
     from ..api.v1 import hit_limit
@@ -478,7 +478,7 @@ def pt_login_ask(token):
                                     AND t.deleted_at IS NULL AND {_pt_space_sql()} LIMIT 1""", (eh, p["org_id"], p["owner_id"])).fetchone()
         # review: the space's limit counts only sign-in mails that really go out (others cannot lock a space's customers out)
         full = bool(with_ticket) and hit_limit(f"ptls:{space}", PT_LOGIN_SPACE, PT_LOGIN_WIN)
-        if full:  # 2.138.3 C (#2380): tell the space's admins / owner (committed below)
+        if full:  # 2.138.4 C (#2380): tell the space's admins / owner (committed below)
             pt_limit_note(c, p["org_id"], p["owner_id"])
         if with_ticket and not full and mail_budget(c, None, em):
             tok = secrets.token_urlsafe(32)

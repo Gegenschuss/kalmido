@@ -168,7 +168,7 @@ def pl_token(c, r):
 
 
 def pl_token_lost(c, r):
-    """2.138.3 C (#2382): True when a token is stored but opens with neither the current server key nor the workspace's
+    """2.138.4 C (#2382): True when a token is stored but opens with neither the current server key nor the workspace's
     key (the server key changed): it has to be entered again. Reads only."""
     v = r["token"]
     if not v or not (isinstance(v, str) and v.startswith(S.PREFIX)):

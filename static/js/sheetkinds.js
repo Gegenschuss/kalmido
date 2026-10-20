@@ -56,7 +56,7 @@ function shk_edit(cur, col, typed) {
 async function shk_toggle(r, c) {
   const on = shk_on(shvCell(r, c)), label = tr('Cell {0} changed', shvAddr(r, c));
   const e = await shvPut([{row_id: r, col_id: c, raw: on ? '0' : '1'}], label);
-  if (e) histToast(label, e);  // 2.138.3 B (#2371): the Undo hint like other cell changes
+  if (e) histToast(label, e);  // 2.138.4 B (#2371): the Undo hint like other cell changes
   return e;
 }
 async function shk_peopleOf(sid) {
@@ -100,7 +100,7 @@ async function shk_upload(r, c, f) {
   histToast(tr('File {0} added to {1}', f.name, addr), e);
 }
 // a tap / click on a checkbox ticks it at once (window capture: before the grid's own tap handling)
-// 2.138.3 B (#2371): on the phone a tap anywhere in the cell ticks (the box alone was too small a target); with the mouse
+// 2.138.4 B (#2371): on the phone a tap anywhere in the cell ticks (the box alone was too small a target); with the mouse
 // only the box (plus its 44 px square), so a click beside it still chooses the cell and Shift / dragging still select a
 // range; a long press still shows the cell, a tap while writing a formula still inserts the reference
 window.addEventListener('click', e => {
@@ -180,7 +180,7 @@ function shk_print() {
     <tbody>${rows.map(r => `<tr><th>${sh._rowNo.get(r.id)}</th>${cols.map(col => `<td class="${SHV_NUM.includes(col.kind) ? 'num' : ''}">${esc(txt(r, col))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
   document.body.appendChild(box);
   document.body.classList.add('shkprint');
-  // 2.138.3 A (#2370): Android Chrome fires afterprint ~30 ms after print(), before the preview is made -> keep the view until
+  // 2.138.4 A (#2370): Android Chrome fires afterprint ~30 ms after print(), before the preview is made -> keep the view until
   // the print media really ends (matchMedia change); without it, a fallback timer after afterprint
   /** @type {any} */
   const mq = window.matchMedia?.('print') || {matches: false}; let timer = 0, t0 = Infinity;

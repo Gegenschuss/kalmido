@@ -66,7 +66,7 @@ NEWS_FOR_ME += ("wiki_shared",)  # 2.126.2 B (#2355)
 
 def news_to_me(kind, actor_id, data, agents, s=None):
     # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
-    if kind in ("upscan", "filereq", "orgkey", "ptlimit"):  # 2.138.3 C (#2380): ptlimit = the portal's sign-in mails used up
+    if kind in ("upscan", "filereq", "orgkey", "ptlimit"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
         return True
     if not actor_id:
         return False
@@ -465,7 +465,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 continue
         elif kind == "wiki_shared":  # 2.126.2 B (#2355): stays after a revoke (it opens "Shared with me"); only path + kind in data
             pass
-        elif kind == "ptlimit":  # 2.138.3 C (#2380): the portal's sign-in mails of my space were used up (no task, no list)
+        elif kind == "ptlimit":  # 2.138.4 C (#2380): the portal's sign-in mails of my space were used up (no task, no list)
             pass
         elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
             if not sees(r["list_id"]):

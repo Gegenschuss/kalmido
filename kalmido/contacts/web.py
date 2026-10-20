@@ -175,7 +175,7 @@ def op_contact_edit(c, uid, cid, b):
             raise Denied(409, tr("An imported address book is updated from its source; contacts cannot be moved into it"))
         if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND (uid=? OR href=?)", (nb, r["uid"], r["href"])).fetchone():
             raise Denied(409, tr("The address book has this contact already"))
-        if c.execute("SELECT src_id FROM books WHERE id=?", (r["book_id"],)).fetchone()[0]:  # 2.138.3 C (#2378): out of a mirror = a copy
+        if c.execute("SELECT src_id FROM books WHERE id=?", (r["book_id"],)).fetchone()[0]:  # 2.138.4 C (#2378): out of a mirror = a copy
             ncid = contact_copy(c, uid, cid, nb)
             contact_store(c, uid, nb, contact_fields({k: v for k, v in b.items() if k != "book_id"}, r), cid=ncid)
             book_touch(c, nb)
@@ -272,7 +272,7 @@ def lv_import_start(c, uid, bid, cards, since=None):
 
 
 def lv_import_run(st, ctx, uid, bid, cards, since=None):
-    # 2.138.3 C (#2377): a pool connection per batch (taken, given back after the batch's commit) instead of one for the
+    # 2.138.4 C (#2377): a pool connection per batch (taken, given back after the batch's commit) instead of one for the
     # whole run, each with the starter's row-level-security context; the photo budget and the counts run across the batches.
     cards = cards[:CONTACTS_PER_BOOK]
     res = {"created": 0, "updated": 0, "unchanged": 0, "errors": 0}

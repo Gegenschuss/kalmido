@@ -132,7 +132,7 @@ def err_rate_ok(lid):
     return True
 
 
-# 2.138.3 C (#2381): the token in a header (Authorization: Bearer … or X-Kalmido-Token) keeps it out of the access logs of
+# 2.138.4 C (#2381): the token in a header (Authorization: Bearer … or X-Kalmido-Token) keeps it out of the access logs of
 # proxies; the path form stays for senders that cannot set a header (Sentry's webhooks). The app's own log lines (Flask's
 # unhandled-error line, the web server's) mask the token part of the path (ERR_LOG_MASK).
 ERR_LOG_MASK = re.compile(r"(/api/hooks/(?:issues|deploy)/[0-9]+/)[^/\s?\]\"']+")
@@ -155,7 +155,7 @@ for _lg in (app.logger, logging.getLogger("waitress")):
 
 @app.post("/api/hooks/issues/<int:lid>")
 def errhook_in_hdr(lid):
-    """2.138.3 C (#2381): the same webhook with the token in a header."""
+    """2.138.4 C (#2381): the same webhook with the token in a header."""
     a = request.headers.get("Authorization") or ""
     token = a[7:].strip() if a[:7].lower() == "bearer " else (request.headers.get("X-Kalmido-Token") or "").strip()
     return errhook_in(lid, token)
@@ -309,7 +309,7 @@ def errhook_set(lid):
                      ON CONFLICT(list_id) DO UPDATE SET token_hash=excluded.token_hash, created_by=excluded.created_by,
                      created_at=excluded.created_at""", (lid, hashlib.sha256(tok.encode()).hexdigest(), me(), iso(now_utc())))
         out["url"] = f"{PUBLIC_URL.rstrip('/')}/api/hooks/issues/{lid}/{tok}"  # the only time it is shown
-        out["hook_url"], out["token"] = f"{PUBLIC_URL.rstrip('/')}/api/hooks/issues/{lid}", tok  # 2.138.3 C (#2381): token as a header
+        out["hook_url"], out["token"] = f"{PUBLIC_URL.rstrip('/')}/api/hooks/issues/{lid}", tok  # 2.138.4 C (#2381): token as a header
     bump(c)
     c.commit()
     return jsonify({**errhook_public(c, lid, True), **out})
@@ -361,9 +361,9 @@ def git_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
         "per_hour": {"type": "integer", "description": "New tickets per hour at most; later reports are only counted"},
         "url": {"type": "string", "description": "Only in the answer of state on / rotate: POST Sentry webhooks or "
                                                  "{title, body?, url?, fingerprint?, level?} to it (the token in the path)"},
-        "hook_url": {"type": "string", "description": "2.138.3: only in the answer of state on / rotate: the same without the token; "
+        "hook_url": {"type": "string", "description": "2.138.4: only in the answer of state on / rotate: the same without the token; "
                                                       "send it as Authorization: Bearer <token> or X-Kalmido-Token"},
-        "token": {"type": "string", "description": "2.138.3: only in the answer of state on / rotate: the token for the header"}}}
+        "token": {"type": "string", "description": "2.138.4: only in the answer of state on / rotate: the token for the header"}}}
     schemas["ErrorHook"] = hook
     paths["/lists/{id}/error-hook"] = {
         "get": op("Is the error-report webhook of a list on (never its URL)", "Lists", ok(ref("ErrorHook")) | errs("404"), [pid("id", "List id")]),

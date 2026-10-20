@@ -726,7 +726,7 @@ CT_COPY_COLS = ("kind", "fn", "given", "family", "middle", "prefix", "suffix", "
 
 
 def contact_copy(c, uid, cid, book_id):
-    """2.138.3 C (#2378): a contact of an imported (mirrored) address book is copied, not moved: its source would bring it
+    """2.138.4 C (#2378): a contact of an imported (mirrored) address book is copied, not moved: its source would bring it
     back at the next sync, so the mirror stays as it is and the target gets a new contact with the same card. -> new id."""
     r = c.execute("SELECT * FROM contacts WHERE id=?", (cid,)).fetchone()
     return contact_store(c, uid, book_id, {k: r[k] for k in CT_COPY_COLS}, uid_=r["uid"], extra=r["extra"], version=r["version"])

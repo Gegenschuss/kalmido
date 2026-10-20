@@ -352,7 +352,7 @@ async function bk_barAct(k, el) {
   }
 }
 async function bk_send(body, ids) {  // one request per 5000 (the server's limit; an address book holds up to 20000)
-  const out = {moved: 0, copied: 0, conflicts: []};  // 2.138.3 C (#2378): copied = out of an imported (mirrored) address book
+  const out = {moved: 0, copied: 0, conflicts: []};  // 2.138.4 C (#2378): copied = out of an imported (mirrored) address book
   for (let i = 0; i < ids.length; i += 5000) { const j = await api('POST', '/api/contacts/bulk', {...body, ids: ids.slice(i, i + 5000)}); out.moved += j.moved || 0; out.copied += j.copied || 0; out.conflicts.push(...(j.conflicts || [])); }
   return out;
 }
@@ -483,7 +483,7 @@ async function ctEditor(c) {
       const r = c ? await api('PATCH', `/api/contacts/${c.id}`, {...body, expect: c.updated_at}) : await api('POST', '/api/contacts', body);
       LS.set('ctBook', body.book_id);
       md.remove(); CT.sel = r.id; CT.card = r;
-      toast(r.copied ? tr('Copied from the imported address book') : c ? tr('Contact saved') : tr('Contact created'));  // 2.138.3 C (#2378)
+      toast(r.copied ? tr('Copied from the imported address book') : c ? tr('Contact saved') : tr('Contact created'));  // 2.138.4 C (#2378)
       await load().catch(() => {}); ctLoad();
       if (S.route.mod === 'contacts' && isMobile() && !c) go('contacts/' + r.id);
     } catch { /* api() showed it */ }

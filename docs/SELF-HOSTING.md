@@ -596,7 +596,7 @@ shared with others, an agent the list is shared with); the database and the data
 
   (the earlier key is read from a file or stdin, never from the command line; `status` counts account keys made with
   another server key as `keys_other_server_key`). Without the master key the private files are lost.
-  Two things stay on the server key itself (2.138.3): the Paperless-ngx API tokens and the search index and previews of
+  Two things stay on the server key itself (2.138.4): the Paperless-ngx API tokens and the search index and previews of
   private documents. After the rewrap, rebuild the index (texts, labels and files stay; previews that no longer open are
   made again in the background):
 
@@ -851,7 +851,7 @@ A short checklist for a new server:
   |---|---|---|
   | `KALMIDO_FORM_FILES_MB_HOUR` | `200` | MB of files anonymous visitors may send through one public form per hour |
   | `KALMIDO_FILE_REQUEST_MB_DAY` | `1000` | MB clients may upload through one file request link a day (2.122.0) |
-  | `KALMIDO_PORTAL_LOGIN_SPACE` | `200` | sign-in mails of the customer portal per space (an organisation or a private space) an hour; when reached, the space's admins (the owner of a private space) get a notice in the bell, once an hour (2.138.3) |
+  | `KALMIDO_PORTAL_LOGIN_SPACE` | `200` | sign-in mails of the customer portal per space (an organisation or a private space) an hour; when reached, the space's admins (the owner of a private space) get a notice in the bell, once an hour (2.138.4) |
   | `KALMIDO_AGENT_PUSH_DAY` | `500` | pushes per agent and person a day (past it the message still arrives, without a push) |
   | `KALMIDO_OFFICE_MAILS_DAY_PERSON` | `150` | office document mails (invoices, quotations) one person sends a day |
   | `KALMIDO_OFFICE_MAILS_DAY_ORG` | `300` | office document mails of one organisation a day |
@@ -946,9 +946,9 @@ the browsers then send nothing.
   required: after the new password the second step follows, and all other sessions of the account end. App passwords
   (CalDAV) and API tokens stay valid; the page for the new password says so and points to *Settings > Account* (2.58).
 
-## The error-report webhook token (2.138.3)
+## The error-report webhook token (2.138.4)
 
-A project list's error reports (list dialog > Repository > Error reports) arrive at a secret webhook. From 2.138.3 the
+A project list's error reports (list dialog > Repository > Error reports) arrive at a secret webhook. From 2.138.4 the
 dialog shows it in two forms: `POST https://kalmido.example.com/api/hooks/issues/<list id>` with the token in a header
 (`Authorization: Bearer <token>` or `X-Kalmido-Token: <token>`), and the older URL with the token in the path, which keeps
 working for services that cannot send a header (Sentry's webhooks). Prefer the header form where the sender allows it:

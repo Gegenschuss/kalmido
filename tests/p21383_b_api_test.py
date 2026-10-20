@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.138.3 API tests, part B (#2371): a truth-value criterion (WAHR / FALSCH, TRUE / FALSE, "WAHR" as text) in SUMMEWENN /
+"""2.138.4 API tests, part B (#2371): a truth-value criterion (WAHR / FALSCH, TRUE / FALSE, "WAHR" as text) in SUMMEWENN /
 ZÄHLENWENN (SUMIF / COUNTIF) hits the ticks of a checkbox column (stored 1 / 0, 1 / 0 in formulas), own container (start.sh).
 Invented names only. freelancer-matrix: sheets
  - SUMMEWENN(C;WAHR;B), SUMIF(C;TRUE;B), ZÄHLENWENN(C;"WAHR"), ZÄHLENWENN(C;FALSCH) (an empty box is no FALSCH, as in

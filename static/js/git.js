@@ -172,7 +172,7 @@ function repoWire(md, lid, folder) {
       <div class="shint lhint">${tr('Sentry or any service that sends JSON: a new error becomes a bug ticket, the same error again only counts up at its open ticket.')}</div>
       ${errUrl && errHdr ? `<div class="shint lhint rpsec" role="status">${esc(tr('Webhook URL:'))} <code>${esc(errHdr.hook_url)}</code><br>${esc(tr('Header (shown only now, keep it secret):'))} <code>${esc('Authorization: Bearer ' + errHdr.token)}</code> <button class="linkbtn" data-rp="err-copy" data-v="h">${ic('copy', 's')} ${tr('Copy')}</button></div>
       <div class="shint lhint" role="status">${esc(tr('Services that cannot send a header (Sentry): this URL with the token works as before:'))} <code>${esc(errUrl)}</code> <button class="linkbtn" data-rp="err-copy">${ic('copy', 's')} ${tr('Copy')}</button></div>`
-      : errUrl ? `<div class="shint lhint rpsec" role="status">${esc(tr('Webhook URL (shown only now, keep it secret):'))} <code>${esc(errUrl)}</code> <button class="linkbtn" data-rp="err-copy">${ic('copy', 's')} ${tr('Copy')}</button></div>` : ''}</div>`;  // 2.138.3 C (#2381): the header form first
+      : errUrl ? `<div class="shint lhint rpsec" role="status">${esc(tr('Webhook URL (shown only now, keep it secret):'))} <code>${esc(errUrl)}</code> <button class="linkbtn" data-rp="err-copy">${ic('copy', 's')} ${tr('Copy')}</button></div>` : ''}</div>`;  // 2.138.4 C (#2381): the header form first
   };
   const errSet = async state => {
     let x; try { x = await api('PATCH', `/api/lists/${lid}/error-hook`, {state}); } catch { return; }
@@ -219,7 +219,7 @@ function repoWire(md, lid, folder) {
     } else if (k === 'err-on') {
       await errSet('on');
     } else if (k === 'err-copy') {
-      const v = b.dataset.v === 'h' && errHdr ? 'Authorization: Bearer ' + errHdr.token : errUrl || '';  // 2.138.3 C (#2381)
+      const v = b.dataset.v === 'h' && errHdr ? 'Authorization: Bearer ' + errHdr.token : errUrl || '';  // 2.138.4 C (#2381)
       try { await navigator.clipboard.writeText(v); toast(tr('Copied')); } catch { toast(v); }
     } else if (k === 'err-menu') {
       menu(b, [{label: tr('New URL (the old one stops working)'), icon: 'sync', fn: () => errSet('rotate')},

@@ -10,7 +10,7 @@ background thread) and the command line for the server admin:
     python -m kalmido.admin.orgcrypt_cli encrypt-wiki           #   (wiki_encrypt=0, before running 2.122 or older) / sealed again
     python -m kalmido.admin.orgcrypt_cli docs-to-server-key     # 2.126.0 A (#1970): the private documents' values on the
     python -m kalmido.admin.orgcrypt_cli docs-to-account-key    #   server-derived key (before running 2.125 or older) / back
-    python -m kalmido.admin.orgcrypt_cli reindex-private        # 2.138.3 C (#2382): after a new server key: the private
+    python -m kalmido.admin.orgcrypt_cli reindex-private        # 2.138.4 C (#2382): after a new server key: the private
                                                                 #   documents' word index again, unreadable previews made again
     python -m kalmido.admin.orgcrypt_cli rewrap-accounts --old-key-file FILE   # 2.64.0: account keys after a new server key
         (FILE "-" = stdin: the earlier KALMIDO_SECRET_KEY, base64; never as an argument)
@@ -545,7 +545,7 @@ def docs_forms(c):
     return out
 
 
-# 2.138.3 C (#2382): what stays on the server key in the private spaces: the Paperless token (pl_sources.token, also an
+# 2.138.4 C (#2382): what stays on the server key in the private spaces: the Paperless token (pl_sources.token, also an
 # organisation's) and the word index / previews of private documents. After a new server key (and rewrap-accounts) the
 # token has to be entered again (counted here, the settings say so) and reindex-private rebuilds the index with the new key.
 DOCS_INDEX_MARK = "docs_private_index_key"  # settings: a fingerprint of the server key the private index was last built with
@@ -834,7 +834,7 @@ def status(c):
     out["docs_account_key"] = _ds().docs_ukey_on(c)  # 2.126.0 A (#1970)
     out["docs"]["private"] = docs_forms(c)
     from ..core.db import gsetting
-    with system_ctx(c):  # 2.138.3 C (#2382): an instance setting
+    with system_ctx(c):  # 2.138.4 C (#2382): an instance setting
         mk = gsetting(c, DOCS_INDEX_MARK) or ""
     out["docs"]["private_index"] = "unknown" if not mk else "current" if mk == _index_mark() else "other_server_key"
     out["paperless_tokens"] = pl_tokens(c)
@@ -1304,7 +1304,7 @@ def main(argv):
     sub.add_parser("encrypt-wiki", help="2.123.0: seal the knowledge pages' texts and history again, wiki_encrypt=1")
     sub.add_parser("docs-to-server-key", help="2.126.0: the private documents' values back on the server-derived key (before running 2.125 or older)")
     sub.add_parser("docs-to-account-key", help="2.126.0: the private documents' values on the persons' account keys again")
-    sub.add_parser("reindex-private", help="2.138.3: after a new server key: the private documents' word index again, "
+    sub.add_parser("reindex-private", help="2.138.4: after a new server key: the private documents' word index again, "
                                            "previews that no longer open are made again")
     ra = sub.add_parser("rewrap-accounts", help="2.64.0: store the account keys again with the current server key (needs the earlier one)")
     ra.add_argument("--old-key-file", required=True, help='a file holding the earlier KALMIDO_SECRET_KEY, "-" = stdin')
@@ -1370,7 +1370,7 @@ def main(argv):
             print(TAG, a.cmd + ":", json.dumps({**t, **left}), "(wiki_encrypt is now", "1)" if on else "0)")
             if t["failed"] or (not on and left["sealed"]):
                 return 1
-        elif a.cmd == "reindex-private":  # 2.138.3 C (#2382)
+        elif a.cmd == "reindex-private":  # 2.138.4 C (#2382)
             t = reindex_private(c)
             print(TAG, "reindex-private:", json.dumps(t))
             if t["failed"]:
@@ -1393,7 +1393,7 @@ def main(argv):
             t = oc.oc_rewrap_accounts(c, old)
             c.commit()
             print(TAG, "rewrap-accounts:", json.dumps(t))
-            pt = pl_tokens(c)  # 2.138.3 C (#2382): what stays on the server key
+            pt = pl_tokens(c)  # 2.138.4 C (#2382): what stays on the server key
             print(TAG, "next: reindex-private (the private documents' search index); Paperless tokens to enter again:", pt["unreadable"])
             if t["other"]:
                 return 1

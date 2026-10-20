@@ -712,7 +712,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 }
 /* 2.122.4 C (#2326): same for the office settings - iOS ignores min-height on a select, so it was 36 px there */
 @media (pointer:coarse) {
-  .ofcset select,.txd select{height:max(var(--fld-h),2.75rem);line-height:1.25}  /* 2.138.3 A (#2362): + the tax dates */
+  .ofcset select,.txd select{height:max(var(--fld-h),2.75rem);line-height:1.25}  /* 2.138.4 A (#2362): + the tax dates */
 }
 /* 2.119.0 A (#2288): entertainment receipts (office_meals.js) */
 .bwbar .bwocc{flex:0 1 12rem;min-width:7rem;min-height:2.25rem}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.138.3 API tests, part C (#2377 #2378 #2380 #2381 #2382): hardening leftovers of 2.126.0.
+"""2.138.4 API tests, part C (#2377 #2378 #2380 #2381 #2382): hardening leftovers of 2.126.0.
  - #2377: a large background contacts import (600 cards) takes a pool connection per batch and ends with every contact;
    importing the same file again updates them all (the result as before); a person without an organisation too
  - #2378: moving a contact OUT of an imported (mirrored) address book copies it (single PATCH: copied true, the mirror keeps
@@ -239,7 +239,7 @@ check(all(x < 300 for x in codes[:2]) and codes[2] == 429 and len(nf) == 1 and n
 check(len(news(A, "ptlimit")) == 1, "#2380: the other space's budget is its own")
 psrc = open(os.path.join(N, "..", "kalmido", "team", "portal.py"), encoding="utf-8").read()
 check(psrc.count("pt_limit_note(c, p[") == 1, "#2380: the portal's own sign-in form tells the owner too")
-# 2.138.3 (#2380, review): the sign-in route stays on its handler - an unknown portal token is no server error
+# 2.138.4 (#2380, review): the sign-in route stays on its handler - an unknown portal token is no server error
 r = requests.post(B + "/p/" + secrets.token_urlsafe(24) + "/login", data={"email": "kunde@example.com"}, allow_redirects=False)
 check(r.status_code < 500, f"#2380: POST /p/<token>/login answers without a server error {r.status_code}")
 

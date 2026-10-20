@@ -302,7 +302,7 @@ def op_contacts_bulk(c, uid, b):
     if mv and have + len(mv) > CONTACTS_PER_BOOK:
         raise Denied(409, tr("At most {0} contacts per address book", CONTACTS_PER_BOOK))
     occ = {r[0]: r[1] for r in c.execute(f"SELECT id, occ_list_id FROM books WHERE id IN ({bk_in(list(books))})", list(books)).fetchall()}
-    # 2.138.3 C (#2378): out of an imported (mirrored) address book = a copy, the mirror stays (its source would bring it back)
+    # 2.138.4 C (#2378): out of an imported (mirrored) address book = a copy, the mirror stays (its source would bring it back)
     mir = {r[0] for r in c.execute(f"SELECT id FROM books WHERE src_id IS NOT NULL AND id IN ({bk_in(list(books))})", list(books)).fetchall()}
     cp = [i for i in mv if rows[i]["book_id"] in mir]
     mv = [i for i in mv if rows[i]["book_id"] not in mir]

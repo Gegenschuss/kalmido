@@ -223,7 +223,7 @@ def kp_link_send(cid):
     full = False
     if (hit_limit(f"ptla:{eh}", PT_LOGIN_ADDR, PT_LOGIN_WIN) or (full := hit_limit(f"ptls:{space}", PT_LOGIN_SPACE, PT_LOGIN_WIN))
             or not mail_budget(c, uid, em)):
-        if full:  # 2.138.3 C (#2380): the space's budget is used up: its admins / owner get a News item
+        if full:  # 2.138.4 C (#2380): the space's budget is used up: its admins / owner get a News item
             from ..team.portal import pt_limit_note
             pt_limit_note(c, org_id, owner_id)
             c.commit()

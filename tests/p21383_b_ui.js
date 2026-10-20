@@ -1,4 +1,4 @@
-// 2.138.3 part B UI test (#2371 #2189), jsdom, own container (start.sh). Invented names only.
+// 2.138.4 part B UI test (#2371 #2189), jsdom, own container (start.sh). Invented names only.
 // - #2371 checkbox cell: on the phone (390 px) a tap on the cell beside the box ticks it, the toast offers Undo and Undo takes
 //   the tick back; with the mouse a click beside the box only chooses the cell; the box answers in a 44 px square and the
 //   arrows of link / file cells are 44 px on touch (sheets.css, rem)
@@ -29,15 +29,15 @@ const rem = v => parseFloat(v) * 16;
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const ORG = (await call('GET', '/api/state')).me.workspaces[0].id;
 
-  // ---- static: the 44 px targets (sheets.css, 2.138.3 B)
+  // ---- static: the 44 px targets (sheets.css, 2.138.4 B)
   const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'css', 'sheets.css'), 'utf8');
-  const from = css.indexOf('2.138.3 B (#2371)'), mine = css.slice(from, css.indexOf('padding-right:3rem', from) + 30).replace(/\/\*[\s\S]*?\*\//g, '');
+  const from = css.indexOf('2.138.4 B (#2371)'), mine = css.slice(from, css.indexOf('padding-right:3rem', from) + 30).replace(/\/\*[\s\S]*?\*\//g, '');
   const coarse = (mine.match(/@media \(pointer:coarse\)\{([^@]*)\}/) || [])[1] || '';
   const lnk = /\.shklnk\{width:([\d.]+)rem;height:([\d.]+)rem\}/.exec(coarse);
   check(lnk && rem(lnk[1]) >= 44 && rem(lnk[2]) >= 44, 'touch: the arrows of link / file cells are at least 44 px: ' + coarse.slice(0, 200));
   const ins = /\.shkbox::after\{[^}]*inset:-([\d.]+)rem/.exec(mine);
   check(ins && 20 + 2 * rem(ins[1]) >= 44, 'the box answers in a square of at least 44 px');
-  check(!/(\d+(\.\d+)?)px/.test(mine.replace(/@media[^{]*\{/g, '')), 'sheets.css (2.138.3 B): rem sizes');
+  check(!/(\d+(\.\d+)?)px/.test(mine.replace(/@media[^{]*\{/g, '')), 'sheets.css (2.138.4 B): rem sizes');
 
   // ---- a table with a checkbox column
   const S0 = await call('POST', '/api/sheets', {title: 'Packing', space: `org:${ORG}`});
