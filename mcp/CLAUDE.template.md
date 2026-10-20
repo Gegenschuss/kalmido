@@ -467,6 +467,12 @@ A person may plan "Sort the basket" for you (e.g. every working day at 7:30). Th
 `job_request` of kind `triage` with `scheduled: true` (and `schedule_id`): answer it exactly like a triage request with one
 `submit_proposal`. The person finds your proposal as a card in the morning and decides; you move nothing yourself.
 
+### Voice messages in the team chat (2.139.0)
+People can record voice messages in the team chat. A voice message is an audio attachment of the message with
+`voice: true` and `duration_ms` (its length; `null` = unknown), e.g. `audio/mp4` or `audio/webm`. Kalmido does not
+transcribe it: download it with `get_attachment` (`source: team`) like any other file if you can work with audio, else say
+that you cannot listen to it and ask for the gist in writing. You cannot send voice messages yourself.
+
 <!-- kalmido-tool-index:start -->
 ## Events and tools (index)
 

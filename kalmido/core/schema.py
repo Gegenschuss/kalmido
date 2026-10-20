@@ -2877,6 +2877,10 @@ MIGRATIONS = [
     ("org_keys", "kek_check_rot", "ALTER TABLE org_keys ADD COLUMN kek_check_rot TEXT"),
     ("org_keys", "rot_started_at", "ALTER TABLE org_keys ADD COLUMN rot_started_at TEXT"),
     ("org_keys", "rotated_at", "ALTER TABLE org_keys ADD COLUMN rotated_at TEXT"),
+    # 2.139.0 B (#2128): a team chat file recorded in the app as a voice message (collab/teamchan.py tvc_*): voice = 1, duration_ms
+    # = the length the browser measured (capped). 2.138 ignores both (the file shows as a plain attachment)
+    ("tchat_files", "voice", "ALTER TABLE tchat_files ADD COLUMN voice INTEGER NOT NULL DEFAULT 0"),
+    ("tchat_files", "duration_ms", "ALTER TABLE tchat_files ADD COLUMN duration_ms INTEGER"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

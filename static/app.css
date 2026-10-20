@@ -1403,7 +1403,7 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .cconf.c{width:.625rem;height:.625rem;border-radius:50%}
 .cconf.k{left:-.625rem;top:-.625rem;width:1.25rem;height:1.25rem;background:none}
 .cconf svg{width:100%;height:100%;stroke:var(--cc,var(--accent))}
-.ccheck{position:absolute;display:grid;place-items:center;border-radius:50%;background:var(--accent);color:var(--accent-ink,#fff);opacity:0;box-shadow:0 .75rem 2.5rem rgba(0,0,0,.3);will-change:transform,opacity}
+.ccheck{position:absolute;display:grid;place-items:center;border-radius:50%;background:var(--accent);color:var(--accent-ink);opacity:0;box-shadow:0 .75rem 2.5rem rgba(0,0,0,.3);will-change:transform,opacity}
 .ccheck svg{width:58%;height:58%;stroke:currentColor}
 .cele-quip{position:fixed;left:50%;bottom:calc(1.75rem + var(--tabs-h) + var(--safe-b));z-index:97;display:flex;align-items:center;gap:.75rem;width:max-content;max-width:min(27.5rem,calc(100vw - 2rem));padding:.625rem 1rem .625rem .875rem;
   background:var(--bg2);border-radius:var(--r-l);box-shadow:var(--shadow);pointer-events:none;opacity:0;transform:translate(-50%,.5rem);transition:opacity .25s,transform .25s}
@@ -7642,3 +7642,21 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 :root #side .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .wsbar{width:auto;min-height:2rem}
 @media (pointer:coarse){ :root #side .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .wsbar{width:auto;min-height:2.75rem} }
 :root #side .sbsrch,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sbsrch{margin-bottom:.5rem}  /* room above the first group heading */
+/* 2.139.0 B (#2128): voice messages in the team chat (voice.js): the recording bar over the composer, the player of an audio file */
+.tvcrec{position:absolute;inset:0;z-index:3;display:flex;align-items:center;gap:.5rem;padding:0 .75rem;background:var(--bg);border-top:1px solid var(--line)}
+.tvcrec .tvcclock{font-variant-numeric:tabular-nums;font-size:var(--fs-m);min-width:2.75rem}
+.tvcrec .tvcmax{font-size:var(--fs-xs)}
+.tvcdot{width:.625rem;height:.625rem;border-radius:50%;background:var(--danger);flex:none}
+@media (prefers-reduced-motion:no-preference){.tvcrec.on .tvcdot{animation:tvcblink 1.2s ease-in-out infinite}}
+@keyframes tvcblink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.85)}}
+.chatts .att.tvcp,.att.tvcp{display:flex;align-items:center;gap:.5rem;flex:0 1 18rem;min-width:13rem;max-width:100%;padding:.375rem .5rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2)}
+.tvcp .tvcpb{flex:none;width:2.25rem;height:2.25rem;border-radius:50%;border:0;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.tvcp .tvcpb .i{width:1rem;height:1rem}
+.tvcp .tvcmain{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:.125rem}
+.tvcp .tvcn{font-size:var(--fs-xs);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tvcp .tvcseek{width:100%;margin:0;accent-color:var(--accent);min-height:1.5rem}
+.tvcp .tvct{font-size:var(--fs-xs);color:var(--muted);font-variant-numeric:tabular-nums;min-width:2.25rem;text-align:right}
+.tvcp .tvcrt{flex:none;border:1px solid var(--line2);background:transparent;color:var(--text2);border-radius:var(--r-s);font-size:var(--fs-xs);padding:.125rem .375rem;min-width:2.25rem;cursor:pointer}
+.tvcp .tvcdl{flex:none}
+.tvcp.err .tvcpb{background:var(--bg4);color:var(--muted)}
+@media (pointer:coarse){.tvcp .tvcpb{width:2.75rem;height:2.75rem}.tvcp .tvcrt{min-height:2.75rem}.tvcp .tvcseek{min-height:2.75rem}}
