@@ -457,7 +457,8 @@ function evImport(c, done, file) {  // 2.143.0 C (#2154): file = an .ics shared 
       done();
     } catch { toast(tr('Import failed')); }
   };
-  if (file) inp.onchange(); else inp.click();
+  if (file) return inp.onchange();  // 2.143.0 C2 (#2154): awaitable, several shared files go one after another
+  inp.click();
 }
 // "Calendar & contacts on the phone": the addresses and the steps for iPhone, Android (DAVx5) and Thunderbird
 function davGuide() {

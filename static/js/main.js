@@ -53,7 +53,9 @@ function bootDone() {
       await caches.delete('tasks-share');
     } catch { /* no cache api */ }
     // Chrome on Android currently hands over no files to installed web apps (verified 2026-09-25)
-    if (!files.length && !meta.text && !meta.url && !meta.title) toast(tr('Please share images and files via the ntfy app (topic inbox)'));
+    const refused = Array.isArray(meta.refused) ? meta.refused : [];  // 2.143.0 C2 (#2154): too large / too many, kept out by the service worker
+    if (!files.length && !refused.length && !meta.text && !meta.url && !meta.title) toast(tr('Please share images and files via the ntfy app (topic inbox)'));
+    if (refused.length) toast(tr('Share: not added: {0} (at most {1} files of {2} MB each)', refused.map(f => f.name).join(', '), meta.max_files || 20, meta.max_mb || 50), null, 8000);
     history.replaceState(null, '', '/#inbox');
     await route();
     // 2.13.1 (#465): "Send to agent": with an agent to chat with, the share sheet asks where it goes (a new task stays the
@@ -66,8 +68,9 @@ function bootDone() {
     const imp = {contacts: feat('contacts') && allOf(/\.vcf$|^text\/(x-)?vcard\b/i), calendar: feat('events') && (S.evcals || []).some(evWrite) && allOf(/\.ics$|^text\/calendar\b/i)};
     const dest = (ags.length || docs || bmU || imp.contacts || imp.calendar) && (files.length || meta.text || meta.url || meta.title) ? await shareDest(ags, docs, !!bmU, imp) : 'task';
     const ext = (f, e) => new RegExp(`\\.${e}$`, 'i').test(f.name || '') ? f : new File([f], (f.name || 'shared') + '.' + e, {type: f.type});  // the imports go by the ending
-    if (dest === 'contacts') { await loadModule('contacts'); for (const f of files) ctImport(null, 'vcf', ext(f, 'vcf')); }
-    else if (dest === 'calendar') { const own = (S.evcals || []).find(x => !x.org_id && x.role === 'owner'), c = own || (S.evcals || []).find(evWrite); for (const f of files) evImport(c, () => load().then(render).catch(() => {}), ext(f, 'ics')); }
+    // 2.143.0 C2 (#2154): one question per share: the contact cards go in as one file, the calendar files one after another
+    if (dest === 'contacts') { await loadModule('contacts'); ctImport(null, 'vcf', files.length > 1 ? new File([(await Promise.all(files.map(f => f.text()))).join('\r\n')], 'shared.vcf', {type: 'text/vcard'}) : ext(files[0], 'vcf')); }
+    else if (dest === 'calendar') { const own = (S.evcals || []).find(x => !x.org_id && x.role === 'owner'), c = own || (S.evcals || []).find(evWrite); for (const f of files) await evImport(c, () => load().then(render).catch(() => {}), ext(f, 'ics')); }
     else if (dest === 'doc') await dc_shareFiles(files);
     else if (dest === 'bookmark') await bm_shareSave(bmU, meta.title);
     else if (dest !== 'task') {

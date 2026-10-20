@@ -7,6 +7,9 @@
    client_ref (201 the first time, 200 with the same note the second time); another person may use the same ref
  - a person without an organisation (freelancer-matrix: tasks, time, notes): share, a repeated note and a repeated
    time entry the same way
+ - 2.143.0 C2 review: the same ref sent several times at once (tab + service worker) = one row and no server error, for
+   notes and time entries; a ref of a note in another list never answers that note; the manifest names the upload limit
+   per file for the service worker's share target
 usage: p2143_c_api_test.py <datadir>"""
 import io
 import os
@@ -14,6 +17,7 @@ import re
 import subprocess
 import sys
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
@@ -154,6 +158,30 @@ r = A.patch(B + f"/api/notes/{nid}", json={"body": "Changed offline", "expect_up
 check(r.ok and r.json().get("body") == "Changed offline", "an offline change of it goes through")
 r = A.patch(B + f"/api/notes/{nid}", json={"body": "Stale base", "expect_updated_at": r1.json()["updated_at"]})
 check(r.status_code == 409 and r.json().get("note", {}).get("body") == "Changed offline", f"a stale base = 409 with the server's note {r.status_code}")
+
+# ---------------------------------------------------------------- 2.143.0 C2 (#2153): the same ref at once
+def burst(s, url, js, n=6):
+    s2 = [sess("alice") for _ in range(n)] if s is A else [s] * n
+    with ThreadPoolExecutor(n) as ex:
+        return list(ex.map(lambda x: x.post(url, json=js), s2))
+
+
+rs = burst(A, B + f"/api/lists/{PRIV}/notes", {"title": "At once", "body": "Twice", "client_ref": "p2143c2-burst"})
+check(all(r.status_code in (200, 201) for r in rs) and len({r.json().get("id") for r in rs}) == 1,
+      f"note sent at once: all answers name one note {[r.status_code for r in rs]}")
+n = c.execute("SELECT COUNT(*) AS n FROM notes WHERE client_ref='p2143c2-burst'").fetchone()["n"]
+check(n == 1, f"note sent at once: stored once ({n})")
+rs = burst(A, B + "/api/time/entries", {**body, "client_id": "p2143c2-burst", "note": "At once"})
+check(all(r.ok for r in rs) and len({r.json().get("id") for r in rs}) == 1, f"time entry sent at once: one entry {[r.status_code for r in rs]}")
+n = c.execute("SELECT COUNT(*) AS n FROM time_entries WHERE client_id='p2143c2-burst'").fetchone()["n"]
+check(n == 1, f"time entry sent at once: stored once ({n})")
+# a ref of a note in another list: never that note
+OTH = A.post(B + "/api/lists", json={"name": "Other notes", "org_id": None}).json()["id"]
+r = A.post(B + f"/api/lists/{OTH}/notes", json=nb)
+check(r.status_code < 500 and r.json().get("id") != nid, f"the ref of a note in another list does not answer it {r.status_code} {r.text[:120]}")
+# the share target's limit per file
+m = A.get(B + "/manifest.json").json()
+check(isinstance(m.get("kalmido_max_file_mb"), int) and m["kalmido_max_file_mb"] > 0, f"the manifest names the upload limit {m.get('kalmido_max_file_mb')}")
 
 # ---------------------------------------------------------------- a person without an organisation
 # freelancer-matrix: tasks, time, notes

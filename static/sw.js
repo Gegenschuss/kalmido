@@ -69,6 +69,11 @@ function shareFromOutside(req) {
 // bytes again on upload and never shows such a file inline)
 const shareName = n => String(n || '').replace(/\\/g, '/').split('/').pop().replace(/[\x00-\x1f:*?"<>|]/g, '_').trim().slice(0, 150);
 const shareType = t => { t = String(t || '').toLowerCase().split(';')[0].trim(); return !/^[\w.+-]+\/[\w.+-]+$/.test(t) || /^(text\/html|application\/xhtml\+xml|image\/svg\+xml|(text|application)\/(xml|javascript|ecmascript|x-javascript))$/.test(t) ? '' : t; };
+// 2.143.0 C2 (#2154): the upload limit per file comes with the manifest (kept in the shell cache); 50 MB = the server's default
+const SHARE_MAX_FILES = 20;
+async function shareMaxMb() {
+  try { const r = await caches.match('/manifest.json') || await fetch('/manifest.json'); const n = +(await r.json()).kalmido_max_file_mb; return n > 0 ? n : 50; } catch { return 50; }
+}
 async function handleShare(req) {
   if (shareFromOutside(req)) return Response.redirect('/', 303);
   try {
@@ -76,11 +81,13 @@ async function handleShare(req) {
     const cache = await caches.open('tasks-share');
     for (const k of await cache.keys()) await cache.delete(k);
     const files = [...fd.values()].filter(f => typeof f !== 'string' && f.size);  // any field name
-    const meta = {title: fd.get('title') || '', text: fd.get('text') || '', url: fd.get('url') || '', files: []};
+    const meta = {title: fd.get('title') || '', text: fd.get('text') || '', url: fd.get('url') || '', files: [], refused: [], max_mb: await shareMaxMb(), max_files: SHARE_MAX_FILES};
+    // 2.143.0 C2 (#2154): a file above the server's upload limit or beyond the first SHARE_MAX_FILES is not kept (the app names it)
     for (let i = 0; i < files.length; i++) {
-      const f = files[i], type = shareType(f.type);
-      await cache.put(`/share-inbox/${i}`, new Response(f, {headers: {'Content-Type': type || 'application/octet-stream'}}));
-      meta.files.push({name: shareName(f.name) || `datei-${i + 1}`, type, size: f.size});
+      const f = files[i], type = shareType(f.type), name = shareName(f.name) || `datei-${i + 1}`;
+      if (meta.files.length >= SHARE_MAX_FILES || f.size > meta.max_mb * 1048576) { meta.refused.push({name, size: f.size}); continue; }
+      await cache.put(`/share-inbox/${meta.files.length}`, new Response(f, {headers: {'Content-Type': type || 'application/octet-stream'}}));
+      meta.files.push({name, type, size: f.size});
     }
     await cache.put('/share-inbox/meta', new Response(JSON.stringify(meta), {headers: {'Content-Type': 'application/json'}}));
     return Response.redirect('/?share=1', 303);
@@ -246,6 +253,7 @@ async function swOutbox() {
   const locks = self.navigator && self.navigator.locks;
   return locks ? locks.request('kalmido-outbox', {ifAvailable: true}, l => l ? swOutboxSend() : null) : swOutboxSend();
 }
+const SW_OBX_URL = /^\/api\/(?!v1\/)[\w/-]+(\?[\w=&%.,-]*)?$/, SW_OBX_METHODS = ['POST', 'PATCH', 'PUT', 'DELETE'];
 async function swOutboxSend() {
   const db = await swIdb(), uid = await swMeta(db, 'uid');
   if (!uid) return;
@@ -259,6 +267,8 @@ async function swOutboxSend() {
   try {
     for (const e of rows) {
       if (e.uid && e.uid !== uid) continue;  // another user's entry: the app drops it
+      // 2.143.0 C2 (#2153): only the app's own write routes are sent again (no API v1, no other origin, no GET)
+      if (typeof e.url !== 'string' || !SW_OBX_URL.test(e.url) || !SW_OBX_METHODS.includes(e.method)) break;
       const url = e.url.replace(/\/(-\d+)(?=\/|$)/, (_, n) => '/' + (idm[n] || n));
       let body = e.body;
       if (body && typeof body === 'object') {
