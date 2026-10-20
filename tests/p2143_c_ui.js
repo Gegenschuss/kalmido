@@ -40,7 +40,7 @@ function browser() {
     Object.defineProperty(w.navigator, 'locks', {configurable: true, value: locks});
     Object.defineProperty(w.navigator, 'serviceWorker', {configurable: true, value: {register: () => Promise.resolve(), addEventListener() {}, controller: null,
       ready: Promise.resolve({sync: {register: async t => { syncs.push(t); }}})}});
-    w.BroadcastChannel = class { constructor(n) { this.n = n; chans.push(this); } postMessage(d) { for (const c of chans) if (c !== this && c.n === this.n && c.onmessage) setTimeout(() => c.onmessage({data: clone(d)}), 0); } close() {} };
+    w.BroadcastChannel = class { constructor(n) { this.n = n; this.w = w; chans.push(this); } postMessage(d) { for (const c of chans) if (c !== this && c.n === this.n && c.onmessage) setTimeout(() => { if (c.w.document) c.onmessage({data: clone(d)}); }, 0); } close() {} };  // a closed window hears nothing
   };
   return {db, writes, syncs, store, setup, shared: {store: {}, wins: []}};
 }
@@ -53,6 +53,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   const me = (await call('GET', '/api/state')).me.id;
   const P = (await call('POST', '/api/lists', {name: 'Flyers'})).id;
   const T0 = (await call('POST', '/api/tasks', {title: 'Draft the flyer', list_id: P})).id;
+  await call('PATCH', `/api/lists/${P}`, {time_tracking: true});
 
   // ================= the queue of the earlier version is taken over
   const br = browser();
@@ -88,6 +89,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
 
   // ================= notes offline
   const N1 = await call('POST', `/api/lists/${P}/notes`, {title: 'Briefing', body: 'Start'});
+  await w1.eval('load()');
   w1.location.hash = '#note/' + N1.id;
   check(await until(() => w1.eval(`!!(S.nt.notes || []).find(n => n.id === ${N1.id})`)), 'the note is open');
   w1.__offline = true;

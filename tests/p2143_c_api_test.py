@@ -128,6 +128,7 @@ check(r.status_code == 403, f"no share from another site {r.status_code}")
 
 # ---------------------------------------------------------------- #2153 sent twice = stored once
 PRIV = A.post(B + "/api/lists", json={"name": "Notes here", "org_id": None}).json()["id"]
+check(A.patch(B + f"/api/lists/{PRIV}", json={"time_tracking": True}).ok, "setup: time tracking in the list")
 body = {"list_id": PRIV, "start": "2026-10-19T08:00:00Z", "end": "2026-10-19T09:30:00Z", "note": "Offline entry", "client_id": "p2143c-te-1"}
 r1, r2 = A.post(B + "/api/time/entries", json=body), A.post(B + "/api/time/entries", json=body)
 check(r1.ok and r2.ok and r1.json().get("id") == r2.json().get("id"), f"time entry: the repeat answers the same entry {r1.text[:150]} {r2.text[:150]}")
@@ -161,6 +162,7 @@ FT = share(Fr, FILES[2:4])
 check(len(atts(FT)) == 2, "freelancer: share with an MP3 and a contact card")
 check(Fr.get(B + f"/api/tasks/{FT}").ok and A.get(B + f"/api/tasks/{FT}").status_code in (403, 404), "freelancer: the task is private")
 FL = Fr.post(B + "/api/lists", json={"name": "My notes", "org_id": None}).json()["id"]
+check(Fr.patch(B + f"/api/lists/{FL}", json={"time_tracking": True}).ok, "freelancer setup: time tracking in the list")
 fb = {**nb, "client_ref": "p2143c-fr-1"}
 r1, r2 = Fr.post(B + f"/api/lists/{FL}/notes", json=fb), Fr.post(B + f"/api/lists/{FL}/notes", json=fb)
 check(r1.status_code == 201 and r2.status_code == 200 and r1.json().get("id") == r2.json().get("id"), "freelancer: a note sent twice = one")
