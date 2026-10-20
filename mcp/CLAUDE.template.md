@@ -193,7 +193,6 @@
   move a task because it lies idle. Read more with `list_stale_tasks`.
 - `get_time_gaps` (user_id = the person you work for) lists working days with work on tasks but no tracked time. Point
   them out to the person and offer entries; never add time for someone without asking.
-- A time entry answered with `month_closed` (409) lies in a month the person closed: tell them, never retry or move it.
 
 ### Planned jobs
 - The event `scheduled_job` (2.34.0) is a job a person planned for you in the app ("every Monday at 9: the week
