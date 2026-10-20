@@ -1423,6 +1423,33 @@ without input tax (`travel` {fares, hotel, vma, other}; defaults for an organisa
 the other expenses account), without a VAT rate (booked without input tax). `GET /api/office/datev/accounts` (admin)
 lists the receipt categories with their default and own account and the travel accounts for the settings page.
 
+### DATEV import: master data and opening balances from the tax advisor (2.148)
+
+Settings → DATEV → **Read DATEV data** (admins; a personal office: its owner) takes a DATEV file the tax advisor sends
+(EXTF, Windows-1252 or UTF-8 with / without BOM, semicolons, CRLF; at most 10 MB and 20 000 rows). The columns are read by
+their names in line 2, not by position. A preview comes first (new / updated / skipped with the reason, the first 20
+rows); nothing is stored until **Take over**. Every import is a run with **Undo** (the toast, and the list on the import
+page).
+
+- **Debtors / creditors** (category 16): a debtor account (ledger length + 1 digits, first digit 1-6) becomes a client
+  with that customer number (company or first + last name, address, VAT id from EU country + VAT number, e-mail). A client
+  with the same customer number (else the same name without a number) only gets its **empty** fields filled; what differs
+  is named in the preview and stays as it is. A creditor account (first digit 7-9) becomes a **supplier** (list under the
+  DATEV settings: rename, delete with undo; name, address, VAT id and IBAN are encrypted at rest). The DATEV booking batch
+  books a receipt whose sender (else the recognised supplier) matches exactly one supplier's name - compared without legal
+  form - on that supplier's creditor account instead of the collective creditor.
+- **Booking batch** (category 21): only the opening bookings (account or counter account 9000 / 9008 / 9009, or a booking
+  text starting with "EB") become the **opening balances** of their year (shown in the bookkeeping); all other bookings are
+  counted and left out - Kalmido is no financial accounting. Importing the same account and year again replaces it (the
+  preview says so; undoing the import puts the earlier balance back). An opening booking in a locked month refuses the
+  whole file.
+
+Routes (admin, never agents): `POST /api/office/datev/import/check` and `POST /api/office/datev/import` (multipart
+`file`), `POST /api/office/datev/import/<run>/undo`, `GET /api/office/datev/suppliers`, `PUT` / `DELETE
+/api/office/datev/suppliers/<id>` (`{name}`), `POST /api/office/datev/suppliers/<id>/restore` (deleted suppliers are
+removed for good after 30 days), `GET /api/office/datev/opening?year=` (`{year, years, items, debit, credit}`). The import
+is in the office log (`import` / `undo`, target `datev_in`).
+
 Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit_scheme`, `reminder_scheme`,
 `payment_days` (14), `reminder_fee` (0), `reminder_deadline_days` (10), `einvoice_format`, `datev_email`, `datev_auto`,
 `invoice_closing_de/en`, `reminder_text_de/en` (empty = the country pack's texts).

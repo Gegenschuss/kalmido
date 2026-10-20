@@ -343,6 +343,9 @@ ROUTES = {
     "GET /api/clients/{}": "office", "GET /api/clients/{}/book-contacts": "office", "GET /api/newsletter": "office",
     "GET /api/newsletter/lists": "office", "GET /api/office/agents/{}": "office", "GET /api/office/cashflow": "office",
     "GET /api/office/cashflow/check": "office", "GET /api/office/catalog": "office", "GET /api/office/datev/extf": "office", "GET /api/office/datev/accounts": "office",  # 2.120.0 C (#2090)
+    "POST /api/office/datev/import/check": "office", "POST /api/office/datev/import": "office", "POST /api/office/datev/import/{}/undo": "office",  # 2.148.0 D (#2458)
+    "GET /api/office/datev/suppliers": "office", "PUT /api/office/datev/suppliers/{}": "office", "DELETE /api/office/datev/suppliers/{}": "office",
+    "POST /api/office/datev/suppliers/{}/restore": "office", "GET /api/office/datev/opening": "office",
     "GET /api/office/deals": "office", "GET /api/office/deals/summary": "office", "GET /api/office/docs": "office",
     "GET /api/office/docs/{}": "office", "GET /api/office/docs/{}/log": "office", "GET /api/office/docs/{}/payments": "office",
     "GET /api/office/docs/{}/pdf": "office", "GET /api/office/docs/{}/render": "office",

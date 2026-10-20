@@ -215,7 +215,7 @@ function oimRunsHtml() {
   const r = OIM.runs;
   if (r === null) return `<p class="muted">${tr('Loading…')}</p>`;
   if (!r.length) return `<p class="muted">${tr('No imports yet.')}</p>`;
-  const kn = {data: N_('Master data'), archive: N_('Archive|documents')};
+  const kn = {data: N_('Master data'), archive: N_('Archive|documents'), datev: N_('DATEV data')};  // 2.148.0 D (#2458)
   return `<ul class="ofclist" role="list">${r.map(x => `<li class="oimrun"><span class="ofcn"><b>${esc(tr(kn[x.kind] || x.kind))} · ${esc(trn('{0} entry', '{0} entries', x.total || 0))}</b><small class="muted">${esc([typeof ofdWhen === 'function' ? ofdWhen(x.created_at) : x.created_at, x.user_name].filter(Boolean).join(' · '))}</small></span>
     ${x.undone_at ? `<span class="rotag">${tr('undone')}</span>` : `<button type="button" class="btn sm" data-oim="undo" data-id="${x.id}">${ic('undo', 's')} ${tr('Undo')}</button>`}${bk_runAreas(x)}${imr_tidyBtn(x)}</li>`).join('')}</ul>`;
 }

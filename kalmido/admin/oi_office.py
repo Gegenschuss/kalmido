@@ -394,6 +394,8 @@ SPECS = [
         key=("org_id", "period")),  # 2.148.0 A (#2471): locked accounting periods
     OiT("office/procdocs.json", "office_procdocs", people=_P, private="office", prep=_p_procdoc,
         label=N_("Procedure documentation")),  # 2.148.0 C (#2472): procedure documentation
+    OiT("office/suppliers.json", "office_suppliers", refs={"import_run_id": "office_import_runs"}, private="office"),  # 2.148.0 D (#2458)
+    OiT("office/opening_balances.json", "office_opening_balances", refs={"import_run_id": "office_import_runs"}, private="office"),
     OiT("office/meal_choices.json", "office_meal_choices", people=_P, private="office"),
     OiT("office/meals.json", "office_meals", people={**_P, "approved_by": "null"}, private="office"),
     OiT("office/meal_files.json", "office_meal_files", refs={"meal_id": "office_meals"}, need=("meal_id",), people=_P, private="office",

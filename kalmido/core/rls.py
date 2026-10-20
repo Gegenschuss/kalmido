@@ -40,6 +40,7 @@ TABLES = (
     "office_cashbooks", "office_cash_entries", "office_cash_closings", "office_cash_log",  # 2.121.0 B (#2095): the cash book
     "office_period_locks",  # 2.148.0 A (#2471): locked accounting periods
     "office_procdocs",  # 2.148.0 C (#2472): versions of the procedure documentation (GoBD)
+    "office_suppliers", "office_opening_balances",  # 2.148.0 D (#2458): the DATEV import (creditors, opening balances)
     "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")
     "wiki_pages",  # 2.49.0 C (#1199): knowledge pages (NULL = private, the app checks owner_id)
     "wiki_spaces",  # 2.64.3 A (#1817): the lock per knowledge space (NULL = a private space, the app checks owner_id)
