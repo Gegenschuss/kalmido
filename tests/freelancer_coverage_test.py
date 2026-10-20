@@ -39,7 +39,8 @@ KINDS = {
                          "the agent API with that agent's token"),
     "team": ("matrix", SUITE + ": the people list, direct messages and discovery without an organisation (no team rooms of "
                        "an organisation, nothing of another workspace)"),
-    "hub": ("matrix", SUITE + ": absences, bookings and hub mail in the personal area (the freelancer is its own admin)"),
+    "hub": ("matrix", SUITE + ", p2125_a_api_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
+                      "2.125.0: the own vacation account and working week, never a vacation request"),
     "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature"),
     "videos": ("matrix", "p2991_a_api_test.py: video sign-offs (2.99.1) at a private task / list / client of a person without an "
                "organisation: create, comments, versions, customer link, export, delete + restore; p2991_c_api_test.py: the own agent "
@@ -194,6 +195,9 @@ ROUTES = {
     "POST /api/hubmail/mails/{}/restore": "hub", "POST /api/team/absences": "hub", "POST /api/team/absences/{}/restore": "hub",
     "POST /api/team/dispo/bookings": "hub", "POST /api/team/dispo/bookings/restore": "hub",
     "PUT /api/team/absences/holidays": "hub",
+    # 2.125.0 A (#2117, #2118): vacation account, requests, the working week
+    "GET /api/team/leave": "hub", "PUT /api/team/leave/quota": "hub", "PUT /api/team/leave/approval": "hub",
+    "PUT /api/team/leave/worktime/{}": "hub", "POST /api/team/absences/{}/decide": "hub",
     # ---- link (22)
     "GET /f/{}": "link", "GET /ical/{}.ics": "link", "GET /p/{}": "link", "GET /p/{}/stop": "link", "GET /portal": "link",
     "GET /portal/login/{}": "link", "GET /s/q/{}": "link", "GET /s/q/{}/pdf": "link", "POST /s/q/{}/comments": "link", "GET /s/{}": "link",
@@ -644,7 +648,8 @@ ROUTES = {
     # ---- time (28)
     "DELETE /api/habits/{}": "time", "DELETE /api/time/entries/{}": "time", "DELETE /api/v1/habits/{}": "time",
     "DELETE /api/v1/time/entries/{}": "time", "DELETE /api/v1/time/timer": "time", "GET /api/time/entries": "time",
-    "GET /api/time/export.csv": "time", "GET /api/time/gaps": "time", "GET /api/time/report": "time",
+    "GET /api/time/export.csv": "time", "GET /api/time/export.xlsx": "time", "GET /api/workload/export.xlsx": "tasks",  # 2.125.0 C (#2122)
+    "GET /api/time/gaps": "time", "GET /api/time/report": "time",
     "GET /api/v1/habits": "time", "GET /api/v1/time/check": "time", "GET /api/v1/time/entries": "time",
     "GET /api/v1/time/from-events": "time", "GET /api/v1/time/gaps": "time", "GET /api/v1/time/timer": "time",
     "PATCH /api/habits/{}": "time", "PATCH /api/time/entries/{}": "time", "PATCH /api/v1/habits/{}": "time",
@@ -652,6 +657,7 @@ ROUTES = {
     "POST /api/time/entries": "time", "POST /api/time/start": "time", "POST /api/time/stop": "time",
     "POST /api/v1/habits": "time", "POST /api/v1/habits/{}/checkin": "time", "POST /api/v1/time/entries": "time",
     "POST /api/v1/time/timer": "time",
+    "GET /api/time/sheets": "time", "POST /api/time/sheets": "time", "POST /api/time/sheets/decide": "time",  # 2.125.0 B (#2119)
     # ---- token (3)
     "POST /api/hooks/deploy/{}/{}": "token", "POST /api/hooks/git/{}": "token", "POST /api/hooks/issues/{}/{}": "token",
     # ---- wiki (24)

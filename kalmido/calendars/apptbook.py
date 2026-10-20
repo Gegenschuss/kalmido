@@ -496,7 +496,8 @@ def apb_busy(c, uid, p, lo, hi, skip=None):
         s, e = parse_iso(r[0]), parse_iso(r[1])
         if s and e:
             out.append((s, e))
-    for r in c.execute("SELECT start_date, end_date, half_day FROM hub_absences WHERE user_id=? AND deleted_at IS NULL AND end_date>=? AND start_date<=?",
+    for r in c.execute("SELECT start_date, end_date, half_day FROM hub_absences WHERE user_id=? AND deleted_at IS NULL AND end_date>=? AND start_date<=? "
+                       "AND status='approved'",  # 2.125.0 A (#2117): an open vacation request does not block the booking page yet
                        (uid, dlo.isoformat(), dhi.isoformat())):
         if not (valid_date(r[0]) and valid_date(r[1])):
             continue

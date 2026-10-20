@@ -15,7 +15,7 @@ from ..personal.timetrack import BadInput, local_bounds, MT_TIME_SQL
 
 GAP_DAYS, GAP_DAYS_MAX = 14, 31   # look back this many days (today not included: the day is not over yet)
 GAP_TASKS = 5                      # task examples per day
-GAP_WORKDAYS = (0, 1, 2, 3, 4)     # Monday to Friday (assumption: there is no per-person working days setting yet)
+GAP_WORKDAYS = (0, 1, 2, 3, 4)     # Monday to Friday: the default; 2.125.0 A (#2118): the person's working days (hub/leave.py wt_workdays)
 
 
 def time_gaps(c, uid, viewer=None, days=GAP_DAYS):
@@ -36,9 +36,11 @@ def time_gaps(c, uid, viewer=None, days=GAP_DAYS):
         JOIN tasks t ON t.id=x.tid WHERE t.deleted_at IS NULL AND {both}""",
                      [uid, lo, hi, uid, lo, hi, uid, lo, hi] + vargs).fetchall()
     worked = {}
+    from ..hub.leave import wt_workdays
+    wd = wt_workdays(c, uid)  # 2.125.0 A (#2118): only the person's working days
     for r in rows:
         d = local_day(r["ts"])
-        if d is None or d.weekday() not in GAP_WORKDAYS:
+        if d is None or d.weekday() not in wd:
             continue
         worked.setdefault(d, {}).setdefault(r["tid"], {"id": r["tid"], "title": r["title"], "list_id": r["list_id"]})
     if not worked:

@@ -6,7 +6,8 @@ Kalmido's team views live in **Workload** (sidebar, module "Workload"). Since 2.
 ## Absences (2.50.0)
 
 - Everybody enters their own absences: **Absences > Enter an absence** - vacation, sick leave, day off or other,
-  one day or a period, optionally half a day (morning / afternoon) and a note. There is no approval: entering is enough.
+  one day or a period, optionally half a day (morning / afternoon) and a note. There is no approval: entering is enough
+  (unless the organisation's admins switch on vacation requests, see below).
 - The admins of an organisation can also enter absences for its members.
 - **Which area:** the workspace switch decides (2.96): on an organisation its absences, on **Private** your own
   personal area (also as a member of organisations), on **All** the first organisation. The picker at the top switches
@@ -22,6 +23,35 @@ Kalmido's team views live in **Workload** (sidebar, module "Workload"). Since 2.
 - Deleting an absence can be undone.
 - Agents read only "away" and the period of their own organisation (`GET /api/v1/absences`, MCP `get_absences`),
   never the kind.
+
+## Working days and weekly hours (2.125.0)
+
+- **Settings > General > Working week**: the days you work (Monday to Friday by default) and your hours per week
+  (empty = 5 x the server's hours per day).
+- The workload spreads the hours per week over your working days: an absence or a public holiday on a working day lowers
+  the week by that day's share, a day off on a day you do not work costs nothing. The hint *Maybe forgotten* in the time
+  view and the vacation account count only working days.
+- An organisation's admins set the working days and hours of their members in **Absences > Vacation accounts**
+  (they are the person's own settings, so they apply in every organisation of that person).
+- Without a setting everything stays as before (Monday to Friday).
+
+## Vacation account and vacation requests (2.125.0)
+
+- **Vacation account:** per person and year an entitlement in days (half days allowed) and an optional carry-over from
+  the year before. The admins of an organisation set it for its members in **Absences > Vacation accounts**; people
+  without an organisation set their own there. The tab shows *entitlement*, *taken* (approved vacation working days of
+  the year; half days count 0.5, public holidays of the state and days you do not work do not count), *requested* (open
+  requests) and *left*. No entitlement = no account, nothing changes.
+- **Vacation requests:** off by default. An organisation's admins switch on **Vacation of members needs an approval** in
+  **Absences > Vacation accounts**. Then vacation a member enters for themselves is a request: the person and the admins
+  see it marked *requested* (striped in the grid); the team, the workload, *Plan my day*, the booking page and agents
+  treat the person as present until it is approved. Sick leave, days off and other absences never need an approval;
+  vacation an admin enters (for themselves or a member) is approved at once. People without an organisation never ask.
+- **Deciding:** the admins see **Open vacation requests** with *Approve* and *Reject* (an optional note for the person).
+  Undo opens the request again. A member who changes the period of a request or an approved vacation, or changes a
+  rejected request, asks again.
+- **Notifications:** the admins get a News item and a push about a new request, the person about the decision; the row
+  *Vacation requests* of the notification settings switches both off. The notes stay in the app.
 
 ## Disposition (2.50.0)
 
@@ -160,11 +190,44 @@ questions stays the classic form.
 - **Who sees whose time.** In the window "Tracked time" of a project, the time reports and the CSV, the owner of the list,
   its admins and the admins of its organisation see everyone's entries. Everyone else sees their own there, and the window
   says "Your time only". The time list in a task's detail still shows everyone's entries of that task.
+- **Excel export (2.125.0).** Next to *CSV* the time view and the client page have *Excel (XLSX)*: the same filters,
+  columns, rounding and visibility as the CSV, but hours and amounts as numbers, start and end as date-time cells and a
+  sum row at the end. The workload view has the same button: people x weeks with the planned and the capacity hours per
+  week (only the people and tasks you may see). Without an organisation it works the same on your own data.
+- **Timer shortcut (2.125.0).** The installed app (Android, desktop) offers *Start / stop timer* in its long-press menu
+  when the module "Time tracking" is on: it opens the time view and starts a timer on the basket, or stops the running one.
 - **Templates keep the project page.** "Save as template" on a project also saves its notepads, the standard arrangement of
   the project page and the block colours. A project made from the template gets its own copies of the notepads, placed and
   coloured as in the original. Notepads written by agents stay with their project.
 - **Undo after "Delete all times of this project"** brings the entries back exactly as they were, including the link to a
   timer started on a phone, so a stop that arrives later from that phone still finds its entry.
+
+## Monthly timesheets: close, approve, send back (2.125.0)
+
+- **Close a month.** On the time page choose *This month* or *Last month*: a card shows the month's timesheet. *Close month*
+  locks your entries that start in that month: no new entry, no change, no delete, no timer start or stop into it, focus
+  sessions and agents' proposals no longer add time there, and *Delete all times of this project* leaves them. The entries
+  show a lock instead of the edit buttons. An entry from the 31st 23:00 to the 1st 01:00 belongs to the month it starts in.
+  A running timer of that month has to be stopped first. *Reopen* unlocks it again as long as nobody approved it.
+- **Approval in an organisation.** The admins of your organisation get a News item (and a push) and see your closed month
+  under *Timesheets of your team*, with the hours on the organisation's lists (never your private time). They *Approve* it
+  or *Send back* with a note: then the month is open again and you get the note. An approved month only an admin reopens.
+  Members cannot decide, admins of another organisation never see it. Every step is one Undo step.
+- **Without an organisation** you are your own admin: closing locks the month, there is no approval step, you reopen it
+  yourself.
+- **Notifications:** the event *Timesheets* in Settings > Notifications (News and push, both can be switched off).
+- **Agents and the API** get `409` with the error code `month_closed` when they write into a closed month.
+
+## Time zone and entries over midnight (2.125.0)
+
+- **Your own time zone** (Settings > Modules > Time tracking > *Time zone*; empty = the server's, the device's zone is offered
+  as a suggestion) decides on which day an entry counts, the periods of the report, the CSV and the timesheet, "today" and
+  the month of the lock above. The calendar, reminders, workload and absences keep the server's time zone. With *All members*
+  the report uses your time zone for everyone's entries.
+- **Entries over midnight** (on by default): an entry from 23:30 to 00:30 counts with 30 minutes on each day in the days of
+  the report and the timesheet, and the CSV has one row per day. The entry itself stays one entry, the totals stay the same.
+  Rounding stays per entry: the rounded time is split by the share of each day, never rounded twice. Switched off, an entry
+  counts on the day it starts, as before.
 
 ## Saved arrangements and templates (2.55.0)
 

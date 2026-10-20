@@ -106,11 +106,13 @@ def workload(c, uid, start=None, weeks=4, org=None):
     aoid = oid or pb_personal(c, uid, create=False)
     gone = abs_days(c, ids, bounds[0][0], bounds[-1][1], aoid) if aoid else {}
     hol = abs_holidays(abs_state(c, aoid), bounds[0][0], bounds[-1][1])
+    from ..hub.leave import wt_workdays
     for pid, p in out.items():
+        wd = wt_workdays(c, pid)  # 2.125.0 A (#2118): the weekly hours spread over the person's working days
         for w, (a, b) in zip(p["weeks"], bounds):
-            f = abs_capacity_factor(gone.get(pid, {}), hol, a, b)
+            f = abs_capacity_factor(gone.get(pid, {}), hol, a, b, wd)
             w["capacity_h"] = round(p["capacity_h"] * f, 2)
-            w["absent_days"] = sum(v for k, v in gone.get(pid, {}).items() if a.isoformat() <= k <= b.isoformat() and date.fromisoformat(k).weekday() < 5)
+            w["absent_days"] = sum(v for k, v in gone.get(pid, {}).items() if a.isoformat() <= k <= b.isoformat() and date.fromisoformat(k).weekday() in wd)
     for p in out.values():
         for w in p["weeks"]:
             cap = w.get("capacity_h", p["capacity_h"])

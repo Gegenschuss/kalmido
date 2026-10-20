@@ -7,6 +7,39 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.125.0] - 2026-10-20
+
+Vacation requests and accounts, working days per person, monthly timesheets, time zone per person, timer shortcut,
+Excel export; the browser demo starts like a new account and shows every module.
+
+### Added
+- Working days and weekly hours per person (Settings > General > Working week; admins of an organisation set them for
+  members): workload, "Maybe forgotten" and the vacation account count only the person's working days; without a
+  setting Monday to Friday as before (#2118).
+- Vacation account per person and year: entitlement, carry-over, taken, requested, rest; half days count 0.5, public
+  holidays and days off do not count (#2117).
+- Vacation requests: an organisation can switch on "Vacation of members needs an approval" (off by default); admins
+  approve or reject with a note (one undo step each), only approved vacation counts as absent - for the team, workload,
+  booking pages and agents. Notifications in their own switchable row "Vacation requests" (#2117).
+- Time tracking: close a month - its entries are locked (web, API, offline replays, focus sessions, agent proposals);
+  admins of the organisation approve it or send it back with a note (stored encrypted, not in push or news). Without an
+  organisation closing locks the month on its own. Notifications in their own switchable row "Timesheets"; the API
+  answers writes into a closed month with 409 `month_closed` (#2119).
+- Time tracking: an own time zone per person (Settings > Modules > Time tracking, "Use this device"); entries over
+  midnight count on each day with their share in report, CSV and timesheet (switchable, on by default; totals and
+  rounding stay the same) (#2120).
+- App shortcut "Start / stop timer" in the long-press menu of the installed app (#2121).
+- Excel export (.xlsx) of time entries, client times and the workload view, with the same filters, rows and visibility
+  as the CSV (#2122).
+- Browser demo: starts like a new account (intro, module choice, tutorial) and runs every module in the browser -
+  contacts, home & life, review, budget, bookmarks, workload with absences and dispo, events, knowledge pages, tables
+  with formulas, file store, documents and the office pages; what needs a server says so in place, and the build lists
+  app calls without a demo stand-in (#1653).
+
+### Changed
+- Time reports and the CSV split entries that run over midnight into one row per day (see above; switch off under
+  Settings > Modules > Time tracking) (#2120).
+
 ## [2.124.2] - 2026-10-20
 
 ### Fixed

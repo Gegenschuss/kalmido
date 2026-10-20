@@ -9,14 +9,14 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from flask import jsonify, redirect, request, Response, send_from_directory
+from flask import g, jsonify, redirect, request, Response, send_from_directory
 
 from ..core.config import app, APP_VERSION, ATT_DIR, ICAL_PREFIX, PUB_PREFIX, SEARCH_INDEX, MAX_FILE_MB, ntfy_attachment_url, NTFY_IN, PUBLIC_URL, safe_urlopen
 from .pg import insert_id
 from ..core.i18n import lang, N_, tr, trn
-from ..core.db import bump, connect, db, default_uid, err, gset, gsetting, iso, now_utc
+from ..core.db import bump, connect, db, default_uid, err, gset, gsetting, iso, now_utc, usettings
 from ..accounts.session import client_ip, GATE, me
-from ..core.access import my_inbox
+from ..core.access import my_inbox, time_all
 
 
 # ---------------------------------------------------------------- pages
@@ -443,6 +443,11 @@ def manifest():
                       for k, n, u in (("new", N_("New task"), "/?action=new"), ("capture", N_("Quick add"), "/?action=capture"),
                                       ("today", N_("Today"), "/#today"),
                                       ("news", N_("News"), "/#news"), ("search", N_("Search"), "/#search"))]
+    # 2.125.0 C (#2121): start / stop the timer from the home screen, only for a signed-in person with the module on
+    u = getattr(g, "user", None)
+    if u and "time" in (usettings(db(), u["id"]).get("features") or "").split(",") and time_all():
+        m["shortcuts"].append({"name": tr("Start / stop timer", lg=lg), "short_name": tr("Timer", lg=lg), "url": "/?action=timer",
+                               "icons": [{"src": f"/static/shortcuts/timer-{z}.png", "sizes": f"{z}x{z}", "type": "image/png"} for z in (96, 192)]})
     return Response(json.dumps(m, ensure_ascii=False, indent=2), mimetype="application/json")
 
 

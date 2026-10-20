@@ -850,6 +850,11 @@ it, and then only lists that the agent **and** that person see count (tasks and 
 entries to the person (with `list_time_entries` for what is already there), never add time for them without asking.
 The web app shows the same as *Maybe forgotten* on top of the time page, and the timesheet can be copied as text.
 
+**Closed months (2.125.0).** A person can close a month of their time tracking (and an admin of their organisation approve
+it). Every write of an entry that starts in such a month (`POST` / `PATCH` / `DELETE /time/entries`, the timer, an applied
+time proposal) answers `409` with the error code `month_closed`: tell the person, do not retry; only they (or after an
+approval their admin) reopen it in the app.
+
 Example `reaction`:
 
 ```json

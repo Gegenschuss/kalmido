@@ -79,7 +79,8 @@ FIELDS = {
     "office_cash_entries": ("text",), "office_cash_log": ("prev",),  # 2.121.0 B (#2095): the cash book
     "office_deals": ("value", "contact", "note", "lost_reason",
                      "next_step", "email", "phone", "company"),  # 2.50.0 (#1196): the sales pipeline; 2.94.0 A (#1930): leads
-    "hub_absences": ("kind", "note"),  # 2.50.0 (#1195): the kind of an absence (sick leave = health data) and its note
+    "time_sheets": ("note",),  # 2.125.0 R (#2119): the note of a timesheet decision
+    "hub_absences": ("kind", "note", "decision_note"),  # 2.50.0 (#1195): the kind of an absence (sick leave = health data) and its note; 2.125.0 A (#2117): + the note of a decision
     # 2.72.0 (#1333): the household budget -- per row with the key of its list's space (column sid, life/budget.py bud_enc;
     # the passes of admin/orgcrypt_cli.py call life/budget.py bud_settle, not fields_pass: these tables have no org_id)
     "budget_entries": ("amount", "title", "note", "counterpart"),
@@ -118,6 +119,7 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_vehicles": N_("Logbook"), "office_drives": N_("Logbook"), "office_drive_log": N_("Logbook"),  # 2.93.0 B (#1928)
                  "office_cash_entries": N_("Cash book"), "office_cash_log": N_("Cash book"),  # 2.121.0 B (#2095)
                  "hub_absences": N_("Kind and note of absences"),  # 2.50.0 (#1195)
+                 "time_sheets": N_("Notes on timesheet decisions"),  # 2.125.0 R (#2119)
                  # 2.72.0 (#1333): amounts, texts and limits of the household budget, its receipts
                  "budget_entries": N_("Household budget"), "budget_recurring": N_("Household budget"), "budget_cats": N_("Household budget"),
                  "hub_mails": N_("E-mails filed with clients and projects"),  # 2.84.0 A (#1198)

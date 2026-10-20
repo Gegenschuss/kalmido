@@ -138,6 +138,7 @@ APP_TO_API = {
     "DELETE /api/time/entries/{}": ["DELETE /time/entries/{}"],
     "GET /api/time/report": ["GET /time/entries"],
     "GET /api/time/export.csv": ["GET /time/entries"],
+    "GET /api/time/export.xlsx": ["GET /time/entries"], "GET /api/workload/export.xlsx": ["GET /workload"],  # 2.125.0 C (#2122): Excel = the same data as the API
     "GET /api/time/gaps": ["GET /time/gaps"],  # 2.34.0 (#269)
     "GET /api/stale": ["GET /stale"],  # 2.34.0 (#266)
     "GET /api/news": ["GET /news"],
@@ -325,6 +326,10 @@ APP_ONLY = [
      "disposition (booking crew and equipment): people only; agents read GET /absences (\"away\" only)",
      ("POST /api/team/absences", "PATCH /api/team/absences/", "DELETE /api/team/absences/", "PUT /api/team/absences/",
       "=GET /api/team/absences/check", "* /api/team/dispo", "=GET /api/team/bookings/mine")),
+    # 2.125.0 A (#2117, #2118): vacation accounts, vacation requests and their decision, the working week of a person
+    ("2.125.0 (#2117, #2118): the vacation account, deciding on vacation requests (a person's decision) and the working days / weekly "
+     "hours of a person stay with people; agents read GET /absences (approved absences only, \"away\" only)",
+     ("* /api/team/leave",)),
     ("2.27.0 (#999): the web panel says a person edits a task (tidy-up waits); agents never edit in a panel", ("=POST /api/tasks/{}/editing",)),
     ("2.42.0 (#1376): the web app's live updates (only the tasks changed since its state); agents follow their events and GET /tasks",
      ("=GET /api/state/delta",)),
@@ -463,6 +468,9 @@ APP_ONLY = [
      ("=PUT /api/lists/{}/page-style", "=POST /api/lists/{}/notepads", "=PATCH /api/notepads/{}", "=DELETE /api/notepads/{}")),
     ("2.43.0 (#1434): delete all times of a project (typed confirmation, restore); agents get 403 by design",
      ("=GET /api/lists/{}/time/delete-all", "=POST /api/lists/{}/time/delete-all", "=POST /api/lists/{}/time/restore")),
+    ("2.125.0 (#2119): closing, reopening and approving a month's timesheet is a person's step; agents get 403 (their writes into "
+     "a closed month answer 409 month_closed)",
+     ("=GET /api/time/sheets", "=POST /api/time/sheets", "=POST /api/time/sheets/decide")),
     # 2.44.0 (#1517): the setup script trades the one-time code for the token and signs a computer off with its own token
     ("2.44.0 (#1517): one-command agent setup on a computer (setup script, no session); not an agent tool",
      ("=POST /api/agent-setup/redeem", "=POST /api/agent-setup/remove")),

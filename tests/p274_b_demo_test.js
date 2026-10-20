@@ -29,6 +29,7 @@ const srv = http.createServer((req, res) => {
   await new Promise(r => srv.listen(0, '127.0.0.1', r));
   const B = `http://127.0.0.1:${srv.address().port}/demo/`;
   const store = {}, errs = [];
+  let intros = 0;  // 2.125.0 D (#1653)
   const open = async (lang = 'de-DE', wait = 2500) => {
     const vc = new VirtualConsole();
     vc.on('jsdomError', e => { if (!/navigation|Not implemented|Could not load (img|link)/.test(e.message)) errs.push(e.message); });
@@ -51,18 +52,24 @@ const srv = http.createServer((req, res) => {
         w.confirm = () => true; w.prompt = () => null;
       }});
     await sleep(wait);
+    // 2.125.0 D (#1653): the first start shows the intro of a new account (language, purpose, modules): "Start" with its defaults,
+    // then the page again (the demo reloads itself after "Start")
+    const go0 = dom.window.document.querySelector('.authscreen [data-su="go"]');
+    if (go0) { intros++; go0.click(); await sleep(600); dom.window.close(); return open(lang, wait); }
     return dom.window;
   };
   const J = async (w, expr) => JSON.parse(await w.eval(`(async () => JSON.stringify(await (${expr})))()`));
   const year = String(new Date().getFullYear());
 
   let w = await open('de-DE'), d = w.document;
+  check(intros === 1, 'a new account starts with the intro (purpose and modules), "Start" with the defaults');  // 2.125.0 D (#1653)
   w.eval('tourEnd(true)'); await sleep(200);
   // 1. a new account has no office; "Office & finance" as the purpose switches it on (with the clients)
   check(!w.eval(`feat('office')`), 'new account: office off');
   const pu = await J(w, `api('POST', '/api/me/purpose', {purpose: 'office'})`);
   await w.eval('load().then(render)'); await sleep(300);
-  check(w.eval(`feat('office') && feat('clients')`) && !/files|contacts|events/.test(pu.features), 'purpose office: office + clients on, server-only modules stay off: ' + pu.features);
+  // 2.125.0 D (#1653): every module runs in the demo now: the purpose switches like on a server (events, contacts included)
+  check(w.eval(`feat('office') && feat('clients')`) && /contacts/.test(pu.features) && /events/.test(pu.features), 'purpose office: office + clients on, the modules of the purpose like on a server: ' + pu.features);
   w.eval(`go('office')`); await sleep(1500);
   const v0 = d.querySelector('#view')?.textContent || '';
   check(/Angebote/.test(v0) && /Neues Angebot/.test(v0), 'office view: quotations tab with "Neues Angebot": ' + v0.slice(0, 160));
@@ -137,8 +144,11 @@ const srv = http.createServer((req, res) => {
   check(/Angebot KVA-/.test(d.querySelector('#kd-print')?.textContent || ''), 'window.open of a PDF: the quotation in the print view');
   d.querySelector('#kd-print [data-kp="close"]')?.click();
   // 7. the server-only parts of the office: a calm answer, no notice while browsing; a write (DATEV) gets the notice
-  const kpi = await w.eval(`rawFetch('GET', '/api/office/kpi').then(() => 'ok', e => e.status + ' ' + e.message)`);
-  check(/^409 /.test(kpi) && /nicht verfügbar/.test(kpi) && !d.querySelector('#kd-note'), 'office KPI: "not available" without the notice: ' + kpi);
+  // 2.125.0 D (#1653): the figures are computed in the browser now; a part still without a stand-in answers calmly
+  const kpi = JSON.parse(await w.eval(`rawFetch('GET', '/api/office/kpi').then(j => JSON.stringify(j), e => JSON.stringify({err: e.status}))`));
+  check(Array.isArray(kpi.revenue?.months) && kpi.revenue.months.length === 12 && kpi.invoices && !d.querySelector('#kd-note'), 'office KPI from the invoices, without the notice: ' + JSON.stringify(kpi).slice(0, 120));
+  const gimp = await w.eval(`rawFetch('GET', '/api/office/imports').then(() => 'ok', e => e.status + ' ' + e.message)`);
+  check(/^409 /.test(gimp) && /nicht verfügbar/.test(gimp) && !d.querySelector('#kd-note'), 'office imports: "not available" without the notice: ' + gimp);
   await w.eval(`rawFetch('POST', '/api/office/docs/${inv.id}/datev', {}).catch(() => 0)`); await sleep(100);
   check(!!d.querySelector('#kd-note'), 'DATEV: the notice with the install link');
   d.querySelector('#kd-note button')?.click();
@@ -181,7 +191,7 @@ const srv = http.createServer((req, res) => {
   for (const [vw, vh, touch] of [[390, 844, true], [1280, 800, false]]) {
     await firefox(async ({cmd, ev, nav, ctx, shot}) => {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
-      await nav(B); await ev(`(() => { localStorage.clear(); return 1; })()`); await nav(B); await sleep(2500);
+      await nav(B); await ev(`(() => { localStorage.clear(); return 1; })()`); await nav(B); await sleep(2500); await ev(`(async () => { const b = document.querySelector('.authscreen [data-su="go"]'); if (b) { b.click(); await new Promise(r => setTimeout(r, 800)); } return 1; })()`); await nav(B); await sleep(2500);  // 2.125.0 D (#1653): the intro first
       const id = await ev(`(async () => { tourEnd(true); await api('POST', '/api/me/purpose', {purpose: 'office'}); await load();
         const c = await api('POST', '/api/clients', {name: 'Beispiel GmbH', street: 'Hauptstraße 5', zip: '20095', city: 'Hamburg'}); await load();
         const o = await api('POST', '/api/office/docs', {}); await api('PATCH', '/api/office/docs/' + o.id, {client_id: c.id, recipient_from_client: true, project_title: 'Website-Relaunch mit Buchungssystem'});

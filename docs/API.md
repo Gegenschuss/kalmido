@@ -108,8 +108,9 @@ headers: call the API from a server, a script or an app, not from JavaScript on 
 
 `code` is one of `invalid` (400), `unknown_field` (400, see below), `unauthorized` (401: missing, invalid or expired
 token), `forbidden` (403: scope, list role or a module that is switched off), `not_found` (404: also for things the user
-cannot see, so their existence is not revealed), `method_not_allowed` (405), `conflict` (409), `rate_limited` (429, with
-`Retry-After`). The message is in the user's language.
+cannot see, so their existence is not revealed), `method_not_allowed` (405), `conflict` (409), `month_closed` (409, 2.125.0: a time entry in a month the person closed
+in the timesheet: creating, changing, deleting, the timer), `rate_limited` (429, with `Retry-After`). The message is in the
+user's language.
 
 **Unknown fields and parameters are refused** (400) instead of being ignored, so a typo does not silently do nothing.
 Since 2.2.1 an unknown JSON field answers with its own code and names every field the endpoint does not know; nothing
@@ -956,7 +957,8 @@ line; `company_fields.address_extra` is the company's extra address line (BT-36)
 company are empty, a plain free address (`company.lines`: street, postcode + city, maybe a country) is read into them in
 the answer; saving the settings keeps them, the free lines stay.
 A list's client: `PATCH /lists/{id}` `{client_id}`. The timesheet of a client is the time report of its lists:
-`GET /time/entries?lists=1,2&from=&to=` (web) or `/api/time/export.csv`.
+`GET /time/entries?lists=1,2&from=&to=` (web) or `/api/time/export.csv` / `/api/time/export.xlsx` (2.125.0, web only: the same
+filters and visibility; `/api/workload/export.xlsx` takes the parameters of `GET /workload`).
 
 `GET /workload?start=&weeks=&org=`: per person and week `minutes` (sum of the tasks' `duration`), `tasks`,
 `unestimated`, `pct` of `capacity_h`, `level`; `nodate` for tasks without a date. 2.50.0 (#1195): each week also
@@ -966,6 +968,8 @@ carries `capacity_h` (the person's hours of that week: absent workdays and publi
 `people` and `items` (`user_id`, `start_date`, `end_date`, `half_day` `""|am|pm`) plus the `holidays` of the
 organisation's state. Never the kind (vacation, sick leave, day off) or the note. An agent sees its own workspace only
 (a private agent: 404); entering absences and the disposition (#1194, booking crew and equipment) are the web app's.
+Since 2.125.0 (#2117) only approved absences are listed: an open or rejected vacation request never appears. Vacation
+accounts, deciding on requests and the working week of people stay in the web app.
 
 `POST /tasks/{id}/approval` (`tasks:write`): `{action: request, approver_id, note?}` / `{action: cancel}`; the approver
 (a person in the app) decides with `approve`, `changes` or `reject`. Tasks carry `approval` (`pending | approved |
