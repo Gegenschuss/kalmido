@@ -7,6 +7,11 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.126.3] - 2026-10-20
+
+### Fixed
+- CI of 2.126.1 / 2.126.2: a client function name no longer trips the icon check, the browser demo answers which agents may draft (#2123 #2124) and the table backlinks (#2357).
+
 ## [2.126.2] - 2026-10-20
 
 Pages: suggestions above the phone keyboard, a news entry when someone shares pages with you, "Mentioned in" on tables.
