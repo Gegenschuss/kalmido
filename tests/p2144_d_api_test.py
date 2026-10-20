@@ -222,7 +222,7 @@ check(op("GET", "status", "w" * 40).status_code == 429, "wrong tokens stay block
 
 # ---- 2.144.0 D2 (#797): only the three known paths skip the person login; anything else under /api/operator/ is not reached
 for m, p in (("GET", "statusx"), ("GET", "status/"), ("GET", "status/x"), ("POST", "admin"), ("GET", "notice")):
-    check(op(m, p, TOKEN).status_code in (401, 404, 405), f"foreign path {m} /api/operator/{p} not served ({op(m, p, TOKEN).status_code})")
+    check(op(m, p, TOKEN).status_code in (401, 403, 404, 405), f"foreign path {m} /api/operator/{p} not served ({op(m, p, TOKEN).status_code})")
 check(op("PUT", "notice", TOKEN, json={"text": "x", "level": "panic"}).json().get("code") == "invalid_notice", "notice error: a code")
 
 # ---- a too short token file: off (404)

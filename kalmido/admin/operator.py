@@ -119,7 +119,7 @@ def op_status(c):
     from .worker import wrk_health
     now = now_utc()
     d7, d30 = iso(now - timedelta(days=7)), iso(now - timedelta(days=30))
-    with system_ctx(c):
+    with system_ctx(c):  # counts across organisations for the hoster -- only numbers leave this block
         people = _count(c, "SELECT COUNT(*) FROM users WHERE kind!='agent'")
         disabled = _count(c, "SELECT COUNT(*) FROM users WHERE kind!='agent' AND disabled!=0")
         agents = _count(c, "SELECT COUNT(*) FROM users WHERE kind='agent'")
