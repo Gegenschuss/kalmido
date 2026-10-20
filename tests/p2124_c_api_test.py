@@ -65,7 +65,7 @@ A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_
 A.patch(B + "/api/settings", json={"lang": "en"})
 ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
 SP = f"org:{ORG}"
-uid = {}
+uid = {"alice": A.get(B + "/api/state").json()["me"]["id"]}
 for u in ("bob", "carol", "erin"):
     r = A.post(B + "/api/users", json={"orgs": [ORG] if u != "erin" else [], "username": u, "display_name": u.title(),
                                        "password": "password123", "email": f"{u}@example.com"})
