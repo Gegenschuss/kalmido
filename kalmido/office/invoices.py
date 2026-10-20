@@ -752,6 +752,10 @@ def inv_files(c, oid, did):
     from .pdf import office_pdf
     m = odoc_render(c, did, oid)
     m.pop("internal", None)
+    from .docs import doc_row
+    from .pdfweb import epdf_draft, epdf_is_draft
+    if epdf_is_draft(doc_row(c, oid, did)):
+        epdf_draft(m)  # 2.138.2 A (#2393): a draft goes out marked
     number = re.sub(r"[^A-Za-z0-9._-]+", "-", str(m.get("number") or "")).strip("-") or f"doc-{did}"
     return [(f"{m['kind']}-{number}.pdf", office_pdf(m), "application/pdf")]
 

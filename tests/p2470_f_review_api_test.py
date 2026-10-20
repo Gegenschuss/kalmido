@@ -130,12 +130,14 @@ if txt is not None:
     check("Lighting" in txt and "Car" in txt, "PDF of the sent quotation: the shoot rows from the cache")
 
 # ---------------------------------------------------------------- #1649 / #1215: percent position in a part, invoice = quotation
-r = A.post(B + D, json={"kind": "offer", "lang": "en", "project_title": "KSK", "items": [svc("Concept", 1, 800)]})
+# 2.138.4 (#2252): the Film & Video pack switches handling costs (4 %) on for a new quotation since 2.113.1; this
+# quotation checks the percent position alone, so it switches them off
+r = A.post(B + D, json={"kind": "offer", "lang": "en", "project_title": "KSK", "items": [svc("Concept", 1, 800)], "handling_pct": None})
 DOC2 = r.json()["id"]
 PA = A.post(B + f"{D}/{DOC2}/parts", json={"title": "Shoot day"}).json()["part"]["id"]
 ksk = {**svc("Artists' social insurance", 1, 5, unit="percent"), "intext": "intern"}
 r = A.put(B + f"{D}/{DOC2}/parts/{PA}/items", json={"items": [svc("Camera", 1, 1000, intext="extern"), ksk]})
-check(r.ok and r.json()["part"]["totals"]["net"] == 1050, f"part A: 1000 + 5 % = 1050 {r.text[:200]}")
+check(r.ok and r.json()["part"]["totals"]["net"] == 1050, f"part A: 1000 + 5 % = 1050 {r.json()['part']['totals'].get('net') if r.ok else r.text[:200]}")
 PB = A.post(B + f"{D}/{DOC2}/parts", json={"title": "Edit"}).json()["part"]["id"]
 r = A.put(B + f"{D}/{DOC2}/parts/{PB}/items", json={"items": [svc("Editing", 1, 3000, intext="extern")]})
 items = r.json()["items"]
@@ -143,7 +145,7 @@ for it in items:
     if it.get("kind") == "part" and it.get("ref_part_id") == PA:
         it["qty"] = 2
 r = A.put(B + f"{D}/{DOC2}/items", json={"items": items})
-check(r.ok and r.json()["totals"]["net"] == 5900, f"title page: 800 + 2 x 1050 + 3000 = 5900 {r.text[:200]}")
+check(r.ok and r.json()["totals"]["net"] == 5900, f"title page: 800 + 2 x 1050 + 3000 = 5900 {r.json()['totals'].get('net') if r.ok else r.text[:200]}")
 
 
 def invoices(label, ksk_amount):
@@ -166,7 +168,7 @@ def invoices(label, ksk_amount):
 invoices("KSK", 50)
 # a part discount over the percent position: discountable lines count with their amount (10 % of 1000 + 50)
 r = A.patch(B + f"{D}/{DOC2}/parts/{PA}", json={"settings": {"discount_pct": 10}})
-check(r.ok and A.get(B + f"{D}/{DOC2}").json()["totals"]["net"] == 5690, "part discount: 800 + 2 x 945 + 3000 = 5690")
+check(r.ok and A.get(B + f"{D}/{DOC2}").json()["totals"]["net"] == 5690, f"part discount: 800 + 2 x 945 + 3000 = 5690 {A.get(B + f'{D}/{DOC2}').json()['totals'].get('net')}")
 invoices("KSK + discount", 50)
 
 # ---------------------------------------------------------------- part quantity 0, sort

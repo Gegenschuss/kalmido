@@ -3932,7 +3932,6 @@ a.tref:hover{background:var(--accent-soft)}
 .nsh{display:flex;align-items:center;gap:.5rem;font-size:var(--fs-s);font-weight:600;color:var(--muted);text-transform:none;margin:.5rem .25rem}
 .nsh .c{font:var(--fs-xs) var(--mono)}
 .ngroup{border-bottom:1px solid var(--line)}
-.ngroup.needs .ngt{font-weight:600}
 .nghead{display:flex;align-items:center;gap:.625rem;padding:.5rem .375rem}
 .ngav{display:flex;flex:none}
 .ngav .avatar{width:1.625rem;height:1.625rem;font-size:.625rem;margin-left:-.375rem;box-shadow:0 0 0 2px var(--bg)}
@@ -3941,7 +3940,14 @@ a.tref:hover{background:var(--accent-soft)}
 .ngmain:hover{background:var(--bg3)}
 .ngt{display:flex;align-items:center;gap:.375rem;color:var(--text);overflow:hidden}
 .ngroup:not(.unread) .ngt{color:var(--text2)}
-.ngroup.unread .ngt::before{content:"";width:.5rem;height:.5rem;border-radius:50%;background:var(--accent);flex:none}
+.ngroup.unread{background:color-mix(in srgb,var(--accent) 8%,transparent);box-shadow:inset .125rem 0 0 var(--accent)}
+.ngroup.unread .ngt{font-weight:600}
+.ngroup.read .ngt{color:var(--muted);font-weight:400}
+.ngroup.read .ngs,.ngroup.read .ngex{color:var(--faint)}
+.ngroup.read .ngav .avatar{opacity:.5;filter:saturate(0)}
+.nitem:not(.unread) .nexc,.nitem:not(.unread) time{color:var(--faint)}
+.nitem:not(.unread) .avatar{opacity:.5;filter:saturate(0)}
+.bpop .nsh,.bpop .nsec{position:sticky;top:0;z-index:1;background:var(--bg)}
 .ngn{font:var(--fs-xs) var(--mono);color:var(--muted);border:1px solid var(--line2);border-radius:var(--r-s);padding:0 .25rem}
 .ngs{font-size:var(--fs-s)}
 .ngitems{padding:0 0 .5rem 2.25rem}
@@ -6745,7 +6751,7 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 [data-wsc],.wsc-on{--wsc:var(--wsd)}
 :root[data-theme="light"] :is([data-wsc],.wsc-on){--wsc:var(--wsl)}
 @media (prefers-color-scheme: light){ :root[data-theme="auto"] :is([data-wsc],.wsc-on){--wsc:var(--wsl)} }
-#main.wsc-on #top{box-shadow:inset 0 .1875rem 0 var(--wsc)}
+/* 2.138.2 C (#2389): no stripe in the list header any more -- the workspace's colour is the stripe on top of the sidebar */
 #side .srow[data-wsc]{background-image:linear-gradient(var(--wsc),var(--wsc));background-size:.1875rem 60%;background-repeat:no-repeat;background-position:0 50%}
 .wsbadge[data-wsc]{color:var(--text);background:color-mix(in srgb,var(--wsc) 14%,transparent);border-color:color-mix(in srgb,var(--wsc) 55%,transparent)}
 .wsbadge[data-wsc]:hover{border-color:var(--wsc)}
@@ -6850,9 +6856,7 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 /* 2.57.0 B (#1807) my own workspace colours (wscolor.js wsp_*): a light tint of the sidebar (--sbbg on #side, the fixed head of
    part A takes it too), a dot in front of the workspace's name in the switch and its menu, the swatches in Settings > Workspaces */
 #side{background:var(--sbbg,var(--bg2))}
-#side.wsp-on{--wsc:var(--wsd);--sbbg:color-mix(in srgb,var(--wsc) 7%,var(--bg2))}
-:root[data-theme="light"] #side.wsp-on{--wsc:var(--wsl);--sbbg:color-mix(in srgb,var(--wsc) 6%,var(--bg2))}
-@media (prefers-color-scheme: light){ :root[data-theme="auto"] #side.wsp-on{--wsc:var(--wsl);--sbbg:color-mix(in srgb,var(--wsc) 6%,var(--bg2))} }
+/* 2.138.2 C (#2389): the tint (#side.wsp-on) is gone; the colour is the top border of #side below */
 .wsp-dot{flex:none;width:.625rem;height:.625rem;border-radius:50%;box-shadow:inset 0 0 0 .09375rem var(--muted)}
 .wsp-dot[data-wsc]{background:var(--wsc);box-shadow:none}
 .wsp-pane{margin:0 0 .75rem}
@@ -7689,3 +7693,44 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .tvcp .tvcdl{flex:none}
 .tvcp.err .tvcpb{background:var(--bg4);color:var(--muted)}
 @media (pointer:coarse){.tvcp .tvcpb{width:2.75rem;height:2.75rem}.tvcp .tvcrt{min-height:2.75rem}.tvcp .tvcseek{min-height:2.75rem}}
+
+/* 2.138.2 C (#2392, #2389): the sidebar's head -- no logo; the workspace switch is the heading (dot + name + arrow), the
+   fold buttons appear on hover / keyboard focus (always on touch screens), the connection dot only offline / while syncing;
+   the account picture sits next to the search at the bottom; a 4 px stripe in the workspace's colour (--wbd / --wbl on #app,
+   wscolor.js wsp_side: my choice, else the organisation's, else the accent for Private; grey under "All") is #side's top border,
+   3 px on top of the header while the sidebar is closed (phone, rail) */
+#app{--wbc:var(--muted)}
+#app.wsb-on{--wbc:var(--wbd)}
+:root[data-theme="light"] #app.wsb-on{--wbc:var(--wbl)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] #app.wsb-on{--wbc:var(--wbl)} }
+#side{border-top:.25rem solid var(--wbc)}  /* the scroll box's own border: never scrolls, never covered by the sticky head */
+@media (max-width:899px){ #top{box-shadow:inset 0 .1875rem 0 var(--wbc)} }
+#app.side-rail #top{box-shadow:inset 0 .1875rem 0 var(--wbc)}
+#side .sbhead{display:flex;align-items:center;gap:.25rem;min-height:2.25rem;margin:0 0 .5rem}
+#side .sbhead .spacer{flex:1}
+:root #side .sbhead .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sbhead .wsbar{width:auto;max-width:100%;min-height:2.25rem;padding:0 .375rem;margin-left:-.125rem;gap:.5rem;border:0;border-radius:var(--radius);background:none;color:var(--text);font-size:1rem;font-weight:600;letter-spacing:-.01em}
+#side .sbhead .wsbar:hover{background:var(--bg3)}
+#side .sbhead .wsbar .wsp-dot{width:.625rem;height:.625rem}
+#side .sbhead .wsbar .wsp-dot:not([data-wsc]){box-shadow:inset 0 0 0 .09375rem var(--muted)}
+#side .sbhead .wsbar > svg:last-child{opacity:.55}
+#side .sbhead .wsbar > svg.i:first-child{color:var(--text2)}
+#side .sbhead .netdot{flex:none;width:.5rem;height:.5rem;border-radius:50%;--nd:var(--st-ready);background:var(--nd)}
+#side .sbhead .netdot.n-on{display:none}
+#side .sbhead .netdot.n-off{--nd:var(--st-off)}
+#side .sbhead .netdot.n-sync{--nd:var(--st-wait)}
+@media (prefers-reduced-motion:no-preference){ #side .sbhead .netdot.n-sync{animation:ndpulse 1.2s ease-in-out infinite} }
+#side .sbhead .sbtools{display:flex;align-items:center;gap:.125rem;flex:none;opacity:0}
+#side .sbhead .sbtools .iconbtn{opacity:.75}
+#side .sbhead:hover .sbtools,#side .sbhead:focus-within .sbtools{opacity:1}
+@media (prefers-reduced-motion:no-preference){ #side .sbhead .sbtools{transition:opacity .15s ease} }
+@media (hover:none){ #side .sbhead .sbtools{opacity:1} }
+#side .sbhead .sfold .i{transform:rotate(90deg)}
+#side .sbhead .sfold[aria-pressed="true"] .i{transform:rotate(-90deg)}
+@media (pointer:coarse){ #side .sbhead .iconbtn{min-width:2.75rem;min-height:2.75rem} :root #side .sbhead .wsbar{min-height:2.75rem} }
+#side .sbdock{display:flex;align-items:center;gap:.5rem}
+#side .sbdock .scmd{flex:1;min-width:0;width:auto}
+#side .sbdock .sbacct{position:relative;display:grid;place-items:center;flex:none;width:2.25rem;height:2.25rem;border-radius:50%}
+#side .sbdock .sbacct .avatar{width:1.75rem;height:1.75rem;font-size:.6875rem}
+#side .sbdock .sbacct:hover .avatar{box-shadow:0 0 0 .125rem color-mix(in srgb,var(--accent) 45%,transparent)}
+@media (pointer:coarse){ #side .sbdock .sbacct{width:2.75rem;height:2.75rem} }
+@media (forced-colors:active){ #side{border-top-color:Highlight} }

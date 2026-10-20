@@ -6,6 +6,8 @@
 //       "All"; a dot in front of each workspace in the switch and its menu; Settings > Workspaces has the swatches (one
 //       Undo step per change); the tint keeps the sidebar's text readable (contrast, both themes); the phone drawer
 //       takes the tint too.
+// 2.138.2 (#2389): no tint any more -- the shown workspace's colour is the stripe on top of the sidebar (--wbd / --wbl on
+//       #app, class wsb-on; Private without a choice = the accent, "none" / "All" = grey); the checks below follow.
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
@@ -54,10 +56,10 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
 
   // ---- without a choice: as before (the admins' colour, Private neutral); the tint follows the shown workspace
   let w = await boot({user: 'alice', hash: 'l/' + W}), d = w.document;
-  const side = () => d.querySelector('#side'), bar = () => d.querySelector('#side .wsbar'), sign = () => d.querySelector('#top h1 .wsbadge');
+  const side = () => d.querySelector('#app'), bar = () => d.querySelector('#side .wsbar'), sign = () => d.querySelector('#top h1 .wsbadge');
   await until(() => bar());
   check(w.eval(`wsc_tone(${ORG})[0]`) === '#ef8a6b' && w.eval(`wsp_tone('private')`) === null, '#1807: no choice: the organisation shows its admins\' colour, Private none');
-  check(side().classList.contains('wsp-on') && side().style.getPropertyValue('--wsd') === '#ef8a6b', '#1807: an organisation shown: the sidebar tint in its colour');
+  check(side().classList.contains('wsb-on') && side().style.getPropertyValue('--wbd') === '#ef8a6b' && !d.querySelector('#side').classList.contains('wsp-on'), '#1807: an organisation shown: the sidebar stripe in its colour, no tint (2.138.2 #2389)');
   check(bar()?.dataset.wsc === '1' && bar().querySelector('.wsp-dot[data-wsc]'), '#1807: the switch carries a coloured dot in front of the name');
   check(d.querySelector(`#side .srow[data-list="${W}"]`)?.style.getPropertyValue('--wsd') === '#ef8a6b', '#1807: no choice: the sidebar stripe as before');
 
@@ -81,13 +83,13 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
 
   // ---- "none": the organisation neutral everywhere (no tint, no stripe, no colour at the switch, a ring as the dot)
   w.eval('render()');
-  await until(() => !side().classList.contains('wsp-on'));
-  check(!side().classList.contains('wsp-on') && !side().style.getPropertyValue('--wsd'), '#1807: "none": no tint');
+  await until(() => !side().classList.contains('wsb-on'));
+  check(!side().classList.contains('wsb-on') && !side().style.getPropertyValue('--wbd'), '#1807: "none": a grey stripe (2.138.2 #2389)');
   check(!d.querySelector(`#side .srow[data-list="${W}"]`)?.dataset.wsc && !d.querySelector('#main').classList.contains('wsc-on'), '#1807: "none": no stripe, no header stripe');
   check(!bar().dataset.wsc && bar().querySelector('.wsp-dot') && !bar().querySelector('.wsp-dot[data-wsc]'), '#1807: "none": the dot is a ring');
   // my own tone wins over the admins' colour
   w.eval(`S.settings.ws_colors = JSON.stringify({private: 'teal', 'org:${ORG}': 'blue'}); render()`);
-  check(side().style.getPropertyValue('--wsd') === '#6d8cff' && side().style.getPropertyValue('--wsl') === '#3b5bdb', '#1807: my tone wins: the list tone (dark / light value)');
+  check(side().style.getPropertyValue('--wbd') === '#6d8cff' && side().style.getPropertyValue('--wbl') === '#3b5bdb', '#1807: my tone wins: the list tone (dark / light value)');
   check(d.querySelector(`#side .srow[data-list="${W}"]`)?.style.getPropertyValue('--wsd') === '#6d8cff' && sign()?.getAttribute('style')?.includes('#6d8cff'), '#1807: also the sidebar stripe and the list\'s sign');
   // the menu of the switch: a dot in front of each workspace, none in front of "All"
   click(w, bar());
@@ -97,31 +99,21 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
   w.eval('closePop()');
   // Private shown: my colour; "All": neutral
   w.eval(`S.settings.workspace = 'private'; go(keyToHash('l:${P}')); render()`);
-  await until(() => side().style.getPropertyValue('--wsd') === '#2dd4bf');
-  check(side().classList.contains('wsp-on') && side().style.getPropertyValue('--wsd') === '#2dd4bf', '#1807: Private shown: the tint in my colour');
+  await until(() => side().style.getPropertyValue('--wbd') === '#2dd4bf');
+  check(side().classList.contains('wsb-on') && side().style.getPropertyValue('--wbd') === '#2dd4bf', '#1807: Private shown: the stripe in my colour');
   check(sign()?.dataset.wsc === '1', '#1807: a private list\'s sign takes my colour of Private');
   check(!d.querySelector(`#side .srow[data-list="${P}"]`)?.dataset.wsc, '#1807: private lists keep no stripe');
   w.eval(`S.settings.workspace = 'all'; render()`);
-  check(!side().classList.contains('wsp-on') && !bar().querySelector('.wsp-dot') && !bar().dataset.wsc, '#1807: "All": no tint, no dot');
+  check(!side().classList.contains('wsb-on') && !bar().querySelector('.wsp-dot') && !bar().dataset.wsc, '#1807: "All": grey stripe, no dot');
   w.close();
 
   // ---- contrast: the tinted sidebar keeps text, secondary text and muted readable (every tone, both themes)
   const css = await (await fetch(B + 'static/app.css')).text();
   const vars = sel => { const m = css.match(new RegExp(sel.replace(/[[\]()"=]/g, '\\$&') + '\\{([^}]*)\\}')); const o = {}; if (m) for (const [, k, v] of m[1].matchAll(/--([\w-]+):([^;]+)/g)) o[k] = v.trim(); return o; };
   const dark = vars(':root'), light = vars(':root[data-theme="light"]');
-  const pd = +(css.match(/#side\.wsp-on\{--wsc:var\(--wsd\);--sbbg:color-mix\(in srgb,var\(--wsc\) (\d+)%,var\(--bg2\)\)\}/) || [])[1];
-  const pl = +(css.match(/:root\[data-theme="light"\] #side\.wsp-on\{--wsc:var\(--wsl\);--sbbg:color-mix\(in srgb,var\(--wsc\) (\d+)%,var\(--bg2\)\)\}/) || [])[1];
-  check(pd >= 4 && pd <= 10 && pl >= 4 && pl <= 10, `#1807: a light tint (${pd} % dark, ${pl} % light)`);
+  // 2.138.2 (#2389): the tint is gone -- the sidebar keeps bg2 in every workspace, so its text contrast is the theme's own
+  check(!/#side\.wsp-on\{--wsc/.test(css) && /#side\{border-top:\.25rem solid var\(--wbc\)\}/.test(css), '#1807 / #2389: no tint rule any more, a 4 px stripe instead');
   check(/#side\{background:var\(--sbbg,var\(--bg2\)\)\}/.test(css), '#1807: #side takes --sbbg (the fixed head shares it)');
-  const tones = await (async () => { const v = await boot({user: 'alice'}); const t = v.eval('JSON.stringify([...LP_TONES.map(t => [t[2], t[4]]), ...WSC_TONES])'); v.close(); return JSON.parse(t); })();
-  let worst = 99;
-  for (const [td, tl] of tones) {
-    for (const [th, tone, p] of [[dark, td, pd], [light, tl, pl]]) {
-      const bg = mix(tone, p / 100, th.bg2);
-      for (const k of ['text', 'text2', 'muted']) worst = Math.min(worst, ratio(rgb(th[k]), bg));
-    }
-  }
-  check(worst >= 4.5, `#1807: contrast on the tinted sidebar >= 4.5:1 (worst ${worst.toFixed(2)})`);
 
   // ---- the real browser: the computed background of #side differs from bg2 (desktop dark + light, the phone drawer)
   await call('PATCH', '/api/settings', {ws_colors: JSON.stringify({private: 'teal', ['org:' + ORG]: 'blue'}), workspace: 'org:' + ORG});
@@ -136,20 +128,22 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
       await signIn(ev);
       await nav(B + '#today');
       await ready(ev, `typeof S !== 'undefined' && !!S.booted && !!document.querySelector('#side .wsbar')`);
-      await ready(ev, `document.querySelector('#side').classList.contains('wsp-on')`);
-      const tinted = await ev(bgOf);
+      await ready(ev, `document.querySelector('#app').classList.contains('wsb-on')`);
+      const tinted = await ev(bgOf), stripe = await ev(`getComputedStyle(document.querySelector('#side')).borderTopColor`);
       await ev(`(() => { S.settings.workspace = 'all'; render(); return 1; })()`);
       await sleep(400);  // Firefox restyles the sidebar after the script that changed it returned
       const plain = await ev(bgOf);
       const bg2 = await ev(`(() => { const e = document.createElement('div'); e.style.background = 'var(--bg2)'; document.body.append(e); const c = getComputedStyle(e).backgroundColor; e.remove(); return c; })()`);
-      check(tinted && plain && tinted !== plain && plain === bg2, `#1807 ${theme}: the tint changes the sidebar background (${tinted} vs ${plain})`);
+      const stripeAll = await ev(`getComputedStyle(document.querySelector('#side')).borderTopColor`);
+      check(tinted && plain && tinted === plain && plain === bg2, `#1807 ${theme}: 2.138.2 (#2389): no tint, the sidebar stays bg2 (${tinted} vs ${plain})`);
+      check(stripe && stripeAll && stripe !== stripeAll && stripe !== 'rgba(0, 0, 0, 0)', `#2389 ${theme}: the stripe takes my tone, grey under "All" (${stripe} / ${stripeAll})`);
       // the phone: the drawer shows the same tint
       await ev(`(() => { S.settings.workspace = 'org:${ORG}'; render(); return 1; })()`);
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
       await sleep(300);
       await ev(`(() => { sideOpenDrawer(); return 1; })()`);
       await ready(ev, `document.querySelector('#side').classList.contains('open')`, 20);
-      check(await ev(`document.querySelector('#side').classList.contains('open') && ${bgOf} === ${JSON.stringify(tinted)}`), `#1807 ${theme}: 390 px drawer: the same tint`);
+      check(await ev(`document.querySelector('#side').classList.contains('open') && ${bgOf} === ${JSON.stringify(tinted)} && getComputedStyle(document.querySelector('#side')).borderTopColor === ${JSON.stringify(stripe)}`), `#1807 ${theme}: 390 px drawer: no tint, the same stripe`);
     });
   }
 
