@@ -120,5 +120,39 @@ INV1 = numbers_case(A, "org", CL)
 FINV1 = numbers_case(Fr, "freelancer", FC)
 check(Bo.delete(B + f"{D}/{INV1}").status_code == 403, "a member still gets 403")
 
+
+# ================================================================ #1967 invoice from times: only the lists the person sees
+def entry(user_id, list_id, start, end, secs, note):
+    sql("INSERT INTO time_entries(user_id, list_id, task_title, start, \"end\", seconds, note, source, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+        (user_id, list_id, "Schnitt", start, end, secs, note, "manual", end, end), write=True)
+
+
+def list_for(S, name, cl):
+    lid = S.post(B + "/api/lists", json={"name": name}).json()["id"]
+    r = S.patch(B + f"/api/lists/{lid}", json={"client_id": cl})
+    assert r.ok, r.text
+    return lid
+
+
+def titles(S, doc):
+    return sorted(x["title"] for x in S.get(B + f"{D}/{doc}").json()["items"] if x["kind"] == "service")
+
+
+LA = list_for(A, "Alices Liste", CL)
+LB = list_for(Bo, "Bobs Liste", CL)
+entry(ALICE, LA, "2026-05-04T08:00:00Z", "2026-05-04T10:00:00Z", 7200, "Konzept")
+entry(BOB, LB, "2026-05-05T08:00:00Z", "2026-05-05T09:00:00Z", 3600, "Schnitt")
+check(LA not in [x["id"] for x in Bo.get(B + "/api/state").json()["lists"]], "setup: the member does not see the admin's list")
+r = Bo.post(B + D + "/from-time", json={"client_id": CL, "from": "2026-05-01", "to": "2026-05-31"})
+check(r.status_code == 201 and titles(Bo, r.json()["id"]) == ["Bobs Liste"], "org: only the lists the member sees are summed " + r.text[:200])
+FL = list_for(Fr, "Privatprojekt", FC)
+entry(FID, FL, "2026-05-04T08:00:00Z", "2026-05-04T09:30:00Z", 5400, "Konzept")
+r = Fr.post(B + D + "/from-time", json={"client_id": FC, "from": "2026-05-01", "to": "2026-05-31"})
+check(r.status_code == 201, "freelancer: invoice from times " + r.text[:200])
+if r.status_code == 201:
+    it = [x for x in Fr.get(B + f"{D}/{r.json()['id']}").json()["items"] if x["kind"] == "service"]
+    check([x["title"] for x in it] == ["Privatprojekt"] and float(it[0]["qty"]) == 1.5, f"freelancer: the private list's hours are summed {it}")
+check(Fr.post(B + D + "/from-time", json={"client_id": CL, "from": "2026-05-01", "to": "2026-05-31"}).status_code == 404, "freelancer: an organisation's client 404")
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
