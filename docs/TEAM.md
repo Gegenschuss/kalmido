@@ -614,3 +614,20 @@ and their values, sections, tags, the list's chat) and nothing moves anywhere el
   chat. Tracked time stays (without the list) for the bookkeeping.
 - Lists with end-to-end encryption are still deleted for good at once (nobody could read them in the trash).
 
+
+## Voice messages in the team chat (2.139.0)
+
+When the text box of a team chat conversation is empty, a **microphone** sits next to the paper clip. Tap it and the
+recording starts at once (the browser asks for the microphone the first time): a bar shows the running time, the
+**bin** discards the recording, **Send** sends it, and the **stop** button ends the recording so you can listen first.
+A recording stops by itself after 5 minutes and waits for Send or the bin; Escape discards it.
+
+- Voice messages are files of the message: the same storage quota, virus check and encryption at rest as other files.
+  They are not possible in end-to-end encrypted or archived conversations (no microphone there).
+- The player in the message: play / pause, the bar to jump, the remaining time, the speed (1×, 1.5×, 2×) and a download
+  button. Only one message plays at a time. Other audio files you attach get the same player.
+- The recording format is the one the device records: phones and Safari record MP4 (AAC), which plays everywhere; some
+  desktop browsers record WebM (Opus). A device that cannot play a recording shows a note and offers the download.
+- The microphone blocked? Allow it in the browser's site settings (or in the phone's settings for the app) and try again.
+- Kalmido never transcribes voice messages and sends them to no service. Agents in a channel see them as audio files
+  (`voice: true`) and can download them like any other file.

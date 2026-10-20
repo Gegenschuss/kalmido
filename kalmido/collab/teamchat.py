@@ -736,7 +736,7 @@ def team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                    "decrypt it in their browser) or {sys: on | off} (the notice that switched it)"),
         "pinned_at": nul("string", description="2.62.0 (#1848): pinned since (null = not pinned); the conversation's page carries pins"),
         "pinned_by": nul("integer", description="2.62.0 (#1848): who pinned it"),
-        "attachments": {"type": "array", "items": {"type": "object"}, "description": "2.113.1 (#2059): files [{id, name, mime, size, url}] (url = /api/v1/team/files/{id})"}}}
+        "attachments": {"type": "array", "items": {"type": "object"}, "description": "2.113.1 (#2059): files [{id, name, mime, size, url, voice, duration_ms}] (url = /api/v1/team/files/{id}; 2.139.0 (#2128): voice = a voice message, duration_ms its length, not transcribed)"}}}
     schemas["TeamMessagePage"] = page("TeamMessage")
     rp, mp = pid(desc="Conversation (room) id"), pid(desc="Message id")
     from .teamchan import tcx_spec

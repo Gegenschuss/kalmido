@@ -1432,7 +1432,8 @@ TOOLS += [
                         "you listen in, every message a person writes there).",
      _obj({}), lambda api, a: api.call("GET", "/team/rooms")),
     ("read_team_chat", "2.17.0: messages of a team chat conversation, oldest first; before = a message id for older ones. Mentions "
-                       "are <@user id>.",
+                       "are <@user id>. 2.139.0: an attachment with voice true is a voice message (duration_ms = its length); "
+                       "Kalmido does not transcribe it, read the audio file with get_attachment source team if you can.",
      _obj({"room_id": S_ID, "before": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 100}}, ["room_id"]),
      lambda api, a: api.call("GET", f"/team/rooms/{int(a['room_id'])}/messages", _pick(a, ("before", "limit")))),
     ("post_team_message", "2.17.0: write in a team chat channel (Markdown; mention people as <@user id>; task_id links a task). "
