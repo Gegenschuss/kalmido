@@ -20,7 +20,7 @@ function newsGroups(items) {
     // 2.25.0 (UX-45): a comment that names me (@me) needs me too, like a mention
     const toMe = it.kind === 'comment' && S.me && (it.excerpt || '').includes(`<@${S.me.id}>`);
     // 2.66.1 (#1943): what the server marks "For you" (the bell's number: replies to me, an agent's comments that reach me) needs me too
-    g.items.push([it, i]); if (!it.read && (NEWS_NEEDS.includes(it.kind) || toMe || it.to_me)) g.needs = true;  // 2.138.1 D (#2405): only unread bundles need me if (!it.read) g.unread++;
+    g.items.push([it, i]); if (!it.read && (NEWS_NEEDS.includes(it.kind) || toMe || it.to_me)) g.needs = true; if (!it.read) g.unread++;  // 2.138.1 D (#2405): only unread bundles need me
   }
   // 2.102.0 B (#2197): unread lines first (the sort is stable: the server's order stays inside)
   return [...groups.values()].sort((a, b) => (b.unread > 0) - (a.unread > 0));
