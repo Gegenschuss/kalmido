@@ -12,14 +12,16 @@ Agents have no access yet (no v1 routes): the session routes are for people only
 """
 import json
 import re
+import time
 import unicodedata
+from datetime import timedelta
 
 from flask import jsonify, request
 
 from ..core.config import app
 from ..core.pg import IntegrityError, insert_id
 from ..core.i18n import tr
-from ..core.db import body, bump, db, iso_ms, now_utc
+from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, task_visible
 from ..collab.comments import user_names
@@ -430,6 +432,111 @@ def wiki_bulk(trash):
         bump(c)
         c.commit()
     return jsonify(ok=True, ids=done, skipped=skipped, files=fdone, files_skipped=fskip)
+
+
+# ---- 2.143.0 B (#2211): the trash of pages -- listed, deleted for good by hand ("Delete for good", "Empty trash") and after
+# the trash period of tasks (tasktrash.ttp_days, KALMIDO_TRASH_DAYS) by the watchdog. Final = the row and what cascades from it
+# (links, files, history, word index), the files' scan / text marks and move records; the stored files after the commit.
+WKT_TICK = {"at": 0.0}
+WKT_BATCH = 200  # pages per run; the rest follows in the next hour
+
+
+def wiki_trash_days():
+    from ..tasks.tasktrash import ttp_days
+    return ttp_days()
+
+
+def wiki_purge(c, ids):
+    """Deletes these pages for good when they are (still) in the trash -> (ids deleted, stored file paths to unlink after the
+    commit). The caller checked the rights."""
+    ids = sorted({int(x) for x in ids})
+    if not ids:
+        return [], []
+    q = ",".join("?" * len(ids))
+    ids = [r[0] for r in c.execute(f"SELECT id FROM wiki_pages WHERE id IN ({q}) AND deleted_at IS NOT NULL ORDER BY id FOR UPDATE", ids)]
+    if not ids:
+        return [], []
+    q = ",".join("?" * len(ids))
+    from .wikiatt import wka_page_files
+    files = wka_page_files(c, ids)
+    fids = [r[0] for r in c.execute(f"SELECT id FROM wiki_files WHERE page_id IN ({q})", ids)]
+    if fids:
+        f = ",".join("?" * len(fids))
+        c.execute(f"DELETE FROM upload_scan WHERE kind='wiki' AND ref_id IN ({f})", fids)
+        c.execute(f"DELETE FROM file_text WHERE kind='wiki' AND ref_id IN ({f})", fids)
+    c.execute(f"DELETE FROM space_moves WHERE kind='wiki' AND obj_id IN ({q})", ids)
+    # a share of exactly this page ends with it (a later page of the same name is not shared by the old link); folder shares stay
+    c.execute("UPDATE wiki_shares s SET revoked_at=? FROM wiki_pages p WHERE p.id IN (" + q + ") AND s.is_folder=0 AND s.revoked_at IS NULL "
+              "AND COALESCE(s.org_id,0)=COALESCE(p.org_id,0) AND COALESCE(s.owner_id,0)=COALESCE(p.owner_id,0) AND lower(s.path)=lower(p.path) "
+              "AND NOT EXISTS (SELECT 1 FROM wiki_pages x WHERE x.deleted_at IS NULL AND COALESCE(x.org_id,0)=COALESCE(p.org_id,0) "
+              "AND COALESCE(x.owner_id,0)=COALESCE(p.owner_id,0) AND lower(x.path)=lower(p.path))", [iso(now_utc()), *ids])
+    c.execute(f"DELETE FROM wiki_pages WHERE id IN ({q})", ids)  # links, files, versions, word index: ON DELETE CASCADE
+    if files:  # a stored file another row still names stays on disk
+        f = ",".join("?" * len(files))
+        used = {r[0] for r in c.execute(f"SELECT path FROM wiki_files WHERE path IN ({f})", files)}
+        files = [p for p in files if p not in used]
+    return ids, files
+
+
+def wiki_trash_tick(c, force=False):
+    """The watchdog (at most hourly): pages longer in the trash than the period go for good, with their files. -> counts."""
+    if not force and time.time() - WKT_TICK["at"] < 3600:
+        return {}
+    WKT_TICK["at"] = time.time()
+    from ..core.pg import system_ctx
+    from ..core.serializers import unlink_files
+    cut = iso_ms(now_utc() - timedelta(days=wiki_trash_days()))
+    with system_ctx(c):  # housekeeping over every space: rows are only deleted, nothing is handed to a person
+        due = [r[0] for r in c.execute("SELECT id FROM wiki_pages WHERE deleted_at IS NOT NULL AND deleted_at<? "
+                                       "ORDER BY deleted_at, id LIMIT ?", (cut, WKT_BATCH))]
+        ids, files = wiki_purge(c, due) if due else ([], [])
+        if ids:
+            bump(c)
+    c.commit()
+    unlink_files(files)  # after the commit: a failed commit keeps the rows and their files
+    return {"pages": len(ids), "files": len(files)}
+
+
+@app.get("/api/wiki/trash")
+def wiki_trash_list():
+    """?space= -- the pages of the space in the trash (newest first) with their files' count / size and the trash period."""
+    c = db()
+    uid = me()
+    oid = wiki_space(c, uid, request.args.get("space"))
+    w, a = wiki_space_sql(oid, uid)
+    rows = c.execute(f"SELECT p.id, p.path, p.deleted_at, COUNT(f.id) AS n, COALESCE(SUM(f.size), 0) AS size FROM wiki_pages p "
+                     f"LEFT JOIN wiki_files f ON f.page_id=p.id WHERE p.deleted_at IS NOT NULL AND p.{w.replace(' AND ', ' AND p.')} "
+                     "GROUP BY p.id, p.path, p.deleted_at ORDER BY p.deleted_at DESC, p.id DESC LIMIT 2000", a).fetchall()
+    return jsonify(space=wiki_space_key(oid), days=wiki_trash_days(),
+                   pages=[{"id": r["id"], "path": r["path"], "deleted_at": r["deleted_at"], "files": r["n"], "size": int(r["size"])}
+                          for r in rows])
+
+
+@app.post("/api/wiki/purge")
+def wiki_purge_many():
+    """{space, ids} -- these pages of the trash for good; {space, all: true} -- empty the space's trash. Rights as deleting a
+    page (wiki_space write). -> {ids, skipped}"""
+    from ..core.serializers import unlink_files
+    c = db()
+    uid = me()
+    b = body()
+    oid = wiki_space(c, uid, b.get("space"), write=True)
+    w, a = wiki_space_sql(oid, uid)
+    ids = b.get("ids")
+    if b.get("all") is True:
+        ids = [r[0] for r in c.execute(f"SELECT id FROM wiki_pages WHERE deleted_at IS NOT NULL AND {w}", a)]
+    elif not isinstance(ids, list) or len(ids) > WIKI_ZIP_FILES or any(isinstance(x, bool) or not isinstance(x, int) for x in ids):
+        raise BadInput(tr("Invalid value: {0}", "ids"))
+    mine = set()
+    if ids:
+        q = ",".join("?" * len(ids))
+        mine = {r[0] for r in c.execute(f"SELECT id FROM wiki_pages WHERE id IN ({q}) AND deleted_at IS NOT NULL AND {w}", [*ids, *a])}
+    done, files = wiki_purge(c, mine)
+    if done:
+        bump(c)
+    c.commit()
+    unlink_files(files)  # after the commit
+    return jsonify(ok=True, ids=done, skipped=[x for x in ids if x not in set(done)])
 
 
 @app.get("/api/wiki/search")
