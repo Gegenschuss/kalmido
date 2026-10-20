@@ -971,6 +971,8 @@ ROUTES = {
     "DELETE /api/budget/recurring/{}": "budget", "POST /api/budget/recurring/{}/book": "budget",
     "GET /api/budget/{}/contracts": "budget", "POST /api/budget/{}/contracts": "budget",
     "POST /api/budget/{}/import/parse": "budget", "POST /api/budget/{}/import/commit": "budget",
+    # 2.146.0 C (#2455): the import runs of a budget (p2146_c_api_test.py: another person 404)
+    "GET /api/budget/{}/import/runs": "budget", "POST /api/budget/{}/import/runs/{}/undo": "budget",
     "POST /api/budget/entries/{}/files": "budget", "GET /api/budget/files/{}": "budget", "DELETE /api/budget/files/{}": "budget",
     # 2.73.0 A (#661): several servers in one app (the person's own server accounts; p273_a_api_test.py)
     "GET /api/servers": "servers", "POST /api/servers": "servers", "PATCH /api/servers/{}": "servers", "DELETE /api/servers/{}": "servers",
