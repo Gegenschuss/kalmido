@@ -155,7 +155,11 @@ _URL_OK = re.compile(r"[^\s\x00-\x1f\x7f]{1,500}")
 _TXT_OK = re.compile(r"[^\x00-\x1f\x7f]{0,200}")
 
 
-def _url(v):
+_LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
+
+
+def _url(v, tls=False):
+    """A http(s) address; tls: only https (a password in Basic auth), plain http only to this machine."""
     if not isinstance(v, str) or not _URL_OK.fullmatch(v.strip()):
         return None
     u = urlsplit(v.strip())
@@ -165,6 +169,8 @@ def _url(v):
         u.port  # noqa: B018 -- raises on a bad port
     except ValueError:
         return None
+    if tls and u.scheme != "https" and u.hostname not in _LOCAL_HOSTS:
+        return None
     return v.strip().rstrip("/")
 
 
@@ -172,6 +178,8 @@ def _check(kind, v):
     """-> cleaned value or None (invalid)."""
     if kind == "url":
         return _url(v)
+    if kind == "url_tls":
+        return _url(v, tls=True)
     if not isinstance(v, str):
         return None
     v = v.strip()
@@ -189,14 +197,14 @@ def _check(kind, v):
     if kind == "sftp_user":
         return v if re.fullmatch(r"[A-Za-z0-9._][A-Za-z0-9._@-]{0,63}", v) else None
     if kind == "path":
-        return v if re.fullmatch(r"[^\x00-\x1f\x7f\"\\]{0,300}", v) else None
+        return v if re.fullmatch(r"[^\x00-\x1f\x7f\"\\*?\[\]{}]{0,300}", v) else None
     if kind == "secret":
         return v if 1 <= len(v) <= 500 and "\n" not in v else None
     return None
 
 
 FIELDS = {"s3": {"endpoint": "url", "region": "region", "bucket": "bucket", "prefix": "prefix"},
-          "webdav": {"url": "url", "user": "user"},
+          "webdav": {"url": "url_tls", "user": "user"},
           "sftp": {"host": "host", "user": "sftp_user", "path": "path"}}
 SECRETS = {"s3": {"key": "s3_key", "secret": "s3_secret"}, "webdav": {"password": "dav_pass"}}
 
@@ -291,7 +299,7 @@ class S3:
     def names(self):
         out, token = [], None
         for _ in range(50):
-            q = [("list-type", "2"), ("prefix", self.key(""))] + ([("continuation-token", token)] if token else [])
+            q = [("delimiter", "/"), ("list-type", "2"), ("prefix", self.key(""))] + ([("continuation-token", token)] if token else [])
             st, _, raw = self.call("GET", "", query=q)
             if st != 200:
                 raise _status_err(st, raw)
@@ -299,9 +307,11 @@ class S3:
                 root = ET.fromstring(raw)
             except ET.ParseError:
                 raise OffsiteError("http", "ListObjectsV2") from None
+            pre = self.key("")
             for el in root.iter():
                 if el.tag.endswith("}Key") or el.tag == "Key":
-                    out.append((el.text or "").rsplit("/", 1)[-1] if (el.text or "").startswith(self.key("")) else "")
+                    k = el.text or ""
+                    out.append(k[len(pre):] if k.startswith(pre) and "/" not in k[len(pre):] else "")  # keys in sub-folders are not ours
             trunc = next((el.text for el in root.iter() if el.tag.split("}")[-1] == "IsTruncated"), "false")
             token = next((el.text for el in root.iter() if el.tag.split("}")[-1] == "NextContinuationToken"), None)
             if trunc != "true" or not token:
@@ -315,7 +325,7 @@ class S3:
 
 
 class WebDAV:
-    PROP = b'<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:getcontentlength/></d:prop></d:propfind>'
+    PROP = b'<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:getcontentlength/><d:resourcetype/></d:prop></d:propfind>'
 
     def __init__(self, conf, sec):
         self.u = urlsplit(conf["url"])
@@ -343,7 +353,9 @@ class WebDAV:
             href = r.findtext("{DAV:}href") or ""
             n = unquote(urlsplit(href).path.rstrip("/").rsplit("/", 1)[-1])
             ln = r.findtext(".//{DAV:}getcontentlength")
-            out[n] = int(ln) if ln and ln.strip().isdigit() else -1
+            if r.find(".//{DAV:}resourcetype/{DAV:}collection") is not None:
+                ln = "dir"  # a folder: never one of the backups (a DELETE would remove it with its content)
+            out[n] = int(ln) if ln and ln.strip().isdigit() else (None if ln == "dir" else -1)
         return out
 
     def put(self, name, path, size):
@@ -351,10 +363,11 @@ class WebDAV:
             st, _, _ = self.call("PUT", name, data=f, length=size, extra={"content-type": "application/octet-stream"})
         if st not in (200, 201, 204):
             raise _status_err(st)
-        return self._props(name, "0").get(name, -1)
+        got = self._props(name, "0").get(name)
+        return got if isinstance(got, int) else -1
 
     def names(self):
-        return [n for n in self._props("", "1") if n]
+        return [n for n, ln in self._props("", "1").items() if n and ln is not None]
 
     def delete(self, name):
         st, _, _ = self.call("DELETE", name)
@@ -404,14 +417,28 @@ class SFTP:
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
-    def put(self, name, path, size):
-        rp = self.rp(name)
-        out, _ = self.run([f'-rm "{rp}.part"', f'put "{path}" "{rp}.part"', f'-rm "{rp}"', f'rename "{rp}.part" "{rp}"', f'ls -l "{rp}"'])
+    @staticmethod
+    def _size(out, name):
         for ln in out.splitlines():
             p = ln.split()
             if len(p) >= 9 and not ln.startswith("sftp>") and p[-1].endswith(name) and p[4].isdigit():
                 return int(p[4])
         return -1
+
+    def put(self, name, path, size):
+        """Upload as .part, then rename over the old file (OpenSSH servers replace it in one step). A server that refuses
+        to rename onto an existing file: the old file goes only once the complete .part is confirmed there."""
+        rp = self.rp(name)
+        try:
+            out, _ = self.run([f'-rm "{rp}.part"', f'put "{path}" "{rp}.part"', f'rename "{rp}.part" "{rp}"', f'ls -l "{rp}"'])
+        except OffsiteError as e:
+            if e.code != "sftp":
+                raise
+            out, _ = self.run([f'ls -l "{rp}.part"'])
+            if self._size(out, name + ".part") != size:
+                raise
+            out, _ = self.run([f'-rm "{rp}"', f'rename "{rp}.part" "{rp}"', f'ls -l "{rp}"'])
+        return self._size(out, name)
 
     def names(self):
         out, _ = self.run([f'ls -1 "{self.dir or "."}"'])
@@ -490,6 +517,7 @@ def bko_upload(force=False):
             if not x["encrypted"] or len(bk_passphrase(c)) < 10:
                 raise OffsiteError("not_encrypted")
             tgt = bko_target(c, conf)
+            c.rollback()  # no open transaction while the (long) upload runs: a restore must not wait for it
             got = tgt.put(x["name"], os.path.join(BK_DIR, x["name"]), x["size"])
             if got != x["size"]:
                 raise OffsiteError("size", got, x["size"])
@@ -523,9 +551,16 @@ def bko_upload(force=False):
 
 
 def bko_tick(c):
-    """backup_tick (the backup thread): the upload of a new backup, or the next try of a failed one."""
-    if gsetting(c, "bko_conf") and bko_conf(c)["on"]:
-        bko_upload()
+    """backup_tick (the backup thread): the upload of a new backup, or the next try of a failed one. The upload runs in
+    its own thread, so a slow target never holds the backup thread (nor its gate: restore / maintenance wait for that)."""
+    if not gsetting(c, "bko_conf") or not bko_conf(c)["on"] or _BKO_LOCK.locked():
+        return
+    items = [x for x in bk_list() if x["kind"] != "safety"]
+    if not items or items[0]["name"] == gsetting(c, "bko_last_name"):
+        return
+    if _BKO["for"] == items[0]["name"] and (_BKO["tries"] >= BKO_TRIES or time.time() < _BKO["next"]):
+        return
+    threading.Thread(target=bko_upload, daemon=True, name="kalmido-offsite").start()
 
 
 # ---- routes (instance admins; the backups switch KALMIDO_BACKUPS as for the backups themselves)
@@ -543,6 +578,11 @@ def offsite_set():
     need_backups()
     c, b = db(), body()
     conf, sec = bko_conf(c), bko_secrets(c)
+    if b.get("remove") is True:  # "Remove target": the addresses, the sealed credentials and the SFTP key pair go
+        _save(c, {}, {})
+        c.commit()
+        _BKO.update({"for": "", "tries": 0, "next": 0.0})
+        return jsonify(bko_state(c))
     if "type" in b:
         if b["type"] not in ("", *BKO_TYPES):
             return err(tr("Invalid value: {0}", "type"))
@@ -662,6 +702,8 @@ def offsite_upload_now():
     c = db()
     if not bko_conf(c)["on"]:
         return err(BKO_ERR_TEXT("incomplete"))
+    if _BKO_LOCK.locked():  # an upload runs already: nothing new starts
+        return jsonify(error=tr("An upload is running already."), **bko_state(c)), 409
     threading.Thread(target=bko_upload, kwargs={"force": True}, daemon=True).start()
     time.sleep(0.05)
     return jsonify(ok=True, **bko_state(c)), 202

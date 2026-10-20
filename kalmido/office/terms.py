@@ -36,7 +36,7 @@ from flask import jsonify, request
 
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import tr
-from ..core.db import body, bump, db, err, iso, local_now, now_utc
+from ..core.db import body, bump, db, err, gset, gsetting, iso, local_now, now_utc
 from ..core.access import Denied
 from ..core.orgcrypt import oc_read_file, oc_write_file
 from .model import office_gate, office_org, office_role, office_settings, office_settings_save
@@ -273,9 +273,32 @@ def agb_purge_tick(c):
     AGB_TICK["at"] = time.time()
     n = 0
     with system_ctx(c):
-        for r in c.execute("SELECT id FROM orgs").fetchall():
-            n += agb_purge(c, r["id"])
+        ids = [r["id"] for r in c.execute("SELECT id FROM orgs").fetchall()]
+        if not gsetting(c, "agb_grace_at"):
+            agb_grace(ids)  # 2.143.0 D (#2259, review): once, before the first round
+            gset(c, "agb_grace_at", iso(now_utc()))
+            c.commit()
+            return 0
+        for oid in ids:
+            n += agb_purge(c, oid)
     return n
+
+
+def agb_grace(ids):
+    """Files stored before 2.143.0 carry their upload time, not the time they were replaced or removed: once, every terms
+    file gets the time of now, so the full AGB_KEEP_DAYS (and the undo step "restore") start for them as well."""
+    t = datetime.datetime.now(datetime.timezone.utc).timestamp()
+    for oid in ids:
+        d = os.path.join(OFFICE_DIR, str(int(oid)))
+        try:
+            names = [n for n in os.listdir(d) if AGB_FILE_RE.fullmatch(n)]
+        except OSError:
+            continue
+        for name in names:
+            try:
+                os.utime(os.path.join(d, name), (t, t))
+            except OSError:
+                pass
 
 
 def agb_valid_date(v):

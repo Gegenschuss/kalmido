@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 
 import requests
 
@@ -186,6 +187,16 @@ for n in (t1, t2):
     age(ORG, n)
 old_current(ORG, "de")  # t3 keeps its young file time: it was replaced just now
 check(all(exists(ORG, n) for n in (t1, t2, t3, t4)), "terms: four files stored")
+# 2.143.0 D (#2259, review): the first round only gives files from before the update the full period (file time = now);
+# the server's own watchdog made that round at its start already (no files then): as after an update, it is due again
+sql("DELETE FROM settings WHERE key='agb_grace_at'", write=True)
+out = purge()
+check("purged 0" in out and all(exists(ORG, n) for n in (t1, t2, t3, t4)), "terms: the first round removes nothing (grace) " + out[-200:])
+mt = subprocess.run(["docker", "exec", CT, "stat", "-c", "%Y", where(ORG, t2)], capture_output=True, text=True).stdout.strip()
+check(mt.isdigit() and time.time() - int(mt) < 3600, f"terms: the grace round set the file time to now ({mt})")
+check(sql("SELECT value FROM settings WHERE key='agb_grace_at'") != [], "terms: the grace round is noted once")
+for n in (t1, t2):
+    age(ORG, n)
 out = purge()
 check("purged 1" in out, "terms: one file purged " + out[-200:])
 check(exists(ORG, t1), "terms: the state a quotation names stays")

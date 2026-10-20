@@ -182,6 +182,11 @@ def s3_file(name):
 
 os.makedirs(os.path.join(REM, "s3", "kbk", "srv1"), exist_ok=True)
 open(s3_file("notes-of-the-admin.txt"), "w").write("not a backup")
+# 2.143.0 B (#2152, review): keys in a sub-folder of the prefix are not ours: they neither take a place nor go
+SUB = [os.path.join(REM, "s3", "kbk", "srv1", "older", f"kalmido-backup-{d}-000000-auto.zip.enc") for d in ("20991231", "20000101")]
+os.makedirs(os.path.dirname(SUB[0]), exist_ok=True)
+for f in SUB:
+    open(f, "wb").write(b"not ours")
 names = []
 for i in range(3):
     n = backup_now()
@@ -199,6 +204,9 @@ else:
 on_target = sorted(os.path.basename(p) for p in glob.glob(s3_file("kalmido-backup-*")))
 check(on_target == sorted(names[1:]), f"#2152 keep 2: the two newest stay, the oldest went {on_target} vs {names}")
 check(os.path.isfile(s3_file("notes-of-the-admin.txt")), "#2152 a file of another name in the folder stays")
+check(all(os.path.isfile(f) for f in SUB), "#2152 review: backup names in a sub-folder of the prefix stay and take no place")
+check(not any(x["method"] == "DELETE" and "kalmido-backup-20" + "000101" in x["path"] for x in remote_log("s3")),
+      "#2152 review: no DELETE for a sub-folder name")
 j = A.get(OFF).json()
 check(j["last_size"] == os.path.getsize(loc) and j["last_ok"] and not j["last_error"], f"#2152 the state: last upload, size, no error {j}")
 
@@ -221,6 +229,10 @@ check(not os.path.exists(s3_file(n)), "#2152 the plain backup is not on the targ
 assert A.patch(B + "/api/admin/backups", json={"encrypt": True}).ok
 
 # ---- WebDAV
+# 2.143.0 B (#2152, review): the password goes in Basic auth: https only, plain http only to this machine
+check(A.patch(OFF, json={"webdav": {"url": "http://dav.example.com/bk"}}).status_code == 400, "#2152 review: WebDAV over http to another host is refused")
+check(A.patch(OFF, json={"webdav": {"url": "https://dav.example.com/bk"}}).ok, "#2152 review: WebDAV over https is accepted")
+check(A.patch(OFF, json={"s3": {"endpoint": "http://127.0.0.1:8093"}}).ok, "#2152 review: S3 http stays possible (signed, no password)")
 r = A.patch(OFF, json={"type": "webdav", "webdav": {"url": "http://127.0.0.1:8094/dav/bk", "user": "kbk", "password": DAVPASS}})
 check(r.ok and r.json()["webdav"]["password_set"] and r.json()["webdav"]["user"] == "kbk", f"#2152 WebDAV saved {r.text[:200]}")
 no_secret(r.text, "#2152 PATCH WebDAV")
@@ -237,6 +249,34 @@ r = A.post(OFF + "/upload")
 check(r.status_code == 202, f"#2152 upload now 202 {r.status_code}")
 check(until(lambda: os.path.isfile(dav_file) and not A.get(OFF).json()["running"], 40), "#2152 upload now sends the newest backup again")
 check(any(x["method"] == "PROPFIND" for x in remote_log("webdav")), "#2152 WebDAV: the size is checked with PROPFIND")
+# 2.143.0 B (#2152, review): a folder with a backup name is never deleted (WebDAV DELETE is recursive); keep 2 counts files only
+DAV = os.path.join(REM, "webdav", "dav", "bk")
+os.makedirs(os.path.join(DAV, "kalmido-backup-20000101-000000-auto.zip.enc"), exist_ok=True)
+open(os.path.join(DAV, "kalmido-backup-20000101-000000-auto.zip.enc", "inside.txt"), "w").write("keep me")
+for d in ("20010101", "20020101"):
+    open(os.path.join(DAV, f"kalmido-backup-{d}-000000-auto.zip.enc"), "wb").write(b"old")
+check(A.post(OFF + "/upload").status_code == 202, "#2152 review: upload now")
+until(lambda: not os.path.exists(os.path.join(DAV, "kalmido-backup-20010101-000000-auto.zip.enc")) and not A.get(OFF).json()["running"], 40)
+check(os.path.isfile(os.path.join(DAV, "kalmido-backup-20000101-000000-auto.zip.enc", "inside.txt")), "#2152 review: WebDAV: a folder with a backup name stays")
+check(not os.path.exists(os.path.join(DAV, "kalmido-backup-20010101-000000-auto.zip.enc"))
+      and os.path.isfile(os.path.join(DAV, "kalmido-backup-20020101-000000-auto.zip.enc")) and os.path.isfile(dav_file),
+      f"#2152 review: WebDAV keep 2 counts files only {sorted(os.listdir(DAV))}")
+# a slow target: "Upload now" while an upload runs = 409; the backup thread is not held by the upload (its schedule goes on)
+open(os.path.join(REM, "webdav.slow"), "w").write("10")
+slow = backup_now()
+check(until(lambda: A.get(OFF).json()["running"] == slow, 20, 0.2), f"#2152 review: the slow upload runs {A.get(OFF).json()}")
+r = A.post(OFF + "/upload")
+check(r.status_code == 409 and "running" in r.text, f"#2152 review: upload now while one runs = 409 {r.status_code} {r.text[:120]}")
+assert A.patch(B + "/api/admin/backups", json={"on": True, "time": "00:00"}).ok
+_x = dbx.connect(DATA)  # switched on after today's time = the first one tomorrow: make today's due
+_x.execute("UPDATE settings SET value='' WHERE key='bk_last_day'")
+_x.commit()
+auto = until(lambda: [x["name"] for x in A.get(B + "/api/admin/backups").json()["items"] if x["name"].endswith("-auto.zip.enc")], 25, 0.3)
+check(auto and A.get(OFF).json()["running"] == slow, f"#2152 review: the scheduled backup is made while the upload still runs {auto}")
+assert A.patch(B + "/api/admin/backups", json={"on": False}).ok
+os.remove(os.path.join(REM, "webdav.slow"))
+check(until(lambda: not A.get(OFF).json()["running"] and A.get(OFF).json()["last_name"] == (auto or [""])[0], 60),
+      f"#2152 review: afterwards the newest (scheduled) backup is uploaded {A.get(OFF).json()}")
 A.patch(OFF, json={"webdav": {"password": "wrong-dav-password"}})
 j = A.post(OFF + "/test").json()
 check(j.get("ok") is False and j.get("code") == "auth" and "401" in j.get("error", ""), f"#2152 WebDAV wrong password = 401 {j}")
@@ -260,7 +300,49 @@ check(r.ok and r.json()["sftp"]["public_key"].startswith("ssh-ed25519 ") and r.j
 check(A.patch(OFF, json={"sftp": {"host": "-oProxyCommand=x"}}).status_code == 400, "#2152 SFTP: a host cannot be an option")
 check(A.patch(OFF, json={"sftp": {"path": 'a"b'}}).status_code == 400, "#2152 SFTP: no quote in the folder")
 check(A.patch(OFF, json={"sftp": {"port": 70000}}).status_code == 400, "#2152 SFTP: port range")
-A.patch(OFF, json={"type": ""})
+for bad in ("bk*", "b?k", "bk[1]", "bk/{a,b}"):  # 2.143.0 B (#2152, review): sftp expands these even in quotes
+    check(A.patch(OFF, json={"sftp": {"path": bad}}).status_code == 400, f"#2152 review: SFTP folder {bad!r} refused")
+# the upload is renamed over the old file; the old file goes only once the complete .part is confirmed (no SFTP server
+# here: the batches are recorded inside the container)
+code = r"""import json, app
+from kalmido.admin import offsite as o
+def go(part_size):
+    calls = []
+    def run(self, lines, accept_new=False):
+        calls.append(lines)
+        if len(calls) == 1:
+            raise o.OffsiteError("sftp", "rename refused")
+        if len(calls) == 2:
+            return "-rw------- 1 u g %d Oct 20 10:00 bk/n.zip.enc.part\n" % part_size, ""
+        return "-rw------- 1 u g 5 Oct 20 10:00 bk/n.zip.enc\n", ""
+    o.SFTP.run = run
+    t = o.SFTP({"path": "bk", "user": "u", "host": "h"}, {})
+    try:
+        got = t.put("n.zip.enc", "/tmp/x", 5)
+    except o.OffsiteError as e:
+        got = e.code
+    return {"got": got, "calls": calls}
+print(json.dumps([go(5), go(3)]))"""
+out = subprocess.run(["docker", "exec", CT, "python", "-c", code], capture_output=True, text=True)
+try:
+    ok5, bad3 = json.loads(out.stdout.strip().splitlines()[-1])
+except (ValueError, IndexError):
+    ok5, bad3 = {"calls": [[]]}, {"calls": []}
+    check(False, f"#2152 review: SFTP batches recorded {out.stderr[-400:]}")
+first = ok5["calls"][0]
+check(not any(x.startswith('-rm "bk/n.zip.enc"') or x == 'rm "bk/n.zip.enc"' for x in first) and any(x.startswith("rename ") for x in first),
+      f"#2152 review: SFTP renames over the old file without deleting it first {first}")
+check(ok5["got"] == 5 and len(ok5["calls"]) == 3 and ok5["calls"][2][0] == '-rm "bk/n.zip.enc"',
+      f"#2152 review: a refused rename: the old file goes after the .part is confirmed {ok5}")
+check(bad3["got"] == "sftp" and len(bad3["calls"]) == 2, f"#2152 review: an incomplete .part: the old file stays {bad3}")
+# "Remove target": addresses, sealed credentials and the key pair go
+A.patch(OFF, json={"type": "s3"})
+r = A.patch(OFF, json={"remove": True})
+j = r.json()
+check(r.ok and j["type"] == "" and j["on"] is False and not j["s3"]["key_set"] and not j["s3"]["secret_set"] and not j["webdav"]["password_set"]
+      and j["sftp"]["public_key"] == "" and j["s3"]["endpoint"] == "", f"#2152 review: remove target clears everything {r.text[:300]}")
+check([list(x) for x in dbx.connect(DATA).execute("SELECT value FROM settings WHERE key='bko_sec'").fetchall()] in ([], [[""]]),
+      "#2152 review: the sealed credentials are gone from the settings")
 
 # ============================================================== #2211 trash of knowledge pages
 Fid, Fr = freelancer(B, A, features=FEAT)
@@ -377,6 +459,16 @@ check(trash_ids(Fr, "private") == [f1], "#2211 freelancer: the own trash")
 r = Fr.post(B + "/api/wiki/purge", json={"space": "private", "all": True})
 check(r.ok and r.json()["ids"] == [f1] and gone(f1) and not stored(f1_path), f"#2211 freelancer: empty trash {r.text}")
 check(Fr.get(B + "/api/wiki/trash", params={"space": SP}).status_code == 404, "#2211 freelancer: no organisation trash")
+
+# ---- 2.143.0 B (#2211, review): the file clean-up removes files under the attachments folder only
+open(os.path.join(DATA, "outside-2211.txt"), "w").write("stays")
+os.makedirs(os.path.join(DATA, "attachments", "x2211"), exist_ok=True)
+open(os.path.join(DATA, "attachments", "x2211", "in.txt"), "w").write("goes")
+code = ("import app\nfrom kalmido.core.serializers import unlink_files\n"
+        "unlink_files(['../outside-2211.txt', 'x2211/in.txt'])\nprint('done')")
+out = subprocess.run(["docker", "exec", CT, "python", "-c", code], capture_output=True, text=True)
+check("done" in out.stdout and os.path.isfile(os.path.join(DATA, "outside-2211.txt"))
+      and not os.path.exists(os.path.join(DATA, "attachments", "x2211", "in.txt")), f"#2211 review: only files under the attachments folder go {out.stderr[-300:]}")
 
 print(f"p2143_b api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
