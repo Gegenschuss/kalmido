@@ -2374,7 +2374,8 @@ a.gitrow:hover{background:var(--bg3)}
 .ppi{display:flex;gap:.625rem;align-items:flex-start;padding:.5rem .625rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2)}
 .ppi.sub{margin-left:1.75rem}
 .ppi.off{opacity:.55}
-.ppi .ppc{margin-top:.5rem;flex:none;width:1.125rem;height:1.125rem;accent-color:var(--accent)}
+.ppi .ppc{margin-top:.5rem;flex:none;width:1.375rem;height:1.375rem;accent-color:var(--accent)}  /* 2.139.0 D (#2401): bigger box */
+.ppi{cursor:pointer}.ppi .ppt{cursor:text}
 .ppb{flex:1;min-width:0;display:flex;flex-direction:column;gap:.375rem}
 .ppb .ppt{width:100%;box-sizing:border-box;font-weight:500}
 .ppf{display:flex;flex-wrap:wrap;gap:.375rem;align-items:center}
@@ -3117,7 +3118,7 @@ button.gchip:hover{color:var(--text)}
 .dprow.nofit .dpt{position:static;width:auto;color:var(--faint)}
 .dprow.off{opacity:.55}
 .dprow .ppcl{align-self:flex-start}
-.dprow .ppc{width:1.125rem;height:1.125rem;margin-top:.125rem}
+.dprow .ppc{width:1.375rem;height:1.375rem;margin-top:0}
 .rvcard{border:1px solid var(--line2);border-left:.1875rem solid var(--accent);border-radius:var(--r-l);background:var(--bg2);padding:.625rem .75rem;margin:.25rem 0 .75rem}
 .rvhd{display:flex;align-items:center;gap:.5rem}
 .rvhd h3{margin:0;font-size:var(--fs-l);display:flex;align-items:center;gap:.375rem}
@@ -4380,7 +4381,7 @@ button.lkchip:hover{border-color:var(--accent)}
 .ctf .tagchip{border:1px solid var(--line2);border-radius:1rem;padding:0 .5rem;font-size:var(--fs-s);background:var(--bg2);color:var(--text2)}
 .ctf .tagchip:hover{border-color:var(--accent)}
 .evmodal .row label.swc{min-width:0;flex:none}
-.evmodal .row textarea,.ctmodal .row textarea{flex:1;width:100%}
+.evmodal .row textarea,.ctmodal .row textarea,#ast-wish{flex:1;width:100%;box-sizing:border-box}  /* 2.139.0 D (#2401): the wish field full width */
 /* 2.22.0 (#663): Home & life (the cards reuse the Family view's .fcard / .flist / .frow), the review + journal, the
    contract / device / health / trip dialogs (.lifedlg = .famdlg), staying in touch on a contact's card */
 .life .lempty{padding:1rem}

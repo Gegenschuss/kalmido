@@ -683,7 +683,8 @@ function commentHtml(c, U, ro = false) {
   const isNew = !ro && !mine && c.id > (S.tl.seen || 0);
   // 2.33.0 (#1076): Reply on every comment (hover / keyboard; phones swipe right)
   // 2.42.0 (#1383): "Save as task" under an agent's comment (who may add tasks in its list); a saved one shows "Saved"
-  const agc = !ro && !mine && isAgentUser(c.user_id), cs = agc && !c.saved_task_id && !editing && canEditList(taskById(c.task_id || S.sel)?.list_id);
+  // 2.139.0 D (#2130): on every comment (own, another person's, an agent's)
+  const agc = !ro && !c.deleted, cs = agc && !c.saved_task_id && !editing && canEditList(taskById(c.task_id || S.sel)?.list_id);
   const csv = agc && c.saved_task_id ? `<button type="button" class="csaved" data-act="cm-saved" data-tid="${c.saved_task_id}" title="${esc(tr('Saved as a task: open it'))}">${ic('bookmark', 's')}<span>${tr('Saved')}</span></button>` : '';
   const cpb = editing || c.deleted ? '' : `<button type="button" class="iconbtn" data-act="cm-copy" data-cid="${c.id}" title="${esc(tr('Copy'))}" aria-label="${esc(tr('Copy'))}" aria-haspopup="menu">${ic('copy', 's')}</button>`;  // 2.46.2 (#1666)
   const acts = ro ? (cpb ? `<span class="cacts">${cpb}</span>` : '') : `<span class="cacts">${editing ? '' : replyBtn()}${cpb}${cs ? `<button class="iconbtn" data-act="cm-save" data-cid="${c.id}" title="${esc(tr('Save as task'))}" aria-label="${esc(tr('Save as task'))}">${ic('bookmark', 's')}</button>` : ''}${mine ? `<button class="iconbtn" data-act="c-edit" data-cid="${c.id}" title="${tr('Edit')}">${ic('edit', 's')}</button>` : ''}${mine || S.tl.moderator ? `<button class="iconbtn" data-act="c-del" data-cid="${c.id}" title="${tr('Delete')}">${ic('trash', 's')}</button>` : ''}</span>`;
