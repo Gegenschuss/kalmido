@@ -1199,7 +1199,10 @@ def agent_abort(aid):
     a = need_chat_agent(c, aid)
     if not agent_active(a):
         return err(tr("This agent is paused"), 409)
-    jid = body().get("job_id")
+    b = body()
+    if not isinstance(b, dict):  # 2.144.0 A2 (#2412): an array / number as body is a bad request, not a 500
+        return err(tr("The body must be a JSON object"))
+    jid = b.get("job_id")
     data = {"user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")}, "source": "chat"}
     if jid is not None:
         if isinstance(jid, bool) or not isinstance(jid, int):
