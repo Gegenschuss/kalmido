@@ -141,8 +141,9 @@ const V = B + 'api/v1';
   w.eval(`go('news')`); await until(() => d.querySelector('.ntabs'));
   const tabs = d.querySelector('.ntabs');
   check(tabs && tabs.querySelector('[data-tab="all"]').classList.contains('on') && /For you/.test(tabs.textContent) && /Activity/.test(tabs.textContent), '#987: the tabs All | For you | Activity, All first');
-  const secs0 = [...d.querySelectorAll('#view .nsec')].map(x => x.textContent.trim());
-  check(secs0.length === 2 && /For you/.test(secs0[0]) && /Activity/.test(secs0[1]) && d.querySelector('#view .nsec.first').nextElementSibling.classList.contains('tome'), '#987: "All" = two sections, the items for me first ' + secs0.join('|'));
+  // 2.138.1 (#2405): the 'Activity' section is now 'Also new'; a Read section comes below
+  const secs0 = [...d.querySelectorAll('#view .nsec:not(.read)')].map(x => x.textContent.trim());
+  check(secs0.length === 2 && /For you/.test(secs0[0]) && /Also new/.test(secs0[1]) && d.querySelector('#view .nsec.first').nextElementSibling.classList.contains('tome'), '#987: "All" = two sections, the items for me first ' + secs0.join('|'));
   click(w, tabs.querySelector('[data-tab="me"]')); await sleep(200);
   let items = [...d.querySelectorAll('#view .nitem')];
   check(items.length === 2 && items.every(x => x.classList.contains('tome')) && items.some(x => /mentioned you/.test(x.textContent)) && items.some(x => /assigned a task to you/.test(x.textContent)), '#987: "For you" = the mention and the assignment ' + items.map(x => x.querySelector('.ntext')?.textContent).join('|'));
@@ -150,12 +151,12 @@ const V = B + 'api/v1';
   items = [...d.querySelectorAll('#view .nitem')];
   check(items.length >= 1 && items.every(x => !x.classList.contains('tome')) && items.some(x => /Claude/.test(x.textContent)), '#987: "Activity" = the agent\'s completion (2.66.1 #1943: no longer its comments) ' + items.length);
   click(w, d.querySelector('.ntabs [data-tab="all"]')); await sleep(200);
-  check(d.querySelectorAll('#view .nitem').length >= 3 && d.querySelectorAll('#view .nsec').length === 2, '#987: "All" shows everything in two sections');
+  check(d.querySelectorAll('#view .nitem').length >= 3 && d.querySelectorAll('#view .nsec:not(.read)').length === 2, '#987: "All" shows everything in two sections');
   // the bell's dropdown: sections
   click(w, d.querySelector('.ntabs [data-tab="me"]')); await sleep(100);
   click(w, d.querySelector('#top [data-act="bell-pop"]')); await until(() => d.querySelector('#pop .bpop .nitem'));
-  const secs = [...d.querySelectorAll('#pop .nsec')].map(x => x.textContent.trim());
-  check(secs.length === 2 && /For you/.test(secs[0]) && /Activity/.test(secs[1]), '#987: the dropdown: "For you" above "Activity" ' + secs.join('|'));
+  const secs = [...d.querySelectorAll('#pop .nsec:not(.read)')].map(x => x.textContent.trim());
+  check(secs.length === 2 && /For you/.test(secs[0]) && /Also new/.test(secs[1]), '#987: the dropdown: "For you" above "Activity" ' + secs.join('|'));
   check(d.querySelector('#pop .bpop .nitem.tome') && d.querySelector('#pop .nsec.first').nextElementSibling.classList.contains('tome'), '#987: the items for me come first');
   w.eval('closePop()');
   // reading one for me lowers the bell
@@ -257,8 +258,8 @@ const V = B + 'api/v1';
     check(await ev(`!document.body.classList.contains('modal-open')`), `${tag}: #976 back after the dialog`);
     await ev(`(() => { wsSet('all'); return 1; })()`); await sleep(400);
     await o.nav(B + '#news'); await ready(ev);
-    for (let i = 0; i < 20 && (await ev(`document.querySelectorAll('#view .nsec').length`)) < 2; i++) await sleep(300);
-    check(await ev(`!!document.querySelector('.ntabs [data-tab="all"].on') && document.querySelectorAll('#view .nsec').length === 2`), `${tag}: #987 News opens with the two sections`)
+    for (let i = 0; i < 20 && (await ev(`document.querySelectorAll('#view .nsec:not(.read)').length`)) < 2; i++) await sleep(300);
+    check(await ev(`!!document.querySelector('.ntabs [data-tab="all"].on') && document.querySelectorAll('#view .nsec:not(.read)').length === 2`), `${tag}: #987 News opens with the two sections`)
     await shot(`p2280-${th}-1440-news.png`);
     await ev(`(() => { document.querySelector('#top [data-act="bell-pop"]').click(); return 1; })()`); await sleep(700);
     await shot(`p2280-${th}-1440-bell.png`);
