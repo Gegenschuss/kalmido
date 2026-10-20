@@ -1,8 +1,8 @@
-/* Kalmido — self-hosted task manager. Vanilla JS, no build step.
+/* tasks — Kalmido, a self-hosted task manager. Vanilla JS, no build step.
    State lives on the server (SQLite); the client keeps a copy, renders views
    from it and polls /api/version to pick up changes from other devices. */
 'use strict';
-const APP_NAME = 'Kalmido';
+const APP_NAME = 'Kalmido';  // display name (repo / container stay "tasks"; was Erledigo until 2026-09-25)
 
 // ------------------------------------------------------------------ icons
 // 2.8.0 (#434) icon set "Punkt": a 20 x 20 grid, open arcs and lines (1.6, round caps), and one filled dot per icon where it
@@ -388,13 +388,14 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#iitip:
 document.addEventListener('scroll', () => iiHide(true), true);
 const hintK = t => `<div class="shint keep">${t}</div>`;  // 2.13.0: a helper line that stays inline (security, data loss, a state)
 const kt = (label, keys) => isTouch() ? label : `${label} (${kbText(keys)})`;  // a label with its keyboard shortcut
-const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.densSideV', 'tasks.densRowsV', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.cwins', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold', 'tasks.mdOpen', 'tasks.pack', 'tasks.headShow', 'tasks.rings', 'tasks.lookLocal']);  // 2.83.0 C (#1427): + theme, header pictures, rings
+const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.densSideV', 'tasks.densRowsV', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.cwins', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold', 'tasks.mdOpen', 'tasks.pack', 'tasks.headShow', 'tasks.rings', 'tasks.lookLocal', 'tasks.pwaHint']);  // 2.143.0 C (#2153): + the install hint (per device); 2.83.0 C (#1427): + theme, header pictures, rings
 function clearLocal() {
   try {
     const ks = [];
     for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('tasks.') && !LS_KEEP.has(k)) ks.push(k); }
     ks.forEach(k => localStorage.removeItem(k));
   } catch { /* private mode */ }
+  if (typeof obxClear === 'function') obxClear();  // 2.143.0 C (#2153): the offline queue in IndexedDB
 }
 // design per device: auto (follows the OS) | dark | light
 function applyTheme() {

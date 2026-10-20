@@ -4728,6 +4728,14 @@ button.lkchip:hover{border-color:var(--accent)}
 #savedok.on{opacity:1}
 @media (prefers-reduced-motion:reduce){ #savedok{transition:none} }
 @media (max-width:899px){ #savedok{bottom:calc(env(safe-area-inset-bottom,0px) + 4.75rem)} }
+/* 2.143.0 C (#2153): the install hint (setcore.js pwa_hint): a small card at the bottom, fades in */
+#pwahint{position:fixed;right:1rem;bottom:calc(env(safe-area-inset-bottom,0px) + 1rem);z-index:56;display:flex;align-items:flex-start;gap:.625rem;max-width:min(26rem,calc(100vw - 2rem));padding:.75rem .75rem .75rem 1rem;border-radius:.75rem;border:1px solid var(--line2);background:var(--bg3);box-shadow:0 .5rem 1.5rem rgba(0,0,0,.18);opacity:0;transform:translateY(.5rem);transition:opacity .2s,transform .2s}
+#pwahint.on{opacity:1;transform:none}
+#pwahint .pwaic{color:var(--accent);padding-top:.125rem}
+#pwahint .pwatx{display:flex;flex-direction:column;gap:.25rem;min-width:0;flex:1}
+#pwahint .pwabtns{display:flex;flex-wrap:wrap;gap:.375rem;margin-top:.375rem}
+@media (max-width:899px){ #pwahint{left:1rem;right:1rem;max-width:none;bottom:calc(env(safe-area-inset-bottom,0px) + 4.75rem)} }
+@media (prefers-reduced-motion:reduce){ #pwahint{transition:none;transform:none} }
 /* 2.25.0 review: the task's title on top of a menu stays readable (it is a disabled button only for the keyboard) */
 .menu-list button.mhead:disabled{opacity:1;color:var(--text)}
 /* review: Settings > Appearance > Sidebar: every row the same shape; 44 px targets on touch screens */
