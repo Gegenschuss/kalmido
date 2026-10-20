@@ -302,6 +302,11 @@ APP_ONLY = [
     ("2.122.0 A (#2097): file requests stay with people -- a person asks a client for files with a public link of a folder; the "
      "client uploads without an account; an agent sees the arriving files like any other file of a folder shared with it",
      ("=GET /api/files/nodes/{}/requests", "=POST /api/files/nodes/{}/requests", "* /api/files/requests/")),
+    ("2.112.1 (#2058): the file store's bulk trash / restore, the ZIP download and the phone scan are steps of people in the app "
+     "(agents read and write files one by one); external share links publish data to people without an account and stay with "
+     "people on purpose -- agents never make, list or revoke them",
+     ("=POST /api/files/trash", "=POST /api/files/restore", "=GET /api/files/zip", "=POST /api/files/scan",
+      "=GET /api/files/nodes/{}/ext-links", "=POST /api/files/nodes/{}/ext-links", "* /api/files/ext-links/")),
     ("2.48.0 (#1111): documents -- a person's own steps (upload by hand / share sheet, review and accept, recognise again, the "
      "preview image, a task for the due date, the workspace's levels / rules / labels / mail address); agents read and set fields "
      "with /documents and add files with /files; 2.122.0 (#2098): create_document; (#2100) the CSV of chosen documents is a person's download", ("=POST /api/docs", "=POST /api/docs/export.csv", "=POST /api/docs/{}/accept", "=POST /api/docs/{}/review",
