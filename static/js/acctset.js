@@ -197,24 +197,55 @@ function omNewOrgRows() {
   return `<div class="row"><label for="u-org">${tr('Organisation')}</label><select id="u-org"><option value="0">${tr('None (private space only)')}</option>${os.map(o => `<option value="${o.id}" ${o.id === one ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select></div>
     <div class="row" id="u-orgrow" ${one ? '' : 'hidden'}><label for="u-orgrole">${tr('Role in the organisation')}</label><select id="u-orgrole"><option value="member">${tr('Member')}</option><option value="admin">${tr('Admin of the organisation')}</option></select></div>`;
 }
+// 2.138.2 B (#2407): the avatar of a person row (Users and the organisation's member list)
+const uRowAv = u => u.avatar ? `<span class="avatar pic"><img src="${esc(u.avatar)}" alt="" loading="lazy"></span>` : av(0, u.display_name);
 async function orgModal(o, done) {
   let us = []; try { us = (await api('GET', '/api/users?all=1')).users.filter(u => !u.disabled && u.kind !== 'agent'); } catch { return; }
   // 2.46.0 (#1561): fresh members (people added since the list was drawn), else saving would drop them
   if (o) { try { S.orgs = (await api('GET', '/api/admin/orgs')).orgs; o = S.orgs.find(x => x.id === o.id) || o; } catch { return; } }
   const mem = new Set(o?.members || []), adm = new Set(o?.admins || []);  // 2.28.0 (#935): + the organisation's admins
+  // 2.138.2 B (#2407): members as a list like Users (search, filter Members / All, a Member and an Admin box per row) instead of
+  // one button per person; the symbol shows the picture / an app icon, never an emoji placeholder; the domain hint under the field
+  const icPrev = v => orgIconHtml({icon_url: o?.icon_url, icon: v});
   const md = modal(`<h3>${o ? tr('Edit organisation') : tr('New organisation')}</h3>
     <div class="row"><label for="og-name">${tr('Name')}</label><input id="og-name" maxlength="60" value="${esc(o?.name || '')}"></div>
-    <div class="row"><label for="og-icon">${tr('Symbol')}</label><input id="og-icon" maxlength="8" class="numin" value="${esc(o?.icon || '')}" placeholder="🏢"></div>
-    <div class="row"><label for="og-dom">${tr('E-mail domains')}</label><input id="og-dom" maxlength="500" value="${esc(o?.domains || '')}" placeholder="example.com" autocapitalize="off"><span class="muted">${tr('registrations with these addresses join it')}</span></div>
-    ${o ? `<div class="row"><label>${tr('Members')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Members'))}">${us.map(u => `<button type="button" class="fperson ${mem.has(u.id) ? 'on' : ''}" data-ogm="${u.id}" aria-pressed="${mem.has(u.id)}">${av(u.id, u.display_name)}<span>${esc(u.display_name)}</span></button>`).join('')}</div></div>
-    <div class="row"><label>${tr('Admins of the organisation')}</label><div class="fpeople" id="og-adm" role="group" aria-label="${esc(tr('Admins of the organisation'))}">${us.filter(u => mem.has(u.id)).map(u => `<button type="button" class="fperson ${adm.has(u.id) ? 'on' : ''}" data-oga="${u.id}" aria-pressed="${adm.has(u.id)}">${av(u.id, u.display_name)}<span>${esc(u.display_name)}</span></button>`).join('')}</div></div>
+    <div class="row"><label for="og-icon">${tr('Symbol')}</label><span class="wsicprev" id="og-icprev">${icPrev(o?.icon || '')}</span><input id="og-icon" maxlength="8" class="numin" value="${esc(o?.icon || '')}" placeholder="${esc(tr('optional'))}"></div>
+    <div class="row"><label for="og-dom">${tr('E-mail domains')}</label><div class="ogfld"><input id="og-dom" maxlength="500" value="${esc(o?.domains || '')}" placeholder="example.com" autocapitalize="off" aria-describedby="og-domh"><span class="muted" id="og-domh">${tr('registrations with these addresses join it')}</span></div></div>
+    ${o ? `<div class="oghd"><b id="og-mh">${tr('Members')}</b><span class="muted" id="og-cnt" aria-live="polite"></span></div>
+    <div class="ua8bar"><input type="search" id="og-q" placeholder="${esc(tr('Name, user name or e-mail'))}" aria-label="${esc(tr('Search users'))}" autocomplete="off" autocapitalize="off" spellcheck="false"><select id="og-flt" aria-label="${esc(tr('Filter'))}"><option value="mem">${tr('Members')}</option><option value="all">${tr('All')}</option></select></div>
+    <div class="members ogml" id="og-list" role="group" aria-labelledby="og-mh"></div>
     <div class="shint">${tr('Admins of an organisation manage its members, name and e-mail domains (Settings > Workspaces); they are not admins of the server.')}</div>` : `<div class="shint">${tr('You become its first member and admin; add people afterwards.')}</div>`}
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${o ? tr('Save') : tr('Create')}</button></div>`);
+  md.classList.add('ogmodal');
+  const row = u => `<div class="mrow ogrow" data-ogrow="${u.id}">${uRowAv(u)}<span class="n">${esc(u.display_name)} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}</span></span>`
+    + `<label class="ogchk"><input type="checkbox" data-ogm="${u.id}" ${mem.has(u.id) ? 'checked' : ''} aria-label="${esc(tr('{0} is a member', u.display_name))}"><span>${tr('Member')}</span></label>`
+    + `<label class="ogchk ${mem.has(u.id) ? '' : 'off'}"><input type="checkbox" data-oga="${u.id}" ${adm.has(u.id) ? 'checked' : ''} ${mem.has(u.id) ? '' : 'disabled'} aria-label="${esc(tr('{0} is an admin of the organisation', u.display_name))}"><span>${tr('Admin')}</span></label></div>`;
+  const count = () => { const c = $('#og-cnt', md); if (c) c.textContent = trn('{0} member', '{0} members', mem.size) + ' · ' + trn('{0} admin', '{0} admins', [...adm].filter(id => mem.has(id)).length); };
+  // drawn again only on search / filter: a box ticked off under "Members" keeps its row until then
+  const draw = () => {
+    const box = $('#og-list', md); if (!box) return;
+    const q = ($('#og-q', md).value || '').trim().toLowerCase(), all = $('#og-flt', md).value === 'all';
+    const hit = us.filter(u => (all || mem.has(u.id)) && (!q || [u.display_name, u.username, u.email].some(x => (x || '').toLowerCase().includes(q))));
+    box.innerHTML = hit.map(row).join('') || `<div class="muted mhint">${all || q ? tr('Nothing found') : tr('No members yet')}</div>`;
+    count();
+  };
+  if (o) { if (!mem.size) $('#og-flt', md).value = 'all'; draw(); }
+  md.addEventListener('input', e => {
+    if (e.target.id === 'og-q') draw();
+    else if (e.target.id === 'og-icon') $('#og-icprev', md).innerHTML = icPrev(e.target.value.trim());
+  });
+  md.addEventListener('change', e => {
+    if (e.target.id === 'og-flt') { draw(); return; }
+    const m = e.target.closest('[data-ogm]'), a = e.target.closest('[data-oga]');
+    if (m) {
+      const id = +m.dataset.ogm, ab = $(`[data-oga="${id}"]`, md);
+      m.checked ? mem.add(id) : mem.delete(id);
+      if (!m.checked) adm.delete(id);  // no admin without being a member (as before)
+      if (ab) { ab.checked = adm.has(id); ab.disabled = !m.checked; ab.closest('.ogchk').classList.toggle('off', !m.checked); }
+    } else if (a) { const id = +a.dataset.oga; a.checked && mem.has(id) ? adm.add(id) : adm.delete(id); }
+    count();
+  });
   md.addEventListener('click', async e => {
-    const p = e.target.closest('[data-ogm]');
-    if (p) { const id = +p.dataset.ogm; mem.has(id) ? mem.delete(id) : mem.add(id); if (!mem.has(id)) adm.delete(id); p.classList.toggle('on', mem.has(id)); p.setAttribute('aria-pressed', mem.has(id)); const ab = $('#og-adm', md); if (ab) ab.innerHTML = us.filter(u => mem.has(u.id)).map(u => `<button type="button" class="fperson ${adm.has(u.id) ? 'on' : ''}" data-oga="${u.id}" aria-pressed="${adm.has(u.id)}">${av(u.id, u.display_name)}<span>${esc(u.display_name)}</span></button>`).join(''); return; }
-    const pa = e.target.closest('[data-oga]');
-    if (pa) { const id = +pa.dataset.oga; adm.has(id) ? adm.delete(id) : adm.add(id); pa.classList.toggle('on', adm.has(id)); pa.setAttribute('aria-pressed', adm.has(id)); return; }
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     try {
@@ -246,7 +277,7 @@ function accountWire(md) {
     const nAg = us.flt === 'people' && !us.q ? j.agents : 0;
     box.innerHTML = (nAg ? `<div class="mrow agsum"><span class="avatar agent">${ic('bot', 's')}</span><span class="n">${esc(trn('{0} agent', '{0} agents', nAg))}</span><button class="linkbtn" data-act="agents-go">${tr('Manage under Agents')}</button></div>` : '')
       + (users.length ? '' : `<div class="muted mhint">${tr('Nothing found')}</div>`)
-      + users.map(u => `<div class="mrow ${u.disabled ? 'off' : ''}" data-urow="${u.id}"><label class="ua8hit"><input type="checkbox" class="ua8chk" data-usel="${u.id}" aria-label="${esc(tr('Select {0}', u.display_name))}" ${us.sel.has(u.id) ? 'checked' : ''} ${u.id === S.me.id ? 'disabled' : ''}></label>${u.avatar ? `<span class="avatar pic"><img src="${esc(u.avatar)}" alt="" loading="lazy"></span>` : av(0, u.display_name)}<span class="n">${esc(u.display_name)}${u.kind === 'agent' ? ' ' + agentBadge() : ''} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}${u.disabled ? ' · ' + tr('disabled') : ''}${u.proxy_login ? ' · ' + tr('SSO: {0}', u.proxy_login) : ''}${u.twofa?.length ? ' · ' + tr('2FA') : ''}${u.oidc_linked ? ' · OIDC' : ''}${u.invite === 'invited' ? ' · ' + tr('Invited') : u.invite === 'expired' ? ' · ' + tr('Invitation expired') : ''}${u.signup === 'pending' ? ' · ' + tr('waits for approval') : u.signup === 'confirm' ? ' · ' + tr('registration not confirmed') : ''}</span></span>${u.signup === 'pending' ? `<button class="btn sm pri" data-acc="user-approve" data-uid="${u.id}">${ic('check', 's')} ${tr('Approve')}</button>` : ''}${u.kind === 'agent'
+      + users.map(u => `<div class="mrow ${u.disabled ? 'off' : ''}" data-urow="${u.id}"><label class="ua8hit"><input type="checkbox" class="ua8chk" data-usel="${u.id}" aria-label="${esc(tr('Select {0}', u.display_name))}" ${us.sel.has(u.id) ? 'checked' : ''} ${u.id === S.me.id ? 'disabled' : ''}></label>${uRowAv(u)}<span class="n">${esc(u.display_name)}${u.kind === 'agent' ? ' ' + agentBadge() : ''} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}${u.disabled ? ' · ' + tr('disabled') : ''}${u.proxy_login ? ' · ' + tr('SSO: {0}', u.proxy_login) : ''}${u.twofa?.length ? ' · ' + tr('2FA') : ''}${u.oidc_linked ? ' · OIDC' : ''}${u.invite === 'invited' ? ' · ' + tr('Invited') : u.invite === 'expired' ? ' · ' + tr('Invitation expired') : ''}${u.signup === 'pending' ? ' · ' + tr('waits for approval') : u.signup === 'confirm' ? ' · ' + tr('registration not confirmed') : ''}</span></span>${u.signup === 'pending' ? `<button class="btn sm pri" data-acc="user-approve" data-uid="${u.id}">${ic('check', 's')} ${tr('Approve')}</button>` : ''}${u.kind === 'agent'
       ? `<button class="linkbtn agmng" data-acc="agent-edit" data-uid="${u.id}" title="${esc(tr('Open the agent dialog'))}">${tr('Managed under Agents')}</button>`
       : `<button class="iconbtn" data-acc="user-edit" data-uid="${u.id}" title="${tr('Edit user')}">${ic('edit', 's')}</button>`}</div>`).join('');
     ua8_pagerDraw(md, us); ua8_selDraw(md, us);

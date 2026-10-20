@@ -5960,7 +5960,6 @@
   "You see your own sort of this shared list.": "Vous voyez votre propre tri de cette liste partagée.",
   "A shared server with workspaces: every organisation is its own workspace with its own admins, who manage its members. People see the members of their organisations and the people they are connected with; private lists stay invisible to an organisation.": "Un serveur partagé avec des espaces de travail : chaque organisation est son propre espace avec ses propres admins, qui gèrent ses membres. Les personnes voient les membres de leurs organisations et les personnes avec qui elles sont en relation ; les listes privées restent invisibles pour une organisation.",
   "{0} admin": ["{0} admin", "{0} admins"],
-  "Admins of the organisation": "Admins de l'organisation",
   "Admins of an organisation manage its members, name and e-mail domains (Settings > Workspaces); they are not admins of the server.": "Les admins d'une organisation gèrent ses membres, son nom et ses domaines e-mail (Réglages › Espaces de travail) ; ils ne sont pas admins du serveur.",
   "You become its first member and admin; add people afterwards.": "Vous en devenez le premier membre et admin ; ajoutez des personnes ensuite.",
   "Workspaces": "Espaces de travail",
@@ -11746,5 +11745,8 @@
   "Contact history": "Historique du contact",
   "{0} framework contract moves with its PDF files": ["{0} contrat-cadre est déplacé avec ses fichiers PDF", "{0} contrats-cadres sont déplacés avec leurs fichiers PDF"],
   "{0} draft loses its framework contract": ["{0} brouillon perd son contrat-cadre", "{0} brouillons perdent leur contrat-cadre"],
-  "{0} framework contract loses its client (clients stay in their workspace)": ["{0} contrat-cadre perd son client (les clients restent dans leur espace de travail)", "{0} contrats-cadres perdent leur client (les clients restent dans leur espace de travail)"]
+  "{0} framework contract loses its client (clients stay in their workspace)": ["{0} contrat-cadre perd son client (les clients restent dans leur espace de travail)", "{0} contrats-cadres perdent leur client (les clients restent dans leur espace de travail)"],
+  "{0} is a member": "{0} est membre",
+  "{0} is an admin of the organisation": "{0} est administrateur de l’organisation",
+  "No members yet": "Pas encore de membres"
 }

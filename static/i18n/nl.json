@@ -5960,7 +5960,6 @@
   "You see your own sort of this shared list.": "Je ziet je eigen sortering van deze gedeelde lijst.",
   "A shared server with workspaces: every organisation is its own workspace with its own admins, who manage its members. People see the members of their organisations and the people they are connected with; private lists stay invisible to an organisation.": "Een gedeelde server met werkruimtes: elke organisatie is een eigen werkruimte met eigen beheerders, die haar leden beheren. Mensen zien de leden van hun organisaties en de mensen met wie ze verbonden zijn; privélijsten blijven onzichtbaar voor een organisatie.",
   "{0} admin": ["{0} beheerder", "{0} beheerders"],
-  "Admins of the organisation": "Beheerders van de organisatie",
   "Admins of an organisation manage its members, name and e-mail domains (Settings > Workspaces); they are not admins of the server.": "Beheerders van een organisatie beheren haar leden, naam en e-maildomeinen (Instellingen › Werkruimtes); ze zijn geen beheerders van de server.",
   "You become its first member and admin; add people afterwards.": "Je wordt het eerste lid en beheerder; voeg daarna mensen toe.",
   "Workspaces": "Werkruimtes",
@@ -11746,5 +11745,8 @@
   "Contact history": "Contactgeschiedenis",
   "{0} framework contract moves with its PDF files": ["{0} raamcontract verhuist met zijn pdf-bestanden", "{0} raamcontracten verhuizen met hun pdf-bestanden"],
   "{0} draft loses its framework contract": ["{0} concept verliest zijn raamcontract", "{0} concepten verliezen hun raamcontract"],
-  "{0} framework contract loses its client (clients stay in their workspace)": ["{0} raamcontract verliest zijn klant (klanten blijven in hun werkruimte)", "{0} raamcontracten verliezen hun klant (klanten blijven in hun werkruimte)"]
+  "{0} framework contract loses its client (clients stay in their workspace)": ["{0} raamcontract verliest zijn klant (klanten blijven in hun werkruimte)", "{0} raamcontracten verliezen hun klant (klanten blijven in hun werkruimte)"],
+  "{0} is a member": "{0} is lid",
+  "{0} is an admin of the organisation": "{0} is beheerder van de organisatie",
+  "No members yet": "Nog geen leden"
 }
