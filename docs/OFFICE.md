@@ -107,6 +107,22 @@ open the tab Templates, `#office/import` sits under Settings, `#clients`, `#clie
 the office joins a group with an entry in `OFM_ITEMS` (`static/js/areas.js`, field `group`, its place in `OFR_ORDER`); an
 office tab without one appears at the end of its group (`OFC_TABS` field 5, else Administration).
 
+## Settings: areas, every field saves itself (2.113)
+
+Office & finance > Settings > General shows its fields in five **areas**, with the same strip of tabs as
+Settings > Administration: **Company** (company data, logo, brand colour, master data file), **Documents** (documents,
+invoices, invoice from parts, closing texts, calculation rules, default texts), **Packs** (country pack, packs list),
+**Data** (DATEV inbox and booking export, legacy import, moving a personal office into an organisation) and **Access**
+(agents' read access, access log). Only one area is shown; the last one chosen is remembered on the device. On a phone the
+strip scrolls sideways.
+
+There is no Save button: each field saves itself when you leave it (a box or a choice at once) and says *Saved* next
+to it, with *Undo* (one undo step per field). Only that field goes to the server (`PUT /api/office/settings` with its
+key; the company data, the free line groups, one language of the default texts and one part of the default rights each
+on their own, the DATEV booking export as one group), so fields of the other areas are never written over. A value the
+server refuses stays in the field, marked with the error, until it is corrected; closing the page asks meanwhile.
+Members see every field locked.
+
 ## Tabs
 
 - **Quotations** - the documents (number, recipient, project, date, net total, status) and the editor.
@@ -254,7 +270,9 @@ operator of the server names in `KALMIDO_PACKS_CATALOG`; without it the list sho
 - **Install, update, uninstall** (office admins; members see the list only): *Install* downloads the pack, checks its
   checksum, size and shape (the same check as the built-in packs, no markup, data only, never program code) and makes
   it available in this office only - a private office or one organisation, never others. An installed country pack
-  appears in the *Country pack* choice, an installed industry pack gets its box in the *Calculation rules*. *Update to
+  appears in the *Country pack* choice, an installed industry pack gets its box in the *Calculation rules*. Since 2.113
+  every industry pack's card (built in or installed) says **Switched on** or **Off** and has its own switch: it
+  changes `industry_packs` of the office at once (the same setting as the box in the calculation rules; one undo step). *Update to
   vN available* shows when the catalogue has a newer version, with its notes. A pack with the code of a built-in one
   (for example a newer `DE`) replaces it in this office only; uninstalling it brings the built-in one back.
 - **Uninstalling** asks first. It is refused, with the reason, while the pack is still in use: the country pack chosen
