@@ -33,6 +33,12 @@ const dp_warn = b => b.conflicts?.length || b.away;
 const dp_warnText = b => [b.conflicts?.length ? tr('Double booking') : '', b.away ? tr('Away on this day') : ''].filter(Boolean).join(' · ');
 const dp_status = b => b.status === 'firm' ? tr('Firm') : tr('Option');
 
+// 2.141.0 C (#2142): download what the view shows (period, filter, area) as CSV or ICS
+function dp_exports(d) {
+  const q = new URLSearchParams({start: d.start, days: DPV.days, filter: DPV.filter, ...(d.org_id ? {org: d.org_id} : {})});
+  return ['csv', 'ics'].map(f => `<a class="btn sm ghost dp-export" data-f="${f}" href="/api/team/dispo/export?${q}&format=${f}" download title="${esc(tr('Download the bookings shown'))}">${ic('download', 's')}<span>${f.toUpperCase()}</span></a>`).join('');
+}
+
 function dp_view() {
   if (!DPV.data && !DPV.loading) setTimeout(dp_load, 0);
   const d = DPV.data;
@@ -76,6 +82,7 @@ function dp_view() {
   return `<div class="dash wload dp">${ab2_tabs('dispo')}<div class="clhead"><div class="seg" role="group" aria-label="${esc(tr('Show'))}">${f('all', N_('All'))}${f('people', N_('People'))}${f('tech', N_('Equipment'))}</div><span class="spacer"></span>
       ${d.orgs.length > 1 ? `<select id="dp-org" aria-label="${esc(tr('Organisation'))}">${d.orgs.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
       <button class="iconbtn" data-act="dp-move" data-d="-1" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><button class="btn sm" data-act="dp-move" data-d="0">${tr('This week')}</button><button class="iconbtn" data-act="dp-move" data-d="1" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button>
+      ${dp_exports(d)}
       <button class="btn sm pri" data-act="dp-new">${ic('plus', 's')} ${tr('Book')}</button></div>
     <div class="wlwrap dpgrid"><table class="wltable dptable"><thead><tr><th scope="col">${tr('Resource')}</th>${head}</tr></thead><tbody>${body || `<tr><td colspan="${days.length + 1}" class="muted">${tr('Nothing to show yet: add people to the organisation or equipment in Office & finance.')}</td></tr>`}</tbody></table></div>
     <ul class="dpdays">${dayList || `<li class="muted">${tr('No bookings this week.')}</li>`}</ul>

@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.141.0** (2026-10-20): the **e-mail filing as a small mail desk** - an own IMAP / SMTP mailbox per workspace,
+  reply and write from the filing (sent mails filed too), HTML mails shown safely, tasks and events from a mail; a CSV /
+  ICS export of the disposition and a consent import for newsletters.
 - **2.140.0** (2026-10-20): private space - shopping items with quantity and price and an offline shopping mode,
   recipes onto the shopping list and the meal plan beyond one week, journal history with search, export and mood
   statistics, budget month comparison and one bank statement reader with the office, several reminder times per habit,
@@ -700,12 +703,13 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - On phones every choice list (list, section, assignee, settings) opens as a bottom sheet like the app's menus: icons, a check on the current value, a search field for long lists
 - Mobile layout with swipe gestures, long-press drag, configurable tab bar per device (on the desktop one sidebar with grouped navigation: Focus, Views, Lists, Filters, Tags and Team); tablets in portrait keep the composer at the bottom
 - Push notifications without an extra app (Web Push: Chrome, Edge, Firefox, Safari, iPhone and iPad from the Home Screen) or via [ntfy](https://ntfy.sh): reminders with *Done* / *Snooze*, focus end, habit reminders, daily digest, comments and assignments; a notification you handled on one device (task completed or opened, News read) closes on your other devices
+- **Slack, Matrix, Telegram or Signal** as extra channels (2.142.0): each person picks which kinds go there (reminders, assignments, mentions, digest, changes in own lists), organisation admins add a team channel for lists everyone in the organisation sees; the address stays encrypted on the server. People without a push device get assignments and mentions by **e-mail**, collected into at most one mail every 10 minutes (off / only without push / always, *Settings > Notifications*)
 - Share from your phone into the basket: a ready-made import for the Android app HTTP Shortcuts, a guide for the iPhone Shortcuts app (see below); app shortcuts (long-press the icon: new task, today, news, search)
 - Profile pictures: ten heron presets (2.19.0) or your own photo (cropped square, resized, metadata removed), shown wherever the initials were
 - **Events and contacts** (2.21.0): your own calendars and address books in Kalmido, synced with the phone's calendar and contacts apps ([Events](#events), [Contacts](#contacts))
 - **Calendar apps (CalDAV), both ways**: every list as a task list in Reminders (iPhone, iPad, Mac), Thunderbird, Evolution, Tasks.org or DAVx⁵ on Android, with an app password per device ([Calendar apps](#calendar-apps-caldav))
 - **Calendar subscription**: your open tasks with a date as an ICS feed for Google Calendar, Apple Calendar, Outlook or Thunderbird
-- **Import from Todoist, Trello, Asana, Microsoft To Do, TickTick and any ICS / VTODO file** (Apple Reminders exports, Nextcloud Tasks, Thunderbird) with a preview, re-import without duplicates and undo ([Moving from other apps](#moving-from-other-apps)); export everything as JSON (incl. your time entries)
+- **Import from Todoist, Trello, Asana, Microsoft To Do, TickTick, Notion, Google Tasks, ClickUp, Jira, any CSV, Markdown checklists and any ICS / VTODO file** (Apple Reminders exports, Nextcloud Tasks, Thunderbird) with a preview, re-import without duplicates and undo ([Moving from other apps](#moving-from-other-apps)); export everything as JSON (incl. your time entries), or your lists as Todoist CSV files or Markdown checklists (2.142.0) - no lock-in
 - **REST API** with personal access tokens (`/api/v1`, OpenAPI 3.1) and signed **webhooks** for Home Assistant, n8n or your own scripts ([docs/API.md](docs/API.md))
 - **Appearance per device**: dark or light theme, compact or comfortable rows, font size from 75 to 150 % in 5 % steps, also with Ctrl + / − / 0 (the whole interface scales, not just the text), Geist, your system font or the low-vision friendly [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), and seven accent colors (violet by default) that all meet WCAG AA in both themes
 - English and German interface, French, Spanish, Italian and Dutch in beta (translations are plain JSON files, [fix or add yours](CONTRIBUTING.md#translations))
@@ -869,6 +873,8 @@ own list with the same name is reused) or one existing list you can edit. The im
   (attachments stay links in the notes), and every task is validated like one typed into the app. Each imported task
   gets a history line *imported from ...*; imports do not send one webhook per task.
 - The same import is available to scripts: `POST /api/v1/import/{source}` ([docs/API.md](docs/API.md#import)).
+- People named in a file (assignees) are never matched to accounts; their names go into the notes as text.
+- **Leaving again** (2.142.0): *Settings > Data* also exports your lists as **Todoist CSV** (a ZIP with one file per list in Todoist's import format) or as **Markdown** checklists (one `.md` per list); lists with a lock are left out (the server cannot read them).
 
 | From | Export there | What comes along |
 |---|---|---|
@@ -878,6 +884,12 @@ own list with the same name is reused) or one existing list you can edit. The im
 | **Microsoft To Do** | No export of its own. Classic Outlook for Windows: *File > Open & Export > Import/Export > Export to a file > Comma Separated Values > Tasks* (Outlook for Mac: *File > Export > Tasks*). CSV files of export tools and ICS files work too. | Title, list, due and start date, status, importance / priority, categories as tags, notes, reminders, steps (when the export has them). English and German Outlook columns, also in Windows-1252. |
 | **ICS / VTODO** | Nextcloud Tasks (calendar > … > *Export*), Thunderbird (right-click the calendar > *Export*), Apple Reminders via an export app or a CalDAV server, Tasks.org via its CalDAV account | One list per calendar; subtasks (`RELATED-TO`), due and start with time zones, repetitions (daily, weekly, monthly, yearly), reminders (`VALARM`), categories as tags, priorities, completed and cancelled tasks. Events are skipped. |
 | **TickTick** | *Settings > Account > Generate backup* | Imported directly (no preview): folders, lists, sections, subtasks, dates, reminders, repetitions, tags. |
+| **Notion** (2.142.0) | *Settings > Export > Markdown & CSV* (a ZIP, ZIPs inside it are read too) | Every database CSV becomes a list (name, status, date or date range, tags, priority; other columns in the notes, the text of a row's own page as well, its checkboxes as subtasks); other pages with `- [ ]` checkboxes become lists. The ID suffixes Notion adds to names are removed. |
+| **Google Tasks** (2.142.0) | [Google Takeout](https://takeout.google.com) > *Tasks* (the ZIP or the `Tasks.json` in it) | Lists, subtasks, due day, notes, completion; deleted tasks are left out. |
+| **ClickUp** (2.142.0) | List or view > … > *Export* > *CSV* | Lists in folders (the space when the folder is hidden), status, start and due dates, priority, tags, checklists as subtasks, estimate as duration; comments, attachments and other columns as text in the notes. |
+| **Jira** (2.142.0) | Issue search > *Export* > *CSV (all fields)* | One list per project, subtasks via *Parent*, status (*Won't Do* = cancelled), priority, due date, labels; issue key, type, sprint, reporter and components in the notes. |
+| **Any CSV** (2.142.0) | Any spreadsheet saved as CSV | Columns are matched by their English or German header (title, due, notes, list, priority, tags, done ...); the preview shows which column went where, unknown columns go into the notes. |
+| **Markdown** (2.142.0) | A `.md` file (Obsidian, Logseq, a README) | Top headings become lists, deeper ones sections; `- [ ]` / `- [x]` tasks, indentation = subtask, text below a task = its note; unambiguous dates (`2025-01-15`, `15.01.2025`, `due:`), `#tags`. |
 
 ## Users and sharing
 
@@ -1366,6 +1378,14 @@ old one stop working. Optionally, mails from your own address (an admin stores i
 too (off by default: sender addresses can be forged). The mailbox must deliver plus addresses (`+…`) to it, which most
 providers do. With `KALMIDO_SMTP_*` the **daily summary** (Settings > Notifications, *Daily digest at*) also comes by
 e-mail: overdue, today, tomorrow, what waits for you and what is unread; *Send now* tries it.
+
+**A mailbox per workspace (2.141):** in the e-mail filing (*Office > Clients > E-mails*) the section *Mailbox* lets the
+admins of an organisation - or a person for their private space - enter an own IMAP mailbox and SMTP access. Its mails
+are fetched every `KALMIDO_IMAP_INTERVAL` seconds and filed in that workspace only (by sender, plus address or as a reply
+to a filed mail; otherwise *Not assigned*). Passwords are stored encrypted and never shown again; the servers are reached
+only with a valid certificate, and hosts in the local network only when listed under *allowed internal hosts*
+(`KALMIDO_CALENDAR_ALLOW_HOSTS`). With SMTP set up, *Reply* and *New e-mail* send plain-text mails that are filed as
+*Sent*. HTML mails are shown cleaned in a sandboxed frame; external images load only on request.
 
 ## Calendar subscriptions (other calendars in Kalmido)
 
@@ -2090,7 +2110,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `AUTH_SESSION_DAYS` | `30` | Lifetime of a "stay logged in" session |
 | `TASKS_DROP_TOKEN` | | Becomes the first admin's `/drop` token (every user has an own one, see *Share from your phone*) |
 | `NTFY_INBOX_URL`, `NTFY_INBOX_TOKEN`, `NTFY_INBOX_TOPIC` | | Optional share inbox: each message on this ntfy topic becomes an inbox task. The topic must be access-controlled (see *Share from your phone*) |
-| `NTFY_INBOX_USER` | first admin | Username whose inbox receives the share inbox |
+| `NTFY_INBOX_USER` | first admin | Username whose inbox receives the share inbox (2.142.0: everyone can also set an own share inbox under *Settings > Notifications*; this variable stays the fallback) |
 | `NTFY_INBOX_PUBLIC` | | Public ntfy URL, if attachment links use a different address than `NTFY_INBOX_URL` |
 | `KALMIDO_SECRET_KEY` | | 2.1.0: 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts (2.2.0) repository tokens and webhook secrets; without it none can be stored. Keep a copy outside the server: losing it means everyone enters their tokens again. Never in the database or backups. 2.42.0: also wraps the per-organisation keys (encryption at rest); without it or an organisation's recovery key, encrypted office data and files are lost. 2.64.0: also the account keys of the private files (no recovery key: keep it safe; `orgcrypt_cli rewrap-accounts` after a planned change) |
 | `KALMIDO_SECRET_FILE` | `/secret/kalmido.key` (docker-compose.yml) | 2.45.0: without `KALMIDO_SECRET_KEY` the key is read from this file; a missing file is created once (32 random bytes, base64, mode 0600). Must not lie inside the data or backup folder (refused: a backup would carry the key). Keep a copy |
@@ -2121,6 +2141,10 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_ONBOARDING` | `1` | `0`: new accounts start empty (no "Getting started" list, no welcome tour) |
 | `KALMIDO_SEARCH_INDEX` | `0` | 2.29.0: search engines stay out by default (`X-Robots-Tag: noindex, nofollow` on every answer, `/robots.txt` with `Disallow: /`); `1` lets them index the sign-in page. Public list links, forms, feeds and the API stay noindex either way |
 | `KALMIDO_AGENT_EVENTS_STALE_H` | `48` | 2.29.0: agent events older than this many hours reach a poller as one `missed` summary instead of one by one (`0` = off; see docs/AGENTS.md) |
+| `KALMIDO_CHANNELS` | `1` | 2.142.0 (#2145): `0` turns the Slack / Matrix / Telegram / Signal channels off |
+| `KALMIDO_CHANNEL_FAILS` | `5` | Failed sends in a row after which a channel switches itself off |
+| `KALMIDO_TELEGRAM_API` | `https://api.telegram.org` | Base address for Telegram channels (a local Bot API server) |
+| `KALMIDO_EVENT_MAIL_DELAY`, `KALMIDO_EVENT_MAIL_GAP` | `600`, `600` | 2.142.0 (#2146): seconds an assignment / mention mail waits to collect more, and the least time between two such mails to one person |
 | `KALMIDO_WEBPUSH` | `1` | `0` turns Web Push off (no key handed out, no new devices, everything goes to ntfy) |
 | `KALMIDO_VAPID_SUBJECT` | `PUBLIC_URL` | Contact the push services see in the VAPID signature: `mailto:you@example.com` or an https URL (Apple needs one of the two; without an https `PUBLIC_URL` the default is `mailto:admin@example.com`) |
 | `KALMIDO_WEBPUSH_HOSTS` | | Extra push services, comma list: `host`, `*.domain` or an exact origin `https://host:port` (only this form allows plain `http://`, e.g. for tests) |

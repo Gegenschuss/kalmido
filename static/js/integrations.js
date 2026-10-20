@@ -371,3 +371,118 @@ function whoDraw(root) {
     }
   });
 }
+// 2.142.0 A (#2145, #2146): notification channels (Slack, Matrix, Telegram, Signal) -- a person's own in Settings > Notifications,
+// an organisation's in Settings > Workspaces (its admins) -- and e-mails for single events. The address / token never comes back
+// from the server: a row shows kind, name and a masked end; editing leaves the address empty unless a new one is typed.
+const CHN_KINDS = {slack: 'Slack', matrix: 'Matrix', telegram: 'Telegram', signal: 'Signal'};
+const CHN_EV = {reminder: N_('Reminders'), assign: N_('Assignments'), comment: N_('Mentions and comments'), digest: N_('Daily digest and briefing'),
+  other: N_('Other notifications'), lists: N_('Changes in my own lists'), newtask: N_('New task'), complete: N_('Task completed')};
+const CHN_EV_ORG = {assign: N_('Assignment'), comment: N_('Comment')};
+const chn_evName = (e, org) => tr((org && CHN_EV_ORG[e]) || CHN_EV[e] || e);
+function chn_state(ch) {
+  if (!ch.enabled) return `<span class="calerr" role="alert">${esc(ch.disabled_reason === 'failures' ? tr('turned off after {0} failed sends', ch.fails) : ch.disabled_reason === 'admin' ? tr('turned off: the person who set it up is no admin any more') : tr('off'))}</span>`;
+  if (ch.last_error) return `<span class="calerr" role="alert">${esc(tr('last send failed: {0}', ch.last_error))}</span>`;
+  return esc(ch.last_at ? tr('last send ok {0}', relTime(ch.last_at)) : tr('nothing sent yet'));
+}
+const chn_rowsHtml = (j, org) => j.channels.length ? j.channels.map(ch => `<div class="mrow chnrow ${ch.enabled ? '' : 'off'}" data-chnid="${ch.id}"><span class="n"><b>${esc(ch.name || CHN_KINDS[ch.kind] || ch.kind)}</b> <span class="muted chnhint">${esc(CHN_KINDS[ch.kind] || ch.kind)} · ${esc(ch.hint)}</span><small class="muted">${esc(ch.events.map(e => chn_evName(e, org)).join(', '))} · ${chn_state(ch)}</small></span>
+    <button class="iconbtn" data-chn="test" title="${tr('Send test')}" aria-label="${tr('Send test')}" ${ch.enabled ? '' : 'disabled'}>${ic('send', 's')}</button>
+    <button class="iconbtn" data-chn="edit" title="${tr('Edit')}" aria-label="${tr('Edit')}">${ic('edit', 's')}</button>
+    <button class="iconbtn danger" data-chn="del" title="${tr('Remove')}" aria-label="${tr('Remove')}">${ic('trash', 's')}</button></div>`).join('')
+  : `<div class="muted mhint">${tr('No channels yet.')}</div>`;
+const chn_mailSel = (id, v) => `<select id="${id}" class="chnmail">${[['nopush', N_('Only without a push device')], ['always', N_('Always')], ['off', N_('Off')]].map(([k, n]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
+function chn_mailHtml(m) {
+  if (!m?.enabled) return '';
+  return `<h4 id="s-evmail-h">${tr('E-mail for single events')}</h4>
+    <div class="row"><label for="s-evm-assign">${tr('Assigned to me')}</label>${chn_mailSel('s-evm-assign', m.assign)}</div>
+    <div class="row"><label for="s-evm-mention">${tr('Mentioned')}</label>${chn_mailSel('s-evm-mention', m.mention)}</div>
+    <div class="shint">${esc(!m.address ? tr('No e-mail address is stored for you: an admin adds it (Settings > Users)') : m.device ? tr('You have a push device, so “Only without a push device” sends nothing at the moment.') : tr('Collected and sent as one e-mail at most every 10 minutes, with links to the tasks.'))}</div>`;
+}
+async function chn_meDraw(md) {  // Settings > Notifications (settings.js: the box #s-chn)
+  const box = $('#s-chn', md); if (!box) return;
+  let j; try { j = await api('GET', '/api/me/channels'); } catch { box.innerHTML = ''; return; }
+  box._j = j;
+  box.innerHTML = (j.enabled ? `<h4 id="s-chn-h">${tr('Channels')}</h4>
+    <div class="shint">${tr('Also send notifications to Slack, Matrix, Telegram or Signal: a short text with the link to the task. The address stays on the server; quiet hours apply.')}</div>
+    <div class="members chnrows">${chn_rowsHtml(j)}</div>
+    <div class="row"><button type="button" class="btn sm" data-chn="new">${ic('plus', 's')} ${tr('Add channel')}</button></div>` : '') + chn_mailHtml(j.mail);
+  if (box._wired) return;
+  box._wired = true;
+  box.addEventListener('click', e => chn_click(e, box, '/api/me/channels', () => chn_meDraw(md)));  // the mail selects save through SETS (settings.js)
+}
+function chn_orgBoxHtml(o) {  // account.js: Settings > Workspaces > an organisation (its admins)
+  return `<div class="chnbox" data-chnorg="${o.id}" hidden><h5>${tr('Channels')}</h5>
+    <div class="shint">${tr('Post what happens in the organisation’s lists that every member sees (new task, completed, assigned, comment) to Slack, Matrix, Telegram or Signal. Never lists shared only with some, never private areas.')}</div>
+    <div class="members chnrows"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <div class="row"><button type="button" class="btn sm" data-chn="new">${ic('plus', 's')} ${tr('Add channel')}</button></div></div>`;
+}
+async function chn_orgLoad(box) {
+  let j; try { j = await api('GET', `/api/orgs/${+box.dataset.chnorg}/channels`); } catch { return; }
+  box._j = j; box.hidden = !j.enabled;
+  $('.chnrows', box).innerHTML = chn_rowsHtml(j, true);
+}
+function chn_orgDraw(root) {
+  root.querySelectorAll('.chnbox').forEach(box => {
+    chn_orgLoad(box);
+    if (box._wired) return;
+    box._wired = true;
+    box.addEventListener('click', e => chn_click(e, box, `/api/orgs/${+box.dataset.chnorg}/channels`, () => chn_orgLoad(box), true));
+  });
+}
+async function chn_click(e, box, base, again, org) {
+  const b = e.target.closest('[data-chn]'); if (!b) return;
+  if (b.dataset.chn === 'new') { chn_modal(null, box._j, base, again, org); return; }
+  const ch = (box._j?.channels || []).find(x => x.id === +b.closest('[data-chnid]')?.dataset.chnid); if (!ch) return;
+  const a = b.dataset.chn;
+  if (a === 'edit') chn_modal(ch, box._j, base, again, org);
+  if (a === 'test') {
+    b.disabled = true;
+    try { const r = await api('POST', `${base}/${ch.id}/test`); toast(r.ok ? tr('Test sent') : tr('Test failed: {0}', r.error_text)); } catch { /* api() showed it */ }
+    b.disabled = false; again();
+  }
+  if (a === 'del') {
+    if (!await askConfirm(tr('Remove the channel “{0}”?', ch.name || CHN_KINDS[ch.kind]), tr('Nothing is sent there any more.'), {ok: tr('Remove'), danger: true})) return;
+    try { await api('DELETE', `${base}/${ch.id}`); toast(tr('Channel removed')); } catch { /* api() showed it */ }
+    again();
+  }
+}
+const CHN_FIELDS = {slack: [['url', N_('Webhook URL'), 'https://hooks.slack.com/services/…']], matrix: [['url', N_('Webhook URL'), 'https://…']],
+  telegram: [['token', N_('Bot token'), '123456:ABC…'], ['chat_id', N_('Chat ID'), '-1001234567890']],
+  signal: [['url', N_('Server address'), 'https://signal.example.com'], ['number', N_('Sender'), '+49…'], ['recipient', N_('Recipient'), '+49…']]};
+const CHN_HELP = {slack: N_('In Slack: Apps > Incoming Webhooks > Add to a channel, then paste the webhook URL here.'),
+  matrix: N_('A webhook bridge of your Matrix server (for example hookshot, generic webhooks) gives you a URL for a room; Kalmido posts the text there as JSON.'),
+  telegram: N_('Create a bot with @BotFather and add it to the chat; the chat ID is the number of the chat or group (or @channelname).'),
+  signal: N_('Needs your own signal-cli-rest-api server: its address, the registered sender number and the recipient (a number or group.…).')};
+function chn_modal(ch, j, base, done, org) {
+  const evs = j?.events || [], on = new Set(ch ? ch.events : evs.filter(e => org || ['reminder', 'assign', 'comment'].includes(e)));
+  const kind = ch?.kind || 'slack';
+  const fields = k => CHN_FIELDS[k].map(([f, n, ph]) => `<div class="row"><label for="chn-${f}">${tr(n)}</label><input id="chn-${f}" data-chnf="${f}" ${f === 'url' ? 'type="url"' : ''} placeholder="${esc(ch ? tr('unchanged') + ' (' + ch.hint + ')' : ph)}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>`).join('')
+    + `<div class="shint keep chnhelp">${esc(tr(CHN_HELP[k]))}</div>`;
+  const md = modal(`<h3>${ch ? tr('Edit channel') : tr('Add channel')}</h3>
+    <div class="row"><label for="chn-kind">${tr('Service')}</label><select id="chn-kind" ${ch ? 'disabled' : ''}>${Object.entries(CHN_KINDS).map(([k, n]) => `<option value="${k}" ${k === kind ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    <div class="row"><label for="chn-name">${tr('Name')}</label><input id="chn-name" maxlength="60" value="${esc(ch?.name || '')}" placeholder="${tr('optional')}"></div>
+    <div id="chn-fields">${fields(kind)}</div>
+    <div class="shint keep">${tr('https:// only; http:// and addresses in your own network only for hosts an admin allowed (Settings > Administration > Advanced).')}</div>
+    <div class="whevg"><b class="muted">${tr('What to send')}</b><div class="featgrid">${evs.map(e => `<label><input type="checkbox" data-chnev="${esc(e)}" ${on.has(e) ? 'checked' : ''}> ${esc(chn_evName(e, org))}</label>`).join('')}</div></div>
+    ${ch ? `<div class="row"><label></label><label class="chkl"><input type="checkbox" id="chn-on" ${ch.enabled ? 'checked' : ''}> ${tr('Active')}</label></div>` : ''}
+    <div class="calerr" role="alert" id="chn-err" hidden></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
+  $('#chn-kind', md).addEventListener('change', e => { $('#chn-fields', md).innerHTML = fields(e.target.value); });
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button[data-m]'); if (!b) return;
+    const err = $('#chn-err', md), show = m => { err.textContent = m || ''; err.hidden = !m; };
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    const body = {name: $('#chn-name', md).value.trim(), events: $$('[data-chnev]', md).filter(x => x.checked).map(x => x.dataset.chnev)};
+    if (!ch) body.kind = $('#chn-kind', md).value;
+    const fs = $$('[data-chnf]', md), typed = fs.filter(x => x.value.trim());
+    if (!ch || typed.length) {  // a new channel needs every field; editing replaces the address only when one is typed
+      const miss = fs.find(x => !x.value.trim()); if (miss) { need(miss); return; }
+      fs.forEach(x => { body[x.dataset.chnf] = x.value.trim(); });
+    }
+    if (ch) body.enabled = $('#chn-on', md).checked;
+    if (!body.events.length) { show(tr('Choose at least one event')); return; }
+    b.disabled = true; show('');
+    try { await calReq(ch ? 'PATCH' : 'POST', ch ? `${base}/${ch.id}` : base, body); md.remove(); toast(tr('Saved')); done && done(); }
+    catch (x) { show(x.message); } finally { b.disabled = false; }
+  });
+  if (!isTouch()) setTimeout(() => $(ch ? '#chn-name' : '#chn-kind', md)?.focus(), 50);
+}

@@ -68,6 +68,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-caltoday': ['cal_today', N_('Events on Today'), 'chk'],
   's-dateok': ['date_confirm', N_('Confirm changes of the date with OK'), 'chk'],  // 2.6.1 (#401)
   's-qfrom': ['quiet_from', N_('Quiet from'), 'time'], 's-qto': ['quiet_to', N_('Quiet until'), 'time'],  // 2.7.0 (#413)
+  's-evm-assign': ['mail_assign', N_('Assigned to me'), 'sel'], 's-evm-mention': ['mail_mention', N_('Mentioned'), 'sel'],  // 2.142.0 A (#2146): integrations.js chn_mailHtml
   's-wfrom': ['work_start', N_('Working hours from'), 'time'], 's-wto': ['work_end', N_('Working hours until'), 'time'],  // 2.10.0 (#440)
   's-wthours': ['capacity_h', N_('Hours per week'), 'text'],  // 2.125.0 A (#2118): the working week (leave.js)
   's-review': ['review_time', N_('Daily review at'), 'time'],
@@ -609,6 +610,8 @@ function settingsModal(focus) {
       <div class="row"><label>${tr('Topic')}</label><code class="topic">${esc(s.ntfy_topic)}</code><button class="btn sm" data-m="test">${ic('bell', 's')} ${tr('Send test')}</button></div>
       ${S.webpush?.enabled ? '' : prio}
       ${hint(`${tr('Subscribe in the ntfy app: server {0}, topic as above', esc(S.ntfyUrl))}${/ntfy\.sh/.test(S.ntfyUrl) || !S.me?.ntfy_inbox ? '' : tr(', with a user that has read access')}. <a href="${esc(topicUrl)}" target="_blank" rel="noopener">${tr('Web view')}</a>`)}</div>
+      <div id="s-ntfyin"></div>
+      <div id="s-chn"></div>${''/* 2.142.0 A (#2145, #2146): channels + e-mail for single events (integrations.js chn_meDraw) */}
       ${notifMatrixHtml(s, hint)}${bl9SetHtml(s, hint)}${typeof tbl_setHtml === 'function' ? tbl_setHtml(chk, hint) : ''}
       ${typeof trd_setHtml === 'function' ? trd_setHtml(s, chk, hint) : ''}
       <h4>${tr('Reminders')}</h4>
@@ -648,7 +651,8 @@ function settingsModal(focus) {
       <div id="s-imp-out"></div>
       <div class="members" id="s-imp-hist"></div>
       <h4>${tr('Export')}</h4>
-      <div class="row"><label>${tr('Export')}</label><a class="btn sm" href="/api/export.json" download>${ic('download', 's')} ${tr('Download JSON')}</a></div>
+      <div class="row"><label>${tr('Export')}</label><a class="btn sm" href="/api/export.json" download>${ic('download', 's')} ${tr('Download JSON')}</a><a class="btn sm" href="/api/export/todoist.zip" download>${ic('download', 's')} ${tr('Todoist CSV')}</a><a class="btn sm" href="/api/export/markdown.zip" download>${ic('download', 's')} ${tr('Markdown')}</a></div>
+      ${hint(tr('One file per list in a ZIP: Todoist CSV for the import of Todoist, Markdown as checklists for any notes app. Lists locked with a password stay out.'))}
       <h4 id="s-pmeta-h">${tr('Photos')}</h4><div class="row">${chk('s-pmeta', s.photo_meta_strip !== '0', tr('Remove location data from photos'))}</div>
       ${hint(tr('Also removes camera details and capture time from the stored file. Applies to your private files; in an organisation its admins decide (Settings > Workspaces).'))}
       ${typeof umzHtml === 'function' ? umzHtml(hint) : ''}
@@ -918,6 +922,8 @@ function settingsModal(focus) {
   tabDraw();
   if (S.me) accountWire(md);
   mailWire(md);  // 2.17.0 (#443)
+  niWire(md);  // 2.142.0 C (#2150)
+  if (typeof chn_meDraw === 'function') chn_meDraw(md);  // 2.142.0 A (#2145)
   md.addEventListener('click', async e => {
     const hz = e.target.closest('#s-hszip'); if (hz) { tkh_zipClick(e, hz, md); return; }  // 2.138.0 C (#1907)
     const b = e.target.closest('button'); if (!b) return;
@@ -998,9 +1004,14 @@ function settingsModal(focus) {
 }
 // ---- Settings > Data > Import (package C): pick the source, choose a file, preview (dry run on the server), import, undo
 const IMP_SRC = [['todoist', 'Todoist'], ['trello', 'Trello'], ['asana', 'Asana'], ['mstodo', 'Microsoft To Do'],
-  ['ics', N_('ICS / VTODO (Apple Reminders, Nextcloud, Thunderbird …)')], ['ticktick', 'TickTick']];
+  // 2.142.0 B (#2147): Notion, Google Tasks, ClickUp, Jira, any CSV, Markdown
+  ['notion', 'Notion'], ['gtasks', 'Google Tasks'], ['clickup', 'ClickUp'], ['jira', 'Jira'],
+  ['ics', N_('ICS / VTODO (Apple Reminders, Nextcloud, Thunderbird …)')], ['csv', N_('CSV file (any columns)')], ['markdown', N_('Markdown checklist')],
+  ['ticktick', 'TickTick']];
 const IMP_ACCEPT = {todoist: '.csv,.zip,.json,text/csv,application/zip,application/json', trello: '.json,application/json', asana: '.csv,text/csv',
-  mstodo: '.csv,.ics,text/csv,text/calendar', ics: '.ics,.ical,.ifb,text/calendar', ticktick: '.csv,text/csv'};
+  mstodo: '.csv,.ics,text/csv,text/calendar', ics: '.ics,.ical,.ifb,text/calendar', ticktick: '.csv,text/csv',
+  notion: '.zip,.csv,.md,application/zip,text/csv,text/markdown', gtasks: '.zip,.json,application/zip,application/json', clickup: '.csv,text/csv',
+  jira: '.csv,text/csv', csv: '.csv,.tsv,.txt,text/csv,text/tab-separated-values', markdown: '.md,.markdown,.txt,text/markdown,text/plain'};  // 2.142.0 B (#2147)
 function impHelp(src) {
   return {
     todoist: tr('<b>Todoist:</b> open the project > … > Export as a CSV file (one file per project), or Settings > Backups > download a backup (a ZIP with every project). Sections, subtasks, @labels, priorities, dates (English and German date texts, also recurring ones), durations and comments are taken over; attachments stay links. The list is named after the file.'),
@@ -1009,6 +1020,13 @@ function impHelp(src) {
     mstodo: tr('<b>Microsoft To Do</b> has no export of its own. Recommended: classic Outlook for Windows > File > Open & Export > Import/Export > Export to a file > Comma Separated Values > your Tasks folder (Outlook for Mac: File > Export > Tasks). CSV files of export tools (columns such as Title, List, Status, Importance, Due) and ICS files work too. English and German Outlook columns are recognized, also in Windows-1252.'),
     ics: tr('<b>ICS files with tasks (VTODO):</b> Nextcloud Tasks (calendar > … > Export), Thunderbird (right-click the calendar > Export), Apple Reminders via an export app or a CalDAV server, Tasks.org via its CalDAV account. Each calendar becomes a list; subtasks, repetitions, reminders, categories (tags), priorities and completion are taken over.'),
     ticktick: tr('<b>TickTick:</b> Settings > Account > Generate backup (CSV). Imported directly, without a preview.'),
+    // 2.142.0 B (#2147)
+    notion: tr('<b>Notion:</b> Settings > Workspace > Export all workspace content (or … on a page > Export) > Markdown & CSV, include subpages. Choose the ZIP as it is (parts inside it are read too). Every database becomes a list (name, status, date, tags and priority are recognized, other properties go into the notes), pages with checkboxes become lists of tasks. People stay names in the notes.'),
+    gtasks: tr('<b>Google Tasks:</b> takeout.google.com > deselect all > select Tasks > create the export, then choose the ZIP (or the Tasks.json inside it). Lists, subtasks, due dates, notes and completion are taken over.'),
+    clickup: tr('<b>ClickUp:</b> open the list or space > … > Export > CSV, all columns. Lists (in folders), subtasks, checklists, tags, priorities, start and due dates, estimates and comments are taken over; assignees stay names in the notes.'),
+    jira: tr('<b>Jira:</b> Filters > search the issues > Export > Export CSV (all fields). Each project becomes a list; sub-tasks and child issues become subtasks, labels tags, priorities and due dates are kept; the issue key, description, sprint and components go into the notes, assignees stay names.'),
+    csv: tr('<b>Any CSV file</b> (also from a spreadsheet): one row per task. Columns such as Title / Name / Task, Due / Date, Notes / Description, List / Project, Section, Priority, Tags and Done / Status are recognized in English and German; every other column goes into the notes. The preview shows which column went where.'),
+    markdown: tr('<b>Markdown checklist</b> (Obsidian, Logseq, a README …): headings become lists (deeper headings sections), - [ ] and - [x] tasks, indented items subtasks, text below a task its notes. Only clear dates (2025-01-15 or 15.01.2025) and #tags are read.'),
   }[src] || '';
 }
 // 2.5.2 (K15): an own file button in the app's language (+ the chosen file's name) instead of the browser's "Browse… No file selected."
@@ -1043,11 +1061,16 @@ function impInit(md) {
       + sel('s-imp-completed', tr('Completed tasks'), [['import', tr('import as completed')], ['skip', tr('skip')]], I.opts.completed || 'import')
       + (I.src === 'todoist' ? sel('s-imp-priority_scale', tr('Todoist priorities'), [['auto', tr('detect automatically')], ['1', tr('1 = p1 (highest)')], ['4', tr('4 = p1 (highest)')]], I.opts.priority_scale || 'auto') : '')
       + (j.lists.length === 1 && !(I.opts.target && I.opts.target !== 'new') ? `<div class="row"><label for="s-imp-name">${tr('List name')}</label><input id="s-imp-name" data-io="list_name" maxlength="200" value="${esc(I.opts.list_name ?? j.lists[0].name)}"></div>` : '') : '';
+    // 2.142.0 B (#2147): any CSV: which column went where
+    const IMP_FIELD = {title: N_('Title'), id: N_('Id'), parent: N_('Parent task'), list: N_('List'), section: N_('Section'), due: N_('Due date'), due_time: N_('Time'),
+      start: N_('Start date'), notes: N_('Notes'), priority: N_('Priority'), tags: N_('Tags'), done: N_('Done'), done_at: N_('Completed at'), created: N_('Created'),
+      assignee: N_('Assignee (as text)'), url: N_('Link')};
+    const cols = j.dry_run && j.columns?.length ? `<div class="imptab impcols"><div class="muted">${tr('Columns')}</div>${j.columns.map(c => `<div class="impr" data-field="${esc(c.field)}"><span class="n">${esc(c.column)}</span><span class="muted">${esc(tr(IMP_FIELD[c.field] || c.field))}</span></div>`).join('')}</div>` : '';
     const sm = j.dry_run && j.samples.length ? `<div class="imptab"><div class="muted">${tr('Examples')}</div>${j.samples.map(t => `<div class="impr${t.subtask ? ' sub' : ''}"><span class="n">${esc(t.title)}</span><span class="muted">${esc([t.section, t.due ? fmtDayAbs(t.due) + (t.due_time ? ' ' + t.due_time : '') : '', t.repeat ? repeatLabel(t.repeat) : '', t.status ? tr('Done') : ''].filter(Boolean).join(' · '))}</span>${prio(t.priority)}${t.tags.map(g => `<span class="tag">#${esc(g)}</span>`).join('')}</div>`).join('')}</div>` : '';
     const btns = j.dry_run
       ? `<div class="row"><button class="btn sm pri" data-imp="go" ${n ? '' : 'disabled'}>${ic('download', 's')} ${trn('Import {0} task', 'Import {0} tasks', n)}</button><button class="btn sm" data-imp="cancel">${tr('Cancel')}</button></div>`
       : (j.import_id ? `<div class="row"><button class="btn sm" data-imp="undo" data-id="${+j.import_id}">${tr('Undo this import')}</button><span class="muted">${tr('possible for 24 hours')}</span></div>` : '');
-    out.innerHTML = `<div class="impbox" role="status"><div class="imphead"><b>${esc(head)}</b></div>${ls}${warns(j.warnings)}${opts}${sm}${btns}</div>`;
+    out.innerHTML = `<div class="impbox" role="status"><div class="imphead"><b>${esc(head)}</b></div>${ls}${warns(j.warnings)}${opts}${cols}${sm}${btns}</div>`;
   }
   async function preview() {
     if (!I.file) return;

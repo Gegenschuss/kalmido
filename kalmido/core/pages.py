@@ -214,10 +214,12 @@ def inbox_user(c):
     return default_uid(c)
 
 
-def ntfy_inbox_import(c, m):
-    """One ntfy message -> one inbox task (+ attachment). Idempotent via tt_id 'ntfy:<id>'."""
+def ntfy_inbox_import(c, m, who=None):
+    """One ntfy message -> one inbox task (+ attachment). Idempotent via tt_id 'ntfy:<id>'.
+    2.142.0 C (#2150): who = a person's own share inbox {"uid", "fetch": url -> bytes | None, "since": id -> stored}; without it
+    the environment's inbox (NTFY_INBOX_*) and its user as before."""
     mid = m["id"]
-    uid = inbox_user(c)
+    uid = who["uid"] if who else inbox_user(c)
     if uid and not c.execute("SELECT 1 FROM tasks WHERE tt_id=?", ("ntfy:" + mid,)).fetchone():
         att = m.get("attachment") or None
         msg = (m.get("message") or "").strip()
@@ -234,21 +236,26 @@ def ntfy_inbox_import(c, m):
         if att and att.get("url"):
             # only attachments stored on the configured ntfy server (public name -> fetched via the internal URL);
             # anything else (other hosts, file://, ...) is never fetched and never gets the token
-            url = ntfy_attachment_url(att["url"])
-            if not url:
-                print("ntfy inbox: attachment URL is not on the ntfy server, not fetched:", repr(str(att["url"])[:200]), flush=True)
+            if who:  # 2.142.0 C (#2150): the person's own server (checked in integrations/ntfyin.py)
+                data = who["fetch"](att["url"])
             else:
-                req = urllib.request.Request(url, headers={"Authorization": f"Bearer {NTFY_IN['token']}"})
-                try:
-                    with safe_urlopen(req, timeout=120) as r:
-                        data = r.read(MAX_FILE_MB * 1024 * 1024 + 1)
-                except (urllib.error.URLError, OSError, ValueError) as e:
-                    print("ntfy inbox: attachment download failed:", e, flush=True)
-                    data = None
-                if data and len(data) <= MAX_FILE_MB * 1024 * 1024:  # 2.13.2: never a 0-byte file
-                    save_attachment_bytes(c, tid, str(att.get("name") or "datei"), str(att.get("type") or ""), data)
+                data, url = None, ntfy_attachment_url(att["url"])
+                if not url:
+                    print("ntfy inbox: attachment URL is not on the ntfy server, not fetched:", repr(str(att["url"])[:200]), flush=True)
+                else:
+                    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {NTFY_IN['token']}"})
+                    try:
+                        with safe_urlopen(req, timeout=120) as r:
+                            data = r.read(MAX_FILE_MB * 1024 * 1024 + 1)
+                    except (urllib.error.URLError, OSError, ValueError) as e:
+                        print("ntfy inbox: attachment download failed:", e, flush=True)
+            if data and len(data) <= MAX_FILE_MB * 1024 * 1024:  # 2.13.2: never a 0-byte file
+                save_attachment_bytes(c, tid, str(att.get("name") or "datei"), str(att.get("type") or ""), data)
         print("ntfy inbox: task", tid, "user", uid, repr(title), "attachment" if att else "", flush=True)
-    gset(c, "ntfy_inbox_since", mid)
+    if who:
+        who["since"](mid)
+    else:
+        gset(c, "ntfy_inbox_since", mid)
     bump(c)
     c.commit()
 

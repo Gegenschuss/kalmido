@@ -490,7 +490,8 @@ function mailHtml(j) {
     <div class="row"><label></label>${mchk('s-mailme', j.from_me, tr('Mails from my own address ({0}) to {1} go to my basket', j.email || tr('none set'), j.plain))}</div>
     <div class="row"><label></label>${mchk('s-mailtrim', j.trim_fwd, tr('Shorten forwarded mails'))}</div>
     <div class="row"><label></label>${mchk('s-mailtrimeml', j.trim_eml, tr('Keep the original mail as an attachment'))}</div>
-    <div class="shint">${tr('A forwarded mail becomes the title (without Fwd:) and one line “From … , date” above the message; signatures, legal notices and older quoted replies are cut. Your own words above the forwarding stay.')}</div>`
+    <div class="shint">${tr('A forwarded mail becomes the title (without Fwd:) and one line “From … , date” above the message; signatures, legal notices and older quoted replies are cut. Your own words above the forwarding stay.')}</div>
+    ${S.me?.is_admin ? `<div class="row"><label>${tr('Mailbox')}</label><button type="button" class="btn sm" data-mail="poll" id="s-mailpoll">${ic('sync', 's')} ${tr('Fetch mails now')}</button><span class="muted" id="s-mailpoll-r" role="status" aria-live="polite"></span></div>` : ''}`
     : `<div class="shint">${S.me?.is_admin ? tr('Not set up on this server: an admin sets KALMIDO_MAIL_ADDRESS and KALMIDO_IMAP_* (see the README).') : tr('Not set up on this server yet. Ask your admin.')}</div>`;  // 2.25.0 (UX-20): server details only for admins
 }
 function mailDigestHtml(j) {
@@ -513,6 +514,14 @@ async function mailWire(md) {
     }
     if (k === 'del') { if (!await askConfirm(tr('Remove this address?'), tr('Mails to it are no longer imported.'), {ok: tr('Remove'), danger: true})) return; try { await api('DELETE', '/api/me/mail/token' + (lid ? `?list_id=${lid}` : '')); } catch { return; } await reload(); return; }
     if (k === 'test') { try { const r = await api('POST', '/api/me/mail/test'); toast(tr('Sent to {0}', r.to)); } catch { /* api() said it */ } }
+    if (k === 'poll') {  // 2.142.0 C (#2149): admins: look into the mailbox now; locked while it runs
+      const out = $('#s-mailpoll-r', md); b.disabled = true; if (out) out.textContent = tr('Fetching…');
+      try {
+        const r = await api('POST', '/api/admin/mail/poll');
+        const n = typeof r?.imported === 'number' ? r.imported : typeof r?.count === 'number' ? r.count : null;
+        if (out) out.textContent = n === null ? tr('Started: new mails appear in a few seconds.') : trn('{0} mail fetched', '{0} mails fetched', n);
+      } catch { if (out) out.textContent = tr('Fetching failed'); } finally { b.disabled = false; }
+    }
   });
   md.addEventListener('change', async e => {
     if (e.target.id === 's-mailtrim' || e.target.id === 's-mailtrimeml') { const k = e.target.id === 's-mailtrim' ? 'mail_trim_fwd' : 'mail_trim_eml'; await api('PATCH', '/api/settings', {[k]: e.target.checked ? '1' : '0'}).catch(() => {}); S.settings[k] = e.target.checked ? '1' : '0'; }  // 2.49.0 (#971)
@@ -650,3 +659,36 @@ document.addEventListener('touchmove', e => {
 document.addEventListener('touchend', e => { if (lyDg?.touch) { if (lyDg.active && e.cancelable) e.preventDefault(); lydragEnd(false); } });
 document.addEventListener('touchcancel', () => { if (lyDg?.touch) lydragEnd(true); });
 document.addEventListener('contextmenu', e => { if (e.target.closest?.('.lycanvas .lyedb') && isTouch()) e.preventDefault(); });  // the long press is the drag
+
+// ------------------------------------------------------------------ 2.142.0 C (#2150) Settings > Notifications: my share inbox (ntfy)
+function niHtml(j) {
+  if (!j) return `<div class="muted">${tr('Loading…')}</div>`;
+  const srv = j.url || j.default_server;
+  const state = !j.enabled ? '' : j.fails ? `<div class="shint ni-bad">${tr('Last check failed ({0}); trying again.', esc(j.last_error || '?'))}</div>` : j.last_ok ? `<div class="shint">${tr('Working: the last check went through.')}</div>` : '';
+  return `<div class="row"><label></label>${mchk('s-nion', j.enabled, tr('Shared items from the ntfy app land in my basket'))}</div>
+    ${j.enabled ? `<div class="row"><label>${tr('Topic')}</label><code class="topic" id="s-nitopic">${esc(j.topic)}</code><button type="button" class="btn sm" data-ni="copy">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm" data-ni="dice">${ic('sync', 's')} ${tr('New topic')}</button></div>
+    ${state}
+    <details class="mopt"><summary>${tr('Own ntfy server')}</summary>
+      <div class="row"><label for="s-niurl">${tr('Server')}</label><input id="s-niurl" type="url" autocomplete="off" placeholder="${esc(j.default_server)}" value="${esc(j.url)}" maxlength="300"></div>
+      <div class="row"><label for="s-nitok">${tr('Read token')}</label><input id="s-nitok" type="password" autocomplete="off" maxlength="400" placeholder="${esc(j.has_token ? tr('set (hidden)') : tr('none'))}">${j.has_token ? `<button type="button" class="btn sm" data-ni="rmtok">${tr('Remove')}</button>` : ''}</div>
+      <div class="row"><label></label><button type="button" class="btn sm pri" data-ni="save">${tr('Save')}</button></div>
+    </details>
+    <div class="shint">${tr('Android: share an image or text > ntfy > server {0}, topic as above. A few seconds later it is a task in your basket, files as attachments. Keep the topic secret: whoever knows it can add tasks.', `<code class="topic">${esc(srv)}</code>`)}</div>` : `<div class="shint">${tr('Off. Turn it on to get a topic of your own; no one else sees what you share.')}</div>`}`;
+}
+async function niWire(md) {
+  const box = $('#s-ntfyin', md); if (!box) return;
+  let j = null;
+  const draw = () => { box.innerHTML = `<h4 id="s-ntfyin-h">${tr('Share inbox (ntfy)')}</h4>` + niHtml(j); };
+  const put = async b => { try { j = await api('PUT', '/api/me/ntfy-inbox', b); } catch { return false; } draw(); return true; };
+  box.addEventListener('click', async e => {
+    const b = e.target.closest('[data-ni]'); if (!b || !j) return;
+    const k = b.dataset.ni;
+    if (k === 'copy') { navigator.clipboard?.writeText(j.topic).then(() => toast(tr('Copied'))); return; }
+    if (k === 'dice') { if (!await askConfirm(tr('A new topic?'), tr('The old one stops working at once; set the new one in the ntfy app.'), {ok: tr('New topic')})) return; await put({new_topic: true}); return; }
+    if (k === 'rmtok') { await put({token: ''}); return; }
+    if (k === 'save') { const t = $('#s-nitok', box).value.trim(); if (await put({url: $('#s-niurl', box).value.trim(), ...(t ? {token: t} : {})})) announce(tr('Saved')); }
+  });
+  box.addEventListener('change', async e => { if (e.target.id === 's-nion') await put({enabled: e.target.checked}); });
+  try { j = await api('GET', '/api/me/ntfy-inbox'); } catch { return; }
+  draw();
+}

@@ -312,6 +312,8 @@ def comment_create(tid):
     if collab_all():  # 2.33.0 (#1076): an agent whose comment is answered hears it like a mention
         agent_comment_events(c, t, cid, mentions, mentions + ([replied] if replied and replied not in mentions else []))
     wh_note(c, tid, "comment", cid=cid)
+    from ..notify.channels import chn_note
+    chn_note(c, tid, "comment", cid=cid)  # 2.142.0 A (#2145): organisation channels / channels of own lists
     bump(c)
     c.commit()
     send_pushes(pushes)
@@ -477,6 +479,9 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
         lv = tbl_level(c, uid, t["id"], s)  # 2.53.0 C (#1424): the task's bell before the list's
         if lv == "mute":
             continue
+        if uid in notify_mentions and notif_ok(c, uid, s, row, "push", t["list_id"]):  # 2.142.0 A (#2146): by e-mail without a push device
+            from ..notify.channels import evm_note
+            evm_note(c, uid, "mention", t["id"], author, s, cid)
         if lv == "urgent":
             if push_reachable(c, uid, s) and not tbl_sent(uid, t["id"]):
                 lg = lang_of(s)
@@ -514,7 +519,7 @@ def comment_push_extra(t, lg):
     acts = [(tr("Reply", lg=lg), f"{PUBLIC_URL}/#reply/{t['id']}")]
     if not t["status"] and not t["deleted_at"]:
         acts.append((tr("Done|action", lg=lg), f"{PUBLIC_URL}/#done/{t['id']}"))
-    return {"actions": acts, "task": t["id"]}
+    return {"actions": acts, "task": t["id"], "kind": "comment"}  # 2.142.0 A (#2145): kind = the notification channels' event
 
 
 def push_day(due, due_time, lg):
@@ -561,6 +566,9 @@ def task_event(c, tid, kind, prev_assignee=None):
         news_add(c, uid, kind, task_id=tid, actor=actor, s=s)
         if tbl_level(c, uid, tid, s, done_ok=kind == "complete"):  # 2.53.0 C (#1424): muted / urgent (pushed by tbl_note)
             continue
+        if kind == "assign" and notif_ok(c, uid, s, KIND_ROW[kind], "push", t["list_id"]):  # 2.142.0 A (#2146): by e-mail
+            from ..notify.channels import evm_note
+            evm_note(c, uid, "assign", tid, actor, s)
         if not notif_ok(c, uid, s, KIND_ROW[kind], "push", t["list_id"]) or not push_reachable(c, uid, s) or \
                 not burst_gate(c, uid, tid, event=True):
             continue
@@ -576,7 +584,7 @@ def task_event(c, tid, kind, prev_assignee=None):
             title, msg = tr("{0} unassigned you from: {1}", who, t["title"], lg=lg), lname
         else:
             title, msg = tr("{0} completed: {1}", who, t["title"], lg=lg), lname
-        g.pushes.append((uid, title, msg, f"{PUBLIC_URL}/#t/{tid}", push_prio(s)))
+        g.pushes.append((uid, title, msg, f"{PUBLIC_URL}/#t/{tid}", push_prio(s), {"kind": "other" if kind == "complete" else "assign"}))
 
 
 def fx2_unassign_hidden(c, uid, t, actor, name, s):
@@ -592,7 +600,7 @@ def fx2_unassign_hidden(c, uid, t, actor, name, s):
     who = name if actor else tr("Someone via the public link", lg=lg)
     lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
     g.pushes.append((uid, tr("{0} removed you as assignee of a task in {1}", who, lname, lg=lg), lname,
-                     f"{PUBLIC_URL}/#l/{t['list_id']}", push_prio(s)))
+                     f"{PUBLIC_URL}/#l/{t['list_id']}", push_prio(s), {"kind": "assign"}))
 
 
 def assignment_events(c, tid, old_assignee, new_assignee):
@@ -608,7 +616,8 @@ def send_pushes(pushes):
     from ..notify.push import notify
     if pushes:
         # (uid, title, msg, click, prio[, extra]): extra = notify() keywords (2.0.8: actions + task of comment pushes)
-        threading.Thread(target=lambda: [notify(x[0], x[1], x[2], x[4], x[3], **(x[5] if len(x) > 5 else {}))
+        # 2.142.0 A (#2145): kind "other" for the notification channels unless the push names its own
+        threading.Thread(target=lambda: [notify(x[0], x[1], x[2], x[4], x[3], **{"kind": "other", **(x[5] if len(x) > 5 else {})})
                                          for x in pushes], daemon=True).start()
 
 
@@ -654,4 +663,5 @@ def _push_tick_one(c, p, users, S, LG, now):
     if p["pending"] or p["mentioned"]:  # 2.0.8: the summary of a comment burst gets Reply / Done too
         t = c.execute("SELECT id, status, deleted_at FROM tasks WHERE id=?", (p["task_id"],)).fetchone()
         ex = comment_push_extra(t, lg) if t else {}
+    ex.setdefault("kind", "comment" if p["pending"] or p["mentioned"] else "other")  # 2.142.0 A (#2145)
     notify(uid, p["title"], " · ".join(parts), push_prio(S[uid]), f"{PUBLIC_URL}/#t/{p['task_id']}", s=S[uid], **ex)

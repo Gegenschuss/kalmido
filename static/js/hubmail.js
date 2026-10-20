@@ -1,7 +1,8 @@
 /* Kalmido web client: 2.84.0 A (#1198) e-mail as an input of the hub -- the section "E-mails" of a client's card and of a
    project page (list, search, the reading view, "Copy address") and the hub inbox (#mailhub, from Office > Clients): the
    own filing address per workspace and the mails "Not assigned" with Assign / Delete. Server: kalmido/hub/hubmail.py.
-   No mail client: nothing is sent or answered, the text is shown as plain text. Assign and Delete = one undo step each.
+   Assign and Delete = one undo step each. 2.141.0 A (#2141, #2138): the mailbox of a workspace + Reply / New e-mail in
+   hubmailbox.js. 2.141.0 B (#2140, #2139): the HTML view (sandboxed frame of the server's cleaned page), Task / Event from a mail.
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
@@ -39,8 +40,9 @@ const hbm_state = key => {
 
 function hbm_headHtml(key) {
   const j = HBM.s[key]?.j;
-  if (!j || key.startsWith('inbox') || !j.can_address) return '';
-  return `<button type="button" class="btn sm" data-hbma="copy" data-hbmk="${key}" title="${esc(tr('Mails to this address are filed here'))}">${ic('copy', 's')}<span>${tr('Copy address')}</span></button>${j.address ? `<button type="button" class="iconbtn" data-hbma="menu" data-hbmk="${key}" aria-haspopup="menu" aria-label="${esc(tr('Address'))}" title="${esc(tr('Address'))}">${ic('dots', 's')}</button>` : ''}`;
+  const nw = typeof hmb_newBtn === 'function' ? hmb_newBtn(key, j) : '';  // 2.141.0 A (#2138): hubmailbox.js
+  if (!j || key.startsWith('inbox') || !j.can_address) return nw;
+  return `${nw}<button type="button" class="btn sm" data-hbma="copy" data-hbmk="${key}" title="${esc(tr('Mails to this address are filed here'))}">${ic('copy', 's')}<span>${tr('Copy address')}</span></button>${j.address ? `<button type="button" class="iconbtn" data-hbma="menu" data-hbmk="${key}" aria-haspopup="menu" aria-label="${esc(tr('Address'))}" title="${esc(tr('Address'))}">${ic('dots', 's')}</button>` : ''}`;
 }
 function hbm_listHtml(key) {
   const s = HBM.s[key], j = s?.j, inbox = key.startsWith('inbox');
@@ -50,7 +52,7 @@ function hbm_listHtml(key) {
   const more = j.total > j.mails.length ? `<p class="muted">${tr('{0} more: search to narrow them down', j.total - j.mails.length)}</p>` : '';
   return `<ul class="hbmlist" role="list">${j.mails.map(m => `<li class="hbmrow">
     <button type="button" class="hbmopen" data-hbmopen="${m.id}" data-hbmk="${key}">
-      <span class="hbmtop"><b class="hbmfrom">${esc(m.from_name || m.from_addr || tr('Unknown sender'))}</b>${m.files ? `<span class="hbmclip muted" title="${esc(trn('{0} attachment', '{0} attachments', m.files))}">${ic('clip', 's')}${m.files}</span>` : ''}<time class="muted">${esc(fmtWhen(m.sent_at || m.created_at))}</time></span>
+      <span class="hbmtop"><b class="hbmfrom">${m.dir === 'out' ? `${ic('send', 's')} ${esc(tr('To {0}', m.to_list || ''))}` : esc(m.from_name || m.from_addr || tr('Unknown sender'))}</b>${m.state === 'failed' ? `<span class="hmbtag bad">${tr('Not sent')}</span>` : m.state === 'sending' ? `<span class="hmbtag">${tr('Sending…')}</span>` : m.dir === 'out' ? `<span class="hmbtag">${tr('Sent')}</span>` : ''}${m.files ? `<span class="hbmclip muted" title="${esc(trn('{0} attachment', '{0} attachments', m.files))}">${ic('clip', 's')}${m.files}</span>` : ''}<time class="muted">${esc(fmtWhen(m.sent_at || m.created_at))}</time></span>
       <span class="hbmsubj">${esc(m.subject || tr('(no subject)'))}</span>
       ${key.startsWith('client') && m.list_name ? `<span class="muted hbmproj">${ic('brief', 's')} ${esc(m.list_name)}</span>` : ''}
     </button>
@@ -66,13 +68,13 @@ function hbm_bodyHtml(key) {
 // mail input is off and nothing is filed
 function hbm_clientHtml(c) {
   const key = 'client:' + c.id, j = hbm_state(key).j;
-  if (!j || (!j.enabled && !j.total && !(HBM.s[key].q || '').trim())) return '';  // shown once loaded
+  if (!j || (!j.enabled && !j.can_send && !j.total && !(HBM.s[key].q || '').trim())) return '';  // shown once loaded (2.141.0 A: or sending works)
   return `<div class="ctsec hbmsec"><h4>${ic('mail', 's')} ${tr('E-mails')}</h4>${hbm_bodyHtml(key)}</div>`;
 }
 function hbm_projHtml(l) {
   if (!l || l.kind !== 'project' || l.e2e) return '';
   const key = 'list:' + l.id, j = hbm_state(key).j;
-  if (!j || (!j.enabled && !j.total && !(HBM.s[key].q || '').trim())) return '';  // shown once loaded
+  if (!j || (!j.enabled && !j.can_send && !j.total && !(HBM.s[key].q || '').trim())) return '';  // shown once loaded (2.141.0 A: or sending works)
   return `<section class="povs hbmsec hbmpov" id="pov-mails"><div class="povh"><h3>${tr('E-mails')}</h3></div>${hbm_bodyHtml(key)}</section>`;
 }
 // the entry in Office > Clients
@@ -85,7 +87,7 @@ function hbm_hubView() {
   const intro = !j ? '' : j.enabled ? `<p class="muted">${tr('Forward e-mails to your filing address (or send it a copy): a mail from the address of a client or of one of its contact persons is filed with that client, everything else waits here until you assign it.')}</p>`
     : `<p class="muted">${tr('Receiving e-mail is not set up on this server (an admin sets up the mailbox).')}</p>`;
   return `<div class="ctview hbmhub"><h2 class="msclh"><a href="#clients" class="linkbtn">${ic('back', 's')}<span>${tr('Clients')}</span></a><span class="muted" aria-hidden="true">›</span><span>${tr('E-mail filing')}</span></h2>
-    ${intro}${sp ? `<h4>${tr('Your filing addresses')}</h4><ul class="hbmspaces" role="list">${sp}</ul>` : ''}
+    ${intro}${sp ? `<h4>${tr('Your filing addresses')}</h4><ul class="hbmspaces" role="list">${sp}</ul>` : ''}${typeof hmb_hubSection === 'function' ? hmb_hubSection() : ''}
     <h4>${tr('Not assigned')}</h4>${hbm_bodyHtml(key)}</div>`;
 }
 
@@ -99,18 +101,113 @@ async function hbm_open(id, key) {
   const md = modal(`<div class="lhdr"><h3>${esc(m.subject || tr('(no subject)'))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <div class="hbmhdr">${f(tr('From'), m.from_name ? `${m.from_name} <${m.from_addr}>` : m.from_addr)}${f(tr('To'), m.to)}${f(tr('Date'), fmtWhen(m.sent_at || m.created_at))}${f(tr('Filed with'), where)}</div>
     ${m.note ? `<div class="shint keep">${ic('info', 's')} ${esc(m.note)}</div>` : ''}
-    <div class="hbmtext">${esc(m.body || '')}</div>
+    ${hbm_actRowHtml(m)}${hbm_madeHtml(m.made)}
+    ${hbm_viewHtml(m, key)}
     ${att ? `<h4>${tr('Attachments')}</h4><ul class="hbmatt" role="list">${att}</ul>` : ''}
     ${m.folder_id ? `<p><a class="linkbtn" href="#ablage/${m.folder_id}" data-m="close">${ic('folder', 's')}<span>${tr('Attachments in the file store')}</span></a></p>` : ''}
-    <div class="foot">${m.can_write ? `<button type="button" class="btn danger" data-hbmd="del">${ic('trash', 's')} ${tr('Delete')}</button><button type="button" class="btn" data-hbmd="asg">${tr('Assign…')}</button>` : ''}<span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
+    <div class="foot">${typeof hmb_replyBtn === 'function' ? hmb_replyBtn(m) : ''}${m.can_write ? `<button type="button" class="btn danger" data-hbmd="del">${ic('trash', 's')} ${tr('Delete')}</button><button type="button" class="btn" data-hbmd="asg">${tr('Assign…')}</button>` : ''}<span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
   md.classList.add('hbmdlg');
   md.addEventListener('click', e => {
     if (e.target.closest('[data-m="close"]')) { modalClose(md); return; }
+    if (hbm_viewClick(e, md, m, key)) return;  // 2.141.0 B (#2140, #2139): Text / HTML, Load images, Task / Event from it
     const b = e.target.closest('[data-hbmd]'); if (!b) return;
     modalClose(md);
     if (b.dataset.hbmd === 'del') hbm_del(m.id); else hbm_assign(m);
   });
 }
+
+// ---- 2.141.0 B (#2140): the HTML view -- the server's own cleaned page (/api/hubmail/mails/<id>/html, own strict CSP) in a
+// frame without scripts and without the app's origin (sandbox: no allow-scripts / allow-same-origin; links open in a new tab,
+// popups leave the sandbox so the opened page works normally); external pictures only after "Load images" (this view only)
+const HBMV = {};  // mail id -> {v: 'html' | 'text', img: bool} while its reading view is open
+function hbm_viewHtml(m, key) {
+  const st = HBMV[m.id] = HBMV[m.id] || {v: m.html ? 'html' : 'text', img: false};
+  const html = m.html && st.v === 'html';
+  const seg = m.html ? `<div class="seg hbmseg" role="group" aria-label="${esc(tr('Show as'))}">${[['text', N_('Text')], ['html', N_('HTML')]].map(([k, n]) =>
+    `<button type="button" data-hbmv="${k}" class="${st.v === k ? 'on' : ''}" aria-pressed="${st.v === k}">${tr(n)}</button>`).join('')}</div>` : '';
+  const img = html && m.html_ext && !st.img ? `<div class="hbmimg muted">${ic('picture', 's')}<span>${tr('External images are blocked.')}</span><button type="button" class="linkbtn" data-hbmv="img">${tr('Load images')}</button></div>` : '';
+  const body = html ? `<iframe class="hbmframe" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="${esc(m.subject || tr('E-mail'))}"
+      src="/api/hubmail/mails/${m.id}/html${st.img ? '?images=1' : ''}"></iframe>` : `<div class="hbmtext">${esc(m.body || '')}</div>`;
+  return `<div class="hbmview" data-hbmview="${m.id}">${seg || img ? `<div class="hbmvbar">${seg}${img}</div>` : ''}${body}</div>`;
+}
+// ---- 2.141.0 B (#2139): Task / Event from the mail (in its workspace), and what was made from it already. Part A's "Reply"
+// sits in the same row (hbm_actRowHtml)
+function hbm_actRowHtml(m) {
+  return `<div class="hbmactrow"><button type="button" class="btn sm" data-hbmmk="task">${ic('done', 's')}<span>${tr('Task from it')}</span></button>${hbm_evOn() ? `<button type="button" class="btn sm" data-hbmmk="event">${ic('cal', 's')}<span>${tr('Event from it')}</span></button>` : ''}</div>`;
+}
+const hbm_evOn = () => feat('events');
+function hbm_madeHtml(made) {
+  if (!made?.length) return '';
+  return `<div class="hbmmade">${made.map(x => `<button type="button" class="linkbtn" data-hbmgo="${x.kind}:${x.id}">${ic(x.kind === 'task' ? 'done' : 'cal', 's')}<span>${esc(x.kind === 'task' ? tr('Task: {0}', x.title) : tr('Event: {0}', x.title))}</span></button>`).join('')}</div>`;
+}
+async function hbm_go(kind, id) {
+  if (kind === 'task') { if (!taskById(id)) await load().catch(() => {}); openDetail(id); }
+  else if (typeof evOpen === 'function') evOpen(id);
+}
+function hbm_viewClick(e, md, m, key) {
+  const v = e.target.closest('[data-hbmv]');
+  if (v) {
+    const st = HBMV[m.id];
+    if (v.dataset.hbmv === 'img') st.img = true; else st.v = v.dataset.hbmv;
+    const box = md.querySelector('[data-hbmview]'); if (box) box.outerHTML = hbm_viewHtml(m, key);
+    return true;
+  }
+  const g = e.target.closest('[data-hbmgo]');
+  if (g) { const [k, id] = g.dataset.hbmgo.split(':'); modalClose(md); hbm_go(k, +id); return true; }
+  const mk = e.target.closest('[data-hbmmk]');
+  if (mk) { modalClose(md); hbm_make(m, key, mk.dataset.hbmmk); return true; }
+  return false;
+}
+async function hbm_make(m, key, kind) {
+  let t; try { t = await api('GET', `/api/hubmail/mails/${m.id}/make`); } catch { return; }
+  const ev = kind === 'event', picks = ev ? t.calendars : t.lists;
+  $('.hbmmkdlg')?.remove();
+  const opts = picks.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
+  const md = modal(`<div class="lhdr"><h3>${ev ? tr('Event from the e-mail') : tr('Task from the e-mail')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
+    ${picks.length ? `<div class="row"><label for="hbm-mkt">${tr('Title')}</label><input id="hbm-mkt" maxlength="300" value="${esc(t.title || '')}"></div>
+    <div class="row"><label for="hbm-mkp">${ev ? tr('Calendar') : tr('List')}</label><select id="hbm-mkp">${opts}</select></div>
+    ${ev ? `<div class="row hbmmkd"><label>${tr('Date')}${dateIn('hbm-mkd', today(), {label: tr('Date')})}</label><label>${tr('Time')}${timeIn('hbm-mkh', '', {label: tr('Time'), empty: tr('All day')})}</label></div>`
+      : `<div class="row"><label>${tr('Due')}${dateIn('hbm-mkd', '', {label: tr('Due'), empty: tr('No date')})}</label></div>`}
+    <p class="shint keep">${tr('The description takes the start of the text and the sender; the e-mail stays linked.')}</p>`
+    : `<p class="muted">${ev ? tr('No calendar of this workspace you can write in.') : tr('No list of this workspace you can write in.')}</p>`}
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button>${picks.length ? `<button class="btn pri" data-m="save">${ic('check', 's')} ${tr('Create')}</button>` : ''}</div>`);
+  md.classList.add('hbmmkdlg');
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { modalClose(md); hbm_open(m.id, key); return; }
+    const title = $('#hbm-mkt', md).value.trim(), pid = +$('#hbm-mkp', md).value, d = $('#hbm-mkd', md)?.value || '';
+    let j;
+    try {
+      if (ev) { const h = $('#hbm-mkh', md)?.value || ''; j = await api('POST', `/api/hubmail/mails/${m.id}/event`, {cal_id: pid, title, start: d ? (h ? `${d}T${h}` : d) : today()}); }
+      else j = await api('POST', `/api/hubmail/mails/${m.id}/task`, {list_id: pid, title, ...(d ? {due: d} : {})});
+    } catch { return; }
+    modalClose(md);
+    if (!ev) load().catch(() => {});
+    if (ev && typeof calInvalidate === 'function') calInvalidate();
+    hbm_open(m.id, key);
+    toast(ev ? tr('Event created') : tr('Task created'), () => hbm_go(ev ? 'event' : 'task', ev ? j.event_id : j.task_id), 6000, tr('Open'));
+  });
+}
+// the mail a task / an event was made from: "E-mail: <subject>" (a tap opens it); only "E-mail" for who may not read the
+// mail (the server sends neither subject nor id then). Filled after the answer (cached a minute), the detail is not redrawn
+const HBML = {};  // 'task:<id>' | 'event:<id>' -> {at, links}
+function hbm_linkHtml(kind, id) {
+  if (!(id > 0)) return '';
+  const k = `${kind}:${id}`, c = HBML[k];
+  if (!c || Date.now() - c.at > 60000) hbm_linkLoad(k);
+  return `<div class="hbmlnk" data-hbmlnk="${k}">${c ? hbm_linkInner(c.links) : ''}</div>`;
+}
+const hbm_linkInner = links => (links || []).map(x => x.mail_id
+  ? `<button type="button" class="linkbtn" data-hbmopen="${x.mail_id}" data-hbmk="link">${ic('mail', 's')}<span>${esc(tr('E-mail: {0}', x.subject || tr('(no subject)')))}</span></button>`
+  : `<span class="muted">${ic('mail', 's')} ${tr('E-mail')}</span>`).join('');
+async function hbm_linkLoad(k) {
+  const [kind, id] = k.split(':');
+  HBML[k] = {at: Date.now(), links: HBML[k]?.links || []};
+  let j; try { j = await rawFetch('GET', `/api/hubmail/links?${kind}_id=${id}`); } catch { return; }
+  HBML[k] = {at: Date.now(), links: j.links || []};
+  for (const el of document.querySelectorAll(`[data-hbmlnk="${k}"]`)) el.innerHTML = hbm_linkInner(j.links);
+}
+const hbm_taskLinkHtml = t => t && !t.context ? hbm_linkHtml('task', t.id) : '';
 
 // ---- assign, delete (one undo step each)
 const hbm_send = (id, t) => api('POST', `/api/hubmail/mails/${id}/assign`, {client_id: t.client_id || null, list_id: t.list_id || null});
@@ -180,7 +277,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('click', e => {
   const o = e.target.closest('[data-hbmopen]');
-  if (o) { e.preventDefault(); hbm_open(+o.dataset.hbmopen, o.dataset.hbmk); return; }
+  if (o) { e.preventDefault(); if (o.closest('#pop') && typeof closePop === 'function') closePop(); hbm_open(+o.dataset.hbmopen, o.dataset.hbmk); return; }
   const a = e.target.closest('[data-hbmasg]');
   if (a) { const m = (HBM.s[a.dataset.hbmk]?.j?.mails || []).find(x => x.id === +a.dataset.hbmasg); if (m) hbm_assign(m); return; }
   const d = e.target.closest('[data-hbmdel]');
