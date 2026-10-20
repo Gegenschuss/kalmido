@@ -4,7 +4,6 @@ import mimetypes
 import os
 import re
 import uuid
-import secrets
 import time
 import urllib.error
 import urllib.parse
@@ -330,15 +329,14 @@ SHARE_PLACEHOLDERS = ("You received a file:", "Ein Bild wurde mit Dir geteilt", 
 
 
 def drop_user(c, auth):
-    """User whose personal drop token is in the Authorization header (constant-time compare)."""
-    if not auth.startswith("Bearer "):
+    """User whose personal drop token is in the Authorization header (2.138.0 C #1907: looked up by its hash)."""
+    if not auth.startswith("Bearer ") or not auth[7:]:
         return None
-    got, hit = auth[7:].encode(), None
+    from ..core.tokenhash import tkh_hash, tkh_match
+    got = auth[7:]
     # 2.86.0 (N3): never a child account (its writes are limited to family.KID_WRITE; /api/me hides its token)
-    for r in c.execute("SELECT * FROM users WHERE drop_token IS NOT NULL AND drop_token!='' AND disabled=0 AND kid=0"):
-        if secrets.compare_digest(got, r["drop_token"].encode()):
-            hit = r
-    return hit
+    r = c.execute("SELECT * FROM users WHERE drop_token_hash=? AND disabled=0 AND kid=0", (tkh_hash(got),)).fetchone()
+    return r if r and tkh_match(got, r["drop_token_hash"]) else None
 
 
 @app.post("/drop")

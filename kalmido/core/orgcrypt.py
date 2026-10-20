@@ -11,8 +11,7 @@ Key model:
                 header keeps a file readable after its list moved to another organisation
 Without a master key nothing is encrypted (everything plain as before); reading plain values / files always works (no
 prefix / magic = unchanged), so the start-up run (oc_migrate) and the way back (admin/orgcrypt_cli.py decrypt-all) can be
-repeated at any point. The org key itself is the recovery key (grouped base32, Settings > Organisation): with it a new
-master key can rewrap the org key (orgcrypt_cli rewrap). Deleting an organisation deletes its key row: what stays in
+repeated at any point. Deleting an organisation deletes its key row: what stays in
 the database or on disk of that organisation can no longer be read (older backups still hold the wrapped key).
 Never log, print or return a key, a recovery key or a decrypted protected value outside the routes that show it anyway.
 
@@ -23,6 +22,16 @@ Everywhere in this module a "space" id names the key: > 0 = an organisation, < 0
 file's header carries the space id, so a file stays readable wherever it lies; the start-up pass (admin/orgcrypt_cli.py
 files_settle) reseals a file that lies in another space now. Switch for private files only: the instance setting
 private_encrypt (default "1"; orgcrypt_cli decrypt-private / encrypt-private), the org_encrypt switch covers both.
+
+2.138.0 C (#1972): the recovery key is no longer the org key itself. Per organisation a random recovery secret R (32
+bytes) wraps the org key: org_keys.recovery_wrapped = "r1." + AES-256-GCM(HKDF(R, info "kalmido-orgkey-recovery-v1"),
+org key, AAD binds the org id) -- independent of the master key, so R plus a database copy restore the org key under a
+new master key (orgcrypt_cli rewrap). R itself is kept wrapped with the KEK (recovery_secret) so that an admin can show it
+again after a step-up (password + second factor, or a fresh sign-in); "new recovery key" replaces R (the old one stops
+working). Shown as "R2-" + 13 groups of base32; rck_parse also takes the earlier format (the raw org key, 13 groups)
+until the organisation's key is rotated. orgcrypt_cli rotate: a new org key K2 for an organisation; while the run
+re-encrypts its data the earlier key stays in wrapped_rot and reading falls back to it (_ROT), at the end it is dropped
+and a new R is made. Organisation exports carry recovery_wrapped in their header (admin/orgexport.py ox_header).
 """
 import base64
 import hashlib
@@ -156,6 +165,7 @@ def oc_error(e):
 
 _LOCK = threading.Lock()
 _CACHE = {}  # (org id, wrapped) -> org key; a deleted / rewrapped row is never found again (the wrapped text is the key)
+_ROT = {}  # 2.138.0 C (#1972): org id -> the earlier org key while orgcrypt_cli rotate runs (reading falls back to it)
 
 
 def _b64u(b):
@@ -241,7 +251,38 @@ def _row(c, org_id):
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         if int(org_id) < 0:  # 2.64.0 (#1864): an account key
             return c.execute("SELECT wrapped, kek_check FROM user_keys WHERE user_id=?", (-int(org_id),)).fetchone()
-        return c.execute("SELECT wrapped, kek_check FROM org_keys WHERE org_id=?", (int(org_id),)).fetchone()
+        return c.execute("SELECT wrapped, kek_check, wrapped_rot, kek_check_rot FROM org_keys WHERE org_id=?", (int(org_id),)).fetchone()
+
+
+def _rck_note(org_id, r, kek=None):
+    """2.138.0 C (#1972): remember the earlier key of an organisation whose rotation runs (row column wrapped_rot)."""
+    if int(org_id) <= 0:
+        return
+    w = r["wrapped_rot"]
+    if not w:
+        with _LOCK:
+            _ROT.pop(int(org_id), None)
+        return
+    kek = kek or _kek()
+    if not hmac.compare_digest(str(r["kek_check_rot"] or ""), _kek_check(kek, org_id)):
+        return
+    ck = (int(org_id), w)
+    with _LOCK:
+        k = _CACHE.get(ck)
+    if k is None:
+        k = _unwrap(kek, org_id, w)
+        with _LOCK:
+            _CACHE[ck] = k
+    with _LOCK:
+        _ROT[int(org_id)] = k
+
+
+def _rot_key(org_id):
+    try:
+        with _LOCK:
+            return _ROT.get(int(org_id)) if org_id else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _open_row(org_id, r, kek=None):
@@ -319,7 +360,9 @@ def oc_key(c, org_id, create=True):
         r = _create(c, org_id)
         if r is None:
             return None
-    return _open_row(org_id, r)
+    k = _open_row(org_id, r)
+    _rck_note(org_id, r)  # 2.138.0 C (#1972)
+    return k
 
 
 def oc_forget(org_id=None):
@@ -327,6 +370,8 @@ def oc_forget(org_id=None):
     with _LOCK:
         for k in [k for k in _CACHE if org_id is None or k[0] == int(org_id)]:
             _CACHE.pop(k, None)
+        for k in [k for k in _ROT if org_id is None or k == int(org_id)]:  # 2.138.0 C (#1972)
+            _ROT.pop(k, None)
 
 
 # ---- fields -----------------------------------------------------------------------------------------------------------
@@ -352,7 +397,13 @@ def oc_dec_k(key, org_id, ctx, value):
         raise OrgCryptError(f"org {org_id}: no key for an encrypted value ({ctx})")
     try:
         raw = _b64u_dec(value[len(PREFIX):])
-        return AESGCM(key).decrypt(raw[:12], raw[12:], _aad(org_id, ctx)).decode()
+        try:
+            return AESGCM(key).decrypt(raw[:12], raw[12:], _aad(org_id, ctx)).decode()
+        except InvalidTag:
+            old = _rot_key(org_id)  # 2.138.0 C (#1972): not re-encrypted yet by a running rotation
+            if old is None or old == key:
+                raise
+            return AESGCM(old).decrypt(raw[:12], raw[12:], _aad(org_id, ctx)).decode()
     except (InvalidTag, ValueError, UnicodeDecodeError):
         raise OrgCryptError(f"org {org_id}: an encrypted value ({ctx}) cannot be decrypted") from None
 
@@ -545,7 +596,13 @@ def oc_open_k(key, data, ctx=FILE_CTX):
         return data
     head = data[:len(MAGIC) + 8]
     try:
-        return AESGCM(key).decrypt(data[len(head):_HEAD], data[_HEAD:], head + bytes(ctx))
+        try:
+            return AESGCM(key).decrypt(data[len(head):_HEAD], data[_HEAD:], head + bytes(ctx))
+        except InvalidTag:
+            old = _rot_key(oc_file_org(data))  # 2.138.0 C (#1972): not resealed yet by a running rotation
+            if old is None or old == key:
+                raise
+            return AESGCM(old).decrypt(data[len(head):_HEAD], data[_HEAD:], head + bytes(ctx))
     except InvalidTag:
         raise OrgCryptError(f"{_label(oc_file_org(data))}: a sealed file cannot be decrypted") from None
 
@@ -563,7 +620,7 @@ def oc_read_file(c, path, ctx=FILE_CTX):
         return oc_open(c, f.read(), ctx)
 
 
-def _write_atomic(path, data, mode=None):
+def _write_atomic(path, data, mode=None, check=None):
     tmp = f"{path}.oc-{os.getpid()}-{threading.get_ident()}.tmp"
     try:
         with open(tmp, "wb") as f:
@@ -572,7 +629,10 @@ def _write_atomic(path, data, mode=None):
             os.fsync(f.fileno())
         if mode is not None:
             os.chmod(tmp, mode)
+        if check is not None and not check():  # 2.138.0 C (#1972): the file changed meanwhile: leave the newer one
+            return False
         os.replace(tmp, path)
+        return True
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)
@@ -584,13 +644,14 @@ def oc_write_file(c, org_id, path, data, ctx=FILE_CTX, fresh=False):
     _write_atomic(path, oc_seal(c, org_id, data, ctx, fresh=fresh))
 
 
-def oc_reseal_file(path, new_data):
-    """Replace a file's bytes atomically, keeping its permissions (the migration and the way back)."""
+def oc_reseal_file(path, new_data, check=None):
+    """Replace a file's bytes atomically, keeping its permissions (the migration and the way back). 2.138.0 C (#1972):
+    check() is asked right before the replace (False: the file stays, returns False)."""
     try:
         mode = os.stat(path).st_mode & 0o7777
     except OSError:
         mode = None
-    _write_atomic(path, new_data, mode)
+    return _write_atomic(path, new_data, mode, check)
 
 
 OVERHEAD = _HEAD + 16  # bytes a sealed file is larger than its plain content
@@ -705,34 +766,169 @@ def oc_cache_open(text):
 
 
 # ---- recovery key -----------------------------------------------------------------------------------------------------
-def oc_recovery_key(c, org_id):
-    """The org key as grouped base32 (13 groups of 4); '' when the encryption is off. The caller checks the rights and
-    logs the showing (never the value)."""
-    key = oc_key(c, org_id)
-    if key is None:
-        return ""
-    s = base64.b32encode(key).decode().rstrip("=")
-    return "-".join(s[i:i + 4] for i in range(0, len(s), 4))
+# 2.138.0 C (#1972): a recovery secret R per organisation wraps the org key (org_keys.recovery_wrapped, independent of the
+# master key); R itself is kept wrapped with the KEK (recovery_secret) so that it can be shown again. The earlier format
+# (the raw org key) is still taken by rck_parse / rewrap until the organisation's key is rotated.
+RCK_TAG = "R2"
 
 
-def oc_parse_recovery(text):
-    """The 32 key bytes from a recovery key (spaces / dashes / case do not matter). ValueError when it is not one."""
+def _rck_kek(secret):
+    return HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"kalmido-orgkey-recovery-v1").derive(secret)
+
+
+def _rck_ad(org_id):
+    return b"kalmido-orgkey-recovery|%d" % int(org_id)
+
+
+def _rck_sad(org_id):
+    return b"kalmido-orgkey-rsecret|%d" % int(org_id)
+
+
+def _rck_seal(key, data, ad):
+    n = os.urandom(12)
+    return "r1." + _b64u(n + AESGCM(key).encrypt(n, data, ad))
+
+
+def _rck_open(key, wrapped, ad, what):
+    try:
+        if not str(wrapped or "").startswith("r1."):
+            raise ValueError
+        raw = _b64u_dec(wrapped[3:])
+        return AESGCM(key).decrypt(raw[:12], raw[12:], ad)
+    except (InvalidTag, ValueError):
+        raise OrgCryptError(what) from None
+
+
+def rck_wrap(secret, org_id, key):
+    """recovery_wrapped: the org key wrapped with a key derived from the recovery secret, bound to the organisation."""
+    return _rck_seal(_rck_kek(secret), key, _rck_ad(org_id))
+
+
+def rck_unwrap(secret, org_id, wrapped):
+    """The org key from recovery_wrapped; OrgCryptError for another recovery key / another organisation."""
+    return _rck_open(_rck_kek(secret), wrapped, _rck_ad(org_id), f"org {int(org_id)}: the recovery key does not belong to this organisation")
+
+
+def rck_format(secret):
+    """"R2-" + 13 groups of 4 (base32): told apart from the earlier format (13 groups, the raw org key)."""
+    s = base64.b32encode(secret).decode().rstrip("=")
+    return RCK_TAG + "-" + "-".join(s[i:i + 4] for i in range(0, len(s), 4))
+
+
+def rck_parse(text):
+    """("secret", R) for a recovery key "R2-...", ("key", org key) for the earlier format; spaces / dashes / case do not
+    matter. ValueError when it is neither."""
     s = re.sub(r"[\s\-]", "", str(text or "")).upper()
+    kind = "key"
+    if len(s) == 54 and s.startswith(RCK_TAG):
+        kind, s = "secret", s[len(RCK_TAG):]
     if not re.fullmatch(r"[A-Z2-7]{52}", s):
         raise ValueError("not a recovery key")
     k = base64.b32decode(s + "=" * (-len(s) % 8))
     if len(k) != 32:
         raise ValueError("not a recovery key")
+    return kind, k
+
+
+def oc_parse_recovery(text):
+    """The 32 key bytes of a recovery key of the earlier format (the raw org key). ValueError for anything else."""
+    kind, k = rck_parse(text)
+    if kind != "key":
+        raise ValueError("not a recovery key")
     return k
 
 
+def rck_resolve(parsed, org_id, wrapped):
+    """The org key a parsed recovery key (rck_parse) stands for: the earlier format is the key itself, a recovery secret
+    opens wrapped (recovery_wrapped of the database or of an export header). OrgCryptError when it does not fit."""
+    kind, b = parsed
+    if kind == "key":
+        return b
+    if not wrapped:
+        raise OrgCryptError(f"org {int(org_id)}: the recovery key does not belong to this organisation")
+    return rck_unwrap(b, org_id, wrapped)
+
+
+def rck_row(c, org_id):
+    """The recovery / rotation columns of the organisation's key row (None without one). No key material leaves."""
+    with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+        return c.execute("SELECT recovery_wrapped, recovery_secret, recovery_shown_at, wrapped_rot, rot_started_at, rotated_at "
+                         "FROM org_keys WHERE org_id=?", (int(org_id),)).fetchone()
+
+
+def _rck_store(c, org_id, secret, key, kek):
+    with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+        c.execute("UPDATE org_keys SET recovery_wrapped=?, recovery_secret=? WHERE org_id=? AND wrapped_rot IS NULL",
+                  (rck_wrap(secret, org_id, key), _rck_seal(kek, secret, _rck_sad(org_id)), int(org_id)))
+
+
+class RckStale(OrgCryptError):
+    """2.138.0 C (#1972): recovery_wrapped exists, but its recovery secret cannot be shown (no copy under this server key,
+    or it does not fit the org key): only a deliberate new one (new=True) replaces it."""
+
+
+def rck_secret(c, org_id, new=False):
+    """-> (R, made): the organisation's recovery secret R (32 bytes), the stored one or a new one (new=True or none yet)
+    -- a new R replaces recovery_wrapped, the earlier R stops working (the caller commits). RckStale when one exists but
+    cannot be shown (stored under an earlier server key / for an earlier org key): never replaced silently. (None, False)
+    without a server key / an org key and while a rotation runs (its end makes one). The caller checks the rights and
+    notes the showing (never the value)."""
+    key = oc_key(c, org_id)
+    if key is None:
+        return None, False
+    r = rck_row(c, org_id)
+    if r is None or r["wrapped_rot"]:
+        return None, False
+    kek = _kek()
+    if not new and r["recovery_wrapped"]:
+        try:
+            if not r["recovery_secret"]:
+                raise OrgCryptError("recovery secret")
+            sec = _rck_open(kek, r["recovery_secret"], _rck_sad(org_id), "recovery secret")
+            if not hmac.compare_digest(rck_unwrap(sec, org_id, r["recovery_wrapped"]), key):
+                raise OrgCryptError("recovery secret")
+        except OrgCryptError:
+            raise RckStale(f"org {int(org_id)}: the recovery key cannot be shown - make a new one") from None
+        return sec, False
+    sec = os.urandom(32)
+    _rck_store(c, org_id, sec, key, kek)
+    return sec, True
+
+
+def rck_wrapped(c, org_id):
+    """recovery_wrapped for an export header (made when there is none yet; one that cannot be shown is kept as it is: it
+    still opens with the R it was made with); None without one (no server key, rotation)."""
+    try:
+        if rck_secret(c, org_id)[0] is None:
+            return None
+    except RckStale:
+        pass
+    r = rck_row(c, org_id)
+    return r["recovery_wrapped"] if r else None
+
+
+def rck_drop_secret(c, org_id):
+    """2.138.0 C (#1972): after rewrap with the earlier format the stored copy of R lies under the earlier server key: it
+    goes (recovery_wrapped stays valid for the R in the safe; oc_status recovery_stale until a new one is made)."""
+    with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+        c.execute("UPDATE org_keys SET recovery_secret=NULL WHERE org_id=?", (int(org_id),))
+
+
+def rck_keep_secret(c, org_id, secret, master=None):
+    """After rewrap with a recovery secret: store R again with the current (or the given) master key (the caller commits)."""
+    with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+        c.execute("UPDATE org_keys SET recovery_secret=? WHERE org_id=?", (_rck_seal(_kek(master), secret, _rck_sad(org_id)), int(org_id)))
+
+
 def oc_rewrap(c, org_id, key, master=None):
-    """Store key (the recovery key's bytes) as the organisation's key, wrapped with the current (or the given) master key.
+    """Store key (the org key, from a recovery key) as the organisation's key, wrapped with the current (or the given) master key.
     A key row that opens with the current master key must hold the same key (no silent replacement)."""
     kek = _kek(master)
     if kek is None:
         raise OrgCryptError("no server key (KALMIDO_SECRET_KEY) set")
     r = _row(c, org_id)
+    if r is not None and r["wrapped_rot"]:  # 2.138.0 C (#1972): first finish the rotation (orgcrypt_cli rotate)
+        raise OrgCryptError(f"org {int(org_id)}: a key rotation is not finished - run rotate again first")
     if r is not None and hmac.compare_digest(str(r["kek_check"]), _kek_check(kek, org_id)):
         if not hmac.compare_digest(_unwrap(kek, org_id, r["wrapped"]), key):
             raise OrgCryptError(f"org {int(org_id)}: the recovery key does not belong to this organisation")
@@ -745,6 +941,96 @@ def oc_rewrap(c, org_id, key, master=None):
                   (int(org_id), _wrap(kek, org_id, key), _kek_check(kek, org_id), _now()))
     oc_forget(org_id)
     return True
+
+
+# ---- 2.138.0 C (#1972): rotation of an organisation's key (admin/orgcrypt_cli.py rotate) ----------------------------------
+def rck_rot_begin(c, org_id):
+    """Start or continue the rotation: -> (earlier key, new key, started). From the start on the row holds the new key in
+    wrapped (new data is sealed with it) and the earlier one in wrapped_rot (reading falls back to it, _ROT)."""
+    kek = _kek()
+    if kek is None:
+        raise OrgCryptError("no server key (KALMIDO_SECRET_KEY) set")
+    r = _row(c, org_id)
+    if r is None:
+        raise OrgCryptError(f"org {int(org_id)}: no key")
+    if r["wrapped_rot"]:
+        if not hmac.compare_digest(str(r["kek_check_rot"] or ""), _kek_check(kek, org_id)):
+            raise OrgCryptError(f"{_label(org_id)}: the server key (KALMIDO_SECRET_KEY) is not the one this key was made with")
+        return _unwrap(kek, org_id, r["wrapped_rot"]), _open_row(org_id, r, kek), False
+    k1, k2 = _open_row(org_id, r, kek), os.urandom(32)
+    with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+        n = c.execute("UPDATE org_keys SET wrapped_rot=wrapped, kek_check_rot=kek_check, wrapped=?, kek_check=?, rot_started_at=? "
+                      "WHERE org_id=? AND wrapped=? AND wrapped_rot IS NULL",
+                      (_wrap(kek, org_id, k2), _kek_check(kek, org_id), _now(), int(org_id), r["wrapped"])).rowcount
+    if n != 1:
+        c.rollback()
+        raise OrgCryptError(f"org {int(org_id)}: the key row changed meanwhile - try again")
+    c.commit()
+    oc_forget(org_id)
+    return k1, k2, True
+
+
+def rck_rot_finish(c, org_id):
+    """End of the rotation: the earlier key (and the copy of a key under an earlier server key) goes, a new recovery secret
+    wraps the new key. -> the new recovery secret (committed)."""
+    kek, key = _kek(), oc_key(c, org_id, create=False)
+    sec = os.urandom(32)
+    if key is None:
+        raise OrgCryptError(f"org {int(org_id)}: no key")
+    with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+        n = c.execute("UPDATE org_keys SET wrapped_rot=NULL, kek_check_rot=NULL, wrapped_prev=NULL, kek_check_prev=NULL, rot_started_at=NULL, "
+                      "rotated_at=?, recovery_wrapped=?, recovery_secret=?, recovery_shown_at=NULL WHERE org_id=? AND wrapped_rot IS NOT NULL",
+                      (_now(), rck_wrap(sec, org_id, key), _rck_seal(kek, sec, _rck_sad(org_id)), int(org_id))).rowcount
+    if n != 1:  # 2.138.0 C (#1972): the row changed meanwhile: no recovery key that is stored nowhere
+        c.rollback()
+        raise OrgCryptError(f"org {int(org_id)}: the key row changed meanwhile (no rotation to finish) - check status")
+    c.commit()
+    oc_forget(org_id)
+    return sec
+
+
+def rck_rekey(k1, k2, org_id, ctx, value):
+    """A field value during a rotation: unchanged when plain or already encrypted with k2, else re-encrypted from k1 to
+    k2 (same organisation and ctx). OrgCryptError when it opens with neither."""
+    if not oc_is_enc(value):
+        return value
+    aad = _aad(org_id, ctx)
+    try:
+        raw = _b64u_dec(value[len(PREFIX):])
+    except ValueError:
+        raise OrgCryptError(f"org {org_id}: a damaged encrypted value ({ctx})") from None
+    try:
+        AESGCM(k2).decrypt(raw[:12], raw[12:], aad)
+        return value
+    except InvalidTag:
+        pass
+    try:
+        plain = AESGCM(k1).decrypt(raw[:12], raw[12:], aad)
+    except InvalidTag:
+        raise OrgCryptError(f"org {org_id}: an encrypted value ({ctx}) opens with neither key") from None
+    n = os.urandom(12)
+    return PREFIX + _b64u(n + AESGCM(k2).encrypt(n, plain, aad))
+
+
+def rck_rekey_file(k1, k2, data, ctxs=(FILE_CTX,)):
+    """A sealed file's bytes during a rotation: None when already sealed with k2, else the bytes sealed with k2 (same
+    header and ctx). OrgCryptError when it opens with neither key under any of ctxs."""
+    head = data[:len(MAGIC) + 8]
+    n0, body = data[len(head):_HEAD], data[_HEAD:]
+    for ctx in ctxs:
+        try:
+            AESGCM(k2).decrypt(n0, body, head + bytes(ctx))
+            return None
+        except InvalidTag:
+            pass
+    for ctx in ctxs:
+        try:
+            plain = AESGCM(k1).decrypt(n0, body, head + bytes(ctx))
+        except InvalidTag:
+            continue
+        n = os.urandom(12)
+        return head + n + AESGCM(k2).encrypt(n, plain, head + bytes(ctx))
+    raise OrgCryptError(f"{_label(oc_file_org(data))}: a sealed file opens with neither key")
 
 
 def oc_rewrap_accounts(c, old_master):
@@ -786,67 +1072,213 @@ def oc_drop_key(c, org_id):
 
 
 def oc_status(c, org_id):
-    """{"enabled", "active", "has_key", "key_ok", "migrated_at", "recovery_shown_at"} for the settings (no secrets)."""
-    out = {"enabled": oc_enabled(), "active": oc_active(c), "has_key": False, "key_ok": None,
-           "migrated_at": None, "recovery_shown_at": None}
+    """{"enabled", "active", "has_key", "key_ok", "migrated_at", "recovery_shown_at"} for the settings (no secrets).
+    2.138.0 C (#1972): + recovery (a recovery key of the current format exists), rotating, rotated_at; R: recovery_stale
+    (it exists but cannot be shown with this server key: only "New recovery key" helps)."""
+    out = {"enabled": oc_enabled(), "active": oc_active(c), "has_key": False, "key_ok": None, "migrated_at": None,
+           "recovery_shown_at": None, "recovery": False, "recovery_stale": False, "rotating": False, "rotated_at": None}
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
-        r = c.execute("SELECT kek_check, migrated_at, recovery_shown_at FROM org_keys WHERE org_id=?", (int(org_id),)).fetchone()
+        r = c.execute("SELECT kek_check, migrated_at, recovery_shown_at, recovery_wrapped, recovery_secret, rot_started_at, rotated_at FROM org_keys "
+                      "WHERE org_id=?", (int(org_id),)).fetchone()
     if r:
-        out.update(has_key=True, migrated_at=r["migrated_at"], recovery_shown_at=r["recovery_shown_at"])
+        out.update(has_key=True, migrated_at=r["migrated_at"], recovery_shown_at=r["recovery_shown_at"], recovery=bool(r["recovery_wrapped"]),
+                   rotating=r["rot_started_at"], rotated_at=r["rotated_at"])
         if SECRET_KEY:
             out["key_ok"] = hmac.compare_digest(str(r["kek_check"]), _kek_check(_kek(), org_id))
+        if SECRET_KEY and r["recovery_wrapped"] and not r["rot_started_at"]:  # 2.138.0 C (#1972)
+            try:
+                _rck_open(_kek(), r["recovery_secret"], _rck_sad(org_id), "recovery secret")
+            except OrgCryptError:
+                out["recovery_stale"] = True
     return out
 
 
 
 # ---- routes: Settings > Organisation > Encryption (organisation admins), the instance switch (instance admin) ----------
 def _org_admin(c, oid):
+    """The organisation id to work on (the person administers it). 2.138.0 C (#1972): oid 0 = the own personal office
+    (orgs.personal_of, office/model.py pb_personal; 404 while there is none)."""
     from flask import g
     from ..accounts.orgs import _need_org_admin
     from ..core.access import Denied
     if g.user is None:
         raise Denied(401)
+    if oid == 0:
+        from ..agents.core import is_agent
+        from ..office.model import pb_personal
+        if is_agent(g.user):
+            raise Denied(403, tr("Agents cannot use this endpoint"))
+        p = pb_personal(c, g.user["id"], create=False)
+        if not p:
+            raise Denied(404)
+        return p
     _need_org_admin(c, oid)
+    return oid
+
+
+RCK_FRESH_MIN = 10  # 2.138.0 C (#1972): minutes a sign-in counts as fresh for accounts without a password
+
+
+def rck_step(c, u):
+    """2.138.0 C (#1972): what showing the recovery key asks of this person: password, totp / passkey (the password and
+    that second factor), fresh (no password: a sign-in of the last RCK_FRESH_MIN minutes) or proxy (signed in by the
+    server's login proxy: only the server admin, orgcrypt_cli recovery)."""
+    from flask import g
+    from ..accounts.login import twofa_methods
+    if u["password_hash"]:
+        m = twofa_methods(c, u)
+        return "totp" if "totp" in m else "passkey" if "passkey" in m else "password"
+    return "proxy" if g.auth_via == "proxy" else "fresh"
+
+
+def _rck_fresh(c):
+    from flask import g, request
+    from datetime import timedelta
+    from ..core.config import COOKIE
+    from ..core.db import iso, now_utc
+    from ..accounts.session import _token_hash
+    tok = request.cookies.get(COOKIE)
+    if g.auth_via != "session" or not tok:
+        return False
+    r = c.execute("SELECT created_at FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone()
+    return bool(r) and str(r[0]) >= iso(now_utc() - timedelta(minutes=RCK_FRESH_MIN))
+
+
+def rck_stepup(c, u, b):
+    """2.138.0 C (#1972): the step-up before a recovery key is shown or made new (rck_step); an error response or None.
+    Rate-limited like a login (password and second factor count as failed logins)."""
+    from ..core.db import err
+    from ..accounts.login import _reauth, pend_take, rc_use, totp_match, unseal, wa_auth_verify
+    from ..accounts.session import _rate_fail, _rate_keys
+    step = rck_step(c, u)
+    if step == "proxy":
+        return jsonify(error=tr("You are signed in through the server’s login proxy. Ask the server admin for the recovery key (command line, SELF-HOSTING.md)."),
+                       need="proxy"), 403
+    if step == "fresh":
+        return None if _rck_fresh(c) else (jsonify(error=tr("Please sign in again, then try again."), need="fresh"), 403)
+    e = _reauth(u, b)
+    if e is not None:
+        return e
+    if step == "password":
+        return None
+    cred, code = b.get("credential"), b.get("code") if isinstance(b.get("code"), str) else ""
+    if isinstance(cred, dict):
+        p = pend_take(f"rck:{u['id']}")
+        ok = bool(p) and wa_auth_verify(c, cred, p.get("chal"), p.get("rp"), uid=u["id"]) == u["id"]
+    elif code and u["totp_secret"]:
+        try:
+            secret = unseal(c, f"totp:{u['id']}", u["totp_secret"])
+        except (InvalidTag, ValueError):
+            secret = ""
+        st = totp_match(secret, code, u["totp_step"]) if secret else None
+        ok = bool(st) and c.execute("UPDATE users SET totp_step=? WHERE id=? AND totp_step<?", (st, u["id"], st)).rowcount == 1
+        ok = ok or rc_use(c, u["id"], code)
+    else:
+        return jsonify(error=tr("Confirm with your second factor."), need=step), 403
+    if not ok:
+        _rate_fail(_rate_keys(u["username"]))
+        return jsonify(error=tr("Wrong code"), need=step), 403
+    return None
+
+
+def rck_tell(c, oid, actor, action):
+    """2.138.0 C (#1972): a News item (in the app only, no push / mail) for the other admins of organisation oid: who
+    showed / made new the recovery key or rotated the key (action shown | new | rotated). Never the value. Caller commits."""
+    import json as _json
+    from ..core.db import iso_ms, now_utc
+    with system_ctx(c):  # orgcrypt: who administers the organisation (structure), the notice names no content
+        org = c.execute("SELECT name, personal_of FROM orgs WHERE id=?", (int(oid),)).fetchone()
+        if not org or org["personal_of"]:
+            return 0
+        ids = [r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' "
+                                       "AND u.kind!='agent' AND u.disabled=0 ORDER BY m.user_id", (int(oid),))]
+        by = ""
+        if actor:
+            a = c.execute("SELECT display_name, username FROM users WHERE id=?", (int(actor),)).fetchone()
+            by = (a["display_name"] or a["username"]) if a else ""
+        n = 0
+        for uid in ids:
+            if uid == actor:
+                continue
+            c.execute("INSERT INTO notifications(user_id,kind,task_id,list_id,actor_id,comment_id,data,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                      (uid, "orgkey", None, None, actor or None, None,
+                       _json.dumps({"org_id": int(oid), "org": org["name"], "action": action, "by_name": by}, ensure_ascii=False), iso_ms(now_utc())))
+            n += 1
+    return n
 
 
 @app.get("/api/orgs/<int:oid>/encryption")
 def oc_route_status(oid):
     """Organisation admins: {enabled (server key set), active (new data is encrypted), has_key, key_ok, migrated_at,
-    recovery_shown_at}. No key material."""
+    recovery_shown_at}. No key material. 2.138.0 C (#1972): + recovery, rotating, rotated_at, step (what showing the
+    recovery key asks: password | totp | passkey | fresh | proxy); oid 0 = the own personal office."""
     from ..core.db import db
     from flask import g
     c = db()
-    _org_admin(c, oid)
-    u = c.execute("SELECT password_hash FROM users WHERE id=?", (g.user["id"],)).fetchone()
+    oid = _org_admin(c, oid)
+    u = c.execute("SELECT * FROM users WHERE id=?", (g.user["id"],)).fetchone()
     return jsonify(**oc_status(c, oid), password=bool(u and u["password_hash"]),  # password: showing the key asks for it
-                   scope=pm_crypt_scope())  # 2.46.1 (#1641)
+                   step=rck_step(c, u), scope=pm_crypt_scope())  # 2.46.1 (#1641)
+
+
+@app.post("/api/orgs/<int:oid>/encryption/recovery/passkey")
+def oc_route_recovery_passkey(oid):
+    """2.138.0 C (#1972): the passkey challenge of the step-up (accounts whose second factor is a passkey)."""
+    from flask import g
+    from ..core.db import db, err
+    from ..accounts.login import pend_set, wa_auth_options
+    c = db()
+    _org_admin(c, oid)
+    if not c.execute("SELECT 1 FROM webauthn_creds WHERE user_id=?", (g.user["id"],)).fetchone():
+        return err(tr("No passkey is set up"), 409)
+    chal, rp, opts = wa_auth_options(c, g.user["id"])
+    pend_set(f"rck:{g.user['id']}", chal=chal, rp=rp)
+    return jsonify(opts)
 
 
 @app.post("/api/orgs/<int:oid>/encryption/recovery")
 def oc_route_recovery(oid):
-    """Organisation admins, {password}: the organisation's recovery key (= its key, grouped base32). The current password is
-    checked like other security steps (accounts without a password -- single sign-on / proxy -- rely on their session);
-    the showing is noted in the office log and in org_keys.recovery_shown_at, never the value. 409 without a server key."""
+    """Organisation admins, {password, code | credential, new}: the organisation's recovery key. 2.138.0 C (#1972): no
+    longer the organisation's key itself but the recovery secret that wraps it ("R2-" + 13 groups, rck_format); new=true
+    makes a new one (the earlier one stops working). Step-up rck_stepup: the password and, when set up, the second factor;
+    accounts without a password need a fresh sign-in. The showing is noted in the office log and in
+    org_keys.recovery_shown_at, the other admins get a News item -- never the value. 409 without a server key / while a
+    rotation runs. oid 0 = the own personal office."""
     from flask import g
     from ..core.db import body, db, err, iso, now_utc
-    from ..accounts.login import _reauth
+    from ..core.pg import write_lock
     c, b = db(), body()
-    _org_admin(c, oid)
+    oid = _org_admin(c, oid)
     if not SECRET_KEY:
         return err(tr("Organisation encryption is off: the server has no KALMIDO_SECRET_KEY."), 409)
     u = c.execute("SELECT * FROM users WHERE id=?", (g.user["id"],)).fetchone()
-    if u["password_hash"]:
-        e = _reauth(u, b)
-        if e is not None:
-            return e
-    rk = oc_recovery_key(c, oid)
+    e = rck_stepup(c, u, b)
+    if e is not None:
+        c.commit()  # a used second factor stays used
+        return e
+    write_lock(c, f"orgkey-recovery-{oid}")
+    new = b.get("new") in (True, 1, "1", "true")
+    r = rck_row(c, oid)
+    if r is not None and r["wrapped_rot"]:
+        return err(tr("The organisation’s key is being renewed on the server. Try again when that is finished."), 409)
+    had = bool(r is not None and r["recovery_wrapped"])
+    try:
+        sec, made = rck_secret(c, oid, new=new)
+    except RckStale:  # 2.138.0 C (#1972): never replaced without "New recovery key"
+        return err(tr("The recovery key cannot be shown with the current server key. Make a new one; the earlier one stops working then."), 409)
+    made = made and had  # a first recovery key replaces none (one of the earlier format stays valid until a rotation)
+    if sec is None:
+        return err(tr("Organisation encryption is off: the server has no KALMIDO_SECRET_KEY."), 409)
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         c.execute("UPDATE org_keys SET recovery_shown_at=? WHERE org_id=?", (iso(now_utc()), oid))
     from ..office.ledger import ofx_log
-    ofx_log(c, oid, "recovery_key", target="org", detail={"shown": 1})
+    ofx_log(c, oid, "recovery_key", target="org", detail={"new": 1} if made else {"shown": 1})
+    rck_tell(c, oid, g.user["id"], "new" if made else "shown")
     c.commit()
-    print("orgcrypt: recovery key of organisation", oid, "shown to user", g.user["id"], flush=True)
-    r = jsonify(recovery_key=rk)
+    print("orgcrypt: recovery key of organisation", oid, "made new" if made else "shown", "for user", g.user["id"], flush=True)
+    from ..notify.sev import sev_log
+    sev_log("org_recovery_key", org=oid, user=g.user["id"], new=bool(made))
+    r = jsonify(recovery_key=rck_format(sec), new=bool(made))
     r.headers["Cache-Control"] = "no-store"
     return r
 

@@ -112,11 +112,13 @@ _IKEYS = {}
 
 
 def _index_key(c, ws):
-    k = _IKEYS.get(ws)
+    base = _ws_key(c, ws) or hashlib.sha256(b"kalmido-docs-index-without-server-key").digest()
+    k = _IKEYS.get((ws, base))  # 2.138.0 C (#1972): per key too - a renewed org key (orgcrypt_cli rotate) indexes with the new one at once
     if k is None:
-        base = _ws_key(c, ws) or hashlib.sha256(b"kalmido-docs-index-without-server-key").digest()
+        for x in [x for x in _IKEYS if x[0] == ws]:
+            _IKEYS.pop(x, None)
         k = hmac.new(base, b"kalmido-docs-index-v1|" + ws.encode(), hashlib.sha256).digest()
-        _IKEYS[ws] = k
+        _IKEYS[(ws, base)] = k
     return k
 
 

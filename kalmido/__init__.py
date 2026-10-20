@@ -27,6 +27,7 @@ ORDER = (
     "core.i18n",
     "core.pg",  # 2.37.0 (#1150): the Postgres layer (core.db re-exports it)
     "core.db",
+    "core.tokenhash",  # 2.138.0 C (#1907): upload / calendar tokens as hashes
     "core.rls",  # 2.37.0 (#1150): row-level security, applied by init_db
     "core.orgcrypt",  # 2.42.0 (#828): keys per organisation, encryption at rest
     "admin.migrate",  # 2.37.0 (#1150): the move from SQLite (migrate-sqlite), used by init_db
