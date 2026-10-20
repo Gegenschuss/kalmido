@@ -104,6 +104,7 @@ The most used helpers:
 | `core/schema.py` | Database schema, migrations, indexes and the default settings (user + instance). |
 | `core/i18n.py` | Server-side translations (tr / trn / N_) and locale helpers (static/i18n/<code>.json, see TRANSLATING.md). |
 | `core/db.py` | Time helpers, the database connection, start-up checks and migrations (init_db, repair_data), settings storage. |
+| `core/tokenhash.py` | 2.138.0 (#1907): the upload token (/drop) and the calendar feed secret (/ical) are stored only as SHA-256 hashes; shown once when created. |
 | `accounts/session.py` | Who is asking: sessions, the proxy login, trusted proxies, the maintenance gate, login rate limits. |
 | `accounts/pictures.py` | Profile pictures and list icons (presets or own images, re-encoded, served with login). |
 | `accounts/login.py` | Password login, first setup, logout and two-factor authentication (TOTP, recovery codes, passkeys). |
