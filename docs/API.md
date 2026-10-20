@@ -956,7 +956,8 @@ line; `company_fields.address_extra` is the company's extra address line (BT-36)
 company are empty, a plain free address (`company.lines`: street, postcode + city, maybe a country) is read into them in
 the answer; saving the settings keeps them, the free lines stay.
 A list's client: `PATCH /lists/{id}` `{client_id}`. The timesheet of a client is the time report of its lists:
-`GET /time/entries?lists=1,2&from=&to=` (web) or `/api/time/export.csv`.
+`GET /time/entries?lists=1,2&from=&to=` (web) or `/api/time/export.csv` / `/api/time/export.xlsx` (2.125.0, web only: the same
+filters and visibility; `/api/workload/export.xlsx` takes the parameters of `GET /workload`).
 
 `GET /workload?start=&weeks=&org=`: per person and week `minutes` (sum of the tasks' `duration`), `tasks`,
 `unestimated`, `pct` of `capacity_h`, `level`; `nodate` for tasks without a date. 2.50.0 (#1195): each week also

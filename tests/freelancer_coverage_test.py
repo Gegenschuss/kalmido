@@ -643,7 +643,8 @@ ROUTES = {
     # ---- time (28)
     "DELETE /api/habits/{}": "time", "DELETE /api/time/entries/{}": "time", "DELETE /api/v1/habits/{}": "time",
     "DELETE /api/v1/time/entries/{}": "time", "DELETE /api/v1/time/timer": "time", "GET /api/time/entries": "time",
-    "GET /api/time/export.csv": "time", "GET /api/time/gaps": "time", "GET /api/time/report": "time",
+    "GET /api/time/export.csv": "time", "GET /api/time/export.xlsx": "time", "GET /api/workload/export.xlsx": "tasks",  # 2.125.0 C (#2122)
+    "GET /api/time/gaps": "time", "GET /api/time/report": "time",
     "GET /api/v1/habits": "time", "GET /api/v1/time/check": "time", "GET /api/v1/time/entries": "time",
     "GET /api/v1/time/from-events": "time", "GET /api/v1/time/gaps": "time", "GET /api/v1/time/timer": "time",
     "PATCH /api/habits/{}": "time", "PATCH /api/time/entries/{}": "time", "PATCH /api/v1/habits/{}": "time",

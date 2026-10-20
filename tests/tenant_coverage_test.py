@@ -279,7 +279,7 @@ ROUTES = {
     "GET /api/clients/{}/book-contacts": "client",  # 2.59.0 (#1735): only the client's own address books (p259_a_api_test.py)
     "POST /api/clients/merge": "client", "POST /api/clients/merges/{}/undo": "client",  # 2.66.0 (#1835): every client checked, one workspace, undo by its scope (p266_b_api_test.py)
     "POST /api/v1/clients": "client", "GET /api/v1/clients/{}": "client", "PATCH /api/v1/clients/{}": "client",
-    "DELETE /api/v1/clients/{}": "client", "GET /api/v1/workload": "client", "GET /api/workload": "client",
+    "DELETE /api/v1/clients/{}": "client", "GET /api/v1/workload": "client", "GET /api/workload": "client", "GET /api/workload/export.xlsx": "client",
     "PUT /api/workload/capacity/{}": "client",
     # ---- office (B: settings, packs, master data, import / export)
     "GET /api/office/settings": "office", "PUT /api/office/settings": "office", "GET /api/office/number-preview": "office",
@@ -631,7 +631,7 @@ ROUTES = {
     "DELETE /api/habits/{}": "own", "POST /api/habits/{}/log": "own", "POST /api/pomo/start": "own",
     "POST /api/pomo/{}/{}": "own", "POST /api/time/start": "own", "POST /api/time/stop": "own",
     "POST /api/time/entries": "own", "PATCH /api/time/entries/{}": "own", "DELETE /api/time/entries/{}": "own",
-    "GET /api/time/entries": "own", "GET /api/time/report": "own", "GET /api/time/export.csv": "own",
+    "GET /api/time/entries": "own", "GET /api/time/report": "own", "GET /api/time/export.csv": "own", "GET /api/time/export.xlsx": "own",
     "GET /api/family/contacts": "own", "POST /api/family/contacts": "own", "PATCH /api/family/contacts/{}": "own",
     "DELETE /api/family/contacts/{}": "own", "POST /api/family/contacts/{}/sync": "own",
     # ---- people (9)

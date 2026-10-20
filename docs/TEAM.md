@@ -160,6 +160,12 @@ questions stays the classic form.
 - **Who sees whose time.** In the window "Tracked time" of a project, the time reports and the CSV, the owner of the list,
   its admins and the admins of its organisation see everyone's entries. Everyone else sees their own there, and the window
   says "Your time only". The time list in a task's detail still shows everyone's entries of that task.
+- **Excel export (2.125.0).** Next to *CSV* the time view and the client page have *Excel (XLSX)*: the same filters,
+  columns, rounding and visibility as the CSV, but hours and amounts as numbers, start and end as date-time cells and a
+  sum row at the end. The workload view has the same button: people x weeks with the planned and the capacity hours per
+  week (only the people and tasks you may see). Without an organisation it works the same on your own data.
+- **Timer shortcut (2.125.0).** The installed app (Android, desktop) offers *Start / stop timer* in its long-press menu
+  when the module "Time tracking" is on: it opens the time view and starts a timer on the basket, or stops the running one.
 - **Templates keep the project page.** "Save as template" on a project also saves its notepads, the standard arrangement of
   the project page and the block colours. A project made from the template gets its own copies of the notepads, placed and
   coloured as in the original. Notepads written by agents stay with their project.
