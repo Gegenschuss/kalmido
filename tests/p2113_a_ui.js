@@ -65,7 +65,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     }
     check(await ev(`!!document.getElementById('osc-street') && !!document.querySelector('#ofc-set [data-ostp="company"] a[href="/api/office/export"]')`), '#2247: the master data file in Company');
     check(await ev(`!!document.querySelector('#ofc-set [data-ostp="data"] a[href="#office/import"]') && !!document.querySelector('#ofc-set [data-ostp="data"] .dxset')`), '#2247: legacy import and DATEV in Data');
-    check(await ev(`!!document.querySelector('#ofc-set [data-ostp="docs"] #os-parts-inv') && !!document.querySelector('#ofc-set [data-ostp="docs"] #os-intro-de') && !!document.querySelector('#ofc-set [data-ostp="docs"] #os-prod-on')`), '#2247: templates, default texts and calculation rules in Documents');
+    check(await ev(`!!document.querySelector('#ofc-set [data-ostp="docs"] #os-parts-inv') && !!document.querySelector('#ofc-set [data-ostp="docs"] #os-intro-de') && !!document.querySelector('#ofc-set [data-ostp="docs"] #os-raw-on')`), '#2247: templates, default texts and calculation rules in Documents');
     check(await ev(`!!document.querySelector('#ofc-set [data-ostp="packs"] #pkc') && !!document.querySelector('#ofc-set [data-ostp="access"] [data-ofc="log"]')`), '#2247: the packs in Packs, the access log in Access');
     // remembered per device, also after a reload
     await ev(tab('packs'));
@@ -129,7 +129,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     await as('bob');
     await nav(B + 'static/icon.svg'); await nav(B + '#office/settings');  // (a real reload)
     check(await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub]') && !!document.getElementById('os-currency')`, 80), 'member: the settings page');
-    check(await ev(`document.getElementById('os-currency').matches(':disabled') && document.getElementById('os-prod-on').matches(':disabled') && document.getElementById('os-name').disabled`), 'member: fields locked (choices and boxes too)');
+    check(await ev(`document.getElementById('os-currency').matches(':disabled') && document.getElementById('os-raw-on').matches(':disabled') && document.getElementById('os-name').disabled`), 'member: fields locked (choices and boxes too)');
     await ev(tab('packs'));
     check(await ready(ev, `!!document.querySelector('#pkc [data-pkc-on="film"]')`, 60) && await ev(`document.querySelector('#pkc [data-pkc-on="film"]').disabled`), 'member: the pack switch locked');
     await ev(`(() => { const s = document.getElementById('os-currency'); s.value = 'USD'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);

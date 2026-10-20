@@ -582,6 +582,7 @@ const OST_FLAT = {'os-color': 'color', 'os-lang': 'lang', 'os-currency': 'curren
   'os-paydays': 'payment_days', 'os-rmfee': 'reminder_fee', 'os-rmdays': 'reminder_deadline_days', 'os-einv': 'einvoice_format', 'os-datev': 'datev_email',
   'os-datev-auto': 'datev_auto', 'os-inv-close-de': 'invoice_closing_de', 'os-inv-close-en': 'invoice_closing_en', 'os-rm-text-de': 'reminder_text_de',
   'os-rm-text-en': 'reminder_text_en', 'os-prod-on': 'producing_on', 'os-pq': 'prod_quotient', 'os-ps': 'producing_service_id', 'os-pr': 'producing_rate',
+  'os-sf': 'share_factor', 'os-sr': 'share_rate',  // 2.113.1 (#2251): producing by amount (film pack option)
   'os-raw-on': 'raw_on', 'os-rf': 'raw_factor', 'os-pack': 'pack', 'os-parts-inv': 'parts_invoice_mode', 'os-parts-t-de': 'parts_summary_title_de',
   'os-parts-t-en': 'parts_summary_title_en', 'os-agents-read': 'agents_read'};
 const OST_SUB = {'os-intro-de': ['intro_text_id', 'de'], 'os-intro-en': ['intro_text_id', 'en'], 'os-closing-de': ['closing_text_id', 'de'], 'os-closing-en': ['closing_text_id', 'en'],

@@ -22,7 +22,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const change = (w, el, v) => { if (!el) return; if (v !== undefined) el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
-const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', rate, tax: 'standard', raw_fee: 0, producing: 0, intext: 'intern', cost: 0, discountable: 1});
+const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', rate, tax: 'standard', raw_fee: 0, producing: 0, in_handling: 0, in_markup: 0, intext: 'intern', cost: 0, discountable: 1});  // 2.113.1 (#2252): the film pack's surcharges stay out of these sums
 const FEATURES = 'cal,collab,comments,contacts,files,clients,office';
 
 (async () => {
