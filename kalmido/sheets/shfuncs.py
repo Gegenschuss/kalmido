@@ -217,6 +217,8 @@ def _as(x, kind):
             return x
         return sh_parse_date(x) if isinstance(x, str) else None
     if kind == "b":
+        if isinstance(x, float) and x in (0.0, 1.0):
+            return x == 1.0  # 2.138.3 B (#2371): a checkbox tick is 1 / 0 in formulas, so WAHR / FALSCH hit it
         return x if isinstance(x, bool) else None
     return x.casefold() if isinstance(x, str) else None
 

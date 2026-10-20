@@ -200,6 +200,11 @@ html.mini-sheet .shvtop>a.btn{display:none}
 .shkadd{color:var(--faint);opacity:0;transition:opacity .15s ease}
 .shvc.cur .shkadd,.shvc:hover .shkadd{opacity:1}
 @media (pointer:coarse){.shkbox{width:1.5rem;height:1.5rem}.shklnk{width:2.25rem;height:2.25rem}}
+/* 2.138.3 B (#2371): the box answers in a 44 px square around it, on the phone the whole cell ticks (sheetkinds.js); the
+   arrows of link / file cells are 44 px on touch */
+.shkbox{position:relative}
+.shkbox::after{content:'';position:absolute;inset:-.75rem}
+@media (pointer:coarse){.shvc.shkcb{cursor:pointer}.shklnk{width:2.75rem;height:2.75rem}.shvc.k-link,.shvc.k-file{padding-right:3rem}}
 @media (prefers-reduced-motion: reduce){.shkadd{transition:none}}
 /* 2.124.0 B (#2112): the history dialog */
 .shhsec{display:flex;flex-wrap:wrap;gap:.375rem}
