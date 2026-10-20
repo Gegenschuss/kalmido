@@ -116,7 +116,7 @@ check(total(ALICE, J1) == 1 and unread(ALICE, J1) == 0, "yes: the entry is read 
 T2 = A.post(B + "/api/tasks", json={"title": "Prepare the invoice", "list_id": W}).json()["id"]
 J2 = wait_move(T2)
 check(unread(ALICE, J2) == 1, "no: unread before")
-sql("INSERT INTO notifications(user_id,kind,task_id,actor_id,data,created_at) VALUES(?,?,?,?,?,?)",
+sql("INSERT INTO notifications(user_id,kind,task_id,actor_id,data,created_at) VALUES(?,?,?,?,CAST(? AS jsonb),?)",
     (BOB, "approval", T2, CL, '{"title": "x", "job": %d}' % J2, "2026-01-01T00:00:00.000Z"), write=True)
 check(unread(BOB, J2) == 1, "no: a second recipient has it unread")
 r = A.post(B + f"/api/agents/jobs/{J2}/action", json={"action": "reject"})
@@ -126,7 +126,7 @@ check(unread(ALICE, J2) == 0 and unread(BOB, J2) == 0, "no: the entries of every
 # ---- an old entry without a job number (task + title)
 T3 = A.post(B + "/api/tasks", json={"title": "Prepare the report", "list_id": W}).json()["id"]
 J3 = wait_move(T3)
-sql("UPDATE notifications SET data = (data::jsonb - 'job')::text WHERE user_id=? AND kind='approval' AND task_id=?", (ALICE, T3), write=True)
+sql("UPDATE notifications SET data = data::jsonb - 'job' WHERE user_id=? AND kind='approval' AND task_id=?", (ALICE, T3), write=True)
 old = sql("SELECT COUNT(*) FROM notifications WHERE user_id=? AND kind='approval' AND task_id=? AND read_at IS NULL AND data->>'job' IS NULL",
           (ALICE, T3))[0][0]
 check(old == 1, f"legacy: an entry without a job number, unread {old}")
