@@ -7841,11 +7841,11 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 @media (pointer:coarse){ #side .sbmark{min-height:2.75rem} }
 
 /* 2.145.0 A (#2438): the workspace head sits on the middle of the page header (#top). #top's content row is centred at
-   .875rem + 1rem (desktop, 2 rem row), .625rem + 1.375rem + safe area (touch / narrow, 2.75 rem buttons) and the head is
+   .875rem + 1.1 rem (desktop, the 35 px title row), .625rem + 1.375rem + safe area (touch / narrow, 2.75 rem buttons) and the head is
    2.25 rem (2.75 rem on touch) high under the 4 px stripe, so the sidebar's top padding is the difference. Before, a later
    rule (padding 1.25rem) overrode the phone's own padding, the head stood ~14 px too low and ignored the notch. */
-:root:root #side{--sbpt:.5rem;padding-top:var(--sbpt)}
-:root:root #side .sbfix{--fv2-top:var(--sbpt)}
+:root:root #side{--sbpt:1rem;padding-top:0}  /* the gap is the sticky head's own padding (no browser offsets a sticky box by its scroller's padding) */
+:root:root #side .sbfix{--fv2-top:0px;top:0;padding-top:var(--sbpt)}
 @media (pointer:coarse){ :root:root #side{--sbpt:.625rem} }
 @media (max-width:899px){ :root:root #side{--sbpt:calc(.375rem + var(--safe-t,0px))} }
 

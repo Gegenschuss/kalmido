@@ -45,12 +45,14 @@ A = sess("alice")
 A.post(B + "/api/admin/setup", json={"org_name": "Kalmido", "lang": "en", "collab_all": True, "modules": ["comments"]})
 r = A.post(B + "/api/users", json={"orgs": [1], "username": "bob", "display_name": "Bob Member", "password": "password123", "email": "bob@example.com"})
 assert r.ok, r.text
+BOB = r.json()["id"]
 FEAT = "collab,comments"
 A.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
 Bo = sess("bob")
 Bo.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
 ME = A.get(B + "/api/state").json()["me"]["id"]
 OL = A.post(B + "/api/lists", json={"name": "Projekt Alpha", "org_id": 1}).json()["id"]
+check(A.put(B + f"/api/lists/{OL}/members", json={"user_id": BOB, "role": "edit"}).ok, "alice shares the list with bob")
 r = Bo.post(B + "/api/tasks", json={"title": "Angebot pruefen", "list_id": OL, "assignee_id": ME})
 check(r.ok, f"bob assigns a task to alice {r.status_code} {r.text[:200]}")
 
