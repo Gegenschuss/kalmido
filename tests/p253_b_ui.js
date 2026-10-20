@@ -113,7 +113,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   w = await boot({user: 'alice', hash: 'l/' + W}); d = w.document;
   const sign = () => d.querySelector('#top h1 .wsbadge');
   await until(() => sign());
-  check(d.querySelector('#main').classList.contains('wsc-on') && /^#[0-9a-f]{6}$/.test(d.querySelector('#main').style.getPropertyValue('--wsd')), '#1474: an organisation list: the header stripe (wsc-on + --wsd)');
+  check(d.querySelector('#main').classList.contains('wsc-on') && /^#[0-9a-f]{6}$/.test(d.querySelector('#main').style.getPropertyValue('--wsd')), '#1474: an organisation list: wsc-on + --wsd on #main (the input frame; 2.138.2 #2389: no header stripe any more)');
   check(sign()?.dataset.wsc === '1' && /--wsd:/.test(sign().getAttribute('style') || ''), '#1474: the sign in the organisation colour');
   check(d.querySelector(`#side .srow[data-list="${W}"]`)?.dataset.wsc === '1', '#1474: the sidebar stripe at the organisation list');
   check(!d.querySelector(`#side .srow[data-list="${P}"]`)?.dataset.wsc, '#1474: no stripe at a private list');

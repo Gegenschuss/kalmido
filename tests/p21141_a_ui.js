@@ -32,7 +32,9 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
   const pv = await call(CA, 'POST', '/api/office/bank/import/preview', {text: csv});
   const mapping = {}; for (const k of ['date', 'amount', 'amount_in', 'amount_out', 'title', 'counterpart', 'decimal', 'date_format']) mapping[k] = pv.guess?.[k] ?? null;
   await call(CA, 'POST', '/api/office/bank/import', {text: csv, filename: 'konto.csv', mapping});
-  const offer = await call(CA, 'POST', '/api/office/docs', {project_title: 'Imagefilm', client_id: cl.id, items: [{title: 'Dreh', qty: 1, rate: 500}]});
+  // 2.138.4 (#2251): since 2.113.1 the office setting producing_on no longer switches producing on for a new quotation
+  // (the tick only shows when the quotation has it on), so the quotation switches it on itself for the #2255 check
+  const offer = await call(CA, 'POST', '/api/office/docs', {project_title: 'Imagefilm', client_id: cl.id, producing_on: 1, items: [{title: 'Dreh', qty: 1, rate: 500}]});
 
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
@@ -67,7 +69,7 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
     const d = await call(CA, 'GET', `/api/office/docs/${offer.id}`);
     check((d.items || []).some(i => i.kind === 'heading' && i.title === 'Phase eins') && !(d.items || []).some(i => i.kind === 'heading' && !i.title), '#2254: the typed heading is saved, empty ones are not');
     // ---- #2255
-    check(await ev(`(() => { const e = document.getElementById('ofd-producing_on'); return !!e && e.getBoundingClientRect().width < 32; })()`), '#2255: the tick is small at 1440 px');
+    check(await ev(`(() => { const e = document.getElementById('ofd-producing_on'); return !!e && e.getBoundingClientRect().width < 32; })()`), '#2255: the tick is small at 1440 px ' + await ev(`String(document.getElementById('ofd-producing_on')?.getBoundingClientRect().width)`));
     check(await ev(`(() => { const e = document.querySelector('.ofdgrid .row input:not([type=checkbox]):not(.numin)'); return !e || e.getBoundingClientRect().width > 100; })()`), '#2255: text fields stay wide');
     await shot('p21141-a-offer.png');
   }, false);

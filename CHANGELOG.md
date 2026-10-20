@@ -22,6 +22,11 @@ Notifications to Slack, Matrix, Telegram and Signal, e-mail on assignments and m
 ### Security
 - Exported CSV cells cannot start a spreadsheet formula; per-person ntfy servers get a time budget per round; a deeply nested ClickUp checklist cell is refused cleanly (review of 2.142.0).
 
+## [2.138.5] - 2026-10-20
+
+### Fixed
+- Quotation parts: a part with its own producing setting "off" shows the switch and "Use the values of the document" again; tests follow the parts that open in place and the film pack defaults (#2266 #2248 #2251 #2252).
+
 ## [2.138.4] - 2026-10-20
 
 Phone fixes for office, tables, documents and bookmarks; the agent chat keeps an open edit; hardening leftovers of 2.126.0.
@@ -55,6 +60,34 @@ Organisation dialog with a searchable member list; decided approvals leave the n
 ### Fixed
 - Notifications: an approval that was decided (yes, no, stop) no longer stays unread under "For you", for everybody it
   was shown to; older stuck entries clear with the next decision (#2406).
+
+## [2.138.2] - 2026-10-20
+
+Sidebar head and workspace colour, office document PDFs, News sections, Mac dock icon.
+
+### Added
+- Office: the PDF button of a draft (quotation, invoice, credit note, ...) asks "Finalise now" / "Show as draft" / Cancel;
+  every PDF of a draft carries a bold DRAFT next to the number and a diagonal watermark on every page - preview,
+  download, mail attachment and agent API alike. Quotations set to sent / accepted / declined without finalising stay
+  unmarked (approval link). E-invoices only for finalised documents (#2393).
+- Number scheme: the building block `{isodate}` gives the date with hyphens (2026-04-15) (#2391).
+- A 1024 px Apple touch icon for the Mac dock: full-bleed, the figure larger (#2396). Re-add the app to the dock to see it.
+
+### Changed
+- Sidebar head: no logo; the first row is the workspace switch (dot, name, arrow). The avatar sits without dots at the
+  bottom next to the search, "Start" is in the account menu; "Collapse all" and the collapse button show on hover or
+  focus (always on touch screens); the network dot only shows offline or while syncing (#2392).
+- Workspace colour: a 4 px stripe across the top of the sidebar (3 px on top of the header when the sidebar is closed)
+  replaces the sidebar tint and the stripe in the list header; Private has one too, Kalmido purple by default; the
+  setting is called "Workspace colour" and can be chosen without an organisation (#2389).
+- News: three sections *For you* (the bell's number), *Also new* and *Read*; unread entries with an accent stripe and
+  bold title, read ones muted and below; the head says "N for you" (#2405).
+- Quotation rights annex: rows and labels 10 pt, note 8.5 pt, the order confirmation as its own section with more space
+  before it; the project line at the top right no larger than the text (#2388).
+
+### Fixed
+- PDF footer: every line of a multi-line company name is bold, the address below stays normal (#2397).
+- Office settings: the company name field grows with its lines (up to 3) instead of scrolling (#2395).
 
 ## [2.138.1] - 2026-10-20
 

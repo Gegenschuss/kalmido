@@ -23,13 +23,14 @@ NAME=${KALMIDO_TEST_CONTAINER:-kalmido-test}
 PORT=${KALMIDO_TEST_PORT:-3048}
 PPORT=${KALMIDO_TEST_PROXY_PORT:-3041}
 D=${1:-${KALMIDO_TEST_DATA:-$HERE/.data}}
+# 2.138.4: stop the old container first - it may still write attachments while the data dir is removed (CI shard 15 race)
+docker rm -f "$NAME" >/dev/null 2>&1 || true
 [[ -n "${KEEP:-}" ]] || { rm -rf "$D"; }
 mkdir -p "$D"
 cp "$HERE/stub_ntfy.py" "$D/"
 # The app sees the host through the docker bridge gateway (docker-proxy), so that is the "trusted proxy".
 GW=$(docker network inspect bridge -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null)
 [[ -n "$GW" ]] || { echo "no docker bridge gateway found" >&2; exit 1; }
-docker rm -f "$NAME" >/dev/null 2>&1 || true
 DBC=${KALMIDO_TEST_DB_CONTAINER:-$NAME-db}
 DBN=k$(printf '%s' "$(cd "$D" && pwd)" | md5sum | cut -c1-15)
 if [[ -z "$(docker ps -q -f "name=^${DBC}$")" ]]; then
