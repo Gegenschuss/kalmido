@@ -27,6 +27,10 @@ Organisation roles, off-site backups, a stronger offline app, sharing any file t
 - Security fix: organisation boundary (roles are enforced server-side in every area).
 - Security fix: backup credentials are sealed and never sent back to the browser; the service worker replays only the app's own write requests.
 
+## [2.142.2] - 2026-10-20
+
+- Meal plan: on a narrow phone the week switcher moves under the title, the next-week arrow stays on screen (#2132); the restore check of the sign-in suite waits for the restore instead of a fixed pause.
+
 ## [2.142.1] - 2026-10-20
 
 - Fixes from CI of 2.142.0: the ntfy share inbox texts call the basket by its name in every language (#2150), the notification channel lookup and a schema comment follow the Postgres rules (#2145).

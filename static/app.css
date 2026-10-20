@@ -4304,6 +4304,11 @@ body.kidmode #app{grid-template-columns:1fr}
 .fmrh{margin:.75rem 0 .375rem;font-size:var(--fs-s);color:var(--muted);font-weight:500}
 .fmrecipes{display:flex;flex-wrap:wrap;gap:.375rem;max-height:40dvh;overflow:auto}
 .fwpick span{font-family:var(--mono);font-size:var(--fs-s)}
+/* 2.140.1 (#2132): on a narrow phone the meal plan week nav wraps under the title and the range shortens, the next-week arrow stays on screen */
+.fc-meals h2{flex-wrap:wrap;row-gap:.25rem}
+.fwnav{max-width:100%;min-width:0}
+.fwpick{min-width:0}
+.fwpick span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .famf .fhint{margin:.125rem 0 .375rem;font-size:var(--fs-s)}
 /* 2.19.0 (owner, #655): the search button next to the open drawer (phones) */
 #scrim .sidesearch{display:none}

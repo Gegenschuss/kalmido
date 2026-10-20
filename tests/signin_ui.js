@@ -213,7 +213,9 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
   input(w, rm.querySelector('#bkr-word'), 'RESTORE');
   check(!rm.querySelector('#bkr-go').disabled, 'RESTORE enables it');
   submit(w, rm.querySelector('form')); await sleep(2500);
-  const st = await api(w, 'GET', '/api/state');
+  // 2.140.1: a slow CI runner may still be restoring after 2.5 s - poll up to 20 s more
+  let st = {};
+  for (let i = 0; i < 40; i++) { try { st = await api(w, 'GET', '/api/state'); } catch (e) { st = {}; } if (st.tasks && !st.tasks.some(t => t.title === 'made after the backup')) break; await sleep(500); }
   check(st.tasks && !st.tasks.some(t => t.title === 'made after the backup'), 'restored (the task made afterwards is gone), admin still logged in');
   // 2.37.0: pg_restore takes a moment; let the page's change check catch up before the window closes
   const t0 = Date.now(); await until(() => w.eval('S.syncOk') > t0, 12000);
