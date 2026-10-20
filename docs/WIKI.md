@@ -33,7 +33,12 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   `orgcrypt_cli encrypt-wiki` (off after the update, so a step back to an older version stays possible); see
   *Encryption at rest* in the self-hosting guide. A sealed text that cannot be opened any more (its key is lost) is never
   shown or saved as the page's text (2.126.2): the page answers `409` (`wiki_unreadable`, "cannot be read") and cannot be
-  saved; search, history and the export skip it.
+  saved; search, history and the export skip it. Since 2.139.0 the message names the way out: the organisation's
+  recovery key (for a private page: the server key of the installation) opens it again, otherwise it can only be
+  deleted - the page shows the message with a *Delete page* button (saving, renaming and moving stay refused so the
+  sealed text is never lost). The search finds such a page by its name and reads its text again once the key is back
+  (a restore with the recovery key, a rotation, another server key). An import over a page of the same name and the
+  switch of the browser lock skip it and name it ("1 page skipped: <name> (not readable)") instead of stopping.
 - **Undo.** Creating, renaming, deleting and importing are one step each (the arrow on top, Ctrl/Cmd+Z, the toast).
 - **Files (2.99.0).** A page can carry PDFs and pictures (PNG, JPEG, GIF, WebP, SVG): *Attach files* below the text,
   at most 25 MB each. The type is checked by the content, not by the name; an SVG is cleaned (no scripts, no outside

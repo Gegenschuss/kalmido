@@ -85,6 +85,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-pmeta': ['photo_meta_strip', N_('Remove location data from photos'), 'chk'],  // 2.61.0 B (#1819)
   's-bl9ac': ['agent_comments', N_('Comments by agents'), 'sel'],  // 2.62.0 (#1854)
   's-asst-on': ['assistant_on', N_('Use the assistant'), 'chk'],  // 2.75.0 (#1411)
+  's-trd': ['chat_read_receipts', N_('Send read receipts'), 'chk'],  // 2.139.0 A (#2129)
 };
 // 2.62.0 (#1854): comments by agents: all | only replies to me (people's comments stay as the matrix says)
 const bl9SetHtml = (s, hint) => collab() && feat('agents') ? `<div class="row"><label for="s-bl9ac">${tr('Comments by agents')}</label><select id="s-bl9ac">${[['all', N_('All')], ['replies', N_('Only replies to me')]].map(([v, n]) => `<option value="${v}" ${(s.agent_comments || 'all') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
@@ -610,6 +611,7 @@ function settingsModal(focus) {
       ${S.webpush?.enabled ? '' : prio}
       ${hint(`${tr('Subscribe in the ntfy app: server {0}, topic as above', esc(S.ntfyUrl))}${/ntfy\.sh/.test(S.ntfyUrl) || !S.me?.ntfy_inbox ? '' : tr(', with a user that has read access')}. <a href="${esc(topicUrl)}" target="_blank" rel="noopener">${tr('Web view')}</a>`)}</div>
       ${notifMatrixHtml(s, hint)}${bl9SetHtml(s, hint)}${typeof tbl_setHtml === 'function' ? tbl_setHtml(chk, hint) : ''}
+      ${typeof trd_setHtml === 'function' ? trd_setHtml(s, chk, hint) : ''}
       <h4>${tr('Reminders')}</h4>
       <div class="row"><label for="s-allday">${tr('All-day reminder at')}</label>${timeIn('s-allday', s.allday_time, {label: tr('All-day reminder at'), clear: false})}</div>
       <div class="row"><label for="s-defrem">${tr('Default reminder')}</label><select id="s-defrem"><option value="">${tr('none')}</option>${REM_OPTS.map(([v, n]) => `<option value="${v}" ${s.default_reminder === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}${s.default_reminder && !REM_OPTS.some(o => o[0] === s.default_reminder) ? `<option value="${esc(s.default_reminder)}" selected>${esc(s.default_reminder.split(',').map(fmtRem).join(', '))}</option>` : ''}</select></div>
@@ -749,6 +751,7 @@ function settingsModal(focus) {
     await setApply({[d[0]]: v}, tr(d[1]));
     if (d[0] === 'agent_comments') loadNews().then(render).catch(() => {});  // 2.66.1 (#1943): the bell's number depends on it
     if (d[0] === 'tz' || d[0] === 'time_split_midnight') S.tv.key = '';  // 2.125.0 B (#2120): the time report again
+    if (d[0] === 'chat_read_receipts' && typeof teamChanged === 'function') teamChanged();  // 2.139.0 A (#2129): "Read by" comes / goes
   };
   const saveName = async () => {
     const el = $('#a-name', md); if (!el || !S.me) return;

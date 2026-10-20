@@ -476,7 +476,9 @@ def _wka_import(c, uid, oid, replace, z, infos, saved):
                 pages.append((pid, folder, path, text))
                 continue
             old = c.execute(f"SELECT id FROM wiki_pages WHERE deleted_at IS NULL AND {w} AND lower(path)=?", [*a, path.lower()]).fetchone()
-            if replace and old:
+            if replace and old and _wka_lost(c, old["id"]):  # 2.139.0 C (#2386): an unreadable page is never overwritten
+                skip(name, tr("The page cannot be read (the key of its encryption is missing)"))
+            elif replace and old:
                 _wka_save(c, old["id"], text, uid, ts)  # 2.123.0 A (#2105, #2102): sealed, the text before in the history
                 updated.append(old["id"])
                 pages.append((old["id"], folder, path, text))
@@ -553,6 +555,10 @@ def _wka_import(c, uid, oid, replace, z, infos, saved):
         old = c.execute(f"SELECT id FROM wiki_pages WHERE deleted_at IS NULL AND {w} AND lower(path)=?", [*a, path.lower()]).fetchone()
         if old:
             pid = old["id"]
+            if _wka_lost(c, pid):  # 2.139.0 C (#2386): its list cannot be added to -- the file is skipped, the page named once
+                if not any(x["name"] == path for x in skipped):
+                    skip(path, tr("The page cannot be read (the key of its encryption is missing)"))
+                raise BadInput(tr("The page cannot be read (the key of its encryption is missing)") + ": " + path)
             if pid not in updated and pid not in created:
                 updated.append(pid)
         else:
@@ -638,6 +644,16 @@ def _wka_import(c, uid, oid, replace, z, infos, saved):
     # 2.99.0 A (#2182): skipped stays the list of names (older callers); skipped_detail = {name, reason} for the report
     return {"ok": True, "created": created, "updated": updated, "files": new_ids, "files_n": len(stored),
             "skipped": [s["name"] for s in skipped][:200], "skipped_detail": skipped[:200], "skipped_n": len(skipped)}
+
+
+def _wka_lost(c, pid):
+    """2.139.0 C (#2386): page pid has a text sealed at rest that cannot be opened."""
+    from .wkhist import WikiUnreadable, wkh_body
+    try:
+        wkh_body(c, c.execute("SELECT id, org_id, owner_id, body FROM wiki_pages WHERE id=?", (pid,)).fetchone())
+    except WikiUnreadable:
+        return True
+    return False
 
 
 def _wka_append(body, lines):

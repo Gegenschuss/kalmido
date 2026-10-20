@@ -203,10 +203,10 @@ def wiki_index():
     names = user_names(c, {r["updated_by"] for r in rows})
     from .wikie2e import wke_index_info  # 2.64.3 A (#1817): the lock of the space; bodies=1 = the ciphertexts for the local search
     e2e = wke_index_info(c, oid, uid)
-    from .wkhist import wkh_body
+    from .wkhist import wsb_body_or
     pages = [wiki_dict(r, full=False, names=names) for r in rows]
     if e2e and request.args.get("bodies") == "1":
-        bodies = {r["id"]: wkh_body(c, r)  # 2.123.0 A (#2105): a page not converted yet may still be sealed at rest
+        bodies = {r["id"]: wsb_body_or(c, r)  # 2.123.0 A (#2105): a page not converted yet may still be sealed at rest; 2.139.0 C (#2386): unreadable = ""
                   for r in c.execute(f"SELECT id, org_id, owner_id, body FROM wiki_pages WHERE deleted_at IS NULL AND {w}", a)}
         for d in pages:
             d["body"] = bodies.get(d["id"], "")

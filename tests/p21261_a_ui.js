@@ -70,7 +70,7 @@ const sql = (q, a = []) => JSON.parse(execFileSync('python3', [path.join(__dirna
   const md = await until(() => d.querySelector('.ppm .ast-head') && d.querySelector('.ppm'));
   const ta = md?.querySelector('#ast-text');
   check(/Proposal by Claude/.test(md?.textContent || '') && ta && ta.value === 'Vielen Dank für Ihre Anfrage.', "#2123: the card: who proposes it, the agent's text in a field");
-  check(md && md.querySelector('[data-ast-copy]') && /Take over/.test(md.querySelector('[data-pp="apply"]')?.textContent || '') && /👎/.test(md.querySelector('[data-pp="discard"]')?.textContent || '')
+  check(md && md.querySelector('[data-ast-copy]') && /Take over/.test(md.querySelector('[data-pp="apply"]')?.textContent || '') && !!md.querySelector('[data-pp="discard"] .thumb svg')  /* 2.139.0 (#2401): app thumb */
     && !md.querySelector('.ppi') && /Alte Einleitung/.test(md.querySelector('.ast-was')?.textContent || ''), '#2123: Copy / Take over / Discard, the current text, no entry list');
   if (ta) ta.value = 'Vielen Dank für Ihre Anfrage, gern bieten wir an.';
   click(w, md?.querySelector('[data-pp="apply"]'));

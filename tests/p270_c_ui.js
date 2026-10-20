@@ -48,7 +48,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(facts.some(f => /^Cancel by/.test(f)) && facts.some(f => /^Term ends/.test(f)) && facts.some(f => /^Cost.*19\.99/.test(f)) && facts.some(f => /^Notice period/.test(f)),
     '#1359: cancel by, term ends, notice period, cost ' + JSON.stringify(facts));
   const rem = md?.querySelector('[data-pp="apply"][data-ctr-remind="1"]'), take = [...(md?.querySelectorAll('[data-pp="apply"]') || [])].find(b => !b.dataset.ctrRemind);
-  check(rem && /Remind me/.test(rem.textContent) && take && /Take it as a note/.test(take.textContent) && /👎/.test(md?.querySelector('[data-pp="discard"]')?.textContent || '')
+  check(rem && /Remind me/.test(rem.textContent) && take && /Take it as a note/.test(take.textContent) && !!md?.querySelector('[data-pp="discard"] .thumb svg')  /* 2.139.0 (#2401): app thumb */
     && !md.querySelector('.ppi'), '#1359: Discard / Remind me / Take it as a note, no entry list');
   click(w, rem);
   const cm = await until(() => sql('SELECT id, user_id, body FROM comments WHERE task_id=? AND deleted_at IS NULL', [mob.id])[0]);
