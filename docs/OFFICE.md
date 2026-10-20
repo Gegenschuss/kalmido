@@ -938,6 +938,30 @@ Routes (office admins only; members 403, other areas 404, agents 403; no agent A
 `GET|POST /api/office/cashbooks/<id>/closing` `{day}`, `GET /api/office/cashbooks/<id>/log`,
 `GET /api/office/cashbook.csv|pdf?book_id=&year=`, `GET /api/docs/<id>/cashbook` (the hint on a receipt).
 
+## Procedure documentation (GoBD) (2.148)
+
+**Bookkeeping -> Procedure documentation** gives a prefilled *Verfahrensdokumentation* in the outline of the GoBD (sections
+1 general description, 2 user documentation, 3 technical system documentation, 4 operating documentation, 5 internal
+control system). Kalmido fills in what it knows: the company data, the members of the office with their role (names
+only), the country pack, number ranges, e-invoice format, cash books, bank imports, the locked months, the DATEV numbers
+(on file yes / no), the encryption and the automatic backup as set by the operator, the retention periods of the German
+pack. Everything Kalmido cannot know (legal form, server location, where backup copies are kept, the last restore test)
+is a marked gap "[ ... to fill in ]" in the view and in the exports; the view counts the open gaps.
+
+- Each field has an own text; **Save new version** stores the own texts together with the prefilled texts of that
+  moment as the next version (1, 2, ...). There is no autosave here on purpose: every save is a version.
+- Older versions open read only from the version picker, exactly as they were saved.
+- **Markdown** and **PDF** of the current state or of a version, with the company, the version, its date and the Kalmido
+  version in the head.
+- The document is in German when the app is in German, else in English. No legal advice: have it checked.
+
+Everybody with access to the office reads (members, read-only, accounting); admins save (without an organisation: your
+personal office, you are its admin). Saved data are encrypted at rest like the other office texts, every save and export
+is in the office log. No agent API (the office is closed to agents).
+
+Routes: `GET /api/office/procdoc?version=&lang=de|en`, `PUT /api/office/procdoc` `{own: {field: text}, base?}` (admins; 409
+when `base` is not the latest version), `GET /api/office/procdoc/versions`, `GET /api/office/procdoc.md|pdf?version=&lang=`.
+
 ## Travel expenses: per diem (2.95)
 
 Every trip computes the German per diem (*Verpflegungsmehraufwand*) per participant with the flat rates of its year:

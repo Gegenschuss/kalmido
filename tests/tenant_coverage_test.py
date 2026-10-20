@@ -1029,6 +1029,9 @@ ROUTES = {
     "GET /s/f/{}/d/{}": "fileextlink", "GET /s/f/{}/v/{}": "fileextlink", "GET /s/f/{}/zip": "fileextlink",
     # 2.138.0 D (#2256): number ranges of the office area one works in, admins write (p2138_d_api_test.py)
     "GET /api/office/number-ranges": "office", "POST /api/office/number-ranges/{}": "office",
+    # 2.148.0 C (#2472): the procedure documentation of the office area one works in, admins save versions (p2148_c_api_test.py)
+    "GET /api/office/procdoc": "office", "PUT /api/office/procdoc": "office", "GET /api/office/procdoc/versions": "office",
+    "GET /api/office/procdoc.md": "office", "GET /api/office/procdoc.pdf": "office",
 }
 
 # ---- 1. every route is classified, nothing stale

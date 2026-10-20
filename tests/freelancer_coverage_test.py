@@ -817,6 +817,9 @@ ROUTES = {
     "GET /s/f/{}/d/{}": "link", "GET /s/f/{}/v/{}": "link", "GET /s/f/{}/zip": "link",
     # 2.138.0 D (#2256): number ranges of the office (p2138_d_api_test.py)
     "GET /api/office/number-ranges": "office", "POST /api/office/number-ranges/{}": "office",
+    # 2.148.0 C (#2472): the procedure documentation (GoBD) of the office (p2148_c_api_test.py as a person without an organisation)
+    "GET /api/office/procdoc": "office", "PUT /api/office/procdoc": "office", "GET /api/office/procdoc/versions": "office",
+    "GET /api/office/procdoc.md": "office", "GET /api/office/procdoc.pdf": "office",
 }
 
 

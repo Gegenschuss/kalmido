@@ -52,6 +52,7 @@ async function bkLoadUstva() {
 const bkReload = () => { BK.info = null; BK.euer = null; if (typeof RKF === 'object') RKF.data = null; ofcDraw(); };  // 2.114.1 B (#2018): receipts count in the cash flow
 
 function bkTabHtml() {
+  if (bkSub() === 'procdoc' && typeof pdHtml === 'function') return pdHtml();  // 2.148.0 C (#2472): the procedure documentation
   if (BK.oid !== OFC.info?.org_id || !BK.period) bkReset();  // another office area
   if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see the bookkeeping.')}</div>`;
   if (BK.err) return `<div class="empty">${esc(BK.err)}</div>`;
@@ -59,7 +60,8 @@ function bkTabHtml() {
   if (bkSub() === 'ustva' && !BK.jumped) { BK.jumped = true; setTimeout(() => $('#bk-ustva')?.scrollIntoView({block: 'start'}), 0); }
   const yNow = new Date().getFullYear(), years = [];
   for (let y = yNow + 1; y >= yNow - 6; y--) years.push([y, String(y)]);
-  const head = `<div class="ofcbar bk-bar"><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('bk-year', BK.year, years)}</label><span class="spacer"></span></div>
+  const head = `<div class="ofcbar bk-bar"><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('bk-year', BK.year, years)}</label><span class="spacer"></span>
+    <a class="btn sm ghost" href="#office/books/procdoc" data-bk-procdoc>${ic('file', 's')}<span>${tr('Procedure documentation')}</span></a></div>
     <div class="bk-photo"><label class="btn pri bk-shot">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="bk-file" accept="image/*,application/pdf" capture="environment" hidden></label>
     <span class="muted bk-photohint">${tr('The receipt goes into the documents; amount and date are recognised.')}</span></div>`;
   const txd = typeof txdSectionHtml === 'function' ? txdSectionHtml() : '';  // part C: the tax dates

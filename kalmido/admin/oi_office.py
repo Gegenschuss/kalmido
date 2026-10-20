@@ -300,6 +300,13 @@ def _p_archive(c, run, src, d, ctx):
     return d
 
 
+def _p_procdoc(c, run, src, d, ctx):
+    """2.148.0 C (#2472): versions of the procedure documentation follow the ones the area already has (rows come by id)."""
+    r = c.execute("SELECT MAX(version) FROM office_procdocs WHERE org_id=?", (d.get("org_id"),)).fetchone()
+    d["version"] = int((r[0] if r else 0) or 0) + 1
+    return d
+
+
 def _p_bank_balance(c, run, src, d, ctx):
     """Balances hang on their statement import; without it (an older export) on one import row of this run."""
     if d.get("import_id"):
@@ -383,6 +390,10 @@ SPECS = [
         people={"closed_by": "null"}, private="office"),
     OiT("office/cash_log.json", "office_cash_log", refs={"book_id": "office_cashbooks", "entry_id": "office_cash_entries"}, need=("book_id",),
         people={"by_user": "null"}, private="office"),
+    OiT("office/period_locks.json", "office_period_locks", people={"locked_by": "null"}, private="office", rid=False,
+        key=("org_id", "period")),  # 2.148.0 A (#2471): locked accounting periods
+    OiT("office/procdocs.json", "office_procdocs", people=_P, private="office", prep=_p_procdoc,
+        label=N_("Procedure documentation")),  # 2.148.0 C (#2472): procedure documentation
     OiT("office/meal_choices.json", "office_meal_choices", people=_P, private="office"),
     OiT("office/meals.json", "office_meals", people={**_P, "approved_by": "null"}, private="office"),
     OiT("office/meal_files.json", "office_meal_files", refs={"meal_id": "office_meals"}, need=("meal_id",), people=_P, private="office",
