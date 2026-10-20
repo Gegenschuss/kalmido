@@ -306,7 +306,8 @@ if OCR:
     q1 = upload(A, [("qr1.pdf", qr_pdf("ASN00042"), "application/pdf")]).json()["ids"][0]
     d = done(A, q1, 120)
     check(d and d["asn"] == 42 and d["auto"].get("asn") == "code", f"archive number read from the QR code ({d and (d['asn'], d['auto'])})")
-    q2 = upload(A, [("qr2.pdf", qr_pdf("ASN00042"), "application/pdf")]).json()["ids"][0]
+    # 2.146.0 (#2452): another scan of the same code (other bytes: the same file would be a duplicate, not stored twice)
+    q2 = upload(A, [("qr2.pdf", qr_pdf("ASN00042") + b"\n% another scan\n", "application/pdf")]).json()["ids"][0]
     d = done(A, q2, 120)
     check(d and d["asn"] is None, "the same number twice: not given again")
     check(ids_of(A, q="ASN00042") == [q1] and q1 in ids_of(A, q="42"), "search by the archive number")

@@ -106,6 +106,7 @@ def _rx_vat(c, node, ws, uid, vat, keep):
 def rx_post(nid):
     """{do: "apply", fields?: [amount, vat_pct, sender]} takes the recognised values over (the answer's "before" is the undo);
     {do: "restore", before: {..}} puts them back; {do: "dismiss"} hides the suggestion, {do: "show"} shows it again.
+    2.146.0 B (#2452): {do: "nodup"} = "no duplicate" (the warning goes, also after a new recognition run), {do: "dup"} its undo.
     People with the right edit on the document (agents 403: they only read the values)."""
     from ..docs.web import _doc, _no_agent, doc_json, doc_update
     c = db()
@@ -115,12 +116,14 @@ def rx_post(nid):
     b = body()
     act = b.get("do")
     det = S.meta_json(c, m, "extracted", {})
-    if act not in ("apply", "restore", "dismiss", "show"):
+    if act not in ("apply", "restore", "dismiss", "show", "nodup", "dup"):
         return err(tr("Invalid value: {0}", "do"))
-    if not det:
+    if not det and act not in ("nodup", "dup"):
         raise Denied(404)
     before = None
-    if act in ("dismiss", "show"):
+    if act in ("nodup", "dup"):
+        c.execute("UPDATE doc_meta SET dup_ok=? WHERE node_id=?", (1 if act == "nodup" else 0, nid))
+    elif act in ("dismiss", "show"):
         det = {k: v for k, v in det.items() if k != "_hidden"}
         if act == "dismiss":
             det["_hidden"] = 1
@@ -163,6 +166,9 @@ def rx_post(nid):
         if e:
             return e
         _rx_vat(c, n, ws, uid, vat, bf.get("is_receipt") is True)
+    if act in ("apply", "restore"):  # 2.146.0 B (#2452): amount / sender changed: look for a duplicate again
+        from ..docs.dups import dup_on_done
+        dup_on_done(c, nid, False)
     fs_log_add(c, nid, "edit")
     bump(c)
     c.commit()
