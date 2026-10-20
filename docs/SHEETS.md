@@ -20,7 +20,9 @@ budget against the time booked, or plain lists (equipment, shooting plan, contac
   sorts (saved for everyone), filters (only your view) and inserts or deletes columns; its right edge changes the width.
 - **Formulas** start with `=`: `+ - * /`, brackets, comparisons, text in quotes, `&` joins text, `19%` is 0.19. Arguments
   are separated by `;` (a `,` works too). Functions: `SUMME/SUM`, `MITTELWERT/AVERAGE`, `MIN`, `MAX`, `ANZAHL/COUNT`,
-  `WENN/IF`, `RUNDEN/ROUND`, `HEUTE/TODAY`, `TAGE/DAYS`. References: `A1`, `A1:B5`, a cell's own name (`day_rate`) or a column's
+  `WENN/IF`, `RUNDEN/ROUND`, `HEUTE/TODAY`, `TAGE/DAYS`, `SUMMEWENN/SUMIF`, `ZÄHLENWENN/COUNTIF`, `SVERWEIS/VLOOKUP`,
+  `XVERWEIS/XLOOKUP`, text functions (`LINKS`, `RECHTS`, `TEIL`, `LÄNGE`, `VERKETTEN`, `GLÄTTEN`, `GROSS`, `KLEIN`) and date
+  functions (`DATUM`, `JAHR`, `MONAT`, `TAG`, `EDATUM`). References: `A1`, `A1:B5`, a cell's own name (`day_rate`) or a column's
   title (all its cells). After `=` the app suggests names, columns, functions and Kalmido values; a click on another cell
   while writing a formula inserts its address.
 - **Kalmido values:** `projekt.<name>.zeit_gesamt` (hours), `.aufgaben`, `.offen`, `.erledigt`, `.budget_h`, the same with
@@ -66,6 +68,25 @@ that many days later; a date minus a date is the number of days.
 | `RUNDEN(value; digits)` | `ROUND` | rounds half up |
 | `HEUTE()` | `TODAY` | today's date |
 | `TAGE(end; start)` | `DAYS` | days between two dates |
+| `SUMMEWENN(range; criterion; [sum range])` | `SUMIF` | sum of the cells whose cell in the range meets the criterion, e.g. `=SUMMEWENN(B2:B9; "Paid"; C2:C9)` |
+| `ZÄHLENWENN(range; criterion)` | `COUNTIF` | how many cells meet the criterion, e.g. `=ZÄHLENWENN(status; "open")` |
+| `SVERWEIS(value; range; column; [approximate])` | `VLOOKUP` | finds the value in the first column of the range and returns the cell of that row in the given column; exact unless the fourth argument is `WAHR` (then the largest value not above it, first column sorted) |
+| `XVERWEIS(value; search range; result range; [if not found])` | `XLOOKUP` | finds the value in a row or column and returns the cell at the same place of the result range |
+| `LINKS(text; [n])`, `RECHTS(text; [n])` | `LEFT`, `RIGHT` | the first / last n characters (default 1) |
+| `TEIL(text; start; n)` | `MID` | n characters from position start (1 = the first) |
+| `LÄNGE(text)` | `LEN` | number of characters |
+| `VERKETTEN(text; ...)` | `CONCAT`, `CONCATENATE` | joins texts and ranges (like `&`) |
+| `GLÄTTEN(text)` | `TRIM` | removes spaces at both ends and double spaces |
+| `GROSS(text)`, `KLEIN(text)` | `UPPER`, `LOWER` | capital / small letters |
+| `DATUM(year; month; day)` | `DATE` | a date; months and days may run over (`DATUM(2026;13;1)` = 1 January 2027) |
+| `JAHR(date)`, `MONAT(date)`, `TAG(date)` | `YEAR`, `MONTH`, `DAY` | the parts of a date |
+| `EDATUM(date; months)` | `EDATE` | the same day some months later (or earlier with a minus), at most the month's last day |
+
+**Criteria** of `SUMMEWENN` / `ZÄHLENWENN`: a number, a date or a text (upper / lower case does not matter, `*` stands for any
+characters, `?` for one, `~*` for a real star), or a comparison in quotes: `">5"`, `"<>done"`, `"<=2026-01-01"`, `"="` (empty
+cells), `"<>"` (cells that are not empty). A lookup that finds nothing shows **Not found** (`#N/A` in Excel); `HEUTE()` is
+computed anew each time the table is shown, so it is tomorrow's date tomorrow. Very large lookups over thousands of rows are
+capped per table: a cell then shows "Wrong type of value" with the hint to use smaller ranges.
 
 **References:** `A1`, a range `A1:B5`, a cell's own name (give a cell a name such as `dayrate` and write `=dayrate*8`), and a
 column's name: `=SUMME(amount)` adds every cell of the column "Amount" except the formula's own cell. Formulas are stored
@@ -138,7 +159,9 @@ their own ways.
   Italian and Dutch with `;` and the decimal comma, otherwise with `,` and the point - the way Excel opens it directly.
   Text a spreadsheet would run as a formula (starting with `+`, `-`, `@` ...) gets a `'` in front.
 - **Excel (.xlsx)** holds values AND formulas where Excel has the same thing: addresses, ranges, column names, `SUMME`,
-  `MITTELWERT`, `MIN`, `MAX`, `ANZAHL`, `WENN`, `RUNDEN`, `HEUTE`, `TAGE` (as SUM, AVERAGE ...). A formula with a Kalmido
+  `MITTELWERT`, `MIN`, `MAX`, `ANZAHL`, `WENN`, `RUNDEN`, `HEUTE`, `TAGE`, `SUMMEWENN`, `ZÄHLENWENN`, `SVERWEIS`, `XVERWEIS`
+  and the text and date functions (as SUM, AVERAGE, SUMIF, VLOOKUP ...; a `SVERWEIS` with three arguments gets `FALSE` as the
+  fourth, because Excel would look up approximately without it). A formula with a Kalmido
   variable (`projekt.…`, `liste.…`, `kunde.…`, `hier.…`) goes in as its value, with a note on the cell showing the Kalmido
   formula. Column kinds become number formats (currency, percent, date), a selection column a drop-down list with the colour
   of each option (the cell or the whole row), cell names Excel names. The file opens in Excel, LibreOffice and Numbers.
@@ -149,7 +172,8 @@ new table in the space shown (in the tables of a project: attached to it) and op
 
 - A first row of text becomes the column titles; Kalmido recognises the column kind (number, currency, percent, date,
   text) from the values and number formats, and an Excel drop-down list becomes a selection column (with its colours).
-- Simple Excel formulas are taken over (with the German names); what Kalmido cannot calculate (other sheets, whole
+- Simple Excel formulas are taken over (with the German names, also `SUMIF`, `COUNTIF`, `VLOOKUP`, `XLOOKUP` and the text
+  and date functions; a `VLOOKUP` without its fourth argument gets `WAHR`, as Excel looks up approximately then); what Kalmido cannot calculate (other sheets, whole
   columns like `A:A`, unknown functions) comes in as its value - the message says how many.
 - A `=` at the start of a CSV value stays text, never a formula. At most 10 MB, 5000 rows, 200 columns.
 - Undo takes back the whole import (the table goes to the trash).

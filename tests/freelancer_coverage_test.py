@@ -594,6 +594,7 @@ ROUTES = {
     "POST /api/office/move-space": "office",
     # 2.96.0 B (#1941): a table to the other workspace
     "POST /api/sheets/{}/move-space": "sheets",
+    "PUT /api/sheets/{}/chart": "sheets",  # 2.124.0 A (#2115): the chart of a table (p2124_a_api_test.py)
     "PATCH /api/sheets/{}/columns/{}": "sheets", "PATCH /api/v1/sheets/{}": "sheets", "POST /api/sheets": "sheets",
     "POST /api/sheets/{}/batches/{}/undo": "sheets", "POST /api/sheets/{}/cells/{}/freeze": "sheets",
     "POST /api/sheets/{}/cells/{}/name": "sheets", "POST /api/sheets/{}/columns": "sheets",

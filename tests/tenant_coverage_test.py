@@ -771,6 +771,7 @@ ROUTES = {
     "GET /api/sheets": "sheet", "POST /api/sheets": "sheet", "GET /api/sheets/{}": "sheet", "PATCH /api/sheets/{}": "sheet",
     # 2.96.0 B (#1941): a table to the other workspace (p296_b_api_test.py)
     "POST /api/sheets/{}/move-space": "sheet",
+    "PUT /api/sheets/{}/chart": "sheet",  # 2.124.0 A (#2115): the chart of a table (p2124_a_api_test.py)
     "DELETE /api/sheets/{}": "sheet", "POST /api/sheets/{}/restore": "sheet", "PUT /api/sheets/{}/cells": "sheet",
     "POST /api/sheets/{}/cells/{}/freeze": "sheet", "POST /api/sheets/{}/cells/{}/name": "sheet",
     "POST /api/sheets/{}/columns": "sheet", "PATCH /api/sheets/{}/columns/{}": "sheet", "DELETE /api/sheets/{}/columns/{}": "sheet",
