@@ -13,7 +13,7 @@ from ..core.db import body, db, err, inbox_default, local_now, now_utc, parse_is
 from ..core.tokenhash import tkh_match, tkh_set_ical
 from ..accounts.session import _rate_blocked, _rate_fail, client_ip, me, rate_ip
 from ..core.access import tvis, vis_sql
-from ..tasks.validation import rr_feasible, rr_norm
+from ..tasks.validation import rmd_export, rr_feasible, rr_norm
 from ..tasks.lifecycle import rr_count, rr_with_count
 
 
@@ -108,6 +108,7 @@ def ics_rrule(rep, dtstart, timed):
     rep = rr_norm(rep)
     if not rep or not rr_feasible(rep, dtstart.date().isoformat()):
         return None, None
+    rep = rmd_export(rep)  # 2.116.0 D (#2066): TIMES -> BYHOUR / BYMINUTE
     parts = []
     for p in rep.split(";"):
         k, v = p.split("=", 1)

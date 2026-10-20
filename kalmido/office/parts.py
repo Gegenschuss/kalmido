@@ -105,8 +105,9 @@ def tp_part_items_all(c, oid, did):
             for r in c.execute("SELECT * FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NOT NULL ORDER BY part_id, sort, id", (did, oid))]
 
 
-def tp_settings_clean(v, cur=None):
-    """The part's own calculation values; a key with None / '' falls back to the document's value (removed)."""
+def tp_settings_clean(v, cur=None, share=False):
+    """The part's own calculation values; a key with None / '' falls back to the document's value (removed).
+    2.113.1 (#2251): share = the document computes "share by amount": prod_quotient is its factor (0.01..10)."""
     if not isinstance(v, dict):
         raise BadInput(tr("Invalid value: {0}", "settings"))
     out = dict(cur or {})
@@ -122,13 +123,13 @@ def tp_settings_clean(v, cur=None):
             out[k] = x
         elif k == "producing_on":
             out[k] = 1 if x in (1, True, "1", "true") else 0
-        else:
-            lo, hi = {"raw_factor": (0, 100), "prod_quotient": (0.1, 1000), "producing_rate": (0, 1e9), "discount_pct": (0, 100)}[k]
+        else:  # 2.113.1 (#2251): prod_quotient from 0.01 (the factor of "share by amount")
+            lo, hi = {"raw_factor": (0, 100), "prod_quotient": (0.01, 1000), "producing_rate": (0, 1e9), "discount_pct": (0, 100)}[k]
             try:
                 n = float(dec(x, "nan"))
             except (ValueError, ArithmeticError):
                 n = float("nan")
-            if not (lo <= n <= hi):
+            if not (lo <= n <= hi) or share and k == "prod_quotient" and n > 10:
                 raise BadInput(tr("Invalid value: {0}", "settings." + k))
             out[k] = n
     return out
@@ -286,7 +287,7 @@ def tp_doc_totals(c, oid, r, items, pack, eur=False):
             base[ln["tax"]] += dec(ln["total"])
             if ln.get("discountable"):
                 disc_base[ln["tax"]] += dec(ln["total"])
-        elif k == "producing":
+        elif k in ("producing", "surcharge"):  # 2.113.1 (#2252): + surcharge
             base["standard"] += dec(ln["total"])
         elif k == "raw":
             if ln.get("optional"):
@@ -541,7 +542,7 @@ def tp_render(c, oid, r, m, pack, lang, locked):
         lines = []
         for ln in pc.get("lines") or []:
             ln = dict(ln)
-            if ln["kind"] in ("item", "producing", "raw", "discount"):
+            if ln["kind"] in ("item", "producing", "surcharge", "raw", "discount"):  # 2.113.1 (#2252): + surcharge
                 ln["total_text"] = fmt_money(ln["total"], lang, cur)
                 if ln.get("rate") is not None:
                     ln["rate_text"] = fmt_money(ln["rate"], lang, cur)
@@ -614,10 +615,10 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
     def auto(lines, factor=Decimal(1), with_disc=True):
         res = []
         for ln in lines:
-            if ln["kind"] == "producing":
-                res.append(pos(ln["title"], dec(ln["qty"]) * factor, "day", ln["rate"], "standard", ln.get("detail") or ""))
-            elif ln["kind"] == "raw" and not ln.get("optional"):
-                res.append(pos(ln["title"], factor, "flat", ln["total"], "standard", ln.get("detail") or ""))
+            if ln["kind"] == "producing":  # 2.113.1 (#2251): without its calculation (internal)
+                res.append(pos(ln["title"], dec(ln["qty"]) * factor, "day", ln["rate"], "standard", ""))
+            elif ln["kind"] == "raw" and not ln.get("optional") or ln["kind"] == "surcharge":  # 2.113.1 (#2252): + surcharge
+                res.append(pos(ln["title"], factor, "flat", ln["total"], "standard", "" if ln["kind"] == "surcharge" else ln.get("detail") or ""))
             elif ln["kind"] == "discount" and with_disc:
                 taxes = ln.get("taxes") or {"standard": abs(dec(ln["total"]))}
                 for k in TAX_KEYS:
@@ -701,6 +702,8 @@ def _ctx_doc(did):
     if r["kind"] != "offer":
         raise Denied(409, tr("Only a quotation has parts"))
     ofx_need_editable(r)
+    from .undo import oun_pre
+    oun_pre(c, uid, oid, "doc", did)  # 2.111.0 A (#2233): every change of a part is a step of the document's undo
     return c, uid, oid, admin, r
 
 
@@ -715,8 +718,10 @@ def _answer(c, oid, did, admin, part=None):
 
 def _done(c, oid, r, admin, part=None, code=200):
     from .docs import recalc
+    from .undo import oun_post
     recalc(c, oid, r["id"])
     bump(c)
+    oun_post(c)
     c.commit()
     return jsonify(_answer(c, oid, r["id"], admin, part)), code
 
@@ -778,7 +783,7 @@ def tp_part_patch(did, pid):
         if not math.isfinite(f["sort"]):  # 2.47.0 (#1215): no nan / inf, the order of the parts must stay defined
             raise BadInput(tr("Invalid value: {0}", "sort"))
     if "settings" in b:
-        f["settings"] = json.dumps(tp_settings_clean(b.get("settings"), p["settings"]), ensure_ascii=False)
+        f["settings"] = json.dumps(tp_settings_clean(b.get("settings"), p["settings"], dict(r).get("producing_mode") == "amount"), ensure_ascii=False)
     if "sheet" in b:
         if p["kind"] != "shoot":
             raise BadInput(tr("Invalid value: {0}", "sheet"))

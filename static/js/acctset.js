@@ -117,6 +117,7 @@ function accountHtml() {
     ${dsc_rowHtml()}${''/* 2.49.0 (#1106): People: find, requests, findable by e-mail */}
     ${wsPaneOn() ? (lmOrgPaneOn() ? lmOrgLinkHtml() : wsPaneHtml(t => `<div class="shint">${t}</div>`)) : S.me?.kid ? '' : wsp_paneHtml() /* 2.138.1 C (#2389, P4): without an organisation the colour of Private is chosen here */}
     ${tfaHtml()}
+    ${typeof sesHtml === 'function' ? sesHtml() : ''}${''/* 2.115.0 B (#2062): active sessions */}
     ${e2eHtml()}${''/* 2.42.0 (#828, #909) */}
     ${apwHtml()}
     <details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary>

@@ -109,7 +109,8 @@ PURPOSE_EXTRA = {"office": ("clients", "workload", "forms", "office")}
 # 2.19.0: what a child account may change: tick / untick (and undo) the tasks it sees, ask for a reward, its own
 # account (name, password, picture, sign-in, push, settings), the news it has read. Everything else is read-only.
 # 2.49.0 (#1537): + the onboarding (a kid's first start marks it done, no sample list) and the parents' PIN (#1551)
-KID_WRITE = re.compile(r"^/api/(auth/.+|me|me/(avatar|2fa/.+|passkeys(/.*)?)|push/.+|news/(read|dismiss)|settings"
+# 2.115.0 B (#2062): + ending own sessions (Active sessions; the PIN guards it like the other account settings)
+KID_WRITE = re.compile(r"^/api/(auth/.+|me|me/(avatar|2fa/.+|passkeys(/.*)?|sessions/.+)|push/.+|news/(read|dismiss)|settings"
                        r"|tasks/\d+/(complete|reopen|undo)|family/rewards/\d+/request|onboarding|me/pin/(unlock|lock))$")
 
 

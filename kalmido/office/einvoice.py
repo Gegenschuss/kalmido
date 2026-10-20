@@ -223,7 +223,7 @@ def ein_build(model, fmt="zugferd"):
     by_rate = {}
     n = 0
     for ln in m.get("lines") or []:
-        if not isinstance(ln, dict) or ln.get("kind") not in ("item", "discount", "producing", "raw"):
+        if not isinstance(ln, dict) or ln.get("kind") not in ("item", "discount", "producing", "surcharge", "raw"):  # 2.113.1 (#2252): + surcharge
             continue
         if ln.get("kind") == "raw" and ln.get("optional"):
             continue

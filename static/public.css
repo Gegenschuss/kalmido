@@ -240,3 +240,16 @@ ul.frq-list li.bad small{color:var(--danger)}
 ul.frq-list li.bad .bar{visibility:hidden}
 .frq-done{color:var(--accent);font-weight:600}
 @media (prefers-reduced-motion:reduce){.frq-drop,ul.frq-list .bar i{transition:none}}
+/* 2.112.1 B (#2058): a file / folder shared through an external link (/s/f/<token>) */
+.xl-act{margin:1rem 0}
+.xl-btn{display:inline-flex;align-items:center;min-height:2.75rem;padding:0 1.25rem;border-radius:.5rem;background:var(--accent);color:var(--ink);font-weight:600;text-decoration:none}
+.xl-btn:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+.xl-prev{margin:1rem 0;text-align:center}
+.xl-prev img{max-width:100%;max-height:70vh;border-radius:.5rem;border:1px solid var(--line)}
+ul.xl-list{font-size:.9375rem}
+ul.xl-list li{display:flex;align-items:center;gap:.5rem;border-bottom:1px solid var(--line);padding:.25rem 0}
+ul.xl-list a,ul.xl-list .xl-off{display:inline-flex;align-items:center;gap:.5rem;min-height:2.75rem;flex:1;min-width:0}
+ul.xl-list .xl-off{color:var(--muted)}
+.xl-ic{width:1.125rem;height:1.125rem;flex:none;color:var(--muted)}
+.xl-crumbs{font-size:.8125rem;color:var(--muted);margin:0 0 .75rem;overflow-wrap:anywhere}
+.xl-crumbs a{color:var(--accent)}

@@ -406,6 +406,8 @@ def time_start():
                        created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,'timer',?,?,?)""",
                     (uid, tid, lid, title, iso(at), iso(end) if end else None,
                      int((end - at).total_seconds()) if end else 0, note, cid, ts, ts))
+    from ..integrations.webhooks import who_note
+    who_note("time.created", "time", eid)  # 2.115.0 A (#2061): a timer started
     bump(c)
     c.commit()
     return jsonify(entry=one_entry(c, eid), stopped=stopped, timer=time_running(c, uid))
@@ -490,6 +492,8 @@ def time_create():
     eid = insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,created_at,updated_at)
                        VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
                     (uid, tid, lid, title, iso(start), iso(end), sec, str(b.get("note") or "").strip()[:500], src, ts, ts))
+    from ..integrations.webhooks import who_note
+    who_note("time.created", "time", eid)  # 2.115.0 A (#2061): a manual entry
     bump(c)
     c.commit()
     return jsonify(one_entry(c, eid))

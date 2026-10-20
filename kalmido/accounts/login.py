@@ -183,7 +183,8 @@ def auth_logout():
     c = db()
     tok = request.cookies.get(COOKIE)
     if tok:
-        c.execute("DELETE FROM sessions WHERE token_hash=?", (_token_hash(tok),))
+        from ..accounts.sessions import ses_end
+        ses_end(c, None, [_token_hash(tok)])  # 2.115.0 B (#2062): with the push subscriptions made in this session
         c.commit()
     resp = jsonify(ok=True, proxy=g.auth_via == "proxy")
     resp.delete_cookie(COOKIE, path="/")

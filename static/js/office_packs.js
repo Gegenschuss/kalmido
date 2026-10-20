@@ -93,9 +93,17 @@ function pkc_itemHtml(it) {
     ${it.update && lt?.changes ? `<div class="muted pkc-changes">${mdFmt(lt.changes)}</div>` : ''}
     ${it.homepage && /^https:\/\//i.test(it.homepage) ? `<a class="pkc-home" href="${esc(it.homepage)}" target="_blank" rel="noopener noreferrer">${tr('Homepage')}</a>` : ''}
     ${PKC.err[k] ? `<p class="pkc-err" role="alert">${esc(PKC.err[k])}</p>` : ''}
+    ${it.kind === 'industry' && (inst || it.builtin) ? pkc_onHtml(it, adm) : ''}
     ${btns ? `<div class="pkc-acts">${btns}</div>` : ''}
   </li>`;
 }
+// 2.113.0 (#2246): an industry pack's card says whether the pack is switched on in this office and switches it at once
+// (office.js ost_save: saved like every settings field, one undo step; the same setting as the box in the calculation rules)
+function pkc_onHtml(it, adm) {
+  const on = (OFC.info?.settings?.industry_packs || []).includes(it.code);
+  return `<div class="pkc-on"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" data-pkc-on="${esc(it.code)}" ${on ? 'checked' : ''} ${adm ? '' : 'disabled'} aria-label="${esc(tr('Industry pack {0}', it.name || it.code))}"><span class="swt" aria-hidden="true"></span></span><span class="pkc-onst">${esc(on ? tr('Switched on') : tr('Off'))}</span></label></div>`;
+}
+document.addEventListener('change', e => { const t = e.target; if (t.dataset?.pkcOn && t.closest('#pkc')) { const st = t.closest('.pkc-on')?.querySelector('.pkc-onst'); if (st) st.textContent = t.checked ? tr('Switched on') : tr('Off'); } });
 // the industry pack boxes of the calculation rules: film keeps its id os-ind-film (and its text), the others os-ind-<code>
 function pkc_indHtml(s, dis) {
   pkc_sync();

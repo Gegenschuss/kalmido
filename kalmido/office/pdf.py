@@ -1015,7 +1015,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 for part in (wrapped[q:q + 40] for q in range(0, max(1, len(wrapped)), 40)):  # a very long block may break (40 lines each)
                     block(len(part) * lh + 10, lambda p, y, part=part: [p.text(x_title + 3, y + 4 + q * lh, s_, body) for q, s_ in enumerate(part)],
                           table=True)
-            elif k in ("item", "producing", "raw", "discount"):
+            elif k in ("item", "producing", "surcharge", "raw", "discount"):  # 2.113.1 (#2252): + surcharge
                 if k == "raw" and ln.get("optional"):
                     continue  # the option is printed below the totals
                 t = str(ln.get("title") or (L["producing"] if k == "producing" else L["discount"] if k == "discount" else ""))
@@ -1034,7 +1034,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 tot_s = str(ln.get("total_text") or "") if ln.get("total_text") else money(ln.get("total") or 0)
                 if np_:
                     rate_s = vat_s = tot_s = ""
-                pos_s = str(ln.get("pos") or "") if k in ("item", "producing") else ""  # 2.114.4 A (#2276): producing numbered too
+                pos_s = str(ln.get("pos") or "") if k in ("item", "producing", "surcharge") else ""  # 2.114.4 A (#2276): producing numbered too; surcharges like it
                 t_lines = pdf_wrap(t, body, c_title - 6)
                 d_lines = pdf_wrap(detail, 8.4, c_title + c_qty + c_rate + c_vat + c_tot - 6) if detail else []
                 h = 8 + len(t_lines) * lh + (len(d_lines) * 8.4 * 1.42 + 2 if d_lines else 0)
@@ -1240,6 +1240,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         sl = [sg] + [str(x) for x in (m.get("signature_name"), co.get("name")) if x]
         block((len(sl) - 1) * lh + 0.6 * lh + lh + 10, lambda p, y, sl=sl: [p.text(PDF_L, y + 8 + i * lh + (0.6 * lh if i else 0), s, body, bold=(i == 1))
                                                                              for i, s in enumerate(sl)], tail=True, sq=4)
+    if m.get("terms_line"):  # 2.113.2 (#2253): "our terms apply (as of ...), see attachment"
+        tl = str(m["terms_line"])
+        block(len(pdf_wrap(tl, body, PDF_CW)) * lh + 10, lambda p, y, t=tl: p.para(PDF_L, y + 10, t, body, PDF_CW))
     if (m.get("kind") or "offer") == "offer" and acc:  # 2.99.0 C (#2195): accepted online -> the signature box instead of the empty lines
         acc_rows = [(str(x[0]), str(x[1])) for x in acc.get("rows") or [] if isinstance(x, (list, tuple)) and len(x) >= 2]
         block(8 + qac_sig_block_h(acc_rows), lambda p, y: qac_sig_block(p, y + 8, acc_rows, str(acc.get("head") or ""), str(acc.get("foot") or ""), accent), tail=True, sq=4)

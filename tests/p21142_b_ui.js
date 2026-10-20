@@ -37,6 +37,8 @@ const call = async (method, url, body, ck) => { const r = await fetch(B + url.re
     await nav(B + '#office/settings');
     for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#os-inv-scheme')`).catch(() => false)); i++) await sleep(300);
     await sleep(800);
+    await ev(`(() => { document.querySelector('[data-ostsub="docs"]')?.click(); return 1; })()`);  // 2.113.0 (#2247): the schemes are in the area Documents
+    await sleep(400);
     const geo = () => ev(`(() => { const i = document.querySelector('#os-inv-scheme').getBoundingClientRect(), p = document.querySelector('#os-inv-scheme-pv'), pr = p.getBoundingClientRect(), b = document.querySelector('#os-inv-scheme-rs') || {hidden: true, getBoundingClientRect: () => ({top: 0, height: 0})}; return {w: Math.round(i.width), bottom: i.bottom, ptop: pr.top, err: p.classList.contains('err'), text: p.textContent, rs: !b.hidden && b.getBoundingClientRect().height > 0, rtop: b.getBoundingClientRect().top, over: document.documentElement.scrollWidth > window.innerWidth + 1, val: document.querySelector('#os-inv-scheme').value}; })()`);
     const before = await geo();
     check(before.val === good && !before.err && !before.rs, tag + 'valid: no message, no reset button ' + JSON.stringify(before));

@@ -80,8 +80,8 @@ async function secAddSubmit(inp) {
   const r = parseQuick(text, new Set());
   inp.value = ''; sa.v = '';
   try {
-    await createTask({title: (r.title || text).slice(0, 500), list_id: lid, section_id: sa.sec || null, due: r.due || null, due_time: r.due_time,
-      priority: r.priority ?? 0, tags: r.tags || [], repeat: r.repeat || ''});
+    await createTask(qa2_body(r, {title: (r.title || text).slice(0, 500), list_id: lid, section_id: sa.sec || null, due: r.due || null, due_time: r.due_time,
+      priority: r.priority ?? 0, tags: r.tags || [], repeat: r.repeat || ''}));  // 2.111.0 C (#2057)
   } catch { inp.value = text; sa.v = text; }
   $('#view .secadd-in')?.focus();
 }

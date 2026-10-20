@@ -13,7 +13,7 @@ cd "$HERE"
 export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
-SHARDS_DEFINED=17
+SHARDS_DEFINED=19
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
@@ -1399,16 +1399,63 @@ fresh; run p2138_d_ui node p2138_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.138.0 part E: resizable dialogs, quotation next step, service import order, PDF closing together, import undo archives, GbR partners (#2234 #2235 #2237 #2238 #2241 #2242)
 fresh; run p2138_e_api "$PY" p2138_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2138_e_ui node p2138_e_ui.js "$KALMIDO_TEST_DATA"
-# 2.138.1 part A: office documents - PDF of a draft asks to finalise, DRAFT watermark, no e-invoice from drafts; number scheme {isodate} (#2393 #2391)
+# 2.138.2 part A: office documents - PDF of a draft asks to finalise, DRAFT watermark, no e-invoice from drafts; number scheme {isodate} (#2393 #2391)
 fresh; run p21381_a_api "$PY" p21381_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21381_a_ui node p21381_a_ui.js "$KALMIDO_TEST_DATA"
-# 2.138.1 part B: office PDF layout - rights annex spacing and sizes, multi-line company name bold in the footer; company name field grows (#2388 #2397 #2395)
+# 2.138.2 part B: office PDF layout - rights annex spacing and sizes, multi-line company name bold in the footer; company name field grows (#2388 #2397 #2395)
 fresh; run p21381_b_api "$PY" p21381_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21381_b_ui node p21381_b_ui.js "$KALMIDO_TEST_DATA"
-# 2.138.1 part C: sidebar head with the workspace on top, workspace colour stripe (#2392 #2389)
+# 2.138.2 part C: sidebar head with the workspace on top, workspace colour stripe (#2392 #2389)
 fresh; run p21381_c_ui node p21381_c_ui.js "$KALMIDO_TEST_DATA"
-# 2.138.1 part D: notifications - read entries muted, open ones on top, counters match (#2405)
+# 2.138.2 part D: notifications - read entries muted, open ones on top, counters match (#2405)
 fresh; run p21381_d_ui node p21381_d_ui.js "$KALMIDO_TEST_DATA"
+shard 18  # 20.10.2026 (job #692): the parked releases 2.111-2.113.0 (new suites still go to shard 17 above)
+# 2.111.0: Buero-Rueckgaengig (a), Termin-Einladungen + Abo-Link (b), Schnellerfassung (c)
+fresh; run p2111_a_api "$PY" p2111_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2111_a_ui node p2111_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2111_b_api "$PY" p2111_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2111_b_ui node p2111_b_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2111_c_api "$PY" p2111_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2111_c_ui node p2111_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.112.1 part A (#2058): file store multi-select (move, trash, ZIP download) and phone scan into a PDF
+fresh; run p21121_a_api "$PY" p21121_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21121_a_ui node p21121_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.112.1 part B (#2058): external share links for files and folders
+fresh; run p21121_b_api "$PY" p21121_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21121_b_ui node p21121_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.113.0 part A: office settings in sections, autosave, industry pack switch (#2247 #2246)
+fresh; run p2113_a_api "$PY" p2113_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2113_a_ui node p2113_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.113.0 part B: offer parts fold open on the title page with a colour each (#2248)
+fresh; run p2113_b_ui node p2113_b_ui.js "$KALMIDO_TEST_DATA"
+shard 19  # 20.10.2026 (job #692): the parked releases 2.113.1-2.116
+# 2.113.1 part A: producing from the net amount, factor quotient, only in the film pack (#2251)
+fresh; run p2113b_a_api "$PY" p2113b_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2113b_a_ui node p2113b_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.113.1 part B: team chat attachments, free channels, group DMs (#2059)
+fresh; run p2113b_b_api "$PY" p2113b_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2113b_b_ui node p2113b_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.113.2: terms (AGB) as a PDF with quotations (#2253)
+fresh; run p2113c_a_api "$PY" p2113c_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2113c_a_ui node p2113c_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.115.0 part A (#2061): incoming webhook per list, outgoing webhooks for organisations + more events
+fresh; run p2115_a_api "$PY" p2115_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2115_a_ui node p2115_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.115.0 part B (#2062): active sessions, sign out everywhere, organisation admins invite accounts
+fresh; run p2115_b_api "$PY" p2115_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2115_b_ui node p2115_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.116.0 part A (#2063: trash period)
+fresh; run p2116_a_api "$PY" p2116_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2116_a_ui node p2116_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.116.0 part B (#2065: full-text search)
+fresh; run p2116_b_api "$PY" p2116_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2116_b_ui node p2116_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.116.0 part C (#2064 #2068: list CSV/print, snippets in the UI)
+fresh; run p2116_c_api "$PY" p2116_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2116_c_ui node p2116_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.116.0 part D (#2066 #2067: several times a day, focus/habits in API v1)
+fresh; run p2116_d_api "$PY" p2116_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2116_d_ui node p2116_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

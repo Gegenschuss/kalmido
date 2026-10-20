@@ -27,7 +27,7 @@ PIN_OPEN = 300     # s: how long a correct PIN opens account / settings / log ou
 # what a kid's app writes by itself (#1537): never asks for the PIN
 PIN_FREE_SETTINGS = {"tour", "folders_closed", "detail_split", "detail_cm_fold", "fav_suggest"}
 # the routes the PIN guards (a kid's other writes are limited by family.KID_WRITE already)
-PIN_GUARD = re.compile(r"^/api/(auth/.+|me|me/(avatar|2fa/.+|passkeys(/.*)?))$")
+PIN_GUARD = re.compile(r"^/api/(auth/.+|me|me/(avatar|2fa/.+|passkeys(/.*)?|sessions/.+))$")  # 2.115.0 B (#2062): + sessions
 
 
 def pin_row(c, kid):

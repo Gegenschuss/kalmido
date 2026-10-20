@@ -17,8 +17,9 @@ from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
-from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, RAW_MODES, TAX_KEYS, dec, fmt_money, inv_calc, office_calc
+from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, RAW_MODES, TAX_KEYS, dec, fmt_money, inv_calc, office_calc
 from .packs import office_pack
+from .undo import oun_post, oun_pre
 from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts)
 from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
@@ -83,7 +84,7 @@ def _num(v, name, lo=None, hi=None):
         raise BadInput(tr("Invalid value: {0}", name))
     if d.is_nan() or not d.is_finite():
         raise BadInput(tr("Invalid value: {0}", name))
-    if (lo is not None and d < lo) or (hi is not None and d > hi):
+    if (lo is not None and d < dec(lo)) or (hi is not None and d > dec(hi)):  # 2.113.1: dec(0.01) = exactly 0.01 (not the float)
         raise BadInput(tr("Invalid value: {0}", name))
     return float(d)
 
@@ -279,11 +280,64 @@ def fk_doc_contact_clean(c, oid, b, cur, f):
     f["recipient"] = json.dumps({"name": rec.get("name") or "", "lines": lines[:12]}, ensure_ascii=False)
 
 
+# ---------------------------------------------------------------- 2.113.1 (#2251, #2252): the options of the industry packs
+PRD_DOC_KEYS = ("handling_pct", "handling_label", "markup_pct", "markup_label", "markup_stacked")
+
+
+def prd_new_doc(c, oid, s):
+    """The calculation fields of a new quotation from the industry packs switched on: "share by amount" when a pack offers
+    it (rate / factor from the office settings share_rate / share_factor, else the pack's; on when producing_on is set),
+    else no producing at all (an older office setting producing_on does not switch on the calculation by quantities any
+    more); handling costs / markup with the pack's label and percentage (on as the pack says)."""
+    from .sheet import prd_options
+    o = prd_options(s)
+    out = {"producing_on": 0, "producing_mode": None, "share_label": None}
+    sh = o["share"]
+    if sh:
+        rate = s.get("share_rate") if s.get("share_rate") is not None else sh["rate"]
+        if s.get("producing_service_id"):
+            sv = _service(c, oid, s["producing_service_id"])
+            if sv and sv.get("daily_rate") is not None:
+                rate = sv["daily_rate"]
+        out.update(producing_on=1 if s.get("producing_on") else 0, producing_mode="amount", producing_rate=rate,
+                   prod_quotient=s.get("share_factor") if s.get("share_factor") is not None else sh["factor"],
+                   share_label=json.dumps(sh["label"], ensure_ascii=False))
+    for k in ("handling", "markup"):
+        x = o[k]
+        if x:
+            out.update({k + "_pct": x["pct"] if x.get("on") else None, k + "_label": json.dumps(x["label"], ensure_ascii=False)})
+            if k == "markup":
+                out["markup_stacked"] = 1 if x.get("stacked") else 0
+    return out
+
+
+def prd_doc_clean(c, oid, b):
+    """handling_pct / markup_pct (0..100; empty = off), handling_label / markup_label (the document's own line title, up
+    to 80 characters; empty = the pack's), markup_stacked from a request."""
+    f = {}
+    for k in ("handling", "markup"):
+        if k + "_pct" in b:
+            f[k + "_pct"] = _num(b.get(k + "_pct"), k + "_pct", 0, 100)
+        if k + "_label" in b:
+            v = re.sub(r"[\x00-\x1f\x7f]", " ", str(b.get(k + "_label") or "")).strip()[:80]
+            if not v:
+                from .sheet import prd_options
+                x = prd_options(office_settings(c, oid))[k]
+                f[k + "_label"] = json.dumps(x["label"], ensure_ascii=False) if x else None
+            else:
+                f[k + "_label"] = json.dumps({"de": v, "en": v}, ensure_ascii=False)
+    if "markup_stacked" in b:
+        f["markup_stacked"] = 0 if b.get("markup_stacked") in (0, False, "0", "false", None, "") else 1
+    return f
+
+
 # ---------------------------------------------------------------- the document as the client sees it
 def _calc_doc(r):
     return {"lang": r["lang"], "currency": r["currency"], "fx_rate": r["fx_rate"], "vat_mode": r["vat_mode"], "raw_mode": r["raw_mode"],
             "raw_factor": r["raw_factor"], "prod_quotient": r["prod_quotient"], "producing_rate": r["producing_rate"],
             "discount_pct": r["discount_pct"], "producing_on": dict(r).get("producing_on"),  # 2.47.0 (#1645)
+            "producing_mode": dict(r).get("producing_mode"), "share_label": dict(r).get("share_label"),  # 2.113.1 (#2251)
+            **{k: dict(r).get(k) for k in PRD_DOC_KEYS},  # 2.113.1 (#2252): handling costs / markup
             "vat_note": dict(r).get("vat_note")}  # 2.47.3 (#1360): "small" prints the section 19 note
 
 
@@ -331,6 +385,11 @@ def doc_public(c, oid, r, admin, items=True):
     d["net_text"] = fmt_money(d["totals"].get("net") or 0, d["lang"], d["currency"])
     d["gross_text"] = fmt_money(d["totals"].get("gross") or 0, d["lang"], d["currency"])
     d["ref_doc_ids"] = _j(d.get("ref_doc_ids") or "[]", [])
+    for k in ("share_label", "handling_label", "markup_label"):  # 2.113.1 (#2251, #2252): {de, en} or None
+        d[k] = _j(d.get(k), {}) or None
+    from .terms import agb_frozen
+    t = agb_frozen(d.get("terms"))  # 2.113.2 (#2253): the terms frozen at finalising (no file name of the server)
+    d["terms"] = {k: t.get(k) or "" for k in ("lang", "date", "sha256", "name")} if t else None
     if r["kind"] in ("invoice", "credit"):
         d.update(inv_money_fields(r, pm))
         d["open_text"] = fmt_money(d["open"], d["lang"], d["currency"])
@@ -591,10 +650,13 @@ def clean_doc(c, oid, b, cur, admin):
         f["producing_on"] = 0 if b.get("producing_on") in (0, False, "0", "false", None, "") else 1
     if "accept_on" in b:  # 2.114.4 B (#2270): order confirmation block per quotation (None = like the office setting)
         f["accept_on"] = None if b.get("accept_on") in (None, "", "default") else (0 if b.get("accept_on") in (0, False, "0", "false") else 1)
-    for k, lo, hi, dflt in (("raw_factor", 0, 10, 0.25), ("prod_quotient", 0.01, 1000, 3), ("producing_rate", 0, 1e7, 600), ("discount_pct", 0, 100, 0)):
+    share = (cur or {}).get("producing_mode") == "amount"  # 2.113.1 (#2251): prod_quotient is the factor (0.01..10) there
+    for k, lo, hi, dflt in (("raw_factor", 0, 10, 0.25), ("prod_quotient", 0.01, 10 if share else 1000, (cur or {}).get("prod_quotient") if share else 3),
+                            ("producing_rate", 0, 1e7, 600), ("discount_pct", 0, 100, 0)):
         if k in b:
             v = _num(b.get(k), k, lo, hi)
             f[k] = dflt if v is None else v
+    f.update(prd_doc_clean(c, oid, b))  # 2.113.1 (#2252): handling costs / markup
     if "rights" in b and b.get("rights") is not None:
         f["rights"] = json.dumps(_rights_clean(c, oid, b["rights"], lang, _j(cur["rights"], {})), ensure_ascii=False)
     if "fields" in b and b.get("fields") is not None:
@@ -634,7 +696,7 @@ def clean_items(c, oid, r, items, admin, part=None):
         _choice(kind, "items.kind", ITEM_KINDS if r["kind"] == "offer" else INV_ITEM_KINDS)  # 2.38.0: discount positions on invoices
         row = {"sort": i, "kind": kind, "service_id": None, "title": _text(it.get("title"), "items.title", 500),
                "detail": _text(it.get("detail"), "items.detail", 4000), "qty": 1, "unit": "day", "rate": 0, "tax": "standard",
-               "raw_fee": 0, "producing": 0, "intext": "intern", "cost": 0, "discountable": 1}
+               "raw_fee": 0, "producing": 0, "in_handling": 0, "in_markup": 0, "intext": "intern", "cost": 0, "discountable": 1}  # 2.113.1 (#2252)
         prev = old.get(it.get("id")) if it.get("id") else None
         if kind == "discount":  # 2.38.0: a discount position: its amount (qty x rate) is taken off, same tax class
             row["qty"] = _num(it.get("qty"), "items.qty", 0, 1e6) or 1
@@ -669,6 +731,9 @@ def clean_items(c, oid, r, items, admin, part=None):
             row["tax"] = _choice(it.get("tax") or "standard", "items.tax", TAX_KEYS)
             row["raw_fee"] = 1 if it.get("raw_fee") in (1, True, "1", "true") else 0
             row["producing"] = 1 if it.get("producing") in (1, True, "1", "true") else 0
+            for k in ("in_handling", "in_markup"):  # 2.113.1 (#2252): absent = as before (a new position: in)
+                v = it.get(k, (prev or {}).get(k, 1))
+                row[k] = 1 if v in (1, True, "1", "true") else 0
             row["intext"] = _choice(it.get("intext") or "intern", "items.intext", ("intern", "extern"))
             row["discountable"] = 0 if it.get("discountable") in (0, False, "0", "false") else 1
             if admin:
@@ -726,6 +791,7 @@ def doc_create(c, oid, uid, b, admin, number=True):
            "producing_on": 1 if s.get("producing_on") else 0,  # 2.47.0 (#1645): the office setting is the default of a new quotation
            "raw_mode": "optional" if s.get("raw_on") else "none", "raw_factor": s.get("raw_factor") if s.get("raw_factor") is not None else 0.25,
            "prod_quotient": s.get("prod_quotient") or 3, "producing_rate": prod_rate, "discount_pct": 0,
+           **prd_new_doc(c, oid, s),  # 2.113.1 (#2251, #2252): the options of the industry packs switched on
            "intro": _default_text(c, oid, s, "intro", lang), "closing": _default_text(c, oid, s, "closing", lang),
            "rights": json.dumps(rights, ensure_ascii=False), "fields": "[]", "totals": "{}", "created_by": uid, "created_at": ts,
            "updated_at": ts, "sent_at": None}
@@ -743,6 +809,8 @@ def doc_create(c, oid, uid, b, admin, number=True):
     if isinstance(b.get("items"), list):
         _put_items(c, oid, doc_row(c, oid, did), b["items"], admin)
     recalc(c, oid, did)
+    from ..integrations.webhooks import who_note
+    who_note("invoice.created", "invoice", did)  # 2.115.0 A (#2061): only invoices / credit notes are sent (who_obj)
     return did
 
 
@@ -814,7 +882,17 @@ def bwb_accept_on(r, s, snd=None):
     return 0 if v in (0, False, "0") else 1
 
 
-def odoc_render(c, doc_id, oid):
+def prd_strip_detail(m):
+    """2.113.1 (#2251): the calculation of producing / surcharge lines stays internal (older documents too): blanked in a
+    print model, on the title page and on the parts' pages. Applied after the signoff hash (sig_doc_hash), which keeps the
+    explanation in, so links sent before 2.113.1 stay valid."""
+    for ln in [*(m.get("lines") or []), *(x for p in m.get("parts") or [] for x in p.get("lines") or [])]:
+        if isinstance(ln, dict) and ln.get("kind") in PRD_INTERNAL_DETAIL:
+            ln["detail"] = ""
+    return m
+
+
+def odoc_render(c, doc_id, oid, keep_detail=False):
     """The print model of a document (dict, see docs/OFFICE.md and tests/fixtures): everything in the document's language
     and formats, nothing of the signed-in person. oid: the organisation the caller works in (required; foreign document =
     404). A finalised document (2.36.2) is printed from its snapshot only: frozen totals, sender, recipient, pack words."""
@@ -843,7 +921,7 @@ def odoc_render(c, doc_id, oid):
     L = dict((pack.get("labels") or {}).get(lang) or {})
     cur = r["currency"]
     for ln in t["lines"]:
-        if ln["kind"] in ("item", "producing", "raw", "discount"):
+        if ln["kind"] in ("item", "producing", "surcharge", "raw", "discount"):  # 2.113.1 (#2252): + surcharge
             ln["total_text"] = fmt_money(ln["total"], lang, cur)
             if ln.get("rate") is not None:
                 ln["rate_text"] = fmt_money(ln["rate"], lang, cur)
@@ -924,7 +1002,9 @@ def odoc_render(c, doc_id, oid):
         tp_render(c, oid, r, m, pack, lang, locked)
     if r["kind"] != "offer":  # 2.38.0 (#1021, F1): the invoice words on top (title, due date, tax lines, reminder table, payment info)
         inv_render(c, oid, r, m, t, pack, L, lang, _fmt_date)
-    return m
+    from .terms import agb_print_line
+    m["terms_line"] = agb_print_line(c, oid, r, lambda d: _fmt_date(d, pack))  # 2.113.2 (#2253): quotations with terms only
+    return m if keep_detail else prd_strip_detail(m)  # 2.113.1 (#2251): keep_detail only for the signoff hash
 
 
 # ---------------------------------------------------------------- routes
@@ -998,6 +1078,7 @@ def odoc_update(did):
     admin = office_role(c, uid, oid) == "admin"
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
+    oun_pre(c, uid, oid, "doc", did)  # 2.111.0 A (#2233): the state before, for the editor's undo
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
@@ -1018,6 +1099,7 @@ def odoc_update(did):
             _assign_number(c, oid, did, s)
     recalc(c, oid, did)
     bump(c)
+    oun_post(c)
     c.commit()
     out = doc_public(c, oid, doc_row(c, oid, did), admin)
     if lang_notes:
@@ -1033,6 +1115,7 @@ def odoc_items_put(did):
     admin = office_role(c, uid, oid) == "admin"
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
+    oun_pre(c, uid, oid, "doc", did)  # 2.111.0 A (#2233)
     b = body()
     items = b.get("items") if isinstance(b, dict) else b
     rows_before = doc_items(c, did, oid)
@@ -1046,6 +1129,7 @@ def odoc_items_put(did):
         ofx_log(c, oid, "items", doc_id=did, detail={"before": before, "after": after})
     recalc(c, oid, did)
     bump(c)
+    oun_post(c)
     c.commit()
     return jsonify(doc_public(c, oid, doc_row(c, oid, did), admin))
 
@@ -1104,6 +1188,9 @@ def odoc_set_status(c, oid, did, st, uid, r=None):
         c.execute("UPDATE office_docs SET paid_at=CASE WHEN status='paid' THEN COALESCE(paid_at, ?) ELSE NULL END WHERE id=? AND org_id=?", (ts, did, oid))
     if st != r["status"]:
         ofx_log(c, oid, "status", doc_id=did, detail={"before": {"status": r["status"]}, "after": {"status": st}})
+        if st in ("sent", "paid"):
+            from ..integrations.webhooks import who_note
+            who_note(f"invoice.{st}", "invoice", did)  # 2.115.0 A (#2061)
         if r["kind"] == "offer":
             ek_purchases_write(c, oid, did)  # 2.47.0 (#1649): accepted = its purchase is written, left = removed
             from .pipeline import pl2_offer_status  # 2.50.0 (#1196): a linked deal of the pipeline follows (one place for both callers)
@@ -1118,6 +1205,7 @@ DUP_SKIP = {"id", "number", "status", "created_at", "updated_at", "sent_at", "cr
             "locked_by", "sender", "recipient_snapshot", "tax_snapshot", "pack_version",
             "due_date", "paid_at", "pdf_sha256", "xml_sha256", "datev_sent_at",  # 2.38.0: the invoice's own marks
             "cancels_id", "ref_doc_ids", "source_doc_id",  # 2.38.0 review: a copy is a fresh document, bound to nothing
+            "terms",  # 2.113.2 (#2253): a copy takes the terms when it is finalised itself
             "version_of", "cashflow",  # 2.88.0 (#1915): set below (a quotation's copy = its next version, cash flow auto)
             "series_id", "series_period", "abs_refs",  # 2.120.0 A (#2087): abs_refs  # 2.91.0 A (#1923): a copy is no invoice of the series (office/recurring.py sets them itself)
             "reminder_fee_state", "agent_id", "list_id"}  # 2.126.0 A (#1979 F6): a fresh fee state, made by the person copying
@@ -1140,6 +1228,8 @@ def odoc_duplicate(did):
     if r["kind"] == "offer":  # 2.88.0 (#1915): the chain of versions points at its first quotation (a copy of a copy too)
         row["version_of"] = r["version_of"] or r["id"]
     nid = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+    from ..integrations.webhooks import who_note
+    who_note("invoice.created", "invoice", nid)  # 2.115.0 A (#2061): a copy
     for it in doc_items(c, did, oid):
         it = {k: v for k, v in it.items() if k not in DUP_ITEM_SKIP}
         it["doc_id"] = nid

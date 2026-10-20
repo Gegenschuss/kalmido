@@ -71,6 +71,7 @@ TABLES = (
     "office_pack_installs",  # 2.76.0 A (#1023): packs installed from the catalogue per office area
     "hub_tokens", "hub_mails",  # 2.84.0 A (#1198): hub mail addresses + filed mails (NULL = private, the app checks owner / client / list)
     "office_archive_log",  # 2.81.0 B (#1834): the history of an archived document (org_id like the entry)
+    "tchat_rooms", "tchat_files",  # 2.113.1 B (#2059): team chat channels of an organisation + their files (NULL = DMs, list channels, own space; the app checks members)
     "sheets",  # 2.89.0 (#1916): tables (NULL = private, the app checks owner_id; parts hang on sheet_id)
     "sheet_shares",  # 2.124.0 C (#2113): a table shared with one person / agent (org_id like the table, NULL = a private table)
     "sched_polls",  # 2.98.0 A (#1953): scheduling polls (NULL = private, the app checks user_id; options / votes hang on poll_id)
@@ -78,6 +79,10 @@ TABLES = (
     "bookmarks",  # 2.97.0 A (#1950): bookmarks (NULL = private, the app checks user_id)
     "office_contract_files",  # 2.117.0 B (#2285): PDF files of a framework contract
     "sheet_files",  # 2.124.0 B (#2110): files of file cells of a table (NULL = private, the app checks the sheet)
+    "office_undo",  # 2.111.0 A (#2233): undo copies of office editors (NULL = a private client, the app checks user_id)
+    "fs_ext_links",  # 2.112.1 B (#2058): external share links of the file store (org_id = the node's, NULL = private)
+    "org_invites",  # 2.115.0 B (#2062): accounts an organisation invited by e-mail (always an organisation's)
+    "webhooks",  # 2.115.0 A (#2061): outgoing webhooks (NULL = a person's own / an agent's, else its organisation's admins)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

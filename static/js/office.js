@@ -305,7 +305,7 @@ function ofcModal(kind, r) {
       const sv = await api(r ? 'PATCH' : 'POST', r ? `/api/office/${kind}/${r.id}` : `/api/office/${kind}`, body);
       md.remove(); ofcReload(kind);
       if (kind === 'contracts' && !r && sv?.id && typeof dmaAfterSave === 'function') dmaAfterSave(sv.id);  // 2.117.0 B (#2285): the chosen PDFs
-      if (kind === 'equipment' && r && ofcAdmin()) astUndo(r, body); else toast(r ? tr('Saved') : tr('Added'));  // 2.92.0 B (#1931): one undo step
+      if (kind === 'equipment' && r && ofcAdmin()) astUndo(r, body); else if (!(r && typeof oun_saved === 'function' && oun_saved(kind + ':' + r.id, body.name_de || body.name || body.key || r.name_de || r.name || r.key))) toast(r ? tr('Saved') : tr('Added'));  // 2.92.0 B (#1931): one undo step; 2.111.0 A (#2233): "… saved · Undo"
     } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
   setTimeout(() => { if (!isTouch() && adm) $('input:not([type=hidden]),select,textarea', md)?.focus(); }, 50);
@@ -320,9 +320,12 @@ function ofcSettingsHtml() {
   if (!OFC.data.services && !OFC.loading.services) setTimeout(() => ofcLoad('services'), 0);
   const ta = (id, label, lines, hint) => `<div class="row"><label for="${id}">${esc(label)}</label><textarea id="${id}" rows="${Math.max(2, (lines || []).length + 1)}" maxlength="3000" ${adm ? '' : 'disabled'}>${esc((lines || []).join('\n'))}</textarea>${hint ? `<span class="muted ofchint">${esc(hint)}</span>` : ''}</div>`;
   const svc = ofcRows('services').filter(x => !x.archived).map(x => [x.id, x.name_de]);
+  const psh = typeof prd_opts === 'function' ? prd_opts().share : null, pshl = psh ? (s.lang === 'en' ? psh.label.en : psh.label.de) || psh.label.de : '';  // 2.113.1 (#2251): only with an industry pack offering it
   const logo = s.logo ? `<img class="ofclogo" src="/api/office/logo?v=${encodeURIComponent(s.logo)}" alt="${esc(tr('Logo'))}">` : `<span class="muted">${tr('No logo yet')}</span>`;
   const dis = adm ? '' : 'disabled';
-  return `<form class="ofcset" id="ofc-set" data-fg="ofc-set:${OFC.info.org_id}" autocomplete="off">
+  // 2.113.0 (#2247): five areas (one shown) and every field saves itself (data-fg-live: no bar "Unsaved changes", no Save button)
+  return `<form class="ofcset" id="ofc-set" data-fg="ofc-set:${OFC.info.org_id}" data-fg-live autocomplete="off">
+    ${ost_subsHtml()}${ost_p('company', dis)}
     <h3>${tr('Company')}</h3>
     ${ofcRowF('os-name', tr('Company name'), `<textarea id="os-name" data-grow="3" style="overflow:hidden" rows="${Math.min(3, Math.max(1, String(cf.name || co.name || '').split('\n').length))}" maxlength="200" ${dis}>${esc(cf.name || co.name || '')}</textarea>`, tr('up to three lines; the letterhead and the footer print them one under the other'))}
     ${ofcCompanyFieldsHtml(cf, dis)}
@@ -332,8 +335,10 @@ function ofcSettingsHtml() {
     ${ta('os-register', tr('Register lines'), co.register_lines, tr('legal form, register, managing director'))}
     ${ta('os-bank', tr('Bank lines'), co.bank_lines, tr('bank, IBAN, BIC; tax number / VAT id'))}</details>
     <div class="row"><label>${tr('Logo')}</label><span class="lacts">${logo}${adm ? `<input type="file" id="os-logo" accept="image/png,image/jpeg,image/webp" aria-label="${esc(tr('Upload logo'))}">${s.logo ? `<button type="button" class="btn sm" data-ofc="logo-del">${tr('Remove')}</button>` : ''}` : ''}</span><span class="muted ofchint">${tr('PNG at least 600 px wide (also JPEG or WebP, up to 4 MB)')}</span></div>
+    ${typeof agbSettingsHtml === 'function' ? agbSettingsHtml() : ''}${/* 2.113.2 (#2253): the terms and conditions (PDF) */ ''}
     ${ofcRowF('os-color', tr('Brand colour'), `<span class="lacts"><input id="os-color" value="${esc(s.color || '')}" maxlength="7" placeholder="#2f5d8a" class="numin" ${dis}><i class="ofcsw" style="background:${cssColor(s.color) || 'var(--accent)'}"></i></span>`, tr('accent in the printed documents; empty = the app’s accent colour'))}${ofcII('color')}
     ${typeof bp_settingsHtml === 'function' ? bp_settingsHtml(s, dis) : ''}
+    </fieldset>${ost_p('docs', dis)}
     <h3>${tr('Documents')}</h3>
     ${ofcRowF('os-lang', tr('Document language'), ofcSel('os-lang', s.lang, [['de', 'Deutsch'], ['en', 'English']]))}
     ${ofcRowF('os-currency', tr('Currency'), `<span class="lacts">${ofcSel('os-currency', s.currency, [['EUR', 'EUR'], ['USD', 'USD']])}<label for="os-fx" class="muted">${tr('1 € in USD')}</label><input id="os-fx" value="${esc(fmtNum(s.fx_usd, 4))}" inputmode="decimal" class="numin" ${dis}></span>`)}${ofcII('currency')}
@@ -355,22 +360,24 @@ function ofcSettingsHtml() {
     ${ofcRowF('os-rmdays', tr('Payment deadline'), `<span class="lacts"><input id="os-rmdays" value="${esc(String(s.reminder_deadline_days ?? 10))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`, tr('on reminders'))}${ofcII('rmdays')}
     ${typeof tpSettingsHtml === 'function' ? tpSettingsHtml(s, dis) : ''}
     ${ofcRowF('os-einv', tr('E-invoice format'), ofcSel('os-einv', s.einvoice_format || 'zugferd', [['zugferd', 'ZUGFeRD (PDF with XML)'], ['xrechnung', 'XRechnung (XML)']]), tr('clients with a buyer reference get XRechnung proposed'))}${ofcII('einv')}
+    </fieldset>${ost_p('data', dis)}
     ${ofcRowF('os-datev', tr('DATEV inbox'), `<input id="os-datev" type="email" value="${esc(s.datev_email || '')}" maxlength="200" placeholder="${esc(tr('e-mail address of the document inbox'))}" ${dis}>`, tr('finalised invoices are mailed there as PDF + XML'))}${ofcII('datev')}
     ${ofcChk('os-datev-auto', tr('Send every invoice to the DATEV inbox when it is sent'), s.datev_auto)}${ofcII('datev_auto')}
     ${ofcChk('os-portal-docs', tr('Show documents in the customer portal'), s.portal_docs)}<p class="muted ofchint">${tr('Sent quotations, invoices with their payment status and credit notes; the client signs in with the link from the client’s menu “Send portal link”')}</p>
     ${typeof dx_settingsHtml === 'function' ? dx_settingsHtml(s, dis) : ''}
+    </fieldset>${ost_p('docs', dis)}
     ${ofcRowF('os-inv-close-de', tr('Invoice closing (German)'), `<textarea id="os-inv-close-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.invoice_closing_de || '')}</textarea>`)}
     ${ofcRowF('os-inv-close-en', tr('Invoice closing (English)'), `<textarea id="os-inv-close-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.invoice_closing_en || '')}</textarea>`)}
     ${ofcRowF('os-rm-text-de', tr('Reminder closing (German)'), `<textarea id="os-rm-text-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.reminder_text_de || '')}</textarea>`)}
     ${ofcRowF('os-rm-text-en', tr('Reminder closing (English)'), `<textarea id="os-rm-text-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.reminder_text_en || '')}</textarea>`)}
     <h3>${tr('Calculation rules')}</h3>
     <p class="muted ofchint">${tr('Default for new quotations, can be changed in each quotation')}</p>
-    ${ofcChk('os-prod-on', tr('Markup (producing) by production days'), s.producing_on)}
+    ${psh ? `${ofcChk('os-prod-on', tr('{0} by amount', pshl), s.producing_on)}
     <div class="ofcrule" data-rule="prod">
-    ${ofcRowF('os-pq', tr('Producing quotient'), `<input id="os-pq" value="${esc(fmtNum(s.prod_quotient, 2))}" inputmode="decimal" class="numin" ${dis}>`, tr('producing days = production days ÷ quotient, rounded to half days'))}${ofcII('pq')}
-    ${ofcRowF('os-ps', tr('Producing rate from'), ofcSel('os-ps', s.producing_service_id, svc, tr('fixed rate below')))}
-    ${ofcRowF('os-pr', tr('Producing rate'), `<input id="os-pr" value="${esc(fmtNum(s.producing_rate, 2))}" inputmode="decimal" class="numin" ${dis}>`, `${ofcCur()} ${tr('per day')}`)}${ofcII('prod_rate')}
-    </div>
+    ${ofcRowF('os-sf', tr('Factor'), `<input id="os-sf" value="${esc(fmtNum(s.share_factor ?? psh.factor, 2))}" inputmode="decimal" class="numin" ${dis}>`, tr('days = amount of the marked positions ÷ day rate × factor, rounded to half days'))}
+    ${ofcRowF('os-ps', tr('Day rate from'), ofcSel('os-ps', s.producing_service_id, svc, tr('fixed rate below')))}
+    ${ofcRowF('os-sr', tr('Day rate'), `<input id="os-sr" value="${esc(fmtNum(s.share_rate ?? psh.rate, 2))}" inputmode="decimal" class="numin" ${dis}>`, `${ofcCur()} ${tr('per day')}`)}
+    </div>` : ''}
     ${ofcChk('os-raw-on', tr('Raw data surcharge'), s.raw_on)}
     <div class="ofcrule" data-rule="raw">
     ${ofcRowF('os-rf', tr('Raw data factor'), `<input id="os-rf" value="${esc(fmtNum(s.raw_factor, 2))}" inputmode="decimal" class="numin" ${dis}>`, tr('raw data amount = sum of the raw data positions × factor'))}${ofcII('rf')}
@@ -384,21 +391,28 @@ function ofcSettingsHtml() {
     ${ofcRowF('os-rt', tr('Rights: duration'), ofcSel('os-rt', s.rights_default?.time_id, ofcTextOpts('rights_time'), tr('none')))}${ofcII('rights')}
     ${ofcRowF('os-rr', tr('Rights: territory'), ofcSel('os-rr', s.rights_default?.territory_id, ofcTextOpts('rights_territory'), tr('none')))}
     ${ofcRowF('os-rm', tr('Rights: media'), ofcSel('os-rm', s.rights_default?.media_id, ofcTextOpts('rights_media'), tr('none')))}
+    </fieldset>${ost_p('packs', dis)}
     <h3>${tr('Country pack')}</h3>
     ${ofcRowF('os-pack', tr('Country pack'), `<span class="lacts">${ofcSel('os-pack', s.pack, (OFC.packs || [[p.code, p.name]]))}<span class="muted">${esc(tr('VAT: {0} standard, {1} reduced, {2} exempt', `${fmtNum(p.tax.standard, 1)} %`, `${fmtNum(p.tax.reduced, 1)} %`, `${fmtNum(p.tax.exempt, 1)} %`))}</span></span>`)}${ofcII('pack')}
+    </fieldset>${ost_p('access', dis)}
     ${typeof oa_settingsHtml === 'function' ? oa_settingsHtml(s, dis) : ''}
-    ${adm ? `<div class="foot stfoot"><span class="aerr" role="alert"></span><span class="spacer"></span><button type="submit" class="btn pri" data-ofc="save-settings">${tr('Save')}</button></div>` : ''}
+    </fieldset>${ost_p('packs')}
     ${typeof pkc_html === 'function' ? pkc_html() : ''}
     ${typeof rk_settingsHtml === 'function' ? rk_settingsHtml() : ''}
     ${typeof bw_settingsHtml === 'function' ? bw_settingsHtml() : ''}
     ${typeof cfs_settingsHtml === 'function' ? cfs_settingsHtml() : ''}
+    </fieldset>${ost_p('company')}
     <h3>${tr('Master data file')}</h3>
     <p class="muted">${tr('Export writes services, equipment, sets, text blocks, contracts and these settings into one JSON file; import reads such a file (also one made from a spreadsheet) and adds what is missing.')}</p>
     <div class="lacts"><a class="btn sm" href="/api/office/export" download="office-master-data.json">${ic('download', 's')} ${tr('Export')}</a>
       ${adm ? `<input type="file" id="os-import" accept="application/json,.json" hidden><button type="button" class="btn sm" data-ofc="import">${ic('upload', 's')} ${tr('Import')}</button><label class="chkl" data-fg-skip><input type="checkbox" id="os-overwrite"> ${tr('overwrite existing')}</label>` : ''}</div>
+    </fieldset>${ost_p('data')}
     ${adm ? `<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('Clients, services, equipment and fixed costs from a spreadsheet, leads from a CSV file; old invoices and quotations as an archive.')}</p><div class="lacts"><a class="btn sm" href="#office/import">${ic('upload', 's')} ${tr('Import legacy data')}</a></div>` : ''}
+    </fieldset>${ost_p('access')}
     ${adm ? `<h3>${tr('Access log')}</h3><p class="muted">${tr('Who opened, printed, changed or exported documents and master data of this organisation.')}</p>${ofcLogHtml()}` : ''}
+    </fieldset>${ost_p('data')}
     ${adm && OFC.info.personal && OFC.info.can_move ? `<h3>${tr('Move into an organisation')}</h3><p class="muted">${tr('Turns this personal office into a new organisation with you as its admin: documents, numbers, settings, master data and your private clients go with it. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-move">${ic('building', 's')} ${tr('Create organisation…')}</button></div>` : ''}
+    </fieldset>
   </form>`;
 }
 // 2.47.3 (#1360): the personal office becomes a new organisation (one way: name, then a confirmation)
@@ -514,12 +528,18 @@ function ofcLogHtml() {
   if (!OFC.log) return `<button type="button" class="btn sm" data-ofc="log">${ic('clock', 's')} ${tr('Show the latest entries')}</button>`;
   if (!OFC.log.length) return `<p class="muted">${tr('No entries yet.')}</p>`;
   const tg = {doc: N_('Document'), settings: N_('Settings'), company: N_('Company'), logo: N_('Logo'), master_data: N_('Master data'), services: N_('Services'),
-    equipment: N_('Equipment'), sets: N_('Sets'), texts: N_('Text blocks'), contracts: N_('Framework contracts'), legacy: N_('Legacy import'), archive: N_('Archive|documents'), datev: N_('DATEV export')};  // 2.47.3 (#1460): + datev
+    equipment: N_('Equipment'), sets: N_('Sets'), texts: N_('Text blocks'), contracts: N_('Framework contracts'), legacy: N_('Legacy import'), archive: N_('Archive|documents'), datev: N_('DATEV export'), terms: N_('Terms and conditions')};  // 2.47.3 (#1460): + datev; 2.113.2 (#2253): + terms
   if (typeof OA_LOG_TG === 'object') Object.assign(tg, OA_LOG_TG);  // 2.51.0 A (#1348): what agents read / drafted, the filter "Agents"
   const rows = OFC.logAg ? OFC.log.filter(x => /^agent_/.test(x.action)) : OFC.log;
   return (typeof oa_logFilter === 'function' ? oa_logFilter() : '') + `<ul class="ofdlog" role="list">${rows.map(x => `<li><span class="muted">${esc(typeof ofdWhen === 'function' ? ofdWhen(x.at) : x.at)}</span> <b>${esc(x.user_name || '?')}</b> ${esc(typeof ofdActText === 'function' ? ofdActText(x.action) : x.action)} · ${esc(tr(tg[x.target] || x.target))}${x.doc_id ? ` <a href="#office/offers/${x.doc_id}">#${x.doc_id}</a>` : ''}</li>`).join('')}</ul>`;
 }
 async function ofcSaveSettings(form) {
+  const body = ofcSettingsBody(form);
+  try { const j = await api('PUT', '/api/office/settings', body); OFC.info.settings = j.settings; OFC.info.company_fields = j.company_fields || OFC.info.company_fields; OFC.info.number_preview = j.number_preview; OFC.log = null; fgDone(form.dataset.fg); toast(tr('Saved')); ofcDraw(); }
+  catch (x) { const el = $('.aerr', form); if (el) el.textContent = x.message || ''; }
+}
+// 2.113.0 (#2247): the full PUT body of the page (Save all; a single field takes its part of it, ost_part)
+function ofcSettingsBody(form) {
   const v = id => $(id, form)?.value ?? '', lines = id => v(id).split('\n').map(x => x.trim()).filter(Boolean);
   const cof = {name: v('#os-name')}; for (const [k] of OFC_CO_FIELDS) cof[k] = v('#osc-' + k).trim();
   if ($('#osc-md_label', form)) cof.md_label = v('#osc-md_label');  // 2.40.0 (#1377)
@@ -527,8 +547,9 @@ async function ofcSaveSettings(form) {
     company_fields: cof, offer_number_at: v('#os-numat') || 'create',
     ...($('#os-counter', form) ? {offer_counter: v('#os-counter') || 'org'} : {}),  // 2.118.0 A (#2265)
     color: v('#os-color').trim(), lang: v('#os-lang'), currency: v('#os-currency'), fx_usd: ofcNum(v('#os-fx')), offer_scheme: v('#os-scheme'), offer_valid_days: ofcNum(v('#os-valid')),
-    prod_quotient: ofcNum(v('#os-pq')), producing_service_id: +v('#os-ps') || null, producing_rate: ofcNum(v('#os-pr')), raw_factor: ofcNum(v('#os-rf')),
-    producing_on: $('#os-prod-on', form)?.checked ? 1 : 0, raw_on: $('#os-raw-on', form)?.checked ? 1 : 0,
+    raw_factor: ofcNum(v('#os-rf')),  // 2.113.1 (#2251): producing only through an industry pack's option (below)
+    ...($('#os-sf', form) ? {share_factor: ofcNum(v('#os-sf')), share_rate: ofcNum(v('#os-sr')), producing_service_id: +v('#os-ps') || null, producing_on: $('#os-prod-on', form)?.checked ? 1 : 0} : {}),
+    raw_on: $('#os-raw-on', form)?.checked ? 1 : 0,
     ...($('#os-accept-on', form) ? {accept_on: $('#os-accept-on', form).checked ? 1 : 0} : {}),  // 2.114.4 B (#2270)
     ...($('#os-portal-docs', form) ? {portal_docs: $('#os-portal-docs', form).checked ? 1 : 0} : {}),  // 2.120.0 B (#2088)
     industry_packs: typeof pkc_indBody === 'function' ? pkc_indBody(form) : $('#os-ind-film', form)?.checked ? ['film'] : [],  // 2.47.0 (#1216), 2.76.0 (#1023): every os-ind-*
@@ -541,8 +562,114 @@ async function ofcSaveSettings(form) {
   if (typeof tpSettingsBody === 'function') Object.assign(body, tpSettingsBody(form));  // 2.47.0 (#1215)
   if (typeof dx_settingsBody === 'function') Object.assign(body, dx_settingsBody(form));  // 2.47.3 (#1460)
   if (typeof oa_settingsBody === 'function') Object.assign(body, oa_settingsBody(form));  // 2.51.0 A (#1348): agents_read
-  try { const j = await api('PUT', '/api/office/settings', body); OFC.info.settings = j.settings; OFC.info.company_fields = j.company_fields || OFC.info.company_fields; OFC.info.number_preview = j.number_preview; OFC.log = null; fgDone(form.dataset.fg); toast(tr('Saved')); ofcDraw(); }
-  catch (x) { const el = $('.aerr', form); if (el) el.textContent = x.message || ''; }
+  return body;
+}
+// ---- 2.113.0 (#2247): the settings in five areas (the pattern of Settings > Administration): one shown, the last one
+// remembered per device; an area may have several parts in the page's order (ost_p), fields sit in a fieldset that is
+// disabled for members
+const OST_SUBS = [['company', 'building', N_('Company')], ['docs', 'file', N_('Documents')], ['packs', 'pack', N_('Packs')], ['data', 'archive', N_('Data')], ['access', 'shield', N_('Access')]];
+const ost_cur = want => { const k = want || LS.get('ofcSetSub', 'company'); return OST_SUBS.some(x => x[0] === k) ? k : 'company'; };
+function ost_subsHtml() {
+  const cur = ost_cur();
+  return `<div class="seg aisub ostsub" role="tablist" aria-label="${esc(tr('Sections'))}">${OST_SUBS.map(([k, i, n]) => `<button type="button" role="tab" id="osts-${k}" data-ostsub="${k}" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${esc(tr(n))}</span></button>`).join('')}</div>`;
+}
+const ost_p = (k, dis) => `<fieldset class="ostp" data-ostp="${k}" role="tabpanel" aria-labelledby="osts-${k}" ${ost_cur() === k ? '' : 'hidden'} ${dis || ''}>`;
+function ost_show(want, save) {
+  const k = ost_cur(want); if (save) LS.set('ofcSetSub', k);
+  $$('#ofc-set [data-ostsub]').forEach(b => { const on = b.dataset.ostsub === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  $$('#ofc-set [data-ostp]').forEach(p => { p.hidden = p.dataset.ostp !== k; });
+  const b = $(`#ofc-set [data-ostsub="${k}"]`);
+  if (typeof segReveal === 'function') segReveal(b); else b?.scrollIntoView?.({block: 'nearest', inline: 'nearest'});  // (settings.js loads lazily)
+}
+// every field saves itself: the part of the PUT body that belongs to it (null = no setting: the country's text field, search, ...);
+// a group the server keeps together goes as one (the DATEV booking export)
+const OST_FLAT = {'os-color': 'color', 'os-lang': 'lang', 'os-currency': 'currency', 'os-fx': 'fx_usd', 'os-scheme': 'offer_scheme', 'os-numat': 'offer_number_at',
+  'os-valid': 'offer_valid_days', 'os-small': 'small_business', 'os-inv-scheme': 'invoice_scheme', 'os-cr-scheme': 'credit_scheme', 'os-rm-scheme': 'reminder_scheme',
+  'os-paydays': 'payment_days', 'os-rmfee': 'reminder_fee', 'os-rmdays': 'reminder_deadline_days', 'os-einv': 'einvoice_format', 'os-datev': 'datev_email',
+  'os-datev-auto': 'datev_auto', 'os-inv-close-de': 'invoice_closing_de', 'os-inv-close-en': 'invoice_closing_en', 'os-rm-text-de': 'reminder_text_de',
+  'os-rm-text-en': 'reminder_text_en', 'os-prod-on': 'producing_on', 'os-pq': 'prod_quotient', 'os-ps': 'producing_service_id', 'os-pr': 'producing_rate',
+  'os-counter': 'offer_counter',  // 2.118.0 A (#2265)
+  'os-sf': 'share_factor', 'os-sr': 'share_rate',  // 2.113.1 (#2251): producing by amount (film pack option)
+  'os-raw-on': 'raw_on', 'os-rf': 'raw_factor', 'os-pack': 'pack', 'os-parts-inv': 'parts_invoice_mode', 'os-parts-t-de': 'parts_summary_title_de',
+  'os-parts-t-en': 'parts_summary_title_en', 'os-agents-read': 'agents_read'};
+const OST_SUB = {'os-intro-de': ['intro_text_id', 'de'], 'os-intro-en': ['intro_text_id', 'en'], 'os-closing-de': ['closing_text_id', 'de'], 'os-closing-en': ['closing_text_id', 'en'],
+  'os-rt': ['rights_default', 'time_id'], 'os-rr': ['rights_default', 'territory_id'], 'os-rm': ['rights_default', 'media_id']};
+const OST_CO = {'os-lines': 'lines', 'os-contact': 'contact_lines', 'os-register': 'register_lines', 'os-bank': 'bank_lines'};
+function ost_part(el, full) {
+  const id = el.id || '';
+  if (id === 'os-name') return {company: {name: full.company.name}, company_fields: {name: full.company_fields.name}};
+  if (el.dataset.co && el.dataset.co in full.company_fields) return {company_fields: {[el.dataset.co]: full.company_fields[el.dataset.co]}};
+  if (OST_CO[id]) return {company: {[OST_CO[id]]: full.company[OST_CO[id]]}};
+  if (OST_FLAT[id] && OST_FLAT[id] in full) return {[OST_FLAT[id]]: full[OST_FLAT[id]]};
+  if (OST_SUB[id]) { const [k, f] = OST_SUB[id]; return {[k]: {[f]: full[k][f]}}; }
+  // an industry pack box: only this pack switches (the list of the others stays as saved, also when not all boxes are drawn)
+  if (id.startsWith('os-ind-')) return {industry_packs: ost_packs(el.dataset.ind || id.slice(7), el.checked)};
+  if (el.dataset.pkcOn) return {industry_packs: ost_packs(el.dataset.pkcOn, el.checked)};  // 2.113.0 (#2246): the switch on a pack's card
+  if (el.closest('.dxset') && full.datev_extf) return {datev_extf: full.datev_extf};
+  return /^os-/.test(id) ? full : null;  // a settings field this map does not know yet (e.g. added later): the whole page, never a silent loss
+}
+const ost_packs = (code, on) => { const l = (OFC.info.settings.industry_packs || []).filter(x => x !== code); return on ? [...l, code] : l; };
+// what the part was before (for undo): the saved settings
+function ost_old(part) {
+  const s = OFC.info.settings || {}, cf = OFC.info.company_fields || {}, cp = x => JSON.parse(JSON.stringify(x ?? null)), o = {};
+  for (const [k, v] of Object.entries(part)) {
+    if (k === 'company_fields') o[k] = Object.fromEntries(Object.keys(v).map(f => [f, cf[f] ?? '']));
+    else if (['company', 'intro_text_id', 'closing_text_id', 'rights_default'].includes(k)) o[k] = Object.fromEntries(Object.keys(v).map(f => [f, cp((s[k] || {})[f] ?? (k === 'company' ? (f === 'name' ? '' : []) : null))]));
+    else o[k] = cp(s[k]);
+  }
+  return o;
+}
+async function ost_put(b) {
+  const j = await api('PUT', '/api/office/settings', b);
+  const pk = OFC.info.settings?.pack;
+  OFC.info.settings = j.settings; OFC.info.company_fields = j.company_fields || OFC.info.company_fields; OFC.info.number_preview = j.number_preview; OFC.log = null;
+  return j.settings?.pack !== pk;
+}
+// what changes more than the field itself is drawn again (pack: its tax rates; currency: the symbols; industry packs: the cards)
+const ost_redraw = (part, pk) => pk ? ofcInfo(true) : ('currency' in part || 'industry_packs' in part) ? ofcDraw() : null;
+const OST = {q: Promise.resolve()};
+function ost_save(el) {
+  const form = el.closest?.('#ofc-set');
+  if (!form || !ofcAdmin() || el.disabled || (el.closest('[data-fg-skip]') && !el.dataset.pkcOn) || el.type === 'file') return;
+  let part = null; try { part = ost_part(el, ofcSettingsBody(form)); } catch { part = null; }
+  if (!part) return;
+  const v = fgVal(el); if (el._ostV === v) return;  // (change and focusout of the same edit)
+  el._ostV = v;
+  const old = ost_old(part), fk = form.dataset.fg, k = fgKey(el);
+  OST.q = OST.q.then(async () => {
+    try {
+      const pk = await ost_put(part);
+      if (el.type === 'checkbox' || el.type === 'radio') el.defaultChecked = el.checked;
+      else if (el.tagName === 'SELECT') [...el.options].forEach(o => { o.defaultSelected = o.selected; });
+      else el.defaultValue = el.value;
+      if (FG.d[fk]) delete FG.d[fk].f[k];
+      const e = histAdd({label: tr('Settings'), undo: () => ost_back(old), redo: () => ost_back(part)});  // one undo step per field
+      await ost_redraw(part, pk);
+      ost_mark(el.isConnected ? el : ost_find(el), 'ok', e);
+    } catch (x) {
+      el._ostV = undefined;
+      const d = FG.d[fk] || (FG.d[fk] = {f: {}}); d.f[k] = v;  // the value stays (a redraw puts it back, closing the page asks)
+      ost_mark(el, 'err', x instanceof Offline ? tr('Offline: only works again with a connection') : x?.message || tr('Could not save'));
+    }
+  });
+  return OST.q;
+}
+async function ost_back(b) {
+  const a = document.activeElement; if (a?.closest?.('#ofc-set')) a.blur();  // (a redraw keeps the value of a focused field)
+  try { const pk = await ost_put(b); if (pk) await ofcInfo(true); else ofcDraw(); } catch { /* shown by api() */ }
+  return {skipped: []};
+}
+// the field again after a redraw
+const ost_find = el => el.id ? $('#ofc-set #' + CSS.escape(el.id)) : el.dataset.pkcOn ? $(`#ofc-set [data-pkc-on="${CSS.escape(el.dataset.pkcOn)}"]`) : null;
+// "Saved" (with Undo) or the error at the field, for a few seconds
+function ost_mark(el, st, x) {
+  const row = el?.closest('.row, .pkc-on') || el?.closest('label') || el?.parentElement; if (!row) return;
+  let m = row.querySelector(':scope > .ostok');
+  if (!m) { m = document.createElement('span'); m.className = 'ostok'; m.setAttribute('role', 'status'); row.append(m); }
+  el.toggleAttribute('aria-invalid', st === 'err'); m.classList.toggle('err', st === 'err');
+  m.innerHTML = st === 'err' ? `${ic('alert', 's')}<span>${esc(x)}</span>` : `${ic('check', 's')}<span>${esc(tr('Saved'))}</span>${x ? `<button type="button" class="linkbtn" data-ost-undo>${esc(tr('Undo'))}</button>` : ''}`;
+  m._e = st === 'ok' ? x : null; m.classList.add('on');
+  clearTimeout(m._t); if (st === 'ok') m._t = setTimeout(() => { m.classList.remove('on'); m._e = null; }, 4000);
 }
 // 2.40.0 (#1378): one upload helper for the office (FormData + the CSRF header X-Requested-With via rawFetch, the server's error text)
 const ofcUpload = (url, file) => { const fd = new FormData(); fd.append('file', file); return rawFetch('POST', url, fd); };
@@ -581,7 +708,17 @@ document.addEventListener('click', async e => {
     inp.value = inp.value.slice(0, p0) + t + inp.value.slice(p1); inp.focus(); inp.setSelectionRange(p0 + t.length, p0 + t.length); inp.dispatchEvent(new Event('input', {bubbles: true})); }
   else if (a === 'logo-del') { e.preventDefault(); try { await api('DELETE', '/api/office/logo'); await ofcInfo(true); toast(tr('Removed')); } catch (x) { toast(x.message || ''); } }
 });
-document.addEventListener('submit', e => { const f = e.target.closest?.('#ofc-set'); if (!f) return; e.preventDefault(); ofcSaveSettings(f); });
+document.addEventListener('submit', e => { const f = e.target.closest?.('#ofc-set'); if (!f) return; e.preventDefault(); if (ofcAdmin()) ofcSaveSettings(f); });
+// 2.113.0 (#2247): an area of the settings; a field saves on its change (boxes, choices, the country) or when it is left
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('#ofc-set [data-ostsub]'); if (b) { e.preventDefault(); ost_show(b.dataset.ostsub, true); return; }
+  const u = e.target.closest?.('#ofc-set [data-ost-undo]'); if (!u) return;
+  e.preventDefault(); const m = u.closest('.ostok');
+  if (m?._e && HIST.undo[HIST.undo.length - 1] === m._e) { m.classList.remove('on'); histStep('undo'); }
+});
+document.addEventListener('change', e => { if (e.target.closest?.('#ofc-set')) ost_save(e.target); });
+document.addEventListener('mousedown', e => { if (e.target.closest?.('#ofc-set [data-ofc="bb"]')) e.preventDefault(); });  // a building block keeps the scheme field focused (no save in between)
+document.addEventListener('focusout', e => { const t = e.target; if (/^(INPUT|TEXTAREA)$/.test(t.tagName) && !/^(checkbox|radio|file|hidden)$/.test(t.type) && t.closest('#ofc-set') && t.value !== t.defaultValue) ost_save(t); });
 // 2.138.1 B (#2395): a short multi-line field (company name) grows with its text up to `max` rows, no inner scrollbar
 function ofcGrow(ta, max = 3) {
   ta.rows = 1;

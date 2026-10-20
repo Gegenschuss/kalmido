@@ -1,0 +1,14 @@
+/* Kalmido web client: the phone scan dialog (abscan.js, loaded on demand; 2.112.1, #2058) */
+.abscandlg .card{max-width:34rem}
+.abscpages{display:flex;flex-direction:column;gap:.5rem;max-height:50vh;overflow-y:auto;margin:.5rem 0}
+.abscpg{display:flex;align-items:center;gap:.75rem;padding:.375rem;border:.0625rem solid var(--line);border-radius:var(--radius)}
+.abscimg{flex:0 0 4rem;height:4rem;display:grid;place-items:center;overflow:hidden;border-radius:.375rem;background:var(--bg2)}
+.abscimg img{max-width:4rem;max-height:4rem;object-fit:contain;transition:transform .2s}
+.abscno{flex:1;min-width:0}
+.abscacts{display:flex;gap:.125rem}
+.abscacts .iconbtn{min-width:2.75rem;min-height:2.75rem}
+.abscempty{padding:1rem 0;text-align:center}
+.abscshot{width:100%;justify-content:center;min-height:2.75rem;margin:.25rem 0 .75rem}
+.absclbl{display:flex;flex-direction:column;gap:.25rem;margin-bottom:.75rem}
+.absclbl.chkl{flex-direction:row;align-items:center;gap:.5rem}
+@media (prefers-reduced-motion:reduce){ .abscimg img{transition:none} }

@@ -82,6 +82,8 @@ needs no permission. Agents created before 2.15.0 keep everything they could do 
 
 - `GET /api/v1/me` shows `token.effective_scopes`; the MCP server lists only the tools the token may use.
 - A request without its permission gets `403` with `error.required_scope`: ask a person to grant it, never work around it.
+- **Trash period (2.138.1).** A task in the trash (`delete_task`, `list_trash`) is deleted for good by the server after the
+  trash period (`KALMIDO_TRASH_DAYS`, 30 days, when the operator has the retention switch on); restore it before then.
 - Optional: **Only from** limits the agent's token to IP addresses / networks; a new token can **expire** (30 / 90 / 365
   days, never by default). Every request is in the [audit log](#audit-log) with the permission it needed.
 - **Only these lists (2.30.0).** An agent (its dialog; a personal agent: the permissions dialog) and every personal API
@@ -472,6 +474,9 @@ Every event has the same envelope, whether it arrives as a webhook or through po
 
 ### Webhooks
 
+(2.138.1: the inbound webhook of a list and the webhooks of an organisation are for other tools, set up by people; see
+[API.md](API.md#inbound-webhook-of-a-list-21150). An agent creates tasks with `POST /api/v1/tasks` and its own token.)
+
 If the agent has a webhook URL, Kalmido POSTs every event to it as JSON. The headers are the same as for [user webhooks](API.md):
 
 | Header | Value |
@@ -801,6 +806,16 @@ free. Every task in events and in the API has `"locked": true | false`.
   MCP `update_task`) and can set or clear it with `{"locked": true | false}`. Do not lift a lock a person set unless
   they ask you to.
 - Locking and unlocking show in the task's history; existing tasks were not locked by the update.
+
+### Reminders at a fixed time (2.138.1)
+
+Besides `reminders` (minutes before the due time) a task can have **one reminder at a fixed time**: `remind_at`, the local
+date and time `YYYY-MM-DDTHH:MM` (the server's time zone, like `due` / `due_time`), also without a due date ("remind me
+on Tuesday at 9:00"). Set or clear it with `POST` / `PATCH /api/v1/tasks` (MCP `create_task` / `update_task`, `null` =
+none). It goes out once, to the same people and over the same channels as the other reminders, and follows the person's
+notification switches; on a recurring task it moves along with the due date when the task is ticked or skipped. People
+type it in the quick add ("remind me tomorrow 9am", "erinnere mich Di 9:00"); calendar apps (CalDAV) see it as an alarm
+at that time.
 
 ### Dates move the dependency chain (2.67.0)
 
@@ -1769,6 +1784,9 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
   updated ..." and may edit or delete it as usual; the next run overwrites only the agent's own block. An agent keeps at
   most 3 notepads per project (its status block included); they do not count against the 20 of people. A blocker in a list
   the agent does not see appears only as `hidden: true` (no title, id or assignee, not in `waits` / `people`).
+- **Invitations by e-mail (2.138.1).** Agents do not send invitation mails: `send_invites` is refused for agent tokens
+  (`403`), because the mail goes out in the person's name. Add the attendees and tell your person to send the invitation
+  in the app; deleting an event that already had invitations still sends the cancellations by itself.
 - **Time check.** `user_id` = a person who may chat with the agent (a personal agent: its owner by default). Only entries and
   tasks of lists both see, events only of calendars shared with the agent, bookings only of the agent's workspace. Events
   and bookings only with the scope `calendar`; a booking of a list the agent does not see appears as "Booked"
@@ -2709,7 +2727,7 @@ with the scope it needs). The tools:
   `share_list_with_group`, `unshare_list_from_group`, `list_folders`, `rename_folder`, `delete_folder`
 - sections: `list_sections`, `create_section`, `rename_section`, `reorder_sections`, `delete_section`
 - tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact),
-  `search_tasks` (2.59.0: `semantic: true` = also tasks of similar meaning), `related_tasks` (2.59.0: up to 5 related tasks, `dup` = probably a duplicate), `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
+  `search_tasks` (2.59.0: `semantic: true` = also tasks of similar meaning; 2.138.1: `fulltext: true` = ranked, also finds a task by its comments, with a snippet), `related_tasks` (2.59.0: up to 5 related tasks, `dup` = probably a duplicate), `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
   `move_task` (list / section / parent + `before_id` / `after_id` / `position`), `link_task_to_list` /
   `unlink_task_from_list` (2.71.0: a task also in another list, see below), `batch_tasks`, `skip_occurrence`,
   `take_task`, `list_subtasks`, `add_subtask`, `list_trash`, `restore_task`, `empty_trash`, `list_tags`, `get_roadmap`
@@ -2729,7 +2747,7 @@ with the scope it needs). The tools:
   `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`,
   `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `list_repos`, `list_environments` (2.60.0), `set_deployment` (2.60.0)
 - time and habits: `get_timer`, `start_timer`, `stop_timer`, `list_time_entries`, `get_time_gaps` (2.34.0), `add_time_entry`, `update_time_entry`,
-  `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`
+  `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`, `get_habit_stats` (2.138.1)
 - News: `list_news`, `mark_news_read`
 - day plans: `get_day_plan`, `get_day_review`
 - family (2.19.0): `get_family`, `add_occasion`, `list_deadline_types`, `add_deadline`, `ingredients_to_shopping`,
@@ -2764,7 +2782,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `delete_task`, `delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`,
 `draft_reminder`, `duplicate_list`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
 `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`,
-`get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_life`, `get_list`, `get_me`,
+`get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_habit_stats`, `get_job`, `get_life`, `get_list`, `get_me`,
 `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_playbook`,
 `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`,
 `get_timer`, `get_usage`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`, `ingredients_to_shopping`,
@@ -2774,8 +2792,8 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`, `list_notes`, `list_office_data`,
 `list_office_documents`, `list_office_leads`, `list_packing_templates`, `list_payment_suggestions`, `list_project_files`,
 `list_receipt_suggestions`, `list_repos`, `list_schedules`, `list_sections`, `list_stale_tasks`, `list_subtasks`,
-`list_tags`, `list_tasks`, `list_team_chats`, `list_templates`, `list_time_entries`, `list_trash`,
-`list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`, `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`,
+`list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`, `list_time_entries`, `list_trash`,
+`list_upkeep_presets`, `list_waiting`, `leave_team_channel`, `mark_news_read`, `mark_team_chat_read`, `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`,
 `propose_playbook`, `propose_to_other_topic`, `propose_to_person`, `react`, `react_team_message`, `react_to_chat`,
 `read_attachment`, `read_briefing`, `read_file`, `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`,
 `rename_folder`, `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`,
@@ -2877,6 +2895,16 @@ own chat.
 | `POST /team/messages/{id}/reactions` `{emoji, on?}` | `react_team_message` | comments |
 | `POST /team/messages/{id}/pin` `{pinned?}` (2.62.0: at most 5 per conversation; the page of a conversation carries `pins`) | `pin_team_message` | comments |
 | `POST /team/rooms/{id}/read` `{last_id?}` | `mark_team_chat_read` | comments |
+| `GET /team/channels` (2.138.1: the channels a person added you to) | `list_team_channels` | read |
+| `DELETE /team/rooms/{id}/members/{your id}` (2.138.1: leave a channel) | `leave_team_channel` | comments |
+| `GET /team/files/{id}` (2.138.1: a file of a team chat message) | `get_attachment` with `source: team` | read |
+
+2.138.1 (#2059): besides the channel of each shared list there are channels people open themselves (`kind` `channel`) and
+group conversations of people (`kind` `group`). An agent is never in a group; it joins a channel only when a person adds it
+(a personal agent by its owner, an agent of the organisation by an organisation admin, always of the channel's organisation).
+In a channel you get `team_message` when someone @mentions you, like in a list's channel. Messages carry `attachments`
+`[{id, name, mime, size, url}]`; `post_team_message` sends `files` `[{name, base64, mime?}]` (not in end-to-end encrypted
+conversations). Opening channels or groups, renaming, archiving and managing members stay with people (`403` for agents).
 
 **Searching conversations (2.33.0)**: `GET /search?scope=messages&q=…` (MCP `search_messages`, scope read) finds words in
 the comments of the tasks of your lists, in the channels of those lists and in your own chats with people -- never in

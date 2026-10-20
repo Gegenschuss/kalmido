@@ -1,7 +1,7 @@
 /* Kalmido web client: the styles of the module "docs" (2.65.0, #1824), loaded with it (static/js/lazyload.js LD_CSS).
    Moved unchanged from app.css (same order); later than app.css in the cascade. */
 .dc-view{position:relative;max-width:68.75rem;margin:0 auto;padding:0 .75rem 5rem}
-.dc-up{min-height:2.75rem}
+.dc-up,.dc-acts2 [data-dc="scan"]{min-height:2.75rem}
 .dc-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.75rem 0 .25rem}
 .dc-acts2{display:inline-flex;align-items:center;gap:.25rem;margin-left:auto}
 .dc-bar #dc-q{flex:1 1 14rem;min-height:2.75rem}
@@ -60,7 +60,7 @@
 @media (max-width:899px) {
   .dc-view{padding:0 .5rem 6rem}
   .dc-grid{grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr));gap:.5rem}
-  .dc-up span{display:none}
+  .dc-up span,.dc-acts2 [data-dc="scan"] span{display:none}
   .dc-filters{display:grid;grid-template-columns:1fr 1fr}
   .dc-filters select{width:100%}
   .dc-range{justify-content:space-between}

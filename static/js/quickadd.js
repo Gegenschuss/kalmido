@@ -106,7 +106,7 @@ const QL = {
 };
 // the weekday number of a name matched by one of the QL patterns
 const qlWd = (L, w) => L.wd.findIndex(p => new RegExp(`^(?:${p})$`, 'i').test(w));
-function parseQuick(text, ignore = new Set()) {
+function parseQuick(text, ignore = new Set(), sub = false) {  // sub: a reminder's date words only (quickadd2.js)
   const out = {title: text, chips: []};
   let s = ' ' + text + ' ';
   const take = (re, type, fn) => {
@@ -116,6 +116,7 @@ function parseQuick(text, ignore = new Set()) {
   };
   // website link: the first http(s) URL goes into the link field, not the title
   take(/\s(https?:\/\/[^\s]+)(?=\s)/i, 'link', m => { out.url = m[1].replace(/[.,;:!?]+$/, ''); return urlHost(out.url); });
+  if (!sub) qa2_early(take, out, () => s);  // 2.111.0 C (#2057): reminder + duration, before the dates take their words
   // repeat (before dates, "jeden montag" contains a weekday)
   take(new RegExp(`\\s(täglich|jeden tag|daily|every day|werktags|jeden werktag|weekdays|every weekday|wöchentlich|jede woche|weekly|every week|monatlich|jeden monat|monthly|every month|jährlich|jedes jahr|yearly|annually|every year|(?:jeden|every) (${WDAY_RE})|(?:alle|every) (\\d+) (tage|wochen|monate|days?|weeks?|months?))(?=\\s)`, 'i'), 'repeat', m => {
     const w = m[1].toLowerCase();
@@ -227,6 +228,7 @@ function parseQuick(text, ignore = new Set()) {
     if (hit && ignore.has('list')) out.chips.push({type: 'list', label: hit.phrase, off: true});
     else if (hit) { out.list_id = hit.list.id; out.chips.push({type: 'list', label: lname(hit.list)}); s = s.slice(0, hit.start) + ' ' + s.slice(hit.end); }
   }
+  if (!sub) qa2_late(take, out, () => s);  // 2.111.0 C (#2057): @person
   if (out.repeat && !out.due) out.due = today();
   out.title = s.replace(/\s+/g, ' ').trim();
   return out;
@@ -328,14 +330,17 @@ function rrEnd(r) {
 function rrForm(base) {
   const p = {}; for (const x of String(base || '').split(';')) { const [k, v] = x.split('='); if (k) p[k] = v; }
   const f = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(p.FREQ) ? p.FREQ : 'WEEKLY';
-  const extra = Object.keys(p).some(k => !['FREQ', 'INTERVAL', 'BYDAY', 'WKST'].includes(k)) || (p.BYDAY && (f !== 'WEEKLY' || /\d/.test(p.BYDAY)));
-  return {f, n: Math.max(1, +p.INTERVAL || 1), days: new Set(f === 'WEEKLY' && p.BYDAY && !/\d/.test(p.BYDAY) ? p.BYDAY.split(',') : []), extra, raw: base};
+  const extra = Object.keys(p).some(k => !['FREQ', 'INTERVAL', 'BYDAY', 'WKST', 'TIMES'].includes(k)) || (p.BYDAY && (f !== 'WEEKLY' || /\d/.test(p.BYDAY)));
+  return {f, n: Math.max(1, +p.INTERVAL || 1), days: new Set(f === 'WEEKLY' && p.BYDAY && !/\d/.test(p.BYDAY) ? p.BYDAY.split(',') : []), extra, raw: base,
+    times: f === 'DAILY' && p.TIMES ? p.TIMES.split(',').filter(x => /^\d{4}$/.test(x)).map(x => `${x.slice(0, 2)}:${x.slice(2)}`) : []};  // 2.116.0 D (#2066): daily at several times
 }
 function rrBuild(cu) {
   if (cu.extra) return cu.raw;
   const days = RR_WD.filter(d => cu.days.has(d));
-  return `FREQ=${cu.f}${cu.n > 1 ? `;INTERVAL=${cu.n}` : ''}${cu.f === 'WEEKLY' && days.length ? `;BYDAY=${days.join(',')}` : ''}`;
+  return `FREQ=${cu.f}${cu.n > 1 ? `;INTERVAL=${cu.n}` : ''}${cu.f === 'WEEKLY' && days.length ? `;BYDAY=${days.join(',')}` : ''}${cu.f === 'DAILY' && cu.times?.length ? `;TIMES=${rmdTimes(cu.times)}` : ''}`;
 }
+// 2.116.0 D (#2066): "HH:MM" list -> the rule's sorted, distinct HHMM list
+const rmdTimes = ts => [...new Set(ts.filter(Boolean).map(x => x.replace(':', '')))].sort().slice(0, 12).join(',');
 function rrSetEnd(r, end) {
   const b = rrBase(r); if (!b) return '';
   if (end.type === 'count') return `${b};COUNT=${Math.max(1, Math.min(999, +end.val || 1))}`;
@@ -353,6 +358,7 @@ function repeatLabelBase(r) {
   const p = Object.fromEntries(r.replace(/^RRULE:/, '').split(';').map(x => x.split('=')));
   const n = +(p.INTERVAL || 1);
   const days = p.BYDAY ? p.BYDAY.split(',').map(d => WD[RR_WD.indexOf(d.replace(/^[-\d]+/, ''))]).join(', ') : '';
+  if (p.FREQ === 'DAILY' && p.TIMES) return tr('Daily at {0}', p.TIMES.split(',').map(x => fmtTimeLoc(`${x.slice(0, 2)}:${x.slice(2)}`)).join(', '));
   if (p.FREQ === 'DAILY') return n === 1 ? tr('Daily') : tr('Every {0} days', n);
   if (p.FREQ === 'WEEKLY') {
     if (p.BYDAY === 'MO,TU,WE,TH,FR') return tr('Weekdays');

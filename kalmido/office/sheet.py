@@ -19,9 +19,11 @@ Rules (the spreadsheet the module replaces):
 Money is Decimal rounded half up like calc.money; the result holds strings (exact) for the parts calculation.
 """
 import json
+import logging
 import os
 import re
 import secrets
+import stat
 from decimal import Decimal, ROUND_HALF_UP
 
 from .calc import dec, money, fmt_money, fmt_qty
@@ -39,6 +41,13 @@ DK_MAX_ROWS = 60
 DK_NAME_MAX = 200
 _CODE_RE = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
 _cache = {}
+# 2.113.1 (#2252): own industry packs of an instance in its data folder (next to the database, /data/packs/industry in
+# Docker), checked like the shipped ones; a file with the code of a shipped pack is refused (log line), the shipped one stays
+IND_DATA_DIR = os.path.join(os.path.dirname(os.environ.get("TASKS_DB", "/data/tasks.db")), "packs", "industry")
+PRD_PACK_MAX = 512 * 1024
+PRD_OPTS = ("share", "handling", "markup")  # 2.113.1 (#2251, #2252): the calculation options a pack may offer
+_data = {}  # path -> ((mtime, size), pack or None)
+log = logging.getLogger(__name__)
 
 
 def _pkc(name, *a):
@@ -56,7 +65,55 @@ def dk_pack_codes():
     """The codes of the industry packs shipped with the app (sorted)."""
     if not os.path.isdir(IND_DIR):
         return []
-    return sorted({f[:-5] for f in os.listdir(IND_DIR) if f.endswith(".json") and _CODE_RE.match(f[:-5])} | (_pkc("pkc_codes", "industry") or set()))  # 2.76.0 (#1023): + the installed packs
+    return sorted({f[:-5] for f in os.listdir(IND_DIR) if f.endswith(".json") and _CODE_RE.match(f[:-5])} | (_pkc("pkc_codes", "industry") or set())  # 2.76.0 (#1023): + the installed packs
+                  | set(prd_data_packs()))  # 2.113.1 (#2252): + the own packs of the data folder
+
+
+def prd_data_packs():
+    """2.113.1 (#2252): {code: pack} of the valid own packs in IND_DATA_DIR (a file is read again when it changes)."""
+    if not os.path.isdir(IND_DATA_DIR):
+        return {}
+    out = {}
+    for f in sorted(os.listdir(IND_DATA_DIR)):
+        code = f[:-5] if f.endswith(".json") else ""
+        if not _CODE_RE.match(code):
+            continue
+        p = os.path.join(IND_DATA_DIR, f)
+        try:
+            st = os.lstat(p)
+        except OSError:
+            continue
+        if not stat.S_ISREG(st.st_mode):  # a regular file only (no symlink, no folder)
+            continue
+        key = (st.st_mtime_ns, st.st_size)
+        hit = _data.get(p)
+        if not hit or hit[0] != key:
+            hit = _data[p] = (key, _prd_load(p, code, st.st_size))
+        if hit[1]:
+            out[code] = hit[1]
+    return out
+
+
+def _prd_load(p, code, size):
+    if os.path.isfile(os.path.join(IND_DIR, code + ".json")):
+        log.warning("own industry pack %s refused: a shipped pack has this code", code)
+        return None
+    if size > PRD_PACK_MAX:
+        log.warning("own industry pack %s refused: larger than %d bytes", code, PRD_PACK_MAX)
+        return None
+    try:
+        with open(p, encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        log.warning("own industry pack %s refused: not readable as JSON", code)
+        return None
+    bad = dk_pack_validate(d)
+    if not bad and d.get("code") != code:
+        bad = ["code: must match the file name"]
+    if bad:
+        log.warning("own industry pack %s refused: %s", code, "; ".join(bad[:5]))
+        return None
+    return d
 
 
 def dk_pack(code, builtin=False):
@@ -73,7 +130,7 @@ def dk_pack(code, builtin=False):
         return _cache[code]
     p = os.path.join(IND_DIR, code + ".json")
     if not os.path.isfile(p):
-        return None
+        return prd_data_packs().get(code)  # 2.113.1 (#2252): an own pack of the data folder
     with open(p, encoding="utf-8") as f:
         d = json.load(f)
     if dk_pack_validate(d):
@@ -128,11 +185,50 @@ def dk_pack_validate(d):
             for k in DK_LABEL_KEYS:
                 if not isinstance(L.get(k), str) or not L[k]:
                     bad.append(f"labels.{lg}.{k}: text required")
+    bad += prd_calc_validate(d.get("calc"))  # 2.113.1 (#2251, #2252)
     for path, s in _strings(d):
         if "<" in s and ">" in s or "javascript:" in s.lower():
             bad.append(f"{path}: markup is not allowed")
             break
     return bad
+
+
+def _prd_name(v, n=60):
+    return isinstance(v, dict) and all(isinstance(v.get(lg), str) and v[lg].strip() and len(v[lg]) <= n for lg in ("de", "en"))
+
+
+def prd_calc_validate(cl):
+    """2.113.1 (#2251, #2252): the optional calculation options of a pack, "calc": {"share": {"label": {de, en}, "rate":
+    day rate, "factor": 0.01..10}, "handling": {"label": {de, en}, "pct": 0..100, "on": bool}, "markup": {"label":
+    {de, en}, "pct": 0..100, "on": bool, "stacked": bool}} -> list of problems."""
+    if cl is None:
+        return []
+    if not isinstance(cl, dict) or any(k not in PRD_OPTS for k in cl):
+        return ["calc: object with " + " | ".join(PRD_OPTS)]
+    bad = []
+    sh = cl.get("share")
+    if sh is not None and (not isinstance(sh, dict) or not _prd_name(sh.get("label")) or not _num_ok(sh.get("rate"), 0.01, 1e7)
+                           or not _num_ok(sh.get("factor"), 0.01, 10)):
+        bad.append("calc.share: {label {de, en}, rate > 0, factor 0.01..10}")
+    for k in ("handling", "markup"):
+        x = cl.get(k)
+        if x is not None and (not isinstance(x, dict) or not _prd_name(x.get("label")) or not _num_ok(x.get("pct"), 0, 100)
+                              or not isinstance(x.get("on", False), bool) or not isinstance(x.get("stacked", False), bool)
+                              or k == "handling" and "stacked" in x):
+            bad.append(f"calc.{k}: {{label {{de, en}}, pct 0..100, on true|false" + (", stacked true|false}" if k == "markup" else "}"))
+    return bad
+
+
+def prd_options(settings):
+    """2.113.1 (#2251, #2252): the calculation options of the industry packs switched on: {"share" | "handling" |
+    "markup": {...} | None}, each the first pack (in the order switched on) that offers it, with its "pack" code."""
+    out = {k: None for k in PRD_OPTS}
+    for code in dk_packs_on(settings):
+        cl = (dk_pack(code) or {}).get("calc") or {}
+        for k in out:
+            if out[k] is None and isinstance(cl.get(k), dict):
+                out[k] = {**cl[k], "pack": code}
+    return out
 
 
 def _strings(d, path="pack"):
@@ -175,7 +271,7 @@ def dk_pack_public(d, lang="de"):
     if not d:
         return None
     return {"code": d["code"], "name": d["name"], "blocks": d["blocks"], "defaults": d["defaults"],
-            "labels": d["labels"], "roles": d.get("roles") or []}
+            "labels": d["labels"], "roles": d.get("roles") or [], "calc": d.get("calc") or {}}  # 2.113.1 (#2251): + calc options
 
 
 # ---------------------------------------------------------------- clean (request -> stored sheet)
