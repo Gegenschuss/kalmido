@@ -148,7 +148,7 @@ RM = next(t for t in kinds["rights_media"] if t["key"] == "internal_web_unpaid")
 
 # ---- packs
 r = A.get(B + O + "/packs")
-check(r.ok and [p["code"] for p in r.json()["packs"]] == ["DE"], "packs: DE is shipped " + r.text[:100])
+check(r.ok and [p["code"] for p in r.json()["packs"]] == ["DE", "XX"], "packs: DE + the neutral base pack XX are shipped " + r.text[:100])  # 2.147.0 (#2461): + XX
 r = A.get(B + O + "/packs/DE")
 check(r.ok and r.json()["pack"]["labels"]["en"]["rights_time"] == "Duration of License" and r.json()["pack"]["labels"]["de"]["rights"] == "Rechteübertragung", "packs: DE labels")
 check(r.json()["pack"]["texts"]["vat_note"]["de"] == "Alle Preise zuzüglich 7 % bzw. 19 % MwSt." and r.json()["pack"]["einvoice"]["status"] == "ready", "packs: vat note + e-invoice ready (2.38.0)")
