@@ -800,7 +800,7 @@ def process(c, nid):
     apply_values(c, m, node, newv, auto)
     auto_all.update({f: (next(iter(a.values()), "rule") if isinstance(a, dict) else a) for f, a in auto.items()})
     if not given.get("text") and doc_guesses(c, m, ws, newv.get("type") or cur["type"], text):  # 2.98.0 D (#2178)
-        ex = EX.extract(text)
+        ex = EX.extract(text, details=True)  # 2.121.0 A (#2092): + supplier, VAT, net / gross, invoice number (a suggestion)
         vals["due_date"] = given.get("due") or ex["due"]
         vals["amount"] = str(given.get("amount") or ex["amount"] or vals["amount"] or "")
         vals["currency"] = str(given.get("currency") or ex["currency"] or vals["currency"] or "")[:8]
@@ -818,5 +818,7 @@ def process(c, nid):
                vals["doc_date"], vals["due_date"], doc_seal(c, ws, "doc_meta.amount", vals["amount"]), vals["currency"],
                json.dumps(auto_all, separators=(",", ":")), _jseal(c, ws, "doc_meta.suggest", sug) if sug else "", review, node["cur_version"],
                _now(), _now(), nid))
+    from ..receipts.extracted import rx_compact
+    meta_set_json(c, nid, ws, "extracted", rx_compact(ex.get("details")))  # 2.121.0 A (#2092): a fresh run, a fresh suggestion
     doc_index(c, nid, ws, index_text(c, dict(meta_row(c, nid)), node["name"], text))
     return state
