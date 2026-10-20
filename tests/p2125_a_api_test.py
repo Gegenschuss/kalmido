@@ -203,6 +203,10 @@ REQ = r.json()["id"]
 check(len(dbx("SELECT 1 FROM notifications WHERE user_id=? AND kind='leavereq'", (BOB,))) == n0 + 1, "#2117: the admin gets a News item")
 r = Ca.post(B + "/api/team/absences", json={"kind": "sick", "start_date": "2027-03-08"})
 check(r.status_code == 201 and r.json()["status"] == "approved", "#2117: sick leave never needs an approval")
+# 2.125.0 R (#2117): reopen only undoes a decision on a vacation request (a sick leave set to pending would count nowhere)
+SICK = r.json()["id"]
+check(Bo.post(B + f"/api/team/absences/{SICK}/decide", json={"action": "reopen"}).status_code == 409, "#2117: a sick leave cannot be reopened (409)")
+check(Bo.get(B + "/api/team/absences/check", params={"user": CAROL, "date": "2027-03-08"}).json().get("absent") is True, "#2117: the sick leave still counts as away")
 r = Bo.post(B + "/api/team/absences", json={"kind": "vacation", "start_date": "2027-03-15"})
 check(r.status_code == 201 and r.json()["status"] == "approved", "#2117: an admin's own vacation is approved")
 _, pc = acc(Ca, CAROL)

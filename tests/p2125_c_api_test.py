@@ -17,6 +17,7 @@ import sys
 import zipfile
 from datetime import datetime, timedelta
 from xml.etree import ElementTree as ET
+from zoneinfo import ZoneInfo
 
 import requests
 import testclock
@@ -133,6 +134,33 @@ check(len(rows) == 2 and rows[1][0] == "Total", "a stranger gets an empty sheet 
 r = requests.get(B + "/api/time/export.xlsx", headers=H)
 check(r.status_code in (401, 403), f"no login: {r.status_code}")
 check(A.get(B + "/api/time/export.xlsx", params={"from": "2000-01-01", "to": "2000-01-02"}).ok, "an empty range is fine")
+
+# 2.125.0 R (#2122, #2120): the person's time zone and an entry over midnight -- the XLSX has exactly the CSV's rows
+check(Ca.patch(B + "/api/settings", json={"tz": "America/New_York"}).ok, "carol works in New York")
+NY = ZoneInfo("America/New_York")
+DNY = (datetime.now(NY) - timedelta(days=3)).date()
+CLN = Ca.post(B + "/api/lists", json={"name": "Night shift", "time_tracking": True}).json()["id"]
+check(Ca.patch(B + f"/api/lists/{CLN}", json={"rate": 90}).ok, "carol's hourly rate")
+st = datetime(DNY.year, DNY.month, DNY.day, 23, 30, tzinfo=NY)
+check(Ca.post(B + "/api/time/entries", json={"list_id": CLN, "start": st.isoformat(), "minutes": 60, "note": "overnight"}).ok, "an entry over midnight")
+QN = {"from": DNY.isoformat(), "to": (DNY + timedelta(days=1)).isoformat()}
+crows = [r for r in csv.reader(io.StringIO(Ca.get(B + "/api/time/export.csv", params=QN).text.lstrip("\ufeff"))) if r][1:]
+rows, _ = xlsx(Ca.get(B + "/api/time/export.xlsx", params=QN))
+xrows = rows[1:-1]
+
+
+def xdt(v):
+    return (datetime(1899, 12, 30) + timedelta(days=v) + timedelta(seconds=30)).strftime("%Y-%m-%d %H:%M")
+
+
+check(len(crows) == 2 and len(xrows) == 2, f"two rows (one per day) in both {len(crows)} {len(xrows)}")
+check([r[3] for r in crows] == [f"{DNY} 23:30", f"{DNY + timedelta(days=1)} 00:00"], f"CSV: New York times {crows}")
+for cr, xr in zip(crows, xrows):
+    check(xdt(xr[3]) == cr[3] and xdt(xr[4]) == cr[4], f"XLSX start / end = CSV {xdt(xr[3])} {xdt(xr[4])} {cr[3:5]}")
+    check(xr[6] == cr[6] and abs(xr[5] - float(cr[5])) < 0.006, f"XLSX duration = CSV {xr[5:7]} {cr[5:7]}")
+    check(cr[8] != "" and abs(xr[8] - float(cr[8])) < 0.006, f"XLSX amount = CSV {xr[8]} {cr[8]}")
+check(abs(rows[-1][8] - 90.0) < 0.006, f"the sum row holds the whole amount {rows[-1]}")
+Ca.patch(B + "/api/settings", json={"tz": ""})
 
 # ================================================================== workload
 rw = A.get(B + "/api/workload/export.xlsx", params={"weeks": 2})

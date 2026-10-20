@@ -13,6 +13,7 @@
    (report days, CSV rows, totals the same, rounding split, not applied twice); in America/New_York the same entry is one day;
    the switch time_split_midnight off keeps one day / one row
 usage: p2125_b_api_test.py <datadir>      (a fresh container; P2125B_NOSTART=1 = the server already runs)"""
+import base64
 import csv
 import io
 import os
@@ -26,6 +27,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer  # noqa: E402
+import dbx as dbxm  # noqa: E402  2.125.0 (#2119): the sealed note in the database
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else ""
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -56,7 +58,10 @@ def iso(dt):
 
 
 if not os.environ.get("P2125B_NOSTART"):
-    subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL)
+    # 2.125.0 (#2119): with the master key, so the decision's note is sealed
+    KEY = base64.b64encode(os.urandom(32)).decode()
+    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + f" -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}")
+    subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL, env=env)
 s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
@@ -98,8 +103,11 @@ check(Bo.get(B + "/api/time/sheets", params={"month": "2026-13"}).status_code ==
 check(Bo.post(B + "/api/time/sheets", json={"month": M, "action": "nope"}).status_code == 400, "an unknown action: 400")
 fut = (cur + timedelta(days=40)).strftime("%Y-%m")
 check(Bo.post(B + "/api/time/sheets", json={"month": fut, "action": "close"}).status_code == 400, "a month in the future: 400")
+# 2.125.0 R (#2119): bob looks at his private workspace -- the month still belongs to his organisation (approval)
+check(Bo.patch(B + "/api/settings", json={"workspace": "private"}).ok, "bob shows the private workspace")
 r = Bo.post(B + "/api/time/sheets", json={"month": M, "action": "close"})
 check(r.ok and r.json()["sheet"]["state"] == "closed" and r.json()["sheet"]["org_id"] == ORG, "bob closes the month " + r.text[:300])
+Bo.patch(B + "/api/settings", json={"workspace": "all"})
 check(Bo.post(B + "/api/time/sheets", json={"month": M, "action": "close"}).status_code == 409, "closed twice: 409")
 r = Bo.post(B + "/api/time/entries", json={"list_id": L, "start": iso(IN_M + timedelta(days=1)), "minutes": 30})
 check(r.status_code == 409 and "closed" in r.json().get("error", ""), "a new entry in the closed month: 409 " + r.text[:200])
@@ -156,6 +164,16 @@ j = Bo.get(B + "/api/time/sheets", params={"month": M}).json()
 check(j["sheet"]["state"] == "open" and j["sheet"]["note"] == "Tuesday is missing" and j["can"]["close"], "sent back: open with the note")
 news = Bo.get(B + "/api/news").json().get("items", [])
 check(any(n["kind"] == "tsheet" and n.get("data", {}).get("act") == "return" for n in news), "bob gets the News item")
+# 2.125.0 (#2119): the note stays out of the News item (and the push); bob reads it in the app (sealed in time_sheets.note)
+check(all("Tuesday is missing" not in str(n) for n in news if n["kind"] == "tsheet"), "the note is not in the News item")
+_c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+try:
+    _raw = str(_c.execute("SELECT note FROM time_sheets WHERE user_id=? AND month=?", (uid["bob"], M)).fetchone()[0])
+    _nraw = str(_c.execute("SELECT data FROM notifications WHERE user_id=? AND kind='tsheet'", (uid["bob"],)).fetchall())
+finally:
+    _c.close()
+check(_raw.startswith("kenc1:") and "Tuesday" not in _raw, "the note is sealed in the database " + _raw[:40])
+check("Tuesday" not in _nraw, "the stored News data holds no note")
 check(A.post(B + "/api/time/sheets/decide", json={"user_id": uid["bob"], "month": M, "action": "restore"}).ok, "Undo of the sending back")
 check(Bo.get(B + "/api/time/sheets", params={"month": M}).json()["sheet"]["state"] == "approved", "... approved again")
 check(A.post(B + "/api/time/sheets/decide", json={"user_id": uid["bob"], "month": M, "action": "restore"}).status_code == 409,
@@ -179,6 +197,22 @@ check(Bo.post(B + "/api/time/sheets", json={"month": CUR, "action": "reopen"}).o
 check(Bo.post(B + "/api/time/start", json={"list_id": L}).ok, "the timer runs")
 check(Bo.post(B + "/api/time/sheets", json={"month": CUR, "action": "close"}).status_code == 409, "closing with a running timer of it: 409")
 Bo.post(B + "/api/time/stop", json={})
+
+# 2.125.0 R (#2119): carol's approved month stays locked after she left the organisation; closing again is no 500
+CL = Ca.post(B + "/api/lists", json={"name": "Carol private", "time_tracking": True, "org_id": None}).json()["id"]
+CE = Ca.post(B + "/api/time/entries", json={"list_id": CL, "start": iso(IN_M), "minutes": 30}).json()["id"]
+r = Ca.post(B + "/api/time/sheets", json={"month": M, "action": "close"})
+check(r.ok and r.json()["sheet"]["org_id"] == ORG, "carol closes in the organisation " + r.text[:200])
+check(A.post(B + "/api/time/sheets/decide", json={"user_id": uid["carol"], "month": M, "action": "approve"}).ok, "alice approves carol's month")
+check(A.delete(B + f"/api/orgs/{ORG}/members/{uid['carol']}").ok, "carol leaves the organisation")
+j = Ca.get(B + "/api/time/sheets", params={"month": M}).json()
+check(j["sheet"]["state"] == "approved" and M in j["locked"] and j["can"]["reopen"], "left: her sheet stays approved " + str(j)[:300])
+check(Ca.delete(B + f"/api/time/entries/{CE}").status_code == 409, "left: the entry stays locked")
+r = Ca.post(B + "/api/time/sheets", json={"month": M, "action": "close"})
+check(r.status_code == 409, f"left: closing again is 409, never 500 ({r.status_code})")
+check(Ca.post(B + "/api/time/sheets", json={"month": M, "action": "reopen"}).ok, "left: she reopens it herself")
+r = Ca.post(B + "/api/time/sheets", json={"month": M, "action": "close"})
+check(r.ok and r.json()["sheet"]["org_id"] is None, "left: closing again works, now without an organisation " + r.text[:200])
 
 # ================================================================ a person without an organisation
 # freelancer-matrix: time
