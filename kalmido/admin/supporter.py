@@ -36,13 +36,23 @@ SUP_PUBKEYS = ("o/j0qVKWZYnOjU010nb8J5dzohrOzQ2xU2brex/7Dh4=",)
 # licence unlocks nothing, it only shows the badge.
 SUP_EXTRA_ENV = os.environ.get("KALMIDO_SUPPORTER_EXTRA_PUBKEYS", "")
 SUP_URL_ENV = os.environ.get("KALMIDO_SUPPORT_URL", "").strip()
+# 2.144.0 D (#2158): the purchase page on the website. Used only when KALMIDO_SUPPORT_URL=default (or once SUP_SHOP_LIVE is
+# switched on in a release, when the payment provider's account exists): until then no buy button points anywhere.
+SUP_SHOP_URL = "https://kalmido.com/support.html"
+SUP_SHOP_LIVE = False
+# 2.144.0 D (#2158): the prices (once, VAT included, voluntary); shown in the dialog. Whole euros.
+SUP_PRICES = {"person": 25, "server": 100}
+SUP_CURRENCY = "EUR"
 SUP_NUDGE_DAYS = 365
 SUP_QUIET_DAYS = 30  # no hint in the first days after the instance was set up
 
 
 def sup_url():
-    """KALMIDO_SUPPORT_URL if it is a plain https:// address ('' otherwise: then only the explanation is shown)."""
+    """KALMIDO_SUPPORT_URL if it is a plain https:// address ('' otherwise: then only the explanation is shown);
+    "default" = the purchase page on the website (2.144.0 D, #2158)."""
     u = SUP_URL_ENV
+    if u.lower() == "default" or (not u and SUP_SHOP_LIVE):  # 2.144.0 D (#2158)
+        u = SUP_SHOP_URL
     if len(u) > 500 or not re.fullmatch(r"https://[^\s\"'<>\\]+", u):
         return ""
     return u
@@ -153,7 +163,8 @@ def sup_about(c, u):
     from .hosting import hosted
     if hosted():
         return {}
-    d = {"supporter": sup_server(c), "support_url": sup_url()}
+    d = {"supporter": sup_server(c), "support_url": sup_url(),
+         "support_prices": {"currency": SUP_CURRENCY, **SUP_PRICES}}  # 2.144.0 D (#2158)
     if u:
         s = usettings(c, u["id"])
         d["supporter_me"] = sup_info(s.get("sup_key") or "", "person")

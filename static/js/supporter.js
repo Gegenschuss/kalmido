@@ -19,6 +19,14 @@ function sup_licRow(l, kind, can) {
     ? `<span class="supbadges">${sup_badge(l)}<span class="muted">${esc(tr('since {0}', date))}${l.id ? ' · ' + esc(l.id) : ''}</span></span>${can ? `<button type="button" class="btn sm" data-sup="del" data-kind="${kind}">${esc(tr('Remove'))}</button>` : ''}`
     : `<span class="muted">${esc(kind === 'server' && !can ? tr('None yet (an admin enters it)') : tr('None yet'))}</span>`}</div>`;
 }
+// 2.144.0 D (#2158): the prices (once, VAT included) under the explanation
+function sup_pricesHtml(p) {
+  if (!p || !p.currency) return '';
+  const fmt = n => { try { return new Intl.NumberFormat(I18N.code || 'en', {style: 'currency', currency: p.currency, maximumFractionDigits: 0}).format(n); } catch { return `${n} ${p.currency}`; } };
+  const one = k => Number.isFinite(p[k]) ? `<span class="supprice" data-kind="${k}"><b>${esc(tr(SUP_KIND_LABEL[k]))}</b> ${esc(tr('{0} once', fmt(p[k])))}</span>` : '';
+  const body = one('person') + one('server');
+  return body ? `<div class="supprices">${body}</div><div class="shint">${esc(tr('Prices include VAT. Pay once, no subscription.'))}</div>` : '';
+}
 // Settings > Help: "Support Kalmido" under "About"
 function sup_aboutHtml() {
   if (!sup_on()) return '';
@@ -26,6 +34,7 @@ function sup_aboutHtml() {
   const url = a.support_url ? `<a class="btn sm pri" href="${esc(a.support_url)}" target="_blank" rel="noopener noreferrer">${ic('heart', 's')} ${esc(tr('Become a supporter'))}</a>` : '';
   return `<div id="s-sup"><h4 id="s-sup-h">${tr('Support Kalmido')}</h4>
     <div class="shint">${esc(tr('A supporter licence is voluntary and paid once. It unlocks nothing — everything in Kalmido stays free. It helps the further development and shows a small badge.'))}</div>
+    ${sup_pricesHtml(a.support_prices)}
     ${url ? `<div class="row suplink"><label></label>${url}</div>` : ''}
     ${sup_licRow(a.supporter, 'server', adm)}${sup_licRow(a.supporter_me, 'person', true)}
     <div class="row supkey"><label for="s-supkey">${tr('Enter key')}</label><input id="s-supkey" autocomplete="off" spellcheck="false" maxlength="600" placeholder="KSUP1…" enterkeyhint="done"><button type="button" class="btn sm" data-sup="add">${esc(tr('Add'))}</button></div>
