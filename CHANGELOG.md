@@ -27,6 +27,20 @@ Phone fixes for office, tables, documents and bookmarks; the agent chat keeps an
 - Customer portal: when a space's sign-in mail budget is used up, its admins (or the owner of a private space) get one notice in the bell; the budget is set with `KALMIDO_PORTAL_LOGIN_SPACE` (#2380).
 - Server key change: the status shows unreadable Paperless tokens and the state of the private document index; new admin command `reindex-private` (#2382).
 
+## [2.138.3] - 2026-10-20
+
+Organisation dialog with a searchable member list; decided approvals leave the notifications.
+
+### Changed
+- Edit organisation: members as a list like Users, with a search (name, user name, e-mail), a filter "Members / All"
+  and a counter; per person a "Member" and an "Admin" box instead of two walls of name buttons. The list scrolls inside
+  the dialog, head and buttons stay (also on the phone). The symbol field shows the organisation's picture or an app
+  icon instead of an emoji placeholder; the e-mail domain hint sits under its field (#2407).
+
+### Fixed
+- Notifications: an approval that was decided (yes, no, stop) no longer stays unread under "For you", for everybody it
+  was shown to; older stuck entries clear with the next decision (#2406).
+
 ## [2.138.1] - 2026-10-20
 
 Six releases that were built on 19.10. but never reached main (2.111-2.116 under their old numbers), brought onto
