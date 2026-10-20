@@ -226,6 +226,7 @@ APP_TO_API = {
     # the files of export / import are the same data as reading / creating
     "GET /api/sheets": ["GET /sheets"], "POST /api/sheets": ["POST /sheets"], "GET /api/sheets/{}": ["GET /sheets/{}"],
     "PATCH /api/sheets/{}": ["PATCH /sheets/{}"], "PUT /api/sheets/{}/cells": ["PUT /sheets/{}/cells"],
+    "GET /api/sheets/{}/tabs": ["GET /sheets/{}/tabs"], "POST /api/sheets/{}/tabs": ["POST /sheets/{}/tabs"],  # 2.124.0 E (#2116)
     "POST /api/sheets/{}/rows": ["POST /sheets/{}/rows"], "POST /api/sheets/{}/columns": ["POST /sheets/{}/columns"],
     "GET /api/sheets/{}/vars": ["GET /sheets/{}/vars"], "POST /api/sheets/{}/batches/{}/undo": ["POST /sheets/{}/batches/{}/undo"],
     "GET /api/sheets/{}/export.csv": ["GET /sheets/{}"], "GET /api/sheets/{}/export.xlsx": ["GET /sheets/{}"],
@@ -261,6 +262,10 @@ APP_ONLY = [
       "=POST /api/sheets/{}/columns/{}/restore", "=DELETE /api/sheets/{}/rows/{}", "=POST /api/sheets/{}/rows/{}/restore",
       "=POST /api/sheets/{}/rows/order", "=POST /api/sheets/{}/cells/{}/freeze", "=POST /api/sheets/{}/cells/{}/name",
       "=POST /api/sheets/{}/presence")),
+    ("2.124.0 E (#2116): arranging the sheets of a table stays with people in the app -- renaming, moving in the sheet bar, the "
+     "trash / restore of a sheet (like arranging rows and columns); an agent lists the sheets, adds one and works in each with the "
+     "table tools and the sheet's id (taking back its call moves a sheet it added to the trash)",
+     ("=PATCH /api/sheets/{}/tabs/{}", "=DELETE /api/sheets/{}/tabs/{}", "=POST /api/sheets/{}/tabs/{}/restore")),
     ("2.124.0 A (#2115): the chart of a table is how a person looks at it in the app (kind and columns of the drawing); an agent "
      "reads it with the table (GET /sheets/{id} answers chart) and works on the values, the drawing itself stays with people",
      ("=PUT /api/sheets/{}/chart",)),
