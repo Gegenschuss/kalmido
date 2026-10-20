@@ -85,7 +85,10 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
   check(!d.querySelector('details[data-sec="parts"] .tpunused'), 'no part is marked unused any more');
 
   // ================= the invoice: the form is chosen
-  click(w, d.querySelector('[data-ofd="to-invoice"]'));
+  // 2.138.0 (#2235): before the acceptance "Create invoice" is in "…" and asks once (the boot bridge answers yes)
+  click(w, d.querySelector('.ofdhead [data-ofd="more"]'));
+  const miInv = await until(() => [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Create invoice/.test(b.textContent)));
+  click(w, miInv);
   // 2.120.0 (#2087): first the type of invoice (full invoice preselected), then the form of a quotation with parts
   await until(() => d.querySelector('.modal input[name="abs-type"]'));
   click(w, d.querySelector('.modal [data-m="ok"]'));
