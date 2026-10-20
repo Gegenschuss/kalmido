@@ -86,6 +86,10 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   check(stopB() && stopB().hidden, 'idle: the Stop button is hidden');
   const working = async () => { await v1('PUT', '/agent/status', {status: 'working', text: 'Answering in the chat'}); w.eval('agentPoll()'); await until(() => stopB() && !stopB().hidden, 40); };
   const aborts = async () => ((await v1('GET', '/agent/events?since=0')).data || []).filter(e => e.event === 'abort');
+  // "working" while a job of the agent runs is the job's: no Stop in the main chat
+  await v1('PUT', '/agent/status', {status: 'working', text: 'Job: Knox'}); await w.eval('jc_sync(true)'); w.eval('agentPoll()'); await sleep(1500);
+  check(stopB() && stopB().hidden, 'a job runs: its "working" shows no Stop in the main chat');
+  await v1('PATCH', `/agent/jobs/${J}`, {state: 'done'}); await w.eval('jc_sync(true)');
   await working();
   check(stopB() && !stopB().hidden && !stopB().disabled, 'working: the Stop button shows next to Send');
   check(stopB().closest('.chcomp') && /Esc/.test(stopB().title) && /Ctrl\+C/.test(stopB().title) && stopB().querySelector('svg, .i, i'), 'Stop: an icon, the tooltip names the keys');
@@ -121,14 +125,16 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   check((await aborts()).length === 3, 'an open menu: Esc closes the menu, no abort');
   ci().value = '';
   // in a job's history the abort carries the job
-  w.eval(`jc_enter(${CL}, {id: ${J}})`);
+  const J2 = (await v1('POST', '/agent/jobs', {title: 'Lena: Release 2.144 stop', user_id: me.id, state: 'running'})).id;
+  await w.eval('jc_sync(true)');
+  w.eval(`jc_enter(${CL}, {id: ${J2}})`);
   await until(() => d.querySelector('#jc-bar'));
   await w.eval('jc_sync(true)'); w.eval('chatPatch({})'); await until(() => stopB() && !stopB().hidden, 40);
   check(stopB() && !stopB().hidden, 'a running job\'s history: Stop shows');
   click(w, stopB());
   await until(async () => (await aborts()).length === 4);
   ab = await aborts();
-  check(ab.length === 4 && ab[3].data.job_id === J, 'Stop in a job\'s history carries the job_id');
+  check(ab.length === 4 && ab[3].data.job_id === J2, 'Stop in a job\'s history carries the job_id');
 
   console.log(`p2144_a_ui: ${ok} ok, ${F.length} failed`);
   w.close();

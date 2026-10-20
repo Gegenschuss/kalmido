@@ -758,7 +758,8 @@ const CHAT_ABORT_WAIT = 20000;
 function chatBusy(a) {
   if (!a || !a.enabled || agentOffline(a)) return false;
   if (S.chat.job) return jc_cur()?.state === 'running';
-  return a.status === 'working' || chatTyping(a);
+  // "working" while a job of it runs is the job's (Stop sits in the job's history and on its card); typing dots = a chat answer
+  return chatTyping(a) || (a.status === 'working' && !Object.values(S.jc.jobs).some(j => jc_live(j) && +j.agent_id === +a.id));
 }
 const chatAbortWaits = () => !!S.chat.abortAt && Date.now() - S.chat.abortAt < CHAT_ABORT_WAIT;
 const chatAbortTip = () => tr('Stop the answer ({0})', IS_MAC ? 'Esc · Ctrl+C · Cmd+.' : 'Esc · Ctrl+C');
