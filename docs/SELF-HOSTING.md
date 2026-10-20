@@ -961,7 +961,17 @@ restart). Browser-encrypted files and chat files are never read. The text is sea
 The recognised text, amounts, sender names, rules and the learnt models are sealed with the workspace's key when
 `KALMIDO_SECRET_KEY` is set (see [Encryption of organisation data](#encryption-of-organisation-data)); the search uses
 keyed hashes of the words, no plain index. Without `KALMIDO_SECRET_KEY` the hash key of the word index is a fixed one
-(the same on every server): whoever reads the database can then test words against it -- set the server key. With *Tasks by e-mail* set up, every person and organisation can create a
+(the same on every server): whoever reads the database can then test words against it -- set the server key.
+Since 2.126 the values of a person's own documents are sealed with the person's account key (like private files), so they
+survive a new server key with `rewrap-accounts`; the start-up pass moves values sealed before once. `encrypt-all`,
+`decrypt-all` and `status` (`docs`) cover the documents' values. **Before going back to 2.125 or older** run
+
+```bash
+docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli docs-to-server-key
+```
+
+(it sets `docs_account_key` to 0 first, then moves the values back and exits with 0 when none is left; otherwise the older
+version shows those values empty). `docs-to-account-key` switches it on again. With *Tasks by e-mail* set up, every person and organisation can create a
 forwarding address for documents in the documents' settings: PDFs and images attached to mails sent there become
 documents.
 

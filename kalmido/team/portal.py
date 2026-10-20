@@ -138,11 +138,11 @@ def pt_open(c, token):
     P = _pt_rt()
     if not P.public_links_on(c):
         return None, P.pub_gone()
-    bad = [("ptbad:" + rate_ip(), PT_BAD_LIMIT)]
-    if _rate_blocked(bad):
-        return None, P.pub_limited(_accept_lang())
+    bad = [("ptbad:" + rate_ip(), PT_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
     p = pt_find(c, token)
     if not p:
+        if _rate_blocked(bad):
+            return None, P.pub_limited(_accept_lang())
         _rate_fail(bad)
         aa_count("security", "portal", rate_ip())
         return None, P.pub_gone()
@@ -299,7 +299,7 @@ def pt_comment(token):
     from ..core.db import bump, iso_ms
     from ..core.i18n import tr
     from ..accounts.session import rate_ip
-    from ..api.v1 import hit_limit
+    from ..api.v1 import hit_budget, hit_limit
     from ..agents.core import agent_comment_events
     c = db()
     p, bad = pt_open(c, token)
@@ -308,7 +308,7 @@ def pt_comment(token):
     lg = pt_lang(c, p)
     if not _pt_post_ok(c, p, "c"):
         return _pt_denied(lg)
-    if hit_limit("ptc:" + rate_ip(), PT_CMT_RATE) or hit_limit(f"ptch:{p['id']}", PT_CMT_HOUR, 3600):
+    if hit_limit("ptc:" + rate_ip(), PT_CMT_RATE) or hit_budget(f"ptch:{p['id']}", PT_CMT_HOUR, rate_ip()):  # 2.126.0 C (#1979 I1)
         return _pt_rt().pub_limited(lg)
     text = _pt_rt().cv_fb_clean(request.form.get("text"), PT_CMT_MAX)
     if not text:
@@ -495,11 +495,11 @@ def pt_login_page(tok):
     from ..core.i18n import tr
     c = db()
     lg = _accept_lang()
-    bad = [("ptbad:" + rate_ip(), PT_BAD_LIMIT)]
-    if _rate_blocked(bad):
-        return _pt_rt().pub_limited(lg)
+    bad = [("ptbad:" + rate_ip(), PT_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
     r = _pt_login_row(c, tok) if _pt_rt().public_links_on(c) else None
     if not r:
+        if _rate_blocked(bad):
+            return _pt_rt().pub_limited(lg)
         _rate_fail(bad)
         return _pt_link_gone(lg)
     e = html.escape
@@ -550,13 +550,13 @@ def pt_login(tok):
     from ..core.access import acx_anon_bind
     c = db()
     lg = _accept_lang()
-    bad = [("ptbad:" + rate_ip(), PT_BAD_LIMIT)]
-    if _rate_blocked(bad):
-        return _pt_rt().pub_limited(lg)
+    bad = [("ptbad:" + rate_ip(), PT_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
     if request.headers.get("Sec-Fetch-Site", "") == "cross-site":
         return _pt_denied(lg)
     r = _pt_login_row(c, tok) if _pt_rt().public_links_on(c) else None
     if not r:
+        if _rate_blocked(bad):
+            return _pt_rt().pub_limited(lg)
         _rate_fail(bad)
         return _pt_link_gone(lg)
     acx_anon_bind(c, r["org_id"])

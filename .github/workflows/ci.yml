@@ -34,6 +34,10 @@ jobs:
       # // @ts-check, every new client file must (tools/check_tscheck.py)
       - name: Type check of the client (files with // @ts-check)
         run: python tools/check_tscheck.py && npx --yes -p typescript@6.0.3 tsc -p jsconfig.json
+      # 2.126.0 (#1993): ESLint as a check only (pinned version, eslint.config.mjs; no-undef, no-unused-vars, eqeqeq); the list of
+      # the client's global names (tools/eslint_globals.json) must be current
+      - name: ESLint of the client
+        run: python tools/eslint_globals.py --check && npx --yes eslint@10.13.0 static/i18n.js 'static/js/*.js' static/sw.js
       - name: Module lists agree (index.html / sw.js / static/js, kalmido/__init__.py / the package)
         run: python tools/check_layout.py
       - name: Server layers (module-level imports only from the own or a lower layer)

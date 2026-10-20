@@ -42,7 +42,9 @@ def ab_books(c, u):
     if not ids:
         return {}
     q = ",".join("?" * len(ids))
-    return {f"b{r['id']}": {"key": f"b{r['id']}", "id": r["id"], "name": r["name"], "color": r["color"], "role": ids[r["id"]]}
+    # 2.126.0 C (#1992 K5): an imported (mirrored) address book is written by its source only: read only over CardDAV
+    return {f"b{r['id']}": {"key": f"b{r['id']}", "id": r["id"], "name": r["name"], "color": r["color"],
+                            "role": "view" if r["src_id"] else ids[r["id"]]}
             for r in c.execute(f"SELECT * FROM books WHERE id IN ({q}) ORDER BY owner_id!=?, id", [*ids, u["id"]])}
 
 

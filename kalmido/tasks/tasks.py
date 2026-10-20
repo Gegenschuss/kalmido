@@ -2,7 +2,7 @@
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app, PUBLIC_URL
-from ..core.pg import insert_id
+from ..core.pg import insert_id, st_ids, write_lock
 from ..core.schema import MAX_DEPTH, USER_DEFAULTS
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, inbox_default, iso, now_utc
@@ -70,6 +70,7 @@ def move_subtree(c, tid, lid):
     user may not move out of (subtask of a foreign parent) stays in its list and becomes top level there."""
     people, ok = list_people(c, lid), {}
     done, level, n = {tid}, [tid], 0
+    moved = [tid]
     while level and n < MAX_DEPTH + 7:
         q = ",".join("?" * len(level))
         nxt = []
@@ -86,7 +87,11 @@ def move_subtree(c, tid, lid):
             if k["assignee_id"] and k["assignee_id"] not in people:
                 c.execute("UPDATE tasks SET assignee_id=NULL WHERE id=?", (k["id"],))
             nxt.append(k["id"])
+            moved.append(k["id"])
         level, n = nxt, n + 1
+    # 2.126.0 D (#1992 A5): who comes along stays only when they share the target list
+    c.execute("DELETE FROM task_people WHERE task_id = ANY(CAST(? AS BIGINT[])) AND NOT (user_id = ANY(CAST(? AS BIGINT[])))",
+              (st_ids(moved), st_ids(people)))
 
 
 def hard_delete(c, ids, lists=None):
@@ -171,6 +176,7 @@ def check_assignee(c, lid, aid):
 WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields", "people"}
 WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act", "le2e_move"}  # 2.64.1 (#1817): le2e_move
 WEB_TASK_EDIT |= {"shift_chain"}  # 2.67.0 B (#1865): shift_chain
+WEB_TASK_NEW |= {"client_ref"}  # 2.126.0 D (#1990): the device's id of a new task (a repeated POST = the same task)
 WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype", "family", "sections", "org_id", "time_tracking"})  # 2.28.0 (#935): org_id; 2.41.0 (#1471): time_tracking
 WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"col_sums", "kpis", "client_id", "rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "agent_members", "agent_peers", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns", "ptype", "sort_mode", "org_id", "stale_days", "agent_followup", "done_in_section", "folder_adopt", "org_visibility", "org_edit"}  # 2.36.2 (#1136): done_in_section; 2.46.0 (#1603)
 WEB_LIST_EDIT |= {"tap_done"}  # 2.46.4 (#1751): "Tap does not open details" (owner / list admins)
@@ -193,6 +199,13 @@ def task_create():
     if not f.get("title"):
         return err(tr("Title missing"))
     c = db()
+    ref = str(b.get("client_ref") or "")[:64] or None  # 2.126.0 D (#1990): sent again (the answer got lost) = the same task
+    if ref and me():
+        write_lock(c, f"task-ref-{me()}")
+        r = c.execute("SELECT id FROM tasks WHERE created_by=? AND client_ref=?", (me(), ref)).fetchone()
+        if r:
+            need_task(c, r[0])
+            return jsonify(one_task(c, r[0]))
     role = need_task(c, f["parent_id"]) if f.get("parent_id") else None  # 2.86.0 (N14): 404 / 403 before the parent checks
     e = check_parent(c, None, f.get("parent_id"))
     if e:
@@ -266,6 +279,8 @@ def task_create():
         f["locked"] = 1  # 2.36.0 (#1118, decision 09.10.2026): a task an agent creates starts locked in the app
     ts = iso(now_utc())
     f["created_by"] = me()
+    if ref and me():
+        f["client_ref"] = ref
     if f.get("assignee_id") or f.get("assignee_group_id"):
         f["assigned_by"] = me()
     cols = list(f) + ["created_at", "updated_at"]
@@ -462,10 +477,11 @@ def _wd_followup(c, t, users, S, LG, now):
 
 @app.patch("/api/tasks/<int:tid>")
 def task_update(tid):
-    from ..tasks.lifecycle import apply_update
+    from ..tasks.lifecycle import apply_update, need_live
     from ..personal.timetrack import field_alias, web_fields
     c = db()
     need_task(c, tid)
+    need_live(c, tid)  # 2.126.0 D (#1992 A3)
     conflicts = []
     old = c.execute("SELECT due, status, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
     b = web_fields(field_alias(body(), "content", "notes"), WEB_TASK_EDIT, "PATCH /api/tasks/{tid}")

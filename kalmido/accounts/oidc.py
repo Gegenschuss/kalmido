@@ -20,7 +20,7 @@ from flask import g, jsonify, redirect, request
 from ..core.config import app, APP_NAME, APP_VERSION, COOKIE, PUBLIC_URL, SECRET_KEY, USERNAME_RE
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc
-from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, set_cookie, start_session
+from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip, set_cookie, start_session
 from ..accounts.login import _user
 
 
@@ -418,7 +418,7 @@ def oidc_start():
     from ..notify.push import _b64u
     if not oidc_cfg()["on"]:
         return err(tr("OIDC login is not configured"), 404)
-    ip_key = [("oidc:" + client_ip(), 60)]
+    ip_key = [("oidc:" + rate_ip(), 60)]
     if _rate_blocked(ip_key):
         return err(tr("Too many failed logins, please wait a few minutes"), 429)
     _rate_fail(ip_key)  # every start counts (60 per 15 min and IP): the state table cannot be flooded

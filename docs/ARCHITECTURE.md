@@ -382,6 +382,21 @@ python3 tools/check_tscheck.py && npx --yes -p typescript@6.0.3 tsc -p jsconfig.
 Switching an older file on: add `// @ts-check` as its first line, fix what tsc reports (mostly a JSDoc type or cast
 `/** @type {HTMLElement} */ (e.target)`; never a change of behaviour), remove the name from `BASE`.
 
+### ESLint (2.126.0)
+
+ESLint checks every client file (`eslint.config.mjs` in the repo root, a check only like tsc: nothing in the app or its
+image) with three rules: `no-undef`, `no-unused-vars` (local variables only; top-level names are globals that other files
+and the HTML use) and `eqeqeq` (`== null` stays allowed for "null or undefined"). The client's global names come from
+`tools/eslint_globals.json`, which `tools/eslint_globals.py` writes from the top-level declarations of `static/i18n.js` +
+`static/js/*.js`; the browser's own names stand in a fixed list in the config (a new browser API = one name there).
+`static/sw.js` has its own service-worker scope. CI runs, and locally the same in the repo root:
+
+```bash
+python3 tools/eslint_globals.py --check && npx --yes eslint@10.13.0 static/i18n.js 'static/js/*.js' static/sw.js
+```
+
+After adding or renaming a top-level function run `python3 tools/eslint_globals.py` and commit the JSON with it.
+
 ### Dragging (2.102.0)
 
 `drag.js` is the shared core of dragging: `drg_attach(root, opts)` lets presses inside `root` start drags (`opts.start`

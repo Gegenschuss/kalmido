@@ -44,7 +44,7 @@ function sd_accept(dx, dy) {
 }
 function sd_move(x, y) {
   const el = SD.el; if (!el || !SD.on) return false;
-  const dx = x - SD.x0, dy = y - SD.y0;
+  const dy = y - SD.y0;
   const now = performance.now(), dt = Math.max(1, now - SD.lastT);
   SD.v = 0.6 * SD.v + 0.4 * ((y - SD.lastY) / dt); SD.lastY = y; SD.lastT = now;
   const vh = sd_vh(), maxH = Math.round(vh * 0.94), minH = Math.min(SD.h0, Math.round(vh * 0.4));

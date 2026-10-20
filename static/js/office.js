@@ -48,7 +48,7 @@ async function ofcLoad(kind, force) {
   if (OFC.loading[kind]) return;
   if (OFC.data[kind] && !force) return;
   OFC.loading[kind] = true;
-  const seq = ++OFC.seq;
+  ++OFC.seq;
   try { const j = await api('GET', `/api/office/${kind}?archived=1`); OFC.data[kind] = j.items || []; }
   catch (x) { OFC.data[kind] = {error: x.message || tr('unknown')}; }
   OFC.loading[kind] = false;

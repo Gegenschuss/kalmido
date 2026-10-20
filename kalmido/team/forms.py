@@ -19,7 +19,7 @@ from ..accounts.login import auth_key, seal, unseal
 from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_feat, need_list
 from ..tasks.validation import log_act
 from ..personal.timetrack import BadInput
-from ..api.v1 import hit_limit
+from ..api.v1 import hit_budget, hit_limit
 from ..lists.public import BOT_ERROR, pub_html, public_links_on
 
 
@@ -391,7 +391,7 @@ def form_send(token):
         return bad
     from .formq import FqRefused, fq_ck_client, fq_ck_in, fq_client, fq_entry_save, fq_file_count, fq_list, fq_markdown, fq_read, fq_text_of, fq_vals
     qs = fq_list(f)  # 2.98.0 B (#1954): a questionnaire (own questions instead of subject / description)
-    if hit_limit("forms:" + rate_ip(), FORM_SEND_RATE) or hit_limit(f"formh:{f['id']}", FORM_SEND_HOUR, 3600):
+    if hit_limit("forms:" + rate_ip(), FORM_SEND_RATE) or hit_budget(f"formh:{f['id']}", FORM_SEND_HOUR, rate_ip()):  # 2.126.0 C (#1979 I1)
         return _msg(tr("Too many requests", lg=lg), tr("Please wait a minute and try again.", lg=lg), lg, 429)
     # 2.86.0 (N22): a body longer than one file + the text fields is refused before it is read
     if (request.content_length or 0) > (FRM_FILE_MAX if f["files"] else 0) + fq_file_count(qs) * FRM_FILE_MAX + 256 * 1024:

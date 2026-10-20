@@ -96,20 +96,22 @@ exports.login = async (user, pw = 'password123', o = {}) => {
 };
 // 2.53.0 (#1410): lazy = false (the default) loads the modules the app loads on demand (settings, contacts, office) right after
 // the start, so suites can call their functions directly; lazy: true leaves them to the app (tests/p253_a_ui.js)
-exports.boot = async function boot({user = 'alice', mobile = false, hash = '', ls = {}, wait = 2500, proxy = null, path = '', media = {}, setup = null, lazy = false, rowIcons} = {}) {
+// 2.126.0 D (#1989): shared = {store: {}, wins: []}: windows of one browser -- one localStorage, a write fires "storage" in the others
+exports.boot = async function boot({user = 'alice', mobile = false, hash = '', ls = {}, wait = 2500, proxy = null, path = '', media = {}, setup = null, lazy = false, rowIcons, shared = null} = {}) {
   const cookie = proxy ? '' : await exports.login(user, undefined, {rowIcons});
   if (proxy) await rowIconsSet({'Remote-User': proxy}, {rowIcons});  // 2.56.1 (#1799)
   // 1.8.1: the start view is the Inbox; the suites written before start on Today as a device that was there last
   // (pass ls: {'tasks.lastKey': null} for a real first start, p181_ui.js)
   // 2.17.0 (#452): News are bundled per task by default; the suites written before test the plain list (that device
   // setting), p2170_ui passes ls: {'tasks.newsBundle': null} for the bundled default
-  const store = {'tasks.newsBundle': 'false', ...(hash || 'tasks.lastKey' in ls ? {} : {'tasks.lastKey': '"today"'}), ...ls};
+  const store = Object.assign(shared ? shared.store : {}, {'tasks.newsBundle': 'false', ...(hash || 'tasks.lastKey' in ls ? {} : {'tasks.lastKey': '"today"'}), ...ls});
   for (const k of Object.keys(store)) if (store[k] === null) delete store[k];
   const vc = new VirtualConsole(); vc.on('jsdomError', e => { if (!/navigation|Not implemented/.test(e.message)) { exports.errs.push(e.message); console.log('script error:', String((e.detail && e.detail.stack) || e.stack || '').split('\n').slice(0, 4).join(' | ')); } });
   const dom = await JSDOM.fromURL(B + path + (hash ? '#' + hash : ''), {runScripts: 'dangerously', resources: new PooledLoader(), pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) {
       w.matchMedia = q => ({matches: q in media ? media[q] : /max-width/.test(q) ? mobile : false, addEventListener() {}, addListener() {}});  // media: {'(prefers-reduced-motion: reduce)': true}
-      Object.defineProperty(w, 'localStorage', {value: {getItem: k => k in store ? store[k] : null, setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; }, key: i => Object.keys(store)[i], get length() { return Object.keys(store).length; }}});
+      const told = k => { for (const o of shared ? shared.wins : []) if (o !== w) { const e = new o.Event('storage'); e.key = k; o.dispatchEvent(e); } };
+      Object.defineProperty(w, 'localStorage', {value: {getItem: k => k in store ? store[k] : null, setItem: (k, v) => { store[k] = String(v); told(k); }, removeItem: k => { delete store[k]; told(k); }, key: i => Object.keys(store)[i], get length() { return Object.keys(store).length; }}});
       w.__offline = false;
       w.fetch = (u, o = {}) => { if (w.__offline) return Promise.reject(new TypeError('Failed to fetch')); const hd = {...(o.headers || {}), ...(proxy ? {'Remote-User': proxy} : {Cookie: cookie})}; return fetch(new URL(String(u), B), {...o, headers: hd}); };
       w.Request = Request; w.Response = Response; w.Headers = Headers; w.FormData = FormData; w.File = File; w.Blob = Blob;
@@ -124,6 +126,7 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
   for (let i = 0; i < 150 && dom.window.document.readyState !== 'complete'; i++) await new Promise(r => setTimeout(r, 100));
   if (!lazy && typeof dom.window.ld_all === 'function') await dom.window.ld_all().catch(e => console.log('ld_all:', e.message));
   dom.window.__cookie = cookie; dom.window.__store = store;
+  if (shared) shared.wins.push(dom.window);
   const close = dom.window.close.bind(dom.window), realmTE = dom.window.TypeError;
   dom.window.close = () => { if (!closedRealms.includes(realmTE)) closedRealms.push(realmTE); close(); };
   return dom.window;

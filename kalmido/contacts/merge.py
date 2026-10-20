@@ -261,7 +261,7 @@ def ctm_unfit_clients(c, refs, tb):
             continue
         for k in rec["moved"]:
             cl = c.execute("SELECT cl.* FROM office_client_contacts k JOIN clients cl ON cl.id=k.client_id WHERE k.id=?", (k["id"],)).fetchone()
-            if cl is not None and not ckl_book_fits(cl, tb):
+            if cl is not None and not ckl_book_fits(cl, tb, c, tb["id"]):
                 c.execute("UPDATE office_client_contacts SET contact_id=NULL WHERE id=?", (k["id"],))
                 back.append({"id": k["id"], "contact_id": k["_from"]})
                 n += 1

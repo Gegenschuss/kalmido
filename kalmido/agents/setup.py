@@ -18,7 +18,7 @@ from ..core.pg import system_ctx
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso
 from ..core.access import Denied
-from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip
+from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip
 from ..api.v1 import API_ON, need_api
 from ..agents.core import AGENT_OFFLINE_S, agent_row
 
@@ -153,7 +153,7 @@ def ains_admin_machine_del(aid, tid):
 def ains_redeem():
     """{code, host?, folder?, os?} -> {token, url, agent, starter_base, version}. No login: the one-time code is the credential."""
     from ..agents.admin import agent_token_new
-    keys = [("setup:ip:" + client_ip(), AINS_RATE)]
+    keys = [("setup:ip:" + rate_ip(), AINS_RATE)]
     if _rate_blocked(keys):
         return err(tr("Too many failed attempts, please wait a few minutes"), 429)
     if not API_ON:
@@ -194,7 +194,7 @@ def ains_remove():
     """The setup script's --uninstall: the computer's own token (Authorization: Bearer) is revoked. Nothing else."""
     auth = request.headers.get("Authorization") or ""
     tok = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
-    keys = [("setup:ip:" + client_ip(), AINS_RATE)]
+    keys = [("setup:ip:" + rate_ip(), AINS_RATE)]
     if _rate_blocked(keys):
         return err(tr("Too many failed attempts, please wait a few minutes"), 429)
     c = db()

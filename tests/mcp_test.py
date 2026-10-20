@@ -252,7 +252,8 @@ check(res["content"][1]["type"] == "image" and res["content"][1]["mimeType"] == 
       and "base64" not in json.loads(res["content"][0]["text"]), "get_attachment: image item for the model, text without base64")
 res = call(s, "get_attachment", {"attachment_id": 9, "source": "chat"})
 check(last()["p"] == "/api/v1/chat-attachments/9" and base64.b64decode(res["structuredContent"]["base64"]) == b"hello log"
-      and res["structuredContent"]["mime"] == "text/plain" and len(res["content"]) == 1, "get_attachment source chat: text file, no image item")
+      and res["structuredContent"]["mime"] == "text/plain" and [x["type"] for x in res["content"]] == ["text", "text"],  # 2.126.0 (#1978): + the data note
+      "get_attachment source chat: text file, no image item")
 res = call(s, "get_attachment", {"attachment_id": 6, "max_bytes": 50})
 check(res["isError"] is True and "max_bytes=50" in res["content"][0]["text"], "get_attachment: over max_bytes -> isError")
 check(call(s, "get_attachment", {"attachment_id": 6, "max_bytes": 30 * 1024 * 1024})["isError"] is True, "get_attachment: max_bytes above 20 MB refused")
@@ -324,12 +325,18 @@ sk = socket.socket()
 sk.bind(("127.0.0.1", 0))
 port = sk.getsockname()[1]
 sk.close()
-hp = subprocess.Popen([sys.executable, MCP, "--http", "--port", str(port)], env={**ENV, "MCP_HTTP_TOKEN": "mcpsecret"},
+# 2.126.0 (#1979 G2): --http needs MCP_HTTP_TOKEN (16+ characters)
+nt = subprocess.run([sys.executable, MCP, "--http", "--port", str(port)], env={k: v for k, v in ENV.items() if k != "MCP_HTTP_TOKEN"},
+                    capture_output=True, text=True, timeout=20)
+check(nt.returncode == 2 and "MCP_HTTP_TOKEN" in nt.stderr, f"http: no MCP_HTTP_TOKEN -> does not start ({nt.returncode})")
+nt = subprocess.run([sys.executable, MCP, "--http", "--port", str(port)], env={**ENV, "MCP_HTTP_TOKEN": "short"}, capture_output=True, text=True, timeout=20)
+check(nt.returncode == 2, "http: a too short MCP_HTTP_TOKEN -> does not start")
+hp = subprocess.Popen([sys.executable, MCP, "--http", "--port", str(port)], env={**ENV, "MCP_HTTP_TOKEN": "mcpsecret-0123456789"},
                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 U = f"http://127.0.0.1:{port}/mcp"
 
 
-def post(obj, token="mcpsecret", origin=None, url=U):
+def post(obj, token="mcpsecret-0123456789", origin=None, url=U):
     h = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
     if token:
         h["Authorization"] = "Bearer " + token

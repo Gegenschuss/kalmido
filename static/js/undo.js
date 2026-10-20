@@ -21,7 +21,7 @@ const withKids = id => { const out = [], walk = x => { for (const k of children(
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const rid = id => (+id < 0 && HIST.ids[id]) || +id;  // a task created offline: its real id once the outbox was sent
 const secId = sid => { let s = sid; for (let i = 0; i < 50 && s && HIST.secmap.has(s); i++) s = HIST.secmap.get(s); return s; };  // re-created sections
-const cancellable = e => { const i = OUT.q.indexOf(e); return i >= 0 && !(OUT.flushing && i === 0); };
+const cancellable = e => { const i = OUT.q.indexOf(e); return i >= 0 && !e.sending && !(OUT.flushing && i === 0); };  // 2.126.0 D (#1989): sending = on its way (any tab)
 const histPending = e => !!e && (e.parts ? e.parts.some(histPending) : !!(e.q && !e.q.done && OUT.q.includes(e.q)));
 const nv = v => v === '' || v === undefined ? null : v;
 const qn = s => tr('“{0}”', s);  // a name in quotes, as the language writes them
@@ -153,7 +153,7 @@ async function histRun(e, dir) {
   if (q) {  // the last operation of this step went through the outbox: cancel it if it has not left yet, else wait for its answer
     for (let n = 0; n < 400 && !q.done && !cancellable(q); n++) await sleep(150);
     if (!q.done && cancellable(q)) {
-      OUT.q.splice(OUT.q.indexOf(q), 1); LS.set('outbox', OUT.q);
+      outSave(() => { OUT.q = OUT.q.filter(x => x !== q); });  // 2.126.0 D (#1989): the shared queue
       histLocal(dir === 'undo' ? e.snaps : e.after);
       e.q = null; renderTop();
       return {skipped: [], local: true};
