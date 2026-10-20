@@ -100,6 +100,9 @@ function wk_sameEl(el, html) {
 const chatNear = box => box.scrollHeight - box.scrollTop - box.clientHeight <= 3 * remPx();
 // 2.12.2 (#451): replaces only the children of box that changed, by their key (data-k) or else by position; the box itself,
 // its scroll position and anything focused outside of it stay
+// 2.138.4 B (#2189): a keyed row with an open edit bubble (.tcedit) that is still being edited stays as it is: the agent
+// chat refreshes every 3 s and autosize() gives the textarea a style, so the row never looked equal and the typed text went
+// (the team chat only redraws on news and skips that while its editor has the focus)
 function patchKids(box, html) {
   const t = document.createElement('template'); t.innerHTML = html;
   const key = n => n.getAttribute('data-k') || (n.hasAttribute('data-cid') ? 'c' + n.getAttribute('data-cid') : null), old = new Map();
@@ -110,6 +113,7 @@ function patchKids(box, html) {
     const o = k ? old.get(k) : at0 && !key(at0) && !keep.has(at0) ? at0 : null;
     let use = n;
     if (o && o.isEqualNode(n)) use = o;
+    else if (o && k && o.querySelector('.tcedit') && n.querySelector('.tcedit')) use = o;  // 2.138.4 B (#2189): a message being edited keeps its editor (text, focus, caret)
     else if (o) o.replaceWith(n);
     const at = prev ? prev.nextElementSibling : box.firstElementChild;
     if (at !== use) box.insertBefore(use, at);

@@ -934,7 +934,8 @@ TOOLS += [
     ("get_contact", "2.21.0: one contact with its linked tasks and events.", _obj({"contact_id": S_ID}, ["contact_id"]),
      lambda api, a: api.call("GET", f"/contacts/{int(a['contact_id'])}")),
     ("create_contact", "2.21.0: create a contact (a name or a company).", _obj(CT_IN), lambda api, a: api.call("POST", "/contacts", body=_pick(a, CT_KEYS))),
-    ("update_contact", "2.21.0: change a contact (only the fields given).", _obj({"contact_id": S_ID, **CT_IN}, ["contact_id"]),
+    ("update_contact", "2.21.0: change a contact (only the fields given). 2.138.4: a new book_id for a contact of an imported address "
+                       "book makes a copy there (answer copied: true).", _obj({"contact_id": S_ID, **CT_IN}, ["contact_id"]),
      lambda api, a: api.call("PATCH", f"/contacts/{int(a['contact_id'])}", body=_pick(a, CT_KEYS))),
     ("delete_contact", "2.21.0: delete a contact.", _obj({"contact_id": S_ID}, ["contact_id"]),
      lambda api, a: api.call("DELETE", f"/contacts/{int(a['contact_id'])}")),
@@ -942,7 +943,8 @@ TOOLS += [
                       "one you may not change -> nothing happens. move: book_id = the target address book; contacts it has already stay "
                       "(conflicts). 2.47.3: set changes properties of all of them (groups_add / groups_remove, org, dept, kind, note_append "
                       "is appended; read-only or imported address books are skipped); its answer's undo, sent back with action restore as "
-                      "items, puts the old values back. 2.58.0: an imported address book as move target -> 409. Ask the person before deleting many.",
+                      "items, puts the old values back. 2.58.0: an imported address book as move target -> 409. 2.138.4: contacts moved OUT of an "
+                      "imported address book are copied (it stays as it is); the answer counts them in copied. Ask the person before deleting many.",
      _obj({"ids": {"type": "array", "items": S_ID}, "action": {"type": "string", "enum": ["delete", "move", "set", "restore"]}, "book_id": S_ID,
            "groups_add": {"type": "array", "items": {"type": "string"}}, "groups_remove": {"type": "array", "items": {"type": "string"}},
            "org": {"type": "string"}, "dept": {"type": "string"}, "kind": {"type": "string", "enum": ["individual", "org"]},

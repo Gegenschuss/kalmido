@@ -167,6 +167,24 @@ def pl_token(c, r):
     return v
 
 
+def pl_token_lost(c, r):
+    """2.138.4 C (#2382): True when a token is stored but opens with neither the current server key nor the workspace's
+    key (the server key changed): it has to be entered again. Reads only."""
+    v = r["token"]
+    if not v or not (isinstance(v, str) and v.startswith(S.PREFIX)):
+        return False
+    key = _token_key(r["ws"])
+    if key:
+        from ..core.orgcrypt import OrgCryptError, oc_dec_k
+        try:
+            oc_dec_k(key, S.ws_org(r["ws"]) or 0, f"pl_sources.token.v2|{r['ws']}", v)
+            return False
+        except OrgCryptError:
+            pass
+    w = S.doc_open(c, r["ws"], "pl_sources.token", v)
+    return not w or w.startswith(S.PREFIX)
+
+
 def pl_mapping(c, r):
     if isinstance(r, dict) and "_map" in r:  # 2.87.9 (#1940): a run into another space keeps the mapping of its source
         return r["_map"]

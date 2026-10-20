@@ -760,7 +760,7 @@ ROUTES = {
     "DELETE /api/templates/{}": "template", "POST /api/templates/{}/apply": "template",
     "POST /api/lists/{}/duplicate": "template", "POST /api/v1/lists/{}/duplicate": "template",  # 2.78.0 (#1881): also p278_dup_api_test.py
     # ---- token (2)
-    "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/git/{}": "token",
+    "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/issues/{}": "token", "POST /api/hooks/git/{}": "token",
     # ---- 2.60.0 (#1514): environments of a project list (they belong to their list; the deploy hook is a secret token)
     "POST /api/hooks/deploy/{}/{}": "token", "GET /api/lists/{}/envs": "list", "POST /api/lists/{}/envs": "list",
     "PATCH /api/envs/{}": "list", "DELETE /api/envs/{}": "list", "POST /api/envs/{}/restore": "list", "POST /api/envs/{}/deploy": "list",

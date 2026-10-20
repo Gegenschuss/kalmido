@@ -217,6 +217,8 @@ def _as(x, kind):
             return x
         return sh_parse_date(x) if isinstance(x, str) else None
     if kind == "b":
+        if isinstance(x, float) and x in (0.0, 1.0):
+            return x == 1.0  # 2.138.4 B (#2371): a checkbox tick is 1 / 0 in formulas, so WAHR / FALSCH hit it
         return x if isinstance(x, bool) else None
     return x.casefold() if isinstance(x, str) else None
 
@@ -286,7 +288,7 @@ def _matches(sv, node, grid, cr):
     """The positions of a grid whose value meets cr (in order). Equality uses the index; empties count as positions."""
     op, kind, val = cr
     me = sv.env.cell_row["id"] if _book_of(sv) is not None else None
-    if op == "=" and kind in ("n", "d", "b", "s"):
+    if op == "=" and kind in ("n", "d", "s"):  # 2.138.4 B (#2371): WAHR / FALSCH compare one by one (_as: a tick 1 / 0 hits them), the index stays as the lookups use it
         return [p for p in _index(sv, node, grid).get((kind, val), ()) if grid.ids[p] != me]
     if shf_hit(None, cr):  # empty cells match too: every position
         shf_spend(sv, grid.nrows * grid.ncols)

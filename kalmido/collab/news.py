@@ -66,7 +66,7 @@ NEWS_FOR_ME += ("wiki_shared",)  # 2.126.2 B (#2355)
 
 def news_to_me(kind, actor_id, data, agents, s=None):
     # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
-    if kind in ("upscan", "filereq", "orgkey"):
+    if kind in ("upscan", "filereq", "orgkey", "ptlimit"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
         return True
     if not actor_id:
         return False
@@ -345,6 +345,23 @@ def news_add(c, uid, kind, task_id=None, list_id=None, comment_id=None, data=Non
                                           json.dumps(data or {}, ensure_ascii=False), iso_ms(now_utc())))
 
 
+def news_read_job(c, j, ts=None):
+    """2.138.3 A (#2406): a decided approval job is done for everybody it was shown to: its unread approval News turn read
+    (by job number; older entries without one by task / list + title of the same agent), their pushes close. Caller commits and bumps."""
+    from ..notify.push import push_handled
+    ts = ts or iso(now_utc())
+    uids = {r[0] for r in c.execute("UPDATE notifications SET read_at=? WHERE kind='approval' AND read_at IS NULL AND data->>'job' = ? "
+                                    "RETURNING user_id", (ts, str(j["id"]))).fetchall()}
+    where, args = ("task_id=?", [j["task_id"]]) if j["task_id"] else ("task_id IS NULL AND list_id=?", [j["list_id"]])
+    if j["task_id"] or j["list_id"]:
+        uids |= {r[0] for r in c.execute(f"UPDATE notifications SET read_at=? WHERE kind='approval' AND read_at IS NULL AND data->>'job' IS NULL "
+                                         f"AND {where} AND actor_id=? AND data->>'title' = ? RETURNING user_id",
+                                         (ts, *args, j["agent_id"], (j["title"] or "")[:200])).fetchall()}
+    if j["task_id"]:
+        for uid in uids:
+            push_handled(c, uid, [j["task_id"]])
+
+
 def news_sig(c, uid):
     """Cheap change marker of my unread items (in /api/version): clients reload the state when it moves."""
     r = c.execute("SELECT COUNT(*), COALESCE(MAX(id),0) FROM notifications WHERE user_id=? AND read_at IS NULL",
@@ -464,6 +481,8 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             if not tsl_news_live(c, uid, r["data"]):
                 continue
         elif kind == "wiki_shared":  # 2.126.2 B (#2355): stays after a revoke (it opens "Shared with me"); only path + kind in data
+            pass
+        elif kind == "ptlimit":  # 2.138.4 C (#2380): the portal's sign-in mails of my space were used up (no task, no list)
             pass
         elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
             if not sees(r["list_id"]):
