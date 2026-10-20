@@ -56,7 +56,12 @@ def tz_preview(c, lid, uid, admin):
     base = f"FROM time_entries e WHERE e.list_id=? AND e.\"end\" IS NOT NULL{own}"
     tot = c.execute(f"SELECT COUNT(*), COALESCE(SUM(e.seconds),0) {base}", args).fetchone()
     bil = c.execute(f"SELECT COUNT(*), COALESCE(SUM(e.seconds),0) {base} AND {tz_billed_sql()}", args).fetchone()
-    return {"count": tot[0] - bil[0], "seconds": int(tot[1] - bil[1]), "billed": bil[0], "billed_seconds": int(bil[1]), "all": admin}
+    from .timesheet import tsl_locked_ids  # 2.125.0 B (#2119): entries of a closed month stay too
+    rows = c.execute(f"SELECT e.id, e.user_id, e.start, e.seconds {base} AND NOT {tz_billed_sql()}", args).fetchall()
+    lk = tsl_locked_ids(c, rows)
+    lks = sum(r["seconds"] for r in rows if r["id"] in lk)
+    return {"count": tot[0] - bil[0] - len(lk), "seconds": int(tot[1] - bil[1] - lks), "billed": bil[0], "billed_seconds": int(bil[1]),
+            "all": admin, "locked": len(lk)}
 
 
 def n43_iso(v):
@@ -109,6 +114,9 @@ def tz_delete_all(lid):
     own = "" if admin else " AND e.user_id=?"
     args = [lid] + ([] if admin else [uid])
     rows = c.execute(f"SELECT e.* FROM time_entries e WHERE e.list_id=? AND e.\"end\" IS NOT NULL{own} AND NOT {tz_billed_sql()} ORDER BY e.id", args).fetchall()
+    from .timesheet import tsl_locked_ids
+    lk = tsl_locked_ids(c, rows)  # 2.125.0 B (#2119): entries of a closed month stay
+    rows = [r for r in rows if r["id"] not in lk]
     ids = [r["id"] for r in rows]
     prev = tz_preview(c, lid, uid, admin)
     for i in range(0, len(ids), 500):
@@ -164,6 +172,9 @@ def tz_restore(lid):
         tid = e.get("task_id")
         if tid and not c.execute("SELECT 1 FROM tasks WHERE id=? AND list_id=?", (tid, lid)).fetchone():
             tid = None
+        from .timesheet import tsl_is_locked
+        if tsl_is_locked(c, owner, str(e["start"])[:40]):
+            continue  # 2.125.0 B (#2119): never into a closed month
         cid, pid = n43_restore_ids(c, owner, e)
         insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,client_id,pomo_id,
                                                  reminded,auto_stopped,created_at,updated_at)

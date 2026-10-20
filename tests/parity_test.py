@@ -467,6 +467,9 @@ APP_ONLY = [
      ("=PUT /api/lists/{}/page-style", "=POST /api/lists/{}/notepads", "=PATCH /api/notepads/{}", "=DELETE /api/notepads/{}")),
     ("2.43.0 (#1434): delete all times of a project (typed confirmation, restore); agents get 403 by design",
      ("=GET /api/lists/{}/time/delete-all", "=POST /api/lists/{}/time/delete-all", "=POST /api/lists/{}/time/restore")),
+    ("2.125.0 (#2119): closing, reopening and approving a month's timesheet is a person's step; agents get 403 (their writes into "
+     "a closed month answer 409 month_closed)",
+     ("=GET /api/time/sheets", "=POST /api/time/sheets", "=POST /api/time/sheets/decide")),
     # 2.44.0 (#1517): the setup script trades the one-time code for the token and signs a computer off with its own token
     ("2.44.0 (#1517): one-command agent setup on a computer (setup script, no session); not an agent tool",
      ("=POST /api/agent-setup/redeem", "=POST /api/agent-setup/remove")),

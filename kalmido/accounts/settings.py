@@ -52,6 +52,7 @@ ROW_ICON_KEYS = ("due", "repeat", "remind", "deadline", "occ", "note", "attach",
                  "ttype", "ms", "blocked", "wait", "stale", "pin", "list", "tags", "fields", "created", "num", "person", "turns")
 SETTINGS_FLAGS += ("photo_meta_strip",)  # 2.61.0 B (#1819): remove the metadata of my photos on upload
 SETTINGS_FLAGS += ("assistant_on",)  # 2.75.0 A (#1411): the built-in assistant for this person (assistant/web.py)
+SETTINGS_FLAGS += ("time_split_midnight",)  # 2.125.0 B (#2120): entries over midnight count on each day (personal/timesheet.py)
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
@@ -104,6 +105,9 @@ def clean_setting(k, v):
         return ",".join(dict.fromkeys(ids))
     if k == "roadmap":
         return clean_roadmap_pref(v)
+    if k == "tz":  # 2.125.0 B (#2120): my time zone of time tracking ('' = the server's)
+        from ..personal.timesheet import tz_clean
+        return tz_clean(sv)
     if k == "agent_comments":  # 2.62.0 (#1854): comments by agents: all | only replies to me
         if sv not in ("all", "replies"):
             raise bad

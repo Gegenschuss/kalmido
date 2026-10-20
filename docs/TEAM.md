@@ -202,6 +202,33 @@ questions stays the classic form.
 - **Undo after "Delete all times of this project"** brings the entries back exactly as they were, including the link to a
   timer started on a phone, so a stop that arrives later from that phone still finds its entry.
 
+## Monthly timesheets: close, approve, send back (2.125.0)
+
+- **Close a month.** On the time page choose *This month* or *Last month*: a card shows the month's timesheet. *Close month*
+  locks your entries that start in that month: no new entry, no change, no delete, no timer start or stop into it, focus
+  sessions and agents' proposals no longer add time there, and *Delete all times of this project* leaves them. The entries
+  show a lock instead of the edit buttons. An entry from the 31st 23:00 to the 1st 01:00 belongs to the month it starts in.
+  A running timer of that month has to be stopped first. *Reopen* unlocks it again as long as nobody approved it.
+- **Approval in an organisation.** The admins of your organisation get a News item (and a push) and see your closed month
+  under *Timesheets of your team*, with the hours on the organisation's lists (never your private time). They *Approve* it
+  or *Send back* with a note: then the month is open again and you get the note. An approved month only an admin reopens.
+  Members cannot decide, admins of another organisation never see it. Every step is one Undo step.
+- **Without an organisation** you are your own admin: closing locks the month, there is no approval step, you reopen it
+  yourself.
+- **Notifications:** the event *Timesheets* in Settings > Notifications (News and push, both can be switched off).
+- **Agents and the API** get `409` with the error code `month_closed` when they write into a closed month.
+
+## Time zone and entries over midnight (2.125.0)
+
+- **Your own time zone** (Settings > Modules > Time tracking > *Time zone*; empty = the server's, the device's zone is offered
+  as a suggestion) decides on which day an entry counts, the periods of the report, the CSV and the timesheet, "today" and
+  the month of the lock above. The calendar, reminders, workload and absences keep the server's time zone. With *All members*
+  the report uses your time zone for everyone's entries.
+- **Entries over midnight** (on by default): an entry from 23:30 to 00:30 counts with 30 minutes on each day in the days of
+  the report and the timesheet, and the CSV has one row per day. The entry itself stays one entry, the totals stay the same.
+  Rounding stays per entry: the rounded time is split by the share of each day, never rounded twice. Switched off, an entry
+  counts on the day it starts, as before.
+
 ## Saved arrangements and templates (2.55.0)
 
 - **Several arrangements per view.** The start page, Today, Time tracking, the overviews, the review and every project page

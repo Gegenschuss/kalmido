@@ -63,6 +63,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-pf': ['pomo_focus', N_('Focus session'), 'pos'], 's-ps': ['pomo_short', N_('Short break'), 'pos'], 's-pl': ['pomo_long', N_('Long break'), 'pos'], 's-pe': ['pomo_long_every', N_('Long break after'), 'pos'],
   's-trnd': ['time_rounding', N_('Rounding'), 'sel'], 's-tcur': ['time_currency', N_('Currency'), 'text'], 's-ttarget': ['time_target', N_('Daily target'), 'num'],
   's-trem': ['time_remind_h', N_('Reminder after'), 'num'], 's-tstop': ['time_autostop_h', N_('Stop automatically after'), 'num'], 's-tfocus': ['time_focus', N_('Focus sessions'), 'chk'],
+  's-ttz': ['tz', N_('Time zone'), 'sel'], 's-tsplit': ['time_split_midnight', N_('Entries over midnight'), 'chk'],  // 2.125.0 B (#2120)
   's-icalscope': ['ical_scope', N_('Calendar subscription'), 'sel'], 's-icalalarm': ['ical_alarms', N_('as calendar alarms'), 'chk'],
   's-caltoday': ['cal_today', N_('Events on Today'), 'chk'],
   's-dateok': ['date_confirm', N_('Confirm changes of the date with OK'), 'chk'],  // 2.6.1 (#401)
@@ -227,6 +228,7 @@ function modulesHtml(hint) {
       <div class="row"><label for="s-tcur">${tr('Currency')}</label><input id="s-tcur" value="${esc(s.time_currency ?? '€')}" maxlength="8" class="numin"></div>
       <div class="row"><label for="s-ttarget">${tr('Daily target')}</label><input type="number" id="s-ttarget" value="${esc(s.time_target || '0')}" min="0" max="24" step="0.25" class="numin"><span class="muted">${tr('hours, 0 = none')}</span></div>
       <div class="row"><label for="s-trem">${tr('Reminder after')}</label><input type="number" id="s-trem" value="${esc(s.time_remind_h ?? '4')}" min="0" max="48" step="0.5" class="numin"><span class="muted">${tr('hours, push “still running?”, 0 = off')}</span></div>
+      ${tsl_setRows(s, hint)}
       <div class="row"><label for="s-tstop">${tr('Stop automatically after')}</label><input type="number" id="s-tstop" value="${esc(s.time_autostop_h ?? '12')}" min="0" max="72" step="0.5" class="numin"><span class="muted">${tr('hours, end = start + value, 0 = off')}</span></div>
       <div class="row"><label>${tr('Focus sessions')}</label><label class="chkl"><input type="checkbox" id="s-tfocus" ${s.time_focus !== '0' ? 'checked' : ''}> ${tr('count as time entries (not while a timer runs)')}</label></div></details>` : '';
   const row = k => k.startsWith('a:') ? mg_modAreaHtml(k.slice(2), x => modRowHtml(x, opt)) : modRowHtml(k, opt);  // 2.44.0 (#1187)
@@ -741,6 +743,7 @@ function settingsModal(focus) {
     if (d[2] === 'time' && el.id === 's-allday' && !v) return;
     await setApply({[d[0]]: v}, tr(d[1]));
     if (d[0] === 'agent_comments') loadNews().then(render).catch(() => {});  // 2.66.1 (#1943): the bell's number depends on it
+    if (d[0] === 'tz' || d[0] === 'time_split_midnight') S.tv.key = '';  // 2.125.0 B (#2120): the time report again
   };
   const saveName = async () => {
     const el = $('#a-name', md); if (!el || !S.me) return;

@@ -339,6 +339,8 @@ def atm_prop_run(c, j, sel, ed, rec):
         if "note" in e:
             x["note"] = _p_str(e["note"], "note", ATM_NOTE_MAX)
         a, b = atm_when(x["date"], x["start"], x["end"])
+        from ..personal.timesheet import tsl_check
+        tsl_check(c, me(), a)  # 2.125.0 B (#2119): no entry into a closed month (409 month_closed)
         tid, lid, title = time_target(c, {"task_id": x["task_id"]} if x["task_id"] else {"list_id": x["list_id"]})
         row = (me(), tid, lid, title, iso(a), iso(b), int((b - a).total_seconds()), x["note"], "manual", ts, ts)
         rec["made"].append(insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,
@@ -358,8 +360,9 @@ def atm_prop_undo(c, j, rec, back=True):
     if back:
         keep = []
         for eid, row in zip(rec.get("made") or [], rec.get("copies") or []):
-            r = c.execute("SELECT updated_at, user_id FROM time_entries WHERE id=?", (eid,)).fetchone()
-            if r and r["user_id"] == me() and r["updated_at"] <= rec["at"]:
+            r = c.execute("SELECT updated_at, user_id, start FROM time_entries WHERE id=?", (eid,)).fetchone()
+            from ..personal.timesheet import tsl_is_locked
+            if r and r["user_id"] == me() and r["updated_at"] <= rec["at"] and not tsl_is_locked(c, me(), r["start"]):  # 2.125.0 B (#2119)
                 c.execute("DELETE FROM time_entries WHERE id=?", (eid,))
                 n += 1
                 keep.append(row)
@@ -368,7 +371,9 @@ def atm_prop_undo(c, j, rec, back=True):
         rec["removed"] = keep
     else:
         made, ts = [], iso(now_utc())
+        from ..personal.timesheet import tsl_check
         for row in rec.get("removed") or []:
+            tsl_check(c, me(), row[4])  # 2.125.0 B (#2119): redo into a closed month: 409
             made.append(insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,
                                        created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)""", (*row[:9], ts, ts)))
             n += 1
