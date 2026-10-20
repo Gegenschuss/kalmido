@@ -237,6 +237,9 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.124.0 C (#2113): sharing one table stays with people -- who may change it through its workspace decides who else sees it; "
+     "an agent never shares (the routes answer 403 to agents) and sees a table shared with it in GET /api/v1/sheets",
+     ("* /api/sheets/{}/shares",)),
     ("2.119.1 B (#2083): the history on a contact's card stays with people -- it gathers filed mails, office documents and "
      "events, which agents do not read through one route (agent access to filed mails comes as its own step; the route answers 403)",
      ("=GET /api/contacts/{}/history",)),

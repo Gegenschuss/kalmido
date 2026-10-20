@@ -168,5 +168,24 @@ old workspace ends (the table would otherwise open to the whole target space), r
 lose their link, quotations made from the table stay where they are, and formulas that use lists or clients of the old
 workspace show "No access" there. Out of an organisation only the person who created the table or an admin of the organisation
 may move it; a private table only its owner. Undo moves it back in one step and brings back the list attachment and the
-carried-over links that fit again. The last move shows in the side panel. Agents never move tables between workspaces.
+carried-over links that fit again. The last move shows in the side panel. Shares of single people / agents end with the move (2.124.0). Agents never move tables between workspaces.
 Route: `POST /api/sheets/{id}/move-space {to, dry, undo}`.
+
+## Sharing one table (2.124.0)
+
+Table menu *Share…*: give single people or agents access to just this table, without the rest of the workspace and
+without the attached list. Each share has a role: *Can view* (read and export, never change) or *Can edit* (cells, rows,
+columns, the title). Deleting, attaching to a list, moving to another workspace, carrying rows over and managing the shares
+stay with the people who may change the table through its workspace (the owner of a private table, the members of the
+organisation or of the attached list); a person who only got a share never passes it on.
+
+You can share with the people you know (an organisation's table: only its members; a private table: the people you share
+lists with, or by e-mail address - the answer never tells whether the address has an account, and no mail goes out) and
+with the agents of the table's workspace (a private table: your own agent). The overview marks a table with shares as
+*Shared*; the recipients find it under *Shared with me*. Stopping a share works at once; every add, stop and role change
+is one Undo step. Moving the table to another workspace ends its shares (the check names them); leaving an organisation
+ends the shares of its tables; a table in the trash is hidden from the recipients until it is restored. Agents see a table
+shared with them in `sheets_list` (`shared_in`, `share_role`) like the tables of their lists.
+Routes: `GET|POST /api/sheets/{id}/shares`, `PATCH|DELETE /api/sheets/{id}/shares/{share}`.
+
+The search (Mod+K) finds tables by their title (only the ones you may open) and opens them.

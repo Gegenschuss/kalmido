@@ -44,7 +44,8 @@ KINDS = {
                "organisation: create, comments, versions, customer link, export, delete + restore; p2991_c_api_test.py: the own agent "
                "of such a person reads and comments them through the API v1"),
     "sheets": ("matrix", "p289_b_api_test.py, p289_c_api_test.py, p289_d_api_test.py: tables (2.89.0) in the private space of a "
-                         "person without an organisation and with that person's own agent; rows to tasks / quotation drafts"),
+                         "person without an organisation and with that person's own agent; rows to tasks / quotation drafts; "
+                         "p2124_c_api_test.py: sharing a private table (2.124.0)"),
     "bookmarks": ("matrix", "p297_a_api_test.py: bookmarks (2.97.0) in the private space of a person without an organisation"),  # 2.97.0 A (#1950)
     "polls": ("matrix", "p298_a_api_test.py: scheduling polls (2.98.0) in the private space of a person without an organisation"),  # 2.98.0 A (#1953)
     "own": ("matrix", SUITE + ": the own settings, profile, tokens, app passwords, push, account export / import"),
@@ -594,6 +595,9 @@ ROUTES = {
     "POST /api/office/move-space": "office",
     # 2.96.0 B (#1941): a table to the other workspace
     "POST /api/sheets/{}/move-space": "sheets",
+    # 2.124.0 C (#2113): shares of one table (p2124_c_api_test.py)
+    "GET /api/sheets/{}/shares": "sheets", "POST /api/sheets/{}/shares": "sheets",
+    "PATCH /api/sheets/{}/shares/{}": "sheets", "DELETE /api/sheets/{}/shares/{}": "sheets",
     "PATCH /api/sheets/{}/columns/{}": "sheets", "PATCH /api/v1/sheets/{}": "sheets", "POST /api/sheets": "sheets",
     "POST /api/sheets/{}/batches/{}/undo": "sheets", "POST /api/sheets/{}/cells/{}/freeze": "sheets",
     "POST /api/sheets/{}/cells/{}/name": "sheets", "POST /api/sheets/{}/columns": "sheets",
