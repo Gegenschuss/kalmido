@@ -621,3 +621,43 @@ and their values, sections, tags, the list's chat) and nothing moves anywhere el
   chat. Tracked time stays (without the list) for the bookkeeping.
 - Lists with end-to-end encryption are still deleted for good at once (nobody could read them in the trash).
 
+
+## Notification channels: Slack, Matrix, Telegram, Signal (2.142.0)
+
+Notifications can also go to a chat service, as a short text with the link to the task.
+
+- **Your own channels:** *Settings > Notifications > Channels > Add channel*. Choose the service and paste what it needs:
+  Slack an *Incoming Webhook* URL, Matrix the URL of a webhook bridge of your Matrix server (for example hookshot's generic
+  webhooks, Kalmido posts `{"text": …}`), Telegram a bot token from @BotFather and the chat ID, Signal the address of your own
+  signal-cli-rest-api server with the registered sender number and the recipient (a number or `group.…`). Then pick what goes
+  there: reminders, assignments, mentions and comments, the daily digest and briefing, other notifications, and *changes in my
+  own lists* (new, completed, assigned, commented in your private lists - the channel of your private area, also without an
+  organisation). *Send test* posts a test message at once.
+- **The organisation's channels:** *Settings > Workspaces > the organisation > Channels* (its admins). They get what happens in
+  the organisation's lists that **every member sees** (*Everyone in the organisation*): new task, completed, assigned, comment.
+  Never a list shared only with some people, never a private area, never another organisation; a list with end-to-end
+  encryption shows only the neutral word. When the admin who set a channel up is no admin any more, it turns itself off; an
+  admin who switches it on again owns it.
+- **The address is a secret:** stored encrypted, never shown again (only the service, the name and the last characters).
+  Editing leaves it unchanged unless you type a new one.
+- **Delivery:** in the background, one try per message with a short time limit. After 5 failed sends in a row the channel
+  turns itself off and the settings say why; switching it on again starts the count anew. Quiet hours hold back your own
+  channel messages (urgent ones excepted).
+- **Addresses:** `https://` only. Addresses in your own network and plain `http://` only for hosts an admin allowed
+  (*Settings > Administration > Advanced* or `KALMIDO_WEBHOOK_ALLOW_HOSTS`), the same guard as for webhooks.
+- Server settings: `KALMIDO_CHANNELS=0` turns channels off; `KALMIDO_CHANNEL_FAILS` (default 5) failures in a row before a
+  channel turns off; `KALMIDO_TELEGRAM_API` another Telegram Bot API server (default `https://api.telegram.org`).
+
+## E-mail for assignments and mentions (2.142.0)
+
+Someone who gets no pushes still learns when a task is assigned to them or they are mentioned in a comment.
+
+- *Settings > Notifications > E-mail for single events*, per kind (*Assigned to me*, *Mentioned*): **Only without a push
+  device** (the default), **Always** or **Off**. "Push device" means a device with Web Push, or ntfy when it is your channel
+  (*Delivery > Channel* ntfy or both); the chat channels above do not count.
+- Needs e-mail sending on the server (`KALMIDO_SMTP_*`) and an e-mail address of the account.
+- **Bundled:** the first event waits 10 minutes for more, then one e-mail lists them all with links; at most one e-mail every
+  10 minutes and 20 a day per person. The text names who did what and the list - never the words of the comment; a task you
+  no longer see by then is left out, a list with end-to-end encryption shows only the neutral word.
+- Agents never get these e-mails (they have their events). Server settings: `KALMIDO_EVENT_MAIL_DELAY` and
+  `KALMIDO_EVENT_MAIL_GAP` (seconds, default 600 each).

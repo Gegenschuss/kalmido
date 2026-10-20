@@ -336,7 +336,7 @@ check(Fi.post(B + f"/api/me/channels/{FC}/test").json().get("ok") is True, "the 
 FLI = Fi.post(B + "/api/lists", json={"name": "Studio", "org_id": None}).json()["id"]
 FT = task(Fi, FLI, "Invoice the client")
 check(got("/frida", has("Frida added: Invoice the client")), "#2145 (P4): the private area's own list events")
-Fi.patch(B + f"/api/tasks/{FT}", json={"status": 1})
+Fi.post(B + f"/api/tasks/{FT}/complete", json={})
 check(got("/frida", has("Frida completed: Invoice the client")), "#2145 (P4): completed in the own list")
 check(Fi.delete(B + f"/api/me/channels/{FC}").ok, "the freelancer removes it")
 
