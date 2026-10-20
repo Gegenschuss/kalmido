@@ -255,13 +255,13 @@ check(A.put(B + f"/api/lists/{LID}/members", json={"user_id": RAG, "role": "edit
 rep = A.get(B + f"/api/lists/{LID}/status-report", params={"days": 7}).json()
 check(RAG in [a["id"] for a in rep.get("agents", [])], "report: the status report names the agent to ask")
 check(ask(A, kind="report", agent_id=RAG, list_id=L2, days=7).status_code == 404, "report: another list not shared 404")
-check(ask(A, kind="report", agent_id=RAG, list_id=LID, days=0).status_code == 400, "report: a bad period 400")
+check(ask(A, kind="report", agent_id=RAG, list_id=LID, days=400).status_code == 400, "report: a bad period 400")
 r = ask(A, kind="report", agent_id=RAG, list_id=LID, days=7, wish="kurz, freundlich", lang="de")
 check(r.status_code == 201, "report: the request " + r.text[:200])
 J5 = r.json()["id"]
 rin = job_input(RAGS, J5).get("input") or {}
 txt = json.dumps(rin, ensure_ascii=False)
-check(rin.get("report", {}).get("counts", {}).get("done") == 1 and "Imagefilm Projekt" in rin["report"].get("markdown", "") and rin.get("wish") == "kurz, freundlich",
+check("Drehbuch schreiben" in rin.get("report", {}).get("markdown", "") and "Imagefilm Projekt" in rin["report"].get("markdown", "") and rin.get("wish") == "kurz, freundlich",
       f"report: the status data + its fixed text {txt[:300]}")
 check("Geheime Notiz" not in txt and "Interner Kommentar" not in txt and "Alice" not in txt, "report: no notes, comments, names in the input")
 check(answer(RAGS, J5, {"text": "x", "field": "intro"}).status_code == 400, "report: unknown field 400")
