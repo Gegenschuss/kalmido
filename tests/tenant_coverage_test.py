@@ -798,6 +798,10 @@ ROUTES = {
     "GET /api/sheets/{}/shares": "sheet_share", "POST /api/sheets/{}/shares": "sheet_share",
     "PATCH /api/sheets/{}/shares/{}": "sheet_share", "DELETE /api/sheets/{}/shares/{}": "sheet_share",
     "PUT /api/sheets/{}/chart": "sheet",  # 2.124.0 A (#2115): the chart of a table (p2124_a_api_test.py)
+    # 2.124.0 E (#2116): the sheets of a table (p2124_e_api_test.py: a stranger 404 on every route, another organisation's agent 404)
+    "GET /api/sheets/{}/tabs": "sheet", "POST /api/sheets/{}/tabs": "sheet", "PATCH /api/sheets/{}/tabs/{}": "sheet",
+    "DELETE /api/sheets/{}/tabs/{}": "sheet", "POST /api/sheets/{}/tabs/{}/restore": "sheet",
+    "GET /api/v1/sheets/{}/tabs": "sheet_v1", "POST /api/v1/sheets/{}/tabs": "sheet_v1",
     "DELETE /api/sheets/{}": "sheet", "POST /api/sheets/{}/restore": "sheet", "PUT /api/sheets/{}/cells": "sheet",
     "POST /api/sheets/{}/cells/{}/freeze": "sheet", "POST /api/sheets/{}/cells/{}/name": "sheet",
     "POST /api/sheets/{}/columns": "sheet", "PATCH /api/sheets/{}/columns/{}": "sheet", "DELETE /api/sheets/{}/columns/{}": "sheet",

@@ -2925,6 +2925,15 @@ a table the call created too. A wrong formula changes nothing (400 with the reas
 | Append rows | `POST /api/v1/sheets/{id}/rows` | `sheet_append_rows` | sheets:write |
 | Add a column | `POST /api/v1/sheets/{id}/columns` | `sheet_add_column` | sheets:write |
 | Take back one of your calls | `POST /api/v1/sheets/{id}/batches/{batch}/undo` | `sheet_undo_batch` | sheets:write |
+| The sheets of a table (2.124.0) | `GET /api/v1/sheets/{id}/tabs` | `sheet_tabs` | sheets:read |
+| Add a sheet to a table (2.124.0) | `POST /api/v1/sheets/{id}/tabs` | `sheet_add_tab` | sheets:write |
+
+**Several sheets (2.124.0).** A table can have several sheets, like a spreadsheet file. Each sheet has its own id: read
+and change it with the routes above (`sheet_read`, `sheet_set_cells` ... with the sheet's id); `book_id` / `tabs` in the
+answer name the table and its sheets, the list of tables shows each table once (`sheets` = its number of sheets). Rights,
+space, list and shares are the table's: whoever may read the table reads all its sheets. A formula reaches into another
+sheet of the same table with `Name!A1` or `'Sheet name'!A1:B5` (also in `SUMMEWENN`, `SVERWEIS` ...); a renamed sheet keeps
+its formulas, a sheet in the trash gives `ref`. Taking back the call that added a sheet moves the sheet to the trash.
 
 - **Inputs**: numbers `1,5` or `1.5`, dates `DD.MM.YYYY` or `YYYY-MM-DD`, a select cell its label (a new label becomes a
   new choice). Formulas start with `=`: `A1`, ranges `B2:B9`, cell names, column names (all cells of the column but the

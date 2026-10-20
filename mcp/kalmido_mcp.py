@@ -973,6 +973,16 @@ TOOLS += [
                          "created too.",
      _obj({"sheet_id": S_ID, "batch": {"type": "string"}}, ["sheet_id", "batch"]),
      lambda api, a: api.call("POST", f"/sheets/{_id(a, 'sheet_id')}/batches/{_q(a['batch'])}/undo")),
+    # 2.124.0 E (#2116): several sheets in one table
+    ("sheet_tabs", "2.124.0 (scope sheets:read): the sheets of a table (id, name, pos, first) - a table can have several sheets like a "
+                   "spreadsheet file. Read / change ONE sheet with sheet_read, sheet_set_cells ... and the sheet's id; a formula reaches "
+                   "into another sheet with Name!A1 or 'Sheet name'!A1:B5.",
+     _obj({"sheet_id": S_ID}, ["sheet_id"]), lambda api, a: api.call("GET", f"/sheets/{_id(a, 'sheet_id')}/tabs")),
+    ("sheet_add_tab", "2.124.0 (scope sheets:write): add a sheet to a table: name?, columns?, rows? (like sheet_create). One call = one "
+                      "batch (taking it back moves the new sheet to the trash: sheet_undo_batch with the NEW sheet's id).",
+     _obj({"sheet_id": S_ID, "name": {"type": "string", "maxLength": 100}, "columns": {"type": "array", "items": _SH_COL, "maxItems": 200},
+           "rows": _SH_ROWS}, ["sheet_id"]),
+     lambda api, a: api.call("POST", f"/sheets/{_id(a, 'sheet_id')}/tabs", body=_pick(a, ("name", "columns", "rows")))),
 ]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
@@ -1948,8 +1958,9 @@ TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
 TOOL_SCOPES["import"] = ("propose_import",)  # 2.68.0 (#1839)
 TOOL_SCOPES["agent"] += ("propose_contract_notice",)  # 2.70.0 C (#1359)
 TOOL_SCOPES["structure"] += ("propose_rule",)  # 2.71.0 A (#1457)
-TOOL_SCOPES["sheets:read"] = ("sheets_list", "sheet_read", "sheet_vars")  # 2.89.0 C (#1916)
-TOOL_SCOPES["sheets:write"] = ("sheet_create", "sheet_update", "sheet_set_cells", "sheet_append_rows", "sheet_add_column", "sheet_undo_batch")
+TOOL_SCOPES["sheets:read"] = ("sheets_list", "sheet_read", "sheet_vars", "sheet_tabs")  # 2.89.0 C (#1916); 2.124.0 E (#2116): + sheet_tabs
+TOOL_SCOPES["sheets:write"] = ("sheet_create", "sheet_update", "sheet_set_cells", "sheet_append_rows", "sheet_add_column", "sheet_undo_batch",
+                               "sheet_add_tab")  # 2.124.0 E (#2116): + sheet_add_tab
 TOOL_SCOPES["comments"] += ("add_video_comment", "set_video_comment_done")  # 2.99.1 C (#1959)
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",

@@ -608,6 +608,11 @@ ROUTES = {
     "GET /api/sheets/{}/shares": "sheets", "POST /api/sheets/{}/shares": "sheets",
     "PATCH /api/sheets/{}/shares/{}": "sheets", "DELETE /api/sheets/{}/shares/{}": "sheets",
     "PUT /api/sheets/{}/chart": "sheets",  # 2.124.0 A (#2115): the chart of a table (p2124_a_api_test.py)
+    # 2.124.0 E (#2116): the sheets of a table (p2124_e_api_test.py: a person without an organisation adds, renames, moves,
+    # deletes and restores sheets of her private table; API v1 through the agents of the same test)
+    "GET /api/sheets/{}/tabs": "sheets", "POST /api/sheets/{}/tabs": "sheets", "PATCH /api/sheets/{}/tabs/{}": "sheets",
+    "DELETE /api/sheets/{}/tabs/{}": "sheets", "POST /api/sheets/{}/tabs/{}/restore": "sheets",
+    "GET /api/v1/sheets/{}/tabs": "sheets", "POST /api/v1/sheets/{}/tabs": "sheets",
     "PATCH /api/sheets/{}/columns/{}": "sheets", "PATCH /api/v1/sheets/{}": "sheets", "POST /api/sheets": "sheets",
     "POST /api/sheets/{}/batches/{}/undo": "sheets", "POST /api/sheets/{}/cells/{}/freeze": "sheets",
     "POST /api/sheets/{}/cells/{}/name": "sheets", "POST /api/sheets/{}/columns": "sheets",

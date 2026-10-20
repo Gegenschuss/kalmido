@@ -1340,6 +1340,15 @@ person cell may name (`GET /api/sheets/{id}/people`), a file into a cell (`POST 
 (`POST /api/sheets/{id}/fixed` `{rows, cols}`), the history of the table (`GET /api/sheets/{id}/history`) and of one cell
 (`GET /api/sheets/{id}/cells/{cell_id}/history`).
 
+2.124.0: several sheets in one table. Each sheet has its own id and is read / changed with the routes above; a table answer
+has `book_id` (the id of the table's first sheet), `book_title`, `tab_name` and `tabs` (`[{id, name, pos, first}]`), the
+list of tables shows each table once with `sheets` (its number of sheets). `GET /api/v1/sheets/{id}/tabs` lists the sheets,
+`POST /api/v1/sheets/{id}/tabs` `{name?, columns?, rows?}` adds one (one batch). Session only (the app): rename / move
+(`PATCH /api/sheets/{id}/tabs/{tab}` `{name?, pos?}`), the trash (`DELETE /api/sheets/{id}/tabs/{tab}`,
+`POST /api/sheets/{id}/tabs/{tab}/restore`; the first sheet: 409), a new or copied sheet (`POST /api/sheets/{id}/tabs`
+`{name?, after_id?, copy_of?}`). Shares and the list belong to the first sheet (409 on a further one). Formulas reach into
+another sheet with `Name!A1` / `'Sheet name'!A1:B5`; the .xlsx export / import carries all sheets.
+
 ```bash
 curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"title": "Angebot Dreh", "space": "private",
