@@ -462,6 +462,23 @@ docker compose up -d kalmido
   example with clevis / tang), so a stolen disk alone is unreadable.
 - **Offsite backups by pull.** Let a second machine pull the backups (the server cannot delete them), encrypt them
   there (for example with `age`, or Kalmido's own *Encrypt backups*), and run a restore test now and then.
+- **Off-site target (2.143.0).** Settings > Administration > Server > *Off-site backup*: one target per server --
+  S3-compatible storage (endpoint, region, bucket, folder, access key and secret key; requests signed with Signature V4;
+  path-style addresses by default, switch them off for `bucket.s3.example.com`), WebDAV (address, user name, password) or
+  SFTP (server, port, user name, folder). For SFTP Kalmido makes an ed25519 key pair and shows the public key: add it to
+  `~/.ssh/authorized_keys` of that user; the first *Test connection* shows the server's fingerprint and saves it, after that
+  only this host key is accepted (*Forget fingerprint* after a planned change of the server). The image ships the `sftp`
+  program (openssh-client); a server run outside the image needs it on the `PATH`.
+  - Only encrypted backups are uploaded: the target cannot be switched on without *Encrypt backups* and its passphrase.
+  - After every backup (automatic or *Back up now*; not the safety copies of a restore) the backup thread uploads the
+    newest one, checks its size on the target (S3: also `Content-MD5` and the signed SHA-256 of the body) and keeps the
+    newest N backups there (default: the daily count kept locally); older files of Kalmido's backup name pattern are
+    deleted, nothing else in the folder. A failed upload is tried again up to 4 times (5, 10, 20 minutes apart), then
+    the admins get an alert; the next backup or *Upload now* starts again. `KALMIDO_OFFSITE_TIMEOUT` (seconds per
+    network step, default 120) and `KALMIDO_OFFSITE_RETRY_S` (first pause, default 300) tune it.
+  - The credentials (keys, password, the SFTP private key) are sealed with the server key and never shown again; the
+    page only says whether they are set. *Test connection* writes a small file to the target and deletes it.
+  - Restoring from the target: download the backup there and use *Restore from a file* (or copy it into the backup folder).
 - **Old snapshots contain plain text.** Filesystem, VM or provider snapshots taken before you switched on encryption
   still hold the data unencrypted: delete them.
 

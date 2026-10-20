@@ -170,7 +170,11 @@ ROUTES = {
     "GET /api/admin/backups": "admin", "PATCH /api/admin/backups": "admin", "POST /api/admin/backups": "admin",
     "GET /api/admin/backups/{}/download": "admin", "DELETE /api/admin/backups/{}": "admin",
     "POST /api/admin/backups/{}/verify": "admin", "POST /api/admin/backups/upload": "admin",
-    "POST /api/admin/backups/restore": "admin", "PUT /api/admin/announcement": "admin",
+    "POST /api/admin/backups/restore": "admin",
+    # 2.143.0 B (#2152): the off-site target of the backups (instance admins, p2143_b_api_test.py)
+    "GET /api/admin/backups/offsite": "admin", "PATCH /api/admin/backups/offsite": "admin",
+    "POST /api/admin/backups/offsite/test": "admin", "POST /api/admin/backups/offsite/upload": "admin",
+    "PUT /api/admin/announcement": "admin",
     "PUT /api/v1/admin/announcement": "admin", "GET /api/admin/agents": "admin", "POST /api/admin/agents": "admin",
     "PATCH /api/admin/agents/{}": "admin", "POST /api/admin/agents/{}/reset": "admin",
     "POST /api/admin/agents/{}/avatar": "admin", "POST /api/admin/agents/{}/token": "admin",
@@ -816,6 +820,8 @@ ROUTES = {
     # 2.96.0 B (#1941): wiki pages / folders to the other workspace (p296_b_api_test.py)
     "POST /api/wiki/move-space": "wiki",
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
+    # 2.143.0 B (#2211): the trash of a space -- list, delete for good / empty (p2143_b_api_test.py: another space 404 / skipped)
+    "GET /api/wiki/trash": "wiki", "POST /api/wiki/purge": "wiki",
     # 2.123.0 C (#2103, #2107): files of the file store / tables in pages (another organisation 404, p2123_c_api_test.py)
     "POST /api/wiki/pages/{}/refs": "wiki", "GET /api/wiki/refs": "wiki",
     # 2.99.0 A (#2182): files of knowledge pages (a file of another organisation / person: 404, p299_a_api_test.py)
