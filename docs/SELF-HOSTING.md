@@ -546,6 +546,22 @@ shared with others, an agent the list is shared with); the database and the data
   another server key as `keys_other_server_key`). Without the master key the private files are lost.
 - **Your own data export** (*Settings > Data > Export*) is JSON and lists the files without their content, as before.
   To take the files themselves out of the data folder in plain text, run `decrypt-private` first.
+
+**Knowledge pages (2.123).** The text of the knowledge pages and of their history is encrypted at rest as well:
+organisation pages with the organisation's key, private pages with the owner's account key (following `org_encrypt`,
+for private pages also `private_encrypt`, and the switch `wiki_encrypt`, default on). Page names stay plain (unique
+names, links, the tree). Spaces encrypted in the browser are not touched (their texts are ciphertext already). Pages
+written before 2.123 are read as they are and encrypted by the same background pass; the search uses a word index of
+keyed hashes (built on the first search of a space). **Before going back to 2.122 or older** turn the texts into plain
+text again, otherwise the older version shows ciphertext instead of the pages:
+
+```bash
+docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli decrypt-wiki
+```
+
+It sets `wiki_encrypt` to 0 first (new texts stay plain, also while 2.123 still runs), then opens every page text and
+version and exits with 0 only when none is left. `encrypt-wiki` switches it on again and encrypts them. `decrypt-all`
+and `decrypt-private` cover the pages too; `status` shows `wiki_encrypt` and the counts.
 ## Encryption in the browser (2.64)
 
 Kalmido has two kinds of encryption. They are independent and can be used together:

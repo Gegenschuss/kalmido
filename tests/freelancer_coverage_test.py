@@ -31,7 +31,7 @@ KINDS = {
                          "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0)"),
     "files": ("matrix", SUITE + ": the own file store (folders, upload, content, versions) and documents; every GET"),
     "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private space (create, change, search, export, trash; "
-                       "2.99.0: page files, ZIP import with PDFs / pictures; 2.123.0 (p2123_b_api_test.py): shares of pages / folders)"),
+                       "2.99.0: page files, ZIP import with PDFs / pictures; 2.123.0: p2123_b_api_test.py shares of pages / folders, p2123_a_api_test.py page history, text search)"),
     "pim": ("matrix", SUITE + ", p294_b_api_test.py, p21191_a_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password"),
     "time": ("matrix", SUITE + ": time entries, the timer, habits"),
     "agents": ("matrix", SUITE + ": the freelancer's own agent (my agents, its token, chat, jobs, share of a private list) and "
@@ -650,6 +650,9 @@ ROUTES = {
     "POST /api/wiki/shares/{}/restore": "wiki", "GET /api/wiki/shared": "wiki", "GET /api/wiki/shared/pages/{}": "wiki",
     "GET /api/wiki/shared/files/{}": "wiki", "GET /api/wiki/shared/files/{}/{}": "wiki",
     "GET /s/w/{}": "link", "GET /s/w/{}/p/{}": "link", "GET /s/w/{}/file/{}": "link",
+    # 2.123.0 A (#2102): the history of a page (p2123_a_api_test.py: list, read, restore in the private space)
+    "GET /api/wiki/pages/{}/versions": "wiki", "GET /api/wiki/pages/{}/versions/{}": "wiki",
+    "POST /api/wiki/pages/{}/versions/{}/restore": "wiki",
     # 2.90.0 - 2.92.0: bookkeeping, bank, tax dates, invoice series, subscriptions, agreements, equipment, file preview
     "DELETE /api/office/agreements/{}": "office", "DELETE /api/office/series/{}": "office",
     "GET /api/attachments/{}/agents": "tasks", "GET /api/attachments/{}/preview": "tasks",

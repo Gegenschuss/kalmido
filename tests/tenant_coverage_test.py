@@ -98,7 +98,7 @@ KINDS = {
     # 2.49.0 (#1199 / #1201): knowledge pages belong to one organisation (every member) or one person (org_id NULL, owner_id)
     "wiki": ("matrix", "p249_c_api_test.py: a page of another organisation / person: 404 (read, change, delete, move, trash, search, export, mentions); "
                        "p299_a_api_test.py: page files (read, upload, delete, trash); p2123_b_api_test.py: shares of pages / folders (list, "
-                       "create, change, revoke, restore, the guest routes; the public page only through its token)"),
+                       "create, change, revoke, restore, the guest routes; the public page only through its token); p2123_a_api_test.py: page history (list, read, restore)"),
     # 2.89.0 (#1916): tables belong to one organisation (every member) or one person (org_id NULL, owner_id); attached to a list
     # the list decides; Kalmido variables in formulas are evaluated per viewer (a source they may not see: "denied", no name / value)
     "sheet": ("matrix", "p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
@@ -769,6 +769,9 @@ ROUTES = {
     "POST /api/wiki/shares/{}/restore": "wiki", "GET /api/wiki/shared": "wiki", "GET /api/wiki/shared/pages/{}": "wiki",
     "GET /api/wiki/shared/files/{}": "wiki", "GET /api/wiki/shared/files/{}/{}": "wiki",
     "GET /s/w/{}": "wiki", "GET /s/w/{}/p/{}": "wiki", "GET /s/w/{}/file/{}": "wiki",
+    # 2.123.0 A (#2102): the history of a page (a page of another organisation / person: 404, p2123_a_api_test.py)
+    "GET /api/wiki/pages/{}/versions": "wiki", "GET /api/wiki/pages/{}/versions/{}": "wiki",
+    "POST /api/wiki/pages/{}/versions/{}/restore": "wiki",
     # 2.64.3 A (#1817): the lock per knowledge space (wiki_space: a space of another organisation 404, p264c_a_api_test.py)
     "GET /api/wiki/e2e": "wiki", "POST /api/wiki/e2e/start": "wiki", "GET /api/wiki/e2e/todo": "wiki",
     "POST /api/wiki/e2e/bulk": "wiki", "POST /api/wiki/e2e/finish": "wiki", "POST /api/wiki/e2e/stop": "wiki",
