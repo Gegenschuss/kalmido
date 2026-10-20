@@ -775,7 +775,7 @@
   "Notifications (ntfy)": "Notifications (ntfy)",
   "Topic": "Topic",
   "Subscribe in the ntfy app: server {0}, topic as above": "Abonnez-vous dans l'app ntfy : serveur {0}, topic comme ci-dessus",
-  ", with a user that has read access": ", avec un utilisateur disposant d'un accès en lecture",
+  ", logged in as user mo": ", connecté en tant qu'utilisateur mo",
   "Web view": "Vue web",
   "Send test": "Envoyer un test",
   "All-day reminder at": "Rappel journée entière à",
@@ -787,7 +787,7 @@
   "Default": "Par défaut",
   "Modules": "Modules",
   "In the ntfy app, add server {0} once": "Dans l'app ntfy, ajoutez une fois le serveur {0}",
-  " and log in with a user that may write to the topic (Settings > Manage users).": " et connectez-vous avec un utilisateur autorisé à écrire dans le topic (Paramètres > Gérer les utilisateurs).",
+  " and log in as user <b>mo</b> (Settings > Manage users; password in <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).": " et connectez-vous en tant qu'utilisateur <b>mo</b> (Paramètres > Gérer les utilisateurs ; mot de passe dans <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).",
   "Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.": "Ensuite : partagez une image ou un texte > ntfy > serveur comme ci-dessus, topic {0}. Quelques secondes plus tard, c'est une tâche dans le panier, les fichiers en pièces jointes.",
   "Color scheme": "Thème",
   "Automatic": "Automatique",
@@ -11978,5 +11978,6 @@
   "Grouped by sections": "De nouveau par sections",
   "{0} once": "{0} une fois",
   "Prices include VAT. Pay once, no subscription.": "Prix TVA comprise. Un seul paiement, sans abonnement.",
-  "The setup code is fixed on this server": "Le code de configuration est fixe sur ce serveur"
+  "The setup code is fixed on this server": "Le code de configuration est fixe sur ce serveur",
+  "This setup code has expired. Ask your hoster for a new one.": "Ce code de configuration a expiré. Demande-en un nouveau à ton hébergeur."
 }

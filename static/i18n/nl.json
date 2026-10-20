@@ -775,7 +775,7 @@
   "Notifications (ntfy)": "Meldingen (ntfy)",
   "Topic": "Topic",
   "Subscribe in the ntfy app: server {0}, topic as above": "Abonneer je in de ntfy-app: server {0}, topic zoals hierboven",
-  ", with a user that has read access": ", met een gebruiker met leesrechten",
+  ", logged in as user mo": ", ingelogd als gebruiker mo",
   "Web view": "Webweergave",
   "Send test": "Test versturen",
   "All-day reminder at": "Herinnering voor hele dag om",
@@ -787,7 +787,7 @@
   "Default": "Standaard",
   "Modules": "Modules",
   "In the ntfy app, add server {0} once": "Voeg in de ntfy-app eenmalig server {0} toe",
-  " and log in with a user that may write to the topic (Settings > Manage users).": " en log in met een gebruiker die naar het topic mag schrijven (Instellingen > Gebruikers beheren).",
+  " and log in as user <b>mo</b> (Settings > Manage users; password in <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).": " en log in als gebruiker <b>mo</b> (Instellingen > Gebruikers beheren; wachtwoord in <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).",
   "Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.": "Daarna: deel een afbeelding of tekst > ntfy > server zoals hierboven, topic {0}. Een paar seconden later is het een taak in de mand, bestanden als bijlagen.",
   "Color scheme": "Kleurenschema",
   "Automatic": "Automatisch",
@@ -11978,5 +11978,6 @@
   "Grouped by sections": "Weer per sectie",
   "{0} once": "{0} eenmalig",
   "Prices include VAT. Pay once, no subscription.": "Prijzen inclusief btw. Eenmalig betalen, geen abonnement.",
-  "The setup code is fixed on this server": "De installatiecode staat vast op deze server"
+  "The setup code is fixed on this server": "De installatiecode staat vast op deze server",
+  "This setup code has expired. Ask your hoster for a new one.": "Deze installatiecode is verlopen. Vraag je hostingprovider om een nieuwe."
 }

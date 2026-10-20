@@ -775,7 +775,7 @@
   "Notifications (ntfy)": "Notifiche (ntfy)",
   "Topic": "Topic",
   "Subscribe in the ntfy app: server {0}, topic as above": "Iscriviti nell'app ntfy: server {0}, topic come sopra",
-  ", with a user that has read access": ", con un utente con accesso in lettura",
+  ", logged in as user mo": ", con l'utente mo",
   "Web view": "Vista web",
   "Send test": "Invia test",
   "All-day reminder at": "Promemoria per tutto il giorno alle",
@@ -787,7 +787,7 @@
   "Default": "Predefinito",
   "Modules": "Moduli",
   "In the ntfy app, add server {0} once": "Nell'app ntfy aggiungi una volta il server {0}",
-  " and log in with a user that may write to the topic (Settings > Manage users).": " e accedi con un utente che può scrivere nel topic (Impostazioni > Gestisci utenti).",
+  " and log in as user <b>mo</b> (Settings > Manage users; password in <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).": " e accedi come utente <b>mo</b> (Impostazioni > Gestisci utenti; password in <code class=\"topic\">~/vault/secrets/ntfy-app-login-mo.txt</code>).",
   "Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.": "Poi: condividi un'immagine o un testo > ntfy > server come sopra, topic {0}. Pochi secondi dopo è un'attività nella raccolta, i file come allegati.",
   "Color scheme": "Schema colori",
   "Automatic": "Automatico",
@@ -11978,5 +11978,6 @@
   "Grouped by sections": "Di nuovo per sezioni",
   "{0} once": "{0} una tantum",
   "Prices include VAT. Pay once, no subscription.": "Prezzi IVA inclusa. Un solo pagamento, nessun abbonamento.",
-  "The setup code is fixed on this server": "Il codice di configurazione è fisso su questo server"
+  "The setup code is fixed on this server": "Il codice di configurazione è fisso su questo server",
+  "This setup code has expired. Ask your hoster for a new one.": "Questo codice di configurazione è scaduto. Chiedine uno nuovo al tuo provider di hosting."
 }

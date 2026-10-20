@@ -1435,7 +1435,9 @@ of the instance and **never sees content**: no names, e-mail addresses, titles, 
   `openssl rand -base64 48`). The server reads it at start and keeps only a hash; a file that cannot be read or is too
   short leaves the interface off. Mount the file read-only and keep it out of backups of the instance.
 - **Only the token.** The console sends `Authorization: Bearer <token>`. A missing or wrong token answers 401 and counts
-  against a limit per address (429 after 20 failures within 15 minutes). Session cookies, the proxy login and personal
+  against a limit per address (wrong tokens get 429 after 20 failures within 15 minutes; the right token always passes,
+  so strangers behind the same address cannot lock the console out). A token file readable by others only gives a
+  warning in the log (chmod 600 recommended). Only these three paths skip the person login. Session cookies, the proxy login and personal
   access tokens never reach these routes, so an instance admin cannot use them either. Every call is written to the
   server log with its action and the caller's address, never the token.
 - **Routes.**
@@ -1444,6 +1446,8 @@ of the instance and **never sees content**: no names, e-mail addresses, titles, 
     registration mode, the current notice's level and times (not its text).
   - `POST /api/operator/setup-code`: a fresh one-time code for the setup page of a new instance, so the customer can
     create the first admin. Only while no account exists (409 afterwards, and with a fixed `KALMIDO_SETUP_CODE`).
+    The code is valid for 24 hours and once; it is kept as a hash in the database, so it works with several web
+    processes. A new request replaces the previous code.
   - `PUT /api/operator/notice`: `{level: "maintenance" | "info", text, minutes?}` sets the notice every client shows
     (for a planned maintenance); an empty `text` clears it. It sends no push.
 - **Keep it private.** Reach the interface only from the console's network (a firewall rule or the reverse proxy),

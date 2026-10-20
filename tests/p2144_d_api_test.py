@@ -20,6 +20,7 @@ import subprocess
 import sys
 
 import requests
+import dbx as dbxm
 from freelancer_fixture import freelancer
 
 N = os.path.dirname(os.path.abspath(__file__))
@@ -110,13 +111,31 @@ check(isinstance(j0.get("version"), str) and j0.get("ok") is True, "status: vers
 # ---- the first admin: a one-time setup code for the setup page
 r = op("POST", "setup-code", TOKEN)
 check(r.ok and isinstance(r.json().get("setup_code"), str), f"setup code {r.status_code} {r.text[:200]}")
+check(r.ok and r.json().get("valid_hours") == 24, f"the code is valid for 24 hours {r.text[:200]}")
 CODE = r.json().get("setup_code", "") if r.ok else ""
 s0 = requests.Session()
 s0.headers.update(H)
-r = s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice Admin", "password": "password123", "setup_code": "zzzz-zzzz-zzzz"})
+SETUP = {"username": "alice", "display_name": "Alice Admin", "password": "password123"}
+r = s0.post(B + "/api/auth/setup", json=dict(SETUP, setup_code="zzzz-zzzz-zzzz"))
 check(r.status_code == 403, f"a wrong setup code is refused {r.status_code}")
-r = s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice Admin", "password": "password123", "setup_code": CODE})
+# 2.144.0 D2 (#797): the operator's code lives as hash + end in the database (every web process knows it) and expires
+dbc = dbxm.connect(os.path.join(DATA, "tasks.db"))
+check(dbc.execute("SELECT COUNT(*) FROM settings WHERE key IN ('setup_code_op_hash','setup_code_op_until')").fetchone()[0] == 2,
+      "the operator's code is kept in the database")
+check(CODE.replace("-", "") not in str(dbc.execute("SELECT value FROM settings WHERE key='setup_code_op_hash'").fetchone()[0]),
+      "only its hash")
+dbc.execute("UPDATE settings SET value='1000' WHERE key='setup_code_op_until'")
+r = s0.post(B + "/api/auth/setup", json=dict(SETUP, setup_code=CODE))
+check(r.status_code == 403 and "expired" in r.text, f"an expired operator code is refused {r.status_code} {r.text[:200]}")
+r = op("POST", "setup-code", TOKEN)
+CODE2 = r.json().get("setup_code", "") if r.ok else ""
+check(r.ok and CODE2 and CODE2 != CODE, "a new code")
+r = s0.post(B + "/api/auth/setup", json=dict(SETUP, setup_code=CODE))
+check(r.status_code == 403, f"the replaced code no longer works {r.status_code}")
+r = s0.post(B + "/api/auth/setup", json=dict(SETUP, setup_code=CODE2))
 check(r.ok, f"the operator's setup code creates the first admin {r.status_code} {r.text[:200]}")
+check(dbc.execute("SELECT COUNT(*) FROM settings WHERE key IN ('setup_code_op_hash','setup_code_op_until')").fetchone()[0] == 0,
+      "used: the code is deleted from the database")
 r = op("POST", "setup-code", TOKEN)
 check(r.status_code == 409 and r.json().get("code") == "setup_done", f"after the setup: no code any more {r.status_code}")
 
@@ -192,11 +211,19 @@ logtext = lg.stdout + lg.stderr
 check("operator interface on" in logtext, "the log says the interface is on")
 check("operator: status from" in logtext, "operator calls are logged")
 check(TOKEN not in logtext and TOKEN[:16] not in logtext, "the token is never logged")
+check("readable by others" in logtext, "a token file with mode 644: a warning in the log (the interface stays on)")
 
 # ---- too many wrong tokens from one address: blocked (also the right one, for a while)
 codes = [op("GET", "status", "w" * 40).status_code for _ in range(22)]
 check(codes[-1] == 429, f"too many wrong tokens: 429 ({codes[-3:]})")
-check(op("GET", "status", TOKEN).status_code == 429, "blocked for a while, the right token too")
+# 2.144.0 D2 (#797): the right token still passes (strangers behind the same address cannot lock the console out)
+check(op("GET", "status", TOKEN).ok, "blocked for wrong tokens, the right token still works")
+check(op("GET", "status", "w" * 40).status_code == 429, "wrong tokens stay blocked after a right one")
+
+# ---- 2.144.0 D2 (#797): only the three known paths skip the person login; anything else under /api/operator/ is not reached
+for m, p in (("GET", "statusx"), ("GET", "status/"), ("GET", "status/x"), ("POST", "admin"), ("GET", "notice")):
+    check(op(m, p, TOKEN).status_code in (401, 403, 404, 405), f"foreign path {m} /api/operator/{p} not served ({op(m, p, TOKEN).status_code})")
+check(op("PUT", "notice", TOKEN, json={"text": "x", "level": "panic"}).json().get("code") == "invalid_notice", "notice error: a code")
 
 # ---- a too short token file: off (404)
 with open(os.path.join(OPDIR, "token"), "w") as f:
