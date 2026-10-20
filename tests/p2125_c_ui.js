@@ -23,8 +23,8 @@ const call = async (method, url, body) => {
   await sleep(600);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {lang: 'en', time_all: true, modules: ['cal']});
-  const FEAT = 'cal,time,workload';
+  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ['cal', 'collab']});
+  const FEAT = 'cal,collab,time,workload';
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const L = (await call('POST', '/api/lists', {name: 'Billable', time_tracking: true})).id;  // time is a switch of each list
   check(L > 0, 'setup: a list with time tracking');
@@ -58,11 +58,11 @@ const call = async (method, url, body) => {
   w = await boot({user: 'alice', hash: 'workload'}); d = w.document;
   for (let i = 0; i < 20 && !d.querySelector('a[href^="/api/workload/export.xlsx"]'); i++) await sleep(300);
   const a2 = d.querySelector('a[href^="/api/workload/export.xlsx"]');
-  check(a2 && /weeks=4/.test(a2.getAttribute('href')), 'workload view: XLSX button ' + (a2 && a2.getAttribute('href')));
+  check(a2 && /weeks=4/.test(a2.getAttribute('href')), 'workload view: XLSX button ' + (a2 ? a2.getAttribute('href') : (d.querySelector('#view') || {}).innerHTML?.slice(0, 700)));
   w.close();
 
   // ---- module off: nothing starts
-  await call('PATCH', '/api/settings', {features: 'cal,workload'});
+  await call('PATCH', '/api/settings', {features: 'cal,collab,workload'});
   w = await boot({user: 'alice', path: '?action=timer'}); await sleep(1200);
   check(w.location.search === '' && !w.eval('S.timer'), 'module off: the shortcut starts nothing');
   const run2 = ((await call('GET', '/api/time/entries?scope=mine')).entries || []).filter(e => !e.end);
