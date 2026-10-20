@@ -617,6 +617,8 @@ def v1_office_pp_post():
     d = _date(b.get("date"), "date") or local_now().date().isoformat()
     if d > local_now().date().isoformat():
         raise BadInput(tr("The date must not lie in the future"))
+    from .periodlock import period_need_open
+    period_need_open(c, oid, d)  # 2.148.0 A (#2471): an agent cannot suggest a payment into a locked month
     conf = b.get("confidence") or "medium"
     if conf not in OFA_CONF:
         raise BadInput(tr("Invalid value: {0}", "confidence"))

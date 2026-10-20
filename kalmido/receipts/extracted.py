@@ -145,6 +145,8 @@ def rx_post(nid):
         if e:
             return e
         if "vat_pct" in want and det.get("vat_pct") in ("19", "7", "0"):
+            from ..office.periodlock import pl_receipt_need_open
+            pl_receipt_need_open(c, nid, becoming=True)  # 2.148.0 A (#2471)
             _rx_vat(c, n, ws, uid, det["vat_pct"], True)
     else:                                         # restore: the values before a Take over (the undo)
         bf = b.get("before")
@@ -162,6 +164,8 @@ def rx_post(nid):
         e = doc_update(c, nid, {"amount": bf.get("amount") or "", "currency": bf.get("currency") or "", "sender": sender}, uid)
         if e:
             return e
+        from ..office.periodlock import pl_receipt_need_open
+        pl_receipt_need_open(c, nid)  # 2.148.0 A (#2471)
         _rx_vat(c, n, ws, uid, vat, bf.get("is_receipt") is True)
     fs_log_add(c, nid, "edit")
     bump(c)

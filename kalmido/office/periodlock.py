@@ -14,7 +14,8 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.i18n import N_, tr
-from ..core.db import body, db, iso, now_utc
+from ..core.db import body, db, iso, local_now, now_utc
+from ..core.pg import write_lock
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .model import office_gate, office_org
@@ -56,7 +57,15 @@ def pl_is_locked(c, oid, day):
 
 
 def period_need_open(c, oid, *days):
-    """409 when any of days lies in a locked month of office area oid (None / '' are skipped)."""
+    """409 when any of days lies in a locked month of office area oid (None / '' are skipped). Holds the area's period
+    lock shared until the commit, so a lock being written (pl_lock: exclusive) waits for this write or the other way round."""
+    if not oid:
+        return
+    held = g.setdefault("_pl_shared", set())
+    if oid not in held:
+        c.execute("SELECT pg_advisory_xact_lock_shared(hashtext(?))", (f"office_period_{int(oid)}",))
+        held.add(oid)
+        g.setdefault("_pl_through", {}).pop(oid, None)  # read after the lock
     t = pl_through(c, oid)
     if not t:
         return
@@ -115,9 +124,11 @@ def pl_lock(c, oid, uid, through):
     m = pl_month(through)
     if not m or not 1 <= int(m[5:7]) <= 12:
         raise BadInput(tr("Invalid value: {0}", "through"))
-    today = pl_month(date.today())
+    today = pl_month(local_now().date())
     if m >= today:
         raise BadInput(tr("Only finished months can be locked"))
+    write_lock(c, f"office_period_{int(oid)}")
+    g.setdefault("_pl_through", {}).pop(oid, None)
     last = pl_through(c, oid)
     if last and m <= last:
         return []
@@ -148,7 +159,7 @@ def pl_get():
     uid = office_gate(c)
     chk = (request.args.get("check") or "").strip()
     oid = office_org(c, uid, admin=bool(chk))
-    out = {"through": pl_through(c, oid), "months": pl_months(c, oid), "first": pl_first_month(c, oid), "current": pl_month(date.today())}
+    out = {"through": pl_through(c, oid), "months": pl_months(c, oid), "first": pl_first_month(c, oid), "current": pl_month(local_now().date())}
     if chk:
         m = pl_month(chk)
         if not m:
@@ -173,3 +184,33 @@ def pl_lock_post():
     months = pl_lock(c, oid, uid, m)
     c.commit()
     return jsonify(ok=True, locked=months, through=pl_through(c, oid))
+
+
+def pl_ws_office(c, ws):
+    """The office area of documents space ws ('o<org>' -> org, 'u<uid>' -> that person's personal office if any)."""
+    if not ws or len(ws) < 2 or not ws[1:].isdigit():
+        return None
+    if ws[0] == "o":
+        return int(ws[1:])
+    r = c.execute("SELECT id FROM orgs WHERE personal_of=? LIMIT 1", (int(ws[1:]),)).fetchone()
+    return r["id"] if r is not None else None
+
+
+def pl_receipt_need_open(c, nid, *new_days, becoming=False):
+    """409 when document nid is a receipt (or becomes one: becoming=True) whose document date or payment day - or one of
+    new_days - lies in a locked month of its office area. Not a receipt / no office: nothing."""
+    r = c.execute("SELECT d.ws, d.doc_date, r.paid_at, r.node_id AS rc FROM doc_meta d LEFT JOIN rc_receipts r ON r.node_id=d.node_id "
+                  "WHERE d.node_id=?", (nid,)).fetchone()
+    if r is None or (r["rc"] is None and not becoming):
+        return
+    oid = pl_ws_office(c, r["ws"])
+    if oid:
+        period_need_open(c, oid, r["doc_date"], r["paid_at"], *new_days)
+
+
+def pl_tree_need_open(c, nid):
+    """409 when file / folder nid or anything below it is a receipt of a locked month (trash, restore, move, new version)."""
+    rows = c.execute("WITH RECURSIVE t(id) AS (SELECT ?::bigint UNION ALL SELECT n.id FROM fs_nodes n JOIN t ON n.parent_id=t.id) "
+                     "SELECT r.node_id FROM rc_receipts r JOIN t ON t.id=r.node_id LIMIT 5000", (nid,)).fetchall()
+    for r in rows:
+        pl_receipt_need_open(c, r["node_id"])

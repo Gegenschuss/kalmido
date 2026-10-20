@@ -151,6 +151,8 @@ def bk_receipt_set_paid(c, oid, node_id, day):
                   "WHERE r.node_id=? AND d.ws=? AND n.deleted_at IS NULL", (node_id, bk_ws(c, oid))).fetchone()
     if not r:
         raise Denied(404)
+    from .periodlock import period_need_open
+    period_need_open(c, oid, r["paid_at"], day)  # 2.148.0 A (#2471): a payment day in a locked month stays
     c.execute("UPDATE rc_receipts SET paid_at=? WHERE node_id=?", (day or None, node_id))
     return r["paid_at"]
 

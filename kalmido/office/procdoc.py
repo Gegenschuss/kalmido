@@ -92,7 +92,7 @@ def _members(c, oid):
             rows = c.execute("SELECT display_name, username, 'admin' AS role FROM users WHERE id=?", (owner,)).fetchall()
         else:
             rows = c.execute("SELECT u.display_name, u.username, m.role FROM org_members m JOIN users u ON u.id=m.user_id "
-                             "WHERE m.org_id=? ORDER BY lower(COALESCE(NULLIF(u.display_name, ''), u.username))", (oid,)).fetchall()
+                             "WHERE m.org_id=? AND COALESCE(m.role, '')<>'guest' ORDER BY lower(COALESCE(NULLIF(u.display_name, ''), u.username))", (oid,)).fetchall()
     return [((r["display_name"] or r["username"] or "").strip(), r["role"] or "member") for r in rows]
 
 

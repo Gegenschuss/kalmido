@@ -794,3 +794,15 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .pd-own textarea{width:100%;min-height:4.5rem;resize:vertical}
 .pd-open .pd-own textarea{border-color:var(--accent)}
 .pd-foot{position:sticky;bottom:0;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;padding:.75rem 0;background:var(--bg)}
+/* 2.148.0 A (#2471): lock periods (GoBD) in the bookkeeping */
+.plsec{margin:1.5rem 0 0}
+.plmonths{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.375rem;list-style:none;margin:.5rem 0 .75rem;padding:0}
+.plm{display:flex;align-items:center;justify-content:center;gap:.25rem;min-height:2.25rem;border:1px solid var(--line2);border-radius:var(--radius);font-size:var(--fs-s);color:var(--muted)}
+.plm.on{border-color:var(--accent);color:var(--accent);font-weight:600}
+.plm.open{border-style:dashed}
+.plpick{display:inline-flex;align-items:center;gap:.5rem}
+.plhints{margin:.5rem 0;padding-left:1.25rem;color:var(--muted)}
+@media (min-width:48rem){.plmonths{grid-template-columns:repeat(12,minmax(0,1fr))}}
+/* 2.148.0 B (#2470): the check of the DATEV ZIP */
+.dxchk{margin:.375rem 0}
+.dxchk ul{margin:.25rem 0 0;padding-left:1.25rem;max-height:12rem;overflow:auto}

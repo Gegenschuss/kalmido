@@ -221,6 +221,8 @@ def rc_put(nid):
         return err(str(e))
     if lid and not rc_project_ok(c, lid, n, uid):
         return err(tr("Choose a project of this workspace"))
+    from ..office.periodlock import pl_receipt_need_open
+    pl_receipt_need_open(c, nid, becoming=bool(cat or lid or b.get("keep") is True or vat not in (_KEEP, None)))  # 2.148.0 A (#2471)
     rc_set(c, n, m["ws"], lid, cat, uid, vat, keep=b.get("keep") is True)
     fs_log_add(c, nid, "receipt")
     bump(c)
@@ -259,6 +261,8 @@ def rc_accept(sid):
         return err(str(e))
     if lid and not rc_project_ok(c, lid, n, uid):
         return err(tr("Choose a project of this workspace"))
+    from ..office.periodlock import pl_receipt_need_open
+    pl_receipt_need_open(c, n["id"], becoming=True)  # 2.148.0 A (#2471)
     pa = pc = pv = None
     if amt or ccy:
         dm = c.execute("SELECT amount, currency FROM doc_meta WHERE node_id=?", (n["id"],)).fetchone()
@@ -301,6 +305,8 @@ def rc_reopen(sid):
     uid = me()
     s, n, m = _need_sug(c, sid)
     if s["state"] == "accepted":
+        from ..office.periodlock import pl_receipt_need_open
+        pl_receipt_need_open(c, n["id"])  # 2.148.0 A (#2471): a receipt of a locked month keeps what was accepted
         vat = _KEEP if s["prev_vat_pct"] is None else (None if s["prev_vat_pct"] in ("-", "x") else s["prev_vat_pct"])
         only_money = not s["list_id"] and not s["category"]  # 2.121.0 review M2: its accept never created / removed the row
         rc_set(c, n, m["ws"], s["prev_list_id"], s["prev_category"] or "", uid, vat, keep=only_money and s["prev_vat_pct"] != "x" and bool(

@@ -66,7 +66,8 @@ function bkTabHtml() {
     <span class="muted bk-photohint">${tr('The receipt goes into the documents; amount and date are recognised.')}</span></div>`;
   const txd = typeof txdSectionHtml === 'function' ? txdSectionHtml() : '';  // part C: the tax dates
   const dob = typeof dimp_obHtml === 'function' ? dimp_obHtml(BK.year) : '';  // 2.148.0 D (#2458): opening balances of the DATEV import
-  return head + bkReceiptsHtml() + bkEuerHtml() + bkUstvaHtml() + bkSettingsHtml() + txd + dob;
+  const plk = typeof plSectionHtml === 'function' ? plSectionHtml() : '';  // 2.148.0 A (#2471): lock periods + auditor export
+  return head + bkReceiptsHtml() + bkEuerHtml() + bkUstvaHtml() + bkSettingsHtml() + txd + dob + plk;
 }
 
 function bkRcRow(r) {

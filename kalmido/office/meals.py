@@ -483,6 +483,8 @@ def bw_meal_post():
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     row = bw_clean(c, oid, uid, b)
+    from .periodlock import period_need_open
+    period_need_open(c, oid, row.get("date"))  # 2.148.0 A (#2471)
     ts = iso(now_utc())
     row.update(org_id=oid, currency=rk_home_cur(c, oid), status="draft", created_by=uid, created_at=ts, updated_at=ts)
     row = oc_enc_fields(c, oid, "office_meals", row)
@@ -503,6 +505,8 @@ def bw_meal_patch(mid):
         raise BadInput(tr("Invalid data"))
     row = bw_clean(c, oid, uid, b, oc_dec_fields(c, oid, "office_meals", r))
     if row:
+        from .periodlock import period_need_open
+        period_need_open(c, oid, r["date"], row.get("date"))  # 2.148.0 A (#2471)
         row["updated_at"] = iso(now_utc())
         row = oc_enc_fields(c, oid, "office_meals", row)
         c.execute(f"UPDATE office_meals SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [mid, oid])
@@ -571,6 +575,8 @@ def bw_meal_approve(mid):
     write_lock(c, f"office_meal_{int(mid)}")
     r = _meal(c, oid, mid)
     _need_draft(r)
+    from .periodlock import period_need_open
+    period_need_open(c, oid, r["date"])  # 2.148.0 A (#2471)
     m = _one(c, oid, mid)
     miss = bw_missing(m)
     if miss:
@@ -596,6 +602,8 @@ def bw_meal_unlock(mid):
     r = _meal(c, oid, mid)
     if r["status"] != "approved":
         raise Denied(409, tr("This entertainment receipt is not approved"))
+    from .periodlock import period_need_open
+    period_need_open(c, oid, r["date"])  # 2.148.0 A (#2471): an approved receipt of a locked month stays approved
     b = body()
     reason = _text(b.get("reason") if isinstance(b, dict) else None, "reason", 500)
     ts = iso(now_utc())

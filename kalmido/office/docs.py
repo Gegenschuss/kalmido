@@ -1083,6 +1083,9 @@ def odoc_update(did):
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
     f = clean_doc(c, oid, b, r, admin)
+    if f.get("date") and f["date"] != r["date"] and r["kind"] in ("invoice", "credit"):
+        from .periodlock import period_need_open
+        period_need_open(c, oid, f["date"])  # 2.148.0 A (#2471): an invoice draft cannot move into a locked month
     from .doclang import fd_lang_swap, fd_put_titles  # 2.40.0 (#1381, #1363): a new language swaps unchanged standard texts
     lang_notes, titles = fd_lang_swap(c, oid, r, b, f)
     if f:

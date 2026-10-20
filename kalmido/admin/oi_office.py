@@ -458,6 +458,12 @@ def _f_runs(c, run, uid, data, who):
         if isinstance(det.get("filled"), dict):
             det["filled"] = {a: {str(n): v for n, v in ((run.m(kinds[a], k), v) for k, v in m.items()) if n}
                              for a, m in det["filled"].items() if a in kinds and isinstance(m, dict)}
+        for key, tbl in (("filled_clients", "clients"), ("filled_suppliers", "office_suppliers")):  # 2.148.0 D (#2458): DATEV runs
+            if isinstance(det.get(key), dict):
+                det[key] = {str(n): v for n, v in ((run.m(tbl, k), v) for k, v in det[key].items()) if n}
+        if isinstance(det.get("replaced"), list):
+            det["replaced"] = [dict(x, import_run_id=run.m("office_import_runs", x.get("import_run_id")) if x.get("import_run_id") else None)
+                               for x in det["replaced"] if isinstance(x, dict)]
         c.execute("UPDATE office_import_runs SET detail=? WHERE id=?", (json.dumps(det, ensure_ascii=False), nid))
 
 

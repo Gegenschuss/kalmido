@@ -165,12 +165,12 @@ def _eur(amount, s):
     return money(amount / (fx if fx > 0 else Decimal(1)))
 
 
-def _line(amount, konto, gegen, bu, day, beleg, text):
+def _line(amount, konto, gegen, bu, day, beleg, text, node=None):
     from .datev import BELEG_RE, _amt, _ddmm
     return {"Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": "S" if amount > 0 else "H", "WKZ Umsatz": "EUR",
             "Konto": konto, "Gegenkonto (ohne BU-Schlüssel)": gegen, "BU-Schlüssel": bu, "Belegdatum": _ddmm(day),
             "Belegfeld 1": BELEG_RE.sub("-", beleg)[:36], "Buchungstext": (text or "").strip()[:60], "Festschreibung": "0",
-            "_date": day, "_kind": "in"}
+            "_date": day, "_kind": "in", **({"_node": node} if node else {})}  # 2.148.0 B (#2470): _node = the receipt's file
 
 
 def _no_amount(c, oid, d_from, d_to):
@@ -238,7 +238,7 @@ def dv_receipt_rows(c, oid, d_from, d_to, st, s):
         no_vat += rc["vat_pct"] is None and not small
         bu = "" if small else bu_in.get(rc["vat_pct"] or "", "")
         rows.append(_line(amount, dv_cat_account(st, rc["category"]), own.get(rc["node_id"], gegen), bu, rc["date"], f"B{rc['node_id']}",
-                          (rc["category"] + " " + rc["title"]) if rc["category"] else rc["title"]))
+                          (rc["category"] + " " + rc["title"]) if rc["category"] else rc["title"], node=rc["node_id"]))
     hints = []
     na = _no_amount(c, oid, d_from, d_to)
     if na:

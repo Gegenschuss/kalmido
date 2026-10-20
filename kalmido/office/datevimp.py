@@ -346,7 +346,10 @@ def _apply16(c, oid, uid, rid, plan, ts):
 
 # ---------------------------------------------------------------- category 21: opening balances
 def _amount(s):
-    s = str(s or "").strip().replace(".", "").replace(",", ".")
+    s = str(s or "").strip()
+    if "," not in s and re.fullmatch(r"-?\d+\.\d{1,2}", s):  # review 2.148: a dot as the decimal point (other EXTF writers)
+        s = s.replace(".", ",")
+    s = s.replace(".", "").replace(",", ".")
     try:
         d = Decimal(s)
     except InvalidOperation:
@@ -550,10 +553,21 @@ def di_undo(c, oid, uid, r):
             c.execute(f"UPDATE office_suppliers SET {', '.join(k + '=?' for k in back)}, updated_at=? WHERE id=? AND org_id=?",
                       [""] * len(back) + [ts, int(sid), oid])
             removed["filled"] += 1
+    from .periodlock import period_need_open  # 2.148.0 A (#2471): balances of a locked year start stay
+    years = {r2["year"] for r2 in c.execute("SELECT DISTINCT year FROM office_opening_balances WHERE org_id=? AND import_run_id=?", (oid, rid))}
+    years |= {int(x.get("year") or 0) for x in detail.get("replaced") or [] if isinstance(x, dict)}
+    period_need_open(c, oid, *[f"{y:04d}-01-01" for y in years if y])
     n = c.execute("DELETE FROM office_opening_balances WHERE org_id=? AND import_run_id=?", (oid, rid)).rowcount
     removed["opening"] = max(n or 0, 0)
     for x in detail.get("replaced") or []:
         if not isinstance(x, dict):
+            continue
+        # review 2.148: only when the key is free again (no later run replaced it) and the earlier run is not undone itself
+        if c.execute("SELECT 1 FROM office_opening_balances WHERE org_id=? AND year=? AND account=?",
+                     (oid, int(x.get("year") or 0), str(x.get("account") or "")[:12])).fetchone():
+            continue
+        if x.get("import_run_id") and c.execute("SELECT 1 FROM office_import_runs WHERE id=? AND org_id=? AND undone_at IS NOT NULL",
+                                                (x.get("import_run_id"), oid)).fetchone():
             continue
         c.execute("INSERT INTO office_opening_balances(org_id, year, account, label, amount, side, import_run_id, created_at) "
                   "VALUES(?,?,?,?,?,?,?,?)", (oid, int(x.get("year") or 0), str(x.get("account") or "")[:12], str(x.get("label") or "")[:60],
