@@ -158,7 +158,10 @@ for want in (NUMBER, "Beispielkunde AG", "z. Hd. Max Mustermann", "50667 Köln",
     check(want in all_t, f"pdf text layer has {want!r}")
 net_text = f"{NET:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") + " €"
 check(net_text in all_t, f"the net total {net_text} is printed (model net {NET})")
-check(not has_image(rd.pages[0]) and T[0].lstrip().startswith("Studio Nordlicht GmbH"), "without a logo: the company name heads the page, no image")
+# 2.139.1 (#2393): a draft carries the light diagonal ENTWURF mark, drawn first (under the content), so it leads the text layer
+T0 = T[0].lstrip()
+check(T0.startswith("ENTWURF"), "a draft PDF is marked ENTWURF")
+check(not has_image(rd.pages[0]) and T0.removeprefix("ENTWURF").lstrip().startswith("Studio Nordlicht GmbH"), "without a logo: the company name heads the page, no image")
 check("3750" not in all_t, "no internal figures in the PDF")
 r = A.get(B + f"{D}/{DOC}/pdf?inline=1")
 check(r.ok and r.headers.get("Content-Disposition", "").startswith("inline;"), "?inline=1 shows the PDF in the browser")

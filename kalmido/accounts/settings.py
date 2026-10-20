@@ -54,6 +54,7 @@ ROW_ICON_KEYS = ("due", "repeat", "remind", "deadline", "occ", "note", "attach",
 SETTINGS_FLAGS += ("photo_meta_strip",)  # 2.61.0 B (#1819): remove the metadata of my photos on upload
 SETTINGS_FLAGS += ("assistant_on",)  # 2.75.0 A (#1411): the built-in assistant for this person (assistant/web.py)
 SETTINGS_FLAGS += ("time_split_midnight",)  # 2.125.0 B (#2120): entries over midnight count on each day (personal/timesheet.py)
+SETTINGS_FLAGS += ("chat_read_receipts",)  # 2.139.0 A (#2129): read receipts in the team chat (collab/teamchat.py)
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
@@ -651,6 +652,8 @@ def umz_export_queries(uid):
         # 2.22.0 (#663): my journal, whom I stay in touch with, my Karakeep connection (without the API key)
         "journal": ("SELECT day, text, mood, updated_at FROM journal WHERE user_id=? ORDER BY day", (uid,)),
         "contact_care": ("SELECT contact_id, every_days, last, note, updated_at FROM contact_care WHERE user_id=?", (uid,)),
+        # 2.140.0 B (#2136): my links of a private device with office equipment (ids only)
+        "device_links": ("SELECT task_id, office_id, equipment_id, origin, created_at, updated_at FROM life_device_links WHERE user_id=?", (uid,)),
         # 2.66.0 A (#1835): my merges of contacts / clients (the history lines, without the undo snapshot)
         "merge_runs": ("SELECT id, kind, target_id, merged_ids, summary, created_at, undone_at FROM merge_runs WHERE user_id=?", (uid,)),
         "karakeep": ("SELECT url, list_id, source, archive, synced_at, created_at FROM kk_conns WHERE user_id=?", (uid,)),

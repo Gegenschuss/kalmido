@@ -292,10 +292,11 @@ const LONG = 'Website relaunch 2026 for the client';
     if (vw === 390 || vw === 904 && vh === 1080) {
       await o.nav(B + '#l/' + L); await ready(ev); await densNoJump(ev, tag);
       // R14: the team chat's message box: a long placeholder stays on one line (ellipsis), not wrapped / clipped
+      // 2.139.0 (#2128): beside the microphone the room name in the placeholder is cut shorter ("Website relau…")
       await o.nav(B + '#team'); await ready(ev);
       await ev(`(() => { const r = [...document.querySelectorAll('.tclist .tcrow')].find(x => x.textContent.includes(${JSON.stringify(LONG)})); r && r.click(); return !!r; })()`); await sleep(1200);
       const ph = await ev(`(() => { const ta = document.querySelector('#tc-in'); if (!ta) return null; ta.value = ''; autosize(ta); const cs = getComputedStyle(ta); const cx = document.createElement('canvas').getContext('2d'); cx.font = cs.font; return {ws: cs.whiteSpace, sh: ta.scrollHeight, ch: ta.clientHeight, h: Math.round(ta.getBoundingClientRect().height), ph: ta.placeholder, pw: Math.round(cx.measureText(ta.placeholder).width), room: Math.round(ta.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)), lab: ta.getAttribute('aria-label')}; })()`);
-      check(ph && /Website relaunch/.test(ph.ph) && ph.ws === 'nowrap' && ph.sh <= ph.ch + 1 && ph.h <= 48 && ph.pw <= ph.room && /…$/.test(ph.ph) && ph.lab.includes(LONG), `${tag}: R14: the long placeholder stays on one line ` + JSON.stringify(ph));
+      check(ph && /Website rel/.test(ph.ph) && ph.ws === 'nowrap' && ph.sh <= ph.ch + 1 && ph.h <= 48 && ph.pw <= ph.room && /…$/.test(ph.ph) && ph.lab.includes(LONG), `${tag}: R14: the long placeholder stays on one line ` + JSON.stringify(ph));
       await shot(`p2180r-${vw}x${vh}-${th}-teamph.png`);
     }
     // 2.18.0 (#642): density "Custom" at the tightest: touch rows stay 44 px

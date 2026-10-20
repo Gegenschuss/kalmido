@@ -106,7 +106,8 @@ function viewBudget() {
   const ents = d.entries.length ? days.map(day => `<h4 class="bgday">${esc(fmtDateLoc(day))}</h4><ul class="bgents">${d.entries.filter(e => e.day === day).map(e => `<li><button type="button" class="bgent bgrow" data-bg="entry" data-id="${e.id}"><span class="bgel"><b>${esc(e.title)}</b><small class="muted">${esc([catName(e.cat_id), e.counterpart].filter(Boolean).join(' · '))}</small></span>${e.files?.length ? `<span class="bgclip" title="${esc(trn('{0} receipt', '{0} receipts', e.files.length))}">${ic('clip', 's')}</span>` : ''}<span class="bgamt ${e.kind}">${e.kind === 'in' ? '+' : '−'}${esc(bg_money(e.amount))}</span></button></li>`).join('')}</ul>`).join('')
     : `<p class="muted bgnone">${tr('No entries in this month yet.')}</p>`;
   const add = w ? `<button type="button" class="btn pri bgadd" data-bg="add">${ic('plus', 's')}<span>${tr('Entry')}</span></button>` : `<p class="muted bgro">${ic('eye', 's')} ${tr('You can look at this budget but not change it.')}</p>`;
-  return `<div class="bgview">${head}${sums}${trend}${add}${open}${cats}<section class="bgsec"><h3>${tr('Entries')}</h3>${ents}</section></div>`;
+  const cmp = `<button type="button" class="btn sm bgcmpb" data-bg="compare">${ic('chart', 's')}<span>${tr('Month comparison')}</span></button>`;  // 2.140.0 B (#2134)
+  return `<div class="bgview">${head}${sums}${trend}${cmp}${add}${open}${cats}<section class="bgsec"><h3>${tr('Entries')}</h3>${ents}</section></div>`;
 }
 
 // ---- dialogs (lifeModal from life.js: data-m="save" / "close")
@@ -372,15 +373,17 @@ function bg_csvModal() {
   const md = bg_modal(`<h3>${ic('upload', 's')} ${tr('Import a CSV file')}</h3><div class="bgcsv"></div><div class="aerr" role="alert"></div><div class="foot bgcfoot"></div>`, async () => {});
   const area = $('.bgcsv', md), foot = $('.bgcfoot', md), err = m => lifeErr(md, {message: m || ''});
   const footHtml = (ok, back) => `${back ? `<button class="btn" data-cs="back">${tr('Back')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button>${ok ? `<button class="btn pri" data-cs="next">${esc(ok)}</button>` : ''}`;
-  const step1 = () => {
+  const step1 = () => {  // 2.140.0 B (#2134): CSV or CAMT
     area.innerHTML = `<div class="shint lhint keep">${ic('lock', 's')} ${tr('No bank access – only the file you download from your bank yourself (CSV export of your account statement).')}</div>
-      <label class="btn bgpick">${ic('upload', 's')}<span>${tr('Choose a CSV file')}</span><input type="file" accept=".csv,.txt,text/csv,text/plain" data-cs-file hidden></label>`;
+      <label class="btn bgpick">${ic('upload', 's')}<span>${tr('Choose a CSV file')}</span><input type="file" accept=".csv,.txt,.xml,text/csv,text/plain,text/xml,application/xml" data-cs-file hidden></label>
+      <p class="muted bgfmts">${tr('CSV of any bank, or CAMT (XML) like in the office’s bank import.')}</p>`;
     foot.innerHTML = footHtml(''); err();
   };
   const sel = (id, label, val, opt) => `<div class="row"><label for="${id}">${esc(label)}</label><select id="${id}">${opt ? `<option value="">${tr('none')}</option>` : ''}${st.p.columns.map((c, i) => `<option value="${i}" ${val === i ? 'selected' : ''}>${esc(c || tr('Column {0}', i + 1))}</option>`).join('')}</select></div>`;
-  const step2 = () => {
+  const step2 = () => {  // 2.140.0 B (#2134): + the recognised bank layout
     const g = st.p.guess || {}, two = g.amount == null && (g.amount_in != null || g.amount_out != null);
     area.innerHTML = `<p class="muted">${tr('Which column holds what? Kalmido has guessed; please check.')}</p>
+      ${g.preset_name ? `<p class="shint lhint keep bgpreset">${ic('check', 's')} ${esc(tr('Recognised layout: {0}', g.preset_name))}</p>` : ''}
       ${sel('cs-date', tr('Date'), g.date)}
       <div class="row"><label>${tr('Amount')}</label><div class="seg" role="radiogroup" id="cs-am" aria-label="${esc(tr('Amount'))}"><button type="button" role="radio" data-am="one" aria-checked="${!two}" class="${two ? '' : 'on'}">${tr('One column (minus = expense)')}</button><button type="button" role="radio" data-am="two" aria-checked="${two}" class="${two ? 'on' : ''}">${tr('Income and expense apart')}</button></div></div>
       <div class="cs-one" ${two ? 'hidden' : ''}>${sel('cs-amt', tr('Amount'), g.amount)}</div>
@@ -431,7 +434,7 @@ function bg_csvModal() {
   md.addEventListener('click', e => {
     const b = e.target.closest('[data-cs]'); if (!b) return;
     if (b.dataset.cs === 'next') next();
-    else if (b.dataset.cs === 'back') { if (st.rows) { st.rows = null; step2(); } else { st.p = null; step1(); } }
+    else if (b.dataset.cs === 'back') { if (st.rows && st.p?.columns) { st.rows = null; step2(); } else { st.rows = null; st.p = null; step1(); } }  // 2.140.0 B (#2134): CAMT has no column step
   });
   md.addEventListener('change', async e => {
     if (e.target.matches('[data-csr]')) { const b = $('[data-cs="next"]', md); if (b) b.textContent = okLabel(); return; }
@@ -440,10 +443,53 @@ function bg_csvModal() {
     if (f.size > 2 * 1024 * 1024) { err(tr('The file is too big (at most 2 MB)')); return; }
     try { st.text = await bg_readFile(f); st.p = await api('POST', `/api/budget/${lid}/import/parse`, {text: st.text}); }
     catch (er) { err(er.message || tr('The file could not be read')); return; }
+    if (st.p.fmt === 'camt') { st.rows = st.p.rows || []; st.skipped = st.p.skipped || 0; step3(); return; }  // 2.140.0 B (#2134): the rows at once
     if (!st.p.columns?.length) { err(tr('No columns found in the file')); return; }
     step2();
   });
   step1();
+  return md;
+}
+
+// ---- 2.140.0 B (#2134): the month comparison -- the shown month against the months before it, one card per category
+// (actual, plan, the difference to the month before and to the average), small bars per month; cards, no wide table
+const BG_CMP = {n: 6};
+function bg_cmpDiff(v, pct, kind) {
+  if (v == null) return '';
+  const up = +v > 0, worse = kind === 'out' ? up : !up, sign = up ? '+' : +v < 0 ? '−' : '±';
+  return `<span class="bgcd ${+v === 0 ? '' : worse ? 'worse' : 'better'}">${sign}${esc(bg_money(Math.abs(+v)))}${pct != null ? ` (${sign}${esc(fmtNum(Math.abs(pct)))} %)` : ''}</span>`;
+}
+function bg_cmpCard(c, months) {
+  const name = c.name ?? (c.key.startsWith('total') ? (c.kind === 'in' ? tr('Received') : tr('Spent')) : tr('No category'));
+  const max = Math.max(1, ...c.months.map(x => Math.max(+x.ist, +x.soll)));
+  const bars = !c.months.some(x => +x.ist) ? '' : `<div class="bgcmpbars" role="img" aria-label="${esc(c.months.map(x => `${bg_monthName(x.month)}: ${bg_money(x.ist)}`).join(', '))}">${c.months.map((x, i) => `<span class="bgcmpm ${i === months.length - 1 ? 'on' : ''}"><i style="transform:scaleY(${(+x.ist / max).toFixed(3)})"></i></span>`).join('')}</div>`;
+  const line = (label, v) => v ? `<div class="bgcmpl"><span class="muted">${esc(label)}</span>${v}</div>` : '';
+  return `<li class="bgcmpc ${c.kind}"><div class="bgcl"><b>${esc(name)}</b><span class="bgamt ${c.kind}">${esc(bg_money(c.ist))}</span></div>
+    ${+c.soll ? line(tr('Plan'), `<span>${esc(bg_money(c.soll))}</span>`) : ''}
+    ${line(tr('Compared with the month before'), bg_cmpDiff(c.diff_prev, c.pct_prev, c.kind))}
+    ${months.length > 2 ? line(tr('Compared with the average'), bg_cmpDiff(c.diff_avg, c.pct_avg, c.kind)) : ''}${bars}</li>`;
+}
+async function bg_cmpModal() {
+  const lid = BG.lid, month = BG.data.month;
+  const md = bg_modal(`<h3>${ic('chart', 's')} ${tr('Month comparison')}</h3><div class="seg bgcmpn" role="radiogroup" aria-label="${esc(tr('Period'))}">${[3, 6, 12].map(n => `<button type="button" role="radio" data-cmpn="${n}" aria-checked="${n === BG_CMP.n}" class="${n === BG_CMP.n ? 'on' : ''}">${esc(trn('{0} month', '{0} months', n))}</button>`).join('')}</div><div class="bgcmp" aria-live="polite"><p class="muted">${tr('Loading…')}</p></div><div class="aerr" role="alert"></div><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`, async () => {});
+  let seq = 0;
+  const draw = async () => {
+    const my = ++seq, box = $('.bgcmp', md);
+    let j; try { j = await api('GET', `/api/budget/${lid}/compare?month=${month}&months=${BG_CMP.n}`); } catch (er) { if (my === seq) lifeErr(md, er); return; }
+    if (my !== seq) return;
+    const sec = (title, list) => list.length ? `<section class="bgsec"><h4>${esc(title)}</h4><ul class="bgcmpl0">${list.map(c => bg_cmpCard(c, j.months)).join('')}</ul></section>` : '';
+    const outs = j.cats.filter(c => c.kind === 'out'), ins = j.cats.filter(c => c.kind === 'in');
+    box.innerHTML = `<p class="muted">${esc(tr('{0} to {1}', bg_monthName(j.months[0]), bg_monthName(j.months[j.months.length - 1])))}</p>
+      <ul class="bgcmpl0 bgcmpt">${bg_cmpCard(j.totals.out, j.months)}${bg_cmpCard(j.totals.in, j.months)}</ul>
+      ${sec(tr('Expenses'), outs)}${sec(tr('Income'), ins)}${outs.length || ins.length ? '' : `<p class="muted">${tr('No entries in this period yet.')}</p>`}`;
+  };
+  md.addEventListener('click', e => {
+    const b = e.target.closest('[data-cmpn]'); if (!b) return;
+    BG_CMP.n = +b.dataset.cmpn;
+    for (const x of $$('[data-cmpn]', md)) { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); }
+    draw();
+  });
+  draw();
   return md;
 }
 
@@ -474,6 +520,7 @@ document.addEventListener('click', async e => {
   else if (k === 'rec') bg_recModal();
   else if (k === 'contracts') bg_contractsModal();
   else if (k === 'csv') bg_csvModal();
+  else if (k === 'compare') bg_cmpModal();
   else if (k === 'share') shareModal(BG.data.list_id);
 });
 document.addEventListener('change', e => {

@@ -302,7 +302,7 @@ had been made in the app. Webhooks fire too.
 | `PUT /lists/{id}/status` | structure | 2.15.0: a project status update `{status: on_track \| at_risk \| off_track \| on_hold \| complete \| "", note?}`; members are told |
 | `GET /filters` · `POST …` · `PATCH /filters/{id}` · `DELETE …` | read · structure · delete | 2.15.0: saved filters `{name, rules}` |
 | `GET /news?filter=` · `POST /news/read` | read · comments | 2.15.0: your News (`filter=mentions \| me`), `unread`; mark read `{ids}` or `{all: true}` |
-| `POST /habits` · `PATCH /habits/{id}` · `DELETE …` | tasks:write · delete | 2.15.0: habits `{name, color?, goal?, days?, per_week?, remind_at?, archived?}` |
+| `POST /habits` · `PATCH /habits/{id}` · `DELETE …` | tasks:write · delete | 2.15.0: habits `{name, color?, goal?, days?, per_week?, remind_at?, remind_times? (up to 6 × HH:MM, 2.140.0), archived?}` |
 | `GET /time/timer` · `POST …` · `DELETE …` | read · time | 2.15.0: the running timer; start `{task_id \| list_id, note?}` (a running one stops); stop |
 | `PATCH /time/entries/{id}` · `DELETE …` | time | 2.15.0: change / delete your entry `{start?, end?, minutes?, note?, task_id? \| list_id?}` |
 | `GET /export` | export | 2.15.0: everything you own as JSON (as Settings > Data > Export) |
@@ -423,11 +423,29 @@ reopens a task that was closed by mistake.
 | `POST /team/groups` | comments | 2.138.1: `{members, name?}` — a group conversation with at least two other people who all work with each other; people only |
 | `PATCH /team/rooms/{id}` | comments | 2.138.1: `{name?, open?, archived?}` — a channel: its creator or an organisation admin (archived = read-only, restorable); a group: every member (name only) |
 | `POST /team/rooms/{id}/members` · `DELETE …/members/{user id}` | comments | 2.138.1: add someone (channel: its managers; group: every member) or join an open channel with your own id; leave with your own id, managers remove others from a channel |
-| `GET /team/files/{id}` | read | 2.138.1: a file of a team chat message (`attachments[].url` of the message); everyone who sees the conversation |
+| `GET /team/files/{id}` | read | 2.138.1: a file of a team chat message (`attachments[].url` of the message); everyone who sees the conversation. 2.139.0 (#2128): each attachment carries `voice` (a voice message recorded in the app) and `duration_ms` (its length, `null` = unknown); audio is served inline (`audio/mp4`, `audio/webm`, `audio/ogg`, `audio/mpeg`) and answers Range requests with `206`. Kalmido does not transcribe voice messages |
 
 2.138.1: `POST /team/rooms/{id}/messages` also takes `multipart/form-data` with `body`, `task_id`, `reply_to` and up to 10
 fields `file` (the body may then be empty; the same size and type limits as task attachments). An end-to-end encrypted
 conversation refuses files (`409`). Deleting a message removes its files for good.
+2.139.0 (#2128): the app records voice messages and sends them this way with the fields `voice=1` and `duration_ms`
+(exactly one file, which must be audio by its content: MP4/M4A, WebM, Ogg or MP3, else `400`). The REST API for agents
+does not take `voice`; agents read voice messages like any other file.
+
+2.139.0 (#2127): **threads**. `POST /team/rooms/{id}/messages` takes `thread_of` (a message of the same conversation; the id
+of an answer names its thread; deleted or another conversation: `400`): the message answers in that thread, one level deep.
+`GET /team/rooms/{id}/messages` lists the main conversation without thread answers; every message carries `thread_of`,
+`thread_count`, `thread_last_at`, `thread_users` (who answered last, up to 3), `thread_unread` and `thread_follow` (you take
+part: you wrote the first message, answered or were mentioned). `?thread=<message id>` returns the answers of that thread
+with `root` (its first message) and `thread_read`; `POST /team/rooms/{id}/read` `{thread, last_id?}` sets your read mark in a
+thread. The unread count of a conversation counts the main conversation and the threads you take part in; an answer in a
+thread notifies only the people taking part (and the mentioned ones). In end-to-end encrypted conversations threads work
+the same (the id is plain metadata, the text stays encrypted).
+
+2.139.0 (#2129): **read receipts**. Your own messages carry `read_by` `{count, users}` (the first 20 member ids that read up
+to there; in a thread: in that thread) and the conversation `read_ok` (the members that send read receipts). A person
+who switched off *Send read receipts* (setting `chat_read_receipts` = `"0"`) shows up nowhere and gets no `read_by` either
+(`read_ok` null). Agents count as readers when they mark a conversation read.
 
 ## Family (2.19.0)
 
@@ -436,11 +454,11 @@ deadlines are ordinary tasks with a `family` object; rotations, people and stars
 
 | Endpoint | Scope | |
 |---|---|---|
-| `GET /family?week=YYYY-MM-DD` | read | upcoming `occasions` (`kind`, `name`, `date`, `days`, `year`, `age`, open `gifts`), `deadlines` (`type`, `who`, `expires`, `due`, `days`), `rotations` (`who`, `current`, `next`, `mode`), the `meals` of the week (with `ingredients`), `shopping` lists, `kids` |
+| `GET /family?week=YYYY-MM-DD&days=7` | read | upcoming `occasions` (`kind`, `name`, `date`, `days`, `year`, `age`, open `gifts`), `deadlines` (`type`, `who`, `expires`, `due`, `days`), `rotations` (`who`, `current`, `next`, `mode`), the `meals` of the week (with `ingredients`; 2.140.0: `recipe_id`, `serves`; `days` = 1-62 days from that Monday), 2.140.0: `recipes` (`title`, `serves`, `ingredients` as `{name, qty, unit, text}`), `shopping` lists, `kids` |
 | `POST /family/occasions` | tasks:write | `{name, date: YYYY-MM-DD or --MM-DD, kind?: birthday\|anniversary, year?, lead_days? (7), list_id?, gifts?: [..]}` -> a yearly task; default list: the first *Birthdays* list (created when missing) |
 | `GET /family/deadline-types` | read | `passport`, `id_card`, `car`, `insurance`, `contract`, `other` with their lead days, repeat and notice period |
 | `POST /family/deadlines` | tasks:write | `{type, expires, who?, notice_months?, lead_days?, title?, list_id?}`: due = `expires` minus the notice period (a passed one moves to the next term), a deadline with reminders |
-| `POST /tasks/{id}/to-shopping` | tasks:write | `{list_id?, items?}`: the ingredients of a meal (the bullet / checklist lines of its notes) onto a shopping list; `{added, skipped}` (open items are not doubled) |
+| `POST /tasks/{id}/to-shopping` | tasks:write | `{list_id?, items?, servings?, preview?}`: the ingredients of a meal or a recipe (the bullet / checklist lines of its notes, below a heading "Ingredients" when there is one; a meal without any: its recipe's) onto a shopping list; `{added, merged, skipped}` (open items are not doubled). 2.140.0: an item is a text or `{name, qty?, unit?}`; a leading amount ("500 g flour") goes to the item's `family.qty` / `family.unit`, an open item of the same name and unit gets the amount added (`merged`); `servings` scales the amounts to that many people (the recipe's `serves`); `preview: true` writes nothing and answers `{items: [{name, qty, unit, text, have}], serves, recipe_id, list_id}` |
 | `POST /lists/{id}/shop-areas` | structure | the default shop areas as sections; the list becomes a shopping list |
 | `GET /family/packing` · `POST` | read · structure | the packing templates; `{template, name?}` creates a list from one |
 | `GET /family/kids` | read | the kid accounts you look after (or yourself, a kid): `stars`, `rewards`, `history`, `parents` |
@@ -452,10 +470,13 @@ deadlines are ordinary tasks with a `family` object; rotations, people and stars
 
 Task fields: `family` (`{kind: birthday|anniversary, name, year?, lead?, src?, card?}` (`card`: the vCard UID of a date
 imported from an address book) or `{kind: deadline, type, who, expires, notice,
-lead}`), `rotation` (`{who: [user ids sharing the list, at least 2], mode: done|week, i}`; setting it sets the assignee,
+lead}`; 2.140.0: a shopping item `{kind: shop, qty?, unit?, price?}` (the amount, its unit and the price of the line in
+your currency; the title stays the name), a recipe `{kind: recipe, serves?}` (notes: the ingredients, best below a
+heading "Ingredients", and the method as numbered steps), a meal `{kind: meal, recipe?, serves?}` (`recipe` = the task
+id of a recipe)), `rotation` (`{who: [user ids sharing the list, at least 2], mode: done|week, i}`; setting it sets the assignee,
 the turn moves on after each completion or every Monday), `people` (who comes along: they see the task, also as
 participants, and get its reminders), `stars` (what a kid account gets for completing it; `null` = 1). Lists have
-`family`: `shopping`, `meals`, `birthdays`, `household`, `packing` or `null`. A kid account takes part in shared lists
+`family`: `shopping`, `meals`, `birthdays`, `household`, `packing`, `family`, `recipes` (2.140.0) or `null`. A kid account takes part in shared lists
 only as a participant; it can complete / reopen what it sees, ask for rewards and change its own account, every other
 change answers `403`. 2.79.0: a kid account has no API and no CalDAV / CardDAV (its limits live in the app): its tokens
 answer `401`, and making an account a kid account deletes its API tokens and app passwords.

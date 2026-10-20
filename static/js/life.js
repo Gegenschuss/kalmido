@@ -315,6 +315,9 @@ function lifeDetailHtml(t, l, ro) {
     if (f.model) rows.push(row(tr('Model'), esc(f.model)));
     if (f.bought) rows.push(row(tr('Bought on'), esc(fmtDateLoc(f.bought))));
     if (f.warranty) rows.push(row(tr('Warranty until'), esc(fmtDateLoc(f.warranty))));
+    if (f.serial) rows.push(row(tr('Serial number'), esc(f.serial)));  // 2.140.0 B (#2136): serial, price, the office link (devlink.js)
+    if (f.price != null) rows.push(row(tr('Price'), esc(fmtMoney(f.price))));
+    if (typeof dlDeviceHtml === 'function') rows.push(dlDeviceHtml(t, ro));
   } else if (k === 'upkeep') {
     const rn = lifeRenew(t.repeat); if (rn) rows.push(row(tr('Every'), esc(trn('{0} month', '{0} months', rn))));
   } else if (k === 'health') {
@@ -363,9 +366,10 @@ async function rvLoad() {
 }
 function viewReview() {
   RV.date = RV.date || today();
+  if (RV.period === 'hist') return viewJournalHist();  // 2.140.0 C (#2133)
   const r = RV.data;
   if ((!r || r.period !== RV.period || !(r.from <= RV.date && RV.date <= r.to)) && !RV.loading) setTimeout(rvLoad, 0);
-  const seg = `<div class="seg" role="radiogroup" aria-label="${esc(tr('Period'))}">${[['day', tr('Day')], ['week', tr('Week')]].map(([k, w]) => `<button type="button" role="radio" data-act="rv-period" data-p="${k}" class="${RV.period === k ? 'on' : ''}" aria-checked="${RV.period === k}">${esc(w)}</button>`).join('')}</div>`;
+  const seg = `<div class="seg" role="radiogroup" aria-label="${esc(tr('Period'))}">${[['day', tr('Day')], ['week', tr('Week')], ['hist', tr('History')]].map(([k, w]) => `<button type="button" role="radio" data-act="rv-period" data-p="${k}" class="${RV.period === k ? 'on' : ''}" aria-checked="${RV.period === k}">${esc(w)}</button>`).join('')}</div>`;
   const label = !r ? '' : r.from === r.to ? fmtDayAbs(r.from) : fmtDayAbs(r.from) + ' – ' + fmtDayAbs(r.to);
   const nav = `<span class="fwnav"><button type="button" class="iconbtn" data-act="rv-move" data-d="-1" aria-label="${esc(RV.period === 'week' ? tr('Previous week') : tr('Previous day'))}" title="${esc(RV.period === 'week' ? tr('Previous week') : tr('Previous day'))}">${ic('left', 's')}</button><b class="rvlab" aria-live="polite">${esc(label)}</b><button type="button" class="iconbtn" data-act="rv-move" data-d="1" aria-label="${esc(RV.period === 'week' ? tr('Next week') : tr('Next day'))}" title="${esc(RV.period === 'week' ? tr('Next week') : tr('Next day'))}">${ic('right', 's')}</button>${RV.date !== today() ? `<button type="button" class="btn sm" data-act="rv-today">${tr('Today')}</button>` : ''}</span>`;
   const head = `<div class="dashhead rvhead">${seg}${nav}<span class="spacer"></span>${lyCustomBtn('review')}</div>`;  // 2.43.0 (#1452)
@@ -389,6 +393,76 @@ function viewReview() {
     next: card('next', 'cal', tr('Coming up'), li(r.next, x => `<li>${tl(x)}</li>`) || `<p class="muted">${tr('Nothing due in the next seven days.')}</p>`, r.next.length),
     ...(r.journal ? {journal} : {})})}</div>`;
 }
+// ---- 2.140.0 C (#2133): the journal history: all entries (newest first), search, mood filter, export, mood statistics
+const JH = {q: '', mood: 0, days: 30, from: '', to: '', items: [], next: null, loaded: false, loading: false, stats: null, seq: 0, t: null};
+const jhParams = () => { const p = new URLSearchParams(); if (JH.q) p.set('q', JH.q); if (JH.mood) p.set('mood', JH.mood); if (JH.from) p.set('from', JH.from); if (JH.to) p.set('to', JH.to); return p; };
+const jhMood = v => (MOODS.find(m => m[0] === v) || [])[1] || '';
+function jhHit(text) {  // a short excerpt around the first match, the match marked
+  const q = JH.q.toLowerCase(), low = text.toLowerCase(), i = q ? low.indexOf(q) : -1;
+  const a = Math.max(0, i > 60 ? i - 60 : 0), part = text.slice(a, a + 220);
+  const pre = a ? '… ' : '', post = a + 220 < text.length ? ' …' : '';
+  if (i < 0) return esc(pre + part + post);
+  const k = i - a;
+  return esc(pre) + esc(part.slice(0, k)) + '<mark>' + esc(part.slice(k, k + q.length)) + '</mark>' + esc(part.slice(k + q.length) + post);
+}
+function jhListHtml() {
+  if (!JH.loaded) return `<p class="muted lempty">${tr('Loading…')}</p>`;
+  if (!JH.items.length) return `<p class="muted lempty">${JH.q || JH.mood || JH.from || JH.to ? tr('No entries found.') : tr('No journal entries yet.')}</p>`;
+  return `<ul class="jhlist">${JH.items.map(x => `<li><button type="button" class="jhrow" data-act="rv-hopen" data-day="${x.day}"><span class="jhd"><b>${esc(fmtDayAbs(x.day))}</b><span class="jhm" aria-hidden="true">${jhMood(x.mood)}</span></span><span class="jhtx">${jhHit(x.text || '')}</span></button></li>`).join('')}</ul>`
+    + (JH.next ? `<p><button type="button" class="btn sm" data-act="rv-hmore" ${JH.loading ? 'disabled' : ''}>${tr('Load more')}</button></p>` : '');
+}
+function jhStatsHtml() {
+  const s = JH.stats;
+  const seg = `<div class="seg" role="radiogroup" aria-label="${esc(tr('Period'))}">${[30, 90, 365].map(n => `<button type="button" role="radio" data-act="rv-hdays" data-n="${n}" class="${JH.days === n ? 'on' : ''}" aria-checked="${JH.days === n}">${esc(trn('{0} day', '{0} days', n))}</button>`).join('')}</div>`;
+  if (!s) return seg + `<p class="muted lempty">${tr('Loading…')}</p>`;
+  if (!s.rated) return seg + `<p class="muted lempty">${tr('No moods in this period.')}</p>`;
+  const mx = Math.max(1, ...Object.values(s.dist));
+  const bars = MOODS.map(([v, e, w]) => `<div class="jhbar" title="${esc(tr(w))}"><span aria-hidden="true">${e}</span><span class="jhtrack"><i style="width:${Math.round(100 * s.dist[v] / mx)}%"></i></span><span class="mono">${s.dist[v]}</span></div>`).join('');
+  const n = s.series.length, pts = s.series.map((x, i) => [n > 1 ? 8 + 284 * i / (n - 1) : 150, 92 - (x.avg - 1) * 21]);
+  const line = `<svg class="jhline" viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label="${esc(tr('Average mood over time'))}"><polyline fill="none" vector-effect="non-scaling-stroke" points="${pts.map(p => p.join(',')).join(' ')}"/>${pts.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="2.5"/>`).join('')}</svg>`;
+  const lab = s.period === 'month' ? tr('Average per month') : tr('Average per week');
+  return `${seg}<p class="jhavg"><b>${fmtNum(s.avg, 1)}</b> <span class="muted">${esc(tr('average of {0} rated days', s.rated))}</span></p><div class="jhbars">${bars}</div><p class="muted jhlab">${esc(lab)}</p>${line}`;
+}
+function viewJournalHist() {
+  if (!JH.loaded && !JH.loading) setTimeout(() => { jhLoad(); jhStats(); }, 0);
+  const seg = `<div class="seg" role="radiogroup" aria-label="${esc(tr('Period'))}">${[['day', tr('Day')], ['week', tr('Week')], ['hist', tr('History')]].map(([k, w]) => `<button type="button" role="radio" data-act="rv-period" data-p="${k}" class="${RV.period === k ? 'on' : ''}" aria-checked="${RV.period === k}">${esc(w)}</button>`).join('')}</div>`;
+  const qs = jhParams().toString(), exp = f => `/api/life/journal/export?format=${f}${JH.from ? '&from=' + JH.from : ''}${JH.to ? '&to=' + JH.to : ''}`;
+  const moods = `<div class="rvmood jhmoods" role="radiogroup" aria-label="${esc(tr('Mood'))}"><button type="button" class="btn sm ${JH.mood ? '' : 'on'}" role="radio" data-act="rv-hmood" data-v="0" aria-checked="${!JH.mood}">${tr('All')}</button>${MOODS.map(([v, e, w]) => `<button type="button" role="radio" data-act="rv-hmood" data-v="${v}" class="${JH.mood === v ? 'on' : ''}" aria-checked="${JH.mood === v}" title="${esc(tr(w))}" aria-label="${esc(tr(w))}">${e}</button>`).join('')}</div>`;
+  return `<div class="dash fam review jhist"><div class="dashhead rvhead">${seg}<span class="spacer"></span></div>
+    <section class="dcard fcard lcard" aria-labelledby="jh-h"><h2 id="jh-h">${ic('journal', 's')}<span>${tr('Journal')}</span></h2>
+      <div class="jhsearch"><input type="search" id="jh-q" value="${esc(JH.q)}" maxlength="200" placeholder="${esc(tr('Search the journal'))}" aria-label="${esc(tr('Search the journal'))}" enterkeyhint="search"></div>
+      ${moods}
+      <div class="jhrange"><label>${tr('From')} ${dateIn('jh-from', JH.from, {label: tr('From'), empty: tr('any')})}</label><label>${tr('To')} ${dateIn('jh-to', JH.to, {label: tr('To'), empty: tr('any')})}</label></div>
+      <div id="jh-list">${jhListHtml()}</div>
+      <div class="fcfoot"><span class="muted">${tr('Download')}</span><a class="btn sm" href="${esc(exp('md'))}" download>${ic('download', 's')} Markdown</a><a class="btn sm" href="${esc(exp('csv'))}" download>${ic('download', 's')} CSV</a></div>
+      <p class="muted rvpriv">${ic('lock', 's')} ${tr('Only you can read your journal.')}</p></section>
+    <section class="dcard fcard lcard" aria-labelledby="jh-s"><h2 id="jh-s">${ic('chart', 's')}<span>${tr('Mood')}</span></h2><div id="jh-stats">${jhStatsHtml()}</div></section></div>`;
+}
+const jhDrawList = () => { const el = $('#jh-list'); if (el && S.route.mod === 'review' && RV.period === 'hist') setHtml(el, jhListHtml()); };
+async function jhLoad(more) {
+  const seq = ++JH.seq; JH.loading = true;
+  if (!more) { JH.items = []; JH.next = null; JH.loaded = false; jhDrawList(); }
+  const p = jhParams(); if (more && JH.next) p.set('before', JH.next);
+  try {
+    const j = await api('GET', '/api/life/journal?' + p);
+    if (seq !== JH.seq) return;
+    JH.items = more ? [...JH.items, ...j.entries] : j.entries; JH.next = j.next;
+  } catch { if (seq !== JH.seq) return; }
+  JH.loaded = true; JH.loading = false; jhDrawList();
+}
+async function jhStats() {
+  try { JH.stats = await api('GET', '/api/life/journal/stats?days=' + JH.days); } catch { JH.stats = null; return; }
+  const el = $('#jh-stats'); if (el && RV.period === 'hist') setHtml(el, jhStatsHtml());
+}
+document.addEventListener('input', e => {
+  if (e.target.id !== 'jh-q') return;
+  clearTimeout(JH.t); JH.t = setTimeout(() => { JH.q = e.target.value.trim(); jhLoad(); }, 300);
+});
+document.addEventListener('change', e => {
+  if (e.target.id !== 'jh-from' && e.target.id !== 'jh-to') return;
+  JH[e.target.id === 'jh-from' ? 'from' : 'to'] = e.target.value; jhLoad();
+  $$('.jhist a[download]').forEach(a => { a.href = a.href.replace(/&(from|to)=[^&]*/g, '') + (JH.from ? '&from=' + JH.from : '') + (JH.to ? '&to=' + JH.to : ''); });
+});
 async function rvSave(day, patch) {
   const r = RV.data; if (!r?.journal) return;
   const cur = r.journal.find(x => x.day === day) || {day, text: '', mood: null};
@@ -431,6 +505,10 @@ document.addEventListener('click', async e => {
   else if (k === 'rv-period') { RV.period = a.dataset.p; RV.data = null; renderView(); }
   else if (k === 'rv-move') { RV.date = addDays(RV.date || today(), (RV.period === 'week' ? 7 : 1) * +a.dataset.d); RV.edit = null; renderView(); $(`#view [data-act="rv-move"][data-d="${a.dataset.d}"]`)?.focus(); }
   else if (k === 'rv-today') { RV.date = today(); RV.edit = null; renderView(); }
+  else if (k === 'rv-hopen') { RV.period = 'day'; RV.date = a.dataset.day; RV.edit = a.dataset.day; RV.data = null; renderView(); }
+  else if (k === 'rv-hmore') jhLoad(true);
+  else if (k === 'rv-hmood') { JH.mood = +a.dataset.v; renderView(); jhLoad(); }
+  else if (k === 'rv-hdays') { JH.days = +a.dataset.n; JH.stats = null; renderView(); jhStats(); }
   else if (k === 'rv-jday') { RV.edit = a.dataset.day; renderView(); $(`#view [data-act="rv-jday"][data-day="${a.dataset.day}"]`)?.focus(); }
   else if (k === 'rv-mood') {
     const ta = $('#rv-text'), day = ta?.dataset.day; if (!day) return;

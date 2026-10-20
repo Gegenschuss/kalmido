@@ -1359,6 +1359,14 @@ fresh; run p21261_a_ui node p21261_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.126.1 part B: table rows -> tasks as an agent proposal, planned inbox sorting (#2125 #2126)
 fresh; run p21261_b_api "$PY" p21261_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21261_b_ui node p21261_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.137.0 part A: organisation import - office + clients (#2344)
+fresh; run p2137_a_api "$PY" p2137_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.137.0 part B: organisation import - file store, documents, knowledge pages, tables, videos (#2344)
+fresh; run p2137_b_api "$PY" p2137_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.137.0 part C: organisation import - chat, absences, forms, notes, time entries, round trip (#2344)
+fresh; run p2137_c_api "$PY" p2137_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.137.0 part D: personal office into an organisation (#1981)
+fresh; run p2137_d_api "$PY" p2137_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.124.0 part A: formulas, chart (#2109 #2115)
 fresh; run p2124_a_api "$PY" p2124_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2124_a_ui node p2124_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1418,6 +1426,18 @@ fresh; run p21383_a_ui node p21383_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21383_b_api "$PY" p21383_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21383_b_ui node p21383_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21383_c_api "$PY" p21383_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.139.0 part A: team chat threads, "read by" (#2127 #2129)
+fresh; run p2139_a_api "$PY" p2139_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2139_a_ui node p2139_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.139.0 part B: voice messages in the team chat (#2128)
+fresh; run p2139_b_api "$PY" p2139_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2139_b_ui node p2139_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.139.0 part C: pages - an unreadable page back in the search once its key returns, error names the way out (#2386)
+fresh; run p2139_c_api "$PY" p2139_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2139_c_ui node p2139_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.139.0 part D: comment -> task, proposal cards with the app thumb and larger check boxes (#2130 #2401)
+fresh; run p2139_d_api "$PY" p2139_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2139_d_ui node p2139_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.142.0 part A: notification channels Slack/Matrix/Telegram/Signal, e-mail on single events (#2145 #2146)
 fresh; run p2142_a_api "$PY" p2142_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2142_a_ui node p2142_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1474,6 +1494,18 @@ fresh; run p2116_c_ui node p2116_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.116.0 part D (#2066 #2067: several times a day, focus/habits in API v1)
 fresh; run p2116_d_api "$PY" p2116_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2116_d_ui node p2116_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.140.0 part A: shopping list quantity / price + offline in the shop, recipes -> shopping list, meal plan beyond 7 days (#2131 #2132)
+fresh; run p2140_a_api "$PY" p2140_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2140_a_ui node p2140_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.140.0 part B: budget month comparison + one CSV importer with office bank import, devices <-> office equipment (#2134 #2136)
+fresh; run p2140_b_api "$PY" p2140_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2140_b_ui node p2140_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.140.0 part C: journal history / search / export / mood stats, habits with several reminder times + weekly goal (#2133 #2135)
+fresh; run p2140_c_api "$PY" p2140_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2140_c_ui node p2140_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.140.0 part D: birthdays written back to CardDAV (#2137)
+fresh; run p2140_d_api "$PY" p2140_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2140_d_ui node p2140_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

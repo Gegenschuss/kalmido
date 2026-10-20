@@ -1,7 +1,7 @@
 """Home & life: the web API (overview, contracts, devices, upkeep, health, trips, review + journal, staying in touch, Karakeep)."""
 from datetime import date
 
-from flask import jsonify, request
+from flask import jsonify, request, Response
 
 from ..core.config import app
 from ..core.i18n import lang, tr
@@ -11,7 +11,7 @@ from ..core.access import health_hidden
 from ..tasks.validation import valid_date
 from ..tasks.tasks import one_task
 from ..life.model import (
-    care_set, contract_create, device_create, health_create, journal_set, life_overview, need_life, review, trip_create,
+    care_set, contract_create, device_create, health_create, journal_export, journal_list, journal_set, journal_stats, life_overview, need_life, review, trip_create,
     upkeep_create, upkeep_presets,
 )
 from ..life.karakeep import kk_delete, kk_lists, kk_public, kk_set, kk_sync
@@ -97,6 +97,34 @@ def life_review():
     if e:
         return e
     return jsonify(review(c, uid, p, d, journal=not health_hidden(c, uid)))
+
+
+@app.get("/api/life/journal")
+def life_journal_list():
+    """?q=&mood=&from=&to=&before=&limit=: my journal entries, newest first, 30 per page (next = the cursor for ?before=)."""
+    c, uid = db(), me()
+    return jsonify(journal_list(c, uid, request.args))
+
+
+@app.get("/api/life/journal/stats")
+def life_journal_stats():
+    """?days=30|90|365: the mood distribution + the average per week (month for 365 days)."""
+    c, uid = db(), me()
+    try:
+        days = int(request.args.get("days", 30))
+    except ValueError:
+        days = 0
+    return jsonify(journal_stats(c, uid, days))
+
+
+@app.get("/api/life/journal/export")
+def life_journal_export():
+    """?format=md|csv&from=&to=: my journal as a download (own entries only, no formulas in the CSV)."""
+    c, uid = db(), me()
+    fmt = "csv" if request.args.get("format") == "csv" else "md"
+    text = journal_export(c, uid, request.args, fmt)
+    return Response(text, mimetype="text/csv; charset=utf-8" if fmt == "csv" else "text/markdown; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="journal.{fmt}"', "Cache-Control": "no-store"})
 
 
 @app.put("/api/life/journal/<day>")

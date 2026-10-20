@@ -108,6 +108,9 @@ MAX_FILE_MB = int(os.environ.get("TASKS_MAX_FILE_MB", "50"))
 # shown in the browser; everything else is served as a download (svg/html could carry script)
 INLINE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp",
                 "image/heic", "image/heif", "application/pdf"}
+# 2.139.0 B (#2128): audio plays in the page (voice messages; nosniff + the sandbox CSP stay). Kept apart from INLINE_TYPES so the
+# content check of pictures / PDFs (files/scan.py sc_sniff_mime) is unchanged; send_stored serves both inline
+AUDIO_INLINE_TYPES = {"audio/mp4", "audio/webm", "audio/ogg", "audio/mpeg"}
 
 # 2.36.0 (#1116): the Paperless connection is removed; PAPERLESS_* variables that are still set are ignored.
 

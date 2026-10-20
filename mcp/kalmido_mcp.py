@@ -325,10 +325,10 @@ def t_post_team_message(api, a):
     """2.138.1 (#2059): a team chat message; files = [{name, base64, mime?}] -> multipart (the body may then be empty)."""
     path = f"/team/rooms/{int(a['room_id'])}/messages"
     if a.get("files"):
-        return api.call("POST", path, multipart=(_pick(a, ("body", "task_id", "reply_to")), _b64_files(a)))
+        return api.call("POST", path, multipart=(_pick(a, ("body", "task_id", "reply_to", "thread_of")), _b64_files(a)))
     if not a.get("body"):
         raise ApiError(400, "body (or files) is required")
-    return api.call("POST", path, body=_pick(a, ("body", "task_id", "reply_to")))
+    return api.call("POST", path, body=_pick(a, ("body", "task_id", "reply_to", "thread_of")))  # 2.139.0 (#2127): thread_of
 
 
 def t_get_attachment(api, a):
@@ -1091,7 +1091,8 @@ LIST_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "folder":
 LIST_PROPS["points_on"] = {"type": "boolean", "description": "2.60.0: story points shown in the app (owner; default off)"}  # 2.60.0 (#1511)
 HABIT_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "goal": {"type": "integer", "minimum": 1},
                "days": {"type": "string", "description": "weekdays 1-7 (1 = Monday), e.g. 12345"}, "per_week": {"type": "integer", "minimum": 0},
-               "remind_at": {"type": "string", "description": "HH:MM or empty"}}
+               "remind_at": {"type": "string", "description": "HH:MM or empty (the single reminder; remind_times replaces it)"},
+               "remind_times": {"type": "array", "maxItems": 6, "items": {"type": "string"}, "description": "up to 6 reminder times HH:MM, e.g. [\"08:00\", \"20:00\"]"}}
 FILES = {"type": "array", "minItems": 1, "maxItems": 10, "items": {"type": "object", "properties": {
     "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}
 APPROVAL_NOTE = (" As an agent this waits for a person's approval: the answer is approval_required with a job; the result comes "
@@ -1434,14 +1435,19 @@ TOOLS += [
                         "you listen in, every message a person writes there).",
      _obj({}), lambda api, a: api.call("GET", "/team/rooms")),
     ("read_team_chat", "2.17.0: messages of a team chat conversation, oldest first; before = a message id for older ones. Mentions "
-                       "are <@user id>.",
-     _obj({"room_id": S_ID, "before": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 100}}, ["room_id"]),
-     lambda api, a: api.call("GET", f"/team/rooms/{int(a['room_id'])}/messages", _pick(a, ("before", "limit")))),
+                       "are <@user id>. 2.139.0 (#2127): the main conversation lists no thread answers; a message with thread_count > 0 "
+                       "has a thread: thread = its id (or the id of one of its answers) returns that thread's answers (root = its first "
+                       "message). Your own messages carry read_by {count, users} (#2129: who read up to there). An attachment with voice true is a voice message "
+                       "(duration_ms = its length); Kalmido does not transcribe it, read the audio file with get_attachment source team if you can.",
+     _obj({"room_id": S_ID, "before": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 100}, "thread": S_ID}, ["room_id"]),
+     lambda api, a: api.call("GET", f"/team/rooms/{int(a['room_id'])}/messages", _pick(a, ("before", "limit", "thread")))),
     ("post_team_message", "2.17.0: write in a team chat channel (Markdown; mention people as <@user id>; task_id links a task). "
                           "reply_to (2.33.0): the id of a message of the same conversation you answer. files (2.138.1): up to 10 "
                           "[{name, base64, mime?}] sent with the message (body may then be ''; not in end-to-end encrypted "
-                          "conversations). Messages carry attachments [{id, name, mime, size, url}]: read one with get_attachment source team.",
-     _obj({"room_id": S_ID, "body": {"type": "string", "maxLength": 8000}, "task_id": S_ID, "reply_to": S_ID,
+                          "conversations). Messages carry attachments [{id, name, mime, size, url}]: read one with get_attachment source team. "
+                          "thread_of (2.139.0): answer in the thread of that message (answer in the thread when the event team_message "
+                          "carried a thread_of).",
+     _obj({"room_id": S_ID, "body": {"type": "string", "maxLength": 8000}, "task_id": S_ID, "reply_to": S_ID, "thread_of": S_ID,
            "files": {"type": "array", "maxItems": 10, "items": {"type": "object", "properties": {
                "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}},
           ["room_id", "body"]), t_post_team_message),
@@ -1461,8 +1467,10 @@ TOOLS += [
                          "belong to; at most 5 per conversation (else 409). read_team_chat returns pins.",
      _obj({"message_id": S_ID, "pinned": {"type": "boolean"}}, ["message_id"]),
      lambda api, a: api.call("POST", f"/team/messages/{int(a['message_id'])}/pin", body=_pick(a, ("pinned",)))),
-    ("mark_team_chat_read", "2.17.0: mark a team chat conversation read (up to last_id, default the newest).",
-     _obj({"room_id": S_ID, "last_id": S_ID}, ["room_id"]), lambda api, a: api.call("POST", f"/team/rooms/{int(a['room_id'])}/read", body=_pick(a, ("last_id",)))),
+    ("mark_team_chat_read", "2.17.0: mark a team chat conversation read (up to last_id, default the newest). 2.139.0: thread = the "
+                            "read mark in that thread (#2127); people see your read mark as \"Read by\" (#2129).",
+     _obj({"room_id": S_ID, "last_id": S_ID, "thread": S_ID}, ["room_id"]),
+     lambda api, a: api.call("POST", f"/team/rooms/{int(a['room_id'])}/read", body=_pick(a, ("last_id", "thread")))),
 ]
 
 
@@ -1473,8 +1481,11 @@ REWARD_IN = {"title": {"type": "string", "maxLength": 200}, "cost": {"type": "in
 TOOLS += [
     ("get_family", "2.19.0 (module Family): upcoming birthdays + anniversaries (with the age), household deadlines, whose turn it is in "
                    "the rotations, the meal plan of a week (week = any day of it, default this week), the shopping lists and the kids "
-                   "you look after (stars, rewards, requests).",
-     _obj({"week": {"type": "string", "description": "YYYY-MM-DD"}}), lambda api, a: api.call("GET", "/family", _pick(a, ("week",)))),
+                   "you look after (stars, rewards, requests). 2.140.0: days = how many days of the meal plan from that Monday "
+                   "(1-62, default 7, plan weeks ahead); the meals carry recipe_id / serves, the recipes come along with their "
+                   "ingredients (name, qty, unit).",
+     _obj({"week": {"type": "string", "description": "YYYY-MM-DD"}, "days": {"type": "integer", "minimum": 1, "maximum": 62}}),
+     lambda api, a: api.call("GET", "/family", _pick(a, ("week", "days")))),
     ("add_occasion", "2.19.0: a birthday or anniversary as a yearly task (age from the year, reminders lead_days before and on the day, "
                      "gift ideas as subtasks); date YYYY-MM-DD or --MM-DD; list_id default: the first Birthdays list (created when missing).",
      _obj({"name": {"type": "string"}, "kind": {"type": "string", "enum": ["birthday", "anniversary"]}, "date": {"type": "string"},
@@ -1490,10 +1501,16 @@ TOOLS += [
            "who": {"type": "string"}, "notice_months": {"type": "integer", "minimum": 0, "maximum": 24},
            "lead_days": {"type": "integer", "minimum": 0, "maximum": 365}, "title": {"type": "string"}, "list_id": S_ID}, ["expires"]),
      lambda api, a: api.call("POST", "/family/deadlines", body=_pick(a, ("type", "expires", "who", "notice_months", "lead_days", "title", "list_id")))),
-    ("ingredients_to_shopping", "2.19.0: put the ingredients of a meal (the list in its notes, or items) on a shopping list; open items "
-                                "with the same name are not added twice.",
-     _obj({"task_id": S_ID, "list_id": S_ID, "items": STRS}, ["task_id"]),
-     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/to-shopping", body=_pick(a, ("list_id", "items")))),
+    ("ingredients_to_shopping", "2.19.0: put the ingredients of a meal or a recipe (the list in its notes; a meal without any: its "
+                                "recipe's; or items) on a shopping list; open items with the same name are not added twice. 2.140.0: a "
+                                "leading amount (\"500 g flour\") goes to the item's amount field, an open item of the same name gets "
+                                "the amount added; servings scales the amounts (needs the recipe's serves); preview = nothing is "
+                                "written, the answer lists the ingredients (have = on the list already).",
+     _obj({"task_id": S_ID, "list_id": S_ID,
+           "items": {"type": "array", "items": {"oneOf": [{"type": "string"}, {"type": "object", "required": ["name"], "properties": {
+               "name": {"type": "string"}, "qty": {"type": ["number", "null"]}, "unit": {"type": "string"}}}]}},
+           "servings": {"type": ["integer", "null"], "minimum": 1, "maximum": 100}, "preview": {"type": "boolean"}}, ["task_id"]),
+     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/to-shopping", body=_pick(a, ("list_id", "items", "servings", "preview")))),
     ("add_shop_areas", "2.19.0: make a list a shopping list and add the default shop areas (sections); a new item goes to the area it "
                        "had last time.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/shop-areas")),

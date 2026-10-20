@@ -28,7 +28,8 @@ KINDS = {
     "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET"),
     "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py, p2113c_a_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
-                         "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0); undo of the editors (2.111.0)"),
+                         "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0); undo of the editors (2.111.0); "
+                         "p2137_a_api_test.py: the owner exports the personal office (export, recovery key) and imports an organisation's office into it (2.137.0)"),
     "files": ("matrix", SUITE + ", p21121_a_api_test.py, p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
                          "file requests of a private folder, tags of files / folders, the tag filter, the documents' filters, bulk change, ZIP, CSV, documents via the API (2.122.0)"),
     "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private space (create, change, search, export, trash; "
@@ -43,7 +44,8 @@ KINDS = {
                        "rename / archive / restore as its own admin, groups only with people one works with (2.113.1)"),
     "hub": ("matrix", SUITE + ", p2125_a_api_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
                       "2.125.0: the own vacation account and working week, never a vacation request"),
-    "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature"),
+    "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature; "
+                           "p2140_a_api_test.py: shopping amounts, recipes, the meal plan beyond a week (2.140.0)"),
     "videos": ("matrix", "p2991_a_api_test.py: video sign-offs (2.99.1) at a private task / list / client of a person without an "
                "organisation: create, comments, versions, customer link, export, delete + restore; p2991_c_api_test.py: the own agent "
                "of such a person reads and comments them through the API v1"),
@@ -404,16 +406,16 @@ ROUTES = {
     "POST /api/v1/office/reminders": "office", "PUT /api/newsletter": "office", "PUT /api/newsletter/consent": "office",
     "PUT /api/office/cashflow/check": "office", "PUT /api/office/docs/{}/items": "office",
     "PUT /api/office/docs/{}/parts/{}/items": "office", "PUT /api/office/settings": "office", "PUT /api/paperless": "office",
-    # ---- orgadmin (23)
+    # ---- orgadmin (23; 2.137.0 A (#2344): export of the own personal office -> "office")
     "GET /api/org-icon/{}/{}.png": "orgadmin", "POST /api/orgs/{}/icon": "orgadmin", "DELETE /api/orgs/{}/icon": "orgadmin",  # 2.87.9 (#1913)
-    "DELETE /api/admin/orgs/{}": "orgadmin", "DELETE /api/orgs/{}/export": "orgadmin",
+    "DELETE /api/admin/orgs/{}": "orgadmin", "DELETE /api/orgs/{}/export": "office",
     "DELETE /api/orgs/{}/lists/{}": "orgadmin", "DELETE /api/orgs/{}/lists/{}/icon": "orgadmin",
     "DELETE /api/orgs/{}/members/{}": "orgadmin", "GET /api/admin/orgs": "orgadmin", "GET /api/orgs/{}/encryption": "orgcrypt",
-    "GET /api/orgs/{}/export": "orgadmin", "GET /api/orgs/{}/export/file": "orgadmin", "GET /api/orgs/{}/lists": "orgadmin",
+    "GET /api/orgs/{}/export": "office", "GET /api/orgs/{}/export/file": "office", "GET /api/orgs/{}/lists": "orgadmin",
     "PATCH /api/admin/orgs/{}": "orgadmin", "PATCH /api/orgs/{}": "orgadmin", "PATCH /api/orgs/{}/lists/{}": "orgadmin",
     "POST /api/admin/orgs": "orgadmin", "POST /api/admin/orgs/boundary/repair": "orgadmin",
     "POST /api/orgs/{}/encryption/recovery": "orgcrypt", "POST /api/orgs/{}/encryption/recovery/passkey": "orgcrypt",  # 2.138.0 (#1972)
-    "POST /api/orgs/{}/export": "orgadmin",
+    "POST /api/orgs/{}/export": "office",
     "POST /api/orgs/{}/lists/{}/archive": "orgadmin", "POST /api/orgs/{}/lists/{}/icon": "orgadmin",
     "POST /api/orgs/{}/lists/{}/owner": "orgadmin", "PUT /api/admin/orgs/visibility": "orgadmin",
     "PUT /api/orgs/{}/lists/{}/icon": "orgadmin", "PUT /api/orgs/{}/members": "orgadmin",
@@ -456,7 +458,8 @@ ROUTES = {
     "GET /api/family/deadline-types": "personal", "GET /api/family/kids": "personal", "GET /api/family/packing": "personal",
     "GET /api/feeds": "personal", "GET /api/feeds/items": "personal", "GET /api/feeds/opml": "personal",
     "GET /api/life": "personal", "GET /api/life/karakeep": "personal", "GET /api/life/karakeep/lists": "personal",
-    "GET /api/life/review": "personal", "GET /api/life/upkeep-presets": "personal", "GET /api/servers": "personal",
+    "GET /api/life/review": "personal", "GET /api/life/journal": "personal", "GET /api/life/journal/stats": "personal", "GET /api/life/journal/export": "personal",  # 2.140.0 C (#2133)
+     "GET /api/life/upkeep-presets": "personal", "GET /api/servers": "personal",
     "GET /api/servers/{}/data": "personal", "GET /api/servers/{}/events": "personal", "GET /api/servers/{}/news": "personal",
     "GET /api/servers/{}/search": "personal", "GET /api/servers/{}/tasks/{}": "personal", "GET /api/supporter": "personal",
     "GET /api/v1/family": "personal", "GET /api/v1/family/deadline-types": "personal", "GET /api/v1/family/kids": "personal",
@@ -477,7 +480,11 @@ ROUTES = {
     "POST /api/family/rewards/{}/decide": "personal", "POST /api/family/rewards/{}/request": "personal",
     "POST /api/feeds": "personal", "POST /api/feeds/items/{}/later": "personal", "POST /api/feeds/opml": "personal",
     "POST /api/feeds/read": "personal", "POST /api/feeds/{}/restore": "personal", "POST /api/life/contracts": "personal",
-    "POST /api/life/devices": "personal", "POST /api/life/health": "personal", "POST /api/life/karakeep/sync": "personal",
+    "POST /api/life/devices": "personal",
+    # 2.140.0 B (#2134, #2136): the budget's month comparison, a device <-> the own office (p2140_b_api_test.py)
+    "GET /api/budget/{}/compare": "personal", "GET /api/life/devices/{}/link": "personal", "POST /api/life/devices/{}/to-office": "personal",
+    "POST /api/life/device-links/{}/pull": "personal", "DELETE /api/life/device-links/{}": "personal",
+    "GET /api/office/equipment/{}/link": "office", "POST /api/office/equipment/{}/to-device": "office", "POST /api/life/health": "personal", "POST /api/life/karakeep/sync": "personal",
     "POST /api/life/trips": "personal", "POST /api/life/upkeep": "personal", "POST /api/servers": "personal",
     "POST /api/servers/code": "personal", "POST /api/servers/move": "personal", "POST /api/servers/{}/news/read": "personal",
     "POST /api/servers/{}/restore": "personal", "POST /api/servers/{}/tasks": "personal",
@@ -630,6 +637,8 @@ ROUTES = {
     "GET /api/v1/sheets/{}": "sheets", "GET /api/v1/sheets/{}/vars": "sheets", "PATCH /api/sheets/{}": "sheets",
     # 2.97.0 C (#2049): office moves (p297_c_api_test.py) - routes below this line
     "POST /api/office/move-space": "office",
+    # 2.137.0 D (#1981): the personal office into an organisation the person is an admin of (p2137_d_api_test.py)
+    "GET /api/office/move/check": "office", "POST /api/office/move/org": "office",
     # 2.96.0 B (#1941): a table to the other workspace
     "POST /api/sheets/{}/move-space": "sheets",
     # 2.124.0 C (#2113): shares of one table (p2124_c_api_test.py)

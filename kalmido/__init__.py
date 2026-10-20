@@ -43,6 +43,7 @@ ORDER = (
     "core.pages",
     "core.instance",
     "core.state",
+    "core.csvimport",  # 2.140.0 B (#2134): the statement reader of budget and bank reconciliation
     "core.merges",  # 2.66.0 (#1835): merging contacts / clients (reversible)
     "lists.lists",
     "lists.groups",
@@ -219,6 +220,7 @@ ORDER = (
     "life.web",
     "life.v1",
     "life.budget",  # 2.72.0 (#1333): the household budget
+    "life.devlink",  # 2.140.0 B (#2136): a private device <-> office equipment
     "life.budget_web",
     "life.rss",  # 2.85.0 B (#1162): feeds
     "life.rss_web",
@@ -308,6 +310,10 @@ ORDER = (
     "admin.orgexport",  # 2.42.0 (#833): organisation export (encrypted archive)
     "admin.acctexport",  # 2.73.0 B (#1473): account export (moving between servers, GDPR copy)
     "admin.acctimport",  # 2.73.0 B (#1473): account import with the mapping of people
+    "admin.orgimport",  # 2.137.0 (#2344): organisation import of the remaining areas (no routes)
+    "admin.oi_office",  # 2.137.0 (#2344): its office tables (no routes)
+    "admin.oi_store",  # 2.137.0 (#2344): its file store, documents, knowledge pages, tables (no routes)
+    "admin.oi_team",  # 2.137.0 (#2344): its chat, absences, forms and the rest (no routes)
     "admin.orgcrypt_cli",  # 2.42.0 (#828): the organisation keys' start-up pass + command line (no routes)
     "docs.extract",  # 2.48.0 (#1111): date / due date / amount from a text (no routes, standard library only)
     "docs.rules",  # 2.48.0 (#1111): sorting rules (no routes)
@@ -343,6 +349,7 @@ ORDER = (
     "office.recurring",  # 2.91.0 A (#1923): invoice series (a template invoice every month / quarter / year, drafts or sent)
     "office.subs",  # 2.91.0 B (#1924): subscriptions and tools (fixed costs with notice period, users, renewal reminder)
     "office.officemove",  # 2.97.0 C (#2049): office data between the personal office and an organisation's office
+    "office.pbtransfer",  # 2.137.0 D (#1981): the personal office into an existing organisation (after office.officemove)
     "office.undo",  # 2.111.0 A (#2233): undo of the office editors (copies before each own change, restore with conflict check)
     "office.numranges",  # 2.138.0 D (#2256): the next running number of every number series (office admin)
     "agents.importprop",  # 2.68.0 A (#1839): agents propose old data for the office (fixed costs), the person takes it over

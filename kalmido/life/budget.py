@@ -14,10 +14,8 @@ else the owner's account; core/orgcrypt.py): sid = the space a row was encrypted
 readable while a moved list is resealed in the background (bud_settle, called by admin/orgcrypt_cli.py's passes).
 Amounts are stored as text ("12.30"), every sum is made here in Decimal.
 """
-import csv
 import hashlib
 import hmac
-import io
 import json
 import re
 import unicodedata
@@ -30,6 +28,7 @@ from ..core.i18n import lang, N_, tr
 from ..core.pg import insert_id, system_ctx
 from ..core.access import Denied, health_hidden, list_role, vis_sql, WRITE_ROLES
 from ..core import orgcrypt as oc
+from ..core import csvimport as cx  # 2.140.0 B (#2134): the shared statement reader
 from ..personal.timetrack import BadInput
 
 BUD_TABLES = ("budget_cats", "budget_recurring", "budget_entries")
@@ -41,8 +40,7 @@ BUD_PER = {"month": 1, "quarter": 3, "year": 12}
 BUD_KINDS = ("out", "in")
 BUD_SOURCES = ("manual", "csv", "recurring")
 BUD_TREND = 6
-BUD_DATE_FORMATS = {"DD.MM.YYYY": r"(\d{1,2})\.(\d{1,2})\.(\d{4})", "YYYY-MM-DD": r"(\d{4})-(\d{1,2})-(\d{1,2})",
-                    "DD.MM.YY": r"(\d{1,2})\.(\d{1,2})\.(\d{2})", "MM/DD/YYYY": r"(\d{1,2})/(\d{1,2})/(\d{4})"}
+BUD_DATE_FORMATS = cx.DATE_FORMATS  # 2.140.0 B (#2134): core/csvimport.py
 BUD_DEFAULT_CATS = ((N_("Housing"), "out"), (N_("Groceries"), "out"), (N_("Mobility"), "out"), (N_("Insurance"), "out"),
                     (N_("Leisure"), "out"), (N_("Other"), "out"), (N_("Salary"), "in"), (N_("Other income"), "in"))
 BUD_MONTH_RE = re.compile(r"(20\d\d|19\d\d)-(0[1-9]|1[0-2])")
@@ -782,6 +780,57 @@ def bud_month_view(c, uid, lid, month):
             "trend": [{"month": k, "ist_in": _f(v["ist_in"]), "ist_out": _f(v["ist_out"])} for k, v in trend.items()]}
 
 
+BUD_COMPARE = (3, 6, 12)  # 2.140.0 B (#2134): the periods of the month comparison
+
+
+def _pct(cur, base):
+    return None if not base else float(((cur - base) / base * 100).quantize(Decimal("0.1")))
+
+
+def bud_compare(c, uid, lid, month, n):
+    """2.140.0 B (#2134): the month comparison -- month against the n - 1 months before it, per category: ist / soll of
+    every month (from the entries and the plan as bud_totals makes it), the difference to the month before and to the
+    average of the earlier months that have any entry at all (months before the budget was used do not pull the average
+    down; absolute and in percent; None when there is nothing to compare with)."""
+    bud_need_on(c, uid)
+    bud_need_list(c, uid, lid)
+    if n not in BUD_COMPARE:
+        raise BadInput(tr("Invalid value: {0}", "months"))
+    months = [_mstr(i) for i in range(_mi(month) - n + 1, _mi(month) + 1)]
+    per = {m: bud_totals(c, lid, m) for m in months}
+    active = [i for i, m in enumerate(months[:-1]) if per[m]["totals"]["ist_in"] or per[m]["totals"]["ist_out"]]
+    cats = []
+
+    def entry(key, name, kind, ist_of, soll_of):
+        ist = [ist_of(m) for m in months]
+        soll = [soll_of(m) for m in months]
+        cur, prev, earlier = ist[-1], ist[-2] if n > 1 else None, [ist[i] for i in active]
+        avg = (sum(earlier, Decimal(0)) / len(earlier)).quantize(Decimal("0.01")) if earlier else None
+        return {"key": key, "name": name, "kind": kind,
+                "months": [{"month": m, "ist": _f(i), "soll": _f(sl)} for m, i, sl in zip(months, ist, soll)],
+                "ist": _f(cur), "soll": _f(soll[-1]), "prev": _f(prev) if prev is not None else None,
+                "diff_prev": _f(cur - prev) if prev is not None else None, "pct_prev": _pct(cur, prev) if prev is not None else None,
+                "avg": _f(avg) if avg is not None else None, "diff_avg": _f(cur - avg) if avg is not None else None,
+                "pct_avg": _pct(cur, avg) if avg is not None else None, "diff_plan": _f(soll[-1] - cur) if soll[-1] else None}
+    dec_ = lambda v: Decimal(str(v))  # noqa: E731 -- bud_totals hands out floats of two decimals
+    for d in _cats(c, lid):
+        def ist_of(m, cid=d["id"]):
+            return dec_(next(x["ist"] for x in per[m]["cats"] if x["id"] == cid))
+
+        def soll_of(m, cid=d["id"]):
+            return dec_(next(x["soll"] for x in per[m]["cats"] if x["id"] == cid))
+        e = entry(d["id"], d["name"], d["kind"], ist_of, soll_of)
+        if any(x["ist"] or x["soll"] for x in e["months"]):
+            cats.append(e)
+    for kind in BUD_KINDS:
+        e = entry(f"none-{kind}", None, kind, lambda m, k=kind: dec_(per[m]["none"]["ist_" + k]), lambda m: Decimal(0))
+        if any(x["ist"] for x in e["months"]):
+            cats.append(e)
+    totals = {kind: entry(f"total-{kind}", None, kind, lambda m, k=kind: dec_(per[m]["totals"]["ist_" + k]),
+                          lambda m, k=kind: dec_(per[m]["totals"]["soll_" + k])) for kind in BUD_KINDS}
+    return {"list_id": lid, "month": month, "months": months, "n": n, "cats": cats, "totals": totals}
+
+
 def bud_overview(c, uid):
     """GET /api/budget: the lists, this month and the totals of the first list (the card on "At home")."""
     bud_need_on(c, uid)
@@ -842,159 +891,51 @@ def bud_files_save(c, uid, eid, files, saved):
     return _files_of(c, [r["id"]]).get(r["id"], [])
 
 
-# ---------------------------------------------------------------- the bank import (CSV)
-_GUESS = {
-    "date": ("buchungstag", "buchungsdatum", "datum", "date", "booking date", "transaction date", "valuta", "wertstellung", "value date"),
-    "amount": ("betrag", "amount", "umsatz", "betrag (eur)", "betrag in eur", "value"),
-    "amount_in": ("haben", "gutschrift", "credit", "eingang", "einnahme"),
-    "amount_out": ("soll", "lastschrift", "debit", "ausgang", "ausgabe"),
-    "title": ("verwendungszweck", "buchungstext", "beschreibung", "description", "purpose", "memo", "reference", "text", "details"),
-    "counterpart": ("beguenstigter/zahlungspflichtiger", "begünstigter/zahlungspflichtiger", "zahlungsempfänger", "zahlungsempfaenger",
-                    "empfänger", "empfaenger", "auftraggeber", "name", "payee", "counterparty", "gegenseite", "partner"),
-}
-
-
-def _decode(text):
-    if not isinstance(text, str):
-        raise BadInput(tr("Invalid value: {0}", "text"))
-    if len(text.encode("utf-8", "ignore")) > BUD_CSV_MAX:
-        raise BadInput(tr("The file is too large (at most {0} MB)", BUD_CSV_MAX // (1024 * 1024)))
-    return text.lstrip("﻿").replace("\r\n", "\n").replace("\r", "\n")
-
-
-def _delim(lines):
-    best, n = ";", -1
-    for d in (";", ",", "\t", "|"):
-        counts = [ln.count(d) for ln in lines[:30] if ln.strip()]
-        if not counts:
-            continue
-        top = max(set(counts), key=counts.count)
-        score = top * counts.count(top) if top else 0
-        if score > n:
-            best, n = d, score
-    return best
+# ---------------------------------------------------------------- the bank import (CSV, CAMT)
+# 2.140.0 B (#2134): the reading itself is core/csvimport.py, shared with the office's bank reconciliation (the same
+# formats, layouts and checks); the names below stay for the callers of earlier versions
+_GUESS = cx.GUESS
+_decode = cx.csv_decode
+_delim = cx.csv_delim
+_parse_amount = cx.csv_amount
+_parse_day = cx.csv_day
+_guess = cx.csv_guess
+_hkey = cx.csv_hkey
+_mapping = cx.csv_mapping
 
 
 def bud_csv_table(text):
-    """CSV text -> (delimiter, header, rows): the header is the first row with the most common column count (bank
-    exports start with a few lines about the account)."""
-    text = _decode(text)
-    lines = text.split("\n")
-    d = _delim(lines)
-    try:
-        rows = [r for r in csv.reader(io.StringIO(text), delimiter=d) if any(x.strip() for x in r)]
-    except csv.Error:
-        raise BadInput(tr("The file cannot be read as CSV")) from None
-    if not rows:
-        raise BadInput(tr("The file is empty"))
-    if len(rows) > BUD_CSV_ROWS + 50:
+    """CSV text -> (delimiter, header, rows) (core/csvimport.csv_table)."""
+    return cx.csv_table(text, BUD_CSV_ROWS)
+
+
+def _row_of(r, m):
+    """One CSV row with mapping m -> {day, amount, kind, title, counterpart, error}."""
+    return cx.csv_row(r, m, BUD_TITLE_MAX, BUD_CP_MAX, BUD_AMOUNT_MAX)
+
+
+def _camt_rows(text):
+    """2.140.0 B (#2134): a CAMT.052 / .053 statement -> budget rows like _row_of (text = purpose, else the counterpart).
+    The budget has no currency of its own: a booking in another currency than most of the file is refused."""
+    rows = cx.camt_rows(text)
+    curs = [r["currency"] for r in rows if r["currency"]]
+    main = max(set(curs), key=curs.count) if curs else ""
+    out = []
+    for r in rows:
+        x = {"day": r["day"], "amount": None, "kind": "out", "title": "", "counterpart": (r["counterpart"] or "")[:BUD_CP_MAX], "error": r["error"]}
+        x["title"] = re.sub(r"\s+", " ", r["purpose"] or r["counterpart"] or "").strip()[:BUD_TITLE_MAX]
+        a = r["amount"]
+        if a is not None:
+            x["amount"], x["kind"] = _f(abs(a)), "in" if a > 0 else "out"
+        if x["error"] is None and r["currency"] and r["currency"] != main:
+            x["error"] = tr("Other currency than the rest of the file ({0})", main)
+        elif x["error"] is None and abs(a) > BUD_AMOUNT_MAX:
+            x["error"] = tr("The amount cannot be read")
+        elif x["error"] is None and not x["title"]:
+            x["error"] = tr("The row has no text")
+        out.append(x)
+    if len(out) > BUD_CSV_ROWS:
         raise BadInput(tr("At most {0} rows per import", BUD_CSV_ROWS))
-    lens = [len(r) for r in rows]
-    common = max(set(lens), key=lens.count)
-    hi = next(i for i, r in enumerate(rows) if len(r) == common)
-    header = [x.strip()[:80] for x in rows[hi]]
-    body = [[x.strip() for x in r] for r in rows[hi + 1:]]
-    return d, header, body
-
-
-def _parse_amount(s, dec):
-    """'1.234,56' / '-12,30' / '12,30-' / '12.30' / '(12.30)' -> signed Decimal or None."""
-    s = (s or "").strip().replace(" ", "").replace(" ", "")
-    s = re.sub(r"(?i)(eur|€|\$|usd|chf|£)", "", s)
-    if not s:
-        return None
-    neg = False
-    if s.endswith("-"):
-        neg, s = True, s[:-1]
-    elif s.startswith("(") and s.endswith(")"):
-        neg, s = True, s[1:-1]
-    if s.startswith("-"):
-        neg, s = not neg, s[1:]
-    elif s.startswith("+"):
-        s = s[1:]
-    if dec == ",":
-        s = s.replace(".", "").replace("'", "").replace(",", ".")
-    else:
-        s = s.replace(",", "").replace("'", "")
-    if not re.fullmatch(r"\d{1,9}(\.\d{1,4})?", s):
-        return None
-    v = Decimal(s).quantize(Decimal("0.01"))
-    return -v if neg else v
-
-
-def _parse_day(s, fmt):
-    m = re.fullmatch(BUD_DATE_FORMATS[fmt], (s or "").strip())
-    if not m:
-        return None
-    a, b_, y = m.groups()
-    if fmt == "YYYY-MM-DD":
-        y, a, b_ = a, b_, y
-        dd, mm = int(b_), int(a)
-    elif fmt == "MM/DD/YYYY":
-        dd, mm = int(b_), int(a)
-    else:
-        dd, mm = int(a), int(b_)
-    yy = int(y) + (2000 if len(y) == 2 else 0)
-    try:
-        return date(yy, mm, dd).isoformat()
-    except ValueError:
-        return None
-
-
-def _guess(header, body):
-    low = [_norm(h) for h in header]
-    g_ = {}
-    for k, names in _GUESS.items():
-        g_[k] = None
-        for n in names:
-            hit = next((i for i, h in enumerate(low) if h == n and i not in g_.values()), None)
-            if hit is None:
-                hit = next((i for i, h in enumerate(low) if n in h and i not in g_.values()), None)
-            if hit is not None:
-                g_[k] = hit
-                break
-    if g_["amount"] is not None:
-        g_["amount_in"] = g_["amount_out"] = None
-    sample = [r for r in body[:50]]
-    cols = [g_[k] for k in ("amount", "amount_in", "amount_out") if g_[k] is not None]
-    vals = [r[i] for r in sample for i in cols if i < len(r) and r[i]]
-    commas = sum(1 for v in vals if re.search(r",\d{1,2}-?$", v))
-    dots = sum(1 for v in vals if re.search(r"\.\d{1,2}-?$", v))
-    g_["decimal"] = "." if dots > commas else ","
-    fmt = "DD.MM.YYYY"
-    if g_["date"] is not None:
-        ds = [r[g_["date"]] for r in sample if g_["date"] < len(r) and r[g_["date"]]]
-        for f in BUD_DATE_FORMATS:
-            if ds and sum(1 for x in ds if _parse_day(x, f)) >= max(1, len(ds) * 0.8):
-                fmt = f
-                break
-    g_["date_format"] = fmt
-    return g_
-
-
-def _hkey(header):
-    return hashlib.sha256("\x1f".join(_norm(h) for h in header).encode()).hexdigest()[:24]
-
-
-def _mapping(m, ncols):
-    """A client's mapping, checked against the number of columns."""
-    if not isinstance(m, dict):
-        raise BadInput(tr("Invalid value: {0}", "mapping"))
-    out = {}
-    for k in ("date", "amount", "amount_in", "amount_out", "title", "counterpart"):
-        v = m.get(k)
-        if v is None:
-            out[k] = None
-            continue
-        if isinstance(v, bool) or not isinstance(v, int) or not 0 <= v < ncols:
-            raise BadInput(tr("Invalid value: {0}", k))
-        out[k] = v
-    if out["date"] is None or (out["amount"] is None and out["amount_in"] is None and out["amount_out"] is None):
-        raise BadInput(tr("Please choose the columns for the date and the amount"))
-    if out["title"] is None and out["counterpart"] is None:
-        raise BadInput(tr("Please choose the column for the text"))
-    out["decimal"] = m.get("decimal") if m.get("decimal") in (",", ".") else ","
-    out["date_format"] = m.get("date_format") if m.get("date_format") in BUD_DATE_FORMATS else "DD.MM.YYYY"
     return out
 
 
@@ -1070,9 +1011,7 @@ def _dkey_counts(c, lid):
 def _is_dup(c, lid, row, counts, sids):
     """True (and one match used up) when an equal entry exists: two equal rows of one file need two existing ones."""
     for s in sids | {bud_sid(c, lid)}:
-        k = bud_dkey(c, lid, s, row["day"], row["amount"], row["kind"], row["title"])
-        if counts.get(k):
-            counts[k] -= 1
+        if cx.csv_dup_take(counts, bud_dkey(c, lid, s, row["day"], row["amount"], row["kind"], row["title"])):
             return True
     return False
 
@@ -1093,23 +1032,29 @@ def _open_recs(c, lid):
 
 def bud_import_parse(c, uid, lid, b):
     """{text, mapping?}: without a mapping the columns, a sample and a guess (the remembered mapping of this header
-    first); with one the checked rows (suggested category / template, duplicates)."""
+    first, then a known bank layout); with one the checked rows (suggested category / template, duplicates).
+    2.140.0 B (#2134): a CAMT.052 / .053 statement (like the office's bank import) -> the checked rows at once (fmt camt)."""
     bud_need_on(c, uid)
     bud_need_list(c, uid, lid, True)
-    d, header, body = bud_csv_table(b.get("text"))
-    if b.get("mapping") is None:
-        g_ = _meta(c, lid).get(_hkey(header)) or _guess(header, body)
-        return {"columns": header, "sample": body[:8], "delimiter": d, "guess": g_}
-    m = _mapping(b["mapping"], len(header))
-    if len(body) > BUD_CSV_ROWS:
-        raise BadInput(tr("At most {0} rows per import", BUD_CSV_ROWS))
+    text = b.get("text")
+    if isinstance(text, str) and cx.camt_is(text):
+        cx.csv_decode(text)  # the size limit
+        parsed, fmt = _camt_rows(text), "camt"
+    else:
+        d, header, body = bud_csv_table(text)
+        if b.get("mapping") is None:
+            g_ = _meta(c, lid).get(_hkey(header)) or _guess(header, body)
+            return {"fmt": "csv", "columns": header, "sample": body[:8], "delimiter": d, "guess": g_}
+        m = _mapping(b["mapping"], len(header))
+        if len(body) > BUD_CSV_ROWS:
+            raise BadInput(tr("At most {0} rows per import", BUD_CSV_ROWS))
+        parsed, fmt = [_row_of(r, m) for r in body], "csv"
     by_cp, by_title = _suggest_maps(c, lid)
     counts, sids = _dkey_counts(c, lid)
     open_for = _open_recs(c, lid)
     used_rec = set()
     rows = []
-    for n, r in enumerate(body, 1):
-        x = _row_of(r, m)
+    for n, x in enumerate(parsed, 1):
         x["n"] = n
         x["cat_id"] = x["recurring_id"] = None
         x["dup"] = False
@@ -1126,7 +1071,7 @@ def bud_import_parse(c, uid, lid, b):
                         x["cat_id"] = x["cat_id"] or rr["cat_id"]
                         break
         rows.append(x)
-    return {"rows": rows, "skipped": sum(1 for x in rows if x["error"])}
+    return {"fmt": fmt, "rows": rows, "skipped": sum(1 for x in rows if x["error"])}
 
 
 def bud_import_commit(c, uid, lid, b):

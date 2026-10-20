@@ -507,7 +507,7 @@ async function wkeMigrate(sp, onProgress, opts = {}) {
   if (WKE.busy[sp]) return WKE.busy[sp];
   const run = (async () => {
     let total = null, last = -1, blank = false, kind = null, reenc = 0, spins = 0;
-    const bad = new Set();
+    const bad = new Set(), lost = new Map();  // 2.139.0 C (#2386): lost = pages whose text cannot be read (skipped, named at the end)
     const prog = (done, tot) => {
       WKE.prog[sp] = {kind, done, total: tot};
       onProgress?.({done, total: tot});
@@ -519,6 +519,7 @@ async function wkeMigrate(sp, onProgress, opts = {}) {
         const mode = todo.mode || WKE.st[sp]?.mode, gen = todo.gen ?? WKE.st[sp]?.gen;
         kind = mode === 'on' ? 'reenc' : mode; reenc = todo.reenc || 0;
         const left = +todo.left?.pages || 0;
+        for (const x of todo.left?.skipped || []) if (!lost.has(x.id)) lost.set(x.id, x.path);  // 2.139.0 C (#2386)
         if (total === null) total = left;
         total = Math.max(total, left);
         prog(total - left, total);
@@ -558,6 +559,7 @@ async function wkeMigrate(sp, onProgress, opts = {}) {
         if (j?.renamed?.length) WKE.renamed = (WKE.renamed || 0) + j.renamed.length;
       }
       if (kind !== 'reenc' || reenc) await rawFetch('POST', '/api/wiki/e2e/finish', {space: sp});
+      if (lost.size) WKE.lost = await wkeLostNames(sp, lost);  // 2.139.0 C (#2386)
       delete WKE.info[sp]; delete WKE.unread[sp];
       if (kind === 'decrypting') { wkeSet(sp, null); }
       else await wkeInfo(sp, true).catch(() => {});
@@ -569,6 +571,16 @@ async function wkeMigrate(sp, onProgress, opts = {}) {
   })();
   WKE.busy[sp] = run;
   try { return await run; } finally { delete WKE.busy[sp]; }
+}
+// 2.139.0 C (#2386): the names of the skipped pages (a name already encrypted is opened here; one that does not open = its number)
+async function wkeLostNames(sp, lost) {
+  const out = [];
+  for (const [id, p] of lost) {
+    let n = p;
+    if (wkeIs(p)) n = await wkeDec(sp, 'path', p).catch(() => null);
+    out.push(n ? wk_base(String(n)) : tr('Unreadable page {0}', id));
+  }
+  return out;
 }
 async function wkeReenc(sp, onProgress, opts) {
   if (wkeMode(sp) !== 'on') return false;
@@ -759,6 +771,7 @@ async function wkeRun(sp, kind, password) {
     await (kind === 'stop' ? wkeStop(sp, password) : kind === 'start' ? wkeStart(sp) : wkeResume(sp));
     ok = true;
     toast(kind === 'stop' || (kind === 'resume' && !wkeOn(sp)) ? tr('The knowledge pages of this space are readable on the server again') : tr('The knowledge pages of this space are encrypted in the browser'));
+    if (WKE.lost?.length) { toast(trn('{0} page skipped: {1} (not readable)', '{0} pages skipped: {1} (not readable)', WKE.lost.length, WKE.lost.slice(0, 5).join(', ') + (WKE.lost.length > 5 ? ' …' : ''))); WKE.lost = null; }  // 2.139.0 C (#2386)
     if (WKE.renamed) { toast(trn('{0} page got a new name (the name was taken)', '{0} pages got a new name (the names were taken)', WKE.renamed)); WKE.renamed = 0; }
     if (WKE.defused) { toast(trn('{0} name or text began like an encrypted value and got a character in front', '{0} names or texts began like an encrypted value and got a character in front', WKE.defused)); WKE.defused = 0; }  // 2.64.3 E (#1817)
   } catch (x) { if (x?.message) toast(x.message); }

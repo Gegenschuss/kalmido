@@ -22,6 +22,90 @@ Notifications to Slack, Matrix, Telegram and Signal, e-mail on assignments and m
 ### Security
 - Exported CSV cells cannot start a spreadsheet formula; per-person ntfy servers get a time budget per round; a deeply nested ClickUp checklist cell is refused cleanly (review of 2.142.0).
 
+## [2.140.0] - 2026-10-20
+
+Private space: shopping, recipes, journal, budget, habits, devices and birthdays.
+
+### Added
+- Shopping lists: quantity, unit and price per item (shown in the task row and large in the shopping mode, with the
+  sums "still to buy" and "in the cart"); a clear leading quantity like "500 g flour" moves into the quantity field; the
+  shopping mode works offline - ticks and new items wait in the outbox and go out when the connection is back (#2131).
+- Recipes as their own list kind: servings, ingredients with a selection and scaling onto a shopping list (the same
+  open item gets the quantity added instead of a duplicate), a recipe on any day of the meal plan; the meal plan pages
+  through any week and date; API `GET /api/family?days=` up to 62 days, `to-shopping` with `servings` / `preview` (#2132).
+- Journal: a history tab with search, mood filter, Markdown / CSV export and mood statistics over 30 / 90 / 365 days;
+  older days can be edited (#2133).
+- Budget: month comparison per category over 3, 6 or 12 months (actual, plan, difference to the previous month and the
+  average); budget and office bank import read statements with one shared module - CAMT now also in the budget, common
+  bank formats are recognised (#2134).
+- Habits: up to six reminder times per habit (the old single time stays the first) and a clear "3 of 5 this week"
+  progress bar on the phone; API v1 habits carry `remind_times` (#2135).
+- A private device can be taken into the office equipment and back, linked on both sides (jump, update fields,
+  unlink); a link to an office you can no longer reach shows a note instead of an error (#2136).
+- Birthdays from address books: per address book you can switch on that a date or year changed in Kalmido is written
+  back to the contact (CardDAV, If-Match); only that date changes, the rest of the vCard stays byte for byte; changes in
+  the address book meanwhile are never overwritten; read-only books and mirrors show a note instead of the switch (#2137).
+
+### Changed
+- Database: new columns `habits.remind_times`, `habits.reminded_hm`, `contact_srcs.writeback` / `wb_ro` / `wb_books` /
+  `wb_err`, `contact_links.want` and the table `life_device_links` (all additive, 2.139 runs on with them).
+
+## [2.139.1] - 2026-10-20
+
+Package 2.137: moving a whole organisation between servers; the personal office into an organisation.
+
+### Added
+- Organisation move: the import of an organisation export takes over every area, not only lists, tasks, calendars and
+  address books - office (master data, quotations and invoices with their items, payments, series, cash book, trips,
+  meals, contracts, archive, bank data, logbook, the stored PDFs; finalised invoices stay finalised with their numbers),
+  clients, file store with all versions, documents, knowledge pages with pictures and history, tables with formulas and
+  file cells, video sign-offs, team chat, absences and vacation accounts, bookings, filed e-mails, newsletter, customer
+  reports, forms with their answers, playbooks, project notes, notepads, rules, sprints, time entries and timesheets.
+  References between the areas point at the new entries; fields and files are sealed again with the target's key; the
+  preview lists what is taken over; one undo removes it all (#2344).
+- The organisation export also contains the office tables that were missing (bank statements, document templates,
+  vehicles and logbook), the page history of knowledge pages and the projects / categories of receipts (#2344).
+- Freelancers: the owner of a personal office exports it (Office > Settings), and the import of such a file goes into
+  the personal office (#2344).
+- Office: the personal office moves into an existing organisation the person administers, with a preview of what goes
+  along, what stays (company and bank data, number ranges, absences) and who sees it afterwards; finalised invoices keep
+  their numbers and stay locked, a number the organisation already uses stops the move (#1981).
+
+### Security
+- Security fix: organisation import (links of video sign-offs, number ranges, logo copies).
+- Security fix: feeds (database connection) (#2408).
+
+### Fixed
+- Server log: every line is written once again (since 2.138.4 each line showed twice) (#2381).
+- API: removing a member from a team chat room through v1 matches its documented path (#2059).
+- Tests: six suites follow the changes of 2.138.1-2.139.0 (news sections, error report header, draft watermark,
+  contact move copies, media queries, full-text placeholders) (#2405 #2381 #2393 #2378 #2372 #2065).
+
+## [2.139.0] - 2026-10-20
+
+Team chat: threads, voice messages, "Read by"; comments become tasks.
+
+### Added
+- Team chat threads: "Reply in thread" in a message's menu; the main conversation shows a line with the number of
+  answers, who answered and a dot for unread ones; the thread opens beside the chat (on phones as its own view).
+  Unread counts and notifications cover only threads you take part in (you wrote, answered or were mentioned);
+  agents read and answer with `thread` / `thread_of` (#2127).
+- "Read by" under your last message that was read (in direct chats "Read"), tap for the list of who read it and who
+  not yet; switch it off under Settings > Notifications > Send read receipts - then nobody sees yours and you see
+  nobody's (#2129).
+- Voice messages: the microphone next to the paper clip records up to 5 minutes, you can listen before sending; stored
+  like other chat files (quota, virus scan, encryption at rest), with its own player (seek, remaining time, 1x / 1.5x /
+  2x). Kalmido does not transcribe them; agents see them as audio attachments with `voice` and `duration_ms` (#2128).
+- Every comment of a task can be saved as a task (own, other people's and agents' comments), with a back link, its
+  files and a "Saved" mark (#2130).
+
+### Fixed
+- Pages: a page whose key was missing is found by its text again once the key is restored; its message says how to
+  open it again or that it can only be deleted; an import or the browser lock skips such a page and names it instead of
+  stopping (#2386).
+- Proposal cards: the app thumb instead of an emoji on accept / reject, larger check boxes and the whole row as the
+  target; the "Your wish" field of the agent text dialog uses the full width (#2401).
+
 ## [2.138.5] - 2026-10-20
 
 ### Fixed
@@ -198,7 +282,6 @@ sort of the basket. Kalmido calls no language model for this; the connected agen
   (suggested: weekdays 7:30) like the button, you find the proposal card in the morning; an empty basket sends nothing (#2126).
 - Agent API / MCP: new proposal kinds `office_text`, `doc_summary`, `report`, `sheet_tasks`; `job_request` of a planned sort
   carries `scheduled: true`; `GET /api/v1/agent/schedules` shows the plan's `action`.
-
 ## [2.126.0] - 2026-10-20
 
 Security release: fixes from the internal audit (office, documents, agents, sync, offline). Please update.

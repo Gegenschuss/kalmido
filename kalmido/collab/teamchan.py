@@ -400,15 +400,18 @@ def tcx_agents_out(c, rid, uid):
 
 # ---------------------------------------------------------------- files
 def tcx_input(b):
-    """(body dict, files) of a team chat message: JSON, or a multipart form (body, task_id, reply_to, client_id, file...)."""
+    """(body dict, files) of a team chat message: JSON, or a multipart form (body, task_id, reply_to, client_id, file...;
+    2.139.0 B (#2128): voice=1 + duration_ms = the one file is a voice message, kept in g.tvc for tcx_save_files)."""
+    g.tvc = None
     if not (request.files or request.form) or (b and not request.form):
         return b, []
     out = {k: request.form.get(k) for k in request.form}
-    unknown = sorted(k for k in [*request.form, *request.files] if k not in ("body", "task_id", "reply_to", "client_id", "file"))
+    unknown = sorted(k for k in [*request.form, *request.files]
+                     if k not in ("body", "task_id", "reply_to", "client_id", "file", "voice", "duration_ms", "thread_of"))  # 2.139.0 A (#2127)
     if unknown:
         from ..personal.timetrack import UnknownFields
         raise UnknownFields(unknown)
-    for k in ("task_id", "reply_to"):
+    for k in ("task_id", "reply_to", "thread_of"):
         v = out.get(k)
         if v in (None, ""):
             out.pop(k, None)
@@ -417,7 +420,46 @@ def tcx_input(b):
     files = [f for f in request.files.getlist("file") if f and f.filename]
     if len(files) > TCX_FILES_MAX:
         raise BadInput(tr("At most {0} files per message", TCX_FILES_MAX))
+    voice, ms = out.pop("voice", None), out.pop("duration_ms", None)
+    if voice not in (None, "", "0"):
+        if voice != "1" or len(files) != 1:
+            raise BadInput(tr("A voice message is exactly one audio file"))
+        g.tvc = {"ms": tvc_duration(ms)}
     return out, files
+
+
+# ---------------------------------------------------------------- 2.139.0 B (#2128): voice messages
+# Recorded in the browser (static/js/voice.js, MediaRecorder: audio/mp4 where it plays everywhere, else webm / ogg) and stored
+# as a team chat file with voice = 1. Kalmido never converts or transcribes them; the server only checks the content is audio.
+TVC_MAX_MS = 5 * 60 * 1000  # the app stops a recording after 5 minutes
+TVC_EXT = {"audio/mp4": "m4a", "audio/webm": "webm", "audio/ogg": "ogg", "audio/mpeg": "mp3"}
+
+
+def tvc_duration(ms):
+    """The length the browser measured as a plausible int (0..TVC_MAX_MS plus a second of slack), None when not given / not a number."""
+    try:
+        v = int(str(ms).strip())
+    except (TypeError, ValueError):
+        return None
+    return max(0, min(v, TVC_MAX_MS + 1000))
+
+
+def tvc_audio_kind(path):
+    """The audio type the first bytes of a (still plain) file show: audio/mp4 | audio/webm | audio/ogg | audio/mpeg, else None."""
+    try:
+        with open(path, "rb") as fh:
+            h = fh.read(64)
+    except OSError:
+        return None
+    if h[4:8] == b"ftyp" and h[8:12] not in (b"heic", b"heix", b"hevc", b"hevx", b"heim", b"heis", b"mif1", b"msf1", b"avif", b"avis"):
+        return "audio/mp4"  # M4A / isom / mp42 / iso5 ... (Safari and Chrome record AAC in an mp4 box)
+    if h[:4] == b"\x1a\x45\xdf\xa3":
+        return "audio/webm"  # EBML (webm / matroska, Opus from Firefox and Chrome)
+    if h[:4] == b"OggS":
+        return "audio/ogg"
+    if h[:3] == b"ID3" or (len(h) > 1 and h[0] == 0xFF and h[1] & 0xE0 == 0xE0):
+        return "audio/mpeg"
+    return None
 
 
 def tcx_files_refused(c, r):
@@ -464,6 +506,7 @@ def tcx_save_files(c, r, m, files, saved):
         raise
     sid, ts = tcx_space(c, r, uid), iso(now_utc())
     oid = sid if sid and sid > 0 else None
+    voice = g.get("tvc")  # 2.139.0 B (#2128): {ms} when tcx_input took a voice message (exactly one file)
     for f in files:
         name = safe_name(f.filename)
         unexec = agent and unexec_name(name) != name  # no executable endings from agents (as in the agent chat)
@@ -484,15 +527,25 @@ def tcx_save_files(c, r, m, files, saved):
             return tr("{0}: the file is empty and was not uploaded", name)
         mime = "text/plain" if unexec else (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
+        kind = None
+        if voice:  # 2.139.0 B (#2128): a voice message must be audio by its content; the name ending follows the content
+            kind = tvc_audio_kind(full)
+            if not kind:
+                return tr("{0}: a voice message must be an audio recording", name)
+            mime, name = kind, safe_name(f"{os.path.splitext(name)[0] or 'voice'}.{TVC_EXT[kind]}")
         try:  # virus scan, type from the content, photo metadata removed
             size, mime, info = up_check_path(c, full, name, mime, uid, oid, "tchat")
         except UploadRefused as e:
             return str(e)
+        if kind and mime in ("application/octet-stream", "video/mp4"):  # the picture / PDF check knows no audio: keep it
+            mime = kind
         oc_seal_path(c, sid, full, fresh=True)  # at rest with the key of the conversation's space (after the checks)
         # 2.113.1 (#2059): a list channel's file row has no organisation (like its room): the list's space is looked up when
         # it moves (admin/orgcrypt_cli.py SPACE_SQL), so the file follows the list into / out of an organisation
-        fid = insert_id(c, "INSERT INTO tchat_files(message_id,room_id,org_id,user_id,name,mime,size,path,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
-                        (m["id"], r["id"], None if r["kind"] == "list" else oid, uid, name, mime, size, rel, ts))
+        fid = insert_id(c, "INSERT INTO tchat_files(message_id,room_id,org_id,user_id,name,mime,size,path,created_at,voice,duration_ms) "
+                           "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                        (m["id"], r["id"], None if r["kind"] == "list" else oid, uid, name, mime, size, rel, ts,
+                         1 if kind else 0, voice["ms"] if kind else None))
         up_after_store(c, "tchat", fid, oid, info)
     return None
 
@@ -513,15 +566,17 @@ def tcx_store(c, r, m, files):
 
 
 def tcx_files_of(c, mids, api=None):
-    """{message id: [{id, name, mime, size, url, up?}]} of team chat messages (api: the REST address, default: from the request)."""
+    """{message id: [{id, name, mime, size, url, voice, duration_ms, up?}]} of team chat messages (api: the REST address, default:
+    from the request); 2.139.0 B (#2128): voice = a voice message recorded in the app, duration_ms its length (null = unknown)."""
     out, mids = {}, [x for x in mids if x]
     if not mids:
         return out
     if api is None:
         api = request.path.startswith("/api/v1/")
-    for f in c.execute(f"SELECT id, message_id, name, mime, size FROM tchat_files WHERE message_id IN ({','.join('?' * len(mids))}) ORDER BY id", mids):
+    for f in c.execute(f"SELECT id, message_id, name, mime, size, voice, duration_ms FROM tchat_files WHERE message_id IN ({','.join('?' * len(mids))}) ORDER BY id", mids):
         out.setdefault(f["message_id"], []).append({"id": f["id"], "name": f["name"], "mime": f["mime"], "size": f["size"],
-                                                    "url": f"/api/v1/team/files/{f['id']}" if api else f"/api/team/files/{f['id']}"})
+                                                    "url": f"/api/v1/team/files/{f['id']}" if api else f"/api/team/files/{f['id']}",
+                                                    "voice": bool(f["voice"]), "duration_ms": f["duration_ms"]})
     if out:
         from ..files.scan import sc_up
         sc_up(c, "tchat", [d for v in out.values() for d in v])
@@ -664,11 +719,14 @@ def v1_tcx_member_add(rid):
     return jsonify(v1_call(tcx_member_add, rid, body=b))
 
 
-@app.delete("/api/v1/team/rooms/<int:rid>/members/<int:uid>")
+# 2.139.1 (#2059): the second id as <uid> like the other v1 member routes, so the route matches its documented path
+@app.delete("/api/v1/team/rooms/<int:rid>/members/<uid>")
 @v1_view
 def v1_tcx_member_del(rid, uid):
     v1_args(())
-    v1_call(tcx_member_del, rid, uid, body={})
+    if not uid.isdigit():
+        return err(tr("unknown"), 404)
+    v1_call(tcx_member_del, rid, int(uid), body={})
     return Response(status=204)
 
 

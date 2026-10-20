@@ -22,11 +22,12 @@ from ..core.access import Denied, my_inbox, time_all
 
 # 2.99.1 A (#1959): frames only of the two video players (the embed URL is built from a checked id: videos/review.py vdr_embed),
 # media over https (a video sign-off's direct file link); no script of theirs is loaded (script-src stays 'self')
+# 2.139.0 B (#2128): media-src blob: = the preview of a voice message before it is sent; microphone=(self) = recording in the app
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
        "img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; "
-       "frame-src 'self' https://player.vimeo.com https://www.youtube-nocookie.com; media-src 'self' https:; "
+       "frame-src 'self' https://player.vimeo.com https://www.youtube-nocookie.com; media-src 'self' https: blob:; "
        "frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'")
-PERMISSIONS_POLICY = ("camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), "
+PERMISSIONS_POLICY = ("camera=(), microphone=(self), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), "
                       "midi=(), hid=(), magnetometer=(), gyroscope=(), accelerometer=(), display-capture=(), "
                       "browsing-topics=()")
 

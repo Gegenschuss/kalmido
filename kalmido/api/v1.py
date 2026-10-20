@@ -32,7 +32,7 @@ from ..tasks.roadmap import list_shift, roadmap_build
 from ..tasks.lifecycle import task_complete, task_reopen, trash_task
 from ..collab.comments import att_dicts, comment_create, comment_dict, comment_plain, user_names
 from ..collab.news import bell_custom_clean, bell_custom_of, BELL_MODES, notif_matrix, notif_update
-from ..personal.habits import habit_log, need_habit
+from ..personal.habits import habit_log, habit_times, need_habit
 from ..personal.timetrack import (
     BadInput, clean_day_hours, entry_out, field_alias, reject_unknown, time_create, time_rounding, time_rows,
     UnknownFields, vis_ids,
@@ -1344,6 +1344,7 @@ def v1_habit(c, h):
     logs = {r["day"]: r["count"] for r in c.execute("SELECT day, count FROM habit_logs WHERE habit_id=? AND day>=? AND count>0",
                                                     (h["id"], since))}
     return {"id": h["id"], "name": h["name"], "color": h["color"], "goal": h["goal"], "days": h["days"], "per_week": h["per_week"],
+            "remind_at": h["remind_at"], "remind_times": habit_times(h),  # 2.140.0 C (#2135)
             "archived": bool(h["archived"]), "today": logs.get(local_now().date().isoformat(), 0), "last_30_days": logs}
 
 

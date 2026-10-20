@@ -269,6 +269,9 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
         rvw_on_move(c, tid, cur)
     if f and "section_id" in f and not cur["parent_id"] and is_shop(c, lid):  # 2.19.0: the shop area of this item
         shop_remember(c, lid, f.get("title") or cur["title"], f["section_id"])
+    if f and ("due" in f or "fam" in f) and cur["fam"]:  # 2.140.0 D (#2137): a birthday's date / year back into its address book
+        from ..family.carddav import cdv_wb_note
+        cdv_wb_note(c, tid, cur, b)
     rul_fire(c, tid, rb)  # 2.71.0 A (#1457)
     return None
 

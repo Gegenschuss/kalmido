@@ -245,6 +245,9 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.140.0 C (#2133): reading, searching, exporting and the mood statistics of the private journal stay with the person -- the "
+     "journal never reaches an agent (API v1 only writes an entry with the scope private)",
+     ("=GET /api/life/journal", "=GET /api/life/journal/stats", "=GET /api/life/journal/export")),
     ("2.124.0 C (#2113): sharing one table stays with people -- who may change it through its workspace decides who else sees it; "
      "an agent never shares (the routes answer 403 to agents) and sees a table shared with it in GET /api/v1/sheets",
      ("* /api/sheets/{}/shares",)),
@@ -423,6 +426,11 @@ APP_ONLY = [
      ("* /api/folders/agents", "* /api/folders/public-links", "POST /api/folders/owner")),
     ("2.22.0 (#663): the Karakeep connection: its API key is entered by the person; the sync is in the API",
      ("=GET /api/life/karakeep", "=PUT /api/life/karakeep", "=DELETE /api/life/karakeep", "GET /api/life/karakeep/lists")),
+    # 2.140.0 B (#2136): a private device taken over into the office equipment and back, with a link -- the office side never
+    # reaches an agent (office_gate) and the API v1 has devices but no office equipment
+    ("2.140.0 (#2136): taking a private device over into the office equipment (and back) and its link are a person's steps: "
+     "office routes never reach agents, the API v1 knows devices (POST /life/devices) but no office equipment",
+     ("* /api/life/devices/", "* /api/life/device-links/")),
     ("2.23.0 (#463): a person's hours per week (their own setting / an admin's) and a QR code image for the screen",
      ("PUT /api/workload/capacity/", "POST /api/qr")),
     ("2.28.0 (#935): a person's organisations (workspaces) and their admins' member management: people only (agents 403)",

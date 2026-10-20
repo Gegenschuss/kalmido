@@ -25,7 +25,7 @@ const LD_MODS = {
   stats: ['stats'],
   calendar: ['calview', 'caldrag', 'apptbook'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings
   docs: ['docs', 'paperless', 'receipts'],
-  life: ['life'],
+  life: ['life', 'devlink'],  // 2.140.0 B (#2136): devlink.js = a device <-> office equipment
   integrations: ['integrations'],
   playbook: ['playbook'],
   timeline: ['timeline', 'roadmap'],
@@ -42,6 +42,7 @@ const LD_MODS = {
   polls: ['polls'],  // 2.102.0 C (#2208): scheduling polls (#1953), on the first "Find a date"
   formq: ['formq'],  // 2.102.0 C (#2208): questionnaires (#1954), with the forms dialog of a list
   ofundo: ['office_undo'],  // 2.111.0 A (#2233): undo of the office editors, clients and tables (office, sheets and the client dialog load it)
+  voice: ['voice'],  // 2.139.0 B (#2128): voice messages of the team chat (the composer's microphone, the audio player)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
@@ -77,7 +78,8 @@ const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_ti
   tlNdBtn: ['timeline'], tlNdOn: ['timeline'],
   viewFeeds: ['feeds', 1], rss_homeCard: ['feeds'],  // 2.85.0 B (#1162)
   viewBookmarks: ['bookmarks', 1],  // 2.97.0 A (#1950)
-  viewSheets: ['sheets', 1]};  // 2.89.0 (#1916)
+  viewSheets: ['sheets', 1],  // 2.89.0 (#1916)
+  tvc_micHtml: ['voice'], tvc_playerHtml: ['voice']};  // 2.139.0 B (#2128): the team chat's composer / an audio file load voice.js
 // 2.102.0 C (#2208) scheduling polls (polls.js, module polls): the switch and the start points' clicks stay at start (moved
 // here): "Find a date" in the calendar bar and in a task (calevents.js), a client's "…" menu (tpo_forClient, a stand-in)
 const tpo_on = () => feat('events') && S.me?.kind !== 'agent';

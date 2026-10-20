@@ -11,14 +11,13 @@ import hashlib
 import hmac
 import re
 import unicodedata
-import xml.etree.ElementTree as ET
 from collections import Counter
 from datetime import date, timedelta
-from decimal import Decimal
 
 from flask import jsonify, request
 
 from ..core.config import SECRET_KEY, app
+from ..core import csvimport as cx  # 2.140.0 B (#2134): the shared statement reader
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import tr
@@ -65,93 +64,16 @@ def bnk_hash(oid, day, amount, counterpart, purpose, ref):
 
 
 # ---------------------------------------------------------------- reading statements
-def bnk_is_camt(text):
-    head = text[:4000]
-    return "<Document" in head and "camt.05" in head
-
-
-def _local(tag):
-    return tag.rsplit("}", 1)[-1] if isinstance(tag, str) else ""
-
-
-def _kids(el, name):
-    return [x for x in el if _local(x.tag) == name]
-
-
-def _kid(el, *path):
-    for name in path:
-        if el is None:
-            return None
-        el = next((x for x in el if _local(x.tag) == name), None)
-    return el
-
-
-def _txt(el, *path):
-    el = _kid(el, *path)
-    return (el.text or "").strip() if el is not None and el.text else ""
-
-
-def _camt_day(el):
-    if el is None:
-        return None
-    v = _txt(el, "Dt") or _txt(el, "DtTm")[:10]
-    try:
-        return date.fromisoformat(v[:10]).isoformat() if v else None
-    except ValueError:
-        return None
+# 2.140.0 B (#2134): CSV and CAMT are read by core/csvimport.py (shared with the household budget); the names stay
+# (cfbank.py reads the balances with the CAMT helpers)
+bnk_is_camt = cx.camt_is
+_local, _kids, _kid, _txt = cx.camt_local, cx.camt_kids, cx.camt_kid, cx.camt_txt
 
 
 def bnk_camt(text):
-    """CAMT.052 / .053 XML -> [{day, amount (signed Decimal), currency, counterpart, purpose, iban, ref, error}]. Documents
-    with a DOCTYPE or an ENTITY are refused before parsing (no entity expansion, no external references)."""
-    if re.search(r"<!\s*(DOCTYPE|ENTITY)", text, re.I):
-        raise BadInput(tr("The file contains a DOCTYPE or an ENTITY and is not read"))
-    try:
-        # the client sends text (UTF-8, cp1252 fallback): a declared encoding (ISO-8859-1 ...) would make expat decode twice
-        root = ET.fromstring(re.sub(r"^\s*<\?xml[^>]*\?>", "", text.lstrip("﻿")).encode("utf-8"))
-    except (ET.ParseError, ValueError):
-        raise BadInput(tr("The file cannot be read as CAMT")) from None
-    out = []
-    for ntry in root.iter():
-        if _local(ntry.tag) != "Ntry":
-            continue
-        amt_el = _kid(ntry, "Amt")
-        row = {"day": _camt_day(_kid(ntry, "BookgDt")) or _camt_day(_kid(ntry, "ValDt")), "amount": None,
-               "currency": ((amt_el.get("Ccy") if amt_el is not None else "") or "").upper()[:3], "counterpart": "", "purpose": "",
-               "iban": None, "ref": _clean(_txt(ntry, "AcctSvcrRef"), 120) or None, "error": None}
-        credit = _txt(ntry, "CdtDbtInd") == "CRDT"
-        try:
-            a = Decimal((amt_el.text or "").strip()) if amt_el is not None else None
-        except (ArithmeticError, ValueError):
-            a = None
-        if a is not None and a.is_finite() and 0 < a <= Decimal("100000000") and money(a) != 0:  # 0.004 -> 0.00 = unreadable
-            row["amount"] = money(a if credit else -a)
-        tx = _kid(ntry, "NtryDtls", "TxDtls")
-        if tx is not None:
-            purpose = [(x.text or "").strip() for x in _kids(_kid(tx, "RmtInf") if _kid(tx, "RmtInf") is not None else tx, "Ustrd")]
-            row["purpose"] = _clean(" ".join(p for p in purpose if p))
-            pts = _kid(tx, "RltdPties")
-            if pts is not None:
-                side, acct = ("Dbtr", "DbtrAcct") if credit else ("Cdtr", "CdtrAcct")
-                p = _kid(pts, side)
-                if p is not None:
-                    row["counterpart"] = _clean(_txt(p, "Nm") or _txt(p, "Pty", "Nm"), 200)
-                iban = _txt(pts, acct, "Id", "IBAN").replace(" ", "").upper()
-                row["iban"] = iban if IBAN_RE.match(iban) else None
-            if not row["ref"]:
-                row["ref"] = _clean(_txt(tx, "Refs", "AcctSvcrRef") or _txt(tx, "Refs", "EndToEndId"), 120) or None
-            if row["ref"] == "NOTPROVIDED":
-                row["ref"] = None
-        if not row["purpose"]:
-            row["purpose"] = _clean(_txt(ntry, "AddtlNtryInf"))
-        if row["day"] is None:
-            row["error"] = tr("The date cannot be read")
-        elif row["amount"] is None:
-            row["error"] = tr("The amount cannot be read")
-        out.append(row)
-    if not out:
-        raise BadInput(tr("The file contains no bookings"))
-    return out
+    """CAMT.052 / .053 XML -> [{day, amount (signed Decimal), currency, counterpart, purpose, iban, ref, error}]
+    (core/csvimport.camt_rows: DOCTYPE / ENTITY refused before parsing)."""
+    return cx.camt_rows(text, BNK_TEXT_MAX)
 
 
 def _iban_col(header):
@@ -159,16 +81,15 @@ def _iban_col(header):
 
 
 def bnk_csv(text, mapping):
-    """CSV with a column mapping (the household budget's helpers) -> rows like bnk_camt."""
-    from ..life.budget import BUD_CSV_ROWS, _mapping, _row_of, bud_csv_table
-    _d, header, rows = bud_csv_table(text)
-    m = _mapping(mapping, len(header))
-    if len(rows) > BUD_CSV_ROWS:
-        raise BadInput(tr("At most {0} rows per import", BUD_CSV_ROWS))
+    """CSV with a column mapping (core/csvimport.py, like the household budget) -> rows like bnk_camt."""
+    _d, header, rows = cx.csv_table(text)
+    m = cx.csv_mapping(mapping, len(header))
+    if len(rows) > cx.CSV_ROWS:
+        raise BadInput(tr("At most {0} rows per import", cx.CSV_ROWS))
     ic = _iban_col(header)
     out = []
     for r in rows:
-        x = _row_of(r, m)
+        x = cx.csv_row(r, m)
         amt = None
         if x["amount"] is not None:
             amt = money(dec(x["amount"]))
@@ -188,7 +109,6 @@ def _hashes(c, oid):
 def bnk_parse(c, oid, b):
     """{text, filename?, mapping?} -> (fmt, rows, preview_of_columns|None). Rows carry n, error and dup (an equal booking is
     there already: two equal rows of one file need two existing ones)."""
-    from ..life.budget import _guess, bud_csv_table
     text = b.get("text")
     if not isinstance(text, str) or not text.strip():
         raise BadInput(tr("The file is empty"))
@@ -202,8 +122,8 @@ def bnk_parse(c, oid, b):
     else:
         fmt = "csv"
         if b.get("mapping") is None:
-            d, header, rows = bud_csv_table(text)
-            return fmt, None, {"columns": header, "sample": rows[:8], "delimiter": d, "guess": _guess(header, rows)}
+            d, header, rows = cx.csv_table(text)
+            return fmt, None, {"columns": header, "sample": rows[:8], "delimiter": d, "guess": cx.csv_guess(header, rows)}
         rows = bnk_csv(text, b["mapping"])
     have = _hashes(c, oid)
     for n, r in enumerate(rows, 1):
@@ -213,9 +133,7 @@ def bnk_parse(c, oid, b):
             r["error"] = tr("Other currency than the office ({0})", home)
         if r["error"] is None:
             r["hash"] = bnk_hash(oid, r["day"], r["amount"], r["counterpart"], r["purpose"], r["ref"])
-            if have.get(r["hash"]):
-                have[r["hash"]] -= 1
-                r["dup"] = True
+            r["dup"] = cx.csv_dup_take(have, r["hash"])
     return fmt, rows, None
 
 
