@@ -420,7 +420,7 @@ ROUTES = {
     "GET /api/office/datev/accounts": "office",  # 2.120.0 C (#2090): input side accounts, admin only (p2120_c_api_test.py)
     # 2.90.0 A (#1921): bookkeeping light, office admins (p290_a_api_test.py)
     "GET /api/office/books": "office", "GET /api/office/books/euer": "office", "GET /api/office/books/ustva": "office",
-    "GET /api/office/books/euer.csv": "office", "GET /api/office/books/euer.pdf": "office",
+    "GET /api/office/books/euer.csv": "office", "GET /api/office/books/euer.pdf": "office", "GET /api/office/books/export": "office",  # 2.147.0 (#2461): neutral export, admin only (p2147_a_api_test.py)
     # ---- office (C, 2.36.1 #1021): quotations of an organisation (10)
     "GET /api/office/docs": "office", "POST /api/office/docs": "office", "GET /api/office/docs/{}": "office",
     "PATCH /api/office/docs/{}": "office", "DELETE /api/office/docs/{}": "office", "PUT /api/office/docs/{}/items": "office",

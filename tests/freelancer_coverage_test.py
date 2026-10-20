@@ -766,7 +766,7 @@ ROUTES = {
     "GET /api/office/agreements": "office", "GET /api/office/agreements/{}": "office",
     "GET /api/office/bank/imports": "office", "GET /api/office/bank/tx": "office",
     "GET /api/office/bank/tx/{}/candidates": "office", "GET /api/office/books": "office",
-    "GET /api/office/books/euer": "office", "GET /api/office/books/euer.csv": "office",
+    "GET /api/office/books/euer": "office", "GET /api/office/books/euer.csv": "office", "GET /api/office/books/export": "office",  # 2.147.0 (#2461)
     "GET /api/office/books/euer.pdf": "office", "GET /api/office/books/ustva": "office",
     "GET /api/office/equipment/policies": "office", "GET /api/office/equipment/receipts": "office",
     "GET /api/office/equipment/receipts/{}": "office", "GET /api/office/equipment/value": "office",
