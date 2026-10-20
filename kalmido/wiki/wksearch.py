@@ -35,12 +35,12 @@ def wks_index(c, pid, oid, owner, text, at):
 
 def wks_catch_up(c, w, a, limit=WKS_CATCH_UP):
     """Index the pages of a space (condition w / args a on wiki_pages p) whose index is missing or older than the page."""
-    from .wkhist import wkh_body
+    from .wkhist import wsb_body_or
     rows = c.execute(f"SELECT p.id, p.org_id, p.owner_id, p.body, p.updated_at FROM wiki_pages p WHERE p.deleted_at IS NULL AND {w} "
                      "AND left(p.path, 5)<>'e2e1:' AND NOT EXISTS (SELECT 1 FROM wiki_words x WHERE x.page_id=p.id AND x.h='u:' || p.updated_at) "
                      f"ORDER BY p.id LIMIT {int(limit)}", a).fetchall()
     for r in rows:
-        wks_index(c, r["id"], r["org_id"], r["owner_id"], wkh_body(c, r), r["updated_at"])
+        wks_index(c, r["id"], r["org_id"], r["owner_id"], wsb_body_or(c, r), r["updated_at"])  # 2.126.2 B (#2358): unreadable = title only
     return len(rows)
 
 
@@ -49,7 +49,7 @@ def wks_search(c, uid, spaces, q, limit=WKS_LIMIT, offset=0):
     = the pages changed last."""
     from ..docs.rules import fold
     from ..docs.store import index_words, query_hashes
-    from .wkhist import wkh_body
+    from .wkhist import wsb_body_or
     from .wikie2e import wke_mode
     words = index_words(q)[:8]
     hits, did = [], 0
@@ -81,7 +81,7 @@ def wks_search(c, uid, spaces, q, limit=WKS_LIMIT, offset=0):
             for i in range(0, len(ids), 500):
                 part = ids[i:i + 500]
                 for r in c.execute(f"SELECT id, org_id, owner_id, body FROM wiki_pages WHERE id IN ({','.join('?' * len(part))})", part):
-                    have[r["id"]] = index_words(wkh_body(c, r))
+                    have[r["id"]] = index_words(wsb_body_or(c, r))  # 2.126.2 B (#2358)
         for r in cand:
             pid, t = r["id"], titles[r["id"]]
             ok, nt, nb = True, 0, 0

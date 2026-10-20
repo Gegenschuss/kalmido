@@ -34,7 +34,8 @@ function wsh_dlg(p, folder) {
   /** @type {any[]|null} */ let users = null;
   const show = m => { const x = wsh$('#wsh-err', md); if (x) { x.textContent = m || ''; x.hidden = !m; } };
   const via = s => s.direct ? '' : `<small class="muted">${esc(tr('via folder “{0}”', wsh_baseName(s.path)))}</small>`;
-  const exp = s => s.expired ? `<span class="calerr">${tr('Expired')}</span>` : s.expires_at ? esc(tr('valid until {0}', fmtDate(wsh_day(s.expires_at)))) : '';
+  // 2.126.2 B (#2358): a public link whose maker left the organisation does not work any more -- shown like an expired one
+  const exp = s => s.ended ? `<span class="calerr">${tr('Ended')}</span> · ${esc(tr('Its creator is no longer in the organisation'))}` : s.expired ? `<span class="calerr">${tr('Expired')}</span>` : s.expires_at ? esc(tr('valid until {0}', fmtDate(wsh_day(s.expires_at)))) : '';
   const draw = () => {
     const box = wsh$('#wsh-body', md); if (!box || !j) return;
     if (j.locked) { box.innerHTML = `<div class="shint keep" role="note">${ic('lock', 's')} ${esc(tr('This space is encrypted in the browser: the server cannot show its pages to others, so they cannot be shared.'))}</div>`; return; }
@@ -44,11 +45,11 @@ function wsh_dlg(p, folder) {
       <div class="row shmail">${cand.length ? `<select id="wsh-user" aria-label="${esc(tr('Person'))}"><option value="">${tr('Choose a person…')}</option>${cand.map(u => `<option value="${u.id}">${esc(u.display_name || u.username || '?')}</option>`).join('')}</select>` : ''}<input id="wsh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-wsh="person">${ic('plus', 's')} ${tr('Add')}</button></div>`
       : `<div class="shint keep">${esc(tr('Every member of the organisation reads these pages already. For people outside it, use a public link.'))}</div>`;
     const pub = !j.enabled ? `<div class="shint keep">${esc(tr('Public links are turned off on this server'))}</div>`
-      : `${links.map(s => `<div class="wshlink"><div class="row icalrow"><input readonly value="${esc(s.url)}" data-wsh-url="${s.id}" aria-label="${esc(tr('Public link'))}"><button type="button" class="btn sm pri" data-wsh="copy" data-id="${s.id}">${ic('copy', 's')} ${tr('Copy')}</button></div>
+      : `${links.map(s => `<div class="wshlink"><div class="row icalrow"><input readonly value="${esc(s.url)}" data-wsh-url="${s.id}" aria-label="${esc(tr('Public link'))}"><button type="button" class="btn sm pri" data-wsh="copy" data-id="${s.id}"${s.ended ? ' disabled' : ''}>${ic('copy', 's')} ${tr('Copy')}</button></div>
           <div class="shint">${via(s)}${exp(s) ? exp(s) + ' · ' : ''}${esc(trn('opened {0} time', 'opened {0} times', s.views))}${s.last_used_at ? ' · ' + esc(tr('last {0}', relTime(s.last_used_at))) : ''}${s.direct ? ` <button type="button" class="btn sm danger" data-wsh="end" data-id="${s.id}">${tr('Turn off')}</button>` : ''}</div></div>`).join('')}
         ${links.length ? '' : `<div class="shint keep">${esc(tr('People without an account can read it through a secret link: only what you share here, nothing else of your pages.'))}</div>`}
         <div class="row"><label for="wsh-exp">${tr('Valid until')}</label>${dateIn('wsh-exp', '', {min: today(), label: tr('Valid until'), empty: tr('no expiry')})}</div>
-        <div class="row"><button type="button" class="btn sm${links.some(s => s.direct) ? '' : ' pri'}" data-wsh="link">${ic('link', 's')} ${tr(links.some(s => s.direct) ? N_('Another public link') : N_('Create public link'))}</button></div>`;
+        <div class="row"><button type="button" class="btn sm${links.some(s => s.direct && !s.ended) ? '' : ' pri'}" data-wsh="link">${ic('link', 's')} ${tr(links.some(s => s.direct && !s.ended) ? N_('Another public link') : N_('Create public link'))}</button></div>`;
     box.innerHTML = `<h4 id="wsh-ppl-h">${tr('People')}</h4>${people}<h4>${tr('Public link')}</h4><div id="wsh-pub">${pub}</div>`;
   };
   const load = async () => {
@@ -102,9 +103,16 @@ async function wsh_loadMine() {
   WSH.busy = true;
   try { WSH.mine = (await rawFetch('GET', '/api/wiki/shared')).pages || []; } catch { WSH.mine = WSH.mine || []; } finally { WSH.v = S.v; WSH.busy = false; }
   if (S.route.mod === 'wiki' && WSH.mine.length) viewSafeRender();
+  wsh_focus();
+}
+// 2.126.2 B (#2355): the News item "… shared … with you" (collab.js) opens the pages view on "Shared with me"
+function wsh_focus() {
+  if (!S.wshFocus || S.route.mod !== 'wiki' || WSH.busy || WSH.v !== S.v) return;
+  S.wshFocus = false;
+  requestAnimationFrame(() => { const h = document.getElementById('wsh-side-h'); if (h) { h.scrollIntoView({block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'}); h.closest('section')?.querySelector('a')?.focus({preventScroll: true}); } else toast(tr('Nothing is shared with you at the moment.')); });
 }
 function wsh_sideHtml() {
-  if (WSH.v !== S.v) wsh_loadMine();
+  if (WSH.v !== S.v) wsh_loadMine(); else if (S.wshFocus) wsh_focus();
   const pg = WSH.mine || []; if (!pg.length) return '';
   return `<section class="wshside" aria-labelledby="wsh-side-h"><h4 id="wsh-side-h">${ic('users', 's')}${tr('Shared with me')}</h4><ul class="wktree">${pg.map(x => `<li><a href="#" class="wkitem" data-wsh-open="${x.id}">${ic('note', 's')}<span>${esc(x.path)}</span><small class="muted">${esc(x.owner_name)}</small></a></li>`).join('')}</ul></section>`;
 }

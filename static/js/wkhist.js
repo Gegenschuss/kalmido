@@ -95,7 +95,7 @@ function wks_html(sp, q, shown) {
 }
 function wks_inner(s, shown) {
   const ids = new Set((shown || []).map(p => p.id)), ps = s.pages.filter(p => !ids.has(p.id));
-  if (!ps.length && !s.more) return '';
+  if (!ps.length) return '';  // 2.126.2 A (#2363): only name hits = no "Found in the text" section, no "Show more"
   return `<h4 class="muted">${ic('search', 's')}${esc(tr('Found in the text'))}</h4><ul class="wktree">${ps.map(p => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span></a></li>`).join('')}</ul>
     ${s.more ? `<button type="button" class="btn sm wksmore" data-wks="more" ${s.busy ? 'disabled' : ''}>${esc(tr('Show more'))}</button>` : ''}`;
 }

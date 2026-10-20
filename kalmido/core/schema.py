@@ -2741,6 +2741,13 @@ MIGRATIONS = [
     # one); nullable, 2.125 and older never set or read it, the index only covers rows that carry one
     ("tasks", "client_ref", "ALTER TABLE tasks ADD COLUMN client_ref TEXT"),
     ("tasks", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS tasks_client_ref ON tasks(created_by, client_ref) WHERE client_ref IS NOT NULL"),
+    # 2.126.1 B (#2126): what a planned agent job does when due: chat (the event scheduled_job, every plan so far) | triage (a
+    # proposal request "Sort the basket" for the plan's person, agents/schedules.py). Older versions never read it (they send
+    # scheduled_job for a triage plan too, with its prefilled prompt)
+    ("agent_schedules", "action", "ALTER TABLE agent_schedules ADD COLUMN action TEXT NOT NULL DEFAULT 'chat'"),
+    # 2.126.1 A (#2123): a document's summary, taken over by a person from an agent's draft (agents/asstprop.py); sealed with
+    # the workspace key like the recognised text. Older versions never read it
+    ("doc_meta", "summary", "ALTER TABLE doc_meta ADD COLUMN summary TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

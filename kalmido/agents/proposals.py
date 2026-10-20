@@ -60,6 +60,8 @@ PROP_KINDS += ("import",)  # 2.68.0 (#1839): the agent proposes old data for the
 PROP_KINDS += ("merge",)  # 2.70.0 B (#1357): duplicate contacts merged (agents/dupprop.py), on request
 PROP_KINDS += ("notice",)  # 2.70.0 C (#1359): a contract's notice deadline as a note (agents/contractprop.py), never on request
 PROP_KINDS += ("rule",)  # 2.71.0 A (#1457): the agent proposes a rule of a list (lists/rules.py), never on request
+PROP_KINDS += ("office_text", "doc_summary", "report")  # 2.126.1 A (#2123 #2124): office texts, a receipt summary, the client report (agents/asstprop.py), on request
+PROP_KINDS += ("sheet_tasks",)  # 2.126.1 B (#2125): table rows -> tasks, proposed by the agent itself (agents/sheetprop.py)
 PROP_MAX_ITEMS = 200                    # entries one proposal may create / change (tasks + subtasks)
 PROP_MAX_BYTES = 256 * 1024             # JSON body of a proposal
 PROP_TITLE_MAX, PROP_NOTES_MAX, PROP_NAME_MAX, PROP_SUMMARY_MAX = 300, 5000, 120, 2000
@@ -223,6 +225,9 @@ def prop_validate(kind, b, inp):
         raise BadInput(tr("This job expects a proposal of kind {0}", kind))
     common = ("kind", "summary")
     out = {"kind": kind, "summary": _p_str(b.get("summary"), "summary", PROP_SUMMARY_MAX, line=False)}
+    if kind == "sheet_tasks":  # 2.126.1 B (#2125)
+        from ..agents.sheetprop import sht_validate
+        return {**out, **sht_validate(b, inp)}
     if kind == "project":
         _p_keys(b, "", (*common, "name", "folder", "sections", "tasks"))
         out["name"] = _p_str(b.get("name"), "name", PROP_NAME_MAX, True)
@@ -362,6 +367,9 @@ def prop_validate(kind, b, inp):
     elif kind == "rule":  # 2.71.0 A (#1457)
         from ..lists.rules import rul_prop_validate
         out.update(rul_prop_validate(b, inp))
+    elif kind in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): texts worded by the agent (agents/asstprop.py)
+        from ..agents.asstprop import ast_validate
+        out.update(ast_validate(kind, b, inp))
     return out
 
 
@@ -439,6 +447,9 @@ def prop_input(c, uid, kind, b):
 @app.get("/api/proposals/agents")
 def proposal_agents_get():
     c = db()
+    if request.args.get("kind") in ("office_text", "doc_summary", "report") and not is_agent(g.user):  # 2.126.1 A (#2123 #2124): ?kind=&doc_id= | &list_id=
+        from ..agents.asstprop import ast_agents_get
+        return ast_agents_get(c, me(), request.args)
     return jsonify(agents=[] if is_agent(g.user) else prop_agents(c, me()))
 
 
@@ -455,6 +466,8 @@ def proposal_request():
     kind = b.get("kind")
     if kind not in PROP_KINDS:
         return err(tr("Invalid value: {0}", "kind"))
+    if kind == "sheet_tasks":  # 2.126.1 B (#2125): the agent proposes it itself, nothing to ask for
+        return err(tr("Invalid value: {0}", "kind"))
     if kind == "cleanup":  # 2.39.0 (#1151): always the list's tidy agent, in packages (agents/cleanup.py)
         from ..agents.cleanup import cln_request
         return cln_request(c, uid, b)
@@ -462,6 +475,9 @@ def proposal_request():
         return err(tr("Invalid value: {0}", "kind"))
     if kind == "notice":  # 2.70.0 C (#1359): the agent proposes it after contract_notice, never on request
         return err(tr("Invalid value: {0}", "kind"))
+    if kind in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): own agents (office switches / the list's), own input (agents/asstprop.py)
+        from ..agents.asstprop import ast_request
+        return ast_request(c, uid, b)
     try:
         aid = int(b.get("agent_id") or 0)
     except (TypeError, ValueError):
@@ -510,6 +526,9 @@ def prop_view(c, j):
             "agent": {"id": j["agent_id"], "name": user_names(c, [j["agent_id"]]).get(j["agent_id"], "")},
             "applied": {"undone": bool(rec.get("undone")), "list_id": rec.get("list"), "at": rec.get("at")} if rec else None,
             "limits": PROP_LIMITS}
+    if j["kind"] == "sheet_tasks":  # 2.126.1 B (#2125): the rows as the person sees them now
+        from ..agents.sheetprop import sht_view_extra
+        out.update(sht_view_extra(c, j))
     if j["kind"] == "layout":  # 2.55.0 (#1066): before / after for the card
         from ..agents.lyprop import lyp_view_extra
         out.update(lyp_view_extra(c, j))
@@ -525,6 +544,9 @@ def prop_view(c, j):
     if j["kind"] == "rule":  # 2.71.0 A (#1457): the rule in names for the card
         from ..lists.rules import rul_prop_extra
         out.update(rul_prop_extra(c, j))
+    if j["kind"] in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): the target as it is now
+        from ..agents.asstprop import ast_view_extra
+        out.update(ast_view_extra(c, j))
     return out
 
 
@@ -623,6 +645,10 @@ def prop_section(c, lid, name, made):
 def prop_run(c, j, sel, ed, extra):
     """Applies the selected (and edited) entries of the stored proposal as the current person. Returns the undo record."""
     kind, aid, uid = j["kind"], j["agent_id"], me()
+    if kind == "sheet_tasks":  # 2.126.1 B (#2125): the to-tasks core of the tables as the person (agents/sheetprop.py)
+        from ..agents.sheetprop import sht_run
+        return sht_run(c, j, sel, ed, extra, {"at": iso(now_utc()), "sel": sel, "edits": ed, "extra": extra, "tasks": [], "sections": [],
+                                              "changes": {}, "list": None, "undone": False})
     if kind in PROP_KINDS_AGENT:  # 2.51.0 C (#1353 #1355): own edits (times, place), own records
         from ..agents.agenttime import atm_prop_run
         return atm_prop_run(c, j, sel, ed, {"at": iso(now_utc()), "sel": sel, "edits": ed, "extra": extra, "tasks": [], "sections": [],
@@ -647,6 +673,10 @@ def prop_run(c, j, sel, ed, extra):
         from ..lists.rules import rul_prop_run
         return rul_prop_run(c, j, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": extra, "tasks": [], "sections": [],
                                    "changes": {}, "list": None, "undone": False})
+    if kind in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): the (edited) text into its field as the person
+        from ..agents.asstprop import ast_run
+        return ast_run(c, j, sel, ed, extra, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": {}, "tasks": [], "sections": [],
+                                              "changes": {}, "list": None, "undone": False})
     prop, inp = json.loads(j["proposal"]), json.loads(j["input"] or "{}")
     edits = {k: prop_edit(kind, k, v, inp, prop) for k, v in ed.items()}
     ts = iso(now_utc())
@@ -839,6 +869,9 @@ def proposal_apply(jid):
     c.execute("UPDATE agent_jobs SET prop_state='applied', state='done', action='approve', action_by=?, action_at=?, updated_at=?, applied=? "
               "WHERE id=?", (me(), ts, ts, json.dumps(rec, ensure_ascii=False), jid))
     counts = {"created": len(rec["tasks"]), "changed": len(rec["changes"])}
+    if j["kind"] == "sheet_tasks":  # 2.126.1 B (#2125): rows skipped (carried over before, no title), the table
+        from ..agents.sheetprop import sht_result
+        counts.update(sht_result(rec))
     if j["kind"] in ("inquiry", "setup"):  # 2.51.0 B (#1351 #1358): event drafts, the quotation draft, lists, modules, project_list_id
         from ..agents.propkinds2 import pk2_result
         counts.update(pk2_result(rec))
@@ -861,6 +894,9 @@ def proposal_apply(jid):
         counts.update(ctr_result(rec))
     if j["kind"] == "rule":  # 2.71.0 A (#1457)
         counts.update(rule_id=rec.get("rule_id"))
+    if j["kind"] in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124)
+        from ..agents.asstprop import ast_result
+        counts.update(ast_result(rec))
     prop_notify_agent(c, j, "approve", "applied", {**counts, "list_id": rec["list"] if j["kind"] in ("project", "cleanup") else None})
     c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND kind='proposal' AND read_at IS NULL AND data->>'job' = ?",
               (ts, me(), str(jid)))
@@ -900,7 +936,10 @@ def proposal_undo(jid):
     if j["prop_state"] != "applied" or not rec or rec.get("undone"):
         return err(tr("Nothing to undo"), 409)
     ts, skipped, n = iso(now_utc()), [], 0
-    if j["kind"] in ("inquiry", "setup"):  # 2.51.0 B (#1351 #1358)
+    if j["kind"] == "sheet_tasks":  # 2.126.1 B (#2125): the batch undo of the tables (tasks to the trash, row marks off)
+        from ..agents.sheetprop import sht_undo
+        n, skipped = sht_undo(c, j, rec)
+    elif j["kind"] in ("inquiry", "setup"):  # 2.51.0 B (#1351 #1358)
         from ..agents.propkinds2 import pk2_undo
         n, skipped = pk2_undo(c, j, rec)
     elif j["kind"] == "cleanup":  # 2.39.0 (#1151): field changes back, closed tasks open again (one step)
@@ -924,6 +963,9 @@ def proposal_undo(jid):
     elif j["kind"] == "rule":  # 2.71.0 A (#1457): the accepted rule goes to the trash
         from ..lists.rules import rul_prop_undo
         n, skipped = rul_prop_undo(c, j, rec)
+    elif j["kind"] in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): the text before comes back (unless changed since)
+        from ..agents.asstprop import ast_undo
+        n, skipped = ast_undo(c, j, rec)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
@@ -977,7 +1019,11 @@ def proposal_redo(jid):
     if j["prop_state"] != "applied" or not rec or not rec.get("undone"):
         return err(tr("Nothing to redo"), 409)
     skipped, n = [], 0
-    if j["kind"] in ("inquiry", "setup"):  # 2.51.0 B (#1351 #1358)
+    if j["kind"] == "sheet_tasks":  # 2.126.1 B (#2125): the batch again
+        from ..agents.sheetprop import sht_undo
+        n, skipped = sht_undo(c, j, rec, back=False)
+        rec.update(undone=False)
+    elif j["kind"] in ("inquiry", "setup"):  # 2.51.0 B (#1351 #1358)
         from ..agents.propkinds2 import pk2_redo
         try:
             rec, n, skipped = pk2_redo(c, j, rec)
@@ -1031,6 +1077,9 @@ def proposal_redo(jid):
         from ..lists.rules import rul_prop_undo
         n, skipped = rul_prop_undo(c, j, rec, back=False)
         rec.update(undone=False)
+    elif j["kind"] in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124)
+        from ..agents.asstprop import ast_undo
+        n, skipped = ast_undo(c, j, rec, back=False)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
@@ -1105,6 +1154,9 @@ def v1_agent_job_proposal(jid):
         raise Denied(404)
     if not j["kind"]:
         raise BadInput(tr("This job did not ask for a proposal"))
+    if j["kind"] == "sheet_tasks":  # 2.126.1 B (#2125): replacing checks the table and the list again
+        from ..agents.sheetprop import sht_replace_check
+        sht_replace_check(c, aid, j)
     if j["kind"] in PROP_KINDS_AGENT:  # 2.51.0 C (#1353 #1355): replacing needs the scope of creating it
         from ..api.scopes import need_scope
         need_scope({"time": "time", "shoot": "calendar"}[j["kind"]])
@@ -1120,6 +1172,9 @@ def v1_agent_job_proposal(jid):
     if j["kind"] == "rule":  # 2.71.0 A (#1457)
         from ..api.scopes import need_scope
         need_scope("structure")
+    if j["kind"] in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): the office switches still on / the list still shared
+        from ..agents.asstprop import ast_need_agent
+        ast_need_agent(c, j, aid)
     if j["prop_state"] not in ("requested", "ready") or j["state"] not in ("running", "waiting"):
         raise Denied(409, tr("This proposal was already applied or discarded"))
     if len(request.data or b"") > PROP_MAX_BYTES:

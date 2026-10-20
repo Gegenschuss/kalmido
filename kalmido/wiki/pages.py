@@ -262,13 +262,16 @@ def wiki_create():
 
 def wiki_relink(c, r, old, new, uid, ts):
     """[[old]] -> [[new]] in the other pages of the space (also [[old|label]] and [[old#part]]); the number of pages changed."""
-    from .wkhist import wkh_open, wkh_seal  # 2.123.0 A (#2105)
+    from .wkhist import WikiUnreadable, wkh_open, wkh_seal  # 2.123.0 A (#2105)
     w, a = wiki_space_sql(r["org_id"], uid)
     rx = re.compile(r"\[\[\s*" + re.escape(old) + r"\s*(?=[\]|#])", re.I)
     n = 0
     for p in c.execute(f"SELECT DISTINCT p.id, p.org_id, p.owner_id, p.body FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.to_path=? "
                        f"AND p.deleted_at IS NULL AND p.{w.replace(' AND ', ' AND p.')}", [old.lower(), *a]).fetchall():
-        ob = wkh_open(c, p["org_id"], p["owner_id"], p["body"])  # 2.123.0 A (#2105)
+        try:
+            ob = wkh_open(c, p["org_id"], p["owner_id"], p["body"])  # 2.123.0 A (#2105)
+        except WikiUnreadable:  # 2.126.2 B (#2358): an unreadable page keeps its text (and its old link)
+            continue
         nb = rx.sub(lambda m: "[[" + new, ob)
         if nb != ob:
             c.execute("UPDATE wiki_pages SET body=?, updated_by=?, updated_at=? WHERE id=?",
