@@ -5,6 +5,7 @@
 //   Undo removes it again, Redo brings it back), a changed cell redraws the bar, a tap on a bar shows its values
 // - line chart with two series: a legend; hide / show; a reader sees the chart without the edit button
 // - without a chart the table looks as before (no chart box); sizes in rem; no script errors
+// - Firefox: bars with two series in light and dark, the phone (the chart scrolls inside); screenshots with P2124A_SHOTS=<dir>
 // P2124A_NOSTART=1 = the server already runs.
 const path = require('path');
 const fs = require('fs');
@@ -21,6 +22,7 @@ const FEAT = 'collab,comments,sheets';
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { try { if (await fn()) return true; } catch { /* not yet */ } await sleep(150); } return false; };
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const key = (w, el, k, o = {}) => el && el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true, ...o}));
+const firefox = require('./ff')({tag: 'p2124_a_ui', check, shots: 'P2124A_SHOTS'});
 const item = (d, re) => [...d.querySelectorAll('[role="menuitem"]')].find(b => re.test(b.textContent));
 
 (async () => {
@@ -125,6 +127,38 @@ const item = (d, re) => [...d.querySelectorAll('[role="menuitem"]')].find(b => r
   await sleep(300);
   check(!item(d, /Chart…|Edit chart/), 'no chart entry in a reader\'s menu');
   check(errs.length === 0, 'no JS errors: ' + errs.slice(0, 3).join(' | '));
+
+  // ---- Firefox: the real look (bars, two series, a legend), light / dark, the phone
+  await call('PUT', `/api/sheets/${SID}/cells`, {cells: [{cell: 'A4', raw: 'Plums'}, {cell: 'A5', raw: 'Quinces'}, {cell: 'B4', raw: '-3'}, {cell: 'B5', raw: '12'},
+    {cell: 'C1', raw: '3'}, {cell: 'C2', raw: '5'}, {cell: 'C3', raw: '=B3*1,5'}, {cell: 'C4', raw: '2'}, {cell: 'C5', raw: '=SUMMEWENN(A1:A3;"apples";B1:B3)'}]});
+  await call('PUT', `/api/sheets/${SID}/chart`, {chart: {type: 'bar', x: C[0], y: [C[1], C[2]]}});
+  const ffLogin = async ({ev, nav}, theme) => {
+    await nav(B + 'static/icon.svg');
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+    return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
+  };
+  const look = async (o, vw, vh, theme) => {
+    const {cmd, ev, nav, shot} = o, tag = `${vw} ${theme}`;
+    await cmd('browsingContext.setViewport', {context: o.ctx, viewport: {width: vw, height: vh}});
+    check(await ffLogin(o, theme) === 200, tag + ': login');
+    await nav(B + '#sheets/' + SID);
+    for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#shc-box svg.shc-svg')`).catch(() => false)); i++) await sleep(250);
+    await sleep(400);
+    const x = await ev(`(() => { const b = document.querySelector('#shc-box'), s = b && b.querySelector('.shc-scroll'), p = b && b.querySelector('path.shc-s0'), q = b && b.querySelector('path.shc-s1');
+      return {box: !!b, bw: b ? Math.round(b.getBoundingClientRect().width) : 0, sw: s ? Math.round(s.getBoundingClientRect().width) : 0, vw: innerWidth,
+        f0: p && getComputedStyle(p).fill, f1: q && getComputedStyle(q).fill, acc: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
+        bars: b ? b.querySelectorAll('path.shc-s0, path.shc-s1').length : 0, leg: b ? b.querySelectorAll('.shc-leg li').length : 0}; })()`);
+    check(x && x.box && x.bars === 10 && x.leg === 2, `${tag}: bars of two series and a legend ` + JSON.stringify(x));
+    check(x && x.f0 && x.f1 && x.f0 !== x.f1, `${tag}: the series differ in colour ` + JSON.stringify(x));
+    check(x && x.bw <= x.vw && x.sw <= x.vw, `${tag}: the chart stays inside the screen (scrolls inside) ` + JSON.stringify(x));
+    await ev(`(() => { const h = document.querySelector('#shc-box .shc-hit[data-shc-i="1"]'); h && h.dispatchEvent(new MouseEvent('click', {bubbles: true})); return 1; })()`);
+    await sleep(300);
+    await shot(`p2124a-${vw}-${theme}.png`);
+  };
+  await firefox(async o => { await look(o, 1280, 800, 'light'); await look(o, 1280, 800, 'dark'); }, false);
+  await firefox(async o => { await look(o, 390, 844, 'dark'); }, true);
+
+  check(errs.length === 0, 'no JS errors at the end: ' + errs.slice(0, 3).join(' | '));
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });
