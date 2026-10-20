@@ -188,10 +188,23 @@ function jcd_addr(body) {
 }
 // the job card a message belongs to (0 = a row of its own)
 function jcd_jobOf(m, byId) {
-  if (m.from !== 'agent' || m.kind === 'notice' || m.choices) return 0;
+  if (m.choices) return 0;
+  return jcd_jobNo(m, byId);
+}
+// 2.144.0 A (#2416): the job an agent message comes from, buttons or not (a job's result mostly carries the suggestion
+// buttons, since 2.122.1 also approval cards): the filter asks this, the card keeps a message with buttons as its own row
+function jcd_jobNo(m, byId) {
+  if (m.from !== 'agent' || m.kind === 'notice') return 0;
   const jb = ux_jobOf(m); if (jb) return jb.no;
   const q = m.reply_to && byId.get(m.reply_to);
   return q && q.from !== 'agent' ? jcd_addr(q.body) : 0;
+}
+// 2.144.0 A (#2416): a row through the filter. "Only me and <agent>": my messages and the main agent's, of the jobs only
+// open approvals / permission questions that wait for me. "Jobs": the job rows and my messages addressed to a job.
+function jcd_pass(m, f, no) {
+  if (f === 'all') return true;
+  if (f === 'me') return !no || (apvHeld(m) && chatChoiceSt(m) === 'open');
+  return !!no || (m.from !== 'agent' && m.kind !== 'notice' && !!jcd_addr(m.body));
 }
 const jcd_filter = () => S.chat.job || !S.jcd.n ? 'all' : LS.get('jcdFilt', 'all');
 const jcd_open = no => !!LS.get('jcdOpen', {})[no];
@@ -204,18 +217,19 @@ function jcd_setOpen(no, on) {
 function jcd_rows(a, row) {
   const ms = S.chat.msgs;
   if (S.chat.job) { S.jcd.map = new Map(); return ms.map(row); }
-  const byId = new Map(ms.map(m => [m.id, m])), of = new Map(), per = new Map(), last = new Map();
+  const byId = new Map(ms.map(m => [m.id, m])), of = new Map(), per = new Map(), last = new Map(), jn = new Map();
   ms.forEach((m, i) => {
-    const no = jcd_jobOf(m, byId); if (!no) return;
+    const no = jcd_jobNo(m, byId); if (!no) return;
+    jn.set(m.id, no); if (m.choices) return;  // 2.144.0 A (#2416): a row of its own, but still a job's
     of.set(m.id, no); if (!per.has(no)) per.set(no, []); per.get(no).push(m); last.set(no, i);
   });
-  S.jcd.map = of; S.jcd.n = per.size;
-  if (!per.size) return ms.map(row);
+  S.jcd.map = of; S.jcd.n = new Set(jn.values()).size;
+  if (!S.jcd.n) return ms.map(row);
   const f = jcd_filter(), out = [];
   ms.forEach((m, i) => {
     const no = of.get(m.id);
     if (no) { if (f !== 'me' && last.get(no) === i) out.push(jcd_cardHtml(no, per.get(no), row)); return; }
-    if (f === 'all' || m.choices || (f === 'me' ? true : m.from !== 'agent' && m.kind !== 'notice' && jcd_addr(m.body))) out.push(row(m));
+    if (jcd_pass(m, f, jn.get(m.id) || 0)) out.push(row(m));
   });
   if (!out.length) out.push(`<div class="muted cmempty" data-k="jcdempty">${esc(tr('No messages yet.'))}</div>`);
   return out;
@@ -256,13 +270,10 @@ function jcm_inBubble(html, btn) {
   }
   return html + btn;
 }
-function jcd_filtHtml() {
-  if (S.chat.job || !S.jcd.n) return '<div class="jcdfilt" id="jcd-filt" hidden></div>';
-  const f = jcd_filter(), a = agentById(S.chat.aid), t = tr('Filter');
-  const opts = [['all', tr('All')], ['me', tr('Only me and {0}', a?.name || '')], ['jobs', tr('Jobs')]];
-  return `<div class="jcdfilt" id="jcd-filt"><div class="jcdseg" role="group" aria-label="${esc(t)}">${opts.map(([k, l]) => `<button type="button" data-jca="filt" data-f="${k}" aria-pressed="${f === k}">${esc(l)}</button>`).join('')}</div></div>`;
-}
-// 2.117.0 C (#2260): on a narrow phone the filter is an icon in the chat header (menu with the three choices; a dot while not "All")
+// 2.144.0 A (#2419): no filter row above the messages any more, on every width the icon in the header (jcd_fbtnHtml)
+function jcd_filtHtml() { return ''; }
+// 2.117.0 C (#2260): the filter is an icon in the chat header (menu with the three choices; a dot while not "All"),
+// 2.144.0 A (#2419) on every width
 function jcd_fbtnHtml() {
   if (S.chat.job || !S.jcd.n) return '<span id="jcd-fbtn" hidden></span>';
   const t = tr('Filter');
@@ -272,9 +283,8 @@ function jcd_fmenu(btn) {
   const f = jcd_filter(), a = agentById(S.chat.aid);
   menu(btn, [['all', tr('All')], ['me', tr('Only me and {0}', a?.name || '')], ['jobs', tr('Jobs')]].map(([k, l]) => ({label: l, on: f === k, fn: () => jcd_setFilter(k)})));
 }
-// after every chat patch (agentchat.js chatPatch): the filter follows (shown once a job is in the chat)
+// after every chat patch (agentchat.js chatPatch): the filter icon follows (shown once a job is in the chat)
 function jcd_patch() {
-  const b = $('#jcd-filt'), h = jcd_filtHtml(); if (b && !wk_sameEl(b, h)) b.outerHTML = h;  // 2.119.1 D (#2310): hidden came back as hidden="": swapped on every patch
   const c = $('#jcd-fbtn'), g = jcd_fbtnHtml(); if (c && !wk_sameEl(c, g)) c.outerHTML = g;
 }
 function jcd_setFilter(f) {
@@ -290,9 +300,8 @@ function jcd_reveal(id) {
   if (ch) { chatPatch({keep: true}); jcd_patch(); }
 }
 document.addEventListener('click', e => {
-  const b = e.target.closest?.('[data-jca]'); if (!b || b.tagName === 'SELECT' || !b.closest('#chat-msgs, #jcd-filt')) return;
+  const b = e.target.closest?.('[data-jca]'); if (!b || b.tagName === 'SELECT' || !b.closest('#chat-msgs')) return;
   const box = $('#chat-msgs');
-  if (b.dataset.jca === 'filt') return jcd_setFilter(b.dataset.f);
   // unfold / fold / more: the tapped card stays where it is on the screen (no jump to the bottom)
   const k = b.dataset.jca === 'tog' ? `.jcdh[data-jcd="${b.dataset.jcd}"]` : `.jcdmore[data-jm="${b.dataset.jm}"]`, y0 = b.getBoundingClientRect().top;
   if (b.dataset.jca === 'tog') jcd_setOpen(+b.dataset.jcd, !jcd_open(+b.dataset.jcd));
