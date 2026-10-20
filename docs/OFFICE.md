@@ -962,6 +962,46 @@ is in the office log. No agent API (the office is closed to agents).
 Routes: `GET /api/office/procdoc?version=&lang=de|en`, `PUT /api/office/procdoc` `{own: {field: text}, base?}` (admins; 409
 when `base` is not the latest version), `GET /api/office/procdoc/versions`, `GET /api/office/procdoc.md|pdf?version=&lang=`.
 
+
+## Locking periods and the export for the tax auditor (GoBD) (2.148)
+
+**Bookkeeping -> Lock periods (GoBD)** shows the months of the year with their lock. **Lock up to ...** locks every open
+month up to and including the chosen one (only finished months, always in order, from the first month with data). The
+dialog explains it and asks to type the month: a locked month is never unlocked. The lock is an entry "period_lock" in the
+office log.
+
+In a locked month the server refuses (409) every change of booking data with a date in it: finalising an invoice or credit
+note dated there, moving a draft's date into it, payments (by hand, from the bank reconciliation or an agent's
+suggestion), matching or unmatching bank bookings, a receipt's amount, date, currency, category, VAT rate or payment day,
+moving it to the trash (also inside a folder), restoring it, a new file version or a new recognition, moving it to another
+workspace, cash entries, trips and their receipts (also imported or moved), entertainment receipts and the undo of a DATEV
+import. Corrections go into an open month, e.g. a credit note dated today. Importing a bank statement stays possible (the
+lines are not bookings until they are matched). A personal office with locked months cannot move into an organisation,
+and nothing moves into a locked month of the organisation.
+
+**Export for the tax auditor** (also in that section): one ZIP for a period (default: the previous calendar year, at most
+eleven years) with the tables bookings (the lines of the DATEV batch), invoices / credit notes, positions, payments,
+receipts, cash book, clients, opening balances and the office log as CSV (UTF-8, `;`, decimal comma, dates DD.MM.YYYY, no
+header line; a text starting with `= + - @` gets a leading apostrophe), described in `index.xml` in the description
+standard of the GDPdU. The DTD `gdpdu-01-09-2004.dtd` that `index.xml` names is not part of the ZIP; the auditor's
+software brings it. Admins (and the accounting role) only.
+
+## DATEV export with receipt images (2.148)
+
+The DATEV export dialog has **With receipt images (ZIP for DATEV Unternehmen online)** (on by default) and **Only locked
+months**. The first press checks the period and lists receipts without a booking (no amount) and bookings without a
+receipt (money paid out on the bank account without a matched receipt, cash paid out without a file); the second press
+downloads one ZIP:
+
+- `EXTF_Buchungsstapel_<from>_<to>.csv`: the booking batch as before; every line of an invoice / credit note or a receipt
+  carries `BEDI "<GUID>"` in the column Beleglink.
+- `Belege_<from>_<to>.zip`: `document.xml` (DATEV XML interface, schema Document_v05.0) with one document per GUID, and the
+  files: the PDF of every finalised invoice / credit note and the file of every receipt you see.
+
+The GUID of a document stays the same in every export of the office area (a repeated export links the same receipts). With
+**Only locked months** the period ends at the last locked month and the batch says Festschreibung 1. Limits: 1500 files and
+80 MB per export (choose a shorter period above).
+
 ## Travel expenses: per diem (2.95)
 
 Every trip computes the German per diem (*Verpflegungsmehraufwand*) per participant with the flat rates of its year:
