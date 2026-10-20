@@ -285,7 +285,8 @@ function ofdAcceptHtml(d) {
 }
 function ofdAutoHtml(d, t) {
   const pOn = d.producing_on !== 0;  // 2.47.0 (#1645): the switches of the document, always shown (null = a document of 2.46: as before)
-  const pShow = prd_prodShown(d), share = d.producing_mode === 'amount', slots = PRD_SLOTS.filter(k => prd_slotShown(d, k));  // 2.113.1 (#2251, #2252)
+  // 2.138.5 (#2266 x #2251): in a part the switch and its source (like the document / own setting + reset) always show
+  const pShow = prd_prodShown(d) || !!d.tpPart, share = d.producing_mode === 'amount', slots = PRD_SLOTS.filter(k => prd_slotShown(d, k));  // 2.113.1 (#2251, #2252)
   const lines = (t.lines || []).filter(l => ['producing', 'surcharge', 'raw', 'discount'].includes(l.kind));
   const prod = lines.find(l => l.kind === 'producing'), raw = lines.find(l => l.kind === 'raw'), disc = lines.find(l => l.kind === 'discount'), surs = lines.filter(l => l.kind === 'surcharge');
   const pTitle = share ? prd_lbl(d.share_label, d) || t.labels?.producing || 'Producing' : t.labels?.producing || 'Producing';

@@ -11,7 +11,8 @@ saved_task_id per message (only for the person asking).
 2.42.0 (#1383): kind "comment": a comment of an agent on a task (msg_id = the comment id; only a comment of an agent, only by
 someone who sees its task) becomes a subtask of that task (as: "sub", the default) or a new task in the same list (as: "list");
 the person needs the right to add tasks there (no list choice). The link points back to the task; the comment's files are
-copied. The task timeline carries saved_task_id per agent comment (for the person asking).
+copied. The task timeline carries saved_task_id per comment (for the person asking).
+2.139.0 D (#2130): any comment can be saved, also a person's own or another's (was: agents' only).
 
 Agents never save (403): they may only offer it -- POST /api/v1/agent/chats/{uid} with offer_save: true shows the button
 "Save as task" under their message, which opens the same dialog for the person."""
@@ -99,12 +100,10 @@ def _message(c, kind, mid, uid):
 
 
 def dl_comment_message(c, cid):
-    """2.42.0 (#1383): _message of a comment: only an agent's, only on a task the person sees (else 404 / 400)."""
+    """2.42.0 (#1383): _message of a comment on a task the person sees (else 404); 2.139.0 D (#2130): any comment, not only an agent's."""
     from ..collab.comments import need_live_comment, user_names
-    from ..agents.core import agent_ids
     k, _ = need_live_comment(c, cid)  # 404 gone / task not visible (participants: only their tasks)
-    if k["user_id"] not in agent_ids(c):
-        raise Denied(400, tr("Only comments of agents can be saved as a task"))
+    # 2.139.0 D (#2130): every comment can be saved (also a person's own or another person's), not only an agent's
     t = c.execute("SELECT id, title FROM tasks WHERE id=?", (k["task_id"],)).fetchone()
     files = [(f["name"], f["mime"], f["size"], f["path"], ("att", f["id"])) for f in c.execute(
         "SELECT id, name, mime, size, path FROM attachments WHERE comment_id=? AND enc=0 ORDER BY id", (cid,))]  # 2.64.2 B (#1817): no encrypted file

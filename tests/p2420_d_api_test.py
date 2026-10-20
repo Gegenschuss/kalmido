@@ -200,7 +200,7 @@ t = r.json().get("task") or {}
 check(r.status_code == 201 and t.get("parent_id") is None and t.get("list_id") == L and t.get("title") == "Own title",
       f"#1383: as a new task in the same list {r.status_code} {str(t)[:200]}")
 r = A.post(B + "/api/chat-save", json={"kind": "comment", "msg_id": CP})
-check(r.status_code == 400, f"#1383: a person's comment is refused {r.status_code}")
+check(r.status_code == 201, f"#1383 -> 2.139.0 (#2130): a person's comment is saved, too {r.status_code}")  # 2.139.0 (#2130): was refused
 r = Ca.post(B + "/api/chat-save", json={"kind": "comment", "msg_id": C2, "as": "list"})
 check(r.status_code == 403, f"#1383: a reader may not add tasks {r.status_code} {r.text[:200]}")
 r = Bo.post(B + "/api/chat-save", json={"kind": "comment", "msg_id": C2})

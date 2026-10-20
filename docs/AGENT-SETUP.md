@@ -566,6 +566,8 @@ chat messages of one person that arrive together: one run). It does what a hoste
   message a person writes there, `mentioned: false`) is its own run without delay: the prompt carries the message fenced, the room
   and the rule to answer in that channel with `post_team_message` (the final text of the run is posted nowhere); when the agent
   only listens in, it answers questions and requests about the list and lets the rest pass. Messages of agents never come.
+  2.139.0 (#2127): a message written in a thread (`message.thread_of`) gets one more line: read the thread with
+  `read_team_chat` `thread` and answer in it with `post_team_message` `thread_of`.
 - **Older servers** (before 2.32 / 2.33 / 2.35): what the server does not know yet is switched off once; the rest runs as
   before.
 

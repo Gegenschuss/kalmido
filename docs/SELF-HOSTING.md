@@ -724,9 +724,9 @@ and download is written to the office log (who, when, size).
   manifest.
 - **Without `KALMIDO_SECRET_KEY`** the organisation data is not encrypted and the export is refused: set the server key
   first (see the section on the encryption of the organisation data).
-- **Import** (2.73; every area since 2.138.5): see [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom) -- an
+- **Import** (2.73; every area since 2.139.1): see [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom) -- an
   admin of an organisation on the other server uploads the archive under *Settings > Data* and opens it with the recovery
-  key. Best into a new, empty organisation. Since 2.138.5 the whole organisation moves: lists and tasks, office (master
+  key. Best into a new, empty organisation. Since 2.139.1 the whole organisation moves: lists and tasks, office (master
   data, documents with items and stored PDFs, payments, series, cash book, trips, meals, contracts, archive, bank data,
   logbook; finalised invoices stay finalised with their numbers), clients, file store with all versions, documents,
   knowledge pages, tables, video sign-offs, team chat, absences, vacation accounts, bookings, filed e-mails, newsletter
@@ -737,7 +737,7 @@ and download is written to the office log (who, when, size).
   report). Not moved: public links and upload links (new ones are made where needed), open agent proposals, the learnt
   models and word indexes (rebuilt on the target), knowledge pages of a space locked in the browser (export them as
   Markdown from the unlocked space), scheduling polls and bookmarks (personal).
-- **A personal office** (2.138.5): its owner exports it the same way (*Office > Settings > Export the office*: the office and
+- **A personal office** (2.139.1): its owner exports it the same way (*Office > Settings > Export the office*: the office and
   the owner's private clients, nothing else); the import of such a file into the private space goes into the personal
   office of the importing person.
 

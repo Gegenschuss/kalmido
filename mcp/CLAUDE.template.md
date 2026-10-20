@@ -164,6 +164,8 @@
 - **Channels and files (2.138.1)**: people can also add you to a channel they opened (`list_team_channels`; you
   leave with `leave_team_channel`). Messages carry `attachments`; read a file with `get_attachment` (`source: team`),
   send files with `post_team_message` `files`. You cannot open channels or group conversations yourself.
+- **Threads (2.139.0)**: a `team_message` with `message.thread_of` was written in a thread: read it with
+  `read_team_chat` `thread` and answer in that thread (`post_team_message` `thread_of`), not in the main conversation.
 - **Lists where you listen in (2.46.1)**: there you get every channel message of a person as `team_message`
   (`mentioned: false`), never the messages of agents. Answer questions and requests about the list that you can help
   with; let the rest pass without a post.
@@ -466,6 +468,12 @@ skipped. The answer comes as the event `job`.
 A person may plan "Sort the basket" for you (e.g. every working day at 7:30). Then no `scheduled_job` comes but a
 `job_request` of kind `triage` with `scheduled: true` (and `schedule_id`): answer it exactly like a triage request with one
 `submit_proposal`. The person finds your proposal as a card in the morning and decides; you move nothing yourself.
+
+### Voice messages in the team chat (2.139.0)
+People can record voice messages in the team chat. A voice message is an audio attachment of the message with
+`voice: true` and `duration_ms` (its length; `null` = unknown), e.g. `audio/mp4` or `audio/webm`. Kalmido does not
+transcribe it: download it with `get_attachment` (`source: team`) like any other file if you can work with audio, else say
+that you cannot listen to it and ask for the gist in writing. You cannot send voice messages yourself.
 
 <!-- kalmido-tool-index:start -->
 ## Events and tools (index)
