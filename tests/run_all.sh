@@ -1380,8 +1380,6 @@ fresh; run p2113_a_api "$PY" p2113_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2113_a_ui node p2113_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.113.0 part B: offer parts fold open on the title page with a colour each (#2248)
 fresh; run p2113_b_ui node p2113_b_ui.js "$KALMIDO_TEST_DATA"
-# 2.113.0 part C: unit select follows the quantity (#2249)
-fresh; run p2113_c_ui node p2113_c_ui.js "$KALMIDO_TEST_DATA"
 shard 19  # 20.10.2026 (job #692): the parked releases 2.113.1-2.116
 # 2.113.1 part A: producing from the net amount, factor quotient, only in the film pack (#2251)
 fresh; run p2113b_a_api "$PY" p2113b_a_api_test.py "$KALMIDO_TEST_DATA"

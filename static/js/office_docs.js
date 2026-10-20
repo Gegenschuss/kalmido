@@ -23,19 +23,6 @@ const ofdQty = (n, d) => { const s = String(+(+n || 0).toFixed(4)); return ofdLa
 const ofdDec = () => { try { return (1.1).toLocaleString(LOCALE()).includes(',') ? ',' : '.'; } catch { return '.'; } };
 const ofdNumIn = v => v == null || v === '' ? '' : String(+(+v).toFixed(4)).replace('.', ofdDec());
 const ofdUnit = (u, d) => { const L = OFC.info?.pack?.labels?.[ofdLang(d)]?.units; return L?.[u] || tr(OFC_UNITS.find(x => x[0] === u)?.[1] || u); };
-// 2.113.0 (#2249): unit option text by quantity (singular only for exactly 1, like calc.unit_text; plural otherwise)
-const OFU_PLURAL = { day: N_('Days|unit'), hour: N_('Hours|unit'), piece: N_('Pieces|unit'), minute: N_('Minutes|unit') };
-function ofu_label(u, qty, d) {
-  if (!OFU_PLURAL[u]) return tr(OFC_UNITS.find(x => x[0] === u)?.[1] || u);
-  const L = OFC.info?.pack?.labels?.[ofdLang(d)];
-  if (+qty === 1 && String(qty).trim() !== '') return L?.units_one?.[u] || tr(OFC_UNITS.find(x => x[0] === u)[1]);
-  return L?.units?.[u] || tr(OFU_PLURAL[u]);
-}
-function ofu_sync(inp, d) {
-  const sel = inp.closest('.ofdnums')?.querySelector('select[data-k="unit"]'); if (!sel) return;
-  const q = parseFloat(String(inp.value).replace(',', '.'));
-  for (const o of sel.options) o.textContent = ofu_label(o.value, isNaN(q) ? 0 : q, d);
-}
 const ofdSvcName = (s, d) => (ofdLang(d) === 'en' ? s.name_en || s.name_de : s.name_de || s.name_en) || '';
 
 // ---- loading
@@ -259,7 +246,7 @@ function ofdItemsHtml(d, adm) {
       <div class="ofditb"><input class="ofdtt" data-i="${i}" data-k="title" value="${esc(it.title)}" maxlength="500" placeholder="${esc(tr('Service'))}" aria-label="${esc(tr('Service'))}">
       <input class="ofddt" data-i="${i}" data-k="detail" value="${esc(it.detail)}" maxlength="4000" placeholder="${esc(tr('Detail (optional)'))}" aria-label="${esc(tr('Detail'))}">
       <span class="ofdnums">${it.unit === 'percent' ? ekPctHtml(it, i, line, d) : `<input data-i="${i}" data-k="qty" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.qty))}" aria-label="${esc(tr('Quantity'))}">
-      <select data-i="${i}" data-k="unit" aria-label="${esc(tr('Unit'))}">${ekUnits().map(([v, n]) => `<option value="${v}" ${it.unit === v ? 'selected' : ''}>${ofu_label(v, it.qty, d)}</option>`).join('')}</select>
+      <select data-i="${i}" data-k="unit" aria-label="${esc(tr('Unit'))}">${ekUnits().map(([v, n]) => `<option value="${v}" ${it.unit === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>
       <span class="muted">×</span><input data-i="${i}" data-k="rate" inputmode="decimal" class="numin ofdrate" value="${esc(ofdNumIn(it.rate))}" aria-label="${esc(tr('Rate (EUR)'))}"><span class="muted">€</span>`}
       <select data-i="${i}" data-k="tax" aria-label="${esc(tr('VAT'))}">${taxes.map(([v, n]) => `<option value="${v}" ${it.tax === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
       <b class="ofdlt">${line ? esc(line.total_text || ofdMoney(line.total, d)) : ''}</b></span>
@@ -386,7 +373,6 @@ function ofdRightsBody() {
 // ---- events (delegated on the tab's body)
 function ofdInput(e) {
   const t = e.target;
-  if (t.dataset?.k === 'qty' && t.dataset.i != null && OFD.doc) { ofu_sync(t, typeof tpCur === 'function' ? tpCur() : OFD.doc); return; }  // 2.113.0 (#2249)
   if (t.id === 'ofd-q') { OFD.q = t.value; const el = t.closest('.pboffers, .ofcbody'); if (el) keepFocus(el, () => fl_set(el, ofdListHtml())); }
 }
 function ofdKey(e) { if (e.key === 'Enter' && e.target.id === 'ofd-q') e.preventDefault(); }
