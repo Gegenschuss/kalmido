@@ -34,6 +34,7 @@ Private space: shopping, recipes, journal, budget, habits, devices and birthdays
 ### Changed
 - Database: new columns `habits.remind_times`, `habits.reminded_hm`, `contact_srcs.writeback` / `wb_ro` / `wb_books` /
   `wb_err`, `contact_links.want` and the table `life_device_links` (all additive, 2.139 runs on with them).
+
 ## [2.138.4] - 2026-10-20
 
 Phone fixes for office, tables, documents and bookmarks; the agent chat keeps an open edit; hardening leftovers of 2.126.0.
