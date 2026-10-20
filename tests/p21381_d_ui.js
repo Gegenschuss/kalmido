@@ -1,4 +1,4 @@
-// 2.138.1 D (#2405): the News bell as an inbox: "For you" (unread + to me, the bell's number) / "Also new" (other unread) /
+// 2.138.2 D (#2405): the News bell as an inbox: "For you" (unread + to me, the bell's number) / "Also new" (other unread) /
 // "Read" (below, muted). jsdom: bell number = "For you" number = header number, read bundles never above unread ones, read =
 // muted class, unread = stripe class and no dot; the same in the plain list. Firefox 390 / 1280, light + dark (P21381D_SHOTS=<dir>).
 // freelancer-matrix: n/a - nur Oberfläche

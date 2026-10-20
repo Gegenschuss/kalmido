@@ -30,7 +30,7 @@ INTEXT = ("intern", "extern", "shooting")  # 2.47.0 (#1216): shooting = only in 
 CREW_INTEXT = ("intern", "extern")  # 2.47.0 (#1649): the Drehpersonal
 TEXT_KINDS = ("rights_time", "rights_territory", "rights_media", "intro", "closing", "note", "block", "raw_note")
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
-SCHEME_RE = re.compile(r"\{(yyyy|yy|seq(?::0?(\d{1,2}))?|project|client|date|isodate|initials|version)\}")  # 2.118.0 A (#2265): version; 2.138.1 A (#2391): isodate
+SCHEME_RE = re.compile(r"\{(yyyy|yy|seq(?::0?(\d{1,2}))?|project|client|date|isodate|initials|version)\}")  # 2.118.0 A (#2265): version; 2.138.2 A (#2391): isodate
 NAME_MAX = 200
 # 2.99.0 D (#2188, decision 18.10.2026): the own company name may have up to three lines (stored with line breaks); the
 # letterhead and the footer print them one under the other, the sender line, mails and the e-invoice (BT-27) on one line
@@ -505,7 +505,7 @@ def office_number_format(scheme, seq, d=None, project="", client="", initials=""
             return _slug(client)
         if t == "date":
             return d.strftime("%Y%m%d")
-        if t == "isodate":  # 2.138.1 A (#2391): the date with hyphens, 2026-04-15
+        if t == "isodate":  # 2.138.2 A (#2391): the date with hyphens, 2026-04-15
             return d.strftime("%Y-%m-%d")
         if t == "initials":
             return _slug(initials)

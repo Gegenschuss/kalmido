@@ -44,7 +44,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   w = await boot({hash: 'inbox'}); d = w.document;
   await until(() => d.querySelector('#side .scmd'), 60);
   check(await w.eval(`tr(COLS.find(c => c[0] === 'due')[1])`) === 'Due', '#1914: the column is called Due');
-  const bar = d.querySelector('#side .sbhead .wsbar');  // 2.138.1 (#2392): the button is the sidebar's heading
+  const bar = d.querySelector('#side .sbhead .wsbar');  // 2.138.2 (#2392): the button is the sidebar's heading
   check(d.querySelector('#side .sbdock .scmd') && bar && bar.querySelector('.wsn')?.textContent, '#1933: workspace button with its name in the row; 2.104.0 (#2161): search sits in the bottom dock' );
   const ok1 = await w.eval(`(() => {
     const md = modal('<div class="wrapx"><div class="lhdr"><h3>First</h3></div><div class="lhdr"><h3>Second</h3></div></div>');
@@ -62,7 +62,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const FCK = await login('frida');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'}, FCK);
   w = await boot({user: 'frida', hash: 'inbox'}); d = w.document;
-  const fbar = await until(() => d.querySelector('#side .sbhead .wsbar'), 60);  // 2.138.1 (#2392)
+  const fbar = await until(() => d.querySelector('#side .sbhead .wsbar'), 60);  // 2.138.2 (#2392)
   check(fbar && /Private/.test(fbar.querySelector('.wsn')?.textContent || ''), '#1933: without an organisation the button stays and shows the private space');
   if (fbar) click(w, fbar);
   const fitems = await until(() => { const x = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim()); return x.length && x; });

@@ -1,4 +1,4 @@
-// 2.138.1 UI tests, part A (office documents), own container (start.sh). Invented data only. jsdom:
+// 2.138.2 UI tests, part A (office documents), own container (start.sh). Invented data only. jsdom:
 // - #2393: the PDF buttons of a draft ask first (dialog "not finalised yet": Finalise now / Show as draft / Cancel);
 //   Cancel does nothing (no PDF, still a draft); Show as draft opens the preview (the server marks it); Finalise now
 //   finalises (the invoice gets its number) and opens the PDF; a finalised document's buttons are the plain links again

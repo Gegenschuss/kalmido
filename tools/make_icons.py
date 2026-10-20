@@ -102,7 +102,7 @@ LOGO_WHITE = svg(bot(WHITE, ant=ANT_DARK, cid="e"), label="Kalmido")
 # maskable: the safe zone is the circle of radius 40 around the centre; the design file scales the figure to .84
 MASKABLE = svg(plate(rx=0) + bot(scale=0.84))
 APPLE = svg(plate(rx=0) + bot())
-# 2.138.1 (#2396): Mac dock icon - no own corners (a rounded or transparent edge puts it into a grey frame on macOS 26)
+# 2.138.2 (#2396): Mac dock icon - no own corners (a rounded or transparent edge puts it into a grey frame on macOS 26)
 # and the figure at about 80 % of the height, so it reads as large as the native icons next to it
 MAC = svg(plate(rx=0) + bot(scale=1.05))
 FAVICON = svg(plate() + bot(scale=1.08, bold=1), label="Kalmido")

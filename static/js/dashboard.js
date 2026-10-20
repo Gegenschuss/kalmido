@@ -20,7 +20,7 @@ function newsGroups(items) {
     // 2.25.0 (UX-45): a comment that names me (@me) needs me too, like a mention
     const toMe = it.kind === 'comment' && S.me && (it.excerpt || '').includes(`<@${S.me.id}>`);
     // 2.66.1 (#1943): what the server marks "For you" (the bell's number: replies to me, an agent's comments that reach me) needs me too
-    g.items.push([it, i]); if (!it.read && (NEWS_NEEDS.includes(it.kind) || toMe || it.to_me)) g.needs = true; if (!it.read) g.unread++;  // 2.138.1 D (#2405): only unread bundles need me
+    g.items.push([it, i]); if (!it.read && (NEWS_NEEDS.includes(it.kind) || toMe || it.to_me)) g.needs = true; if (!it.read) g.unread++;  // 2.138.2 D (#2405): only unread bundles need me
   }
   // 2.102.0 B (#2197): unread lines first (the sort is stable: the server's order stays inside)
   return [...groups.values()].sort((a, b) => (b.unread > 0) - (a.unread > 0));
@@ -52,7 +52,7 @@ function newsGroupHtml(g, pop) {
 }
 function newsBundledHtml(vis, pop, pre = '') {
   // 2.18.0 (#652): the sections are h2 (the page's h1 is the header title; the bell's panel has no heading above them)
-  // 2.138.1 D (#2405): For you (unread + to me, the bell's number) / Also new (other unread) / Read (below, newest first)
+  // 2.138.2 D (#2405): For you (unread + to me, the bell's number) / Also new (other unread) / Read (below, newest first)
   const gs = newsGroups(vis), needs = gs.filter(g => g.needs), info = gs.filter(g => !g.needs && g.unread), done = gs.filter(g => !g.unread);
   const sect = (id, title, n, body, cls) => `<section class="nsect ${cls}" aria-labelledby="${id}"><h2 id="${id}" class="nsh">${title}${n ? `<span class="c">${n}</span>` : ''}</h2>${body}</section>`;
   return (needs.length || pre ? sect('ns-need', tr('For you'), bellCount(), pre + needs.map(g => newsGroupHtml(g, pop)).join(''), 'me') : '')

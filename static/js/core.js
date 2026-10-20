@@ -542,7 +542,7 @@ const acctLabel = () => tr('Account') + ': ' + (S.me?.display_name || '') + ' ·
 function netDotDraw() {
   if (!globalThis.document) return;
   const n = netState();
-  // 2.138.1 C (#2392): the dot sits in the sidebar's head now (shown only offline / syncing), no longer on the picture
+  // 2.138.2 C (#2392): the dot sits in the sidebar's head now (shown only offline / syncing), no longer on the picture
   for (const d of $$('#side .netdot')) { d.className = 'netdot n-' + n.k; d.setAttribute('aria-label', n.label); d.title = n.label; }
   for (const b of $$('.sbacct')) { b.setAttribute('aria-label', acctLabel()); b.title = acctLabel(); }
 }

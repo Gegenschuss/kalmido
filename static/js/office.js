@@ -446,7 +446,7 @@ const ofcMdLabelHtml = (cf, dis) => ofcRowF('osc-md_label', tr('Printed as'), `<
 // the next number of each scheme with its counter (restarts every year or never), errors in plain words from the server
 const OFC_BB = [['{yyyy}', N_('Year'), '2026'], ['{yy}', N_('Year, short'), '26'], ['{seq:03}', N_('Running number, 3 digits'), '001'], ['{seq}', N_('Running number'), '1'],
   ['{project}', N_('Project'), 'Imagefilm'], ['{client}', N_('Client'), 'Beispiel-AG'], ['{date}', N_('Date'), '20261014'],
-  ['{isodate}', N_('Date with hyphens'), '2026-10-14'], ['{initials}', N_('Initials'), 'AB']];  // 2.138.1 A (#2391)
+  ['{isodate}', N_('Date with hyphens'), '2026-10-14'], ['{initials}', N_('Initials'), 'AB']];  // 2.138.2 A (#2391)
 const OFC_BB_VER = ['{version}', N_('Version'), '2'];  // 2.118.0 A (#2265): quotations only (the duplicate of a quotation = the next version)
 OFC.pv = OFC.pv || {};
 function ofcSchemeHtml(id, kind, label, val, dis) {
@@ -719,7 +719,7 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => { if (e.target.closest?.('#ofc-set')) ost_save(e.target); });
 document.addEventListener('mousedown', e => { if (e.target.closest?.('#ofc-set [data-ofc="bb"]')) e.preventDefault(); });  // a building block keeps the scheme field focused (no save in between)
 document.addEventListener('focusout', e => { const t = e.target; if (/^(INPUT|TEXTAREA)$/.test(t.tagName) && !/^(checkbox|radio|file|hidden)$/.test(t.type) && t.closest('#ofc-set') && t.value !== t.defaultValue) ost_save(t); });
-// 2.138.1 B (#2395): a short multi-line field (company name) grows with its text up to `max` rows, no inner scrollbar
+// 2.138.2 B (#2395): a short multi-line field (company name) grows with its text up to `max` rows, no inner scrollbar
 function ofcGrow(ta, max = 3) {
   ta.rows = 1;
   const n = Math.max(1, String(ta.value).split('\n').length);

@@ -377,7 +377,7 @@ async function ofdLoadLog(id) {
 
 // ---- saving
 // 2.40.0 (#1366): the PDF opens in the browser; the Android app's WebView shows no PDF itself, there the link downloads as before
-// 2.138.1 A (#2393): the PDF of a document not yet finalised: asked first ("Finalise now" = the normal finalising, then the
+// 2.138.2 A (#2393): the PDF of a document not yet finalised: asked first ("Finalise now" = the normal finalising, then the
 // PDF; "Show as draft" = the PDF the server marks DRAFT on every page). A finalised, sent or read-only one opens as before.
 const ofdPdfView = d => ({url: ofdPdfUrl(d.id, true), name: (d.number || tr('Document')) + '.pdf', dlUrl: ofdPdfUrl(d.id)});
 function ofdPdfOpen(d, dl) {
@@ -491,7 +491,7 @@ function ofdMoreItems(d, inList) {
       {label: tr('Duplicate'), icon: 'copy', fn: async () => { try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/duplicate`); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } }},
       d.kind === 'offer' && d.client_id && ofcAdmin() && typeof dtFromOffer === 'function' ? {label: tr('Create order confirmation'), icon: 'file', fn: () => dtFromOffer(d)} : null,  // 2.93.0 A (#1927)
       !inList && d.kind === 'offer' && d.status !== 'accepted' ? {label: tr('Create invoice'), icon: 'receipt', fn: () => kvaToInvoice(d)} : null,  // 2.138.0 E (#2235): always reachable
-      {label: tr('Preview (PDF)'), icon: 'eye', fn: () => !inList && !d.locked && d.can_edit && d.status === 'draft' ? ofdPdfAskGo(d, false) : ofdPdfOpen(d, false)},  // 2.40.0 (#1364): the PDF, not the JSON print model; 2.138.1 A (#2393): a draft asks first (a list row opens marked)
+      {label: tr('Preview (PDF)'), icon: 'eye', fn: () => !inList && !d.locked && d.can_edit && d.status === 'draft' ? ofdPdfAskGo(d, false) : ofdPdfOpen(d, false)},  // 2.40.0 (#1364): the PDF, not the JSON print model; 2.138.2 A (#2393): a draft asks first (a list row opens marked)
       ...(typeof ls_moreItems === 'function' ? ls_moreItems(d, inList) : []),  // 2.120.0 D (#2089)
       ofdIsInv(d) && d.kind !== 'reminder' && d.kind !== 'delivery' && d.locked ? {label: tr('E-invoice XML'), icon: 'download', fn: () => window.open(`/api/office/docs/${d.id}/xml`, '_blank', 'noopener')} : null,
       ofdIsInv(d) && d.kind !== 'reminder' && d.kind !== 'delivery' && d.locked ? {label: tr('Send to the DATEV inbox'), icon: 'send', fn: async () => { const j = await ofdSave('POST', `/api/office/docs/${d.id}/datev`); if (j) toast(tr('Sent to the DATEV inbox')); }} : null,
@@ -537,7 +537,7 @@ async function ofdClick(e) {
   }
   if (a === 'remind') { ofdReminderDialog(); return; }
   if (!d) return;
-  if (a === 'pdf-ask') { await ofdPdfAskGo(OFD.doc, !!b.dataset.dl); return; }  // 2.138.1 A (#2393)
+  if (a === 'pdf-ask') { await ofdPdfAskGo(OFD.doc, !!b.dataset.dl); return; }  // 2.138.2 A (#2393)
   if (a.startsWith('tp-') && typeof tpClick === 'function') { await tpClick(a, b); return; }  // 2.47.0 (#1215): the parts
   if (a === 'to-invoice') { await kvaToInvoice(OFD.doc); return; }
   if (a === 'kva-st') { await ofdSave('POST', `/api/office/docs/${OFD.doc.id}/status`, {status: b.dataset.st}); return; }  // 2.138.0 E (#2235): the answer updates OFD.doc

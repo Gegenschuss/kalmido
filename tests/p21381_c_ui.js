@@ -1,4 +1,4 @@
-// 2.138.1 C UI tests, own container (start.sh). The sidebar's head and the workspace colour:
+// 2.138.2 C UI tests, own container (start.sh). The sidebar's head and the workspace colour:
 // #2392 variant A: no logo; the workspace switch (dot + name + arrow) is the first row and the heading; the account picture
 //       sits without dots next to the search at the bottom; fold-all / fold the sidebar only show on hover / keyboard focus
 //       (always on touch screens); the connection dot only offline / while syncing; the update dot only at Settings;

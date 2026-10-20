@@ -141,7 +141,7 @@ const V = B + 'api/v1';
   w.eval(`go('news')`); await until(() => d.querySelector('.ntabs'));
   const tabs = d.querySelector('.ntabs');
   check(tabs && tabs.querySelector('[data-tab="all"]').classList.contains('on') && /For you/.test(tabs.textContent) && /Activity/.test(tabs.textContent), '#987: the tabs All | For you | Activity, All first');
-  // 2.138.1 (#2405): the 'Activity' section is now 'Also new'; a Read section comes below
+  // 2.138.2 (#2405): the 'Activity' section is now 'Also new'; a Read section comes below
   const secs0 = [...d.querySelectorAll('#view .nsec:not(.read)')].map(x => x.textContent.trim());
   check(secs0.length === 2 && /For you/.test(secs0[0]) && /Also new/.test(secs0[1]) && d.querySelector('#view .nsec.first').nextElementSibling.classList.contains('tome'), '#987: "All" = two sections, the items for me first ' + secs0.join('|'));
   click(w, tabs.querySelector('[data-tab="me"]')); await sleep(200);
@@ -281,7 +281,7 @@ const V = B + 'api/v1';
     await o.nav(B + '#today'); await ready(ev);
     await ev(`(() => { document.querySelector('#top [data-act="side"]').click(); return 1; })()`); await sleep(600);
     // 2.87.9 (#1933): the switch is a round icon button beside the search
-    check(await ev(`(() => { const b = document.querySelector('#side .wsbar'); return !!b && b.getBoundingClientRect().width > 30 && b.parentElement.classList.contains('sbhead'); })()`), `${tag}: #935 the switch in the drawer, the head of the sidebar (2.138.1 #2392)`);  // 2.138.1 (#2392): the switch is the sidebar's heading
+    check(await ev(`(() => { const b = document.querySelector('#side .wsbar'); return !!b && b.getBoundingClientRect().width > 30 && b.parentElement.classList.contains('sbhead'); })()`), `${tag}: #935 the switch in the drawer, the head of the sidebar (2.138.2 #2392)`);  // 2.138.2 (#2392): the switch is the sidebar's heading
     await shot('p2280-light-390-drawer.png');
     await ev(`(() => { wsSet('private'); return 1; })()`); await sleep(700);
     check(await ev(`!!document.querySelector('#top .wschip')`), `${tag}: #935 the chip on the phone`);

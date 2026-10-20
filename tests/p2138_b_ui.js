@@ -1,7 +1,7 @@
 // 2.138.0 B (#2161) UI tests, own container (start.sh). The sidebar: the search field is docked at the bottom (all widths),
 // freelancer-matrix: n/a - nur Oberfläche (Person ohne Organisation wird in der Datei geprüft)
 // the head is logo + avatar, row 2 = workspace button (name, ellipsis) + fold-all; a person without an organisation sees "Private".
-// 2.138.1 (#2392): no logo; the workspace button is the head, the avatar sits next to the search (p21381_c_ui).
+// 2.138.2 (#2392): no logo; the workspace button is the head, the avatar sits next to the search (p21381_c_ui).
 // jsdom (structure, freelancer) + Firefox at 390 (drawer open, Search tab in the bar) and 1280. Screenshots with P2138B_SHOTS=<dir>.
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -30,7 +30,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   await until(() => d.querySelector('#side .sbdock .scmd'), 60);
   const side = d.querySelector('#side');
   check(d.querySelector('#side .sbdock .scmd[data-act="palette"]') && !d.querySelector('#side .sbsrch .scmd') && side.lastElementChild.classList.contains('sbdock'), 'the search field is the docked last element of the sidebar');
-  // 2.138.1 (#2392): head = workspace button (the heading) + fold-all; the avatar sits next to the search in the dock
+  // 2.138.2 (#2392): head = workspace button (the heading) + fold-all; the avatar sits next to the search in the dock
   check(d.querySelector('#side .sbdock .sbacct') && !d.querySelector('#side .sbrand'), 'no logo row; the avatar in the bottom dock');
   const bar = d.querySelector('#side .sbhead .wsbar');
   check(bar && bar.getAttribute('data-act') === 'ws-menu' && bar.querySelector('.wsn')?.textContent && d.querySelector('#side .sbhead .kbfoldall'), 'head: workspace button with name, fold-all beside it');
@@ -41,7 +41,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const FCK = await login('frida');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'}, FCK);
   w = await boot({user: 'frida', hash: 'inbox'}); d = w.document;
-  const fb = await until(() => d.querySelector('#side .sbhead .wsbar'), 60);  // 2.138.1 (#2392)
+  const fb = await until(() => d.querySelector('#side .sbhead .wsbar'), 60);  // 2.138.2 (#2392)
   check(fb && /Private/.test(fb.querySelector('.wsn')?.textContent || ''), 'without an organisation the button says "Private"');
   w.close();
 
@@ -63,7 +63,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
     if (vw < 900) { await ev(`(() => { document.querySelector('#top [data-act="side"]').click(); return 1; })()`); await sleep(700); }
     const g = await ev(GEO);
     check(g.sv && g.sb <= g.ih && g.sb >= g.ih - 16 && g.sw >= 43.5, `${tag}: the search field sits at the bottom edge, 44 px ` + JSON.stringify(g));
-    check(g.ay > g.wy && g.ww >= 56 && g.ww <= g.sdw && g.over <= 0, `${tag}: workspace button on top, avatar at the bottom (2.138.1 #2392), nothing sideways ` + JSON.stringify(g));
+    check(g.ay > g.wy && g.ww >= 56 && g.ww <= g.sdw && g.over <= 0, `${tag}: workspace button on top, avatar at the bottom (2.138.2 #2392), nothing sideways ` + JSON.stringify(g));
     if (vw < 900) check(await ev(`document.body.classList.contains('tab-search')`), `${tag}: the Search tab is in the bar (default)`);
     // Mod+K itself is covered by appearance_ui (jsdom); untouched by #2161
     await ev(`(() => { document.querySelector('#side .scmd').click(); return 1; })()`);

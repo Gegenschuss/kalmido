@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.138.1 API tests, part A (office documents), own container (start.sh). Invented names, services and amounts only.
+"""2.138.2 API tests, part A (office documents), own container (start.sh). Invented names, services and amounts only.
  - #2393: every PDF of a document that is not finalised is marked: DRAFT / ENTWURF (the document's language) at the number
    and on every page (a quotation over several pages), also ?inline=1 and the agents' GET /api/v1/office/docs/<id>/pdf;
    the finalised quotation / invoice and a quotation sent without finalising carry no mark; a draft invoice has no e-invoice (XML 409, a ZUGFeRD draft PDF

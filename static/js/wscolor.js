@@ -1,5 +1,5 @@
 /* Kalmido web client: workspace colours (2.53.0, #1474): Private stays neutral, an organisation has a colour (its admins
-   choose, every member sees the same) -- the stripe on top of the sidebar (2.138.1 C, #2389), the frame of the input fields, the
+   choose, every member sees the same) -- the stripe on top of the sidebar (2.138.2 C, #2389), the frame of the input fields, the
    sign / switch of the workspace, the hint when something moves from Private into an organisation.
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md; after listcolor.js). */
 'use strict';
@@ -29,7 +29,7 @@ const wsp_tone = ws => { if (!wsOn() || !ws || ws === 'all') return null; if (ws
 const wsp_vars = ws => { const t = wsp_tone(ws); return t ? `--wsd:${t[0]};--wsl:${t[1]}` : ''; };
 // like wsc_attr for a workspace key (the switch, the chip, a list's sign): Private takes my colour too
 const wsp_attr = ws => { const v = wsp_vars(ws); return v ? ` data-wsc="1" style="${v}"` : ''; };
-// 2.138.1 C (#2389): the colour of the stripe on top of the sidebar (and the dot of the switch) -- my own choice, else the
+// 2.138.2 C (#2389): the colour of the stripe on top of the sidebar (and the dot of the switch) -- my own choice, else the
 // organisation's (its admins' colour), else Kalmido's accent for Private (also without an organisation, P4); "All" and a
 // neutral choice: null (grey stripe, hollow dot)
 const wsp_barTone = ws => {
@@ -41,7 +41,7 @@ const wsp_barTone = ws => {
 const wsp_barVars = ws => { const t = wsp_barTone(ws); return t ? `--wsd:${t[0]};--wsl:${t[1]}` : ''; };
 // the dot in front of a workspace's name (the switch and its menu); neutral = a hollow ring
 const wsp_dot = ws => { const v = wsp_barVars(ws); return `<span class="wsp-dot" aria-hidden="true"${v ? ` data-wsc="1" style="${v}"` : ''}></span>`; };
-// 2.138.1 C (#2389): no tint of the sidebar any more -- the shown workspace's colour goes onto #app (--wbd / --wbl) for the
+// 2.138.2 C (#2389): no tint of the sidebar any more -- the shown workspace's colour goes onto #app (--wbd / --wbl) for the
 // 4 px stripe on top of the sidebar and the 3 px stripe on top of the header while the sidebar is closed (phone, rail)
 const WSB_VARS = ['--wbd', '--wbl'];
 function wsp_side() {
@@ -62,12 +62,12 @@ function wsp_paneHtml() {
   const row = ws => {
     const nm = wsName(ws), org = ws !== 'private', def = org ? WSC_TONES[wsc_ix(wsOrg(wsc_ofWs(ws))?.color, wsc_ofWs(ws))][0] : '';
     const b = (v, bg, lab) => `<button type="button" style="background:${bg}" aria-label="${esc(lab)}" title="${esc(lab)}" data-wspc="${v}" class="${v ? '' : 'wsp-def'}"></button>`;
-    return `<div class="row wsp-row" data-wsp="${esc(ws)}"><span class="wsp-nm">${wsIcon(ws)}<span>${esc(nm)}</span></span><div class="colors" role="group" aria-label="${esc(tr('Colour of {0}', nm))}">${org ? b('', def, tr('Default (colour of the organisation)')) + b('none', 'var(--bg4)', tr('No color')) : b('', 'var(--accent)', tr('Default (Kalmido purple)')) /* 2.138.1 C (#2389) */}${LP_TONES.map(t => b(t[0], t[2], tr(t[1]))).join('')}</div></div>`;
+    return `<div class="row wsp-row" data-wsp="${esc(ws)}"><span class="wsp-nm">${wsIcon(ws)}<span>${esc(nm)}</span></span><div class="colors" role="group" aria-label="${esc(tr('Colour of {0}', nm))}">${org ? b('', def, tr('Default (colour of the organisation)')) + b('none', 'var(--bg4)', tr('No color')) : b('', 'var(--accent)', tr('Default (Kalmido purple)')) /* 2.138.2 C (#2389) */}${LP_TONES.map(t => b(t[0], t[2], tr(t[1]))).join('')}</div></div>`;
   };
-  // 2.138.1 C (#2389): "Workspace colour" -- the stripe on top of the sidebar; Private's default is the accent (no "No color")
+  // 2.138.2 C (#2389): "Workspace colour" -- the stripe on top of the sidebar; Private's default is the accent (no "No color")
   return `<div class="wsp-pane"><h5>${tr('Workspace colour')}</h5><div class="shint keep">${tr('Only you see it: a stripe on top of the sidebar and a dot in the workspace switch. Without a choice an organisation shows the colour its admins chose; Private shows Kalmido purple.')}</div>${(wsOn() ? wsOptions() : ['private']).filter(w => w !== 'all').map(row).join('')}</div>`;
 }
-// 2.138.1 C (#2389, P4): the swatches react (Settings > Workspaces, and the account page of a person without an organisation)
+// 2.138.2 C (#2389, P4): the swatches react (Settings > Workspaces, and the account page of a person without an organisation)
 function wsp_paneWire(box) {
   const p = box?.querySelector('.wsp-pane'); if (!p || p._w) return;
   p._w = 1; wsp_paneMark();
@@ -108,7 +108,7 @@ function wsc_sync() {
   const k = S.route?.mod === 'tasks' ? String(S.route.key || '') : '';
   lp_put($('#main'), 'wsc-on', wsc_listVars(k.startsWith('l:') ? listById(+k.slice(2)) : null), WSC_VARS);
   wsc_detail();
-  wsp_side();  // 2.57.0 B (#1807); 2.138.1 C (#2389): the stripe's colour
+  wsp_side();  // 2.57.0 B (#1807); 2.138.2 C (#2389): the stripe's colour
 }
 function wsc_detail() {
   const t = S.sel ? taskById(S.sel) : null;
@@ -130,7 +130,7 @@ function wsc_paneDraw(box) {
     row.innerHTML = `<label>${tr('Colour of the workspace')}</label><div class="colors" role="group" aria-label="${esc(tr('Colour of the workspace'))}">${WSC_TONES.map((t, i) => `<button type="button" style="background:${t[0]}" class="${cur === t[0] ? 'on' : ''}" aria-pressed="${cur === t[0]}" aria-label="${esc(tr('Color {0}', i + 1))}" data-wscp="${t[0]}" ${adm ? '' : 'disabled'}></button>`).join('')}</div>`;
     const hint = document.createElement('div');
     hint.className = 'shint keep';
-    hint.textContent = adm ? tr('Every member sees it as a stripe on top of the sidebar and a dot in the workspace switch, unless they choose their own colour.') : tr('Only an admin of this organisation can change it.');  // 2.138.1 C (#2389): new hint
+    hint.textContent = adm ? tr('Every member sees it as a stripe on top of the sidebar and a dot in the workspace switch, unless they choose their own colour.') : tr('Only an admin of this organisation can change it.');  // 2.138.2 C (#2389): new hint
     const sum = det.querySelector('summary');
     sum.after(row); row.after(hint);
     if (!adm) continue;

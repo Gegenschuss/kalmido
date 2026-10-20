@@ -6723,7 +6723,7 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 [data-wsc],.wsc-on{--wsc:var(--wsd)}
 :root[data-theme="light"] :is([data-wsc],.wsc-on){--wsc:var(--wsl)}
 @media (prefers-color-scheme: light){ :root[data-theme="auto"] :is([data-wsc],.wsc-on){--wsc:var(--wsl)} }
-/* 2.138.1 C (#2389): no stripe in the list header any more -- the workspace's colour is the stripe on top of the sidebar */
+/* 2.138.2 C (#2389): no stripe in the list header any more -- the workspace's colour is the stripe on top of the sidebar */
 #side .srow[data-wsc]{background-image:linear-gradient(var(--wsc),var(--wsc));background-size:.1875rem 60%;background-repeat:no-repeat;background-position:0 50%}
 .wsbadge[data-wsc]{color:var(--text);background:color-mix(in srgb,var(--wsc) 14%,transparent);border-color:color-mix(in srgb,var(--wsc) 55%,transparent)}
 .wsbadge[data-wsc]:hover{border-color:var(--wsc)}
@@ -6828,7 +6828,7 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 /* 2.57.0 B (#1807) my own workspace colours (wscolor.js wsp_*): a light tint of the sidebar (--sbbg on #side, the fixed head of
    part A takes it too), a dot in front of the workspace's name in the switch and its menu, the swatches in Settings > Workspaces */
 #side{background:var(--sbbg,var(--bg2))}
-/* 2.138.1 C (#2389): the tint (#side.wsp-on) is gone; the colour is the top border of #side below */
+/* 2.138.2 C (#2389): the tint (#side.wsp-on) is gone; the colour is the top border of #side below */
 .wsp-dot{flex:none;width:.625rem;height:.625rem;border-radius:50%;box-shadow:inset 0 0 0 .09375rem var(--muted)}
 .wsp-dot[data-wsc]{background:var(--wsc);box-shadow:none}
 .wsp-pane{margin:0 0 .75rem}
@@ -7647,7 +7647,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 @media (pointer:coarse){ :root #side .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .wsbar{width:auto;min-height:2.75rem} }
 :root #side .sbsrch,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sbsrch{margin-bottom:.5rem}  /* room above the first group heading */
 
-/* 2.138.1 C (#2392, #2389): the sidebar's head -- no logo; the workspace switch is the heading (dot + name + arrow), the
+/* 2.138.2 C (#2392, #2389): the sidebar's head -- no logo; the workspace switch is the heading (dot + name + arrow), the
    fold buttons appear on hover / keyboard focus (always on touch screens), the connection dot only offline / while syncing;
    the account picture sits next to the search at the bottom; a 4 px stripe in the workspace's colour (--wbd / --wbl on #app,
    wscolor.js wsp_side: my choice, else the organisation's, else the accent for Private; grey under "All") is #side's top border,

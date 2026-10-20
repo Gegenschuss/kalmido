@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.138.1 API tests, part B (office PDF layout), no server (kalmido/office/pdf.py of the source tree). Invented data only.
+"""2.138.2 API tests, part B (office PDF layout), no server (kalmido/office/pdf.py of the source tree). Invented data only.
  - #2388: quotation rights appendix: rows 10 pt (label = value), note 8.5 pt, project line top right not larger than the body text;
    the order confirmation after the appendix is a section of its own (>= 28 pt air, bold 10 pt heading) and is not cut off
  - #2397: footer with a two-line company name: both name lines bold, the address below normal; one-line name unchanged

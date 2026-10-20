@@ -55,7 +55,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
 
   // ================= jsdom: #475 the dashboard
   let w = await boot({user: 'alice', hash: 'today', ls: {'tasks.newsBundle': null}}), d = w.document;
-  // 2.138.1 (#2392): the logo left the sidebar -- the account menu (picture next to the search) has "Start"
+  // 2.138.2 (#2392): the logo left the sidebar -- the account menu (picture next to the search) has "Start"
   click(w, d.querySelector('#side .sbdock .sbacct')); await sleep(200);
   const logo = [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => (b.querySelector('.ml') || b).textContent.trim() === 'Start');
   check(!!logo, '#475: the account menu opens the dashboard ("Start")');

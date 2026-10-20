@@ -1021,7 +1021,7 @@ louder, and see who limited the list; the News list stays complete, only pushes 
 <p align="center"><img src="docs/news.png" alt="News inbox with mentions, grouped comments, an assignment, a completion and a shared list"></p>
 
 **Bundled (2.17.0):** News are grouped per task (or list) with one line of what happened ("2 comments · completed"),
-three sections (2.138.1): *For you* (unread approvals, proposals, mentions, assignments, follow-ups; the number is the
+three sections (2.138.2): *For you* (unread approvals, proposals, mentions, assignments, follow-ups; the number is the
 bell's), *Also new* (other unread activity) and *Read* (muted, below), *Mark read* per group;
 *Bundled* in the bar switches to the plain list (per device). *Summarize* sends your unread News to an agent's chat,
 which answers with a short summary.

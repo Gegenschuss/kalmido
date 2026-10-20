@@ -99,7 +99,7 @@ if im:
     check(im.mode == "RGB" or (im.mode == "RGBA" and im.getextrema()[3][0] == 255) or (im.mode == "P" and "transparency" not in im.info),
           f"apple-touch-icon: opaque ({im.mode})")
 
-# 2.138.1 (#2396): the Mac dock icon - 1024 px, opaque and full-bleed (violet in all four corners), the figure large
+# 2.138.2 (#2396): the Mac dock icon - 1024 px, opaque and full-bleed (violet in all four corners), the figure large
 im = img("apple-touch-icon-1024.png")
 if im:
     check(im.size == (1024, 1024), "apple-touch-icon-1024: 1024 px")
@@ -180,7 +180,7 @@ for what, rx in (("heron path", r"M24 50C34 42|M34 64C46 55"), ("heron class", r
     check(not hits, f"no {what} left: {hits[:3]}")
 
 # ---- no sloth in public files
-# 2.138.1: \b so identifiers like ast_slotHtml (slot + Html) do not count
+# 2.138.2: \b so identifiers like ast_slotHtml (slot + Html) do not count
 WORDS = re.compile(r"\bsloth|faultier|paresseux|perezoso|bradipo|luiaard", re.I)
 pub = SERVER + CLIENT + ["static/app.css", "static/public.css", "static/index.html", "static/quips.json",
        "static/manifest.json"] + [os.path.relpath(p, ROOT) for p in glob.glob(os.path.join(ST, "i18n", "*.json"))

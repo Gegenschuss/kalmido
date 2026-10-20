@@ -1,4 +1,4 @@
-// 2.138.1 B (#2395) UI test: the company name field in the office settings grows with its text (up to 3 rows, no inner scrollbar).
+// 2.138.2 B (#2395) UI test: the company name field in the office settings grows with its text (up to 3 rows, no inner scrollbar).
 // freelancer-matrix: office - nur Oberfläche, das Feld ist für Organisation und Person ohne Organisation dasselbe
 const {execFileSync} = require('child_process');
 const path = require('path');

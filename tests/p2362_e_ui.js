@@ -60,7 +60,7 @@ const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}
   const pdf = d.querySelector('.ofdhead .ofdpdf');
   // 2.40.0 (#1366): the PDF button opens the PDF in the browser, an own button downloads it
   // 2.138.0 (#2235): its word is "Preview" (the aria-label stays "Open PDF")
-  // 2.138.1 (#2393): a draft's PDF buttons ask first (finalise now / show as draft): buttons instead of links
+  // 2.138.2 (#2393): a draft's PDF buttons ask first (finalise now / show as draft): buttons instead of links
   check(pdf && pdf.getAttribute('aria-label') === 'Open PDF' && /Preview/.test(pdf.textContent) && pdf.dataset.ofd === 'pdf-ask'
     && d.querySelector('.ofdhead .ofddl')?.dataset.dl === '1', '#1146: the PDF button has a label and an aria-label');
   check(!!d.querySelector('[data-ofd="finalize"]') && !!d.querySelector('#ofd-service_from') && !!d.querySelector('#ofd-service_to') && !d.querySelector('input[type="date"]'), 'editor: Finalise, period of service (date pickers, no native date input)');

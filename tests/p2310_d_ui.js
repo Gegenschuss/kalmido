@@ -125,7 +125,7 @@ const axe = async (ev, where) => {  // the rules of p2160_a11y over the list wit
 
   // ================= #378 jsdom: the connection dot
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
-  const dot = () => d.querySelector('#side .sbhead .netdot');  // 2.138.1 (#2392): the dot sits in the sidebar's head (CSS hides it while online)
+  const dot = () => d.querySelector('#side .sbhead .netdot');  // 2.138.2 (#2392): the dot sits in the sidebar's head (CSS hides it while online)
   await until(() => dot());
   check(dot()?.classList.contains('n-on') && dot().getAttribute('aria-label') === 'Online' && dot().getAttribute('role') === 'img', 'online: a green dot, named Online');
   check(/^Account: Alice · Online$/.test(d.querySelector('#side .sbacct').getAttribute('aria-label')), 'the picture\'s button says the state too');
@@ -177,7 +177,7 @@ const axe = async (ev, where) => {  // the rules of p2160_a11y over the list wit
     check(await ev(`(() => { const b = document.querySelector('#view .lchead [data-colsort="due"]'); return b.getBoundingClientRect().height >= 24; })()`), `${tag}: the title button is a 24 px target`);
     await at('due');
     check(await ev(`document.querySelector('#view .lchead .lc[data-k="due"]')?.getAttribute('aria-sort')`) === 'descending', `${tag}: a second click reverses`);
-    // 2.138.1 (#2392): online = no dot at all, and the picture (bottom dock) carries none
+    // 2.138.2 (#2392): online = no dot at all, and the picture (bottom dock) carries none
     check(await ev(`(() => { const d = document.querySelector('#side .sbhead .netdot'), a = document.querySelector('#side .sbdock .sbacct'); if (!d || !a) return false; return d.getBoundingClientRect().width === 0 && !a.querySelector('.netdot, .dot'); })()`), `${tag}: online: no connection dot, the picture without dots`);
     await axe(ev, `${tag} list sorted by a column`);
     await shot(`p2310d-${th}-1440-sorted.png`);
@@ -190,7 +190,7 @@ const axe = async (ev, where) => {  // the rules of p2160_a11y over the list wit
     await o.nav(B + '#l/' + L); await ready(ev);
     check(await ev(`(() => { const h = document.querySelector('#view .lchead'); return !h || h.getBoundingClientRect().height === 0; })()`), `${tag}: no title row on the phone`);
     await ev(`(() => { document.querySelector('#top [data-act="side"]').click(); return 1; })()`); await sleep(800);
-    check(await ev(`(() => { const d = document.querySelector('#side .sbhead .netdot'), a = document.querySelector('#side .sbdock .sbacct'); if (!d || !a) return false; return d.getBoundingClientRect().width === 0 && d.getAttribute('aria-label') === 'Online' && a.getBoundingClientRect().width >= 40 && !a.querySelector('.netdot'); })()`), `${tag}: online: no dot in the drawer, the picture in the bottom dock`);  // 2.138.1 (#2392)
+    check(await ev(`(() => { const d = document.querySelector('#side .sbhead .netdot'), a = document.querySelector('#side .sbdock .sbacct'); if (!d || !a) return false; return d.getBoundingClientRect().width === 0 && d.getAttribute('aria-label') === 'Online' && a.getBoundingClientRect().width >= 40 && !a.querySelector('.netdot'); })()`), `${tag}: online: no dot in the drawer, the picture in the bottom dock`);  // 2.138.2 (#2392)
     await shot('p2310d-light-390-drawer.png');
   }, true);
 

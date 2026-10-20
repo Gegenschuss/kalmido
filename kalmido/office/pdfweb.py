@@ -136,21 +136,21 @@ def _model(c, oid, did):
         co["logo_path"] = lp if (office_settings(c, oid).get("logo") and os.path.isfile(lp)) else None
         from .docs import doc_row
         if epdf_is_draft(doc_row(c, oid, did)):
-            epdf_draft(model)  # 2.138.1 A (#2393): every kind that is not finalised (2.38.0: the invoice kinds only)
+            epdf_draft(model)  # 2.138.2 A (#2393): every kind that is not finalised (2.38.0: the invoice kinds only)
     model.pop("internal", None)  # never printed
     from .letterhead import bp_model
     return bp_model(c, oid, did, model)  # 2.120.0 E (#2091): the own letterhead (a finalised document: the one frozen with it)
 
 
 def epdf_is_draft(r):
-    """2.138.1 A (#2393): document row r prints as a draft: not finalised and still in status draft (a quotation set to
+    """2.138.2 A (#2393): document row r prints as a draft: not finalised and still in status draft (a quotation set to
     sent / accepted / declined without finalising is locked the same way since 2.39.0 and its customer link serves it)."""
     from .ledger import ofx_locked
     return not ofx_locked(r) and (r["status"] or "draft") == "draft"
 
 
 def epdf_draft(model):
-    """2.138.1 A (#2393): marks the print model of a document that is not finalised: DRAFT / ENTWURF (the document's
+    """2.138.2 A (#2393): marks the print model of a document that is not finalised: DRAFT / ENTWURF (the document's
     language) in bold at the number of the key data and as the light diagonal mark on every page (pdf.py). Coupled to
     "not finalised" in _render, so no PDF of a draft (button, preview, download, mail, agents) goes out unmarked."""
     word = tr("Draft", lg=model.get("lang") or "de").upper()
@@ -175,7 +175,7 @@ def _render(c, oid, r, model=None):
     from .ledger import ofx_locked
     model = model or _model(c, oid, r["id"])
     if epdf_is_draft(r):
-        epdf_draft(model)  # 2.138.1 A (#2393): never an unmarked draft, whichever model came in
+        epdf_draft(model)  # 2.138.2 A (#2393): never an unmarked draft, whichever model came in
     xml, fmt = None, ""
     if r["kind"] in EPDF_KINDS_XML and ofx_locked(r):
         fmt = epdf_format(c, oid, r)

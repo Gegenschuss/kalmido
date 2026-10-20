@@ -6,7 +6,7 @@
 //       "All"; a dot in front of each workspace in the switch and its menu; Settings > Workspaces has the swatches (one
 //       Undo step per change); the tint keeps the sidebar's text readable (contrast, both themes); the phone drawer
 //       takes the tint too.
-// 2.138.1 (#2389): no tint any more -- the shown workspace's colour is the stripe on top of the sidebar (--wbd / --wbl on
+// 2.138.2 (#2389): no tint any more -- the shown workspace's colour is the stripe on top of the sidebar (--wbd / --wbl on
 //       #app, class wsb-on; Private without a choice = the accent, "none" / "All" = grey); the checks below follow.
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -59,7 +59,7 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
   const side = () => d.querySelector('#app'), bar = () => d.querySelector('#side .wsbar'), sign = () => d.querySelector('#top h1 .wsbadge');
   await until(() => bar());
   check(w.eval(`wsc_tone(${ORG})[0]`) === '#ef8a6b' && w.eval(`wsp_tone('private')`) === null, '#1807: no choice: the organisation shows its admins\' colour, Private none');
-  check(side().classList.contains('wsb-on') && side().style.getPropertyValue('--wbd') === '#ef8a6b' && !d.querySelector('#side').classList.contains('wsp-on'), '#1807: an organisation shown: the sidebar stripe in its colour, no tint (2.138.1 #2389)');
+  check(side().classList.contains('wsb-on') && side().style.getPropertyValue('--wbd') === '#ef8a6b' && !d.querySelector('#side').classList.contains('wsp-on'), '#1807: an organisation shown: the sidebar stripe in its colour, no tint (2.138.2 #2389)');
   check(bar()?.dataset.wsc === '1' && bar().querySelector('.wsp-dot[data-wsc]'), '#1807: the switch carries a coloured dot in front of the name');
   check(d.querySelector(`#side .srow[data-list="${W}"]`)?.style.getPropertyValue('--wsd') === '#ef8a6b', '#1807: no choice: the sidebar stripe as before');
 
@@ -84,7 +84,7 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
   // ---- "none": the organisation neutral everywhere (no tint, no stripe, no colour at the switch, a ring as the dot)
   w.eval('render()');
   await until(() => !side().classList.contains('wsb-on'));
-  check(!side().classList.contains('wsb-on') && !side().style.getPropertyValue('--wbd'), '#1807: "none": a grey stripe (2.138.1 #2389)');
+  check(!side().classList.contains('wsb-on') && !side().style.getPropertyValue('--wbd'), '#1807: "none": a grey stripe (2.138.2 #2389)');
   check(!d.querySelector(`#side .srow[data-list="${W}"]`)?.dataset.wsc && !d.querySelector('#main').classList.contains('wsc-on'), '#1807: "none": no stripe, no header stripe');
   check(!bar().dataset.wsc && bar().querySelector('.wsp-dot') && !bar().querySelector('.wsp-dot[data-wsc]'), '#1807: "none": the dot is a ring');
   // my own tone wins over the admins' colour
@@ -111,7 +111,7 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
   const css = await (await fetch(B + 'static/app.css')).text();
   const vars = sel => { const m = css.match(new RegExp(sel.replace(/[[\]()"=]/g, '\\$&') + '\\{([^}]*)\\}')); const o = {}; if (m) for (const [, k, v] of m[1].matchAll(/--([\w-]+):([^;]+)/g)) o[k] = v.trim(); return o; };
   const dark = vars(':root'), light = vars(':root[data-theme="light"]');
-  // 2.138.1 (#2389): the tint is gone -- the sidebar keeps bg2 in every workspace, so its text contrast is the theme's own
+  // 2.138.2 (#2389): the tint is gone -- the sidebar keeps bg2 in every workspace, so its text contrast is the theme's own
   check(!/#side\.wsp-on\{--wsc/.test(css) && /#side\{border-top:\.25rem solid var\(--wbc\)\}/.test(css), '#1807 / #2389: no tint rule any more, a 4 px stripe instead');
   check(/#side\{background:var\(--sbbg,var\(--bg2\)\)\}/.test(css), '#1807: #side takes --sbbg (the fixed head shares it)');
 
@@ -135,7 +135,7 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
       const plain = await ev(bgOf);
       const bg2 = await ev(`(() => { const e = document.createElement('div'); e.style.background = 'var(--bg2)'; document.body.append(e); const c = getComputedStyle(e).backgroundColor; e.remove(); return c; })()`);
       const stripeAll = await ev(`getComputedStyle(document.querySelector('#side')).borderTopColor`);
-      check(tinted && plain && tinted === plain && plain === bg2, `#1807 ${theme}: 2.138.1 (#2389): no tint, the sidebar stays bg2 (${tinted} vs ${plain})`);
+      check(tinted && plain && tinted === plain && plain === bg2, `#1807 ${theme}: 2.138.2 (#2389): no tint, the sidebar stays bg2 (${tinted} vs ${plain})`);
       check(stripe && stripeAll && stripe !== stripeAll && stripe !== 'rgba(0, 0, 0, 0)', `#2389 ${theme}: the stripe takes my tone, grey under "All" (${stripe} / ${stripeAll})`);
       // the phone: the drawer shows the same tint
       await ev(`(() => { S.settings.workspace = 'org:${ORG}'; render(); return 1; })()`);
