@@ -380,18 +380,96 @@ def books_member_rm(bid, uid):
     return jsonify(ok=True)
 
 
+# 2.146.0 E (#2457): several vCard files in one request (Outlook writes one .vcf per contact) or a ZIP of them (Google
+# Takeout): multipart field "files" (several) or one "file" that is a ZIP. The vCards go through the one import of a single
+# file (duplicates by UID / the likely-duplicates check as before); each file and all together at most VCF_MAX.
+CT_VCF_EXTS = (".vcf", ".vcard")
+
+
+def _vcf_text(data):
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return data.decode("utf-16", "replace")
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return data.decode("latin-1")
+
+
+def ct_gather(ups):
+    """The uploads -> (vCard bytes of all readable files, info {files, errors [{file, error}], skipped [names]}); None when
+    it is one plain file (the single import reads it as before, CSV included)."""
+    from ..core.zipread import ZipLimit, base_name, is_zip, zip_read
+    if len(ups) == 1 and not is_zip(ups[0][0], ups[0][1]):
+        return None
+    parts, errors, skipped, total = [], [], [], 0
+
+    def take(name, data):
+        nonlocal total
+        text = _vcf_text(data)
+        if "BEGIN:VCARD" not in text.upper():
+            errors.append({"file": name, "error": tr("This is not a contacts file (vCard)")})
+            return
+        total += len(data)
+        if total > VCF_MAX:
+            raise BadInput(tr("The files are too large together (at most {0} MB)", VCF_MAX // (1024 * 1024)))
+        parts.append(text.strip())
+
+    for name, data in ups:
+        name = base_name(name) or tr("File")
+        if is_zip(name, data):
+            try:
+                z = zip_read(data, CT_VCF_EXTS, VCF_MAX, total_max=VCF_MAX)
+            except ZipLimit as e:
+                raise BadInput(str(e)) from None
+            errors += [{"file": f"{name}: {x['file']}" if x["file"] else name, "error": x["error"]} for x in z.errors]
+            skipped += z.skipped
+            for n, d in z.files:
+                take(n, d)
+        else:
+            take(name, data)
+    if not parts:
+        raise BadInput(errors[0]["error"] if len(errors) == 1 else tr("No contacts file found (vCard)"))
+    return "\r\n".join(parts).encode("utf-8") + b"\r\n", {"files": len(parts), "errors": errors[:50], "skipped": skipped[:50]}
+
+
+def _ct_uploads():
+    """The uploaded files [(name, bytes)]: field "files" (several, 2.146.0 E #2457) and / or "file"; the whole request at most VCF_MAX."""
+    if (request.content_length or 0) > VCF_MAX + 1024 * 1024:  # before the form is parsed
+        raise BadInput(tr("The file is too large (at most {0} MB)", VCF_MAX // (1024 * 1024)))
+    out, total = [], 0
+    for f in [x for x in request.files.getlist("files") if x] + [x for x in request.files.getlist("file") if x]:
+        data = f.stream.read(VCF_MAX + 1 - total)
+        total += len(data)
+        if total > VCF_MAX:
+            raise BadInput(tr("The file is too large (at most {0} MB)", VCF_MAX // (1024 * 1024)))
+        out.append((f.filename or "", data))
+    return out
+
+
 @app.post("/api/books/<int:bid>/import")
 def books_import(bid):
     need_feat("contacts")
-    f = request.files.get("file")
-    raw = f.read(VCF_MAX + 1) if f else request.get_data(cache=False)[:VCF_MAX + 1]
+    bg = request.args.get("background") in ("1", "true")  # 2.41.0 (#1437): ?background=1 (the app): a large file answers 202 {import_id, ...} at once
+    preview = request.args.get("preview") in ("1", "true")
+    if len(request.files.getlist("files")) + len(request.files.getlist("file")) > 1 or request.files.get("files"):
+        ups = _ct_uploads()
+        if not ups:
+            return err(tr("No file"))
+        got = ct_gather(ups)  # 2.146.0 E (#2457): several files
+        name, raw = ("contacts.vcf", got[0]) if got else ups[0]
+    else:
+        f = request.files.get("file")
+        raw = f.read(VCF_MAX + 1) if f else request.get_data(cache=False)[:VCF_MAX + 1]
+        name = (f.filename or "") if f else ""
+        got = ct_gather([(name, raw)]) if raw else None  # 2.146.0 E (#2457): one ZIP of vCards
+        if got:
+            name, raw = "contacts.vcf", got[0]
     if not raw:
         return err(tr("No file"))
-    # 2.41.0 (#1437): ?background=1 (the app): a large file answers 202 {import_id, state: "running", ...} at once
-    bg = request.args.get("background") in ("1", "true")
     # 2.119.1 A (#2080): a CSV file too; ?preview=1 answers its columns, the form field mapping = a field per column
-    r = op_import(db(), me(), bid, raw, bg=bg, csv_ok=True, mapping=request.form.get("mapping"), preview=request.args.get("preview") in ("1", "true"),
-                  name=f.filename or "" if f else "")
+    r = op_import(db(), me(), bid, raw, bg=bg, csv_ok=True, mapping=None if got else request.form.get("mapping"), preview=preview, name=name)
+    if got:
+        r["files"] = got[1]
     return (jsonify(r), 202) if "import_id" in r else jsonify(r)
 
 
