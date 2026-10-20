@@ -147,6 +147,9 @@ const FAM = 'cal,habits,comments,collab,family';
   check(await until(async () => (await call('GET', '/api/state')).tasks.some(t => t.title === 'Lasagne' && t.list_id === L.meals && t.fam?.kind === 'meal' && t.section_id)), 'a meal added to the meal plan (2.46.1: list Family, marked, in its section)');
   const meal = (await call('GET', '/api/state')).tasks.find(t => t.list_id === L.meals && /Spaghetti/.test(t.title));
   click(w, d.querySelector(`#view [data-act="fam-ingr"][data-id="${meal.id}"]`));
+  // 2.140.0 A (#2132): a short choice first (every ingredient ticked), then onto the list
+  check(await until(() => [...d.querySelectorAll('.modal')].pop()?.querySelectorAll('.fingr input:checked').length === 4), 'the ingredients choice: four, all ticked');
+  click(w, [...d.querySelectorAll('.modal')].pop().querySelector('[data-m="save"]'));
   check(await until(async () => (await call('GET', '/api/state')).tasks.filter(t => t.list_id === L.shopping && t.status === 0).length === 7), 'ingredients on the shopping list (3 + 4)');
   check(await until(() => /4 items on the shopping list/.test(d.querySelector('#toast').textContent)), 'the toast says how many: ' + d.querySelector('#toast').textContent);
   // stars + rewards by a parent
@@ -194,7 +197,8 @@ const FAM = 'cal,habits,comments,collab,family';
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
   w.eval('listModal()'); await sleep(200);
   md = d.querySelector('.modal.lnew');
-  check(md.querySelector('#l-fam') && md.querySelector('#l-fam').options.length === 7, 'new list: "Used for" with seven choices (2.46.1 #1615: Family)');
+  // 2.140.0 A (#2132): + Recipes
+  check(md.querySelector('#l-fam') && md.querySelector('#l-fam').options.length === 8, 'new list: "Used for" with eight choices (2.46.1 #1615: Family; 2.140.0: Recipes)');
   md.querySelector('#l-name').value = 'Weekend shop';
   change(w, md.querySelector('#l-fam'), 'shopping');
   check(md.querySelector('#l-dab').checked, 'a shopping list: done at the bottom ticked');

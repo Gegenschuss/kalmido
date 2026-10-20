@@ -956,6 +956,7 @@ function taskRow(t, opts = {}) {
   else if (t.milestone_id && !opts.trash && !opts.subRow && rs('ms')) meta.push(msChip(t));
   if (t.sprint_id) { const sc = spr_rowChip(t, opts); if (sc) meta.push(sc); }  // 2.60.0 (#343): only with "Show the sprint in the task row"
   if (isOcc(t) && famOn() && t.status === 0 && occWhat(t) && rs('occ')) meta.push(`<span class="occm">${ic('cake', 's')}${esc(occWhat(t))}</span>`);  // 2.19.0 (#653)
+  if (t.fam?.kind === 'shop' && !opts.trash) { const q = famRowQty(t); if (q) meta.unshift(q); }  // 2.140.0 A (#2131): the amount of a shopping item
   if (t.rotation?.who?.length > 1 && famOn() && t.status === 0 && !opts.trash && rs('turns')) meta.push(`<span class="rotm" title="${esc(tr('Takes turns'))}">${ic('turns', 's')}<span class="sr">${esc(tr('Takes turns'))}</span></span>`);
   if (t.context) meta.push(`<span class="ctxm" title="${esc(tr('The main task of a subtask assigned to you: read-only, without notes, files and comments'))}">${ic('sub', 's')}${tr('Context')}</span>`);
   // 2.0.4 (#308): "Ready to start" only when the view has dependencies at all (see renderList); a button: tap / click

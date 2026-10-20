@@ -14,16 +14,17 @@ from ..tasks.tasks import one_task
 from ..collab.comments import user_names
 from ..personal.timetrack import BadInput
 from ..family.family import (
-    deadline_create, FAM_DL, h6a_admin_kid_ok, FAM_NOTE_MAX, family_overview, ingredient_lines, kid_balance, kid_dict, kid_parents,
+    deadline_create, FAM_DL, h6a_admin_kid_ok, FAM_NOTE_MAX, family_overview, ingredient_items, kid_balance, kid_dict, kid_parents,
     kid_push, KID_REWARDS_MAX, kids_for, need_kid, occ_create, packing_create, packing_templates, purpose_apply,
-    REWARD_COST_MAX, reward_dict, shop_areas_add, to_shopping,
+    fam_list, recipe_of, REWARD_COST_MAX, reward_dict, serves_of, SERVES_MAX, shop_areas_add, shop_key, to_shopping,
 )
 
 
 # ---- web API
 @app.get("/api/family")
 def family_get():
-    """The Family view's data (also GET /api/v1/family). ?week=YYYY-MM-DD: the meal plan of the week of that day."""
+    """The Family view's data (also GET /api/v1/family). ?week=YYYY-MM-DD: the meal plan of the week of that day;
+    2.140.0 A (#2132): ?days=1-62 (default 7): the meal plan of that many days from that Monday."""
     c, uid = db(), me()
     wk = request.args.get("week")
     start = None
@@ -32,7 +33,9 @@ def family_get():
             return err(tr("Invalid value: {0}", "week"))
         d = date.fromisoformat(wk)
         start = d - timedelta(days=d.weekday())
-    return jsonify(family_overview(c, uid, start))
+    days = request.args.get("days")
+    days = as_int(days, "days", 1, 62) if days not in (None, "") else 7
+    return jsonify(family_overview(c, uid, start, days))
 
 
 @app.post("/api/family/occasions")
@@ -66,20 +69,47 @@ def family_deadline_new():
 
 @app.post("/api/tasks/<int:tid>/to-shopping")
 def task_to_shopping(tid):
-    """{list_id?, items?: [..]} -- the ingredients of a meal (its notes; or the given items) onto a shopping list."""
+    """{list_id?, items?: [..], servings?, preview?} -- the ingredients of a meal or a recipe (its notes; a meal without
+    any: the notes of its recipe; or the given items) onto a shopping list. 2.140.0 A (#2131, #2132): an item is a text
+    or {name, qty?, unit?}; servings scales the amounts of the notes (servings / the recipe's); preview = nothing is
+    written, the answer lists the ingredients ({items: [{name, qty, unit, text, have}], serves, recipe_id})."""
     c, uid = db(), me()
     need_task(c, tid, write=False, full=True)
     b = body()
+    t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+    src = t
+    rec = recipe_of(c, t, uid) if not ingredient_items(t["content"]) else None
+    if rec is not None:
+        src = rec
+    serves = serves_of(c, src) or serves_of(c, t)
+    sv = b.get("servings")
+    sv = as_int(sv, "servings", 1, SERVES_MAX) if sv not in (None, "") else None
     items = b.get("items")
-    if items is None:
-        items = ingredient_lines(c.execute("SELECT content FROM tasks WHERE id=?", (tid,)).fetchone()[0])
-    elif not isinstance(items, list) or len(items) > 100 or not all(isinstance(x, str) for x in items):
+    if items is None:  # the notes, scaled to the servings
+        items = [{k: x[k] for k in ("name", "qty", "unit", "text")}
+                 for x in ingredient_items(src["content"], sv / serves if sv and serves and sv != serves else None)]
+    elif not isinstance(items, list) or len(items) > 100 or not all(
+            isinstance(x, str) or (isinstance(x, dict) and isinstance(x.get("name"), str) and not set(x) - {"name", "qty", "unit"}) for x in items):
         return err(tr("Invalid value: {0}", "items"))
-    items = [x.strip()[:TITLE_MAX] for x in items if x.strip()]
+    items = [x.strip()[:TITLE_MAX] if isinstance(x, str) else x for x in items if (x if isinstance(x, str) else x["name"]).strip()]
+    lid = b.get("list_id")
+    lid = as_int(lid, "list_id", 1) if lid not in (None, "") else None
+    if b.get("preview"):  # 2.140.0 A (#2132): what would go, "have" = an open item of that name is on the list already
+        tl = lid or fam_list(c, uid, "shopping", create=False)
+        if tl:
+            need_list(c, tl, write=False)
+        have = {shop_key(r[0]) for r in c.execute("SELECT title FROM tasks WHERE list_id=? AND status=0 AND deleted_at IS NULL AND parent_id IS NULL",
+                                                   (tl,))} if tl else set()
+        out = []
+        for x in items:
+            x = {"name": x, "qty": None, "unit": ""} if isinstance(x, str) else x
+            out.append({"name": x["name"], "qty": x.get("qty"), "unit": x.get("unit") or "", "text": x.get("text") or x["name"],
+                        "have": shop_key(x["name"]) in have})
+        return jsonify(items=out, serves=serves, recipe_id=rec["id"] if rec is not None else None, list_id=tl)
+    items = [{k: v for k, v in x.items() if k != "text"} if isinstance(x, dict) else x for x in items]
     if not items:
         return err(tr("No ingredients found: write them as a list in the notes"))
-    lid = b.get("list_id")
-    out = to_shopping(c, uid, items, as_int(lid, "list_id", 1) if lid not in (None, "") else None, source=tid)
+    out = to_shopping(c, uid, items, lid, source=tid)
     bump(c)
     c.commit()
     return jsonify(out)
