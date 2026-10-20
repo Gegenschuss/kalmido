@@ -713,7 +713,8 @@ TOOLS = [
     ("confirm_abort", "2.144.0: the person pressed Stop in the chat (event abort {user, job_id?}): end the answer you are working on "
                       "right away, then confirm with this tool -- without job_id your status goes back to idle and the typing dots end; "
                       "with job_id only that job's current step was stopped (the job stays, your status too). Then say in one or two "
-                      "lines in the chat what was done until then (send_chat).",
+                      "lines in the chat what was done until then (send_chat). Only the run for that person (user) or a Stop "
+                      "of your owner; someone else's Stop for another person's run: ignore it, do not confirm.",
      _obj({"seq": {"type": "integer", "minimum": 0}, "job_id": S_ID}),
      lambda api, a: api.call("POST", "/agent/aborted", body=_pick(a, ("seq", "job_id")))),
     ("chat_typing", "Show typing dots in one person's chat for 10 seconds while you write an answer (call again to keep them; "

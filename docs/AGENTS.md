@@ -1312,6 +1312,12 @@ With `job_id` only that job's step was stopped and the status stays. Afterwards 
 was done until then; nothing running = confirm only. MCP: `confirm_abort`. The reference launcher ends the running
 command (its whole process group) and posts the short note itself.
 
+Stop only **that person's** run: a team agent working for one person must not end it because someone else pressed Stop
+(the status `working` is the agent's, so others may see it too). Only `user.id` of the event = the person the running
+answer is for, or the agent's owner / operator, ends it; any other Stop is ignored (no confirmation, no note). The app
+shows the button only to the person the agent is writing to (its typing signal for them, or their own unanswered message
+while it works).
+
 **Typing in task comments (2.22.0).** Before an agent answers a comment on a task it sends
 `POST /api/v1/tasks/{id}/typing` (MCP: `comment_typing`, scope `comments`): everyone who sees the task's comments sees
 "<name> is writing …" for 8 seconds; send it again while writing. People's comment boxes send the same signal by themselves.

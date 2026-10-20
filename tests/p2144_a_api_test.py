@@ -9,9 +9,13 @@ freelancer-matrix: agents
    status stays; unknown field / foreign job 400; a person's token 403; the OpenAPI entry carries x-kalmido-scope
  - GET /api/v1/agent names the event 'abort'
  - a person without an organisation stops their own agent the same way
+ - 2.144.0 A2: a body that is no JSON object 400 (both routes); the reference launcher (mcp/agent_run.py, no server) ends a
+   running answer only for the person it is for or an operator, someone else's Stop is ignored (no confirmation)
 usage: p2144_a_api_test.py <datadir>      (P2144A_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
+import importlib.util
 import os
 import subprocess
+import tempfile
 import sys
 import time
 
@@ -118,6 +122,8 @@ check(jst.get(J) == "running", f"the job itself keeps running: {jst.get(J)}")
 check(A.post(B + f"/api/agents/{CL}/abort", json={"job_id": JO}).status_code == 404, "job_id of another agent: 404")
 check(A.post(B + f"/api/agents/{CL}/abort", json={"job_id": 999999}).status_code == 404, "unknown job: 404")
 check(A.post(B + f"/api/agents/{CL}/abort", json={"job_id": "x"}).status_code == 400, "job_id not a number: 400")
+check(A.post(B + f"/api/agents/{CL}/abort", json=[1]).status_code == 400, "A2: a body that is no JSON object: 400")
+check(T1.post(V + "/agent/aborted", json=[1]).status_code == 400, "A2: aborted with a body that is no JSON object: 400")
 T1.patch(V + f"/agent/jobs/{J}", json={"state": "done"})
 check(A.post(B + f"/api/agents/{CL}/abort", json={"job_id": J}).status_code == 409, "an ended job: 409")
 
@@ -158,6 +164,56 @@ FT.put(V + "/agent/status", json={"status": "working", "text": "x"})
 r = FT.post(V + "/agent/aborted", json={"seq": (ev or {}).get("seq")})
 check(r.ok and r.json().get("status") == "idle", f"freelancer: the agent confirms {r.status_code} {r.text[:200]}")
 check(F.post(B + f"/api/agents/{CL}/abort", json={}).status_code == 404, "freelancer: someone else's agent 404")
+
+# ---------------------------------------------------------------- 2.144.0 A2: the reference launcher stops only that person's run
+os.environ.setdefault("KALMIDO_URL", "http://127.0.0.1:9")
+os.environ.setdefault("KALMIDO_TOKEN", "abk_" + "y" * 30)
+os.environ.pop("KALMIDO_OWNER_IDS", None)
+os.environ.pop("KALMIDO_PERM_USER", None)
+spec = importlib.util.spec_from_file_location("agent_run", os.path.join(N, "..", "mcp", "agent_run.py"))
+ar = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ar)
+
+
+class StubApi:
+    def __init__(self):
+        self.calls = []
+
+    def soft(self, *a, **k):
+        self.calls.append(a)
+        return 200
+
+    def status(self, *a, **k):
+        self.calls.append(("status",) + a)
+
+
+class Proc:
+    def poll(self):
+        return None
+
+
+class St:
+    aborted = False
+
+
+killed = []
+ar.kill_tree = lambda p: killed.append(p)
+r = ar.Runner(["claude"], tempfile.mkdtemp(prefix="kalmido-p2144a-"))
+r.api, r.agent = StubApi(), {"owner_id": 7}
+ab = lambda uid, seq=5: {"event": "abort", "seq": seq, "data": {"user": {"id": uid}, "source": "chat"}}
+r.proc, r.cur_st, r.cur_uid = Proc(), St(), 5
+r.abort(ab(6))
+check(not r.cur_st.aborted and not killed and not r.api.calls, "launcher: Stop by someone else for person 5's run: ignored, not confirmed")
+r.abort(ab(5))
+check(r.cur_st.aborted and len(killed) == 1 and r.abort_ev and r.abort_ev["seq"] == 5, "launcher: Stop by the person the run is for ends it")
+r.proc, r.cur_st, r.cur_uid = Proc(), St(), None
+r.abort(ab(6))
+check(not r.cur_st.aborted and len(killed) == 1, "launcher: a task run is not stopped by someone who is no operator")
+r.abort(ab(7))
+check(r.cur_st.aborted and len(killed) == 2, "launcher: the agent's owner may stop any run")
+r.proc = None
+r.abort(ab(6, 9))
+check(any(c[:2] == ("POST", "/agent/aborted") for c in r.api.calls), "launcher: nothing running: confirmed at once")
 
 print(f"p2144_a_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

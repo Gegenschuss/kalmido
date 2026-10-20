@@ -1593,6 +1593,7 @@
 "chartW",
 "chatAbort",
 "chatAbortHtml",
+"chatAbortKey",
 "chatAbortSync",
 "chatAbortTip",
 "chatAbortWaits",

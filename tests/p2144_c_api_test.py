@@ -4,6 +4,7 @@
  - the app's PATCH /api/lists/<id> {group_field}: 'cf:<id>' or the id of a text / select field of this list; '' / null = off;
    a number / date field, a field of another list, garbage = 400; a member (edit) or viewer = 403; /api/state carries it
  - the sections stay untouched while a grouping is on
+ - 2.144.0 A2: deleting the grouping field ends the grouping (group_field back to '')
  - PATCH /api/v1/lists/<id> {sort_mode, group_field} with a personal token (scope structure); GET carries both; a wrong
    sort_mode = 400; a read-only token = 403
  - a person without an organisation (freelancer-matrix: lists): groups and sorts the own private list in the app and over
@@ -104,6 +105,10 @@ t = next(x for x in A.get(B + "/api/state").json()["tasks"] if x["id"] == T1)
 check(t.get("section_id") == sec, "the task keeps its section")
 r = A.patch(B + f"/api/lists/{L}", json={"group_field": None})
 check(r.ok and lst(A, L).get("group_field") == "", "null = by sections again")
+# 2.144.0 A2 (#2414): a deleted grouping field ends the grouping
+fgone = A.post(B + f"/api/lists/{L}/fields", json={"name": "Temporary", "type": "text"}).json()["id"]
+assert A.patch(B + f"/api/lists/{L}", json={"group_field": f"cf:{fgone}"}).ok
+check(A.delete(B + f"/api/fields/{fgone}").ok and lst(A, L).get("group_field") == "", "A2: deleting the grouping field ends the grouping")
 
 # ================================================================ /api/v1: sort_mode and group_field
 TK = token(A, ["read", "structure"])

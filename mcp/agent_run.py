@@ -1255,6 +1255,7 @@ class Runner:
         self.perm_thread = None
         self.cur = 0
         self.proc, self.cur_st, self.abort_ev = None, None, None  # 2.144.0 (#2412): the running command, its stream, the Stop
+        self.cur_uid = None  # 2.144.0 (#2412): whose chat the running command answers (None: a task / event run)
 
     # the approval requests this runner posted: message id -> {uid, title, what, at, reminded} (2.44.0: on disk)
     @property
@@ -1464,6 +1465,9 @@ class Runner:
             if text:
                 body, appr, sugg, done = split_tail_blocks(redact(text))
                 body, appr, sugg = self.check_approval(args, uid, body, appr, sugg, st.session_id, what)
+                if body is None:  # 2.144.0 (#2412): stopped while the approval check ran
+                    self.aborted_note(uid, st)
+                    return
                 if done:  # 2.44.0 (#1441): approvals the person decided in words -> exactly those cards are closed
                     self.close_decided(uid, done)
                 if appr:
@@ -1737,6 +1741,8 @@ class Runner:
         if session_id:
             st2, _ = self._exec(args + ["--resume", session_id], CARD_FIX.format(line=line.replace('"', "'")), uid, what, None,
                                 steps=False)
+            if st2 is not None and st2.aborted:  # 2.144.0 (#2412): Stop during this second run ends the whole answer
+                return None, None, []
             t2 = result_text(st2) if st2 else ""
             if t2:
                 body, appr, sugg, _ = split_tail_blocks(redact(t2))
@@ -1798,6 +1804,10 @@ class Runner:
             return
         p, st = self.proc, self.cur_st
         if p is not None and p.poll() is None and st is not None:
+            # 2.144.0 (#2412): only the person the run is for (or an operator) may end it; anyone else: nothing, not confirmed
+            if uid != self.cur_uid and uid not in self.perm_operators():
+                log("stop pressed in the chat by someone the running answer is not for: ignored")
+                return
             log("stop pressed in the chat: ending the command")
             self.abort_ev, st.aborted = ev, True
             kill_tree(p)
@@ -1972,7 +1982,7 @@ class Runner:
             return None, -1
         st.timed_out = False
         err_tail = st.err_tail = []
-        self.proc, self.cur_st = p, st  # 2.144.0 (#2412): Stop in the chat ends it (abort, from the event thread)
+        self.proc, self.cur_st, self.cur_uid = p, st, uid  # 2.144.0 (#2412): Stop in the chat ends it (abort, from the event thread)
 
         def time_up():
             st.timed_out = True
