@@ -399,6 +399,8 @@ colours, rows with inputs and formulas - all in ONE call), `sheet_update`, `shee
 `sheet_append_rows`, `sheet_add_column`, `sheet_undo_batch`. You see only tables attached to a list shared with you and those
 you created. Every write call is one batch the person can take back; a cell with error `denied` is a source not shared with
 you: never guess its value. Formulas: `=SUMME(B2:B9)`, `=stunden*satz`, `=projekt.<name>.zeit_gesamt` (arguments with `;`).
+Column kinds also `checkbox` (1 / 0), `person` (account id of someone who sees the table), `link` (http(s) / mailto only)
+and `file` (read only for you: the file name; people upload files in the app).
 
 ### Video sign-offs (2.99.1)
 A video sign-off holds links only (Vimeo, YouTube, a video file; each new link = a version v1, v2 ...) and comments at a

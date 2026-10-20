@@ -917,8 +917,11 @@ TOOLS += [
 ]
 # 2.89.0 C (#1916): tables ("Excel in simple"): lists and formulas whose cells can fetch Kalmido numbers. You see only tables
 # shared with you (attached to a list you see) and those you created; every write call is ONE batch a person can take back
-_SH_COL = {"type": "object", "description": "{title (also its name in formulas), kind text|number|currency|percent|date|select, options?: "
-                                            "[{label, color?: #rrggbb}] (select), color_mode?: cell|row (select: colour the cell or the row), width?}"}
+_SH_COL = {"type": "object", "description": "{title (also its name in formulas), kind text|number|currency|percent|date|select|checkbox|person|link|file, "
+                                            "options?: [{label, color?: #rrggbb}] (select), color_mode?: cell|row (select: colour the cell or the row), width?}. "
+                                            "2.124.0: checkbox = 1 / 0 (WAHR / FALSCH, ja / nein also work; SUMME counts the ticks), person = the account "
+                                            "id or exact name of someone who may see the table, link = http(s) or mailto address, file = read only "
+                                            "for you (raw file:<id>, display = the file name; people upload files in the app)"}
 _SH_ROWS = {"type": "array", "items": {"type": "array"}, "description": "Rows of inputs in the order of the columns: numbers (1,5 or 1.5), "
                                                                       "dates DD.MM.YYYY or YYYY-MM-DD, a select cell its label, formulas start with "
                                                                       "= (A1, B2:B9, cell / column names, SUMME, MITTELWERT, MIN, MAX, ANZAHL, WENN, "
@@ -954,7 +957,7 @@ TOOLS += [
      _obj({"sheet_id": S_ID, "rows": _SH_ROWS, "after_row_id": S_ID}, ["sheet_id", "rows"]),
      lambda api, a: api.call("POST", f"/sheets/{_id(a, 'sheet_id')}/rows", body=_pick(a, ("rows", "after_row_id")))),
     ("sheet_add_column", "2.89.0 (scope sheets:write): add a column (title, kind, options, color_mode) at the end or after after_col_id.",
-     _obj({"sheet_id": S_ID, "title": {"type": "string", "maxLength": 80}, "kind": {"type": "string", "enum": ["text", "number", "currency", "percent", "date", "select"]},
+     _obj({"sheet_id": S_ID, "title": {"type": "string", "maxLength": 80}, "kind": {"type": "string", "enum": ["text", "number", "currency", "percent", "date", "select", "checkbox", "person", "link", "file"]},
            "options": {"type": "array", "items": {"type": "object"}}, "color_mode": {"type": "string", "enum": ["cell", "row"]}, "after_col_id": S_ID},
           ["sheet_id", "title"]),
      lambda api, a: api.call("POST", f"/sheets/{_id(a, 'sheet_id')}/columns", body=_pick(a, ("title", "kind", "options", "color_mode", "after_col_id")))),

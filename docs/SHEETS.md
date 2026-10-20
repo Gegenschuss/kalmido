@@ -15,7 +15,8 @@ budget against the time booked, or plain lists (equipment, shooting plan, contac
   cell, Enter or F2 edits it, Esc cancels, Delete empties the selection. Ctrl/Cmd+C / X / V copy, cut and paste ranges, also
   from and to other spreadsheets; pasting below the last row adds rows. Enter in the last row adds a row. The bar above the
   grid shows and edits the content of the chosen cell. On a phone a tap chooses a cell, a second tap edits it.
-- **Columns** have a kind: text, number, currency, percent, date or selection. A selection has its own options, each with a
+- **Columns** have a kind: text, number, currency, percent, date, selection, checkbox, person, link or file (2.124.0, see
+  below). A selection has its own options, each with a
   colour of the app palette; the colour goes to the cell or, if you choose so, to the whole row. The menu of a column title
   sorts (saved for everyone), filters (only your view) and inserts or deletes columns; its right edge changes the width.
 - **Formulas** start with `=`: `+ - * /`, brackets, comparisons, text in quotes, `&` joins text, `19%` is 0.19. Arguments
@@ -45,6 +46,29 @@ budget against the time booked, or plain lists (equipment, shooting plan, contac
   it). A phone shows the grid as before, without these buttons.
 - **Undo.** Every action (a cell, a paste, sorting, a column, a row, creating, renaming, deleting) is one step back (the
   arrow on top, Ctrl/Cmd+Z, the toast). Deleted tables, columns and rows can be restored.
+
+## More column kinds, rows kept in view, printing and history (2.124.0)
+
+- **Checkbox.** A tap on the box ticks it (or choose the cell and press Space or Enter). In formulas a tick counts as 1,
+  an empty box as 0: `=SUMME(D2:D20)` counts the ticks.
+- **Person.** Choose one of the people who may see the table: the members of the attached project or list, of the
+  organisation, or in a private table only you. The cell shows the picture and the name; someone who can no longer see the
+  table (or whose account is gone) reads *Unknown*.
+- **Link.** Type a web address (`https://…`, `www.example.com` gets `https://`) or an e-mail address (becomes `mailto:`).
+  Anything else is refused. The cell shows the address shortened; the arrow at its end opens it in a new tab.
+- **File.** Enter (or a second tap) on a file cell opens *Upload file…*, *Open*, *Download* and *Remove file*; on a computer a
+  file can also be dropped on the cell. The file lies encrypted at rest like task attachments and as large as they may be;
+  only people who may read the table open it. A removed or replaced file can be brought back with Undo; after 30 days it is
+  deleted for good. Changing a column's kind keeps every input as it was.
+- **Keep rows / columns in view.** In the menu of a row number or a column title: *Keep rows in view up to here* /
+  *Keep columns in view up to here*. Those rows / columns stay put while you scroll (also on a phone), for everyone who
+  opens the table; *Release the kept rows* / *columns* (or the table's menu) ends it. Not the same as *Freeze value*,
+  which keeps one cell's value as a copy.
+- **Print / PDF.** The table's menu has *Print / PDF…*: a plain view of the rows shown (filters apply) with the column
+  titles repeated on every page. In the print dialog choose *Save as PDF* for a PDF file (on phones too).
+- **History.** The panel has *History of the cell* (who changed the chosen cell when, before -> after) and *Recent changes*
+  (also in the table's menu): the latest 200 changes of the table within 90 days, people and agents. Whoever may read the
+  table sees its history; it moves along when the table moves to another workspace.
 
 ## Formulas, functions and Kalmido variables
 
@@ -143,12 +167,15 @@ their own ways.
   formula. Column kinds become number formats (currency, percent, date), a selection column a drop-down list with the colour
   of each option (the cell or the whole row), cell names Excel names. The file opens in Excel, LibreOffice and Numbers.
 - Values are calculated with what you may see: the file never holds a value you could not see in Kalmido.
+- 2.124.0: a checkbox goes out as a truth value (CSV: `WAHR` / `FALSCH` in German, `TRUE` / `FALSE` otherwise), a person as
+  the name, a link as its address, a file as its file name (the file itself stays in Kalmido).
 
 **Import.** In the tables overview (the three dots next to *New table*) choose *Import CSV or Excel…*: the file becomes a
 new table in the space shown (in the tables of a project: attached to it) and opens at once.
 
 - A first row of text becomes the column titles; Kalmido recognises the column kind (number, currency, percent, date,
   text) from the values and number formats, and an Excel drop-down list becomes a selection column (with its colours).
+  A column of truth values only (`WAHR` / `FALSCH`, `TRUE` / `FALSE`, Excel's checkboxes) becomes a checkbox column (2.124.0).
 - Simple Excel formulas are taken over (with the German names); what Kalmido cannot calculate (other sheets, whole
   columns like `A:A`, unknown functions) comes in as its value - the message says how many.
 - A `=` at the start of a CSV value stays text, never a formula. At most 10 MB, 5000 rows, 200 columns.

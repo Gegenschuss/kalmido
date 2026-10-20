@@ -2926,8 +2926,12 @@ a table the call created too. A wrong formula changes nothing (400 with the reas
   new choice). Formulas start with `=`: `A1`, ranges `B2:B9`, cell names, column names (all cells of the column but the
   formula's own), `+ - * /`, `&`, `19%`, comparisons, `SUMME`/`SUM`, `MITTELWERT`/`AVERAGE`, `MIN`, `MAX`, `ANZAHL`/`COUNT`,
   `WENN`/`IF`, `RUNDEN`/`ROUND`, `HEUTE`/`TODAY`, `TAGE`/`DAYS`; arguments with `;` (`,` works too).
-- **Columns** (`sheet_create`, `sheet_add_column`): `{title, kind text|number|currency|percent|date|select, options?:
+- **Columns** (`sheet_create`, `sheet_add_column`): `{title, kind text|number|currency|percent|date|select|checkbox|person|link|file, options?:
   [{label, color?: "#rrggbb"}], color_mode?: cell|row}`. Colours: best the app's palette (the colours of list fields).
+  2.124.0: a `checkbox` cell takes `1` / `0` (also `WAHR` / `FALSCH`, `ja` / `nein`) and counts as 1 / 0 in formulas; a
+  `person` cell the account id (or the exact name) of someone who may see the table, anyone else is refused; a `link` cell
+  an `http(s)://` or `mailto:` address (anything else is refused); a `file` cell is read only for agents (raw `file:<id>`,
+  display = the file name) - people upload files into cells in the app.
 - **Kalmido variables**: `projekt.<name>.<field>`, `liste.<name>.<field>` (fields `zeit_gesamt` hours, `aufgaben`, `offen`,
   `erledigt`, `budget_h`), `kunde.<name>.<field>` (`satz`, `budget_h`, `budget_betrag`, `zeit_gesamt`), `hier.<field>`
   (the attached project / list). `<name>` is the lower-case name with `_` for spaces; `sheet_vars` lists them with their

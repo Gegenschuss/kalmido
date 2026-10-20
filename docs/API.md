@@ -1319,6 +1319,14 @@ value is calculated with the token's visibility (`error: "denied"` for a source 
 one batch (`batch` in the answer) a person can take back. The app also exports a table as CSV / .xlsx and imports both
 (`GET /api/sheets/{id}/export.csv|xlsx`, `POST /api/sheets/import`, session only).
 
+2.124.0: column kinds `checkbox` (`1` / `0`), `person` (an account id of someone who may see the table), `link`
+(`http(s)://` / `mailto:` only, 400 otherwise) and `file` (read only through the API: raw `file:<id>`, display = the file
+name). A table answer has `freeze_rows` / `freeze_cols` (rows / columns kept in view). Session only (the app): the people a
+person cell may name (`GET /api/sheets/{id}/people`), a file into a cell (`POST /api/sheets/{id}/files`, multipart
+`file`, `row_id`, `col_id`) and its download (`GET /api/sheets/{id}/files/{file_id}`), the rows / columns kept in view
+(`POST /api/sheets/{id}/fixed` `{rows, cols}`), the history of the table (`GET /api/sheets/{id}/history`) and of one cell
+(`GET /api/sheets/{id}/cells/{cell_id}/history`).
+
 ```bash
 curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"title": "Angebot Dreh", "space": "private",
