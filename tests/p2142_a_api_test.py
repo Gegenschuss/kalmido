@@ -161,7 +161,8 @@ assert r.status_code in (200, 201), r.text
 OB = r.json().get("id")
 Bo, Ca, Do, Em, Fr = (sess(u) for u in ("bob", "carol", "dora", "emil", "frank"))
 for s in (A, Bo, Ca, Do, Em, Fr):
-    assert s.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": FEATURES}).ok
+    # 2.142.2: quiet hours off - their default 22:00-07:00 holds channel messages back, so the suite went red after 22:00 (CI)
+    assert s.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": FEATURES, "quiet_from": "", "quiet_to": ""}).ok
 
 
 def task(s, lid, title):
