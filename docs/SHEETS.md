@@ -142,6 +142,27 @@ organisation's projects, lists and clients). If a source is deleted, the cell sh
 Errors in a cell: "Circular reference" (cells that depend on each other), "Division by zero", "Reference not found" (a
 deleted row / column - Undo brings it back), "Wrong type of value", "Formula error" (a typo; the formula is not saved).
 
+## Several sheets in one table (2.124.0)
+
+A table can have several sheets, like a spreadsheet file. Under the grid sits the sheet bar: with one sheet only a quiet
+*+* (the table looks as before), with more the sheets as tabs, the open one in the accent colour; on a phone the bar
+scrolls sideways. *+* adds a sheet after the open one and opens it. Tap another sheet to open it; tap the open sheet for
+its menu: *Rename…*, *Duplicate* (columns, rows, inputs and formulas; file cells stay empty), *Move left* / *Move right*
+(on a computer you can also drag a sheet) and *Delete sheet* (to the trash - Undo brings it back). Every step is one Undo
+step. The first sheet carries the table and is not deleted on its own (delete the table in its menu instead).
+
+- **One table, one set of rights.** The title, the space, the attached list, the shares of single people and a move to
+  another workspace belong to the whole table: whoever may read the table reads all its sheets, whoever may change it
+  changes all of them. The overview, the search (Mod+K) and agents show the table once, with its number of sheets.
+- **Formulas across sheets** as in Excel: `=Kosten!B4`, `=SUMME('Kosten 2027'!B2:B9)`, also in `SUMMEWENN`, `SVERWEIS` ...
+  (a sheet name with spaces in `'…'`). A renamed sheet keeps its formulas; a change in one sheet shows in the other the next
+  time it loads; a deleted sheet gives "Reference not found" until Undo brings it back; sheets reading each other in a
+  circle give "Circular reference". The chart, the rows / columns kept in view and the history belong to each sheet.
+- **Files.** An Excel import takes every visible sheet (at most 30, the limits count for the whole file), formulas into
+  another sheet included; the Excel export writes every sheet (formulas into another sheet included). CSV stays one sheet:
+  the one open.
+- An older Kalmido (before 2.124) on the same database shows the further sheets as tables of their own - nothing is lost.
+
 ## A chart from columns (2.124.0)
 
 A table's menu (the three dots at the top right) has *Chart…*: choose bars or a line, the column with the labels (or the row
@@ -211,7 +232,7 @@ new table in the space shown (in the tables of a project: attached to it) and op
   text) from the values and number formats, and an Excel drop-down list becomes a selection column (with its colours).
   A column of truth values only (`WAHR` / `FALSCH`, `TRUE` / `FALSE`, Excel's checkboxes) becomes a checkbox column (2.124.0).
 - Simple Excel formulas are taken over (with the German names, also `SUMIF`, `COUNTIF`, `VLOOKUP`, `XLOOKUP` and the text
-  and date functions; a `VLOOKUP` without its fourth argument gets `WAHR`, as Excel looks up approximately then); what Kalmido cannot calculate (other sheets, whole
+  and date functions; a `VLOOKUP` without its fourth argument gets `WAHR`, as Excel looks up approximately then); what Kalmido cannot calculate (since 2.124.0 not other sheets of the file any more, whole
   columns like `A:A`, unknown functions) comes in as its value - the message says how many.
 - A `=` at the start of a CSV value stays text, never a formula. At most 10 MB, 5000 rows, 200 columns.
 - Undo takes back the whole import (the table goes to the trash).

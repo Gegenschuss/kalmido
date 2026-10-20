@@ -401,6 +401,8 @@ you created and tables a person shared with you one by one (`shared_in`, role `r
 you: never guess its value. Formulas: `=SUMME(B2:B9)`, `=stunden*satz`, `=projekt.<name>.zeit_gesamt` (arguments with `;`).
 Column kinds also `checkbox` (1 / 0), `person` (account id of someone who sees the table), `link` (http(s) / mailto only)
 and `file` (read only for you: the file name; people upload files in the app).
+2.124.0: a table can have several sheets (`sheet_tabs` lists them, `sheet_add_tab` adds one); read and fill one sheet with
+the tools above and the sheet's id, reach into another sheet with `Name!A1` or `'Sheet name'!A1:B5`.
 
 ### Video sign-offs (2.99.1)
 A video sign-off holds links only (Vimeo, YouTube, a video file; each new link = a version v1, v2 ...) and comments at a
@@ -511,7 +513,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`, `review_task`, `search_contacts`,
 `search_files`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `sheet_add_column`, `sheet_append_rows`,
-`sheet_create`, `sheet_read`, `sheet_set_cells`, `sheet_undo_batch`, `sheet_update`, `sheet_vars`, `sheets_list`, `set_contact_care`, `set_list_columns`, `set_list_review`,
+`sheet_add_tab`, `sheet_create`, `sheet_read`, `sheet_set_cells`, `sheet_tabs`, `sheet_undo_batch`, `sheet_update`, `sheet_vars`, `sheets_list`, `set_contact_care`, `set_list_columns`, `set_list_review`,
 `set_project_overview`, `set_project_status`, `set_status`, `set_video_comment_done`, `set_waiting`, `set_wip_limit`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`,
