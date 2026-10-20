@@ -123,7 +123,8 @@ assert A.patch(B + f"/api/wiki/pages/{plan}", json={"body": body}).ok
 
 # ---------------------------------------------------------------- person share of a folder
 r = share(A, space="private", folder="Customer A", kind="person", email="dave@example.com")
-check(r.ok and r.json().get("by_email") is None and r.json().get("user", {}).get("id") == DAVE, "#2104: a folder shared with a person by e-mail address " + r.text[:300])
+# 2.123.0 (#2104, review): by e-mail address the answer is the same as for an unknown address (no account id / name)
+check(r.ok and r.json().get("by_email") is True and "user" not in r.json(), "#2104: a folder shared with a person by e-mail address, nothing revealed " + r.text[:300])
 r = share(A, space="private", folder="Customer A", kind="person", email="nobody@example.com")
 check(r.ok and r.json().get("by_email") is True, "#2104: an unknown address is not revealed " + r.text[:200])
 check(share(A, page_id=plan, kind="person", user_id=ALICE).status_code == 404, "#2104: no share with oneself")
@@ -162,6 +163,11 @@ j = r.json()
 check(r.ok and j.get("person") is True and len(j["shares"]) == 1 and j["shares"][0]["direct"] is False and j["shares"][0]["folder"] is True,
       "#2104: the page's dialog shows the folder's share as inherited " + r.text[:300])
 pshare = j["shares"][0]["id"] if j.get("shares") else 0
+check(j["shares"][0]["user"] == {"id": None, "name": "dave@example.com", "by_email": True} if j.get("shares") else False,
+      "#2104: a share made by e-mail address shows the typed address, not the account " + r.text[:300])
+deep = page(A, "private", "Customer A/Deep", ">" * 3000 + " deep\n\n" + "**" * 1500 + "x" + "**" * 1500)
+r = Da.get(B + f"/api/wiki/shared/pages/{deep}")
+check(r.ok and "deep" in r.json().get("html", ""), f"#2104: deeply nested quotes / emphasis render (no recursion error) {r.status_code}")
 # case and expiry
 r = share(A, space="private", folder="customer a", kind="person", user_id=DAVE, expires="2000-01-01")
 check(r.status_code == 400, "#2104: an expiry in the past is refused " + r.text[:200])
