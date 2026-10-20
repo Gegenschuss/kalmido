@@ -268,6 +268,9 @@ check(until(lambda: A.get(OFF).json()["running"] == slow, 20, 0.2), f"#2152 revi
 r = A.post(OFF + "/upload")
 check(r.status_code == 409 and "running" in r.text, f"#2152 review: upload now while one runs = 409 {r.status_code} {r.text[:120]}")
 assert A.patch(B + "/api/admin/backups", json={"on": True, "time": "00:00"}).ok
+_x = dbx.connect(DATA)  # switched on after today's time = the first one tomorrow: make today's due
+_x.execute("UPDATE settings SET value='' WHERE key='bk_last_day'")
+_x.commit()
 auto = until(lambda: [x["name"] for x in A.get(B + "/api/admin/backups").json()["items"] if x["name"].endswith("-auto.zip.enc")], 25, 0.3)
 check(auto and A.get(OFF).json()["running"] == slow, f"#2152 review: the scheduled backup is made while the upload still runs {auto}")
 assert A.patch(B + "/api/admin/backups", json={"on": False}).ok
