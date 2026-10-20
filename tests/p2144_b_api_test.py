@@ -59,8 +59,13 @@ check(A.patch(B + f"/api/agents/{ag['devbot']['id']}/color", json={"color": "#12
 
 # a job's end result without an earlier say message
 TOK = ag["devbot"]["token"]
+A.patch(B + f"/api/admin/agents/{ag['devbot']['id']}", json={"org_id": ME["workspaces"][0]["id"]})
 V = {"Authorization": "Bearer " + TOK, "Content-Type": "application/json"}
-J = requests.post(B + "/api/v1/agent/jobs", headers=V, json={"title": "Knox: Release 2.144", "user_id": ME["id"], "state": "running"}).json()["id"]
+WL = A.post(B + "/api/lists", json={"name": "Work", "org_id": ME["workspaces"][0]["id"]}).json()["id"]
+A.put(B + f"/api/lists/{WL}/members", json={"user_id": ag["devbot"]["id"], "role": "edit"})
+JR = requests.post(B + "/api/v1/agent/jobs", headers=V, json={"title": "Knox: Release 2.144", "user_id": ME["id"], "state": "running"})
+J = JR.json().get("id")
+check(J, "setup: a job")
 long = "✅ Knox: ready\n" + "\n".join(f"- point {i}" for i in range(12))
 mid = requests.post(B + f"/api/v1/agent/chats/{ME['id']}", headers=V, json={"body": long, "job_id": J}).json()["id"]
 requests.patch(B + f"/api/v1/agent/jobs/{J}", headers=V, json={"state": "done"})
