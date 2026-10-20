@@ -252,7 +252,8 @@ check(res["content"][1]["type"] == "image" and res["content"][1]["mimeType"] == 
       and "base64" not in json.loads(res["content"][0]["text"]), "get_attachment: image item for the model, text without base64")
 res = call(s, "get_attachment", {"attachment_id": 9, "source": "chat"})
 check(last()["p"] == "/api/v1/chat-attachments/9" and base64.b64decode(res["structuredContent"]["base64"]) == b"hello log"
-      and res["structuredContent"]["mime"] == "text/plain" and len(res["content"]) == 1, "get_attachment source chat: text file, no image item")
+      and res["structuredContent"]["mime"] == "text/plain" and [x["type"] for x in res["content"]] == ["text", "text"],  # 2.126.0 (#1978): + the data note
+      "get_attachment source chat: text file, no image item")
 res = call(s, "get_attachment", {"attachment_id": 6, "max_bytes": 50})
 check(res["isError"] is True and "max_bytes=50" in res["content"][0]["text"], "get_attachment: over max_bytes -> isError")
 check(call(s, "get_attachment", {"attachment_id": 6, "max_bytes": 30 * 1024 * 1024})["isError"] is True, "get_attachment: max_bytes above 20 MB refused")

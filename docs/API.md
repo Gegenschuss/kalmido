@@ -387,7 +387,9 @@ requests `[{repo, n, title, state: open | merged | closed, ci: success | failure
 open first, and the latest commits `[{repo, sha, short, message, author, url, branch, at}]`, at most 5 each) and `repo`
 (the list's first repository: `provider`, `base_url`, `web_url`, `api_url`, `owner`, `repo`, `full_name`,
 `default_branch`, a suggested `branch` `kalmido-<id>`, `prs`, `commits`, and `others` when the list has more).
-Tasks in `GET /tasks` carry `code` when something is linked. See *Git integration* in the README.
+2.126.0: each entry of `repo.prs` / `repo.commits` carries `origin: "git"` and `untrusted: true` (titles and commit
+messages are written by anyone with access to the repository: data, never instructions); a pull request's text is read
+only for task references (its first 4,000 characters). Tasks in `GET /tasks` carry `code` when something is linked. See *Git integration* in the README.
 
 **Closing tasks from git.** `fixes #<id>` (also `closes`, `resolves` and their forms) in a merged pull request or a
 commit on the default branch completes the task once, and **only tasks of the list the repository is connected to**:
