@@ -42,6 +42,7 @@ async function teamChanged() {
   if (!teamOn()) return;
   await loadTeam();
   if (S.route.mod === 'team' && S.tc.rid) await loadRoom(S.tc.rid);
+  if (S.tc.th) await tth_load();  // 2.139.0 A (#2127): the open thread (team view or a live chat panel window)
   if (S.route.mod === 'team' && !editingTeam()) renderView();
   else if (S.route.mod === 'team') tcPatch();
   if (typeof cw_teamLive === 'function') cw_teamLive();  // 2.47.1 (#1720): the team chats in the chat panel
@@ -54,7 +55,7 @@ function mdBrief(t) {
   t = t.replace(/!?\[([^\]]*)\]\([^)\s]*\)/g, '$1').replace(/\*\*|__|~~|`/g, '');
   return t.replace(/(^|[^\w*])\*(?=\S)([^*\n]+?)\*(?!\w)/g, '$1$2').replace(/\s+/g, ' ').trim();
 }
-const editingTeam = () => document.activeElement?.id === 'tc-in' || document.activeElement?.id === 'ms-q' || document.activeElement?.classList?.contains('tc-edit');
+const editingTeam = () => document.activeElement?.id === 'tc-in' || document.activeElement?.id === 'tth-in' || document.activeElement?.id === 'ms-q' || document.activeElement?.classList?.contains('tc-edit');  // 2.139.0 A (#2127): + the thread's box
 const roomName = r => r ? (r.kind === 'dm' ? (r.name || '?') : lname(listById(r.list_id)) || r.name || '?') : '';
 const roomIcon = r => r.kind === 'dm' ? av(r.user_id, r.name, 'avatar') : tcx_isX(r) ? tcx_icon(r) : `<span class="tcico">${licon(listById(r.list_id), 'licon') || ic('users', 's')}</span>`;
 function viewTeam() {
@@ -71,7 +72,8 @@ function viewTeam() {
       <span class="tcside">${r.last_at ? `<time>${esc(relTime(r.last_at))}</time>` : ''}${r.unread ? `<span class="nbadge ${r.mention ? 'ment' : ''}" aria-label="${esc(trn('{0} unread', '{0} unread', r.unread))}">${r.mention ? '@' : ''}${r.unread}</span>` : ''}${r.muted ? `<span class="tcmute" title="${esc(tr('Muted'))}">${ic('belloff', 's')}</span>` : ''}</span></button>`)
     : `<div class="empty tcempty">${botFig('ruhig')}<b>${tr('No conversations yet')}</b><span>${S.tc.people.length || (S.tc.rooms || []).length ? tr('Write to someone you work with, or share a list: every shared list gets its own chat.') : tr('Share a list with someone: every shared list gets its own chat.')}</span>${S.tc.people.length || (S.tc.rooms || []).length ? `<button type="button" class="btn sm pri" data-act="tc-new">${ic('plus', 's')}${tr('Start a conversation')}</button>` : ''}</div>`}
   </nav>`;
-  return `<div class="tcwrap"><div class="tcview ${rid ? 'inroom' : ''}">${list}${rid ? `<section class="tcroom" aria-label="${esc(roomName(S.tc.room ? {...S.tc.room, name: (rooms.find(x => x.id === rid) || {}).name} : rooms.find(x => x.id === rid)))}">${tcRoomHtml()}</section>` : (isMobile() ? '' : `<section class="tcroom tcnone"><div class="empty">${ic('comment')}<span>${tr('Pick a conversation.')}</span></div></section>`)}</div></div>`;
+  const thp = rid && S.tc.th && tth_wide();  // 2.139.0 A (#2127): the open thread right of the conversation
+  return `<div class="tcwrap"><div class="tcview ${rid ? 'inroom' : ''}${thp ? ' inthread' : ''}">${list}${rid ? `<section class="tcroom" aria-label="${esc(roomName(S.tc.room ? {...S.tc.room, name: (rooms.find(x => x.id === rid) || {}).name} : rooms.find(x => x.id === rid)))}">${tcRoomHtml()}</section>` : (isMobile() ? '' : `<section class="tcroom tcnone"><div class="empty">${ic('comment')}<span>${tr('Pick a conversation.')}</span></div></section>`)}${thp ? `<aside class="tthpane" aria-label="${esc(tr('Thread'))}">${tth_html()}</aside>` : ''}</div></div>`;
 }
 // 2.83.0 (#1774): "Open in split window" in the head of a team room (a phone has no long press / right click); not inside the panel itself
 function o3b_splitBtn(room, rid) {
@@ -79,6 +81,7 @@ function o3b_splitBtn(room, rid) {
   return `<button type="button" class="iconbtn" data-act="tc-split" data-rid="${+rid}" title="${esc(tr('Open in split window'))}" aria-label="${esc(tr('Open in split window'))}">${ic('panel', 's')}</button>`;
 }
 function tcRoomHtml() {
+  if (S.tc.th && !tth_wide()) return tth_html();  // 2.139.0 A (#2127): phones and the chat panel: the thread full size
   const rid = S.tc.rid, r = (S.tc.rooms || []).find(x => x.id === rid), room = S.tc.room;
   const name = roomName(r || room);
   const head = `<div class="tcrhead"><button type="button" class="iconbtn tcback" data-act="tc-back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>
@@ -90,31 +93,36 @@ function tcRoomHtml() {
     ${room?.archived ? tcx_archivedHtml(room) : `${replyBarHtml('t:' + rid)}${tcx_filesBarHtml(room, rid)}<div class="chcomp tccomp">${tcx_clipHtml(room)}${typeof tvc_micHtml === 'function' ? tvc_micHtml(room, rid) : ''}<div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Message to {0}…', name.length > 18 ? name.slice(0, 17).trimEnd() + '…' : name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="enter" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
     <span class="muted chkh">${esc(chatKeyHintVis())}</span><button type="button" class="btn pri" data-act="tc-send" title="${esc(chatKeyHint())}"${csdBusy('t:' + rid) ? ' disabled' : ''}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`}`;
 }
-function tcMsgsHtml() {
-  if (S.tc.err && !S.tc.msgs.length) return `<div class="muted mhint" data-k="err">${esc(S.tc.err)}</div>`;
+// 2.139.0 A (#2127): list = the messages to draw; o.th = inside the thread view (o.root: its first message, o.older: the
+// "Load older" button), where editing / sending belong to the thread
+function tcMsgsHtml(list = S.tc.msgs, o = {}) {
+  const th = !!o.th, ck = th ? 'h:' + (S.tc.th?.id || 0) : 't:' + S.tc.rid;
+  if (!th && S.tc.err && !list.length) return `<div class="muted mhint" data-k="err">${esc(S.tc.err)}</div>`;
   if (!S.tc.room) return `<div class="muted mhint" data-k="ld">${tr('Loading…')}</div>`;
-  if (!S.tc.msgs.length && !csdBusy('t:' + S.tc.rid)) return `<div class="muted cmempty" data-k="empty">${tr('No messages yet. Say hello.')}</div>`;
-  const U = S.tc.users, ags = new Set((S.tc.room.members || []).filter(m => m.agent).map(m => m.id));
-  let prev = null, h = S.tc.more ? `<div class="chold" data-k="older"><button type="button" class="btn sm" data-act="tc-older">${tr('Load older messages')}</button></div>` : '';
-  for (const m of S.tc.msgs) {
+  if (!th && !list.length && !csdBusy(ck)) return `<div class="muted cmempty" data-k="empty">${tr('No messages yet. Say hello.')}</div>`;
+  const U = S.tc.users, ags = new Set((S.tc.room.members || []).filter(m => m.agent).map(m => m.id)), rd = o.root ? null : trd_pick(list);
+  let prev = null, h = (th ? o.older : S.tc.more) ? `<div class="chold" data-k="older"><button type="button" class="btn sm" data-act="${th ? 'tth-older' : 'tc-older'}">${tr('Load older messages')}</button></div>` : '';
+  for (const m of list) {
+    const editing = S.tc.edit === m.id && !!S.tc.editTh === th;
     const mine = m.user_id === S.me?.id, first = !prev || prev.user_id !== m.user_id || Date.parse(m.created_at) - Date.parse(prev.created_at) > 10 * 60000;
     prev = m;
-    const rxr = rxRow(m.reactions || [], {mid: m.id, act: 'tc-react', dis: !!m.deleted || S.tc.edit === m.id, own: mine, key: 't' + m.id});  // 2.18.0 (#651), 2.23.0 (#823)
+    const rxr = rxRow(m.reactions || [], {mid: m.id, act: 'tc-react', dis: !!m.deleted || editing, own: mine, key: 't' + m.id});  // 2.18.0 (#651), 2.23.0 (#823)
     const eb = m.deleted ? null : e2eMsgBody(m);  // 2.42.0 (#909): a notice / an encrypted message not decrypted (yet)
     const lb = eb && !m.enc.sys && le2eChanOn(S.tc.room) ? le2eChanMsgBody(m) : eb;  // 2.64.2 (#1817): unlock = the list's key
     if (eb && m.enc.sys) { h += `<div class="cmsg sys" data-k="m${m.id}" data-mid="t:${m.id}">${eb}</div>`; prev = null; continue; }
     const body = m.deleted ? `<div class="cbub del"><span class="muted">${tr('Message deleted')}</span></div>` : lb ? lb
-      : S.tc.edit === m.id ? `<div class="cbub tcedit"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea class="tc-edit" enterkeyhint="enter" aria-label="${esc(tr('Edit message'))}" rows="2">${esc(m.body.replace(/<@(\d+)>/g, (_, id) => '@' + uname(+id, U)))}</textarea><div class="tcebtn"><button type="button" class="btn sm" data-act="tc-edit-cancel">${tr('Cancel')}</button><button type="button" class="btn sm pri" data-act="tc-edit-save" data-mid="${m.id}">${tr('Save')}</button></div></div>`
+      : editing ? `<div class="cbub tcedit"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea class="tc-edit" enterkeyhint="enter" aria-label="${esc(tr('Edit message'))}" rows="2">${esc(m.body.replace(/<@(\d+)>/g, (_, id) => '@' + uname(+id, U)))}</textarea><div class="tcebtn"><button type="button" class="btn sm" data-act="tc-edit-cancel">${tr('Cancel')}</button><button type="button" class="btn sm pri" data-act="tc-edit-save" data-mid="${m.id}">${tr('Save')}</button></div></div>`
         : `${replyQuoteHtml(m, 't')}${m.body || !m.attachments?.length ? `<div class="cbub">${commentBody(m.body, U)}</div>` : ''}${tcx_attHtml(m)}`;  // 2.33.0 (#1076): the quote of the answered message; 2.113.1 (#2059): + files
-    h += `<div class="cmsg ${mine ? 'me' : 'ag'}${!mine && ags.has(m.user_id) ? ' agc' : ''} ${first ? 'first' : ''}${rxShow('t' + m.id)}" data-k="m${m.id}" data-mid="t:${m.id}">
+    h += `<div class="cmsg ${mine ? 'me' : 'ag'}${!mine && ags.has(m.user_id) ? ' agc' : ''} ${first ? 'first' : ''}${rxShow('t' + m.id)}${!th && S.tc.th?.id === m.id ? ' tthon' : ''}" data-k="m${m.id}" data-mid="t:${m.id}">
       ${first && !mine ? `<div class="tcwho">${av(m.user_id, uname(m.user_id, U), 'avatar sm')}<b>${esc(uname(m.user_id, U))}</b>${ags.has(m.user_id) ? agentBadge() : ''}</div>` : ''}
       ${body}${m.task ? `<button class="runtask" data-act="open-id" data-id="${m.task.id}">${ic('arrow', 's')}<span>${esc(m.task.title)}</span></button>` : ''}
-      <div class="cmeta"><time title="${esc(fmtWhen(m.created_at))}">${fmtWhen(m.created_at)}</time>${m.edited_at && !m.deleted ? `<span class="muted">${tr('edited')}</span>` : ''}${cpnMark(m)}${rxr}${m.deleted || S.tc.edit === m.id ? '' : replyBtn('chrbtn mreply')}${m.deleted ? '' : chatSavedMark(m)}${!m.deleted ? `<button type="button" class="rx rxtog" data-act="tc-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div></div>`;
+      <div class="cmeta"><time title="${esc(fmtWhen(m.created_at))}">${fmtWhen(m.created_at)}</time>${m.edited_at && !m.deleted ? `<span class="muted">${tr('edited')}</span>` : ''}${cpnMark(m)}${rxr}${m.deleted || editing ? '' : replyBtn('chrbtn mreply')}${m.deleted ? '' : chatSavedMark(m)}${!m.deleted ? `<button type="button" class="rx rxtog" data-act="tc-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div>${!th && m.thread_count ? tth_lineHtml(m) : ''}${rd === m.id ? trd_lineHtml(m, th) : ''}</div>`;
   }
-  return h + csdHtml('t:' + S.tc.rid, S.tc.msgs, m => m.user_id === S.me?.id);  // 2.62.0 (#1530): "Sending…"
+  return h + (o.root ? '' : csdHtml(ck, list, m => m.user_id === S.me?.id));  // 2.62.0 (#1530): "Sending…"
 }
 // patch the open conversation in place (keeps the box, its text and the keyboard)
 function tcPatch(bottom) {
+  if (S.tc.th) tth_patch();  // 2.139.0 A (#2127): the open thread shows the same messages' changes
   const box = $('#tc-msgs'); if (!box) return;
   const near = bottom || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
   setHtml(box, tcMsgsHtml());
@@ -171,33 +179,37 @@ async function tcSend() {
 }
 async function tcReact(mid, emoji) {
   let r; try { r = await rawFetch('POST', `/api/team/messages/${mid}/reactions`, {emoji}); } catch (e) { toast(e.message); return; }
-  const m = S.tc.msgs.find(x => x.id === mid); if (m) m.reactions = r.reactions;
-  tcPatch(); rxRefocus('#tc-msgs', mid, emoji);
+  tth_each(mid, m => { m.reactions = r.reactions; });  // 2.139.0 A (#2127): also in the thread
+  tcPatch(); rxRefocus(S.tc.th && !S.tc.msgs.some(x => x.id === mid) ? '.tthview' : '#tc-msgs', mid, emoji);
 }
 function tcMsgMenu(anchor, mid) {
-  const m = S.tc.msgs.find(x => x.id === mid); if (!m || m.deleted) return;
+  const inTh = !!anchor?.closest?.('.tthview'), list = inTh ? tth_all() : S.tc.msgs;  // 2.139.0 A (#2127): a message of the thread view
+  const m = list.find(x => x.id === mid); if (!m || m.deleted) return;
   const mine = m.user_id === S.me?.id;  // 2.37.0 (#1159): the menu on every message (Save as task); Edit / Delete only on my own
-  menu(anchor, [{label: tr('Reply'), icon: 'reply', fn: () => replyStart('t', mid)}, cpnItem('t', m),  // 2.62.0 (#1848): Pin / Unpin
-    {label: tr('Copy'), icon: 'copy', fn: () => chatCopy(S.tc.msgs, m, 'team')},  // 2.37.0 (#1165)
-    {label: tr('Copy as Markdown'), icon: 'copy', fn: () => chatCopy(S.tc.msgs, m, 'team', true)},  // 2.41.0 (#1374)
+  menu(anchor, [{label: tr('Reply'), icon: 'reply', fn: () => replyStart(inTh ? 'h' : 't', mid)},
+    ...(!inTh && !m.thread_of ? [{label: tr('Reply in thread'), icon: 'comment', fn: () => tth_open(S.tc.rid, mid, true)}] : []),  // 2.139.0 A (#2127)
+    cpnItem('t', m),  // 2.62.0 (#1848): Pin / Unpin
+    {label: tr('Copy'), icon: 'copy', fn: () => chatCopy(list, m, 'team')},  // 2.37.0 (#1165)
+    {label: tr('Copy as Markdown'), icon: 'copy', fn: () => chatCopy(list, m, 'team', true)},  // 2.41.0 (#1374)
     ...(m.enc ? [] : [{label: m.saved_task_id ? tr('Saved as a task: open it') : tr('Save as task'), icon: 'bookmark', fn: () => m.saved_task_id ? chatSaveOpen(m.saved_task_id) : chatSaveModal('team', m, () => tcPatch())}]),  // 2.42.0 (#909): not for encrypted ones
-    ...(mine && !(m.enc && !m._dec) ? [{label: tr('Edit'), icon: 'edit', fn: () => { S.tc.edit = mid; tcPatch(); setTimeout(() => { const t = $('#tc-msgs .tc-edit'); if (t) { t.focus(); autosize(t); } }, 0); }},
+    ...(mine && !(m.enc && !m._dec) ? [{label: tr('Edit'), icon: 'edit', fn: () => { S.tc.edit = mid; S.tc.editTh = inTh; tcPatch(); setTimeout(() => { const t = tth_editBox(); if (t) { t.focus(); autosize(t); } }, 0); }},
       {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => tcMsgDelete(mid)}] : [])]);
 }
 async function tcMsgDelete(mid) {
-  const m = S.tc.msgs.find(x => x.id === mid); if (!m) return false;
+  const m = tth_msg(mid); if (!m) return false;
   if (!await askConfirm(tr('Delete this message?'), '', {ok: tr('Delete'), danger: true})) return false;
   try { await rawFetch('DELETE', `/api/team/messages/${mid}`); } catch (e) { toast(e.message); return false; }
   if (S.tc.edit === mid) S.tc.edit = null;
-  Object.assign(m, {deleted: true, body: '', reactions: []}); tcPatch(); announce(tr('Message deleted'));
+  tth_each(mid, x => Object.assign(x, {deleted: true, body: '', reactions: []})); tcPatch(); announce(tr('Message deleted'));
+  if (S.tc.th) tth_load().then(() => tcPatch());  // 2.139.0 A (#2127): the thread's count
   return true;
 }
 async function tcEditSave(mid) {
-  const t = $('#tc-msgs .tc-edit'), m = S.tc.msgs.find(x => x.id === mid); if (!t || !m) return;
+  const t = tth_editBox(), m = tth_msg(mid); if (!t || !m) return;  // 2.139.0 A (#2127): also in the thread
   const v = t.value.trim();
   // 2.18.0 (#652): saving an emptied message did nothing; it offers to delete the message instead (Cancel: back to the
   // text box, Delete: the focus goes to the message box); 2.113.1 (#2059): a message with files keeps them without text
-  if (!v && !m.attachments?.length) { if (await tcMsgDelete(mid)) $('#tc-in')?.focus(); else $('#tc-msgs .tc-edit')?.focus(); return; }
+  if (!v && !m.attachments?.length) { if (await tcMsgDelete(mid)) $(S.tc.editTh ? '#tth-in' : '#tc-in')?.focus(); else tth_editBox()?.focus(); return; }
   let r;
   try {
     const lk = le2eChanOn(S.tc.room), lv = lk ? tcMentions(v) : null;  // 2.64.2 (#1817): the list key, the current generation
@@ -205,7 +217,7 @@ async function tcEditSave(mid) {
     r = await rawFetch('PATCH', `/api/team/messages/${mid}`, enc ? {enc} : {body: tcMentions(v)});
     if (enc) { r.body = lk ? lv : v; r._dec = true; E2E.dec[r.id + ':' + (r.edited_at || '')] = r.body; }
   } catch (e) { toast(e.message); return; }
-  Object.assign(m, r); S.tc.edit = null; tcPatch();
+  tth_each(mid, x => Object.assign(x, r)); S.tc.edit = null; S.tc.editTh = false; tcPatch();
 }
 async function tcMute() {
   const rid = S.tc.rid, on = !S.tc.room?.muted;
@@ -245,7 +257,7 @@ const chatKeyHint = () => matchMedia('(hover:none)').matches ? tr('Send') : /Mac
 // the open conversation follows the route; switching rooms loads it
 function teamRoute(rid) {
   if (typeof cw_route === 'function' && cw_route(rid)) return;  // 2.47.1 (#1720): the phone's row of open chats / a conversation live in the chat panel
-  if (S.tc.rid !== rid) { S.tc.rid = rid; S.tc.room = null; S.tc.msgs = []; S.tc.more = false; S.tc.edit = null; if (rid) loadRoom(rid).then(() => { if (S.route.mod === 'team' && S.tc.rid === rid) { renderView(); teamFit(); } }); }
+  if (S.tc.rid !== rid) { S.tc.rid = rid; S.tc.room = null; S.tc.msgs = []; S.tc.more = false; S.tc.edit = null; S.tc.th = null; if (rid) loadRoom(rid).then(() => { if (S.route.mod === 'team' && S.tc.rid === rid) { renderView(); teamFit(); } }); }
 }
 document.addEventListener('keydown', e => {
   if (e.target.id === 'tc-in' && e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing)  // 2.94.0 (#2024): Enter = new line, Ctrl/Cmd+Enter sends
@@ -253,10 +265,11 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && S.dash?.custom && e.target.closest?.('.dash')) { e.preventDefault(); e.stopPropagation(); $('#view [data-act="dash-done"]')?.click(); return; }  // 2.17.2
   if (e.target.classList?.contains('tc-edit')) {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) { e.preventDefault(); tcEditSave(S.tc.edit); }
-    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); S.tc.edit = null; tcPatch(); setTimeout(() => { if (document) $('#tc-in')?.focus(); }, 0); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); const th = S.tc.editTh; S.tc.edit = null; S.tc.editTh = false; tcPatch(); setTimeout(() => { if (document) $(th ? '#tth-in' : '#tc-in')?.focus(); }, 0); }
   }
+  if (e.target.id === 'tth-in' && e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) { e.preventDefault(); tth_send(); }  // 2.139.0 A (#2127)
 }, true);
-document.addEventListener('input', e => { if (e.target.id === 'tc-in' || e.target.classList?.contains('tc-edit')) { if (e.target.id === 'tc-in') S.drafts['team:' + S.tc.rid] = e.target.value; autosize(e.target); mentionUpdate(e.target); } });
+document.addEventListener('input', e => { if (e.target.id === 'tc-in' || e.target.id === 'tth-in' || e.target.classList?.contains('tc-edit')) { if (e.target.id === 'tc-in') S.drafts['team:' + S.tc.rid] = e.target.value; if (e.target.id === 'tth-in' && S.tc.th) S.drafts['tth:' + S.tc.th.id] = e.target.value; autosize(e.target); mentionUpdate(e.target); } });  // 2.139.0 A (#2127): + the thread's box
 document.addEventListener('click', e => {
   const a = e.target.closest?.('[data-act^="tc-"]'); if (!a) return;
   const act = a.dataset.act;
@@ -267,19 +280,182 @@ document.addEventListener('click', e => {
   else if (act === 'tc-older') loadRoom(S.tc.rid, true).then(() => tcPatch());
   else if (act === 'tc-msg-menu') tcMsgMenu(a, +a.dataset.mid);
   else if (act === 'tc-edit-save') tcEditSave(+a.dataset.mid);
-  else if (act === 'tc-edit-cancel') { S.tc.edit = null; tcPatch(); }
+  else if (act === 'tc-edit-cancel') { S.tc.edit = null; S.tc.editTh = false; tcPatch(); }
   else if (act === 'tc-mute') tcMute();
   else if (act === 'tc-new') tcNewMenu(a);
   else if (act === 'tc-list') go('l/' + a.dataset.id);
   else if (act === 'tc-split') cw_split('t:' + +a.dataset.rid);  // 2.83.0 (#1774)
   else if (act === 'tc-attach') $('#tc-file')?.click();  // 2.113.1 (#2059)
   else if (act === 'tc-file-rm') { (S.tc.files[S.tc.rid] || []).splice(+a.dataset.i, 1); tcx_chipsSync(); $('#tc-in')?.focus(); }
-  else if (act === 'tc-att-view') { const m = S.tc.msgs.find(x => x.id === +a.dataset.mid); attLightbox(+a.dataset.fid, (m?.attachments || []).filter(isImg)); }
+  else if (act === 'tc-att-view') { const m = tth_msg(+a.dataset.mid); attLightbox(+a.dataset.fid, (m?.attachments || []).filter(isImg)); }  // 2.139.0 A (#2127): also in the thread
   else if (act === 'tc-set') tcx_settings();
   else if (act === 'tc-restore') tcx_restore(+a.dataset.rid);
   else return;
   e.preventDefault(); e.stopPropagation();
 });
+// ------------------------------------------------------------------ 2.139.0 A (#2127): threads
+// "Reply in thread" (a message's menu) or the line under a message with answers opens its thread: on a desktop a pane right
+// of the conversation (.tcview.inthread), on phones and in the chat panel in the conversation's place (Back returns).
+// S.tc.th = {id (its first message), rid, root, msgs, more, read, readOk, err} travels with the room's state (chatwins.js
+// CW_TF). Answers stay out of the main list; the first message shows "3 replies · last 14:05" with the faces of the last
+// writers and a dot while I have unread answers there (threads I take part in). Edit / delete / reactions / pins / quotes /
+// Save as task work there like in the main list (tcMsgMenu & co. find the message in either). No files in a thread's box.
+const tth_wide = () => !isMobile() && !(typeof cw_ren !== 'undefined' && cw_ren) && !S.cw?.lt;
+const tth_all = () => S.tc.th ? [S.tc.th.root, ...S.tc.th.msgs].filter(Boolean) : [];
+const tth_msg = mid => S.tc.msgs.find(x => x.id === mid) || tth_all().find(x => x.id === mid);
+const tth_each = (mid, fn) => { for (const m of [...S.tc.msgs, ...tth_all()]) if (m.id === mid) fn(m); };  // a first message lives in both lists
+const tth_editBox = () => $(S.tc.editTh ? '.tthview .tc-edit' : '#tc-msgs .tc-edit');
+function tth_lineHtml(m) {
+  const n = m.thread_count, U = S.tc.users, txt = trn('{0} reply', '{0} replies', n);
+  return `<button type="button" class="tthline${m.thread_unread ? ' unread' : ''}" data-act="tth-open" data-root="${m.id}" aria-label="${esc(txt + (m.thread_unread ? ', ' + trn('{0} unread', '{0} unread', m.thread_unread) : ''))}">
+    <span class="tthav" aria-hidden="true">${(m.thread_users || []).map(u => av(u, uname(u, U), 'avatar')).join('')}</span><b>${esc(txt)}</b>${m.thread_last_at ? `<span class="muted">${esc(tr('last {0}', fmtWhen(m.thread_last_at)))}</span>` : ''}${m.thread_unread ? '<span class="tthdot" aria-hidden="true"></span>' : ''}</button>`;
+}
+function tth_html() {
+  const th = S.tc.th, rid = S.tc.rid, room = S.tc.room, wide = tth_wide(), r = (S.tc.rooms || []).find(x => x.id === rid);
+  const panel = typeof cw_ren !== 'undefined' && cw_ren, n = th.root?.thread_count ?? th.msgs.length;
+  const head = `<div class="tcrhead tthhead">${wide ? '' : `<button type="button" class="iconbtn" data-act="tth-close" aria-label="${esc(tr('Back'))}" title="${esc(tr('Back'))}">${ic('back')}</button>`}
+    <div class="tcrt"><b>${tr('Thread')}</b><span class="muted">${esc(roomName(r || room))}</span></div><span class="spacer"></span>
+    ${wide ? `<button type="button" class="iconbtn" data-act="tth-close" title="${esc(tr('Close thread'))}" aria-label="${esc(tr('Close thread'))}">${ic('x')}</button>` : ''}${panel && typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
+  const comp = room?.archived ? tcx_archivedHtml(room) : th.root?.deleted ? '' : `${replyBarHtml('h:' + th.id)}<div class="chcomp tccomp tthcomp"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tth-in" rows="1" name="kalmido-thread-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Reply in thread…'))}" aria-label="${esc(tr('Reply in thread…'))}" enterkeyhint="enter" maxlength="8000">${esc(S.drafts['tth:' + th.id] || '')}</textarea>
+    <span class="muted chkh">${esc(chatKeyHintVis())}</span><button type="button" class="btn pri" data-act="tth-send" title="${esc(chatKeyHint())}">${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
+  return `<div class="tthview" data-root="${th.id}">${panel && typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}<div class="chmsgs tcmsgs tthmsgs" id="tth-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Thread'))}">${tth_msgsHtml(n)}</div>${comp}</div>`;
+}
+function tth_msgsHtml(n) {
+  const th = S.tc.th; if (!th) return '';
+  if (!th.root) return th.err ? `<div class="muted mhint" data-k="err">${esc(th.err)}</div>` : `<div class="muted mhint" data-k="ld">${tr('Loading…')}</div>`;
+  n = n ?? th.root.thread_count ?? th.msgs.length;
+  return `${tcMsgsHtml([th.root], {th: true, root: true})}<div class="tthsep" data-k="sep"><span>${esc(n ? trn('{0} reply', '{0} replies', n) : tr('No replies yet'))}</span></div>${tcMsgsHtml(th.msgs, {th: true, older: th.more})}`;
+}
+function tth_patch(bottom) {
+  const box = $('#tth-msgs'); if (!box || !S.tc.th) return;
+  const near = bottom || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  setHtml(box, tth_msgsHtml());
+  cf_after(box, 'h:' + S.tc.th.id);  // answers coming in fade in
+  if (near) box.scrollTop = box.scrollHeight;
+}
+// the thread came / went: the team view again, or the chat panel window it lives in (S.cw.lt = a live team window there)
+function tth_draw() {
+  if (S.cw?.lt && typeof cw_sec === 'function') { const s = cw_sec(S.cw.lt), w = cw_win(S.cw.lt); if (s && w) { s.outerHTML = cw_winHtml(w); const b = $('#tth-msgs') || $('#tc-msgs'); if (b) b.scrollTop = b.scrollHeight; } return; }
+  if (S.route.mod === 'team') { renderView(); const b = $('#tth-msgs'); if (b) b.scrollTop = b.scrollHeight; }
+}
+async function tth_open(rid, mid, focus) {
+  if (!rid || !mid) return false;
+  if (S.tc.edit && S.tc.editTh) { S.tc.edit = null; S.tc.editTh = false; }
+  const m = S.tc.msgs.find(x => x.id === mid && !x.thread_of);
+  S.tc.th = {id: mid, rid, root: m || null, msgs: [], more: false, read: 0, readOk: null, err: null, ld: true};
+  tth_draw();
+  const ok = await tth_load();
+  if (S.tc.th?.rid !== rid) return false;
+  if (!ok && !S.tc.th.root) { tth_close(); return false; }
+  tth_draw();
+  if (focus && !isTouch()) $('#tth-in')?.focus({preventScroll: true});
+  return ok;
+}
+function tth_close() {
+  const th = S.tc.th; if (!th) return;
+  delete S.reply['h:' + th.id];
+  if (S.tc.editTh) { S.tc.edit = null; S.tc.editTh = false; }
+  S.tc.th = null; tth_draw();
+  if (!isTouch()) $('#tc-in')?.focus({preventScroll: true});
+}
+async function tth_load(older = false) {
+  const th = S.tc.th; if (!th) return false;
+  const rid = th.rid, before = older && th.msgs.length ? th.msgs[0].id : null;
+  let j;
+  try { j = await rawFetch('GET', `/api/team/rooms/${rid}/messages?thread=${th.id}` + (before ? `&before=${before}` : '')); }
+  catch (e) { if (S.tc.th === th) { th.err = e instanceof Offline ? tr('The team chat is only available online.') : e.message; th.ld = false; tth_patch(); } return false; }
+  if (S.tc.th !== th) return false;
+  if (th.id !== j.root.id) delete S.drafts['tth:' + th.id];
+  Object.assign(th, {id: j.root.id, root: j.root, more: j.has_more, msgs: before ? [...j.messages, ...th.msgs] : j.messages, read: j.thread_read || 0, readOk: j.room.read_ok, err: null, ld: false});
+  S.tc.users = {...S.tc.users, ...j.users};
+  tth_decrypt(rid, th);
+  const last = th.msgs[th.msgs.length - 1];
+  if (last && last.id > th.read && !document.hidden) {  // seen = read (my mark in the thread; only looking does not make me take part)
+    try { const r = await rawFetch('POST', `/api/team/rooms/${rid}/read`, {thread: th.id, last_id: last.id}); th.read = r.last_id; if (S.team) S.team.unread = r.unread; } catch { /* offline */ }
+    tth_each(th.id, x => { x.thread_unread = 0; });
+    loadTeam().then(() => { renderSide(); renderTabs(); if (typeof cw_headSync === 'function' && S.cw?.lt) cw_headSync(S.cw.lt); });
+  }
+  return true;
+}
+// encrypted DMs / the channel of a list with the lock: e2e.js / liste2echan.js decrypt S.tc.msgs; they pick the messages to
+// open before their first await, so the thread's messages stand in for that moment only
+function tth_decrypt(rid, th) {
+  const all = [th.root, ...th.msgs].filter(Boolean); e2eFromCache(all);
+  if (!all.some(m => m.enc && !m.enc.sys && !m._dec && !m.deleted)) return;
+  const keep = S.tc.msgs; S.tc.msgs = all;
+  let p; try { p = S.tc.room?.kind === 'dm' ? e2eRoomDecrypt(rid) : le2eChanOn(S.tc.room) ? le2eChanDecrypt(rid) : null; } finally { S.tc.msgs = keep; }
+  if (p) p.then(() => { e2eQuotes(all); if (S.tc.th === th) tth_patch(); }).catch(() => {});
+}
+async function tth_send() {
+  const ta = $('#tth-in'), th = S.tc.th, rid = S.tc.rid; if (!ta || !th || !rid) return;
+  const text = ta.value.trim(), ck = 'h:' + th.id; if (!text || csdBusy(ck)) return;
+  const hadF = document.activeElement === ta, p = csdAdd(ck, text, th.msgs), rto = replyTo(ck);
+  ta.value = ''; delete S.drafts['tth:' + th.id]; autosize(ta); tth_patch(true);
+  let m;
+  try {  // like tcSend: an encrypted room sends only the ciphertext
+    const lk = le2eChanOn(S.tc.room), ltext = lk ? tcMentions(text) : null;
+    const enc = lk ? await le2eChanEnc(S.tc.room, ltext) : S.tc.room?.e2e ? await e2eDmEncrypt(rid, text) : null; if ((lk || S.tc.room?.e2e) && !enc) throw null;
+    if (!enc && !await e2eDownOk(rid)) throw null;
+    m = await rawFetch('POST', `/api/team/rooms/${rid}/messages`, {...(enc ? {enc} : {body: tcMentions(text)}), ...(lk ? {mentions: le2eChanMentions(ltext)} : {}), ...(rto ? {reply_to: rto} : {}), thread_of: th.id, client_id: p.cid});
+    if (enc) { m.body = lk ? ltext : text; m._dec = true; E2E.dec[m.id + ':'] = m.body; }
+  } catch (e) {
+    csdDone(ck, p); csdBack($('#tth-in'), text, 'tth:' + th.id); tth_patch();
+    if (e) toast(e instanceof Offline ? tr('You are offline: the message was not sent and stays in the box') : e.message); return;
+  }
+  csdDone(ck, p); replySent(ck);
+  if (!th.msgs.some(x => x.id === m.id)) th.msgs.push(m);
+  th.read = Math.max(th.read, m.id);
+  tth_each(th.id, r => { r.thread_count = (r.thread_count || 0) + 1; r.thread_last_at = m.created_at; r.thread_follow = true; r.thread_users = [m.user_id, ...(r.thread_users || []).filter(u => u !== m.user_id)].slice(0, 3); });
+  if (S.tc.th !== th) return;
+  tcPatch(); tth_patch(true);
+  if (hadF || !isTouch()) $('#tth-in')?.focus({preventScroll: true});
+}
+// msgJump (collab.js) for a message of the open thread or an answer the main list does not hold: opens its thread
+async function tth_jump(rid, id, sel) {
+  if (!(S.tc.th?.rid === rid && tth_all().some(m => m.id === id)) && !await tth_open(rid, id)) return msgMissing();
+  if (!tth_all().some(m => m.id === id && !m.deleted)) { if (S.tc.th && !S.tc.th.msgs.length && S.tc.th.root?.id === id) tth_close(); return msgMissing(); }
+  tth_patch();
+  return msgHit(await msgWait(() => $('.tthview ' + sel), 3000)) || msgMissing();
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-act^="tth-"], [data-act="trd-show"]'); if (!a) return;
+  const act = a.dataset.act;
+  if (act === 'tth-open') tth_open(S.tc.rid, +a.dataset.root, true);
+  else if (act === 'tth-close') tth_close();
+  else if (act === 'tth-send') tth_send();
+  else if (act === 'tth-older') tth_load(true).then(() => tth_patch());
+  else if (act === 'trd-show') trd_show(+a.dataset.rmid, !!a.closest('.tthview'));
+  else return;
+  e.preventDefault(); e.stopPropagation();
+});
+
+// ------------------------------------------------------------------ 2.139.0 A (#2129): "Read by"
+// Only under my own latest message that somebody read: a direct message "Read", a group / channel / list chat "Read by 3"
+// with small faces; a tap lists who read it and who did not yet. The server sends read_by only at my messages and only
+// while I send read receipts myself (Settings > Notifications > Team chat; both ways).
+function trd_pick(list) {
+  for (let i = list.length - 1; i >= 0; i--) { const m = list[i]; if (m.user_id === S.me?.id && !m.deleted && m.read_by?.count) return m.id; }
+  return null;
+}
+function trd_lineHtml(m, th) {
+  const rb = m.read_by, U = S.tc.users;
+  if (S.tc.room?.kind === 'dm') return `<div class="trdline" role="status">${ic('check', 's')}<span>${tr('Read|receipt')}</span></div>`;
+  const txt = tr('Read by {0}', rb.count);
+  return `<button type="button" class="trdline" data-act="trd-show" data-rmid="${m.id}" aria-haspopup="dialog" title="${esc(txt)}"><span class="tthav" aria-hidden="true">${rb.users.slice(0, 3).map(u => av(u, uname(u, U), 'avatar')).join('')}</span><span>${esc(txt)}</span></button>`;
+}
+async function trd_show(mid, inTh) {
+  const m = (inTh ? tth_all() : S.tc.msgs).find(x => x.id === mid), rb = m?.read_by; if (!rb) return;
+  const U = S.tc.users, ok = (inTh ? S.tc.th?.readOk : S.tc.room?.read_ok) || [], seen = new Set(rb.users);
+  const row = u => `<li class="trdp">${av(u, uname(u, U), 'avatar sm')}<span>${esc(uname(u, U))}</span></li>`;
+  const more = n => n > 0 ? `<li class="muted">${esc(trn('and {0} more', 'and {0} more', n))}</li>` : '';
+  const not = rb.count > rb.users.length ? [] : ok.filter(u => !seen.has(u) && u !== m.user_id);  // a cut list: the rest is not known
+  const html = `<h4>${esc(tr('Read|receipt'))}</h4><ul class="trdl">${rb.users.map(row).join('')}${more(rb.count - rb.users.length)}</ul>${not.length ? `<h4>${esc(tr('Not read yet'))}</h4><ul class="trdl">${not.slice(0, 20).map(row).join('')}${more(not.length - 20)}</ul>` : ''}`;
+  await askDialog({title: tr('Read by {0}', rb.count), html, ok: tr('Close'), after: md => md.querySelector('[data-cd="no"]')?.remove()});
+}
+// Settings > Notifications: "Send read receipts" (settings.js asks for it when the team chat is on)
+const trd_setHtml = (s, chk, hint) => teamOn() ? `<h4 id="s-trd-h">${tr('Team chat')}</h4><div class="row">${chk('s-trd', s.chat_read_receipts !== '0', tr('Send read receipts'))}</div>
+  ${hint(tr('Others see up to where you have read a conversation, and you see theirs. Off: nobody sees when you read, and you see nobody else either.'))}` : '';
+
 // ------------------------------------------------------------------ 2.113.1 (#2059): channels, groups, files
 // Channels anyone opens (for an organisation: open to all its people or invited only; or in the own space with people one
 // works with), group conversations of three or more people, files in team chat messages (clip, paste, drag & drop).

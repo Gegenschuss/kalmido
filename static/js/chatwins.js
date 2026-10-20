@@ -12,7 +12,7 @@
 // row with the open chats above the chat switches between them.
 const CW_MIN = 220;  // px: the smallest height of an open window; more windows than fit fold to their header
 S.cw = {wins: [], act: '', st: {}, lt: '', home: null};
-const CW_TF = ['rid', 'room', 'msgs', 'more', 'edit'];
+const CW_TF = ['rid', 'room', 'msgs', 'more', 'edit', 'editTh', 'th'];  // 2.139.0 A (#2127): + the open thread
 const cw_tcGet = () => Object.fromEntries(CW_TF.map(f => [f, S.tc[f]]));
 const cw_tcPut = o => { for (const f of CW_TF) S.tc[f] = o ? o[f] : (f === 'msgs' ? [] : null); };
 const cw_id = k => +k.slice(2);

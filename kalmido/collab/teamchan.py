@@ -407,11 +407,11 @@ def tcx_input(b):
         return b, []
     out = {k: request.form.get(k) for k in request.form}
     unknown = sorted(k for k in [*request.form, *request.files]
-                     if k not in ("body", "task_id", "reply_to", "client_id", "file", "voice", "duration_ms"))
+                     if k not in ("body", "task_id", "reply_to", "client_id", "file", "voice", "duration_ms", "thread_of"))  # 2.139.0 A (#2127)
     if unknown:
         from ..personal.timetrack import UnknownFields
         raise UnknownFields(unknown)
-    for k in ("task_id", "reply_to"):
+    for k in ("task_id", "reply_to", "thread_of"):
         v = out.get(k)
         if v in (None, ""):
             out.pop(k, None)
