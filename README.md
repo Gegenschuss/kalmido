@@ -20,6 +20,13 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.123.0** (2026-10-20): knowledge pages - history with restore, pictures and files from the file store, read-only
+  sharing with people or a public link, full-text search with a word index, `[[datei:…]]` / `[[tabelle:…]]` links, check
+  boxes become tasks, texts encrypted at rest (switched on by the admin); cash flow with opening balance, corrections by
+  hand and the real month-end balance.
+- **2.122.0** (2026-10-20): file request links for clients, tags in the file store, a much stronger document search
+  with bulk changes and ZIP, Shift-click ranges, documents via the API, CSV export, more OCR languages, swiping
+  through the news on phones and yearly VAT returns.
 - **2.121.0** (2026-10-20): receipts - the recognition reads supplier, VAT rate, net / gross and invoice number as a
   suggestion, categories with their SKR03 / SKR04 account, receipts billed on to clients as outlays, a cash book (gapless
   numbers, day closing, cancellation instead of delete, CSV / PDF), agents may suggest amount and VAT rate.

@@ -547,7 +547,7 @@ def orgs_get():
         from ..accounts.tenancy import boundary_summary
         return jsonify(orgs=[org_public(c, r) for r in rows], visibility=vis_mode(c), mode=m, editable=m == "workspaces",
                        creatable=m == "workspaces", name_env=bool(ORG_NAME_ENV),
-                       boundary=boundary_summary(c))  # 2.30.0 (#1036): memberships across the workspace boundary (0 = clean)
+                       boundary=boundary_summary(c, g.user["id"]))  # 2.122.4 A (#1724): names only inside own orgs; 2.30.0 (#1036): memberships across the workspace boundary (0 = clean)
 
 
 @app.post("/api/admin/orgs/boundary/repair")
@@ -565,7 +565,7 @@ def oa_boundary_repair():
     n = sum(len(v) for v in done.values())
     if n:
         print(f"boundary check (#1563): {n} memberships across the workspace boundary removed by an admin", flush=True)
-    return jsonify(removed=n, kinds={k: len(v) for k, v in done.items()}, boundary=boundary_summary(c))
+    return jsonify(removed=n, kinds={k: len(v) for k, v in done.items()}, boundary=boundary_summary(c, g.user["id"]))  # 2.122.4 A (#1724)
 
 
 def _no_change():

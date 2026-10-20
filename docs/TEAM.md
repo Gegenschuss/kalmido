@@ -239,9 +239,14 @@ control*: it opens in a new tab and its comments carry no timecode.
   them. A new link stops the older one; deleting the sign-off stops it at once.
 - Rights: who sees the task / project / client sees the sign-off and may comment (like task comments); changing it, new
   versions, the customer link, moving and deleting need the right to edit there. A locked list (end-to-end) has none.
+  At a client (2.122.4) that is an office role in the client's organisation (or, for a private client, its creator).
 - *Move to another workspace…* takes it with its versions and comments into a project of the private space or an
   organisation (its creator or an admin of the organisation); the customer links and their record stay in the old
-  workspace. Undo brings it back to its old place.
+  workspace. Undo brings it back to its old place. Since 2.122.4 the records stay bound to the sign-off and show again
+  when it comes back; in the new workspace they never show.
+- Deleting for good: a sign-off in the trash is deleted for good after 30 days with its versions, comments and customer
+  records. A task, project or client that is deleted for good takes its video sign-offs with it, including the customer's
+  recorded decision (like the approval records of documents).
 - Every step can be undone. The players are embedded without loading any script of Vimeo or YouTube (YouTube through
   youtube-nocookie.com); only the two player addresses may be framed (Content-Security-Policy).
 
@@ -290,6 +295,32 @@ along; the files are sealed again with the target's key. One undo step moves eve
 
 Out of an organisation only the owner (or who uploaded it) or an organisation admin moves something; a person without an
 organisation has no other workspace and does not see the action. Agents never move data between workspaces.
+
+## File requests: clients upload into a folder (2.122.0)
+
+A client sends logos, contracts or receipts without an account: **Request files…** in the menu of a folder of the file
+store (everyone who may add files there) opens the folder's requests and **New file request**. A request has a title
+and a note for the client, an end date (required, suggested in 14 days, at most 90), the size per file, how many files
+in all and the allowed kinds (documents and pictures ticked; design files, archives, audio and video on request).
+Programs, web pages and SVG files are never accepted, also not under another ending: the content must fit the name.
+Optionally every request gets its own subfolder. **Create link** copies the link; the row also has a QR code.
+
+The page of the link (`/u/<token>`) shows only the title, the note and a file field (drag and drop, a progress bar per
+file; without JavaScript the plain form works). It never shows the folder, its files or other uploads. The files land in
+the folder as files of whoever asked (counted on their storage, scanned and sealed like every upload, a free name instead
+of overwriting); the history of each file says *received through a file request*. A request in the documents inbox
+folder is recognised like any other document there.
+
+The folder's list shows each request as open, expired, stopped or not working, with the number of files that arrived.
+In its menu: **Extend by 14 days**, **Stop the link** (it stops at once; *Open again* brings it back) and **Remove**;
+each is one undo step. A link also stops when its folder goes into the trash or into another workspace, or when whoever
+asked can no longer add files there. Unknown, expired and stopped links get the same answer. Limits per address and
+link (sends per minute and hour, a daily volume per link: `KALMIDO_FILE_REQUEST_MB_DAY`, default 1000 MB) keep a
+link in the open from filling the disk. Public links have to be on (Settings > Administration); a person without an
+organisation uses requests in the own folders the same way.
+
+Whoever asked gets one News item (and a push) per request when files arrive; more files within ten minutes raise its
+count instead of sending again. *Files from file requests* in the notification settings switches News and push off.
 
 ## Pinned chat messages (2.62.0)
 

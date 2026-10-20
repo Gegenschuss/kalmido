@@ -41,8 +41,8 @@ function rk_cashflowHtml() {
       <span class="rkcfbal ${+r.balance < 0 ? 'neg' : ''}">${tr('Balance')} ${ofcMoney(r.balance)}</span></header>${bars(r)}
       <table class="rkcftab"><thead><tr><th></th><th class="num">${tr('Actual')}</th><th class="num">${tr('Planned')}</th></tr></thead><tbody>
       <tr><th>${tr('In|cashflow')}</th><td class="num">${val(r.month, 'in', 'actual', r.in.actual)}</td><td class="num">${val(r.month, 'in', 'plan', r.in.plan, 'plan')}</td></tr>
-      <tr><th>${tr('Out|cashflow')}</th><td class="num">${val(r.month, 'out', 'actual', r.out.actual)}</td><td class="num">${val(r.month, 'out', 'plan', r.out.plan, 'plan')}</td></tr>${bk_cfReserveRows(r)}</tbody></table>
-      ${rk_cfOpenHtml(r.month)}${k ? rk_cfEntries(k) : ''}</section>`;
+      <tr><th>${tr('Out|cashflow')}</th><td class="num">${val(r.month, 'out', 'actual', r.out.actual)}</td><td class="num">${val(r.month, 'out', 'plan', r.out.plan, 'plan')}</td></tr>${bk_cfReserveRows(r)}${cfs_accRows(r)}</tbody></table>
+      ${rk_cfOpenHtml(r.month)}${cfs_adjHtml(r.month)}${k ? rk_cfEntries(k) : ''}</section>`;
   }).join('');
   return bar + `<div class="rkcfms">${cards}</div><p class="muted ofchint">${tr('Actual = paid or already past; planned = expected (open invoices on their due date, sent and accepted quotations without an invoice at the end of their period of service, one version per quotation).')} ${d.basis === 'net' ? tr('Net: documents and fixed costs without VAT; purchases and travel receipts as entered.') : tr('Gross: documents and fixed costs incl. VAT; purchases and travel receipts as entered.')}</p>` + rk_fixedHtml() + fci_checkHtml();
 }
@@ -92,11 +92,17 @@ document.addEventListener('click', async e => {
 function rk_fixedHtml() {
   const fx = RKF.fixed || [], rp = k => tr(RK_CF_REPEATS.find(x => x[0] === k)?.[1] || k);
   // 2.67.0 (#1838): grouped by category (without one last), net and gross per row; import from a spreadsheet + its template
+  // 2.122.3 A (#2335): template + import moved to Settings > Import legacy data (office_import.js), here only a link to it
   const cats = [...new Set(fx.map(f => f.category || ''))].sort((a, b) => !a - !b || a.localeCompare(b, undefined, {sensitivity: 'base'}));
-  const row = f => `<li><button type="button" class="ofcrow" data-rkf="fixed" data-id="${f.id}"><span class="ofcn"><b>${esc(f.label)}${f.sub ? ` <span class="abo-tag">${tr('Subscription')}</span>` : ''}</b><small class="muted">${esc([rp(f.repeat), tr('from {0}', fmtDateLoc(f.start)), f.until ? tr('until {0}', fmtDateLoc(f.until)) : '', tr('VAT {0} %', f.vat_rate || 0)].filter(Boolean).join(' · '))}</small></span><span class="rksum fcisum"><span>${ofcMoney(f.amount)} <small class="muted">${tr('net')}</small></span><small class="muted">${ofcMoney(f.gross ?? f.amount)} ${tr('gross')}</small></span>${ic('chev', 's')}</button></li>`;
-  return `<div class="ofcbar fcibar"><h3 class="ofcgrp">${tr('Fixed costs')}</h3><span class="spacer"></span>${fx.some(f => f.sub) ? `<a class="btn sm ghost" href="#office/subs" data-abo="go">${ic('repeat', 's')}<span>${tr('Subscriptions & tools')}</span></a>` : ''}<a class="btn sm ghost" href="/api/office/fixed-costs/import/template" download>${ic('download', 's')}<span>${tr('Download template')}</span></a><button class="btn sm" data-rkf="fimp">${ic('upload', 's')}<span>${tr('Import from Excel')}</span></button><button class="btn sm pri" data-rkf="fnew">${ic('plus', 's')}<span>${tr('New fixed cost')}</span></button></div>`
+  const row = f => `<li><button type="button" class="ofcrow" data-rkf="fixed" data-id="${f.id}"><span class="ofcn"><b>${esc(f.label)}${f.sub ? ` <span class="abo-tag">${tr('Subscription')}</span>` : ''}</b><small class="muted">${esc([rp(f.repeat), tr('from {0}', fmtDateLoc(f.start)), f.until ? tr('until {0}', fmtDateLoc(f.until)) : '', +f.vat_rate ? tr('VAT {0} %', f.vat_rate) : tr('without VAT')].filter(Boolean).join(' · '))}</small></span>${rk_fixedSum(f)}${ic('chev', 's')}</button></li>`;
+  return `<div class="ofcbar fcibar"><h3 class="ofcgrp">${tr('Fixed costs')}</h3><span class="spacer"></span>${fx.some(f => f.sub) ? `<a class="btn sm ghost" href="#office/subs" data-abo="go">${ic('repeat', 's')}<span>${tr('Subscriptions & tools')}</span></a>` : ''}<button class="btn sm pri" data-rkf="fnew">${ic('plus', 's')}<span>${tr('New fixed cost')}</span></button></div>`
     + (fx.length ? cats.map(k => `${cats.length > 1 || k ? `<h4 class="fcicat">${esc(k || tr('Without category'))}</h4>` : ''}<ul class="ofclist" role="list">${fx.filter(f => (f.category || '') === k).map(row).join('')}</ul>`).join('')
-      : `<p class="muted lempty">${tr('No fixed costs yet, e.g. rent or software subscriptions.')}</p>`) + rk_agrFixedHtml();
+      : `<p class="muted lempty">${tr('No fixed costs yet, e.g. rent or software subscriptions.')}</p>`) + oim_link('fixed', !fx.length) + rk_agrFixedHtml();
+}
+// 2.122.3 A (#2333): without VAT net and gross are the same, so one amount without "net"/"gross" (like the contracts row)
+function rk_fixedSum(f) {
+  if (!+f.vat_rate) return `<span class="rksum fcisum"><span>${ofcMoney(f.amount)}</span></span>`;
+  return `<span class="rksum fcisum"><span>${ofcMoney(f.amount)} <small class="muted">${tr('net')}</small></span><small class="muted">${ofcMoney(f.gross ?? f.amount)} ${tr('gross')}</small></span>`;
 }
 // 2.92.0 A (#1925): the contributions of business contracts and insurances, read-only here (edited in Contracts & insurance)
 function rk_agrFixedHtml() {
@@ -231,3 +237,111 @@ document.addEventListener('click', e => {
   else return;
   e.preventDefault();
 });
+
+// ---- 2.123.0 D (#2341): the account balance -- start balance (office settings), corrections by hand per month, the real
+// balance at the end of a month against the computed one. Server: kalmido/office/cfstart.py. Without a start balance and
+// without corrections the cards stay as before. Every change = one undo step.
+const CFS = {st: undefined, oid: null};
+const CFS_DIRS = [['in', N_('Other money in|cashflow')], ['out', N_('Other money out|cashflow')]];
+const cfs_amt = v => { const n = ofcNum(v); return n == null ? null : n; };
+// the account rows of a month card: computed balance at the month's end, the real one (by hand, optional) and the difference
+function cfs_accRows(r) {
+  if (r.account == null) return '';
+  const real = r.real != null ? fmtNum(+r.real, 2) : '', d = r.diff != null ? +r.diff : null;
+  return `<tr class="cfs-acc"><th>${tr('Account balance at the end of the month')} <small class="muted">${tr('computed')}</small></th><td class="num ${+r.account < 0 ? 'neg' : ''}" colspan="2">${ofcMoney(r.account)}</td></tr>
+      <tr class="cfs-real"><th><label for="cfs-real-${r.month}">${tr('Real balance')} <span class="cfs-hand">${tr('by hand')}</span></label></th><td class="num" colspan="2"><input id="cfs-real-${r.month}" class="numin cfs-realin" inputmode="decimal" maxlength="20" data-cfs-real="${r.month}" value="${esc(real)}" placeholder="${esc(tr('optional'))}" aria-describedby="cfs-diff-${r.month}"></td></tr>
+      ${d != null ? `<tr class="cfs-diff"><th>${tr('Difference')}</th><td class="num ${d ? 'cfs-off' : ''}" colspan="2" id="cfs-diff-${r.month}">${d > 0 ? '+' : ''}${ofcMoney(d)}</td></tr>` : ''}`;
+}
+// the corrections by hand of a month (marked "by hand"), a tap edits one; "+ Correction" adds one
+function cfs_adjHtml(mo) {
+  const es = (RKF.data?.adjust || []).filter(a => a.month === mo);
+  const row = a => `<li><button type="button" class="ofcrow" data-cfs="edit" data-id="${a.id}"><span class="ofcn"><b>${esc(tr(CFS_DIRS.find(x => x[0] === a.dir)?.[1] || a.dir))} <span class="cfs-hand">${tr('by hand')}</span></b>${a.note ? `<small class="muted">${esc(a.note)}</small>` : ''}</span><span class="rksum">${a.dir === 'out' ? '−' : '+'}${ofcMoney(a.amount)}</span>${ic('chev', 's')}</button></li>`;
+  return `${es.length ? `<ul class="ofclist cfs-adj" role="list" aria-label="${esc(tr('Corrections by hand'))}">${es.map(row).join('')}</ul>` : ''}<div class="cfs-add"><button type="button" class="btn sm ghost" data-cfs="new" data-month="${mo}">${ic('plus', 's')}<span>${tr('Correction')}</span></button></div>`;
+}
+function cfs_modal(a, mo) {
+  const md = modal(`<h3>${a ? tr('Edit correction') : tr('New correction')}</h3>
+    <p class="muted ofchint">${esc(tr('For money outside Kalmido in {0}. Counts only in the account balance; the computed values stay as they are.', rk_month(a?.month || mo)))}</p>
+    ${ofcRowF('cfs-dir', tr('Kind'), ofcSel('cfs-dir', a?.dir || 'in', CFS_DIRS.map(([k, n]) => [k, tr(n)])))}
+    ${ofcRowF('cfs-amount', tr('Amount'), ofcIn('cfs-amount', a ? fmtNum(+a.amount, 2) : '', {num: true}), ofcCur())}
+    ${ofcRowF('cfs-note', tr('Note'), ofcIn('cfs-note', a?.note, {max: 200, ph: tr('e.g. cash payment')}))}
+    <div class="aerr" role="alert"></div>
+    <div class="foot">${a ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${a ? tr('Save') : tr('Add')}</button></div>`);
+  md.classList.add('ofcdlg');
+  const close = fgModal(md);
+  const keep = x => ({month: x.month, dir: x.dir, amount: x.amount, note: x.note || ''});
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { close(); return; }
+    try {
+      if (b.dataset.m === 'del') {
+        const j = await api('DELETE', `/api/office/cashflow/adjust/${a.id}`); md.remove(); rk_cfReload();
+        let id = a.id;
+        offerUndo(tr('Deleted'), histAdd({label: tr('Correction deleted'), undo: async () => { id = (await api('POST', '/api/office/cashflow/adjust', keep(j.item))).id; rk_cfReload(); },
+          redo: async () => { await api('DELETE', `/api/office/cashflow/adjust/${id}`); rk_cfReload(); }}));
+        return;
+      }
+      const v = id => $(id, md)?.value ?? '';
+      const body = {month: a?.month || mo, dir: v('#cfs-dir'), amount: cfs_amt(v('#cfs-amount')), note: v('#cfs-note')};
+      if (a) {
+        const old = keep(a);
+        await api('PATCH', `/api/office/cashflow/adjust/${a.id}`, body); md.remove(); rk_cfReload();
+        offerUndo(tr('Saved'), histAdd({label: tr('Correction changed'), undo: async () => { await api('PATCH', `/api/office/cashflow/adjust/${a.id}`, old); rk_cfReload(); },
+          redo: async () => { await api('PATCH', `/api/office/cashflow/adjust/${a.id}`, body); rk_cfReload(); }}));
+      } else {
+        const j = await api('POST', '/api/office/cashflow/adjust', body); md.remove(); rk_cfReload();
+        let id = j.id;
+        offerUndo(tr('Added'), histAdd({label: tr('Correction added'), undo: async () => { await api('DELETE', `/api/office/cashflow/adjust/${id}`); rk_cfReload(); },
+          redo: async () => { id = (await api('POST', '/api/office/cashflow/adjust', body)).id; rk_cfReload(); }}));
+      }
+    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+  });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-cfs]'); if (!b) return;
+  e.preventDefault();
+  if (b.dataset.cfs === 'new') cfs_modal(null, b.dataset.month);
+  else if (b.dataset.cfs === 'edit') { const a = (RKF.data?.adjust || []).find(x => x.id === +b.dataset.id); if (a) cfs_modal(a); }
+});
+// the real balance at the end of a month: saved on change (empty = removed), one undo step
+async function cfs_realPut(mo, amount) { await api('PUT', '/api/office/cashflow/actual', {month: mo, amount}); rk_cfReload(); }
+document.addEventListener('change', async e => {
+  const t = e.target.closest?.('[data-cfs-real]'); if (!t) return;
+  const mo = t.dataset.cfsReal, raw = t.value.trim(), amount = raw ? cfs_amt(raw) : null;
+  if (raw && amount == null) { toast(tr('Invalid value: {0}', tr('Real balance'))); return; }
+  const was = RKF.data?.rows?.find(r => r.month === mo)?.real ?? null;
+  if ((was == null && amount == null) || (was != null && amount != null && +was === +amount)) return;
+  try { await cfs_realPut(mo, amount); } catch (x) { toast(x.message || tr('unknown')); return; }
+  offerUndo(tr('Saved'), histAdd({label: tr('Real balance changed'), undo: () => cfs_realPut(mo, was), redo: () => cfs_realPut(mo, amount)}));
+});
+document.addEventListener('keydown', e => { const x = e.target; if (e.key === 'Enter' && !e.isComposing && x.dataset?.cfsReal) { e.preventDefault(); x.blur(); } });
+
+// the start balance in the office settings (own section, saved on change like the travel purposes; admins only)
+async function cfs_load() {
+  CFS.oid = OFC.info?.org_id;
+  try { CFS.st = (await api('GET', '/api/office/cashflow/start')).start; } catch (x) { CFS.st = null; }
+  const sec = $('.cfsset'); if (sec) sec.outerHTML = cfs_settingsHtml();  // only this section: the settings form keeps what is typed there
+}
+function cfs_settingsHtml() {
+  if (!ofcAdmin()) return '';
+  if (CFS.oid !== OFC.info?.org_id) { CFS.oid = OFC.info?.org_id; CFS.st = undefined; setTimeout(cfs_load, 0); }
+  const st = CFS.st;
+  return `<section class="cfsset" data-fg-skip aria-labelledby="cfs-h"><h3 id="cfs-h">${tr('Cash flow')}</h3>
+    <p class="muted ofchint">${tr('Starting balance of the account: the cash flow adds all money in and out from this day on and shows the balance at the end of every month. Empty = no account balance.')}</p>
+    ${st === undefined ? `<p class="muted">${tr('Loading…')}</p>` : `${ofcRowF('cfs-amount-set', tr('Starting balance'), `<span class="lacts">${ofcIn('cfs-amount-set', st ? fmtNum(+st.amount, 2) : '', {num: true, ph: tr('optional')})}<span class="muted">${ofcCur() === 'USD' ? '$' : '€'}</span></span>`)}
+    <div class="row"><label id="cfs-dayl">${tr('Reference date')}</label>${dateIn('cfs-day', st?.day || new Date().toISOString().slice(0, 10), {label: tr('Reference date'), clear: false})}</div>`}</section>`;
+}
+async function cfs_startSet(v) {
+  CFS.st = v ? (await api('PUT', '/api/office/cashflow/start', {amount: v.amount, day: v.day})).start : (await api('DELETE', '/api/office/cashflow/start'), null);
+  RKF.data = null; const sec = $('.cfsset'); if (sec) sec.outerHTML = cfs_settingsHtml();
+}
+document.addEventListener('change', async e => {
+  const t = e.target; if (!(t.id === 'cfs-amount-set' || t.id === 'cfs-day') || !t.closest?.('.cfsset')) return;
+  const raw = $('#cfs-amount-set')?.value.trim() || '', amount = raw ? cfs_amt(raw) : null, day = $('#cfs-day')?.value || '';
+  if (raw && amount == null) { toast(tr('Invalid value: {0}', tr('Starting balance'))); return; }
+  const was = CFS.st ? {amount: CFS.st.amount, day: CFS.st.day} : null, now = amount == null ? null : {amount: String(amount), day};
+  if (!was && !now) return;
+  if (was && now && +was.amount === +now.amount && was.day === now.day) return;
+  try { await cfs_startSet(now); } catch (x) { toast(x.message || tr('unknown')); return; }
+  offerUndo(tr('Saved'), histAdd({label: tr('Starting balance changed'), undo: () => cfs_startSet(was), redo: () => cfs_startSet(now)}));
+});
+document.addEventListener('keydown', e => { const x = e.target; if (e.key === 'Enter' && !e.isComposing && x.id === 'cfs-amount-set') { e.preventDefault(); e.stopPropagation(); x.blur(); } }, true);  // never the settings form's submit

@@ -117,7 +117,8 @@ CHECKS = {
                   "(tl.id IS NOT NULL AND tl.org_id IS DISTINCT FROM v.org_id) OR (l.id IS NOT NULL AND l.org_id IS DISTINCT FROM v.org_id) OR "
                   "(cl.id IS NOT NULL AND cl.org_id IS DISTINCT FROM v.org_id) OR EXISTS (SELECT 1 FROM video_versions x WHERE x.review_id=v.id "
                   "AND x.org_id IS DISTINCT FROM v.org_id) OR EXISTS (SELECT 1 FROM video_comments x WHERE x.review_id=v.id AND x.org_id IS DISTINCT "
-                  "FROM v.org_id) OR EXISTS (SELECT 1 FROM office_signoffs s WHERE s.video_id=v.id AND s.org_id IS DISTINCT FROM v.org_id))"),
+                  "FROM v.org_id) OR EXISTS (SELECT 1 FROM office_signoffs s WHERE s.video_id=v.id AND s.org_id IS DISTINCT FROM v.org_id "
+                  "AND s.state='open' AND s.revoked_at IS NULL))"),  # 2.122.4 A (#2215 L3): a moved review keeps its old (closed) records
     "gen_doc_signoff": ("SELECT s.id, s.created_by FROM office_signoffs s JOIN office_gen_docs d ON d.id=s.gen_doc_id WHERE d.org_id IS DISTINCT FROM s.org_id"),
     "pay_prop": ("SELECT p.id, p.agent_id FROM office_pay_props p JOIN office_docs d ON d.id=p.doc_id WHERE d.org_id IS DISTINCT FROM p.org_id"),
     # an agent of an organisation that is gone, or a personal agent working in an organisation its owner is not in
@@ -156,6 +157,15 @@ CHECKS = {
     # 2.99.0 A (#2182): a file of a knowledge page that lies in another space than its page (org / owner) -- (file, who stored it)
     "wiki_file": ("SELECT f.id, f.created_by FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id WHERE "
                   "COALESCE(f.org_id,0)<>COALESCE(p.org_id,0) OR (p.org_id IS NULL AND f.owner_id IS DISTINCT FROM p.owner_id)"),
+    # 2.123.0 B (#2104): a live person share of a knowledge page / folder that crosses a boundary: in an organisation's space
+    # (people get shares in private spaces only), with an agent, or with the space's owner itself -- (share, person)
+    "wiki_share": ("SELECT s.id, s.user_id FROM wiki_shares s JOIN users u ON u.id=s.user_id WHERE s.kind='person' AND s.revoked_at IS NULL "
+                   "AND (s.org_id IS NOT NULL OR u.kind='agent' OR s.user_id=s.owner_id)"),
+    # 2.122.0 A (#2097): a file request in another workspace than its folder, or of an organisation's folder made by a person
+    # outside that organisation (the link stops anyway: files/filereq.py frq_alive) -- (request, its creator); counted only
+    "file_request": ("SELECT q.id, q.created_by FROM fs_upload_requests q JOIN fs_nodes n ON n.id=q.node_id WHERE q.deleted_at IS NULL "
+                     "AND (COALESCE(q.org_id,0)<>COALESCE(n.org_id,0) OR (n.org_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM org_members om "
+                     "WHERE om.org_id=n.org_id AND om.user_id=q.created_by)))"),
     # 2.71.0 B (#1459): a task shown in a list of another workspace (the trigger kalmido_ml_prune drops such links on every
     # move; the read layer ignores them: tasks/multilist.py ml_fill) -- (further list, who linked it)
     "list_task_link": ("SELECT k.list_id, k.added_by FROM task_links k JOIN tasks t ON t.id=k.task_id JOIN lists o ON o.id=t.list_id "
@@ -312,10 +322,31 @@ OA_OBJ = {"list": ("list", "lists"), "group": ("list", "lists"), "cal": ("calend
 OA_DETAIL_MAX = 100
 
 
-def oa_details(c, limit=OA_DETAIL_MAX):
+def rg4_oa_seen(c, viewer_uid):
+    """2.122.4 A (#1724): what the instance admin viewer_uid may see by name in the boundary findings: (own organisations,
+    function(person id) -> True when it is the viewer, shares an organisation with them or belongs to none)."""
+    if not viewer_uid:
+        return set(), lambda pid: False
+    mine = {r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=?", (viewer_uid,)).fetchall()}
+    def person(pid):
+        if pid == viewer_uid:
+            return True
+        theirs = {r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=?", (pid,)).fetchall()}
+        if not theirs:
+            ag = c.execute("SELECT org_id FROM agents WHERE user_id=?", (pid,)).fetchone()
+            return not ag or not ag[0] or ag[0] in mine
+        return bool(theirs & mine)
+    return mine, person
+
+
+def oa_details(c, limit=OA_DETAIL_MAX, viewer_uid=None):
     """[{kind, type (list | calendar | book | agent), id, name, user_id, user, agent, fixable}] for the findings (at most
-    limit). Same rows as boundary_check; fixable = a person's membership that boundary_repair takes out. Admin only (the caller)."""
+    limit). Same rows as boundary_check; fixable = a person's membership that boundary_repair takes out. Admin only (the caller).
+    2.122.4 A (#1724): with viewer_uid, objects of organisations the viewer is not a member of and people outside the viewer's
+    organisations come with ids only (name / user empty; the client shows "#id"): an organisation's object is named only for
+    its members, a private one / an agent when the viewer sees its owner (a shared organisation or none at all)."""
     out = []
+    mine, person = rg4_oa_seen(c, viewer_uid) if viewer_uid else (None, None)
     for k, sql in CHECKS.items():
         if len(out) >= limit:
             break
@@ -329,17 +360,48 @@ def oa_details(c, limit=OA_DETAIL_MAX):
                 row = c.execute("SELECT display_name FROM users WHERE id=?", (oid_,)).fetchone()
                 name, who, ag = (row[0] if row else ""), oid_, True
             u = c.execute("SELECT display_name FROM users WHERE id=?", (who,)).fetchone()
+            if person:  # 2.122.4 A (#1724): ids only outside the viewer's organisations
+                ws = rg4_oa_obj_ws(c, table, oid_, mine)
+                if ws is False or (ws is None and not person(oid_ if not table else rg4_oa_owner(c, table, oid_))):
+                    name, u = "", None
+                elif ws is None and not person(who):
+                    u = None
             out.append({"kind": k, "type": ot, "id": oid_, "name": name, "user_id": who, "user": u[0] if u else "", "agent": ag,
                         "fixable": k in REPAIR or k in ("client_contact", "hub_mail_ref")})
     return out
 
 
-def boundary_summary(c):
-    """For GET /api/admin/orgs: the live count + when the nightly check ran last."""
+def rg4_oa_obj_ws(c, table, oid_, mine):
+    """2.122.4 A (#1724): the workspace of a finding's object: True = one of the viewer's organisations, False = another
+    organisation, None = private (or an agent finding without a table: decided by the person)."""
+    if not table:
+        return None
+    if table == "events":
+        r = c.execute("SELECT k.org_id FROM events e JOIN ev_cals k ON k.id=e.cal_id WHERE e.id=?", (oid_,)).fetchone()
+    elif table == "books":  # a book_org finding: org_id may be empty while owner_org_id names the organisation (review 2.122.4)
+        r = c.execute("SELECT COALESCE(org_id, owner_org_id) FROM books WHERE id=?", (oid_,)).fetchone()
+    else:
+        r = c.execute(f"SELECT org_id FROM {table} WHERE id=?", (oid_,)).fetchone()
+    return (r[0] in mine) if r and r[0] else None
+
+
+def rg4_oa_owner(c, table, oid_):
+    """2.122.4 A (#1724): the owner of a private object of a finding (None when unknown)."""
+    if table == "events":
+        r = c.execute("SELECT k.owner_id FROM events e JOIN ev_cals k ON k.id=e.cal_id WHERE e.id=?", (oid_,)).fetchone()
+    else:
+        col = "created_by" if table == "clients" else "owner_id"
+        r = c.execute(f"SELECT {col} FROM {table} WHERE id=?", (oid_,)).fetchone()
+    return r[0] if r else None
+
+
+def boundary_summary(c, viewer_uid=None):
+    """For GET /api/admin/orgs: the live count + when the nightly check ran last. 2.122.4 A (#1724): viewer_uid = the
+    instance admin asking (names only inside their organisations, see oa_details)."""
     from ..core.pg import system_ctx
     with system_ctx(c):  # 2.37.0 (#1150): counts and ids over every organisation, no content
         res = boundary_check(c)
-        details = oa_details(c) if res["n"] else []  # 2.46.0 (#1563): names of the objects and people, for the admin
+        details = oa_details(c, viewer_uid=viewer_uid) if res["n"] else []  # 2.46.0 (#1563): names of the objects and people, for the admin
     last = boundary_last(c)
     return {"violations": res["n"], "kinds": res["kinds"], "sample": res["sample"], "checked_at": last.get("at") or None,
             "details": details}

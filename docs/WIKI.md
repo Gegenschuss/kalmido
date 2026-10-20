@@ -19,12 +19,42 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
 - **Frontmatter.** A leading block of `key: value` lines between `---` lines is shown as small fields above the text.
 - **Templates.** Pages under `Templates/` are offered as the start of a new page.
 - **Saving** is automatic. When someone else saved the page in between, you choose which version stays.
+- **History (2.123.0).** *History* in the menu of a page lists its saved versions with date and person (saves of one
+  person within ten minutes are one version, at most 100 per page, the oldest go). A version opens with a line
+  comparison to the current text; *Restore* makes its text the current one again (a new version, the name stays) and can
+  be undone. Whoever may read the page reads its history, restoring needs the right to change it. The history goes with
+  the page (trash, moving to another workspace) and is deleted with it. Encrypted spaces (see below) keep no history.
+- **Search (2.123.0).** *Find a page* filters the names at once; from two characters the pages whose text has the words
+  follow under *Found in the text* (whole words and word beginnings, names first, then the newest), 30 at a time with
+  *Show more*. The server searches a word index of keyed hashes, not the text itself.
+- **Encrypted at rest (2.123.0).** The text of every page and of its versions is stored encrypted with the key of its
+  space (the organisation's key, for private pages your account key), like the office data; names (paths) stay plain
+  because links and the tree need them. Nothing changes in use. The server admin switches it on once with
+  `orgcrypt_cli encrypt-wiki` (off after the update, so a step back to an older version stays possible); see
+  *Encryption at rest* in the self-hosting guide.
 - **Undo.** Creating, renaming, deleting and importing are one step each (the arrow on top, Ctrl/Cmd+Z, the toast).
 - **Files (2.99.0).** A page can carry PDFs and pictures (PNG, JPEG, GIF, WebP, SVG): *Attach files* below the text,
   at most 25 MB each. The type is checked by the content, not by the name; an SVG is cleaned (no scripts, no outside
   references). In the text, `![label](/api/wiki/files/<id>/<name>)` shows a picture and `[label](…)` opens a file; the
   link button next to a file copies that line. The files have the rights of their page: whoever may read the page may
   open them. Deleting a file or its page can be undone. An encrypted space (see below) takes no files yet.
+- **Pictures and files in the editor (2.123.0).** *Insert picture or file* above the text uploads files to the page (also
+  pasting a picture or dropping files into the text) or picks a file of the **file store** of the same space
+  (*From the file store…*: browse its folders or search). A file of the file store is referenced, not copied:
+  `![label](/api/files/nodes/<id>/content)` shows a picture, `[label](…)` opens the file. A reader sees it only with the
+  right to open that file in the file store; everyone else sees *File not available*, without its name. Only files of the
+  page's own space are offered and shown (an organisation's page: that organisation's file store; a private page: your own
+  private one). After a move to another workspace such references stay as text and show as not available.
+- **Links to files and tables (2.123.0).** `[[datei:Folder/Contract.pdf]]` (a path of the file store from its top, or the
+  file's number) links a file, `[[tabelle:Budget]]` (its title or number) links a table of the same space; `|label` sets the
+  text. Typing `[[datei:` or `[[tabelle:` suggests them. A reader without access sees plain text. The file details in the
+  file store list the pages under *Mentioned in*. The export keeps these links as they are.
+- **Check boxes as tasks (2.123.0).** In reading mode an open check box line `- [ ] …` has a **+** button; with several
+  open lines *Open items as tasks* takes them all. The dialog chooses the list (the basket first); dates, `#tags` and
+  priorities in the line are read like in quick add. The line then ends with the task link `#123`, which shows the task's
+  state (struck through when done); ticking the box in the page does not change the task. Creating the tasks and changing
+  the line are one undo step. In an encrypted space this works as well, but the task titles are stored with the lock of
+  the chosen list (a hint says so when that list has none).
 - **Export / import.** The "…" menu in the header (section *Space*) exports a space as a ZIP of `.md` files in folders (the format of
   SilverBullet and similar tools) and imports such a ZIP: at most 2000 files, 1 MB per page, 25 MB per PDF or picture and
   500 MB in total; pages with an existing name are skipped unless you replace them. Paths with `..` are refused.
@@ -94,6 +124,32 @@ unlocked and a key of every locked space involved (without the target's key the 
 releases it). Names in a locked target are compared in the browser. Undo moves the pages back, encrypted again for the old
 space. If a key changes between the check and the move, the server refuses it (`409`) and the browser tries once more. The
 server never sees a plain name or text of a locked space; the history of such a move keeps no page names.
+
+## Sharing a page or a folder, read only (2.123.0)
+
+Page menu *Share…* (this page) or *Share folder…* (the page's folder: its own page, every page below it, also pages you add
+later; "Customer A" never includes "Customer AB"). Whoever may write in the space shares; in the private space that is you.
+
+- **People** (private space only): a person with an account reads the pages in the app under *Shared with me* in the side
+  bar of the knowledge pages -- only what you shared, never the rest of your space (no index, search, backlinks or mentions).
+  Choose the person or type an e-mail address (the answer never tells whether an account has it). Pages of an organisation
+  are read by all its members anyway; people outside get a public link (no person shares across the organisation boundary).
+  Agents never get a share.
+- **Public link**: a secret address `/s/w/<token>` that opens a plain read-only page without an account and without the app
+  (no scripts): the page, or the list of the folder's pages. Pictures and files of the shared pages come along; a
+  `[[link]]` to a page that is not shared shows as plain text, task numbers stay text. Optional *Valid until*; several links
+  per page are possible (one per customer). *Turn off* ends a link at once; Undo brings the same link back. Unknown,
+  expired and turned-off links all answer "Link not available". The pages are `noindex`, never cached, rate limited like
+  the public list links, and the server switch for public links (*Settings > Users > Whole server*, `KALMIDO_PUBLIC_LINKS=0`)
+  turns these off too. Only the SHA-256 of a token is looked up; the token itself is kept sealed so you can copy it again.
+- Renaming a page or a folder takes its shares along; a page in the trash is not shared (Undo brings it back); moving pages
+  to the other workspace ends their shares. A space encrypted in the browser cannot share (the server cannot read its text);
+  links of a space that gets locked stop working. Shared pages carry a small people mark in the tree and in the title.
+
+Routes: `GET /api/wiki/shares?page=<id> | space=&folder=`, `POST /api/wiki/shares {page_id | space + folder, kind: person |
+link, user_id | email, expires}`, `PATCH /api/wiki/shares/<id> {expires}`, `DELETE /api/wiki/shares/<id>` (revoke),
+`POST /api/wiki/shares/<id>/restore`; the guest: `GET /api/wiki/shared`, `GET /api/wiki/shared/pages/<id>`,
+`GET /api/wiki/shared/files/<id>`; the public page: `GET /s/w/<token>`, `/s/w/<token>/p/<id>`, `/s/w/<token>/file/<id>`.
 
 ## Mind map (2.49.0)
 

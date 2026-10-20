@@ -17,7 +17,8 @@
 .vdrhd{display:flex;align-items:center;gap:.375rem}
 .vdrhd h3{margin:0;min-width:0;overflow-wrap:anywhere}
 .vdrv1{font-variant-numeric:tabular-nums;color:var(--text2);padding:0 .5rem}
-.vdrvsel select{min-height:2.25rem}
+.vdrvsel select{min-height:2.75rem}  /* 2.122.4 C (#2217): 44 px target */
+@media (pointer:coarse){.vdrvsel select{height:2.75rem}}
 .vdrstate{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.5rem 0}
 .vdrchip{display:inline-flex;align-items:center;padding:.125rem .625rem;border-radius:62.5rem;border:1px solid var(--line2);font-size:.8125rem;font-weight:600;color:var(--text2)}
 .vdrchip.st-approved{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
@@ -29,6 +30,7 @@
 .vdrtl{position:relative;height:1.75rem;margin:.375rem 0;border-radius:.5rem;background:var(--bg3);border:1px solid var(--line)}
 .vdrmk{position:absolute;top:.125rem;width:1.25rem;height:1.375rem;margin-left:-.625rem;padding:0;border:0;background:transparent;cursor:pointer}
 .vdrmk::after{content:"";position:absolute;left:.375rem;top:.125rem;width:.5rem;height:1.125rem;border-radius:.25rem;background:var(--accent)}
+.vdrmk::before{content:"";position:absolute;left:-.75rem;top:-.6875rem;width:2.75rem;height:2.75rem}  /* 2.122.4 C (#2217): invisible 44 px target */
 .vdrmk.done::after{background:var(--muted)}
 .vdrmk:focus-visible{outline:2px solid var(--accent)}
 .vdrcmp{margin:.75rem 0 .5rem}
@@ -43,8 +45,9 @@
 .vdrc{padding:.5rem 0;border-bottom:1px solid var(--line)}
 .vdrch{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;min-height:2.25rem}
 .vdrch small{white-space:nowrap}
-.vdrtc{min-height:2.25rem;min-width:3.5rem;padding:0 .5rem;border:0;border-radius:.375rem;background:var(--accent-soft,var(--bg3));color:var(--accent);
+.vdrtc{position:relative;min-height:2.25rem;min-width:3.5rem;padding:0 .5rem;border:0;border-radius:.375rem;background:var(--accent-soft,var(--bg3));color:var(--accent);
   font-family:var(--mono,monospace);font-size:.8125rem;font-variant-numeric:tabular-nums;cursor:pointer}
+.vdrtc::before{content:"";position:absolute;inset:-.25rem -.125rem}  /* 2.122.4 C (#2217): 44 px target, look unchanged */
 .vdrcb{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:.125rem}
 .vdrc.done>.vdrcb{color:var(--muted);text-decoration:line-through}
 .vdrdone.on{color:var(--accent)}

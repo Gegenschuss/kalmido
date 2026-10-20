@@ -54,7 +54,23 @@ async function ofcLoad(kind, force) {
   OFC.loading[kind] = false;
   ofcDraw();
 }
-function ofcDraw() { if (S.route.mod !== 'office') return; const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('office', viewOffice()))); }
+function ofcDraw() { if (S.route.mod !== 'office') return; const el = $('#view'); if (el) keepFocus(el, () => ofcPaint(el)); }
+// 2.122.2 (#2327): a reload of the same office view (save, archive switch, year) keeps the old content until the new data
+// is there -- no short "Loading…" page that made the browser lose the scroll position -- and the scroll position stays.
+// A view that is still loading after 4 s is drawn anyway (a part that never loads must not freeze the old page).
+const OFCP = {key: null, t: 0};
+function ofcPaint(el, force) {
+  const key = [OFC.info?.org_id ?? '-', S.route.tab || '', S.route.id || ''].join('|');
+  const html = mg_wrap('office', viewOffice()), same = OFCP.key === key && !!el.querySelector('.dash.office .ofcbody');
+  const wait = `<p class="muted lempty">${tr('Loading…')}</p>`;
+  if (!force && same && html.includes(wait) && ![...el.querySelectorAll('.dash.office .ofcbody p.lempty')].some(p => p.textContent === tr('Loading…'))) {
+    if (!OFCP.t) OFCP.t = setTimeout(() => { OFCP.t = 0; if (S.route.mod === 'office') { const v = $('#view'); if (v) keepFocus(v, () => ofcPaint(v, true)); } }, 4000);
+    return;
+  }
+  clearTimeout(OFCP.t); OFCP.t = 0;
+  const top = el.scrollTop; setHtml(el, html); OFCP.key = key;
+  if (same && el.scrollTop !== top) el.scrollTop = top;
+}
 const ofcReload = kind => { if (kind) delete OFC.data[kind]; else OFC.data = {}; if (S.route.mod === 'office') ofcDraw(); };
 const ofcRows = kind => Array.isArray(OFC.data[kind]) ? OFC.data[kind] : [];
 const ofcRow = (kind, id) => ofcRows(kind).find(r => r.id === id);
@@ -138,6 +154,7 @@ function ofcListHtml(kind) {
   } else if (kind === 'texts') list = ofcGrouped(rows, r => tr(OFC_TEXT_KINDS.find(k => k[0] === r.kind)?.[1] || r.kind), r => ofcRowBtn('texts', r, r.key || (r.text_de || r.text_en).slice(0, 60), (r.text_de && !r.text_en ? tr('no English text stored') + ' · ' : '') + (r.key ? [r.text_de, r.text_en].filter(Boolean).join(' / ').slice(0, 120) : (r.text_en || '').slice(0, 80))), OFC_TEXT_KINDS.map(k => tr(k[1])));
   else list = rows.length ? `<ul class="ofclist" role="list">${rows.map(r => ofcRowBtn('contracts', r, r.name, [r.date ? fmtDateLoc(r.date) : '', r.raw_included ? tr('raw data included') : '', r.client_id && cdn_label((S.clients || []).find(c => c.id === r.client_id))].filter(Boolean).join(' · '), typeof dmaClip === 'function' ? dmaClip(r.files) : '')).join('')}</ul>` : '';
   if (!rows.length && !list) list = `<div class="empty nempty eact">${ic(kind === 'texts' ? 'note' : 'list')}<span>${q ? tr('Nothing matches.') : adm ? tr('Nothing here yet. Add the first entry or import a file under Settings.') : tr('Nothing here yet.')}</span></div>`;
+  if (!q && (kind === 'services' || kind === 'equipment')) list += oim_link('master', !rows.length);  // 2.122.3 A (#2335)
   return bar + list + (kind === 'services' ? sr_roleSections(hit) : '');  // 2.47.0 (#1649)
 }
 // 2.47.0 (#1649): the masters Freelancer-Rollen (purchase price per day / hour, a service points to its role) and
@@ -359,11 +376,12 @@ function ofcSettingsHtml() {
     ${typeof pkc_html === 'function' ? pkc_html() : ''}
     ${typeof rk_settingsHtml === 'function' ? rk_settingsHtml() : ''}
     ${typeof bw_settingsHtml === 'function' ? bw_settingsHtml() : ''}
+    ${typeof cfs_settingsHtml === 'function' ? cfs_settingsHtml() : ''}
     <h3>${tr('Master data file')}</h3>
     <p class="muted">${tr('Export writes services, equipment, sets, text blocks, contracts and these settings into one JSON file; import reads such a file (also one made from a spreadsheet) and adds what is missing.')}</p>
     <div class="lacts"><a class="btn sm" href="/api/office/export" download="office-master-data.json">${ic('download', 's')} ${tr('Export')}</a>
       ${adm ? `<input type="file" id="os-import" accept="application/json,.json" hidden><button type="button" class="btn sm" data-ofc="import">${ic('upload', 's')} ${tr('Import')}</button><label class="chkl" data-fg-skip><input type="checkbox" id="os-overwrite"> ${tr('overwrite existing')}</label>` : ''}</div>
-    ${adm ? `<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('Clients, services and equipment from a spreadsheet; old invoices and quotations as an archive.')}</p><div class="lacts"><a class="btn sm" href="#office/import">${ic('upload', 's')} ${tr('Import legacy data')}</a></div>` : ''}
+    ${adm ? `<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('Clients, services, equipment and fixed costs from a spreadsheet, leads from a CSV file; old invoices and quotations as an archive.')}</p><div class="lacts"><a class="btn sm" href="#office/import">${ic('upload', 's')} ${tr('Import legacy data')}</a></div>` : ''}
     ${adm ? `<h3>${tr('Access log')}</h3><p class="muted">${tr('Who opened, printed, changed or exported documents and master data of this organisation.')}</p>${ofcLogHtml()}` : ''}
     ${adm && OFC.info.personal && OFC.info.can_move ? `<h3>${tr('Move into an organisation')}</h3><p class="muted">${tr('Turns this personal office into a new organisation with you as its admin: documents, numbers, settings, master data and your private clients go with it. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-move">${ic('building', 's')} ${tr('Create organisation…')}</button></div>` : ''}
   </form>`;

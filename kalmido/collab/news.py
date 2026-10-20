@@ -42,6 +42,7 @@ NEWS_KINDS = ("mention", "comment", "assign", "unassign", "take", "complete", "s
 NEWS_KINDS += ("review",)  # 2.60.0 C (#1512): a review asked of me / my task sent back (row "review", tasks/review.py)
 NEWS_KINDS += ("upscan",)  # 2.61.0 (#1818): the virus scanner found malware in a file I uploaded earlier (files/scan.py, no push)
 NEWS_KINDS += ("e2e_key",)  # 2.64.1 (#1817): someone handed me the key of a list encrypted in the browser (row "share", collab/liste2e.py)
+NEWS_KINDS += ("filereq",)  # 2.122.0 A (#2097): a client uploaded files through my file request (row "filereq", files/filereq.py)
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
@@ -58,7 +59,7 @@ NEWS_FOR_ME += ("e2e_key",)  # 2.64.1 (#1817)
 
 
 def news_to_me(kind, actor_id, data, agents, s=None):
-    if kind == "upscan":  # 2.61.0 (#1818): my own file was locked (no actor)
+    if kind in ("upscan", "filereq"):  # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me
         return True
     if not actor_id:
         return False
@@ -124,15 +125,18 @@ NOTIF_ROWS = ("comment", "reply", "follow", "mention", "assign", "newtask", "com
               "chat",  # 2.17.0 (#419): a direct message / a team chat message (push only; mentions follow "mention")
               "errreport")  # 2.18.0 (owner decision): exactly one News item + push when a NEW error first becomes a ticket
 NOTIF_ROWS += ("review",)  # 2.60.0 C (#1512): a review asked of me / my task sent back by the reviewer (News + push on by default)
+NOTIF_ROWS += ("filereq",)  # 2.122.0 A (#2097): files arrived through my file request (News + push on by default, bundled)
 NOTIF_NEWS_GROUP = {"comment": "comment", "reply": "comment", "follow": "comment", "mention": "mention", "assign": "assign",
                     "complete": "complete", "status": "status", "share": "share", "unblock": "unblock"}
 NOTIF_NEWS_PRIMARY = ("comment", "mention", "assign", "complete", "status", "share", "unblock")  # News = news_kinds
 NOTIF_NEWS_NEW = {"newtask": 0, "approval": 0, "followup": 1, "usage": 1, "proposal": 1, "errreport": 1}
 NOTIF_NEWS_NEW["review"] = 1  # 2.60.0 C (#1512)
+NOTIF_NEWS_NEW["filereq"] = 1  # 2.122.0 A (#2097)
 NOTIF_PUSH_DEFAULT = {"comment": 1, "reply": 1, "follow": 1, "mention": 1, "assign": 1, "newtask": 0, "complete": 1,
                       "status": 0, "share": 0, "unblock": 1, "approval": 1, "followup": 1, "reminder": 1, "usage": 1,
                       "proposal": 1, "nag": 1, "chat": 1, "errreport": 1}
 NOTIF_PUSH_DEFAULT["review"] = 1  # 2.60.0 C (#1512)
+NOTIF_PUSH_DEFAULT["filereq"] = 1  # 2.122.0 A (#2097)
 NOTIF_NO_NEWS = ("reminder", "nag", "chat")
 NOTIF_UNMUTED = ("mention", "assign")        # still come through a muted list
 NOTIF_NO_BELL = ("reminder", "followup", "usage", "proposal")  # never changed by a list bell
@@ -148,6 +152,7 @@ KIND_ROW = {"mention": "mention", "comment": "comment", "assign": "assign", "una
             "proposal": "proposal", "take": "assign", "errreport": "errreport", "apdecide": "assign", "signup": "usage",
             "orglist": "share", "playbook_proposal": "proposal", "connreq": "share", "connok": "share", "lytpl": "share"}  # 2.35.0 (#1101): an organisation admin archived / restored / deleted / handed over a list
 KIND_ROW["review"] = "review"  # 2.60.0 C (#1512)
+KIND_ROW["filereq"] = "filereq"  # 2.122.0 A (#2097)
 
 
 def notif_stored(s):
@@ -426,6 +431,10 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
         elif kind == "upscan":  # 2.61.0 (#1818): while my file stays locked
             from ..files.scan import sc_news_live
             if not sc_news_live(c, r["data"]):
+                continue
+        elif kind == "filereq":  # 2.122.0 A (#2097): while I may still write in the request's folder
+            from ..files.filereq import frq_news_live
+            if not frq_news_live(c, uid, r["data"]):
                 continue
         elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
             if not sees(r["list_id"]):

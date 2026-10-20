@@ -477,9 +477,7 @@ def _wka_import(c, uid, oid, replace, z, infos, saved):
                 continue
             old = c.execute(f"SELECT id FROM wiki_pages WHERE deleted_at IS NULL AND {w} AND lower(path)=?", [*a, path.lower()]).fetchone()
             if replace and old:
-                c.execute("UPDATE wiki_pages SET body=?, attrs=?, updated_by=?, updated_at=? WHERE id=?",
-                          (text, json.dumps(wiki_frontmatter(text), ensure_ascii=False), uid, ts, old["id"]))
-                wiki_set_links(c, old["id"], text)
+                _wka_save(c, old["id"], text, uid, ts)  # 2.123.0 A (#2105, #2102): sealed, the text before in the history
                 updated.append(old["id"])
                 pages.append((old["id"], folder, path, text))
             else:
@@ -631,7 +629,8 @@ def _wka_import(c, uid, oid, replace, z, infos, saved):
             _wka_save(c, pid, nb, uid, ts)
     for pid, ks in extra.items():  # "Imported files" pages and pages outside this import
         r = page_row(pid)
-        nb = _wka_append(r["body"], [md(k, True, None) for k in ks])
+        from .wkhist import wkh_body  # 2.123.0 A (#2105)
+        nb = _wka_append(wkh_body(c, r), [md(k, True, None) for k in ks])
         _wka_save(c, pid, nb, uid, ts)
     if created or updated or new_ids:
         bump(c)
@@ -648,9 +647,13 @@ def _wka_append(body, lines):
 
 
 def _wka_save(c, pid, text, uid, ts):
+    from .wkhist import wkh_note, wkh_prev, wkh_seal  # 2.123.0 A (#2105, #2102): sealed; the text before stays in the history
+    r = c.execute("SELECT * FROM wiki_pages WHERE id=?", (pid,)).fetchone()
+    prev = wkh_prev(c, r)
     c.execute("UPDATE wiki_pages SET body=?, attrs=?, updated_by=?, updated_at=? WHERE id=?",
-              (text, json.dumps(wiki_frontmatter(text), ensure_ascii=False), uid, ts, pid))
+              (wkh_seal(c, r["org_id"], r["owner_id"], text), json.dumps(wiki_frontmatter(text), ensure_ascii=False), uid, ts, pid))
     wiki_set_links(c, pid, text)
+    wkh_note(c, pid, uid, ts, prev=prev)
 
 
 # ---- export ---------------------------------------------------------------------------------------------------------------
@@ -660,7 +663,7 @@ def wka_export_zip(c, oid, uid):
     Written into a temporary file (the files may be large), sent and gone."""
     w, a = wiki_space_sql(oid, uid)
     pw = w.replace(" AND ", " AND p.")
-    pages = c.execute(f"SELECT id, path, body FROM wiki_pages WHERE deleted_at IS NULL AND {w} ORDER BY path", a).fetchall()
+    pages = c.execute(f"SELECT id, org_id, owner_id, path, body FROM wiki_pages WHERE deleted_at IS NULL AND {w} ORDER BY path", a).fetchall()
     zpath, used = {}, {}
     rows = c.execute(f"SELECT f.id, f.page_id, f.name, f.path, p.path AS ppath FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id "
                      f"WHERE f.deleted_at IS NULL AND p.deleted_at IS NULL AND p.{pw} ORDER BY f.page_id, f.id", a).fetchall()
@@ -682,12 +685,13 @@ def wka_export_zip(c, oid, uid):
             return f"![[{p}]]"
         lb = m.group(2)
         return f"[[{p}]]" if not lb or lb == r["name"] else f"[[{p}|{lb.replace('|', '/')}]]"
+    from .wkhist import wkh_body
     os.makedirs(WKA_TMP, mode=0o700, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix="export-", suffix=".zip", dir=WKA_TMP)
     try:
         with os.fdopen(fd, "wb") as out, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
             for r in pages:
-                z.writestr(r["path"] + ".md", WKA_URL_RE.sub(back, r["body"] or ""))
+                z.writestr(r["path"] + ".md", WKA_URL_RE.sub(back, wkh_body(c, r) or ""))  # 2.123.0 A (#2105): opened
             for p, r in zpath.values():
                 try:
                     data = oc_read_file(c, os.path.join(ATT_DIR, r["path"]))

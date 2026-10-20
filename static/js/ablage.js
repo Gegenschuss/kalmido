@@ -44,6 +44,7 @@ const ab_reload = () => { AB.key = ''; if (S.route.mod === 'ablage') ab_load(); 
 // ---- the view
 function viewAblage() {
   if (!ab_on()) return `<div class="empty">${tr('The file store is off (Settings > Modules)')}</div>`;
+  if (typeof dt_abOn !== 'function' && typeof ld_later === 'function') ld_later('tagsel');  // 2.122.0 B (#2099 #2295): tags, Shift ranges
   const r = S.route, key = r.nid ? 'n:' + r.nid : 's:' + ab_curSpace();
   if (AB.key !== key && !AB.loading) setTimeout(ab_load, 0);
   const d = AB.dkey === key ? AB.data : null, sp = r.nid ? (d?.space || '') : ab_curSpace();
@@ -54,19 +55,20 @@ function viewAblage() {
   const spaces = `<nav class="abspaces" aria-label="${esc(tr('File store'))}">${ab_spaces().map(s => `<button type="button" class="abspace ${!r.nid && s === sp ? 'on' : ''}" data-ab="space" data-sp="${esc(s)}" ${!r.nid && s === sp ? 'aria-current="page"' : ''}>${ab_spaceIcon(s)}<span>${esc(ab_spaceName(s))}</span></button>${r.nid && s === (sp || 'shared') ? treeHtml : ''}`).join('')}</nav>`;
   const trash = !r.nid && sp === 'trash', canAdd = r.nid ? ab_canWrite(d?.node?.role) : (sp === 'private' || (sp || '').startsWith('org:'));
   const crumbs = r.nid && d ? `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}"><button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp === 'shared' || !sp ? 'shared' : sp)}" data-abdrop="top">${esc(ab_spaceName(sp || 'shared'))}</button>${(d.crumbs || []).map((c, i, a) => `<span class="abcsep" aria-hidden="true">/</span>${i === a.length - 1 ? `<span class="abccur" aria-current="page">${esc(c.name)}</span>` : `<button type="button" class="linkbtn" data-go="ablage/${c.id}" data-abdrop="${c.id}">${esc(c.name)}</button>`}`).join('')}</nav>` : `<h3 class="abtitle">${esc(ab_spaceName(sp))}</h3>`;
-  const tools = trash ? '' : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button><input type="file" id="ab-file" multiple hidden>` : ''}${ab_smvTools(d)}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
+  const tools = trash ? '' : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button><input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_smvTools(d)}${typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : ''}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
   let body;
   if (AB.err && AB.key === key) body = `<div class="empty">${ic('folder')}<span>${esc(AB.err)}</span><button type="button" class="btn" data-ab="space" data-sp="private">${tr('My files')}</button></div>`;
   else if (!d) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
   else if (!d.items.length) body = `<div class="empty abempty">${ic(trash ? 'trash' : 'folder')}<span>${trash ? tr('The trash is empty') : sp === 'shared' && !r.nid ? tr('Nothing is shared with you yet') : canAdd ? tr('Drop files here or use “Upload”') : tr('This folder is empty')}</span></div>`;
   else body = `<div class="ablist${AB.selOn ? ' abselon' : ''}" role="list">${d.items.map(n => ab_rowHtml(n, trash)).join('')}</div>`;
+  if (d && typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) body = dt_abBody(sp || d.space);  // 2.122.0 B (#2099): the tag filter of the space
   const search = !trash && typeof ftxtBox === 'function' ? ftxtBox() : '';  // 2.61.0 (#1820): names + recognised text
   if (search && ftxtActive()) body = ftxtResults();
   const hint = !r.nid && sp === 'private' && d && !d.items.length ? `<p class="muted abhint">${tr('Share a folder with a person or an agent: they see exactly that folder, nothing else.')}</p>` : '';
   return `<div class="abview ${canAdd ? 'abdropok' : ''}" data-abzone="${r.nid || ''}">${spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools}${body}${search && ftxtActive() ? '' : hint + (trash ? '' : ab_smvBar())}</div></div>`;
 }
 function ab_rowHtml(n, trash) {
-  const meta = [n.kind === 'folder' ? '' : fmtSize(n.size || 0), ab_when(trash ? n.deleted_at : n.updated_at), n.created_by_name && n.created_by !== S.me?.id ? n.created_by_name : ''].filter(Boolean).join(' · ');
+  const meta = [n.path || '', n.kind === 'folder' ? '' : fmtSize(n.size || 0), ab_when(trash ? n.deleted_at : n.updated_at), n.created_by_name && n.created_by !== S.me?.id ? n.created_by_name : ''].filter(Boolean).join(' · ');
   const badges = (n.shared ? `<span class="abbadge" title="${esc(tr('Shared'))}" aria-label="${esc(tr('Shared'))}">${ic('users', 's')}</span>` : '')
     + (n.agent_id ? `<span class="abbadge" title="${esc(tr('Folder of an agent'))}">${ic('bot', 's')}</span>` : '')
     + (n.version > 1 ? `<span class="abver" title="${esc(tr('Version {0}', n.version))}">v${n.version}</span>` : '')
@@ -75,9 +77,9 @@ function ab_rowHtml(n, trash) {
     : `<button type="button" class="abopen" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''}>${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button>`;  // abmeta2: the details below the name on phones
   const acts = trash ? `<button type="button" class="btn sm" data-ab="restore" data-id="${n.id}">${ic('undo', 's')} ${tr('Restore')}</button>`
     : `<button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>`;
-  return `<div class="abrow" role="listitem" data-abid="${n.id}" ${!trash && ab_canWrite(n.role) ? 'draggable="true"' : ''}>${trash ? '' : ab_smvBox(n)}${main}<span class="abmeta muted">${esc(meta)}</span><span class="abbadges">${badges}</span>${acts}</div>`;
+  return `<div class="abrow" role="listitem" data-abid="${n.id}" ${!trash && ab_canWrite(n.role) ? 'draggable="true"' : ''}>${trash ? '' : ab_smvBox(n)}${main}${typeof dt_abTags === 'function' ? dt_abTags(n) : ''}<span class="abmeta muted">${esc(meta)}</span><span class="abbadges">${badges}</span>${acts}</div>`;
 }
-const ab_item = id => (AB.data?.items || []).find(x => x.id === +id) || (AB.data?.node?.id === +id ? AB.data.node : null) || (typeof ftxtItem === 'function' ? ftxtItem(id) : null);  // 2.61.0 (#1820): + search hits
+const ab_item = id => (AB.data?.items || []).find(x => x.id === +id) || (AB.data?.node?.id === +id ? AB.data.node : null) || (typeof ftxtItem === 'function' ? ftxtItem(id) : null) || (typeof dt_abItem === 'function' ? dt_abItem(id) : null);  // 2.61.0 (#1820): + search hits; 2.122.0 B: + tag filter hits
 
 // ---- opening a file: images in the lightbox, PDFs in the PDF view, text in the text view, the rest downloads
 function ab_openFile(n) {
@@ -172,10 +174,12 @@ function ab_menu(anchor, n) {
     f ? {label: tr('Open'), icon: 'eye', fn: () => ab_openFile(n)} : null,
     f ? {label: tr('Download'), icon: 'download', fn: () => { const a = document.createElement('a'); a.href = ab_url(n, true); a.download = n.name; document.body.appendChild(a); a.click(); a.remove(); }} : null,
     {label: tr('Details and history'), icon: 'info', fn: () => ab_details(n.id)},
+    w && n.kind === 'folder' && !n.agent_id ? {label: tr('Request files…'), icon: 'upload', fn: () => frq_open(n)} : null,  // 2.122.0 A (#2097)
     own ? {label: tr('Share…'), icon: 'users', fn: () => ab_share(n.id)} : null,
     '-',
     w && n.kind === 'file' ? {label: tr('Upload a new version…'), icon: 'upload', fn: () => ab_newVersion(n)} : null,
     w ? {label: tr('Rename…'), icon: 'edit', fn: () => ab_rename(n)} : null,
+    w && typeof dt_abEdit === 'function' ? {label: tr('Tags…'), icon: 'tag', fn: () => dt_abEdit(n)} : null,  // 2.122.0 B (#2099)
     w ? {label: tr('Move to…'), icon: 'arrow', fn: () => ab_moveDlg(n)} : null,
     ab_smvOk(n) && smv_can(n.org_id) ? {label: tr('Move to another workspace…'), icon: 'building', fn: () => ab_smvSpace([n])} : null,  // 2.96.0 A (#1941)
     '-',
@@ -187,7 +191,17 @@ const AB_ACT = {list: N_('opened the folder'), read: N_('read'), download: N_('d
   write: N_('created'), upload: N_('uploaded'), version: N_('uploaded a new version'), restore_version: N_('restored a version'), rename: N_('renamed'),
   move: N_('moved'), trash: N_('moved to the trash'), restore: N_('restored'), share: N_('shared'), share_change: N_('changed a share'),
   unshare: N_('stopped sharing'), org_access: N_('changed who in the organisation sees it'), create: N_('created'), link: N_('linked'),
-  moved_space: N_('moved to another workspace')};  // 2.96.0 A (#1941)
+  moved_space: N_('moved to another workspace'),  // 2.96.0 A (#1941)
+  tags: N_('changed the tags')};  // 2.122.0 B (#2099)
+// 2.123.0 C (#2103, #2107): the knowledge pages (that I may read) which show or link this file
+async function ab_wikiRefs(md, id) {
+  let ps; try { ps = (await rawFetch('GET', '/api/wiki/refs?file=' + id)).pages || []; } catch { return; }
+  if (!ps.length || !md.isConnected) return;
+  const sec = document.createElement('div');
+  sec.className = 'dsec wkmen';
+  sec.innerHTML = `${ic('book', 's')}<span class="muted">${tr('Mentioned in')}</span>${ps.map(p => `<a href="#wiki/${p.id}" data-m="close">${esc(p.path)}</a>`).join('<span class="muted">,</span>')}`;
+  $('.foot', md)?.before(sec);
+}
 async function ab_details(id) {
   let n; try { n = await api('GET', `/api/files/nodes/${id}`); } catch { return; }
   $('.abdlg')?.remove();
@@ -197,6 +211,7 @@ async function ab_details(id) {
   const md = modal(`<div class="lhdr"><h3>${ab_icon(n)} ${esc(n.name)}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <div class="muted abpath">${esc((n.crumbs || []).map(c => c.name).join(' / '))}</div>
     <div class="abfacts">${n.kind !== 'folder' ? `<span>${fmtSize(n.size || 0)}</span>` : ''}<span>${esc(tr('Changed {0}', ab_when(n.updated_at)))}</span>${n.owner ? `<span>${esc(tr('Owner: {0}', n.owner))}</span>` : ''}<span>${esc(ab_role(n.role))}</span></div>
+    ${typeof dt_abDetails === 'function' ? dt_abDetails(n) : ''}
     ${n.kind === 'link' ? `<div class="shint keep">${ic('link', 's')} ${esc(tr('A link to a file of a task or project. Whoever opens it needs access to the original.'))}</div>` : ''}
     ${n.kind !== 'folder' ? `<div class="row"><button type="button" class="btn sm" data-abd="open">${ic('eye', 's')} ${tr('Open')}</button>${ab_canWrite(n.role) && n.kind === 'file' ? `<button type="button" class="btn sm" data-abd="ver">${ic('upload', 's')} ${tr('Upload a new version…')}</button>` : ''}</div>` : ''}
     ${vers ? `<h4>${tr('Versions')}</h4><div class="abvers">${vers}</div>` : ''}
@@ -204,6 +219,7 @@ async function ab_details(id) {
     ${n.log ? `<h4>${tr('History')}</h4><div class="ablog">${log || `<span class="muted">${tr('Nothing yet')}</span>`}</div><p class="muted abhint">${tr('Every access of an agent is listed here.')}</p>` : ''}
     <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
   md.classList.add('abdlg');
+  if (n.kind === 'file' && feat('wiki')) ab_wikiRefs(md, n.id);  // 2.123.0 C (#2107)
   md.addEventListener('click', async e => {
     if (e.target.closest('[data-m="close"]')) { modalClose(md); return; }
     const v = e.target.closest('[data-abv]');
@@ -214,6 +230,7 @@ async function ab_details(id) {
     const b = e.target.closest('[data-abd]'); if (!b) return;
     if (b.dataset.abd === 'open') ab_openFile(n);
     else if (b.dataset.abd === 'ver') ab_newVersion(n);
+    else if (b.dataset.abd === 'tags' && typeof dt_abEdit === 'function') dt_abEdit(n, () => ab_details(n.id));  // 2.122.0 B (#2099)
     else if (b.dataset.abd === 'share') { modalClose(md); ab_share(n.id); }
   });
 }

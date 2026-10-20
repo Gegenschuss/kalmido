@@ -7,8 +7,13 @@
 (() => {
   const box = document.querySelector('.vdr-player'); if (!box) return;
   const prov = box.dataset.prov, origin = box.dataset.origin || '', fr = box.querySelector('iframe'), vid = box.querySelector('video');
+  // 2.122.4 A (#2215 L7): the page opened under another host than the configured address: YouTube talks only to the origin
+  // named in the player URL, so name this page's own (reloads the frame once, only then; never a host header of the request)
+  if (fr && prov === 'youtube') {
+    try { const u = new URL(fr.src); if (u.searchParams.get('origin') !== location.origin) { u.searchParams.set('origin', location.origin); fr.src = u.href; } } catch { /* keep the frame */ }
+  }
   let cur = 0, dur = 0;
-  const p2 = n => String(n).padStart(2, '0');
+  const p2 =n => String(n).padStart(2, '0');
   const tc = s => { s = Math.floor(s || 0); const h = Math.floor(s / 3600); return h ? `${h}:${p2(Math.floor(s / 60) % 60)}:${p2(s % 60)}` : `${p2(Math.floor(s / 60))}:${p2(s % 60)}`; };
   const send = o => { try { fr.contentWindow.postMessage(JSON.stringify(o), origin); } catch { /* the frame is gone */ } };
   const pause = () => { if (vid) vid.pause(); else if (prov === 'vimeo') send({method: 'pause'}); else send({event: 'command', func: 'pauseVideo', args: []}); };

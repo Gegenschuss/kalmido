@@ -1271,6 +1271,12 @@ fresh; run p21141_b_api "$PY" p21141_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21141_b_ui node p21141_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.114.1 part C: transfer of rights on its own last page of the quotation PDF (#2258)
 fresh; run p21141_c_api "$PY" p21141_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.122.4 part A: rights - org overview for the instance admin, edit right, feeds once, video sign-off rests (#1724 #1906 #2215 #2217)
+fresh; run p21224_a_api "$PY" p21224_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.122.4 part B: office - rights once in the quotation PDF, storage counts meal/contract PDFs, CSV formula guard (#2261 #2316 #2317)
+fresh; run p21224_b_api "$PY" p21224_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.122.4 part C: phone sizes - office settings selects, contact import notice, video sign-off targets, bookmarks (#2326 #2348 #2217 #2223)
+fresh; run p21224_c_ui node p21224_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.120.0 part A: progress and final invoices, cash discount (#2087)
 fresh; run p2120_a_api "$PY" p2120_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2120_a_ui node p2120_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1297,9 +1303,37 @@ fresh; run p2121_c_api "$PY" p2121_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2121_c_ui node p2121_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.121.0 lead: receipt categories with an SKR03 / SKR04 account (#2093)
 fresh; run p2121_d_api "$PY" p2121_d_api_test.py "$KALMIDO_TEST_DATA"
-# 2.124.0: base carries #2341 from 2.123 (part D builds on it); drop these two lines when 2.123 is merged
+# 2.123.0 part A: page text sealed at rest (#2105), page history (#2102), search with word index (#2106)
+fresh; run p2123_a_api "$PY" p2123_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2123_a_ui node p2123_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.123.0 part B: share a page / folder: read only, guest, public link (#2104)
+fresh; run p2123_b_api "$PY" p2123_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2123_b_ui node p2123_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.123.0 part C: pictures from the Ablage in pages (#2103), [[datei:]] / [[tabelle:]] links (#2107), checkboxes as tasks (#2108)
+fresh; run p2123_c_api "$PY" p2123_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2123_c_ui node p2123_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.123.0 part D: cash flow: opening balance, manual corrections, reconciliation (#2341); installment list number format (#2351)
 fresh; run p2123_d_api "$PY" p2123_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2123_d_ui node p2123_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.122.0 part A: file request link, clients upload documents (#2097)
+fresh; run p2122_a_api "$PY" p2122_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2122_a_ui node p2122_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.122.0 part B: tags in the file store (#2099), document search with several filters + ZIP (#2294), shift-click ranges (#2295)
+fresh; run p2122_b_api "$PY" p2122_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2122_b_ui node p2122_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.122.0 part C: create documents via API (#2098), CSV of the document list (#2100), OCR languages (#2101), swipe in news (#2314)
+fresh; run p2122_c_api "$PY" p2122_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2122_c_ui node p2122_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.122.0 part D: yearly VAT return only (#2315)
+fresh; run p2122_d_api "$PY" p2122_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2122_d_ui node p2122_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.122.3 part A: office - one amount at 0 % VAT, import/export on the settings page, empty areas link there (#2333 #2335)
+fresh; run p21223_a_api "$PY" p21223_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21223_a_ui node p21223_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.122.3 part B: drag a single task onto another = subtask (#2334)
+fresh; run p21223_b_ui node p21223_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.122.3 part C: chat - "Show more" right under the shortened message (#2340)
+fresh; run p21223_c_ui node p21223_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.124.0 part A: formulas, chart (#2109 #2115)
 fresh; run p2124_a_api "$PY" p2124_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2124_a_ui node p2124_a_ui.js "$KALMIDO_TEST_DATA"

@@ -191,6 +191,7 @@ def abs_offer_info(c, oid, offer):
         out.append({"id": x["id"], "number": x["number"], "date": x["date"], "status": x["status"], "locked": bool(x["locked_at"]),
                     "net_eur": dstr(pn), "gross": t.get("gross") or "0.00", "gross_text": fmt_money(t.get("gross") or 0, x["lang"], x["currency"]),
                     **inv_money_fields(x, pm)})
+        out[-1]["open_text"] = fmt_money(out[-1]["open"], x["lang"], x["currency"])  # 2.123.0 (#2351): German number format
     return {"net": dstr(net), "net_text": fmt_money(net, offer["lang"], "EUR"), "progress": out, "billed": dstr(billed),
             "remaining": dstr(net - billed), "remaining_text": fmt_money(net - billed, offer["lang"], "EUR")}
 

@@ -28,7 +28,8 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(await until(() => w.eval('!!TXD.data'), 40), 'the data loads');
   const mount = () => { d.querySelectorAll('[data-txd-root]').forEach(x => x.remove()); const h = d.createElement('div'); h.id = 'txdbox'; h.innerHTML = w.eval('txdSectionHtml()'); d.body.appendChild(h); };
   mount();
-  check(!!d.querySelector('#txd-ustva') && d.querySelectorAll('#txd-ustva option').length === 3, 'VAT return: none / monthly / quarterly');
+  // 2.122.0 (#2315): a fourth option "year" (only the annual return)
+  check(!!d.querySelector('#txd-ustva') && d.querySelectorAll('#txd-ustva option').length === 4, 'VAT return: none / monthly / quarterly / yearly');
   check(!!d.querySelector('[data-txd="est"]') && !!d.querySelector('[data-txd="gewst"]') && !!d.querySelector('#txd-lead'), 'income tax, trade tax, lead days');
   check(d.querySelector('[data-txd="ustva_ext"]').disabled, 'the extension waits for a VAT return');
   check(/No tax advice; figures without guarantee\./.test(d.querySelector('[data-txd-root]').textContent), 'the note: no tax advice');

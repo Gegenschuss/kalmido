@@ -6,6 +6,8 @@ background thread) and the command line for the server admin:
     python -m kalmido.admin.orgcrypt_cli decrypt-all            # the way back before a downgrade (sets org_encrypt=0)
     python -m kalmido.admin.orgcrypt_cli decrypt-private        # 2.64.0 (#1864): only the private spaces' files plain again
     python -m kalmido.admin.orgcrypt_cli encrypt-private        #   (private_encrypt=0) / sealed again (private_encrypt=1)
+    python -m kalmido.admin.orgcrypt_cli decrypt-wiki           # 2.123.0 A (#2105): the knowledge pages' texts plain again
+    python -m kalmido.admin.orgcrypt_cli encrypt-wiki           #   (wiki_encrypt=0, before running 2.122 or older) / sealed again
     python -m kalmido.admin.orgcrypt_cli rewrap-accounts --old-key-file FILE   # 2.64.0: account keys after a new server key
         (FILE "-" = stdin: the earlier KALMIDO_SECRET_KEY, base64; never as an argument)
     python -m kalmido.admin.orgcrypt_cli rewrap --org N --recovery-file FILE [--force]   (FILE "-" = stdin; never as an argument;
@@ -346,6 +348,12 @@ def _bud():
     return budget
 
 
+def _wkh():
+    """2.123.0 A (#2105): wiki/wkhist.py (imported late, like _bud)."""
+    from ..wiki import wkhist
+    return wkhist
+
+
 def _row_space(r):
     return int(r["org_id"]) if r["org_id"] else oc.oc_user_space(r["owner_id"])
 
@@ -461,6 +469,7 @@ def decrypt_private(c):
     c.commit()
     st = {}
     _bud().bud_settle(c, plain=lambda sid: sid < 0)  # 2.72.0 (#1333): budgets of private spaces plain again
+    _wkh().wkh_settle(c, plain=lambda sid: sid < 0)  # 2.123.0 A (#2105): texts of private knowledge pages plain again
     n, bad = files_decrypt(c, all_files(c), only=lambda hid: hid is not None and hid < 0, stats=st)
     return {"files": n, "failed": bad, "kept": st.get("kept", 0)}
 
@@ -528,6 +537,7 @@ def encrypt_all(c, stop=None, pause=0.0):
     # 2.64.0 (#1864): the private spaces' files, and files that lie in another space now
     st = files_settle(c, stop, pause=pause)
     tot["fields"] += _bud().bud_settle(c, stop=stop)  # 2.72.0 (#1333): the household budget's rows in their list's space
+    tot["fields"] += _wkh().wkh_settle(c, stop=stop)["changed"]  # 2.123.0 A (#2105): the knowledge pages' texts and history
     tot["files"] += st["sealed"]
     tot["resealed"], tot["failed"] = st["resealed"], tot["failed"] + st["failed"]
     if not (stop and stop()) and not st["failed"] and oc.oc_active(c) and oc.oc_private_on(c):
@@ -554,6 +564,7 @@ def decrypt_all(c):
             continue
         tot["fields"] += fields_pass(c, oid, False, key)
     tot["fields"] += _bud().bud_settle(c, plain=lambda sid: True)  # 2.72.0 (#1333): the household budget plain again
+    tot["fields"] += _wkh().wkh_settle(c, plain=lambda sid: True)["changed"]  # 2.123.0 A (#2105): the knowledge pages plain again
     from ..tasks.related import emb_drop_sealed
     emb_drop_sealed(c)  # 2.59.0 B (#1375): no sealed task vector stays behind (computed again, plain)
     c.commit()
@@ -570,6 +581,7 @@ def status(c):
     out["org_encrypt"] = (r[0] if r else "1") != "0"
     out["private_encrypt"] = oc.oc_private_on(c)  # 2.64.0 (#1864)
     out["private"] = private_count(c)
+    out["wiki_encrypt"], out["wiki"] = _wkh().wkh_switch(c), _wkh().wkh_count(c)  # 2.123.0 A (#2105)
     for oid in _org_ids(c):
         st = oc.oc_status(c, oid)
         out["orgs"].append({"org": oid, "has_key": st["has_key"], "key_ok": st["key_ok"], "migrated_at": st["migrated_at"],
@@ -768,6 +780,8 @@ def main(argv):
     sub.add_parser("decrypt-all", help="the way back before a downgrade: everything plain again, org_encrypt=0")
     sub.add_parser("decrypt-private", help="2.64.0: only the private spaces' files plain again, private_encrypt=0")
     sub.add_parser("encrypt-private", help="2.64.0: seal the private spaces' files again, private_encrypt=1")
+    sub.add_parser("decrypt-wiki", help="2.123.0: the knowledge pages' texts and history plain again (before 2.122 or older), wiki_encrypt=0")
+    sub.add_parser("encrypt-wiki", help="2.123.0: seal the knowledge pages' texts and history again, wiki_encrypt=1")
     ra = sub.add_parser("rewrap-accounts", help="2.64.0: store the account keys again with the current server key (needs the earlier one)")
     ra.add_argument("--old-key-file", required=True, help='a file holding the earlier KALMIDO_SECRET_KEY, "-" = stdin')
     rw = sub.add_parser("rewrap", help="store an organisation's key again (new KALMIDO_SECRET_KEY) from its recovery key")
@@ -812,6 +826,17 @@ def main(argv):
                 print(TAG, "encrypt-private: org_encrypt is 0, nothing is sealed until it is switched on again", flush=True)
                 return 1
             print(TAG, "encrypt-private:", json.dumps(files_settle(c)))
+        elif a.cmd in ("decrypt-wiki", "encrypt-wiki"):  # 2.123.0 A (#2105): the switch first, then the pass
+            from ..core.db import gset
+            on = a.cmd == "encrypt-wiki"
+            with system_ctx(c):  # orgcrypt: an instance setting
+                gset(c, "wiki_encrypt", "1" if on else "0")
+            c.commit()
+            t = _wkh().wkh_settle(c, plain=None if on else (lambda sid: True))
+            left = _wkh().wkh_count(c)
+            print(TAG, a.cmd + ":", json.dumps({**t, **left}), "(wiki_encrypt is now", "1)" if on else "0)")
+            if t["failed"] or (not on and left["sealed"]):
+                return 1
         elif a.cmd == "rewrap-accounts":
             from ..core.config import _secret_key_parse
             try:

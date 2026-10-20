@@ -546,6 +546,29 @@ shared with others, an agent the list is shared with); the database and the data
   another server key as `keys_other_server_key`). Without the master key the private files are lost.
 - **Your own data export** (*Settings > Data > Export*) is JSON and lists the files without their content, as before.
   To take the files themselves out of the data folder in plain text, run `decrypt-private` first.
+
+**Knowledge pages (2.123).** The text of the knowledge pages and of their history is encrypted at rest as well:
+organisation pages with the organisation's key, private pages with the owner's account key (following `org_encrypt`,
+for private pages also `private_encrypt`) once you switch it on - it is off after the update, so 2.122 and older can
+still read every page if you go back:
+
+```bash
+docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli encrypt-wiki
+```
+
+This sets `wiki_encrypt` to 1 and encrypts the existing pages and versions. Page names stay plain (unique
+names, links, the tree). Spaces encrypted in the browser are not touched (their texts are ciphertext already). Pages
+written before are read as they are and encrypted by the background pass; the search uses a word index of
+keyed hashes (built on the first search of a space). **Before going back to 2.122 or older** (only after `encrypt-wiki`)
+turn the texts into plain text again, otherwise the older version shows ciphertext instead of the pages:
+
+```bash
+docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli decrypt-wiki
+```
+
+It sets `wiki_encrypt` to 0 first (new texts stay plain, also while 2.123 still runs), then opens every page text and
+version and exits with 0 only when none is left. `encrypt-wiki` switches it on again and encrypts them. `decrypt-all`
+and `decrypt-private` cover the pages too; `status` shows `wiki_encrypt` and the counts.
 ## Encryption in the browser (2.64)
 
 Kalmido has two kinds of encryption. They are independent and can be used together:
@@ -764,6 +787,7 @@ A short checklist for a new server:
   | Variable | Default | What it limits |
   |---|---|---|
   | `KALMIDO_FORM_FILES_MB_HOUR` | `200` | MB of files anonymous visitors may send through one public form per hour |
+  | `KALMIDO_FILE_REQUEST_MB_DAY` | `1000` | MB clients may upload through one file request link a day (2.122.0) |
   | `KALMIDO_AGENT_PUSH_DAY` | `500` | pushes per agent and person a day (past it the message still arrives, without a push) |
   | `KALMIDO_OFFICE_MAILS_DAY_PERSON` | `150` | office document mails (invoices, quotations) one person sends a day |
   | `KALMIDO_OFFICE_MAILS_DAY_ORG` | `300` | office document mails of one organisation a day |

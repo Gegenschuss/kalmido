@@ -215,6 +215,7 @@ The most used helpers:
 | `hub/dispo.py` | 2.50.0 (#1194): resources and disposition (module "dispo"): bookings of members, contacts, equipment and sets (option / firm), double bookings and absences as warnings, "who is free", my bookings. See docs/TEAM.md. |
 | `team/approvals.py` | Approvals as a step of a task: request, approve / changes / reject, withdraw. |
 | `team/forms.py` | Forms (module "forms"): a link whose page (/f/<token>) creates a task in a list. |
+| `files/filereq.py` | 2.122.0 (#2097): file requests -- a public link (/u/<token>) of a folder through which a client uploads files without an account (table `fs_upload_requests`, the creator's files via `fs_put`, News row `filereq`). |
 | `team/v1.py` | Clients, workload, approvals, forms: the REST API v1 (+ MCP) and its OpenAPI part. |
 | `accounts/signup.py` | Self-registration on the login page and sign-in links (QR) for people without e-mail. |
 | `admin/hosting.py` | Running Kalmido for others (2.24.0): storage quota per person, the notice / maintenance banner, daily e-mail limits, the "agent joined" notice, `KALMIDO_HOSTED`. |

@@ -1,6 +1,7 @@
 /* Kalmido web client: the styles of the module "contacts" (2.65.0, #1824), loaded with it (static/js/lazyload.js LD_CSS).
    Moved unchanged from app.css (same order); later than app.css in the cascade. */
-.ctimp{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.5rem + var(--tabs-h) + var(--safe-b));z-index:81;background:var(--bg3);border-radius:var(--radius);padding:.625rem .5rem .625rem .875rem;display:flex;flex-wrap:wrap;gap:.375rem .75rem;align-items:center;box-shadow:var(--shadow);font-size:var(--fs-m);width:min(24rem,calc(100vw - 2rem))}
+/* 2.122.4 C (#2348): the import notice sits below the dialogs (.modal = 70), it no longer covers them */
+.ctimp{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.5rem + var(--tabs-h) + var(--safe-b));z-index:69;background:var(--bg3);border-radius:var(--radius);padding:.625rem .5rem .625rem .875rem;display:flex;flex-wrap:wrap;gap:.375rem .75rem;align-items:center;box-shadow:var(--shadow);font-size:var(--fs-m);width:min(24rem,calc(100vw - 2rem))}
 .ctimp .ctimp-t{flex:1 1 0;min-width:0}
 /* 2.119.1 A (#2080): the CSV import's columns (name + an example above the field it goes to) */
 .ctxmap{max-height:min(28rem,55vh);overflow:auto}

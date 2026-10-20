@@ -20,6 +20,24 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 .wkback{border-top:1px solid var(--line);padding-top:.5rem}
 .wkback h4{display:flex;align-items:center;gap:.375rem;margin:0 0 .25rem;font-size:var(--fs-s);color:var(--muted)}
 .wkback ul{margin:0;padding-left:1.25rem}
+/* 2.123.0 A (#2102, #2106): the page history (wkhist.js) and the text hits below the page list */
+.modal.wkhdlg .card{width:min(44rem,100%)}
+.wkhbody{max-height:min(70vh,36rem);overflow:auto}
+.wkhlist{list-style:none;margin:0;padding:0}
+.wkhitem{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.75rem;padding:.375rem .5rem;border:0;border-radius:var(--r-s);background:none;color:inherit;text-align:left;cursor:pointer}
+.wkhitem:hover,.wkhitem:focus-visible{background:var(--bg3)}
+.wkhwhen{flex:1;min-width:0}
+.wkhcur{padding:.0625rem .5rem;border-radius:var(--r-s);background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);font-size:var(--fs-s)}
+.wkhhead{display:flex;align-items:center;gap:.5rem;margin-bottom:.25rem}
+.wkhsum{font-size:var(--fs-s);margin:.25rem 0}
+.wkhdiff{font-family:var(--mono);font-size:var(--fs-s);line-height:1.5;border:1px solid var(--line2);border-radius:var(--r-l);overflow:auto;background:var(--bg)}
+.wkhd{display:flex;gap:.5rem;padding:0 .5rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.wkhd.add{background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.wkhd.del{background:color-mix(in srgb,var(--danger) 10%,transparent);color:var(--text2)}
+.wkhd.gap{color:var(--faint);justify-content:center}
+.wkhdm{flex:none;width:.75rem;color:var(--muted)}
+.wks h4{display:flex;align-items:center;gap:.375rem;margin:.75rem 0 .25rem;font-size:var(--fs-s)}
+.wksmore{margin:.375rem 0 0 .25rem}
 .wkfiles{border-top:1px solid var(--line);padding-top:.5rem}
 .wkfiles h4{display:flex;align-items:center;gap:.375rem;margin:0 0 .375rem;font-size:var(--fs-s);color:var(--muted)}
 .wkfiles ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.25rem}
@@ -40,3 +58,20 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 /* 2.99.0 B (#2183): the page menu shows on hover / keyboard focus of the title row; touch devices always see it */
 @media (hover:hover){.nthead [data-wk="pmenu"]{opacity:0;transition:opacity .2s}.nthead:hover [data-wk="pmenu"],.nthead:focus-within [data-wk="pmenu"],.nthead [data-wk="pmenu"][aria-expanded="true"]{opacity:1}}
 @media (prefers-reduced-motion:reduce){.nthead [data-wk="pmenu"]{transition:none}}
+/* 2.123.0 C (#2103, #2107, #2108): the editor's insert bar, files of the file store, links to files / tables, checkbox lines -> tasks */
+.wembar{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;margin-bottom:.375rem}
+.wemna{display:inline-flex;align-items:center;gap:.375rem;padding:.375rem .625rem;border:1px dashed var(--line2);border-radius:var(--r-s);color:var(--muted);font-size:var(--fs-s)}
+a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
+.wemref{color:var(--muted)}
+.wkmd .tref.wemdone{text-decoration:line-through;opacity:.7}
+.md li.cb .wemcb{order:1;margin-left:auto;flex:none;min-width:2.75rem;min-height:2.75rem;margin-top:-.625rem;margin-bottom:-.625rem}
+.wemcbbar{display:flex;justify-content:flex-end;margin-bottom:.5rem}
+.wemcbl{list-style:none;margin:0 0 .5rem;padding:0;display:flex;flex-direction:column;gap:.25rem;max-height:40vh;overflow:auto}
+.wemcbl label{display:flex;align-items:flex-start;gap:.5rem;min-height:2.25rem}
+.wemdlg .ssearch{flex:none;margin-bottom:.5rem}
+.wemcrumbs{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;margin-bottom:.375rem;color:var(--muted)}
+.wempick{display:flex;flex-direction:column;gap:.125rem;max-height:50vh;overflow:auto}
+.wemit{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;padding:0 .625rem;border:0;border-radius:var(--r-s);background:none;color:var(--text);text-align:left;cursor:pointer}
+.wemit:hover,.wemit:focus-visible{background:var(--accent-soft)}
+.wemit .wemn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wemhint{font-size:var(--fs-s);margin:.5rem 0 0}

@@ -157,14 +157,19 @@ ORDER = (
     "collab.liste2echan",  # 2.64.2 C (#1817): the list channel (team chat of a list) with the lock
     "wiki.wikie2e",  # 2.64.3 (#1817): the lock per knowledge space (path + text encrypted in the browser)
     "wiki.wkmove",  # 2.96.0 B (#1941): wiki pages and folders to the other workspace (private <-> organisation)
+    "wiki.wkembed",  # 2.123.0 C (#2103, #2107): files of the file store and tables in knowledge pages (by reference)
     "wiki.wikiatt",  # 2.99.0 A (#2182): files of knowledge pages (upload, ZIP import / export)
+    "wiki.wkshare",  # 2.123.0 B (#2104): read-only shares of pages / folders (people, public link)
+    "wiki.wkhist", "wiki.wksearch",  # 2.123.0 A (#2105, #2102, #2106): texts sealed at rest, page history, word index
     "files.store",  # 2.48.0 (#1207): the file store (Ablage): tree, roles, versions (no routes; the interface of docs / import)
     "files.scan",  # 2.61.0 (#1818): virus scan of uploads (clamd), the later scan, the admin's scanner state
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
     "files.fsmove",  # 2.96.0 A (#1941): files, folders and documents to the other workspace (private <-> organisation)
+    "files.fstags",  # 2.122.0 B (#2099): tags of files and folders (the documents' tag set of the workspace)
     "files.v1",  # 2.48.0 (#1207): the file store in the REST API (files:read / files:write)
     "files.photometa",  # 2.61.0 B (#1819): photo metadata (GPS, camera) removed on upload (no routes; files/upsafe.py)
     "files.upsafe",  # 2.61.0 (#1818 #1819 #1820): the shared upload path - scan, metadata, text recognition (no routes)
+    "files.filereq",  # 2.122.0 A (#2097): file requests - a public link /u/<token> through which a client uploads files
     "integrations.mail",
     "accounts.invite",
     "family.family",
@@ -234,6 +239,7 @@ ORDER = (
     "office.mealpdf",  # 2.119.0 A (#2288): the PDFs of the entertainment receipts (no routes)
     "office.meals",  # 2.119.0 A (#2288): entertainment receipts (Bewirtungsbelege): meals, approval + log, choices, evaluation
     "office.cashflow",  # 2.47.3 (#1652, part B): cash flow per month + fixed costs
+    "office.cfstart",  # 2.123.0 D (#2341): start balance, corrections by hand and real balances of the cash flow
     "office.pipeline",  # 2.50.0 B (#1196): the sales pipeline
     "office.leads",  # 2.94.0 A (#1930): leads before the pipeline (stage lead): convert, CSV import, agents
     "office.kpi",  # 2.50.0 B (#1197): the business figures
@@ -285,7 +291,10 @@ ORDER = (
     "docs.thumbfill",  # 2.66.1 (#1944): one-time catch-up of the previews of imported documents (no routes)
     "files.textscan",  # 2.61.0 C (#1820): text recognition of normal stored files (queue, search, Ablage search route)
     "docs.web",  # 2.48.0 (#1111): the routes of the documents area
+    "docs.dsearch",  # 2.122.0 B (#2294): filters + search syntax of the documents list (no routes)
+    "docs.batch",  # 2.122.0 B (#2294): the chosen documents at once (tags / type / sender) and as one ZIP
     "docs.v1",  # 2.48.0 (#1111): documents for agents (API v1 + OpenAPI)
+    "docs.csvx",  # 2.122.0 (#2100): the documents list as CSV
     "sheets.io",  # 2.89.0 C (#1916): tables to / from CSV and .xlsx (export, import as a new sheet)
     "sheets.v1",  # 2.89.0 C (#1916): tables for agents (API v1 + OpenAPI)
     "videos.v1",  # 2.99.1 C (#1959): video sign-offs for agents (API v1 + OpenAPI)

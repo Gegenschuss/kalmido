@@ -708,8 +708,8 @@ def rk_report_get():
 
 def _csv_safe(s):
     """No formula injection in spreadsheet programs."""
-    s = str(s or "")
-    return "'" + s if s[:1] in ("=", "+", "-", "@") else s
+    from ..core.serializers import csv_cell  # 2.122.4 B (#2317): one shared helper
+    return csv_cell(s)
 
 
 # ---------------------------------------------------------------- billing on to the client

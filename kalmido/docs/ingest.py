@@ -34,12 +34,13 @@ def _now():
     return iso(now_utc())
 
 
-def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=None):
+def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=None, parent_id=None):
     """Store a new document of account uid in the workspace org_id (None: uid's own) and queue its recognition. meta:
     fields given by the caller (an import) -- date, due, amount, currency, sender, type, tags [names], text, ext_id; they
     are taken as they are ("import"), the recognition fills in the rest. An ext_id already present in the workspace
     returns that document instead of a second copy. Returns the node id; the caller commits (then docs_kick()). Raises
-    what fs_put raises (Denied, ValueError, hosting.QuotaExceeded)."""
+    what fs_put raises (Denied, ValueError, hosting.QuotaExceeded). parent_id: 2.122.0 (#2098) a folder the API puts it in
+    (needs 'edit' there; default: the workspace's documents folder)."""
     meta = dict(meta or {})
     ext = str(meta.pop("ext_id", "") or "")[:200] or None
     ws_guess = S.doc_ws(org_id, uid)
@@ -47,9 +48,9 @@ def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=Non
         r = c.execute("SELECT node_id FROM doc_meta WHERE ws=? AND ext_id=?", (ws_guess, ext)).fetchone()
         if r:
             return r[0]
-    folder = S.root_folder(c, uid, org_id)  # 2.48.0 review: the marked documents folder, members file in
+    folder = int(parent_id) if parent_id else S.root_folder(c, uid, org_id)  # 2.48.0 review: the marked documents folder, members file in
     up = {}  # 2.61.0 B (#1819): the upload checks' info -- the capture date of a photo (read before its metadata went)
-    nid = fs_put(c, uid, folder, name, data, mime, org_id, up=up)
+    nid = fs_put(c, uid, folder, name, data, mime, None if parent_id else org_id, up=up)
     node = c.execute("SELECT org_id, owner_id FROM fs_nodes WHERE id=?", (nid,)).fetchone()
     doc_add(c, nid, node["org_id"], node["owner_id"], uid, source, ext, meta)
     if up.get("taken_at"):
@@ -60,7 +61,7 @@ def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=Non
 def doc_add(c, nid, org_id, owner_id, uid, source="upload", ext=None, meta=None):
     """The doc_meta row of an existing file node (state wait)."""
     ws = S.doc_ws(org_id, owner_id)
-    given = {k: v for k, v in (meta or {}).items() if k in ("date", "due", "amount", "currency", "sender", "type", "tags", "text") and v}
+    given = {k: v for k, v in (meta or {}).items() if k in ("date", "due", "amount", "currency", "sender", "type", "tags", "text", "_by") and v}
     if isinstance(given.get("tags"), str):
         given["tags"] = [t.strip() for t in given["tags"].split(",") if t.strip()]
     for k in ("date", "due"):

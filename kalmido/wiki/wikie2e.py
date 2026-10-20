@@ -211,9 +211,10 @@ def wke_left(c, sp, limit=None):
     if limit is None:
         return None, {"pages": int(n)}
     out = []
-    for r in c.execute(f"SELECT id, path, body FROM wiki_pages WHERE {w} AND {cond} ORDER BY id LIMIT ?", [*a, limit]).fetchall():
+    from .wkhist import wkh_body  # 2.123.0 A (#2105): a text sealed at rest goes out plain (the browser encrypts it)
+    for r in c.execute(f"SELECT id, org_id, owner_id, path, body FROM wiki_pages WHERE {w} AND {cond} ORDER BY id LIMIT ?", [*a, limit]).fetchall():
         out.append({"id": r["id"], "path": r["path"] if _wke_todo_val(mode, gen, r["path"]) else None,
-                    "body": r["body"] if _wke_todo_val(mode, gen, r["body"]) else None})
+                    "body": wkh_body(c, r) if _wke_todo_val(mode, gen, r["body"]) else None})
     return out, {"pages": int(n)}
 
 
@@ -377,6 +378,8 @@ def wke_start():
     from .wikiatt import wka_drop_trashed
     from ..core.serializers import unlink_files
     gone = wka_drop_trashed(c, oid, uid)  # 2.99.0 (#2182, review M2): no plain file in the trash of an encrypted space
+    from .wkhist import wkh_drop_space
+    wkh_drop_space(c, oid, None if oid else uid)  # 2.123.0 A (#2102, #2106): no history / word index of a locked space
     bump(c)
     c.commit()
     unlink_files(gone)
@@ -439,7 +442,7 @@ def wke_bulk():
             pid = x.get("id")
             if isinstance(pid, bool) or not isinstance(pid, int):
                 raise bad("id")
-            row = c.execute(f"SELECT id, path, body, deleted_at FROM wiki_pages WHERE id=? AND {w}", [pid, *a]).fetchone()
+            row = c.execute(f"SELECT id, org_id, owner_id, path, body, deleted_at FROM wiki_pages WHERE id=? AND {w}", [pid, *a]).fetchone()
             if not row:
                 raise bad("pages")
             upd = {}
@@ -475,8 +478,12 @@ def wke_bulk():
                     upd[k] = v
             if not upd:
                 continue
+            plain = upd.get("body")
             if "body" in upd:
                 upd["attrs"] = "{}" if enc else json.dumps(wiki_frontmatter(upd["body"]), ensure_ascii=False)
+                if not enc:  # 2.123.0 A (#2105): the plain text again is sealed at rest
+                    from .wkhist import wkh_seal
+                    upd["body"] = wkh_seal(c, row["org_id"], row["owner_id"], plain)
             try:
                 with c.savepoint():
                     c.execute(f"UPDATE wiki_pages SET {','.join(k + '=?' for k in upd)} WHERE id=?", [*upd.values(), pid])
@@ -485,7 +492,7 @@ def wke_bulk():
             if enc:
                 c.execute("DELETE FROM wiki_links WHERE from_id=?", (pid,))
             elif "body" in upd:
-                wiki_set_links(c, pid, upd["body"])
+                wiki_set_links(c, pid, plain)
     except BadInput as x:
         c.rollback()
         return err(str(x))

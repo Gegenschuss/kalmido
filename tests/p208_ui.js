@@ -221,16 +221,19 @@ async function swTests() {
   w.close();
   w = await boot({user: 'alice', mobile: true, hash: 'today'}); d = w.document;
   w.eval(`settingsModal('look')`); await sleep(600);
-  const ts = d.querySelector('.modal #s-tabadd');
+  const ts = d.querySelector('.modal select');  // 2.122.2 (#2329): "+ Add tab" is a sheet now, any select of the dialog
   if (ts && ts.options.length >= 2) { mdown(w, ts); await sleep(50); check(d.querySelector('#pop.selpop') && d.querySelector('#pop').classList.contains('overmodal'), 'settings select: the sheet above the dialog'); }
   w.close();
 
   // ================= #331 #reply/<id>: the task opens with the comment box focused
-  w = await boot({user: 'alice', hash: 'reply/' + plan}); d = w.document; await sleep(800);
+  w = await boot({user: 'alice', hash: 'reply/' + plan}); d = w.document;
+  // 2.122.4 (#2218): wait for the condition, not a fixed time
+  for (let i = 0; i < 40 && d.activeElement?.id !== 'c-input'; i++) await sleep(150);
   check(w.eval('S.sel') === plan && d.activeElement?.id === 'c-input', 'desktop: #reply/<id> opens the task, the comment box has the focus');
   check(w.location.hash === '#all' || !/reply/.test(w.location.hash), 'the reply hash is replaced: ' + w.location.hash);
   w.close();
-  w = await boot({user: 'alice', mobile: true, hash: 'reply/' + plan}); d = w.document; await sleep(900);
+  w = await boot({user: 'alice', mobile: true, hash: 'reply/' + plan}); d = w.document;
+  for (let i = 0; i < 40 && d.activeElement?.id !== 'c-input'; i++) await sleep(150);
   check(w.eval('S.sel') === plan && d.activeElement?.id === 'c-input', 'phone: the same');
   w.close();
 

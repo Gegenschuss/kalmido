@@ -334,8 +334,8 @@ def ast_value_get():
 
 def bnk_csv_cell(s):
     """No formula injection in spreadsheet programs (like travel.py _csv_safe)."""
-    s = str(s or "")
-    return "'" + s if s[:1] in ("=", "+", "-", "@", "\t", "\r") else s
+    from ..core.serializers import csv_cell  # 2.122.4 B (#2317): one shared helper
+    return csv_cell(s)
 
 
 def _de(v):

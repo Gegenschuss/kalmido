@@ -369,6 +369,17 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .rkcftab .bk-cfres th,.rkcftab .bk-cfres td,.rkcftab .bk-cffree th,.rkcftab .bk-cffree td{padding:.25rem;font-size:var(--fs-s)}
 .rkcftab .bk-cffree td{font-weight:600}
 .rkcftab .bk-cffree td.neg{color:var(--danger)}
+/* 2.123.0 D (#2341): the account balance -- computed, the real one by hand, the difference; corrections by hand */
+.rkcftab .cfs-acc th,.rkcftab .cfs-acc td,.rkcftab .cfs-real th,.rkcftab .cfs-real td,.rkcftab .cfs-diff th,.rkcftab .cfs-diff td{padding:.25rem;font-size:var(--fs-s)}
+.rkcftab .cfs-acc td{font-weight:600}
+.rkcftab .cfs-acc td.neg{color:var(--danger)}
+.rkcftab .cfs-real label{font-weight:500}
+.rkcftab .cfs-realin{width:8rem;min-height:2.75rem;text-align:right}
+.rkcftab .cfs-diff td.cfs-off{color:var(--accent);font-weight:600}
+.cfs-hand{display:inline-block;padding:0 .375rem;border:.0625rem solid var(--accent);border-radius:var(--radius);color:var(--accent);font-size:var(--fs-xs);font-weight:500;line-height:1.4}
+.cfs-adj{margin-top:.25rem}
+.cfs-add{display:flex;justify-content:flex-end;margin-top:.25rem}
+.cfs-add .btn{min-height:2.75rem}
 /* 2.91.0 B (#1924) */
 .abo-tag{display:inline-block;margin-left:.25rem;padding:0 .375rem;border-radius:.625rem;font-size:var(--fs-s);font-weight:400;color:var(--accent);border:1px solid var(--accent);vertical-align:middle}
 .abo-sums{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin:.5rem 0}
@@ -644,6 +655,10 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 @media (pointer:coarse) {
   .ofdeditor select,.ofdhead select{height:var(--fld-h);line-height:1.25}
 }
+/* 2.122.4 C (#2326): same for the office settings - iOS ignores min-height on a select, so it was 36 px there */
+@media (pointer:coarse) {
+  .ofcset select{height:var(--fld-h);line-height:1.25}
+}
 /* 2.119.0 A (#2288): entertainment receipts (office_meals.js) */
 .bwbar .bwocc{flex:0 1 12rem;min-width:7rem;min-height:2.25rem}
 .bwlist .rotag{display:inline-flex;align-items:center;gap:.25rem;flex:none}
@@ -683,3 +698,12 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
   .bwclist li,.bwcadd{flex-wrap:wrap}.bwclist input,.bwcadd input{flex-basis:100%}
   .bwbar .bwocc{flex:1 1 100%}
 }
+/* 2.122.3 A (#2335): a section of the import page reached by its anchor is marked briefly; the way there from a list */
+.oim .oimsec{position:relative;scroll-margin-top:4rem}
+.oim .oimsec::after{content:'';position:absolute;inset:0 -.5rem -.25rem;border-radius:.5rem;box-shadow:0 0 0 .125rem var(--accent);opacity:0;pointer-events:none;transition:opacity .2s ease-out}
+.oim .oimsec.oimflash::after{opacity:1}
+.oimlink{margin:.5rem 0 1rem;font-size:.875rem}
+.oimlink a{color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.oim .oimsec::after{transition:none}}
+.oimlink.e a{color:var(--accent)}
+.oimlink a{display:inline-flex;align-items:center;gap:.25rem;min-height:2.75rem}

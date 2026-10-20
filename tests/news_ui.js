@@ -92,7 +92,7 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   w.eval(`tabsMore(document.querySelector('[data-act="tabs-more"]'))`); await sleep(200);
   check(/Neuigkeiten/.test(d.querySelector('#pop, .menu-list')?.textContent || ''), '"More" offers News');
   w.eval(`settingsModal()`); await sleep(300);
-  check([...d.querySelectorAll('#s-tabadd option')].some(o => o.value === 'news'), 'tab option "News" available');
+  check(w.eval(`tabAddGroups().flatMap(g => g.items).map(x => x.id)`).includes('news'), 'tab option "News" available');  // 2.122.2 (#2329): a sheet instead of the select
   w.close();
   console.log(`\n${ok} ok, ${F.length} failed`);
   if (errs.length) console.log('JS ERRORS', [...new Set(errs)]);

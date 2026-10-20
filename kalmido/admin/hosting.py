@@ -66,7 +66,10 @@ def _user_bytes(c, uids):
     e = fs_bytes_of(c, uids)  # 2.48.0 (#1207): every version in the file store counts for its uploader
     g = c.execute(f"SELECT COALESCE(SUM(size),0) FROM budget_files WHERE user_id IN ({q})", uids).fetchone()[0]  # 2.72.0 (#1333): receipts
     h = c.execute(f"SELECT COALESCE(SUM(size),0) FROM wiki_files WHERE created_by IN ({q})", uids).fetchone()[0]  # 2.99.0 A (#2182)
-    return int(a + b + d + e + g + h)
+    # 2.122.4 B (#2316): entertainment receipts and contract files count for their uploader too
+    k = sum(c.execute(f"SELECT COALESCE(SUM(size),0) FROM {t} WHERE created_by IN ({q})", uids).fetchone()[0]
+            for t in ("office_meal_files", "office_contract_files"))
+    return int(a + b + d + e + g + h + k)
 
 
 def quota_info(c, uid):
