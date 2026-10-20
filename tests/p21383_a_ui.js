@@ -63,17 +63,18 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files,reading,sheets';
       const pr = await ev(`(async () => {
         const out = {}; let mqL = null; const mq = {matches: false, addEventListener: (t, f) => { mqL = f; }, removeEventListener: () => { mqL = null; }};
         const mm = window.matchMedia; window.matchMedia = q => q === 'print' ? mq : mm.call(window, q);
-        window.print = () => { mq.matches = true; mqL?.(); dispatchEvent(new Event('afterprint')); };  // Android: afterprint right after print()
+        // 2.144.2 B (#2370): Android also ends the print media right away; the view now stays until the user is back (a tap)
+        window.print = () => { mq.matches = true; mqL?.(); dispatchEvent(new Event('afterprint')); mq.matches = false; mqL?.(); };  // Android: afterprint + media end right after print()
         shk_print();
         await new Promise(r => setTimeout(r, 300));
         out.kept = document.body.classList.contains('shkprint') && !!document.getElementById('shk-print');
-        mq.matches = false; mqL?.();  // the print media ends
+        document.body.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true}));  // back in the app
         out.gone = !document.body.classList.contains('shkprint') && !document.getElementById('shk-print');
         window.matchMedia = mm; return JSON.stringify(out);
       })()`);
       const prj = JSON.parse(pr || '{}');
       check(prj.kept, `${u}: #2370 the early afterprint keeps the print view`);
-      check(prj.gone, `${u}: #2370 the print view goes when the print media ends`);
+      check(prj.gone, `${u}: #2370 the print view goes once the user is back in the app`);
 
       // ---- #2362: documents
       await nav(B + '#docs');
