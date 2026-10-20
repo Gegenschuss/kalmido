@@ -603,8 +603,13 @@ the role next to each member, and in *Invite by e-mail*; *What the roles mean* e
   channels, no agents of the organisation, no invitations. In the member list a guest only sees the admins and the people
   they share something with.
 - **Accounting**: like a guest, plus the office of the organisation to read and export (also the bookkeeping, the income
-  statement and the DATEV export) and receipts to upload into the organisation's documents. Nothing is sent, deleted or
-  changed, no master data or settings. The typical case: the tax advisor.
+  statement and the DATEV export) and receipts to upload into the organisation's documents (a wrongly uploaded receipt
+  of their own they can rename or remove again). Nothing else is sent, deleted or changed, no master data or settings.
+  The typical case: the tax advisor.
+
+The three limited roles add nothing at the top level of the organisation's files, own no list of the organisation (a list
+handed over goes only to a member or admin), copy no list into the organisation, use no internal form of the organisation
+and move nothing out of its office. Their closed months of working time stay their own (no approval by the organisation).
 
 The person's private space stays as it is (there they are their own admin); a person without any organisation notices no
 change. Every check sits on the server: the app, the REST API, MCP and CalDAV / CardDAV answer 403 (read-only) or 404 (guest,
@@ -615,7 +620,8 @@ API for scripts of the web app: `PUT /api/orgs/{org}/members {user_id | email, r
 {email, role}` and `POST /api/users {orgs: [{id, role}]}` take `member`, `admin`, `guest`, `readonly` or `accounting`;
 `GET /api/orgs` carries each member's role, `roles` (the roles with their explanation) and `limited` (my own role is one of
 the three). Before version 2.143 a server read an unknown role as *Member*: going back to an older version is only safe
-while nobody holds one of the new roles.
+while nobody holds one of the new roles. From 2.143 on a stored role the server does not know reads as *Guest* (and is
+noted in the server log).
 
 ## The group "Conversations" in the sidebar (2.99.0)
 

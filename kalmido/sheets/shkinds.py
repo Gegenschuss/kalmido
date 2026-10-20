@@ -49,7 +49,8 @@ def shk_people(c, sheet_row):
     if l is not None:
         ids = set(list_people(c, l["id"]))
     elif sheet_row["org_id"]:
-        ids = {r[0] for r in c.execute("SELECT user_id FROM org_members WHERE org_id=?", (sheet_row["org_id"],))}
+        # 2.143.0 A (#2151, review): who sees the organisation's tables (admin, member, read-only); guests only by a share below
+        ids = {r[0] for r in c.execute("SELECT user_id FROM org_members WHERE org_id=? AND role IN ('admin','member','readonly')", (sheet_row["org_id"],))}
     else:
         ids = {sheet_row["owner_id"]} if sheet_row["owner_id"] else set()
     # 2.124.0 (#2113): + the people this one table is shared with (agents drop out below)

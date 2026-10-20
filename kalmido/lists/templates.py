@@ -557,9 +557,10 @@ def list_duplicate(lid):
     else:
         folder = src["folder"] if src["owner_id"] == uid else (c.execute(
             "SELECT folder FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone() or [""])[0]
-    from ..accounts.orgs import user_orgs
-    # the workspace of the original when I belong to it (a private list stays private), else the default of a new list
-    org = src["org_id"] if src["org_id"] is None or src["org_id"] in user_orgs(c, uid) else "auto"
+    from ..accounts.orgroles import user_orgs_full
+    # the workspace of the original when I belong to it (a private list stays private), else the default of a new list;
+    # 2.143.0 A (#2151, review): only when my role there may add lists (guest / read-only / accounting: the default)
+    org = src["org_id"] if src["org_id"] is None or src["org_id"] in user_orgs_full(c, uid, write=True) else "auto"
     if org != "auto":
         g.list_keep = ("org_id",)  # list_created: the original's workspace beats the folder's default (like an explicit org_id)
     new = tpl_apply_list(c, uid, d, name, folder, base, org_id=org)

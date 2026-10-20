@@ -140,6 +140,9 @@ def files_list():
         rows = [r for r in c.execute("SELECT * FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND deleted_at IS NULL ORDER BY id", (oid,))
                 if r["id"] in vis]
         role = "edit" if ctx.role != "agent" else None  # every person of the organisation may add at its top
+        from ..accounts.orgroles import org_writes
+        if role and not org_writes(c, uid, oid):
+            role = "view"  # 2.143.0 A (#2151, review): guest / read-only / accounting add nothing at the top
     else:
         rows = []
         if vis:
