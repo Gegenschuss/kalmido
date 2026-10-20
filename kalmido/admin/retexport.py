@@ -34,10 +34,8 @@ from ..accounts.session import me
 
 RX_VALID_DAYS = 7  # a finished export counts this long as "exported" for the deletion
 RX_YEARS = {"documents": 8, "books": 10}  # what the hint says (invoices / receipts 8 years, books 10 years)
-RX_NOTE = N_("Keep these records yourself: invoices and receipts for 8 years, books (cash book, logs, bank statements) for 10 years. "
-             "Kalmido does not keep them after the deletion; the duty to keep them lies with you.")
-RX_NEEDED = N_("This account or organisation has records you must keep (invoices, receipts, cash book). Download the retention "
-               "export first and confirm it, or say explicitly that you do without it.")
+RX_NOTE = N_("Keep these records yourself: invoices and receipts for 8 years, books (cash book, logs, bank statements) for 10 years. Kalmido does not keep them after the deletion; the duty to keep them lies with you.")
+RX_NEEDED = N_("This account or organisation has records you must keep (invoices, receipts, cash book). Download the retention export first and confirm it, or say explicitly that you do without it.")
 # (archive name, table) of the tables that go along as CSV; the where clause is the organisation export's (orgexport.OX_AREAS)
 RX_TABLES = (
     ("invoices/documents.csv", "office_docs"),
