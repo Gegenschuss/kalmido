@@ -272,7 +272,7 @@ def agb_purge_tick(c):
         return 0
     AGB_TICK["at"] = time.time()
     n = 0
-    with system_ctx(c):
+    with system_ctx(c):  # the watchdog walks every office area (organisations and personal offices), no person behind it
         ids = [r["id"] for r in c.execute("SELECT id FROM orgs").fetchall()]
         if not gsetting(c, "agb_grace_at"):
             agb_grace(ids)  # 2.143.0 D (#2259, review): once, before the first round
