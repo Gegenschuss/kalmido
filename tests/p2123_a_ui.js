@@ -50,7 +50,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(await until(() => !d.querySelector('.wkhdlg')), 'Restore closes the dialog');
   const after = await until(async () => { const p = await call('GET', '/api/wiki/pages/' + PG); return p.body === 'Line one\nLine two\nLine three' && p; });
   check(after, 'the page has the restored text');
-  check(await until(() => w.WK?.pg?.body === 'Line one\nLine two\nLine three'), 'the open page shows it');
+  check(await until(() => w.eval(`WK.pg && WK.pg.body`) === 'Line one\nLine two\nLine three'), 'the open page shows it');
   check(((await call('GET', `/api/wiki/pages/${PG}/versions`)).versions || []).length === 3, 'the restore is a new version');
   w.eval(`histStep('undo')`);
   check(await until(async () => (await call('GET', '/api/wiki/pages/' + PG)).body === 'Line one\nLine 2 changed\nLine three\nLine four'), 'ONE Undo brings the text before back');
