@@ -182,7 +182,8 @@ def dl_device_get(tid):
     c, uid = db(), me()
     _device(c, uid, tid, write=False)
     l = c.execute("SELECT * FROM life_device_links WHERE task_id=? AND user_id=?", (tid, uid)).fetchone()
-    return jsonify(link=dl_public(c, uid, l, "device") if l else None, offices=[] if l else dl_offices(c, uid))
+    taken = l is None and c.execute("SELECT 1 FROM life_device_links WHERE task_id=?", (tid,)).fetchone()  # another person's link
+    return jsonify(link=dl_public(c, uid, l, "device") if l else None, offices=[] if l or taken else dl_offices(c, uid))
 
 
 @app.post("/api/life/devices/<int:tid>/to-office")
@@ -194,7 +195,7 @@ def dl_device_to_office(tid):
     c, uid = db(), me()
     office_gate(c)
     _t, f = _device(c, uid, tid)
-    if c.execute("SELECT 1 FROM life_device_links WHERE task_id=? AND user_id=?", (tid, uid)).fetchone():
+    if c.execute("SELECT 1 FROM life_device_links WHERE task_id=?", (tid,)).fetchone():  # also by another person of a shared list
         raise BadInput(tr("This device is linked already"))
     b = body()
     if not isinstance(b, dict):
