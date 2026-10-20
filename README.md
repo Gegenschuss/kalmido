@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.139.0** (2026-10-20): team chat threads, voice messages with their own player and "Read by" (can be switched
+  off); every task comment can become a task; unreadable pages back in the search once their key returns; proposal
+  cards with the app thumb and larger check boxes.
 - **2.138.1** (2026-10-20): six releases from 19.10. brought onto today's code - office undo, invitation mails
   and calendar subscription links, quick add with @person and reminders at a time; file store ZIP, phone scan and
   external links; office settings in areas, quotation parts in colour, terms as PDF; team chat files, channels and
