@@ -12,6 +12,7 @@ import hmac
 import io
 import json
 import re
+import struct
 import zipfile
 import unicodedata
 from collections import Counter
@@ -156,10 +157,18 @@ class _Files:
             self.files.append({"name": name, "text": text})
 
     def add_zip(self, name, data):
+        # 2.144.1 (review): the entry count of the end record before zipfile builds an object per entry; zip64 is not taken
+        e = data.rfind(b"PK\x05\x06")
+        cnt = struct.unpack_from("<H", data, e + 10)[0] if 0 <= e <= len(data) - 22 else None
+        if cnt is not None and cnt > BNK_ZIP_ENTRIES_MAX:
+            raise BadInput(tr("The ZIP file holds too many entries (at most {0})", BNK_ZIP_ENTRIES_MAX))
+        if cnt is None or cnt == 0xFFFF:
+            self.errors.append({"file": name, "error": tr("The ZIP file cannot be read")})
+            return
         try:
             zf = zipfile.ZipFile(io.BytesIO(data))
             infos = zf.infolist()
-        except (zipfile.BadZipFile, zipfile.LargeZipFile, ValueError, OSError):
+        except Exception:  # BadZipFile, a broken zip64 locator (struct.error) ...: never a 500
             self.errors.append({"file": name, "error": tr("The ZIP file cannot be read")})
             return
         if len(infos) > BNK_ZIP_ENTRIES_MAX:
@@ -203,6 +212,8 @@ def _uploads(b):
                 raise BadInput(tr("The upload is too large (at most {0} MB)", BNK_UPLOAD_MAX // (1024 * 1024)))
             if name.casefold().endswith(".zip") or data[:4] == b"PK\x03\x04":
                 fs.add_zip(name, data)
+            elif not name.casefold().endswith(BNK_EXTS):
+                fs.errors.append({"file": name, "error": tr("Not a bank statement (only XML, CSV or ZIP)")})  # 2.144.1 (review)
             else:
                 fs.add(name, data)
                 fs.labels.append(name)
@@ -222,7 +233,8 @@ def _uploads(b):
 
 def _req():
     """The request as a dict: the JSON body, or the form fields of a multipart upload (mapping as a JSON string, account)."""
-    if (request.content_length or 0) > BNK_UPLOAD_MAX + 1024 * 1024:  # before the form is parsed
+    request.max_content_length = BNK_UPLOAD_MAX + 1024 * 1024  # 2.144.1 (review): werkzeug refuses a longer body itself, on any server
+    if (request.content_length or 0) > request.max_content_length:  # before the form is parsed
         raise BadInput(tr("The upload is too large (at most {0} MB)", BNK_UPLOAD_MAX // (1024 * 1024)))
     if not request.files:
         b = body()

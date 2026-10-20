@@ -12315,5 +12315,6 @@
   "Choose files": "Dateien wählen",
   "or drop them here": "oder hier ablegen",
   "Skipped: {0}": "Übersprungen: {0}",
-  "The columns apply to every CSV file.": "Die Spalten gelten für alle CSV-Dateien."
+  "The columns apply to every CSV file.": "Die Spalten gelten für alle CSV-Dateien.",
+  "Not a bank statement (only XML, CSV or ZIP)": "Kein Kontoauszug (nur XML, CSV oder ZIP)"
 }

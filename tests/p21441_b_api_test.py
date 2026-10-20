@@ -242,6 +242,10 @@ r = up(Fr, "/import/preview", [("viele.zip", zipped([(f"t{i}.xml", X20) for i in
 check(r.status_code == 400 and "400 files" in r.text, "more than 400 files: 400 " + r.text[:200])
 r = up(Fr, "/import/preview", [("kaputt.zip", b"PK\x03\x04 not a zip at all")])
 check(r.status_code == 400, "a broken zip: 400 " + r.text[:200])
+# 2.144.1 (review): a file picked or dropped directly that is no statement is named, never read as a CSV
+r = up(Fr, "/import/preview", [("brief.pdf", b"%PDF-1.4 junk"), ("gut.xml", X20)])
+check(r.ok and r.json()["count"] == 1 and any(e["file"] == "brief.pdf" and "Not a bank statement" in e["error"] for e in r.json()["file_errors"]),
+      "a direct pdf named as no statement " + r.text[:200])
 check(Fr.get(B + K + "/imports").ok, "the server keeps answering")
 
 # the JSON way stays as it was

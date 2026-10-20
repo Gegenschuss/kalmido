@@ -12315,5 +12315,6 @@
   "Choose files": "Bestanden kiezen",
   "or drop them here": "of zet ze hier neer",
   "Skipped: {0}": "Overgeslagen: {0}",
-  "The columns apply to every CSV file.": "De kolommen gelden voor alle CSV-bestanden."
+  "The columns apply to every CSV file.": "De kolommen gelden voor alle CSV-bestanden.",
+  "Not a bank statement (only XML, CSV or ZIP)": "Geen bankafschrift (alleen XML, CSV of ZIP)"
 }
