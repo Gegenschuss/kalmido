@@ -3,7 +3,7 @@
 names and texts only.
  - #2105 the text of a page is sealed at rest ("kenc1:" in the database, never the plain text) in an organisation and in a
    private space; reading, template, rename with relink, mentions, export / import, the move private <-> organisation work;
-   a plain page from before (written straight into the database) is read and sealed by encrypt-wiki; the way back
+   sealing is off until encrypt-wiki; a plain page from before (written straight into the database) is read and sealed by encrypt-wiki; the way back
    decrypt-wiki (wiki_encrypt=0) leaves every page text and version plain, new saves stay plain, encrypt-wiki seals again
  - #2102 the history: saves of one person within 10 minutes share a version, another person / later = a new one, at most
    100 per page, reading a version, restoring (a new version, 409 on a stale expect_updated_at), versions sealed and moved
@@ -121,6 +121,11 @@ FID, Fr = freelancer(B, A)
 _, Fo = freelancer(B, A, "fiona")
 
 # ================================================================ #2105 sealed at rest
+# 2.123.0 (#2105): sealing is off until an admin runs encrypt-wiki (2.122 must read the pages after an update and a rollback)
+P0 = page(Bo, SP, "Ablauf/Vorher", "Vor dem Einschalten geschrieben")
+check(raw(P0) == "Vor dem Einschalten geschrieben", "#2105: by default (wiki_encrypt unset) a new page text stays plain")
+rc, out = cli("encrypt-wiki")
+check(rc == 0 and raw(P0).startswith("kenc1:"), "#2105: encrypt-wiki switches sealing on and seals the plain page " + out[-300:])
 TEXT = "# Ablauf\nDer Zitronenbaum wird im Herbst geschnitten. Siehe [[Ablauf/Werkzeug]]."
 P1 = page(Bo, SP, "Ablauf/Garten", TEXT)
 check(raw(P1).startswith("kenc1:") and "Zitronenbaum" not in raw(P1), "#2105: the text of an organisation page is sealed in the database")

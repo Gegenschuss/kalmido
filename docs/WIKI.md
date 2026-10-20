@@ -29,7 +29,9 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   *Show more*. The server searches a word index of keyed hashes, not the text itself.
 - **Encrypted at rest (2.123.0).** The text of every page and of its versions is stored encrypted with the key of its
   space (the organisation's key, for private pages your account key), like the office data; names (paths) stay plain
-  because links and the tree need them. Nothing changes in use. See *Encryption at rest* in the self-hosting guide.
+  because links and the tree need them. Nothing changes in use. The server admin switches it on once with
+  `orgcrypt_cli encrypt-wiki` (off after the update, so a step back to an older version stays possible); see
+  *Encryption at rest* in the self-hosting guide.
 - **Undo.** Creating, renaming, deleting and importing are one step each (the arrow on top, Ctrl/Cmd+Z, the toast).
 - **Files (2.99.0).** A page can carry PDFs and pictures (PNG, JPEG, GIF, WebP, SVG): *Attach files* below the text,
   at most 25 MB each. The type is checked by the content, not by the name; an SVG is cleaned (no scripts, no outside
