@@ -2877,6 +2877,10 @@ MIGRATIONS = [
     ("org_keys", "kek_check_rot", "ALTER TABLE org_keys ADD COLUMN kek_check_rot TEXT"),
     ("org_keys", "rot_started_at", "ALTER TABLE org_keys ADD COLUMN rot_started_at TEXT"),
     ("org_keys", "rotated_at", "ALTER TABLE org_keys ADD COLUMN rotated_at TEXT"),
+    # 2.143.0 C (#2153): the device's id of a note written offline (a repeated POST from the outbox = the same note). Older
+    # versions never read it
+    ("notes", "client_ref", "ALTER TABLE notes ADD COLUMN client_ref TEXT"),
+    ("notes", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS notes_client_ref ON notes(created_by, client_ref) WHERE client_ref IS NOT NULL"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

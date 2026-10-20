@@ -254,7 +254,15 @@ to *deny* and allow each app per group, so a new account does not open every app
 - **A new version on the phone:** close the app completely (or reload it), then check the version under *Settings >
   Help*. An old cached app shows old screens.
 - **Offline changes live in the browser** until they are synced: do not clear the site data while you have unsynced
-  changes.
+  changes. Tasks, habits, time entries, the timer and notes can be changed offline; deleting or moving a note needs a
+  connection, and so do the notes of a list with end-to-end encryption.
+- **Install hint.** Once per start (not in the first half minute) the app may offer to install itself: on Android and
+  desktop browsers with the browser's own install question, on iPhone / iPad with the steps (*Share > Add to Home
+  Screen*). *Not now* asks again after two weeks, *Don't show again* never on that device; the installed app never shows it.
+- **Sharing into Kalmido.** The installed app is a share target for every file type (pictures, PDFs, Office files, ZIP,
+  audio, video, ...): a shared file becomes a new task with the file attached. Contact cards (`.vcf`) can also go into
+  the contacts, calendar files (`.ics`) into a calendar (the existing imports). Files are stored as attachments and
+  downloaded, never shown inline, except pictures and PDFs.
 - **Only Web Push?** Then remove ntfy topics you do not use: a topic on the public `ntfy.sh` can be read by anyone who
   knows its name.
 - **Your own ntfy server:** for the phone's battery set the server's `keepalive-interval` to about 3 minutes, use the

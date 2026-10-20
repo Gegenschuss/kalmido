@@ -478,20 +478,25 @@ def entry_times(b, start, end, sec, tz=None):
 
 @app.post("/api/time/entries")
 def time_create():
-    """Manual entry: {task_id | list_id, start, end | minutes, note}."""
+    """Manual entry: {task_id | list_id, start, end | minutes, note, client_id?}."""
     need_time()
     need_feat("time")
     b = body()
     c = db()
     uid, ts = me(), iso(now_utc())
+    cid = str(b.get("client_id") or "")[:64] or None  # 2.143.0 C (#2153): sent again from the offline outbox = the same entry
+    if cid:
+        r = c.execute("SELECT id FROM time_entries WHERE user_id=? AND client_id=?", (uid, cid)).fetchone()
+        if r:
+            return jsonify(one_entry(c, r["id"]))
     tid, lid, title = time_target(c, b)
     from .timesheet import tsl_check, tz_of
     start, end, sec = entry_times(b, None, None, 0, tz_of(c, uid))
     tsl_check(c, uid, start)  # 2.125.0 B (#2119)
     src = b.get("source") if b.get("source") in TIME_SOURCES else "manual"
-    eid = insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,created_at,updated_at)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
-                    (uid, tid, lid, title, iso(start), iso(end), sec, str(b.get("note") or "").strip()[:500], src, ts, ts))
+    eid = insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,client_id,created_at,updated_at)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (uid, tid, lid, title, iso(start), iso(end), sec, str(b.get("note") or "").strip()[:500], src, cid, ts, ts))
     from ..integrations.webhooks import who_note
     who_note("time.created", "time", eid)  # 2.115.0 A (#2061): a manual entry
     bump(c)

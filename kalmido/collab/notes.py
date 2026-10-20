@@ -126,15 +126,21 @@ def notes_of_list(lid):
 
 @app.post("/api/lists/<int:lid>/notes")
 def note_create(lid):
-    """{title, body?, tags?, pinned?} -- a new note in the list (owner, admins, members)."""
+    """{title, body?, tags?, pinned?, client_ref?} -- a new note in the list (owner, admins, members)."""
     c = db()
     note_role(c, lid, write=True)
-    f = note_fields(body())
+    b = body()
+    ts, uid = iso(now_utc()), me()
+    ref = str(b.get("client_ref") or "")[:64] or None  # 2.143.0 C (#2153): sent again from the offline outbox = the same note
+    if ref:
+        r = c.execute("SELECT * FROM notes WHERE created_by=? AND client_ref=?", (uid, ref)).fetchone()
+        if r:
+            return jsonify(note_dict(r)), 200
+    f = note_fields(b)
     from .liste2e import le2e_guard
     le2e_guard(c, lid, {"note_title": f["title"], "note_body": f.get("body", "")})  # 2.64.1 (#1817)
-    ts, uid = iso(now_utc()), me()
-    nid = insert_id(c, "INSERT INTO notes(list_id,title,body,tags,pinned,created_by,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
-                    (lid, f["title"], f.get("body", ""), f.get("tags", ""), f.get("pinned", 0), uid, uid, ts, ts))
+    nid = insert_id(c, "INSERT INTO notes(list_id,title,body,tags,pinned,created_by,updated_by,created_at,updated_at,client_ref) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (lid, f["title"], f.get("body", ""), f.get("tags", ""), f.get("pinned", 0), uid, uid, ts, ts, ref))
     bump(c)
     c.commit()
     r = c.execute("SELECT * FROM notes WHERE id=?", (nid,)).fetchone()

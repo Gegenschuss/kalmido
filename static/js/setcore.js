@@ -130,3 +130,42 @@ const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_(
 const aiPaneOn = () => !!S.me && (feat('agents') || (!!S.me.is_admin && (S.agents || []).length > 0));
 const ABOUT_LINKS = [['https://kalmido.com', N_('Website'), 'link'], ['https://github.com/Gegenschuss/kalmido', N_('Source code on GitHub'), 'file'], ['https://github.com/Gegenschuss/kalmido/issues', N_('Report a problem'), 'alert']];
 const openExt = u => { const w = window.open(u, '_blank', 'noopener,noreferrer'); if (w) w.opener = null; };
+// 2.143.0 C (#2153): a quiet hint to install the app. Android / desktop: the browser's own install question
+// (beforeinstallprompt, kept until the hint's button is pressed); iPhone / iPad (Safari has no such question): how to add it
+// (Share, then "Add to Home Screen"). At most once per start, not in the first half minute, never in the installed app, the
+// browser demo, a list window or over a dialog; "Not now" asks again after two weeks, "Don't show again" never on this device
+// (tasks.pwaHint, kept on logout like the other device preferences).
+const PWA = {ev: null, t: 0, shown: false};
+const pwa_ios = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const pwa_iosSafari = () => pwa_ios() && /Safari\//.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(navigator.userAgent);
+function pwa_ok() {
+  const h = LS.get('pwaHint', null);
+  if (PWA.shown || window.KDEMO || (typeof MW_ON !== 'undefined' && MW_ON) || tch_standalone() || S.setupPending || S.capturePage) return false;
+  return !(h && (h.never || (h.later && Date.now() - h.later < 14 * 864e5)));
+}
+function pwa_hint() {
+  if (!S.booted || !pwa_ok() || !(PWA.ev || pwa_iosSafari())) return;
+  if ($('.modal') || $('#pwahint') || S.settings?.tour === 'pending') { PWA.t = setTimeout(pwa_hint, 60000); return; }  // later, not over something open
+  PWA.shown = true;
+  const ios = !PWA.ev, el = document.createElement('div');
+  el.id = 'pwahint'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-labelledby', 'pwah-t');
+  el.innerHTML = `<span class="pwaic">${ic(ios ? 'upload' : 'download')}</span><div class="pwatx"><b id="pwah-t">${esc(tr('Install Kalmido as an app'))}</b>
+    <span class="muted">${esc(ios ? tr('Tap Share, then “Add to Home Screen”.') : tr('Opens in its own window and works offline.'))}</span>
+    <div class="pwabtns">${ios ? '' : `<button type="button" class="btn sm pri" data-pwa="install">${esc(tr('Install'))}</button>`}<button type="button" class="btn sm" data-pwa="later">${esc(tr('Not now'))}</button><button type="button" class="btn sm" data-pwa="never">${esc(tr('Don’t show again'))}</button></div></div>
+    <button type="button" class="iconbtn" data-pwa="later" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x', 's')}</button>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('on'));
+  el.addEventListener('click', async e => {
+    const a = e.target.closest('[data-pwa]')?.dataset.pwa; if (!a) return;
+    if (a === 'install' && PWA.ev) { const ev = PWA.ev; PWA.ev = null; try { ev.prompt(); const c = await ev.userChoice; if (c?.outcome === 'accepted') LS.set('pwaHint', {never: true}); } catch { /* the browser said no */ } }
+    else LS.set('pwaHint', a === 'never' ? {never: true} : {later: Date.now()});
+    el.remove();
+  });
+}
+window.addEventListener('beforeinstallprompt', e => {
+  if (!pwa_ok()) return;  // the browser's own small sign in the address bar stays
+  e.preventDefault(); PWA.ev = e;
+  if (S.booted && !PWA.t) PWA.t = setTimeout(pwa_hint, 30000);
+});
+window.addEventListener('appinstalled', () => { LS.set('pwaHint', {never: true}); PWA.ev = null; $('#pwahint')?.remove(); });
+function pwa_boot() { if (!PWA.t && pwa_ok() && (PWA.ev || pwa_iosSafari())) PWA.t = setTimeout(pwa_hint, 30000); }

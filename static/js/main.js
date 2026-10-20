@@ -25,7 +25,7 @@ function bootDone() {
   const sil = location.hash.match(/^#signin\/([A-Za-z0-9_-]{20,100})$/);  // 2.23.0 (#444): a sign-in link (QR code)
   if (sil) { bootDone(); await i18nLoad(uiLang()); await signinScreen(sil[1]); return; }
   const i18nBoot = i18nLoad(uiLang());  // last used language (localStorage), in parallel with the state
-  try { await load(); if (!S.lists.length) throw new Error('no state'); } catch (e) { bootDone(); if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = botEmpty(navigator.onLine === false ? 'offline' : 'schaut', tr('Server not reachable.'), tr('Reload the page once the server is reachable again.')).replace(/<\/div>$/, `<button type="button" class="btn pri" id="boot-retry">${ic('sync', 's')} ${tr('Try again')}</button></div>`); $('#boot-retry')?.addEventListener('click', () => location.reload()); return; }
+  try { await outOpen(); await load(); if (!S.lists.length) throw new Error('no state'); } catch (e) { bootDone(); if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = botEmpty(navigator.onLine === false ? 'offline' : 'schaut', tr('Server not reachable.'), tr('Reload the page once the server is reachable again.')).replace(/<\/div>$/, `<button type="button" class="btn pri" id="boot-retry">${ic('sync', 's')} ${tr('Try again')}</button></div>`); $('#boot-retry')?.addEventListener('click', () => location.reload()); return; }
   await i18nBoot; await i18nLoad(uiLang()); S.booted = true;
   setTimeout(msvvBoot, 0);  // 2.73.0 C (#661): the other servers (msvview.js), after the own state
   setTimeout(chatFabDraw, 0);  // 2.29.0 (#363)
@@ -61,8 +61,14 @@ function bootDone() {
     const ags = agentsOn() ? (S.agents || []).filter(a => a.enabled) : [];
     const docs = files.length && typeof dc_shareOk === 'function' && dc_shareOk();  // 2.48.0 (#1111): "File as document"
     const bmU = !files.length && feat('reading') ? shareLink(meta.text, meta.url)[0] : '';  // 2.97.0 A (#1950): a shared link -> "Save as bookmark"
-    const dest = (ags.length || docs || bmU) && (files.length || meta.text || meta.url || meta.title) ? await shareDest(ags, docs, !!bmU) : 'task';
-    if (dest === 'doc') await dc_shareFiles(files);
+    // 2.143.0 C (#2154): shared contact cards (.vcf) / calendar files (.ics) can go through the existing imports
+    const allOf = re => files.length > 0 && files.every(f => re.test(f.name || '') || re.test(f.type || ''));
+    const imp = {contacts: feat('contacts') && allOf(/\.vcf$|^text\/(x-)?vcard\b/i), calendar: feat('events') && (S.evcals || []).some(evWrite) && allOf(/\.ics$|^text\/calendar\b/i)};
+    const dest = (ags.length || docs || bmU || imp.contacts || imp.calendar) && (files.length || meta.text || meta.url || meta.title) ? await shareDest(ags, docs, !!bmU, imp) : 'task';
+    const ext = (f, e) => new RegExp(`\\.${e}$`, 'i').test(f.name || '') ? f : new File([f], (f.name || 'shared') + '.' + e, {type: f.type});  // the imports go by the ending
+    if (dest === 'contacts') { await loadModule('contacts'); for (const f of files) ctImport(null, 'vcf', ext(f, 'vcf')); }
+    else if (dest === 'calendar') { const own = (S.evcals || []).find(x => !x.org_id && x.role === 'owner'), c = own || (S.evcals || []).find(evWrite); for (const f of files) evImport(c, () => load().then(render).catch(() => {}), ext(f, 'ics')); }
+    else if (dest === 'doc') await dc_shareFiles(files);
     else if (dest === 'bookmark') await bm_shareSave(bmU, meta.title);
     else if (dest !== 'task') {
       const txt = [meta.title, meta.text, meta.url && !(meta.text || '').includes(meta.url) ? meta.url : ''].map(x => (x || '').trim()).filter(Boolean).join('\n');
@@ -123,6 +129,7 @@ function bootDone() {
     navigator.serviceWorker.addEventListener('message', swMessage);
   }
   setTimeout(wpSync, 3000);
+  pwa_boot();  // 2.143.0 C (#2153): the install hint (setcore.js)
   // v1.1: first start of a new account: "Getting started" list (server side, in the user's language), then the tour
   // 2.24.0 (UX-22): not while the first-run setup is still open (its "Start" reloads; then the list, in the chosen language,
   // and the tour follow, one after the other)
