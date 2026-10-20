@@ -152,8 +152,12 @@ def office_org(c, uid, admin=False):
         raise BadInput(tr(OFFICE_NO_ORG))
     if not oid or not role:
         raise BadInput(tr(OFFICE_NO_ORG))
-    if admin and role != "admin":
+    from ..accounts.orgroles import office_allowed
+    no = office_allowed(c, uid, oid)  # 2.143.0 A (#2151): guest none; read-only reads; accounting reads + exports
+    if admin and role != "admin" and not (role == "accounting" and no is None):  # accounting reads the admins' bookkeeping
         raise Denied(403, tr(OFFICE_ADMIN_ONLY))
+    if no:
+        raise Denied(403, tr(no))
     return oid
 
 

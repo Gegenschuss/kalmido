@@ -123,6 +123,9 @@ def fs_role(c, nid, uid=None, chain=None):
     if agent:
         role = "edit" if any(r["agent_id"] == uid for r in chain) else None
         return _best(_shares_role(c, ids, uid, True), role)
+    from ..accounts.orgroles import org_limited
+    if org and org_limited(c, uid, org):
+        return _fs_limited_role(c, uid, org, chain, ids)  # 2.143.0 A (#2151)
     if n["owner_id"] == uid:
         return "owner"
     if org:
@@ -134,6 +137,33 @@ def fs_role(c, nid, uid=None, chain=None):
         if r["org_access"] in ("view", "edit") and org:
             role = _best(r["org_access"], role)
     return _best(_shares_role(c, ids, uid, False), role)
+
+
+def _fs_docs_root(c, org):
+    from ..docs.store import doc_ws, root_id
+    return root_id(c, doc_ws(org, None))
+
+
+def _fs_limited_role(c, uid, org, chain, ids):
+    """2.143.0 A (#2151): the role of a guest / read-only / accounting person on a node of organisation org. Read-only: what
+    a member sees, at most 'view'. Guest: only their own nodes and shares. Accounting: like a guest, plus the organisation's
+    documents folder to read (receipts) and their own uploads there (the upload itself is the documents area's,
+    docs/web.py). Review: a guest / accounting person corrects and removes their own nodes ('edit'); read-only stays 'view'."""
+    from ..accounts.orgroles import org_role_key
+    rk = org_role_key(c, uid, org)
+    role = ("view" if rk == "readonly" else "edit") if chain[0]["owner_id"] == uid else None
+    if rk == "readonly":
+        for r in chain:
+            if r["org_access"] in ("view", "edit"):
+                role = "view"
+    elif rk == "accounting":
+        root = _fs_docs_root(c, org)
+        if root and any(r["id"] == root for r in chain):
+            role = _best(role, "view")  # own receipts stay 'edit' (review)
+    share = _shares_role(c, ids, uid, False)
+    if rk == "readonly" and share:
+        share = "view"
+    return _best(share, role)
 
 
 def need_node(c, nid, write=False, trash=False, manage=False):
@@ -190,11 +220,19 @@ def fs_visible_sql_c(c, uid):
         oids = ",".join(str(int(x)) for x in ctx.org_ids) or "0"
         orgs = f"n.org_id IS NULL OR n.org_id IN ({oids})"
         from ..accounts.orgs import is_org_admin
+        from ..accounts.orgroles import org_role_key
         admin = [int(o) for o in ctx.org_ids if is_org_admin(c, uid, o)]
         seed = f"n.owner_id = {uid}"
         if admin:
             seed += f" OR n.org_id IN ({','.join(map(str, admin))})"
-        seed += f" OR (n.org_access IN ('view', 'edit') AND n.org_id IN ({oids}))"
+        # 2.143.0 A (#2151): "everyone in the organisation" folders only for member / admin / read-only; accounting: the
+        # organisation's documents folder; guests: their own nodes and shares
+        rks = {int(o): org_role_key(c, uid, o) for o in ctx.org_ids}
+        full = ",".join(str(o) for o, rk in rks.items() if rk not in ("guest", "accounting")) or "0"
+        seed += f" OR (n.org_access IN ('view', 'edit') AND n.org_id IN ({full}))"
+        roots = [_fs_docs_root(c, o) for o, rk in rks.items() if rk == "accounting"]
+        if any(roots):
+            seed += f" OR n.id IN ({','.join(str(int(x)) for x in roots if x)})"
         if collab_all():
             seed += (f" OR n.id IN (SELECT node_id FROM fs_shares WHERE (user_id = {uid} OR group_id IN "
                      f"(SELECT group_id FROM group_members WHERE user_id = {uid})) AND (expires_at IS NULL OR expires_at > '{now}'))")
@@ -265,6 +303,9 @@ def _place(c, uid, parent_id, org_id, write_role=True, add_file=False):
         raise Denied(403, tr("Agents add files only in folders shared with them or in their own folder"))
     if org_id and int(org_id) not in ctx.org_ids:
         raise Denied(404)
+    if org_id:  # 2.143.0 A (#2151, review): the organisation's top level only for members / admins (receipts: docs/web.py)
+        from ..accounts.orgroles import need_org_write
+        need_org_write(c, uid, int(org_id))
     return uid, (int(org_id) if org_id else None)
 
 

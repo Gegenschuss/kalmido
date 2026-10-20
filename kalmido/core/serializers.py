@@ -204,9 +204,12 @@ def attachment_files(c, task_ids):
 
 
 def unlink_files(paths):
+    root = os.path.realpath(ATT_DIR)
     for p in paths:
         try:
             full = os.path.join(ATT_DIR, p)
+            if not os.path.realpath(full).startswith(root + os.sep):  # 2.143.0 B (#2211, review): only files under ATT_DIR
+                continue
             os.remove(full)
             d = os.path.dirname(full)
             if d != ATT_DIR and not os.listdir(d):

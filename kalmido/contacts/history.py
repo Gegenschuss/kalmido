@@ -79,7 +79,7 @@ def ctk_docs(c, uid, clients):
         if not cl:
             continue
         oid = cl["org_id"] or (pb_personal(c, uid, create=False) if cl["created_by"] == uid else None)
-        if oid and office_role(c, uid, oid):
+        if oid and office_role(c, uid, oid) and office_role(c, uid, oid) != "guest":  # 2.143.0 A (#2151, review)
             areas.setdefault(oid, set()).add(cl["id"])
     out = []
     for oid, cids in areas.items():

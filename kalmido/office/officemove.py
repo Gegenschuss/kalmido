@@ -217,9 +217,18 @@ def ofm_need(c, uid, what, ids):
     if len(areas) != 1:
         raise BadInput(tr("Choose items of one workspace"))
     area = areas.pop()
-    if not office_role(c, uid, area):
+    if not office_role(c, uid, area) or office_role(c, uid, area) == "guest":
         raise Denied(404)
     return area, rows
+
+
+def ofm_writer(c, uid, *areas):
+    """2.143.0 A (#2151, review): moving changes both offices -- 403 for guest / read-only / accounting in either of them."""
+    from ..accounts.orgroles import office_allowed
+    for a in areas:
+        no = office_allowed(c, uid, a, write=True)
+        if no:
+            raise Denied(403, tr(no))
 
 
 def ofm_rights(c, uid, what, src, dst, rows):
@@ -229,6 +238,7 @@ def ofm_rights(c, uid, what, src, dst, rows):
         raise Denied(404)
     if not rt:
         raise Denied(409, tr("You are not a member of this organisation"))
+    ofm_writer(c, uid, src, dst)
     if what in OFM_ADMIN and (rs != "admin" or rt != "admin"):
         raise Denied(403, tr(OFFICE_ADMIN_ONLY))
     if pb_owner(c, src) is None and rs != "admin" and any(r["created_by"] != uid for r in rows):
@@ -592,6 +602,7 @@ def rmv_undo_run(c, uid, mid, files):
     rt, rs = office_role(c, uid, dst), office_role(c, uid, src)
     if not rt or not rs:
         raise Denied(404)
+    ofm_writer(c, uid, src, dst)
     if what in OFM_ADMIN and (rs != "admin" or rt != "admin"):
         raise Denied(403, tr(OFFICE_ADMIN_ONLY))
     write_lock(c, f"office_move_{int(dst)}")

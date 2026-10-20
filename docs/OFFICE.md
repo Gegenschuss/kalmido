@@ -1453,6 +1453,10 @@ is one undo step); members see and open them. Each file is stored once by its co
 office folder, sealed like the stored documents, part of the backups); an older state is never overwritten, so what went
 out with a quotation stays readable.
 
+A replaced or removed state is kept for 30 days (the undo step) and then deleted from the disk, unless a document of the office
+(the trash included) names it; the current state is never touched. Quotations, invoices and sent documents keep the state they went
+out with. This applies to organisation offices and to the personal office alike.
+
 - **Finalising** a document notes the state of its language (date, SHA-256); a draft follows the current state. A
   quotation prints the line "Es gelten unsere AGB (Stand ...), siehe Anhang." / "Our terms and conditions (as of ...)
   apply, see attachment." - only when terms exist in the document's language (terms in the other language only: no line,

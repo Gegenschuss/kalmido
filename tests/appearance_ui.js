@@ -78,7 +78,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   // 2.102.0: the first window right after this suite's own container start loads its 136 start scripts in ~4 s on the
   // test VM (cold server), more than boot()'s default 2.5 s
-  let w = await boot({user: 'alice', wait: 6000}), d = w.document;
+  let w = await boot({user: 'alice', wait: 6000, ls: {'tasks.lookLocal': 'true'}})  /* 2.143.0 D (#2155): these checks are about the device keys; the account sync has its own suite (p2143_d) */, d = w.document;
   const de = d.documentElement.dataset;
   check(de.fsize === 'm' && de.font === 'geist' && de.accent === 'violet' && de.theme === 'auto' && de.density === 'compact', 'defaults: normal size, Geist, violet (2.11.0), automatic, compact');
   check(w.eval('uiZ()') === 1 && w.eval('weekH()') === 44, 'default scale 1 (week grid 44 px per hour)');
@@ -136,10 +136,10 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   check(x.fsize === 'xl' && x.font === 'system' && x.accent === 'lime' && x.theme === 'light' && x.density === 'comfortable', 'same device: restored on the next start');
   w.close();
   w = await boot({user: 'alice'}); d = w.document; x = d.documentElement.dataset;
-  check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'violet', 'other device: defaults (per device)');
+  check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'violet', 'other device: defaults (the account has no appearance yet, 2.143.0 D #2155)');
   w.close();
   // garbage in localStorage -> defaults
-  w = await boot({user: 'alice', ls: {'tasks.fsize': '"huge"', 'tasks.font': '"comic"', 'tasks.accent': '"<x>"', 'tasks.theme': '"light"'}}); d = w.document; x = d.documentElement.dataset;
+  w = await boot({user: 'alice', ls: {'tasks.lookLocal': 'true', 'tasks.fsize': '"huge"', 'tasks.font': '"comic"', 'tasks.accent': '"<x>"', 'tasks.theme': '"light"'}}); d = w.document; x = d.documentElement.dataset;
   check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'violet', 'unknown stored values fall back to the defaults');
   // reset to defaults
   w.eval(`settingsModal('look')`); await sleep(300);
@@ -181,10 +181,10 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
 
   // ---- phone + German
   await (await fetch(B + 'api/settings', {method: 'PATCH', headers: {...H, Cookie: await require('./boot').login('alice')}, body: JSON.stringify({lang: 'de'})})).text();
-  w = await boot({user: 'alice', ls: {'tasks.accent': '"amber"'}}); d = w.document;
+  w = await boot({user: 'alice', ls: {'tasks.lookLocal': 'true', 'tasks.accent': '"amber"'}}); d = w.document;
   check(d.documentElement.dataset.accent === 'orange' && w.__store['tasks.accent'] === '"orange"', 'stored "amber" (1.1.2) is migrated to "orange"');
   w.close();
-  w = await boot({user: 'alice', mobile: true, ls: {'tasks.fsize': '"xl"'}}); d = w.document;
+  w = await boot({user: 'alice', mobile: true, ls: {'tasks.lookLocal': 'true', 'tasks.fsize': '"xl"'}}); d = w.document;
   check(d.documentElement.dataset.fsize === 'xl' && d.documentElement.dataset.density === 'comfortable', 'phone: 125 % + comfortable');
   w.eval(`settingsModal('look')`); await sleep(300);
   md = d.querySelector('.modal.smodal');

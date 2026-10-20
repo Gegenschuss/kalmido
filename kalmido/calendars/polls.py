@@ -73,6 +73,9 @@ def tpo_may(c, uid, r, write=False):
     from ..accounts.orgs import is_org_admin, user_orgs
     if r["org_id"] not in user_orgs(c, uid) or not acx_org_ok(c, uid, r["org_id"]):
         return False
+    from ..accounts.orgroles import org_sees_all, org_writes
+    if not org_sees_all(c, uid, r["org_id"]) or (write and not org_writes(c, uid, r["org_id"])):
+        return False  # 2.143.0 A (#2151): guests / accounting do not see it, read-only changes nothing
     return not write or r["user_id"] == uid or is_org_admin(c, uid, r["org_id"])
 
 
@@ -100,6 +103,8 @@ def tpo_space(c, uid, v):
     from ..accounts.orgs import user_orgs
     if oid not in user_orgs(c, uid):
         raise Denied(404)
+    from ..accounts.orgroles import need_org_area
+    need_org_area(c, uid, oid)  # 2.143.0 A (#2151)
     return oid
 
 
@@ -306,7 +311,8 @@ def tpo_list():
     tpo_gate()
     c, uid, a = db(), me(), request.args
     from ..accounts.orgs import user_orgs
-    orgs = [o for o in user_orgs(c, uid) if acx_org_ok(c, uid, o)]
+    from ..accounts.orgroles import user_orgs_full
+    orgs = [o for o in user_orgs(c, uid) if acx_org_ok(c, uid, o) and o in user_orgs_full(c, uid)]  # 2.143.0 A (#2151)
     sp = a.get("space") or "all"
     if sp == "private":
         orgs = []

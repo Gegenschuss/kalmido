@@ -228,7 +228,7 @@ def grp_oidc_sync(c, uid, claim_groups):
 def grp_visible(c, r):
     """2.30.0 (#1036, B1): in the mode workspaces a group is visible to its creator, its members and the members of the
     organisations its members belong to -- not to somebody who only knows one member privately."""
-    from ..accounts.orgs import instance_mode, user_orgs
+    from ..accounts.orgs import instance_mode
     if instance_mode(c) != "workspaces" or not has_request_context() or getattr(g, "user", None) is None:
         return True
     uid = me()
@@ -237,7 +237,8 @@ def grp_visible(c, r):
     mem = grp_members(c, r["id"])
     if uid in mem:
         return True
-    mine = user_orgs(c, uid)
+    from ..accounts.orgroles import user_orgs_full
+    mine = user_orgs_full(c, uid)  # 2.143.0 A (#2151, review): not through an organisation where uid is guest / accounting
     if not mine or not mem:
         return False
     return bool(c.execute(f"SELECT 1 FROM org_members WHERE org_id IN ({','.join('?' * len(mine))}) AND user_id IN ({','.join('?' * len(mem))}) LIMIT 1",

@@ -216,7 +216,7 @@ function entryModal(e, preset = {}) {
       body.start = iso(tm.start); if (!run) body.end = iso(tm.end);
     }
     let j;
-    try { j = e ? await api('PATCH', `/api/time/entries/${e.id || 0}`, body) : await api('POST', '/api/time/entries', {...target, ...body}); } catch { return; }
+    try { j = e ? await api('PATCH', `/api/time/entries/${e.id || 0}`, body) : await api('POST', '/api/time/entries', {...target, ...body, client_id: newCid()}); } catch { return; }  // 2.143.0 C (#2153): sent again from the outbox = one entry
     md.remove();
     toast(j.queued ? tr('Will be sent as soon as the server is reachable') : e ? tr('Saved') : tr('Time added: {0}', hmm(j.seconds)));
     await timeChanged(j);
@@ -233,7 +233,7 @@ async function teDelete(id) {
   await timeChanged(r);
   if (e.end) {
     const x = histAdd({label: tr('Time entry deleted ({0})', hmm(e.seconds)), res: r, lids: e.list_id ? [e.list_id] : [],
-      undo: async h => { const j = await api('POST', '/api/time/entries', back); h.eid = j?.id; await timeChanged(j); return {q: j?._q || null}; },
+      undo: async h => { const j = await api('POST', '/api/time/entries', {...back, client_id: newCid()}); h.eid = j?.id; await timeChanged(j); return {q: j?._q || null}; },
       redo: async h => { if (!h.eid) return {skipped: [tr('Time entry')], none: true}; const j = await api('DELETE', `/api/time/entries/${h.eid}`); await timeChanged(j); return {q: j?._q || null}; }});
     offerUndo(tr('Time entry deleted ({0})', hmm(e.seconds)), x);
   }

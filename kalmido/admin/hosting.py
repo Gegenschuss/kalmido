@@ -393,6 +393,43 @@ def user_storage(c, uid):
     return {"used": _user_bytes(c, [uid]), "quota_mb": r[0] if r else None}
 
 
+def org_activity(c):
+    """2.143.0 D (#2156): per organisation numbers only (members, last sign-in date, bytes, lists, tasks) + one row "private"
+    for the people without an organisation. No names of people, no contents."""
+    from ..core.pg import system_ctx
+    one = lambda q, a=(): c.execute(q, a).fetchone()[0]
+    def row(uids, org_id):
+        if not uids:
+            return {"members": 0, "last_login": None, "storage_bytes": 0, "lists": 0, "tasks": 0}
+        q = ",".join("?" * len(uids))
+        last = one(f"SELECT MAX(COALESCE(NULLIF(last_seen_at, ''), created_at)) FROM sessions WHERE user_id IN ({q})", list(uids))
+        if org_id:
+            lw, a = "l.org_id=?", [org_id]
+        else:  # private spaces: lists of these people outside every organisation
+            lw, a = f"l.org_id IS NULL AND l.owner_id IN ({q})", list(uids)
+        return {"members": len(uids), "last_login": (last or "")[:10] or None, "storage_bytes": _user_bytes(c, list(uids)),
+                "lists": one(f"SELECT COUNT(*) FROM lists l WHERE {lw}", a),
+                "tasks": one(f"SELECT COUNT(*) FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.deleted_at IS NULL AND {lw}", a)}
+    out = []
+    with system_ctx(c):
+        orgs = c.execute("SELECT id, name FROM orgs WHERE personal_of IS NULL ORDER BY id").fetchall()
+        in_org = set()
+        for o in orgs:
+            uids = [r[0] for r in c.execute("SELECT user_id FROM org_members WHERE org_id=?", (o["id"],))]
+            in_org.update(uids)
+            out.append({"id": o["id"], "name": o["name"], **row(uids, o["id"])})
+        free = [r[0] for r in c.execute("SELECT id FROM users WHERE disabled=0") if r[0] not in in_org]
+        private = {"members": 0, **row(free, 0)}
+    return {"orgs": out, "private": private}
+
+
+@app.get("/api/admin/orgs/activity")
+def admin_orgs_activity():
+    from ..accounts.users import need_admin
+    need_admin()
+    return jsonify(org_activity(db()))
+
+
 @app.get("/api/v1/me/storage")
 @v1_view
 def v1_my_storage():

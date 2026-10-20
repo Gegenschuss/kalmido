@@ -33,7 +33,7 @@ KINDS = {
     "files": ("matrix", SUITE + ", p21121_a_api_test.py, p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
                          "file requests of a private folder, tags of files / folders, the tag filter, the documents' filters, bulk change, ZIP, CSV, documents via the API (2.122.0)"),
     "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private space (create, change, search, export, trash; "
-                       "2.99.0: page files, ZIP import with PDFs / pictures; 2.123.0: p2123_b_api_test.py shares of pages / folders, p2123_a_api_test.py page history, text search)"),
+                       "2.99.0: page files, ZIP import with PDFs / pictures; 2.123.0: p2123_b_api_test.py shares of pages / folders, p2123_a_api_test.py page history, text search; 2.143.0: p2143_b_api_test.py the trash, delete for good, empty)"),
     "pim": ("matrix", SUITE + ", p294_b_api_test.py, p21191_a_api_test.py, p2111_b_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password; "
                     "invitation mails and the subscription link of an own calendar (2.111.0)"),
     "time": ("matrix", SUITE + ", p2116_d_api_test.py: time entries, the timer, habits; focus sessions and habit statistics over the API v1 (2.116.0)"),
@@ -87,14 +87,18 @@ ROUTES = {
     "GET /api/admin/health": "admin",  # 2.102.0 D (#1994): the server's capacity numbers
     "GET /api/admin/lists/orphaned": "admin", "GET /api/admin/orgcrypt": "admin", "GET /api/admin/related": "admin",
     "GET /api/admin/storage-check": "admin", "GET /api/admin/upload-scan": "admin",
-    "GET /api/v1/admin/agents/{}/audit": "admin", "GET /api/v1/admin/status": "admin", "GET /api/v1/admin/users": "admin",
+    "GET /api/v1/admin/agents/{}/audit": "admin", "GET /api/v1/admin/status": "admin", "GET /api/v1/admin/orgs/activity": "admin", "GET /api/admin/orgs/activity": "admin", "GET /api/v1/admin/users": "admin",
     "PATCH /api/admin/agents/{}": "admin", "PATCH /api/admin/alerts": "admin", "PATCH /api/admin/backups": "admin",
     "PATCH /api/admin/groups/{}": "admin", "PATCH /api/admin/settings": "admin", "POST /api/admin/agents": "admin",
     "POST /api/admin/agents/{}/avatar": "admin", "POST /api/admin/agents/{}/reset": "admin",
     "POST /api/admin/agents/{}/secret": "admin", "POST /api/admin/agents/{}/setup-code": "admin",
     "POST /api/admin/agents/{}/test": "admin", "POST /api/admin/agents/{}/token": "admin",
     "POST /api/admin/alerts/test": "admin", "POST /api/admin/backups": "admin", "POST /api/admin/backups/restore": "admin",
-    "POST /api/admin/backups/upload": "admin", "POST /api/admin/backups/{}/verify": "admin", "POST /api/admin/groups": "admin",
+    "POST /api/admin/backups/upload": "admin",
+    # 2.143.0 B (#2152): the off-site target is a setting of the server (its operator), not of a workspace
+    "GET /api/admin/backups/offsite": "admin", "PATCH /api/admin/backups/offsite": "admin",
+    "POST /api/admin/backups/offsite/test": "admin", "POST /api/admin/backups/offsite/upload": "admin",
+    "POST /api/admin/backups/{}/verify": "admin", "POST /api/admin/groups": "admin",
     "POST /api/admin/groups/{}/avatar": "admin", "POST /api/admin/mail/poll": "admin", "POST /api/admin/oidc/check": "admin",
     "POST /api/admin/setup": "admin", "PUT /api/admin/agent-policy": "admin", "PUT /api/admin/announcement": "admin",
     "PUT /api/admin/groups/{}/avatar": "admin", "PUT /api/admin/oidc": "admin", "PUT /api/admin/orgcrypt": "admin",
@@ -730,6 +734,8 @@ ROUTES = {
     # 2.96.0 B (#1941): wiki pages / folders to the other workspace
     "POST /api/wiki/move-space": "wiki",
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
+    # 2.143.0 B (#2211): the trash of the private space (p2143_b_api_test.py)
+    "GET /api/wiki/trash": "wiki", "POST /api/wiki/purge": "wiki",
     # 2.123.0 C (#2103, #2107): files of the file store / tables in pages (p2123_c_api_test.py: own private file store and tables)
     "POST /api/wiki/pages/{}/refs": "wiki", "GET /api/wiki/refs": "wiki",
     # 2.97.0 D (#2050 #2051): locked spaces / clean-up (p297_d_api_test.py) - routes below this line

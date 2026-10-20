@@ -3,7 +3,12 @@
    An organisation's admin invites an address (role member / admin): a new account gets the invitation mail (or the link to
    copy), an address with an account is added as before. The open invitations of the organisation (accounts it invited that
    never signed in) with "Resend" and "Withdraw" (deletes that account). Inviting and withdrawing are one undo step each. */
-const oinvRoleSel = (id, cur = 'member') => `<select id="${id}" aria-label="${esc(tr('Role'))}"><option value="member" ${cur !== 'admin' ? 'selected' : ''}>${tr('Member')}</option><option value="admin" ${cur === 'admin' ? 'selected' : ''}>${tr('Admin')}</option></select>`;
+// 2.143.0 A (#2151): every organisation role (server: accounts/orgroles.py); hints = GET /api/orgs roles [{key, label, hint}]
+const oinvRoleSel = (id, cur = 'member', hints = [], attrs = '') => `<select ${id ? `id="${id}" ` : ''}class="orgrolesel" ${attrs || `aria-label="${esc(tr('Role'))}"`}>${['member', 'admin', 'readonly', 'accounting', 'guest'].map(k =>
+  `<option value="${k}" ${k === (cur || 'member') ? 'selected' : ''} title="${esc((hints.find(x => x.key === k) || {}).hint || '')}">${esc(oinvRoleSel.label(k))}</option>`).join('')}</select>`;
+oinvRoleSel.label = r => ({admin: tr('Admin'), readonly: tr('Read-only'), accounting: tr('Accounting'), guest: tr('Guest')})[r] || tr('Member');
+// the short explanation of each role (a closed details block next to the role pickers)
+oinvRoleSel.help = (hints = []) => hints.length ? `<details class="orgrolehelp"><summary class="muted">${tr('What the roles mean')}</summary><ul class="shint">${hints.map(h => `<li><b>${esc(h.label)}</b>: ${esc(h.hint)}</li>`).join('')}</ul></details>` : '';
 // called by wsPaneDraw (account.js): each organisation I administer gets the button + its open invitations
 async function oinvDraw(box) {
   for (const det of $$('.wsorg[data-oid]', box)) {
@@ -15,7 +20,7 @@ async function oinvDraw(box) {
     const add = $('.wsadd', det);
     const html = `<div class="oinvbox"><div class="row"><button type="button" class="btn sm" data-oinv="new">${ic('send', 's')} ${tr('Invite by e-mail')}</button></div>
       ${j.invites.length ? `<div class="shint">${tr('Open invitations')}</div><div class="members">${j.invites.map(v => `<div class="mrow oinvrow" data-oinvu="${v.user_id}"><span class="avatar">${ic('mail', 's')}</span>
-        <span class="n"><b>${esc(v.email || v.name)}</b><small class="muted">${esc([v.role === 'admin' ? tr('Admin') : tr('Member'), v.state === 'invited' ? tr('Invited') : tr('Invitation expired'), fmtWhen(v.created_at)].join(' · '))}</small></span>
+        <span class="n"><b>${esc(v.email || v.name)}</b><small class="muted">${esc([oinvRoleSel.label(v.role), v.state === 'invited' ? tr('Invited') : tr('Invitation expired'), fmtWhen(v.created_at)].join(' · '))}</small></span>
         <button type="button" class="btn sm" data-oinv="resend">${tr('Resend')}</button><button type="button" class="btn sm" data-oinv="withdraw">${tr('Withdraw')}</button></div>`).join('')}</div>` : ''}</div>`;
     if (add) add.insertAdjacentHTML('afterend', html); else det.insertAdjacentHTML('beforeend', html);
   }
@@ -27,14 +32,16 @@ async function oinvSend(oid, email, role) {
   else toast(tr('If this address has an account, the person is now a member.'));
   return r;
 }
-function oinvDialog(oid) {
+function oinvDialog(oid, hints = []) {
   /** @type {any} */
   const md = modal(`<h3>${ic('send', 's')} ${tr('Invite by e-mail')}</h3><form class="oinvform">
     <div class="row"><label for="oinv-mail">${tr('E-mail')}</label><input id="oinv-mail" type="email" required maxlength="200" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="send"></div>
-    <div class="row"><label for="oinv-role">${tr('Role')}</label>${oinvRoleSel('oinv-role')}</div>
+    <div class="row"><label for="oinv-role">${tr('Role')}</label>${oinvRoleSel('oinv-role', 'member', hints)}</div>
+    <div class="shint oinvrolehint">${esc((hints.find(x => x.key === 'member') || {}).hint || '')}</div>
     <div class="shint">${tr('Without an account, a new one is created in this organisation and the person gets an e-mail to choose a password. With an account, the person is added.')}</div>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" type="submit">${tr('Invite')}</button></div></form>`);
   md.addEventListener('click', e => { if (/** @type {any} */ (e.target).closest('[data-m="close"]')) md.remove(); });
+  $('#oinv-role', md).addEventListener('change', e => { $('.oinvrolehint', md).textContent = (hints.find(x => x.key === /** @type {any} */ (e.target).value) || {}).hint || ''; });  // 2.143.0 A (#2151)
   md.querySelector('form').addEventListener('submit', async e => {
     e.preventDefault();
     const email = $('#oinv-mail', md).value.trim(), role = $('#oinv-role', md).value, sb = md.querySelector('[type=submit]');
@@ -56,7 +63,9 @@ function oinvDialog(oid) {
 document.addEventListener('click', async e => {
   const b = /** @type {any} */ (e.target).closest?.('[data-oinv]'); if (!b) return;
   const oid = +b.closest('[data-oid]')?.dataset.oid; if (!oid) return;
-  if (b.dataset.oinv === 'new') { oinvDialog(oid); return; }
+  if (b.dataset.oinv === 'new') {  // 2.143.0 A (#2151): with the role explanations of GET /api/orgs (wsPaneDraw keeps it)
+    const o = (($('#s-ws')?._j || {}).orgs || []).find(x => x.id === oid); oinvDialog(oid, o?.roles || []); return;
+  }
   const row = b.closest('[data-oinvu]'), uid = +row?.dataset.oinvu; if (!uid) return;
   const who = $('b', row)?.textContent || '';
   b.disabled = true;

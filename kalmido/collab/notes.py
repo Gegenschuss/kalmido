@@ -3,7 +3,7 @@ import re
 from flask import jsonify, request, Response
 
 from ..core.config import app
-from ..core.pg import insert_id
+from ..core.pg import IntegrityError, insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..accounts.session import me
@@ -126,15 +126,30 @@ def notes_of_list(lid):
 
 @app.post("/api/lists/<int:lid>/notes")
 def note_create(lid):
-    """{title, body?, tags?, pinned?} -- a new note in the list (owner, admins, members)."""
+    """{title, body?, tags?, pinned?, client_ref?} -- a new note in the list (owner, admins, members)."""
     c = db()
     note_role(c, lid, write=True)
-    f = note_fields(body())
+    b = body()
+    ts, uid = iso(now_utc()), me()
+    ref = str(b.get("client_ref") or "")[:64] or None  # 2.143.0 C (#2153): sent again from the offline outbox = the same note
+    # 2.143.0 C2 (#2153): only a note of this list counts as the same one
+    same = "SELECT * FROM notes WHERE created_by=? AND client_ref=? AND list_id=?"
+    if ref:
+        r = c.execute(same, (uid, ref, lid)).fetchone()
+        if r:
+            return jsonify(note_dict(r)), 200
+    f = note_fields(b)
     from .liste2e import le2e_guard
     le2e_guard(c, lid, {"note_title": f["title"], "note_body": f.get("body", "")})  # 2.64.1 (#1817)
-    ts, uid = iso(now_utc()), me()
-    nid = insert_id(c, "INSERT INTO notes(list_id,title,body,tags,pinned,created_by,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
-                    (lid, f["title"], f.get("body", ""), f.get("tags", ""), f.get("pinned", 0), uid, uid, ts, ts))
+    try:
+        with c.savepoint():
+            nid = insert_id(c, "INSERT INTO notes(list_id,title,body,tags,pinned,created_by,updated_by,created_at,updated_at,client_ref) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                            (lid, f["title"], f.get("body", ""), f.get("tags", ""), f.get("pinned", 0), uid, uid, ts, ts, ref))
+    except IntegrityError:  # 2.143.0 C2 (#2153): the same ref sent twice at once (tab + service worker): the first one wins
+        r = c.execute(same, (uid, ref, lid)).fetchone() if ref else None
+        if not r:
+            raise
+        return jsonify(note_dict(r)), 200
     bump(c)
     c.commit()
     r = c.execute("SELECT * FROM notes WHERE id=?", (nid,)).fetchone()
