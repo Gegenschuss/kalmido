@@ -155,6 +155,8 @@ _spec.loader.exec_module(KX)
 SKIP_KEYS = re.compile(r"^(id|.*_id|.*_by|.*_at|org_id|owner_id|user_id|a|b|ws|uid|href|tt_id|path|sort|email_hash|token|"
                        r"trig_val|act_val|rule|files|data|review|res_label|personal_of|list_name|icon|name_key|log|"
                        r"reply_to|last_at|synced_at|updated|created|changed|added|at|day_key|enc_by|kenc|fetched)$")
+SKIP_IN = {"newsletter/connection.json": ("auto", "error")}  # on purpose: no automatic sync until connected again
+DEPENDS = {"hub/bookings.json": "office/equipment.json"}  # bookings of equipment come with part A (office)
 SKIP_ENTRIES = {"manifest.json", "organisation.json", "members.json"}
 
 
@@ -168,11 +170,11 @@ def open_archive(ox, rk):
             return zipfile.ZipFile(io.BytesIO(f.read()))
 
 
-def norm_rows(rows):
+def norm_rows(rows, skip=()):
     out = collections.Counter()
     for r in rows:
         if isinstance(r, dict):
-            out[json.dumps({k: v for k, v in r.items() if not SKIP_KEYS.match(k)}, sort_keys=True, ensure_ascii=False, default=str)] += 1
+            out[json.dumps({k: v for k, v in r.items() if not SKIP_KEYS.match(k) and k not in skip}, sort_keys=True, ensure_ascii=False, default=str)] += 1
     return out
 
 
@@ -184,10 +186,17 @@ def norm_archive(zf):
             continue
         raw = zf.read(n)
         if n.endswith(".json") and not n.startswith("files/"):
-            rows[n] = norm_rows(json.loads(raw.decode("utf-8")))
+            rows[n] = norm_rows(json.loads(raw.decode("utf-8")), SKIP_IN.get(n, ()))
         else:
             files[n.rsplit("/", 1)[0]][hashlib.sha256(raw).hexdigest()] += 1
     return rows, files
+
+
+def norm_archive_count(zf, entry):
+    try:
+        return len(json.loads(zf.read(entry).decode("utf-8")))
+    except KeyError:
+        return 0
 
 
 def compare(z1, z2):
@@ -253,6 +262,7 @@ LO = ok(A.post(B + "/api/lists", json={"name": "Alpha Projekt", "org_id": ORG}),
 LO2 = ok(A.post(B + "/api/lists", json={"name": "Alpha Zweitliste", "org_id": ORG}), "second org list")["id"]
 for u in (BOB, DORA):
     ok(A.put(B + f"/api/lists/{LO}/members", json={"user_id": u, "role": "edit"}), "share the list")
+ok(A.patch(B + f"/api/lists/{LO}", json={"kind": "project", "time_tracking": True}), "a project with time tracking")
 SEC = ok(A.post(B + "/api/sections", json={"list_id": LO, "name": "Doing"}), "a section")["id"]
 TO = ok(A.post(B + "/api/tasks", json={"title": "Dreh vorbereiten", "list_id": LO}), "task")["id"]
 ok(A.patch(B + f"/api/tasks/{TO}", json={"people": [BOB]}), "bob comes along to the task")
@@ -371,7 +381,7 @@ check(NL and NT, "list and task are in the new organisation")
 NR = one("SELECT id FROM tchat_rooms WHERE kind='list' AND list_id=?", (NL,))
 msgs = dbx("SELECT id, user_id, body, reply_to FROM tchat_msgs WHERE room_id=? ORDER BY id", (NR,))
 check(len(msgs) == 3, f"the three messages came along {len(msgs)}")
-by = {x["body"]: x for x in msgs}
+by = {x["body"]: dict(x) for x in msgs}
 check(by.get("Start um neun", {}).get("user_id") == ALICE and by.get("Passt", {}).get("user_id") == BOB, "authors: alice + bob (ticked)")
 check(by.get("Ich komme später", {}).get("user_id") is None, "dora (not ticked): the message stays without author")
 check(by.get("Passt", {}).get("reply_to") == by.get("Start um neun", {}).get("id"), "the answer points at the new message")
@@ -404,7 +414,7 @@ check(len(NTK) == 1 and NTK[0]["email_hash"] == EHASH and NTK[0]["form_id"] == (
       "the customer report: same reporter, the new form")
 check(one("SELECT COUNT(*) FROM form_entries WHERE form_id=?", (NF[0]["id"] if NF else 0,)) == 1, "the form entry came along")
 # rules: bob's maps, dora's is paused
-rl = {x["name"]: x for x in dbx("SELECT name, active, paused_reason, act_val, trig_val FROM list_rules WHERE list_id=?", (NL,))}
+rl = {x["name"]: dict(x) for x in dbx("SELECT name, active, paused_reason, act_val, trig_val FROM list_rules WHERE list_id=?", (NL,))}
 NSEC = one("SELECT id FROM sections WHERE list_id=? AND name='Doing'", (NL,))
 check(rl.get("Bob übernimmt", {}).get("active") == 1 and json.loads(rl["Bob übernimmt"]["act_val"]).get("user_id") == BOB
       and rl["Bob übernimmt"]["trig_val"] == str(NSEC), f"bob's rule maps column + person {rl.get('Bob übernimmt')}")
@@ -436,42 +446,38 @@ check(T("SELECT color, hub_leave_approval FROM orgs WHERE id=?", (ORG3,)) == [("
 check(one("SELECT COUNT(*) FROM tchat_msgs WHERE room_id=?", (RID,)) == 3, "the source organisation's chat stays as it was")
 check(Do.get(B + f"/api/team/rooms/{NR}/messages").status_code in (403, 404), "dora (not in the new organisation) cannot read its chat")
 
-# ---------------------------------------------------------------- the round trip
-OX2, RK3 = export(A, ORG3)
-Z1, Z2 = open_archive(OX1, RK1), open_archive(OX2, RK3)
-diffs = compare(Z1, Z2)
-strict = bool(os.environ.get("P2137C_STRICT"))
-for n, t in diffs:
-    mine = n.startswith(MINE)
-    print(("ROUNDTRIP " if mine or strict else "ROUNDTRIP-OTHER ") + n + ": " + t, flush=True)
-# rows of people who were not ticked (dora) are left out on purpose: compared with an import where everyone is ticked below
-part = [(n, t) for n, t in diffs if n.startswith(MINE)]
-print(f"round trip (dora not ticked): {len(diffs)} differences, {len(part)} in this part's entries", flush=True)
+# ---------------------------------------------------------------- undo of this import
+r = A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
+check(r.ok, f"undo {r.text[:160]}")
+for t in ("hub_absences", "hub_bookings", "hub_leave_quota", "hub_mails", "nl_conns", "nl_segments", "time_sheets"):
+    check(one(f"SELECT COUNT(*) FROM {t} WHERE org_id=?", (ORG3,)) == 0, f"undo removed {t}")
+check(not dbx("SELECT 1 FROM lists WHERE org_id=?", (ORG3,)), "undo removed the lists (and with them chat, forms, notes ...)")
+check(one("SELECT COUNT(*) FROM hub_absences WHERE org_id=?", (ORG,)) == 2, "the source organisation's rows stay")
 
-# a second import with everyone ticked: then the round trip must be equal
+# ---------------------------------------------------------------- the round trip: everyone ticked
+# (one server: the tasks of an import that is still there are not imported twice, a timesheet is one per person and month --
+# so the first import is undone above and the source's timesheets are removed like on a move to another server)
+dbx("DELETE FROM time_sheets WHERE org_id=?", (ORG,))
 r = A.post(B + "/api/admin/orgs", json={"name": "Delta Leer", "admin_id": ALICE})
 ORG4 = r.json().get("id") if r.status_code == 201 else 0
 iid4, _pv = opened(A, OX1, RK1)
 j = run(A, iid4, ORG4, people={EH("bob@example.com"): {"share": True}, EH("dora@example.com"): {"share": True}})
 check(j.get("state") == "done", f"import with everyone ticked done {j.get('error')}")
 OX4, RK4 = export(A, ORG4)
-diffs = compare(Z1, open_archive(OX4, RK4))
-bad = []
+strict = bool(os.environ.get("P2137C_STRICT"))
+Z1, Z4 = open_archive(OX1, RK1), open_archive(OX4, RK4)
+diffs = compare(Z1, Z4)
+bad, other = [], []
 for n, t in diffs:
-    mine = n.startswith(MINE)
-    print(("ROUNDTRIP " if mine or strict else "ROUNDTRIP-OTHER ") + n + ": " + t, flush=True)
-    if mine or strict:
-        bad.append(f"{n}: {t}")
+    dep = DEPENDS.get(n)
+    later = dep and norm_archive_count(Z1, dep) and not norm_archive_count(Z4, dep)  # its rows point at a part not merged yet
+    (bad if n.startswith(MINE) and not later or strict else other).append(f"{n}: {t}")
 check(not bad, "round trip: every entry equal after export -> import -> export: " + "; ".join(bad)[:1500])
-print(f"round trip (everyone ticked): {len(diffs)} differences, {len(bad)} counted", flush=True)
-
-# ---------------------------------------------------------------- undo
+for x in other:  # parts A / B (not counted until P2137C_STRICT=1)
+    print("FAIL? not counted (other part): ROUNDTRIP " + x[:400], flush=True)
+print(f"round trip: {len(diffs)} differences, {len(bad)} counted", flush=True)
 r = A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
-check(r.ok, f"undo {r.text[:160]}")
-for t in ("hub_absences", "hub_bookings", "hub_leave_quota", "hub_mails", "nl_conns", "nl_segments", "time_sheets"):
-    check(one(f"SELECT COUNT(*) FROM {t} WHERE org_id=?", (ORG4,)) == 0, f"undo removed {t}")
-check(not dbx("SELECT 1 FROM lists WHERE org_id=?", (ORG4,)), "undo removed the lists (and with them chat, forms, notes ...)")
-check(one("SELECT COUNT(*) FROM hub_absences WHERE org_id=?", (ORG3,)) == 1, "the other import stays")
+check(r.ok and not dbx("SELECT 1 FROM lists WHERE org_id=?", (ORG4,)), f"undo of the round trip import {r.text[:160]}")
 
 # ---------------------------------------------------------------- into the private space: only alice's own rows
 iid, _pv = opened(A, OX1, RK1)
