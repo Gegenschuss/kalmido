@@ -455,7 +455,8 @@ ROUTES = {
     "GET /api/family/deadline-types": "personal", "GET /api/family/kids": "personal", "GET /api/family/packing": "personal",
     "GET /api/feeds": "personal", "GET /api/feeds/items": "personal", "GET /api/feeds/opml": "personal",
     "GET /api/life": "personal", "GET /api/life/karakeep": "personal", "GET /api/life/karakeep/lists": "personal",
-    "GET /api/life/review": "personal", "GET /api/life/upkeep-presets": "personal", "GET /api/servers": "personal",
+    "GET /api/life/review": "personal", "GET /api/life/journal": "personal", "GET /api/life/journal/stats": "personal", "GET /api/life/journal/export": "personal",  # 2.140.0 C (#2133)
+     "GET /api/life/upkeep-presets": "personal", "GET /api/servers": "personal",
     "GET /api/servers/{}/data": "personal", "GET /api/servers/{}/events": "personal", "GET /api/servers/{}/news": "personal",
     "GET /api/servers/{}/search": "personal", "GET /api/servers/{}/tasks/{}": "personal", "GET /api/supporter": "personal",
     "GET /api/v1/family": "personal", "GET /api/v1/family/deadline-types": "personal", "GET /api/v1/family/kids": "personal",

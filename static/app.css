@@ -802,6 +802,13 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .trow.dropafter{box-shadow:inset 0 -2px 0 var(--accent)}
 
 /* ---------- habits: notes + per week ---------- */
+/* 2.140.0 C (#2135): week progress segments + several reminder times */
+.hprog{display:flex;gap:.1875rem;margin-top:.3125rem;max-width:11rem}
+.hprog i{flex:1;height:.4375rem;border-radius:99px;background:var(--bg4)}
+.hprog i.on{background:var(--hc)}
+.hprog.hit i.on{box-shadow:0 0 0 1px var(--hc)}
+.hrems{display:flex;flex-wrap:wrap;gap:.375rem;align-items:center}
+@media (max-width:899px){.hprog{max-width:none}.hprog i{height:.5rem}}
 .hc.noted::after,.heat div.d.noted::after{content:'';position:absolute;right:2px;bottom:2px;width:.3125rem;height:.3125rem;border-radius:50%;background:var(--p3)}
 .heat div.d{position:relative}
 .heat div.d.selday{outline:2px solid var(--accent);outline-offset:-2px}
@@ -4398,6 +4405,25 @@ button.lkchip:hover{border-color:var(--accent)}
 .rvjdays button.has{border-color:var(--accent)}
 .rvjdays button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .rvjdays button:disabled{opacity:.45;cursor:default}
+/* 2.140.0 C (#2133): journal history, search, mood statistics */
+.jhsearch input{width:100%;margin:0 0 .5rem}
+.jhmoods{display:flex;flex-wrap:wrap;gap:.25rem;margin:0 0 .5rem}
+.jhrange{display:flex;flex-wrap:wrap;gap:.75rem;margin:0 0 .5rem;color:var(--muted);font-size:var(--fs-s)}
+.jhlist{list-style:none;margin:0 0 .5rem;padding:0}
+.jhrow{display:flex;flex-direction:column;align-items:stretch;gap:.125rem;width:100%;text-align:left;padding:.5rem .25rem;border-bottom:1px solid var(--line);color:var(--text)}
+.jhrow:hover{background:var(--bg2)}
+.jhd{display:flex;gap:.5rem;align-items:center}
+.jhtx{color:var(--muted);font-size:var(--fs-s);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.jhtx mark{background:transparent;color:var(--accent);font-weight:600}
+.jhbars{display:grid;gap:.25rem;margin:.5rem 0}
+.jhbar{display:grid;grid-template-columns:1.5rem minmax(0,1fr) 2rem;align-items:center;gap:.5rem}
+.jhtrack{height:.5rem;border-radius:62.5rem;background:var(--bg4);overflow:hidden}
+.jhtrack i{display:block;height:100%;background:var(--accent);border-radius:62.5rem}
+.jhavg{margin:.5rem 0 0;font-size:var(--fs-l)}
+.jhlab{margin:.5rem 0 .125rem}
+.jhline{width:100%;height:6rem;display:block}
+.jhline polyline{stroke:var(--accent);stroke-width:2}
+.jhline circle{fill:var(--accent)}
 @media (pointer:coarse){
   .lcare .btn,.lcard .fcfoot .btn,.lpre .tagchip,.rvjdays button,.lmore>summary,.lacts .btn{min-height:2.75rem}
 }

@@ -408,6 +408,7 @@ def openapi_spec():
         "Habit": {"type": "object", "properties": {
             "id": {"type": "integer"}, "name": {"type": "string"}, "color": {"type": "string"}, "goal": {"type": "integer"},
             "days": {"type": "string", "description": "Weekdays 1 (Mon) - 7 (Sun)"}, "per_week": {"type": "integer"}, "archived": {"type": "boolean"},
+            "remind_at": {"type": "string"}, "remind_times": {"type": "array", "items": {"type": "string"}, "description": "Reminder times HH:MM (up to 6)"},
             "today": {"type": "integer"}, "last_30_days": {"type": "object", "additionalProperties": {"type": "integer"}}}},
         "HabitCheckedIn": {"allOf": [ref("Habit"), {"type": "object", "properties": {"date": date_s, "count": {"type": "integer"}}}]},
         "CheckinInput": {"type": "object", "additionalProperties": False, "properties": {

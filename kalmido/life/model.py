@@ -577,6 +577,111 @@ def journal_set(c, uid, day, b):
     return {"day": day, "text": text, "mood": mood}
 
 
+# 2.140.0 C (#2133): history, search, export and mood statistics of the journal (stored as plain text in table journal,
+# private per person: every query is filtered by user_id, nothing is cached on the server)
+JOURNAL_PAGE = 30
+JOURNAL_STAT_DAYS = (30, 90, 365)
+
+
+def _journal_ok(c, uid):
+    need_life(c, uid, "review")
+    if health_hidden(c, uid):
+        raise Denied(403)
+
+
+def _journal_where(uid, q=None, mood=None, lo=None, hi=None, before=None):
+    where, args = ["user_id=?"], [uid]
+    if lo:
+        where.append("day>=?"), args.append(lo)
+    if hi:
+        where.append("day<=?"), args.append(hi)
+    if before:
+        where.append("day<?"), args.append(before)
+    if mood:
+        where.append("mood=?"), args.append(mood)
+    if q:
+        like = "%" + q.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        where.append("LOWER(text) LIKE ? ESCAPE '\\'"), args.append(like)
+    return " AND ".join(where), args
+
+
+def _journal_args(b):
+    """The common filters of the list + export: q (text), mood (1..5), from / to (dates), before (cursor)."""
+    out = {}
+    q = (b.get("q") or "").strip()
+    if q:
+        out["q"] = q[:200]
+    if b.get("mood") not in (None, ""):
+        out["mood"] = as_int(b["mood"], "mood", 1, 5)
+    for k, dst in (("from", "lo"), ("to", "hi"), ("before", "before")):
+        if b.get(k):
+            if not valid_date(b[k]):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[dst] = b[k]
+    return out
+
+
+def journal_list(c, uid, b):
+    """{entries: [{day, text, mood}] newest first, next: cursor day or null}: ?q= ?mood= ?from= ?to= ?before= ?limit=."""
+    _journal_ok(c, uid)
+    f = _journal_args(b)
+    lim = as_int(b.get("limit") or JOURNAL_PAGE, "limit", 1, 100)
+    where, args = _journal_where(uid, **f)
+    rows = c.execute(f"SELECT day, text, mood FROM journal WHERE {where} ORDER BY day DESC LIMIT ?", (*args, lim + 1)).fetchall()
+    ent = [{"day": r["day"], "text": r["text"], "mood": r["mood"]} for r in rows[:lim]]
+    return {"entries": ent, "next": ent[-1]["day"] if len(rows) > lim else None}
+
+
+def journal_stats(c, uid, days):
+    """{days, written, rated, avg, dist: {1..5: n}, series: [{from, avg, n}]}: the mood of the last 30 / 90 / 365 days, the
+    series per week (30 / 90 days) or per month (365)."""
+    _journal_ok(c, uid)
+    if days not in JOURNAL_STAT_DAYS:
+        raise BadInput(tr("Invalid value: {0}", "days"))
+    today = local_now().date()
+    lo = (today - timedelta(days=days - 1)).isoformat()
+    rows = c.execute("SELECT day, text, mood FROM journal WHERE user_id=? AND day>=? AND day<=? ORDER BY day", (uid, lo, today.isoformat())).fetchall()
+    dist = {str(i): 0 for i in range(1, 6)}
+    buckets = {}
+    for r in rows:
+        if r["mood"] is None:
+            continue
+        dist[str(r["mood"])] += 1
+        d = date.fromisoformat(r["day"])
+        k = d.replace(day=1) if days > 90 else d - timedelta(days=d.weekday())
+        b = buckets.setdefault(k.isoformat(), [0, 0])
+        b[0] += r["mood"]
+        b[1] += 1
+    rated = sum(dist.values())
+    return {"days": days, "written": sum(1 for r in rows if r["text"]), "rated": rated,
+            "avg": round(sum(int(k) * n for k, n in dist.items()) / rated, 2) if rated else None, "dist": dist,
+            "period": "month" if days > 90 else "week",
+            "series": [{"from": k, "avg": round(v[0] / v[1], 2), "n": v[1]} for k, v in sorted(buckets.items())]}
+
+
+def journal_export(c, uid, b, fmt):
+    """The entries of the range (oldest first) as Markdown or CSV text (Date, Mood, Text; spreadsheet formulas defused)."""
+    import csv
+    import io
+    from ..core.serializers import csv_cell
+    _journal_ok(c, uid)
+    f = _journal_args(b)
+    f.pop("before", None)
+    where, args = _journal_where(uid, **f)
+    rows = c.execute(f"SELECT day, text, mood FROM journal WHERE {where} ORDER BY day", args).fetchall()
+    if fmt == "csv":
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow([tr("Date"), tr("Mood"), tr("Text")])
+        for r in rows:
+            w.writerow([r["day"], r["mood"] or "", csv_cell(r["text"])])
+        return "\ufeff" + buf.getvalue()
+    out = [f"# {tr('Journal')}", ""]
+    for r in rows:
+        out += [f"## {r['day']}" + (f" ({r['mood']}/5)" if r["mood"] else ""), "", r["text"], ""]
+    return "\n".join(out)
+
+
 def review(c, uid, period, day, journal=True):
     """{period, from, to, done, open, moved, next, journal}: what uid completed in the day / week (Monday to Sunday) of
     `day`, what is still open from it (due on or before its end), what they moved away, what comes in the next 7 days."""

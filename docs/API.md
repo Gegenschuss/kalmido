@@ -302,7 +302,7 @@ had been made in the app. Webhooks fire too.
 | `PUT /lists/{id}/status` | structure | 2.15.0: a project status update `{status: on_track \| at_risk \| off_track \| on_hold \| complete \| "", note?}`; members are told |
 | `GET /filters` · `POST …` · `PATCH /filters/{id}` · `DELETE …` | read · structure · delete | 2.15.0: saved filters `{name, rules}` |
 | `GET /news?filter=` · `POST /news/read` | read · comments | 2.15.0: your News (`filter=mentions \| me`), `unread`; mark read `{ids}` or `{all: true}` |
-| `POST /habits` · `PATCH /habits/{id}` · `DELETE …` | tasks:write · delete | 2.15.0: habits `{name, color?, goal?, days?, per_week?, remind_at?, archived?}` |
+| `POST /habits` · `PATCH /habits/{id}` · `DELETE …` | tasks:write · delete | 2.15.0: habits `{name, color?, goal?, days?, per_week?, remind_at?, remind_times? (up to 6 × HH:MM, 2.140.0), archived?}` |
 | `GET /time/timer` · `POST …` · `DELETE …` | read · time | 2.15.0: the running timer; start `{task_id \| list_id, note?}` (a running one stops); stop |
 | `PATCH /time/entries/{id}` · `DELETE …` | time | 2.15.0: change / delete your entry `{start?, end?, minutes?, note?, task_id? \| list_id?}` |
 | `GET /export` | export | 2.15.0: everything you own as JSON (as Settings > Data > Export) |

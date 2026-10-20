@@ -778,12 +778,14 @@ def repair_data(c):
             c.execute("UPDATE list_members SET folder=?, view=? WHERE list_id=? AND user_id=?",
                       (clean_folder(fo, False), v, r["list_id"], r["user_id"]))
             bump_n("list_member")
-    for h in c.execute("SELECT id, color, remind_at, goal, per_week, days FROM habits").fetchall():
+    for h in c.execute("SELECT id, color, remind_at, remind_times, goal, per_week, days FROM habits").fetchall():
         f = {}
         if h["color"] and not (isinstance(h["color"], str) and LIST_COLOR_RE.fullmatch(h["color"])):
             f["color"] = ""
         if h["remind_at"] and not valid_hm(h["remind_at"]):
             f["remind_at"] = ""
+        if h["remind_times"] and not all(valid_hm(x) for x in h["remind_times"].split(",")):  # 2.140.0 C (#2135)
+            f["remind_times"] = h["remind_at"] if "remind_at" not in f else ""
         if isinstance(h["goal"], bool) or not isinstance(h["goal"], int) or not 1 <= h["goal"] <= 1000:
             f["goal"] = 1
         if isinstance(h["per_week"], bool) or not isinstance(h["per_week"], int) or not 0 <= h["per_week"] <= 7:

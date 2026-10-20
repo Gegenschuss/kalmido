@@ -1089,7 +1089,8 @@ LIST_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "folder":
 LIST_PROPS["points_on"] = {"type": "boolean", "description": "2.60.0: story points shown in the app (owner; default off)"}  # 2.60.0 (#1511)
 HABIT_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "goal": {"type": "integer", "minimum": 1},
                "days": {"type": "string", "description": "weekdays 1-7 (1 = Monday), e.g. 12345"}, "per_week": {"type": "integer", "minimum": 0},
-               "remind_at": {"type": "string", "description": "HH:MM or empty"}}
+               "remind_at": {"type": "string", "description": "HH:MM or empty (the single reminder; remind_times replaces it)"},
+               "remind_times": {"type": "array", "maxItems": 6, "items": {"type": "string"}, "description": "up to 6 reminder times HH:MM, e.g. [\"08:00\", \"20:00\"]"}}
 FILES = {"type": "array", "minItems": 1, "maxItems": 10, "items": {"type": "object", "properties": {
     "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}
 APPROVAL_NOTE = (" As an agent this waits for a person's approval: the answer is approval_required with a job; the result comes "

@@ -1085,9 +1085,9 @@ def v1_news_read():
 @app.post("/api/v1/habits")
 @v1_view
 def v1_habit_create():
-    """{name, color?, goal?, days? ("1234567" = Mon-Sun), per_week?, remind_at? (HH:MM)}"""
+    """{name, color?, goal?, days? ("1234567" = Mon-Sun), per_week?, remind_at? (HH:MM), remind_times? (up to 6 x HH:MM)}"""
     v1_args(())
-    b = _v1_body(("name", "color", "goal", "days", "per_week", "remind_at"))
+    b = _v1_body(("name", "color", "goal", "days", "per_week", "remind_at", "remind_times"))
     j = v1_call(habit_create, body=b)
     c = db()
     return jsonify(v1_habit(c, c.execute("SELECT * FROM habits WHERE id=?", (j["id"],)).fetchone())), 201
@@ -1097,7 +1097,7 @@ def v1_habit_create():
 @v1_view
 def v1_habit_update(hid):
     v1_args(())
-    b = _v1_body(("name", "color", "goal", "days", "per_week", "remind_at", "archived"))
+    b = _v1_body(("name", "color", "goal", "days", "per_week", "remind_at", "remind_times", "archived"))
     if "archived" in b:
         if not isinstance(b["archived"], bool):
             raise BadInput(tr("Invalid value: {0}", "archived"))
@@ -1379,12 +1379,14 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "/habits": {"post": op("Create a habit", "Habits", ok(ref("Habit"), "Created", "201") | errs("400", "403"), scope="tasks:write",
                                body={"type": "object", "required": ["name"], "properties": {
                                    "name": {"type": "string"}, "color": {"type": "string"}, "goal": {"type": "integer"},
-                                   "days": {"type": "string"}, "per_week": {"type": "integer"}, "remind_at": {"type": "string"}}})},
+                                   "days": {"type": "string"}, "per_week": {"type": "integer"}, "remind_at": {"type": "string"},
+                                   "remind_times": {"type": "array", "maxItems": 6, "items": {"type": "string"}}}})},  # 2.140.0 C (#2135)
         "/habits/{id}": {
             "patch": op("Change a habit", "Habits", ok(ref("Habit")) | errs("400", "404"), [pid("id", "Habit id")], scope="tasks:write",
                         body={"type": "object", "properties": {"name": {"type": "string"}, "color": {"type": "string"}, "goal": {"type": "integer"},
                                                                "days": {"type": "string"}, "per_week": {"type": "integer"},
-                                                               "remind_at": {"type": "string"}, "archived": {"type": "boolean"}}}),
+                                                               "remind_at": {"type": "string"}, "archived": {"type": "boolean"},
+                                                               "remind_times": {"type": "array", "maxItems": 6, "items": {"type": "string"}}}}),
             "delete": op("Delete a habit", "Habits", nobody | errs("404"), [pid("id", "Habit id")], scope="delete")},
         "/time/timer": {
             "get": op("The running timer", "Time tracking", ok(obj) | errs("403")),
