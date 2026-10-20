@@ -118,6 +118,17 @@ organisation's projects, lists and clients). If a source is deleted, the cell sh
 Errors in a cell: "Circular reference" (cells that depend on each other), "Division by zero", "Reference not found" (a
 deleted row / column - Undo brings it back), "Wrong type of value", "Formula error" (a typo; the formula is not saved).
 
+## A chart from columns (2.124.0)
+
+A table's menu (the three dots at the top right) has *Chart…*: choose bars or a line, the column with the labels (or the row
+numbers) and one to six columns with numbers. The chart sits above the formula bar and shows the calculated values (formulas
+included, the rows of your filters only) and follows every change at once. One series is drawn in the accent colour, more
+series in shades of it and grey (a line also dashed) with a legend. Tap a column of the chart (or point at it with the
+mouse) to read its values. The pencil changes the chart, the cross hides it for now (*Show chart* in the menu brings it
+back). The chart is saved with the table: everyone who sees the table sees it, only who may change the table changes it,
+and Undo takes a change back. A table without a chart looks exactly as before. Agents read the setting with the table
+(`chart`), they do not change it.
+
 ## Carrying a table over: tasks, quotation, list as rows (2.89.0)
 
 A table is never linked silently to the rest of Kalmido. Everything below happens only when you press the button in the
