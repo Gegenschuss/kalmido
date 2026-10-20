@@ -228,7 +228,10 @@ def ua8_private_left(c, uid):
             "SELECT 1 FROM sheets WHERE owner_id=? AND org_id IS NULL LIMIT 1",  # 2.89.0 (#1916): private tables
             "SELECT 1 FROM hub_mails WHERE owner_id=? AND org_id IS NULL LIMIT 1",
             "SELECT 1 FROM habits WHERE user_id=? LIMIT 1",
-            "SELECT 1 FROM time_entries t LEFT JOIN lists l ON l.id=t.list_id WHERE t.user_id=? AND l.org_id IS NULL LIMIT 1"))
+            "SELECT 1 FROM time_entries t LEFT JOIN lists l ON l.id=t.list_id WHERE t.user_id=? AND l.org_id IS NULL LIMIT 1",
+            # 2.146.0 D (#2468): the personal office's records (invoices, cash book): only the person can export them
+            "SELECT 1 FROM office_docs d JOIN orgs o ON o.id=d.org_id WHERE o.personal_of=? LIMIT 1",
+            "SELECT 1 FROM office_cash_entries e JOIN orgs o ON o.id=e.org_id WHERE o.personal_of=? LIMIT 1"))
 
 
 @app.get("/api/users/<int:uid>/delete-info")
@@ -249,8 +252,12 @@ def ua8_delete_info(uid):
             raise
         return jsonify(**base, can_delete=False, reason=e.text(), org_id=oid, heirs=ua8_heirs(c, oid, uid), lists=[], candidates=[])
     lists = ua8_owned(c, uid)
+    from ..admin.retexport import rx_user_info
+    ret = rx_user_info(c, uid, along=False)  # 2.146.0 D (#2468): records to keep -> the retention export step first
+    ret["needed_along"] = rx_user_info(c, uid, along=True)["needed"]  # ... also when the lists (with receipts) go along
     return jsonify(**base, can_delete=True, by="instance" if by == "instance" else "org", org_id=None if by == "instance" else by,
-                   username=u["username"], lists=ua8_list_info(c, lists, by), candidates=ua8_candidates(c, lists, uid) if lists else [])
+                   username=u["username"], lists=ua8_list_info(c, lists, by), candidates=ua8_candidates(c, lists, uid) if lists else [],
+                   retention=ret)
 
 
 def ua8_foreign(c, lr):
@@ -323,6 +330,10 @@ def ua8_lists_settle(c, u, by):
                             lists=bad), 409), None
         with system_ctx(c):  # review M3 (#1969: receipts are kept 10 years): a list with project receipts is only handed over
             bad = [lr["id"] for lr in lists if c.execute("SELECT 1 FROM budget_files WHERE list_id=? LIMIT 1", (lr["id"],)).fetchone()]
+        from ..admin.hosting import hosted
+        if bad and hosted() and request.args.get("retention") in ("exported", "waived"):
+            bad = []  # 2.146.0 D (#2468): hosted, the keeping lies with the person: after the retention export / its waiver
+            # (user_delete checks it in the same transaction) the receipts go along, files included (list_purge)
         if bad:
             return (jsonify(error=tr("Lists with receipts cannot be deleted along (receipts are kept): hand them over instead."),
                             lists=bad), 409), None

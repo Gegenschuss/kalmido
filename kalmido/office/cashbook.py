@@ -654,8 +654,14 @@ def _export_data(c, oid, uid):
     if bid is None:
         cb_default(c, oid, uid)
         bid = next(b["id"] for b in cb_books(c, oid))
-    book = _book(c, oid, bid)
     frm, to, y = _range()
+    return cb_export_data(c, oid, uid, _book(c, oid, bid), frm, to, y)
+
+
+def cb_export_data(c, oid, uid, book, frm, to, y=None):
+    """2.146.0 D (#2468): what the CSV / PDF of cash book row book show for [frm, to] (also without a request: the
+    retention export, admin/retexport.py)."""
+    bid = book["id"]
     ents, rows, last = cb_list(c, oid, uid, book, frm, to)
     closings = cb_closings(c, oid, bid, frm, to)
     log = [r for r in cb_log_rows(c, oid, bid) if frm <= r["at"][:10] <= to or (r["entry_id"] and any(e["id"] == r["entry_id"] for e in ents))]
@@ -709,10 +715,19 @@ def _prev_text(prev):
 def cb_csv():
     """?book_id=&year= | &from=&to= -> the entries (number, date, text, income, expense, VAT, balance, cancellation link),
     the day closings and the change log (semicolon, decimal comma like the EUeR CSV)."""
-    from .books import bk_csv_cell as cell
     from .ledger import ofx_log
     c, uid, oid = _ctx()
     book, frm, to, y, ents, closings, log, start, end = _export_data(c, oid, uid)
+    data = cb_csv_text(book, frm, to, y, ents, closings, log, start, end)
+    ofx_log(c, oid, "export", target="cashbook", detail={"what": "cashbook.csv", "book_id": book["id"], "from": frm, "to": to})
+    c.commit()
+    return Response(data, mimetype="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="cashbook-{_label(frm, to, y).replace(" – ", "_")}.csv"', "Cache-Control": "no-store"})
+
+
+def cb_csv_text(book, frm, to, y, ents, closings, log, start, end):
+    """The cash book CSV (with the byte order mark) of cb_export_data's values; 2.146.0 D (#2468): also for the retention export."""
+    from .books import bk_csv_cell as cell
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";", lineterminator="\r\n")
     w.writerow([cell(tr("Cash book")), cell(book["name"]), _label(frm, to, y)])
@@ -733,10 +748,7 @@ def cb_csv():
     for r in log:
         w.writerow([r["at"], r["no"] or "", cell(tr(CB_ACTIONS.get(r["action"], r["action"]))), cell(r["by"]), cell(_prev_text(r["prev"]))])
     w.writerow([cell(tr(CB_NOTE))])
-    ofx_log(c, oid, "export", target="cashbook", detail={"what": "cashbook.csv", "book_id": book["id"], "from": frm, "to": to})
-    c.commit()
-    return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": f'attachment; filename="cashbook-{_label(frm, to, y).replace(" – ", "_")}.csv"', "Cache-Control": "no-store"})
+    return "﻿" + buf.getvalue()
 
 
 def cb_pdf_bytes(c, oid, book, frm, to, y, ents, closings, log, start, end, lg):

@@ -666,6 +666,11 @@ def org_delete(oid):
         n = fs_org_live(c, oid)  # 2.48.0 (#1207): nothing of the file store disappears with it (the trash does)
         if n:
             return err(tr("This organisation still has {0} folders and files in its file store: delete them first", n), 409)
+        from ..admin.retexport import rx_gate, rx_subject
+        bad, retained = rx_gate(c, rx_subject(c, "org", oid))  # 2.146.0 D (#2468): the retention export (or its waiver) first
+        if bad:
+            return bad
+        oname = (c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0]
         fs_files = fs_org_purge(c, oid)
         from ..wiki.wikiatt import wka_org_files
         fs_files += wka_org_files(c, oid)  # 2.99.0 A (#2182): files of its knowledge pages (the rows go with the organisation)
@@ -691,6 +696,9 @@ def org_delete(oid):
         org_icon_drop_file(oid, icon)  # 2.87.9 (#1913)
         from ..core.serializers import unlink_files
         unlink_files(fs_files)
+        if retained:
+            from ..admin.retexport import rx_alert
+            rx_alert(retained[0], [g.user["username"], oname])
         return jsonify(ok=True)
 
 

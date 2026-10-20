@@ -48,3 +48,40 @@ function ox_pbBoxHtml(oid) {
     <p class="muted">${tr('An encrypted archive with this office and your private clients, to take them to another Kalmido server: there under Settings > Data into an organisation or into your own office. It opens with the recovery key.')}</p>
     <div class="oxbox" data-oxorg="${+oid}"><div class="oxst" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div></div>${ocBoxHtml({id: +oid}, {title: ''})}</section>`;
 }
+// ---- 2.146.0 D (#2468): the retention export (kalmido/admin/retexport.py): a readable ZIP of the records the law asks to
+// keep (invoices with e-invoice XML, receipts with files, cash books, bank statements, office log) -- in the settings for the
+// person (own office) and the organisation's admins, and as the step before deleting an account or an organisation: the
+// server deletes only after a finished export or an explicit waiver
+function rxBoxHtml(kind, id) {
+  const url = kind === 'org' ? `/api/retention/org/${+id}/export.zip` : '/api/retention/me/export.zip';
+  return `<div class="rxbox" data-rx="${esc(kind)}"><h5>${tr('Retention export')}</h5>
+    <div class="shint">${tr('A readable ZIP with the records you must keep: invoices with their e-invoice, receipts with their files, cash books, bank statements and the office log, with a table of contents.')}</div>
+    <div class="shint">${tr('Keep these records yourself: invoices and receipts for 8 years, books (cash book, logs, bank statements) for 10 years. Kalmido does not keep them after the deletion; the duty to keep them lies with you.')}</div>
+    <div class="row"><a class="btn sm" href="${url}" download data-rxdl>${ic('download', 's')} ${tr('Download retention export')}</a></div></div>`;
+}
+// the step before a deletion: resolves 'exported' | 'waived' | null (cancelled); info = the server's retention object
+async function rxAsk(info, title) {
+  const L = {documents: tr('Finalised documents'), receipts: tr('Receipts'), project_receipts: tr('Receipts of lists'), cash: tr('Cash book entries'), bank: tr('Bank transactions'), archive: tr('Archived documents')};
+  const counts = Object.entries(info.counts || {}).map(([k, n]) => `<li>${esc(L[k] || k)}: ${n}</li>`).join('');
+  const md = modal(`<h3>${esc(tr('Retention export before deleting “{0}”', title))}</h3>
+    <div class="shint keep warn">${ic('alert', 's')} ${esc(info.note)}</div>
+    ${counts ? `<ul class="rxcounts">${counts}</ul>` : ''}
+    ${info.can_export ? `<div class="row"><a class="btn sm pri" href="${esc(info.url)}" download data-rxdl>${ic('download', 's')} ${tr('Download retention export')}</a></div>`
+      : `<div class="shint keep">${tr('Only the person themself (for their own office) or an admin of the organisation can download it, under Settings.')}</div>`}
+    ${info.exported_at ? `<div class="shint keep">${esc(tr('Last finished export: {0}', fmtWhen(info.exported_at)))}</div>` : ''}
+    <fieldset class="rxhow"><legend>${tr('Before deleting')}</legend>
+      <label class="chkl"><input type="radio" name="rxhow" value="exported"> ${tr('The export is downloaded and kept')}</label>
+      <label class="chkl"><input type="radio" name="rxhow" value="waived"> ${tr('I do without the export (the records are lost)')}</label>
+    </fieldset>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" data-m="go" disabled>${tr('Continue')}</button></div>`);
+  const how = () => $('[name="rxhow"]:checked', md)?.value;
+  md.addEventListener('change', () => { $('[data-m="go"]', md).disabled = !how(); });
+  return new Promise(res => {
+    onRemove(md, () => res(null));
+    md.addEventListener('click', e => {
+      const b = e.target.closest('button[data-m]'); if (!b) return;
+      if (b.dataset.m === 'go') { res(how()); md.remove(); return; }
+      md.remove();
+    });
+  });
+}
