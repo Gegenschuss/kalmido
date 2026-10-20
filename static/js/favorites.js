@@ -73,9 +73,9 @@ const lc_favSetHtml = (chk, hint) => `<h4 id="s-fav-h">${tr('Favourites')}</h4>
       ${hint(tr('After two weeks of much work in a list without a star, Kalmido asks once whether to add it to your favourites. It never sets a star by itself.'))}`;
 // once per start of the app: a busy list without a star is offered (the server asks about each list only once)
 async function lc_favSuggest() {
-  if (S.settings?.fav_suggest === '0' || !navigator.onLine) return;
+  if (S.settings?.fav_suggest === '0' || !navigator.onLine || !OUT.online) return;  // 2.140.0 A (#2131): + the server not reachable
   try {
-    const r = await api('POST', '/api/favorites/suggestion', {});
+    const r = await rawFetch('POST', '/api/favorites/suggestion', {});  // 2.140.0 A (#2131): quiet (no "Offline" toast in the shop)
     const l = r && r.list_id && listById(r.list_id);
     if (l && !favIs(l.id)) toast(tr('You worked a lot in “{0}” these two weeks. Add it to your favourites?', lname(l)), () => favSet(l.id, true), 12000, tr('Add to favourites'));
   } catch { /* offline or an older server: no suggestion */ }

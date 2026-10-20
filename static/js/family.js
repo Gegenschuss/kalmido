@@ -12,8 +12,8 @@ const famOn = () => feat('family');
 const kidMe = () => !!S.me?.kid;
 S.kids = []; S.famWeek = null; S.shop = null;
 const FAM_KINDS = [['', N_('An ordinary list')], ['shopping', N_('Shopping list')], ['meals', N_('Meal plan')], ['birthdays', N_('Birthdays')],
-  ['household', N_('Household')], ['packing', N_('Packing list')], ['family', N_('Family')]];  // 2.46.1 (#1615): "family"
-const FAM_KIND_ICON = {shopping: 'cart', meals: 'meal', birthdays: 'cake', household: 'home', packing: 'bag'};
+  ['household', N_('Household')], ['packing', N_('Packing list')], ['family', N_('Family')], ['recipes', N_('Recipes')]];  // 2.46.1 (#1615): "family"; 2.140.0 A (#2132): "recipes"
+const FAM_KIND_ICON = {shopping: 'cart', meals: 'meal', birthdays: 'cake', household: 'home', packing: 'bag', recipes: 'book'};
 const famKindOf = lid => listById(lid)?.family || '';
 const isOcc = t => !!t?.fam && (t.fam.kind === 'birthday' || t.fam.kind === 'anniversary');
 const isDl = t => t?.fam?.kind === 'deadline';
@@ -47,6 +47,42 @@ function famData() {
 }
 const shopOpen = lid => [...S.tasks.values()].filter(t => t.list_id === lid && t.status === 0 && !t.deleted_at && !t.parent_id).length;
 
+// ---- 2.140.0 A (#2131): amount + price of a shopping item (tasks.fam {kind: shop, qty?, unit?, price?}; the title stays the name)
+const isShopItem = t => !!t && !t.parent_id && (t.fam?.kind === 'shop' || (famKindOf(t.list_id) === 'shopping' && !t.fam));
+const shopQty = t => t?.fam?.kind === 'shop' && t.fam.qty != null ? fmtNum(t.fam.qty, 3) + (t.fam.unit ? ' ' + t.fam.unit : '') : (t?.fam?.kind === 'shop' && t.fam.unit ? t.fam.unit : '');
+const famRowQty = t => famOn() && isShopItem(t) && shopQty(t) ? `<span class="qtym" title="${esc(tr('Quantity'))}">${esc(shopQty(t))}</span>` : '';
+// the same rules as the server's shop_split: a clear leading amount ("2 Milch", "500 g Mehl", "2x Eier"); else none
+const SHOP_UNITS = 'x|×|kg|g|gr|mg|l|ml|cl|dl|liter|litre|liters|litres|stk|st|stück|pck|pack|packs|packung|packungen|dose|dosen|can|cans|bund|bunch|el|tl|tbsp|tsp|cup|cups|pcs|piece|pieces|becher|glas|gläser|flasche|flaschen|bottle|bottles|scheiben|slice|slices|zehen|clove|cloves|prise|pinch|oz|lb|lbs';
+const SHOP_SPLIT = new RegExp(`^\\s*(\\d{1,5}(?:[.,]\\d{1,3})?|\\d{1,3}\\s*/\\s*\\d{1,3}|\\d{0,3}\\s*[½¼¾⅓⅔])\\s*(?:(${SHOP_UNITS})\\.?(?=\\s)|)\\s+(\\S.*)$`, 'iu');
+const SHOP_FRAC = {'½': .5, '¼': .25, '¾': .75, '⅓': 1 / 3, '⅔': 2 / 3};
+function qtyParse(v) {
+  const x = String(v ?? '').trim(); let m;
+  if ((m = x.match(/^(\d{1,6})?\s*([½¼¾⅓⅔])$/))) return (+(m[1] || 0)) + SHOP_FRAC[m[2]];
+  if ((m = x.match(/^(\d{1,6})\s*\/\s*(\d{1,4})$/))) return +m[2] ? +m[1] / +m[2] : null;
+  return /^\d{1,6}([.,]\d{1,3})?$/.test(x) ? +x.replace(',', '.') : null;
+}
+function shopSplit(title) {
+  const s0 = String(title || '').trim(), m = s0.match(SHOP_SPLIT);
+  if (!m) return {qty: null, unit: '', name: s0};
+  const q = qtyParse(m[1].replace(/\s+/g, '')), name = m[3].trim();
+  let unit = m[2] || ''; if (/^(x|×)$/i.test(unit)) unit = '';
+  if (q == null || q <= 0 || q > 1e5 || !/\p{L}/u.test(name) || (!unit && q > 99)) return {qty: null, unit: '', name: s0};
+  return {qty: Math.round(q * 1000) / 1000, unit, name};
+}
+const shopKeyC = s => shopSplit(String(s || '').replace(/\s*\([^)]*\)\s*$/, '')).name.replace(/[\s.,;:!?]+/g, ' ').trim().toLowerCase();
+// the fam of a shopping item after a change (ch: {qty, unit, price}; null / '' = remove); null = nothing left
+function shopFamWith(t, ch) {
+  const f = {...(t.fam?.kind === 'shop' ? t.fam : {}), ...ch, kind: 'shop'};
+  for (const k of ['qty', 'unit', 'price']) if (f[k] == null || f[k] === '') delete f[k];
+  return Object.keys(f).length > 1 ? f : null;
+}
+const moneyParse = v => { const x = String(v ?? '').trim().replace(/\s|€/g, '').replace(',', '.'); return x === '' ? null : /^\d{1,7}(\.\d{1,2})?$/.test(x) ? +x : NaN; };
+
+// ---- 2.140.0 A (#2132): recipes = tasks of a list of family "recipes" (or fam kind recipe); a meal may point to one
+const isRecipe = t => !!t && !t.parent_id && t.fam?.kind !== 'meal' && (t.fam?.kind === 'recipe' || famKindOf(t.list_id) === 'recipes');
+const famRecipes = () => [...S.tasks.values()].filter(t => isRecipe(t) && t.status === 0 && !t.deleted_at && !t.context && !listById(t.list_id)?.archived)
+  .sort((a, b) => a.title.localeCompare(b.title));
+
 function viewFamily() {
   if (kidMe()) return viewKid();
   const d = famData(), t0 = today();
@@ -64,7 +100,10 @@ function viewFamily() {
   const days = [...Array(7)].map((_, i) => addDays(d.mon, i));
   const mealH = `<div class="fweek" role="group" aria-label="${esc(tr('Meal plan'))}">${days.map(day => { const ms = d.meals.filter(t => t.due === day);
     return `<div class="fday ${day === t0 ? 'today' : ''}"><span class="fdl">${esc(dayLabel(day))}</span><span class="fdm">${ms.map(t => `<span class="fmeal ${t.status ? 'done' : ''}"><a ${open(t.id)}>${esc(t.title)}</a><button type="button" class="iconbtn" data-act="fam-ingr" data-id="${t.id}" title="${esc(tr('Ingredients to the shopping list'))}" aria-label="${esc(tr('Ingredients of {0} to the shopping list', t.title))}">${ic('cart', 's')}</button></span>`).join('')}</span><button type="button" class="iconbtn" data-act="fam-meal" data-day="${day}" title="${esc(tr('Add a meal'))}" aria-label="${esc(tr('Add a meal on {0}', fmtDateLoc(day)))}">${ic('plus', 's')}</button></div>`; }).join('')}</div>`;
-  const weekNav = `<span class="fwnav"><button type="button" class="iconbtn" data-act="fam-week" data-d="-7" aria-label="${esc(tr('Previous week'))}" title="${esc(tr('Previous week'))}">${ic('left', 's')}</button><button type="button" class="iconbtn" data-act="fam-week" data-d="7" aria-label="${esc(tr('Next week'))}" title="${esc(tr('Next week'))}">${ic('right', 's')}</button></span>`;
+  // 2.140.0 A (#2132): any week: back / ahead, a day to start from, back to today; the range is said
+  const away = !!S.famWeek && S.famWeek !== t0;
+  const weekNav = `<span class="fwnav"><button type="button" class="iconbtn" data-act="fam-week" data-d="-7" aria-label="${esc(tr('Previous week'))}" title="${esc(tr('Previous week'))}">${ic('left', 's')}</button><button type="button" class="btn sm fwpick" data-act="fam-weekpick" aria-label="${esc(tr('Show the meal plan from') + ': ' + fmtDateLoc(d.mon) + ' – ' + fmtDateLoc(addDays(d.mon, 6)))}" title="${esc(tr('Choose a day'))}">${ic('cal', 's')}<span>${esc(fmtDateLoc(d.mon))} – ${esc(fmtDateLoc(addDays(d.mon, 6)))}</span></button><button type="button" class="iconbtn" data-act="fam-week" data-d="7" aria-label="${esc(tr('Next week'))}" title="${esc(tr('Next week'))}">${ic('right', 's')}</button>${away ? `<button type="button" class="btn sm" data-act="fam-weeknow">${tr('Today')}</button>` : ''}</span>`;  // "Today" last: the buttons before it keep their place (the focus)
+  const mealFoot = `<div class="fcfoot"><button type="button" class="btn sm" data-act="fam-recipes">${ic('book', 's')}<span>${tr('Recipes')}</span>${famRecipes().length ? `<span class="c">${famRecipes().length}</span>` : ''}</button></div>`;
   // shopping
   const shopH = d.shops.length ? `<ul class="flist">${d.shops.map(l => `<li class="frow fshop"><a href="#l/${l.id}" class="ft"><b>${esc(lname(l))}</b><span class="muted">${esc(trn('{0} item left', '{0} items left', shopOpen(l.id)))}</span></a><button type="button" class="btn pri" data-act="fam-shop" data-id="${l.id}">${ic('cart', 's')}<span>${tr('Shopping mode')}</span></button></li>`).join('')}</ul>`
     : `<p class="muted">${tr('No shopping list yet.')}</p><button type="button" class="btn" data-act="fam-newlist" data-k="shopping">${ic('plus', 's')} ${tr('Shopping list')}</button>`;
@@ -81,7 +120,7 @@ function viewFamily() {
     ${lyHtml('family', {  // 2.55.0 (#1067): the cards are blocks of the view builder (same order and width as before)
       occ: card('occ', 'cake', tr('Birthdays & anniversaries'), occH + `<div class="fcfoot"><button type="button" class="btn sm" data-act="fam-contacts">${ic('users', 's')}<span>${tr('From contacts…')}</span></button></div>`, '', d.occ.filter(t => daysTo(t.due) <= 30).length || ''),
       rot: card('rot', 'turns', tr('Whose turn'), rotH, '', d.rots.length || ''),
-      meals: card('meals', 'meal', tr('Meal plan'), mealH, weekNav),
+      meals: card('meals', 'meal', tr('Meal plan'), mealH + mealFoot, weekNav),
       shop: card('shop', 'cart', tr('Shopping'), shopH),
       dl: card('dl', 'hourglass', tr('Deadlines'), dlH, '', d.dls.filter(t => daysTo(t.due) <= 30).length || ''),
       kids: kidsH ? card('kids', 'star', tr('Kids'), kidsH) : '',
@@ -210,21 +249,140 @@ async function pm_famTarget(key) {
   if (!s) { try { s = await api('POST', '/api/sections', {list_id: lid, name: tr(PM_FAM_SECS[key])}); await load(); } catch { s = null; } }
   return {list_id: lid, section_id: s?.id || null};
 }
-async function famMeal(day) {
-  const name = await askPrompt(tr('What is on {0}?', fmtDateLoc(day)), '', {ok: tr('Add'), input: {placeholder: tr('e.g. Lasagne'), max: 300}});
-  if (!name || !name.trim()) return;
+// 2.140.0 A (#2132): a meal = a name or a recipe of the collection (the meal points to it); any day, also weeks ahead
+async function famMealAdd(day, name, recipe) {
   // 2.46.1 (#1615): an old Meal plan list first, else the list "Family" (section Meal plan), marked as a meal
   let lid = famData().mealLists.find(l => canAddTo(l.id))?.id, sec = {};
-  if (!lid) { const x = await pm_famTarget('meals'); if (!x) return; lid = x.list_id; sec = {section_id: x.section_id, fam: {kind: 'meal'}}; }
-  const t = await createTask({title: name.trim(), list_id: lid, due: day, ...sec}).catch(() => null);
-  if (t) toast(tr('Added: {0}', t.title), () => openDetail(t.id), 6000, tr('Ingredients…'));
+  const fam = recipe ? {kind: 'meal', recipe: recipe.id, ...(recipe.fam?.serves ? {serves: recipe.fam.serves} : {})} : null;
+  if (!lid) { const x = await pm_famTarget('meals'); if (!x) return null; lid = x.list_id; sec = {section_id: x.section_id, fam: fam || {kind: 'meal'}}; }
+  else if (fam) sec = {fam};
+  return createTask({title: (recipe ? recipe.title : name).trim().slice(0, 300), list_id: lid, due: day, ...sec}).catch(() => null);
 }
+async function famMeal(day) {
+  const rs = famRecipes();
+  if (!rs.length) {
+    const name = await askPrompt(tr('What is on {0}?', fmtDateLoc(day)), '', {ok: tr('Add'), input: {placeholder: tr('e.g. Lasagne'), max: 300}});
+    if (!name || !name.trim()) return;
+    const t = await famMealAdd(day, name);
+    if (t) toast(tr('Added: {0}', t.title), () => openDetail(t.id), 6000, tr('Ingredients…'));
+    return;
+  }
+  const md = modal(`<h3>${ic('meal', 's')} ${esc(tr('What is on {0}?', fmtDateLoc(day)))}</h3>
+    <div class="row"><input id="fm-name" maxlength="300" autocomplete="off" placeholder="${esc(tr('e.g. Lasagne'))}" aria-label="${esc(tr('Meal'))}"></div>
+    <h4 class="fmrh">${tr('From your recipes')}</h4><div class="fmrecipes" role="group" aria-label="${esc(tr('Recipes'))}"></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Add')}</button></div>`);
+  md.classList.add('famdlg');
+  const draw = () => { const q = $('#fm-name', md).value.trim().toLowerCase(), hit = rs.filter(r => !q || r.title.toLowerCase().includes(q)).slice(0, 30);
+    $('.fmrecipes', md).innerHTML = hit.map(r => `<button type="button" class="btn sm" data-rid="${r.id}">${ic('book', 's')}<span>${esc(r.title)}</span></button>`).join('') || `<p class="muted">${tr('No recipe of that name.')}</p>`; };
+  draw();
+  $('#fm-name', md).addEventListener('input', draw);
+  const done = t => { md.remove(); if (t) toast(tr('Added: {0}', t.title), () => openDetail(t.id), 6000, tr('Open')); };
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    if (b.dataset.rid) { done(await famMealAdd(day, '', taskById(+b.dataset.rid))); return; }
+    if (b.dataset.m !== 'save') return;
+    const name = $('#fm-name', md).value.trim(); if (!name) { $('#fm-name', md).focus(); return; }
+    const r = rs.find(x => x.title.trim().toLowerCase() === name.toLowerCase());  // the exact name of a recipe = that recipe
+    done(await famMealAdd(day, name, r));
+  });
+  setTimeout(() => $('#fm-name', md)?.focus(), 30);
+}
+// a recipe onto a day of the meal plan
+function famPlan(id) {
+  const r = taskById(id); if (!r) return;
+  const md = modal(`<h3>${ic('meal', 's')} ${esc(tr('Plan “{0}”', r.title))}</h3>
+    <div class="row"><label for="fp-day">${tr('Day')}</label>${dateIn('fp-day', today(), {label: tr('Day'), clear: false})}</div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Add')}</button></div>`);
+  md.classList.add('famdlg');
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    const day = $('#fp-day', md)?.value; if (!day) return;
+    md.remove();
+    const t = await famMealAdd(day, '', r);
+    if (t) { S.famWeek = day; toast(tr('Planned on {0}', fmtDateLoc(day)), () => go('family'), 6000, tr('Meal plan')); }
+  });
+}
+// the meal plan from any day on (the seven days from there)
+function famWeekPick() {
+  const md = modal(`<h3>${ic('cal', 's')} ${tr('Show the meal plan from')}</h3>
+    <div class="row">${dateIn('fw-day', S.famWeek || today(), {label: tr('Day'), clear: false})}</div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Show')}</button></div>`);
+  md.classList.add('famdlg');
+  md.addEventListener('click', e => {
+    const b = e.target.closest('button[data-m]'); if (!b) return;
+    const d = $('#fw-day', md)?.value; md.remove();
+    if (b.dataset.m === 'save' && d) { S.famWeek = d === today() ? null : d; renderView(); $('#view [data-act="fam-weekpick"]')?.focus(); }
+  });
+}
+// the list of recipes (created when missing)
+async function famRecipesOpen() {
+  const l = S.lists.find(x => x.family === 'recipes' && !x.archived);
+  const lid = l ? l.id : await famNewList('recipes');
+  if (lid) go('l/' + lid);
+}
+// 2.140.0 A (#2132): the ingredients of a meal / recipe to a shopping list: a short choice first (tick per ingredient,
+// untick what is at home), the amounts scaled to the servings, the same item on the list gets the amount added
 async function famIngredients(id) {
   const t = taskById(id); if (!t) return;
-  let j; try { j = await api('POST', `/api/tasks/${id}/to-shopping`, {}); } catch { return; }
-  await load(); render();
-  const msg = [j.added.length ? trn('{0} item on the shopping list', '{0} items on the shopping list', j.added.length) : '', j.skipped.length ? trn('{0} was already there', '{0} were already there', j.skipped.length) : ''].filter(Boolean).join(' · ');
-  toast(msg || tr('Nothing to add'), () => go('l/' + j.list_id), 6000, tr('Open'));
+  const shops = S.lists.filter(l => l.family === 'shopping' && !l.archived && canEditList(l.id));
+  let lid = shops.some(l => l.id === S.famShopLid) ? S.famShopLid : shops[0]?.id || null, sv = t.fam?.serves || null, p;
+  const prev = () => api('POST', `/api/tasks/${id}/to-shopping`, {preview: true, ...(lid ? {list_id: lid} : {}), ...(sv ? {servings: sv} : {})});
+  try { p = await prev(); } catch { return; }
+  if (!p.items.length) { toast(tr('No ingredients found: write them as a list in the notes')); return; }
+  if (!sv) sv = p.serves;
+  const off = new Set();  // names unticked (kept when the servings change)
+  const amt = x => x.qty != null ? fmtNum(x.qty, 2) + (x.unit ? ' ' + x.unit : '') : x.unit || '';
+  const md = modal(`<h3>${ic('cart', 's')} ${esc(tr('Ingredients of {0}', t.title))}</h3>
+    ${p.serves ? `<div class="row"><label for="fi-sv">${tr('Servings')}</label><input id="fi-sv" class="numin" type="number" inputmode="numeric" min="1" max="100" value="${esc(sv || '')}"></div>` : ''}
+    ${shops.length > 1 ? `<div class="row"><label for="fi-list">${tr('Shopping list')}</label><select id="fi-list">${shops.map(l => `<option value="${l.id}" ${l.id === lid ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
+    <p class="muted">${tr('Untick what is at home already.')}</p>
+    <ul class="fingr" role="group" aria-label="${esc(tr('Ingredients'))}"></ul>
+    <div class="aerr" role="alert" id="fi-err"></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('To the shopping list')}</button></div>`);
+  md.classList.add('famdlg');
+  const draw = () => { $('.fingr', md).innerHTML = p.items.map((x, i) => `<li><label class="chkl"><input type="checkbox" data-i="${i}" ${off.has(x.name) ? '' : 'checked'}><span class="fiq">${esc(amt(x))}</span><span class="fin">${esc(x.name)}</span>${x.have ? `<small class="muted">${esc(x.qty != null ? tr('on the list, the quantity is added') : tr('on the list'))}</small>` : ''}</label></li>`).join(''); };
+  draw();
+  const again = async () => { try { p = await prev(); draw(); } catch { /* api() said it */ } };
+  md.addEventListener('change', e => {
+    if (e.target.dataset.i != null) { const n = p.items[+e.target.dataset.i].name; e.target.checked ? off.delete(n) : off.add(n); }
+    if (e.target.id === 'fi-sv') { sv = Math.max(1, Math.min(100, Math.round(+e.target.value) || 1)); again(); }
+    if (e.target.id === 'fi-list') { lid = +e.target.value; S.famShopLid = lid; again(); }
+  });
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    const items = p.items.filter(x => !off.has(x.name)).map(x => ({name: x.name, qty: x.qty, unit: x.unit}));
+    if (!items.length) { $('#fi-err', md).textContent = tr('Nothing to add'); return; }
+    let j; try { j = await rawFetch('POST', `/api/tasks/${id}/to-shopping`, {items, ...(lid ? {list_id: lid} : {})}); } catch (er) { $('#fi-err', md).textContent = er.message || ''; return; }
+    md.remove(); await load(); render();
+    const msg = [j.added.length ? trn('{0} item on the shopping list', '{0} items on the shopping list', j.added.length) : '', (j.merged || []).length ? trn('{0} quantity added', '{0} quantities added', j.merged.length) : '', j.skipped.length ? trn('{0} was already there', '{0} were already there', j.skipped.length) : ''].filter(Boolean).join(' · ');
+    toast(msg || tr('Nothing to add'), () => go('l/' + j.list_id), 6000, tr('Open'));
+  });
+}
+// 2.140.0 A (#2131): amount and price of an item, from shopping mode (a tap on the amount)
+function shopQtyEdit(id) {
+  const t = taskById(id); if (!t) return;
+  const f = t.fam?.kind === 'shop' ? t.fam : {};
+  const md = modal(`<h3>${esc(t.title)}</h3>
+    <div class="row"><label for="sq-qty">${tr('Quantity')}</label><span class="lcost"><input id="sq-qty" class="numin" inputmode="decimal" autocomplete="off" value="${f.qty != null ? esc(fmtNum(f.qty, 3)) : ''}" placeholder="1"><input id="sq-unit" class="numin" autocomplete="off" maxlength="16" value="${esc(f.unit || '')}" placeholder="${esc(tr('Unit'))}" aria-label="${esc(tr('Unit'))}"></span></div>
+    <div class="row"><label for="sq-price">${tr('Price')}</label><input id="sq-price" class="numin" inputmode="decimal" autocomplete="off" value="${f.price != null ? esc(fmtNum(f.price, 2)) : ''}" placeholder="0,00"></div>
+    <div class="aerr" role="alert" id="sq-err"></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  md.classList.add('famdlg', 'shopqdlg');
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    const qv = $('#sq-qty', md).value.trim(), q = qv === '' ? null : qtyParse(qv), pr = moneyParse($('#sq-price', md).value);
+    if (qv !== '' && (q == null || q > 1e5)) { $('#sq-err', md).textContent = tr('Invalid value: {0}', tr('Quantity')); $('#sq-qty', md).focus(); return; }
+    if (Number.isNaN(pr)) { $('#sq-err', md).textContent = tr('Invalid value: {0}', tr('Price')); $('#sq-price', md).focus(); return; }
+    const unit = $('#sq-unit', md).value.trim().slice(0, 16);
+    md.remove();
+    try { await patchTask(id, {fam: shopFamWith(t, {qty: q, unit, price: pr})}, true); } catch { /* queued offline */ }
+    shopDraw(); $(`.shopmode [data-act="shop-qty"][data-id="${id}"]`)?.focus({preventScroll: true});
+  });
+  setTimeout(() => $('#sq-qty', md)?.focus(), 30);
 }
 async function famGive(kid) {
   const k = (S.kids || []).find(x => x.id === kid); if (!k) return;
@@ -337,8 +495,23 @@ function famDetailHtml(t, l, ro) {
   if ((kidIn && !t.fam && !proj) || t.stars != null) {
     out.push(`<div class="row"><label for="d-stars">${tr('Stars for a child')}</label><input id="d-stars" class="numin" type="number" inputmode="numeric" min="0" max="50" value="${esc(t.stars ?? '')}" placeholder="1" ${ro || !canEditList(t.list_id) ? 'readonly' : ''}><span class="muted">★</span></div>`);
   }
+  const rw = !ro;
+  if (isShopItem(t)) {  // 2.140.0 A (#2131): amount (number + unit) and price of the line
+    const f = t.fam?.kind === 'shop' ? t.fam : {}, sp = f.qty == null ? shopSplit(t.title) : null;
+    out.push(`<div class="row"><label for="d-fqty">${tr('Quantity')}</label><input id="d-fqty" class="numin" inputmode="decimal" autocomplete="off" value="${f.qty != null ? esc(fmtNum(f.qty, 3)) : ''}" placeholder="1" ${rw ? '' : 'readonly'}><input id="d-funit" class="numin" autocomplete="off" maxlength="16" value="${esc(f.unit || '')}" placeholder="${esc(tr('Unit'))}" aria-label="${esc(tr('Unit'))}" ${rw ? '' : 'readonly'}>${sp?.qty != null && rw ? `<button type="button" class="btn sm" data-act="fam-qtytitle" data-id="${t.id}">${esc(tr('Take “{0}” from the title', fmtNum(sp.qty, 3) + (sp.unit ? ' ' + sp.unit : '')))}</button>` : ''}</div>
+      <div class="row"><label for="d-fprice">${tr('Price')}</label><input id="d-fprice" class="numin" inputmode="decimal" autocomplete="off" value="${f.price != null ? esc(fmtNum(f.price, 2)) : ''}" placeholder="0,00" ${rw ? '' : 'readonly'}></div>`);
+  }
+  if (isRecipe(t)) {  // 2.140.0 A (#2132): a recipe: for how many, its ingredients to a shopping list, onto a day of the meal plan
+    out.push(`<div class="row"><label for="d-fserves">${tr('Servings')}</label><input id="d-fserves" class="numin" type="number" inputmode="numeric" min="1" max="100" value="${esc(t.fam?.serves ?? '')}" placeholder="4" ${rw ? '' : 'readonly'}></div>
+      <div class="row"><label>${tr('Ingredients')}</label><button type="button" class="btn sm" data-act="fam-ingr" data-id="${t.id}">${ic('cart', 's')}<span>${tr('To the shopping list')}</span></button><button type="button" class="btn sm" data-act="fam-plan" data-id="${t.id}">${ic('meal', 's')}<span>${tr('Plan on a day')}</span></button></div>
+      <p class="muted fhint">${tr('Ingredients as a list below a heading “Ingredients”, the method as numbered steps.')}</p>`);
+  }
   if (pm_isMeal(t) && !t.parent_id) {  // 2.46.1 (#1615): also a meal in the list "Family"
-    out.push(`<div class="row"><label>${tr('Ingredients')}</label><button type="button" class="btn sm" data-act="fam-ingr" data-id="${t.id}">${ic('cart', 's')}<span>${tr('To the shopping list')}</span></button><span class="muted">${tr('one per line in the description')}</span></div>`);
+    const rs = famRecipes(), rid = t.fam?.recipe, rec = rid && taskById(rid);
+    // 2.140.0 A (#2132): the recipe it is made from and for how many
+    if (rs.length || rid) out.push(`<div class="row"><label for="d-frecipe">${tr('Recipe')}</label><select id="d-frecipe" ${rw ? '' : 'disabled'}><option value="">${tr('none')}</option>${rid && !rec ? `<option value="${rid}" selected>${esc(tr('(not visible)'))}</option>` : ''}${rs.map(r => `<option value="${r.id}" ${r.id === rid ? 'selected' : ''}>${esc(r.title)}</option>`).join('')}</select>${rec ? `<a class="btn sm" href="#t/${rec.id}">${ic('book', 's')}<span>${tr('Open')}</span></a>` : ''}</div>`);
+    if (rid || t.fam?.serves) out.push(`<div class="row"><label for="d-fserves">${tr('Servings')}</label><input id="d-fserves" class="numin" type="number" inputmode="numeric" min="1" max="100" value="${esc(t.fam?.serves ?? '')}" placeholder="${esc(rec?.fam?.serves ?? 4)}" ${rw ? '' : 'readonly'}></div>`);
+    out.push(`<div class="row"><label>${tr('Ingredients')}</label><button type="button" class="btn sm" data-act="fam-ingr" data-id="${t.id}">${ic('cart', 's')}<span>${tr('To the shopping list')}</span></button><span class="muted">${rid ? tr('from the recipe, or one per line in the description') : tr('one per line in the description')}</span></div>`);
   }
   return out.length ? `<div class="dsec famsec"><h5>${tr('Family')}</h5><div class="famf">${out.join('')}</div></div>` : '';
 }
@@ -349,6 +522,23 @@ document.addEventListener('change', e => {
   if (el.id === 'd-fname' || el.id === 'd-fyear') { const v = el.value.trim(); famDetailPatch(t, {fam: {...t.fam, ...(el.id === 'd-fname' ? {name: v} : {year: v ? +v : null})}}); }
   if (el.id === 'd-fexp' && el.value) famDetailPatch(t, {fam: {...t.fam, expires: el.value}});
   if (el.id === 'd-stars') famDetailPatch(t, {stars: el.value === '' ? null : +el.value});
+  // 2.140.0 A (#2131, #2132): amount, unit, price of a shopping item; servings and recipe of a recipe / meal
+  if (el.id === 'd-fqty' || el.id === 'd-funit' || el.id === 'd-fprice') {
+    const q = el.id === 'd-fqty' ? (el.value.trim() === '' ? null : qtyParse(el.value)) : undefined, pr = el.id === 'd-fprice' ? moneyParse(el.value) : undefined;
+    if (q === undefined && pr === undefined) { famDetailPatch(t, {fam: shopFamWith(t, {unit: el.value.trim().slice(0, 16)})}); return; }
+    if ((el.id === 'd-fqty' && el.value.trim() !== '' && (q == null || q < 0 || q > 1e5)) || Number.isNaN(pr)) { toast(tr('Invalid value: {0}', el.id === 'd-fqty' ? tr('Quantity') : tr('Price'))); renderDetail(); return; }
+    famDetailPatch(t, {fam: shopFamWith(t, el.id === 'd-fqty' ? {qty: q} : {price: pr})});
+  }
+  if (el.id === 'd-fserves') {
+    const v = el.value === '' ? null : Math.max(1, Math.min(100, Math.round(+el.value) || 1));
+    const f = {...(t.fam || {kind: isRecipe(t) ? 'recipe' : 'meal'})}; if (v == null) delete f.serves; else f.serves = v;
+    famDetailPatch(t, {fam: Object.keys(f).length > 1 || t.fam ? f : null});  // a fam kind of its own stays
+  }
+  if (el.id === 'd-frecipe') {
+    const f = {...(t.fam || {}), kind: 'meal'}; if (el.value) f.recipe = +el.value; else delete f.recipe;
+    if (!f.recipe) delete f.serves;
+    famDetailPatch(t, {fam: Object.keys(f).length > 1 || t.fam?.kind === 'meal' ? f : null});
+  }
   if (el.id === 'd-rot') {
     if (!el.checked) { famDetailPatch(t, {rotation: null}); return; }
     const l = listById(t.list_id), ppl = listPeople(l).filter(p => !(l.members || []).find(m => m.user_id === p.user_id && m.agent)).map(p => p.user_id);
@@ -387,6 +577,7 @@ function shopModeOpen(lid) {
   });
   clearInterval(shopTimer);
   shopTimer = setInterval(shopPoll, 2000);
+  shopPoll();  // 2.140.0 A (#2131): fresh at once, so the local copy (the offline cache) is the latest one for the shop
   if (isMobile() || isTouch()) history.pushState({shop: lid}, '', location.hash);  // Android Back closes shopping mode, not the app
   // a phone keyboard would cover half the list: the field gets the focus only with a mouse / keyboard
   if (!isTouch()) setTimeout(() => $('.shopmode .shopadd input')?.focus({preventScroll: true}), 60);
@@ -402,8 +593,14 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('focusin', e => { if (e.target.matches?.('.famdlg input:not([type="checkbox"])') && !e.target.hasAttribute('enterkeyhint')) e.target.setAttribute('enterkeyhint', 'done'); });
 let shopTimer = 0;
+// 2.140.0 A (#2131): offline in the shop: ticks, unticks, new items and amounts wait in the outbox (core.js) and go out on
+// reconnect (last state wins); the poll then only tries quietly every 10 s, the hint and the number of waiting changes follow
+const shopSig = () => `${OUT.online ? 1 : 0}|${OUT.down ? 1 : 0}|${OUT.q.length}`;
 async function shopPoll() {
-  if (!S.shop || document.hidden || OUT.q.length || imeOn) return;  // the add field keeps its text and focus through a redraw
+  if (!S.shop) return;
+  if (S.shop.sig !== shopSig() && !imeOn) shopDraw();
+  if (document.hidden || OUT.q.length || imeOn) return;  // the add field keeps its text and focus through a redraw
+  if (!OUT.online && (S.shop.n = (S.shop.n || 0) + 1) % 5) return;
   try { const {v} = await api('GET', '/api/version'); if (v !== S.v) { await load(); shopDraw(); } } catch { /* offline: the ticks wait in the queue */ }
 }
 function shopDraw() {
@@ -413,14 +610,19 @@ function shopDraw() {
   const open = items.filter(t => t.status === 0), done = items.filter(t => t.status !== 0).sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''));
   const secs = S.sections.filter(s => s.list_id === l.id).sort((a, b) => a.sort - b.sort || a.id - b.id);
   const ro = !canAddTo(l.id);
-  const row = t => `<li class="shopi ${t.status ? 'done' : ''}"><button type="button" class="shopchk" data-act="shop-tick" data-id="${t.id}" role="checkbox" aria-checked="${t.status !== 0}" aria-label="${esc(t.title)}" ${canEdit(t) ? '' : 'disabled'}>${t.status ? ic('check') : ''}</button><span class="shopt">${esc(t.title)}</span>${!t.status && secs.length && canEditList(l.id) ? `<button type="button" class="iconbtn shoparea" data-act="shop-area" data-id="${t.id}" aria-haspopup="menu" title="${esc(tr('Shop area'))}" aria-label="${esc(tr('Shop area of {0}', t.title))}">${ic('columns', 's')}</button>` : ''}</li>`;
+  const qn = t => shopQty(t), pr = t => t.fam?.kind === 'shop' && t.fam.price != null ? t.fam.price : null;  // 2.140.0 A (#2131)
+  const row = t => `<li class="shopi ${t.status ? 'done' : ''}"><button type="button" class="shopchk" data-act="shop-tick" data-id="${t.id}" role="checkbox" aria-checked="${t.status !== 0}" aria-label="${esc((qn(t) ? qn(t) + ' ' : '') + t.title)}" ${canEdit(t) ? '' : 'disabled'}>${t.status ? ic('check') : ''}</button><span class="shopt">${esc(t.title)}${pr(t) != null ? `<small class="shoppr">${esc(fmtMoney(pr(t)))}</small>` : ''}</span><button type="button" class="shopq ${qn(t) ? '' : 'none'}" data-act="shop-qty" data-id="${t.id}" title="${esc(tr('Quantity and price'))}" aria-label="${esc(tr('Quantity and price of {0}', t.title) + (qn(t) ? ': ' + qn(t) : ''))}" ${canEdit(t) ? '' : 'disabled'}>${qn(t) ? esc(qn(t)) : ic('plus', 's')}</button>${!t.status && secs.length && canEditList(l.id) ? `<button type="button" class="iconbtn shoparea" data-act="shop-area" data-id="${t.id}" aria-haspopup="menu" title="${esc(tr('Shop area'))}" aria-label="${esc(tr('Shop area of {0}', t.title))}">${ic('columns', 's')}</button>` : ''}</li>`;
   const groups = [...secs.map(s => [s.name, open.filter(t => t.section_id === s.id)]), [tr('Other'), open.filter(t => !t.section_id || !secs.some(s => s.id === t.section_id))]].filter(g => g[1].length);
   const focusId = document.activeElement?.closest?.('.shopmode') ? (document.activeElement.dataset.id ? `[data-act="${document.activeElement.dataset.act}"][data-id="${document.activeElement.dataset.id}"]` : document.activeElement.id ? '#' + document.activeElement.id : '') : '';
   const val = $('#shop-in', ov)?.value || '';
+  S.shop.sig = shopSig();
+  const sum = ts => ts.reduce((a, t) => a + (pr(t) || 0), 0), priced = items.some(t => pr(t) != null);
+  const off = !OUT.online ? `<p class="shopoff" role="status">${ic('cloud', 's')}<span>${esc([OUT.down ? tr('Server not reachable – changes are sent later') : tr('Offline – changes are sent later'), OUT.q.length ? trn('{0} change waiting', '{0} changes waiting', OUT.q.length) : ''].filter(Boolean).join(' · '))}</span></p>` : '';
   $('.shopcard', ov).innerHTML = `<div class="shophead"><h2 id="shop-h">${ic('cart', 's')}<span>${esc(lname(l))}</span></h2><span class="shopn" role="status">${esc(open.length ? trn('{0} left', '{0} left', open.length) : tr('Everything in the cart'))}</span><span class="spacer"></span><button type="button" class="iconbtn shopx" data-act="shop-close" aria-label="${esc(tr('End shopping mode'))}" title="${esc(tr('End shopping mode'))}">${ic('x')}</button></div>
-    ${ro ? '' : `<form class="shopadd" data-shopadd><input id="shop-in" autocomplete="off" enterkeyhint="done" placeholder="${esc(tr('Add an item'))}" aria-label="${esc(tr('Add an item'))}"><button type="submit" class="btn pri" aria-label="${esc(tr('Add'))}">${ic('plus', 's')}</button></form>`}
+    ${off}${ro ? '' : `<form class="shopadd" data-shopadd><input id="shop-in" autocomplete="off" enterkeyhint="done" placeholder="${esc(tr('Add an item'))}" aria-label="${esc(tr('Add an item'))}"><button type="submit" class="btn pri" aria-label="${esc(tr('Add'))}">${ic('plus', 's')}</button></form>`}
     <div class="shopbody">${groups.map(([n, ts]) => `<section class="shopg"><h3>${esc(n)} <span class="c">${ts.length}</span></h3><ul>${ts.map(row).join('')}</ul></section>`).join('') || (items.length ? '' : `<p class="muted">${tr('The list is empty.')}</p>`)}
-    ${done.length ? `<section class="shopg shopdone"><h3>${tr('In the cart')} <span class="c">${done.length}</span></h3><ul>${done.map(row).join('')}</ul></section>` : ''}</div>`;
+    ${done.length ? `<section class="shopg shopdone"><h3>${tr('In the cart')} <span class="c">${done.length}</span></h3><ul>${done.map(row).join('')}</ul></section>` : ''}</div>
+    ${priced ? `<div class="shopsum" role="status"><span>${tr('Still to buy')} <b>${esc(fmtMoney(sum(open)))}</b></span><span>${tr('In the cart')} <b>${esc(fmtMoney(sum(done)))}</b></span></div>` : ''}`;
   if ($('#shop-in', ov)) $('#shop-in', ov).value = val;
   if (focusId) { const f = $(focusId, ov); if (f) f.focus({preventScroll: true}); }
 }
@@ -429,7 +631,19 @@ document.addEventListener('submit', async e => {
   e.preventDefault();
   const inp = $('#shop-in'), v = inp?.value.trim(); if (!v || !S.shop) return;
   inp.value = '';
-  try { await createTask({title: v, list_id: S.shop.lid}); await load(); } catch { /* api() said it */ }
+  // 2.140.0 A (#2131): a clear leading amount goes to the amount field; an open item of the same name is not added twice
+  // (the amount is added to it when the units match), also offline
+  const sp = shopSplit(v), lid = S.shop.lid, k = shopKeyC(sp.name);
+  const same = [...S.tasks.values()].find(t => t.list_id === lid && t.status === 0 && !t.deleted_at && !t.parent_id && shopKeyC(t.title) === k);
+  try {
+    if (same) {
+      const f = same.fam?.kind === 'shop' ? same.fam : null, uk = u => String(u || '').toLowerCase().replace(/\.$/, '');
+      if (sp.qty != null && !same.fam && shopSplit(same.title).qty == null) await patchTask(same.id, {fam: shopFamWith(same, {qty: sp.qty, unit: sp.unit})}, true);
+      else if (sp.qty != null && f?.qty != null && uk(f.unit) === uk(sp.unit)) await patchTask(same.id, {fam: shopFamWith(same, {qty: Math.round((f.qty + sp.qty) * 1000) / 1000})}, true);
+      toast(tr('Already on the list: {0}', same.title));
+    } else await createTask({title: sp.qty != null ? sp.name : v, list_id: lid, ...(sp.qty != null ? {fam: shopFamWith({}, {qty: sp.qty, unit: sp.unit})} : {})});
+    await load();
+  } catch { /* api() said it */ }
   shopDraw(); $('#shop-in')?.focus({preventScroll: true});
 });
 
@@ -446,6 +660,12 @@ document.addEventListener('click', async e => {
   else if (k === 'fam-meal') famMeal(a.dataset.day);
   else if (k === 'fam-ingr') famIngredients(id);
   else if (k === 'fam-week') { S.famWeek = addDays(S.famWeek || today(), +a.dataset.d); renderView(); $(`#view [data-act="fam-week"][data-d="${a.dataset.d}"]`)?.focus(); }
+  else if (k === 'fam-weeknow') { S.famWeek = null; renderView(); $('#view [data-act="fam-weekpick"]')?.focus(); }  // 2.140.0 A (#2132)
+  else if (k === 'fam-weekpick') famWeekPick();
+  else if (k === 'fam-plan') famPlan(id);
+  else if (k === 'fam-recipes') famRecipesOpen();
+  else if (k === 'fam-qtytitle') { const t = taskById(id), sp = shopSplit(t?.title); if (t && sp.qty != null) famDetailPatch(t, {title: sp.name, fam: shopFamWith(t, {qty: sp.qty, unit: sp.unit})}); }
+  else if (k === 'shop-qty') shopQtyEdit(id);
   else if (k === 'fam-shop' || k === 'shop-start') shopModeOpen(id || +a.dataset.lid);
   else if (k === 'fam-areas') { try { const j = await api('POST', `/api/lists/${a.dataset.lid}/shop-areas`, {}); await load(); render(); toast(trn('{0} shop area added', '{0} shop areas added', j.added)); } catch { /* api() said it */ } }
   else if (k === 'fam-give') famGive(+a.dataset.kid);
@@ -475,6 +695,8 @@ function famBar(l) {
     const n = shopOpen(l.id), hasSec = S.sections.some(s => s.list_id === l.id);
     return `<div class="fambar"><button type="button" class="btn pri shopgo" data-act="shop-start" data-lid="${l.id}">${ic('cart', 's')}<span>${tr('Shopping mode')}</span></button><span class="muted">${esc(trn('{0} item left', '{0} items left', n))}</span>${!hasSec && canEditList(l.id) ? `<button type="button" class="btn sm" data-act="fam-areas" data-lid="${l.id}">${ic('columns', 's')}<span>${tr('Add shop areas')}</span></button>` : ''}</div>`;
   }
+  // 2.140.0 A (#2132): a recipe = a task (servings in the task panel, ingredients + method in its description)
+  if (l.family === 'recipes') return `<div class="fambar"><a class="btn" href="#family">${ic('meal', 's')}<span>${tr('Week plan')}</span></a><span class="muted">${tr('A recipe per task: ingredients and method in its description.')}</span></div>`;
   if (l.family === 'meals') return `<div class="fambar"><a class="btn" href="#family">${ic('meal', 's')}<span>${tr('Week plan')}</span></a><span class="muted">${tr('A meal per day, the ingredients in its description.')}</span></div>`;
   if (l.family === 'birthdays') return `<div class="fambar"><button type="button" class="btn" data-act="fam-occ">${ic('cake', 's')}<span>${tr('Birthday')}</span></button><button type="button" class="btn" data-act="fam-contacts">${ic('users', 's')}<span>${tr('From contacts…')}</span></button></div>`;
   if (l.family === 'household') return `<div class="fambar"><button type="button" class="btn" data-act="fam-dl">${ic('hourglass', 's')}<span>${tr('Household deadline')}</span></button><a class="btn" href="#family">${ic('family', 's')}<span>${tr('Family')}</span></a></div>`;
