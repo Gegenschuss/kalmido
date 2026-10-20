@@ -11,6 +11,7 @@ minor one, anything that needs action on your side a major one.
 
 ### Fixed
 - CI of 2.125.0: the vacation client passes the type check, the notification tests count the new rows "Vacation requests" and "Timesheets" (#2117 #2119).
+- The client list could fail (error 500) when a time entry was stored without a time zone offset and entries are split at midnight (#2120).
 
 ## [2.125.0] - 2026-10-20
 
