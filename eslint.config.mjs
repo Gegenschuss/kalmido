@@ -16,9 +16,10 @@ const BROWSER = [
   'DecompressionStream', 'CompressionStream', 'Element', 'ErrorEvent', 'Event', 'File', 'FileReader', 'FormData', 'Headers',
   'Audio', 'Image', 'IntersectionObserver', 'MediaRecorder', 'MutationObserver', 'NodeFilter', 'Notification', 'Option', 'ResizeObserver', 'Request', 'Response',
   'TextDecoder', 'TextEncoder', 'URL', 'URLSearchParams', 'XMLHttpRequest', 'AbortController', 'HTMLElement', 'Node',
+  'IDBRequest', 'BroadcastChannel',
 ];
 const WORKER = ['self', 'caches', 'clients', 'registration', 'fetch', 'console', 'URL', 'URLSearchParams', 'Response',
-  'Request', 'Headers', 'setTimeout', 'clearTimeout', 'atob'];
+  'Request', 'Headers', 'setTimeout', 'clearTimeout', 'atob', 'indexedDB', 'BroadcastChannel'];
 const ro = names => Object.fromEntries(names.map(n => [n, 'readonly']));
 const RULES = {
   'no-undef': 'error',
