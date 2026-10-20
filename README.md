@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.138.5** (2026-10-20): a whole organisation moves between two Kalmido servers - the import of an organisation export
+  now takes over every area (office with finalised invoices and cash book, clients, file store, documents, knowledge
+  pages, tables, video sign-offs, team chat, absences, newsletter, forms, notes, time entries), with the references
+  between them; a freelancer exports their personal office and moves it into an organisation they administer.
 - **2.138.4** (2026-10-20): phones - office fixed-cost import rows stay whole, table checkbox cells tick on a tap
   with undo, sheet bar above the tab bar, Android print view, touch-sized controls in documents and bookmarks; the
   agent chat keeps an open edit; error-report webhook token in a header, contact copies out of mirrored address books,
@@ -38,10 +42,6 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **2.138.0** (2026-10-20): office - start number per number range, the quotation bar shows the next step, quotation
   fixes (units by quantity, renamed parts on the title page, wrapping PDF headings, closing kept together), import order
   and undo; resizable dialogs; rule triggers / actions and Kanban swimlanes; sidebar search at the bottom; security fixes.
-- **2.137.0** (2026-10-20): a whole organisation moves between two Kalmido servers - the import of an organisation export
-  now takes over every area (office with finalised invoices and cash book, clients, file store, documents, knowledge
-  pages, tables, video sign-offs, team chat, absences, newsletter, forms, notes, time entries), with the references
-  between them; a freelancer exports their personal office and moves it into an organisation they administer.
 - **2.126.2** (2026-10-20): pages on phones - suggestions stay above the keyboard, checkbox "+" without overlap; a
   news entry when someone shares pages with you; "Mentioned in" on tables; ended links and unreadable sealed pages shown as such.
 - **2.126.1** (2026-10-20): agents draft for you - office texts and reminders, document summaries, the client report

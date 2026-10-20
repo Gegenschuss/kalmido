@@ -78,7 +78,7 @@ never move office data. Undo takes the whole move back in one step (copies and a
 target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates|meals|contracts, ids, to:
 "private"|"org:<id>", dry, copy_issued}` -> `{notes, block, count, move_id}`; `{undo: move_id}` takes it back.
 
-**The whole personal office into an organisation** (2.137.0): Settings of the office, *Transfer into an organisation*, offered
+**The whole personal office into an organisation** (2.138.5): Settings of the office, *Transfer into an organisation*, offered
 when you are an admin of at least one organisation. The preview names what goes along (documents, payments, clients with
 their contact persons, master data, cash book, travel expenses, files ...), what stays in the personal office (its settings,
 company and bank data, your number counters, the start and real balances of the cash flow; the organisation keeps its own)
