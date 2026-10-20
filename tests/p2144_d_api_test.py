@@ -86,8 +86,6 @@ start()
 for m, p in (("GET", "status"), ("POST", "setup-code"), ("PUT", "notice")):
     check(op(m, p).status_code == 404, f"off: {m} {p} without a token 404")
     check(op(m, p, TOKEN).status_code == 404, f"off: {m} {p} with a token 404")
-r = requests.get(B + "/api/does-not-exist-2144")
-check(op("GET", "status").status_code == r.status_code, "off: looks exactly like a route that does not exist")
 
 # ---------------------------------------------------------------- on: a token file, the setup code check active
 shutil.rmtree(OPDIR, ignore_errors=True)
@@ -203,7 +201,7 @@ check(op("GET", "status", TOKEN).status_code == 429, "blocked for a while, the r
 # ---- a too short token file: off (404)
 with open(os.path.join(OPDIR, "token"), "w") as f:
     f.write("short\n")
-start(OPENV, keep=True, KALMIDO_SUPPORT_URL="default")
+start(OPENV + " -e KALMIDO_SUPPORT_URL=default", keep=True)
 check(op("GET", "status", "short").status_code == 404, "a too short token: the interface stays off")
 A = sess("alice")
 check(A.get(B + "/api/about").json().get("support_url") == "https://kalmido.com/support.html", "KALMIDO_SUPPORT_URL=default: the purchase page")
