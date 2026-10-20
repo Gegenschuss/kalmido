@@ -17,7 +17,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {org_name: 'Kalmido', lang: 'en', collab_all: true, modules: ['cal', 'comments']});
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,comments,collab,clients'});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,comments,collab,clients,office'});
   const w = await boot({hash: 'inbox'}), d = w.document;
   await until(() => d.querySelector('#side'), 60);
   w.eval(`go('office/settings')`);
