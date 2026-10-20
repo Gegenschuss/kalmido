@@ -274,11 +274,13 @@ def dsp_export():
     hdr = {"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"}
     if fmt == "csv":
         from ..core.serializers import csv_cell as cell
+        from ..core.access import list_role
         lists = {}
         for r in rows:
             if r["list_id"] and r["list_id"] not in lists:
                 x = c.execute("SELECT name, e2e FROM lists WHERE id=?", (r["list_id"],)).fetchone()  # row-level security: lists I may see
-                lists[r["list_id"]] = "" if not x or x["e2e"] else x["name"]
+                # 2.141.0 C (#2142, review): only names of lists I am a member of (the view shows no other names either)
+                lists[r["list_id"]] = "" if not x or x["e2e"] or not list_role(c, r["list_id"], uid) else x["name"]
         kind = {"user": tr("Person"), "contact": tr("Contact"), "equipment": tr("Equipment"), "set": tr("Equipment set")}
         status = {"option": tr("Option"), "firm": tr("Firm")}
         buf = io.StringIO()

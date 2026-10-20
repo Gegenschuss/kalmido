@@ -386,7 +386,10 @@ def nwl_consent_import():
         return err(tr("Invalid value: {0}", "csv"))
     if len(text.encode("utf-8")) > NWL_IMP_BYTES:
         return err(tr("The file is too large (at most {0} MB)", NWL_IMP_BYTES // (1024 * 1024)))
-    rows, cols = _imp_rows(text.lstrip("\ufeff"))
+    try:
+        rows, cols = _imp_rows(text.lstrip("\ufeff"))
+    except csv.Error:  # 2.141.0 C (#2143, review): an oversized field / broken quoting = a clear error, not a 500
+        return err(tr("Invalid value: {0}", "csv"))
     if len(rows) > NWL_IMP_ROWS:
         return err(tr("Too many rows (at most {0})", NWL_IMP_ROWS))
     fname = re.sub(r"[\x00-\x1f\x7f]", "", fname).strip()[-80:]

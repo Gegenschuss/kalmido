@@ -55,7 +55,7 @@ start type summary nowrap id name class style span headers scope abbr cite datet
 _URL_RE = re.compile(r"url\s*\(\s*(['\"]?)(.*?)\1\s*\)", re.I | re.S)
 _CSS_AT = re.compile(r"@import[^;]*;?|@namespace[^;]*;?|@charset[^;]*;?|@font-face\s*\{[^}]*\}", re.I)
 # a declaration that could run code or hide a word behind CSS escapes goes as a whole
-_CSS_BAD = re.compile(r"[^;{}]*(?:expression\s*\(|javascript\s*:|vbscript\s*:|behavior\s*:|-moz-binding|\\)[^;{}]*", re.I)
+_CSS_BAD = re.compile(r"[^;{}]*(?:expression\s*\(|javascript\s*:|vbscript\s*:|behavior\s*:|-moz-binding|image-set\s*\(|url\s*\((?![^)]*\))|\\)[^;{}]*", re.I)
 _LINK_OK = re.compile(r"^(https?:|mailto:|tel:|#)", re.I)
 
 
@@ -375,6 +375,8 @@ def mh_make_task(mid):
     l = c.execute("SELECT org_id, e2e, archived FROM lists WHERE id=?", (lid,)).fetchone()
     if _org(l["org_id"]) != _org(m["org_id"]):
         return err(tr("The list belongs to another workspace"), 409)
+    if l["archived"]:  # 2.141.0 B (#2139, review): not into an archived list
+        raise Denied(404)
     if l["e2e"] or le2b_list_locked(c, lid):
         return err(tr("Not possible in a locked list"), 409)
     title0, desc = _defaults(c, m)
