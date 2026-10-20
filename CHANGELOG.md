@@ -7,6 +7,23 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.126.2] - 2026-10-20
+
+Pages: suggestions above the phone keyboard, a news entry when someone shares pages with you, "Mentioned in" on tables.
+
+### Added
+- Pages: when someone shares a page or folder with you, the news show "X shared the page ... with you"; a tap opens
+  "Shared with me". It follows the existing "Sharing" row of the notification settings, no new push or mail (#2355).
+- Tables: a "Mentioned in" line lists the pages that link the table with [[tabelle:...]] (#2357).
+
+### Fixed
+- Pages on phones: the suggestion list after [[datei: / [[tabelle: stays above the on-screen keyboard; the "+" at
+  checkbox lines no longer overlap (hit area grows to the right only); a search hit only in a page name no longer shows
+  an empty "Found in the text" section (#2363).
+- Pages: a public link of an organisation page whose creator left the organisation is shown as ended and no longer
+  counts as an active share. A sealed page text whose key is missing is never shown or saved as text: the page is
+  "not readable" (409), search, history and export skip it (#2358).
+
 ## [2.126.1] - 2026-10-20
 
 Agents draft for you: office texts, document summaries, the client report, table rows as tasks and a planned morning

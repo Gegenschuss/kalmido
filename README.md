@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.126.2** (2026-10-20): pages on phones - suggestions stay above the keyboard, checkbox "+" without overlap; a
+  news entry when someone shares pages with you; "Mentioned in" on tables; ended links and unreadable sealed pages shown as such.
 - **2.126.1** (2026-10-20): agents draft for you - office texts and reminders, document summaries, the client report
   from the status report, table rows as tasks, a planned morning sort of the basket; always as a card you decide on.
 - **2.126.0** (2026-10-20): security release - fixes from the internal audit for office, documents, agents, sync and
