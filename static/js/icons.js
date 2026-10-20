@@ -1,8 +1,8 @@
-/* tasks — Kalmido, a self-hosted task manager. Vanilla JS, no build step.
+/* Kalmido — self-hosted task manager. Vanilla JS, no build step.
    State lives on the server (SQLite); the client keeps a copy, renders views
    from it and polls /api/version to pick up changes from other devices. */
 'use strict';
-const APP_NAME = 'Kalmido';  // display name (repo / container stay "tasks"; was Erledigo until 2026-09-25)
+const APP_NAME = 'Kalmido';
 
 // ------------------------------------------------------------------ icons
 // 2.8.0 (#434) icon set "Punkt": a 20 x 20 grid, open arcs and lines (1.6, round caps), and one filled dot per icon where it
@@ -395,7 +395,7 @@ function clearLocal() {
     for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('tasks.') && !LS_KEEP.has(k)) ks.push(k); }
     ks.forEach(k => localStorage.removeItem(k));
   } catch { /* private mode */ }
-  if (typeof obxClear === 'function') obxClear();  // 2.143.0 C (#2153): the offline queue in IndexedDB
+  return typeof obxClear === 'function' ? obxClear() : Promise.resolve();  // 2.143.0 C (#2153): the offline queue in IndexedDB (C2: awaitable)
 }
 // design per device: auto (follows the OS) | dark | light
 function applyTheme() {

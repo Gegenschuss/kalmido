@@ -484,7 +484,7 @@ async function logout() {
   await e2eForget();  // 2.42.0 (#828): keys remembered on this device go
   try { await fetch('/api/auth/logout', {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}); } catch { /* offline */ }
   try { for (const k of await caches.keys()) await caches.delete(k); } catch { /* no Cache Storage */ }  // 2.126.0 D (#1992 O4): the app loads again from the server
-  clearLocal(); location.replace('/');
+  await Promise.race([clearLocal(), new Promise(r => setTimeout(r, 1500))]); location.replace('/');  // 2.143.0 C2 (#2153): the IndexedDB queue is empty before the page goes
 }
 // login / first-run setup / "no account" screen (built-in login; with single sign-on the proxy logs in)
 async function authScreen(j) {

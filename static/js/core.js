@@ -408,7 +408,7 @@ async function obxDrain() {
 }
 const obxMeta = (k, v) => { if (OBX.on) OBX.st.setMeta(k, v).catch(() => {}); };
 // logout / another user in this browser (clearLocal): the queue goes with the rest of the local data
-function obxClear() { if (!OBX.on) return; for (const o of OUT.q) o.done = true; OUT.q = []; OBX.st.clear().then(() => { try { OBX.ch?.postMessage({clear: true}); } catch { /* closed */ } }, () => {}); }
+function obxClear() { if (!OBX.on) return Promise.resolve(); for (const o of OUT.q) o.done = true; OUT.q = []; return OBX.st.clear().then(() => { try { OBX.ch?.postMessage({clear: true}); } catch { /* closed */ } }, () => {}); }  // 2.143.0 C2 (#2153): a Promise (awaited before leaving the page)
 // Background Sync: the service worker sends the queue once the device is online again (it leaves it to an open tab)
 function obxSyncReg() { if (OBX.on && navigator.serviceWorker?.ready) navigator.serviceWorker.ready.then(r => r.sync?.register('kalmido-outbox')).catch(() => {}); }
 if (globalThis.navigator?.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data?.type === 'outbox-flush' && OUT.q.length) flush(); });

@@ -442,6 +442,7 @@ def manifest():
         m = json.load(f)
     lg = lang()
     m["lang"], m["description"] = lg, tr("Tasks, lists, calendar, habits, focus", lg=lg)
+    m["kalmido_max_file_mb"] = MAX_FILE_MB  # 2.143.0 C2 (#2154): the service worker's limit for shared files (browsers ignore the key)
     # long-press menu of the installed app (Android / desktop); the client handles these start URLs
     m["shortcuts"] = [{"name": tr(n, lg=lg), "short_name": tr(n, lg=lg), "url": u,
                        "icons": [{"src": f"/static/shortcuts/{k}-{z}.png", "sizes": f"{z}x{z}", "type": "image/png"} for z in (96, 192)]}

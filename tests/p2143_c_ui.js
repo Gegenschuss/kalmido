@@ -10,6 +10,9 @@
 // - #2153 the install hint: shown once, "Not now" closes it and it does not come back; "Don't show again" is kept; never in
 //   the installed app; on an iPhone the steps instead of the button
 // - #2154 the share sheet offers "Add to contacts" / "Add to calendar" for shared .vcf / .ics files
+// - 2.143.0 C2 review: the service worker sends only the app's own write routes again (no API v1, no GET, no other
+//   origin) and stops at anything else; a shared file above the upload limit or beyond 20 files is kept out and named;
+//   logging out awaits the cleared store; two shared calendar files ask one after another (never two dialogs at once)
 const {boot, errs, sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -176,6 +179,90 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(!w3.document.querySelector('.shdest [data-sd="contacts"]'), 'without a card: no contacts button');
   w3.document.querySelector('.shdest [data-sd="task"]')?.click();
   w3.close();
+
+  // ================= 2.143.0 C2 (#2153): logging out empties the store before the page goes
+  const br4 = browser();
+  const w4 = await boot({user: 'alice', hash: 'l/' + P, shared: br4.shared, setup: br4.setup});
+  br4.db.ops.set('left', {k: 'left', n: 1, method: 'PATCH', url: `/api/tasks/${T0}`, body: {title: 'x'}, uid: me});
+  const cl = w4.eval('clearLocal()');
+  check(cl && typeof cl.then === 'function', 'clearLocal gives a Promise');
+  await cl;
+  check(br4.db.ops.size === 0, `after it the store is empty (${br4.db.ops.size})`);
+  w4.close();
+
+  // ================= 2.143.0 C2 (#2153, #2154): the service worker in a sandbox
+  const vm = require('vm');
+  const SW = await (await fetch(B + 'sw.js')).text();
+  const swCache = new Map(), swFetch = [];
+  class R { constructor(b, o = {}) { this.b = b; this.headers = new Map(Object.entries(o.headers || {})); this.ok = o.status ? o.status < 400 : true; }
+    static redirect(u, st) { return {redirect: u, status: st}; } async json() { return JSON.parse(this.b); } }
+  const idb = {ops: new Map(), meta: new Map([['uid', {k: 'uid', v: me}]])};
+  const req = fn => { const r = {}; setTimeout(() => { try { r.result = fn(); r.onsuccess && r.onsuccess(); } catch (e) { r.error = e; r.onerror && r.onerror(); } }, 0); return r; };
+  const fakeDb = {objectStoreNames: {contains: () => true}, transaction: () => ({objectStore: n => ({
+    get: k => req(() => idb[n].get(k)), getAll: () => req(() => [...idb[n].values()]), put: v => req(() => idb[n].set(v.k, v)), delete: k => req(() => idb[n].delete(k))})})};
+  const swCtx = vm.createContext({
+    self: {addEventListener() {}, location: {origin: 'https://kalmido.example'}, clients: {matchAll: async () => []}, navigator: {}},
+    caches: {open: async () => ({keys: async () => [...swCache.keys()], delete: async k => swCache.delete(k), put: async (k, v) => { swCache.set(k, v); }}),
+      match: async k => k === '/manifest.json' ? new R(JSON.stringify({kalmido_max_file_mb: 1})) : undefined},
+    indexedDB: {open: () => req(() => fakeDb)},
+    fetch: async (u, o = {}) => { swFetch.push([(o.method || 'GET'), u]); const r = new R(JSON.stringify(u === '/api/me' ? {id: me} : {ok: true}));
+      r.headers = {get: () => 'application/json'}; return r; },
+    Response: R, URL, setTimeout, console, atob, Uint8Array, JSON,
+  });
+  vm.runInContext(SW, swCtx);
+  const okUrl = u => vm.runInContext(`SW_OBX_URL.test(${JSON.stringify(u)})`, swCtx);
+  check(okUrl('/api/tasks/-12') && okUrl('/api/lists/3/notes') && okUrl('/api/tasks/4?force=1'), 'service worker: the app\'s routes are sent');
+  check(!okUrl('/api/v1/tasks') && !okUrl('https://evil.example/api/tasks') && !okUrl('//evil.example/api/tasks') && !okUrl('/share') && !okUrl('/api/../x'),
+    'service worker: API v1, other origins and other paths are not');
+  idb.ops.set('a', {k: 'a', n: 1, method: 'PATCH', url: '/api/tasks/5', body: {title: 'one'}, uid: me});
+  idb.ops.set('b', {k: 'b', n: 2, method: 'POST', url: '/api/v1/tasks', body: {title: 'two'}, uid: me});
+  idb.ops.set('c', {k: 'c', n: 3, method: 'PATCH', url: '/api/tasks/6', body: {title: 'three'}, uid: me});
+  await vm.runInContext('swOutboxSend()', swCtx);
+  const sent = swFetch.filter(([, u]) => u !== '/api/me').map(([m, u]) => m + ' ' + u);
+  check(sent.join() === 'PATCH /api/tasks/5', `service worker: sent up to the foreign entry, then stopped ${JSON.stringify(sent)}`);
+  check(!idb.ops.has('a') && idb.ops.has('b') && idb.ops.has('c'), 'the foreign entry stays for the app, nothing after it went');
+  idb.ops.clear(); swFetch.length = 0;
+  idb.ops.set('g', {k: 'g', n: 1, method: 'GET', url: '/api/tasks/5', uid: me});
+  await vm.runInContext('swOutboxSend()', swCtx);
+  check(!swFetch.some(([m, u]) => u !== '/api/me'), 'a GET entry is not sent');
+  // the share target: limit 1 MB (from the manifest), at most 20 files
+  const fd = new FormData();
+  fd.append('title', 'Holiday');
+  fd.append('files', new Blob([new Uint8Array(1048577)], {type: 'video/mp4'}), 'big.mp4');
+  for (let i = 0; i < 21; i++) fd.append('files', new Blob(['BEGIN:VCALENDAR'], {type: 'text/calendar'}), `e${i}.ics`);
+  const red = await vm.runInContext('handleShare', swCtx)({headers: {get: () => 'none'}, referrer: '', formData: async () => fd});
+  const meta = JSON.parse(swCache.get('/share-inbox/meta').b);
+  check(red.redirect === '/?share=1', `share: the app opens (${red.redirect})`);
+  check(meta.files.length === 20 && meta.files[0].name === 'e0.ics' && swCache.has('/share-inbox/19') && !swCache.has('/share-inbox/20'), `share: 20 files kept (${meta.files.length})`);
+  check(meta.refused.map(f => f.name).join() === 'big.mp4,e20.ics' && meta.max_mb === 1 && meta.max_files === 20, `share: the too large one and the 21st are named ${JSON.stringify(meta.refused)}`);
+
+  // ================= 2.143.0 C2 (#2154): two shared calendar files = one question after the other, the refused one is named
+  await call('POST', '/api/evcals', {name: 'Shared here'});
+  const ics = n => `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:p2143c2-${n}@example.com\r\nDTSTART:20261101T090000Z\r\nDTEND:20261101T100000Z\r\nSUMMARY:Shared ${n}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
+  const shareSetup = w => {
+    const m = {title: '', text: '', url: '', files: [{name: 'a.ics', type: 'text/calendar', size: 9}, {name: 'b.ics', type: 'text/calendar', size: 9}], refused: [{name: 'clip.mov', size: 9e9}], max_mb: 50, max_files: 20};
+    const items = {'/share-inbox/meta': {json: async () => m}, '/share-inbox/0': {blob: async () => new w.Blob([ics('a')], {type: 'text/calendar'})},
+      '/share-inbox/1': {blob: async () => new w.Blob([ics('b')], {type: 'text/calendar'})}};
+    w.caches = {open: async () => ({match: async k => items[k]}), delete: async () => true, keys: async () => []};
+    w.__dialogs = 'manual';  // boot.js would answer the questions itself
+  };
+  const w5 = await boot({user: 'alice', path: '?share=1', setup: shareSetup});
+  check(await until(() => /clip\.mov/.test(w5.document.querySelector('#toast')?.textContent || '')), 'share: the refused file is named');
+  check(await until(() => !!w5.document.querySelector('.shdest [data-sd="calendar"]')), 'share: "Add to calendar" is offered');
+  w5.document.querySelector('.shdest [data-sd="calendar"]')?.click();
+  const dlgUp = await until(() => w5.document.querySelectorAll('.itc-dlg').length === 1);
+  check(dlgUp, 'the first calendar file asks ' + (dlgUp ? '' : JSON.stringify({modals: [...w5.document.querySelectorAll('.modal')].map(m => m.className + ':' + m.textContent.slice(0, 80)),
+    toast: w5.document.querySelector('#toast')?.textContent, cals: w5.eval('(S.evcals || []).map(c => [c.id, c.org_id, c.role])'), hash: w5.location.hash})));
+  await sleep(300);
+  check(w5.document.querySelectorAll('.itc-dlg').length === 1, `only one question at a time (${w5.document.querySelectorAll('.itc-dlg').length})`);
+  const d1 = w5.document.querySelector('.itc-dlg');
+  d1?.querySelector('form')?.requestSubmit();
+  check(await until(() => w5.document.querySelectorAll('.itc-dlg').length === 1 && w5.document.querySelector('.itc-dlg') !== d1), 'then the second one asks');
+  w5.document.querySelector('.itc-dlg form')?.requestSubmit();
+  check(await until(() => !w5.document.querySelector('.itc-dlg')), 'and no question is left');
+  check(await until(async () => ((await call('GET', '/api/events?from=2026-10-25&to=2026-11-05')).items || []).filter(e => /^Shared [ab]$/.test(e.title)).length === 2),
+    'both events arrived');
+  w5.close();
 
   check(!errs.length, 'no script errors: ' + errs.slice(0, 3).join(' | '));
   console.log(`${ok} ok, ${F.length} failed`);
