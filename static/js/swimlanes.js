@@ -1,3 +1,4 @@
+// @ts-check
 /* Kalmido web client: Kanban swimlanes.
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
@@ -55,7 +56,7 @@ function swlMenu(anchor, lid) {
     ...swlFields(lid).map(f => ({label: f.name, icon: f.type === 'checkbox' ? 'check' : 'list', on: m === 'f' + f.id, fn: () => swlSet(lid, 'f' + f.id)}))]);
 }
 document.addEventListener('click', e => {
-  const b = e.target.closest?.('#view [data-swl-menu]'); if (!b) return;
+  const b = /** @type {any} */ (e.target).closest?.('#view [data-swl-menu]'); if (!b) return;
   swlMenu(b, +b.dataset.swlMenu);
 });
 // the board with lanes; o = the column parts of viewKanban (head, add, knew), so both boards draw a column the same way

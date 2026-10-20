@@ -1,3 +1,4 @@
+// @ts-check
 // 2.138.0 D (#2256): number ranges -- the office admin sets the next running number of every series (quotation, invoice,
 // credit note, reminder, delivery note) under the number schemes of the settings, and a draft's number can be changed in the document
 // editor (click on the number). Own save per row via /api/office/number-ranges (not the settings' save, hence the ids
@@ -112,15 +113,17 @@ async function onumDocSave() {
 function onumListFresh() {
   if (typeof OFD !== 'object' || typeof ofcTab !== 'function' || S.route?.mod !== 'office' || ofcTab() !== 'offers' || S.route.id || OFD.loading || !OFD.list) return;
   // 2.138.0 D (#2256, review): every state push calls this -> at most one reload per 5 s, a later push within it reloads at its end
-  const wait = 5000 - (Date.now() - (onumListFresh.at || 0));
-  if (wait > 0) { if (!onumListFresh.timer) onumListFresh.timer = setTimeout(() => { onumListFresh.timer = 0; onumListFresh(); }, wait); return; }
-  onumListFresh.at = Date.now();
+  const f = /** @type {any} */ (onumListFresh);
+  const wait = 5000 - (Date.now() - (f.at || 0));
+  if (wait > 0) { if (!f.timer) f.timer = setTimeout(() => { f.timer = 0; onumListFresh(); }, wait); return; }
+  f.at = Date.now();
   ofdLoadList(true);
 }
 
 document.addEventListener('click', e => {
-  const b = e.target.closest?.('[data-onum]');
-  if (!b) { if (e.target.closest?.('.ofdhead .ofdnum b') && typeof OFD === 'object' && onumDocCan(OFD.doc) && !ONUM.doc) onumDocOpen(); return; }
+  const tg = /** @type {any} */ (e.target);
+  const b = tg.closest?.('[data-onum]');
+  if (!b) { if (tg.closest?.('.ofdhead .ofdnum b') && typeof OFD === 'object' && onumDocCan(OFD.doc) && !ONUM.doc) onumDocOpen(); return; }
   const a = b.dataset.onum;
   if (a === 'set') { e.preventDefault(); onumApply(b.dataset.kind); }
   else if (a === 'doc-open') onumDocOpen();
@@ -128,7 +131,7 @@ document.addEventListener('click', e => {
   else if (a === 'doc-x') { ONUM.doc = null; ofdDraw(); }
 });
 document.addEventListener('input', e => {
-  const t = e.target;
+  const t = /** @type {any} */ (e.target);
   if (t.dataset?.onumIn) {
     const k = t.dataset.onumIn, r = (ONUM.ranges || []).find(x => x.kind === k); if (!r) return;
     ONUM['v' + k] = t.value; delete ONUM['e' + k];
@@ -142,9 +145,9 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
-  const t = e.target;
+  const t = /** @type {any} */ (e.target);
   if (t.dataset?.onumIn || t.dataset?.onumWhy) { e.preventDefault(); onumApply(t.dataset.onumIn || t.dataset.onumWhy); }  // never the settings' submit
   else if (t.id === 'onum-doc' || t.id === 'onum-doc-why') { e.preventDefault(); e.stopPropagation(); onumDocSave(); }
 }, true);
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && ONUM.doc && (e.target.id === 'onum-doc' || e.target.id === 'onum-doc-why')) { ONUM.doc = null; ofdDraw(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && ONUM.doc && (/** @type {any} */ (e.target).id === 'onum-doc' || /** @type {any} */ (e.target).id === 'onum-doc-why')) { ONUM.doc = null; ofdDraw(); } });
 if (typeof OA_LOG_TG === 'object') OA_LOG_TG.number_range = N_('Number ranges');  // the office log names the target
