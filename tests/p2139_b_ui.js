@@ -55,6 +55,8 @@ function fakeMic(w) {
   const BOB = (await call('POST', '/api/users', {orgs: [ORG], username: 'bob', display_name: 'Bob', password: 'password123'})).id;
   const BCK = await login('bob');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT}, BCK);
+  const L = (await call('POST', '/api/lists', {name: 'Team', org_id: ORG})).id;  // alice and bob work together (direct messages)
+  await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'edit'});
   const CH = (await call('POST', '/api/team/channels', {name: 'Studio', org_id: ORG, members: [BOB]})).id;
   check(CH > 0, 'a channel to start with');
   await call('POST', `/api/team/rooms/${CH}/messages`, {body: 'Hello'}, BCK);
@@ -65,7 +67,7 @@ function fakeMic(w) {
     await until(() => d.querySelector('#tc-in'));
     const mic = await until(() => d.querySelector('.tccomp [data-act="tvc-rec"]'));
     const clip = d.querySelector('.tccomp [data-act="tc-attach"]');
-    check(mic && clip && clip.nextElementSibling === mic && !mic.classList.contains('hidden') && mic.getAttribute('aria-label') === 'Record a voice message'
+    check(mic && clip && clip.parentElement === mic.parentElement && mic.previousElementSibling?.id === 'tc-file' && !mic.classList.contains('hidden') && mic.getAttribute('aria-label') === 'Record a voice message'
       && mic.querySelector('svg'), 'composer: the microphone (app icon) next to the paperclip');
     const ta = d.querySelector('#tc-in');
     ta.value = 'typing'; ta.dispatchEvent(new w.Event('input', {bubbles: true}));
