@@ -364,6 +364,30 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .kcards .trow:hover{background:var(--bg3)}
 .kadd input{width:100%;margin-top:.375rem;background:transparent;border-style:dashed}
 .knew{flex:0 0 13.75rem;padding:.5rem}
+/* 2.138.0 D (#2060): Kanban swimlanes (swimlanes.js); a mouse shows a lane's "+ Task" on pointing at its cell */
+.swlbar{display:flex;justify-content:flex-end;margin:0 0 .5rem}
+.swlbtn.on{color:var(--accent);border-color:var(--accent)}
+.kanban.swl{display:block}
+.kanban.swl>*{width:max-content;min-width:100%}
+.swlrow{display:flex;gap:.75rem}
+.swlhrow{align-items:flex-start}
+.swlhc,.swlc{max-height:none}
+.swlhc{padding-bottom:0}
+.swlhc .khead{padding-bottom:.25rem}
+.swlc{min-height:3.5rem}
+.swlc .kcards{overflow:visible}
+.swlane{margin-top:.75rem}
+.swlh{position:sticky;left:0;display:inline-flex;align-items:center;gap:.375rem;max-width:calc(100vw - 2.5rem);min-height:2.25rem;padding:.25rem .5rem;margin-bottom:.375rem;background:none;border:0;border-radius:var(--radius);color:var(--text2);font-weight:600;font-size:var(--fs-s);cursor:pointer}
+.swlh:hover{background:var(--bg3)}
+.swlh>svg:first-child{transition:transform .15s;color:var(--muted)}
+.swlane.closed .swlh>svg:first-child{transform:rotate(-90deg)}
+.swln{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.swlh .c{font:500 var(--fs-xs)/1 var(--mono);color:var(--muted)}
+.swlh .flag-0{color:var(--muted)}
+.swldot{--fc:var(--muted);width:.625rem;height:.625rem;border-radius:50%;background:var(--fc);flex:none}
+.swlav{width:1.25rem;height:1.25rem;font-size:.5625rem;flex:none}
+@media (hover:hover){.swlc .kadd{opacity:0;transition:opacity .15s}.swlc:hover .kadd,.swlc .kadd:focus-within{opacity:1}}
+@media (prefers-reduced-motion:reduce){.swlh>svg:first-child,.swlc .kadd{transition:none}}
 
 /* ---------- calendar ---------- */
 .calbar{display:flex;align-items:center;gap:.5rem;margin-bottom:.625rem}

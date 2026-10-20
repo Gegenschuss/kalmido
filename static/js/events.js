@@ -801,8 +801,8 @@ document.addEventListener('keydown', async e => {
     if (t.dataset.kadd !== undefined && t.value.trim()) {
       const lid = S.route.key === 'inbox' ? inbox().id : +S.route.key.slice(2);
       const r = parseQuick(t.value.trim()); t.value = '';
-      await createTask({title: r.title, list_id: lid, section_id: t.dataset.kadd ? +t.dataset.kadd : null, due: r.due, due_time: r.due_time, priority: r.priority || 0, tags: r.tags || [], repeat: r.repeat || ''});
-      $(`[data-kadd="${t.dataset.kadd}"]`)?.focus(); return;
+      await createTask({title: r.title, list_id: lid, section_id: t.dataset.kadd ? +t.dataset.kadd : null, due: r.due, due_time: r.due_time, priority: r.priority || 0, tags: r.tags || [], repeat: r.repeat || '', ...swlNew(lid, t.dataset.swl, r)});  // 2.138.0 D (#2060): + the swimlane's value
+      [...$$('[data-kadd]')].find(x => x.dataset.kadd === t.dataset.kadd && x.dataset.swl === t.dataset.swl)?.focus(); return;
     }
     if (t.dataset.qadd !== undefined && t.value.trim()) {
       const r = parseQuick(t.value.trim()); t.value = '';
