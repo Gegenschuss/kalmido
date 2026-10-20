@@ -284,6 +284,11 @@ ev = wait_for(lambda: [e for e in events(cl, "scheduled_job") if e["data"]["sche
 check(len(ev) == 1 and ev[0]["data"]["prompt"] == "Write the week plan.", "a chat plan still sends scheduled_job")
 r = Bo.patch(B + f"/api/agent-schedules/{PC}", json={"action": "triage"})
 check(r.ok and r.json()["action"] == "triage" and r.json()["prompt"] == "Write the week plan.", "a chat plan can become a triage plan (text kept)")
+# 2.126.1 review: a manager of the agent (the instance admin) never sends bob's basket to the agent
+r = plan(Bo, title="Status note", prompt="Write the status note.")
+PM = r.json().get("id")
+check(A.patch(B + f"/api/agent-schedules/{PM}", json={"action": "triage"}).status_code == 403, "a manager cannot turn bob's chat plan into sorting his basket")
+check(A.post(B + f"/api/agent-schedules/{PT}/run").status_code == 403, "a manager cannot run bob's triage plan now")
 
 # ================================================================ a person without an organisation
 # freelancer-matrix: sheets, agents
