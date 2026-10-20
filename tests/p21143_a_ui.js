@@ -36,7 +36,8 @@ const near = (a, b) => Math.abs(+a - +b) < 0.005;
   const st = await call(CF, 'PUT', '/api/office/settings', {industry_packs: ['film']});
   check(st.http === 200, 'the pack Film & Video in the personal office ' + st.http);
   const cl = await call(CF, 'POST', '/api/clients', {name: 'Beispiel Medien GmbH'});
-  const q = await call(CF, 'POST', '/api/office/docs', {project_title: 'Imagefilm', client_id: cl.id});
+  // 2.138.4 (#2252): since 2.113.1 the film pack switches handling costs (4 %) on for a new quotation - off here, the sums below are without them
+  const q = await call(CF, 'POST', '/api/office/docs', {project_title: 'Imagefilm', client_id: cl.id, handling_pct: null});
   const D = `/api/office/docs/${q.id}`;
   check((await call(CF, 'PATCH', D, {producing_on: 1, prod_quotient: 3, producing_rate: 500, raw_mode: 'none', discount_pct: 0})).http === 200, 'the calculation values of the document');
   // part A: takes over the document (4.5 producing days / 3 = 1.5 days), part B: own setting, producing off
