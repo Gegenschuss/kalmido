@@ -103,3 +103,47 @@ if (MW_ON && MW_TASK) {
   };
   setTimeout(sync, 300); setInterval(sync, 1000);
 }
+
+// ---- 2.145.0 B (#2424): an own window starts from the state the app already has open. The start scripts run ~0.6 s; the full state
+// request (all lists and tasks) came on top of that. Now the window asks the open app windows of this browser (BroadcastChannel, same
+// origin, same person: the uid of this browser's storage) for their state while its scripts still run, draws from it at once and fetches
+// the state behind it (the usual full load, then a redraw that waits for unsaved input like the poll's). The answer is serialised like
+// the offline cache (LS.set: le2eRepl, the ciphers of encrypted lists only, never a key), so nothing the window could not read from
+// this browser anyway. No answer within 200 ms after the scripts ran (no app window open, a busy one), a change still waiting to be
+// sent, another person: the normal start.
+const MW_SNAP_CH = 'kalmido-mini-state';
+const mw_snapP = MW_ON && typeof BroadcastChannel === 'function' && LS.get('uid', null) != null ? new Promise(res => {
+  const uid = LS.get('uid', null), ask = Math.random().toString(36).slice(2), ch = new BroadcastChannel(MW_SNAP_CH);
+  const done = j => { ch.onmessage = null; ch.close(); res(j); };
+  ch.onmessage = e => {
+    const m = e.data; if (!m || m.re !== ask || m.uid !== uid || typeof m.state !== 'string') return;
+    let j = null; try { j = JSON.parse(m.state); } catch { /* broken: wait for another answer or the time-out */ }
+    if (j?.me?.id === uid && Array.isArray(j.lists) && Array.isArray(j.tasks)) done(j);
+  };
+  setTimeout(() => done(null), 8000);  // the channel does not stay open
+  ch.postMessage({ask, uid});
+}) : null;
+let mw_snapUsed = false;
+async function mw_bootLoad() {  // main.js: instead of load() in an own window
+  const j = mw_snapP ? await Promise.race([mw_snapP, new Promise(r => setTimeout(() => r(null), 200))]) : null;
+  if (!j || OUT.q.length || S.tasks.size) return load();
+  OUT.me = j.me.id; applyState(j); S.lpCache = j; mw_snapUsed = true;
+  try { performance.mark('kalmido:snap'); } catch { /* old browser */ }
+}
+async function mw_bootSync() {  // main.js, after the first picture: the real state behind it
+  if (!mw_snapUsed) return;
+  try { await load(); } catch { return; /* offline / signed out: the poll and api() take it from here */ }
+  td_renderSoon();
+}
+// a booted main window answers (own windows do not: they would serialise the same state once more): its current state, like the offline cache
+if (!MW_ON && typeof BroadcastChannel === 'function') {
+  try {
+    const ch = new BroadcastChannel(MW_SNAP_CH);
+    ch.onmessage = e => {
+      const m = e.data; if (!m || typeof m.ask !== 'string' || !S.booted || !S.me || m.uid !== S.me.id || !S.lpCache || OUT.q.length) return;
+      let state;
+      try { state = JSON.stringify({...S.lpCache, v: S.v, tasks: [...S.tasks.values()], lists: S.lists, counts: S.counts}, typeof le2eRepl === 'function' ? le2eRepl() : undefined); } catch { return; }
+      ch.postMessage({re: m.ask, uid: S.me.id, state});
+    };
+  } catch { /* no channel: every window starts on its own */ }
+}
