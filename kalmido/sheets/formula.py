@@ -3,6 +3,7 @@
 An input starting with "=" is a formula: + - * /, brackets, comparisons (= <> < > <= >=, for IF), text in "..." joined with &,
 19% = 0.19, arguments split by ";" (German Excel) or "," (accepted too). Functions (German names, English aliases): SUMME/SUM,
 MITTELWERT/AVERAGE, MIN, MAX, ANZAHL/COUNT, WENN/IF, RUNDEN/ROUND, HEUTE/TODAY, TAGE/DAYS. A date plus a number is a date.
+2.124.0 A (#2109): more in sheets/shfuncs.py (SUMMEWENN, ZÄHLENWENN, SVERWEIS, XVERWEIS, text and date functions).
 References: A1, A1:B5, a cell's own name, a column's name (= every cell of the column but the formula's own), Kalmido variables
 projekt.<name>.<field>, liste.<name>.<field>, kunde.<name>.<field>, hier.<field> (sheets/vars.py).
 
@@ -18,7 +19,7 @@ from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 SH_RAW_MAX = 10_000
-SH_ERR_KINDS = ("deleted", "denied", "cycle", "syntax", "div0", "ref", "type")
+SH_ERR_KINDS = ("deleted", "denied", "cycle", "syntax", "div0", "ref", "type", "na")  # 2.124.0 A (#2109): + na = not found
 SH_FUNCS = {"summe": "sum", "sum": "sum", "mittelwert": "avg", "average": "avg", "min": "min", "max": "max",
             "anzahl": "count", "count": "count", "wenn": "if", "if": "if", "runden": "round", "round": "round",
             "heute": "today", "today": "today", "tage": "days", "days": "days"}
@@ -31,7 +32,9 @@ SH_MAX_DEPTH = 200  # 2.89.0 (#1916): review 4, the depth of a formula's tree (=
 SH_MAX_NEST = 64  # brackets / functions / signs inside each other (Excel allows 64) -> syntax "deep"
 
 _A1 = re.compile(r"\$?([A-Za-z]{1,3})\$?(\d{1,6})(?![\w.$])")
-_IDREF = re.compile(r"\{(c|col|p|l|k|t):(\d{1,18})\}((?:\.\w+)?)")
+_IDREF = re.compile(r"\{(c|col|p|l|k|t|x):(\d{1,18})\}((?:\.\w+)?)")  # 2.124.0 E (#2116): + x = a cell of another sheet of the table
+# 2.124.0 E (#2116): Blatt2!A1, 'Mein Blatt'!A1:B5 (a sheet of the same table, as in .xlsx)
+_XREF = re.compile(r"(?:'((?:[^']|''){1,100})'|([^\W\d][\w.]{0,99}))!\$?([A-Za-z]{1,3})\$?(\d{1,6})(?::\$?([A-Za-z]{1,3})\$?(\d{1,6}))?(?![\w.$(])")
 _IDENT = re.compile(r"[^\W\d]\w*(?:\.\w+)*")
 _NUM = re.compile(r"\d+(?:[.,]\d+)?(?:[eE][+-]?\d+)?|[.,]\d+")
 _DATE_DE = re.compile(r"(\d{1,2})\.(\d{1,2})\.(\d{4})")
@@ -127,6 +130,14 @@ def sh_tokens(s):
             out.append(("num", v, i, i + len(txt)))
             i += len(txt)
             continue
+        if ch == "'" or ch.isalpha() or ch == "_":  # 2.124.0 E (#2116): a reference into another sheet
+            m = _XREF.match(s, i)
+            if m:
+                name = m.group(1).replace("''", "'") if m.group(1) is not None else m.group(2)
+                end = (m.group(5).upper(), int(m.group(6))) if m.group(5) else None
+                out.append(("xref", (name, (m.group(3).upper(), int(m.group(4))), end), i, m.end()))
+                i = m.end()
+                continue
         if ch == "$" or ch.isalpha() or ch == "_":
             m = _A1.match(s, i)
             if m and not (i + len(m.group()) < n and s[i + len(m.group())] == "("):
@@ -231,6 +242,8 @@ class _Parser:
                 raise ShErr("syntax", ":")
             self.i += 1
             node2 = self.resolve(tok2)
+            if node[0] == "xcell" and node2[0] == "xcell":  # 2.124.0 E (#2116): {x:..}:{x:..} (stored form)
+                return ("xrange", node[1], node2[1])
             if node[0] != "cell" or node2[0] != "cell":
                 raise ShErr("syntax", ":")
             return ("range", node[1], node2[1])
@@ -244,7 +257,7 @@ class _Parser:
         if k == "str":
             self.i += 1
             return ("s", v)
-        if k in ("a1", "idref"):
+        if k in ("a1", "idref", "xref"):  # 2.124.0 E (#2116): + xref
             return self.ref()
         if k == "ident":
             if v.lower() in SH_BOOLS:
@@ -252,7 +265,7 @@ class _Parser:
                 return ("b", SH_BOOLS[v.lower()])
             return self.ref()
         if k == "fn":
-            key = SH_FUNCS.get(v.lower())
+            key = sh_fn_key(v)  # 2.124.0 A (#2109): + the functions of sheets/shfuncs.py
             if not key:
                 raise ShErr("syntax", v)
             self.i += 2  # name + "("
@@ -596,6 +609,11 @@ class ShEval:
             return self.env.var(n[1], n[2], n[3])
         if k == "here":
             return self.env.here(n[1])
+        if k in ("xcell", "xrange"):  # 2.124.0 E (#2116): a cell / range of another sheet of the table
+            fn = getattr(self.env, k, None)
+            if fn is None:
+                raise ShErr("ref")
+            return fn(*n[1:])
         if k == "neg":
             return -_num(self.scalar(n[1]))
         if k == "pct":
@@ -703,7 +721,8 @@ class ShEval:
             if len(args) != 2:
                 raise ShErr("syntax", "TAGE")
             return float((_date(self.scalar(args[0])) - _date(self.scalar(args[1]))).days)
-        raise ShErr("syntax", key)
+        from .shfuncs import shf_call  # 2.124.0 A (#2109): SUMMEWENN, SVERWEIS, text and date functions
+        return shf_call(self, key, args)
 
     def flat_count(self, args):
         out = []
@@ -717,6 +736,16 @@ class ShEval:
                 elif isinstance(x, str) and not isinstance(v, list) and sh_parse_number(x) is not None:
                     out.append(x)
         return out
+
+
+def sh_fn_key(name):
+    """2.124.0 A (#2109): the key of a function name (any case): the classic ones above, then those of sheets/shfuncs.py."""
+    low = (name or "").lower()
+    key = SH_FUNCS.get(low)
+    if key is None:
+        from .shfuncs import SHF_NAMES
+        key = SHF_NAMES.get(low)
+    return key
 
 
 def sh_today():

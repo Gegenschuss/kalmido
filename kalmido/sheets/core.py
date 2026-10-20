@@ -26,10 +26,14 @@ from ..accounts.session import me
 from ..collab.comments import user_names
 from ..personal.timetrack import BadInput
 from .formula import (SH_FUNCS, SH_RAW_MAX, SH_TEXT_BUDGET, ShErr, ShEval, sh_col_index, sh_col_letter, sh_fmt, sh_freeze_dump, sh_freeze_load,
-                      sh_json_value, sh_name_ok, sh_parse, sh_parse_date, sh_plain_value, sh_slug, sh_today, sh_tokens, sh_vtype)
+                      sh_fn_key, sh_json_value, sh_name_ok, sh_parse, sh_parse_date, sh_plain_value, sh_slug, sh_today, sh_tokens, sh_vtype)
+from .shfuncs import SHF_HELP
 from .vars import SH_VAR_WORD, sh_fields_of, sh_here_value, sh_slug_of, sh_id_of, sh_source, sh_var_value
+from .shkinds import SHK_KINDS, shk_plain, shk_raw  # 2.124.0 B (#2110): checkbox, person, link, file
+from .shbook import (shb_counts, shb_deleted, shb_dict, shb_display, shb_internal, shb_only_books, shb_pairs, shb_rights_row,
+                     shb_check, shb_touch)  # 2.124.0 E (#2116): several sheets in one table
 
-SH_KINDS = ("text", "number", "currency", "percent", "date", "select")
+SH_KINDS = ("text", "number", "currency", "percent", "date", "select") + SHK_KINDS  # 2.124.0 B (#2110): + checkbox, person, link, file
 SH_COLOR_MODES = ("cell", "row")
 SH_TITLE_MAX, SH_COL_TITLE_MAX, SH_COLS_MAX, SH_ROWS_MAX, SH_CELLS_MAX, SH_OPTIONS_MAX = 200, 80, 200, 5000, 5000, 100
 SH_START_COLS, SH_START_ROWS = 3, 10
@@ -37,7 +41,7 @@ SH_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
 SH_OPT_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,24}")
 SH_ERR_TEXT = {"deleted": N_("Source deleted"), "denied": N_("No access"), "cycle": N_("Circular reference"),
                "syntax": N_("Formula error"), "div0": N_("Division by zero"), "ref": N_("Reference not found"),
-               "type": N_("Wrong type of value")}
+               "type": N_("Wrong type of value"), "na": N_("Not found")}  # 2.124.0 A (#2109): + na (SVERWEIS / XVERWEIS)
 SH_PRESENCE_S = 15
 _PRES, _PRES_LOCK = {}, threading.Lock()
 
@@ -87,10 +91,17 @@ def sh_list_bound(c, r):
     return l
 
 
-def sh_may(c, uid, r, write=False):
-    """May uid read (write: change) sheet r?"""
+def sh_may(c, uid, r, write=False, share=True):
+    """May uid read (write: change) sheet r? share=False: through the space / list only."""
     if not uid:
         return False
+    r = shb_rights_row(c, r)  # 2.124.0 E (#2116): a further sheet has the rights of its table's first sheet
+    if r is None:
+        return False
+    if share:  # 2.124.0 C (#2113): a share of this one table adds to the rights below (sheets/shshare.py)
+        from .shshare import shs_may
+        if shs_may(c, uid, r, write):
+            return True
     l = sh_list_bound(c, r)
     if sh_is_agent(c, uid):
         if l is not None:
@@ -134,7 +145,7 @@ def sh_need(c, sid, write=False, deleted=False):
     """The sheet row for the current principal; 404 when they may not see it (or it is (not) in the trash), 403 read-only."""
     r = c.execute("SELECT * FROM sheets WHERE id=?", (sid,)).fetchone() if isinstance(sid, int) and 0 < sid < 2 ** 62 else None
     uid = me()
-    if not r or bool(r["deleted_at"]) != deleted or not sh_may(c, uid, r):
+    if not r or shb_deleted(c, r) != deleted or not sh_may(c, uid, r):  # 2.124.0 E (#2116): + the table's first sheet in the trash
         raise Denied(404)
     if write and not sh_may(c, uid, r, write=True):
         raise Denied(403)
@@ -147,7 +158,9 @@ def sh_reload(c, sid):
 
 def sh_touch(c, sid, uid):
     """The sheet changed: its counter + time (the app reloads it), and the area counter of /api/version."""
-    c.execute("UPDATE sheets SET rev=rev+1, updated_at=?, updated_by=? WHERE id=?", (iso_ms(now_utc()), uid, sid))
+    ts = iso_ms(now_utc())
+    c.execute("UPDATE sheets SET rev=rev+1, updated_at=?, updated_by=? WHERE id=?", (ts, uid, sid))
+    shb_touch(c, sid, ts, uid)  # 2.124.0 E (#2116): the other sheets of the table
     bump(c)
 
 
@@ -319,9 +332,17 @@ def sh_to_internal(c, sheet_row, text, uid, book=None, keep=""):
             rep = "{c:%d}" % book.ensure(pos[0], pos[1], uid)["id"]
         elif kind == "ident" and val.lower() not in ("wahr", "true", "falsch", "false"):
             rep = _ident_internal(c, sheet_row, book, names, val, uid)
+        elif kind == "xref":  # 2.124.0 E (#2116): Blatt2!A1
+            rep = shb_internal(c, sheet_row, book, val, uid)
         elif kind == "idref":
             typ, xid, field = val
-            if typ == "c":
+            if typ == "x":  # 2.124.0 E (#2116)
+                tab = shb_check(c, sheet_row, xid)
+                if tab is None:
+                    raise BadInput(tr("Unknown name: {0}", body[a:b]))
+                if tab["id"] == sheet_row["id"]:  # review: a cell of this very sheet is a plain cell reference (its dependency)
+                    rep = "{c:%d}" % xid
+            elif typ == "c":
                 if xid not in book.cells:
                     raise BadInput(tr("Unknown name: {0}", body[a:b]))
             elif typ == "col":
@@ -332,7 +353,7 @@ def sh_to_internal(c, sheet_row, text, uid, book=None, keep=""):
                     raise BadInput(tr("Unknown field: {0}", field or "?"))
                 if val not in kept and sh_source(c, sheet_row, uid, typ, xid) in (None, "deleted"):
                     raise BadInput(tr("Unknown name: {0}", body[a:b]))
-        elif kind == "fn" and val.lower() not in SH_FUNCS:
+        elif kind == "fn" and sh_fn_key(val) is None:  # 2.124.0 A (#2109): + shfuncs
             raise BadInput(tr("Unknown function: {0}", val))
         if rep is not None:
             out.append(body[last:a])
@@ -384,6 +405,8 @@ def _node(tok, book, sheet_row):
             return ("cell", xid)
         if typ == "col":
             return ("col", xid)
+        if typ == "x":  # 2.124.0 E (#2116): a cell of another sheet of the table
+            return ("xcell", xid)
         return ("var", typ, xid, field)
     if kind == "ident":
         parts = val.lower().split(".")
@@ -424,6 +447,8 @@ def sh_to_display(c, sheet_row, raw, book=None, uid=None):
         elif typ == "col":
             if xid in book.col_slug:
                 rep = book.col_slug[xid]
+        elif typ == "x":  # 2.124.0 E (#2116)
+            rep = shb_display(c, sheet_row, xid, book.__dict__.setdefault("shb_cache", {}))
         else:
             s = sh_slug_of(c, sheet_row, uid, typ, xid)
             if s:
@@ -433,7 +458,7 @@ def sh_to_display(c, sheet_row, raw, book=None, uid=None):
             out.append(rep)
             last = b
     out.append(body[last:])
-    return "=" + "".join(out)
+    return "=" + shb_pairs("".join(out))  # 2.124.0 E (#2116): Blatt2!A1:B5
 
 
 # ---------------------------------------------------------------- evaluation
@@ -441,6 +466,8 @@ def _err_res(kind, detail=""):
     t = tr(SH_ERR_TEXT[kind])
     if kind == "type" and detail == "long":  # 2.89.0 (#1916): review 1
         t = tr("The text is too long (at most {0} characters)", SH_RAW_MAX)
+    elif kind == "type" and detail == "big":  # 2.124.0 A (#2109): the cell budget of SUMMEWENN / SVERWEIS ...
+        t = tr("Too much to compute: use smaller ranges")
     elif kind == "syntax" and detail == "deep":
         t = tr("The formula is nested too deeply")
     elif kind == "syntax" and detail and detail not in ("empty", "end"):
@@ -520,6 +547,14 @@ class _Env:
     def today(self):
         return sh_today()
 
+    def xcell(self, cid):  # 2.124.0 E (#2116): a cell / range of another sheet of the table (sheets/shbook.py)
+        from .shbook import shb_value
+        return shb_value(self.ev, cid)
+
+    def xrange(self, a, b):
+        from .shbook import shb_range
+        return shb_range(self.ev, a, b)
+
 
 class ShEvaluator:
     """Evaluates every live cell of a book for viewer uid in dependency order (no recursion: a long chain of cells is fine);
@@ -555,6 +590,8 @@ class ShEvaluator:
         if x["frozen"]:
             v, _ = sh_freeze_load(x["frozen_value"])
             return self.out(v, kind, "frozen")
+        if kind in SHK_KINDS:  # 2.124.0 B (#2110)
+            return shk_plain(self, x, kind)
         v = sh_plain_value(raw, kind, opts)
         if kind == "text" or (kind != "select" and isinstance(v, str)):
             d = raw if kind != "select" else (v or "")
@@ -809,15 +846,23 @@ def sh_dict(c, sheet_row, uid=None, book=None):
             "cells": cells, "names": {x["name"]: x["id"] for x in book.cells.values() if x.get("name") and book.live(x)},
             "presence": sh_presence(c, sheet_row["id"], uid), "sources": list(srcs.values()), "batches": sh_batches(c, sheet_row["id"]),
             "rev": sheet_row["rev"], "deleted_at": sheet_row["deleted_at"], "updated_at": sheet_row["updated_at"],
-            "agent": ({"id": sheet_row["agent_id"], "batch": sheet_row["agent_batch"]} if sheet_row["agent_id"] else None)}
+            "freeze_rows": sheet_row["freeze_rows"], "freeze_cols": sheet_row["freeze_cols"],  # 2.124.0 B (#2111)
+            "agent": ({"id": sheet_row["agent_id"], "batch": sheet_row["agent_batch"]} if sheet_row["agent_id"] else None),
+            "chart": _chart_of(sheet_row), **shb_dict(c, sheet_row)}  # 2.124.0 A (#2115); E (#2116): book_id, book_title, tab_name, tabs
+
+
+def _chart_of(sheet_row):
+    from .shchart import shc_load  # 2.124.0 A (#2115): a later module (ORDER)
+    return shc_load(sheet_row)
 
 
 def sh_brief(c, rows, uid):
     """The entries of GET /api/sheets."""
     names = user_names(c, {r["updated_by"] for r in rows} | {r["agent_id"] for r in rows if r["agent_id"]})
-    return [{"id": r["id"], "title": r["title"], "space": sh_space_key(r["org_id"]), "list_id": r["list_id"],
+    from .shshare import shs_marks  # 2.124.0 C (#2113): + shared / shared_in
+    return shb_counts(c, rows, shs_marks(c, uid, rows, [{"id": r["id"], "title": r["title"], "space": sh_space_key(r["org_id"]), "list_id": r["list_id"],
              "list_title": sh_list_title(c, r, uid), "updated_at": r["updated_at"], "updated_by_name": names.get(r["updated_by"], ""),
-             "agent": ({"id": r["agent_id"], "name": names.get(r["agent_id"], "")} if r["agent_id"] else None)} for r in rows]
+             "agent": ({"id": r["agent_id"], "name": names.get(r["agent_id"], "")} if r["agent_id"] else None)} for r in rows]))  # 2.124.0 E (#2116): + sheets
 
 
 # ---------------------------------------------------------------- changes
@@ -1024,6 +1069,8 @@ def _write_cells(c, sheet_row, cells, uid, agent_id, batch, book):
             later.append((rid, cid, raw.strip()))  # after the plain inputs: a formula may name a cell set in the same call
             continue
         raw = _select_raw(c, book, book.col_by[cid], raw) if book.col_by[cid]["kind"] == "select" else raw
+        if book.col_by[cid]["kind"] in SHK_KINDS:  # 2.124.0 B (#2110): checked / translated (file: the old one to the trash)
+            raw = shk_raw(c, book, book.col_by[cid], rid, raw)
         changed.add(_store(c, book, sid, rid, cid, raw, uid, ts, agent_id, batch))
     for rid, cid, raw in later:
         x = book.at.get((rid, cid))
@@ -1047,6 +1094,8 @@ def _store(c, book, sid, rid, cid, raw, uid, ts, agent_id, batch):
                            "VALUES(?,?,?,?,?,?,?,?)", (sid, rid, cid, raw, uid, ts, agent_id, batch))
         book._add(dict(c.execute("SELECT * FROM sheet_cells WHERE id=?", (xid,)).fetchone()))
     sh_change(c, sid, batch, agent_id, "cell", cell_id=xid, row_id=rid, col_id=cid, old=old, new=raw)
+    from .shhist import shh_log  # 2.124.0 B (#2112)
+    shh_log(c, book, xid, rid, cid, old, raw, uid, agent_id, ts)  # 2.124.0 B (#2112): people's changes too
     return xid
 
 
@@ -1222,6 +1271,8 @@ def sh_vars(c, sheet_row, uid, q=""):
                     break
     for fn in ("SUMME", "MITTELWERT", "MIN", "MAX", "ANZAHL", "WENN", "RUNDEN", "HEUTE", "TAGE"):
         add(fn, fn, "function", "", tr(SH_FN_HELP[fn]))
+    for fn, help_ in SHF_HELP.items():  # 2.124.0 A (#2109)
+        add(fn, fn, "function", "", tr(help_))
     return out[:300]
 
 
@@ -1253,6 +1304,8 @@ def sh_index(c, uid, space=None, list_id=None):
         if lids:
             cond += f" OR list_id IN ({','.join(str(int(x)) for x in lids)})"
         rows = c.execute(f"SELECT * FROM sheets WHERE deleted_at IS NULL AND ({cond}) ORDER BY updated_at DESC, id LIMIT 2000", (owner,)).fetchall()
+    elif space == "shared":  # 2.124.0 C (#2113): only the sheets shared with uid (below)
+        rows = []
     else:
         oid = sh_space(c, uid, space)
         if oid is None:
@@ -1264,4 +1317,6 @@ def sh_index(c, uid, space=None, list_id=None):
         else:
             rows = c.execute("SELECT * FROM sheets WHERE deleted_at IS NULL AND org_id=? ORDER BY lower(title), id LIMIT 2000",
                              (oid,)).fetchall()
-    return [r for r in rows if sh_may(c, uid, r)]
+    from .shshare import shs_index  # 2.124.0 C (#2113): space "shared" / the shared sheets in "all"
+    rows = shb_only_books(c, rows)  # 2.124.0 E (#2116): a table once, never its further sheets
+    return [r for r in (rows if list_id is not None else shs_index(c, uid, space, rows)) if sh_may(c, uid, r)]

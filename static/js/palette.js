@@ -327,11 +327,12 @@ function palAll() {
 // 2.87.9 (#1934): what the views of the areas list on their side, as search hits: the senders, document types and tags of the
 // documents, the top folders of the file store. Fetched (quietly) when the search opens, for the shown workspace, at most
 // once a minute; only what the server lists for the person (the same lists the views show)
-const PALX = {ws: '', at: 0, docs: null, folders: []};
+const PALX = {ws: '', at: 0, docs: null, folders: [], sheets: []};  // 2.124.0 C (#2113): + the tables (titles only)
 function palSubLoad() {
   const ws = wsCur();
   if (PALX.ws === ws && Date.now() - PALX.at < 60000) return;
-  PALX.ws = ws; PALX.at = Date.now(); PALX.docs = null; PALX.folders = [];
+  PALX.ws = ws; PALX.at = Date.now(); PALX.docs = null; PALX.folders = []; PALX.sheets = [];
+  if (feat('sheets') && !S.me?.kid) rawFetch('GET', '/api/sheets?space=all').then(j => { if (PALX.ws === ws) { PALX.sheets = (j.sheets || []).filter(x => ws === 'all' || !wsOn() || x.space === ws || x.shared_in); redraw(); } }).catch(() => {});  // 2.124.0 C (#2113): the index, no cells
   const redraw = () => { if (PALX.ws === ws && $('.palette') && PAL.q.trim()) palDraw(); };
   if (feat('docs') && !S.me?.kid) rawFetch('GET', `/api/docs?ws=${encodeURIComponent(ws)}&limit=1`).then(j => { if (PALX.ws === ws) { PALX.docs = j.facets || null; redraw(); } }).catch(() => {});
   if (typeof ab_on === 'function' && ab_on()) {
@@ -348,8 +349,9 @@ function palSubItems(add) {
   if (f) for (const [k, key, icon, kn] of [['sender', 'senders', 'user', N_('Sender')], ['type', 'types', 'file', N_('Document type')], ['tag', 'tags', 'tag', N_('Tag')]])
     for (const x of f[key] || []) add(`dcf:${k}:${x.ids.join(',')}`, 'view', x.name, icon, () => dc_filterGo(k, x.ids.join(',')), {qonly: true, sub: `${tr('Documents')} · ${tr(kn)}`});
   if (PALX.ws === wsCur()) for (const n of PALX.folders) add('abf:' + n.id, 'view', n.name, 'folder', () => go('ablage/' + n.id), {qonly: true, sub: tr('Files') + (n.many ? ' · ' + ab_spaceName(n.sp) : '')});
+  if (PALX.ws === wsCur()) for (const x of PALX.sheets) add('sh:' + x.id, 'sheet', x.title || tr('Untitled table'), 'sheet', () => go('sheets/' + x.id), {qonly: true, sub: [tr('Tables'), x.shared_in ? tr('Shared with me') : x.list_title || ''].filter(Boolean).join(' · ')});  // 2.124.0 C (#2113)
 }
-const PAL_KIND = {note: N_('note|palette kind'), folder: N_('folder|palette kind'), action: N_('action'), task: N_('task|palette kind'), view: N_('view'), list: N_('list|palette kind'), filter: N_('filter'), tag: N_('tag'), setting: N_('setting'), tasks: N_('task|palette kind')};
+const PAL_KIND = {note: N_('note|palette kind'), folder: N_('folder|palette kind'), action: N_('action'), task: N_('task|palette kind'), view: N_('view'), list: N_('list|palette kind'), filter: N_('filter'), tag: N_('tag'), setting: N_('setting'), tasks: N_('task|palette kind'), sheet: N_('table|palette kind')};  // 2.124.0 C (#2113): + sheet
 function palItems() {
   const q = PAL.q.trim();
   if (PAL.mode === 'ref') return rf_palItems(q);  // 2.53.0 (#1449): pick a reference for the comment / description (refs.js)

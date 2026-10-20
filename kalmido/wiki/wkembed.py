@@ -67,7 +67,10 @@ def wem_sheet_ok(c, uid, sid, page):
     from ..sheets.core import sh_may
     if not uid or not isinstance(sid, int) or not 0 < sid < 2 ** 62:
         return None
+    from ..sheets.shbook import shb_deleted
     r = c.execute("SELECT * FROM sheets WHERE id=? AND deleted_at IS NULL", (sid,)).fetchone()
+    if r and shb_deleted(c, r):  # 2.124.0 (#2116): a further sheet of a table in the trash
+        return None
     return r if r and wem_same_space(r, page) and sh_may(c, uid, r) else None
 
 
@@ -104,7 +107,7 @@ def wem_find_sheet(c, page, ref):
     if ref.isdigit() and len(ref) < 16:
         r = c.execute(f"SELECT id FROM sheets WHERE id=? AND deleted_at IS NULL AND {w}", [int(ref), *a]).fetchone()
     else:
-        r = c.execute(f"SELECT id FROM sheets WHERE lower(title)=? AND deleted_at IS NULL AND {w} ORDER BY id LIMIT 1", [ref.lower(), *a]).fetchone()
+        r = c.execute(f"SELECT id FROM sheets WHERE lower(title)=? AND deleted_at IS NULL AND book_id IS NULL AND {w} ORDER BY id LIMIT 1", [ref.lower(), *a]).fetchone()
     return r["id"] if r else None
 
 

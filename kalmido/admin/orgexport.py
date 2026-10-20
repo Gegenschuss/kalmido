@@ -266,6 +266,7 @@ OX_AREAS = (
     ("office/cashflow_start.json", "office_cf_start", "org_id=?"),  # 2.123.0 D (#2341): start balance, corrections, real balances
     ("office/cashflow_adjust.json", "office_cf_adjust", "org_id=?"),
     ("office/cashflow_actual.json", "office_cf_actual", "org_id=?"),
+    ("office/bank_balances.json", "office_bank_balances", "org_id=?"),  # 2.124.0 D (#2342): balances of the imported statements
     ("office/sub_reminders.json", "office_sub_reminders", "org_id=?"),  # 2.91.0 B (#1924): reminder tasks before a subscription renews
     ("office/agreements.json", "office_agreements", "org_id=?"),  # 2.92.0 A (#1925): business contracts and insurances
     ("office/deals.json", "office_deals", "org_id=?"),  # 2.50.0 (#1196): the sales pipeline
@@ -281,6 +282,9 @@ OX_AREAS = (
     ("sheets/rows.json", "sheet_rows", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
     ("sheets/cells.json", "sheet_cells", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
     ("sheets/links.json", "sheet_links", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),  # 2.89.0 (#1916, D): carried over by button
+    ("sheets/shares.json", "sheet_shares", "org_id=?"),  # 2.124.0 C (#2113): single tables shared with people / agents
+    ("sheets/files.json", "sheet_files", "org_id=?"),  # 2.124.0 B (#2110): files of file cells (the rows; names, sizes)
+    ("sheets/history.json", "sheet_hist", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),  # 2.124.0 B (#2112): cell history
     ("videos/reviews.json", "video_reviews", "org_id=?"),  # 2.99.1 A (#1959): video sign-offs (links only), versions, comments
     ("videos/versions.json", "video_versions", "org_id=?"),
     ("videos/comments.json", "video_comments", "org_id=?"),
@@ -401,6 +405,11 @@ def ox_build(c, oid, out, by=None):
                 full = _under(ATT_DIR, r.get("path"))
                 if full:
                     _put_bytes(zf, man, f"files/wiki/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
+        if "sheet_files" in have:  # 2.124.0 B (#2110): the files of table cells (decrypted like the attachments)
+            for r in _rows(c, oid, "sheet_files", "org_id=?", (oid,)):
+                full = _under(ATT_DIR, r.get("path"))
+                if full:
+                    _put_bytes(zf, man, f"files/sheets/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
         odir = os.path.join(OFFICE_DIR, str(int(oid)))
         if os.path.isdir(odir):
             for root, dirs, files in os.walk(odir):

@@ -7,7 +7,7 @@ task and comment files save_attachments / save_attachment_bytes, project files, 
                          of the file is queued (files/textscan.py)
 
 Browser-encrypted files (e2e, 2.42.0 #828) never come here: the server cannot read them.
-kind names the stored row: "fs" (fs_nodes id), "att" (attachments id), "list" (list_files id), "chat" (chat_files id), "wiki" (wiki_files id, 2.99.0 A #2182)."""
+kind names the stored row: "fs" (fs_nodes id), "att" (attachments id), "list" (list_files id), "chat" (chat_files id), "wiki" (wiki_files id, 2.99.0 A #2182), "sheet" (sheet_files id, 2.124.0 B #2110)."""
 import os
 
 KINDS = ("fs", "att", "list", "chat")

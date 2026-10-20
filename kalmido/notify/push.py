@@ -599,6 +599,8 @@ def watchdog_tick(c):
     _wd_section(c, "entertainment receipts trash", bw_purge_tick)  # 2.119.0 A (#2288): trashed drafts and bills go after 30 days
     from ..wiki.wikiatt import wka_tick
     _wd_section(c, "wiki files", wka_tick)  # 2.99.0 (#2182): files in the trash for good after 30 days
+    from ..sheets.shkinds import shk_tick
+    _wd_section(c, "table files", shk_tick)  # 2.124.0 B (#2110): files no cell holds any more, for good after 30 days
     _wd_section(c, "admin alerts", aa_tick)
 
 

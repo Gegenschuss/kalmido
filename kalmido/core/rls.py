@@ -33,6 +33,7 @@ TABLES = (
     "office_trip_purposes",  # 2.117.0 A (#2292): own purposes of trips
     "office_meals", "office_meal_files", "office_meal_choices", "office_meal_log",  # 2.119.0 A (#2288): entertainment receipts
     "office_bank_imports", "office_bank_tx",  # 2.90.0 B (#1921): bank reconciliation
+    "office_bank_balances",  # 2.124.0 D (#2342): balances of the imported statements
     "office_inv_series", "office_sub_reminders",  # 2.91.0 A (#1923), B (#1924)
     "office_doc_templates", "office_gen_docs",  # 2.93.0 A (#1927): document templates and the documents made from them
     "office_vehicles", "office_drives", "office_drive_log",  # 2.93.0 B (#1928): the logbook
@@ -69,10 +70,12 @@ TABLES = (
     "hub_tokens", "hub_mails",  # 2.84.0 A (#1198): hub mail addresses + filed mails (NULL = private, the app checks owner / client / list)
     "office_archive_log",  # 2.81.0 B (#1834): the history of an archived document (org_id like the entry)
     "sheets",  # 2.89.0 (#1916): tables (NULL = private, the app checks owner_id; parts hang on sheet_id)
+    "sheet_shares",  # 2.124.0 C (#2113): a table shared with one person / agent (org_id like the table, NULL = a private table)
     "sched_polls",  # 2.98.0 A (#1953): scheduling polls (NULL = private, the app checks user_id; options / votes hang on poll_id)
     "office_agreements",  # 2.92.0 A (#1925): business contracts and insurances of an office area
     "bookmarks",  # 2.97.0 A (#1950): bookmarks (NULL = private, the app checks user_id)
     "office_contract_files",  # 2.117.0 B (#2285): PDF files of a framework contract
+    "sheet_files",  # 2.124.0 B (#2110): files of file cells of a table (NULL = private, the app checks the sheet)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

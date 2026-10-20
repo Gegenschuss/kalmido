@@ -4,7 +4,8 @@ Export (reading the sheet is enough; values evaluated for the person exporting, 
   - CSV: the values (no formulas), a header row with the column titles, UTF-8 with BOM, ";" and the decimal comma in the
     decimal-comma languages (like /api/time/export.csv); text that a spreadsheet would run as a formula gets a "'" (_csv_cell).
   - .xlsx: values AND formulas where Excel has the same thing (addresses, ranges, column ranges, SUM / AVERAGE / MIN / MAX /
-    COUNT / IF / ROUND / TODAY / DAYS, + - * / & % comparisons); a formula with a Kalmido variable (projekt.x.y ...) or one
+    COUNT / IF / ROUND / TODAY / DAYS, 2.124.0 A (#2109): SUMIF / COUNTIF / VLOOKUP / XLOOKUP and the text / date functions of
+    sheets/shfuncs.py, + - * / & % comparisons); a formula with a Kalmido variable (projekt.x.y ...) or one
     Excel cannot express is written as its value with a note (comment) showing the Kalmido formula. Column kinds become number
     formats, select columns a drop-down list (data validation) and a fill colour per option (conditional formatting, the cell
     or the whole row by color_mode), cell names Excel names. Written by hand (zipfile, no library), checked against the
@@ -33,10 +34,12 @@ from ..core.i18n import dec_comma, lang, tr
 from ..accounts.session import me
 from ..office.legacyimport import _col_index, _local, _rels
 from ..personal.timetrack import BadInput, _csv_cell
+from .shkinds import shk_export, shk_guess  # 2.124.0 B (#2110)
 from .core import (SH_COLS_MAX, SH_ROWS_MAX, ShBook, _write_cells, sh_brief, sh_create, sh_currency, sh_eval, sh_need, sh_options,
                    sh_reload, sh_to_display, sh_to_internal, sh_touch)
-from .formula import (SH_CURRENCY_SYMBOLS, SH_FUNCS, ShErr, sh_col_letter, sh_fmt_date, sh_name_ok, sh_parse_date, sh_parse_number,
-                      sh_tokens)
+from .formula import (SH_CURRENCY_SYMBOLS, ShErr, sh_col_letter, sh_fmt_date, sh_name_ok, sh_parse_date, sh_parse_number,
+                      sh_fn_key, sh_tokens)
+from .shfuncs import SHF_DE, SHF_EXCEL, shf_vlookup3
 
 SHX_FILE_MAX = 10 * 1024 * 1024        # an uploaded file
 SHX_UNZIPPED_MAX = 60 * 1024 * 1024    # the parts of an .xlsx read in all (zip bomb guard)
@@ -48,7 +51,10 @@ SHX_KALMIDO_FN = {"SUM": "SUMME", "AVERAGE": "MITTELWERT", "MIN": "MIN", "MAX": 
                   "ROUND": "RUNDEN", "TODAY": "HEUTE", "DAYS": "TAGE",
                   "SUMME": "SUMME", "MITTELWERT": "MITTELWERT", "ANZAHL": "ANZAHL", "WENN": "WENN", "RUNDEN": "RUNDEN",
                   "HEUTE": "HEUTE", "TAGE": "TAGE"}
-SHX_XL_ERR = {"div0": "#DIV/0!", "ref": "#REF!", "cycle": "#VALUE!", "type": "#VALUE!", "syntax": "#NAME?"}
+SHX_XL_ERR = {"div0": "#DIV/0!", "ref": "#REF!", "cycle": "#VALUE!", "type": "#VALUE!", "syntax": "#NAME?", "na": "#N/A"}
+SHX_EXCEL_FN.update(SHF_EXCEL)  # 2.124.0 A (#2109): SUMIF, VLOOKUP, text and date functions both ways
+SHX_KALMIDO_FN.update({re.sub(r"^_xlfn\.", "", x): SHF_DE[k] for k, x in SHF_EXCEL.items()})
+SHX_KALMIDO_FN.update({"CONCATENATE": "VERKETTEN", **{x: x for x in SHF_DE.values()}})
 _NS = "http://schemas.openxmlformats.org"
 _MAIN = f"{_NS}/spreadsheetml/2006/main"
 _EPOCH = date(1899, 12, 30)
@@ -122,7 +128,7 @@ def shx_csv(c, sheet):
         for ci, col in enumerate(book.cols):
             x = at.get((ri, ci))
             r = res.get(x["id"]) if x else None
-            v = _pyval(r)
+            v = shk_export(col, r, _pyval(r), lg, csv=True)  # 2.124.0 B (#2110): a checkbox as WAHR / FALSCH
             if v is None:
                 row.append("")
             elif isinstance(v, bool):
@@ -154,14 +160,24 @@ def _xl_ref(book, x, hdr=1):
 
 
 def shx_xl_formula(book, raw, self_cell, last_row):
+    f = _shx_xl_formula(book, raw, self_cell, last_row)
+    if f and "!" in f and getattr(book, "shb_xl", None):  # 2.124.0 E (#2116): 'Sheet 2'!A2:'Sheet 2'!B5 -> 'Sheet 2'!A2:B5
+        from .shbook import shb_pairs
+        f = shb_pairs(f)
+    return f
+
+
+def _shx_xl_formula(book, raw, self_cell, last_row):
     """The Excel form of a stored formula (ids), or None when Excel has no equivalent (Kalmido variables, hier.*, a column
     range that contains the cell itself, a deleted reference). last_row = the sheet's last row in the file (1-based)."""
     try:
         toks = sh_tokens(raw[1:])
     except ShErr:
         return None
-    out = []
-    for kind, val, _a, _b in toks:
+    out, v3 = [], shf_vlookup3(toks)  # 2.124.0 A (#2109): VLOOKUP with three arguments is approximate in Excel
+    for i, (kind, val, _a, _b) in enumerate(toks):
+        if i in v3:
+            out.append(",FALSE")
         if kind == "num":
             out.append(_xl_num(val))
         elif kind == "str":
@@ -171,7 +187,7 @@ def shx_xl_formula(book, raw, self_cell, last_row):
         elif kind == "sep":
             out.append(",")
         elif kind == "fn":
-            key = SH_FUNCS.get(val.lower())
+            key = sh_fn_key(val)  # 2.124.0 A (#2109): + shfuncs
             if key not in SHX_EXCEL_FN:
                 return None
             out.append(SHX_EXCEL_FN[key])
@@ -195,6 +211,12 @@ def shx_xl_formula(book, raw, self_cell, last_row):
                     return None
                 L = sh_col_letter(book.col_idx[xid])
                 out.append(f"{L}2:{L}{last_row}")
+            elif typ == "x":  # 2.124.0 E (#2116): a cell of another sheet of the table (only when all sheets are written)
+                from .shbook import shb_xl_ref
+                ref = shb_xl_ref(book, xid)
+                if ref is None:
+                    return None
+                out.append(ref)
             else:
                 return None  # a Kalmido variable: the value goes into the file, the formula into a note
         else:
@@ -232,10 +254,12 @@ def _xl_name_ok(name):
     return bool(name) and not re.fullmatch(r"[rRcC]|[rR]\d*[cC]\d*|[rR]\d+|[cC]\d+", name) and len(name) <= 255
 
 
-def shx_xlsx(c, sheet):
+def shx_xlsx(c, sheet, xl_names=None):
     """The .xlsx bytes of the sheet (one visible sheet; a hidden sheet "_lists" only when a drop-down list is too long to
-    be written inline)."""
+    be written inline). 2.124.0 E (#2116): xl_names = {sheet id: name in the file} of the table's sheets (sheets/shbook.py
+    shb_xlsx puts the files of all sheets together; formulas into another sheet keep their reference then)."""
     book, res, at = _grid(c, sheet)
+    book.shb_xl = xl_names
     ncols = len(book.cols)
     nrows = _used_rows(book, at, res)
     last_row = nrows + 1                       # the header is row 1
@@ -256,7 +280,7 @@ def shx_xlsx(c, sheet):
             ref = f"{sh_col_letter(ci)}{ri + 2}"
             r = res.get(x["id"]) or {}
             raw = x["raw"] or ""
-            v = _pyval(r)
+            v = shk_export(col, r, _pyval(r), None)  # 2.124.0 B (#2110): a checkbox as a truth value
             s = style_of.get(col["kind"])
             if isinstance(v, date):
                 s = 4
@@ -547,6 +571,25 @@ def shx_read_xlsx(raw):
         raise BadInput(tr("This is not a spreadsheet file (.xlsx)")) from None
 
 
+def shx_read_xlsx_all(raw, most):
+    """2.124.0 E (#2116): every visible sheet of an .xlsx (at most `most`) -> [ShxGrid] with .sheet_name; the cell limit counts
+    for all sheets together."""
+    first = shx_read_xlsx(raw)
+    if first.n_sheets < 2 or most < 2:
+        return [first]
+    z = zipfile.ZipFile(io.BytesIO(raw))
+    names, budget, ctx = set(z.namelist()), [0], {}
+    try:
+        out = [first] + [_read_xlsx(z, names, budget, k, ctx) for k in range(1, min(first.n_sheets, most))]
+    except BadInput:
+        raise
+    except (ET.ParseError, KeyError, ValueError, IndexError, zipfile.BadZipFile, zlib.error, EOFError, RuntimeError):
+        raise BadInput(tr("This is not a spreadsheet file (.xlsx)")) from None
+    if sum(1 for g in out for r in g.rows for x in r if (x.get("v") or "") != "" or x.get("f")) > SHX_CELLS_MAX:
+        raise _shx_too_many()
+    return out
+
+
 def _budget_xml(z, name, budget):
     if z.getinfo(name).file_size + budget[0] > SHX_UNZIPPED_MAX:
         raise BadInput(tr("The file is too large"))
@@ -557,26 +600,32 @@ def _budget_xml(z, name, budget):
     return ET.fromstring(data)
 
 
-def _read_xlsx(z, names, budget):
-    strings = []
-    if "xl/sharedStrings.xml" in names:
-        for si in _budget_xml(z, "xl/sharedStrings.xml", budget):
-            if _local(si.tag) == "si":
-                strings.append("".join(t.text or "" for t in si.iter() if _local(t.tag) == "t" and not _in_rph(si, t)))
-    fmts, dxf_fill = _num_fmts(z, names, budget)
-    wb = _budget_xml(z, "xl/workbook.xml", budget)
-    wrels = _rels(z, "xl/workbook.xml", [0])
-    sheets = []  # (name, path, hidden)
-    for sh in wb.iter():
-        if _local(sh.tag) == "sheet":
-            rid = next((v for k, v in sh.attrib.items() if _local(k) == "id"), None)
-            if wrels.get(rid) in names:
-                sheets.append(((sh.get("name") or ""), wrels[rid], sh.get("state") in ("hidden", "veryHidden")))
+def _read_xlsx(z, names, budget, which=0, ctx=None):
+    """The visible sheet number `which` (2.124.0 E #2116: ctx = the parts every sheet shares, read once for all of them)."""
+    ctx = {} if ctx is None else ctx
+    if "wb" not in ctx:
+        strings = []
+        if "xl/sharedStrings.xml" in names:
+            for si in _budget_xml(z, "xl/sharedStrings.xml", budget):
+                if _local(si.tag) == "si":
+                    strings.append("".join(t.text or "" for t in si.iter() if _local(t.tag) == "t" and not _in_rph(si, t)))
+        fmts, dxf_fill = _num_fmts(z, names, budget)
+        wb = _budget_xml(z, "xl/workbook.xml", budget)
+        wrels = _rels(z, "xl/workbook.xml", [0])
+        sheets = []  # (name, path, hidden)
+        for sh in wb.iter():
+            if _local(sh.tag) == "sheet":
+                rid = next((v for k, v in sh.attrib.items() if _local(k) == "id"), None)
+                if wrels.get(rid) in names:
+                    sheets.append(((sh.get("name") or ""), wrels[rid], sh.get("state") in ("hidden", "veryHidden")))
+        ctx.update(strings=strings, fmts=fmts, dxf_fill=dxf_fill, wb=wb, sheets=sheets)
+    strings, fmts, dxf_fill, wb, sheets = ctx["strings"], ctx["fmts"], ctx["dxf_fill"], ctx["wb"], ctx["sheets"]
     visible = [s for s in sheets if not s[2]] or sheets
-    if not visible:
+    if not visible or which >= len(visible):
         raise BadInput(tr("This is not a spreadsheet file (.xlsx)"))
-    sname, path, _h = visible[0]
+    sname, path, _h = visible[which]
     g = ShxGrid()
+    g.sheet_name, g.n_sheets = sname, len(visible)  # 2.124.0 E (#2116)
     cells, shared, full = {}, {}, 0
     root = _budget_xml(z, path, budget)
     dvs, cfs = [], []
@@ -688,7 +737,7 @@ def _read_xlsx(z, names, budget):
     # names of single cells of this sheet
     for dn in wb.iter(f"{{{_MAIN}}}definedName"):
         nm, val = dn.get("name") or "", (dn.text or "").strip()
-        if dn.get("localSheetId") not in (None, str(sheets.index(visible[0]))) or nm.startswith("_xlnm"):
+        if dn.get("localSheetId") not in (None, str(sheets.index(visible[which]))) or nm.startswith("_xlnm"):
             continue
         m = re.fullmatch(r"(?:'((?:[^']|'')+)'|([^'!]+))!\$?([A-Z]{1,3})\$?(\d+)", val)
         if m and (m.group(1) or m.group(2) or "").replace("''", "'") == sname:
@@ -748,17 +797,20 @@ def _dv_labels(z, names, budget, sheets, f1):
 
 
 # ---------------------------------------------------------------- import: into a sheet
-def shx_kalmido_formula(f, hdr, names_at):
+def shx_kalmido_formula(f, hdr, names_at, xsheets=None):
     """An Excel formula -> the Kalmido input (German names, ";", addresses moved up by the header row), or None when it has
-    something Kalmido cannot take (other sheets, whole columns, unknown functions, names that are no cell of this sheet)."""
+    something Kalmido cannot take (other sheets, whole columns, unknown functions, names that are no cell of this sheet).
+    2.124.0 E (#2116): xsheets = {Excel sheet name: (Kalmido sheet name, its header rows)} -- other sheets of the file."""
     if not f or f.startswith("\x00"):
         return None
     try:
         toks = sh_tokens(f)
     except ShErr:
         return None
-    out = []
+    out, v3 = [], shf_vlookup3(toks)
     for i, (kind, val, a, b) in enumerate(toks):
+        if i in v3:  # 2.124.0 A (#2109): Excel's VLOOKUP without the fourth argument looks up approximately
+            out.append(";WAHR")
         if kind == "num":
             out.append(_xl_num(val))
         elif kind == "str":
@@ -777,6 +829,12 @@ def shx_kalmido_formula(f, hdr, names_at):
             if name not in SHX_KALMIDO_FN:
                 return None
             out.append(SHX_KALMIDO_FN[name])
+        elif kind == "xref" and xsheets and val[0] in xsheets:  # 2.124.0 E (#2116): Sheet2!A1, 'My sheet'!A1:B5
+            from .shbook import shb_quote
+            to, h = xsheets[val[0]]
+            if val[1][1] - h < 1 or (val[2] and val[2][1] - h < 1):
+                return None
+            out.append(shb_quote(to) + "!" + f"{val[1][0]}{val[1][1] - h}" + (f":{val[2][0]}{val[2][1] - h}" if val[2] else ""))
         elif kind == "ident":
             up = val.upper()
             if up in ("TRUE", "WAHR"):
@@ -797,6 +855,8 @@ def _guess_kind(vals, fmts):
     vals = [v for v in vals if v != ""]
     if not vals:
         return "text"
+    if shk_guess(vals):  # 2.124.0 B (#2110): truth values only
+        return "checkbox"
     if any(f == "date" for f in fmts) and all(sh_parse_date(v) for v in vals):
         return "date"
     if all(sh_parse_date(v) for v in vals):
@@ -822,8 +882,10 @@ def _is_header(row, nxt):
                for x in vals)
 
 
-def shx_import(c, uid, grid, space, title, list_id=None):
-    """A new sheet from a read file -> (sheet id, report). Formulas that Kalmido cannot take are kept as their value."""
+def shx_import(c, uid, grid, space, title, list_id=None, into=None):
+    """A new sheet from a read file -> (sheet id, report). Formulas that Kalmido cannot take are kept as their value.
+    2.124.0 E (#2116): into = the first sheet of a table: a further sheet of it named title; a formula into another sheet of
+    the file is kept as its value and noted in grid.xlater (sheets/shbook.py shb_import sets it once all sheets are there)."""
     rows = grid.rows
     while rows and not any((x.get("v") or "") != "" or x.get("f") for x in rows[-1]):
         rows.pop()
@@ -851,9 +913,15 @@ def shx_import(c, uid, grid, space, title, list_id=None):
         else:
             columns.append({"title": titles[ci], "kind": _guess_kind(vals, fmts)})
     report = {"rows": len(data), "columns": width, "formulas": 0, "as_value": 0, "options_added": 0, "names": 0}
-    sid = sh_create(c, uid, space, title, list_id, columns=columns or None, rows=max(len(data), 1))
+    grid.hdr = hdr  # 2.124.0 E (#2116)
+    if into is not None:
+        from .shbook import shb_create
+        sid = shb_create(c, into, uid, title, columns=columns or None, rows=max(len(data), 1))
+    else:
+        sid = sh_create(c, uid, space, title, list_id, columns=columns or None, rows=max(len(data), 1))
     sheet = sh_reload(c, sid)
     book = ShBook(c, sheet)
+    book.shh_off = True  # 2.124.0 B (#2112): a new table from a file has no history of its own
     plain, later = [], []
     names_at = {nm: (r - hdr, ci) for nm, (r, ci) in grid.names.items() if r - hdr >= 0 and ci < width}
     for ri, r in enumerate(data):
@@ -868,6 +936,8 @@ def shx_import(c, uid, grid, space, title, list_id=None):
                     later.append((rid, col["id"], kf, v))
                     continue
                 report["as_value"] += 1
+                if "!" in f and hasattr(grid, "xlater"):  # 2.124.0 E (#2116): maybe another sheet of the file
+                    grid.xlater.append((rid, col["id"], f, v, names_at))
             if v == "":
                 continue
             if v.startswith("="):
@@ -901,6 +971,7 @@ def shx_import(c, uid, grid, space, title, list_id=None):
             if v != "":
                 ok.append({"row_id": rid, "col_id": col_id, "raw": ("'" + v) if v.startswith("=") else v})
     book = ShBook(c, sheet)
+    book.shh_off = True  # 2.124.0 B (#2112)
     for i in range(0, len(ok), SHX_CHUNK):
         _write_cells(c, sheet, ok[i:i + SHX_CHUNK], uid, None, None, book)
     sh_touch(c, sid, uid)
@@ -910,6 +981,10 @@ def shx_import(c, uid, grid, space, title, list_id=None):
 def shx_report_text(rep):
     """The import's result in words (translated)."""
     out = [tr("{0} rows and {1} columns imported", rep["rows"], rep["columns"])]
+    if rep.get("sheets", 1) > 1:  # 2.124.0 E (#2116)
+        out.append(tr("{0} sheets imported", rep["sheets"]))
+    if rep.get("sheets_total", 0) > rep.get("sheets", 1):
+        out.append(tr("{0} sheets left out (at most {1} per table)", rep["sheets_total"] - rep["sheets"], rep["sheets"]))
     if rep["formulas"]:
         out.append(tr("{0} formulas taken over", rep["formulas"]))
     if rep["as_value"]:
@@ -936,10 +1011,11 @@ def shx_export_xlsx(sid):
     """Values, formulas Excel understands, formats, drop-down lists and colours as .xlsx."""
     c = db()
     r = sh_need(c, sid)
-    data = shx_xlsx(c, r)
+    from .shbook import shb_xlsx
+    data, title = shb_xlsx(c, r)  # 2.124.0 E (#2116): every sheet of the table
     c.commit()
     return Response(data, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    headers={"Content-Disposition": _disposition(shx_file_name(r["title"], "xlsx")), "Cache-Control": "no-store"})
+                    headers={"Content-Disposition": _disposition(shx_file_name(title, "xlsx")), "Cache-Control": "no-store"})
 
 
 @app.post("/api/sheets/import")
@@ -961,13 +1037,15 @@ def shx_import_post():
     except ValueError:
         raise BadInput(tr("Invalid value: {0}", "list_id")) from None
     if raw.startswith(b"PK") or name.lower().endswith(".xlsx"):
-        grid = shx_read_xlsx(raw)
+        from .shbook import SHB_TABS_MAX
+        grid = shx_read_xlsx_all(raw, SHB_TABS_MAX)  # 2.124.0 E (#2116): every sheet of the file
     elif name.lower().endswith((".csv", ".txt", ".tsv")) or not name:
         grid = shx_read_csv(raw)
     else:
         raise BadInput(tr("Only .csv and .xlsx files can be imported"))
     title = (request.form.get("title") or re.sub(r"\.(csv|xlsx|txt|tsv)$", "", name, flags=re.I) or "").strip()
-    sid, rep = shx_import(c, uid, grid, request.form.get("space") or "private", title, lid)
+    from .shbook import shb_import
+    sid, rep = shb_import(c, uid, grid, request.form.get("space") or "private", title, lid)  # 2.124.0 E (#2116)
     c.commit()
     r = sh_reload(c, sid)
     return jsonify(sheet=sh_brief(c, [r], uid)[0], report=rep, messages=shx_report_text(rep)), 201

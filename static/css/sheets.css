@@ -152,3 +152,92 @@ html.shzfull #side,html.shzfull #tabs,html.shzfull #top,html.shzfull #chatfab,ht
 html.shzfull #app{grid-template-columns:minmax(0,1fr)}
 html.shzfull .shvscroll,html.mini-sheet .shvscroll{max-height:none;height:calc(100dvh - 10rem)}
 html.mini-sheet .shvtop>a.btn{display:none}
+/* 2.124.0 A (#2115): the simple chart of a table (sheetchart.js) - one accent: lilac, lilac shades and grey; lines also dashed */
+.shc{position:relative;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);padding:.375rem .5rem .5rem}
+.shc-head{display:flex;align-items:center;gap:.5rem;min-height:2rem;color:var(--muted);font-size:var(--fs-s)}
+.shc-head>svg.i{color:var(--accent)}
+.shc-leg{display:flex;flex-wrap:wrap;gap:.25rem .75rem;list-style:none;margin:0;padding:0}
+.shc-leg li{display:inline-flex;align-items:center;gap:.375rem;color:var(--text)}
+.shc-key{display:inline-block;width:.75rem;height:.75rem;border-radius:.1875rem;background:currentColor}
+.shc-key.shc-kl{height:.1875rem;border-radius:.125rem}
+.shc-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.shc-svg{display:block;overflow:visible}
+.shc-grid{stroke:var(--line2);stroke-width:1}
+.shc-zero{stroke:var(--faint)}
+.shc-ax{fill:var(--muted);font-size:.6875rem}
+.shc-val{fill:var(--text);font-size:.6875rem;font-weight:600}
+.shc-svg path:not(.shc-ln){stroke:var(--bg2);stroke-width:2}
+.shc-ln{fill:none!important;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.shc-svg .shc-dot{stroke:var(--bg2);stroke-width:2}
+.shc-hit{fill:transparent;cursor:pointer}
+.shc-hit.on{fill:var(--accent);fill-opacity:.08}
+.shc-s0{fill:var(--accent);stroke:var(--accent);color:var(--accent)}
+.shc-s1{fill:var(--muted);stroke:var(--muted);color:var(--muted)}
+.shc-s2{fill:color-mix(in srgb,var(--accent) 55%,var(--bg2));stroke:color-mix(in srgb,var(--accent) 55%,var(--bg2));color:color-mix(in srgb,var(--accent) 55%,var(--bg2))}
+.shc-s3{fill:var(--faint);stroke:var(--faint);color:var(--faint)}
+.shc-s4{fill:color-mix(in srgb,var(--accent) 30%,var(--bg2));stroke:color-mix(in srgb,var(--accent) 30%,var(--bg2));color:color-mix(in srgb,var(--accent) 30%,var(--bg2))}
+.shc-s5{fill:var(--text);stroke:var(--text);color:var(--text)}
+.shc-ln.shc-s1,.shc-ln.shc-s4{stroke-dasharray:.375rem .25rem}
+.shc-ln.shc-s3,.shc-ln.shc-s5{stroke-dasharray:.125rem .25rem}
+.shc-tip{display:flex;flex-wrap:wrap;gap:.25rem .75rem;align-items:center;margin-top:.375rem;padding:.375rem .5rem;border-radius:var(--r-s);background:var(--bg3);font-size:var(--fs-s)}
+.shc-tip span{display:inline-flex;align-items:center;gap:.375rem}
+.shc-tip[hidden]{display:none}
+.shc-note{margin:.25rem 0 0;font-size:var(--fs-s)}
+.shc-kind,.shc-ys{border:0;padding:0;margin:0 0 .75rem;display:flex;flex-wrap:wrap;gap:.25rem 1rem}
+.shc-kind legend,.shc-ys legend{font-weight:600;margin-bottom:.25rem;width:100%}
+.shc-ys{max-height:14rem;overflow:auto}
+@media (max-width:40rem){ .shc-ys{flex-direction:column} }
+/* 2.124.0 B (#2110): checkbox, person, link and file cells */
+.shvc.shkcb{text-align:center;padding:0}
+.shkbox{display:inline-grid;place-items:center;width:1.25rem;height:1.25rem;border:.125rem solid var(--line2);border-radius:.3125rem;vertical-align:middle;cursor:pointer}
+.shkbox.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.shkbox svg.i{width:.875rem;height:.875rem}
+.shvc .shkav{width:1.25rem;height:1.25rem;margin-right:.375rem;vertical-align:middle}
+.shvc.k-link,.shvc.k-file{padding-right:1.75rem}
+.shvc.k-file>svg.i{margin-right:.25rem;vertical-align:-.125rem;color:var(--muted)}
+.shklnk{position:absolute;right:.125rem;top:50%;transform:translateY(-50%);display:inline-grid;place-items:center;width:1.5rem;height:1.5rem;border-radius:var(--r-s);color:var(--accent)}
+.shklnk:hover,.shklnk:focus-visible{background:var(--accent-soft)}
+.shkadd{color:var(--faint);opacity:0;transition:opacity .15s ease}
+.shvc.cur .shkadd,.shvc:hover .shkadd{opacity:1}
+@media (pointer:coarse){.shkbox{width:1.5rem;height:1.5rem}.shklnk{width:2.25rem;height:2.25rem}}
+@media (prefers-reduced-motion: reduce){.shkadd{transition:none}}
+/* 2.124.0 B (#2112): the history dialog */
+.shhsec{display:flex;flex-wrap:wrap;gap:.375rem}
+.shhlist{list-style:none;margin:0;padding:0;max-height:min(60dvh,32rem);overflow:auto}
+.shhlist li{padding:.5rem 0;border-bottom:1px solid var(--line)}
+.shhwho{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;font-size:var(--fs-s)}
+.shhwho .shkav{width:1.25rem;height:1.25rem}
+.shhchg{display:flex;align-items:baseline;gap:.5rem;margin-top:.25rem;padding-left:1.625rem;overflow-wrap:anywhere}
+.shhv{font-family:var(--mono);font-size:var(--fs-s)}
+.shharr{color:var(--muted)}
+/* 2.124.0 B (#2111): the print view (rows / columns kept in view are plain there) */
+#shk-print{display:none}
+@media print{
+  body.shkprint>*:not(#shk-print){display:none!important}
+  body.shkprint,html:has(body.shkprint){background:#fff!important;height:auto;overflow:visible}
+  body.shkprint #shk-print{display:block;color:#000;background:#fff;font:9pt/1.35 sans-serif}
+  #shk-print h1{font-size:14pt;margin:0 0 .25rem}
+  #shk-print .shkpm{margin:0 0 .75rem;color:#555}
+  #shk-print table{border-collapse:collapse;width:100%}
+  #shk-print thead{display:table-header-group}
+  #shk-print th,#shk-print td{border:1px solid #999;padding:.125rem .375rem;text-align:left;vertical-align:top}
+  #shk-print thead th{background:#eee}
+  #shk-print td.num{text-align:right}
+  #shk-print tr{break-inside:avoid}
+  @page{margin:12mm}
+}
+/* 2.124.0 E (#2116): the sheet bar under the grid (sheetbook.js): tabs that scroll sideways on a phone, the open one in the
+   accent; one sheet = only a quiet "+" */
+.shbbar{display:flex;align-items:center;gap:.25rem;margin-top:.5rem;min-width:0;border-top:.0625rem solid var(--line)}
+.shbbar.one{border-top:0;justify-content:flex-start}
+.shbbar.one .shbadd{opacity:.6}
+.shbbar.one .shbadd:hover,.shbbar.one .shbadd:focus-visible{opacity:1}
+.shbtabs{display:flex;gap:.125rem;overflow-x:auto;scrollbar-width:thin;min-width:0;-webkit-overflow-scrolling:touch}
+.shbtab{display:inline-flex;align-items:center;gap:.25rem;min-height:2.5rem;padding:0 .875rem;white-space:nowrap;border:0;
+  border-bottom:.125rem solid transparent;background:none;color:var(--muted);font:inherit;font-size:var(--fs-s);cursor:pointer;border-radius:0 0 .375rem .375rem}
+.shbtab:hover{color:var(--text);background:var(--bg3)}
+.shbtab.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.shbtab.drag{opacity:.5}
+.shbtab svg.i{width:.875rem;height:.875rem}
+.shbadd{flex:none}
+@media (pointer:coarse){.shbtab{min-height:2.75rem}}

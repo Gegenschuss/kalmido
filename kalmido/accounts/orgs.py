@@ -669,6 +669,8 @@ def org_delete(oid):
         fs_files = fs_org_purge(c, oid)
         from ..wiki.wikiatt import wka_org_files
         fs_files += wka_org_files(c, oid)  # 2.99.0 A (#2182): files of its knowledge pages (the rows go with the organisation)
+        from ..sheets.shkinds import shk_org_files
+        fs_files += shk_org_files(c, oid)  # 2.124.0 B (#2110): files of its tables' file cells
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))  # 2.30.0 (#1036): they stay with their owners, private
         c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))  # 2.52.0 C (#1438): its own books -> the managers'
@@ -938,6 +940,8 @@ def org_leave(c, oid, uid, heir):
     c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
     # 2.53.0 (#1424, review): the leaver's task bells in the organisation go too (else the nightly boundary check alarms)
     c.execute("DELETE FROM task_bell WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
+    from ..sheets.shshare import shs_leave
+    shs_leave(c, oid, [uid, *ags])  # 2.124.0 C (#2113): their shares of the organisation's tables end
     from ..core.access import acx_drop
     acx_drop()  # 2.36.2 (#1142): the request's access contexts follow the new memberships
     return n

@@ -1209,7 +1209,10 @@ def storage_check():
                                       "LEFT JOIN lists l ON l.id=f.list_id"),
                       # 2.99.0 A (#2182): files of knowledge pages (where = the page's name; a locked space's name is a ciphertext)
                       ("wiki_file", "SELECT f.id, f.page_id AS owner, f.name, f.size, f.path, CASE WHEN left(p.path, 5)='e2e1:' THEN '' "
-                                    "ELSE p.path END AS where_ FROM wiki_files f LEFT JOIN wiki_pages p ON p.id=f.page_id")):
+                                    "ELSE p.path END AS where_ FROM wiki_files f LEFT JOIN wiki_pages p ON p.id=f.page_id"),
+                      # 2.124.0 B (#2110): files of table cells (where = the table's title)
+                      ("sheet_file", "SELECT f.id, f.sheet_id AS owner, f.name, f.size, f.path, s.title AS where_ FROM sheet_files f "
+                                     "LEFT JOIN sheets s ON s.id=f.sheet_id")):
         for r in c.execute(sql):
             n += 1
             full = os.path.join(ATT_DIR, r["path"] or "")

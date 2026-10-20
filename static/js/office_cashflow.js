@@ -41,10 +41,10 @@ function rk_cashflowHtml() {
       <span class="rkcfbal ${+r.balance < 0 ? 'neg' : ''}">${tr('Balance')} ${ofcMoney(r.balance)}</span></header>${bars(r)}
       <table class="rkcftab"><thead><tr><th></th><th class="num">${tr('Actual')}</th><th class="num">${tr('Planned')}</th></tr></thead><tbody>
       <tr><th>${tr('In|cashflow')}</th><td class="num">${val(r.month, 'in', 'actual', r.in.actual)}</td><td class="num">${val(r.month, 'in', 'plan', r.in.plan, 'plan')}</td></tr>
-      <tr><th>${tr('Out|cashflow')}</th><td class="num">${val(r.month, 'out', 'actual', r.out.actual)}</td><td class="num">${val(r.month, 'out', 'plan', r.out.plan, 'plan')}</td></tr>${bk_cfReserveRows(r)}${cfs_accRows(r)}</tbody></table>
+      <tr><th>${tr('Out|cashflow')}</th><td class="num">${val(r.month, 'out', 'actual', r.out.actual)}</td><td class="num">${val(r.month, 'out', 'plan', r.out.plan, 'plan')}</td></tr>${bk_cfReserveRows(r)}${cfs_accRows(r)}${cfb_rows(r)}</tbody></table>
       ${rk_cfOpenHtml(r.month)}${cfs_adjHtml(r.month)}${k ? rk_cfEntries(k) : ''}</section>`;
   }).join('');
-  return bar + `<div class="rkcfms">${cards}</div><p class="muted ofchint">${tr('Actual = paid or already past; planned = expected (open invoices on their due date, sent and accepted quotations without an invoice at the end of their period of service, one version per quotation).')} ${d.basis === 'net' ? tr('Net: documents and fixed costs without VAT; purchases and travel receipts as entered.') : tr('Gross: documents and fixed costs incl. VAT; purchases and travel receipts as entered.')}</p>` + rk_fixedHtml() + fci_checkHtml();
+  return bar + cfb_boxHtml(d) + `<div class="rkcfms">${cards}</div><p class="muted ofchint">${tr('Actual = paid or already past; planned = expected (open invoices on their due date, sent and accepted quotations without an invoice at the end of their period of service, one version per quotation).')} ${d.basis === 'net' ? tr('Net: documents and fixed costs without VAT; purchases and travel receipts as entered.') : tr('Gross: documents and fixed costs incl. VAT; purchases and travel receipts as entered.')}</p>` + rk_fixedHtml() + fci_checkHtml();
 }
 // 2.90.0 A (#1921): with a tax reserve (Bookkeeping, tax_reserve_pct > 0): the month's reserve and what is free after all reserves so far
 const bk_cfReserveRows = r => r.reserve == null ? '' : `<tr class="bk-cfres"><th>${tr('Tax reserve')}</th><td class="num" colspan="2">${ofcMoney(r.reserve)}</td></tr>
@@ -345,3 +345,41 @@ document.addEventListener('change', async e => {
   offerUndo(tr('Saved'), histAdd({label: tr('Starting balance changed'), undo: () => cfs_startSet(was), redo: () => cfs_startSet(now)}));
 });
 document.addEventListener('keydown', e => { const x = e.target; if (e.key === 'Enter' && !e.isComposing && x.id === 'cfs-amount-set') { e.preventDefault(); e.stopPropagation(); x.blur(); } }, true);  // never the settings form's submit
+
+// ---- 2.124.0 D (#2342): the balance according to the bank (the closing balances of the imported statements, every account
+// added up) against the computed one; it only suggests: "use as starting balance" (no start balance yet) and per month "use as
+// real balance" (no real balance by hand yet) save through the routes of #2341, one undo step each. Without balances nothing
+// changes. Server: kalmido/office/cfbank.py.
+const cfb_signed = v => `${+v > 0 ? '+' : ''}${ofcMoney(v)}`;
+function cfb_boxHtml(d) {
+  const b = d.bank; if (!b) return '';
+  const accs = b.accounts || [];
+  return `<section class="cfb-box" aria-label="${esc(tr('Account balance according to the bank'))}"><div class="cfb-head"><b>${esc(tr('Account balance according to the bank on {0}: {1}', cfb_day(b.day), ofcMoney(b.amount)))}</b><span class="cfs-hand">${tr('from the bank reconciliation')}</span></div>
+    ${accs.length > 1 ? `<small class="muted">${esc(accs.map(a => `${cfb_acct(a.account)}: ${ofcMoney(a.amount)} (${cfb_day(a.day)})`).join(' · '))}</small>` : ''}
+    ${b.diff != null ? `<p class="cfb-diff">${esc(tr('Difference to the computed balance: {0}', cfb_signed(b.diff)))}</p>` : ''}
+    ${b.suggest_start ? `<div class="cfs-add"><button type="button" class="btn sm" data-cfb="start">${tr('Use as starting balance')}</button></div>` : ''}</section>`;
+}
+function cfb_rows(r) {
+  const b = r.bank; if (!b) return '';
+  return `<tr class="cfb-row"><th>${esc(tr('According to the bank on {0}', cfb_day(b.day)))} <span class="cfs-hand">${tr('from the bank reconciliation')}</span></th><td class="num" colspan="2">${ofcMoney(b.amount)}</td></tr>
+      ${b.diff != null ? `<tr class="cfb-row"><th>${tr('Difference to the computed balance')}</th><td class="num ${+b.diff ? 'cfs-off' : ''}" colspan="2">${cfb_signed(b.diff)}</td></tr>` : ''}
+      ${r.account != null && r.real == null ? `<tr class="cfb-row"><td colspan="3"><div class="cfs-add"><button type="button" class="btn sm ghost" data-cfb="real" data-month="${r.month}">${tr('Use as real balance')}</button></div></td></tr>` : ''}`;
+}
+document.addEventListener('click', async e => {
+  const t = e.target.closest?.('[data-cfb]'); if (!t) return;
+  e.preventDefault();
+  const d = RKF.data; if (!d?.bank) return;
+  t.disabled = true;
+  try {
+    if (t.dataset.cfb === 'start') {
+      const now = {amount: d.bank.amount, day: d.bank.day};
+      const set = async v => { await cfs_startSet(v); rk_cfReload(); };
+      await set(now);
+      offerUndo(tr('Saved'), histAdd({label: tr('Starting balance changed'), undo: () => set(null), redo: () => set(now)}));
+    } else if (t.dataset.cfb === 'real') {
+      const mo = t.dataset.month, amount = d.rows.find(r => r.month === mo)?.bank?.amount; if (amount == null) return;
+      await cfs_realPut(mo, amount);
+      offerUndo(tr('Saved'), histAdd({label: tr('Real balance changed'), undo: () => cfs_realPut(mo, null), redo: () => cfs_realPut(mo, amount)}));
+    }
+  } catch (x) { t.disabled = false; toast(x.message || tr('unknown')); }
+});

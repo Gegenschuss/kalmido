@@ -138,11 +138,17 @@ ORDER = (
     "wiki.pages",  # 2.49.0 C (#1199): knowledge pages
     "wiki.outline",  # 2.49.0 C (#1201): outline import of the mind map (no storage)
     "sheets.formula",  # 2.89.0 (#1916): tables -- the formula engine (no routes)
+    "sheets.shfuncs",  # 2.124.0 A (#2109): SUMMEWENN, SVERWEIS, text and date functions of formulas (no routes)
     "sheets.vars",  # 2.89.0 (#1916): Kalmido variables of formulas, evaluated per viewer (no routes)
+    "sheets.shkinds",  # 2.124.0 B (#2110, #2111): column kinds checkbox / person / link / file, rows / columns kept in view
+    "sheets.shhist",  # 2.124.0 B (#2112): the change history of the cells (people and agents)
     "sheets.core",  # 2.89.0 (#1916): sheets, columns, rows, cells, agent batches (no routes; used by sheets.web and part C/D)
     "sheets.web",  # 2.89.0 (#1916): the routes of the tables area (/api/sheets)
     "sheets.step2",  # 2.89.0 (#1916, D): step 2 -- rows to tasks / quotation, a list as rows (by button)
     "sheets.shmove",  # 2.96.0 B (#1941): a table to the other workspace (private <-> organisation)
+    "sheets.shshare",  # 2.124.0 C (#2113): one table shared with single people / agents (sheet_shares)
+    "sheets.shchart",  # 2.124.0 A (#2115): the simple chart of a table (its setting; drawn by static/js/sheetchart.js)
+    "sheets.shbook",  # 2.124.0 E (#2116): several sheets in one table (the sheet bar's routes; rights / formulas hang in core)
     "collab.teamchat",
     "collab.msgsearch",  # 2.33.0 (#1080)
     "collab.chatsave",  # 2.37.0 (#1159)
@@ -240,6 +246,7 @@ ORDER = (
     "office.meals",  # 2.119.0 A (#2288): entertainment receipts (Bewirtungsbelege): meals, approval + log, choices, evaluation
     "office.cashflow",  # 2.47.3 (#1652, part B): cash flow per month + fixed costs
     "office.cfstart",  # 2.123.0 D (#2341): start balance, corrections by hand and real balances of the cash flow
+    "office.cfbank",  # 2.124.0 D (#2342): the balances of the bank statements in the cash flow (no routes)
     "office.pipeline",  # 2.50.0 B (#1196): the sales pipeline
     "office.leads",  # 2.94.0 A (#1930): leads before the pipeline (stage lead): convert, CSV import, agents
     "office.kpi",  # 2.50.0 B (#1197): the business figures

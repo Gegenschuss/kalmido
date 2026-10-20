@@ -22,7 +22,11 @@ def _int(v, what):
 
 def _need_w(c, sid, deleted=False):
     need_feat("sheets")
-    return sh_need(c, sid, write=True, deleted=deleted)
+    r = sh_need(c, sid, write=True, deleted=deleted)
+    if deleted:  # 2.124.0 C (#2113): a table in the trash: never through a share
+        from .shshare import shs_need_own
+        shs_need_own(c, r, 404)
+    return r
 
 
 def _done(c, sid, extra=None):
@@ -67,6 +71,9 @@ def sheets_get(sid):
     d = sh_dict(c, r)
     from .shmove import shm_last  # 2.96.0 B (#1941): the last move between workspaces (both sides see it)
     d["moved"] = shm_last(c, sid)
+    from .shshare import shs_flags  # 2.124.0 C (#2113): shared_in, can_share, shared
+    from .shbook import shb_rights_row
+    d.update(shs_flags(c, shb_rights_row(c, r) or r, me()))  # 2.124.0 E (#2116): the shares of the whole table
     c.commit()  # sheet_lastvals of the viewer
     return jsonify(d)
 
@@ -82,11 +89,17 @@ def sheets_patch(sid):
     if "title" in b:
         f["title"] = sh_clean_title(b["title"]) or r["title"]
     if "list_id" in b and b["list_id"] != r["list_id"]:
+        from .shshare import shs_need_own
+        shs_need_own(c, r)  # 2.124.0 C (#2113): never through a share
         if not sh_may_rebind(c, uid, r):
             raise Denied(403)  # detaching opens the table to the whole space: its creator or the list's owner / admins only
         f["list_id"] = sh_check_list(c, r["org_id"], b["list_id"], uid)
+    from .shbook import shb_patch, shb_sync
+    f = shb_patch(c, r, f)  # 2.124.0 E (#2116): the list on the first sheet only; a further sheet's title = its name in the bar
     if f:
         c.execute(f"UPDATE sheets SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), sid])
+        if "list_id" in f:
+            shb_sync(c, sid)  # 2.124.0 E (#2116): every sheet of the table hangs on the same list
         sh_touch(c, sid, uid)
     c.commit()
     return jsonify(sh_dict(c, sh_reload(c, sid)))
@@ -96,7 +109,8 @@ def sheets_patch(sid):
 def sheets_delete(sid):
     """To the trash (Undo: POST /api/sheets/<id>/restore)."""
     c = db()
-    _need_w(c, sid)
+    from .shshare import shs_need_own
+    shs_need_own(c, _need_w(c, sid))  # 2.124.0 C (#2113): never through a share
     c.execute("UPDATE sheets SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), sid))
     sh_touch(c, sid, me())
     return _done(c, sid)
@@ -105,7 +119,10 @@ def sheets_delete(sid):
 @app.post("/api/sheets/<int:sid>/restore")
 def sheets_restore(sid):
     c = db()
-    _need_w(c, sid, deleted=True)
+    r = _need_w(c, sid, deleted=True)
+    if r["book_id"]:  # 2.124.0 (#2116, review): a further sheet comes back through its sheet route (name and count checks)
+        from .shbook import sheets_tabs_restore
+        return sheets_tabs_restore(r["book_id"], sid)
     c.execute("UPDATE sheets SET deleted_at=NULL WHERE id=?", (sid,))
     sh_touch(c, sid, me())
     return _done(c, sid)

@@ -25,12 +25,12 @@ const SHV_KINDS = [['text', N_('Text')], ['number', N_('Number')], ['currency', 
 const SHV_NUM = ['number', 'currency', 'percent'];
 const SHV_KICON = {text: 'edit', number: 'hash', currency: 'money', percent: 'chart', date: 'cal', select: 'list'};
 const SHV_ERR = {deleted: N_('Source deleted'), denied: N_('No access'), cycle: N_('Circular reference'), syntax: N_('Formula error'),
-  div0: N_('Division by zero'), ref: N_('Reference missing'), type: N_('Wrong type')};
+  div0: N_('Division by zero'), ref: N_('Reference missing'), type: N_('Wrong type'), na: N_('Not found')}; // 2.124.0 A (#2109): + na
 const SHV_ORIGIN = {own: N_('Own value'), formula: N_('Formula'), kalmido: N_('Value from Kalmido'), frozen: N_('Frozen value')};
 const SHV_WIDTHS = [[80, N_('Narrow')], [120, N_('Normal')], [200, N_('Wide')], [320, N_('Very wide')]];
 
 const shvSpaces = () => ['private', ...(S.me?.workspaces || []).map(w => 'org:' + w.id)];
-const shvSpaceName = sp => sp === 'private' ? tr('Private|workspace') : (wsOrg(sp.slice(4))?.name || tr('Organisation'));
+const shvSpaceName = sp => sp === 'private' ? tr('Private|workspace') : sp === 'shared' ? tr('Shared with me') : (wsOrg(sp.slice(4))?.name || tr('Organisation'));  // 2.124.0 C (#2113): + shared
 const shvListSpace = l => l?.org_id ? 'org:' + l.org_id : 'private';
 function shvNewSpace() {  // the space a new sheet goes to: the workspace switch, else the last one used, else the first organisation
   const ok = v => !!v && shvSpaces().includes(v), ws = typeof wsCur === 'function' ? wsCur() : 'all';
@@ -133,7 +133,7 @@ function shvOverview(lid) {
   if (!d || d.v !== S.v) shvLoadIdx(key);
   const l = lid ? listById(lid) : null, ws = typeof wsCur === 'function' ? wsCur() : 'all';
   let items = d?.items || [];
-  if (!lid && ws && ws !== 'all') items = items.filter(x => x.space === ws);
+  if (!lid && ws && ws !== 'all') items = items.filter(x => x.space === ws || x.shared_in);  // 2.124.0 C (#2113): shared with me: in every workspace
   const hooks = SHV_HOOKS.overview.length;
   const head = `<div class="shvtop">${lid ? `<a class="btn sm" href="#l/${lid}">${ic('back', 's')}${esc(l ? lname(l) : tr('List'))}</a>` : ''}
     <h2 class="shvh">${lid ? esc(tr('Tables of {0}', l ? lname(l) : '')) : tr('Tables')}</h2><span class="spacer"></span>
@@ -142,9 +142,9 @@ function shvOverview(lid) {
   if (!d?.items) return `<div class="shvwrap shvov">${head}<p class="muted lempty" role="status">${d?.err ? esc(d.err) : tr('Loading…')}</p></div>`;
   if (!items.length) return `<div class="shvwrap shvov">${head}${botEmpty('ruhig', lid ? tr('No tables attached yet.') : tr('No tables yet.'), tr('Lists and calculations like in a spreadsheet, and every cell can fetch figures from Kalmido: hours booked, budget, open tasks.'))}</div>`;
   const card = x => `<li class="shvcard" data-id="${x.id}"><a href="#sheets/${x.id}" class="shvcl">${ic('sheet')}<span class="shvct"><b>${esc(x.title || tr('Untitled table'))}</b>
-      <span class="muted">${x.list_title && !lid ? esc(x.list_title) + ' · ' : ''}${x.updated_at ? esc(relTime(x.updated_at)) : ''}${x.updated_by_name ? ' · ' + esc(x.updated_by_name) : ''}${x.agent ? ' · ' + esc(tr('changed by an agent')) : ''}</span></span></a>
+      <span class="muted">${x.list_title && !lid ? esc(x.list_title) + ' · ' : ''}${x.updated_at ? esc(relTime(x.updated_at)) : ''}${x.updated_by_name ? ' · ' + esc(x.updated_by_name) : ''}${x.agent ? ' · ' + esc(tr('changed by an agent')) : ''}${x.sheets > 1 ? ' · ' + esc(trn('{0} sheet', '{0} sheets', x.sheets)) : ''}${x.shared && !x.shared_in ? ` · <span class="shs-mark">${ic('users', 's')}${tr('Shared')}</span>` : ''}</span></span></a>
     <button type="button" class="iconbtn" data-shv="cmenu" data-id="${x.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More') + ': ' + (x.title || ''))}">${ic('dots')}</button></li>`;
-  const groups = shvSpaces().map(sp => [sp, items.filter(x => x.space === sp)]).filter(g => g[1].length);
+  const groups = [...shvSpaces(), 'shared'].map(sp => [sp, items.filter(x => sp === 'shared' ? x.shared_in : x.space === sp && !x.shared_in)]).filter(g => g[1].length);  // 2.124.0 C (#2113): + shared with me
   const many = groups.length > 1 || (!lid && shvSpaces().length > 1);
   return `<div class="shvwrap shvov">${head}${groups.map(([sp, xs]) => `<section class="shvgrp" aria-label="${esc(shvSpaceName(sp))}">${many ? `<h3>${esc(shvSpaceName(sp))}</h3>` : ''}<ul class="shvcards">${xs.map(card).join('')}</ul></section>`).join('')}</div>`;
 }
@@ -154,7 +154,7 @@ function shvSheetHtml(sh) {
   const pres = shvPresHtml(sh);
   SHV.rset = shvRangeSet();
   const back = sh.list_id ? `<a class="btn sm" href="#sheets/l/${sh.list_id}" title="${esc(tr('Tables of {0}', sh.list_title || ''))}">${ic('back', 's')}<span class="shvbk">${esc(sh.list_title || tr('List'))}</span></a>` : `<a class="btn sm" href="#sheets">${ic('back', 's')}<span class="shvbk">${tr('Tables')}</span></a>`;
-  const top = `<div class="shvtop">${back}<h2 class="shvh"><button type="button" class="shvtitle" data-shv="rename" ${w ? '' : 'disabled'} title="${esc(w ? tr('Rename…') : '')}">${esc(sh.title || tr('Untitled table'))}</button></h2>
+  const top = `<div class="shvtop">${back}<h2 class="shvh"><button type="button" class="shvtitle" data-shv="rename" ${w ? '' : 'disabled'} title="${esc(w ? tr('Rename…') : '')}">${esc((sh.book_title ?? sh.title) || tr('Untitled table'))}</button></h2>
     ${w ? '' : `<span class="shvro">${ic('eye', 's')}${tr('Read only')}</span>`}<span class="spacer"></span>
     ${nf ? `<button type="button" class="btn sm" data-shv="unfilter" title="${esc(tr('Reset filters'))}">${ic('filter', 's')}${trn('{0} filter', '{0} filters', nf)}${ic('x', 's')}</button>` : ''}
     <button type="button" class="btn sm ${SHV.deps ? 'on' : ''}" data-shv="deps" aria-haspopup="menu" aria-pressed="${!!SHV.deps}">${ic('deps', 's')}<span class="shvbk">${tr('Dependencies')}</span></button>${typeof shz_btnsHtml === 'function' ? shz_btnsHtml(sh) : ''}
@@ -167,9 +167,9 @@ function shvSheetHtml(sh) {
   const head = `<thead><tr><th class="shvcorner" scope="col"><span class="sr">${tr('Row')}</span></th>${cols.map(c => shvTh(sh, c, filt)).join('')}${w ? `<th class="shvaddc"><button type="button" class="iconbtn" data-shv="coladd" title="${esc(tr('Add column'))}" aria-label="${esc(tr('Add column'))}">${ic('plus', 's')}</button></th>` : ''}${shz ? shz_headHtml(sh) : ''}</tr></thead>`;
   const body = `<tbody>${rows.map(r => shvTr(sh, r)).join('')}</tbody>${shz ? shz_bodyHtml(sh) : ''}`;
   const foot = `<div class="shvfoot">${w ? `<button type="button" class="btn sm" data-shv="rowadd">${ic('plus', 's')}${tr('Add row')}</button>` : ''}${nf ? `<span class="muted">${tr('{0} of {1} rows shown', rows.length, all)}</span>` : ''}</div>`;
-  return `<div class="shvwrap shvsheet" data-k="shv-${sh.id}">${top}${pres}${bar}
+  return `<div class="shvwrap shvsheet" data-k="shv-${sh.id}">${top}${pres}${typeof shc_html === 'function' ? shc_html(sh) : ''}${bar}
     <div class="shvbody"><div class="shvgridw"><div class="shzbox"${typeof shz_boxAttr === 'function' ? shz_boxAttr(sh) : ''}><div class="shvscroll" id="shv-scroll" tabindex="0" role="grid" aria-label="${esc(sh.title || tr('Table'))}" aria-rowcount="${all + 1}" aria-colcount="${cols.length + 1}" aria-multiselectable="true" ${c0 ? `aria-activedescendant="shv-c-${c0.r}-${c0.c}"` : ''}>
-      <table class="shvgrid" role="presentation">${colgroup}${head}${body}</table><svg class="shvdeps" id="shv-deps" aria-hidden="true"></svg></div>${typeof shz_gripHtml === 'function' ? shz_gripHtml(sh) : ''}</div>${foot}</div>
+      <table class="shvgrid" role="presentation">${colgroup}${head}${body}</table><svg class="shvdeps" id="shv-deps" aria-hidden="true"></svg></div>${typeof shz_gripHtml === 'function' ? shz_gripHtml(sh) : ''}</div>${foot}${typeof shb_barHtml === 'function' ? shb_barHtml(sh) : ''}</div>
     <aside class="shvside" id="shv-side" aria-label="${esc(tr('Cell details'))}">${shvSideHtml(sh)}</aside></div></div>`;
 }
 function shvPresHtml(sh) {  // "Anna is editing B4" (others only)
@@ -210,6 +210,7 @@ function shvTd(sh, rid, col) {
       if (o) { const cc = cssColor(o.color); inner = `<span class="shvopt${cc ? ' fill' : ''}" ${cc ? `style="--fc:${cc};--fct:${lrInk(cc)}"` : ''}>${esc(o.label)}</span>`; if (cc && col.color_mode !== 'row') { style = `--shc:${cc}`; cls.push('shvcc'); } }
     } else inner = shvShow(c);
   }
+  if (typeof shk_td === 'function') { const x = shk_td(sh, col, c, rid, cls); if (x != null) inner = x; }  // 2.124.0 B (#2110): sheetkinds.js
   if (col.kind === 'select' && sh.can_write) inner += `<span class="shvdd" aria-hidden="true">${ic('down', 's')}</span>`;
   if (sel) cls.push('sel'); if (cur) cls.push('cur'); if (pres) cls.push('shvpc');
   const tip = c ? shvTip(c, pres) : '';
@@ -324,7 +325,7 @@ function shvBarSync() {
   if (document.activeElement !== inp && !(SHV.ed && SHV.ed.bar)) { inp.value = SHV.ed ? SHV.ed.val ?? '' : c?.raw || ''; inp.readOnly = !sh.can_write || !cur; inp.placeholder = cur ? (sh.can_write ? tr('Value or =formula') : '') : tr('Choose a cell'); }
 }
 function shvSideSync() { const s = $('#shv-side'); if (s && SHV.sh && !s.contains(document.activeElement)) s.innerHTML = shvSideHtml(SHV.sh); }
-function shvAfter() { shvBarSync(); shvDepsDraw(); if (typeof shz_fill === 'function') shz_fill(); }  // 2.98.0 C (#2181): the empty cells that fill the frame
+function shvAfter() { shvBarSync(); shvDepsDraw(); if (typeof shz_fill === 'function') shz_fill(); if (typeof shk_after === 'function') shk_after(); }  // 2.124.0 B (#2111): + the rows / columns kept in view  // 2.98.0 C (#2181): the empty cells that fill the frame
 // after a write: the changed cells and the rows they colour are drawn in place (an open editor stays)
 function shvPatchAll() {
   const sh = SHV.sh, tb = $('#shv-scroll tbody'); if (!sh || !tb) return;
@@ -345,6 +346,7 @@ function shvPatchAll() {
   const p = $('#shv-scroll')?.closest('.shvsheet')?.querySelector('.shvpres');
   if (p || shvOthers(sh).length) { const t = document.createElement('template'); t.innerHTML = shvPresHtml(sh); const np = t.content.firstElementChild; if (p && np) p.replaceWith(np); else if (p) p.remove(); else if (np) $('.shvsheet .shvtop')?.after(np); }
   shvBarSync(); shvSideSync(); shvDepsDraw();
+  if (typeof shc_patch === 'function') shc_patch(sh);  // 2.124.0 A (#2115): the chart follows the cells (sheetchart.js)
 }
 // a write's answer {cells, rev}: the cells it changed and those that follow them
 function shvMerge(sid, r, sent) {
@@ -405,7 +407,7 @@ async function shvNew(lid) {
 }
 function shvAfterIdx(id, gone) {
   for (const d of Object.values(SHV.idx)) d.v = -1;
-  if (gone && S.route.mod === 'sheets' && S.route.sh === id) { SHV.sh = null; go(SHV.backTo || 'sheets'); return; }
+  if (gone && S.route.mod === 'sheets' && (S.route.sh === id || SHV.sh?.book_id === id)) { SHV.sh = null; go(SHV.backTo || 'sheets'); return; }  // 2.124.0 E (#2116): + a further sheet of the table
   if (SHV.sh?.id === id) SHV.sh._v = -1;
   if (S.route.mod === 'sheets') renderView();
 }
@@ -572,6 +574,7 @@ function shvEditStart(typed, bar) {
   const sh = SHV.sh, cur = SHV.cur; if (!sh?.can_write || !cur) return;
   const col = sh._col.get(cur.c);
   if (col?.kind === 'select' && !bar && !(typed && typed.startsWith('='))) { shvOptMenu(cur.r, cur.c); return; }
+  if (!bar && !(typed && typed.startsWith('=')) && typeof shk_edit === 'function' && shk_edit(cur, col, typed)) return;  // 2.124.0 B (#2110)
   const c = shvCell(cur.r, cur.c), val = typed != null ? typed : c?.raw || '';
   SHV.ed = {r: cur.r, c: cur.c, orig: c?.raw || '', val, typed: typed != null, bar: !!bar};
   shvPresence(SHV.ed);
@@ -763,17 +766,18 @@ document.addEventListener('click', async e => {
   else if (k === 'omenu') menu(a, SHV_HOOKS.overview.flatMap(f => { try { return f(S.route.shl ? null : (typeof wsCur === 'function' ? wsCur() : 'all'), S.route.shl || null) || []; } catch (er) { console.error(er); return []; } }));
   else if (k === 'cmenu') {
     const id = +a.dataset.id, x = Object.values(SHV.idx).flatMap(d => d.items || []).find(y => y.id === id); if (!x) return;
-    menu(a, [{label: tr('Open'), icon: 'sheet', fn: () => go('sheets/' + id)}, {label: tr('Rename…'), icon: 'edit', fn: () => shvRename(id, x.title)},
-      ...sh_smvItems(x),  // 2.96.0 B (#1941)
-      '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => shvDelete(id, x.title, S.route.shl || null)}]);
+    menu(a, [{label: tr('Open'), icon: 'sheet', fn: () => go('sheets/' + id)}, ...(x.shared_in && x.share_role !== 'write' ? [] : [{label: tr('Rename…'), icon: 'edit', fn: () => shvRename(id, x.title)}]),
+      ...(x.shared_in ? [] : [...sh_smvItems(x),  // 2.96.0 B (#1941); 2.124.0 C (#2113): a shared table: no move / delete
+      '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => shvDelete(id, x.title, S.route.shl || null)}])]);
   }
   else if (!sh) return;
-  else if (k === 'rename') shvRename(sh.id, sh.title);
-  else if (k === 'menu') menu(a, [...(sh.can_write ? [{label: tr('Rename…'), icon: 'edit', fn: () => shvRename(sh.id, sh.title)},
-      {label: sh.list_id ? tr('Attached to {0}…', sh.list_title || '') : tr('Attach to a project or list…'), icon: 'link', fn: () => shvAttach(sh)}] : []),
+  const bk = sh?.book_id && sh.book_id !== sh.id ? {...sh, id: sh.book_id, title: sh.book_title} : sh;  // 2.124.0 E (#2116): title, list, delete = the whole table
+  if (k === 'rename') shvRename(bk.id, bk.title);
+  else if (k === 'menu') menu(a, [...(sh.can_write ? [{label: tr('Rename…'), icon: 'edit', fn: () => shvRename(bk.id, bk.title)},
+      ...(sh.shared_in ? [] : [{label: sh.list_id ? tr('Attached to {0}…', sh.list_title || '') : tr('Attach to a project or list…'), icon: 'link', fn: () => shvAttach(bk)}])] : []),  // 2.124.0 C (#2113): not through a share
     ...(sh.list_id ? [{label: tr('Open {0}', sh.list_title || tr('List')), icon: 'list', fn: () => go('l/' + sh.list_id)}] : []),
     ...SHV_HOOKS.menu.flatMap(f => { try { return f(sh) || []; } catch (er) { console.error(er); return []; } }),
-    ...(sh.can_write ? ['-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => shvDelete(sh.id, sh.title, sh.list_id)}] : [])]);
+    ...(sh.can_write && !sh.shared_in ? ['-', {label: (sh.tabs || []).length > 1 ? tr('Delete table') : tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => shvDelete(bk.id, bk.title, sh.list_id)}] : [])]);  // 2.124.0 C (#2113)
   else if (k === 'deps') menu(a, [{label: tr('No arrows'), on: !SHV.deps, fn: () => { SHV.deps = 0; shvRender(); }},
     {label: tr('Arrows for the chosen cell'), on: SHV.deps === 1, fn: () => { SHV.deps = 1; shvRender(); }},
     {label: tr('Arrows for the whole table'), on: SHV.deps === 2, fn: () => { SHV.deps = 2; shvRender(); }}]);
@@ -794,12 +798,14 @@ function shvColMenu(cid, a) {
     {label: tr('Filter by this column…'), icon: 'filter', on: !!f, fn: () => shvFilterPop(cid, a)},
     ...(f ? [{label: tr('Remove filter'), icon: 'x', fn: () => { delete SHV.filt[sh.id][cid]; shvRender(); }}] : []),
     ...(w ? ['-', {label: tr('Insert column right'), icon: 'plus', fn: () => shvColModal(null, cid)},
-      {label: tr('Delete column'), icon: 'trash', cls: 'flag-5', fn: () => shvColDel(cid)}] : [])], null, null, col.title || col.letter);
+      {label: tr('Delete column'), icon: 'trash', cls: 'flag-5', fn: () => shvColDel(cid)}] : []),
+    ...(SHV_HOOKS.colmenu || []).flatMap(f => { try { return f(sh, col) || []; } catch (er) { console.error(er); return []; } })], null, null, col.title || col.letter);  // 2.124.0 B (#2111)
 }
 function shvRowMenu(rid, a) {
   const sh = SHV.sh; if (!sh?.can_write) { const c = sh?.columns[0]; if (c) shvSelect(rid, c.id); return; }
   menu(a, [{label: tr('Insert row above'), icon: 'up', fn: () => shvRowAdd(rid, true)}, {label: tr('Insert row below'), icon: 'down', fn: () => shvRowAdd(rid)},
-    '-', {label: tr('Delete row'), icon: 'trash', cls: 'flag-5', fn: () => shvRowDel(rid)}], null, null, tr('Row {0}', sh._rowNo.get(rid)));
+    '-', {label: tr('Delete row'), icon: 'trash', cls: 'flag-5', fn: () => shvRowDel(rid)},
+    ...(SHV_HOOKS.rowmenu || []).flatMap(f => { try { return f(sh, rid) || []; } catch (er) { console.error(er); return []; } })], null, null, tr('Row {0}', sh._rowNo.get(rid)));  // 2.124.0 B (#2111)
 }
 function shvFilterPop(cid, anchor) {  // a filter of the view: text contains / number from-to / options
   const sh = SHV.sh, col = sh._col.get(cid); if (!col) return;
@@ -957,7 +963,7 @@ window.addEventListener('resize', () => { if (S.route.mod === 'sheets' && SHV.de
 // the move back is ONE undo step and brings the attachment and the links back where they fit again.
 const sh_smvOrg = sp => sp && sp !== 'private' ? +sp.slice(4) : null;
 function sh_smvItems(x) {
-  if (!x || S.me?.kind === 'agent' || x.can_write === false || !smv_can(sh_smvOrg(x.space))) return [];
+  if (!x || S.me?.kind === 'agent' || x.can_write === false || x.shared_in || !smv_can(sh_smvOrg(x.space))) return [];  // 2.124.0 C (#2113): + not through a share
   return [{label: tr('Move to another workspace…'), icon: 'brief', fn: () => sh_smvMove(x)}];
 }
 async function sh_smvMove(x) {

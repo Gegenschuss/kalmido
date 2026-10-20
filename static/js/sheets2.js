@@ -115,7 +115,7 @@ function sh2SrcLists(sh, d) {  // the lists this sheet already has rows of (for 
 
 // ---- hooks: the sheet's menu, the row marks, the side panel
 SHV_HOOKS.menu.push(sh => {
-  if (!sh?.can_write) return [];
+  if (!sh?.can_write || sh.shared_in) return [];  // 2.124.0 C (#2113): carrying over never through a share
   const d = sh2Data(sh), out = ['-', {label: tr('Create tasks from rows…'), icon: 'check', fn: () => sh2ToTasks(sh)}];
   if (d?.office) out.push({label: tr('Take over as a quotation…'), icon: 'receipt', fn: () => sh2ToOffer(sh)});
   out.push({label: tr('List as rows…'), icon: 'download', fn: () => sh2FromList(sh)});

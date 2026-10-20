@@ -233,11 +233,13 @@ def bnk_preview():
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     fmt, rows, cols = bnk_parse(c, oid, b)
+    from .cfbank import cfb_preview
+    extra = cfb_preview(c, oid, fmt, b, cols)  # 2.124.0 D (#2342): the statement's balances / the guessed balance column
     if rows is None:
-        return jsonify(fmt=fmt, **cols)
+        return jsonify(fmt=fmt, **cols, **extra)
     ok = [r for r in rows if not r["error"]]
     return jsonify(fmt=fmt, rows=[_row_out(r) for r in rows], count=sum(1 for r in ok if not r["dup"]),
-                   dup_count=sum(1 for r in ok if r["dup"]), skipped=len(rows) - len(ok))
+                   dup_count=sum(1 for r in ok if r["dup"]), skipped=len(rows) - len(ok), **extra)
 
 
 def _import_public(r):
@@ -270,11 +272,13 @@ def bnk_import():
                "created_at": ts}
         row = oc_enc_fields(c, oid, "office_bank_tx", row)
         c.execute(f"INSERT INTO office_bank_tx({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+    from .cfbank import cfb_store
+    bal_n = cfb_store(c, oid, iid, fmt, b, ts)  # 2.124.0 D (#2342): the statement's balances, counted while the import is active
     bump(c)
     c.commit()
     imp = c.execute("SELECT * FROM office_bank_imports WHERE id=?", (iid,)).fetchone()
     return jsonify({"import": _import_public(imp), "count": len(new), "dup_count": dup,
-                    "skipped": sum(1 for r in rows if r["error"])}), 201
+                    "skipped": sum(1 for r in rows if r["error"]), "balances": bal_n}), 201
 
 
 @app.get("/api/office/bank/imports")

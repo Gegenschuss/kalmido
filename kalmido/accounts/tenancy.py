@@ -102,6 +102,9 @@ CHECKS = {
                 "LEFT JOIN office_docs d ON t.match_kind='invoice' AND d.id=t.match_id LEFT JOIN office_payments p ON p.id=t.payment_id "
                 "WHERE t.deleted_at IS NULL AND ((i.id IS NOT NULL AND i.org_id IS DISTINCT FROM t.org_id) OR "
                 "(d.id IS NOT NULL AND d.org_id IS DISTINCT FROM t.org_id) OR (p.id IS NOT NULL AND p.org_id IS DISTINCT FROM t.org_id))"),
+    # 2.124.0 D (#2342): a statement balance whose import lies in another office area
+    "bank_balance": ("SELECT b.id, b.import_id FROM office_bank_balances b JOIN office_bank_imports i ON i.id=b.import_id "
+                     "WHERE i.org_id IS DISTINCT FROM b.org_id"),
     # 2.93.0 A (#1927): a document made from a template bound to a client / project list / quotation / template of another
     # office area (a personal office's documents bind the owner's private clients and lists), or a signature link of it
     # in another area than the document
@@ -188,6 +191,14 @@ CHECKS = {
     # sh_list_ok) -- (sheet, who created it; counted only)
     "sheet_list": ("SELECT s.id, s.created_by FROM sheets s JOIN lists l ON l.id=s.list_id WHERE s.deleted_at IS NULL "
                    "AND l.org_id IS DISTINCT FROM s.org_id"),
+    # 2.124.0 B (#2110): a file of a table cell that lies in another space than its table (sheets/shkinds.py shk_move_files
+    # moves them along) -- (file, who stored it; counted only)
+    "sheet_file": ("SELECT f.id, f.created_by FROM sheet_files f JOIN sheets s ON s.id=f.sheet_id WHERE "
+                   "COALESCE(f.org_id,0)<>COALESCE(s.org_id,0) OR (s.org_id IS NULL AND f.owner_id IS DISTINCT FROM s.owner_id)"),
+    # 2.124.0 E (#2116): a further sheet of a table whose space / list differs from its first sheet's (the rights follow the first
+    # sheet: sheets/shbook.py; a move / list change copies them over) -- (sheet, who created it; counted only)
+    "sheet_book": ("SELECT s.id, s.created_by FROM sheets s JOIN sheets b ON b.id=s.book_id WHERE COALESCE(s.org_id,0)<>COALESCE(b.org_id,0) "
+                   "OR (s.org_id IS NULL AND s.owner_id IS DISTINCT FROM b.owner_id) OR s.list_id IS DISTINCT FROM b.list_id"),
     # 2.89.0 (#1916, D): a row carried over into a task / taken from a task of another workspace than the table's (the buttons
     # refuse it; the formulas show "No access" then) -- (sheet, who pressed the button; counted only)
     "sheet_link": ("SELECT s.id, k.created_by FROM sheet_links k JOIN sheets s ON s.id=k.sheet_id JOIN tasks t ON t.id=k.target_id "
@@ -202,6 +213,12 @@ CHECKS = {
                    "OR (l.id IS NOT NULL AND l.org_id IS DISTINCT FROM p.org_id))"),
     "hub_token_person": ("SELECT m.org_id, m.user_id FROM hub_tokens m JOIN users u ON u.id=m.user_id WHERE m.org_id IS NOT NULL AND "
                          + _PERSON.format(o="m", m="m")),
+    # 2.124.0 C (#2113): a live share of an organisation's table with a person outside it (repaired), of a table with an agent of
+    # another workspace, or a share whose org_id differs from its table's (the read layer refuses all: sheets/shshare.py shs_fits)
+    "sheet_share_person": ("SELECT s.sheet_id, s.user_id FROM sheet_shares s JOIN sheets t ON t.id=s.sheet_id JOIN users u ON u.id=s.user_id "
+                           "WHERE s.revoked_at IS NULL AND t.org_id IS NOT NULL AND " + _PERSON.format(o="t", m="s")),
+    "sheet_share_agent": ("SELECT s.sheet_id, s.user_id FROM sheet_shares s JOIN sheets t ON t.id=s.sheet_id JOIN agents a ON a.user_id=s.user_id "
+                          "WHERE s.revoked_at IS NULL AND (COALESCE(a.org_id,0)!=COALESCE(t.org_id,0) OR s.org_id IS DISTINCT FROM t.org_id)"),
     # 2.97.0 A (#1950): a bookmark of an organisation held by an agent or by a person outside it (the read layer needs the
     # membership: life/bookmarks.py bm_get; counted only) -- (bookmark, owner)
     "bookmark_owner": ("SELECT b.id, b.user_id FROM bookmarks b JOIN users u ON u.id=b.user_id WHERE b.org_id IS NOT NULL AND "
@@ -236,7 +253,8 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
           "doc_mail_person": ("doc_mail", "org_id"),  # 2.48.0 (#1111)
           "task_bell_person": ("task_bell", "task_id"),  # 2.53.0 C (#1424)
           "assistant_person": ("assistant_access", "list_id"),  # 2.75.0 A (#1411)
-          "hub_token_person": ("hub_tokens", "org_id")}  # 2.84.0 A (#1198)
+          "hub_token_person": ("hub_tokens", "org_id"),  # 2.84.0 A (#1198)
+          "sheet_share_person": ("sheet_shares", "sheet_id")}  # 2.124.0 C (#2113)
 TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Administration > Organisations")
 
 

@@ -120,7 +120,7 @@ async function bnkRead(f) {
   bnkImpModal(text, f.name);
 }
 function bnkImpModal(text, name) {
-  const md = modal(''), card = $('.card', md), st = {p: null, mapping: null, rows: null};
+  const md = modal(''), card = $('.card', md), st = {p: null, mapping: null, rows: null, account: null};  // 2.124.0 D (#2342): account = the name for a CSV balance
   md.classList.add('ofcdlg', 'bnkdlg');
   const errEl = () => $('.aerr', md), err = m => { const e = errEl(); if (e) e.textContent = m || ''; };
   const foot = (ok, back) => `<div class="aerr" role="alert"></div><div class="foot">${back ? `<button class="btn" data-bi="back">${tr('Back')}</button>` : ''}<span class="spacer"></span><button class="btn" data-bi="close">${tr('Cancel')}</button>${ok ? `<button class="btn pri" data-bi="next">${esc(ok)}</button>` : ''}</div>`;
@@ -132,7 +132,7 @@ function bnkImpModal(text, name) {
       <div class="row"><label>${tr('Amount')}</label><div class="seg" role="radiogroup" id="bi-am" aria-label="${esc(tr('Amount'))}"><button type="button" role="radio" data-am="one" aria-checked="${!two}" class="${two ? '' : 'on'}">${tr('One column (minus = expense)')}</button><button type="button" role="radio" data-am="two" aria-checked="${two}" class="${two ? 'on' : ''}">${tr('Income and expense apart')}</button></div></div>
       <div class="bi-one" ${two ? 'hidden' : ''}>${sel('bi-amt', tr('Amount'), g.amount)}</div>
       <div class="bi-two" ${two ? '' : 'hidden'}>${sel('bi-in', tr('Income'), g.amount_in, true)}${sel('bi-out', tr('Expense'), g.amount_out, true)}</div>
-      ${sel('bi-title', tr('Purpose'), g.title, true)}${sel('bi-cp', tr('Paid to / from'), g.counterpart, true)}
+      ${sel('bi-title', tr('Purpose'), g.title, true)}${sel('bi-cp', tr('Paid to / from'), g.counterpart, true)}${cfb_mapHtml(st, sel, g)}
       <div class="row"><label for="bi-dec">${tr('Decimal separator')}</label><select id="bi-dec"><option value="," ${g.decimal !== '.' ? 'selected' : ''}>${tr('comma (1.234,56)')}</option><option value="." ${g.decimal === '.' ? 'selected' : ''}>${tr('point (1,234.56)')}</option></select></div>
       <div class="row"><label for="bi-df">${tr('Date format')}</label><select id="bi-df">${['DD.MM.YYYY', 'DD.MM.YY', 'YYYY-MM-DD', 'MM/DD/YYYY'].map(f => `<option ${g.date_format === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div>
       <div class="bgtblw"><table class="bgtbl"><thead><tr>${st.p.columns.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${st.p.sample.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
@@ -140,16 +140,17 @@ function bnkImpModal(text, name) {
   };
   const mapOf = () => {
     const n = id => { const v = $(id, md)?.value; return v === '' || v == null ? null : +v; }, two = $('#bi-am [aria-checked="true"]', md)?.dataset.am === 'two';
-    return {date: n('#bi-date'), amount: two ? null : n('#bi-amt'), amount_in: two ? n('#bi-in') : null, amount_out: two ? n('#bi-out') : null, title: n('#bi-title'), counterpart: n('#bi-cp'), decimal: $('#bi-dec', md).value, date_format: $('#bi-df', md).value};
+    st.account = $('#bi-accname', md)?.value.trim() || null;  // 2.124.0 D (#2342): balance + own account column (optional)
+    return {date: n('#bi-date'), amount: two ? null : n('#bi-amt'), amount_in: two ? n('#bi-in') : null, amount_out: two ? n('#bi-out') : null, title: n('#bi-title'), counterpart: n('#bi-cp'), decimal: $('#bi-dec', md).value, date_format: $('#bi-df', md).value, balance: n('#bi-bal'), account: n('#bi-acc')};
   };
   const rowsView = () => {
     const p = st.p;
     card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${esc(name)} · ${esc([trn('{0} new', '{0} new', p.count), p.dup_count ? trn('{0} already there', '{0} already there', p.dup_count) : '', p.skipped ? trn('{0} with an error', '{0} with an error', p.skipped) : ''].filter(Boolean).join(' · '))}</p>
-      <ul class="ofclist bnkprev" role="list">${p.rows.slice(0, 200).map(r => `<li class="ofcrow ${r.error || r.dup ? 'arch' : ''}"><span class="ofcn"><b>${esc(r.counterpart || r.purpose || tr('Row {0}', r.n))}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.error || (r.dup ? tr('already there') : r.purpose)].filter(Boolean).join(' · '))}</small></span>${r.amount != null ? `<span class="bnkamt ${+r.amount > 0 ? 'in' : 'out'}">${esc(bnkAmt(r.amount))}</span>` : ''}</li>`).join('')}</ul>
+      ${cfb_prevHtml(p.balances)}<ul class="ofclist bnkprev" role="list">${p.rows.slice(0, 200).map(r => `<li class="ofcrow ${r.error || r.dup ? 'arch' : ''}"><span class="ofcn"><b>${esc(r.counterpart || r.purpose || tr('Row {0}', r.n))}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.error || (r.dup ? tr('already there') : r.purpose)].filter(Boolean).join(' · '))}</small></span>${r.amount != null ? `<span class="bnkamt ${+r.amount > 0 ? 'in' : 'out'}">${esc(bnkAmt(r.amount))}</span>` : ''}</li>`).join('')}</ul>
       ${p.rows.length > 200 ? `<p class="muted">${tr('Showing the first 200 rows')}</p>` : ''}${foot(p.count ? trn('Import {0} booking', 'Import {0} bookings', p.count) : '', p.fmt === 'csv')}`;
   };
   const preview = async mapping => {
-    try { st.p = await api('POST', '/api/office/bank/import/preview', {text, filename: name, ...(mapping ? {mapping} : {})}); }
+    try { st.p = await api('POST', '/api/office/bank/import/preview', {text, filename: name, ...(mapping ? {mapping} : {}), ...(st.account ? {account: st.account} : {})}); }
     catch (x) { if (st.p) err(x.message); else { md.remove(); toast(x.message || tr('unknown')); } $$('button[data-bi]', md).forEach(b => { b.disabled = false; }); return; }
     if (st.p.columns) cols(); else rowsView();
   };
@@ -161,7 +162,7 @@ function bnkImpModal(text, name) {
     if (b.dataset.bi === 'back') { await preview(null); return; }
     if (st.p?.columns) { st.mapping = mapOf(); b.disabled = true; await preview(st.mapping); return; }
     b.disabled = true;
-    const req = {text, filename: name, ...(st.mapping ? {mapping: st.mapping} : {})};
+    const req = {text, filename: name, ...(st.mapping ? {mapping: st.mapping} : {}), ...(st.account ? {account: st.account} : {})};
     try {
       const j = await api('POST', '/api/office/bank/import', req), iid = j.import.id;
       md.remove(); BNK.state = 'open'; BNK.imports = null; bnkReload();
@@ -193,3 +194,21 @@ document.addEventListener('click', e => {
   else return;
   e.preventDefault();
 });
+
+// ---- 2.124.0 D (#2342): the balance of the statement. CSV: an optional balance column, an optional column with the own IBAN,
+// else the account's name (default "Main account"; known names offered). The preview names the closing balance per account.
+// Server: kalmido/office/cfbank.py.
+const cfb_day = d => fmtDay('year', pd(d));  // always with the year (TT.MM.JJJJ)
+const cfb_acct = a => /^[A-Z]{2}\d{2}[A-Z0-9]{8,}$/.test(a || '') ? `${a.slice(0, 4)} … ${a.slice(-4)}` : (a || '');
+function cfb_mapHtml(st, sel, g) {
+  const known = st.p.accounts || [], v = st.account ?? (known.find(a => !/^[A-Z]{2}\d{2}/.test(a)) || tr('Main account'));
+  return `${sel('bi-bal', tr('Balance (optional)'), g.balance, true)}${sel('bi-acc', tr('Own account (IBAN, optional)'), g.account, true)}
+      <div class="row"><label for="bi-accname">${tr('Account name for the balance')}</label><input id="bi-accname" maxlength="60" list="bi-accl" autocomplete="off" value="${esc(v)}"><datalist id="bi-accl">${known.map(a => `<option value="${esc(a)}">`).join('')}</datalist></div>`;
+}
+function cfb_prevHtml(bals) {
+  const last = {};
+  for (const b of (bals || []).filter(x => x.kind === 'close')) if (!last[b.account] || b.day >= last[b.account].day) last[b.account] = b;
+  const ls = Object.values(last);
+  if (!ls.length) return '';
+  return `<ul class="cfb-prev" role="list">${ls.map(b => `<li>${esc(tr('Account balance according to the bank on {0}: {1}', cfb_day(b.day), ofcMoney(b.amount)))}${ls.length > 1 || /^[A-Z]{2}\d{2}/.test(b.account) ? ` <small class="muted">${esc(cfb_acct(b.account))}</small>` : ''}</li>`).join('')}</ul>`;
+}

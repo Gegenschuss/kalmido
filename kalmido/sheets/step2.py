@@ -53,7 +53,11 @@ def _gate(c, sid, write=True):
         raise Denied(403, tr("Agents cannot use this endpoint"))
     if write:
         need_feat("sheets")
-    return sh_need(c, sid, write=write), uid
+    r = sh_need(c, sid, write=write)
+    if write:  # 2.124.0 C (#2113): carrying rows over (tasks, quotation, list as rows) never through a share
+        from .shshare import shs_need_own
+        shs_need_own(c, r)
+    return r, uid
 
 
 def _int(v, what):

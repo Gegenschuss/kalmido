@@ -231,8 +231,9 @@ def org_files(c, oid):
         rows = c.execute("SELECT a.path FROM attachments a JOIN tasks t ON t.id=a.task_id JOIN lists l ON l.id=t.list_id "
                          "WHERE l.org_id=? UNION ALL SELECT f.path FROM list_files f JOIN lists l ON l.id=f.list_id WHERE l.org_id=? "
                          "UNION ALL SELECT f.path FROM budget_files f JOIN lists l ON l.id=f.list_id WHERE l.org_id=? "  # 2.72.0 (#1333)
-                         "UNION ALL SELECT path FROM wiki_files WHERE org_id=?",  # 2.99.0 A (#2182): files of knowledge pages
-                         (oid, oid, oid, oid)).fetchall()
+                         "UNION ALL SELECT path FROM wiki_files WHERE org_id=? "  # 2.99.0 A (#2182): files of knowledge pages
+                         "UNION ALL SELECT path FROM sheet_files WHERE org_id=?",  # 2.124.0 B (#2110): files of table cells
+                         (oid, oid, oid, oid, oid)).fetchall()
     return [os.path.join(ATT_DIR, r[0]) for r in rows if r[0]] + _office_files(oid) + list(f8f_icon_files(c, oid))
 
 
@@ -242,7 +243,8 @@ def all_files(c):
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         rows = c.execute("SELECT path FROM attachments UNION ALL SELECT path FROM list_files UNION ALL SELECT path FROM fs_versions "
                          "UNION ALL SELECT path FROM chat_files UNION ALL SELECT path FROM budget_files "  # 2.72.0 (#1333)
-                         "UNION ALL SELECT path FROM wiki_files").fetchall()  # 2.99.0 A (#2182)
+                         "UNION ALL SELECT path FROM wiki_files "  # 2.99.0 A (#2182)
+                         "UNION ALL SELECT path FROM sheet_files").fetchall()  # 2.124.0 B (#2110)
     out = [os.path.join(ATT_DIR, r[0]) for r in rows if r[0]] + list(f8f_icon_files(c))  # 2.58.0 (#1805)
     if os.path.isdir(OFFICE_DIR):
         for name in sorted(os.listdir(OFFICE_DIR)):
@@ -336,6 +338,9 @@ SPACE_SQL = (
                              "WHERE f.path<>''", "f.list_id"),
     # 2.99.0 A (#2182): files of knowledge pages (the space of their page)
     ("wiki_files", "f.id", "SELECT f.id AS rid, f.path, f.org_id, f.owner_id FROM wiki_files f WHERE f.path<>''", None),
+    # 2.124.0 B (#2110): files of table cells (the space of their sheet)
+    ("sheet_files", "f.id", "SELECT f.id AS rid, f.path, s.org_id, s.owner_id FROM sheet_files f JOIN sheets s ON s.id=f.sheet_id "
+                            "WHERE f.path<>''", None),
     # 2.83.0 (#1427): the lists' own header pictures (lists/listhead.py o3c_head_rel) move with their list
     ("lists", "l.id", "SELECT l.id AS rid, 'listheads/l' || l.id || '-' || l.header_file || '.jpg' AS path, l.org_id, l.owner_id "
                       "FROM lists l WHERE l.header_file<>''", "l.id"),

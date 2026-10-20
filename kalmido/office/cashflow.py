@@ -440,6 +440,8 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True
     if cfs:  # 2.123.0 D (#2341): start balance, corrections by hand, real balances (office/cfstart.py; nothing set = as before)
         from .cfstart import cfs_apply
         cfs_apply(c, oid, out, today)
+        from .cfbank import cfb_apply
+        cfb_apply(c, oid, out, today)  # 2.124.0 D (#2342): the balances of the bank statements (none = as before)
     return out
 
 

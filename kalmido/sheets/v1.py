@@ -64,7 +64,8 @@ def _int_or_none(v, what):
 @app.get("/api/v1/sheets")
 @v1_view
 def v1_sheets_list():
-    """The tables you may read: ?space=private|org:<id>|all (default all) or ?list_id= (attached to that list)."""
+    """The tables you may read: ?space=private|org:<id>|shared|all (default all; 2.124.0 C #2113: shared = only the tables
+    shared with you one by one) or ?list_id= (attached to that list)."""
     a = v1_args(("space", "list_id"))
     c = db()
     lid = a.get("list_id")
@@ -131,11 +132,17 @@ def v1_sheet_patch(sid):
     if "list_id" in b:
         lid = _int_or_none(b["list_id"], "list_id")
         if lid != r["list_id"]:
+            from .shshare import shs_need_own
+            shs_need_own(c, r)  # 2.124.0 C (#2113): never through a share
             if not sh_may_rebind(c, me(), r):
                 raise Denied(403)  # 2.89.0 (#1916): review 2, the rule of the web route; agents only on their own sheets
             f["list_id"] = sh_check_list(c, r["org_id"], lid, me())
+    from .shbook import shb_patch, shb_sync
+    f = shb_patch(c, r, f)  # 2.124.0 E (#2116): the list on the first sheet only; a further sheet's title = its name in the bar
     if f:
         c.execute(f"UPDATE sheets SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), sid])
+        if "list_id" in f:
+            shb_sync(c, sid)  # 2.124.0 E (#2116)
         sh_touch(c, sid, me())
     c.commit()
     return jsonify(_v1_sheet(c, sh_reload(c, sid)))
@@ -237,18 +244,26 @@ def sheets_spec(paths, schemas, op, ok, errs, ref, pid, q):
               "description": "Rows of inputs in the order of the columns. Numbers 1,5 or 1.5, dates DD.MM.YYYY or ISO, a select cell its "
                              "label (a new label becomes a new choice), formulas start with = (A1, B2:B9, cell / column names, "
                              "SUMME/SUM, MITTELWERT/AVERAGE, MIN, MAX, ANZAHL/COUNT, WENN/IF, RUNDEN/ROUND, HEUTE/TODAY, TAGE/DAYS, "
+                             "SUMMEWENN/SUMIF, ZÄHLENWENN/COUNTIF, SVERWEIS/VLOOKUP, XVERWEIS/XLOOKUP, LINKS/LEFT, RECHTS/RIGHT, "
+                             "TEIL/MID, LÄNGE/LEN, VERKETTEN/CONCAT, GLÄTTEN/TRIM, GROSS/UPPER, KLEIN/LOWER, DATUM/DATE, "
+                             "JAHR/YEAR, MONAT/MONTH, TAG/DAY, EDATUM/EDATE, "
                              "projekt.<name>.<field>, liste.<name>.<field>, kunde.<name>.<field>, hier.<field>; arguments with ;)"}
     schemas["SheetBrief"] = {"type": "object", "properties": {
         "id": {"type": "integer"}, "title": {"type": "string"}, "space": {"type": "string", "description": "private | org:<id>"},
         "list_id": {"type": ["integer", "null"]}, "list_title": {"type": ["string", "null"]}, "updated_at": {"type": "string"},
-        "updated_by_name": {"type": "string"}, "agent": {"type": ["object", "null"], "description": "The agent that created it"}}}
+        "updated_by_name": {"type": "string"}, "agent": {"type": ["object", "null"], "description": "The agent that created it"},
+        # 2.124.0 C (#2113): single shares
+        "shared": {"type": "integer", "description": "Number of people / agents this one table is shared with"},
+        "shared_in": {"type": "boolean", "description": "You see it only because it is shared with you"},
+        "share_role": {"type": "string", "description": "read | write (only with shared_in)"},
+        "sheets": {"type": "integer", "description": "2.124.0: the number of sheets of the table"}}}
     schemas["SheetCell"] = {"type": "object", "properties": {
         "id": {"type": "integer"}, "row_id": {"type": "integer"}, "col_id": {"type": "integer"}, "addr": {"type": "string", "description": "B4"},
         "raw": {"type": "string", "description": "The input; a formula with the current names"}, "name": {"type": ["string", "null"]},
         "value": {"description": "number | text | ISO date | boolean | null"}, "vtype": {"type": "string"}, "display": {"type": "string"},
         "origin": {"type": "string", "enum": ["own", "formula", "kalmido", "frozen"]},
-        "error": {"type": ["string", "null"], "enum": [None, "deleted", "denied", "cycle", "syntax", "div0", "ref", "type"],
-                  "description": "denied = a Kalmido variable you may not see (no value, no name)"},
+        "error": {"type": ["string", "null"], "enum": [None, "deleted", "denied", "cycle", "syntax", "div0", "ref", "type", "na"],
+                  "description": "denied = a Kalmido variable you may not see (no value, no name); na = not found (VLOOKUP / XLOOKUP)"},
         "error_text": {"type": ["string", "null"]}, "option": {"type": ["string", "null"], "description": "select: the choice's id"},
         "agent": {"type": ["object", "null"], "description": "{id, name, batch} when an agent wrote it last"},
         "sources": {"type": "array", "items": {"type": "object"}}, "refs": {"type": "array", "items": {"type": "integer"}}}}
@@ -258,16 +273,22 @@ def sheets_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "currency": {"type": "string"},
         "columns": {"type": "array", "items": {"type": "object", "description": "{id, pos, title, kind, options, color_mode, width, letter}"}},
         "rows": {"type": "array", "items": {"type": "object", "description": "{id, pos}"}},
+        "chart": {"type": ["object", "null"], "description": "2.124.0: the table's chart set in the app, {type: bar | line, x: column id of "
+                                                            "the labels | null, y: [column ids of the numbers]}; read only here"},
         "cells": {"type": "array", "items": ref("SheetCell")}, "names": {"type": "object"},
         "sources": {"type": "array", "items": {"type": "object"}, "description": "The Kalmido variables used: {type p|l|k, id, label, fields, denied, deleted}"},
         "batches": {"type": "array", "items": {"type": "object"}, "description": "Agent calls on this table: {batch, agent_id, agent_name, created_at, count, undone}"},
-        "rev": {"type": "integer"}, "batch": {"type": "string", "description": "The batch of this call (agents)"}}}
+        "rev": {"type": "integer"}, "batch": {"type": "string", "description": "The batch of this call (agents)"},
+        # 2.124.0 E (#2116): several sheets in one table
+        "book_id": {"type": "integer", "description": "2.124.0: the table this sheet belongs to (the id of its first sheet)"},
+        "book_title": {"type": "string"}, "tab_name": {"type": "string", "description": "The sheet's name (Name!A1 in formulas)"},
+        "tabs": {"type": "array", "items": {"type": "object"}, "description": "The table's sheets {id, name, pos, first}"}}}
     T = "Tables"
     sid = pid("id", "Table id")
     write = "An agent's call is one batch (its id comes back as batch): people see the change and can take it back."
     paths["/sheets"] = {
         "get": op("Tables you may read (2.89.0)", T, ok({"type": "object", "properties": {"data": {"type": "array", "items": ref("SheetBrief")}}})
-                  | errs("400", "404"), [q("space", "private, org:<id> or all (default)"), q("list_id", "Tables attached to this list", {"type": "integer"})],
+                  | errs("400", "404"), [q("space", "private, org:<id>, shared (2.124.0: only tables shared with you) or all (default)"), q("list_id", "Tables attached to this list", {"type": "integer"})],
                   scope="sheets:read",
                   desc="An agent sees tables attached to a list shared with it and the tables it created itself."),
         "post": op("Create a table in one step: columns (with choices and colours), rows, formulas (2.89.0)", T,
@@ -312,4 +333,6 @@ def sheets_spec(paths, schemas, op, ok, errs, ref, pid, q):
         scope="sheets:write",
         desc="Cells get their former input unless someone changed them since; added rows / columns go to the trash, a table the call "
              "created too. An agent may take back only its own calls.")}
+    from .shbook import shb_spec
+    shb_spec(paths, schemas, op, ok, errs, ref, pid, q, inputs, col_in, write)  # 2.124.0 E (#2116): the sheets of a table
 
