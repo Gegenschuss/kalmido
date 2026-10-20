@@ -263,7 +263,7 @@ r = share(Fr, page_id=fp, kind="link")
 check(r.status_code == 201, "#2104: a person without an organisation shares a page by link (freelancer-matrix: wiki) " + r.text[:200])
 ftok = r.json().get("url", "").rsplit("/", 1)[-1]
 r = share(Fr, space="private", folder="Offer", kind="person", email="dave@example.com")
-check(r.status_code == 201 and "Offer/Terms" in shared(Da), "#2104: the freelancer shares a folder with a person " + r.text[:200])
+check(r.ok and r.json().get("by_email") is True and "Offer/Terms" in shared(Da), "#2104: the freelancer shares a folder with a person " + r.text[:200])  # 2.123.0 (#2104, review): by e-mail = 200 by_email
 r = Fr.get(B + "/api/wiki/shares", params={"space": "private"})
 check(r.ok and len(r.json().get("shares", [])) == 2, "#2104: the freelancer lists the shares of the private space")
 fsid = r.json()["shares"][0]["id"]

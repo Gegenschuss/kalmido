@@ -70,7 +70,7 @@ const FEAT = 'cal,comments,collab,wiki';
     await menuPick(ev, 'Share folder…');
     check(await wait(ev, `!!document.querySelector('.wshmodal #wsh-email')`), '1440: the folder dialog');
     await ev(`(() => { const i = document.querySelector('.wshmodal #wsh-email'); i.value = 'dave@example.com'; document.querySelector('.wshmodal [data-wsh="person"]').click(); return 1; })()`);
-    check(await wait(ev, `/Dave Customer/.test(document.querySelector('.wshmodal #wsh-ppl')?.textContent || '')`), '1440: Dave is in the folder share');
+    check(await wait(ev, `/dave@example\.com/.test(document.querySelector('.wshmodal #wsh-ppl')?.textContent || '')`), '1440: Dave is in the folder share (shown by the typed address)');  // 2.123.0 (#2104, review)
     await shot('p2123-b-1440-folder.png');
   }, false);
   // the public page without an account
