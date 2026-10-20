@@ -383,12 +383,19 @@ def user_delete(uid):
     if n and not request.args.get("lists"):
         return err(trn("The user still owns {0} list. Delete it or disable the user instead.",
                        "The user still owns {0} lists. Delete them or disable the user instead.", n), 409)
+    from ..admin.retexport import rx_gate, rx_subject
+    # 2.146.0 D (#2468): records to keep -> the retention export or its waiver first (counted before the lists go; the lists'
+    # own refusals answer first)
+    keep, retained = rx_gate(c, rx_subject(c, "user", uid), along=request.args.get("lists") == "delete")
     if n:
         bad, done = ua8_lists_settle(c, u, by)
         if bad:
             c.rollback()
             return bad
         icons, lfiles, audit = done[0], done[1], (done[2], done[3])
+    if keep:
+        c.rollback()
+        return keep
     files = user_purge(c, uid)
     bump(c)
     c.commit()
@@ -400,6 +407,9 @@ def user_delete(uid):
             list_icon_drop_file(lid, icon)
         list_files_drop(lfiles)
     ua8_audit(g.user["username"], u["username"], *audit)  # 2.88.0 (#1980): the security log
+    if retained:  # 2.146.0 D (#2468): deleted after the retention export / with its waiver
+        from ..admin.retexport import rx_alert
+        rx_alert(retained[0], [g.user["username"], u["username"]])
     return jsonify(ok=True, lists=n)
 
 

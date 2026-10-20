@@ -1686,6 +1686,39 @@ Routes: `GET / POST / PUT / DELETE /api/office/letterhead` (state, multipart `fi
 with `m1` / `m2` = `[top, right, bottom, left]` in mm, removal), `POST /api/office/letterhead/restore` (`{file}`: the
 previous file again, the undo) and `GET /api/office/letterhead/preview` (the sample as PDF).
 
+## Retention export before deleting an account or an organisation (2.146.0)
+
+Invoices and receipts must be kept for 8 years, books (cash book, logs, bank statements) for 10 years. The duty lies with
+the person or organisation that issued / received them, not with the server: once an account or an organisation is
+deleted, its records are gone. So before that, download the **retention export**: a readable ZIP (no recovery key needed)
+with
+
+- `invoices/`: every finalised document as its stored PDF (ZUGFeRD with the XML inside) and the XRechnung XML, rendered
+  from the frozen snapshot where an older document has no stored file; the documents, positions, payments, clients and
+  company data as CSV;
+- `receipts/`: the receipts of the documents space with their files (also those in the trash) and `receipts.csv`;
+  `project-receipts/`: the receipt files of lists and projects;
+- `cashbook/`: every cash book as PDF and CSV over its whole time (entries, day closings, change log);
+- `bank/`, `expenses/`, `archive/`, `logs/` (the office log and the change logs, GoBD) as CSV; `office-files/`: every other
+  file of the office folder (archived PDFs, accepted quotations, entertainment bills ...);
+- `00-index.txt` (contents, the retention note, files that could not be read) and `manifest.json` (SHA-256 of every file).
+
+Who downloads it: the person themself for their own records (*Office -> Settings -> Data*, also without an organisation)
+and the admins of an organisation for its office (*Settings -> Organisation*). Nobody else -- an instance admin neither
+(the organisation boundary). The ZIP is streamed, nothing is written to the server's disk; only a download that ran to its
+end counts.
+
+Deleting an account (`DELETE /api/users/<id>`) or an organisation (`DELETE /api/admin/orgs/<id>`) that has such records
+answers `409` (`code: "retention"`) until the request carries `?retention=exported` (a finished export of that account /
+organisation within the last 7 days) or `?retention=waived` (the deleting admin does without it explicitly). Both, and every
+finished export, are noted (table `retention_log`) and land in the security log. The delete dialogs ask for this step
+first. An organisation admin can no longer delete an account whose personal office holds invoices or a cash book (only the
+person can export it; a server admin deletes it after that).
+
+Routes (people only, an API token 403): `GET /api/retention/me`, `GET /api/retention/me/export.zip`,
+`GET /api/retention/org/<id>` (the organisation's admins; an instance admin sees only whether records exist),
+`GET /api/retention/org/<id>/export.zip`.
+
 ## Database
 
 New tables, all additive and keyed by `org_id` with `ON DELETE CASCADE`: `office_settings`, `office_services`,
