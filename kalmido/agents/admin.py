@@ -458,7 +458,8 @@ def agent_org_set(c, aid, v):
 def _agent_org_set(c, aid, v, main_org, user_orgs):
     a = agent_row(c, aid)
     if v == "auto":
-        oids = user_orgs(c, a["owner_id"]) if a["owner_id"] else []
+        from ..accounts.orgroles import user_orgs_full
+        oids = user_orgs_full(c, a["owner_id"], write=True) if a["owner_id"] else []  # 2.143.0 A (#2151)
         v = oids[0] if oids else (None if a["owner_id"] else main_org(c))
     if v in (None, "", 0, "0", "private"):
         c.execute("UPDATE agents SET org_id=NULL, office_drafts=CASE WHEN org_id IS NULL THEN office_drafts ELSE 0 END WHERE user_id=?", (aid,))  # 2.51.0 A (#1348)
@@ -471,6 +472,9 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
         raise BadInput(tr("Invalid value: {0}", "org_id"))
     if a["owner_id"] and v not in user_orgs(c, a["owner_id"]):
         raise BadInput(tr("The owner of this agent is not a member of that organisation"))
+    if a["owner_id"]:
+        from ..accounts.orgroles import need_org_write
+        need_org_write(c, a["owner_id"], v)  # 2.143.0 A (#2151): agents work only for members / admins of an organisation
     if (a["org_id"] or None) != v:
         n = c.execute("""SELECT COUNT(*) FROM lists l WHERE COALESCE(l.org_id,0)!=? AND l.is_inbox=0 AND (l.owner_id=? OR l.id IN
                          (SELECT list_id FROM list_members WHERE user_id=?))""", (v or 0, aid, aid)).fetchone()[0]

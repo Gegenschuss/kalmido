@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta, timezone
 from flask import g, has_request_context, jsonify, request, Response
 
 from ..core.config import app, PUBLIC_URL, TZ
-from ..core.pg import insert_id, Row
+from ..core.pg import IntegrityError, insert_id, Row
 from ..core.i18n import dec_comma, lang, LANGS, tr
 from ..core.db import body, bump, db, err, gsetting, iso, local_now, now_utc, parse_iso, usettings
 from ..accounts.session import me, user_public
@@ -478,20 +478,32 @@ def entry_times(b, start, end, sec, tz=None):
 
 @app.post("/api/time/entries")
 def time_create():
-    """Manual entry: {task_id | list_id, start, end | minutes, note}."""
+    """Manual entry: {task_id | list_id, start, end | minutes, note, client_id?}."""
     need_time()
     need_feat("time")
     b = body()
     c = db()
     uid, ts = me(), iso(now_utc())
+    cid = str(b.get("client_id") or "")[:64] or None  # 2.143.0 C (#2153): sent again from the offline outbox = the same entry
+    if cid:
+        r = c.execute("SELECT id FROM time_entries WHERE user_id=? AND client_id=?", (uid, cid)).fetchone()
+        if r:
+            return jsonify(one_entry(c, r["id"]))
     tid, lid, title = time_target(c, b)
     from .timesheet import tsl_check, tz_of
     start, end, sec = entry_times(b, None, None, 0, tz_of(c, uid))
     tsl_check(c, uid, start)  # 2.125.0 B (#2119)
     src = b.get("source") if b.get("source") in TIME_SOURCES else "manual"
-    eid = insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,created_at,updated_at)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
-                    (uid, tid, lid, title, iso(start), iso(end), sec, str(b.get("note") or "").strip()[:500], src, ts, ts))
+    try:
+        with c.savepoint():
+            eid = insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,client_id,created_at,updated_at)
+                               VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                            (uid, tid, lid, title, iso(start), iso(end), sec, str(b.get("note") or "").strip()[:500], src, cid, ts, ts))
+    except IntegrityError:  # 2.143.0 C2 (#2153): the same client_id sent twice at once (tab + service worker): the first one wins
+        r = c.execute("SELECT id FROM time_entries WHERE user_id=? AND client_id=?", (uid, cid)).fetchone() if cid else None
+        if not r:
+            raise
+        return jsonify(one_entry(c, r["id"]))
     from ..integrations.webhooks import who_note
     who_note("time.created", "time", eid)  # 2.115.0 A (#2061): a manual entry
     bump(c)

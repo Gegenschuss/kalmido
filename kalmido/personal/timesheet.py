@@ -239,16 +239,21 @@ def tsl_admin_orgs(c, uid):
     return [o for o in user_orgs(c, uid) if is_org_admin(c, uid, o)]
 
 
-def tsl_member(c, uid, oid):
+def tsl_member(c, uid, oid, full=True):
+    """2.143.0 A (#2151, review): full = a member of the organisation's staff (admin, member, read-only), not a guest /
+    accounting; full=False: any membership (reopening an approved month after leaving)."""
     from ..accounts.orgs import user_orgs
-    return bool(oid) and oid in user_orgs(c, uid)
+    if not oid or oid not in user_orgs(c, uid):
+        return False
+    from ..accounts.orgroles import org_sees_all
+    return not full or org_sees_all(c, uid, oid)
 
 
 def tsl_org(c, uid):
     """2.125.0 R (#2119): the organisation a closed month belongs to: the shown workspace when it is one of the person's
     organisations, else their first one; None only without an organisation (the workspace "Private" never skips the approval)."""
-    from ..accounts.orgs import user_orgs
-    mine = user_orgs(c, uid)
+    from ..accounts.orgroles import user_orgs_full
+    mine = user_orgs_full(c, uid)  # 2.143.0 A (#2151, review): a guest's / accounting person's month stays theirs
     if not mine:
         return None
     ws = str(usettings(c, uid).get("workspace") or "")
@@ -284,7 +289,7 @@ def tsl_log_add(r, action, by, note="", prev=None):
 
 def tsl_can_reopen(c, uid, r):
     """The person reopens a closed month; an approved one only without the organisation (none / left it / deleted)."""
-    return bool(r) and (r["state"] == "closed" or (r["state"] == "approved" and not tsl_member(c, uid, r["org_id"])))
+    return bool(r) and (r["state"] == "closed" or (r["state"] == "approved" and not tsl_member(c, uid, r["org_id"], full=False)))
 
 
 def tsl_note(c, r):

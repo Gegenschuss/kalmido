@@ -299,9 +299,9 @@ def wkr_place(c, oid, by_id, viewer):
     """2.97.0 D (#2051): a workspace of a history line as the viewer may see it -> (key or None, name): an organisation of
     the viewer by name, another one only as "Organisation"; the own private space "Private", another person's "private
     space" (a move out of a private space is always made by its owner, by_id)."""
-    from ..accounts.orgs import user_orgs
+    from ..accounts.orgroles import org_sees_all
     if oid:
-        if oid in user_orgs(c, viewer):
+        if org_sees_all(c, viewer, oid):  # 2.143.0 A (#2151, review): a guest's organisation area stays closed
             r = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()
             return wiki_space_key(oid), (r["name"] if r else "") or tr("Organisation")
         return None, tr("Organisation")

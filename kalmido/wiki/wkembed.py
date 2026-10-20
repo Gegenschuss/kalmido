@@ -204,7 +204,8 @@ def wem_backlinks():
         col, oid = "to_sheet", sid
     else:
         raise BadInput(tr("Invalid value: {0}", "file"))
-    orgs = user_orgs(c, uid)
+    from ..accounts.orgroles import user_orgs_full
+    orgs = [o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]  # 2.143.0 A (#2151)
     rows = c.execute(f"SELECT DISTINCT p.id, p.org_id, p.path FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.{col}=? "
                      f"AND {wke_open_sql('p')} AND p.deleted_at IS NULL AND ((p.org_id IS NULL AND p.owner_id=?)"
                      + (f" OR p.org_id IN ({','.join(str(int(x)) for x in orgs)})" if orgs else "") + ") ORDER BY p.path LIMIT 50",

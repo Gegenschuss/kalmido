@@ -134,7 +134,8 @@ const M = 'ZQXmark';  // every plain text of a locked list carries it: no storag
     // offline: the outbox holds ciphers only, the screen the plain text; _prev is the cipher the server holds
     await ev(`(window.__f0 = window.fetch, window.fetch = () => Promise.reject(new TypeError('offline')), 1)`);
     await ev(`api('PATCH', '/api/tasks/${T}', {title: '${M} offline'}).then(() => 1, () => 1)`);
-    const ob = await ev(`(() => { const q = JSON.parse(localStorage.getItem('tasks.outbox') || '[]'); const e = q.find(x => x.url === '/api/tasks/${T}'); return e ? {t: e.body.title, p: e.body._prev?.title} : null; })()`);
+    // 2.143.0 C (#2153): the outbox lives in IndexedDB where the browser has it (OBX.st), else in localStorage
+    const ob = await ev(`(async () => { await new Promise(r => setTimeout(r, 300)); const q = OBX.on ? await OBX.st.all() : JSON.parse(localStorage.getItem('tasks.outbox') || '[]'); const e = q.find(x => x.url === '/api/tasks/${T}'); return e ? {t: e.body.title, p: e.body._prev?.title} : null; })()`);
     check(ob && ob.t.startsWith('e2e1:') && ob.p === row.title, 'H1: the outbox holds the cipher, _prev = the cipher on the server ' + JSON.stringify(ob));
     check(await ev(`S.tasks.get(${T}).title === '${M} offline'`), 'offline: the screen shows the plain text');
     await ev(`(S.tasks.get(${T3}).content = '${M} typed', 1)`);  // typed here, no cipher yet

@@ -77,7 +77,7 @@ def tcx_room_ok(c, r, uid):
     if uid in tcx_members(c, r):
         return True
     return bool(r["kind"] == "channel" and r["is_open"] and r["org_id"] and not r["archived_at"] and not is_agent_id(c, uid)
-                and r["org_id"] in user_orgs(c, uid) and tcx_person_ok(c, uid))
+                and r["org_id"] in _orgs_full(c, uid) and tcx_person_ok(c, uid))  # 2.143.0 A (#2151): not guests / accounting
 
 
 def is_agent_id(c, uid):
@@ -131,8 +131,15 @@ def tcx_sig(c, uid):
     return f"{r[0]}-{r[1]}-{r[2]}-{r[3]}-{r[4]}"
 
 
+def _orgs_full(c, uid, write=False):
+    """2.143.0 A (#2151): uid's organisations whose open channels / people they see (write: may open a channel in)."""
+    from ..accounts.orgroles import user_orgs_full
+    full = set(user_orgs_full(c, uid, write))
+    return [o for o in user_orgs(c, uid) if o in full]
+
+
 def _org_rows(c, uid):
-    ids = user_orgs(c, uid)
+    ids = _orgs_full(c, uid)  # 2.143.0 A (#2151)
     if not ids:
         return []
     with system_ctx(c):  # the names of uid's own organisations
@@ -239,7 +246,7 @@ def tcx_channels():
     c = db()
     need_tchat(c)
     uid = me()
-    orgs = user_orgs(c, uid)
+    orgs = _orgs_full(c, uid)  # 2.143.0 A (#2151)
     rows = c.execute(f"""SELECT * FROM tchat_rooms WHERE kind='channel' AND (id IN (SELECT room_id FROM tchat_members WHERE user_id=?)
                          OR created_by=? {('OR org_id IN (' + ','.join('?' * len(orgs)) + ')') if orgs else ''}) ORDER BY lower(name), id""",
                      (uid, uid, *orgs)).fetchall()
@@ -270,6 +277,9 @@ def tcx_channel_new():
     oid = b.get("org_id")
     if oid is not None and (isinstance(oid, bool) or not isinstance(oid, int) or oid not in user_orgs(c, uid)):
         return err(tr("Invalid value: {0}", "org_id"))
+    if oid is not None and oid not in _orgs_full(c, uid, write=True):
+        from ..accounts.orgroles import need_org_write
+        need_org_write(c, uid, oid)  # 2.143.0 A (#2151): guests / read-only / accounting open no channel of the organisation
     op = b.get("open", False)
     if not isinstance(op, bool) or (op and not oid):
         return err(tr("Invalid value: {0}", "open"))

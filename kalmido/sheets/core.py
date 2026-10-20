@@ -78,6 +78,8 @@ def sh_space(c, uid, v):
     from ..accounts.orgs import user_orgs
     if oid not in user_orgs(c, uid):
         raise Denied(404)
+    from ..accounts.orgroles import need_org_area
+    need_org_area(c, uid, oid)  # 2.143.0 A (#2151): guests / accounting 404, read-only only reads
     return oid
 
 
@@ -98,6 +100,10 @@ def sh_may(c, uid, r, write=False, share=True):
     r = shb_rights_row(c, r)  # 2.124.0 E (#2116): a further sheet has the rights of its table's first sheet
     if r is None:
         return False
+    if write and r["org_id"] and not sh_is_agent(c, uid):
+        from ..accounts.orgroles import org_readonly
+        if org_readonly(c, uid, r["org_id"]):
+            return False  # 2.143.0 A (#2151): read-only changes nothing of the organisation (also with a share)
     if share:  # 2.124.0 C (#2113): a share of this one table adds to the rights below (sheets/shshare.py)
         from .shshare import shs_may
         if shs_may(c, uid, r, write):
@@ -121,8 +127,8 @@ def sh_may(c, uid, r, write=False, share=True):
         return bool(role) and (not write or role in WRITE_ROLES)
     if r["org_id"] is None:
         return r["owner_id"] == uid
-    from ..accounts.orgs import user_orgs
-    return r["org_id"] in user_orgs(c, uid) and acx_org_ok(c, uid, r["org_id"])
+    from ..accounts.orgroles import org_sees_all
+    return org_sees_all(c, uid, r["org_id"]) and acx_org_ok(c, uid, r["org_id"])  # 2.143.0 A (#2151): not guests / accounting
 
 
 def sh_may_rebind(c, uid, r):
@@ -1297,7 +1303,8 @@ def sh_index(c, uid, space=None, list_id=None):
             a = c.execute("SELECT org_id FROM agents WHERE user_id=?", (uid,)).fetchone()
             orgs = str(int(a[0])) if a and a[0] else ""
         else:
-            orgs = ",".join(str(int(x)) for x in user_orgs(c, uid))
+            from ..accounts.orgroles import user_orgs_full
+            orgs = ",".join(str(int(x)) for x in user_orgs(c, uid) if x in user_orgs_full(c, uid))  # 2.143.0 A (#2151)
         lids = [r[0] for r in c.execute("SELECT DISTINCT list_id FROM sheets WHERE deleted_at IS NULL AND list_id IS NOT NULL").fetchall()
                 if list_role(c, r[0], uid)]
         cond = "(org_id IS NULL AND owner_id=?)" + (f" OR org_id IN ({orgs})" if orgs else "")

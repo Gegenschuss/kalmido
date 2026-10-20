@@ -611,6 +611,39 @@ search (name, user name, e-mail), the filter *Members* / *All* and a counter. Ea
 box; *Admin* only works for members, and taking someone out of the organisation also ends their admin role. The list
 scrolls inside the dialog, *Save* stays in view. The symbol field shows the organisation's picture or an app icon.
 
+## Roles in an organisation: guest, read-only, accounting (2.143)
+
+Besides *Member* and *Admin* an organisation admin can give a person one of three limited roles (*Settings > Workspaces*,
+the role next to each member, and in *Invite by e-mail*; *What the roles mean* explains them in the app):
+
+- **Read-only**: sees everything a member sees and changes nothing in the organisation: lists and tasks (also lists shared
+  with them as *Member*), the office, pages, tables, address books, calendars, files. The team chat stays open (reading and
+  writing). The office shows its data without the buttons to add or delete.
+- **Guest**: sees in the organisation only what is shared with them personally (a list, a calendar, an address book, a
+  table, a file); there it works with the role of that share. No organisation-wide lists, no office, no pages, no open
+  channels, no agents of the organisation, no invitations. In the member list a guest only sees the admins and the people
+  they share something with.
+- **Accounting**: like a guest, plus the office of the organisation to read and export (also the bookkeeping, the income
+  statement and the DATEV export) and receipts to upload into the organisation's documents (a wrongly uploaded receipt
+  of their own they can rename or remove again). Nothing else is sent, deleted or changed, no master data or settings.
+  The typical case: the tax advisor.
+
+The three limited roles add nothing at the top level of the organisation's files, own no list of the organisation (a list
+handed over goes only to a member or admin), copy no list into the organisation, use no internal form of the organisation
+and move nothing out of its office. Their closed months of working time stay their own (no approval by the organisation).
+
+The person's private space stays as it is (there they are their own admin); a person without any organisation notices no
+change. Every check sits on the server: the app, the REST API, MCP and CalDAV / CardDAV answer 403 (read-only) or 404 (guest,
+accounting: as if the content did not exist). The last admin of an organisation cannot step down. The instance admin's
+organisation dialog only switches *Admin* on and off; the limited roles stay as they are there.
+
+API for scripts of the web app: `PUT /api/orgs/{org}/members {user_id | email, role}`, `POST /api/orgs/{org}/invites
+{email, role}` and `POST /api/users {orgs: [{id, role}]}` take `member`, `admin`, `guest`, `readonly` or `accounting`;
+`GET /api/orgs` carries each member's role, `roles` (the roles with their explanation) and `limited` (my own role is one of
+the three). Before version 2.143 a server read an unknown role as *Member*: going back to an older version is only safe
+while nobody holds one of the new roles. From 2.143 on a stored role the server does not know reads as *Guest* (and is
+noted in the server log).
+
 ## The group "Conversations" in the sidebar (2.99.0)
 
 The group no longer grows with every person you share a list with:

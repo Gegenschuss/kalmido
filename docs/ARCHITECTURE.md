@@ -31,8 +31,14 @@ development workflow see [CONTRIBUTING.md](../CONTRIBUTING.md).
    The client keeps it in the object `S` (`static/js/core.js`) and renders every view from it (`render()` in
    `static/js/render.js`).
 2. **A change**: the client applies it locally first, then sends it (`api()` in `static/js/core.js`; every change carries
-   the header `X-Requested-With: kalmido` against CSRF). Offline, it waits in an outbox in `localStorage` and is sent
-   later; a field changed elsewhere meanwhile comes back as a conflict the user resolves.
+   the header `X-Requested-With: kalmido` against CSRF). Offline, it waits in an outbox and is sent later; a field
+   changed elsewhere meanwhile comes back as a conflict the user resolves. The outbox (tasks, habits, time entries and the
+   timer, notes) lives in IndexedDB (`kalmido-outbox`: one record per change, shared by the tabs over a BroadcastChannel,
+   one tab sends under a Web Lock; browsers without IndexedDB keep it in `localStorage`). Where the browser has
+   Background Sync, the service worker sends it once the device is online again, but only while no tab is open (a tab
+   sends it itself, with the full conflict handling) and only for the user signed in on the device; it stops at the
+   first answer it cannot handle alone. New tasks, notes and manual time entries carry a device id (`client_ref` /
+   `client_id`), so a change sent twice is stored once.
 3. **On the server** a route checks the login (`accounts/session.py`: `authenticate`, `me()`), the access
    (`core/access.py`: `need_task`, `need_list`, `need_project` ...), validates (`tasks/validation.py`, `BadInput`),
    writes, logs the activity (`log_act`), queues News, pushes and webhooks (`news_add`, `notify`, `wh_note`), and calls
@@ -733,7 +739,7 @@ padded to 64-byte steps) and wraps that key for every member with ECDH between t
   with a lock placeholder until decrypted in the background). Every write of a text of such a list is encrypted in
   `api()` before the offline outbox and the network; moving a task in or out carries its texts, subtasks, comments and
   text fields in the target format (`le2e_move`, also for drag and drop and undo).
-- **Device storage.** What goes to `localStorage` (state cache, outbox, conflicts, other windows) holds only ciphertext;
+- **Device storage.** What goes to `localStorage` / IndexedDB (state cache, outbox, conflicts, other windows) holds only ciphertext;
   plain text exists only in memory and is wiped (with the undo steps of such lists) when the encryption is locked or on
   logout. The list keys are not stored on the device: offline, a locked list stays unreadable until the next unlock.
 - **Switching** runs in the browser of the owner / list admin with a progress bar (`le2eStart`, `le2eStop`, resumable).

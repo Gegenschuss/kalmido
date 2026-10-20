@@ -144,12 +144,18 @@ const CONTRAST = `(() => {
   w.close();
   await call('PATCH', '/api/settings', {features: ALL});
   // accent migration: mint (the old default) -> the default once (2.11.0: violet); another colour stays
+  // 2.143.0 (#2155): the appearance follows the account (the first device uploads its own) -> every boot below starts as a
+  // never-saved account, so the device's own value is what is checked
+  const lookReset = () => call('PATCH', '/api/settings', {look: ''});
+  await lookReset();
   w = await boot({user: 'alice', hash: 'today', ls: {'tasks.accent': '"mint"'}}); d = w.document;
   check(d.documentElement.dataset.accent === 'violet' && !w.__store['tasks.accent'] && w.__store['tasks.accentMig280'] === '1', 'mint device migrates to the default (violet since 2.11.0)');
   w.close();
+  await sleep(900); await lookReset();
   w = await boot({user: 'alice', hash: 'today', ls: {'tasks.accent': '"mint"', 'tasks.accentMig280': '1'}}); d = w.document;
   check(d.documentElement.dataset.accent === 'mint', 'mint picked again after the migration stays');
   w.close();
+  await sleep(900); await lookReset();
   w = await boot({user: 'alice', hash: 'today', ls: {'tasks.accent': '"sky"'}}); d = w.document;
   check(d.documentElement.dataset.accent === 'sky', 'own accent choice stays');
   w.close();

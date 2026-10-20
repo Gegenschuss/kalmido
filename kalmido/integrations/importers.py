@@ -2254,6 +2254,8 @@ def imp_opts(form, uid):
             m = re.fullmatch(r"org:(\d+)", sp)
             if not m or int(m.group(1)) not in user_orgs(db(), uid):
                 raise BadInput(tr("Invalid value: {0}", "space"))
+            from ..accounts.orgroles import need_org_write
+            need_org_write(db(), uid, int(m.group(1)))  # 2.143.0 A (#2151)
             o["space"] = int(m.group(1))
     return o
 

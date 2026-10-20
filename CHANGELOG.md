@@ -7,6 +7,31 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.143.0] - 2026-10-20
+
+Organisation roles, off-site backups, a stronger offline app, sharing any file to Kalmido, the pages trash emptied for good.
+
+### Added
+- Organisations: three more roles besides member and admin - **read-only** (sees what members see, changes nothing; team chat stays open), **guest** (sees only what is shared with them personally) and **accounting** (reads and exports the office, uploads receipts). Admins pick the role in the member list and in invitations, with a short explanation; the server checks it on every route, including REST API, CalDAV/CardDAV and files (#2151).
+- Backups: an off-site target per server - S3-compatible storage, WebDAV (https) or SFTP (key pair made by Kalmido, host key pinned after the first test). Only encrypted backups leave the server; upload after each backup with retries, the newest N are kept on the target; "Test connection", "Upload now", "Remove target" (#2152).
+- Offline: the outbox lives in IndexedDB and is sent by background sync, also with the app closed; notes and time entries can be written offline and never arrive twice; a quiet install hint (browser prompt, steps on iPhone), with "not now" and "never" (#2153).
+- Share to Kalmido takes every file type (office files, ZIP, audio, video ...); shared contact cards and calendar files can go straight into contacts or a calendar; files over the upload limit are named instead of failing later (#2154).
+- Appearance follows your account across devices; "Only on this device" keeps a device's own look (#2155).
+- Administration: activity per organisation - members, last sign-in date, storage, lists and tasks; numbers only (#2156).
+
+### Changed
+- Pages: the trash has its own dialog (restore, delete for good, empty); pages in the trash are deleted for good with their files after the trash period (#2211).
+- Office: replaced terms PDFs that no document names any more are removed 30 days after they stopped being current (#2259).
+
+### Security
+- Security fix: organisation boundary (roles are enforced server-side in every area).
+- Security fix: backup credentials are sealed and never sent back to the browser; the service worker replays only the app's own write requests.
+
+## [2.142.3] - 2026-10-20
+
+### Security
+- Pillow 13.0.0: fixes nine image-library advisories published on 20.10.2026 (one critical heap overflow when reading JPEG files); the test suites switch off the quiet hours where they wait for channel messages and are spread more evenly over the CI shards (#2145).
+
 ## [2.142.2] - 2026-10-20
 
 - Meal plan: on a narrow phone the week switcher moves under the title, the next-week arrow stays on screen (#2132); the restore check of the sign-in suite waits for the restore instead of a fixed pause.

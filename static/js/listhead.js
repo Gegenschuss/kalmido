@@ -20,7 +20,7 @@ o3c_meta();
 try { matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => setTimeout(o3c_meta, 0)); } catch { /* old browser */ }
 function o3c_packHtml() {
   const cur = lookPref('pack');
-  return `<h4>${tr('Theme')}<span class="devtag">${tr('This device')}</span></h4>
+  return `<h4>${tr('Theme')}</h4>
     <div class="lkopts o3c-packs" id="s-pack" role="group">${LOOK.pack.map(([v, n]) => { const [bg, bg3, tx, ln] = O3C_PACK_PV[v];
       return `<button type="button" data-look="pack" data-v="${v}" aria-pressed="${cur === v}" class="${cur === v ? 'on' : ''}"><span class="o3c-pv" aria-hidden="true" style="--pb:${bg};--pb3:${bg3};--pt:${tx};--pl:${ln}"><i></i><i></i><i></i></span><span class="lkn">${tr(n)}</span></button>`; }).join('')}</div>
     <div class="shint">${tr('A theme sets the background tones and the look of cards. Paper switches to the light scheme, Night to the dark one; your accent colour, density and font stay.')}</div>`;
@@ -54,6 +54,11 @@ function o3c_lookHtml() {
     <div class="shint">${tr('The header of a list or folder is set in its settings and is the same for everyone. Here you only choose whether this device shows it.')}</div>`;
 }
 document.addEventListener('change', e => {
+  if (e.target?.id === 's-look-local') {  // 2.143.0 D (#2155): this device keeps its own appearance (on) / follows the account (off)
+    e.stopPropagation();
+    if (e.target.checked) LS.set('lookLocal', true); else { LS.del('lookLocal'); lookPush(); }
+    return;
+  }
   const k = {'s-o3c-head': 'headShow'}[e.target?.id]; if (!k) return;
   e.stopPropagation();
   setLocal(tr('Show header pictures'), () => LS.get(k, true) !== false,

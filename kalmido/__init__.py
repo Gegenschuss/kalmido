@@ -77,6 +77,7 @@ ORDER = (
     "accounts.onboarding",
     "accounts.users",
     "accounts.orgs",
+    "accounts.orgroles",  # 2.143.0 A (#2151): organisation roles guest / read-only / accounting
     "accounts.spacemove",  # 2.96.0 (#1941): the shared rules of moving data between the private space and an organisation (no routes)
     "accounts.tenancy",
     "accounts.orglists",  # 2.35.0 (#1101)
@@ -101,6 +102,7 @@ ORDER = (
     "calendars.apptbook",  # 2.94.0 B (#1929): appointment booking by customers (public page, no login)
     "calendars.polls",  # 2.98.0 A (#1953): scheduling polls (vote through a link, the winning time becomes an event)
     "admin.backup",
+    "admin.offsite",  # 2.143.0 B (#2152): the off-site target of the backups (S3, WebDAV, SFTP)
     "api.v1",
     "notify.caps",  # 2.33.0 (#927)
     "notify.taskbell",  # 2.53.0 C (#1424): the bell of one task per person

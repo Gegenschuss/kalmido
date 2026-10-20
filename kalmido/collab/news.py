@@ -501,7 +501,8 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 wo = int(json.loads(r["data"] or "{}").get("org_id") or 0)
             except (ValueError, TypeError, AttributeError):
                 wo = 0
-            if wo not in user_orgs(c, uid):
+            from ..accounts.orgroles import org_sees_all
+            if wo not in user_orgs(c, uid) or not org_sees_all(c, uid, wo):  # 2.143.0 A (#2151)
                 continue
         elif kind != "unshare":
             if r["t_title"] is None or r["t_del"] or not sees(r["t_list"]) or not sees_task(r["task_id"], True):

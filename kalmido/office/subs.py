@@ -85,7 +85,8 @@ def abo_people(c, oid):
     if owner is not None:
         ids = [owner]
     else:
-        ids = [r[0] for r in c.execute("SELECT user_id FROM org_members WHERE org_id=?", (oid,))]
+        # 2.143.0 A (#2151, review): the organisation's staff (admin, member, read-only), not guests / accounting
+        ids = [r[0] for r in c.execute("SELECT user_id FROM org_members WHERE org_id=? AND role IN ('admin','member','readonly')", (oid,))]
     if not ids:
         return []
     out = []

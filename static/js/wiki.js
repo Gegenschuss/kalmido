@@ -272,6 +272,42 @@ async function wk_delete(p) {
 }
 function wk_export() { if (wk_e2e(wk_cur())) { wkeExport(wk_cur()).catch(e => toast(e.message)); return; }  // 2.64.3 B (#1817): the ZIP is made in the browser
   const a = document.createElement('a'); a.href = '/api/wiki/export?space=' + encodeURIComponent(wk_cur()); a.download = 'wiki.zip'; document.body.append(a); a.click(); a.remove(); }
+// 2.143.0 B (#2211): the trash of the space -- restore a page, delete one for good, empty it (server: wiki/pages.py wiki_purge)
+async function wk_trashDlg(sp = wk_cur()) {
+  const md = modal(`<h3>${tr('Trash')} · ${esc(wk_spaceName(sp))}</h3><div class="wktrash"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <div class="foot"><button type="button" class="btn danger hidden" data-wkt="empty">${ic('trash', 's')} ${tr('Empty trash')}</button><span class="spacer"></span><button type="button" class="btn" data-wkt="close">${tr('Close')}</button></div>`);
+  md.classList.add('wktrashdlg');
+  let pages = [];
+  const draw = async () => {
+    const box = $('.wktrash', md);
+    let j; try { j = await rawFetch('GET', '/api/wiki/trash?space=' + encodeURIComponent(sp)); } catch (e) { box.innerHTML = `<div class="muted mhint">${esc(e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message)}</div>`; return; }
+    pages = j.pages || [];
+    if (wk_e2e(sp) && typeof wkeOpen === 'function') { const ks = await wkeKeys(sp).catch(() => null); for (const p of pages) if (!await wkeOpen(sp, p, ks).catch(() => false)) p.path = ''; }
+    $('[data-wkt="empty"]', md).classList.toggle('hidden', !pages.length);
+    box.innerHTML = (pages.length ? `<div class="members">${pages.map(p => `<div class="mrow wktrow" data-wktid="${p.id}"><span class="n"><b>${p.path ? esc(p.path) : `<span class="muted">${tr('Encrypted page')}</span>`}</b><small class="muted">${esc([tr('Moved to the trash on {0}', fmtWhen(p.deleted_at)), p.files ? trn('{0} file', '{0} files', p.files) + ' · ' + fmtBytes(p.size) : ''].filter(Boolean).join(' · '))}</small></span>`
+      + `<span class="oadmb"><button type="button" class="btn sm" data-wkt="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button><button type="button" class="btn sm danger" data-wkt="purge">${ic('trash', 's')}<span>${tr('Delete permanently…')}</span></button></span></div>`).join('')}</div>`
+      : `<div class="muted mhint">${tr('Trash is empty.')}</div>`) + `<div class="shint">${esc(tr('Pages in the trash are deleted for good after {0} days, with their files.', j.days || 30))}</div>`;
+  };
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-wkt]'); if (!b) return;
+    const k = b.dataset.wkt, id = +b.closest('[data-wktid]')?.dataset.wktid, p = pages.find(x => x.id === id);
+    if (k === 'close') { modalClose(md); return; }
+    b.disabled = true;
+    try {
+      if (k === 'restore' && p) { const r = await rawFetch('POST', '/api/wiki/restore', {ids: [id]}); if (r.skipped?.length) toast(tr('A page with this name already exists')); }
+      if (k === 'purge' && p) {
+        if (!await askConfirm(tr('Delete “{0}” permanently?', p.path ? wk_base(p.path) : tr('Encrypted page')), tr('The page and its files are deleted for good. This cannot be undone.'), {danger: true, ok: tr('Delete permanently')})) return;
+        await rawFetch('POST', '/api/wiki/purge', {space: sp, ids: [id]});
+      }
+      if (k === 'empty') {
+        if (!await askConfirm(tr('Empty the trash permanently?'), tr('All pages in the trash and their files are deleted for good. This cannot be undone.'), {danger: true, ok: tr('Empty trash')})) return;
+        await rawFetch('POST', '/api/wiki/purge', {space: sp, all: true});
+      }
+      wk_after(sp); await draw();
+    } catch (x) { toast(x.message); } finally { b.disabled = false; }
+  });
+  await draw();
+}
 function wk_import() {
   let sp = wk_cur();
   const inp = document.createElement('input');
@@ -322,7 +358,7 @@ function wk_acPick(i) {
 }
 // 2.99.0 B (#2183): the former sidebar menu, now the "Space" section (de: Bereich) of the header "…" menu (same rights as before)
 function w299_areaItems() {
-  return [{head: tr('Space')}, {label: tr('Export as ZIP'), icon: 'download', fn: wk_export}, ...(WK.idx[wk_cur()]?.mayWrite !== false ? [{label: tr('Import ZIP…'), icon: 'upload', fn: wk_import}] : []),
+  return [{head: tr('Space')}, {label: tr('Export as ZIP'), icon: 'download', fn: wk_export}, ...(WK.idx[wk_cur()]?.mayWrite !== false ? [{label: tr('Import ZIP…'), icon: 'upload', fn: wk_import}, {label: tr('Trash'), icon: 'trash', fn: () => wk_trashDlg()}] : []),  // 2.143.0 B (#2211): + Trash
     ...(typeof wkeDlg === 'function' && S.me?.kind !== 'agent' && globalThis.crypto?.subtle ? [{label: tr('Encryption…'), icon: 'lock', fn: () => wkeDlg(wk_cur())}] : [])];
 }
 // ---- events (own listeners: data-wk)

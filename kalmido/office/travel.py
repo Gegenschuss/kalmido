@@ -103,7 +103,9 @@ def rk_home_cur(c, oid):
 
 def rk_people(c, oid, uid):
     """The people of the office area [{id, name}]: the members of the organisation (a personal office: its person)."""
+    # 2.143.0 A (#2151, review): the organisation's staff (admin, member, read-only), not guests / accounting
     rows = c.execute("SELECT u.id, u.display_name, u.username FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? "
+                     "AND m.role IN ('admin','member','readonly') "
                      "ORDER BY lower(COALESCE(NULLIF(u.display_name, ''), u.username))", (oid,)).fetchall()
     if not any(r["id"] == uid for r in rows):
         rows = list(rows) + list(c.execute("SELECT id, display_name, username FROM users WHERE id=?", (uid,)).fetchall())
