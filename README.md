@@ -20,6 +20,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.138.4** (2026-10-20): phones - office fixed-cost import rows stay whole, table checkbox cells tick on a tap
+  with undo, sheet bar above the tab bar, Android print view, touch-sized controls in documents and bookmarks; the
+  agent chat keeps an open edit; error-report webhook token in a header, contact copies out of mirrored address books,
+  a notice when the portal sign-in budget is used up, `reindex-private` after a new server key.
+
 - **2.138.2** (2026-10-20): the sidebar head shows your **workspace** on top (avatar at the bottom next to the search),
   a **colour stripe** on top of the sidebar marks private / organisation; office PDFs of **drafts** ask to finalise first
   or are marked DRAFT on every page, the number scheme knows **{isodate}**, calmer rights annex and a bold multi-line

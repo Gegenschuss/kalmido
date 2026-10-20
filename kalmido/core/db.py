@@ -95,7 +95,7 @@ def db_error(e):
         raise e
     import traceback
     code = 403 if denied else 400
-    path = re.sub(r"^(/api/hooks/issues/[0-9]+/)[^/]+", r"\1***", request.path)  # 2.126.0 B (#1979 I8): no hook token in the log
+    path = re.sub(r"^(/api/hooks/(?:issues|deploy)/[0-9]+/)[^/]+", r"\1***", request.path)  # 2.126.0 B (#1979 I8): no hook token in the log; 2.138.4 (#2381): the deploy hook too
     print(f"database error ({code}) {request.method} {path}:\n" + "".join(traceback.format_exception(e)).rstrip(), flush=True)
     if denied:  # the second floor caught what an app check missed: the admins hear it (security alerts)
         from ..notify.alerts import aa_count

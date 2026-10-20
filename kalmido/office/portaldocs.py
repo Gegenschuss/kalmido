@@ -220,8 +220,13 @@ def kp_link_send(cid):
     eh = pt_email_hash(c, em)
     org_id, owner_id = kp_space(c, oid)
     space = f"{org_id or ''}:{owner_id or ''}"
-    if (hit_limit(f"ptla:{eh}", PT_LOGIN_ADDR, PT_LOGIN_WIN) or hit_limit(f"ptls:{space}", PT_LOGIN_SPACE, PT_LOGIN_WIN)
+    full = False
+    if (hit_limit(f"ptla:{eh}", PT_LOGIN_ADDR, PT_LOGIN_WIN) or (full := hit_limit(f"ptls:{space}", PT_LOGIN_SPACE, PT_LOGIN_WIN))
             or not mail_budget(c, uid, em)):
+        if full:  # 2.138.4 C (#2380): the space's budget is used up: its admins / owner get a News item
+            from ..team.portal import pt_limit_note
+            pt_limit_note(c, org_id, owner_id)
+            c.commit()
         raise Denied(429, tr("Too many portal links for this address; try again in an hour"))
     tok = secrets.token_urlsafe(32)
     now = now_utc()
