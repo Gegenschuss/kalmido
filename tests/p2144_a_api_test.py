@@ -70,6 +70,8 @@ ORG = me["workspaces"][0]["id"]
 def agent(name):
     ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": name, "display_name": name.title()}).json()
     A.patch(B + f"/api/admin/agents/{ag['id']}", json={"org_id": ORG})
+    lid = A.post(B + "/api/lists", json={"name": "Work " + name, "org_id": ORG}).json()["id"]
+    assert A.put(B + f"/api/lists/{lid}/members", json={"user_id": ag["id"], "role": "edit"}).ok  # a shared list: Alice may write it
     return ag["id"], bearer(ag["token"])
 
 
@@ -143,6 +145,7 @@ check(op.get("x-kalmido-scope"), f"OpenAPI: /agent/aborted with x-kalmido-scope 
 # ---------------------------------------------------------------- a person without an organisation
 # freelancer-matrix: agents
 FID, F = freelancer(B, A)
+A.put(B + "/api/admin/agent-policy", json={"user_agents": True})  # personal agents allowed
 fa = F.post(B + "/api/my/agents", json={"username": "fridabot", "display_name": "Frida's bot", "scopes": ["read", "tasks:write", "comments"]})
 check(fa.status_code in (200, 201), f"freelancer: an own agent {fa.status_code} {fa.text[:200]}")
 FA = fa.json().get("id")
