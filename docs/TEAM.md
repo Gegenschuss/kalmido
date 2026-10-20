@@ -328,7 +328,7 @@ For software teams working on a board. Everything is off until you switch it on.
   the last (up to six) closed sprints as bars and their average as a planning aid for the next sprint.
 - Agents read and set the same through the API and MCP (`points`, `set_wip_limit`, `get_velocity`, see AGENTS.md).
 
-## Swimlanes on the board (2.114.0)
+## Swimlanes on the board (2.138.0)
 
 The button *Swimlanes* above a kanban board groups the cards into horizontal lanes: by **person** (the people with tasks
 on the board, then *Nobody assigned*), by **priority** (High, Medium, Low, No priority) or by a **custom field** of the
