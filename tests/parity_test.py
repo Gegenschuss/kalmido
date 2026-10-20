@@ -45,6 +45,7 @@ APP_TO_API = {
     "GET /api/me/storage": ["GET /me/storage"],  # 2.24.0 (#910)
     "GET /api/tasks": ["GET /tasks", "GET /search", "GET /trash"],
     "GET /api/search/messages": ["GET /search"],  # 2.33.0 (#1080): ?scope=messages
+    "GET /api/search": ["GET /search"],  # 2.116.0 B (#2065): ?fulltext=1
     "GET /api/tasks/{}": ["GET /tasks/{}"],
     "POST /api/tasks": ["POST /tasks", "POST /tasks/{}/subtasks"],
     "PATCH /api/tasks/{}": ["PATCH /tasks/{}"],
@@ -139,6 +140,7 @@ APP_TO_API = {
     "GET /api/time/report": ["GET /time/entries"],
     "GET /api/time/export.csv": ["GET /time/entries"],
     "GET /api/time/export.xlsx": ["GET /time/entries"], "GET /api/workload/export.xlsx": ["GET /workload"],  # 2.125.0 C (#2122): Excel = the same data as the API
+    "GET /api/lists/{}/export.csv": ["GET /tasks"],  # 2.116.0 (#2064): agents read the same tasks via GET /tasks?list_id=
     "GET /api/time/gaps": ["GET /time/gaps"],  # 2.34.0 (#269)
     "GET /api/stale": ["GET /stale"],  # 2.34.0 (#266)
     "GET /api/news": ["GET /news"],
@@ -165,6 +167,10 @@ APP_TO_API = {
     "DELETE /api/notes/{}": ["DELETE /notes/{}"],
     # 2.17.0 (#419): team chat
     "GET /api/team": ["GET /team/rooms"], "POST /api/team/dm": ["POST /team/dm"],
+    # 2.113.1 (#2059): channels, groups, files
+    "GET /api/team/channels": ["GET /team/channels"], "POST /api/team/channels": ["POST /team/channels"], "POST /api/team/groups": ["POST /team/groups"],
+    "PATCH /api/team/rooms/{}": ["PATCH /team/rooms/{}"], "POST /api/team/rooms/{}/members": ["POST /team/rooms/{}/members"],
+    "DELETE /api/team/rooms/{}/members/{}": ["DELETE /team/rooms/{}/members/{}"], "GET /api/team/files/{}": ["GET /team/files/{}"],
     "GET /api/team/rooms/{}/messages": ["GET /team/rooms/{}/messages"], "POST /api/team/rooms/{}/messages": ["POST /team/rooms/{}/messages"],
     "POST /api/team/rooms/{}/read": ["POST /team/rooms/{}/read"], "PATCH /api/team/messages/{}": ["PATCH /team/messages/{}"],
     "DELETE /api/team/messages/{}": ["DELETE /team/messages/{}"], "POST /api/team/messages/{}/reactions": ["POST /team/messages/{}/reactions"],
@@ -302,6 +308,11 @@ APP_ONLY = [
     ("2.122.0 A (#2097): file requests stay with people -- a person asks a client for files with a public link of a folder; the "
      "client uploads without an account; an agent sees the arriving files like any other file of a folder shared with it",
      ("=GET /api/files/nodes/{}/requests", "=POST /api/files/nodes/{}/requests", "* /api/files/requests/")),
+    ("2.112.1 (#2058): the file store's bulk trash / restore, the ZIP download and the phone scan are steps of people in the app "
+     "(agents read and write files one by one); external share links publish data to people without an account and stay with "
+     "people on purpose -- agents never make, list or revoke them",
+     ("=POST /api/files/trash", "=POST /api/files/restore", "=GET /api/files/zip", "=POST /api/files/scan",
+      "=GET /api/files/nodes/{}/ext-links", "=POST /api/files/nodes/{}/ext-links", "* /api/files/ext-links/")),
     ("2.48.0 (#1111): documents -- a person's own steps (upload by hand / share sheet, review and accept, recognise again, the "
      "preview image, a task for the due date, the workspace's levels / rules / labels / mail address); agents read and set fields "
      "with /documents and add files with /files; 2.122.0 (#2098): create_document; (#2100) the CSV of chosen documents is a person's download", ("=POST /api/docs", "=POST /api/docs/export.csv", "=POST /api/docs/{}/accept", "=POST /api/docs/{}/review",
@@ -340,7 +351,7 @@ APP_ONLY = [
      ("=POST /api/client-errors",)),
     ("2.92.0 C (#1926): which agents a person may ask for a summary of a file (the preview's button); the request is a comment that mentions the agent",
      ("=GET /api/attachments/{}/agents",)),
-    ("sign-in, sessions, two-factor, passkeys, OIDC: a person in a browser", ("* /api/auth/", "* /api/me/2fa", "* /api/me/passkeys", "=PATCH /api/me", "=GET /api/me")),
+    ("sign-in, sessions, two-factor, passkeys, OIDC: a person in a browser", ("* /api/auth/", "* /api/me/2fa", "* /api/me/passkeys", "* /api/me/sessions", "=PATCH /api/me", "=GET /api/me")),
     ("credentials and keys of the account: tokens, webhooks, upload token, avatar, phone shortcut", (
         "* /api/me/tokens", "* /api/me/webhooks", "POST /api/me/drop-token", "* /api/me/avatar", "GET /api/me/share/")),
     ("administration: never through a token (agents are never admins); admins read users / status with admin-read", (
@@ -366,16 +377,25 @@ APP_ONLY = [
         "* /api/folders/repos", "PUT /api/lists/{}/folder-repo")),  # 2.33.0 (#934): folder repositories, read through /lists/{id}/repos
     ("2.18.0: the error-report webhook of a list: its secret URL is shown once to people (owner / list admins); the inbound hook "
      "is called by the error service, not by a client", ("* /api/lists/{}/error-hook", "POST /api/hooks/issues/")),
+    # 2.115.0 A (#2061): inbound webhooks of a list -- a secret URL shown once to people (owner / list admins), called by the
+    # other tool (n8n, Make, Zapier, Home Assistant); agents create tasks through POST /tasks with their own token
+    ("2.115.0 (#2061): inbound webhooks of a list: their secret URL is shown once to people (owner / list admins); the URL is "
+     "called by another tool, not by a client; agents create tasks with POST /tasks", ("* /api/lists/{}/hooks-in", "* /api/hooks-in/", "POST /api/hooks/in/")),
     ("2.60.0 (#1514): environments (Staging, Live) are created, renamed and removed by people in the app, their deploy-webhook token is "
      "shown once to people; agents read them (list_environments) and record deployments (set_deployment)",
      ("* /api/lists/{}/envs", "* /api/envs/", "POST /api/hooks/deploy/")),
     ("external calendar subscriptions and the calendar feed link: personal settings", ("* /api/calendars", "* /api/ical")),
+    # 2.111.0 (#2056): the secret subscription link of an event calendar is a person's own credential (like the task feed
+    # link), and the editor's invitation info only serves the switch; agents send invitations with send_invites on the events
+    ("2.111.0 (#2056): the subscription link of an event calendar (a secret of the person) and the editor's invitation info",
+     ("* /api/evcals/{}/feed", "GET /api/evinvite")),
     ("2.19.0: address books (CardDAV) for birthdays: their passwords are entered by people, like calendar subscriptions", ("* /api/family/contacts",)),
     ("2.49.0 (#1551): the parents' PIN of a child account: a secret people type in the app (the parent sets it, the child opens "
      "its settings with it), never an agent", ("* /api/family/kids/{}/pin", "* /api/me/pin/")),
     ("the app's personal settings, onboarding and sample data", ("PATCH /api/settings", "POST /api/briefing/read", "POST /api/onboarding", "* /api/sample")),
     ("2.32.0 (#1063, #983): how a person arranges their views and the project page: people only, never agents", ("* /api/lists/{}/layout",)),
-    ("the focus timer is a personal on-screen timer; time is tracked with /time/timer", ("* /api/pomo/",)),
+    ("the focus timer is a personal on-screen timer; time is tracked with /time/timer; 2.116.0 (#2067): persons' scripts reach it "
+     "as /api/v1/focus (agent tokens are refused)", ("* /api/pomo/",)),
     # 2.83.0 (#1427): the header strip is how the app draws a list (agents read header_style in GET /lists)
     ("2.83.0 (#1427): the header strip of a list (style, own picture) and of a person's folder is set by people in the app; "
      "agents read header_style in GET /lists", ("* /api/lists/{}/header", "GET /api/list-header/", "* /api/folder-heads")),
@@ -610,7 +630,7 @@ def sample(schema):
 
 TOOL_VARIANTS = {  # extra arguments that reach other routes of the same tool
     "list_files": [{"folder_id": 1}], "read_file": [{"as": "base64"}], "write_file": [{"file_id": 1}],  # 2.48.0 (#1207)
-    "get_attachment": [{"source": "chat"}, {"source": "project", "list_id": 1}],
+    "get_attachment": [{"source": "chat"}, {"source": "project", "list_id": 1}, {"source": "team"}],  # 2.113.1 (#2059): team
     "react": [{"remove": True}],
     "upload_attachment": [],
 }
@@ -655,6 +675,16 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "GET /lists/{}/error-hook": "2.18.0: the error-report webhook carries a secret URL; agents are refused (403), people manage it",
     "PATCH /lists/{}/error-hook": "2.18.0: the error-report webhook carries a secret URL; agents are refused (403), people manage it",
     "POST /team/dm": "direct messages are between people; agents cannot open them (403), people talk to an agent in its own chat",
+    "POST /team/channels": "2.113.1 (#2059): people open channels; agents are refused (403) and only added by people",
+    "POST /team/groups": "2.113.1 (#2059): group conversations are between people; agents are refused (403)",
+    "PATCH /team/rooms/{}": "2.113.1 (#2059): renaming / archiving a channel is for its creator or an organisation admin (people; agents 403)",
+    "POST /team/rooms/{}/members": "2.113.1 (#2059): people add members (agents only by their owner / an organisation admin; agents 403)",
+    "GET /focus": "2.116.0 (#2067): focus sessions are private to a person; agent tokens get 403, so no tool (scripts with a personal token use it)",
+    "GET /focus/stats": "2.116.0 (#2067): as GET /focus",
+    "POST /focus/start": "2.116.0 (#2067): as GET /focus",
+    "POST /focus/{}/stop": "2.116.0 (#2067): as GET /focus",
+    "POST /focus/{}/pause": "2.116.0 (#2067): as GET /focus",
+    "POST /focus/{}/resume": "2.116.0 (#2067): as GET /focus",
     "POST /me/purpose": "2.19.0: the modules of the account (scope account): never for agents",
 }
 none = sorted(r for r in API if r not in reached and r not in API_ONLY)

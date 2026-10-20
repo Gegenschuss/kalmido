@@ -20,6 +20,21 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.138.4** (2026-10-20): phones - office fixed-cost import rows stay whole, table checkbox cells tick on a tap
+  with undo, sheet bar above the tab bar, Android print view, touch-sized controls in documents and bookmarks; the
+  agent chat keeps an open edit; error-report webhook token in a header, contact copies out of mirrored address books,
+  a notice when the portal sign-in budget is used up, `reindex-private` after a new server key.
+- **2.138.3** (2026-10-20): edit organisation - members as a searchable list with "Member" and "Admin" boxes; a decided
+  agent approval no longer stays unread in the notifications.
+- **2.138.2** (2026-10-20): the sidebar head shows your **workspace** on top (avatar at the bottom next to the search),
+  a **colour stripe** on top of the sidebar marks private / organisation; office PDFs of **drafts** ask to finalise first
+  or are marked DRAFT on every page, the number scheme knows **{isodate}**, calmer rights annex and a bold multi-line
+  company name in the footer; **News** in *For you / Also new / Read*; a larger **Mac dock icon**.
+- **2.138.1** (2026-10-20): six releases from 19.10. brought onto today's code - office undo, invitation mails
+  and calendar subscription links, quick add with @person and reminders at a time; file store ZIP, phone scan and
+  external links; office settings in areas, quotation parts in colour, terms as PDF; team chat files, channels and
+  groups; producing by amount, handling costs and markup; inbound and organisation webhooks, active sessions,
+  invitations by e-mail; trash period, list CSV / print, full-text search, repeats several times a day.
 - **2.138.0** (2026-10-20): office - start number per number range, the quotation bar shows the next step, quotation
   fixes (units by quantity, renamed parts on the title page, wrapping PDF headings, closing kept together), import order
   and undo; resizable dialogs; rule triggers / actions and Kanban swimlanes; sidebar search at the bottom; security fixes.
@@ -1016,7 +1031,8 @@ louder, and see who limited the list; the News list stays complete, only pushes 
 <p align="center"><img src="docs/news.png" alt="News inbox with mentions, grouped comments, an assignment, a completion and a shared list"></p>
 
 **Bundled (2.17.0):** News are grouped per task (or list) with one line of what happened ("2 comments · completed"),
-*Needs you* (approvals, proposals, mentions, assignments, follow-ups) above *For your information*, *Mark read* per group;
+three sections (2.138.2): *For you* (unread approvals, proposals, mentions, assignments, follow-ups; the number is the
+bell's), *Also new* (other unread activity) and *Read* (muted, below), *Mark read* per group;
 *Bundled* in the bar switches to the plain list (per device). *Summarize* sends your unread News to an agent's chat,
 which answers with a short summary.
 

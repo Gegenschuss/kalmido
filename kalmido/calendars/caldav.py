@@ -34,7 +34,7 @@ from ..accounts.login import RC_ALPHABET
 from ..core.access import acx_lists_sql, collab_all, Denied, ov_role, plists, pvis, task_visible, tvis, WRITE_ROLES
 from ..core.pages import valid_url
 from ..tasks.validation import (
-    check_parent, CONTENT_MAX, REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm, rr_problem, TITLE_MAX, valid_date,
+    check_parent, CONTENT_MAX, REM_COUNT, REM_MAX, REM_MIN, rmd_split, rr_feasible, rr_norm, rr_problem, TITLE_MAX, valid_date,
 )
 from ..tasks.tasks import my_tags, task_create, task_update
 from ..tasks.lifecycle import task_complete, task_delete, task_reopen, task_restore
@@ -492,6 +492,10 @@ def dav_vtodo(t, ctx):
             if re.fullmatch(r"-?\d{1,7}", off.strip()):
                 L += ["BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{ics_text(t['title'])}",
                       f"TRIGGER;RELATED=END:{ics_dur(base - int(off))}", "END:VALARM"]
+    if "remind_at" in t.keys() and t["remind_at"]:  # 2.111.0 C (#2057): the fixed-time reminder, an absolute trigger
+        at = datetime.fromisoformat(t["remind_at"]).replace(tzinfo=TZ).astimezone(timezone.utc)
+        L += ["BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{ics_text(t['title'])}", "X-KALMIDO-AT:1",
+              f"TRIGGER;VALUE=DATE-TIME:{at.strftime('%Y%m%dT%H%M%SZ')}", "END:VALARM"]
     if meta is not None and meta["extra"]:
         have, depth = {_prop_name(x) for x in L}, 0
         # 2.126.0 C (#1979 I3): the alarms and attachments a person's app kept go back to that person only
@@ -978,11 +982,18 @@ def dav_read(raw, allday_min):
     # reminders: VALARMs with a TRIGGER that fits an offset from the due date; the others are kept as they came
     rems = []
     alarms = list(td.walk("VALARM"))
+    v["remind_at"] = None
     for i, block in enumerate(rw["alarms"]):
         al = alarms[i] if i < len(alarms) else None
         off = None
         trig = al.get("TRIGGER") if al is not None else None
         tv = _ics_val(trig)
+        # 2.111.0 C (#2057): our fixed-time reminder (marked), or any absolute alarm of a task without a due date
+        # (not a location alarm of Apple's apps: ACTION NONE / X-APPLE-PROXIMITY with the dummy trigger of 1976 - kept as it came)
+        if (isinstance(tv, datetime) and v["remind_at"] is None and (al.get("X-KALMIDO-AT") is not None or not v["due"])
+                and tv.year >= 2000 and al.get("X-APPLE-PROXIMITY") is None and str(al.get("ACTION") or "").upper() != "NONE"):
+            v["remind_at"] = (tv if tv.tzinfo else tv.replace(tzinfo=TZ)).astimezone(TZ).strftime("%Y-%m-%dT%H:%M")
+            continue
         if v["due"] and trig is not None and tv is not None:
             due_d = date.fromisoformat(v["due"])
             if v["due_time"]:
@@ -1098,10 +1109,14 @@ def dav_patch(c, u, cur, v, caps, lid):
             start = None
         if (cur["start"] or None) != (start or None):
             p["start"] = start
-        if (cur["repeat"] or "") != v["repeat"]:
+        # 2.116.0 D (#2066): a client that only knows the BYHOUR / plain daily form keeps the task's TIMES
+        keep = "TIMES=" in (cur["repeat"] or "") and v["repeat"] in ("", rmd_split(cur["repeat"])[0])
+        if (cur["repeat"] or "") != v["repeat"] and not keep:
             p["repeat"] = v["repeat"]
     if _rem_set(cur["reminders"]) != sorted(v["reminders"]) and v["due"]:
         p["reminders"] = ",".join(str(x) for x in v["reminders"])
+    if (cur["remind_at"] or None) != v["remind_at"]:  # 2.111.0 C (#2057)
+        p["remind_at"] = v["remind_at"]
     if "tags" in v or "CATEGORIES" in caps:
         want = v.get("tags") or []
         if sorted(my_tags(c, tid)) != sorted(want):
@@ -1190,6 +1205,8 @@ def dav_put(c, u, pw_row, lst, name):
     b["list_id"] = lid
     if v["reminders"] and v["due"]:
         b["reminders"] = ",".join(str(x) for x in v["reminders"])
+    if v["remind_at"]:  # 2.111.0 C (#2057)
+        b["remind_at"] = v["remind_at"]
     if v.get("tags"):
         b["tags"] = v["tags"]
     pid = dav_parent_id(c, u, lid, None, v["parent_uid"])

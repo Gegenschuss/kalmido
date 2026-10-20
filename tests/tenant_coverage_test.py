@@ -51,13 +51,14 @@ KINDS = {
     "team": ("matrix", "p2280_api_test.py: team chat rooms and direct messages"),
     "agent": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: agents, their chat, events and jobs"),
     "people": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: the user list, user changes, invitations / sign-in links by id"),
-    "org": ("matrix", "p2280_api_test.py: organisations, their members and admins"),
-    "calendar": ("matrix", "p2300_tenant_test.py: calendars by id, sharing (B2), workspace (B3); p294_b_api_test.py (the booking page: types / bookings of another person 404, the public pages)"),
+    "org": ("matrix", "p2280_api_test.py: organisations, their members and admins; p2115_b_api_test.py: invitations by e-mail (2.115.0)"),
+    "calendar": ("matrix", "p2300_tenant_test.py: calendars by id, sharing (B2), workspace (B3); p294_b_api_test.py (the booking page: types / bookings of another person 404, the public pages); "
+                 "p2111_b_api_test.py (invitation marks and subscription links of another person's calendar 404, a link ends with the sharing)"),
     "event": ("matrix", "p2300_tenant_test.py: events by id, ranges, invitations"),
     "book": ("matrix", "p2300_tenant_test.py: address books by id, sharing (B2), workspace (B3)"),
     "contact": ("matrix", "p2300_tenant_test.py: contacts by id, links to tasks"),
     "dav": ("matrix", "p2300_tenant_test.py: CalDAV / CardDAV collections of others"),
-    "ical": ("matrix", "p2300_tenant_test.py: the calendar feed has only visible tasks"),
+    "ical": ("matrix", "p2300_tenant_test.py: the calendar feed has only visible tasks; p2111_b_api_test.py: the event calendar feed only while its person sees the calendar"),
     "group": ("matrix", "p2300_tenant_test.py: groups without a visible member stay unknown (B1)"),
     "template": ("matrix", "p2300_tenant_test.py: templates by id, from / into lists of others"),
     "form": ("matrix", "p2300_tenant_test.py: forms by id, the form page for another organisation"),
@@ -67,7 +68,7 @@ KINDS = {
     # 2.36.1 (#1021): office & finance -- every row belongs to an organisation (org_id), read through office_org (the workspace
     # one works in); foreign ids 404; agents and kids 403 before any query; 2.47.3 (#1360): a private person works in the own
     # personal office (a hidden area only its owner reaches). No /api/v1, no MCP in stage 1
-    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p290_a_api_test.py (bookkeeping light), p290_b_api_test.py (bank reconciliation), p290_c_api_test.py (tax dates), p291_a_api_test.py (invoice series), p291_b_api_test.py (subscriptions and tools), p292_a_api_test.py (business contracts and insurances), p292_b_api_test.py (equipment value, insurance list), p293_a_api_test.py (document templates, signature), p293_b_api_test.py (logbook), p294_a_api_test.py (leads), p295_a_api_test.py (per diem, its report), p295_b_api_test.py (per diem spreadsheet import)"),
+    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p290_a_api_test.py (bookkeeping light), p290_b_api_test.py (bank reconciliation), p290_c_api_test.py (tax dates), p291_a_api_test.py (invoice series), p291_b_api_test.py (subscriptions and tools), p292_a_api_test.py (business contracts and insurances), p292_b_api_test.py (equipment value, insurance list), p293_a_api_test.py (document templates, signature), p293_b_api_test.py (logbook), p294_a_api_test.py (leads), p295_a_api_test.py (per diem, its report), p295_b_api_test.py (per diem spreadsheet import), p2113c_a_api_test.py (terms and conditions as PDF)"),
     # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
     # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
     "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share; "
@@ -83,7 +84,7 @@ KINDS = {
     # 2.75.0 (#1411): the built-in assistant: a person's shares of visible lists, tasks only of shared lists / the own basket
     "assistant": ("matrix", "p275_a_api_test.py: another person's task / basket item / list 404 or left out; shares of lists the person no longer sees dropped; the log only own rows; agents never"),
     "receipt": ("matrix", "p248_d_receipts_api_test.py: receipt data and suggestions only on a visible document; projects of another workspace refused; outsiders 404"),
-    "webhook": ("matrix", "p2300_tenant_test.py: webhooks by id, deliveries only of visible tasks"),
+    "webhook": ("matrix", "p2300_tenant_test.py: webhooks by id, deliveries only of visible tasks; p2115_a_api_test.py: an organisation's webhooks only for its admins, never events of a member's private list"),
     "export": ("matrix", "p2300_tenant_test.py: the export has only the own data"),
     "stats": ("matrix", "p2300_tenant_test.py: statistics count only own / visible tasks"),
     "publiclink": ("matrix", "p2300_tenant_test.py: the public link of another person's list by id"),
@@ -158,6 +159,9 @@ KINDS = {
     "servers": ("matrix", "p273_a_api_test.py: the server accounts of another person 404 (read, change, delete, restore, data, tasks, move); agents 403; nothing of another person's tasks moves"),
     # 2.84.0 A (#1198): mails filed with a client / project (hub/hubmail.py hbm_can: the client / list / recipient, always in the mail's workspace)
     "hubmail": ("matrix", "p284_a_api_test.py: a mail / attachment / address of another organisation or a private client of another person 404, a forged sender finds only the recipient's workspace, after leaving nothing, assigning across workspaces refused, agents 403"),
+    # 2.112.1 B (#2058): external share links of the file store (files/extlinks.py)
+    "fileextlink": ("matrix", "p21121_b_api_test.py: the links of another organisation's / person's node 404 (list, create, renew, revoke, "
+                              "restore); a link serves only its own tree (other ids 404); dead when the creator leaves / loses the right"),
 }
 
 ROUTES = {
@@ -203,6 +207,9 @@ ROUTES = {
     # (2.98.0 spacer C)
     # 2.98.0 D (#2163 #2178 #2184): polish (p298_d_api_test.py) - routes below this line
     # (2.98.0 spacer D)
+    # 2.111.0 A (#2233): undo of the office editors (p2111_a_api_test.py) - routes below this line
+    "POST /api/office/undo/{}/{}": "office",
+    # (2.111.0 spacer A)
     # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
     "GET /api/bookmarks": "bookmark", "POST /api/bookmarks": "bookmark", "GET /api/bookmarks/{}": "bookmark",
     "PATCH /api/bookmarks/{}": "bookmark", "DELETE /api/bookmarks/{}": "bookmark", "POST /api/bookmarks/{}/restore": "bookmark",
@@ -254,6 +261,8 @@ ROUTES = {
     "POST /api/me/2fa/totp": "auth", "POST /api/me/2fa/totp/confirm": "auth", "POST /api/me/2fa/totp/disable": "auth",
     "POST /api/me/2fa/recovery": "auth", "POST /api/me/passkeys/options": "auth", "POST /api/me/passkeys": "auth",
     "PATCH /api/me/passkeys/{}": "auth", "DELETE /api/me/passkeys/{}": "auth", "GET /api/auth/oidc/start": "auth",
+    # 2.115.0 B (#2062): the own sessions (user_id = me; p2115_b_api_test.py: a foreign session id is 404)
+    "GET /api/me/sessions": "auth", "DELETE /api/me/sessions/{}": "auth", "POST /api/me/sessions/others": "auth",
     "GET /api/auth/oidc/callback": "auth", "POST /api/auth/signup": "auth", "POST /api/auth/link": "auth",
     # ---- book (16)
     "GET /api/v1/address-books": "book", "POST /api/v1/address-books": "book", "PATCH /api/v1/address-books/{}": "book",
@@ -273,6 +282,7 @@ ROUTES = {
     "GET /api/v1/event-calendars/{}/export": "calendar", "GET /api/evcals": "calendar", "POST /api/evcals": "calendar",
     "PATCH /api/evcals/{}": "calendar", "DELETE /api/evcals/{}": "calendar", "PUT /api/evcals/{}/members": "calendar",
     "DELETE /api/evcals/{}/members/{}": "calendar", "GET /api/evcals/{}/export.ics": "calendar",
+    "GET /api/evinvite": "calendar", "GET /api/evcals/{}/feed": "calendar", "POST /api/evcals/{}/feed": "calendar",  # 2.111.0 B (#2056)
     # ---- chatfile (4)
     "GET /api/chat-files/{}": "chatfile", "DELETE /api/chat-files/{}": "chatfile",
     "POST /api/chat-save": "chatsave",  # 2.37.0 (#1159)
@@ -405,6 +415,9 @@ ROUTES = {
     # 2.120.0 E (#2091): the own letterhead PDF (6)
     "GET /api/office/letterhead": "office", "POST /api/office/letterhead": "office", "PUT /api/office/letterhead": "office",
     "DELETE /api/office/letterhead": "office", "POST /api/office/letterhead/restore": "office", "GET /api/office/letterhead/preview": "office",
+    # 2.113.2 (#2253): terms and conditions as PDF per language (p2113c_a_api_test.py)
+    "GET /api/office/terms": "office", "POST /api/office/terms/{}": "office", "GET /api/office/terms/{}/file": "office",
+    "DELETE /api/office/terms/{}": "office", "POST /api/office/terms/{}/restore": "office", "GET /api/office/docs/{}/terms": "office",
     # ---- office (E, 2.36.2 #1021 / #1142): finalising a document, its history and the organisation's office log (3)
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
     "GET /api/office/docs/{}/log": "office", "GET /api/office/log": "office",
@@ -494,6 +507,7 @@ ROUTES = {
     "GET /api/lists/{}/notify-template": "list", "PUT /api/lists/{}/notify-template": "list",
     "GET /api/folders/people/diff": "folder", "GET /api/folders/groups/{}/diff": "folder",  # 2.46.0 (#1606): roles set per list
     "GET /api/v1/lists/{}/notify-template": "list", "POST /api/notify-templates/asked": "own",
+    "GET /api/search": "aggregate",  # 2.116.0 B (#2065): full-text search, the visibility of the task search (p2116_b_api_test.py)
     "GET /api/search/messages": "aggregate",  # 2.33.0 (#1080): only what the person may read (vis_sql, rooms, own agent chats)
     "GET /api/admin/client-ip": "admin",  # 2.33.0 (#834)
     "GET /api/admin/health": "admin",  # 2.102.0 D (#1994): numbers only (pool, threads, role, loops), no user data
@@ -511,8 +525,9 @@ ROUTES = {
     "PUT /api/admin/groups/{}/avatar": "group", "POST /api/admin/groups/{}/avatar": "group",  # 2.46.0 (#1605): group pictures
     "DELETE /api/admin/groups/{}/avatar": "group", "GET /api/group-avatar/{}/{}.jpg": "group",  # (p2460_c_api_test.py: outside 404)
     # ---- ical (3)
-    "GET /ical/{}.ics": "ical", "GET /api/ical": "ical", "POST /api/ical": "ical",
+    "GET /ical/{}.ics": "ical", "GET /ical/ev/{}.ics": "ical", "GET /api/ical": "ical", "POST /api/ical": "ical",
     # ---- list (100)
+    "GET /api/lists/{}/export.csv": "list",  # 2.116.0 C (#2064): the list CSV, role of the list + tvis
     "GET /api/lists/{}/agent-access": "list",  # 2.30.0 (#919): the agents' access log of a list (its members)
     "PUT /api/lists/{}/favorite": "list", "DELETE /api/lists/{}/favorite": "list", "PUT /api/lists/{}/in-mine": "list",  # 2.41.0 (#1365)
     "PUT /api/lists/{}/icon": "list", "POST /api/lists/{}/icon": "list", "DELETE /api/lists/{}/icon": "list",
@@ -578,6 +593,9 @@ ROUTES = {
      "POST /api/admin/orgs": "org", "PATCH /api/admin/orgs/{}": "org",
     "DELETE /api/admin/orgs/{}": "org", "PUT /api/admin/orgs/visibility": "org", "GET /api/orgs": "org",
     "PATCH /api/orgs/{}": "org", "PUT /api/orgs/{}/members": "org", "DELETE /api/orgs/{}/members/{}": "org",
+    # 2.115.0 B (#2062): an organisation's invitations by e-mail (p2115_b_api_test.py: other organisation 404, member 403)
+    "GET /api/orgs/{}/invites": "org", "POST /api/orgs/{}/invites": "org", "POST /api/orgs/{}/invites/{}/resend": "org",
+    "DELETE /api/orgs/{}/invites/{}": "org",
     # 2.35.0 (#1101): an organisation admin's lists of the organisation (p2350_c_api_test.py: other organisation, private list, member 403)
     "GET /api/orgs/{}/lists": "org", "POST /api/orgs/{}/lists/{}/archive": "org", "DELETE /api/orgs/{}/lists/{}": "org",
     "POST /api/orgs/{}/lists/{}/owner": "org",
@@ -608,6 +626,9 @@ ROUTES = {
     "DELETE /api/me/tokens/{}": "own", "GET /api/v1/me": "own", "GET /api/v1/me/app-passwords": "own",
     "POST /api/v1/me/app-passwords": "own", "DELETE /api/v1/me/app-passwords/{}": "own",
     "PATCH /api/v1/me/notifications": "own", "GET /api/v1/time/entries": "own", "POST /api/v1/time/entries": "own",
+    "GET /api/v1/habits/{}/stats": "own", "GET /api/v1/focus": "own", "GET /api/v1/focus/stats": "own",  # 2.116.0 D (#2067)
+    "POST /api/v1/focus/start": "own", "POST /api/v1/focus/{}/stop": "own", "POST /api/v1/focus/{}/pause": "own",
+    "POST /api/v1/focus/{}/resume": "own",
     "GET /api/v1/habits": "own", "POST /api/v1/habits/{}/checkin": "own", "POST /api/v1/import/{}": "own",
     "POST /api/v1/imports/{}/undo": "own", "GET /api/me/app-passwords": "own", "POST /api/me/app-passwords": "own",
     "DELETE /api/me/app-passwords/{}": "own", "GET /api/calendars": "own", "POST /api/calendars/discover": "own",
@@ -660,6 +681,7 @@ ROUTES = {
     # 2.50.0 (#329, #1200)
     "GET /s/{}/file/{}": "signoff", "GET /s/{}/logo": "signoff", "POST /s/{}/feedback": "signoff", "GET /s/q/{}": "signoff", "GET /s/q/{}/pdf": "signoff", "POST /s/q/{}": "signoff",
     "POST /s/q/{}/comments": "signoff",  # 2.99.1 A (#1959): a customer's comment on a video sign-off
+    "GET /s/q/{}/terms": "signoff",  # 2.113.2 (#2253): the terms frozen with the quotation of the link
     # 2.99.1 A (#1959): video sign-offs (videos/review.py; p2991_a_api_test.py)
     "GET /api/videos": "video", "POST /api/videos": "video", "GET /api/videos/{}": "video", "PATCH /api/videos/{}": "video",
     "DELETE /api/videos/{}": "video", "POST /api/videos/{}/restore": "video", "POST /api/videos/{}/versions": "video",
@@ -723,6 +745,12 @@ ROUTES = {
     "PATCH /api/v1/team/messages/{}": "team", "DELETE /api/v1/team/messages/{}": "team",
     "POST /api/v1/team/messages/{}/reactions": "team", "POST /api/v1/team/rooms/{}/read": "team",
     "POST /api/team/messages/{}/pin": "team", "POST /api/v1/team/messages/{}/pin": "team",  # 2.62.0 (#1848): also p262_a_api_test.py
+    # 2.113.1 B (#2059): channels, groups, files: p2113b_b_api_test.py (another organisation's person / agent 404 / 400)
+    "GET /api/team/channels": "team", "POST /api/team/channels": "team", "POST /api/team/groups": "team",
+    "PATCH /api/team/rooms/{}": "team", "POST /api/team/rooms/{}/members": "team", "DELETE /api/team/rooms/{}/members/{}": "team",
+    "GET /api/team/files/{}": "team", "GET /api/v1/team/channels": "team", "POST /api/v1/team/channels": "team",
+    "POST /api/v1/team/groups": "team", "PATCH /api/v1/team/rooms/{}": "team", "POST /api/v1/team/rooms/{}/members": "team",
+    "DELETE /api/v1/team/rooms/{}/members/{}": "team", "GET /api/v1/team/files/{}": "team",
     # ---- template (12)
     "GET /api/v1/templates": "template", "POST /api/v1/templates": "template", "PATCH /api/v1/templates/{}": "template",
     "DELETE /api/v1/templates/{}": "template", "POST /api/v1/templates/{}/apply": "template",
@@ -730,7 +758,7 @@ ROUTES = {
     "DELETE /api/templates/{}": "template", "POST /api/templates/{}/apply": "template",
     "POST /api/lists/{}/duplicate": "template", "POST /api/v1/lists/{}/duplicate": "template",  # 2.78.0 (#1881): also p278_dup_api_test.py
     # ---- token (2)
-    "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/git/{}": "token",
+    "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/issues/{}": "token", "POST /api/hooks/git/{}": "token",
     # ---- 2.60.0 (#1514): environments of a project list (they belong to their list; the deploy hook is a secret token)
     "POST /api/hooks/deploy/{}/{}": "token", "GET /api/lists/{}/envs": "list", "POST /api/lists/{}/envs": "list",
     "PATCH /api/envs/{}": "list", "DELETE /api/envs/{}": "list", "POST /api/envs/{}/restore": "list", "POST /api/envs/{}/deploy": "list",
@@ -739,6 +767,14 @@ ROUTES = {
     "GET /api/me/webhooks": "webhook", "POST /api/me/webhooks": "webhook", "PATCH /api/me/webhooks/{}": "webhook",
     "DELETE /api/me/webhooks/{}": "webhook", "POST /api/me/webhooks/{}/secret": "webhook",
     "POST /api/me/webhooks/{}/test": "webhook", "GET /api/me/webhooks/{}/log": "webhook",
+    # 2.115.0 A (#2061): webhooks of an organisation (its admins only; deliveries only of what the organisation owns) and the
+    # inbound webhooks of a list (owner / list admins; the URL creates tasks only in its own list) -- p2115_a_api_test.py
+    "GET /api/orgs/{}/webhooks": "webhook", "POST /api/orgs/{}/webhooks": "webhook", "PATCH /api/orgs/{}/webhooks/{}": "webhook",
+    "DELETE /api/orgs/{}/webhooks/{}": "webhook", "POST /api/orgs/{}/webhooks/{}/secret": "webhook",
+    "POST /api/orgs/{}/webhooks/{}/test": "webhook", "GET /api/orgs/{}/webhooks/{}/log": "webhook",
+    "POST /api/hooks/in/{}": "token", "GET /api/lists/{}/hooks-in": "list", "POST /api/lists/{}/hooks-in": "list",
+    "PATCH /api/hooks-in/{}": "list", "DELETE /api/hooks-in/{}": "list", "POST /api/hooks-in/{}/rotate": "list",
+    "POST /api/hooks-in/{}/restore": "list",
     # ---- 2.34.0 (#264 #265): the briefing (a person's own, an agent: of a person it may chat with, only shared lists) and
     # the status report of a list (p2340_a_api_test.py has the cross-tenant cases)
     "GET /api/briefing": "aggregate", "POST /api/briefing/read": "own", "GET /api/v1/briefing": "aggregate",
@@ -852,6 +888,8 @@ ROUTES = {
     "PATCH /api/files/nodes/{}": "file", "PATCH /api/files/shares/{}": "file", "POST /api/files/folders": "file",
     # 2.96.0 A (#1941): files / folders / documents to the other workspace (p296_a_api_test.py)
     "POST /api/files/move-space": "file",
+    # 2.112.1 A (#2058): several nodes into the trash / back, the ZIP download, the phone scan (p21121_a_api_test.py)
+    "POST /api/files/trash": "file", "POST /api/files/restore": "file", "GET /api/files/zip": "file", "POST /api/files/scan": "file",
     "POST /api/files/links": "file", "POST /api/files/nodes/{}/restore": "file", "POST /api/files/nodes/{}/shares": "file",
     "POST /api/files/nodes/{}/versions": "file", "POST /api/files/nodes/{}/versions/{}/restore": "file",
     "POST /api/files/upload": "file", "POST /api/paperless/import": "paperless", "POST /api/paperless/stop": "paperless",
@@ -953,6 +991,11 @@ ROUTES = {
     # 2.120.0 B (#2088): the customer's documents in the portal (cookie address + space + client, another client / space /
     # a draft 404) and the office's "Send portal link" (a client of the office area only; p2120_b_api_test.py)
     "GET /portal/docs/{}/pdf": "portal", "POST /api/office/clients/{}/portal-link": "office",
+    # 2.112.1 B (#2058): external share links (p21121_b_api_test.py)
+    "GET /api/files/nodes/{}/ext-links": "fileextlink", "POST /api/files/nodes/{}/ext-links": "fileextlink",
+    "POST /api/files/ext-links/{}/regenerate": "fileextlink", "DELETE /api/files/ext-links/{}": "fileextlink",
+    "POST /api/files/ext-links/{}/restore": "fileextlink", "GET /s/f/{}": "fileextlink", "POST /s/f/{}/unlock": "fileextlink",
+    "GET /s/f/{}/d/{}": "fileextlink", "GET /s/f/{}/v/{}": "fileextlink", "GET /s/f/{}/zip": "fileextlink",
     # 2.138.0 D (#2256): number ranges of the office area one works in, admins write (p2138_d_api_test.py)
     "GET /api/office/number-ranges": "office", "POST /api/office/number-ranges/{}": "office",
 }

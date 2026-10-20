@@ -382,11 +382,12 @@ function palItems() {
   const create = {id: 'new:', kind: 'action', cls: 'pdo', label: tr('Create as task: {0}', r.title || q), sub: [tl ? lname(tl) : '', r.due ? dayLabel(r.due) + (r.due_time ? ' ' + r.due_time : '') : ''].filter(Boolean).join(' · '), icon: 'plus', fn: () => palCreate(q)};
   const asks = (S.agents || []).filter(x => x.enabled && x.chat !== false).slice(0, 3).map(x => ({id: 'ask:' + x.id, kind: 'action', cls: 'pdo', label: tr('Ask {0}: {1}', x.name, q), sub: tr('Sends it to the chat'), icon: 'bot', img: x.avatar || null, fn: () => palAsk(x.id, q)}));
   const msgs = palMsgItems(q);  // 2.33.0 (#1080): hits in comments and chats (chat.js), on their way while typing
-  return hits.length ? [...hits, ...asks, create, ...msgs] : [create, ...asks, ...msgs];
+  const fts = typeof ftsPalItems === 'function' ? ftsPalItems(q, hits) : [];  // 2.116.0 B (#2065): "Everywhere" (ftsearch.js)
+  return hits.length ? [...hits, ...asks, create, ...fts, ...msgs] : [create, ...asks, ...fts, ...msgs];
 }
 function palCreate(q) {
   const r = parseQuick(q, new Set()), d = quickDefaults();
-  return createTask({title: r.title || q, list_id: r.list_id || d.list_id, due: r.due || d.due, due_time: r.due_time, priority: r.priority ?? 0, tags: [...(d.tags || []), ...(r.tags || [])], repeat: r.repeat || ''});
+  return createTask(qa2_body(r, {title: r.title || q, list_id: r.list_id || d.list_id, due: r.due || d.due, due_time: r.due_time, priority: r.priority ?? 0, tags: [...(d.tags || []), ...(r.tags || [])], repeat: r.repeat || ''}));  // 2.111.0 C (#2057)
 }
 // 2.16.0 (#644): "Ask <agent>: …" from the command field: the text as a chat message, then the chat opens
 async function palAsk(aid, text) {

@@ -10,7 +10,7 @@ Browser-encrypted files (e2e, 2.42.0 #828) never come here: the server cannot re
 kind names the stored row: "fs" (fs_nodes id), "att" (attachments id), "list" (list_files id), "chat" (chat_files id), "wiki" (wiki_files id, 2.99.0 A #2182), "sheet" (sheet_files id, 2.124.0 B #2110)."""
 import os
 
-KINDS = ("fs", "att", "list", "chat")
+KINDS = ("fs", "att", "list", "chat", "tchat")  # 2.113.1 (#2059): tchat = tchat_files id
 
 
 class UploadRefused(ValueError):

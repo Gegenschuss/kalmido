@@ -163,12 +163,37 @@
 .ua8how{border:0;padding:0;margin:.75rem 0 0;display:flex;flex-direction:column;gap:.5rem}
 .ua8how legend{font-weight:600;padding:0;margin-bottom:.25rem}
 .ua8how select{max-width:100%}
+/* 2.138.3 B (#2407): "Edit organisation": head and foot stay, the member list scrolls; per row a Member and an Admin box */
+.modal.ogmodal .card{display:flex;flex-direction:column}
+.modal.ogmodal .card>*{flex:none}
+.modal.ogmodal .card>.ogml{flex:1 1 auto;min-height:7rem;overflow-y:auto;overscroll-behavior:contain;margin:0 -.25rem .5rem;padding:0 .25rem}
+.ogfld{flex:1;display:flex;flex-direction:column;gap:.25rem;min-width:0}
+.ogfld .muted{font-size:var(--fs-s)}
+.oghd{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;margin:.5rem 0 .25rem}
+.oghd .muted{font-size:var(--fs-s)}
+.ogrow{min-height:2.75rem;border-top:1px solid var(--line);flex:none}  /* .members is a flex column: a wrapped row must not shrink */
+.ogrow:first-child{border-top:0}
+.ogchk{display:inline-flex;align-items:center;gap:.375rem;flex:none;min-height:2.75rem;padding:0 .25rem;cursor:pointer;font-size:var(--fs-s)}
+.ogchk input{width:1.125rem;height:1.125rem;margin:0;accent-color:var(--accent)}
+.ogchk.off{opacity:.45;cursor:default}
+@media (max-width:30rem) {
+  .ogrow .n{flex:1 0 100%;white-space:normal}
+  .ogrow .n .muted{display:block}
+  .ogrow .avatar+.n{flex-basis:calc(100% - 2.5rem)}
+  .ogrow .ogchk{margin-left:auto}
+  .ogrow .ogchk+.ogchk{margin-left:0}
+}
 @media (pointer:coarse) {
   .ua8hit{min-width:2.75rem;min-height:2.75rem;margin:-.25rem 0 -.25rem -.5rem}
   .ua8chk{width:1.5rem;height:1.5rem}
   .ua8pg .iconbtn{min-width:2.75rem;min-height:2.75rem}
+  .ogchk input{width:1.5rem;height:1.5rem}
 }
 /* 2.92.0 D (#2010): on the phone the selection bar is fixed above the tab bar, so the first tick no longer pushes the list down */
 @media (max-width:899px) {
   .ua8sel{position:fixed;left:.5rem;right:.5rem;bottom:calc(var(--tabs-h) + var(--safe-b) + .5rem);z-index:45;margin:0;background:var(--bg3);border:1px solid var(--accent);box-shadow:var(--shadow)}
 }
+/* 2.115.0 B (#2062): active sessions + open organisation invitations: two lines per row (name, details), large buttons */
+.sesrow .n,.oinvrow .n{white-space:normal}
+.sesrow .n small,.oinvrow .n small{display:block}
+@media (pointer:coarse){.sesrow .btn,.oinvrow .btn{min-height:2.75rem}}

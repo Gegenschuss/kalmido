@@ -87,7 +87,7 @@ function viewDocs() {
       <div class="seg dc-seg" role="tablist"><button type="button" role="tab" data-dc="all" aria-selected="${!DC.f.review}">${tr('All')}</button><button type="button" role="tab" data-dc="review" aria-selected="${DC.f.review}">${tr('To review')}${DC.review ? ` <span class="dc-count">${DC.review}</span>` : ''}</button></div>
       <button type="button" class="btn sm ${active ? 'on' : ''}" data-dc="more" aria-expanded="${!!DC.more}">${ic('filter', 's')} ${tr('Filter')}${active ? ` <span class="dc-count">${dc_fEntries().length}</span>` : ''}</button>
       <span class="dc-acts2"><label class="btn pri dc-up" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span><input type="file" id="dc-file" multiple accept="application/pdf,image/*,.pdf,.txt" hidden></label>
-      ${dc_smvBtn()}<button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button></span>
+      <button type="button" class="btn sm" data-dc="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>${dc_smvBtn()}<button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button></span>
     </div>
     ${DC.more && !isMobile() ? `<div class="dc-fpanel dc-flt">${dc_fltHtml()}</div>` : ''}${dc_fbarHtml()}
     ${DC.waiting ? `<p class="muted dc-wait" role="status">${ic('hourglass', 's')} ${esc(trn('{0} document is being recognised…', '{0} documents are being recognised…', DC.waiting))}</p>` : ''}`;
@@ -429,6 +429,7 @@ document.addEventListener('click', e => {
   if (o) { history.replaceState(null, '', `#docs/${o.dataset.dco}`); dc_open(+o.dataset.dco); return; }
   const b = e.target.closest('[data-dc]'); if (!b) return;
   const a = b.dataset.dc;
+  if (a === 'scan') { abm_scanOpen({docs: true}); return; }  // 2.112.1 A (#2058): photographed pages -> one PDF -> a document
   if (a === 'settings') dc_settings();
   else if (a === 'all' || a === 'review') { DC.f.review = a === 'review'; dc_load(); dc_draw(); }
   else if (a === 'more') { if (isMobile()) dc_fSheet(); else { DC.more = !DC.more; dc_draw(); } }  // 2.122.0 B (#2294): phones: a sheet
@@ -609,7 +610,8 @@ function dc_fChanged() { DC.at = 0; dc_load(); dc_fSheetDraw(); if (!isMobile())
 document.addEventListener('click', e => {
   const x = e.target.closest?.('[data-dcx]');
   if (x && x.closest('.dc-view')) {
-    if (x.dataset.dcx === 'q') DC.q = ''; else dc_fEntries()[+x.dataset.dcx]?.rm();
+    if (x.dataset.dcx === 'q') { DC.q = ''; const qi = $('#dc-q'); if (qi) qi.value = ''; clearTimeout(dc_qTimer); }  // 2.138.4 A (#2362): a focused field keeps its text in the redraw (iOS: the tap leaves the focus there)
+    else dc_fEntries()[+x.dataset.dcx]?.rm();
     dc_fChanged(); return;
   }
   const box = e.target.closest?.('.dc-flt'); if (!box) return;
@@ -635,18 +637,6 @@ document.addEventListener('change', e => {
   DC.f[k] = el.type === 'checkbox' ? el.checked : el.value;
   dc_fChanged();
 });
-async function dc_filteredIds() {  // every id the search and the filters find (all pages, at most DC_SMV_MAX); the CSV export (part C) uses it
-  const p = dc_params(), out = [];
-  p.set('facets', '0'); p.set('limit', '200');
-  for (let off = 0; off < DC_SMV_MAX; off += 200) {
-    p.set('offset', String(off));
-    const j = await api('GET', '/api/docs?' + p);
-    for (const d of j.docs || []) out.push(d.id);
-    if ((j.docs || []).length < 200) break;
-  }
-  return out;
-}
-
 // ---- 2.122.0 B (#2295): Shift-click chooses a range of cards (tagsel.js dt_rsClick), Shift-click without choosing turns it on
 function dc_rsClick(e, id) {
   if (typeof dt_rsClick !== 'function') { dc_smvToggle(id); return; }

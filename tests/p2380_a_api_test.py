@@ -161,7 +161,7 @@ check(all(x["kind"] == "offer" for x in A.get(B + D).json()["docs"]), "list with
 # a quotation with the producing / raw data / discount automation condenses into positions
 # (2.40.1: since 2.40.0 (#1379) a new organisation starts with both rules off: switched on here first)
 check(A.put(B + "/api/office/settings", json={"producing_on": 1, "raw_on": 1}).ok, "producing / raw data switched on (#1379)")
-r = A.post(B + D, json={"project_title": "Automatik", "client_id": CL, "raw_mode": "included", "discount_pct": 10, "prod_quotient": 3, "producing_rate": 600})
+r = A.post(B + D, json={"project_title": "Automatik", "client_id": CL, "raw_mode": "included", "discount_pct": 10, "prod_quotient": 3, "producing_rate": 600, "producing_on": 1})  # 2.113.1 (#2251): the office setting no longer switches producing on for a new quotation (only a pack option does); the document does
 AUTO = r.json()["id"]
 A.put(B + f"{D}/{AUTO}/items", json={"items": [{"title": "Schnitt", "qty": 3, "rate": 1000, "raw_fee": 1, "producing": 1}]})
 at = A.get(B + f"{D}/{AUTO}").json()["totals"]

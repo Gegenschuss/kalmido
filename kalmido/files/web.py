@@ -66,12 +66,16 @@ def _items(c, rows, parent_role=None):
     sh = _shared_flags(c, [r["id"] for r in rows])
     from .upsafe import up_marks
     up = up_marks(c, "fs", [r["id"] for r in rows if r["kind"] == "file"])  # 2.61.0 (#1818)
+    from .extlinks import xl_flags
+    xl = xl_flags(c, [r["id"] for r in rows])  # 2.112.1 B (#2058): live external links (a badge for the owners)
     out = []
     for r in rows:
         role = parent_role
         if role != "owner":
             role = fs_role(c, r["id"], uid) or role
         x = fs_node_json(c, r, role, names, r["id"] in sh or bool(r["org_access"]), up)
+        if r["id"] in xl and role == "owner":
+            x["xl"] = True
         if r["kind"] == "link":
             try:
                 fs_link_target(c, dict(r))
@@ -302,6 +306,8 @@ def files_node_get(nid):
         out["org_access_from"] = next(({"id": r["id"], "name": r["name"], "access": r["org_access"]} for r in chain[1:] if r["org_access"]), None)
     if n["role"] in ("owner", "edit"):
         out["log"] = _log(c, nid)
+        if n["role"] != "owner":  # 2.112.1 (#2058): the label of an external link is for the owners only
+            out["log"] = [{**x, "detail": ""} if x["action"].startswith("ext_") else x for x in out["log"]]
     fs_log_add(c, nid, "meta")
     c.commit()
     return jsonify(out)

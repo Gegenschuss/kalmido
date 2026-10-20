@@ -135,7 +135,7 @@ S_STORY = svc("Storyboard-Erstellung", "Storyboard creation", 980)
 S_ANIM = svc("Animation 2D / Motion Design", "Animation 2D / motion design", 1080, raw=1, prod=1)
 S_CUT = svc("Schnitt", "Editing", 980, raw=1, prod=1)
 S_SOUND = svc("Sound Design", "Sound design", 980, cat="Audio", raw=1, prod=1)
-r = A.post(B + D, json={"project_title": "Imagefilm Herbstkampagne", "project_ref": "PO-4711",
+r = A.post(B + D, json={"project_title": "Imagefilm Herbstkampagne", "project_ref": "PO-4711", "producing_on": 1,  # 2.113.1 (#2251): the office setting no longer switches producing on for a new quotation (only a pack option does); the document does
                         "recipient": {"name": "Beispielkunde AG", "lines": ["Beispielkunde AG", "z. Hd. Max Mustermann", "Marktstraße 5", "50667 Köln"]}})
 assert r.status_code == 201, r.text
 DOC, NUMBER = r.json()["id"], r.json()["number"]

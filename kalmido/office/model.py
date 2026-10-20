@@ -75,6 +75,9 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "producing_on": 0, "raw_on": 0,
                      "portal_docs": 0,  # 2.120.0 B (#2088): sent documents show in the customer portal (office/portaldocs.py)
                      "accept_on": 1,  # 2.114.4 B (#2270): quotations print the order confirmation block (per document: docs.accept_on)
+                     # 2.113.1 (#2251): day rate and factor of "share by amount" (an industry pack's option); None = the
+                     # pack's values. prod_quotient / producing_rate above keep their old meaning for older documents
+                     "share_rate": None, "share_factor": None,
                      # 2.47.3 (#1360): small business (section 19 UStG): new documents without VAT + the note (also orgs)
                      "small_business": 0,
                      # 2.47.0 (#1216): industry packs switched on (office/packs/industry/<code>.json; "film" = shoot calculation)
@@ -103,7 +106,9 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # 2.120.0 A (#2087): the default cash discount of new invoices (0 = none; office/abschlag.py)
                      "skonto_pct": 0, "skonto_days": 0,
                      # 2.120.0 E (#2091): the own letterhead PDF + margins (set only by its own routes, office/letterhead.py)
-                     "letterhead": {}}
+                     "letterhead": {},
+                     # 2.113.2 (#2253): the terms and conditions as PDF per language (set only by their own routes, office/terms.py)
+                     "terms": {}}
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 
 
@@ -309,7 +314,7 @@ def office_settings_clean(c, oid, b, cur):
     """Validates a PUT body (partial) against the current settings -> the new full dict."""
     out = json.loads(json.dumps(cur))
     for k, v in b.items():
-        if k not in SETTINGS_KEYS or k == "logo":  # the logo is set by the upload route
+        if k not in SETTINGS_KEYS or k in ("logo", "terms"):  # the logo / the terms (2.113.2, #2253) are set by their upload routes
             continue
         if k == "pack":
             if not isinstance(v, str) or v.strip().upper() not in office_pack_codes():
@@ -389,6 +394,8 @@ def office_settings_clean(c, oid, b, cur):
             out[k] = v
         elif k == "prod_quotient":
             out["prod_quotient"] = _num(v, "prod_quotient", 0.1, 1000)
+        elif k in ("share_rate", "share_factor"):  # 2.113.1 (#2251): empty = the pack's value
+            out[k] = None if v in (None, "") else _num(v, k, *((0.01, 1e9) if k == "share_rate" else (0.01, 10)))
         elif k == "raw_factor":
             out["raw_factor"] = _num(v, "raw_factor", 0, 100)
         elif k == "producing_service_id":
@@ -1163,7 +1170,7 @@ def office_import(c, oid, d, overwrite=False):
     st = d.get("settings")
     if isinstance(st, dict):
         cur = office_settings(c, oid)
-        b = {k: v for k, v in st.items() if k in SETTINGS_KEYS and k != "logo"}
+        b = {k: v for k, v in st.items() if k in SETTINGS_KEYS and k not in ("logo", "terms")}  # 2.113.2 (#2253): no terms files
         where = ("settings", "")
         if "producing_service_id" in b and b["producing_service_id"] is not None:
             b["producing_service_id"] = mapped("services", b["producing_service_id"], where, "producing_service_id")

@@ -57,6 +57,7 @@ ORDER = (
     "tasks.tasks",
     "tasks.roadmap",
     "tasks.lifecycle",
+    "tasks.tasktrash",  # 2.116.0 A (#2063): the trash period of tasks
     "tasks.attachments",
     "tasks.batch",
     "tasks.mineorder",  # 2.40.0 (#1344)
@@ -69,6 +70,7 @@ ORDER = (
     "personal.timewipe",  # 2.43.0 (#1434)
     "accounts.settings",
     "lists.favorites",  # 2.40.0 (#1361)
+    "lists.listexport",  # 2.116.0 C (#2064)
     "accounts.layouts",  # 2.32.0 (#1063, #983)
     "accounts.layoutsets",  # 2.55.0 (#1069, #1068, #1066)
     "accounts.onboarding",
@@ -90,6 +92,7 @@ ORDER = (
     "calendars.caldav",
     "integrations.importers",
     "notify.push",
+    "tasks.remindat",  # 2.111.0 C (#2057)
     "notify.alerts",
     "notify.sev",  # 2.36.2 (#1133)
     "calendars.subscriptions",
@@ -105,6 +108,7 @@ ORDER = (
     "lists.report",  # 2.34.0 (#265)
     "api.openapi",
     "integrations.webhooks",
+    "integrations.hookin",  # 2.115.0 A (#2061)
     "agents.core",
     "collab.reactions",
     "agents.chat",
@@ -151,7 +155,9 @@ ORDER = (
     "sheets.shchart",  # 2.124.0 A (#2115): the simple chart of a table (its setting; drawn by static/js/sheetchart.js)
     "sheets.shbook",  # 2.124.0 E (#2116): several sheets in one table (the sheet bar's routes; rights / formulas hang in core)
     "collab.teamchat",
+    "collab.teamchan",  # 2.113.1 B (#2059): channels, groups, files of the team chat (after teamchat)
     "collab.msgsearch",  # 2.33.0 (#1080)
+    "tasks.ftsearch",  # 2.116.0 B (#2065): full-text search of tasks + comments (/api/search)
     "collab.chatsave",  # 2.37.0 (#1159)
     "collab.chatpins",  # 2.62.0 (#1848): pinned chat messages (after teamchat / agents.chat)
     "collab.cchoice",  # 2.41.0 (#1383): answer buttons / approval cards in comments
@@ -173,12 +179,16 @@ ORDER = (
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
     "files.fsmove",  # 2.96.0 A (#1941): files, folders and documents to the other workspace (private <-> organisation)
     "files.fstags",  # 2.122.0 B (#2099): tags of files and folders (the documents' tag set of the workspace)
+    "files.bulk",  # 2.112.1 A (#2058): several nodes into the trash / back, the ZIP download, the phone scan -> one PDF
     "files.v1",  # 2.48.0 (#1207): the file store in the REST API (files:read / files:write)
+    "files.extlinks",  # 2.112.1 B (#2058): external share links of files / folders (/s/f/<token>, no login)
     "files.photometa",  # 2.61.0 B (#1819): photo metadata (GPS, camera) removed on upload (no routes; files/upsafe.py)
     "files.upsafe",  # 2.61.0 (#1818 #1819 #1820): the shared upload path - scan, metadata, text recognition (no routes)
     "files.filereq",  # 2.122.0 A (#2097): file requests - a public link /u/<token> through which a client uploads files
     "integrations.mail",
     "accounts.invite",
+    "accounts.sessions",  # 2.115.0 B (#2062): active sessions
+    "accounts.orginvite",  # 2.115.0 B (#2062): organisation admins invite accounts by e-mail
     "family.family",
     "family.web",
     "family.pin",  # 2.49.0 B (#1551)
@@ -189,6 +199,8 @@ ORDER = (
     "events.web",
     "events.dav",
     "events.v1",
+    "events.invite",  # 2.111.0 B (#2056): invitation mails to external attendees (iMIP)
+    "events.evfeed",  # 2.111.0 B (#2056): subscription links of event calendars (GET /ical/ev/<token>.ics)
     "contacts.model",
     "contacts.carddav",
     "contacts.web",
@@ -259,6 +271,7 @@ ORDER = (
     "office.bank",  # 2.90.0 B (#1921): bank reconciliation: CSV / CAMT import, matching bookings to invoices and receipts
     "office.doctpl_samples",  # 2.117.0 B (#2283): the letter samples of the document templates (data, no routes)
     "office.doctpl",  # 2.93.0 A (#1927): document templates with variables, documents as PDF, signature by customer link
+    "office.terms",  # 2.113.2 (#2253): terms and conditions (AGB) as PDF per language, sent with quotations
     "videos.review",  # 2.99.1 A (#1959): video sign-off with comments at a timecode (links only), customer link = signoff kind video
     "office.logbook",  # 2.93.0 B (#1928): the logbook (vehicles, drives, change log, year report, mileage allowance)
     "office.cashbook",  # 2.121.0 B (#2095): the cash book (cash boxes, entries, cancellations, day closings, CSV / PDF)
@@ -312,6 +325,7 @@ ORDER = (
     "docs.csvx",  # 2.122.0 (#2100): the documents list as CSV
     "sheets.io",  # 2.89.0 C (#1916): tables to / from CSV and .xlsx (export, import as a new sheet)
     "sheets.v1",  # 2.89.0 C (#1916): tables for agents (API v1 + OpenAPI)
+    "personal.v1focus",  # 2.116.0 D (#2067): focus sessions + habit statistics for API v1
     "videos.v1",  # 2.99.1 C (#1959): video sign-offs for agents (API v1 + OpenAPI)
     "paperless.ngx",  # 2.48.0 (#1152): Paperless-ngx connection + import into the documents (self-hosted only)
     "paperless.web",  # 2.48.0 (#1152): the routes of the Paperless-ngx connection (self-hosted only)
@@ -331,6 +345,7 @@ ORDER = (
     "office.subs",  # 2.91.0 B (#1924): subscriptions and tools (fixed costs with notice period, users, renewal reminder)
     "office.officemove",  # 2.97.0 C (#2049): office data between the personal office and an organisation's office
     "office.pbtransfer",  # 2.137.0 D (#1981): the personal office into an existing organisation (after office.officemove)
+    "office.undo",  # 2.111.0 A (#2233): undo of the office editors (copies before each own change, restore with conflict check)
     "office.numranges",  # 2.138.0 D (#2256): the next running number of every number series (office admin)
     "agents.importprop",  # 2.68.0 A (#1839): agents propose old data for the office (fixed costs), the person takes it over
     "agents.sheetprop",  # 2.126.1 B (#2125): table rows -> tasks as an agent's proposal (after api.v1, sheets.step2)

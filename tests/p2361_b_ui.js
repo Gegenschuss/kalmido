@@ -95,7 +95,8 @@ const FEAT = 'cal,comments,collab,clients';
   w.eval(`go('office/settings')`); await until(() => d.querySelector('.office .ofcset'), 60);
   check(/next: KVA-\d{4}-001/.test(d.querySelector('#os-preview')?.textContent || ''), 'settings: the number preview ' + d.querySelector('#os-preview')?.textContent);
   check(/19/.test(d.querySelector('.office .ofcset')?.textContent || '') && /7/.test(d.querySelector('.office .ofcset')?.textContent || '') && d.querySelector('#os-pack')?.value === 'DE', 'settings: pack DE with its tax rates');
-  check(!!d.querySelector('.office [data-ofc="save-settings"]') && !!d.querySelector('.office [data-ofc="import"]') && !!d.querySelector('.office a[href="/api/office/export"]'), 'settings: save, import, export');
+  // 2.113.0 (#2247): no Save button any more (every field saves itself); the areas instead
+  check(!d.querySelector('.office [data-ofc="save-settings"]') && !!d.querySelector('#ofc-set [data-ostsub="company"]') && !!d.querySelector('.office [data-ofc="import"]') && !!d.querySelector('.office a[href="/api/office/export"]'), 'settings: areas, import, export');
   d.querySelector('#os-name').value = 'Studio Nordlicht GmbH'; d.querySelector('#os-lines').value = 'Hafenstraße 12\n20457 Hamburg';
   d.querySelector('#ofc-set').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
   await until(async () => (await call('GET', '/api/office/settings')).settings?.company?.name === 'Studio Nordlicht GmbH', 40);

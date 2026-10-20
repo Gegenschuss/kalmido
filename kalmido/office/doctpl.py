@@ -930,6 +930,8 @@ def dt_final(gid):
     vals = oc_enc_fields(c, oid, "office_gen_docs", {"body": text})
     c.execute("UPDATE office_gen_docs SET body=?, body_hash=?, status='final', node_id=?, final_at=?, lang=?, updated_at=? WHERE id=? AND org_id=?",
               (vals["body"], d["body_hash"], nid, ts, lang, ts, gid, oid))
+    from .terms import agb_gen_freeze  # 2.113.2 (#2253): order confirmations / contracts keep the terms of their language
+    c.execute("UPDATE office_gen_docs SET terms=? WHERE id=? AND org_id=?", (agb_gen_freeze(c, oid, r["kind"], lang), gid, oid))
     ofx_log(c, oid, "gen_doc_final", target="gen_doc", detail={"gen_doc": gid, "title": d["title"], "body_hash": d["body_hash"], "node_id": nid})
     bump(c)
     c.commit()

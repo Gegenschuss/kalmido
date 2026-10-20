@@ -4,7 +4,15 @@ office_calc(doc, items, pack) -> dict reproduces the rules of the spreadsheet te
  - a position is qty x rate; rates are kept in the organisation's currency (EUR) and converted into the document's
    currency with doc["fx_rate"] when the document is in USD (converted rate rounded to 2 places first, like the template)
  - "Producing": the sum of the quantities of the positions flagged producing, divided by doc["prod_quotient"], rounded to
-   half days the way the template does (ROUND(x / 5, 1) * 5), times doc["producing_rate"]; only when > 0
+   half days the way the template does (ROUND(x / 5, 1) * 5), times doc["producing_rate"]; only when > 0.
+   2.113.1 (#2251): doc["producing_mode"] "amount" = the option "share by amount" an industry pack offers: the amount of
+   the flagged positions (net, qty x rate, before discount, without raw data) / doc["producing_rate"] x doc["prod_quotient"]
+   (a factor then), rounded to half days, times the rate; amount and rate in the document's currency; title from
+   doc["share_label"] {de, en}. None = the calculation by quantities above (every older document keeps it)
+ - 2.113.1 (#2252): two surcharges after the positions, before discount / raw data, standard tax, each on when its
+   percentage is set: handling costs = doc["handling_pct"] % of the positions flagged in_handling; markup =
+   doc["markup_pct"] % of the positions flagged in_markup (+ the handling costs with doc["markup_stacked"]); titles from
+   doc["handling_label"] / doc["markup_label"] ({de, en} or the document's own text)
  - raw data: the sum of the totals of the positions flagged raw_fee times doc["raw_factor"]; raw_mode "optional" shows
    the line without counting it (net_incl_raw next to net), "included" counts it (net_excl_raw next to net), "none" omits it
  - discount: doc["discount_pct"] on the positions flagged discountable, one negative line
@@ -12,6 +20,7 @@ office_calc(doc, items, pack) -> dict reproduces the rules of the spreadsheet te
 Money is Decimal, rounded half up to 2 places at every step the template rounds; the result holds floats (JSON).
 """
 import re
+import json
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 
 Q2 = Decimal("0.01")
@@ -24,6 +33,9 @@ LABELS = {
     "de": {
         "producing": "Producing", "producing_detail": "{days} {day_word} = {qty} {prod_word} / {quot}, auf halbe Tage gerundet",  # 2.114.4 A (#2276): singular for 1
         "raw_optional": "Optional: Bereitstellung der Rohdaten", "raw_included": "Bereitstellung der Rohdaten",
+        "share_detail": "{amount} / {rate} x {factor} = {days} Tage, auf halbe Tage gerundet",  # 2.113.1 (#2251)
+        "handling": "Handlungskosten", "markup": "Markup", "surcharge_detail": "{pct} % auf die markierten Positionen",  # 2.113.1 (#2252)
+        "surcharge_detail_stacked": "{pct} % auf die markierten Positionen und die Handlungskosten",
         "raw_detail": "{pct} % der Positionen mit Rohdaten", "discount": "Rabatt", "discount_detail": "{pct} % auf die markierten Positionen",
         "net": "Summe Netto", "net_incl_raw": "Summe netto mit Option Rohdaten", "net_excl_raw": "ohne Rohdaten", "gross": "Gesamt Brutto",  # 2.114.4 A (#2275)
         "tax_standard": "MwSt. {pct} %", "tax_reduced": "MwSt. {pct} %", "tax_exempt": "steuerfrei",
@@ -34,6 +46,9 @@ LABELS = {
     "en": {
         "producing": "Producing", "producing_detail": "{days} {day_word} = {qty} {prod_word} / {quot}, rounded to half days",
         "raw_optional": "Optional: Delivery of raw data", "raw_included": "Delivery of raw data",
+        "share_detail": "{amount} / {rate} x {factor} = {days} days, rounded to half days",  # 2.113.1 (#2251)
+        "handling": "Handling costs", "markup": "Markup", "surcharge_detail": "{pct} % on the marked positions",  # 2.113.1 (#2252)
+        "surcharge_detail_stacked": "{pct} % on the marked positions and the handling costs",
         "raw_detail": "{pct} % of the positions with raw data", "discount": "Discount", "discount_detail": "{pct} % on the marked positions",
         "net": "Net Total", "net_incl_raw": "Net total with option raw data", "net_excl_raw": "excluding raw data", "gross": "Gross Total",
         "tax_standard": "VAT {pct} %", "tax_reduced": "VAT {pct} %", "tax_exempt": "tax exempt",
@@ -181,6 +196,8 @@ def office_calc(doc, items, pack=None):
     # the flagged positions alone decide
     prod_on = doc.get("producing_on")
     prod_on = True if prod_on is None else _flag(prod_on)
+    share = doc.get("producing_mode") == "amount"  # 2.113.1 (#2251): share by amount (prod_quotient = the factor)
+    hu_pct, mk_pct = dec(doc.get("handling_pct"), "0"), dec(doc.get("markup_pct"), "0")  # 2.113.1 (#2252)
     rates = {k: (Decimal(0) if novat else pack_tax(pack, k)) for k in TAX_KEYS}
 
     def conv(rate):  # the rate in the document's currency
@@ -198,6 +215,8 @@ def office_calc(doc, items, pack=None):
     items_net = Decimal(0)
     raw_base = Decimal(0)
     prod_qty = Decimal(0)
+    prod_amt = Decimal(0)  # 2.113.1 (#2251): the amount of the flagged positions (share by amount)
+    hu_base, mk_base = Decimal(0), Decimal(0)  # 2.113.1 (#2252)
     costs = Decimal(0)
     base = {k: Decimal(0) for k in TAX_KEYS}  # taxable amounts per key
     disc_base = {k: Decimal(0) for k in TAX_KEYS}
@@ -227,6 +246,12 @@ def office_calc(doc, items, pack=None):
             raw_base += total
         if _flag(it.get("producing")) and pct is None:
             prod_qty += qty
+        if _flag(it.get("producing")):
+            prod_amt += total
+        if _flag(it.get("in_handling")):
+            hu_base += total
+        if _flag(it.get("in_markup")):
+            mk_base += total
         if _flag(it.get("discountable", 1)):
             disc_base[tax] += total
         costs += money(dec(it.get("cost")) * qty * (fx if currency == "USD" else 1))
@@ -236,21 +261,46 @@ def office_calc(doc, items, pack=None):
                       **({"pct": _num(pct), "base": _num(ext_base)} if pct is not None else {}),
                       "rate": _num(rate), "tax": tax, "tax_pct": _num(rates[tax]), "total": _num(total),
                       "raw_fee": 1 if _flag(it.get("raw_fee")) else 0, "producing": 1 if _flag(it.get("producing")) else 0,
+                      "in_handling": 1 if _flag(it.get("in_handling")) else 0, "in_markup": 1 if _flag(it.get("in_markup")) else 0,
                       "intext": it.get("intext") or "intern", "discountable": 1 if _flag(it.get("discountable", 1)) else 0})
 
     # Producing
-    days = half_days(prod_qty / quot) if prod_on and quot > 0 and prod_qty > 0 else Decimal(0)
     prod_rate_doc = conv(prod_rate)
+    if share:  # 2.113.1 (#2251): amount and rate both in the document's currency
+        days = half_days(prod_amt / prod_rate_doc * quot) if prod_on and quot > 0 and prod_rate_doc > 0 and prod_amt > 0 else Decimal(0)
+    else:
+        days = half_days(prod_qty / quot) if prod_on and quot > 0 and prod_qty > 0 else Decimal(0)
     prod_total = money(days * prod_rate_doc) if days > 0 else Decimal(0)
     if days > 0:
         base["standard"] += prod_total
         en = (lang or "de").lower().startswith("en")  # 2.114.4 A (#2276): a position number like the positions above, "1 Tag"
-        lines.append({"kind": "producing", "pos": pos + 1, "title": label(pack, lang, "producing"), "qty": _num(days), "qty_text": fmt_qty(days, lang),
+        if share:
+            title = prd_label(doc.get("share_label"), lang) or label(pack, lang, "producing")
+            detail = label(pack, lang, "share_detail", amount=fmt_money(prod_amt, lang, currency), rate=fmt_money(prod_rate_doc, lang, currency),
+                           factor=fmt_qty(quot, lang), days=fmt_qty(days, lang))
+        else:
+            title = label(pack, lang, "producing")
+            detail = label(pack, lang, "producing_detail", days=fmt_qty(days, lang), qty=fmt_qty(prod_qty, lang), quot=fmt_qty(quot, lang),
+                           day_word=unit_text(pack, lang, "day", days),
+                           prod_word=("production day" if en else "Produktionstag") if prod_qty == 1 else ("production days" if en else "Produktionstage"))
+        lines.append({"kind": "producing", "pos": pos + 1, "title": title, "qty": _num(days), "qty_text": fmt_qty(days, lang),
                       "unit": "day", "unit_text": unit_text(pack, lang, "day", days), "rate": _num(prod_rate_doc), "tax": "standard",
-                      "tax_pct": _num(rates["standard"]), "total": _num(prod_total),
-                      "detail": label(pack, lang, "producing_detail", days=fmt_qty(days, lang), qty=fmt_qty(prod_qty, lang), quot=fmt_qty(quot, lang),
-                                      day_word=unit_text(pack, lang, "day", days),
-                                      prod_word=("production day" if en else "Produktionstag") if prod_qty == 1 else ("production days" if en else "Produktionstage"))})
+                      "tax_pct": _num(rates["standard"]), "total": _num(prod_total), "detail": detail})
+
+    # 2.113.1 (#2252): handling costs, then the markup (stacked: also on the handling costs); the discount takes in neither
+    hu_total = money(hu_base * hu_pct / 100) if hu_pct > 0 else Decimal(0)
+    stacked = _flag(doc.get("markup_stacked"))
+    mk_total = money((mk_base + (hu_total if stacked else 0)) * mk_pct / 100) if mk_pct > 0 else Decimal(0)
+    for slot, amt, pct_, det in (("handling", hu_total, hu_pct, "surcharge_detail"),
+                                 ("markup", mk_total, mk_pct, "surcharge_detail_stacked" if stacked and hu_total > 0 else "surcharge_detail")):
+        if amt <= 0:
+            continue
+        base["standard"] += amt
+        lines.append({"kind": "surcharge", "slot": slot, "pos": pos + 1 + sum(1 for x in lines if x["kind"] in ("producing", "surcharge")),
+                      "title": prd_label(doc.get(slot + "_label"), lang) or label(pack, lang, slot),
+                      "qty": 1, "qty_text": "1", "unit": "flat", "unit_text": "", "pct": _num(pct_), "rate": _num(amt),
+                      "tax": "standard", "tax_pct": _num(rates["standard"]), "total": _num(amt),
+                      "detail": label(pack, lang, det, pct=fmt_qty(pct_, lang))})
 
     # raw data
     raw_amount = money(raw_base * raw_factor) if raw_mode != "none" else Decimal(0)
@@ -274,7 +324,7 @@ def office_calc(doc, items, pack=None):
             lines.append({"kind": "discount", "title": label(pack, lang, "discount"), "pct": _num(disc_pct), "total": _num(-discount),
                           "detail": label(pack, lang, "discount_detail", pct=fmt_qty(disc_pct, lang))})
 
-    net = items_net + prod_total + (raw_amount if raw_mode == "included" else Decimal(0)) - discount
+    net = items_net + prod_total + hu_total + mk_total + (raw_amount if raw_mode == "included" else Decimal(0)) - discount
     tax_lines, tax_sum = [], Decimal(0)
     if not novat:
         for k in TAX_KEYS:
@@ -290,7 +340,9 @@ def office_calc(doc, items, pack=None):
         "fx_note": label(pack, lang, "fx_note", rate=fmt_qty(fx, lang)) if currency == "USD" else "",
         "vat_mode": "novat" if novat else "vat", "raw_mode": raw_mode, "producing_on": 1 if prod_on else 0,
         "items_net": _num(items_net), "producing_qty": _num(prod_qty), "producing_days": _num(days), "producing_rate": _num(prod_rate_doc),
-        "producing_total": _num(prod_total), "raw_base": _num(raw_base), "raw_factor": _num(raw_factor), "raw_amount": _num(raw_amount),
+        "producing_total": _num(prod_total), "producing_mode": "amount" if share else None, "producing_amount": _num(prod_amt),
+        "handling_pct": _num(hu_pct), "handling_base": _num(hu_base), "handling_total": _num(hu_total),
+        "markup_pct": _num(mk_pct), "markup_base": _num(mk_base), "markup_total": _num(mk_total), "raw_base": _num(raw_base), "raw_factor": _num(raw_factor), "raw_amount": _num(raw_amount),
         "discount_pct": _num(disc_pct), "discount": _num(discount),
         "net": _num(net), "tax_lines": tax_lines, "tax_total": _num(tax_sum), "gross": _num(gross),
         "net_incl_raw": _num(net + raw_amount) if raw_mode == "optional" and raw_base > 0 else None,
@@ -324,6 +376,25 @@ def bwa_vat_note(note, pcts, lang="de"):
             break
     sp = " %" if " %" in m.group(0) else "%"
     return note[:m.start()] + join.join(fmt_qty(p, lang) + sp for p in pcts) + note[m.end():]
+
+
+# 2.113.1 (#2251): how producing / handling costs / markup were computed is internal: customer documents
+# (print model, PDF, approval page, e-invoice, an invoice made from the quotation) show their title and amount only
+PRD_INTERNAL_DETAIL = ("producing", "surcharge")
+
+
+def prd_label(v, lang):
+    """2.113.1 (#2251): a line title {de, en} (dict or JSON text, as stored on the document) in the document's language."""
+    if isinstance(v, str):
+        try:
+            v = json.loads(v)
+        except ValueError:
+            return v.strip()[:80]
+    if not isinstance(v, dict):
+        return ""
+    lg = "en" if (lang or "de").lower().startswith("en") else "de"
+    t = v.get(lg) or v.get("de") or v.get("en") or ""
+    return t.strip()[:80] if isinstance(t, str) else ""
 
 
 def _flag(v):

@@ -1175,6 +1175,13 @@ svg.chart{display:block;max-width:100%;overflow:visible}
   @page{margin:16mm 14mm}
 }
 
+/* 2.116.0 C (#2064): the printable list (listprint.js) inside the timesheet's page */
+.lexpage .lxl{list-style:none;margin:0 0 1rem;padding:0}
+.lexpage .lxr{display:flex;gap:.625rem;align-items:flex-start;padding:.3125rem 0;border-bottom:1px solid #ddd;break-inside:avoid}
+.lexpage .lxbox{flex:none;width:.875rem;height:.875rem;margin-top:.1875rem;border:1.5px solid #111;border-radius:.1875rem;font-size:.6875rem;line-height:.75rem;text-align:center}
+.lexpage .lxr.done .lxt{color:#666}
+.lexpage .lxn{white-space:pre-wrap;color:#333;font-size:.75rem;margin-top:.125rem}
+
 /* ---------- package 3: dependencies, project status + progress, custom fields ---------- */
 :root{--st-on_track:var(--ok);--st-at_risk:var(--p3);--st-off_track:var(--p5);--st-on_hold:var(--p1);--st-complete:var(--accent);--st-none:var(--muted)}
 .meta .blk,.dsec h5 .blk{color:var(--p3);font-weight:500}
@@ -3238,6 +3245,7 @@ body.in-chat #top{display:none}
 /* P5: the date sheet: a label for the reminders, "Done" always in view, the quick days in full words */
 .prow .plab{font-size:var(--fs-s);flex:none}
 .prow:has(.remchips){flex-wrap:wrap}
+.prow.ratrow{flex-wrap:wrap}  /* 2.111.0 C (#2057): the fixed-time reminder: date + time wrap under the label on narrow phones */
 .prow .remchips{flex:1 1 100%}
 #pop.sheet .popfoot{position:sticky;bottom:calc(-.75rem - var(--safe-b));z-index:2;background:var(--bg2);margin:.5rem -.75rem calc(-.75rem - var(--safe-b));padding:.625rem .75rem calc(.75rem + var(--safe-b));border-top:1px solid var(--line)}
 #pop .quick button{white-space:normal;text-align:center;line-height:1.15}
@@ -3838,6 +3846,23 @@ body.lcmoving,body.lcmoving *{cursor:grabbing!important;user-select:none!importa
 .tcempty{padding:2rem 1rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:.375rem}
 .tcempty b{color:var(--text)}
 .tcempty .btn{margin-top:.625rem}  /* 2.27.0 (#986) */
+/* 2.113.1 (#2059): sections of the conversation list, an archived channel, files in the composer, channel / group dialogs */
+.tcsec{padding:.75rem .75rem .25rem;font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.tcarch{display:flex;align-items:center;gap:.5rem;padding:.75rem;border-top:1px solid var(--line);color:var(--muted);font-size:.875rem}
+.tcarch .btn{margin-left:auto}
+.tcfiles{padding:.5rem .75rem 0}
+.tcfiles .cfile button{min-width:2.75rem;min-height:2.75rem;justify-content:center}
+.tcxdlg h4,#tcx-set h4{margin:.75rem 0 .375rem;font-size:.875rem}
+.tcxhint{font-size:.8125rem;margin:0 0 .625rem}
+.tcxsec{display:flex;flex-direction:column;gap:.375rem;margin-bottom:.625rem}
+.tcxpick{display:flex;flex-direction:column;max-height:16rem;overflow:auto;border:1px solid var(--line);border-radius:var(--radius)}
+.tcxp{display:flex;align-items:center;gap:.625rem;min-height:2.75rem;padding:.25rem .625rem;color:var(--text);cursor:pointer}
+.tcxp+.tcxp{border-top:1px solid var(--line)}
+.tcxp input{flex:none;margin:0}
+.tcxrow{display:flex;align-items:center;gap:.625rem;min-height:2.75rem}
+.tcxn{flex:1;min-width:0;display:flex;flex-direction:column}
+.tcxn b,.tcxn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tcxmem{max-height:14rem;overflow:auto;margin-bottom:.625rem}
 @media (max-width:899px){
   body.in-team #view{overflow:hidden;padding-bottom:calc(var(--tabs-h) + var(--safe-b));display:flex;flex-direction:column;overscroll-behavior:none}
   body.in-team.kb-open #view{padding-bottom:0}
@@ -6294,6 +6319,20 @@ button.lnph:hover{border-color:var(--accent)}
 .ablrow.abag b{color:var(--fg,inherit)}
 .abshsum{display:flex;flex-wrap:wrap;gap:.375rem;margin-bottom:.5rem}
 .abshp{display:inline-flex;align-items:center;gap:.25rem;padding:.25rem .625rem;border:1px solid var(--line);border-radius:99rem;font-size:.9rem}
+/* 2.112.1 B (#2058): external share links in the details of a file / folder (ablinks.js) */
+.xl-sec h4{margin-top:1rem}
+.xl-row{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;padding:0 .25rem;border-bottom:1px solid var(--line)}
+.xl-row .iconbtn{min-width:2.75rem;min-height:2.75rem}
+.xl-row.xl-dead .xl-name{color:var(--muted);text-decoration:line-through}
+.xl-main{display:flex;flex-direction:column;flex:1;min-width:0}
+.xl-main small{overflow-wrap:anywhere}
+.xl-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xl-why{margin:.25rem 0}
+.xl-form{display:grid;gap:.375rem;margin:.75rem 0}
+.xl-form label,.xl-out label{font-size:.8125rem;color:var(--muted)}
+.xl-form input,.xl-form select,.xl-out input{min-height:2.75rem}
+.xl-out .row{display:flex;gap:.5rem;align-items:center}
+.xl-out input{flex:1;min-width:0}
 .abshadd{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.75rem 0}
 .abshadd select{flex:1 1 12rem;min-height:2.5rem}
 .abexp{display:inline-flex;align-items:center;gap:.375rem}
@@ -7133,7 +7172,8 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .fcisum{display:flex;flex-direction:column;align-items:flex-end;line-height:1.25}
 .fcidlg .card{max-width:42rem;width:100%}
 .fcilist{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.375rem;max-height:60vh;overflow-y:auto}
-.fcirow{display:flex;align-items:center;gap:.625rem;min-height:2.75rem;padding:.375rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2)}
+/* 2.138.4 A (#2359): rows never shrink in the scrolling column (amount line overflowed on phones) */
+.fcirow{flex-shrink:0;display:flex;align-items:center;gap:.625rem;min-height:2.75rem;padding:.375rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2)}
 .fcirow.on{border-color:var(--accent)}
 .fcirow.dup:not(.on),.fcirow.err{opacity:.6}
 .fcirow.err small{color:var(--muted)}
@@ -7575,6 +7615,14 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 /* 2.119.0 B (#2210): the Agents section of the dialog "All people …" */
 .sbpmd .sbph{margin:.75rem 0 .25rem;font-size:.75rem;font-weight:600;color:var(--muted);text-transform:none}
 .sbpmd .mrow[data-aid] .sdot{flex:none}
+/* 2.112.1 A (#2058): download / trash in the selection bar; phones: icons only, the moves in its "..." menu */
+.abselm{display:none}
+@media (max-width:599px){ .abselbar .abselt,.abselbar .abselx{display:none} .abselm{display:inline-flex} .abselbar .btn{min-width:2.75rem;justify-content:center} }
+/* 2.115.0 A (#2061) inbound webhooks of a list (hookin.js): the URL shown once, the curl example */
+.whi-url code{overflow-wrap:anywhere;word-break:break-all}
+.whi-ex{margin-top:.375rem}
+.whevg{margin:.5rem 0}
+.whevg > b{display:block;font-size:var(--fs-xs);margin-bottom:.25rem}
 
 /* 2.138.0 B (#2161): search docked at the bottom of the sidebar; head = logo + avatar, then workspace button + fold-all */
 #side{display:flex;flex-direction:column;padding-bottom:0}

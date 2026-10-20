@@ -195,7 +195,13 @@ function caldavHtml(hint) {
 }
 // Settings > Integrations > Webhooks
 const WH_EV_NAMES = {'task.created': N_('Task created'), 'task.updated': N_('Task changed'), 'task.completed': N_('Task completed'), 'task.reopened': N_('Task reopened'),
-  'task.deleted': N_('Task deleted'), 'comment.created': N_('New comment'), 'list.shared': N_('List shared')};
+  'task.deleted': N_('Task deleted'), 'comment.created': N_('New comment'), 'list.shared': N_('List shared'),
+  // 2.115.0 A (#2061): more events, grouped in the dialog
+  'event.created': N_('Event created'), 'event.updated': N_('Event changed'), 'event.deleted': N_('Event deleted'), 'file.created': N_('File added'),
+  'invoice.created': N_('Invoice created'), 'invoice.sent': N_('Invoice sent'), 'invoice.paid': N_('Invoice paid'), 'time.created': N_('Time entry added')};
+const WH_EV_GROUPS = [[N_('Tasks'), ['task.', 'comment.', 'list.']], [N_('Calendar'), ['event.']], [N_('Files'), ['file.']], [N_('Invoices'), ['invoice.']], [N_('Time tracking'), ['time.']]];
+const whEvGrid = (evs, on) => WH_EV_GROUPS.map(([g, ps]) => [g, evs.filter(x => ps.some(p => x.startsWith(p)))]).filter(([, xs]) => xs.length)
+  .map(([g, xs]) => `<div class="whevg"><b class="muted">${esc(tr(g))}</b><div class="featgrid">${xs.map(x => `<label><input type="checkbox" data-whev="${esc(x)}" ${on.has(x) ? 'checked' : ''}> ${esc(tr(WH_EV_NAMES[x] || x))} <code class="muted">${esc(x)}</code></label>`).join('')}</div></div>`).join('');
 const whHtml = () => S.webhooks?.enabled ? `<h4 id="s-wh-h">${tr('Webhooks')}</h4>
   <div class="shint">${tr('Kalmido sends a signed POST request to your URL when something changes in lists you can see, for example to n8n or Home Assistant. Failed deliveries are retried after 1 min, 5 min, 30 min and 2 h; after that the webhook is turned off.')}</div>
   <a class="slink" href="${API_DOCS}#webhooks" target="_blank" rel="noopener noreferrer">${tr('How to verify the signature')}</a>
@@ -238,15 +244,15 @@ function whWire(md) {
     }
   });
 }
-function whModal(w, j, done) {
+function whModal(w, j, done, base = '/api/me/webhooks') {  // 2.115.0 A (#2061): base = an organisation's webhooks too
   const evs = (j?.events || Object.keys(WH_EV_NAMES)), on = new Set(w ? w.events : ['task.created', 'task.completed']);
   const md = modal(`<h3>${w ? tr('Edit webhook') : tr('Add webhook')}</h3>
     <div class="row"><label for="wh-name">${tr('Name')}</label><input id="wh-name" maxlength="60" value="${esc(w?.name || '')}" placeholder="${tr('optional')}"></div>
     <div class="row"><label for="wh-url">${tr('URL')}</label><input id="wh-url" type="url" value="${esc(w?.url || '')}" placeholder="https://…" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
     <div class="shint keep">${tr('https:// only; http:// and addresses in your own network only for hosts an admin allowed (Settings > Administration > Advanced).')}</div>
-    <div class="featgrid" id="wh-evs">${evs.map(x => `<label><input type="checkbox" data-whev="${esc(x)}" ${on.has(x) ? 'checked' : ''}> ${esc(tr(WH_EV_NAMES[x] || x))} <code class="muted">${esc(x)}</code></label>`).join('')}</div>
+    <div id="wh-evs">${whEvGrid(evs, on)}</div>
     ${w ? `<div class="row"><label></label><label class="chkl"><input type="checkbox" id="wh-on" ${w.enabled ? 'checked' : ''}> ${tr('Active')}</label><button class="btn sm" data-m="secret">${ic('key', 's')} ${tr('New secret')}</button></div>` : ''}
-    <div class="shint keep">${tr('Only tasks and lists you can see are sent, with your tags. The signing secret is shown once after saving.')}</div>
+    <div class="shint keep">${base.startsWith('/api/orgs/') ? tr('Only what belongs to the organisation is sent, never the members’ private areas. The signing secret is shown once after saving.') : tr('Only tasks and lists you can see are sent, with your tags. The signing secret is shown once after saving.')}</div>
     <div class="calerr" role="alert" id="wh-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
   md.addEventListener('click', async e => {
@@ -255,7 +261,7 @@ function whModal(w, j, done) {
     if (b.dataset.m === 'close') { md.remove(); return; }
     if (b.dataset.m === 'secret') {
       if (!await askConfirm(tr('Create a new signing secret?'), tr('The receiver must use the new one from now on.'), {ok: tr('New secret'), danger: true})) return;
-      try { const r = await calReq('POST', `/api/me/webhooks/${w.id}/secret`); secretModal(tr('Signing secret'), r.secret, tr('Copy it now into the receiver: it is shown only this once. It signs every delivery (header X-Kalmido-Signature).')); } catch (x) { show(x.message); }
+      try { const r = await calReq('POST', `${base}/${w.id}/secret`); secretModal(tr('Signing secret'), r.secret, tr('Copy it now into the receiver: it is shown only this once. It signs every delivery (header X-Kalmido-Signature).')); } catch (x) { show(x.message); }
       return;
     }
     const body = {name: $('#wh-name', md).value.trim(), url: $('#wh-url', md).value.trim(), events: $$('[data-whev]', md).filter(x => x.checked).map(x => x.dataset.whev)};
@@ -264,7 +270,7 @@ function whModal(w, j, done) {
     if (!body.events.length) { show(tr('Choose at least one event')); return; }
     b.disabled = true; show('');
     try {
-      const r = await calReq(w ? 'PATCH' : 'POST', w ? `/api/me/webhooks/${w.id}` : '/api/me/webhooks', body);
+      const r = await calReq(w ? 'PATCH' : 'POST', w ? `${base}/${w.id}` : base, body);
       md.remove(); done && done();
       if (!w) secretModal(tr('Signing secret'), r.secret, tr('Copy it now into the receiver: it is shown only this once. It signs every delivery (header X-Kalmido-Signature).'));
       else toast(tr('Saved'));
@@ -272,8 +278,8 @@ function whModal(w, j, done) {
   });
   if (!isTouch()) setTimeout(() => $(w ? '#wh-name' : '#wh-url', md)?.focus(), 50);  // 2.13.0: no keyboard popping up on touch
 }
-async function whLog(w) {
-  let j; try { j = await api('GET', `/api/me/webhooks/${w.id}/log`); } catch { return; }
+async function whLog(w, base = '/api/me/webhooks') {
+  let j; try { j = await api('GET', `${base}/${w.id}/log`); } catch { return; }
   const md = modal(`<h3>${tr('Delivery log')}</h3><div class="shint keep">${esc(w.name || urlHost(w.url))} · ${tr('the last {0} attempts, newest first; bodies are never stored', 50)}</div>
     <div class="members whlog">${j.items.length ? j.items.map(x => `<div class="mrow ${x.ok ? '' : 'off'}"><span class="n"><b>${esc(x.event)}</b>${x.attempt > 1 ? ' · ' + esc(tr('attempt {0}', x.attempt)) : ''} · ${x.ok ? esc(tr('ok')) : `<span class="calerr" role="alert">${esc(x.error_text || tr('failed'))}</span>`}${x.status ? ` · HTTP ${esc(String(x.status))}` : ''} · ${esc(String(x.ms))} ms<small class="muted">${esc(fmtWhen(x.created_at))}${x.delivery ? ' · ' + esc(x.delivery.slice(0, 8)) : ''}</small></span></div>`).join('') : `<div class="muted mhint">${tr('Nothing sent yet.')}</div>`}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
@@ -320,5 +326,48 @@ function pubWire(md, lid) {
       if (a === 'off') { j = await calReq('DELETE', `/api/lists/${lid}/public-link`); toast(tr('Public link turned off')); }
       pubDraw(md, lid, j);
     } catch (x) { show(x.message); } finally { b.disabled = false; }
+  });
+}
+// 2.115.0 A (#2061): Settings > Workspaces > an organisation > Webhooks (its admins): the same rows and dialog as the own ones,
+// for everything the organisation owns (lists, calendars, files, office, time) -- never the members' private areas
+function whoBoxHtml(o) {
+  return `<div class="whobox" data-whoorg="${o.id}"><h5>${tr('Webhooks')}</h5>
+    <div class="shint">${tr('Kalmido sends a signed POST request to your URL when something changes in this organisation: tasks, events, files, invoices and time entries. Never from the members’ private areas.')}</div>
+    <div class="members whorows"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <div class="row"><button type="button" class="btn sm" data-who="new">${ic('plus', 's')} ${tr('Add webhook')}</button></div></div>`;
+}
+async function whoLoad(box) {
+  const oid = +box.dataset.whoorg, rows = $('.whorows', box);
+  let j; try { j = await api('GET', `/api/orgs/${oid}/webhooks`); } catch { rows.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
+  box._j = j;
+  if (!j.enabled) { box.hidden = true; return; }
+  rows.innerHTML = j.hooks.length ? j.hooks.map(w => `<div class="mrow whrow ${w.enabled ? '' : 'off'}" data-whid="${w.id}"><span class="n"><b>${esc(w.name || urlHost(w.url))}</b> <span class="muted">${esc(urlHost(w.url))}</span><small class="muted">${esc(trn('{0} event|webhook', '{0} events|webhook', w.events.length))} · ${w.enabled || w.disabled_reason !== 'admin' ? whState(w) : `<span class="calerr" role="alert">${esc(tr('turned off: the person who set it up is no admin any more'))}</span>`}</small></span>
+      <button class="iconbtn" data-who="test" title="${tr('Send test')}" aria-label="${tr('Send test')}" ${w.enabled ? '' : 'disabled'}>${ic('send', 's')}</button>
+      <button class="iconbtn" data-who="log" title="${tr('Delivery log')}" aria-label="${tr('Delivery log')}">${ic('list', 's')}</button>
+      <button class="iconbtn" data-who="edit" title="${tr('Edit')}" aria-label="${tr('Edit')}">${ic('edit', 's')}</button>
+      <button class="iconbtn danger" data-who="del" title="${tr('Remove')}" aria-label="${tr('Remove')}">${ic('trash', 's')}</button></div>`).join('')
+    : `<div class="muted mhint">${tr('No webhooks yet.')}</div>`;
+}
+function whoDraw(root) {
+  root.querySelectorAll('.whobox').forEach(whoLoad);
+  if (root._whoWired) return;
+  root._whoWired = true;
+  root.addEventListener('click', async e => {
+    const b = e.target.closest('[data-who]'); if (!b) return;
+    const box = b.closest('.whobox'), base = `/api/orgs/${+box.dataset.whoorg}/webhooks`, a = b.dataset.who, again = () => whoLoad(box);
+    if (a === 'new') { whModal(null, box._j, again, base); return; }
+    const w = (box._j?.hooks || []).find(x => x.id === +b.closest('[data-whid]')?.dataset.whid); if (!w) return;
+    if (a === 'edit') whModal(w, box._j, again, base);
+    if (a === 'log') whLog(w, base);
+    if (a === 'test') {
+      b.disabled = true;
+      try { const r = await api('POST', `${base}/${w.id}/test`); toast(r.ok ? tr('Test delivered (HTTP {0}, {1} ms)', r.status, r.ms) : tr('Test failed: {0}', r.error_text)); } catch { /* api() showed it */ }
+      b.disabled = false; again();
+    }
+    if (a === 'del') {
+      if (!await askConfirm(tr('Remove the webhook “{0}”?', w.name || urlHost(w.url)), tr('Nothing is sent to this address any more.'), {ok: tr('Remove'), danger: true})) return;
+      try { await api('DELETE', `${base}/${w.id}`); toast(tr('Webhook removed')); } catch { /* api() showed it */ }
+      again();
+    }
   });
 }

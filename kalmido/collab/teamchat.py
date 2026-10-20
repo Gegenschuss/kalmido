@@ -29,6 +29,7 @@ from ..collab.replies import reply_check, reply_quotes
 # person; pushes: every DM and every @mention (notification row "chat"; a muted list bell keeps a channel quiet except
 # mentions). Needs collaboration on (instance switch); the person's module "collab" off = no team chat.
 TCHAT_MAX, TCHAT_PAGE = 8000, 50
+TCX_KINDS = ("channel", "group")  # 2.113.1 (#2059): rooms with their own members (collab/teamchan.py)
 
 
 def tchat_on(c, uid=None):
@@ -73,6 +74,9 @@ def tchat_list_members(c, lid):
 def tchat_room_members(c, r):
     if r["kind"] == "dm":
         return {r["a"], r["b"]}
+    if r["kind"] in TCX_KINDS:  # 2.113.1 (#2059): channels / groups (collab/teamchan.py)
+        from .teamchan import tcx_members
+        return tcx_members(c, r)
     return tchat_list_members(c, r["list_id"])
 
 
@@ -81,6 +85,11 @@ def tchat_room_ok(c, r, uid):
         return False
     if r["kind"] == "dm":
         return uid in (r["a"], r["b"])
+    if r["kind"] in TCX_KINDS:  # 2.113.1 (#2059)
+        from .teamchan import tcx_room_ok
+        return tcx_room_ok(c, r, uid)
+    if r["kind"] != "list":
+        return False
     return list_role(c, r["list_id"], uid) in FULL_ROLES and c.execute(
         "SELECT 1 FROM lists WHERE id=? AND archived=0", (r["list_id"],)).fetchone() is not None
 
@@ -125,6 +134,8 @@ def tchat_rooms(c, uid):
         rooms.append(r)
     for r in c.execute("SELECT * FROM tchat_rooms WHERE kind='dm' AND (a=? OR b=?) AND last_at IS NOT NULL", (uid, uid)):
         rooms.append(r)
+    from .teamchan import tcx_room_brief, tcx_rooms_of
+    rooms += tcx_rooms_of(c, uid)  # 2.113.1 (#2059): my channels and groups (also without messages)
     names = user_names(c, {x for r in rooms if r["kind"] == "dm" for x in (r["a"], r["b"])})
     out = []
     for r in rooms:
@@ -139,6 +150,8 @@ def tchat_rooms(c, uid):
         if r["kind"] == "dm":
             other = r["b"] if r["a"] == uid else r["a"]
             d.update(user_id=other, name=names.get(other, "?"), e2e=bool(r["e2e"]))  # 2.42.0 (#909)
+        elif r["kind"] in TCX_KINDS:
+            d.update(tcx_room_brief(c, r, uid))
         else:
             l = c.execute("SELECT name, is_inbox, owner_id FROM lists WHERE id=?", (r["list_id"],)).fetchone()
             d.update(list_id=r["list_id"], name=l["name"], members=len(tchat_list_members(c, r["list_id"])))
@@ -159,7 +172,12 @@ def tchat_sig(c, uid):
     e = c.execute("SELECT COALESCE(MAX(edited_at),'') FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id WHERE "
                   "(r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN " + vis_sql(ov=False) + ")", (uid, uid, uid, uid)).fetchone()[0]
     rd = c.execute("SELECT COALESCE(SUM(last_id),0) FROM tchat_reads WHERE user_id=?", (uid,)).fetchone()[0]
-    return f"{r[0]}.{r[1]}.{rd}.{e[-6:] if e else ''}.{r[2]}{r[3][-6:]}"  # 2.62.0 (#1848): + the pins
+    # 2.113.1 (#2059): + the messages of my channels / groups and their names, states, members
+    from .teamchan import tcx_sig
+    x = c.execute("""SELECT COALESCE(MAX(m.id),0), COUNT(m.id), COALESCE(MAX(m.edited_at),''), COUNT(m.pinned_at) FROM tchat_msgs m
+                     WHERE m.room_id IN (SELECT room_id FROM tchat_members WHERE user_id=?)""", (uid,)).fetchone()
+    tx = f".{x[0]}.{x[1]}.{x[2][-6:]}.{x[3]}.{tcx_sig(c, uid)}"
+    return f"{r[0]}.{r[1]}.{rd}.{e[-6:] if e else ''}.{r[2]}{r[3][-6:]}{tx}"  # 2.62.0 (#1848): + the pins
 
 
 def tchat_unread(c, uid):
@@ -172,7 +190,7 @@ def tchat_dm_unread(c, uid):
     """2.28.0 (#987): unread direct messages (people writing to me) -- counted at the bell as "For you"."""
     if not tchat_on(c, uid):
         return 0
-    return sum(x["unread"] for x in tchat_rooms(c, uid) if x["kind"] == "dm" and not x["muted"])
+    return sum(x["unread"] for x in tchat_rooms(c, uid) if x["kind"] in ("dm", "group") and not x["muted"])  # 2.113.1 (#2059): groups like DMs
 
 
 def md_brief(text):
@@ -192,6 +210,10 @@ def md_brief(text):
 def tchat_msg_brief(c, m):
     names = user_names(c, [int(x) for x in MENTION_RE.findall(m["body"])])
     d = {"id": m["id"], "user_id": m["user_id"], "text": comment_plain(c, md_brief(m["body"]), names)[:140], "created_at": m["created_at"]}
+    if not d["text"] and not m["enc"]:  # 2.113.1 (#2059): a message with files only: the first file's name
+        f = c.execute("SELECT name FROM tchat_files WHERE message_id=? ORDER BY id LIMIT 1", (m["id"],)).fetchone()
+        if f:
+            d.update(text=f["name"][:140], file=True)
     if m["enc"]:  # 2.42.0 (#909): an encrypted message / a notice: the app says so (the server has no text)
         from ..collab.e2e import e2e_msg_parse
         d["enc"] = (e2e_msg_parse(m["enc"]) or {}).get("sys") or "msg"
@@ -216,7 +238,7 @@ def tchat_rx(c, ids):
     return out
 
 
-def tchat_msg_dict(c, m, rx=None, quotes=None):
+def tchat_msg_dict(c, m, rx=None, quotes=None, files=None):
     t = c.execute("SELECT id, title FROM tasks WHERE id=? AND deleted_at IS NULL", (m["task_id"],)).fetchone() if m["task_id"] else None
     # 2.33.0 (#1076): reply_to + reply (a short quote of the answered message; quotes = reply_quotes of a page)
     rt = m["reply_to"] if "reply_to" in m.keys() and not m["deleted_at"] else None
@@ -228,7 +250,19 @@ def tchat_msg_dict(c, m, rx=None, quotes=None):
             "enc": None if m["deleted_at"] or not m["enc"] else _e2e_parse(m["enc"]),  # 2.42.0 (#909): {v, iv, ct} | {sys}
             # 2.62.0 (#1848): pinned (collab/chatpins.py); a deleted message is never pinned
             "pinned_at": None if m["deleted_at"] or "pinned_at" not in m.keys() else m["pinned_at"],
-            "pinned_by": None if m["deleted_at"] or "pinned_by" not in m.keys() or not m["pinned_at"] else m["pinned_by"]}
+            "pinned_by": None if m["deleted_at"] or "pinned_by" not in m.keys() or not m["pinned_at"] else m["pinned_by"],
+            # 2.113.1 (#2059): the files of the message (collab/teamchan.py; files = tcx_files_of of a page)
+            "attachments": [] if m["deleted_at"] else (files if files is not None else _tcx_files(c, [m["id"]])).get(m["id"], [])}
+
+
+def _tcx_files_api(c, mid):
+    from .teamchan import tcx_files_of
+    return tcx_files_of(c, [mid], api=True).get(mid, [])
+
+
+def _tcx_files(c, ids):
+    from .teamchan import tcx_files_of
+    return tcx_files_of(c, ids)
 
 
 def _e2e_parse(v):
@@ -296,6 +330,7 @@ def tchat_messages(rid):
     rows = list(reversed(rows[:lim]))
     rx = tchat_rx(c, [m["id"] for m in rows])
     qs = reply_quotes(c, "t", [m["reply_to"] for m in rows if not m["deleted_at"]])
+    fs = _tcx_files(c, [m["id"] for m in rows if not m["deleted_at"]])  # 2.113.1 (#2059)
     mem = tchat_room_members(c, r)
     names = user_names(c, mem | {m["user_id"] for m in rows if m["user_id"]})
     lr, muted = tchat_last_read(c, rid, me())
@@ -303,9 +338,13 @@ def tchat_messages(rid):
     from ..collab.chatpins import cpin_team_list
     saved = chat_save_of(c, me(), "team", [m["id"] for m in rows])  # 2.37.0 (#1159): saved as a task by me
     from ..collab.liste2echan import le2c_out, le2c_room  # 2.64.2 C (#1817): the lock of the list (agents / API: no ciphertext)
+    xr = {}
+    if r["kind"] in TCX_KINDS:  # 2.113.1 (#2059): name, organisation, open / archived, joined, may manage
+        from .teamchan import tcx_room_brief
+        xr = {k: v for k, v in tcx_room_brief(c, r, me()).items() if k != "members"}
     return jsonify(room={"id": r["id"], "kind": r["kind"], "list_id": r["list_id"], "muted": muted, "last_read": lr, "e2e": bool(r["e2e"]),
-                         "members": [{"id": u, "name": names.get(u, "?"), "agent": u in agent_ids(c)} for u in sorted(mem)], **le2c_room(c, r)},
-                   messages=le2c_out(c, r, [{**tchat_msg_dict(c, m, rx, qs), "saved_task_id": saved.get(m["id"])} for m in rows]), has_more=more,
+                         "members": [{"id": u, "name": names.get(u, "?"), "agent": u in agent_ids(c)} for u in sorted(mem)], **le2c_room(c, r), **xr},
+                   messages=le2c_out(c, r, [{**tchat_msg_dict(c, m, rx, qs, fs), "saved_task_id": saved.get(m["id"])} for m in rows]), has_more=more,
                    users={str(k): v for k, v in names.items()}, pins=le2c_out(c, r, cpin_team_list(c, rid)))  # 2.62.0 (#1848): also older than the page; 2.64.2 C: the lock
 
 
@@ -317,8 +356,17 @@ def tchat_post(rid):
     c = db()
     need_tchat(c)
     r = need_room(c, rid)
-    b = body()
+    from .teamchan import tcx_add, tcx_files_refused, tcx_input, tcx_members, tcx_store
+    b, files = tcx_input(body())  # 2.113.1 (#2059): JSON, or a multipart form with files (field file, repeatable)
+    if r["kind"] == "channel" and r["archived_at"]:
+        return err(tr("This channel is archived"), 409)
+    if files:
+        bad = tcx_files_refused(c, r)
+        if bad:
+            return bad
     text = b.get("body")
+    if files and (text is None or (isinstance(text, str) and not text.strip())):
+        text = None
     if r["kind"] == "list":  # 2.64.2 C (#1817): the channel of a list with the lock takes only a ciphertext of the list key
         from ..collab.liste2echan import le2c_check
         enc = le2c_check(c, r, b)
@@ -328,6 +376,8 @@ def tchat_post(rid):
         return enc
     if enc:
         text = ""
+    elif files and text is None:  # 2.113.1 (#2059): only files
+        text = ""
     elif not isinstance(text, str) or not text.strip():
         return err(tr("The message is empty"))
     if len(text) > TCHAT_MAX:
@@ -335,7 +385,7 @@ def tchat_post(rid):
     tid = b.get("task_id")
     if tid is not None and (isinstance(tid, bool) or not isinstance(tid, int) or not task_visible(c, tid, me())):
         return err(tr("Invalid value: {0}", "task_id"))
-    text, mentions = tchat_clean_mentions(c, r, text.strip()) if not enc else ("", [])
+    text, mentions = tchat_clean_mentions(c, r, text.strip()) if not enc and text else ("", [])
     if enc and r["kind"] == "list":  # 2.64.2 C (#1817): the browser names the @mentioned members of an encrypted message
         from ..collab.liste2echan import le2c_mentions
         mentions = le2c_mentions(c, r, b)
@@ -344,7 +394,7 @@ def tchat_post(rid):
     except BadInput as e:
         return err(str(e))
     cid = csd_client_id(b)  # 2.62.0 (#1530): the same message sent again (several Enter presses) -> the stored one
-    if cid:
+    if cid and not files:
         dup = csd_dup(c, "tchat_msgs", "room_id=? AND user_id=?", (rid, me()), cid, text)
         if dup:
             return jsonify(tchat_msg_dict(c, dup, tchat_rx(c, [dup["id"]]))), 200
@@ -353,6 +403,10 @@ def tchat_post(rid):
                     (rid, me(), text, tid, ts, orig["id"] if orig else None, enc))
     if cid:
         c.execute("UPDATE tchat_msgs SET client_id=? WHERE id=?", (cid, mid))
+    if r["kind"] == "channel" and me() not in tcx_members(c, r):  # 2.113.1 (#2059): writing in an open channel joins it
+        tcx_add(c, rid, me(), me())
+    if files:
+        tcx_store(c, r, c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone(), files)
     c.execute("UPDATE tchat_rooms SET last_at=? WHERE id=?", (ts, rid))
     c.execute("INSERT INTO tchat_reads(room_id,user_id,last_id) VALUES(?,?,?) ON CONFLICT(room_id,user_id) DO UPDATE SET last_id=excluded.last_id",
               (rid, me(), mid))
@@ -416,34 +470,45 @@ def tchat_notify(c, r, m, mentions, replied=None):
     listen = set(listen_agents_of(c, r["list_id"])) if r["kind"] == "list" and sender not in ags else set()
     for uid in sorted(members - {sender}):
         if uid in ags:
+            if r["kind"] == "channel":  # 2.113.1 (#2059): a personal agent in a channel is addressed by its owner only (like agent_usable)
+                from .teamchan import tcx_agent_org
+                a = tcx_agent_org(c, uid)
+                if a and a["owner_id"] and a["owner_id"] != sender:
+                    continue
             if uid in mentions or uid in listen:
                 agent_emit(c, uid, "team_message", {"room": {"id": r["id"], "kind": r["kind"], "list_id": r["list_id"]},
                                                      "mentioned": uid in mentions, "listening": uid in listen,
                                                      "message": {"id": m["id"], "text": text[:AGENT_EVENT_COMMENT_CHARS], "user_id": sender,
                                                                  "task_id": m["task_id"], "created_at": m["created_at"],
-                                                                 "reply_to": m["reply_to"], "reply": rq},
+                                                                 "reply_to": m["reply_to"], "reply": rq,
+                                                                 "attachments": _tcx_files_api(c, m["id"])},  # 2.113.1 (#2059)
                                                      "user": {"id": sender, "name": who}})
             continue
         s = collab_user(c, uid, r["list_id"])
         if not s:
             continue
         _lr, muted = tchat_last_read(c, r["id"], uid)
-        dm, ment = r["kind"] == "dm", uid in mentions
+        dm, ment = r["kind"] in ("dm", "group"), uid in mentions  # 2.113.1 (#2059): a group pushes like a DM
         if r["kind"] == "list" and not ment and not (list_bell(c, uid, r["list_id"])[0] == "all"):
+            continue
+        if r["kind"] == "channel" and not ment:  # 2.113.1 (#2059): a channel pushes @mentions and answers only
             continue
         if muted and not ment:
             continue
         if not notif_ok(c, uid, s, "mention" if ment else "chat", "push", r["list_id"]) or not push_reachable(c, uid, s):
             continue
         lg = lang_of(s)
-        if dm:
+        if r["kind"] in TCX_KINDS:  # 2.113.1 (#2059)
+            from .teamchan import tcx_group_name
+            title = tr("{0} in {1}", who, tcx_group_name(c, r, uid) if r["kind"] == "group" else r["name"], lg=lg)
+        elif dm:
             title = who
         else:
             ln = c.execute("SELECT name FROM lists WHERE id=?", (r["list_id"],)).fetchone()
             title = tr("{0} in {1}", who, ln["name"] if ln else "?", lg=lg)
         msg = tr("New message from {0}", who, lg=lg) if sealed else \
-            tr("{0} replied to your message: {1}", who, text, lg=lg) if uid == replied and r["kind"] == "list" else \
-            tr("Replied to your message: {0}", text, lg=lg) if uid == replied else text
+            tr("{0} replied to your message: {1}", who, text, lg=lg) if uid == replied and r["kind"] != "dm" else \
+            tr("Replied to your message: {0}", text, lg=lg) if uid == replied else (text or tr("Sent a file", lg=lg))  # 2.113.1 (#2059): only files
         g.pushes.append((uid, title, msg[:300], f"{PUBLIC_URL}/#team/{r['id']}", push_prio(s)))
 
 
@@ -455,6 +520,10 @@ def need_tmsg(c, mid, edit=False):
     if edit and m["user_id"] != me():
         if edit == "delete" and r["kind"] == "list" and list_role(c, r["list_id"]) in MANAGE_ROLES:
             return m, r
+        if edit == "delete" and r["kind"] == "channel":  # 2.113.1 (#2059): its creator / an organisation admin
+            from .teamchan import tcx_can_manage
+            if tcx_can_manage(c, r, me()):
+                return m, r
         raise Denied(403)
     return m, r
 
@@ -490,7 +559,8 @@ def tchat_edit(mid):
         c.commit()
         m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
         return jsonify(tchat_msg_dict(c, m, tchat_rx(c, [mid])))
-    if not isinstance(text, str) or not text.strip():
+    # 2.113.1 (#2059): a message with files may lose its text (the files stay the message)
+    if not isinstance(text, str) or (not text.strip() and not c.execute("SELECT 1 FROM tchat_files WHERE message_id=? LIMIT 1", (mid,)).fetchone()):
         return err(tr("The message is empty"))
     if len(text) > TCHAT_MAX:
         return err(tr("The message is too long (max. {0} characters)", TCHAT_MAX))
@@ -511,7 +581,12 @@ def tchat_delete(mid):
     m, _r = need_tmsg(c, mid, edit="delete")
     c.execute("UPDATE tchat_msgs SET deleted_at=?, edited_at=?, body='', enc=NULL WHERE id=?", (iso_ms(now_utc()), iso_ms(now_utc()), mid))
     c.execute("DELETE FROM tchat_rx WHERE message_id=?", (mid,))
+    from .teamchan import tcx_files_drop
+    gone = tcx_files_drop(c, mid)  # 2.113.1 (#2059): its files go for good (rows now, the disk after the commit)
     c.commit()
+    if gone:
+        from ..core.serializers import unlink_files
+        unlink_files(gone)
     return jsonify(ok=True, id=mid)
 
 
@@ -597,8 +672,12 @@ def v1_tchat_messages(rid):
 @v1_view
 def v1_tchat_post(rid):
     v1_args(())
-    b = v1_json()
-    reject_unknown(b, ("body", "task_id", "reply_to"))  # 2.33.0 (#1076): reply_to
+    if request.files or request.form:  # 2.113.1 (#2059): a multipart form with files (body, task_id, reply_to, file...)
+        b = {k: request.form.get(k) for k in request.form}
+        reject_unknown({k: v for k, v in b.items()}, ("body", "task_id", "reply_to"))
+    else:
+        b = v1_json()
+        reject_unknown(b, ("body", "task_id", "reply_to"))  # 2.33.0 (#1076): reply_to
     return jsonify(v1_call(tchat_post, rid, body=b)), 201
 
 
@@ -640,7 +719,7 @@ def v1_tchat_read(rid):
 def team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     TC = "Team chat"
     schemas["TeamRoom"] = {"type": "object", "properties": {
-        "id": {"type": "integer"}, "kind": {"type": "string", "enum": ["dm", "list"]}, "name": {"type": "string"},
+        "id": {"type": "integer"}, "kind": {"type": "string", "enum": ["dm", "list", "channel", "group"], "description": "2.113.1: + channel, group (collab channels)"}, "name": {"type": "string"},
         "list_id": {"type": "integer"}, "user_id": {"type": "integer", "description": "dm: the other person"},
         "unread": {"type": "integer"}, "mention": {"type": "boolean", "description": "An unread message mentions you"},
         "muted": {"type": "boolean"}, "last": nul("object"), "last_at": nul("string", format="date-time"),
@@ -656,9 +735,12 @@ def team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "enc": nul("object", description="2.42.0: an end-to-end encrypted DM: {v, iv, ct} (body empty, only the two people can "
                    "decrypt it in their browser) or {sys: on | off} (the notice that switched it)"),
         "pinned_at": nul("string", description="2.62.0 (#1848): pinned since (null = not pinned); the conversation's page carries pins"),
-        "pinned_by": nul("integer", description="2.62.0 (#1848): who pinned it")}}
+        "pinned_by": nul("integer", description="2.62.0 (#1848): who pinned it"),
+        "attachments": {"type": "array", "items": {"type": "object"}, "description": "2.113.1 (#2059): files [{id, name, mime, size, url}] (url = /api/v1/team/files/{id})"}}}
     schemas["TeamMessagePage"] = page("TeamMessage")
     rp, mp = pid(desc="Conversation (room) id"), pid(desc="Message id")
+    from .teamchan import tcx_spec
+    tcx_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)  # 2.113.1 (#2059): channels, groups, files
     paths["/team/rooms"] = {"get": op("2.17.0: your team chat conversations (channels of shared lists, direct messages) with unread counts",
                                       TC, ok(ref("TeamRoomPage")) | errs("404"))}
     paths["/team/dm"] = {"post": op("Open the direct conversation with a person you work with (people only, not agents)", TC,
@@ -667,7 +749,8 @@ def team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     paths["/team/rooms/{id}/messages"] = {
         "get": op("Messages of a conversation, oldest first (?before=<id> for older ones); 2.62.0 (#1848): pins = its pinned messages", TC, ok(ref("TeamMessagePage")) | errs("400", "404"),
                   [rp, q("before", "Only messages older than this id", {"type": "integer"}), q("limit", "At most this many (1-100)", {"type": "integer"})]),
-        "post": op("Write in a conversation; mention people as <@id>", TC, ok(ref("TeamMessage"), "Created", "201") | errs("400", "404"), [rp],
+        "post": op("Write in a conversation; mention people as <@id>. 2.113.1 (#2059): or multipart/form-data with body, task_id, reply_to "
+                   "and up to 10 fields file (the body may then be empty; not in end-to-end encrypted conversations: 409)", TC, ok(ref("TeamMessage"), "Created", "201") | errs("400", "404"), [rp],
                    body={"type": "object", "properties": {"body": {"type": "string"}, "task_id": {"type": "integer"},
                                                           "reply_to": {"type": "integer", "description": "2.33.0: answer this message of the same conversation (else 400)"}},
                          "required": ["body"]}, scope="comments")}

@@ -284,7 +284,7 @@ def occurrences():
                 if occ > z or n >= RR_OCC_PER_TASK:
                     break
                 n += 1
-                if occ.date().isoformat() != t["due"]:
+                if occ.date().isoformat() != t["due"] and (not out or out[-1] != {"id": t["id"], "date": occ.date().isoformat()}):
                     out.append({"id": t["id"], "date": occ.date().isoformat()})
         except (ValueError, TypeError, OverflowError):
             continue

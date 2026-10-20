@@ -26,20 +26,22 @@ KINDS = {
     "tasks": ("matrix", SUITE + ": tasks, comments, subtasks, attachments, tags, notes, search, trash, day plan, roadmap, export "
                         "and import in the private space; every GET of the area as the freelancer (no 403 / 5xx)"),
     "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET"),
-    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
+    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py, p2113c_a_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
-                         "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0); "
+                         "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0); undo of the editors (2.111.0); "
                          "p2137_a_api_test.py: the owner exports the personal office (export, recovery key) and imports an organisation's office into it (2.137.0)"),
-    "files": ("matrix", SUITE + ", p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
+    "files": ("matrix", SUITE + ", p21121_a_api_test.py, p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
                          "file requests of a private folder, tags of files / folders, the tag filter, the documents' filters, bulk change, ZIP, CSV, documents via the API (2.122.0)"),
     "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private space (create, change, search, export, trash; "
                        "2.99.0: page files, ZIP import with PDFs / pictures; 2.123.0: p2123_b_api_test.py shares of pages / folders, p2123_a_api_test.py page history, text search)"),
-    "pim": ("matrix", SUITE + ", p294_b_api_test.py, p21191_a_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password"),
-    "time": ("matrix", SUITE + ": time entries, the timer, habits"),
+    "pim": ("matrix", SUITE + ", p294_b_api_test.py, p21191_a_api_test.py, p2111_b_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password; "
+                    "invitation mails and the subscription link of an own calendar (2.111.0)"),
+    "time": ("matrix", SUITE + ", p2116_d_api_test.py: time entries, the timer, habits; focus sessions and habit statistics over the API v1 (2.116.0)"),
     "agents": ("matrix", SUITE + ": the freelancer's own agent (my agents, its token, chat, jobs, share of a private list) and "
                          "the agent API with that agent's token"),
     "team": ("matrix", SUITE + ": the people list, direct messages and discovery without an organisation (no team rooms of "
-                       "an organisation, nothing of another workspace)"),
+                       "an organisation, nothing of another workspace); p2113b_b_api_test.py: a private channel with files, "
+                       "rename / archive / restore as its own admin, groups only with people one works with (2.113.1)"),
     "hub": ("matrix", SUITE + ", p2125_a_api_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
                       "2.125.0: the own vacation account and working week, never a vacation request"),
     "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature"),
@@ -115,6 +117,9 @@ ROUTES = {
     # (2.98.0 spacer C)
     # 2.98.0 D (#2163 #2178 #2184): polish (p298_d_api_test.py) - routes below this line
     # (2.98.0 spacer D)
+    # 2.111.0 A (#2233): undo of the office editors (p2111_a_api_test.py) - routes below this line
+    "POST /api/office/undo/{}/{}": "office",
+    # (2.111.0 spacer A)
     # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
     "GET /api/bookmarks": "bookmarks", "POST /api/bookmarks": "bookmarks", "GET /api/bookmarks/{}": "bookmarks",
     "PATCH /api/bookmarks/{}": "bookmarks", "DELETE /api/bookmarks/{}": "bookmarks",
@@ -159,6 +164,8 @@ ROUTES = {
     "POST /api/auth/setup": "auth", "POST /api/auth/signup": "auth", "POST /api/me/2fa/recovery": "auth",
     "POST /api/me/2fa/totp": "auth", "POST /api/me/2fa/totp/confirm": "auth", "POST /api/me/2fa/totp/disable": "auth",
     "POST /api/me/passkeys": "auth", "POST /api/me/passkeys/options": "auth",
+    # 2.115.0 B (#2062): active sessions (p2115_b_api_test.py as a person without an organisation)
+    "GET /api/me/sessions": "own", "DELETE /api/me/sessions/{}": "own", "POST /api/me/sessions/others": "own",
     # ---- files (51)
     "DELETE /api/docs/labels/{}/{}": "files", "DELETE /api/docs/mail": "files", "DELETE /api/docs/rules/{}": "files",
     "DELETE /api/docs/{}/task": "files", "DELETE /api/files/nodes/{}": "files", "DELETE /api/files/shares/{}": "files",
@@ -176,6 +183,8 @@ ROUTES = {
     "GET /u/{}": "link", "POST /u/{}": "link", "GET /u/v/up.js": "public",
     # 2.96.0 A (#1941): files / folders / documents to the other workspace
     "POST /api/files/move-space": "files",
+    # 2.112.1 A (#2058): several nodes into the trash / back, the ZIP download, the phone scan (p21121_a_api_test.py)
+    "POST /api/files/trash": "files", "POST /api/files/restore": "files", "GET /api/files/zip": "files", "POST /api/files/scan": "files",
     "POST /api/docs": "files", "POST /api/docs/labels/{}": "files", "POST /api/docs/mail": "files",
     "POST /api/docs/rules": "files", "POST /api/docs/{}/accept": "files", "POST /api/docs/{}/redo": "files",
     "POST /api/docs/{}/review": "files", "POST /api/docs/{}/task": "files", "POST /api/files/folders": "files",
@@ -203,8 +212,8 @@ ROUTES = {
     "GET /api/team/leave": "hub", "PUT /api/team/leave/quota": "hub", "PUT /api/team/leave/approval": "hub",
     "PUT /api/team/leave/worktime/{}": "hub", "POST /api/team/absences/{}/decide": "hub",
     # ---- link (22)
-    "GET /f/{}": "link", "GET /ical/{}.ics": "link", "GET /p/{}": "link", "GET /p/{}/stop": "link", "GET /portal": "link",
-    "GET /portal/login/{}": "link", "GET /s/q/{}": "link", "GET /s/q/{}/pdf": "link", "POST /s/q/{}/comments": "link", "GET /s/{}": "link",
+    "GET /f/{}": "link", "GET /ical/{}.ics": "link", "GET /ical/ev/{}.ics": "link", "GET /p/{}": "link", "GET /p/{}/stop": "link", "GET /portal": "link",
+    "GET /portal/login/{}": "link", "GET /s/q/{}": "link", "GET /s/q/{}/pdf": "link", "GET /s/q/{}/terms": "link", "POST /s/q/{}/comments": "link", "GET /s/{}": "link",
     "GET /s/{}/file/{}": "link", "GET /s/{}/logo": "link", "POST /f/{}": "link", "POST /p/{}/comment": "link",
     "POST /p/{}/login": "link", "POST /p/{}/notify": "link", "POST /p/{}/stop": "link", "POST /portal/login/{}": "link",
     "POST /portal/logout": "link", "POST /s/q/{}": "link", "POST /s/{}/feedback": "link", "POST /s/{}/tick": "link",
@@ -230,6 +239,7 @@ ROUTES = {
     "GET /api/folders/public-links": "lists", "GET /api/folders/repos": "lists", "GET /api/group-avatar/{}/{}.jpg": "lists",
     "GET /api/groups": "lists", "GET /api/layouts/offers/{}": "lists", "GET /api/layouts/saved": "lists",
     "GET /api/list-files/{}": "lists", "GET /api/list-header/{}/{}.jpg": "lists", "GET /api/list-icon/{}/{}.png": "lists",
+    "GET /api/lists/{}/export.csv": "lists",  # 2.116.0 C (#2064): p2116_c_api_test.py
     "GET /api/lists/{}/agent-access": "lists", "GET /api/lists/{}/checks": "lists", "GET /api/lists/{}/e2e": "lists",
     "GET /api/lists/{}/e2e/todo": "lists", "GET /api/lists/{}/envs": "lists", "GET /api/lists/{}/error-hook": "lists",
     "GET /api/lists/{}/folder-preview": "lists", "GET /api/lists/{}/forms": "lists", "GET /api/lists/{}/groups": "lists",
@@ -314,6 +324,9 @@ ROUTES = {
     # 2.120.0 E (#2091): the own letterhead PDF
     "GET /api/office/letterhead": "office", "POST /api/office/letterhead": "office", "PUT /api/office/letterhead": "office",
     "DELETE /api/office/letterhead": "office", "POST /api/office/letterhead/restore": "office", "GET /api/office/letterhead/preview": "office",
+    # 2.113.2 (#2253): terms and conditions as PDF (p2113c_a_api_test.py, freelancer-matrix: office)
+    "GET /api/office/terms": "office", "POST /api/office/terms/{}": "office", "GET /api/office/terms/{}/file": "office",
+    "DELETE /api/office/terms/{}": "office", "POST /api/office/terms/{}/restore": "office", "GET /api/office/docs/{}/terms": "office",
     "DELETE /api/office/packs/installed/{}/{}": "office", "DELETE /api/office/trips/{}": "office",
     "DELETE /api/office/trips/{}/items/{}": "office", "DELETE /api/office/{}/{}": "office", "DELETE /api/paperless": "office",
     "DELETE /api/paperless/zip": "office", "DELETE /api/v1/clients/{}": "office", "GET /api/clients": "office",
@@ -405,6 +418,9 @@ ROUTES = {
     "POST /api/orgs/{}/lists/{}/archive": "orgadmin", "POST /api/orgs/{}/lists/{}/icon": "orgadmin",
     "POST /api/orgs/{}/lists/{}/owner": "orgadmin", "PUT /api/admin/orgs/visibility": "orgadmin",
     "PUT /api/orgs/{}/lists/{}/icon": "orgadmin", "PUT /api/orgs/{}/members": "orgadmin",
+    # 2.115.0 B (#2062): inviting into an organisation needs one (a person without one has no members)
+    "GET /api/orgs/{}/invites": "orgadmin", "POST /api/orgs/{}/invites": "orgadmin", "POST /api/orgs/{}/invites/{}/resend": "orgadmin",
+    "DELETE /api/orgs/{}/invites/{}": "orgadmin",
     # ---- own (61)
     "DELETE /api/account/export": "own", "DELETE /api/account/import/{}": "own", "DELETE /api/me/app-passwords/{}": "own",
     "DELETE /api/me/avatar": "own", "DELETE /api/me/mail/token": "own", "DELETE /api/me/tokens/{}": "own",
@@ -488,6 +504,7 @@ ROUTES = {
     "POST /api/contacts/groups": "pim", "GET /api/calendars": "pim",
     "GET /api/calendars/events": "pim", "GET /api/contacts": "pim", "GET /api/contacts/{}": "pim", "GET /api/contacts/{}/history": "pim",  # 2.119.1 B (#2083)
     "GET /api/evcals": "pim",
+    "GET /api/evinvite": "pim", "GET /api/evcals/{}/feed": "pim", "POST /api/evcals/{}/feed": "pim",  # 2.111.0 B (#2056)
     "GET /api/evcals/{}/export.ics": "pim", "GET /api/events": "pim", "GET /api/events/{}": "pim",
     "GET /api/v1/address-books": "pim", "GET /api/v1/address-books/{}/export": "pim", "GET /api/v1/contacts": "pim",
     "GET /api/v1/contacts/{}": "pim", "GET /api/v1/event-calendars": "pim", "GET /api/v1/event-calendars/{}/export": "pim",
@@ -537,7 +554,7 @@ ROUTES = {
     "GET /api/dayplan": "tasks", "GET /api/dayplan/review": "tasks", "GET /api/deps": "tasks", "GET /api/export.json": "tasks",
     "GET /api/ical": "tasks", "GET /api/imports": "tasks", "GET /api/news": "tasks", "GET /api/notes": "tasks",
     "GET /api/notes/{}": "tasks", "GET /api/occurrences": "tasks", "GET /api/pomo/stats": "tasks", "GET /api/roadmap": "tasks",
-    "GET /api/search/messages": "tasks", "GET /api/sprints/{}": "tasks", "GET /api/stale": "tasks", "GET /api/state": "tasks",
+    "GET /api/search": "tasks", "GET /api/search/messages": "tasks", "GET /api/sprints/{}": "tasks", "GET /api/stale": "tasks", "GET /api/state": "tasks",
     "GET /api/state/delta": "tasks", "GET /api/stats": "tasks", "GET /api/tags/count": "tasks", "GET /api/tasks": "tasks",
     "GET /api/tasks/{}": "tasks", "GET /api/tasks/{}/bell": "tasks", "GET /api/tasks/{}/deps": "tasks",
     "GET /api/tasks/{}/enc-note": "tasks", "GET /api/tasks/{}/events": "tasks", "GET /api/tasks/{}/milestone": "tasks",
@@ -653,11 +670,20 @@ ROUTES = {
     "POST /api/users/{}/signin-link": "team", "POST /api/v1/team/dm": "team", "POST /api/v1/team/messages/{}/pin": "team",
     "POST /api/v1/team/messages/{}/reactions": "team", "POST /api/v1/team/rooms/{}/messages": "team",
     "POST /api/v1/team/rooms/{}/read": "team", "PUT /api/disc": "team", "PUT /api/e2e/keys": "team",
+    # 2.113.1 B (#2059): channels, groups, files of the team chat (p2113b_b_api_test.py, a private channel of a freelancer)
+    "GET /api/team/channels": "team", "POST /api/team/channels": "team", "POST /api/team/groups": "team",
+    "PATCH /api/team/rooms/{}": "team", "POST /api/team/rooms/{}/members": "team", "DELETE /api/team/rooms/{}/members/{}": "team",
+    "GET /api/team/files/{}": "team", "GET /api/v1/team/channels": "team", "POST /api/v1/team/channels": "team",
+    "POST /api/v1/team/groups": "team", "PATCH /api/v1/team/rooms/{}": "team", "POST /api/v1/team/rooms/{}/members": "team",
+    "DELETE /api/v1/team/rooms/{}/members/{}": "team", "GET /api/v1/team/files/{}": "team",
     # ---- time (28)
     "DELETE /api/habits/{}": "time", "DELETE /api/time/entries/{}": "time", "DELETE /api/v1/habits/{}": "time",
     "DELETE /api/v1/time/entries/{}": "time", "DELETE /api/v1/time/timer": "time", "GET /api/time/entries": "time",
     "GET /api/time/export.csv": "time", "GET /api/time/export.xlsx": "time", "GET /api/workload/export.xlsx": "tasks",  # 2.125.0 C (#2122)
     "GET /api/time/gaps": "time", "GET /api/time/report": "time",
+    "GET /api/v1/habits/{}/stats": "time", "GET /api/v1/focus": "time", "GET /api/v1/focus/stats": "time",  # 2.116.0 D (#2067)
+    "POST /api/v1/focus/start": "time", "POST /api/v1/focus/{}/stop": "time", "POST /api/v1/focus/{}/pause": "time",
+    "POST /api/v1/focus/{}/resume": "time",
     "GET /api/v1/habits": "time", "GET /api/v1/time/check": "time", "GET /api/v1/time/entries": "time",
     "GET /api/v1/time/from-events": "time", "GET /api/v1/time/gaps": "time", "GET /api/v1/time/timer": "time",
     "PATCH /api/habits/{}": "time", "PATCH /api/time/entries/{}": "time", "PATCH /api/v1/habits/{}": "time",
@@ -667,7 +693,15 @@ ROUTES = {
     "POST /api/v1/time/timer": "time",
     "GET /api/time/sheets": "time", "POST /api/time/sheets": "time", "POST /api/time/sheets/decide": "time",  # 2.125.0 B (#2119)
     # ---- token (3)
-    "POST /api/hooks/deploy/{}/{}": "token", "POST /api/hooks/git/{}": "token", "POST /api/hooks/issues/{}/{}": "token",
+    "POST /api/hooks/deploy/{}/{}": "token", "POST /api/hooks/git/{}": "token", "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/issues/{}": "token",
+    # 2.115.0 A (#2061): inbound webhooks of a list (p2115_a_api_test.py calls them as a person without an organisation);
+    # the hook URL itself is a secret token; the webhooks of an organisation are managed by its admins
+    "POST /api/hooks/in/{}": "token", "GET /api/lists/{}/hooks-in": "lists", "POST /api/lists/{}/hooks-in": "lists",
+    "PATCH /api/hooks-in/{}": "lists", "DELETE /api/hooks-in/{}": "lists", "POST /api/hooks-in/{}/rotate": "lists",
+    "POST /api/hooks-in/{}/restore": "lists",
+    "GET /api/orgs/{}/webhooks": "orgadmin", "POST /api/orgs/{}/webhooks": "orgadmin", "PATCH /api/orgs/{}/webhooks/{}": "orgadmin",
+    "DELETE /api/orgs/{}/webhooks/{}": "orgadmin", "POST /api/orgs/{}/webhooks/{}/secret": "orgadmin",
+    "POST /api/orgs/{}/webhooks/{}/test": "orgadmin", "GET /api/orgs/{}/webhooks/{}/log": "orgadmin",
     # ---- wiki (24)
     "DELETE /api/wiki/pages/{}": "wiki", "GET /api/wiki": "wiki", "GET /api/wiki/e2e": "wiki",
     "GET /api/wiki/e2e/todo": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki",
@@ -752,6 +786,11 @@ ROUTES = {
     "DELETE /api/office/contracts/{}/files/{}": "office", "POST /api/office/contracts/{}/files/{}/restore": "office",
     # 2.120.0 B (#2088): documents in the customer portal of a freelancer's personal office (p2120_b_api_test.py)
     "GET /portal/docs/{}/pdf": "link", "POST /api/office/clients/{}/portal-link": "office",
+    # 2.112.1 B (#2058): external share links of the file store (p21121_b_api_test.py calls them as a freelancer too)
+    "GET /api/files/nodes/{}/ext-links": "files", "POST /api/files/nodes/{}/ext-links": "files",
+    "POST /api/files/ext-links/{}/regenerate": "files", "DELETE /api/files/ext-links/{}": "files",
+    "POST /api/files/ext-links/{}/restore": "files", "GET /s/f/{}": "link", "POST /s/f/{}/unlock": "link",
+    "GET /s/f/{}/d/{}": "link", "GET /s/f/{}/v/{}": "link", "GET /s/f/{}/zip": "link",
     # 2.138.0 D (#2256): number ranges of the office (p2138_d_api_test.py)
     "GET /api/office/number-ranges": "office", "POST /api/office/number-ranges/{}": "office",
 }

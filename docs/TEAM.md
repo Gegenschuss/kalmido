@@ -400,6 +400,40 @@ organisation uses requests in the own folders the same way.
 Whoever asked gets one News item (and a push) per request when files arrive; more files within ten minutes raise its
 count instead of sending again. *Files from file requests* in the notification settings switches News and push off.
 
+## Several files at once, ZIP download, scanning with the phone (2.138.1)
+
+In the file store, **Select** (check boxes, also on the phone) and the bar now also offer **Download** and **Move to the
+trash**. Download of one file gives the file itself; several items or a folder become one ZIP that keeps the folder
+structure (a doubled name gets " (2)"). A folder's menu (its row or the open folder's "…") has **Download as ZIP**. The ZIP
+holds only what you may see: nothing from the trash, no links to task or project files, no file the virus scanner locked
+or has not checked yet. Moving several items into the trash is one undo step that brings all of them back. On a phone the
+moves of the bar sit in its "…" menu.
+
+**Scan** next to *Upload* (and in *Documents*) opens the scan dialog: take a photo per page with the camera (on a computer:
+choose pictures), turn a page by 90 degrees, change the order, remove a page, then **Save as PDF**. *Black and white
+(document)* (on by default) gives a clean grey page. Kalmido builds one PDF on your own server -- at most 30 pages, every page
+scaled to about 2000 pixels, without the photo's metadata or location -- and stores it like an upload: the storage limit,
+the virus scan and the text recognition apply. From *Documents* the PDF becomes a document of the workspace there.
+
+## Links for external people (2.138.1)
+
+A file or a folder of the file store can go to people without an account through a secret link: **Link for external
+people…** in a row's menu, or **Create link** in its details. Choose how long it is valid (1 day, 7 days, 30 days, until a
+date, no end), optionally a password and a label only the owners see (one link per customer, for example). The page shows
+a file with its size and a download button (pictures with a preview), a folder with its folders and files, each to
+download, and the whole folder as a ZIP. Nothing else: no upload, no versions, no comments, no names of people. A row with
+a live link carries a link badge; the details list every link with views and the last time it was opened, **Copy**,
+**New link** (the old address stops at once) and **Revoke** (one undo step brings the same address back).
+
+Only who may share the item (its owner, an organisation's admins) makes a link; agents never do, and folders of agents,
+linked task files and items in the trash cannot be shared outside. A link stops working at once when it expires, is
+revoked, the item or a folder above it goes into the trash or into another workspace, the person who made it can no
+longer share it (left the organisation, no longer admin), the organisation's admin turns off **Allow external share
+links** (Settings > Workspaces; nothing is deleted, turning it on brings the links back) or the server's admin turns off
+public links. Every view and download through a link shows up in the item's history, without the visitor's address;
+the page is never indexed or cached, and guessing addresses or passwords is limited per address. A person without an
+organisation shares from the private space the same way (only the server's switch applies).
+
 ## Pinned chat messages (2.62.0)
 
 Important messages stay in view: in the team chat and in the chat with an agent, *Pin* in the menu of a message (on a
@@ -411,6 +445,27 @@ pin, in an agent chat the person and the agent. Others see the change right away
 
 A message is sent once: it shows at once as *Sending…*, and Send / Enter wait until the server took it, so pressing
 Enter again (for example right after waking the laptop) does not send it twice.
+## Channels, groups and files in the team chat (2.138.1)
+
+Besides the chat of every shared list there are **channels** anyone opens: *Team chat > New message > New channel*. A
+channel of an organisation is either *open to the whole organisation* (everyone in it finds it under *Browse channels*
+and joins; writing in it joins too) or for invited people only. Without an organisation (your own space) a channel is
+always for invited people, chosen from the people you work with. Its creator and the admins of the organisation rename
+it, open or close it, add and remove members and archive it (the gear in the head of the channel); an archived channel
+stays readable for its members and comes back with *Restore*. Each change is one step of *Undo*.
+
+**Groups** are conversations of three or more people (*New group*): everyone in a group must work with everyone else
+(the same people you could write a direct message to). The name is optional; without one the group is named after its
+members. Every member adds people and leaves; nobody removes someone else. A group notifies like a direct message.
+
+**Files**: the paperclip next to the message box, pasting an image or dropping files on the conversation adds up to ten
+files to a message (50 MB each). Images show as thumbnails (a tap opens them large), other files as tiles. Everyone in
+the conversation opens them; deleting the message deletes its files for good. End-to-end encrypted conversations
+(encrypted direct messages, the chat of a list with the lock) take no files.
+
+Agents take part in a channel only when a person adds them: your own agents, and as an admin of the organisation its
+shared agents. They never join groups.
+
 ## The customer portal (2.63.0)
 
 A form with **status link** turns every report sent without an account into a customer report: the reporter gets a link to
@@ -527,6 +582,13 @@ answers `{users, total, offset, limit, agents}` (without `limit` the whole list 
 `DELETE /api/users/{id}?lists=transfer&to={id}` or `?lists=delete&confirm={user name}` (without `lists` an account that
 owns lists still gets 409), `POST /api/users/bulk {ids, action: disable | enable | org_add, org_id}` and
 `DELETE /api/orgs/{org}/members/{id}?to={id}`. Agents do not manage accounts: no REST API or MCP change.
+
+## Members of an organisation as a list (2.138.3)
+
+*Settings > Administration > Organisation*, the pencil of an organisation: its members are a list like *Settings > Administration > Users*, with a
+search (name, user name, e-mail), the filter *Members* / *All* and a counter. Each person has a *Member* and an *Admin*
+box; *Admin* only works for members, and taking someone out of the organisation also ends their admin role. The list
+scrolls inside the dialog, *Save* stays in view. The symbol field shows the organisation's picture or an app icon.
 
 ## The group "Conversations" in the sidebar (2.99.0)
 

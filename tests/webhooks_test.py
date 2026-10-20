@@ -150,7 +150,8 @@ w1 = mk(A, STUB + "/a", ALL, "all")
 check(w1["secret"].startswith("whsec_") and len(w1["secret"]) >= 40, "secret whsec_… shown on creation")
 S1 = w1["secret"]
 lst = A.get(B + "/api/me/webhooks").json()
-check(lst["enabled"] and lst["events"] == ALL and len(lst["hooks"]) == 1 and "secret" not in lst["hooks"][0], "list: never the secret")
+# 2.115.0 (#2061): more events after the task ones (calendar, files, invoices, time)
+check(lst["enabled"] and lst["events"][:len(ALL)] == ALL and "invoice.paid" in lst["events"] and len(lst["hooks"]) == 1 and "secret" not in lst["hooks"][0], "list: never the secret")
 row = dbx("SELECT secret FROM webhooks WHERE id=?", (w1["id"],))[0][0]
 raw = dbxm.dump(DATA)  # 2.37.0: the whole Postgres database (was the tasks.db file + WAL)
 check(row.startswith("v1.") and S1 not in row and S1.encode() not in raw, "secret stored sealed, never in clear text")

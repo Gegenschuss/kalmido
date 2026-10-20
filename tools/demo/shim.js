@@ -278,6 +278,7 @@
   const needTask = id => { const t = taskById(id); if (!t) gone(); return t; };
   const TASK_FIELDS = ['title', 'content', 'priority', 'due', 'due_time', 'start', 'duration', 'reminders', 'repeat', 'repeat_from', 'url', 'list_id',
     'section_id', 'parent_id', 'sort', 'pinned', 'tags', 'ttype', 'deadline', 'nag', 'plan_start', 'assignee_id', 'status', 'fam', 'stars'];
+  TASK_FIELDS.push('remind_at');  // 2.111.0 C (#2057): the fixed-time reminder
   function applyFields(t, b) {
     for (const k of TASK_FIELDS) if (k in b) t[k] = b[k];
     if ('title' in b && !String(b.title || '').trim()) bad('Title missing');

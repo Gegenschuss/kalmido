@@ -403,6 +403,9 @@ function listMenuItems(id, anchor) {
   if (feat('sheets') && !l.is_inbox && !l.archived && !l.e2e) items.push({label: tr('Tables'), icon: 'sheet', cls: 'msheets', fn: () => go('sheets/l/' + id)});  // 2.89.0 (#1916): the tables attached to it
   if (!l.archived && typeof mw_ok === 'function' && mw_ok()) items.push({label: tr('Open in its own window'), icon: 'panel', cls: 'mminiwin', fn: () => mw_open(id)});  // 2.39.1 (#1294): desktop, miniwin.js
   if (!l.is_inbox && !l.archived) items.push({label: tr('Move to folder…'), icon: 'folder', fn: () => folderPick(at(), id)});
+  // 2.116.0 C (#2064): the list as a CSV file / a printable page (listprint.js); a list with the lock has only ciphertext on the server
+  items.push({label: tr('Export as CSV'), icon: 'download', cls: 'mlexcsv', fn: () => lexCsv(id), ...(l.e2e ? {dis: true, title: tr('Not available in encrypted lists')} : {})},
+    {label: tr('Print'), icon: 'file', cls: 'mlexprint', fn: () => lexPrint(id)});
   if (dupOk(l)) items.push({label: tr('Duplicate list…'), icon: 'copy', cls: 'mdup', fn: () => listDuplicate(id)});  // 2.78.0 (#1881, templates.js)
   if (!l.is_inbox && !l.archived && typeof dx_start === 'function' && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.push({label: tr('Select several lists'), icon: 'check', fn: () => dx_start(id)});  // 2.47.3 (#1727)
   // 2.27.0 (#991): from the sidebar (right-click / long press): its place among the lists of its folder
@@ -829,6 +832,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="shint lhint">${tr('When a task is postponed, the tasks of this list it blocks that would now start too early move by the same number of days (also in the timeline). One undo takes the whole chain back.')}</div>` : ''}
     ${id && canManage(l) && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this list: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner and list admins can change them')}</div>` : ''}
     ${id ? rul_boxHtml(l) /* 2.71.0 A (#1457): rules of the list (rules.js) */ : ''}
+    ${id ? whiBoxHtml(l) /* 2.115.0 A (#2061): inbound webhooks (hookin.js) */ : ''}
     ${id && !l.is_inbox && (l.kind || 'list') === 'project' ? `<div class="lrepo" ${repoShown(l) ? '' : 'hidden'}><div class="shint keep lhint lrepohint" hidden>${ic('git', 's')} ${tr('Connect a repository (optional)')}</div>${repoBoxHtml(l)}</div>` : ''}
     </div>
     ${id ? `<div class="row lmtrow"><label>${tr('My tasks')}</label><label class="chkl"><input type="checkbox" id="l-inmine" ${mtShown(id) ? 'checked' : ''}> ${tr('Show in My tasks')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
@@ -1005,6 +1009,7 @@ function listModal(id, folder = '', o = {}) {
   };
   const drawFields = () => { const box = $('#l-fields', md); if (box) box.innerHTML = fieldsBox(id); };
   if (id) rul_mount(md, l);  // 2.71.0 A (#1457)
+  if (id) whiMount(md, l);  // 2.115.0 A (#2061)
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.m === 'field-add') { fieldModal(id, null, drawFields); return; }  // 2.39.1 (#1217): no project needed any more
@@ -1198,4 +1203,12 @@ function lookRedraw(md, focusSel) {  // re-render the pane (states + preview) an
   const p = $('#s-lookin', md); if (!p) return;
   p.innerHTML = lookHtml();
   if (focusSel) $(focusSel, p)?.focus();
+}
+
+// 2.115.0 (#2061): the inbound webhook section of the list settings; the rest of it loads on demand (hookin.js, whiMount)
+const whiOn = l => !!l && !l.is_inbox && l.life !== 'health' && l.life !== 'budget' && canManage(l);
+
+function whiBoxHtml(l) {
+  if (!whiOn(l)) return '';
+  return `<h4 title="${esc(tr('Create tasks in this list from other tools (n8n, Make, Zapier, Home Assistant)'))}">${tr('Inbound webhook')}</h4><div class="members whi-box" id="l-whi"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 }

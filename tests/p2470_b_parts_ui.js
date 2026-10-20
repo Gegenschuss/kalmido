@@ -3,6 +3,7 @@
 //   every part and marks the one that is not on the title page
 // - opening a part shows the quotation's position editor for its positions; a change goes to the part (its net changes), the
 //   print switch is stored, "Title page" goes back and the part line shows the new amount
+//   (2.113.0 #2248: the part opens in place under "Parts" on the title page; its row closes it again)
 // - "Add service" offers the parts after the services; picking one puts it on the title page
 // - "Create invoice" asks for the form (like the quotation / title page / summary) and makes the invoice in the chosen form
 // - the office settings have the preset for invoices from quotations with parts
@@ -53,25 +54,27 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
 
   // ================= an open part
   click(w, pl.querySelector('[data-ofd="tp-open"]'));
-  await until(() => d.querySelector('.tphead .tptitle'));
-  check(d.querySelector('.tphead .tptitle')?.value === 'Module A', 'the open part: its title');
-  const its = [...d.querySelectorAll('.tpsec .ofdits .ofdit')];
+  // 2.113.0 (#2248): the part opens in place (.tpfbox in its row under "Parts"), the title page stays
+  const BX = `.tpfbox[data-pid="${PA}"]`;
+  await until(() => d.querySelector(`${BX} .tphead .tptitle`));
+  check(d.querySelector(`${BX} .tphead .tptitle`)?.value === 'Module A', 'the open part: its title');
+  const its = [...d.querySelectorAll(`${BX} .ofdits .ofdit`)];
   check(its.length === 1 && its[0].querySelector('[data-k="title"]')?.value === 'Animation', 'the open part: the position editor with its positions');
-  check(!d.querySelector('.tppl') && !d.querySelector('details[data-sec="parts"]'), 'the open part replaces the title page positions');
+  check(d.querySelector('.tppl') && d.querySelector(`details[data-sec="parts"] ${BX}`), 'the open part opens in place below the title page positions');
   change(w, its[0].querySelector('[data-k="qty"]'), '3');
   const net = await until(async () => { const x = await call('GET', `/api/office/docs/${doc.id}`); const p = (x.parts || []).find(q => q.id === PA); return p && p.totals.net === 1500 && x.totals.net === 2300 ? x : null; });  // (both written by one save)
   check(net && net.totals.net === 2300, 'a change in the part goes to the part: part 1,500, quotation 2,300 ' + (net && net.totals.net));
   check((net?.items || []).length === 2, 'the title page keeps its two positions');
-  await until(() => /1,500\.00/.test(d.querySelector('.tptotals')?.textContent || ''));
-  check(/1,500\.00/.test(d.querySelector('.tptotals')?.textContent || ''), 'the part\'s sum on screen');
-  d.querySelector('.tphead [data-tp="print"]').checked = false;
-  change(w, d.querySelector('.tphead [data-tp="print"]'));
+  await until(() => /1,500\.00/.test(d.querySelector(`${BX} .tptotals`)?.textContent || ''));
+  check(/1,500\.00/.test(d.querySelector(`${BX} .tptotals`)?.textContent || ''), 'the part\'s sum on screen');
+  d.querySelector(`${BX} .tphead [data-tp="print"]`).checked = false;
+  change(w, d.querySelector(`${BX} .tphead [data-tp="print"]`));
   check(await until(async () => ((await call('GET', `/api/office/docs/${doc.id}`)).parts || []).find(q => q.id === PA)?.print === 0), 'the print switch is stored');
-  const ti = d.querySelector('.tphead .tptitle'); change(w, ti, 'Module A (web)');
+  const ti = d.querySelector(`${BX} .tphead .tptitle`); change(w, ti, 'Module A (web)');
   check(await until(async () => ((await call('GET', `/api/office/docs/${doc.id}`)).parts || []).find(q => q.id === PA)?.title === 'Module A (web)'), 'renaming the part');
-  click(w, d.querySelector('[data-ofd="tp-back"]'));
-  await until(() => d.querySelector('.tppl'));
-  check(/1,500\.00/.test(d.querySelector('.tppl .ofdlt')?.textContent || ''), 'back on the title page: the part line shows the new amount');
+  click(w, d.querySelector(`.tprow [data-ofd="tp-open"][data-tog][data-pid="${PA}"]`));  // 2.113.0 (#2248): the row closes it
+  await until(() => !d.querySelector(BX));
+  check(!d.querySelector(BX) && /1,500\.00/.test(d.querySelector('.tppl .ofdlt')?.textContent || ''), 'closed again: the part line shows the new amount');
 
   // ================= "Add service" offers the parts
   click(w, d.querySelector('[data-ofd="it-svc"]'));
@@ -108,11 +111,11 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
   w = await boot({user: 'alice', hash: `office/offers/${doc.id}`}); d = w.document;
   await until(() => d.querySelector('.ofdeditor .tppl [data-ofd="tp-open"]'));
   click(w, d.querySelector('.ofdeditor .tppl [data-ofd="tp-open"]'));
-  await until(() => d.querySelector('.tphead .tptitle'));
-  check(d.querySelector('.tphead .tptitle') && d.querySelector('.tpsec .ofdits [data-k="qty"]')?.closest('fieldset')?.disabled, 'sent quotation: a part opens read only');
-  click(w, d.querySelector('[data-ofd="tp-back"]'));
-  await until(() => d.querySelector('.tppl'));
-  check(!!d.querySelector('.tppl'), 'sent quotation: back to the title page');
+  await until(() => d.querySelector('.tpfbox .tphead .tptitle'));
+  check(d.querySelector('.tpfbox .tphead .tptitle') && d.querySelector('.tpfbox .ofdits [data-k="qty"]')?.closest('fieldset')?.disabled, 'sent quotation: a part opens read only');
+  click(w, d.querySelector('.tprow.tpfon [data-ofd="tp-open"][data-tog]'));  // 2.113.0 (#2248): the row closes it (a link, works read only)
+  await until(() => !d.querySelector('.tpfbox'));
+  check(!d.querySelector('.tpfbox') && !!d.querySelector('.tppl'), 'sent quotation: the part closes again');
   w.close();
 
   // ================= the office settings

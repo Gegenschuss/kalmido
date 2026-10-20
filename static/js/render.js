@@ -976,7 +976,7 @@ function taskRow(t, opts = {}) {
   const dueOn = rs('due') || dueClass(t) === 'over';  // 2.56.1 (#1799): overdue always shows
   if (t.due && !opts.checklist && !lc && !(inDay && !t.due_time) && dueOn) meta.push(`<span class="dt ${dueClass(t)}${mc}">${dueClass(t) === 'over' ? ic('alert', 's') + `<span class="sr">${tr('Overdue')}: </span>` : ic(inDay ? 'clock' : 'cal', 's')}${inDay ? esc(t.due_time) : due}</span>`);
   if (t.repeat && !opts.checklist && rs('repeat')) meta.push(`<span>${ic('repeat', 's')}</span>`);
-  if (t.reminders && t.due && !opts.checklist && rs('remind')) meta.push(`<span${nagOf(t) ? ` class="nagm" title="${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}"` : ''}>${ic('bell', 's')}${nagOf(t) ? ic('repeat', 's') : ''}</span>`);
+  if (rat_has(t) && !opts.checklist && rs('remind')) meta.push(`<span${nagOf(t) ? ` class="nagm" title="${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}"` : ''}>${ic('bell', 's')}${nagOf(t) ? ic('repeat', 's') : ''}</span>`);
   if (t.deadline && t.due && !opts.checklist && !opts.trash && (rs('deadline') || dueClass(t) === 'over')) meta.push(dlChip(t));  // 2.7.0 (#412)
   if (kids.length && !lc && rs('sub')) meta.push(`<span class="subc">${ic('sub', 's')}${kids.length - openKids}/${kids.length}</span>`);
   if (t.content && !opts.compact && rs('note')) meta.push(`<span>${ic('edit', 's')}</span>`);
@@ -1013,6 +1013,7 @@ function taskRow(t, opts = {}) {
   // 2.0.8 (#319): sorted by "Created": a small creation date on the row
   if (!lc && !opts.trash && !opts.checklist && t.created_at && opts.crd && rs('created')) meta.push(`<span class="crd" title="${esc(tr('Created {0}', fmtWhen(t.created_at)))}">${ic('plus', 's')}${dayLabel(ds(new Date(t.created_at)))}</span>`);
   if (opts.trash) meta.push(`<span>${tr('deleted {0}', dayLabel(t.deleted_at.slice(0, 10)))}</span>`);
+  if (opts.trash) { const l = ttpLeft(t); if (l != null) meta.push(`<span class="ttpleft">${esc(l ? trn('{0} day left', '{0} days left', l) : tr('deleted soon'))}</span>`); }  // 2.116.0 A (#2063)
   const msvb = msvvSelfBadge(opts); if (msvb) meta.unshift(msvb);  // 2.73.0 C (#661): merged views, a server linked
   if (opts.trash && t.keep) meta.push(`<span class="tkeep" title="${esc(tr('Only the list owner can delete it for good'))}">${ic('lock', 's')}${tr('stays')}</span>`);  // 2.0.5
   // 2.8.0 (#434): the status glyph (circle; priority = its colour; an agent working on it = an open arc + dot) and, in
@@ -1635,6 +1636,8 @@ function viewArchived() {
       <div class="aacts"><button class="btn sm" data-go="l/${l.id}">${tr('Open')}</button>${canManage(l) || lmOrgAdmin(l) ? `<button class="btn sm" data-act="arch-restore" data-id="${l.id}">${ic('undo', 's')}<span>${tr('Restore')}</span></button><button class="btn sm danger" data-act="arch-del" data-id="${l.id}">${ic('trash', 's')}<span>${tr('Delete permanently…')}</span></button>` : ''}</div></div>`;
   }).join('')}</div>`;
 }
+// 2.116.0 A (#2063): days until a trashed task is deleted for good (null = no period known); 0 = in the next run
+const ttpLeft = t => { const d = S.hist?.days; if (!d || !t.deleted_at) return null; return Math.max(0, Math.ceil((Date.parse(t.deleted_at) + d * 864e5 - Date.now()) / 864e5)); };
 function viewHistory() {
   const trash = S.route.key === 'trash';
   const arr = S.extra || [];
@@ -1642,7 +1645,9 @@ function viewHistory() {
   if (!arr.length) return otr + (otr ? '' : `<div class="empty">${ic(trash ? 'trash' : 'done')}${trash ? tr('Trash is empty.') : tr('Nothing completed yet.')}</div>`);
   if (trash) {  // 2.0.5: what "Empty" leaves behind (shared lists of other owners) is said up front and marked per row
     const kept = S.hist?.k === 'trash' && S.hist.kept != null ? S.hist.kept : arr.filter(t => t.keep).length;  // 2.40.0 (#1432): the whole trash
-    return otr + (kept ? `<div class="shint trkeep">${ic('lock', 's')} ${esc(trn('{0} item stays when you empty the trash: it is in a list of another owner, only they can delete it for good.', '{0} items stay when you empty the trash: they are in lists of other owners, only they can delete them for good.', kept))}</div>` : '')
+    const days = S.hist?.k === 'trash' ? S.hist.days : null;  // 2.116.0 A (#2063): the trash period, from the server
+    return otr + (days ? `<div class="shint ttphint">${ic('clock', 's')} ${esc(trn('Tasks in the trash are deleted for good after {0} day.', 'Tasks in the trash are deleted for good after {0} days.', days))}</div>` : '')
+      + (kept ? `<div class="shint trkeep">${ic('lock', 's')} ${esc(trn('{0} item stays when you empty the trash: it is in a list of another owner, only they can delete it for good.', '{0} items stay when you empty the trash: they are in lists of other owners, only they can delete them for good.', kept))}</div>` : '')
       + (vl_begin(arr.length) ? vl_seg('trash', arr, t => taskRow(t, {trash: true, showList: true})) : arr.map(t => taskRow(t, {trash: true, showList: true})).join('')) + histMoreHtml();  // 2.65.0 (#1825)
   }
   const g = new Map();
