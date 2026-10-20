@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.138.4** (2026-10-20): phones - office fixed-cost import rows stay whole, table checkbox cells tick on a tap
+  with undo, sheet bar above the tab bar, Android print view, touch-sized controls in documents and bookmarks; the
+  agent chat keeps an open edit; error-report webhook token in a header, contact copies out of mirrored address books,
+  a notice when the portal sign-in budget is used up, `reindex-private` after a new server key.
 - **2.138.1** (2026-10-20): six releases from 19.10. brought onto today's code - office undo, invitation mails
   and calendar subscription links, quick add with @person and reminders at a time; file store ZIP, phone scan and
   external links; office settings in areas, quotation parts in colour, terms as PDF; team chat files, channels and

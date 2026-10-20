@@ -7172,7 +7172,8 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .fcisum{display:flex;flex-direction:column;align-items:flex-end;line-height:1.25}
 .fcidlg .card{max-width:42rem;width:100%}
 .fcilist{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.375rem;max-height:60vh;overflow-y:auto}
-.fcirow{display:flex;align-items:center;gap:.625rem;min-height:2.75rem;padding:.375rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2)}
+/* 2.138.4 A (#2359): rows never shrink in the scrolling column (amount line overflowed on phones) */
+.fcirow{flex-shrink:0;display:flex;align-items:center;gap:.625rem;min-height:2.75rem;padding:.375rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2)}
 .fcirow.on{border-color:var(--accent)}
 .fcirow.dup:not(.on),.fcirow.err{opacity:.6}
 .fcirow.err small{color:var(--muted)}

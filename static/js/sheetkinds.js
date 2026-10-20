@@ -53,9 +53,11 @@ function shk_edit(cur, col, typed) {
   if (col.kind === 'person') { shk_personMenu(cur.r, cur.c); return true; }
   shk_fileMenu(cur.r, cur.c); return true;
 }
-function shk_toggle(r, c) {
-  const on = shk_on(shvCell(r, c));
-  return shvPut([{row_id: r, col_id: c, raw: on ? '0' : '1'}], tr('Cell {0} changed', shvAddr(r, c)));
+async function shk_toggle(r, c) {
+  const on = shk_on(shvCell(r, c)), label = tr('Cell {0} changed', shvAddr(r, c));
+  const e = await shvPut([{row_id: r, col_id: c, raw: on ? '0' : '1'}], label);
+  if (e) histToast(label, e);  // 2.138.4 B (#2371): the Undo hint like other cell changes
+  return e;
 }
 async function shk_peopleOf(sid) {
   const x = SHK.people[sid]; if (x && Date.now() - x.at < 60000) return x.list;
@@ -98,8 +100,14 @@ async function shk_upload(r, c, f) {
   histToast(tr('File {0} added to {1}', f.name, addr), e);
 }
 // a tap / click on a checkbox ticks it at once (window capture: before the grid's own tap handling)
+// 2.138.4 B (#2371): on the phone a tap anywhere in the cell ticks (the box alone was too small a target); with the mouse
+// only the box (plus its 44 px square), so a click beside it still chooses the cell and Shift / dragging still select a
+// range; a long press still shows the cell, a tap while writing a formula still inserts the reference
 window.addEventListener('click', e => {
-  const b = /** @type {any} */ (e.target).closest?.('#shv-scroll [data-shkbox]'); if (!b) return;
+  const t = /** @type {any} */ (e.target);
+  let b = t.closest?.('#shv-scroll [data-shkbox]');
+  if (!b && isTouch() && !SHV.ed && Date.now() - (SHV.lpDone || 0) >= 600) b = t.closest?.('#shv-scroll td.shvc.shkcb[data-r]')?.querySelector('[data-shkbox]');
+  if (!b) return;
   const td = b.closest('td.shvc[data-r]'), sh = SHV.sh; if (!td || !sh) return;
   e.preventDefault(); e.stopPropagation();
   const r = +td.dataset.r, c = +td.dataset.c;
@@ -158,21 +166,31 @@ function shk_after() {  // after each redraw: the sticky rules of the kept rows 
 });
 
 // ---- print / PDF: a plain view of the shown rows (the browser's dialog prints or saves a PDF)
+/** @type {null|(() => void)} */
+let shkPrintDone = null;
 function shk_print() {
   const sh = SHV.sh; if (!sh) return;
   const rows = shvVisRows(sh), cols = sh.columns;
   const txt = (r, col) => { const c = shvCell(r.id, col.id, sh); if (!c) return ''; if (c.error) return c.error_text || tr(SHV_ERR[c.error] || N_('Error'));
     if (col.kind === 'select') return shvOpt(col, c)?.label || ''; if (col.kind === 'checkbox' && !shk_isF(c)) return shk_on(c) ? tr('Yes') : ''; return String(c.display ?? c.value ?? ''); };
-  document.getElementById('shk-print')?.remove();
+  shkPrintDone?.(); document.getElementById('shk-print')?.remove();
   const box = document.createElement('div'); box.id = 'shk-print';
   box.innerHTML = `<h1>${esc(sh.title || tr('Untitled table'))}</h1><p class="shkpm">${esc(fmtWhen(new Date().toISOString()))}${rows.length < sh.rows.length ? ' · ' + esc(tr('{0} of {1} rows shown', rows.length, sh.rows.length)) : ''}</p>
     <table><thead><tr><th></th>${cols.map(c => `<th>${esc(c.title || c.letter || '')}</th>`).join('')}</tr></thead>
     <tbody>${rows.map(r => `<tr><th>${sh._rowNo.get(r.id)}</th>${cols.map(col => `<td class="${SHV_NUM.includes(col.kind) ? 'num' : ''}">${esc(txt(r, col))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
   document.body.appendChild(box);
   document.body.classList.add('shkprint');
-  const done = () => { document.body.classList.remove('shkprint'); box.remove(); removeEventListener('afterprint', done); };
-  addEventListener('afterprint', done);
-  setTimeout(() => window.print(), 50);  // the view goes after printing (afterprint); on screen it is never shown
+  // 2.138.4 A (#2370): Android Chrome fires afterprint ~30 ms after print(), before the preview is made -> keep the view until
+  // the print media really ends (matchMedia change); without it, a fallback timer after afterprint
+  /** @type {any} */
+  const mq = window.matchMedia?.('print') || {matches: false}; let timer = 0, t0 = Infinity;
+  const done = () => { clearTimeout(timer); document.body.classList.remove('shkprint'); box.remove(); removeEventListener('afterprint', onAfter); mq.removeEventListener?.('change', onMq); if (shkPrintDone === done) shkPrintDone = null; };
+  const onMq = () => { clearTimeout(timer); if (!mq.matches) done(); };
+  const onAfter = () => { clearTimeout(timer); if (mq.matches || performance.now() - t0 < 500) timer = setTimeout(done, 30000); else done(); };  // desktop: print() blocks until the dialog closes
+  shkPrintDone = done;
+  addEventListener('afterprint', onAfter);
+  mq.addEventListener?.('change', onMq);
+  setTimeout(() => { t0 = performance.now(); window.print(); }, 50);  // the view goes after printing (afterprint); on screen it is never shown
 }
 
 // ---- history

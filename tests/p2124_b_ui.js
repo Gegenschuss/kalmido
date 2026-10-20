@@ -141,6 +141,7 @@ const items = d => [...d.querySelectorAll('#pop [role="menuitem"]')];
   check(d.body.classList.contains('shkprint') && d.querySelectorAll('#shk-print tbody tr').length === R.length, 'the print view: every shown row');
   check(await until(() => printed === 1), 'the print dialog opens');
   check(/Kit/.test(d.querySelector('#shk-print h1')?.textContent || '') && /Bob/.test(d.querySelector('#shk-print tbody').textContent), 'title and values in the print view');
+  await sleep(600);  // 2.138.4 (#2370): an afterprint right after print() is the early Android one and keeps the view; a desktop one comes later
   w.dispatchEvent(new w.Event('afterprint'));
   check(!d.getElementById('shk-print') && !d.body.classList.contains('shkprint'), 'after printing: the view is gone');
   w.close();
