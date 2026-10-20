@@ -234,8 +234,8 @@ def _find(c, token):
                          JOIN users u ON u.id=l.owner_id WHERE f.token_hash=? AND f.enabled=1 AND u.disabled=0 AND l.archived=0""",
                       (_token_hash(token),)).fetchone()
     if r is not None and g.user and r["access"] == "public" and r["l_org"]:
-        from ..accounts.orgs import user_orgs
-        if r["l_org"] not in user_orgs(c, g.user["id"]):
+        from ..accounts.orgroles import user_orgs_full
+        if r["l_org"] not in user_orgs_full(c, g.user["id"], write=True):  # 2.143.0 A (#2151, review): limited roles = visitor
             # 2.37.0 (review K2-2): a signed-in person of another organisation uses a public form like a visitor (the
             # context hook prefers g.user, whose organisations do not include the list's)
             g.user = None
@@ -281,7 +281,9 @@ def _may_use(c, f):
         if not g.user["is_admin"] and not may_see(c, f["l_owner"], g.user["id"]):
             return _gone(lg)
         return None
-    owner_orgs, mine = set(user_orgs(c, f["l_owner"])), set(user_orgs(c, g.user["id"]))
+    from ..accounts.orgroles import user_orgs_full
+    # 2.143.0 A (#2151, review): an organisation's internal form is for its writing roles (not guest / read-only / accounting)
+    owner_orgs, mine = set(user_orgs(c, f["l_owner"])), set(user_orgs_full(c, g.user["id"], write=True))
     # 2.30.0 (#1036): the form of an organisation's list is for the people of THAT organisation (not of every organisation of
     # its owner); in the mode workspaces instance admins are no exception (as everywhere there)
     if f["l_org"]:

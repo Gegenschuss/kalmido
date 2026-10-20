@@ -147,11 +147,11 @@ def _fs_docs_root(c, org):
 def _fs_limited_role(c, uid, org, chain, ids):
     """2.143.0 A (#2151): the role of a guest / read-only / accounting person on a node of organisation org. Read-only: what
     a member sees, at most 'view'. Guest: only their own nodes and shares. Accounting: like a guest, plus the organisation's
-    documents folder to read (receipts) and their own uploads there. Nobody of them deletes (own nodes 'view' -- the
-    upload itself is the documents area's, docs/web.py)."""
+    documents folder to read (receipts) and their own uploads there (the upload itself is the documents area's,
+    docs/web.py). Review: a guest / accounting person corrects and removes their own nodes ('edit'); read-only stays 'view'."""
     from ..accounts.orgroles import org_role_key
     rk = org_role_key(c, uid, org)
-    role = "view" if chain[0]["owner_id"] == uid else None
+    role = ("view" if rk == "readonly" else "edit") if chain[0]["owner_id"] == uid else None
     if rk == "readonly":
         for r in chain:
             if r["org_access"] in ("view", "edit"):
@@ -159,7 +159,7 @@ def _fs_limited_role(c, uid, org, chain, ids):
     elif rk == "accounting":
         root = _fs_docs_root(c, org)
         if root and any(r["id"] == root for r in chain):
-            role = "view"
+            role = _best(role, "view")  # own receipts stay 'edit' (review)
     share = _shares_role(c, ids, uid, False)
     if rk == "readonly" and share:
         share = "view"
@@ -303,6 +303,9 @@ def _place(c, uid, parent_id, org_id, write_role=True, add_file=False):
         raise Denied(403, tr("Agents add files only in folders shared with them or in their own folder"))
     if org_id and int(org_id) not in ctx.org_ids:
         raise Denied(404)
+    if org_id:  # 2.143.0 A (#2151, review): the organisation's top level only for members / admins (receipts: docs/web.py)
+        from ..accounts.orgroles import need_org_write
+        need_org_write(c, uid, int(org_id))
     return uid, (int(org_id) if org_id else None)
 
 

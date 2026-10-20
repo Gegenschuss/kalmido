@@ -602,7 +602,8 @@ def hbm_heir(c, r, not_uid=None):
                                         (r["list_id"], r["list_id"]))]
     elif r["kind"] == "client":
         o = c.execute("SELECT org_id FROM clients WHERE id=?", (r["client_id"],)).fetchone()
-        cand = [x[0] for x in c.execute("SELECT user_id FROM org_members WHERE org_id=? ORDER BY user_id", (o["org_id"],))] if o and o["org_id"] else []
+        cand = [x[0] for x in c.execute("SELECT user_id FROM org_members WHERE org_id=? AND role IN ('admin','member') ORDER BY user_id",
+                                        (o["org_id"],))] if o and o["org_id"] else []  # 2.143.0 A (#2151, review): writing roles only
     else:
         return None
     for uid in sorted({x for x in cand if x and x != r["user_id"] and x != not_uid}):

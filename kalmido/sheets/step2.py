@@ -126,15 +126,19 @@ def sh2_target_list(c, sheet, uid, lid):
     return l
 
 
-def sh2_office(c, sheet, uid, create=False):
+def sh2_office(c, sheet, uid, create=False, write=False):
     """The office area of the sheet's space for uid, or None when it is not available there (module off, no role; a
-    private sheet: uid's own personal office)."""
+    private sheet: uid's own personal office). 2.143.0 A (#2151, review): guests never; read-only / accounting only to
+    read (create / write: members and admins)."""
     from ..office.model import office_on, office_role, pb_personal
     if not office_on(c, uid):
         return None
     if sheet["org_id"] is None:
         return pb_personal(c, uid, create=create)
-    return sheet["org_id"] if office_role(c, uid, sheet["org_id"]) else None
+    from ..accounts.orgroles import office_allowed
+    if not office_role(c, uid, sheet["org_id"]) or office_allowed(c, uid, sheet["org_id"], write=bool(create or write)):
+        return None
+    return sheet["org_id"]
 
 
 def _unit(s):
@@ -466,7 +470,7 @@ def _offer_drop(c, sheet, uid, did):
     """Deletes the quotation draft a button press made, when the office lets uid delete it (its admin; still a draft)."""
     from ..office.ledger import ofx_locked, ofx_log
     from ..office.model import office_role
-    oid = sh2_office(c, sheet, uid)
+    oid = sh2_office(c, sheet, uid, write=True)
     r = c.execute("SELECT * FROM office_docs WHERE id=?", (did,)).fetchone()
     if not r:
         return True  # already gone

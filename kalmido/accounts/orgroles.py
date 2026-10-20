@@ -10,7 +10,8 @@
 
 The person's private space is untouched (there they are their own admin); a person without organisation sees no change.
 Every check sits on the server (routes, API v1, MCP, DAV); the app only hides what a role cannot use.
-A server of the version before (2.142) reads an unknown role as member: give the new roles out only on 2.143.0 or later."""
+A server of the version before (2.142) reads an unknown role as member: give the new roles out only on 2.143.0 or later.
+From 2.143.0 on an unknown stored role reads as guest (restrictive), never as member."""
 from flask import g, has_request_context, request
 
 from ..core.i18n import N_, tr
@@ -26,7 +27,8 @@ ACC_MSG = N_("The accounting role can read and export the office and upload rece
 
 
 def org_roles_of(c, uid):
-    """{org id: role} of uid (cached per request; core/access.py acx_drop() forgets it). Unknown values read as member."""
+    """{org id: role} of uid (cached per request; core/access.py acx_drop() forgets it). Unknown values read as guest (the
+    most restricted role) and are logged once per request."""
     if not uid:
         return {}
     cache = g.setdefault("org_roles", {}) if has_request_context() else {}
@@ -37,9 +39,18 @@ def org_roles_of(c, uid):
             cache[uid] = {}
         else:
             with system_ctx(c):  # membership structure (also asked for other people)
-                cache[uid] = {r[0]: (r[1] if r[1] in ROLE_KEYS else "member")
+                cache[uid] = {r[0]: role_known(r[1], r[0], uid)
                               for r in c.execute("SELECT org_id, role FROM org_members WHERE user_id=?", (uid,))}
     return cache[uid]
+
+
+def role_known(role, oid=None, uid=None):
+    """A stored role as one of ROLE_KEYS: an unknown value (a newer version's role, a hand edit) reads as guest, never as
+    member (review)."""
+    if role in ROLE_KEYS:
+        return role
+    print(f"organisation roles (#2151): unknown role {str(role)[:20]!r} of user {uid} in organisation {oid} read as guest", flush=True)
+    return "guest"
 
 
 def org_role_key(c, uid, oid):

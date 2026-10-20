@@ -161,7 +161,10 @@ def org_role(c, uid, oid):
         return None
     with system_ctx(c):  # 2.37.0 (#1150): membership structure (also asked for other people)
         r = c.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
-    return (r["role"] if r["role"] in ORG_ROLES else "member") if r else None
+    if not r:
+        return None
+    from .orgroles import role_known
+    return role_known(r["role"], oid, uid)  # 2.143.0 A (#2151, review): unknown -> guest
 
 
 def is_org_admin(c, uid, oid):
@@ -632,6 +635,8 @@ def org_update(oid):
             c.execute("UPDATE org_members SET role='member' WHERE org_id=? AND role='admin'", (oid,))
             for x in b["admins"]:
                 c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND user_id IN (SELECT id FROM users WHERE kind!='agent')", (oid, x))
+            from ..core.access import acx_drop
+            acx_drop()  # 2.143.0 A (#2151, review): the request's cached roles follow
         bump(c)
         c.commit()
         return jsonify(org_public(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone()))
@@ -751,7 +756,7 @@ def org_mine_dict(c, r, uid):
             "photo_meta_strip": bool(r["photo_meta_strip"]),  # 2.61.0 B (#1819)
             "ext_links": bool(r["ext_links"]),  # 2.112.1 B (#2058): external share links of the file store allowed
             "role": org_role(c, uid, r["id"]) or "member",
-            "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "member",
+            "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "guest",
                          "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
             "lists": c.execute("SELECT COUNT(*) FROM lists WHERE org_id=? AND deleted_at IS NULL", (r["id"],)).fetchone()[0] if full else 0,
             "limited": not full or not org_writes(c, uid, r["id"]),  # 2.143.0 A (#2151): guest / read-only / accounting

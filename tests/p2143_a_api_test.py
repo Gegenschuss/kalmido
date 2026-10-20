@@ -10,6 +10,10 @@ names only, addresses @example.com. tenant-matrix: org (every check runs inside 
    its own role; no list / page in the organisation; the member list shows only the people they share something with
  - accounting: like a guest outside the office; the office and its bookkeeping readable, nothing writable; receipts upload
    into the organisation's documents (a guest / read-only person cannot)
+ - review fixes: no folder / file at the organisation's top for limited roles (accounting removes its own receipt); no
+   office move, no list copy into the organisation, no list ownership, no internal form, no group through the organisation
+   for them; a guest's / accounting person's closed month stays theirs; travel people only the organisation's staff; an
+   unknown stored role reads as guest
  - a person without organisation (freelancer-matrix: lists, office, wiki): unchanged, everything in the own space works
 usage: p2143_a_api_test.py <datadir>      (a fresh container; P2143A_NOSTART=1 = the server already runs)"""
 import os
@@ -198,6 +202,92 @@ check(VR.patch(B + f"/api/v1/tasks/{T1}", json={"title": "x"}).status_code == 40
 check(VR.post(B + "/api/v1/tasks", json={"list_id": L2, "title": "x"}).status_code == 403, "v1 read-only: no new task")
 check(VG.get(B + f"/api/v1/tasks/{T1}").status_code == 404, "v1 guest: an organisation-wide task is 404")
 check(VG.get(B + f"/api/v1/tasks/{T2}").ok, "v1 guest: the shared list's task")
+
+# ================================================================ review fixes (#2151, 2.143.0 A2)
+# files: the organisation's top level only for members / admins; accounting removes its own receipt
+for nm, s in (("guest", Gi), ("read-only", Ri), ("accounting", Ax)):
+    check(s.post(B + "/api/files/folders", json={"name": "Top " + nm, "space": f"org:{ORG}"}).status_code in (403, 404), f"{nm}: no folder at the organisation's top")
+    r = s.post(B + "/api/files/upload", data={"space": f"org:{ORG}"}, files={"file": ("note.txt", b"note", "text/plain")})
+    check(r.status_code in (403, 404), f"{nm}: no file at the organisation's top ({r.status_code})")
+    r = s.get(B + "/api/files", params={"space": f"org:{ORG}"})
+    check(not r.ok or r.json().get("role") != "edit", f"{nm}: the top level is not offered as editable ({r.status_code} {r.text[:120]})")
+check(Bo.post(B + "/api/files/folders", json={"name": "Team folder", "space": f"org:{ORG}"}).ok, "member: a folder at the organisation's top")
+r = Ax.post(B + "/api/docs", data={"ws": f"org:{ORG}"}, files={"files": ("receipt2.txt", b"Receipt 7.10 EUR", "text/plain")})
+rid = (r.json().get("ids") or [None])[0] if r.status_code == 201 else None
+rd = Ax.delete(B + f"/api/files/nodes/{rid}") if rid else None
+check(rd is not None and rd.ok, f"accounting: removes its own wrong receipt {r.text[:80]} -> {rd.status_code if rd is not None else '-'} {rd.text[:150] if rd is not None else ''}")
+
+# office: moving clients / drafts out of the organisation needs a writing office role
+cl = Bo.post(B + "/api/clients", json={"name": "Northwind Example GmbH", "org_id": ORG})
+CL = cl.json().get("id") if cl.ok else None
+check(CL, "setup: a client of the organisation " + cl.text[:150])
+for nm, s in (("read-only", Ri), ("accounting", Ax)):
+    r = s.post(B + "/api/office/move-space", json={"what": "clients", "ids": [CL], "to": "private", "dry": 1})
+    check(r.status_code in (403, 404), f"{nm}: moves no client out of the organisation ({r.status_code} {r.text[:120]})")
+r = Gi.post(B + "/api/office/move-space", json={"what": "clients", "ids": [CL], "to": "private", "dry": 1})
+check(r.status_code in (403, 404), f"guest: no office move ({r.status_code})")
+
+# a copied list stays in the organisation only for writing roles
+for nm, s in (("guest", Gi), ("read-only", Ri), ("accounting", Ax)):
+    r = s.post(B + f"/api/lists/{L2}/duplicate", json={"name": "Copy " + nm})
+    if r.ok:
+        nl = state_lists(s).get(r.json()["list_id"], {})
+        check(nl.get("org_id") != ORG, f"{nm}: the copy is not in the organisation ({nl.get('org_id')})")
+    else:
+        check(r.status_code in (403, 404), f"{nm}: copy refused or private ({r.status_code} {r.text[:120]})")
+r = Bo.post(B + f"/api/lists/{L1}/duplicate", json={"name": "Copy member"})
+check(r.ok and state_lists(Bo).get(r.json()["list_id"], {}).get("org_id") == ORG, "member: the copy stays in the organisation " + r.text[:120])
+
+# list ownership: only to a member / admin of the organisation
+cands = {x["id"] for x in A.get(B + f"/api/lists/{L2}/owner").json().get("candidates", [])}
+check(uid["bob"] in cands and not cands & {uid["gina"], uid["rita"], uid["axel"]}, f"owner candidates without limited roles {cands}")
+for u in ("gina", "rita", "axel"):
+    check(A.post(B + f"/api/lists/{L2}/owner", json={"user_id": uid[u]}).status_code == 409, f"no list ownership for {u}")
+
+# an organisation's internal form: not for guests / read-only / accounting
+fr = A.post(B + f"/api/lists/{L1}/forms", json={"title": "Requests", "access": "org"})
+FT = fr.json().get("url", "").rsplit("/f/", 1)[-1] if fr.status_code == 201 else ""
+check(FT, "setup: an internal form " + fr.text[:150])
+check(Bo.get(B + f"/f/{FT}").status_code == 200, "member: opens the internal form")
+for nm, s in (("guest", Gi), ("read-only", Ri), ("accounting", Ax)):
+    check(s.get(B + f"/f/{FT}").status_code == 404, f"{nm}: the internal form is not available")
+
+# groups: not visible through an organisation where one is a guest / accounting
+gr = A.post(B + "/api/admin/groups", json={"name": "Studio crew", "members": [uid["bob"]]})
+GID = gr.json().get("id") if gr.ok else None
+check(GID, "setup: a group " + gr.text[:150])
+gids = lambda s: {x["id"] for x in s.get(B + "/api/groups").json().get("groups", [])}  # noqa: E731
+check(GID in gids(Ri), "read-only: sees the group of organisation people")
+check(GID not in gids(Gi) and GID not in gids(Ax), "guest / accounting: no group through the organisation")
+
+# timesheets: a guest's / accounting person's closed month stays theirs (no approval by the organisation)
+import datetime as _dt  # noqa: E402
+PM = (_dt.date.today().replace(day=1) - _dt.timedelta(days=1)).strftime("%Y-%m")
+for nm, s in (("guest", Gi), ("accounting", Ax)):
+    r = s.post(B + "/api/time/sheets", json={"month": PM, "action": "close"})
+    check(r.ok and not r.json()["sheet"].get("org_id"), f"{nm}: the closed month has no organisation " + r.text[:200])
+r = Bo.post(B + "/api/time/sheets", json={"month": PM, "action": "close"})
+check(r.ok and r.json()["sheet"].get("org_id") == ORG, "member: the closed month goes to the organisation " + r.text[:200])
+
+# an unknown stored role (a newer version's, a hand edit) reads as guest, not as member
+import dbx  # noqa: E402
+r = A.post(B + "/api/users", json={"orgs": [{"id": ORG, "role": "member"}], "username": "uma", "display_name": "Uma",
+                                   "password": "password123", "email": "uma@example.com"})
+check(r.ok, "setup: uma " + r.text[:150])
+uid["uma"] = r.json().get("id")
+dbx.connect(DATA).execute("UPDATE org_members SET role=? WHERE org_id=? AND user_id=?", ("boss", ORG, uid["uma"]))
+Um = sess("uma")
+check(L1 not in state_lists(Um), "unknown role: no organisation-wide list (guest)")
+check(Um.post(B + "/api/tasks", json={"list_id": L1, "title": "x"}).status_code in (403, 404), "unknown role: no task in an organisation list")
+check(Um.get(B + "/api/office/settings").status_code == 403, "unknown role: no office")
+og = next(x for x in A.get(B + "/api/orgs").json()["orgs"] if x["id"] == ORG)
+check({m["id"]: m["role"] for m in og["members"]}.get(uid["uma"]) == "guest", "unknown role: shown as guest to the admin")
+
+# office people lists: no guests / accounting among the organisation's people
+r = A.get(B + "/api/office/trips")
+ppl = {p["id"] for p in r.json().get("people", [])} if r.ok else set()
+check(r.ok and uid["bob"] in ppl and uid["rita"] in ppl and uid["gina"] not in ppl and uid["axel"] not in ppl,
+      f"travel people: the staff only ({r.status_code} {ppl})")
 
 # ================================================================ a person without organisation (P4)
 # freelancer-matrix: lists
