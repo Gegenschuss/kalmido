@@ -243,9 +243,42 @@ function jcd_cardHtml(no, list, row) {
 }
 // the end result / an error under the card: 5 lines, "Show more" for longer ones
 function jcd_resHtml(m, row) {
-  const b = String(m.body || ''), long = b.split('\n').length > 5 || b.length > 400, more = S.jcd.more.has(m.id);
+  const long = jcf_long(m), more = S.jcd.more.has(m.id);
   return `<div class="jcdres${long && !more ? ' jcdclamp' : ''}${jcd_kind(m) === 'error' ? ' jcdx' : ''}">${long ? jcm_inBubble(row(m), `<button type="button" class="linkbtn jcdmore" data-jca="more" data-jm="${m.id}" aria-expanded="${more}">${esc(tr(more ? 'Show less' : 'Show more'))}</button>`) : row(m)}</div>`;
 }
+// 2.144.0 B (#2417): "Fold long messages" for every message at once (a header icon, kept per device). Folded = the cut of the
+// job result (jcd_resHtml: 5 lines + "Show more"); a message opened on its own stays open (S.jcd.more, the last 200 ids, kept
+// per device); "Show less" on a single message switches the mode on for all.
+const JCF_MAX = 200;
+try { S.jcd.more = new Set(LS.get('jcfOpen', [])); } catch (e) { /* storage not readable: nothing open */ }
+const jcf_on = () => LS.get('jcfOn', '') === '1';
+const jcf_long = m => { const b = String(m.body || ''); return b.split('\n').length > 5 || b.length > 400; };
+function jcf_save() {
+  const a = [...S.jcd.more]; if (a.length > JCF_MAX) S.jcd.more = new Set(a.slice(-JCF_MAX));
+  LS.set('jcfOpen', [...S.jcd.more]);
+}
+function jcf_more(id) { if (S.jcd.more.has(id)) S.jcd.more.delete(id); else S.jcd.more.add(id); jcf_save(); }
+function jcf_fold(id) { S.jcd.more.delete(id); jcf_save(); jcf_set(true); }
+function jcf_set(on) { LS.set('jcfOn', on ? '1' : ''); document.querySelectorAll('.jcfbtn').forEach(b => { b.setAttribute('aria-pressed', on); }); }
+function jcf_btnHtml() {
+  const t = tr('Fold long messages');
+  return `<button type="button" class="iconbtn jcfbtn" data-jca="foldall" aria-pressed="${jcf_on()}" title="${esc(t)}" aria-label="${esc(t)}">${ic('collapse')}</button>`;
+}
+// the row of a message with the cut (long messages only; a job result in a card is cut by jcd_resHtml)
+function jcf_wrap(m, html) {
+  if (m.kind === 'notice' || m.choices || S.chat.edit === m.id || !jcf_long(m)) return html;
+  if (S.jcd.map.has(m.id) && JCD_SHOW.has(jcd_kind(m))) return html;
+  const on = jcf_on(), more = S.jcd.more.has(m.id), cut = on && !more;
+  const btn = `<button type="button" class="linkbtn jcdmore" data-jca="${on ? 'more' : 'fold'}" data-jm="${m.id}"${on ? ` aria-expanded="${more}"` : ''}>${esc(tr(cut ? 'Show more' : 'Show less'))}</button>`;
+  const h = jcm_inBubble(html, btn);
+  return cut ? h.replace('class="cmsg ', 'class="cmsg jcfcut ') : h;
+}
+const jcf_row = fn => m => jcf_wrap(m, fn(m));
+function jcf_toggle(btn) {
+  jcf_set(!jcf_on()); chatPatch({keep: true});
+  btn?.focus?.({preventScroll: true});
+}
+document.addEventListener('click', e => { const b = e.target.closest?.('.jcfbtn'); if (b) jcf_toggle(b); });
 // 2.122.3 jcm (#2340): put the button right after the message text (end of the .cbub div), before steps / suggestion / time
 function jcm_inBubble(html, btn) {
   const st = html.indexOf('<div class="cbub'); if (st < 0) return html + btn;
@@ -287,6 +320,7 @@ function jcd_reveal(id) {
   let ch = false;
   if (jcd_filter() !== 'all' && m) { const r = document.querySelector(`#chat-msgs [data-mid="a:${+id}"]`); if (!r) { LS.set('jcdFilt', 'all'); ch = true; } }
   if (no && m && !JCD_SHOW.has(jcd_kind(m)) && !jcd_open(no)) { jcd_setOpen(no, true); ch = true; }
+  if (m && jcf_long(m) && (jcf_on() || (no && JCD_SHOW.has(jcd_kind(m)))) && !S.jcd.more.has(m.id)) { S.jcd.more.add(m.id); jcf_save(); ch = true; }  // 2.144.0 B (#2417): the target is unfolded
   if (ch) { chatPatch({keep: true}); jcd_patch(); }
 }
 document.addEventListener('click', e => {
@@ -296,7 +330,8 @@ document.addEventListener('click', e => {
   // unfold / fold / more: the tapped card stays where it is on the screen (no jump to the bottom)
   const k = b.dataset.jca === 'tog' ? `.jcdh[data-jcd="${b.dataset.jcd}"]` : `.jcdmore[data-jm="${b.dataset.jm}"]`, y0 = b.getBoundingClientRect().top;
   if (b.dataset.jca === 'tog') jcd_setOpen(+b.dataset.jcd, !jcd_open(+b.dataset.jcd));
-  else if (b.dataset.jca === 'more') { const id = +b.dataset.jm; if (S.jcd.more.has(id)) S.jcd.more.delete(id); else S.jcd.more.add(id); }
+  else if (b.dataset.jca === 'more') { const id = +b.dataset.jm; jcf_more(id); }
+  else if (b.dataset.jca === 'fold') jcf_fold(+b.dataset.jm);
   else return;
   const top = box ? box.scrollTop : 0;
   chatPatch({keep: true});

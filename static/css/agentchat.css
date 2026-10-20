@@ -368,7 +368,6 @@ button.jcdh{cursor:pointer}
 .jcdres.jcdclamp .cbub{max-height:7.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
 .jcdres.jcdx .cbub{box-shadow:inset .25rem 0 0 var(--danger)}
 .jcdmore{min-height:2.75rem;padding:0 .5rem;color:var(--accent)}
-.cmsg > .jcdmore{align-self:flex-start}
 .jcdfilt{display:flex;align-items:center;padding:.375rem .75rem;border-bottom:1px solid var(--line)}
 .jcdfilt[hidden]{display:none}
 .jcdseg{display:flex;gap:.25rem;min-width:0;padding:.1875rem;border-radius:62.5rem;background:var(--bg3)}
@@ -386,3 +385,10 @@ button.jcdh{cursor:pointer}
 /* 2.119.0 B (#2302): the hint is a small line under the field (own row), so it also shows in the narrow side panel and split windows */
 .chcomp:has(> .chkh:not(:empty)){flex-wrap:wrap}
 .chcomp > .chkh:not(:empty){flex:0 0 100%;order:9;margin-top:-.25rem;text-align:right;font-size:.6875rem}
+/* 2.144.0 B (#2411): the agent's own colour on the chat header and the input box (a stripe, not a fill); #2417: cut long messages */
+body .chath.agcol{border-top:.1875rem solid var(--agcol);padding-top:.5625rem}
+#achat.cwsplit .cwin>.chath.agcol{padding-top:.5rem}
+.chcomp.agcol{border-top-color:color-mix(in srgb,var(--agcol) 55%,var(--line))}
+.chcomp.agcol:focus-within{border-top-color:var(--agcol)}
+.cmsg.jcfcut .cbub{max-height:7.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
+.jcfbtn[aria-pressed="true"]{color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
