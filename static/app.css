@@ -3884,7 +3884,6 @@ a.tref:hover{background:var(--accent-soft)}
 .nsh{display:flex;align-items:center;gap:.5rem;font-size:var(--fs-s);font-weight:600;color:var(--muted);text-transform:none;margin:.5rem .25rem}
 .nsh .c{font:var(--fs-xs) var(--mono)}
 .ngroup{border-bottom:1px solid var(--line)}
-.ngroup.needs .ngt{font-weight:600}
 .nghead{display:flex;align-items:center;gap:.625rem;padding:.5rem .375rem}
 .ngav{display:flex;flex:none}
 .ngav .avatar{width:1.625rem;height:1.625rem;font-size:.625rem;margin-left:-.375rem;box-shadow:0 0 0 2px var(--bg)}
@@ -3893,7 +3892,14 @@ a.tref:hover{background:var(--accent-soft)}
 .ngmain:hover{background:var(--bg3)}
 .ngt{display:flex;align-items:center;gap:.375rem;color:var(--text);overflow:hidden}
 .ngroup:not(.unread) .ngt{color:var(--text2)}
-.ngroup.unread .ngt::before{content:"";width:.5rem;height:.5rem;border-radius:50%;background:var(--accent);flex:none}
+.ngroup.unread{background:color-mix(in srgb,var(--accent) 8%,transparent);box-shadow:inset .125rem 0 0 var(--accent)}
+.ngroup.unread .ngt{font-weight:600}
+.ngroup.read .ngt{color:var(--muted);font-weight:400}
+.ngroup.read .ngs,.ngroup.read .ngex{color:var(--faint)}
+.ngroup.read .ngav .avatar{opacity:.5;filter:saturate(0)}
+.nitem:not(.unread) .nexc,.nitem:not(.unread) time{color:var(--faint)}
+.nitem:not(.unread) .avatar{opacity:.5;filter:saturate(0)}
+.bpop .nsh,.bpop .nsec{position:sticky;top:0;z-index:1;background:var(--bg)}
 .ngn{font:var(--fs-xs) var(--mono);color:var(--muted);border:1px solid var(--line2);border-radius:var(--r-s);padding:0 .25rem}
 .ngs{font-size:var(--fs-s)}
 .ngitems{padding:0 0 .5rem 2.25rem}
