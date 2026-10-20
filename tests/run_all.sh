@@ -1446,6 +1446,18 @@ fresh; run p2116_c_ui node p2116_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.116.0 part D (#2066 #2067: several times a day, focus/habits in API v1)
 fresh; run p2116_d_api "$PY" p2116_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2116_d_ui node p2116_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.140.0 part A: shopping list quantity / price + offline in the shop, recipes -> shopping list, meal plan beyond 7 days (#2131 #2132)
+fresh; run p2140_a_api "$PY" p2140_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2140_a_ui node p2140_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.140.0 part B: budget month comparison + one CSV importer with office bank import, devices <-> office equipment (#2134 #2136)
+fresh; run p2140_b_api "$PY" p2140_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2140_b_ui node p2140_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.140.0 part C: journal history / search / export / mood stats, habits with several reminder times + weekly goal (#2133 #2135)
+fresh; run p2140_c_api "$PY" p2140_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2140_c_ui node p2140_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.140.0 part D: birthdays written back to CardDAV (#2137)
+fresh; run p2140_d_api "$PY" p2140_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2140_d_ui node p2140_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
