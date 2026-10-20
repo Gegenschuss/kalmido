@@ -687,3 +687,12 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
   .bwclist li,.bwcadd{flex-wrap:wrap}.bwclist input,.bwcadd input{flex-basis:100%}
   .bwbar .bwocc{flex:1 1 100%}
 }
+/* 2.122.3 A (#2335): a section of the import page reached by its anchor is marked briefly; the way there from a list */
+.oim .oimsec{position:relative;scroll-margin-top:4rem}
+.oim .oimsec::after{content:'';position:absolute;inset:0 -.5rem -.25rem;border-radius:.5rem;box-shadow:0 0 0 .125rem var(--accent);opacity:0;pointer-events:none;transition:opacity .2s ease-out}
+.oim .oimsec.oimflash::after{opacity:1}
+.oimlink{margin:.5rem 0 1rem;font-size:.875rem}
+.oimlink a{color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.oim .oimsec::after{transition:none}}
+.oimlink.e a{color:var(--accent)}
+.oimlink a{display:inline-flex;align-items:center;gap:.25rem;min-height:2.75rem}

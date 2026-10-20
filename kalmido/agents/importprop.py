@@ -63,7 +63,7 @@ def aim_validate(b, inp):
     repeat, start, until, category, vat_rate}]}. Only the shape is checked here; every row is judged when the card is shown
     and again when it is accepted. Unknown fields of a row (an org_id, an id, created_by ...) are dropped."""
     from ..agents.proposals import _p_keys, _p_str
-    from ..office.fixedimport import FCI_NOVAT_RE, fci_num
+    from ..office.fixedimport import fci_num, fci_vat_guess
     from ..office.calc import dstr, money
     _p_keys(b, "", ("kind", "summary", "area", "title", "note", "items"))
     area = b.get("area", "fixed_costs")
@@ -83,8 +83,8 @@ def aim_validate(b, inp):
             d = fci_num(row["amount"])
             if d is not None:
                 row["amount"] = dstr(money(d))
-        if row["vat_rate"] in (None, ""):  # as the spreadsheet import: 19 %, insurances and contributions 0 %
-            row["vat_rate"] = 0 if FCI_NOVAT_RE.search(str(row["label"] or "")) or FCI_NOVAT_RE.search(str(row["category"] or "")) else 19
+        if row["vat_rate"] in (None, ""):  # as the spreadsheet import: 19 %, insurances, contributions, bank, taxes, memberships 0 % (2.122.2)
+            row["vat_rate"] = fci_vat_guess(row["label"], row["category"])  # 2.122.2 (#2323)
         items.append(row)
     return {"area": area, "note": _p_str(b.get("note"), "note", AIM_NOTE_MAX, line=False), "items": items}
 
@@ -309,7 +309,7 @@ def aim_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "start": {"type": "string", "format": "date", "description": "YYYY-MM-DD: the first due date (yearly / quarterly: its month counts)"},
         "until": {"type": ["string", "null"], "format": "date", "description": "YYYY-MM-DD: the last month (optional)"},
         "category": {"type": "string", "maxLength": 100, "description": "Free group, e.g. Insurances"},
-        "vat_rate": {"type": "integer", "enum": [0, 7, 19], "description": "VAT on the net amount; left out: 19, insurances and contributions 0"}}}
+        "vat_rate": {"type": "integer", "enum": [0, 7, 19], "description": "VAT on the net amount; left out: 19, insurances, contributions, bank and credit costs, taxes and memberships 0 (a tax adviser 19)"}}}
     paths["/agent/proposals/import"] = {"post": op(
         "2.68.0 (#1839): propose old data for the office (today: fixed costs) -- the person checks and takes it over", "Agents",
         ok({"type": "object"}, "Created", "201") | errs("400", "403", "404", "409", "413", "429"),

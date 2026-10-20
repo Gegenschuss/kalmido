@@ -1,7 +1,7 @@
 """2.90.0 C (#1922): tax dates as recurring tasks (VAT return, income tax prepayments, trade tax).
 
 Setting office `tax_dates` (set only by the routes here, the general settings route ignores it):
-{ustva: none|month|quarter, ustva_ext: 0|1, est: 0|1, gewst: 0|1, lead_days: 0-30, user: uid, tasks: {kind: tid|None}, sig: {kind: str}}.
+{ustva: none|month|quarter|year, ustva_ext: 0|1, est: 0|1, gewst: 0|1, lead_days: 0-30, user: uid, tasks: {kind: tid|None}, sig: {kind: str}}.
 One recurring task per switched-on kind in the inbox of the person (pattern: fixedimport.py, the monthly cash flow check)."""
 import calendar
 from datetime import date
@@ -18,7 +18,7 @@ from .fixedimport import fci_people, fci_task_end
 from .model import office_settings, office_settings_save
 
 TXD_KINDS = ("ustva", "est", "gewst")
-TXD_USTVA = ("none", "month", "quarter")
+TXD_USTVA = ("none", "month", "quarter", "year")  # 2.122.0 D (#2315): year = only the annual VAT return
 TXD_LEAD = 3
 # kind -> (day of the deadline, titles); the months follow from the configuration (txd_months)
 TXD_TITLES = {"ustva": N_("Submit the VAT return (deadline: the 10th)"),
@@ -31,6 +31,14 @@ TXD_TEXT = {"ustva": N_("Prepare and submit the advance VAT return."),
 TXD_NOTE = N_("No tax advice; figures without guarantee.")
 TXD_WEEKEND = N_("If the deadline falls on a weekend or a public holiday, the next working day applies.")
 TXD_HELP = N_("Open the VAT return preparation")
+# 2.122.0 D (#2315): ustva "year" = no advance return, one task per year for the annual VAT return (deadline 31 July of the next year)
+TXY_TITLE = N_("Submit the annual VAT return (deadline: 31 July)")
+TXY_TEXT = N_("Prepare and submit the annual VAT return for the previous year.")
+TXY_HINT = N_("With a tax adviser the deadline is usually later; please agree it with your tax adviser.")
+
+
+def txy_year(kind, cfg):
+    return kind == "ustva" and cfg["ustva"] == "year"
 
 
 def txd_clean(s):
@@ -53,6 +61,8 @@ def txd_months(kind, cfg):
     if kind == "ustva":
         if cfg["ustva"] == "month":
             return list(range(1, 13))
+        if cfg["ustva"] == "year":
+            return [7]  # 2.122.0 D (#2315): 31 July, the extension does not apply
         if cfg["ustva"] == "quarter":
             sh = 1 if cfg["ustva_ext"] else 0  # permanent extension: one month later
             return [1 + sh, 4 + sh, 7 + sh, 10 + sh]
@@ -69,7 +79,7 @@ def txd_deadlines(kind, cfg, frm, n=1):
     y, m = frm.year, frm.month
     for _ in range(40):
         if m in months:
-            d = date(y, m, TXD_DAY[kind])
+            d = date(y, m, 31 if txy_year(kind, cfg) else TXD_DAY[kind])
             if d >= frm:
                 out.append(d)
                 if len(out) >= n:
@@ -85,6 +95,8 @@ def txd_due(dl, lead):
 def txd_repeat(kind, cfg, dl, due):
     """RRULE for the task: its due day is the deadline minus the lead; a lead that reaches into the previous month counts from the
     month's end (exact for every month length)."""
+    if txy_year(kind, cfg):
+        return "FREQ=YEARLY"  # 2.122.0 D (#2315): the due day stays in July (lead at most 30 days)
     if due.month == dl.month:
         day = due.day
     else:
@@ -94,7 +106,7 @@ def txd_repeat(kind, cfg, dl, due):
 
 
 def txd_sig(kind, cfg, person):
-    return f"{kind}|{cfg['ustva'] if kind == 'ustva' else 1}|{cfg['ustva_ext'] if kind == 'ustva' else 0}|{cfg['lead_days']}|{person}"
+    return f"{kind}|{cfg['ustva'] if kind == 'ustva' else 1}|{cfg['ustva_ext'] if kind == 'ustva' and not txy_year(kind, cfg) else 0}|{cfg['lead_days']}|{person}"
 
 
 def txd_task_new(c, kind, cfg, person):
@@ -111,11 +123,15 @@ def txd_task_new(c, kind, cfg, person):
     base = PUBLIC_URL.rstrip("/")
     url = base + "/#office/books/ustva" if kind == "ustva" else base + "/#office/books"
     content = f"{tr(TXD_TEXT[kind], lg=lg)}\n\n[{tr(TXD_HELP, lg=lg)}]({url})\n\n_{tr(TXD_NOTE, lg=lg)} {tr(TXD_WEEKEND, lg=lg)}_"
+    title = tr(TXD_TITLES[kind], lg=lg)
+    if txy_year(kind, cfg):  # 2.122.0 D (#2315)
+        title = tr(TXY_TITLE, lg=lg)
+        content = f"{tr(TXY_TEXT, lg=lg)}\n\n{tr(TXY_HINT, lg=lg)}\n\n[{tr(TXD_HELP, lg=lg)}]({url})\n\n_{tr(TXD_NOTE, lg=lg)} {tr(TXD_WEEKEND, lg=lg)}_"
     lid = my_inbox(c, person)
     ts = iso(now_utc())
     srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
     tid = insert_id(c, "INSERT INTO tasks(list_id,title,content,due,repeat,sort,created_at,updated_at,created_by,url,assignee_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                    (lid, tr(TXD_TITLES[kind], lg=lg), content, due.isoformat(), txd_repeat(kind, cfg, dl, due), srt, ts, ts, person, url, person))
+                    (lid, title, content, due.isoformat(), txd_repeat(kind, cfg, dl, due), srt, ts, ts, person, url, person))
     log_act(c, tid, "created", uid=person)
     return tid
 

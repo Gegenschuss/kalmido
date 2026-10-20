@@ -30,19 +30,42 @@ const oimClientOpts = cur => [['', tr('no client')], ...(OIM.clients || []).map(
 function oimHtml() {
   if (!ofcAdmin()) return `<div class="empty">${ic('lock')}<span>${tr('Only an admin of this organisation can do this')}</span></div>`;
   if (OIM.runs === null && !OIM.loading) { OIM.loading = true; setTimeout(async () => { await oimLoad(); OIM.loading = false; }, 0); }
+  setTimeout(oim_jump, 0);  // 2.122.3 A (#2335)
   const back = `<div class="ofcbar"><a class="btn sm" href="#office/settings">${ic('back', 's')} ${tr('Settings')}</a></div>`;
   return `<div class="oim">${back}<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('Take over your clients, services and equipment from a spreadsheet and keep old invoices and quotations as an archive. You see everything before it is saved; every import can be undone.')}</p>
-    <section class="oimsec"><h4>${ic('list', 's')} ${tr('Master data from a spreadsheet')}</h4>
+    <section class="oimsec" id="oim-master"><h4>${ic('list', 's')} ${tr('Master data from a spreadsheet')}</h4>
     <p class="muted">${tr('An .xlsx file with the sheets or tables Contacts (one address per cell), Services and Equipment.')}</p>
     <div class="lacts"><input type="file" id="oim-xlsx" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden><button type="button" class="btn sm pri" data-oim="pick-xlsx" ${OIM.busy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose file')}</button>${OIM.busy ? `<span class="muted">${tr('Reading…')}</span>` : ''}</div>
-    ${OIM.pv ? oimPreviewHtml() : ''}</section>
-    <section class="oimsec"><h4>${ic('archive', 's')} ${tr('Old invoices and quotations')}</h4>
+    ${OIM.pv ? oimPreviewHtml() : ''}</section>${oim_moreHtml()}
+    <section class="oimsec" id="oim-archive"><h4>${ic('archive', 's')} ${tr('Old invoices and quotations')}</h4>
     <p class="muted">${tr('PDF files are archived unchanged: never renumbered, never sent again, no e-invoice. Key data come from the file name; please add amount and payment.')}</p>
     <div class="lacts"><input type="file" id="oim-pdf" accept="application/pdf,.pdf" multiple hidden><button type="button" class="btn sm" data-oim="pick-pdf" ${OIM.archBusy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose PDF files')}</button></div>
     ${oimArchHtml()}</section>
     <section class="oimsec"><h4>${ic('hash', 's')} ${tr('Number counters')}</h4>${oimCounterHtml()}</section>
     <section class="oimsec"><h4>${ic('clock', 's')} ${tr('Import runs')}</h4>${oimRunsHtml()}</section></div>`;
 }
+
+// 2.122.3 A (#2335): one-off imports of other office areas live here too (their preview dialogs stay in their modules);
+// every section has an anchor: #office/import/<area> scrolls there and marks it briefly
+function oim_moreHtml() {
+  return `<section class="oimsec" id="oim-fixed"><h4>${ic('trend', 's')} ${tr('Fixed costs from a spreadsheet')}</h4>
+    <p class="muted">${tr('An .xlsx file with name, net amount and due month; you see a preview before anything is saved.')}</p>
+    <div class="lacts"><a class="btn sm ghost" href="/api/office/fixed-costs/import/template" download>${ic('download', 's')}<span>${tr('Download template')}</span></a><button type="button" class="btn sm" data-rkf="fimp">${ic('upload', 's')}<span>${tr('Import from Excel')}</span></button></div></section>
+    <section class="oimsec" id="oim-leads"><h4>${ic('target', 's')} ${tr('Leads from a CSV file')}</h4>
+    <p class="muted">${tr('A CSV file with name, company, e-mail and phone; leads with an e-mail that is already there are skipped.')}</p>
+    <div class="lacts"><button type="button" class="btn sm" data-lead="import">${ic('upload', 's')}<span>${tr('Import CSV')}</span></button></div></section>`;
+}
+function oim_jump() {
+  const m = /^#office\/import\/(\w+)/.exec(location.hash); if (!m) return;
+  const el = document.getElementById('oim-' + m[1]); if (!el) return;
+  if (OIM.jumped !== location.hash) {  // once per visit; the mark survives the redraws of the next 1.5 s (the page loads its runs)
+    OIM.jumped = location.hash; OIM.flashTo = Date.now() + 1500;
+    el.scrollIntoView({block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+    setTimeout(() => document.getElementById('oim-' + m[1])?.classList.remove('oimflash'), 1500);
+  }
+  if (Date.now() < OIM.flashTo) el.classList.add('oimflash');
+}
+window.addEventListener('hashchange', () => { OIM.jumped = null; });
 
 function oimPreviewHtml() {
   const p = OIM.pv, cl = p.clients || [];
@@ -209,7 +232,7 @@ function oimArchiveListHtml(q) {
   if (!OIM.list) { setTimeout(oimLoadList, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const items = (OIM.list.items || []).filter(r => (!q || [r.number, r.client, r.client_name, r.project].some(v => (v || '').toLowerCase().includes(q))) && (!OIM.cl || String(r.client_id) === OIM.cl));
   const sum = OIM.list.sum_invoices ? `<p class="muted oimsum">${esc(tr('Archived invoices: {0}, of which paid: {1}', ofcMoney(OIM.list.sum_invoices), ofcMoney(OIM.list.sum_paid)))}</p>` : '';
-  const imp = ofcAdmin() ? `<a class="btn sm" href="#office/import">${ic('upload', 's')} ${tr('Import legacy data')}</a>` : '';
+  const imp = ofcAdmin() ? `<a class="btn sm" href="#office/import/archive">${ic('upload', 's')} ${tr('Import legacy data')}</a>` : '';
   const sum0 = r81b_clFilter() + sum;  // 2.81.0 (#1834): the client filter above the list
   if (!items.length) return (OIM.cl ? sum0 : '') + `<div class="empty nempty eact">${ic('archive')}<span>${q || OIM.cl ? tr('Nothing matches.') : tr('No archived documents. Old invoices and quotations are added under Settings > Import legacy data.')}</span>${q ? '' : imp}</div>`;
   // 2.40.0 (#1366): the row shows the PDF in the browser, the button next to it downloads it

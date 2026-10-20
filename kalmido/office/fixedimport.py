@@ -46,8 +46,23 @@ FCI_HEAD = {  # normalised header (letters / digits only) -> field
     "kündigungsfristtage": "notice_days", "kuendigungsfristtage": "notice_days", "noticedays": "notice_days", "noticeperiod": "notice_days",
 }
 FCI_YES_RE = re.compile(r"^(ja|j|yes|y|x|1|true|abo|oui|sí|si|sì|wahr)$", re.I)  # 2.91.0 B (#1924)
+FCI_VAT_RE = re.compile(r"steuerberat|steuerkanzlei|steuerbüro|steuerbuero|tax\s*(?:advis|consult)", re.I)  # 2.122.2 (#2323): always VAT
+
+
+def fci_vat_guess(label, category):
+    """2.122.2 (#2323): the default VAT rate of a row without one: 0 % for insurances, contributions, bank / credit costs,
+    taxes, memberships (by the name or the category); a tax adviser by name always 19 %, also below a group "Steuern"."""
+    if FCI_VAT_RE.search(str(label or "")):
+        return 19
+    return 0 if FCI_NOVAT_RE.search(str(label or "")) or FCI_NOVAT_RE.search(str(category or "")) else 19
+
+
 FCI_QUARTER_RE = re.compile(r"viertelj|quartal|\bq[1-4]\b|quarter", re.I)
-FCI_NOVAT_RE = re.compile(r"versicherung|abgabe|beitrag|kammer|berufsgenossenschaft|rundfunk|insurance|contribution|levy", re.I)
+FCI_NOVAT_RE = re.compile(  # 2.122.2 (#2323): + bank and credit costs, taxes (not the tax adviser), service charge, memberships, KSK
+    r"versicherung|abgabe|beitrag|kammer|berufsgenossenschaft|rundfunk|insurance|contribution|levy"
+    r"|(?<!daten)bank|sparkasse|kontoführ|kontofuehr|girokarte|kredit|zins|provision|tilgung|rückzahl|rueckzahl"
+    r"|steuer(?!berat|kanzlei|büro|buero|programm|software)|hausgeld|mitglied|adac|\bksk\b|künstlersozial|kuenstlersozial"
+    r"|knappschaft|\bbg\b|\bloan|interest|membership|\btax(?!\s*(?:advis|consult))", re.I)
 FCI_REPEATS = (("once", re.compile(r"einmal|once", re.I)), ("quarterly", FCI_QUARTER_RE),
                ("yearly", re.compile(r"jährl|jaehrl|jahr|year|annual", re.I)), ("monthly", re.compile(r"monatl|month", re.I)))
 FCI_REASONS = {"name": N_("No name"), "amount": N_("Amount missing or not readable"), "zero": N_("Amount is 0"),
@@ -116,15 +131,25 @@ def fci_preview(c, oid, raw):
     if not grid:
         raise BadInput(tr("The spreadsheet is empty"))
     cols, hi = None, 0
+    heads = []
     for i, row in enumerate(grid[:20]):
         m = {}
         for j, cell in enumerate(row):
             f = FCI_HEAD.get(fci_norm(cell))
             if f and f not in m:
                 m[f] = j
+        heads.append(m)
         if "label" in m and "amount" in m:
             cols, hi = m, i
             break
+    if cols is None:  # 2.122.2 (#2323): an "Amount" column but no "Name" (A1 = "Grundkosten 2025"): the first text column is the name
+        for i, m in enumerate(heads):
+            if "amount" in m:
+                used = set(m.values())
+                j = next((j for j, cell in enumerate(grid[i]) if j not in used and str(cell or "").strip() and fci_num(cell) is None), None)
+                if j is not None:
+                    cols, hi = {**m, "label": j}, i
+                    break
     if cols is None:
         raise BadInput(tr("No header row with the columns Name and Amount (net) found"))
     body_rows = [(hi + 2 + k, r) for k, r in enumerate(grid[hi + 1:])]
@@ -142,6 +167,8 @@ def fci_preview(c, oid, raw):
     for no, r in body_rows:
         if not any(str(x).strip() for x in r):
             continue  # empty rows: silently skipped
+        if all(not str(x).strip() or fci_num(x) == 0 for x in r):
+            continue  # 2.122.2 (#2323): a row with only "0" (a month cell of an empty row) is empty too
         label, amt_s, mon_s = _clean_text(cell(r, "label"), 200), cell(r, "amount"), cell(r, "month")
         cat = _clean_text(cell(r, "category"), 100)
         base = {"row": no, "label": label, "amount": "", "gross": "", "repeat": "", "start": "", "month": mon_s[:10],
@@ -171,7 +198,7 @@ def fci_preview(c, oid, raw):
             out.append({**base, "reason": tr(FCI_REASONS["vat"])})
             continue
         if vr is None:
-            vr = 0 if FCI_NOVAT_RE.search(label) or FCI_NOVAT_RE.search(base["category"]) else 19
+            vr = fci_vat_guess(label, base["category"])
         nd_s = cell(r, "notice_days")  # 2.91.0 B (#1924): whole days, empty = 0
         nd = fci_num(nd_s) if nd_s else dec(0)
         if nd is None or nd != int(nd) or not 0 <= nd <= 730:

@@ -35,13 +35,14 @@ function aboHtml() {
     <div class="seg fcibasis" role="group" aria-label="${esc(tr('Amounts'))}">${[['net', tr('Net')], ['gross', tr('Gross')]].map(([k, n]) => `<button type="button" data-abo="basis" data-v="${k}" class="${ABO.basis === k ? 'on' : ''}" aria-pressed="${ABO.basis === k}">${esc(n)}</button>`).join('')}</div>
     ${d.items.length ? `<a class="btn sm ghost" href="/api/office/subs.csv" download>${ic('download', 's')}<span>CSV</span></a>` : ''}
     <button class="btn sm pri" data-abo="new">${ic('plus', 's')}<span>${tr('Subscription')}</span></button></div>`;
-  if (!d.items.length) return bar + `<div class="abo-empty"><p class="muted">${tr('No subscriptions yet. Mark software, licences and other tools you pay for regularly - and see what they cost a month and a year.')}</p><button class="btn pri" data-abo="new">${ic('plus', 's')}<span>${tr('Add a subscription')}</span></button></div>` + aboCandHtml(d);
+  if (!d.items.length) return bar + `<div class="abo-empty"><p class="muted">${tr('No subscriptions yet. Mark software, licences and other tools you pay for regularly - and see what they cost a month and a year.')}</p><button class="btn pri" data-abo="new">${ic('plus', 's')}<span>${tr('Add a subscription')}</span></button>${oim_link('fixed', true)}</div>` + aboCandHtml(d);  // 2.122.3 A (#2335): + the import link
   const head = `<div class="abo-sums"><div class="abo-sum"><span class="muted">${tr('per month')}</span><b>${ofcMoney(net ? t.per_month_net : t.per_month)}</b></div><div class="abo-sum"><span class="muted">${tr('per year')}</span><b>${ofcMoney(net ? t.per_year_net : t.per_year)}</b></div></div>
     ${t.low_use_count ? `<button type="button" class="abo-low ${ABO.low ? 'on' : ''}" data-abo="lowf" aria-pressed="${ABO.low}">${ic('bulb', 's')}<span>${esc(trn('Hardly used: {0} subscription, {1} a year', 'Hardly used: {0} subscriptions, {1} a year', t.low_use_count, ofcMoney(net ? t.low_use_per_year_net : t.low_use_per_year)))}</span>${ABO.low ? `<small class="muted">${tr('show all')}</small>` : ''}</button>` : ''}
     <p class="muted ofchint">${net ? tr('Net, without VAT.') : tr('Gross, incl. VAT.')} ${tr('Quarterly and yearly amounts are spread over the months; one-off costs are not counted.')}</p>`;
   const items = ABO.low ? d.items.filter(f => f.low_use && f.running) : d.items;
-  return bar + head + `<ul class="ofclist abo-list" role="list">${items.map(f => aboRowHtml(f, d.today)).join('')}</ul>` + aboCandHtml(d);
+  return bar + head + `<ul class="ofclist abo-list" role="list">${items.map(f => aboRowHtml(f, d.today)).join('')}</ul>` + oim_link('fixed') + aboCandHtml(d);
 }
+// 2.122.3 A (#2333): without VAT the amount says "without VAT" instead of "net"
 function aboRowHtml(f, today) {
   const cb = f.cancel_by, left = cb ? aboDays(today, cb) : null;
   const when = [f.next_renewal ? tr('renews {0}', fmtDateLoc(f.next_renewal)) : f.running ? '' : tr('ended')];
@@ -49,7 +50,7 @@ function aboRowHtml(f, today) {
   const users = aboSeatsShort(f);
   return `<li class="abo-row ${f.running ? '' : 'arch'} ${f.low_use ? 'low' : ''}"><button type="button" class="ofcrow abo-main" data-abo="edit" data-id="${f.id}">
       <span class="ofcn"><b>${esc(f.label)}${f.url ? ` ${ic('link', 's')}` : ''}${f.remind_days && f.remind_user ? ` <span class="abo-bell" title="${esc(tr('Reminder on'))}">${ic('bell', 's')}</span>` : ''}</b>
-      <small class="muted">${esc([`${ofcMoney(f.amount)} ${tr('net')} ${aboRp(f.repeat)}`, ...when].filter(Boolean).join(' · '))}</small>
+      <small class="muted">${esc([`${ofcMoney(f.amount)} ${+f.vat_rate ? tr('net') : tr('without VAT')} ${aboRp(f.repeat)}`, ...when].filter(Boolean).join(' · '))}</small>
       ${cancel || users ? `<small class="abo-meta">${cancel}${users ? `<span class="muted">${ic('users', 's')} ${esc(users)}</span>` : ''}</small>` : ''}</span>
       <span class="rksum abo-per"><span>${ofcMoney(aboPer(f, 'per_month'))}</span><small class="muted">${tr('per month')}</small></span></button>
     <label class="chkl swl abo-sw"><span class="swc"><input type="checkbox" role="switch" data-abo-low="${f.id}" ${f.low_use ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('hardly used')}</span></label></li>`;

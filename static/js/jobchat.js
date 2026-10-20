@@ -244,7 +244,17 @@ function jcd_cardHtml(no, list, row) {
 // the end result / an error under the card: 5 lines, "Show more" for longer ones
 function jcd_resHtml(m, row) {
   const b = String(m.body || ''), long = b.split('\n').length > 5 || b.length > 400, more = S.jcd.more.has(m.id);
-  return `<div class="jcdres${long && !more ? ' jcdclamp' : ''}${jcd_kind(m) === 'error' ? ' jcdx' : ''}">${row(m)}${long ? `<button type="button" class="linkbtn jcdmore" data-jca="more" data-jm="${m.id}" aria-expanded="${more}">${esc(tr(more ? 'Show less' : 'Show more'))}</button>` : ''}</div>`;
+  return `<div class="jcdres${long && !more ? ' jcdclamp' : ''}${jcd_kind(m) === 'error' ? ' jcdx' : ''}">${long ? jcm_inBubble(row(m), `<button type="button" class="linkbtn jcdmore" data-jca="more" data-jm="${m.id}" aria-expanded="${more}">${esc(tr(more ? 'Show less' : 'Show more'))}</button>`) : row(m)}</div>`;
+}
+// 2.122.3 jcm (#2340): put the button right after the message text (end of the .cbub div), before steps / suggestion / time
+function jcm_inBubble(html, btn) {
+  const st = html.indexOf('<div class="cbub'); if (st < 0) return html + btn;
+  const re = /<(\/?)div\b/g; re.lastIndex = st; let d = 0, x;
+  while ((x = re.exec(html))) {
+    d += x[1] ? -1 : 1;
+    if (!d) { const e = html.indexOf('>', x.index) + 1; return html.slice(0, e) + btn + html.slice(e); }
+  }
+  return html + btn;
 }
 function jcd_filtHtml() {
   if (S.chat.job || !S.jcd.n) return '<div class="jcdfilt" id="jcd-filt" hidden></div>';

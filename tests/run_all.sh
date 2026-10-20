@@ -1303,6 +1303,25 @@ fresh; run p2121_c_api "$PY" p2121_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2121_c_ui node p2121_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.121.0 lead: receipt categories with an SKR03 / SKR04 account (#2093)
 fresh; run p2121_d_api "$PY" p2121_d_api_test.py "$KALMIDO_TEST_DATA"
+# 2.122.0 part A: file request link, clients upload documents (#2097)
+fresh; run p2122_a_api "$PY" p2122_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2122_a_ui node p2122_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.122.0 part B: tags in the file store (#2099), document search with several filters + ZIP (#2294), shift-click ranges (#2295)
+fresh; run p2122_b_api "$PY" p2122_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2122_b_ui node p2122_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.122.0 part C: create documents via API (#2098), CSV of the document list (#2100), OCR languages (#2101), swipe in news (#2314)
+fresh; run p2122_c_api "$PY" p2122_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2122_c_ui node p2122_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.122.0 part D: yearly VAT return only (#2315)
+fresh; run p2122_d_api "$PY" p2122_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2122_d_ui node p2122_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.122.3 part A: office - one amount at 0 % VAT, import/export on the settings page, empty areas link there (#2333 #2335)
+fresh; run p21223_a_api "$PY" p21223_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21223_a_ui node p21223_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.122.3 part B: drag a single task onto another = subtask (#2334)
+fresh; run p21223_b_ui node p21223_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.122.3 part C: chat - "Show more" right under the shortened message (#2340)
+fresh; run p21223_c_ui node p21223_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

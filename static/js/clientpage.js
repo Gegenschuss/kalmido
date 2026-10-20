@@ -53,6 +53,14 @@ const ms_tag = (kind) => kind === 'client' ? `<span class="mstag mstag-cl">${ic(
 // 2.47.3 (#1360): the page follows the workspace of the sidebar like the office (Private = the private clients, an
 // organisation = its clients, All = every client one sees)
 const ms_inWs = c => { const ws = typeof wsCur === 'function' ? wsCur() : 'all'; return ws === 'all' || (ws === 'private' ? c.org_id == null : 'org:' + c.org_id === ws); };
+// 2.122.3 A (#2335): the way from a list of the office to its section of Settings > Import legacy data (#office/import/<area>):
+// an empty list says "Already have a list? Import from Excel", a filled one ends with a quiet "Import…" (office admins only;
+// lives here because the clients view draws it too without the office module loaded; the import page checks again)
+function oim_link(area, empty, csv) {
+  if (typeof officeOn !== 'function' || !officeOn() || (S.route.mod === 'office' && typeof ofcAdmin === 'function' && !ofcAdmin())) return '';
+  const t = empty ? (csv ? tr('Already have a list? Import from CSV') : tr('Already have a list? Import from Excel')) : tr('Import…');
+  return `<p class="oimlink ${empty ? 'e' : ''}"><a href="#office/import/${area}" data-oim-go="${area}">${empty ? ic('upload', 's') + ' ' : ''}${esc(t)}</a></p>`;
+}
 function ms_clView() {
   if (MSC.ws !== undefined && MSC.ws !== (typeof wsCur === 'function' ? wsCur() : 'all')) ms_clDirty();
   MSC.ws = typeof wsCur === 'function' ? wsCur() : 'all';
@@ -72,10 +80,10 @@ function ms_clView() {
     <button class="btn sm pri" data-act="client-new">${ic('plus', 's')}<span class="cdl">${tr('New client')}</span></button></div>`;
   const items = MSC.items === null ? null : ms_clShown();
   const list = items === null ? `<div class="muted ctempty">${tr('Loading…')}</div>`
-    : !MSC.items.length ? `<div class="empty nempty eact msclempty">${ic('brief')}<span>${tr('Clients are companies for quotations and invoices, with hours and budget. Private people belong in Contacts.')}</span><button class="btn pri" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button>${feat('contacts') ? `<a class="btn" href="#contacts">${ic('users', 's')} ${tr('Contacts')}</a>` : ''}</div>`
+    : !MSC.items.length ? `<div class="empty nempty eact msclempty">${ic('brief')}<span>${tr('Clients are companies for quotations and invoices, with hours and budget. Private people belong in Contacts.')}</span><button class="btn pri" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button>${feat('contacts') ? `<a class="btn" href="#contacts">${ic('users', 's')} ${tr('Contacts')}</a>` : ''}${oim_link('master', true)}</div>`
     : !items.length ? `<div class="empty">${ic('brief')}${tr('No client matches.')}</div>`
     : `<ul class="ctlist" role="list" aria-label="${esc(tr('Clients'))}">${items.map(c => `<li><button type="button" class="ctrow ${c.id === id ? 'on' : ''} ${MSC.pick?.has(c.id) ? 'picked' : ''} ${c.archived ? 'msarch' : ''}" data-clopen="${c.id}" ${MSC.pick ? `aria-pressed="${MSC.pick.has(c.id)}"` : `aria-current="${c.id === id}"`}>${MSC.pick ? `<span class="ctchk ${MSC.pick.has(c.id) ? 'on' : ''}" aria-hidden="true">${MSC.pick.has(c.id) ? ic('check', 's') : ''}</span>` : ''}${ms_clAv(c)}<span class="ctn"><b>${esc(cdn_label(c))}</b><small class="muted">${esc([cdn_label(c) !== c.name ? c.name : '', c.archived ? tr('archived') : '', c.contact, c.email].filter(Boolean).join(' · '))}</small></span>${c.budget && c.budget.level !== 'none' ? `<i class="msbud lv-${c.budget.level}" title="${esc(tr(BUDGET_TXT[c.budget.level]))}"></i>` : ''}</button></li>`).join('')}</ul>`;
-  return `<div class="ctview msclients ${id ? 'withcard' : ''} ${MSC.pick ? 'ctpicking' : ''}">${mob && id ? '' : head}${MSC.pick && !(mob && id) ? ms_clBar() : ''}${mob && id ? '' : bar}<div class="ctcols">${mob && id ? '' : `<div class="ctlistw">${list}</div>`}${card}</div></div>`;
+  return `<div class="ctview msclients ${id ? 'withcard' : ''} ${MSC.pick ? 'ctpicking' : ''}">${mob && id ? '' : head}${MSC.pick && !(mob && id) ? ms_clBar() : ''}${mob && id ? '' : bar}<div class="ctcols">${mob && id ? '' : `<div class="ctlistw">${list}${MSC.items?.length && !MSC.pick ? oim_link('master') : ''}</div>`}${card}</div></div>`;
 }
 function ms_clCard(c) {
   const b = c.billing || {}, cur = S.settings.time_currency || '€';

@@ -124,40 +124,24 @@ def doc_query(c, uid, args):
         where.append("n.org_id = ?")
         params.append(int(ws[4:]))
     base_where, base_params = list(where), list(params)
-    for key, col in (("sender", "d.sender_id"), ("type", "d.type_id")):
-        ids = [int(x) for x in str(args.get(key) or "").split(",") if x.strip().isdigit()][:50]
-        if ids:
-            where.append(f"{col} IN ({','.join('?' * len(ids))})")
-            params += ids
-    tags = [int(x) for x in str(args.get("tag") or "").split(",") if x.strip().isdigit()][:50]
-    if tags:
-        where.append(f"d.node_id IN (SELECT node_id FROM doc_node_tags WHERE tag_id IN ({','.join('?' * len(tags))}))")
-        params += tags
-    for key, op in (("from", ">="), ("to", "<=")):
-        v = str(args.get(key) or "")[:10]
-        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
-            where.append(f"COALESCE(d.doc_date, substr(n.created_at, 1, 10)) {op} ?")
-            params.append(v)
-    if str(args.get("review") or "") in ("1", "true"):
-        where.append("d.review = 1")
-    st = str(args.get("state") or "")
-    if st in S.STATES:
-        where.append("d.state = ?")
-        params.append(st)
+    # 2.122.0 B (#2294): several tags (every one / one of them / not), several senders and types, both dates, folder, file
+    # type, "without ...", and the search syntax of the search field (docs/dsearch.py)
+    from .dsearch import dsr_filters, dsr_text
+    q, text = dsr_filters(c, args, where, params, base_where, base_params)
     sql = f"FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {' AND '.join(where)}"
-    q = str(args.get("q") or "").strip()[:200]
-    if q:
+    if q or any(text.values()):
         by_ws = {}
         for r in c.execute(f"SELECT d.node_id, d.ws {sql}", params):
             by_ws.setdefault(r[1], []).append(r[0])
-        hit = S.search_ids(c, by_ws, q)
-        for ws_, ids_ in by_ws.items():  # an archive serial number ("ASN00042", "42"): its document as well
+        hit = S.search_ids(c, by_ws, q) if q else None
+        for ws_, ids_ in by_ws.items() if q else ():  # an archive serial number ("ASN00042", "42"): its document as well
             pre = re.escape(S.cfg_get(c, ws_)["asn_prefix"])
             n = re.fullmatch(rf"\s*(?:{pre})?\s*[:#-]?\s*0*(\d{{1,9}})\s*", q, re.I)
             if n:
                 r_ = c.execute("SELECT node_id FROM doc_meta WHERE ws=? AND asn=?", (ws_, int(n.group(1)))).fetchone()
                 if r_ and r_[0] in ids_:
                     hit = (hit or set()) | {r_[0]}
+        hit = dsr_text(c, by_ws, hit, text)
         if hit is not None:
             ids = sorted(hit)[:5000]
             sql += f" AND d.node_id IN ({','.join('?' * len(ids))})" if ids else " AND FALSE"
@@ -198,12 +182,20 @@ def facets(c, uid, ws_filter):
             if name:
                 merged.setdefault(name.lower(), {"name": name, "ids": []})["ids"].append(lid)
         out[key] = sorted(merged.values(), key=lambda v: (v["name"] or "").lower())
+    # 2.122.0 B (#2294): the folders the visible documents lie in (merged by name as the labels)
+    merged = {}
+    for r in c.execute(f"SELECT DISTINCT p.id, p.name FROM fs_nodes p WHERE p.id IN (SELECT n.parent_id FROM doc_meta d JOIN fs_nodes n "
+                       f"ON n.id=d.node_id WHERE {' AND '.join(where)}) AND p.id IN {fs_visible_sql(uid, c)}", params):
+        merged.setdefault(r[1].lower(), {"name": r[1], "ids": []})["ids"].append(r[0])
+    out["folders"] = sorted(merged.values(), key=lambda v: v["name"].lower())
     return out
 
 
 @app.get("/api/docs")
 def docs_list():
-    """Documents I can see: ?ws=all|private|org:<id>&q=&sender=&type=&tag=&from=&to=&review=1&state=&limit=&offset=."""
+    """Documents I can see: ?ws=all|private|org:<id>&q=&sender=&type=&tag=&from=&to=&review=1&state=&limit=&offset=.
+    2.122.0 B (#2294): sender / type / tag / folder repeatable (comma ids = one name), tag_mode=all|any, not_tag=, added_from=,
+    added_to=, no_tag=1, no_sender=1, no_type=1, ftype=pdf,image,office,text,other; q takes the syntax of docs/dsearch.py."""
     c = db()
     uid = me()
     rows, total, review = doc_query(c, uid, request.args)
@@ -536,6 +528,16 @@ def _settings_labels(c, ws, uid, can):
     return {k: [{"id": x["ids"][0], "name": x["name"]} for x in f[k]] for k in ("senders", "types", "tags")}
 
 
+def _ocr_missing(c, uid):
+    """2.122.0 (#2101): readable names of the Tesseract languages this person's app language needs that the image lacks."""
+    from ..core.i18n import lang as _lang
+    from .ocr import ocr_available as _av, ocr_langs
+    if not _av():
+        return []
+    names = {"deu": "Deutsch", "eng": "English", "fra": "Français", "ita": "Italiano", "spa": "Español", "nld": "Nederlands"}
+    return [names.get(x, x) for x in ocr_langs(_lang(c, uid=uid))[1]]
+
+
 def _settings_json(c, ws, uid):
     from ..integrations.mail import MAIL_IN_ON, mail_addr
     oid = S.ws_org(ws)
@@ -552,7 +554,7 @@ def _settings_json(c, ws, uid):
     cfg = S.cfg_get(c, ws)
     return {"ws": f"org:{oid}" if oid else "private", "can_manage": can, "levels": cfg["levels"], "inbox": cfg["inbox"],
             "rules": S.rules_get(c, ws) if can else [], **_settings_labels(c, ws, uid, can), "folders": [f for f in folders if f["name"].lower() != S.INBOX.lower()],
-            "root_id": root, "ocr": ocr_available(), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws), "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(tok[0]) if (tok and MAIL_IN_ON) else ""}}
+            "root_id": root, "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws), "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(tok[0]) if (tok and MAIL_IN_ON) else ""}}
 
 
 @app.get("/api/docs/settings")
@@ -711,7 +713,9 @@ def docs_label_restore(kind):
         part = ids[i:i + 1000]
         q = ",".join("?" * len(part))
         if kind == "tag":
-            for (nid,) in c.execute(f"SELECT node_id FROM doc_meta WHERE ws=? AND node_id IN ({q})", (ws, *part)).fetchall():
+            from ..files.fstags import dt_ws_nodes  # 2.122.0 B (#2099): also files / folders of the workspace
+            wc, wp = dt_ws_nodes(ws)
+            for (nid,) in c.execute(f"SELECT n.id FROM fs_nodes n WHERE {wc} AND n.id IN ({q})", (*wp, *part)).fetchall():
                 c.execute("INSERT INTO doc_node_tags(node_id, tag_id) VALUES(?,?) ON CONFLICT DO NOTHING", (nid, lid))
         else:
             c.execute(f"UPDATE doc_meta SET {kind}_id=? WHERE ws=? AND {kind}_id IS NULL AND node_id IN ({q})", (lid, ws, *part))

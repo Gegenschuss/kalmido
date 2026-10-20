@@ -303,6 +303,12 @@ Settings > "Import legacy data" (organisation admins only) takes over what an of
 documents. It is a function of the app: the person uploads the files, sees a preview, corrects it and confirms. Nothing
 is guessed in the background and no language model is involved.
 
+Since 2.122.3 the page also holds the one-off imports of fixed costs (spreadsheet) and leads (CSV); each section has its
+own address (`#office/import/master`, `fixed`, `leads`, `archive`) that scrolls there and marks it. An empty list of
+clients, services, equipment, fixed costs, subscriptions or leads links to its section ("Already have a list? Import
+from Excel"), a filled one ends with a quiet "Import…" link. Running exports (DATEV, bookkeeping, bank statements) stay
+where they are used.
+
 - **Spreadsheet (.xlsx)**: read with the Python standard library only (no macros, no formulas evaluated, files with XML
   entities refused, at most 10 MB). Sheets or tables (Excel "Format as table") are found by name: `Contacts` (column
   `addresses`, one address text per cell), `Services` (`serviceDE`, `serviceEN`, `dailyrate`, `hourlyrate`, `rawfee`,
@@ -518,7 +524,7 @@ follow-up day; a day that has come is marked in the accent colour, the toolbar c
 Leads never count in the open sum, the weighted sum or the forecast. *Convert into a client* makes a client of the area
 from company / person / e-mail / phone (the person as its contact person) - or takes an existing client with the same
 e-mail or company name, which is offered - and moves the deal to *Inquiry*; the undo moves it back and removes a client
-made by the conversion as long as nothing else uses it. *Import CSV* reads a file with columns such as name, company,
+made by the conversion as long as nothing else uses it. *Import CSV* (since 2.122.3 under Settings > Import legacy data) reads a file with columns such as name, company,
 e-mail, phone, source, next step, follow-up, note, value (German, English, Spanish, French, Italian and Dutch headers;
 at most 1000 rows): a preview first, then the rows without errors are taken over; e-mails already in the pipeline or
 earlier in the file are skipped as duplicates. An import is one undo step (its leads go into the bin). A confirmed
@@ -535,7 +541,7 @@ Routes: `GET` / `POST /api/office/deals/<id>/convert` (`{client_id?}`; `GET` = f
 The tab **Cash flow** (admins of the office area only) shows per month what comes in and goes out, actual and planned.
 **Fixed costs** (rent, subscriptions, insurances) are entered there: name, amount **net**, a free **category** (the list
 groups by it, without one last; the field suggests the categories already used), the **VAT rate** (0, 7 or 19 %), repeat
-(once, monthly, quarterly, yearly), first due date and end. Each row shows net and gross. Fixed costs from before 2.67
+(once, monthly, quarterly, yearly), first due date and end. Each row shows net and gross (at 0 % VAT one amount and "without VAT", 2.122.3). Fixed costs from before 2.67
 have 0 % and keep their amounts.
 
 **Net | Gross** above the months switches the sums (gross by default; the choice is kept on the device). Gross adds the
@@ -564,7 +570,7 @@ not part of the approval) with a line which version counts; everyone who may edi
 undo step takes it back, the office log records it. Freelancers without an organisation have the same in their personal
 office.
 
-**Import from Excel**: "Download template" gives an .xlsx with the header row and three example rows. The first sheet is
+**Import from Excel** (since 2.122.3 under Settings > Import legacy data, section "Fixed costs from a spreadsheet"): "Download template" gives an .xlsx with the header row and three example rows. The first sheet is
 read below its header row: `Name`, `Betrag (netto)` (also `Betrag`, `netto`, `Amount (net)`), `fällig Monat` (also
 `Monat`, `Due month`); optional `Kategorie`, `USt`, `Wiederholung`. A row with a name but no amount is a group row: its
 name is the category of the rows below. Month 0 = monthly from 1 January 2026, 1-12 = yearly in that month (on the 1st);
@@ -603,8 +609,8 @@ of a self-employed person. **Photograph receipt** opens the camera on a phone (t
 receipt goes into your documents, amount and date are recognised in the background, and you add the category and the VAT
 rate (19 / 7 / 0 % or unknown). The **income/expense statement** of a year counts payments received on your invoices
 (cash principle, split by VAT rate) against your receipts and travel expenses, with export as CSV or PDF. The **VAT return**
-section lists the figures (fields 81, 86, 21, 45, 66, 83) for a month or quarter to type into ELSTER, on cash or accrual basis;
-small businesses get no return. A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
+section lists the figures (fields 81, 86, 21, 45, 66, 83) for a month, a quarter or the whole year to type into ELSTER, on cash
+or accrual basis; with the yearly tax dates setting the whole previous year is preselected (2.122); small businesses get no return. A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
 as "Tax reserve" and "Freely available". No tax advice; figures without guarantee. Kalmido sends nothing to the tax office.
 
 **Billing receipts on to a client (2.121):** under the receipts of the month, **Bill receipts on to a client …** (or **Bill on to a
@@ -651,11 +657,14 @@ Tables `office_bank_imports`, `office_bank_tx` (see Database).
 
 ## Tax dates as tasks (2.90)
 
-At the bottom of **Bookkeeping**, **Tax dates** keeps the usual German deadlines in view: the VAT return (none, monthly
-or quarterly, optionally with the permanent extension), the income tax prepayments (10 March, June, September, December)
+At the bottom of **Bookkeeping**, **Tax dates** keeps the usual German deadlines in view: the VAT return (none, monthly,
+quarterly or yearly, optionally with the permanent extension), the income tax prepayments (10 March, June, September, December)
 and the trade tax prepayments (15 February, May, August, November). Each kind switched on becomes ONE recurring task in
 the basket of the person chosen (an admin of the office; in a personal office its owner), due on the deadline minus the
 lead time (default 3 days); the title names the real deadline, the VAT task links to the VAT return figures.
+**Yearly (annual return only)** (2.122) is for businesses that file no advance returns: instead of the advance return one
+yearly task "Submit the annual VAT return" (31 July of the following year; with a tax adviser the deadline is usually later,
+so please agree it with them); the permanent extension does not apply there.
 Switching a kind off or changing it ends the old task (done, never deleted) and creates a new one when needed; a task
 completed or deleted by hand comes back on the next save. A deadline on a weekend or holiday moves to the next working
 day (Kalmido does not shift it). No tax advice; figures without guarantee.

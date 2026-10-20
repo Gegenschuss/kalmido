@@ -1,0 +1,14 @@
+/* 2.122.0 A (#2097): file requests of a folder (filereq.js): one row per request, its link with copy / QR, the new-request form */
+.frq-list{display:flex;flex-direction:column;gap:.5rem;margin:.5rem 0}
+.frq-row{border:1px solid var(--line);border-radius:.5rem;padding:.5rem .75rem}
+.frq-row.frq-expired,.frq-row.frq-revoked,.frq-row.frq-inactive{opacity:.7}
+.frq-head{display:flex;align-items:center;gap:.5rem;min-height:2.75rem}
+.frq-facts{display:flex;flex-wrap:wrap;gap:.125rem .75rem;font-size:var(--fs-xs)}
+.frq-link{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.375rem;align-items:center;margin:.5rem 0 .25rem}
+.frq-link input{min-height:2.75rem;font:var(--fs-xs) var(--mono)}
+.frq-link .btn,.frq-link .iconbtn{min-height:2.75rem}
+.frq-qr{display:flex;justify-content:center;margin:.5rem 0}
+.frq-qr img{width:11rem;height:11rem;border-radius:.375rem;background:#fff}
+.frq-nums{display:grid;grid-template-columns:1fr 6rem;gap:.375rem .75rem;align-items:center}
+.frq-kinds{border:0;padding:0;margin:.5rem 0}
+.frq-kinds .chkl{min-height:2.75rem}

@@ -36,14 +36,16 @@ const LD_MODS = {
   pubvideo: ['pubvideo'],  // 2.99.1 A (#1959): only the customer page of a video sign-off loads it (/s/q/<token>), the app never
   polls: ['polls'],  // 2.102.0 C (#2208): scheduling polls (#1953), on the first "Find a date"
   formq: ['formq'],  // 2.102.0 C (#2208): questionnaires (#1954), with the forms dialog of a list
+  tagsel: ['tagsel'],  // 2.122.0 B (#2099 #2294 #2295): tag picker, tag filter buttons, Shift ranges (file store + documents)
+  filereq: ['filereq'],  // 2.122.0 A (#2097): file request links of a folder (dialog on demand)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
 // uses the token dialogs, a knowledge page embeds mind maps; 2.87.9 (#1936): Paperless-ngx (paperless.js) is in Integrations
-const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs'], agentchat: ['integrations'], wiki: ['mindmap']};
+const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs'], agentchat: ['integrations'], wiki: ['mindmap'], docs: ['tagsel']};  // 2.122.0 B: docs -> tagsel
 // functions of a module that code loaded at start calls: a stand-in loads the module and then calls the real one (the
 // module's own function declaration replaces the stand-in on window)
-const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved'], contacts: ['ctRoute', 'ctEditor'],
+const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved'], contacts: ['ctRoute', 'ctEditor'], filereq: ['frq_open'],
   // 2.65.0 (#1823)
   agentchat: ['chatOpen', 'chatClose', 'chatPop', 'chatDock', 'chatFloatMin', 'apvJump', 'chatChoice', 'shareDest', 'chatFileRm', 'chatReact',
     'chatModeMenu', 'stepsAlways', 'stepsLive', 'chatEditStart', 'chatOlder', 'chatSend', 'chatBottom', 'chatDraw', 'agModal', 'agDraw', 'aiuLoad', 'ains_setupModal'],
@@ -59,7 +61,7 @@ const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 
 // them next to the scripts and resolves only once they apply (no unstyled flash when the area opens)
 const LD_CSS = {settings: ['settings'], contacts: ['contacts'], office: ['office'], agentchat: ['agentchat'], pdf: ['pdf'], mindmap: ['mindmap'],
   wiki: ['wiki'], stats: ['stats'], calendar: ['calendar'], docs: ['docs'], life: ['life'],
-  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev']};  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
+  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq']};  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
 const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office'],
   // 2.65.0 (#1823)
   chatViewHtml: ['agentchat', 1], jobStepsHtml: ['agentchat'], aiuCardHtml: ['agentchat'], aiuNewsText: ['agentchat'], chatInner: ['agentchat'],
