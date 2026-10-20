@@ -12390,5 +12390,6 @@
   "{0} once": "{0} eenmalig",
   "Prices include VAT. Pay once, no subscription.": "Prijzen inclusief btw. Eenmalig betalen, geen abonnement.",
   "The setup code is fixed on this server": "De installatiecode staat vast op deze server",
-  "This setup code has expired. Ask your hoster for a new one.": "Deze installatiecode is verlopen. Vraag je hostingprovider om een nieuwe."
+  "This setup code has expired. Ask your hoster for a new one.": "Deze installatiecode is verlopen. Vraag je hostingprovider om een nieuwe.",
+  "Channel type": "Soort"
 }
