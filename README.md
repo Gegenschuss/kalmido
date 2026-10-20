@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.124.0** (2026-10-20): tables - SUMIF, COUNTIF, VLOOKUP / XLOOKUP, text and date functions, checkbox / person /
+  link / file columns, rows and columns kept in view, print, cell history, sharing single tables with people and agents,
+  charts, several sheets per table, tables in Mod+K; cash flow balance from the bank reconciliation.
 - **2.123.0** (2026-10-20): knowledge pages - history with restore, pictures and files from the file store, read-only
   sharing with people or a public link, full-text search with a word index, `[[datei:…]]` / `[[tabelle:…]]` links, check
   boxes become tasks, texts encrypted at rest (switched on by the admin); cash flow with opening balance, corrections by

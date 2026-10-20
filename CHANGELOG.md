@@ -7,6 +7,32 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.124.0] - 2026-10-20
+
+Tables: more functions, new column kinds, rows and columns kept in view, print, history, sharing, charts and several
+sheets; cash flow balance from the bank reconciliation.
+
+### Added
+- Tables: new functions SUMMEWENN/SUMIF, ZÄHLENWENN/COUNTIF (criteria like `">5"`, `"<>x"`, wildcards `*` `?`),
+  SVERWEIS/VLOOKUP, XVERWEIS/XLOOKUP, LINKS/LEFT, RECHTS/RIGHT, TEIL/MID, LÄNGE/LEN, VERKETTEN/CONCAT, GLÄTTEN/TRIM,
+  GROSS/UPPER, KLEIN/LOWER, DATUM/DATE, JAHR/YEAR, MONAT/MONTH, TAG/DAY, EDATUM/EDATE; they come in and go out as
+  formulas in .xlsx files; a lookup that finds nothing shows "Not found" (#2109).
+- Tables: column kinds checkbox (counts as 1 in formulas), person (someone who may see the table), link (http, https,
+  mailto) and file (upload into a cell, stored encrypted, trash and Undo like attachments) (#2110).
+- Tables: keep the first rows / columns in view while scrolling; "Print / save as PDF" with the header repeated on every
+  page (#2111).
+- Tables: change history of the cells for people and agents - "History of the cell" and "Recent changes" (newest 200 per
+  table within 90 days) (#2112).
+- Tables: share a single table with people (read or edit) and with agents of its workspace, revocable at any time; it
+  shows under "Shared with me"; deleting, moving and step 2 stay with the table's own people (#2113).
+- Tables in the Mod+K search (#2114).
+- Tables: a simple bar or line chart from columns, live with the values, saved per table (#2115).
+- Tables: several sheets per table - sheet bar under the grid (add, rename, duplicate, move, delete with Undo),
+  formulas across sheets (`Sheet2!A1`), .xlsx import / export of all sheets, sheets through the agent API (#2116).
+- Cash flow: the balances of imported bank statements (CAMT.052 / .053 balances, an optional balance column for CSV,
+  several accounts added up) show as "Account balance according to the bank" with the difference to the computed
+  balance and can be taken over as starting balance or real balance; a value by hand always wins (#2342).
+
 ## [2.123.0] - 2026-10-20
 
 Knowledge pages: history, pictures from the file store, sharing, full-text search; cash flow with an account balance.
