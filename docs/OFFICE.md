@@ -368,7 +368,7 @@ where they are used.
   stays, as does the service the calculation rules name as the producing one; the answer says what stayed. 2.138.0: a
   service used in a document or framework contract and a device in a set are archived instead of staying active
   (documents keep showing them with name and price); the page lists them with the document or set they are in, each with
-  **Restore**. A run undone before 2.112 shows **Archive leftover entries** once: it archives what that run left active
+  **Restore**. A run undone before 2.138 shows **Archive leftover entries** once: it archives what that run left active
   (only its own services and devices, never the producing service, nothing deleted). Fields a merge filled are emptied
   again while they still hold the imported value.
 

@@ -54,6 +54,7 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
     await call(ck, 'PUT', `/api/office/docs/${doc.id}/parts/${pa.part.id}/items`, {items: [svc('Animation', 2, 500)]});
     const t1 = await call(ck, 'POST', '/api/office/trips', {date_from: '2024-03-10', date_to: '2024-03-12', overnight: 1, dest: 'Hamburg', people: [{name: 'Externe Person'}]});
     check(t1.http === 201, u + ': a trip without receipts ' + t1.http);
+    await call(ck, 'POST', `/api/office/docs/${doc.id}/status`, {status: 'accepted'});  // 2.138.0 (#2235): "Create invoice" in the bar once accepted
     prep[u] = {doc: doc.id};
   }
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
