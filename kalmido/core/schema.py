@@ -3138,6 +3138,8 @@ USER_DEFAULTS = {
     # 2.57.0 B (#1807): my own colour per workspace, json {"private" | "org:<id>": tone key of LP_TONES | "none"};
     # a missing key = the default (an organisation: its admins' colour, Private: neutral). Only I see it.
     "ws_colors": "{}",
+    # 2.143.0 D (#2155): the appearance of all devices, json {LOOK_KEYS key: value}; '' = never saved (the first device uploads its own)
+    "look": "",
     # 2.57.0 A (#1798): the sidebar's favourites of every kind in the person's order, json list of keys: "l:<list id>" (the
     # star itself stays in fav_lists), "folder:<path>", "v:<view>" (today, tomorrow, ...), "m:<module or area>", "f:<filter id>",
     # "tag:<name>", "p:<user id>", "g:<group id>", "a:<agent id>"; synced to every device like the other settings

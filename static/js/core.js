@@ -652,6 +652,7 @@ function applyState(j) {
   S.lists = j.lists; S.inboxNames = j.inbox_names || []; S.sections = j.sections; S.habits = j.habits; S.pomo = j.pomo;
   S.notes = j.notes || []; S.team = j.team || {enabled: false, unread: 0};  // 2.17.0 (#442 #419)
   S.pomoToday = j.pomo_today; S.avatars = j.avatars || {}; S.colors = j.colors || {}; S.share = j.share || null; S.settings = j.settings; S.mineOrder = moFromState(j); S.languages = j.languages || [{code: 'en', name: 'English'}]; LS.set('lang', j.settings.lang || 'en'); document.documentElement.lang = j.settings.lang || 'en'; S.counts = j.counts; S.v = j.v; S.ntfyUrl = j.ntfy_url;
+  lookAdopt();  // 2.143.0 D (#2155)
   o3c_ringsMigrate();  // 2.118.0 (#2297): old device switch for rings -> account setting, once
   foldSync();  // 2.4.0 (#361): folded folders follow the user (all devices)
   S.tasks = new Map(j.tasks.map(t => [t.id, t]));

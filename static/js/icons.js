@@ -315,8 +315,8 @@ try { if (screen.orientation?.addEventListener) screen.orientation.addEventListe
 document.addEventListener('focusout', () => { if (vpPending) setTimeout(() => { if (!editFocused()) stableViewport(); }, 0); }, true);
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('tasks.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem('tasks.' + k, JSON.stringify(v, typeof le2eRepl === 'function' ? le2eRepl() : undefined)); } catch { /* private mode */ } },  // 2.64.1 (#1817): ciphers only (H1)
-  del(k) { try { localStorage.removeItem('tasks.' + k); } catch { /* private mode */ } },
+  set(k, v) { try { localStorage.setItem('tasks.' + k, JSON.stringify(v, typeof le2eRepl === 'function' ? le2eRepl() : undefined)); } catch { /* private mode */ } if (typeof lookQueue === 'function') lookQueue(k); },  // 2.64.1 (#1817): ciphers only (H1); 2.143.0 D (#2155): appearance keys go to the account
+  del(k) { try { localStorage.removeItem('tasks.' + k); } catch { /* private mode */ } if (typeof lookQueue === 'function') lookQueue(k); },
 };
 // multi-user: everything under tasks.* belongs to the logged-in user (cache, outbox, tab bar, ...) except
 // these device preferences. Wiped on logout and when another user logs in in the same browser.
@@ -388,7 +388,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#iitip:
 document.addEventListener('scroll', () => iiHide(true), true);
 const hintK = t => `<div class="shint keep">${t}</div>`;  // 2.13.0: a helper line that stays inline (security, data loss, a state)
 const kt = (label, keys) => isTouch() ? label : `${label} (${kbText(keys)})`;  // a label with its keyboard shortcut
-const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.densSideV', 'tasks.densRowsV', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.cwins', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold', 'tasks.mdOpen', 'tasks.pack', 'tasks.headShow', 'tasks.rings']);  // 2.83.0 C (#1427): + theme, header pictures, rings
+const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.densSideV', 'tasks.densRowsV', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.cwins', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold', 'tasks.mdOpen', 'tasks.pack', 'tasks.headShow', 'tasks.rings', 'tasks.lookLocal']);  // 2.83.0 C (#1427): + theme, header pictures, rings
 function clearLocal() {
   try {
     const ks = [];

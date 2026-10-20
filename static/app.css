@@ -7643,3 +7643,9 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 :root #side .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .wsbar{width:auto;min-height:2rem}
 @media (pointer:coarse){ :root #side .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .wsbar{width:auto;min-height:2.75rem} }
 :root #side .sbsrch,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sbsrch{margin-bottom:.5rem}  /* room above the first group heading */
+/* 2.143.0 D (#2156): activity per organisation (Administration > Organisation) */
+.actwrap{overflow-x:auto}
+.acttbl{border-collapse:collapse;width:100%;font-size:var(--fs-s,.8125rem)}
+.acttbl th,.acttbl td{padding:.375rem .5rem;text-align:right;border-bottom:1px solid var(--line2);white-space:nowrap}
+.acttbl th:first-child{text-align:left;font-weight:500}
+.acttbl thead th{color:var(--muted);font-weight:500;font-size:var(--fs-xs)}

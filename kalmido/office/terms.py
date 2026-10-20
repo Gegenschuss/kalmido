@@ -203,12 +203,79 @@ def agb_file_response(c, oid, t, name, inline=False):
 def agb_set(c, oid, lang, meta):
     s = office_settings(c, oid)
     t = dict(s.get("terms") or {})
+    old = t.get(lang)
+    if isinstance(old, dict) and (not meta or old.get("file") != meta.get("file")):  # 2.143.0 D (#2259): the file's time = when it stopped being current
+        p = agb_path(oid, old.get("file"))
+        try:
+            if p:
+                os.utime(p)
+        except OSError:
+            pass
     if meta:
         t[lang] = meta
     else:
         t.pop(lang, None)
     s["terms"] = t
     office_settings_save(c, oid, s)
+
+
+AGB_KEEP_DAYS = 30  # a replaced / removed state stays this long (the undo step "restore"), then it goes if nothing names it
+AGB_TICK = {"at": 0.0}
+
+
+def agb_purge(c, oid, now=None):
+    """2.143.0 D (#2259): deletes the stored terms files of office area oid that are not the current state of their language, are
+    named by no row of office_docs / office_gen_docs (the trash included; open approval links reach their file only through
+    these rows) and stopped being current at least AGB_KEEP_DAYS ago (file time, see agb_set). Files go after the commit
+    (nothing is read). Returns the number of files removed."""
+    d = os.path.join(OFFICE_DIR, str(int(oid)))
+    try:
+        names = [n for n in os.listdir(d) if AGB_FILE_RE.fullmatch(n)]
+    except OSError:
+        return 0
+    if not names:
+        return 0
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    limit = (now - datetime.timedelta(days=AGB_KEEP_DAYS)).timestamp()
+    keep = set()
+    t = office_settings(c, oid).get("terms") or {}
+    for lg in AGB_LANGS:
+        m = t.get(lg) if isinstance(t, dict) else None
+        if isinstance(m, dict):
+            keep.add(m.get("file"))
+            if (m.get("uploaded_at") or "") > iso(now - datetime.timedelta(days=AGB_KEEP_DAYS)):
+                keep.update(n for n in names if n.startswith(f"terms-{lg}-"))  # replaced a short while ago: the older ones stay
+    for tbl in ("office_docs", "office_gen_docs"):
+        for r in c.execute(f"SELECT terms FROM {tbl} WHERE org_id=? AND terms IS NOT NULL AND terms<>''", (oid,)):
+            f = agb_frozen(r["terms"])
+            if f:
+                keep.add(f["file"])
+    n = 0
+    for name in names:
+        if name in keep:
+            continue
+        p = os.path.join(d, name)
+        try:
+            if os.path.getmtime(p) <= limit:
+                os.remove(p)
+                n += 1
+        except OSError:
+            continue  # the next round tries again
+    return n
+
+
+def agb_purge_tick(c):
+    """Watchdog: agb_purge for every office area (organisations and personal offices), at most every 6 hours."""
+    import time
+    from ..core.pg import system_ctx
+    if time.time() - AGB_TICK["at"] < 6 * 3600:
+        return 0
+    AGB_TICK["at"] = time.time()
+    n = 0
+    with system_ctx(c):
+        for r in c.execute("SELECT id FROM orgs").fetchall():
+            n += agb_purge(c, r["id"])
+    return n
 
 
 def agb_valid_date(v):

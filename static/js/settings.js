@@ -458,6 +458,7 @@ function admSubShow(md, want, save) {
   $$('[data-admsub]', md).forEach(b => { const on = b.dataset.admsub === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
   segReveal($(`[data-admsub="${k}"]`, md));
   $$('[data-admp]', md).forEach(p => { p.hidden = p.dataset.admp !== k; });
+  if (k === 'org') actDraw(md);  // 2.143.0 D (#2156)
   if (k === 'server' && typeof rt9_adminDraw === 'function') rt9_adminDraw(md);  // 2.59.0 B (#1375)
   if (k === 'agents') return Promise.all([ad_agPolicyDraw(md), audDraw(md)]);  // 2.46.6 (#1710): loaded when shown
 }
@@ -659,7 +660,7 @@ function settingsModal(focus) {
     users: S.me?.is_admin ? admSubsHtml({  // 2.24.0 (#826): Administration in sub-tabs like Agents
       users: usersHtml() + grpHtml() + orphHtml(),
       signin: `<div id="s-signin">${signinHtml(hint)}</div>`,
-      org: orgsHtml() + orgAgentsHtml(hint) + ocAdminHtml(hint),  // 2.42.0 (#828): + encryption of organisation data
+      org: orgsHtml() + actHtml() + orgAgentsHtml(hint) + ocAdminHtml(hint),  // 2.42.0 (#828): + encryption of organisation data
       agents: ad_agentsHtml(hint),  // 2.46.6 (#1710)
       server: instanceHtml(chk, hint) + ad_updHtml(hint) + hostHtml(hint) + bkHtml() + stoHtml() + (typeof rt9_adminHtml === 'function' ? rt9_adminHtml(hint) : '') + asst_admHtml(),  // 2.75.0 (#1411): + asst_admHtml; 2.59.0 B (#1375): + related tasks  // 2.46.6 (#1710): + the update check result (was Help)
       log: aaHtml()}, ad_admFocus(focus)) : '',  // 1.9.0: users first

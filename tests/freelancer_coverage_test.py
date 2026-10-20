@@ -85,7 +85,7 @@ ROUTES = {
     "GET /api/admin/health": "admin",  # 2.102.0 D (#1994): the server's capacity numbers
     "GET /api/admin/lists/orphaned": "admin", "GET /api/admin/orgcrypt": "admin", "GET /api/admin/related": "admin",
     "GET /api/admin/storage-check": "admin", "GET /api/admin/upload-scan": "admin",
-    "GET /api/v1/admin/agents/{}/audit": "admin", "GET /api/v1/admin/status": "admin", "GET /api/v1/admin/users": "admin",
+    "GET /api/v1/admin/agents/{}/audit": "admin", "GET /api/v1/admin/status": "admin", "GET /api/v1/admin/orgs/activity": "admin", "GET /api/admin/orgs/activity": "admin", "GET /api/v1/admin/users": "admin",
     "PATCH /api/admin/agents/{}": "admin", "PATCH /api/admin/alerts": "admin", "PATCH /api/admin/backups": "admin",
     "PATCH /api/admin/groups/{}": "admin", "PATCH /api/admin/settings": "admin", "POST /api/admin/agents": "admin",
     "POST /api/admin/agents/{}/avatar": "admin", "POST /api/admin/agents/{}/reset": "admin",

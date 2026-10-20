@@ -180,6 +180,16 @@ async function orgsDraw(md) {
   if (bd && j.orgs.length) box.insertAdjacentHTML('beforeend', oa_boundaryHtml(bd));  // 2.46.0 (#1563): unfoldable, with "Clean up"
   const vs = $('#a-vis', md); if (vs) vs.innerHTML = VIS_UI.map(([k, n]) => `<option value="${k}" ${k === j.visibility ? 'selected' : ''}>${esc(tr(n))}</option>`).join('');
 }
+// 2.143.0 D (#2156): Administration > Organisation: activity per organisation (numbers only; + one row for people without one)
+const actHtml = () => `<h4 id="s-act-h">${tr('Activity per organisation')}</h4><div id="s-act" class="shint">${tr('Loading…')}</div>`;
+async function actDraw(md) {
+  const box = $('#s-act', md); if (!box) return;
+  let j; try { j = await api('GET', '/api/admin/orgs/activity'); } catch { box.innerHTML = ''; return; }
+  const row = (n, o) => `<tr><th scope="row">${esc(n)}</th><td>${o.members}</td><td>${o.last_login ? esc(o.last_login) : '–'}</td><td>${esc(fmtBytes(o.storage_bytes))}</td><td>${o.lists}</td><td>${o.tasks}</td></tr>`;
+  box.className = 'actwrap';
+  box.innerHTML = `<table class="acttbl"><thead><tr><th>${tr('Organisation')}</th><th>${tr('Members')}</th><th>${tr('Last sign-in')}</th><th>${tr('Storage')}</th><th>${tr('Lists')}</th><th>${tr('Tasks')}</th></tr></thead><tbody>${
+    j.orgs.map(o => row(o.name, o)).join('')}${row(tr('Without organisation'), j.private)}</tbody></table>`;
+}
 // ---- 2.28.0 (#935): Settings > Workspaces -- my organisations; an organisation's admin adds / removes members and sets their
 // role (also when not an admin of the server), renames it, sets its e-mail domains
 const wsPaneOn = () => wsOn() && !S.me?.kid;

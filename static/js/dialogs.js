@@ -1166,6 +1166,31 @@ function orphWire(md) {
 }
 // Settings > Appearance: all per-device visual settings, applied instantly (no Save), with a live preview
 const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent', 'pack', 'headShow'];  // 2.18.0: densSideV / densRowsV; 2.83.0 C (#1427): theme, header pictures, rings
+// 2.143.0 D (#2155): the appearance follows the account (setting "look"), unless this device keeps its own (LS lookLocal).
+// Every LOOK_KEYS change (LS.set / LS.del) is sent after a short pause; a state from the server is adopted when it differs.
+let lookTimer = 0, lookApplying = false;
+const lookLocal = () => LS.get('lookLocal', false) === true;
+const lookSnap = () => Object.fromEntries(LOOK_KEYS.map(k => [k, LS.get(k, null)]).filter(([, v]) => v != null));
+function lookQueue(k) {
+  if (lookApplying || !LOOK_KEYS.includes(k) || typeof S === 'undefined' || !S.settings || lookLocal()) return;
+  clearTimeout(lookTimer); lookTimer = setTimeout(lookPush, 800);
+}
+function lookPush() {
+  lookTimer = 0; if (lookLocal() || !S.settings) return;
+  const v = JSON.stringify(lookSnap()); S.settings.look = v;
+  api('PATCH', '/api/settings', {look: v}).catch(() => {});
+}
+function lookAdopt() {  // after a state load: first time the account has none -> upload this device's; otherwise the account wins
+  if (lookLocal() || lookTimer || !S.settings) return;
+  const v = S.settings.look || '';
+  if (!v) { if (Object.keys(lookSnap()).length) lookPush(); return; }
+  let o; try { o = JSON.parse(v); } catch { return; }
+  if (!o || typeof o !== 'object' || JSON.stringify(o) === JSON.stringify(lookSnap())) return;
+  lookApplying = true;
+  try { for (const k of LOOK_KEYS) { if (o[k] != null) LS.set(k, o[k]); else LS.del(k); } } finally { lookApplying = false; }
+  applyTheme(); applyDensity(); applyLook(); o3c_meta();
+  if (S.booted) render();
+}
 const THEMES = [['auto', N_('Automatic')], ['dark', N_('Dark')], ['light', N_('Light')]];
 const DENSITIES = [['compact', N_('Compact')], ['comfortable', N_('Comfortable')], ['custom', N_('Custom|density')]];
 const FSIZE_ORDER = ['s', 'm', 'l', 'xl'];
@@ -1180,7 +1205,7 @@ function lookHtml() {
       <div class="lpv-foot"><span class="btn sm pri">${ic('plus', 's')} ${tr('Add task')}</span><span class="lpv-link">${tr('Show completed')}</span><span class="lpv-prio flag-5">${ic('flag', 's')}${tr('high')}</span></div>
     </div>
     ${o3c_packHtml() /* 2.83.0 C (#1427): themes (listhead.js) */}
-    <h4>${tr('Color scheme')}<span class="devtag">${tr('This device')}</span></h4>
+    <h4>${tr('Color scheme')}</h4>
     <div class="row">${seg('theme', THEMES)}</div>
     <h4>${tr('Density')}</h4>
     <div class="row">${seg('density', DENSITIES)}</div>
@@ -1196,7 +1221,9 @@ function lookHtml() {
     <h4>${tr('Accent color')}</h4>
     <div class="lkopts lkacc" id="s-accent" role="group">${LOOK.accent.map(([v, n, d, l]) => `<button ${on('accent', v)} style="--sw-d:${d};--sw-l:${l}" title="${tr(n)}"><i class="lksw"></i><span class="lkn">${tr(n)}</span></button>`).join('')}</div>
     ${o3c_lookHtml() /* 2.83.0 C (#1427): header pictures + progress rings */}
-    <div class="row lkreset"><button class="btn sm" data-m="look-reset">${ic('undo', 's')} ${tr('Reset to defaults')}</button><span class="muted">${tr('Applies to this device only.')}</span></div>`;
+    <div class="row"><label class="chkl"><input type="checkbox" id="s-look-local" ${lookLocal() ? 'checked' : ''}> ${tr('Only on this device')}</label></div>
+    <div class="shint">${tr('Off: your appearance is saved to your account and used on all your devices. On: this device keeps its own and neither sends nor takes over.')}</div>
+    <div class="row lkreset"><button class="btn sm" data-m="look-reset">${ic('undo', 's')} ${tr('Reset to defaults')}</button><span class="muted">${tr('Applies to your account; with "Only on this device" on, to this device only.')}</span></div>`;
 }
 const lookCur = k => k === 'theme' ? LS.get('theme', 'auto') : k === 'density' ? densityMode() : k === 'densitySide' ? sideDensityPref() : k === 'densityRows' ? densityPref() : k === 'fsize' ? fsPct() : lookPref(k);
 function lookRedraw(md, focusSel) {  // re-render the pane (states + preview) and keep the keyboard focus

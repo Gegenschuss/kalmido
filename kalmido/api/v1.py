@@ -1453,6 +1453,17 @@ def v1_admin_status():
                    webhooks_pending=n("SELECT COUNT(*) FROM webhook_queue"))
 
 
+@app.get("/api/v1/admin/orgs/activity")
+@v1_view
+def v1_admin_orgs_activity():
+    """2.143.0 D (#2156): numbers per organisation (+ the people without one); admins only, no names or contents."""
+    v1_args(())
+    if not g.user["is_admin"]:
+        raise Denied(403)
+    from ..admin.hosting import org_activity
+    return jsonify(org_activity(db()))
+
+
 @app.errorhandler(404)
 def not_found(e):
     from ..lists.public import BOT_ERROR, pub_gone, pub_html

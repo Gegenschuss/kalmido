@@ -107,6 +107,11 @@ organisation admin adds and removes members. A server without any organisation l
 once there is one, people see the members of their organisations and the people they share something with; private lists
 reach anybody else by e-mail address.
 
+**Activity per organisation (2.143).** Instance admins see under *Settings > Administration > Organisation* one table with, per
+organisation, the members, the date of the last sign-in, the storage used, and the numbers of lists and tasks, plus a row
+"Without organisation" (the private spaces of people who belong to none). Numbers only: no people, no contents. The same data is
+`GET /api/v1/admin/orgs/activity` (scope `admin-read`).
+
 **Lists of the organisation (2.35, 2.56).** Organisation admins find the organisation's shared lists under *Settings >
 Organisation > Lists of the organisation*: names, owners and numbers, never the contents. They can archive, restore, delete
 from the archive and hand a list over to another member; since 2.56 also *Edit* its name, icon (emoji or picture) and
