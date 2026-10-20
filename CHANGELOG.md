@@ -46,6 +46,11 @@ resizable dialogs; more rule triggers and Kanban swimlanes; sidebar search at th
 - Security fix (organisation recovery key): showing the key asks for password and second factor, the other admins are
   told; server admins can renew an organisation's key with `orgcrypt_cli rotate --org <id>` (#1972).
 
+## [2.126.3] - 2026-10-20
+
+### Fixed
+- CI of 2.126.1 / 2.126.2: a client function name no longer trips the icon check, the browser demo answers which agents may draft (#2123 #2124) and the table backlinks (#2357).
+
 ## [2.126.2] - 2026-10-20
 
 Pages: suggestions above the phone keyboard, a news entry when someone shares pages with you, "Mentioned in" on tables.
