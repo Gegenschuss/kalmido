@@ -148,8 +148,9 @@ s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
 A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True, "modules": ["comments"]})
-ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
-uid = {}
+ST = A.get(B + "/api/state").json()["me"]
+ORG = ST["workspaces"][0]["id"]
+uid = {"alice": ST["id"]}
 for u in ("bob", "carol", "dora", "emil", "frank"):
     r = A.post(B + "/api/users", json={"orgs": [ORG] if u != "frank" else [], "username": u, "display_name": u.title(),
                                        "password": "password123", "email": f"{u}@example.test"})
@@ -235,8 +236,9 @@ check(x and x[0].get("number") == "+4915100000001" and x[0].get("recipients") ==
       f"#2145: Signal: number, recipients, message {x}")
 check(none_after("/mx", has("Prepare the offer"), wait=2), "#2145: the Matrix channel (digest only) gets no assignment")
 A.post(B + f"/api/tasks/{T1}/comments", json={"body": f"Please check <@{uid['bob']}>"})
-check(got(SECRET_PATH, has("mentioned you")), "#2145: a mention arrives in Slack")
-check(none_after("/sig/v2/send", has("mentioned you"), wait=2), "#2145: Signal (assignments only) gets no mention")
+check(got(SECRET_PATH, lambda p: "mentioned you" in p["text"] or "you were mentioned" in p["text"]),
+      "#2145: a mention arrives in Slack (at once or in the burst summary)")
+check(none_after("/sig/v2/send", lambda p: "mentioned" in p["message"], wait=2), "#2145: Signal (assignments only) gets no mention")
 check(Bo.patch(B + f"/api/me/channels/{SL['id']}", json={"enabled": False}).json().get("enabled") is False, "switched off")
 T2 = task(A, SH, "Order paper")
 A.patch(B + f"/api/tasks/{T2}", json={"assignee_id": uid["bob"]})
@@ -284,7 +286,7 @@ A.patch(B + f"/api/tasks/{TO}", json={"assignee_id": uid["bob"]})
 check(got("/org-alpha", has("Alice assigned Bob: Plan the launch")), "#2145: the assignment")
 Bo.post(B + f"/api/tasks/{TO}/comments", json={"body": "Draft is ready"})
 check(got("/org-alpha", has("Bob commented on Plan the launch: Draft is ready")), "#2145: the comment with its words")
-Bo.patch(B + f"/api/tasks/{TO}", json={"status": 1})
+Bo.post(B + f"/api/tasks/{TO}/complete", json={})
 check(got("/org-alpha", has("Bob completed: Plan the launch")), "#2145: completed")
 # tenant-matrix: channel -- never what not every member sees
 OS = A.post(B + "/api/lists", json={"name": "Alpha leadership", "org_id": ORG}).json()["id"]
@@ -300,7 +302,7 @@ check(none_after("/org-alpha", lambda p: any(w in p["text"] for w in ("Salary re
 TL = task(A, OL, "Locked title words")
 got("/org-alpha", has("Locked title words"))
 dbx("UPDATE lists SET e2e='on' WHERE id=?", (OL,))
-A.patch(B + f"/api/tasks/{TL}", json={"status": 1})
+A.post(B + f"/api/tasks/{TL}/complete", json={})
 lk = [p["text"] for p in got("/org-alpha", has("Alice completed:"))]
 check(lk and "Task" in lk[-1] and "Locked title words" not in lk[-1], f"#2145: a list with the lock: the neutral word, no title: {lk[-1:]}")
 dbx("UPDATE lists SET e2e=NULL WHERE id=?", (OL,))
@@ -367,7 +369,8 @@ m = wait_mail("dora@example.test", 2, secs=15)
 check(len(m) == 2 and "Write the agenda" in mail_parts(m[-1])[1] and mail_parts(m[-1])[0] == "Kalmido: 1 new notification",
       f"#2146: then the second one ({len(m)})")
 # a push device: "nopush" sends nothing, "always" does
-dbx("INSERT INTO user_settings(user_id,key,value) VALUES(?, 'ntfy_topic', 'emil-topic-0123456789')", (uid["emil"],))
+check(Em.get(B + "/api/me/channels").json()["mail"]["device"] is False, "the topic every account gets is no push device by itself")
+check(Em.patch(B + "/api/settings", json={"push_channel": "ntfy"}).ok, "emil uses ntfy")
 check(Em.get(B + "/api/me/channels").json()["mail"]["device"] is True, "emil has a push device")
 A.patch(B + f"/api/tasks/{M1}", json={"assignee_id": uid["emil"]})
 time.sleep(6)

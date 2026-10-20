@@ -188,7 +188,7 @@ def chn_tick():
     with GATE.bg():
         c = connect()
         try:
-            with system_ctx(c):
+            with system_ctx(c):  # background loop: every person's and organisation's channels
                 c.execute("DELETE FROM notify_channel_queue WHERE channel_id IN (SELECT id FROM notify_channels WHERE enabled=0)")
                 rows = [dict(r) for r in c.execute("""SELECT q.id, q.channel_id, q.text, n.kind, n.target FROM notify_channel_queue q
                                                       JOIN notify_channels n ON n.id=q.channel_id
@@ -208,7 +208,7 @@ def chn_tick():
         with GATE.bg():
             c = connect()
             try:
-                with system_ctx(c):
+                with system_ctx(c):  # background loop: the results of every channel
                     for r, (ok, status, code) in res:
                         chn_result(c, r["channel_id"], ok, status, code)
                 c.commit()
@@ -266,7 +266,7 @@ def chn_push(uid, title, msg, prio, click, kind, s):
             return False
         c = connect()
         try:
-            with system_ctx(c):
+            with system_ctx(c):  # the recipient's own channels (a push thread has no request context)
                 rows = [r for r in c.execute("""SELECT id, events FROM notify_channels WHERE user_id=? AND org_id IS NULL AND enabled=1""",
                                              (uid,)) if kind in r["events"].split(",")]
                 n = sum(1 for r in rows if chn_enqueue(c, r["id"], chn_text(title, msg, click)))
@@ -285,7 +285,7 @@ def chn_reachable(c, uid):
     """uid has a channel switched on (pushes are worth building for them even without a device)."""
     if not CH_ON:
         return False
-    with system_ctx(c):
+    with system_ctx(c):  # the person's own channels, asked for other people too (pushes to them)
         return bool(c.execute("SELECT 1 FROM notify_channels WHERE user_id=? AND org_id IS NULL AND enabled=1 LIMIT 1", (uid,)).fetchone())
 
 
@@ -310,7 +310,7 @@ def chn_flush(resp):
     if n and resp.status_code < 400:
         try:
             c = db()
-            with system_ctx(c):
+            with system_ctx(c):  # after the request: the channels of the list's organisation / owner, not the actor's
                 chn_list_events(c, n)
             c.commit()
         except Exception as e:  # noqa: BLE001  (never fail the request that already succeeded)
@@ -336,8 +336,8 @@ def chn_list_events(c, n):
                          FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?""", (tid,)).fetchone()
         if not t or t["deleted_at"] or t["ldel"] or t["archived"] or (t["life"] or "") in ("health", "budget"):
             continue
-        if ev == "complete" and not t["status"]:
-            continue
+        if ev == "complete" and t["status"] != 2:
+            continue  # completed (2) only, not "won't do" or reopened again within the request
         for ch in chans:
             if ev not in ch["events"].split(",") and not (not ch["org_id"] and "lists" in ch["events"].split(",")):
                 continue
@@ -535,7 +535,7 @@ def chn_test_do(chid, oid=None):
     c.commit()
     text = chn_text(tr("{0}: test", APP_NAME), tr("Notifications are arriving."), PUBLIC_URL)
     ok, status, code = chn_send(r["kind"], t, text, allow) if t else (False, None, "config")
-    with system_ctx(c):
+    with system_ctx(c):  # the count of the channel (an organisation's too) after its test
         chn_result(c, chid, ok, status, code)
     c.commit()
     return jsonify(ok=ok, status=status, error=code, error_text=chn_err_text(code, status) if code else "",
@@ -604,9 +604,13 @@ def org_channel_test(oid, chid):
 
 # ---------------------------------------------------------------- #2146: e-mails for single events
 def evm_device(c, uid, s):
-    """A push device: a Web Push subscription or an ntfy topic (the channels of #2145 do not count)."""
-    from .push import webpush_count
-    return bool(s.get("ntfy_topic")) or webpush_count(c, uid) > 0
+    """A push device: a Web Push subscription, or the ntfy topic when the person uses ntfy (channel ntfy / both, or a server
+    without Web Push) -- every account gets a topic at creation, so its mere existence says nothing. The channels of #2145
+    do not count."""
+    from .push import push_channel, WEBPUSH_ON, webpush_count
+    if webpush_count(c, uid) > 0:
+        return True
+    return bool(s.get("ntfy_topic")) and (not WEBPUSH_ON or push_channel(s) in ("ntfy", "both"))
 
 
 def evm_choice(s, kind):
