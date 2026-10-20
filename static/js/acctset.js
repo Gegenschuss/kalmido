@@ -207,7 +207,7 @@ async function orgModal(o, done) {
   const mem = new Set(o?.members || []), adm = new Set(o?.admins || []);  // 2.28.0 (#935): + the organisation's admins
   // 2.138.3 B (#2407): members as a list like Users (search, filter Members / All, a Member and an Admin box per row) instead of
   // one button per person; the symbol shows the picture / an app icon, never an emoji placeholder; the domain hint under the field
-  const icPrev = v => orgIconHtml({icon_url: o?.icon_url, icon: v});
+  const icPrev = v => orgIconHtml(v ? {icon: v} : {icon_url: o?.icon_url});  // a typed symbol replaces the picture on saving
   const md = modal(`<h3>${o ? tr('Edit organisation') : tr('New organisation')}</h3>
     <div class="row"><label for="og-name">${tr('Name')}</label><input id="og-name" maxlength="60" value="${esc(o?.name || '')}"></div>
     <div class="row"><label for="og-icon">${tr('Symbol')}</label><span class="wsicprev" id="og-icprev">${icPrev(o?.icon || '')}</span><input id="og-icon" maxlength="8" class="numin" value="${esc(o?.icon || '')}" placeholder="${esc(tr('optional'))}"></div>
@@ -221,7 +221,7 @@ async function orgModal(o, done) {
   const row = u => `<div class="mrow ogrow" data-ogrow="${u.id}">${uRowAv(u)}<span class="n">${esc(u.display_name)} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}</span></span>`
     + `<label class="ogchk"><input type="checkbox" data-ogm="${u.id}" ${mem.has(u.id) ? 'checked' : ''} aria-label="${esc(tr('{0} is a member', u.display_name))}"><span>${tr('Member')}</span></label>`
     + `<label class="ogchk ${mem.has(u.id) ? '' : 'off'}"><input type="checkbox" data-oga="${u.id}" ${adm.has(u.id) ? 'checked' : ''} ${mem.has(u.id) ? '' : 'disabled'} aria-label="${esc(tr('{0} is an admin of the organisation', u.display_name))}"><span>${tr('Admin')}</span></label></div>`;
-  const count = () => { const c = $('#og-cnt', md); if (c) c.textContent = trn('{0} member', '{0} members', mem.size) + ' · ' + trn('{0} admin', '{0} admins', [...adm].filter(id => mem.has(id)).length); };
+  const count = () => { const c = $('#og-cnt', md); if (c) c.textContent = trn('{0} member', '{0} members', us.filter(u => mem.has(u.id)).length) + ' · ' + trn('{0} admin', '{0} admins', us.filter(u => mem.has(u.id) && adm.has(u.id)).length); };
   // drawn again only on search / filter: a box ticked off under "Members" keeps its row until then
   const draw = () => {
     const box = $('#og-list', md); if (!box) return;

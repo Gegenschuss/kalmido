@@ -7,6 +7,7 @@ freelancer-matrix: agents
    task / list + title)
  - a person without an organisation: the same for the own agent
 usage: p21382_a_api_test.py <datadir>      (P21382A_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
+import json
 import os
 import subprocess
 import sys
@@ -130,9 +131,13 @@ sql("UPDATE notifications SET data = data::jsonb - 'job' WHERE user_id=? AND kin
 old = sql("SELECT COUNT(*) FROM notifications WHERE user_id=? AND kind='approval' AND task_id=? AND read_at IS NULL AND data->>'job' IS NULL",
           (ALICE, T3))[0][0]
 check(old == 1, f"legacy: an entry without a job number, unread {old}")
+# 2.138.3 (#2406, review): an old entry of another sender with the same title stays (it may be a different open question)
+ttl = sql("SELECT data->>'title' FROM notifications WHERE user_id=? AND kind='approval' AND task_id=?", (ALICE, T3))[0][0]
+sql("INSERT INTO notifications(user_id,kind,task_id,actor_id,data,created_at) VALUES(?,?,?,?,CAST(? AS jsonb),?)",
+    (ALICE, "approval", T3, BOB, json.dumps({"title": ttl}), "2026-01-01T00:00:00.000Z"), write=True)
 check(A.post(B + f"/api/agents/jobs/{J3}/action", json={"action": "stop"}).ok, "legacy: stopped")
 old = sql("SELECT COUNT(*) FROM notifications WHERE user_id=? AND kind='approval' AND task_id=? AND read_at IS NULL", (ALICE, T3))[0][0]
-check(old == 0, "legacy: the old entry is read by task + title")
+check(old == 1, "legacy: the old entry is read by task + title + sender, the other sender's stays")
 
 # ---- a person without an organisation (freelancer-matrix: agents)
 FU, F = freelancer(B, A, "frida")

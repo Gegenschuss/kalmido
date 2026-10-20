@@ -347,13 +347,19 @@ def news_add(c, uid, kind, task_id=None, list_id=None, comment_id=None, data=Non
 
 def news_read_job(c, j, ts=None):
     """2.138.3 A (#2406): a decided approval job is done for everybody it was shown to: its unread approval News turn read
-    (by job number; older entries without one by task / list + title). Caller commits and bumps."""
+    (by job number; older entries without one by task / list + title of the same agent), their pushes close. Caller commits and bumps."""
+    from ..notify.push import push_handled
     ts = ts or iso(now_utc())
-    c.execute("UPDATE notifications SET read_at=? WHERE kind='approval' AND read_at IS NULL AND data->>'job' = ?", (ts, str(j["id"])))
+    uids = {r[0] for r in c.execute("UPDATE notifications SET read_at=? WHERE kind='approval' AND read_at IS NULL AND data->>'job' = ? "
+                                    "RETURNING user_id", (ts, str(j["id"]))).fetchall()}
     where, args = ("task_id=?", [j["task_id"]]) if j["task_id"] else ("task_id IS NULL AND list_id=?", [j["list_id"]])
     if j["task_id"] or j["list_id"]:
-        c.execute(f"UPDATE notifications SET read_at=? WHERE kind='approval' AND read_at IS NULL AND data->>'job' IS NULL "
-                  f"AND {where} AND data->>'title' = ?", (ts, *args, (j["title"] or "")[:200]))
+        uids |= {r[0] for r in c.execute(f"UPDATE notifications SET read_at=? WHERE kind='approval' AND read_at IS NULL AND data->>'job' IS NULL "
+                                         f"AND {where} AND actor_id=? AND data->>'title' = ? RETURNING user_id",
+                                         (ts, *args, j["agent_id"], (j["title"] or "")[:200])).fetchall()}
+    if j["task_id"]:
+        for uid in uids:
+            push_handled(c, uid, [j["task_id"]])
 
 
 def news_sig(c, uid):
