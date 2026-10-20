@@ -33,13 +33,18 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   check(pane && !pane.classList.contains('hidden') && d.querySelector('#s-share-h')?.textContent === 'Share from your phone', 'Settings > Integrations > Share from your phone');
   const zip = d.querySelector('#s-hszip');
   check(zip && zip.getAttribute('href') === '/api/me/share/httpshortcuts.zip' && zip.hasAttribute('download'), 'HTTP Shortcuts download link');
-  const zr = await fetch(B + 'api/me/share/httpshortcuts.zip', {headers: {Cookie: cks.alice}});
+  // 2.138.0 (#1907): the download makes a new token, so only same-origin (a browser sends Sec-Fetch-Site)
+  const zr = await fetch(B + 'api/me/share/httpshortcuts.zip', {headers: {Cookie: cks.alice, 'Sec-Fetch-Site': 'same-origin'}});
   check(zr.ok && zr.headers.get('content-type') === 'application/zip', 'the link delivers the ZIP');
   check(d.querySelector('#s-dropurl').value === 'https://kalmido.example', 'server address shown (2.0.2: without /drop, the shortcut adds it)');
-  check(d.querySelector('#s-droptok').type === 'password' && !/[A-Za-z0-9_-]{20}/.test(d.querySelector('#s-droptok').value), 'token hidden until copied');
+  // 2.138.0 (#1907): the token is stored as a hash: no token field until one is created, then shown once
+  check(!d.querySelector('#s-droptok') && d.querySelector('#s-dropw [data-m="drop-new-tok"]'), 'no token field before a token is created');
   d.querySelector('[data-m="drop-copy-url"]').click(); await sleep(200);
+  d.querySelector('#s-dropw [data-m="drop-new-tok"]').click(); await sleep(600);
+  d.querySelector('[data-cd="yes"]')?.click(); await sleep(600);
+  const tok = d.querySelector('#s-droptok')?.value || '';
+  check(tok.length >= 20 && (await call('alice', 'GET', '/api/me')).drop_token_set === true, 'new token shown in the field');
   d.querySelector('[data-m="drop-copy-tok"]').click(); await sleep(500);
-  const tok = (await call('alice', 'GET', '/api/me')).drop_token;
   check(w.__clip[0] === 'https://kalmido.example' && w.__clip[1] === tok, 'copy buttons: address + token ' + JSON.stringify(w.__clip).slice(0, 80));
   check(/Get Contents of URL/.test(pane.textContent) && /Show in Share Sheet/.test(pane.textContent), 'Shortcuts app guide');
   check(!/Add the Kalmido shortcut/.test(pane.textContent), 'no iOS shortcut link while the server has none');

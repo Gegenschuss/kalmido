@@ -239,10 +239,9 @@ check(not any(o.get("id") == T3 or o.get("task_id") == T3 for o in occ.get("item
 check(str(T3) in json.dumps(A.get(B + "/api/occurrences", params={"from": T0, "to": (testclock.today() + timedelta(days=5)).isoformat()}).json()),
       "owner gets the repeat")
 # ICS feed
-for s_, n in ((P, "pete"), (C, "carol")):
-    s_.post(B + "/api/ical", json={"action": "create"})
-ics_p = requests.get(B + P.get(B + "/api/ical").json()["url"].replace("https://kalmido.example", "")).text
-ics_c = requests.get(B + C.get(B + "/api/ical").json()["url"].replace("https://kalmido.example", "")).text
+# 2.138.0 (#1907): the feed link is only in the answer of create / rotate
+ics_p = requests.get(B + P.post(B + "/api/ical", json={"action": "rotate"}).json()["url"].replace("https://kalmido.example", "")).text
+ics_c = requests.get(B + C.post(B + "/api/ical", json={"action": "rotate"}).json()["url"].replace("https://kalmido.example", "")).text
 check("Pete top task" in ics_p and "Pete assigned subtask" in ics_p, "ICS: own tasks")
 for x in ("Hidden task", "Secret parent", "Sibling secret", "Carol only", "SECRET"):
     check(x not in ics_p, f"ICS participant leaks {x!r}")

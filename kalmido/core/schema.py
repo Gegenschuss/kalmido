@@ -2734,6 +2734,22 @@ MIGRATIONS = [
     ("hub_absences", "decided_at", "ALTER TABLE hub_absences ADD COLUMN decided_at TEXT"),
     ("hub_absences", "decision_note", "ALTER TABLE hub_absences ADD COLUMN decision_note TEXT NOT NULL DEFAULT ''"),
     ("orgs", "hub_leave_approval", "ALTER TABLE orgs ADD COLUMN hub_leave_approval BIGINT NOT NULL DEFAULT 0"),
+    # 2.138.0 C (#1907): upload token / calendar feed secret only as a SHA-256 hash (core/tokenhash.py), *_at = when created.
+    # The plain columns drop_token / ical_token stay and are NULL; the version before runs on (shortcuts / feed made anew)
+    ("users", "drop_token_hash", "ALTER TABLE users ADD COLUMN drop_token_hash TEXT"),
+    ("users", "drop_token_at", "ALTER TABLE users ADD COLUMN drop_token_at TEXT"),
+    ("users", "ical_token_hash", "ALTER TABLE users ADD COLUMN ical_token_hash TEXT"),
+    ("users", "ical_token_at", "ALTER TABLE users ADD COLUMN ical_token_at TEXT"),
+    # 2.138.0 C (#1972): the recovery key wraps the organisation key (core/orgcrypt.py): recovery_wrapped = the org key under
+    # a key derived from the recovery secret, recovery_secret = that secret under the server key (shown again); during
+    # orgcrypt_cli rotate wrapped_rot / kek_check_rot hold the earlier key (reading falls back to it), rot_started_at /
+    # rotated_at the state. 2.125 runs on with them (it shows the org key itself and reads only after a finished rotation)
+    ("org_keys", "recovery_wrapped", "ALTER TABLE org_keys ADD COLUMN recovery_wrapped TEXT"),
+    ("org_keys", "recovery_secret", "ALTER TABLE org_keys ADD COLUMN recovery_secret TEXT"),
+    ("org_keys", "wrapped_rot", "ALTER TABLE org_keys ADD COLUMN wrapped_rot TEXT"),
+    ("org_keys", "kek_check_rot", "ALTER TABLE org_keys ADD COLUMN kek_check_rot TEXT"),
+    ("org_keys", "rot_started_at", "ALTER TABLE org_keys ADD COLUMN rot_started_at TEXT"),
+    ("org_keys", "rotated_at", "ALTER TABLE org_keys ADD COLUMN rotated_at TEXT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -2741,6 +2757,7 @@ INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
 CREATE INDEX IF NOT EXISTS tasks_assignee ON tasks(assignee_id);
 CREATE INDEX IF NOT EXISTS habits_user ON habits(user_id);
+CREATE INDEX IF NOT EXISTS users_drop_token_hash ON users(drop_token_hash) WHERE drop_token_hash IS NOT NULL;
 CREATE INDEX IF NOT EXISTS pomos_user ON pomos(user_id);
 CREATE INDEX IF NOT EXISTS filters_user ON filters(user_id);
 CREATE INDEX IF NOT EXISTS task_tags_user ON task_tags(user_id, tag);

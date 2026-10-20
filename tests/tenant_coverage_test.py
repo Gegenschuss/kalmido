@@ -586,6 +586,7 @@ ROUTES = {
     # 2.42.0 (#828): an organisation's encryption state + recovery key (its admins only; p2420_b_api_test.py: member 403, other
     # organisation 404, agent refused); the instance switch org_encrypt is the operator's
     "GET /api/orgs/{}/encryption": "org", "POST /api/orgs/{}/encryption/recovery": "org",
+    "POST /api/orgs/{}/encryption/recovery/passkey": "org",  # 2.138.0 (#1972): the passkey challenge of the step-up (p2138_c_api_test.py)
     "GET /api/admin/orgcrypt": "admin", "PUT /api/admin/orgcrypt": "admin",
     # 2.42.0 (#833): the organisation export (its admins only; p2420_c_api_test.py: member 403, other organisation 404, agent refused)
     "GET /api/orgs/{}/export": "org", "POST /api/orgs/{}/export": "org", "DELETE /api/orgs/{}/export": "org", "GET /api/orgs/{}/export/file": "org",
