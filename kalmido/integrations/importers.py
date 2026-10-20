@@ -215,7 +215,9 @@ IMPORT_JSON_DEPTH = 40                    # nesting of a JSON file (Trello: ~6)
 IMPORT_UNDO_HOURS = 24
 IMPORT_RATE = _imp_env("KALMIDO_IMPORT_RATE", 30)  # imports + previews per user and 10 minutes
 IMPORT_KEEP = 20                          # import records (undo) kept per user
-IMPORT_SOURCES = {"todoist": "Todoist", "trello": "Trello", "asana": "Asana", "mstodo": "Microsoft To Do", "ics": "ICS"}
+IMPORT_SOURCES = {"todoist": "Todoist", "trello": "Trello", "asana": "Asana", "mstodo": "Microsoft To Do", "ics": "ICS",
+                  # 2.142.0 B (#2147): file imports only (no API / OAuth connection, nothing fetched from the files)
+                  "notion": "Notion", "gtasks": "Google Tasks", "clickup": "ClickUp", "jira": "Jira", "csv": "CSV", "markdown": "Markdown"}
 IMPORT_OPTS = ("dry_run", "target", "mode", "archived", "completed", "list_name", "priority_scale", "space")
 IMPORT_SAMPLES = 8
 csv.field_size_limit(max(csv.field_size_limit(), 4 * CONTENT_MAX))
@@ -310,7 +312,7 @@ def imp_json(text):
         imp_fail(N_("The JSON file could not be read"))
 
 
-def imp_zip(data, exts):
+def imp_zip(data, exts, full=False):
     """Members of a ZIP (read in memory, never extracted to disk) with the given extensions: [(name, bytes)].
     Guards: member count, total and per-member size (declared AND actually read), compression ratio."""
     try:
@@ -336,13 +338,13 @@ def imp_zip(data, exts):
         if len(b) > i.file_size or len(b) > budget:
             imp_fail(N_("The ZIP file unpacks to too much data"))
         budget -= len(b)
-        out.append((base, b))
+        out.append((i.filename.replace("\\", "/") if full else base, b))  # 2.142.0 B (#2147): full = the path inside the ZIP
     return out
 
 
 def imp_stem(name):
     base = str(name or "").replace("\\", "/").rsplit("/", 1)[-1]
-    base = re.sub(r"\.(csv|json|ics|ical|ifb|txt|zip)$", "", base, flags=re.I)
+    base = re.sub(r"\.(csv|json|ics|ical|ifb|txt|zip|md|markdown)$", "", base, flags=re.I)
     return imp_line(re.sub(r"\s*\[\d+\]$", "", base), LIST_NAME_MAX)  # Todoist backup: "Name [2203306141].csv"
 
 
@@ -1231,7 +1233,756 @@ def _ics_todo(td, L, plan, base_t, n):
         t["reminders"] = rems[:REM_COUNT]
 
 
-IMPORT_PARSERS = {"todoist": parse_todoist, "trello": parse_trello, "asana": parse_asana, "mstodo": parse_mstodo, "ics": parse_ics}
+# ---- 2.142.0 B (#2147): Notion, Google Tasks, ClickUp, Jira, any CSV, Markdown checklists. File imports only: nothing in a
+# file is fetched (links stay text), people are never matched to accounts (their names go into the notes as text).
+def imp_csv_multi(text):
+    """Like imp_csv, but a header that repeats (Jira: Labels, Sprint, Components) keeps every value: rows = {key: [values]}."""
+    first = text.split("\n", 1)[0]
+    delim = max((",", ";", "\t"), key=first.count)
+    try:
+        rd = csv.reader(io.StringIO(text), delimiter=delim)
+        head = next(rd, None)
+        if not head:
+            imp_fail(N_("The file is empty"))
+        keys = [imp_line(h, 100).lower() for h in head]
+        rows = []
+        for r in rd:
+            if not any(x.strip() for x in r):
+                continue
+            row = {}
+            for i, k in enumerate(keys):
+                if k and i < len(r) and r[i].strip():
+                    row.setdefault(k, []).append(r[i])
+            rows.append(row)
+            if len(rows) > IMPORT_MAX_TASKS * 3:
+                imp_fail(N_("Too many rows (more than {0} tasks)"), IMPORT_MAX_TASKS)
+    except csv.Error:
+        imp_fail(N_("The CSV file could not be read"))
+    return keys, rows
+
+
+def imp_anydate(s, dmy=None):
+    """imp_numdate + dates with month names: 'January 15, 2025', 'Wednesday, January 15th 2025', '15 Jan 2025',
+    '15. Januar 2025', '15/Jan/25 10:00 AM' (Jira), optionally a time (10:00 [AM|PM]) and a time zone after it. -> (date, time | None)."""
+    s = str(s or "").strip()
+    d, t = imp_numdate(s, dmy)
+    if d:
+        return d, t
+    x = re.sub(r"\([^)]*\)", " ", s.lower())
+    x = re.sub(r"[\s,]+", " ", x).strip()
+    tm = None
+    m = re.search(r"(?:^|\s)(?:at\s|um\s)?(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]m)?)(?:\s+\S+)?$", x)
+    if m:
+        tm = _imp_hm(m.group(1))
+        x = x[:m.start()].strip()
+    x = re.sub(rf"^(?:{_WD_RE})\.?\s+", "", x)
+    m = re.fullmatch(rf"(\d{{1,2}})(?:st|nd|rd|th|\.)?[\s/.-]*({_MON_RE})\.?[\s/.-]*(\d{{2}}|\d{{4}})", x) or \
+        re.fullmatch(rf"({_MON_RE})\.?[\s/.-]*(\d{{1,2}})(?:st|nd|rd|th|\.)?[\s/.-]+(\d{{4}})", x)
+    if not m:
+        return None, None
+    a, b, y = m.groups()
+    day, mon = (int(a), IMP_MONTHS[b]) if a.isdigit() else (int(b), IMP_MONTHS[a])
+    y = int(y) + (2000 if len(y) == 2 else 0)
+    try:
+        dd = date(y, mon, day).isoformat()
+    except ValueError:
+        return None, None
+    return (dd, tm) if valid_date(dd) else (None, None)
+
+
+def _imp_epoch(v):
+    """A Unix time in seconds or milliseconds (ClickUp) -> (date, time | None in local time; midnight = no time)."""
+    v = str(v or "").strip()
+    if not re.fullmatch(r"\d{9,13}", v):
+        return None, None
+    n = int(v) / (1000 if len(v) > 11 else 1)
+    with contextlib.suppress(ValueError, OverflowError, OSError):
+        d, t = imp_local(datetime.fromtimestamp(n, timezone.utc))
+        return (d, None if t == "00:00" else t) if valid_date(d) else (None, None)
+    return None, None
+
+
+IMP_DONE = {"done", "complete", "completed", "closed", "resolved", "finished", "erledigt", "fertig", "abgeschlossen", "geschlossen",
+            "x", "yes", "y", "true", "ja", "wahr", "1", "✓", "✔", "✅", "checked", "gelöst"}
+IMP_CANCEL = {"cancelled", "canceled", "won't do", "wont do", "won't fix", "abgebrochen", "verworfen", "abgesagt", "declined", "rejected",
+              "duplicate", "storniert"}
+
+
+def imp_done(v):
+    """A status / checkbox value -> 2 (done), -1 (cancelled, won't do) or 0."""
+    v = re.sub(r"\s+", " ", str(v or "").strip().lower())
+    return 2 if v in IMP_DONE else -1 if v in IMP_CANCEL else 0
+
+
+def imp_prio_any(v):
+    """Priority words of Jira / ClickUp / other apps -> 0, 1, 3, 5 (None = not understood). The two top levels are high."""
+    v = re.sub(r"\s+", " ", str(v or "").strip().lower())
+    if not v or v in ("none", "keine", "-", "no priority", "ohne"):
+        return 0
+    for words, p in ((("highest", "blocker", "critical", "urgent", "dringend", "kritisch", "high", "hoch", "höchste", "wichtig",
+                       "important", "p1", "!!!"), 5),
+                     (("medium", "mittel", "normal", "major", "p2", "!!"), 3),
+                     (("low", "lowest", "niedrig", "gering", "minor", "trivial", "p3", "p4", "!"), 1)):
+        if v in words:
+            return p
+    return None
+
+
+def imp_who(t, src, v):
+    """People of a file never become accounts: their names go into the notes as text."""
+    v = imp_line(re.sub(r"^\[|\]$", "", str(v or "").strip()), 300)
+    if v:
+        imp_addnote(t, tr("Assignee ({0}): {1}", IMPORT_SOURCES[src], v))
+
+
+IMP_OPEN = {"", "no", "n", "nein", "false", "falsch", "0", "open", "offen", "todo", "to do", "to-do", "not started", "nicht begonnen",
+            "new", "neu"}
+
+
+def _imp_status_note(t, st, v, label):
+    """A status that is neither done nor plainly open ("In progress", "Waiting") goes into the notes."""
+    v = imp_line(v, 100)
+    if not st and v.lower() not in IMP_OPEN:
+        imp_addnote(t, f"{label}: {v}")
+
+
+def _imp_strip_br(v):
+    return re.sub(r"^\[|\]$", "", str(v or "").strip())
+
+
+# the column names any CSV can carry (lower case); the first match per field wins, the rest goes into the notes
+IMP_COLS = {
+    "title": ("title", "name", "task", "task name", "taskname", "summary", "subject", "aufgabe", "titel", "betreff", "todo", "to-do",
+              "item", "aufgabenname", "bezeichnung"),
+    "id": ("id", "task id", "key", "issue key", "uid", "nummer", "nr"),
+    "parent": ("parent", "parent id", "parent task", "parent task id", "übergeordnet", "übergeordnete aufgabe", "eltern"),
+    "list": ("list", "list name", "project", "project name", "liste", "projekt", "board", "folder", "ordner"),
+    "section": ("section", "section/column", "column", "group", "abschnitt", "spalte", "gruppe", "bereich", "phase"),
+    "due": ("due", "due date", "duedate", "due_date", "date", "deadline", "fällig", "fällig am", "fälligkeit", "fälligkeitsdatum",
+            "datum", "termin", "frist", "bis", "end date", "enddatum"),
+    "due_time": ("due time", "time", "uhrzeit", "zeit"),
+    "start": ("start", "start date", "start_date", "startdatum", "beginn", "begin", "von"),
+    "notes": ("notes", "note", "description", "beschreibung", "notiz", "notizen", "details", "body", "content", "inhalt", "text",
+              "kommentar", "comment", "comments"),
+    "priority": ("priority", "priorität", "prio", "importance", "wichtigkeit", "dringlichkeit"),
+    "tags": ("tags", "tag", "labels", "label", "schlagwörter", "schlagworte", "stichwörter", "categories", "category", "kategorien",
+             "kategorie", "keywords"),
+    "done": ("done", "completed", "complete", "erledigt", "is done", "is completed", "checked", "status", "state", "zustand",
+             "fertig", "check"),
+    "done_at": ("completed at", "completed date", "date completed", "completion date", "done at", "erledigt am", "abgeschlossen am"),
+    "created": ("created", "created time", "created at", "created date", "date created", "erstellt", "erstellt am", "angelegt"),
+    "assignee": ("assignee", "assignees", "assigned to", "zuständig", "verantwortlich", "owner", "responsible", "person", "bearbeiter"),
+    "url": ("url", "link", "website", "webseite"),
+}
+
+
+def imp_colmap(keys, title_fallback=True):
+    """CSV header (lower case) -> {field: column}; the title falls back to the first column."""
+    col = {}
+    for f, names in IMP_COLS.items():
+        col[f] = next((k for k in names if k in keys and k not in col.values()), None)
+    if not col["title"] and title_fallback:  # the first column that is no other field (a column read as notes is taken back)
+        taken = {v for f, v in col.items() if v and f != "notes"}
+        col["title"] = next((k for k in keys if k and k not in taken), None)
+        if col["title"] and col["title"] == col["notes"]:
+            col["notes"] = None
+    return col
+
+
+def _imp_dmy(values):
+    """Slash dates of a column: day first (True), month first (False) or not to tell (None)."""
+    for v in values:
+        m = re.match(r"\s*(\d{1,2})/(\d{1,2})/\d{2,4}", str(v or ""))
+        if m:
+            if int(m.group(1)) > 12:
+                return True
+            if int(m.group(2)) > 12:
+                return False
+    return None
+
+
+def _imp_extra(t, row, keys, head, skip):
+    lines = [f"{head.get(k, k)}: {imp_line(row.get(k), 500)}" for k in keys if k and k not in skip and imp_line(row.get(k), 500)]
+    if lines:
+        imp_addnote(t, "\n".join(lines))
+
+
+# ---- any CSV
+IMP_FIELD_NAMES = ("title", "id", "parent", "list", "section", "due", "due_time", "start", "notes", "priority", "tags", "done",
+                   "done_at", "created", "assignee", "url")
+
+
+def parse_csv(data, fname, opts, plan):
+    keys, rows, head = imp_csv(imp_decode(data))
+    col = imp_colmap(keys)
+    if not col["title"]:
+        imp_fail(N_("No column with a task title found"))
+    g_ = lambda r, f: (r.get(col[f]) or "") if col[f] else ""  # noqa: E731
+    used = {v: f for f, v in col.items() if v}
+    plan["columns"] = [{"column": head.get(k, k), "field": used.get(k, "notes")} for k in keys if k]
+    dmy = _imp_dmy([g_(r, "due") for r in rows] + [g_(r, "start") for r in rows])
+    if dmy is None and any(re.match(r"\s*\d{1,2}/\d{1,2}/", g_(r, "due") + " " + g_(r, "start")) for r in rows):
+        imp_warn(plan, N_("Dates like 01/02/2025 were read as month/day/year"), None)
+    lists, seen, by_id, by_title, rows_t = {}, {}, {}, {}, []
+    for r in rows:
+        title = imp_line(g_(r, "title"))
+        if not title:
+            continue
+        ln = imp_line(g_(r, "list"), LIST_NAME_MAX) or imp_stem(fname) or "CSV"
+        L = lists.get(ln) or lists.setdefault(ln, imp_list(plan, ln))
+        rid = imp_line(g_(r, "id"), 100)
+        d, tm = imp_anydate(g_(r, "due"), dmy)
+        key = (ln, title, d)
+        seen[key] = seen.get(key, 0) + 1
+        t = imp_task(L, ("id:" + rid) if rid else imp_hash(ln, title, d, seen[key]), title, due=d,
+                     due_time=_imp_hm(g_(r, "due_time")) or tm, section=imp_line(g_(r, "section"), LIST_NAME_MAX) or None,
+                     tags=imp_tags(_imp_strip_br(g_(r, "tags"))), created_at=imp_ts(g_(r, "created")) if g_(r, "created") else None)
+        if g_(r, "due").strip() and not d:
+            imp_warn(plan, N_("Date not understood, kept in the notes: {0}"), title, imp_line(g_(r, "due"), 60))
+            imp_addnote(t, tr("Due: {0}", imp_line(g_(r, "due"), 100)))
+        sd = imp_anydate(g_(r, "start"), dmy)[0]
+        if sd and d and sd <= d:
+            t["start"] = sd
+        pr = imp_prio_any(g_(r, "priority"))
+        if pr is None:
+            imp_warn(plan, N_("Priority not understood, kept in the notes"), title)
+            imp_addnote(t, tr("Priority: {0}", imp_line(g_(r, "priority"), 100)))
+        t["priority"] = pr or 0
+        st = imp_done(g_(r, "done"))
+        _imp_status_note(t, st, g_(r, "done"), head.get(col["done"], col["done"]))
+        da = g_(r, "done_at").strip()
+        if st or (da and not col["done"]):
+            t.update(status=st or 2, completed_at=(imp_ts(da) if da else None) or iso(now_utc()))
+        url = imp_line(g_(r, "url"), 2000)
+        if url:
+            t["url"] = url
+        imp_addnote(t, g_(r, "notes"))
+        imp_who(t, "csv", g_(r, "assignee"))
+        _imp_extra(t, r, keys, head, set(used))
+        if rid:
+            by_id[rid] = t["ext"]
+        by_title.setdefault((ln, title), t["ext"])
+        rows_t.append((t, ln, imp_line(g_(r, "parent"), 300)))
+    for t, ln, p in rows_t:
+        if p:
+            t["parent"] = by_id.get(p) or by_title.get((ln, p))
+            if not t["parent"]:
+                imp_warn(plan, N_("Parent task not found, imported as a main task"), t["title"])
+
+
+# ---- Markdown checklists
+_MD_HEAD = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
+_MD_BOX = re.compile(r"^(\s*)(?:[-*+]|\d+[.)])\s+\[([ xX/\-])\]\s+(.*)$")
+_MD_ANYBOX = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+\[[ xX/\-]\]\s", re.M)
+_MD_ITEM = re.compile(r"^(\s*)(?:[-*+]|\d+[.)])\s+(.*)$")
+_MD_DATE = re.compile(r"(?:(📅|⏳|🛫|✅|due:?|fällig:?|start:?|@due\(|@start\()\s*)?(\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{4})"
+                      r"(?:[ T](\d{1,2}:\d{2}))?\)?", re.I)
+_MD_TAG = re.compile(r"(?:^|\s)#([^\W\d_][\w/-]{0,99})", re.U)
+
+
+def _md_title(text):
+    """Title of a Markdown task -> (title, {due, due_time, start, done_at, priority, tags}). Only clear dates (2025-01-15,
+    15.01.2025, with a due / start marker or the Obsidian Tasks symbols); priorities ⏫ 🔼 🔽, #tags."""
+    out = {"due": None, "due_time": None, "start": None, "done_at": None, "priority": 0, "tags": []}
+
+    def dt(m):
+        mark = (m.group(1) or "").lower().rstrip(":(")
+        d = m.group(2)
+        if "." in d:
+            d = imp_numdate(d)[0]
+        if not d or not valid_date(d):
+            return m.group(0)
+        if mark in ("🛫", "⏳", "start", "@start"):
+            out["start"] = out["start"] or d
+        elif mark == "✅":
+            out["done_at"] = d
+        elif not out["due"]:
+            tm = (m.group(3) or "").zfill(5)
+            out["due"], out["due_time"] = d, tm if m.group(3) and valid_hm(tm) else None
+        return " "
+    text = _MD_DATE.sub(dt, text)
+    for sym, p in (("⏫", 5), ("🔺", 5), ("🔼", 3), ("🔽", 1), ("⏬", 1)):
+        if sym in text:
+            out["priority"] = out["priority"] or p
+            text = text.replace(sym, " ")
+    out["tags"] = list(dict.fromkeys(imp_line(m.group(1), 100) for m in _MD_TAG.finditer(text)))[:50]
+    text = _MD_TAG.sub(" ", text)
+    return imp_line(text), out
+
+
+def _md_parse(text, plan, name, ext0, heads_as_lists=True, src="markdown"):
+    """Markdown -> tasks: the top heading level = lists (heads_as_lists), deeper headings = sections; - [ ] / - [x] / * [ ] / 1. [ ]
+    = tasks (plain bullets only in a file without any checkbox), indentation = subtask, text below a task = its notes.
+    -> the number of tasks."""
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    if lines and lines[0].strip() == "---":  # front matter
+        end = next((i for i, x in enumerate(lines[1:60], 1) if x.strip() in ("---", "...")), None)
+        if end:
+            lines = lines[end + 1:]
+    fence, heads, boxes = False, [], False
+    for x in lines:
+        if x.lstrip().startswith(("```", "~~~")):
+            fence = not fence
+        elif not fence:
+            h = _MD_HEAD.match(x)
+            if h:
+                heads.append(len(h.group(1)))
+            elif _MD_BOX.match(x):
+                boxes = True
+    top = min(heads) if heads and heads_as_lists else None
+    state = {"list": None, "name": name}
+    section, stack, last, seen, n, fence = None, [], None, {}, 0, False
+
+    def cur():
+        if state["list"] is None:
+            state["list"] = imp_list(plan, state["name"] or name)
+        return state["list"]
+    for x in lines:
+        if x.lstrip().startswith(("```", "~~~")):
+            fence = not fence
+            if last is not None:
+                last["_md"].append(x.strip())
+            continue
+        h = None if fence else _MD_HEAD.match(x)
+        if h:
+            txt = imp_line(re.sub(r"[*_`]", "", h.group(2)), LIST_NAME_MAX)
+            if top and len(h.group(1)) == top:
+                state.update(list=None, name=txt or name)
+                section = None
+            else:
+                section = txt or None
+            stack, last = [], None
+            continue
+        m = None if fence else (_MD_BOX.match(x) or (None if boxes else _MD_ITEM.match(x)))
+        if m:
+            ind = len(m.group(1).expandtabs(4))
+            mark = m.group(2) if boxes else " "
+            body = m.group(3) if boxes else m.group(2)
+            while stack and stack[-1][0] >= ind:
+                stack.pop()
+            parent = stack[-1][1] if stack else None
+            title, ex = _md_title(body)
+            L = cur()
+            chain = "/".join(p[1]["title"] for p in stack)
+            k = (L["name"], section, chain, title)
+            seen[k] = seen.get(k, 0) + 1
+            t = imp_task(L, imp_hash(ext0, L["name"], section, chain, title, seen[k]), title or tr("(untitled)"), section=section,
+                         parent=parent["ext"] if parent else None, due=ex["due"], due_time=ex["due_time"], start=ex["start"],
+                         priority=ex["priority"], tags=ex["tags"])
+            t["_md"] = []
+            if mark in "xX":
+                t.update(status=2, completed_at=imp_ts(ex["done_at"]) or iso(now_utc()))
+            elif mark == "-":
+                t.update(status=-1, completed_at=iso(now_utc()))
+            stack.append((ind, t))
+            last, n = t, n + 1
+            continue
+        if last is not None and (x.strip() or last["_md"]):
+            base = (stack[-1][0] if stack else 0) + 2
+            last["_md"].append(x[base:] if x[:base].strip() == "" else x.strip())
+    for L in plan["lists"]:
+        for t in L["tasks"]:
+            if "_md" in t:
+                imp_addnote(t, "\n".join(t.pop("_md")))
+    return n
+
+
+def parse_markdown(data, fname, opts, plan):
+    text = imp_decode(data)
+    if not _md_parse(text, plan, imp_stem(fname) or "Markdown", "md"):
+        imp_fail(N_("No tasks found in the file"))
+
+
+# ---- Notion (export "Markdown & CSV": a ZIP, often with ZIPs inside, page and database names carry an id at the end)
+_NOTION_ID = re.compile(r"\s+[0-9a-f]{32}$|\s+[0-9a-f]{8}(?:-?[0-9a-f]{4}){3}-?[0-9a-f]{12}$", re.I)
+IMPORT_NEST_ZIPS = 20  # ZIPs inside a ZIP (Notion splits big exports into parts), one level deep
+
+
+def _notion_name(path):
+    base = str(path or "").replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
+    base = re.sub(r"\.(csv|md|markdown|zip)$", "", base, flags=re.I)
+    base = re.sub(r"_all$", "", base)
+    return imp_line(_NOTION_ID.sub("", base), LIST_NAME_MAX)
+
+
+def _notion_files(data):
+    """(path, bytes) of every CSV / Markdown file of a Notion export ZIP, also inside ZIPs in it (one level, IMPORT_NEST_ZIPS,
+    one budget for everything)."""
+    out, budget, nested = [], IMPORT_MAX_MB * 1048576 * 3, 0
+    for path, b in imp_zip(data, (".csv", ".md", ".markdown", ".zip"), full=True):
+        if path.lower().endswith(".zip"):
+            nested += 1
+            if nested > IMPORT_NEST_ZIPS:
+                imp_fail(N_("The ZIP file contains too many files"))
+            for p2, b2 in imp_zip(b, (".csv", ".md", ".markdown", ".zip"), full=True):
+                if p2.lower().endswith(".zip"):
+                    imp_fail(N_("The ZIP file is nested too deeply"))
+                budget -= len(b2)
+                out.append((path[:-4] + "/" + p2, b2))
+        else:
+            budget -= len(b)
+            out.append((path, b))
+        if budget < 0:
+            imp_fail(N_("The ZIP file unpacks to too much data"))
+    return out
+
+
+def _notion_date(v):
+    """'January 15, 2025', 'January 15, 2025 10:00 AM (GMT+1)', '2025-01-15', ranges 'A → B' -> (start, due, time)."""
+    parts = [x.strip() for x in re.split(r"\s+(?:→|->)\s+", str(v or "").strip()) if x.strip()]
+    if not parts:
+        return None, None, None
+    d1, t1 = imp_anydate(parts[0])
+    if len(parts) > 1:
+        d2, t2 = imp_anydate(parts[1])
+        if d1 and d2 and d1 <= d2:
+            return d1, d2, t2
+    return None, d1, t1
+
+
+def _notion_db(text, path, plan, opts):
+    keys, rows, head = imp_csv(text)
+    if not keys or not rows:
+        return {}
+    col = imp_colmap(keys)
+    # Notion: the title is the first column; a checkbox column may be named anything ("Done", "Erledigt", "Checkbox")
+    col["title"] = next((k for k in ("name", "title", "task", "task name", "aufgabe", "titel") if k in keys), keys[0])
+    if col["done"] == col["title"]:
+        col["done"] = None
+    if not col["done"]:
+        col["done"] = next((k for k in keys if k not in col.values() and rows and
+                            all(str(r.get(k) or "").strip().lower() in ("yes", "no", "ja", "nein", "") for r in rows)
+                            and any(str(r.get(k) or "").strip() for r in rows)), None)
+    g_ = lambda r, f: (r.get(col[f]) or "") if col[f] else ""  # noqa: E731
+    name = _notion_name(path) or "Notion"
+    L = imp_list(plan, name)
+    used = {v for v in col.values() if v} | {"last edited time", "last edited by", "created by"}
+    seen, idx = {}, {}
+    for r in rows:
+        title = imp_line(g_(r, "title"))
+        if not title:
+            continue
+        seen[title] = seen.get(title, 0) + 1
+        sd, d, tm = _notion_date(g_(r, "due"))
+        t = imp_task(L, imp_hash("notion", name, title, seen[title]), title, due=d, due_time=None if tm == "00:00" else tm, start=sd,
+                     tags=imp_tags(g_(r, "tags"), r","), section=imp_line(g_(r, "section"), LIST_NAME_MAX) or None,
+                     created_at=imp_ts(imp_anydate(g_(r, "created"))[0]) if g_(r, "created") else None)
+        if g_(r, "due").strip() and not d:
+            imp_warn(plan, N_("Date not understood, kept in the notes: {0}"), title, imp_line(g_(r, "due"), 60))
+            imp_addnote(t, tr("Due: {0}", imp_line(g_(r, "due"), 100)))
+        pr = imp_prio_any(g_(r, "priority"))
+        t["priority"] = pr or 0
+        if pr is None:
+            used.discard(col["priority"])  # not understood: the column goes into the notes
+        st = imp_done(g_(r, "done"))
+        _imp_status_note(t, st, g_(r, "done"), head.get(col["done"], col["done"]))
+        if st:
+            t.update(status=st, completed_at=iso(now_utc()))
+        url = imp_line(g_(r, "url"), 2000)
+        if url and valid_url(url):
+            t["url"] = url
+        imp_addnote(t, g_(r, "notes"))
+        imp_who(t, "notion", g_(r, "assignee"))
+        _imp_extra(t, r, keys, head, used)
+        used.add(col["priority"])
+        idx.setdefault(title.lower(), t)
+    return {"list": L, "rows": idx}
+
+
+def _notion_page_body(text):
+    """A database row's own page: drop the title heading and the property lines below it."""
+    lines = text.replace("\r\n", "\n").split("\n")
+    i = 0
+    while i < len(lines) and not lines[i].strip():
+        i += 1
+    if i < len(lines) and lines[i].startswith("# "):
+        i += 1
+    while i < len(lines) and not lines[i].strip():
+        i += 1
+    while i < len(lines) and re.match(r"^[^\s:#\-*][^:]{0,80}:\s", lines[i]):
+        i += 1
+    return "\n".join(lines[i:]).strip()
+
+
+def parse_notion(data, fname, opts, plan):
+    if data[:4] == b"PK\x03\x04":
+        files = _notion_files(data)
+    else:
+        files = [(fname or "Notion.md", data)]
+    csvs = [(p, b) for p, b in files if p.lower().endswith(".csv")]
+    have_all = {p[:-8].lower() for p, _ in csvs if p.lower().endswith("_all.csv")}
+    dbs, n = {}, 0
+    for p, b in csvs:  # newer exports carry "<db>.csv" (the view) next to "<db>_all.csv" (every row): the full one wins
+        if not p.lower().endswith("_all.csv") and p[:-4].lower() in have_all:
+            continue
+        r = _notion_db(imp_decode(b), p, plan, opts)
+        if r:
+            dbs.setdefault(_notion_name(p).lower(), []).append(r)
+            n += len(r["list"]["tasks"])
+    skipped = 0
+    for p, b in sorted((x for x in files if not x[0].lower().endswith(".csv")), key=lambda x: x[0].count("/")):
+        text = imp_decode(b)
+        segs = p.split("/")
+        owner = _notion_name(segs[-2]).lower() if len(segs) > 1 else ""
+        row = None
+        for db_ in dbs.get(owner, []):
+            row = db_["rows"].get(_notion_name(p).lower())
+            if row:
+                L = db_["list"]
+                break
+        if row:  # the page of a database row: its text into the task's notes, its checkboxes become subtasks
+            body = _notion_page_body(text)
+            sub = imp_plan("notion")
+            if _md_parse(body, sub, row["title"], "notion:" + row["ext"], heads_as_lists=False):
+                for t in sub["lists"][0]["tasks"]:
+                    t["section"] = row["section"]
+                    t["parent"] = t["parent"] or row["ext"]
+                    L["tasks"].append(t)
+                    n += 1
+                body = "\n".join(x for x in body.split("\n") if not _MD_BOX.match(x))
+            imp_addnote(row, body)
+            continue
+        if not _MD_ANYBOX.search(text):
+            skipped += 1
+            continue
+        text = re.sub(r"\A\s*# [^\n]*\n", "", text)  # the page title (the list is named after the page)
+        got = _md_parse(text, plan, _notion_name(p) or "Notion", "notion:" + p, heads_as_lists=False)
+        if not got:
+            skipped += 1
+        n += got
+    if not n:
+        imp_fail(N_("No Notion database (CSV) or checklist found in the file"))
+    if skipped:
+        imp_warn(plan, N_("Pages without a checklist were skipped"), None)
+        plan["warn"][(N_("Pages without a checklist were skipped"),)]["n"] = skipped
+
+
+# ---- Google Tasks (Takeout: a ZIP with Tasks/Tasks.json, or the JSON itself)
+def parse_gtasks(data, fname, opts, plan):
+    if data[:4] == b"PK\x03\x04":
+        members = imp_zip(data, (".json",), full=True)
+        pick = [b for p, b in members if p.lower().rsplit("/", 1)[-1] == "tasks.json"] or [b for _, b in members]
+        if not pick:
+            imp_fail(N_("No Tasks.json found in the ZIP file"))
+        js = [imp_json(imp_decode(b)) for b in pick[:5]]
+    else:
+        js = [imp_json(imp_decode(data))]
+    ok = False
+    for j in js:
+        if not isinstance(j, dict) or not isinstance(j.get("items"), list):
+            continue
+        items = [x for x in j["items"] if isinstance(x, dict)]
+        if j.get("kind") == "tasks#taskLists" or any(isinstance(x.get("items"), list) or x.get("kind") == "tasks#taskList" for x in items):
+            for tl in items:
+                _gtasks_list(tl.get("title") or "Google Tasks", [x for x in tl.get("items") or [] if isinstance(x, dict)], plan)
+            ok = True
+        elif j.get("kind") == "tasks#tasks" or any(x.get("kind") == "tasks#task" for x in items):
+            _gtasks_list(imp_stem(fname) or "Google Tasks", items, plan)
+            ok = True
+    if not ok:
+        imp_fail(N_("This is not a Google Tasks export (Tasks.json from Google Takeout expected)"))
+
+
+def _gtasks_list(name, items, plan):
+    L = imp_list(plan, name)
+    items = [x for x in items if not x.get("deleted")]
+    items.sort(key=lambda x: (str(x.get("parent") or ""), str(x.get("position") or "")))
+    for it in items:
+        tid = str(it.get("id") or "") or imp_hash(name, it.get("title"), it.get("updated"))
+        t = imp_task(L, tid, it.get("title") or tr("(untitled)"), parent=str(it["parent"]) if it.get("parent") else None,
+                     created_at=imp_ts(it.get("created")) if it.get("created") else None)
+        due = str(it.get("due") or "")[:10]  # Google keeps the day only (midnight UTC): never shifted by a time zone
+        if valid_date(due):
+            t["due"] = due
+        imp_addnote(t, it.get("notes"))
+        if it.get("status") == "completed":
+            t.update(status=2, completed_at=imp_ts(it.get("completed")) or iso(now_utc()))
+        links = [x for x in it.get("links") or [] if isinstance(x, dict) and x.get("link")]
+        if links:
+            imp_addnote(t, tr("Links (not opened):") + "\n" + "\n".join(
+                f"- {imp_line(x.get('description') or x.get('type') or 'link', 200)}: {imp_line(x.get('link'), 2000)}" for x in links))
+
+
+# ---- ClickUp (CSV export of a list / space)
+CU_STD = {"task id", "task custom id", "task name", "task content", "status", "date created", "date created text", "due date",
+          "due date text", "start date", "start date text", "parent id", "attachments", "assignees", "tags", "priority", "list name",
+          "folder name", "space name", "time estimated", "time estimated text", "checklists", "comments", "assigned comments",
+          "time spent", "time spent text", "rolled up time", "rolled up time text", "date updated", "date updated text",
+          "date closed", "date closed text", "date done", "date done text", "lists", "latest comment", "task url", "points",
+          "watchers", "creator", "sprint points", "dependencies", "linked tasks"}
+
+
+def _cu_date(v, text):
+    d, t = _imp_epoch(v)
+    if not d:
+        d, t = imp_anydate(v)
+    if not d and text:
+        d, t = imp_anydate(re.sub(r"\s+(?:gmt|utc)[+-]?\d*$", "", str(text).strip(), flags=re.I))
+    return d, (None if t == "00:00" else t)
+
+
+def _cu_checklists(v):
+    """ClickUp checklists as JSON ({name: [items]} or [{name, items}]) -> [(name, [(text, done)])]; None = not JSON."""
+    try:
+        j = json.loads(v) if len(v) < 200000 else None
+    except ValueError:
+        return None
+    if isinstance(j, dict):
+        j = [{"name": k, "items": x} for k, x in j.items()]
+    if not isinstance(j, list):
+        return None
+    out = []
+    for cl in j[:50]:
+        if not isinstance(cl, dict):
+            continue
+        its = []
+        for it in (cl.get("items") or [])[:500]:
+            if isinstance(it, str):
+                its.append((it, False))
+            elif isinstance(it, dict):
+                its.append((str(it.get("name") or it.get("text") or ""), bool(it.get("resolved") or it.get("checked") or it.get("done"))))
+        out.append((str(cl.get("name") or ""), [x for x in its if x[0].strip()]))
+    return out
+
+
+def parse_clickup(data, fname, opts, plan):
+    keys, rows, head = imp_csv(imp_decode(data))
+    if "task name" not in keys:
+        imp_fail(N_("This is not a ClickUp CSV export (column Task Name missing)"))
+    lists, seen = {}, {}
+    for r in rows:
+        title = imp_line(r.get("task name"))
+        if not title:
+            continue
+        ln = imp_line(r.get("list name"), LIST_NAME_MAX) or imp_stem(fname) or "ClickUp"
+        fo = imp_line(r.get("folder name"), FOLDER_MAX)
+        fo = "" if fo.lower() in ("hidden", "-", "none") else fo
+        fo = fo or imp_line(r.get("space name"), FOLDER_MAX)
+        L = lists.get((fo, ln)) or lists.setdefault((fo, ln), imp_list(plan, ln, folder=fo))
+        tid = imp_line(r.get("task id"), 100)
+        seen[(ln, title)] = seen.get((ln, title), 0) + 1
+        d, tm = _cu_date(r.get("due date"), r.get("due date text"))
+        t = imp_task(L, tid or imp_hash(ln, title, seen[(ln, title)]), title, due=d, due_time=tm,
+                     parent=imp_line(r.get("parent id"), 100) or None, tags=imp_tags(_imp_strip_br(r.get("tags")), r","),
+                     created_at=imp_ts(_imp_epoch(r.get("date created"))[0]) if _imp_epoch(r.get("date created"))[0] else None)
+        if (r.get("due date") or "").strip() and not d:
+            imp_warn(plan, N_("Date not understood, kept in the notes: {0}"), title, imp_line(r.get("due date text") or r["due date"], 60))
+            imp_addnote(t, tr("Due: {0}", imp_line(r.get("due date text") or r["due date"], 100)))
+        sd = _cu_date(r.get("start date"), r.get("start date text"))[0]
+        if sd and d and sd <= d:
+            t["start"] = sd
+        pv = (r.get("priority") or "").strip().lower()
+        t["priority"] = {"1": 5, "2": 5, "3": 3, "4": 1}.get(pv, imp_prio_any(pv) or 0)
+        st = imp_done(r.get("status"))
+        if st:
+            done_at = _imp_epoch(r.get("date closed") or r.get("date done"))[0]
+            t.update(status=st, completed_at=imp_ts(done_at) if done_at else iso(now_utc()))
+        est = (r.get("time estimated") or "").strip()
+        if est.isdigit() and int(est) >= 60000:
+            t["duration"] = min(int(est) // 60000, DURATION_MAX)
+        imp_addnote(t, r.get("task content"))
+        if not st and imp_line(r.get("status"), 100).lower() not in IMP_OPEN:
+            imp_addnote(t, tr("Status ({0}): {1}", "ClickUp", imp_line(r.get("status"), 100)))
+        imp_who(t, "clickup", r.get("assignees"))
+        att = _imp_strip_br(r.get("attachments")).strip()
+        if att:
+            imp_addnote(t, tr("Attachments (links, not downloaded):") + "\n" + imp_textblock(att, 4000))
+        cm = imp_textblock(_imp_strip_br(r.get("comments")), 20000)
+        if cm:
+            imp_addnote(t, tr("Comments ({0}):", "ClickUp") + "\n" + cm)
+        lines = [f"{head.get(k, k)}: {imp_line(r.get(k), 500)}" for k in keys if k and k not in CU_STD and imp_line(r.get(k), 500)]
+        if lines:
+            imp_addnote(t, "\n".join(lines))
+        clv = (r.get("checklists") or "").strip()
+        if clv and clv not in ("[]", "{}"):
+            cls = _cu_checklists(clv)
+            if cls is None:
+                imp_addnote(t, tr("Checklists ({0}):", "ClickUp") + "\n" + imp_textblock(clv, 4000))
+                continue
+            for i, (cn, its) in enumerate(cls):
+                par = t
+                if len(cls) > 1:
+                    par = imp_task(L, f"{t['ext']}:cl{i}", cn or tr("Checklist"), parent=t["ext"])
+                for k2, (txt, dn) in enumerate(its):
+                    s = imp_task(L, f"{par['ext']}:ci{k2}", txt, parent=par["ext"])
+                    if dn:
+                        s.update(status=2, completed_at=t["completed_at"] or iso(now_utc()))
+    known = {t["ext"] for L in plan["lists"] for t in L["tasks"]}
+    for L in plan["lists"]:
+        for t in L["tasks"]:
+            if t["parent"] and t["parent"] not in known:
+                imp_warn(plan, N_("Parent task not found, imported as a main task"), t["title"])
+                t["parent"] = None
+
+
+# ---- Jira (CSV export of an issue search: "Export > CSV (all fields / current fields)")
+JIRA_NOTE_COLS = (("sprint", N_("Sprint")), ("components", N_("Components")),
+                  ("fix version/s", N_("Fix version")), ("affects version/s", N_("Affects version")), ("reporter", N_("Reporter")),
+                  ("resolution", N_("Resolution")), ("custom field (story points)", N_("Story points")),
+                  ("custom field (epic link)", N_("Epic")), ("custom field (epic name)", N_("Epic")))
+
+
+def parse_jira(data, fname, opts, plan):
+    keys, rows = imp_csv_multi(imp_decode(data))
+    if "summary" not in keys or not ({"issue key", "issue id"} & set(keys)):
+        imp_fail(N_("This is not a Jira CSV export (columns Summary and Issue key missing)"))
+    one = lambda r, k: (r.get(k) or [""])[0]  # noqa: E731
+    lists, idx, out = {}, {}, []
+    for r in rows:
+        title = imp_line(one(r, "summary"))
+        key, iid = imp_line(one(r, "issue key"), 100), imp_line(one(r, "issue id"), 100)
+        if not title or not (key or iid):
+            continue
+        ln = imp_line(one(r, "project name") or one(r, "project key"), LIST_NAME_MAX) or imp_stem(fname) or "Jira"
+        L = lists.get(ln) or lists.setdefault(ln, imp_list(plan, ln))
+        d, tm = imp_anydate(one(r, "due date"))
+        tags = [imp_line(x, 100) for k in ("labels", "label") for v in r.get(k) or [] for x in str(v).split() if imp_line(x, 100)]
+        t = imp_task(L, key or iid, title, due=d, due_time=None if tm == "00:00" else tm, tags=list(dict.fromkeys(tags))[:50],
+                     created_at=imp_ts(" ".join(filter(None, imp_anydate(one(r, "created"))))) if one(r, "created") else None)
+        if one(r, "due date").strip() and not d:
+            imp_warn(plan, N_("Date not understood, kept in the notes: {0}"), title, imp_line(one(r, "due date"), 60))
+            imp_addnote(t, tr("Due: {0}", imp_line(one(r, "due date"), 100)))
+        sd = imp_anydate(one(r, "custom field (start date)"))[0]
+        if sd and d and sd <= d:
+            t["start"] = sd
+        pr = imp_prio_any(one(r, "priority"))
+        t["priority"] = pr or 0
+        st = imp_done(one(r, "status"))
+        res = one(r, "resolution").strip()
+        if res and res.lower() not in ("unresolved", "ungelöst"):  # a resolution means closed; "Won't Do" etc. = cancelled
+            st = -1 if imp_done(res) == -1 else (st or 2)
+        if st:
+            rv = one(r, "resolved")
+            rd = imp_anydate(rv) if rv else (None, None)
+            t.update(status=st, completed_at=imp_ts(f"{rd[0]} {rd[1] or '12:00'}") if rd[0] else iso(now_utc()))
+        head = " · ".join(x for x in (key, imp_line(one(r, "issue type"), 100)) if x)
+        imp_addnote(t, "Jira: " + head if head else "")
+        imp_addnote(t, one(r, "description"))
+        lines = []
+        for k, label in JIRA_NOTE_COLS:
+            vals = [imp_line(x, 200) for x in r.get(k) or [] if imp_line(x, 200)]
+            if vals:
+                lines.append(f"{tr(label)}: {', '.join(dict.fromkeys(vals))}")
+        if pr is None:
+            lines.append(f"{tr('Priority')}: {imp_line(one(r, 'priority'), 100)}")
+        if lines:
+            imp_addnote(t, "\n".join(lines))
+        imp_who(t, "jira", one(r, "assignee"))
+        for x in (key, iid):
+            if x:
+                idx.setdefault(x, t["ext"])
+        out.append((t, imp_line(one(r, "parent") or one(r, "parent id") or one(r, "parent key"), 100)))
+    for t, p in out:
+        if p:
+            t["parent"] = idx.get(p)
+            if not t["parent"]:
+                imp_warn(plan, N_("Parent task not found, imported as a main task"), t["title"])
+
+
+IMPORT_PARSERS = {"todoist": parse_todoist, "trello": parse_trello, "asana": parse_asana, "mstodo": parse_mstodo, "ics": parse_ics,
+                  # 2.142.0 B (#2147)
+                  "notion": parse_notion, "gtasks": parse_gtasks, "clickup": parse_clickup, "jira": parse_jira, "csv": parse_csv,
+                  "markdown": parse_markdown}
 
 
 # ---- writing a plan
@@ -1448,6 +2199,8 @@ def imp_run(c, uid, plan, opts, dry):
                            for L in plan["lists"] for t in L["tasks"][:IMPORT_SAMPLES]][:IMPORT_SAMPLES],
                "warnings": [{"text": tr(k[0], *k[1:], lg=lg), "count": w["n"], "examples": w["ex"]}
                             for k, w in plan["warn"].items()],
+               # 2.142.0 B (#2147): any CSV: which column went into which field (unknown columns: the notes)
+               **({"columns": plan["columns"]} if plan.get("columns") else {}),
                # compatibility with the TickTick import's answer
                "tasks": stats["tasks"], "new_lists": stats["lists"]}
         if dry:
