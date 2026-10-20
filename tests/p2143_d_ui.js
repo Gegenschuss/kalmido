@@ -31,10 +31,10 @@ const change = (w, el, on) => { el.checked = on; el.dispatchEvent(new w.Event('c
   await call('bob', 'PATCH', '/api/settings', {lang: 'en', tour: 'done'});
 
   // ================= #2155: the account's appearance is applied on a device that has none of its own
-  await call('alice', 'PATCH', '/api/settings', {look: JSON.stringify({theme: 'light', accent: 'teal'})});
+  await call('alice', 'PATCH', '/api/settings', {look: JSON.stringify({theme: 'light', accent: 'mint'})});
   let w = await boot({user: 'alice'}); let d = w.document;
-  await until(() => d.documentElement.dataset.accent === 'teal', 40);
-  check(d.documentElement.dataset.theme === 'light' && d.documentElement.dataset.accent === 'teal', `the account's appearance is applied: ${d.documentElement.dataset.theme} / ${d.documentElement.dataset.accent}`);
+  await until(() => d.documentElement.dataset.accent === 'mint', 40);
+  check(d.documentElement.dataset.theme === 'light' && d.documentElement.dataset.accent === 'mint', `the account's appearance is applied: ${d.documentElement.dataset.theme} / ${d.documentElement.dataset.accent}`);
 
   w.eval(`settingsModal('look')`); await sleep(300);
   const pane = () => d.querySelector('.smodal [data-pane="look"]');
@@ -48,8 +48,8 @@ const change = (w, el, on) => { el.checked = on; el.dispatchEvent(new w.Event('c
   // off: it goes to the account
   change(w, pane().querySelector('#s-look-local'), false); await sleep(1500);
   check(w.localStorage.getItem('tasks.lookLocal') === null && (await look('alice')).theme === 'dark', 'switch off: this device appearance goes to the account');
-  w.eval(`lookSet('accent', 'pink')`); await sleep(1500);
-  check((await look('alice')).accent === 'pink', 'a change is saved to the account');
+  w.eval(`lookSet('accent', 'rose')`); await sleep(1500);
+  check((await look('alice')).accent === 'rose', 'a change is saved to the account');
   w.eval(`for (const k of LOOK_KEYS) LS.del(k); applyTheme(); applyLook();`); await sleep(1500);
   check(JSON.stringify(await look('alice')) === '{}', 'reset: the account appearance is reset too');
   w.close();
@@ -67,10 +67,10 @@ const change = (w, el, on) => { el.checked = on; el.dispatchEvent(new w.Event('c
   w.close();
   // the account has none yet: the device's own is uploaded once
   check((await look('bob')) === null, 'bob: no appearance saved yet');
-  w = await boot({user: 'bob', ls: {'tasks.theme': '"light"', 'tasks.accent': '"teal"'}}); d = w.document;
+  w = await boot({user: 'bob', ls: {'tasks.theme': '"light"', 'tasks.accent': '"mint"'}}); d = w.document;
   await until(async () => (await look('bob')), 30);
   const up = await look('bob');
-  check(up && up.theme === 'light' && up.accent === 'teal', 'first load: the local appearance goes to the account ' + JSON.stringify(up));
+  check(up && up.theme === 'light' && up.accent === 'mint', 'first load: the local appearance goes to the account ' + JSON.stringify(up));
   w.close();
 
   // ================= #2156: the activity table (Administration > Organisation)

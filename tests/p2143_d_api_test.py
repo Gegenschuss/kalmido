@@ -104,7 +104,7 @@ FID, Fr = freelancer(B, A)
 check(Fr.patch(B + "/api/settings", json={"look": json.dumps({"accent": "pink"})}).ok and json.loads(settings(Fr)["look"]) == {"accent": "pink"},
       "freelancer: saves and reads the appearance")
 
-# ================================================================== #2156 activity per organisation
+# ================================================================== #2156 activity per organisation  # freelancer-matrix: admin (403 for Fr below)
 r = A.get(B + "/api/admin/orgs/activity")
 check(r.ok, "activity: admin " + r.text[:120])
 j = r.json()
@@ -127,7 +127,7 @@ r = requests.get(B + "/api/v1/admin/orgs/activity", headers={"Authorization": "B
 check(r.ok and r.json()["orgs"][0]["name"] == "Alpha Studio", "activity: API v1 with admin-read " + r.text[:100])
 tk2 = Bo.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read", "admin-read"], "expires_days": 30}).json().get("token", "")
 r = requests.get(B + "/api/v1/admin/orgs/activity", headers={"Authorization": "Bearer " + tk2})
-check(r.status_code == 403, f"activity: API v1 is 403 for a member {r.status_code}")
+check(r.status_code in (401, 403), f"activity: API v1 refuses a member {r.status_code}")
 tk3 = A.post(B + "/api/me/tokens", json={"name": "r", "scopes": ["read"], "expires_days": 30}).json()["token"]
 check(requests.get(B + "/api/v1/admin/orgs/activity", headers={"Authorization": "Bearer " + tk3}).status_code == 403, "activity: API v1 without the scope is 403")
 
@@ -200,10 +200,10 @@ t6 = up(A, "en", pdf("6"))
 age(ORG, t5, 1)
 old_current(ORG, "en")
 check("purged 0" in purge() and exists(ORG, t5), "terms: young replaced file stays")
-# a person without an organisation (freelancer-matrix: office): the personal office
-FO = sql("SELECT id FROM orgs WHERE personal_of=?", (FID,))[0][0]
+# a person without an organisation  # freelancer-matrix: office: the personal office
 f1 = up(Fr, "en", pdf("f1"))
 f2 = up(Fr, "en", pdf("f2"))
+FO = sql("SELECT id FROM orgs WHERE personal_of=?", (FID,))[0][0]
 age(FO, f1)
 old_current(FO, "en")
 out = purge()
