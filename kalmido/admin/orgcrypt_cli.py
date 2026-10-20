@@ -536,7 +536,8 @@ def docs_count(c):
     out = {"enc": 0, "plain": 0}
     with system_ctx(c):  # orgcrypt: counts only
         for table, idc, col, ctx in DOC_JOBS:
-            for r in c.execute(f"SELECT left({col}, 6) AS p, COUNT(*) AS n FROM {table} WHERE {col}<>'' GROUP BY left({col}, 6)"):
+            for r in c.execute(f"SELECT left({col}::text, 6) AS p, COUNT(*) AS n FROM {table} WHERE {col}::text<>'' "
+                                 f"GROUP BY left({col}::text, 6)"):
                 out["enc" if r["p"] == oc.PREFIX else "plain"] += int(r["n"])
     return out
 
