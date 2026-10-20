@@ -690,7 +690,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `runtime_changed` | 2.4.1: an admin changed the agent's [runtime settings](#runtime-settings) | `runtime` |
 | `reset` | 2.4.1: an admin pressed *Reset now*: the host should restart the agent with a fresh session | `reset_seq`, `runtime`, `user` |
 | `ping` | the "Send test" button in the admin settings | `message` |
-| `team_message` | 2.17.0: someone @mentions the agent in a list's team chat (the agent is a member of the channel of every list shared with it); 2.46.1: in a list where the agent listens in, every message of a person in its channel, without an @mention (`mentioned` false; never a message of an agent) | `room` `{id, kind, list_id}`, `mentioned`, `listening` (2.46.1), `message` `{id, text, user_id, task_id, created_at, reply_to, reply}`, `user` `{id, name}`; 2.33.0: also when someone answers one of the agent's channel messages (`reply_to`, see [Replies](#replies-to-one-message-2330)); answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`) |
+| `team_message` | 2.17.0: someone @mentions the agent in a list's team chat (the agent is a member of the channel of every list shared with it); 2.46.1: in a list where the agent listens in, every message of a person in its channel, without an @mention (`mentioned` false; never a message of an agent) | `room` `{id, kind, list_id}`, `mentioned`, `listening` (2.46.1), `message` `{id, text, user_id, task_id, created_at, reply_to, reply, attachments, thread_of}` (2.139.0: an attachment with `voice: true` is a voice message, `duration_ms` its length; Kalmido does not transcribe), `user` `{id, name}`; 2.33.0: also when someone answers one of the agent's channel messages (`reply_to`, see [Replies](#replies-to-one-message-2330)); answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`); 2.139.0 (#2127): `thread_of` set = the message answers in a thread: answer in that thread (`thread_of`) |
 | `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}`; 2.39.0 kind `cleanup` ([Tidy up a list](#tidy-up-a-list-2390)): + `list_id` (and the list's `playbook`); 2.70.0 kind `extract`: `input.images` = photos of the meeting ([A meeting becomes tasks](#a-meeting-becomes-tasks-2700)); 2.126.1 kind `triage` from a [planned *Sort the basket*](#planned-jobs-2340): + `scheduled: true`, `schedule_id`, `due_at`, `late`, `manual`, `hint` (`input.schedule_id` too) |
 | `task_added` | 2.23.0 (#795): a top-level task was created in, or moved into, a list shared with the agent (not for its own tasks); 2.30.0: only when the agent [listens in](#agent-listens-in-2300) there | `task`, `list`, `how`: `created` or `moved`, `moved_from` `{id, name}` (only when the agent sees that list), `source`: `form`, `mail`, `errors`, `proposal` (when not made in the app); 2.63.0: a form's report also carries `ttype` (when the form sets one) and `portal: true` (the sender has a status link and sees only the answers meant for them, never internal comments); 2.98.0: a questionnaire's task has the answers in its description (a Markdown heading per question) and, when the form matches clients, a last line naming the client or "client unknown" |
 | `chat_choice` | 2.28.0 (#1005): the person pressed an answer button of one of the agent's chat messages (see *Answer buttons*); 2.30.0: also a 👍 / 👎 on a permission question (2.87.9: no longer, only the buttons) | `message_id`, `choice_ids`, `labels`, `message`, `user` `{id, name}`; + `task`, `list` when the message was about a task; permission questions: `permission: true`, `approval`, `via`: `button` or `reaction`; 2.35.0 approval requests (`request_chat_approval`): `approval`, `approval_request` `{title, what}`, `via` |
@@ -2922,7 +2922,7 @@ own chat.
 | `PATCH /team/messages/{id}` · `DELETE …` (own messages) | `edit_team_message` · `delete_team_message` | comments |
 | `POST /team/messages/{id}/reactions` `{emoji, on?}` | `react_team_message` | comments |
 | `POST /team/messages/{id}/pin` `{pinned?}` (2.62.0: at most 5 per conversation; the page of a conversation carries `pins`) | `pin_team_message` | comments |
-| `POST /team/rooms/{id}/read` `{last_id?}` | `mark_team_chat_read` | comments |
+| `POST /team/rooms/{id}/read` `{last_id?, thread?}` (2.139.0: `thread` = the read mark in a thread) | `mark_team_chat_read` | comments |
 | `GET /team/channels` (2.138.1: the channels a person added you to) | `list_team_channels` | read |
 | `DELETE /team/rooms/{id}/members/{your id}` (2.138.1: leave a channel) | `leave_team_channel` | comments |
 | `GET /team/files/{id}` (2.138.1: a file of a team chat message) | `get_attachment` with `source: team` | read |
@@ -2933,6 +2933,19 @@ group conversations of people (`kind` `group`). An agent is never in a group; it
 In a channel you get `team_message` when someone @mentions you, like in a list's channel. Messages carry `attachments`
 `[{id, name, mime, size, url}]`; `post_team_message` sends `files` `[{name, base64, mime?}]` (not in end-to-end encrypted
 conversations). Opening channels or groups, renaming, archiving and managing members stay with people (`403` for agents).
+
+2.139.0 (#2128): **voice messages**. People record them in the app (the microphone in the composer); a voice message is
+an audio attachment with `voice: true` and `duration_ms` (the length the browser measured, `null` = unknown); every
+attachment carries both fields (`voice: false` for normal files). Kalmido does not transcribe: an agent downloads the
+file like any other (`GET /team/files/{id}`, MCP `get_attachment` with `source: team`; served as `audio/mp4`,
+`audio/webm`, `audio/ogg` or `audio/mpeg`, Range requests answer `206`). Agents cannot send voice messages.
+
+2.139.0 (#2127): **threads**. A message can answer in a thread under another message (`thread_of` = the thread's first
+message, one level deep). `read_team_chat` lists the main conversation without thread answers; a message with
+`thread_count` > 0 has a thread: `read_team_chat` with `thread` = its id returns the answers (`root` = the first message).
+`team_message` carries `message.thread_of` when it was written in a thread: answer in that thread (`post_team_message`
+`thread_of`), not in the main conversation. 2.139.0 (#2129): your own messages carry `read_by` `{count, users}`; people see
+your read mark (`mark_team_chat_read`, with `thread` inside a thread) as "Read by".
 
 **Searching conversations (2.33.0)**: `GET /search?scope=messages&q=…` (MCP `search_messages`, scope read) finds words in
 the comments of the tasks of your lists, in the channels of those lists and in your own chats with people -- never in

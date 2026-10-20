@@ -67,6 +67,7 @@ if ($env:KALMIDO_EVENTS -eq '1') { $Events = $true }
 # kalmido-capability: outbox, jobs, event_bundling (2.44.0: mcp/agent_extras.py and mcp/agent_job.py, loaded by agent_run.py)
 # kalmido-capability: approval_closed, perm_relay, approval_lifecycle, session_resume, robust_runs
 # kalmido-capability: team_listen (2.46.1: team chat messages of lists the agent listens in on, in mcp/agent_run.py)
+# kalmido-capability: team_thread (2.139.0: a team chat message in a thread is answered in that thread, in mcp/agent_run.py)
 # kalmido-capability: rules_block (2.46.6: the fixed rules of mcp/agent_rules.md in front of every prompt, in mcp/agent_run.py)
 # kalmido-capability: workflow_file (2.46.6: WORKFLOW-KALMIDO.md, asked for once, in mcp/agent_run.py)
 # kalmido-capability: job_wake (2.46.6: a wake run after a job, a lost job continued once; mcp/agent_run.py + agent_job.py)

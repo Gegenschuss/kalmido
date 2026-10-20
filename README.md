@@ -25,6 +25,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   that really hides job results; the home block **Today** shows today's events and counts running jobs; **group a
   list** by a custom field; an optional **operator interface** for hosters (numbers only, no content) and the
   supporter licence prices.
+- **2.139.0** (2026-10-20): team chat threads, voice messages with their own player and "Read by" (can be switched
+  off); every task comment can become a task; unreadable pages back in the search once their key returns; proposal
+  cards with the app thumb and larger check boxes.
 - **2.138.4** (2026-10-20): phones - office fixed-cost import rows stay whole, table checkbox cells tick on a tap
   with undo, sheet bar above the tab bar, Android print view, touch-sized controls in documents and bookmarks; the
   agent chat keeps an open edit; error-report webhook token in a header, contact copies out of mirrored address books,

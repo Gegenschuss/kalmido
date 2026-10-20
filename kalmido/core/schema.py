@@ -1912,6 +1912,17 @@ CREATE TABLE IF NOT EXISTS tchat_files (
   path TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS tchat_files_msg ON tchat_files(message_id);
 -- 2.98.0 C/D (#2180 #2181 #2178): (new tables below this line)
+-- 2.139.0 A (#2127): a person's read mark in a thread of the team chat (root_id = the thread's first message, tchat_msgs.thread_of).
+-- follow = 1: I take part (the root's author, everyone who answered or was @mentioned in it: counted unread, notified); 0 = only
+-- looked at it (the mark still counts for "Read by").
+-- New table only: 2.138 ignores it
+CREATE TABLE IF NOT EXISTS tchat_thread_reads (
+  root_id BIGINT NOT NULL REFERENCES tchat_msgs(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  room_id BIGINT NOT NULL REFERENCES tchat_rooms(id) ON DELETE CASCADE, last_id BIGINT NOT NULL DEFAULT 0,
+  follow BIGINT NOT NULL DEFAULT 1, PRIMARY KEY (root_id, user_id));
+CREATE INDEX IF NOT EXISTS tchat_thread_reads_user ON tchat_thread_reads(user_id, room_id);
+-- 2.139.0 review (F3): the poll signature (tchat_sig) reads the marks of a set of rooms
+CREATE INDEX IF NOT EXISTS tchat_thread_reads_room ON tchat_thread_reads(room_id);
 -- (2.98.0 last anchor)
 -- 2.99.0 A (#2182): files of knowledge pages (PDFs and pictures; upload and ZIP import, wiki/wikiatt.py). org_id / owner_id
 -- as the page (NULL = private, the app checks owner_id); path below ATT_DIR (wiki/<page id>/…, sealed like attachments);
@@ -2877,6 +2888,14 @@ MIGRATIONS = [
     ("org_keys", "kek_check_rot", "ALTER TABLE org_keys ADD COLUMN kek_check_rot TEXT"),
     ("org_keys", "rot_started_at", "ALTER TABLE org_keys ADD COLUMN rot_started_at TEXT"),
     ("org_keys", "rotated_at", "ALTER TABLE org_keys ADD COLUMN rotated_at TEXT"),
+    # 2.139.0 B (#2128): a team chat file recorded in the app as a voice message (collab/teamchan.py tvc_*): voice = 1, duration_ms
+    # = the length the browser measured (capped). 2.138 ignores both (the file shows as a plain attachment)
+    ("tchat_files", "voice", "ALTER TABLE tchat_files ADD COLUMN voice INTEGER NOT NULL DEFAULT 0"),
+    ("tchat_files", "duration_ms", "ALTER TABLE tchat_files ADD COLUMN duration_ms INTEGER"),
+    # 2.139.0 A (#2127): a team chat message in a thread: the id of its first message (NULL = the main conversation). One level:
+    # an answer to an answer hangs at the same root. 2.138 ignores it (it shows thread answers in the main conversation)
+    ("tchat_msgs", "thread_of", "ALTER TABLE tchat_msgs ADD COLUMN thread_of BIGINT"),
+    ("tchat_msgs", "thread_of", "CREATE INDEX IF NOT EXISTS tchat_msgs_thread ON tchat_msgs(room_id, thread_of) WHERE thread_of IS NOT NULL"),
     # 2.144.0 C (#2414): the list view grouped by a custom field (text / select) for every member, like sort_mode:
     # '' = the sections as before, 'cf:<field id>' = one group per value (2.143 ignores it)
     ("lists", "group_field", "ALTER TABLE lists ADD COLUMN group_field TEXT NOT NULL DEFAULT ''"),
@@ -3062,6 +3081,7 @@ USER_DEFAULTS = {
     "detail_split": "60", "detail_cm_fold": "0",
     # 2.32.0 (#1081): an agent's steps in the chat: live under the typing dots (1) and kept above every answer (always, 0)
     "agent_steps_live": "1", "agent_steps_always": "0",
+    "chat_read_receipts": "1",  # 2.139.0 A (#2129): others see when I read team chat messages (off: I see nobody's either)
     # 2.4.2 (#391): sharing with agents, per agent id (string): {"auto": [agent ids that get my new lists],
     # "skip": {"<agent id>": [list ids I stopped sharing with it]}}; written only by /api/agents/<aid>/share-all + /autoshare
     # and the member routes (server-only)

@@ -4,6 +4,9 @@ since #2105). wiki_words holds HMAC hashes of the folded words of a page's text 
 and one row 'u:<updated_at>' = the state the index was built from. A save indexes its page at once; pages saved elsewhere
 (an older version of the app, a [[link]] renamed, a move, an import) are indexed again by the next search that covers
 their space (at most WKS_CATCH_UP per space and search). Spaces with the lock are searched in the browser (wikie2e.js).
+2.139.0 C (#2386): a page whose text cannot be opened (its key is missing) is found by its name only and marked
+'x:<updated_at>:<key state>' instead -- the next search reads it again once the key state of its space changed (a key
+restored with the recovery key, a rotation, another server key), never at every search while the key stays missing.
 
 A page matches when every query word is in its name (part of a word, as before) or in its text (a whole word, or a word
 starting with it: like the documents' search, a word of 4+ characters is found by its longest stored prefix and checked
@@ -20,10 +23,32 @@ def wks_ws(oid, owner):
     return doc_ws(oid, owner)
 
 
-def wks_index(c, pid, oid, owner, text, at):
-    """The word index of page pid (plain text, the page's updated_at after the save)."""
+def wks_key_state(c, oid, owner):
+    """2.139.0 C (#2386): a short mark of the key a space's texts are sealed with (its key row and the current server key):
+    it changes with every key event, so pages that could not be read are tried again then."""
+    import hashlib
+    from ..core.orgcrypt import OrgCryptError, _kek, _kek_check, _row
+    from .wkhist import wkh_sid
+    sid = wkh_sid(oid, owner)
+    if not sid:
+        return "0"
+    try:
+        kek = _kek()
+        r = _row(c, sid)
+        s = "|".join(str(x) for x in (tuple(r) if r is not None else ("none",))) + "|" + (_kek_check(kek, sid) if kek else "")
+    except OrgCryptError:
+        s = "error"
+    return hashlib.sha256(s.encode()).hexdigest()[:12]
+
+
+def wks_index(c, pid, oid, owner, text, at, unreadable=None):
+    """The word index of page pid (plain text, the page's updated_at after the save). unreadable = the key state of the space
+    when the text could not be opened (2.139.0 C #2386): no words, the mark 'x:' to try it again after a key event."""
     from ..docs.store import index_words, word_hashes
     c.execute("DELETE FROM wiki_words WHERE page_id=?", (pid,))
+    if unreadable is not None:
+        c.execute("INSERT INTO wiki_words(page_id, h) VALUES (?,?) ON CONFLICT DO NOTHING", (pid, f"x:{at}:{unreadable}"))
+        return
     if le2e_is_cipher(text):
         return
     hs = sorted(word_hashes(c, wks_ws(oid, owner), index_words(text or ""))) + ["u:" + str(at)]
@@ -33,14 +58,21 @@ def wks_index(c, pid, oid, owner, text, at):
                   [x for h in part for x in (pid, h)])
 
 
-def wks_catch_up(c, w, a, limit=WKS_CATCH_UP):
-    """Index the pages of a space (condition w / args a on wiki_pages p) whose index is missing or older than the page."""
-    from .wkhist import wsb_body_or
+def wks_catch_up(c, w, a, limit=WKS_CATCH_UP, oid=None, owner=None):
+    """Index the pages of a space (condition w / args a on wiki_pages p; oid / owner = the space) whose index is missing or
+    older than the page -- or (2.139.0 C #2386) that could not be read under an earlier key state of the space."""
+    from .wkhist import WikiUnreadable, wkh_body
+    ks = wks_key_state(c, oid, owner)
     rows = c.execute(f"SELECT p.id, p.org_id, p.owner_id, p.body, p.updated_at FROM wiki_pages p WHERE p.deleted_at IS NULL AND {w} "
-                     "AND left(p.path, 5)<>'e2e1:' AND NOT EXISTS (SELECT 1 FROM wiki_words x WHERE x.page_id=p.id AND x.h='u:' || p.updated_at) "
-                     f"ORDER BY p.id LIMIT {int(limit)}", a).fetchall()
+                     "AND left(p.path, 5)<>'e2e1:' AND NOT EXISTS (SELECT 1 FROM wiki_words x WHERE x.page_id=p.id AND "
+                     "x.h IN ('u:' || p.updated_at, 'x:' || p.updated_at || ':' || CAST(? AS text))) "
+                     f"ORDER BY p.id LIMIT {int(limit)}", [*a, ks]).fetchall()
     for r in rows:
-        wks_index(c, r["id"], r["org_id"], r["owner_id"], wsb_body_or(c, r), r["updated_at"])  # 2.126.2 B (#2358): unreadable = title only
+        try:
+            text, bad = wkh_body(c, r), None
+        except WikiUnreadable:  # 2.126.2 B (#2358): unreadable = title only; 2.139.0 C (#2386): again after a key event
+            text, bad = "", ks
+        wks_index(c, r["id"], r["org_id"], r["owner_id"], text, r["updated_at"], unreadable=bad)
     return len(rows)
 
 
@@ -58,7 +90,7 @@ def wks_search(c, uid, spaces, q, limit=WKS_LIMIT, offset=0):
             continue  # a space with the lock: searched in the browser
         w, a = ("p.org_id=?", [oid]) if oid else ("p.org_id IS NULL AND p.owner_id=?", [uid])
         if words:
-            did += wks_catch_up(c, w, a)
+            did += wks_catch_up(c, w, a, oid=oid, owner=None if oid else uid)
         rows = c.execute(f"SELECT p.id, p.org_id, p.owner_id, p.path, p.attrs, p.created_by, p.updated_by, p.created_at, p.updated_at "
                          f"FROM wiki_pages p WHERE p.deleted_at IS NULL AND {w} AND left(p.path, 5)<>'e2e1:'", a).fetchall()
         if not words:

@@ -798,6 +798,10 @@ def team_hint(x):
     if x.get("mentioned") is False:
         out.append("You were not addressed: you listen in on this list. Answer only when the message is a question or request "
                    "about the list that you can help with; otherwise do nothing (no post).")
+    if m.get("thread_of"):  # kalmido-capability: team_thread (2.139.0, #2127): the message answers in a thread
+        out.append(f"This message answers in a thread (thread_of {m.get('thread_of')}): read it with read_team_chat thread "
+                   f"{m.get('thread_of')} when you need its context and answer in that thread (post_team_message thread_of "
+                   f"{m.get('thread_of')}), not in the main conversation.")
     out.append(f"Answer in that channel with post_team_message (room_id {rm.get('id')}), short and in Markdown; your final text "
                "is not posted anywhere.")
     return out

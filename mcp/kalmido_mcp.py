@@ -325,10 +325,10 @@ def t_post_team_message(api, a):
     """2.138.1 (#2059): a team chat message; files = [{name, base64, mime?}] -> multipart (the body may then be empty)."""
     path = f"/team/rooms/{int(a['room_id'])}/messages"
     if a.get("files"):
-        return api.call("POST", path, multipart=(_pick(a, ("body", "task_id", "reply_to")), _b64_files(a)))
+        return api.call("POST", path, multipart=(_pick(a, ("body", "task_id", "reply_to", "thread_of")), _b64_files(a)))
     if not a.get("body"):
         raise ApiError(400, "body (or files) is required")
-    return api.call("POST", path, body=_pick(a, ("body", "task_id", "reply_to")))
+    return api.call("POST", path, body=_pick(a, ("body", "task_id", "reply_to", "thread_of")))  # 2.139.0 (#2127): thread_of
 
 
 def t_get_attachment(api, a):
@@ -1445,14 +1445,19 @@ TOOLS += [
                         "you listen in, every message a person writes there).",
      _obj({}), lambda api, a: api.call("GET", "/team/rooms")),
     ("read_team_chat", "2.17.0: messages of a team chat conversation, oldest first; before = a message id for older ones. Mentions "
-                       "are <@user id>.",
-     _obj({"room_id": S_ID, "before": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 100}}, ["room_id"]),
-     lambda api, a: api.call("GET", f"/team/rooms/{int(a['room_id'])}/messages", _pick(a, ("before", "limit")))),
+                       "are <@user id>. 2.139.0 (#2127): the main conversation lists no thread answers; a message with thread_count > 0 "
+                       "has a thread: thread = its id (or the id of one of its answers) returns that thread's answers (root = its first "
+                       "message). Your own messages carry read_by {count, users} (#2129: who read up to there). An attachment with voice true is a voice message "
+                       "(duration_ms = its length); Kalmido does not transcribe it, read the audio file with get_attachment source team if you can.",
+     _obj({"room_id": S_ID, "before": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 100}, "thread": S_ID}, ["room_id"]),
+     lambda api, a: api.call("GET", f"/team/rooms/{int(a['room_id'])}/messages", _pick(a, ("before", "limit", "thread")))),
     ("post_team_message", "2.17.0: write in a team chat channel (Markdown; mention people as <@user id>; task_id links a task). "
                           "reply_to (2.33.0): the id of a message of the same conversation you answer. files (2.138.1): up to 10 "
                           "[{name, base64, mime?}] sent with the message (body may then be ''; not in end-to-end encrypted "
-                          "conversations). Messages carry attachments [{id, name, mime, size, url}]: read one with get_attachment source team.",
-     _obj({"room_id": S_ID, "body": {"type": "string", "maxLength": 8000}, "task_id": S_ID, "reply_to": S_ID,
+                          "conversations). Messages carry attachments [{id, name, mime, size, url}]: read one with get_attachment source team. "
+                          "thread_of (2.139.0): answer in the thread of that message (answer in the thread when the event team_message "
+                          "carried a thread_of).",
+     _obj({"room_id": S_ID, "body": {"type": "string", "maxLength": 8000}, "task_id": S_ID, "reply_to": S_ID, "thread_of": S_ID,
            "files": {"type": "array", "maxItems": 10, "items": {"type": "object", "properties": {
                "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}},
           ["room_id", "body"]), t_post_team_message),
@@ -1472,8 +1477,10 @@ TOOLS += [
                          "belong to; at most 5 per conversation (else 409). read_team_chat returns pins.",
      _obj({"message_id": S_ID, "pinned": {"type": "boolean"}}, ["message_id"]),
      lambda api, a: api.call("POST", f"/team/messages/{int(a['message_id'])}/pin", body=_pick(a, ("pinned",)))),
-    ("mark_team_chat_read", "2.17.0: mark a team chat conversation read (up to last_id, default the newest).",
-     _obj({"room_id": S_ID, "last_id": S_ID}, ["room_id"]), lambda api, a: api.call("POST", f"/team/rooms/{int(a['room_id'])}/read", body=_pick(a, ("last_id",)))),
+    ("mark_team_chat_read", "2.17.0: mark a team chat conversation read (up to last_id, default the newest). 2.139.0: thread = the "
+                            "read mark in that thread (#2127); people see your read mark as \"Read by\" (#2129).",
+     _obj({"room_id": S_ID, "last_id": S_ID, "thread": S_ID}, ["room_id"]),
+     lambda api, a: api.call("POST", f"/team/rooms/{int(a['room_id'])}/read", body=_pick(a, ("last_id", "thread")))),
 ]
 
 

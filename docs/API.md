@@ -424,11 +424,29 @@ reopens a task that was closed by mistake.
 | `POST /team/groups` | comments | 2.138.1: `{members, name?}` — a group conversation with at least two other people who all work with each other; people only |
 | `PATCH /team/rooms/{id}` | comments | 2.138.1: `{name?, open?, archived?}` — a channel: its creator or an organisation admin (archived = read-only, restorable); a group: every member (name only) |
 | `POST /team/rooms/{id}/members` · `DELETE …/members/{user id}` | comments | 2.138.1: add someone (channel: its managers; group: every member) or join an open channel with your own id; leave with your own id, managers remove others from a channel |
-| `GET /team/files/{id}` | read | 2.138.1: a file of a team chat message (`attachments[].url` of the message); everyone who sees the conversation |
+| `GET /team/files/{id}` | read | 2.138.1: a file of a team chat message (`attachments[].url` of the message); everyone who sees the conversation. 2.139.0 (#2128): each attachment carries `voice` (a voice message recorded in the app) and `duration_ms` (its length, `null` = unknown); audio is served inline (`audio/mp4`, `audio/webm`, `audio/ogg`, `audio/mpeg`) and answers Range requests with `206`. Kalmido does not transcribe voice messages |
 
 2.138.1: `POST /team/rooms/{id}/messages` also takes `multipart/form-data` with `body`, `task_id`, `reply_to` and up to 10
 fields `file` (the body may then be empty; the same size and type limits as task attachments). An end-to-end encrypted
 conversation refuses files (`409`). Deleting a message removes its files for good.
+2.139.0 (#2128): the app records voice messages and sends them this way with the fields `voice=1` and `duration_ms`
+(exactly one file, which must be audio by its content: MP4/M4A, WebM, Ogg or MP3, else `400`). The REST API for agents
+does not take `voice`; agents read voice messages like any other file.
+
+2.139.0 (#2127): **threads**. `POST /team/rooms/{id}/messages` takes `thread_of` (a message of the same conversation; the id
+of an answer names its thread; deleted or another conversation: `400`): the message answers in that thread, one level deep.
+`GET /team/rooms/{id}/messages` lists the main conversation without thread answers; every message carries `thread_of`,
+`thread_count`, `thread_last_at`, `thread_users` (who answered last, up to 3), `thread_unread` and `thread_follow` (you take
+part: you wrote the first message, answered or were mentioned). `?thread=<message id>` returns the answers of that thread
+with `root` (its first message) and `thread_read`; `POST /team/rooms/{id}/read` `{thread, last_id?}` sets your read mark in a
+thread. The unread count of a conversation counts the main conversation and the threads you take part in; an answer in a
+thread notifies only the people taking part (and the mentioned ones). In end-to-end encrypted conversations threads work
+the same (the id is plain metadata, the text stays encrypted).
+
+2.139.0 (#2129): **read receipts**. Your own messages carry `read_by` `{count, users}` (the first 20 member ids that read up
+to there; in a thread: in that thread) and the conversation `read_ok` (the members that send read receipts). A person
+who switched off *Send read receipts* (setting `chat_read_receipts` = `"0"`) shows up nowhere and gets no `read_by` either
+(`read_ok` null). Agents count as readers when they mark a conversation read.
 
 ## Family (2.19.0)
 

@@ -673,6 +673,11 @@ async function propOpen(jid) {
   S.prop = {jid, v, md, sel: new Set(propKeys(v)), ed: {}};
   propDraw();
   md.addEventListener('input', e => propEdit(e.target));
+  // 2.139.0 D (#2401): the whole row is the tap target of its checkbox (not the title field, date button or links)
+  md.addEventListener('click', e => {
+    const row = e.target.closest?.('.ppi'); if (!row || e.target.closest('input,button,a,select,textarea,label,.dp')) return;
+    const cb = $('.ppc', row); if (cb && !cb.disabled) cb.click();
+  });
   md.addEventListener('change', e => {
     if (e.target.classList.contains('ppc')) {
       const k = e.target.closest('.ppi')?.dataset.k; if (k === undefined) return;
