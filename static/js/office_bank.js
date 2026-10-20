@@ -126,8 +126,9 @@ function bnkImpModal(text, name) {
   const foot = (ok, back) => `<div class="aerr" role="alert"></div><div class="foot">${back ? `<button class="btn" data-bi="back">${tr('Back')}</button>` : ''}<span class="spacer"></span><button class="btn" data-bi="close">${tr('Cancel')}</button>${ok ? `<button class="btn pri" data-bi="next">${esc(ok)}</button>` : ''}</div>`;
   const sel = (id, label, val, opt) => `<div class="row"><label for="${id}">${esc(label)}</label><select id="${id}">${opt ? `<option value="">${tr('none')}</option>` : ''}${st.p.columns.map((c, i) => `<option value="${i}" ${val === i ? 'selected' : ''}>${esc(c || tr('Column {0}', i + 1))}</option>`).join('')}</select></div>`;
   const cols = () => {
-    const g = st.mapping || st.p.guess || {}, two = g.amount == null && (g.amount_in != null || g.amount_out != null);
+    const g = st.mapping || st.p.guess || {}, two = g.amount == null && (g.amount_in != null || g.amount_out != null);  // 2.140.0 B (#2134): + the recognised bank layout
     card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${esc(name)} · ${tr('Which column holds what? Kalmido has guessed; please check.')}</p>
+      ${st.p.guess?.preset_name ? `<p class="shint lhint keep bgpreset">${ic('check', 's')} ${esc(tr('Recognised layout: {0}', st.p.guess.preset_name))}</p>` : ''}
       ${sel('bi-date', tr('Date'), g.date)}
       <div class="row"><label>${tr('Amount')}</label><div class="seg" role="radiogroup" id="bi-am" aria-label="${esc(tr('Amount'))}"><button type="button" role="radio" data-am="one" aria-checked="${!two}" class="${two ? '' : 'on'}">${tr('One column (minus = expense)')}</button><button type="button" role="radio" data-am="two" aria-checked="${two}" class="${two ? 'on' : ''}">${tr('Income and expense apart')}</button></div></div>
       <div class="bi-one" ${two ? 'hidden' : ''}>${sel('bi-amt', tr('Amount'), g.amount)}</div>
