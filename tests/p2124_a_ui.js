@@ -39,7 +39,8 @@ const item = (d, re) => [...d.querySelectorAll('[role="menuitem"]')].find(b => r
   // ---- static: the chart's styles in rem, no px but hairlines
   const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'css', 'sheets.css'), 'utf8');
   const part = css.slice(css.indexOf('#2115'));
-  const px = (part.replace(/\/\*[\s\S]*?\*\//g, '').match(/(\d+(\.\d+)?)px/g) || []).filter(x => parseFloat(x) > 2);
+  // 2.139.1 (#2372): media-query breakpoints are not style sizes, later rules in the sheet use them
+  const px = (part.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media[^{]*\{/g, '{').match(/(\d+(\.\d+)?)px/g) || []).filter(x => parseFloat(x) > 2);
   check(part.length > 100 && !px.length, 'chart styles: rem only ' + px.slice(0, 3));
 
   const L = (await call('POST', '/api/lists', {name: 'Harvest', org_id: ORG})).id;

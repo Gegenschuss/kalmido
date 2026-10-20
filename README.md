@@ -23,6 +23,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **2.141.0** (2026-10-20): the **e-mail filing as a small mail desk** - an own IMAP / SMTP mailbox per workspace,
   reply and write from the filing (sent mails filed too), HTML mails shown safely, tasks and events from a mail; a CSV /
   ICS export of the disposition and a consent import for newsletters.
+- **2.140.0** (2026-10-20): private space - shopping items with quantity and price and an offline shopping mode,
+  recipes onto the shopping list and the meal plan beyond one week, journal history with search, export and mood
+  statistics, budget month comparison and one bank statement reader with the office, several reminder times per habit,
+  devices linked with the office equipment, birthdays written back to the address book.
 - **2.139.1** (2026-10-20): a whole organisation moves between two Kalmido servers - the import of an organisation export
   now takes over every area (office with finalised invoices and cash book, clients, file store, documents, knowledge
   pages, tables, video sign-offs, team chat, absences, newsletter, forms, notes, time entries), with the references

@@ -42,14 +42,20 @@ from ..agents.core import agent_ids, is_agent
 #     ID card, car inspection, insurance, contract, other); files are attached like on any task
 #   meal plan = tasks of a list with family 'meals' (due = the day, notes = the ingredients); one tap puts the
 #     ingredients on a shopping list (POST /api/tasks/<id>/to-shopping, open items are not doubled)
+#   2.140.0 A (#2131): a shopping item may carry fam {kind: shop, qty?, unit?, price?} (the amount and the price of the
+#     line; the title stays the name); shopping mode works offline (the outbox of core.js)
+#   2.140.0 A (#2132): recipes = tasks of a list with family 'recipes' (or fam {kind: recipe, serves?}; notes = the
+#     ingredients + the method); a meal may point to one (fam {kind: meal, recipe?, serves?}); its ingredients go to a
+#     shopping list scaled to the servings, an open item of the same name and unit gets the amount added
 #   packing lists = built-in templates (holiday, pool, daycare, camping, business trip) -> a list with "done at the
 #     bottom" (reusable)
 # Rights: the usual list roles; rewards / stars of a kid only its parents (and admins); a kid requests rewards.
 from dateutil.relativedelta import relativedelta  # noqa: E402
 
-FAM_LIST_KINDS = ("", "shopping", "meals", "birthdays", "household", "packing", "family")  # 2.46.1 (#1615): "family"
+FAM_LIST_KINDS = ("", "shopping", "meals", "birthdays", "household", "packing", "family", "recipes")  # 2.46.1 (#1615): "family"; 2.140.0 A (#2132): "recipes"
 FAM_OCC = ("birthday", "anniversary")
 FAM_NAME_MAX, FAM_NOTE_MAX = 100, 200
+QTY_MAX, PRICE_MAX, UNIT_MAX, SERVES_MAX = 100_000, 1_000_000, 16, 100  # 2.140.0 A (#2131, #2132)
 FAM_LEAD_MAX = 365
 STARS_MAX = 50
 ROT_MAX = 20
@@ -238,7 +244,29 @@ def clean_fam(v):
         if isinstance(v.get("card"), str) and v["card"]:
             out["card"] = v["card"][:200]  # the vCard UID of an imported contact (kept for a later contacts module)
     elif k == "meal":  # 2.46.1 (#1615): a meal of the meal plan, in any list (before: only lists of family "meals")
-        allowed = {"kind"}
+        allowed = {"kind", "recipe", "serves"}  # 2.140.0 A (#2132): the recipe it is made from, for how many
+        if v.get("recipe") not in (None, ""):
+            out["recipe"] = as_int(v["recipe"], "recipe", 1)
+        if v.get("serves") not in (None, ""):
+            out["serves"] = as_int(v["serves"], "serves", 1, SERVES_MAX)
+    elif k == "recipe":  # 2.140.0 A (#2132): a recipe (any list; a list of family "recipes" holds them)
+        allowed = {"kind", "serves"}
+        if v.get("serves") not in (None, ""):
+            out["serves"] = as_int(v["serves"], "serves", 1, SERVES_MAX)
+    elif k == "shop":  # 2.140.0 A (#2131): the amount and the price of a shopping item
+        allowed = {"kind", "qty", "unit", "price"}
+        q = shop_num(v.get("qty"), "qty", QTY_MAX)
+        if q is not None:
+            out["qty"] = q
+        u = v.get("unit", "")
+        if not isinstance(u, str):
+            raise bad
+        u = re.sub(r"\s+", " ", u).strip()[:UNIT_MAX]
+        if u:
+            out["unit"] = u
+        pr = shop_num(v.get("price"), "price", PRICE_MAX, 2)
+        if pr is not None:
+            out["price"] = pr
     elif k == "deadline":
         allowed = {"kind", "type", "who", "expires", "notice", "lead"}
         if v.get("type", "other") not in FAM_DL:
@@ -261,6 +289,37 @@ def clean_fam(v):
     if v.get("lead") not in (None, ""):
         out["lead"] = as_int(v["lead"], "lead", 0, FAM_LEAD_MAX)
     return json.dumps(out, ensure_ascii=False, separators=(",", ":"))
+
+
+def shop_num(v, what, mx, nd=3):
+    """2.140.0 A (#2131): an amount / a price from a client: a number or a text ("1,5", "1/2", "½"); None = none."""
+    if v in (None, ""):
+        return None
+    bad = BadInput(tr("Invalid value: {0}", what))
+    if isinstance(v, str):
+        v = qty_parse(v)
+        if v is None:
+            raise bad
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 <= v <= mx or v != v:
+        raise bad
+    v = round(float(v), nd)
+    return int(v) if v == int(v) else v
+
+
+_FRAC = {"½": .5, "¼": .25, "¾": .75, "⅓": 1 / 3, "⅔": 2 / 3}
+
+
+def qty_parse(s):
+    """2.140.0 A (#2131): "2", "1,5", "0.25", "1/2", "½", "1½" -> a number; anything else -> None."""
+    s = str(s or "").strip()
+    m = re.fullmatch(r"(\d{1,6})?\s*([½¼¾⅓⅔])", s)
+    if m:
+        return (int(m.group(1)) if m.group(1) else 0) + _FRAC[m.group(2)]
+    m = re.fullmatch(r"(\d{1,6})\s*/\s*(\d{1,4})", s)
+    if m:
+        return int(m.group(1)) / int(m.group(2)) if int(m.group(2)) else None
+    m = re.fullmatch(r"\d{1,6}(?:[.,]\d{1,3})?", s)
+    return float(s.replace(",", ".")) if m else None
 
 
 def clean_rotation(v):
@@ -445,7 +504,8 @@ def fam_list(c, uid, kind, create=True):
 
 
 FAM_LIST_NAMES = {"shopping": N_("Shopping list"), "meals": N_("Meal plan"), "birthdays": N_("Birthdays"),
-                  "household": N_("Household"), "packing": N_("Packing list"), "family": N_("Family")}
+                  "household": N_("Household"), "packing": N_("Packing list"), "family": N_("Family"),
+                  "recipes": N_("Recipes")}  # 2.140.0 A (#2132)
 # 2.46.1 (#1615): the family's one list "Family" holds these sections; birthdays, deadlines and meals without a chosen list
 # land in theirs (a list of the old kind "birthdays" / "household" / "meals" the user has stays the target)
 FAM_SECTIONS = (("household", N_("Household")), ("birthdays", N_("Birthdays")), ("meals", N_("Meal plan")), ("deadlines", N_("Deadlines")))
@@ -642,6 +702,33 @@ def shop_key(title):
     return re.sub(r"[\s.,;:!?]+", " ", s).strip().casefold()[:120]
 
 
+# 2.140.0 A (#2131): a leading amount that is clear ("2 Milch", "500 g Mehl", "2x Eier", "1,5 l Milch"): number, an
+# optional unit of the list below and a space before the name, a count without a unit up to 99; "3er Pack", "7up",
+# "100% Saft" stay titles
+_UNITS = ("x|×|kg|g|gr|mg|l|ml|cl|dl|liter|litre|liters|litres|stk|st|stück|pck|pack|packs|packung|packungen|dose|dosen|can|cans|"
+          "bund|bunch|el|tl|tbsp|tsp|cup|cups|pcs|piece|pieces|becher|glas|gläser|flasche|flaschen|bottle|bottles|scheiben|"
+          "slice|slices|zehen|clove|cloves|prise|pinch|oz|lb|lbs")
+_SPLIT = re.compile(r"^\s*(\d{1,5}(?:[.,]\d{1,3})?|\d{1,3}\s*/\s*\d{1,3}|\d{0,3}\s*[½¼¾⅓⅔])\s*"
+                    r"(?:(" + _UNITS + r")\.?(?=\s)|(?<=\d)(x|×)|)\s+(\S.*)$", re.I)
+
+
+def shop_split(title):
+    """2.140.0 A (#2131): "500 g Mehl" -> (500, "g", "Mehl"); "2x Milch" -> (2, "", "Milch"); not clear -> (None, "", title)."""
+    s = str(title or "").strip()
+    m = _SPLIT.match(s)
+    if not m:
+        return None, "", s
+    q = qty_parse(re.sub(r"\s+", "", m.group(1)))
+    unit = m.group(2) or ""
+    name = m.group(4).strip()
+    if q is None or q <= 0 or q > QTY_MAX or not re.search(r"[^\W\d_]", name) or (not unit and q > 99):  # "2024 Wein" stays
+        return None, "", s
+    if unit.casefold() in ("x", "×"):
+        unit = ""
+    q = round(q, 3)
+    return (int(q) if q == int(q) else q), unit, name
+
+
 def shop_remember(c, lid, title, sid):
     k = shop_key(title)
     if not k or title.startswith("e2e1:"):  # 2.64.1 B (#1817): nothing remembered of a list with the lock
@@ -723,9 +810,23 @@ def is_shop(c, lid):
     return bool(r) and r[0] == "shopping"
 
 
+# 2.140.0 A (#2132): a heading like "Zutaten" / "Ingredients" marks where a recipe's ingredients are (up to the next heading)
+_INGR_HEAD = re.compile(r"^\s*(?:#{1,6}\s*|\*\*)?\s*(?:zutaten|ingredients?|ingrédients?|ingredientes|ingredienti|ingrediënten|"
+                        r"einkauf(?:sliste)?|shopping(?: list)?)\b", re.I)
+
+
 def ingredient_lines(text):
-    """The ingredients in a meal's notes: checklist / bullet / numbered lines (open ones), else every plain line."""
+    """The ingredients in a meal's notes: checklist / bullet / numbered lines (open ones), else every plain line.
+    2.140.0 A (#2132): with a heading "Ingredients" (any language) only the lines below it; bullets and numbered lines
+    together = the numbered ones are the method's steps (left out)."""
     lines = [x.rstrip() for x in str(text or "").replace("\r", "").split("\n")]
+    hi = next((i for i, x in enumerate(lines) if _INGR_HEAD.match(x)), None)
+    if hi is not None:
+        end = next((i for i in range(hi + 1, len(lines)) if re.match(r"^\s*#{1,6}\s", lines[i]) or
+                    (re.match(r"^\s*\*\*.+\*\*:?\s*$", lines[i]))), len(lines))
+        lines = lines[hi + 1:end]
+    if any(re.match(r"^\s*[-*+]\s+\S", x) for x in lines) and any(re.match(r"^\s*\d+[.)]\s+\S", x) for x in lines):
+        lines = [x for x in lines if not re.match(r"^\s*\d+[.)]\s", x)]
     items, bul = [], False
     for ln in lines:
         m = re.match(r"^\s*(?:[-*+]|\d+[.)])\s+(\[( |x|X)\]\s*)?(.*\S)\s*$", ln)
@@ -744,9 +845,45 @@ def ingredient_lines(text):
     return out[:100]
 
 
+def ingredient_items(text, factor=None):
+    """2.140.0 A (#2132): the ingredients as {name, qty, unit, text}: a clear leading amount is split off (shop_split),
+    scaled by factor (servings wanted / servings of the recipe)."""
+    out = []
+    for x in ingredient_lines(text):
+        q, u, n = shop_split(x)
+        if q is not None and factor:
+            q = round(q * factor, 2)
+            q = int(q) if q == int(q) else q
+        out.append({"name": n, "qty": q, "unit": u, "text": x})
+    return out
+
+
+def unit_key(u):
+    """2.140.0 A (#2132): units that mean the same ("St." / "Stk" / "", "Liter" / "l") for adding amounts up."""
+    u = str(u or "").strip().rstrip(".").casefold()
+    return {"stk": "", "st": "", "stück": "", "pcs": "", "piece": "", "pieces": "", "x": "", "×": "", "liter": "l", "litre": "l",
+            "liters": "l", "litres": "l", "gr": "g"}.get(u, u)
+
+
+def shop_fam(q, u, price=None, keep=None):
+    """2.140.0 A (#2131): the fam text of a shopping item (keep = its fam before: the price stays)."""
+    f = {"kind": "shop"}
+    if q is not None:
+        f["qty"] = q
+    if u:
+        f["unit"] = u[:UNIT_MAX]
+    p = price if price is not None else (keep or {}).get("price")
+    if p is not None:
+        f["price"] = p
+    return json.dumps(f, ensure_ascii=False, separators=(",", ":")) if len(f) > 1 else ""
+
+
 def to_shopping(c, uid, items, lid=None, source=None):
     """Adds items to a shopping list (lid, else the first one the user may write, created when missing); open items with
-    the same name are not added twice. -> {list_id, added: [{id, title}], skipped: [titles]}"""
+    the same name are not added twice. 2.140.0 A (#2131, #2132): an item is a text ("500 g Mehl": the amount goes to the
+    amount field) or {name, qty?, unit?}; an open item of the same name gets the amount
+    added (same unit, or it had none). -> {list_id, added: [{id, title, qty, unit}], merged: [{id, title, qty, unit}],
+    skipped: [titles]}"""
     if lid:
         need_list(c, lid)
         if not is_shop(c, lid):
@@ -756,22 +893,67 @@ def to_shopping(c, uid, items, lid=None, source=None):
     from ..collab.liste2eguard import le2b_list_locked, le2b_off
     if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): the server cannot add plain items to a list with the lock (the app does)
         raise BadInput(le2b_off())
-    have = {shop_key(r[0]) for r in c.execute("SELECT title FROM tasks WHERE list_id=? AND status=0 AND deleted_at IS NULL AND parent_id IS NULL", (lid,))}
+    have = {}
+    for r in c.execute("SELECT id, title, fam FROM tasks WHERE list_id=? AND status=0 AND deleted_at IS NULL AND parent_id IS NULL ORDER BY id", (lid,)):
+        have.setdefault(shop_key(r[1]), {"id": r[0], "title": r[1], "fam": _jparse(r[2]) or {}})
     srt = c.execute("SELECT COALESCE(MAX(sort),0) FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
     ts = iso(now_utc())
-    added, skipped = [], []
+    added, merged, skipped = [], [], []
     for x in items:
-        k = shop_key(x)
-        if not k or k in have:
-            skipped.append(x)
+        if isinstance(x, dict):
+            name = re.sub(r"\s+", " ", str(x.get("name") or "")).strip()[:TITLE_MAX]
+            q = shop_num(x.get("qty"), "qty", QTY_MAX)
+            u = re.sub(r"\s+", " ", str(x.get("unit") or "")).strip()[:UNIT_MAX]
+        else:
+            q, u, name = shop_split(str(x))
+            name = name[:TITLE_MAX]
+        k = shop_key(name)
+        if not k:
+            skipped.append(name)
             continue
-        have.add(k)
+        ex = have.get(k)
+        if ex:
+            f = ex["fam"]
+            if q is not None and (not f or f.get("kind") == "shop"):
+                if f.get("qty") is not None and unit_key(f.get("unit")) == unit_key(u):
+                    nq = round(f["qty"] + q, 3)
+                    nq, nu = (int(nq) if nq == int(nq) else nq), f.get("unit", "")
+                elif f.get("qty") is None and shop_split(ex["title"])[0] is None:  # "Milch" without an amount: it gets this one
+                    nq, nu = q, u
+                else:
+                    skipped.append(name)
+                    continue
+                ex["fam"] = _jparse(shop_fam(nq, nu, keep=f)) or {}
+                c.execute("UPDATE tasks SET fam=?, updated_at=? WHERE id=?", (shop_fam(nq, nu, keep=f), ts, ex["id"]))
+                merged.append({"id": ex["id"], "title": ex["title"], "qty": nq, "unit": nu})
+                continue
+            skipped.append(name)
+            continue
         srt += 1
-        tid = insert_id(c, "INSERT INTO tasks(list_id,section_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?)",
-                        (lid, shop_area_of(c, lid, x), x, srt, ts, ts, uid))
+        fam = shop_fam(q, u)
+        tid = insert_id(c, "INSERT INTO tasks(list_id,section_id,title,sort,created_at,updated_at,created_by,fam) VALUES(?,?,?,?,?,?,?,?)",
+                        (lid, shop_area_of(c, lid, name), name, srt, ts, ts, uid, fam))
         log_act(c, tid, "created", {"from": source} if source else None, uid=uid)
-        added.append({"id": tid, "title": x})
-    return {"list_id": lid, "added": added, "skipped": skipped}
+        have[k] = {"id": tid, "title": name, "fam": _jparse(fam) or {}}
+        added.append({"id": tid, "title": name, "qty": q, "unit": u})
+    return {"list_id": lid, "added": added, "merged": merged, "skipped": skipped}
+
+
+def recipe_of(c, t, uid):
+    """2.140.0 A (#2132): the recipe a meal points to (a row the user may see) or None."""
+    f = _jparse(t["fam"]) or {}
+    rid = f.get("recipe") if f.get("kind") == "meal" else None
+    if not rid:
+        return None
+    from ..core.access import task_visible
+    r = c.execute("SELECT * FROM tasks WHERE id=? AND deleted_at IS NULL", (rid,)).fetchone()
+    return r if r and task_visible(c, rid, uid, full=True) else None
+
+
+def serves_of(c, t):
+    """2.140.0 A (#2132): for how many a recipe is (fam serves), None = not said."""
+    f = _jparse(t["fam"]) or {}
+    return f.get("serves") if f.get("kind") in ("recipe", "meal") else None
 
 
 # ---- packing lists
@@ -898,16 +1080,17 @@ def family_examples(c, uid, tasks=True):
 
 
 # ---- the overview (Family view, dashboard card, API)
-def family_overview(c, uid, start=None):
+def family_overview(c, uid, start=None, days=7):
     """What the Family view shows, for the API (the app computes the same from its state): upcoming birthdays and
     anniversaries (with the age), deadlines, who is next in the rotations, the meal plan of the week starting `start`
-    (Monday of this week by default), the shopping lists with their open items and the kids I look after (or me)."""
+    (Monday of this week by default), the shopping lists with their open items and the kids I look after (or me).
+    2.140.0 A (#2132): the meal plan covers `days` days from `start` (1-62), the recipes come along."""
     today = local_now().date()
     mon = start or (today - timedelta(days=today.weekday()))
     rows = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND status=0 AND (fam!='' OR rotation!='' OR "
-                         "list_id IN (SELECT id FROM lists WHERE family IN ('meals','shopping')))", (uid, uid))
+                         "list_id IN (SELECT id FROM lists WHERE family IN ('meals','shopping','recipes')))", (uid, uid))
     lists = {d["id"]: d for d in visible_lists(c, uid)}
-    occ, dls, rots, meals = [], [], [], []
+    occ, dls, rots, meals, recipes = [], [], [], [], []
     names = user_names(c, {x for t in rows for x in ((t.get("rotation") or {}).get("who") or [])})
     for t in rows:
         f = t.get("fam") or {}
@@ -928,15 +1111,20 @@ def family_overview(c, uid, start=None):
                          "who": [{"user_id": x, "name": names.get(x, "?")} for x in r["who"]],
                          "current": t["assignee_id"], "next": r["who"][(i + 1) % n], "due": t["due"]})
         if (lists.get(t["list_id"], {}).get("family") == "meals" or f.get("kind") == "meal") and t["due"] and not t["parent_id"] and \
-                mon.isoformat() <= t["due"] <= (mon + timedelta(days=6)).isoformat():
+                mon.isoformat() <= t["due"] <= (mon + timedelta(days=days - 1)).isoformat():
             meals.append({"task_id": t["id"], "list_id": t["list_id"], "title": t["title"], "day": t["due"], "time": t["due_time"],
-                          "ingredients": ingredient_lines(t["content"])})
+                          "ingredients": ingredient_lines(t["content"]), "recipe_id": f.get("recipe"), "serves": f.get("serves")})
+        elif (lists.get(t["list_id"], {}).get("family") == "recipes" or f.get("kind") == "recipe") and f.get("kind") != "meal" and \
+                not t["parent_id"] and len(recipes) < 500:
+            recipes.append({"task_id": t["id"], "list_id": t["list_id"], "title": t["title"], "serves": f.get("serves"),
+                            "ingredients": ingredient_items(t["content"])})
     occ.sort(key=lambda x: (x["days"], x["name"].casefold()))
+    recipes.sort(key=lambda x: (x["title"].casefold(), x["task_id"]))
     dls.sort(key=lambda x: (x["due"], x["task_id"]))
     meals.sort(key=lambda x: (x["day"], x["time"] or "", x["task_id"]))
     shop = [{"list_id": lid, "name": d["name"], "open": sum(1 for t in rows if t["list_id"] == lid and not t["parent_id"]),
              "role": d["role"]} for lid, d in lists.items() if d.get("family") == "shopping" and not d["archived"]]
-    return {"occasions": occ, "deadlines": dls, "rotations": rots, "week": mon.isoformat(), "meals": meals, "shopping": shop,
+    return {"occasions": occ, "deadlines": dls, "rotations": rots, "week": mon.isoformat(), "days": days, "meals": meals, "recipes": recipes, "shopping": shop,
             "kids": kids_for(c, uid), "kid": is_kid(c, uid)}
 
 

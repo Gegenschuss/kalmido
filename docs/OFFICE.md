@@ -762,7 +762,8 @@ invoices and receipts. Kalmido has no bank access: you import the file you downl
   which column holds the date, the amount (one column with a minus for money out, or income and expense apart), the
   purpose and the counterpart; Kalmido guesses them as in the household budget. A CAMT file goes straight to the
   preview (booking day, amount with credit / debit, counterpart and IBAN, purpose, the bank's reference). XML files with
-  a DOCTYPE or ENTITY are refused. At most 2 MB and 3000 rows per file.
+  a DOCTYPE or ENTITY are refused. At most 2 MB and 3000 rows per file. 2.140: the household budget reads files with the
+  same reader (one module, no data shared); a few bank layouts are recognised by their columns and pre-fill the choice.
 - **Duplicates**: a booking already imported into this office area (same day, amount, counterpart, purpose, reference)
   is skipped and counted; two equal bookings in one file stay two.
 - **Matching**: every open booking shows the best suggestion with its reason. Money in -> open invoices (same amount as
@@ -859,6 +860,14 @@ purchase date, net purchase price, serial number, vendor and the receipt. Open a
 
 Members of an organisation see the devices, never their prices or values. All prices, values and
 serial numbers are encrypted at rest. No tax advice; figures without guarantee.
+
+**Private device <-> equipment (2.140).** A device of *Home & life* can be added to the office equipment from its task
+panel (*Add to the office equipment*: the own office, or an organisation where you are admin; the dialog asks for the
+net price because the device keeps what you paid), and a piece of equipment can be taken over as a private device
+(*Take over as a private device* in its editor; admins). The fields are copied once (name and model, serial number,
+purchase date, price; the vendor becomes the device's note) and both sides show the link with a jump to the other side,
+*Update from there* and *Remove link*. Nothing is mirrored by itself. Only you see your link; when you leave the
+organisation or the other side is deleted, the link shows a hint (without names) and can be removed.
 
 API (office admins; members 403, another office area 404): the fields go through `POST|PATCH /api/office/equipment[/<id>]`
 (`purchase_date`, `purchase_net`, `new_value`, `current_value`, `serial_no`, `vendor`, `receipt_node_id`, `life_months`,

@@ -149,7 +149,9 @@ class _ErrTokenMask(logging.Filter):
         return True
 
 
-for _lg in (app.logger, logging.getLogger("waitress")):
+# 2.139.1 (#2381): the logger by name, not app.logger - reading app.logger at import adds Flask's own stderr handler before
+# waitress sets up the root one, and every app log line came out twice
+for _lg in (logging.getLogger(app.name), logging.getLogger("waitress")):
     _lg.addFilter(_ErrTokenMask())
 
 

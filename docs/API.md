@@ -302,7 +302,7 @@ had been made in the app. Webhooks fire too.
 | `PUT /lists/{id}/status` | structure | 2.15.0: a project status update `{status: on_track \| at_risk \| off_track \| on_hold \| complete \| "", note?}`; members are told |
 | `GET /filters` · `POST …` · `PATCH /filters/{id}` · `DELETE …` | read · structure · delete | 2.15.0: saved filters `{name, rules}` |
 | `GET /news?filter=` · `POST /news/read` | read · comments | 2.15.0: your News (`filter=mentions \| me`), `unread`; mark read `{ids}` or `{all: true}` |
-| `POST /habits` · `PATCH /habits/{id}` · `DELETE …` | tasks:write · delete | 2.15.0: habits `{name, color?, goal?, days?, per_week?, remind_at?, archived?}` |
+| `POST /habits` · `PATCH /habits/{id}` · `DELETE …` | tasks:write · delete | 2.15.0: habits `{name, color?, goal?, days?, per_week?, remind_at?, remind_times? (up to 6 × HH:MM, 2.140.0), archived?}` |
 | `GET /time/timer` · `POST …` · `DELETE …` | read · time | 2.15.0: the running timer; start `{task_id \| list_id, note?}` (a running one stops); stop |
 | `PATCH /time/entries/{id}` · `DELETE …` | time | 2.15.0: change / delete your entry `{start?, end?, minutes?, note?, task_id? \| list_id?}` |
 | `GET /export` | export | 2.15.0: everything you own as JSON (as Settings > Data > Export) |
@@ -454,11 +454,11 @@ deadlines are ordinary tasks with a `family` object; rotations, people and stars
 
 | Endpoint | Scope | |
 |---|---|---|
-| `GET /family?week=YYYY-MM-DD` | read | upcoming `occasions` (`kind`, `name`, `date`, `days`, `year`, `age`, open `gifts`), `deadlines` (`type`, `who`, `expires`, `due`, `days`), `rotations` (`who`, `current`, `next`, `mode`), the `meals` of the week (with `ingredients`), `shopping` lists, `kids` |
+| `GET /family?week=YYYY-MM-DD&days=7` | read | upcoming `occasions` (`kind`, `name`, `date`, `days`, `year`, `age`, open `gifts`), `deadlines` (`type`, `who`, `expires`, `due`, `days`), `rotations` (`who`, `current`, `next`, `mode`), the `meals` of the week (with `ingredients`; 2.140.0: `recipe_id`, `serves`; `days` = 1-62 days from that Monday), 2.140.0: `recipes` (`title`, `serves`, `ingredients` as `{name, qty, unit, text}`), `shopping` lists, `kids` |
 | `POST /family/occasions` | tasks:write | `{name, date: YYYY-MM-DD or --MM-DD, kind?: birthday\|anniversary, year?, lead_days? (7), list_id?, gifts?: [..]}` -> a yearly task; default list: the first *Birthdays* list (created when missing) |
 | `GET /family/deadline-types` | read | `passport`, `id_card`, `car`, `insurance`, `contract`, `other` with their lead days, repeat and notice period |
 | `POST /family/deadlines` | tasks:write | `{type, expires, who?, notice_months?, lead_days?, title?, list_id?}`: due = `expires` minus the notice period (a passed one moves to the next term), a deadline with reminders |
-| `POST /tasks/{id}/to-shopping` | tasks:write | `{list_id?, items?}`: the ingredients of a meal (the bullet / checklist lines of its notes) onto a shopping list; `{added, skipped}` (open items are not doubled) |
+| `POST /tasks/{id}/to-shopping` | tasks:write | `{list_id?, items?, servings?, preview?}`: the ingredients of a meal or a recipe (the bullet / checklist lines of its notes, below a heading "Ingredients" when there is one; a meal without any: its recipe's) onto a shopping list; `{added, merged, skipped}` (open items are not doubled). 2.140.0: an item is a text or `{name, qty?, unit?}`; a leading amount ("500 g flour") goes to the item's `family.qty` / `family.unit`, an open item of the same name and unit gets the amount added (`merged`); `servings` scales the amounts to that many people (the recipe's `serves`); `preview: true` writes nothing and answers `{items: [{name, qty, unit, text, have}], serves, recipe_id, list_id}` |
 | `POST /lists/{id}/shop-areas` | structure | the default shop areas as sections; the list becomes a shopping list |
 | `GET /family/packing` · `POST` | read · structure | the packing templates; `{template, name?}` creates a list from one |
 | `GET /family/kids` | read | the kid accounts you look after (or yourself, a kid): `stars`, `rewards`, `history`, `parents` |
@@ -470,10 +470,13 @@ deadlines are ordinary tasks with a `family` object; rotations, people and stars
 
 Task fields: `family` (`{kind: birthday|anniversary, name, year?, lead?, src?, card?}` (`card`: the vCard UID of a date
 imported from an address book) or `{kind: deadline, type, who, expires, notice,
-lead}`), `rotation` (`{who: [user ids sharing the list, at least 2], mode: done|week, i}`; setting it sets the assignee,
+lead}`; 2.140.0: a shopping item `{kind: shop, qty?, unit?, price?}` (the amount, its unit and the price of the line in
+your currency; the title stays the name), a recipe `{kind: recipe, serves?}` (notes: the ingredients, best below a
+heading "Ingredients", and the method as numbered steps), a meal `{kind: meal, recipe?, serves?}` (`recipe` = the task
+id of a recipe)), `rotation` (`{who: [user ids sharing the list, at least 2], mode: done|week, i}`; setting it sets the assignee,
 the turn moves on after each completion or every Monday), `people` (who comes along: they see the task, also as
 participants, and get its reminders), `stars` (what a kid account gets for completing it; `null` = 1). Lists have
-`family`: `shopping`, `meals`, `birthdays`, `household`, `packing` or `null`. A kid account takes part in shared lists
+`family`: `shopping`, `meals`, `birthdays`, `household`, `packing`, `family`, `recipes` (2.140.0) or `null`. A kid account takes part in shared lists
 only as a participant; it can complete / reopen what it sees, ask for rewards and change its own account, every other
 change answers `403`. 2.79.0: a kid account has no API and no CalDAV / CardDAV (its limits live in the app): its tokens
 answer `401`, and making an account a kid account deletes its API tokens and app passwords.

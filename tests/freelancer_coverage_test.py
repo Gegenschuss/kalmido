@@ -44,7 +44,8 @@ KINDS = {
                        "rename / archive / restore as its own admin, groups only with people one works with (2.113.1)"),
     "hub": ("matrix", SUITE + ", p2125_a_api_test.py, p2141_a_api_test.py, p2141_b_api_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
                       "2.125.0: the own vacation account and working week, never a vacation request; 2.141.0 A: the own mailbox, reply / new e-mail; 2.141.0 B: HTML view, task / event from a private mail"),
-    "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature"),
+    "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature; "
+                           "p2140_a_api_test.py: shopping amounts, recipes, the meal plan beyond a week (2.140.0)"),
     "videos": ("matrix", "p2991_a_api_test.py: video sign-offs (2.99.1) at a private task / list / client of a person without an "
                "organisation: create, comments, versions, customer link, export, delete + restore; p2991_c_api_test.py: the own agent "
                "of such a person reads and comments them through the API v1"),
@@ -461,7 +462,8 @@ ROUTES = {
     "GET /api/family/deadline-types": "personal", "GET /api/family/kids": "personal", "GET /api/family/packing": "personal",
     "GET /api/feeds": "personal", "GET /api/feeds/items": "personal", "GET /api/feeds/opml": "personal",
     "GET /api/life": "personal", "GET /api/life/karakeep": "personal", "GET /api/life/karakeep/lists": "personal",
-    "GET /api/life/review": "personal", "GET /api/life/upkeep-presets": "personal", "GET /api/servers": "personal",
+    "GET /api/life/review": "personal", "GET /api/life/journal": "personal", "GET /api/life/journal/stats": "personal", "GET /api/life/journal/export": "personal",  # 2.140.0 C (#2133)
+     "GET /api/life/upkeep-presets": "personal", "GET /api/servers": "personal",
     "GET /api/servers/{}/data": "personal", "GET /api/servers/{}/events": "personal", "GET /api/servers/{}/news": "personal",
     "GET /api/servers/{}/search": "personal", "GET /api/servers/{}/tasks/{}": "personal", "GET /api/supporter": "personal",
     "GET /api/v1/family": "personal", "GET /api/v1/family/deadline-types": "personal", "GET /api/v1/family/kids": "personal",
@@ -482,7 +484,11 @@ ROUTES = {
     "POST /api/family/rewards/{}/decide": "personal", "POST /api/family/rewards/{}/request": "personal",
     "POST /api/feeds": "personal", "POST /api/feeds/items/{}/later": "personal", "POST /api/feeds/opml": "personal",
     "POST /api/feeds/read": "personal", "POST /api/feeds/{}/restore": "personal", "POST /api/life/contracts": "personal",
-    "POST /api/life/devices": "personal", "POST /api/life/health": "personal", "POST /api/life/karakeep/sync": "personal",
+    "POST /api/life/devices": "personal",
+    # 2.140.0 B (#2134, #2136): the budget's month comparison, a device <-> the own office (p2140_b_api_test.py)
+    "GET /api/budget/{}/compare": "personal", "GET /api/life/devices/{}/link": "personal", "POST /api/life/devices/{}/to-office": "personal",
+    "POST /api/life/device-links/{}/pull": "personal", "DELETE /api/life/device-links/{}": "personal",
+    "GET /api/office/equipment/{}/link": "office", "POST /api/office/equipment/{}/to-device": "office", "POST /api/life/health": "personal", "POST /api/life/karakeep/sync": "personal",
     "POST /api/life/trips": "personal", "POST /api/life/upkeep": "personal", "POST /api/servers": "personal",
     "POST /api/servers/code": "personal", "POST /api/servers/move": "personal", "POST /api/servers/{}/news/read": "personal",
     "POST /api/servers/{}/restore": "personal", "POST /api/servers/{}/tasks": "personal",

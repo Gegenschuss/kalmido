@@ -1091,7 +1091,8 @@ LIST_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "folder":
 LIST_PROPS["points_on"] = {"type": "boolean", "description": "2.60.0: story points shown in the app (owner; default off)"}  # 2.60.0 (#1511)
 HABIT_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "goal": {"type": "integer", "minimum": 1},
                "days": {"type": "string", "description": "weekdays 1-7 (1 = Monday), e.g. 12345"}, "per_week": {"type": "integer", "minimum": 0},
-               "remind_at": {"type": "string", "description": "HH:MM or empty"}}
+               "remind_at": {"type": "string", "description": "HH:MM or empty (the single reminder; remind_times replaces it)"},
+               "remind_times": {"type": "array", "maxItems": 6, "items": {"type": "string"}, "description": "up to 6 reminder times HH:MM, e.g. [\"08:00\", \"20:00\"]"}}
 FILES = {"type": "array", "minItems": 1, "maxItems": 10, "items": {"type": "object", "properties": {
     "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}
 APPROVAL_NOTE = (" As an agent this waits for a person's approval: the answer is approval_required with a job; the result comes "
@@ -1480,8 +1481,11 @@ REWARD_IN = {"title": {"type": "string", "maxLength": 200}, "cost": {"type": "in
 TOOLS += [
     ("get_family", "2.19.0 (module Family): upcoming birthdays + anniversaries (with the age), household deadlines, whose turn it is in "
                    "the rotations, the meal plan of a week (week = any day of it, default this week), the shopping lists and the kids "
-                   "you look after (stars, rewards, requests).",
-     _obj({"week": {"type": "string", "description": "YYYY-MM-DD"}}), lambda api, a: api.call("GET", "/family", _pick(a, ("week",)))),
+                   "you look after (stars, rewards, requests). 2.140.0: days = how many days of the meal plan from that Monday "
+                   "(1-62, default 7, plan weeks ahead); the meals carry recipe_id / serves, the recipes come along with their "
+                   "ingredients (name, qty, unit).",
+     _obj({"week": {"type": "string", "description": "YYYY-MM-DD"}, "days": {"type": "integer", "minimum": 1, "maximum": 62}}),
+     lambda api, a: api.call("GET", "/family", _pick(a, ("week", "days")))),
     ("add_occasion", "2.19.0: a birthday or anniversary as a yearly task (age from the year, reminders lead_days before and on the day, "
                      "gift ideas as subtasks); date YYYY-MM-DD or --MM-DD; list_id default: the first Birthdays list (created when missing).",
      _obj({"name": {"type": "string"}, "kind": {"type": "string", "enum": ["birthday", "anniversary"]}, "date": {"type": "string"},
@@ -1497,10 +1501,16 @@ TOOLS += [
            "who": {"type": "string"}, "notice_months": {"type": "integer", "minimum": 0, "maximum": 24},
            "lead_days": {"type": "integer", "minimum": 0, "maximum": 365}, "title": {"type": "string"}, "list_id": S_ID}, ["expires"]),
      lambda api, a: api.call("POST", "/family/deadlines", body=_pick(a, ("type", "expires", "who", "notice_months", "lead_days", "title", "list_id")))),
-    ("ingredients_to_shopping", "2.19.0: put the ingredients of a meal (the list in its notes, or items) on a shopping list; open items "
-                                "with the same name are not added twice.",
-     _obj({"task_id": S_ID, "list_id": S_ID, "items": STRS}, ["task_id"]),
-     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/to-shopping", body=_pick(a, ("list_id", "items")))),
+    ("ingredients_to_shopping", "2.19.0: put the ingredients of a meal or a recipe (the list in its notes; a meal without any: its "
+                                "recipe's; or items) on a shopping list; open items with the same name are not added twice. 2.140.0: a "
+                                "leading amount (\"500 g flour\") goes to the item's amount field, an open item of the same name gets "
+                                "the amount added; servings scales the amounts (needs the recipe's serves); preview = nothing is "
+                                "written, the answer lists the ingredients (have = on the list already).",
+     _obj({"task_id": S_ID, "list_id": S_ID,
+           "items": {"type": "array", "items": {"oneOf": [{"type": "string"}, {"type": "object", "required": ["name"], "properties": {
+               "name": {"type": "string"}, "qty": {"type": ["number", "null"]}, "unit": {"type": "string"}}}]}},
+           "servings": {"type": ["integer", "null"], "minimum": 1, "maximum": 100}, "preview": {"type": "boolean"}}, ["task_id"]),
+     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/to-shopping", body=_pick(a, ("list_id", "items", "servings", "preview")))),
     ("add_shop_areas", "2.19.0: make a list a shopping list and add the default shop areas (sections); a new item goes to the area it "
                        "had last time.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/shop-areas")),

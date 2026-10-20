@@ -138,6 +138,9 @@ def openapi_spec():
         # 2.19.0 (#653): the module Family
         "family": {"type": ["object", "null"], "description": "2.19.0: a birthday / anniversary {kind: birthday | anniversary, name, year?, lead?} "
                    "(a yearly task; age = due year - year) or a household deadline {kind: deadline, type, who, expires, notice (months), lead}; "
+                   "2.140.0: a shopping item {kind: shop, qty?, unit?, price?} (amount + unit of the line, its price in the "
+                   "user's currency; the title stays the name), a recipe {kind: recipe, serves?} (notes = ingredients under a heading "
+                   "\"Ingredients\" + the method), a meal {kind: meal, recipe? (task id), serves?}; "
                    "null = none. Easier: POST /family/occasions and /family/deadlines"},
         "rotation": {"type": ["object", "null"], "description": "2.19.0: household rotation {who: [user ids of people sharing the list, "
                      "at least 2], mode: done (the next person after each completion) | week (every Monday), i (whose turn, index; "
@@ -262,7 +265,7 @@ def openapi_spec():
             "agent_followup": {"type": "boolean", "description": "2.34.0 (#266): \"Agent follows up\": the list's agents get its stale tasks once a day (event stale_tasks; default false)"},
             "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
-                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing; null = an ordinary list"),
+                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing, recipes (2.140.0: a task per recipe); null = an ordinary list"),
             "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", "budget", None], description="2.22.0: what the list is for in "
                         "Home & life (health lists are private: never visible to agents, tokens need the scope private); null = none"),
             "trip": {"type": ["object", "null"], "description": "2.22.0: a trip list's {from, to, where?}", "properties": {
@@ -286,7 +289,7 @@ def openapi_spec():
                          "(e.g. Backlog … Done); without it the project starts without sections"},
             "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
-                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing; null = an ordinary list"),
+                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing, recipes (2.140.0: a task per recipe); null = an ordinary list"),
             "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "2.7.0: default nag interval of the list's tasks (owner)"},
             "day_hours": nul("number", minimum=1, maximum=24, description="2.7.0: hours per day / shift (owner); null = the server's value"),
             "org_id": nul("integer", description="2.28.0: the workspace: an organisation you belong to, null = private (default: the folder's, else private)")}},
@@ -299,7 +302,7 @@ def openapi_spec():
                 "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "where": {"type": "string"}}},
             "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
-                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing; null = an ordinary list"),
+                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing, recipes (2.140.0: a task per recipe); null = an ordinary list"),
             "name": {"type": "string"}, "color": {"type": "string"}, "folder": {"type": "string"},
             "view": {"type": "string", "enum": list(LIST_VIEWS)},
             "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project; \"checklist\" is a deprecated alias of list + done_at_bottom"},
@@ -408,6 +411,7 @@ def openapi_spec():
         "Habit": {"type": "object", "properties": {
             "id": {"type": "integer"}, "name": {"type": "string"}, "color": {"type": "string"}, "goal": {"type": "integer"},
             "days": {"type": "string", "description": "Weekdays 1 (Mon) - 7 (Sun)"}, "per_week": {"type": "integer"}, "archived": {"type": "boolean"},
+            "remind_at": {"type": "string"}, "remind_times": {"type": "array", "items": {"type": "string"}, "description": "Reminder times HH:MM (up to 6)"},
             "today": {"type": "integer"}, "last_30_days": {"type": "object", "additionalProperties": {"type": "integer"}}}},
         "HabitCheckedIn": {"allOf": [ref("Habit"), {"type": "object", "properties": {"date": date_s, "count": {"type": "integer"}}}]},
         "CheckinInput": {"type": "object", "additionalProperties": False, "properties": {

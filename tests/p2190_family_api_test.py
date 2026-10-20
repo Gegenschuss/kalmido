@@ -387,7 +387,9 @@ check(j["added"] == [] and len(j["skipped"]) == 4, "again: nothing doubled")
 r = A.post(B + "/api/tasks", json={"title": "Pancakes", "list_id": MEALS, "due": today.isoformat(),
                                    "content": "# Pancakes\n- [x] Flour\n- [ ] 3 Eggs\n* 500 ml Milch\nsome text"})
 j = A.post(B + f"/api/tasks/{r.json()['id']}/to-shopping", json={"list_id": WS}).json()
-check([x["title"] for x in j["added"]] == ["3 Eggs", "500 ml Milch"], "only open checklist / bullet lines; into the chosen list " + str(j))
+# 2.140.0 A (#2131): a leading amount goes to the item's amount field (the title is the name)
+check([(x["title"], x["qty"], x["unit"]) for x in j["added"]] == [("Eggs", 3, ""), ("Milch", 500, "ml")],
+      "only open checklist / bullet lines; into the chosen list " + str(j))
 j = A.post(B + f"/api/tasks/{MEAL}/to-shopping", json={"items": ["Basilikum"]}).json()
 check([x["title"] for x in j["added"]] == ["Basilikum"], "explicit items")
 check(A.post(B + f"/api/tasks/{MEAL}/to-shopping", json={"list_id": L2 + 999}).status_code == 404, "unknown list: 404")
