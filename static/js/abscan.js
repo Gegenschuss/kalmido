@@ -14,7 +14,7 @@ const abm_scanName = () => { const d = new Date(); return `Scan ${d.getFullYear(
 // is when the browser cannot draw it (the server reads it then)
 async function abm_shrink(f) {
   try {
-    const bm = await createImageBitmap(f);
+    const bm = await window.createImageBitmap(f);
     const k = Math.min(1, ABM_SCAN_EDGE / Math.max(bm.width, bm.height));
     const cv = document.createElement('canvas'); cv.width = Math.round(bm.width * k); cv.height = Math.round(bm.height * k);
     cv.getContext('2d').drawImage(bm, 0, 0, cv.width, cv.height); bm.close?.();
