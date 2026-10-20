@@ -12374,5 +12374,13 @@
   "Applies to your account; with \"Only on this device\" on, to this device only.": "Se aplica a tu cuenta; con «Solo en este dispositivo» activado, solo a este dispositivo.",
   "Activity per organisation": "Actividad por organización",
   "Last sign-in": "Último inicio de sesión",
-  "Without organisation": "Sin organización"
+  "Without organisation": "Sin organización",
+  "Kalmido - Start": "Kalmido: inicio",
+  "Unread in other workspaces": "Sin leer en otros espacios de trabajo",
+  "1 unread in {0}": "1 sin leer en {0}",
+  "{0} unread in {1}": "{0} sin leer en {1}",
+  "Switch": "Cambiar",
+  "Tracked time (h)": "Tiempo registrado (h)",
+  "Created by": "Creado por",
+  "Completed by": "Completado por"
 }
