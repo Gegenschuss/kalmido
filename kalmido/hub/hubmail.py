@@ -356,7 +356,9 @@ def hbm_inbox():
 def hbm_mail_get(mid):
     c = db()
     _gate()
-    return jsonify(hbm_public(c, _need_mail(c, mid), full=True))
+    m = _need_mail(c, mid)
+    from .mailview import mh_info  # 2.141.0 B (#2140, #2139): the HTML part (+ its external pictures) and what was made from the mail
+    return jsonify({**hbm_public(c, m, full=True), **mh_info(c, m)})
 
 
 @app.get("/api/hubmail/mails/<int:mid>/files/<int:nid>")
