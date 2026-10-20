@@ -82,10 +82,24 @@ class WikiUnreadable(OrgCryptError):
     """2.126.2 B (#2358): a sealed page text that cannot be opened (its key is gone) -- 409 wiki_unreadable, never the
     ciphertext as text (a save would write it down as the page)."""
 
+    def __init__(self, msg="", private=False):
+        super().__init__(msg)
+        self.private = private  # 2.139.0 C (#2386): a page of the private space (no organisation recovery key)
+
+
+def wsb_unreadable_text(private):
+    """2.139.0 C (#2386): the message names the way out -- the recovery key, else only deleting (save, rename and move are
+    refused so the sealed text is never lost)."""
+    if private:
+        return tr("This page cannot be read: the key of its encryption is missing. It opens again once the server key of this "
+                  "installation is restored; otherwise it can only be deleted.")
+    return tr("This page cannot be read: the key of its encryption is missing. The recovery key of the organisation opens it "
+              "again; otherwise it can only be deleted.")
+
 
 @app.errorhandler(WikiUnreadable)
 def wsb_unreadable(e):
-    return jsonify(error=tr("This page cannot be read: the key of its encryption is missing."), code="wiki_unreadable"), 409
+    return jsonify(error=wsb_unreadable_text(getattr(e, "private", False)), code="wiki_unreadable"), 409
 
 
 def wsb_sealed_shape(value):
@@ -106,7 +120,7 @@ def wkh_open(c, oid, owner, value, ctx=WKH_CTX):
         return oc_dec_k(oc_key(c, sid, create=False), sid, ctx, value)
     except OrgCryptError as e:
         if wkh_on(c, sid) or wsb_sealed_shape(value):  # 2.126.2 B (#2358): an error, not the ciphertext as the page's text
-            raise WikiUnreadable(str(e)) from None
+            raise WikiUnreadable(str(e), private=not oid) from None
         return value
 
 
