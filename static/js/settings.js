@@ -608,6 +608,7 @@ function settingsModal(focus) {
       <div class="row"><label>${tr('Topic')}</label><code class="topic">${esc(s.ntfy_topic)}</code><button class="btn sm" data-m="test">${ic('bell', 's')} ${tr('Send test')}</button></div>
       ${S.webpush?.enabled ? '' : prio}
       ${hint(`${tr('Subscribe in the ntfy app: server {0}, topic as above', esc(S.ntfyUrl))}${/ntfy\.sh/.test(S.ntfyUrl) || !S.me?.ntfy_inbox ? '' : tr(', with a user that has read access')}. <a href="${esc(topicUrl)}" target="_blank" rel="noopener">${tr('Web view')}</a>`)}</div>
+      <div id="s-ntfyin"></div>
       ${notifMatrixHtml(s, hint)}${bl9SetHtml(s, hint)}${typeof tbl_setHtml === 'function' ? tbl_setHtml(chk, hint) : ''}
       <h4>${tr('Reminders')}</h4>
       <div class="row"><label for="s-allday">${tr('All-day reminder at')}</label>${timeIn('s-allday', s.allday_time, {label: tr('All-day reminder at'), clear: false})}</div>
@@ -646,7 +647,8 @@ function settingsModal(focus) {
       <div id="s-imp-out"></div>
       <div class="members" id="s-imp-hist"></div>
       <h4>${tr('Export')}</h4>
-      <div class="row"><label>${tr('Export')}</label><a class="btn sm" href="/api/export.json" download>${ic('download', 's')} ${tr('Download JSON')}</a></div>
+      <div class="row"><label>${tr('Export')}</label><a class="btn sm" href="/api/export.json" download>${ic('download', 's')} ${tr('Download JSON')}</a><a class="btn sm" href="/api/export/todoist.zip" download>${ic('download', 's')} ${tr('Todoist CSV')}</a><a class="btn sm" href="/api/export/markdown.zip" download>${ic('download', 's')} ${tr('Markdown')}</a></div>
+      ${hint(tr('One file per list in a ZIP: Todoist CSV for the import of Todoist, Markdown as checklists for any notes app. Lists locked with a password stay out.'))}
       <h4 id="s-pmeta-h">${tr('Photos')}</h4><div class="row">${chk('s-pmeta', s.photo_meta_strip !== '0', tr('Remove location data from photos'))}</div>
       ${hint(tr('Also removes camera details and capture time from the stored file. Applies to your private files; in an organisation its admins decide (Settings > Workspaces).'))}
       ${typeof umzHtml === 'function' ? umzHtml(hint) : ''}
@@ -915,6 +917,7 @@ function settingsModal(focus) {
   tabDraw();
   if (S.me) accountWire(md);
   mailWire(md);  // 2.17.0 (#443)
+  niWire(md);  // 2.142.0 C (#2150)
   md.addEventListener('click', async e => {
     const hz = e.target.closest('#s-hszip'); if (hz) { tkh_zipClick(e, hz, md); return; }  // 2.138.0 C (#1907)
     const b = e.target.closest('button'); if (!b) return;

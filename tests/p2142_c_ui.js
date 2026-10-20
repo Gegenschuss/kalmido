@@ -48,7 +48,7 @@ const until = async (fn, n = 60, ms = 150) => { for (let i = 0; i < n; i++) { co
   const pb = await until(() => d.querySelector('#s-mailpoll'));
   check(pb && /Fetch mails now/.test(pb.textContent), 'admin: the button is there');
   pb?.click();
-  const res = await until(() => (d.querySelector('#s-mailpoll-r')?.textContent || '').trim());
+  const res = await until(() => { const x = (d.querySelector('#s-mailpoll-r')?.textContent || '').trim(); return x && x !== 'Fetching…' ? x : ''; });
   check(/Started|fetched/.test(res || ''), 'admin: a short result: ' + res);
   check(await until(() => !d.querySelector('#s-mailpoll')?.disabled), 'admin: unlocked again after the answer');
   w.close();

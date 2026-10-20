@@ -186,6 +186,8 @@ ORDER = (
     "files.upsafe",  # 2.61.0 (#1818 #1819 #1820): the shared upload path - scan, metadata, text recognition (no routes)
     "files.filereq",  # 2.122.0 A (#2097): file requests - a public link /u/<token> through which a client uploads files
     "integrations.mail",
+    "integrations.ntfyin",  # 2.142.0 C (#2150)
+    "integrations.exporters",  # 2.142.0 C (#2148)
     "accounts.invite",
     "accounts.sessions",  # 2.115.0 B (#2062): active sessions
     "accounts.orginvite",  # 2.115.0 B (#2062): organisation admins invite accounts by e-mail

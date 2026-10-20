@@ -131,7 +131,7 @@ t1 = mk_task(A, L1, "Write the brief", priority=5, due="2026-11-02", due_time="1
 mk_task(A, L1, "Draft outline", parent_id=t1, priority=3)
 mk_task(A, L1, "Weekly review", repeat="FREQ=WEEKLY", due="2026-11-03", section_id=SEC, priority=1)
 done = mk_task(A, L1, "Old chore")
-A.patch(B + f"/api/tasks/{done}", json={"status": 2})
+assert A.post(B + f"/api/tasks/{done}/complete", json={}).ok
 mk_task(A, L1, "No priority task", section_id=SEC)
 L2 = mk_list(A, "Private errands")
 mk_task(A, L2, "Buy stamps")

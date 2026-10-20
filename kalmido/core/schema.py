@@ -2041,6 +2041,14 @@ CREATE TABLE IF NOT EXISTS org_invites (
   role TEXT NOT NULL DEFAULT 'member', created_by BIGINT REFERENCES users(id) ON DELETE SET NULL, created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS org_invites_org ON org_invites(org_id, created_at);
 -- (2.115.0 B, last line)
+-- 2.142.0 C (#2150): a person's own ntfy share inbox (integrations/ntfyin.py): on/off, topic, optional own ntfy server (url) and
+-- read token (sealed with the server key, never sent to a client), since = the last imported message id (or unix time),
+-- fails / last_error / last_ok = the state of the last rounds. Goes with the account. New table only: 2.141 ignores it
+CREATE TABLE IF NOT EXISTS ntfy_inboxes (
+  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, enabled BIGINT NOT NULL DEFAULT 0,
+  topic TEXT NOT NULL DEFAULT '', url TEXT NOT NULL DEFAULT '', token TEXT NOT NULL DEFAULT '', since TEXT NOT NULL DEFAULT '',
+  fails BIGINT NOT NULL DEFAULT 0, last_error TEXT NOT NULL DEFAULT '', last_ok TEXT, updated_at TEXT NOT NULL DEFAULT '');
+-- (2.142.0 C, last line)
 """
 # Bumped when the database layout changes (stored in kalmido_meta.schema_version; SQLite: PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).

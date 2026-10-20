@@ -113,7 +113,7 @@ TENANT_EXEMPT = {
     "fs_versions": "2.48.0 (#1207): the versions of a file store node, bound through the node (need_node)",
     "fs_shares": "2.48.0 (#1207): shares of a file store node, bound through the node; share targets are checked against its workspace (tenancy CHECKS)",
     "fs_log": "2.48.0 (#1207): the access history of a file store node, bound through the node (shown to its owners and editors)",
-    "filters": _OWN, "user_settings": _OWN, "sessions": _OWN, "push_subs": _OWN, "templates": _OWN, "cal_subs": _OWN,
+    "filters": _OWN, "user_settings": _OWN, "sessions": _OWN, "push_subs": _OWN, "ntfy_inboxes": _OWN, "templates": _OWN, "cal_subs": _OWN,
     "recovery_codes": _OWN, "webauthn_creds": _OWN, "api_tokens": _OWN,
     "imports": _OWN, "sample_items": _OWN, "app_passwords": _OWN, "dav_sync2": _OWN, "journal": _OWN, "contact_care": _OWN,
     "user_invites": "an invitation / password link of one account (admins only)", "folder_props": _OWN + " (the defaults of a folder; each list keeps its org_id)",

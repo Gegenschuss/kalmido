@@ -259,6 +259,16 @@ to *deny* and allow each app per group, so a new account does not open every app
   knows its name.
 - **Your own ntfy server:** for the phone's battery set the server's `keepalive-interval` to about 3 minutes, use the
   WebSocket protocol in the Android app, and let your proxy pass WebSocket upgrades.
+- **Share inbox per person (ntfy):** 2.142.0 (#2150): everyone switches it on in *Settings > Notifications > Share inbox*
+  and gets an own long random topic (optionally an own ntfy server and a read token; the token is stored sealed with the
+  server key and never sent back to a browser). What is shared to the topic becomes a task in that person's basket. The
+  server polls the topics of all people who switched it on (a failure counts for that person only); a guessable topic on the
+  public `ntfy.sh` is refused. An own server on an internal address needs an entry in `KALMIDO_CALENDAR_ALLOW_HOSTS` like a
+  calendar subscription. The `NTFY_INBOX_*` variables stay as before for one person.
+- **Export to other tools:** *Settings > Data* offers, next to the JSON file, a ZIP with one Todoist CSV per list and a ZIP
+  with one Markdown checklist per list. Lists locked with a password stay out (the server only holds ciphertext).
+- **Fetch mails now:** admins see a button under *Settings > Integrations > Tasks by e-mail* that asks the mailbox at once
+  instead of waiting for the next round.
 - **iPhone shortcut for sharing:** build it once in the Shortcuts app and share it for everyone, with import questions
   (placeholders) for the server address and the token, never with your own token inside.
 - **The upload token is not an API token.** *Share from your phone* uses each person's upload token for `/drop` only;
