@@ -346,7 +346,7 @@ def news_add(c, uid, kind, task_id=None, list_id=None, comment_id=None, data=Non
 
 
 def news_read_job(c, j, ts=None):
-    """2.138.2 A (#2406): a decided approval job is done for everybody it was shown to: its unread approval News turn read
+    """2.138.3 A (#2406): a decided approval job is done for everybody it was shown to: its unread approval News turn read
     (by job number; older entries without one by task / list + title). Caller commits and bumps."""
     ts = ts or iso(now_utc())
     c.execute("UPDATE notifications SET read_at=? WHERE kind='approval' AND read_at IS NULL AND data->>'job' = ?", (ts, str(j["id"])))

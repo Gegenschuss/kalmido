@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.138.2 API tests, part A (#2406). Invented people and texts only.
+"""2.138.3 API tests, part A (#2406). Invented people and texts only.
 freelancer-matrix: agents
  - an agent's request that waits for approval makes an "approval" News entry (carrying the job number); deciding it
    (yes, no, stop) sets the unread entries of that job to read for every person it was shown to; the bell number drops

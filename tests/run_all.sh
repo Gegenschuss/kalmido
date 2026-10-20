@@ -1399,9 +1399,9 @@ fresh; run p2138_d_ui node p2138_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.138.0 part E: resizable dialogs, quotation next step, service import order, PDF closing together, import undo archives, GbR partners (#2234 #2235 #2237 #2238 #2241 #2242)
 fresh; run p2138_e_api "$PY" p2138_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2138_e_ui node p2138_e_ui.js "$KALMIDO_TEST_DATA"
-# 2.138.2 part A: a decided approval marks its notifications read (#2406)
+# 2.138.3 part A: a decided approval marks its notifications read (#2406)
 fresh; run p21382_a_api "$PY" p21382_a_api_test.py "$KALMIDO_TEST_DATA"
-# 2.138.2 part B: edit organisation - members as a searchable list with member / admin boxes (#2407)
+# 2.138.3 part B: edit organisation - members as a searchable list with member / admin boxes (#2407)
 fresh; run p21382_b_ui node p21382_b_ui.js "$KALMIDO_TEST_DATA"
 shard 18  # 20.10.2026 (job #692): the parked releases 2.111-2.113.0 (new suites still go to shard 17 above)
 # 2.111.0: Buero-Rueckgaengig (a), Termin-Einladungen + Abo-Link (b), Schnellerfassung (c)

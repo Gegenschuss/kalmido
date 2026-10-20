@@ -198,14 +198,14 @@ function omNewOrgRows() {
   return `<div class="row"><label for="u-org">${tr('Organisation')}</label><select id="u-org"><option value="0">${tr('None (private space only)')}</option>${os.map(o => `<option value="${o.id}" ${o.id === one ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select></div>
     <div class="row" id="u-orgrow" ${one ? '' : 'hidden'}><label for="u-orgrole">${tr('Role in the organisation')}</label><select id="u-orgrole"><option value="member">${tr('Member')}</option><option value="admin">${tr('Admin of the organisation')}</option></select></div>`;
 }
-// 2.138.2 B (#2407): the avatar of a person row (Users and the organisation's member list)
+// 2.138.3 B (#2407): the avatar of a person row (Users and the organisation's member list)
 const uRowAv = u => u.avatar ? `<span class="avatar pic"><img src="${esc(u.avatar)}" alt="" loading="lazy"></span>` : av(0, u.display_name);
 async function orgModal(o, done) {
   let us = []; try { us = (await api('GET', '/api/users?all=1')).users.filter(u => !u.disabled && u.kind !== 'agent'); } catch { return; }
   // 2.46.0 (#1561): fresh members (people added since the list was drawn), else saving would drop them
   if (o) { try { S.orgs = (await api('GET', '/api/admin/orgs')).orgs; o = S.orgs.find(x => x.id === o.id) || o; } catch { return; } }
   const mem = new Set(o?.members || []), adm = new Set(o?.admins || []);  // 2.28.0 (#935): + the organisation's admins
-  // 2.138.2 B (#2407): members as a list like Users (search, filter Members / All, a Member and an Admin box per row) instead of
+  // 2.138.3 B (#2407): members as a list like Users (search, filter Members / All, a Member and an Admin box per row) instead of
   // one button per person; the symbol shows the picture / an app icon, never an emoji placeholder; the domain hint under the field
   const icPrev = v => orgIconHtml({icon_url: o?.icon_url, icon: v});
   const md = modal(`<h3>${o ? tr('Edit organisation') : tr('New organisation')}</h3>

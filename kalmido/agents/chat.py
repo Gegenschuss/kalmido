@@ -151,7 +151,7 @@ def agent_job_action(jid):
             if task_visible(c, t["id"], j["agent_id"], full=True):
                 data.update(task=task_for(c, t, j["agent_id"]), list=lst_brief(c, t["list_id"]))
     agent_emit(c, j["agent_id"], "job", data)
-    if j["approval"]:  # 2.138.2 A (#2406): rejected / stopped: the question is settled for everybody
+    if j["approval"]:  # 2.138.3 A (#2406): rejected / stopped: the question is settled for everybody
         from ..collab.news import news_read_job
         news_read_job(c, j, ts)
     bump(c)

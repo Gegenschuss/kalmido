@@ -163,7 +163,7 @@
 .ua8how{border:0;padding:0;margin:.75rem 0 0;display:flex;flex-direction:column;gap:.5rem}
 .ua8how legend{font-weight:600;padding:0;margin-bottom:.25rem}
 .ua8how select{max-width:100%}
-/* 2.138.2 B (#2407): "Edit organisation": head and foot stay, the member list scrolls; per row a Member and an Admin box */
+/* 2.138.3 B (#2407): "Edit organisation": head and foot stay, the member list scrolls; per row a Member and an Admin box */
 .modal.ogmodal .card{display:flex;flex-direction:column}
 .modal.ogmodal .card>*{flex:none}
 .modal.ogmodal .card>.ogml{flex:1 1 auto;min-height:7rem;overflow-y:auto;overscroll-behavior:contain;margin:0 -.25rem .5rem;padding:0 .25rem}
