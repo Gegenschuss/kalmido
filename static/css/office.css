@@ -429,6 +429,7 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .cfs-adj{margin-top:.25rem}
 .cfs-add{display:flex;justify-content:flex-end;margin-top:.25rem}
 .cfs-add .btn{min-height:2.75rem}
+@media (max-width:899px){.cfb-real{position:sticky;bottom:calc(var(--tabs-h) + var(--safe-b));z-index:6;background:var(--bg2)}}  /* 2.144.2 B (#2372): above the tab bar like the sheet bar */
 /* 2.124.0 D (#2342): the balance according to the bank (cash flow, import preview) */
 .cfb-box{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0;padding:.5rem .75rem;border:.0625rem solid var(--line2);border-radius:var(--radius)}
 .cfb-head{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}

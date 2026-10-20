@@ -38,8 +38,10 @@ function wt_toggle(b) {
 // the notification row "leave" (account.js matrix): a new request (admins), the decision on my own
 NOTIF_ROWS.push(['leave', N_('Vacation requests'), N_('admins: a new request; everybody: the decision on their own')]);
 NM_NEWS_NEW.leave = 1; NM_PUSH.leave = 1;
-const LV = {data: null, key: '', seq: 0};
+const LV = {data: null, key: '', seq: 0, open: false};  // 2.144.2 B (#2375): open = the vacation accounts stay open across a reload
 const lv_num = n => fmtNum(n || 0, 1);
+// 2.144.2 B (#2375): the section is drawn anew after each save (data reloaded), so its open state lives in LV
+document.addEventListener('toggle', e => { if (e.target.classList?.contains('lvbox')) LV.open = e.target.open; }, true);
 function lv_reset() { LV.data = null; LV.key = ''; }
 async function lv_load(org, year) {
   const seq = ++LV.seq, key = `${org || ''}:${year}`;
@@ -79,7 +81,7 @@ function lv_html(ad) {
   const rows = d.people.map(p => `<li><button type="button" class="ab2li" data-act="lv-edit" data-uid="${p.id}">${av(p.id, p.display_name)}<span class="ab2lt"><b>${esc(p.display_name)}</b><span class="muted">${esc(lv_wtText(p))}</span>${lv_accLine(p)}</span>${ic('edit', 's')}</button></li>`).join('');
   const sw = d.personal ? '' : `<div class="row lvsw"><label class="chkl"><input type="checkbox" id="lv-approval" ${d.approval ? 'checked' : ''}> ${tr('Vacation of members needs an approval')}</label></div>
       <div class="shint">${tr('On: vacation a member enters is a request until an admin approves it. Sick leave and days off need no approval. Admins entering vacation for someone approve it at once.')}</div>`;
-  return `${pendHtml}<details class="lvbox"><summary>${esc(tr('Vacation accounts {0}', String(year)))}</summary>
+  return `${pendHtml}<details class="lvbox" ${LV.open ? 'open' : ''}><summary>${esc(tr('Vacation accounts {0}', String(year)))}</summary>
       <ul class="ab2list">${rows}</ul>${sw}</details>`;
 }
 const lv_wtText = p => { const wd = p.workdays || WT_DEFAULT; return `${wd.map(i => wt_dayName(i)).join(' ')} · ${tr('{0} h / week', fmtNum(p.capacity_h, 1))}`; };
@@ -123,8 +125,8 @@ async function lv_decide(it, ok) {
   const step = (action, n) => async () => { await api('POST', `/api/team/absences/${it.id}/decide`, {action, note: n}); ab2_reload(); };
   try {
     await step(ok ? 'approve' : 'reject', note)();
-    histAdd({label: ok ? tr('Vacation approved') : tr('Vacation rejected'), undo: step('reopen', ''), redo: step(ok ? 'approve' : 'reject', note)});
-    toast(ok ? tr('Vacation approved') : tr('Vacation rejected'));
+    // 2.144.2 B (#2375): the hint carries Undo (the same history step)
+    histToast(ok ? tr('Vacation approved') : tr('Vacation rejected'), histAdd({label: ok ? tr('Vacation approved') : tr('Vacation rejected'), undo: step('reopen', ''), redo: step(ok ? 'approve' : 'reject', note)}));
   } catch { /* api() said it */ }
 }
 

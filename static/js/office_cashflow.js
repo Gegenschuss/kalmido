@@ -41,7 +41,7 @@ function rk_cashflowHtml() {
       <span class="rkcfbal ${+r.balance < 0 ? 'neg' : ''}">${tr('Balance')} ${ofcMoney(r.balance)}</span></header>${bars(r)}
       <table class="rkcftab"><thead><tr><th></th><th class="num">${tr('Actual')}</th><th class="num">${tr('Planned')}</th></tr></thead><tbody>
       <tr><th>${tr('In|cashflow')}</th><td class="num">${val(r.month, 'in', 'actual', r.in.actual)}</td><td class="num">${val(r.month, 'in', 'plan', r.in.plan, 'plan')}</td></tr>
-      <tr><th>${tr('Out|cashflow')}</th><td class="num">${val(r.month, 'out', 'actual', r.out.actual)}</td><td class="num">${val(r.month, 'out', 'plan', r.out.plan, 'plan')}</td></tr>${bk_cfReserveRows(r)}${cfs_accRows(r)}${cfb_rows(r)}</tbody></table>
+      <tr><th>${tr('Out|cashflow')}</th><td class="num">${val(r.month, 'out', 'actual', r.out.actual)}</td><td class="num">${val(r.month, 'out', 'plan', r.out.plan, 'plan')}</td></tr>${bk_cfReserveRows(r)}${cfs_accRows(r)}${cfb_rows(r)}</tbody></table>${cfb_realBar(r)}
       ${rk_cfOpenHtml(r.month)}${cfs_adjHtml(r.month)}${k ? rk_cfEntries(k) : ''}</section>`;
   }).join('');
   return bar + cfb_boxHtml(d) + `<div class="rkcfms">${cards}</div><p class="muted ofchint">${tr('Actual = paid or already past; planned = expected (open invoices on their due date, sent and accepted quotations without an invoice at the end of their period of service, one version per quotation).')} ${d.basis === 'net' ? tr('Net: documents and fixed costs without VAT; purchases and travel receipts as entered.') : tr('Gross: documents and fixed costs incl. VAT; purchases and travel receipts as entered.')}</p>` + rk_fixedHtml() + fci_checkHtml();
@@ -362,9 +362,11 @@ function cfb_boxHtml(d) {
 function cfb_rows(r) {
   const b = r.bank; if (!b) return '';
   return `<tr class="cfb-row"><th>${esc(tr('According to the bank on {0}', cfb_day(b.day)))} <span class="cfs-hand">${tr('from the bank reconciliation')}</span></th><td class="num" colspan="2">${ofcMoney(b.amount)}</td></tr>
-      ${b.diff != null ? `<tr class="cfb-row"><th>${tr('Difference to the computed balance')}</th><td class="num ${+b.diff ? 'cfs-off' : ''}" colspan="2">${cfb_signed(b.diff)}</td></tr>` : ''}
-      ${r.account != null && r.real == null ? `<tr class="cfb-row"><td colspan="3"><div class="cfs-add"><button type="button" class="btn sm ghost" data-cfb="real" data-month="${r.month}">${tr('Use as real balance')}</button></div></td></tr>` : ''}`;
+      ${b.diff != null ? `<tr class="cfb-row"><th>${tr('Difference to the computed balance')}</th><td class="num ${+b.diff ? 'cfs-off' : ''}" colspan="2">${cfb_signed(b.diff)}</td></tr>` : ''}`;
 }
+// 2.144.2 B (#2372): "Use as real balance" in its own bar below the month's table (a table cell cannot stick above the
+// phone's tab bar; the bar can)
+const cfb_realBar = r => r.bank && r.account != null && r.real == null ? `<div class="cfs-add cfb-real"><button type="button" class="btn sm ghost" data-cfb="real" data-month="${r.month}">${tr('Use as real balance')}</button></div>` : '';
 document.addEventListener('click', async e => {
   const t = e.target.closest?.('[data-cfb]'); if (!t) return;
   e.preventDefault();

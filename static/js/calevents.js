@@ -41,6 +41,7 @@ async function evPop(anchor, e) {
   let ev;
   try { ev = await api('GET', `/api/events/${e.eid}`); } catch { closePop(); return; }
   if ($('#pop').classList.contains('hidden')) return;
+  if (AP_EVPEND.has(ev.id)) { ev.status = AP_EVPEND.get(ev.id); e = {...e, status: ev.status}; }  // 2.144.2 B (#1811): a confirm still on its way
   const role = ev.role, w = role === 'owner' || role === 'edit', me = (ev.attendees || []).find(a => a.user_id === S.me?.id);
   const att = ev.attendees || [];
   const t = ev.task_id ? taskById(ev.task_id) : null;
@@ -64,6 +65,9 @@ async function evPop(anchor, e) {
     if (ps) { try { await api('POST', `/api/events/${ev.id}/rsvp`, {partstat: ps.dataset.evps}); } catch { return; } closePop(); toast(tr('Answer sent: {0}', tr(EV_PS_WORD[ps.dataset.evps]))); calInvalidate(); renderView(); return; }
     const b = ev2.target.closest('[data-evp]'); if (!b) return;
     const k = b.dataset.evp;
+    // 2.144.2 B (#1811): the draft marks leave the popover at once, so no picture of it (the phone sheet's exit, a sheet
+    // shown again) still says Draft + Confirm after the tap
+    if (k === 'apok') p.querySelectorAll('.apdraftact, .evdraftb').forEach(x => x.remove());
     closePop();
     if (k === 'edit') evEditor({ev, occ: e.recurring ? e.occ : null});
     else if (k === 'del') evDelete(ev, e.recurring ? e.occ : null);
