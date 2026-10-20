@@ -18,6 +18,7 @@ freelancer-matrix: sheets
 usage: p2124_a_api_test.py <datadir>      (a fresh container; P2124A_NOSTART=1 = the server already runs)"""
 import io
 import json
+import time
 import os
 import subprocess
 import sys
@@ -133,6 +134,13 @@ check(cell(d, "D7").get("raw") == '=SVERWEIS("cherry";A1:C4;2;FALSCH)', "the for
 r = put(A, SID, [{"cell": "B3", "raw": "4"}])
 check(r.ok and any(x["addr"] == "D7" and x["value"] == 4 for x in r.json()["cells"]), "changing B3 answers the SVERWEIS again " + r.text[:300])
 check(put(A, SID, [{"cell": "D8", "raw": "=FOO(1)"}]).status_code == 400, "an unknown function: 400")
+# 2.124.0 review: wildcards match without backtracking (a long cell and many * answered at once)
+t0 = time.time()
+r = put(A, SID, [{"cell": "A6", "raw": "a" * 3000}, {"cell": "F7", "raw": '=ZÄHLENWENN(A1:A6;"*a*a*a*a*a*a*b")'},
+                 {"cell": "F8", "raw": '=COUNTIF(A1:A6;"*a*a*a*a*a*a")'}])
+d = get(A, SID)
+check(r.ok and cell(d, "F7").get("value") == 0 and cell(d, "F8").get("value") == 1 and time.time() - t0 < 10,
+      "wildcards on a 3000-character cell: fast " + json.dumps(cell(d, "F8"))[:200])
 
 # approximate lookup, text, dates, errors -- a second table
 r = A.post(B + "/api/sheets", json={"title": "Misc", "space": f"org:{ORG}"})
