@@ -171,7 +171,7 @@
 .ogfld .muted{font-size:var(--fs-s)}
 .oghd{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;margin:.5rem 0 .25rem}
 .oghd .muted{font-size:var(--fs-s)}
-.ogrow{min-height:2.75rem;border-top:1px solid var(--line)}
+.ogrow{min-height:2.75rem;border-top:1px solid var(--line);flex:none}  /* .members is a flex column: a wrapped row must not shrink */
 .ogrow:first-child{border-top:0}
 .ogchk{display:inline-flex;align-items:center;gap:.375rem;flex:none;min-height:2.75rem;padding:0 .25rem;cursor:pointer;font-size:var(--fs-s)}
 .ogchk input{width:1.125rem;height:1.125rem;margin:0;accent-color:var(--accent)}

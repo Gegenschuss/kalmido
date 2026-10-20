@@ -136,11 +136,12 @@ const EMOJI = /\p{Extended_Pictographic}/u;
       const m = await ev(`(() => { const c = document.querySelector('.modal.ogmodal .card'), l = c.querySelector('#og-list'), f = c.querySelector('.foot'), h = c.querySelector('h3');
         const cr = c.getBoundingClientRect(), fr = f.getBoundingClientRect(), r = l.querySelector('.ogrow').getBoundingClientRect(), b = l.querySelector('.ogchk').getBoundingClientRect();
         return {lscroll: l.scrollHeight > l.clientHeight + 4, cscroll: c.scrollHeight - c.clientHeight, footIn: fr.bottom <= cr.bottom + 1 && fr.top >= cr.top, headTop: h.getBoundingClientRect().top >= cr.top - 1,
-          rowH: r.height, boxH: b.height, rem: parseFloat(getComputedStyle(document.documentElement).fontSize), wide: c.scrollWidth <= c.clientWidth + 1}; })()`);
+          rowH: r.height, boxH: b.height, inRow: [...l.querySelectorAll('.ogrow')].slice(0, 6).every(x => { const xr = x.getBoundingClientRect(); return [...x.querySelectorAll('.ogchk')].every(k => { const kr = k.getBoundingClientRect(); return kr.top >= xr.top - 1 && kr.bottom <= xr.bottom + 1; }); }), rem: parseFloat(getComputedStyle(document.documentElement).fontSize), wide: c.scrollWidth <= c.clientWidth + 1}; })()`);
       check(m.lscroll, `#2407 ${tag}: the long list scrolls inside`);
       check(m.cscroll <= 2 && m.footIn && m.headTop, `#2407 ${tag}: head and foot stay in view (card overflow ${m.cscroll})`);
       check(m.rowH >= 2.75 * m.rem - 0.5 && m.boxH >= 2.75 * m.rem - 0.5, `#2407 ${tag}: rows and boxes are at least 2.75rem high (${m.rowH}, ${m.boxH})`);
       check(m.wide, `#2407 ${tag}: no sideways scrolling`);
+      check(m.inRow, `#2407 ${tag}: the boxes stay inside their row (a wrapped row grows)`);
       await shot(`p21382-b-${tag}.png`);
     }, tag === 'narrow' ? true : false);
   }
