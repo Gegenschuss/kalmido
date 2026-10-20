@@ -1393,6 +1393,12 @@ fresh; run p2138_b_ui node p2138_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.138.0 part C: security fixes - upload / calendar tokens, organisation recovery key (#1907 #1972)
 fresh; run p2138_c_api "$PY" p2138_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2138_c_ui node p2138_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.138.0 part D: office number ranges with a start number; more rule triggers / actions, Kanban swimlanes (#2256 #2060)
+fresh; run p2138_d_api "$PY" p2138_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2138_d_ui node p2138_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.138.0 part E: resizable dialogs, quotation next step, service import order, PDF closing together, import undo archives, GbR partners (#2234 #2235 #2237 #2238 #2241 #2242)
+fresh; run p2138_e_api "$PY" p2138_e_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2138_e_ui node p2138_e_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
