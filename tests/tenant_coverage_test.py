@@ -786,6 +786,9 @@ ROUTES = {
     "POST /api/sheets/{}/columns/{}/restore": "sheet", "POST /api/sheets/{}/rows": "sheet", "DELETE /api/sheets/{}/rows/{}": "sheet",
     "POST /api/sheets/{}/rows/{}/restore": "sheet", "POST /api/sheets/{}/rows/order": "sheet", "POST /api/sheets/{}/presence": "sheet",
     "GET /api/sheets/{}/vars": "sheet", "POST /api/sheets/{}/batches/{}/undo": "sheet",
+    # 2.124.0 B (#2110 #2111 #2112): people of a person cell, files of file cells, rows / columns kept in view, the history (p2124_b_api_test.py)
+    "GET /api/sheets/{}/people": "sheet", "POST /api/sheets/{}/files": "sheet", "GET /api/sheets/{}/files/{}": "sheet", "GET /api/sheets/{}/files/{}/{}": "sheet",
+    "POST /api/sheets/{}/fixed": "sheet", "GET /api/sheets/{}/history": "sheet", "GET /api/sheets/{}/cells/{}/history": "sheet",
     # 2.49.0 (#1106): find people by e-mail, connection requests, blocks
     "GET /api/disc": "discover", "PUT /api/disc": "discover", "POST /api/disc/confirm": "discover", "POST /api/disc/find": "discover",
     "POST /api/disc/check": "discover", "POST /api/disc/requests": "discover", "POST /api/disc/requests/{}/{}": "discover",

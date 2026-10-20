@@ -610,6 +610,9 @@ ROUTES = {
     "POST /api/sheets/{}/to-offer": "sheets", "POST /api/sheets/{}/to-tasks": "sheets", "POST /api/v1/sheets": "sheets",
     "POST /api/v1/sheets/{}/batches/{}/undo": "sheets", "POST /api/v1/sheets/{}/columns": "sheets",
     "POST /api/v1/sheets/{}/rows": "sheets", "PUT /api/sheets/{}/cells": "sheets", "PUT /api/v1/sheets/{}/cells": "sheets",
+    # 2.124.0 B (#2110 #2111 #2112): p2124_b_api_test.py (a person without an organisation in her private table)
+    "GET /api/sheets/{}/people": "sheets", "POST /api/sheets/{}/files": "sheets", "GET /api/sheets/{}/files/{}": "sheets", "GET /api/sheets/{}/files/{}/{}": "sheets",
+    "POST /api/sheets/{}/fixed": "sheets", "GET /api/sheets/{}/history": "sheets", "GET /api/sheets/{}/cells/{}/history": "sheets",
     "DELETE /api/v1/team/messages/{}": "team", "GET /api/avatar/{}/{}.jpg": "team", "GET /api/disc": "team",
     "GET /api/e2e/keys": "team", "GET /api/e2e/pub/{}": "team", "GET /api/team": "team",
     "GET /api/team/rooms/{}/messages": "team", "GET /api/users": "team", "GET /api/v1/team/rooms": "team",

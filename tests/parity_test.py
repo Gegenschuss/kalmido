@@ -264,6 +264,11 @@ APP_ONLY = [
     ("2.124.0 A (#2115): the chart of a table is how a person looks at it in the app (kind and columns of the drawing); an agent "
      "reads it with the table (GET /sheets/{id} answers chart) and works on the values, the drawing itself stays with people",
      ("=PUT /api/sheets/{}/chart",)),
+    ("2.124.0 B (#2110 #2111 #2112): uploading a file into a table cell and opening it, the people a person cell offers, the "
+     "rows / columns kept in view and the history of the cells stay with people in the app; an agent reads and writes the new "
+     "kinds through the table tools (a file cell read only: its name and id)",
+     ("=GET /api/sheets/{}/people", "=POST /api/sheets/{}/files", "=GET /api/sheets/{}/files/{}", "=GET /api/sheets/{}/files/{}/{}",
+      "=POST /api/sheets/{}/fixed", "=GET /api/sheets/{}/history", "=GET /api/sheets/{}/cells/{}/history")),
     ("2.98.0 B (#1954): the evaluation of a questionnaire (all submissions with the senders' names, addresses and answers, "
      "their CSV) stays with the people who manage the form in the app; an agent gets each submission as its task (task_added, "
      "the answers in the description) and sets the questions through the form's fields",
