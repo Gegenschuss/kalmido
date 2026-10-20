@@ -134,16 +134,16 @@ check(A.post(B + f"/api/agents/jobs/{J3}/action", json={"action": "stop"}).ok, "
 old = sql("SELECT COUNT(*) FROM notifications WHERE user_id=? AND kind='approval' AND task_id=? AND read_at IS NULL", (ALICE, T3))[0][0]
 check(old == 0, "legacy: the old entry is read by task + title")
 
-# ---- an approval without a task (list deletion)
-L = A.post(B + "/api/lists", json={"name": "Old stuff", "org_id": ORG}).json()["id"]
-check(A.put(B + f"/api/lists/{L}/members", json={"user_id": CL, "role": "admin"}).ok, "list: agent admin")
-check(A.patch(B + f"/api/lists/{L}", json={"archived": True}).ok, "list: archived")
-r = requests.delete(V + f"/lists/{L}", headers=CLH)
-check(r.status_code == 202, f"list: the deletion waits {r.status_code} {r.text[:200]}")
+# ---- an approval without a task (deleting a custom field of a list)
+r = A.post(B + f"/api/lists/{W}/fields", json={"name": "Budget", "type": "number"})
+check(r.ok, "field: created " + r.text[:200])
+FLD = r.json()["id"]
+r = requests.delete(V + f"/fields/{FLD}", headers=CLH)
+check(r.status_code == 202, f"field: the deletion waits {r.status_code} {r.text[:200]}")
 J4 = (r.json().get("job") or {}).get("id")
-check(unread(ALICE, J4) == 1, "list: the News entry without a task is unread, with the job number")
-check(A.post(B + f"/api/agents/jobs/{J4}/action", json={"action": "reject"}).ok, "list: rejected")
-check(unread(ALICE, J4) == 0 and total(ALICE, J4) == 1, "list: the entry is read")
+check(unread(ALICE, J4) == 1, "field: the News entry without a task is unread, with the job number")
+check(A.post(B + f"/api/agents/jobs/{J4}/action", json={"action": "reject"}).ok, "field: rejected")
+check(unread(ALICE, J4) == 0 and total(ALICE, J4) == 1, "field: the entry is read")
 
 # ---- a person without an organisation (freelancer-matrix: agents)
 FU, F = freelancer(B, A, "frida")
