@@ -579,7 +579,11 @@ def bk_uploads_gc():
 
 
 def backup_tick(c):
-    if not BK_ON_ENV or gsetting(c, "bk_on") != "1":
+    if not BK_ON_ENV:
+        return
+    from .offsite import bko_tick
+    bko_tick(c)  # 2.143.0 B (#2152): the newest backup to the off-site target (also when only manual backups are made)
+    if gsetting(c, "bk_on") != "1":
         return
     bk_uploads_gc()
     now = local_now()

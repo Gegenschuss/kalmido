@@ -1514,6 +1514,18 @@ fresh; run p2116_c_ui node p2116_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.116.0 part D (#2066 #2067: several times a day, focus/habits in API v1)
 fresh; run p2116_d_api "$PY" p2116_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2116_d_ui node p2116_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.143.0 part A (#2151: organisation roles guest / read-only / accounting)
+fresh; run p2143_a_api "$PY" p2143_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2143_a_ui node p2143_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.143.0 part B (#2152 #2211: off-site backup target, wiki trash emptied for good)
+fresh; run p2143_b_api "$PY" p2143_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2143_b_ui node p2143_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.143.0 part C (#2153 #2154: offline PWA outbox, share target for all file types)
+fresh; run p2143_c_api "$PY" p2143_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2143_c_ui node p2143_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.143.0 part D (#2155 #2156 #2259: appearance across devices, activity per organisation, unused terms PDFs)
+fresh; run p2143_d_api "$PY" p2143_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2143_d_ui node p2143_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.140.0 part A: shopping list quantity / price + offline in the shop, recipes -> shopping list, meal plan beyond 7 days (#2131 #2132)
 fresh; run p2140_a_api "$PY" p2140_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2140_a_ui node p2140_a_ui.js "$KALMIDO_TEST_DATA"

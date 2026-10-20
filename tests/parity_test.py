@@ -680,6 +680,7 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "POST /lists/{}/join": "2.46.0 (#1603): joining a list seen through the organisation: people only (an agent never sees a list that way, 404)",
     "GET /admin/users": "admin-read: never for agents",
     "GET /admin/status": "admin-read: never for agents",
+    "GET /admin/orgs/activity": "2.143.0 D (#2156): admin-read, numbers per organisation: never for agents",
     "PUT /admin/announcement": "2.24.0: the server's notice: admins and operator scripts (account + admin-read, never agents)",
     "GET /admin/agents/{}/audit": "admin-read: never for agents",
     "GET /me/app-passwords": "account: never for agents",

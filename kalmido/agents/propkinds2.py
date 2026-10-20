@@ -63,7 +63,7 @@ def pk2_area(c, uid, aid):
     from ..office.model import pb_personal
     r = c.execute("SELECT org_id FROM agents WHERE user_id=?", (aid,)).fetchone()
     org = r["org_id"] if r else None
-    if org and org_role(c, uid, org):
+    if org and org_role(c, uid, org) in ("admin", "member"):  # 2.143.0 A (#2151): not the limited roles
         return org, org
     return None, pb_personal(c, uid, create=False)
 

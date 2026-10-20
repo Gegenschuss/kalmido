@@ -42,7 +42,7 @@ Create a token under **Settings > Account > API tokens**:
   | `contacts` (2.21.0) | address books and contacts, reading included (personal data of other people: never part of the old `write`, never an agent's default) |
   | `private` (2.22.0) | health lists and the journal, reading included (never part of the old `write`; an agent never gets it and never sees a health list) |
   | `account` | your notification settings and app passwords (never for agents) |
-  | `admin-read` (admins only) | `GET /api/v1/admin/users`, `/admin/status`, `/admin/agents/{id}/audit`; checked on every request: if the user stops being an admin, it stops working (never for agents) |
+  | `admin-read` (admins only) | `GET /api/v1/admin/users`, `/admin/status`, `/admin/orgs/activity`, `/admin/agents/{id}/audit`; checked on every request: if the user stops being an admin, it stops working (never for agents) |
 
   A new token starts with `read`. A request without the needed scope gets `403` with `error.required_scope`. Tokens
   created before 2.15.0 keep what they could do: `write` stands for every scope but `admin-read`, and old read-only
@@ -267,6 +267,7 @@ had been made in the app. Webhooks fire too.
 | `POST /import/{source}` | structure | Import an export file (multipart), see [Import](#import) |
 | `POST /imports/{id}/undo` | delete | Undo an import within 24 hours |
 | `GET /admin/users` | admin-read | All users (no secrets) |
+| `GET /admin/orgs/activity` | admin-read | Numbers per organisation (members, last sign-in date, storage in bytes, lists, tasks) and one row for people without an organisation; no names or contents |
 | `GET /admin/status` | admin-read | Version, counts, update available (`latest_version`, `update_checked_at`, `update_error`), last backup, pending webhooks |
 | `GET /admin/agents/{id}/audit` | admin-read | 2.2.1: the agent's audit log, newest first: `{id, at, agent_id, agent_name, method, route, status, task_id, list_id, ms, denied}`; `?status=2xx\|3xx\|4xx\|5xx\|denied`, `?day=YYYY-MM-DD`, cursor pages (see [AGENTS.md](AGENTS.md#audit-log)) |
 | `GET /lists/{id}/sections` · `POST …` | read · structure | 2.15.0: sections in order; create `{name, before_id?}` (at the end or in front of a section) |

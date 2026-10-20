@@ -505,7 +505,12 @@ def root_add_ok(c, uid, chain):
     if len(chain) != 1 or top["kind"] != "folder" or not top["org_id"]:
         return False
     ctx = acx_of(c, uid)
-    return ctx.role != "agent" and top["org_id"] in ctx.org_ids and root_id(c, doc_ws(top["org_id"], None)) == top["id"]
+    if ctx.role == "agent" or top["org_id"] not in ctx.org_ids:
+        return False
+    from ..accounts.orgroles import org_role_key
+    if org_role_key(c, uid, top["org_id"]) in ("guest", "readonly"):  # 2.143.0 A (#2151, review): accounting uploads receipts
+        return False
+    return root_id(c, doc_ws(top["org_id"], None)) == top["id"]
 
 
 def docs_root(c, node):

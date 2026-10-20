@@ -27,6 +27,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **2.144.1** (2026-10-20): office fixes - the bank import takes several statements or a ZIP at once and says which
   file to export from online banking (CAMT.053 recommended), the cash flow opens it next to the bank balance; the office
   side bar stays put on touch tablets.
+- **2.143.0** (2026-10-20): organisation roles read-only, guest and accounting; off-site backups to S3, WebDAV or SFTP
+  (encrypted only); outbox in IndexedDB with background sync, offline notes and time entries, an install hint; share
+  any file type to Kalmido; appearance follows your account; activity per organisation for admins; the pages trash
+  and old terms PDFs are emptied for good.
 - **2.141.0** (2026-10-20): the **e-mail filing as a small mail desk** - an own IMAP / SMTP mailbox per workspace,
   reply and write from the filing (sent mails filed too), HTML mails shown safely, tasks and events from a mail; a CSV /
   ICS export of the disposition and a consent import for newsletters.
@@ -635,7 +639,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   data, purchase and contract rates and stored files (needs `KALMIDO_SECRET_KEY`; see SELF-HOSTING.md). 2.64.0: the files
   of the private space are stored encrypted on the server as well, with a key per person (server-side, not end-to-end)
 - **Automatic backups** of the database and all attachments, daily with retention, optionally encrypted, downloadable,
-  and a **restore** right in the app (checked, with a safety backup of the current state first)
+  and a **restore** right in the app (checked, with a safety backup of the current state first); encrypted backups can also go to an
+  **off-site target** (S3-compatible, WebDAV over https or SFTP) after each run (2.143.0)
 - **Admin alerts** over each admin's own channel (Web Push or ntfy): a new version, devices that stopped taking pushes, watchdog errors, failing integrations, repeated failed logins, low disk space or a failed database check reach the admins, never with task contents
 
 **AI agents**
@@ -1195,6 +1200,10 @@ a private list by e-mail address (the answer never says whether the address has 
 - The **instance admin** (the operator) creates organisations with a first admin and deletes empty ones; *Users* lists
   every account. When adding a person the admin picks the organisation (none, or one of them) and the role (member /
   admin); with exactly one organisation it is preselected.
+- 2.143.0: besides member and admin an organisation knows **read-only** (sees what members see, changes nothing; team
+  chat stays open), **guest** (sees only what is shared with them personally) and **accounting** (reads and exports the
+  office, uploads receipts). The server checks the role everywhere (see docs/TEAM.md). Going back to an older version
+  treats these roles as "member" - set them back to member first.
 - **Organisation admins** manage their members (add by e-mail address, roles, removal - the removed person's lists of the
   organisation go to the admin), name and e-mail domains under *Settings > Account > Workspaces*, without being admins of
   the server.

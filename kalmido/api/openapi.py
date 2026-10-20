@@ -495,6 +495,13 @@ def openapi_spec():
             "update_checked_at": nul("string"), "update_error": nul("string"),
             "backups": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "last_ok": nul("string")}},
             "webhooks_pending": {"type": "integer"}}},
+        "AdminOrgActivityRow": {"type": "object", "properties": {
+            "members": {"type": "integer"}, "last_login": nul("string", description="Date (YYYY-MM-DD) of the latest sign-in"),
+            "storage_bytes": {"type": "integer"}, "lists": {"type": "integer"}, "tasks": {"type": "integer"}}},
+        "AdminOrgActivity": {"type": "object", "description": "2.143.0: numbers only, no people or contents", "properties": {
+            "orgs": {"type": "array", "items": {"allOf": [ref("AdminOrgActivityRow"), {"type": "object", "properties": {
+                "id": {"type": "integer"}, "name": {"type": "string"}}}]}},
+            "private": ref("AdminOrgActivityRow")}},
         "WebhookPayload": {"type": "object", "description": "Body of a webhook delivery (POST to your URL). Verify X-Kalmido-Signature first.",
                            "properties": {"id": {"type": "string", "description": "Delivery id (also X-Kalmido-Delivery; the same for every retry)"},
                                           "event": {"type": "string", "enum": [*WH_EVENTS, "ping"]},
@@ -664,6 +671,7 @@ def openapi_spec():
         "/imports/{id}/undo": {"post": op(f"Undo an import (within {IMPORT_UNDO_HOURS} hours): removes what it created", "Import",
                                           ok(ref("ImportUndone")) | errs("404", "409"), [pid("id", "Import id")], scope="write")},
         "/admin/users": {"get": op("All users (admins, scope admin-read)", A, ok(ref("AdminUserPage")) | errs("403"), scope="admin-read")},
+        "/admin/orgs/activity": {"get": op("2.143.0: activity per organisation and for people without one: members, last sign-in date, storage, lists, tasks (admins, scope admin-read)", A, ok(ref("AdminOrgActivity")) | errs("403"), scope="admin-read")},
         "/admin/status": {"get": op("Server status (admins, scope admin-read)", A, ok(ref("AdminStatus")) | errs("403"), scope="admin-read")},
         "/admin/agents/{id}/audit": {"get": op(  # 2.2.1 (#358)
             "Audit log of an agent: every API request made with its token, newest first (admins, scope admin-read)", A,

@@ -44,6 +44,12 @@ def ws_param(c, raw, uid, manage=False):
     oid = int(m.group(1))
     if oid not in acx_of(c, uid).org_ids:
         raise Denied(404)
+    from ..accounts.orgroles import org_role_key, need_org_write, is_write_request
+    rk = org_role_key(c, uid, oid)  # 2.143.0 A (#2151): guests have no documents area of the organisation; read-only reads;
+    if rk == "guest":               # accounting reads it and uploads receipts (POST /api/docs), nothing else
+        raise Denied(404)
+    if (manage or is_write_request()) and not (rk == "accounting" and not manage and request.method == "POST" and request.path == "/api/docs"):
+        need_org_write(c, uid, oid)
     if manage:
         from ..accounts.orgs import is_org_admin
         if not is_org_admin(c, uid, oid):

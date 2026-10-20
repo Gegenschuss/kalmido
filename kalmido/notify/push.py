@@ -620,10 +620,14 @@ def _watchdog_tick(c):
     _wd_section(c, "files cleanup", fsm_orphans_gc)  # 2.97.0 D (#2051): stored versions without a row, once a night
     from ..office.contractfiles import dma_purge_tick
     _wd_section(c, "contract files trash", dma_purge_tick)  # 2.117.0 (#2285, review): trashed contract PDFs go after 30 days
+    from ..office.terms import agb_purge_tick
+    _wd_section(c, "terms files", agb_purge_tick)  # 2.143.0 D (#2259): replaced terms PDFs nobody names go after 30 days
     from ..office.meals import bw_purge_tick
     _wd_section(c, "entertainment receipts trash", bw_purge_tick)  # 2.119.0 A (#2288): trashed drafts and bills go after 30 days
     from ..wiki.wikiatt import wka_tick
     _wd_section(c, "wiki files", wka_tick)  # 2.99.0 (#2182): files in the trash for good after 30 days
+    from ..wiki.pages import wiki_trash_tick
+    _wd_section(c, "wiki trash", wiki_trash_tick)  # 2.143.0 B (#2211): pages in the trash for good after the trash period of tasks
     from ..sheets.shkinds import shk_tick
     _wd_section(c, "table files", shk_tick)  # 2.124.0 B (#2110): files no cell holds any more, for good after 30 days
     _wd_section(c, "admin alerts", aa_tick)

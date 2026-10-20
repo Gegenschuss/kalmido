@@ -439,11 +439,11 @@ function evShareModal(c, users, done) {
     }
   });
 }
-function evImport(c, done) {
+function evImport(c, done, file) {  // 2.143.0 C (#2154): file = an .ics shared from another app (no file picker)
   const inp = document.createElement('input');
   inp.type = 'file'; inp.accept = '.ics,text/calendar';
   inp.onchange = async () => {
-    const f = inp.files[0]; if (!f) return;
+    const f = file || inp.files[0]; if (!f) return;
     // 2.87.9 (#1940): where the events go, in words; from an organisation's calendar also into an own private calendar
     const pc = (S.evcals || []).find(x => !x.org_id && x.role === 'owner');
     const to = await importTargetConfirm({what: tr('the events'), ws: wsOf(c), place: c.name, privOk: !!pc});
@@ -458,6 +458,7 @@ function evImport(c, done) {
       done();
     } catch { toast(tr('Import failed')); }
   };
+  if (file) return inp.onchange();  // 2.143.0 C2 (#2154): awaitable, several shared files go one after another
   inp.click();
 }
 // "Calendar & contacts on the phone": the addresses and the steps for iPhone, Android (DAVx5) and Thunderbird

@@ -550,14 +550,14 @@ function ctPhoto(file) {  // a square JPEG of at most 256 px (small enough for e
     r.readAsDataURL(file);
   });
 }
-function ctImport(bookId, kind) {
+function ctImport(bookId, kind, file) {  // 2.143.0 C (#2154): file = a .vcf shared from another app (no file picker)
   const books = (S.books || []).filter(b => ctWrite(b) && wsObjIn(b));
   const run = async bid => {
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = kind === 'csv' ? '.csv,.txt,.tsv,text/csv,text/plain' : '.vcf,.vcard,.zip,text/vcard,text/x-vcard,application/zip';  // 2.119.1 A (#2080)
     if (kind !== 'csv') inp.multiple = true;  // 2.146.0 E (#2457): one .vcf per contact (Outlook) or a ZIP (Google Takeout)
     inp.onchange = async () => {
-      const fs = [...inp.files], f = fs[0]; if (!f) return;
+      const fs = file ? [file] : [...inp.files], f = fs[0]; if (!f) return;
       // 2.87.9 (#1940): where the contacts go, in words; from an organisation's book also into an own private book
       const b = (S.books || []).find(x => x.id === bid);
       const to = await importTargetConfirm({what: tr('the contacts'), ws: wsOf(b), place: b?.name || '', privOk: true});
@@ -570,7 +570,7 @@ function ctImport(bookId, kind) {
       if (fs.length > 1 || /\.zip$/i.test(f.name)) ctImpRun(bid, fs);  // 2.146.0 E (#2457): the server reads the vCards of all files
       else if (kind === 'csv' || !/\.vcf$/i.test(f.name)) ctx_csvMap(bid, f); else ctImpRun(bid, f);  // 2.119.1 A (#2080): CSV: the columns first
     };
-    inp.click();
+    if (file) inp.onchange(); else inp.click();
   };
   if (bookId) { run(bookId); return; }
   if (books.length === 1) { run(books[0].id); return; }

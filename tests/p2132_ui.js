@@ -175,6 +175,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   for (let i = 0; i < 40; i++) await tcall('POST', `/agent/chats/${ME}`, TOK, {body: `Answer ${i + 1}: some text that is long enough to make the chat scroll on every screen size`});
   const ffLogin = async ({ev, nav}, theme = 'light', ls = {}) => {
     await nav(B + 'static/icon.svg');
+    await call('PATCH', '/api/settings', {look: ''});  // 2.143.0 (#2155): the account's appearance from the jsdom boots above would win over this device's
     await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); ${Object.entries(ls).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join(' ')} return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };

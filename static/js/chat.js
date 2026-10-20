@@ -662,8 +662,65 @@ S.nt = {lid: null, id: null, notes: null, mayWrite: false, q: '', edit: false, s
 const notesOf = lid => (S.notes || []).filter(n => n.list_id === lid);
 const notesOn = l => !!l && !l.is_inbox && !(l.role === 'participant');
 async function loadNotes(lid) {
-  try { const j = await rawFetch('GET', `/api/lists/${lid}/notes`); if (S.nt.lid !== lid) return; S.nt.notes = j.notes; S.nt.mayWrite = j.may_write; S.nt.err = null; }
-  catch (e) { S.nt.err = e instanceof Offline ? tr('Notes are only available online.') : e.message; }
+  try { const j = await rawFetch('GET', `/api/lists/${lid}/notes`); if (S.nt.lid !== lid) return; S.nt.notes = j.notes; S.nt.mayWrite = j.may_write; S.nt.err = null; ntKeep(lid, j); }
+  catch (e) {
+    const c = e instanceof Offline && ntKept(lid);  // 2.143.0 C (#2153): offline: the notes as last seen (and written on)
+    if (c) { if (S.nt.lid === lid) { S.nt.notes = c.notes; S.nt.mayWrite = c.may_write; S.nt.err = null; for (const o of OUT.q) if (/^\/api\/(notes\/-?\d+|lists\/\d+\/notes)$/.test(o.url)) ntLocal(o); } return; }
+    S.nt.err = e instanceof Offline ? tr('Notes are only available online.') : e.message;
+  }
+}
+// 2.143.0 C (#2153): notes offline. The notes of the lists opened in this tab stay in memory, those of the last one also in
+// localStorage (an offline start); a change made offline (text, title, tags, pin, a new note) waits in the outbox like a task's
+// and is drawn at once; a newer text of the same note replaces the waiting one. The server answers a changed-in-between with
+// 409: that change waits with its text in the conflicts dialog (outReject). Deleting and moving still need a connection.
+const NT_MEM = new Map();
+const ntLocked = lid => typeof LE2E === 'object' && LE2E.on.has(lid);  // a list with the lock: its notes never wait in plain text
+function ntKeep(lid, j) { NT_MEM.set(lid, j); if (!ntLocked(lid)) LS.set('ntLast', {lid, j}); }
+function ntKept(lid) { if (NT_MEM.has(lid)) return NT_MEM.get(lid); const c = LS.get('ntLast', null); return c && c.lid === lid ? c.j : null; }
+const NT_URL = /^\/api\/(notes\/-?\d+|lists\/\d+\/notes)$/;
+function ntLocal(e) {  // applyLocal part of the outbox
+  const {method, url, body = {}} = e, now = new Date().toISOString();
+  if (method === 'POST') {
+    const lid = +url.match(/lists\/(\d+)/)[1], {client_ref, ...f} = body;
+    let n = (S.nt.notes || []).find(x => x.id === e.tmp);
+    if (!n) {
+      n = {id: e.tmp, list_id: lid, title: f.title || '', body: f.body || '', tags: f.tags || [], pinned: !!f.pinned, created_by: S.me?.id, updated_by: S.me?.id, created_at: now, updated_at: now, updated_by_name: S.me?.display_name || ''};
+      if (S.nt.lid === lid && S.nt.notes) S.nt.notes = [n, ...S.nt.notes];
+    }
+    if (!(S.notes || []).some(x => x.id === e.tmp)) S.notes = [{id: e.tmp, list_id: lid, title: n.title, tags: n.tags, pinned: n.pinned, updated_at: now}, ...(S.notes || [])];
+    return n;
+  }
+  const id = +url.match(/notes\/(-?\d+)/)[1], {expect_updated_at, ...f} = body;
+  const n = (S.nt.notes || []).find(x => x.id === id); if (n) Object.assign(n, f);
+  const b = (S.notes || []).find(x => x.id === id); if (b) for (const k of ['title', 'tags', 'pinned']) if (k in f) b[k] = f[k];
+  return n || {ok: true, queued: true};
+}
+// into the outbox; a waiting change of the same note that has not left yet takes the newer values (its base stays)
+function ntEnqueue(method, url, body) {
+  const q = method === 'PATCH' && outSync().find((x, i) => (i > 0 || !OUT.flushing) && !x.sending && !x.done && x.method === 'PATCH' && x.url === url);
+  if (q) { outSave(() => { q.body = {...q.body, ...body, ...('expect_updated_at' in q.body ? {expect_updated_at: q.body.expect_updated_at} : {})}; }); renderTop(); return ntLocal({method, url, body}); }
+  return enqueue(method, url, body);
+}
+// a sent change came back (outFlush): the real note for one made offline, the new base for the changes still waiting
+function ntSent(e, j) {
+  if (!j || !j.id) return;
+  if (e.tmp) {
+    for (const a of [S.nt.notes, S.notes]) { const x = (a || []).find(n => n.id === e.tmp); if (x) x.id = j.id; }
+    if (S.nt.id === e.tmp) { S.nt.id = j.id; if (S.route.mod === 'notes') history.replaceState(null, '', '#note/' + j.id); }
+    return;
+  }
+  const n = (S.nt.notes || []).find(x => x.id === j.id);
+  if (n) n.updated_at = j.updated_at;
+  const old = e.body?.expect_updated_at;
+  if (old && j.updated_at) outSave(() => { for (const x of OUT.q) if (x !== e && x.url === e.url && x.body?.expect_updated_at === old) x.body = {...x.body, expect_updated_at: j.updated_at}; });
+}
+// one write of a note: straight to the server, or into the outbox (offline, a note made offline, changes of it still waiting)
+async function ntWrite(n, patch) {
+  const url = `/api/notes/${n.id}`;
+  if (n.id < 0) delete patch.expect_updated_at;  // made offline: no base on the server yet
+  if (n.id < 0 || OUT.q.some(x => x.url === url)) { ntEnqueue('PATCH', url, patch); return {queued: true}; }
+  try { return await rawFetch('PATCH', url, patch); }
+  catch (e) { if (e instanceof Offline && !ntLocked(n.list_id)) { ntEnqueue('PATCH', url, patch); return {queued: true}; } throw e; }
 }
 // #123 -> a link to that task (only tasks I see; text inside code / links / buttons and inside tags stays)
 // 2.35.0 (#1096): also in chats, comments and the description, there compact (only "#123", the title in the tooltip);
@@ -762,12 +819,13 @@ async function noteFlush() {
   if (g) { const tg = g.value.split(',').map(x => x.trim().replace(/^#/, '')).filter(Boolean); if (tg.join() !== n.tags.join()) patch.tags = tg; }
   if (Object.keys(patch).length === 1) return;
   try {
-    const r = await rawFetch('PATCH', `/api/notes/${n.id}`, patch);
+    const r = await ntWrite(n, patch);  // 2.143.0 C (#2153): offline into the outbox
+    if (r.queued) { const s = $('#nt-saved'); if (s) s.textContent = tr('You are offline: the note is saved as soon as the server is reachable'); return; }
     Object.assign(n, r); const brief = (S.notes || []).find(x => x.id === n.id); if (brief) Object.assign(brief, {title: r.title, tags: r.tags, pinned: r.pinned, updated_at: r.updated_at});
     const s = $('#nt-saved'); if (s) { s.textContent = tr('Saved'); setTimeout(() => { if (s.isConnected) s.textContent = ''; }, 1500); }
   } catch (e) {
     if (e.status === 409 && e.data?.note) { noteConflict(n, e.data.note, patch); return; }
-    S.nt.dirty = true; toast(e instanceof Offline ? tr('You are offline: the note is saved as soon as the server is reachable') : e.message);
+    S.nt.dirty = true; toast(e instanceof Offline ? tr('Offline: only works again with a connection') : e.message);  // 2.143.0 C (#2153): only a locked list's note
   }
 }
 async function noteConflict(mine, theirs, patch) {
@@ -779,7 +837,9 @@ async function noteConflict(mine, theirs, patch) {
 }
 async function noteNew() {
   const lid = S.nt.lid;
-  let r; try { r = await rawFetch('POST', `/api/lists/${lid}/notes`, {title: tr('New note')}); } catch (e) { toast(e.message); return; }
+  const url = `/api/lists/${lid}/notes`, b = {title: tr('New note'), client_ref: outKey()};  // 2.143.0 C (#2153): offline into the outbox (ntLocal draws it)
+  let r; try { r = await rawFetch('POST', url, b); } catch (e) { if (!(e instanceof Offline) || ntLocked(lid)) { toast(e instanceof Offline ? tr('Offline: only works again with a connection') : e.message); return; } r = null; }
+  if (!r) { r = enqueue('POST', url, b); S.nt.newId = r.id; go('note/' + r.id); setTimeout(() => { const t = $('#nt-title'); if (t) { t.focus(); t.select(); } }, 120); return; }
   S.nt.notes = [r, ...(S.nt.notes || [])]; S.notes = [{id: r.id, list_id: lid, title: r.title, tags: [], pinned: false, updated_at: r.updated_at}, ...(S.notes || [])];
   S.nt.newId = r.id; go('note/' + r.id);
   setTimeout(() => { const t = $('#nt-title'); if (t) { t.focus(); t.select(); } }, 120);
@@ -818,7 +878,7 @@ document.addEventListener('click', e => {
   if (act === 'nt-new') noteNew();
   else if (act === 'nt-close') { noteFlush(); go('notes/' + S.nt.lid); }
   else if (act === 'nt-mode') { noteFlush(); S.nt.edit = a.dataset.m === 'edit'; renderView(); if (S.nt.edit) setTimeout(() => { const b = $('#nt-body'); if (b) { autosize(b); b.focus(); } }, 0); }
-  else if (act === 'nt-pin' && n) { rawFetch('PATCH', `/api/notes/${n.id}`, {pinned: !n.pinned}).then(r => { Object.assign(n, r); renderView(); }).catch(err => toast(err.message)); }
+  else if (act === 'nt-pin' && n) { ntWrite(n, {pinned: !n.pinned}).then(r => { if (!r.queued) Object.assign(n, r); renderView(); }).catch(err => toast(err instanceof Offline ? tr('Offline: only works again with a connection') : err.message)); }  // 2.143.0 C (#2153): offline too
   else if (act === 'nt-menu') noteMenu(a);
   else return;
   e.preventDefault(); e.stopPropagation();
