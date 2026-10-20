@@ -160,6 +160,9 @@ def visible_lists(c, uid):
                 d.update(folder=r["folder"], sort=r["sort"], mirrored=True)
         else:
             d["role"] = "owner"
+        if r["org_id"]:
+            from ..accounts.orgroles import cap_list_role
+            d["role"] = cap_list_role(c, uid, r["org_id"], d["role"])  # 2.143.0 A (#2151): read-only in the organisation -> view
         d["members"] = members.get(r["id"], [])
         if d["role"] == "participant" and d["members"]:  # 2.86.0 (N20 review): only the people who share a task with uid
             from ..collab.comments import h6r_shared_people

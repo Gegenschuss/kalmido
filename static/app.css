@@ -7643,3 +7643,6 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 :root #side .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .wsbar{width:auto;min-height:2rem}
 @media (pointer:coarse){ :root #side .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .wsbar{width:auto;min-height:2.75rem} }
 :root #side .sbsrch,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sbsrch{margin-bottom:.5rem}  /* room above the first group heading */
+/* 2.143.0 A (#2151): read-only / accounting in an organisation's office: no create or delete buttons (the server refuses them) */
+.dash.office[data-ofcro] :is([data-ofc="new"], [data-ofd^="new"], .iconbtn.danger, .btn.danger) { display: none; }
+.orgrolehelp ul { margin: .25rem 0 0; padding-left: 1.1rem; }

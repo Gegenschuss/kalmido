@@ -76,6 +76,7 @@ ORDER = (
     "accounts.onboarding",
     "accounts.users",
     "accounts.orgs",
+    "accounts.orgroles",  # 2.143.0 A (#2151): organisation roles guest / read-only / accounting
     "accounts.spacemove",  # 2.96.0 (#1941): the shared rules of moving data between the private space and an organisation (no routes)
     "accounts.tenancy",
     "accounts.orglists",  # 2.35.0 (#1101)

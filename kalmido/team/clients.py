@@ -59,7 +59,8 @@ def client_rows(c, uid, archived=True):
     if u["is_admin"] and not _org_boundary(c):
         return rows
     from ..accounts.orgs import user_orgs
-    orgs = set(user_orgs(c, uid))
+    from ..accounts.orgroles import user_orgs_full
+    orgs = set(user_orgs(c, uid)) & set(user_orgs_full(c, uid))  # 2.143.0 A (#2151): not guests / accounting
     return [r for r in rows if (r["org_id"] in orgs) or (r["org_id"] is None and r["created_by"] == uid)]
 
 
@@ -68,6 +69,9 @@ def need_client(c, cid, uid=None):
     r = next((x for x in client_rows(c, uid) if x["id"] == cid), None)
     if not r:
         raise Denied(404)
+    from ..accounts.orgroles import is_write_request, need_org_write
+    if r["org_id"] and is_write_request():
+        need_org_write(c, uid, r["org_id"])  # 2.143.0 A (#2151): read-only changes no client of the organisation
     return r
 
 
@@ -125,6 +129,9 @@ def clean_client(c, uid, b, new=False):
             mine = set(user_orgs(c, uid))
             if v is not None and not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (v,)).fetchone():  # 2.47.3 (#1360)
                 raise BadInput(tr("Invalid value: {0}", k))
+            if v is not None and v in mine:
+                from ..accounts.orgroles import need_org_write
+                need_org_write(c, uid, v)  # 2.143.0 A (#2151)
             if v is not None and v not in mine and not (u["is_admin"] and not _org_boundary(c)):
                 raise BadInput(tr("You can only add clients to your own organisations"))
         out[k] = v
@@ -286,8 +293,8 @@ def client_create():
     _gate(c)
     f = clean_client(c, uid, body(), new=True)
     if "org_id" not in f:
-        from ..accounts.orgs import user_orgs
-        mine = user_orgs(c, uid)
+        from ..accounts.orgroles import user_orgs_full
+        mine = user_orgs_full(c, uid, write=True)  # 2.143.0 A (#2151): never into an organisation where uid only reads
         f["org_id"] = mine[0] if mine else None
     ts = iso(now_utc())
     f.update(created_by=uid, created_at=ts, updated_at=ts)

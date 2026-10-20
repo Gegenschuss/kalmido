@@ -225,8 +225,8 @@ def dsp_get():
                                         "ORDER BY start, id", (oid, last.isoformat() + "T99", first.isoformat()))]
     conf = dsp_conflicts(c, oid, rows, first, last)
     gone = abs_days(c, [p["id"] for p in res["people"]], first, last, oid)
-    from ..accounts.orgs import user_orgs
-    mine = user_orgs(c, uid)
+    from ..accounts.orgroles import user_orgs_full
+    mine = user_orgs_full(c, uid)  # 2.143.0 A (#2151): not guests / accounting
     return jsonify(org_id=oid, orgs=[{"id": r[0], "name": r[1]} for r in c.execute(
         "SELECT id, name FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id") if r[0] in mine],
         can_book=True, admin=abs_admin(c, uid, oid), today=today.isoformat(), start=first.isoformat(), end=last.isoformat(),

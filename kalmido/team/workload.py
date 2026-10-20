@@ -38,7 +38,8 @@ def wl_people(c, uid, org=None):
     """[(id, row)] of the people of the workload view for uid: the organisation (org, else uid's first), visible to uid."""
     from ..accounts.orgs import user_orgs, visible_people
     u = g.user
-    mine = user_orgs(c, uid)
+    from ..accounts.orgroles import user_orgs_full
+    mine = [o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]  # 2.143.0 A (#2151): not guests / accounting
     if org is not None:
         if org not in mine and not u["is_admin"]:
             raise Denied(404)
@@ -118,9 +119,8 @@ def workload(c, uid, start=None, weeks=4, org=None):
             cap = w.get("capacity_h", p["capacity_h"])
             w["pct"] = round(w["minutes"] / 60 / cap * 100) if cap else (None if not w["minutes"] else 999)
             w["level"] = "none" if w["pct"] is None else "over" if w["pct"] > 100 else "warn" if w["pct"] >= 80 else "ok"
-    from ..accounts.orgs import user_orgs
     orgs = [{"id": r[0], "name": r[1]} for r in c.execute("SELECT id, name FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id")
-            if g.user["is_admin"] or r[0] in user_orgs(c, uid)]
+            if g.user["is_admin"] or r[0] in _mine_full(c, uid)]  # 2.143.0 A (#2151)
     return {"weeks": [{"start": a.isoformat(), "end": b.isoformat()} for a, b in bounds], "people": [out[i] for i in ids],
             "org_id": oid, "orgs": orgs, "today": today.isoformat()}
 
@@ -157,3 +157,10 @@ def workload_capacity(uid):
     bump(c)
     c.commit()
     return jsonify(id=uid, capacity_h=capacity_h(c, uid))
+
+
+def _mine_full(c, uid):
+    """2.143.0 A (#2151): uid's organisations without the ones where they are a guest / accounting."""
+    from ..accounts.orgs import user_orgs
+    from ..accounts.orgroles import user_orgs_full
+    return [o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]

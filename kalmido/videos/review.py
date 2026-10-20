@@ -179,8 +179,8 @@ def vdr_may(c, uid, r, write=False, api=False):
         return vdr_client_ok(c, uid, r["client_id"]) and (not write or rg4_client_write(c, uid, r["client_id"]))
     if r["org_id"] is None:
         return r["owner_id"] == uid
-    from ..accounts.orgs import user_orgs
-    return r["org_id"] in user_orgs(c, uid)
+    from ..accounts.orgroles import org_sees_all, org_writes
+    return org_sees_all(c, uid, r["org_id"]) and (not write or org_writes(c, uid, r["org_id"]))  # 2.143.0 A (#2151)
 
 
 def vdr_need(c, vid, write=False, deleted=False):
