@@ -13,6 +13,7 @@ freelancer-matrix: office  tenant-matrix: org
  - an organisation: its admin gets the info + ZIP; a member and another organisation's admin 404, an agent 403; deleting
    the organisation (instance admin) 409 without the step, with a waiver / after an export it goes
  - self-hosting stays: a list with project receipts is still only handed over (409 with lists), also with a waiver
+ - hosted (restart with KALMIDO_HOSTED=1, KEEP): with the waiver the account goes with its list of receipts, files included
 usage: p2146_d_api_test.py <datadir>"""
 import base64
 import hashlib
@@ -270,6 +271,30 @@ r = A.delete(B + f"/api/users/{RID}", params={"lists": "delete", "confirm": "ros
 check(r.status_code == 409 and r.json().get("lists") == [BL], "self-hosting: a list with receipts is not deleted along, also with a waiver " + r.text[:200])
 z = unzip(Ro.get(B + RX + "/me/export.zip"))
 check(any(n.startswith("project-receipts/") and z.read(n) == b"paid" for n in z.namelist()), "rosa: the project receipt in her ZIP")
+
+# ---------------------------------------------------------------- hosted (KALMIDO_HOSTED=1, the same data): after the step the
+# lists' receipts go along with the account, files included (the keeping lies with the person)
+BP = sql("SELECT path FROM budget_files WHERE list_id=?", (BL,))[0][0]
+BFULL = os.path.join(DATA, "attachments", BP)
+check(os.path.isfile(BFULL), "setup: the project receipt file is on the disk")
+subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL,
+               env={**os.environ, "KEEP": "1", "EXTRA": os.environ.get("EXTRA", "") + f" -e KALMIDO_HOSTED=1 -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}"})
+for _ in range(80):
+    try:
+        if requests.get(B + "/api/health", timeout=2).ok:
+            break
+    except requests.RequestException:
+        pass
+    time.sleep(0.25)
+A = sess("alice")
+r = A.get(B + f"/api/users/{RID}/delete-info")
+check(r.ok and r.json()["retention"]["hosted"] is True and r.json()["retention"]["needed_along"] is True, "hosted: delete-info " + r.text[:300])
+r = A.delete(B + f"/api/users/{RID}", params={"lists": "delete", "confirm": "rosa"})
+check(r.status_code == 409, "hosted: without the step still 409 " + r.text[:200])
+r = A.delete(B + f"/api/users/{RID}", params={"lists": "delete", "confirm": "rosa", "retention": "waived"})
+check(r.ok, "hosted: with the waiver the account goes with its list of receipts " + r.text[:200])
+check(not sql("SELECT 1 FROM lists WHERE id=?", (BL,)) and not sql("SELECT 1 FROM budget_files WHERE list_id=?", (BL,)), "hosted: list + receipt rows gone")
+check(not os.path.exists(BFULL), "hosted: the receipt file is gone from the disk")
 
 print(f"p2146_d_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
