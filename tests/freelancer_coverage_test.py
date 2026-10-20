@@ -641,12 +641,12 @@ ROUTES = {
     # 2.96.0 B (#1941): wiki pages / folders to the other workspace
     "POST /api/wiki/move-space": "wiki",
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
+    # 2.123.0 C (#2103, #2107): files of the file store / tables in pages (p2123_c_api_test.py: own private file store and tables)
+    "POST /api/wiki/pages/{}/refs": "wiki", "GET /api/wiki/refs": "wiki",
     # 2.97.0 D (#2050 #2051): locked spaces / clean-up (p297_d_api_test.py) - routes below this line
     # 2.99.0 A (#2182): files of knowledge pages (p299_a_api_test.py: import, upload, read, delete in the private space)
     "GET /api/wiki/files/{}": "wiki", "GET /api/wiki/files/{}/{}": "wiki", "DELETE /api/wiki/files/{}": "wiki",
     "POST /api/wiki/pages/{}/files": "wiki",
-    # 2.123.0 C (#2103, #2107): files of the file store / tables in pages (p2123_c_api_test.py: own private file store and tables)
-    "POST /api/wiki/pages/{}/refs": "wiki", "GET /api/wiki/refs": "wiki",
     # 2.90.0 - 2.92.0: bookkeeping, bank, tax dates, invoice series, subscriptions, agreements, equipment, file preview
     "DELETE /api/office/agreements/{}": "office", "DELETE /api/office/series/{}": "office",
     "GET /api/attachments/{}/agents": "tasks", "GET /api/attachments/{}/preview": "tasks",
