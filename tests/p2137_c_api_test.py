@@ -211,7 +211,12 @@ def compare(z1, z2):
         elif a != b:
             lost = list((a - b).elements())[:1]
             new = list((b - a).elements())[:1]
-            diffs.append((n, f"contents differ: before {lost[0][:300] if lost else ''} | after {new[0][:300] if new else ''}"))
+            try:  # the keys that differ, so a red run says what changed
+                x, y = json.loads(lost[0]), json.loads(new[0])
+                keys = sorted(k for k in set(x) | set(y) if x.get(k) != y.get(k))
+                diffs.append((n, "contents differ: " + "; ".join(f"{k}: {str(x.get(k))[:80]!r} -> {str(y.get(k))[:80]!r}" for k in keys)))
+            except (ValueError, TypeError, IndexError, AttributeError):
+                diffs.append((n, f"contents differ: before {lost[0][:300] if lost else ''} | after {new[0][:300] if new else ''}"))
     for d in sorted(set(f1) | set(f2)):
         if f1.get(d) != f2.get(d):
             diffs.append((d + "/", f"files {sum(f1.get(d, {}).values())} -> {sum(f2.get(d, {}).values())} (or other contents)"))
