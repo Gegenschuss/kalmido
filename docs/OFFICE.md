@@ -387,6 +387,13 @@ where they are used.
   file follow in their category. **Renumber** in the services list does the same for the order shown (one undo step). Excel error values like `#NV` count as empty; `intext` may be `intern`, `extern` or `shooting`; a
   service named "Künstlersozialkasse" becomes a rate in percent (`0.05` -> 5 %). `rawfee` / `producingfee` are always
   read. A table renamed by Excel (`Services_2`) is found too.
+- **Client columns and CSV (2.146.0)**: the clients' address may also stand in columns of their own (company, contact,
+  street, house number, postcode, city, country; German and English headers like `Firma`, `Straße`, `PLZ`, `Ort`, `Land`,
+  `company`, `street`, `zip`, `city`, `country` are found). The preview shows a box "Columns" with a choice per field;
+  changing it reads the file again. Without street / postcode / city columns the one-cell address and its splitter stay.
+  A country name becomes its code, a 5-digit postcode without a country counts as Germany. Instead of the .xlsx a CSV
+  file (UTF-8 or Windows-1252, delimiter found) is read as the sheet `Contacts` (or as `Services` / `Equipment` when the
+  file is named so). Old Excel files (.xls) are not read: the message asks to save them as .xlsx or CSV.
 - **Fill instead of skip (2.47.0)**: a service, device, role or crew row whose name exists already is proposed as "fill":
   only the EMPTY fields of the existing entry take the file's value (empty = no text / no number; for the flags and the
   order also 0), set values are never overwritten. The preview lists the fields per row (`fill`); with nothing to fill
@@ -433,7 +440,8 @@ where they are used.
   again while they still hold the imported value.
 
 Routes (organisation admin; members read the archive and, 2.81.0, correct it): `POST /api/office/legacy/preview` (multipart `file`, stores
-nothing), `POST /api/office/legacy/split` `{address}`, `POST /api/office/legacy/import` `{clients, roles, crew, services, equipment}`
+nothing; 2.146.0: .xlsx or CSV, the optional form field `map` = `{name, contact, address, street, house, zip, city, country: column index}`,
+the answer's `columns` = `{head, map, mode: columns | one}`), `POST /api/office/legacy/split` `{address}`, `POST /api/office/legacy/import` `{clients, roles, crew, services, equipment}`
 (the preview's rows with `action` new / merge / fill / skip and `merge_id`; 2.46.1: `areas` = only these of clients / roles /
 crew / services / equipment, the others are neither written nor checked), `GET /api/office/legacy/runs` (2.46.1: a data run lists its
 `areas` with `count` and `undone_at`), `POST /api/office/legacy/runs/<id>/undo` (2.46.1: `{kinds: [...]}` undoes only these

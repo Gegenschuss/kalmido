@@ -628,8 +628,136 @@ def sr_intext(v):
     return "intern" if v.startswith("int") else ("shooting" if v.startswith(("shoot", "dreh")) else "extern")
 
 
-def fi_preview(c, oid, raw):
-    book = fi_xlsx_read(raw)
+# 2.146.0 E (#2456): the clients' address in separate columns (Company | Street | Postcode | City | Country) as most
+# exports have it, beside the one-cell address; a CSV file is read like a sheet. The columns are found from the header
+# (or the person assigns them in the preview: form field "map"); without street / postcode / city columns the one-cell way stays.
+FI_ADDR_COLS = {
+    "name": ("firma", "company", "companyname", "firmenname", "name", "kunde", "kundenname", "client", "customer", "organisation",
+             "organization", "unternehmen", "name1"),
+    "contact": ("ansprechpartner", "ansprechperson", "kontaktperson", "contactperson", "contact", "kontakt", "name2", "zhd"),
+    "street": ("straße", "strasse", "str", "street", "streetaddress", "addressline1", "adresszeile1", "straßeundhausnummer",
+               "strasseundhausnummer", "straßenr", "strassenr", "straßehausnummer", "strassehausnummer", "street1"),
+    "house": ("hausnummer", "hausnr", "nr", "housenumber", "houseno"),
+    "zip": ("plz", "postleitzahl", "zip", "zipcode", "postcode", "postalcode", "postal", "postleitzahlplz"),
+    "city": ("ort", "stadt", "city", "town", "wohnort", "ortschaft", "gemeinde"),
+    "country": ("land", "country", "staat", "countrycode", "ländercode", "laendercode"),
+    "address": ("addresses", "address", "adresse", "adressen", "anschrift"),
+}
+FI_MAP_KEYS = tuple(FI_ADDR_COLS)
+FI_CSV_NAMES = ("services", "leistungen", "equipment", "geräte", "technik", "freelancer", "staff", "crew")  # a CSV named so is that table
+FI_XLS_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"  # an old Excel file (.xls, BIFF in an OLE container)
+FI_NOT_CSV = (b"%PDF", b"\x89PNG", b"GIF8", b"\xff\xd8\xff", b"<?xml", b"{\\rtf")  # files that are surely no CSV
+
+
+def fi_book(raw, name=""):
+    """2.146.0 E (#2456): {lower-case name: rows} of an upload: .xlsx (fi_xlsx_read) or CSV (one table, named after the
+    file when that is a known table, else "contacts"). An old .xls gets a clear message (no reader for it here)."""
+    if raw.startswith(b"PK"):
+        return fi_xlsx_read(raw)
+    if raw.startswith(FI_XLS_MAGIC) or (name or "").lower().endswith(".xls"):
+        raise BadInput(tr("Old Excel files (.xls) cannot be read. Please save the file as .xlsx or CSV and choose it again."))
+    if (name or "").lower().endswith((".xlsx", ".xlsm")):
+        raise BadInput(tr("This is not a spreadsheet file (.xlsx)"))
+    if b"\x00" in raw[:4096] or raw.startswith(FI_NOT_CSV) or (name or "").lower().endswith((".pdf", ".zip", ".png", ".jpg", ".jpeg", ".heic")):
+        raise BadInput(tr("This is not a spreadsheet file (.xlsx or CSV)"))
+    from ..core.csvimport import csv_table
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode("cp1252", "replace")
+    _d, head, body_ = csv_table(text, max_rows=FI_ROWS_MAX)
+    stem = re.sub(r"\.[^.]*$", "", (name or "").replace("\\", "/").rsplit("/", 1)[-1]).strip().lower()
+    return {stem if stem in FI_CSV_NAMES else "contacts": [head] + body_[:FI_ROWS_MAX]}
+
+
+def fi_head_orig(book, *names):
+    """The header row of that table as written in the file (for the column choice)."""
+    for n in names:
+        rows = book.get(n)
+        if rows is None:
+            continue
+        for row in rows[:10]:
+            if any(str(x).strip() for x in row):
+                return [str(x).strip()[:80] for x in row]
+        return []
+    return []
+
+
+def fi_addr_map(head, amap=None):
+    """{field: column index} of the client columns: the person's choice (amap, validated) or found from the header."""
+    n = len(head)
+    if isinstance(amap, dict):
+        out = {}
+        for k in FI_MAP_KEYS:
+            v = amap.get(k)
+            if isinstance(v, int) and not isinstance(v, bool) and 0 <= v < n:
+                out[k] = v
+        return out
+    h = [eq_head(x) for x in head]
+    out, used = {}, set()
+    for k in FI_MAP_KEYS:
+        for nm in FI_ADDR_COLS[k]:
+            if nm in h and h.index(nm) not in used:
+                out[k] = h.index(nm)
+                used.add(out[k])
+                break
+    return out
+
+
+def fi_addr_columns(m):
+    """True when the clients come from separate columns (street, postcode or city assigned)."""
+    return any(k in m for k in ("street", "zip", "city"))
+
+
+def fi_country(v):
+    """A country cell -> (ISO code, recognised)."""
+    v = _clean_line(v)
+    if not v:
+        return "", True
+    if re.fullmatch(r"[A-Za-z]{2}", v):
+        return v.upper(), True
+    code = COUNTRIES.get(v.strip(" .").lower())
+    return (code, True) if code else ("", False)
+
+
+def fi_columns_client(row, m):
+    """2.146.0 E (#2456): one client from separate columns -> the splitter's shape {name, contact, street, zip, city,
+    country, address, flags}; an address column beside street-less columns counts as the street."""
+    get = lambda k: _clean_line(str(row[m[k]])) if k in m and m[k] < len(row) else ""  # noqa: E731
+    street = get("street") or (get("address") if "street" not in m else "")
+    if get("house") and street and not street.endswith(get("house")):
+        street = f"{street} {get('house')}"
+    elif get("house") and not street:
+        street = get("house")
+    out = {"name": get("name"), "contact": get("contact")[:120], "street": street[:200], "zip": get("zip")[:20], "city": get("city")[:120],
+           "country": "", "flags": []}
+    if not out["name"] and "name" not in m and row:  # no company column: the first column that is no address part
+        free = next((j for j in range(len(row)) if j not in m.values()), None)
+        out["name"] = _clean_line(str(row[free])) if free is not None else ""
+    flags = out["flags"]
+    code, ok = fi_country(get("country"))
+    if not ok:
+        flags.append("country")
+    if not code and re.fullmatch(r"\d{5}", out["zip"]):
+        code = "DE"
+    out["country"] = code
+    if not out["zip"]:
+        flags.append("no_zip")
+    if not out["street"]:
+        flags.append("no_street")
+    elif POBOX_RE.match(out["street"]):
+        flags.append("po_box")
+    if code and code != "DE":
+        flags.append("foreign")
+    out["address"] = "\n".join(x for x in (out["name"], out["contact"], out["street"], " ".join(x for x in (out["zip"], out["city"]) if x),
+                                            get("country")) if x)[:500]
+    _shorten(out)
+    out["flags"] = list(dict.fromkeys(flags))
+    return out
+
+
+def fi_preview(c, oid, raw, name="", amap=None):
+    book = fi_book(raw, name)  # 2.146.0 E (#2456): also CSV
     out = {"sheets": sorted(book), "clients": [], "roles": [], "crew": [], "services": [], "equipment": [], "other": {}}
     t = _table(book, "contacts", "kontakte", "kunden", "adressen")
     if t:
@@ -637,14 +765,27 @@ def fi_preview(c, oid, raw):
         ci = _col(head, "addresses", "address", "adresse", "adressen", "anschrift")
         if ci is None and head:
             ci = 0
+        orig = fi_head_orig(book, "contacts", "kontakte", "kunden", "adressen")
+        amap = fi_addr_map(orig, amap)  # 2.146.0 E (#2456): separate address columns
+        cols = fi_addr_columns(amap)
+        if isinstance(amap.get("address"), int) and not cols:
+            ci = amap["address"]
+        out["columns"] = {"head": orig[:60], "map": amap, "mode": "columns" if cols else "one"}
         known = _org_clients(c, oid)
         kn = [(fi_norm(k["name"]), k["zip"] or "", k) for k in known]
         seen = []
         for i, row in enumerate(rows):
-            txt = str(row[ci] if ci is not None and ci < len(row) else "").strip()
-            if not txt:
-                continue
-            a = fi_split_address(txt)
+            if cols:
+                if not any(str(x).strip() for x in row):
+                    continue
+                a = fi_columns_client(row, amap)
+                if not a["name"] and not a["street"]:
+                    continue
+            else:
+                txt = str(row[ci] if ci is not None and ci < len(row) else "").strip()
+                if not txt:
+                    continue
+                a = fi_split_address(txt)
             a["row"] = i + 2
             n = fi_norm(a["name"])
             a["dup"] = None
@@ -1752,11 +1893,17 @@ def _upload(name, mx):
 
 @app.post("/api/office/legacy/preview")
 def fi_preview_post():
-    """Org admin. multipart 'file' (.xlsx) -> the preview: clients (split address, reasons, duplicate), services,
+    """Org admin. multipart 'file' (.xlsx or CSV, 2.146.0 E #2456; optional 'map' = the client columns) -> the preview: clients (split address, reasons, duplicate), services,
     equipment, other sheets (counted only). Nothing is stored."""
     c, uid, oid = _ctx()
-    _f, raw = _upload("file", FI_XLSX_MAX)
-    return jsonify(fi_preview(c, oid, raw))
+    f, raw = _upload("file", FI_XLSX_MAX)
+    amap = None
+    if request.form.get("map"):  # 2.146.0 E (#2456): the person's column choice {field: column index}
+        try:
+            amap = json.loads(request.form["map"][:2000])
+        except ValueError:
+            raise BadInput(tr("Invalid value: {0}", "map")) from None
+    return jsonify(fi_preview(c, oid, raw, f.filename or "", amap))
 
 
 @app.post("/api/office/legacy/split")

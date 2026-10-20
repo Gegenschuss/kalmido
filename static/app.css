@@ -5635,6 +5635,8 @@ html.mini #app.detail-open{grid-template-columns:minmax(0,1fr) var(--detW,25.5re
 .oimfl .dpw,.oimfl .dpbtn{width:100%;min-height:2.75rem}  /* 2.39.1 (#1182): the app's date picker, like the neighbours */
 .oimfl.chkl{flex-direction:row;align-items:center;min-height:2.75rem}
 .ofdkinds{flex-wrap:wrap}
+.e46map{margin:.5rem 0;padding:.5rem;border:1px solid var(--line2);border-radius:var(--radius)}  /* 2.146.0 E (#2456): the client columns */
+.e46map summary{cursor:pointer;min-height:2.75rem;display:flex;align-items:center;gap:.5rem}
 @media (max-width:560px){ .oimgrid{grid-template-columns:repeat(2,minmax(0,1fr))} }
 /* 2.40.0 (#1380): the contact persons of a client (dialog cards, the list on the client page) */
 .clk{display:flex;flex-direction:column;gap:.5rem;flex:1;min-width:0}
