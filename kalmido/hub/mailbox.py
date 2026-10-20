@@ -45,6 +45,7 @@ from ..accounts.session import me
 from . import hubmail as H
 
 MBX_TLS = ("starttls", "ssl", "none")
+MBX_MAIL_MAX = 50 * 1024 * 1024  # review: a larger mail of a workspace's own server is not fetched (marked seen)
 MBX_SEND_HOUR = 30      # mails one person sends from the filing in an hour
 MBX_RCPT = 20           # recipients of one mail (To + Cc)
 MBX_TEXT_MAX = 100000   # characters of a mail's text
@@ -151,7 +152,7 @@ class _SafeIMAP(imaplib.IMAP4):
 class _SafeIMAP_SSL(imaplib.IMAP4_SSL):
     def __init__(self, host, port, timeout, allow):
         self._kal_allow = allow
-        super().__init__(host, port, timeout=timeout)
+        super().__init__(host, port, timeout=timeout, ssl_context=ssl.create_default_context())  # review: certificate checked
 
     def _create_socket(self, timeout):
         from ..calendars.subscriptions import _cal_connector
@@ -366,7 +367,7 @@ def mbx_put():
     old = mbx_secret(c, r) if r else {}
     secret = {}
     for p, host, port in (("imap", "imap_host", "imap_port"), ("smtp", "smtp_host", "smtp_port")):
-        same = r and v[host] == r[host] and v[port] == int(r[port] or 0) and (p != "imap" or v["imap_ssl"] == int(r["imap_ssl"]))
+        same = r and v[host] == r[host] and v[port] == int(r[port] or 0) and (v["imap_ssl"] == int(r["imap_ssl"]) if p == "imap" else v["smtp_tls"] == r["smtp_tls"])
         secret[p] = old.get(p, "") if same else ""
         k = p + "_password"
         if k in d and d[k] not in (None, ""):
@@ -391,7 +392,8 @@ def mbx_put():
     c.commit()
     r = mbx_row(c, ws)
     chk = None
-    if d.get("check") is True:
+    from ..api.v1 import hit_limit
+    if d.get("check") is True and not hit_limit(f"mbxcheck:{me()}", 20, 600):  # review: the same limit as /mailbox/check
         chk = mbx_check(c, r, secret)
         code = chk.get("imap") or chk.get("smtp") or ""
         c.execute("UPDATE hub_mailboxes SET error=?, error_at=? WHERE id=?", (code, ts if code else None, r["id"]))
@@ -531,7 +533,7 @@ def mbx_poll_one(box):
         secret, allow = _bg(lambda c: (mbx_secret(c, box), _allow(c)))
         M = _imap_open(None, box, secret, allow=allow)
         try:
-            n = mail_fetch(M, _folder_arg(box["imap_folder"] or "INBOX"), lambda c2, raw: mbx_import(c2, box, raw))
+            n = mail_fetch(M, _folder_arg(box["imap_folder"] or "INBOX"), lambda c2, raw: mbx_import(c2, box, raw), max_bytes=MBX_MAIL_MAX)
         finally:
             try:
                 M.logout()

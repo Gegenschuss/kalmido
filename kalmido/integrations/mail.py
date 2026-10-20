@@ -236,15 +236,23 @@ def mail_import(c, raw):
     return tid
 
 
-def mail_fetch(M, folder, importer):
+def mail_fetch(M, folder, importer, max_bytes=None):
     """2.141.0 A (#2141): the unseen mails of folder (a logged-in IMAP connection) -> importer(c, raw), each one marked \\Seen
-    afterwards (also when it was for nobody or failed: it is never looked at again). Returns how many were taken in."""
+    afterwards (also when it was for nobody or failed: it is never looked at again). Returns how many were taken in.
+    max_bytes (review): a mail whose RFC822.SIZE is larger is not fetched (marked seen) -- a workspace's own server."""
     n = 0
     typ, _ = M.select(folder)
     if typ != "OK":
         raise imaplib.IMAP4.error("SELECT failed")
     typ, data = M.uid("SEARCH", None, "UNSEEN")
     for u in (data[0] or b"").split()[:200]:
+        if max_bytes:
+            typ, sz = M.uid("FETCH", u, "(RFC822.SIZE)")
+            got = re.search(rb"RFC822\.SIZE (\d+)", b" ".join(x if isinstance(x, bytes) else b"" for x in (sz or [])))
+            if not got or int(got.group(1)) > max_bytes:
+                print("mail: skipped one mail: too large or no size", flush=True)
+                M.uid("STORE", u, "+FLAGS", "(\\Seen)")
+                continue
         typ, parts = M.uid("FETCH", u, "(RFC822)")
         raw = next((p[1] for p in parts if isinstance(p, tuple) and len(p) > 1), None)
         if raw:
@@ -322,11 +330,18 @@ class _SafeSMTP(smtplib.SMTP):
 class _SafeSMTP_SSL(smtplib.SMTP_SSL):
     def __init__(self, host, port, timeout, allow):
         self._kal_allow = allow
-        super().__init__(host, port, timeout=timeout)
+        super().__init__(host, port, timeout=timeout, context=_tls_ctx())
 
     def _get_socket(self, host, port, timeout):
         from ..calendars.subscriptions import _cal_connector
         return self.context.wrap_socket(_cal_connector(self._kal_allow)((host, port), timeout), server_hostname=self._host)
+
+
+def _tls_ctx():
+    """2.141.0 A (#2141, review): a workspace's own server is only spoken to with a checked certificate (the stdlib default
+    of smtplib / imaplib checks none); KALMIDO_SMTP_* / KALMIDO_IMAP_* of the admin stay as they were."""
+    import ssl
+    return ssl.create_default_context()
 
 
 def smtp_open(smtp=None):
@@ -342,7 +357,7 @@ def smtp_open(smtp=None):
         S_ = _SafeSMTP_SSL(cfg["host"], port, 30, allow) if tls == "ssl" else _SafeSMTP(cfg["host"], port, 30, allow)
     try:
         if tls == "starttls":
-            S_.starttls()
+            S_.starttls(context=None if smtp is None else _tls_ctx())
         if cfg["user"]:
             S_.login(cfg["user"], cfg["password"])
     except BaseException:
