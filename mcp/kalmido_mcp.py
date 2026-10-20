@@ -710,6 +710,13 @@ TOOLS = [
                    "person's conversation, then the answer also carries its pinned messages (pins).",
      _obj({"since": {"type": "integer", "minimum": 0}, "user_id": S_ID}),
      lambda api, a: api.call("GET", "/agent/chats", _pick(a, ("since", "user_id")))),
+    ("confirm_abort", "2.144.0: the person pressed Stop in the chat (event abort {user, job_id?}): end the answer you are working on "
+                      "right away, then confirm with this tool -- without job_id your status goes back to idle and the typing dots end; "
+                      "with job_id only that job's current step was stopped (the job stays, your status too). Then say in one or two "
+                      "lines in the chat what was done until then (send_chat). Only the run for that person (user) or a Stop "
+                      "of your owner; someone else's Stop for another person's run: ignore it, do not confirm.",
+     _obj({"seq": {"type": "integer", "minimum": 0}, "job_id": S_ID}),
+     lambda api, a: api.call("POST", "/agent/aborted", body=_pick(a, ("seq", "job_id")))),
     ("chat_typing", "Show typing dots in one person's chat for 10 seconds while you write an answer (call again to keep them; "
                     "send_chat ends them).",
      _obj({"chat_user_id": S_ID}, ["chat_user_id"]), lambda api, a: api.call("POST", "/agent/typing", body=_pick(a, ("chat_user_id",)))),
@@ -1130,10 +1137,14 @@ TOOLS += [
                     "archived (true = archive), done_at_bottom, nag, day_hours, time_tracking (2.41.0, owner), project_type (2.18.0, owner / list admins: "
                     "agency | software | private, null = none; switches on what the type needs, never deletes anything); "
                     "org_visibility (2.46.0, owner / list admins of an organisation list: \"\" = only invited people, \"org\" = everyone "
-                    "in the organisation, read-only for them unless org_edit true; opening it waits for approval).",
+                    "in the organisation, read-only for them unless org_edit true; opening it waits for approval); "
+                    "sort_mode and group_field (2.144.0, owner / list admins, the same for every member): the list's sort "
+                    "(\"\" = default, prio, custom, date, title, created, cf:<field id> ...) and the list view grouped by a text / "
+                    "select custom field (\"cf:<field id>\", \"\" = by sections again; the sections never change).",
      _obj({"list_id": S_ID, **LIST_PROPS, "archived": {"type": "boolean"},
            "project_type": {"type": ["string", "null"], "enum": ["agency", "software", "private", "", None]},
-           "org_visibility": {"type": "string", "enum": ["", "org"]}, "org_edit": {"type": "boolean"}}, ["list_id"]),
+           "org_visibility": {"type": "string", "enum": ["", "org"]}, "org_edit": {"type": "boolean"},
+           "sort_mode": {"type": "string"}, "group_field": {"type": ["string", "integer", "null"]}}, ["list_id"]),  # 2.144.0 (#2414)
      lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}", body=_without(a, "list_id"))),
     ("delete_list", "Delete an ARCHIVED list for good (owner; archive it first with update_list archived=true); its tasks go to the "
                     "trash." + APPROVAL_NOTE, _obj({"list_id": S_ID}, ["list_id"]),

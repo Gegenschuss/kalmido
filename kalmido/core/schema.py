@@ -2961,6 +2961,9 @@ MIGRATIONS = [
     # versions never read it
     ("notes", "client_ref", "ALTER TABLE notes ADD COLUMN client_ref TEXT"),
     ("notes", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS notes_client_ref ON notes(created_by, client_ref) WHERE client_ref IS NOT NULL"),
+    # 2.144.0 C (#2414): the list view grouped by a custom field (text / select) for every member, like sort_mode:
+    # '' = the sections as before, 'cf:<field id>' = one group per value (2.143 ignores it)
+    ("lists", "group_field", "ALTER TABLE lists ADD COLUMN group_field TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

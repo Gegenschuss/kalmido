@@ -48,6 +48,9 @@ def proxy_login_value():
 PT_PREFIXES = ("/p/", "/portal/")  # 2.63.0 B (#1513): a customer report's status link, the portal's sign-in / sign-out
 
 
+OPERATOR_PATHS = frozenset(("/api/operator/status", "/api/operator/setup-code", "/api/operator/notice"))  # 2.144.0 D2 (#797)
+
+
 def _token_hash(t):
     return hashlib.sha256(t.encode()).hexdigest()
 
@@ -226,6 +229,8 @@ def authenticate():
         return None  # 2.2.0: inbound Git webhook: no user, no proxy header, the HMAC signature is the credential
         # (2.18.0: also the error-report webhook: the secret token in its URL is the credential; 2.60.0: and the deploy hook)
         # (2.115.0 A (#2061): and the inbound webhook of a list)
+    if request.path in OPERATOR_PATHS:  # 2.144.0 D2 (#797): exact paths, a later route under /api/operator/ is not let through
+        return None  # 2.144.0 D (#797): the hosting operator's interface: its own token (admin/operator.py), never a person
     if request.path.startswith(PUB_PREFIX):
         return None  # public list link: no user; the token in the path is the credential (see "public links")
     c = db()

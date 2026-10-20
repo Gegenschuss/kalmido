@@ -259,6 +259,7 @@ function groupRest(v, arr, dn = []) {  // dn: 2.36.2 (#1136) the completed tasks
       ...(v.folder && l.folder !== v.folder ? {sub: l.folder} : {})}));  // 2.4.0 (#361): the lists of a subfolder get its header
   }
   if (v.group === 'section') {
+    const gf = v.list && lgfField(v.list); if (gf) return lgfGroups(v.list, gf, arr, dn);  // 2.144.0 C (#2414): grouped by a field
     const secs = S.sections.filter(s => s.list_id === v.list), mk = p => dsxMerge(arr.filter(p), dn.filter(p));
     if (!secs.length) return [{id: 'all', name: '', tasks: mk(() => true)}];
     const sc = t => ml_sec(t, v.list);  // 2.71.0 B (#1459): a linked task sits in the section of its link
@@ -363,6 +364,44 @@ function dsxCount(g, v) {
   const done = v.dsx ? g.tasks.filter(t => t.status).length : 0;
   if (!done) return `<span class="c">${g.tasks.length}</span>`;
   return `<span class="c dsxc" title="${esc(tr('{0} of {1} done', done, g.tasks.length))}">${esc(tr('{0}/{1} done', done, g.tasks.length))}</span>`;
+}
+// ---- 2.144.0 C (#2414): a list view grouped by a custom field (lists.group_field, the same for every member; owner / list
+// admins pick it in the sort menu): one group per value (select: in the order of its options, text: by value), "No value"
+// last, empty groups left out; a group folds like a section (S.collapsed). The sections stay as they are and come back
+// when the grouping is off; while it is on a dragged row only changes the order (no section move)
+const LGF_TYPES = ['text', 'select'];
+const lgfFields = lid => fieldsOf(lid).filter(f => LGF_TYPES.includes(f.type));
+function lgfField(lid) {
+  const m = /^cf:(\d+)$/.exec(listById(lid)?.group_field || '');
+  return m ? lgfFields(lid).find(f => f.id === +m[1]) || null : null;
+}
+const lgfKey = s => { let h = 5381; for (const ch of s) h = ((h * 33) ^ ch.codePointAt(0)) >>> 0; return h.toString(36); };  // a text value as a safe group id
+function lgfGroups(lid, f, arr, dn = []) {
+  const val = t => String(t.fields?.[f.id] ?? '').trim(), mk = p => dsxMerge(arr.filter(p), dn.filter(p)), gid = k => `gf:${lid}:${f.id}:${k}`;
+  let out;
+  if (f.type === 'select') {
+    const os = f.options?.options || [];
+    out = [...os.map(o => ({id: gid('o' + o.id), name: o.name, tasks: mk(t => val(t) === String(o.id))})), {id: gid('n'), name: tr('No value'), tasks: mk(t => !os.some(o => val(t) === String(o.id)))}];
+  } else {
+    const vs = [...new Set([...arr, ...dn].map(val).filter(Boolean))].sort((a, b) => a.localeCompare(b, LOCALE(), {numeric: true}));
+    out = [...vs.map(x => ({id: gid('v' + lgfKey(x)), name: x, tasks: mk(t => val(t) === x)})), {id: gid('n'), name: tr('No value'), tasks: mk(t => !val(t))}];
+  }
+  return out.filter(g => g.tasks.length).map(g => ({...g, cls: 'lgf'}));
+}
+// the sort menu's part "Group by" (owner / list admins of a list in the list view with a text / select field)
+function lgfItems(l) {
+  if (!l || l.is_inbox || !canManage(l) || listView(l) !== 'list') return [];
+  const fs = lgfFields(l.id), cur = lgfField(l.id); if (!fs.length) return [];
+  return [{head: tr('Group by')}, {label: tr('Sections|group by'), icon: 'list', on: !cur, cls: 'lgfitem', fn: () => lgfSet(l.id, '')},
+    ...fs.map(f => ({label: tr('Field: {0}', f.name), icon: FT_ICON[f.type], on: cur?.id === f.id, cls: 'lgfitem', fn: () => lgfSet(l.id, 'cf:' + f.id)}))];
+}
+async function lgfSet(id, gf) {
+  const l = listById(id); if (!l) return;
+  const was = l.group_field || '';
+  if (was === gf) return;
+  try { await optWrite(optSet(() => listById(id), {group_field: gf}), () => api('PATCH', '/api/lists/' + id, {group_field: gf})); } catch { return; }
+  const put = x => async () => { await api('PATCH', '/api/lists/' + id, {group_field: x}); await load(); render(); return {skipped: []}; };
+  offerUndo(gf ? tr('Grouped by {0}', fieldById(+gf.slice(3))?.name || '') : tr('Grouped by sections'), histAdd({label: tr('Group by'), undo: put(was), redo: put(gf)}));
 }
 async function dsxSet(id, on) {
   const l = listById(id); if (!l || dsxFixedOff(l)) return;

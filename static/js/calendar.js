@@ -105,7 +105,7 @@ async function ensureCalEv(lo, hi) {
     if (!hit || S.cal.loading !== key) { S.cal.loading = ''; return; }
     cevApply(hit, key);
   }
-  if (S.route.mod === 'cal' || (S.route.mod === 'tasks' && S.route.key === 'today')) renderView();
+  if (S.route.mod === 'cal' || (S.route.mod === 'tasks' && S.route.key === 'today') || S.route.mod === 'home') renderView();  // 2.144.0 C (#2418): + the start page
 }
 function calInvalidate() { S.cal.key = ''; S.cal.loading = ''; }
 // 2.30.0 (#1036): an own event of a calendar outside the shown workspace is left out (subscriptions and invitations stay)

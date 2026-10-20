@@ -7577,6 +7577,10 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .suplic .btn{margin-left:auto}
 .supkey input{flex:1;min-width:0;font-family:var(--mono, monospace)}
 .supbar .btn{flex:none}
+/* 2.144.0 D (#2158): the prices in "Support Kalmido" */
+.supprices{display:flex;flex-wrap:wrap;gap:.375rem 1rem;margin:.5rem 0 .25rem}
+.supprice{display:inline-flex;align-items:baseline;gap:.375rem}
+.supprice b{font-weight:600}
 /* 2.75.0 B (#1411) assistant: settings section, its log, the text dialog, the busy entry points */
 .asstprov{display:flex;gap:.5rem;align-items:flex-start}
 .asstlists{display:grid;grid-template-columns:repeat(auto-fill,minmax(12rem,1fr));gap:.25rem .75rem;margin:.25rem 0 .75rem}

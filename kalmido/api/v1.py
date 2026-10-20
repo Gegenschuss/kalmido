@@ -527,6 +527,8 @@ def v1_list(d):
             "project_type": d.get("ptype") or None,  # 2.18.0 (#408): agency | software | private, null = none
             "family": d.get("family") or None,  # 2.19.0 (#653): shopping | meals | birthdays | household | packing, null = none
             "life": d.get("life") or None, "trip": d.get("trip") or None,
+            # 2.144.0 C (#2414): the list's sort and its grouping by a custom field, the same for every member
+            "sort_mode": d.get("sort_mode") or "", "group_field": d.get("group_field") or "",
             "client_id": d.get("client_id")}  # 2.22.0 (#663): contracts | home | health | travel | reading
 
 
@@ -820,7 +822,7 @@ def v1_list_patch(lid):
                                                "listen_agent_ids", "columns", "archived", "project_type", "family", "life", "trip",
                                                "client_id", "agent_members", "agent_peers", "org_id",
                                                "stale_days", "agent_followup", "folder_adopt", "time_tracking",
-                                               "org_visibility", "org_edit"))  # 2.28.0 (#935); 2.34.0 (#266); 2.39.1 (#1188); 2.41.0 (#1471); 2.46.0 (#1603)
+                                               "org_visibility", "org_edit", "sort_mode", "group_field"))  # 2.28.0 (#935); 2.34.0 (#266); 2.39.1 (#1188); 2.41.0 (#1471); 2.46.0 (#1603)
     unknown = [k for k in unknown if k != "points_on"]  # 2.60.0 (#1511): story points on (the owner)
     if "points_on" in b and not isinstance(b["points_on"], bool):
         raise BadInput(tr("Invalid value: {0}", "points_on"))

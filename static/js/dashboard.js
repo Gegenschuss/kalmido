@@ -352,7 +352,10 @@ function dashCard(k) {
     if (tl != null || mine) ts.splice(0, ts.length, ...ts.filter(t => (!mine || t.assignee_id === S.me?.id) && lyo_inList(tl, listById(t.list_id))));
     // 2.45.0 (#1504): a box to add a task for today right here
     const add = `<form class="hpadd" data-hpadd><input id="hp-add" type="text" placeholder="${esc(tr('New task for today …'))}" aria-label="${esc(tr('New task for today'))}" autocomplete="off" enterkeyhint="done" maxlength="500"></form>`;
-    return card(add + (tasksList(ts, lyo_get('home', 'today', 'n', 8)) || `<p class="muted">${tr('Nothing left for today.')}</p>`), '', ts.length || '');  // 2.45.0 (#1504): no "Open" (the draft; Today is in the sidebar)
+    // 2.144.0 C (#2418): today's events on top (the source and rows of "Events today" in Today, its calendar switches too), the
+    // tasks below; the empty line only when both are empty
+    const evs = hpEvents(), evh = evs.length ? `<div class="cevlist dcev">${evs.map(e => cevRow(e, t0)).join('')}</div>` : '';
+    return card(add + evh + (tasksList(ts, lyo_get('home', 'today', 'n', 8)) || (evs.length ? '' : `<p class="muted">${tr('Nothing left for today.')}</p>`)), '', (ts.length + evs.length) || '');  // 2.45.0 (#1504): no "Open" (the draft; Today is in the sidebar)
   }
   if (k === 'news') {
     if (S.nf.items === null || S.nf.sig !== (S.news?.sig ?? '')) { if (!S.nf.loading) loadNews().then(() => { if (S.route.mod === 'home') renderView(); }); }
@@ -430,10 +433,24 @@ function forMeBanner() {
     <ul class="dwl">${dms.map(r => `<li><a href="#team/${r.id}">${av(r.user_id, r.name, 'avatar')}<span class="dwt"><b>${esc(r.name)}</b> ${esc(r.last ? mdBrief(r.last.text) : '')}</span><span class="nbadge">${r.unread}</span></a></li>`).join('')}${its.map(([it, i]) => `<li><button type="button" class="dwb" data-act="news-open" data-i="${i}">${av(it.actor_id, uname(it.actor_id, S.nf.users), 'avatar')}<span class="dwt">${newsText(it, S.nf.users)}${it.task_title ? ' · ' + esc(it.task_title) : ''}</span></button></li>`).join('')}</ul></section>`;
 }
 // ---- 2.45.0 (#1504) the start page: one sentence on top, compact news lines, "since HH:MM" of a running job
+// 2.144.0 C (#2418): the events of today for the block Today (setting "Show events", on by default)
+function hpEvents() {
+  if (!lyo_get('home', 'today', 'ev', true) || typeof cevOn !== 'function' || !feat('cal') || !calEvOn()) return [];
+  const t0 = today(); ensureCalEv(t0, t0);
+  return cevOn(t0).filter(cvxTodayOn).sort(cevSort);
+}
 function hpSummary() {
   const t0 = today(), ts = openTasks().filter(t => !t.parent_id && t.due && t.due <= t0), over = ts.filter(t => t.due < t0).length;
-  const ag = agentsOn() ? (S.agents || []).filter(a => agentHst(a) === 'working').length : 0;
-  const parts = [ts.length && trn('{0} task for today', '{0} tasks for today', ts.length), over && trn('{0} overdue', '{0} overdue', over), ag && trn('{0} agent working', '{0} agents working', ag)].filter(Boolean);
+  const wa = agentsOn() ? (S.agents || []).filter(a => agentHst(a) === 'working') : [], ag = wa.length;
+  // 2.144.0 C (#2418): the running jobs behind the working agents ("1 agent working (10 jobs)"; the number only when > 0)
+  const nj = wa.reduce((n, a) => n + (+a.running || 0), 0);
+  // 2.144.0 C (#2418): the briefing counts my overdue tasks of every workspace, the start page only the shown one: an overdue
+  // task of another workspace is named with its workspace instead of silently missing
+  const ows = wsCur() === 'all' ? [] : [...S.tasks.values()].filter(t => t.status === 0 && !t.parent_id && !t.context && t.due && t.due < t0 && wsHidden(t) && !archHidden(t) && !ovHidden(t));
+  const owsN = new Set(ows.map(t => wsOf(listById(t.list_id))));
+  const parts = [ts.length && trn('{0} task for today', '{0} tasks for today', ts.length), over && trn('{0} overdue', '{0} overdue', over),
+    ows.length && (owsN.size === 1 ? trn('{0} overdue in {1}', '{0} overdue in {1}', ows.length, wsName([...owsN][0])) : trn('{0} overdue in other workspaces', '{0} overdue in other workspaces', ows.length)),
+    ag && (nj ? trn('{0} agent working', '{0} agents working', ag) + ' ' + trn('({0} job)', '({0} jobs)', nj) : trn('{0} agent working', '{0} agents working', ag))].filter(Boolean);
   if (!parts.length) return `<p class="hpsum">${esc(tr('Nothing due today.'))}</p>`;
   const x = parts.join(', ');
   return `<p class="hpsum">${esc(x.charAt(0).toUpperCase() + x.slice(1) + '.').replace(/\d+/g, '<b>$&</b>')}</p>`;
