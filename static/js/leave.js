@@ -1,3 +1,4 @@
+// @ts-check
 /* Kalmido web client: working days per person and leave (2.125.0 A, #2118 / #2117) -- the working days + weekly hours in
    Settings (General, "Working week"), the vacation account, vacation requests and their approval in the absences tab of
    the workload view (absence.js draws the tab, this file the leave parts it hooks in).

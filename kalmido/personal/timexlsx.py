@@ -10,9 +10,9 @@ from datetime import date, datetime
 from xml.sax.saxutils import escape
 from flask import g, request, Response
 
-from ..core.config import app, TZ
+from ..core.config import app
 from ..core.i18n import lang, tr
-from ..core.db import db, err, inbox_default, local_now, parse_iso
+from ..core.db import db, err, local_now
 from ..core.access import Denied, need_feat
 from ..core.serializers import csv_cell
 from ..accounts.session import me
@@ -96,28 +96,25 @@ def tx_response(data, name):
     return Response(data, mimetype=XLSX_MIME, headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
-def tx_time_rows(rep):
-    """The rows of the time sheet: the columns of the CSV, but numbers / date-times as such, plus a sum row."""
+def tx_time_rows(c, uid, rep):
+    """The rows of the time sheet: the rows and columns of the CSV (2.125.0 R (#2122): the same rows, timesheet.py tz_rows), but
+    numbers / date-times as such, plus a sum row."""
+    from .timesheet import tz_rows
     B = TX_BOLD
     rows = [[(tr(h), B) for h in ("List", "Task", "User", "Start|time", "End|time", "Duration (h)", "Duration (h:mm)", "Rounded (h)")]
             + [(tr("Amount ({0})", rep["currency"]), B), (tr("Note"), B)]]
-    names = {l["id"]: l["name"] for l in rep["lists"]}
     tot_s = tot_r = 0
     tot_a, any_a = 0.0, False
-    for e in rep["entries"]:
-        lid = e["list_id"] if e["list_id"] in names else 0
-        ln = names.get(lid, "")
-        lst = next((x for x in rep["lists"] if x["id"] == lid), None)
-        ln = tr("Basket") if lst and lst["is_inbox"] and inbox_default(ln) else (ln or tr("No list"))
-        s0 = parse_iso(e["start"]).astimezone(TZ).replace(tzinfo=None, second=0, microsecond=0)
-        en = parse_iso(e["end"]).astimezone(TZ).replace(tzinfo=None, second=0, microsecond=0) if e["end"] else None
-        sec, rs = e["seconds"], e["rounded"]
+    for x in tz_rows(c, uid, rep):
+        s0 = x["start"].replace(tzinfo=None, second=0, microsecond=0)
+        en = x["end"].replace(tzinfo=None, second=0, microsecond=0) if x["end"] else None
+        sec, rs, amt = x["seconds"], x["rounded"], x["amount"]
         tot_s, tot_r = tot_s + sec, tot_r + rs
-        if e["amount"] is not None:
-            tot_a, any_a = tot_a + e["amount"], True
-        rows.append([(ln, 0), (e["title"] or tr("No task"), 0), (e["user_name"], 0), (s0, TX_DT), (en if en else tr("running"), TX_DT),
+        if amt is not None:
+            tot_a, any_a = tot_a + amt, True
+        rows.append([(x["list"], 0), (x["title"], 0), (x["user"], 0), (s0, TX_DT), (en if en else tr("running"), TX_DT),
                      (round(sec / 3600, 2), TX_NUM), (f"{sec // 3600}:{sec % 3600 // 60:02d}", 0), (round(rs / 3600, 2), TX_NUM),
-                     (round(e["amount"], 2) if e["amount"] is not None else None, TX_NUM), (e["note"], 0)])
+                     (round(amt, 2) if amt is not None else None, TX_NUM), (x["note"], 0)])
     rows.append([(tr("Total"), B), ("", 0), ("", 0), ("", 0), ("", 0), (round(tot_s / 3600, 2), TX_BNUM),
                  (f"{tot_s // 3600}:{tot_s % 3600 // 60:02d}", B), (round(tot_r / 3600, 2), TX_BNUM), (round(tot_a, 2) if any_a else None, TX_BNUM)])
     return rows
@@ -131,7 +128,7 @@ def time_xlsx():
     uid = me()
     rep = time_report(c, uid, dict(request.args), own=n43_admin_lists(c, uid))
     name = f"{tr('timesheet|file')}-{rep['from'] or 'all'}-{rep['to'] or local_now().date().isoformat()}.xlsx"
-    return tx_response(tx_book(tr("Timesheet"), tx_time_rows(rep), [22, 30, 18, 17, 17, 12, 12, 12, 12, 40]), name)
+    return tx_response(tx_book(tr("Timesheet"), tx_time_rows(c, uid, rep), [22, 30, 18, 17, 17, 12, 12, 12, 12, 40]), name)
 
 
 def tx_workload_rows(d):

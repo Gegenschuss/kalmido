@@ -345,6 +345,9 @@ def lv_decide(aid):
     if act == "reopen":
         if cur == "pending":
             raise BadInput(tr("This vacation request is still open"))
+        # 2.125.0 R (#2117): only the Undo of a decision on a vacation request (a sick leave set to pending would count nowhere)
+        if not r["decided_by"] or oc_dec_fields(c, r["org_id"], "hub_absences", r)["kind"] != "vacation":
+            raise Denied(409, tr("This absence was not decided on"))
         c.execute("UPDATE hub_absences SET status='pending', decided_by=NULL, decided_at=NULL, decision_note='' WHERE id=?", (aid,))
     else:
         if cur != "pending":

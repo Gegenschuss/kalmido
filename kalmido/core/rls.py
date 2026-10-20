@@ -95,6 +95,8 @@ def rule(nullable, col="org_id"):
 OWN_RULES = {
     "orgs": f"{SYS} OR id = ANY ({ORG_IDS})",
     "org_members": f"{SYS} OR user_id = {UID} OR org_id = ANY ({ORG_IDS})",
+    # 2.125.0 R (#2119): a person keeps their own timesheets after leaving the organisation (the lock of an approved month)
+    "time_sheets": f"{rule(True)} OR user_id = {UID}",
 }
 
 

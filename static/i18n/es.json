@@ -9368,6 +9368,8 @@
   "an agent": "un agente",
   "Project #{0}": "Proyecto #{0}",
   "Receipt": "Comprobante",
+  "This absence was not decided on": "No se ha decidido sobre esta ausencia",
+  "Notes on timesheet decisions": "Notas de las decisiones sobre las hojas de horas",
   "A month in the future cannot be closed": "No se puede cerrar un mes futuro",
   "An entry over midnight counts on each day with its share. Rounding and the hourly rate (list settings) only apply to the report, CSV and timesheet; the tracked times stay exact.": "Una entrada que pasa la medianoche cuenta en cada día con su parte. El redondeo y la tarifa por hora (ajustes de la lista) solo se aplican al informe, al CSV y a la hoja de horas; los tiempos registrados quedan exactos.",
   "Approved by {0} on {1}": "Aprobado por {0} el {1}",

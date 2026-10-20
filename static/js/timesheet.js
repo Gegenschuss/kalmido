@@ -104,7 +104,7 @@ function tsl_newsText(it, d, who, q) {
   const m = tsl_monthName(String(d.month || '0000-01'));
   if (d.act === 'closed') return tr('{0} closed the timesheet {1} and waits for your approval', who, q(m));
   if (d.act === 'approve') return tr('{0} approved your timesheet {1}', who, q(m));
-  return tr('{0} sent your timesheet {1} back', who, q(m)) + (d.note ? ' · ' + esc(d.note) : '');
+  return tr('{0} sent your timesheet {1} back', who, q(m));  // 2.125.0 R (#2119): the note only in the app (sealed), never in News
 }
 function tsl_open(d) {
   const m = String(d?.month || '');

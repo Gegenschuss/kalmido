@@ -9368,6 +9368,8 @@
   "an agent": "een agent",
   "Project #{0}": "Project #{0}",
   "Receipt": "Bon",
+  "This absence was not decided on": "Over deze afwezigheid is niet beslist",
+  "Notes on timesheet decisions": "Notities bij beslissingen over urenstaten",
   "A month in the future cannot be closed": "Een maand in de toekomst kan niet worden afgesloten",
   "An entry over midnight counts on each day with its share. Rounding and the hourly rate (list settings) only apply to the report, CSV and timesheet; the tracked times stay exact.": "Een invoer over middernacht telt op elke dag met zijn deel. Afronding en uurtarief (lijstinstellingen) gelden alleen voor het rapport, de CSV en de urenstaat; de geregistreerde tijden blijven exact.",
   "Approved by {0} on {1}": "Goedgekeurd door {0} op {1}",

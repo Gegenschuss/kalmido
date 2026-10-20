@@ -12,6 +12,7 @@ from ..core.db import body, bump, db, iso, now_utc, parse_iso, usettings
 from ..core.i18n import tr
 from ..core.access import Denied, need_time
 from ..core.pg import insert_id
+from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.schema import USER_DEFAULTS
 from ..accounts.session import me
 
@@ -94,6 +95,30 @@ def tz_split(start, end, sec, rnd, zone):
         out.append({"day": a.astimezone(zone).date().isoformat(), "start": a, "end": b, "seconds": s1 - ps, "rounded": r1 - pr})
         ps, pr = s1, r1
     return out
+
+
+def tz_rows(c, uid, rep):
+    """2.125.0 R (#2120, #2122): THE rows of the time exports (CSV and XLSX) of a time report rep: times in my time zone, an
+    entry over midnight = one row per day (its share; the amount split like the rounded time). -> dicts list, title, user,
+    start, end (aware, None = running), seconds, rounded, amount, note (plain values, the caller formats them)."""
+    from ..core.db import inbox_default
+    zone = tz_of(c, uid)
+    names = {l["id"]: l["name"] for l in rep["lists"]}
+    for e in rep["entries"]:
+        lid = e["list_id"] if e["list_id"] in names else 0
+        ln = names.get(lid, "")
+        lst = next((x for x in rep["lists"] if x["id"] == lid), None)
+        ln = tr("Basket") if lst and lst["is_inbox"] and inbox_default(ln) else (ln or tr("No list"))
+        parts = e.get("parts") or [e]
+        amts = [e["amount"]] * len(parts)
+        if len(parts) > 1 and e["amount"] is not None:
+            cum = [round(e["amount"] * sum(y["rounded"] for y in parts[:k + 1]) / e["rounded"], 2) if e["rounded"] else 0.0 for k in range(len(parts))]
+            amts = [round(cum[k] - (cum[k - 1] if k else 0.0), 2) for k in range(len(parts))]
+        for k, x in enumerate(parts):
+            yield {"list": ln, "title": e["title"] or tr("No task"), "user": e["user_name"],
+                   "start": parse_iso(x["start"]).astimezone(zone),
+                   "end": parse_iso(x["end"]).astimezone(zone) if x["end"] and (e["end"] or k < len(parts) - 1) else None,
+                   "seconds": x["seconds"], "rounded": x["rounded"], "amount": amts[k], "note": e["note"]}
 
 
 # ---------------------------------------------------------------- 2.125.0 B (#2119): monthly timesheets
@@ -217,6 +242,21 @@ def tsl_member(c, uid, oid):
     return bool(oid) and oid in user_orgs(c, uid)
 
 
+def tsl_org(c, uid):
+    """2.125.0 R (#2119): the organisation a closed month belongs to: the shown workspace when it is one of the person's
+    organisations, else their first one; None only without an organisation (the workspace "Private" never skips the approval)."""
+    from ..accounts.orgs import user_orgs
+    mine = user_orgs(c, uid)
+    if not mine:
+        return None
+    ws = str(usettings(c, uid).get("workspace") or "")
+    try:
+        cur = int(ws[4:]) if ws.startswith("org:") else None
+    except ValueError:
+        cur = None
+    return cur if cur in mine else mine[0]
+
+
 def tsl_clean_month(v, zone):
     v = str(v or "").strip()
     if not v:
@@ -234,7 +274,7 @@ def tsl_log_add(r, action, by, note="", prev=None):
         log = []
     x = {"at": iso(now_utc()), "by": by, "action": action}
     if note:
-        x["note"] = note[:300]
+        x["note"] = 1  # 2.125.0 R (#2119): only that there was one; the text is sealed in time_sheets.note
     if prev:
         x["from"] = prev
     return json.dumps((log + [x])[-TSL_LOG_MAX:], ensure_ascii=False)
@@ -243,6 +283,11 @@ def tsl_log_add(r, action, by, note="", prev=None):
 def tsl_can_reopen(c, uid, r):
     """The person reopens a closed month; an approved one only without the organisation (none / left it / deleted)."""
     return bool(r) and (r["state"] == "closed" or (r["state"] == "approved" and not tsl_member(c, uid, r["org_id"])))
+
+
+def tsl_note(c, r):
+    """2.125.0 R (#2119): the decision's note in plain text (sealed with the organisation's key like hub_absences.decision_note)."""
+    return oc_dec_fields(c, r["org_id"], "time_sheets", r)["note"] or "" if r["org_id"] else (r["note"] or "")
 
 
 def tsl_out(c, r, uid):
@@ -256,7 +301,7 @@ def tsl_out(c, r, uid):
     except ValueError:
         log = []
     names = user_names(c, [r["decided_by"], *[x.get("by") for x in log]])
-    return {"state": r["state"], "note": r["note"], "closed_at": r["closed_at"], "decided_at": r["decided_at"],
+    return {"state": r["state"], "note": tsl_note(c, r), "closed_at": r["closed_at"], "decided_at": r["decided_at"],
             "decided_by": r["decided_by"], "decided_by_name": names.get(r["decided_by"], "") if r["decided_by"] else "",
             "org_id": r["org_id"], "org_name": _org_name(c, r["org_id"]) if r["org_id"] else "",
             "log": [{**x, "by_name": names.get(x.get("by"), "")} for x in log[-10:]], "user_id": uid}
@@ -282,7 +327,7 @@ def tsl_review(c, uid, month):
     rows = [r for r in rows if tsl_member(c, r["user_id"], r["org_id"])][:200]
     names = user_names(c, [r["user_id"] for r in rows])
     return [{"user_id": r["user_id"], "name": names.get(r["user_id"], ""), "month": r["month"], "state": r["state"],
-             "closed_at": r["closed_at"], "decided_at": r["decided_at"], "note": r["note"], "org_id": r["org_id"],
+             "closed_at": r["closed_at"], "decided_at": r["decided_at"], "note": tsl_note(c, r), "org_id": r["org_id"],
              "seconds": tsl_org_seconds(c, r["user_id"], r["month"], r["org_id"])} for r in rows]
 
 
@@ -334,7 +379,6 @@ def tsl_get():
 @app.post("/api/time/sheets")
 def tsl_set():
     """{month, action: close | reopen} -- my own month."""
-    from ..accounts.orgs import ws_obj_default
     from ..collab.comments import user_names
     need_time()
     tsl_no_agent()
@@ -354,7 +398,7 @@ def tsl_set():
         run = c.execute("SELECT start FROM time_entries WHERE user_id=? AND \"end\" IS NULL", (uid,)).fetchone()
         if run and tsl_month_of(run["start"], zone) == month:
             raise Denied(409, tr("Stop the running timer first"))
-        oid = ws_obj_default(c, uid)
+        oid = tsl_org(c, uid)  # 2.125.0 R (#2119): was the workspace default (private = no approval)
         if r:
             c.execute("UPDATE time_sheets SET state='closed', org_id=?, closed_at=?, decided_by=NULL, decided_at=NULL, note='', log=?, updated_at=? WHERE id=?",
                       (oid, ts, tsl_log_add(r, "close", uid), ts, r["id"]))
@@ -401,16 +445,17 @@ def tsl_decide():
     if r["org_id"] not in tsl_admin_orgs(c, uid):
         raise Denied(403, tr("Only an admin of the organisation can approve timesheets"))
     st, ts = r["state"], iso(now_utc())
+    enote = oc_enc_fields(c, r["org_id"], "time_sheets", {"note": note})["note"]  # 2.125.0 R (#2119): sealed like the leave's note
     if act == "approve":
         if st != "closed":
             raise Denied(409, tr("Only a closed month can be approved"))
         c.execute("UPDATE time_sheets SET state='approved', decided_by=?, decided_at=?, note=?, log=?, updated_at=? WHERE id=?",
-                  (uid, ts, note, tsl_log_add(r, "approve", uid, note), ts, r["id"]))
+                  (uid, ts, enote, tsl_log_add(r, "approve", uid, note), ts, r["id"]))
     elif act == "return":
         if st not in TSL_LOCKED:
             raise Denied(409, tr("This month is open"))
         c.execute("UPDATE time_sheets SET state='open', decided_by=?, decided_at=?, note=?, log=?, updated_at=? WHERE id=?",
-                  (uid, ts, note, tsl_log_add(r, "return", uid, note, prev=st), ts, r["id"]))
+                  (uid, ts, enote, tsl_log_add(r, "return", uid, note, prev=st), ts, r["id"]))
     elif act == "unapprove":
         if st != "approved":
             raise Denied(409, tr("This month is not approved"))
@@ -428,10 +473,11 @@ def tsl_decide():
     if act in ("approve", "return"):
         actor = user_names(c, [uid]).get(uid, "?")
         lab = tsl_label(month)
-        tsl_notify(c, who, {"act": act, "user_id": who, "month": month, "note": note[:300]},
+        # 2.125.0 R (#2119): the note stays out of News and push (the person reads it in the app, like a leave decision's)
+        tsl_notify(c, who, {"act": act, "user_id": who, "month": month},
                    lambda lg: tr("Timesheet approved", lg=lg) if act == "approve" else tr("Timesheet sent back", lg=lg),
                    lambda lg: (tr("{0} approved your timesheet {1}", actor, lab, lg=lg) if act == "approve"
-                               else tr("{0} sent your timesheet {1} back", actor, lab, lg=lg)) + (" · " + note[:200] if note else ""))
+                               else tr("{0} sent your timesheet {1} back", actor, lab, lg=lg)))
     bump(c)
     c.commit()
     return jsonify(ok=True, review=tsl_review(c, uid, month))

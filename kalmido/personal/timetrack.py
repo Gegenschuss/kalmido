@@ -10,7 +10,7 @@ from flask import g, has_request_context, jsonify, request, Response
 from ..core.config import app, PUBLIC_URL, TZ
 from ..core.pg import insert_id, Row
 from ..core.i18n import dec_comma, lang, LANGS, tr
-from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, usettings
+from ..core.db import body, bump, db, err, gsetting, iso, local_now, now_utc, parse_iso, usettings
 from ..accounts.session import me, user_public
 from ..core.access import (
     _pset_sql, Denied, health_hidden, list_role, need_feat, need_list, need_task, need_time, plists,
@@ -765,32 +765,18 @@ def time_csv():
     lg = lang()
     de = dec_comma(lg)  # 2.11.0: every decimal-comma language
     num = (lambda x: f"{x:.2f}".replace(".", ",")) if de else (lambda x: f"{x:.2f}")
-    names = {l["id"]: l["name"] for l in rep["lists"]}
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";" if de else ",", lineterminator="\r\n")
     w.writerow([tr("List"), tr("Task"), tr("User"), tr("Start|time"), tr("End|time"), tr("Duration (h)"),
                 tr("Duration (h:mm)"), tr("Rounded (h)"), tr("Amount ({0})", rep["currency"]), tr("Note")])
-    from .timesheet import tz_of
-    zone = tz_of(c, uid)  # 2.125.0 B (#2120): times in my time zone
-    for e in rep["entries"]:
-        lid = e["list_id"] if e["list_id"] in names else 0
-        ln = names.get(lid, "")
-        lst = next((x for x in rep["lists"] if x["id"] == lid), None)
-        ln = tr("Basket") if lst and lst["is_inbox"] and inbox_default(ln) else (ln or tr("No list"))
-        # 2.125.0 B (#2120): an entry over midnight = one row per day (its share; the amount split like the rounded time)
-        parts = e.get("parts") or [e]
-        amts = [e["amount"]] * len(parts)
-        if len(parts) > 1 and e["amount"] is not None:
-            cum = [round(e["amount"] * sum(y["rounded"] for y in parts[:k + 1]) / e["rounded"], 2) if e["rounded"] else 0.0 for k in range(len(parts))]
-            amts = [round(cum[k] - (cum[k - 1] if k else 0.0), 2) for k in range(len(parts))]
-        for k, x in enumerate(parts):
-            s0 = parse_iso(x["start"]).astimezone(zone)
-            en = parse_iso(x["end"]).astimezone(zone) if x["end"] and (e["end"] or k < len(parts) - 1) else None
-            sec, rs, amt = x["seconds"], x["rounded"], amts[k]
-            w.writerow([_csv_cell(ln), _csv_cell(e["title"] or tr("No task")), _csv_cell(e["user_name"]),
-                        s0.strftime("%Y-%m-%d %H:%M"), en.strftime("%Y-%m-%d %H:%M") if en else tr("running"),
-                        num(sec / 3600), f"{sec // 3600}:{sec % 3600 // 60:02d}", num(rs / 3600),
-                        num(amt) if amt is not None else "", _csv_cell(e["note"])])
+    from .timesheet import tz_rows
+    # 2.125.0 B (#2120): times in my time zone, an entry over midnight = one row per day; R (#2122): the rows shared with the XLSX
+    for x in tz_rows(c, uid, rep):
+        s0, en, sec, rs, amt = x["start"], x["end"], x["seconds"], x["rounded"], x["amount"]
+        w.writerow([_csv_cell(x["list"]), _csv_cell(x["title"]), _csv_cell(x["user"]),
+                    s0.strftime("%Y-%m-%d %H:%M"), en.strftime("%Y-%m-%d %H:%M") if en else tr("running"),
+                    num(sec / 3600), f"{sec // 3600}:{sec % 3600 // 60:02d}", num(rs / 3600),
+                    num(amt) if amt is not None else "", _csv_cell(x["note"])])
     name = f"{tr('timesheet|file')}-{rep['from'] or 'all'}-{rep['to'] or local_now().date().isoformat()}.csv"
     name = re.sub(r"[^A-Za-z0-9._-]", "_", name)
     return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
