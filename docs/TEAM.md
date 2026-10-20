@@ -586,6 +586,13 @@ answers `{users, total, offset, limit, agents}` (without `limit` the whole list 
 owns lists still gets 409), `POST /api/users/bulk {ids, action: disable | enable | org_add, org_id}` and
 `DELETE /api/orgs/{org}/members/{id}?to={id}`. Agents do not manage accounts: no REST API or MCP change.
 
+## Members of an organisation as a list (2.138.3)
+
+*Settings > Administration > Organisation*, the pencil of an organisation: its members are a list like *Settings > Administration > Users*, with a
+search (name, user name, e-mail), the filter *Members* / *All* and a counter. Each person has a *Member* and an *Admin*
+box; *Admin* only works for members, and taking someone out of the organisation also ends their admin role. The list
+scrolls inside the dialog, *Save* stays in view. The symbol field shows the organisation's picture or an app icon.
+
 ## The group "Conversations" in the sidebar (2.99.0)
 
 The group no longer grows with every person you share a list with:
