@@ -63,7 +63,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   // ================= stars from the row menus
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
   check(!d.querySelector('#side .sg-favs'), 'no favourites section without a star');
-  check(d.querySelector('#side .sbfix .sbrand') && d.querySelector('#side .sbfix .scmd'), 'the fixed head holds the brand and the search');
+  check(d.querySelector('#side .sbfix .sbrand') && d.querySelector('#side .sbdock .scmd'), 'the fixed head holds the brand; 2.104.0 (#2161): the search sits in the bottom dock');
   const star = async (sel, key, what) => {
     let r, it;
     for (let i = 0; i < 3 && !it; i++) { r = d.querySelector(sel); rclick(w, r); it = await until(() => menuItem(d, /^Add to favourites/), 12); }  // a sync redraw may close the menu

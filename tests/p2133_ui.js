@@ -76,7 +76,9 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     // 2.24.0 (UX-36): the phone's tab bar has its own "Search" tab by default; the drawer itself still has exactly one entry
     const sw = s.where.filter(x => !x.startsWith('tabs:'));
     // 2.31.0 (#1057): phones (the tab bar with "Search") have only the tab: no field in the drawer, no magnifier in the header
-    if (vw < 900) check(!sw.length && s.where.some(x => x.startsWith('tabs:')), `${vw}x${vh}${drawer ? ' (drawer open)' : ''}: exactly one search entry, the Search tab ` + JSON.stringify(s));
+    // 2.104.0 (#2161): the open drawer covers the tab bar, so it shows its own search field (docked at its bottom) again
+    if (vw < 900 && drawer) check(sw.length === 1 && sw[0] === 'side:scmd', `${vw}x${vh} (drawer open): exactly one search entry in the drawer, the field at its bottom ` + JSON.stringify(s));
+    else if (vw < 900) check(!sw.length && s.where.some(x => x.startsWith('tabs:')), `${vw}x${vh}: exactly one search entry, the Search tab ` + JSON.stringify(s));
     else check(sw.length === 1 && sw[0] === 'side:scmd', `${vw}x${vh}${drawer ? ' (drawer open)' : ''}: exactly one search entry, the command-bar field in the sidebar ` + JSON.stringify(s));
     await shot(`p2133-${vw}x${vh}-search.png`);
     if (drawer) { await ev(`(() => { closeSide(); return 1; })()`); await sleep(400); }

@@ -45,7 +45,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   await until(() => d.querySelector('#side .scmd'), 60);
   check(await w.eval(`tr(COLS.find(c => c[0] === 'due')[1])`) === 'Due', '#1914: the column is called Due');
   const bar = d.querySelector('#side .sbsrch .wsbar');
-  check(d.querySelector('#side .sbsrch .scmd') && bar && bar.querySelector('svg') && bar.querySelector('.sr')?.textContent && !bar.querySelector('.wsn'), '#1933: search and the round workspace button in one line');
+  check(d.querySelector('#side .sbdock .scmd') && bar && bar.querySelector('.wsn')?.textContent, '#1933: workspace button with its name in the row; 2.104.0 (#2161): search sits in the bottom dock' );
   const ok1 = await w.eval(`(() => {
     const md = modal('<div class="wrapx"><div class="lhdr"><h3>First</h3></div><div class="lhdr"><h3>Second</h3></div></div>');
     const h = md.querySelectorAll('.lhdr'), a = dw_card(h[0].querySelector('h3')), b = dw_card(h[1]);
@@ -63,7 +63,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'}, FCK);
   w = await boot({user: 'frida', hash: 'inbox'}); d = w.document;
   const fbar = await until(() => d.querySelector('#side .sbsrch .wsbar'), 60);
-  check(fbar && /Private/.test(fbar.querySelector('.sr')?.textContent || ''), '#1933: without an organisation the button stays and shows the private space');
+  check(fbar && /Private/.test(fbar.querySelector('.wsn')?.textContent || ''), '#1933: without an organisation the button stays and shows the private space');
   if (fbar) click(w, fbar);
   const fitems = await until(() => { const x = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim()); return x.length && x; });
   check(fitems && fitems.length === 1 && /Private/.test(fitems[0]), '#1933: its menu offers only the private space: ' + fitems);
