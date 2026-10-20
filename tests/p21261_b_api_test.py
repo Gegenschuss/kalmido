@@ -261,12 +261,15 @@ q = wait_for(lambda: plan_row(PT).get("last_state") == "empty" and plan_row(PT))
 check(q and q["next_at"] and not [e for e in events(cl, "job_request") if e["data"].get("scheduled")], "an empty basket: nothing sent (empty)")
 I1 = Bo.post(B + "/api/tasks", json={"title": "Call the printer"}).json()["id"]
 I2 = Bo.post(B + "/api/tasks", json={"title": "Invoice for the shoot"}).json()["id"]
+HL = Bo.post(B + "/api/lists", json={"name": "Health notes"}).json()["id"]
+HOK = Bo.patch(B + f"/api/lists/{HL}", json={"life": "health"}).ok
 due(PT)
 ev = wait_for(lambda: [e for e in events(cl, "job_request") if e["data"].get("scheduled")])
 check(len(ev) == 1 and ev[0]["data"]["kind"] == "triage" and ev[0]["data"]["schedule_id"] == PT, "due: one job_request of kind triage, scheduled " + str(ev)[:300])
 inp = ev[0]["data"]["input"] if ev else {}
 check(sorted(x["task_id"] for x in inp.get("items", [])) == sorted([I1, I2]) and W in [x["id"] for x in inp.get("lists", [])],
       "the input of the button: the basket items, bob's lists")
+check(not HOK or HL not in [x["id"] for x in inp.get("lists", [])], "unattended: never a health list as a target")
 check(plan_row(PT).get("last_state") == "sent", "last_state sent")
 JT = ev[0]["data"]["job"]["id"] if ev else 0
 due(PT)
