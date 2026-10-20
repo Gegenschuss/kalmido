@@ -79,7 +79,9 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check([...d.querySelectorAll('#d-tl .cm')].some(c => /edited/.test(c.textContent)), '"edited" shown');
   // delete own comment -> disappears
   const before = d.querySelectorAll('#d-tl .cm').length;
-  d.querySelector(`[data-act="c-del"][data-cid="${last.id}"]`).click(); await sleep(700);
+  d.querySelector(`[data-act="c-del"][data-cid="${last.id}"]`).click();
+  // 2.142.2: CI red once with the fixed 700 ms (slow runner) - wait up to 6 s for the timeline to redraw
+  for (let i = 0; i < 40 && d.querySelectorAll('#d-tl .cm').length !== before - 1; i++) await sleep(150);
   check(d.querySelectorAll('#d-tl .cm').length === before - 1, 'deleted comment disappears');
   // link field: edit + invalid
   w.eval('closeDetail()'); await sleep(50);
