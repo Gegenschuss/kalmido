@@ -577,9 +577,9 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     await ev(`(() => { document.querySelectorAll('.modal:not(.authscreen)').forEach(x => x.remove()); listModal(${P}); return 1; })()`); await sleep(700);
     await shot(`p2130-listdialog-1440-${theme}.png`);
     await ev(`(() => { document.querySelectorAll('.modal:not(.authscreen)').forEach(x => x.remove()); return 1; })()`);
-    // P16: the logo in the accent colour
-    const lg = await ev(`(() => { const s = document.querySelector('.sbrand svg.logo'); return s ? getComputedStyle(s).color : null; })()`);
-    check(lg && !/rgb\(45, 212, 191\)/.test(lg), `1440 ${theme} P16: the logo follows the accent (${lg})`);
+    // P16: the logo in the accent colour; 2.138.1 (#2392, #2389): no logo in the sidebar -- Private's stripe follows the accent
+    const lg = await ev(`(() => { const s = document.querySelector('#side'); return s ? [getComputedStyle(s).borderTopColor, getComputedStyle(document.documentElement).getPropertyValue('--accent')] : null; })()`);
+    check(lg && lg[0] && lg[0] !== 'rgba(0, 0, 0, 0)', `1440 ${theme} P16: the sidebar's stripe is coloured (${lg})`);
   }, false);
 
   // ---- the sign-in page (P7): 44 px fields, show password, nothing behind it gets the focus
