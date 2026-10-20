@@ -9,9 +9,24 @@ minor one, anything that needs action on your side a major one.
 
 ## [2.138.0] - 2026-10-20
 
-Quotation fixes (units, parts, PDF headings), sidebar search at the bottom, security fixes.
+Office: start number per number range, quotation bar with the next step, quotation fixes (units, parts, PDF headings);
+resizable dialogs; more rule triggers and Kanban swimlanes; sidebar search at the bottom; security fixes.
+
+### Added
+- Office: a start number per number range (quotation, invoice, credit note, reminder, delivery note) in the office
+  settings; it only goes up, a jump for invoices and credit notes needs a reason (office log); a draft's number can be
+  changed in the editor (#2256).
+- Rules: new triggers "created", "assigned" and "field changed", new actions "priority", "list tag" and "set field" (#2060).
+- Board: swimlanes by person, priority or a custom field; moving a card to another lane takes its value, with one undo
+  step (#2060).
+- Dialogs on a desktop can be resized at a grip and keep their size per kind (#2234).
+- Company data: the form "Partners (GbR)" (#2242).
 
 ### Changed
+- Quotations: the bar shows the next step (finalise, mark as sent, accepted / declined, create invoice); an invoice before
+  the acceptance sits in the "..." menu with one question; the PDF button reads "Preview" (#2235).
+- Office import: existing services take the file's order, a "Renumber" button; undoing an import archives entries in use
+  (with where they are used and "Restore") and can tidy leftovers (#2237 #2241).
 - Sidebar: the search field sits as a fixed bar at the bottom of the sidebar (phone menu and desktop); the head shows logo
   and avatar, below it the workspace button with its name and "Collapse all". Mod+K still opens the search (#2161).
 - Quotation items: the unit choice follows the quantity ("5 days", singular only for exactly 1), in all languages (#2249).
@@ -22,6 +37,8 @@ Quotation fixes (units, parts, PDF headings), sidebar search at the bottom, secu
   no longer drops the line of a part added meanwhile (#2239).
 - Quotation PDF: long part and title headings wrap, the quotation number line sits above the part title (#2240).
 - The service worker leaves requests of other origins (e.g. browser extensions) alone (#2257).
+- Quotation PDF: the closing (totals, greeting, signature, confirmation) stays on one page, set a little tighter before a
+  page break; no heading alone at a page end (#2238).
 
 ### Security
 - Security fix (upload and calendar subscription tokens): the link is shown once when it is created; existing shortcuts
