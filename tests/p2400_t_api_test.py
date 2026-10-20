@@ -78,7 +78,7 @@ check(out == "Master data: read .xlsx|the docs and it old|2*3 = 6 and a*b*c|*not
 out, e = py("from kalmido.notify.push import webpush_payload as w; p = w('**Bold** [x](https://example.com)', 'Due · `code`', '4'); print(p['title'] + '|' + p['body'])")
 check(out == "Bold x|Due · code", "#1409: a push shows the title without the marks " + repr(out + e))
 r = A.post(B + "/api/ical", json={"action": "create"})
-url = (A.get(B + "/api/ical").json() or {}).get("url") or ""
+url = (r.json() or {}).get("url") or ""  # 2.138.0 (#1907): the feed link is only in the answer of create / rotate
 check(bool(url), "#1409: calendar feed link (setup) " + r.text[:120])
 if url:
     ics = requests.get(B + "/ical/" + url.rsplit("/ical/", 1)[-1]).text

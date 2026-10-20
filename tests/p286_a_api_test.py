@@ -11,6 +11,7 @@
  - N8 an instance admin sees and looks after the kids of their own organisation (and orphans), not another organisation's
  - N9 /api/state kid_ids: only kids the person sees
 usage: p286_a_api_test.py <datadir>      (a fresh container; P286A_NOSTART=1 = the server already runs)"""
+import hashlib
 import os
 import subprocess
 import sys
@@ -117,16 +118,18 @@ check(r.ok, f"N2: a signed-in re-authentication is not locked out ({r.status_cod
 K = sess("kima")
 r = K.post(B + "/share", data={"title": "Kid share", "text": "hello"}, allow_redirects=False)
 check(r.status_code == 403, f"N3: a child account cannot POST /share ({r.status_code})")
-check(K.get(B + "/api/me").json().get("drop_token") == "", "N3: /api/me shows a kid no drop token")
-ktok = dbx("SELECT drop_token FROM users WHERE id=?", (ids["kima"],))[0][0]
+check(K.get(B + "/api/me").json().get("drop_token_set") is False, "N3: /api/me shows a kid no drop token")
+# 2.138.0 (#1907): tokens are stored as SHA-256 hashes; give the kid one directly to see /drop refuses it
+ktok = "kid-token-" + "k" * 24
+dbx("UPDATE users SET drop_token_hash=? WHERE id=?", (hashlib.sha256(ktok.encode()).hexdigest(), ids["kima"]))
 r = requests.post(B + "/drop", headers={"Authorization": "Bearer " + ktok}, data={"text": "Kid drop"})
 check(r.status_code >= 400, f"N3: /drop does not take a kid's token ({r.status_code})")
 check(not dbx("SELECT 1 FROM tasks WHERE title='Kid drop'"), "N3: no task from the kid's drop")
 r = K.post(B + "/api/me/drop-token")
 check(r.status_code == 403, f"N3 review: a child account cannot make a new upload token ({r.status_code})")
-check(dbx("SELECT drop_token FROM users WHERE id=?", (ids["kima"],))[0][0] == ktok, "N3 review: the kid's token stayed unchanged")
+check(dbx("SELECT drop_token_hash FROM users WHERE id=?", (ids["kima"],))[0][0] == hashlib.sha256(ktok.encode()).hexdigest(), "N3 review: the kid's token stayed unchanged")
 Bo = sess("bob")
-btok = Bo.get(B + "/api/me").json().get("drop_token")
+btok = Bo.post(B + "/api/me/drop-token").json().get("drop_token")  # 2.138.0 (#1907): shown once, when created
 r = requests.post(B + "/drop", headers={"Authorization": "Bearer " + btok}, data={"text": "Grown-up drop"})
 check(r.ok, f"N3: an ordinary account still drops ({r.status_code})")
 

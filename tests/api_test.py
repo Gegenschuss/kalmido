@@ -279,7 +279,7 @@ exp = A.get(B + "/api/export.json").json()
 check(any(t["id"] == PT and t["url"] == "https://docs.example.net/x" for t in exp["tasks"]), "export contains the link")
 check("comments" in exp and "activity" in exp and any(c["task_id"] == ST for c in exp["comments"]), "export contains comments + activity")
 # /drop + /share with links
-tok = Bb.get(B + "/api/me").json()["drop_token"]
+tok = Bb.post(B + "/api/me/drop-token").json()["drop_token"]  # 2.138.0 (#1907): the token is shown once, when created
 r = requests.post(B + "/drop", headers={"Authorization": "Bearer " + tok}, data={"text": "Read this https://github.com/abc/def."})
 t = [x for x in Bb.get(B + "/api/state").json()["tasks"] if x["title"] == "Read this"]
 check(t and t[0]["url"] == "https://github.com/abc/def", f"/drop: link into the field, removed from the title ({r.text.strip()})")
