@@ -56,7 +56,7 @@ FIELD_JOBS = [("office_company", "org_id", col, "text") for col in oc.FIELDS["of
 ]
 # 2.126.0 A (#1971): (table, id column, column, sealing context) of the documents' values: sealed per workspace (column ws)
 # by docs/store.py doc_seal, the organisation's key or the person's own key
-DOC_JOBS = [("doc_meta", "node_id", col, f"doc_meta.{col}") for col in ("text", "amount", "suggest", "trained", "extracted")] + [
+DOC_JOBS = [("doc_meta", "node_id", col, f"doc_meta.{col}") for col in ("text", "amount", "suggest", "trained", "extracted", "summary")] + [  # 2.138.0: + summary (2.126.1 #2123)
     ("doc_senders", "id", "name", "doc_senders.name"),
     ("doc_rules", "id", "data", "doc_rules.data"),
     ("doc_models", "id", "data", "doc_models.data"),
@@ -951,7 +951,8 @@ ROT_WS = (("doc_rules", "id", "data", "doc_rules.data"), ("doc_models", "id", "d
           # 2.138.0 C (#1972): sealed per workspace since 2.97 (receipt recognition / suggestions) or missed before (trained)
           ("doc_meta", "node_id", "trained", "doc_meta.trained"), ("doc_meta", "node_id", "extracted", "doc_meta.extracted"),
           ("rc_suggest", "id", "amount", "rc_suggest.amount"), ("rc_suggest", "id", "prev_amount", "rc_suggest.prev_amount"),
-          ("doc_meta", "node_id", "summary", "doc_meta.summary"))  # 2.138.0 (#1972): document summaries of 2.126.1 (#2123)
+          ("doc_meta", "node_id", "summary", "doc_meta.summary"),  # 2.138.0 (#1972): document summaries of 2.126.1 (#2123)
+          ("pl_uploads", "id", "mapping", "pl_sources.mapping"))  # 2.138.0 (#1972): the mapping chosen for an uploaded export
 ROT_SETTLE = float(os.environ.get("KALMIDO_ORGCRYPT_ROT_SETTLE", "5"))  # seconds after the key switch (requests that hold the old key end)
 
 
