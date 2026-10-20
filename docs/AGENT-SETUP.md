@@ -524,7 +524,9 @@ chat messages of one person that arrive together: one run). It does what a hoste
   server; the MIME type comes from the file ending), sent as a message of its own just before the answer so the answer's
   buttons stay the newest message. Images the agent only **looks at** with its Read tool are copied there and attached too (chat runs
   only; task runs have no folder; folders named in `KALMIDO_NO_AUTO_IMAGE_DIRS`, and any path with a part `uploads` or
-  `chat-attachments`, are never attached, so the person's own uploads do not come back). The prompt tells the agent about the folder. Needs
+  `chat-attachments`, are never attached, so the person's own uploads do not come back; 2.126.0: only images inside the
+  project folder (the working folder of the launcher) or a folder named in `KALMIDO_AUTO_IMAGE_DIRS` are attached, other
+  files the agent wants to show go into `$KALMIDO_OUTBOX`). The prompt tells the agent about the folder. Needs
   a server with chat files (2.13.1+); older servers get nothing.
 - **Long work as a job** (2.44.0, [`mcp/agent_job.py`](../mcp/agent_job.py)): work that takes more than about ten minutes (a release
   build, an audit, a full test run) the agent starts with `python3 agent_job.py start --title "..." [--worktree] -` (the brief on
