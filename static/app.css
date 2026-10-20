@@ -5899,6 +5899,11 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
   .ofwrap > .ofrail{position:static;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:calc(var(--safe-b) + 1rem)}
   .ofwrap > .ofbody{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:calc(var(--safe-b) + 6rem)}
 }
+/* 2.144.1 (#2445, iPad simulator): Safari's bounce at the top of the scrolling view pulled the office bar along (portrait: the
+   sticky .ofpb, landscape: the rail); touch tablets get no bounce in the office, like the chats (phones unchanged) */
+@media (min-width:600px) and (hover:none),(min-width:600px) and (pointer:coarse){
+  #view:has(.ofpb),#view:has(> .ofwrap),.ofwrap > .ofbody,.ofwrap > .ofrail{overscroll-behavior-y:none}
+}
 .ofpb{position:sticky;top:0;z-index:3;display:flex;flex-direction:column;margin:0 0 .75rem;background:var(--bg);border-bottom:1px solid var(--line)}
 .ofpback{display:inline-flex;align-items:center;gap:.25rem;align-self:flex-start;min-height:2.75rem;padding:0 .25rem 0 0;border:0;border-radius:var(--radius);background:none;color:var(--muted);font:inherit;font-size:var(--fs-s);cursor:pointer}
 .ofpback svg{width:.875rem;height:.875rem;transform:rotate(90deg)}
