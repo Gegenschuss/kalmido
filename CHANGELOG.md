@@ -29,6 +29,54 @@ mails shown safely, tasks and events from a mail; plus a disposition export and 
 - Security fix (e-mail filing): mailbox passwords are stored encrypted, never sent back, bound to their server, and a
   workspace's own mail servers are only reached with a checked certificate and through the internal-host guard (#2141).
 - Security fix (e-mail filing): HTML content is cleaned on the server and isolated in the browser (#2140).
+## [2.139.1] - 2026-10-20
+
+Package 2.137: moving a whole organisation between servers; the personal office into an organisation.
+
+### Added
+- Organisation move: the import of an organisation export takes over every area, not only lists, tasks, calendars and
+  address books - office (master data, quotations and invoices with their items, payments, series, cash book, trips,
+  meals, contracts, archive, bank data, logbook, the stored PDFs; finalised invoices stay finalised with their numbers),
+  clients, file store with all versions, documents, knowledge pages with pictures and history, tables with formulas and
+  file cells, video sign-offs, team chat, absences and vacation accounts, bookings, filed e-mails, newsletter, customer
+  reports, forms with their answers, playbooks, project notes, notepads, rules, sprints, time entries and timesheets.
+  References between the areas point at the new entries; fields and files are sealed again with the target's key; the
+  preview lists what is taken over; one undo removes it all (#2344).
+- The organisation export also contains the office tables that were missing (bank statements, document templates,
+  vehicles and logbook), the page history of knowledge pages and the projects / categories of receipts (#2344).
+- Freelancers: the owner of a personal office exports it (Office > Settings), and the import of such a file goes into
+  the personal office (#2344).
+- Office: the personal office moves into an existing organisation the person administers, with a preview of what goes
+  along, what stays (company and bank data, number ranges, absences) and who sees it afterwards; finalised invoices keep
+  their numbers and stay locked, a number the organisation already uses stops the move (#1981).
+
+### Security
+- Security fix: organisation import (links of video sign-offs, number ranges, logo copies).
+- Security fix: feeds (database connection) (#2408).
+## [2.139.0] - 2026-10-20
+
+Team chat: threads, voice messages, "Read by"; comments become tasks.
+
+### Added
+- Team chat threads: "Reply in thread" in a message's menu; the main conversation shows a line with the number of
+  answers, who answered and a dot for unread ones; the thread opens beside the chat (on phones as its own view).
+  Unread counts and notifications cover only threads you take part in (you wrote, answered or were mentioned);
+  agents read and answer with `thread` / `thread_of` (#2127).
+- "Read by" under your last message that was read (in direct chats "Read"), tap for the list of who read it and who
+  not yet; switch it off under Settings > Notifications > Send read receipts - then nobody sees yours and you see
+  nobody's (#2129).
+- Voice messages: the microphone next to the paper clip records up to 5 minutes, you can listen before sending; stored
+  like other chat files (quota, virus scan, encryption at rest), with its own player (seek, remaining time, 1x / 1.5x /
+  2x). Kalmido does not transcribe them; agents see them as audio attachments with `voice` and `duration_ms` (#2128).
+- Every comment of a task can be saved as a task (own, other people's and agents' comments), with a back link, its
+  files and a "Saved" mark (#2130).
+
+### Fixed
+- Pages: a page whose key was missing is found by its text again once the key is restored; its message says how to
+  open it again or that it can only be deleted; an import or the browser lock skips such a page and names it instead of
+  stopping (#2386).
+- Proposal cards: the app thumb instead of an emoji on accept / reject, larger check boxes and the whole row as the
+  target; the "Your wish" field of the agent text dialog uses the full width (#2401).
 ## [2.138.5] - 2026-10-20
 
 ### Fixed
@@ -205,7 +253,6 @@ sort of the basket. Kalmido calls no language model for this; the connected agen
   (suggested: weekdays 7:30) like the button, you find the proposal card in the morning; an empty basket sends nothing (#2126).
 - Agent API / MCP: new proposal kinds `office_text`, `doc_summary`, `report`, `sheet_tasks`; `job_request` of a planned sort
   carries `scheduled: true`; `GET /api/v1/agent/schedules` shows the plan's `action`.
-
 ## [2.126.0] - 2026-10-20
 
 Security release: fixes from the internal audit (office, documents, agents, sync, offline). Please update.

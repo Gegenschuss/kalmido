@@ -76,3 +76,7 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wemit:hover,.wemit:focus-visible{background:var(--accent-soft)}
 .wemit .wemn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wemhint{font-size:var(--fs-s);margin:.5rem 0 0}
+/* 2.139.0 C (#2386): a page whose text cannot be read -- the message with its way out and deleting */
+.wklost{display:flex;flex-direction:column;align-items:flex-start;gap:.5rem;margin:1rem;padding:.75rem 1rem;border:1px solid var(--line2);border-radius:var(--r-s);color:var(--text2)}
+.wklost p{margin:0;font-size:var(--fs-s);line-height:1.4}
+.wklost > svg{color:var(--muted)}

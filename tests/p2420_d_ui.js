@@ -85,7 +85,7 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
       await ev(`(() => { openDetail(${T[1]}); return 1; })()`);
       check(await ready(`!!document.querySelector('#d-tl-items .cm[data-cid="${C1}"]')`), '#1383: the agent comment in the timeline');
       check(await ev(`!!document.querySelector('#d-tl-items .cm[data-cid="${C1}"] [data-act="cm-save"]')`), '#1383: "Save as task" under the agent comment');
-      check(await ev(`!document.querySelector('#d-tl-items .cm[data-cid="${CP}"] [data-act="cm-save"]')`), '#1383: not under a person\'s comment');
+      check(await ev(`!!document.querySelector('#d-tl-items .cm[data-cid="${CP}"] [data-act="cm-save"]')`), '#1383 -> 2.139.0 (#2130): also under a person\'s comment');
       await ev(`(() => { document.querySelector('#d-tl-items .cm[data-cid="${C1}"] [data-act="cm-save"]').click(); return 1; })()`);
       check(await ready(`!!document.querySelector('.modal [name="cs-as"][value="sub"]')`), '#1383: the dialog offers subtask / new task');
       const dlg = await ev(`(() => { const m = document.querySelector('.modal'); return {title: m.querySelector('#cs-title')?.value, sub: m.querySelector('[name="cs-as"][value="sub"]')?.checked, list: !!m.querySelector('[name="cs-as"][value="list"]')}; })()`);

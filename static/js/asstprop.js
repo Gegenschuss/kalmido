@@ -141,7 +141,7 @@ function ast_draw(v) {
     ${t.text && kind !== 'report' ? `<details class="ast-was"><summary class="muted">${esc(tr('Current text'))}</summary><div class="muted">${esc(t.text)}</div></details>` : ''}
     ${gone ? `<div class="shint">${esc(kind === 'office_text' ? tr('The document is finalised or sent: the text can no longer be taken over.') : tr('This is no longer available to you.'))}</div>` : ''}
     <div class="shint keep">${esc(how)}</div>`;
-  const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Discard'))}">👎 ${esc(tr('Discard'))}</button><span class="spacer"></span>
+  const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Discard'))}">${thumbIc(false)} ${esc(tr('Discard'))}</button><span class="spacer"></span>
     <button class="btn" data-pp="close">${tr('Close')}</button><button class="btn" data-ast-copy="1">${ic('copy', 's')} ${esc(tr('Copy'))}</button>
     <button class="btn pri" data-pp="apply" ${gone ? 'disabled' : ''}>${ic('check', 's')} ${esc(tr('Take over'))}</button>`;
   return {main, foot};

@@ -469,6 +469,24 @@ the conversation opens them; deleting the message deletes its files for good. En
 Agents take part in a channel only when a person adds them: your own agents, and as an admin of the organisation its
 shared agents. They never join groups.
 
+## Threads and "Read by" in the team chat (2.139.0)
+
+**Threads** keep a side topic out of the main conversation: *Reply in thread* in the menu of a message (the three dots)
+opens the thread next to the conversation (on a phone full screen, *Back* returns). Answers there stay out of the main
+conversation; under the first message a slim line shows how many answers there are, when the last came and who wrote
+them, with a dot while some are unread. Editing, deleting, reactions, pinning, quoting a message and *Save as task* work in
+a thread as everywhere; a search hit or a pin of a thread answer opens its thread. A deleted first message keeps its
+thread ("Message deleted" stays above the line).
+
+The unread count of a conversation counts the main conversation and the threads you take part in: you wrote the first
+message, answered or were @mentioned. Only those people are notified of a new answer (the conversation's *Mute* and the
+notification settings still apply); everyone else sees the thread line without a push.
+
+**Read by**: under your own latest message that someone has read a small grey line says *Read* (a direct message) or
+*Read by 3* with small pictures (groups, channels, the chat of a list); a tap lists who read it and who did not yet. There
+are no ticks at every message. *Settings > Chat > Send read receipts* switches it off: then nobody sees when you read,
+and you see nobody's read state either.
+
 ## The customer portal (2.63.0)
 
 A form with **status link** turns every report sent without an account into a customer report: the reporter gets a link to
@@ -624,3 +642,20 @@ and their values, sections, tags, the list's chat) and nothing moves anywhere el
   chat. Tracked time stays (without the list) for the bookkeeping.
 - Lists with end-to-end encryption are still deleted for good at once (nobody could read them in the trash).
 
+
+## Voice messages in the team chat (2.139.0)
+
+When the text box of a team chat conversation is empty, a **microphone** sits next to the paper clip. Tap it and the
+recording starts at once (the browser asks for the microphone the first time): a bar shows the running time, the
+**bin** discards the recording, **Send** sends it, and the **stop** button ends the recording so you can listen first.
+A recording stops by itself after 5 minutes and waits for Send or the bin; Escape discards it.
+
+- Voice messages are files of the message: the same storage quota, virus check and encryption at rest as other files.
+  They are not possible in end-to-end encrypted or archived conversations (no microphone there).
+- The player in the message: play / pause, the bar to jump, the remaining time, the speed (1×, 1.5×, 2×) and a download
+  button. Only one message plays at a time. Other audio files you attach stay a normal file (download).
+- The recording format is the one the device records: phones and Safari record MP4 (AAC), which plays everywhere; some
+  desktop browsers record WebM (Opus). A device that cannot play a recording shows a note and offers the download.
+- The microphone blocked? Allow it in the browser's site settings (or in the phone's settings for the app) and try again.
+- Kalmido never transcribes voice messages and sends them to no service. Agents in a channel see them as audio files
+  (`voice: true`) and can download them like any other file.

@@ -1359,6 +1359,14 @@ fresh; run p21261_a_ui node p21261_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.126.1 part B: table rows -> tasks as an agent proposal, planned inbox sorting (#2125 #2126)
 fresh; run p21261_b_api "$PY" p21261_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21261_b_ui node p21261_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.137.0 part A: organisation import - office + clients (#2344)
+fresh; run p2137_a_api "$PY" p2137_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.137.0 part B: organisation import - file store, documents, knowledge pages, tables, videos (#2344)
+fresh; run p2137_b_api "$PY" p2137_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.137.0 part C: organisation import - chat, absences, forms, notes, time entries, round trip (#2344)
+fresh; run p2137_c_api "$PY" p2137_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.137.0 part D: personal office into an organisation (#1981)
+fresh; run p2137_d_api "$PY" p2137_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.124.0 part A: formulas, chart (#2109 #2115)
 fresh; run p2124_a_api "$PY" p2124_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2124_a_ui node p2124_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1418,6 +1426,18 @@ fresh; run p21383_a_ui node p21383_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21383_b_api "$PY" p21383_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21383_b_ui node p21383_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21383_c_api "$PY" p21383_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.139.0 part A: team chat threads, "read by" (#2127 #2129)
+fresh; run p2139_a_api "$PY" p2139_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2139_a_ui node p2139_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.139.0 part B: voice messages in the team chat (#2128)
+fresh; run p2139_b_api "$PY" p2139_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2139_b_ui node p2139_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.139.0 part C: pages - an unreadable page back in the search once its key returns, error names the way out (#2386)
+fresh; run p2139_c_api "$PY" p2139_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2139_c_ui node p2139_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.139.0 part D: comment -> task, proposal cards with the app thumb and larger check boxes (#2130 #2401)
+fresh; run p2139_d_api "$PY" p2139_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2139_d_ui node p2139_d_ui.js "$KALMIDO_TEST_DATA"
 shard 18  # 20.10.2026 (job #692): the parked releases 2.111-2.113.0 (new suites still go to shard 17 above)
 # 2.111.0: Buero-Rueckgaengig (a), Termin-Einladungen + Abo-Link (b), Schnellerfassung (c)
 fresh; run p2111_a_api "$PY" p2111_a_api_test.py "$KALMIDO_TEST_DATA"

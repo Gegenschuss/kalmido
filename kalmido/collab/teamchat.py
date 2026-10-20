@@ -139,12 +139,16 @@ def tchat_rooms(c, uid):
     names = user_names(c, {x for r in rooms if r["kind"] == "dm" for x in (r["a"], r["b"])})
     out = []
     for r in rooms:
-        last = c.execute("SELECT * FROM tchat_msgs WHERE room_id=? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1", (r["id"],)).fetchone()
+        # 2.139.0 A (#2127): the preview and the unread count: the main conversation + the threads I take part in
+        last = c.execute("SELECT * FROM tchat_msgs WHERE room_id=? AND deleted_at IS NULL AND thread_of IS NULL ORDER BY id DESC LIMIT 1",
+                         (r["id"],)).fetchone()
         lr, muted = tchat_last_read(c, r["id"], uid)
-        unread = c.execute("SELECT COUNT(*) FROM tchat_msgs WHERE room_id=? AND id>? AND deleted_at IS NULL AND COALESCE(user_id,0)!=?",
-                           (r["id"], lr, uid)).fetchone()[0]
-        mention = bool(unread) and c.execute("SELECT 1 FROM tchat_msgs WHERE room_id=? AND id>? AND deleted_at IS NULL AND body ILIKE ?",
-                                             (r["id"], lr, f"%<@{uid}>%")).fetchone() is not None
+        unread = c.execute("SELECT COUNT(*) FROM tchat_msgs WHERE room_id=? AND id>? AND deleted_at IS NULL AND COALESCE(user_id,0)!=? "
+                           "AND thread_of IS NULL", (r["id"], lr, uid)).fetchone()[0]
+        tu, tm = tth_unread(c, r["id"], uid)
+        mention = (bool(unread) and c.execute("SELECT 1 FROM tchat_msgs WHERE room_id=? AND id>? AND deleted_at IS NULL AND thread_of IS NULL "
+                                              "AND body ILIKE ?", (r["id"], lr, f"%<@{uid}>%")).fetchone() is not None) or tm
+        unread += tu
         d = {"id": r["id"], "kind": r["kind"], "unread": unread, "mention": mention, "muted": muted,
              "last": tchat_msg_brief(c, last) if last else None, "last_at": last["created_at"] if last else None}
         if r["kind"] == "dm":
@@ -171,7 +175,12 @@ def tchat_sig(c, uid):
                   (uid, uid, uid, uid)).fetchone()
     e = c.execute("SELECT COALESCE(MAX(edited_at),'') FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id WHERE "
                   "(r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN " + vis_sql(ov=False) + ")", (uid, uid, uid, uid)).fetchone()[0]
-    rd = c.execute("SELECT COALESCE(SUM(last_id),0) FROM tchat_reads WHERE user_id=?", (uid,)).fetchone()[0]
+    # 2.139.0 A (#2129, #2127): + the read marks of everyone (mine included) in the conversations I have read and in their
+    # threads, so "Read by" shows without reloading
+    rd = c.execute("""SELECT (SELECT COALESCE(SUM(last_id),0) FROM tchat_reads WHERE room_id IN (SELECT room_id FROM tchat_reads WHERE user_id=?)),
+                             (SELECT COALESCE(SUM(last_id),0) + COUNT(*) FROM tchat_thread_reads
+                              WHERE room_id IN (SELECT room_id FROM tchat_reads WHERE user_id=?))""", (uid, uid)).fetchone()
+    rd = f"{rd[0]}-{rd[1]}"
     # 2.113.1 (#2059): + the messages of my channels / groups and their names, states, members
     from .teamchan import tcx_sig
     x = c.execute("""SELECT COALESCE(MAX(m.id),0), COUNT(m.id), COALESCE(MAX(m.edited_at),''), COUNT(m.pinned_at) FROM tchat_msgs m
@@ -238,7 +247,7 @@ def tchat_rx(c, ids):
     return out
 
 
-def tchat_msg_dict(c, m, rx=None, quotes=None, files=None):
+def tchat_msg_dict(c, m, rx=None, quotes=None, files=None, th=None):
     t = c.execute("SELECT id, title FROM tasks WHERE id=? AND deleted_at IS NULL", (m["task_id"],)).fetchone() if m["task_id"] else None
     # 2.33.0 (#1076): reply_to + reply (a short quote of the answered message; quotes = reply_quotes of a page)
     rt = m["reply_to"] if "reply_to" in m.keys() and not m["deleted_at"] else None
@@ -252,7 +261,10 @@ def tchat_msg_dict(c, m, rx=None, quotes=None, files=None):
             "pinned_at": None if m["deleted_at"] or "pinned_at" not in m.keys() else m["pinned_at"],
             "pinned_by": None if m["deleted_at"] or "pinned_by" not in m.keys() or not m["pinned_at"] else m["pinned_by"],
             # 2.113.1 (#2059): the files of the message (collab/teamchan.py; files = tcx_files_of of a page)
-            "attachments": [] if m["deleted_at"] else (files if files is not None else _tcx_files(c, [m["id"]])).get(m["id"], [])}
+            "attachments": [] if m["deleted_at"] else (files if files is not None else _tcx_files(c, [m["id"]])).get(m["id"], []),
+            # 2.139.0 A (#2127): the thread it answers in (NULL = the main conversation); a root: its answers (th = tth_summary of a page)
+            "thread_of": m["thread_of"] if "thread_of" in m.keys() else None,
+            **tth_fields((th if th is not None else tth_summary(c, me(), [m["id"]])).get(m["id"]))}
 
 
 def _tcx_files_api(c, mid):
@@ -317,23 +329,35 @@ def tchat_dm():
 
 @app.get("/api/team/rooms/<int:rid>/messages")
 def tchat_messages(rid):
-    """?before=<id> (older page), ?limit (max 100) -- messages oldest first, with reactions; members of the room."""
+    """?before=<id> (older page), ?limit (max 100) -- messages oldest first, with reactions; members of the room.
+    2.139.0 A (#2127): the main conversation (no thread answers); ?thread=<message id> = the answers of that message's thread
+    (an answer's id names its thread too) with root = the thread's first message."""
     c = db()
     need_tchat(c)
     r = need_room(c, rid)
     before = request.args.get("before")
     before = as_int(before, "before", 1) if before else None
     lim = as_int(request.args.get("limit", TCHAT_PAGE), "limit", 1, 100)
-    rows = c.execute("SELECT * FROM tchat_msgs WHERE room_id=?" + (" AND id<?" if before else "") + " ORDER BY id DESC LIMIT ?",
-                     (rid, before, lim + 1) if before else (rid, lim + 1)).fetchall()
+    root = None
+    if request.args.get("thread"):
+        root = tth_get(c, rid, as_int(request.args.get("thread"), "thread", 1))
+        if not root:
+            raise Denied(404)
+    where = "thread_of=?" if root else "thread_of IS NULL"
+    args = (rid, root["id"]) if root else (rid,)
+    rows = c.execute("SELECT * FROM tchat_msgs WHERE room_id=? AND " + where + (" AND id<?" if before else "") + " ORDER BY id DESC LIMIT ?",
+                     (*args, before, lim + 1) if before else (*args, lim + 1)).fetchall()
     more = len(rows) > lim
     rows = list(reversed(rows[:lim]))
     rx = tchat_rx(c, [m["id"] for m in rows])
     qs = reply_quotes(c, "t", [m["reply_to"] for m in rows if not m["deleted_at"]])
     fs = _tcx_files(c, [m["id"] for m in rows if not m["deleted_at"]])  # 2.113.1 (#2059)
     mem = tchat_room_members(c, r)
-    names = user_names(c, mem | {m["user_id"] for m in rows if m["user_id"]})
+    th = tth_summary(c, me(), [m["id"] for m in rows] + ([root["id"]] if root else []))  # 2.139.0 A (#2127)
+    names = user_names(c, mem | {m["user_id"] for m in rows if m["user_id"]} | {u for x in th.values() for u in x["users"]}
+                       | ({root["user_id"]} if root and root["user_id"] else set()))
     lr, muted = tchat_last_read(c, rid, me())
+    marks = trd_marks(c, rid, mem, me(), root["id"] if root else None)  # 2.139.0 A (#2129): None = read receipts off for me
     from ..collab.chatsave import chat_save_of
     from ..collab.chatpins import cpin_team_list
     saved = chat_save_of(c, me(), "team", [m["id"] for m in rows])  # 2.37.0 (#1159): saved as a task by me
@@ -342,10 +366,19 @@ def tchat_messages(rid):
     if r["kind"] in TCX_KINDS:  # 2.113.1 (#2059): name, organisation, open / archived, joined, may manage
         from .teamchan import tcx_room_brief
         xr = {k: v for k, v in tcx_room_brief(c, r, me()).items() if k != "members"}
+    out = {}
+    if root:  # 2.139.0 A (#2127): the thread's first message and my read mark in it
+        saved.update(chat_save_of(c, me(), "team", [root["id"]]))
+        rq = reply_quotes(c, "t", [root["reply_to"]] if not root["deleted_at"] else [])
+        out = {"root": le2c_out(c, r, [{**tchat_msg_dict(c, root, tchat_rx(c, [root["id"]]), rq, _tcx_files(c, [root["id"]]), th),
+                                         "saved_task_id": saved.get(root["id"])}])[0],
+               "thread_read": tth_last_read(c, root["id"], me())}
     return jsonify(room={"id": r["id"], "kind": r["kind"], "list_id": r["list_id"], "muted": muted, "last_read": lr, "e2e": bool(r["e2e"]),
-                         "members": [{"id": u, "name": names.get(u, "?"), "agent": u in agent_ids(c)} for u in sorted(mem)], **le2c_room(c, r), **xr},
-                   messages=le2c_out(c, r, [{**tchat_msg_dict(c, m, rx, qs, fs), "saved_task_id": saved.get(m["id"])} for m in rows]), has_more=more,
-                   users={str(k): v for k, v in names.items()}, pins=le2c_out(c, r, cpin_team_list(c, rid)))  # 2.62.0 (#1848): also older than the page; 2.64.2 C: the lock
+                         "members": [{"id": u, "name": names.get(u, "?"), "agent": u in agent_ids(c)} for u in sorted(mem)], **le2c_room(c, r), **xr,
+                         "read_ok": None if marks is None else sorted(marks)},  # 2.139.0 A (#2129): who may show up in "Read by"
+                   messages=le2c_out(c, r, [{**tchat_msg_dict(c, m, rx, qs, fs, th), "saved_task_id": saved.get(m["id"]),
+                                             **trd_field(marks, m, me())} for m in rows]), has_more=more,
+                   users={str(k): v for k, v in names.items()}, pins=le2c_out(c, r, cpin_team_list(c, rid)), **out)  # 2.62.0 (#1848): also older than the page; 2.64.2 C: the lock
 
 
 @app.post("/api/team/rooms/<int:rid>/messages")
@@ -391,6 +424,7 @@ def tchat_post(rid):
         mentions = le2c_mentions(c, r, b)
     try:
         orig = reply_check(c, "t", b.get("reply_to"), room_id=rid)
+        root = tth_root(c, rid, b.get("thread_of"))  # 2.139.0 A (#2127): an answer in a thread (400: not a live message of this room)
     except BadInput as e:
         return err(str(e))
     cid = csd_client_id(b)  # 2.62.0 (#1530): the same message sent again (several Enter presses) -> the stored one
@@ -399,8 +433,8 @@ def tchat_post(rid):
         if dup:
             return jsonify(tchat_msg_dict(c, dup, tchat_rx(c, [dup["id"]]))), 200
     ts = iso_ms(now_utc())
-    mid = insert_id(c, "INSERT INTO tchat_msgs(room_id,user_id,body,task_id,created_at,reply_to,enc) VALUES(?,?,?,?,?,?,?)",
-                    (rid, me(), text, tid, ts, orig["id"] if orig else None, enc))
+    mid = insert_id(c, "INSERT INTO tchat_msgs(room_id,user_id,body,task_id,created_at,reply_to,enc,thread_of) VALUES(?,?,?,?,?,?,?,?)",
+                    (rid, me(), text, tid, ts, orig["id"] if orig else None, enc, root))
     if cid:
         c.execute("UPDATE tchat_msgs SET client_id=? WHERE id=?", (cid, mid))
     if r["kind"] == "channel" and me() not in tcx_members(c, r):  # 2.113.1 (#2059): writing in an open channel joins it
@@ -408,8 +442,11 @@ def tchat_post(rid):
     if files:
         tcx_store(c, r, c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone(), files)
     c.execute("UPDATE tchat_rooms SET last_at=? WHERE id=?", (ts, rid))
-    c.execute("INSERT INTO tchat_reads(room_id,user_id,last_id) VALUES(?,?,?) ON CONFLICT(room_id,user_id) DO UPDATE SET last_id=excluded.last_id",
-              (rid, me(), mid))
+    if root:  # 2.139.0 A (#2127): the thread's people (its first message's author, the @mentioned, me: read up to here)
+        tth_follow(c, r, root, [*mentions, *([orig["user_id"]] if orig and orig["user_id"] else [])], mid)
+    else:
+        c.execute("INSERT INTO tchat_reads(room_id,user_id,last_id) VALUES(?,?,?) ON CONFLICT(room_id,user_id) DO UPDATE SET last_id=excluded.last_id",
+                  (rid, me(), mid))
     m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
     tchat_notify(c, r, m, mentions, replied=orig["user_id"] if orig and orig["user_id"] != me() else None)
     c.commit()
@@ -468,6 +505,8 @@ def tchat_notify(c, r, m, mentions, replied=None):
     # 2.46.1 (#1639): an agent that listens in on the list gets every channel message, not only an @mention; never a message of
     # an agent (no loop between agents); health lists and an agent's list limit stay with agent_emit
     listen = set(listen_agents_of(c, r["list_id"])) if r["kind"] == "list" and sender not in ags else set()
+    root = m["thread_of"] if "thread_of" in m.keys() else None  # 2.139.0 A (#2127): an answer in a thread notifies its people only
+    follow = {x[0] for x in c.execute("SELECT user_id FROM tchat_thread_reads WHERE root_id=? AND follow=1", (root,))} if root else set()
     for uid in sorted(members - {sender}):
         if uid in ags:
             if r["kind"] == "channel":  # 2.113.1 (#2059): a personal agent in a channel is addressed by its owner only (like agent_usable)
@@ -481,7 +520,8 @@ def tchat_notify(c, r, m, mentions, replied=None):
                                                      "message": {"id": m["id"], "text": text[:AGENT_EVENT_COMMENT_CHARS], "user_id": sender,
                                                                  "task_id": m["task_id"], "created_at": m["created_at"],
                                                                  "reply_to": m["reply_to"], "reply": rq,
-                                                                 "attachments": _tcx_files_api(c, m["id"])},  # 2.113.1 (#2059)
+                                                                 "attachments": _tcx_files_api(c, m["id"]),  # 2.113.1 (#2059)
+                                                                 "thread_of": root},  # 2.139.0 A (#2127)
                                                      "user": {"id": sender, "name": who}})
             continue
         s = collab_user(c, uid, r["list_id"])
@@ -489,9 +529,12 @@ def tchat_notify(c, r, m, mentions, replied=None):
             continue
         _lr, muted = tchat_last_read(c, r["id"], uid)
         dm, ment = r["kind"] in ("dm", "group"), uid in mentions  # 2.113.1 (#2059): a group pushes like a DM
-        if r["kind"] == "list" and not ment and not (list_bell(c, uid, r["list_id"])[0] == "all"):
+        if root:  # 2.139.0 A (#2127): a thread answer: only its people (the room's mute / the chat row still apply)
+            if uid not in follow and not ment:
+                continue
+        elif r["kind"] == "list" and not ment and not (list_bell(c, uid, r["list_id"])[0] == "all"):
             continue
-        if r["kind"] == "channel" and not ment:  # 2.113.1 (#2059): a channel pushes @mentions and answers only
+        elif r["kind"] == "channel" and not ment:  # 2.113.1 (#2059): a channel pushes @mentions and answers only
             continue
         if muted and not ment:
             continue
@@ -509,7 +552,8 @@ def tchat_notify(c, r, m, mentions, replied=None):
         msg = tr("New message from {0}", who, lg=lg) if sealed else \
             tr("{0} replied to your message: {1}", who, text, lg=lg) if uid == replied and r["kind"] != "dm" else \
             tr("Replied to your message: {0}", text, lg=lg) if uid == replied else (text or tr("Sent a file", lg=lg))  # 2.113.1 (#2059): only files
-        g.pushes.append((uid, title, msg[:300], f"{PUBLIC_URL}/#team/{r['id']}", push_prio(s)))
+        g.pushes.append((uid, title, msg[:300], f"{PUBLIC_URL}/#msg/t/{r['id']}/{m['id']}" if root else f"{PUBLIC_URL}/#team/{r['id']}",
+                         push_prio(s)))  # 2.139.0 A (#2127): a thread answer opens its thread
 
 
 def need_tmsg(c, mid, edit=False):
@@ -614,11 +658,14 @@ def tchat_react(mid):
 
 @app.post("/api/team/rooms/<int:rid>/read")
 def tchat_read(rid):
-    """{last_id?, muted?} -- everything up to last_id (default: the newest) is read; muted = no pushes except mentions."""
+    """{last_id?, muted?} -- everything up to last_id (default: the newest) is read; muted = no pushes except mentions.
+    2.139.0 A (#2127): {thread: <first message id>, last_id?} = the read mark in that thread (default: its newest answer)."""
     c = db()
     need_tchat(c)
     need_room(c, rid)
     b = body()
+    if b.get("thread") is not None:
+        return tth_read(c, rid, b)
     lid = b.get("last_id")
     if lid is None and "muted" in b:  # only (un)muting: the read mark stays
         lid = 0
@@ -637,6 +684,138 @@ def tchat_read(rid):
         push_handled(c, me(), [], (f"team-{rid}",))  # 2.19.0 (#668): read here = its notification closes elsewhere
     c.commit()
     return jsonify(ok=True, last_id=max(lr, lid), muted=muted, unread=tchat_unread(c, me()))
+
+
+# ---- 2.139.0 A (#2127): threads. A message answers in a thread when it carries thread_of = the id of the thread's first
+# message (the root, a message of the main conversation of the same room). One level: an answer to an answer hangs at the same
+# root. The main conversation lists no thread answers; the root carries thread_count / thread_last_at / thread_users and my
+# unread answers. tchat_thread_reads keeps a read mark per person and thread; follow = the person takes part (the root's
+# author, who answered, who was @mentioned or answered by reply_to; in a DM both): only they count its answers as unread and
+# get its pushes. The plain id is metadata, so threads work in end-to-end encrypted rooms too (the text stays sealed).
+TTH_USERS = 3  # avatars of a thread's line
+
+
+def tth_get(c, rid, mid):
+    """The root row of the thread message mid of room rid belongs to (an answer names its root; any other message is a root), else None."""
+    m = c.execute("SELECT * FROM tchat_msgs WHERE id=? AND room_id=?", (mid, rid)).fetchone()
+    if m and m["thread_of"]:
+        m = c.execute("SELECT * FROM tchat_msgs WHERE id=? AND room_id=?", (m["thread_of"], rid)).fetchone()
+    return m
+
+
+def tth_root(c, rid, v):
+    """thread_of of a new message -> the root id (None = the main conversation); BadInput when it is no live message of rid."""
+    from ..personal.timetrack import BadInput
+    if v in (None, "", 0, "0"):
+        return None
+    if isinstance(v, bool) or not (isinstance(v, int) or (isinstance(v, str) and v.isdigit())):
+        raise BadInput(tr("Invalid value: {0}", "thread_of"))
+    m = tth_get(c, rid, int(v))
+    if not m or m["deleted_at"]:
+        raise BadInput(tr("This thread cannot be answered here"))
+    return m["id"]
+
+
+def tth_follow(c, r, root, uids, mid):
+    """After answer mid in thread root: its people take part (the root's author and in a DM both: every answer is new to them;
+    uids = the @mentioned / answered: from this answer on), the sender also read it up to mid."""
+    ra = c.execute("SELECT user_id FROM tchat_msgs WHERE id=?", (root,)).fetchone()
+    full = {ra[0] if ra else None, *((r["a"], r["b"]) if r["kind"] == "dm" else ())} - {None, me()}
+    for u in sorted(full | (set(uids) - {None, me()})):
+        c.execute("INSERT INTO tchat_thread_reads(root_id,user_id,room_id,last_id,follow) VALUES(?,?,?,?,1) "
+                  "ON CONFLICT(root_id,user_id) DO UPDATE SET follow=1", (root, u, r["id"], 0 if u in full else mid - 1))
+    c.execute("INSERT INTO tchat_thread_reads(root_id,user_id,room_id,last_id,follow) VALUES(?,?,?,?,1) ON CONFLICT(root_id,user_id) "
+              "DO UPDATE SET follow=1, last_id=GREATEST(tchat_thread_reads.last_id, excluded.last_id)", (root, me(), r["id"], mid))
+
+
+def tth_unread(c, rid, uid):
+    """(unread answers in the threads of room rid uid takes part in, whether one of them @mentions uid)."""
+    r = c.execute("""SELECT COUNT(*), COALESCE(SUM(CASE WHEN m.body ILIKE ? THEN 1 ELSE 0 END),0) FROM tchat_msgs m
+                     JOIN tchat_thread_reads t ON t.root_id=m.thread_of AND t.user_id=? AND t.follow=1
+                     WHERE t.room_id=? AND m.room_id=? AND m.id>t.last_id AND m.deleted_at IS NULL AND COALESCE(m.user_id,0)!=?""",
+                  (f"%<@{uid}>%", uid, rid, rid, uid)).fetchone()
+    return r[0], bool(r[1])
+
+
+def tth_summary(c, uid, ids):
+    """{root id: {count, last_at, users, unread, follow}} for the messages ids that have live answers."""
+    ids = sorted({int(i) for i in ids if i})
+    if not ids:
+        return {}
+    q = ",".join("?" * len(ids))
+    out = {r[0]: {"count": r[1], "last_at": r[2], "users": [], "unread": 0, "follow": False} for r in c.execute(
+        f"SELECT thread_of, COUNT(*), MAX(created_at) FROM tchat_msgs WHERE thread_of IN ({q}) AND deleted_at IS NULL GROUP BY thread_of", ids)}
+    if not out:
+        return out
+    for r in c.execute(f"""SELECT thread_of, user_id FROM tchat_msgs WHERE thread_of IN ({q}) AND deleted_at IS NULL AND user_id IS NOT NULL
+                           GROUP BY thread_of, user_id ORDER BY MAX(id) DESC""", ids):
+        if r[0] in out and len(out[r[0]]["users"]) < TTH_USERS:
+            out[r[0]]["users"].append(r[1])
+    for r in c.execute(f"""SELECT t.root_id, t.follow, (SELECT COUNT(*) FROM tchat_msgs m WHERE m.thread_of=t.root_id AND m.id>t.last_id
+                             AND m.deleted_at IS NULL AND COALESCE(m.user_id,0)!=?) FROM tchat_thread_reads t
+                           WHERE t.user_id=? AND t.root_id IN ({q})""", (uid, uid, *ids)):
+        if r[0] in out:
+            out[r[0]].update(follow=bool(r[1]), unread=r[2] if r[1] else 0)
+    return out
+
+
+def tth_fields(x):
+    """The thread fields of a message (x = its tth_summary entry, None = no answers)."""
+    x = x or {}
+    return {"thread_count": x.get("count", 0), "thread_last_at": x.get("last_at"), "thread_users": x.get("users", []),
+            "thread_unread": x.get("unread", 0), "thread_follow": x.get("follow", False)}
+
+
+def tth_last_read(c, root, uid):
+    r = c.execute("SELECT last_id FROM tchat_thread_reads WHERE root_id=? AND user_id=?", (root, uid)).fetchone()
+    return r[0] if r else 0
+
+
+def tth_read(c, rid, b):
+    """POST read with {thread, last_id?}: my read mark in a thread (only looking does not make me take part)."""
+    v, lid = b.get("thread"), b.get("last_id")
+    if isinstance(v, bool) or not isinstance(v, int):
+        return err(tr("Invalid value: {0}", "thread"))
+    root = tth_get(c, rid, v)
+    if not root:
+        raise Denied(404)
+    if lid is None:
+        lid = c.execute("SELECT COALESCE(MAX(id),0) FROM tchat_msgs WHERE thread_of=?", (root["id"],)).fetchone()[0]
+    elif isinstance(lid, bool) or not isinstance(lid, int):
+        return err(tr("Invalid value: {0}", "last_id"))
+    c.execute("INSERT INTO tchat_thread_reads(root_id,user_id,room_id,last_id,follow) VALUES(?,?,?,?,0) ON CONFLICT(root_id,user_id) "
+              "DO UPDATE SET last_id=GREATEST(tchat_thread_reads.last_id, excluded.last_id)", (root["id"], me(), rid, max(lid, 0)))
+    c.commit()
+    return jsonify(ok=True, thread=root["id"], last_id=tth_last_read(c, root["id"], me()), unread=tchat_unread(c, me()))
+
+
+# ---- 2.139.0 A (#2129): "Read by". The read marks are there (tchat_reads.last_id, in a thread tchat_thread_reads.last_id); a
+# member of the room sees, at their own messages, who of the others read up to there. The personal setting chat_read_receipts
+# ("Send read receipts", default on) off = the others do not see my mark and I see nobody's (both ways). Agents read through
+# mark_team_chat_read and count like people.
+TRD_USERS = 20
+
+
+def trd_marks(c, rid, mem, uid, root=None):
+    """{member: read mark} of the others in room rid (root: in that thread) who send read receipts; None when uid sends none."""
+    if usettings(c, uid).get("chat_read_receipts") == "0":
+        return None
+    others = sorted(u for u in mem if u != uid)
+    if not others:
+        return {}
+    off = {r[0] for r in c.execute("SELECT user_id FROM user_settings WHERE key='chat_read_receipts' AND value='0' AND user_id IN "
+                                   f"({','.join('?' * len(others))})", others)}
+    have = {r[0]: r[1] for r in (c.execute("SELECT user_id, last_id FROM tchat_thread_reads WHERE root_id=?", (root,)) if root
+                                 else c.execute("SELECT user_id, last_id FROM tchat_reads WHERE room_id=?", (rid,)))}
+    return {u: have.get(u, 0) for u in others if u not in off}
+
+
+def trd_field(marks, m, uid):
+    """{read_by: {count, users (the first TRD_USERS)}} at a live message of uid, else {}."""
+    if marks is None or m["user_id"] != uid or m["deleted_at"]:
+        return {}
+    who = [u for u, last in marks.items() if last >= m["id"]]
+    return {"read_by": {"count": len(who), "users": who[:TRD_USERS]}}
 
 
 # ---- REST API v1 (people and agents; agents cannot open DMs)
@@ -663,9 +842,10 @@ def v1_tchat_dm():
 @app.get("/api/v1/team/rooms/<int:rid>/messages")
 @v1_view
 def v1_tchat_messages(rid):
-    v1_args(("before", "limit"))
+    v1_args(("before", "limit", "thread"))  # 2.139.0 A (#2127): thread
     j = v1_call(tchat_messages, rid)
-    return jsonify(data=j["messages"], room=j["room"], has_more=j["has_more"], next_cursor=None, pins=j["pins"])  # 2.62.0 (#1848): pins
+    return jsonify(data=j["messages"], room=j["room"], has_more=j["has_more"], next_cursor=None, pins=j["pins"],  # 2.62.0 (#1848): pins
+                   **({"root": j["root"], "thread_read": j["thread_read"]} if "root" in j else {}))
 
 
 @app.post("/api/v1/team/rooms/<int:rid>/messages")
@@ -674,10 +854,10 @@ def v1_tchat_post(rid):
     v1_args(())
     if request.files or request.form:  # 2.113.1 (#2059): a multipart form with files (body, task_id, reply_to, file...)
         b = {k: request.form.get(k) for k in request.form}
-        reject_unknown({k: v for k, v in b.items()}, ("body", "task_id", "reply_to"))
+        reject_unknown({k: v for k, v in b.items()}, ("body", "task_id", "reply_to", "thread_of"))
     else:
         b = v1_json()
-        reject_unknown(b, ("body", "task_id", "reply_to"))  # 2.33.0 (#1076): reply_to
+        reject_unknown(b, ("body", "task_id", "reply_to", "thread_of"))  # 2.33.0 (#1076): reply_to; 2.139.0 A (#2127): thread_of
     return jsonify(v1_call(tchat_post, rid, body=b)), 201
 
 
@@ -712,7 +892,7 @@ def v1_tchat_react(mid):
 def v1_tchat_read(rid):
     v1_args(())
     b = v1_json()
-    reject_unknown(b, ("last_id", "muted"))
+    reject_unknown(b, ("last_id", "muted", "thread"))  # 2.139.0 A (#2127): thread
     return jsonify(v1_call(tchat_read, rid, body=b))
 
 
@@ -736,7 +916,15 @@ def team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                    "decrypt it in their browser) or {sys: on | off} (the notice that switched it)"),
         "pinned_at": nul("string", description="2.62.0 (#1848): pinned since (null = not pinned); the conversation's page carries pins"),
         "pinned_by": nul("integer", description="2.62.0 (#1848): who pinned it"),
-        "attachments": {"type": "array", "items": {"type": "object"}, "description": "2.113.1 (#2059): files [{id, name, mime, size, url}] (url = /api/v1/team/files/{id})"}}}
+        "attachments": {"type": "array", "items": {"type": "object"}, "description": "2.113.1 (#2059): files [{id, name, mime, size, url, voice, duration_ms}] (url = /api/v1/team/files/{id}; 2.139.0 (#2128): voice = a voice message, duration_ms its length, not transcribed)"},
+        "thread_of": nul("integer", description="2.139.0 (#2127): the first message of the thread this message answers in (null = the main conversation)"),
+        "thread_count": {"type": "integer", "description": "2.139.0 (#2127): answers in this message's thread (0 = none)"},
+        "thread_last_at": nul("string", format="date-time", description="2.139.0 (#2127): the newest answer of its thread"),
+        "thread_users": {"type": "array", "items": {"type": "integer"}, "description": "2.139.0 (#2127): who answered last in its thread (up to 3)"},
+        "thread_unread": {"type": "integer", "description": "2.139.0 (#2127): answers you have not read in a thread you take part in"},
+        "thread_follow": {"type": "boolean", "description": "2.139.0 (#2127): you take part in its thread (wrote it, answered or were mentioned)"},
+        "read_by": {"type": "object", "description": "2.139.0 (#2129): only at your own messages, when read receipts are on for you: "
+                    "{count, users (the first 20 member ids)} of the others who read up to it (in a thread: in that thread)"}}}
     schemas["TeamMessagePage"] = page("TeamMessage")
     rp, mp = pid(desc="Conversation (room) id"), pid(desc="Message id")
     from .teamchan import tcx_spec
@@ -747,15 +935,23 @@ def team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                     ok({"type": "object"}) | errs("403", "404"), body={"type": "object", "properties": {"user_id": {"type": "integer"}},
                                                                                      "required": ["user_id"]}, scope="comments")}
     paths["/team/rooms/{id}/messages"] = {
-        "get": op("Messages of a conversation, oldest first (?before=<id> for older ones); 2.62.0 (#1848): pins = its pinned messages", TC, ok(ref("TeamMessagePage")) | errs("400", "404"),
-                  [rp, q("before", "Only messages older than this id", {"type": "integer"}), q("limit", "At most this many (1-100)", {"type": "integer"})]),
+        "get": op("Messages of a conversation, oldest first (?before=<id> for older ones); 2.62.0 (#1848): pins = its pinned messages. "
+                  "2.139.0 (#2127): the main conversation without thread answers; ?thread=<message id> = the answers of that message's "
+                  "thread (root = its first message, thread_read = your read mark there)", TC, ok(ref("TeamMessagePage")) | errs("400", "404"),
+                  [rp, q("before", "Only messages older than this id", {"type": "integer"}), q("limit", "At most this many (1-100)", {"type": "integer"}),
+                   q("thread", "2.139.0 (#2127): the answers of this message's thread", {"type": "integer"})]),
         "post": op("Write in a conversation; mention people as <@id>. 2.113.1 (#2059): or multipart/form-data with body, task_id, reply_to "
                    "and up to 10 fields file (the body may then be empty; not in end-to-end encrypted conversations: 409)", TC, ok(ref("TeamMessage"), "Created", "201") | errs("400", "404"), [rp],
                    body={"type": "object", "properties": {"body": {"type": "string"}, "task_id": {"type": "integer"},
-                                                          "reply_to": {"type": "integer", "description": "2.33.0: answer this message of the same conversation (else 400)"}},
+                                                          "reply_to": {"type": "integer", "description": "2.33.0: answer this message of the same conversation (else 400)"},
+                                                          "thread_of": {"type": "integer", "description": "2.139.0 (#2127): answer in the thread of this message "
+                                                                        "of the same conversation (an answer's id names its thread; deleted / other room: 400)"}},
                          "required": ["body"]}, scope="comments")}
-    paths["/team/rooms/{id}/read"] = {"post": op("Mark a conversation read (up to last_id) and / or mute it", TC, ok({"type": "object"}) | errs("400", "404"),
-                                                 [rp], body={"type": "object", "properties": {"last_id": {"type": "integer"}, "muted": {"type": "boolean"}}}, scope="comments")}
+    paths["/team/rooms/{id}/read"] = {"post": op("Mark a conversation read (up to last_id) and / or mute it; 2.139.0 (#2127): with thread = "
+                                                 "the read mark in that thread", TC, ok({"type": "object"}) | errs("400", "404"),
+                                                 [rp], body={"type": "object", "properties": {"last_id": {"type": "integer"}, "muted": {"type": "boolean"},
+                                                                                              "thread": {"type": "integer", "description": "2.139.0 (#2127): the thread's first message"}}},
+                                                 scope="comments")}
     paths["/team/messages/{id}"] = {
         "patch": op("Change your own message", TC, ok(ref("TeamMessage")) | errs("400", "403", "404", "409"), [mp],
                     body={"type": "object", "properties": {"body": {"type": "string"}}, "required": ["body"]}, scope="comments"),

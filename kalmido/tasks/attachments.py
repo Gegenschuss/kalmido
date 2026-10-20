@@ -5,7 +5,7 @@ import re
 import uuid
 from flask import g, has_request_context, jsonify, request
 
-from ..core.config import app, ATT_DIR, INLINE_TYPES, MAX_FILE_MB
+from ..core.config import app, ATT_DIR, AUDIO_INLINE_TYPES, INLINE_TYPES, MAX_FILE_MB
 from ..core.i18n import tr
 from ..core.db import bump, db, err, insert_id, iso, now_utc
 from ..accounts.session import me
@@ -243,7 +243,10 @@ def send_stored(a):
         e = err(tr("File damaged or missing"), 410 if os.path.isfile(full) else 404)
         e[0].headers["Cache-Control"] = "no-store"  # never cache a broken answer
         return e
-    inline = a["mime"] in INLINE_TYPES and request.args.get("dl") != "1"
+    # 2.139.0 B (#2128): audio too, but only a voice message (its content was checked as audio on upload; any other file's
+    # audio type comes from the browser / the name only); Range requests answer 206 (send_file conditional, also sealed)
+    voice = a["mime"] in AUDIO_INLINE_TYPES and "voice" in a.keys() and bool(a["voice"])
+    inline = (a["mime"] in INLINE_TYPES or voice) and request.args.get("dl") != "1"
     resp = oc_send_file(db(), full, mimetype=a["mime"] if inline else "application/octet-stream",  # 2.42.0 (#828): sealed -> decrypted
                         as_attachment=not inline, conditional=True, max_age=0,
                         # 2.64.2 B (#1817): a list file's name is a ciphertext (the real one is inside the file)
