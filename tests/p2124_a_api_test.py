@@ -243,7 +243,8 @@ if IM:
     for a, (raw, val) in want.items():
         x = cell(d, a)
         check(x.get("raw") == raw and x.get("value") == val, f"import {a}: {raw} = {val!r} " + json.dumps(x)[:250])
-    put(A, IM, [{"cell": "D1", "raw": '=SVERWEIS("a";A1:B3;2)'}])
+    A.post(B + f"/api/sheets/{IM}/columns", json={"title": "Check", "kind": "text"})
+    check(put(A, IM, [{"cell": "D1", "raw": '=SVERWEIS("a";A1:B3;2)'}]).ok, "a VLOOKUP with three arguments")
     r = A.get(B + f"/api/sheets/{IM}/export.xlsx")
     check(r.ok, "export .xlsx")
     sx = zipfile.ZipFile(io.BytesIO(r.content)).read("xl/worksheets/sheet1.xml").decode()

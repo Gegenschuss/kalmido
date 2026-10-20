@@ -83,7 +83,7 @@ const item = (d, re) => [...d.querySelectorAll('[role="menuitem"]')].find(b => r
   click(w, md.querySelector('[data-m="save"]'));
   check(await until(() => d.querySelectorAll('#shc-box svg.shc-svg path.shc-s0').length === 3), 'saved: an SVG with three bars ' + d.getElementById('shc-box')?.innerHTML.slice(0, 200));
   check((await call('GET', `/api/sheets/${SID}`)).chart?.y?.[0] === C[1], 'the setting is stored');
-  check(/Apples/.test(d.querySelector('#shc-box svg').textContent) && /Pears/.test(d.querySelector('#shc-box svg').textContent), 'the labels from column A');
+  check(/Apples/.test(d.querySelector('#shc-box svg.shc-svg').textContent) && /Pears/.test(d.querySelector('#shc-box svg.shc-svg').textContent), 'the labels from column A');
   // one undo step: Undo removes the chart, Redo brings it back
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await call('GET', `/api/sheets/${SID}`)).chart === null && !d.getElementById('shc-box')), 'undo: no chart again');
@@ -119,7 +119,7 @@ const item = (d, re) => [...d.querySelectorAll('[role="menuitem"]')].find(b => r
 
   // ---- a reader sees the chart, without the edit button
   w = await boot({user: 'carol', hash: 'sheets/' + SID}); d = w.document;
-  check(await until(() => d.querySelector('#shc-box svg')), 'the reader sees the chart');
+  check(await until(() => d.querySelector('#shc-box svg.shc-svg')), 'the reader sees the chart');
   check(!d.querySelector('#shc-box [data-shc="edit"]'), 'no edit button for a reader');
   click(w, d.querySelector('[data-shv="menu"]'));
   await sleep(300);
