@@ -7,6 +7,15 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.122.2] - 2026-10-20
+
+Office: scroll position, fixed cost import, tab picker.
+
+### Fixed
+- Office: saving an entry (cash flow, subscriptions, books incl. the year switch, logbook, travel costs, templates, pipeline, contracts) keeps the view and its scroll position; no short "Loading…" page any more (#2327).
+- Office: the fixed cost import fits a phone (amount and VAT rate on a second line), suggests 0 % VAT for bank and credit costs, taxes (not the tax adviser), service charge, memberships, KSK, Knappschaft and BG, finds a header row without "Name" in A1 and skips rows with only "0" (#2323).
+- Settings > Appearance: "+ Add tab …" opens a sheet with a search, folded sections, lists below their folder and the app's icons instead of one long list (#2329).
+
 ## [2.122.0] - 2026-10-20
 
 File store and documents: file request links, tags everywhere, a stronger search; swiping through the news; yearly VAT.
