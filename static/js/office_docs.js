@@ -162,8 +162,10 @@ function ofdEditorHtml() {
     ${stSel}<span class="spacer"></span>
     <span class="ofdsave muted" aria-live="polite">${OFD.saving ? tr('Saving…') : OFD.err ? esc(OFD.err) : ''}</span>${acts.join('')}
     ${lk || ro ? '' : `<button type="button" class="btn sm ofdfin" data-ofd="finalize" title="${esc(tr('Freeze number, positions, sums, sender and tax rates'))}">${ic('lock', 's')}<span>${tr('Finalise')}</span></button>`}
-    <a class="btn sm ofdpdf" href="${ofdPdfUrl(d.id, true)}" target="_blank" rel="noopener" data-ofd="pdf"${typeof pv_attr === 'function' ? pv_attr({url: ofdPdfUrl(d.id, true), name: (d.number || tr('Document')) + '.pdf', dlUrl: ofdPdfUrl(d.id)}) : ''} aria-label="${esc(tr('Open PDF'))}" title="${esc(tr('Open PDF'))}">${ic('pdf', 's')}<span class="ofdpdft">${tr('Preview')}</span></a>
-    <a class="btn sm ofddl" href="${ofdPdfUrl(d.id)}" download data-ofd="pdf" aria-label="${esc(tr('Download PDF'))}" title="${esc(tr('Download PDF'))}">${ic('download', 's')}<span class="ofdpdft">${tr('Download')}</span></a>
+    ${lk || ro || d.status !== 'draft' ? `<a class="btn sm ofdpdf" href="${ofdPdfUrl(d.id, true)}" target="_blank" rel="noopener" data-ofd="pdf"${typeof pv_attr === 'function' ? pv_attr(ofdPdfView(d)) : ''} aria-label="${esc(tr('Open PDF'))}" title="${esc(tr('Open PDF'))}">${ic('pdf', 's')}<span class="ofdpdft">${tr('Preview')}</span></a>
+    <a class="btn sm ofddl" href="${ofdPdfUrl(d.id)}" download data-ofd="pdf" aria-label="${esc(tr('Download PDF'))}" title="${esc(tr('Download PDF'))}">${ic('download', 's')}<span class="ofdpdft">${tr('Download')}</span></a>`
+    : `<button type="button" class="btn sm ofdpdf" data-ofd="pdf-ask" aria-label="${esc(tr('Open PDF'))}" title="${esc(tr('Open PDF'))}">${ic('pdf', 's')}<span class="ofdpdft">${tr('Preview')}</span></button>
+    <button type="button" class="btn sm ofddl" data-ofd="pdf-ask" data-dl="1" aria-label="${esc(tr('Download PDF'))}" title="${esc(tr('Download PDF'))}">${ic('download', 's')}<span class="ofdpdft">${tr('Download')}</span></button>`}
     <button type="button" class="btn sm" data-ofd="more" aria-haspopup="menu" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>`;
   const invFields = inv && kind !== 'reminder' ? `
     ${ofdF('order_ref', tr('PO number'), ofdIn('order_ref', d.order_ref, {max: 80, ph: tr('the client\'s order reference')}))}
@@ -376,6 +378,37 @@ async function ofdLoadLog(id) {
 
 // ---- saving
 // 2.40.0 (#1366): the PDF opens in the browser; the Android app's WebView shows no PDF itself, there the link downloads as before
+// 2.138.2 A (#2393): the PDF of a document not yet finalised: asked first ("Finalise now" = the normal finalising, then the
+// PDF; "Show as draft" = the PDF the server marks DRAFT on every page). A finalised, sent or read-only one opens as before.
+const ofdPdfView = d => ({url: ofdPdfUrl(d.id, true), name: (d.number || tr('Document')) + '.pdf', dlUrl: ofdPdfUrl(d.id)});
+function ofdPdfOpen(d, dl) {
+  if (!dl && typeof pdfView === 'function') { pdfView(ofdPdfView(d)); return; }
+  const a = document.createElement('a'); a.href = ofdPdfUrl(d.id, !dl);
+  if (dl) a.download = ''; else { a.target = '_blank'; a.rel = 'noopener'; }
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function ofdPdfAsk() {
+  return new Promise(res => {
+    let done = false;
+    const md = modal(`<h3 id="ofdpa-t">${esc(tr('This document is not finalised yet'))}</h3><div class="cdlg-b" id="ofdpa-b">${esc(tr('Finalise it now: number, positions, sums, sender and tax rates are frozen, then the PDF opens. Or look at it as a draft: every page is marked DRAFT.'))}</div>
+      <div class="foot"><button type="button" class="btn" data-pa="">${esc(tr('Cancel'))}</button><span class="spacer"></span><button type="button" class="btn" data-pa="draft">${esc(tr('Show as draft'))}</button><button type="button" class="btn pri" data-pa="final">${ic('lock', 's')} ${esc(tr('Finalise now'))}</button></div>`);
+    md.classList.add('cdlg', 'ofdpa');
+    md.setAttribute('role', 'alertdialog'); md.setAttribute('aria-modal', 'true'); md.setAttribute('aria-labelledby', 'ofdpa-t'); md.setAttribute('aria-describedby', 'ofdpa-b');
+    const prev = document.activeElement;
+    const fin = v => { if (done) return; done = true; res(v); if (md.isConnected) md.remove(); try { if (prev && prev.isConnected) prev.focus({preventScroll: true}); } catch { /* gone */ } };
+    md.addEventListener('click', e => { const b = e.target.closest('[data-pa]'); if (b) fin(b.dataset.pa || null); });
+    onRemove(md, () => fin(null));
+    setTimeout(() => $('[data-pa="draft"]', md)?.focus(), 30);
+  });
+}
+async function ofdPdfAskGo(d, dl) {
+  const v = await ofdPdfAsk(); if (!v) return;
+  if (v === 'final') {
+    const j = await ofdSave('POST', `/api/office/docs/${d.id}/finalize`, {}); if (!j) return;  // the server's checks: the error stays as toast
+    toast(tr('Finalised as {0}', j.number || '')); d = {...d, ...j};
+  }
+  ofdPdfOpen(d, dl);
+}
 const ofdPdfUrl = (id, inline) => `/api/office/docs/${id}/pdf${inline && !/; wv\)/.test(navigator.userAgent || '') ? '?inline=1' : ''}`;
 async function ofdSave(method, url, body) {
   OFD.saving++; ofdSaveHint();
@@ -459,7 +492,7 @@ function ofdMoreItems(d, inList) {
       {label: tr('Duplicate'), icon: 'copy', fn: async () => { try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/duplicate`); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } }},
       d.kind === 'offer' && d.client_id && ofcAdmin() && typeof dtFromOffer === 'function' ? {label: tr('Create order confirmation'), icon: 'file', fn: () => dtFromOffer(d)} : null,  // 2.93.0 A (#1927)
       !inList && d.kind === 'offer' && d.status !== 'accepted' ? {label: tr('Create invoice'), icon: 'receipt', fn: () => kvaToInvoice(d)} : null,  // 2.138.0 E (#2235): always reachable
-      {label: tr('Preview (PDF)'), icon: 'eye', fn: () => typeof pdfView === 'function' ? pdfView({url: ofdPdfUrl(d.id, true), name: (d.number || tr('Document')) + '.pdf', dlUrl: ofdPdfUrl(d.id)}) : window.open(ofdPdfUrl(d.id, true), '_blank', 'noopener')},  // 2.40.0 (#1364): the PDF, not the JSON print model
+      {label: tr('Preview (PDF)'), icon: 'eye', fn: () => !inList && !d.locked && d.can_edit && d.status === 'draft' ? ofdPdfAskGo(d, false) : ofdPdfOpen(d, false)},  // 2.40.0 (#1364): the PDF, not the JSON print model; 2.138.2 A (#2393): a draft asks first (a list row opens marked)
       ...(typeof ls_moreItems === 'function' ? ls_moreItems(d, inList) : []),  // 2.120.0 D (#2089)
       ofdIsInv(d) && d.kind !== 'reminder' && d.kind !== 'delivery' && d.locked ? {label: tr('E-invoice XML'), icon: 'download', fn: () => window.open(`/api/office/docs/${d.id}/xml`, '_blank', 'noopener')} : null,
       ofdIsInv(d) && d.kind !== 'reminder' && d.kind !== 'delivery' && d.locked ? {label: tr('Send to the DATEV inbox'), icon: 'send', fn: async () => { const j = await ofdSave('POST', `/api/office/docs/${d.id}/datev`); if (j) toast(tr('Sent to the DATEV inbox')); }} : null,
@@ -505,6 +538,7 @@ async function ofdClick(e) {
   }
   if (a === 'remind') { ofdReminderDialog(); return; }
   if (!d) return;
+  if (a === 'pdf-ask') { await ofdPdfAskGo(OFD.doc, !!b.dataset.dl); return; }  // 2.138.2 A (#2393)
   if (a.startsWith('tp-') && typeof tpClick === 'function') { await tpClick(a, b); return; }  // 2.47.0 (#1215): the parts
   if (a === 'to-invoice') { await kvaToInvoice(OFD.doc); return; }
   if (a === 'kva-st') { await ofdSave('POST', `/api/office/docs/${OFD.doc.id}/status`, {status: b.dataset.st}); return; }  // 2.138.0 E (#2235): the answer updates OFD.doc

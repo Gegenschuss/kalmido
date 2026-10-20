@@ -32,7 +32,15 @@ const BELL_N = 8;
 // 2.28.0 (#987): the unread direct messages (people writing to me) as rows at the top of "For you"
 const dmRows = () => teamOn() ? (S.tc.rooms || []).filter(r => r.kind === 'dm' && r.unread && !r.muted) : [];
 const dmRowHtml = r => `<a class="nitem unread k-dm ndm" href="#team/${r.id}" aria-label="${esc(trn('{0} new message from {1}', '{0} new messages from {1}', r.unread, r.name))}">${av(r.user_id, r.name, 'avatar', '', `<i class="nk">${ic('comment', 's')}</i>`)}<div class="nmain"><div class="ntext">${trn('{0} new message from {1}', '{0} new messages from {1}', r.unread, `<b>${esc(r.name)}</b>`)}</div>${r.last ? `<div class="nexc">${esc(mdBrief(r.last.text))}</div>` : ''}</div>${r.last_at ? `<time>${relTime(r.last_at)}</time>` : ''}</a>`;
-const newsSecHead = (k, n, first) => `<div class="nsec ${first ? 'first' : ''}">${k === 'me' ? ic('at', 's') : ic('pulse', 's')}<span>${k === 'me' ? tr('For you') : tr('Activity')}</span>${n ? `<span class="c nunread">${n}</span>` : ''}</div>`;
+const newsSecHead = (k, n, first) => `<div class="nsec ${k} ${first ? 'first' : ''}">${k === 'me' ? ic('at', 's') : k === 'read' ? ic('check', 's') : ic('pulse', 's')}<span>${k === 'me' ? tr('For you') : k === 'read' ? tr('Read') : tr('Also new')}</span>${n ? `<span class="c ${k === 'me' ? 'nunread' : ''}">${n}</span>` : ''}</div>`;
+// 2.138.2 D (#2405): the plain list in three sections (For you = unread + to me, Also new = other unread, Read = the rest); one grouping for bell, sheet and view
+const newsSecs = pairs => ({me: pairs.filter(([it]) => !it.read && newsForMe(it)), also: pairs.filter(([it]) => !it.read && !newsForMe(it)), read: pairs.filter(([it]) => it.read)});
+function newsPlainHtml(shown, dms, pop, dmHtml) {
+  const s = newsSecs(shown), row = ([it, i]) => newsItemHtml(it, i, pop);
+  return (dms.length || s.me.length ? newsSecHead('me', bellCount(), true) + dmHtml + s.me.map(row).join('') : '')
+    + (s.also.length ? newsSecHead('act', s.also.length, !dms.length && !s.me.length) + s.also.map(row).join('') : '')
+    + (s.read.length ? newsSecHead('read', 0, !dms.length && !s.me.length && !s.also.length) + s.read.map(row).join('') : '');
+}
 function bellPopHtml() {
   const mine = S.nf.items && S.nf.f === S.nf.filter ? S.nf.items : null, n = bellCount(), nAll = S.news?.unread || 0;
   if (teamOn() && S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; }); }
@@ -41,15 +49,12 @@ function bellPopHtml() {
   const all = [...forMe, ...act];  // "For you" first, then the activity
   const shown = all.filter(([it]) => newsKindOk(it)).slice(0, BELL_N);
   const dms = dmRows();
-  const head = `<div class="bphead"><button type="button" class="bphl" data-bp="news" title="${esc(tr('Show all'))}"><b id="bp-h">${tr('News')}</b><span class="bpchev" aria-hidden="true">›</span></button>${n ? `<span class="bpnew">${esc(trn('{0} new', '{0} new', n))}</span>` : ''}<span class="spacer"></span>${nAll ? `<button type="button" class="btn sm bpread" data-bp="readall" title="${esc(tr('Mark all as read'))}" aria-label="${esc(tr('Mark all as read'))}">${ic('check', 's')}<span>${tr('All read')}</span></button>` : ''}<button type="button" class="iconbtn" data-bp="settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
+  const head = `<div class="bphead"><button type="button" class="bphl" data-bp="news" title="${esc(tr('Show all'))}"><b id="bp-h">${tr('News')}</b><span class="bpchev" aria-hidden="true">›</span></button>${n ? `<span class="bpnew">${esc(tr('{0} for you', n))}</span>` : ''}<span class="spacer"></span>${nAll ? `<button type="button" class="btn sm bpread" data-bp="readall" title="${esc(tr('Mark all as read'))}" aria-label="${esc(tr('Mark all as read'))}">${ic('check', 's')}<span>${tr('All read')}</span></button>` : ''}<button type="button" class="iconbtn" data-bp="settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
   let body;
   if (!mine) body = `<div class="empty bpempty">${S.nf.err === 'offline' ? tr('News are only available online.') : S.nf.err ? esc(S.nf.err) : tr('Loading…')}</div>`;
   else if (!shown.length) body = `<div class="empty bpempty">${ic('bell')}<span>${all.length ? tr('Nothing of this kind.') : S.nf.unread && mine.length ? tr('No unread news') : tr('No news')}</span>${all.length ? '' : `<small class="muted">${esc(newsWhat())}</small>`}</div>`;
-  else if (newsBundled()) body = `<div class="nlist bplist nbund">${dms.map(dmRowHtml).join('')}${newsBundledHtml(all.filter(([it]) => newsKindOk(it)).slice(0, 40), true)}</div>`;  // 2.17.0 (#452)
-  else {  // 2.28.0 (#987): two sections
-    const me_ = shown.filter(([it]) => newsForMe(it)), ac = shown.filter(([it]) => !newsForMe(it));
-    body = `<div class="nlist bplist">${dms.length || me_.length ? newsSecHead('me', dms.reduce((a, r) => a + r.unread, 0) + me_.filter(([it]) => !it.read).length, true) + dms.map(dmRowHtml).join('') + me_.map(([it, i]) => newsItemHtml(it, i, true)).join('') : ''}${ac.length ? newsSecHead('act', ac.filter(([it]) => !it.read).length, !dms.length && !me_.length) + ac.map(([it, i]) => newsItemHtml(it, i, true)).join('') : ''}</div>`;
-  }
+  else if (newsBundled()) body = `<div class="nlist bplist nbund">${newsBundledHtml(all.filter(([it]) => newsKindOk(it)).slice(0, 40), true, dms.map(dmRowHtml).join(''))}</div>`;  // 2.17.0 (#452)
+  else body = `<div class="nlist bplist">${newsPlainHtml(shown, dms, true, dms.map(dmRowHtml).join(''))}</div>`;  // 2.138.2 D (#2405): three sections
   if (!mine && dms.length) body = `<div class="nlist bplist">${newsSecHead('me', dms.reduce((a, r) => a + r.unread, 0), true)}${dms.map(dmRowHtml).join('')}</div>`;
   const grab = isMobile() ? `<div class="bpgrab" data-bpgrab role="button" tabindex="0" aria-label="${esc(tr('Drag up for more room, tap for full height'))}" title="${esc(tr('Drag up for more room, tap for full height'))}"><i></i></div>`
     : `<button type="button" class="bpgrip" data-bpgrip aria-label="${esc(tr('Resize (arrow keys; double-click: default size)'))}" title="${esc(tr('Drag to resize · double-click: default size'))}"></button>`;
@@ -304,8 +309,7 @@ function viewNews() {
   if (!shown.length && !dms.length) return bar + chips + `<div class="empty nempty">${ic('bell')}<b>${tr('Nothing of this kind.')}</b></div>` + newsMoreHtml();
   // 2.28.0 (#987): "All" shows the two sections, what people sent me first, the activity behind it
   const listHtml = () => { if (newsBundled()) return `<div class="nbund">${newsBundledHtml(shown, false)}</div>`; if (tab !== 'all') return `<div class="nlist">${shown.map(([it, i]) => newsItemHtml(it, i)).join('')}</div>`;
-    const me_ = shown.filter(([it]) => newsForMe(it)), ac = shown.filter(([it]) => !newsForMe(it));
-    return `<div class="nlist">${dms.length || me_.length ? newsSecHead('me', dms.reduce((a, r) => a + r.unread, 0) + me_.filter(([it]) => !it.read).length, true) + dmh + me_.map(([it, i]) => newsItemHtml(it, i)).join('') : ''}${ac.length ? newsSecHead('act', ac.filter(([it]) => !it.read).length, !dms.length && !me_.length) + ac.map(([it, i]) => newsItemHtml(it, i)).join('') : ''}</div>`; };
+    return `<div class="nlist">${newsPlainHtml(shown, dms, false, dmh)}</div>`; };
   return bar + chips + (tab === 'all' && !newsBundled() ? '' : dmh) + listHtml() + newsMoreHtml() + `${isTouch() && !newsBundled() ? `<div class="muted nswipe">${tr('Swipe an item sideways to remove it.')}</div>` : ''}`;
 }
 async function loadNews() {

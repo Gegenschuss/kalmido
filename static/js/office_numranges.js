@@ -10,9 +10,10 @@ const ONUM_SCHEME_IDS = {offer: 'os-scheme', invoice: 'os-inv-scheme', credit: '
 // a number of the scheme with example values (the same building blocks the server knows, office/model.py)
 function onumFmt(scheme, seq) {
   const d = new Date(), y = String(d.getFullYear()), p2 = n => String(n).padStart(2, '0');
-  return String(scheme || '').replace(/\{(yyyy|yy|seq(?::0?(\d+))?|project|client|date|initials)\}/g, (m, t, w) =>
+  return String(scheme || '').replace(/\{(yyyy|yy|seq(?::0?(\d+))?|project|client|date|isodate|initials)\}/g, (m, t, w) =>
     t === 'yyyy' ? y : t === 'yy' ? y.slice(2) : t.startsWith('seq') ? String(seq).padStart(+w || 0, '0')
-      : t === 'project' ? tr('Project') : t === 'client' ? tr('Client') : t === 'date' ? y + p2(d.getMonth() + 1) + p2(d.getDate()) : 'AB');
+      : t === 'project' ? tr('Project') : t === 'client' ? tr('Client') : t === 'date' ? y + p2(d.getMonth() + 1) + p2(d.getDate())
+      : t === 'isodate' ? y + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) : 'AB');  // 2.138.2 (#2391)
 }
 
 async function onumLoad() {

@@ -30,7 +30,7 @@ INTEXT = ("intern", "extern", "shooting")  # 2.47.0 (#1216): shooting = only in 
 CREW_INTEXT = ("intern", "extern")  # 2.47.0 (#1649): the Drehpersonal
 TEXT_KINDS = ("rights_time", "rights_territory", "rights_media", "intro", "closing", "note", "block", "raw_note")
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
-SCHEME_RE = re.compile(r"\{(yyyy|yy|seq(?::0?(\d{1,2}))?|project|client|date|initials|version)\}")  # 2.118.0 A (#2265): version
+SCHEME_RE = re.compile(r"\{(yyyy|yy|seq(?::0?(\d{1,2}))?|project|client|date|isodate|initials|version)\}")  # 2.118.0 A (#2265): version; 2.138.2 A (#2391): isodate
 NAME_MAX = 200
 # 2.99.0 D (#2188, decision 18.10.2026): the own company name may have up to three lines (stored with line breaks); the
 # letterhead and the footer print them one under the other, the sender line, mails and the e-invoice (BT-27) on one line
@@ -479,8 +479,8 @@ def office_scheme_clean(v, name=None, offer=True):
     if "{" in rest or "}" in rest:
         m = re.search(r"\{[^{}]*\}?", rest)
         if offer:  # 2.118.0 A (#2265): + {version}
-            bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {initials} {version}"), m.group(0) if m else "{")
-        bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {initials}"), m.group(0) if m else "{")
+            bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {isodate} {initials} {version}"), m.group(0) if m else "{")
+        bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {isodate} {initials}"), m.group(0) if m else "{")
     if re.search(r"[\\/<>\"'&\x00-\x1f]", rest):  # 2.36.1 review: no markup characters in numbers
         bad(N_("These characters cannot be part of a number: \\ / < > \" ' &"))
     return v
@@ -510,6 +510,8 @@ def office_number_format(scheme, seq, d=None, project="", client="", initials=""
             return _slug(client)
         if t == "date":
             return d.strftime("%Y%m%d")
+        if t == "isodate":  # 2.138.2 A (#2391): the date with hyphens, 2026-04-15
+            return d.strftime("%Y-%m-%d")
         if t == "initials":
             return _slug(initials)
         if t == "version":  # 2.118.0 A (#2265)
@@ -578,7 +580,7 @@ def onc_parse(scheme, num):
             pat += r"(\d+)"
             names.append("version" if t == "version" else "seq")
         else:
-            pat += {"yyyy": r"\d{4}", "yy": r"\d{2}", "date": r"\d{8}"}.get(t, r".+?")
+            pat += {"yyyy": r"\d{4}", "yy": r"\d{2}", "date": r"\d{8}", "isodate": r"\d{4}-\d{2}-\d{2}"}.get(t, r".+?")
         pos = m.end()
     pat += re.escape(scheme[pos:])
     m = re.fullmatch(pat, num or "")
