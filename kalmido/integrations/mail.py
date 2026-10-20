@@ -243,7 +243,7 @@ def mail_fetch(M, folder, importer, max_bytes=None):
     n = 0
     typ, _ = M.select(folder)
     if typ != "OK":
-        raise imaplib.IMAP4.error("SELECT failed")
+        raise imaplib.IMAP4.error("could not select the folder")
     typ, data = M.uid("SEARCH", None, "UNSEEN")
     for u in (data[0] or b"").split()[:200]:
         if max_bytes:
