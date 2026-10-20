@@ -955,6 +955,13 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                  f"At most {PROP_MAX_ITEMS} entries, {PROP_MAX_BYTES // 1024} KB."})},
         "/agent/chats": {"get": op("Chat messages after a cursor", AG, ok(ref("ChatPage")) | errs("400", "403"),
                                    [q("since", "Message id", {"type": "integer"}), q("user_id", "One person", {"type": "integer"}), q("limit", "At most 500", {"type": "integer"})])},
+        # 2.144.0 A (#2412)
+        "/agent/aborted": {"post": op("2.144.0 (#2412): confirm an 'abort' event (the person pressed Stop in the chat) once the running answer "
+                                      "is ended: without job_id the status goes back to idle and the typing dots / live steps end; with job_id "
+                                      "(only that job's step was stopped) the status stays. Say in the chat what was done until then",
+                                      AG, ok(ref("Agent")) | errs("400", "403"), scope=W, body={
+            "type": "object", "properties": {"seq": {"type": "integer", "description": "The seq of the abort event"},
+                                             "job_id": nul("integer")}})},
         "/tasks/{id}/typing": {"post": op("2.22.0 (#693): \"<name> is writing …\" in the task's comments for 8 s (send it again while writing; "
                                           "people and agents alike, before a comment answer)", AG, ok({"type": "object"}) | errs("404"),
                                           [pid()], scope="comments")},

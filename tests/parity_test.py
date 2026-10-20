@@ -364,7 +364,7 @@ APP_ONLY = [
     ("approvals and proposals come only from people (the agent's side: /agent/jobs, POST /agent/jobs/{id}/proposal)", (
         "* /api/agents/jobs", "* /api/proposals", "POST /api/comments/{}/apply", "POST /api/comments/{}/decide")),
     ("people's side of the agent chat (2.39.0: also editing one's own message), waking and sharing with agents (the agent uses /agent/*)", (
-        "=GET /api/agents/{}/chat", "=POST /api/agents/{}/chat", "=PATCH /api/agents/{}/chat/{}", "POST /api/agents/{}/wake", "POST /api/tasks/{}/wake", "* /api/agents/{}/share", "PUT /api/lists/{}/agent",
+        "=GET /api/agents/{}/chat", "=POST /api/agents/{}/chat", "=PATCH /api/agents/{}/chat/{}", "POST /api/agents/{}/wake", "POST /api/agents/{}/abort", "POST /api/tasks/{}/wake", "* /api/agents/{}/share", "PUT /api/lists/{}/agent",
         "* /api/agents/{}/autoshare", "GET /api/agents/usage")),
     ("devices and pushes of a person", ("* /api/push/", "POST /api/ntfy/test")),
     # 2.142.0 A (#2145): agents get events, not pushes; the addresses of a person's channels are secrets of the account
@@ -394,6 +394,10 @@ APP_ONLY = [
     ("2.60.0 (#1514): environments (Staging, Live) are created, renamed and removed by people in the app, their deploy-webhook token is "
      "shown once to people; agents read them (list_environments) and record deployments (set_deployment)",
      ("* /api/lists/{}/envs", "* /api/envs/", "POST /api/hooks/deploy/")),
+    # 2.144.0 D (#797): the hosting operator's interface: its own token from a file, called by the hoster's console, never
+    # by a person or an agent (no account of the instance; numbers only)
+    ("2.144.0 (#797): the hosting operator's interface (own token, the hoster's console; not a user or agent API)",
+     ("GET /api/operator/status", "POST /api/operator/setup-code", "PUT /api/operator/notice")),
     ("external calendar subscriptions and the calendar feed link: personal settings", ("* /api/calendars", "* /api/ical")),
     # 2.111.0 (#2056): the secret subscription link of an event calendar is a person's own credential (like the task feed
     # link), and the editor's invitation info only serves the switch; agents send invitations with send_invites on the events

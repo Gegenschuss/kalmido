@@ -36,6 +36,7 @@ addresses and paths to your setup.
 - [Moving to a new server](#moving-to-a-new-server)
 - [Trash period of tasks (2.116)](#trash-period-of-tasks-2116)
 - [Production updates](#production-updates)
+- [Run by a hoster: the operator interface (2.144)](#run-by-a-hoster-the-operator-interface-2144)
 - [Support Kalmido (supporter licence)](#support-kalmido-supporter-licence)
 
 ## Requirements
@@ -1480,6 +1481,39 @@ trash for 30 days and are then deleted for good, with their comments and attachm
   backup.
 - **Keep the previous image** until the new version has proven itself; do not prune images right after an update.
 
+## Run by a hoster: the operator interface (2.144)
+
+A hoster that runs Kalmido instances for customers uses a console of its own (a separate program). The console talks to
+an instance only through a small HTTP interface; it never shares code with Kalmido. The operator is **not an account**
+of the instance and **never sees content**: no names, e-mail addresses, titles, texts or files.
+
+- **Off by default.** Without `KALMIDO_OPERATOR_TOKEN_FILE` every `/api/operator/...` route answers 404, like a route
+  that does not exist. The variable names a file with the operator token (32-512 characters, no blanks; for example
+  `openssl rand -base64 48`). The server reads it at start and keeps only a hash; a file that cannot be read or is too
+  short leaves the interface off. Mount the file read-only and keep it out of backups of the instance.
+- **Only the token.** The console sends `Authorization: Bearer <token>`. A missing or wrong token answers 401 and counts
+  against a limit per address (wrong tokens get 429 after 20 failures within 15 minutes; the right token always passes,
+  so strangers behind the same address cannot lock the console out). A token file readable by others only gives a
+  warning in the log (chmod 600 recommended). Only these three paths skip the person login. Session cookies, the proxy login and personal
+  access tokens never reach these routes, so an instance admin cannot use them either. Every call is written to the
+  server log with its action and the caller's address, never the token.
+- **Routes.**
+  - `GET /api/operator/status`: version, health (role, threads, connection pool, worker), numbers of people (total,
+    disabled, agents, active in 7 / 30 days), organisations, storage (files, database, free disk), backup state,
+    registration mode, the current notice's level and times (not its text).
+  - `POST /api/operator/setup-code`: a fresh one-time code for the setup page of a new instance, so the customer can
+    create the first admin. Only while no account exists (409 afterwards, and with a fixed `KALMIDO_SETUP_CODE`).
+    The code is valid for 24 hours and once; it is kept as a hash in the database, so it works with several web
+    processes. A new request replaces the previous code.
+  - `PUT /api/operator/notice`: `{level: "maintenance" | "info", text, minutes?}` sets the notice every client shows
+    (for a planned maintenance); an empty `text` clears it. It sends no push.
+- **Keep it private.** Reach the interface only from the console's network (a firewall rule or the reverse proxy),
+  never from the internet.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `KALMIDO_OPERATOR_TOKEN_FILE` | empty | File with the operator token; empty = the operator interface is off (404) |
+
 ## Support Kalmido (supporter licence)
 
 Since 2.74. A supporter licence is voluntary and paid once. It **unlocks nothing**: every feature stays free (AGPL-3.0).
@@ -1498,10 +1532,13 @@ servers only; with `KALMIDO_HOSTED=1` the section, the badge and the hint are hi
   Settings > Help > Support Kalmido > "Remind me once a year" turns it off. Members never see it.
 - **Payment link.** `KALMIDO_SUPPORT_URL=https://…` shows a "Become a supporter" button in that section. Unset (the
   default) means only the explanation and the key field are shown; only `https://` addresses are accepted.
+  `KALMIDO_SUPPORT_URL=default` (2.144) points the button at the purchase page on the Kalmido website.
+- **Prices (2.144).** The section names the prices: personal licence 25 EUR, server licence 100 EUR, each paid once,
+  VAT included, no subscription.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `KALMIDO_SUPPORT_URL` | empty | Payment page for supporter licences (https only); empty = no button |
+| `KALMIDO_SUPPORT_URL` | empty | Payment page for supporter licences (https only, or `default` = the website's purchase page); empty = no button |
 | `KALMIDO_SUPPORTER_EXTRA_PUBKEYS` | empty | Further trusted public keys (base64, comma separated) -- for tests; a licence unlocks nothing |
 
 Keys are made with `tools/supporter_key.py` (`genkey --out FILE` keeps the private key outside the repository with mode

@@ -7,6 +7,24 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.144.0] - 2026-10-20
+
+Agent chat with a stop button, agent colours and a quieter filter; the home block Today shows today's events; lists grouped by a custom field; groundwork for hosting (operator interface) and supporter licence prices.
+
+### Added
+- Agent chat: stop a running answer - a stop button next to Send while the agent works for you; Esc stops always, Ctrl+C stops when no text is selected (on a Mac always, plus Cmd+.). New agent event `abort` (`POST /api/agents/{id}/abort`), the agent confirms with `POST /api/v1/agent/aborted` or the MCP tool `confirm_abort`; the reference launcher ends the running command (#2412).
+- Agent chat: one icon in the header folds long messages for all at once (remembered per device); a message you unfold stays open, search and reply quotes unfold their target (#2417).
+- Agent chat: the header and the composer carry the agent's colour, so two agent chats are easy to tell apart (#2411).
+- Home: the block Today lists today's events above the tasks (switch "Show events" in the block settings); the header counts running jobs ("1 agent working (10 jobs)") and names overdue tasks of another workspace (#2418).
+- Lists: group a list by a custom text or choice field, one collapsible group per value, for all members; sections stay as they are. `PATCH /api/v1/lists/{id}` and the MCP tool `update_list` set `sort_mode` and `group_field` (#2414).
+- Hosting: optional operator interface for a hoster's console (`KALMIDO_OPERATOR_TOKEN_FILE`, off by default) - numbers only (version, health, people, organisations, storage, backup), a one-time setup code for the first admin (valid 24 h) and the maintenance notice, never any content (#797).
+- Supporter licence: the dialog shows the prices (person 25 EUR, server 100 EUR, once, VAT included); a purchase link only when switched on (#2158).
+
+### Fixed
+- Agent chat: the filter "Only me and ..." no longer shows job results with buttons; open approvals waiting for you stay visible; "Jobs" shows only job cards and their messages (#2416).
+- Agent chat: the filter is the icon in the chat header on every width, the filter row above the messages is gone (#2419).
+- Agent chat: a job card whose only message is the final result shows it below the card, its unfolding is remembered (#2365).
+
 ## [2.143.0] - 2026-10-20
 
 Organisation roles, off-site backups, a stronger offline app, sharing any file to Kalmido, the pages trash emptied for good.

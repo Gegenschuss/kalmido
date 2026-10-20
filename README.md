@@ -20,6 +20,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.144.0** (2026-10-20): agent chat - a **stop button** (Esc, Ctrl+C without a selection) for a running answer,
+  **agent colours** in header and composer, fold long messages for all at once, the filter as an icon in the header
+  that really hides job results; the home block **Today** shows today's events and counts running jobs; **group a
+  list** by a custom field; an optional **operator interface** for hosters (numbers only, no content) and the
+  supporter licence prices.
 - **2.143.0** (2026-10-20): organisation roles read-only, guest and accounting; off-site backups to S3, WebDAV or SFTP
   (encrypted only); outbox in IndexedDB with background sync, offline notes and time entries, an install hint; share
   any file type to Kalmido; appearance follows your account; activity per organisation for admins; the pages trash
@@ -2467,6 +2472,14 @@ Issues, translations and pull requests are welcome, see [CONTRIBUTING.md](CONTRI
 [tests/README.md](tests/README.md). Pull requests need a one-time agreement to the [CLA](CLA.md) (you keep your copyright; the
 project stays AGPL-3.0). Security problems: please report them privately, see [SECURITY.md](SECURITY.md).
 Contact: hello@kalmido.com.
+
+## Supporter licence
+
+Kalmido is free and stays free. If you want to support it, there is a voluntary one-time supporter licence: 25 EUR per
+person or 100 EUR per server, VAT included, no subscription. It unlocks nothing - every feature is in the free app - and
+shows a small badge under *Settings > Help > About*, where you also enter the key. The key is checked offline on your
+server. Purchases will run through a merchant of record with its buyer terms (refund within 14 days); until the shop is
+open the dialog shows only the prices. Hosted servers do not show the licence at all.
 
 ## License
 

@@ -708,6 +708,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `sprint_closed` | 2.60.0 (#343): a sprint was closed (by a person or after its last day); `sprint.review` holds the done / moved / added task ids, counts and points | `list_id`, `list`, `sprint` (with `review`), `next_sprint_id` |
 | `chat_pinned` | 2.62.0 (#1848): the person pinned or unpinned a message of the agent's chat (see [Pinned chat messages](#pinned-chat-messages-2620)); information only, nothing to answer (the reference launcher starts no run) | `message` (the chat message, with `pinned_at` / `pinned_by`), `pinned` (true / false), `user` `{id, name}` |
 | `contract_notice` | 2.70.0 (#1359): the last day to cancel a contract (Home & life) in a list shared with the agent is near: from the contract's own lead (else 30 days) before it; once per contract, deadline and agent; never from a health list; only while the person has the module *Contracts* on. 2.92.0 (#1925): also a business contract of the office (Office > Contracts & insurance, its deadline task carries `fam.office_agreement`; `office` true; the person needs the office module instead). Answer with ONE `propose_contract_notice` (see [Contracts and notice deadlines](#contracts-and-notice-deadlines-2700)) | `task_id`, `list_id`, `name`, `provider`, `cost`, `per`, `monthly`, `yearly`, `notice`, `notice_unit`, `due` (cancel by), `ends`, `renew_months`, `days`, `user` `{id, name}`, `lang`, `office` (2.92.0), `hint` |
+| `abort` | 2.144.0 (#2412): the person pressed **Stop** in the agent's chat (the button while the agent works, or Esc / Ctrl+C, see [Stopping a running answer](#stopping-a-running-answer-21440)); end the running answer at once, then confirm with `POST /api/v1/agent/aborted` | `user`, `source` (`chat`), `job_id` + `job` when it was pressed in a job's history (stop only that job's current step) |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -1273,6 +1274,11 @@ with `job_id`, else `400`; another value `400`): `say` (an interim message), `qu
 result, ⚠️ ⏰ ⏹ = error, else an interim message. Older servers answer `400` for the unknown field: send it again
 without. The reference starter sends `result` / `error` with a job's result (`agent_job.py`).
 
+2.144.0 (#2416 / #2419): the filter is the filter icon in the chat header on every width (a dot while it is not *All*).
+*Only me and <agent>* shows my messages and the main agent's answers; every message of a job (`job_id`, the `Job #N` start
+or an answer to a message addressed to a job) is left out, also with buttons, except an open approval or permission question
+that waits for me. *Jobs* shows the job cards and the job messages with buttons, plus my messages addressed to a job.
+
 **What the person sees in the chat header (2.4.1).** Under the agent's name: typing dots while it writes to this person,
 then its state in words: *working on #51* (the status task, a link), *working*, *waiting for you*, *ready* (idle),
 *paused*, *limit reached* or *not connected* (2.6.0; was *offline*). The dots show while the agent's status is `working` on nothing in particular, on a
@@ -1289,6 +1295,28 @@ event poll and no API call with its token (`contact_age` in the agent lists peop
 header's agent pill busy. An agent with a webhook is told about events, so it only shows *not connected* when `online`
 is `false`. Kalmido stores the last poll at most every 30 seconds and a token's last use at most every 60 seconds, so
 this costs nothing extra.
+
+### Stopping a running answer (2.144.0)
+
+While the agent works for a person (typing dots or status `working`), the chat shows a **Stop** button (at the computer
+also Esc; Ctrl+C when no text is selected, on a Mac Ctrl+C or Cmd+.). Pressing it sends the event `abort`
+`{user, source: "chat", job_id?, job?}` (`POST /api/agents/{id}/abort {job_id?}` in the app: whoever may write the agent may
+stop it; in a job's history also only who may stop that job). The agent ends the answer it is working on (a job: only
+its current step; the job keeps running and has its own Stop on its card), then confirms:
+
+```
+POST /api/v1/agent/aborted   {"seq": 812, "job_id": null}   -> the agent (status idle, typing dots and live steps end)
+```
+
+With `job_id` only that job's step was stopped and the status stays. Afterwards say in one or two lines in the chat what
+was done until then; nothing running = confirm only. MCP: `confirm_abort`. The reference launcher ends the running
+command (its whole process group) and posts the short note itself.
+
+Stop only **that person's** run: a team agent working for one person must not end it because someone else pressed Stop
+(the status `working` is the agent's, so others may see it too). Only `user.id` of the event = the person the running
+answer is for, or the agent's owner / operator, ends it; any other Stop is ignored (no confirmation, no note). The app
+shows the button only to the person the agent is writing to (its typing signal for them, or their own unanswered message
+while it works).
 
 **Typing in task comments (2.22.0).** Before an agent answers a comment on a task it sends
 `POST /api/v1/tasks/{id}/typing` (MCP: `comment_typing`, scope `comments`): everyone who sees the task's comments sees
@@ -2722,7 +2750,7 @@ Inside an interactive Claude Code session, you can instead call the MCP tool `wa
 with the scope it needs). The tools:
 
 - account: `get_me`, `list_agents`, `export_data`
-- lists: `list_lists`, `get_list`, `create_list`, `update_list` (also archive, folder), `delete_list`, `shift_list_dates`,
+- lists: `list_lists`, `get_list`, `create_list`, `update_list` (also archive, folder; 2.144.0: `sort_mode` and `group_field`, the shared sort and the grouping of the list view by a text / select custom field), `delete_list`, `shift_list_dates`,
   `set_list_columns`, `list_members`, `share_list`, `unshare_list`, `list_groups`, `get_group`, `list_list_groups`,
   `share_list_with_group`, `unshare_list_from_group`, `list_folders`, `rename_folder`, `delete_folder`
 - sections: `list_sections`, `create_section`, `rename_section`, `reorder_sections`, `delete_section`
@@ -2774,7 +2802,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
 `add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_shop_areas`, `add_snippet`,
 `add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
-`chat_typing`, `check_in_habit`, `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`,
+`chat_typing`, `check_in_habit`, `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `confirm_abort`,
 `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`, `create_event_calendar`, `create_field`,
 `create_file_folder`, `create_filter`, `create_form`, `create_habit`, `create_job`, `create_list`, `create_list_tag`,
 `create_note`, `create_offer_draft`, `create_office_lead`, `create_packing_list`, `create_section`, `create_task`, `create_template`,
