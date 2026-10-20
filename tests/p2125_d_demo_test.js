@@ -166,6 +166,17 @@ const srv = http.createServer((req, res) => {
   await J(`api('POST', '/api/team/absences', {kind: 'vacation', start_date: '${m0}-10', end_date: '${m0}-11', half_day: '', note: ''})`);
   const ab = await J(`api('GET', '/api/team/absences?start=${m0}-01&end=${m0}-28')`);
   check(ab.items.length === 1 && ab.items[0].can_edit, 'absences: own vacation listed');
+  // 2.125.0 (#2117 #2118 #2119): vacation account, working week and the monthly timesheet in the demo
+  await J(`api('PUT', '/api/team/leave/quota', {user_id: 1, year: ${m0.slice(0, 4)}, days: 30, carry: 0})`);
+  const lv = await J(`api('GET', '/api/team/leave?year=${m0.slice(0, 4)}')`);
+  check(lv.people.length === 1 && lv.people[0].quota.days === 30 && lv.people[0].taken >= 0 && lv.people[0].taken <= 2 && lv.people[0].rest === 30 - lv.people[0].taken && !lv.approval, 'leave: account counts the vacation');
+  const wt = await J(`api('PUT', '/api/team/leave/worktime/1', {workdays: [0, 1, 2, 3], hours: 32})`);
+  check(wt.workdays.length === 4 && wt.capacity_h === 32, 'leave: working week saved');
+  const ts0 = await J(`api('GET', '/api/time/sheets')`);
+  check(ts0.sheet.state === 'open' && ts0.can.close, 'timesheet: month open');
+  await J(`api('POST', '/api/time/sheets', {month: '${ts0.month}', action: 'close'})`);
+  const ts2 = await J(`api('GET', '/api/time/sheets')`);
+  check(ts2.sheet.state === 'closed' && ts2.can.reopen && ts2.locked.includes(ts0.month), 'timesheet: month closed');
   await visit('workload', 'workload after an absence');
 
   // 4. server-only features answer at the place (the notice), never silently
