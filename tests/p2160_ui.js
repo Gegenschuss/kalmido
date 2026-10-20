@@ -47,10 +47,10 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
 
   // ================= jsdom: #641 the account picture in the Kalmido row
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
-  const acct = d.querySelector('#side .sbrand .sbacct');
-  check(acct && acct.querySelector('.avatar') && acct.getAttribute('aria-haspopup') === 'menu' && /^Account: Alice( · |$)/.test(acct.getAttribute('aria-label')), '#641: the account picture at the right of the Kalmido row, named');
+  const acct = d.querySelector('#side .sbdock .sbacct');  // 2.138.2 (#2392): the picture sits next to the search at the bottom
+  check(acct && acct.querySelector('.avatar') && acct.getAttribute('aria-haspopup') === 'menu' && /^Account: Alice( · |$)/.test(acct.getAttribute('aria-label')), '#641: the account picture next to the search, named');
   check(!d.querySelector('#side .suser') && !d.querySelector('#side .sdtop'), '#641: the old account rows (drawer top, sidebar bottom) are gone');
-  check(d.querySelector('#side .sbrand .sbhome') && d.querySelector('#side .sfoot .sset'), 'the logo and the Settings row stay');
+  check(d.querySelector('#side .sbhead .wsbar') && d.querySelector('#side .sfoot .sset'), 'the workspace heading and the Settings row stay');  // 2.138.2 (#2392): no logo in the sidebar
   click(w, acct); await sleep(150);
   let mi = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => (b.querySelector('.ml') || b).textContent.trim());
   check(mi[0] === 'Alice · alice' && mi.includes('Account') && mi.includes('Settings') && mi.includes('Log out'), '#641: the menu: who, Account, Settings, Log out ' + mi.join('|'));
@@ -252,8 +252,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await o.nav(B + '#today'); await ready(ev);
     let p = await ev(center('#top [data-act="side"]')); await tap(p.x, p.y); await sleep(700);
-    p = await ev(center('#side .sbrand .sbacct'));
-    check(p && p.w >= 44 && p.h >= 44, `${tag}: the account picture in the drawer's Kalmido row, a 44 px target ` + JSON.stringify(p));
+    p = await ev(center('#side .sbdock .sbacct'));  // 2.138.2 (#2392)
+    check(p && p.w >= 44 && p.h >= 44, `${tag}: the account picture in the drawer's bottom dock, a 44 px target ` + JSON.stringify(p));
     await tap(p.x, p.y); await sleep(600);
     const m = await ev(`[...document.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].map(b => (b.querySelector('.ml') || b).textContent.trim())`);
     check(m.includes('Account') && m.includes('Settings') && m.includes('Log out'), `${tag}: a tap opens Account / Settings / Log out ` + m.join('|'));

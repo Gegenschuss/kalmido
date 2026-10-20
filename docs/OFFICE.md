@@ -180,7 +180,9 @@ In the area Packs, every industry pack's card says **Switched on** or **Off** an
 ## Number scheme
 
 Placeholders: `{yyyy}` `{yy}` year, `{seq}` or `{seq:03}` the counter (zero-padded to the given width), `{project}`,
-`{client}`, `{date}` (`yyyymmdd`), `{initials}`, `{version}` (quotations, see below). Default `KVA-{yyyy}-{seq:03}` -> `KVA-2026-001`. The counter runs per
+`{client}`, `{date}` (`yyyymmdd`), `{isodate}` (`yyyy-mm-dd`, 2.138.2), `{initials}`, `{version}` (quotations, see below). Default `KVA-{yyyy}-{seq:03}` -> `KVA-2026-001`.
+In `{client}`, `{project}` and `{initials}` spaces and other punctuation become hyphens; letters (umlauts too), digits, `_` and `-`
+stay, at most 40 characters: `{client}_{project}_KV{seq:02}_{isodate}_{initials}` -> `DAF_Beteiligung_KV04_2026-04-15_MG`. The counter runs per
 organisation, document kind and period: with `{yyyy}` / `{yy}` in the scheme it starts again every year, without it
 never. A number is reserved once and never reused.
 
@@ -1369,6 +1371,12 @@ Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit
   mail server answers 409 with a generic reason, details stay in the server log.
 - A finalised document whose stored PDF or XML is missing answers 409 (logged as `store_missing`) instead of being
   rendered again from the snapshot; drafts are always rendered.
+- Drafts (2.138.2): every PDF of a document that is not finalised and still in status `draft` is marked DRAFT / ENTWURF
+  (the document's language) in bold at the number and as a light diagonal word on every page, whichever way it is fetched
+  (preview, download, mail, `GET /api/v1/office/docs/<id>/pdf`). A quotation set to sent / accepted / declined without
+  finalising is locked as well and prints unmarked (its customer link serves that PDF). A draft has no e-invoice: `GET .../xml` answers 409, a ZUGFeRD draft PDF carries
+  no XML. In the app the PDF buttons of a draft ask first: *Finalise now* (the normal finalising, then the PDF) or
+  *Show as draft*.
 
 ## Terms and conditions as PDF (2.113)
 

@@ -55,8 +55,10 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
 
   // ================= jsdom: #475 the dashboard
   let w = await boot({user: 'alice', hash: 'today', ls: {'tasks.newsBundle': null}}), d = w.document;
-  const logo = d.querySelector('#side .sbrand .sbhome');
-  check(logo && logo.dataset.go === 'home' && /^Kalmido: Start$/.test(logo.getAttribute('aria-label')), '#475: the logo opens the dashboard (its name starts with the visible "Kalmido")');
+  // 2.138.2 (#2392): the logo left the sidebar -- the account menu (picture next to the search) has "Start"
+  click(w, d.querySelector('#side .sbdock .sbacct')); await sleep(200);
+  const logo = [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => (b.querySelector('.ml') || b).textContent.trim() === 'Start');
+  check(!!logo, '#475: the account menu opens the dashboard ("Start")');
   click(w, logo); await sleep(600);
   check(w.location.hash === '#home' && d.querySelector('#top h1')?.textContent.includes('Start'), '#475: #home, titled Start (2.25.0)');
   await until(() => d.querySelector('.dcard.dc-news .hpnl li'));  // 2.45.0 (#1504): News compact, one line per bundle
