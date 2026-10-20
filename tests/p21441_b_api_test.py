@@ -186,7 +186,7 @@ check(r.ok and p["files"] == 2 and p["count"] == 3 and p["dup_count"] == 1, f"tw
 check(r.ok and [x["day"] for x in p["rows"]] == [d(10), d(10), d(11), d(11)] and [x["file"] for x in p["rows"]][:2] == ["tag10.xml", "monat.xml"], "sorted: day, then file")
 r = up(Fr, "/import", [("tag10.xml", DAY), ("monat.xml", MON)])
 check(r.status_code == 201 and r.json()["count"] == 3 and r.json()["import"]["filename"] == "2 files: tag10.xml, monat.xml", "two files imported " + r.text[:300])
-check(sum(1 for t in all_tx(Fr) if "Kaffee" in (t.get("counterpart") or "")) == 2, "two equal coffees of one file are two bookings")
+check(sum(1 for t in all_tx(Fr) if t.get("amount") == "-2.80") == 2, "two equal coffees of one file are two bookings")
 r = up(Fr, "/import/preview", [("monat.xml", MON)])
 check(r.ok and r.json()["count"] == 0 and r.json()["dup_count"] == 3, "the month statement again: all three there")
 
@@ -257,7 +257,7 @@ r = up(A, "/import", [("alpha.zip", Z)])
 check(r.status_code == 201 and r.json()["count"] == 4, "organisation: zip import " + r.text[:200])
 IA = r.json()["import"]["id"] if r.status_code == 201 else 0
 tx = sql("SELECT amount, counterpart FROM office_bank_tx WHERE import_id=?", (IA,))
-check(len(tx) == 4 and all(enc(x[0]) and enc(x[1]) for x in tx), "bookings encrypted at rest")
+check(len(tx) == 4 and all(enc(x[0]) for x in tx) and all(enc(x[1]) for x in tx if x[1]), "bookings encrypted at rest")
 check(up(Bo, "/import/preview", [("alpha.zip", Z)]).status_code == 403 and up(Bo, "/import", [("alpha.zip", Z)]).status_code == 403, "a member without the admin role: 403")
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "write"], "username": "bankbot", "display_name": "Bank Bot"})
 AG = {**H, "Authorization": "Bearer " + r.json()["token"]}

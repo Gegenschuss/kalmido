@@ -81,9 +81,10 @@ const MT = ':20:STARTUMS\n:25:12030000/0000202051\n:28C:1/1\n:60F:C261001EUR100,
     await ev(give([['konto.sta', MT]]));
     check(await ready(ev, `/MT940/.test(document.querySelector('.modal.bnkdlg .aerr')?.textContent || '') && !document.querySelector('.modal.bnkdlg #bi-date')`, 40), 'MT940: the message in the dialog, no column step');
     await ev(`(() => { document.querySelector('.modal.bnkdlg [data-bi="close"]').click(); return 1; })()`);
+    check(await ready(ev, `!document.querySelector('.modal')`, 40), 'the dialog closes');
     // the cash flow opens the same dialog
     await ev(tab('#office/cashflow'));
-    check(await ready(ev, `!!document.querySelector('[data-cfb-imp]')`, 80), 'the cash flow offers "Import bank statement"');
+    check(await ready(ev, `!!document.querySelector('[data-cfb-imp]')`, 80), 'the cash flow offers "Import bank statement" ' + await ev(`location.hash + ' ' + document.querySelectorAll('.modal').length`));
     await ev(`(() => { document.querySelector('[data-cfb-imp]').click(); return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('.modal.bnkdlg .bnk-hint li').length === 3`, 40), 'the same dialog with the hint');
     await ev(give([['tag3.xml', C2]]));
