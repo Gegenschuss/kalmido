@@ -1297,6 +1297,24 @@ fresh; run p2121_c_api "$PY" p2121_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2121_c_ui node p2121_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.121.0 lead: receipt categories with an SKR03 / SKR04 account (#2093)
 fresh; run p2121_d_api "$PY" p2121_d_api_test.py "$KALMIDO_TEST_DATA"
+# 2.124.0: base carries #2341 from 2.123 (part D builds on it); drop these two lines when 2.123 is merged
+fresh; run p2123_d_api "$PY" p2123_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2123_d_ui node p2123_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.124.0 part A: formulas, chart (#2109 #2115)
+fresh; run p2124_a_api "$PY" p2124_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2124_a_ui node p2124_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.124.0 part B: column kinds, freeze + print, change history (#2110 #2111 #2112)
+fresh; run p2124_b_api "$PY" p2124_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2124_b_ui node p2124_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.124.0 part C: share single tables, tables in Mod+K (#2113 #2114)
+fresh; run p2124_c_api "$PY" p2124_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2124_c_ui node p2124_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.124.0 part D: cash flow balance from the bank import (#2342)
+fresh; run p2124_d_api "$PY" p2124_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2124_d_ui node p2124_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.124.0 part E: several sheets per table (#2116)
+fresh; run p2124_e_api "$PY" p2124_e_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2124_e_ui node p2124_e_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
