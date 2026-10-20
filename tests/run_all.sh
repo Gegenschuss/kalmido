@@ -13,7 +13,7 @@ cd "$HERE"
 export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
-SHARDS_DEFINED=13
+SHARDS_DEFINED=17
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
@@ -928,7 +928,7 @@ fresh; run p262_b_api "$PY" p262_b_api_test.py "$KALMIDO_TEST_DATA"
 # 2.62.0 part A: sending once in the chats (#1530), pinned chat messages (#1848)
 fresh; run p262_a_api "$PY" p262_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p262_a_ui node p262_a_ui.js "$KALMIDO_TEST_DATA"
-shard 2  # 2.80.0: the 2.63-2.66 suites run in shard 2 (shard 10 full)
+shard 14  # 2.124.2: the 2.63-2.66 suites (was shard 2: shard 2 ran into the 45 min CI limit)
 # 2.63.0 part D: one space list for knowledge pages, conversation on the job card (#1857 #1482)
 fresh; run p263_d_ui node p263_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.63.0 part A: the public report form - type, file, spam guard, status link (#1513)
@@ -1047,7 +1047,7 @@ fresh; run p278_dup_api "$PY" p278_dup_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p278_dup_ui node p278_dup_ui.js "$KALMIDO_TEST_DATA"
 # 2.79.0: security fixes of audit #476 part 1 (H1 ICS attendees, M1 app passwords, M2 admin scopes, M4 link lock, M5 child accounts, M6 health time, M8 backup folders, M9 proxy default)
 fresh; run p279_sec_api "$PY" p279_sec_api_test.py "$KALMIDO_TEST_DATA"
-shard 13  # 2.84.0 + 2.80.3: the 2.81 suites (and new ones after them) run in shard 13 (shard 3 took 30 min with the 2.74-2.80 suites)
+shard 16  # 2.124.2: the 2.81 suites (was shard 13: over 45 min with the 2.99-2.125 suites)
 # 2.81.0 part B: correct archived office documents (client, tax lines, paid, history, #1834), DATEV customer number of locked invoices (#1867)
 fresh; run p281_b_api "$PY" p281_b_api_test.py "$KALMIDO_TEST_DATA"
 # 2.81.0 part A: #1852 stale contact link, #1466 agent contact persons
@@ -1198,7 +1198,7 @@ fresh; run p298_c_ui node p298_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p298_d_api "$PY" p298_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.87.9 part E (#1914 #1920 #1909 #1933 #1937 #1952 #1963): polish
 fresh; run p287b_e_ui node p287b_e_ui.js "$KALMIDO_TEST_DATA"
-shard 11  # 2.98.1: the 2.90-2.93 and 2.99.1 suites run in shard 11 (shard 13 over 45 min, shard 11 took 18 min)
+shard 15  # 2.124.2: the 2.90-2.93 and 2.99.1 suites (was shard 11: over 45 min)
 # 2.90.0 part A (#1921): bookkeeping light (EUeR, VAT return figures, tax reserve, receipt photo)
 fresh; run p290_a_api "$PY" p290_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p290_a_ui node p290_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1263,7 +1263,7 @@ fresh; run p2119_a_api "$PY" p2119_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2119_a_ui node p2119_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.119.0 part B: filled active icon buttons, send-key hint in the agent chat side window, pin agents in "All people" (#2301 #2302 #2210)
 fresh; run p2119_b_ui node p2119_b_ui.js "$KALMIDO_TEST_DATA"
-shard 13  # 2.98.1: new suites go here, above this line
+shard 13  # 2.98.1: the 2.99-2.123 C suites (new ones go to shard 17 below)
 # 2.114.1 part A: bank button "Match" wording + 44 px buttons, empty heading, producing checkbox (#2017 #2254 #2255)
 fresh; run p21141_a_ui node p21141_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.114.1 part B: books reload after bank match, matched receipts in the cash flow (#2016 #2018)
@@ -1312,6 +1312,7 @@ fresh; run p2123_b_ui node p2123_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.123.0 part C: pictures from the Ablage in pages (#2103), [[datei:]] / [[tabelle:]] links (#2107), checkboxes as tasks (#2108)
 fresh; run p2123_c_api "$PY" p2123_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2123_c_ui node p2123_c_ui.js "$KALMIDO_TEST_DATA"
+shard 17  # 2.124.2: new suites go here (shard 13 keeps the 2.99-2.123 C suites above)
 # 2.123.0 part D: cash flow: opening balance, manual corrections, reconciliation (#2341); installment list number format (#2351)
 fresh; run p2123_d_api "$PY" p2123_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2123_d_ui node p2123_d_ui.js "$KALMIDO_TEST_DATA"
