@@ -415,6 +415,7 @@ class Stream:
         self.session_id = ""  # for the one approval_check follow-up in the same session
         self.tools, self.context_tokens = 0, 0  # 2.44.0 (#1448 / #1446): tool calls seen, size of the conversation
         self.timed_out, self.err_tail = False, []
+        self.aborted = False  # 2.144.0 (#2412): ended by Stop in the chat
         self._lock = threading.Lock()  # tick() runs from the reader and from the ticker thread
 
     def feed(self, line):
@@ -1158,6 +1159,9 @@ SUMMARY_PROMPT = ("(Launcher: this conversation ends now ({why}) and a new one s
                   "summary for it: open work, decisions, what the person expects next, in at most 15 short lines. Facts only, "
                   "no greeting, no tools.)")
 RUN_FAILED = os.environ.get("KALMIDO_RUN_FAILED", "Sorry, this run failed twice ({0}). Please try again later.")
+# 2.144.0 (#2412): Stop in the chat ({0} = the tool calls done until then)
+ABORTED = os.environ.get("KALMIDO_ABORTED", "Stopped as asked ({0} tool steps done until then). Tell me how to go on.")
+ABORT_JOB = os.environ.get("KALMIDO_ABORT_JOB", "This launcher cannot stop a single step of a job: use Stop on the job's card to end the job.")
 
 
 def perm_hook(argv):
@@ -1250,6 +1254,7 @@ class Runner:
         self.refresh_due = False
         self.perm_thread = None
         self.cur = 0
+        self.proc, self.cur_st, self.abort_ev = None, None, None  # 2.144.0 (#2412): the running command, its stream, the Stop
 
     # the approval requests this runner posted: message id -> {uid, title, what, at, reminded} (2.44.0: on disk)
     @property
@@ -1444,6 +1449,10 @@ class Runner:
         log(f"run: {'+'.join(str(e.get('event')) for e in evs)} ({'chat ' + str(uid) if uid else 'task event'}), prompt {len(prompt)} chars"
             + (", resumed" if key and key in self.state.data["sessions"] else ""))
         st, rc, why = self.attempt_runs(args, prompt, uid, what, tid, key)
+        if st is not None and st.aborted:  # kalmido-capability: abort (2.144.0, #2412)
+            self.session_done(key, st)
+            self.aborted_note(uid, st)
+            return
         if st is None:
             self.api.status("error", "The agent command cannot be started")
             self.run_failed(uid, why)
@@ -1501,6 +1510,8 @@ class Runner:
         for n in (1, 2):
             sess = self.state.data["sessions"].get(key) if key else None
             st, rc = self._exec(self.run_args(args + (["--resume", sess["id"]] if sess else [])), prompt, uid, what, tid)
+            if st is not None and st.aborted:  # 2.144.0 (#2412): stopped by the person, never a second try
+                return st, rc, "stopped"
             if st is not None and (result_text(st) or rc == 0):
                 return st, rc, ""
             why = ("cannot be started" if st is None else
@@ -1752,6 +1763,9 @@ class Runner:
                        "deny" if x.get("approval") == "rejected" or ids == ["deny"] else None)
                 self.resolve_perm(mid, dec)
                 continue
+            if ev.get("event") == "abort":  # kalmido-capability: abort (2.144.0, #2412): never a run of its own
+                self.abort(ev)
+                continue
             if ev.get("event") == "chat":
                 uid = self.chat_uid(ev)
                 word = str((x.get("message") or {}).get("body") or "").strip().lower().rstrip(".!")
@@ -1766,6 +1780,49 @@ class Runner:
                         continue
             out.append(ev)
         return out
+
+    # kalmido-capability: abort (2.144.0, #2412)
+    def abort(self, ev):
+        """Stop in the chat (event abort, from the event thread): the running command ends with everything it started;
+        run() then posts the short note and confirms. A job's step (job_id) is not stopped by this launcher: a line into
+        the job's history and a note to the person. Nothing running: confirmed at once."""
+        x = ev.get("data") or {}
+        uid = int((x.get("user") or {}).get("id") or 0) or None
+        jid = x.get("job_id")
+        if jid:
+            log(f"stop pressed for job {jid}: not supported here, noted")
+            self.api.soft("PATCH", f"/agent/jobs/{int(jid)}", {"append_log": f"{time.strftime('%H:%M')} Stop pressed in the chat (a single step cannot be stopped here)"})
+            if uid:
+                self.api.soft("POST", f"/agent/chats/{uid}", {"body": ABORT_JOB})
+            self.confirm_abort(ev, job_id=int(jid))
+            return
+        p, st = self.proc, self.cur_st
+        if p is not None and p.poll() is None and st is not None:
+            log("stop pressed in the chat: ending the command")
+            self.abort_ev, st.aborted = ev, True
+            kill_tree(p)
+            return
+        log("stop pressed in the chat: nothing running")
+        self.confirm_abort(ev)
+
+    def confirm_abort(self, ev, job_id=None):
+        """POST /agent/aborted (status idle, the Stop button goes); an older server without it: status idle."""
+        b = {"seq": int(ev["seq"])} if str((ev or {}).get("seq") or "").isdigit() else {}
+        if job_id:
+            b["job_id"] = job_id
+        if self.api.soft("POST", "/agent/aborted", b) != 200 and not job_id:
+            self.api.status("idle", host=self.host())
+
+    def aborted_note(self, uid, st):
+        """After a stopped run: one short line into the chat (the person who pressed Stop, else the chat of the run), confirmed."""
+        ev, self.abort_ev = self.abort_ev or {}, None
+        to = int(((ev.get("data") or {}).get("user") or {}).get("id") or 0) or uid
+        if to:
+            try:
+                self.api.chat(int(to), ABORTED.replace("{0}", str(st.tools)))
+            except Exception as e:
+                log(f"stop note not posted: {type(e).__name__}")
+        self.confirm_abort(ev)
 
     def resolve_perm(self, mid, decision):
         """The person's answer to permission question mid -> the hook's answer file (allow / deny). Twice: once; after the
@@ -1915,6 +1972,7 @@ class Runner:
             return None, -1
         st.timed_out = False
         err_tail = st.err_tail = []
+        self.proc, self.cur_st = p, st  # 2.144.0 (#2412): Stop in the chat ends it (abort, from the event thread)
 
         def time_up():
             st.timed_out = True
@@ -1947,6 +2005,7 @@ class Runner:
         for line in p.stdout:
             st.feed(line)
         rc = p.wait()
+        self.proc = None
         stop.set()
         if timer:
             timer.cancel()

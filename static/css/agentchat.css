@@ -349,7 +349,7 @@ button.jcdh{cursor:pointer}
 .jpart .jcdh{border-left-color:color-mix(in srgb,var(--jcol) 70%,var(--bg))}
 .jpart .jcddot{background:color-mix(in srgb,var(--jcol) 70%,var(--bg))}
 @media (hover:hover){ button.jcdh:hover{background:color-mix(in srgb,var(--jcol) 8%,var(--bg2))} }
-.jcdh:focus-visible,.jcdseg button:focus-visible{outline:.125rem solid var(--accent);outline-offset:.125rem}
+.jcdh:focus-visible{outline:.125rem solid var(--accent);outline-offset:.125rem}
 .jcdt{display:flex;align-items:center;gap:.5rem;min-width:0}
 .jcddot{flex:none;width:.5rem;height:.5rem;border-radius:50%;background:var(--jcol)}
 .jcdt b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
@@ -368,19 +368,17 @@ button.jcdh{cursor:pointer}
 .jcdres.jcdclamp .cbub{max-height:7.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
 .jcdres.jcdx .cbub{box-shadow:inset .25rem 0 0 var(--danger)}
 .jcdmore{min-height:2.75rem;padding:0 .5rem;color:var(--accent)}
-.jcdfilt{display:flex;align-items:center;padding:.375rem .75rem;border-bottom:1px solid var(--line)}
-.jcdfilt[hidden]{display:none}
-.jcdseg{display:flex;gap:.25rem;min-width:0;padding:.1875rem;border-radius:62.5rem;background:var(--bg3)}
-.jcdseg button{min-width:0;min-height:2rem;padding:0 .75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;border-radius:62.5rem;background:none;color:var(--muted);font:inherit;font-size:var(--fs-s);cursor:pointer}
-.jcdseg button[aria-pressed="true"]{background:var(--bg);color:var(--text);box-shadow:0 0 0 1px var(--line)}
-.jcdfbtn{position:relative;min-width:2.75rem;min-height:2.75rem;display:none}
+.cmsg > .jcdmore{align-self:flex-start}
+/* 2.144.0 A (#2419): the filter row is gone, the icon in the header on every width */
+.jcdfbtn{position:relative;min-width:2.75rem;min-height:2.75rem;display:inline-flex}
 .jcdfbtn[hidden]{display:none}
 .jcdfdot{position:absolute;top:.5rem;right:.5rem;width:.5rem;height:.5rem;border-radius:50%;background:var(--accent)}
-@media (pointer:coarse){ .jcdseg button{min-height:2.75rem} }
-@media (max-width:40rem){ .jcdfilt{display:none} .jcdfbtn{display:inline-flex} }
 @media (prefers-reduced-motion:reduce){ .jcdt .i{transition:none} }
 /* 2.102.0 B (#2204): the key hint next to the send button (the team chat and the agent / job chat) */
 .chcomp .chkh{flex:none;align-self:center;font-size:var(--fs-s);white-space:nowrap}
+/* 2.144.0 A (#2412): Stop while the agent works (next to Send) */
+.chcomp .chstop{flex:none;align-self:center;min-width:2.75rem;min-height:2.75rem;color:var(--danger)}
+.chcomp .chstop[hidden]{display:none}
 .chcomp .chkh:empty{display:none}
 /* 2.119.0 B (#2302): the hint is a small line under the field (own row), so it also shows in the narrow side panel and split windows */
 .chcomp:has(> .chkh:not(:empty)){flex-wrap:wrap}

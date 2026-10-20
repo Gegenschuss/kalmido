@@ -137,6 +137,9 @@
 - While you work, set your status to **working** with a short text (`set_status`, e.g. "Building 2.4.0"); set it back
   to **idle** only when nothing is running any more. Give a `task_id` only when you really write in that task; a chat
   run sets working without `task_id`.
+- **Stop** (event `abort`, 2.144.0): the person pressed Stop in the chat. End what you are working on at once (in a
+  job's history only that job's current step), confirm with `confirm_abort` and say in one or two lines what was done until
+  then. Never pick the work up again on your own.
 - With the status of each run, report what you **really** run with: `model` (the model as people know it, e.g.
   "Opus 5.5"), `permission_mode` (ask | auto: what this run uses) and `host_permission_mode` (your host's own default).
   The chat header shows them.
@@ -507,6 +510,9 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `sprint_started` / `sprint_closed`: a sprint of a project list shared with you started / was closed (`sprint`, with `review` when closed: done / moved / added task ids and points). Sprints: `list_sprints`, `get_sprint` (tasks + burndown), `set_task_sprint` (into a sprint or back to the backlog; people plan and close sprints)
 - `chat_pinned`: the person pinned (`pinned: true`) or unpinned a message of your chat (`message`); information only, nothing to answer
   (the current pins of a conversation: `pins` in `GET /agent/chats?user_id=`)
+- `abort` (2.144.0): the person pressed **Stop** in your chat (`user`, `job_id` when it was in a job's history): end the answer
+  you are working on at once (a job: only its current step, the job stays), confirm with `confirm_abort` and say in one or
+  two lines what was done until then; nothing running = confirm only
 - `contract_notice`: a shared contract's last day to cancel is near (once per deadline): answer with ONE `propose_contract_notice`
 
 Related tasks (2.59.0): task events may carry `task.related` = up to 5 tasks close in meaning `[{id, title, score}]` (only
@@ -519,7 +525,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_shop_areas`, `add_snippet`,
 `add_subtask`, `add_time_entry`, `add_upkeep`, `add_video_comment`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
 `chat_typing`, `check_in_habit`, `check_time_entries`, `clear_plan_usage`, `clear_waiting`, `client_id`,
-`comment_typing`, `complete_task`, `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`,
+`comment_typing`, `complete_task`, `confirm_abort`, `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`,
 `create_event_calendar`, `create_field`, `create_file_folder`, `create_filter`, `create_form`, `create_habit`,
 `create_job`, `create_list`, `create_list_tag`, `create_note`, `create_notepad`, `create_offer_draft`, `create_office_lead`,
 `create_packing_list`, `create_section`, `create_task`, `create_template`, `create_text_file`, `create_trip`,

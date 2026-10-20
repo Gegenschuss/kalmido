@@ -1,7 +1,7 @@
 // 2.117.0 UI tests of part C (#2260; own container, start.sh). jsdom, the agent chat with a job in it:
-// - wide: the button group (.jcdseg) is there, no filter icon visible by CSS rules; no select.jcdsel any more
+// - 2.144.0 (#2419): no filter row (.jcdseg) any more on any width; no select.jcdsel any more
 // - the header icon (#jcd-fbtn) opens a menu with the three choices; the choice works; a dot shows while the filter is not "All"
-// - phone (390 px rules in the CSS): the filter row is hidden, the icon is shown, the icon is >= 2.75rem
+// - CSS: the icon is shown on every width (2.144.0 #2419), the icon is >= 2.75rem
 const {execFileSync} = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -42,7 +42,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   await until(() => fbtn() && !fbtn().hidden);
   check(!d.querySelector('select.jcdsel'), 'no select.jcdsel any more');
   check(fbtn() && !fbtn().hidden && hd().contains(fbtn()), 'the filter icon sits in the chat header');
-  check(filt() && !filt().hidden && filt().querySelectorAll('.jcdseg button').length === 3, 'wide: the button group is there');
+  check(!filt() && !d.querySelector('.jcdseg'), 'no filter row above the messages');  // 2.144.0 (#2419): the icon on every width
   check(!fbtn().querySelector('.jcdfdot'), 'filter All: no dot');
   click(w, fbtn());
   await until(() => d.querySelector('[role=menuitem]'));
@@ -53,12 +53,11 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(w.eval(`LS.get('jcdFilt')`) === 'jobs', 'the choice is kept');
   await until(() => fbtn()?.querySelector('.jcdfdot'));
   check(fbtn().querySelector('.jcdfdot'), 'filter Jobs: the dot shows');
-  check(filt().querySelector('[data-f="jobs"]').getAttribute('aria-pressed') === 'true', 'the button group follows the menu');
 
   // CSS: phone = icon instead of the row; hit area; rem only
   const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'css', 'agentchat.css'), 'utf8');
   const blk = css.slice(css.indexOf('/* 2.96.0 C (#2015)'));
-  check(/@media \(max-width:40rem\)\{ \.jcdfilt\{display:none\} \.jcdfbtn\{display:inline-flex\} \}/.test(blk), 'phone: no filter row, the icon instead');
+  check(/\.jcdfbtn\{[^}]*display:inline-flex/.test(blk) && !/\.jcdfilt|\.jcdseg/.test(blk), 'the icon on every width, no filter row');  // 2.144.0 (#2419)
   check(/\.jcdfbtn\{[^}]*min-width:2\.75rem;min-height:2\.75rem/.test(blk) && /\.jcdfdot\{[^}]*background:var\(--accent\)/.test(blk), 'icon >= 2.75rem, dot in the accent colour');
   check(!/\.jcdfbtn\{[^}]*\d+px/.test(blk) && !/\.jcdfdot\{[^}]*\d+px/.test(blk), 'rem sizes');
 
