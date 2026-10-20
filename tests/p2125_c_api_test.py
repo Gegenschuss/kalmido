@@ -138,16 +138,26 @@ check(A.get(B + "/api/time/export.xlsx", params={"from": "2000-01-01", "to": "20
 rw = A.get(B + "/api/workload/export.xlsx", params={"weeks": 2})
 check(rw.status_code == 200 and "spreadsheetml.sheet" in rw.headers["Content-Type"], f"workload xlsx {rw.status_code}")
 rows, styles = xlsx(rw)
-names = [r[0] for r in rows[1:-1]]
 check(rows[0][0] == "Person" and len(rows[0]) == 1 + 2 * 2 + 1, f"workload header {rows[0]}")
 a_row = next(r for r in rows if r[0] == "Alice")
 check(any(isinstance(v, float) and abs(v - 1.5) < 0.01 for v in a_row[1:]), f"alice has 1.5 h planned {a_row}")
 check(rows[-1][0] == "Total" and styles[-1][1] == 4, "workload: a sum row")
-rb, _ = xlsx(Bo.get(B + "/api/workload/export.xlsx", params={"weeks": 2}))
-check({r[0] for r in rb[1:-1]} <= {"Alice", "Bob"} and "Carol" not in {r[0] for r in rb[1:-1]}, "the editor sees only people of the shared list")
+
+
+def same_as_view(s, who):
+    """The sheet holds exactly the people and hours of /api/workload (what the person may see, no more)."""
+    j = s.get(B + "/api/workload", params={"weeks": 2}).json()
+    x, _ = xlsx(s.get(B + "/api/workload/export.xlsx", params={"weeks": 2}))
+    want = [[p["display_name"]] + [v for w in p["weeks"] for v in (round(w["minutes"] / 60, 2), round(w["capacity_h"], 2))]
+            + [round(p["nodate"]["minutes"] / 60, 2)] for p in j["people"]]
+    check(x[1:-1] == want, f"{who}: the workload sheet equals the view {x[1:-1]} {want}")
+
+
+same_as_view(A, "admin")
+same_as_view(Bo, "editor")
+same_as_view(Ca, "stranger")
 rc_, _ = xlsx(Ca.get(B + "/api/workload/export.xlsx", params={"weeks": 2}))
-check(not any(r[0] == "Alice" and any(isinstance(v, float) and v > 0 and i % 2 == 1 for i, v in enumerate(r[1:], 1)) for r in rc_[1:-1]),
-      "a stranger sees no planned hours of the list")
+check(all(v == 0.0 for r in rc_[1:-1] for v in r[1::2]), "a stranger sees no planned hours of the list")
 check(A.get(B + "/api/workload/export.xlsx", params={"weeks": "x"}).status_code == 400, "a bad weeks value: 400")
 check(requests.get(B + "/api/workload/export.xlsx", headers=H).status_code in (401, 403), "workload: no login")
 A.patch(B + "/api/settings", json={"features": "cal,comments,collab,time,progress"})
@@ -163,7 +173,8 @@ check(r.ok, "freelancer: an own entry " + r.text[:200])
 rows, _ = xlsx(Fr.get(B + "/api/time/export.xlsx", params=Q))
 check([r[9] for r in rows[1:-1]] == ["solo"] and rows[-1][0] == "Total", f"freelancer: own entry in the xlsx {rows}")
 rows, _ = xlsx(Fr.get(B + "/api/workload/export.xlsx"))
-check(rows[0][0] == "Person" and rows[1][0] == "Frida", f"freelancer: workload xlsx {rows[:2]}")
+check(rows[0][0] == "Person" and rows[-1][0] == "Total", f"freelancer: workload xlsx {rows[:2]}")
+same_as_view(Fr, "freelancer")
 
 # ================================================================== the manifest shortcut
 def timer_shortcut(s):

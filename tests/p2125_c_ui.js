@@ -54,7 +54,8 @@ const call = async (method, url, body) => {
   const a1 = d.querySelector('a[href^="/api/time/export.xlsx"]'), c1 = d.querySelector('a[href^="/api/time/export.csv"]');
   check(a1 && c1 && a1.getAttribute('href').split('?')[1] === c1.getAttribute('href').split('?')[1], 'time view: XLSX button with the query of the CSV button');
   check(a1 && /Excel/.test(a1.textContent), 'time view: the label says Excel');
-  w.location.hash = '#workload';
+  w.close();
+  w = await boot({user: 'alice', hash: 'workload'}); d = w.document;
   for (let i = 0; i < 20 && !d.querySelector('a[href^="/api/workload/export.xlsx"]'); i++) await sleep(300);
   const a2 = d.querySelector('a[href^="/api/workload/export.xlsx"]');
   check(a2 && /weeks=4/.test(a2.getAttribute('href')), 'workload view: XLSX button ' + (a2 && a2.getAttribute('href')));
