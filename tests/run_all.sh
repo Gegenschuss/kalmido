@@ -1447,6 +1447,15 @@ fresh; run p2142_b_ui node p2142_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.142.0 part C: export to Todoist CSV / Markdown, admin "fetch mail now", ntfy share inbox per person (#2148 #2149 #2150)
 fresh; run p2142_c_api "$PY" p2142_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2142_c_ui node p2142_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.145.0 part A: sidebar logo purple + footer logo, workspace head aligned, news hint for other workspaces (#2433 #2437 #2438 #2444)
+fresh; run p2145_a_api "$PY" p2145_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2145_a_ui node p2145_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.145.0 part B: own window (mini mode) starts fast (#2424)
+fresh; run p2145_b_api "$PY" p2145_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2145_b_ui node p2145_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.145.0 part C: list CSV more columns, print view project head (#2431 #2432)
+fresh; run p2145_c_api "$PY" p2145_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2145_c_ui node p2145_c_ui.js "$KALMIDO_TEST_DATA"
 shard 18  # 20.10.2026 (job #692): the parked releases 2.111-2.113.0 (new suites still go to shard 17 above)
 # 2.111.0: Buero-Rueckgaengig (a), Termin-Einladungen + Abo-Link (b), Schnellerfassung (c)
 fresh; run p2111_a_api "$PY" p2111_a_api_test.py "$KALMIDO_TEST_DATA"
