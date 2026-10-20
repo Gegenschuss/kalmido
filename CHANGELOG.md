@@ -31,6 +31,13 @@ Package 2.137: moving a whole organisation between servers; the personal office 
 ### Security
 - Security fix: organisation import (links of video sign-offs, number ranges, logo copies).
 - Security fix: feeds (database connection) (#2408).
+
+### Fixed
+- Server log: every line is written once again (since 2.138.4 each line showed twice) (#2381).
+- API: removing a member from a team chat room through v1 matches its documented path (#2059).
+- Tests: six suites follow the changes of 2.138.1-2.139.0 (news sections, error report header, draft watermark,
+  contact move copies, media queries, full-text placeholders) (#2405 #2381 #2393 #2378 #2372 #2065).
+
 ## [2.139.0] - 2026-10-20
 
 Team chat: threads, voice messages, "Read by"; comments become tasks.
