@@ -7,6 +7,28 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.138.0] - 2026-10-20
+
+Quotation fixes (units, parts, PDF headings), sidebar search at the bottom, security fixes.
+
+### Changed
+- Sidebar: the search field sits as a fixed bar at the bottom of the sidebar (phone menu and desktop); the head shows logo
+  and avatar, below it the workspace button with its name and "Collapse all". Mod+K still opens the search (#2161).
+- Quotation items: the unit choice follows the quantity ("5 days", singular only for exactly 1), in all languages (#2249).
+
+### Fixed
+- Quotations: a percent item keeps its unit choice, switching back to a unit sets quantity 1 if it was empty (#2236).
+- Quotation parts: renaming a part also renames its line on the title page (own texts there stay); saving the title page
+  no longer drops the line of a part added meanwhile (#2239).
+- Quotation PDF: long part and title headings wrap, the quotation number line sits above the part title (#2240).
+- The service worker leaves requests of other origins (e.g. browser extensions) alone (#2257).
+
+### Security
+- Security fix (upload and calendar subscription tokens): the link is shown once when it is created; existing shortcuts
+  and subscriptions keep working (#1907).
+- Security fix (organisation recovery key): showing the key asks for password and second factor, the other admins are
+  told; server admins can renew an organisation's key with `orgcrypt_cli rotate --org <id>` (#1972).
+
 ## [2.126.2] - 2026-10-20
 
 Pages: suggestions above the phone keyboard, a news entry when someone shares pages with you, "Mentioned in" on tables.
