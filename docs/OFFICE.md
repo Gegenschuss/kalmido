@@ -78,6 +78,18 @@ never move office data. Undo takes the whole move back in one step (copies and a
 target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates|meals|contracts, ids, to:
 "private"|"org:<id>", dry, copy_issued}` -> `{notes, block, count, move_id}`; `{undo: move_id}` takes it back.
 
+**The whole personal office into an organisation** (2.137.0): Settings of the office, *Transfer into an organisation*, offered
+when you are an admin of at least one organisation. The preview names what goes along (documents, payments, clients with
+their contact persons, master data, cash book, travel expenses, files ...), what stays in the personal office (its settings,
+company and bank data, your number counters, the start and real balances of the cash flow; the organisation keeps its own)
+and who sees it afterwards (every member of the organisation with access to the office). Every entry keeps its id;
+finalised invoices stay finalised with their numbers, closed cash book days stay closed; the protected fields and the
+stored files are sealed anew with the organisation's key. A number the organisation already uses refuses the transfer
+(the preview lists them; numbers are never rewritten). One way, no undo. Only the person in the app, never an agent or an
+access token. `GET /api/office/move/check?org=<id>` -> `{org, ok, moves, keeps, notes, conflicts, numbers, who}`;
+`POST /api/office/move/org` `{org, confirm: true}` -> `{ok, org_id, name, clients, files, rows}` (404 not a member, 403 not
+its admin, 409 conflicts / not a personal office / nothing to move).
+
 **Small business (section 19 UStG)**: the setting `small_business` (Settings tab, "Invoices"; a setting of every office
 area, also of an organisation): new quotations and invoices are made without VAT and with the note "Gemäß § 19 UStG
 wird keine Umsatzsteuer berechnet." (`vat_mode` `novat`, `vat_note` `small`); the e-invoice gets the tax category `E`

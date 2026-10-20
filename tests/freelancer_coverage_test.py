@@ -606,6 +606,8 @@ ROUTES = {
     "GET /api/v1/sheets/{}": "sheets", "GET /api/v1/sheets/{}/vars": "sheets", "PATCH /api/sheets/{}": "sheets",
     # 2.97.0 C (#2049): office moves (p297_c_api_test.py) - routes below this line
     "POST /api/office/move-space": "office",
+    # 2.137.0 D (#1981): the personal office into an organisation the person is an admin of (p2137_d_api_test.py)
+    "GET /api/office/move/check": "office", "POST /api/office/move/org": "office",
     # 2.96.0 B (#1941): a table to the other workspace
     "POST /api/sheets/{}/move-space": "sheets",
     # 2.124.0 C (#2113): shares of one table (p2124_c_api_test.py)
