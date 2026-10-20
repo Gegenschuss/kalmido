@@ -774,3 +774,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .onumdoc input{min-height:2.25rem;max-width:14rem}
 .onumdoc .ofchint{flex-basis:100%}
 .onumpen{min-height:2.25rem;min-width:2.25rem}
+/* 2.144.2 A (#2352): iOS ignores min-height on a select - cash book year / VAT and the "Bill on" quotation pick get a 44 px height on touch */
+@media (pointer:coarse) {
+  .cb-bar select,#cb-vat,#bkb-doc{height:2.75rem;line-height:1.25}
+}
