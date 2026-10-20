@@ -138,10 +138,10 @@ function viewHabits() {
   return h;
 }
 // 2.140.0 C (#2135): up to six reminder times; the old single time (remind_at) is the first one
-const REM_MAX = 6;
+const HREM_MAX = 6;
 const remTimes = x => (x.remind_times || x.remind_at || '').split(',').filter(Boolean);
 const remRows = ts => (ts.length ? ts : ['']).map((t, i) => `<span class="hrem">${timeIn('h-rem' + i, t, {label: tr('Reminder'), empty: tr('off')})}</span>`).join('')
-  + (ts.length && ts.length < REM_MAX ? `<button type="button" class="btn sm" data-m="remadd">${ic('plus', 's')} ${tr('Add time')}</button>` : '');
+  + (ts.length && ts.length < HREM_MAX ? `<button type="button" class="btn sm" data-m="remadd">${ic('plus', 's')} ${tr('Add time')}</button>` : '');
 function habitModal(id) {
   const x = id ? S.habits.find(h => h.id === id) : {name: '', goal: 1, days: '1234567', per_week: 0, color: HCOLORS[1], remind_at: '', logs: {}, notes: {}, created_at: new Date().toISOString()};
   x.notes = x.notes || {};

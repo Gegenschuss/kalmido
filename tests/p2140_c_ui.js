@@ -3,6 +3,7 @@
 // dialog (add a time, saved sorted), "3 of 5 this week" with segments (#2135).
 const {boot, errs, sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
+const firefox = require('./ff')({tag: 'p2140_c_ui', check: (c, what) => check(c, what), shots: 'P2140C_SHOTS'});
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 let CK;
@@ -73,6 +74,23 @@ const ymd = n => { const d = new Date(); d.setDate(d.getDate() - n); return `${d
   click(w, d.querySelector('[data-act="habit-open"]')); await sleep(500);
   check(d.querySelectorAll('#h-rems input[data-dp]').length === 6 && !d.querySelector('[data-m="remadd"]'), 'at six times the add button is gone');
   w.close();
+  // ---- a phone (390 px): the weekly progress is readable, nothing sideways; screenshots with P2140C_SHOTS=<dir>
+  await firefox(async o => {
+    const {cmd, ev, nav, shot} = o;
+    await cmd('browsingContext.setViewport', {context: o.ctx, viewport: {width: 390, height: 844}});
+    await nav(B + 'static/icon.svg');
+    await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
+    for (const [hash, sel, name] of [['habits', '.hprog', 'habits'], ['review', '[data-act="rv-period"][data-p="hist"]', 'journal']]) {
+      await nav(B + '#' + hash);
+      for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('${sel}')`).catch(() => false)); i++) await sleep(250);
+      if (name === 'journal') { await ev(`(() => { document.querySelector('${sel}').click(); return 1; })()`); await sleep(1500); }
+      await sleep(600);
+      const g = await ev(`(() => { const p = document.querySelector('.hprog'), r = p && p.getBoundingClientRect(); return {w: r ? Math.round(r.width) : 0, over: document.documentElement.scrollWidth - innerWidth}; })()`);
+      check(g.over <= 0, `phone ${name}: nothing sideways ` + JSON.stringify(g));
+      if (name === 'habits') check(g.w >= 120, 'phone: the week progress is at least 120 px wide: ' + g.w);
+      await shot(`p2140c-${name}-390.png`);
+    }
+  }, true);
   check(!errs.length, 'jsdom: no JS errors ' + errs.join(' | '));
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
