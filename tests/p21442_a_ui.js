@@ -47,7 +47,7 @@ const FEAT = 'cal,comments,collab,events,files,time';
   check(/\.chkl\{min-height:2\.75rem/.test(rd('static/app.css')), '#2447: .chkl has 2.75rem on touch');
   // #2352 / #2375: CSS rules
   const docs = rd('static/css/docs.css'), off = rd('static/css/office.css'), app = rd('static/app.css');
-  check(/pointer: coarse[^]*\.rc-acts \.btn[^}]*min-height: 2\.75rem/.test(docs) && /\.rc-money input[^}]*min-height: 2\.75rem/.test(docs), '#2352: receipt sheet buttons and amount / VAT fields 44 px on touch');
+  check(/pointer:coarse[^]*\.rc-acts \.btn[^}]*min-height: 2\.75rem/.test(docs) && /\.rc-money input[^}]*min-height: 2\.75rem/.test(docs), '#2352: receipt sheet buttons and amount / VAT fields 44 px on touch');
   check(/pointer:coarse\) \{\s*\.cb-bar select,#cb-vat,#bkb-doc\{height:2\.75rem/.test(off), '#2352: cash book selects and the "Bill on" pick 44 px on touch');
   check(/\.wtdays button\{min-width:2\.75rem;min-height:2\.75rem\}/.test(app) && /\.chkl\.wtfocus\{[^}]*overflow-wrap:anywhere/.test(app), '#2375: workweek buttons 44 px, focus label wraps');
   check(!!d.querySelector('#chn-kind') && rd('static/js/settings.js').includes('chkl wtfocus'), '#2375: the focus-sessions label has the wrapping class');
