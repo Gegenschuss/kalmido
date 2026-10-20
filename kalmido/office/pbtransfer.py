@@ -278,10 +278,10 @@ def pbt_post():
         if own_default and moved_books:  # the target keeps its own default cash box
             q = ",".join("?" * len(moved_books))
             c.execute(f"UPDATE office_cashbooks SET is_default=0 WHERE org_id=? AND id IN ({q})", (dst, *moved_books))
-        # the counters: the target continues after the moved numbers where it has no counter of its own; the personal
-        # office keeps its own (the person's sequence never restarts)
+        # the counters: the target continues after the moved numbers (its own counter is raised where it is lower, review
+        # M2: never a number twice); the personal office keeps its own (the person's sequence never restarts)
         c.execute("INSERT INTO office_numbers(org_id, kind, period, last) SELECT ?, kind, period, last FROM office_numbers WHERE org_id=? "
-                  "ON CONFLICT(org_id, kind, period) DO NOTHING", (dst, src))
+                  "ON CONFLICT(org_id, kind, period) DO UPDATE SET last=GREATEST(office_numbers.last, excluded.last)", (dst, src))
         cl = p["clients"]
         if cl:
             q = ",".join("?" * len(cl))

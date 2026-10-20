@@ -87,6 +87,15 @@ def _oi_put(ctx, old, new, seal=True, mime="", keep=False):
     return new
 
 
+def _oi_logo_ok(ctx, name):
+    """2.137.0 review L4: a content-addressed logo copy only under the name of its own content (never a file that a
+    later logo of the target would be taken for)."""
+    import hashlib
+    from .acctimport import _file_bytes
+    raw = _file_bytes(ctx.zf, ctx.files, _oi_name(name))
+    return raw is not None and hashlib.sha256(raw).hexdigest()[:16] == name[5:21]
+
+
 def _oi_number_taken(c, space, number):
     if not number:
         return False
@@ -138,6 +147,9 @@ def _p_settings(c, run, src, d, ctx):
 
 def _p_numbers(c, run, src, d, ctx):
     if c.execute("SELECT 1 FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (ctx.space, d.get("kind"), d.get("period") or "")).fetchone():
+        if isinstance(d.get("last"), int):  # 2.137.0 review M2: the kept counter continues after the imported numbers (never one twice)
+            c.execute("UPDATE office_numbers SET last=GREATEST(last, ?) WHERE org_id=? AND kind=? AND period=?",
+                      (d["last"], ctx.space, d.get("kind"), d.get("period") or ""))
         run.warning(N_("A number range of the target office was kept: {0}"), f"{d.get('kind')} {d.get('period') or ''}".strip())
         return None
     return d
@@ -202,7 +214,7 @@ def _a_doc(c, run, src, nid, ctx):
             _oi_put(ctx, f"doc{old}-{epdf_name(r_old)}.{ext}", f"doc{int(nid)}-{epdf_name(r_new)}.{ext}", mime=mime)
     snd = _oi_json(src.get("sender"), {})
     if isinstance(snd, dict):
-        if isinstance(snd.get("logo"), str) and re.fullmatch(r"logo-[0-9a-f]{16}\.png", snd["logo"]):
+        if isinstance(snd.get("logo"), str) and re.fullmatch(r"logo-[0-9a-f]{16}\.png", snd["logo"]) and _oi_logo_ok(ctx, snd["logo"]):
             _oi_put(ctx, snd["logo"], snd["logo"], seal=False, mime="image/png", keep=True)
         lh = snd.get("letterhead")
         if isinstance(lh, dict) and isinstance(lh.get("file"), str) and re.fullmatch(r"lhs-[0-9a-f]{16}\.pdf", lh["file"]):

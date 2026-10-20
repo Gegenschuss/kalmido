@@ -167,6 +167,22 @@ def _wiki_locked(c, ctx):
                      (ctx.space or 0, 0 if ctx.space else ctx.uid)).fetchone() is not None
 
 
+def _video_version(c, run, src, d, ctx):
+    """2.137.0 review M1: the link is checked like a pasted one (videos/review.py vdr_parse); provider and embed id come from it."""
+    from ..personal.timetrack import BadInput
+    from ..videos.review import vdr_parse
+    from .acctimport import tr, umz_cols
+    try:
+        v = vdr_parse(src.get("url"))
+    except BadInput:
+        run.warning(N_("A row could not be taken over: {0}"), tr(N_("Video sign-offs")))
+        return False
+    for k in ("url", "provider", "embed_id"):
+        if k in d or k in umz_cols(c, "video_versions")[0]:
+            d[k] = v[k]
+    return d
+
+
 _W_LOCKED = N_("Knowledge pages encrypted in the browser were not taken over: export them as Markdown from the unlocked space and import that file into the knowledge pages.")
 
 
@@ -428,7 +444,7 @@ SPECS = [
     # video sign-offs
     OiT("videos/reviews.json", "video_reviews", refs={"task_id": "tasks", "list_id": "lists", "client_id": "clients"}, people=_P,
         label=N_("Video sign-offs"), prep=_video),
-    OiT("videos/versions.json", "video_versions", refs={"review_id": "video_reviews"}, need=("review_id",), people=_P),
+    OiT("videos/versions.json", "video_versions", refs={"review_id": "video_reviews"}, need=("review_id",), people=_P, prep=_video_version),
     OiT("videos/comments.json", "video_comments", refs={"review_id": "video_reviews", "version_id": "video_versions"}, need=("review_id",),
         late={"parent_id": "video_comments"}, people={"author_id": "null"}),
 ]
