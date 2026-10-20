@@ -1839,6 +1839,14 @@ button.tvr-task:hover{color:var(--accent)}
 .tvgaps li{display:flex;align-items:center;gap:.625rem;flex-wrap:wrap;min-height:2.75rem}
 .tvgaps .tvg-day{font-weight:600;min-width:6.5rem}
 .tvgaps .tvg-t{flex:1;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 2.125.0 B (#2119): the month's timesheet and the team's closed months on the time page */
+.tslcard{margin:.25rem 0 .875rem;padding:.625rem .875rem}
+.tslcard.tsl-closed,.tslcard.tsl-approved{border-left:.1875rem solid var(--accent)}
+.tslrow{display:flex;align-items:center;gap:.625rem;flex-wrap:wrap;min-height:2.75rem}
+.tslinfo{flex:1;min-width:10rem;display:flex;flex-direction:column;gap:.125rem}
+.tslinfo small{font-size:var(--fs-s,.8125rem)}
+.tslrev .tslrow+.tslrow{border-top:1px solid var(--line);padding-top:.5rem;margin-top:.5rem}
+.terow .tslock{color:var(--muted)}
 .tvr-idle{display:inline-flex;align-items:center;gap:.375rem;color:var(--muted);font-size:var(--fs-m);margin-right:.25rem}
 .tvr-go{max-width:14rem}
 .tvr-go span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -6408,6 +6416,21 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .ab2md .ab2dates{display:flex;gap:.75rem}
 .ab2md .ab2dates label{display:flex;flex-direction:column;gap:.25rem;flex:1}
 .ab2hint{margin:.5rem 0}
+/* 2.125.0 A (#2117): vacation requests (striped = requested), the account line, the admins' accounts */
+.ab2table td.off.req{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--accent) 30%,transparent) 0 .25rem,transparent .25rem .5rem)}
+.lvacc{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .75rem;margin:.5rem 0;padding:.5rem .75rem;border:1px solid var(--line);border-radius:var(--radius)}
+.lvt{font-weight:600}
+.lvnums{display:flex;flex-wrap:wrap;gap:.125rem .75rem;font-size:var(--fs-s)}
+.lvneg b{color:var(--danger)}
+.lvreq{display:flex;align-items:center;gap:.625rem;min-height:2.75rem;padding:.375rem .25rem;border-bottom:1px solid var(--line)}
+.lvbtns{display:flex;gap:.375rem;flex-wrap:wrap}
+.lvbtns .btn{min-height:2.25rem}
+.lvbox{margin:.75rem 0}
+.lvbox>summary{cursor:pointer;font-weight:600;min-height:2.25rem;display:flex;align-items:center}
+.lvsw{margin-top:.5rem}
+.wtdays{flex-wrap:wrap}
+.wtdays button{min-width:2.75rem;min-height:2.25rem}
+@media (max-width:599px){.lvreq{flex-wrap:wrap}.lvbtns{width:100%}.lvbtns .btn{flex:1;justify-content:center}}
 .wlc.ab2wl .wlbar{outline:1px dashed color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:1px}
 @media (max-width:599px){.ab2grid{display:none}.ab2tabs{display:flex}.ab2tabs button{flex:1;justify-content:center}}
 

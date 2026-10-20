@@ -212,6 +212,7 @@ ORDER = (
     "office.clientlink",  # 2.59.0 A (#1735): the address book search of the client dialog
     "team.workload",
     "hub.absence",  # 2.50.0 A (#1195): absences + German public holidays
+    "hub.leave",  # 2.125.0 A (#2118, #2117): working days per person, vacation account + requests
     "hub.dispo",  # 2.50.0 A (#1194): resources and disposition (bookings of crew and equipment)
     "hub.agentdispo",  # 2.51.0 C (#1355): shoot planning by agents (event drafts, options), the disposition in the REST API
     "hub.hubmail",  # 2.84.0 A (#1198): e-mail as an input of the hub (mails filed with clients / projects)
@@ -282,6 +283,8 @@ ORDER = (
     "admin.clientip",  # 2.33.0 (#834)
     "tasks.stale",  # 2.34.0 (#266)
     "personal.timegaps",  # 2.34.0 (#269)
+    "personal.timexlsx",  # 2.125.0 C (#2122): Excel export of times + workload
+    "personal.timesheet",  # 2.125.0 B (#2119, #2120): monthly timesheets + the person's time zone of time tracking
     "agents.agentpin",  # 2.51.0 C (#1352): agents on the pin board + the weekly status of a project
     "agents.agenttime",  # 2.51.0 C (#1353): agents check time tracking + propose entries from events
     "agents.lyprop",  # 2.55.0 B (#1066): agents propose arrangements of views (the person accepts)

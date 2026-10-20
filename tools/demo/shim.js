@@ -56,13 +56,14 @@
     repos: [], role: 'owner', sort: 0, status: '', status_at: null, status_by: null, status_note: '', tags: [], ticket_tpl: '', tickets: 0,
     tidy_agent_id: null, view: 'list', family: ''};
   const SETTINGS_DEF = {agent_share: '{}', agents_hidden: '', allday_time: '09:00', cal_today: '1', celebrate: '1', comment_order: 'old',
-    date_confirm: '0', default_reminder: '0', digest_time: '', features: 'cal,timeline,matrix,habits,kanban,collab,stats,time,progress,deps,fields,comments,agents',
+    date_confirm: '0', default_reminder: '0', digest_time: '', features: 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,deps,fields,comments,events,contacts,files,docs,agents',  // 2.125.0 D (#1653): USER_DEFAULTS + agents
     features_rev: '11', show_done_default: '0', folders: '[]', folders_closed: '[]', hide_blocked_today: '0', hide_progress: '', ical_alarms: '1', ical_scope: 'all',
     lang: 'en', nav_order: 'tasks,cal,matrix,habits', news_kinds: 'mention,assign,comment,unblock,share,status', notify: '', ntfy_topic: '',
     onboard: 'pending', pomo_focus: '25', pomo_long: '15', pomo_long_every: '4', pomo_short: '5', progress_subtasks: '0',
     push_channel: 'webpush', push_priority: '4', quiet_from: '22:00', quiet_to: '07:00', review_time: '', roadmap: '', sample_ask: '1',
     show_done_views: '{}', time_autostop_h: '12', time_currency: '€', time_focus: '1', time_remind_h: '4', time_rounding: '0', time_target: '0',
-    tour: 'pending', work_end: '17:00', work_start: '09:00'};
+    tour: 'pending', work_end: '17:00', work_start: '09:00',
+    setup: 'pending'};  // 2.125.0 D (#1653): the first start shows the intro + module choice of a new account (an older storage has no key = done)
   const AGENT = 2;
 
   // 2.74.0 (#1653): a new account: the Basket (named in the visitor's language), the simulated agent with its hello; the
@@ -258,13 +259,15 @@
       languages: [{beta: false, code: 'de', name: 'Deutsch'}, {beta: false, code: 'en', name: 'English'}, {beta: true, code: 'es', name: 'Español'},
         {beta: true, code: 'fr', name: 'Français'}, {beta: true, code: 'it', name: 'Italiano'}, {beta: true, code: 'nl', name: 'Nederlands'}],
       news: {unread: 0, sig: '0'}, avatars: {[AGENT]: 'static/avatars/robot.svg'}, templates: [],
-      timer: DB.timer ? entryOut(DB.time.find(e => e.id === DB.timer)) : null, time_totals: tt, time_lists: tl, time_day_h: 8, collab_all: true, time_all: true,
-      about: {available: false, latest: '', checked_at: '', error: '', collab_all: true, cal_on: false, oidc: {configured: false}},
+      timer: DB.timer ? entryOut(DB.time.find(e => e.id === DB.timer)) : null, time_totals: tt, time_lists: tl, time_day_h: 8, collab_all: DB.inst?.collab_all !== false, time_all: DB.inst?.time_all !== false,
+      about: {available: false, latest: '', checked_at: '', error: '', collab_all: DB.inst?.collab_all !== false, cal_on: false, oidc: {configured: false},
+        org_name_env: true},  // 2.125.0 D (#1653): the demo has no organisation to name (the intro does not ask)
       calendars: {enabled: false, subs: 0}, api: {enabled: false}, webhooks: {enabled: false}, caldav: {enabled: false}, public_links: false,
       share: {drop_url: '', ios_shortcut: ''}, sample: sampleState(), agents: [agentOut()], proposers: [], groups: [], my_groups: [],
       dayplan: {default_duration: 30, review_time: '', work_end: DB.settings.work_end, work_start: DB.settings.work_start},
       kids: [], kid_ids: [],  // 2.19.0 (#653): no other accounts in the demo
       clients: DB.settings.features.split(',').includes('clients') ? (DB.clients || []).map(clientBrief) : [], workspaces: false,  // 2.74.0 (#1653)
+      setup_pending: DB.settings.setup === 'pending', books: fon('contacts') ? books().map(bookOut) : [], evcals: fon('events') ? evcals().map(evcalOut) : [],  // 2.125.0 D (#1653): the intro (static/js/account.js setupChoices)
     };
   }
 
@@ -409,7 +412,7 @@
     'GET /api/briefing': () => ({}), 'GET /api/layouts/saved': () => ({saved: []}), 'GET /api/layouts/std': () => ({layouts: {}, can: false}),
     'POST /api/favorites/suggestion': () => ({list_id: null}),  // 2.74.0 (#1653): was a write -> the notice popped up 8 s after the start 'GET /api/ical': () => ({enabled: false}),
   };
-  const R = [], MISS = [], GATE = [];  // MISS: calls answered by the fallback (tests list them); GATE (2.74.0): office reads gated on purpose
+  const R = [], MISS = [], GATE = [], UNKNOWN = [], CALLS = [];  // 2.125.0 D (#1653): UNKNOWN = reads no route here knows (console.warn + a line)  // MISS: calls answered by the fallback (tests list them); GATE (2.74.0): office reads gated on purpose
   const on = (m, re, fn) => R.push([m, new RegExp('^' + re + '$'), fn]);
   on('GET', '/api/state', () => state());
   // 2.74.0 (#1653): the first start of a new account and the sample project on request
@@ -481,7 +484,8 @@
     if (!DB.deps.some(d => d[0] === a && d[1] === c)) DB.deps.push([a, c]); return {ok: true}; });
   on('DELETE', '/api/deps/(\\d+)/(\\d+)', (q, b, a, c) => { DB.deps = DB.deps.filter(d => !(d[0] === +a && d[1] === +c)); return {ok: true}; });
   on('GET', '/api/occurrences', q => occurrences(q.get('from'), q.get('to')));
-  on('GET', '/api/calendars/events', () => ({events: [], errors: []}));
+  // 2.125.0 D (#1653): + the own events (module events, see demo-modules)
+  on('GET', '/api/calendars/events', q => evRange(q.get('from') || today(), q.get('to') || today()));
   on('GET', '/api/tags/count', q => { const tg = q.get('tag'); const ts = live().filter(t => t.tags.includes(tg)); return {open: ts.filter(t => t.status === 0).length, tasks: ts.length}; });
   on('POST', '/api/tags/delete', (q, b) => { const tg = b.tag || b.name; for (const t of DB.tasks) t.tags = t.tags.filter(x => x !== tg); return {ok: true, tasks: 0}; });
   on('POST', '/api/tags/rename', (q, b) => { for (const t of DB.tasks) t.tags = [...new Set(t.tags.map(x => x === b.old ? b.new : x))]; return {ok: true}; });
@@ -681,20 +685,50 @@
   const PURPOSE = {me: ['cal', 'events', 'contacts'], home: ['cal', 'events', 'contacts', 'habits', ...LIFE],
     family: ['cal', 'habits', 'comments', 'collab', 'family', 'events', 'contacts', 'contracts', 'home', 'travel'], team: TEAM, software: TEAM, office: TEAM};
   const PURPOSE_EXTRA = {office: ['clients', 'workload', 'forms', 'office']};
-  const DEMO_OFF = new Set(['events', 'contacts', 'files', 'docs', 'workload', 'forms', ...LIFE]);
+  // 2.125.0 D (#1653): every module runs in the demo now; PM_FULL = kalmido/family/family.py PM_FULL
+  const DEMO_OFF = new Set();
+  const PM_FULL = ['cal', 'timeline', 'matrix', 'habits', 'pomo', 'kanban', 'collab', 'stats', 'time', 'progress', 'deps', 'fields', 'agents', 'comments',
+    'family', 'events', 'contacts', ...LIFE, 'budget', 'feeds', 'clients', 'workload', 'forms', 'office', 'wiki', 'files', 'dispo', 'sheets'];
   on('POST', '/api/me/purpose', (q, b) => {
     const p = b.purpose, am = b.all_modules; if (!PURPOSE[p]) bad('Invalid purpose');
-    const extra = PURPOSE_EXTRA[p] || [], onS = new Set(am == null ? [...PURPOSE[p], ...extra] : am ? [...PURPOSE_MODS, ...extra] : []);
-    const sw = [...PURPOSE_MODS, ...(am === false ? Object.values(PURPOSE_EXTRA).flat() : [])];
+    const extra = PURPOSE_EXTRA[p] || [], onS = new Set(am == null ? [...PURPOSE[p], ...extra] : am ? PM_FULL : []);  // 2.125.0 D (#1653): all = PM_FULL like the server
+    const sw = [...PURPOSE_MODS, ...(am === false ? PM_FULL : [])];
     let fs = DB.settings.features.split(',').filter(Boolean);
     fs = [...fs.filter(x => !sw.includes(x) || onS.has(x)), ...PURPOSE_MODS.filter(x => onS.has(x) && !fs.includes(x))];
-    fs = [...fs, ...extra.filter(x => onS.has(x) && !fs.includes(x))].filter(x => !DEMO_OFF.has(x));
+    fs = [...fs, ...extra.filter(x => onS.has(x) && !fs.includes(x))];
+    fs = [...fs, ...PM_FULL.filter(x => onS.has(x) && !fs.includes(x))].filter(x => !DEMO_OFF.has(x));
     if (am != null) DB.settings.mods_all = am ? '1' : '0';
     DB.settings.features = fs.join(','); DB.settings.purpose = p;
     const created = [];
     if (p === 'family') { for (const [k, n] of [['shopping', 'Shopping list'], ['household', 'Household']]) if (!DB.lists.some(l => l.family === k)) created.push(famList(k, n).id); }
     else if (b.examples === true && ['team', 'office', 'software'].includes(p) && !sampleState()) created.push(sampleMake());
     return {features: DB.settings.features, created};
+  });
+
+  // 2.125.0 D (#1653): "Start" of the intro (static/js/account.js setupChoices) like kalmido/core/instance.py admin_setup: the
+  // language, the two switches for everybody, the modules (USER_DEFAULTS features + family, the life areas only when picked),
+  // the purpose with its extras ("all modules" = PM_FULL), the start (empty, sample project, a project of a type)
+  const SETUP_FEATS = ['cal', 'timeline', 'matrix', 'habits', 'pomo', 'kanban', 'collab', 'stats', 'time', 'progress', 'deps', 'fields', 'comments', 'events', 'contacts', 'files', 'docs', 'family'];
+  on('POST', '/api/admin/setup', (q, b) => {
+    const mods = b.modules; if (!Array.isArray(mods)) bad(tx('Invalid value: {0}').replace('{0}', 'modules'));
+    if (b.lang && LANGS.includes(b.lang)) DB.settings.lang = b.lang;
+    DB.inst = {...DB.inst, ...(typeof b.collab_all === 'boolean' ? {collab_all: b.collab_all} : {}), ...(typeof b.time_all === 'boolean' ? {time_all: b.time_all} : {})};
+    let fs = SETUP_FEATS.filter(f => f === 'collab' || f === 'time' || mods.includes(f));
+    fs = [...fs, ...LIFE.filter(m => mods.includes(m) && !fs.includes(m))];
+    if (b.purpose && PURPOSE[b.purpose]) {
+      DB.settings.purpose = b.purpose;
+      let on = PURPOSE[b.purpose].filter(m => LIFE.includes(m) && !fs.includes(m));
+      on = [...on, ...(PURPOSE_EXTRA[b.purpose] || []).filter(m => !on.includes(m) && !fs.includes(m))];
+      if (typeof b.all_modules === 'boolean') { on = b.all_modules ? PM_FULL.filter(m => !fs.includes(m)) : []; DB.settings.mods_all = b.all_modules ? '1' : '0'; }
+      fs = [...fs, ...on];
+      if (b.purpose === 'family') for (const [k, n] of [['shopping', 'Shopping list'], ['household', 'Household']]) if (!DB.lists.some(l => l.family === k)) famList(k, n);
+    }
+    DB.settings.features = fs.filter(x => !DEMO_OFF.has(x)).join(',');
+    if (b.project_type) { const n = {agency: 'Agency', software: 'Software / AI dev', private: 'Personal|project type'}[b.project_type] || 'Project';
+      DB.lists.push({...clone(LIST_DEF), id: nid('list'), created_at: iso(), name: tx(n), kind: 'project', ptype: b.project_type, sort: Math.max(0, ...DB.lists.map(x => x.sort)) + 1}); }
+    if (b.sample === true && !sampleState()) sampleMake(); else if ('sample' in b) DB.settings.sample_ask = '0';
+    DB.settings.setup = 'done';
+    return {ok: true};
   });
 
   // ---------------------------------------------------------------- demo-office (2.74.0, #1653)
@@ -892,7 +926,7 @@
     if (b.company_fields) for (const k of CO_KEYS) if (k in b.company_fields) o.company[k] = String(b.company_fields[k] ?? '');
     const {company_fields, pack, ...rest} = b; o.settings = {...o.settings, ...rest}; return ofInfo(); });
   on('GET', '/api/office/number-preview', q => { const k = q.get('kind') || 'offer'; return {preview: `${SCHEME[k] || 'KVA'}-${today().slice(0, 4)}-001`, valid: true, yearly: true}; });
-  for (const k of ['roles', 'crew', 'equipment', 'sets', 'texts', 'contracts']) on('GET', `/api/office/${k}`, () => ({items: []}));
+  // 2.125.0 D (#1653): roles, crew, equipment, sets, texts and contracts are collections now (demo-modules below)
   on('GET', '/api/office/services', () => ({items: clone(OF().services)}));
   const SVC = ['name_de', 'name_en', 'category', 'sort', 'unit', 'daily_rate', 'hourly_rate', 'raw_fee', 'producing', 'intext', 'role', 'role_id', 'tax', 'archived'];
   const svcSet = (s, b) => { for (const k of SVC) if (k in b) s[k] = b[k]; if (!String(s.name_de || '').trim()) bad(tx('Name missing')); s.updated_at = iso(); };
@@ -1005,7 +1039,721 @@
   });
   const wopen = window.open;
   window.open = (url, ...rest) => { const id = pdfId(String(url || '')); if (id) { printView(id); return null; }
-    if (/^\/api\//.test(String(url || ''))) { notice(); return null; } return wopen.call(window, url, ...rest); };
+    if (/^\/api\//.test(String(url || ''))) { if (!fileOpen(String(url))) notice(); return null; } return wopen.call(window, url, ...rest); };
+
+  // ---------------------------------------------------------------- demo-modules (2.125.0 D, #1653)
+  // Every module of a new account runs in the demo (shapes of the server's JSON, read off the Flask routes): contacts, home &
+  // life, review & journal, budget, feeds (no fetching: the notice), bookmarks, workload with absences and disposition,
+  // knowledge pages, tables (a small evaluator for the common formulas), the file store and documents (small files kept as
+  // data URLs in this browser) and the office's pages beyond quotes / invoices (pipeline, cash flow, figures, bookkeeping,
+  // subscriptions, travel, meals, agreements, equipment). A new route: one on(...) line (or crud(...) for a plain
+  // collection); tools/build_demo.py lists the app's calls that no route here answers.
+  const MD = () => DB.m || (DB.m = {});
+  const mcol = k => MD()[k] || (MD()[k] = []);
+  const mfind = (k, id) => mcol(k).find(x => x.id === +id) || gone();
+  const fon = f => DB.settings.features.split(',').includes(f);
+  const num = v => { if (typeof v === 'number') return v; const s = String(v ?? '').replace(/[^\d,.-]/g, ''); if (!s) return 0; return +(s.includes(',') ? s.replace(/\./g, '').replace(',', '.') : s) || 0; };
+  const m2 = v => (Math.round((+v || 0) * 100) / 100).toFixed(2);
+  const daysTo = d => d ? Math.round((Date.parse(String(d).slice(0, 10) + 'T12:00:00') - Date.parse(today() + 'T12:00:00')) / 864e5) : null;
+  const addD = (d, n) => { const x = new Date(String(d).slice(0, 10) + 'T12:00:00'); x.setDate(x.getDate() + n); return ds(x); };
+  const addM = (d, n) => { const x = new Date(String(d).slice(0, 10) + 'T12:00:00'); x.setMonth(x.getMonth() + n); return ds(x); };
+  const monday = d => { const x = new Date(String(d || today()).slice(0, 10) + 'T12:00:00'); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return ds(x); };
+  const monthEnd = m => { const [y, mo] = m.split('-').map(Number); return `${m}-${pad(new Date(y, mo, 0).getDate())}`; };
+  const monthAdd = (m, n) => { const [y, mo] = m.split('-').map(Number), x = new Date(y, mo - 1 + n, 1); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}`; };
+  // crud(base, key, opts): a plain collection in DB.m[key]: GET base -> {[list]: items}, POST -> the new one, GET / PATCH / PUT /
+  // DELETE base/<id>, POST base/<id>/restore (deleted_at, so undo works)
+  function crud(base, key, {list = 'items', def = () => ({}), out = x => clone(x), keep = () => true, index = null, post = null, one = null, del = null} = {}) {
+    on('GET', base, q => index ? index(q) : {[list]: mcol(key).filter(x => !x.deleted_at && keep(x, q)).map(out)});
+    on('POST', base, (q, b) => { const x = {...def(b), ...b, id: nid(key), created_at: iso(), updated_at: iso(), deleted_at: null}; mcol(key).push(x); return post ? post(x) : out(x); });
+    on('GET', base + '/(\\d+)', (q, b, id) => out(mfind(key, id)));
+    const upd = (q, b, id) => { const x = mfind(key, id), before = clone(x); Object.assign(x, b, {updated_at: iso()}); return one ? one(x, before) : out(x); };
+    on('PATCH', base + '/(\\d+)', upd); on('PUT', base + '/(\\d+)', upd);
+    on('DELETE', base + '/(\\d+)', (q, b, id) => { const x = mfind(key, id); x.deleted_at = iso(); return del ? del(x) : {ok: true, item: out(x)}; });
+    on('POST', base + '/(\\d+)/restore', (q, b, id) => { const x = mfind(key, id); x.deleted_at = null; return out(x); });
+  }
+
+  // ---- events in own calendars (kalmido/events/model.py cal_public / ev_dict / occ_out): no CalDAV, no invitations by mail in
+  // the demo; repeating events are expanded with the task repeat rules (DAILY / WEEKLY / MONTHLY / YEARLY, INTERVAL, BYDAY)
+  const evcals = () => { const k = mcol('evcals'); if (!k.length) k.push({id: nid('evcals'), name: tx('Calendar'), color: '#7c5cff', description: '', sort: 0, deleted_at: null}); return k.filter(x => !x.deleted_at); };
+  const evcalOut = k => ({id: k.id, name: k.name, color: k.color, description: k.description || '', owner_id: 1, role: 'owner', sort: k.sort || 0, org_id: null, owner_name: DB.me.display_name, members: [], hidden: false});
+  const evOut = e => ({id: e.id, cal_id: e.cal_id, uid: 'demo-' + e.id, title: e.title, location: e.location || '', description: e.description || '', all_day: !!e.all_day, start: e.start, end: e.end,
+    tz: e.tz || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', rrule: e.rrule || '', exdates: [], overrides: [], reminders: e.reminders || [], status: e.status || 'confirmed', busy: e.busy !== false,
+    url: e.url || null, task_id: e.task_id || null, attendees: [], role: 'owner', created_by: 1, created_at: e.created_at, updated_at: e.updated_at});
+  const utcZ = local => new Date(local).toISOString().replace(/\.\d{3}Z$/, 'Z');
+  function evRange(lo, hi) {
+    const out = [], cals = new Set(evcals().map(k => k.id));
+    for (const e of mcol('events').filter(x => !x.deleted_at && cals.has(x.cal_id))) {
+      const d0 = e.start.slice(0, 10), len = Math.round((Date.parse(e.end.slice(0, 10) + 'T12:00:00') - Date.parse(d0 + 'T12:00:00')) / 864e5), tm = s => s.length > 10 ? s.slice(10) : '';
+      let d = d0, n = 0;
+      while (d <= hi && n < 400) {
+        if (addD(d, len) >= lo) out.push({id: 'k' + out.length, own: true, eid: e.id, occ: d, cal: e.cal_id, title: e.title, location: e.location || '', description: (e.description || '').slice(0, 2000), all_day: !!e.all_day,
+          start: e.all_day ? d : utcZ(d + tm(e.start)), end: e.all_day ? addD(d, Math.max(1, len)) : utcZ(addD(d, len) + tm(e.end)), recurring: !!e.rrule, changed: false, status: e.status || 'confirmed', role: 'owner', task_id: e.task_id || null, att: 0});
+        if (!e.rrule) break; d = nextDate(e.rrule, d); n++;
+      }
+    }
+    return {events: out, subs: {}, evcals: Object.fromEntries(evcals().map(k => [k.id, {name: k.name, color: k.color, role: 'owner'}])), errors: []};
+  }
+  const evSet = (e, b) => { for (const k of ['title', 'location', 'description', 'all_day', 'start', 'end', 'tz', 'rrule', 'reminders', 'status', 'busy', 'url', 'task_id']) if (k in b) e[k] = b[k];
+    if (b.cal_id) e.cal_id = +b.cal_id; if (!e.cal_id) e.cal_id = evcals()[0].id; if (!e.start) bad(tx('Invalid value: {0}').replace('{0}', 'start')); if (!e.end || e.end < e.start) e.end = e.start; e.updated_at = iso(); };
+  on('GET', '/api/events/(\\d+)', (q, b, id) => { const e = mfind('events', id); if (e.deleted_at) gone(); return evOut(e); });
+  on('POST', '/api/events', (q, b) => { const e = {id: nid('events'), created_at: iso(), deleted_at: null}; evSet(e, b); mcol('events').push(e); return evOut(e); });
+  on('PATCH', '/api/events/(\\d+)', (q, b, id) => { const e = mfind('events', id); if (b.expect && b.expect !== e.updated_at) throw new Http(409, {error: tx('Changed in the meantime')}); evSet(e, b); return evOut(e); });
+  on('DELETE', '/api/events/(\\d+)', (q, b, id) => { mfind('events', id).deleted_at = iso(); return {ok: true}; });
+  on('POST', '/api/events/(\\d+)/restore', (q, b, id) => { const e = mfind('events', id); e.deleted_at = null; return evOut(e); });
+  on('POST', '/api/events/(\\d+)/prep-task', (q, b, id) => { const e = mfind('events', id), inbox = DB.lists.find(l => l.is_inbox) || DB.lists[0];
+    const t = newTask({title: e.title, list_id: inbox.id, due: addD(e.start.slice(0, 10), -1)}); return {task_id: t.id, ...taskOut(t)}; });
+  on('POST', '/api/evcals', (q, b) => { const k = {id: nid('evcals'), name: String(b.name || '').trim() || tx('Calendar'), color: b.color || '#22c55e', description: '', sort: mcol('evcals').length, deleted_at: null}; mcol('evcals').push(k); return evcalOut(k); });
+  on('PATCH', '/api/evcals/(\\d+)', (q, b, id) => { const k = mfind('evcals', id); for (const f of ['name', 'color', 'description']) if (f in b) k[f] = b[f]; return evcalOut(k); });
+
+  // ---- time: the "days without entries" card stays empty (kalmido/personal/timegaps.py)
+  on('GET', '/api/time/gaps', () => ({from: day(-14), to: day(-1), days: []}));
+
+  // ---- contacts + address books (kalmido/contacts/web.py, model.py contact_brief / contact_dict / book_public)
+  const books = () => { const b = mcol('books'); if (!b.length) b.push({id: nid('books'), name: tx('Contacts'), color: '#7c5cff', created_at: iso(), deleted_at: null}); return b.filter(x => !x.deleted_at); };
+  const bookOut = b => ({id: b.id, name: b.name, color: b.color, owner_id: 1, role: 'owner', org_id: null, imported: false, birthdays_list_id: null,
+    count: mcol('contacts').filter(c => !c.deleted_at && c.book_id === b.id).length, owner_name: DB.me.display_name, org_owned: false, org_role: null, can_org: false, members: []});
+  const CT_ARR = ['emails', 'phones', 'urls', 'addresses', 'groups'];
+  const ctFn = c => String(c.fn || [c.prefix, c.given, c.middle, c.family, c.suffix].filter(Boolean).join(' ') || c.org || '').trim();
+  const ctBrief = c => ({id: c.id, book_id: c.book_id, fn: ctFn(c), org: c.org || '', kind: c.kind || 'individual', email: c.emails?.[0]?.value || '', phone: c.phones?.[0]?.value || '',
+    photo: false, bday: c.bday || '', groups: c.groups || []});
+  const careOut = c => { const k = c.care || {every_days: 0, last: null, note: ''}; return {every_days: k.every_days || 0, last: k.last || null, note: k.note || '', due: k.every_days && k.last ? addD(k.last, k.every_days) : null}; };
+  const ctFull = c => ({given: '', family: '', middle: '', prefix: '', suffix: '', nickname: '', org: '', dept: '', title: '', bday: '', anniversary: '', note: '', uid: 'demo-' + c.id,
+    ...clone(c), photo: '', ...Object.fromEntries(CT_ARR.map(k => [k, c[k] || []])), fn: ctFn(c), kind: c.kind || 'individual', tasks: [], events: [], clients: [], role: 'owner',
+    newsletter: false, ...(fon('care') ? {care: careOut(c)} : {})});
+  const ctSet = (c, b) => { for (const [k, v] of Object.entries(b)) if (!['id', 'expect', 'role'].includes(k)) c[k] = v; c.fn = ''; c.fn = ctFn({...c, fn: b.fn}); if (!c.fn) bad(tx('Please enter a name')); c.updated_at = iso(); };
+  const liveCt = () => mcol('contacts').filter(c => !c.deleted_at);
+  on('GET', '/api/contacts', q => {
+    const s = (q.get('q') || '').toLowerCase(), g = q.get('group'), bk = +q.get('book_id') || 0, off = +q.get('offset') || 0, lim = Math.min(+q.get('limit') || 500, 2000);
+    const all = liveCt().filter(c => (!s || [ctFn(c), c.org, ...(c.emails || []).map(e => e.value), ...(c.phones || []).map(e => e.value)].join(' ').toLowerCase().includes(s))
+      && (!g || (c.groups || []).includes(g)) && (!bk || c.book_id === bk)).sort((a, b) => ctFn(a).localeCompare(ctFn(b)));
+    return {items: all.slice(off, off + lim).map(ctBrief), total: all.length, groups: [...new Set(liveCt().flatMap(c => c.groups || []))].sort()};
+  });
+  on('GET', '/api/contacts/groups', () => ({items: [...new Set(liveCt().flatMap(c => c.groups || []))].sort().map(name => ({name, count: liveCt().filter(c => (c.groups || []).includes(name)).length}))}));
+  on('POST', '/api/contacts/groups', (q, b) => { let n = 0;
+    for (const c of liveCt()) if ((c.groups || []).includes(b.name)) { c.groups = b.action === 'rename' ? [...new Set(c.groups.map(x => x === b.name ? b.to : x))] : c.groups.filter(x => x !== b.name); n++; }
+    return {action: b.action, changed: n, skipped: 0, undo: null}; });
+  on('POST', '/api/contacts/dupcheck', (q, b) => { const fn = String(b.fn || [b.given, b.family].filter(Boolean).join(' ')).trim().toLowerCase(), em = (b.emails || []).map(x => String(x).toLowerCase());
+    return {items: liveCt().filter(c => (fn && ctFn(c).toLowerCase() === fn) || (c.emails || []).some(e => em.includes(String(e.value).toLowerCase())))
+      .map(c => ({id: c.id, fn: ctFn(c), org: c.org || '', book_id: c.book_id, reasons: [(c.emails || []).some(e => em.includes(String(e.value).toLowerCase())) ? 'email' : 'name']}))}; });
+  on('POST', '/api/contacts', (q, b) => { const c = {id: nid('contacts'), book_id: +b.book_id || books()[0].id, created_at: iso(), deleted_at: null}; ctSet(c, b); mcol('contacts').push(c); return ctFull(c); });
+  on('GET', '/api/contacts/(\\d+)', (q, b, id) => { const c = mfind('contacts', id); if (c.deleted_at) gone(); return ctFull(c); });
+  on('GET', '/api/contacts/(\\d+)/history', () => ({items: [], more: false}));
+  on('PATCH', '/api/contacts/(\\d+)', (q, b, id) => { const c = mfind('contacts', id); if (b.expect && b.expect !== c.updated_at) throw new Http(409, {error: tx('Changed in the meantime')}); ctSet(c, b); return ctFull(c); });
+  on('DELETE', '/api/contacts/(\\d+)', (q, b, id) => { mfind('contacts', id).deleted_at = iso(); return {ok: true}; });
+  on('POST', '/api/contacts/(\\d+)/restore', (q, b, id) => { const c = mfind('contacts', id); c.deleted_at = null; return ctFull(c); });
+  on('PUT', '/api/contacts/(\\d+)/care', (q, b, id) => { const c = mfind('contacts', id), k = c.care || (c.care = {every_days: 0, last: null, note: ''});
+    if ('every_days' in b) k.every_days = Math.max(0, +b.every_days || 0); if ('note' in b) k.note = String(b.note || ''); if ('last' in b) k.last = b.last === 'today' ? today() : b.last || null; return careOut(c); });
+  on('GET', '/api/books', () => ({items: books().map(bookOut)}));
+  on('POST', '/api/books', (q, b) => { const x = {id: nid('books'), name: String(b.name || tx('Contacts')), color: b.color || '#7c5cff', created_at: iso(), deleted_at: null}; mcol('books').push(x); return bookOut(x); });
+  on('PATCH', '/api/books/(\\d+)', (q, b, id) => { const x = mfind('books', id); if (b.name) x.name = String(b.name); if (b.color) x.color = b.color; return bookOut(x); });
+  on('DELETE', '/api/books/(\\d+)', (q, b, id) => { if (books().length < 2) bad(tx('Invalid value: {0}').replace('{0}', 'book')); mfind('books', id).deleted_at = iso(); return {ok: true}; });
+
+  // ---- home & life (kalmido/life/model.py life_overview): the rows are tasks with fam {kind: contract | device | upkeep | health}
+  const LIFE_LIST = {contract: 'Contracts', device: 'Home & devices', upkeep: 'Home & devices', health: 'Health', travel: 'Travel', reading: 'Read later'};
+  const lifeList = (kind, lid) => (lid && listById(lid)) || DB.lists.find(l => l.life === kind && !l.archived) || (() => {
+    const l = {...clone(LIST_DEF), id: nid('list'), created_at: iso(), name: tx(LIFE_LIST[kind] || 'Home & life'), life: kind, sort: Math.max(0, ...DB.lists.map(x => x.sort)) + 1}; DB.lists.push(l); return l; })();
+  const famTasks = k => live().filter(t => t.status === 0 && t.fam && t.fam.kind === k);
+  const PERM = {month: 1, quarter: 3, year: 12};
+  const lifeTask = (kind, b, o) => newTask({list_id: lifeList(kind === 'upkeep' || kind === 'device' ? 'device' : kind, b.list_id).id, ...o});
+  on('GET', '/api/life', () => {
+    const out = {modules: LIFE.filter(m => fon(m) && m !== 'review')};
+    if (fon('contracts')) { const items = famTasks('contract').map(t => { const f = t.fam, mo = (+f.cost || 0) / (PERM[f.per] || 1);
+      return {task_id: t.id, list_id: t.list_id, title: t.title, name: f.name, provider: f.provider || '', cost: +f.cost || 0, per: f.per || 'month', monthly: +m2(mo), yearly: +m2(mo * 12), notice: f.notice || 0,
+        notice_unit: f.nu || 'm', due: t.due, ends: f.ends || null, renew_months: f.renew || 0, days: daysTo(t.due), account: f.account || '', start: f.start || null}; });
+      out.contracts = {items, monthly: +m2(items.reduce((a, x) => a + x.monthly, 0)), yearly: +m2(items.reduce((a, x) => a + x.yearly, 0))}; }
+    if (fon('home')) out.home = {devices: famTasks('device').map(t => ({task_id: t.id, list_id: t.list_id, title: t.title, name: t.fam.name, model: t.fam.model || '', bought: t.fam.bought || null, warranty: t.fam.warranty || null, days: daysTo(t.fam.warranty || t.due)})),
+      upkeep: famTasks('upkeep').map(t => ({task_id: t.id, list_id: t.list_id, title: t.title, item: t.fam.item || '', due: t.due, every_months: t.fam.every || 0, days: daysTo(t.due)}))};
+    if (fon('care')) out.care = {contacts: fon('contacts'), items: liveCt().filter(c => c.care?.every_days).map(c => { const k = careOut(c); return {contact_id: c.id, fn: ctFn(c), photo: false, ...k, days: k.due ? daysTo(k.due) : 0}; })};
+    if (fon('health')) out.health = {items: famTasks('health').map(t => ({task_id: t.id, list_id: t.list_id, title: t.title, type: t.fam.type || 'appointment', who: t.fam.who || '', due: t.due, time: t.due_time, repeat: t.repeat || '', days: daysTo(t.due)}))};
+    if (fon('travel')) out.travel = {trips: DB.lists.filter(l => l.life === 'travel' && l.trip && !l.archived).map(l => { const tr0 = l.trip, ts = live().filter(t => t.list_id === l.id && !t.parent_id);
+      return {list_id: l.id, name: l.name, where: tr0.where || '', from: tr0.from, to: tr0.to, days: daysTo(tr0.from), state: tr0.to < today() ? 'past' : tr0.from <= today() ? 'now' : 'upcoming', open: ts.filter(t => t.status === 0).length, total: ts.length}; })};
+    if (fon('reading')) { const ls = DB.lists.filter(l => l.life === 'reading' && !l.archived).map(l => l.id), items = live().filter(t => ls.includes(t.list_id) && t.status === 0);
+      out.reading = {lists: ls, items: items.slice(0, 5).map(t => ({task_id: t.id, list_id: t.list_id, title: t.title, url: t.url || ''})), count: items.length, karakeep: {connected: false}}; }
+    return out;
+  });
+  on('GET', '/api/life/upkeep-presets', () => ({presets: []}));
+  on('GET', '/api/life/karakeep', () => ({connected: false}));
+  const noticeAt = (ends, n, u) => !ends ? null : u === 'd' ? addD(ends, -n) : u === 'w' ? addD(ends, -7 * n) : addM(ends, -n);
+  on('POST', '/api/life/contracts', (q, b) => { const name = String(b.name || '').trim() || bad(tx('Please enter a name')), n = +b.notice || 0;
+    return lifeTask('contract', b, {title: tx('Cancel or renew the contract: {0}').replace('{0}', name), due: noticeAt(b.ends, n, b.notice_unit) || b.ends || null,
+      repeat: +b.renew_months ? `FREQ=MONTHLY;INTERVAL=${+b.renew_months}` : '', fam: {kind: 'contract', name, provider: b.provider || '', cost: num(b.cost), per: b.per || 'month', notice: n, nu: b.notice_unit || 'm',
+        lead: +b.lead_days || 0, account: b.account || '', start: b.start || null, ends: b.ends || null, renew: +b.renew_months || 0}}); });
+  on('POST', '/api/life/devices', (q, b) => { const name = String(b.name || '').trim() || bad(tx('Please enter a name'));
+    return lifeTask('device', b, {title: b.warranty ? tx('Warranty ends: {0}').replace('{0}', name) : name, due: b.warranty || null, fam: {kind: 'device', name, model: b.model || '', bought: b.bought || null, warranty: b.warranty || null, lead: +b.lead_days || 0}}); });
+  on('POST', '/api/life/upkeep', (q, b) => { const title = String(b.title || '').trim() || bad(tx('Please enter a name')), ev = +b.every_months || 12;
+    return lifeTask('upkeep', b, {title, due: b.next || today(), repeat: `FREQ=MONTHLY;INTERVAL=${ev}`, fam: {kind: 'upkeep', item: '', every: ev, lead: +b.lead_days || 0}}); });
+  on('POST', '/api/life/health', (q, b) => { const title = String(b.title || '').trim() || bad(tx('Please enter a name')), times = Array.isArray(b.times) && b.times.length ? b.times : [b.time || null];
+    return {tasks: times.map(tm => lifeTask('health', b, {title, due: b.date || today(), due_time: tm || null, repeat: b.type === 'medication' ? 'FREQ=DAILY' : +b.every_months ? `FREQ=MONTHLY;INTERVAL=${+b.every_months}` : '',
+      fam: {kind: 'health', type: b.type || 'appointment', who: b.who || ''}}))}; });
+  on('POST', '/api/life/trips', (q, b) => { const name = String(b.name || '').trim() || bad(tx('Please enter a name'));
+    const l = {...clone(LIST_DEF), id: nid('list'), created_at: iso(), name, life: 'travel', trip: {from: b.from || today(), to: b.to || b.from || today(), where: b.where || ''}, sort: Math.max(0, ...DB.lists.map(x => x.sort)) + 1};
+    DB.lists.push(l); return {list_id: l.id, event_id: null}; });
+
+  // ---- review & journal (kalmido/life/model.py review / journal_set)
+  on('GET', '/api/life/review', q => {
+    const period = q.get('period') === 'week' ? 'week' : 'day', date = q.get('date') || today(), from = period === 'week' ? monday(date) : date, to = period === 'week' ? addD(from, 6) : date;
+    const ref = t => ({task_id: t.id, title: t.title, list_id: t.list_id});
+    return {period, from, to,
+      done: live().filter(t => t.status !== 0 && t.completed_at && ds(new Date(t.completed_at)) >= from && ds(new Date(t.completed_at)) <= to).map(t => ({...ref(t), at: t.completed_at})),
+      open: live().filter(t => t.status === 0 && t.due && t.due <= to && !t.parent_id).map(t => ({...ref(t), due: t.due, overdue: t.due < today()})),
+      moved: [], next: live().filter(t => t.status === 0 && t.due && t.due > to && t.due <= addD(to, 7) && !t.parent_id).map(t => ({...ref(t), due: t.due, time: t.due_time})),
+      journal: mcol('journal').filter(j => j.day >= from && j.day <= to).map(j => ({day: j.day, text: j.text, mood: j.mood}))};
+  });
+  on('PUT', '/api/life/journal/([0-9-]{10})', (q, b, dd) => { if (dd > addD(today(), 1)) bad(tx('Invalid value: {0}').replace('{0}', 'day'));
+    const J = mcol('journal'), text = String(b.text || ''), mood = b.mood == null ? null : Math.min(5, Math.max(1, +b.mood)), i = J.findIndex(j => j.day === dd);
+    if (!text && mood == null) { if (i >= 0) J.splice(i, 1); return {day: dd, text: '', mood: null}; }
+    const j = {id: i >= 0 ? J[i].id : nid('journal'), day: dd, text, mood}; if (i >= 0) J[i] = j; else J.push(j); return {day: dd, text, mood}; });
+
+  // ---- budget (kalmido/life/budget.py): household budgets of their own (not in the sidebar), categories, entries, recurring entries
+  const bgEntries = (lid, m) => mcol('bentries').filter(e => !e.deleted_at && e.list_id === lid && (!m || e.day.slice(0, 7) === m));
+  const recDue = (r, m) => !r.deleted_at && r.start <= m && (!r.until || r.until >= m) && ((+m.slice(0, 4) - +r.start.slice(0, 4)) * 12 + (+m.slice(5) - +r.start.slice(5))) % (PERM[r.per] || 1) === 0;
+  const bgTotals = (lid, m) => { const es = bgEntries(lid, m), cats = mcol('bcats').filter(c => !c.deleted_at && c.list_id === lid), recs = mcol('brec').filter(r => r.list_id === lid && recDue(r, m));
+    const soll = c => c.limit != null ? +c.limit : recs.filter(r => r.cat_id === c.id).reduce((a, r) => a + +r.amount, 0);
+    const sum = k => +m2(es.filter(e => e.kind === k).reduce((a, e) => a + +e.amount, 0));
+    const t = {soll_in: +m2(cats.filter(c => c.kind === 'in').reduce((a, c) => a + soll(c), 0)), ist_in: sum('in'), soll_out: +m2(cats.filter(c => c.kind === 'out').reduce((a, c) => a + soll(c), 0)), ist_out: sum('out')};
+    t.saldo = +m2(t.ist_in - t.ist_out); return {t, es, cats, recs, soll}; };
+  const bgEntry = e => ({id: e.id, list_id: e.list_id, day: e.day, amount: +e.amount, kind: e.kind, title: e.title || '', note: e.note || '', counterpart: e.counterpart || '', cat_id: e.cat_id ?? null,
+    recurring_id: e.recurring_id ?? null, source: e.source || '', files: [], created_by: 1, updated_at: e.updated_at});
+  const bgCat = c => ({id: c.id, list_id: c.list_id, name: c.name, kind: c.kind, limit: c.limit ?? null, sort: c.sort || 0});
+  const bgRec = r => ({id: r.id, list_id: r.list_id, title: r.title, amount: +r.amount, kind: r.kind, cat_id: r.cat_id ?? null, per: r.per, start: r.start, until: r.until || null, contract_task_id: r.contract_task_id || null, contract_changed: false, contract: null});
+  const bgList = id => mcol('budgets').find(x => x.id === +id && !x.deleted_at) || gone();
+  on('GET', '/api/budget', q => { const m = q.get('month') || today().slice(0, 7), ls = mcol('budgets').filter(x => !x.deleted_at);
+    return {lists: ls.map(l => ({id: l.id, name: l.name, color: '#7c5cff', owner_id: 1, shared: false, can_write: true})), month: m, summary: ls[0] ? bgTotals(ls[0].id, m).t : null}; });
+  on('GET', '/api/budget/(\\d+)', (q, b, id) => { const l = bgList(id), m = q.get('month') || today().slice(0, 7), {t, es, cats, recs, soll} = bgTotals(l.id, m);
+    return {list_id: l.id, name: l.name, month: m, can_write: true, totals: t,
+      cats: cats.sort((a, c) => (a.sort || 0) - (c.sort || 0) || a.id - c.id).map(c => ({...bgCat(c), soll: +m2(soll(c)), ist: +m2(es.filter(e => e.cat_id === c.id).reduce((a, e) => a + +e.amount, 0)), planned: 0})),
+      none: {ist_in: +m2(es.filter(e => !e.cat_id && e.kind === 'in').reduce((a, e) => a + +e.amount, 0)), ist_out: +m2(es.filter(e => !e.cat_id && e.kind === 'out').reduce((a, e) => a + +e.amount, 0))},
+      entries: es.sort((a, c) => c.day.localeCompare(a.day) || c.id - a.id).map(bgEntry),
+      open_recurring: recs.filter(r => !es.some(e => e.recurring_id === r.id)).map(r => ({recurring: bgRec(r), amount: +r.amount, day: m + '-01'})),
+      trend: [5, 4, 3, 2, 1, 0].map(n => { const mm = monthAdd(m, -n), x = bgTotals(l.id, mm).t; return {month: mm, ist_in: x.ist_in, ist_out: x.ist_out}; })}; });
+  on('POST', '/api/budget/lists', () => { const l = {id: nid('budgets'), name: tx('Budget'), created_at: iso(), deleted_at: null}; mcol('budgets').push(l); return {list_id: l.id}; });
+  const bgSet = (e, b) => { for (const k of ['day', 'kind', 'title', 'note', 'counterpart', 'cat_id', 'recurring_id', 'source']) if (k in b) e[k] = b[k]; if ('amount' in b) e.amount = Math.abs(num(b.amount));
+    if (!/^\d{4}-\d\d-\d\d$/.test(e.day || '')) bad(tx('Invalid value: {0}').replace('{0}', 'day')); e.updated_at = iso(); };
+  on('POST', '/api/budget/(\\d+)/entries', (q, b, id) => { const e = {id: nid('bentries'), list_id: bgList(id).id, kind: 'out', deleted_at: null}; bgSet(e, b); mcol('bentries').push(e); return bgEntry(e); });
+  on('PATCH', '/api/budget/entries/(\\d+)', (q, b, id) => { const e = mfind('bentries', id); bgSet(e, b); return bgEntry(e); });
+  on('DELETE', '/api/budget/entries/(\\d+)', (q, b, id) => { const e = mfind('bentries', id); e.deleted_at = iso(); return {ok: true, entry: bgEntry(e)}; });
+  on('POST', '/api/budget/(\\d+)/cats', (q, b, id) => { const c = {id: nid('bcats'), list_id: bgList(id).id, name: String(b.name || '').trim() || bad(tx('Please enter a name')), kind: b.kind === 'in' ? 'in' : 'out',
+    limit: b.limit == null || b.limit === '' ? null : num(b.limit), sort: mcol('bcats').length, deleted_at: null}; mcol('bcats').push(c); return bgCat(c); });
+  on('PATCH', '/api/budget/cats/(\\d+)', (q, b, id) => { const c = mfind('bcats', id); for (const k of ['name', 'kind', 'sort']) if (k in b) c[k] = b[k]; if ('limit' in b) c.limit = b.limit == null || b.limit === '' ? null : num(b.limit); return bgCat(c); });
+  on('DELETE', '/api/budget/cats/(\\d+)', (q, b, id) => { const c = mfind('bcats', id); c.deleted_at = iso(); const ids = mcol('bentries').filter(e => e.cat_id === c.id).map(e => e.id);
+    mcol('bentries').forEach(e => { if (e.cat_id === c.id) e.cat_id = null; }); return {ok: true, cat: bgCat(c), entry_ids: ids, recurring_ids: []}; });
+  on('GET', '/api/budget/(\\d+)/recurring', (q, b, id) => ({items: mcol('brec').filter(r => r.list_id === +id && !r.deleted_at).map(bgRec)}));
+  const recSet = (r, b) => { for (const k of ['title', 'kind', 'cat_id', 'per', 'start', 'until', 'contract_task_id']) if (k in b) r[k] = b[k]; if ('amount' in b) r.amount = Math.abs(num(b.amount)); r.start = r.start || today().slice(0, 7); };
+  on('POST', '/api/budget/(\\d+)/recurring', (q, b, id) => { const r = {id: nid('brec'), list_id: bgList(id).id, kind: 'out', per: 'month', deleted_at: null}; recSet(r, b); mcol('brec').push(r); return bgRec(r); });
+  on('PATCH', '/api/budget/recurring/(\\d+)', (q, b, id) => { const r = mfind('brec', id); recSet(r, b); return bgRec(r); });
+  on('DELETE', '/api/budget/recurring/(\\d+)', (q, b, id) => { const r = mfind('brec', id); r.deleted_at = iso(); return {ok: true, item: bgRec(r)}; });
+  on('POST', '/api/budget/recurring/(\\d+)/book', (q, b, id) => { const r = mfind('brec', id), e = {id: nid('bentries'), list_id: r.list_id, deleted_at: null};
+    bgSet(e, {day: b.day || (b.month || today().slice(0, 7)) + '-01', amount: r.amount, kind: r.kind, title: r.title, cat_id: r.cat_id, recurring_id: r.id}); mcol('bentries').push(e); return bgEntry(e); });
+  const bgContracts = lid => famTasks('contract').map(t => ({task_id: t.id, name: t.fam.name, provider: t.fam.provider || '', cost: +t.fam.cost || 0, per: t.fam.per || 'month',
+    monthly: +m2((+t.fam.cost || 0) / (PERM[t.fam.per] || 1)), taken: mcol('brec').some(r => r.list_id === lid && !r.deleted_at && r.contract_task_id === t.id)}));
+  on('GET', '/api/budget/(\\d+)/contracts', (q, b, id) => ({items: bgContracts(+id)}));
+  on('POST', '/api/budget/(\\d+)/contracts', (q, b, id) => { const lid = bgList(id).id, want = Array.isArray(b.task_ids) ? b.task_ids.map(Number) : null; let n = 0;
+    for (const c of bgContracts(lid)) if (!c.taken && (!want || want.includes(c.task_id))) { const r = {id: nid('brec'), list_id: lid, deleted_at: null}; recSet(r, {title: c.name, amount: c.cost, kind: 'out', per: c.per, contract_task_id: c.task_id}); mcol('brec').push(r); n++; }
+    return {created: n, items: bgContracts(lid)}; });
+
+  // ---- feeds: fetching needs a server (the notice on "Add"), the views stay calm
+  on('GET', '/api/feeds', () => ({feeds: [], unread: 0, max: 100}));
+  on('GET', '/api/feeds/items', () => ({items: [], more: false, unread: 0}));
+  on('POST', '/api/feeds/read', () => ({ids: []}));
+
+  // ---- bookmarks (kalmido/life/bookmarks.py bm_out): no page preview in the demo (preview "done", no image)
+  const host = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+  const bmOut = x => ({id: x.id, url: x.url, title: x.title || host(x.url) || x.url, description: x.description || '', site: host(x.url), tags: x.tags || [], note: x.note || '', state: x.state || 'unread',
+    image: '', preview: 'done', preview_error: '', has_text: false, src: '', space: 'private', mine: true, can_edit: true, created_at: x.created_at, updated_at: x.updated_at});
+  const bmLive = () => mcol('bm').filter(x => !x.deleted_at);
+  on('GET', '/api/bookmarks', q => { const s = (q.get('q') || '').toLowerCase(), tag = q.get('tag'), st = q.get('state') || '', off = +q.get('offset') || 0;
+    const all = bmLive().filter(x => (st === 'all' || (st ? x.state === st : x.state !== 'archived')) && (!tag || (x.tags || []).includes(tag))
+      && (!s || [x.title, x.url, x.description, x.note].join(' ').toLowerCase().includes(s))).sort((a, b) => b.id - a.id);
+    const tags = {}; for (const x of bmLive()) for (const t of x.tags || []) tags[t] = (tags[t] || 0) + 1;
+    return {items: all.slice(off, off + 50).map(bmOut), more: all.length > off + 50, count: all.length, tags: Object.entries(tags).map(([tag, n]) => ({tag, n})).sort((a, b) => b.n - a.n)}; });
+  on('POST', '/api/bookmarks', (q, b) => { const url = String(b.url || '').trim(); if (!/^https?:\/\/\S+$/i.test(url)) bad(tx('Invalid value: {0}').replace('{0}', 'url'));
+    const ex = bmLive().find(x => x.url === url); if (ex) return {bookmark: bmOut(ex), existed: true};
+    const x = {id: nid('bm'), url, title: String(b.title || ''), tags: [], state: 'unread', created_at: iso(), updated_at: iso(), deleted_at: null}; mcol('bm').push(x); return {bookmark: bmOut(x), existed: false}; });
+  on('GET', '/api/bookmarks/(\\d+)', (q, b, id) => ({...bmOut(mfind('bm', id)), text: ''}));
+  on('PATCH', '/api/bookmarks/(\\d+)', (q, b, id) => { const x = mfind('bm', id); for (const k of ['title', 'url', 'description', 'note', 'tags', 'state']) if (k in b) x[k] = b[k]; x.updated_at = iso(); return bmOut(x); });
+  on('DELETE', '/api/bookmarks/(\\d+)', (q, b, id) => { mfind('bm', id).deleted_at = iso(); return {ok: true, id: +id}; });
+  on('POST', '/api/bookmarks/(\\d+)/restore', (q, b, id) => { const x = mfind('bm', id); x.deleted_at = null; return bmOut(x); });
+  on('POST', '/api/bookmarks/(\\d+)/refresh', (q, b, id) => bmOut(mfind('bm', id)));
+
+  // ---- workload (kalmido/team/workload.py): one person (the demo has no team), the open tasks with a date and an estimate
+  const absDays = (from, to) => { let n = 0; for (const a of mcol('absences').filter(x => !x.deleted_at)) for (let d = from; d <= to; d = addD(d, 1)) {
+    const wd = new Date(d + 'T12:00:00').getDay(); if (wd && wd < 6 && d >= a.start_date && d <= a.end_date) n += a.half_day ? 0.5 : 1; } return n; };
+  const wlCell = (ts, cap, absent) => { const min = ts.reduce((a, t) => a + (+t.duration || 0), 0), capW = cap * Math.max(0, 5 - absent) / 5, pct = min && capW ? Math.round(min / 60 / capW * 100) : min ? 100 : null;
+    return {minutes: min, tasks: ts.length, unestimated: ts.filter(t => !t.duration).length, ids: ts.map(t => t.id), capacity_h: +m2(capW), absent_days: absent, pct, level: !ts.length ? 'none' : pct > 100 ? 'over' : pct > 85 ? 'warn' : 'ok'}; };
+  on('GET', '/api/workload', q => { const n = Math.min(12, +q.get('weeks') || 4), st = monday(q.get('start') || today()), cap = num(DB.settings.capacity_h) || 40;
+    const weeks = Array.from({length: n}, (_, i) => ({start: addD(st, 7 * i), end: addD(st, 7 * i + 6)}));
+    const mine = live().filter(t => t.status === 0 && !t.parent_id && (!t.assignee_id || t.assignee_id === 1));
+    return {weeks, org_id: null, orgs: [], today: today(), people: [{id: 1, username: DB.me.username, display_name: DB.me.display_name, avatar: '', capacity_h: cap, own: true,
+      weeks: weeks.map(w => wlCell(mine.filter(t => t.due && t.due >= w.start && t.due <= w.end), cap, absDays(w.start, w.end))),
+      nodate: (() => { const ts = mine.filter(t => !t.due); return {minutes: ts.reduce((a, t) => a + (+t.duration || 0), 0), tasks: ts.length, unestimated: ts.filter(t => !t.duration).length, ids: ts.map(t => t.id)}; })()}]}; });
+  on('PUT', '/api/workload/capacity/(\\d+)', (q, b) => { DB.settings.capacity_h = b.hours == null || b.hours === '' ? '' : String(num(b.hours)); return {id: 1, capacity_h: num(DB.settings.capacity_h) || 40}; });
+  // absences (kalmido/hub/absence.py): own ones, holidays of a chosen German state (the nationwide days + Easter based)
+  const STATES = {BW: 'Baden-Württemberg', BY: 'Bayern', BE: 'Berlin', BB: 'Brandenburg', HB: 'Bremen', HH: 'Hamburg', HE: 'Hessen', MV: 'Mecklenburg-Vorpommern', NI: 'Niedersachsen',
+    NW: 'Nordrhein-Westfalen', RP: 'Rheinland-Pfalz', SL: 'Saarland', SN: 'Sachsen', ST: 'Sachsen-Anhalt', SH: 'Schleswig-Holstein', TH: 'Thüringen'};
+  const easter = y => { const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30,
+    i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451), mo = Math.floor((h + l - 7 * m + 114) / 31), da = ((h + l - 7 * m + 114) % 31) + 1; return `${y}-${pad(mo)}-${pad(da)}`; };
+  const holidays = (from, to) => { if (!MD().state) return []; const out = [];
+    for (let y = +from.slice(0, 4); y <= +to.slice(0, 4); y++) { const e = easter(y);
+      for (const [d, n] of [[`${y}-01-01`, 'Neujahr'], [addD(e, -2), 'Karfreitag'], [addD(e, 1), 'Ostermontag'], [`${y}-05-01`, 'Tag der Arbeit'], [addD(e, 39), 'Christi Himmelfahrt'],
+        [addD(e, 50), 'Pfingstmontag'], [`${y}-10-03`, 'Tag der Deutschen Einheit'], [`${y}-12-25`, '1. Weihnachtstag'], [`${y}-12-26`, '2. Weihnachtstag']]) if (d >= from && d <= to) out.push({date: d, name: n}); }
+    return out.sort((a, b) => a.date.localeCompare(b.date)); };
+  const absOut = a => ({id: a.id, user_id: 1, start_date: a.start_date, end_date: a.end_date, half_day: a.half_day || '', kind: a.kind || 'vacation', note: a.note || '', can_edit: true});
+  const absSet = (a, b) => { for (const k of ['kind', 'start_date', 'end_date', 'half_day', 'note']) if (k in b) a[k] = b[k]; if (!a.end_date) a.end_date = a.start_date;
+    if (!/^\d{4}-\d\d-\d\d$/.test(a.start_date || '') || a.end_date < a.start_date) bad(tx('Invalid value: {0}').replace('{0}', 'date')); };
+  on('GET', '/api/team/absences', q => { const st = q.get('start') || today().slice(0, 8) + '01', en = q.get('end') || monthEnd(today().slice(0, 7));
+    return {org_id: null, orgs: [], personal: 1, admin: true, state: MD().state || '', states: STATES, today: today(), start: st, end: en,
+      people: [{id: 1, username: DB.me.username, display_name: DB.me.display_name, avatar: '', own: true}],
+      items: mcol('absences').filter(a => !a.deleted_at && a.end_date >= st && a.start_date <= en).map(absOut), holidays: holidays(st, en)}; });
+  on('GET', '/api/team/absences/check', q => { const d = q.get('date') || today(), a = mcol('absences').find(x => !x.deleted_at && d >= x.start_date && d <= x.end_date);
+    return a ? {absent: true, half_day: a.half_day || '', until: a.end_date} : {absent: false}; });
+  on('PUT', '/api/team/absences/holidays', (q, b) => { MD().state = STATES[b.state] ? b.state : ''; return {org_id: null, state: MD().state}; });
+  on('POST', '/api/team/absences', (q, b) => { const a = {id: nid('absences'), deleted_at: null}; absSet(a, b); mcol('absences').push(a); return absOut(a); });
+  on('PATCH', '/api/team/absences/(\\d+)', (q, b, id) => { const a = mfind('absences', id); absSet(a, b); return absOut(a); });
+  on('DELETE', '/api/team/absences/(\\d+)', (q, b, id) => { mfind('absences', id).deleted_at = iso(); return {ok: true}; });
+  on('POST', '/api/team/absences/(\\d+)/restore', (q, b, id) => { const a = mfind('absences', id); a.deleted_at = null; return absOut(a); });
+  // 2.125.0 (#2117 #2118): the vacation account + the working week of the one person (a personal area: its own admin, no
+  // requests -- every vacation is approved at once, like kalmido/hub/leave.py for a person without an organisation)
+  const wtDays = () => (MD().workdays ?? '0,1,2,3,4').split(',').filter(x => x !== '').map(Number);
+  const lvCount = (s, e, half, wd, hol) => { let n = 0; for (let d = s; d <= e; d = addD(d, 1)) { const w = (new Date(d + 'T12:00:00Z').getUTCDay() + 6) % 7;
+    if (wd.includes(w) && !hol.has(d)) n += half ? 0.5 : 1; } return n; };
+  const lvAcc = year => { const y0 = `${year}-01-01`, y1 = `${year}-12-31`, q = (MD().quota || {})[year] || null, hol = new Set(holidays(y0, y1).map(h => h.date));
+    const taken = mcol('absences').filter(a => !a.deleted_at && (a.kind || 'vacation') === 'vacation' && a.end_date >= y0 && a.start_date <= y1)
+      .reduce((s, a) => s + lvCount(a.start_date < y0 ? y0 : a.start_date, a.end_date > y1 ? y1 : a.end_date, a.half_day, wtDays(), hol), 0);
+    return {quota: q, taken, requested: 0, rest: q ? q.days + (q.carry || 0) - taken : null}; };
+  const capH = () => +(DB.settings?.capacity_h || MD().capacity_h || 0) || 40;
+  on('GET', '/api/team/leave', q => { const year = +(q.get('year') || today().slice(0, 4));
+    return {org_id: null, year, admin: true, personal: true, approval: false, pending: [],
+      people: [{id: 1, display_name: DB.me.display_name || DB.me.username, own: true, workdays: wtDays(), capacity_h: capH(), capacity_set: !!MD().capacity_h, ...lvAcc(year)}]}; });
+  on('PUT', '/api/team/leave/quota', (q, b) => { const year = +b.year, m = MD().quota = MD().quota || {};
+    if (b.days === null || b.days === '' || b.days === undefined) delete m[year]; else m[year] = {days: +b.days || 0, carry: +b.carry || 0};
+    return {org_id: null, user_id: 1, year, quota: m[year] || null}; });
+  on('PUT', '/api/team/leave/approval', () => bad(tx('Only admins of the organisation can change this')));
+  on('PUT', '/api/team/leave/worktime/(\\d+)', (q, b) => { if ('workdays' in b) MD().workdays = Array.isArray(b.workdays) ? b.workdays.join(',') : String(b.workdays || '');
+    if ('hours' in b) MD().capacity_h = b.hours === null ? '' : String(b.hours); return {id: 1, workdays: wtDays(), capacity_h: capH(), capacity_set: !!MD().capacity_h}; });
+  on('POST', '/api/team/absences/(\\d+)/decide', (q, b, id) => absOut(mfind('absences', id)));
+  // 2.125.0 (#2119): the monthly timesheet of the one person (no organisation: closing locks, no approval step)
+  const tslOut = m => { const r = (MD().sheets || {})[m]; return r ? {state: r.state, note: '', closed_at: r.closed_at, decided_at: null, decided_by: null,
+    decided_by_name: '', org_id: null, org_name: '', log: [], user_id: 1} : {state: 'open', note: '', closed_at: null, decided_at: null, decided_by: null, decided_by_name: '', org_id: null, org_name: '', log: []}; };
+  on('GET', '/api/time/sheets', q => { const m = /^\d{4}-\d\d$/.test(q.get('month') || '') ? q.get('month') : today().slice(0, 7), st = tslOut(m).state;
+    return {month: m, sheet: tslOut(m), locked: Object.keys(MD().sheets || {}).sort(), can: {close: st === 'open' && m <= today().slice(0, 7), reopen: st !== 'open'}, org: false, review: []}; });
+  on('POST', '/api/time/sheets', (q, b) => { const m = b.month, s = MD().sheets = MD().sheets || {};
+    if (!/^\d{4}-\d\d$/.test(m || '')) bad(tx('Invalid value: {0}').replace('{0}', 'month'));
+    if (b.action === 'close') s[m] = {state: 'closed', closed_at: iso()}; else delete s[m]; return {ok: true, month: m, sheet: tslOut(m)}; });
+  on('POST', '/api/time/sheets/decide', () => bad(tx('Only admins of the organisation can change this')));
+  // disposition (kalmido/hub/dispo.py): the person, the contacts and the office's equipment as resources
+  const dpRes = () => ({people: [{kind: 'user', id: 1, name: DB.me.display_name, avatar: ''}], contacts: liveCt().slice(0, 50).map(c => ({kind: 'contact', id: c.id, name: ctFn(c)})),
+    equipment: mcol('of_equipment').filter(x => !x.deleted_at && !x.archived).map(x => ({kind: 'equipment', id: x.id, name: x.name, category: x.category || ''})),
+    sets: mcol('of_sets').filter(x => !x.deleted_at && !x.archived).map(x => ({kind: 'set', id: x.id, name: x.name, items: (x.items || []).map(i => i.equipment_id)}))});
+  const resName = (k, id) => (dpRes()[{user: 'people', contact: 'contacts', equipment: 'equipment', set: 'sets'}[k]] || []).find(r => r.id === +id)?.name || '?';
+  const bkLive = () => mcol('bookings').filter(x => !x.deleted_at);
+  const bkOut = x => ({id: x.id, job: x.job, title: x.title, start: x.start, end: x.end, kind: x.kind, rid: x.rid, label: resName(x.kind, x.rid), status: x.status || 'option', note: x.note || '',
+    list_id: x.list_id || null, event_id: null, conflicts: bkLive().filter(o => o.id !== x.id && o.kind === x.kind && o.rid === x.rid && o.start.slice(0, 10) <= x.end.slice(0, 10) && o.end.slice(0, 10) >= x.start.slice(0, 10)).map(o => o.id),
+    away: x.kind === 'user' && absDays(x.start.slice(0, 10), x.end.slice(0, 10)) > 0});
+  const awayMap = (from, to) => { const m = {}; for (let d = from; d <= to; d = addD(d, 1)) { const a = mcol('absences').find(x => !x.deleted_at && d >= x.start_date && d <= x.end_date); if (a) (m['1'] = m['1'] || {})[d] = a.half_day ? 0.5 : 1; } return m; };
+  on('GET', '/api/team/dispo', q => { const st = q.get('start') || monday(), en = addD(st, (+q.get('days') || 7) - 1);
+    return {org_id: null, orgs: [], can_book: true, admin: true, today: today(), start: st, end: en, resources: dpRes(),
+      bookings: bkLive().filter(x => x.end.slice(0, 10) >= st && x.start.slice(0, 10) <= en).map(bkOut), away: awayMap(st, en), holidays: holidays(st, en)}; });
+  on('GET', '/api/team/bookings/mine', () => ({bookings: bkLive().filter(x => x.kind === 'user' && x.rid === 1 && x.end >= today()).map(x => ({...bkOut(x), org: ''}))}));
+  on('GET', '/api/team/dispo/free', q => { const d = q.get('date') || today(), busy = bkLive().filter(x => x.start.slice(0, 10) <= d && x.end.slice(0, 10) >= d), r = dpRes(), free = (k, arr) => arr.filter(x => !busy.some(b => b.kind === k && b.rid === x.id));
+    return {date: d, people: free('user', r.people), contacts: free('contact', r.contacts), equipment: free('equipment', r.equipment), sets: free('set', r.sets), away: Object.keys(awayMap(d, d)).map(Number)}; });
+  on('POST', '/api/team/dispo/bookings', (q, b) => { if (!String(b.title || '').trim()) bad(tx('Please enter a title')); const job = 'j' + nid('bookjob');
+    const made = (b.resources || []).map(r => { const x = {id: nid('bookings'), job, title: String(b.title).trim(), start: b.start || today(), end: b.end || b.start || today(), kind: r.kind, rid: +r.id, status: b.status || 'option', note: b.note || '', list_id: b.list_id || null, deleted_at: null}; mcol('bookings').push(x); return x; });
+    const out = made.map(bkOut); return {bookings: out, warnings: out.filter(x => x.conflicts.length || x.away).length}; });
+  on('PATCH', '/api/team/dispo/bookings/(\\d+)', (q, b, id) => { const x0 = mfind('bookings', id), xs = b.all ? bkLive().filter(x => x.job === x0.job) : [x0];
+    for (const x of xs) for (const k of ['title', 'start', 'end', 'status', 'note']) if (k in b) x[k] = b[k]; return {bookings: xs.map(bkOut)}; });
+  on('DELETE', '/api/team/dispo/bookings/(\\d+)', (q, b, id) => { const x0 = mfind('bookings', id), xs = q.get('all') === '1' ? bkLive().filter(x => x.job === x0.job) : [x0]; xs.forEach(x => { x.deleted_at = iso(); }); return {ids: xs.map(x => x.id)}; });
+  on('POST', '/api/team/dispo/bookings/restore', (q, b) => { let n = 0; for (const id of b.ids || []) { const x = mcol('bookings').find(y => y.id === +id); if (x) { x.deleted_at = null; n++; } } return {restored: n}; });
+
+  // ---- knowledge pages (kalmido/wiki/pages.py): one private space, links [[Path]], backlinks, rename relinks, trash
+  const wkClean = p => String(p || '').trim().replace(/\.md$/i, '').split('/').map(s => s.replace(/[[\]|#^\\]/g, '').trim()).filter(Boolean).join('/');
+  const wkLive = () => mcol('wiki').filter(p => !p.deleted_at);
+  const wkAttrs = body => { const m = /^---\n([\s\S]*?)\n---/.exec(body || ''), o = {}; if (m) for (const l of m[1].split('\n')) { const i = l.indexOf(':'); if (i > 0) o[l.slice(0, i).trim()] = l.slice(i + 1).trim(); } return o; };
+  const wkOut = (p, body) => ({id: p.id, space: 'private', org_id: null, path: p.path, attrs: wkAttrs(p.body), created_by: 1, updated_by: 1, created_at: p.created_at, updated_at: p.updated_at,
+    template: /^(Templates|Vorlagen)\//.test(p.path), updated_by_name: DB.me.display_name, shared: 0, ...(body ? {body: p.body || ''} : {})});
+  const wkLinks = p => { const re = new RegExp('\\[\\[' + p.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\]\\]|\\||#)', 'i'); return wkLive().filter(o => o.id !== p.id && re.test(o.body || '')).map(o => ({id: o.id, path: o.path})); };
+  const wkFull = p => ({...wkOut(p, true), backlinks: wkLinks(p), moved: null, files: [], shares: 0});
+  const wkTaken = (path, not) => wkLive().some(o => o.id !== not && o.path.toLowerCase() === path.toLowerCase());
+  const wkRelink = (from, to, not) => { let n = 0; const re = new RegExp('\\[\\[' + from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\]\\]|\\||#)', 'gi');
+    for (const o of wkLive()) if (o.id !== not && re.test(o.body || '')) { o.body = o.body.replace(re, '[[' + to); n++; } return n; };
+  on('GET', '/api/wiki', q => ({space: 'private', may_write: true, e2e: null, pages: wkLive().sort((a, b) => a.path.localeCompare(b.path)).map(p => wkOut(p, q.get('bodies') === '1'))}));
+  on('GET', '/api/wiki/shared', () => ({pages: []}));
+  on('GET', '/api/wiki/search', q => { const s = (q.get('q') || '').toLowerCase(); return {pages: wkLive().filter(p => (p.path + ' ' + p.body).toLowerCase().includes(s)).map(p => wkOut(p))}; });
+  on('GET', '/api/wiki/mentions', q => ({pages: wkLive().filter(p => new RegExp('#' + (+q.get('task') || 0) + '\\b').test(p.body || '')).map(p => ({id: p.id, path: p.path}))}));
+  on('GET', '/api/wiki/pages/(\\d+)', (q, b, id) => { const p = mfind('wiki', id); if (p.deleted_at) gone(); return wkFull(p); });
+  on('POST', '/api/wiki/pages', (q, b) => { const path = wkClean(b.path); if (!path) bad(tx('Please enter a name')); if (wkTaken(path)) throw new Http(409, {error: tx('Folder already exists')});
+    const tpl = b.template_id ? mcol('wiki').find(x => x.id === +b.template_id) : null;
+    const p = {id: nid('wiki'), path, body: String(b.body || (tpl ? tpl.body : '') || ''), created_at: iso(), updated_at: iso(), deleted_at: null}; mcol('wiki').push(p); return {...wkOut(p, true), moved: null, files: [], shares: 0}; });
+  on('PATCH', '/api/wiki/pages/(\\d+)', (q, b, id) => { const p = mfind('wiki', id);
+    if (b.expect_updated_at && b.expect_updated_at !== p.updated_at) throw new Http(409, {error: tx('Changed in the meantime'), page: wkFull(p)});
+    let relinked = 0;
+    if ('path' in b) { const to = wkClean(b.path); if (!to) bad(tx('Please enter a name')); if (wkTaken(to, p.id)) throw new Http(409, {error: tx('Folder already exists')}); relinked = wkRelink(p.path, to, p.id); p.path = to; }
+    if ('body' in b) p.body = String(b.body || ''); p.updated_at = iso(); return {...wkFull(p), relinked}; });
+  on('POST', '/api/wiki/move', (q, b) => { const from = wkClean(b.from), to = wkClean(b.to), moved = []; let relinked = 0;
+    for (const p of wkLive()) if (p.path === from || p.path.startsWith(from + '/')) { const np = to + p.path.slice(from.length); relinked += wkRelink(p.path, np, p.id); moved.push({id: p.id, from: p.path, to: np}); p.path = np; p.updated_at = iso(); }
+    return {ok: true, moved, relinked}; });
+  on('DELETE', '/api/wiki/pages/(\\d+)', (q, b, id) => { const p = mfind('wiki', id); p.deleted_at = iso(); return {ok: true, page: wkOut(p, true)}; });
+  on('POST', '/api/wiki/trash', (q, b) => { const ids = []; for (const id of b.ids || []) { const p = mcol('wiki').find(x => x.id === +id); if (p) { p.deleted_at = iso(); ids.push(p.id); } } return {ok: true, ids, skipped: [], files: [], files_skipped: []}; });
+  on('POST', '/api/wiki/restore', (q, b) => { const ids = [], skipped = []; for (const id of b.ids || []) { const p = mcol('wiki').find(x => x.id === +id); if (!p) continue; if (wkTaken(p.path, p.id)) skipped.push(p.id); else { p.deleted_at = null; ids.push(p.id); } }
+    return {ok: true, ids, skipped, files: [], files_skipped: []}; });
+  on('POST', '/api/wiki/pages/(\\d+)/refs', () => ({files: {}, links: {}}));
+
+  // ---- tables (kalmido/sheets): the grid, cell names, freezing; formulas evaluated here for the common cases (numbers, text, + - * / & %,
+  // comparisons, A1 / A1:B5 / names, SUM AVERAGE MIN MAX COUNT IF ROUND TODAY DAYS with their German names); other functions and
+  // Kalmido variables answer with a clear "only in your own Kalmido" text in the cell
+  const shLetter = i => { let s = ''; i++; while (i) { const r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); } return s; };
+  const shNew = (b = {}) => { const sh = {id: nid('sheets'), title: String(b.title || '').trim() || tx('Table'), list_id: b.list_id || null, cols: [], rows: [], cells: {}, rev: 1, created_at: iso(), updated_at: iso(), deleted_at: null, freeze_rows: 0, freeze_cols: 0, chart: null};
+    for (let i = 0; i < 3; i++) sh.cols.push({id: nid('shcol'), pos: i + 1, title: '', kind: 'text', options: [], color_mode: 'cell', width: null, deleted_at: null});
+    for (let i = 0; i < 10; i++) sh.rows.push({id: nid('shrow'), pos: i + 1, deleted_at: null}); return sh; };
+  const shGet = id => { const s = mfind('sheets', id); if (s.deleted_at) gone(); return s; };
+  const SH_ERR = {syntax: 'Formula error', div0: 'Division by zero', ref: 'Reference not found', type: 'Wrong type of value', cycle: 'Circular reference', na: 'Not found', deleted: 'Source deleted', denied: 'No access'};
+  class ShErr { constructor(k, text) { this.k = k; this.text = text; } }
+  const SH_FN = {SUM: 'SUM', SUMME: 'SUM', AVERAGE: 'AVG', MITTELWERT: 'AVG', MIN: 'MIN', MAX: 'MAX', COUNT: 'COUNT', ANZAHL: 'COUNT', IF: 'IF', WENN: 'IF', ROUND: 'ROUND', RUNDEN: 'ROUND', TODAY: 'TODAY', HEUTE: 'TODAY', DAYS: 'DAYS', TAGE: 'DAYS'};
+  const shNum = v => { if (v == null || v === '') return 0; if (typeof v === 'number') return v; if (typeof v === 'boolean') return v ? 1 : 0; if (v && v.date) return Date.parse(v.date + 'T12:00:00Z') / 864e5;
+    const n = num(v); if (/^\s*-?[\d.,]+\s*%?\s*€?\s*$/.test(String(v))) return String(v).includes('%') ? n / 100 : n; throw new ShErr('type'); };
+  function shPlain(raw, col) {
+    const k = col.kind, s = String(raw);
+    if (k === 'select') { const o = (col.options || []).find(x => String(x.id) === s); return o ? o.label : s; }
+    if (k === 'date') { const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(s.trim()); const d = m ? `${m[3]}-${pad(+m[2])}-${pad(+m[1])}` : /^\d{4}-\d\d-\d\d$/.test(s.trim()) ? s.trim() : null; return d ? {date: d} : s; }
+    if (/^\s*[+-]?[\d.,]+\s*(%|€|EUR)?\s*$/.test(s)) { const n = num(s); return k === 'percent' || s.includes('%') ? n / 100 : n; }
+    if (k === 'checkbox') return s === '1' || s.toLowerCase() === 'true';
+    return s;
+  }
+  function shTokens(f) {
+    const out = [], semi = f.includes(';'); let i = 0;
+    while (i < f.length) { const c = f[i];
+      if (/\s/.test(c)) { i++; continue; }
+      let m = /^(\d+(?:[.,]\d+)?)/.exec(f.slice(i)); if (m && (semi || !m[1].includes(','))) { out.push(['n', +m[1].replace(',', '.')]); i += m[1].length; continue; }
+      if (m) { out.push(['n', +m[1].split(',')[0]]); i += m[1].split(',')[0].length; continue; }
+      if (c === '"') { const j = f.indexOf('"', i + 1); if (j < 0) throw new ShErr('syntax'); out.push(['s', f.slice(i + 1, j)]); i = j + 1; continue; }
+      m = /^(<=|>=|<>|[-+*/&=<>%():;,])/.exec(f.slice(i)); if (m) { out.push(['o', m[1] === ';' ? ',' : m[1]]); i += m[1].length; continue; }
+      m = /^\$?[A-Za-zÄÖÜäöüß_][\wÄÖÜäöüß.$]*/.exec(f.slice(i)); if (m) { out.push(['w', m[0]]); i += m[0].length; continue; }
+      throw new ShErr('syntax'); }
+    return out;
+  }
+  function shEval(sh) {
+    const cols = sh.cols.filter(c => !c.deleted_at).sort((a, b) => a.pos - b.pos), rows = sh.rows.filter(r => !r.deleted_at).sort((a, b) => a.pos - b.pos);
+    const colOf = Object.fromEntries(cols.map((c, i) => [shLetter(i), c])), res = {}, busy = new Set();
+    const names = {}; for (const [k, c] of Object.entries(sh.cells)) if (c.name) names[c.name.toLowerCase()] = k;
+    const keyOf = a => { const m = /^\$?([A-Z]+)\$?(\d+)$/.exec(a.toUpperCase()); if (!m) return null; const c = colOf[m[1]], r = rows[+m[2] - 1]; if (!c || !r) throw new ShErr('ref'); return r.id + ':' + c.id; };
+    const val = (k, refs) => { const c = sh.cells[k]; if (c) refs.add(c.id); if (!c || !String(c.raw ?? '').length) return null; const r = calc(k); if (r.err) throw new ShErr(r.err.k, r.err.text); return r.v; };
+    function calc(k) {
+      if (res[k]) return res[k];
+      const c = sh.cells[k], [rid, cid] = k.split(':').map(Number), col = sh.cols.find(x => x.id === cid);
+      if (c.frozen) return (res[k] = {v: c.fv ?? null, refs: []});
+      const raw = String(c.raw ?? '');
+      if (!raw.startsWith('=')) return (res[k] = {v: shPlain(raw, col || {kind: 'text'}), refs: [], plain: true});
+      if (busy.has(k)) throw new ShErr('cycle');
+      busy.add(k); const refs = new Set();
+      try {
+        const tk = shTokens(raw.slice(1)); let p = 0;
+        const peek = () => tk[p], take = o => { if (tk[p] && tk[p][0] === 'o' && tk[p][1] === o) { p++; return true; } return false; };
+        const need = o => { if (!take(o)) throw new ShErr('syntax'); };
+        const range = (a, b) => { const ka = keyOf(a), kb = keyOf(b); const [r1, c1] = ka.split(':').map(Number), [r2, c2] = kb.split(':').map(Number);
+          const ri = [rows.findIndex(r => r.id === r1), rows.findIndex(r => r.id === r2)].sort((x, y) => x - y), ci = [cols.findIndex(x => x.id === c1), cols.findIndex(x => x.id === c2)].sort((x, y) => x - y), out = [];
+          for (let i = ri[0]; i <= ri[1]; i++) for (let j = ci[0]; j <= ci[1]; j++) out.push(val(rows[i].id + ':' + cols[j].id, refs)); return {range: out}; };
+        const prim = () => { const t = tk[p++]; if (!t) throw new ShErr('syntax');
+          if (t[0] === 'n' || t[0] === 's') return t[1];
+          if (t[0] === 'o' && t[1] === '(') { const v = expr(); need(')'); return v; }
+          if (t[0] !== 'w') throw new ShErr('syntax');
+          const w = t[1], W = w.toUpperCase().replace(/\$/g, '');
+          if (['TRUE', 'WAHR'].includes(W)) return true; if (['FALSE', 'FALSCH'].includes(W)) return false;
+          if (take('(')) { const args = []; if (!take(')')) { do { args.push(expr()); } while (take(',')); need(')'); } return fn(W, args); }
+          if (/^[A-Z]+\d+$/.test(W)) { if (take(':')) { const t2 = tk[p++]; if (!t2 || t2[0] !== 'w') throw new ShErr('syntax'); return range(W, t2[1].replace(/\$/g, '')); } return val(keyOf(W), refs); }
+          if (names[w.toLowerCase()]) return val(names[w.toLowerCase()], refs);
+          if (/^(projekt|liste|kunde|hier|aufgabe|project|list|client|here|task)\./i.test(w)) throw new ShErr('denied', T().sheetVar);
+          throw new ShErr('ref'); };
+        const unary = () => { if (take('-')) return -shNum(unary()); if (take('+')) return shNum(unary()); let v = prim(); while (take('%')) v = shNum(v) / 100; return v; };
+        const mul = () => { let v = unary(); for (;;) { if (take('*')) v = shNum(v) * shNum(unary()); else if (take('/')) { const d = shNum(unary()); if (!d) throw new ShErr('div0'); v = shNum(v) / d; } else return v; } };
+        const add = () => { let v = mul(); for (;;) { if (take('+')) { const r = mul(); v = v && v.date ? {date: addD(v.date, shNum(r))} : shNum(v) + shNum(r); } else if (take('-')) { const r = mul(); v = v && v.date ? (r && r.date ? shNum(v) - shNum(r) : {date: addD(v.date, -shNum(r))}) : shNum(v) - shNum(r); } else return v; } };
+        const txt = v => v == null ? '' : v.date ? v.date : typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v);
+        const cat = () => { let v = add(); while (take('&')) v = txt(v) + txt(add()); return v; };
+        const cmp = (a, o, b) => { const x = typeof a === 'string' || typeof b === 'string' ? [txt(a).toLowerCase(), txt(b).toLowerCase()] : [shNum(a), shNum(b)];
+          return {'=': x[0] === x[1], '<>': x[0] !== x[1], '<': x[0] < x[1], '>': x[0] > x[1], '<=': x[0] <= x[1], '>=': x[0] >= x[1]}[o]; };
+        function expr() { const a = cat(), t = peek(); if (t && t[0] === 'o' && ['=', '<>', '<', '>', '<=', '>='].includes(t[1])) { p++; return cmp(a, t[1], cat()); } return a; }
+        function fn(W, args) {
+          const f = SH_FN[W]; if (!f) throw new ShErr('syntax', T().sheetFn);
+          const flat = () => args.flatMap(a => a && a.range ? a.range.filter(v => typeof v === 'number' || (v && v.date)).map(shNum) : [shNum(a)]);
+          if (f === 'SUM') return flat().reduce((a, b) => a + b, 0);
+          if (f === 'AVG') { const xs = flat(); if (!xs.length) throw new ShErr('div0'); return xs.reduce((a, b) => a + b, 0) / xs.length; }
+          if (f === 'MIN' || f === 'MAX') { const xs = flat(); return xs.length ? Math[f.toLowerCase()](...xs) : 0; }
+          if (f === 'COUNT') return args.flatMap(a => a && a.range ? a.range : [a]).filter(v => typeof v === 'number' || (v && v.date)).length;
+          if (f === 'IF') return (args[0] && args[0].range ? false : shNum(args[0])) ? args[1] ?? true : args[2] ?? false;
+          if (f === 'ROUND') { const d = Math.round(shNum(args[1] ?? 0)), m = 10 ** d, x = shNum(args[0]); return Math.sign(x) * Math.round(Math.abs(x) * m + 1e-9) / m; }
+          if (f === 'TODAY') return {date: today()};
+          if (f === 'DAYS') return Math.round(shNum(args[0]) - shNum(args[1]));
+          throw new ShErr('syntax');
+        }
+        const v = expr(); if (p < tk.length) throw new ShErr('syntax');
+        if (v && v.range) throw new ShErr('type');
+        return (res[k] = {v, refs: [...refs]});
+      } catch (e) { if (!(e instanceof ShErr)) throw e; if (e.k === 'cycle' && !busy.has(k)) throw e; return (res[k] = {err: e, refs: [...refs]}); }
+      finally { busy.delete(k); }
+    }
+    for (const k of Object.keys(sh.cells)) { try { calc(k); } catch (e) { if (e instanceof ShErr) res[k] = {err: e, refs: []}; else throw e; } }
+    return {res, cols, rows};
+  }
+  // kalmido/sheets/formula.py sh_fmt_number / sh_fmt_currency / sh_fmt_date (up to 4 decimals, thousands per language)
+  const shFmt = (v, kind, cur) => { const lg = DB.settings.lang || 'en', en = lg === 'en';
+    const nf = (n, dec) => { let t = Math.abs(n).toFixed(dec ?? 4); if (dec == null) t = t.replace(/0+$/, '').replace(/\.$/, ''); const [w, f] = t.split('.'), th = en ? ',' : lg === 'fr' ? ' ' : '.';
+      const r = w.replace(/\B(?=(\d{3})+(?!\d))/g, th) + (f ? (en ? '.' : ',') + f : ''); return (n < 0 && +t ? '-' : '') + r; };
+    if (v == null) return ''; if (v.date) { const [y, m, d] = v.date.split('-'); return en ? v.date : ['fr', 'es', 'it'].includes(lg) ? `${d}/${m}/${y}` : lg === 'nl' ? `${d}-${m}-${y}` : `${d}.${m}.${y}`; }
+    if (typeof v === 'boolean') return tx(v ? 'Yes' : 'No');
+    if (typeof v !== 'number') return String(v);
+    if (kind === 'currency') { const sym = {EUR: '€', USD: '$', GBP: '£', CHF: 'CHF'}[cur] || cur || '€', s = nf(Math.abs(v), 2), neg = v < 0 && Math.round(Math.abs(v) * 100) ? '-' : ''; return en ? `${neg}${sym}${s}` : `${neg}${s} ${sym}`; }
+    if (kind === 'percent') { const s = nf(v * 100); return en ? `${s}%` : `${s} %`; }
+    return nf(v); };
+  function shOut(sh) {
+    const {res, cols, rows} = shEval(sh), idOf = {}, cells = [];
+    for (const [k, c] of Object.entries(sh.cells)) idOf[c.id] = k;
+    for (const [k, c] of Object.entries(sh.cells)) {
+      if (!String(c.raw ?? '').length && !c.name && !c.frozen) continue;
+      const [rid, cid] = k.split(':').map(Number), col = sh.cols.find(x => x.id === cid) || {kind: 'text'}, ri = rows.findIndex(r => r.id === rid), ci = cols.findIndex(x => x.id === cid), r = res[k] || {v: null, refs: []};
+      if (ri < 0 || ci < 0) continue;
+      const v = r.err ? null : r.v, vtype = r.err || v == null || v === '' ? 'empty' : typeof v === 'number' ? 'number' : typeof v === 'boolean' ? 'bool' : v.date ? 'date' : 'text';
+      const etext = r.err ? r.err.text || tx(SH_ERR[r.err.k] || 'Formula error') : null;
+      cells.push({id: c.id, row_id: rid, col_id: cid, addr: shLetter(ci) + (ri + 1), raw: String(c.raw ?? ''), name: c.name || null, frozen: !!c.frozen, agent: null, updated_by: 1, updated_by_name: DB.me.display_name,
+        updated_at: c.updated_at, option: col.kind === 'select' && (col.options || []).some(o => String(o.id) === String(c.raw)) ? c.raw : null,
+        value: v && v.date ? v.date : v === '' ? null : v, vtype, display: r.err ? etext : col.kind === 'text' && r.plain ? String(c.raw) : shFmt(v, col.kind, sh.currency || 'EUR'),
+        origin: c.frozen ? 'frozen' : String(c.raw).startsWith('=') ? 'formula' : 'own', error: r.err ? r.err.k : null, error_text: etext, last_value: null, refs: (r.refs || []).filter(x => idOf[x]), sources: []});
+    }
+    return {id: sh.id, title: sh.title, space: 'private', org_id: null, list_id: sh.list_id, list_title: sh.list_id ? listById(sh.list_id)?.name || null : null, can_write: true, currency: sh.currency || 'EUR',
+      columns: cols.map((c, i) => ({id: c.id, pos: c.pos, title: c.title, kind: c.kind, options: c.options || [], color_mode: c.color_mode || 'cell', width: c.width ?? null, letter: shLetter(i)})),
+      rows: rows.map(r => ({id: r.id, pos: r.pos})), cells, names: Object.fromEntries(Object.values(sh.cells).filter(c => c.name).map(c => [c.name, c.id])), presence: [], sources: [], batches: [], rev: sh.rev,
+      deleted_at: null, updated_at: sh.updated_at, freeze_rows: sh.freeze_rows || 0, freeze_cols: sh.freeze_cols || 0, agent: null, chart: sh.chart || null, book_id: sh.id, book_title: sh.title, tab_name: sh.title,
+      tabs: [{id: sh.id, name: sh.title, pos: 0, first: true}], moved: null, shared_in: false, can_share: false, shared: 0};
+  }
+  const shBrief = s => ({id: s.id, title: s.title, space: 'private', list_id: s.list_id, list_title: s.list_id ? listById(s.list_id)?.name || null : null, updated_at: s.updated_at, updated_by_name: DB.me.display_name,
+    agent: null, shared: 0, shared_in: false, sheets: 1});
+  const shBump = s => { s.rev++; s.updated_at = iso(); return {ok: true, rev: s.rev}; };
+  on('GET', '/api/sheets', q => ({sheets: mcol('sheets').filter(s => !s.deleted_at && (!q.get('list_id') || s.list_id === +q.get('list_id'))).sort((a, b) => b.updated_at.localeCompare(a.updated_at)).map(shBrief)}));
+  on('POST', '/api/sheets', (q, b) => { const s = shNew(b); mcol('sheets').push(s); return shOut(s); });
+  on('GET', '/api/sheets/(\\d+)', (q, b, id) => shOut(shGet(id)));
+  on('PATCH', '/api/sheets/(\\d+)', (q, b, id) => { const s = shGet(id); for (const k of ['title', 'list_id', 'freeze_rows', 'freeze_cols', 'chart', 'currency']) if (k in b) s[k] = b[k]; shBump(s); return shOut(s); });
+  on('DELETE', '/api/sheets/(\\d+)', (q, b, id) => { const s = shGet(id); s.deleted_at = iso(); return shBump(s); });
+  on('POST', '/api/sheets/(\\d+)/restore', (q, b, id) => { const s = mfind('sheets', id); s.deleted_at = null; return shBump(s); });
+  on('GET', '/api/sheets/(\\d+)/links', () => ({links: [], lists: [], office: false, clients: [], row_lists: []}));
+  on('GET', '/api/sheets/(\\d+)/vars', () => ({vars: []}));
+  on('POST', '/api/sheets/(\\d+)/presence', () => ({ok: true, seconds: 15}));
+  on('PUT', '/api/sheets/(\\d+)/cells', (q, b, id) => { const s = shGet(id), gone0 = [];
+    for (const x of b.cells || []) { const k = (+x.row_id) + ':' + (+x.col_id); if (!s.rows.some(r => r.id === +x.row_id) || !s.cols.some(c => c.id === +x.col_id)) bad(tx('Reference not found'));
+      const c = s.cells[k] || (s.cells[k] = {id: nid('shcell'), raw: '', name: null, frozen: false}); c.raw = String(x.raw ?? ''); c.updated_at = iso();
+      if (!c.raw && !c.name && !c.frozen) { gone0.push({id: c.id, row_id: +x.row_id, col_id: +x.col_id, raw: '', name: null, frozen: false}); delete s.cells[k]; } }
+    shBump(s); return {cells: [...shOut(s).cells, ...gone0], rev: s.rev}; });
+  on('POST', '/api/sheets/(\\d+)/rows', (q, b, id) => { const s = shGet(id), live0 = s.rows.filter(r => !r.deleted_at).sort((a, c) => a.pos - c.pos), at = b.after_row_id ? live0.findIndex(r => r.id === +b.after_row_id) + 1 : live0.length, ids = [];
+    const n = Math.min(100, Math.max(1, +b.count || 1)), news = Array.from({length: n}, () => { const r = {id: nid('shrow'), pos: 0, deleted_at: null}; ids.push(r.id); return r; });
+    live0.splice(at, 0, ...news); live0.forEach((r, i) => { r.pos = i + 1; }); s.rows.push(...news); return {...shBump(s), ids}; });
+  on('DELETE', '/api/sheets/(\\d+)/rows/(\\d+)', (q, b, id, rid) => { const s = shGet(id), r = s.rows.find(x => x.id === +rid) || gone(); r.deleted_at = iso(); return shBump(s); });
+  on('POST', '/api/sheets/(\\d+)/rows/(\\d+)/restore', (q, b, id, rid) => { const s = shGet(id), r = s.rows.find(x => x.id === +rid) || gone(); r.deleted_at = null; return shBump(s); });
+  on('POST', '/api/sheets/(\\d+)/rows/order', (q, b, id) => { const s = shGet(id), ids = (b.ids || []).map(Number), rest = s.rows.filter(r => !ids.includes(r.id)).sort((a, c) => a.pos - c.pos);
+    [...ids.map(i => s.rows.find(r => r.id === i)).filter(Boolean), ...rest].forEach((r, i) => { r.pos = i + 1; }); return shBump(s); });
+  const colOut = (s, c) => shOut(s).columns.find(x => x.id === c.id) || {...c};
+  on('POST', '/api/sheets/(\\d+)/columns', (q, b, id) => { const s = shGet(id), live0 = s.cols.filter(c => !c.deleted_at).sort((a, c) => a.pos - c.pos), at = b.after_col_id ? live0.findIndex(c => c.id === +b.after_col_id) + 1 : live0.length;
+    const c = {id: nid('shcol'), pos: 0, title: String(b.title || ''), kind: b.kind || 'text', options: [], color_mode: 'cell', width: null, deleted_at: null}; live0.splice(at, 0, c); live0.forEach((x, i) => { x.pos = i + 1; }); s.cols.push(c);
+    shBump(s); return {column: colOut(s, c), rev: s.rev}; });
+  on('PATCH', '/api/sheets/(\\d+)/columns/(\\d+)', (q, b, id, cid) => { const s = shGet(id), c = s.cols.find(x => x.id === +cid) || gone();
+    for (const k of ['title', 'kind', 'options', 'color_mode', 'width']) if (k in b) c[k] = b[k];
+    if ('pos' in b) { const live0 = s.cols.filter(x => !x.deleted_at && x !== c).sort((a, x) => a.pos - x.pos); live0.splice(Math.max(0, +b.pos - 1), 0, c); live0.forEach((x, i) => { x.pos = i + 1; }); }
+    shBump(s); return {column: colOut(s, c), rev: s.rev}; });
+  on('DELETE', '/api/sheets/(\\d+)/columns/(\\d+)', (q, b, id, cid) => { const s = shGet(id), c = s.cols.find(x => x.id === +cid) || gone(); c.deleted_at = iso(); return shBump(s); });
+  on('POST', '/api/sheets/(\\d+)/columns/(\\d+)/restore', (q, b, id, cid) => { const s = shGet(id), c = s.cols.find(x => x.id === +cid) || gone(); c.deleted_at = null; return shBump(s); });
+  const shCell = (s, cellId) => { const e = Object.entries(s.cells).find(([, c]) => c.id === +cellId) || gone(); return e; };
+  on('POST', '/api/sheets/(\\d+)/cells/(\\d+)/freeze', (q, b, id, cellId) => { const s = shGet(id), [k, c] = shCell(s, cellId);
+    if (b.frozen) { const v = shEval(s).res[k]; c.fv = v && !v.err ? v.v : null; c.frozen = true; } else { c.frozen = false; delete c.fv; } shBump(s); const o = shOut(s); return {cell: o.cells.find(x => x.id === c.id), cells: o.cells, rev: s.rev}; });
+  on('POST', '/api/sheets/(\\d+)/cells/(\\d+)/name', (q, b, id, cellId) => { const s = shGet(id), [, c] = shCell(s, cellId), n = String(b.name || '').trim();
+    if (n && Object.values(s.cells).some(x => x !== c && (x.name || '').toLowerCase() === n.toLowerCase())) throw new Http(409, {error: tx('Folder already exists')});
+    c.name = n || null; shBump(s); const o = shOut(s); return {cell: o.cells.find(x => x.id === c.id), cells: o.cells, rev: s.rev}; });
+
+  // ---- file store + documents (kalmido/files/web.py fs_node_json, kalmido/docs/web.py doc_json): one tree of nodes; uploads arrive
+  // as {files: [{name, type, size, data}]} (the fetch replacement reads FormData), small files keep their content as a data URL
+  const FILE_MAX = 400 * 1024;
+  const nodes = () => mcol('nodes');
+  const nodeLive = () => nodes().filter(n => !n.deleted_at);
+  const nodeOut = n => ({id: n.id, parent_id: n.parent_id ?? null, kind: n.kind, name: n.name, org_id: null, owner_id: 1, owner: DB.me.display_name, created_by: 1, created_by_name: DB.me.display_name,
+    agent_id: null, mime: n.mime || null, size: n.size || 0, version: n.version || 1, created_at: n.created_at, updated_at: n.updated_at, deleted_at: n.deleted_at || null, org_access: '', role: 'owner', shared: false, tags: n.tags || []});
+  const crumbs = n => { const out = []; let x = n; while (x) { out.unshift({id: x.id, name: x.name}); x = x.parent_id ? nodes().find(y => y.id === x.parent_id) : null; } return out; };
+  const nodeSort = (a, b) => (a.kind === 'folder' ? 0 : 1) - (b.kind === 'folder' ? 0 : 1) || a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+  const needNode = id => { const n = nodes().find(x => x.id === +id); if (!n) gone(); return n; };
+  const nodeDetails = n => ({...nodeOut(n), crumbs: crumbs(n), in_trash: !!n.deleted_at, versions: n.kind === 'file' ? (n.versions || []).map(v => ({no: v.no, created_at: v.created_at, size: v.size, by: DB.me.display_name})) : undefined,
+    shares: [], inherited: [], org_access_from: null, log: [{name: DB.me.display_name, agent: false, action: n.kind === 'folder' ? 'create' : 'upload', at: n.created_at}]});
+  const putFile = (parent, f, extra = {}) => { const same = nodeLive().find(n => n.kind === 'file' && (n.parent_id ?? null) === (parent ?? null) && n.name === f.name && !n.doc === !extra.doc);
+    const v = {no: 1, created_at: iso(), size: f.size, data: f.data};
+    if (same) { same.versions = [...(same.versions || []), {...v, no: (same.version || 1) + 1}]; same.version = (same.version || 1) + 1; Object.assign(same, {size: f.size, mime: f.type, data: f.data, updated_at: iso()}); return same; }
+    const n = {id: nid('nodes'), parent_id: parent ?? null, kind: 'file', name: f.name || 'file', mime: f.type || 'application/octet-stream', size: f.size || 0, version: 1, data: f.data, versions: [v], tags: [],
+      created_at: iso(), updated_at: iso(), deleted_at: null, ...extra}; nodes().push(n); return n; };
+  on('GET', '/api/files', q => { const par = q.get('parent'), sp = q.get('space') || 'private';
+    if (par) { const n = needNode(par); if (n.deleted_at) gone(); if (n.kind !== 'folder') gone(); return {items: nodeLive().filter(x => x.parent_id === n.id).sort(nodeSort).map(nodeOut), node: nodeOut(n), crumbs: crumbs(n), space: 'private', role: 'owner'}; }
+    if (sp === 'trash') return {items: nodes().filter(n => n.deleted_at && !(n.parent_id && nodes().find(p => p.id === n.parent_id)?.deleted_at)).map(nodeOut), node: null, crumbs: [], space: 'trash', role: 'owner'};
+    return {items: sp === 'private' ? nodeLive().filter(x => !x.parent_id).sort(nodeSort).map(nodeOut) : [], node: null, crumbs: [], space: sp, role: 'owner'}; });
+  on('GET', '/api/files/nodes/(\\d+)', (q, b, id) => nodeDetails(needNode(id)));
+  on('GET', '/api/files/nodes/(\\d+)/share-targets', () => ({people: [], groups: [], agents: []}));
+  on('GET', '/api/files/folders', () => ({folders: nodeLive().filter(n => n.kind === 'folder').map(n => ({id: n.id, name: n.name, path: crumbs(n).map(c => c.name).join('/'), org_id: null, owner_id: 1}))}));
+  on('GET', '/api/files/search', q => { const s = (q.get('q') || '').toLowerCase(); return {items: nodeLive().filter(n => n.name.toLowerCase().includes(s)).slice(0, 50).map(nodeOut)}; });
+  on('POST', '/api/files/folders', (q, b) => { const name = String(b.name || '').trim() || bad(tx('Please enter a name')), par = b.parent_id ? needNode(b.parent_id).id : null;
+    if (nodeLive().some(n => n.kind === 'folder' && (n.parent_id ?? null) === par && n.name.toLowerCase() === name.toLowerCase())) throw new Http(409, {error: tx('Folder already exists')});
+    const n = {id: nid('nodes'), parent_id: par, kind: 'folder', name, size: 0, version: 1, tags: [], created_at: iso(), updated_at: iso(), deleted_at: null}; nodes().push(n); return nodeOut(n); });
+  on('POST', '/api/files/upload', (q, b) => { const par = b.parent_id ? needNode(b.parent_id).id : null; return {items: (b.files || []).map(f => nodeOut(putFile(par, f)))}; });
+  on('POST', '/api/files/nodes/(\\d+)/versions', (q, b, id) => { const n = needNode(id), f = (b.files || [])[0] || bad(tx('Invalid value: {0}').replace('{0}', 'file'));
+    putFile(n.parent_id, {...f, name: n.name}, n.doc ? {doc: n.doc} : {}); return nodeDetails(n); });
+  on('POST', '/api/files/nodes/(\\d+)/versions/(\\d+)/restore', (q, b, id, no) => { const n = needNode(id), v = (n.versions || []).find(x => x.no === +no) || gone();
+    putFile(n.parent_id, {name: n.name, type: n.mime, size: v.size, data: v.data}, n.doc ? {doc: n.doc} : {}); return {version: n.version}; });
+  on('PATCH', '/api/files/nodes/(\\d+)', (q, b, id) => { const n = needNode(id); if ('name' in b) n.name = String(b.name || '').trim() || n.name; if ('parent_id' in b) n.parent_id = b.parent_id ? needNode(b.parent_id).id : null; n.updated_at = iso(); return nodeOut(n); });
+  on('DELETE', '/api/files/nodes/(\\d+)', (q, b, id) => { const n = needNode(id); if (q.get('purge') === '1') { const all = new Set([n.id]); let k = 0; while (k !== all.size) { k = all.size; for (const x of nodes()) if (all.has(x.parent_id)) all.add(x.id); }
+    MD().nodes = nodes().filter(x => !all.has(x.id)); } else n.deleted_at = iso(); return {ok: true}; });
+  on('POST', '/api/files/nodes/(\\d+)/restore', (q, b, id) => { const n = needNode(id); n.deleted_at = null; return nodeOut(n); });
+  // documents: file nodes with doc fields, in the folder "Documents"
+  const docRoot = () => nodeLive().find(n => n.kind === 'folder' && n.docroot) || (() => { const n = {id: nid('nodes'), parent_id: null, kind: 'folder', name: tx('Documents'), docroot: true, size: 0, version: 1, tags: [], created_at: iso(), updated_at: iso(), deleted_at: null}; nodes().push(n); return n; })();
+  const lbl = (k, name) => { if (!name) return null; const L = mcol('dl_' + k), x = L.find(y => y.name.toLowerCase() === String(name).toLowerCase()) || (() => { const y = {id: nid('dl_' + k), name: String(name)}; L.push(y); return y; })(); return {id: x.id, name: x.name}; };
+  const dcOut = n => { const d = n.doc || {}; return {id: n.id, name: n.name, mime: n.mime, size: n.size, org_id: null, ws: 'private', state: 'done', error: '', error_text: '', method: 'text', pages: 1, date: d.date || n.created_at.slice(0, 10),
+    due: d.due || null, taken_at: null, amount: d.amount ?? null, currency: d.currency || null, sender: d.sender || null, type: d.type || null, tags: d.tags || [], folder: d.folder || null, auto: {}, suggest: {}, review: !!d.review,
+    thumb: false, task_id: d.task_id || null, asn: d.asn ?? null, source: 'upload', created_at: n.created_at, updated_at: n.updated_at, parent_id: n.parent_id}; };
+  const docLive = () => nodeLive().filter(n => n.doc);
+  const dcSettings = () => ({ws: 'private', can_manage: true, levels: {sender: 'learn', type: 'learn', tags: 'learn', folder: 'learn'}, inbox: false, rules: [], senders: mcol('dl_sender'), types: mcol('dl_type'), tags: mcol('dl_tag'), folders: [],
+    root_id: docRoot().id, ocr: false, ocr_missing: [], asn_prefix: 'ASN', asn_next: (MD().asn || 0) + 1, mail: {enabled: false, address: ''}, ...(MD().dcset || {})});
+  on('GET', '/api/docs', q => { const s = (q.get('q') || '').toLowerCase(), tag = q.get('tag'), lim = +q.get('limit') || 200;
+    const all = docLive().filter(n => (!s || n.name.toLowerCase().includes(s)) && (!tag || (n.doc.tags || []).some(t => t.name === tag || String(t.id) === tag)) && (q.get('review') !== '1' || n.doc.review)).sort((a, b) => b.id - a.id);
+    const facet = k => { const m = {}; for (const n of docLive()) for (const x of k === 'tags' ? n.doc.tags || [] : [n.doc[k]].filter(Boolean)) (m[x.name] = m[x.name] || []).push(x.id); return Object.entries(m).map(([name, ids]) => ({name, ids: [...new Set(ids)]})); };
+    return {docs: all.slice(0, lim).map(dcOut), total: all.length, review: docLive().filter(n => n.doc.review).length, waiting: 0, facets: {senders: facet('sender'), types: facet('type'), tags: facet('tags'), folders: []}}; });
+  on('GET', '/api/docs/settings', () => dcSettings());
+  on('PUT', '/api/docs/settings', (q, b) => { const {ws, ...rest} = b; MD().dcset = {...(MD().dcset || {}), ...rest}; return dcSettings(); });
+  on('POST', '/api/docs', (q, b) => { const root = docRoot(); return {ids: (b.files || []).map(f => putFile(root.id, f, {doc: {review: true, tags: []}}).id), errors: []}; });
+  const dcFull = n => ({...dcOut(n), role: 'owner', text: '', extracted: null});
+  const needDc = id => { const n = needNode(id); if (!n.doc || n.deleted_at) gone(); return n; };
+  on('GET', '/api/docs/(\\d+)', (q, b, id) => dcFull(needDc(id)));
+  on('GET', '/api/docs/(\\d+)/receipt', () => gone());
+  on('GET', '/api/paperless', () => gone());
+  on('PATCH', '/api/docs/(\\d+)', (q, b, id) => { const n = needDc(id), d = n.doc;
+    if ('name' in b) n.name = String(b.name || '').trim() || n.name;
+    for (const k of ['date', 'due', 'currency']) if (k in b) d[k] = b[k] || null;
+    if ('amount' in b) d.amount = b.amount === '' || b.amount == null ? null : m2(num(b.amount));
+    if ('sender' in b) d.sender = lbl('sender', b.sender); if ('type' in b) d.type = lbl('type', b.type);
+    if ('tags' in b) d.tags = (b.tags || []).map(t => lbl('tag', t)).filter(Boolean);
+    if ('asn' in b) d.asn = b.asn === 'next' ? (MD().asn = (MD().asn || 0) + 1) : b.asn ? +b.asn : null;
+    n.updated_at = iso(); return dcFull(n); });
+  on('POST', '/api/docs/(\\d+)/accept', (q, b, id) => dcFull(needDc(id)));
+  on('POST', '/api/docs/(\\d+)/redo', (q, b, id) => dcFull(needDc(id)));
+  on('POST', '/api/docs/(\\d+)/review', (q, b, id) => { const n = needDc(id); n.doc.review = b.done === false; return dcFull(n); });
+  on('POST', '/api/docs/(\\d+)/task', (q, b, id) => { const n = needDc(id), inbox = DB.lists.find(l => l.is_inbox) || DB.lists[0], t = newTask({title: n.name, list_id: inbox.id}); n.doc.task_id = t.id; return {task_id: t.id, title: t.title}; });
+  on('DELETE', '/api/docs/(\\d+)/task', (q, b, id) => { needDc(id).doc.task_id = null; return {ok: true}; });
+  // the content of a file: a download / a new tab from the stored data URL (or the notice when the file was too big for the demo)
+  function fileOpen(href) {
+    const m = /\/api\/(?:files\/nodes|docs)\/(\d+)\/(content|file|preview)/.exec(href); if (!m) return false;
+    const n = nodes().find(x => x.id === +m[1]); if (!n) return false;
+    if (!n.data) { notice(); return true; }
+    const bin = atob(n.data.split(',')[1] || ''), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([u8], {type: n.mime || 'application/octet-stream'}));
+    if (/dl=1/.test(href)) { const a = document.createElement('a'); a.href = url; a.download = n.name; document.body.appendChild(a); a.click(); a.remove(); } else wopen.call(window, url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000); return true;
+  }
+
+  // ---- the office's further pages (kalmido/office/*): pipeline, cash flow, figures, bookkeeping, subscriptions, travel, meals, agreements, equipment
+  const ofLines = () => OF().docs.filter(d => d.kind === 'invoice' && d.status !== 'draft' && d.status !== 'cancelled').map(d => ({d, ln: docLine(d)}));
+  for (const k of ['roles', 'crew', 'equipment', 'sets', 'texts', 'contracts'])
+    crud('/api/office/' + k, 'of_' + k, {def: () => ({org_id: 1, archived: 0}), keep: (x, q) => q.get('archived') === '1' || !x.archived, post: x => ({id: x.id}), one: x => ({id: x.id}), del: () => ({result: 'deleted'})});
+  on('GET', '/api/office/contracts/(\\d+)/files', () => ({items: []}));
+  on('GET', '/api/office/equipment/policies', () => ({items: []}));
+  // pipeline
+  const dealOut = x => ({id: x.id, title: x.title || '', stage: x.stage || 'inquiry', client_id: x.client_id || null, client_name: (CL().find(c => c.id === x.client_id) || {}).name || '', contact: x.contact || '', value: m2(num(x.value)),
+    probability: +x.probability || 0, expected_date: x.expected_date || null, offer_id: x.offer_id || null, offer_number: '', offer_status: '', list_id: x.list_id || null, note: x.note || '', lost_reason: x.lost_reason || '',
+    follow_up: x.follow_up || null, next_step: x.next_step || '', source: x.source || '', company: x.company || ''});
+  crud('/api/office/deals', 'deals', {out: dealOut, post: x => ({id: x.id, stage: x.stage || 'inquiry'}), one: (x, before) => ({before: dealOut(before)}), index: () => {
+    const items = mcol('deals').filter(x => !x.deleted_at), open = items.filter(x => !['won', 'lost', 'lead'].includes(x.stage)), fc = {};
+    for (const x of open) if (x.expected_date) { const m = x.expected_date.slice(0, 7); fc[m] = (fc[m] || 0) + num(x.value) * (+x.probability || 0) / 100; }
+    return {summary: {open: m2(open.reduce((a, x) => a + num(x.value), 0)), weighted: m2(open.reduce((a, x) => a + num(x.value) * (+x.probability || 0) / 100, 0)), count_open: open.length,
+      forecast: Object.keys(fc).sort().map((m, i) => ({month: m, weighted: m2(fc[m]), next: i === 0})), undated: open.filter(x => !x.expected_date).length, leads: items.filter(x => x.stage === 'lead').length, leads_due: 0}, items: items.map(dealOut)}; }});
+  on('POST', '/api/office/deals/(\\d+)/offer', (q, b, id) => { const x = mfind('deals', id), d = newDoc('offer', {client_id: x.client_id || null, project_title: x.title || ''}); x.offer_id = d.id; return {doc_id: d.id}; });
+  on('POST', '/api/office/deals/(\\d+)/project', (q, b, id) => { const x = mfind('deals', id), l = {...clone(LIST_DEF), id: nid('list'), created_at: iso(), name: x.title || tx('Project'), kind: 'project', sort: Math.max(0, ...DB.lists.map(y => y.sort)) + 1};
+    DB.lists.push(l); x.list_id = l.id; return {list_id: l.id, modules_on: []}; });
+  // generated documents need the server's templates: the page shows its empty state, creating one = the notice
+  on('GET', '/api/office/gen-docs', () => ({docs: [], templates: [], clients: CL().map(c => ({id: c.id, name: c.name})), lists: [], offers: [], vars: []}));
+  // cash flow: invoices (paid = actual, open = plan by due month), fixed costs every month, own adjustments
+  const fixedLive = sub => mcol('fixed').filter(x => !x.deleted_at && (sub == null || !!x.sub === sub));
+  const fixedIn = (x, m) => (x.start || '0000-00').slice(0, 7) <= m && (!x.until || x.until.slice(0, 7) >= m) && (x.repeat !== 'yearly' || (x.start || '').slice(5, 7) === m.slice(5, 7)) && (x.repeat !== 'quarterly' || ((+m.slice(5) - +(x.start || '2000-01').slice(5, 7)) % 3 + 3) % 3 === 0);
+  const fxOut = x => ({id: x.id, label: x.label || '', amount: m2(num(x.amount)), vat_rate: +x.vat_rate || 0, gross: m2(num(x.amount) * (1 + (+x.vat_rate || 0) / 100)), repeat: x.repeat || 'monthly', start: x.start || today(),
+    until: x.until || null, category: x.category || '', sub: x.sub ? 1 : 0, notice_days: +x.notice_days || 0, seats: x.seats || [], seat_names: [], low_use: x.low_use ? 1 : 0, remind_days: +x.remind_days || 0,
+    remind_user: x.remind_user || null, url: x.url || ''});
+  crud('/api/office/fixed-costs', 'fixed', {out: fxOut, post: x => ({id: x.id}), one: x => fxOut(x), del: x => ({item: fxOut(x)}), index: () => ({items: fixedLive().map(fxOut), agreements: []})});
+  crud('/api/office/cashflow/adjust', 'cfadj', {post: x => ({id: x.id}), del: x => ({item: clone(x)})});
+  on('GET', '/api/office/cashflow', q => { const from = q.get('from') || today().slice(0, 7), n = Math.min(24, +q.get('months') || 3), gross = q.get('basis') !== 'net'; let bal = num((MD().cfstart || {}).amount);
+    const L = ofLines(), entries = [];
+    const rows = Array.from({length: n}, (_, i) => { const m = monthAdd(from, i); let ia = 0, ip = 0, op = 0;
+      for (const {d, ln} of L) { for (const p of d.payments || []) if (String(p.date || '').slice(0, 7) === m) { ia += num(p.amount); entries.push({month: m, dir: 'in', state: 'actual', kind: 'invoice', number: d.number, date: p.date, label: ln.recipient_name, amount: m2(num(p.amount)), overdue: false, open_offer: false, doc_id: d.id}); }
+        const open = num(ln.open); if (open > 0 && String(d.due_date || d.date).slice(0, 7) === m) { ip += open; entries.push({month: m, dir: 'in', state: 'plan', kind: 'invoice', number: d.number, date: d.due_date, label: ln.recipient_name, amount: m2(open), overdue: ln.state === 'overdue', open_offer: false, doc_id: d.id}); } }
+      for (const x of fixedLive()) if (fixedIn(x, m)) { const a = num(x.amount) * (gross ? 1 + (+x.vat_rate || 0) / 100 : 1); op += a; entries.push({month: m, dir: 'out', state: 'plan', kind: 'fixed', number: '', date: m + '-01', label: x.label, amount: m2(a), overdue: false, open_offer: false, doc_id: null}); }
+      for (const a of mcol('cfadj').filter(x => !x.deleted_at && x.month === m)) { if (a.dir === 'out') op += num(a.amount); else ip += num(a.amount); }
+      bal += ia + ip - op; return {month: m, current: m === today().slice(0, 7), balance: m2(bal), in: {actual: m2(ia), plan: m2(ip)}, out: {actual: '0.00', plan: m2(op)}}; });
+    return {basis: gross ? 'gross' : 'net', rows, entries, adjust: mcol('cfadj').filter(x => !x.deleted_at).map(clone)}; });
+  on('GET', '/api/office/cashflow/check', () => ({on: 0, user_id: null, people: [], lost: false}));
+  on('PUT', '/api/office/cashflow/check', (q, b) => ({on: b.on ? 1 : 0, user_id: null, people: [], lost: false}));
+  on('PUT', '/api/office/cashflow/actual', (q, b) => { MD().cfstart = {month: b.month, amount: num(b.amount)}; return {ok: true}; });
+  on('GET', '/api/office/cashflow/start', () => ({start: MD().cfstart || null}));
+  // figures (kalmido/office/kpi.py) from the invoices, the pipeline and the cash flow
+  on('GET', '/api/office/kpi', q => { const y = +q.get('year') || +today().slice(0, 4), L = ofLines(), mk = today().slice(0, 7), rev = m => L.filter(({d}) => String(d.date).slice(0, 7) === m).reduce((a, {ln}) => a + num(ln.net), 0);
+    const months = Array.from({length: 12}, (_, i) => { const m = `${y}-${pad(i + 1)}`; return {month: m, amount: m2(rev(m)), prev: m2(rev(`${y - 1}-${pad(i + 1)}`))}; });
+    const yr = yy => L.filter(({d}) => String(d.date).slice(0, 4) === String(yy)).reduce((a, {ln}) => a + num(ln.net), 0);
+    const open = L.filter(({ln}) => num(ln.open) > 0), od = open.filter(({ln}) => ln.state === 'overdue'), deals = mcol('deals').filter(x => !x.deleted_at && !['won', 'lost', 'lead'].includes(x.stage));
+    return {year: y, today: today(), revenue: {month: m2(rev(mk)), month_prev: m2(rev(monthAdd(mk, -1))), year: m2(yr(y)), year_prev: m2(yr(y - 1)), to_date: true, month_key: mk, months},
+      invoices: {open: {amount: m2(open.reduce((a, {ln}) => a + num(ln.open), 0)), count: open.length}, overdue: {amount: m2(od.reduce((a, {ln}) => a + num(ln.open), 0)), count: od.length}},
+      pipeline: {weighted: m2(deals.reduce((a, x) => a + num(x.value) * (+x.probability || 0) / 100, 0)), open: m2(deals.reduce((a, x) => a + num(x.value), 0))},
+      cashflow: [0, 1, 2].map(() => ({balance: '0.00'})), clients: []}; });
+  // bank: the import needs a file of the bank (the notice); the list stays calm
+  on('GET', '/api/office/bank/tx', () => ({items: [], counts: {open: 0, matched: 0}}));
+  on('GET', '/api/office/bank/imports', () => ({items: []}));
+  // bookkeeping: income from the paid invoices of the year
+  on('GET', '/api/office/books', () => ({receipts: [], missing: [], small_business: !!flag(ofSettings().small_business), upload_ws: 'private'}));
+  on('GET', '/api/office/books/euer', q => { const y = String(+q.get('year') || today().slice(0, 4)), L = ofLines().filter(({d}) => String(d.date).slice(0, 4) === y);
+    const net = L.reduce((a, {ln}) => a + num(ln.net), 0), gr = L.reduce((a, {ln}) => a + num(ln.gross), 0);
+    return {year: +y, income: L.length ? [{label: tx('Invoices'), count: L.length, net: m2(net), vat: m2(gr - net), gross: m2(gr)}] : [], income_total: {net: m2(net), vat: m2(gr - net), gross: m2(gr)},
+      expenses: [], expense_total: {net: '0.00', vat: '0.00', gross: '0.00'}, profit: m2(net), small_business: !!flag(ofSettings().small_business), tax_reserve_pct: +ofSettings().tax_reserve_pct || 0,
+      tax_reserve: m2(net * (+ofSettings().tax_reserve_pct || 0) / 100), missing_vat: 0, notes: ['', '']}; });
+  on('GET', '/api/office/books/ustva', () => ({small_business: !!flag(ofSettings().small_business), kz: {81: '0.00', 86: '0.00', 66: '0.00', 83: '0.00'}, tax: {19: '0.00', 7: '0.00'}, basis: 'ist', exempt_other: '0.00', missing_vat: 0, items: []}));
+  const TXD = () => ({ustva: 'quarter', ustva_ext: 0, est: 0, gewst: 0, lead_days: 7, user: null, people: [], tasks: {}, next: [], small_business: false, lost: false, ...(MD().txd || {})});
+  on('GET', '/api/office/tax-dates', () => TXD());
+  on('PUT', '/api/office/tax-dates', (q, b) => { MD().txd = {...(MD().txd || {}), ...b}; return TXD(); });
+  on('GET', '/api/office/receipts/billed', () => ({billed: {}}));
+  // subscriptions = fixed costs with sub 1
+  on('GET', '/api/office/subs', () => { const items = fixedLive(true).map(x => { const o = fxOut(x), pm = num(o.amount) / ({yearly: 12, quarterly: 3}[o.repeat] || 1);
+      return {...o, running: !o.until || o.until >= today(), next_renewal: null, cancel_by: null, per_month: m2(pm * (1 + o.vat_rate / 100)), per_month_net: m2(pm)}; });
+    const s = k => items.reduce((a, x) => a + num(x[k]), 0);
+    return {items, candidates: [], today: today(), people: [], remind_people: [], totals: {per_month: m2(s('per_month')), per_year: m2(s('per_month') * 12), per_month_net: m2(s('per_month_net')), per_year_net: m2(s('per_month_net') * 12),
+      low_use_count: 0, low_use_per_year: '0.00', low_use_per_year_net: '0.00'}}; });
+  // travel expenses (without the per-diem tables of the server: no meal allowance in the demo)
+  const TRIP_CATS = [['hotel', 'Hotel'], ['train', 'Train'], ['flight', 'Flight'], ['parking', 'Parking'], ['food', 'Food'], ['other', 'Other']];
+  const tripOut = x => { const items = (x.items || []).filter(i => !i.deleted_at).map(i => ({id: i.id, date: i.date || x.date_from, category: i.category || 'other', text: i.text || '', amount: m2(num(i.amount)), currency: 'EUR',
+      amount_home: m2(num(i.amount)), fx_rate: 1, datev: 0, datev_no: '', billed: null}));
+    return {id: x.id, date_from: x.date_from || today(), date_to: x.date_to || x.date_from || today(), dest: x.dest || '', overnight: x.overnight ? 1 : 0, people: x.people || [{id: 1, name: DB.me.display_name}], purpose: x.purpose || '',
+      client_id: x.client_id || null, project: x.project || '', km: x.km ?? null, note: x.note || '', missing: 0, items, total: m2(items.reduce((a, i) => a + num(i.amount), 0)), vma: null, vma_off: 1, country: x.country || 'DE',
+      place: x.place || '', t_start: x.t_start || '', t_end: x.t_end || '', vma_days: []}; };
+  crud('/api/office/trips', 'trips', {out: tripOut, post: x => ({id: x.id}), del: x => ({trip: tripOut(x)}), index: q => { const y = q.get('year');
+    return {trips: mcol('trips').filter(x => !x.deleted_at && (!y || String(x.date_from || '').startsWith(y))).map(tripOut), missing: 0, categories: TRIP_CATS.map(([key, l]) => ({key, label: tx(l)})), currency: 'EUR',
+      clients: CL().map(c => ({id: c.id, name: c.name})), people: [{id: 1, name: DB.me.display_name}], purposes: []}; }});
+  on('POST', '/api/office/trips/(\\d+)/items', (q, b, id) => { const x = mfind('trips', id), i = {...b, id: nid('tripitem'), deleted_at: null}; (x.items = x.items || []).push(i); return {item_id: i.id}; });
+  on('PATCH', '/api/office/trips/(\\d+)/items/(\\d+)', (q, b, id, iid) => { const i = (mfind('trips', id).items || []).find(y => y.id === +iid) || gone(); Object.assign(i, b); return {ok: true}; });
+  on('DELETE', '/api/office/trips/(\\d+)/items/(\\d+)', (q, b, id, iid) => { const i = (mfind('trips', id).items || []).find(y => y.id === +iid) || gone(); i.deleted_at = iso(); return {ok: true, item: clone(i)}; });
+  on('GET', '/api/office/trips/purposes', () => ({purposes: []}));
+  on('GET', '/api/office/trips/report', () => { const ts = mcol('trips').filter(x => !x.deleted_at).map(tripOut); return {rows: [], count: ts.length, total: m2(ts.reduce((a, t) => a + num(t.total), 0))}; });
+  on('GET', '/api/office/trips/vma', () => ({people: [], total: '0.00', rates: true, source: []}));
+  on('GET', '/api/office/vehicles', () => ({vehicles: [], note: ''}));
+  // entertainment receipts
+  const mealOut = x => { const g = (x.amounts || []).reduce((a, r) => a + num(r.gross ?? r.amount), 0) + num(x.tip);
+    return {id: x.id, date: x.date || today(), place_name: x.place_name || '', place_address: x.place_address || '', occasion: x.occasion || '', host: x.host || {id: 1, name: DB.me.display_name}, guests: x.guests || [],
+      amounts: x.amounts || [], tip: m2(num(x.tip)), note: x.note || '', locked: x.locked ? 1 : 0, calc: {gross: m2(g)}}; };
+  crud('/api/office/meals', 'meals', {out: mealOut, index: q => { const y = q.get('year'), ms = mcol('meals').filter(x => !x.deleted_at && (!y || String(x.date || '').startsWith(y)));
+    return {meals: ms.map(mealOut), people: [{id: 1, name: DB.me.display_name}], choices: {places: [...new Set(ms.map(x => x.place_name).filter(Boolean))].map(name => ({name, address: ''})), persons: []}}; }});
+  on('POST', '/api/office/meals/(\\d+)/approve', (q, b, id) => { const x = mfind('meals', id); x.locked = 1; return mealOut(x); });
+  on('POST', '/api/office/meals/(\\d+)/unlock', (q, b, id) => { const x = mfind('meals', id); x.locked = 0; return mealOut(x); });
+  on('GET', '/api/office/meals/choices', () => ({places: [], persons: []}));
+  on('GET', '/api/office/meals/report', () => { const ms = mcol('meals').filter(x => !x.deleted_at).map(mealOut), g = m2(ms.reduce((a, x) => a + num(x.calc.gross), 0));
+    return {count: ms.length, drafts: ms.filter(x => !x.locked).length, total: {gross: g, vat: '0.00', deductible: '0.00', not_deductible: '0.00', food: '0.00', drinks: '0.00', tip: '0.00', net: g}, rates: [], months: []}; });
+  // framework agreements / insurances
+  const agOut = x => { const c = num(x.cost), mo = c / (PERM[x.per] || 1); return {id: x.id, kind: x.kind || 'other', name: x.name || '', provider: x.provider || '', number: x.number || '', archived: x.archived ? 1 : 0, cost: m2(c), per: x.per || 'month',
+    monthly: m2(mo), vat_pct: x.vat_pct ?? null, start: x.start || null, ends: x.ends || null, notice: +x.notice || 0, notice_unit: x.notice_unit || 'm', renew_months: +x.renew_months || 0, lead_days: +x.lead_days || 0,
+    cashflow: x.cashflow === 0 ? 0 : 1, task: null, doc: null, deadline: noticeAt(x.ends, +x.notice || 0, x.notice_unit || 'm'), covered: null}; };
+  crud('/api/office/agreements', 'agreements', {out: agOut, post: x => ({id: x.id}), index: q => ({items: mcol('agreements').filter(x => !x.deleted_at && (q.get('archived') === '1' || !x.archived)).map(agOut),
+    lists: DB.lists.filter(l => !l.archived).slice(0, 30).map(l => ({id: l.id, name: l.name, inbox: !!l.is_inbox}))})});
+  // the office settings' further parts
+  on('GET', '/api/office/letterhead', () => ({letterhead: {on: false}}));
+  on('GET', '/api/office/packs', () => ({packs: [], industry: null}));
+  on('GET', '/api/office/catalog', () => ({items: [], configured: false, can_manage: false}));
 
   // ---------------------------------------------------------------- the notice for server features
   function notice() {
@@ -1021,6 +1769,15 @@
     const c = el.querySelector('button'); c.textContent = x.close; c.onclick = () => el.remove();
     setTimeout(() => { const t = document.getElementById('toast'); if (t) t.classList.add('hidden'); }, 0);
     a.focus();
+  }
+  // 2.125.0 D (#1653): a part of the app the demo does not imitate yet: a calm line at the bottom (once per page view), never silent
+  function unknownNote() {
+    if (document.getElementById('kd-unk')) return;
+    const el = document.createElement('div'); el.id = 'kd-unk'; el.className = 'kd-unknown'; el.setAttribute('role', 'status');
+    el.innerHTML = '<span></span><button type="button" class="kd-btn"></button>';
+    el.querySelector('span').textContent = T().unknown; const c = el.querySelector('button'); c.textContent = T().close; c.onclick = () => el.remove();
+    (document.body || document.documentElement).appendChild(el);
+    setTimeout(() => el.remove(), 8000);
   }
   const installUrl = () => SITE + ((DB && DB.settings.lang) === 'de' ? 'de/installation.html' : 'install.html');
 
@@ -1042,6 +1799,7 @@
   }
   function handle(method, url, body) {
     const u = new URL(url, 'https://demo.invalid/'), path = u.pathname, key = method + ' ' + path;
+    CALLS.push(key); if (CALLS.length > 60) CALLS.shift();  // 2.125.0 D (#1653): the last calls (tests, a look in the console)
     if (QUIET[key]) return [200, QUIET[key]()];
     for (const [m, re, fn] of R) {
       if (m !== method) continue;
@@ -1057,14 +1815,30 @@
     if (/^\/api\/office\//.test(path)) { GATE.push(key); if (method !== 'GET') notice(); return [409, {error: T().gated, demo: 'gated'}]; }
     MISS.push(key);
     if (GATED.test(path) || method !== 'GET') { notice(); return [409, {error: T().gated, demo: 'gated'}]; }
-    return [200, {}];  // an unknown read: empty
+    // 2.125.0 D (#1653): an unknown read (a route newer than this shim): console.warn + a small visible line, an empty answer
+    UNKNOWN.push(key); console.warn('demo: no stand-in for', key, '(add it in tools/demo/shim.js)'); unknownNote();
+    return [200, {}];
+  }
+  const FD_OK = /^\/api\/(files\/upload|files\/nodes\/\d+\/versions|docs)$/;
+  async function fdBody(fd) {
+    const out = {files: []};
+    for (const [k, v] of fd.entries()) {
+      if (typeof v === 'string') { out[k] = v; continue; }
+      const data = v.size <= FILE_MAX ? await new Promise(res => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => res(null); r.readAsDataURL(v); }) : null;
+      out.files.push({name: v.name || 'file', type: v.type || 'application/octet-stream', size: v.size || 0, data});
+    }
+    return out;
   }
   window.fetch = async (input, opt = {}) => {
     const url = typeof input === 'string' ? input : input.url, method = (opt.method || (typeof input === 'object' && input.method) || 'GET').toUpperCase();
     const p = new URL(url, 'https://demo.invalid/').pathname;
     if (!p.startsWith('/api/')) return staticFile(p);
     let body = {};
-    if (opt.body instanceof FormData || opt.body instanceof Blob) { notice(); return json(409, {error: T().gated, demo: 'gated'}); }
+    if (opt.body instanceof FormData || opt.body instanceof Blob) {
+      // 2.125.0 D (#1653): uploads into the file store and the documents stay in this browser (small files with their content)
+      if (!(opt.body instanceof FormData) || !FD_OK.test(p)) { notice(); return json(409, {error: T().gated, demo: 'gated'}); }
+      body = await fdBody(opt.body);
+    }
     if (typeof opt.body === 'string') { try { body = JSON.parse(opt.body); } catch { body = {}; } }
     await new Promise(r => setTimeout(r, 0));
     try { const [st, out] = handle(method, url, body); return json(st, out); }
@@ -1073,7 +1847,7 @@
   // download links of the app (JSON export, CSV, backups) point at the server: the notice instead
   document.addEventListener('click', e => {
     const a = e.target.closest && e.target.closest('a[href]');
-    if (a && /^\/api\//.test(a.getAttribute('href') || '')) { e.preventDefault(); e.stopImmediatePropagation(); const id = pdfId(a.getAttribute('href')); if (id) printView(id); else notice(); }  // 2.74.0 (#1653): a PDF = the print view
+    if (a && /^\/api\//.test(a.getAttribute('href') || '')) { e.preventDefault(); e.stopImmediatePropagation(); const id = pdfId(a.getAttribute('href')); if (id) printView(id); else if (!fileOpen(a.getAttribute('href'))) notice(); }  // 2.125.0 D (#1653): + stored files  // 2.74.0 (#1653): a PDF = the print view
   }, true);
 
   // ---------------------------------------------------------------- banner + reset
@@ -1099,7 +1873,7 @@
   }
   const CSPV = [];  // blocked by the page's CSP (tests: must stay empty)
   document.addEventListener('securitypolicyviolation', e => CSPV.push(e.violatedDirective + ' ' + e.blockedURI));
-  window.KDEMO = {reset, db: () => DB, miss: MISS, gated: GATE, csp: CSPV, printView};
+  window.KDEMO = {reset, db: () => DB, miss: MISS, gated: GATE, unknown: UNKNOWN, calls: CALLS, csp: CSPV, printView, routes: () => R.map(([m, re]) => m + ' ' + re.source)};
 
   DB = loadDb();
   if (DB && DB.ver === VER) save();  // 2.74.0 (#1653): a migrated storage is written back once

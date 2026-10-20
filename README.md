@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.125.0** (2026-10-20): vacation requests with approval and vacation accounts, working days and weekly hours per
+  person, close and approve monthly timesheets, time zone per person with entries split at midnight, timer shortcut,
+  Excel export of times and workload; the browser demo starts like a new account and shows every module.
 - **2.124.0** (2026-10-20): tables - SUMIF, COUNTIF, VLOOKUP / XLOOKUP, text and date functions, checkbox / person /
   link / file columns, rows and columns kept in view, print, cell history, sharing single tables with people and agents,
   charts, several sheets per table, tables in Mod+K; cash flow balance from the bank reconciliation.

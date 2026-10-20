@@ -3,7 +3,9 @@
 An absence belongs to one person and one area: the organisation it was entered in (hub_absences.org_id), or the person's
 own hidden area (pb_personal, people without an organisation). Row-level security keeps every row inside its organisation;
 the app adds the rest:
-- everyone enters their own absences; an organisation's admins also those of its members (no approval, just entering);
+- everyone enters their own absences; an organisation's admins also those of its members (no approval, just entering;
+  2.125.0 A (#2117): an organisation's admins may ask for approvals of vacation, hub/leave.py -- only approved absences
+  count as "away" for the team, the workload, the day plan, the booking page and agents);
 - the team sees "absent" and the period; the kind (above all sick leave) and the note only the person and the admins of
   the organisation. Agents never see the kind (health data), at most "absent" (GET /api/v1/absences);
 - German public holidays per state, computed here (Easter formula, no library, no service): one state per organisation
@@ -168,9 +170,9 @@ def abs_public(r, full, c=None):
     if full and c is not None:
         r = oc_dec_fields(c, r["org_id"], "hub_absences", r)
     d = {"id": r["id"], "user_id": r["user_id"], "start_date": r["start_date"], "end_date": r["end_date"],
-         "half_day": r["half_day"] or ""}
+         "half_day": r["half_day"] or "", "status": r["status"] or "approved"}  # 2.125.0 A (#2117)
     if full:
-        d.update(kind=r["kind"], note=r["note"] or "")
+        d.update(kind=r["kind"], note=r["note"] or "", decision_note=r["decision_note"] or "")
     return d
 
 
@@ -228,7 +230,7 @@ def abs_days(c, user_ids, first, last, oid=None):
         return {}
     q = ",".join("?" * len(user_ids))
     sql = (f"SELECT user_id, start_date, end_date, half_day FROM hub_absences WHERE deleted_at IS NULL AND user_id IN ({q}) "
-           "AND start_date<=? AND end_date>=?")
+           "AND start_date<=? AND end_date>=? AND status='approved'")  # 2.125.0 A (#2117): a request is not "away" yet
     args = [*user_ids, last.isoformat(), first.isoformat()]
     if oid is not None:
         sql += " AND org_id=?"
@@ -244,16 +246,18 @@ def abs_days(c, user_ids, first, last, oid=None):
     return out
 
 
-def abs_capacity_factor(days, holidays, a, b):
-    """The share of the five workdays Monday..Friday of the week [a, b] the person is there (0..1)."""
+def abs_capacity_factor(days, holidays, a, b, wd=(0, 1, 2, 3, 4)):
+    """The share of the workdays (wd; 2.125.0 A (#2118): the person's, default Monday..Friday) of the week [a, b] the
+    person is there (0..1)."""
+    n = len(wd)
     gone = 0.0
     d = a
     while d <= b:
-        if d.weekday() < 5:
+        if d.weekday() in wd:
             k = d.isoformat()
             gone += 1 if k in holidays else days.get(k, 0)
         d += timedelta(days=1)
-    return max(0.0, (5 - min(5.0, gone)) / 5)
+    return max(0.0, (n - min(n, gone)) / n) if n else 0.0
 
 
 def abs_check(c, uid, day):
@@ -262,14 +266,14 @@ def abs_check(c, uid, day):
     if not may_see(c, me(), uid):
         return None
     r = c.execute("SELECT end_date, half_day FROM hub_absences WHERE deleted_at IS NULL AND user_id=? AND start_date<=? AND end_date>=? "
-                  "ORDER BY half_day, end_date DESC LIMIT 1", (uid, day.isoformat(), day.isoformat())).fetchone()
+                  "AND status='approved' ORDER BY half_day, end_date DESC LIMIT 1", (uid, day.isoformat(), day.isoformat())).fetchone()
     return {"absent": True, "half_day": r["half_day"] or "", "until": r["end_date"]} if r else None
 
 
 def abs_mine_today(c, uid, day):
     """For the day plan: {kind, half_day, holiday} when uid is absent on day / it is a holiday of their area, else None."""
     r = c.execute("SELECT org_id, kind, half_day FROM hub_absences WHERE deleted_at IS NULL AND user_id=? AND start_date<=? AND end_date>=? "
-                  "ORDER BY half_day LIMIT 1", (uid, day.isoformat(), day.isoformat())).fetchone()
+                  "AND status='approved' ORDER BY half_day LIMIT 1", (uid, day.isoformat(), day.isoformat())).fetchone()
     hol = ""
     try:
         hol = abs_holidays_year(day.year, abs_state(c, abs_org(c, uid, create=False))).get(day.isoformat(), "")
@@ -315,7 +319,8 @@ def abs_list():
                    start=first.isoformat(), end=last.isoformat(),
                    people=[{**user_public(p), "own": p["id"] == uid} for p in people],
                    items=[{**abs_public(r, adm or r["user_id"] == uid, c), "can_edit": adm or r["user_id"] == uid}
-                          for r in rows if r["user_id"] in pids],
+                          for r in rows if r["user_id"] in pids
+                          and (r["status"] == "approved" or adm or r["user_id"] == uid)],  # 2.125.0 A (#2117): requests only for them
                    holidays=[{"date": k, "name": v} for k, v in sorted(abs_holidays(st, first, last).items())])
 
 
@@ -338,9 +343,12 @@ def abs_create():
             raise Denied(404, tr("unknown user"))
     v = abs_clean(b)
     e = oc_enc_fields(c, oid, "hub_absences", {"kind": v["kind"], "note": v.get("note", "")})
-    aid = insert_id(c, "INSERT INTO hub_absences(org_id,user_id,kind,start_date,end_date,half_day,note,created_by,created_at) "
-                       "VALUES(?,?,?,?,?,?,?,?,?)", (oid, who, e["kind"], v["start_date"], v["end_date"], v.get("half_day", ""),
-                                                     e["note"], uid, iso(now_utc())))
+    from .leave import lv_requested, lv_status_new
+    st = lv_status_new(c, uid, oid, who, v["kind"])  # 2.125.0 A (#2117): a member's vacation may be a request
+    aid = insert_id(c, "INSERT INTO hub_absences(org_id,user_id,kind,start_date,end_date,half_day,note,created_by,created_at,status) "
+                       "VALUES(?,?,?,?,?,?,?,?,?,?)", (oid, who, e["kind"], v["start_date"], v["end_date"], v.get("half_day", ""),
+                                                       e["note"], uid, iso(now_utc()), st))
+    lv_requested(c, _row(c, aid))
     bump(c)
     c.commit()
     return jsonify({**abs_public(_row(c, aid), True, c), "can_edit": True}), 201
@@ -352,9 +360,14 @@ def abs_edit(aid):
     r = _row(c, aid)
     if r["deleted_at"] or not _may_edit(c, uid, r):
         raise Denied(404 if r["deleted_at"] else 403)
-    v = oc_enc_fields(c, r["org_id"], "hub_absences", abs_clean(body(), dict(r)))
+    p = abs_clean(body(), dict(r))
+    v = oc_enc_fields(c, r["org_id"], "hub_absences", p)
+    from .leave import lv_requested, lv_status_edit
+    v.update(lv_status_edit(c, uid, r, p))  # 2.125.0 A (#2117): a member's changed vacation asks again
     if v:
         c.execute(f"UPDATE hub_absences SET {', '.join(k + '=?' for k in v)} WHERE id=?", (*v.values(), aid))
+        if v.get("status") == "pending" and r["status"] != "pending":
+            lv_requested(c, _row(c, aid))
         bump(c)
         c.commit()
     return jsonify({**abs_public(_row(c, aid), True, c), "can_edit": True})
@@ -452,10 +465,11 @@ def v1_absences():
         return jsonify(org_id=None, people=[], items=[], holidays=[])
     people = abs_people(c, oid)
     pids = {p["id"] for p in people}
-    rows = c.execute("SELECT * FROM hub_absences WHERE org_id=? AND deleted_at IS NULL AND start_date<=? AND end_date>=? ORDER BY start_date, id",
+    rows = c.execute("SELECT * FROM hub_absences WHERE org_id=? AND deleted_at IS NULL AND start_date<=? AND end_date>=? "
+                     "AND status='approved' ORDER BY start_date, id",  # 2.125.0 A (#2117): never a request
                      (oid, last.isoformat(), first.isoformat())).fetchall()
     return jsonify(org_id=oid, people=[{"id": p["id"], "display_name": p["display_name"] or p["username"]} for p in people],
-                   items=[{k: v for k, v in abs_public(r, False).items() if k != "id"} for r in rows if r["user_id"] in pids],
+                   items=[{k: v for k, v in abs_public(r, False).items() if k not in ("id", "status")} for r in rows if r["user_id"] in pids],
                    holidays=[{"date": k, "name": v} for k, v in sorted(abs_holidays(abs_state(c, oid), first, last).items())])
 
 
@@ -463,7 +477,7 @@ def abs_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     paths["/absences"] = {"get": op(
         "2.50.0 (#1195): who of your organisation is away when (vacation, sick leave, days off) -- only \"away\" and the period, "
         "never the kind or the note; an agent sees its own workspace only (a private agent: 404); plus the public holidays of the "
-        "organisation's state", "Workload",
+        "organisation's state; 2.125.0 (#2117): approved absences only, never an open or rejected vacation request", "Workload",
         ok({"type": "object", "properties": {
             "org_id": nul("integer"),
             "people": {"type": "array", "items": {"type": "object", "properties": {"id": {"type": "integer"}, "display_name": {"type": "string"}}}},

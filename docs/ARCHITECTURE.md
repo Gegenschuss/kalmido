@@ -212,6 +212,7 @@ The most used helpers:
 | `team/clients.py` | Clients (module "clients"): clients of an organisation above the lists, hours, budget, estimate vs. actual. |
 | `team/workload.py` | Workload (module "workload"): planned hours per person and week against their capacity. |
 | `hub/absence.py` | 2.50.0 (#1195): absences per person and area (the team sees "away", the kind only the person and the admins; kind + note encrypted at rest), German public holidays per state, the effect on workload, day plan and assigning, `GET /api/v1/absences`. See docs/TEAM.md. |
+| `hub/leave.py` | 2.125.0 (#2118, #2117): working days per person (setting `workdays`, read by workload, time gaps and the vacation account), the vacation account per person / area / year (`hub_leave_quota`), vacation requests (`hub_absences.status`, the organisation's switch `orgs.hub_leave_approval`) and their decision with News / push. See docs/TEAM.md. |
 | `hub/dispo.py` | 2.50.0 (#1194): resources and disposition (module "dispo"): bookings of members, contacts, equipment and sets (option / firm), double bookings and absences as warnings, "who is free", my bookings. See docs/TEAM.md. |
 | `team/approvals.py` | Approvals as a step of a task: request, approve / changes / reject, withdraw. |
 | `team/forms.py` | Forms (module "forms"): a link whose page (/f/<token>) creates a task in a list. |
@@ -343,6 +344,7 @@ registering the ones of its area.
 | `contacts.js` | Contacts (module "contacts"): the view, the editor, the card, import / export. Loaded on demand (2.53.0). |
 | `clients.js` | Clients, the workload view, approvals in the task panel, forms of a list, sign-in links with a QR code. |
 | `absence.js` | 2.50.0 (#1195): the tabs of the workload view, the absences tab (month grid, list, "Enter an absence" sheet, public holidays), the day plan hint, the warning when assigning to somebody away. |
+| `leave.js` | 2.125.0 (#2118, #2117): the working week in Settings > General, the vacation account line, open requests with Approve / Reject and the admins' sheet of a person (entitlement, working days, hours) in the absences tab. |
 | `dispo.js` | 2.50.0 (#1194): the disposition tab (week grid per resource, a day list on phones, booking sheet, who is free, my bookings). |
 | `life.js` | Home & life: the view, its dialogs (contract, device, upkeep, health, trip, Karakeep), the review + journal, staying in touch on a contact's card. |
 | `budget.js` | 2.72.0 (#1333): the household budget (`#budget/<list id>`, a tab of the area Home): month view with totals, six-month bars, categories with their limit, "Open this month" (recurring entries to book), entries per day; the dialogs entry (+ receipts), categories, recurring entries, taking over contracts, CSV import with column mapping; the card on Home & life; reloads on the area `budget` of `/api/version`. |

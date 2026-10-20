@@ -52,11 +52,13 @@ TABLES = (
     "rc_receipts", "rc_suggest",  # 2.48.0 (#1356): receipts: project / category, the agents' suggestions
     "office_deals",  # 2.50.0 B (#1196): the sales pipeline
     "hub_absences",  # 2.50.0 A (#1195): absences (the area they were entered in; the app hides the kind)
+    "hub_leave_quota",  # 2.125.0 A (#2117): vacation accounts (the area like hub_absences)
     "hub_bookings",  # 2.50.0 A (#1194): bookings of the disposition
     "office_signoffs",  # 2.50.0 C (#1200): approval links (NULL = a private list's acceptance, the app checks the list)
     "video_reviews", "video_versions", "video_comments",  # 2.99.1 A (#1959): video sign-offs (NULL = private, the app checks owner / task / list / client)
     "office_pay_props",  # 2.51.0 A (#1350): payment suggestions of agents
     "task_bell",  # 2.53.0 C (#1424): the bell of one task per person (NULL = a private list's task)
+    "time_sheets",  # 2.125.0 B (#2119): monthly timesheets (NULL = a person without organisation, the app checks user_id)
     "nl_conns", "nl_segments", "nl_members", "nl_runs",  # 2.55.0 E (#1455): the newsletter connection (NULL = a person's own)
     "task_vectors",  # 2.59.0 B (#1375): the text vectors of related tasks (NULL = a private list's task)
     "upload_scan",  # 2.61.0 A (#1818): unchecked / infected uploads (NULL = a private file; files/scan.py)
@@ -93,6 +95,8 @@ def rule(nullable, col="org_id"):
 OWN_RULES = {
     "orgs": f"{SYS} OR id = ANY ({ORG_IDS})",
     "org_members": f"{SYS} OR user_id = {UID} OR org_id = ANY ({ORG_IDS})",
+    # 2.125.0 R (#2119): a person keeps their own timesheets after leaving the organisation (the lock of an approved month)
+    "time_sheets": f"{rule(True)} OR user_id = {UID}",
 }
 
 

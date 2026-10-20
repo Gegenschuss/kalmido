@@ -111,6 +111,9 @@ KINDS = {
     "sheet_share": ("matrix", "p2124_c_api_test.py: shares of a table of another organisation / person: 404 for the stranger "
                               "(list, add, change, stop), a person / agent of another workspace cannot get a share (409), a recipient "
                               "sees only the shared table, not the rest of the workspace"),
+    # 2.125.0 B (#2119): monthly timesheets: the person's own month, the admins of the sheet's organisation decide
+    "timesheet": ("matrix", "p2125_b_api_test.py: a timesheet of another organisation's member: 404 for its admin, 403 for a "
+                            "member of the same organisation, a person without organisation: no decision by anyone (404)"),
     # 2.97.0 A (#1950): bookmarks belong to one organisation (every member reads, the owner / its admins change) or one person
     "bookmark": ("matrix", "p297_a_api_test.py: a bookmark of another organisation / person: 404 (read, change, delete, picture, move)"),
     # 2.98.0 A (#1953): scheduling polls belong to one organisation (every member reads, the owner / its admins change) or one person
@@ -138,7 +141,9 @@ KINDS = {
                       "(p249_e_api_test.py: no account disclosure, no probing by id, organisations unchanged)"),
     # 2.50.0 A (#1195, #1194): absences and bookings of an organisation / a personal area (row-level security + the app)
     "hub": ("matrix", "p250_a_api_test.py: absences and bookings by id of another organisation 404 (read, change, delete, restore), "
-                      "the kind of an absence only for the person and the admins, resources of another organisation cannot be booked"),
+                      "the kind of an absence only for the person and the admins, resources of another organisation cannot be booked; "
+                      "p2125_a_api_test.py (2.125.0): vacation accounts, requests, decisions and the working week of another "
+                      "organisation's people 404, requests never seen by the team or agents"),
     # 2.59.0 B (#1375): related tasks -- candidates only among the tasks the asker sees
     "related": ("matrix", "p259_b_api_test.py: related tasks, the hint while adding, search semantic=1, API v1 and agent events never "
                           "name a task of another organisation, an unshared list or a private list; another organisation's task 404"),
@@ -279,7 +284,7 @@ ROUTES = {
     "GET /api/clients/{}/book-contacts": "client",  # 2.59.0 (#1735): only the client's own address books (p259_a_api_test.py)
     "POST /api/clients/merge": "client", "POST /api/clients/merges/{}/undo": "client",  # 2.66.0 (#1835): every client checked, one workspace, undo by its scope (p266_b_api_test.py)
     "POST /api/v1/clients": "client", "GET /api/v1/clients/{}": "client", "PATCH /api/v1/clients/{}": "client",
-    "DELETE /api/v1/clients/{}": "client", "GET /api/v1/workload": "client", "GET /api/workload": "client",
+    "DELETE /api/v1/clients/{}": "client", "GET /api/v1/workload": "client", "GET /api/workload": "client", "GET /api/workload/export.xlsx": "client",
     "PUT /api/workload/capacity/{}": "client",
     # ---- office (B: settings, packs, master data, import / export)
     "GET /api/office/settings": "office", "PUT /api/office/settings": "office", "GET /api/office/number-preview": "office",
@@ -631,7 +636,7 @@ ROUTES = {
     "DELETE /api/habits/{}": "own", "POST /api/habits/{}/log": "own", "POST /api/pomo/start": "own",
     "POST /api/pomo/{}/{}": "own", "POST /api/time/start": "own", "POST /api/time/stop": "own",
     "POST /api/time/entries": "own", "PATCH /api/time/entries/{}": "own", "DELETE /api/time/entries/{}": "own",
-    "GET /api/time/entries": "own", "GET /api/time/report": "own", "GET /api/time/export.csv": "own",
+    "GET /api/time/entries": "own", "GET /api/time/report": "own", "GET /api/time/export.csv": "own", "GET /api/time/export.xlsx": "own",
     "GET /api/family/contacts": "own", "POST /api/family/contacts": "own", "PATCH /api/family/contacts/{}": "own",
     "DELETE /api/family/contacts/{}": "own", "POST /api/family/contacts/{}/sync": "own",
     # ---- people (9)
@@ -797,6 +802,8 @@ ROUTES = {
     # 2.124.0 C (#2113): shares of one table (p2124_c_api_test.py)
     "GET /api/sheets/{}/shares": "sheet_share", "POST /api/sheets/{}/shares": "sheet_share",
     "PATCH /api/sheets/{}/shares/{}": "sheet_share", "DELETE /api/sheets/{}/shares/{}": "sheet_share",
+    # 2.125.0 B (#2119): monthly timesheets (p2125_b_api_test.py)
+    "GET /api/time/sheets": "timesheet", "POST /api/time/sheets": "own", "POST /api/time/sheets/decide": "timesheet",
     "PUT /api/sheets/{}/chart": "sheet",  # 2.124.0 A (#2115): the chart of a table (p2124_a_api_test.py)
     # 2.124.0 E (#2116): the sheets of a table (p2124_e_api_test.py: a stranger 404 on every route, another organisation's agent 404)
     "GET /api/sheets/{}/tabs": "sheet", "POST /api/sheets/{}/tabs": "sheet", "PATCH /api/sheets/{}/tabs/{}": "sheet",
@@ -851,7 +858,9 @@ ROUTES = {
     # 2.50.0 A (#1195): absences; (#1194): resources and disposition
     "GET /api/team/absences": "hub", "POST /api/team/absences": "hub", "PATCH /api/team/absences/{}": "hub",
     "DELETE /api/team/absences/{}": "hub", "POST /api/team/absences/{}/restore": "hub", "PUT /api/team/absences/holidays": "hub",
-    "GET /api/team/absences/check": "hub", "GET /api/team/dispo": "hub", "GET /api/team/dispo/free": "hub",
+    "GET /api/team/absences/check": "hub", "GET /api/team/leave": "hub", "PUT /api/team/leave/quota": "hub",  # 2.125.0 A (#2117)
+    "PUT /api/team/leave/approval": "hub", "PUT /api/team/leave/worktime/{}": "hub", "POST /api/team/absences/{}/decide": "hub",
+    "GET /api/team/dispo": "hub", "GET /api/team/dispo/free": "hub",
     "POST /api/team/dispo/bookings": "hub", "PATCH /api/team/dispo/bookings/{}": "hub", "DELETE /api/team/dispo/bookings/{}": "hub",
     "POST /api/team/dispo/bookings/restore": "hub", "GET /api/team/bookings/mine": "hub", "GET /api/v1/absences": "hub",
     # 2.51.0 C (#1352 #1353 #1355): agents on the pin board, time check / proposals, the disposition + shoot proposals (p251_c_api_test.py)

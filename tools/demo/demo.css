@@ -53,3 +53,6 @@
   :root.kd-printing #kd-print .kd-pscroll{overflow:visible;padding:0}
   .kp-page{box-shadow:none;width:auto;padding:0;border-radius:0}
 }
+/* 2.125.0 D (#1653): a part the demo does not imitate yet (tools/demo/shim.js unknownNote) */
+#kd-unk{position:fixed;z-index:9998;left:50%;bottom:1.25rem;transform:translateX(-50%);display:flex;gap:.75rem;align-items:center;width:max-content;max-width:calc(100vw - 2rem);box-sizing:border-box;
+  padding:.625rem .875rem;border-radius:.75rem;background:var(--bg2,var(--bg));color:var(--text);border:.0625rem solid var(--line2,var(--line));box-shadow:0 .5rem 1.5rem rgba(0,0,0,.25);font:.875rem/1.45 var(--sans)}
