@@ -11,10 +11,10 @@ const leadDue = x => !!x.follow_up && x.follow_up <= today();
 function leadSort(its) {  // by follow-up day (none last), then the newest first
   return its.slice().sort((a, b) => (a.follow_up || '9999').localeCompare(b.follow_up || '9999') || b.id - a.id);
 }
+// 2.122.3 A (#2335): "Import CSV" moved to Settings > Import legacy data (office_import.js, section leads)
 function leadBar() {
   const s = PPS.data?.summary || {};
   return `${s.leads ? `<span class="muted lead-cnt">${esc(trn('{0} lead', '{0} leads', s.leads))}${s.leads_due ? ` · <b class="lead-duen">${esc(tr('{0} to follow up', s.leads_due))}</b>` : ''}</span>` : ''}
-    <button class="btn sm lead-tb" data-lead="import">${ic('upload', 's')}<span>${tr('Import CSV')}</span></button>
     <button class="btn sm lead-tb" data-pp="newlead">${ic('plus', 's')}<span>${tr('New lead')}</span></button>`;
 }
 function leadCard(x) {

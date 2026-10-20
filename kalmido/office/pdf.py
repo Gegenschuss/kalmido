@@ -1143,10 +1143,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     bfc_rights, bfc_seen = [], []
     rights = m.get("rights") or {}
     r_rows = [(str(r[0]), str(r[1])) for r in (rights.get("rows") or []) if isinstance(r, (list, tuple)) and len(r) >= 2 and str(r[1]).strip()]
-    if str(rights.get("exceptions") or "").strip():
-        r_rows.append((str(ml.get("rights_exceptions") or ("Ausnahmen" if lang == "de" else "Exceptions")), str(rights["exceptions"])))
-    if rights.get("exclusive"):
-        r_rows.append((str(ml.get("rights_exclusive") or ("Exklusiv" if lang == "de" else "Exclusive")), "ja" if lang == "de" else "yes"))
+    # 2.122.4 B (#2261): exceptions / exclusive are already in rights.rows (docs.py print model), not appended again
     if r_rows or rights.get("note"):
         lab_w = 112
         r_lines = [(a, pdf_wrap(b, 9, PDF_CW - lab_w - 12)) for a, b in r_rows]

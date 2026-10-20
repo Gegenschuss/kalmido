@@ -235,7 +235,7 @@ function dgMark(el, cls, text) { el.classList.add(cls); el.dataset.dg = text; }
 // 2.87.9 (#1965): moving a selection over the same third of the same row changes nothing (no search, no restyle)
 let dgLast = null;
 function dgOver(e, id) {
-  const lr = dgLast && !e.altKey && DG.ids && !e.target.closest?.('.dgzone') && e.target.closest?.('#view .trow');
+  const lr = dgLast && !e.altKey && (DG.ids || dgLast.one) && !e.target.closest?.('.dgzone') && e.target.closest?.('#view .trow');
   if (lr && lr === dgLast.row && lr.isConnected && dgZone(lr, e.clientY) === dgLast.zn && lr.classList.contains(dgLast.cls)) return true;
   dgLast = null;
   dgClear();
@@ -254,7 +254,7 @@ function dgOver(e, id) {
     e.dataTransfer.dropEffect = 'link';
     return true;
   }
-  if (!DG.ids) return false;
+  if (!DG.ids) return dgs_over(e, row, id, tid);  // 2.122.3 B (#2334): one task, the middle of a row
   $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   const zn = dgZone(row, e.clientY);
   if (zn === 'onto') dgMark(row, 'dgonto', trn('{0} task becomes its subtask', '{0} tasks become its subtasks', dgRoots(ids).length));
@@ -283,6 +283,7 @@ function dgDrop(e, id) {
     dgDepAdd(ok.map(w => [w, tid]));
     return true;
   }
+  if (!ids && row && !row.closest('#detail') && dgs_mid(row, y) && dgs_ok(id, +row.dataset.id)) { end(); dgMakeSubs([id], +row.dataset.id); return true; }  // 2.122.3 B (#2334)
   if (!ids) return false;
   end();
   if (el.closest?.('#detail')) return true;
@@ -324,6 +325,43 @@ function dgDrop(e, id) {
     return true;
   }
   if (quad) { batch('patch', {priority: +quad.dataset.quad}, false, may); return true; }
+  return true;
+}
+// 2.122.3 B (#2334): a single dragged task (mouse or finger) onto the middle of another becomes its subtask, as a
+// selection does (dgMakeSubs: one batch, one Undo). Only where it may: both editable, no milestone, not under itself or
+// its own subtask, not already there, the depth fits, no move into / out of a list with the lock (that needs a PATCH).
+// Elsewhere (and the upper / lower part of a row) dnd.js moves it as before.
+function dgs_ok(id, tid) {
+  const t = S.tasks.get(id), p = S.tasks.get(tid);
+  if (!t || !p || id <= 0 || tid <= 0 || id === tid || t.context || p.context || !canEdit(t) || !canEdit(p) || isMs(t) || isMs(p)) return false;
+  if (t.parent_id === tid || dgAncestors(tid).includes(id) || !dgFits(tid, id)) return false;
+  return t.list_id === p.list_id || !(typeof le2eOn === 'function' && (le2eOn(t.list_id) || le2eOn(p.list_id)));
+}
+// the middle of a row that has a size (a row without one keeps the old halves)
+const dgs_mid = (row, y) => row.getBoundingClientRect().height > 0 && dgZone(row, y) === 'onto';
+function dgs_over(e, row, id, tid) {
+  if (!dgs_mid(row, e.clientY) || !dgs_ok(id, tid)) return false;
+  $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
+  dgMark(row, 'dgonto', tr('As a subtask of this task'));
+  dgLast = {row, zn: 'onto', cls: 'dgonto', one: true};
+  return true;
+}
+// the finger's drag (dnd.js, once per frame): true = the middle of a row is marked here, else dnd.js marks before / after
+let dgsRow = null;
+function dgs_touchMark(at, id, y) {
+  const row = at?.closest?.('#view .trow'), on = !!row && !row.closest('#detail') && dgs_mid(row, y) && dgs_ok(id, +row.dataset.id);
+  if (on && row === dgsRow && row.classList.contains('dgonto')) return true;
+  if (dgsRow) { dgsRow.classList.remove('dgonto'); delete dgsRow.dataset.dg; dgsRow = null; }
+  if (!on) return false;
+  $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
+  dgMark(row, 'dgonto', tr('As a subtask of this task'));
+  dgsRow = row;
+  return true;
+}
+function dgs_touchDrop(el, id, y) {
+  const row = el?.closest?.('#view .trow');
+  if (!row || row.closest('#detail') || y == null || !dgs_mid(row, y) || !dgs_ok(id, +row.dataset.id)) return false;
+  dgMakeSubs([id], +row.dataset.id);
   return true;
 }
 // the two drop fields in the open task's dependencies (only while a task is dragged)

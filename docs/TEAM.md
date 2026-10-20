@@ -239,9 +239,14 @@ control*: it opens in a new tab and its comments carry no timecode.
   them. A new link stops the older one; deleting the sign-off stops it at once.
 - Rights: who sees the task / project / client sees the sign-off and may comment (like task comments); changing it, new
   versions, the customer link, moving and deleting need the right to edit there. A locked list (end-to-end) has none.
+  At a client (2.122.4) that is an office role in the client's organisation (or, for a private client, its creator).
 - *Move to another workspace…* takes it with its versions and comments into a project of the private space or an
   organisation (its creator or an admin of the organisation); the customer links and their record stay in the old
-  workspace. Undo brings it back to its old place.
+  workspace. Undo brings it back to its old place. Since 2.122.4 the records stay bound to the sign-off and show again
+  when it comes back; in the new workspace they never show.
+- Deleting for good: a sign-off in the trash is deleted for good after 30 days with its versions, comments and customer
+  records. A task, project or client that is deleted for good takes its video sign-offs with it, including the customer's
+  recorded decision (like the approval records of documents).
 - Every step can be undone. The players are embedded without loading any script of Vimeo or YouTube (YouTube through
   youtube-nocookie.com); only the two player addresses may be framed (Content-Security-Policy).
 

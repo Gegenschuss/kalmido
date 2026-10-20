@@ -37,6 +37,26 @@ Knowledge pages: history, pictures from the file store, sharing, full-text searc
 
 ### Fixed
 - Office: the installment list shows the open amount in the number format of the document (#2351).
+## [2.122.4] - 2026-10-20
+
+Fixes: quotation PDF, storage quota, CSV exports, phone sizes, boundary check and edit rights of the instance admin, feeds, video sign-off, two clock-dependent tests.
+
+### Fixed
+- Quotation PDF lists "Exceptions" and "Exclusive" of the transfer of rights only once (#2261); the storage quota counts entertainment receipts and contract files (#2316); every CSV export guards text cells against formulas, also after a tab or line break (#2317).
+- Instance admin: the boundary check names objects and people only inside the own organisations, and a private connection no longer gives the right to edit members of another organisation (#1724); the same feed address is followed only once, also on a double tap or parallel import (#1906).
+- Video sign-off: protocols stay after a move between private and organisation and come back on undo, the customer page controls YouTube under any address, writing at an office client needs an office role, the customer's decision shows in the reader's language (#2215 #2217).
+- Phones: 44 px selects in office settings on iOS, the contact import notice lies under dialogs, larger touch targets in video sign-off and bookmarks, full-width bookmark fields, "Save" stays reachable above the keyboard (#2326 #2348 #2217 #2223); tests no longer depend on the time of day (#2218 #1910).
+## [2.122.3] - 2026-10-20
+
+Office fixes, drag a task under another, chat "Show more".
+
+### Changed
+- Office: one-off imports (fixed costs from Excel, leads from CSV) moved from the lists to Settings > Import legacy data, each with its own section; empty lists link there with "Already have a list? Import from Excel", filled ones with a quiet "Import…" at the end (#2335).
+
+### Fixed
+- Office: fixed costs and subscriptions without VAT show one amount with "without VAT" instead of the same net and gross amount twice (#2333).
+- Tasks: a single task dropped onto the middle of another becomes its subtask, with the mouse and with the finger, one undo step; milestones and its own subtasks are no target (#2334).
+- Chat: "Show more" of a shortened message sits right under the cut text, before steps, suggestion and time (#2340).
 
 ## [2.122.2] - 2026-10-20
 

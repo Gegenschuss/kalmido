@@ -97,7 +97,11 @@ def om_admin_all(c, uid):
     with system_ctx(c):  # membership structure
         in_org = c.execute("SELECT 1 FROM org_members WHERE user_id=? LIMIT 1", (uid,)).fetchone()
         pending = c.execute("SELECT 1 FROM users WHERE id=? AND signup='pending'", (uid,)).fetchone()
-    return not in_org or bool(pending) or admin_sees(c, uid)
+        # 2.122.4 A (#1724): a private connection no longer counts (it made members of other organisations editable);
+        # only a shared organisation, besides accounts outside every organisation and waiting registrations
+        shared = uid == me() or c.execute("SELECT 1 FROM org_members a JOIN org_members b ON b.org_id=a.org_id "
+                                          "WHERE a.user_id=? AND b.user_id=? LIMIT 1", (me(), uid)).fetchone()
+    return not in_org or bool(pending) or bool(shared)
 
 
 def user_orgs_public(c, uid):

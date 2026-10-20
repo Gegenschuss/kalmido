@@ -164,6 +164,8 @@ async function bm_detail(id) {
       <span class="spacer"></span>${ro ? '' : `<button class="btn pri" data-m="save">${tr('Save')}</button>`}</div>`);
   md.classList.add('bmdlg');
   md.setAttribute('role', 'dialog'); md.setAttribute('aria-modal', 'true'); md.setAttribute('aria-labelledby', 'bmd-t');
+  // 2.122.4 C (#2223): the soft keyboard must not hide the focused field / Save (iOS)
+  md.addEventListener('focusin', e => { if (e.target.matches('input,textarea,select')) setTimeout(() => e.target.scrollIntoView?.({block: 'center'}), 300); });
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-m]'); if (!b) return;
     const k = b.dataset.m;

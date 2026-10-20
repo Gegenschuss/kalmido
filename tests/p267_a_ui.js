@@ -61,7 +61,8 @@ const ym = TC.today().slice(0, 7);
     await ev(`(() => { const m = document.querySelector('.modal'); m.querySelector('#cf-vat').value = '7'; m.querySelector('[data-m="save"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal') && /107\\.00/.test(document.querySelector('[data-rkf="fixed"][data-id="${f1.id}"]')?.textContent || '')`), 'the rate saved (7 %: 107.00 gross)');
     // ---- the import: the template as the file
-    check(await ev(`document.querySelector('a[href="/api/office/fixed-costs/import/template"]')?.hasAttribute('download') && !!document.querySelector('[data-rkf="fimp"]')`), 'import button and template link');
+    // 2.122.3 (#2335): template + import moved to Settings > Import legacy data; the cash flow only links there
+    check(await ev(`!document.querySelector('.fcibar [data-rkf="fimp"]') && !document.querySelector('.fcibar a[href$="/import/template"]') && !!document.querySelector('.oimlink a[href="#office/import/fixed"]')`), 'import link to the import page');
     await ev(`(async () => { const b = await (await fetch('/api/office/fixed-costs/import/template', {credentials: 'same-origin'})).blob(); fci_preview(new File([b], 'template.xlsx')); return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('.fcidlg .fcirow').length === 2`), 'the preview dialog with the two example rows');
     check(await ev(`/Take over 2 rows/.test(document.querySelector('.fcidlg [data-fci="go"]').textContent) && document.querySelector('.fcidlg [data-fci="vat"][data-i="1"]').value === '0'`),

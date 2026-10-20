@@ -384,6 +384,8 @@ def init_db(guard=True, load=None):
         for stmt in INDEXES.strip().split(";"):
             if stmt.strip():
                 c.execute(stmt)
+        from ..life.rss import rg4_feed_unique
+        rg4_feed_unique(c)  # 2.122.4 A (#1906): one followed feed per address (skipped while old duplicates exist)
         from ..office.ledger import ofx_migrate
         ofx_migrate(c)  # 2.36.2 (#1142, E): office positions carry their organisation
         from ..office.contacts_cl import fk_migrate
