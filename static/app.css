@@ -4930,7 +4930,7 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 /* 2.31.0 (#1057): phones with "Search" in the tab bar: one search (the tab); the header magnifier, the drawer's search field
    and the search button next to the open drawer step aside (without the tab they stay) */
 @media (max-width:899px){
-  body.tab-search #top .cmdbar,body.tab-search #side .scmd,body.tab-search #scrim .sidesearch{display:none!important}
+  body.tab-search #top .cmdbar{display:none!important}  /* 2.138.0 B (#2161): the drawer's search dock and the side button stay */
 }
 /* 2.31.0 (#1046): sub-tabs (Settings > Agents, Administration) keep their real width; the strip scrolls sideways instead of
    letting the labels run into each other */
@@ -7529,3 +7529,23 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 /* 2.119.0 B (#2210): the Agents section of the dialog "All people …" */
 .sbpmd .sbph{margin:.75rem 0 .25rem;font-size:.75rem;font-weight:600;color:var(--muted);text-transform:none}
 .sbpmd .mrow[data-aid] .sdot{flex:none}
+
+/* 2.138.0 B (#2161): search docked at the bottom of the sidebar; head = logo + avatar, then workspace button + fold-all */
+#side{display:flex;flex-direction:column;padding-bottom:0}
+#side>*{flex:none}
+#side .sbdock{position:sticky;bottom:0;z-index:3;margin-top:auto;padding:.5rem 0 calc(.5rem + var(--safe-b,0px));background:var(--sbbg,var(--bg2));box-shadow:0 -1px 0 var(--line)}
+#side .sbdock::before{content:"";position:absolute;inset:0 -.75rem;background:inherit;z-index:-1}
+#side .sbdock .scmd{margin:0;height:2.75rem}
+#side .sbsrch{align-items:center;margin:0 0 .375rem}
+#side .sbsrch .spacer{flex:1}
+#side .wsbar{width:auto;max-width:70%;min-height:2rem;padding:0 .625rem;gap:.375rem;font-size:var(--fs-s,.8125rem);border-radius:1rem;flex:0 1 auto;min-width:0}
+#side .wsbar .wsn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#side .wsbar > svg:last-child{flex:none;opacity:.6}
+#side .wsbar .wsp-dot{position:static;flex:none;box-shadow:none;width:.5rem;height:.5rem}
+#side .sbsrch .kbfoldall{flex:none;opacity:.65}
+@media (pointer:coarse){ #side .wsbar{min-height:2.75rem} }
+@media (max-width:899px){ body:has(#side.open) #scrim .sidesearch{display:none} }
+:root #side .sbdock .scmd{height:2.75rem}
+:root #side .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .wsbar{width:auto;min-height:2rem}
+@media (pointer:coarse){ :root #side .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .wsbar{width:auto;min-height:2.75rem} }
+:root #side .sbsrch,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sbsrch{margin-bottom:.5rem}  /* room above the first group heading */
