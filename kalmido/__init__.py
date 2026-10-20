@@ -350,6 +350,7 @@ ORDER = (
     "agents.asstprop",  # 2.126.1 A (#2123 #2124): office texts, document summaries, client reports by an agent (no routes of its own)
     "lists.rules",  # 2.71.0 A (#1457): rules of a list (When ... then ...), after api.v1
     "admin.supporter",  # 2.74.0 (#338): the supporter licence (self-hosted only, a badge, unlocks nothing)
+    "admin.operator",  # 2.144.0 D (#797): the hosting operator's interface (off unless a token file is configured)
     "assistant.core",  # 2.75.0 (#1411): the built-in assistant -- configuration, model call, prompts (off unless configured)
     "assistant.web",  # 2.75.0 (#1411): the routes of the built-in assistant
     "admin.worker",  # 2.102.0 D (#1994 / #1997): health numbers, the process role, one runner per background loop

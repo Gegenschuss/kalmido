@@ -226,6 +226,8 @@ def authenticate():
         return None  # 2.2.0: inbound Git webhook: no user, no proxy header, the HMAC signature is the credential
         # (2.18.0: also the error-report webhook: the secret token in its URL is the credential; 2.60.0: and the deploy hook)
         # (2.115.0 A (#2061): and the inbound webhook of a list)
+    if request.path.startswith("/api/operator/"):
+        return None  # 2.144.0 D (#797): the hosting operator's interface: its own token (admin/operator.py), never a person
     if request.path.startswith(PUB_PREFIX):
         return None  # public list link: no user; the token in the path is the credential (see "public links")
     c = db()
