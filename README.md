@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.141.0** (2026-10-20): the **e-mail filing as a small mail desk** - an own IMAP / SMTP mailbox per workspace,
+  reply and write from the filing (sent mails filed too), HTML mails shown safely, tasks and events from a mail; a CSV /
+  ICS export of the disposition and a consent import for newsletters.
 - **2.138.4** (2026-10-20): phones - office fixed-cost import rows stay whole, table checkbox cells tick on a tap
   with undo, sheet bar above the tab bar, Android print view, touch-sized controls in documents and bookmarks; the
   agent chat keeps an open edit; error-report webhook token in a header, contact copies out of mirrored address books,
@@ -1348,6 +1351,14 @@ old one stop working. Optionally, mails from your own address (an admin stores i
 too (off by default: sender addresses can be forged). The mailbox must deliver plus addresses (`+…`) to it, which most
 providers do. With `KALMIDO_SMTP_*` the **daily summary** (Settings > Notifications, *Daily digest at*) also comes by
 e-mail: overdue, today, tomorrow, what waits for you and what is unread; *Send now* tries it.
+
+**A mailbox per workspace (2.141):** in the e-mail filing (*Office > Clients > E-mails*) the section *Mailbox* lets the
+admins of an organisation - or a person for their private space - enter an own IMAP mailbox and SMTP access. Its mails
+are fetched every `KALMIDO_IMAP_INTERVAL` seconds and filed in that workspace only (by sender, plus address or as a reply
+to a filed mail; otherwise *Not assigned*). Passwords are stored encrypted and never shown again; the servers are reached
+only with a valid certificate, and hosts in the local network only when listed under *allowed internal hosts*
+(`KALMIDO_CALENDAR_ALLOW_HOSTS`). With SMTP set up, *Reply* and *New e-mail* send plain-text mails that are filed as
+*Sent*. HTML mails are shown cleaned in a sandboxed frame; external images load only on request.
 
 ## Calendar subscriptions (other calendars in Kalmido)
 
