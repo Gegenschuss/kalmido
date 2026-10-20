@@ -95,14 +95,15 @@ function lv_sheet(p) {
     <div class="row"><label for="lv-hours">${tr('Hours per week')}</label><input id="lv-hours" class="numin" inputmode="decimal" value="${esc(p.capacity_set ? fmtNum(p.capacity_h, 2) : '')}" placeholder="${esc(fmtNum(p.capacity_h, 1))}"><span class="muted">${tr('Empty = 5 × the hours per day of the server')}</span></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${ic('check', 's')} ${tr('Save')}</button></div>`);
   md.classList.add('lvmd');
+  const mq = /** @type {any} */ (md);  // 2.125.1 (#2117): for the type check ($ takes a Document)
   const numOf = v => { const t = String(v).trim().replace(',', '.'); return t === '' ? null : +t; };
   md.addEventListener('click', async e => {
-    const b = e.target.closest('[data-m]'); if (!b) return;
+    const b = /** @type {any} */ (e.target).closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
-    const days = numOf($('#lv-days', md).value), carry = numOf($('#lv-carry', md).value) || 0, hours = $('#lv-hours', md).value.trim().replace(',', '.');
+    const days = numOf($('#lv-days', mq).value), carry = numOf($('#lv-carry', mq).value) || 0, hours = $('#lv-hours', mq).value.trim().replace(',', '.');
     if (days !== null && !(days >= 0 && days <= 366 && Number.isInteger(days * 2))) { toast(tr('Vacation days: whole or half days')); return; }
     if (!(carry >= 0 && carry <= 366 && Number.isInteger(carry * 2))) { toast(tr('Vacation days: whole or half days')); return; }
-    const org = d.org_id, wd = wt_str(wt_daysOf($('#lv-wd', md)));
+    const org = d.org_id, wd = wt_str(wt_daysOf($('#lv-wd', mq)));
     const before = {q: p.quota ? {days: p.quota.days, carry: p.quota.carry} : null, wd: wt_str(p.workdays || WT_DEFAULT), hours: p.capacity_set ? String(p.capacity_h) : ''};
     const after = {q: days === null ? null : {days, carry}, wd, hours};
     const put = x => async () => {
@@ -132,14 +133,15 @@ function lv_click(a, k) {
   if (k === 'lv-edit') { const p = d.people.find(x => x.id === +a.dataset.uid); if (p) lv_sheet(p); }
   else if (k === 'lv-ok' || k === 'lv-no') { const it = d.pending.find(x => x.id === +a.dataset.id); if (it) lv_decide(it, k === 'lv-ok'); }
 }
-document.addEventListener('change', async e => {
+document.addEventListener('change', async ev => {
+  const e = {target: /** @type {any} */ (ev.target)};  // 2.125.1 (#2117): for the type check
   if (e.target.id !== 'lv-approval') return;
   const org = LV.data?.org_id, to = e.target.checked, put = v => async () => { await api('PUT', '/api/team/leave/approval', {org, on: v}); ab2_reload(); };
   try { await put(to)(); histAdd({label: tr('Changed setting: {0}', tr('Vacation of members needs an approval')), sett: true, undo: put(!to), redo: put(to)}); toast(tr('Saved')); } catch { e.target.checked = !to; /* api() said it */ }
 });
 
 document.addEventListener('click', async e => {
-  const a = e.target.closest?.('[data-act^="wt-"], [data-act^="lv-"]'); if (!a || a.disabled) return;
+  const a = /** @type {any} */ (e.target).closest?.('[data-act^="wt-"], [data-act^="lv-"]'); if (!a || a.disabled) return;
   e.preventDefault(); e.stopPropagation();
   const k = a.dataset.act;
   if (k === 'wt-day') { const d = wt_toggle(a); if (d) await setApply({workdays: wt_str(d)}, tr('Working days')); }
