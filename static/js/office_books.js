@@ -60,7 +60,7 @@ function bkTabHtml() {
   const yNow = new Date().getFullYear(), years = [];
   for (let y = yNow + 1; y >= yNow - 6; y--) years.push([y, String(y)]);
   const head = `<div class="ofcbar bk-bar"><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('bk-year', BK.year, years)}</label><span class="spacer"></span></div>
-    <div class="bk-photo"><label class="btn pri bk-shot">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="bk-file" accept="image/*,application/pdf" capture="environment" hidden></label>
+    <div class="bk-photo"><label class="btn pri bk-shot">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="bk-file" accept="image/*,application/pdf,.xml,application/xml,text/xml" capture="environment" hidden></label>
     <span class="muted bk-photohint">${tr('The receipt goes into the documents; amount and date are recognised.')}</span></div>`;
   const txd = typeof txdSectionHtml === 'function' ? txdSectionHtml() : '';  // part C: the tax dates
   return head + bkReceiptsHtml() + bkEuerHtml() + bkUstvaHtml() + bkSettingsHtml() + txd;
@@ -164,7 +164,7 @@ async function bkSheet(id, fresh) {
   try { [doc, rc] = await Promise.all([api('GET', `/api/docs/${id}`), api('GET', `/api/docs/${id}/receipt`)]); } catch (x) { toast(x.message || tr('unknown')); return; }
   const r = rc.receipt || {}, cats = [...new Set([...(BK.info?.categories || []), ...(rc.categories || [])])];
   const wait = doc.state === 'wait' || doc.state === 'run';
-  const md = modal(`<h3>${tr('Receipt')}</h3><p class="muted bk-sname">${esc(doc.name)}</p><div class="bk-rx"></div>
+  const md = modal(`<h3>${tr('Receipt')}</h3><p class="muted bk-sname">${esc(doc.name)}${doc.einvoice ? ` · <a class="bk-einv" href="/api/docs/${id}/einvoice" target="_blank" rel="noopener">${tr('Readable view')}</a>` : ''}</p><div class="bk-rx"></div>
     <p class="muted bk-rec" role="status">${wait ? tr('Being recognised…') : ''}</p>
     ${ofcRowF('bk-cat', tr('Category'), ofcIn('bk-cat', r.category, {max: 60, list: 'bk-cats', ph: tr('e.g. Travel, Material, Software')}) + `<datalist id="bk-cats">${cats.map(k => `<option value="${esc(k)}"${bkAcct(k) ? ` label="${esc(bkAcct(k).account)}"` : ''}>`).join('')}</datalist>`)}
     <div class="bk-acct muted" aria-live="polite"></div>
@@ -287,6 +287,7 @@ async function bkPoll(id, md, touched, n) {  // the recognition runs in the back
   if (!md.isConnected) return;
   if (d.state === 'wait' || d.state === 'run') { bkPoll(id, md, touched, n + 1); return; }
   const st = $('.bk-rec', md); if (st) st.textContent = d.state === 'done' ? tr('Recognised') : (d.error_text || '');
+  if (d.einvoice && !$('.bk-einv', md)) $('.bk-sname', md)?.insertAdjacentHTML('beforeend', ` · <a class="bk-einv" href="/api/docs/${id}/einvoice" target="_blank" rel="noopener">${tr('Readable view')}</a>`);  // 2.146.0 A (#2451)
   if (d.amount && !touched.has('bk-amount') && !$('#bk-amount', md).value) $('#bk-amount', md).value = fmtNum(+d.amount, 2);
   const di = $('#bk-date', md);
   if (d.date && di && !touched.has('bk-date') && !di.value) { di.value = d.date; if (typeof dpSync === 'function') dpSync(di); }

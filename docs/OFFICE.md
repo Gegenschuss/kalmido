@@ -747,6 +747,14 @@ is billed net (the input tax stays yours), without a rate or in a small business
 is never billed twice, and Undo takes the positions back while the document is a draft. Agents may suggest amount, currency and VAT
 rate of a receipt as well; you change them in the suggestion card before you accept (Undo brings the old values back).
 
+**Receiving e-invoices (2.146):** XRechnung files (.xml, UBL or CII syntax) and ZUGFeRD / Factur-X PDFs (the XML embedded in
+the PDF) are read as e-invoices - uploaded with **Photograph receipt** or **Add documents**, or attached to a mail to your
+documents' forwarding address (any other .xml in a mail is left out). Date, due date, gross amount, currency and the seller
+(as sender) come from the invoice data instead of the text recognition; invoice number, net, VAT per rate and the VAT rate wait
+in the suggestion line of the receipt. The document says "E-invoice" and offers **Readable view**: the invoice as a plain page
+(seller, recipient, lines, VAT, totals, IBAN) to read, print or save as PDF with the browser. An XML with a DOCTYPE, a broken one
+or one beyond the limits (5 MB, nesting, number of elements) stays an ordinary file.
+
 **Accounts per category (2.121):** with the DATEV export set up, a receipt's sheet shows under the category the account of the
 chart SKR03 or SKR04 (Settings → DATEV) it is booked on - the default the export finds for the category (e.g. Software 4964 /
 6837), or your own. **Change account** sets your own account for this category (empty = the default again; one undo step); the

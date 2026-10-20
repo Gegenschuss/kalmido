@@ -1342,6 +1342,11 @@ The web app's own routes (`/api/docs`, a signed-in person, never an agent): `GET
 (levels per feature, the inbox folder), `POST` / `PATCH` / `DELETE /api/docs/rules`, `PATCH` / `DELETE /api/docs/labels/{kind}/{id}` (the delete answers the documents it touched; `POST /api/docs/labels/{kind}` `{ws, name, ids}` is its undo),
 `POST` / `DELETE /api/docs/mail` (the forwarding address). Deleting and restoring use the file store
 (`DELETE /api/files/nodes/{id}`, `POST /api/files/nodes/{id}/restore`).
+2.146.0 (#2451): an e-invoice (XRechnung UBL / CII as `.xml`, ZUGFeRD / Factur-X PDF) is recognised from its data: `method`
+`e-invoice`, `auto` marks the fields taken from it with `e-invoice`, `GET /api/docs/{id}` carries `einvoice` `{format: ubl|cii, kind:
+invoice|credit_note, source: xml|pdf, number}` and `extracted` the values of the invoice; `GET /api/docs/{id}/einvoice` answers the
+readable view (HTML, CSP sandbox, no script; `404` for a document that is no e-invoice). Agents read the same values through
+`extracted` of `GET /api/v1/documents/{id}`.
 2.122.0 (#2294): `GET /api/docs` takes the filters of `GET /api/v1/documents` (several `tag` / `sender` / `type` / `folder` values,
 each `1,7` = one name) and answers the folders of the visible documents in `facets.folders`; `POST /api/docs/bulk` `{ids, add_tags?,
 remove_tags?, type?, sender?}` changes the chosen documents one may change (at most 500 per request; answers `{changed, denied,

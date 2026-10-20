@@ -227,6 +227,7 @@ def docs_mail_import(c, msg, raw):
     from ..core.access import Denied, acx_of
     from ..admin.hosting import QuotaExceeded
     import hashlib
+    from ..office.einvoice_in import ei_is
     hdrs = " ".join(str(msg.get_all(h, [])) for h in ("To", "Cc", "Delivered-To", "X-Original-To", "Envelope-To"))
     toks = MAIL_TOKEN_RE.findall(hdrs)
     if not toks:
@@ -245,7 +246,8 @@ def docs_mail_import(c, msg, raw):
         _text, files = mail_text(msg)
         first = 0
         for i, (name, mime, data) in enumerate(files[:MAIL_FILES]):
-            if not (mime.startswith("image/") or mime == "application/pdf" or name.lower().endswith(".pdf")):
+            # 2.146.0 A (#2451): an e-invoice XML (XRechnung UBL / CII) goes in too, any other XML does not
+            if not (mime.startswith("image/") or mime == "application/pdf" or name.lower().endswith(".pdf") or ei_is(data)):
                 continue
             try:
                 with c.savepoint():

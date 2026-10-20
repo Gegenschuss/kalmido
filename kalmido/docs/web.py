@@ -100,6 +100,9 @@ def doc_json(c, m, node, full=False, role=None):
         d["text"] = S.meta_text(c, m)
         from ..receipts.extracted import rx_doc_view
         d["extracted"] = rx_doc_view(c, m)  # 2.121.0 A (#2092): what the recognition read off a receipt (a suggestion)
+        einv = S.meta_json(c, m, "extracted", {}).get("_einv")  # 2.146.0 A (#2451): an e-invoice (its readable view)
+        if isinstance(einv, dict):
+            d["einvoice"] = {k: einv.get(k) for k in ("format", "kind", "source", "number")}
         from ..agents.asstprop import ast_doc_extra
         ast_doc_extra(c, d, m)  # 2.126.1 A (#2123): the summary a person took over from an agent
     return d
@@ -482,6 +485,25 @@ def docs_file(nid):
     fs_log_add(c, nid, "download" if request.args.get("dl") == "1" else "read")
     c.commit()
     return send_stored({"id": nid, "path": v["path"], "name": n["name"], "mime": v["mime"] or n["mime"], "size": v["size"]})
+
+
+@app.get("/api/docs/<int:nid>/einvoice")
+def docs_einvoice(nid):
+    """2.146.0 A (#2451): the readable view of an e-invoice (XRechnung / ZUGFeRD) -- a plain page to read and print; every value
+    escaped, no script (CSP sandbox)."""
+    from flask import Response
+    from ..office.einvoice_in import ei_html
+    c = db()
+    m, n = _doc(c, nid)
+    inv = S.meta_json(c, m, "extracted", {}).get("_einv")
+    if not isinstance(inv, dict):
+        raise Denied(404)
+    fs_log_add(c, nid, "read")
+    c.commit()
+    r = Response(ei_html(inv, n["name"]), mimetype="text/html")
+    r.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox allow-modals"
+    r.headers["Cache-Control"] = "private, no-store"
+    return r
 
 
 @app.post("/api/docs/<int:nid>/task")

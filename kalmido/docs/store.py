@@ -808,9 +808,15 @@ def process(c, nid):
     except (Denied, OSError, OrgCryptError):
         c.execute("UPDATE doc_meta SET state='failed', error='missing', updated_at=? WHERE node_id=?", (_now(), nid))
         return "failed"
+    ei = None
+    if not given.get("text"):
+        from ..office.einvoice_in import ei_of_file, ei_text
+        ei = ei_of_file(node["name"], node["mime"], data, m["created_by"])  # 2.146.0 A (#2451): an e-invoice (XML / in a PDF)
     if given.get("text"):
         from ..tasks.attachtext import file_kind  # 2.66.1 (#1944): the kind all the same -> preview + QR code of an import
         res = {"text": str(given["text"])[:200_000], "method": "import", "kind": file_kind(node["name"], node["mime"], data[:2048])}
+    elif ei and ei["source"] == "xml":       # 2.146.0 A (#2451): the readable text of the invoice, not the XML
+        res = {"text": ei_text(ei), "method": "e-invoice", "kind": "einvoice"}
     else:
         try:
             from ..core.i18n import lang as _lang
@@ -820,6 +826,8 @@ def process(c, nid):
         res = doc_text(node["name"], node["mime"], data, lang=ulang)
     if res.get("error") == "busy":
         return "wait"
+    if ei and not res.get("error"):
+        res["method"] = "e-invoice"
     thumb_store(c, m, node, data, res.get("kind"))
     text = res.get("text") or ""
     if not m["asn"]:
@@ -834,11 +842,18 @@ def process(c, nid):
     #     # 2.98.0 D (#2178): the amount / due date are guessed below, once the type is known
     vals = {"doc_date": given.get("date") or ex["date"], "due_date": given.get("due") or ex["due"],
             "amount": str(given.get("amount") or ex["amount"] or ""), "currency": str(given.get("currency") or ex["currency"] or "")[:8]}
+    auto_all = meta_json(c, m, "auto", {})
+    if ei:                                   # 2.146.0 A (#2451): the e-invoice's values replace the recognition's
+        from ..office.einvoice_in import ei_details
+        ei_det = ei_details(ei)
+        for k, v in (("doc_date", ei["date"]), ("due_date", ei["due"]), ("amount", ei_det["gross"]), ("currency", ei["currency"])):
+            if v and not given.get({"doc_date": "date", "due_date": "due"}.get(k, k)):
+                vals[k] = str(v)[:8] if k == "currency" else v
+                auto_all[{"doc_date": "date", "due_date": "due"}.get(k, k)] = "e-invoice"
     if m["doc_date"]:
         vals["doc_date"] = m["doc_date"]     # set by hand while it waited
     if m["amount"] and not m["method"]:      # 2.90.0 A (#1921): an amount typed in before the first run (receipt photo) stays
         vals["amount"] = doc_open(c, ws, "doc_meta.amount", m["amount"]) or vals["amount"]
-    auto_all = meta_json(c, m, "auto", {})
     if not vals["doc_date"] and m["taken_at"]:  # 2.61.0 B (#1819): no date in the text -> the day the photo was taken
         vals["doc_date"] = str(m["taken_at"])[:10]
         auto_all["date"] = "photo"
@@ -858,6 +873,14 @@ def process(c, nid):
     if imported:
         apply_values(c, m, node, imported, {f: ({t: how for t in v} if f == "tags" else how) for f, v in imported.items()} if how == "agent" else {}, how)
         auto_all.update({f: how for f in imported})
+    if ei and not given.get("sender") and not m["sender_id"] and (ei_det["supplier"] or ei_det["vat_id"]):
+        from ..receipts.extracted import rx_sender_find  # 2.146.0 A (#2451): the seller of the e-invoice is the sender
+        sid, sname = rx_sender_find(c, ws, ei_det, nid)
+        sid = sid or (label_id(c, ws, "sender", sname[:120]) if sname else None)
+        if sid:
+            apply_values(c, m, node, {"sender": sid}, {})
+            imported["sender"] = sid         # fixed: the classifier does not override it
+            auto_all["sender"] = "e-invoice"
     cur = current(c, m, node)
     fixed = {f for f in ("sender", "type", "tags") if cur[f]} | set(imported)  # a value set by hand / imported stays
     if cur["folder"]:
@@ -866,7 +889,7 @@ def process(c, nid):
     sug = {**sug, **agent_sug}
     apply_values(c, m, node, newv, auto)
     auto_all.update({f: (next(iter(a.values()), "rule") if isinstance(a, dict) else a) for f, a in auto.items()})
-    if not given.get("text") and doc_guesses(c, m, ws, newv.get("type") or cur["type"], text):  # 2.98.0 D (#2178)
+    if not given.get("text") and not ei and doc_guesses(c, m, ws, newv.get("type") or cur["type"], text):  # 2.98.0 D (#2178)
         ex = EX.extract(text, details=True)  # 2.121.0 A (#2092): + supplier, VAT, net / gross, invoice number (a suggestion)
         vals["due_date"] = given.get("due") or ex["due"]
         vals["amount"] = str(given.get("amount") or ex["amount"] or vals["amount"] or "")
@@ -886,6 +909,10 @@ def process(c, nid):
                json.dumps(auto_all, separators=(",", ":")), _jseal(c, ws, "doc_meta.suggest", sug) if sug else "", review, node["cur_version"],
                _now(), _now(), nid))
     from ..receipts.extracted import rx_compact
-    meta_set_json(c, nid, ws, "extracted", rx_compact(ex.get("details")))  # 2.121.0 A (#2092): a fresh run, a fresh suggestion
+    if ei:                                   # 2.146.0 A (#2451): the e-invoice's values + the invoice for its readable view
+        from ..office.einvoice_in import ei_compact
+        meta_set_json(c, nid, ws, "extracted", {**rx_compact(ei_det), "_einv": ei_compact(ei)})
+    else:
+        meta_set_json(c, nid, ws, "extracted", rx_compact(ex.get("details")))  # 2.121.0 A (#2092): a fresh run, a fresh suggestion
     doc_index(c, nid, ws, index_text(c, dict(meta_row(c, nid)), node["name"], text))
     return state
