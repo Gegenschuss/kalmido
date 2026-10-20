@@ -491,6 +491,33 @@ e-mail* (the server's mailbox, see SELF-HOSTING.md "Mail"); without it the addre
 - **Search**: subject, sender and text (a hashed word index, no plain index).
 - **Agents** have no access to filed mails in 2.84 (no API route, no MCP tool).
 
+### The mailbox of a workspace, replies and new mails (2.141)
+
+Since 2.141 a workspace can bring its **own mailbox** and Kalmido can **send** from the filing (plain text, no attachments).
+
+- **Set up**: Office > Clients > *E-mail filing* > *Mailbox* (an organisation: its admins; the private space: the person
+  themselves, also a person without any organisation). Receiving = IMAP (server, port, SSL, user, password, folder),
+  sending = SMTP (server, port, STARTTLS / SSL / none, user, password, sender address and name); either one alone is fine.
+  *Save and check* logs in to both (nothing is sent) and says what failed - never with the server's own words. The
+  passwords are stored encrypted with the server key and never shown again: an empty field keeps them, another server or
+  port needs them again. A server in the local network needs the admin's *Allowed internal hosts* (Settings >
+  Administration > Advanced, the same list as calendar subscriptions and webhooks).
+- **Receiving**: the mailbox is fetched with the server's mail round (`KALMIDO_IMAP_INTERVAL`, *Fetch now* in the dialog);
+  each mail is marked as read and goes to the e-mail filing of **this workspace only**: a client's / project's address of
+  the same workspace files there, an answer to a filed mail (In-Reply-To / References) joins that mail's client or project,
+  else the sender is matched like at the filing address; the rest waits under *Not assigned* with the person who set the
+  mailbox up (an organisation: while they are its admin, else its first admin). A workspace mailbox feeds only the filing
+  (no tasks by mail, no documents). The server's own mailbox (`KALMIDO_IMAP_*`) works as before.
+- **Reply / New e-mail**: *Reply* in the reading view of a mail (to its sender, "Re: ...", the quote, In-Reply-To /
+  References), *New e-mail* in the e-mails of a client or project (the client's and its contact persons' addresses are
+  suggested). Who may change the mail / see the client / change the project may write. The mail goes out through the SMTP of
+  the workspace; without one through the server's (`KALMIDO_SMTP_*`: the server's sender address, Reply-To = the person's
+  own address, the server's daily e-mail limit), without both the dialog says how to set it up. At most 30 mails per person
+  and hour, 20 recipients per mail.
+- **Filed as sent**: the mail is filed before it goes out (with the same client / project, the `.eml` in the file store) and
+  shows "Sent" in the list; when the SMTP fails it stays as "Not sent" with the reason (and the text stays in the dialog).
+- **Agents and kid accounts** cannot send (no API route, no MCP tool in 2.141).
+
 ## Travel expenses: taking over a per diem spreadsheet (2.95)
 
 Office -> Money -> Travel expenses -> **Take over from Excel** (shown while the trip list is empty and in the
