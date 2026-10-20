@@ -294,6 +294,7 @@ USt-IdNr. DE123456789
 BAKE = """Bäckerei Musterkorn
 Brotgasse 2
 12345 Musterstadt
+Kassenbon
 05.10.2026  08:12
 2x Brötchen   1,20
 1x Kaffee     2,50
@@ -320,7 +321,9 @@ check((d2.get("extracted") or {}).get("invoice_no") == "RE-2026-118", "the recog
 check(dbx("SELECT dup_of, dup_ok FROM doc_meta WHERE node_id=?", (T2,))[0] == (T1, 0), "stored: dup_of, dup_ok 0")
 B1 = txt(Fr, "baecker-1.txt", BAKE)
 B2 = txt(Fr, "baecker-2.txt", BAKE.replace("2x Brötchen   1,20\n1x Kaffee     2,50", "1x Kaffee     2,50\n2x Brötchen   1,20"))
-check(doc(Fr, B2).get("duplicate_of", {}).get("id") == B1, f"same supplier + amount + date: duplicate {doc(Fr, B2).get('duplicate_of')}")
+db2 = doc(Fr, B2)
+check((db2.get("duplicate_of") or {}).get("id") == B1, f"same supplier + amount + date: duplicate {db2.get('duplicate_of')} "
+      f"({db2.get('amount')} {db2.get('date')} {(db2.get('extracted') or {}).get('supplier')})")
 B3 = txt(Fr, "kiosk.txt", BAKE.replace("Bäckerei Musterkorn", "Kiosk Beispielecke").replace("Brotgasse 2", "Eckweg 1"))
 check("duplicate_of" not in doc(Fr, B3), "another supplier with the same amount and date: no duplicate")
 # rights
@@ -359,7 +362,8 @@ h = hints(P).get("dups") or {}
 check(h.get("count") == 2 and sorted(h.get("ids") or []) == sorted([T2, B2]) and "not exported" in h.get("text", ""), f"the hint names them {h}")
 bel = batch(P + "&dups=1")
 check({f"B{T1}", f"B{T2}", f"B{B2}"} <= bel, f"?dups=1: exported too {sorted(bel)}")
-check("are exported" in (hints(P + "&dups=1").get("dups") or {}).get("text", ""), "the hint says they are in")
+t = (hints(P + "&dups=1").get("dups") or {}).get("text", "")
+check("exported" in t and "not exported" not in t, f"the hint says they are in {t!r}")
 
 # "no duplicate" -> gone, also after a new recognition run; "dup" brings it back
 r = Fr.post(B + f"/api/docs/{T2}/extracted", json={"do": "nodup"})

@@ -45,19 +45,23 @@ def _norm_no(v):
     return re.sub(r"[\s\-/._#:]+", "", str(v or "")).casefold()
 
 
-def _amount(c, m):
-    try:
-        v = Decimal(str(S.doc_open(c, m["ws"], "doc_meta.amount", m["amount"]) or "").replace(",", "."))
-    except (InvalidOperation, ValueError):
-        return None
-    return v if v != 0 else None
+def _amount(c, m, det):
+    """The document's amount, else the recognised gross (a till receipt's amount is only set for an invoice type)."""
+    for raw in (S.doc_open(c, m["ws"], "doc_meta.amount", m["amount"]), det.get("gross")):
+        try:
+            v = Decimal(str(raw or "").replace(",", "."))
+        except (InvalidOperation, ValueError):
+            continue
+        if v != 0:
+            return v
+    return None
 
 
 def _key(c, m):
     from ..receipts.extracted import _rx_norm
     det = S.meta_json(c, m, "extracted", {})
     return {"sender": m["sender_id"], "sup": _rx_norm(det.get("supplier")), "vat_id": str(det.get("vat_id") or "").upper(),
-            "no": _norm_no(det.get("invoice_no")), "amount": _amount(c, m), "date": m["doc_date"] or ""}
+            "no": _norm_no(det.get("invoice_no")), "amount": _amount(c, m, det), "date": m["doc_date"] or ""}
 
 
 def _same_supplier(a, b):
