@@ -62,7 +62,7 @@ const call = async (method, url, body, ck) => { const r = await fetch(B + url.re
     await ev(`(() => { document.querySelector('#os-scheme').dispatchEvent(new FocusEvent('focusout', {bubbles: true})); return 1; })()`);  // 2.113.0 (#2247): a field saves itself when left
     await ev(`(() => { const f = document.querySelector('#ofc-set'); if (f.requestSubmit) f.requestSubmit(); else f.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true})); return 1; })()`);
     let s; for (let i = 0; i < 30; i++) { s = (await call('GET', '/api/office/settings', null, ck)).settings || {}; if (s.offer_counter === 'client') break; await sleep(300); }
-    check(s.offer_counter === 'client' && s.offer_scheme === KV + '-V{version}', tag + 'saved: per client + the scheme ' + JSON.stringify({c: s.offer_counter, sc: s.offer_scheme}));
+    check(s.offer_counter === 'client' && s.offer_scheme === KV + '-V{version}', tag + 'saved: per client + the scheme ' + JSON.stringify({c: s.offer_counter, sc: s.offer_scheme}) + ' ' + await ev(`[...document.querySelectorAll('#ofc-set .ostok')].map(x => x.className + ': ' + x.textContent).join(' | ')`));
   }, width < 500);
 
   await run('fiona', FCK, 1000);
