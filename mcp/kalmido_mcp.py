@@ -926,7 +926,8 @@ _SH_ROWS = {"type": "array", "items": {"type": "array"}, "description": "Rows of
                                                                       "kunde.<name>.<field>, hier.<field>; arguments with ;)"}
 TOOLS += [
     ("sheets_list", "2.89.0 (scope sheets:read): the tables you may read (id, title, space, attached list). space private | org:<id> | all, "
-                    "or list_id = the tables attached to that project / list.",
+                    "or list_id = the tables attached to that project / list. 2.124.0: a table a person shared with you one by one "
+                    "is in it too (shared_in: true, share_role read | write); space shared = only those.",
      _obj({"space": {"type": "string"}, "list_id": S_ID}), lambda api, a: api.call("GET", "/sheets", _pick(a, ("space", "list_id")))),
     ("sheet_read", "2.89.0 (scope sheets:read): one table: columns (id, letter, title, kind, options), rows, cells (addr, raw input with "
                    "names, value, display, error). Values are calculated with YOUR visibility: a project / list / client not shared with "

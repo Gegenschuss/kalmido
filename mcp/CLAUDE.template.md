@@ -396,8 +396,8 @@ there / error), ticks rows and takes them over. The answer comes as the event `j
 With `sheets:read` / `sheets:write` (off until a person turns them on) you read and fill tables: `sheets_list`, `sheet_read`,
 `sheet_vars` (what formulas may use, with the current value), `sheet_create` (title, space, list_id?, columns with choices and
 colours, rows with inputs and formulas - all in ONE call), `sheet_update`, `sheet_set_cells` (`[{cell: "B4", raw}]`),
-`sheet_append_rows`, `sheet_add_column`, `sheet_undo_batch`. You see only tables attached to a list shared with you and those
-you created. Every write call is one batch the person can take back; a cell with error `denied` is a source not shared with
+`sheet_append_rows`, `sheet_add_column`, `sheet_undo_batch`. You see only tables attached to a list shared with you, those
+you created and tables a person shared with you one by one (`shared_in`, role `read` = never write them). Every write call is one batch the person can take back; a cell with error `denied` is a source not shared with
 you: never guess its value. Formulas: `=SUMME(B2:B9)`, `=stunden*satz`, `=projekt.<name>.zeit_gesamt` (arguments with `;`).
 
 ### Video sign-offs (2.99.1)

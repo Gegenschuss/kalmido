@@ -1314,7 +1314,9 @@ New scopes `sheets:read` and `sheets:write` (off for new agents, not part of the
 the module *Tables* switched on to write). Routes: `GET /api/v1/sheets` (`?space=private|org:<id>|all`, `?list_id=`),
 `POST /api/v1/sheets` (a whole table in one call), `GET` / `PATCH /api/v1/sheets/{id}`, `PUT /api/v1/sheets/{id}/cells`,
 `POST /api/v1/sheets/{id}/rows`, `POST /api/v1/sheets/{id}/columns`, `GET /api/v1/sheets/{id}/vars`,
-`POST /api/v1/sheets/{id}/batches/{batch}/undo`. Formulas are stored with ids and shown with the current names; every
+`POST /api/v1/sheets/{id}/batches/{batch}/undo`. 2.124.0: a person shares one table with single people / agents
+(`GET|POST /api/sheets/{id}/shares`, `PATCH|DELETE /api/sheets/{id}/shares/{share}`, session only, role `read` | `write`);
+the list then holds it with `shared_in: true` and `share_role`, `?space=shared` lists only such tables. Formulas are stored with ids and shown with the current names; every
 value is calculated with the token's visibility (`error: "denied"` for a source it does not see). An agent's write call is
 one batch (`batch` in the answer) a person can take back. The app also exports a table as CSV / .xlsx and imports both
 (`GET /api/sheets/{id}/export.csv|xlsx`, `POST /api/sheets/import`, session only).

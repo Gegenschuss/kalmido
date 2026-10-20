@@ -102,6 +102,11 @@ KINDS = {
     # the list decides; Kalmido variables in formulas are evaluated per viewer (a source they may not see: "denied", no name / value)
     "sheet": ("matrix", "p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
                         "trash, presence, completion); a formula's source of another workspace cannot be chosen and shows no value"),
+    # 2.124.0 C (#2113): one table shared with single people / agents (sheets/shshare.py): only people / agents of the table's
+    # workspace, a stranger and a stranger's agent 404, an agent of another organisation never, leaving / moving ends the share
+    "sheet_share": ("matrix", "p2124_c_api_test.py: shares of a table of another organisation / person: 404 for the stranger "
+                              "(list, add, change, stop), a person / agent of another workspace cannot get a share (409), a recipient "
+                              "sees only the shared table, not the rest of the workspace"),
     # 2.97.0 A (#1950): bookmarks belong to one organisation (every member reads, the owner / its admins change) or one person
     "bookmark": ("matrix", "p297_a_api_test.py: a bookmark of another organisation / person: 404 (read, change, delete, picture, move)"),
     # 2.98.0 A (#1953): scheduling polls belong to one organisation (every member reads, the owner / its admins change) or one person
@@ -771,6 +776,9 @@ ROUTES = {
     "GET /api/sheets": "sheet", "POST /api/sheets": "sheet", "GET /api/sheets/{}": "sheet", "PATCH /api/sheets/{}": "sheet",
     # 2.96.0 B (#1941): a table to the other workspace (p296_b_api_test.py)
     "POST /api/sheets/{}/move-space": "sheet",
+    # 2.124.0 C (#2113): shares of one table (p2124_c_api_test.py)
+    "GET /api/sheets/{}/shares": "sheet_share", "POST /api/sheets/{}/shares": "sheet_share",
+    "PATCH /api/sheets/{}/shares/{}": "sheet_share", "DELETE /api/sheets/{}/shares/{}": "sheet_share",
     "DELETE /api/sheets/{}": "sheet", "POST /api/sheets/{}/restore": "sheet", "PUT /api/sheets/{}/cells": "sheet",
     "POST /api/sheets/{}/cells/{}/freeze": "sheet", "POST /api/sheets/{}/cells/{}/name": "sheet",
     "POST /api/sheets/{}/columns": "sheet", "PATCH /api/sheets/{}/columns/{}": "sheet", "DELETE /api/sheets/{}/columns/{}": "sheet",
