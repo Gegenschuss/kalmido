@@ -466,6 +466,24 @@ the conversation opens them; deleting the message deletes its files for good. En
 Agents take part in a channel only when a person adds them: your own agents, and as an admin of the organisation its
 shared agents. They never join groups.
 
+## Threads and "Read by" in the team chat (2.139.0)
+
+**Threads** keep a side topic out of the main conversation: *Reply in thread* in the menu of a message (the three dots)
+opens the thread next to the conversation (on a phone full screen, *Back* returns). Answers there stay out of the main
+conversation; under the first message a slim line shows how many answers there are, when the last came and who wrote
+them, with a dot while some are unread. Editing, deleting, reactions, pinning, quoting a message and *Save as task* work in
+a thread as everywhere; a search hit or a pin of a thread answer opens its thread. A deleted first message keeps its
+thread ("Message deleted" stays above the line).
+
+The unread count of a conversation counts the main conversation and the threads you take part in: you wrote the first
+message, answered or were @mentioned. Only those people are notified of a new answer (the conversation's *Mute* and the
+notification settings still apply); everyone else sees the thread line without a push.
+
+**Read by**: under your own latest message that someone has read a small grey line says *Read* (a direct message) or
+*Read by 3* with small pictures (groups, channels, the chat of a list); a tap lists who read it and who did not yet. There
+are no ticks at every message. *Settings > Chat > Send read receipts* switches it off: then nobody sees when you read,
+and you see nobody's read state either.
+
 ## The customer portal (2.63.0)
 
 A form with **status link** turns every report sent without an account into a customer report: the reporter gets a link to

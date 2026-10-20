@@ -429,6 +429,21 @@ reopens a task that was closed by mistake.
 fields `file` (the body may then be empty; the same size and type limits as task attachments). An end-to-end encrypted
 conversation refuses files (`409`). Deleting a message removes its files for good.
 
+2.139.0 (#2127): **threads**. `POST /team/rooms/{id}/messages` takes `thread_of` (a message of the same conversation; the id
+of an answer names its thread; deleted or another conversation: `400`): the message answers in that thread, one level deep.
+`GET /team/rooms/{id}/messages` lists the main conversation without thread answers; every message carries `thread_of`,
+`thread_count`, `thread_last_at`, `thread_users` (who answered last, up to 3), `thread_unread` and `thread_follow` (you take
+part: you wrote the first message, answered or were mentioned). `?thread=<message id>` returns the answers of that thread
+with `root` (its first message) and `thread_read`; `POST /team/rooms/{id}/read` `{thread, last_id?}` sets your read mark in a
+thread. The unread count of a conversation counts the main conversation and the threads you take part in; an answer in a
+thread notifies only the people taking part (and the mentioned ones). In end-to-end encrypted conversations threads work
+the same (the id is plain metadata, the text stays encrypted).
+
+2.139.0 (#2129): **read receipts**. Your own messages carry `read_by` `{count, users}` (the first 20 member ids that read up
+to there; in a thread: in that thread) and the conversation `read_ok` (the members that send read receipts). A person
+who switched off *Send read receipts* (setting `chat_read_receipts` = `"0"`) shows up nowhere and gets no `read_by` either
+(`read_ok` null). Agents count as readers when they mark a conversation read.
+
 ## Family (2.19.0)
 
 The module *Family* (the app shows it while the person has it on; the API always works). Birthdays, anniversaries and

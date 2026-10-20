@@ -821,17 +821,17 @@ function addCommentFiles(files) {
 function mentionState(ta) {
   const pick = ta.parentElement.querySelector('.mpick'); if (!pick) return null;
   const pre = ta.value.slice(0, ta.selectionStart), m = pre.match(/(?:^|\s)@([^\s@<>]{0,30}(?: [^\s@<>]{0,30})?)$/u);
-  const people = (ta.id === 'tc-in' || ta.classList.contains('tc-edit') ? (S.tc.room?.members || []).map(m => ({id: m.id, user_id: m.id, name: m.name})) : (S.tl.people || [])).filter(p => !S.me || p.id !== S.me.id);  // 2.17.0: the team chat's members
+  const people = (ta.id === 'tc-in' || ta.id === 'tth-in' || ta.classList.contains('tc-edit') ? (S.tc.room?.members || []).map(m => ({id: m.id, user_id: m.id, name: m.name})) : (S.tl.people || [])).filter(p => !S.me || p.id !== S.me.id);  // 2.17.0: the team chat's members
   if (!m || !people.length) return {pick, items: []};
   const q = m[1].toLowerCase();
   // 2.26.0 (#928): agents only where the list owner opened them to members (else the server ignores the mention)
-  const tc = ta.id === 'tc-in' || ta.classList.contains('tc-edit'), ll = listById(tc ? S.tc.room?.list_id : taskById(S.sel)?.list_id);
+  const tc = ta.id === 'tc-in' || ta.id === 'tth-in' || ta.classList.contains('tc-edit'), ll = listById(tc ? S.tc.room?.list_id : taskById(S.sel)?.list_id);
   const agOk = !ll || ll.agents_open !== false;
   const items = people.filter(p => agOk || !(p.agent || agentById(p.user_id ?? p.id))).filter(p => { const n = p.name.toLowerCase(); return n.startsWith(q) || n.split(/\s+/).some(w => w.startsWith(q)); }).slice(0, 6);
   return {pick, items, start: pre.length - m[1].length - 1};
 }
 function mentionUpdate(ta) {
-  if (ta.id !== 'tc-in' && !ta.classList.contains('tc-edit') && !cmSocial(taskById(S.sel))) { if (S.mp) mentionClose(); return; }  // #315: nobody to mention in a private list
+  if (ta.id !== 'tc-in' && ta.id !== 'tth-in' && !ta.classList.contains('tc-edit') && !cmSocial(taskById(S.sel))) { if (S.mp) mentionClose(); return; }  // #315: nobody to mention in a private list
   const st = mentionState(ta); if (!st) return;
   S.mp = st.items.length ? {ta, ...st, i: 0} : null;
   st.pick.classList.toggle('hidden', !st.items.length);
@@ -859,7 +859,7 @@ function mentionPick(i) {
 function mentionClose() { if (S.mp) { S.mp.pick.classList.add('hidden'); mentionAria(S.mp.ta, ''); S.mp = null; } }
 document.addEventListener('keydown', e => {
   const t = e.target;
-  if (!(t.id === 'c-input' || t.classList?.contains('c-edit-input') || t.id === 'tc-in' || t.classList?.contains('tc-edit'))) return;
+  if (!(t.id === 'c-input' || t.classList?.contains('c-edit-input') || t.id === 'tc-in' || t.id === 'tth-in' || t.classList?.contains('tc-edit'))) return;
   if (S.mp && S.mp.ta === t) {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault(); S.mp.i = (S.mp.i + (e.key === 'ArrowDown' ? 1 : -1) + S.mp.items.length) % S.mp.items.length;
@@ -907,8 +907,11 @@ async function msgJump(o = {}) {
     const rid = +o.chat; if (!rid || !teamOn()) return msgMissing();
     if (S.route.mod !== 'team' || S.tc.rid !== rid) go('team/' + rid);
     if (!await msgWait(() => S.tc.rid === rid && S.tc.room)) return msgMissing();
+    if (typeof tth_jump === 'function' && S.tc.th && tth_all().some(m => m.id === id)) return tth_jump(rid, id, sel);  // 2.139.0 A (#2127): in the open thread
     for (let n = 0; n < 60 && !S.tc.msgs.some(m => m.id === id) && S.tc.more && S.tc.msgs.length && S.tc.msgs[0].id > id; n++) { await loadRoom(rid, true); if (S.tc.rid !== rid) return false; }
+    if (!S.tc.msgs.some(m => m.id === id) && typeof tth_jump === 'function') return tth_jump(rid, id, sel);  // 2.139.0 A (#2127): an answer in a thread
     if (!S.tc.msgs.some(m => m.id === id && !m.deleted)) return msgMissing();
+    if (typeof tth_close === 'function' && S.tc.th && !tth_wide()) tth_close();  // 2.139.0 A (#2127): a full-screen thread makes way
     tcPatch(); S.tc.fitUntil = 0;
     return msgHit(await msgWait(() => $('#tc-msgs ' + sel), 3000)) || msgMissing();
   }
@@ -930,12 +933,15 @@ window.msgJump = msgJump;
 // (a tap jumps to the original, msgJump), a deleted original says "Message deleted". State per place:
 // S.reply['c:<task>' | 't:<room>' | 'a:<agent>'] = {id, name, text}.
 S.reply = {};
-const replyCtx = art => art === 'c' ? (S.sel ? 'c:' + S.sel : null) : art === 't' ? (S.tc?.rid ? 't:' + S.tc.rid : null) : art === 'a' ? (S.chat?.aid ? 'a:' + S.chat.aid : null) : null;
-const replyIn = art => $(art === 'c' ? '#detail #c-input' : art === 't' ? '#tc-in' : '#chat-in');
+// 2.139.0 A (#2127): art 'h' = a team chat thread (chat.js tth_*): place 'h:<first message>', its own box #tth-in
+const replyCtx = art => art === 'c' ? (S.sel ? 'c:' + S.sel : null) : art === 't' ? (S.tc?.rid ? 't:' + S.tc.rid : null) : art === 'a' ? (S.chat?.aid ? 'a:' + S.chat.aid : null) : art === 'h' ? (S.tc?.th ? 'h:' + S.tc.th.id : null) : null;
+const replyIn = art => $(art === 'c' ? '#detail #c-input' : art === 't' ? '#tc-in' : art === 'h' ? '#tth-in' : '#chat-in');
+// a message element's art for replying: a team chat message inside the thread view answers in the thread
+const replyArt = (el, art) => art === 't' && el?.closest?.('.tthview') ? 'h' : art;
 function replyMsg(art, id) {
-  const m = art === 'c' ? (S.tl.comments || []).find(x => x.id === id) : art === 't' ? (S.tc.msgs || []).find(x => x.id === id) : (S.chat.msgs || []).find(x => x.id === id);
+  const m = art === 'c' ? (S.tl.comments || []).find(x => x.id === id) : art === 't' ? (S.tc.msgs || []).find(x => x.id === id) : art === 'h' ? (typeof tth_all === 'function' ? tth_all() : []).find(x => x.id === id) : (S.chat.msgs || []).find(x => x.id === id);
   if (!m || m.deleted) return null;
-  const U = art === 'c' ? S.tl.users : art === 't' ? S.tc.users : {};
+  const U = art === 'c' ? S.tl.users : art === 't' || art === 'h' ? S.tc.users : {};
   const name = art === 'a' ? (m.from === 'agent' ? agentById(S.chat.aid)?.name || '' : tr('You')) : m.user_id === S.me?.id ? tr('You') : uname(m.user_id, U);
   let text = mdBrief(decodeMentions(m.body || '', U));
   if (!text) text = (m.attachments || [])[0]?.name || '';
@@ -981,12 +987,12 @@ document.addEventListener('click', e => {
     return;
   }
   const host = a.closest('[data-mid]'), [art, id] = String(host?.dataset.mid || '').split(':');
-  if (art && +id) replyStart(art, +id);
+  if (art && +id) replyStart(replyArt(host, art), +id);
 });
 // Escape in a box with an open reply: first the reply goes (window capture: before the boxes' own Escape)
 window.addEventListener('keydown', e => {
   if (e.key !== 'Escape' || e.isComposing) return;
-  const t = e.target, art = t.id === 'c-input' ? 'c' : t.id === 'tc-in' ? 't' : t.id === 'chat-in' ? 'a' : null;
+  const t = e.target, art = t.id === 'c-input' ? 'c' : t.id === 'tc-in' ? 't' : t.id === 'tth-in' ? 'h' : t.id === 'chat-in' ? 'a' : null;
   if (art && !S.mp && replyCancel(replyCtx(art), false)) { e.preventDefault(); e.stopImmediatePropagation(); }
 }, true);
 // phones: swipe right on a message
@@ -1020,18 +1026,18 @@ function rswRowAt(e) {
     const m = st.m, go = !cancel && st.dx >= RSW_MIN;
     m.style.transition = reducedMotion() ? 'none' : 'transform .16s ease-out'; m.style.transform = '';
     setTimeout(() => { m.style.transition = ''; m.classList.remove('rsw'); m.querySelector(':scope > .rswarr')?.remove(); }, 180);
-    if (go) { const [art, id] = String(m.dataset.mid).split(':'); replyStart(art, +id); }
+    if (go) { const [art, id] = String(m.dataset.mid).split(':'); replyStart(replyArt(m, art), +id); }
   };
   document.addEventListener('touchstart', e => {
     if (sw) swEnd(true);
     if (e.touches?.length !== 1) return;
     // 2.34.0 (#1091): the whole row of a message counts (a short message has a narrow bubble): a touch beside it in the
     // messages box takes the message at that height
-    const m = e.target.closest?.('#detail .cm[data-mid], #tc-msgs .cmsg[data-mid], #chat-msgs .cmsg[data-mid]') || rswRowAt(e);
+    const m = e.target.closest?.('#detail .cm[data-mid], #tc-msgs .cmsg[data-mid], .tthview .cmsg[data-mid], #chat-msgs .cmsg[data-mid]') || rswRowAt(e);
     if (!m || m.querySelector('.cedit, .tcedit') || e.target.closest('textarea, input, pre, table, .rxrow, .catts, .chatts, .cchoices, .cperm, [contenteditable="true"]')) return;
     const t = e.touches[0]; if (t.clientX < RSW_EDGE || t.clientX > innerWidth - RSW_EDGE) return;
     const sel = getSelection?.(); if (sel && !sel.isCollapsed && String(sel).trim()) return;
-    const [art, id] = String(m.dataset.mid).split(':'); if (!replyCtx(art) || !replyMsg(art, +id)) return;
+    const [art0, id] = String(m.dataset.mid).split(':'), art = replyArt(m, art0); if (!replyCtx(art) || !replyMsg(art, +id)) return;
     sw = {m, x: t.clientX, y: t.clientY, dx: 0, lock: false};
     document.addEventListener('touchmove', swMove, {passive: false});
   }, {passive: true});

@@ -164,6 +164,8 @@
 - **Channels and files (2.138.1)**: people can also add you to a channel they opened (`list_team_channels`; you
   leave with `leave_team_channel`). Messages carry `attachments`; read a file with `get_attachment` (`source: team`),
   send files with `post_team_message` `files`. You cannot open channels or group conversations yourself.
+- **Threads (2.139.0)**: a `team_message` with `message.thread_of` was written in a thread: read it with
+  `read_team_chat` `thread` and answer in that thread (`post_team_message` `thread_of`), not in the main conversation.
 - **Lists where you listen in (2.46.1)**: there you get every channel message of a person as `team_message`
   (`mentioned: false`), never the messages of agents. Answer questions and requests about the list that you can help
   with; let the rest pass without a post.
