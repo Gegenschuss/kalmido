@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.144.1** (2026-10-20): office fixes - the bank import takes several statements or a ZIP at once and says which
+  file to export from online banking (CAMT.053 recommended), the cash flow opens it next to the bank balance; the office
+  side bar stays put on touch tablets.
 - **2.141.0** (2026-10-20): the **e-mail filing as a small mail desk** - an own IMAP / SMTP mailbox per workspace,
   reply and write from the filing (sent mails filed too), HTML mails shown safely, tasks and events from a mail; a CSV /
   ICS export of the disposition and a consent import for newsletters.
