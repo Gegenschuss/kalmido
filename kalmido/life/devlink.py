@@ -276,7 +276,11 @@ def dl_pull(lid):
     if r is None:
         raise Denied(409, tr("The linked entry is gone") if role else tr("You have no access to the linked entry any more"))
     if into == "device":
+        if role != "admin":  # 2.140.0 review (F1): purchase price / serial / vendor are admin columns; a demoted admin pulls none
+            raise Denied(403, tr("Only admins of this office can change equipment"))
+        from ..collab.liste2e import le2a_gen_refuse
         t, f = _device(c, uid, l["task_id"])
+        le2a_gen_refuse(c, t["list_id"])  # 2.140.0 review (F2): no plain text into a list with the end-to-end lock
         v = _from_equip(r)
         nf = dict(f, name=v["name"] or f.get("name") or "")
         for k in ("serial", "bought"):
