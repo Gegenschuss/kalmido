@@ -90,6 +90,35 @@ def v1_agent_status():
     return jsonify(agent_self(c, aid))
 
 
+@app.post("/api/v1/agent/aborted")
+@v1_view
+def v1_agent_aborted():
+    """2.144.0 A (#2412): the agent confirms an 'abort' event {seq?, job_id?}: without job_id its status goes back to idle
+    and its live steps end (the Stop button in the chat goes away); with job_id (only that job's step was stopped) the
+    status stays. What was done until then the agent says in the chat in its own words."""
+    v1_args(())
+    aid = need_agent()
+    b = v1_json()
+    unknown = sorted(k for k in b if k not in ("seq", "job_id"))
+    if unknown:
+        raise UnknownFields(unknown)
+    for k in ("seq", "job_id"):
+        if b.get(k) is not None and (isinstance(b[k], bool) or not isinstance(b[k], int)):
+            raise BadInput(tr("Invalid value: {0}", k))
+    c = db()
+    jid = b.get("job_id")
+    if jid is not None and not c.execute("SELECT 1 FROM agent_jobs WHERE id=? AND agent_id=?", (jid, aid)).fetchone():
+        raise BadInput(tr("Invalid value: {0}", "job_id"))
+    if jid is None:
+        from ..agents.steps import steps_end
+        c.execute("UPDATE agents SET status='idle', status_text='', status_at=?, status_task=NULL, typing_until=0 WHERE user_id=?",
+                  (iso(now_utc()), aid))  # the typing dots end too
+        steps_end(c, aid)
+    bump(c)
+    c.commit()
+    return jsonify(agent_self(c, aid))
+
+
 _AGENT_POLLED = {}  # agent id -> monotonic time of the last written poll (2.4.1: at most every AGENT_POLL_WRITE_S)
 
 

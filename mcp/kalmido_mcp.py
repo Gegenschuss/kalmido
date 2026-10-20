@@ -710,6 +710,12 @@ TOOLS = [
                    "person's conversation, then the answer also carries its pinned messages (pins).",
      _obj({"since": {"type": "integer", "minimum": 0}, "user_id": S_ID}),
      lambda api, a: api.call("GET", "/agent/chats", _pick(a, ("since", "user_id")))),
+    ("confirm_abort", "2.144.0: the person pressed Stop in the chat (event abort {user, job_id?}): end the answer you are working on "
+                      "right away, then confirm with this tool -- without job_id your status goes back to idle and the typing dots end; "
+                      "with job_id only that job's current step was stopped (the job stays, your status too). Then say in one or two "
+                      "lines in the chat what was done until then (send_chat).",
+     _obj({"seq": {"type": "integer", "minimum": 0}, "job_id": S_ID}),
+     lambda api, a: api.call("POST", "/agent/aborted", body=_pick(a, ("seq", "job_id")))),
     ("chat_typing", "Show typing dots in one person's chat for 10 seconds while you write an answer (call again to keep them; "
                     "send_chat ends them).",
      _obj({"chat_user_id": S_ID}, ["chat_user_id"]), lambda api, a: api.call("POST", "/agent/typing", body=_pick(a, ("chat_user_id",)))),
