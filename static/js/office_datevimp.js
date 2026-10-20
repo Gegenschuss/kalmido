@@ -62,7 +62,7 @@ function dimp_dialog() {
     if (typeof ofcDraw === 'function') ofcDraw();
     toast(dimp_doneText(j), async () => { await api('POST', `/api/office/datev/import/${j.run_id}/undo`); DIMP.sup = null; DIMP.ob = {}; dimp_supLoad(); if (typeof ofcDraw === 'function') ofcDraw(); }, 12000);
   });
-  const ok = $('[data-m="ok"]', md); if (ok) ok.disabled = true;
+  const ok = /** @type {any} */ ($('[data-m="ok"]', /** @type {any} */ (md))); if (ok) ok.disabled = true;
   return md;
 }
 function dimp_doneText(j) {
