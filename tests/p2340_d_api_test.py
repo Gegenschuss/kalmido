@@ -206,7 +206,7 @@ check("read_attachment" in names, "#368: MCP lists read_attachment")
 res = rpc("tools/call", {"name": "read_attachment", "arguments": {"attachment_id": F_PDF}})["result"]
 check(res["isError"] is False and "12000 EUR" in res["structuredContent"]["text"], "#368: MCP read_attachment gives the PDF text")
 res = rpc("tools/call", {"name": "read_attachment", "arguments": {"attachment_id": F_PNG}})["result"]
-check(res["isError"] is False and res["content"][-1]["type"] == "image" and res["content"][-1]["mimeType"] == "image/png", "#368: MCP returns an image as image item")
+check(res["isError"] is False and res["content"][1]["type"] == "image" and res["content"][1]["mimeType"] == "image/png", "#368: MCP returns an image as image item")  # 2.126.0 (#1978): the data note comes last
 res = rpc("tools/call", {"name": "read_attachment", "arguments": {"attachment_id": F_PRIV}})["result"]
 check(res["isError"] is True, "#368: MCP: a file of a list not shared -> error")
 p.stdin.close()

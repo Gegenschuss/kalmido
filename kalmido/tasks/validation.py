@@ -585,6 +585,8 @@ def check_parent(c, tid, parent):
         return tr("unknown")
     if tid is not None and (parent == tid or parent in descendants(c, tid) or tid in ancestors(c, parent)):
         return tr("A task cannot be nested under itself")
+    if (c.execute("SELECT deleted_at FROM tasks WHERE id=?", (parent,)).fetchone() or [None])[0]:
+        return tr("The parent task is in the trash")  # 2.126.0 D (#1992 A4): a live subtask would go when the trash is emptied
     # 2.18.0 (#430): milestones are top-level tasks without subtasks
     if (c.execute("SELECT ms FROM tasks WHERE id=?", (parent,)).fetchone() or [0])[0]:
         return tr("A milestone cannot have subtasks")

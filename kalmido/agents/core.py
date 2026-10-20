@@ -207,10 +207,10 @@ def agent_emit(c, aid, event, data, actor="auto"):
             if not agent_usable(c, aid, actor["id"], lid):
                 return None
     if lid and isinstance(lid, int) and "playbook" not in data:  # 2.39.0 (#1168): the list's effective Playbook comes along
-        from ..lists.playbook import pb_event
+        from ..lists.playbook import pb_event, pb_for_agent
         pb = pb_event(c, lid)
         if pb:
-            data = {**data, "playbook": pb}
+            data = {**data, "playbook": pb_for_agent(c, pb, aid)}  # 2.126.0 B (#1978): with its authors
     ev, ts = str(uuid.uuid4()), iso(now_utc())
     via = (act_via() or "web") if has_request_context() else "web"
     seq = insert_id(c, "INSERT INTO agent_events(agent_id,uuid,event,payload,created_at) VALUES(?,?,?,'{}',?)", (aid, ev, event, ts))
@@ -582,6 +582,8 @@ def agent_added_events(c, tid, from_lid=None, source=None, info=None):
             extra["moved_from"] = {"id": from_lid, "name": lst_brief(c, from_lid)["name"]}
         if source:
             extra["source"] = source
+            if source in ("mail", "form", "errors"):  # 2.126.0 B (#1978): text from outside Kalmido
+                extra.update(origin=source, untrusted=True)
         extra.update(info or {})  # 2.63.0 (#1513): a form's report: portal, ttype
         agent_emit(c, aid, "task_added", agent_task_data(c, tid, aid, **extra))
 
@@ -769,11 +771,16 @@ def agent_typing_to(a, uid):
 
 
 # ---- permissions of people towards agents
-def is_approver(c, t, uid):
+def is_approver(c, t, uid, agent=None, assignee=True):
+    """2.126.0 B (#1974 #1975): agent = the agent whose request is decided: uid must also be allowed to address it
+    (agent_usable) or own the list; assignee=False: the assignee alone is not enough (an agent's waiting approval job)."""
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone() if uid else None
     if not u or is_agent(u) or u["disabled"] or not task_visible(c, t["id"], uid, full=True):
         return False
-    return list_role(c, t["list_id"], uid) in MANAGE_ROLES or t["assignee_id"] == uid or bool(u["is_admin"])
+    if agent and not agent_usable(c, agent, uid, t["list_id"]) \
+            and not c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=?", (t["list_id"], uid)).fetchone():
+        return False
+    return list_role(c, t["list_id"], uid) in MANAGE_ROLES or (assignee and t["assignee_id"] == uid) or bool(u["is_admin"])
 
 
 # 2.26.0 (#928): the events a person can only send to an agent where the agent is open to them (agent_usable); the
@@ -926,6 +933,8 @@ def job_may_act(c, j, uid, action):
     t = c.execute("SELECT * FROM tasks WHERE id=?", (j["task_id"],)).fetchone()
     if not t:
         return False
+    if j["approval"]:  # 2.126.0 B (#1974): an approval job: the approver, an admin, the list's owner / admins who may address the agent
+        return is_approver(c, t, uid, agent=j["agent_id"], assignee=False) or (action == "stop" and task_visible(c, t["id"], uid, write=True))
     return is_approver(c, t, uid) or (action == "stop" and task_visible(c, t["id"], uid, write=True))
 
 

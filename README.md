@@ -20,6 +20,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.126.2** (2026-10-20): pages on phones - suggestions stay above the keyboard, checkbox "+" without overlap; a
+  news entry when someone shares pages with you; "Mentioned in" on tables; ended links and unreadable sealed pages shown as such.
+- **2.126.1** (2026-10-20): agents draft for you - office texts and reminders, document summaries, the client report
+  from the status report, table rows as tasks, a planned morning sort of the basket; always as a card you decide on.
+- **2.126.0** (2026-10-20): security release - fixes from the internal audit for office, documents, agents, sync and
+  offline; private document data on the account key; ESLint in CI.
 - **2.125.0** (2026-10-20): vacation requests with approval and vacation accounts, working days and weekly hours per
   person, close and approve monthly timesheets, time zone per person with entries split at midnight, timer shortcut,
   Excel export of times and workload; the browser demo starts like a new account and shows every module.

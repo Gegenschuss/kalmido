@@ -174,7 +174,6 @@ function povSet(l, on) {
 }
 async function setListView(l, v) {  // List / Kanban / Timeline (stored on the server) or the overview (this device)
   if (v === 'overview') { povSet(l, true); render(); return; }
-  const was = povOn(l);
   povSet(l, false);
   // 2.41.2 (#1501): the view switches at once (optimistic), the server follows
   if (v !== listView(l)) { try { await optWrite(optSet(() => listById(l.id), {view: v}), () => api('PATCH', '/api/lists/' + l.id, {view: v})); } catch { /* shown, put back */ } return; }

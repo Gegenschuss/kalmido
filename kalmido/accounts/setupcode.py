@@ -9,7 +9,7 @@ import os
 import secrets
 import threading
 
-from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip
+from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip
 
 SH_CODE_ENV = os.environ.get("KALMIDO_SETUP_CODE", "").strip()
 SH_CODE_OFF = SH_CODE_ENV.lower() in ("off", "0", "false", "no")
@@ -67,7 +67,7 @@ def sh_code_check(c, code):
     from ..core.i18n import tr
     if SH_CODE_OFF:
         return None
-    keys = [("setupcode:ip:" + client_ip(), SH_CODE_RATE)]
+    keys = [("setupcode:ip:" + rate_ip(), SH_CODE_RATE)]
     if _rate_blocked(keys):
         return tr("Too many failed attempts, please wait a few minutes"), 429
     sh_code_ensure(c)

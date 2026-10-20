@@ -927,6 +927,8 @@ ROUTES = {
     "POST /api/tasks/{}/chain/pull": "task",
     # 2.68.0 (#1839): an agent proposes old data for its person's office (only a card; p268_a_api_test.py: other person / org 404)
     "POST /api/v1/agent/proposals/import": "agent",
+    # 2.126.1 B (#2125): an agent proposes table rows as tasks (a card; p21261_b_api_test.py: not shared table / list, other org 404)
+    "POST /api/v1/agent/proposals/sheet-tasks": "agent",
     # 2.69.0 A (#1846): the uploaded Paperless-ngx export of one workspace (p269_a_api_test.py: member 403, outsider 404, agent refused)
     "POST /api/paperless/zip": "paperless", "POST /api/paperless/zip/part": "paperless", "GET /api/paperless/zip/preview": "paperless",
     "POST /api/paperless/zip/import": "paperless", "POST /api/paperless/zip/stop": "paperless", "DELETE /api/paperless/zip": "paperless",

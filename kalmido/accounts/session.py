@@ -65,8 +65,23 @@ def _is_open(path, method):
 
 
 def rate_ip():
-    """Client address for rate limits and alerts (2.10.0: the same as client_ip, see proxy_mw)."""
-    return client_ip()
+    """Client address for rate limits and alerts (2.10.0: the same as client_ip, see proxy_mw).
+    2.126.0 C (#1976): the counter key of an address: IPv4 as it is, IPv6 as its /64 network (one connection usually
+    owns a whole /64), an IPv4-mapped IPv6 address as the IPv4 one. Logs and token address checks keep client_ip()."""
+    return rate_key_ip(client_ip())
+
+
+def rate_key_ip(addr):
+    """2.126.0 C (#1976): see rate_ip."""
+    try:
+        a = ipaddress.ip_address((addr or "").split("%")[0])
+    except ValueError:
+        return addr or ""
+    if a.version == 6 and a.ipv4_mapped:
+        return str(a.ipv4_mapped)
+    if a.version == 6:
+        return str(ipaddress.ip_network(f"{a}/64", strict=False).network_address)
+    return str(a)
 
 
 def _ip_in(addr, nets):
@@ -271,7 +286,7 @@ def _rate_keys(username, pre="", lim=(5, 20, 100)):
     """2.10.0 (#445): failed logins count per user name AND address ("u:name@ip", 5), per address ("ip:", 20) and, as a
     ceiling against slow attacks from many addresses, per user name alone ("uall:", 100). One attacker (one address) can
     no longer lock a person out: only the pair name + attacker's address and the attacker's address are blocked."""
-    ip = client_ip()
+    ip = rate_ip()  # 2.126.0 C (#1976): IPv6 per /64
     return [(pre + "u:" + username + "@" + ip, lim[0]), (pre + "ip:" + ip, lim[1]), (pre + "uall:" + username, lim[2])]
 
 
@@ -281,7 +296,7 @@ KNOWN_DAYS = 30
 
 def _rate_reset(username, pre=""):
     """A successful login clears the counter of the pair user name + this address and remembers the address as known."""
-    ip = client_ip()
+    ip = rate_ip()  # 2.126.0 C (#1976)
     with _fail_lock:
         _fails.pop(pre + "u:" + username + "@" + ip, None)
         seen = _known.setdefault(pre + "uall:" + username, {})
@@ -297,7 +312,7 @@ def h6a_uall_exempt(k, now):
     signed in as this account already (re-authentication). The pair and address limits still apply everywhere."""
     if "uall:" not in k:
         return False
-    if (now - _known.get(k, {}).get(client_ip(), 0)) < KNOWN_DAYS * 86400:
+    if (now - _known.get(k, {}).get(rate_ip(), 0)) < KNOWN_DAYS * 86400:
         return True
     u = getattr(g, "user", None)
     return bool(u is not None and k == "uall:" + (u["username"] or ""))
@@ -308,21 +323,35 @@ def _rate_blocked(keys):
     with _fail_lock:
         for k, limit in keys:
             arr = [t for t in _fails.get(k, []) if now - t < FAIL_WINDOW]
-            _fails[k] = arr
+            if arr:
+                _fails[k] = arr
+            else:  # 2.126.0 review (#1976): a look-up never adds a key (only failures do)
+                _fails.pop(k, None)
             if len(arr) >= limit and not h6a_uall_exempt(k, now):
                 return True
     return False
 
 
+_FAILS_MAX, _FAILS_ARR = 20000, 500  # 2.126.0 C (#1976): idle keys are forgotten above this many; per key the newest 500
+_fails_swept = [0.0]
+
+
 def _rate_fail(keys):
     """Records a failure; returns the keys whose limit this failure just reached (the rate limit trips)."""
     out = []
+    now = time.time()
     with _fail_lock:
         for k, limit in keys:
             arr = _fails.setdefault(k, [])
-            arr.append(time.time())
+            arr.append(now)
             if len(arr) == limit:
                 out.append(k)
+            if len(arr) > _FAILS_ARR:
+                del arr[:len(arr) - _FAILS_ARR]
+        if len(_fails) > _FAILS_MAX and now - _fails_swept[0] > 30:  # 2.126.0 C (#1976): forget keys idle for a window
+            _fails_swept[0] = now
+            for k in [k for k, v in _fails.items() if not v or now - v[-1] >= FAIL_WINDOW]:
+                _fails.pop(k, None)
     return out
 
 

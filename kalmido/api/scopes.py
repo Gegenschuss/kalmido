@@ -73,8 +73,10 @@ from ..agents.api import job_notify
 # start with read, new agents with read + tasks:write + comments. Tokens from before 2.15 keep "write" (= everything
 # but admin-read) and their old read tokens got attachments:read once, so nothing changes for them.
 # Dangerous changes by an AGENT wait for a person (need_approval): deleting a list / a field, emptying the trash, a
-# batch of 10+ tasks, moving an own list into another folder, renaming / removing folders, sharing (people, groups).
-# The agent gets 202 + a waiting job; Approve (the agent's owner, the list owner, an admin) replays the stored request
+# batch of 10+ tasks, moving an own list into another folder, renaming / removing folders, sharing (people, groups),
+# 2.126.0 B (#1979 G5): an answer to a customer (comment with portal).
+# The agent gets 202 + a waiting job; Approve (the agent's owner, the list owner / admins who may address the agent, an admin;
+# 2.126.0 B (#1974): not the assignee alone) replays the stored request
 # as the agent with its rights at that moment (approval_run), Reject stops it; the agent gets a "job" event either way.
 SCOPE_LABELS = {"read": N_("Read"), "tasks:write": N_("Tasks"), "comments": N_("Comments"), "structure": N_("Structure"),
                 "delete": N_("Delete & trash"), "attachments:read": N_("Read files"), "attachments:write": N_("Upload files"),
@@ -351,7 +353,9 @@ def need_approval(c, title, args=(), list_id=None, task_id=None, detail=None):
 def approval_replay_token(c, header):
     """The X-Kalmido-Replay header of approval_run -> the agent's newest token row (once per approved job)."""
     jid, _, sig = str(header).partition(":")
-    if not jid.isdigit() or not hmac.compare_digest(sig, hmac.new(_REPLAY_KEY, jid.encode(), "sha256").hexdigest()):
+    if not re.fullmatch(r"[0-9]{1,18}", jid) or not re.fullmatch(r"[0-9a-f]{64}", sig):  # 2.126.0 B (#1979 G3): shape first
+        return None
+    if not hmac.compare_digest(sig, hmac.new(_REPLAY_KEY, jid.encode(), "sha256").hexdigest()):
         return None
     j = c.execute("SELECT * FROM agent_jobs WHERE id=? AND state='running' AND action='approve' AND approval IS NOT NULL",
                   (int(jid),)).fetchone()

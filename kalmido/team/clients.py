@@ -322,6 +322,9 @@ def client_update(cid):
         f.pop("org_id")  # unchanged (the dialog sends it with every save)
     if "org_id" in f:
         h6c_client_move_ok(c, uid, old)
+        if old["org_id"] and c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND client_id=? AND locked_at IS NOT NULL LIMIT 1",
+                                       (old["org_id"], cid)).fetchone():  # 2.126.0 A (#1979 F7): its finalised documents keep it
+            raise Denied(409, tr("Finalised documents of this organisation refer to this client, so it stays here. “Move to another workspace…” in the office takes a copy along."))
     if f:
         f["updated_at"] = iso(now_utc())
         c.execute(f"UPDATE clients SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), cid])

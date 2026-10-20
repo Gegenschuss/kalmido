@@ -9,7 +9,8 @@ bundling of task events (#1447). agent_run.py imports it tolerantly: without thi
                    ending) are copied into the folder and attached too -- but not in task runs (they answer on the task,
                    nothing reaches the chat), and not what the person sent themselves (folders named in
                    KALMIDO_NO_AUTO_IMAGE_DIRS, separated by the path separator, and any path with a part named
-                   chat-attachments / uploads).
+                   chat-attachments / uploads). 2.126.0: only images inside the project folder (the working folder)
+                   or a folder named in KALMIDO_AUTO_IMAGE_DIRS.
   jobs (#1445)     the prompt tells a chat run how to start a job; the environment carries the command (KALMIDO_JOB_CMD),
                    the person (KALMIDO_CHAT_USER) and the state folder. A Stop of a job (event `job`, action stop) is passed
                    to agent_job.py; a finished job wakes the chat agent (2.46.6, agent_run.py job_watch).
@@ -337,9 +338,13 @@ class Extras:
                 log(f"image not copied: {type(e).__name__}")
 
     def _own_image(self, path):
-        """False for what the person sent (upload folders) and for files that are not there or too big."""
-        p = os.path.abspath(os.path.expanduser(path))
+        """False for what the person sent (upload folders) and for files that are not there or too big. 2.126.0 B (#1979 G1):
+        only images inside the project folder (the working folder) or a folder named in KALMIDO_AUTO_IMAGE_DIRS."""
+        p = os.path.realpath(os.path.expanduser(path))
         if not os.path.isfile(p) or os.path.getsize(p) > max_file_bytes() or os.path.getsize(p) == 0:
+            return False
+        roots = [os.getcwd()] + [d for d in (os.environ.get("KALMIDO_AUTO_IMAGE_DIRS") or "").split(os.pathsep) if d.strip()]
+        if not any(p.startswith(os.path.realpath(os.path.expanduser(d)).rstrip(os.sep) + os.sep) for d in roots):
             return False
         parts = {s.lower() for s in p.split(os.sep)}
         if any(s in parts for s in SKIP_DIR_PARTS):

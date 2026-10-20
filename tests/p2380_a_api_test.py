@@ -467,7 +467,8 @@ if r.status_code == 201:
 r = Ca.post(B + "/api/clients", json={"name": "Beta-Kunde"})
 check(r.status_code == 201, "setup: client of the second organisation " + r.text[:120])
 CLB = r.json().get("id")
-check(all(x["id"] != CLB for x in A.get(B + "/api/clients").json()["clients"]), "#1209 M3: the instance admin does not list a foreign organisation's client")
+r = A.get(B + "/api/clients")  # 2.126.0: the answer in the message when it is no JSON
+check(r.ok and all(x["id"] != CLB for x in r.json()["clients"]), f"#1209 M3: the instance admin does not list a foreign organisation's client {r.status_code} {r.text[:300]}")
 check(A.get(B + f"/api/clients/{CLB}").status_code == 404, "#1209 M3: a foreign organisation's client = 404 for the instance admin")
 check(A.patch(B + f"/api/clients/{CL}", json={"org_id": ORG2}).status_code == 400, "#1209 M3: the instance admin cannot move a client into a foreign organisation")
 

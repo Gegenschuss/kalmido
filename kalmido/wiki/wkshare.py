@@ -474,11 +474,11 @@ def wsh_open(c, token, files=False):
     ip = rate_ip()
     if hit_limit(("pubf:" if files else "pubv:") + ip, CV_FILE_RATE if files else PUB_VIEW_RATE):
         return None, pub_limited(_accept_lang())
-    bad = [("pubbad:" + ip, PUB_BAD_LIMIT)]
-    if _rate_blocked(bad):
-        return None, pub_limited(_accept_lang())
+    bad = [("pubbad:" + ip, PUB_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
     s = wsh_find(c, token)
     if not s:
+        if _rate_blocked(bad):
+            return None, pub_limited(_accept_lang())
         _rate_fail(bad)
         aa_count("security", "publink", ip)
         return None, pub_gone()

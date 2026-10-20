@@ -33,7 +33,7 @@ from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc, write_lock
 from ..core.access import Denied, collab_all
 from ..core.pg import insert_id, system_ctx
-from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, me
+from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, me, rate_ip
 
 DISC_DAY = 30            # searches per account and day
 DISC_CHECK_DAY = 300     # addresses of the address book check per account and day
@@ -128,7 +128,7 @@ def _quota(c, uid, searches=0, checked=0):
 
 
 def _ip_brake():
-    keys = [(DISC_IP[1] + client_ip(), DISC_IP[0])]
+    keys = [(DISC_IP[1] + rate_ip(), DISC_IP[0])]
     if _rate_blocked(keys):
         return True
     _rate_fail(keys)

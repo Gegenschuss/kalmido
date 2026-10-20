@@ -164,7 +164,7 @@ def json_posts():
 # ======== outbox (#1443)
 reset()
 st1 = os.path.join(TMP, "st1")
-r = runner([chat("WRITEFILE and LOOKIMAGE please")], st1)
+r = runner([chat("WRITEFILE and LOOKIMAGE please")], st1, {"KALMIDO_AUTO_IMAGE_DIRS": TMP})  # 2.126.0 (#1979 G1): images only from allowed folders
 check(r.returncode == 0, f"runner exit 0 ({r.stderr[-300:]})")
 fp = files_posts()
 check(len(fp) == 1, f"one multipart post with the files: {len(fp)}")
@@ -182,8 +182,11 @@ check(s and s[0]["job"] is None and s[0]["chat_user"] == "7", "the run knows the
 check(not os.path.exists(s[0]["outbox"]), "the outbox folder is removed after sending")
 
 reset()
-r = runner([chat("LOOKUPLOAD only")], os.path.join(TMP, "st1b"))
+r = runner([chat("LOOKUPLOAD only")], os.path.join(TMP, "st1b"), {"KALMIDO_AUTO_IMAGE_DIRS": TMP})
 check(not files_posts(), "an image from an upload folder is not attached again")
+reset()  # 2.126.0 (#1979 G1)
+r = runner([chat("LOOKIMAGE only")], os.path.join(TMP, "st1d"))
+check(not files_posts(), "an image outside the project folder and KALMIDO_AUTO_IMAGE_DIRS is not attached")
 
 reset()
 r = runner([{"event": "comment", "seq": 5, "data": {"task": {"id": 5, "title": "Footer"}, "comment": {"id": 2, "text": "WRITEFILE LOOKIMAGE"}}}],

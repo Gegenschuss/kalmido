@@ -463,7 +463,8 @@ codes = [requests.get(V + "/me", headers={"Authorization": f"Bearer abk_{'z' * 3
 n401 = codes.index(429) if 429 in codes else 99
 check(18 <= n401 <= 30 and set(codes[:n401]) == {401} and set(codes[n401:]) == {429},
       f"invalid tokens: at most 30 per address (incl. the earlier ones), then 429: {n401} x 401")
-check(ar.get("/me").status_code == 429, "address blocked for valid tokens too (15 min)")
+# 2.126.0 (#1979 I2): the address limit applies to invalid tokens only, a valid token from there keeps working
+check(ar.get("/me").status_code == 200, "a valid token from the limited address still works")
 time.sleep(8)
 al = dbx("SELECT kind, message FROM admin_alerts WHERE kind='security' ORDER BY id")
 check(any("invalid token" in m for _, m in al) and any("API rate limit" in m for _, m in al), "admin alert about invalid tokens " + str(al)[-300:])

@@ -149,6 +149,8 @@ def ofm_doc_hold(c, r):
     """None when document row r may move, else why it stays: 'issued' | 'linked'."""
     if r["status"] != "draft" or r["locked_at"]:
         return "issued"
+    if r["kind"] in ("invoice", "credit") and r["number"]:  # 2.126.0 A (#1966): its number belongs to this office's series
+        return "issued"
     if r["series_id"] or r["cancels_id"] or (r["ref_doc_ids"] or "").strip() not in ("", "[]", "null"):
         return "linked"
     for t in OFM_DOC_HOLD:

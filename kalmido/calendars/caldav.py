@@ -380,7 +380,8 @@ def dav_login():
     username = a.username.strip().lower()[:64]
     pw = apppw_norm(a.password)[:100]
     keys = _rate_keys(username, "dav:", (10, 30, 150))
-    if _rate_blocked(keys):
+    # 2.126.0 C (#1977): the per-name ceiling ("dav:uall:") only raises an alert; the lock is per name + address and per address
+    if _rate_blocked([k for k in keys if not k[0].startswith("dav:uall:")]):
         raise DavError(429, "Too many failed logins, please wait a few minutes")
     c = db()
     u = c.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
@@ -402,7 +403,10 @@ def dav_login():
         check_password_hash(_DUMMY_HASH, pw or "x")  # same cost for an unknown user / no app password
     if not hit:
         for k in _rate_fail(keys):
-            if k.startswith("dav:ip:"):
+            if k.startswith("dav:uall:"):
+                aa_now("security", "ratelimit:" + k, N_("Many failed CalDAV/CardDAV logins for user {0} from different addresses."),
+                       [username])
+            elif k.startswith("dav:ip:"):
                 aa_now("security", "ratelimit:" + k, N_("Login rate limit reached for IP {0} (logins refused for {1} min)."),
                        [fx2_mask_ip(client_ip()), FAIL_WINDOW // 60])
             elif u:
@@ -494,13 +498,19 @@ def dav_vtodo(t, ctx):
               f"TRIGGER;VALUE=DATE-TIME:{at.strftime('%Y%m%dT%H%M%SZ')}", "END:VALARM"]
     if meta is not None and meta["extra"]:
         have, depth = {_prop_name(x) for x in L}, 0
+        # 2.126.0 C (#1979 I3): the alarms and attachments a person's app kept go back to that person only
+        by = meta["extra_by"] if "extra_by" in meta.keys() else None
+        own, skip = by is None or by == ctx.get("viewer"), 0
         for x in meta["extra"].split("\n"):
             if not x:
                 continue
             up = x[:6].upper()
+            if not own and (skip or x.upper() == "BEGIN:VALARM"):
+                skip += 1 if up == "BEGIN:" else -1 if x[:4].upper() == "END:" else 0
+                continue
             if depth == 0 and up != "BEGIN:":
                 n = _prop_name(x)
-                if (n in DAV_SINGLE and n in have) or (own_rule and n in ("EXRULE", "RDATE", "EXDATE")):
+                if (n in DAV_SINGLE and n in have) or (own_rule and n in ("EXRULE", "RDATE", "EXDATE")) or (not own and n == "ATTACH"):
                     continue
             depth += 1 if up == "BEGIN:" else -1 if x[:4].upper() == "END:" else 0
             L.append(x)
@@ -573,7 +583,7 @@ def dav_ctx(c, u, task_ids):
         return dav_uid_of(pid, extra_meta[pid])
     s = usettings(c, u["id"])
     from ..collab.liste2eguard import le2b_task_lists
-    return {"meta": meta, "tags": tags, "uid": uid, "allday": hm_minutes(s.get("allday_time") or "09:00"), "context": set(),
+    return {"meta": meta, "tags": tags, "uid": uid, "viewer": u["id"], "allday": hm_minutes(s.get("allday_time") or "09:00"), "context": set(),
             "e2e": le2b_task_lists(c, task_ids)}  # 2.64.1 B (#1817): tasks of lists with the lock
 
 
@@ -1158,7 +1168,7 @@ def dav_put(c, u, pw_row, lst, name):
                    v["done_occurrence"])
         old_uid = dav_uid_of(cur["id"], c.execute("SELECT * FROM dav_meta WHERE task_id=?", (cur["id"],)).fetchone())
         pend = v["parent_uid"] if v["parent_uid"] and not c.execute("SELECT parent_id FROM tasks WHERE id=?", (cur["id"],)).fetchone()[0] else None
-        dav_meta_set(c, cur["id"], extra=v["extra"], parent_uid=pend, **({"uid": v["uid"]} if v["uid"] != old_uid else {}))
+        dav_meta_set(c, cur["id"], extra=v["extra"], extra_by=u["id"], parent_uid=pend, **({"uid": v["uid"]} if v["uid"] != old_uid else {}))
         c.commit()
         return Response(status=204)
     if lst["role"] == "view":
@@ -1181,7 +1191,7 @@ def dav_put(c, u, pw_row, lst, name):
             p["parent_id"] = None
         v1_call(task_update, oid, body=p)
         dav_status(oid, c.execute("SELECT status FROM tasks WHERE id=?", (oid,)).fetchone()[0], v["status"])
-        dav_meta_set(c, oid, uid=v["uid"], href=name, extra=v["extra"], parent_uid=None)
+        dav_meta_set(c, oid, uid=v["uid"], href=name, extra=v["extra"], extra_by=u["id"], parent_uid=None)
         c.commit()
         return Response(status=201)
     if _own_id(DAV_HREF_RE, name):  # names of this form belong to the tasks they name
@@ -1207,7 +1217,7 @@ def dav_put(c, u, pw_row, lst, name):
     if v["status"] != 0:  # arrives completed (an old done task): no completion events, no next occurrence
         c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=? WHERE id=?", (v["status"], v["completed_at"], u["id"], tid))
         bump(c)
-    dav_meta_set(c, tid, uid=v["uid"], href=name, extra=v["extra"],
+    dav_meta_set(c, tid, uid=v["uid"], href=name, extra=v["extra"], extra_by=u["id"],  # 2.126.0 C (#1979 I3): who wrote extra
                  parent_uid=v["parent_uid"] if v["parent_uid"] and not pid else None)
     c.commit()
     dav_adopt_children(c, u, lid, tid, v["uid"])

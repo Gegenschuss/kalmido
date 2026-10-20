@@ -1313,6 +1313,12 @@ fresh; run p2123_b_ui node p2123_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2123_c_api "$PY" p2123_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2123_c_ui node p2123_c_ui.js "$KALMIDO_TEST_DATA"
 shard 17  # 2.124.2: new suites go here (shard 13 keeps the 2.99-2.123 C suites above)
+# 2.126.2 part A: page suggestions above the phone keyboard, checkbox "+" without overlap, search edge case (#2363), "Mentioned in" on sheets (#2357)
+fresh; run p21262_a_api "$PY" p21262_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21262_a_ui node p21262_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.126.2 part B: link of a gone creator shown as ended, unreadable sealed text is an error (#2358), news entry for shared pages (#2355)
+fresh; run p21262_b_api "$PY" p21262_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21262_b_ui node p21262_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.123.0 part D: cash flow: opening balance, manual corrections, reconciliation (#2341); installment list number format (#2351)
 fresh; run p2123_d_api "$PY" p2123_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2123_d_ui node p2123_d_ui.js "$KALMIDO_TEST_DATA"
@@ -1335,6 +1341,24 @@ fresh; run p21223_a_ui node p21223_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21223_b_ui node p21223_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.122.3 part C: chat - "Show more" right under the shortened message (#2340)
 fresh; run p21223_c_ui node p21223_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.126.0 part A: office + documents fixes (#1966 #1967 #1970 #1971 #1979)
+fresh; run p2126_a_api "$PY" p2126_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.126.0 part B: agent fixes (#1973 #1974 #1975 #1978 #1979)
+fresh; run p2126_b_api "$PY" p2126_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.126.0 part C: rate limits, sync, push subscriptions (#1976 #1977 #1985 #1986 #1991 #1979 #1992)
+fresh; run p2126_c_api "$PY" p2126_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.126.0 part D: tasks + offline queue (#1987 #1989 #1990 #1992)
+fresh; run p2126_d_api "$PY" p2126_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2126_d_ui node p2126_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.126.0 part E: ESLint in CI (#1993)
+fresh; run p2126_e_api "$PY" p2126_e_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2126_e_ui node p2126_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.126.1 part A: agent drafts - office texts, receipt summary, client report (#2123 #2124)
+fresh; run p21261_a_api "$PY" p21261_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21261_a_ui node p21261_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.126.1 part B: table rows -> tasks as an agent proposal, planned inbox sorting (#2125 #2126)
+fresh; run p21261_b_api "$PY" p21261_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21261_b_ui node p21261_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.124.0 part A: formulas, chart (#2109 #2115)
 fresh; run p2124_a_api "$PY" p2124_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2124_a_ui node p2124_a_ui.js "$KALMIDO_TEST_DATA"

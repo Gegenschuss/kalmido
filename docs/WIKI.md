@@ -31,7 +31,9 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   space (the organisation's key, for private pages your account key), like the office data; names (paths) stay plain
   because links and the tree need them. Nothing changes in use. The server admin switches it on once with
   `orgcrypt_cli encrypt-wiki` (off after the update, so a step back to an older version stays possible); see
-  *Encryption at rest* in the self-hosting guide.
+  *Encryption at rest* in the self-hosting guide. A sealed text that cannot be opened any more (its key is lost) is never
+  shown or saved as the page's text (2.126.2): the page answers `409` (`wiki_unreadable`, "cannot be read") and cannot be
+  saved; search, history and the export skip it.
 - **Undo.** Creating, renaming, deleting and importing are one step each (the arrow on top, Ctrl/Cmd+Z, the toast).
 - **Files (2.99.0).** A page can carry PDFs and pictures (PNG, JPEG, GIF, WebP, SVG): *Attach files* below the text,
   at most 25 MB each. The type is checked by the content, not by the name; an SVG is cleaned (no scripts, no outside
@@ -134,7 +136,8 @@ later; "Customer A" never includes "Customer AB"). Whoever may write in the spac
   bar of the knowledge pages -- only what you shared, never the rest of your space (no index, search, backlinks or mentions).
   Choose the person or type an e-mail address (the answer never tells whether an account has it). Pages of an organisation
   are read by all its members anyway; people outside get a public link (no person shares across the organisation boundary).
-  Agents never get a share.
+  Agents never get a share. The person gets a News item "X shared the page … with you" (2.126.2; it follows the
+  *Sharing* row of the notification settings, no push by default) that opens *Shared with me*.
 - **Public link**: a secret address `/s/w/<token>` that opens a plain read-only page without an account and without the app
   (no scripts): the page, or the list of the folder's pages. Pictures and files of the shared pages come along; a
   `[[link]]` to a page that is not shared shows as plain text, task numbers stay text. Optional *Valid until*; several links
@@ -145,6 +148,9 @@ later; "Customer A" never includes "Customer AB"). Whoever may write in the spac
 - Renaming a page or a folder takes its shares along; a page in the trash is not shared (Undo brings it back); moving pages
   to the other workspace ends their shares. A space encrypted in the browser cannot share (the server cannot read its text);
   links of a space that gets locked stop working. Shared pages carry a small people mark in the tree and in the title.
+- A public link of an organisation's page works only while the person who made it is an active member; once they leave
+  the organisation or their account is deleted or disabled, the dialog shows the link as *Ended* (2.126.2) and it no
+  longer counts as a live share (mark, limit). Make a new link if it is still needed.
 
 Routes: `GET /api/wiki/shares?page=<id> | space=&folder=`, `POST /api/wiki/shares {page_id | space + folder, kind: person |
 link, user_id | email, expires}`, `PATCH /api/wiki/shares/<id> {expires}`, `DELETE /api/wiki/shares/<id>` (revoke),

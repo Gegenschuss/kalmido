@@ -57,7 +57,7 @@ function viewFamily() {
   const occH = occ.length ? `<ul class="flist">${occ.map(t => { const n = daysTo(t.due), w = occWhat(t); return `<li><a ${open(t.id)} class="frow"><span class="fem" aria-hidden="true">${t.fam.kind === 'birthday' ? '🎂' : '💍'}</span><span class="ft"><b>${esc(t.fam.name || t.title)}</b>${w ? `<span class="muted">${esc(w)}</span>` : ''}</span><span class="fwhen ${n <= 7 ? 'soon' : ''}">${esc(n <= 14 ? daysWord(n) : fmtDateLoc(t.due))}</span></a></li>`; }).join('')}</ul>`
     : `<p class="muted">${tr('No birthdays yet.')}</p>`;
   // whose turn
-  const rotH = d.rots.length ? `<ul class="flist">${d.rots.map(t => { const r = t.rotation, i = (r.i || 0) % r.who.length, nx = r.who[(i + 1) % r.who.length], ln = listById(t.list_id);
+  const rotH = d.rots.length ? `<ul class="flist">${d.rots.map(t => { const r = t.rotation;
     return `<li><a ${open(t.id)} class="frow">${av(t.assignee_id, personName(t.list_id, t.assignee_id) || '?')}<span class="ft"><b>${esc(t.title)}</b><span class="muted">${esc(rotOrder(t))} · ${esc(r.mode === 'week' ? tr('weekly') : tr('after each time'))}</span></span>${t.due ? `<span class="fwhen ${t.due < t0 ? 'over' : ''}">${esc(dayLabel(t.due))}</span>` : ''}</a></li>`; }).join('')}</ul>`
     : `<p class="muted">${tr('Nobody takes turns yet: open a repeating task in a shared list and choose “Take turns”.')}</p>`;
   // meal plan of the week

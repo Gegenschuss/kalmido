@@ -828,7 +828,7 @@ def bud_files_save(c, uid, eid, files, saved):
         mime = (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) or mimetypes.guess_type(name)[0] \
             or "application/octet-stream"
         from ..files.upsafe import up_check_path, UploadRefused
-        try:  # 2.61.0 (#1818 #1819): virus scan + photo metadata like every upload, before sealing (an unchecked receipt is not rescanned later)
+        try:  # 2.61.0 (#1818 #1819): virus scan + photo metadata like every upload, before sealing
             size, mime, _info = up_check_path(c, full, name, mime, uid, oc.oc_list_org(c, lid) or None, "budget")
         except UploadRefused as e:  # up_check_path removed the file
             saved.remove(rel)
@@ -836,6 +836,8 @@ def bud_files_save(c, uid, eid, files, saved):
         oc.oc_seal_path(c, sid, full, fresh=True)  # like attachments: the space key of the list (organisation / owner)
         ids.append(insert_id(c, "INSERT INTO budget_files(entry_id,list_id,name,mime,size,path,user_id,created_at) VALUES(?,?,?,?,?,?,?,?)",
                              (r["id"], lid, name, mime, size, rel, uid, _ts())))
+        from ..files.scan import sc_after_store
+        sc_after_store(c, "budget", ids[-1], oc.oc_list_org(c, lid) or None, _info)  # 2.126.0 A (#1979 L1): unchecked = scanned later
     c.execute("UPDATE budget_entries SET updated_at=? WHERE id=?", (_ts(), r["id"]))
     return _files_of(c, [r["id"]]).get(r["id"], [])
 

@@ -782,7 +782,10 @@ def contact_store(c, uid, book_id, f, cid=None, uid_=None, href=None, extra=None
                 ("kind", "fn", "given", "family", "middle", "prefix", "suffix", "nickname", "org", "dept", "title", "emails", "phones",
                  "addresses", "urls", "bday", "anniversary", "note", "groups", "photo")}
         cols["kind"] = cols["kind"] or "individual"
-        cols.update(book_id=book_id, uid=uid_, href=href or (re.sub(r"[^A-Za-z0-9._-]", "_", uid_)[:180] + ".vcf"), extra=extra or "",
+        if not href:  # 2.126.0 C (#1992 K8): a UID with other characters (or a long one) gets a hash, so two never share a name
+            base = re.sub(r"[^A-Za-z0-9._-]", "_", uid_)
+            href = (base if base == uid_ and len(base) <= 180 else base[:170] + "-" + hashlib.sha256(uid_.encode()).hexdigest()[:8]) + ".vcf"
+        cols.update(book_id=book_id, uid=uid_, href=href, extra=extra or "",
                     version=version or "3.0", src_digest=src_digest or "", created_by=uid, created_at=ts, updated_at=ts)
         cols["search"] = search_text({**cols, **{k: _jl(cols[k]) for k in ("emails", "phones", "addresses", "groups")}})
         cid = insert_id(c, f"INSERT INTO contacts({','.join(cols)}) VALUES({','.join('?' * len(cols))})", list(cols.values()))

@@ -10,7 +10,7 @@ from ..core.schema import MAX_DEPTH
 from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, inbox_default, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import me
-from ..core.access import Denied, list_role, MANAGE_ROLES, my_inbox, my_max_sort, need_list, need_task
+from ..core.access import Denied, list_role, MANAGE_ROLES, my_inbox, my_max_sort, need_list, need_task, WRITE_ROLES
 from ..core.pages import valid_link
 from ..lists.lists import list_created, clean_color, clean_folder, LIST_KINDS
 from ..tasks.validation import (
@@ -369,8 +369,11 @@ def template_create():
             from ..collab.liste2eguard import le2b_list_locked, le2b_off
             if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): a template would be a plain-text copy on the server
                 return jsonify(error=le2b_off(), code="list_e2e"), 409
-            if need_list(c, lid, write=False) == "participant":  # the whole list is not theirs to copy
+            role = need_list(c, lid, write=False)
+            if role == "participant":  # the whole list is not theirs to copy
                 raise Denied(403, tr("Participants cannot save the whole list as a template"))
+            if role not in WRITE_ROLES:  # 2.126.0 D (#1992 A6): view only
+                raise Denied(403, tr("View only: the list cannot be saved as a template"))
             kind, data = "list", tpl_list_data(c, lid, uid, base, rel=bool(b.get("relative")))
             name = data["name"]
         else:
@@ -523,13 +526,16 @@ DUP_MAX_NODES = 2000
 
 @app.post("/api/lists/<int:lid>/duplicate")
 def list_duplicate(lid):
-    """{name?, done?: bool, folder?} -> {list_id}. Who may save the list as a template may duplicate it (not participants)."""
+    """{name?, done?: bool, folder?} -> {list_id}. Who may save the list as a template may duplicate it (who may edit the list)."""
     from ..lists.fields import tpl_clean_fields
     b = body()
     c = db()
     uid = me()
-    if need_list(c, lid, write=False) == "participant":
+    role = need_list(c, lid, write=False)
+    if role == "participant":
         raise Denied(403, tr("Participants cannot duplicate the whole list"))
+    if role not in WRITE_ROLES:  # 2.126.0 D (#1992 A6): view only
+        raise Denied(403, tr("View only: the list cannot be duplicated"))
     from ..collab.liste2eguard import le2b_list_locked, le2b_off
     if le2b_list_locked(c, lid):  # 2.78.0 N35 (#476): the copy would be an unlocked list (like a template, 2.64.1 B)
         return jsonify(error=le2b_off(), code="list_e2e"), 409

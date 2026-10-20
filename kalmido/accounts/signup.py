@@ -7,7 +7,7 @@ from flask import g, jsonify
 from ..core.config import app, EMAIL_RE, MIN_PASSWORD, PUBLIC_URL, USERNAME_RE
 from ..core.i18n import LANGS, tr
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset, usettings, write_lock
-from ..accounts.session import _accept_lang, _rate_fail, client_ip, me
+from ..accounts.session import _accept_lang, _rate_fail, client_ip, me, rate_ip
 from ..accounts.login import finish_login, pend_cookie, pend_new, twofa_methods
 from ..core.access import Denied
 from ..api.v1 import hit_limit
@@ -163,7 +163,7 @@ def auth_signup():
     answer = jsonify(ok=True, mail=mail, pending=m == "approval")
     write_lock(c, "accounts")  # 2.37.0 (#1150): was BEGIN IMMEDIATE
     _cleanup(c)
-    if hit_limit("signup:" + client_ip(), SIGNUP_RATE, 3600):  # counted for valid requests only
+    if hit_limit("signup:" + rate_ip(), SIGNUP_RATE, 3600):  # counted for valid requests only
         c.commit()
         return err(tr("Too many attempts, please wait a few minutes", lg=lg), 429)
     dom = email.rsplit("@", 1)[-1].lower()

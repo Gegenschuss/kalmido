@@ -428,7 +428,6 @@ function renderDetail0() {
   const l = listById(t.list_id);
   const kids = children(t.id);
   const parent = t.parent_id && S.tasks.get(t.parent_id);
-  const secs = S.sections.filter(s => s.list_id === t.list_id);
   const dueTxt = t.due ? dueLabel(t) : tr('Date');
   const mdMode = t.content && !S.editContent;
   const ro = !canEdit(t), shared = l && l.shared;

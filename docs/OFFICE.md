@@ -1014,6 +1014,17 @@ step, `all` = back to the opening, `redo`, `redoall`) writes a copy back in one 
 exactly as this person's last step left it; rights as for the normal change. Saves without the header (agents, the
 API, other apps) record nothing.
 
+## Texts by an agent (2.126.1)
+
+On a draft (quotation, invoice, reminder) the section *Introduction and closing* offers *Draft text with an agent* when an
+agent of the office area may draft office documents and the area lets agents read office data. Choose the agent (when
+there are several), the text (introduction or closing) and, if you like, a short wish ("friendly, short"). The agent gets
+the document without purchase prices, the client and the current text (a reminder also its invoices, open amounts and
+days overdue) and answers with a proposal: you edit the text on the card and take it over (one undo step) or discard it.
+Nothing is sent; a finalised or sent document can no longer take it. The same way a document or receipt you may change
+offers *Summarise with an agent* in the document sheet (only agents that see the file); the summary taken over shows
+there. Kalmido itself never runs a language model for this: the agent connected to Kalmido words the text.
+
 ## Recipient and client names (2.97.0)
 
 - A client has its name (printed on quotations, invoices, the e-invoice) and an optional **display name** for the pickers

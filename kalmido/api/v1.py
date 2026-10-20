@@ -15,7 +15,7 @@ from ..core.config import API_PREFIX, app, APP_NAME, APP_VERSION, PUB_PREFIX, TZ
 from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
-from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, FAIL_WINDOW, me, rate_ip
+from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, FAIL_WINDOW, client_ip, me, rate_ip
 from ..accounts.login import twofa_methods
 from ..core.access import collab_all, Denied, list_role, need_list, need_task, need_time, time_all, token_lists, tvis, vis_sql
 from ..core.serializers import load_tasks
@@ -116,6 +116,12 @@ def hit_limit(key, limit, window=60):
     return False
 
 
+def hit_budget(key, limit, ip, window=3600, share=3):
+    """2.126.0 C (#1979 I1): a per-resource budget (a form, a link per hour) of which one address uses at most a share,
+    so a single address cannot use it up for everyone else. Refused by the address part = the resource is not counted."""
+    return hit_limit(f"{key}@{ip}", max(1, limit // share), window) or hit_limit(key, limit, window)
+
+
 def act_via():
     """How the current request acts: 'api' (personal access token), 'public_link' or None (the app)."""
     if not has_request_context():
@@ -153,9 +159,7 @@ def api_authenticate():
         return None  # the spec contains no data
     g.audit_t0 = time.monotonic()
     ip = rate_ip()
-    bad = [("apibad:" + ip, API_BAD_LIMIT)]
-    if _rate_blocked(bad):
-        return v1_err(429, tr("Too many invalid tokens, please wait a few minutes"), {"Retry-After": str(FAIL_WINDOW)})
+    bad = [("apibad:" + ip, API_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): checked below, only when the token is not valid
     auth = request.headers.get("Authorization", "")
     tok = auth[7:].strip() if auth[:7].lower() == "bearer " else ""
     c = db()
@@ -173,6 +177,8 @@ def api_authenticate():
         u = None
     expired = bool(row and row["expires_at"] and parse_iso(row["expires_at"]) <= now_utc())
     if not u or expired:
+        if _rate_blocked(bad):
+            return v1_err(429, tr("Too many invalid tokens, please wait a few minutes"), {"Retry-After": str(FAIL_WINDOW)})
         if tok and not expired:  # a missing header is a client mistake; a wrong token is counted and reported
             for k in _rate_fail(bad):
                 aa_now("security", "ratelimit:" + k, N_("API rate limit reached for IP {0}: too many invalid tokens (refused for {1} min)."),
@@ -188,7 +194,7 @@ def api_authenticate():
         refused = usage_refused(c, u["id"])
         if refused is not None:
             return refused
-    if not g.get("approved_job") and not token_ip_ok(row, rate_ip()):  # 2.15.0 (#479): optional address restriction (checked when an approved request was stored)
+    if not g.get("approved_job") and not token_ip_ok(row, client_ip()):  # 2.15.0 (#479): optional address restriction (checked when an approved request was stored)
         return v1_err(403, tr("This token may not be used from this address"))
     scopes = scopes_effective(c, row, u)
     need = v1_scope_need(request.method, request.url_rule)
@@ -405,6 +411,8 @@ def task_for(c, row, uid):
         out["encrypted_note"] = True  # 2.42.0 (#828): agents learn only that there is an encrypted note
     if c.execute("SELECT 1 FROM task_note_locks WHERE task_id=?", (row["id"],)).fetchone():
         out["note_locked"] = True  # 2.48.0 (#1642): the note is locked with its owner's password (never readable here)
+    if str(row["tt_id"] or "").startswith("mail:"):  # 2.126.0 B (#1978): title and notes came from an e-mail
+        out.update(origin="mail", untrusted=True)
     return out
 
 
@@ -1270,6 +1278,13 @@ def v1_comment_create(tid):
         raise BadInput(tr("Expected {0}", '{"body": "..."}'))
     c = db()
     _v1_live(c, tid, write=False, full=True)  # view-only members may comment (as in the app)
+    if b.get("portal") not in (None, False, 0, "0", "false", "") and not any(b.get(k) for k in ("suggestion", "choices", "approval")):
+        # 2.126.0 B (#1979 G5): an agent's answer to a customer waits for a person (need_approval: agents only)
+        from ..api.scopes import need_approval
+        from ..team.portal import pt_comment_flag
+        if pt_comment_flag(c, tid, me(), b["portal"]):
+            t = c.execute("SELECT title, list_id FROM tasks WHERE id=?", (tid,)).fetchone()
+            need_approval(c, N_("Answer the customer of the task “{0}”"), (t["title"][:80],), list_id=t["list_id"], task_id=tid)
     j = v1_call(comment_create, tid, body={"body": b["body"], **{k: b[k] for k in ("suggestion", "reply_to", "choices", "multi", "approval",
                                                                                     "expires_in", "portal") if k in b}})
     return jsonify(v1_comment(c, {**j, "task_id": tid}, user_names(c, [me()]))), 201
