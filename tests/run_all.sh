@@ -1312,6 +1312,12 @@ fresh; run p2123_b_ui node p2123_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.123.0 part C: pictures from the Ablage in pages (#2103), [[datei:]] / [[tabelle:]] links (#2107), checkboxes as tasks (#2108)
 fresh; run p2123_c_api "$PY" p2123_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2123_c_ui node p2123_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.126.2 part A: page suggestions above the phone keyboard, checkbox "+" without overlap, search edge case (#2363), "Mentioned in" on sheets (#2357)
+fresh; run p21262_a_api "$PY" p21262_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21262_a_ui node p21262_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.126.2 part B: link of a gone creator shown as ended, unreadable sealed text is an error (#2358), news entry for shared pages (#2355)
+fresh; run p21262_b_api "$PY" p21262_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21262_b_ui node p21262_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.123.0 part D: cash flow: opening balance, manual corrections, reconciliation (#2341); installment list number format (#2351)
 fresh; run p2123_d_api "$PY" p2123_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2123_d_ui node p2123_d_ui.js "$KALMIDO_TEST_DATA"
