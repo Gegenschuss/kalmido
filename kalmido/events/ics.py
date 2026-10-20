@@ -152,7 +152,7 @@ def _extra_merge(have_lines, extra, own_rule):
         up = x[:6].upper()
         if depth == 0 and up != "BEGIN:":
             n = _prop_name(x)
-            if (n in EV_SINGLE and n in have) or (own_rule and n in ("EXRULE", "RDATE", "EXDATE")):
+            if (n in EV_SINGLE and n in have) or (own_rule and n == "EXDATE"):  # 2.126.0 C (#1985): RDATE / EXRULE stay
                 continue
         depth += 1 if up == "BEGIN:" else -1 if x[:4].upper() == "END:" else 0
         out.append(x)

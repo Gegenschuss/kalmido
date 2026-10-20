@@ -207,6 +207,7 @@ def wait_req(n=1):
     return False
 
 
+r.agent = {"owner_id": 7}  # 2.126.0 (#1973): only the agent's operator answers permission questions (here its owner)
 p = hook()
 p.stdin.write('{"tool_name": "Bash", "tool_input": {"command": "deploy --token=' + os.environ["KALMIDO_TOKEN"] + '"}}')
 p.stdin.close()

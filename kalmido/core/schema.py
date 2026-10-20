@@ -2734,6 +2734,13 @@ MIGRATIONS = [
     ("hub_absences", "decided_at", "ALTER TABLE hub_absences ADD COLUMN decided_at TEXT"),
     ("hub_absences", "decision_note", "ALTER TABLE hub_absences ADD COLUMN decision_note TEXT NOT NULL DEFAULT ''"),
     ("orgs", "hub_leave_approval", "ALTER TABLE orgs ADD COLUMN hub_leave_approval BIGINT NOT NULL DEFAULT 0"),
+    # 2.126.0 C (#1979 I3): the person whose calendar app wrote dav_meta.extra (NULL = before 2.126: sent to everyone as before);
+    # its alarms and attachments go back to that person only. Older versions never read it
+    ("dav_meta", "extra_by", "ALTER TABLE dav_meta ADD COLUMN extra_by BIGINT"),
+    # 2.126.0 D (#1990): the id the device gave a task it created (a POST /api/tasks sent again = that task, not a second
+    # one); nullable, 2.125 and older never set or read it, the index only covers rows that carry one
+    ("tasks", "client_ref", "ALTER TABLE tasks ADD COLUMN client_ref TEXT"),
+    ("tasks", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS tasks_client_ref ON tasks(created_by, client_ref) WHERE client_ref IS NOT NULL"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

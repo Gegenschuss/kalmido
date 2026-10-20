@@ -40,7 +40,7 @@ KALMIDO_URL=https://tasks.example.com KALMIDO_TOKEN=abk_... MCP_HTTP_TOKEN=$(ope
 # client: url http://127.0.0.1:8765/mcp, header "Authorization: Bearer <MCP_HTTP_TOKEN>"
 ```
 
-By default the server binds to `127.0.0.1`. It rejects requests with an `Origin` that is not localhost (DNS rebinding) and, when `MCP_HTTP_TOKEN` is set, requests without that bearer token. If you bind to another address, always set `MCP_HTTP_TOKEN` and put TLS in front.
+By default the server binds to `127.0.0.1`. It rejects requests with an `Origin` that is not localhost (DNS rebinding) and requests without the bearer token. Since 2.126.0 `MCP_HTTP_TOKEN` (at least 16 characters) is required: without it `--http` does not start. If you bind to another address, put TLS in front.
 
 ## Tools
 

@@ -70,6 +70,8 @@ GIT_CI = 5                                              # CI lookups per poll
 GIT_RATE_FLOOR = 25                                     # requests left: pause until the reset
 GIT_BACKOFF_MAX = 3600                                  # s
 GIT_MAX_BYTES = 4 * 1024 * 1024
+GIT_HOOK_MAX_BYTES = 25 * 1024 * 1024                   # 2.126.0 B (#1979 I5): inbound hook body (GitHub sends at most 25 MB)
+GIT_HOOK_PER_MIN = 120                                  # 2.126.0 B (#1979 I5): inbound hooks per connection and minute
 GIT_MAX_CONNS = 5                                       # per list
 GIT_TASK_PRS, GIT_TASK_COMMITS = 5, 5                   # shown per task
 GIT_PROVIDERS = ("github", "gitea", "gitlab", "bitbucket")
@@ -345,6 +347,9 @@ def _git_web(u):
     return u if u.lower().startswith(("https://", "http://")) else ""
 
 
+GIT_PR_BODY_MAX = 4000  # 2.126.0 B (#1978): a pull request's text is read only for task references (was 20000)
+
+
 def git_pr_of(p):
     """A pull request of either provider -> our fields (None if it does not look like one)."""
     if not isinstance(p, dict) or not isinstance(p.get("number"), int):
@@ -352,7 +357,7 @@ def git_pr_of(p):
     merged = bool(p.get("merged_at")) or p.get("merged") is True
     head = p.get("head") if isinstance(p.get("head"), dict) else {}
     user = p.get("user") if isinstance(p.get("user"), dict) else {}
-    return {"number": p["number"], "title": _gs(p.get("title"), 500), "body": str(p.get("body") or "")[:20000],
+    return {"number": p["number"], "title": _gs(p.get("title"), 500), "body": str(p.get("body") or "")[:GIT_PR_BODY_MAX],
             "state": "merged" if merged else "open" if p.get("state") == "open" else "closed",
             "author": _gs(user.get("login"), 100), "url": _git_web(p.get("html_url")), "head_ref": _gs(head.get("ref"), 250),
             "head_sha": _gs(head.get("sha"), 64), "updated_at": _gs(p.get("updated_at"), 40), "merged_at": _gs(p.get("merged_at"), 40) or None}
@@ -768,8 +773,10 @@ def git_repo_for_task(c, t):
     first = git_public(c, rows[0])
     code = git_code_for(c, [t["id"]]).get(t["id"], {"prs": [], "commits": []})
     d = {k: first[k] for k in ("provider", "base_url", "web_url", "owner", "repo", "full_name", "default_branch")}
+    # 2.126.0 B (#1978): titles and commit messages are written by anyone with access to the repository
     d.update(api_url=git_urls(rows[0]["provider"], rows[0]["base_url"])[0], branch=f"kalmido-{t['id']}",
-             prs=code["prs"], commits=code["commits"])
+             prs=[{**x, "origin": "git", "untrusted": True} for x in code["prs"]],
+             commits=[{**x, "origin": "git", "untrusted": True} for x in code["commits"]])
     if len(rows) > 1:
         d["others"] = [{k: x[k] for k in ("provider", "web_url", "full_name", "default_branch")} for x in (git_public(c, y) for y in rows[1:])]
     return d
@@ -1039,22 +1046,34 @@ def git_refresh(cid):
 @app.post("/api/hooks/git/<int:cid>")
 def git_hook(cid):
     """Inbound webhook (GitHub / Gitea / Forgejo / GitLab / Bitbucket): a valid signature only triggers the next poll at once."""
+    from ..api.v1 import hit_limit
+    from ..accounts.session import rate_ip
+    # 2.126.0 B (#1979 I5): a limit and a size cap before the signature; review: per address, so one sender cannot hold up
+    # the hooks of a connection for the repository host (a wider cap per connection stays)
+    if hit_limit(f"githook:{cid}@{rate_ip()}", GIT_HOOK_PER_MIN) or hit_limit(f"githook:{cid}", GIT_HOOK_PER_MIN * 5):
+        return err(tr("Too many requests"), 429)
+    if (request.content_length or 0) > GIT_HOOK_MAX_BYTES:
+        return err(tr("The file is too large (at most {0} MB)", GIT_HOOK_MAX_BYTES // (1024 * 1024)), 413)
     c = db()
     r = c.execute("SELECT * FROM git_conns WHERE id=?", (cid,)).fetchone()
     sec = git_unseal(cid, "hook", r["hook_secret"]) if r and r["hook_secret"] else ""
     if not sec:
         return err(tr("unknown"), 404)
-    raw = request.get_data(cache=False) or b""
-    mac = hmac.new(sec.encode(), raw, hashlib.sha256).hexdigest()
+    raw = request.get_data(cache=False) if request.content_length is not None else request.stream.read(GIT_HOOK_MAX_BYTES + 1)
+    if len(raw or b"") > GIT_HOOK_MAX_BYTES:
+        return err(tr("The file is too large (at most {0} MB)", GIT_HOOK_MAX_BYTES // (1024 * 1024)), 413)
+    mac = hmac.new(sec.encode(), raw or b"", hashlib.sha256).hexdigest()
     gh = request.headers.get("X-Hub-Signature-256", "")
     gt = request.headers.get("X-Gitea-Signature", "") or request.headers.get("X-Forgejo-Signature", "")
     # 2.18.0: GitLab sends the secret itself (X-Gitlab-Token, compared in constant time), Bitbucket Cloud an HMAC-SHA256
     # in X-Hub-Signature ("sha256=...")
     gl = request.headers.get("X-Gitlab-Token", "")
     bb = request.headers.get("X-Hub-Signature", "")
-    if not ((gh.startswith("sha256=") and hmac.compare_digest(gh[7:].lower(), mac)) or (gt and hmac.compare_digest(gt.lower(), mac))
-            or (gl and hmac.compare_digest(gl.encode(), sec.encode()))
-            or (bb.startswith("sha256=") and hmac.compare_digest(bb[7:].lower(), mac))):
+    mb = mac.encode()  # 2.126.0 B (#1979 I5): compared as bytes (a header with other characters is simply wrong)
+    if not ((gh.startswith("sha256=") and hmac.compare_digest(gh[7:].lower().encode("utf-8", "replace"), mb))
+            or (gt and hmac.compare_digest(gt.lower().encode("utf-8", "replace"), mb))
+            or (gl and hmac.compare_digest(gl.encode("utf-8", "replace"), sec.encode()))
+            or (bb.startswith("sha256=") and hmac.compare_digest(bb[7:].lower().encode("utf-8", "replace"), mb))):
         return err(tr("Invalid signature"), 401)
     if request.headers.get("X-GitHub-Event") == "ping":
         return jsonify(ok=True, ping=True)

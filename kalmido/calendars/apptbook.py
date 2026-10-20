@@ -617,11 +617,11 @@ def apb_open(c, slug):
     ip = rate_ip()
     if hit_limit("apbv:" + ip, APB_VIEW_RATE):
         return None, pub_limited(apb_lang_hdr())
-    bad = [("pubbad:" + ip, APB_BAD_LIMIT)]
-    if _rate_blocked(bad):
-        return None, pub_limited(apb_lang_hdr())
+    bad = [("pubbad:" + ip, APB_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
     p = c.execute("SELECT * FROM appt_pages WHERE slug=? AND enabled=1", (slug,)).fetchone() if SLUG_RE.fullmatch(slug or "") else None
     if not p or not apb_live(c, p["user_id"]):
+        if _rate_blocked(bad):
+            return None, pub_limited(apb_lang_hdr())
         _rate_fail(bad)
         aa_count("security", "publink", ip)
         return None, pub_gone()

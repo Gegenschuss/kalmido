@@ -28,7 +28,7 @@ from ..core.i18n import lang, languages, N_, tr
 from ..core.db import adopt_orphans, body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, local_now, now_utc, uset, write_lock
 from ..accounts.session import (
     _accept_lang, _DUMMY_HASH, _peer_trusted, _rate_blocked, _rate_fail, _rate_keys, _rate_reset, _token_hash,
-    client_ip, FAIL_WINDOW, proxy_login_value, set_cookie, start_session, user_public,
+    client_ip, FAIL_WINDOW, proxy_login_value, rate_ip, set_cookie, start_session, user_public,
 )
 
 
@@ -187,6 +187,7 @@ def auth_logout():
         c.commit()
     resp = jsonify(ok=True, proxy=g.auth_via == "proxy")
     resp.delete_cookie(COOKIE, path="/")
+    resp.headers["Clear-Site-Data"] = '"cache"'  # 2.126.0 D (#1992 O4): the browser's copies of files and pages of this account
     return resp
 
 
@@ -681,7 +682,7 @@ def auth_pk_options():
     c = db()
     if gsetting(c, "passkey_login") == "0":
         return err(tr("Logging in with a passkey is turned off on this server"), 403)
-    if _rate_blocked([("ip:" + client_ip(), 20)]):
+    if _rate_blocked([("ip:" + rate_ip(), 20)]):
         return err(tr("Too many failed logins, please wait a few minutes"), 429)
     chal, rp, opts = wa_auth_options(c, None, uv=True)
     tok = pend_new("pk", None, chal=chal, rp=rp, remember=bool(body().get("remember", True)))
@@ -692,7 +693,7 @@ def auth_pk_options():
 def auth_pk():
     from ..notify.alerts import aa_count
     c = db()
-    keys = [("ip:" + client_ip(), 20)]
+    keys = [("ip:" + rate_ip(), 20)]
     if gsetting(c, "passkey_login") == "0":
         return err(tr("Logging in with a passkey is turned off on this server"), 403)
     if _rate_blocked(keys):

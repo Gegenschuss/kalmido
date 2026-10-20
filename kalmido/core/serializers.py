@@ -16,6 +16,7 @@ def task_dict(r, tags, full_snips=False):
     d = dict(zip(r.keys(), r)) if isinstance(r, tuple) else dict(r)  # 2.65.0 (#1505): a row at once, not key by key
     d.pop("reminded", None)
     d.pop("nag_at", None)
+    d.pop("client_ref", None)  # 2.126.0 D (#1990): only the server matches it
     # 2.18.0 (#430): ms only on milestones, milestone_id only when set (keeps every other task's dict as it was)
     if not d.get("ms"):
         d.pop("ms", None)

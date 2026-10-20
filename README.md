@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.126.0** (2026-10-20): security release - fixes from the internal audit for office, documents, agents, sync and
+  offline; private document data on the account key; ESLint in CI.
 - **2.125.0** (2026-10-20): vacation requests with approval and vacation accounts, working days and weekly hours per
   person, close and approve monthly timesheets, time zone per person with entries split at midnight, timer shortcut,
   Excel export of times and workload; the browser demo starts like a new account and shows every module.

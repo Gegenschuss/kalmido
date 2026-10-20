@@ -151,11 +151,18 @@ def fk_migrate(c):
 # = clients.org_id, inside its workspace); a client without an organisation (a freelancer's) takes its creator's own books
 # (no organisation, private workspace). Never a private book for an organisation's client, never across organisations.
 # Name, e-mail, phone and role stay a copy on the contact person (documents read the copy); nothing follows later edits.
-def ckl_book_fits(cl, b):
+def ckl_book_fits(cl, b, c=None, book_id=None):
     """Is address book b (org_id, owner_org_id, owner_id) one the contact persons of client cl may link to?"""
     if cl["org_id"]:
         return b["owner_org_id"] == cl["org_id"] and b["org_id"] == cl["org_id"]
-    return not b["owner_org_id"] and not b["org_id"] and b["owner_id"] == cl["created_by"]
+    if b["owner_org_id"] or b["org_id"]:
+        return False
+    # 2.126.0 C (#1992 K10): a private client like an organisation's: the client creator's own private books and the private
+    # books shared with them (review: not every private book; same rule as the nightly check in accounts/tenancy.py)
+    if b["owner_id"] == cl["created_by"]:
+        return True
+    return bool(c is not None and book_id and c.execute("SELECT 1 FROM book_members WHERE book_id=? AND user_id=?",
+                                                         (book_id, cl["created_by"])).fetchone())
 
 
 def ckl_contact_ok(c, uid, cl, kid):
@@ -165,7 +172,7 @@ def ckl_contact_ok(c, uid, cl, kid):
     if not r or r["kind"] == "group":
         return None
     b = c.execute("SELECT org_id, owner_org_id, owner_id FROM books WHERE id=?", (r["book_id"],)).fetchone()
-    return r if b and ckl_book_fits(cl, b) else None
+    return r if b and ckl_book_fits(cl, b, c, r["book_id"]) else None
 
 
 class CklGone(BadInput):
@@ -211,7 +218,7 @@ def ckl_contact_clients(c, kid, uid):
     u = c.execute("SELECT kind, kid FROM users WHERE id=?", (uid,)).fetchone()
     if not u or u["kid"] or (u["kind"] or "user") == "agent" or not clients_on(c, uid):
         return []
-    rows = c.execute("SELECT k.id, k.client_id, k.role, b.org_id, b.owner_org_id, b.owner_id FROM office_client_contacts k "
+    rows = c.execute("SELECT k.id, k.client_id, k.role, b.id AS book_id, b.org_id, b.owner_org_id, b.owner_id FROM office_client_contacts k "
                      "JOIN contacts ct ON ct.id=k.contact_id JOIN books b ON b.id=ct.book_id WHERE k.contact_id=? ORDER BY k.client_id, k.id",
                      (kid,)).fetchall()
     if not rows:
@@ -219,7 +226,7 @@ def ckl_contact_clients(c, kid, uid):
     mine = {r["id"]: r for r in client_rows(c, uid)}
     return [{"client_id": r["client_id"], "name": mine[r["client_id"]]["name"], "icon": mine[r["client_id"]]["icon"], "role": r["role"],
              "contact_person_id": r["id"]}
-            for r in rows if r["client_id"] in mine and ckl_book_fits(mine[r["client_id"]], r)]
+            for r in rows if r["client_id"] in mine and ckl_book_fits(mine[r["client_id"]], r, c, r["book_id"])]
 
 
 def ckl_candidates(c, uid, cl, q="", limit=20):
@@ -232,7 +239,7 @@ def ckl_candidates(c, uid, cl, q="", limit=20):
     if not ids:
         return []
     books = {b["id"]: b for b in c.execute(f"SELECT id, name, org_id, owner_org_id, owner_id FROM books WHERE id IN ({','.join('?' * len(ids))})", ids)
-             if ckl_book_fits(cl, b)}
+             if ckl_book_fits(cl, b, c, b["id"])}
     if not books:
         return []
     from ..core.pg import like_escape

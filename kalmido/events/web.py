@@ -13,7 +13,7 @@ from ..tasks.validation import as_int, valid_date
 from ..personal.timetrack import BadInput
 from ..events.model import (
     att_clean, cal_create, cal_fields, cal_member_set, cal_public, cal_touch, cals_for, default_cal, ev_delete, ev_dict,
-    ev_fields, ev_occ_change, ev_range, ev_store, EV_KEYS, EV_PARTSTAT, EV_RANGE_DAYS, EV_TITLE_MAX, need_event, need_evcal,
+    ev_fields, ev_occ_change, ev_ov_tidy, ev_range, ev_store, EV_KEYS, EV_PARTSTAT, EV_RANGE_DAYS, EV_TITLE_MAX, need_event, need_evcal,
     wall,
 )
 from ..events.ics import ics_export
@@ -148,6 +148,8 @@ def op_event_edit(c, uid, eid, b, occ=None):
     f = ev_fields(c, uid, {k: v for k, v in b.items() if k not in ("attendees", "cal_id", "expect")}, r)
     if "rrule" in f and not f["rrule"]:
         f["overrides"], f["exdates"] = "", ""
+    else:
+        ev_ov_tidy(r, f)  # 2.126.0 C (#1992 K6)
     att = att_clean(c, b["attendees"], eid, r["cal_id"]) if "attendees" in b else None
     ev_store(c, uid, r["cal_id"], f, eid=eid, attendees=att)
     c.commit()
