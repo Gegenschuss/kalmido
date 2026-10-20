@@ -989,7 +989,9 @@ def dav_read(raw, allday_min):
         trig = al.get("TRIGGER") if al is not None else None
         tv = _ics_val(trig)
         # 2.111.0 C (#2057): our fixed-time reminder (marked), or any absolute alarm of a task without a due date
-        if isinstance(tv, datetime) and v["remind_at"] is None and (al.get("X-KALMIDO-AT") is not None or not v["due"]):
+        # (not a location alarm of Apple's apps: ACTION NONE / X-APPLE-PROXIMITY with the dummy trigger of 1976 - kept as it came)
+        if (isinstance(tv, datetime) and v["remind_at"] is None and (al.get("X-KALMIDO-AT") is not None or not v["due"])
+                and tv.year >= 2000 and al.get("X-APPLE-PROXIMITY") is None and str(al.get("ACTION") or "").upper() != "NONE"):
             v["remind_at"] = (tv if tv.tzinfo else tv.replace(tzinfo=TZ)).astimezone(TZ).strftime("%Y-%m-%dT%H:%M")
             continue
         if v["due"] and trig is not None and tv is not None:
