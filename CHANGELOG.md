@@ -7,6 +7,10 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.142.1] - 2026-10-20
+
+- Fixes from CI of 2.142.0: the ntfy share inbox texts call the basket by its name in every language (#2150), the notification channel lookup and a schema comment follow the Postgres rules (#2145).
+
 ## [2.142.0] - 2026-10-20
 
 Notifications to Slack, Matrix, Telegram and Signal, e-mail on assignments and mentions, importers for Notion, Google Tasks, ClickUp, Jira, CSV and Markdown, export as Todoist CSV or Markdown.
