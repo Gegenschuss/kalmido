@@ -51,7 +51,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(box && box.style.position === '', '#2363: desktop (no visualViewport shift) keeps the CSS place');
   w.eval(`window.visualViewport = {height: 400, offsetTop: 0, addEventListener(t, f) { (window.__vv = window.__vv || {})[t] = f; }, removeEventListener() {}}; window.innerHeight = 800;`);
   box = await type('x [[tabelle:budg');
-  if (!box) { const b0 = d.querySelector('#wk-ac'); console.log('debug: ac', b0 && b0.className, b0 && b0.innerHTML.slice(0, 120), 'ta', ta.value, w.eval('String(typeof wem_acPlace)')); try { w.eval('wem_acPlace(document.querySelector("#wk-ac"))'); } catch (e) { console.log('debug: place threw', e.message); } }
+  await until(() => box.style.position === 'fixed');  // the 200 ms debounce redraws the list that is still shown
   check(box && box.style.position === 'fixed' && box.style.bottom === '408px', '#2363: keyboard open: the list is fixed above it ' + box?.style.position + ' ' + box?.style.bottom);
   w.eval(`window.visualViewport.height = 300`); w.eval(`window.__vv?.resize?.()`);
   check(box && box.style.bottom === '508px', '#2363: a visualViewport resize moves it ' + box?.style.bottom);
