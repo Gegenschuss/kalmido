@@ -173,6 +173,8 @@ def open_archive(ox, rk):
 def norm_rows(rows, skip=()):
     out = collections.Counter()
     for r in rows:
+        if isinstance(r, dict) and r.get("action") == "recovery_key" and r.get("target") == "org":
+            continue  # 2.137.0 (#2344, with 2.138.0 #1972): the target's own recovery key, made by its first export
         if isinstance(r, dict):
             out[json.dumps({k: v for k, v in r.items() if not SKIP_KEYS.match(k) and k not in skip}, sort_keys=True, ensure_ascii=False, default=str)] += 1
     return out
