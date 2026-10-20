@@ -45,8 +45,10 @@ function dx_dialog() {
     <div class="row"><label id="dx-fl">${tr('From')}</label>${dateIn('dx-from', dx_iso(from), {label: tr('From'), clear: false})}</div>
     <div class="row"><label id="dx-tl">${tr('To')}</label>${dateIn('dx-to', dx_iso(to), {label: tr('To'), clear: false, after: 'dx-from'})}</div>
     ${ofcChk('dx-in', tr('Include receipts and travel expenses'), (OFC.info?.settings?.datev_extf || {}).in_on ?? 1)}
+    ${ofcChk('dx-dups', tr('Include possibly duplicate receipts'), 0)}
     <p class="muted" id="dx-res" aria-live="polite"></p>`, tr('Download'), async m => {
-    const q = `from=${encodeURIComponent($('#dx-from', m).value)}&to=${encodeURIComponent($('#dx-to', m).value)}${$('#dx-in', m)?.checked ? '' : '&in=0'}`;
+    // 2.146.0 B (#2452): possible duplicates stay out unless ticked (the toast names how many)
+    const q = `from=${encodeURIComponent($('#dx-from', m).value)}&to=${encodeURIComponent($('#dx-to', m).value)}${$('#dx-in', m)?.checked ? '' : '&in=0'}${$('#dx-dups', m)?.checked ? '&dups=1' : ''}`;
     const j = await api('GET', `/api/office/datev/extf?${q}&check=1`);
     const a = document.createElement('a'); a.href = `/api/office/datev/extf?${q}`; a.download = j.file || ''; document.body.appendChild(a); a.click(); a.remove();
     toast([j.count === 1 ? tr('1 booking exported') : tr('{0} bookings exported', j.count), ...(j.hints || []).map(h => h.text)].join('. '));  // 2.120.0 C (#2090)

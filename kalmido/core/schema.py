@@ -2957,6 +2957,15 @@ MIGRATIONS = [
     ("contact_srcs", "wb_err", "ALTER TABLE contact_srcs ADD COLUMN wb_err TEXT NOT NULL DEFAULT ''"),
     # 2.140.0 D (#2137): what the owner set in Kalmido and the next sync writes into the vCard (JSON {mo, dy, y}; '' = nothing)
     ("contact_links", "want", "ALTER TABLE contact_links ADD COLUMN want TEXT NOT NULL DEFAULT ''"),
+    # 2.146.0 B (#2452): duplicates of documents. raw_sha = sha256 of the bytes as uploaded (before metadata was cut; the
+    # plain digest like fs_versions.sha256), the same file in the same workspace is not stored twice. dup_of = an older
+    # document that looks like the same invoice (supplier + invoice number, or supplier + amount + date), dup_ok = 1 when a
+    # person said "no duplicate". 2.145 ignores all three
+    ("doc_meta", "raw_sha", "ALTER TABLE doc_meta ADD COLUMN raw_sha TEXT NOT NULL DEFAULT ''"),
+    ("doc_meta", "raw_sha", "CREATE INDEX IF NOT EXISTS doc_meta_raw_sha ON doc_meta(ws, raw_sha) WHERE raw_sha <> ''"),
+    ("doc_meta", "dup_of", "ALTER TABLE doc_meta ADD COLUMN dup_of BIGINT"),
+    ("doc_meta", "dup_ok", "ALTER TABLE doc_meta ADD COLUMN dup_ok INTEGER NOT NULL DEFAULT 0"),
+    # (2.146.0 B end)
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

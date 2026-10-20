@@ -379,6 +379,9 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .bk-year{display:inline-flex;align-items:center;gap:.5rem}
 .bk-photo{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem;margin:.5rem 0 1rem}
 .bk-shot{min-height:3.25rem;padding:0 1.25rem;font-size:var(--fs-m);gap:.5rem;cursor:pointer}
+.bk-files{min-height:3.25rem;padding:0 1.25rem;gap:.5rem;cursor:pointer}  /* 2.146.0 B (#2453): several files / a ZIP */
+.bk-merge{display:grid;gap:.5rem;border:0;margin:0;padding:0}
+.bk-merge legend{margin-bottom:.25rem}
 .bk-photohint{font-size:var(--fs-s)}
 .bk-sec{margin:1.25rem 0}
 .bk-h{margin:.75rem 0 .25rem;font-weight:600}
@@ -412,7 +415,7 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
   .bk-tab th,.bk-tab td{display:flex;justify-content:space-between;border:0;padding:.125rem .25rem}
   .bk-tab th{font-weight:600}
   .bk-tab td.num::before{content:attr(data-l);color:var(--muted);font-size:var(--fs-s)}
-  .bk-shot{width:100%;justify-content:center}
+  .bk-shot,.bk-files{width:100%;justify-content:center}
   .bk-kz>div{flex-direction:column;gap:.125rem}
 }
 .rkcftab .bk-cfres th,.rkcftab .bk-cfres td,.rkcftab .bk-cffree th,.rkcftab .bk-cffree td{padding:.25rem;font-size:var(--fs-s)}

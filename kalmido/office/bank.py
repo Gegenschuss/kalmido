@@ -9,11 +9,8 @@ Every route: office_gate + office_org(admin=True) -- admins of the office area o
 agents and kids 403, foreign ids 404. amount / counterpart / purpose / iban are encrypted at rest (orgcrypt)."""
 import hashlib
 import hmac
-import io
 import json
 import re
-import struct
-import zipfile
 import unicodedata
 from collections import Counter
 from datetime import date, timedelta
@@ -22,6 +19,7 @@ from flask import jsonify, request
 
 from ..core.config import SECRET_KEY, app
 from ..core import csvimport as cx  # 2.140.0 B (#2134): the shared statement reader
+from ..core import zipread as zr
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import tr
@@ -157,42 +155,18 @@ class _Files:
             self.files.append({"name": name, "text": text})
 
     def add_zip(self, name, data):
-        # 2.144.1 (review): the entry count of the end record before zipfile builds an object per entry; zip64 is not taken
-        e = data.rfind(b"PK\x05\x06")
-        cnt = struct.unpack_from("<H", data, e + 10)[0] if 0 <= e <= len(data) - 22 else None
-        if cnt is not None and cnt > BNK_ZIP_ENTRIES_MAX:
-            raise BadInput(tr("The ZIP file holds too many entries (at most {0})", BNK_ZIP_ENTRIES_MAX))
-        if cnt is None or cnt == 0xFFFF:
-            self.errors.append({"file": name, "error": tr("The ZIP file cannot be read")})
-            return
+        # 2.146.0: the shared in-memory reader (core/zipread, same rules as 2.144.1); its limits stop the whole import
         try:
-            zf = zipfile.ZipFile(io.BytesIO(data))
-            infos = zf.infolist()
-        except Exception:  # BadZipFile, a broken zip64 locator (struct.error) ...: never a 500
-            self.errors.append({"file": name, "error": tr("The ZIP file cannot be read")})
+            z = zr.zip_read(data, BNK_EXTS, BNK_FILE_MAX, BNK_UNPACKED_MAX, BNK_ZIP_ENTRIES_MAX, BNK_FILES_MAX)
+        except zr.ZipLimit as x:
+            raise BadInput(str(x))
+        self.errors += [{**e, "file": e["file"] or name} for e in z.errors]
+        if any(not e["file"] for e in z.errors):
             return
-        if len(infos) > BNK_ZIP_ENTRIES_MAX:
-            raise BadInput(tr("The ZIP file holds too many entries (at most {0})", BNK_ZIP_ENTRIES_MAX))
-        n = 0
-        for info in infos:
-            raw = info.filename.replace("\\", "/")
-            base = _fname(raw)
-            if info.is_dir() or not base or raw.startswith("__MACOSX/") or "/__MACOSX/" in raw or base.startswith("._") or base.startswith("."):
-                continue  # folders and the hidden files of the packing system
-            if not base.casefold().endswith(BNK_EXTS):
-                self.skipped.append(base)  # nested ZIPs included: never opened
-                continue
-            n += 1
-            if info.flag_bits & 0x1:
-                self.errors.append({"file": base, "error": tr("The file is encrypted; please pack it without a password")})
-                continue
-            try:  # the sizes in the ZIP's header are never trusted: reading stops one byte after the limit
-                with zf.open(info) as f:
-                    part = f.read(BNK_FILE_MAX + 1)
-            except Exception:  # BadZipFile, zlib.error, an unknown compression ...: a broken entry never stops the others
-                self.errors.append({"file": base, "error": tr("The file cannot be read")})
-                continue
+        self.skipped += z.skipped
+        for base, part in z.files:
             self.add(base, part)
+        n = z.n
         self.labels.append(tr("{0} ({1} files)", name, n) if n != 1 else name)
 
 

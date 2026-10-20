@@ -68,6 +68,11 @@ DV_NO_VAT_1 = N_("1 receipt without a VAT rate booked without input tax")
 # 2.120.0 (#2090): travel receipts marked "in DATEV" (with a DATEV number) are booked there already -- not twice
 DV_IN_DATEV = N_("{0} travel receipts already in DATEV are not exported again")
 DV_IN_DATEV_1 = N_("1 travel receipt already in DATEV is not exported again")
+# 2.146.0 B (#2452): a possible duplicate (docs/dups.py) stays out unless the export asks for it (?dups=1)
+DV_DUP = N_("{0} possibly duplicate receipts are not exported")
+DV_DUP_1 = N_("1 possibly duplicate receipt is not exported")
+DV_DUP_IN = N_("{0} possibly duplicate receipts are exported")
+DV_DUP_IN_1 = N_("1 possibly duplicate receipt is exported")
 
 
 def _len(st, n, plus=0):
@@ -201,10 +206,20 @@ def dv_receipt_rows(c, oid, d_from, d_to, st, s):
     gegen = dv_counter(st)
     bu_in = {**DV_BU_IN, **(st.get("bu_in") or {})}
     rows, no_cat, no_vat = [], 0, 0
-    for rc in bk_receipts(c, oid, d_from, d_to, by="doc"):
+    from flask import has_request_context, request
+    from ..docs.dups import dup_open
+    rcs = bk_receipts(c, oid, d_from, d_to, by="doc")
+    dups = dup_open(c, [rc["node_id"] for rc in rcs])
+    with_dups = has_request_context() and request.args.get("dups") == "1"
+    dup_ids = []
+    for rc in rcs:
         amount = _eur(rc["amount"], s)
         if amount == 0:
             continue
+        if rc["node_id"] in dups:
+            dup_ids.append(rc["node_id"])
+            if not with_dups:
+                continue
         no_cat += not rc["category"]
         no_vat += rc["vat_pct"] is None and not small
         bu = "" if small else bu_in.get(rc["vat_pct"] or "", "")
@@ -219,6 +234,10 @@ def dv_receipt_rows(c, oid, d_from, d_to, st, s):
         hints.append({"key": "no_category", "count": no_cat, "text": tr(DV_NO_CAT_1, o) if no_cat == 1 else tr(DV_NO_CAT, no_cat, o)})
     if no_vat:
         hints.append({"key": "no_vat", "count": no_vat, "text": tr(DV_NO_VAT_1) if no_vat == 1 else tr(DV_NO_VAT, no_vat)})
+    if dup_ids:
+        n = len(dup_ids)
+        txt = (tr(DV_DUP_IN_1) if n == 1 else tr(DV_DUP_IN, n)) if with_dups else (tr(DV_DUP_1) if n == 1 else tr(DV_DUP, n))
+        hints.append({"key": "dups", "count": n, "ids": dup_ids[:50], "text": txt})
     return rows, hints
 
 

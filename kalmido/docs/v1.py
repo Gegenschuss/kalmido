@@ -27,6 +27,7 @@ V1_FIELDS = ("date", "due", "amount", "currency", "sender", "type", "tags", "tex
 def _v1_doc(c, m, node, full=False, role=None):
     d = doc_json(c, m, node, full=full, role=role)
     d.pop("thumb", None)
+    d.pop("duplicate_of", None)  # 2.146.0 B (#2452): the duplicate warning is for the people of the app (agents: not in API v1)
     d["url"] = f"/api/v1/documents/{m['node_id']}"
     d["content_url"] = f"/api/v1/files/{m['node_id']}/content"
     return d

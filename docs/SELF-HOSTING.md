@@ -1038,6 +1038,14 @@ gross (they must add up, else only the gross stays) and the invoice number. They
 sheet and the office's receipt sheet show one line *Recognised: ...* with *Take over* (sender, VAT rate and amount, one
 undo step) and *Discard*; the invoice number stays visible with a copy button.
 
+2.146.0: HEIC / HEIF photos (iPhone) are read with `pi-heif` (BSD-3-Clause, read only; its bundled libheif / libde265 are
+LGPL, no encoder) -- part of the image. An own build without it keeps working: such photos show *This server cannot read
+HEIC photos yet*. The same file is not stored twice in a workspace (upload, share and mail input compare the bytes); an
+invoice that looks like an older one (same supplier and invoice number, or same supplier, amount and date) gets the
+warning *Possibly a duplicate of ...* and stays out of the DATEV batch until someone answers *No duplicate* or the export
+includes it. The receipt upload and the mail input unpack ZIP files and Outlook's `winmail.dat` in memory (PDF, pictures,
+XML; at most 100 files and 60 MB unpacked per ZIP, no nested ZIPs).
+
 Each tool runs as a short-lived process with limits; tune them for small hosts:
 
 | Variable | Default | Meaning |

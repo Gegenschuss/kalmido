@@ -324,6 +324,8 @@ ORDER = (
     "docs.store",  # 2.48.0 (#1111): documents: tables, sealing, word index, recognition run (no routes)
     "docs.ingest",  # 2.48.0 (#1111): docs_ingest + the background queue, mail / inbox folder
     "docs.thumbfill",  # 2.66.1 (#1944): one-time catch-up of the previews of imported documents (no routes)
+    "docs.unpack",  # 2.146.0 B (#2453): ZIP / winmail.dat of an upload or a mail -> its files (no routes)
+    "docs.dups",  # 2.146.0 B (#2452): the same file / the same invoice twice (no routes; hooks into the recognition)
     "files.textscan",  # 2.61.0 C (#1820): text recognition of normal stored files (queue, search, Ablage search route)
     "docs.web",  # 2.48.0 (#1111): the routes of the documents area
     "docs.dsearch",  # 2.122.0 B (#2294): filters + search syntax of the documents list (no routes)

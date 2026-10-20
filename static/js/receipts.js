@@ -85,7 +85,8 @@ document.addEventListener('click', async e => {
 // "Recognised: ..." with Take over / Discard while it would change something (doc.extracted.new); Take over and Discard are
 // one undo step each. The invoice number stays visible (copy button) even after the take-over.
 function rx_html(d) {
-  const x = d?.extracted; if (!x) return '';
+  if (!d?.extracted && !d?.duplicate_of) return '';
+  const x = d.extracted || {};  // 2.146.0 B (#2452): a possible duplicate shows without recognised values too
   const w = d.role !== 'view', cur = x.currency || d.currency;
   const parts = [x.supplier && `<b>${esc(x.supplier)}</b>`, x.invoice_no && esc(tr('No. {0}', x.invoice_no)),
     x.net && `${tr('net')} ${esc(dc_money(x.net, cur))}`, x.vat_pct && esc(tr('VAT {0} %', x.vat_pct)), x.gross && `${tr('gross')} ${esc(dc_money(x.gross, cur))}`].filter(Boolean);
@@ -94,7 +95,10 @@ function rx_html(d) {
     <span class="rc-acts"><button type="button" class="btn sm" data-rx="dismiss:${d.id}">${tr('Discard')}</button><button type="button" class="btn sm pri" data-rx="apply:${d.id}">${tr('Take over')}</button></span></div>` : '';
   const no = x.invoice_no ? `<div class="rx-no"><span class="muted">${tr('Invoice number')}:</span> <span class="rx-nov">${esc(x.invoice_no)}</span>
     <button type="button" class="linkbtn" data-rx="copy:${d.id}" aria-label="${esc(tr('Copy'))}">${tr('Copy')}</button></div>` : '';
-  return line || no ? `<div class="rx-slot">${line}${no}</div>` : '';
+  // 2.146.0 B (#2452): an older document looks like the same invoice -- a link to it, "No duplicate" keeps the decision
+  const du = d.duplicate_of, dup = du ? `<div class="rx-dup" role="note">${ic('alert', 's')}<span>${tr('Possibly a duplicate of')} <a href="#docs/${+du.id}">${esc(du.name)}</a></span>
+    ${w ? `<button type="button" class="btn sm" data-rx="nodup:${d.id}">${tr('No duplicate')}</button>` : ''}</div>` : '';
+  return line || no || dup ? `<div class="rx-slot">${dup}${line}${no}</div>` : '';
 }
 async function rx_post(id, b) {
   const j = await api('POST', `/api/docs/${id}/extracted`, b);
@@ -113,7 +117,10 @@ document.addEventListener('click', async e => {
   }
   b.disabled = true;
   let j; try { j = await rx_post(id, {do: act}); } catch { b.disabled = false; return; }
-  if (act === 'apply') {
+  if (act === 'nodup') {
+    const label = tr('Marked as no duplicate');
+    histToast(label, histAdd({label, undo: () => rx_post(id, {do: 'dup'}), redo: () => rx_post(id, {do: 'nodup'})}));
+  } else if (act === 'apply') {
     const before = j.before, label = tr('Recognised values taken over');
     histToast(label, histAdd({label, undo: () => rx_post(id, {do: 'restore', before}), redo: () => rx_post(id, {do: 'apply'})}));
   } else {

@@ -18,12 +18,14 @@ from ..core.db import connect, iso, now_utc
 from ..core.pg import system_ctx
 from ..files.store import fs_add_hooks, fs_on_delete, fs_put
 from . import store as S
+from .unpack import doc_unpack
 
 IDLE = 5             # s the queue sleeps when there is nothing to do (a new document wakes it at once)
 SCAN_EVERY = max(1, int(os.environ.get("KALMIDO_DOCS_SCAN_S", "60") or 60))  # s between two looks into the inbox folders
 RUN_STALE = 30       # min after which a run that was cut off (restart) is taken up again
 TRIES = 3            # runs of one document at most
 MAIL_FILES = 20      # attachments of one mail at most
+MAIL_UNPACKED = 50   # 2.146.0 B (#2453): files out of one ZIP / winmail.dat of a mail at most
 _Q = {"thread": None, "scan": 0.0}
 doc_on_done = []     # 2.48.0 (#1356): hooks f(c, nid, first) after a recognition run (receipts: the event document_added)
 _WAKE = threading.Event()
@@ -34,13 +36,15 @@ def _now():
     return iso(now_utc())
 
 
-def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=None, parent_id=None):
+def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=None, parent_id=None, dedup=False, info=None):
     """Store a new document of account uid in the workspace org_id (None: uid's own) and queue its recognition. meta:
     fields given by the caller (an import) -- date, due, amount, currency, sender, type, tags [names], text, ext_id; they
     are taken as they are ("import"), the recognition fills in the rest. An ext_id already present in the workspace
     returns that document instead of a second copy. Returns the node id; the caller commits (then docs_kick()). Raises
     what fs_put raises (Denied, ValueError, hosting.QuotaExceeded). parent_id: 2.122.0 (#2098) a folder the API puts it in
-    (needs 'edit' there; default: the workspace's documents folder)."""
+    (needs 'edit' there; default: the workspace's documents folder). dedup: 2.146.0 B (#2452) the same bytes already in the
+    workspace (a document uid may see) return that document; info (a dict) then gets dup = True."""
+    from .dups import dup_same_file, raw_sha
     meta = dict(meta or {})
     ext = str(meta.pop("ext_id", "") or "")[:200] or None
     ws_guess = S.doc_ws(org_id, uid)
@@ -48,6 +52,13 @@ def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=Non
         r = c.execute("SELECT node_id FROM doc_meta WHERE ws=? AND ext_id=?", (ws_guess, ext)).fetchone()
         if r:
             return r[0]
+    sha = raw_sha(data)
+    if dedup:
+        same = dup_same_file(c, ws_guess, sha, uid)
+        if same:
+            if info is not None:
+                info["dup"] = True
+            return same
     folder = int(parent_id) if parent_id else S.root_folder(c, uid, org_id)  # 2.48.0 review: the marked documents folder, members file in
     up = {}  # 2.61.0 B (#1819): the upload checks' info -- the capture date of a photo (read before its metadata went)
     nid = fs_put(c, uid, folder, name, data, mime, None if parent_id else org_id, up=up)
@@ -55,6 +66,7 @@ def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=Non
     doc_add(c, nid, node["org_id"], node["owner_id"], uid, source, ext, meta)
     if up.get("taken_at"):
         c.execute("UPDATE doc_meta SET taken_at=? WHERE node_id=?", (str(up["taken_at"])[:40], nid))
+    c.execute("UPDATE doc_meta SET raw_sha=? WHERE node_id=?", (sha, nid))  # 2.146.0 B (#2452)
     return nid
 
 
@@ -245,14 +257,22 @@ def docs_mail_import(c, msg, raw):
         _text, files = mail_text(msg)
         first = 0
         for i, (name, mime, data) in enumerate(files[:MAIL_FILES]):
-            if not (mime.startswith("image/") or mime == "application/pdf" or name.lower().endswith(".pdf")):
+            parts = doc_unpack(name, data, MAIL_UNPACKED)  # 2.146.0 B (#2453): a ZIP / winmail.dat -> its files
+            if parts is not None:
+                for e in parts[1]:
+                    print("docs: mail attachment", e[:200], flush=True)
+                parts = [(n, m2, b, f"mail:{mid}:{i}:{j}") for j, (n, b, m2) in enumerate(parts[0])]
+            elif mime.startswith("image/") or mime == "application/pdf" or name.lower().endswith(".pdf"):
+                parts = [(name, mime, data, f"mail:{mid}:{i}")]
+            else:
                 continue
-            try:
-                with c.savepoint():
-                    nid = docs_ingest(c, uid, org, name, data, mime, "mail", {"ext_id": f"mail:{mid}:{i}"})
-                first = first or nid
-            except (Denied, ValueError, QuotaExceeded) as e:
-                print("docs: mail attachment refused", type(e).__name__, flush=True)
+            for pname, pmime, pdata, pext in parts:
+                try:
+                    with c.savepoint():  # 2.146.0 B (#2452): a file already there is linked, not stored again
+                        nid = docs_ingest(c, uid, org, pname, pdata, pmime, "mail", {"ext_id": pext}, dedup=True)
+                    first = first or nid
+                except (Denied, ValueError, QuotaExceeded) as e:
+                    print("docs: mail attachment refused", type(e).__name__, flush=True)
     c.commit()
     if first:
         docs_kick()

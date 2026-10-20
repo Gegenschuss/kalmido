@@ -167,7 +167,11 @@ In the area Packs, every industry pack's card says **Switched on** or **Off** an
   API: `GET|POST /api/office/contracts/<id>/files` (multipart `file`, `date?`, `replace?`),
   `GET|PATCH|DELETE /api/office/contracts/<id>/files/<file id>`, `POST .../<file id>/restore`.
 - **Bookkeeping** (admins, 2.90) - income/expense statement, VAT return figures, tax reserve, receipt photo and tax
-  dates, see below.
+  dates, see below. Since 2.146 the receipt buttons take several files at once (at most 50, also a ZIP or a
+  `winmail.dat`); several photos can be merged into one receipt (the pages of a long till receipt become one PDF). A file
+  that is already there is not stored again (*This file already exists*, Open shows it); a receipt that looks like the
+  same invoice as an older one is marked *Possibly a duplicate of ...* with a link and *No duplicate*. The DATEV export
+  leaves such receipts out unless *Include possibly duplicate receipts* is ticked.
 - **Bank** (admins, 2.90) - bank reconciliation, see below.
 - **Settings** - company name and address lines, contact / register / bank lines (printed in the footer), logo, own letterhead PDF (2.120, see "Own letterhead"),
   brand colour (accent in the print only), document language (de / en), currency (EUR / USD + rate), number scheme with
