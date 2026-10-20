@@ -166,14 +166,17 @@ const taskOf = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)
     const eh = d.querySelector('#rp-err');
     check(eh && /Error reports/.test(eh.textContent) && /Off/.test(eh.textContent) && eh.querySelector('[data-rp="err-on"]'), '2.18.0: error reports row, off, Turn on');
     click(w, eh.querySelector('[data-rp="err-on"]'));
-    const code = await until(() => d.querySelector('#rp-err .rpsec code'));
+    // 2.139.1 (#2381): the header form comes first (URL without the token + the Bearer header), the path form with the token after it
+    const code = await until(() => [...d.querySelectorAll('#rp-err code')].find(e => /\/api\/hooks\/issues\/\d+\/./.test(e.textContent)));
     const url = code?.textContent || '';
+    const hdr = [...d.querySelectorAll('#rp-err .rpsec code')].map(e => e.textContent);
+    check(new RegExp(`/api/hooks/issues/${P}$`).test(hdr[0] || '') && hdr[1] === 'Authorization: Bearer ' + url.split('/').pop(), '2.139.1: the header form first: ' + hdr.join(' | '));
     check(new RegExp(`/api/hooks/issues/${P}/[\\w-]{20,}$`).test(url) && d.querySelector('#rp-err [data-rp="err-copy"]') && d.querySelector('#rp-err [data-rp="err-menu"]')
       && /On/.test(d.querySelector('#rp-err .rpm').textContent), '2.18.0: on: the URL once, Copy, the menu: ' + url);
     check(d.activeElement === d.querySelector('#rp-err [data-rp="err-copy"]'), '2.18.0: focus moves to Copy');
     w.close();
     const ep = B + 'api/hooks/issues/' + url.split('/api/hooks/issues/')[1];
-    const rr = await (await fetch(ep, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({title: 'UI crash', fingerprint: 'ui-1'})})).json();
+    const rr = await (await fetch(B + 'api/hooks/issues/' + P, {method: 'POST', headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + url.split('/').pop()}, body: JSON.stringify({title: 'UI crash', fingerprint: 'ui-1'})})).json();  // 2.139.1 (#2381): token in the header
     check(rr.task_id, '2.18.0: a report made a ticket');
     await fetch(ep, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({title: 'UI crash', fingerprint: 'ui-1'})});
     w = await boot({user: 'bob', hash: 'l/' + P}); d = w.document;
