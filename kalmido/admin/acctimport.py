@@ -591,7 +591,9 @@ UMZ_CHECK = {
     ("tasks", "plan_start"): valid_plan_start, ("tasks", "priority"): lambda v: v in PRIORITIES,
     ("tasks", "duration"): lambda v: isinstance(v, int) and 1 <= v <= DURATION_MAX,
     ("tasks", "repeat_from"): lambda v: v in ("due", "done"), ("tasks", "reminders"): _umz_rem,
-    ("habits", "remind_at"): lambda v: v == "" or valid_hm(v), ("habits", "days"): lambda v: bool(re.fullmatch(r"[1-7]{1,7}", v or "")),
+    ("habits", "remind_at"): lambda v: v == "" or valid_hm(v),
+    ("habits", "remind_times"): lambda v: v == "" or (len(v.split(",")) <= 6 and all(valid_hm(x) for x in v.split(","))),  # 2.140.0 C (#2135)
+    ("habits", "days"): lambda v: bool(re.fullmatch(r"[1-7]{1,7}", v or "")),
     ("habits", "goal"): lambda v: isinstance(v, int) and 1 <= v <= 1000, ("habits", "per_week"): lambda v: isinstance(v, int) and 0 <= v <= 7,
     ("habit_logs", "day"): valid_date, ("events", "start"): _iso_ts, ("events", "end"): _iso_ts,
     ("time_entries", "start"): _iso_ts, ("time_entries", "end"): _iso_ts,

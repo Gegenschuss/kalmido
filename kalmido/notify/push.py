@@ -27,7 +27,7 @@ from ..tasks.validation import NAG_HOUR_CAP, NAG_MINUTES, valid_hm
 from ..tasks.tasks import _wd_followups
 from ..collab.comments import collab_on, task_push_tick
 from ..collab.news import news_cleanup, news_unread, notif_ok
-from ..personal.habits import pomo_close, pomo_elapsed, pomo_planned_end
+from ..personal.habits import habit_times, pomo_close, pomo_elapsed, pomo_planned_end
 from ..personal.timetrack import _num, time_watchdog
 
 
@@ -801,8 +801,8 @@ def _wd_pomo(c, p, users, S, LG):
 def _wd_habits(c, users, S, LG, now):
     # habit reminders
     today = now.date().isoformat()
-    for h in c.execute("SELECT * FROM habits WHERE archived=0 AND remind_at!='' AND reminded_on!=?",
-                       (today,)).fetchall():
+    for h in c.execute("SELECT * FROM habits WHERE archived=0 AND (remind_at!='' OR remind_times!='') "
+                       "AND NOT (reminded_on=? AND reminded_hm='')", (today,)).fetchall():
         try:
             _wd_habit(c, h, users, S, LG, now)
         except Exception as e:  # noqa: BLE001
@@ -812,16 +812,19 @@ def _wd_habits(c, users, S, LG, now):
 def _wd_habit(c, h, users, S, LG, now):
     today = now.date().isoformat()
     wd = str(now.isoweekday())
-    if not valid_hm(h["remind_at"]) or (not h["per_week"] and wd not in str(h["days"])) \
-            or now.strftime("%H:%M") < h["remind_at"]:
+    # 2.140.0 C (#2135): several times a day; the latest slot that is due and not yet reminded today fires once
+    last = h["reminded_hm"] if h["reminded_on"] == today else ""
+    due = [t for t in habit_times(h) if valid_hm(t) and last < t <= now.strftime("%H:%M")]
+    if not due or (not h["per_week"] and wd not in str(h["days"])):
         return
+    slot = due[-1]
     if h["per_week"]:  # "x times a week": no reminder once this week's target is reached
         mon = (now.date() - timedelta(days=now.weekday())).isoformat()
         done_w = c.execute("SELECT COUNT(*) FROM habit_logs WHERE habit_id=? AND day>=? AND day<=? AND count>=?",
                            (h["id"], mon, today, h["goal"])).fetchone()[0]
         if done_w >= h["per_week"]:
             return
-    c.execute("UPDATE habits SET reminded_on=? WHERE id=?", (today, h["id"]))
+    c.execute("UPDATE habits SET reminded_on=?, reminded_hm=? WHERE id=?", (today, slot, h["id"]))
     c.commit()
     if h["user_id"] not in users:
         return

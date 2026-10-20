@@ -57,8 +57,9 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   // old task not in state: fetched on demand
   const tgt = st.items.find(x => x.task_id)?.task_id;
   w.eval(`S.tasks.delete(${tgt})`);
-  const idx = [...d.querySelectorAll('#view .nitem')].findIndex((r, i) => w.eval(`S.nf.items[${i}].task_id`) === tgt);
-  d.querySelectorAll('#view .nitem')[idx].dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await sleep(900);
+  // 2.139.1 (#2405): the list is grouped in sections (For you / Also new / Read), so a row's place is not its item index; data-i is
+  const row = [...d.querySelectorAll('#view .nitem[data-i]')].find(r => w.eval(`S.nf.items[${r.dataset.i}].task_id`) === tgt);
+  row.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await sleep(900);
   check(w.eval('S.sel') === tgt && d.querySelector('#detail #d-title, #detail .dtop'), 'task outside the state opened via GET /api/tasks/<id>');
   w.eval('closeDetail()'); await sleep(200);
   // mark all read

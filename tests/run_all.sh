@@ -1485,6 +1485,18 @@ fresh; run p2116_c_ui node p2116_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.116.0 part D (#2066 #2067: several times a day, focus/habits in API v1)
 fresh; run p2116_d_api "$PY" p2116_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2116_d_ui node p2116_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.140.0 part A: shopping list quantity / price + offline in the shop, recipes -> shopping list, meal plan beyond 7 days (#2131 #2132)
+fresh; run p2140_a_api "$PY" p2140_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2140_a_ui node p2140_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.140.0 part B: budget month comparison + one CSV importer with office bank import, devices <-> office equipment (#2134 #2136)
+fresh; run p2140_b_api "$PY" p2140_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2140_b_ui node p2140_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.140.0 part C: journal history / search / export / mood stats, habits with several reminder times + weekly goal (#2133 #2135)
+fresh; run p2140_c_api "$PY" p2140_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2140_c_ui node p2140_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.140.0 part D: birthdays written back to CardDAV (#2137)
+fresh; run p2140_d_api "$PY" p2140_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2140_d_ui node p2140_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.144.0 part A: agent chat - filter only as the header icon, filter "only me" hides job results, stop a running answer (#2416 #2419 #2412)
 fresh; run p2144_a_api "$PY" p2144_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2144_a_ui node p2144_a_ui.js "$KALMIDO_TEST_DATA"

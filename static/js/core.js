@@ -424,7 +424,8 @@ function applyLocal(e) {
       reminders: body.reminders || '', repeat: body.repeat || '', repeat_from: body.repeat_from || 'due', url: body.url || null,
       sort: par ? 1e9 : Math.min(0, ...[...S.tasks.values()].map(x => x.sort)) - 1,
       created_at: nowIso, updated_at: nowIso, completed_at: null, deleted_at: null, tags: body.tags || [], fields: body.fields || {}, blocked: 0, blockers: [], blocking: 0,
-      ...(body.ms ? {ms: 1} : {}), ...(body.milestone_id ? {milestone_id: body.milestone_id} : {})};  // 2.18.0 (#430)
+      ...(body.ms ? {ms: 1} : {}), ...(body.milestone_id ? {milestone_id: body.milestone_id} : {}),  // 2.18.0 (#430)
+      ...(body.fam ? {fam: body.fam} : {})};  // 2.140.0 A (#2131): the amount of an item added offline in shopping mode
     S.tasks.set(t.id, t); return t;
   }
   if (url === '/api/tasks/batch') {

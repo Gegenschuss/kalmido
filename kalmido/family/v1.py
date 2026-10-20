@@ -61,7 +61,7 @@ def reminder_people(c, t, users, rcpt):
 @app.get("/api/v1/family")
 @v1_view
 def v1_family():
-    v1_args(("week",))
+    v1_args(("week", "days"))  # 2.140.0 A (#2132): days
     return jsonify(v1_call(family_get))
 
 
@@ -103,7 +103,7 @@ def v1_family_deadline():
 def v1_task_to_shopping(tid):
     v1_args(())
     b = v1_json()
-    reject_unknown(b, ("list_id", "items"))
+    reject_unknown(b, ("list_id", "items", "servings", "preview"))  # 2.140.0 A (#2132): servings, preview
     _v1_live(db(), tid, write=False, full=True)
     return jsonify(v1_call(task_to_shopping, tid, body=b))
 
@@ -232,16 +232,26 @@ def family_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     schemas["Family"] = {"type": "object", "properties": {
         "occasions": {"type": "array", "items": ref("FamilyOccasion")}, "deadlines": {"type": "array", "items": ref("FamilyDeadline")},
         "rotations": {"type": "array", "items": ref("FamilyRotation")}, "week": {"type": "string", "format": "date", "description": "Monday of the meal plan"},
+        "days": {"type": "integer", "description": "2.140.0: how many days from week the meal plan covers"},
         "meals": {"type": "array", "items": {"type": "object", "properties": {
             "task_id": {"type": "integer"}, "list_id": {"type": "integer"}, "title": {"type": "string"}, "day": {"type": "string", "format": "date"},
-            "time": nul("string"), "ingredients": {"type": "array", "items": {"type": "string"}}}}},
+            "time": nul("string"), "ingredients": {"type": "array", "items": {"type": "string"}},
+            "recipe_id": nul("integer", description="2.140.0: the recipe (task id) the meal is made from"),
+            "serves": nul("integer", description="2.140.0: for how many people")}}},
+        "recipes": {"type": "array", "description": "2.140.0: the recipes (tasks of a Recipes list or with family kind recipe)",
+                    "items": {"type": "object", "properties": {
+                        "task_id": {"type": "integer"}, "list_id": {"type": "integer"}, "title": {"type": "string"}, "serves": nul("integer"),
+                        "ingredients": {"type": "array", "items": ref("Ingredient")}}}},
         "shopping": {"type": "array", "items": {"type": "object", "properties": {
             "list_id": {"type": "integer"}, "name": {"type": "string"}, "open": {"type": "integer"}, "role": {"type": "string"}}}},
         "kids": {"type": "array", "items": ref("Kid")}, "kid": {"type": "boolean", "description": "The token's user is a kid account"}}}
+    schemas["Ingredient"] = {"type": "object", "description": "2.140.0: an ingredient line with its amount split off", "properties": {
+        "name": {"type": "string"}, "qty": nul("number"), "unit": {"type": "string"}, "text": {"type": "string", "description": "The line as written"}}}
     kid_p, rid_p = pid("id", "Kid (user) id"), pid("id", "Reward id")
     paths["/family"] = {"get": op("2.19.0 (module Family): upcoming birthdays + anniversaries, deadlines, rotations, the week's meal plan, "
                                   "shopping lists, kids", F, ok(ref("Family")) | errs("400"),
-                                  [q("week", "A day of the week whose meal plan to show (default: this week)", {"type": "string", "format": "date"})])}
+                                  [q("week", "A day of the week whose meal plan to show (default: this week)", {"type": "string", "format": "date"}),
+                                   q("days", "2.140.0: how many days of the meal plan from that Monday (default 7)", {"type": "integer", "minimum": 1, "maximum": 62})])}
     paths["/family/occasions"] = {"post": op("A birthday or anniversary: a yearly task with the age, reminders lead_days before and on the day, "
                                              "gift ideas as subtasks", F, ok(ref("Task"), "Created", "201") | errs("400", "403", "404"),
                                              body={"type": "object", "required": ["name", "date"], "properties": {
@@ -260,12 +270,23 @@ def family_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                                  "lead_days": {"type": "integer", "minimum": 0, "maximum": FAM_LEAD_MAX}, "title": {"type": "string"},
                                                  "list_id": nul("integer", description="Default: the first Household list (created when missing)")}},
                                              scope="tasks:write")}
-    paths["/tasks/{id}/to-shopping"] = {"post": op("Put the ingredients of a meal (the lists in its notes, or items) on a shopping list; open "
-                                                   "items with the same name are not added twice", F,
+    paths["/tasks/{id}/to-shopping"] = {"post": op("Put the ingredients of a meal or a recipe (the lists in its notes; a meal without any: the "
+                                                   "notes of its recipe; or items) on a shopping list; open items with the same name are not added "
+                                                   "twice (2.140.0: the amount is added to theirs). A leading amount (\"500 g flour\") goes to the "
+                                                   "item's amount field (family.qty / family.unit); servings scales the amounts of the notes; "
+                                                   "preview = nothing is written, the answer lists the ingredients", F,
                                                    ok({"type": "object", "properties": {"list_id": {"type": "integer"}, "added": {"type": "array", "items": {"type": "object"}},
-                                                                                        "skipped": {"type": "array", "items": {"type": "string"}}}}) | errs("400", "403", "404"),
-                                                   [pid()], body={"type": "object", "properties": {"list_id": nul("integer"),
-                                                                                                    "items": {"type": "array", "items": {"type": "string"}}}},
+                                                                                        "merged": {"type": "array", "items": {"type": "object"}, "description": "2.140.0: open items that got the amount added"},
+                                                                                        "skipped": {"type": "array", "items": {"type": "string"}},
+                                                                                        "items": {"type": "array", "items": ref("Ingredient"), "description": "preview only (+ have: on the list already)"},
+                                                                                        "serves": nul("integer", description="preview only: the recipe's servings"),
+                                                                                        "recipe_id": nul("integer", description="preview only")}}) | errs("400", "403", "404"),
+                                                   [pid()], body={"type": "object", "properties": {
+                                                       "list_id": nul("integer"),
+                                                       "items": {"type": "array", "items": {"oneOf": [{"type": "string"}, {"type": "object", "required": ["name"], "properties": {
+                                                           "name": {"type": "string"}, "qty": nul("number"), "unit": {"type": "string"}}}]}},
+                                                       "servings": nul("integer", description="2.140.0: scale the amounts of the notes to this many people (needs the recipe's serves)"),
+                                                       "preview": {"type": "boolean", "description": "2.140.0: only list what would go"}}},
                                                    scope="tasks:write")}
     paths["/lists/{id}/shop-areas"] = {"post": op("Make a list a shopping list and add the default shop areas as sections", F,
                                                   ok({"type": "object", "properties": {"added": {"type": "integer"}}}) | errs("403", "404"),

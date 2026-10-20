@@ -156,6 +156,9 @@ KINDS = {
                            "a reader of only the further list gets the task nowhere (state, search, feed, public link, agent), "
                            "\"also\" names only visible lists"),
     # 2.72.0 (#1333): the household budget
+    # 2.140.0 B (#2136): a private device linked with office equipment (life/devlink.py)
+    "devlink": ("matrix", "p2140_b_api_test.py: another person's device, link or equipment of another office area 404; taking over "
+                          "into an organisation only as its admin (403); a link of another person never shows on the equipment"),
     "budget": ("matrix", "p272_a_budget_api_test.py: categories, entries, templates, contracts, import and receipts by id of another "
                          "person's budget 404, read-only shared = no change, agents / tokens without the scope private never"),
     # 2.73.0 A (#661): the accounts of one person on other Kalmido servers (accounts/servers.py) -- private per person
@@ -657,7 +660,8 @@ ROUTES = {
     "PUT /api/v1/life/journal/{}": "own", "POST /api/v1/life/karakeep/sync": "own", "GET /api/life": "own",
     "GET /api/life/upkeep-presets": "own", "POST /api/life/contracts": "own", "POST /api/life/devices": "own",
     "POST /api/life/upkeep": "own", "POST /api/life/health": "own", "POST /api/life/trips": "own",
-    "GET /api/life/review": "own", "PUT /api/life/journal/{}": "own", "GET /api/life/karakeep": "own",
+    "GET /api/life/review": "own", "GET /api/life/journal": "own", "GET /api/life/journal/stats": "own", "GET /api/life/journal/export": "own",  # 2.140.0 C (#2133)
+     "PUT /api/life/journal/{}": "own", "GET /api/life/karakeep": "own",
     "PUT /api/life/karakeep": "own", "DELETE /api/life/karakeep": "own", "GET /api/life/karakeep/lists": "own",
     "POST /api/life/karakeep/sync": "own", "POST /api/filters": "own", "PATCH /api/filters/{}": "own",
     "DELETE /api/filters/{}": "own", "POST /api/habits": "own", "PATCH /api/habits/{}": "own",
@@ -951,6 +955,10 @@ ROUTES = {
     "POST /api/rules/{}/restore": "list", "GET /api/v1/lists/{}/rules": "list", "POST /api/v1/lists/{}/rules/proposals": "list",
     # 2.72.0 (#1333): the household budget (a list of kind budget; p272_a_budget_api_test.py)
     "GET /api/budget": "budget", "POST /api/budget/lists": "budget", "GET /api/budget/{}": "budget",
+    "GET /api/budget/{}/compare": "budget",  # 2.140.0 B (#2134): the month comparison (p2140_b_api_test.py)
+    # 2.140.0 B (#2136): a private device <-> office equipment (p2140_b_api_test.py)
+    "GET /api/life/devices/{}/link": "devlink", "POST /api/life/devices/{}/to-office": "devlink", "POST /api/life/device-links/{}/pull": "devlink",
+    "DELETE /api/life/device-links/{}": "devlink", "GET /api/office/equipment/{}/link": "devlink", "POST /api/office/equipment/{}/to-device": "devlink",
     "POST /api/budget/{}/cats": "budget", "PATCH /api/budget/cats/{}": "budget", "DELETE /api/budget/cats/{}": "budget",
     "POST /api/budget/{}/entries": "budget", "PATCH /api/budget/entries/{}": "budget", "DELETE /api/budget/entries/{}": "budget",
     "GET /api/budget/{}/recurring": "budget", "POST /api/budget/{}/recurring": "budget", "PATCH /api/budget/recurring/{}": "budget",

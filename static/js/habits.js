@@ -112,6 +112,8 @@ function habitStats(h) {
   for (let i = 0; i < 30; i++) { const d = addDays(today(), -i); if (d < h.created_at.slice(0, 10)) break; if (habitScheduled(h, d)) { sched++; if ((h.logs[d] || 0) >= h.goal) hit++; } }
   return {total: days.length, best, streak: habitStreak(h), rate: sched ? Math.round(100 * hit / sched) : 0};
 }
+// 2.140.0 C (#2135): "3 of 5 this week" as a row of segments (one per planned day)
+const weekProg = (h, mon) => { const n = weekDone(h, mon); return `<span class="hprog ${n >= h.per_week ? 'hit' : ''}" role="progressbar" aria-valuemin="0" aria-valuemax="${h.per_week}" aria-valuenow="${Math.min(n, h.per_week)}" aria-label="${esc(tr('{0} of {1} this week', n, h.per_week))}">${[...Array(h.per_week)].map((_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</span>`; };
 function viewHabits() {
   const hs = S.habits.filter(h => !h.archived);
   if (!S.habits.length) return `<div class="empty nempty eact">${ic('habit')}<span>${tr('No habits yet.')}</span><button class="btn pri" data-act="habit-new">${ic('plus', 's')} ${tr('Create habit')}</button></div>`;
@@ -121,7 +123,7 @@ function viewHabits() {
   let h = `<div class="hweek head"><span class="hnh"></span>${days.map(d => `<span class="${d === t0 ? 'today' : ''}" aria-label="${esc(dayLabel(d, true))}">${WD[pd(d).getDay()]}<br>${pd(d).getDate()}</span>`).join('')}<span style="text-align:right">${tr('Streak')}</span></div>`;
   for (const x of hs) {
     const col = cssColor(x.color) || HCOLORS[0];
-    h += `<div class="hweek" style="--hc:${col}"><div class="hname" data-act="habit-open" data-id="${x.id}"><span class="sw" style="background:${col}"></span><div style="min-width:0"><b>${esc(x.name)}</b><small>${x.per_week ? tr('{0}/{1} this week', weekDone(x, mon), x.per_week) : x.goal > 1 ? tr('{0}/{1} today', x.logs[t0] || 0, x.goal) : habitScheduled(x, t0) ? ((x.logs[t0] || 0) >= 1 ? tr('done today') : tr('open today')) : tr('day off today')}</small></div></div>
+    h += `<div class="hweek" style="--hc:${col}"><div class="hname" data-act="habit-open" data-id="${x.id}"><span class="sw" style="background:${col}"></span><div style="min-width:0"><b>${esc(x.name)}</b><small>${x.per_week ? tr('{0} of {1} this week', weekDone(x, mon), x.per_week) : x.goal > 1 ? tr('{0}/{1} today', x.logs[t0] || 0, x.goal) : habitScheduled(x, t0) ? ((x.logs[t0] || 0) >= 1 ? tr('done today') : tr('open today')) : tr('day off today')}</small>${x.per_week ? weekProg(x, mon) : ''}</div></div>
       ${days.map(d => {
         const c = x.logs[d] || 0, sch = habitScheduled(x, d);
         const cls = [d > t0 ? 'future' : '', !sch ? 'off' : '', c >= x.goal ? 'full' : c ? 'part' : '', d === t0 ? 'today' : ''].join(' ');
@@ -135,6 +137,11 @@ function viewHabits() {
   if (arch.length) h += `<div class="ghead" style="margin-top:1rem">${tr('Archived')}</div>` + arch.map(x => `<div class="srow" data-act="habit-open" data-id="${x.id}"><span class="sw" style="background:${cssColor(x.color) || HCOLORS[0]}"></span><span class="n muted">${esc(x.name)}</span></div>`).join('');
   return h;
 }
+// 2.140.0 C (#2135): up to six reminder times; the old single time (remind_at) is the first one
+const HREM_MAX = 6;
+const remTimes = x => (x.remind_times || x.remind_at || '').split(',').filter(Boolean);
+const remRows = ts => (ts.length ? ts : ['']).map((t, i) => `<span class="hrem">${timeIn('h-rem' + i, t, {label: tr('Reminder'), empty: tr('off')})}</span>`).join('')
+  + (ts.length && ts.length < HREM_MAX ? `<button type="button" class="btn sm" data-m="remadd">${ic('plus', 's')} ${tr('Add time')}</button>` : '');
 function habitModal(id) {
   const x = id ? S.habits.find(h => h.id === id) : {name: '', goal: 1, days: '1234567', per_week: 0, color: HCOLORS[1], remind_at: '', logs: {}, notes: {}, created_at: new Date().toISOString()};
   x.notes = x.notes || {};
@@ -163,7 +170,7 @@ function habitModal(id) {
     <div class="row"><label>${tr('Frequency')}</label><div class="seg" id="h-freq"><button data-freq="days" class="${x.per_week ? '' : 'on'}">${tr('Fixed days')}</button><button data-freq="week" class="${x.per_week ? 'on' : ''}">${tr('X times a week')}</button></div></div>
     <div class="row ${x.per_week ? 'hidden' : ''}" id="h-daysrow"><label>${tr('days|label')}</label><div class="wdays" id="h-days">${WD_MO().map((w, i) => `<button class="${x.days.includes(String(i + 1)) ? 'on' : ''}" data-wd="${i + 1}">${w}</button>`).join('')}</div></div>
     <div class="row ${x.per_week ? '' : 'hidden'}" id="h-pwrow"><label for="h-pw">${tr('Times per week')}</label><input id="h-pw" type="number" min="1" max="7" value="${esc(x.per_week || 3)}" style="max-width:5.625rem"><span class="muted" style="font-size:var(--fs-s)">${tr('on any days')}</span></div>
-    <div class="row"><label for="h-rem">${tr('Reminder')}</label>${timeIn('h-rem', x.remind_at, {label: tr('Reminder'), empty: tr('off')})}</div>
+    <div class="row hremrow"><label>${tr('Reminder')}</label><div class="hrems" id="h-rems">${remRows(remTimes(x))}</div></div>
     <div class="row"><label>${tr('Color')}</label><div class="colors" id="h-col" role="group" aria-label="${esc(tr('Color'))}">${HCOLORS.map((c, i) => `<button type="button" style="background:${c}" class="${(cssColor(x.color) || HCOLORS[0]) === c ? 'on' : ''}" aria-pressed="${(cssColor(x.color) || HCOLORS[0]) === c}" aria-label="${esc(tr('Color {0}', i + 1))}" data-c="${c}"></button>`).join('')}</div></div>
     <div class="foot">${id ? `<button class="btn danger" data-m="del">${tr('Delete')}</button><button class="btn" data-m="arch">${x.archived ? tr('Reactivate') : tr('Archive')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.addEventListener('click', async e => {
@@ -193,11 +200,15 @@ function habitModal(id) {
       return;
     }
     const act = b.dataset.m;
+    if (act === 'remadd') {
+      const ts = $$('#h-rems input[data-dp]', md).map(i => i.value).filter(Boolean);
+      $('#h-rems', md).innerHTML = remRows([...ts, ts.length ? '12:00' : '09:00']);
+    }
     if (act === 'close') md.remove();
     if (act === 'save') {
       const days = $$('#h-days button.on', md).map(b => b.dataset.wd).join('') || '1234567';
       const perWeek = $('#h-freq button.on', md)?.dataset.freq === 'week' ? Math.max(1, Math.min(7, +$('#h-pw', md).value || 1)) : 0;
-      const body = {name: $('#h-name', md).value.trim(), goal: Math.max(1, +$('#h-goal', md).value || 1), days, per_week: perWeek, remind_at: $('#h-rem', md).value, color: $('#h-col button.on', md)?.dataset.c || HCOLORS[0]};
+      const body = {name: $('#h-name', md).value.trim(), goal: Math.max(1, +$('#h-goal', md).value || 1), days, per_week: perWeek, remind_times: [...new Set($$('#h-rems input[data-dp]', md).map(i => i.value).filter(Boolean))].sort(), color: $('#h-col button.on', md)?.dataset.c || HCOLORS[0]};
       if (!body.name) return $('#h-name', md).focus();
       if (id) await api('PATCH', '/api/habits/' + id, body); else await api('POST', '/api/habits', body);
       md.remove(); await load(); render();
