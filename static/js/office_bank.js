@@ -109,25 +109,36 @@ async function bnkCand(tid) {
 }
 
 // ---- the import: file -> (CSV: columns) -> preview -> take over
-function bnkPick() {
-  const i = document.createElement('input'); i.type = 'file'; i.accept = '.csv,.txt,.xml,text/csv,text/plain,application/xml,text/xml';
-  i.onchange = () => { if (i.files[0]) bnkRead(i.files[0]); }; i.click();
+// 2.144.1 B (#2446, #2450): the button opens the dialog first: which file to take from the online banking + "Choose files"
+// (several files or one ZIP, also dropped onto the dialog). The files go as they are (multipart, field files); the server reads
+// UTF-8, else windows-1252, opens a ZIP in memory and merges everything into one preview. after = called once imported (the
+// cash flow loads again).
+const BNK_ACCEPT = '.xml,.csv,.txt,.zip,text/csv,text/plain,application/xml,text/xml,application/zip,application/x-zip-compressed';
+function bnkPick(after) { return bnkImpModal(null, null, after); }
+function bnkHintHtml() {
+  return `<ul class="bnk-hint" role="list">
+    <li class="ok">${ic('check', 's')}<span>${tr('Recommended: XML (CAMT.053), booked transactions – version V2 or V8 does not matter. Only this brings the account balance along. Several files or one ZIP work too.')}</span></li>
+    <li>${ic('info', 's')}<span>${tr('Also works: CSV export (you choose the columns) – the account balance only when the CSV has a balance column.')}</span></li>
+    <li class="no">${ic('ban', 's')}<span>${tr('Do not use: pending transactions / CAMT.052 (not booked yet, they would come twice later) and MT940 / MT942 (not read).')}</span></li></ul>`;
 }
-async function bnkRead(f) {
-  const rd = enc => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => no(r.error); r.readAsText(f, enc); });
-  let text;
-  try { text = await f.text(); if (text.includes('�')) text = await rd('windows-1252'); } catch (x) { toast(x.message || tr('unknown')); return; }  // as the budget: UTF-8, else windows-1252
-  bnkImpModal(text, f.name);
-}
-function bnkImpModal(text, name) {
+function bnkImpModal(text, name, after) {  // text + name: one statement read already (as before); without them the start step
   const md = modal(''), card = $('.card', md), st = {p: null, mapping: null, rows: null, account: null};  // 2.124.0 D (#2342): account = the name for a CSV balance
   md.classList.add('ofcdlg', 'bnkdlg');
+  let files = typeof text === 'string' ? [new File([text], name || 'statement.txt', {type: 'text/plain'})] : [];
+  const label = () => files.length === 1 ? files[0].name : trn('{0} file', '{0} files', files.length);
+  const form = mapping => {
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f, f.name);
+    if (mapping) fd.append('mapping', JSON.stringify(mapping));
+    if (st.account) fd.append('account', st.account);
+    return fd;
+  };
   const errEl = () => $('.aerr', md), err = m => { const e = errEl(); if (e) e.textContent = m || ''; };
   const foot = (ok, back) => `<div class="aerr" role="alert"></div><div class="foot">${back ? `<button class="btn" data-bi="back">${tr('Back')}</button>` : ''}<span class="spacer"></span><button class="btn" data-bi="close">${tr('Cancel')}</button>${ok ? `<button class="btn pri" data-bi="next">${esc(ok)}</button>` : ''}</div>`;
   const sel = (id, label, val, opt) => `<div class="row"><label for="${id}">${esc(label)}</label><select id="${id}">${opt ? `<option value="">${tr('none')}</option>` : ''}${st.p.columns.map((c, i) => `<option value="${i}" ${val === i ? 'selected' : ''}>${esc(c || tr('Column {0}', i + 1))}</option>`).join('')}</select></div>`;
   const cols = () => {
     const g = st.mapping || st.p.guess || {}, two = g.amount == null && (g.amount_in != null || g.amount_out != null);  // 2.140.0 B (#2134): + the recognised bank layout
-    card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${esc(name)} · ${tr('Which column holds what? Kalmido has guessed; please check.')}</p>
+    card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${esc(label())} · ${tr('Which column holds what? Kalmido has guessed; please check.')}</p>${st.p.files > 1 ? `<p class="muted">${tr('The columns apply to every CSV file.')}</p>` : ''}${filesInfo(st.p)}
       ${st.p.guess?.preset_name ? `<p class="shint lhint keep bgpreset">${ic('check', 's')} ${esc(tr('Recognised layout: {0}', st.p.guess.preset_name))}</p>` : ''}
       ${sel('bi-date', tr('Date'), g.date)}
       <div class="row"><label>${tr('Amount')}</label><div class="seg" role="radiogroup" id="bi-am" aria-label="${esc(tr('Amount'))}"><button type="button" role="radio" data-am="one" aria-checked="${!two}" class="${two ? '' : 'on'}">${tr('One column (minus = expense)')}</button><button type="button" role="radio" data-am="two" aria-checked="${two}" class="${two ? 'on' : ''}">${tr('Income and expense apart')}</button></div></div>
@@ -144,36 +155,58 @@ function bnkImpModal(text, name) {
     st.account = $('#bi-accname', md)?.value.trim() || null;  // 2.124.0 D (#2342): balance + own account column (optional)
     return {date: n('#bi-date'), amount: two ? null : n('#bi-amt'), amount_in: two ? n('#bi-in') : null, amount_out: two ? n('#bi-out') : null, title: n('#bi-title'), counterpart: n('#bi-cp'), decimal: $('#bi-dec', md).value, date_format: $('#bi-df', md).value, balance: n('#bi-bal'), account: n('#bi-acc')};
   };
+  const start = () => {
+    card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${tr('Which file from your online banking?')}</p>${bnkHintHtml()}
+      <div class="bnk-drop" data-bi-drop><button type="button" class="btn pri" data-bi="pick">${ic('upload', 's')}<span>${tr('Choose files')}</span></button><small class="muted">${tr('or drop them here')}</small></div>
+      ${foot('')}`;
+  };
+  const filesInfo = p => {
+    const errs = p.file_errors || [], skip = p.skipped_files || [];
+    if (!errs.length && !skip.length) return '';
+    return `<ul class="bnk-files" role="list">${errs.map(e => `<li class="no">${ic('alert', 's')}<span><b>${esc(e.file)}</b> ${esc(e.error)}</span></li>`).join('')}${skip.length ? `<li>${ic('info', 's')}<span>${esc(tr('Skipped: {0}', skip.join(', ')))}</span></li>` : ''}</ul>`;
+  };
   const rowsView = () => {
-    const p = st.p;
-    card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${esc(name)} · ${esc([trn('{0} new', '{0} new', p.count), p.dup_count ? trn('{0} already there', '{0} already there', p.dup_count) : '', p.skipped ? trn('{0} with an error', '{0} with an error', p.skipped) : ''].filter(Boolean).join(' · '))}</p>
-      ${cfb_prevHtml(p.balances)}<ul class="ofclist bnkprev" role="list">${p.rows.slice(0, 200).map(r => `<li class="ofcrow ${r.error || r.dup ? 'arch' : ''}"><span class="ofcn"><b>${esc(r.counterpart || r.purpose || tr('Row {0}', r.n))}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.error || (r.dup ? tr('already there') : r.purpose)].filter(Boolean).join(' · '))}</small></span>${r.amount != null ? `<span class="bnkamt ${+r.amount > 0 ? 'in' : 'out'}">${esc(bnkAmt(r.amount))}</span>` : ''}</li>`).join('')}</ul>
+    const p = st.p, many = (p.files || 1) > 1;
+    card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${esc(label())} · ${esc([many && files.length === 1 ? trn('{0} file', '{0} files', p.files) : '', trn('{0} new', '{0} new', p.count), p.dup_count ? trn('{0} already there', '{0} already there', p.dup_count) : '', p.skipped ? trn('{0} with an error', '{0} with an error', p.skipped) : ''].filter(Boolean).join(' · '))}</p>
+      ${cfb_prevHtml(p.balances)}${filesInfo(p)}<ul class="ofclist bnkprev" role="list">${p.rows.slice(0, 200).map(r => `<li class="ofcrow ${r.error || r.dup ? 'arch' : ''}"><span class="ofcn"><b>${esc(r.counterpart || r.purpose || tr('Row {0}', r.n))}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.error || (r.dup ? tr('already there') : r.purpose), many ? r.file : ''].filter(Boolean).join(' · '))}</small></span>${r.amount != null ? `<span class="bnkamt ${+r.amount > 0 ? 'in' : 'out'}">${esc(bnkAmt(r.amount))}</span>` : ''}</li>`).join('')}</ul>
       ${p.rows.length > 200 ? `<p class="muted">${tr('Showing the first 200 rows')}</p>` : ''}${foot(p.count ? trn('Import {0} booking', 'Import {0} bookings', p.count) : '', p.fmt === 'csv')}`;
   };
   const preview = async mapping => {
-    try { st.p = await api('POST', '/api/office/bank/import/preview', {text, filename: name, ...(mapping ? {mapping} : {}), ...(st.account ? {account: st.account} : {})}); }
-    catch (x) { if (st.p) err(x.message); else { md.remove(); toast(x.message || tr('unknown')); } $$('button[data-bi]', md).forEach(b => { b.disabled = false; }); return; }
+    try { st.p = await api('POST', '/api/office/bank/import/preview', form(mapping)); }
+    catch (x) {
+      if (st.p) err(x.message); else if (typeof text === 'string') { md.remove(); toast(x.message || tr('unknown')); }
+      else { start(); err(x.message || tr('unknown')); }  // 2.144.1 B (#2446): e.g. MT940 -> the message in the start step
+      $$('button[data-bi]', md).forEach(b => { b.disabled = false; }); return;
+    }
     if (st.p.columns) cols(); else rowsView();
+  };
+  const take = fl => {
+    files = [...(fl || [])]; if (!files.length) return;
+    Object.assign(st, {p: null, mapping: null}); card.innerHTML = `<p class="muted">${tr('Loading…')}</p>`; preview(null);
   };
   md.addEventListener('click', async e => {
     const am = e.target.closest('#bi-am [data-am]');
     if (am) { for (const x of $$('#bi-am [data-am]', md)) { x.classList.toggle('on', x === am); x.setAttribute('aria-checked', x === am); } $('.bi-one', md).hidden = am.dataset.am === 'two'; $('.bi-two', md).hidden = am.dataset.am !== 'two'; return; }
     const b = e.target.closest('button[data-bi]'); if (!b) return;
     if (b.dataset.bi === 'close') { md.remove(); return; }
+    if (b.dataset.bi === 'pick') { const i = document.createElement('input'); i.type = 'file'; i.multiple = true; i.accept = BNK_ACCEPT; i.className = 'bnk-file'; i.hidden = true; i.onchange = () => { take(i.files); i.remove(); }; md.append(i); i.click(); return; }
     if (b.dataset.bi === 'back') { await preview(null); return; }
     if (st.p?.columns) { st.mapping = mapOf(); b.disabled = true; await preview(st.mapping); return; }
     b.disabled = true;
-    const req = {text, filename: name, ...(st.mapping ? {mapping: st.mapping} : {}), ...(st.account ? {account: st.account} : {})};
     try {
-      const j = await api('POST', '/api/office/bank/import', req), iid = j.import.id;
-      md.remove(); BNK.state = 'open'; BNK.imports = null; bnkReload();
+      const j = await api('POST', '/api/office/bank/import', form(st.mapping)), iid = j.import.id;
+      md.remove(); BNK.state = 'open'; BNK.imports = null; bnkReload(); if (after) after();
       offerUndo(trn('{0} booking imported', '{0} bookings imported', j.count), histAdd({label: tr('Bank statement imported'),
         undo: async () => { await api('POST', `/api/office/bank/imports/${iid}/undo`); BNK.imports = null; bnkReload(); },
         redo: async () => { await api('POST', `/api/office/bank/imports/${iid}/restore`); BNK.imports = null; bnkReload(); }}));
     } catch (x) { b.disabled = false; err(x.message); }
   });
-  card.innerHTML = `<p class="muted">${tr('Loading…')}</p>`;
-  preview(null);
+  // 2.144.1 B (#2446): files dropped onto the dialog
+  md.addEventListener('dragover', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); $('[data-bi-drop]', md)?.classList.add('on'); } });
+  md.addEventListener('dragleave', e => { if (!md.contains(e.relatedTarget)) $('[data-bi-drop]', md)?.classList.remove('on'); });
+  md.addEventListener('drop', e => { if (!e.dataTransfer?.files?.length) return; e.preventDefault(); if (!st.p || !st.p.rows) take(e.dataTransfer.files); });
+  if (files.length) { card.innerHTML = `<p class="muted">${tr('Loading…')}</p>`; preview(null); } else start();
+  md.bnkTake = take;  // the UI tests hand files over here
   return md;
 }
 

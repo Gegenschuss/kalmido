@@ -159,11 +159,27 @@ def cfb_read(c, oid, fmt, b):
     return cfb_csv_balance(text, b["mapping"], b.get("account"))
 
 
+def cfb_read_all(c, oid, fmt, b, parts=None):
+    """2.144.1 B (#2450): the balances of every statement of one import (parts = [{fmt, text}] from bank.bnk_parse; without
+    them the body's text). Every file's balance is a real bank balance of its day (the cash flow uses them per month), so all
+    are kept and the newest one is the current balance; an equal balance in two files (day and month statement) counts once."""
+    if parts is None:
+        return cfb_read(c, oid, fmt, b)
+    out, seen = [], set()
+    for p in parts:
+        for x in cfb_read(c, oid, p["fmt"], {"text": p["text"], "mapping": b.get("mapping"), "account": b.get("account")}):
+            k = (x["account"], x["day"], x["kind"], x["amount"])
+            if k not in seen:
+                seen.add(k)
+                out.append(x)
+    return out
+
+
 def _bal_out(x):
     return {"account": x["account"], "day": x["day"], "amount": dstr(x["amount"]), "kind": x["kind"]}
 
 
-def cfb_preview(c, oid, fmt, b, cols):
+def cfb_preview(c, oid, fmt, b, cols, parts=None):
     """The additions of bnk_preview: CSV columns -> guess.balance / guess.account (into cols) and the known accounts;
     rows -> balances [{account, day, amount, kind}]."""
     if cols is not None:
@@ -172,12 +188,12 @@ def cfb_preview(c, oid, fmt, b, cols):
         for k, v in g.items():
             (cols.setdefault("guess", {}))[k] = v if v not in taken else None
         return {"accounts": cfb_accounts(c, oid)}
-    return {"balances": [_bal_out(x) for x in cfb_read(c, oid, fmt, b)]}
+    return {"balances": [_bal_out(x) for x in cfb_read_all(c, oid, fmt, b, parts)]}
 
 
-def cfb_store(c, oid, iid, fmt, b, ts):
+def cfb_store(c, oid, iid, fmt, b, ts, parts=None):
     """Stores the balances of import iid (called inside bnk_import's transaction) -> their number."""
-    bals = cfb_read(c, oid, fmt, b)
+    bals = cfb_read_all(c, oid, fmt, b, parts)
     for x in bals:
         row = oc_enc_fields(c, oid, "office_bank_balances", {"org_id": oid, "import_id": iid, "account": x["account"], "day": x["day"],
                                                              "amount": dstr(x["amount"]), "kind": x["kind"], "created_at": ts})

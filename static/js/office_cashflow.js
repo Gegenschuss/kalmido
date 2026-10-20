@@ -351,13 +351,21 @@ document.addEventListener('keydown', e => { const x = e.target; if (e.key === 'E
 // real balance" (no real balance by hand yet) save through the routes of #2341, one undo step each. Without balances nothing
 // changes. Server: kalmido/office/cfbank.py.
 const cfb_signed = v => `${+v > 0 ? '+' : ''}${ofcMoney(v)}`;
+// 2.144.1 B (#2446): "Import bank statement" opens the dialog of the bank reconciliation (office_bank.js, same hint), the
+// cash flow loads again afterwards; without a bank balance yet a small button above the months
+const cfb_impBtn = (cls = 'ghost') => typeof bnkPick === 'function' ? `<button type="button" class="btn sm ${cls}" data-cfb-imp>${ic('upload', 's')}<span>${tr('Import bank statement')}</span></button>` : '';
+document.addEventListener('click', e => {
+  if (!e.target.closest?.('[data-cfb-imp]')) return;
+  e.preventDefault();
+  bnkPick(() => { if (typeof BNK === 'object') BNK.data = null; rk_cfReload(); });
+});
 function cfb_boxHtml(d) {
-  const b = d.bank; if (!b) return '';
+  const b = d.bank; if (!b) return cfb_impBtn() ? `<div class="cfb-imp">${cfb_impBtn()}</div>` : '';
   const accs = b.accounts || [];
   return `<section class="cfb-box" aria-label="${esc(tr('Account balance according to the bank'))}"><div class="cfb-head"><b>${esc(tr('Account balance according to the bank on {0}: {1}', cfb_day(b.day), ofcMoney(b.amount)))}</b><span class="cfs-hand">${tr('from the bank reconciliation')}</span></div>
     ${accs.length > 1 ? `<small class="muted">${esc(accs.map(a => `${cfb_acct(a.account)}: ${ofcMoney(a.amount)} (${cfb_day(a.day)})`).join(' · '))}</small>` : ''}
     ${b.diff != null ? `<p class="cfb-diff">${esc(tr('Difference to the computed balance: {0}', cfb_signed(b.diff)))}</p>` : ''}
-    ${b.suggest_start ? `<div class="cfs-add"><button type="button" class="btn sm" data-cfb="start">${tr('Use as starting balance')}</button></div>` : ''}</section>`;
+    <div class="cfs-add">${b.suggest_start ? `<button type="button" class="btn sm" data-cfb="start">${tr('Use as starting balance')}</button>` : ''}${cfb_impBtn()}</div></section>`;
 }
 function cfb_rows(r) {
   const b = r.bank; if (!b) return '';

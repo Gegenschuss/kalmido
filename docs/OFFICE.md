@@ -783,12 +783,31 @@ invoices and receipts. Kalmido has no bank access: you import the file you downl
   export). The account is the IBAN of an optional own-account column (e.g. "Auftragskonto") or the name typed in the
   dialog (default "Main account"). The preview names the balances; they count in the cash flow while the import is not
   taken back. Amount and account are encrypted at rest.
+- **Which file** (2.144.1): **Import bank statement** first opens the dialog with a short hint: take the XML export
+  **CAMT.053, booked transactions** (version V2 or V8 does not matter; only it brings the balance along); a CSV export works
+  too (columns chosen by hand, a balance only with a balance column); do not take pending transactions / CAMT.052 (not
+  booked yet, they would come twice later) or MT940 / MT942 (not read: such a file gets a clear message). The cash flow
+  has the same button next to the balance according to the bank; it opens this dialog and loads the cash flow again.
+- **Several files or a ZIP** (2.144.1): choose several statements at once, a ZIP file (e.g. one statement per day from the
+  bank) or drop them onto the dialog. Everything becomes one preview sorted by day (then file, then row) and one import
+  (one **Take back** / undo for all). A ZIP is read in memory only, never unpacked to disk: only `.xml`, `.csv` and `.txt`
+  entries count (folders and hidden files of the packing system are ignored; other entries and nested ZIPs are named as
+  skipped), only the file name is shown, encrypted entries are refused. Limits: 20 MB upload, 400 statements, 2 MB and 3000
+  rows per statement, 60 MB unpacked and 20000 rows altogether, at most 2000 entries in a ZIP. A file that cannot be read
+  is named with its reason and the others go on. CAMT and CSV may be mixed; the column choice of the first CSV holds for
+  every CSV, CSV files with different columns are refused (import them one by one). Duplicates across files: a booking in
+  a day and in a month statement counts once (per booking the larger number of the office area or of one earlier file of
+  the import counts, never the sum); two equal bookings in one file stay two. The balances of every file are kept (each
+  one is a real balance of its day; the cash flow uses them per month), so the newest file gives the current balance.
 
 Routes (office admins only; members 403, other areas 404, agents 403): `POST /api/office/bank/import/preview`,
 `POST /api/office/bank/import`, `GET /api/office/bank/imports`, `POST /api/office/bank/imports/<id>/undo|restore`,
 `GET /api/office/bank/tx?state=open|matched|all&from&to`, `GET /api/office/bank/tx/<id>/candidates?q=`,
 `POST /api/office/bank/tx/<id>/match` `{kind: invoice|receipt|private|ignored, id?}`, `POST /api/office/bank/tx/<id>/unmatch`.
-Tables `office_bank_imports`, `office_bank_tx`, `office_bank_balances` (2.124, see Database).
+Tables `office_bank_imports`, `office_bank_tx`, `office_bank_balances` (2.124, see Database). Both import routes take the JSON body `{text,
+filename?, mapping?, account?}` (one file) or, since 2.144.1, `multipart/form-data` with the field `files` (several, a ZIP
+is opened) and `mapping` (a JSON string) / `account` as form fields; the answer adds `files`, `file_errors [{file, error}]`
+and `skipped_files`, each preview row its `file`. `fmt` of a mixed import is `mixed`.
 
 ## Tax dates as tasks (2.90)
 
