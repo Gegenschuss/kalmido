@@ -92,6 +92,9 @@ def clean_setting(k, v):
         if not math.isfinite(x) or not 0 <= x <= 168:
             raise bad
         return str(round(x, 2))
+    if k == "workdays":  # 2.125.0 A (#2118): working weekdays "0,1,2,3,4" ('' = Monday..Friday)
+        from ..hub.leave import wt_clean
+        return wt_clean(sv)
     if k in ("quiet_from", "quiet_to"):  # 2.7.0 (#413)
         if sv and not valid_hm(sv):
             raise bad

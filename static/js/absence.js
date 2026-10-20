@@ -36,18 +36,18 @@ function ab2_view() {
   const hol = Object.fromEntries((d.holidays || []).map(h => [h.date, h.name]));
   const byUser = {};
   for (const it of d.items) (byUser[it.user_id] = byUser[it.user_id] || []).push(it);
-  const cellOf = (uid, day) => (byUser[uid] || []).find(it => it.start_date <= day && it.end_date >= day);
+  const cellOf = (uid, day) => (byUser[uid] || []).find(it => it.start_date <= day && it.end_date >= day && it.status !== 'rejected');  // 2.125.0 A (#2117)
   const head = days.map(x => { const dt = pd(x), we = dt.getDay() === 0 || dt.getDay() === 6; return `<th scope="col" class="${we ? 'we' : ''}${hol[x] ? ' hol' : ''}${x === d.today ? ' tdy' : ''}" title="${esc(hol[x] || fmtDayAbs(x))}">${dt.getDate()}</th>`; }).join('');
   const rows = d.people.map(p => `<tr><th scope="row"><span class="wlp">${av(p.id, p.display_name)}<b>${esc(p.display_name)}</b></span></th>${days.map(x => {
     const it = cellOf(p.id, x), dt = pd(x), we = dt.getDay() === 0 || dt.getDay() === 6;
-    const tip = it ? `${esc(p.display_name)}: ${esc(it.kind ? ab2_kindName(it.kind) : tr('Away'))} ${esc(ab2_span(it))}` : esc(hol[x] || '');
-    return `<td class="ab2c${we ? ' we' : ''}${hol[x] ? ' hol' : ''}${it ? ' off' + (it.half_day ? ' half' : '') : ''}"${tip ? ` title="${tip}"` : ''}>${it && it.can_edit ? `<button type="button" class="ab2b" data-act="ab2-edit" data-id="${it.id}" aria-label="${tip}"></button>` : ''}</td>`;
+    const tip = it ? `${esc(p.display_name)}: ${esc(it.kind ? ab2_kindName(it.kind) : tr('Away'))} ${esc(ab2_span(it))}${esc(lv_mark(it))}` : esc(hol[x] || '');
+    return `<td class="ab2c${we ? ' we' : ''}${hol[x] ? ' hol' : ''}${it ? ' off' + (it.half_day ? ' half' : '') + lv_cls(it) : ''}"${tip ? ` title="${tip}"` : ''}>${it && it.can_edit ? `<button type="button" class="ab2b" data-act="ab2-edit" data-id="${it.id}" aria-label="${tip}"></button>` : ''}</td>`;
   }).join('')}</tr>`).join('');
   const mon = first.toLocaleDateString(LOCALE(), {month: 'long', year: 'numeric'});
   const list = d.items.map(it => {
     const p = d.people.find(x => x.id === it.user_id);
     const what = it.kind ? ab2_kindName(it.kind) : tr('Away');
-    const inner = `${av(it.user_id, p?.display_name || '?')}<span class="ab2lt"><b>${esc(p?.display_name || '?')}</b><span class="muted">${esc(ab2_span(it))} · ${esc(what)}${it.note ? ' · ' + esc(it.note) : ''}</span></span>`;
+    const inner = `${av(it.user_id, p?.display_name || '?')}<span class="ab2lt"><b>${esc(p?.display_name || '?')}</b><span class="muted">${esc(ab2_span(it))} · ${esc(what)}${it.note ? ' · ' + esc(it.note) : ''}${esc(lv_mark(it))}</span></span>`;
     return `<li>${it.can_edit ? `<button type="button" class="ab2li" data-act="ab2-edit" data-id="${it.id}">${inner}${ic('edit', 's')}</button>` : `<div class="ab2li">${inner}</div>`}</li>`;
   }).join('');
   const hl = (d.holidays || []).map(h => `<li class="muted">${esc(fmtDayAbs(h.date))} · ${esc(h.name)}</li>`).join('');
@@ -60,6 +60,7 @@ function ab2_view() {
       <button class="iconbtn" data-act="ab2-move" data-d="-1" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><button class="btn sm" data-act="ab2-move" data-d="0">${tr('This month')}</button><button class="iconbtn" data-act="ab2-move" data-d="1" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button>
       <button class="btn sm pri" data-act="ab2-new">${ic('plus', 's')} ${tr('Enter an absence')}</button></div>
     <p class="muted">${tr('The team sees who is away and when. The reason (for example sick leave) and the note only the person and the admins of the organisation see.')}</p>
+    ${lv_html(d)}
     <div class="wlwrap ab2grid"><table class="wltable ab2table"><thead><tr><th scope="col">${tr('Person')}</th>${head}</tr></thead><tbody>${rows || `<tr><td colspan="${days.length + 1}" class="muted">${tr('Nobody to show.')}</td></tr>`}</tbody></table></div>
     <h4 class="ab2h">${tr('Absences this month')}</h4>
     ${list ? `<ul class="ab2list">${list}</ul>` : `<p class="muted">${tr('Nobody is away this month.')}</p>`}
@@ -84,6 +85,7 @@ function ab2_sheet(it) {
     <div class="row" id="ab2-halfrow"><label for="ab2-half">${tr('Duration')}</label><select id="ab2-half"><option value="">${tr('Whole day')}</option><option value="am" ${it?.half_day === 'am' ? 'selected' : ''}>${tr('Half day (morning)')}</option><option value="pm" ${it?.half_day === 'pm' ? 'selected' : ''}>${tr('Half day (afternoon)')}</option></select></div>
     <div class="row"><label for="ab2-note">${tr('Note')}</label><input id="ab2-note" maxlength="500" value="${esc(it?.note || '')}" placeholder="${esc(tr('optional'))}"></div>
     <div class="shint lhint keep">${tr('The team only sees that you are away. The kind and the note stay with you and the admins of the organisation.')}</div>
+    ${lv_sheetHint()}
     <div class="foot">${it ? `<button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${ic('check', 's')} ${tr('Save')}</button></div>`);
   md.classList.add('ab2md');
   const sync = () => { const one = $('#ab2-from', md).value && $('#ab2-from', md).value === $('#ab2-to', md).value; $('#ab2-halfrow', md).hidden = !one; if (!one) $('#ab2-half', md).value = ''; };
@@ -107,10 +109,11 @@ function ab2_sheet(it) {
         histAdd({label: tr('Absence changed'), undo: put(before), redo: put(v)});
       } else {
         const r = await api('POST', '/api/team/absences', v);
+        AB2.req = r.status === 'pending';  // 2.125.0 A (#2117): a request, not yet away
         histAdd({label: tr('Absence entered'), undo: async () => { await api('DELETE', `/api/team/absences/${r.id}`); ab2_reload(); },
           redo: async () => { await api('POST', `/api/team/absences/${r.id}/restore`); ab2_reload(); }});
       }
-      md.remove(); ab2_reload(); toast(tr('Saved'));
+      md.remove(); ab2_reload(); toast(!it && AB2.req ? tr('Vacation requested') : tr('Saved'));
     } catch { b.disabled = false; /* api() said it */ }
   });
 }
@@ -124,7 +127,7 @@ async function ab2_delete(it) {
   } catch { /* api() said it */ }
 }
 
-function ab2_reload() { AB2.data = null; if (S.route.mod === 'workload') { WLV.data = null; ab2_load(); } }
+function ab2_reload() { AB2.data = null; lv_reset(); if (S.route.mod === 'workload') { WLV.data = null; ab2_load(); } }
 
 // "Plan my day" on a day away / a holiday: a hint instead of the proposal (the server leaves the proposal empty)
 function ab2_dayHint(a) {

@@ -52,6 +52,7 @@ TABLES = (
     "rc_receipts", "rc_suggest",  # 2.48.0 (#1356): receipts: project / category, the agents' suggestions
     "office_deals",  # 2.50.0 B (#1196): the sales pipeline
     "hub_absences",  # 2.50.0 A (#1195): absences (the area they were entered in; the app hides the kind)
+    "hub_leave_quota",  # 2.125.0 A (#2117): vacation accounts (the area like hub_absences)
     "hub_bookings",  # 2.50.0 A (#1194): bookings of the disposition
     "office_signoffs",  # 2.50.0 C (#1200): approval links (NULL = a private list's acceptance, the app checks the list)
     "video_reviews", "video_versions", "video_comments",  # 2.99.1 A (#1959): video sign-offs (NULL = private, the app checks owner / task / list / client)

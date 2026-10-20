@@ -69,6 +69,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-dateok': ['date_confirm', N_('Confirm changes of the date with OK'), 'chk'],  // 2.6.1 (#401)
   's-qfrom': ['quiet_from', N_('Quiet from'), 'time'], 's-qto': ['quiet_to', N_('Quiet until'), 'time'],  // 2.7.0 (#413)
   's-wfrom': ['work_start', N_('Working hours from'), 'time'], 's-wto': ['work_end', N_('Working hours until'), 'time'],  // 2.10.0 (#440)
+  's-wthours': ['capacity_h', N_('Hours per week'), 'text'],  // 2.125.0 A (#2118): the working week (leave.js)
   's-review': ['review_time', N_('Daily review at'), 'time'],
   's-brief': ['brief_time', N_('Morning briefing at'), 'time'],  // 2.34.0 (#264)
   's-lemo': ['list_emoji', N_('Suggest icons for new lists'), 'chk'],  // 2.32.0 (#1077)
@@ -164,6 +165,7 @@ function settingsSync() {
   ntfyShow(md);
   const lk = $('#s-lookin', md); if (lk) lk.innerHTML = lookHtml();
   rsy_sync(md);  // 2.56.1 (#1799)
+  if (typeof wt_sync === 'function') wt_sync(md);  // 2.125.0 A (#2118)
   md._tabDraw?.();
   md._sideDraw?.();
 }
@@ -592,7 +594,8 @@ function settingsModal(focus) {
       <h4 id="s-plan-h">${tr('Day planning')}</h4>
       <div class="row"><label for="s-wfrom">${tr('Working hours')}</label>${timeIn('s-wfrom', s.work_start || '09:00', {label: tr('Working hours from'), clear: false})}<label for="s-wto" class="qtol">${tr('until|time')}</label>${timeIn('s-wto', s.work_end || '17:00', {label: tr('Working hours until'), clear: false})}</div>
       <div class="row"><label for="s-review">${tr('Daily review at')}</label>${timeIn('s-review', s.review_time || '', {label: tr('Daily review at'), empty: tr('off')})}</div>
-      ${hint(tr('“Plan my day” in Today fills the free time between your calendar events within these hours with your open tasks (a task without a duration counts 30 minutes). The daily review shows in Today after the end of your working hours; with a time set it also comes as a push.'))}`,
+      ${hint(tr('“Plan my day” in Today fills the free time between your calendar events within these hours with your open tasks (a task without a duration counts 30 minutes). The daily review shows in Today after the end of your working hours; with a time set it also comes as a push.'))}
+      ${typeof wt_setHtml === 'function' ? wt_setHtml(s, hint) : ''}`,
     modules: modulesHtml(hint),
     notify: `${S.webpush?.enabled ? `<div class="pushnow" id="s-pushnow" role="status" aria-live="polite"></div>` : ''}${S.webpush?.enabled ? `<h4>${tr('Delivery')}</h4>
       <div class="row"><label for="s-pushch">${tr('Channel')}</label><select id="s-pushch">${[['webpush', N_('Web Push')], ['ntfy', 'ntfy'], ['both', N_('Both')]].map(([v, n]) => `<option value="${v}" ${(s.push_channel || 'webpush') === v ? 'selected' : ''}>${v === 'ntfy' ? n : tr(n)}</option>`).join('')}</select><button class="btn sm" data-m="ptest">${ic('bell', 's')} ${tr('Send test')}</button></div>

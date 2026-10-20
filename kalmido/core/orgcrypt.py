@@ -79,7 +79,7 @@ FIELDS = {
     "office_cash_entries": ("text",), "office_cash_log": ("prev",),  # 2.121.0 B (#2095): the cash book
     "office_deals": ("value", "contact", "note", "lost_reason",
                      "next_step", "email", "phone", "company"),  # 2.50.0 (#1196): the sales pipeline; 2.94.0 A (#1930): leads
-    "hub_absences": ("kind", "note"),  # 2.50.0 (#1195): the kind of an absence (sick leave = health data) and its note
+    "hub_absences": ("kind", "note", "decision_note"),  # 2.50.0 (#1195): the kind of an absence (sick leave = health data) and its note; 2.125.0 A (#2117): + the note of a decision
     # 2.72.0 (#1333): the household budget -- per row with the key of its list's space (column sid, life/budget.py bud_enc;
     # the passes of admin/orgcrypt_cli.py call life/budget.py bud_settle, not fields_pass: these tables have no org_id)
     "budget_entries": ("amount", "title", "note", "counterpart"),

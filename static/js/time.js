@@ -326,6 +326,7 @@ function viewTime() {
       ${tvClient() ? `<span class="tvclient">${ic('brief', 's')}<a href="#client/${tvClient().id}">${esc(tvClient().name)}</a><button class="iconbtn" data-act="client-tvx" title="${esc(tr('All lists'))}" aria-label="${esc(tr('Show all lists again'))}">${ic('x', 's')}</button></span>` : `<button class="btn sm" data-act="tv-lists">${ic('filter', 's')} ${esc(tvListsLabel())}</button>`}<span class="spacer"></span>
       <button class="btn sm" data-act="te-add">${ic('plus', 's')} ${tr('Entry')}</button>
       <a class="btn sm" href="/api/time/export.csv?${esc(q)}" download>${ic('download', 's')} CSV</a>
+      <a class="btn sm" href="/api/time/export.xlsx?${esc(q)}" download>${ic('download', 's')} ${tr('Excel (XLSX)')}</a>
       <button class="btn sm" data-act="tv-sheet" ${j ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet')}</button>${lyCustomBtn('time')}</div>`;
   if (S.ly.view === 'time') return h + lyHtml('time', {}) + '</div>';
   if (!j) return h + lyHtml('time', P) + `<div class="empty">${tv.err ? (tv.err === 'offline' ? tr('Reports are only available online.') : esc(tv.err)) : tr('Loading…')}</div></div>`;

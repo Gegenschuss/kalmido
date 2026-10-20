@@ -90,6 +90,19 @@ function bootDone() {
     history.replaceState(null, '', '/' + (location.hash || ''));
     await route();
     openQuickSheet();
+  } else if (new URLSearchParams(location.search).get('action') === 'timer') {  // 2.125.0 C (#2121): app shortcut "Start / stop timer"
+    history.replaceState(null, '', '/' + (location.hash || ''));  // the parameter goes first: a reload never toggles twice
+    if (timeOn()) location.hash = '#time';
+    await route();
+    if (!timeOn()) toast(tr('Time tracking is turned off in your settings'));
+    else if (S.timer) await timerStop();
+    else {  // a timer needs a task or list with time tracking on: the one of the latest entry, else the first such list
+      let last = null;
+      try { last = ((await api('GET', '/api/time/entries?scope=mine&from=' + new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10))).entries || [])[0]; } catch { /* the first list below */ }
+      const lst = S.lists.find(l => l.time_tracking && !l.archived);
+      const target = last ? (last.task_id ? {task_id: last.task_id} : {list_id: last.list_id}) : lst ? {list_id: lst.id} : null;
+      if (target) await timerStart(target); else toast(tr('Switch on time tracking in the list settings to track time'));
+    }
   } else if (new URLSearchParams(location.search).get('action') === 'capture') {  // 2.4.0 (#187): app shortcut "Quick add"
     history.replaceState(null, '', '/' + (location.hash || ''));
     await route();
