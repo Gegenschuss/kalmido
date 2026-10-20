@@ -81,7 +81,8 @@ def form_key(html):
 
 def pdf_text(data):
     out = b""
-    for m in re.finditer(rb"stream\r?\n(.*?)\r?\nendstream", data, re.S):
+    # Kalmido ends a stream with "\nendstream": a compressed stream may itself end in a CR byte (1 in 256), "\r?" cut it off (CI red, 2.145.1 #2439)
+    for m in re.finditer(rb"stream\r?\n(.*?)\nendstream", data, re.S):
         try:
             out += zlib.decompress(m.group(1))
         except zlib.error:

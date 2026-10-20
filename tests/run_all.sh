@@ -1393,6 +1393,7 @@ fresh; run p2125_c_api "$PY" p2125_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2125_c_ui node p2125_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.125.0 part D: browser demo like a new account, all modules (#1653) (no container)
        run p2125_d_demo node p2125_d_demo_test.js
+shard 18  # 2.142.2: shard 17 hit the 45 min CI limit - the 2.138-2.142 groups moved here; 20.10.2026 (job #692): the parked releases 2.111-2.113.0 (new suites still go to shard 17 above)
 # 2.138.0 part A: office quotations - unit in percent rows, part rename on the title page, wrapped part headings, unit words by quantity; service worker other origins (#2236 #2239 #2240 #2249 #2257)
 fresh; run p2138_a_api "$PY" p2138_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2138_a_ui node p2138_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1447,7 +1448,6 @@ fresh; run p2142_b_ui node p2142_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.142.0 part C: export to Todoist CSV / Markdown, admin "fetch mail now", ntfy share inbox per person (#2148 #2149 #2150)
 fresh; run p2142_c_api "$PY" p2142_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2142_c_ui node p2142_c_ui.js "$KALMIDO_TEST_DATA"
-shard 18  # 20.10.2026 (job #692): the parked releases 2.111-2.113.0 (new suites still go to shard 17 above)
 # 2.111.0: Buero-Rueckgaengig (a), Termin-Einladungen + Abo-Link (b), Schnellerfassung (c)
 fresh; run p2111_a_api "$PY" p2111_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2111_a_ui node p2111_a_ui.js "$KALMIDO_TEST_DATA"
