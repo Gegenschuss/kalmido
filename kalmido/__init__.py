@@ -326,6 +326,7 @@ ORDER = (
     "office.recurring",  # 2.91.0 A (#1923): invoice series (a template invoice every month / quarter / year, drafts or sent)
     "office.subs",  # 2.91.0 B (#1924): subscriptions and tools (fixed costs with notice period, users, renewal reminder)
     "office.officemove",  # 2.97.0 C (#2049): office data between the personal office and an organisation's office
+    "office.numranges",  # 2.138.0 D (#2256): the next running number of every number series (office admin)
     "agents.importprop",  # 2.68.0 A (#1839): agents propose old data for the office (fixed costs), the person takes it over
     "agents.sheetprop",  # 2.126.1 B (#2125): table rows -> tasks as an agent's proposal (after api.v1, sheets.step2)
     "agents.meetprop",  # 2.70.0 A (#1354): a meeting becomes tasks (extract with photos, the chat's cards)

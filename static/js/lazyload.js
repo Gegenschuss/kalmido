@@ -16,7 +16,7 @@ const LD_MODS = {
     'office_agreements', 'office_assets',  // 2.92.0 (#1925, #1931)
     'office_meals',  // 2.119.0 A (#2288): entertainment receipts
     'office_leads', 'office_cfiles',  // 2.94.0 A (#1930), 2.117.0 B (#2285)  // 2.76.0 A (#1023): office_packs
-    'office_letterhead'],  // 2.120.0 E (#2091)
+    'office_letterhead', 'office_numranges'],  // 2.120.0 E (#2091); 2.138.0 D (#2256): office_numranges
   // 2.65.0 (#1823): more areas load on first use (the start loads about a third less)
   agentchat: ['agentchat', 'agentsetup'],
   pdf: ['pdfview', 'docpreview'],  // 2.92.0 C (#1926): docpreview.js = the Word / Excel preview

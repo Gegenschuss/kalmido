@@ -713,3 +713,12 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 @media (prefers-reduced-motion:reduce){.oim .oimsec::after{transition:none}}
 .oimlink.e a{color:var(--accent)}
 .oimlink a{display:inline-flex;align-items:center;gap:.25rem;min-height:2.75rem}
+/* 2.138.0 D (#2256): the next running number of every series (settings) and a draft's number in the editor */
+.onum h4{margin:1rem 0 .25rem}
+.onum .onumrow .numin{width:8rem}
+.onumwhy{flex-basis:100%}
+.onumwhy input{flex:1;min-width:0}
+.onumdoc{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;font-size:var(--fs-m)}
+.onumdoc input{min-height:2.25rem;max-width:14rem}
+.onumdoc .ofchint{flex-basis:100%}
+.onumpen{min-height:2.25rem;min-width:2.25rem}
