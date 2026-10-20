@@ -48,7 +48,7 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
   // ================= #2467 subtasks show at once
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
   const f0 = w.fetch; let answered = 0;
-  w.fetch = (u, o = {}) => String(u).includes('/api/tasks') && o.method === 'POST' ? sleep(700).then(() => f0(u, o)).then(r => { answered++; return r; }) : f0(u, o);
+  w.fetch = (u, o = {}) => /\/api\/tasks$/.test(String(u)) && o.method === 'POST' ? sleep(4000).then(() => f0(u, o)).then(r => { answered++; return r; }) : f0(u, o);
   w.eval(`openDetail(${P})`); await until(() => d.querySelector('#d-sub'));
   const NAMES = ['One bulb', 'Two switch', 'Three wall', 'Four tap', 'Five door'];
   for (const n of NAMES) { const f = d.querySelector('#d-sub'); f.focus(); f.value = n; f.dispatchEvent(new w.Event('input', {bubbles: true})); key(w, f, 'Enter'); await sleep(20); }
@@ -56,7 +56,7 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
   const early = shown();
   check(answered === 0 && JSON.stringify(early) === JSON.stringify(NAMES), '#2467: all five rows at once, before any answer, in order: ' + JSON.stringify(early) + ' answered ' + answered);
   check(d.querySelector('#d-sub')?.value === '' && d.activeElement === d.querySelector('#d-sub'), '#2467: the field is empty and keeps the focus');
-  await until(() => answered >= 5, 80); await sleep(400);
+  await until(() => answered >= 5, 200); await sleep(400);
   const ids = [...d.querySelectorAll('#detail .subs .trow')].map(r => +r.dataset.id);
   check(JSON.stringify(shown()) === JSON.stringify(NAMES) && ids.length === 5 && ids.every(i => i > 0), '#2467: after the answers five real rows, no duplicates: ' + JSON.stringify(ids));
   const srv = (await call('GET', '/api/state')).tasks.filter(t => t.parent_id === P).sort((a, b) => a.sort - b.sort || a.id - b.id).map(t => t.title);
