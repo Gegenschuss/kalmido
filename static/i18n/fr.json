@@ -12295,5 +12295,13 @@
   "This address book cannot be changed (read only or a mirror): changes stay in Kalmido": "Ce carnet ne peut pas être modifié (lecture seule ou miroir) : les modifications restent dans Kalmido",
   "This address book server sends no reliable version tags: Kalmido does not write there": "Ce serveur de carnets n'envoie pas de balises de version fiables : Kalmido n'y écrit pas",
   "A contact could not be changed safely: nothing was written": "Un contact n'a pas pu être modifié en toute sécurité : rien n'a été écrit",
-  "Writing back failed: {0}": "Échec de la réécriture : {0}"
+  "Writing back failed: {0}": "Échec de la réécriture : {0}",
+  "Kalmido - Start": "Kalmido – Accueil",
+  "Unread in other workspaces": "Non lus dans d'autres espaces de travail",
+  "1 unread in {0}": "1 non lu dans {0}",
+  "{0} unread in {1}": "{0} non lus dans {1}",
+  "Switch": "Changer",
+  "Tracked time (h)": "Temps saisi (h)",
+  "Created by": "Créé par",
+  "Completed by": "Terminé par"
 }

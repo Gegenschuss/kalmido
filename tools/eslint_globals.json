@@ -3297,6 +3297,7 @@
 "leadSrcName",
 "lexCsv",
 "lexDoc",
+"lexHead",
 "lexPrint",
 "lexRows",
 "lg_decor",

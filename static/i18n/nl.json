@@ -12295,5 +12295,13 @@
   "This address book cannot be changed (read only or a mirror): changes stay in Kalmido": "Dit adresboek kan niet worden gewijzigd (alleen-lezen of een spiegel): wijzigingen blijven in Kalmido",
   "This address book server sends no reliable version tags: Kalmido does not write there": "Deze adresboekserver stuurt geen betrouwbare versielabels: Kalmido schrijft daar niet",
   "A contact could not be changed safely: nothing was written": "Een contact kon niet veilig worden gewijzigd: er is niets geschreven",
-  "Writing back failed: {0}": "Terugschrijven mislukt: {0}"
+  "Writing back failed: {0}": "Terugschrijven mislukt: {0}",
+  "Kalmido - Start": "Kalmido – Start",
+  "Unread in other workspaces": "Ongelezen in andere werkruimtes",
+  "1 unread in {0}": "1 ongelezen in {0}",
+  "{0} unread in {1}": "{0} ongelezen in {1}",
+  "Switch": "Wisselen",
+  "Tracked time (h)": "Geregistreerde tijd (u)",
+  "Created by": "Aangemaakt door",
+  "Completed by": "Voltooid door"
 }
