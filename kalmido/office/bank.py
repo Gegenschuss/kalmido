@@ -212,7 +212,7 @@ def _uploads(b):
                 raise BadInput(tr("The upload is too large (at most {0} MB)", BNK_UPLOAD_MAX // (1024 * 1024)))
             if name.casefold().endswith(".zip") or data[:4] == b"PK\x03\x04":
                 fs.add_zip(name, data)
-            elif not name.casefold().endswith(BNK_EXTS):
+            elif not name.casefold().endswith(BNK_EXTS) and not bnk_is_mt940(_decode(data[:20000])):  # MT940 (.sta ...) gets its own message
                 fs.errors.append({"file": name, "error": tr("Not a bank statement (only XML, CSV or ZIP)")})  # 2.144.1 (review)
             else:
                 fs.add(name, data)
