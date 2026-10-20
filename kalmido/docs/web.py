@@ -633,6 +633,8 @@ def docs_rule_edit(rid):
     ws = _rule_ws(c, rid)
     d = body()
     if "pos" in d and isinstance(d["pos"], (int, float)) and not isinstance(d["pos"], bool):
+        if not -1e9 < d["pos"] < 1e9:  # 2.126.0 A (#1979 L4): also no Infinity / NaN
+            return err(tr("Invalid value: {0}", "pos"))
         c.execute("UPDATE doc_rules SET pos=? WHERE id=?", (int(d["pos"]), rid))
     if "match" in d:
         _rid, e = _rule_save(c, ws, d, rid)

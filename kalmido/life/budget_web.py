@@ -176,7 +176,10 @@ def budget_file_get(fid):
     c = db()
     uid = me()
     bud_need_on(c, uid)
-    return send_stored(dict(bud_obj(c, uid, "budget_files", fid, write=False)))
+    r = dict(bud_obj(c, uid, "budget_files", fid, write=False))
+    from ..files.scan import sc_guard
+    sc_guard(c, "budget", fid)  # 2.126.0 A (#1979 L1): like the other stored files
+    return send_stored(r)
 
 
 @app.delete("/api/budget/files/<int:fid>")

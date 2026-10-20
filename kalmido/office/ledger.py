@@ -326,6 +326,7 @@ def ofx_finalize(c, oid, uid, did):
     s = office_settings(c, oid)
     pack = office_pack(s["pack"]) or office_pack("DE") or {}
     if r["kind"] != "offer":  # 2.38.0 (#1021, F1): the required fields of an invoice (400 with the list), due date
+        write_lock(c, f"office_num_{int(oid)}")  # 2.126.0 A (#1979 F5): the date check and the number in one go (docs._assign_number)
         inv_before_finalize(c, oid, r, s, pack)
         r = doc_row(c, oid, did)
     if not r["number"]:

@@ -8,6 +8,8 @@ background thread) and the command line for the server admin:
     python -m kalmido.admin.orgcrypt_cli encrypt-private        #   (private_encrypt=0) / sealed again (private_encrypt=1)
     python -m kalmido.admin.orgcrypt_cli decrypt-wiki           # 2.123.0 A (#2105): the knowledge pages' texts plain again
     python -m kalmido.admin.orgcrypt_cli encrypt-wiki           #   (wiki_encrypt=0, before running 2.122 or older) / sealed again
+    python -m kalmido.admin.orgcrypt_cli docs-to-server-key     # 2.126.0 A (#1970): the private documents' values on the
+    python -m kalmido.admin.orgcrypt_cli docs-to-account-key    #   server-derived key (before running 2.125 or older) / back
     python -m kalmido.admin.orgcrypt_cli rewrap-accounts --old-key-file FILE   # 2.64.0: account keys after a new server key
         (FILE "-" = stdin: the earlier KALMIDO_SECRET_KEY, base64; never as an argument)
     python -m kalmido.admin.orgcrypt_cli rewrap --org N --recovery-file FILE [--force]   (FILE "-" = stdin; never as an argument;
@@ -48,6 +50,20 @@ FIELD_JOBS = [("office_company", "org_id", col, "text") for col in oc.FIELDS["of
     ("office_docs", "id", "totals", "json"),
     ("office_settings", "org_id", "data", "json"),
     ("office_doc_log", "id", "detail", "log"),
+]
+# 2.126.0 A (#1971): (table, id column, column, sealing context) of the documents' values: sealed per workspace (column ws)
+# by docs/store.py doc_seal, the organisation's key or the person's own key
+DOC_JOBS = [("doc_meta", "node_id", col, f"doc_meta.{col}") for col in ("text", "amount", "suggest", "trained", "extracted")] + [
+    ("doc_senders", "id", "name", "doc_senders.name"),
+    ("doc_rules", "id", "data", "doc_rules.data"),
+    ("doc_models", "id", "data", "doc_models.data"),
+    ("rc_suggest", "id", "note", "rc_suggest.note"),
+    ("rc_suggest", "id", "amount", "rc_suggest.amount"),
+    ("rc_suggest", "id", "prev_amount", "rc_suggest.prev_amount"),
+    ("pl_uploads", "id", "info", "pl_uploads.info"),
+    ("pl_uploads", "id", "mapping", "pl_sources.mapping"),  # the upload's mapping is sealed like the source's
+    ("pl_sources", "id", "mapping", "pl_sources.mapping"),
+    ("file_text", "id", "text", "file_text.text"),
 ]
 
 
@@ -386,6 +402,145 @@ def space_rows(c, list_ids=None, commit=False):
             last = rows[-1]["rid"]
 
 
+# ---- 2.126.0 A (#1971): the documents' values -------------------------------------------------------------------------
+def _ds():
+    from ..docs import store
+    return store
+
+
+def docs_pass(c, enc, stop=None):
+    """Seal (enc) every plain document value with its workspace's key, or open every sealed one (decrypt-all). Compare and
+    set, batches with a commit each. -> {"changed": n, "failed": n} (a value that cannot be opened stays as it is)."""
+    S = _ds()
+    out = {"changed": 0, "failed": 0}
+    if enc and not oc.oc_active(c):
+        return out
+    for table, idc, col, ctx in DOC_JOBS:
+        last = None
+        while True:
+            if stop and stop():
+                return out
+            with system_ctx(c):  # orgcrypt: server-side bulk work over every workspace, never content handed to a person
+                write_lock(c, "orgcrypt")
+                sql = f"SELECT {idc} AS rid, ws, {col} AS v FROM {table} WHERE {col}<>'' AND left({col}, 6)" + ("<>?" if enc else "=?")
+                args = [oc.PREFIX]
+                if last is not None:
+                    sql += f" AND {idc} > ?"
+                    args.append(last)
+                rows = c.execute(sql + f" ORDER BY {idc} LIMIT {BATCH}", args).fetchall()
+                for r in rows:
+                    if enc:
+                        new = S.doc_seal(c, r["ws"], ctx, r["v"])
+                    else:
+                        new = S.doc_open(c, r["ws"], ctx, r["v"], default=None)
+                        if new is None:
+                            out["failed"] += 1
+                            continue
+                    if new != r["v"]:
+                        out["changed"] += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {col}=?", (new, r["rid"], r["v"])).rowcount
+            c.commit()
+            if len(rows) < BATCH:
+                break
+            last = rows[-1]["rid"]
+    return out
+
+
+def docs_settle(c, account, stop=None):
+    """2.126.0 A (#1970): the sealed values of the persons' own documents (workspaces u<id>) into one form: account=True
+    the person's account key (the start-up pass, docs-to-account-key), False the key derived from the server key (the way
+    back for an older version, docs-to-server-key). Compare and set, batches with a commit each. -> {"changed", "failed"}."""
+    S = _ds()
+    out = {"changed": 0, "failed": 0}
+    for table, idc, col, ctx in DOC_JOBS:
+        last = None
+        while True:
+            if stop and stop():
+                return out
+            with system_ctx(c):  # orgcrypt: server-side bulk work over the private workspaces, never content handed to a person
+                write_lock(c, "orgcrypt")
+                sql = f"SELECT {idc} AS rid, ws, {col} AS v FROM {table} WHERE ws LIKE 'u%' AND left({col}, 6)=?"  # pg-ok: ws prefix u is case-exact
+                args = [oc.PREFIX]
+                if last is not None:
+                    sql += f" AND {idc} > ?"
+                    args.append(last)
+                rows = c.execute(sql + f" ORDER BY {idc} LIMIT {BATCH}", args).fetchall()
+                for r in rows:
+                    try:
+                        plain, is_acct = S.doc_open_as(c, r["ws"], ctx, r["v"])
+                    except oc.OrgCryptError:
+                        out["failed"] += 1
+                        continue
+                    if is_acct == account or (account and S._acct_key(c, r["ws"], True) is None):
+                        continue
+                    new = S.doc_seal_as(c, r["ws"], ctx, plain, account)
+                    out["changed"] += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {col}=?", (new, r["rid"], r["v"])).rowcount
+            c.commit()
+            if len(rows) < BATCH:
+                break
+            last = rows[-1]["rid"]
+    return out
+
+
+def docs_settle_once(c, stop=None):
+    """2.126.0 A (#1970): the start-up pass moves the persons' document values to their account keys once (setting
+    docs_account_key_at notes a finished pass; docs-to-server-key / docs-to-account-key clear it)."""
+    from ..core.db import gset
+    S = _ds()
+    with system_ctx(c):  # orgcrypt: instance settings, no content
+        done = c.execute("SELECT 1 FROM settings WHERE key='docs_account_key_at'").fetchone()
+    if done or not S.docs_ukey_on(c):
+        return {"changed": 0, "failed": 0}
+    t = docs_settle(c, True, stop)
+    if not (stop and stop()):
+        with system_ctx(c):  # orgcrypt: an instance setting
+            gset(c, "docs_account_key_at", _now())
+        c.commit()
+    return t
+
+
+def docs_switch(c, account):
+    """2.126.0 A (#1970): docs-to-account-key / docs-to-server-key -- the switch first (a running server seals new values
+    in that form from now on), then the pass. -> counts plus what is left in the other form."""
+    from ..core.db import gset
+    with system_ctx(c):  # orgcrypt: instance settings
+        gset(c, "docs_account_key", "1" if account else "0")
+        c.execute("DELETE FROM settings WHERE key='docs_account_key_at'")
+    c.commit()
+    t = docs_settle(c, account)
+    if account and not t["failed"]:
+        with system_ctx(c):  # orgcrypt: an instance setting
+            gset(c, "docs_account_key_at", _now())
+        c.commit()
+    f = docs_forms(c)
+    return {**t, "left": f["server_key"] if account else f["account_key"]}
+
+
+def docs_forms(c):
+    """2.126.0 A (#1970): {"account_key": n, "server_key": n, "unreadable": n} over the sealed values of the persons' own
+    documents (status)."""
+    S = _ds()
+    out = {"account_key": 0, "server_key": 0, "unreadable": 0}
+    for table, idc, col, ctx in DOC_JOBS:
+        with system_ctx(c):  # orgcrypt: counts only (each value is opened, never shown)
+            rows = c.execute(f"SELECT ws, {col} AS v FROM {table} WHERE ws LIKE 'u%' AND left({col}, 6)=?", (oc.PREFIX,)).fetchall()  # pg-ok: ws prefix u is case-exact
+        for r in rows:
+            try:
+                out["account_key" if S.doc_open_as(c, r["ws"], ctx, r["v"])[1] else "server_key"] += 1
+            except oc.OrgCryptError:
+                out["unreadable"] += 1
+    return out
+
+
+def docs_count(c):
+    """{"enc": n, "plain": n} over the documents' values of every workspace (status)."""
+    out = {"enc": 0, "plain": 0}
+    with system_ctx(c):  # orgcrypt: counts only
+        for table, idc, col, ctx in DOC_JOBS:
+            for r in c.execute(f"SELECT left({col}, 6) AS p, COUNT(*) AS n FROM {table} WHERE {col}<>'' GROUP BY left({col}, 6)"):
+                out["enc" if r["p"] == oc.PREFIX else "plain"] += int(r["n"])
+    return out
+
+
 def _pause():
     try:
         return max(0.0, float(os.environ.get("KALMIDO_ORGCRYPT_PAUSE", "0.2")))
@@ -543,6 +698,8 @@ def encrypt_all(c, stop=None, pause=0.0):
     st = files_settle(c, stop, pause=pause)
     tot["fields"] += _bud().bud_settle(c, stop=stop)  # 2.72.0 (#1333): the household budget's rows in their list's space
     tot["fields"] += _wkh().wkh_settle(c, stop=stop)["changed"]  # 2.123.0 A (#2105): the knowledge pages' texts and history
+    tot["fields"] += docs_pass(c, True, stop)["changed"]  # 2.126.0 A (#1971): the documents' values
+    tot["fields"] += docs_settle_once(c, stop)["changed"]  # 2.126.0 A (#1970): private ones on the account keys
     tot["files"] += st["sealed"]
     tot["resealed"], tot["failed"] = st["resealed"], tot["failed"] + st["failed"]
     if not (stop and stop()) and not st["failed"] and oc.oc_active(c) and oc.oc_private_on(c):
@@ -570,6 +727,9 @@ def decrypt_all(c):
         tot["fields"] += fields_pass(c, oid, False, key)
     tot["fields"] += _bud().bud_settle(c, plain=lambda sid: True)  # 2.72.0 (#1333): the household budget plain again
     tot["fields"] += _wkh().wkh_settle(c, plain=lambda sid: True)["changed"]  # 2.123.0 A (#2105): the knowledge pages plain again
+    d = docs_pass(c, False)  # 2.126.0 A (#1971): the documents' values plain again
+    tot["fields"] += d["changed"]
+    tot["failed"] += d["failed"]
     from ..tasks.related import emb_drop_sealed
     emb_drop_sealed(c)  # 2.59.0 B (#1375): no sealed task vector stays behind (computed again, plain)
     c.commit()
@@ -587,6 +747,9 @@ def status(c):
     out["private_encrypt"] = oc.oc_private_on(c)  # 2.64.0 (#1864)
     out["private"] = private_count(c)
     out["wiki_encrypt"], out["wiki"] = _wkh().wkh_switch(c), _wkh().wkh_count(c)  # 2.123.0 A (#2105)
+    out["docs"] = docs_count(c)  # 2.126.0 A (#1971): the documents' values of every workspace
+    out["docs_account_key"] = _ds().docs_ukey_on(c)  # 2.126.0 A (#1970)
+    out["docs"]["private"] = docs_forms(c)
     for oid in _org_ids(c):
         st = oc.oc_status(c, oid)
         out["orgs"].append({"org": oid, "has_key": st["has_key"], "key_ok": st["key_ok"], "migrated_at": st["migrated_at"],
@@ -780,13 +943,15 @@ def main(argv):
     from ..core.db import connect
     ap = argparse.ArgumentParser(prog="python -m kalmido.admin.orgcrypt_cli", description="Kalmido: organisation keys (encryption at rest)")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("status", help="per organisation: key, encrypted / plain fields and files")
+    sub.add_parser("status", help="per organisation: key, encrypted / plain fields and files; the documents' values (docs)")
     sub.add_parser("encrypt-all", help="encrypt every organisation's fields and files (org_encrypt=1)")
     sub.add_parser("decrypt-all", help="the way back before a downgrade: everything plain again, org_encrypt=0")
     sub.add_parser("decrypt-private", help="2.64.0: only the private spaces' files plain again, private_encrypt=0")
     sub.add_parser("encrypt-private", help="2.64.0: seal the private spaces' files again, private_encrypt=1")
     sub.add_parser("decrypt-wiki", help="2.123.0: the knowledge pages' texts and history plain again (before 2.122 or older), wiki_encrypt=0")
     sub.add_parser("encrypt-wiki", help="2.123.0: seal the knowledge pages' texts and history again, wiki_encrypt=1")
+    sub.add_parser("docs-to-server-key", help="2.126.0: the private documents' values back on the server-derived key (before running 2.125 or older)")
+    sub.add_parser("docs-to-account-key", help="2.126.0: the private documents' values on the persons' account keys again")
     ra = sub.add_parser("rewrap-accounts", help="2.64.0: store the account keys again with the current server key (needs the earlier one)")
     ra.add_argument("--old-key-file", required=True, help='a file holding the earlier KALMIDO_SECRET_KEY, "-" = stdin')
     rw = sub.add_parser("rewrap", help="store an organisation's key again (new KALMIDO_SECRET_KEY) from its recovery key")
@@ -812,6 +977,7 @@ def main(argv):
             print(TAG, "decrypt-all:", json.dumps(t))
             st = status(c)
             left = sum(o["fields"]["enc"] + o["files"]["enc"] for o in st["orgs"]) + st["private"]["files"]["enc"] - t["kept"]  # 2.64.0 (#1864)
+            left += st["docs"]["enc"]  # 2.126.0 A (#1971)
             print(TAG, "still encrypted:", left, "(org_encrypt is now 0)")
             if left or t["failed"]:
                 return 1
@@ -841,6 +1007,11 @@ def main(argv):
             left = _wkh().wkh_count(c)
             print(TAG, a.cmd + ":", json.dumps({**t, **left}), "(wiki_encrypt is now", "1)" if on else "0)")
             if t["failed"] or (not on and left["sealed"]):
+                return 1
+        elif a.cmd in ("docs-to-server-key", "docs-to-account-key"):  # 2.126.0 A (#1970): the switch first, then the pass
+            t = docs_switch(c, a.cmd == "docs-to-account-key")
+            print(TAG, a.cmd + ":", json.dumps(t), "(docs_account_key is now", "1)" if a.cmd == "docs-to-account-key" else "0)")
+            if t["failed"] or t["left"]:
                 return 1
         elif a.cmd == "rewrap-accounts":
             from ..core.config import _secret_key_parse
