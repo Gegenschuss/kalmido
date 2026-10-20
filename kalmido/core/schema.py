@@ -2032,7 +2032,7 @@ CREATE TABLE IF NOT EXISTS ev_cal_feeds (
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, secret TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE (cal_id, user_id));
 CREATE TABLE IF NOT EXISTS ev_invite_day (
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, day TEXT NOT NULL, n BIGINT NOT NULL DEFAULT 0, PRIMARY KEY (user_id, day));
--- (2.111.0 B end)
+-- (end of 2.111.0 B)
 -- 2.112.1 B (#2058): external share links of the file store (files/extlinks.py): a file / folder for people without an
 -- account through /s/f/<token> (192 random bits; sealed so the owners can copy it again, looked up by SHA-256). org_id =
 -- the node's (NULL = private); label only for the owners; pw_hash + pw_ver (the unlock cookie is bound to it); revoked_at
