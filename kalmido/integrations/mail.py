@@ -236,40 +236,48 @@ def mail_import(c, raw):
     return tid
 
 
+def mail_fetch(M, folder, importer):
+    """2.141.0 A (#2141): the unseen mails of folder (a logged-in IMAP connection) -> importer(c, raw), each one marked \\Seen
+    afterwards (also when it was for nobody or failed: it is never looked at again). Returns how many were taken in."""
+    n = 0
+    typ, _ = M.select(folder)
+    if typ != "OK":
+        raise imaplib.IMAP4.error("SELECT failed")
+    typ, data = M.uid("SEARCH", None, "UNSEEN")
+    for u in (data[0] or b"").split()[:200]:
+        typ, parts = M.uid("FETCH", u, "(RFC822)")
+        raw = next((p[1] for p in parts if isinstance(p, tuple) and len(p) > 1), None)
+        if raw:
+            with GATE.bg():
+                c = connect()
+                try:
+                    if importer(c, raw):
+                        n += 1
+                except Exception as e:  # noqa: BLE001 - 2.126.0 review: one mail that fails is skipped (marked seen), never blocks the rest
+                    print("mail: skipped one mail:", type(e).__name__, e, flush=True)
+                    try:
+                        c.rollback()
+                    except Exception:  # noqa: BLE001
+                        pass
+                finally:
+                    c.close()
+        M.uid("STORE", u, "+FLAGS", "(\\Seen)")
+    return n
+
+
 def mail_poll_once():
     """One round: the unseen mails of the folder -> tasks; each one is marked \\Seen afterwards (also when it was for
     nobody: it is never looked at again)."""
     port = IMAP["port"] or (993 if IMAP["ssl"] else 143)
     M = imaplib.IMAP4_SSL(IMAP["host"], port, timeout=60) if IMAP["ssl"] else imaplib.IMAP4(IMAP["host"], port, timeout=60)
-    n = 0
     try:
         M.login(IMAP["user"], IMAP["password"])
-        M.select(IMAP["folder"])
-        typ, data = M.uid("SEARCH", None, "UNSEEN")
-        for u in (data[0] or b"").split()[:200]:
-            typ, parts = M.uid("FETCH", u, "(RFC822)")
-            raw = next((p[1] for p in parts if isinstance(p, tuple) and len(p) > 1), None)
-            if raw:
-                with GATE.bg():
-                    c = connect()
-                    try:
-                        if mail_import(c, raw):
-                            n += 1
-                    except Exception as e:  # noqa: BLE001 - 2.126.0 review: one mail that fails is skipped (marked seen), never blocks the rest
-                        print("mail: skipped one mail:", type(e).__name__, e, flush=True)
-                        try:
-                            c.rollback()
-                        except Exception:  # noqa: BLE001
-                            pass
-                    finally:
-                        c.close()
-            M.uid("STORE", u, "+FLAGS", "(\\Seen)")
+        return mail_fetch(M, IMAP["folder"], mail_import)
     finally:
         try:
             M.logout()
         except Exception:  # noqa: BLE001
             pass
-    return n
 
 
 _MAIL_WAKE = threading.Event()
@@ -299,21 +307,67 @@ def mail_poll_now():
     return jsonify(ok=True)
 
 
-def mail_send(to, subject, text, html_body=None, images=None, from_name=None, attachments=None, cc=None, reply_to=None):
-    """Sends one mail with KALMIDO_SMTP_*; raises on failure. images: {cid: (bytes, subtype)} shown in the HTML part
-    (2.22.0: the logo of the invitation); from_name: a display name for the sender. 2.38.0 (#1021): attachments =
-    [(file name, bytes, mime type)] (invoice PDF / XML), cc = a second address, reply_to = the sender's own address."""
+class _SafeSMTP(smtplib.SMTP):
+    """2.141.0 A (#2141): SMTP to a host a workspace entered: every address of the name is checked (no internal host unless
+    the admin allowed it, calendars/subscriptions.py cal_allow) and exactly the checked one is connected to."""
+    def __init__(self, host, port, timeout, allow):
+        self._kal_allow = allow
+        super().__init__(host, port, timeout=timeout)
+
+    def _get_socket(self, host, port, timeout):
+        from ..calendars.subscriptions import _cal_connector
+        return _cal_connector(self._kal_allow)((host, port), timeout)
+
+
+class _SafeSMTP_SSL(smtplib.SMTP_SSL):
+    def __init__(self, host, port, timeout, allow):
+        self._kal_allow = allow
+        super().__init__(host, port, timeout=timeout)
+
+    def _get_socket(self, host, port, timeout):
+        from ..calendars.subscriptions import _cal_connector
+        return self.context.wrap_socket(_cal_connector(self._kal_allow)((host, port), timeout), server_hostname=self._host)
+
+
+def smtp_open(smtp=None):
+    """2.141.0 A (#2141): a connected and logged-in SMTP session: KALMIDO_SMTP_* (smtp None), else a workspace's access
+    {host, port, tls, user, password, from, allow} (allow = the hosts that may be internal: the connection is checked)."""
+    cfg = smtp or SMTP
+    tls = cfg["tls"]
+    port = cfg["port"] or (465 if tls == "ssl" else 587 if tls == "starttls" else 25)
+    if smtp is None:
+        S_ = smtplib.SMTP_SSL(cfg["host"], port, timeout=30) if tls == "ssl" else smtplib.SMTP(cfg["host"], port, timeout=30)
+    else:
+        allow = cfg.get("allow") or frozenset()
+        S_ = _SafeSMTP_SSL(cfg["host"], port, 30, allow) if tls == "ssl" else _SafeSMTP(cfg["host"], port, 30, allow)
+    try:
+        if tls == "starttls":
+            S_.starttls()
+        if cfg["user"]:
+            S_.login(cfg["user"], cfg["password"])
+    except BaseException:
+        try:
+            S_.close()
+        except Exception:  # noqa: BLE001
+            pass
+        raise
+    return S_
+
+
+def mail_message(to, subject, text, html_body=None, images=None, from_name=None, attachments=None, cc=None, reply_to=None, smtp=None):
+    """2.141.0 A (#2141): the message mail_send sends (built first so the e-mail filing can keep it before it goes out)."""
     from ..collab.liste2eguard import le2b_net
     subject, text = le2b_net(subject), le2b_net(text)  # 2.64.1 B (#1817): never a ciphertext of a list with the lock in a mail
     html_body = le2b_net(html_body) if html_body else html_body
+    frm = (smtp or SMTP)["from"]
     m = email.message.EmailMessage()
-    m["From"], m["To"], m["Subject"] = (email.utils.formataddr((from_name, SMTP["from"])) if from_name else SMTP["from"]), to, subject
+    m["From"], m["To"], m["Subject"] = (email.utils.formataddr((from_name, frm)) if from_name else frm), to, subject
     if cc:
         m["Cc"] = cc
     if reply_to:
         m["Reply-To"] = reply_to
     m["Date"] = email.utils.formatdate(localtime=True)
-    m["Message-ID"] = email.utils.make_msgid(domain=(SMTP["from"].rpartition("@")[2] or "kalmido.local"))
+    m["Message-ID"] = email.utils.make_msgid(domain=(frm.rpartition("@")[2] or "kalmido.local"))
     m.set_content(text)
     if html_body:
         m.add_alternative(html_body, subtype="html")
@@ -322,20 +376,29 @@ def mail_send(to, subject, text, html_body=None, images=None, from_name=None, at
     for name, data, mime in attachments or []:
         main, _, sub = (mime or "application/octet-stream").partition("/")
         m.add_attachment(data, maintype=main or "application", subtype=sub or "octet-stream", filename=name)
-    tls = SMTP["tls"]
-    port = SMTP["port"] or (465 if tls == "ssl" else 587 if tls == "starttls" else 25)
-    S_ = smtplib.SMTP_SSL(SMTP["host"], port, timeout=30) if tls == "ssl" else smtplib.SMTP(SMTP["host"], port, timeout=30)
+    return m
+
+
+def mail_deliver(m, smtp=None):
+    """2.141.0 A (#2141): sends a built message (mail_message) through KALMIDO_SMTP_* or the access smtp; raises on failure."""
+    S_ = smtp_open(smtp)
     try:
-        if tls == "starttls":
-            S_.starttls()
-        if SMTP["user"]:
-            S_.login(SMTP["user"], SMTP["password"])
         S_.send_message(m)
     finally:
         try:
             S_.quit()
         except Exception:  # noqa: BLE001
             pass
+
+
+def mail_send(to, subject, text, html_body=None, images=None, from_name=None, attachments=None, cc=None, reply_to=None, smtp=None):
+    """Sends one mail with KALMIDO_SMTP_*; raises on failure. images: {cid: (bytes, subtype)} shown in the HTML part
+    (2.22.0: the logo of the invitation); from_name: a display name for the sender. 2.38.0 (#1021): attachments =
+    [(file name, bytes, mime type)] (invoice PDF / XML), cc = a second address, reply_to = the sender's own address.
+    2.141.0 A (#2141): smtp = a workspace's own SMTP access instead (hub/mailbox.py mbx_smtp); returns the message sent."""
+    m = mail_message(to, subject, text, html_body, images, from_name, attachments, cc, reply_to, smtp=smtp)
+    mail_deliver(m, smtp)
+    return m
 
 
 def digest_mail_content(c, uid, today):
