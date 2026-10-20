@@ -115,7 +115,7 @@ function accountHtml() {
     ${pw ? `<div class="row"><label for="a-cur">${tr('Password')}</label><input type="text" class="cfhid" hidden tabindex="-1" aria-hidden="true" autocomplete="username" value="${esc(S.me?.username || '')}" readonly><input type="password" id="a-cur" placeholder="${tr('current password')}" autocomplete="current-password"><input type="password" id="a-new" placeholder="${tr('new password')}" autocomplete="new-password"><button class="btn sm" data-acc="pw">${tr('Change')}</button></div>` : ''}
     ${storageHtml()}
     ${dsc_rowHtml()}${''/* 2.49.0 (#1106): People: find, requests, findable by e-mail */}
-    ${wsPaneOn() ? (lmOrgPaneOn() ? lmOrgLinkHtml() : wsPaneHtml(t => `<div class="shint">${t}</div>`)) : ''}
+    ${wsPaneOn() ? (lmOrgPaneOn() ? lmOrgLinkHtml() : wsPaneHtml(t => `<div class="shint">${t}</div>`)) : S.me?.kid ? '' : wsp_paneHtml() /* 2.138.1 C (#2389, P4): without an organisation the colour of Private is chosen here */}
     ${tfaHtml()}
     ${e2eHtml()}${''/* 2.42.0 (#828, #909) */}
     ${apwHtml()}
@@ -254,7 +254,7 @@ function accountWire(md) {
   ua8_wire(md, us, drawUsers);
   drawUsers();
   orgsDraw(md);
-  if (wsPaneOn()) { wsPaneDraw(md); wsPaneWire(md); }  // 2.28.0 (#935)
+  if (wsPaneOn()) { wsPaneDraw(md); wsPaneWire(md); } else wsp_paneWire(md);  // 2.28.0 (#935); 2.138.1 C (#2389): the colour of Private
   md.addEventListener('change', async e => {  // 2.22.0 (#752): whom people see
     if (e.target.id !== 'a-vis') return;
     try { await api('PUT', '/api/admin/orgs/visibility', {mode: e.target.value}); toast(tr('Saved')); await load(); } catch { /* api() said it */ }

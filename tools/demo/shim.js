@@ -1378,6 +1378,8 @@
   on('GET', '/api/wiki', q => ({space: 'private', may_write: true, e2e: null, pages: wkLive().sort((a, b) => a.path.localeCompare(b.path)).map(p => wkOut(p, q.get('bodies') === '1'))}));
   on('GET', '/api/wiki/shared', () => ({pages: []}));
   on('GET', '/api/wiki/search', q => { const s = (q.get('q') || '').toLowerCase(); return {pages: wkLive().filter(p => (p.path + ' ' + p.body).toLowerCase().includes(s)).map(p => wkOut(p))}; });
+  // 2.126.2 (#2357): the pages that link a table / a file ([[tabelle:id]] / [[datei:id]]), as the server's /api/wiki/refs
+  on('GET', '/api/wiki/refs', q => { const k = q.get('sheet') ? 'tabelle' : 'datei', id = +(q.get('sheet') || q.get('file')) || 0; return {pages: wkLive().filter(p => new RegExp('\\[\\[' + k + ':' + id + '\\b').test(p.body || '')).map(p => ({id: p.id, path: p.path}))}; });
   on('GET', '/api/wiki/mentions', q => ({pages: wkLive().filter(p => new RegExp('#' + (+q.get('task') || 0) + '\\b').test(p.body || '')).map(p => ({id: p.id, path: p.path}))}));
   on('GET', '/api/wiki/pages/(\\d+)', (q, b, id) => { const p = mfind('wiki', id); if (p.deleted_at) gone(); return wkFull(p); });
   on('POST', '/api/wiki/pages', (q, b) => { const path = wkClean(b.path); if (!path) bad(tx('Please enter a name')); if (wkTaken(path)) throw new Http(409, {error: tx('Folder already exists')});
