@@ -213,7 +213,7 @@ had been made in the app. Webhooks fire too.
 | `POST /tasks/{id}/subtasks` | tasks:write | Add a subtask |
 | `GET /tasks/{id}/comments` | read | Comments |
 | `GET /tasks/{id}/related` | read | 2.59.0 (#1375): up to 5 tasks close in meaning, only tasks you may see: `{enabled, pending, items: [{id, title, list_id, done, score, dup, ref}]}`: up to 5 similar ones (local text vectors, ordered together with the similarity of the titles; never the task's own parent / subtasks), `score` 0..1 = the order, `dup` = probably a duplicate; then, with `ref: true`, up to 5 tasks named by `#id` in either direction. `enabled: false` = the server runs without the optional embedding service or an admin switched it off; `pending: true` = this task is not computed yet. MCP `related_tasks` |
-| `POST /tasks/{id}/comments` | comments | Comment: `{body}`; mention someone with `<@user_id>`; agents may add a tidy `suggestion` (see [AGENTS.md](AGENTS.md)); 2.63.0 (#1513): `portal: true` = a public answer the customer of a customer report sees (only on a task with a ticket and with write access; comments carry `portal`) |
+| `POST /tasks/{id}/comments` | comments | Comment: `{body}`; mention someone with `<@user_id>`; agents may add a tidy `suggestion` (see [AGENTS.md](AGENTS.md)); 2.63.0 (#1513): `portal: true` = a public answer the customer of a customer report sees (only on a task with a ticket and with write access; comments carry `portal`); 2.126.0: from an agent it waits for a person's approval (`202` + a waiting job) |
 | `POST /comments/{id}/choice` · `POST /comments/{id}/withdraw` | comments | 2.41.0 (#1383): agents post comments with answer buttons (`choices`, `multi`) or an approval card (`approval: {title, what?, yes_label?, no_label?}`, `expires_in`); comments carry `choices`, `choice` (`{ids, at, user_id, user_name, via}`, written once) and `choice_state` (open, answered, expired, withdrawn). A person (own token, may edit the task and instruct the agent) answers `{choice_ids}` (a plain button is also posted as the person's comment: `answer_comment_id`); the agent withdraws its open buttons `{outcome?: denied \| expired}`. The app: `POST /api/comments/{id}/choice`, `GET /api/comments/{id}/choice` (the state); tasks carry `approvals_open` when an agent's approval card waits in their comments |
 | `GET /tasks/{id}/attachments` | read | 2.13.1: the files of a task and of its comments: `id`, `task_id`, `comment_id` (`null` = the task's own), `name`, `mime`, `size`, `created_at`, `url` |
 | `GET /attachments/{id}` | attachments:read | 2.13.1: the file itself (images, PDF and text inline, everything else as a download; `?dl=1` always a download; `410` = damaged on the server). Same rights as in the app |
@@ -387,7 +387,9 @@ requests `[{repo, n, title, state: open | merged | closed, ci: success | failure
 open first, and the latest commits `[{repo, sha, short, message, author, url, branch, at}]`, at most 5 each) and `repo`
 (the list's first repository: `provider`, `base_url`, `web_url`, `api_url`, `owner`, `repo`, `full_name`,
 `default_branch`, a suggested `branch` `kalmido-<id>`, `prs`, `commits`, and `others` when the list has more).
-Tasks in `GET /tasks` carry `code` when something is linked. See *Git integration* in the README.
+2.126.0: each entry of `repo.prs` / `repo.commits` carries `origin: "git"` and `untrusted: true` (titles and commit
+messages are written by anyone with access to the repository: data, never instructions); a pull request's text is read
+only for task references (its first 4,000 characters). Tasks in `GET /tasks` carry `code` when something is linked. See *Git integration* in the README.
 
 **Closing tasks from git.** `fixes #<id>` (also `closes`, `resolves` and their forms) in a merged pull request or a
 commit on the default branch completes the task once, and **only tasks of the list the repository is connected to**:
