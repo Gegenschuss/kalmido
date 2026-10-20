@@ -25,6 +25,10 @@ Agent chat with a stop button, agent colours and a quieter filter; the home bloc
 - Agent chat: the filter is the icon in the chat header on every width, the filter row above the messages is gone (#2419).
 - Agent chat: a job card whose only message is the final result shows it below the card, its unfolding is remembered (#2365).
 
+## [2.142.2] - 2026-10-20
+
+- Meal plan: on a narrow phone the week switcher moves under the title, the next-week arrow stays on screen (#2132); the restore check of the sign-in suite waits for the restore instead of a fixed pause.
+
 ## [2.142.1] - 2026-10-20
 
 - Fixes from CI of 2.142.0: the ntfy share inbox texts call the basket by its name in every language (#2150), the notification channel lookup and a schema comment follow the Postgres rules (#2145).

@@ -139,7 +139,12 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
     check(await until(() => ev(`!!document.querySelector('${MSG} .rxrow .rxtog')`), 60), `${tag}: the agent chat shows the message with its smiley ` + await ev(`(() => location.hash + ' msgs=' + document.querySelectorAll('#chat-msgs .cmsg').length)()`));
     await ev(`(() => { document.querySelector('${MSG} .rxrow .rxtog')?.click(); return 1; })()`);  // 2.23.0 (#823): behind the smiley
     check(await until(() => ev(`!!document.querySelector('${MSG} .rxrow [data-act="rx-more"]')`), 40), `${tag}: the smiley opens the reactions with "+"`);
-    const pb = await ev(`(() => { const e = document.querySelector('${MSG} .rxrow [data-act="rx-more"]'); if (!e) return {w: 0, h: 0}; e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height}; })()`);
+    // 2.142.2: CI red twice (one viewport each run) - the tap landed while the chat was still scrolling / laying out after
+    // scrollIntoView; measure until the "+" stands still (two equal readings) before the real tap
+    const PB = `(() => { const e = document.querySelector('${MSG} .rxrow [data-act="rx-more"]'); if (!e) return {w: 0, h: 0}; const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height}; })()`;
+    await ev(`(() => { document.querySelector('${MSG} .rxrow [data-act="rx-more"]')?.scrollIntoView({block: 'center'}); return 1; })()`);
+    let pb = await ev(PB);
+    for (let i = 0; i < 20; i++) { await sleep(150); const p2 = await ev(PB); if (p2.x === pb.x && p2.y === pb.y) break; pb = p2; }
     check(pb.w >= 43.5 && pb.h >= 43.5, `${tag}: "+" is a 44 px target ` + JSON.stringify(pb));
     await tap(pb.x, pb.y);
     check(await until(() => ev(`!!document.querySelector('#pop:not(.hidden) .rxgrid')`), 30), `${tag}: one tap opens the emoji grid`);
