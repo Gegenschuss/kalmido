@@ -1188,6 +1188,16 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .lexpage .lxbox{flex:none;width:.875rem;height:.875rem;margin-top:.1875rem;border:1.5px solid #111;border-radius:.1875rem;font-size:.6875rem;line-height:.75rem;text-align:center}
 .lexpage .lxr.done .lxt{color:#666}
 .lexpage .lxn{white-space:pre-wrap;color:#333;font-size:.75rem;margin-top:.125rem}
+/* 2.145.0 C (#2432): the project head on top of the printable list: compact, black on white, no page break inside */
+.lexpage .lxhead{margin:0 0 1rem;padding:0 0 .75rem;border-bottom:1.5px solid #111;break-inside:avoid;font-size:.8125rem}
+.lexpage .lxdesc{margin:0 0 .5rem;color:#111}
+.lexpage .lxdesc :is(p,ul,ol){margin:0 0 .375rem}
+.lexpage .lxfacts{display:grid;grid-template-columns:max-content 1fr;gap:.25rem .875rem;margin:0}
+.lexpage .lxhr{display:contents}
+.lexpage .lxhr dt{font-weight:600;color:#111}
+.lexpage .lxhr dd{margin:0;color:#222}
+.lexpage .lxms{list-style:none;margin:0;padding:0}
+.lexpage h1{break-after:avoid}
 
 /* ---------- package 3: dependencies, project status + progress, custom fields ---------- */
 :root{--st-on_track:var(--ok);--st-at_risk:var(--p3);--st-off_track:var(--p5);--st-on_hold:var(--p1);--st-complete:var(--accent);--st-none:var(--muted)}
