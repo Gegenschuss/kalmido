@@ -68,6 +68,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-caltoday': ['cal_today', N_('Events on Today'), 'chk'],
   's-dateok': ['date_confirm', N_('Confirm changes of the date with OK'), 'chk'],  // 2.6.1 (#401)
   's-qfrom': ['quiet_from', N_('Quiet from'), 'time'], 's-qto': ['quiet_to', N_('Quiet until'), 'time'],  // 2.7.0 (#413)
+  's-evm-assign': ['mail_assign', N_('Assigned to me'), 'sel'], 's-evm-mention': ['mail_mention', N_('Mentioned'), 'sel'],  // 2.142.0 A (#2146): integrations.js chn_mailHtml
   's-wfrom': ['work_start', N_('Working hours from'), 'time'], 's-wto': ['work_end', N_('Working hours until'), 'time'],  // 2.10.0 (#440)
   's-wthours': ['capacity_h', N_('Hours per week'), 'text'],  // 2.125.0 A (#2118): the working week (leave.js)
   's-review': ['review_time', N_('Daily review at'), 'time'],
@@ -609,6 +610,7 @@ function settingsModal(focus) {
       ${S.webpush?.enabled ? '' : prio}
       ${hint(`${tr('Subscribe in the ntfy app: server {0}, topic as above', esc(S.ntfyUrl))}${/ntfy\.sh/.test(S.ntfyUrl) || !S.me?.ntfy_inbox ? '' : tr(', with a user that has read access')}. <a href="${esc(topicUrl)}" target="_blank" rel="noopener">${tr('Web view')}</a>`)}</div>
       <div id="s-ntfyin"></div>
+      <div id="s-chn"></div>${''/* 2.142.0 A (#2145, #2146): channels + e-mail for single events (integrations.js chn_meDraw) */}
       ${notifMatrixHtml(s, hint)}${bl9SetHtml(s, hint)}${typeof tbl_setHtml === 'function' ? tbl_setHtml(chk, hint) : ''}
       <h4>${tr('Reminders')}</h4>
       <div class="row"><label for="s-allday">${tr('All-day reminder at')}</label>${timeIn('s-allday', s.allday_time, {label: tr('All-day reminder at'), clear: false})}</div>
@@ -918,6 +920,7 @@ function settingsModal(focus) {
   if (S.me) accountWire(md);
   mailWire(md);  // 2.17.0 (#443)
   niWire(md);  // 2.142.0 C (#2150)
+  if (typeof chn_meDraw === 'function') chn_meDraw(md);  // 2.142.0 A (#2145)
   md.addEventListener('click', async e => {
     const hz = e.target.closest('#s-hszip'); if (hz) { tkh_zipClick(e, hz, md); return; }  // 2.138.0 C (#1907)
     const b = e.target.closest('button'); if (!b) return;

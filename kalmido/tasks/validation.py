@@ -59,6 +59,8 @@ def log_act(c, tid, kind, data=None, uid=None):
         wh_note(c, tid, kind)  # webhooks: collected per request, queued after a successful response
         from ..notify.taskbell import tbl_note
         tbl_note(c, tid, kind, uid)  # 2.53.0 C (#1424): "Urgent" on the task: every change is a push
+        from ..notify.channels import chn_note
+        chn_note(c, tid, kind)  # 2.142.0 A (#2145): new / completed / assigned -> organisation channels, own list channels
     from ..collab.liste2eguard import le2b_act_data
     data = le2b_act_data(c, tid, kind, data)  # 2.64.1 B (#1817): never a text of a list with the lock in the history
     ts, js = iso_ms(now_utc()), json.dumps(data or {}, ensure_ascii=False)
