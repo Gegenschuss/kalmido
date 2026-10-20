@@ -41,6 +41,11 @@ Office fixes: the office side bar stays put on touch tablets, the bank import sa
 ### Security
 - Security fix: bank statement upload.
 
+## [2.142.3] - 2026-10-20
+
+### Security
+- Pillow 13.0.0: fixes nine image-library advisories published on 20.10.2026 (one critical heap overflow when reading JPEG files); the test suites switch off the quiet hours where they wait for channel messages and are spread more evenly over the CI shards (#2145).
+
 ## [2.142.2] - 2026-10-20
 
 - Meal plan: on a narrow phone the week switcher moves under the title, the next-week arrow stays on screen (#2132); the restore check of the sign-in suite waits for the restore instead of a fixed pause.
