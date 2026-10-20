@@ -111,6 +111,9 @@ KINDS = {
     "sheet_share": ("matrix", "p2124_c_api_test.py: shares of a table of another organisation / person: 404 for the stranger "
                               "(list, add, change, stop), a person / agent of another workspace cannot get a share (409), a recipient "
                               "sees only the shared table, not the rest of the workspace"),
+    # 2.125.0 B (#2119): monthly timesheets: the person's own month, the admins of the sheet's organisation decide
+    "timesheet": ("matrix", "p2125_b_api_test.py: a timesheet of another organisation's member: 404 for its admin, 403 for a "
+                            "member of the same organisation, a person without organisation: no decision by anyone (404)"),
     # 2.97.0 A (#1950): bookmarks belong to one organisation (every member reads, the owner / its admins change) or one person
     "bookmark": ("matrix", "p297_a_api_test.py: a bookmark of another organisation / person: 404 (read, change, delete, picture, move)"),
     # 2.98.0 A (#1953): scheduling polls belong to one organisation (every member reads, the owner / its admins change) or one person
@@ -797,6 +800,8 @@ ROUTES = {
     # 2.124.0 C (#2113): shares of one table (p2124_c_api_test.py)
     "GET /api/sheets/{}/shares": "sheet_share", "POST /api/sheets/{}/shares": "sheet_share",
     "PATCH /api/sheets/{}/shares/{}": "sheet_share", "DELETE /api/sheets/{}/shares/{}": "sheet_share",
+    # 2.125.0 B (#2119): monthly timesheets (p2125_b_api_test.py)
+    "GET /api/time/sheets": "timesheet", "POST /api/time/sheets": "own", "POST /api/time/sheets/decide": "timesheet",
     "PUT /api/sheets/{}/chart": "sheet",  # 2.124.0 A (#2115): the chart of a table (p2124_a_api_test.py)
     # 2.124.0 E (#2116): the sheets of a table (p2124_e_api_test.py: a stranger 404 on every route, another organisation's agent 404)
     "GET /api/sheets/{}/tabs": "sheet", "POST /api/sheets/{}/tabs": "sheet", "PATCH /api/sheets/{}/tabs/{}": "sheet",

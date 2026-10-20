@@ -291,7 +291,8 @@ check(w38["total"]["seconds"] == (7 + 61 + 60 + 60) * 60, f"week 38 raw total {w
 check(w38["total"]["rounded"] == (15 + 75 + 60 + 60) * 60, f"week 38 rounded total {w38['total']['rounded']}")
 check(w38["total"]["count"] == 4, "week 38: 4 entries (midnight entry counted on Sunday)")
 days = {d["date"]: d["seconds"] for d in w38["days"]}
-check(days == {"2026-09-14": 420, "2026-09-15": 3660, "2026-09-16": 3600, "2026-09-20": 3600}, f"per day {days}")
+# 2.125.0 (#2120): the entry over midnight counts on each day with its share (setting time_split_midnight, default on)
+check(days == {"2026-09-14": 420, "2026-09-15": 3660, "2026-09-16": 3600, "2026-09-20": 1800, "2026-09-21": 1800}, f"per day {days}")
 la = [l for l in w38["lists"] if l["id"] == CL][0]
 check(la["rounded"] == (15 + 75 + 60) * 60 and la["amount"] == 250.0 and la["rate"] == 100, f"list A rounded 2.5 h x 100 = 250 ({la['amount']})")
 check([t["title"] for t in la["tasks"]] == ["Design", "Build"] and la["tasks"][0]["rounded"] == 90 * 60 and la["tasks"][0]["amount"] == 150.0, "tasks sorted by time, per-task amount")
@@ -340,7 +341,7 @@ check(r.content.startswith(b"\xef\xbb\xbf"), "CSV starts with a UTF-8 BOM")
 check('filename="timesheet-2026-09-14-2026-09-20.csv"' in r.headers.get("content-disposition", ""), "CSV file name " + r.headers.get("content-disposition", ""))
 rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig"))))
 check(rows[0] == ["List", "Task", "User", "Start", "End", "Duration (h)", "Duration (h:mm)", "Rounded (h)", "Amount (€)", "Note"], f"CSV header {rows[0]}")
-check(len(rows) == 1 + 6, f"CSV rows {len(rows)}")
+check(len(rows) == 1 + 7, f"CSV rows {len(rows)}")  # 2.125.0 (#2120): the entry over midnight = one row per day
 check(rows[1] == ["Client A", "Design", "Carol", "2026-09-14 09:00", "2026-09-14 09:07", "0.12", "0:07", "0.25", "25.00", ""], f"CSV row 1 {rows[1]}")
 note_row = [x for x in rows if x[3] == "2026-09-17 09:00"][0]
 check(note_row[9] == 'Say "hi"; then=\nnext line', "CSV: quotes, separator and newline escaped")
