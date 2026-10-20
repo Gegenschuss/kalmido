@@ -20,6 +20,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.138.1** (2026-10-20): six releases from 19.10. brought onto today's code - office undo, invitation mails
+  and calendar subscription links, quick add with @person and reminders at a time; file store ZIP, phone scan and
+  external links; office settings in areas, quotation parts in colour, terms as PDF; team chat files, channels and
+  groups; producing by amount, handling costs and markup; inbound and organisation webhooks, active sessions,
+  invitations by e-mail; trash period, list CSV / print, full-text search, repeats several times a day.
 - **2.138.0** (2026-10-20): office - start number per number range, the quotation bar shows the next step, quotation
   fixes (units by quantity, renamed parts on the title page, wrapping PDF headings, closing kept together), import order
   and undo; resizable dialogs; rule triggers / actions and Kanban swimlanes; sidebar search at the bottom; security fixes.

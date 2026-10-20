@@ -161,6 +161,9 @@
 - In a list's team chat you get the event `team_message` when someone @mentions you (or answers one of your
   messages): answer there (`post_team_message`), short and in Markdown. Do not post there on your own unless someone
   asked you to report there.
+- **Channels and files (2.138.1)**: people can also add you to a channel they opened (`list_team_channels`; you
+  leave with `leave_team_channel`). Messages carry `attachments`; read a file with `get_attachment` (`source: team`),
+  send files with `post_team_message` `files`. You cannot open channels or group conversations yourself.
 - **Lists where you listen in (2.46.1)**: there you get every channel message of a person as `team_message`
   (`mentioned: false`), never the messages of agents. Answer questions and requests about the list that you can help
   with; let the rest pass without a post.
@@ -374,6 +377,11 @@ when the list's rules or a person ask, never overwrite a person's estimate. A se
 for the kanban column, moving stays allowed. `get_velocity` gives the completed points of the last closed sprints and their
 average: a planning aid, never a measure of a person.
 
+### Reminders at a fixed time (2.138.1)
+"Remind me on Tuesday at 9" is `remind_at: "YYYY-MM-DDTHH:MM"` (local time, also without a due date; `null` removes it) in
+`create_task` / `update_task`; `reminders` stays the minutes before the due time. It fires once and moves along with a
+recurring task's due date.
+
 ### Arrangements of views (2.55.0)
 With the right `layouts` (off until a person turns it on for you) you may PROPOSE how a view of the person you work for is
 arranged; you never change a view yourself. `list_layout_blocks` and `get_view_layout` show the blocks, their order, widths
@@ -522,7 +530,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`, `draft_reminder`, `duplicate_list`,
 `edit_team_message`, `empty_trash`, `export_data`, `export_ics`, `export_vcards`, `get_absences`, `get_agent`,
 `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`, `get_dependencies`,
-`get_dispo`, `get_dispo_free`, `get_document`, `get_event`, `get_family`, `get_group`, `get_job`, `get_key_figures`,
+`get_dispo`, `get_dispo_free`, `get_document`, `get_event`, `get_family`, `get_group`, `get_habit_stats`, `get_job`, `get_key_figures`,
 `get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`,
 `get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`,
 `get_usage`, `get_velocity`, `get_video_review`, `get_view_layout`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`,
@@ -533,8 +541,8 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_jobs`, `list_kids`, `list_layout_blocks`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`,
 `list_notepads`, `list_notes`, `list_office_data`, `list_office_documents`, `list_office_leads`, `list_packing_templates`,
 `list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_rules`, `list_schedules`,
-`list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
-`list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_video_reviews`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
+`list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`,
+`list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_video_reviews`, `list_waiting`, `leave_team_channel`, `mark_news_read`, `mark_team_chat_read`,
 `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`, `propose_contract_notice`, `propose_import`, `propose_layout`, `propose_playbook`,
 `propose_rule`, `propose_sheet_tasks`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,

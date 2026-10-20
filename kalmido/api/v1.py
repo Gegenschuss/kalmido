@@ -127,7 +127,8 @@ def act_via():
     if not has_request_context():
         return None
     v = g.get("auth_via")
-    return "api" if v == "token" else "public_link" if v == "public" else "caldav" if v == "dav" else None
+    return "api" if v == "token" else "public_link" if v == "public" else "caldav" if v == "dav" else \
+        "webhook" if v == "hook_in" else None  # 2.115.0 A (#2061): the inbound webhook of a list
 
 
 def api_scopes(csv_):
@@ -357,6 +358,7 @@ def task_core(r, tags, fields):
             # 2.36.0 (#1118): locked in the app (tasks created with an agent token start locked; the API is not bound by it)
             "locked": bool(r["locked"]) if "locked" in r.keys() else False,
             "points": r["points"] if "points" in r.keys() else None,  # 2.60.0 (#1511): story points (null = none)
+            "remind_at": r["remind_at"] if "remind_at" in r.keys() else None,  # 2.111.0 C (#2057): fixed-time reminder
             # 2.35.0 (#1095): the code snippets: one task (GET / change / webhook row) all of them, lists only snippets_n
             **_snips(r)}
 
@@ -419,6 +421,7 @@ V1_TASK_IN = ("title", "notes", "list_id", "section_id", "parent_id", "priority"
               "deadline", "deadline_in_today", "nag", "assignee_group_id", "plan_start", "milestone", "milestone_id",
               "family", "rotation", "stars", "people", "snippets", "locked")
 V1_TASK_IN += ("points",)  # 2.60.0 (#1511): story points 1, 2, 3, 5, 8, 13 (null = none)
+V1_TASK_IN += ("remind_at",)  # 2.111.0 C (#2057): a reminder at a fixed local time "YYYY-MM-DDTHH:MM" (null = none)
 
 
 def v1_task_in(b, allowed=V1_TASK_IN):
@@ -1384,7 +1387,12 @@ def v1_search():
     if request.args.get("scope") == "messages":  # 2.33.0 (#1080): comments, team chat, agent chats
         from ..collab.msgsearch import v1_search_messages
         return v1_search_messages()
-    a = v1_args(("q", "limit", "cursor", "scope", "semantic"))  # 2.59.0 B (#1375): + semantic
+    a = v1_args(("q", "limit", "cursor", "scope", "semantic", "fulltext"))  # 2.59.0 B (#1375): + semantic; 2.116.0 B: + fulltext
+    if a.get("fulltext") not in (None, "", "0", "1"):
+        raise BadInput(tr("Invalid value: {0}", "fulltext"))
+    if a.get("fulltext") == "1" and a.get("scope") in (None, "", "tasks"):  # 2.116.0 B (#2065): ranked, with comments
+        from ..tasks.ftsearch import fts_v1
+        return fts_v1(a, v1_task)
     if a.get("scope") not in (None, "", "tasks"):
         raise BadInput(tr("Invalid value: {0}", "scope"))
     if a.get("semantic") not in (None, "", "0", "1"):

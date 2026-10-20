@@ -534,14 +534,20 @@ def watchdog_tick(c):
     _wd_section(c, "audit cleanup", audit_cleanup)  # 2.2.1 (#358)
     _wd_section(c, "proposal cleanup", prop_cleanup)  # 2.3.0
     _wd_section(c, "chat files cleanup", chat_files_gc)  # 2.13.1 (#465)
+    from ..collab.teamchan import tcx_files_gc
+    _wd_section(c, "team chat files cleanup", tcx_files_gc)  # 2.113.1 (#2059)
     from ..admin.orgexport import ox_cleanup
     _wd_section(c, "org export cleanup", ox_cleanup)  # 2.42.0 (#833): archives after 24 h
     from ..core.merges import mg_prune
     _wd_section(c, "merge snapshots", mg_prune, False)  # 2.66.0 (#1835): the undo data of merges after 30 days
+    from ..office.undo import oun_prune
+    _wd_section(c, "office undo copies", oun_prune)  # 2.111.0 A (#2233): the editors' undo copies after a day
     from ..videos.review import vdr_trash_prune
     _wd_section(c, "video trash", vdr_trash_prune)  # 2.99.1 (#1959) review M3: video sign-offs in the trash after 30 days
     from ..lists.listtrash import otr_prune
     _wd_section(c, "list trash", otr_prune)  # 2.102.0 A (#1988): deleted lists for good after 30 days, with their files
+    from ..tasks.tasktrash import ttp_tick
+    _wd_section(c, "task trash", ttp_tick)  # 2.116.0 A (#2063): tasks in the trash after KALMIDO_TRASH_DAYS (switch: core/retention)
     from ..admin.acctexport import umz_cleanup
     _wd_section(c, "account export cleanup", umz_cleanup)  # 2.73.0 B (#1473): account exports + import uploads after 24 h
     from ..accounts.servers import msv_cleanup
@@ -557,6 +563,8 @@ def watchdog_tick(c):
     _wd_section(c, "time", time_watchdog, users, S, LG)
     now = local_now()
     _wd_section(c, "reminders", _wd_reminders, users, S, LG, now)
+    from ..tasks.remindat import rat_tick
+    _wd_section(c, "fixed reminders", rat_tick, users, S, LG, now)  # 2.111.0 C (#2057): "remind me Tue 9:00"
     _wd_section(c, "nags", _wd_nags, users, S, LG, now)  # 2.7.0 (#413), after the reminders (a reminder counts as a nag)
     _wd_section(c, "follow-ups", _wd_followups, users, S, LG, now)  # 2.1.0 (#335)
     from ..tasks.stale import _wd_stale

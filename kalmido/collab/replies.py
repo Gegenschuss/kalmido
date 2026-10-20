@@ -72,8 +72,9 @@ def reply_quotes(c, art, ids):
             continue
         uid = r["agent_id"] if art == "a" and r["sender"] == "agent" else r["user_id"]
         text = _plain(c, r["body"], names)
-        if not text and art in ("a", "c"):  # only files: the first file's name
+        if not text and art in ("a", "c", "t"):  # only files: the first file's name (2.113.1 #2059: also team chat)
             f = c.execute("SELECT name FROM chat_files WHERE message_id=? ORDER BY id LIMIT 1" if art == "a" else
+                          "SELECT name FROM tchat_files WHERE message_id=? ORDER BY id LIMIT 1" if art == "t" else
                           "SELECT name FROM attachments WHERE comment_id=? ORDER BY id LIMIT 1", (i,)).fetchone()
             text = (tr("Encrypted file") if f["name"].startswith("e2e1:") else f["name"][:QUOTE_CHARS]) if f else ""  # 2.64.2 B (#1817)
         q = {"id": i, "deleted": False, "user_id": uid, "name": names.get(uid, ""), "text": text}

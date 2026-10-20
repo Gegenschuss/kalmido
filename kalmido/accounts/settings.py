@@ -523,10 +523,12 @@ def push_subs_add():
     if not c.execute("SELECT 1 FROM push_subs WHERE endpoint=? AND user_id=?", (ep, uid)).fetchone() \
             and c.execute("SELECT COUNT(*) FROM push_subs WHERE user_id=?", (uid,)).fetchone()[0] >= WEBPUSH_MAX_SUBS:
         return err(tr("Too many devices (at most {0}). Remove one first.", WEBPUSH_MAX_SUBS))
-    c.execute("""INSERT INTO push_subs(user_id,endpoint,p256dh,auth,label,created_at) VALUES(?,?,?,?,?,?)
+    from ..accounts.sessions import ses_current_hash  # 2.115.0 B (#2062): the session it was made in (ends with it)
+    c.execute("""INSERT INTO push_subs(user_id,endpoint,p256dh,auth,label,created_at,session_hash) VALUES(?,?,?,?,?,?,?)
                  ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id, p256dh=excluded.p256dh, auth=excluded.auth,
-                   label=CASE WHEN excluded.label!='' THEN excluded.label ELSE push_subs.label END, fails=0, backoff_until=0""",
-              (uid, ep, keys["p256dh"].rstrip("="), keys["auth"].rstrip("="), label, iso(now_utc())))
+                   label=CASE WHEN excluded.label!='' THEN excluded.label ELSE push_subs.label END, fails=0, backoff_until=0,
+                   session_hash=CASE WHEN excluded.session_hash!='' THEN excluded.session_hash ELSE push_subs.session_hash END""",
+              (uid, ep, keys["p256dh"].rstrip("="), keys["auth"].rstrip("="), label, iso(now_utc()), ses_current_hash() or ""))
     c.commit()
     r = c.execute("SELECT * FROM push_subs WHERE endpoint=?", (ep,)).fetchone()
     return jsonify({**push_sub_public(r), "known": True})
@@ -657,7 +659,7 @@ def umz_export_queries(uid):
                                    "WHERE user_id=?", (uid,)),
         # package B, without secrets: API tokens (no hash), webhooks (no signing secret), public links (no token / password)
         "api_tokens": ("SELECT id, name, prefix, scopes, expires_at, created_at, last_used_at FROM api_tokens WHERE user_id=?", (uid,)),
-        "webhooks": ("SELECT id, name, url, events, enabled, created_at FROM webhooks WHERE user_id=?", (uid,)),
+        "webhooks": ("SELECT id, name, url, events, enabled, created_at FROM webhooks WHERE user_id=? AND org_id IS NULL", (uid,)),
         "public_links": (f"SELECT list_id, mode, notes, password_hash IS NOT NULL AS has_password, expires_at, created_at FROM public_links "
                          f"WHERE list_id IN {own}", (uid,)),
         # 2.75.0 A (#1411): the lists I shared with the built-in assistant and its log (numbers only, no texts)

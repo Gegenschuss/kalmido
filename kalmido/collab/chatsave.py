@@ -86,11 +86,16 @@ def _message(c, kind, mid, uid):
     if r["kind"] == "dm":
         other = r["b"] if r["a"] == uid else r["a"]
         where = tr("Direct message with {0}", user_names(c, [other]).get(other, "?"))
+    elif r["kind"] in ("channel", "group"):  # 2.113.1 (#2059)
+        from ..collab.teamchan import tcx_group_name
+        where = tr("Team chat {0}", tcx_group_name(c, r, uid) if r["kind"] == "group" else r["name"])
     else:
         ln = c.execute("SELECT name FROM lists WHERE id=?", (r["list_id"],)).fetchone()
         where = tr("Team chat {0}", ln["name"] if ln else "?")
     who = user_names(c, [m["user_id"]]).get(m["user_id"], "?") if m["user_id"] else "?"
-    return _plain_mentions(c, m["body"]), [], where, who, m["created_at"], f"#msg/t/{r['id']}/{mid}"
+    files = [(f["name"], f["mime"], f["size"], f["path"], ("tchat", f["id"])) for f in c.execute(  # 2.113.1 (#2059): its files come along
+        "SELECT id, name, mime, size, path FROM tchat_files WHERE message_id=? ORDER BY id", (mid,))]
+    return _plain_mentions(c, m["body"]), files, where, who, m["created_at"], f"#msg/t/{r['id']}/{mid}"
 
 
 def dl_comment_message(c, cid):

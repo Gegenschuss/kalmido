@@ -156,6 +156,8 @@ def fill_row(t, org):
             has_org = sql("SELECT 1 FROM information_schema.columns WHERE table_name=? AND column_name='org_id'", (ref,))
             r = sql(f"SELECT MIN(id) FROM {ref}" + (" WHERE org_id=?" if has_org and ref != "orgs" else ""), (org,) if has_org and ref != "orgs" else ())
             v = r[0][0] if r and r[0][0] is not None else 1
+            if ref == "users" and org != ALPHA:  # 2.115.0 (#2062): org_invites is keyed by the user: another person per organisation
+                v = sql("SELECT MAX(id) FROM users")[0][0] or v
         elif "int" in typ or typ in ("numeric", "double precision"):
             v = 0
         elif typ == "bytea":
@@ -175,6 +177,9 @@ def fill_row(t, org):
 
 
 for _ in range(3):  # a few rounds: tables that point at others of the same organisation
+    # 2.113.1 (#2059): a team chat file points at a message; tchat_msgs has no org_id (no row of its own here): one per room
+    for (rid,) in sql("SELECT r.id FROM tchat_rooms r WHERE NOT EXISTS (SELECT 1 FROM tchat_msgs m WHERE m.room_id=r.id)"):
+        sql("INSERT INTO tchat_msgs(room_id, body, created_at) VALUES(?, 'x', '2026-10-20T00:00:00')", (rid,))
     for t in ORG_T:
         for o in (ALPHA, BETA):
             if not sql(f"SELECT 1 FROM {t} WHERE org_id=?", (o,)):

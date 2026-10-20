@@ -116,7 +116,8 @@ r = A.post(B + f"{D}/{Q1['id']}/invoice")
 check(r.status_code == 201 and [x["title"] for x in r.json()["items"]][:2] == ["Dreh", "Producing"], "#1645: the invoice from the quotation has its producing line " + r.text[:160])
 A.put(B + O + "/settings", json={"producing_on": 1, "raw_on": 1})
 Q2 = A.post(B + D, json={"project_title": "Film zwei"}).json()
-check(Q2.get("producing_on") == 1 and Q2.get("raw_mode") == "optional", "#1645 default on: the quotation starts on")
+# 2.113.1 (#2251): without an industry pack offering "share by amount" a new quotation starts without producing
+check(Q2.get("producing_on") == 0 and Q2.get("raw_mode") == "optional", "#2251: without a pack option the quotation starts without producing")
 A.put(B + f"{D}/{Q2['id']}/items", json={"items": [{"kind": "service", "service_id": SV, "qty": 6}]})
 j = A.patch(B + f"{D}/{Q2['id']}", json={"producing_on": 0, "raw_mode": "none"}).json()
 check([x["kind"] for x in j["totals"]["lines"]] == ["item"] and j["totals"]["net"] == 6000 and j["items"][0]["producing"] == 1,

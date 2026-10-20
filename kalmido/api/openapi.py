@@ -110,7 +110,7 @@ def openapi_spec():
         "due_time": nul("string", pattern="^[0-2][0-9]:[0-5][0-9]$", description="HH:MM, local time of the server; null = all day"),
         "start": nul("string", format="date", description="First day (timeline)"), "duration": nul("integer", description="Minutes"),
         "reminders": {"type": "array", "items": {"type": "integer"}, "description": "Minutes before the due time"},
-        "repeat": {"type": "string", "description": "RRULE body (FREQ=WEEKLY;BYDAY=MO) or empty"},
+        "repeat": {"type": "string", "description": "RRULE body (FREQ=WEEKLY;BYDAY=MO) or empty. 2.116.0: FREQ=DAILY;TIMES=0800,1300,2000 = daily at several times (HHMM, at most 12; completing moves the due time to the next one, after the last to the first of the next day)"},
         "repeat_from": {"type": "string", "enum": ["due", "done"]}, "url": nul("string", format="uri"),
         "tags": {"type": "array", "items": {"type": "string"}, "description": "The token user's own tags"},
         "pinned": {"type": "boolean"}, "assignee_id": nul("integer"), "created_by": nul("integer"), "completed_by": nul("integer"),
@@ -163,6 +163,11 @@ def openapi_spec():
     # 2.60.0 (#1511): story points
     task_props["points"] = nul("integer", enum=[1, 2, 3, 5, 8, 13, None], description="2.60.0: story points (Fibonacci); "
                                "null = none. Always stored; the app shows them where the list has story points on (points_on)")
+    # 2.111.0 C (#2057): a reminder at a fixed local time, with or without a due date
+    task_props["remind_at"] = nul("string", pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-2][0-9]:[0-5][0-9]$",
+                                  description="2.111.0: a reminder at a fixed local date and time (server time zone, like due / "
+                                  "due_time), with or without a due date; null = none. Fires once, like the reminders before the "
+                                  "due time; on a recurring task it moves along with the due date")
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}
@@ -621,6 +626,9 @@ def openapi_spec():
                               ok({"oneOf": [ref("TaskPage"), page("MessageHit")]}) | errs("400", "503"),
                               [{**q("q", "Search text (words; case, accents and ä/ae do not matter; each word matches word beginnings)"), "required": True},
                                q("scope", "tasks (default) or messages", {"type": "string", "enum": ["tasks", "messages"]}),
+                               q("fulltext", "2.116.0: 1 = ranked full-text search of tasks (title before notes) and their comments; "
+                                 "each task once with match {where: title|notes|comment|field|file, snippet {text, marks}, comment_id}",
+                                 {"type": "string", "enum": ["0", "1"]}),
                                q("art", "messages: only these kinds, comma-separated: c (comments), t (team chat), a (agent chat)"),
                                q("sender", "messages: only from this user id", {"type": "integer"}),
                                q("room", "messages: only this team chat room", {"type": "integer"}),
@@ -678,6 +686,8 @@ def openapi_spec():
     docs_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.48.0 (#1111)
     from ..sheets.v1 import sheets_spec
     sheets_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.89.0 C (#1916)
+    from ..personal.v1focus import v1f_spec
+    v1f_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.116.0 D (#2067)
     from ..videos.v1 import vdr_v1_spec
     vdr_v1_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.99.1 C (#1959)
     pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.23.0 (#463)

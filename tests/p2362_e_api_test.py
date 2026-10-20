@@ -140,7 +140,7 @@ check(Bo.put(B + O + "/settings", json={"company_fields": {"street": "x"}}).stat
 check(Bo.get(B + O + "/settings").json()["company_fields"]["street"] == "Hafenstraße 12", "company fields: members read them")
 
 # ---------------------------------------------------------------- a quotation, printed from the fields
-r = A.post(B + D, json={"project_title": "Imagefilm", "client_id": CL})
+r = A.post(B + D, json={"project_title": "Imagefilm", "client_id": CL, "producing_on": 1})  # 2.113.1 (#2251): the office setting no longer switches producing on for a new quotation (only a pack option does); the document does
 check(r.status_code == 201, "new quotation " + r.text[:200])
 DOC = r.json()["id"]
 check(r.json()["number"].startswith("KVA-") and r.json()["locked"] is False and r.json()["can_edit"] is True, "numbered at creation (default), open")

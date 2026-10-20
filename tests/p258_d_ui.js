@@ -46,11 +46,11 @@ const FEAT = 'cal,comments,collab,time,progress,kanban,timeline,fields,team';
   check(w.eval(`(() => { const a = document.createElement('div'), b = document.createElement('div'); a.innerHTML = '<button id="tc-new" class="chnew">New</button><button id="cm-new" class="chnew">N</button>'; b.innerHTML = '<button id="tc-new" class="chnew hidden">New</button><button id="cm-new" class="chnew hidden">N</button>'; morphKids(a, b); return !a.querySelector('#tc-new').classList.contains('hidden') && !a.querySelector('#cm-new').classList.contains('hidden'); })()`), '#1756: a shown tc-new / cm-new pill stays shown on a morph');
   w.close();
 
-  // ================= #1812: the office privacy switch above Save
+  // ================= #1812: the office privacy switch above Save; 2.113.0 (#2247): no Save button, the switch sits in the area Access
   w = await boot({user: 'alice', hash: 'office/settings'}); d = w.document;
-  await until(() => d.querySelector('#os-agents-read') && d.querySelector('[data-ofc="save-settings"]'));
-  const sw1 = d.querySelector('#os-agents-read'), sv = d.querySelector('[data-ofc="save-settings"]');
-  check(sw1 && sv && !!(sw1.compareDocumentPosition(sv) & w.Node.DOCUMENT_POSITION_FOLLOWING), '#1812: the switch comes before the Save button');
+  await until(() => d.querySelector('#os-agents-read'));
+  const sw1 = d.querySelector('#os-agents-read');
+  check(sw1 && sw1.closest('[data-ostp]')?.dataset.ostp === 'access' && !d.querySelector('[data-ofc="save-settings"]'), '#1812: the switch sits in the area Access (no Save button)');
   w.close();
 
   // ================= #1758: Esc in a detail number field

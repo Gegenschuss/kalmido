@@ -86,12 +86,16 @@ def sig_expiry(v):
 
 def sig_doc_hash(c, oid, did):
     """SHA-256 of a quotation's printed content (canonical JSON of the print model's customer-facing parts)."""
-    from .docs import odoc_render
-    m = odoc_render(c, did, oid)
+    from .docs import odoc_render, prd_strip_detail
+    m = odoc_render(c, did, oid, keep_detail=True)  # 2.113.1 (#2251): hashed with the explanation, as links sent before
     keep = {k: m.get(k) for k in ("kind", "number", "date", "valid_until", "currency", "vat_mode", "project_title", "project_ref",
                                   "service_from", "service_to", "recipient", "intro", "lines", "totals", "rights", "closing", "fields",
                                   "parts")}
-    return hashlib.sha256(json.dumps(keep, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest(), m
+    from .terms import agb_doc_terms
+    t = agb_doc_terms(c, oid, c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone())
+    if t:  # 2.113.2 (#2253) review: other terms under an open link void it (only when there are terms: older links keep their hash)
+        keep["terms"] = t["sha256"]
+    return hashlib.sha256(json.dumps(keep, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest(), prd_strip_detail(m)
 
 
 def sig_list_hash(c, r):
@@ -413,7 +417,7 @@ def sig_offer_html(c, r, lg, token):
             rows.append(f'<tr class="hd"><td colspan="3">{e(ln.get("title") or "")}</td></tr>')
         elif k == "text":
             rows.append(f'<tr class="tx"><td colspan="3">{e(ln.get("text") or "")}</td></tr>')
-        elif k in ("item", "producing", "raw", "discount"):
+        elif k in ("item", "producing", "surcharge", "raw", "discount"):  # 2.113.1 (#2252): + surcharge
             q = " ".join(x for x in (ln.get("qty_text") or "", ln.get("unit_text") or "") if x)
             rows.append(f'<tr><td>{e(ln.get("title") or "")}</td><td class="q">{e(q)}</td><td class="m">{e(ln.get("total_text") or "")}</td></tr>')
     t = m.get("totals") or {}
@@ -448,9 +452,13 @@ def sig_page(c, r, token, lg, error=None, code=200):
             h = tr("Approved|video", lg=lg) if d["state"] == "accepted" else tr("Changes requested", lg=lg)
         when = d["signed_at"] or ""
         pdf_t = tr("Download the signed document (PDF)", lg=lg) if doc else tr("Download the quotation (PDF)", lg=lg)
+        from .terms import agb_sig_html, agb_sig_note
+        terms = agb_sig_note(c, r, lg) if r["kind"] in ("offer", "document") and d["state"] == "accepted" else ""  # 2.113.2 (#2253)
         main = (f'<div class="msg"><h1>{e(h)}</h1><p>{e(r["title"])}</p><p>{e(tr("By {0} on {1} (UTC).", d["signer_name"] or "", when[:16].replace("T", " "), lg=lg))}</p>'
+                + terms
                 + (f'<p><a class="pdf" href="{SIG_PREFIX}{e(token)}/pdf" download rel="nofollow">{e(pdf_t)}</a></p>'
                    if (r["kind"] == "offer" or (doc and d["state"] == "accepted")) and h6c_sig_pdf_ok(c, r) else "")  # 2.86.0 (N17)
+                + (agb_sig_html(c, r, lg, token, SIG_PREFIX) if terms and h6c_sig_pdf_ok(c, r) else "")
                 + f'<p class="sub">{e(tr("Thank you. You can close this page.", lg=lg))}</p></div>')
         return pub_html(h, main, lg)
     vid = r["kind"] == "video"  # 2.99.1 A (#1959)
@@ -462,6 +470,9 @@ def sig_page(c, r, token, lg, error=None, code=200):
         head = vdr_sig_html(c, r, lg, token, SIG_PREFIX)
     else:
         head = sig_offer_html(c, r, lg, token) if r["kind"] == "offer" else sig_list_html(c, r, lg)
+    if r["kind"] in ("offer", "document"):  # 2.113.2 (#2253): the terms next to the PDF
+        from .terms import agb_sig_html
+        head += agb_sig_html(c, r, lg, token, SIG_PREFIX)
     acc = (tr("I accept the quotation", lg=lg) if r["kind"] == "offer" else tr("I sign this document", lg=lg) if r["kind"] == "document"
            else tr("I approve this version of the video", lg=lg) if vid else tr("I confirm the acceptance", lg=lg))
     go = tr("Sign bindingly", lg=lg) if r["kind"] == "document" else tr("Approve|video", lg=lg) if vid else tr("Accept bindingly", lg=lg)
@@ -557,6 +568,30 @@ def sig_pdf_get(token):
     return resp
 
 
+@app.get("/s/q/<token>/terms")
+def sig_terms_get(token):
+    """2.113.2 (#2253): the terms (PDF) frozen with the quotation / document of the link; the same rules and answers as /pdf."""
+    from .terms import AGB_ATTACH, agb_file_response, agb_lang, agb_sig_terms
+    c = db()
+    if hit_limit("sigv:" + rate_ip(), SIG_VIEW_RATE):
+        return pub_limited(_accept_lang())
+    r, bad = sig_open(c, token)
+    if bad:
+        return bad
+    if r["kind"] not in ("offer", "document") or not h6c_sig_pdf_ok(c, r) or (r["kind"] == "document" and r["state"] not in ("open", "accepted")):
+        return pub_gone()
+    t = agb_sig_terms(c, r)
+    if not t:
+        return pub_gone()
+    try:
+        resp = agb_file_response(c, r["org_id"], t, AGB_ATTACH[agb_lang(t["lang"])].format(t["date"] or "undated"))
+    except Denied:
+        return pub_gone()
+    resp.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    return resp
+
+
 def _clean_text(v, mx):
     v = (v or "").replace("\r", "")
     v = "".join(ch for ch in v if ch == "\n" or ord(ch) >= 32)
@@ -626,6 +661,11 @@ def sig_decide(token):
               (st, ts, vals["signer_name"], vals["signer_email"], vals["reason"], vals["ip"], vals["user_agent"], r["id"]))
     proto = {"signoff": r["id"], "state": st, "name": name, "email": email, "reason": reason, "at": ts, "ip": ip, "user_agent": ua,
              "doc_hash": r["doc_hash"], "signature": "simple electronic signature"}
+    if r["kind"] in ("offer", "document"):  # 2.113.2 (#2253): the terms state the customer decided on
+        from .terms import agb_sig_proto
+        t = agb_sig_proto(c, r)
+        if t:
+            proto["terms"] = t
     if r["kind"] == "offer":
         from .docs import odoc_set_status
         from .ledger import ofx_log

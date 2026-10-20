@@ -336,6 +336,8 @@ def fs_put(c, uid, parent_id, name, data, mime=None, org_id=None, agent_id=None,
     up_after_store(c, "fs", nid, org, info)
     if up is not None:
         up.update(info)
+    from ..integrations.webhooks import who_note
+    who_note("file.created", "file", nid)  # 2.115.0 A (#2061)
     return nid
 
 

@@ -744,6 +744,9 @@ _TOC_SKIP = ("DATABASE PROPERTIES", "ROW SECURITY", "DEFAULT ACL", "STDSTRINGS",
              "ENCODING", "TRIGGER", "COMMENT", "DATABASE", "POLICY", "SCHEMA", "ACL")
 _TOC_KINDS = tuple(sorted(_TOC_KEEP + _TOC_SKIP, key=len, reverse=True))
 _TOC_LINE = re.compile(r"(\d+); (\d+) (\d+) (.*)")
+# 2.116.0 (#2065, job #692): the full-text indexes (tasks/ftsearch.py) call to_tsvector / setweight / "left": not in the
+# call list of _calls_ok, and they need not be: a restore leaves them out and init_db creates them again (fts_index_init)
+_TOC_REBUILT = {"fts_tasks", "fts_comments"}
 
 
 def bk_toc(dump):
@@ -775,6 +778,8 @@ def bk_toc(dump):
         elif kind == "COMMENT" and rest[:2] in (["public", "TABLE"], ["public", "COLUMN"]):
             keep.append(ln)  # a comment on a table / column (plain text, checked below like everything else)
             continue
+        elif kind == "INDEX" and len(rest) >= 2 and rest[0] == "public" and rest[1] in _TOC_REBUILT:
+            continue  # rebuilt by init_db after the restore (its expression calls functions a dump statement may not have)
         elif kind in _TOC_KEEP:  # (a name with a space would split: refused, Kalmido has none)
             ok = len(rest) >= 2 and rest[0] == "public" and (kind != "TABLE" or len(rest) <= 3)
             if ok:
@@ -1212,7 +1217,10 @@ def storage_check():
                                     "ELSE p.path END AS where_ FROM wiki_files f LEFT JOIN wiki_pages p ON p.id=f.page_id"),
                       # 2.124.0 B (#2110): files of table cells (where = the table's title)
                       ("sheet_file", "SELECT f.id, f.sheet_id AS owner, f.name, f.size, f.path, s.title AS where_ FROM sheet_files f "
-                                     "LEFT JOIN sheets s ON s.id=f.sheet_id")):
+                                     "LEFT JOIN sheets s ON s.id=f.sheet_id"),
+                      # 2.113.1 (#2059): files in the team chat (where = the conversation's name)
+                      ("team_file", "SELECT f.id, f.room_id AS owner, f.name, f.size, f.path, r.name AS where_ FROM tchat_files f "
+                                    "LEFT JOIN tchat_rooms r ON r.id=f.room_id")):
         for r in c.execute(sql):
             n += 1
             full = os.path.join(ATT_DIR, r["path"] or "")

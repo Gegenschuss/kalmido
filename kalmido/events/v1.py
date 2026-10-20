@@ -219,7 +219,10 @@ def events_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "status": {"type": "string", "enum": list(EV_STATUS)}, "busy": {"type": "boolean"}, "url": nul("string"), "task_id": nul("integer"),
         "attendees": {"type": "array", "items": {"type": "object", "properties": {
             "user_id": {"type": "integer"}, "contact_id": {"type": "integer"}, "email": {"type": "string"}, "name": {"type": "string"},
-            "partstat": {"type": "string", "enum": list(EV_PARTSTAT)}, "role": {"type": "string", "enum": ["req", "opt"]}}}}}}
+            "partstat": {"type": "string", "enum": list(EV_PARTSTAT)}, "role": {"type": "string", "enum": ["req", "opt"]}}}},
+        # 2.111.0 B (#2056): invitation mails to the external attendees (addresses, contacts); default off
+        "send_invites": {"type": "boolean", "description": "Mail the invitation (.ics) to new external attendees, and to all of them "
+                                                           "when time, place, title or repeat changed; default false. Agent tokens: 403 (people send invitations)"}}}
     cal_in = {"type": "object", "properties": {"name": {"type": "string"}, "color": {"type": "string"}, "description": {"type": "string"}}}
     cid_p, eid_p, uid_p = pid("id", "Calendar id"), pid("id", "Event id"), pid("user_id", "User id")
     occ_q = q("occurrence", "Only this occurrence of a repeating event (its original start, see Occurrence.occ)")

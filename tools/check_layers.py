@@ -49,6 +49,8 @@ KNOWN = {
     ("calendars.polls", "api.v1"),
     # 2.124.1: the sheet routes of API v1 (decorators at module level, as sheets.v1)
     ("sheets.shbook", "api.v1"),
+    # the parked releases 2.113.1 / 2.116.0 (#2059 team chat channels, #2067 focus in API v1): v1 route decorators at module level
+    ("collab.teamchan", "api.v1"), ("personal.v1focus", "api.v1"),
 }
 
 

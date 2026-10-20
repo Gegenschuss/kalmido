@@ -107,6 +107,25 @@ open the tab Templates, `#office/import` sits under Settings, `#clients`, `#clie
 the office joins a group with an entry in `OFM_ITEMS` (`static/js/areas.js`, field `group`, its place in `OFR_ORDER`); an
 office tab without one appears at the end of its group (`OFC_TABS` field 5, else Administration).
 
+## Settings: areas, every field saves itself (2.113)
+
+Office & finance > Settings > General shows its fields in five **areas**, with the same strip of tabs as
+Settings > Administration: **Company** (company data, logo, brand colour, master data file), **Documents** (documents,
+invoices, invoice from parts, closing texts, calculation rules, default texts), **Packs** (country pack, packs list),
+**Data** (DATEV inbox and booking export, legacy import, moving a personal office into an organisation) and **Access**
+(agents' read access, access log). Only one area is shown; the last one chosen is remembered on the device. On a phone the
+strip scrolls sideways.
+
+There is no Save button: each field saves itself when you leave it (a box or a choice at once) and says *Saved* next
+to it, with *Undo* (one undo step per field). Only that field goes to the server (`PUT /api/office/settings` with its
+key; the company data, the free line groups, one language of the default texts and one part of the default rights each
+on their own, the DATEV booking export as one group), so fields of the other areas are never written over. A value the
+server refuses stays in the field, marked with the error, until it is corrected; closing the page asks meanwhile.
+Members see every field locked.
+
+In the area Packs, every industry pack's card says **Switched on** or **Off** and has its own switch; it changes
+`industry_packs` at once, like the box of the same pack in the calculation rules.
+
 ## Tabs
 
 - **Quotations** - the documents (number, recipient, project, date, net total, status) and the editor.
@@ -150,7 +169,10 @@ office tab without one appears at the end of its group (`OFC_TABS` field 5, else
   (`producing_on` 0/1, raw data via `raw_mode`, "none" = off), always shown; the flags of services and positions are
   always kept, the spreadsheet import always reads those columns, a framework contract always presets raw data;
   existing and finalised documents keep what they hold, documents of 2.46 and older get `producing_on` once at start-up
-  (1 when a position counts towards producing, else the default), so their sums stay. The company data choose the word before the
+  (1 when a position counts towards producing, else the default), so their sums stay. Since 2.138.1 a new quotation computes producing only
+  through an industry pack that offers "share by amount" (see docs/PACKS.md, calculation options); without such a pack
+  new quotations start without producing and the switch, the fields and the marks are hidden. Older quotations keep
+  their calculation by quantities / quotient (and show their switch to turn it off). The company data choose the word before the
   management's names in the footer (`md_label`: Geschäftsführung, Gesellschafter, Inhaber, Inhaberin, Vorstand, Partner;
   German or English by the document's language). Unsaved input of these pages survives a change of the view and live
   updates until it is saved or discarded.
@@ -272,7 +294,9 @@ operator of the server names in `KALMIDO_PACKS_CATALOG`; without it the list sho
 - **Install, update, uninstall** (office admins; members see the list only): *Install* downloads the pack, checks its
   checksum, size and shape (the same check as the built-in packs, no markup, data only, never program code) and makes
   it available in this office only - a private office or one organisation, never others. An installed country pack
-  appears in the *Country pack* choice, an installed industry pack gets its box in the *Calculation rules*. *Update to
+  appears in the *Country pack* choice, an installed industry pack gets its box in the *Calculation rules*. Since 2.113
+  every industry pack's card (built in or installed) says **Switched on** or **Off** and has its own switch: it
+  changes `industry_packs` of the office at once (the same setting as the box in the calculation rules; one undo step). *Update to
   vN available* shows when the catalogue has a newer version, with its notes. A pack with the code of a built-in one
   (for example a newer `DE`) replaces it in this office only; uninstalling it brings the built-in one back.
 - **Uninstalling** asks first. It is refused, with the reason, while the pack is still in use: the country pack chosen
@@ -994,6 +1018,29 @@ amount. When a quotation becomes "accepted" its purchase is stored for the cash 
 position with a purchase and per part, amount encrypted at rest, dated at the start of the period of service, else the
 day of acceptance), stored anew when the accepted quotation changes and removed when it leaves that status.
 
+## Undo in the editors (2.138.1)
+
+Documents (quotations, invoices, credit notes, reminders and the parts of a quotation), clients, the master data
+(services, texts, contracts, sets, roles) and tables keep saving every change at once. Every own saved change is one
+step of the app's history: Ctrl+Z (Mac: Cmd+Z) takes it back while the focus is not in a text field (there the field's
+own text undo works). Leaving a changed document or table (Back, the menu, a link, another document) turns its steps
+into one entry and shows "... saved · Undo" for 10 seconds; its button brings back everything since the document was
+opened. Leaving without a change shows nothing. The client and master data dialogs keep their Save button; after a save
+the same hint brings back the values from before the dialog. Equipment, document templates and documents made from
+templates keep their own undo.
+
+Never undone: finalising, sending, payments, a status change, a number, the reminder fee and DATEV keep their dialogs
+and end the way back for the open document. The server refuses an undo (409 with the reason) when someone else changed
+the object in the meantime (their change stays), when the document was finalised or sent meanwhile, or when a client
+moved to another workspace. Tables check the table's revision the same way.
+
+How it works: the editor sends its saves with the header `X-Kalmido-Undo: <session token>`; the write routes keep a
+copy of the stored rows before the step and a fingerprint of the state after it (table `office_undo`, one day).
+`POST /api/office/undo/<doc|client|services|texts|contracts|sets|roles|crew>/<id>` with `{sess, op}` (`undo` = the newest
+step, `all` = back to the opening, `redo`, `redoall`) writes a copy back in one transaction, only while the object is
+exactly as this person's last step left it; rights as for the normal change. Saves without the header (agents, the
+API, other apps) record nothing.
+
 ## Texts by an agent (2.126.1)
 
 On a draft (quotation, invoice, reminder) the section *Introduction and closing* offers *Draft text with an agent* when an
@@ -1068,6 +1115,12 @@ reminders stay strictly locked. The list rows carry `can_delete` / `can_unlock` 
 like a service: a position of kind `part` with a quantity ("Interactive module x 5"); the title page can also have direct
 positions. A part may stand on the title page several times or not at all (then it counts nothing and is not printed; the
 editor marks it).
+
+(2.113.) In the editor a part opens **in place** on the title page (tap its line under Parts; several may be open at
+once). Every part has a colour of its own by its place in the list: a dot on its line and on the title page's line that
+uses it, a coloured frame and head ("Part 2 of 3") on the open part. Sent and finalised quotations open the same way,
+with locked fields. The unit choice of a position follows its quantity like the PDF does ("1 Day", "5 Days"; decimals
+count as plural).
 
 - **Calculation**: a part line = the part's net x quantity; its tax bases per rate x quantity (a part with 7 % and 19 %
   positions stays exact), its raw data x quantity (optional stays optional, included stays included) and its external
@@ -1308,6 +1361,36 @@ Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit
 - A finalised document whose stored PDF or XML is missing answers 409 (logged as `store_missing`) instead of being
   rendered again from the snapshot; drafts are always rendered.
 
+## Terms and conditions as PDF (2.113)
+
+*Settings > Terms and conditions (PDF)* holds the office's terms and conditions as a PDF file per language (German,
+English) with the date they apply from ("as of"). The admin of the office uploads, replaces and removes them (removing
+is one undo step); members see and open them. Each file is stored once by its content (`terms-<lang>-<hash>.pdf` in the
+office folder, sealed like the stored documents, part of the backups); an older state is never overwritten, so what went
+out with a quotation stays readable.
+
+- **Finalising** a document notes the state of its language (date, SHA-256); a draft follows the current state. A
+  quotation prints the line "Es gelten unsere AGB (Stand ...), siehe Anhang." / "Our terms and conditions (as of ...)
+  apply, see attachment." - only when terms exist in the document's language (terms in the other language only: no line,
+  no attachment). Replacing the terms later does not change a finalised quotation, its line or its attachment.
+- **Sending**: finalised quotations can be mailed too (status `sent`). The send dialog has the tick *Attach terms and
+  conditions* - ticked for quotations, unticked for invoices, credit notes and reminders - when the document's language
+  has terms. The file goes along as `AGB-Stand-<date>.pdf` / `Terms-<date>.pdf`; the log entry "send" names the state
+  (language, date, SHA-256) and the document's history shows "with terms and conditions as of ...". The DATEV copy never
+  carries them.
+- **Approval link**: the customer page of a quotation offers the terms for download next to the PDF
+  (`/s/q/<token>/terms`, the same rules as the PDF); the decision record (`signoff_accepted` / `signoff_declined`) names
+  the state and the confirmation page says "Terms and conditions as of ...". Contracts and order confirmations made from
+  templates keep the state when they are finished and offer it on their signature link (they have no mail dispatch).
+
+Routes (office members read, the office's admin writes; a personal office works the same): `GET /api/office/terms`
+(`{terms: {de, en}, admin, max_mb}`), `POST /api/office/terms/<lang>` (multipart `file` - a PDF up to 10 MB - and
+`date` YYYY-MM-DD, default today), `GET /api/office/terms/<lang>/file` (`?inline=1`), `DELETE /api/office/terms/<lang>`
+(answers `removed` for the undo; the file stays), `POST /api/office/terms/<lang>/restore` `{sha256, date, name}` (only a
+state stored in this office) and `GET /api/office/docs/<id>/terms` (the state the document prints / sends, `default` = the
+tick of the send dialog; `?file=1` downloads it). `POST /api/office/docs/<id>/send` takes `terms: true|false` (missing =
+on for quotations). A document's answer carries `terms` (`{lang, date, sha256, name}` or null).
+
 ## Company fields
 
 Settings > Company holds the company as single fields: name, street, postcode, city, country (ISO code), e-mail, phone,
@@ -1529,6 +1612,8 @@ Since 2.36.2 also `office_company` and `office_doc_log`, the columns `locked_at`
 `tax_pct`, `net`, `tax_amount` of `office_doc_items` (positions written without `org_id` get it at the next start) and
 the billing columns of `clients` - all nullable or with a default, so the previous release runs on with them.
 Unfinished logo uploads (`*.tmp`) are not part of backups.
+Since 2.138.1 also `office_undo` (the copies for the editors' undo, see "Undo in the editors"; `org_id` nullable for a
+private client, rows live one day); 2.110 runs on with it.
 Since 2.37.0 (PostgreSQL) amounts, rates and quantities are `NUMERIC(14,4)` (exact decimals; read back as numbers as
 before), and every `office_*` table is under row-level security by `org_id`: a request only ever gets rows of its own
 organisations, even if a route forgot a check.

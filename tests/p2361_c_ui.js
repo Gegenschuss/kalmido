@@ -48,6 +48,8 @@ const FEAT = 'cal,comments,collab,office,clients';
   check(!!doc && /office\/offers\/\d+/.test(w.location.hash) && /^KVA-\d{4}-001$/.test(doc.number), 'New creates a draft on the server and opens it: ' + w.location.hash + ' ' + doc?.number);
   await until(() => d.querySelector('.ofdhead .ofdnum b')?.textContent === doc.number);
   check(d.querySelector('.ofdhead .ofdnum b')?.textContent === doc.number && d.querySelector('#ofd-status')?.value === 'draft', 'the editor head shows number and status');
+  // 2.113.1 (#2251): the office setting no longer switches producing on for a new quotation (only a pack option does); the document does
+  await call('PATCH', `/api/office/docs/${doc.id}`, {producing_on: 1});
   check(!!d.querySelector('#ofd-lang') && d.querySelector('#ofd-lang').value === 'de' && !!d.querySelector('#ofd-project_title') && !!d.querySelector('#ofd-date[data-dp="date"]') && !d.querySelector('input[type="date"]'), 'head fields: language de (organisation default), project title, date picker (no native date input)');
   check(!!d.querySelector('#ofd-totals') && /0,00 €/.test(d.querySelector('#ofd-totals .tr-net dd')?.textContent || ''), 'the totals block shows 0,00 € in the document language');
   check(d.querySelectorAll('.ofdits .ofdit').length === 0 && !!d.querySelector('[data-ofd="it-svc"]'), 'no positions yet, Add service is there');

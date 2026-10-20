@@ -335,6 +335,7 @@ async function rawFetch(method, url, body) {
 async function rawFetch0(method, url, body) {
   const opt = {method, headers: {'X-Requested-With': 'kalmido'}, redirect: 'manual'};
   const dev = wpDevHeader(url); if (dev) opt.headers['X-Kalmido-Device'] = dev;
+  const un = typeof oun_hdr === 'function' ? oun_hdr(method, url) : ''; if (un) opt.headers['X-Kalmido-Undo'] = un;  // 2.111.0 A (#2233): office_undo.js
   if (body instanceof FormData) opt.body = body;
   else if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
   let r;
@@ -357,6 +358,7 @@ async function rawFetch0(method, url, body) {
     if (j.code === 'agent_bridge') e.shown = true;  // 2.30.0 (#919): bridgeTry asks and repeats it
     if (j.pin && S.me?.kid) { e.shown = true; kd_pinClosed(); }  // 2.49.0 (#1551): the PIN time ran out: ask again
     throw e; }
+  if (method !== 'GET' && typeof oun_ok === 'function') oun_ok(method, url, j);  // 2.111.0 A (#2233)
   return j;
 }
 const queueable = (method, url) => method !== 'GET' && /^\/api\/(tasks|habits\/\d+\/log|time\/(start|stop|entries))/.test(url) && !/\/(comments|seen|timeline)$/.test(url);
@@ -757,7 +759,7 @@ async function loadExtra() {
     if (S.hist.k !== k) S.hist = {k, n: HIST_PAGE, next: null, deletable: null, kept: null};
     const j = await api('GET', `/api/tasks?scope=${k}&limit=${Math.min(S.hist.n, 2000)}`);
     if (S.hist.k !== k) return;
-    Object.assign(S.hist, {next: j.next || null, deletable: j.deletable ?? null, kept: j.kept ?? null});
+    Object.assign(S.hist, {next: j.next || null, deletable: j.deletable ?? null, kept: j.kept ?? null, days: j.days ?? null});  // 2.116.0 A (#2063): + trash period
     S.extra = j.tasks;
   } else if (S.route.mod !== 'news' && S.route.mod !== 'time') S.extra = null;  // News / time reports: tasks fetched on demand stay
 }

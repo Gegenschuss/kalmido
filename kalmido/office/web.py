@@ -205,12 +205,15 @@ def office_row_patch(kind, rid):
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
     old = office_row(c, oid, kind, rid)
+    from .undo import oun_post, oun_pre
+    oun_pre(c, uid, oid, kind, rid)  # 2.111.0 A (#2233): the state before, for "Saved · Undo"
     r = office_update(c, oid, kind, rid, b)
     diff = ofx_diff(old, r)
     diff["after"].pop("updated_at", None)
     diff["before"].pop("updated_at", None)
     if diff["after"]:
         ofx_log(c, oid, "update", target=kind, detail={"id": r["id"], **diff})
+    oun_post(c)
     c.commit()
     return jsonify(r)
 

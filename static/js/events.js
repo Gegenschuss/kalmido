@@ -173,6 +173,7 @@ async function submitQuick(input, extra = {}) {
   if (d.who && r.list_id && dsxWhoLists(d.who).some(l => l.id === r.list_id)) body.assignee_id = d.who;
   if (d.who && d.noList && !body.list_id) { toast(tr('No list with {0} that you can add to: share a list with them first.', personNameAny(d.who) || '?'), null, 5000); return; }
   if (body.due_time && S.settings.default_reminder !== '') body.reminders = S.settings.default_reminder;
+  qa2_body(r, body);  // 2.111.0 C (#2057): @person, duration, reminder
   input.value = ''; S.quick.ignore = new Set(); updateChips(input);
   if (pasted.length) { S.qfiles[input.id] = []; qFilesDraw(input); }
   if (input.id === 'qsheet' && (cap || S.quickPreset.content || S.quickPreset.url || S.quickPreset.due_time || S.quickPreset.files?.length)) { S.quickPreset = {}; closePop(); }
@@ -788,7 +789,7 @@ document.addEventListener('keydown', async e => {
       t.value = '';
       subAddQ = subAddQ.then(async () => {
         const r = parseQuick(v.trim(), new Set());
-        const nt = await api('POST', '/api/tasks', {title: r.title || v, parent_id: p.id, list_id: p.list_id, due: r.due, due_time: r.due_time, priority: r.priority || 0});
+        const nt = await api('POST', '/api/tasks', qa2_body(r, {title: r.title || v, parent_id: p.id, list_id: p.list_id, due: r.due, due_time: r.due_time, priority: r.priority || 0}));  // 2.111.0 C (#2057)
         await load(); renderKeepField('#d-sub', () => { renderDetail(); render(); });
         if (nt?.id) histCreate(tr('Subtask {0} added', qn(String(nt.title || r.title || v).slice(0, 40))), nt);
       }).catch(() => { const f = $('#d-sub'); if (f && !f.value) f.value = v; });  // not saved: the text comes back (api() showed why)
@@ -801,12 +802,12 @@ document.addEventListener('keydown', async e => {
     if (t.dataset.kadd !== undefined && t.value.trim()) {
       const lid = S.route.key === 'inbox' ? inbox().id : +S.route.key.slice(2);
       const r = parseQuick(t.value.trim()); t.value = '';
-      await createTask({title: r.title, list_id: lid, section_id: t.dataset.kadd ? +t.dataset.kadd : null, due: r.due, due_time: r.due_time, priority: r.priority || 0, tags: r.tags || [], repeat: r.repeat || '', ...swlNew(lid, t.dataset.swl, r)});  // 2.138.0 D (#2060): + the swimlane's value
+      await createTask(qa2_body(r, {title: r.title, list_id: lid, section_id: t.dataset.kadd ? +t.dataset.kadd : null, due: r.due, due_time: r.due_time, priority: r.priority || 0, tags: r.tags || [], repeat: r.repeat || '', ...swlNew(lid, t.dataset.swl, r)}));  // 2.138.0 D (#2060): + the swimlane's value
       [...$$('[data-kadd]')].find(x => x.dataset.kadd === t.dataset.kadd && x.dataset.swl === t.dataset.swl)?.focus(); return;
     }
     if (t.dataset.qadd !== undefined && t.value.trim()) {
       const r = parseQuick(t.value.trim()); t.value = '';
-      await createTask({title: r.title, priority: +t.dataset.qadd, due: r.due, due_time: r.due_time, tags: r.tags || [], list_id: r.list_id || mxList(), repeat: r.repeat || ''});
+      await createTask(qa2_body(r, {title: r.title, priority: +t.dataset.qadd, due: r.due, due_time: r.due_time, tags: r.tags || [], list_id: r.list_id || mxList(), repeat: r.repeat || ''}));
       $(`[data-qadd="${t.dataset.qadd}"]`)?.focus(); return;
     }
   }

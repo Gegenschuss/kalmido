@@ -56,19 +56,19 @@ function mdBrief(t) {
 }
 const editingTeam = () => document.activeElement?.id === 'tc-in' || document.activeElement?.id === 'ms-q' || document.activeElement?.classList?.contains('tc-edit');
 const roomName = r => r ? (r.kind === 'dm' ? (r.name || '?') : lname(listById(r.list_id)) || r.name || '?') : '';
-const roomIcon = r => r.kind === 'dm' ? av(r.user_id, r.name, 'avatar') : `<span class="tcico">${licon(listById(r.list_id), 'licon') || ic('users', 's')}</span>`;
+const roomIcon = r => r.kind === 'dm' ? av(r.user_id, r.name, 'avatar') : tcx_isX(r) ? tcx_icon(r) : `<span class="tcico">${licon(listById(r.list_id), 'licon') || ic('users', 's')}</span>`;
 function viewTeam() {
   if (typeof cw_tcHome === 'function' && S.cw.lt) return cw_tcHome(viewTeam);  // 2.47.1 (#1720): a conversation live in the chat panel (chatwins.js)
   if (!teamOn()) return `<div class="empty">${tr('The team chat needs collaboration (Settings > Modules).')}</div>`;
   if (S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.route.mod === 'team') renderView(); }); }
   // 2.27.0 (#986): only conversations that have messages (newest first); an empty one shows once it is opened / written in
-  const rid = S.tc.rid, rooms = (S.tc.rooms || []).filter(r => (r.last || r.id === rid) && (r.kind === 'dm' || r.id === rid || inWs(listById(r.list_id))));  // 2.28.0 (#935)
+  const rid = S.tc.rid, rooms = (S.tc.rooms || []).filter(r => (r.last || r.id === rid || tcx_isX(r)) && (r.kind === 'dm' || r.id === rid || (tcx_isX(r) ? tcx_vis(r) : inWs(listById(r.list_id)))));  // 2.28.0 (#935); 2.113.1 (#2059): channels / groups also without messages
   const list = `<nav class="tclist" aria-label="${esc(tr('Conversations'))}">
     <div class="tchead"><b>${tr('Conversations')}</b><span class="spacer"></span><button type="button" class="btn sm pri" data-act="tc-new" aria-haspopup="${S.tc.people.length ? 'menu' : 'dialog'}">${ic('plus', 's')}${tr('New message')}</button></div>
-    ${S.tc.rooms === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : rooms.length ? rooms.map(r => `<button type="button" class="tcrow ${r.id === rid ? 'on' : ''} ${r.unread ? 'unread' : ''}" data-act="tc-open" data-rid="${r.id}" ${r.id === rid ? 'aria-current="true"' : ''}>
-      ${roomIcon(r)}<span class="tcmain"><span class="tcn">${esc(roomName(r))}${r.kind === 'list' ? `<span class="tck">${ic('users', 's')}${r.members}</span>` : ''}</span>
-      <span class="tclast">${r.last ? esc((r.last.user_id === S.me?.id ? tr('You') + ': ' : r.kind === 'list' ? uname(r.last.user_id, S.tc.users) + ': ' : '') + (e2eBriefText(r.last) ?? mdBrief(r.last.text))) : `<span class="muted">${tr('No messages yet')}</span>`}</span></span>
-      <span class="tcside">${r.last_at ? `<time>${esc(relTime(r.last_at))}</time>` : ''}${r.unread ? `<span class="nbadge ${r.mention ? 'ment' : ''}" aria-label="${esc(trn('{0} unread', '{0} unread', r.unread))}">${r.mention ? '@' : ''}${r.unread}</span>` : ''}${r.muted ? `<span class="tcmute" title="${esc(tr('Muted'))}">${ic('belloff', 's')}</span>` : ''}</span></button>`).join('')
+    ${S.tc.rooms === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : rooms.length ? tcx_listHtml(rooms, r => `<button type="button" class="tcrow ${r.id === rid ? 'on' : ''} ${r.unread ? 'unread' : ''}" data-act="tc-open" data-rid="${r.id}" ${r.id === rid ? 'aria-current="true"' : ''}>
+      ${roomIcon(r)}<span class="tcmain"><span class="tcn">${esc(roomName(r))}${r.kind !== 'dm' ? `<span class="tck">${ic('users', 's')}${r.members}</span>` : ''}</span>
+      <span class="tclast">${r.last ? esc((r.last.user_id === S.me?.id ? tr('You') + ': ' : r.kind !== 'dm' ? uname(r.last.user_id, S.tc.users) + ': ' : '') + (e2eBriefText(r.last) ?? mdBrief(r.last.text))) : `<span class="muted">${tr('No messages yet')}</span>`}</span></span>
+      <span class="tcside">${r.last_at ? `<time>${esc(relTime(r.last_at))}</time>` : ''}${r.unread ? `<span class="nbadge ${r.mention ? 'ment' : ''}" aria-label="${esc(trn('{0} unread', '{0} unread', r.unread))}">${r.mention ? '@' : ''}${r.unread}</span>` : ''}${r.muted ? `<span class="tcmute" title="${esc(tr('Muted'))}">${ic('belloff', 's')}</span>` : ''}</span></button>`)
     : `<div class="empty tcempty">${botFig('ruhig')}<b>${tr('No conversations yet')}</b><span>${S.tc.people.length || (S.tc.rooms || []).length ? tr('Write to someone you work with, or share a list: every shared list gets its own chat.') : tr('Share a list with someone: every shared list gets its own chat.')}</span>${S.tc.people.length || (S.tc.rooms || []).length ? `<button type="button" class="btn sm pri" data-act="tc-new">${ic('plus', 's')}${tr('Start a conversation')}</button>` : ''}</div>`}
   </nav>`;
   return `<div class="tcwrap"><div class="tcview ${rid ? 'inroom' : ''}">${list}${rid ? `<section class="tcroom" aria-label="${esc(roomName(S.tc.room ? {...S.tc.room, name: (rooms.find(x => x.id === rid) || {}).name} : rooms.find(x => x.id === rid)))}">${tcRoomHtml()}</section>` : (isMobile() ? '' : `<section class="tcroom tcnone"><div class="empty">${ic('comment')}<span>${tr('Pick a conversation.')}</span></div></section>`)}</div></div>`;
@@ -82,13 +82,13 @@ function tcRoomHtml() {
   const rid = S.tc.rid, r = (S.tc.rooms || []).find(x => x.id === rid), room = S.tc.room;
   const name = roomName(r || room);
   const head = `<div class="tcrhead"><button type="button" class="iconbtn tcback" data-act="tc-back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>
-    ${r ? roomIcon(r) : ''}<div class="tcrt"><b>${esc(name)}</b>${room && room.kind === 'list' ? `<span class="muted">${esc(room.members.map(m => m.name).slice(0, 6).join(', '))}${room.members.length > 6 ? ' +' + (room.members.length - 6) : ''}</span>` : ''}</div>
+    ${r ? roomIcon(r) : ''}<div class="tcrt"><b>${esc(name)}</b>${room && room.kind !== 'dm' ? `<span class="muted">${esc(room.members.map(m => m.name).slice(0, 6).join(', '))}${room.members.length > 6 ? ' +' + (room.members.length - 6) : ''}</span>` : ''}</div>
     <span class="spacer"></span>${msgSearchBtn('t', rid)}${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the list'))}" aria-label="${esc(tr('Open the list'))}">${ic('list')}</button>` : ''}
-    ${typeof dw_winBtn === 'function' ? dw_winBtn('team', rid) : ''}${o3b_splitBtn(room, rid)}${e2eRoomBtns(room)}<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button>${typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
+    ${typeof dw_winBtn === 'function' ? dw_winBtn('team', rid) : ''}${o3b_splitBtn(room, rid)}${tcx_headBtn(room)}${e2eRoomBtns(room)}<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button>${typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
   return `${typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}${e2eRoomNotice(room)}${le2eChanNotice(room)}${cpnBarHtml('t:' + rid)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
     <button type="button" class="chnew hidden" id="tc-new">${tr('New message')} <span aria-hidden="true">↓</span></button>
-    ${replyBarHtml('t:' + rid)}<div class="chcomp tccomp"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Message to {0}…', name.length > 18 ? name.slice(0, 17).trimEnd() + '…' : name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="enter" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
-    <span class="muted chkh">${esc(chatKeyHintVis())}</span><button type="button" class="btn pri" data-act="tc-send" title="${esc(chatKeyHint())}"${csdBusy('t:' + rid) ? ' disabled' : ''}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
+    ${room?.archived ? tcx_archivedHtml(room) : `${replyBarHtml('t:' + rid)}${tcx_filesBarHtml(room, rid)}<div class="chcomp tccomp">${tcx_clipHtml(room)}<div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Message to {0}…', name.length > 18 ? name.slice(0, 17).trimEnd() + '…' : name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="enter" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
+    <span class="muted chkh">${esc(chatKeyHintVis())}</span><button type="button" class="btn pri" data-act="tc-send" title="${esc(chatKeyHint())}"${csdBusy('t:' + rid) ? ' disabled' : ''}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`}`;
 }
 function tcMsgsHtml() {
   if (S.tc.err && !S.tc.msgs.length) return `<div class="muted mhint" data-k="err">${esc(S.tc.err)}</div>`;
@@ -105,7 +105,7 @@ function tcMsgsHtml() {
     if (eb && m.enc.sys) { h += `<div class="cmsg sys" data-k="m${m.id}" data-mid="t:${m.id}">${eb}</div>`; prev = null; continue; }
     const body = m.deleted ? `<div class="cbub del"><span class="muted">${tr('Message deleted')}</span></div>` : lb ? lb
       : S.tc.edit === m.id ? `<div class="cbub tcedit"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea class="tc-edit" enterkeyhint="enter" aria-label="${esc(tr('Edit message'))}" rows="2">${esc(m.body.replace(/<@(\d+)>/g, (_, id) => '@' + uname(+id, U)))}</textarea><div class="tcebtn"><button type="button" class="btn sm" data-act="tc-edit-cancel">${tr('Cancel')}</button><button type="button" class="btn sm pri" data-act="tc-edit-save" data-mid="${m.id}">${tr('Save')}</button></div></div>`
-        : `${replyQuoteHtml(m, 't')}<div class="cbub">${commentBody(m.body, U)}</div>`;  // 2.33.0 (#1076): the quote of the answered message
+        : `${replyQuoteHtml(m, 't')}${m.body || !m.attachments?.length ? `<div class="cbub">${commentBody(m.body, U)}</div>` : ''}${tcx_attHtml(m)}`;  // 2.33.0 (#1076): the quote of the answered message; 2.113.1 (#2059): + files
     h += `<div class="cmsg ${mine ? 'me' : 'ag'}${!mine && ags.has(m.user_id) ? ' agc' : ''} ${first ? 'first' : ''}${rxShow('t' + m.id)}" data-k="m${m.id}" data-mid="t:${m.id}">
       ${first && !mine ? `<div class="tcwho">${av(m.user_id, uname(m.user_id, U), 'avatar sm')}<b>${esc(uname(m.user_id, U))}</b>${ags.has(m.user_id) ? agentBadge() : ''}</div>` : ''}
       ${body}${m.task ? `<button class="runtask" data-act="open-id" data-id="${m.task.id}">${ic('arrow', 's')}<span>${esc(m.task.title)}</span></button>` : ''}
@@ -140,7 +140,7 @@ function tcMentions(text) {
 }
 async function tcSend() {
   const ta = $('#tc-in'), rid = S.tc.rid; if (!ta || !rid) return;
-  const text = ta.value.trim(); if (!text) return;
+  const text = ta.value.trim(), files = tcx_filesOk(S.tc.room) ? S.tc.files[rid] || [] : []; if (!text && !files.length) return;  // 2.113.1 (#2059): + files
   const hadF = document.activeElement === ta, ck = 't:' + rid; if (csdBusy(ck)) return;  // 2.62.0 (#1530): one send at a time
   const p = csdAdd(ck, text, S.tc.msgs), sb = () => $('[data-act="tc-send"]');  // shown as "Sending…", the box empties at once
   ta.value = ''; delete S.drafts['team:' + rid]; autosize(ta); if (sb()) sb().disabled = true; tcPatch(true);
@@ -153,7 +153,7 @@ async function tcSend() {
     const lk = le2eChanOn(S.tc.room), ltext = lk ? tcMentions(text) : null;
     const enc = lk ? await le2eChanEnc(S.tc.room, ltext) : S.tc.room?.e2e ? await e2eDmEncrypt(rid, text) : null; if ((lk || S.tc.room?.e2e) && !enc) throw null;  // 2.62.0 (#1530): throw = the text goes back into the box
     if (!enc && !await e2eDownOk(rid)) throw null;  // 2.42.0 (#909): switched off by the server alone -> ask first
-    m = await rawFetch('POST', `/api/team/rooms/${rid}/messages`, {...(enc ? {enc} : {body: tcMentions(text)}), ...(lk ? {mentions: le2eChanMentions(ltext)} : {}), ...(rto ? {reply_to: rto} : {}), client_id: p.cid});
+    m = await rawFetch('POST', `/api/team/rooms/${rid}/messages`, files.length && !enc ? tcx_form(tcMentions(text), rto, p.cid, files) : {...(enc ? {enc} : {body: tcMentions(text)}), ...(lk ? {mentions: le2eChanMentions(ltext)} : {}), ...(rto ? {reply_to: rto} : {}), client_id: p.cid});
     if (enc) { m.body = lk ? ltext : text; m._dec = true; E2E.dec[m.id + ':'] = m.body; }
   }
   catch (e) {  // 2.62.0 (#1530): the text goes back into the box
@@ -161,9 +161,10 @@ async function tcSend() {
     if (e) toast(e instanceof Offline ? tr('You are offline: the message was not sent and stays in the box') : e.message); return;
   }
   csdDone(ck, p); if (sb()) sb().disabled = false; replySent('t:' + rid);
+  if (files.length) { delete S.tc.files[rid]; tcx_chipsSync(); }
   const live = S.tc.rid === rid, k = 't:' + rid, arr = live ? S.tc.msgs : S.cw?.home?.rid === rid ? S.cw.home.msgs : typeof cw_has === 'function' && cw_has(k) ? cw_stOf(k).msgs : msgs;
   if (arr && !arr.some(x => x.id === m.id)) arr.push(m);
-  const r = (S.tc.rooms || []).find(x => x.id === rid); if (r) { r.last = {id: m.id, user_id: m.user_id, text, created_at: m.created_at}; r.last_at = m.created_at; }
+  const r = (S.tc.rooms || []).find(x => x.id === rid); if (r) { r.last = {id: m.id, user_id: m.user_id, text: text || files[0]?.name || '', created_at: m.created_at}; r.last_at = m.created_at; }
   if (!live) { if (typeof cw_has === 'function' && cw_has(k)) cw_patch(k); return; }
   tcPatch(true);
   if (hadF || !isTouch()) ta.focus({preventScroll: true});
@@ -195,8 +196,8 @@ async function tcEditSave(mid) {
   const t = $('#tc-msgs .tc-edit'), m = S.tc.msgs.find(x => x.id === mid); if (!t || !m) return;
   const v = t.value.trim();
   // 2.18.0 (#652): saving an emptied message did nothing; it offers to delete the message instead (Cancel: back to the
-  // text box, Delete: the focus goes to the message box)
-  if (!v) { if (await tcMsgDelete(mid)) $('#tc-in')?.focus(); else $('#tc-msgs .tc-edit')?.focus(); return; }
+  // text box, Delete: the focus goes to the message box); 2.113.1 (#2059): a message with files keeps them without text
+  if (!v && !m.attachments?.length) { if (await tcMsgDelete(mid)) $('#tc-in')?.focus(); else $('#tc-msgs .tc-edit')?.focus(); return; }
   let r;
   try {
     const lk = le2eChanOn(S.tc.room), lv = lk ? tcMentions(v) : null;  // 2.64.2 (#1817): the list key, the current generation
@@ -215,8 +216,10 @@ async function tcMute() {
 function tcNewMenu(anchor) {
   // 2.27.0 (#986): people (a direct message) and the chats of shared lists nobody has written in yet
   const quiet = (S.tc.rooms || []).filter(r => r.kind === 'list' && !r.last).sort((a, b) => roomName(a).localeCompare(roomName(b), LOCALE()));
-  if (!S.tc.people.length && !quiet.length) { dmWhy(); return; }  // 2.24.0 (#906): the button is always there and explains why not yet
-  menu(anchor, [...S.tc.people.map(p => ({label: p.name, icon: 'user', fn: () => dmOpen(p.id, p.name)})),
+  // 2.113.1 (#2059): a channel, a group, the open channels to join
+  const xs = [{label: tr('New channel'), icon: 'hash', fn: tcx_chanNew}, ...(S.tc.people.length >= 2 ? [{label: tr('New group'), icon: 'users', fn: tcx_groupNew}] : []), {label: tr('Browse channels'), icon: 'search', fn: tcx_browse}, '-'];
+  if (!S.tc.people.length && !quiet.length) { menu(anchor, [...xs.slice(0, -1), '-', {label: tr('Direct messages'), icon: 'user', fn: () => dmWhy()}]); return; }  // 2.24.0 (#906): explains why no DM yet
+  menu(anchor, [...xs, ...S.tc.people.map(p => ({label: p.name, icon: 'user', fn: () => dmOpen(p.id, p.name)})),
     ...(quiet.length ? [...(S.tc.people.length ? ['-'] : []), ...quiet.map(r => ({label: roomName(r), icon: 'users', fn: () => go('team/' + r.id)}))] : [])]);
 }
 // 2.24.0 (#906): a direct message from anywhere (the person card, "Tasks of …", the team chat). When it cannot work yet the
@@ -269,9 +272,197 @@ document.addEventListener('click', e => {
   else if (act === 'tc-new') tcNewMenu(a);
   else if (act === 'tc-list') go('l/' + a.dataset.id);
   else if (act === 'tc-split') cw_split('t:' + +a.dataset.rid);  // 2.83.0 (#1774)
+  else if (act === 'tc-attach') $('#tc-file')?.click();  // 2.113.1 (#2059)
+  else if (act === 'tc-file-rm') { (S.tc.files[S.tc.rid] || []).splice(+a.dataset.i, 1); tcx_chipsSync(); $('#tc-in')?.focus(); }
+  else if (act === 'tc-att-view') { const m = S.tc.msgs.find(x => x.id === +a.dataset.mid); attLightbox(+a.dataset.fid, (m?.attachments || []).filter(isImg)); }
+  else if (act === 'tc-set') tcx_settings();
+  else if (act === 'tc-restore') tcx_restore(+a.dataset.rid);
   else return;
   e.preventDefault(); e.stopPropagation();
 });
+// ------------------------------------------------------------------ 2.113.1 (#2059): channels, groups, files
+// Channels anyone opens (for an organisation: open to all its people or invited only; or in the own space with people one
+// works with), group conversations of three or more people, files in team chat messages (clip, paste, drag & drop).
+// The server decides who may do what (kalmido/collab/teamchan.py); the app only offers it.
+const tcx_isX = r => r?.kind === 'channel' || r?.kind === 'group';
+const tcx_vis = r => !r.org_id || inWs({org_id: r.org_id});
+const tcx_icon = r => `<span class="tcico">${ic(r.kind === 'channel' ? 'hash' : 'users', 's')}</span>`;
+function tcx_listHtml(rooms, row) {
+  const ch = rooms.filter(r => r.kind === 'channel'), gr = rooms.filter(r => r.kind === 'group'), rest = rooms.filter(r => !tcx_isX(r));
+  if (!ch.length && !gr.length) return rest.map(row).join('');
+  const sec = (t, a) => a.length ? `<div class="tcsec" role="heading" aria-level="3">${esc(t)}</div>${a.map(row).join('')}` : '';
+  return sec(tr('Channels'), ch) + sec(tr('Groups'), gr) + sec(tr('Lists and direct messages'), rest);
+}
+const tcx_headBtn = room => tcx_isX(room) ? `<button type="button" class="iconbtn" data-act="tc-set" title="${esc(room.kind === 'channel' ? tr('Channel settings') : tr('Group settings'))}" aria-label="${esc(room.kind === 'channel' ? tr('Channel settings') : tr('Group settings'))}">${ic('gear')}</button>` : '';
+const tcx_archivedHtml = room => `<div class="tcarch" role="status">${ic('archive', 's')}<span>${tr('This channel is archived')}</span>${room.manage ? `<button type="button" class="btn sm" data-act="tc-restore" data-rid="${room.id}">${tr('Restore')}</button>` : ''}</div>`;
+// files: what waits in the composer (per conversation), the clip, the message's files
+S.tc.files = {};
+const tcx_filesOk = room => !!room && !room.e2e && !(typeof le2eChanOn === 'function' && le2eChanOn(room)) && !room.archived;
+const tcx_chipsHtml = rid => (S.tc.files[rid] || []).map((f, i) => `<span class="cfile">${ic(/^image\//.test(f.type) ? 'clip' : 'file', 's')}<span>${esc(f.name || tr('Image'))}</span><button type="button" data-act="tc-file-rm" data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove') + ': ' + (f.name || tr('Image')))}">${ic('x', 's')}</button></span>`).join('');
+const tcx_clipHtml = room => tcx_filesOk(room) ? `<button type="button" class="iconbtn chclip" data-act="tc-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}">${ic('clip')}</button><input type="file" id="tc-file" multiple hidden>` : '';
+const tcx_filesBarHtml = (room, rid) => tcx_filesOk(room) ? `<div class="cfiles tcfiles" id="tc-files">${tcx_chipsHtml(rid)}</div>` : '';
+function tcx_chipsSync() { const b = $('#tc-files'); if (b) b.innerHTML = tcx_chipsHtml(S.tc.rid); }
+function tcx_addFiles(files, rid = S.tc.rid) {
+  if (!rid || !tcx_filesOk(S.tc.room)) { if (files?.length) toast(S.tc.room?.archived ? tr('This channel is archived') : tr('Files cannot be sent in an end-to-end encrypted conversation')); return; }
+  files = noEmpty(files); if (!files.length) return;
+  const big = files.find(f => f.size > 50 * 1024 * 1024);
+  if (big) { toast(tr('{0} is larger than 50 MB', big.name)); files = files.filter(f => f !== big); }
+  const arr = S.tc.files[rid] ||= [];
+  arr.push(...files.slice(0, Math.max(0, 10 - arr.length)));
+  if (arr.length >= 10 && files.length) toast(tr('At most {0} files per message', 10));
+  tcx_chipsSync();
+}
+function tcx_form(body, rto, cid, files) {
+  const fd = new FormData(); if (body) fd.append('body', body); if (rto) fd.append('reply_to', rto); if (cid) fd.append('client_id', cid);
+  files.forEach((f, i) => fd.append('file', f, f.name || `bild-${Date.now()}-${i}.png`));
+  return fd;
+}
+function tcx_attHtml(m) {
+  const fs = m.deleted ? [] : m.attachments || []; if (!fs.length) return '';
+  return `<div class="atts chatts">${fs.map(a => upLocked(a) ? scnLockedTile(a)
+    : isImg(a) ? `<div class="att img"><a href="${attUrl(a)}" data-act="tc-att-view" data-mid="${m.id}" data-fid="${a.id}" title="${esc(a.name)}"><img src="${attUrl(a)}" loading="lazy" alt="${esc(a.name)}"></a>${scnImgMark(a)}</div>`
+    : `<div class="att file">${attFileA(a)}</div>`).join('')}</div>`;
+}
+document.addEventListener('change', e => { if (e.target.id === 'tc-file') { tcx_addFiles(e.target.files); e.target.value = ''; $('#tc-in')?.focus(); } });
+document.addEventListener('paste', e => {
+  if (document.activeElement?.id !== 'tc-in') return;
+  const f = [...(e.clipboardData?.files || [])]; if (!f.length) return;
+  e.preventDefault(); e.stopImmediatePropagation(); tcx_addFiles(f);
+}, true);
+const tcx_dropZone = e => { const z = e.target.closest?.('#view .tcroom'); return z && S.tc.rid && tcx_filesOk(S.tc.room) ? z : null; };
+document.addEventListener('dragover', e => { if (!hasFiles(e)) return; const z = tcx_dropZone(e); if (!z) return; e.preventDefault(); e.stopImmediatePropagation(); e.dataTransfer.dropEffect = 'copy'; z.classList.add('filedrop'); }, true);
+document.addEventListener('dragleave', e => { if (hasFiles(e) && !e.relatedTarget?.closest?.('.tcroom')) $$('.tcroom.filedrop').forEach(x => x.classList.remove('filedrop')); }, true);
+document.addEventListener('drop', e => {
+  if (!hasFiles(e)) return; const z = tcx_dropZone(e); if (!z) return;
+  e.preventDefault(); e.stopImmediatePropagation(); z.classList.remove('filedrop'); tcx_addFiles(e.dataTransfer.files); $('#tc-in')?.focus();
+}, true);
+// channels / groups: create, settings, browse
+async function tcx_req(method, url, body) {
+  try { return await rawFetch(method, url, body); } catch (e) { toast(e instanceof Offline ? tr('The team chat is only available online.') : e.message); return null; }
+}
+async function tcx_refresh(rid) { await loadTeam(); if (rid && S.tc.rid === rid) await loadRoom(rid); if (S.route.mod === 'team') renderView(); renderSide(); }
+const tcx_pick = (ids, users, agents = [], on = []) => ids.length || agents.length ? `<div class="tcxpick" role="group" aria-label="${esc(tr('Members'))}">${[...ids.map(id => [id, false]), ...agents.map(id => [id, true])].map(([id, ag]) => `<label class="tcxp"><input type="checkbox" value="${id}" ${on.includes(id) ? 'checked' : ''}>${av(id, users[id] || '?', 'avatar sm')}<span>${esc(users[id] || '?')}</span>${ag ? agentBadge() : ''}</label>`).join('')}</div>` : `<p class="muted">${tr('Nobody to add yet.')}</p>`;
+const tcx_checked = md => $$('.tcxpick input:checked', md).map(x => +x.value);
+function tcx_dlg(title, inner, ok, wire) {
+  return new Promise(res => {
+    let done = false;
+    const md = modal(`<form class="tcxdlg" novalidate><h3>${esc(title)}</h3>${inner}<div class="foot"><span class="spacer"></span><button type="button" class="btn" data-x="no">${tr('Cancel')}</button><button type="submit" class="btn pri">${esc(ok)}</button></div></form>`);
+    modalA11y(md);
+    const fin = v => { if (done) return; done = true; res(v); if (md.isConnected) md.remove(); };
+    md.querySelector('form').addEventListener('submit', e => { e.preventDefault(); const v = wire.submit(md); if (v) fin(v); });
+    md.addEventListener('click', e => { if (e.target.closest('[data-x="no"]')) fin(null); });
+    if (wire.init) wire.init(md);
+    onRemove(md, () => fin(null));
+    setTimeout(() => $('input[type="text"]', md)?.focus(), 30);
+  });
+}
+async function tcx_chanNew() {
+  const j = await tcx_req('GET', '/api/team/channels'); if (!j) return;
+  const U = {...S.tc.users, ...j.users};
+  const spaces = [...j.orgs.map(o => ({id: o.id, name: o.name, people: o.people, agents: o.agents})), {id: 0, name: tr('Private|workspace'), people: j.people, agents: j.agents}];
+  const cur = spaces.find(s => s.id && wsCur() === 'org:' + s.id) || spaces[0];
+  const sp = md => spaces.find(s => s.id === +($('#tcx-sp', md)?.value || 0)) || cur;
+  const draw = md => { const s = sp(md), op = $('#tcx-open', md); op.disabled = !s.id; if (!s.id) op.checked = false; $('#tcx-mem', md).innerHTML = tcx_pick(s.people, U, s.agents); $('#tcx-oh', md).textContent = s.id ? tr('Everyone in {0} can find and join it.', s.name) : tr('Channels of your own space are for invited people only.'); };
+  const v = await tcx_dlg(tr('New channel'), `<div class="row"><label for="tcx-name">${tr('Name')}</label><input type="text" id="tcx-name" maxlength="80" autocomplete="off" placeholder="${esc(tr('e.g. General'))}"></div>
+    ${spaces.length > 1 ? `<div class="row"><label for="tcx-sp">${tr('Workspace')}</label><select id="tcx-sp">${spaces.map(s => `<option value="${s.id}" ${s === cur ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>` : ''}
+    <div class="row"><label class="chkl"><input type="checkbox" id="tcx-open" ${cur.id ? 'checked' : ''}> ${tr('Open to the whole organisation')}</label></div><p class="muted tcxhint" id="tcx-oh"></p>
+    <div class="tcxsec"><b>${tr('Invite')}</b><div id="tcx-mem"></div></div>`, tr('Create'), {
+    init: md => { draw(md); $('#tcx-sp', md)?.addEventListener('change', () => draw(md)); },
+    submit: md => { const name = $('#tcx-name', md).value.trim(); if (!name) { toast(tr('Give the channel a name')); $('#tcx-name', md).focus(); return null; }
+      const s = sp(md); return {name, org_id: s.id || null, open: !!s.id && $('#tcx-open', md).checked, members: tcx_checked(md)}; }});
+  if (!v) return;
+  const r = await tcx_req('POST', '/api/team/channels', v); if (!r) return;
+  offerUndo(tr('Channel “{0}” created', r.name), histAdd({label: tr('New channel “{0}”', r.name), undo: () => rawFetch('PATCH', `/api/team/rooms/${r.id}`, {archived: true}).then(() => tcx_refresh()), redo: () => rawFetch('PATCH', `/api/team/rooms/${r.id}`, {archived: false}).then(() => tcx_refresh())}));
+  await loadTeam(); go('team/' + r.id);
+}
+async function tcx_groupNew() {
+  const ppl = S.tc.people || [];
+  if (ppl.length < 2) { dmWhy(); return; }
+  const U = Object.fromEntries(ppl.map(p => [p.id, p.name]));
+  const v = await tcx_dlg(tr('New group'), `<p class="muted tcxhint">${tr('A group conversation with at least two people you work with (everyone in it must work with each other).')}</p>
+    <div class="tcxsec"><b>${tr('Members')}</b>${tcx_pick(ppl.map(p => p.id), U)}</div>
+    <div class="row"><label for="tcx-name">${tr('Name (optional)')}</label><input type="text" id="tcx-name" maxlength="80" autocomplete="off"></div>`, tr('Create'), {
+    submit: md => { const m = tcx_checked(md); if (m.length < 2) { toast(tr('A group needs at least two other people')); return null; } return {members: m, name: $('#tcx-name', md).value.trim()}; }});
+  if (!v) return;
+  const r = await tcx_req('POST', '/api/team/groups', v); if (!r) return;
+  await loadTeam(); go('team/' + r.id);
+}
+async function tcx_browse() {
+  const j = await tcx_req('GET', '/api/team/channels'); if (!j) return;
+  const open = j.channels.filter(c => !c.joined && !c.archived && c.open), arch = j.channels.filter(c => c.archived && c.manage);
+  const row = (c, act, lbl) => `<div class="tcxrow">${tcx_icon(c)}<span class="tcxn"><b>${esc(c.name)}</b><span class="muted">${esc(trn('{0} member', '{0} members', c.members))}</span></span><button type="button" class="btn sm" data-xb="${act}" data-rid="${c.id}">${lbl}</button></div>`;
+  const md = modal(`<h3>${tr('Browse channels')}</h3>${open.length ? open.map(c => row(c, 'join', tr('Join'))).join('') : `<p class="muted">${tr('No open channels to join.')}</p>`}
+    ${arch.length ? `<h4>${tr('Archived')}</h4>${arch.map(c => row(c, 'restore', tr('Restore'))).join('')}` : ''}<div class="foot"><span class="spacer"></span><button type="button" class="btn" data-xb="close">${tr('Close')}</button></div>`);
+  modalA11y(md);
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-xb]'); if (!b) return;
+    if (b.dataset.xb === 'close') { md.remove(); return; }
+    const rid = +b.dataset.rid; md.remove();
+    if (b.dataset.xb === 'join') { if (await tcx_req('POST', `/api/team/rooms/${rid}/members`, {user_id: S.me.id})) { await loadTeam(); go('team/' + rid); } }
+    else tcx_restore(rid);
+  });
+}
+async function tcx_restore(rid) {
+  if (!await tcx_req('PATCH', `/api/team/rooms/${rid}`, {archived: false})) return;
+  offerUndo(tr('Channel restored'), histAdd({label: tr('Channel restored'), undo: () => rawFetch('PATCH', `/api/team/rooms/${rid}`, {archived: true}).then(() => tcx_refresh(rid)), redo: () => rawFetch('PATCH', `/api/team/rooms/${rid}`, {archived: false}).then(() => tcx_refresh(rid))}));
+  await tcx_refresh(rid); go('team/' + rid);
+}
+// the settings of a channel / group: name, open, members, archive, leave (each change at once, one undo step each)
+async function tcx_settings() {
+  const rid = S.tc.rid, room = S.tc.room; if (!tcx_isX(room)) return;
+  const ch = room.kind === 'channel', man = !!room.manage;
+  let cand = null;
+  if (man) { const j = await tcx_req('GET', '/api/team/channels'); if (!j) return; S.tc.users = {...S.tc.users, ...j.users};
+    cand = ch ? (room.org_id ? (j.orgs.find(o => o.id === room.org_id) || {people: [], agents: []}) : {people: j.people, agents: j.agents}) : {people: j.people, agents: []}; }
+  const md = modal('<div id="tcx-set"></div>');
+  modalA11y(md);
+  const step = (label, undo, redo) => offerUndo(label, histAdd({label, undo: () => undo().then(() => tcx_refresh(rid)), redo: () => redo().then(() => tcx_refresh(rid))}));
+  const patch = b => rawFetch('PATCH', `/api/team/rooms/${rid}`, b);
+  const draw = () => {
+    const r = S.tc.room || room, mem = r.members || [], ids = new Set(mem.map(m => m.id));
+    const add = man && cand ? [...cand.people, ...cand.agents].filter(id => !ids.has(id) && id !== S.me.id) : [];
+    $('#tcx-set', md).innerHTML = `<h3>${esc(ch ? tr('Channel settings') : tr('Group settings'))}</h3>
+      ${man ? `<form class="tcxname row"><label for="tcx-name">${tr('Name')}</label><input type="text" id="tcx-name" maxlength="80" value="${esc(r.kind === 'group' ? r.custom_name || '' : r.name || '')}" ${ch ? '' : `placeholder="${esc(r.name || '')}"`}><button type="submit" class="btn sm">${tr('Save')}</button></form>` : `<p><b>${esc(r.name || '')}</b></p>`}
+      ${ch && man && r.org_id ? `<div class="row"><label class="chkl"><input type="checkbox" id="tcx-open" ${r.open ? 'checked' : ''}> ${tr('Open to the whole organisation')}</label></div>` : ch ? `<p class="muted tcxhint">${r.open ? tr('Open to the whole organisation') : tr('Invited people only')}</p>` : ''}
+      <h4>${tr('Members')} <span class="muted">${mem.length}</span></h4><div class="tcxmem">${mem.map(m => `<div class="tcxrow">${av(m.id, m.name, 'avatar sm')}<span class="tcxn">${esc(m.name)}${m.agent ? agentBadge() : ''}</span>${ch && man && m.id !== S.me.id ? `<button type="button" class="iconbtn" data-xs="rm" data-uid="${m.id}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove') + ': ' + m.name)}">${ic('x', 's')}</button>` : ''}</div>`).join('')}</div>
+      ${add.length ? `<div class="row"><label for="tcx-add">${tr('Add someone')}</label><select id="tcx-add"><option value="">${tr('Choose')}</option>${add.map(id => `<option value="${id}">${esc(S.tc.users[id] || '?')}</option>`).join('')}</select></div>` : ''}
+      <div class="foot">${ids.has(S.me.id) ? `<button type="button" class="btn" data-xs="leave">${ic('logout', 's')}${tr('Leave')}</button>` : ''}${ch && man ? `<button type="button" class="btn" data-xs="archive">${ic('archive', 's')}${tr('Archive')}</button>` : ''}<span class="spacer"></span><button type="button" class="btn pri" data-xs="close">${tr('Done')}</button></div>`;
+  };
+  const after = async () => { await tcx_refresh(rid); if (md.isConnected) draw(); };
+  draw();
+  md.addEventListener('submit', async e => {
+    e.preventDefault(); const was = room.kind === 'group' ? S.tc.room.custom_name || '' : S.tc.room.name, v = $('#tcx-name', md).value.trim();
+    if (v === was || (ch && !v)) return;
+    if (!await tcx_req('PATCH', `/api/team/rooms/${rid}`, {name: v})) return;
+    step(tr('Renamed to “{0}”', v || tr('the members')), () => patch({name: was}), () => patch({name: v})); after();
+  });
+  md.addEventListener('change', async e => {
+    if (e.target.id === 'tcx-open') { const on = e.target.checked; if (!await tcx_req('PATCH', `/api/team/rooms/${rid}`, {open: on})) { e.target.checked = !on; return; }
+      step(on ? tr('Open to the whole organisation') : tr('Invited people only'), () => patch({open: !on}), () => patch({open: on})); after(); }
+    else if (e.target.id === 'tcx-add' && e.target.value) { const uid = +e.target.value;
+      if (!await tcx_req('POST', `/api/team/rooms/${rid}/members`, {user_id: uid})) { e.target.value = ''; return; }
+      step(tr('{0} added', S.tc.users[uid] || '?'), () => rawFetch('DELETE', `/api/team/rooms/${rid}/members/${uid}`), () => rawFetch('POST', `/api/team/rooms/${rid}/members`, {user_id: uid})); after(); }
+  });
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-xs]'); if (!b) return;
+    const a = b.dataset.xs;
+    if (a === 'close') { md.remove(); return; }
+    if (a === 'rm') { const uid = +b.dataset.uid, nm = (S.tc.room.members.find(m => m.id === uid) || {}).name || '?';
+      if (!await tcx_req('DELETE', `/api/team/rooms/${rid}/members/${uid}`)) return;
+      step(tr('{0} removed', nm), () => rawFetch('POST', `/api/team/rooms/${rid}/members`, {user_id: uid}), () => rawFetch('DELETE', `/api/team/rooms/${rid}/members/${uid}`)); after(); }
+    else if (a === 'archive') { if (!await tcx_req('PATCH', `/api/team/rooms/${rid}`, {archived: true})) return;
+      md.remove(); step(tr('Channel archived'), () => patch({archived: false}), () => patch({archived: true})); await tcx_refresh(rid); }
+    else if (a === 'leave') {
+      const back = ch && room.open && room.org_id;  // an open channel: joining again is the undo
+      if (!back && !await askConfirm(tr('Leave this conversation?'), tr('You can only come back when someone adds you again.'), {ok: tr('Leave'), danger: true})) return;
+      if (!await tcx_req('DELETE', `/api/team/rooms/${rid}/members/${S.me.id}`)) return;
+      md.remove();
+      if (back) step(tr('Left the channel'), () => rawFetch('POST', `/api/team/rooms/${rid}/members`, {user_id: S.me.id}), () => rawFetch('DELETE', `/api/team/rooms/${rid}/members/${S.me.id}`));
+      else toast(tr('You left the conversation'));
+      await loadTeam(); go('team');
+    }
+  });
+}
 // a shared list's own chat, from its header / menu
 async function listChat(lid) {
   if (!teamOn()) return;
@@ -476,8 +667,8 @@ async function msgSearch(q, f = {}) {
   hits.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '') || b.id - a.id);
   return {hits, total: ok.reduce((n, r) => n + (r.total || 0), 0), next: ok.find(r => r.next != null)?.next ?? null};
 }
-const MSG_KIND = {task: N_('Comment'), list: N_('Team chat'), dm: N_('Direct message'), agent: N_('Agent chat')};
-const msgIcon = h => h.chat_type === 'agent' ? 'bot' : h.chat_type === 'list' ? 'users' : h.chat_type === 'dm' ? 'user' : 'comment';
+const MSG_KIND = {task: N_('Comment'), list: N_('Team chat'), dm: N_('Direct message'), agent: N_('Agent chat'), channel: N_('Channel'), group: N_('Group')};  // 2.113.1 (#2059): + channel, group
+const msgIcon = h => h.chat_type === 'agent' ? 'bot' : h.chat_type === 'list' || h.chat_type === 'group' ? 'users' : h.chat_type === 'channel' ? 'hash' : h.chat_type === 'dm' ? 'user' : 'comment';
 // the snippet with its hits as <mark> (marks count code points, like the server)
 function msgSnip(h) {
   const cs = Array.from(h.snippet || ''); let o = '', at = 0;

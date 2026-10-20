@@ -193,3 +193,7 @@
 @media (max-width:899px) {
   .ua8sel{position:fixed;left:.5rem;right:.5rem;bottom:calc(var(--tabs-h) + var(--safe-b) + .5rem);z-index:45;margin:0;background:var(--bg3);border:1px solid var(--accent);box-shadow:var(--shadow)}
 }
+/* 2.115.0 B (#2062): active sessions + open organisation invitations: two lines per row (name, details), large buttons */
+.sesrow .n,.oinvrow .n{white-space:normal}
+.sesrow .n small,.oinvrow .n small{display:block}
+@media (pointer:coarse){.sesrow .btn,.oinvrow .btn{min-height:2.75rem}}

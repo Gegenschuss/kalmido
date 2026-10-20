@@ -74,7 +74,7 @@ async function dkSave(root, pid, sheet) {
     if (j?.doc_totals && OFD.doc) OFD.doc.totals = j.doc_totals;
     const pi = (OFD.doc?.parts || []).findIndex(x => x.id === pid); if (pi >= 0) OFD.doc.parts[pi] = np;
     if (root.isConnected) { root.innerHTML = dkSheetHtml(np, d, DK.adm[pid]); if (focus) $(`[data-dk="${focus}"]`, root)?.focus(); }
-    else ofdDraw();  // the view was drawn again meanwhile (e.g. master data loaded): draw it with the new figures
+    ofdDraw();  // the view was drawn again meanwhile (e.g. master data loaded): draw it with the new figures; 2.113.0 (#2248): also the title page next to the open sheet
   } catch (x) { toast(x.message || tr('unknown')); }
   finally { DK.saving--; ofdSaveHint?.(); }
 }

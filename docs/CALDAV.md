@@ -40,7 +40,7 @@ Kalmido 2.9.0 is a CalDAV server for tasks. Every list you can see appears as a 
 | Your tags | `CATEGORIES` |
 | Subtasks | `RELATED-TO;RELTYPE=PARENT` (a child may arrive before its parent) |
 | Repeat (daily, weekly, monthly, yearly) | `RRULE`. Completing a repeating task in a client moves it to the next date, as in the app, and the done occurrence appears as a new completed task. |
-| Reminders | `VALARM` with a relative (`RELATED=END`/`START`) or absolute `TRIGGER`. For all-day tasks the offset counts from your all-day reminder time (Settings › Notifications). |
+| Reminders | `VALARM` with a relative (`RELATED=END`/`START`) or absolute `TRIGGER`. For all-day tasks the offset counts from your all-day reminder time (Settings › Notifications). 2.138.1: the reminder at a fixed time is an alarm with an absolute `TRIGGER;VALUE=DATE-TIME` (marked `X-KALMIDO-AT`); an absolute alarm on a task without a due date becomes that reminder. |
 | Link | `URL` |
 | UID | Stable. The client's UID is kept; tasks made in Kalmido get `kalmido-<id>-<instance>`. |
 
@@ -266,6 +266,29 @@ its hash is used to find it, a hidden field catches simple bots, a vote sent wit
 a page used before is asked again, votes from other sites and too many votes from one address (per minute, per poll) are
 refused, a poll takes at most 300 votes. The page loads no outside scripts; its one small script only shows the times in
 the voter's zone. The page lives below the public links' prefix `/s/` and needs the server's *Public links* switch.
+
+## Invitations by e-mail and subscription links (2.138.1)
+
+**Invitations.** People of this server see an event they are invited to in their calendar. Anyone else (an e-mail address
+or a contact with an address) learns about it by mail: when you save an event with such attendees, the editor shows
+*Send the invitation by e-mail* (ticked as soon as a new address comes in; untick it and nobody is mailed). The mail goes
+out under your name with the event attached as a calendar file (`.ics`, method REQUEST), so Apple Calendar, Outlook,
+Gmail and Thunderbird offer to add it and to answer; the answer goes to your own address (Reply-To), Kalmido does not read
+it. A repeating event goes as one invitation with its rule and its changed or left-out dates.
+- Who gets a mail: new external attendees; all of them when the time, the place, the title, the repeat or the status
+  changed (a new version of the same invitation). Changing only the notes mails nobody.
+- Removing an invited attendee, deleting the event or its calendar, or setting it to *Cancelled* sends a cancellation
+  (method CANCEL) to everyone who got an invitation. Undo of a delete invites them again.
+- Only who may change the event sends invitations. At most 100 attendees per event and 200 invitation mails per person and
+  day. Without mail sending on the server nothing is sent and the editor says so.
+- Agents never send invitations (`send_invites` from an agent token is refused with 403), see [API.md](API.md#events-2210).
+
+**Subscription link.** In the calendars list (Calendar > Calendars, the menu of a calendar) *Subscription link* makes a
+secret link (`…/ical/ev/<id>.<secret>.ics`) for calendar apps that only read: copy it, open it in the calendar app, make a
+new one (the old one stops at once) or turn it off. Anyone with the link sees this calendar's events, so treat it like a
+password. Every person who sees the calendar has their own link, and it only works while that person still sees the
+calendar (sharing ended, organisation left: the link stops). The feed lists the events with their repeat rules, without
+attendees and without your reminders; the subscribing app refreshes about every 15 minutes.
 
 ## For admins
 

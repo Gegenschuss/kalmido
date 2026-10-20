@@ -101,7 +101,7 @@ def setup(S, who):
 
 
 def quotation(S, who, cl, lang, items):
-    r = S.post(B + D, json={"project_title": f"Imagefilm {who} {lang}", "client_id": cl, "lang": lang})
+    r = S.post(B + D, json={"project_title": f"Imagefilm {who} {lang}", "client_id": cl, "lang": lang, "producing_on": 1})  # 2.113.1 (#2251): producing per quotation (the office setting no longer switches it on)
     check(r.status_code == 201, f"{who} {lang}: a quotation {r.status_code} {r.text[:200]}")
     doc = r.json().get("id")
     r = S.put(B + f"{D}/{doc}/items", json={"items": items})
@@ -122,7 +122,11 @@ def scenario(S, who):
     check("Kunde" not in [x[0] for x in rd.get("meta") or []], f"{who}: #2277 no 'Kunde' row in the head {rd.get('meta')}")
     prod = [x for x in rd.get("lines") or [] if x.get("kind") == "producing"]
     check(prod and prod[0].get("pos") == 3 and prod[0].get("unit_text") == "Tag", f"{who}: #2276 producing numbered 3, '1 Tag' {prod[:1]}")
-    check(prod and prod[0].get("detail", "").startswith("1 Tag = 3 Produktionstage / 3"), f"{who}: #2276 the app keeps the formula {prod[:1]}")
+    # 2.113.1 (#2251): the print model (preview, PDF) carries no calculation text; the editor shows it from
+    # the document's own totals
+    check(prod and not prod[0].get("detail"), f"{who}: #2251 no formula in the print model {prod[:1]}")
+    ed = [x for x in (S.get(B + f"{D}/{doc}").json().get("totals") or {}).get("lines") or [] if x.get("kind") == "producing"]
+    check(ed and ed[0].get("detail", "").startswith("1 Tag = 3 Produktionstage / 3"), f"{who}: #2276 the app keeps the formula {ed[:1]}")
     check(rd.get("totals", {}).get("vat_note") == "Alle Preise zuzüglich 19 % MwSt.", f"{who}: #2274 only 19 % {rd.get('totals', {}).get('vat_note')}")
     r = S.get(B + f"{D}/{doc}/pdf")
     check(r.status_code == 200 and r.content.startswith(b"%PDF"), f"{who}: the PDF {r.status_code}")
