@@ -2877,6 +2877,9 @@ MIGRATIONS = [
     ("org_keys", "kek_check_rot", "ALTER TABLE org_keys ADD COLUMN kek_check_rot TEXT"),
     ("org_keys", "rot_started_at", "ALTER TABLE org_keys ADD COLUMN rot_started_at TEXT"),
     ("org_keys", "rotated_at", "ALTER TABLE org_keys ADD COLUMN rotated_at TEXT"),
+    # 2.144.0 C (#2414): the list view grouped by a custom field (text / select) for every member, like sort_mode:
+    # '' = the sections as before, 'cf:<field id>' = one group per value (2.143 ignores it)
+    ("lists", "group_field", "ALTER TABLE lists ADD COLUMN group_field TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

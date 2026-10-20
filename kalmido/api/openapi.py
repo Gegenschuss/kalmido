@@ -2,7 +2,7 @@
 
 from ..core.config import API_PREFIX, APP_NAME
 from ..core.access import ROLES
-from ..lists.lists import COL_DOC, COL_MAX, LIST_KIND_ALIASES, LIST_KINDS, LIST_NAME_MAX, LIST_VIEWS
+from ..lists.lists import COL_DOC, COL_MAX, LIST_KIND_ALIASES, LIST_KINDS, LIST_NAME_MAX, LIST_VIEWS, SORT_MODE_DOC
 from ..tasks.validation import NAG_VALUES, PRIORITIES, TICKET_TYPES
 from ..tasks.tasks import WAIT_NOTE_MAX
 from ..tasks.roadmap import ROADMAP_MAX_DAYS, SHIFT_MAX_DAYS, SHIFT_MAX_TASKS
@@ -248,6 +248,10 @@ def openapi_spec():
                            "columns or project_type: the modules it switched on (custom field columns: [\"fields\"] for the list's owner)"},
             "is_inbox": {"type": "boolean"}, "archived": {"type": "boolean"},
             "done_at_bottom": {"type": "boolean", "description": "2.7.2: \"Show completed at the bottom\": completed tasks stay visible below the open ones and come back with one tap"},
+            "sort_mode": {"type": "string", "description": "2.144.0 (#2414): the list's sort, the same for every member (\"\" = default; " + SORT_MODE_DOC + ")"},
+            "group_field": {"type": "string", "description": "2.144.0 (#2414): the list view grouped by a custom field: \"cf:<field id>\" (a text "
+                            "or select field of the list: one group per value, select fields in the order of their options, \"No value\" last; "
+                            "sections stay and come back when it is off), \"\" = by sections"},
             "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
             "kind": {"type": "string", "enum": list(LIST_KINDS), "description": "List type; project lists have dependencies and progress (2.41.0: time tracking is the switch time_tracking of any list; 2.7.2: the type checklist is gone, see done_at_bottom; 2.39.1: custom fields in every list)"},
             "view": {"type": "string", "enum": list(LIST_VIEWS)}, "role": {"type": "string", "enum": ["owner", "admin", "edit", "participant", "view"]},
@@ -304,6 +308,10 @@ def openapi_spec():
             "view": {"type": "string", "enum": list(LIST_VIEWS)},
             "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project; \"checklist\" is a deprecated alias of list + done_at_bottom"},
             "done_at_bottom": {"type": "boolean", "description": "2.7.2: show completed tasks at the bottom (owner)"},
+            "sort_mode": {"type": "string", "description": "2.144.0 (#2414): the list's sort for every member (owner / list admins); \"\" = default; " + SORT_MODE_DOC},
+            "group_field": {"type": ["string", "integer", "null"], "description": "2.144.0 (#2414): group the list view by a custom field for every "
+                            "member (owner / list admins): \"cf:<field id>\" or the id of a text / select field of this list; \"\" / null = by sections "
+                            "again (the sections themselves never change)"},
             "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this list (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
             "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
             "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "Default nag interval of the list's tasks (owner); off / empty = none"},

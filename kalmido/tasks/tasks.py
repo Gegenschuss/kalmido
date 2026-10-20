@@ -179,6 +179,7 @@ WEB_TASK_EDIT |= {"shift_chain"}  # 2.67.0 B (#1865): shift_chain
 WEB_TASK_NEW |= {"client_ref"}  # 2.126.0 D (#1990): the device's id of a new task (a repeated POST = the same task)
 WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype", "family", "sections", "org_id", "time_tracking"})  # 2.28.0 (#935): org_id; 2.41.0 (#1471): time_tracking
 WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"col_sums", "kpis", "client_id", "rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "agent_members", "agent_peers", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns", "ptype", "sort_mode", "org_id", "stale_days", "agent_followup", "done_in_section", "folder_adopt", "org_visibility", "org_edit"}  # 2.36.2 (#1136): done_in_section; 2.46.0 (#1603)
+WEB_LIST_EDIT |= {"group_field"}  # 2.144.0 C (#2414)
 WEB_LIST_EDIT |= {"tap_done"}  # 2.46.4 (#1751): "Tap does not open details" (owner / list admins)
 WEB_COMMENT = frozenset({"body", "suggestion", "reply_to", "choices", "multi", "approval", "expires_in", "mentions"})  # 2.64.1 (#1817): mentions  # 2.33.0 (#1076): reply_to; 2.41.0 (#1383): choices
 WEB_COMMENT |= {"portal"}  # 2.63.0 B (#1513): an answer the customer sees

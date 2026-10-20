@@ -30,6 +30,23 @@ MEMBER_LIST_FIELDS = ("folder", "sort", "view")  # a member's own sidebar placem
 LIST_SORTS = ("", "prio", "custom", "date", "title", "creator", "flow", "created", "created_asc")  # 2.27.0 (#988): lists.sort_mode
 # 2.31.0 (#354): the sorts of a click on a column title (the other direction, the columns without a menu entry)
 LIST_SORTS += ("date_desc", "prio_asc")
+SORT_MODE_DOC = ("prio | custom | date | date_desc | title | creator | flow | created | created_asc | prio_asc, or cf:<field id>[_desc], "
+                 "col:who|tags|time|progress|deps[_desc]")  # 2.144.0 C (#2414): sort_mode in the API docs
+GROUP_FIELD_TYPES = ("text", "select")  # 2.144.0 C (#2414): the custom fields a list view can be grouped by
+
+
+def group_field_check(c, lid, v):
+    """2.144.0 C (#2414): lists.group_field from a request: '' / null = none, 'cf:<id>' (or the id) = a text / select field
+    of this list; None = invalid."""
+    if v in (None, ""):
+        return ""
+    if isinstance(v, bool):
+        return None
+    m = re.fullmatch(r"(?:cf:)?(\d{1,9})", str(v)) if isinstance(v, (str, int)) else None
+    if not m:
+        return None
+    r = c.execute("SELECT type FROM list_fields WHERE id=? AND list_id=?", (int(m.group(1)), lid)).fetchone()
+    return f"cf:{int(m.group(1))}" if r and r["type"] in GROUP_FIELD_TYPES else None
 LIST_SORT_RE = r"cf:\d{1,9}(_desc)?|col:(who|tags|time|progress|deps)(_desc)?"
 LIST_VIEWS = ("list", "kanban", "timeline", "mindmap")  # 2.49.0 (#1201): + mind map
 LIST_COLOR_RE = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
@@ -349,6 +366,14 @@ def list_update(lid):
             return err(tr("Invalid value: {0}", "sort_mode"))
         c.execute("UPDATE lists SET sort_mode=? WHERE id=?", (sm, lid))
         b = {k: v for k, v in b.items() if k != "sort_mode"}
+    if "group_field" in b:  # 2.144.0 C (#2414): the view grouped by a custom field, the same for every member (owner / list admins)
+        if role not in MANAGE_ROLES:
+            return err(tr("Only the owner and list admins can change this setting"), 403)
+        gf = group_field_check(c, lid, b["group_field"])
+        if gf is None:
+            return err(tr("Invalid value: {0}", "group_field"))
+        c.execute("UPDATE lists SET group_field=? WHERE id=?", (gf, lid))
+        b = {k: v for k, v in b.items() if k != "group_field"}
     if "done_in_section" in b:  # 2.36.2 (#1136): completed tasks stay in their section (owner / list admins; null = default)
         if role not in MANAGE_ROLES:
             return err(tr("Only the owner and list admins can change this setting"), 403)

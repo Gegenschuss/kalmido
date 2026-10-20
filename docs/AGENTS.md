@@ -2722,7 +2722,7 @@ Inside an interactive Claude Code session, you can instead call the MCP tool `wa
 with the scope it needs). The tools:
 
 - account: `get_me`, `list_agents`, `export_data`
-- lists: `list_lists`, `get_list`, `create_list`, `update_list` (also archive, folder), `delete_list`, `shift_list_dates`,
+- lists: `list_lists`, `get_list`, `create_list`, `update_list` (also archive, folder; 2.144.0: `sort_mode` and `group_field`, the shared sort and the grouping of the list view by a text / select custom field), `delete_list`, `shift_list_dates`,
   `set_list_columns`, `list_members`, `share_list`, `unshare_list`, `list_groups`, `get_group`, `list_list_groups`,
   `share_list_with_group`, `unshare_list_from_group`, `list_folders`, `rename_folder`, `delete_folder`
 - sections: `list_sections`, `create_section`, `rename_section`, `reorder_sections`, `delete_section`

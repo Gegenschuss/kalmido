@@ -1129,10 +1129,14 @@ TOOLS += [
                     "archived (true = archive), done_at_bottom, nag, day_hours, time_tracking (2.41.0, owner), project_type (2.18.0, owner / list admins: "
                     "agency | software | private, null = none; switches on what the type needs, never deletes anything); "
                     "org_visibility (2.46.0, owner / list admins of an organisation list: \"\" = only invited people, \"org\" = everyone "
-                    "in the organisation, read-only for them unless org_edit true; opening it waits for approval).",
+                    "in the organisation, read-only for them unless org_edit true; opening it waits for approval); "
+                    "sort_mode and group_field (2.144.0, owner / list admins, the same for every member): the list's sort "
+                    "(\"\" = default, prio, custom, date, title, created, cf:<field id> ...) and the list view grouped by a text / "
+                    "select custom field (\"cf:<field id>\", \"\" = by sections again; the sections never change).",
      _obj({"list_id": S_ID, **LIST_PROPS, "archived": {"type": "boolean"},
            "project_type": {"type": ["string", "null"], "enum": ["agency", "software", "private", "", None]},
-           "org_visibility": {"type": "string", "enum": ["", "org"]}, "org_edit": {"type": "boolean"}}, ["list_id"]),
+           "org_visibility": {"type": "string", "enum": ["", "org"]}, "org_edit": {"type": "boolean"},
+           "sort_mode": {"type": "string"}, "group_field": {"type": ["string", "integer", "null"]}}, ["list_id"]),  # 2.144.0 (#2414)
      lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}", body=_without(a, "list_id"))),
     ("delete_list", "Delete an ARCHIVED list for good (owner; archive it first with update_list archived=true); its tasks go to the "
                     "trash." + APPROVAL_NOTE, _obj({"list_id": S_ID}, ["list_id"]),
