@@ -89,8 +89,12 @@ CL, CLH = r.json()["id"], hdr(r.json()["token"])
 A.patch(B + f"/api/admin/agents/{CL}", json={"org_id": ORG})
 W = A.post(B + "/api/lists", json={"name": "Work", "org_id": ORG}).json()["id"]
 W3 = A.post(B + "/api/lists", json={"name": "Elsewhere", "org_id": ORG}).json()["id"]
-for lid in (W, W3):
-    for m in (CL, BOB):
+r = A.post(B + "/api/users", json={"orgs": [ORG], "username": "carol", "display_name": "Carol", "password": "password123",
+                                   "email": "carol@example.com"})
+assert r.ok, r.text
+CAROL = r.json()["id"]
+for lid, ms in ((W, (CL, BOB)), (W3, (CL, BOB, CAROL))):  # Carol only in the target list: the agent's move there waits
+    for m in ms:
         check(A.put(B + f"/api/lists/{lid}/members", json={"user_id": m, "role": "edit"}).ok, f"setup: {m} in {lid}")
 
 
