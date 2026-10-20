@@ -7,6 +7,11 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.125.1] - 2026-10-20
+
+### Fixed
+- CI of 2.125.0: the vacation client passes the type check, the notification tests count the new rows "Vacation requests" and "Timesheets" (#2117 #2119).
+
 ## [2.125.0] - 2026-10-20
 
 Vacation requests and accounts, working days per person, monthly timesheets, time zone per person, timer shortcut,
