@@ -18,8 +18,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
 const FEAT = 'cal,comments,collab,office,clients,docs,files';
 const T = TC.today();
 const P0 = (() => { const [y, m] = T.slice(0, 7).split('-').map(Number); const py = m === 1 ? y - 1 : y, pm = m === 1 ? 12 : m - 1; return `${py}-${String(pm).padStart(2, '0')}`; })();
-const DAY = `${P0}-20`, DE = `20.${P0.slice(5, 7)}.${P0.slice(0, 4)}`;
-const CSV = `Buchungstag;Name;Verwendungszweck;Betrag;Saldo\n${DE};Laden Beispiel;Einkauf;-10,00;1.240,00\n${DE};Kunde Beispiel;Zahlung;250,00;1.250,00\n`;
+const DAY = `${P0}-20`, DE = `20.${P0.slice(5, 7)}.${P0.slice(0, 4)}`, DE19 = `19.${P0.slice(5, 7)}.${P0.slice(0, 4)}`;
+const CSV = `Buchungstag;Name;Verwendungszweck;Betrag;Saldo\n${DE};Laden Beispiel;Einkauf;-10,00;1.240,00\n${DE19};Kunde Beispiel;Zahlung;250,00;1.250,00\n`;  // newest first
 
 (async () => {
   await sleep(600);
