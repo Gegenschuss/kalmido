@@ -176,7 +176,8 @@ check(count(Bo, CH) == n0, "voice: a refused voice message leaves nothing behind
 r = Bo.post(B + f"/api/team/rooms/{CH}/messages", data={"body": "The jingle"}, files=[("file", ("jingle.m4a", M4A, "audio/mp4"))])
 a = att(r)
 check(r.status_code == 201 and a.get("voice") is False and a.get("duration_ms") is None and a.get("mime") == "audio/mp4", "audio file: voice false " + r.text[:200])
-check(Bo.get(B + f"/api/team/files/{a.get('id')}").headers.get("Content-Disposition", "").startswith("inline"), "audio file: inline too")
+# 2.139.0 review (F1): only a voice message (content checked as audio) plays inline; another audio file is a download
+check(Bo.get(B + f"/api/team/files/{a.get('id')}").headers.get("Content-Disposition", "").startswith("attachment"), "audio file: a download")
 r = Bo.post(B + f"/api/team/rooms/{CH}/messages", data={"body": "Notes"}, files=[("file", ("n.txt", b"notes", "text/plain"))])
 check(r.status_code == 201 and att(r).get("voice") is False, "plain file: voice false")
 

@@ -495,9 +495,9 @@ function tcx_form(body, rto, cid, files) {
 }
 function tcx_attHtml(m) {
   const fs = m.deleted ? [] : m.attachments || []; if (!fs.length) return '';
-  // 2.139.0 B (#2128): voice messages / audio files get the player (voice.js)
+  // 2.139.0 B (#2128): voice messages get the player (voice.js); review F1: only they play inline, another audio file is a download
   return `<div class="atts chatts">${fs.map(a => upLocked(a) ? scnLockedTile(a)
-    : /^audio\/(mp4|webm|ogg|mpeg|x-m4a|aac)/.test(a.mime || '') && typeof tvc_playerHtml === 'function' ? tvc_playerHtml(a) || `<div class="att file">${attFileA(a)}</div>`
+    : a.voice && /^audio\/(mp4|webm|ogg|mpeg|x-m4a|aac)/.test(a.mime || '') && typeof tvc_playerHtml === 'function' ? tvc_playerHtml(a) || `<div class="att file">${attFileA(a)}</div>`
     : isImg(a) ? `<div class="att img"><a href="${attUrl(a)}" data-act="tc-att-view" data-mid="${m.id}" data-fid="${a.id}" title="${esc(a.name)}"><img src="${attUrl(a)}" loading="lazy" alt="${esc(a.name)}"></a>${scnImgMark(a)}</div>`
     : `<div class="att file">${attFileA(a)}</div>`).join('')}</div>`;
 }

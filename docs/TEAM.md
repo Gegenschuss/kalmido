@@ -643,7 +643,7 @@ A recording stops by itself after 5 minutes and waits for Send or the bin; Escap
 - Voice messages are files of the message: the same storage quota, virus check and encryption at rest as other files.
   They are not possible in end-to-end encrypted or archived conversations (no microphone there).
 - The player in the message: play / pause, the bar to jump, the remaining time, the speed (1×, 1.5×, 2×) and a download
-  button. Only one message plays at a time. Other audio files you attach get the same player.
+  button. Only one message plays at a time. Other audio files you attach stay a normal file (download).
 - The recording format is the one the device records: phones and Safari record MP4 (AAC), which plays everywhere; some
   desktop browsers record WebM (Opus). A device that cannot play a recording shows a note and offers the download.
 - The microphone blocked? Allow it in the browser's site settings (or in the phone's settings for the app) and try again.

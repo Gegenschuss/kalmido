@@ -1921,6 +1921,8 @@ CREATE TABLE IF NOT EXISTS tchat_thread_reads (
   room_id BIGINT NOT NULL REFERENCES tchat_rooms(id) ON DELETE CASCADE, last_id BIGINT NOT NULL DEFAULT 0,
   follow BIGINT NOT NULL DEFAULT 1, PRIMARY KEY (root_id, user_id));
 CREATE INDEX IF NOT EXISTS tchat_thread_reads_user ON tchat_thread_reads(user_id, room_id);
+-- 2.139.0 review (F3): the poll signature (tchat_sig) reads the marks of a set of rooms
+CREATE INDEX IF NOT EXISTS tchat_thread_reads_room ON tchat_thread_reads(room_id);
 -- (2.98.0 last anchor)
 -- 2.99.0 A (#2182): files of knowledge pages (PDFs and pictures; upload and ZIP import, wiki/wikiatt.py). org_id / owner_id
 -- as the page (NULL = private, the app checks owner_id); path below ATT_DIR (wiki/<page id>/…, sealed like attachments);
