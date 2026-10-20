@@ -1527,6 +1527,18 @@ fresh; run p2141_b_ui node p2141_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.141.0 part C: dispatch export CSV / ICS, newsletter consent import (#2142 #2143)
 fresh; run p2141_c_api "$PY" p2141_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2141_c_ui node p2141_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.148.0 part A: lock periods + auditor export GoBD (#2471)
+fresh; run p2148_a_api "$PY" p2148_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2148_a_ui node p2148_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.148.0 part B: receipt images with the DATEV batch (#2470)
+fresh; run p2148_b_api "$PY" p2148_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2148_b_ui node p2148_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.148.0 part C: procedure documentation template GoBD (#2472)
+fresh; run p2148_c_api "$PY" p2148_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2148_c_ui node p2148_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.148.0 part D: DATEV import of master data + opening balances (#2458)
+fresh; run p2148_d_api "$PY" p2148_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2148_d_ui node p2148_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
