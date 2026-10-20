@@ -45,8 +45,8 @@ const today = () => JSON.parse(sql("SELECT value FROM user_settings WHERE user_i
   check(after[0]?.classList.contains('lyp-new') && /Hidden: .*Basket/.test(figs[1]?.textContent || ''), '#1066: changed blocks marked, the hidden ones named');
   check([...(figs[0]?.querySelectorAll('.lyp-c') || [])].some(c => c.textContent === 'Basket'), '#1066: before: the basket still shown');
   check(/Proposal by Claude/.test(md?.textContent || '') && /Your tasks first/.test(md?.querySelector('.ppsum')?.textContent || ''), '#1066: who proposes it and why');
-  check(md?.querySelector('#lyp-use')?.checked === true && /👍/.test(md.querySelector('[data-pp="apply"]')?.textContent || '')
-    && /👎/.test(md.querySelector('[data-pp="discard"]')?.textContent || '') && !md.querySelector('.ppi'), '#1066: "Use it right away" ticked, 👍 / 👎, no entry list');
+  check(md?.querySelector('#lyp-use')?.checked === true && !!md.querySelector('[data-pp="apply"] .thumb svg')  /* 2.139.0 (#2401) */
+    && !!md.querySelector('[data-pp="discard"] .thumb svg') && !md.querySelector('.ppi'), '#1066: "Use it right away" ticked, 👍 / 👎, no entry list');
   // 👍 switches the view
   click(w, md?.querySelector('[data-pp="apply"]'));
   const t1 = await until(() => today().order?.[0] === 'tasks' && today());
