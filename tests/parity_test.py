@@ -367,7 +367,14 @@ APP_ONLY = [
         "=GET /api/agents/{}/chat", "=POST /api/agents/{}/chat", "=PATCH /api/agents/{}/chat/{}", "POST /api/agents/{}/wake", "POST /api/agents/{}/abort", "POST /api/tasks/{}/wake", "* /api/agents/{}/share", "PUT /api/lists/{}/agent",
         "* /api/agents/{}/autoshare", "GET /api/agents/usage")),
     ("devices and pushes of a person", ("* /api/push/", "POST /api/ntfy/test")),
+    # 2.142.0 A (#2145): agents get events, not pushes; the addresses of a person's channels are secrets of the account
+    ("2.142.0 (#2145): a person's notification channels (Slack, Matrix, Telegram, Signal): set up in the app, agents have their events",
+     ("* /api/me/channels",)),
     ("2.17.0 (#443): a person's e-mail addresses for new tasks and the summary by mail (secrets of the account)", ("* /api/me/mail",)),
+    # 2.142.0 C (#2148, #2150): files for other apps (agents read the tasks via /api/v1) and the own share inbox (its token is a secret)
+    ("2.142.0 (#2148): export of one's lists as Todoist CSV / Markdown files for other apps (agents read tasks via /api/v1)",
+     ("GET /api/export/todoist.zip", "GET /api/export/markdown.zip")),
+    ("2.142.0 (#2150): a person's ntfy share inbox (topic, own server, read token = a secret of the account)", ("* /api/me/ntfy-inbox",)),
     ("public links: sharing outside the instance, people only", ("* /api/lists/{}/public-link",
                                                                   "* /api/lists/{}/signoffs")),  # 2.50.0 (#1200): acceptance links of a list
     ("2.33.0 (#927): notification templates are set by the owner in the app; agents only read a list's template",

@@ -267,11 +267,12 @@ def ntfy_attachment_url(u):
     return None
 
 
-def ntfy_inbox_allowed():
+def ntfy_inbox_allowed(url=None, topic=None):
     """The share inbox imports whatever is published to the topic: refuse a guessable topic on the
-    public ntfy.sh (anyone could publish there)."""
-    host = (urllib.parse.urlsplit(NTFY_IN["url"]).hostname or "").lower()
-    if host in ("ntfy.sh", "www.ntfy.sh") and (len(NTFY_IN["topic"]) < 16 or NTFY_IN["topic"].lower() == "inbox"):
+    public ntfy.sh (anyone could publish there). 2.142.0 C (#2150): url / topic of a person's own inbox (default: the environment's)."""
+    url, topic = NTFY_IN["url"] if url is None else url, NTFY_IN["topic"] if topic is None else topic
+    host = (urllib.parse.urlsplit(url).hostname or "").lower()
+    if host in ("ntfy.sh", "www.ntfy.sh") and (len(topic) < 16 or topic.lower() == "inbox"):
         return False
     return True
 

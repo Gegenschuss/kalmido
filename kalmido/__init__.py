@@ -104,6 +104,7 @@ ORDER = (
     "api.v1",
     "notify.caps",  # 2.33.0 (#927)
     "notify.taskbell",  # 2.53.0 C (#1424): the bell of one task per person
+    "notify.channels",  # 2.142.0 A (#2145, #2146): Slack / Matrix / Telegram / Signal, e-mails for single events
     "tasks.dayplan",
     "tasks.briefing",  # 2.34.0 (#264)
     "lists.report",  # 2.34.0 (#265)
@@ -187,6 +188,8 @@ ORDER = (
     "files.upsafe",  # 2.61.0 (#1818 #1819 #1820): the shared upload path - scan, metadata, text recognition (no routes)
     "files.filereq",  # 2.122.0 A (#2097): file requests - a public link /u/<token> through which a client uploads files
     "integrations.mail",
+    "integrations.ntfyin",  # 2.142.0 C (#2150)
+    "integrations.exporters",  # 2.142.0 C (#2148)
     "accounts.invite",
     "accounts.sessions",  # 2.115.0 B (#2062): active sessions
     "accounts.orginvite",  # 2.115.0 B (#2062): organisation admins invite accounts by e-mail

@@ -426,7 +426,7 @@ function jhStatsHtml() {
 function viewJournalHist() {
   if (!JH.loaded && !JH.loading) setTimeout(() => { jhLoad(); jhStats(); }, 0);
   const seg = `<div class="seg" role="radiogroup" aria-label="${esc(tr('Period'))}">${[['day', tr('Day')], ['week', tr('Week')], ['hist', tr('History')]].map(([k, w]) => `<button type="button" role="radio" data-act="rv-period" data-p="${k}" class="${RV.period === k ? 'on' : ''}" aria-checked="${RV.period === k}">${esc(w)}</button>`).join('')}</div>`;
-  const qs = jhParams().toString(), exp = f => `/api/life/journal/export?format=${f}${JH.from ? '&from=' + JH.from : ''}${JH.to ? '&to=' + JH.to : ''}`;
+  const exp = f => `/api/life/journal/export?format=${f}${JH.from ? '&from=' + JH.from : ''}${JH.to ? '&to=' + JH.to : ''}`;
   const moods = `<div class="rvmood jhmoods" role="radiogroup" aria-label="${esc(tr('Mood'))}"><button type="button" class="btn sm ${JH.mood ? '' : 'on'}" role="radio" data-act="rv-hmood" data-v="0" aria-checked="${!JH.mood}">${tr('All')}</button>${MOODS.map(([v, e, w]) => `<button type="button" role="radio" data-act="rv-hmood" data-v="${v}" class="${JH.mood === v ? 'on' : ''}" aria-checked="${JH.mood === v}" title="${esc(tr(w))}" aria-label="${esc(tr(w))}">${e}</button>`).join('')}</div>`;
   return `<div class="dash fam review jhist"><div class="dashhead rvhead">${seg}<span class="spacer"></span></div>
     <section class="dcard fcard lcard" aria-labelledby="jh-h"><h2 id="jh-h">${ic('journal', 's')}<span>${tr('Journal')}</span></h2>

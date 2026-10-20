@@ -25,6 +25,21 @@ Agent chat with a stop button, agent colours and a quieter filter; the home bloc
 - Agent chat: the filter is the icon in the chat header on every width, the filter row above the messages is gone (#2419).
 - Agent chat: a job card whose only message is the final result shows it below the card, its unfolding is remembered (#2365).
 
+## [2.142.0] - 2026-10-20
+
+Notifications to Slack, Matrix, Telegram and Signal, e-mail on assignments and mentions, importers for Notion, Google Tasks, ClickUp, Jira, CSV and Markdown, export as Todoist CSV or Markdown.
+
+### Added
+- Notification channels Slack, Matrix (webhook bridge), Telegram and Signal (signal-cli REST): own channels per person under *Settings > Notifications* with the kinds that go there and *Send test*; organisation admins add channels for new, completed, assigned and commented tasks of lists everyone in the organisation sees (never private or locked contents). Addresses are stored encrypted and never shown again; a channel switches itself off after 5 failures in a row; quiet hours apply (#2145).
+- E-mail on assignment and mention for people without a push device, collected into at most one mail every 10 minutes (20 a day), per kind off / only without push / always; default: only without push (#2146).
+- Import from Notion (Markdown & CSV export, nested ZIPs), Google Tasks (Takeout), ClickUp and Jira (CSV), any CSV (columns matched by header, the preview shows which column went where) and Markdown checklists; people in the files are never matched to accounts (#2147).
+- Export of your lists as Todoist CSV (a ZIP, one file per list, Todoist's import format) or Markdown checklists under *Settings > Data* (#2148).
+- Administration: *Fetch mails now* next to the mail-to-task settings (#2149).
+- Own share inbox over ntfy per person under *Settings > Notifications* (topic, optionally own server and read token); the `NTFY_INBOX_*` variables stay the fallback (#2150).
+
+### Security
+- Exported CSV cells cannot start a spreadsheet formula; per-person ntfy servers get a time budget per round; a deeply nested ClickUp checklist cell is refused cleanly (review of 2.142.0).
+
 ## [2.141.0] - 2026-10-20
 
 The e-mail filing becomes a small mail desk: each workspace its own mailbox, replies and new mails from the filing, HTML
@@ -47,6 +62,7 @@ mails shown safely, tasks and events from a mail; plus a disposition export and 
 - Security fix (e-mail filing): mailbox passwords are stored encrypted, never sent back, bound to their server, and a
   workspace's own mail servers are only reached with a checked certificate and through the internal-host guard (#2141).
 - Security fix (e-mail filing): HTML content is cleaned on the server and isolated in the browser (#2140).
+
 ## [2.140.0] - 2026-10-20
 
 Private space: shopping, recipes, journal, budget, habits, devices and birthdays.

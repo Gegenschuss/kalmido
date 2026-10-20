@@ -85,6 +85,8 @@ KINDS = {
     "assistant": ("matrix", "p275_a_api_test.py: another person's task / basket item / list 404 or left out; shares of lists the person no longer sees dropped; the log only own rows; agents never"),
     "receipt": ("matrix", "p248_d_receipts_api_test.py: receipt data and suggestions only on a visible document; projects of another workspace refused; outsiders 404"),
     "webhook": ("matrix", "p2300_tenant_test.py: webhooks by id, deliveries only of visible tasks; p2115_a_api_test.py: an organisation's webhooks only for its admins, never events of a member's private list"),
+    "channel": ("matrix", "p2142_a_api_test.py (2.142.0): a channel of another person / organisation by id: 404; an organisation's channels only for its admins; "
+                          "its messages never of a private list, a list shared only with some, another organisation or the words of a locked list"),
     "export": ("matrix", "p2300_tenant_test.py: the export has only the own data"),
     "stats": ("matrix", "p2300_tenant_test.py: statistics count only own / visible tasks"),
     "publiclink": ("matrix", "p2300_tenant_test.py: the public link of another person's list by id"),
@@ -483,7 +485,7 @@ ROUTES = {
     "DELETE /api/events/{}": "event", "POST /api/events/{}/restore": "event", "POST /api/events/{}/rsvp": "event",
     "POST /api/events/{}/prep-task": "event", "GET /api/tasks/{}/events": "event",
     # ---- export (2)
-    "GET /api/export.json": "export", "GET /api/v1/export": "export",
+    "GET /api/export.json": "export", "GET /api/export/todoist.zip": "export", "GET /api/export/markdown.zip": "export",  "GET /api/v1/export": "export",
     # ---- family (32)
     "GET /api/v1/family": "family", "POST /api/v1/family/occasions": "family",
     "GET /api/v1/family/deadline-types": "family", "POST /api/v1/family/deadlines": "family",
@@ -623,7 +625,8 @@ ROUTES = {
     "POST /api/favorites/suggestion": "own",  # 2.46.1 (#1361): a favourite suggestion from the person's own activity
     "PUT /api/tasks/mine-order": "own", "GET /api/me/wait-suggestions": "own", "DELETE /api/me/wait-suggestions": "own",  # 2.41.0 (#1205)
     "POST /api/onboarding": "own", "POST /api/sample": "own", "DELETE /api/sample": "own", "PATCH /api/settings": "own",
-    "POST /api/ntfy/test": "own", "GET /api/push/vapid": "own", "GET /api/push/subs": "own", "POST /api/push/subs": "own",
+    "POST /api/ntfy/test": "own", "GET /api/me/ntfy-inbox": "own", "PUT /api/me/ntfy-inbox": "own",  # 2.142.0 C (#2150)
+     "GET /api/push/vapid": "own", "GET /api/push/subs": "own", "POST /api/push/subs": "own",
     "DELETE /api/push/subs/{}": "own", "POST /api/push/unsubscribe": "own", "POST /api/push/handled": "own",
     "POST /api/push/test": "own", "GET /api/me": "own", "PATCH /api/me": "own", "POST /api/me/drop-token": "own",
     "GET /api/me/share/httpshortcuts.zip": "own", "PUT /api/me/avatar": "own", "POST /api/me/avatar": "own",
@@ -783,6 +786,12 @@ ROUTES = {
     "GET /api/orgs/{}/webhooks": "webhook", "POST /api/orgs/{}/webhooks": "webhook", "PATCH /api/orgs/{}/webhooks/{}": "webhook",
     "DELETE /api/orgs/{}/webhooks/{}": "webhook", "POST /api/orgs/{}/webhooks/{}/secret": "webhook",
     "POST /api/orgs/{}/webhooks/{}/test": "webhook", "GET /api/orgs/{}/webhooks/{}/log": "webhook",
+    # 2.142.0 A (#2145): notification channels of a person / of an organisation (its admins; messages only of lists open to every
+    # member) -- p2142_a_api_test.py
+    "GET /api/me/channels": "channel", "POST /api/me/channels": "channel", "PATCH /api/me/channels/{}": "channel",
+    "DELETE /api/me/channels/{}": "channel", "POST /api/me/channels/{}/test": "channel",
+    "GET /api/orgs/{}/channels": "channel", "POST /api/orgs/{}/channels": "channel", "PATCH /api/orgs/{}/channels/{}": "channel",
+    "DELETE /api/orgs/{}/channels/{}": "channel", "POST /api/orgs/{}/channels/{}/test": "channel",
     "POST /api/hooks/in/{}": "token", "GET /api/lists/{}/hooks-in": "list", "POST /api/lists/{}/hooks-in": "list",
     "PATCH /api/hooks-in/{}": "list", "DELETE /api/hooks-in/{}": "list", "POST /api/hooks-in/{}/rotate": "list",
     "POST /api/hooks-in/{}/restore": "list",
