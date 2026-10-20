@@ -46,7 +46,8 @@ const SAME_YEAR = prev.slice(0, 4) === TODAY.slice(0, 4);
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     await signIn(ev, 'erin');
     await nav(B + '#office/books');
-    check(await ready(ev, `document.querySelectorAll('#pl-sec .plmonths li').length === 12`, 100), 'the bookkeeping shows the section with 12 months');
+    check(await ready(ev, `document.querySelectorAll('#pl-sec .plmonths li').length === 12`, 100), 'the bookkeeping shows the section with 12 months '
+      + await ev(`JSON.stringify({hash: location.hash, bar: !!document.querySelector('.bk-bar'), sec: (document.querySelector('#pl-sec')?.outerHTML || '').slice(0, 300), pl: typeof PL === 'object' ? PL.data : 'no PL', admin: typeof ofcAdmin === 'function' ? ofcAdmin() : 'no fn'})`).catch(e => String(e)));
     check(await ev(`document.querySelectorAll('#pl-sec .plm.on').length === 0 && /Nothing is locked yet/.test(document.querySelector('#pl-sec').textContent)`), 'nothing locked yet');
     check(await ev(`document.querySelector('#pl-to')?.value === '${prev}'`), `"Lock up to" offers the month before (${prev})`);
     await ev(`(() => { document.querySelector('#pl-sec').scrollIntoView({block: 'start'}); return 1; })()`); await sleep(300);
