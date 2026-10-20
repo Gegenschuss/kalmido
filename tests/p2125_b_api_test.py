@@ -13,6 +13,7 @@
    (report days, CSV rows, totals the same, rounding split, not applied twice); in America/New_York the same entry is one day;
    the switch time_split_midnight off keeps one day / one row
 usage: p2125_b_api_test.py <datadir>      (a fresh container; P2125B_NOSTART=1 = the server already runs)"""
+import base64
 import csv
 import io
 import os
@@ -26,6 +27,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer  # noqa: E402
+import dbx as dbxm  # noqa: E402  2.125.0 (#2119): the sealed note in the database
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else ""
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -56,7 +58,10 @@ def iso(dt):
 
 
 if not os.environ.get("P2125B_NOSTART"):
-    subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL)
+    # 2.125.0 (#2119): with the master key, so the decision's note is sealed
+    KEY = base64.b64encode(os.urandom(32)).decode()
+    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + f" -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}")
+    subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL, env=env)
 s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
@@ -159,6 +164,16 @@ j = Bo.get(B + "/api/time/sheets", params={"month": M}).json()
 check(j["sheet"]["state"] == "open" and j["sheet"]["note"] == "Tuesday is missing" and j["can"]["close"], "sent back: open with the note")
 news = Bo.get(B + "/api/news").json().get("items", [])
 check(any(n["kind"] == "tsheet" and n.get("data", {}).get("act") == "return" for n in news), "bob gets the News item")
+# 2.125.0 (#2119): the note stays out of the News item (and the push); bob reads it in the app (sealed in time_sheets.note)
+check(all("Tuesday is missing" not in str(n) for n in news if n["kind"] == "tsheet"), "the note is not in the News item")
+_c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+try:
+    _raw = str(_c.execute("SELECT note FROM time_sheets WHERE user_id=? AND month=?", (uid["bob"], M)).fetchone()[0])
+    _nraw = str(_c.execute("SELECT data FROM notifications WHERE user_id=? AND kind='tsheet'", (uid["bob"],)).fetchall())
+finally:
+    _c.close()
+check(_raw.startswith("kenc1:") and "Tuesday" not in _raw, "the note is sealed in the database " + _raw[:40])
+check("Tuesday" not in _nraw, "the stored News data holds no note")
 check(A.post(B + "/api/time/sheets/decide", json={"user_id": uid["bob"], "month": M, "action": "restore"}).ok, "Undo of the sending back")
 check(Bo.get(B + "/api/time/sheets", params={"month": M}).json()["sheet"]["state"] == "approved", "... approved again")
 check(A.post(B + "/api/time/sheets/decide", json={"user_id": uid["bob"], "month": M, "action": "restore"}).status_code == 409,
