@@ -7,6 +7,26 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.126.1] - 2026-10-20
+
+Agents draft for you: office texts, document summaries, the client report, table rows as tasks and a planned morning
+sort of the basket. Kalmido calls no language model for this; the connected agent words it and you decide on a card.
+
+### Added
+- Office: "Draft text with an agent" for the introduction and closing text of quotation, invoice and reminder drafts.
+  The agent gets the document without purchase prices; you edit the text on the proposal card and take it over (one
+  undo step); nothing is sent, a finalised or sent document is never changed (#2123).
+- Documents: "Summarise with an agent" saves a summary on the document (sealed like the recognised text), shown in the
+  document sheet and in the API (#2123).
+- Projects: "Word the report with an agent" in the status report - the agent gets the report of the period without
+  comments, notes and names; the text you take over replaces the fixed text for copying and sharing (#2124).
+- Agents can propose rows of a table shared with them as tasks of a shared list (`POST /api/v1/agent/proposals/sheet-tasks`,
+  MCP `propose_sheet_tasks`); you untick rows, edit titles and apply the card as yourself (#2125).
+- Planned agent jobs have a kind: "Sort the basket (proposal)" sends your basket to the agent at the planned time
+  (suggested: weekdays 7:30) like the button, you find the proposal card in the morning; an empty basket sends nothing (#2126).
+- Agent API / MCP: new proposal kinds `office_text`, `doc_summary`, `report`, `sheet_tasks`; `job_request` of a planned sort
+  carries `scheduled: true`; `GET /api/v1/agent/schedules` shows the plan's `action`.
+
 ## [2.126.0] - 2026-10-20
 
 Security release: fixes from the internal audit (office, documents, agents, sync, offline). Please update.

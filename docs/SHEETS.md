@@ -207,6 +207,11 @@ Like every Kalmido variable, `aufgabe.<id>.<field>` is evaluated for the person 
 These buttons are for people only; agents work inside a table with the table tools and create tasks or office drafts in
 their own ways.
 
+**An agent proposes rows as tasks (2.126.1).** An agent that a table and a list are shared with may propose rows as tasks
+instead of pressing the button. You get a card (News, and a push if you want it): the table, the list and one line per row
+as you see it, with the agent's title above the cell's. Untick rows, change titles or dates, then **Apply**: the same as the
+button, as you, and the history names the agent. Rows carried over before are greyed out. Undo takes the tasks back.
+
 ## Tables as files: export and import
 
 **Export.** A table's menu (the three dots at the top right) has *Export as CSV* and *Export as Excel (.xlsx)*.

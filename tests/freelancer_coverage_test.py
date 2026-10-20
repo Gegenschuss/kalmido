@@ -137,6 +137,7 @@ ROUTES = {
     "POST /api/v1/agent/chats/{}/messages/{}/withdraw": "agents", "POST /api/v1/agent/jobs": "agents",
     "POST /api/v1/agent/jobs/{}/proposal": "agents", "POST /api/v1/agent/progress": "agents",
     "POST /api/v1/agent/proposals": "agents", "POST /api/v1/agent/proposals/import": "agents",
+    "POST /api/v1/agent/proposals/sheet-tasks": "agents",  # 2.126.1 B (#2125): p21261_b_api_test.py, the freelancer's own agent
     "POST /api/v1/agent/proposals/shoot": "agents", "POST /api/v1/agent/proposals/time": "agents",
     "POST /api/v1/agent/typing": "agents", "POST /api/v1/agent/usage": "agents",
     "POST /api/v1/agents/{}/chat/{}/choice": "agents", "POST /api/v1/agents/{}/chat/{}/reactions": "agents",

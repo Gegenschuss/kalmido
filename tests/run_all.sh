@@ -1353,6 +1353,12 @@ fresh; run p2126_d_ui node p2126_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.126.0 part E: ESLint in CI (#1993)
 fresh; run p2126_e_api "$PY" p2126_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2126_e_ui node p2126_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.126.1 part A: agent drafts - office texts, receipt summary, client report (#2123 #2124)
+fresh; run p21261_a_api "$PY" p21261_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21261_a_ui node p21261_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.126.1 part B: table rows -> tasks as an agent proposal, planned inbox sorting (#2125 #2126)
+fresh; run p21261_b_api "$PY" p21261_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21261_b_ui node p21261_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.124.0 part A: formulas, chart (#2109 #2115)
 fresh; run p2124_a_api "$PY" p2124_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2124_a_ui node p2124_a_ui.js "$KALMIDO_TEST_DATA"
