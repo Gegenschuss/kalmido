@@ -158,7 +158,7 @@ KINDS = {
     # 2.73.0 A (#661): the accounts of one person on other Kalmido servers (accounts/servers.py) -- private per person
     "servers": ("matrix", "p273_a_api_test.py: the server accounts of another person 404 (read, change, delete, restore, data, tasks, move); agents 403; nothing of another person's tasks moves"),
     # 2.84.0 A (#1198): mails filed with a client / project (hub/hubmail.py hbm_can: the client / list / recipient, always in the mail's workspace)
-    "hubmail": ("matrix", "p284_a_api_test.py: a mail / attachment / address of another organisation or a private client of another person 404, a forged sender finds only the recipient's workspace, after leaving nothing, assigning across workspaces refused, agents 403"),
+    "hubmail": ("matrix", "p284_a_api_test.py: a mail / attachment / address of another organisation or a private client of another person 404, a forged sender finds only the recipient's workspace, after leaving nothing, assigning across workspaces refused, agents 403; 2.141.0 B: p2141_b_api_test.py the HTML view / task / event from a mail of another organisation 404, into a list / calendar of another workspace 409, the mail of a task only with the mail's rights"),
     # 2.112.1 B (#2058): external share links of the file store (files/extlinks.py)
     "fileextlink": ("matrix", "p21121_b_api_test.py: the links of another organisation's / person's node 404 (list, create, renew, revoke, "
                               "restore); a link serves only its own tree (other ids 404); dead when the creator leaves / loses the right"),
@@ -972,6 +972,9 @@ ROUTES = {
     "GET /api/hubmail/inbox": "hubmail", "GET /api/hubmail/mails/{}": "hubmail", "GET /api/hubmail/mails/{}/files/{}": "hubmail",
     "GET /api/hubmail/targets": "hubmail", "POST /api/hubmail/mails/{}/assign": "hubmail", "DELETE /api/hubmail/mails/{}": "hubmail",
     "POST /api/hubmail/mails/{}/restore": "hubmail",
+    # 2.141.0 B (#2140, #2139): the HTML view, a task / an event from a mail (only into lists / calendars of the mail's workspace), the mail of a task / event
+    "GET /api/hubmail/mails/{}/html": "hubmail", "GET /api/hubmail/mails/{}/make": "hubmail", "POST /api/hubmail/mails/{}/task": "hubmail",
+    "POST /api/hubmail/mails/{}/event": "hubmail", "GET /api/hubmail/links": "hubmail",
     # 2.85.0 B (#1162): feeds, a person's own (no organisation, never an agent's; p285_b_api_test.py: another person gets 404)
     "GET /api/feeds": "own", "POST /api/feeds": "own", "DELETE /api/feeds/{}": "own", "POST /api/feeds/{}/restore": "own",
     "GET /api/feeds/items": "own", "POST /api/feeds/read": "own", "POST /api/feeds/items/{}/later": "own",
