@@ -170,7 +170,7 @@ check(x.ok and "Dreh" in x.text and "Producing" not in x.text and "Rohdaten" not
 # switched on: the same as before 2.40
 r = A.put(B + O + "/settings", json={"producing_on": 1, "raw_on": True})
 check(r.ok and r.json()["settings"]["producing_on"] == 1 and r.json()["settings"]["raw_on"] == 1, "#1379: both switched on " + r.text[:120])
-Q2 = A.post(B + D, json={"project_title": "Film 2", "client_id": CL}).json()
+Q2 = A.post(B + D, json={"project_title": "Film 2", "client_id": CL, "producing_on": 1}).json()  # 2.113.1 (#2251): the office setting no longer switches producing on for a new quotation (only a pack option does); the document does
 j = A.put(B + f"{D}/{Q2['id']}/items", json={"items": [{"kind": "service", "service_id": SV, "qty": 6}]}).json()
 kinds = [x["kind"] for x in j["totals"]["lines"]]
 check(Q2.get("raw_mode") == "optional" and kinds == ["item", "producing", "raw"] and j["totals"]["net"] == 7200,

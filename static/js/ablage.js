@@ -55,7 +55,7 @@ function viewAblage() {
   const spaces = `<nav class="abspaces" aria-label="${esc(tr('File store'))}">${ab_spaces().map(s => `<button type="button" class="abspace ${!r.nid && s === sp ? 'on' : ''}" data-ab="space" data-sp="${esc(s)}" ${!r.nid && s === sp ? 'aria-current="page"' : ''}>${ab_spaceIcon(s)}<span>${esc(ab_spaceName(s))}</span></button>${r.nid && s === (sp || 'shared') ? treeHtml : ''}`).join('')}</nav>`;
   const trash = !r.nid && sp === 'trash', canAdd = r.nid ? ab_canWrite(d?.node?.role) : (sp === 'private' || (sp || '').startsWith('org:'));
   const crumbs = r.nid && d ? `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}"><button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp === 'shared' || !sp ? 'shared' : sp)}" data-abdrop="top">${esc(ab_spaceName(sp || 'shared'))}</button>${(d.crumbs || []).map((c, i, a) => `<span class="abcsep" aria-hidden="true">/</span>${i === a.length - 1 ? `<span class="abccur" aria-current="page">${esc(c.name)}</span>` : `<button type="button" class="linkbtn" data-go="ablage/${c.id}" data-abdrop="${c.id}">${esc(c.name)}</button>`}`).join('')}</nav>` : `<h3 class="abtitle">${esc(ab_spaceName(sp))}</h3>`;
-  const tools = trash ? '' : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button><input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_smvTools(d)}${typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : ''}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
+  const tools = trash ? '' : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button><button type="button" class="btn sm" data-ab="scan">${ic('camera', 's')} ${tr('Scan')}</button><input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_smvTools(d)}${typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : ''}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
   let body;
   if (AB.err && AB.key === key) body = `<div class="empty">${ic('folder')}<span>${esc(AB.err)}</span><button type="button" class="btn" data-ab="space" data-sp="private">${tr('My files')}</button></div>`;
   else if (!d) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
@@ -72,7 +72,8 @@ function ab_rowHtml(n, trash) {
   const badges = (n.shared ? `<span class="abbadge" title="${esc(tr('Shared'))}" aria-label="${esc(tr('Shared'))}">${ic('users', 's')}</span>` : '')
     + (n.agent_id ? `<span class="abbadge" title="${esc(tr('Folder of an agent'))}">${ic('bot', 's')}</span>` : '')
     + (n.version > 1 ? `<span class="abver" title="${esc(tr('Version {0}', n.version))}">v${n.version}</span>` : '')
-    + upMarkHtml(n.up);  // 2.61.0 (#1818): not checked by the virus scanner yet / locked
+    + upMarkHtml(n.up)  // 2.61.0 (#1818): not checked by the virus scanner yet / locked
+    + (typeof xl_badge === 'function' ? xl_badge(n) : '');  // 2.112.1 B (#2058): a live external link
   const main = trash ? `<span class="abopen">${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></span>`
     : `<button type="button" class="abopen" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''}>${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button>`;  // abmeta2: the details below the name on phones
   const acts = trash ? `<button type="button" class="btn sm" data-ab="restore" data-id="${n.id}">${ic('undo', 's')} ${tr('Restore')}</button>`
@@ -173,9 +174,11 @@ function ab_menu(anchor, n) {
   menu(anchor, [
     f ? {label: tr('Open'), icon: 'eye', fn: () => ab_openFile(n)} : null,
     f ? {label: tr('Download'), icon: 'download', fn: () => { const a = document.createElement('a'); a.href = ab_url(n, true); a.download = n.name; document.body.appendChild(a); a.click(); a.remove(); }} : null,
+    n.kind === 'folder' ? {label: tr('Download as ZIP'), icon: 'download', fn: () => abm_download([n])} : null,  // 2.112.1 A (#2058)
     {label: tr('Details and history'), icon: 'info', fn: () => ab_details(n.id)},
     w && n.kind === 'folder' && !n.agent_id ? {label: tr('Request files…'), icon: 'upload', fn: () => frq_open(n)} : null,  // 2.122.0 A (#2097)
     own ? {label: tr('Share…'), icon: 'users', fn: () => ab_share(n.id)} : null,
+    typeof xl_menuItem === 'function' ? xl_menuItem(n) : null,  // 2.112.1 B (#2058)
     '-',
     w && n.kind === 'file' ? {label: tr('Upload a new version…'), icon: 'upload', fn: () => ab_newVersion(n)} : null,
     w ? {label: tr('Rename…'), icon: 'edit', fn: () => ab_rename(n)} : null,
@@ -206,7 +209,7 @@ async function ab_details(id) {
   let n; try { n = await api('GET', `/api/files/nodes/${id}`); } catch { return; }
   $('.abdlg')?.remove();
   const vers = (n.versions || []).map(v => `<div class="abvrow"><span><b>v${v.no}</b> · ${esc(ab_when(v.created_at))} · ${fmtSize(v.size)}${v.by ? ' · ' + esc(v.by) : ''}</span><span class="spacer"></span><a class="iconbtn" href="${ab_url(n, true, v.no)}" download="${esc(n.name)}" title="${esc(tr('Download'))}" aria-label="${esc(tr('Download version {0}', v.no))}">${ic('download', 's')}</a>${ab_canWrite(n.role) && v.no !== n.version ? `<button type="button" class="btn sm" data-abv="${v.no}">${tr('Restore')}</button>` : ''}</div>`).join('');
-  const log = (n.log || []).map(x => `<div class="ablrow ${x.agent ? 'abag' : ''}">${x.agent ? ic('bot', 's') : ic('user', 's')}<span><b>${esc(x.name || '?')}</b> ${esc(tr(AB_ACT[x.action] || x.action))}</span><span class="spacer"></span><small class="muted">${esc(fmtDay('short', new Date(x.at)))} ${esc(new Date(x.at).toLocaleTimeString(LOCALE(), {hour: '2-digit', minute: '2-digit'}))}</small></div>`).join('');
+  const log = (n.log || []).map(x => `<div class="ablrow ${x.agent ? 'abag' : ''}">${x.agent ? ic('bot', 's') : ic('user', 's')}<span><b>${esc(x.name || (typeof xl_logWho === 'function' && xl_logWho(x)) || '?')}</b> ${esc(tr(AB_ACT[x.action] || x.action))}</span><span class="spacer"></span><small class="muted">${esc(fmtDay('short', new Date(x.at)))} ${esc(new Date(x.at).toLocaleTimeString(LOCALE(), {hour: '2-digit', minute: '2-digit'}))}</small></div>`).join('');
   const shares = n.role === 'owner' ? [...(n.shares || []), ...(n.inherited || [])] : [];
   const md = modal(`<div class="lhdr"><h3>${ab_icon(n)} ${esc(n.name)}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <div class="muted abpath">${esc((n.crumbs || []).map(c => c.name).join(' / '))}</div>
@@ -220,6 +223,7 @@ async function ab_details(id) {
     <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
   md.classList.add('abdlg');
   if (n.kind === 'file' && feat('wiki')) ab_wikiRefs(md, n.id);  // 2.123.0 C (#2107)
+  if (typeof xl_mount === 'function') xl_mount(md, n);  // 2.112.1 B (#2058): "Link for external people"
   md.addEventListener('click', async e => {
     if (e.target.closest('[data-m="close"]')) { modalClose(md); return; }
     const v = e.target.closest('[data-abv]');
@@ -308,6 +312,7 @@ document.addEventListener('click', e => {
   if (a === 'space') { AB.space = b.dataset.sp; LS.set('abSpace', AB.space); AB.key = ''; if (S.route.nid) go('ablage'); else ab_load(); return; }
   if (a === 'new-folder') { ab_newFolder(); return; }
   if (a === 'upload') { $('#ab-file')?.click(); return; }
+  if (a === 'scan') { abm_scan(); return; }  // 2.112.1 A (#2058)
   if (a === 'open' && n) { if (n.kind === 'folder') go('ablage/' + n.id); else ab_openFile(n); return; }
   if (a === 'menu' && n) { ab_menu(b, n); return; }
   if (a === 'restore' && n) ab_restore(n);
@@ -358,8 +363,11 @@ function ab_smvBar() {
   const ns = ab_smvSel(), all = (AB.data?.items || []).length, ok = ns.length > 0 && ns.every(ab_smvOk), from = ns[0]?.org_id || null;
   return `<div class="abselbar" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="absn" aria-live="polite">${esc(tr('{0} selected', ns.length))}</span>
     <button type="button" class="linkbtn" data-absel="all">${ns.length === all ? tr('Select none') : tr('Select all')}</button><span class="spacer"></span>
-    <button type="button" class="btn sm" data-absel="move" ${ok ? '' : 'disabled'}>${ic('arrow', 's')} ${tr('Move to…')}</button>
-    ${smv_can(from) ? `<button type="button" class="btn sm" data-absel="space" ${ok ? '' : 'disabled'}>${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''}
+    <button type="button" class="btn sm" data-absel="dl" ${ns.length && ns.some(abm_dlOk) ? '' : 'disabled'}>${ic('download', 's')} <span class="abselt">${tr('Download')}</span></button>
+    <button type="button" class="btn sm" data-absel="trash" ${ns.length && ns.every(abm_trashOk) ? '' : 'disabled'} aria-label="${esc(tr('Move to the trash'))}" title="${esc(tr('Move to the trash'))}">${ic('trash', 's')} <span class="abselt">${tr('Move to the trash')}</span></button>
+    <button type="button" class="btn sm abselx" data-absel="move" ${ok ? '' : 'disabled'}>${ic('arrow', 's')} ${tr('Move to…')}</button>
+    ${smv_can(from) ? `<button type="button" class="btn sm abselx" data-absel="space" ${ok ? '' : 'disabled'}>${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''}
+    <button type="button" class="iconbtn abselm" data-absel="more" ${ok ? '' : 'disabled'} aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button>
     <button type="button" class="iconbtn" data-absel="off" aria-label="${esc(tr('Cancel'))}" title="${esc(tr('Cancel'))}">${ic('x')}</button></div>`;
 }
 const ab_smvEnd = () => { AB.sel.clear(); AB.selOn = false; };
@@ -412,9 +420,48 @@ document.addEventListener('click', e => {
   else if (a === 'all') { const all = ab_smvSel().length === items.length; AB.sel = new Set(all ? [] : items.map(n => n.id)); ab_draw(); }
   else if (a === 'move') ab_smvMoveDlg(ab_smvSel());
   else if (a === 'space') ab_smvSpace(ab_smvSel());
+  else if (a === 'dl') abm_download(ab_smvSel());  // 2.112.1 A (#2058)
+  else if (a === 'trash') abm_trash(ab_smvSel());
+  else if (a === 'more') { const ns = ab_smvSel(); menu(b, [{label: tr('Move to…'), icon: 'arrow', fn: () => ab_smvMoveDlg(ns)},
+    smv_can(ns[0]?.org_id || null) ? {label: tr('Move to another workspace…'), icon: 'building', fn: () => ab_smvSpace(ns)} : null], null, null, tr('Selection')); }
 });
 document.addEventListener('change', e => {
   const b = e.target.closest?.('[data-absel="one"]'); if (!b) return;
   const id = +b.dataset.id; if (b.checked) AB.sel.add(id); else AB.sel.delete(id);
   ab_draw();
 });
+
+// ---- 2.112.1 A (#2058): the selection into the trash (ONE undo step for all), download (one file as it is, else a ZIP),
+// a folder as a ZIP, the phone scan (abscan.js) into the open folder
+const abm_trashOk = n => ab_canWrite(n.role) && (n.parent_id || n.role === 'owner');
+const abm_dlOk = n => n.kind === 'folder' || (n.kind === 'file' && !upLocked(n));
+async function abm_trash(ns) {
+  ns = ns.filter(abm_trashOk); if (!ns.length) return;
+  let r; try { r = await api('POST', '/api/files/trash', {ids: ns.map(n => n.id)}); } catch { return; }
+  const ids = r.ids || ns.map(n => n.id);
+  ab_smvEnd(); ab_reload();
+  offerUndo(trn('{0} item moved to the trash', '{0} items moved to the trash', ns.length), histAdd({label: tr('Move to the trash'),
+    undo: () => ab_req('POST', '/api/files/restore', {ids}), redo: () => ab_req('POST', '/api/files/trash', {ids})}));
+}
+async function abm_download(ns) {
+  ns = ns.filter(abm_dlOk); if (!ns.length) return;
+  const a = document.createElement('a');
+  if (ns.length === 1 && ns[0].kind === 'file') { a.href = ab_url(ns[0], true); a.download = ns[0].name; }
+  else {
+    const q = ns.map(n => n.id).join(',');
+    try { await api('GET', `/api/files/zip?ids=${q}&check=1`); } catch { return; }  // the limits first: the refusal as a message, not as a file
+    a.href = `/api/files/zip?ids=${q}`;
+    toast(tr('The ZIP is being prepared…'));
+  }
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function abm_scan() {
+  const parent = S.route.nid || null, space = ab_curSpace(), old = new Set((AB.data?.items || []).map(x => x.id));
+  abm_scanOpen({parent, space, done: items => {
+    ab_reload();
+    const created = items.filter(x => !old.has(x.id));
+    if (!created.length) return;
+    const ids = created.map(x => x.id);
+    offerUndo(tr('“{0}” saved', created[0].name), histAdd({label: tr('Scan'), undo: () => ab_req('POST', '/api/files/trash', {ids}), redo: () => ab_req('POST', '/api/files/restore', {ids})}));
+  }});
+}

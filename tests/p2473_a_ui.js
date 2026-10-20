@@ -34,7 +34,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(!!d.querySelector('[data-ofc="pb-move"]'), 'freelancer: the instance admin may move the office into an organisation');
   check(!d.querySelector('.pbhint'), 'freelancer: no hint without an organisation');
   d.querySelector('#os-small').checked = true;
-  d.querySelector('[data-ofc="save-settings"]').click();
+  d.querySelector('#os-small').dispatchEvent(new w.Event('change', {bubbles: true}));  // 2.113.0 (#2247): the box saves itself
   check(await until(async () => (await call('GET', '/api/office/settings')).settings?.small_business === 1, 40), 'section 19: saved from the settings');
   w.close();
 

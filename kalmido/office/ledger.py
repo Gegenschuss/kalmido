@@ -26,7 +26,7 @@ import shutil
 from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
-from flask import g, jsonify, request
+from flask import g, jsonify, request, has_app_context
 
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import N_, tr
@@ -101,7 +101,7 @@ def _cap(detail):
 def ofx_log(c, oid, action, target="doc", doc_id=None, detail=None, dedupe_min=0):
     """One entry of the office log of organisation oid by the signed-in person. dedupe_min: reads (open, pdf, render,
     export) of the same person on the same thing within that many minutes are written once."""
-    u = getattr(g, "user", None)
+    u = getattr(g, "user", None) if has_app_context() else None  # 2.138.0 (#1972): also from a background thread (org export)
     uid = u["id"] if u is not None else None
     at = now_utc()
     if dedupe_min:
@@ -133,7 +133,7 @@ def ofx_diff(before, after):
     return {"before": b, "after": a}
 
 
-ITEM_LOG_KEYS = ("kind", "service_id", "title", "detail", "qty", "unit", "rate", "tax", "raw_fee", "producing", "discountable", "cost")
+ITEM_LOG_KEYS = ("kind", "service_id", "title", "detail", "qty", "unit", "rate", "tax", "raw_fee", "producing", "discountable", "cost", "in_handling", "in_markup")  # 2.113.1 (#2252): + the surcharge flags
 
 
 def ofx_items_brief(rows):
@@ -381,6 +381,8 @@ def ofx_finalize(c, oid, uid, did):
              "texts": {k: {lang: v.get(lang) or ""} for k, v in (pack.get("texts") or {}).items() if isinstance(v, dict) and isinstance(v.get(lang) or "", str)}}
     from .catalog import pkc_origin  # 2.76.0 (#1023): which pack file exactly (built in or installed from a catalogue)
     tsnap["pack_sha256"], tsnap["pack_source"] = pkc_origin("country", tsnap["pack"])
+    from .terms import agb_freeze
+    agb_freeze(c, oid, r)  # 2.113.2 (#2253): the terms of the document's language, before the stored PDF is written
     ts = iso(now_utc())
     c.execute("UPDATE office_docs SET locked_at=?, locked_by=?, sender=?, recipient_snapshot=?, tax_snapshot=?, pack_version=?, totals=?, "
               "updated_at=? WHERE id=? AND org_id=?",

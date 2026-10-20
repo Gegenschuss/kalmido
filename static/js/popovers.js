@@ -196,11 +196,11 @@ function datePop(anchor, id) {
   if (!canEdit(t)) { roToast(); return; }
   if (tlkStop(t)) return;  // 2.36.0 (#1118): locked
   const st = {due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, start: t.start, duration: t.duration, month: (t.due || today()).slice(0, 7),
-    deadline: t.deadline || 0, nag: t.nag || ''};
+    deadline: t.deadline || 0, nag: t.nag || '', remind_at: t.remind_at || null};  // 2.111.0 C (#2057): + the fixed-time reminder
   const instant = dateInstant(), before = snapTask(t);
   const body = () => ({due: st.due, due_time: st.due ? st.due_time : null, reminders: st.due ? st.reminders : '', repeat: st.due ? st.repeat : '', repeat_from: st.repeat_from,
     start: st.due && st.start && st.start < st.due ? st.start : null, duration: st.due_time ? (st.duration || 30) : null,
-    ...(st.due ? {deadline: st.deadline, nag: st.nag} : {deadline: 0, nag: ''})});
+    ...(st.due ? {deadline: st.deadline, nag: st.nag} : {deadline: 0, nag: ''}), remind_at: st.remind_at || null});
   const msgOf = () => st.due ? tr('Date: {0}', dayLabel(st.due)) : tr('Date removed');
   // instant mode: what was sent last, the running request chain, the dependent tasks the server moved along (first prev)
   const I = {sig: JSON.stringify(body()), timer: null, chain: Promise.resolve(), saved: false, shifted: new Map(), done: false, last: null};
@@ -231,12 +231,17 @@ function datePop(anchor, id) {
     I.done = true; clearTimeout(I.timer);
     await I.chain;
     if (!I.saved) return;
-    const back = {}; for (const k of ['due', 'due_time', 'reminders', 'repeat', 'repeat_from', 'start', 'duration', 'deadline', 'nag']) back[k] = before[k] ?? (k === 'reminders' || k === 'repeat' || k === 'nag' ? '' : k === 'deadline' ? 0 : null);
+    const back = {}; for (const k of ['due', 'due_time', 'reminders', 'repeat', 'repeat_from', 'start', 'duration', 'deadline', 'nag', 'remind_at']) back[k] = before[k] ?? (k === 'reminders' || k === 'repeat' || k === 'nag' ? '' : k === 'deadline' ? 0 : null);
     try { await patchTask(id, back, true); } catch { return; }
     // dependent tasks the server moved along: back to where they were
     const items = {}; for (const x of I.shifted.values()) items[x.id] = {start: x.prev_start, due: x.prev_due};
     if (Object.keys(items).length) { try { await histBatch('patch_each', Object.keys(items).map(Number), {items}); await load(); render(); } catch { /* shown */ } }
     toast(tr('Changes undone'));
+  };
+  // 2.116.0 D (#2066): set the times of a daily repeat; the task's own time follows the first one
+  const rmdApply = (cu, ts) => {
+    cu.times = ts.filter(Boolean).sort(); st.repeat = rrSetEnd(rrBuild(cu), rrEnd(st.repeat));
+    if (cu.times.length) { st.due_time = cu.times[0]; if (!st.due) st.due = today(); }
   };
   const draw = () => {
     const [y, m] = st.month.split('-').map(Number);
@@ -246,6 +251,7 @@ function datePop(anchor, id) {
     const rems = new Set((st.reminders || '').split(',').filter(Boolean));
     const wd = st.due ? RR_WD[pd(st.due).getDay()] : 'MO', md = st.due ? pd(st.due).getDate() : 1;
     const presets = [['', tr('None')], ['FREQ=DAILY', tr('Daily')], ['FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', tr('Weekdays')], [`FREQ=WEEKLY;BYDAY=${wd}`, tr('Weekly ({0})', WD[RR_WD.indexOf(wd)])], [`FREQ=WEEKLY;INTERVAL=2;BYDAY=${wd}`, tr('Every 2 weeks ({0})', WD[RR_WD.indexOf(wd)])], [`FREQ=MONTHLY;BYMONTHDAY=${md}`, tr('Monthly (on day {0})', md)], ['FREQ=YEARLY', tr('Yearly')]];
+    presets.splice(2, 0, ['__multi', tr('Several times a day')]);  // 2.116.0 D (#2066)
     const cur = rrBase(st.repeat), end = rrEnd(st.repeat);
     const custom = cur && !presets.some(p => p[0] === cur);
     const cu = st.cust ? rrForm(cur) : null;
@@ -257,12 +263,14 @@ function datePop(anchor, id) {
       <div class="prow">${ic('timeline', 's')}<span class="muted" style="font-size:var(--fs-s)">${tr('Start|date')}</span>${dateIn('p-start', st.start || '', {max: st.due || '', label: tr('Start|date'), empty: tr('none')})}${st.start ? `<button class="iconbtn" data-q="nostart" title="${tr('No date range')}" aria-label="${tr('No date range')}">${ic('x', 's')}</button>` : ''}</div>
       <div class="prow">${ic('bell', 's')}<span class="muted plab">${tr('Reminder')}</span><div class="remchips" role="group" aria-label="${esc(tr('Reminder'))}">${[...REM_CHIPS, ...[...rems].filter(v => !REM_CHIPS.includes(v)).sort((a, b) => a - b)].map(v => `<button class="${rems.has(v) ? 'on' : ''}" data-rem="${v}" aria-pressed="${rems.has(v)}" title="${esc(fmtRem(v))}">${esc(remChip(v))}</button>`).join('')}<button class="${st.remc ? 'on' : ''}" data-q="remc" aria-expanded="${!!st.remc}">${tr('Other…|reminder')}</button></div></div>
       ${st.remc ? `<div class="prow remcust" role="group" aria-label="${esc(tr('Own reminder'))}"><input type="number" id="p-remn" min="1" max="999" inputmode="numeric" value="${esc(String(st.remn || 3))}" aria-label="${esc(tr('How many'))}"><select id="p-remu" aria-label="${esc(tr('Unit'))}">${REM_UNITS.map(([v, n]) => `<option value="${v}" ${String(st.remu || '1440') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select><span class="muted">${tr('before|reminder')}</span><button class="btn sm" data-q="remadd">${tr('Add')}</button></div>` : ''}
+      ${rat_row(st)}
       ${st.due ? `<div class="prow pdl"><label class="chkl"><input type="checkbox" id="p-dl" ${st.deadline ? 'checked' : ''}> ${ic('flag', 's')}${tr('Deadline')}</label>${st.deadline ? `<label class="chkl"><input type="checkbox" id="p-dlt" ${st.deadline === 2 ? 'checked' : ''}> ${tr('On Today from the first reminder')}</label>` : ''}</div>
       <div class="prow">${ic('repeat', 's')}<label class="muted pnagl" for="p-nag">${tr('Repeat reminder')}</label><select id="p-nag">${[['', tr('as the list ({0})', listById(t.list_id)?.nag ? nagLabel(listById(t.list_id).nag) : tr('Off|nag'))], ...NAG_OPTS.map(([v, n]) => [v, tr(n)])].map(([v, n]) => `<option value="${v}" ${st.nag === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>` : ''}
       <div class="prow">${ic('repeat', 's')}<select id="p-rep" aria-label="${esc(tr('Repeat'))}">${presets.map(([v, n]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${n}</option>`).join('')}${custom ? `<option value="${esc(cur)}" selected>${esc(repeatLabelBase(cur))}</option>` : ''}<option value="__custom">${tr('Custom…')}</option></select>${custom && !cu ? `<button class="iconbtn" data-q="cust" title="${tr('Edit')}" aria-label="${tr('Edit repeat')}">${ic('edit', 's')}</button>` : ''}</div>
       ${cu ? `<div class="rrcust" role="group" aria-label="${tr('Custom repeat')}">
         <div class="prow"><span class="muted">${tr('Every|repeat')}</span><input type="number" id="p-rn" min="1" max="99" value="${cu.n}" inputmode="numeric" aria-label="${tr('Interval')}"><select id="p-rf" aria-label="${tr('Unit')}">${[['DAILY', trn('day', 'days', cu.n)], ['WEEKLY', trn('week', 'weeks', cu.n)], ['MONTHLY', trn('month', 'months', cu.n)], ['YEARLY', trn('year', 'years', cu.n)]].map(([v, n]) => `<option value="${v}" ${cu.f === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
         ${cu.f === 'WEEKLY' ? `<div class="prow rrwd" role="group" aria-label="${tr('On')}">${wdOrder().map(i => `<button class="${cu.days.has(RR_WD[i]) ? 'on' : ''}" data-rwd="${RR_WD[i]}" aria-pressed="${cu.days.has(RR_WD[i])}" aria-label="${esc(WDL[i])}">${esc(WD[i])}</button>`).join('')}</div>` : ''}
+        ${cu.f === 'DAILY' ? `<div class="rrtimes" role="group" aria-label="${esc(tr('Times per day'))}">${cu.times.map((x, i) => `<div class="prow">${ic('clock', 's')}${timeIn('p-tm' + i, x, {label: tr('Time'), clear: false})}<button class="iconbtn" data-rtdel="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></div>`).join('')}${cu.times.length < 12 ? `<div class="prow"><button class="btn sm" data-q="rtadd">${esc(cu.times.length ? tr('Add a time') : tr('Several times a day'))}</button></div>` : ''}</div>` : ''}
         ${cu.extra ? `<div class="shint keep">${tr('This rule has more parts than the form shows; edit it below.')}</div>` : ''}
         <details class="rrx" ${cu.extra ? 'open' : ''}><summary>${tr('Advanced · rule text (RRULE)')}</summary><input id="p-rrule" value="${esc(cur)}" spellcheck="false" autocapitalize="off" aria-label="RRULE" placeholder="FREQ=WEEKLY;INTERVAL=3;BYDAY=MO,TH"></details></div>` : ''}
       ${st.repeat ? `<div class="prow" style="padding-left:1.375rem"><span class="muted" style="font-size:var(--fs-s)">${tr('Ends')}</span><select id="p-end" style="max-width:8.125rem" aria-label="${esc(tr('Ends'))}"><option value="never" ${end.type === 'never' ? 'selected' : ''}>${tr('never')}</option><option value="count" ${end.type === 'count' ? 'selected' : ''}>${tr('after count')}</option><option value="until" ${end.type === 'until' ? 'selected' : ''}>${tr('on date')}</option></select>${end.type === 'count' ? `<input type="number" id="p-endn" min="1" max="999" value="${esc(end.val)}" style="max-width:4.625rem"><span class="muted" style="font-size:var(--fs-s)">${trn('time', 'times', end.val)}</span>` : end.type === 'until' ? dateIn('p-endd', end.val, {label: tr('on date'), clear: false, min: st.due || ''}) : ''}</div>` : ''}
@@ -300,12 +308,18 @@ function datePop(anchor, id) {
       return;
     }
     if (q === 'nostart') { st.start = null; redraw(); }
+    if (q === 'ratx') { st.remind_at = null; redraw(); }  // 2.111.0 C (#2057)
     if (q === 'notime') { st.due_time = null; redraw(); }
     if (q === 'cust') { st.cust = true; redraw(); }
     if (b.dataset.rwd) {  // custom weekly repeat: weekday toggles
       const cu = rrForm(rrBase(st.repeat)); cu.days.has(b.dataset.rwd) ? cu.days.delete(b.dataset.rwd) : cu.days.add(b.dataset.rwd);
       if (!cu.days.size) cu.days.add(b.dataset.rwd);
       st.repeat = rrSetEnd(rrBuild(cu), rrEnd(st.repeat)); redraw(); $(`#pop [data-rwd="${b.dataset.rwd}"]`)?.focus();
+    }
+    if (q === 'rtadd' || b.dataset.rtdel !== undefined) {  // 2.116.0 D (#2066): times of a daily repeat
+      const cu = rrForm(rrBase(st.repeat)), ts = cu.times.length ? cu.times : ['08:00'];
+      if (q === 'rtadd') { const l = ts[ts.length - 1]; ts.push(cu.times.length ? `${pad(Math.min(23, +l.slice(0, 2) + 1))}:${l.slice(3)}` : '20:00'); } else ts.splice(+b.dataset.rtdel, 1);
+      rmdApply(cu, ts); redraw(); return;
     }
     if (q === 'cancel') closePop();
     if (q === 'done') closePop();  // instant: popOnClose -> finish()
@@ -321,6 +335,7 @@ function datePop(anchor, id) {
   };
   const dateChange = e => {
     if (e.target.id === 'p-remn' || e.target.id === 'p-remu') { st.remn = +$('#p-remn').value || 1; st.remu = $('#p-remu').value; return; }
+    if (rat_change(e, st)) { redraw(); return; }  // 2.111.0 C (#2057)
     if (e.target.id === 'p-dl') { st.deadline = e.target.checked ? 1 : 0; redraw(); }
     if (e.target.id === 'p-dlt') { st.deadline = e.target.checked ? 2 : 1; redraw(); }
     if (e.target.id === 'p-nag') { st.nag = e.target.value; redraw(); }
@@ -329,8 +344,10 @@ function datePop(anchor, id) {
       if (st.due_time && !st.reminders && S.settings.default_reminder !== '') st.reminders = S.settings.default_reminder;
       redraw();
     }
+    if (/^p-tm\d+$/.test(e.target.id)) { rmdApply(rrForm(rrBase(st.repeat)), $$('#pop .rrtimes input[type=hidden]').map(x => x.value)); redraw(); return; }
     if (e.target.id === 'p-rep') {
       let v = e.target.value;
+      if (v === '__multi') v = 'FREQ=DAILY;TIMES=0800,2000', st.cust = true; else
       if (v === '__custom') { st.cust = true; v = rrBase(st.repeat) || `FREQ=WEEKLY;BYDAY=${st.due ? RR_WD[pd(st.due).getDay()] : 'MO'}`; } else st.cust = false;
       st.repeat = !v ? '' : /COUNT=|UNTIL=/.test(v) ? v : rrSetEnd(v, rrEnd(st.repeat)); if (v && !st.due) st.due = today(); redraw();
     }

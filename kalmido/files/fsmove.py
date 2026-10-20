@@ -419,6 +419,8 @@ def files_move_space():
             c.execute(f"UPDATE upload_scan SET org_id=? WHERE kind='fs' AND ref_id IN ({','.join('?' * len(part))})", [to, *part])
         for n, _, _, _ in plan["roots"]:
             fs_log_add(c, n["id"], "moved_space", f"{fsm_ws(src)}->{fsm_ws(to)}")
+        from .extlinks import xl_space_moved
+        xl_space_moved(c, ids)  # 2.112.1 B (#2058): external links end with the move into another workspace
         bump(c)
         c.commit()
     except BaseException:

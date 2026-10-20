@@ -110,6 +110,7 @@ function clientSheet(c) {  // the time view of the client's month, then its prin
 
 // ---- the client dialog
 function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's area, null = private), o.stay (no jump to the client)
+  if (c && typeof loadModule === 'function') loadModule('ofundo').catch(() => {});  // 2.111.0 A (#2233): "Saved · Undo" after the save
   const md = modal(`<h3>${c ? tr('Edit client') : tr('New client')}</h3>
     <div class="row"><label for="cl-name">${tr('Name')}</label><input id="cl-name" maxlength="80" value="${esc(c?.name || '')}" autocomplete="organization"></div>
     <div class="row"><label for="cl-nx">${tr('Name addition')}</label><input id="cl-nx" maxlength="120" value="${esc(c?.name_extra || '')}" autocomplete="off" placeholder="${esc(tr('optional'))}" aria-describedby="cl-nx-h"></div>
@@ -158,7 +159,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
         gone = true;
       }
       md.remove(); await load(); render(); clReload();
-      toast(gone ? tr('The linked contact no longer exists; link removed.') : c ? tr('Saved') : tr('Added: {0}', r.name));
+      if (gone || !(c && typeof oun_saved === 'function' && oun_saved('client:' + c.id, r.name))) toast(gone ? tr('The linked contact no longer exists; link removed.') : c ? tr('Saved') : tr('Added: {0}', r.name));  // 2.111.0 A (#2233)
       if (!c && !o.stay) go('client/' + r.id);
       if (o.done) await o.done(r);
     } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }

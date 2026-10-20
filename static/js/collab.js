@@ -520,7 +520,8 @@ function fmtWhen(iso) {
 }
 const fmtDayAbs = s => fmtDay(pd(s).getFullYear() !== new Date().getFullYear() ? 'year' : 'short', pd(s));
 function actText(a, U) {  // "via API" after lines written through a personal access token
-  return actText0(a, U) + (a.data?.via === 'api' ? ` <span class="via">${tr('via API')}</span>` : a.data?.via === 'caldav' ? ` <span class="via">${tr('via CalDAV')}</span>` : '');
+  return actText0(a, U) + (a.data?.via === 'api' ? ` <span class="via">${tr('via API')}</span>` : a.data?.via === 'caldav' ? ` <span class="via">${tr('via CalDAV')}</span>`
+    : a.data?.via === 'webhook' ? ` <span class="via">${tr('via webhook')}</span>` : '');  // 2.115.0 A (#2061)
 }
 const viaName = (d, id, U) => d?.rule ? tr('Rule {0}', d.rule.name || '') : d?.via === 'public_link' && !id ? (d.ext_name ? tr('{0} (customer, via the link)', d.ext_name) : tr('Someone via the public link')) : uname(id, U);  // 2.50.0 (#329): + the customer's name
 function actText0(a, U) {

@@ -253,8 +253,11 @@ def org_files(c, oid):
                          "WHERE l.org_id=? UNION ALL SELECT f.path FROM list_files f JOIN lists l ON l.id=f.list_id WHERE l.org_id=? "
                          "UNION ALL SELECT f.path FROM budget_files f JOIN lists l ON l.id=f.list_id WHERE l.org_id=? "  # 2.72.0 (#1333)
                          "UNION ALL SELECT path FROM wiki_files WHERE org_id=? "  # 2.99.0 A (#2182): files of knowledge pages
-                         "UNION ALL SELECT path FROM sheet_files WHERE org_id=?",  # 2.124.0 B (#2110): files of table cells
-                         (oid, oid, oid, oid, oid)).fetchall()
+                         "UNION ALL SELECT path FROM sheet_files WHERE org_id=? "  # 2.124.0 B (#2110): files of table cells
+                         "UNION ALL SELECT path FROM tchat_files WHERE org_id=? "  # 2.113.1 (#2059): team chat files sealed for it
+                         "UNION ALL SELECT f.path FROM tchat_files f JOIN tchat_rooms r ON r.id=f.room_id JOIN lists l ON l.id=r.list_id "
+                         "WHERE r.kind='list' AND l.org_id=?",  # and those of its lists' channels
+                         (oid, oid, oid, oid, oid, oid, oid)).fetchall()
     return [os.path.join(ATT_DIR, r[0]) for r in rows if r[0]] + _office_files(oid) + list(f8f_icon_files(c, oid))
 
 
@@ -265,7 +268,8 @@ def all_files(c):
         rows = c.execute("SELECT path FROM attachments UNION ALL SELECT path FROM list_files UNION ALL SELECT path FROM fs_versions "
                          "UNION ALL SELECT path FROM chat_files UNION ALL SELECT path FROM budget_files "  # 2.72.0 (#1333)
                          "UNION ALL SELECT path FROM wiki_files "  # 2.99.0 A (#2182)
-                         "UNION ALL SELECT path FROM sheet_files").fetchall()  # 2.124.0 B (#2110)
+                         "UNION ALL SELECT path FROM sheet_files "  # 2.124.0 B (#2110)
+                         "UNION ALL SELECT path FROM tchat_files").fetchall()  # 2.113.1 (#2059): team chat files
     out = [os.path.join(ATT_DIR, r[0]) for r in rows if r[0]] + list(f8f_icon_files(c))  # 2.58.0 (#1805)
     if os.path.isdir(OFFICE_DIR):
         for name in sorted(os.listdir(OFFICE_DIR)):
@@ -354,6 +358,11 @@ SPACE_SQL = (
                             "WHERE v.path<>''", None),
     ("chat_files", "f.id", "SELECT f.id AS rid, f.path, NULL AS org_id, m.user_id AS owner_id FROM chat_files f "
                            "JOIN agent_chat m ON m.id=f.message_id WHERE f.path<>''", None),
+    # 2.113.1 (#2059): team chat files (org_id = the organisation of the conversation, else the uploader's account; a list
+    # channel's file: its list's space now)
+    ("tchat_files", "f.id", "SELECT f.id AS rid, f.path, CASE WHEN l.id IS NULL THEN f.org_id ELSE l.org_id END AS org_id, "
+                            "CASE WHEN l.id IS NULL THEN f.user_id ELSE l.owner_id END AS owner_id FROM tchat_files f "
+                            "JOIN tchat_rooms r ON r.id=f.room_id LEFT JOIN lists l ON l.id=r.list_id AND r.kind='list' WHERE f.path<>''", "r.list_id"),
     # 2.72.0 (#1333): the receipts of the household budget
     ("budget_files", "f.id", "SELECT f.id AS rid, f.path, l.org_id, l.owner_id FROM budget_files f JOIN lists l ON l.id=f.list_id "
                              "WHERE f.path<>''", "f.list_id"),

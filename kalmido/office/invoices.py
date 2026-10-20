@@ -37,7 +37,8 @@ STATE_TXT = {"issued": N_("Finalised"), "paid": N_("Paid"), "partial": N_("Partl
 TITLE_FALLBACK = {"invoice": {"de": "Rechnung", "en": "Invoice"}, "credit": {"de": "Gutschrift", "en": "Credit note"},
                   "reminder_1": {"de": "Zahlungserinnerung", "en": "Payment reminder"}, "reminder_2": {"de": "Mahnung", "en": "Reminder"},
                   "reminder_3": {"de": "Letzte Mahnung", "en": "Final reminder"},
-                  "delivery": {"de": "Lieferschein", "en": "Delivery note"}, "delivery_service": {"de": "Leistungsnachweis", "en": "Proof of service"}}  # 2.120.0 D (#2089)
+                  "delivery": {"de": "Lieferschein", "en": "Delivery note"}, "delivery_service": {"de": "Leistungsnachweis", "en": "Proof of service"},  # 2.120.0 D (#2089)
+                  "offer": {"de": "Angebot", "en": "Quotation"}}  # 2.113.2 (#2253): a finalised quotation is mailed too
 
 
 def _j(s, default):
@@ -170,6 +171,8 @@ def inv_refresh_paid(c, oid, did):
     if gross > 0 and (p["paid"] + p["credits"] >= gross or abs_skonto_covered(c, oid, r, p["credits"])):
         if r["status"] != "paid":
             c.execute("UPDATE office_docs SET status='paid', paid_at=?, updated_at=? WHERE id=? AND org_id=?", (ts, ts, did, oid))
+            from ..integrations.webhooks import who_note
+            who_note("invoice.paid", "invoice", did)  # 2.115.0 A (#2061): the payments reached the total
     elif r["status"] == "paid":
         c.execute("UPDATE office_docs SET status=?, paid_at=NULL, updated_at=? WHERE id=? AND org_id=?",
                   ("sent" if r["sent_at"] else "issued", ts, did, oid))
@@ -334,11 +337,11 @@ def inv_items_from_offer(c, oid, r, parts_mode=None, parts_title=None):
             row.update(qty=1, unit="flat", rate=pct[it["id"]]["total"])
         out.append(row)
     for ln in lines:
-        if ln["kind"] == "producing":
-            out.append({"kind": "service", "service_id": None, "title": ln["title"], "detail": ln.get("detail") or "", "qty": ln["qty"], "unit": "day",
+        if ln["kind"] == "producing":  # 2.113.1 (#2251): without its calculation (internal)
+            out.append({"kind": "service", "service_id": None, "title": ln["title"], "detail": "", "qty": ln["qty"], "unit": "day",
                         "rate": ln["rate"], "tax": "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1})
-        elif ln["kind"] == "raw" and not ln.get("optional"):
-            out.append({"kind": "service", "service_id": None, "title": ln["title"], "detail": ln.get("detail") or "", "qty": 1, "unit": "flat",
+        elif ln["kind"] == "raw" and not ln.get("optional") or ln["kind"] == "surcharge":  # 2.113.1 (#2252): + surcharge
+            out.append({"kind": "service", "service_id": None, "title": ln["title"], "detail": "" if ln["kind"] == "surcharge" else ln.get("detail") or "", "qty": 1, "unit": "flat",
                         "rate": ln["total"], "tax": "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1})
         elif ln["kind"] == "discount":
             out.append({"kind": "discount", "service_id": None, "title": ln["title"], "detail": ln.get("detail") or "", "qty": 1, "unit": "flat",
@@ -349,7 +352,10 @@ def inv_items_from_offer(c, oid, r, parts_mode=None, parts_title=None):
 def _insert_doc(c, oid, uid, row):
     ts = iso(now_utc())
     row.update(org_id=oid, number="", status="draft", totals="{}", created_by=uid, created_at=ts, updated_at=ts, sent_at=None)
-    return insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+    did = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+    from ..integrations.webhooks import who_note
+    who_note("invoice.created", "invoice", did)  # 2.115.0 A (#2061)
+    return did
 
 
 def _put_rows(c, oid, did, rows):
@@ -821,16 +827,24 @@ def inv_send(c, oid, uid, r, b):
     if r["kind"] == "invoice" and b.get("timesheet") in (1, True, "1", "true"):  # 2.120.0 D (#2089): the timesheet as a second attachment
         from .delivery import ls_sheet_file
         sheet = [ls_sheet_file(c, oid, uid, r)]
+    from .terms import agb_mail_files
+    mail_files, terms = agb_mail_files(c, oid, r, b, files + sheet)  # 2.113.2 (#2253): the terms PDF on request (quotations: by default; never to DATEV)
     u = g.user
     from .ledger import ofx_company
     rt = ofx_company(c, oid).get("email") or ""  # 2.39.0 (#1209 audit N4): the client's answer goes to the company, not the server
     rt = rt if re.fullmatch(r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+", rt) else None
-    _mail(to, subject, text, attachments=files + sheet, cc=cc or None, from_name=(u["display_name"] if u is not None and "display_name" in u.keys() else None),
+    _mail(to, subject, text, attachments=mail_files, cc=cc or None, from_name=(u["display_name"] if u is not None and "display_name" in u.keys() else None),
           reply_to=rt)
+    if r["kind"] == "offer" and r["status"] == "draft":  # 2.113.2 (#2253): a mailed quotation is sent (purchase, pipeline as in the app)
+        from .docs import odoc_set_status
+        odoc_set_status(c, oid, r["id"], "sent", uid, r)
     ts = iso(now_utc())
     c.execute("UPDATE office_docs SET status=CASE WHEN status IN ('issued') THEN 'sent' ELSE status END, sent_at=COALESCE(sent_at, ?), updated_at=? "
               "WHERE id=? AND org_id=?", (ts, ts, r["id"], oid))
-    ofx_log(c, oid, "send", doc_id=r["id"], detail={"to": to, "cc": cc, "files": [f[0] for f in files + sheet], **({"own_text": 1} if own else {})})
+    from ..integrations.webhooks import who_note
+    who_note("invoice.sent", "invoice", r["id"])  # 2.115.0 A (#2061): mailed
+    ofx_log(c, oid, "send", doc_id=r["id"], detail={"to": to, "cc": cc, "files": [f[0] for f in mail_files], **({"own_text": 1} if own else {}),
+                                                      **({"terms": terms} if terms else {})})  # 2.113.2 (#2253)
     return files, datev
 
 

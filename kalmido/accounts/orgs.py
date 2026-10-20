@@ -730,6 +730,7 @@ def org_mine_dict(c, r, uid):
     names = user_names(c, [m["user_id"] for m in mem])
     return {"id": r["id"], "name": r["name"], **org_icon_fields(r), "color": r["color"] or "", "domains": r["domains"],  # 2.87.9 (#1913)
             "photo_meta_strip": bool(r["photo_meta_strip"]),  # 2.61.0 B (#1819)
+            "ext_links": bool(r["ext_links"]),  # 2.112.1 B (#2058): external share links of the file store allowed
             "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "member",
                          "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
@@ -768,6 +769,10 @@ def org_mine_update(oid):
         if not isinstance(b["photo_meta_strip"], bool):
             return err(tr("Invalid value: {0}", "photo_meta_strip"))
         c.execute("UPDATE orgs SET photo_meta_strip=? WHERE id=?", (int(b["photo_meta_strip"]), oid))
+    if "ext_links" in b:  # 2.112.1 B (#2058): off = every external link of the organisation's files is dead at once (kept)
+        if not isinstance(b["ext_links"], bool):
+            return err(tr("Invalid value: {0}", "ext_links"))
+        c.execute("UPDATE orgs SET ext_links=? WHERE id=?", (int(b["ext_links"]), oid))
     _org_patch(c, oid, b)
     bump(c)
     c.commit()

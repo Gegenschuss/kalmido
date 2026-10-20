@@ -227,7 +227,9 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   q2.focus(); q2.dispatchEvent(pe);
   check(d.querySelector('.qadd .qfiles .qfile') && pe.defaultPrevented, '#678: a pasted image shows as a file chip');
   key(w, q2, 'Enter');
-  const tk = await until(async () => (await call('GET', '/api/state')).tasks.find(t => t.title === 'Ask @Bob about the logo'), 60);
+  // 2.111.0 (#2057): @Bob in the quick add assigns the task to Bob (the text leaves the title)
+  const tk = await until(async () => (await call('GET', '/api/state')).tasks.find(t => t.title === 'Ask about the logo'), 60);
+  check(tk && tk.assignee_id === BOB, '#2057: @Bob assigns the new task to Bob ' + JSON.stringify(tk && {title: tk.title, assignee_id: tk.assignee_id}));
   check(tk && await until(async () => ((await call('GET', `/api/tasks/${tk.id}`)).attachments || []).length === 1, 60), '#678: the task is created with the image attached');
   w.close();
 

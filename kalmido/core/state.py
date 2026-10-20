@@ -427,6 +427,8 @@ def task_query():
         if not cur:  # 2.40.0 (#1432): "Empty" counts the whole trash, not only the loaded page
             lids = [r[0] for r in c.execute(f"SELECT list_id FROM tasks WHERE deleted_at IS NOT NULL AND list_id IN {wr_sql()}", (uid, uid))]
             extra = {"deletable": sum(1 for x in lids if x in ok), "kept": sum(1 for x in lids if x not in ok)}
+        from ..tasks.tasktrash import ttp_days
+        extra["days"] = ttp_days()  # 2.116.0 A (#2063): the trash period (the client shows the days left per row)
     elif scope == "search":
         rows = search_tasks(c, uid, request.args.get('q', '').strip(), limit)
         if request.args.get("semantic") == "1":  # 2.59.0 B (#1375): + tasks of similar meaning (only visible ones)

@@ -1,0 +1,385 @@
+"""2.113.2 (#2253): the office's terms and conditions (AGB) as a PDF per language (de / en), sent along with quotations.
+
+Storage: the office folder like the logo and the stored document PDFs (<data dir>/office/<org_id>/), one file per content
+terms-<lang>-<sha16>.pdf (content-addressed, never overwritten: an older state stays readable for quotations that went out
+with it and for open approval links), sealed at rest with oc_write_file / read with oc_read_file. Flat below the
+organisation folder, so the backup's member rule and the restore (admin/backup.py) cover it unchanged. The current state per
+language is office_settings.terms = {"de": {file, sha256, date, name, bytes, uploaded_at}, "en": {...}}, set only by the
+routes below (excluded from the general settings PATCH and the master data import, like the logo).
+
+Routes (office_gate + office_org; members read, the office's admin writes; a personal office = its owner is the admin):
+GET    /api/office/terms                    {terms: {de: meta | null, en: meta | null}, admin}
+POST   /api/office/terms/<lang>             multipart file (PDF only: header %PDF-, at most AGB_MAX_MB) + date (YYYY-MM-DD,
+                                            default today) -> the new current state of that language
+GET    /api/office/terms/<lang>/file        the current file (?inline=1 shows it in the browser)
+DELETE /api/office/terms/<lang>             removes the entry only (the file stays for quotations already sent)
+POST   /api/office/terms/<lang>/restore     {sha256, date, name}: puts a state back that is stored in this office (the undo
+                                            step of "Remove"); 404 for a file of another office or a changed content
+Every change goes into the office log (target "terms").
+
+Freezing: finalising a document (ledger.ofx_finalize) notes the current state of the document's language in
+office_docs.terms (JSON {lang, date, sha256, file, name}) BEFORE anything is rendered. A finalised document uses exactly that
+state (PDF line, mail attachment, approval link, decision record); a draft uses the current state. A quotation finalised
+without a frozen state (older ones) never gets a line or an attachment (no wrong state). Invoices / credit notes / reminders
+may attach the terms on request (unticked by default): their frozen state, else the current one (they print no line).
+Documents made from templates (doctpl.py, kinds contract / confirmation) freeze the state when they are finished
+(office_gen_docs.terms) and offer it on their approval link. Only the document's language counts: terms in the other
+language only = no line, no attachment."""
+import datetime
+import hashlib
+import json
+import os
+import re
+import urllib.parse
+
+from flask import jsonify, request
+
+from ..core.config import app, OFFICE_DIR
+from ..core.i18n import tr
+from ..core.db import body, bump, db, err, iso, local_now, now_utc
+from ..core.access import Denied
+from ..core.orgcrypt import oc_read_file, oc_write_file
+from .model import office_gate, office_org, office_role, office_settings, office_settings_save
+
+AGB_LANGS = ("de", "en")
+AGB_MAX_MB = 10
+AGB_MAIL_MAX_MB = 20  # all attachments of one document mail together
+AGB_FILE_RE = re.compile(r"terms-(de|en)-[0-9a-f]{16}\.pdf")
+AGB_NAME_MAX = 120
+AGB_GEN_KINDS = ("contract", "confirmation")  # documents from templates that carry the terms (framework contract, order confirmation)
+# printed in the document's language (like the other print words of office/pdf.py)
+AGB_LINE = {"de": "Es gelten unsere AGB (Stand {0}), siehe Anhang.",
+            "en": "Our terms and conditions (as of {0}) apply, see attachment."}
+AGB_ATTACH = {"de": "AGB-Stand-{0}.pdf", "en": "Terms-{0}.pdf"}
+
+
+# ---------------------------------------------------------------- helpers
+def agb_path(oid, name):
+    """The path of a stored terms file of office area oid (None for a foreign / malformed name or a missing file)."""
+    if not isinstance(name, str) or not AGB_FILE_RE.fullmatch(name):
+        return None
+    p = os.path.join(OFFICE_DIR, str(int(oid)), name)
+    return p if os.path.isfile(p) else None
+
+
+def agb_lang(lang):
+    return "en" if str(lang or "").lower().startswith("en") else "de"
+
+
+def agb_all(c, oid):
+    """{de: meta | None, en: meta | None}: the current states whose file is there."""
+    t = office_settings(c, oid).get("terms") or {}
+    out = {}
+    for lg in AGB_LANGS:
+        m = t.get(lg) if isinstance(t, dict) else None
+        out[lg] = dict(m) if isinstance(m, dict) and agb_path(oid, m.get("file")) else None
+    return out
+
+
+def agb_current(c, oid, lang):
+    return agb_all(c, oid).get(agb_lang(lang))
+
+
+def agb_ref(meta, lang):
+    """The short reference noted with a document / a decision: {lang, date, sha256, file, name}."""
+    return {"lang": agb_lang(lang), "date": meta.get("date") or "", "sha256": meta.get("sha256") or "",
+            "file": meta.get("file") or "", "name": meta.get("name") or ""}
+
+
+def agb_frozen(v):
+    """The frozen state of a row value (office_docs.terms / office_gen_docs.terms) or None."""
+    try:
+        d = json.loads(v) if isinstance(v, str) and v else None
+    except ValueError:
+        return None
+    return d if isinstance(d, dict) and d.get("file") and d.get("sha256") else None
+
+
+def agb_doc_terms(c, oid, r):
+    """The terms state of document row r (office_docs) when the file is there, else None (see the module text)."""
+    from .ledger import ofx_locked
+    lang = agb_lang(r["lang"])
+    if ofx_locked(r):
+        t = agb_frozen(r["terms"] if "terms" in r.keys() else None)
+        if t and t.get("lang") == lang and agb_path(oid, t["file"]):
+            return t
+        if r["kind"] == "offer":
+            return None  # a quotation never shows a state it was not finalised with
+    cur = agb_current(c, oid, lang)
+    return agb_ref(cur, lang) if cur else None
+
+
+def agb_freeze(c, oid, r):
+    """ledger.ofx_finalize: note the current state of the document's language in office_docs.terms (before rendering)."""
+    cur = agb_current(c, oid, r["lang"])
+    c.execute("UPDATE office_docs SET terms=? WHERE id=? AND org_id=?",
+              (json.dumps(agb_ref(cur, r["lang"]), ensure_ascii=False) if cur else None, r["id"], oid))
+
+
+def agb_gen_freeze(c, oid, kind, lang):
+    """doctpl.dt_final: the JSON to note in office_gen_docs.terms (None for other kinds or without terms)."""
+    if kind not in AGB_GEN_KINDS:
+        return None
+    cur = agb_current(c, oid, lang)
+    return json.dumps(agb_ref(cur, lang), ensure_ascii=False) if cur else None
+
+
+def agb_gen_terms(c, oid, d):
+    """The frozen state of a finished document from a template (dict with "terms") when its file is there."""
+    t = agb_frozen((d or {}).get("terms"))
+    return t if t and agb_path(oid, t["file"]) else None
+
+
+def agb_fmt_date(v, lang):
+    """2026-10-19 -> 19.10.2026 (de) / 2026-10-19 (en)."""
+    try:
+        d = datetime.date.fromisoformat(str(v or ""))
+    except ValueError:
+        return str(v or "")
+    return d.strftime("%d.%m.%Y") if agb_lang(lang) == "de" else d.isoformat()
+
+
+def agb_print_line(c, oid, r, fmt_date=None):
+    """docs.odoc_render: the line "our terms apply, see attachment" of a quotation ('' without terms in its language)."""
+    if r["kind"] != "offer":
+        return ""
+    t = agb_doc_terms(c, oid, r)
+    if not t:
+        return ""
+    lang = agb_lang(r["lang"])
+    return AGB_LINE[lang].format((fmt_date(t["date"]) if fmt_date else "") or agb_fmt_date(t["date"], lang))
+
+
+def agb_attachment(c, oid, t):
+    """(file name, bytes, mime) of terms state t for a mail, or None when the file has gone."""
+    p = agb_path(oid, t.get("file"))
+    if not p:
+        return None
+    return (AGB_ATTACH[agb_lang(t.get("lang"))].format(t.get("date") or "undated"), oc_read_file(c, p), "application/pdf")
+
+
+def agb_mail_files(c, oid, r, b, files):
+    """invoices.inv_send: (files + the terms, terms ref | None). b["terms"]: true / false; missing = on for quotations only.
+    413 when the mail would get too large."""
+    want = b.get("terms")
+    want = r["kind"] == "offer" if want is None else want in (1, True, "1", "true")
+    t = agb_doc_terms(c, oid, r) if want else None
+    a = agb_attachment(c, oid, t) if t else None
+    if not a:
+        return files, None
+    if sum(len(f[1]) for f in files) + len(a[1]) > AGB_MAIL_MAX_MB * 1024 * 1024:
+        raise Denied(413, tr("The attachments are too large for one mail (at most {0} MB)", AGB_MAIL_MAX_MB))
+    return list(files) + [a], t
+
+
+def agb_public(meta):
+    return {k: meta.get(k) for k in ("date", "sha256", "name", "bytes", "uploaded_at")} if meta else None
+
+
+def agb_clean_name(v):
+    v = os.path.basename(str(v or "").replace("\\", "/"))
+    v = re.sub(r"[\x00-\x1f\x7f\"]+", "", v).strip()
+    return (v or "terms.pdf")[:AGB_NAME_MAX]
+
+
+def agb_disposition(name, inline=False):
+    """Content-Disposition with a plain ASCII fallback and the UTF-8 name."""
+    ascii_ = re.sub(r"[^A-Za-z0-9._-]+", "-", name).strip("-") or "terms.pdf"
+    return f"{'inline' if inline else 'attachment'}; filename=\"{ascii_}\"; filename*=UTF-8''{urllib.parse.quote(name)}"
+
+
+def agb_file_response(c, oid, t, name, inline=False):
+    from .pdfweb import _file_response
+    p = agb_path(oid, t.get("file"))
+    if not p:
+        raise Denied(404)
+    resp = _file_response(oc_read_file(c, p), "terms.pdf", "application/pdf", inline=inline)
+    resp.headers["Content-Disposition"] = agb_disposition(name, inline)
+    if inline:  # 2.113.2 (#2253) review: an uploaded PDF shown on the app's origin runs sandboxed (no scripts, no forms)
+        resp.headers["Content-Security-Policy"] = "sandbox"
+    return resp
+
+
+def agb_set(c, oid, lang, meta):
+    s = office_settings(c, oid)
+    t = dict(s.get("terms") or {})
+    if meta:
+        t[lang] = meta
+    else:
+        t.pop(lang, None)
+    s["terms"] = t
+    office_settings_save(c, oid, s)
+
+
+def agb_valid_date(v):
+    v = (v or "").strip() if isinstance(v, str) else ""
+    if not v:
+        return local_now().date().isoformat()
+    try:
+        d = datetime.date.fromisoformat(v)
+    except ValueError:
+        return None
+    return d.isoformat() if re.fullmatch(r"\d{4}-\d{2}-\d{2}", v) and 2000 <= d.year <= 2100 else None
+
+
+# ---------------------------------------------------------------- approval links (office/signoff.py)
+def agb_sig_terms(c, r):
+    """The terms of approval link r, or None: a quotation's like its PDF line (frozen when finalised, a quotation sent without
+    finalising the current state), a finished document's frozen state."""
+    if r["kind"] == "offer" and r["doc_id"]:
+        d = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (r["doc_id"], r["org_id"])).fetchone()
+        return agb_doc_terms(c, r["org_id"], d) if d is not None else None
+    if r["kind"] == "document" and r["gen_doc_id"]:
+        d = c.execute("SELECT terms FROM office_gen_docs WHERE id=? AND org_id=?", (r["gen_doc_id"], r["org_id"])).fetchone()
+        return agb_gen_terms(c, r["org_id"], {"terms": d["terms"]}) if d is not None else None
+    return None
+
+
+def agb_sig_html(c, r, lg, token, prefix):
+    """The download link of the terms on the customer's page ('' without frozen terms)."""
+    import html
+    t = agb_sig_terms(c, r)
+    if not t:
+        return ""
+    e = html.escape
+    return (f'<p><a class="pdf" href="{prefix}{e(token)}/terms" download rel="nofollow">'
+            f'{e(tr("Download the terms and conditions (PDF, as of {0})", agb_fmt_date(t["date"], lg), lg=lg))}</a></p>')
+
+
+def agb_sig_note(c, r, lg):
+    """The confirmation page's line naming the terms state ('' without)."""
+    import html
+    t = agb_sig_terms(c, r)
+    return f'<p>{html.escape(tr("Terms and conditions as of {0}", agb_fmt_date(t["date"], lg), lg=lg))}</p>' if t else ""
+
+
+def agb_sig_proto(c, r):
+    """The terms state noted in the decision record: {lang, date, sha256} or None."""
+    t = agb_sig_terms(c, r)
+    return {k: t[k] for k in ("lang", "date", "sha256")} if t else None
+
+
+# ---------------------------------------------------------------- routes
+def _ctx(admin=False):
+    c = db()
+    uid = office_gate(c)
+    return c, uid, office_org(c, uid, admin=admin)
+
+
+def _lang(lang):
+    if lang not in AGB_LANGS:
+        raise Denied(404)
+    return lang
+
+
+def _answer(c, oid, uid, **extra):
+    return jsonify(terms={lg: agb_public(m) for lg, m in agb_all(c, oid).items()}, admin=office_role(c, uid, oid) == "admin",
+                   max_mb=AGB_MAX_MB, **extra)
+
+
+@app.get("/api/office/terms")
+def agb_get():
+    """Members of the office: the current terms per language (metadata)."""
+    c, uid, oid = _ctx()
+    return _answer(c, oid, uid)
+
+
+@app.post("/api/office/terms/<lang>")
+def agb_upload(lang):
+    """The office's admin: multipart "file" (PDF, at most AGB_MAX_MB MB) + "date" (YYYY-MM-DD, default today)."""
+    from .ledger import ofx_log
+    c, uid, oid = _ctx(admin=True)
+    lang = _lang(lang)
+    f = request.files.get("file")
+    if not f:
+        return err(tr("No file"))
+    raw = f.read(AGB_MAX_MB * 1024 * 1024 + 1)
+    if len(raw) > AGB_MAX_MB * 1024 * 1024:
+        return err(tr("The file is too large (at most {0} MB)", AGB_MAX_MB), 413)
+    if not raw.startswith(b"%PDF-"):
+        return err(tr("Only PDF files"))
+    day = agb_valid_date(request.form.get("date"))
+    if not day:
+        return err(tr("Invalid value: {0}", "date"))
+    sha = hashlib.sha256(raw).hexdigest()
+    name = f"terms-{lang}-{sha[:16]}.pdf"
+    d = os.path.join(OFFICE_DIR, str(int(oid)))
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    if not os.path.isfile(os.path.join(d, name)):  # content-addressed: the same content is stored once, never overwritten
+        oc_write_file(c, oid, os.path.join(d, name), raw, fresh=True)
+    meta = {"file": name, "sha256": sha, "date": day, "name": agb_clean_name(f.filename), "bytes": len(raw), "uploaded_at": iso(now_utc())}
+    agb_set(c, oid, lang, meta)
+    ofx_log(c, oid, "upload", target="terms", detail=dict(agb_ref(meta, lang), bytes=len(raw)))
+    bump(c)
+    c.commit()
+    return _answer(c, oid, uid)
+
+
+@app.get("/api/office/terms/<lang>/file")
+def agb_file(lang):
+    """Members of the office: the current terms file of the language (?inline=1 to look at it)."""
+    c, uid, oid = _ctx()
+    m = agb_current(c, oid, _lang(lang))
+    if not m:
+        raise Denied(404)
+    return agb_file_response(c, oid, m, m.get("name") or "terms.pdf", inline=request.args.get("inline") == "1")
+
+
+@app.delete("/api/office/terms/<lang>")
+def agb_delete(lang):
+    """The office's admin: removes the current entry (the file stays for documents that went out with it).
+    Returns {removed: {sha256, date, name}} for the undo step (restore)."""
+    from .ledger import ofx_log
+    c, uid, oid = _ctx(admin=True)
+    lang = _lang(lang)
+    m = agb_current(c, oid, lang)
+    if not m:
+        raise Denied(404)
+    agb_set(c, oid, lang, None)
+    ofx_log(c, oid, "delete", target="terms", detail=agb_ref(m, lang))
+    bump(c)
+    c.commit()
+    return _answer(c, oid, uid, removed={"sha256": m["sha256"], "date": m["date"], "name": m.get("name") or ""})
+
+
+@app.post("/api/office/terms/<lang>/restore")
+def agb_restore(lang):
+    """The office's admin: {sha256, date, name} puts a stored state of this office back as the current one."""
+    from .ledger import ofx_log
+    c, uid, oid = _ctx(admin=True)
+    lang = _lang(lang)
+    b = body()
+    if not isinstance(b, dict) or not re.fullmatch(r"[0-9a-f]{64}", str(b.get("sha256") or "")):
+        return err(tr("Invalid data"))
+    sha = b["sha256"]
+    name = f"terms-{lang}-{sha[:16]}.pdf"
+    p = agb_path(oid, name)
+    if not p:
+        raise Denied(404)
+    data = oc_read_file(c, p)
+    if hashlib.sha256(data).hexdigest() != sha:
+        raise Denied(404)
+    day = agb_valid_date(b.get("date"))
+    if not day:
+        return err(tr("Invalid value: {0}", "date"))
+    meta = {"file": name, "sha256": sha, "date": day, "name": agb_clean_name(b.get("name")), "bytes": len(data), "uploaded_at": iso(now_utc())}
+    agb_set(c, oid, lang, meta)
+    ofx_log(c, oid, "restore", target="terms", detail=agb_ref(meta, lang))
+    bump(c)
+    c.commit()
+    return _answer(c, oid, uid)
+
+
+@app.get("/api/office/docs/<int:did>/terms")
+def agb_doc_get(did):
+    """Members of the office: the terms state document did would send / prints ({terms: {lang, date, sha256, name} | null,
+    default: ticked in the send dialog}); ?file=1 downloads that file."""
+    from .docs import doc_row
+    c, uid, oid = _ctx()
+    r = doc_row(c, oid, did)
+    t = agb_doc_terms(c, oid, r)
+    if request.args.get("file") == "1":
+        if not t:
+            raise Denied(404)
+        return agb_file_response(c, oid, t, AGB_ATTACH[agb_lang(t["lang"])].format(t["date"] or "undated"))
+    return jsonify(terms={k: t[k] for k in ("lang", "date", "sha256", "name")} if t else None, default=r["kind"] == "offer")

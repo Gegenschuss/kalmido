@@ -185,8 +185,9 @@ async function evEditor(o = {}) {
   const drawAtts = () => {
     $('#ev-atts', md).innerHTML = atts.length ? atts.map((a, i) => `<span class="evatp ps-${esc(a.partstat || 'needs-action')}">${a.user_id ? av(a.user_id, a.name || ppl.get(a.user_id) || '') : ic(a.contact_id ? 'user' : 'at', 's')}<span>${esc(a.name || ppl.get(a.user_id) || a.email)}</span><span class="muted evps">${esc(tr(EV_PS_WORD[a.partstat || 'needs-action']))}</span><button type="button" class="iconbtn" data-evatrm="${i}" aria-label="${esc(tr('Remove {0}', a.name || a.email || ''))}">${ic('x', 's')}</button></span>`).join('')
       : `<span class="muted">${tr('Only you')}</span>`;
+    evi_draw(md, atts);  // 2.111.0 B (#2056): the invitation switch (evinvite.js)
   };
-  drawRems(); drawAtts(); dvw_rows(md);
+  drawRems(); drawAtts(); dvw_rows(md); evi_init(md, ev, atts);
   const attList = async q => {  // suggestions: people of this server + contacts (name / e-mail)
     const opts = people.filter(u => !atts.some(a => a.user_id === u.id) && (!q || u.display_name.toLowerCase().includes(q.toLowerCase()))).slice(0, 8).map(u => ({v: u.display_name, k: 'u' + u.id}));
     if (feat('contacts') && q.length >= 2) {
@@ -228,6 +229,7 @@ async function evEditor(o = {}) {
       dpSet($('#ev-sd', md), s.slice(0, 10)); dpSet($('#ev-ed', md), endDay(en));
       if (!st.all_day) { dpSet($('#ev-stm', md), s.slice(11, 16)); dpSet($('#ev-etm', md), en.slice(11, 16)); }
       $('.evrep', md).hidden = $('.evatts', md).hidden = $('.evrems', md).hidden = scope === 'one';
+      evi_draw(md, atts);
       return;
     }
     const b = e.target.closest('[data-evm]'); if (!b) return;
@@ -245,7 +247,8 @@ async function evEditor(o = {}) {
         body.start = `${sd}T${val('ev-stm') || '09:00'}`; body.end = `${ed}T${val('ev-etm') || '10:00'}`;
         if (body.end < body.start) { toast(tr('The end must be after the start')); return; }
       }
-      if (dvw_isSub(val('ev-cal'))) { b.disabled = true; if (await dvw_save(o, val('ev-cal'), body)) md.remove(); else b.disabled = false; return; }  // 2.52.0 (#1128): a subscribed CalDAV calendar
+      if (evi_on(md)) body.send_invites = true;  // 2.111.0 B (#2056)
+      if (dvw_isSub(val('ev-cal'))) { delete body.send_invites; b.disabled = true; if (await dvw_save(o, val('ev-cal'), body)) md.remove(); else b.disabled = false; return; }  // 2.52.0 (#1128): a subscribed CalDAV calendar
       if (scope === 'one') {
         try { await api('PATCH', `/api/events/${ev.id}?occ=${encodeURIComponent(o.occ)}`, body); } catch { return; }
       } else {
@@ -387,6 +390,7 @@ async function evCalsModal() {
         own && collab() && {label: tr('Share…'), icon: 'users', fn: () => evShareModal(c, users, refresh)},
         evWrite(c) && {label: tr('Import a calendar file (ICS)…'), icon: 'upload', fn: () => evImport(c, refresh)},
         {label: tr('Export (ICS)'), icon: 'download', fn: () => { location.href = `/api/evcals/${c.id}/export.ics`; }},
+        {label: tr('Subscription link…'), icon: 'link', fn: () => evf_modal(c)},  // 2.111.0 B (#2056): evinvite.js
         {label: tr('Only this calendar'), icon: 'eye', fn: async () => { await cvxOnly(`e:${c.id}`); draw(); }},  // 2.36.1 (#1127)
         {label: tr('Show all calendars'), icon: 'all', fn: async () => { await cvxAll(); draw(); }},
         !own && {label: tr('Leave this calendar'), icon: 'logout', fn: async () => { if (!await askConfirm(tr('Leave the calendar “{0}”?', c.name), '', {ok: tr('Leave'), danger: true})) return; try { await api('DELETE', `/api/evcals/${c.id}/members/${S.me.id}`); } catch { return; } refresh(); }},

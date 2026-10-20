@@ -114,7 +114,7 @@ TENANT_EXEMPT = {
     "fs_shares": "2.48.0 (#1207): shares of a file store node, bound through the node; share targets are checked against its workspace (tenancy CHECKS)",
     "fs_log": "2.48.0 (#1207): the access history of a file store node, bound through the node (shown to its owners and editors)",
     "filters": _OWN, "user_settings": _OWN, "sessions": _OWN, "push_subs": _OWN, "templates": _OWN, "cal_subs": _OWN,
-    "recovery_codes": _OWN, "webauthn_creds": _OWN, "api_tokens": _OWN, "webhooks": _OWN + " (deliveries only for visible tasks)",
+    "recovery_codes": _OWN, "webauthn_creds": _OWN, "api_tokens": _OWN,
     "imports": _OWN, "sample_items": _OWN, "app_passwords": _OWN, "dav_sync2": _OWN, "journal": _OWN, "contact_care": _OWN,
     "user_invites": "an invitation / password link of one account (admins only)", "folder_props": _OWN + " (the defaults of a folder; each list keeps its org_id)",
     "folder_heads": _OWN + " (2.83.0 #1427: the header strip style of an owner's folder; no content)",
@@ -136,6 +136,7 @@ TENANT_EXEMPT = {
     "groups": "instance-wide groups of the operator: visible only through members one may see (B1); shares go through the rule",
     "group_members": "members of a group (see groups); materialized into list_members under the workspace rule",
     "tchat_msgs": _CHAT, "tchat_reads": _CHAT, "tchat_rx": _CHAT,
+    "tchat_members": "2.113.1 B (#2059): members of a team chat channel / group: bound through its room (tchat_rooms.org_id; tenancy CHECKS tchat_person / tchat_agent)",
     "agent_chat": "a person's chat with an agent (agent_id + user_id; the agent's workspace decides what it sees)",
     "chat_reactions": "per agent chat message",
     "agent_steps": "2.32.0 (#1081): an agent's steps for ONE person (its chat answer / its job for that person); only that person reads them",
@@ -152,6 +153,8 @@ TENANT_EXEMPT = {
     "wiki_keys": "2.64.3 (#1817): a wrapped key of a knowledge space -> its wiki_spaces row (org_id or owner_id); only the person it is wrapped for reads it",
     "wiki_key_pending": "2.64.3 (#1817): an organisation member waiting for the key of a knowledge space -> its wiki_spaces row (org_id)",
     "msv_links": "2.73.0 A (#661): the accounts of one person on other Kalmido servers (accounts/servers.py); only the person sees them",
+    "ev_cal_feeds": _CAL + " (2.111.0 B #2056: a person's subscription link; every fetch checks that the person still sees the calendar)",
+    "ev_invite_day": _OWN + " (2.111.0 B #2056: the person's count of invitation mails per day)",
 }
 schema_src = re.sub(r"--[^\n]*", "", read("kalmido", "core", "schema.py"))
 tables = {m.group(1): m.group(2) for m in re.finditer(r"CREATE TABLE IF NOT EXISTS (\w+)\s*\((.*?)\);", schema_src, re.S)}

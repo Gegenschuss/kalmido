@@ -34,6 +34,7 @@ addresses and paths to your setup.
 - [Several servers in one app (2.73)](#several-servers-in-one-app-273)
 - [Capacity, health and a worker process (2.102)](#capacity-health-and-a-worker-process-2102)
 - [Moving to a new server](#moving-to-a-new-server)
+- [Trash period of tasks (2.116)](#trash-period-of-tasks-2116)
 - [Production updates](#production-updates)
 - [Support Kalmido (supporter licence)](#support-kalmido-supporter-licence)
 
@@ -112,6 +113,21 @@ from the archive and hand a list over to another member; since 2.56 also *Edit* 
 colour, without needing a role in the list. That is all: tasks, sections, members and settings stay with the owner and the
 list's admins. Private lists are never shown or changed, agents cannot use these functions, every change lands in the
 dialog's history (old and new value) and the owner and the members get a News entry.
+
+**Inviting by e-mail (2.115).** An organisation's admin can invite somebody who has no account yet: *Settings >
+Organisation > Invite by e-mail* (address and role). Kalmido creates an account without a password (the user name is made
+from the address), makes it a member of that organisation in the chosen role and mails the invitation link (the link is
+shown, too, to pass on without mail). An address that already has an account is added as with *Add by e-mail address*.
+Open invitations are listed below with *Resend* (a new link, the old one stops working) and *Withdraw* (deletes the account,
+only while it never signed in and belongs to this organisation alone). Limits: 20 new invitations per inviting person and
+day, plus the daily mail budget. Instance admins switch it off under *Settings > Users > Registration on the login page*
+(*Organisation admins may invite new people by e-mail*, on by default); adding existing accounts stays possible.
+
+**Active sessions (2.115).** *Settings > Account > Active sessions* lists every browser and app a person is signed in with:
+browser and system (read from the User-Agent, nothing else about the device and no address is stored), how they signed in,
+since when and the last activity (written at most every five minutes). *Log out* ends one session, *Log out everywhere
+else* all but the current one; push notifications subscribed in an ended session stop with it. Agent tokens and app
+passwords are not sessions and stay as they are. A child account with the parents' PIN needs the PIN first.
 
 **Finding people by e-mail (2.49).** Under *Settings > Account > Find people* a person can find someone by their full
 e-mail address and send a connection request; once it is accepted, both see each other like after sharing a list. Only
@@ -974,6 +990,13 @@ published). ClamAV needs **about 1 to 1.5 GB of RAM**; `freshclam` inside the co
 `clamav:` block (and the `clamav-db` volume entry) from `docker-compose.yml`, then `docker compose up -d --remove-orphans`.
 Uploads are then taken without a scan and without a mark. An own ClamAV elsewhere: `KALMIDO_CLAMD=host:3310`.
 
+**ZIP downloads of the file store (2.138.1).** Several chosen items or a folder are packed on the server into a temporary
+file (the system's temp folder, removed as soon as the download starts) and refused beforehand when they pass a limit:
+`KALMIDO_FILES_ZIP_MAX_MB` (default `1024`, the sum of the file sizes) and `KALMIDO_FILES_ZIP_MAX_FILES` (default `5000`).
+Keep enough free space in the temp folder for the largest ZIP you allow. A folder ZIP through an external share link has
+lower limits of its own, `KALMIDO_EXT_ZIP_MAX_MB` (default `256`) and `KALMIDO_EXT_ZIP_MAX_FILES` (default `1000`), and is
+limited per link and per address; at most two ZIPs or phone scans are built at the same time per server process.
+
 **Photos turned by the camera** are turned upright and saved again when their metadata are removed (see TEAM.md). The
 re-encode holds the whole picture in memory, so it is done only up to `KALMIDO_PHOTO_MAX_PIXELS` pixels (2.81; default
 `40000000`, at least `1000000`); larger photos keep a small orientation mark instead. Lower it on a host with little memory.
@@ -1370,6 +1393,26 @@ Notes:
 5. **Tell people what to redo,** because it is bound to the old server or name: passkeys (if the name changed), the
    installed app and push permissions (reinstall), calendar and contact accounts (CalDAV / CardDAV), shortcut URLs for
    sharing, and calendar subscription (ICS) links.
+
+## Trash period of tasks (2.116)
+
+A task in the trash is deleted for good once it has been there for the trash period: with its subtasks, comments,
+field values, history and the attachment files on disk. The server checks at most once an hour, in portions of 500
+tasks. The run covers every trash, also tasks in shared lists of other owners (which "Empty trash" leaves to the list
+owner). Office records (invoices, receipts, bookings, agreements) never go with a task: they only lose the link.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `KALMIDO_TRASH_DAYS` | `30` | the trash period in days (shared with the other trash periods); `0` switches the task trash run off |
+| `KALMIDO_PURGE_TRASH` | (unset) | `1` = the trash runs delete, `0` = they only count; wins over the general switch |
+| `KALMIDO_RETENTION_PURGE` | (unset) | `1` = every retention run deletes |
+
+**Dry run by default:** while neither switch is on, the run only counts what it would delete and writes the numbers
+to the server log (`retention: trash/tasks would delete (dry run): tasks=…`), so an update never deletes anything by
+surprise. Read the counts, then switch it on. The app tells people the period in the trash either way.
+
+**Privacy policy:** if you publish one for your server, name the period, for example: "Tasks you delete stay in the
+trash for 30 days and are then deleted for good, with their comments and attachments."
 
 ## Production updates
 

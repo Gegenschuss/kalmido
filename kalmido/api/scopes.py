@@ -245,6 +245,7 @@ SCOPE_RULES = (
     (r"^/tasks/\{[^}]+\}/comments", "comments"),
     (r"^/comments/", "comments"),
     (r"^/time/", "time"),
+    (r"^/focus", "time"),  # 2.116.0 D (#2067): a focus session on a task becomes a time entry
     (r"^/imports/", "delete"),  # an import's undo deletes what it created
     (r"^/import/", "structure"),
     (r"^/lists/\{[^}]+\}/files", "attachments:write"),
