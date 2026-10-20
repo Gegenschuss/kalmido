@@ -434,6 +434,7 @@ document.addEventListener('click', async e => {
     case 'news-kind': newsKindSet(a.dataset.nk); renderView(); break;
     case 'news-dismiss': newsDismiss(+a.dataset.i); break;
     case 'news-settings': settingsModal('newskinds'); break;
+    case 'news-ws': wsSet(a.dataset.ws); break;  // 2.145.0 A (#2444)
     case 'news-unread': S.nf.unread = !S.nf.unread; LS.set('newsUnread', S.nf.unread); renderView(); break;
     case 'news-readall': newsReadAll().then(() => { if (S.route.mod === 'news') renderView(); }); break;  // 2.13.0: with undo
     case 'news-filter': if (a.dataset.nk === '') newsKindSet(''); S.nf.filter = 'fme' in a.dataset && S.nf.filter === 'me' && a.getAttribute('aria-pressed') === 'true' ? '' : a.dataset.f; LS.set('newsFilter', S.nf.filter);  /* 2.13.0: the chip toggles */ S.nf.items = null; renderView(); break;
