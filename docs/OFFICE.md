@@ -797,9 +797,18 @@ invoices and receipts. Kalmido has no bank access: you import the file you downl
   taken back. Amount and account are encrypted at rest.
 - **Which file** (2.144.1): **Import bank statement** first opens the dialog with a short hint: take the XML export
   **CAMT.053, booked transactions** (version V2 or V8 does not matter; only it brings the balance along); a CSV export works
-  too (columns chosen by hand, a balance only with a balance column); do not take pending transactions / CAMT.052 (not
-  booked yet, they would come twice later) or MT940 / MT942 (not read: such a file gets a clear message). The cash flow
-  has the same button next to the balance according to the bank; it opens this dialog and loads the cash flow again.
+  too (columns chosen by hand, a balance only with a balance column); better not CAMT.052 (day reports, see below) and
+  not MT940 / MT942 (not read: such a file gets a clear message). The cash flow has the same button next to the balance
+  according to the bank; it opens this dialog and loads the cash flow again.
+- **CAMT.052 day reports** (2.146): an entry's status (`Sts`, in camt.052.001.08 `Sts/Cd`) is read. Pending entries (PDNG,
+  anything not BOOK) are shown in the preview as "pending – not imported" and are never imported; the booked version comes
+  with a later report. A booking found by its bank reference (`AcctSvcrRef`, else the `EndToEndId`; `NOTPROVIDED` /
+  `NONREF` do not count; always together with the amount) in the office area or in an earlier file of the import counts
+  once, also with another day or text (pending first, booked later). The references are kept as keyed hashes only
+  (`office_bank_tx.rkeys`). When day reports were read the preview recommends the account statement (CAMT.053) for the
+  bookkeeping. CSV: a debit / credit mark column (S/H, Soll/Haben, D/C, -/+) next to an amount without a sign is guessed
+  (also an unnamed column right after the amount, and the Volksbank / Raiffeisenbank layouts); dates also as
+  `DD-MM-YYYY` and `YYYYMMDD`.
 - **Several files or a ZIP** (2.144.1): choose several statements at once, a ZIP file (e.g. one statement per day from the
   bank) or drop them onto the dialog. Everything becomes one preview sorted by day (then file, then row) and one import
   (one **Take back** / undo for all). A ZIP is read in memory only, never unpacked to disk: only `.xml`, `.csv` and `.txt`
@@ -819,7 +828,8 @@ Routes (office admins only; members 403, other areas 404, agents 403): `POST /ap
 Tables `office_bank_imports`, `office_bank_tx`, `office_bank_balances` (2.124, see Database). Both import routes take the JSON body `{text,
 filename?, mapping?, account?}` (one file) or, since 2.144.1, `multipart/form-data` with the field `files` (several, a ZIP
 is opened) and `mapping` (a JSON string) / `account` as form fields; the answer adds `files`, `file_errors [{file, error}]`
-and `skipped_files`, each preview row its `file`. `fmt` of a mixed import is `mixed`.
+and `skipped_files`, each preview row its `file`. `fmt` of a mixed import is `mixed`. Since 2.146 the answers add `pending_count` and `camt052`,
+each row `pending`; the mapping may name `sign` (the column of the debit / credit mark).
 
 ## Tax dates as tasks (2.90)
 

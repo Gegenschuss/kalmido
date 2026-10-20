@@ -2966,6 +2966,15 @@ MIGRATIONS = [
     ("doc_meta", "dup_of", "ALTER TABLE doc_meta ADD COLUMN dup_of BIGINT"),
     ("doc_meta", "dup_ok", "ALTER TABLE doc_meta ADD COLUMN dup_ok INTEGER NOT NULL DEFAULT 0"),
     # (2.146.0 B end)
+    # 2.146.0 C (#2469 #2455): the bank imports find a booking again by its reference (AcctSvcrRef / EndToEndId with the
+    # amount, keyed HMACs space separated, never the reference itself); the household budget also by day + amount +
+    # counterpart IBAN (ikey, keyed) and remembers the import run of an entry (import_run; budget_meta.runs = the last runs
+    # as JSON) so one import can be taken back. Older versions ignore them
+    ("office_bank_tx", "rkeys", "ALTER TABLE office_bank_tx ADD COLUMN rkeys TEXT NOT NULL DEFAULT ''"),
+    ("budget_entries", "rkeys", "ALTER TABLE budget_entries ADD COLUMN rkeys TEXT NOT NULL DEFAULT ''"),
+    ("budget_entries", "ikey", "ALTER TABLE budget_entries ADD COLUMN ikey TEXT NOT NULL DEFAULT ''"),
+    ("budget_entries", "import_run", "ALTER TABLE budget_entries ADD COLUMN import_run TEXT NOT NULL DEFAULT ''"),
+    ("budget_meta", "runs", "ALTER TABLE budget_meta ADD COLUMN runs TEXT NOT NULL DEFAULT '[]'"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

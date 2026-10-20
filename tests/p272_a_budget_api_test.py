@@ -286,7 +286,8 @@ check(rows[3]["error"] and rows[4]["error"] and rows[3]["n"] == 4, "broken rows 
 ok = [{k: x[k] for k in ("day", "amount", "kind", "title", "counterpart", "cat_id", "recurring_id")} for x in rows if not x["error"]]
 mp = dict(gs, counterpart=None)
 r = A.post(B + f"/api/budget/{L}/import/commit", json={"rows": ok, "mapping": mp, "columns": p["columns"]})
-check(r.status_code == 201 and r.json() == {"created": 3, "skipped_dup": 0}, "commit: 3 created " + r.text[:150])
+# 2.146.0 (#2455): the answer also names the import run
+check(r.status_code == 201 and {k: r.json().get(k) for k in ("created", "skipped_dup")} == {"created": 3, "skipped_dup": 0}, "commit: 3 created " + r.text[:150])
 check(R_W not in open_ids(M), "the linked template is booked by the import")
 check(one("SELECT COUNT(*) FROM budget_entries WHERE list_id=? AND source='csv'", (L,)) == 3, "source csv")
 p2 = A.post(B + f"/api/budget/{L}/import/parse", json={"text": CSV1}).json()
@@ -294,7 +295,7 @@ check(p2["guess"]["counterpart"] is None and p2["guess"]["amount"] == 4, "the sa
 rows2 = A.post(B + f"/api/budget/{L}/import/parse", json={"text": CSV1, "mapping": gs}).json()["rows"]
 check([x["dup"] for x in rows2 if not x["error"]] == [True, True, True], "the second import: every row a duplicate")
 r = A.post(B + f"/api/budget/{L}/import/commit", json={"rows": ok})
-check(r.json() == {"created": 0, "skipped_dup": 3}, "commit again: nothing twice " + r.text[:100])
+check({k: r.json().get(k) for k in ("created", "skipped_dup")} == {"created": 0, "skipped_dup": 3}, "commit again: nothing twice " + r.text[:100])
 CSV2 = ("Date,Description,Payee,Debit,Credit\n2026-09-20,Coffee,Cafe Example,3.50,\n2026-09-21,Refund,Shop Example,,10.00\n"
         "2026-09-22,Coffee,Cafe Example,3.50,\n")
 p = A.post(B + f"/api/budget/{L}/import/parse", json={"text": CSV2}).json()
@@ -315,9 +316,10 @@ check(r3[0]["day"] == "2026-09-01" and A.post(B + f"/api/budget/{L}/import/commi
 r3 = A.post(B + f"/api/budget/{L}/import/parse", json={"text": CSV3 + "01.09.26;Coffee;-2,00\n", "mapping": g3}).json()["rows"]
 check([x["dup"] for x in r3] == [True, True, False], "a third equal row later: only that one is new")
 check(A.post(B + f"/api/budget/{L}/import/parse", json={"text": "a;b\n" + "x" * (2 * 1024 * 1024)}).status_code in (400, 413), "more than 2 MB: refused")
-big = "Datum;Text;Betrag\n" + "01.09.2026;x;-1,00\n" * 3001
+# 2.146.0 (#2455): more than 3000 rows are read (the app takes them over in parts); the limit of one import is 20000
+big = "Datum;Text;Betrag\n" + "01.09.2026;x;-1,00\n" * 20001
 check(A.post(B + f"/api/budget/{L}/import/parse", json={"text": big, "mapping": g3 | {"date_format": "DD.MM.YYYY"}}).status_code == 400,
-      "more than 3000 rows: 400")
+      "more than 20000 rows: 400")
 check(A.post(B + f"/api/budget/{L}/import/parse", json={"text": CSV3, "mapping": dict(g3, date=9)}).status_code == 400, "a column out of range: 400")
 check(A.post(B + f"/api/budget/{L}/import/commit", json={"rows": [dict(o3[0], amount=-1)]}).status_code == 400, "commit checks again")
 

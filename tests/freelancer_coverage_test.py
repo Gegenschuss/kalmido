@@ -479,6 +479,8 @@ ROUTES = {
     "POST /api/budget/recurring/{}/book": "personal", "POST /api/budget/{}/cats": "personal",
     "POST /api/budget/{}/contracts": "personal", "POST /api/budget/{}/entries": "personal",
     "POST /api/budget/{}/import/commit": "personal", "POST /api/budget/{}/import/parse": "personal",
+    # 2.146.0 C (#2455): an import run listed / taken back (p2146_c_api_test.py)
+    "GET /api/budget/{}/import/runs": "personal", "POST /api/budget/{}/import/runs/{}/undo": "personal",
     "POST /api/budget/{}/recurring": "personal", "POST /api/family/contacts": "personal",
     "POST /api/family/contacts/{}/sync": "personal", "POST /api/family/deadlines": "personal",
     "POST /api/family/kids/{}/rewards": "personal", "POST /api/family/kids/{}/stars": "personal",

@@ -7480,6 +7480,12 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .bgpr select{max-width:100%;margin-top:.25rem}
 .bgwarn{color:var(--danger)}
 .bgprev{max-height:50vh;overflow-y:auto}
+/* 2.146.0 C (#2455 #2469): the household import -- the last imports, pending bookings, file messages */
+.bgrunl,.bgpendl,.bgcsv .bnk-files{list-style:none;margin:.25rem 0;padding:0;display:flex;flex-direction:column;gap:.25rem}
+.bgrun,.bgpendl li{display:flex;align-items:center;gap:.5rem;padding:.375rem 0;border-bottom:1px solid var(--line2);min-width:0}
+.bgrun .bgel,.bgpendl .bgel{flex:1;min-width:0}
+.bgpendl li{opacity:.7}
+.bgcsv .bnk-files li{display:flex;gap:.5rem;align-items:flex-start;min-width:0;overflow-wrap:anywhere}
 @media (max-width:30rem){.bgtiles{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.bg-saldo{grid-column:1/-1}.bgview{padding:.5rem .5rem 5rem}}
 /* 2.73.0 A (#661) Settings > Account > Servers: the short-name badge of a server (solid in the settings; the combined views use C's muted badge), the account rows */
 :is(.msvrow,.msvmodal) .msvb{display:inline-flex;align-items:center;justify-content:center;min-width:1.75rem;height:1.375rem;padding:0 .3125rem;border-radius:.375rem;background:var(--msvc,#6e56cf);color:#fff;font-size:var(--fs-xs);font-weight:700;letter-spacing:.02em;line-height:1;flex:0 0 auto;box-sizing:border-box}
