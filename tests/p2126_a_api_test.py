@@ -7,10 +7,10 @@
    data on the account key and back (docs-to-server-key)
  - #1979: the duplicate starts a fresh reminder fee, a client with finalised invoices stays in the organisation, broken
    input gives 400 instead of 500
-tenant-matrix: office
-freelancer-matrix: office
-freelancer-matrix: docs
+freelancer-matrix: office, files
 usage: p2126_a_api_test.py <datadir>      (a fresh container; P2126A_NOSTART=1 = the server already runs)"""
+import base64
+import json
 import os
 import subprocess
 import sys
@@ -30,6 +30,9 @@ FAILS, OKS = [], [0]
 FEAT = "cal,comments,collab,office,clients,time,docs"
 O = "/api/office"
 D = O + "/docs"
+CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+KEY = base64.b64encode(os.urandom(32)).decode()
+KEY2 = base64.b64encode(os.urandom(32)).decode()
 
 
 def check(cond, what):
@@ -64,10 +67,28 @@ def item(title, qty, rate, unit="day"):
             "intext": "intern", "cost": 0, "discountable": 1}
 
 
-if os.environ.get("P2126A_NOSTART") != "1":
-    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True)
+def start(key=KEY, keep=False):
+    extra = ["-e KALMIDO_ORGCRYPT_DELAY=0", "-e KALMIDO_ORGCRYPT_PAUSE=0", "-e KALMIDO_SECRET_KEY=" + key]
+    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " " + " ".join(extra), **({"KEEP": "1"} if keep else {}))
+    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
     time.sleep(0.8)
+
+
+def cli(*args, stdin=None):
+    r = subprocess.run(["docker", "exec", "-i", CT, "python", "-m", "kalmido.admin.orgcrypt_cli", *args], input=stdin,
+                       capture_output=True, text=True, timeout=300)
+    return r.returncode, r.stdout + r.stderr
+
+
+def status():
+    rc, out = cli("status")
+    assert rc == 0, out
+    return json.JSONDecoder().raw_decode(out[out.index("{"):])[0]
+
+
+if os.environ.get("P2126A_NOSTART") != "1":
+    start()
 s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice Admin", "password": "password123"}).ok
@@ -153,6 +174,83 @@ if r.status_code == 201:
     it = [x for x in Fr.get(B + f"{D}/{r.json()['id']}").json()["items"] if x["kind"] == "service"]
     check([x["title"] for x in it] == ["Privatprojekt"] and float(it[0]["qty"]) == 1.5, f"freelancer: the private list's hours are summed {it}")
 check(Fr.post(B + D + "/from-time", json={"client_id": CL, "from": "2026-05-01", "to": "2026-05-31"}).status_code == 404, "freelancer: an organisation's client 404")
+
+
+# ================================================================ #1971 / #1970 the documents' values (freelancer-matrix: files)
+def doc_view(S, ws):
+    j = S.get(B + "/api/docs/settings", params={"ws": ws}).json()
+    return {"rules": [{k: v for k, v in x.items() if k not in ("id", "pos")} for x in j.get("rules") or []],
+            "senders": sorted(x["name"] for x in j.get("senders") or [])}
+
+
+def doc_data(S, ws, tag):
+    r = S.post(B + "/api/docs/rules", json={"ws": ws, "kind": "any", "match": f"Rechnung {tag}", "sender": f"Versand {tag}"})
+    assert r.status_code == 201, r.text
+    r = S.post(B + "/api/docs/labels/sender", json={"ws": ws, "name": f"Absender {tag}", "ids": []})
+    assert r.status_code == 201, r.text
+
+
+def raw_rules(ws_prefix):
+    return [x[0] for x in sql("SELECT data FROM doc_rules WHERE ws LIKE ? ORDER BY id", (ws_prefix + "%",))]
+
+
+doc_data(Fr, "private", "eins")
+doc_data(A, f"org:{ORG}", "zwei")
+FV, AV = doc_view(Fr, "private"), doc_view(A, f"org:{ORG}")
+check(FV["senders"] == ["Absender eins"] and FV["rules"] and FV["rules"][0].get("sender") == "Versand eins", f"freelancer: own rule and sender {FV}")
+check(all(v.startswith("kenc1:") for v in raw_rules("u") + raw_rules("o")), "rules are sealed in both workspaces")
+st = status()
+check(st["docs"]["enc"] >= 4 and st["docs"]["plain"] == 0, f"status: the documents' values are counted {st.get('docs')}")
+check(st["docs_account_key"] is True and st["docs"]["private"]["account_key"] >= 2 and st["docs"]["private"]["server_key"] == 0,
+      f"#1970: private values on the account key {st['docs'].get('private')}")
+rc, out = cli("decrypt-all")
+check(rc == 0 and "still encrypted: 0" in out, "decrypt-all: nothing left sealed, also no document value " + out[-300:])
+check(not any(v.startswith("kenc1:") for v in raw_rules("")), "decrypt-all: the rules are plain")
+check(doc_view(Fr, "private") == FV and doc_view(A, f"org:{ORG}") == AV, "decrypt-all: everything reads the same")
+doc_data(Fr, "private", "drei")  # written while the encryption is off
+check(status()["docs"]["plain"] >= 6, "status: plain document values counted")
+rc, out = cli("encrypt-all")
+check(rc == 0, "encrypt-all " + out[-300:])
+st = status()
+check(st["docs"]["plain"] == 0 and st["docs"]["enc"] >= 6, f"encrypt-all: every document value sealed {st['docs']}")
+FV = doc_view(Fr, "private")
+check(FV["senders"] == ["Absender drei", "Absender eins"] and len(FV["rules"]) == 2, f"encrypt-all: the freelancer reads everything {FV}")
+check(doc_view(A, f"org:{ORG}") == AV, "encrypt-all: the organisation reads everything")
+# the way back for an older version and forward again
+rc, out = cli("docs-to-server-key")
+check(rc == 0 and '"left": 0' in out, "docs-to-server-key " + out[-300:])
+st = status()
+check(st["docs_account_key"] is False and st["docs"]["private"]["account_key"] == 0 and st["docs"]["private"]["server_key"] >= 4,
+      f"docs-to-server-key: private values on the server-derived key {st['docs']['private']}")
+check(doc_view(Fr, "private") == FV, "server-derived key: the same content")
+doc_data(Fr, "private", "vier")  # sealed in the older form while the switch is off
+FV = doc_view(Fr, "private")
+check(status()["docs"]["private"]["account_key"] == 0, "switch off: new values in the older form")
+rc, out = cli("docs-to-account-key")
+check(rc == 0 and '"left": 0' in out, "docs-to-account-key " + out[-300:])
+st = status()
+check(st["docs_account_key"] is True and st["docs"]["private"]["server_key"] == 0, f"docs-to-account-key {st['docs']['private']}")
+check(doc_view(Fr, "private") == FV, "account key: the same content")
+# the start-up pass moves values of the older form
+cli("docs-to-server-key")
+sql("DELETE FROM settings WHERE key='docs_account_key'", write=True)  # as after an update from an older version
+start(keep=True)
+Fr, A = sess("frida"), sess("alice")
+st = {}
+for _ in range(40):
+    st = status()
+    if st["docs"]["private"]["server_key"] == 0:
+        break
+    time.sleep(0.25)
+check(st["docs"]["private"]["server_key"] == 0 and st["docs"]["private"]["account_key"] >= 6, f"start-up pass: private values on the account key {st['docs']['private']}")
+check(doc_view(Fr, "private") == FV, "start-up pass: the same content")
+# a new server key: the account keys are stored again (rewrap-accounts), the private documents' values stay readable
+start(key=KEY2, keep=True)
+rc, out = cli("rewrap-accounts", "--old-key-file", "-", stdin=KEY + "\n")
+check(rc == 0, "rewrap-accounts " + out[-300:])
+Fr = sess("frida")
+check(doc_view(Fr, "private") == FV, "new server key: the freelancer's document values are still there")
+check(KEY not in out and KEY2 not in out, "no key in the output")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
