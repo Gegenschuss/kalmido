@@ -422,7 +422,8 @@ ROUTES = {
     "DELETE /api/orgs/{}/invites/{}": "orgadmin",
     # ---- own (61)
     "DELETE /api/account/export": "own", "DELETE /api/account/import/{}": "own", "DELETE /api/me/app-passwords/{}": "own",
-    "DELETE /api/me/avatar": "own", "DELETE /api/me/mail/token": "own", "DELETE /api/me/tokens/{}": "own",
+    "DELETE /api/me/avatar": "own", "GET /api/me/ntfy-inbox": "own", "PUT /api/me/ntfy-inbox": "own",
+    "DELETE /api/me/mail/token": "own", "DELETE /api/me/tokens/{}": "own",
     "DELETE /api/me/wait-suggestions": "own", "DELETE /api/me/webhooks/{}": "own", "DELETE /api/push/subs/{}": "own",
     "DELETE /api/v1/me/app-passwords/{}": "own", "GET /api/account/export": "own", "GET /api/account/export/file": "own",
     "GET /api/account/import": "own", "GET /api/account/import/{}": "own", "GET /api/me": "own",
@@ -550,7 +551,7 @@ ROUTES = {
     "DELETE /api/v1/tasks/{}/dependencies/{}": "tasks", "DELETE /api/v1/tasks/{}/links/{}": "tasks",
     "DELETE /api/v1/tasks/{}/waiting": "tasks", "DELETE /api/v1/trash": "tasks", "GET /api/attachments/{}": "tasks",
     "GET /api/briefing": "tasks", "GET /api/chat-files/{}": "tasks", "GET /api/comments/{}/choice": "tasks",
-    "GET /api/dayplan": "tasks", "GET /api/dayplan/review": "tasks", "GET /api/deps": "tasks", "GET /api/export.json": "tasks",
+    "GET /api/dayplan": "tasks", "GET /api/dayplan/review": "tasks", "GET /api/deps": "tasks", "GET /api/export.json": "tasks", "GET /api/export/todoist.zip": "tasks", "GET /api/export/markdown.zip": "tasks", 
     "GET /api/ical": "tasks", "GET /api/imports": "tasks", "GET /api/news": "tasks", "GET /api/notes": "tasks",
     "GET /api/notes/{}": "tasks", "GET /api/occurrences": "tasks", "GET /api/pomo/stats": "tasks", "GET /api/roadmap": "tasks",
     "GET /api/search": "tasks", "GET /api/search/messages": "tasks", "GET /api/sprints/{}": "tasks", "GET /api/stale": "tasks", "GET /api/state": "tasks",

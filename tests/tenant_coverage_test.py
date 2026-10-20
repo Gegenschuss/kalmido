@@ -473,7 +473,7 @@ ROUTES = {
     "DELETE /api/events/{}": "event", "POST /api/events/{}/restore": "event", "POST /api/events/{}/rsvp": "event",
     "POST /api/events/{}/prep-task": "event", "GET /api/tasks/{}/events": "event",
     # ---- export (2)
-    "GET /api/export.json": "export", "GET /api/v1/export": "export",
+    "GET /api/export.json": "export", "GET /api/export/todoist.zip": "export", "GET /api/export/markdown.zip": "export",  "GET /api/v1/export": "export",
     # ---- family (32)
     "GET /api/v1/family": "family", "POST /api/v1/family/occasions": "family",
     "GET /api/v1/family/deadline-types": "family", "POST /api/v1/family/deadlines": "family",
@@ -613,7 +613,8 @@ ROUTES = {
     "POST /api/favorites/suggestion": "own",  # 2.46.1 (#1361): a favourite suggestion from the person's own activity
     "PUT /api/tasks/mine-order": "own", "GET /api/me/wait-suggestions": "own", "DELETE /api/me/wait-suggestions": "own",  # 2.41.0 (#1205)
     "POST /api/onboarding": "own", "POST /api/sample": "own", "DELETE /api/sample": "own", "PATCH /api/settings": "own",
-    "POST /api/ntfy/test": "own", "GET /api/push/vapid": "own", "GET /api/push/subs": "own", "POST /api/push/subs": "own",
+    "POST /api/ntfy/test": "own", "GET /api/me/ntfy-inbox": "own", "PUT /api/me/ntfy-inbox": "own",  # 2.142.0 C (#2150)
+     "GET /api/push/vapid": "own", "GET /api/push/subs": "own", "POST /api/push/subs": "own",
     "DELETE /api/push/subs/{}": "own", "POST /api/push/unsubscribe": "own", "POST /api/push/handled": "own",
     "POST /api/push/test": "own", "GET /api/me": "own", "PATCH /api/me": "own", "POST /api/me/drop-token": "own",
     "GET /api/me/share/httpshortcuts.zip": "own", "PUT /api/me/avatar": "own", "POST /api/me/avatar": "own",
