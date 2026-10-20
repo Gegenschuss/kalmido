@@ -31,10 +31,10 @@ const change = (w, el, on) => { el.checked = on; el.dispatchEvent(new w.Event('c
   await call('bob', 'PATCH', '/api/settings', {lang: 'en', tour: 'done'});
 
   // ================= #2155: the account's appearance is applied on a device that has none of its own
-  await call('alice', 'PATCH', '/api/settings', {look: JSON.stringify({theme: 'light', accent: 'mint'})});
+  await call('alice', 'PATCH', '/api/settings', {look: JSON.stringify({theme: 'light', accent: 'sky'})});
   let w = await boot({user: 'alice'}); let d = w.document;
-  await until(() => d.documentElement.dataset.accent === 'mint', 40);
-  check(d.documentElement.dataset.theme === 'light' && d.documentElement.dataset.accent === 'mint', `the account's appearance is applied: ${d.documentElement.dataset.theme} / ${d.documentElement.dataset.accent}`);
+  await until(() => d.documentElement.dataset.accent === 'sky', 40);
+  check(d.documentElement.dataset.theme === 'light' && d.documentElement.dataset.accent === 'sky', `the account's appearance is applied: ${d.documentElement.dataset.theme} / ${d.documentElement.dataset.accent}`);
 
   w.eval(`settingsModal('look')`); await sleep(300);
   const pane = () => d.querySelector('.smodal [data-pane="look"]');
@@ -67,10 +67,10 @@ const change = (w, el, on) => { el.checked = on; el.dispatchEvent(new w.Event('c
   w.close();
   // the account has none yet: the device's own is uploaded once
   check((await look('bob')) === null, 'bob: no appearance saved yet');
-  w = await boot({user: 'bob', ls: {'tasks.theme': '"light"', 'tasks.accent': '"mint"'}}); d = w.document;
+  w = await boot({user: 'bob', ls: {'tasks.theme': '"light"', 'tasks.accent': '"sky"'}}); d = w.document;
   await until(async () => (await look('bob')), 30);
   const up = await look('bob');
-  check(up && up.theme === 'light' && up.accent === 'mint', 'first load: the local appearance goes to the account ' + JSON.stringify(up));
+  check(up && up.theme === 'light' && up.accent === 'sky', 'first load: the local appearance goes to the account ' + JSON.stringify(up));
   w.close();
 
   // ================= #2156: the activity table (Administration > Organisation)
