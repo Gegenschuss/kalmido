@@ -283,6 +283,7 @@ registering the ones of its area.
 | `render.js` | Rendering: the shell (sidebar, header, tabs) and task rows. |
 | `vlist.js` | Long lists (2.65.0): a view with more than 300 rows draws only the rows near the visible part (see below). |
 | `calendar.js` | Kanban, the calendar events' data and what other views show of the calendar. |
+| `swimlanes.js` | Kanban swimlanes (2.138.0): lanes by person, priority or a custom field, the drop into a lane. |
 | `calview.js` | 2.65.0 (#1823): the calendar views month / week / day and Settings > Calendars. Loaded on demand (module `calendar`). |
 | `timeline.js` | The timeline (Gantt). |
 | `depchain.js` | The chain moving along: drag preview, the not-moved note, "Pull the chain in" (2.67.0). |

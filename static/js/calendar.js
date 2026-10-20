@@ -12,13 +12,19 @@ function viewKanban() {
   const loose = tasks.filter(t => !sc(t) || !secs.some(s => s.id === sc(t)));
   if (loose.length || !secs.length) cols.push({id: null, name: secs.length ? tr('Unassigned') : tr('Tasks'), tasks: loose});
   for (const s of secs) cols.push({id: s.id, name: s.name, tasks: tasks.filter(t => sc(t) === s.id)});
-  return `${listHead(listById(lid))}<div class="kanban">${cols.map(c => `
+  // 2.138.0 D (#2060): the column parts are shared with the board in swimlanes (swimlanes.js); a lane's "+ Task" carries its key
+  const head = c => `<div class="khead" ${c.id ? `data-ksec="${c.id}"` : ''}>${c.id && !ro ? secHandle(c.id) : ''}${esc(c.name)} ${wip_kHead(c)}${spt_kSum(c, lid)}${c.id && !ro ? `<button class="iconbtn" data-act="section-menu" data-id="${c.id}" title="${esc(tr('More') + ': ' + c.name)}" aria-label="${esc(tr('More') + ': ' + c.name)}">${ic('dots', 's')}</button>` : ''}</div>`;
+  const add = (c, sw, swn) => ro ? '' : `<div class="kadd"><input placeholder="${tr('+ Task')}" aria-label="${esc(tr('New task in {0}', sw == null ? c.name : c.name + ' · ' + swn))}" data-kadd="${c.id ?? ''}"${sw == null ? '' : ` data-swl="${esc(sw)}"`} enterkeyhint="done"></div>`;
+  const knew = ro ? '' : `<div class="knew"><button class="btn sm" data-act="section-new">${ic('plus', 's')} ${tr('Column')}</button></div>`;
+  const swm = swlMode(lid);
+  if (swm) return `${listHead(listById(lid))}${swlBar(lid)}${swlBoard(lid, swm, cols, tasks, {head, add, knew})}`;
+  return `${listHead(listById(lid))}${swlBar(lid)}<div class="kanban">${cols.map(c => `
     <div class="kcol" data-kcol="${c.id ?? ''}">
-      <div class="khead" ${c.id ? `data-ksec="${c.id}"` : ''}>${c.id && !ro ? secHandle(c.id) : ''}${esc(c.name)} ${wip_kHead(c)}${spt_kSum(c, lid)}${c.id && !ro ? `<button class="iconbtn" data-act="section-menu" data-id="${c.id}" title="${esc(tr('More') + ': ' + c.name)}" aria-label="${esc(tr('More') + ': ' + c.name)}">${ic('dots', 's')}</button>` : ''}</div>
+      ${head(c)}
       <div class="kcards">${c.tasks.map(t => taskRow(t, {compact: true})).join('')}</div>
-      ${ro ? '' : `<div class="kadd"><input placeholder="${tr('+ Task')}" aria-label="${esc(tr('New task in {0}', c.name))}" data-kadd="${c.id ?? ''}" enterkeyhint="done"></div>`}
+      ${add(c)}
     </div>`).join('')}
-    ${ro ? '' : `<div class="knew"><button class="btn sm" data-act="section-new">${ic('plus', 's')} ${tr('Column')}</button></div>`}</div>`;
+    ${knew}</div>`;
 }
 
 // ------------------------------------------------------------------ calendar

@@ -8,8 +8,12 @@
 
 const RUL = {};  // list id -> {rules, limit, available}
 const RUL_TRIG = [['section', N_('A task comes into a column')], ['done', N_('A task is completed')], ['reopen', N_('A task is opened again')],
-  ['ltag', N_('A task gets a list tag')], ['due', N_('The due date is reached')]];
-const RUL_ACT = [['assign', N_('Assign to')], ['due', N_('Set the due date')], ['comment', N_('Write a comment')], ['move', N_('Move to')]];
+  ['ltag', N_('A task gets a list tag')], ['due', N_('The due date is reached')],
+  // 2.138.0 D (#2060): + created, assigned, custom field changed
+  ['created', N_('A task is created')], ['assigned', N_('A task is assigned')], ['field', N_('A custom field changes')]];
+const RUL_ACT = [['assign', N_('Assign to')], ['due', N_('Set the due date')], ['comment', N_('Write a comment')], ['move', N_('Move to')],
+  ['priority', N_('Set the priority')], ['tag', N_('Add a list tag')], ['field', N_('Set a custom field')]];  // 2.138.0 D (#2060)
+const RX_PRIO = [['none', N_('None')], ['low', N_('Low')], ['medium', N_('Medium')], ['high', N_('High')]];
 const RUL_DAYS = [0, 1, 2, 3, 7, 14, 30];
 const rul_on = l => !!l && !l.is_inbox && l.life !== 'health' && canManage(l);
 const rul_secs = lid => S.sections.filter(s => s.list_id === lid);
@@ -22,6 +26,9 @@ function rul_trigText(r) {
   if (t.kind === 'done') return tr('a task is completed');
   if (t.kind === 'reopen') return tr('a task is opened again');
   if (t.kind === 'ltag') return tr('a task gets the tag {0}', rul_q(n.tag || rul_gone()));
+  if (t.kind === 'created') return tr('a task is created');
+  if (t.kind === 'assigned') return t.user_id ? tr('a task is assigned to {0}', n.trig_user || rul_gone()) : tr('a task is assigned to someone');
+  if (t.kind === 'field') return rxTrigField(t, n);
   return tr('the due date of a task is reached');
 }
 function rul_dueText(d) {
@@ -32,8 +39,40 @@ function rul_actText(r) {
   if (a.kind === 'assign') return tr('assign it to {0}', n.user || rul_gone());
   if (a.kind === 'due') return rul_dueText(a.days);
   if (a.kind === 'comment') return tr('comment {0}', rul_q((a.text || '').length > 60 ? a.text.slice(0, 59) + '…' : a.text || ''));
+  if (a.kind === 'priority') return tr('set its priority to {0}', tr((RX_PRIO.find(x => x[0] === a.priority) || RX_PRIO[0])[1]));
+  if (a.kind === 'tag') return tr('add the tag {0}', rul_q(n.tag_to || rul_gone()));
+  if (a.kind === 'field') return rxActField(a, n);
   const where = [n.list, n.section_to].filter(Boolean).join(' › ') || (a.section_id ? rul_gone() : '');
   return tr('move it to {0}', where);
+}
+// 2.138.0 D (#2060): the sentences of the custom field trigger / action
+function rxTrigField(t, n) {
+  const f = rul_q(n.field || rul_gone());
+  if (t.value == null) return tr('the field {0} changes', f);
+  if (fieldById(t.field_id)?.type === 'checkbox' || t.value === '0') return t.value === '1' ? tr('the field {0} is checked', f) : tr('the field {0} is unchecked', f);
+  return tr('the field {0} is set to {1}', f, rul_q(n.value || t.value));
+}
+function rxActField(a, n) {
+  const f = rul_q(n.field_to || rul_gone());
+  if (a.value == null) return tr('clear the field {0}', f);
+  if (n.field_type === 'checkbox') return tr('check the field {0}', f);
+  return tr('set the field {0} to {1}', f, rul_q(n.value_to || a.value));
+}
+const rxFields = lid => fieldsAll(lid).filter(f => f.type !== 'formula');
+const rxOpt = (v, n, cur) => `<option value="${esc(String(v))}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`;
+function rxTrigValHtml(lid, fid, cur) {  // "set to" of a selection / checkbox field (else: any change)
+  const f = fieldById(+fid); if (!f || !['select', 'checkbox'].includes(f.type)) return '';
+  const os = f.type === 'checkbox' ? [['1', tr('Checked|checkbox')], ['0', tr('Unchecked|checkbox')]] : (f.options?.options || []).map(o => [o.id, o.name]);
+  return `<label for="rul-tfv">${tr('Value')}</label><select id="rul-tfv">${rxOpt('', tr('Any change'), cur)}${os.map(([v, nm]) => rxOpt(v, nm, cur)).join('')}</select>`;
+}
+function rxActValHtml(l, fid, cur) {  // the fixed value, as the field type asks
+  const f = fieldById(+fid); if (!f) return '';
+  const lab = `<label for="rul-fval">${tr('Value')}</label>`, c = cur ?? '';
+  if (f.type === 'checkbox') return lab + `<select id="rul-fval">${rxOpt('1', tr('Checked|checkbox'), c ? '1' : '')}${rxOpt('', tr('Unchecked|checkbox'), c ? '1' : '')}</select>`;
+  if (f.type === 'select') return lab + `<select id="rul-fval">${rxOpt('', tr('Empty|value'), c)}${(f.options?.options || []).map(o => rxOpt(o.id, o.name, c)).join('')}</select>`;
+  if (f.type === 'person') return lab + `<select id="rul-fval">${rxOpt('', tr('Empty|value'), c)}${listPeople(l).map(p => rxOpt(p.user_id, p.name, c)).join('')}</select>`;
+  if (f.type === 'date') return lab + dateIn('rul-fval', c, {label: tr('Value')});
+  return lab + `<input id="rul-fval" ${f.type === 'number' ? 'inputmode="decimal"' : ''} maxlength="1000" value="${esc(String(c))}" placeholder="${esc(tr('Empty|value'))}">`;
 }
 const rul_sentence = r => tr('When {0}, then {1}.', rul_trigText(r), rul_actText(r));
 
@@ -97,6 +136,7 @@ function rul_dialog(lid, r, done) {
     <div class="row"><label for="rul-name">${tr('Name')}</label><input id="rul-name" maxlength="80" value="${esc(r?.name || '')}" placeholder="${esc(tr('e.g. Review'))}"></div>
     <div class="row"><label for="rul-trig">${tr('When')}</label><select id="rul-trig">${RUL_TRIG.map(([k, n]) => opt(k, tr(n), t.kind)).join('')}</select></div>
     <div class="row" id="rul-tv"></div>
+    <div class="row" id="rul-tv2" hidden></div>
     <div class="row"><label for="rul-act">${tr('Then|rule')}</label><select id="rul-act">${RUL_ACT.map(([k, n]) => opt(k, tr(n), a.kind)).join('')}</select></div>
     <div id="rul-av"></div>
     <div class="shint keep">${tr('The rule runs with your rights. A change made by a rule never starts another rule.')}</div>
@@ -107,7 +147,15 @@ function rul_dialog(lid, r, done) {
     const k = $('#rul-trig', md).value, x = $('#rul-tv', md);
     if (k === 'section') x.innerHTML = `<label for="rul-tsec">${tr('Column')}</label><select id="rul-tsec">${rul_secs(lid).map(s => opt(s.id, s.name, t.section_id)).join('') || opt('', tr('No columns yet'))}</select>`;
     else if (k === 'ltag') x.innerHTML = `<label for="rul-ttag">${tr('Tag')}</label><select id="rul-ttag">${listTags(lid).map(g => opt(g.id, g.name, t.tag_id)).join('') || opt('', tr('No list tags yet'))}</select>`;
+    else if (k === 'assigned') x.innerHTML = `<label for="rul-tuser">${tr('Person')}</label><select id="rul-tuser">${opt('', tr('Anyone'), t.user_id)}${listPeople(l).map(p => opt(p.user_id, p.name, t.user_id)).join('')}</select>`;
+    else if (k === 'field') x.innerHTML = `<label for="rul-tfld">${tr('Field')}</label><select id="rul-tfld">${rxFields(lid).map(f => opt(f.id, f.name, t.field_id)).join('') || opt('', tr('No custom fields yet'))}</select>`;
     else x.innerHTML = '';
+    x.hidden = !x.innerHTML;
+    drawTV();
+  };
+  const drawTV = () => {  // 2.138.0 D (#2060): the value of a field trigger
+    const x = $('#rul-tv2', md), k = $('#rul-trig', md).value, fid = $('#rul-tfld', md)?.value;
+    x.innerHTML = k === 'field' ? rxTrigValHtml(lid, fid, +fid === t.field_id ? t.value : '') : '';
     x.hidden = !x.innerHTML;
   };
   const drawA = (lst) => {
@@ -115,6 +163,13 @@ function rul_dialog(lid, r, done) {
     if (k === 'assign') x.innerHTML = `<div class="row"><label for="rul-user">${tr('Person')}</label><select id="rul-user">${listPeople(l).map(p => opt(p.user_id, p.name, a.user_id)).join('')}</select></div>`;
     else if (k === 'due') x.innerHTML = `<div class="row"><label for="rul-days">${tr('Due')}</label><select id="rul-days">${RUL_DAYS.map(d => opt(d, d ? trn('in {0} day', 'in {0} days', d) : tr('today'), a.days)).join('')}${opt('none', tr('No date|clear'), a.kind === 'due' && a.days == null ? 'none' : '')}</select></div>`;
     else if (k === 'comment') x.innerHTML = `<div class="row"><label for="rul-text">${tr('Comment')}</label><textarea id="rul-text" rows="3" maxlength="2000">${esc(a.text || '')}</textarea></div>`;
+    else if (k === 'priority') x.innerHTML = `<div class="row"><label for="rul-prio">${tr('Priority')}</label><select id="rul-prio">${RX_PRIO.map(([v, n]) => opt(v, tr(n), a.priority || 'high')).join('')}</select></div>`;
+    else if (k === 'tag') x.innerHTML = `<div class="row"><label for="rul-atag">${tr('Tag')}</label><select id="rul-atag">${listTags(lid).map(g => opt(g.id, g.name, a.tag_id)).join('') || opt('', tr('No list tags yet'))}</select></div>`;
+    else if (k === 'field') {
+      const fs = rxFields(lid), fid = lst || (a.kind === 'field' && a.field_id) || fs[0]?.id;
+      x.innerHTML = `<div class="row"><label for="rul-afld">${tr('Field')}</label><select id="rul-afld">${fs.map(f => opt(f.id, f.name, fid)).join('') || opt('', tr('No custom fields yet'))}</select></div>
+        <div class="row" id="rul-afv">${rxActValHtml(l, fid, a.kind === 'field' && +fid === a.field_id ? a.value : '')}</div>`;
+    }
     else {
       const to = lst || a.list_id || lid;
       x.innerHTML = `<div class="row"><label for="rul-list">${tr('List')}</label><select id="rul-list">${rul_targets(lid).map(y => opt(y.id, y.id === lid ? tr('This list') : lname(y), to)).join('')}</select></div>
@@ -126,15 +181,19 @@ function rul_dialog(lid, r, done) {
     if (e.target.id === 'rul-trig') drawT();
     if (e.target.id === 'rul-act') drawA();
     if (e.target.id === 'rul-list') drawA(+e.target.value);
+    if (e.target.id === 'rul-tfld') drawTV();
+    if (e.target.id === 'rul-afld') drawA(+e.target.value);
   });
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     if (b.dataset.m !== 'save') return;
     const tk = $('#rul-trig', md).value, ak = $('#rul-act', md).value, v = id => $('#' + id, md)?.value || '';
-    const trig = {kind: tk, ...(tk === 'section' ? {section_id: +v('rul-tsec') || null} : tk === 'ltag' ? {tag_id: +v('rul-ttag') || null} : {})};
+    const trig = {kind: tk, ...(tk === 'section' ? {section_id: +v('rul-tsec') || null} : tk === 'ltag' ? {tag_id: +v('rul-ttag') || null}
+      : tk === 'assigned' ? {user_id: +v('rul-tuser') || null} : tk === 'field' ? {field_id: +v('rul-tfld') || null, value: v('rul-tfv') || null} : {})};
     const act = {kind: ak, ...(ak === 'assign' ? {user_id: +v('rul-user') || null} : ak === 'due' ? {days: v('rul-days') === 'none' ? null : +v('rul-days')}
-      : ak === 'comment' ? {text: v('rul-text')} : {list_id: +v('rul-list') || lid, section_id: +v('rul-sec') || null})};
+      : ak === 'comment' ? {text: v('rul-text')} : ak === 'priority' ? {priority: v('rul-prio')} : ak === 'tag' ? {tag_id: +v('rul-atag') || null}
+      : ak === 'field' ? {field_id: +v('rul-afld') || null, value: v('rul-fval').trim() || null} : {list_id: +v('rul-list') || lid, section_id: +v('rul-sec') || null})};
     const q = {name: v('rul-name').trim() || tr(RUL_TRIG.find(x => x[0] === tk)[1]), trigger: trig, action: act};
     b.disabled = true;
     try { await calReq(r ? 'PATCH' : 'POST', r ? `/api/rules/${r.id}` : `/api/lists/${lid}/rules`, q); }

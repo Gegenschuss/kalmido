@@ -877,7 +877,7 @@ function renderView0() {
   const sai = $('#view .secadd-in'), saiF = !!sai && document.activeElement === sai;
   // 2.12.2 (#453 B2): any other focused field of the view (Kanban "+ Task", search, …) comes back with its text, caret and focus
   const fa = document.activeElement, fk = fa && el.contains(fa) && editFocused() && fa !== qi && fa !== tin && fa !== sai
-    ? (fa.id ? () => document.getElementById(fa.id) : 'kadd' in fa.dataset ? () => [...el.querySelectorAll('[data-kadd]')].find(x => x.dataset.kadd === fa.dataset.kadd) : null) : null;
+    ? (fa.id ? () => document.getElementById(fa.id) : 'kadd' in fa.dataset ? () => [...el.querySelectorAll('[data-kadd]')].find(x => x.dataset.kadd === fa.dataset.kadd && x.dataset.swl === fa.dataset.swl) : null) : null;
   const fv = fk && fa.value, fs = fk && [fa.selectionStart, fa.selectionEnd];
   if (sai && S.secAdd) S.secAdd.v = sai.value;
   if (m !== 'cal') el.classList.remove('calfit');

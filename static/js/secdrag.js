@@ -3,13 +3,14 @@
 // on a phone (below, like a task: a buzz, the section folds while it is dragged). Held and let go without moving: the menu
 // with up / down as before (the way without dragging).
 const sb_secKan = () => !!$('#view .kcol[data-kcol]');
-const sb_secEls = () => sb_secKan() ? $$('#view .kcol[data-kcol]') : $$('#view .ghead[data-section]').map(h => h.closest('.group') || h);
+// 2.138.0 D (#2060): with swimlanes only the head row's columns (.swlc = a lane's cells)
+const sb_secEls = () => sb_secKan() ? $$('#view .kcol[data-kcol]:not(.swlc)') : $$('#view .ghead[data-section]').map(h => h.closest('.group') || h);
 const sb_secHead = el => el.classList.contains('group') ? el.querySelector('.ghead[data-section]') || el : el;
 // -> {el: the head / column to go before, end: after the last one} or null; el = the element under the pointer, used when
 // nothing is laid out (no sizes)
 function sb_secSpot(x, y, el) {
   const kan = sb_secKan(), els = sb_secEls(), n = sb_dropNear(els, kan ? x : y, kan ? 'x' : 'y', 48);
-  if (!n) { const t = el?.closest?.('#view .ghead[data-section], #view .kcol[data-kcol]'); return t ? {el: t, end: false} : null; }
+  if (!n) { const t = el?.closest?.('#view .ghead[data-section], #view .kcol[data-kcol]:not(.swlc)'); return t ? {el: t, end: false} : null; }
   const i = els.indexOf(n.el);
   return n.after && i < els.length - 1 ? {el: sb_secHead(els[i + 1]), end: false} : {el: sb_secHead(n.el), end: n.after};
 }
