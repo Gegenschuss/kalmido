@@ -426,6 +426,7 @@ ROUTES = {
     "POST /api/office/legacy/counter": "office",
     "POST /api/office/legacy/archive/address": "office",  # 2.40.0 (#1421): the address of an archived PDF (p2400_k_api_test.py)
     "GET /api/office/legacy/archive/{}": "office",  # 2.81.0 B (#1834): one archived document + its history (p281_b_api_test.py)
+    "POST /api/office/legacy/runs/{}/tidy": "office", "POST /api/office/services/renumber": "office",  # 2.138.0 E (#2241, #2237): p2138_e_api_test.py
     # ---- comment (9)
     "POST /api/comments/{}/decide": "comment", "POST /api/v1/comments/{}/reactions": "comment",
     "DELETE /api/v1/comments/{}/reactions/{}": "comment", "PATCH /api/v1/comments/{}": "comment",
