@@ -477,10 +477,11 @@ def inv_from_time(c, oid, uid, b):
     pid = b.get("project_id")
     # the WHERE part first (a fragment: pg_prepare only checks the complete statement below)
     from ..core.access import vis_sql
-    # 2.86.0 (N16): only the lists the person making the invoice sees (their hours, names)
+    # 2.86.0 (N16): only the lists the person making the invoice sees (their hours, names); 2.126.0 A (#1967): the
+    # personal office's lists are the owner's private ones (org_id NULL)
     sql = ("FROM time_entries e JOIN lists l ON l.id=e.list_id "
-           f"WHERE l.client_id=? AND l.org_id=? AND l.id IN {vis_sql()} AND e.\"end\" IS NOT NULL AND e.start>=? AND e.start<?")
-    args = [cid, oid, uid, uid, d_from + "T00:00:00", (date.fromisoformat(d_to) + timedelta(days=1)).isoformat() + "T00:00:00"]
+           f"WHERE l.client_id=? AND {pb_cl_sql(c, oid, 'l.org_id', 'l.owner_id')} AND l.id IN {vis_sql()} AND e.\"end\" IS NOT NULL AND e.start>=? AND e.start<?")
+    args = [cid, uid, uid, d_from + "T00:00:00", (date.fromisoformat(d_to) + timedelta(days=1)).isoformat() + "T00:00:00"]
     if pid not in (None, "", 0):
         try:
             pid = int(pid)

@@ -369,6 +369,9 @@ def v1_rc_list():
     if _is_agent():
         where.append("agent_id=?")
         args.append(uid)
+    else:  # 2.126.0 A (#1979 L7): a person -- only documents they see, before the limit
+        from ..files.store import fs_visible_sql_c
+        where.append(f"node_id IN {fs_visible_sql_c(c, uid)}")
     if st != "all":
         where.append("state=?")
         args.append(st)
