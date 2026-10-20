@@ -249,6 +249,33 @@ def pdf_wrap(text, size, width, bold=False):
     return out
 
 
+def pb_wrap(text, size, width, bold=False, spacing=0.0):
+    """2.138.0 A (#2240): pdf_wrap for a spaced heading line (the character spacing counts into the width)."""
+    if not spacing:
+        return pdf_wrap(text, size, width, bold)
+    out = []
+
+    def emit(line):
+        while len(line) > 1 and pdf_text_width(line, size, bold, spacing) > width:  # one long word: cut by characters
+            k = len(line) - 1
+            while k > 1 and pdf_text_width(line[:k], size, bold, spacing) > width:
+                k -= 1
+            out.append(line[:k])
+            line = line[k:]
+        out.append(line)
+    for ln in pdf_wrap(text, size, width, bold):
+        line = ""
+        for w in ln.split(" "):
+            cand = (line + " " + w) if line else w
+            if not line or pdf_text_width(cand, size, bold, spacing) <= width:
+                line = cand
+                continue
+            emit(line)
+            line = w
+        emit(line)
+    return out
+
+
 def _rgb(hexcol):
     h = (hexcol or "").strip().lstrip("#")
     if not re.fullmatch(r"[0-9a-fA-F]{6}", h):
@@ -912,10 +939,15 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
 
     # -- title line, project title, intro
 
+    # 2.138.0 A (#2240): a long title wraps over the full width (the page count sits in the footer); the accent line under its last line
+    t_lines = pb_wrap(title.upper(), 16, PDF_CW, True, 1.0)
+
     def draw_title(p, y):
-        p.text(PDF_L, y + 6, title.upper(), 16, True, C_INK, spacing=1.0)
-        p.line(PDF_L, y + 6 + 22, PDF_L + 14 * MM, y + 6 + 22, 1.6, accent)
-    block(34, draw_title, keep_next=True)
+        for j, s in enumerate(t_lines):
+            p.text(PDF_L, y + 6 + j * 20, s, 16, True, C_INK, spacing=1.0)
+        ly = y + 6 + (len(t_lines) - 1) * 20 + 22
+        p.line(PDF_L, ly, PDF_L + 14 * MM, ly, 1.6, accent)
+    block(34 + (len(t_lines) - 1) * 20, draw_title, keep_next=True)
     if m.get("project_title"):
         pt = str(m["project_title"])
         n = len(pdf_wrap(pt, 10.4, PDF_CW, True))
@@ -1223,12 +1255,20 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         ptitle = str(part.get("title") or "")
         psub = " · ".join(x for x in (f"{L['number']} {number}" if number else "", str(m.get("project_title") or "")) if x)
 
-        def draw_part_head(p, y, ptitle=ptitle, psub=psub):
-            p.text(PDF_L, y + 6, ptitle.upper(), 14, True, C_INK, spacing=0.8)
-            p.line(PDF_L, y + 6 + 20, PDF_L + 14 * MM, y + 6 + 20, 1.6, accent)
-            if psub:
-                p.text(PDF_L + PDF_CW, y + 8, psub, 8.6, False, C_INK2, align="r")
-        block(34, draw_part_head, keep_next=True, brk=True)
+        # 2.138.0 A (#2240): number + project as a small line above the title (was right beside it, a long title ran over it);
+        # the title wraps over the full width, the accent line under its last line
+        pt_lines = pb_wrap(ptitle.upper(), 14, PDF_CW, True, 0.8)
+        ps_lines = pdf_wrap(psub, 8.6, PDF_CW) if psub else []
+        pt_top = 4 + 12 * len(ps_lines) if ps_lines else 6
+        pt_line = pt_top + (len(pt_lines) - 1) * 17.5 + 20
+
+        def draw_part_head(p, y, pt_lines=pt_lines, ps_lines=ps_lines, pt_top=pt_top, pt_line=pt_line):
+            for j, s in enumerate(ps_lines):
+                p.text(PDF_L, y + 2 + j * 12, s, 8.6, False, C_INK2)
+            for j, s in enumerate(pt_lines):
+                p.text(PDF_L, y + pt_top + j * 17.5, s, 14, True, C_INK, spacing=0.8)
+            p.line(PDF_L, y + pt_line, PDF_L + 14 * MM, y + pt_line, 1.6, accent)
+        block(pt_line + 8, draw_part_head, keep_next=True, brk=True)
         for hr in part.get("head") or []:
             if isinstance(hr, (list, tuple)) and len(hr) >= 2:
                 block(lh, lambda p, y, a=str(hr[0]), b=str(hr[1]): (p.text(PDF_L, y, a, 9, False, C_INK2), p.text(PDF_L + 112, y, b, 9)), keep_next=True)
