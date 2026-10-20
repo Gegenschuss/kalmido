@@ -30,6 +30,7 @@ Moving a whole organisation between servers; the personal office into an organis
 
 ### Security
 - Security fix: organisation import (links of video sign-offs, number ranges, logo copies).
+- Security fix: feeds (database connection) (#2408).
 
 ## [2.126.0] - 2026-10-20
 
