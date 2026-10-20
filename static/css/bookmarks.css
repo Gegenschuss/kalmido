@@ -53,3 +53,9 @@
   .bmdlg .row input,.bmdlg .row select,.bmdlg .row textarea{flex:1 1 100%;min-width:0;width:100%;box-sizing:border-box}
   .bmdlg .bmdfoot{position:sticky;bottom:-1.25rem;background:var(--bg2);padding:.5rem 0 .25rem;margin-bottom:-.25rem}
 }
+/* 2.138.4 A (#2367): 44 px on a phone: iOS ignores min-height on a select (height instead, like .ofcset select); the tags get the height
+   themselves (the pseudo box did not count the 1 px border: 42.5 px) */
+@media (pointer:coarse),(max-width:899px) {
+  .bmdlg select,.bmbar select{height:2.75rem;line-height:1.25}
+  .bmtag{min-height:2.75rem;box-sizing:border-box}
+}

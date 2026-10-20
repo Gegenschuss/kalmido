@@ -228,6 +228,7 @@ def contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "one in a read-only address book -> 403, and nothing changes. move: book_id = the target (write access); a contact the target "
         "has already (same UID) is left where it is and listed in conflicts. Birthday tasks follow (deleted contacts: to the trash).", K,
         ok({"type": "object", "properties": {"action": {"type": "string"}, "deleted": {"type": "integer"}, "moved": {"type": "integer"},
+                                             "copied": {"type": "integer", "description": "move: copied out of an imported (mirrored) address book"},
                                              "unchanged": {"type": "integer"}, "conflicts": {"type": "array", "items": {"type": "integer"}},
                                              "changed": {"type": "integer"}, "skipped": {"type": "integer"},
                                              "undo": {"type": "array", "items": {"type": "object"}, "description": "set: the old values (send them back with restore)"}}})

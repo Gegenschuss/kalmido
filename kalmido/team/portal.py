@@ -15,6 +15,7 @@ client) fills the rest of this module. Keep the signatures; a changed contract g
 import hashlib
 import hmac
 import html
+import os
 import re
 import secrets
 import threading
@@ -88,6 +89,10 @@ PT_BAD_LIMIT = 30          # unknown tokens per address within FAIL_WINDOW
 PT_CMT_RATE, PT_CMT_HOUR, PT_CMT_MAX = 10, 30, 4000   # answers per address and minute / per ticket and hour / characters
 PT_LOGIN_IP, PT_LOGIN_ADDR, PT_LOGIN_SPACE = 5, 3, 200  # sign-in requests per address / per e-mail / sign-in mails per space (window below)
 PT_LOGIN_WIN = 3600
+try:  # 2.138.4 C (#2380): the space's sign-in mails per window can be set (tests use a small one)
+    PT_LOGIN_SPACE = max(1, int(os.environ.get("KALMIDO_PORTAL_LOGIN_SPACE") or PT_LOGIN_SPACE))
+except ValueError:
+    pass
 PT_LOGIN_TTL = 30 * 60     # s: a sign-in link is valid this long, once
 PT_COOKIE_DAYS = 7
 PT_COOKIE = "kalmido_portal"
@@ -422,6 +427,29 @@ def _pt_mail_html(lines, url, button, foot=""):
               f'text-decoration:none">{e(button)}</a></p>' + (f'<p style="color:#777;font-size:.85rem">{foot}</p>' if foot else "") + "</div>")
 
 
+def pt_limit_note(c, org_id, owner_id):
+    """2.138.4 C (#2380): the space's budget of sign-in mails (ptls) is used up: a News item for its admins (an organisation)
+    or its owner (the private space), at most once per window and process; no push, no mail. Caller commits."""
+    import json
+    from ..api.v1 import hit_limit
+    from ..core.db import iso_ms
+    from ..core.pg import system_ctx
+    if hit_limit(f"ptlsn:{org_id or ''}:{owner_id or ''}", 1, PT_LOGIN_WIN):
+        return 0
+    with system_ctx(c):  # who administers the space (structure); the notice names no customer
+        if org_id:
+            ids = [r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? "
+                                           "AND m.role='admin' AND u.kind!='agent' AND u.disabled=0 ORDER BY m.user_id", (int(org_id),))]
+            on = (c.execute("SELECT name FROM orgs WHERE id=?", (int(org_id),)).fetchone() or [""])[0]
+        else:
+            ids, on = [int(owner_id)] if owner_id else [], ""
+        for uid in ids:
+            c.execute("INSERT INTO notifications(user_id,kind,task_id,list_id,actor_id,comment_id,data,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                      (uid, "ptlimit", None, None, None, None, json.dumps({"org_id": org_id, "org": on, "limit": PT_LOGIN_SPACE,
+                                                                           "hours": PT_LOGIN_WIN // 3600}, ensure_ascii=False), iso_ms(now_utc())))
+    return len(ids)
+
+
 @app.post("/p/<token>/login")
 def pt_login_ask(token):
     from flask import redirect, request
@@ -449,7 +477,10 @@ def pt_login_ask(token):
                                     WHERE p.email_hash=? AND p.org_id IS NOT DISTINCT FROM ? AND p.owner_id IS NOT DISTINCT FROM ?
                                     AND t.deleted_at IS NULL AND {_pt_space_sql()} LIMIT 1""", (eh, p["org_id"], p["owner_id"])).fetchone()
         # review: the space's limit counts only sign-in mails that really go out (others cannot lock a space's customers out)
-        if with_ticket and not hit_limit(f"ptls:{space}", PT_LOGIN_SPACE, PT_LOGIN_WIN) and mail_budget(c, None, em):
+        full = bool(with_ticket) and hit_limit(f"ptls:{space}", PT_LOGIN_SPACE, PT_LOGIN_WIN)
+        if full:  # 2.138.4 C (#2380): tell the space's admins / owner (committed below)
+            pt_limit_note(c, p["org_id"], p["owner_id"])
+        if with_ticket and not full and mail_budget(c, None, em):
             tok = secrets.token_urlsafe(32)
             now = now_utc()
             c.execute("INSERT INTO portal_logins(email_hash,org_id,owner_id,token_hash,created_at,expires_at) VALUES(?,?,?,?,?,?)",
