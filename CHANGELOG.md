@@ -22,6 +22,29 @@ Notifications to Slack, Matrix, Telegram and Signal, e-mail on assignments and m
 ### Security
 - Exported CSV cells cannot start a spreadsheet formula; per-person ntfy servers get a time budget per round; a deeply nested ClickUp checklist cell is refused cleanly (review of 2.142.0).
 
+## [2.141.0] - 2026-10-20
+
+The e-mail filing becomes a small mail desk: each workspace its own mailbox, replies and new mails from the filing, HTML
+mails shown safely, tasks and events from a mail; plus a disposition export and a consent import for newsletters.
+
+### Added
+- E-mail filing: every workspace (an organisation or the private space) can set up its own IMAP mailbox and SMTP access;
+  its mails are filed in that workspace only, replies to filed mails go to the same client or project. The server
+  mailbox (`KALMIDO_IMAP_*` / `KALMIDO_SMTP_*`) keeps working as before (#2141).
+- E-mail filing: reply to a filed mail and write new mails to a client or project (plain text); the sent mail is filed
+  automatically, a failed one stays visible as "Not sent" (#2138).
+- E-mail filing: HTML mails are shown cleaned in a sandboxed frame, external images only after "Load images"; a switch
+  between text and HTML (#2140).
+- E-mail filing: make a task or an event from a mail; the task / event shows the mail and the mail shows what was made
+  from it (#2139).
+- Disposition: download the bookings shown as CSV or ICS (#2142).
+- Newsletter: import consents from a CSV (e-mail, date, source) with a preview of all rows and their problems (#2143).
+
+### Security
+- Security fix (e-mail filing): mailbox passwords are stored encrypted, never sent back, bound to their server, and a
+  workspace's own mail servers are only reached with a checked certificate and through the internal-host guard (#2141).
+- Security fix (e-mail filing): HTML content is cleaned on the server and isolated in the browser (#2140).
+
 ## [2.140.0] - 2026-10-20
 
 Private space: shopping, recipes, journal, budget, habits, devices and birthdays.

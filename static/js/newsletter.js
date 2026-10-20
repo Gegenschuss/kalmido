@@ -3,7 +3,7 @@
 // preview). The service sends, runs the double opt-in, the unsubscribe link and the bounces; unsubscriptions, bounces and
 // confirmed opt-ins come back to the contacts. One connection per workspace (an organisation: its admins; a person's own
 // space: that person). The access data are never shown again (only "set" + the last characters).
-const NWL = {ws: null, d: null, poll: 0, seq: 0};
+const NWL = {ws: null, d: null, poll: 0, seq: 0, imp: null};
 const NWL_KIND_TXT = {listmonk: 'listmonk', brevo: 'Brevo', cleverreach: 'CleverReach'};
 const NWL_ST_TXT = {'': N_('Unknown'), yes: N_('Consented'), pending: N_('Double opt-in pending'), unsub: N_('Unsubscribed'), bounce: N_('Bounced')};
 const NWL_USER_TXT = {listmonk: N_('API user'), cleverreach: N_('Client ID')};
@@ -16,7 +16,7 @@ function nwl_wsList() {
 function nwl_open() {
   const list = nwl_wsList(), cur = wsCur();
   NWL.ws = list.includes(cur) ? cur : list.includes(NWL.ws) ? NWL.ws : list[0];
-  NWL.d = null;
+  NWL.d = null; NWL.imp = null;
   const md = modal(`<div class="lhdr"><h3>${tr('Newsletter')}</h3><span class="spacer"></span><button class="iconbtn" data-nwl="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div><div class="nwl-body"><p class="muted">${tr('Loading…')}</p></div>`);
   md.classList.add('nwl-md');
   onRemove(md, () => clearTimeout(NWL.poll));
@@ -50,7 +50,7 @@ function nwl_html() {
   if (!d) return `${nwl_wsSel()}<p class="muted">${tr('Only admins of the organisation can change this')}</p>`;
   const why = `<p class="muted nwl-why">${tr('Kalmido does not send newsletters itself. A newsletter service does: it keeps the proof of the double opt-in, puts an unsubscribe link into every mail, handles bounces and sends from its own well-known servers. Kalmido keeps your contacts, segments and consent and syncs them with it.')}</p>`;
   const c = d.conn;
-  if (!c || NWL.edit) return nwl_wsSel() + why + (d.key_ok ? nwl_formHtml(NWL.edit || c?.kind || 'listmonk', c) : `<p class="nwl-err">${tr('The server key is missing: the access data cannot be stored safely')}</p>`);
+  if (!c || NWL.edit) return nwl_wsSel() + why + (d.key_ok ? nwl_formHtml(NWL.edit || c?.kind || 'listmonk', c) : `<p class="nwl-err">${tr('The server key is missing: the access data cannot be stored safely')}</p>`) + (c ? '' : nwl_impHtml());
   const busy = c.busy || d.runs?.[0]?.state === 'busy';
   const n = d.contacts;
   let h = nwl_wsSel() + why;
@@ -72,6 +72,18 @@ function nwl_html() {
     h += `<details class="nwl-log"><summary>${tr('Log')}</summary><ul>${d.runs.map(r => `<li><span class="muted">${esc(fmtWhen(r.started_at))}</span> ${esc(tr(r.kind === 'auto' ? 'daily' : 'by hand'))} ·
       ${r.state === 'busy' ? tr('running') : esc(tr('{0} added, {1} updated, {2} taken off, {3} unsubscribed, {4} bounced, {5} confirmed', r.counts.added || 0, r.counts.renamed || 0, r.counts.removed || 0, r.counts.unsub || 0, r.counts.bounce || 0, r.counts.confirmed || 0))}
       ${r.errors.map(x => `<div class="nwl-err">${esc(x.text || x.code)}</div>`).join('')}</li>`).join('')}</ul></details>`;
+  }
+  return h + nwl_impHtml();
+}
+// 2.141.0 C (#2143): consent import from a CSV (E-mail, Date, Source): preview first, then import
+function nwl_impHtml() {
+  const i = NWL.imp, p = i?.pre;
+  let h = `<h4>${tr('Import consents')}</h4><p class="muted">${tr('A CSV file with the columns E-mail, Date and Source (optional). It only records proof for contacts that are already in your address books; nothing is sent.')}</p>
+    <div class="row"><label for="nwl-imp-file">${tr('CSV file')}</label><input id="nwl-imp-file" type="file" accept=".csv,text/csv,text/plain"></div>`;
+  if (p) {
+    h += `<p class="nwl-imp-sum">${tr('{0} rows: {1} valid, {2} with a problem', p.rows, p.valid, p.errors_count)} · ${tr('{0} will be recorded, {1} stay as they are, {2} not in the address books', p.will_change, p.kept, p.unmatched)}</p>`;
+    if (p.errors.length) h += `<ul class="nwl-imp-err">${p.errors.map(x => `<li><span class="muted">${tr('Line {0}', x.line)}</span> ${esc(x.email)} · ${esc(x.reason)}</li>`).join('')}</ul>`;
+    h += `<div class="foot"><button type="button" class="btn" data-nwl="imp-cancel">${tr('Cancel')}</button><span class="spacer"></span><button type="button" class="btn pri" data-nwl="imp-go" ${p.will_change ? '' : 'disabled'}>${tr('Import')}</button></div>`;
   }
   return h;
 }
@@ -125,9 +137,27 @@ async function nwl_segEdit(s) {
     } catch (x) { $('.nwl-err', md).textContent = x?.message || tr('Could not save'); b.disabled = false; }
   });
 }
+async function nwl_impCall(apply) {
+  const i = NWL.imp;
+  return api('POST', '/api/newsletter/consent/import', {ws: NWL.ws, csv: i.text, filename: i.name, apply});
+}
+document.addEventListener('change', async e => {
+  const f = e.target.closest('#nwl-imp-file'); if (!f || !f.files[0]) return;
+  const file = f.files[0];
+  if (file.size > 2 * 1024 * 1024) { toast(tr('The file is too large (at most {0} MB)', 2)); return; }
+  NWL.imp = {name: file.name, text: await file.text(), pre: null};
+  try { NWL.imp.pre = await nwl_impCall(false); } catch { NWL.imp = null; }
+  nwl_draw();
+});
 document.addEventListener('click', async e => {
   const b = e.target.closest('.nwl-md [data-nwl]'); if (!b) return;
   const a = b.dataset.nwl, d = NWL.d;
+  if (a === 'imp-cancel') { NWL.imp = null; nwl_draw(); return; }
+  if (a === 'imp-go') {
+    b.disabled = true;
+    try { const r = await nwl_impCall(true); NWL.imp = null; nwl_load(); toast(tr('{0} consents recorded', r.applied)); } catch { b.disabled = false; }
+    return;
+  }
   if (a === 'close') { b.closest('.nwl-md')?.remove(); return; }
   if (a === 'edit') { NWL.edit = d.conn.kind; nwl_draw(); return; }
   if (a === 'cancel') { NWL.edit = null; nwl_draw(); return; }

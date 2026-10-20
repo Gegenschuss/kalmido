@@ -53,6 +53,9 @@ class Imap(socketserver.StreamRequestHandler):
                 u = int(args[1])
                 data = open(os.path.join(D, "in", f"{u}.eml"), "rb").read()
                 seq = msgs().index(u) + 1
+                if "RFC822.SIZE" in " ".join(args[2:]).upper():  # 2.141.0 A (#2141, review): the size asked before a workspace mailbox fetches
+                    self.w(f"* {seq} FETCH (UID {u} RFC822.SIZE {len(data)})\r\n{tag} OK FETCH done\r\n")
+                    continue
                 self.w(f"* {seq} FETCH (UID {u} RFC822 {{{len(data)}}}\r\n".encode() + data + b")\r\n" + f"{tag} OK FETCH done\r\n".encode())
             elif cmd == "UID" and args and args[0].upper() == "STORE":
                 u = int(args[1])

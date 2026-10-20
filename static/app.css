@@ -6836,6 +6836,9 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .nwl-err { color: var(--danger, #c0392b); margin: .3rem 0; }
 .nwl-err:empty { display: none; }
 .nwl-prev { font-size: .85rem; color: var(--muted); border-left: .1875rem solid var(--accent); padding: .2rem .6rem; margin: 0; }
+.nwl-imp-sum { margin: .4rem 0; }
+.nwl-imp-err { list-style: none; margin: .2rem 0; padding: 0; max-height: 10rem; overflow: auto; font-size: .85rem; }
+.nwl-imp-err li { padding: .1rem 0; }
 .nwl-tag { font-size: .75rem; padding: .05rem .45rem; border-radius: 9999px; border: 1px solid var(--accent); color: var(--accent); }
 .nwl-segs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
 .nwl-segs li { display: flex; align-items: center; gap: .4rem; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: .625rem; min-height: 2.75rem; }
@@ -7671,6 +7674,29 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .hbmpick{display:flex;align-items:center;gap:.5rem;width:100%;text-align:left;background:none;border:0;color:inherit;padding:.5rem .25rem;min-height:2.75rem;border-radius:var(--r-s);cursor:pointer}
 .hbmpick:hover,.hbmpick:focus-visible{background:var(--bg3)}
 .hbmadlg .card{max-height:85vh;overflow:auto}
+/* 2.141.0 B (#2140, #2139): HTML view of a filed mail (sandboxed frame, light inside also in dark mode), Task / Event from it */
+.hbmdlg .card{max-height:90vh;overflow:auto}
+.hbmactrow{display:flex;gap:.375rem;flex-wrap:wrap;margin:0 0 .5rem}
+.hbmmade{display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;margin:0 0 .5rem;font-size:var(--fs-s)}
+.hbmvbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 .375rem}
+.hbmimg{display:inline-flex;align-items:center;gap:.375rem;font-size:var(--fs-s)}
+.hbmframe{display:block;width:100%;height:60vh;min-height:16rem;border:1px solid var(--line);border-radius:var(--r-s);background:#fff;color-scheme:light}
+.hbmmkd{display:flex;gap:.75rem;flex-wrap:wrap}
+.hbmlnk{display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;font-size:var(--fs-s)}
+.hbmlnk:empty{display:none}
+/* 2.141.0 A (#2141, #2138): the mailbox of a workspace + writing from the e-mail filing (hubmailbox.js) */
+.hmberr{display:flex;align-items:center;gap:.25rem;color:var(--danger)}
+.hmbtag{font-size:var(--fs-xs,.75rem);padding:0 .375rem;border-radius:var(--r-s);background:var(--bg3);color:var(--muted);white-space:nowrap}
+.hmbtag.bad{color:var(--danger)}
+.hmbcheck{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.25rem;font-size:var(--fs-s)}
+.hmbcheck li{display:flex;align-items:center;gap:.375rem}
+.hmbok{color:var(--ok)}
+.hmbbad,.hmb-err{color:var(--danger)}
+.hmb-err:empty{display:none}
+.hmbsug{display:flex;flex-wrap:wrap;gap:.375rem;margin:-.25rem 0 .625rem}
+.hmbtext{width:100%;min-height:12rem;resize:vertical;font:inherit;font-size:var(--fs-s);padding:.625rem;border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg2);color:var(--text)}
+.hmbcdlg .card,.hmbdlg .card{max-height:90vh;overflow:auto}
+.hmbnote{font-size:var(--fs-s)}
 
 /* 2.81.0 B (#1834) correct an archived document: tax lines, client filter, history */
 .r81b-dlg .r81b-ln{display:flex;gap:.5rem;align-items:center;margin-bottom:.375rem}

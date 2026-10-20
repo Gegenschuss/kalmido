@@ -4,13 +4,17 @@
 log shows numbers of the organisation's contacts) needs the right to manage that workspace -- an organisation's admin, the
 person themself for their own space. The consent of a contact: whoever may change the contact. Agents have no routes here
 (they read the consent with the contact through the API v1 when they may read the contact anyway)."""
+import csv
+import io
 import json
+import re
+from datetime import date, datetime, timezone
 
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.db import body, db, err
-from ..core.i18n import tr
+from ..core.db import body, db, err, iso, local_now
+from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..accounts.session import me
 from ..docs.web import _no_agent, ws_param
@@ -320,3 +324,114 @@ def nwl_consent():
         done.append(cid)
     c.commit()
     return jsonify({"changed": done, "kept": kept})
+
+
+# 2.141.0 C (#2143): consent import from a CSV (E-mail, Date, Source). Preview first (apply false), then apply true. Careful
+# variant: only contacts already in the workspace's address books are touched, none is created; a consent that is already
+# "yes" and an unsubscribe / bounce stay as they are; "" / "pending" become "yes" with the date and source of the file.
+NWL_IMP_BYTES = 2 * 1024 * 1024
+NWL_IMP_ROWS = 5000
+NWL_IMP_SHOW = 100  # error lines in the answer
+_IMP_HEAD = {"email": ("email", "e-mail", "e mail", "mail", "e-mail-adresse", "emailadresse", "email address"),
+             "date": ("date", "datum", "consent date", "einwilligung", "zeitpunkt"),
+             "source": ("source", "quelle", "herkunft", "origin")}
+_IMP_REASON = {"email": N_("No valid e-mail address"), "date": N_("Date missing or invalid"), "future": N_("Date is in the future"),
+               "dup": N_("Duplicate address in the file")}
+
+
+def _imp_date(v):
+    v = (v or "").strip()
+    m = re.fullmatch(r"(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ].*)?", v) or None
+    if m:
+        y, mo, d = int(m[1]), int(m[2]), int(m[3])
+    else:
+        m = re.fullmatch(r"(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s.*)?", v)
+        if not m:
+            return None
+        d, mo, y = int(m[1]), int(m[2]), int(m[3])
+    try:
+        return date(y, mo, d)
+    except ValueError:
+        return None
+
+
+def _imp_rows(text):
+    """[(line number, [cells])] without empty lines and the header, plus the column index of email / date / source."""
+    first = next((ln for ln in text.splitlines() if ln.strip()), "")
+    delim = max(",;\t", key=lambda d: first.count(d))
+    rows = [(i, r) for i, r in enumerate(csv.reader(io.StringIO(text), delimiter=delim), 1) if any(x.strip() for x in r)]
+    cols = {"email": 0, "date": 1, "source": 2}
+    if rows and not any("@" in x for x in rows[0][1]):  # a header line: find the columns by name
+        head = [x.strip().lower() for x in rows[0][1]]
+        found = {k: next((i for i, h in enumerate(head) if h in names), None) for k, names in _IMP_HEAD.items()}
+        if found["email"] is not None:
+            cols = {k: v for k, v in found.items() if v is not None}
+            rows = rows[1:]
+    return rows, cols
+
+
+@app.post("/api/newsletter/consent/import")
+def nwl_consent_import():
+    """{ws, csv: text, filename?, apply?} -- the consent import: columns E-mail, Date (YYYY-MM-DD or DD.MM.YYYY), Source (optional),
+    header line optional, comma / semicolon / tab. apply false (default): only the preview {rows, valid, errors:[{line, email,
+    reason}], errors_count, matched, will_change, kept, unmatched}; apply true stores the valid rows."""
+    c = db()
+    d = body()
+    unknown = sorted(set(d) - {"ws", "csv", "filename", "apply"})
+    if unknown:
+        return err(tr("Unknown field: {0}", ", ".join(unknown)[:200]))
+    _uid, _org, ws = _ws(c, d.get("ws"))
+    text, fname, apply_ = d.get("csv"), d.get("filename") or "", bool(d.get("apply"))
+    if not isinstance(text, str) or not text.strip() or not isinstance(fname, str):
+        return err(tr("Invalid value: {0}", "csv"))
+    if len(text.encode("utf-8")) > NWL_IMP_BYTES:
+        return err(tr("The file is too large (at most {0} MB)", NWL_IMP_BYTES // (1024 * 1024)))
+    try:
+        rows, cols = _imp_rows(text.lstrip("\ufeff"))
+    except csv.Error:  # 2.141.0 C (#2143, review): an oversized field / broken quoting = a clear error, not a 500
+        return err(tr("Invalid value: {0}", "csv"))
+    if len(rows) > NWL_IMP_ROWS:
+        return err(tr("Too many rows (at most {0})", NWL_IMP_ROWS))
+    fname = re.sub(r"[\x00-\x1f\x7f]", "", fname).strip()[-80:]
+    by_mail = {}
+    for r in N.nwl_contacts(c, ws):
+        for e in N._jl(r["emails"]):
+            v = str((e or {}).get("value") or "").strip().lower() if isinstance(e, dict) else ""
+            if N.nwl_email_ok(v):
+                by_mail.setdefault(v, []).append(r)
+    today, seen = local_now().date(), set()
+    errors, valid, will, kept, unmatched, todo = [], 0, 0, 0, 0, []
+    from ..contacts.model import need_contact
+    for line, cells in rows:
+        cell = lambda k: (cells[cols[k]].strip() if k in cols and cols[k] < len(cells) else "")  # noqa: E731
+        mail, day = cell("email").lower(), _imp_date(cell("date"))
+        bad = ("email" if not N.nwl_email_ok(mail) else "date" if not day else "future" if day > today else "dup" if mail in seen else None)
+        if bad:
+            errors.append({"line": line, "email": mail[:254], "code": bad, "reason": tr(_IMP_REASON[bad])})
+            continue
+        seen.add(mail)
+        valid += 1
+        hits = by_mail.get(mail)
+        if not hits:
+            unmatched += 1
+            continue
+        src = (tr("Import: {0}", fname) if fname else tr("Import")) + (" · " + cell("source") if cell("source") else "")
+        src = re.sub(r"[\x00-\x1f\x7f]", " ", src)[:N.NWL_SOURCE_MAX]
+        at = iso(datetime(day.year, day.month, day.day, 12, 0, tzinfo=timezone.utc))
+        for r in hits:
+            if (r["nl_status"] or "") not in ("", "pending"):  # consented already, unsubscribed or bounced: untouched
+                kept += 1
+                continue
+            try:
+                need_contact(c, r["id"], write=True)
+            except Denied:
+                kept += 1
+                continue
+            will += 1
+            todo.append((r["id"], src, at))
+    if apply_:
+        for cid, src, at in todo:
+            N.nwl_set_status(c, cid, "yes", src, at)
+        c.commit()
+    return jsonify({"rows": len(rows), "valid": valid, "errors": errors[:NWL_IMP_SHOW], "errors_count": len(errors), "will_change": will,
+                    "kept": kept, "unmatched": unmatched, "applied": len(todo) if apply_ else 0})
