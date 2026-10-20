@@ -90,7 +90,7 @@ function dimp_previewHtml(j) {
   const c = j.counts || {};
   const sum = j.category === 21
     ? [tr('{0} opening balances', c.opening || 0), c.replaced ? tr('{0} replace existing ones', c.replaced) : '', c.other ? tr('{0} other bookings not taken over', c.other) : '', c.skipped ? tr('{0} skipped', c.skipped) : '']
-    : [tr('{0} new', c.new || 0), tr('{0} updated', c.updated || 0), tr('{0} skipped', c.skipped || 0)];
+    : [trn('{0} new', '{0} new', c.new || 0), tr('{0} updated', c.updated || 0), tr('{0} skipped', c.skipped || 0)];
   const head = `<p class="dimpsum" data-dimp-kind="${esc(j.kind)}"><b>${esc(j.category === 21 ? tr('Booking batch') : tr('Debtors and creditors'))}</b> · ${esc(sum.filter(Boolean).join(' · '))}</p>`;
   const hints = (j.hints || []).map(h => `<p class="muted ofchint">${esc(h)}</p>`).join('');
   const rows = (j.rows || []).map(x => {
