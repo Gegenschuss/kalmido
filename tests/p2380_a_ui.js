@@ -88,8 +88,11 @@ const TEST_IBAN = 'DE02120300000000202051';
 
   // ================= jsdom: the quotation has "Create invoice"; the settings carry the invoice fields
   w = await boot({hash: 'office/offers/' + offer.id}); d = w.document;
-  await until(() => d.querySelector('.ofdeditor [data-ofd="to-invoice"]'), 60);
-  check(!!d.querySelector('[data-ofd="to-invoice"]') && !!d.querySelector('#ofd-valid_until') && !!d.querySelector('#ofd-raw_mode'), 'quotation editor: "Create invoice", valid-until and the automation stay');
+  // 2.138.0 (#2235): a draft quotation shows "Finalise" in front, "Create invoice" is in "…"
+  await until(() => d.querySelector('.ofdeditor [data-ofd="finalize"]'), 60);
+  w.eval('document.querySelector(".ofdhead [data-ofd=\\"more\\"]").click()');
+  await until(() => [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Create invoice/.test(b.textContent)));
+  check(!d.querySelector('.ofdhead [data-ofd="to-invoice"]') && [...d.querySelectorAll('#pop [role="menuitem"]')].some(b => /Create invoice/.test(b.textContent)) && !!d.querySelector('#ofd-valid_until') && !!d.querySelector('#ofd-raw_mode'), 'quotation editor: "Create invoice" in "…", valid-until and the automation stay');
   w.close();
   w = await boot({hash: 'office/settings'}); d = w.document;
   await until(() => d.querySelector('#ofc-set #os-inv-scheme'), 60);

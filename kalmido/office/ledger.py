@@ -52,7 +52,8 @@ COMPANY_MAX = {"name": 200, "street": 200, "address_extra": 200, "zip": 20, "cit
 # 2.40.0 (#1377): the word before the names of the management in the printed footer (md_label; '' = "Geschäftsführung" as before)
 FE_MD_LABELS = {"": ("Geschäftsführung", "Managing directors"), "shareholders": ("Gesellschafter", "Shareholders"),
                 "owner_m": ("Inhaber", "Owner"), "owner_f": ("Inhaberin", "Owner"), "board": ("Vorstand", "Executive board"),
-                "partners": ("Partner", "Partners")}
+                "partners": ("Partner", "Partners"),
+                "gbr_partners": ("Gesellschafter", "Partners")}  # 2.138.0 E (#2242): GbR partners; "shareholders" stays as stored
 # words of the printed company lines (the document's language); a pack may override them with labels[lang]["company_<key>"]
 COMPANY_WORDS = {
     "de": {"phone": "Tel.", "email": "E-Mail", "tax_number": "Steuernummer", "vat_id": "USt-IdNr.", "iban": "IBAN", "bic": "BIC",

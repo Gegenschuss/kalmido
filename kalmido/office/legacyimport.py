@@ -883,6 +883,10 @@ def fi_import(c, oid, uid, b):
     for kind, cols in (("services", ("name_de", "name_en", "category", "sort", "unit", "daily_rate", "hourly_rate", "raw_fee", "producing", "intext", "role")),
                        ("equipment", ("name", "name_en", "category", "daily_rate"))):  # 2.45.1 (#1556): name_en
         sr_import_rows(c, oid, rid, kind, lists[kind], cols, counts, filled, role_of if kind == "services" else None)
+    if lists["services"]:  # 2.138.0 E (#2237): the file's order also for the services that existed before
+        imr_renumber(c, oid, imr_file_order(lists["services"]))
+        for v in (filled.get("services") or {}).values():  # the order is renumbered, never emptied again by the undo
+            v.pop("sort", None)
     c.execute("UPDATE office_import_runs SET counts=?, detail=? WHERE id=? AND org_id=?",
               (json.dumps(counts), json.dumps({"merged": merged, "filled": filled, "areas": list(areas)}), rid, oid))
     return rid, counts
@@ -956,6 +960,41 @@ def sr_import_rows(c, oid, rid, kind, rows, cols, counts, filled, resolve=None):
         counts[kind] += 1
 
 
+# 2.138.0 E (#2237): the order of the services. An import takes the file's order also for the services that existed
+# before (only sort is overwritten, every other field is still only filled), then every service is numbered 1..n without
+# gaps in the order the list shows (grouped by category, the categories in their first appearance). "Renumber" in the
+# services does the same with the current order.
+def imr_file_order(rows):
+    """{lower-case German name: the file's sort} of the import's service rows (every action, also skip)."""
+    out = {}
+    for x in rows:
+        if isinstance(x, dict) and isinstance(x.get("sort"), (int, float)) and not isinstance(x.get("sort"), bool):
+            nm = str(x.get("name_de") or "").strip().lower()
+            if nm and abs(x["sort"]) < 1e12:
+                out.setdefault(nm, float(x["sort"]))
+    return out
+
+
+def imr_renumber(c, oid, first=None):
+    """Numbers the services of office area oid 1..n; first = {lower-case name: sort}: these come first in that order (the
+    file of an import), the others after them in their current order. -> the number of services whose order changed."""
+    rows = office_rows(c, oid, "services")  # already in the list's order (sort, category, name, id)
+    first = first or {}
+    pos = {r["id"]: i for i, r in enumerate(rows)}
+    key = lambda r: (0, first[(r.get("name_de") or "").strip().lower()], pos[r["id"]]) if (r.get("name_de") or "").strip().lower() in first else (1, 0, pos[r["id"]])  # noqa: E731
+    groups = {}
+    for r in sorted(rows, key=key):
+        groups.setdefault(r.get("category") or "", []).append(r)
+    n, changed, ts = 0, 0, iso(now_utc())
+    for g in groups.values():
+        for r in g:
+            n += 1
+            if float(r.get("sort") or 0) != n:
+                c.execute("UPDATE office_services SET sort=?, updated_at=? WHERE id=? AND org_id=?", (n, ts, r["id"], oid))
+                changed += 1
+    return changed
+
+
 # 2.46.1 (#1557): the areas of a data import, each imported and undone on its own. The run keeps per area when it was
 # undone in its detail JSON ({"undone": {"equipment": "<iso>"}}, no new column); undone_at = the whole run (every area
 # with entries undone, or the whole undo).
@@ -1014,6 +1053,7 @@ def fi_undo(c, oid, uid, rid, kinds=None):
     removed = {"clients": 0, "services": 0, "equipment": 0, "archive": 0, "merged": 0, "contacts": 0, "filled": 0, "roles": 0, "crew": 0}
     kept = {"clients": 0, "services": 0, "equipment": 0, "roles": 0, "crew": 0}
     kept_ids = set()
+    archived = []  # 2.138.0 E (#2241): the used services / devices the undo archived (name + where they are used)
     for row in (c.execute(f"SELECT id FROM clients WHERE {pb_cl_sql(c, oid)} AND import_run_id=?", (rid,)).fetchall() if "clients" in todo else []):
         if _client_used(c, oid, row["id"], rid):
             kept["clients"] += 1
@@ -1029,8 +1069,14 @@ def fi_undo(c, oid, uid, rid, kinds=None):
         table = MD[kind]["table"]
         extra = " AND kind=?" if MD[kind].get("kind") else ""
         for row in c.execute(f"SELECT id FROM {table} WHERE org_id=? AND import_run_id=?{extra}", (oid, rid, *((MD[kind]["kind"],) if extra else ()))).fetchall():
-            if office_in_use(c, kind, row["id"], oid) or (kind == "services" and s.get("producing_service_id") == row["id"]):
+            if kind == "services" and s.get("producing_service_id") == row["id"]:  # the calculation rules' producing service stays active
                 kept[kind] += 1
+                continue
+            if office_in_use(c, kind, row["id"], oid):
+                if kind in IMR_KINDS:  # 2.138.0 E (#2241): a used service / device is archived (its documents keep their copy)
+                    archived.append(imr_archive(c, oid, kind, row["id"]))
+                else:
+                    kept[kind] += 1
                 continue
             c.execute(f"DELETE FROM {table} WHERE id=? AND org_id=?", (row["id"], oid))
             removed[kind] += 1
@@ -1074,7 +1120,64 @@ def fi_undo(c, oid, uid, rid, kinds=None):
     areas = bk_area_counts(counts if isinstance(counts, dict) else {}) or FI_AREAS  # 2.58.0 (#1557): a run without entries: every area
     if kinds is None or all(k in undone for k in areas):
         c.execute("UPDATE office_import_runs SET undone_at=?, undone_by=? WHERE id=? AND org_id=?", (ts, uid, rid, oid))
-    return removed, kept, files
+    return removed, kept, files, archived
+
+
+# 2.138.0 E (#2241): undoing an import archives the services and devices of the run that documents, contracts or sets
+# use (before: they stayed active). The service the calculation rules name as the producing one stays active. The answer
+# names each archived entry and where it is used; "restore" is the normal edit (archived 0). Runs undone before this
+# release: "Archive leftover entries" archives what is still active of the run's undone areas (nothing is deleted).
+IMR_KINDS = ("services", "equipment")
+
+
+def imr_used(c, oid, kind, rid, limit=3):
+    """Where row rid of kind is used: up to limit labels (document number / title, contract, set) of organisation oid."""
+    out = []
+    if kind == "services":
+        for d in c.execute("SELECT DISTINCT d.id, d.number, d.project_title FROM office_doc_items i JOIN office_docs d ON d.id=i.doc_id "
+                           "WHERE i.service_id=? AND d.org_id=? ORDER BY d.id DESC LIMIT ?", (rid, oid, limit)):
+            out.append(" · ".join(x for x in (d["number"], d["project_title"]) if x) or tr("Draft"))
+        if len(out) < limit:
+            out += [x.get("name") or "" for x in office_rows(c, oid, "contracts") if str(rid) in (x.get("rates") or {})][:limit - len(out)]
+    elif kind == "equipment":
+        for x in c.execute("SELECT name FROM office_sets WHERE org_id=? AND (items ILIKE ? OR items ILIKE ?) ORDER BY id LIMIT ?",
+                           (oid, f'%"equipment_id": {int(rid)},%', f'%"equipment_id": {int(rid)}}}%', limit)):
+            out.append(x["name"])
+    return out
+
+
+def imr_archive(c, oid, kind, rid):
+    """Archives row rid of kind (organisation oid) -> {kind, id, name, used: [labels]}."""
+    c.execute(f"UPDATE {MD[kind]['table']} SET archived=1, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), rid, oid))
+    r = c.execute(f"SELECT {MD[kind]['label']} AS name FROM {MD[kind]['table']} WHERE id=? AND org_id=?", (rid, oid)).fetchone()
+    return {"kind": kind, "id": rid, "name": r["name"] if r else "", "used": imr_used(c, oid, kind, rid)}
+
+
+def imr_leftover_ids(c, oid, r):
+    """[(kind, id)] of run r: its still active services / devices of the areas already undone (not the producing service)."""
+    if r["kind"] != "data":
+        return []
+    undone = bk_detail(r).get("undone")
+    undone = undone if isinstance(undone, dict) else {}
+    prod = office_settings(c, oid).get("producing_service_id")
+    out = []
+    for kind in IMR_KINDS:
+        if not (r["undone_at"] or kind in undone):
+            continue
+        for x in c.execute(f"SELECT id FROM {MD[kind]['table']} WHERE org_id=? AND import_run_id=? AND archived=0 ORDER BY id", (oid, r["id"])):
+            if not (kind == "services" and x["id"] == prod):
+                out.append((kind, x["id"]))
+    return out
+
+
+def imr_tidy(c, oid, rid):
+    """Archives the leftover entries of undone run rid -> [{kind, id, name, used}]. 409 when the run was not undone."""
+    write_lock(c, f"office_import_{int(oid)}")
+    r = _run_row(c, oid, rid)
+    und = bk_detail(r).get("undone")
+    if r["kind"] != "data" or not (r["undone_at"] or (isinstance(und, dict) and any(k in und for k in IMR_KINDS))):
+        raise Denied(409, tr("This import has not been undone"))
+    return [imr_archive(c, oid, kind, i) for kind, i in imr_leftover_ids(c, oid, r)]
 
 
 def sr_unfill(c, oid, detail, todo, removed):
@@ -1697,6 +1800,7 @@ def fi_runs_get():
             und = bk_detail(r).get("undone") or {}
             out[-1]["areas"] = {k: {"count": n, "undone_at": und.get(k) if isinstance(und, dict) else None}
                                 for k, n in bk_area_counts(counts if isinstance(counts, dict) else {}).items()}
+            out[-1]["leftover"] = len(imr_leftover_ids(c, oid, r)) if r["undone_at"] or und else 0  # 2.138.0 E (#2241)
     return jsonify(runs=out)
 
 
@@ -1705,13 +1809,58 @@ def fi_undo_post(rid):
     """Org admin. 2.46.1 (#1557): body {kinds: [clients | services | equipment]} = only these areas (none: the whole run)."""
     c, uid, oid = _ctx()
     kinds = (body() or {}).get("kinds")
-    removed, kept, files = fi_undo(c, oid, uid, rid, kinds=kinds)
+    removed, kept, files, archived = fi_undo(c, oid, uid, rid, kinds=kinds)
     from .ledger import ofx_log
-    ofx_log(c, oid, "undo", target="legacy", detail={"run_id": rid, "removed": removed, "kept": kept, **({"kinds": kinds} if kinds else {})})
+    ofx_log(c, oid, "undo", target="legacy", detail={"run_id": rid, "removed": removed, "kept": kept, **({"kinds": kinds} if kinds else {}),
+                                                     **({"archived": [{"kind": a["kind"], "id": a["id"]} for a in archived]} if archived else {})})
     bump(c)
     c.commit()
     _unlink_files(oid, files)  # after the commit: a failed undo keeps its files
-    return jsonify(removed=removed, kept=kept)
+    return jsonify(removed=removed, kept=kept, archived=archived)  # 2.138.0 E (#2241): + the archived entries
+
+
+@app.post("/api/office/legacy/runs/<int:rid>/tidy")
+def imr_tidy_post(rid):
+    """Org admin. 2.138.0 E (#2241): archives what an earlier undo of run rid left active (its services / devices of the
+    undone areas, never the producing service; nothing deleted) -> {archived: [{kind, id, name, used}]}."""
+    c, uid, oid = _ctx()
+    archived = imr_tidy(c, oid, rid)
+    from .ledger import ofx_log
+    if archived:
+        ofx_log(c, oid, "archive", target="legacy", detail={"run_id": rid, "archived": [{"kind": a["kind"], "id": a["id"]} for a in archived]})
+    bump(c)
+    c.commit()
+    return jsonify(archived=archived)
+
+
+@app.post("/api/office/services/renumber")
+def imr_renumber_post():
+    """Org admin (like editing a service). 2.138.0 E (#2237): numbers the services 1..n in the order the list shows;
+    body {sorts: {id: sort}} instead sets exactly these values (the undo / redo of the client; only own services).
+    -> {changed, before: {id: sort}} (before = the old values of the changed services)."""
+    c, uid, oid = _ctx()
+    b = body() or {}
+    write_lock(c, f"office_import_{int(oid)}")
+    before = {str(r["id"]): r["sort"] for r in office_rows(c, oid, "services")}
+    sorts = b.get("sorts") if isinstance(b, dict) else None
+    if sorts is not None:
+        if not isinstance(sorts, dict) or len(sorts) > 5000:
+            raise BadInput(tr("Invalid data"))
+        ts = iso(now_utc())
+        for k, v in sorts.items():
+            if k not in before or not isinstance(v, (int, float)) or isinstance(v, bool) or abs(v) >= 1e12:
+                raise BadInput(tr("Invalid data"))
+            c.execute("UPDATE office_services SET sort=?, updated_at=? WHERE id=? AND org_id=?", (float(v), ts, int(k), oid))
+    else:
+        imr_renumber(c, oid)
+    after = {str(r["id"]): r["sort"] for r in office_rows(c, oid, "services")}
+    old = {k: v for k, v in before.items() if after.get(k) != v}
+    from .ledger import ofx_log
+    if old:
+        ofx_log(c, oid, "update", target="services", detail={"renumber": len(old)})
+    bump(c)
+    c.commit()
+    return jsonify(changed=len(old), before=old)
 
 
 @app.post("/api/office/legacy/archive/parse")

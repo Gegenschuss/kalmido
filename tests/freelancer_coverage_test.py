@@ -375,6 +375,7 @@ ROUTES = {
     "POST /api/office/legacy/archive/run": "office", "POST /api/office/legacy/counter": "office",
     "POST /api/office/legacy/import": "office", "POST /api/office/legacy/preview": "office",
     "POST /api/office/legacy/runs/{}/undo": "office", "POST /api/office/legacy/split": "office",
+    "POST /api/office/legacy/runs/{}/tidy": "office", "POST /api/office/services/renumber": "office",  # 2.138.0 E (#2241, #2237): p2138_e_api_test.py
     "POST /api/office/logo": "office", "POST /api/office/move": "office", "POST /api/office/packs/install": "office",
     "POST /api/office/packs/installed/{}/{}/restore": "office", "POST /api/office/packs/validate": "office",
     "POST /api/office/pay-props/{}": "office", "POST /api/office/signoffs/{}/revoke": "office",

@@ -42,7 +42,7 @@ function oimHtml() {
     <div class="lacts"><input type="file" id="oim-pdf" accept="application/pdf,.pdf" multiple hidden><button type="button" class="btn sm" data-oim="pick-pdf" ${OIM.archBusy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose PDF files')}</button></div>
     ${oimArchHtml()}</section>
     <section class="oimsec"><h4>${ic('hash', 's')} ${tr('Number counters')}</h4>${oimCounterHtml()}</section>
-    <section class="oimsec"><h4>${ic('clock', 's')} ${tr('Import runs')}</h4>${oimRunsHtml()}</section></div>`;
+    <section class="oimsec"><h4>${ic('clock', 's')} ${tr('Import runs')}</h4>${imr_archivedHtml()}${oimRunsHtml()}</section></div>`;
 }
 
 // 2.122.3 A (#2335): one-off imports of other office areas live here too (their preview dialogs stay in their modules);
@@ -217,7 +217,7 @@ function oimRunsHtml() {
   if (!r.length) return `<p class="muted">${tr('No imports yet.')}</p>`;
   const kn = {data: N_('Master data'), archive: N_('Archive|documents')};
   return `<ul class="ofclist" role="list">${r.map(x => `<li class="oimrun"><span class="ofcn"><b>${esc(tr(kn[x.kind] || x.kind))} · ${esc(trn('{0} entry', '{0} entries', x.total || 0))}</b><small class="muted">${esc([typeof ofdWhen === 'function' ? ofdWhen(x.created_at) : x.created_at, x.user_name].filter(Boolean).join(' · '))}</small></span>
-    ${x.undone_at ? `<span class="rotag">${tr('undone')}</span>` : `<button type="button" class="btn sm" data-oim="undo" data-id="${x.id}">${ic('undo', 's')} ${tr('Undo')}</button>`}${bk_runAreas(x)}</li>`).join('')}</ul>`;
+    ${x.undone_at ? `<span class="rotag">${tr('undone')}</span>` : `<button type="button" class="btn sm" data-oim="undo" data-id="${x.id}">${ic('undo', 's')} ${tr('Undo')}</button>`}${bk_runAreas(x)}${imr_tidyBtn(x)}</li>`).join('')}</ul>`;
 }
 
 // ---- the archive in the documents tab (office_docs.js asks for it when the kind "Archive" is chosen)
@@ -330,12 +330,14 @@ document.addEventListener('click', async e => {
     try { await api('POST', '/api/office/legacy/counter', {kind: b.dataset.kind, last: +b.dataset.last}); toast(tr('Saved')); await oimLoad(); await ofcInfo(true); } catch (x) { toast(x.message || ''); }
   } else if (a === 'area-skip') bk_skipAll(b.dataset.area);
   else if (a === 'undo') {
-    const kind = b.dataset.kind;  // 2.46.1 (#1557): one area only
-    if (!await askConfirm(kind ? tr(BK_UNDO[kind]) + '?' : tr('Undo this import?'), kind ? tr('Only the entries of this area are removed, except what is in use by now. The rest of the import stays.') : tr('Everything it added is removed, except what is in use by now (a client with a quotation, a list or an archived document; a service in a document). Clients that were merged lose the fields the import filled in.'), {ok: tr('Undo'), danger: true})) return;
+    const kind = b.dataset.kind;  // 2.46.1 (#1557): one area only; 2.138.0 E (#2241): the texts say that used services / devices are archived
+    if (!await askConfirm(kind ? tr(BK_UNDO[kind]) + '?' : tr('Undo this import?'), kind ? tr('Only the entries of this area are removed; services and devices in use are archived. The rest of the import stays.') : tr('Everything it added is removed. A client in use stays; a service or device in use is archived (documents keep showing it). Clients that were merged lose the fields the import filled in.'), {ok: tr('Undo'), danger: true})) return;
     try {
       const j = await api('POST', `/api/office/legacy/runs/${b.dataset.id}/undo`, kind ? {kinds: [kind]} : undefined);
       const k = j.kept || {}, kept = (k.clients || 0) + (k.services || 0) + (k.equipment || 0) + (k.roles || 0) + (k.crew || 0);
-      toast(tr('Import undone') + (kept ? ' · ' + trn('{0} entry stays because it is in use', '{0} entries stay because they are in use', kept) : ''));
+      OIM.arcd = (j.archived || []).length ? j.archived : null;  // 2.138.0 E (#2241): the used entries the undo archived
+      toast(tr('Import undone') + (kept ? ' · ' + trn('{0} entry stays because it is in use', '{0} entries stay because they are in use', kept) : '')
+        + (OIM.arcd ? ' · ' + trn('{0} entry in use archived', '{0} entries in use archived', OIM.arcd.length) : ''));
       OIM.list = null; ofcReload('services'); ofcReload('equipment'); ofcReload('roles'); ofcReload('crew'); await oimLoad();
     } catch (x) { toast(x.message || ''); }
   }
@@ -455,3 +457,56 @@ async function r81b_archEdit(id) {
     else if (b.dataset.r81b === 'rm') { lines.splice(+b.closest('.r81b-ln').dataset.i, 1); paint(md); }
   });
 }
+
+// ---- 2.138.0 E (#2237): "Renumber" in the services: 1..n in the order the list shows (one undo step)
+async function imr_renumber() {
+  let j;
+  try { j = await api('POST', '/api/office/services/renumber'); } catch (x) { toast(x.message || tr('unknown')); return; }
+  ofcReload('services');
+  if (!j.changed) { toast(tr('The order is already numbered')); return; }
+  const before = j.before || {};
+  offerUndo(tr('Services renumbered'), histAdd({label: tr('Services renumbered'),
+    undo: async () => { await api('POST', '/api/office/services/renumber', {sorts: before}); ofcReload('services'); },
+    redo: async () => { await api('POST', '/api/office/services/renumber'); ofcReload('services'); }}));
+}
+
+// ---- 2.138.0 E (#2241): the entries an undo archived because documents use them (name, where), each with "Restore";
+// "Archive leftover entries" for a run undone before (only its own entries, nothing deleted). Each is one undo step.
+const IMR_KIND = {services: N_('Service'), equipment: N_('Device')};
+function imr_archivedHtml() {
+  const a = OIM.arcd; if (!a?.length) return '';
+  return `<div class="imrarc" role="status"><div class="imrhead"><b>${esc(trn('{0} entry in use archived', '{0} entries in use archived', a.length))}</b><button type="button" class="btn sm ghost" data-imr="arc-close" aria-label="${esc(tr('Close'))}">${ic('x', 's')}</button></div>
+    <p class="muted">${tr('Documents keep showing them with name and price. Restore an entry to offer it again.')}</p>
+    <ul class="ofclist" role="list">${a.map((x, i) => `<li class="oimrun"><span class="ofcn"><b>${esc(x.name || '–')}</b><small class="muted">${esc([tr(IMR_KIND[x.kind] || x.kind), x.used?.length ? tr('Used in {0}', x.used.join(', ')) : ''].filter(Boolean).join(' · '))}</small></span>
+      ${x.restored ? `<span class="rotag">${tr('Restored')}</span>` : `<button type="button" class="btn sm" data-imr="restore" data-i="${i}">${ic('undo', 's')} ${tr('Restore')}</button>`}</li>`).join('')}</ul></div>`;
+}
+const imr_tidyBtn = x => x.leftover ? `<div class="oimrunareas"><button type="button" class="btn sm ghost" data-imr="tidy" data-id="${x.id}">${ic('archive', 's')} ${esc(tr('Archive leftover entries'))} <span class="muted">(${x.leftover})</span></button></div>` : '';
+const imr_set = (list, archived) => Promise.all(list.map(x => api('PATCH', `/api/office/${x.kind}/${x.id}`, {archived})));
+const imr_after = async () => { ofcReload('services'); ofcReload('equipment'); await oimLoad(); };
+async function imr_restore(i) {
+  const x = OIM.arcd?.[i]; if (!x) return;
+  try { await imr_set([x], 0); } catch (e) { toast(e.message || tr('unknown')); return; }
+  x.restored = true; await imr_after();
+  offerUndo(tr('Restored'), histAdd({label: tr('Restore') + ` “${x.name}”`,
+    undo: async () => { await imr_set([x], 1); x.restored = false; await imr_after(); },
+    redo: async () => { await imr_set([x], 0); x.restored = true; await imr_after(); }}));
+}
+async function imr_tidy(rid) {
+  if (!await askConfirm(tr('Archive leftover entries?'), tr('The services and devices this undone import left behind are archived. Nothing is deleted; documents keep showing them.'), {ok: tr('Archive')})) return;
+  let j;
+  try { j = await api('POST', `/api/office/legacy/runs/${rid}/tidy`); } catch (e) { toast(e.message || tr('unknown')); return; }
+  const list = j.archived || [];
+  OIM.arcd = list.length ? list : null; await imr_after();
+  if (!list.length) return;
+  offerUndo(trn('{0} entry in use archived', '{0} entries in use archived', list.length), histAdd({label: tr('Archive leftover entries'),
+    undo: async () => { await imr_set(list, 0); OIM.arcd = null; await imr_after(); },
+    redo: async () => { await imr_set(list, 1); OIM.arcd = list; await imr_after(); }}));
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-imr]'); if (!b) return;
+  const a = b.dataset.imr;
+  if (a === 'renumber') imr_renumber();
+  else if (a === 'restore') imr_restore(+b.dataset.i);
+  else if (a === 'tidy') imr_tidy(+b.dataset.id);
+  else if (a === 'arc-close') { OIM.arcd = null; ofcDraw(); }
+});

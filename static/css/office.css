@@ -24,6 +24,7 @@
 .ofcdlg .card{width:min(40rem,100%)}
 .ofcdlg .row textarea{flex:1;min-width:0;width:100%}
 .ofchint{font-size:var(--fs-s);flex-basis:100%}
+.imrcur{flex:none;font-size:var(--fs-m)} /* 2.138.0 E (#2237): the currency beside a rate field */
 .ofcitems{display:flex;flex-direction:column;gap:.375rem;margin-bottom:.5rem}
 .ofcitem{display:flex;gap:.375rem;align-items:center}
 .ofcitem select{flex:1;min-width:0}
@@ -138,6 +139,7 @@
 }
 @media (max-width:599px) {
   .ofdhead .ofdfin span{display:inline}
+  .ofdhead .ofdnext.pri span{display:inline}  /* 2.138.0 E (#2235): the next step keeps its word on the phone */
 }
 .ofdstat.st-overdue{color:var(--danger)}
 .ofdpaysum{display:flex;gap:1rem;flex-wrap:wrap;justify-content:flex-end;margin:.5rem 0;font-variant-numeric:tabular-nums}
@@ -190,6 +192,10 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .oimarea.off h4{color:var(--text2)}
 .oimrun{flex-wrap:wrap}
 .oimrunareas{flex-basis:100%;display:flex;flex-wrap:wrap;gap:.375rem;align-items:center}
+/* 2.138.0 E (#2241): the entries an undo archived */
+.imrarc{margin:0 0 .75rem;padding:.5rem .625rem;border-radius:var(--radius);border:1px solid var(--line2)}
+.imrarc p{margin:.25rem 0 .5rem;font-size:var(--fs-s)}
+.imrhead{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
 .dksheet{display:flex;flex-direction:column;gap:.75rem}
 .dkbox{border:1px solid var(--line2);border-radius:.625rem;padding:.625rem .75rem}
 .dkbox>summary,.dkbox>h4{margin:0 0 .5rem;font-weight:600;cursor:default}

@@ -322,7 +322,9 @@ where they are used.
   (`jobtitleDE`, `jobtitleEN`, `dailyrate`, `intext`) the master "Crew" of the shoot calculation, both through the same
   way; they are imported before the services, so the column `freelancer` of a service points to its role (`role_id`).
   The column `order` is the order of the category (a table `category` / `order` wins); inside a category the rows keep
-  the file's order. Excel error values like `#NV` count as empty; `intext` may be `intern`, `extern` or `shooting`; a
+  the file's order. 2.138.0: the import takes this order also for services that existed before (only their order is
+  overwritten) and then numbers all services 1, 2, 3 ... without gaps, grouped by category; services that are not in the
+  file follow in their category. **Renumber** in the services list does the same for the order shown (one undo step). Excel error values like `#NV` count as empty; `intext` may be `intern`, `extern` or `shooting`; a
   service named "Künstlersozialkasse" becomes a rate in percent (`0.05` -> 5 %). `rawfee` / `producingfee` are always
   read. A table renamed by Excel (`Services_2`) is found too.
 - **Fill instead of skip (2.47.0)**: a service, device, role or crew row whose name exists already is proposed as "fill":
@@ -363,15 +365,22 @@ where they are used.
   never lowered.
 - **Undo**: every confirmed import is a run (list with date, person, count). Undoing removes what the run added unless
   something builds on it by now - a client with a list, document, framework contract or archived document of another run
-  stays, as does a service used in a document or as the producing rate, and equipment in a set; the answer says what
-  stayed. Fields a merge filled are emptied again while they still hold the imported value.
+  stays, as does the service the calculation rules name as the producing one; the answer says what stayed. 2.138.0: a
+  service used in a document or framework contract and a device in a set are archived instead of staying active
+  (documents keep showing them with name and price); the page lists them with the document or set they are in, each with
+  **Restore**. A run undone before 2.138 shows **Archive leftover entries** once: it archives what that run left active
+  (only its own services and devices, never the producing service, nothing deleted). Fields a merge filled are emptied
+  again while they still hold the imported value.
 
 Routes (organisation admin; members read the archive and, 2.81.0, correct it): `POST /api/office/legacy/preview` (multipart `file`, stores
 nothing), `POST /api/office/legacy/split` `{address}`, `POST /api/office/legacy/import` `{clients, roles, crew, services, equipment}`
 (the preview's rows with `action` new / merge / fill / skip and `merge_id`; 2.46.1: `areas` = only these of clients / roles /
 crew / services / equipment, the others are neither written nor checked), `GET /api/office/legacy/runs` (2.46.1: a data run lists its
 `areas` with `count` and `undone_at`), `POST /api/office/legacy/runs/<id>/undo` (2.46.1: `{kinds: [...]}` undoes only these
-areas of a data run, `409` for an area undone already; the whole undo afterwards takes the areas left), `POST /api/office/legacy/archive/parse` `{names}`,
+areas of a data run, `409` for an area undone already; the whole undo afterwards takes the areas left; 2.138.0: `archived` =
+`[{kind, id, name, used}]`), `POST /api/office/legacy/runs/<id>/tidy` (2.138.0: archives the leftovers of an undone run,
+`409` for a run not undone; the runs list `leftover` per data run), `POST /api/office/services/renumber` (2.138.0: 1..n in
+the list's order, or `{sorts: {id: sort}}` = exactly these values; answers `changed` and `before`), `POST /api/office/legacy/archive/parse` `{names}`,
 `POST /api/office/legacy/archive/run`, `POST /api/office/legacy/archive` (multipart `file` + `run_id`, `kind`, `number`,
 `project_no`, `project`, `client_id`, `client_name`, `date`, `amount`, `paid`; 409 for a used number or the same PDF
 twice), `GET /api/office/legacy/archive?kind=&client_id=`, `PATCH /api/office/legacy/archive/<id>` (only `amount`, `paid`,
