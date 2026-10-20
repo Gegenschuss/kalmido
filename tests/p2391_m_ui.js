@@ -94,7 +94,8 @@ const FEAT = 'comments,collab,agents,stats,time';
     if (p) {
       await drag(195, p.top + 12, 0, -Math.min(220, p.top + 6), 'touch'); await sleep(400);  // 2.58.0 (#1757): the visible X makes the sheet taller, stay inside the viewport
       const p2 = await rect(ev, '#pop.sheet');
-      check(p2 && p2.h > p.h + 40, `#1181: dragged up, the sheet is taller (${p.h} -> ${p2 && p2.h})`);
+      // 2.138.4: the list menu got longer (CSV / print, 2.138.1) and starts almost full height - then "taller" = it reaches the top
+      check(p2 && (p2.h > p.h + 40 || p2.h >= p.h && p2.top <= 64), `#1181: dragged up, the sheet is taller or at the top (${p.h} -> ${p2 && p2.h}, top ${p2 && p2.top})`);
       await shot('p2391m-390-sheet-tall.png');
       const p3 = p2 || p;
       await drag(195, p3.top + 12, 0, Math.min(700, 830 - p3.top - 12), 'touch'); await sleep(700);

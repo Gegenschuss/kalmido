@@ -91,20 +91,19 @@ const near = (a, b) => Math.abs(+a - +b) < 0.005;
     await shot('p21143-a-title.png');
     // part A: takes over the document (2.138.4 (#2248): "Open part", not the fold-open toggle that also carries tp-open)
     await ev(`(() => { document.querySelector('[data-ofd="tp-open"]:not([data-tog])[data-pid="${pa.id}"]').click(); return 1; })()`);
-    check(await ready(ev, `(document.querySelector('.tpprodsrc .rotag')?.textContent || '').trim() === 'wie Dokument'`), 'part A: "wie Dokument" -- ' + await ev(`document.querySelector('.tpprodsrc')?.textContent || ''`));
-    check(await ev(`/dieses Teils mit Producing-Haken/.test(document.querySelector('.ofdprodhint')?.textContent || '') && !document.querySelector('[data-ofd="tp-prod-doc"]')`), 'part A: the hint for a part, no reset button');
+    check(await ready(ev, `(document.querySelector('.tpfbox[data-pid="${pa.id}"] .tpprodsrc .rotag')?.textContent || '').trim() === 'wie Dokument'`), 'part A: "wie Dokument" -- ' + await ev(`document.querySelector('.tpfbox[data-pid="${pa.id}"] .tpprodsrc')?.textContent || ''`));
+    check(await ev(`/dieses Teils mit Producing-Haken/.test(document.querySelector('.tpfbox[data-pid="${pa.id}"] .ofdprodhint')?.textContent || '') && !document.querySelector('.tpfbox[data-pid="${pa.id}"] [data-ofd="tp-prod-doc"]')`), 'part A: the hint for a part, no reset button');
     check(await ev(noScroll), 'part A: no horizontal scrolling on the phone');
-    await ev(`(() => { document.querySelector('[data-ofd="tp-back"]').click(); return 1; })()`);
+    // 2.138.4 (#2248): parts open in place on the title page (no own view, no back button)
     // part B: own setting -> back to the document's values
     check(await ready(ev, `!!document.querySelector('[data-ofd="tp-open"]:not([data-tog])[data-pid="${pb.id}"]')`), 'back on the title page');
     await ev(`(() => { document.querySelector('[data-ofd="tp-open"]:not([data-tog])[data-pid="${pb.id}"]').click(); return 1; })()`);
-    check(await ready(ev, `(document.querySelector('.tpprodsrc.own .rotag')?.textContent || '').trim() === 'eigene Einstellung' && !!document.querySelector('[data-ofd="tp-prod-doc"]')`), 'part B: "eigene Einstellung" with the reset button');
+    check(await ready(ev, `(document.querySelector('.tpfbox[data-pid="${pb.id}"] .tpprodsrc.own .rotag')?.textContent || '').trim() === 'eigene Einstellung' && !!document.querySelector('.tpfbox[data-pid="${pb.id}"] [data-ofd="tp-prod-doc"]')`), 'part B: "eigene Einstellung" with the reset button');
     check(await ev(noScroll), 'part B: no horizontal scrolling on the phone');
-    await ev(`(() => { document.querySelector('.ofdits .ofdflags')?.scrollIntoView({block: 'start'}); return 1; })()`); await sleep(300);
+    await ev(`(() => { document.querySelector('.tpfbox[data-pid="${pb.id}"] .ofdflags')?.scrollIntoView({block: 'start'}); return 1; })()`); await sleep(300);
     await shot('p21143-a-part.png');
-    await ev(`(() => { document.querySelector('[data-ofd="tp-prod-doc"]').click(); return 1; })()`);
-    check(await ready(ev, `(document.querySelector('.tpprodsrc .rotag')?.textContent || '').trim() === 'wie Dokument'`), 'part B after the reset: "wie Dokument"');
-    await ev(`(() => { document.querySelector('[data-ofd="tp-back"]').click(); return 1; })()`);
+    await ev(`(() => { document.querySelector('.tpfbox[data-pid="${pb.id}"] [data-ofd="tp-prod-doc"]').click(); return 1; })()`);
+    check(await ready(ev, `(document.querySelector('.tpfbox[data-pid="${pb.id}"] .tpprodsrc .rotag')?.textContent || '').trim() === 'wie Dokument'`), 'part B after the reset: "wie Dokument"');
     // 2 producing days / 3 = 0.67, rounded to half days = 0.5
     check(await ready(ev, `${note(pb.id)} === 'inkl. Producing 0,5 Tage'`), 'part B line now: "inkl. Producing 0,5 Tage" -- ' + await ev(note(pb.id)));
   }, true);
