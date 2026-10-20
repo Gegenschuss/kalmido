@@ -315,7 +315,7 @@ for u, n in (("bruno", "Bruno Admin"), ("carol", "Carol Member"), ("dave", "Dave
     ids[u] = r.json()["id"]
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
 Bo, Ca, Da, Er = sess("bruno"), sess("carol"), sess("dave"), sess("erin")
-FEAT = "cal,comments,collab,office,clients,time"
+FEAT = "cal,comments,collab,office,clients,time,wiki"
 ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ALICE}).json()["id"]
 for u, role in (("bruno", "admin"), ("carol", "member"), ("erin", "admin")):
     assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": f"{u}@example.com", "role": role}).ok
@@ -427,6 +427,15 @@ for _ in range(90):
 check(DOC and doc_hits(A, "zaunkoenigweg") == [DOC], f"document of the organisation found by a word before the rotation {r.status_code} {r.text[:150]}")
 DW0 = {x[0] for x in dbx("SELECT h FROM doc_words WHERE node_id=?", (DOC,))}
 
+# 2.138.0 C (#1972): a knowledge page of the organisation, sealed (encrypt-wiki) and found by its words (keyed with the org key)
+r = A.post(B + "/api/wiki/pages", json={"space": f"org:{ORG}", "path": "Wartung/Zaun", "body": "Quittenhecke am Nordtor schneiden"})
+WP = r.json().get("id") if r.status_code == 201 else None
+rc, out, err_ = cli("encrypt-wiki")
+check(WP and rc == 0 and str(one("SELECT body FROM wiki_pages WHERE id=?", (WP,))).startswith("kenc1:"), f"knowledge page sealed {r.status_code} {rc} {out[-200:]}")
+ws_ = A.get(B + "/api/wiki/search", params={"q": "quittenhecke"})
+check(ws_.ok and [p["id"] for p in ws_.json().get("pages", [])] == [WP], "knowledge page found by a word before the rotation " + ws_.text[:150])
+WW0 = {x[0] for x in dbx("SELECT h FROM wiki_words WHERE page_id=?", (WP,))}
+
 # ---------------------------------------------------------------- rotate: aborted after the switch, then finished
 WR0 = one("SELECT wrapped FROM org_keys WHERE org_id=?", (ORG,))
 rc, out, err_ = cli("rotate", "--org", str(ORG), env=("KALMIDO_TEST_ROT_ABORT=1", "KALMIDO_ORGCRYPT_ROT_SETTLE=0"))
@@ -443,7 +452,7 @@ ENC1 = one("SELECT iban FROM office_company WHERE org_id=?", (ORG,))
 rc, out, err_ = cli("rotate", "--org", str(ORG), env=("KALMIDO_ORGCRYPT_ROT_SETTLE=0",))
 lines = [x.strip() for x in out.splitlines() if x.strip().startswith("R2-")]
 RN = lines[0] if lines else ""
-check(rc == 0 and RN and RN not in err_, f"rotate finished, the new recovery key on stdout {rc} {out[-300:]} {err_[-2500:]}")
+check(rc == 0 and RN and RN not in err_, f"rotate finished, the new recovery key on stdout {rc} {out[-300:]} {err_[-2500:].replace(chr(10), " | ")}")
 check(one("SELECT wrapped_rot FROM org_keys WHERE org_id=?", (ORG,)) is None and one("SELECT rotated_at FROM org_keys WHERE org_id=?", (ORG,))
       and one("SELECT wrapped_prev FROM org_keys WHERE org_id=?", (ORG,)) is None, "after the rotation: earlier key gone, rotated_at noted")
 check(one("SELECT iban FROM office_company WHERE org_id=?", (ORG,)) == ENC1, "a value written during the rotation (new key) is left as it is")
@@ -457,6 +466,13 @@ check(r.ok and r.json().get("recovery_key") == RN, "after the rotation the new r
 DW1 = {x[0] for x in dbx("SELECT h FROM doc_words WHERE node_id=?", (DOC,))}
 check(DW1 and not DW1 & DW0 and doc_hits(A, "zaunkoenigweg") == [DOC] and doc_hits(A, "wartungsv") == [DOC],
       f"after the rotation: the word index made with the new key, the document found again ({len(DW0)} / {len(DW1)})")
+WB1 = str(one("SELECT body FROM wiki_pages WHERE id=?", (WP,)))
+WW1 = {x[0] for x in dbx("SELECT h FROM wiki_words WHERE page_id=?", (WP,))}
+ws_ = A.get(B + "/api/wiki/search", params={"q": "quittenhecke"})
+check(WB1.startswith("kenc1:") and A.get(B + f"/api/wiki/pages/{WP}").json().get("body") == "Quittenhecke am Nordtor schneiden"
+      and WW1 - {x for x in WW1 if x.startswith("u:")} and not (WW1 & WW0) - {x for x in WW0 if x.startswith("u:")}
+      and ws_.ok and [p["id"] for p in ws_.json().get("pages", [])] == [WP],
+      "after the rotation: the knowledge page re-encrypted, its word index made with the new key, found again")
 # 2.138.0 C (#1972): finishing a rotation that no longer runs: an error, no recovery key that is stored nowhere
 RWN = one("SELECT recovery_wrapped FROM org_keys WHERE org_id=?", (ORG,))
 rc, out, err_ = py("from kalmido.core.db import connect\nfrom kalmido.core import orgcrypt as oc\nc = connect()\ntry:\n"
@@ -473,6 +489,7 @@ check(rc == 1 and "renewed" in out, f"rewrap: the earlier format is refused afte
 rc, out, err_ = cli("rewrap", "--org", str(ORG), "--recovery-file", "-", stdin=RN + "\n")
 check(rc == 0, f"rewrap with the recovery key of the rotation {rc} {out[-200:]} {err_[-200:]}")
 check(iban(A) == TEST_IBAN and A.get(B + f"/api/attachments/{AID}").content == BODY, "after rewrap: field + file readable")
+check(A.get(B + f"/api/wiki/pages/{WP}").json().get("body") == "Quittenhecke am Nordtor schneiden", "after rewrap: the knowledge page readable (new key only)")
 # recovery on the command line: into a new 0600 file, never over an existing one
 rc, out, err_ = cli("recovery", "--org", str(ORG), "--recovery-out", "/tmp/p2138c-rk.txt")
 mode = subprocess.run(["docker", "exec", CT, "stat", "-c", "%a", "/tmp/p2138c-rk.txt"], capture_output=True, text=True).stdout.strip()

@@ -790,16 +790,20 @@ ROT_WS = (("doc_rules", "id", "data", "doc_rules.data"), ("doc_models", "id", "d
 ROT_SETTLE = float(os.environ.get("KALMIDO_ORGCRYPT_ROT_SETTLE", "5"))  # seconds after the key switch (requests that hold the old key end)
 
 
+# 2.138.0 C (#1972): tables with one row per organisation (no id column; office_cf_start since 2.123)
+ROT_ORG_ROWS = ("office_company", "office_settings", "office_cf_start")
+
+
 def _rot_jobs(oid):
     """(table, id column, column, AAD org column, kind, ctx) of every value the rotation re-encrypts."""
     out = []
     for t, cols in oc.FIELDS.items():
-        idc = "org_id" if t in ("office_company",) else "id"
+        idc = "org_id" if t in ROT_ORG_ROWS else "id"
         oc_col = "sid" if t.startswith("budget_") else "org_id"
         out += [(t, idc, col, oc_col, "text", f"{t}.{col}") for col in cols]
     out.append(("office_doc_items", "id", "cost_enc", "org_id", "text", "office_doc_items.cost_enc"))
     for (t, col), keys in oc.JSON_KEYS.items():
-        out.append((t, "org_id" if t == "office_settings" else "id", col, "org_id", "json", f"{t}.{col}"))
+        out.append((t, "org_id" if t in ROT_ORG_ROWS else "id", col, "org_id", "json", f"{t}.{col}"))
     out += [(t, idc, col, "ws", "ws", ctx) for t, idc, col, ctx in ROT_WS]
     from ..wiki.wkhist import WKH_CTX, WKH_VCTX  # 2.138.0 C (#1972): page texts of the organisation (wiki/wkhist.py _seal)
     out += [("wiki_pages", "id", "body", "org_id", "text", WKH_CTX), ("wiki_versions", "id", "body", "org_id", "text", WKH_VCTX)]
