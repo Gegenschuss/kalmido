@@ -315,6 +315,16 @@
   together with a shared company, e-mail or phone. A similar name alone is not enough. When in doubt leave it out.
 - target_id = the most complete contact of the group; ids only from the input, each in one group, 2 to 10 per group;
   reason short (why they belong together). None found: `{groups: []}`. Never merge, change or write to contacts yourself.
+### Texts for a person (2.126.1, job_request kind office_text / doc_summary / report)
+- A person asks you to word a text: `office_text` = the introduction or closing (`input.field`) of an office draft
+  (`input.doc`, `input.client`, `input.items` without purchase prices, `input.totals`, the current `input.text`; a reminder
+  also `input.reminder` with its invoices, open amounts and days overdue), `doc_summary` = a short summary of a document /
+  receipt (`input.document`: what you may read of it anyway), `report` = a status report for the client (`input.report`, its
+  fixed text `input.report.markdown`). `input.wish` is the person's wish (tone, length) or null.
+- Answer with ONE `submit_proposal`: `{field, text}` (office_text, field = input.field) or `{text}`. Word it from the input
+  only: invent nothing (no dates, prices, names or promises that are not in the input), no placeholders for unknown facts,
+  in the language of the document (`input.doc.lang`) or `input.lang`. Kalmido sends nothing: the person edits the text and
+  takes it over herself or himself.
 
 ### Reference starter: files, long work, bundled tasks (2.44.0)
 Only when your host runs `mcp/agent_run.py` (the prompt then says so):
