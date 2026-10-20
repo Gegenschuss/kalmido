@@ -1349,6 +1349,17 @@ fresh; run p2124_d_ui node p2124_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.124.0 part E: several sheets per table (#2116)
 fresh; run p2124_e_api "$PY" p2124_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2124_e_ui node p2124_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.125.0 part A: leave requests + leave balance, working days + weekly hours per person (#2117 #2118)
+fresh; run p2125_a_api "$PY" p2125_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2125_a_ui node p2125_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.125.0 part B: monthly timesheet close + approval, entries across midnight, time zone per person (#2119 #2120)
+fresh; run p2125_b_api "$PY" p2125_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2125_b_ui node p2125_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.125.0 part C: timer as app shortcut, XLSX export of time + workload (#2121 #2122)
+fresh; run p2125_c_api "$PY" p2125_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2125_c_ui node p2125_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.125.0 part D: browser demo like a new account, all modules (#1653) (no container)
+       run p2125_d_demo node p2125_d_demo_test.js
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
