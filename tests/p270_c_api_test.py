@@ -138,7 +138,9 @@ share(A, CL1, CLA)
 CL2 = A.post(B + "/api/lists", json={"name": "Contracts two"}).json()["id"]
 OTHER = A.post(B + "/api/lists", json={"name": "Other"}).json()["id"]
 C_LIM = contract(A, "Car insurance", D(9), cost=40, per="month", list_id=CL2)
-dbx("UPDATE agents SET org_id=? WHERE user_id=?", (ORG, LIM))  # new lists of alice belong to her workspace Alpha
+dbx("UPDATE agents SET org_id=? WHERE user_id=?", (ORG, LIM))
+# 2.148.1 (#2480): with two organisations and none chosen a new list is private (was: the first one) -> put both into Alpha
+dbx("UPDATE lists SET org_id=? WHERE id IN (?,?)", (ORG, CL2, OTHER))
 dbx("UPDATE agents SET list_ids=? WHERE user_id=?", (str(OTHER), LIM))  # first the limit, then the shares (the watchdog runs every second)
 share(A, CL2, LIM)
 share(A, OTHER, LIM)
