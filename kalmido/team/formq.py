@@ -254,8 +254,10 @@ def fq_text_of(qs, ans):
 
 def fq_md(v):
     """2.148.1 E (#2496): an answer from outside as plain Markdown text: no links, images, HTML, headings or lists of its own."""
-    v = re.sub(r"([\\`*_\[\]()<>!|~])", r"\\\1", str(v))
-    return re.sub(r"(?m)^(\s*)([#+\-]|\d+[.)])", r"\1\\\2", v)
+    # 2.148.1 F: ( ) stay (a link needs the escaped "]" before them); a list mark only counts before a blank / the line end
+    v = re.sub(r"([\\`*_\[\]<>!|~])", r"\\\1", str(v))
+    v = re.sub(r"(?m)^(\s*)(#|[+\-](?=\s|$))", r"\1\\\2", v)
+    return re.sub(r"(?m)^(\s*\d+)([.)])(?=\s|$)", r"\1\\\2", v)
 
 
 def fq_shown(q, v, lg):

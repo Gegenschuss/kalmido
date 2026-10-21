@@ -2,9 +2,9 @@
 
 An address without an account becomes a new account (no password, user name made from the address like a registration),
 member of the organisation in the chosen role, and gets the invitation mail of accounts/invite.py (the link is in the
-answer, too, to copy without e-mail). An address that has an account is added as today (PUT /api/orgs/<oid>/members: the
+answer, too, to copy without e-mail). An address that has an account is added as today (PUT /api/orgs/<id>/members: the
 answer says nothing more). 2.148.1 A (#2480): an existing account is never added silently: it gets an invitation (org_joins,
-a News item) and joins when the person accepts (POST /api/orgs/<oid>/join; DELETE declines); only an instance admin still
+a News item) and joins when the person accepts (POST /api/orgs/<id>/join; DELETE declines); only an instance admin still
 adds directly. Both ways answer the same (no "invited" / "user_id"). 2.148.1 A (#2486): the link of a new account goes only
 by e-mail (an organisation admin never sees it, also not on a mail error or with the mail budget used up); an instance admin
 still gets it then (servers without SMTP), logged. At most OINV_RESEND_DAY resends per invitation and day. The instance admins can switch this off (Settings > Users > Sign-in, global setting org_invites;
