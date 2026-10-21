@@ -275,6 +275,18 @@ check(len(kept) == 1, f"#2482: the folder of before stays while it holds a file 
 code = "import os, sys, shutil\nbase = os.path.dirname(sys.argv[1].rstrip('/'))\nfor n in os.listdir(base):\n" \
        "    if '.pre-restore-' in n: shutil.rmtree(os.path.join(base, n))\n"
 subprocess.run(["docker", "exec", CT, "python", "-c", code, ATT], capture_output=True, text=True)
+# 2.148.1 G (#2482): a file of a known folder that the archive does not bring keeps the folder of before (older archives)
+NEWER = "tchat/7/after-backup.txt"
+code = "import os, sys\np = os.path.join(sys.argv[1], sys.argv[2]); os.makedirs(os.path.dirname(p), exist_ok=True); open(p, 'w').write('newer')\n"
+subprocess.run(["docker", "exec", CT, "python", "-c", code, ATT, NEWER], capture_output=True, text=True)
+r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
+check(r.ok and r.json().get("ok"), f"#2482: second restore {r.status_code} {r.text[:300]}")
+A = sess("alice")
+code = "import os, sys\nbase = os.path.dirname(sys.argv[1].rstrip('/')); pre = os.path.basename(sys.argv[1].rstrip('/')) + '.pre-restore-'\n" \
+       "print(sum(os.path.exists(os.path.join(base, n, sys.argv[2])) for n in os.listdir(base) if n.startswith(pre)))\n" \
+       "for n in os.listdir(base):\n    if n.startswith(pre): __import__('shutil').rmtree(os.path.join(base, n))\n"
+r = subprocess.run(["docker", "exec", CT, "python", "-c", code, ATT, NEWER], capture_output=True, text=True)
+check(r.stdout.strip() == "1", f"#2482: a file the archive does not list stays in the folder of before {r.stdout[-100:]} {r.stderr[-200:]}")
 for s in (A,):
     s.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 Bo = sess("bruno")
