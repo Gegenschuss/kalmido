@@ -10,8 +10,8 @@ const DC_FEATS = [['sender', N_('Sender')], ['type', N_('Document type')], ['tag
 const DC_LEVELS = [['learn', N_('Learns from your documents')], ['rules', N_('Rules only')], ['agent', N_('Left to an agent')], ['off', N_('Off')]];
 const DC_KINDS = [['any', N_('contains one of the words')], ['all', N_('contains all words')], ['exact', N_('contains the exact phrase')],
   ['fuzzy', N_('contains the phrase (tolerates typos)')], ['regex', N_('matches the pattern (regular expression)')]];
-// 2.153.0 (#2179): the types of the custom fields of documents (docs/fields.py DF_TYPES)
-const DC_FTYPES = [['text', N_('Text')], ['number', N_('Number')], ['money', N_('Amount')], ['date', N_('Date')], ['checkbox', N_('Checkbox')], ['select', N_('Selection')], ['url', N_('Link')]];
+// 2.153.0 (#2179): the types of the custom fields of documents (docs/fields.py DF_TYPES; DC_FTYPES = the file types of the filter)
+const DC_CFTYPES = [['text', N_('Text')], ['number', N_('Number')], ['money', N_('Amount')], ['date', N_('Date')], ['checkbox', N_('Checkbox')], ['select', N_('Selection')], ['url', N_('Link')]];
 const DC_STATE = {wait: N_('Waiting for recognition'), run: N_('Recognising…'), done: N_('Recognised'), failed: N_('Recognition failed')};
 const DC_BY = {rule: N_('set by a rule'), learn: N_('learnt from your documents'), agent: N_('set by an agent'), import: N_('imported'), code: N_('read from the code on the document'), photo: N_('from the capture date of the photo')};  // 2.61.0 B (#1819): photo
 
@@ -374,13 +374,13 @@ function dc_cfSettings(s) {  // 2.153.0 (#2179): the custom fields of the worksp
   const fs = s.fields || [];
   return `<h4>${tr('Custom fields')}</h4>
     <p class="muted">${tr('Extra fields every document of this workspace can have, e.g. a contract or customer number.')}</p>
-    ${fs.length ? `<ul class="dc-rules">${fs.map(f => `<li class="dc-rule"><span>${esc(f.name)} <span class="muted">${esc(tr(DC_FTYPES.find(t => t[0] === f.type)?.[1] || f.type))}${f.type === 'select' ? `: ${esc((f.options || []).map(o => o.name).join(', '))}` : ''}</span></span><span>
+    ${fs.length ? `<ul class="dc-rules">${fs.map(f => `<li class="dc-rule"><span>${esc(f.name)} <span class="muted">${esc(tr(DC_CFTYPES.find(t => t[0] === f.type)?.[1] || f.type))}${f.type === 'select' ? `: ${esc((f.options || []).map(o => o.name).join(', '))}` : ''}</span></span><span>
       ${f.type === 'select' ? `<button type="button" class="iconbtn" data-dcs="fopt:${f.id}" aria-label="${esc(tr('Options'))}" title="${esc(tr('Options'))}">${ic('list')}</button>` : ''}
       <button type="button" class="iconbtn" data-dcs="fren:${f.id}" aria-label="${esc(tr('Rename'))}" title="${esc(tr('Rename'))}">${ic('edit')}</button>
       <button type="button" class="iconbtn" data-dcs="fdel:${f.id}" aria-label="${esc(tr('Delete {0}', f.name))}" title="${esc(tr('Delete {0}', f.name))}">${ic('trash')}</button></span></li>`).join('')}</ul>` : ''}
     <details class="dc-radd dc-fadd"><summary>${tr('New field')}</summary>
       <div class="row"><label for="dcf-name">${tr('Name')}</label><input id="dcf-name" maxlength="60" autocomplete="off"></div>
-      <div class="row"><label for="dcf-type">${tr('Type')}</label><select id="dcf-type" data-dcs="ftype">${DC_FTYPES.map(([v, l]) => `<option value="${v}">${tr(l)}</option>`).join('')}</select></div>
+      <div class="row"><label for="dcf-type">${tr('Type')}</label><select id="dcf-type" data-dcs="ftype">${DC_CFTYPES.map(([v, l]) => `<option value="${v}">${tr(l)}</option>`).join('')}</select></div>
       <div class="row dcf-opts" hidden><label for="dcf-opts">${tr('Options')}</label><input id="dcf-opts" maxlength="600" placeholder="${esc(tr('comma-separated'))}" autocomplete="off"></div>
       <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-dcs="fadd">${tr('Add field')}</button></div></details>`;
 }
