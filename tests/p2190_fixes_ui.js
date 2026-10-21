@@ -99,8 +99,9 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
   await w.eval('wpSweep(null, true)');
   check(shown.every(x => x.closed), '"Mark all as read": every notification closes');
   w.eval('S.news = {unread: 3, sig: "x"}; S.team = {enabled: true, unread: 2}; badgeN = -1; badgeSync()');
-  const exp = w.eval('(collab() ? 3 : 0) + (teamOn() ? 2 : 0)');
-  check(badge.at(-1) === exp, `the app badge: unread News + chat (${badge.at(-1)} = ${exp})`);
+  // 2.152.1 (#2626): the badge is the bell's number (bellCount: For you + direct messages), activity / rooms no longer count
+  const exp = w.eval('collab() ? bellCount() : (teamOn() ? 2 : 0)');
+  check(badge.at(-1) === exp, `the app badge: the bell's number (${badge.at(-1)} = ${exp})`);
   w.eval('S.news = {unread: 0, sig: "y"}; S.team = {enabled: true, unread: 0}; badgeSync()');
   check(badge.at(-1) === 0, 'nothing unread: the badge is cleared');
   w.close();
