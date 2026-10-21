@@ -111,12 +111,13 @@ function mm_propsSvg(items, x, y, w, o = {}) {
   const txt = (tx, t) => `<text x="${tx}" y="${y + 4}" class="mmp"${st('fill', mut)}${st('font', MM_PF)}>${esc(t)}</text>`;
   const fits = mm_propsW(items) <= w;
   let cx = x, out = '';
-  for (const it of items) {
-    const iw = mm_propW(it), rest = x + w - cx;
-    if (!fits && iw + 8 + ell > rest) {  // phones / long values: what does not fit ends in …
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i], iw = mm_propW(it), rest = x + w - cx, last = i === items.length - 1;
+    if (!fits && (last ? iw : iw + 8 + ell) > rest) {  // phones / long values: what does not fit ends in …
       const room = rest - (it.ic ? 14 : 0);
-      if (it.txt && room > 30) out += (it.ic ? mm_icSvg(it.ic, cx, y, o) : '') + txt(cx + (it.ic ? 14 : 0), mm_clip2(it.txt, room));
-      else out += txt(cx, '…');
+      let t2 = it.txt && !it.dot && room > 30 ? mm_clip2(it.txt, last ? room : room - ell - 4) : '';
+      if (t2 && !t2.endsWith('…')) t2 += ' …';  // it fits, the ones after it do not
+      out += t2 ? (it.ic ? mm_icSvg(it.ic, cx, y, o) : '') + txt(cx + (it.ic ? 14 : 0), t2) : txt(cx, '…');
       break;
     }
     if (it.dot) out += `<circle class="mmpd p${it.dot}" cx="${cx + 4}" cy="${y}" r="4"${o.inline ? ` fill="${MM_PHEX[it.dot]}"` : ''}/>`;
@@ -582,8 +583,8 @@ function mm_ideasBar() {  // per request: waiting for the agent / ideas there wi
   const l = listById(MM.lid), ro = !l || mm_ro(l), js = MM.ideas.jobs; if (!js.length) return '';
   return `<div class="mmideas" role="status">${js.map(j => {
     const open = j.state === 'ready' ? mm_ideaOpenKeys(j).length : 0;
-    if (j.state === 'requested') return `<div class="mmir">${ic('bulb', 's')}<span>${esc(tr('{0} is thinking of ideas for “{1}”…', j.agent.name, j.path.at(-1) || lname(l)))}</span><button type="button" class="btn sm" data-mm="ideas-stop" data-j="${j.id}">${tr('Cancel')}</button></div>`;
-    return `<div class="mmir">${ic('bulb', 's')}<span>${esc(trn('{1}: {0} idea for “{2}”', '{1}: {0} ideas for “{2}”', open, j.agent.name, j.path.at(-1) || lname(l)))}</span>${ro ? '' : `<button type="button" class="btn sm" data-mm="ideas-take" data-j="${j.id}">${tr('Take all')}</button><button type="button" class="btn sm" data-mm="ideas-drop" data-j="${j.id}">${tr('Discard all')}</button>`}</div>`;
+    if (j.state === 'requested') return `<div class="mmir">${ic('bulb', 's')}<span>${esc(tr('{0} is thinking of ideas for “{1}”…', j.agent.name, j.path.at(-1) || lname(l)))}</span><button type="button" class="btn sm" data-mm="ideas-stop" data-j="${j.id}" title="${esc(tr('Cancel request'))}" aria-label="${esc(tr('Cancel request'))}">${ic('x', 's')}<span>${tr('Cancel')}</span></button></div>`;
+    return `<div class="mmir">${ic('bulb', 's')}<span>${esc(trn('{1}: {0} idea for “{2}”', '{1}: {0} ideas for “{2}”', open, j.agent.name, j.path.at(-1) || lname(l)))}</span>${ro ? '' : `<button type="button" class="btn sm" data-mm="ideas-take" data-j="${j.id}" title="${esc(tr('Take all'))}" aria-label="${esc(tr('Take all'))}">${ic('check', 's')}<span>${tr('Take all')}</span></button><button type="button" class="btn sm" data-mm="ideas-drop" data-j="${j.id}" title="${esc(tr('Discard all'))}" aria-label="${esc(tr('Discard all'))}">${ic('x', 's')}<span>${tr('Discard all')}</span></button>`}</div>`;
   }).join('')}</div>`;
 }
 const mm_ideaOpenKeys = j => j.items.flatMap((it, i) => [String(i), ...it.children.map((c, x) => `${i}.${x}`)]).filter(k => !j.taken[k] && !j.dropped.includes(k));

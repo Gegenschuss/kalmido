@@ -51,13 +51,18 @@ i.mmpd{display:inline-block;width:.5rem;height:.5rem;border-radius:50%}
 .mmib.drop:hover .mmpi{color:var(--danger)}
 .mmideas{display:flex;flex-direction:column;gap:.25rem}
 .mmir{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.375rem .625rem;border:1px dashed var(--accent);border-radius:var(--r-s);background:var(--accent-soft);font-size:var(--fs-s)}
-.mmir>span{flex:1 1 12rem;min-width:0}
+.mmir>span{flex:1 1 0;min-width:0}
+.mmwrap .mmideas~.mmstage{height:calc(100vh - 18rem)}
 .mmir .i{color:var(--accent)}
 .mmoi.mmoidea{opacity:.75;font-style:italic;border:1px dashed var(--accent);background:var(--accent-soft)}
 .mmop{display:inline-flex;flex:0 1 auto;min-width:0;overflow:hidden;flex-wrap:nowrap;align-items:center;gap:.5rem;margin-left:.25rem}
 @media (max-width:899px) {
   .mmstage{height:calc(100vh - 17rem)}
   .mmbar .btn span{display:none}
+  .mmir{flex-wrap:nowrap;padding:.25rem .5rem}
+  .mmir .btn span{display:none}
+  .mmir>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mmwrap .mmideas~.mmstage{height:calc(100vh - 20rem)}
 }
 @media (prefers-reduced-motion:no-preference) {
   .mmnode rect{transition:stroke .15s}
