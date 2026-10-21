@@ -230,6 +230,10 @@ check(st.get(ORG, {}).get("fields", {}).get("enc") == 0 and st.get(ORG, {}).get(
 rc, out, err_ = cli("encrypt-all")
 check(rc == 0 and str(one("SELECT plate FROM office_vehicles WHERE id=?", (VID,))).startswith("kenc1:"),
       f"#2481: encrypt-all seals a value written while the encryption was off {rc} {out[-200:]} {err_[-300:]}")
+# 2.148.1 G (#2481): a second pass leaves sealed values as they are
+sealed = one("SELECT plate FROM office_vehicles WHERE id=?", (VID,))
+rc, out, err_ = cli("encrypt-all")
+check(rc == 0 and one("SELECT plate FROM office_vehicles WHERE id=?", (VID,)) == sealed, f"#2481: encrypt-all again: the sealed value unchanged {rc} {err_[-300:]}")
 rc, out, err_ = cli("rotate", "--org", str(ORG))
 check(rc == 0 and one("SELECT wrapped_rot FROM org_keys WHERE org_id=?", (ORG,)) is None, f"#2481: key renewal finished {rc} {out[-200:]} {err_[-400:]}")
 vs = A.get(B + O + "/vehicles").json().get("vehicles", [])
