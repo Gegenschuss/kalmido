@@ -8,7 +8,8 @@ Own container (start.sh), invented companies and people only (@example.com / .ex
  - no webhook event for trial invoices (a real one queues invoice.created)
  - an invoice series from a trial invoice: 409
  - the admin deletes a trial document at any time (finalised, sent, signed, with follow-ups; the follow-up stays, its
-   link is emptied; the office log has the delete with trial: true); a member 403 (can_delete false)
+   link is emptied; the office log has the delete with trial: true); a member 403 (can_delete false); trip costs billed
+   on it are free again (single delete and delete all)
  - the list: trial on every row, ?trial=1|0, trial_count, first {offer, invoice}, office_id
  - POST /api/office/trial/delete-all: member 403, counts, real documents and other areas stay, stored files and the
    filed PDF of a document from a template are gone, the TEST series starts again (tenant-matrix: office)
@@ -32,6 +33,7 @@ from freelancer_fixture import freelancer  # noqa: E402
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
+CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 FAILS, OKS = [], [0]
 TEST_IBAN = "DE02120300000000202051"
 
@@ -153,6 +155,12 @@ def run(S, oid, who, M=None, cl=None):
     check(real(counters(oid)) == before, f"{who}: no real counter moved {real(counters(oid))} vs {before}")
     check(counters(oid).get(("trial", "")) == 2, f"{who}: the TEST counter at 2 {counters(oid)}")
     check(S.post(B + f"{D}/{q1}/number", json={"number": "X-77"}).status_code == 400, f"{who}: a number by hand for a trial one 400")
+    # a trip cost billed on the trial quotation (freed again when it is deleted, below)
+    r = S.post(B + O + "/trips", json={"date_from": "2030-02-10", "dest": "Example location", "items": [{"date": "2030-02-10", "category": "taxi", "amount": 25}]})
+    check(r.status_code == 201, f"{who}: a trip " + r.text[:200])
+    ti = (r.json().get("items") or [{}])[0].get("id")
+    r = S.post(B + O + "/trips/bill", json={"doc_id": q1, "item_ids": [ti]})
+    check(r.ok, f"{who}: the trip cost billed on the trial quotation " + r.text[:200])
     S.patch(B + f"{D}/{q1}", json={"trial": False, "project_title": "Trial film 2"})
     check(S.get(B + f"{D}/{q1}").json().get("trial") is True, f"{who}: PATCH never switches trial")
     q0 = make(S, cl, "Real film", trial=False)
@@ -223,6 +231,9 @@ def run(S, oid, who, M=None, cl=None):
     d = S.get(B + f"{D}/{inv}").json()
     check(d.get("id") == inv and not d.get("source_doc_id"), f"{who}: the follow-up stays, its link emptied {d.get('source_doc_id')}")
     check(not dbx("SELECT 1 FROM office_signoffs WHERE token_hash=?", (f"p214410a-{who}",)), f"{who}: the signoff went with it")
+    check(dbx("SELECT billed_doc_id FROM office_trip_items WHERE id=?", (ti,))[0][0] is None, f"{who}: the trip cost is free again")
+    r = S.post(B + O + "/trips/bill", json={"doc_id": i1, "item_ids": [ti]})
+    check(r.ok, f"{who}: the freed trip cost can be billed again (on the trial invoice) " + r.text[:200])
     ent = [x for x in S.get(B + O + "/log?limit=200").json().get("log") or [] if x.get("doc_id") == q1 and x.get("action") == "delete"]
     check(ent and ent[0]["detail"].get("trial") is True and ent[0]["detail"].get("number") == "TEST-001", f"{who}: the office log keeps the delete {ent[:1]}")
     # ------------------------------------------------ delete all
@@ -230,10 +241,13 @@ def run(S, oid, who, M=None, cl=None):
     check(files, f"{who}: the finalised trial invoice has its stored file")
     n_trial = len(lst(S, "?kind=offer&trial=1")["docs"]) + len(lst(S, "?kind=invoice&trial=1")["docs"]) + len(lst(S, "?kind=credit&trial=1")["docs"])
     r = S.post(B + DA)
+    if r.status_code >= 500:  # the server's traceback into the suite log
+        print(subprocess.run(["docker", "logs", "--tail", "60", CT], capture_output=True, text=True).stderr[-6000:], flush=True)
     check(r.ok and r.json().get("ok") is True and r.json().get("docs") == n_trial and r.json().get("gen_docs") == 1,
           f"{who}: delete all {r.text[:200]} (expected {n_trial} documents)")
     check(lst(S).get("trial_count") == 0, f"{who}: no trial document left")
     check(S.get(B + f"{D}/{q0}").ok, f"{who}: the real quotation stays")
+    check(dbx("SELECT billed_doc_id FROM office_trip_items WHERE id=?", (ti,))[0][0] is None, f"{who}: delete all frees the trip cost too")
     check(not office_files(oid, inv), f"{who}: the stored file is gone {office_files(oid, inv)}")
     check(not dbx("SELECT 1 FROM fs_nodes WHERE id=?", (node,)), f"{who}: the filed document PDF is gone")
     check(not dbx("SELECT 1 FROM office_gen_docs WHERE id=?", (gd,)), f"{who}: the document from a template is gone")

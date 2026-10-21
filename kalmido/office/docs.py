@@ -1392,15 +1392,19 @@ def odoc_delete(did):
 
 
 # 2.144.10 A (#2576): deleting trial documents. Follow-ups stay (they are trial documents themselves), their reference is
-# emptied; payments, items, parts and signoff links go with the row (ON DELETE CASCADE); the stored PDF / XML files and a
+# emptied; receipts and trip costs billed on it are free again; payments, items, parts and signoff links go with the row (ON DELETE CASCADE); the stored PDF / XML files and a
 # document's filed PDFs in the documents space are removed after the commit. The office log keeps a "delete" entry.
 def trial_drop_doc(c, oid, r):
     """Deletes trial document r (the caller holds the locks, checked the role and commits) -> the file paths to remove."""
     import glob
     from ..core.config import OFFICE_DIR
+    from .books import bk_ws
     did = r["id"]
     for col in ("source_doc_id", "cancels_id", "version_of"):
         c.execute(f"UPDATE office_docs SET {col}=NULL WHERE org_id=? AND {col}=?", (oid, did))
+    # receipts and trip costs billed on it are free again for the real billing (time entries follow the invoices themselves)
+    c.execute("UPDATE rc_receipts SET billed_doc_id=NULL, billed_at=NULL WHERE ws=? AND billed_doc_id=?", (bk_ws(c, oid), did))
+    c.execute("UPDATE office_trip_items SET billed_doc_id=NULL, billed_at=NULL WHERE org_id=? AND billed_doc_id=?", (oid, did))
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net"),
                                                   "kind": r["kind"], "trial": True, **({"locked": True} if ofx_locked(r) else {})})
     c.execute("DELETE FROM office_docs WHERE id=? AND org_id=? AND trial=1", (did, oid))
@@ -1413,6 +1417,8 @@ def trial_drop_gen_doc(c, oid, g_):
     ids, paths = [], []
     for nid in {g_["node_id"], g_["signed_node_id"]} - {None}:
         if c.execute("SELECT 1 FROM fs_nodes WHERE id=?", (nid,)).fetchone():
+            # the document reader may still work on the freshly filed PDF: take its row first (never a deadlock with it)
+            c.execute("SELECT node_id FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,)).fetchall()
             i, p = fs_purge(c, nid)
             ids += i
             paths += p
