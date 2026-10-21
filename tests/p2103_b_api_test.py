@@ -176,6 +176,13 @@ sql("INSERT INTO file_text(kind, ref_id, ws, state, created_at, updated_at) VALU
 check(Fr.delete(B + f"/api/sheets/{S_OLD}").ok, "setup: the old table into the trash")
 ROW = one("SELECT id FROM sheet_rows WHERE sheet_id=? ORDER BY pos LIMIT 1", (S_LIVE,))
 COL = one("SELECT id FROM sheet_columns WHERE sheet_id=? ORDER BY pos LIMIT 1", (S_LIVE,))
+# 2.152.0 (#2165, review C-M2): the deleted row holds a file; a second row keeps its own
+RF, _ = sheet_file(S_LIVE, ROW, "row-receipt.pdf")
+r = Fr.post(B + f"/api/sheets/{S_LIVE}/files", files={"file": ("kept.pdf", PDF, "application/pdf")},
+            data={"row_id": str(one("SELECT id FROM sheet_rows WHERE sheet_id=? ORDER BY pos LIMIT 1 OFFSET 1", (S_LIVE,))),
+                  "col_id": str(one("SELECT col_id FROM sheet_cells WHERE raw=?", (f"file:{RF}",)))})
+check(r.status_code == 201, "setup: a file in a second, live row " + r.text[:160])
+KF = r.json().get("file", {}).get("id") if r.ok else 0
 check(Fr.delete(B + f"/api/sheets/{S_LIVE}/rows/{ROW}").ok and Fr.delete(B + f"/api/sheets/{S_LIVE}/columns/{COL}").ok,
       "setup: a row and a column of the live table into the trash")
 sql("UPDATE sheets SET deleted_at=? WHERE id=?", (OLD, S_OLD), write=True)
@@ -250,6 +257,8 @@ check(r.ok, "tables: the live table still opens " + r.text[:120])
 check(not os.path.exists(TF_PATH) and not sql("SELECT 1 FROM sheet_files WHERE id=?", (TF,))
       and not sql("SELECT 1 FROM file_text WHERE kind='sheet' AND ref_id=?", (TF,))
       and not sql("SELECT 1 FROM upload_scan WHERE kind='sheet' AND ref_id=?", (TF,)), "tables: the further sheet's file, text and scan rows gone with the table")
+check(sql("SELECT deleted_at IS NOT NULL FROM sheet_files WHERE id=?", (RF,)) == [(1,)], "tables: the purged row's file is in the files' trash")
+check(sql("SELECT deleted_at IS NULL FROM sheet_files WHERE id=?", (KF,)) == [(1,)], "tables: the live row's file stays")
 check(not sql("SELECT 1 FROM hub_mails WHERE id=?", (HM,)) and not sql("SELECT 1 FROM hub_words WHERE mail_id=?", (HM,)), "hub mail: row and word index gone")
 check(sql("SELECT deleted_at IS NOT NULL FROM fs_nodes WHERE id=?", (HF,)) == [(1,)], "hub mail: its folder is in the file store's trash now")
 check(sql("SELECT 1 FROM hub_mails WHERE message_id='fresh-1@example.com'"), "hub mail: deleted today stays")
