@@ -15,6 +15,7 @@
 const kbSideGroups = () => sideGroupOrder().filter(g => !sideHidden('g:' + g) || g === 'lists');
 const kbSideAnyOpen = () => kbSideGroups().some(g => sideOpen(g)) || folderNames().some(f => !foldClosed(f));  // 2.45.0 (#1502): Tags is a group now
 function kbSideSetAll(closed) {
+  if (sv_setAll(closed)) return;  // 2.156.0 D (#2186): in a sidebar view only for now
   for (const g of SIDE_GROUPS) {
     const key = SIDE_FOLDED.includes(g) ? 'sideOpenG' : 'sideGroups', x = new Set(LS.get(key, []) || []);
     if (SIDE_FOLDED.includes(g) === closed) x.delete(g); else x.add(g);

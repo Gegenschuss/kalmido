@@ -3284,6 +3284,10 @@ USER_DEFAULTS = {
     # star itself stays in fav_lists), "folder:<path>", "v:<view>" (today, tomorrow, ...), "m:<module or area>", "f:<filter id>",
     # "tag:<name>", "p:<user id>", "g:<group id>", "a:<agent id>"; synced to every device like the other settings
     "fav_items": "[]",
+    # 2.156.0 D (#2186): the sidebar's saved views, json list of {id, name, icon, open (groups shown open), fclosed (closed
+    # folders), hide (keys of hidden entries, "g:<group>" or a fav_items key), start (a route, optional)}; side_view = the id of
+    # the active one ('' = "Everything"); per person, the same on every device (accounts/sideviews.py)
+    "side_views": "[]", "side_view": "",
     # 2.61.0 B (#1819): '0' = my own photos (not an organisation's) keep their metadata (GPS, camera, capture time) on upload
     "photo_meta_strip": "1",
     # 2.62.0 (#1854): comments by agents in the bell and as push: all | replies (only replies to me: reply_to my comment,

@@ -231,8 +231,8 @@ const sideGroupOrder = () => {  // an own order stays; unknown groups go to the 
   if (o.length && !o.includes('areas')) o.splice(o.includes('views') ? o.indexOf('views') + 1 : o.length, 0, 'areas');
   return [...new Set([...o, ...SIDE_GROUPS])];
 };
-const sideOpen = g => SIDE_FOLDED.includes(g) ? (LS.get('sideOpenG', []) || []).includes(g) : !(LS.get('sideGroups', []) || []).includes(g);
-function sideGroupToggle(g) { const key = SIDE_FOLDED.includes(g) ? 'sideOpenG' : 'sideGroups', x = new Set(LS.get(key, []) || []); x.has(g) ? x.delete(g) : x.add(g); LS.set(key, [...x]); renderSide(); }
+const sideOpen = g => sv_open(g) ?? (SIDE_FOLDED.includes(g) ? (LS.get('sideOpenG', []) || []).includes(g) : !(LS.get('sideGroups', []) || []).includes(g));  // 2.156.0 D (#2186): an active sidebar view decides (sideviews.js)
+function sideGroupToggle(g) { if (sv_toggle(g)) return; const key = SIDE_FOLDED.includes(g) ? 'sideOpenG' : 'sideGroups', x = new Set(LS.get(key, []) || []); x.has(g) ? x.delete(g) : x.add(g); LS.set(key, [...x]); renderSide(); }
 function teamPeople() {
   if (!collab()) return [];
   const seen = new Map();
@@ -423,7 +423,7 @@ function renderSide() {
   const oldAcct = $('#side .sbacct');  // 2.47.0 (#1654): keep the account node (same <img>) when nothing about it changed
   $('#side').innerHTML = `
     <div class="sbfix">${'' /* 2.57.0 (#1798): the fixed head (workspace, favourites) stays while the rest scrolls */}
-    <div class="sbhead">${'' /* 2.138.2 C (#2392): no logo (the 4 px stripe of #2389 is #side's top border, app.css); the workspace switch is the heading, fold + fold-all show on hover / focus, the dot only offline or while syncing */}${wsBarHtml()}${netDotHtml()}<span class="spacer"></span><span class="sbtools">${kbFoldAllBtn()}${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</span></div>
+    <div class="sbhead">${'' /* 2.138.2 C (#2392): no logo (the 4 px stripe of #2389 is #side's top border, app.css); the workspace switch is the heading, fold + fold-all show on hover / focus, the dot only offline or while syncing */}${wsBarHtml()}${netDotHtml()}<span class="spacer"></span><span class="sbtools">${kbFoldAllBtn()}${fv2_svToolBtn() /* 2.156.0 D (#2186) */}${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</span></div>
     ${favSideHtml(lists, listRow, head)}</div>
     ${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('')}
     <div class="sgroup sfoot">
@@ -433,6 +433,7 @@ function renderSide() {
     <div class="sbdock">${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}</button>` : '' /* 2.138.2 C (#2392): the account picture, without dots, next to the search */}<button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button></div>`;  // 2.138.0 B (#2161)
   const newAcct = $('#side .sbacct');
   if (oldAcct && newAcct && oldAcct.innerHTML === newAcct.innerHTML && oldAcct.title === newAcct.title) newAcct.replaceWith(oldAcct);
+  sv_after();  // 2.156.0 D (#2186): what the active view hides goes under "Others (N)" (sideviews.js)
   sideRove();
 }
 // 2.13.0 (#453 A9): the sidebar is ONE tab stop (roving tabindex): Tab lands on the open view's row (or the first one),

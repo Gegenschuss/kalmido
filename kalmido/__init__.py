@@ -76,6 +76,7 @@ ORDER = (
     "lists.listexport",  # 2.116.0 C (#2064)
     "accounts.layouts",  # 2.32.0 (#1063, #983)
     "accounts.layoutsets",  # 2.55.0 (#1069, #1068, #1066)
+    "accounts.sideviews",  # 2.156.0 D (#2186): the sidebar's saved views (no routes: user settings side_views / side_view)
     "accounts.onboarding",
     "accounts.users",
     "accounts.orgs",

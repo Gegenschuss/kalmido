@@ -95,11 +95,11 @@ function fv2_tiles(lists) {
 }
 // the section "Favourites" (renderSide via favSideHtml): the heading with "Only favourites" (lists only), the tiles below
 function fv2_sideHtml(lists, head) {
-  const ts = fv2_tiles(lists); if (!ts.length) return '';
+  const ts = fv2_tiles(lists), sv = sv_tilesHtml(); if (!ts.length) return sv ? `<div class="sgroup sg-favs sg-svonly">${sv}</div>` : '';  // 2.156.0 D (#2186): + the view tiles
   const only = favOnly(), lab = tr('Only favourites');
   const acts = favAny() ? `<button type="button" data-fav-only class="${only ? 'on' : ''}" aria-pressed="${only}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('filter', 's')}</button>` : '';
   const drag = isMobile() ? '' : ' draggable="true"';
-  return `<div class="sgroup sg-favs">${head('favs', tr('Favourites'), acts)}${sideOpen('favs') ? `<div class="fv2-grid" role="group" aria-label="${esc(tr('Favourites'))}">${ts.map(t =>
+  return `<div class="sgroup sg-favs">${head('favs', tr('Favourites'), acts)}${sv}${sideOpen('favs') ? `<div class="fv2-grid" role="group" aria-label="${esc(tr('Favourites'))}">${ts.map(t =>
     `<button type="button" class="fv2-tile ${t.on ? 'on' : ''}" data-fv2="${esc(t.key)}" ${t.attrs} title="${esc(t.name)}" aria-label="${esc(t.name)}"${t.on ? ' aria-current="page"' : ''}${drag}>${t.icon}</button>`).join('')}</div>` : ''}</div>`;
 }
 
@@ -249,3 +249,25 @@ document.addEventListener('touchcancel', () => { const lp = FV2.lp; FV2.lp = nul
 
 // ---- the fixed head gets a fine line while the sidebar is scrolled below it
 document.addEventListener('scroll', e => { if (e.target?.id === 'side') e.target.classList.toggle('fv2-scrolled', e.target.scrollTop > 2); }, {capture: true, passive: true});
+
+// ---- 2.156.0 D (#2186): saved views of the sidebar (sideviews.js, loaded on demand). Until it is loaded the sidebar is
+// "Everything" and these stand-ins answer for it; a person with views (or the tool menu, the settings) loads it, then the
+// sidebar draws again. The module's own functions replace the stand-ins on window.
+const fv2_svHas = () => { const v = S.settings?.side_views; return !!v && v !== '[]'; };
+function fv2_svLoad() {
+  if (fv2_svLoad.p) return fv2_svLoad.p;
+  fv2_svLoad.p = loadModule('sideviews').then(() => { renderSide(); }, e => { fv2_svLoad.p = null; throw e; });
+  return fv2_svLoad.p;
+}
+window.sv_open = window.sv_fold = () => null;
+window.sv_toggle = window.sv_foldSet = window.sv_setAll = () => false;
+window.sv_tilesHtml = () => '';
+window.sv_after = () => { if (fv2_svHas()) fv2_svLoad().catch(() => {}); };
+window.sv_setHtml = () => { fv2_svLoad().then(() => { const b = $('#s-sv-wrap'); if (b) b.outerHTML = sv_setHtml(); }, () => {}); return '<div id="s-sv-wrap"></div>'; };
+// the tool button in the sidebar's head: save the sidebar as it is as a view, update / edit the active one, manage them
+const fv2_svToolBtn = () => `<button type="button" class="iconbtn svtool" data-svt="1" aria-haspopup="menu" title="${esc(tr('Sidebar views'))}" aria-label="${esc(tr('Sidebar views'))}">${ic('panel', 's')}</button>`;
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-svt]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  fv2_svLoad().then(() => sv_toolMenu($('#side [data-svt]') || b), () => {});
+}, true);

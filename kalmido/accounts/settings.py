@@ -67,6 +67,9 @@ def clean_setting(k, v):
     bad = BadInput(tr("Invalid value: {0}", k))
     if k == "fav_items":  # 2.57.0 (#1798): the sidebar's favourites of every kind, in their order (a json list)
         return fv2_clean_items(v)
+    if k in ("side_views", "side_view"):  # 2.156.0 D (#2186): the sidebar's saved views and the active one (accounts/sideviews.py)
+        from .sideviews import sv_clean
+        return sv_clean(k, v)
     if isinstance(v, (dict, list)) and k not in ("folders", "folders_closed", "show_done_views", "group_order", "folder_colors", *CAL_LIST_KEYS):
         raise bad
     sv = "" if v is None else str(v).strip()

@@ -310,8 +310,9 @@ function sideOrder() {  // lists as shown: top-level lists first, then folder by
   return [...ls.filter(l => !l.folder), ...folderNames().flatMap(f => ls.filter(l => l.folder === f))];
 }
 // open / closed folders: S.collapsed "fold:<path>" (as before) + the user setting folders_closed (all devices)
-const foldClosed = p => S.collapsed.has('fold:' + p);
+const foldClosed = p => sv_fold(p) ?? S.collapsed.has('fold:' + p);  // 2.156.0 D (#2186): in a sidebar view only for now (sideviews.js)
 function foldSet(p, closed) {
+  if (sv_foldSet(p, closed)) return;
   if (closed) S.collapsed.add('fold:' + p); else S.collapsed.delete('fold:' + p);
   LS.set('collapsed', [...S.collapsed]);
   S.settings.folders_closed = JSON.stringify([...S.collapsed].filter(k => k.startsWith('fold:')).map(k => k.slice(5)));
