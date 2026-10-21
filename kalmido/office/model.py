@@ -573,25 +573,28 @@ SCHEME_TEXT = ("project", "client", "initials")
 
 
 def scheme_collapse(s):
-    """s with every empty block marked \x00 -> the separators (- _ . / space) before it go, a leading one after it too."""
-    s = re.sub(r"[-_./ ]*\x00", "\x00", s)
+    """s with every empty block marked \x00 -> the separators (- _ . / space) before it go when a separator, another empty
+    block or the end follows (a prefix like "RE-" before {seq} keeps its hyphen); at the start the ones after it go."""
+    s = re.sub(r"[-_./ ]+\x00(?=[-_./ ]|\x00|$)", "\x00", s)
     s = re.sub(r"^\x00+[-_./ ]*", "", s)
     return s.replace("\x00", "")
 
 
 def scheme_variants(scheme):
-    """The scheme and every form of it with one or more of its text blocks left out (as office_number_format writes them)."""
+    """Every form of the scheme with one or more of its text blocks left out (as office_number_format writes them), then the
+    scheme itself, then the forms numbers given before 2.144.9 have (the block empty, its separators kept: "-KV02-M")."""
     toks = [m for m in SCHEME_RE.finditer(scheme) if m.group(1) in SCHEME_TEXT][:4]
-    out = [scheme]
+    out, old = [], []
     for mask in range(1, 1 << len(toks)):
         v, pos = "", 0
         for i, m in enumerate(toks):
             v += scheme[pos:m.start()] + ("\x00" if mask >> i & 1 else m.group(0))
             pos = m.end()
-        v = scheme_collapse(v + scheme[pos:])
-        if v not in out:
-            out.append(v)
-    return out
+        v += scheme[pos:]
+        for x, into in ((scheme_collapse(v), out), (v.replace("\x00", ""), old)):
+            if x not in out and x not in old and x != scheme:
+                into.append(x)
+    return out + [scheme] + old
 
 
 def _slug(s):

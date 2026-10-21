@@ -396,10 +396,10 @@ def tp_clean_item(c, oid, r, it, i, prev):
         raise BadInput(tr("Invalid value: {0}", "items.unit"))
     net = _j(p["totals"], {}).get("net") or 0
     # 2.144.9 (#2575, decision 21.10.2026): the part's name is the one source of its title page lines -- a line whose text was
-    # changed here (or a new line with an own text) renames the part; an unchanged line takes the part's name
+    # changed here renames the part; an unchanged line takes the part's name
     t = _text(it.get("title"), "items.title", 500)
     title = p["title"] or t or ""
-    if t and t[:300] != (p["title"] or "") and t != (prev or {}).get("title"):
+    if t and prev and t[:300] != (p["title"] or "") and t != prev.get("title"):  # review: a new / stale line never renames
         title = t[:300]
         c.execute("UPDATE office_doc_parts SET title=?, updated_at=? WHERE id=? AND org_id=?", (title, iso(now_utc()), pid, oid))
         from .ledger import ofx_log

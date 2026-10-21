@@ -909,12 +909,12 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             info.append((L["client"], str(m["client"])))
         if m.get("project_ref"):
             info.append((L["ref"], str(m["project_ref"])))
+    # 2.144.9 (#2575): the number's label of this document (the head row that carries the number: "Rechnung Nr." on an
+    # invoice) for the part pages and the rights appendix -- not the quotation's label; own fields do not count
+    num_l = next((k for k, v in info if number and v == number), L["number"])
     for f in m.get("fields") or []:
         if isinstance(f, dict) and str(f.get("name") or "").strip():
             info.append((str(f["name"]), str(f.get("value") or "")))
-    # 2.144.9 (#2575): the number's label of this document (the head row that carries the number: "Rechnung Nr." on an
-    # invoice) for the part pages and the rights appendix -- not the quotation's label
-    num_l = next((k for k, v in info if number and v == number), L["number"])
     info_x = PDF_L + PDF_ADDR_W + 8 * MM
     info_w = PDF_CW - PDF_ADDR_W - 8 * MM
     info_lh = 8.6 * 1.45
