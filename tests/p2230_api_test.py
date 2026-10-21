@@ -203,7 +203,11 @@ check(Bo.get(B + f"/api/clients/{CL}").json()["stats"]["seconds"] == 5400, "Bob:
 rep = A.get(B + "/api/time/report", params={"scope": "all", "lists": f"{P1},{P2}", "from": D(-31), "to": D(0)}).json()
 check(rep["total"]["seconds"] == 7200 and {x["id"] for x in rep["lists"]} == {P1, P2}, "the timesheet: the time report of the client's lists")
 csv_ = A.get(B + "/api/time/export.csv", params={"scope": "all", "lists": f"{P1},{P2}", "from": D(-31), "to": D(0)})
-check(csv_.ok and "Aurora website" in csv_.text and "120.75" in csv_.text, "… and its CSV (the client's rate)")
+# 2.143.0: an entry over the Berlin midnight is one row per day (2.125.0 B, #2120): the list's rows add up to the amount
+import csv as _csv, io as _io
+_rows = [r for r in _csv.reader(_io.StringIO(csv_.text.lstrip("\ufeff"))) if r and r[0] == "Aurora website"]
+_amt = sum(float(r[8]) for r in _rows if r[8])
+check(csv_.ok and _rows and abs(_amt - 120.75) < 0.011, "… and its CSV (the client's rate) " + str(_amt))
 # delete: creator or admin; the lists stay
 check(Bo.delete(B + f"/api/clients/{CL}").status_code == 403, "Bob cannot delete Alice's client")
 check(A.patch(B + f"/api/clients/{CL}", json={"archived": True}).json()["archived"] and CL not in [c["id"] for c in A.get(B + "/api/clients").json()["clients"]]
