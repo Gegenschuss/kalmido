@@ -382,6 +382,8 @@ def init_db(guard=True, load=None):
         c.executescript(WIKI_E2E_TRIGGER)  # 2.64.3 (#1817): members of organisations whose knowledge space has the lock
         from ..tasks.delta import dl_setup
         dl_setup(c)  # 2.42.0 (#1376): the change triggers of the delta state
+        from ..core.access import acx_gen_setup
+        acx_gen_setup(c)  # 2.149.0 C (#2508): membership changes renew the generation the access-context cache checks
         from ..tasks.multilist import ml_setup
         ml_setup(c)  # 2.71.0 B (#1459): links never cross a workspace boundary
         for stmt in INDEXES.strip().split(";"):
@@ -860,12 +862,21 @@ def lv_area():
 
 def lv_versions(c):
     """{area: counter} of every area (0 = never changed)."""
-    out = dict.fromkeys(LV_AREA_KEYS, 0)
+    return lv_versions_fmt(c.execute(*lv_versions_q()).fetchone())
+
+
+def lv_versions_q():
+    """2.149.0 C (#2507): the query of lv_versions (one row: the keys, the values; /api/version runs it inside one statement)."""
     keys = ["version:" + k for k in LV_AREA_KEYS]  # 2.41.1 (#1376): the known keys, no LIKE (pg_dialect)
-    for r in c.execute(f"SELECT key, value FROM settings WHERE key IN ({','.join('?' * len(keys))})", keys):
-        k = r[0][8:]
+    return f"SELECT array_agg(key), array_agg(value) FROM settings WHERE key IN ({','.join('?' * len(keys))})", tuple(keys)
+
+
+def lv_versions_fmt(r):
+    out = dict.fromkeys(LV_AREA_KEYS, 0)
+    for key, value in zip((r[0] or []) if r else [], (r[1] or []) if r else []):
+        k = key[8:]
         if k in out:
-            out[k] = int(r[1])
+            out[k] = int(value)
     return out
 
 

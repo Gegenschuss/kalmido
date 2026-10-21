@@ -125,9 +125,17 @@ def tcx_room_brief(c, r, uid):
 
 def tcx_sig(c, uid):
     """A part of tchat_sig: my memberships and the names / states of my channels and groups (renamed, archived, joined)."""
-    r = c.execute("""SELECT COUNT(*), COALESCE(SUM(length(r.name)),0), COUNT(r.archived_at), COALESCE(SUM(r.is_open),0),
+    return tcx_sig_fmt(c.execute(*tcx_sig_q(uid)).fetchone())
+
+
+def tcx_sig_q(uid):
+    """2.149.0 C (#2507): the query of tcx_sig (one row, 5 columns; tchat_sig runs it inside its one statement)."""
+    return ("""SELECT COUNT(*), COALESCE(SUM(length(r.name)),0), COUNT(r.archived_at), COALESCE(SUM(r.is_open),0),
                      COALESCE(SUM((SELECT COUNT(*) FROM tchat_members x WHERE x.room_id=r.id)),0)
-                     FROM tchat_members m JOIN tchat_rooms r ON r.id=m.room_id WHERE m.user_id=?""", (uid,)).fetchone()
+                     FROM tchat_members m JOIN tchat_rooms r ON r.id=m.room_id WHERE m.user_id=?""", (uid,))
+
+
+def tcx_sig_fmt(r):
     return f"{r[0]}-{r[1]}-{r[2]}-{r[3]}-{r[4]}"
 
 

@@ -191,19 +191,25 @@ def system_ctx(c):
     organisation's rows), then restore the previous context -- also after an exception. Greppable on purpose: use it only
     where the app deliberately works across organisations (resolving a public token, counting for the admin overview,
     creating an organisation, accepting an invitation) and never to hand content of foreign organisations to a person."""
-    c._begin()
+    # 2.149.0 C (#2508): set_config only when the context really changes. Inside a running transaction c._ctx is what
+    # the database holds, so a nested block (or one entered while "system" already) applies nothing, and an idle
+    # connection opens its transaction with "system" directly; a request context the hook would have chosen first is
+    # resolved by the next statement after the block, as before.
+    same = c._ctx == SYSTEM and c._pg.info.transaction_status == TransactionStatus.INTRANS
     if not c._sys:
         c._sys_prev = c._ctx
     c._sys += 1
     c._ctx = SYSTEM
-    c._apply_ctx()
+    if not same:
+        c._apply_ctx()
     try:
         yield c
     finally:
         c._sys -= 1
         if not c._sys:
             c._ctx, c._sys_prev = c._sys_prev, None
-            if not c.closed and not c._pg.closed and c._pg.info.transaction_status == TransactionStatus.INTRANS:
+            if not c.closed and not c._pg.closed and c._pg.info.transaction_status == TransactionStatus.INTRANS \
+                    and c._ctx != SYSTEM:
                 c._apply_ctx()  # same transaction goes on: back to the caller's context (aborted / ended: next _begin)
 
 

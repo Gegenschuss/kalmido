@@ -900,7 +900,15 @@ def cal_list(c, uid):
 
 
 def cal_sig(c, uid):
-    r = c.execute("SELECT COUNT(*), MAX(changed_at), SUM(visible) FROM cal_subs WHERE user_id=?", (uid,)).fetchone()
+    return cal_sig_fmt(c.execute(*cal_sig_q(uid)).fetchone())
+
+
+def cal_sig_q(uid):
+    """2.149.0 C (#2507): the query of cal_sig (one row, 3 columns; /api/version runs it inside one statement)."""
+    return "SELECT COUNT(*), MAX(changed_at), SUM(visible) FROM cal_subs WHERE user_id=?", (uid,)
+
+
+def cal_sig_fmt(r):
     return f"{r[0]}.{r[2] or 0}.{r[1] or ''}"
 
 

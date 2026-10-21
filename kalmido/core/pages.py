@@ -480,14 +480,36 @@ def health():
 
 @app.get("/api/version")
 def version():
-    from ..collab.news import news_sig
-    from ..calendars.subscriptions import cal_sig
-    from ..collab.teamchat import tchat_sig
     from ..agents.chat import task_typing_for
-    from ..agents.steps import steps_sig
-    from ..core.db import lv_versions
     c = db()
-    return jsonify(v=int(gsetting(c, "version")), app=APP_VERSION, n=news_sig(c, me()), c=cal_sig(c, me()), t=tchat_sig(c, me()),  # app: 2.27.0 (#968), t: 2.17.0 (#419)
+    v, n, cs, t, sp, a = version_sigs(c, me())  # 2.149.0 C (#2507): one statement instead of ten (same values)
+    return jsonify(v=v, app=APP_VERSION, n=n, c=cs, t=t,  # app: 2.27.0 (#968), t: 2.17.0 (#419)
                    ty=task_typing_for(c, me()),  # ty: 2.22.0 (#693) who is writing a comment where
-                   sp=steps_sig(c, me()),  # sp: 2.32.0 (#1081) a new step of an agent for me (the open chat fetches)
-                   a=lv_versions(c))  # a: 2.41.0 (#1376) a change counter per area (tasks, comments, agentchat, team, office, ...)
+                   sp=sp,  # sp: 2.32.0 (#1081) a new step of an agent for me (the open chat fetches)
+                   a=a)  # a: 2.41.0 (#1376) a change counter per area (tasks, comments, agentchat, team, office, ...)
+
+
+def version_sigs(c, uid):
+    """2.149.0 C (#2507): the values of the 4-second poll -- the version, news_sig, cal_sig, tchat_sig, steps_sig and
+    lv_versions -- read in ONE statement (each module keeps its query + formatting: *_sig_q / *_sig_fmt, the single
+    functions use the same). Returns (v, n, c, t, sp, a)."""
+    from ..core.db import GLOBAL_DEFAULTS, lv_versions_fmt, lv_versions_q
+    from ..collab.news import news_sig_fmt, news_sig_q
+    from ..calendars.subscriptions import cal_sig_fmt, cal_sig_q
+    from ..collab.teamchat import TCHAT_SIG_COLS, tchat_sig_fmt, tchat_sig_q
+    from ..agents.steps import steps_sig_fmt, steps_sig_q
+    from ..core.access import collab_all
+    parts = [("SELECT (SELECT value FROM settings WHERE key='version')", (), 1), (*news_sig_q(uid), 2), (*cal_sig_q(uid), 3),
+             (*steps_sig_q(uid), 1), (*lv_versions_q(), 2)]
+    chat = collab_all()
+    if chat:
+        parts.append((*tchat_sig_q(uid), TCHAT_SIG_COLS))
+    sql = "SELECT * FROM " + " CROSS JOIN ".join(f"({q}) p{i}" for i, (q, _, _) in enumerate(parts))
+    row = c.execute(sql, tuple(x for _, a, _ in parts for x in a)).fetchone()
+    cols, i = [], 0
+    for _, _, k in parts:
+        cols.append(tuple(row[i:i + k]))
+        i += k
+    v = cols[0][0] if cols[0][0] is not None else GLOBAL_DEFAULTS.get("version", "")
+    return (int(v), news_sig_fmt(cols[1]), cal_sig_fmt(cols[2]), tchat_sig_fmt(cols[5]) if chat else "",
+            steps_sig_fmt(cols[3]), lv_versions_fmt(cols[4]))

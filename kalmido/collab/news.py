@@ -364,8 +364,15 @@ def news_read_job(c, j, ts=None):
 
 def news_sig(c, uid):
     """Cheap change marker of my unread items (in /api/version): clients reload the state when it moves."""
-    r = c.execute("SELECT COUNT(*), COALESCE(MAX(id),0) FROM notifications WHERE user_id=? AND read_at IS NULL",
-                  (uid,)).fetchone()
+    return news_sig_fmt(c.execute(*news_sig_q(uid)).fetchone())
+
+
+def news_sig_q(uid):
+    """2.149.0 C (#2507): the query of news_sig (one row, 2 columns; /api/version runs it inside one statement)."""
+    return "SELECT COUNT(*), COALESCE(MAX(id),0) FROM notifications WHERE user_id=? AND read_at IS NULL", (uid,)
+
+
+def news_sig_fmt(r):
     return f"{r[0]}.{r[1]}"
 
 
