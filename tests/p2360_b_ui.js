@@ -185,9 +185,13 @@ const NOTES = 'Intro text for the plan.\n\n- [ ] first step\n- [ ] second step\n
       check(s1.sel > 3 && !s1.ed, '1280: part 1: dragging selects text and keeps the view ' + JSON.stringify(s1));
       await ev(`(() => { getSelection().removeAllRanges(); return 1; })()`);
       const at = {type: 'pointerMove', x: Math.round(pos.x + 20), y: Math.round(pos.y)};
-      await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [at, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]});
-      await cmd('input.releaseActions', {context: ctx}); await sleep(700);
-      const s2 = await ev(`({sel: String(getSelection()).trim().length, ed: !document.querySelector('#d-content').classList.contains('hidden')})`);
+      // 2.147.1 CI: on a slow runner the two clicks can land as two single clicks (nothing selected) - one more try then
+      let s2 = {sel: 0};
+      for (let k = 0; k < 2 && !(s2.sel > 0); k++) {
+        await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [at, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]});
+        await cmd('input.releaseActions', {context: ctx}); await sleep(700);
+        s2 = await ev(`({sel: String(getSelection()).trim().length, ed: !document.querySelector('#d-content').classList.contains('hidden')})`);
+      }
       check(s2.sel > 0 && !s2.ed, '1280: part 1: a double click selects a word and keeps the view ' + JSON.stringify(s2));
       await ev(`(() => { getSelection().removeAllRanges(); return 1; })()`);
       await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [at, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]});

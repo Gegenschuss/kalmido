@@ -170,7 +170,7 @@ async function firefox(fn) {
   await v1(ag.token, 'POST', '/agent/usage', {model: 'x', input_tokens: 100, output_tokens: 1});
   await v1(ag.token, 'GET', '/agent/events?since=0');
   w.eval('load().then(render)'); await sleep(800);
-  check(/limit reached/.test(st().textContent) && st().classList.contains('st-limit'), 'limit reached: ' + st().textContent);
+  check(await until(() => /limit reached/.test(st().textContent) && st().classList.contains('st-limit')), 'limit reached: ' + st().textContent);  // 2.147.1 CI: wait like the other states
   await call('PATCH', `/api/admin/agents/${ag.id}`, {limits: null, enabled: false});
   w.eval('load().then(render)'); await sleep(800);
   check(await until(() => /paused/.test(st().textContent)), 'paused');  // 2.98.1: as above

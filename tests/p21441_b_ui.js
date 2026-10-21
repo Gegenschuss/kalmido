@@ -84,6 +84,8 @@ const MT = ':20:STARTUMS\n:25:12030000/0000202051\n:28C:1/1\n:60F:C261001EUR100,
     check(await ready(ev, `!document.querySelector('.modal')`, 40), 'the dialog closes');
     // the cash flow opens the same dialog
     await ev(tab('#office/cashflow'));
+    // 2.147.2 CI: on a slow runner the tab switch can get lost right after the dialog closed (hash stayed #office/bank) - once more then
+    if (!await ready(ev, `!!document.querySelector('[data-cfb-imp]')`, 40)) await ev(tab('#office/cashflow'));
     check(await ready(ev, `!!document.querySelector('[data-cfb-imp]')`, 80), 'the cash flow offers "Import bank statement" ' + await ev(`location.hash + ' ' + document.querySelectorAll('.modal').length`));
     await ev(`(() => { document.querySelector('[data-cfb-imp]').click(); return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('.modal.bnkdlg .bnk-hint li').length === 3`, 40), 'the same dialog with the hint');
