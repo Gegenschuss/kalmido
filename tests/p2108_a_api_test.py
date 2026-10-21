@@ -10,6 +10,9 @@ PATCH /api/docs/<id> {custom_fields}. Invented names only, generated file conten
    change; another organisation's admin gets 404
  - moving a document private -> organisation: the values go along, the fields are found by name and type or made there,
    a select value by its option's name, sealed with the target's key
+ - 2.153.0 (review B1): the key passes on the command line carry the values along: rotating an organisation's key,
+   decrypt-all / encrypt-all, docs-to-server-key / docs-to-account-key; editing a select field's options keeps a value
+   that cannot be opened
 tenant-matrix: document
 freelancer-matrix: files
 usage: p2108_a_api_test.py <datadir>      (a fresh container; P2108A_NOSTART=1: the container runs already)"""
@@ -255,6 +258,59 @@ rows = dbx("SELECT ws, org_id, value FROM doc_field_values WHERE node_id=?", (D2
 check(len(rows) == 3 and all(x[0] == f"o{ORG}" and x[1] == ORG and x[2].startswith("kenc1:") for x in rows), f"the values belong to Alpha, sealed ({rows[:1]})")
 check(cf(Bo, D2).get("Akte", {}).get("value") == "A-77", "Alpha's admin reads the value (Alpha's key)")
 check(one("SELECT COUNT(*) FROM doc_fields WHERE ws=?", (f"u{CAROL}",)) == 3, "the private definitions stay where they were")
+
+# ==== 2.153.0 (#2179, review B1): the key passes on the command line carry the field values along (rotation, decrypt-all /
+# encrypt-all, the private values between account key and server-derived key); editing a select field never drops a value
+# it cannot open
+CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+
+
+def cli(*args, env=()):
+    e = [x for kv in env for x in ("-e", kv)]
+    r = subprocess.run(["docker", "exec", "-i", *e, CT, "python", "-m", "kalmido.admin.orgcrypt_cli", *args],
+                       capture_output=True, text=True, timeout=300)
+    return r.returncode, r.stdout + r.stderr
+
+
+def vals(s, nid):
+    return {k: x.get("value") for k, x in cf(s, nid).items()}
+
+
+def raw(nid):
+    return {r[0]: r[1] for r in dbx("SELECT field_id, value FROM doc_field_values WHERE node_id=?", (nid,))}
+
+
+AV0, FV0 = vals(Bo, D2), vals(Fr, D1)
+RA0, RF0 = raw(D2), raw(D1)
+check(AV0.get("Akte") == "A-77" and FV0.get("Vertragsnummer") == "MV-4711-Zebra", f"before the key passes ({AV0} {FV0})")
+check(one("SELECT COUNT(*) FROM doc_field_values WHERE id IS NULL") == 0 and one("SELECT COUNT(DISTINCT id) FROM doc_field_values") ==
+      one("SELECT COUNT(*) FROM doc_field_values"), "every value row has its own row id")
+rc, out = cli("rotate", "--org", str(ORG), env=("KALMIDO_ORGCRYPT_ROT_SETTLE=0",))
+check(rc == 0 and '"unreadable": 0' in out and '"finished": true' in out, f"rotate Alpha's key: finished, nothing unreadable ({rc} {out[-300:].replace('R2-', 'R2?')})")
+RA1 = raw(D2)
+check(sorted(RA1) == sorted(RA0) and all(RA1[k].startswith("kenc1:") and RA1[k] != RA0[k] for k in RA0),
+      "rotate: Alpha's field values re-encrypted with the new key")
+check(vals(Bo, D2) == AV0 and vals(Ca, D2) == AV0, f"rotate: the values still readable ({vals(Bo, D2)})")
+check(raw(D1) == RF0, "rotate: the freelancer's values untouched")
+rc, out = cli("decrypt-all")
+check(rc == 0 and "still encrypted: 0" in out, "decrypt-all: no field value left sealed " + out[-300:])
+check(not any(v.startswith("kenc1:") for v in list(raw(D2).values()) + list(raw(D1).values())), "decrypt-all: the field values are plain")
+check(vals(Bo, D2) == AV0 and vals(Fr, D1) == FV0, "decrypt-all: the values read the same")
+rc, out = cli("encrypt-all")
+check(rc == 0 and all(v.startswith("kenc1:") for v in list(raw(D2).values()) + list(raw(D1).values())), "encrypt-all: the field values sealed again " + out[-300:])
+check(vals(Bo, D2) == AV0 and vals(Fr, D1) == FV0, "encrypt-all: the values read the same")
+RF1 = raw(D1)
+rc, out = cli("docs-to-server-key")
+check(rc == 0 and '"left": 0' in out and '"failed": 0' in out, "docs-to-server-key " + out[-300:])
+check(raw(D1) != RF1 and vals(Fr, D1) == FV0, "docs-to-server-key: the freelancer's values in the other form, readable")
+rc, out = cli("docs-to-account-key")
+check(rc == 0 and '"left": 0' in out and '"failed": 0' in out, "docs-to-account-key " + out[-300:])
+check(vals(Fr, D1) == FV0, "docs-to-account-key: the values readable")
+# a select value that cannot be opened (sealed for another workspace) stays when the field's options are edited
+dbx("UPDATE doc_field_values SET value=? WHERE node_id=? AND field_id=?", (raw(D1)[F["Vertragsnummer"]], D2, ASTAT))
+BAD = raw(D2)[ASTAT]
+r = Bo.patch(B + f"/api/docs/fields/{ASTAT}", json={"options": [{"name": "Aktiv"}, {"name": "Ruhend"}]})
+check(r.ok and raw(D2).get(ASTAT) == BAD, f"editing the options never deletes a value it cannot open ({r.status_code} {r.text[:120]})")
 
 print(f"p2108_a_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

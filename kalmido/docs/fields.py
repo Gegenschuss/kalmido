@@ -426,7 +426,8 @@ def docs_field_edit(fid):
     if r["type"] == "select":  # values of removed options go
         keep = {o["id"] for o in opts["options"]}
         for v in c.execute("SELECT node_id, value FROM doc_field_values WHERE field_id=?", (fid,)).fetchall():
-            if S.doc_open(c, r["ws"], CTX, v["value"], default=None) not in keep:
+            x = S.doc_open(c, r["ws"], CTX, v["value"], default=None)
+            if x is not None and x not in keep:  # review B1: a value that cannot be opened is never dropped here
                 c.execute("DELETE FROM doc_field_values WHERE node_id=? AND field_id=?", (v["node_id"], fid))
     if r["type"] == "select":
         _reindex_nodes(c, nids)  # the word index holds the option names
