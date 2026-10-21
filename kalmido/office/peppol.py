@@ -70,7 +70,7 @@ PEP_ERR = {"config": N_("The Peppol connection is not set up completely"),
            "answer": N_("The provider's answer could not be read"),
            "unreachable": N_("The recipient cannot receive e-invoices over the Peppol network"),
            "too_large": N_("The provider's answer is too large")}
-PEP_MISSING = {"feature": N_("E-invoices are switched off in this office"),
+PEP_NEED = {"feature": N_("E-invoices are switched off in this office"),
                "kind": N_("Only finalised invoices and credit notes go over the Peppol network"),
                "setup": N_("Set up the Peppol connection in the office settings (your own account at a Peppol access point provider)"),
                "key": N_("The API key of the Peppol provider is missing"),
@@ -401,7 +401,7 @@ def pep_ubl(c, oid, r, conf=None, receiver_id=None):
 
 
 def pep_missing(c, oid, r, conf=None):
-    """What stops sending document row r (list of PEP_MISSING keys, empty = ready)."""
+    """What stops sending document row r (list of PEP_NEED keys, empty = ready)."""
     from .ledger import ofx_locked
     conf = conf or pep_conf(c, oid)
     out = []
@@ -453,7 +453,7 @@ def pep_view(c, oid, uid, r):
     miss = pep_missing(c, oid, r, conf)
     sends = pep_sends(c, oid, r["id"])
     live = next((x for x in sends if x["status"] in PEP_LIVE), None)
-    return {"configured": bool(conf["provider"]), "missing": [{"key": k, "text": tr(PEP_MISSING[k])} for k in miss],
+    return {"configured": bool(conf["provider"]), "missing": [{"key": k, "text": tr(PEP_NEED[k])} for k in miss],
             "receiver_id": (cl["peppol_id"] if cl is not None else "") or "", "client_id": r["client_id"],
             "receiver_suggest": pep_id_suggest(cl["vat_id"]) if cl is not None and not cl["peppol_id"] else "",
             "sandbox": int(conf["sandbox"] or 0), "provider_name": tr(PEP_PROVIDERS[conf["provider"]]["name"]) if conf["provider"] in PEP_PROVIDERS else "",
@@ -496,7 +496,7 @@ def pep_send(c, oid, uid, r, again=False):
     conf = pep_conf(c, oid)
     miss = pep_missing(c, oid, r, conf)
     if miss:
-        raise Denied(409, tr(PEP_MISSING[miss[0]]))
+        raise Denied(409, tr(PEP_NEED[miss[0]]))
     sends = pep_sends(c, oid, r["id"])
     if any(x["status"] in PEP_LIVE for x in sends):
         raise Denied(409, tr("This document went over the Peppol network already"))
@@ -510,7 +510,7 @@ def pep_send(c, oid, uid, r, again=False):
         raise Denied(409, str(e)) from None
     from .einvoice import ein_ubl_check
     if prof == "peppol" and any("R003" in f for f in ein_ubl_check(ubl)):
-        raise Denied(409, tr(PEP_MISSING["reference"]))
+        raise Denied(409, tr(PEP_NEED["reference"]))
     ad = pep_adapter(c, oid, conf)
     try:
         reach = ad.lookup(receiver)
@@ -626,7 +626,7 @@ def pep_doc_get(did):
     c, uid, oid = _ctx()
     r = _doc(c, oid, did)
     if r["kind"] not in ("invoice", "credit"):
-        raise Denied(409, tr(PEP_MISSING["kind"]))
+        raise Denied(409, tr(PEP_NEED["kind"]))
     if request.args.get("refresh") == "1" and pep_refresh(c, oid, did):
         c.commit()
     return jsonify(pep_view(c, oid, uid, r))
@@ -639,7 +639,7 @@ def pep_lookup_post(did):
     r = _doc(c, oid, did)
     cl = _client_pid(c, oid, r["client_id"])
     if cl is None or not cl["peppol_id"]:
-        raise Denied(409, tr(PEP_MISSING["receiver" if cl is not None else "client"]))
+        raise Denied(409, tr(PEP_NEED["receiver" if cl is not None else "client"]))
     try:
         ok = pep_adapter(c, oid).lookup(cl["peppol_id"])
     except PepError as e:
