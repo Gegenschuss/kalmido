@@ -1589,6 +1589,9 @@ fresh; run p21443_c_ui node p21443_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2155_a_caldav "$PY" p2155_a_caldav_test.py "$KALMIDO_TEST_DATA"
 # 2.155.0 part C: own repeat rules in the event editor, the calendar year view (#2075 #2078)
 fresh; run p2155_c_cal_ui node p2155_c_cal_ui.js "$KALMIDO_TEST_DATA"
+# 2.155.0 part B: holidays + absences in the calendar, their subscription link, free / busy of invited people (#2076 #2077)
+fresh; run p2155_b_absence_cal "$PY" p2155_b_absence_cal_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2155_b_ui node p2155_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
