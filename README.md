@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.147.2** (2026-10-21): fixes for the **read-only role** (the office opens straight away, no *Join* that brings
+  no writing, no + button in lists you may only read) and for **dialogs on phones** (role picker, role help, backup
+  fields above the keyboard, long names in the pages trash).
 - **2.147.1** (2026-10-21): **drag tasks into the chats** (team chat, thread, agent chat) as references, several at once, with
   *Insert reference* on phones; **overdue invoices suggest a payment reminder** as a draft (nothing is sent) and
   invoices / reminders in EUR carry a **GiroCode** for banking apps; moving many documents to another workspace shows

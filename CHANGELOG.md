@@ -7,6 +7,17 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.147.2] - 2026-10-21
+
+Small fixes from the phone test of 2.143: the read-only role and dialogs on phones.
+
+### Fixed
+- Read-only role: the office opens straight away again (it stayed on *Loading…* when opened directly or after a reload) (#2500).
+- Read-only role: an organisation-wide list no longer offers *Join* (it would bring no writing) but says the role is read-only; a list you may only read has no + button, and a typed task says you can only read it instead of silently doing nothing (#2500).
+- Organisation settings on phones: the role picker is 44 px high and shows *Read-only* in full; *What the roles mean* shows the list when opened (#2501).
+- Off-site backup on Android: a tapped field scrolls above the keyboard; the S3 field *Region* has its own label (was "Bundesland / Region" in German) (#2501).
+- Pages trash: long page names wrap instead of being cut (#2501).
+
 ## [2.147.1] - 2026-10-21
 
 Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.
