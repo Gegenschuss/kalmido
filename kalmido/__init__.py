@@ -285,6 +285,10 @@ ORDER = (
     "office.doctpl_samples",  # 2.117.0 B (#2283): the letter samples of the document templates (data, no routes)
     "office.doctpl",  # 2.93.0 A (#1927): document templates with variables, documents as PDF, signature by customer link
     "office.terms",  # 2.113.2 (#2253): terms and conditions (AGB) as PDF per language, sent with quotations
+    "office.letters",  # 2.153.0 (#2028): letters (correspondence): recipient, text, signature, DIN 5008 PDF, status, filing
+    "office.letterlinks",  # 2.153.0 (#2028): letter <-> document links, history, deadline -> task, follow-up, reference line
+    "office.lettermail",  # 2.153.0 (#2029, #2030): letters by e-mail with the answer linked, text blocks
+    "office.letteragent",  # 2.153.0 (#2031): agents draft letters (API v1, MCP, event at a document)
     "videos.review",  # 2.99.1 A (#1959): video sign-off with comments at a timecode (links only), customer link = signoff kind video
     "office.logbook",  # 2.93.0 B (#1928): the logbook (vehicles, drives, change log, year report, mileage allowance)
     "office.cashbook",  # 2.121.0 B (#2095): the cash book (cash boxes, entries, cancellations, day closings, CSV / PDF)

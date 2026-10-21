@@ -43,6 +43,20 @@ async function ms_clGdLoad(id) {
   MSC.gdLoading = false;
   ms_clDraw();
 }
+// 2.153.0 (#2028): the client's letters (office/letters.py; admins of the office only, else no section)
+function ms_clLtHtml(c) {
+  if (typeof officeOn !== 'function' || !officeOn()) return '';
+  if (MSC.lt?.id !== c.id) { if (!MSC.ltLoading) setTimeout(() => ms_clLtLoad(c.id), 0); return ''; }
+  const ls = MSC.lt.letters; if (!ls) return '';
+  const st = {draft: tr('Draft'), sent: tr('Sent'), delivered: tr('Delivered')};
+  return `<div class="ctsec"><h4>${tr('Letters')}</h4>${ls.length ? `<ul class="ctlinks">${ls.slice(0, 20).map(x => `<li><a class="linkbtn" href="#office/letters/${x.id}">${ic('mail', 's')} ${esc(x.subject || x.rcpt_name || tr('Letter'))}</a><span class="muted"> · ${esc([fmtDateLoc(x.letter_date), st[x.status] || x.status].filter(Boolean).join(' · '))}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No letters yet.')}</p>`}</div>`;
+}
+async function ms_clLtLoad(id) {
+  MSC.ltLoading = true;
+  try { MSC.lt = {id, letters: (await rawFetch('GET', `/api/office/letters?client_id=${id}&brief=1`)).letters || []}; } catch { MSC.lt = {id, letters: null}; }  // quiet: members (403) see no section
+  MSC.ltLoading = false;
+  ms_clDraw();
+}
 function ms_clDraw() { if (S.route.mod === 'clients') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('clients', viewClients()))); } }
 const ms_clDirty = () => { MSC.items = null; MSC.inv = null; };
 const ms_clShown = () => (MSC.items || []).filter(c => (MSC.arch || !c.archived) && (!MSC.q.trim() || [c.name, c.name_extra, c.display_name, c.label, c.contact, c.email, c.phone, c.note, c.billing?.customer_no]
@@ -112,7 +126,7 @@ function ms_clCard(c) {
       persons: ks.length ? `<div class="ctsec"><h4>${tr('Contact persons')}</h4><ul class="ctlinks msclks">${ks.map(k => `<li>${ic('user', 's')} ${k.contact_id && feat('contacts') ? `<a href="#contacts/${k.contact_id}" title="${esc(tr('Open contact'))}"><b>${esc(k.name)}</b></a>` : `<b>${esc(k.name)}</b>`}${k.role ? ` <span class="muted">${esc(k.role)}</span>` : ''}${k.is_default && ks.length > 1 ? ` <span class="rotag">${tr('Default')}</span>` : ''}${k.email ? ` · <a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : ''}${k.phone ? ` · <a href="tel:${esc(k.phone.replace(/[^\d+]/g, ''))}">${esc(k.phone)}</a>` : ''}</li>`).join('')}</ul></div>` : '',
       invoices: typeof officeOn === 'function' && officeOn() && MSC.inv !== null ? `<div class="ctsec"><h4>${tr('Open invoices')}</h4>${inv.length ? `<ul class="ctlinks">${inv.map(x => `<li><a class="linkbtn" href="#office/offers/${x.id}">${ic('receipt', 's')} ${esc(x.number || tr('Draft'))}</a><span class="muted"> · ${esc(x.date ? fmtDateLoc(x.date) : '')} · ${esc(x.open_text || '')} · ${esc(x.status_text || '')}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No open invoices.')}</p>`}</div>` : '',
       tickets: typeof ptl_clientHtml === 'function' ? ptl_clientHtml(c) : '',  // 2.63.0 B (#1513): the client's reports
-      gendocs: ms_clGdHtml(c),  // 2.93.0 A (#1927): the documents made from templates (office admins)
+      gendocs: ms_clGdHtml(c) + ms_clLtHtml(c),  // 2.93.0 A (#1927): the documents made from templates (office admins); 2.153.0 (#2028): + letters
       ...clientDetailParts(c)})}${clm_histHtml(c)}${typeof hbm_clientHtml === 'function' ? hbm_clientHtml(c) : ''}${typeof vdr_clientHtml === 'function' ? vdr_clientHtml(c) : ''}${''/* 2.99.1 A (#1959): video sign-offs */}</div>
   </article>`;
 }

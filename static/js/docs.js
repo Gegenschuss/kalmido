@@ -188,7 +188,7 @@ function dc_mdDraw(md) {
       </div></div>
     <p class="dc-state ${esc(d.state)}" role="status">${esc(tr(DC_STATE[d.state] || d.state))}${d.state === 'failed' && d.error_text ? `: ${esc(d.error_text)}` : ''}${d.method === 'ocr' ? ` · ${tr('text recognition')}` : d.method === 'e-invoice' ? ` · ${tr('E-invoice')}` : ''}
       ${w && (d.state === 'done' || d.state === 'failed') ? `<button type="button" class="linkbtn" data-dc="redo">${tr('Recognise again')}</button>` : ''}</p>
-    ${sugHtml}${due}${typeof rx_html === 'function' ? rx_html(d) : ''}${typeof rc_slot === 'function' ? rc_slot(d) : ''}${typeof ast_docSlot === 'function' ? ast_docSlot(d) : '' /* 2.126.1 A (#2123) */}
+    ${sugHtml}${due}${typeof rx_html === 'function' ? rx_html(d) : ''}${typeof rc_slot === 'function' ? rc_slot(d) : ''}${typeof ltd_slot === 'function' ? ltd_slot(d) : ''}${typeof ast_docSlot === 'function' ? ast_docSlot(d) : '' /* 2.126.1 A (#2123) */}
     <div class="dc-form">
       ${field('name', tr('Title'), `<input id="dc-name" data-dcp="name" value="${esc(d.name)}" maxlength="150" ${ro}>`)}
       ${field('sender', tr('Sender'), `<input id="dc-sender" data-dcp="sender" value="${esc(d.sender?.name || '')}" list="dc-sl" autocomplete="off" maxlength="120" ${ro}>${dl('dc-sl', set.senders)}`)}

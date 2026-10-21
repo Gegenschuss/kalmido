@@ -39,10 +39,10 @@ OFA_ITEM_KEYS = ("kind", "service_id", "text", "detail", "qty", "unit", "price",
 OFA_DATA_KEYS = ("client_id", "title", "intro", "items", "list_id")
 OFA_CONF = ("high", "medium", "low")
 OFA_MASTER = ("services", "texts", "contracts")
-OFA_LOG_TARGETS = ("office", "services", "texts", "contracts", "clients", "docs", "doc", "pdf", "offer", "invoice", "reminder", "payment", "leads")  # 2.94.0 A (#1930): + leads
+OFA_LOG_TARGETS = ("office", "services", "texts", "contracts", "clients", "docs", "doc", "pdf", "offer", "invoice", "reminder", "payment", "leads", "letter")  # 2.94.0 A (#1930): + leads; 2.153.0 (#2031): + letter
 # link buttons in the chat (agents/chat.py): only the office document view, a list, and a document's PDF preview -- no other
-# app route (some do something when opened), no outside address
-NOTIFY_HREF_RE = re.compile(r"^(#office/offers/\d{1,12}|#l/\d{1,12}|/api/office/docs/\d{1,12}/pdf\?inline=1)$")
+# app route (some do something when opened), no outside address; 2.153.0 (#2031): + a letter (#office/letters/<id>)
+NOTIFY_HREF_RE = re.compile(r"^(#office/offers/\d{1,12}|#office/letters/\d{1,12}|#l/\d{1,12}|/api/office/docs/\d{1,12}/pdf\?inline=1)$")
 OFA_RULES = N_("Drafts only: a person reserves the number, finalises, sends and books. Free positions, other prices and discounts are marked.")
 OFA_OFF = N_("This agent may not work in the office (its switch “May draft office documents” is off)")
 OFA_PRIVACY_OFF = N_("Agents may not read the office data of this area (switch in the office settings)")

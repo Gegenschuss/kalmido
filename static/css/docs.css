@@ -93,6 +93,16 @@
 .rc-slot { margin: .6rem 0; }
 .rc-slot:empty { display: none; }
 .rc-h { margin: .4rem 0; }
+/* 2.153.0 (#2028): correspondence at a document (letterdoc.js) */
+.ltd:empty { display: none; }
+.ltd { margin: .6rem 0; }
+.ltd-h { margin: .4rem 0; }
+.ltd-acts, .ltd-dl { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: .4rem 0; }
+.ltd-acts .btn, .ltd-dl .btn { min-height: 2.5rem; }
+.ltd-src { flex-basis: 100%; font-size: var(--fs-s); }
+.ltd-list { list-style: none; margin: .4rem 0; padding: 0; display: grid; gap: .25rem; }
+.ltd-list li { display: flex; flex-wrap: wrap; gap: .25rem .5rem; align-items: baseline; }
+.ltd-list .muted { font-size: var(--fs-s); }
 .rc-sug { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem .6rem;
   border-radius: .5rem; background: var(--accent-soft); margin-bottom: .5rem; }
 .rc-acts { display: flex; gap: .4rem; }
