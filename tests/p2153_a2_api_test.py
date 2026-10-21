@@ -107,7 +107,7 @@ def private_letter(s, tag):
     r = s.post(B + LT, json={"answers": d1})
     assert r.status_code == 201, r.text
     lid = r.json()["id"]
-    r = s.patch(B + f"{LT}/{lid}", json={"contact_id": ct, "subject": f"Antwort {tag}"})
+    r = s.patch(B + f"{LT}/{lid}", json={"contact_id": ct, "rcpt_name": f"Kontakt {tag} Beispiel", "subject": f"Antwort {tag}"})
     check(r.ok, f"setup {tag}: the private contact as recipient " + r.text[:200])
     sql("UPDATE office_letters SET node_id=? WHERE id=?", (d2, lid), write=True)  # the filed letter PDF
     check(sql("SELECT COUNT(*) FROM office_letter_links WHERE letter_id=?", (lid,))[0][0] == 1, f"setup {tag}: the answer link")
