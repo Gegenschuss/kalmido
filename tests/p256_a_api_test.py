@@ -185,10 +185,10 @@ JB = job("Clara: Bob's run", task_id=T, user_id=BOB)
 mb = post(Bo, "Clara: bob writes to her too")  # bob's own conversation: never in alice's history
 r = A.get(B + f"/api/agents/{CL}/chat?job={JC}")
 check(r.ok, "#1793: alice reads the job's history " + r.text[:200])
-# 2.107.0 (#1962): a job created for a person starts with its start line (a notice) -- the first row of its history
+# 2.153.0 (#1962): a job created for a person starts with its start line (a notice) -- the first row of its history
 nid = lambda r: [m["id"] for m in r.json().get("messages", []) if m.get("job_msg") != "start"]  # noqa: E731
 starts = lambda r: [m["id"] for m in r.json().get("messages", []) if m.get("job_msg") == "start"]  # noqa: E731
-check(r.ok and len(starts(r)) == 1 and r.json()["messages"][0]["job_msg"] == "start", "2.107.0: the job's start line opens its history")
+check(r.ok and len(starts(r)) == 1 and r.json()["messages"][0]["job_msg"] == "start", "2.153.0: the job's start line opens its history")
 got = nid(r) if r.ok else []
 check(got == [m1, m3, m4, m5, m6, m10], f"#1793: only the job's messages, oldest first {got} vs {[m1, m3, m4, m5, m6, m10]}")
 check(mb not in got and m8 not in got and m7 not in got and m2 not in got and m9 not in got, "#1793: nothing else")

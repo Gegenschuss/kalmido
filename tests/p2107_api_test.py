@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.107.0 API tests (#1962): a chat of its own per job. Invented names only.
+"""2.153.0 API tests (#1962): a chat of its own per job. Invented names only.
  - a job created for a person starts with ONE grey line in that person's chat (kind notice, job_id, job_msg start, the title
    as text, read at once); a job without a person or for another person: none in this chat
  - POST /api/agents/{id}/chat {job_id} (JSON and multipart): the message is stored with the job (job_id, job_parent), the
@@ -101,13 +101,13 @@ def events(h=CLH, since=0):
 
 
 # ================================================================== the start line
-J = job(CLH, "Knox: Release 2.107 (own job chat)", log="Start")
+J = job(CLH, "Knox: Release 2.152 (own job chat)", log="Start")
 NOP = job(CLH, "No person", who=None)
 CJ = job(CLH, "Carla: for carol", CAROL)
 msgs = chat(Bo).get("messages", [])
 st = [m for m in msgs if m.get("job_id") == J]
 check(len(st) == 1 and st[0]["kind"] == "notice" and st[0]["job_msg"] == "start" and st[0]["from"] == "agent"
-      and st[0]["body"] == "Knox: Release 2.107 (own job chat)", "a job for bob: one start line in bob's chat " + str(st)[:300])
+      and st[0]["body"] == "Knox: Release 2.152 (own job chat)", "a job for bob: one start line in bob's chat " + str(st)[:300])
 check(not [m for m in msgs if m.get("job_id") in (NOP, CJ)], "no start line for a job without a person / for carol in bob's chat")
 check(not [m for m in chat(Ca).get("messages", []) if m.get("job_id") == J], "carol: no start line of bob's job")
 check([m.get("job_id") for m in chat(Ca).get("messages", [])] == [CJ], "carol: the start line of her own job")
@@ -122,7 +122,7 @@ check(r.status_code == 201 and r.json().get("job_id") == J and r.json().get("bod
 MB = r.json().get("id")
 ev = [e for e in events() if (e.get("data") or {}).get("message", {}).get("id") == MB]
 check(len(ev) == 1 and ev[0]["data"]["message"].get("job_id") == J and (ev[0]["data"].get("job") or {}).get("id") == J
-      and (ev[0]["data"].get("job") or {}).get("title") == "Knox: Release 2.107 (own job chat)",
+      and (ev[0]["data"].get("job") or {}).get("title") == "Knox: Release 2.152 (own job chat)",
       "the agent's chat event: message.job_id + data.job " + str(ev)[:400])
 r = Bo.post(B + f"/api/agents/{CL}/chat", data={"body": "a file for the job", "job_id": str(J)},
             files={"file": ("note.txt", b"hello", "text/plain")})

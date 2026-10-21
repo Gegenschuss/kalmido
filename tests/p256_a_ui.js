@@ -82,8 +82,9 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   ci.value = 'one more thing'; ci.dispatchEvent(new w.Event('input', {bubbles: true}));
   click(w, d.querySelector('[data-act="chat-send"]'));
   const sent = await until(async () => ((await call('GET', `/api/agents/${CL}/chat`)).messages || []).find(m => m.from === 'user' && /one more thing/.test(m.body)));
-  // 2.107.0 (#1962): the box sends to the job with its job_id, no "Job N:" in front any more
-  check(sent?.body === 'one more thing' && sent?.job_id === JA, '#1962: sent with job_id, without "Job N: …" ' + (sent?.body || '') + ' ' + sent?.job_id);
+  // 2.56.0 review: the box addresses the job by its number (a title like "Release: 2.56" is no name the service knows);
+  // 2.153.0 (#1962): + its job_id
+  check(sent?.body === `Job ${JA}: one more thing` && sent?.job_id === JA, '#1793: sent as "Job N: …" with job_id ' + (sent?.body || '') + ' ' + sent?.job_id);
   await until(() => /one more thing/.test(d.querySelector('#chat-msgs')?.textContent || ''));
   check(/one more thing/.test(d.querySelector('#chat-msgs')?.textContent || ''), '#1793: the message shows in the job\'s history');
   click(w, d.querySelector('#jc-bar [data-act="jc-back"]'));

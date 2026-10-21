@@ -1,10 +1,10 @@
-// 2.107.0 UI tests (#1962; own container, start.sh). jsdom, the agent chat on the phone page:
-// - the whole chat: a job is its card with short lines (result / question / error, one line each, a tap opens the job's
-//   chat) and the link "Open the job chat"; the start line and all messages stay folded in the card
+// 2.153.0 UI tests (#1962; own container, start.sh), 2.153.0: rescued onto 2.147. jsdom, the agent chat on the phone page:
+// - the whole chat: a job is its card; under it the newest results / questions / errors (2.144.0 fold, never repeated in the
+//   folded history) and the link "Open the job chat"; the start line and the other messages stay folded in the card
 // - the job's own chat: the start line, its messages, its progress lines (grey, in time order); what I type there goes out
-//   with job_id and WITHOUT "Job N:" in front (a typed "Job N:" / "Name:" is dropped), it lands in the job's chat and in the
-//   whole chat inside the card, never as an own row
-// - messages without job_id stay rows of the whole chat; hit areas of the short lines and the link >= 2.75rem
+//   with job_id AND still "Job N:" in front (hosts that read only the text reach the job), it lands in the job's chat and in
+//   the whole chat inside the card, never as an own row
+// - messages without job_id stay rows of the whole chat; hit area of the link >= 2.75rem
 const {execFileSync} = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -49,24 +49,23 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const card = () => d.querySelector(`#chat-msgs .jcd[data-jcd="${J}"]`);
   await until(() => card() && /plain answer/.test(box()?.textContent || ''));
 
-  // ================= the whole chat: one card with short lines and the link
+  // ================= the whole chat: one card, the question and the result under it, the link
   check(d.querySelectorAll('#chat-msgs .jcd').length === 1, 'the job = one card');
-  const lines = () => [...(card()?.querySelectorAll(':scope > .jcsl') || [])];
-  check(lines().length === 2 && lines()[0].classList.contains('k-question') && lines()[1].classList.contains('k-result'), 'short lines: the question and the result ' + lines().map(x => x.className).join());
-  check(lines()[1]?.querySelector('span')?.textContent === '✅ Knox: release ready' && lines()[1].querySelector('b')?.textContent === 'Result', 'a short line: kind + the first line only ' + lines()[1]?.textContent);
-  check(!card().querySelector('.jcdres') && !/point 2/.test([...card().childNodes].filter(x => !x.classList?.contains('jcdhist')).map(x => x.textContent).join('')), 'the whole result is not shown outside the folded history');
+  const under = () => [...(card()?.querySelectorAll(':scope > .jcdres') || [])];
+  check(under().length === 2 && under()[0].querySelector(`[data-mid="a:${mq}"]`) && under()[1].querySelector(`[data-mid="a:${mr}"]`), 'under the card: the question and the result ' + under().length);
+  check(/point 2/.test(under()[1]?.textContent || ''), 'the result is shown whole (short: not cut)');
   const go = card()?.querySelector(':scope > .jcsgo');
   check(go && go.dataset.act === 'jc-open' && +go.dataset.jid === J && /Open the job chat/.test(go.textContent), 'the link "Open the job chat"');
   const hist = () => card()?.querySelector('.jcdhist');
   check(hist()?.hidden && hist().querySelector('.cnotice') && /Release 2\.107 job chat/.test(hist().querySelector('.cnotice').textContent), 'folded: the start line is in the card');
-  check(hist().querySelectorAll(':scope > .cmsg').length === 3, 'folded: all three job messages (incl. the result) are in the card ' + hist().querySelectorAll(':scope > .cmsg').length);
+  check(hist().querySelectorAll(':scope > .cmsg').length === 1, 'folded: the other job message (question and result are not repeated) ' + hist().querySelectorAll(':scope > .cmsg').length);
   check([...box().children].some(x => x.classList.contains('cmsg') && /plain answer/.test(x.textContent)) && box().querySelector(':scope > .cmsg.me'), 'messages without job_id stay rows of the whole chat');
   check(!box().querySelector(':scope > .jcsp'), 'no progress lines in the whole chat');
 
   // ================= the job's own chat
-  click(w, lines()[1]);
+  click(w, go);
   await until(() => d.querySelector('#jc-bar') && d.querySelector('#chat-msgs .jcsp'));
-  check(w.eval('S.chat.job && +S.chat.job.id') === J && d.querySelector('#jc-bar'), 'a tap on a short line opens the job\'s chat');
+  check(w.eval('S.chat.job && +S.chat.job.id') === J && d.querySelector('#jc-bar'), 'the link opens the job\'s chat');
   const rows = () => [...box().children];
   const prog = () => rows().filter(x => x.classList.contains('jcsp')).map(x => x.textContent);
   check(prog().join('|') === 'Started|Tests green', 'the progress lines in the job\'s chat ' + prog().join('|'));
@@ -83,12 +82,12 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(/Message to Knox/.test(ci?.placeholder || ''), 'the box addresses the job ' + ci?.placeholder);
   ci.value = 'Job ' + J + ': blue please'; await w.eval('chatSend()');
   await until(() => sent.length && rows().some(x => /blue please/.test(x.textContent)));
-  check(sent[0]?.job_id === J && sent[0]?.body === 'blue please', 'sent with job_id, the typed "Job N:" dropped ' + JSON.stringify(sent[0]));
+  check(sent[0]?.job_id === J && sent[0]?.body === `Job ${J}: blue please`, 'sent with job_id, a typed "Job N:" kept once ' + JSON.stringify(sent[0]));
   ci.value = 'and a bigger font'; await w.eval('chatSend()');
   await until(() => sent.length > 1 && rows().some(x => /bigger font/.test(x.textContent)));
-  check(sent[1]?.job_id === J && sent[1]?.body === 'and a bigger font', 'a plain text: as typed, with job_id ' + JSON.stringify(sent[1]));
+  check(sent[1]?.job_id === J && sent[1]?.body === `Job ${J}: and a bigger font`, 'a plain text: "Job N:" in front, with job_id ' + JSON.stringify(sent[1]));
   const srv = await call('GET', `/api/agents/${CL}/chat?job=${J}`);
-  check(srv.messages.filter(m => m.from === 'user' && m.job_id === J).map(m => m.body).join('|') === 'blue please|and a bigger font', 'the server stored both with the job');
+  check(srv.messages.filter(m => m.from === 'user' && m.job_id === J).map(m => m.body).join('|') === `Job ${J}: blue please|Job ${J}: and a bigger font`, 'the server stored both with the job');
   w.rawFetch = of;
 
   // ================= back to the whole chat: my job messages are inside the card
@@ -102,9 +101,9 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
 
   // ================= phone: hit areas
   const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'css', 'agentchat.css'), 'utf8');
-  const blk = css.slice(css.indexOf('/* 2.107.0 (#1962)'));
+  const blk = css.slice(css.indexOf('/* 2.153.0 (#1962)'));
   const rule = s2 => (new RegExp(s2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\{([^}]*)\\}').exec(blk) || [])[1] || '';
-  check(/min-height:2\.75rem/.test(rule('.jcsl')) && /min-height:2\.75rem/.test(rule('.jcsgo')), 'short lines and the link: min-height 2.75rem (44 px)');
+  check(/min-height:2\.75rem/.test(rule('.jcsgo')), 'the link: min-height 2.75rem (44 px)');
   const plain = blk.replace(/\/\*[\s\S]*?\*\//g, '');
   check(!/(?<![\d.])([3-9]|\d{2,})px/.test(plain) && !/#[0-9a-f]{3,6}\b/i.test(plain), 'CSS: rem sizes, no new colours');
 

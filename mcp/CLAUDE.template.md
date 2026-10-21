@@ -150,7 +150,7 @@
   only**: never tool output, file contents, logs, data rows or secrets. Only the person you work for sees them. Send a
   job's result with `send_chat` and its `job_id`, so its history shows under it, and `job_msg` (`result`, or `error` when
   it failed; `say` / `question` for messages in between), so the app shows it under the job's card.
-- **Each job has its own chat** (2.107.0): a chat message with `job_id` was typed in that job's chat in the app. It is for
+- **Each job has its own chat** (2.153.0): a chat message with `job_id` was typed in that job's chat in the app. It is for
   that job: hand it to the job (as with "Job 82: ...") or answer it about that job, with its `job_id`; never start new
   work from it. Without `job_id` it belongs to the whole chat as before.
 - Every larger piece of work gets **one job** (`create_job`), created at the **start**, not at the end, with short

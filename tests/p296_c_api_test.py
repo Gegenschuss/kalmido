@@ -143,7 +143,7 @@ check(L.get("id") == LEAD and L.get("name") == "Knox" and L.get("version") == "2
 P = jobs.get(str(PART)) or {}
 check(P.get("parent_id") == LEAD and P.get("parent_name") == "Knox" and P.get("name") == "Knox C" and P.get("version") == "",
       "jobs: the part job with its leader, no version in its title " + str(P))
-# 2.107.0 (#1962): a job created for bob starts with its start line in bob's chat -- PLAIN is in his chat now
+# 2.153.0 (#1962): a job created for bob starts with its start line in bob's chat -- PLAIN is in his chat now
 check(str(PLAIN) in jobs and str(OTJ) not in jobs and str(CJ) not in jobs, "jobs: only jobs of the delivered messages (a start line counts) " + str(sorted(jobs)))
 check(requests.patch(V + f"/agent/jobs/{LEAD}", headers=CLH, json={"state": "done"}).ok, "the agent ends the leader")
 jobs = chat(Bo).get("jobs") or {}

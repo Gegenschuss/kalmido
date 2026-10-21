@@ -680,7 +680,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `mention` | someone mentions the agent in a comment, or writes `@agentname` in a task title or notes | `task`, `list`, `comment` (or `null`), `where`: `comment` or `task` |
 | `comment` | a new comment on a task the agent follows (assigned to it, created by it, or it commented before); 2.13.1: in a list where the agent **reads every comment**, every comment a person writes there; 2.41.0 (#1383): a person pressed a button under one of the agent's comments ([Answer buttons and approval cards in comments](#answer-buttons-and-approval-cards-in-comments-2410)); 2.63.0 (#1513): the customer of a [customer report](#customer-reports-2630) wrote on its status page | `task`, `list`, `comment`; 2.41.0: `answer` `{comment_id, choice_ids, labels, via, user, approval?, approval_request?}`; 2.63.0: `comment.portal` (the customer sees it), a customer's comment has `author_id` null and `comment.ext_name` |
 | `assigned` / `unassigned` | a task is assigned to the agent or taken away from it | `task`, `list` |
-| `chat` | a person writes in their chat with the agent | `message` `{id, body, task_id, created_at, attachments}`, `user` `{id, name}`; fetching it marks the message *delivered* (2.7.2); 2.13.1: `attachments` `[{id, name, mime, size, url}]` (images / files, `body` may then be empty); 2.107.0 (#1962): `message.job_id` + `job` (the job) when it was typed in that job's own chat |
+| `chat` | a person writes in their chat with the agent | `message` `{id, body, task_id, created_at, attachments}`, `user` `{id, name}`; fetching it marks the message *delivered* (2.7.2); 2.13.1: `attachments` `[{id, name, mime, size, url}]` (images / files, `body` may then be empty); 2.153.0 (#1962): `message.job_id` + `job` (the job) when it was typed in that job's own chat |
 | `reaction` | someone reacts to one of the agent's comments; 2.7.2: or to one of its chat messages | comments: `task`, `list`, `comment` `{id, text}`, `reaction` `{emoji, user}`, `approval`: `approved`, `rejected` or `null`; chat: `chat_message` `{id, text, from, created_at}`, `reaction`, `approval`, `user`; 2.30.0: `stale: true` when a 👍 / 👎 hit a permission question that is already answered or expired (act on `approval`, never on the emoji) ([Chat reactions](#chat-reactions-and-delivery-272)) |
 | `job` | someone presses Approve, Reject or Stop on one of the agent's jobs; 2.3.0: a proposal was applied (`approve`) or discarded (`reject`); 2.56.0: someone wrote to a running job from its card (`message`) | `job`, `action`: `approve`, `reject`, `stop` or `message` (2.56.0, with `text`; the job itself does not change), `user`; for proposals also `proposal` `{state: applied \| discarded, created, changed, list_id}` |
 | `tidy` | a person creates a task in a list with tidy mode `suggest` or `auto`; 2.4.1: only to the list's tidy agent (`list.tidy_agent_id`); 2.29.0: not for tasks created in bulk through the API beyond the first five; 2.30.0: also for a task a person moves into the list (not in a bulk move beyond the first five) | `task`, `list`, `mode` |
@@ -1279,14 +1279,14 @@ without. The reference starter sends `result` / `error` with a job's result (`ag
 or an answer to a message addressed to a job) is left out, also with buttons, except an open approval or permission question
 that waits for me. *Jobs* shows the job cards and the job messages with buttons, plus my messages addressed to a job.
 
-2.107.0 (#1962): **a chat of its own per job.** In the whole chat a job keeps only short lines: its card, the newest
-results, questions and errors as one line each (a tap opens the job's chat) and the link *Open the job chat*; all its
-messages stay folded in the card. When you create a job for a person (`user_id`), Kalmido writes its start line into
+2.153.0 (#1962): **a chat of its own per job.** In the whole chat a job is its card: under it the newest results,
+questions and errors (long ones cut to a few lines) and the link *Open the job chat*; its other messages stay folded in
+the card. When you create a job for a person (`user_id`), Kalmido writes its start line into
 that person's chat: a notice (`kind` `notice`, no push, never unread) with `job_id`, `job_msg` `start` and the job's
 title as text. The job's own chat (in the app: the job's name, *Open the job chat*, *Conversation* on its card) shows its
 messages, the person's messages to it and its progress lines (`append_log`, only for the person it is for). What the
-person types there reaches you as the usual `chat` event with `message.job_id` and the job in `data.job`, without
-`Job 82: …` in front: hand it to that job (the way you handle `Job 82: …`, which keeps working in the whole chat) and
+person types there reaches you as the usual `chat` event with `message.job_id` and the job in `data.job`; the app still
+puts `Job 82: …` in front, so a host that reads only the text reaches the job as before. Hand it to that job and
 post the job's answers with its `job_id`. Messages without `job_id` stay in the whole chat. The reference starter answers
 such a message in a chat run and posts the answer with the `job_id` (`mcp/agent_run.py`).
 
@@ -1723,7 +1723,7 @@ a folder above it) is shared with it, and every access is written into the file'
 | Documents shared with you (`q` = words of the text, `review=1` = waiting in *To review*; 2.122.0: `q` takes `tag:Name`, `sender:Name`, `type:Name`, `date:2025-01..2025-03`, `"exact phrase"`, `-word`; filters `tag` / `not_tag` / `tag_mode`, `sender`, `type`, `folder`, `added_from` / `added_to`, `no_tag`, `no_sender`, `ftype`) | `GET /api/v1/documents` | `list_documents` |
 | One document with its fields, open suggestions and the recognised text | `GET /api/v1/documents/{id}` | `get_document` |
 | A new document (2.122.0: `content_base64` + `name`, or multipart `file`; optional `title`, `parent_id`, `sender`, `type`, `tags`, `date`, `due`, `amount`, `currency`; without `parent_id` an agent writes into its own result folder) | `POST /api/v1/documents` | `create_document` |
-| Set fields (role *edit*): `date`, `due`, `amount`, `currency`, `sender`, `type`, `tags` (names), `custom_fields` (2.108.0: `{name or id: value}`, only fields the workspace has) | `PATCH /api/v1/documents/{id}` | `update_document` |
+| Set fields (role *edit*): `date`, `due`, `amount`, `currency`, `sender`, `type`, `tags` (names), `custom_fields` (2.153.0: `{name or id: value}`, only fields the workspace has) | `PATCH /api/v1/documents/{id}` | `update_document` |
 | The file itself | `GET /api/v1/files/{id}/content` | -- |
 
 Scopes: `files:read` / `files:write` (the file store's). Values an agent sets are marked *set by an agent*. Where the
