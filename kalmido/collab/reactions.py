@@ -95,8 +95,8 @@ def react(c, k, uid, emoji, on):
         res["approval"] = "approved" if emoji == "up" else "rejected"
     sug = json.loads(k["suggestion"]) if k["suggestion"] else None
     if res["approval"] and sug and sug.get("kind") in ("integrate", "deploy", "merge_request") \
-            and not is_approver(c, t, uid, agent=author["id"]):  # 2.126.0 B (#1975): only who may address the agent decides
-        res["approval"] = None
+            and not is_approver(c, t, uid, agent=author["id"], assignee=sug.get("kind") == "merge_request"):  # 2.126.0 B (#1975): only who may address the agent decides
+        res["approval"] = None  # 2.148.1 D (#2495): integrate / deploy: the assignee alone does not decide (as approval jobs, #1974)
     if res["approval"]:  # 2.126.0 review: logged only once the approval counts
         log_act(c, t["id"], "approval", {"agent": author["id"], "comment": k["id"], "ok": emoji == "up"})
     if sug and sug.get("kind") in ("integrate", "deploy"):  # 2.26.0 (#949): only an approver decides (see agents/gates.py)
