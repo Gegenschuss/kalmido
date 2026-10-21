@@ -12420,5 +12420,20 @@
   "Switch": "Cambiar",
   "Tracked time (h)": "Tiempo registrado (h)",
   "Created by": "Creado por",
-  "Completed by": "Completado por"
+  "Completed by": "Completado por",
+  "{0} of {1} moved": "{0} de {1} movidos",
+  "{0} payment reminders suggested": "{0} recordatorios de pago sugeridos",
+  "1 payment reminder suggested": "1 recordatorio de pago sugerido",
+  "after the due date or the last reminder's deadline; only drafts, you send them": "tras el vencimiento o el plazo del último recordatorio; solo borradores, el envío lo haces tú",
+  "Check the drafts and send them yourself - nothing goes out automatically.": "Revisa los borradores y envíalos tú mismo; nada se envía automáticamente.",
+  "GiroCode on invoices and reminders (QR code for banking apps, EUR only)": "GiroCode en facturas y recordatorios (código QR para apps bancarias, solo EUR)",
+  "Moving…": "Moviendo…",
+  "Only {0} of {1} moved to {2}": "Solo se movieron {0} de {1} a {2}",
+  "Overdue invoices: {0} reminder drafts are ready. Check them and send them like any reminder - nothing was sent.": "Facturas vencidas: hay {0} borradores de recordatorio listos. Revísalos y envíalos como cualquier recordatorio; no se ha enviado nada.",
+  "Payment reminders suggested: {0}": "Recordatorios de pago sugeridos: {0}",
+  "Show drafts": "Ver borradores",
+  "Suggest after": "Sugerir tras",
+  "suggested": "sugerido",
+  "Suggest payment reminders for overdue invoices": "Sugerir recordatorios de pago para facturas vencidas",
+  "Read|section": "Leído"
 }

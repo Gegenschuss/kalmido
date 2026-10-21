@@ -12420,5 +12420,20 @@
   "Switch": "Wisselen",
   "Tracked time (h)": "Geregistreerde tijd (u)",
   "Created by": "Aangemaakt door",
-  "Completed by": "Voltooid door"
+  "Completed by": "Voltooid door",
+  "{0} of {1} moved": "{0} van {1} verplaatst",
+  "{0} payment reminders suggested": "{0} betalingsherinneringen voorgesteld",
+  "1 payment reminder suggested": "1 betalingsherinnering voorgesteld",
+  "after the due date or the last reminder's deadline; only drafts, you send them": "na de vervaldatum of de termijn van de laatste herinnering; alleen concepten, versturen doe je zelf",
+  "Check the drafts and send them yourself - nothing goes out automatically.": "Controleer de concepten en verstuur ze zelf - er gaat niets automatisch weg.",
+  "GiroCode on invoices and reminders (QR code for banking apps, EUR only)": "GiroCode op facturen en herinneringen (QR-code voor bank-apps, alleen EUR)",
+  "Moving…": "Verplaatsen…",
+  "Only {0} of {1} moved to {2}": "Slechts {0} van {1} verplaatst naar {2}",
+  "Overdue invoices: {0} reminder drafts are ready. Check them and send them like any reminder - nothing was sent.": "Achterstallige facturen: {0} concepten voor herinneringen staan klaar. Controleer ze en verstuur ze zoals elke herinnering - er is niets verstuurd.",
+  "Payment reminders suggested: {0}": "Betalingsherinneringen voorgesteld: {0}",
+  "Show drafts": "Concepten tonen",
+  "Suggest after": "Voorstellen na",
+  "suggested": "voorgesteld",
+  "Suggest payment reminders for overdue invoices": "Betalingsherinneringen voorstellen voor achterstallige facturen",
+  "Read|section": "Gelezen"
 }

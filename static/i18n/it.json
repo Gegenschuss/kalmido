@@ -12420,5 +12420,20 @@
   "Switch": "Passa",
   "Tracked time (h)": "Tempo registrato (h)",
   "Created by": "Creato da",
-  "Completed by": "Completato da"
+  "Completed by": "Completato da",
+  "{0} of {1} moved": "{0} di {1} spostati",
+  "{0} payment reminders suggested": "{0} solleciti di pagamento proposti",
+  "1 payment reminder suggested": "1 sollecito di pagamento proposto",
+  "after the due date or the last reminder's deadline; only drafts, you send them": "dopo la scadenza o il termine dell'ultimo sollecito; solo bozze, l'invio lo fai tu",
+  "Check the drafts and send them yourself - nothing goes out automatically.": "Controlla le bozze e inviale tu - nulla parte automaticamente.",
+  "GiroCode on invoices and reminders (QR code for banking apps, EUR only)": "GiroCode su fatture e solleciti (codice QR per app bancarie, solo EUR)",
+  "Moving…": "Spostamento…",
+  "Only {0} of {1} moved to {2}": "Solo {0} di {1} spostati in {2}",
+  "Overdue invoices: {0} reminder drafts are ready. Check them and send them like any reminder - nothing was sent.": "Fatture scadute: {0} bozze di sollecito sono pronte. Controllale e inviale come ogni sollecito - non è stato inviato nulla.",
+  "Payment reminders suggested: {0}": "Solleciti di pagamento proposti: {0}",
+  "Show drafts": "Mostra bozze",
+  "Suggest after": "Proporre dopo",
+  "suggested": "proposto",
+  "Suggest payment reminders for overdue invoices": "Proporre solleciti per le fatture scadute",
+  "Read|section": "Letti"
 }

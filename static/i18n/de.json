@@ -12420,5 +12420,20 @@
   "Switch": "Wechseln",
   "Tracked time (h)": "Erfasste Zeit (h)",
   "Created by": "Erstellt von",
-  "Completed by": "Erledigt von"
+  "Completed by": "Erledigt von",
+  "{0} of {1} moved": "{0} von {1} verschoben",
+  "{0} payment reminders suggested": "{0} Zahlungserinnerungen vorgeschlagen",
+  "1 payment reminder suggested": "1 Zahlungserinnerung vorgeschlagen",
+  "after the due date or the last reminder's deadline; only drafts, you send them": "nach Fälligkeit bzw. nach der Frist der letzten Erinnerung; nur Entwürfe, versenden tust du",
+  "Check the drafts and send them yourself - nothing goes out automatically.": "Prüfe die Entwürfe und versende sie selbst - nichts geht automatisch raus.",
+  "GiroCode on invoices and reminders (QR code for banking apps, EUR only)": "GiroCode auf Rechnungen und Erinnerungen (QR-Code für Banking-Apps, nur EUR)",
+  "Moving…": "Wird verschoben …",
+  "Only {0} of {1} moved to {2}": "Nur {0} von {1} nach {2} verschoben",
+  "Overdue invoices: {0} reminder drafts are ready. Check them and send them like any reminder - nothing was sent.": "Überfällige Rechnungen: {0} Entwürfe für Zahlungserinnerungen liegen bereit. Prüfe sie und versende sie wie jede Erinnerung - es wurde nichts verschickt.",
+  "Payment reminders suggested: {0}": "Zahlungserinnerungen vorgeschlagen: {0}",
+  "Show drafts": "Entwürfe zeigen",
+  "Suggest after": "Vorschlagen nach",
+  "suggested": "vorgeschlagen",
+  "Suggest payment reminders for overdue invoices": "Zahlungserinnerungen für überfällige Rechnungen vorschlagen",
+  "Read|section": "Gelesen"
 }
