@@ -663,6 +663,7 @@ async function propOpen(jid) {
   try { v = await rawFetch('GET', `/api/proposals/${jid}`); } catch (e) {  // 2.5.2 (K19): a readable reason instead of "unknown"
     toast(e instanceof Offline ? tr('Offline: only works again with a connection') : e.status === 404 ? tr('This proposal is not available: only the person who asked for it can open it, or it was removed.') : e.message); return;
   }
+  if (v?.kind === 'ideas') { await loadModule('mindmap').catch(() => {}); if (typeof mm_ideasOpen === 'function') mm_ideasOpen(v); return; }  // 2.156.0 A (#1201): ideas show in the mind map
   if (aim_is(v) && typeof ofcMoney !== 'function') await loadModule('office').catch(() => {});  // 2.68.0 (#1839, review): the preview uses the office module (lazy)
   if (ctr_is(v) && typeof noticeWord !== 'function') await loadModule('life').catch(() => {});  // 2.70.0 C (#1359): the card uses life.js (loaded on demand since 2.65.0)
   if (['office_text', 'doc_summary', 'report', 'sheet_tasks'].includes(v?.kind) && (typeof ast_is !== 'function' || typeof sht_is !== 'function')) await loadModule('asstprop').catch(() => {});  // 2.126.1 A (#2123 #2124): asstprop.js on demand

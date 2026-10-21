@@ -762,6 +762,7 @@ function applyState(j) {
   lookAdopt();  // 2.143.0 D (#2155)
   o3c_ringsMigrate();  // 2.118.0 (#2297): old device switch for rings -> account setting, once
   foldSync();  // 2.4.0 (#361): folded folders follow the user (all devices)
+  scl_sync();  // 2.156.0 C (#2073): folded sections too (listedit.js)
   S.tasks = new Map(j.tasks.map(t => [t.id, t]));
   S.filters = j.filters || [];
   S.notify = j.notify || null;  // 2.1.0 (#317) the notification matrix (the server's view)
@@ -771,6 +772,7 @@ function applyState(j) {
   S.templates = j.templates || [];
   S.timer = j.timer || null; S.timeTotals = j.time_totals || {};
   S.timeLists = j.time_lists || {}; S.timeDayH = +j.time_day_h || 8;  // 2.7.0 (#407)
+  S.maxDepth = +j.max_depth || 3;  // 2.156.0 A (#1949): the levels of tasks (kalmido/core/schema.py MAX_DEPTH)
   S.fields = j.fields || [];
   S.folderOrders = j.folder_orders || {};  // 2.27.0 (#988): the order of other people's folders I see their lists in
   S.folderProps = j.folder_props || {}; S.foldersSharedIn = j.folders_shared_in || []; S.folderShares = j.folder_shares || {};  /* 2.41.0 (#1428) */  // 2.29.0 (#1030 / #929)

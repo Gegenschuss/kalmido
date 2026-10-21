@@ -1,0 +1,42 @@
+/* 2.156.0 D (#2186): saved views of the sidebar (sideviews.js, loaded with it): the view tiles apart in the favourites' head,
+   "Others (N)" at the end of the sidebar, the editor dialog and the list in Settings > Appearance > Sidebar. */
+#side .sv-row{display:flex;gap:.375rem;padding:.25rem .125rem .375rem;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+#side .sv-row::-webkit-scrollbar{display:none}
+#side .sg-favs:not(.sg-svonly) .sv-row{margin-bottom:.25rem;border-bottom:1px solid var(--line)}
+#side .sv-tile{display:flex;align-items:center;gap:.375rem;flex:none;max-width:9rem;min-height:2.25rem;padding:0 .75rem 0 .625rem;border:1px solid var(--line);border-radius:999px;background:var(--bg2);color:var(--text2);font:inherit;font-size:var(--fs-s);cursor:pointer;-webkit-touch-callout:none;user-select:none}
+#side .sv-tile:hover{background:var(--bg3);color:var(--text)}
+#side .sv-tile.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);color:var(--text);background:var(--bg)}
+#side .sv-tile .i{width:1rem;height:1rem;flex:none}
+#side .sv-tile .svt-n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#side .sg-svmore .svm-body{padding-left:.25rem}
+#side .sg-svmore .svm-body>.sgroup{margin-top:.25rem}
+@media (pointer:coarse){ #side .sv-tile{min-height:2.75rem} }
+
+/* the editor */
+.svdlg .card{max-width:34rem}
+.svdlg .svd-icrow{align-items:flex-start}
+.svdlg .svd-lab{flex:none;min-width:6rem;padding-top:.5rem}
+.svdlg .svd-ic{display:grid;grid-template-columns:repeat(auto-fill,minmax(2.5rem,1fr));gap:.25rem;flex:1;min-width:0}
+.svdlg .svd-ico{display:flex;align-items:center;justify-content:center;aspect-ratio:1;min-height:2.5rem;padding:0;border:1px solid var(--line);border-radius:.625rem;background:var(--bg);color:var(--text2);cursor:pointer}
+.svdlg .svd-ico:hover{background:var(--bg3);color:var(--text)}
+.svdlg .svd-ico.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);color:var(--text)}
+.svdlg .svd-ico .i{width:1.125rem;height:1.125rem}
+.svdlg .svd-list{display:flex;flex-direction:column;gap:.5rem;max-height:min(24rem,45dvh);overflow-y:auto;margin:.5rem 0;padding-right:.25rem}
+.svdlg .svd-g{display:flex;flex-direction:column;gap:.125rem;padding:.375rem .5rem;border-radius:.625rem;background:var(--bg2)}
+.svdlg .svd-gh{display:flex;align-items:center;gap:.5rem}
+.svdlg .svd-gl{flex:1;min-width:0;font-weight:600}
+.svdlg .svd-g label{display:flex;align-items:center;gap:.5rem;min-height:2rem;cursor:pointer}
+.svdlg .svd-i{padding-left:calc(1.5rem + var(--svd, 0) * 1rem)}
+.svdlg .svd-g.off .svd-i{opacity:.5}
+.svdlg .svd-open{display:inline-flex;align-items:center;gap:.25rem;flex:none}
+.svdlg .svd-open .i{transform:rotate(-90deg)}
+.svdlg .svd-open.on{border-color:var(--accent);color:var(--text)}
+.svdlg .svd-open.on .i{transform:none}
+@media (pointer:coarse){ .svdlg .svd-g label,.svdlg .svd-open{min-height:2.75rem} }
+
+/* Settings > Appearance > Sidebar */
+.svset{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0}
+.svset .svrow{display:flex;align-items:center;gap:.25rem;padding:.25rem .25rem .25rem .5rem;border-radius:.625rem;background:var(--bg2)}
+.svset .svr-ic{display:flex;flex:none;color:var(--text2)}
+.svset .svr-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (pointer:coarse){ .svset .svrow .iconbtn{min-height:2.75rem} }

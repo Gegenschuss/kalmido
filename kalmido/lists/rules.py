@@ -241,7 +241,7 @@ def rul_act_clean(c, lid, a):
     reject_unknown(a, ("kind", "field_id", "value"))
     fid = _int(a.get("field_id"), "action.field_id")
     f = _field_row(c, lid, fid)
-    if not f or f["type"] == "formula":
+    if not f or f["type"] in ("formula", "multiselect", "task"):  # 2.156.0 B (#2069): + multiselect, task (not as a rule's value)
         raise BadInput(tr("Invalid value: {0}", "action.field_id"))
     return {"field_id": fid, "value": field_value(c, f, a.get("value"), lid)}
 

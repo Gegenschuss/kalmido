@@ -63,6 +63,7 @@ PROP_KINDS += ("notice",)  # 2.70.0 C (#1359): a contract's notice deadline as a
 PROP_KINDS += ("rule",)  # 2.71.0 A (#1457): the agent proposes a rule of a list (lists/rules.py), never on request
 PROP_KINDS += ("office_text", "doc_summary", "report")  # 2.126.1 A (#2123 #2124): office texts, a receipt summary, the client report (agents/asstprop.py), on request
 PROP_KINDS += ("sheet_tasks",)  # 2.126.1 B (#2125): table rows -> tasks, proposed by the agent itself (agents/sheetprop.py)
+PROP_KINDS += ("ideas",)  # 2.156.0 A (#1201): sub-branches for a branch of the mind map, on request (agents/ideaprop.py)
 PROP_MAX_ITEMS = 200                    # entries one proposal may create / change (tasks + subtasks)
 PROP_MAX_BYTES = 256 * 1024             # JSON body of a proposal
 PROP_TITLE_MAX, PROP_NOTES_MAX, PROP_NAME_MAX, PROP_SUMMARY_MAX = 300, 5000, 120, 2000
@@ -371,6 +372,9 @@ def prop_validate(kind, b, inp):
     elif kind in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): texts worded by the agent (agents/asstprop.py)
         from ..agents.asstprop import ast_validate
         out.update(ast_validate(kind, b, inp))
+    elif kind == "ideas":  # 2.156.0 A (#1201)
+        from ..agents.ideaprop import idp_validate
+        out.update(idp_validate(b, inp))
     return out
 
 
@@ -451,6 +455,9 @@ def proposal_agents_get():
     if request.args.get("kind") in ("office_text", "doc_summary", "report") and not is_agent(g.user):  # 2.126.1 A (#2123 #2124): ?kind=&doc_id= | &list_id=
         from ..agents.asstprop import ast_agents_get
         return ast_agents_get(c, me(), request.args)
+    if request.args.get("kind") == "ideas" and not is_agent(g.user):  # 2.156.0 A (#1201): ?kind=ideas&list_id=
+        from ..agents.ideaprop import idp_agents_get
+        return idp_agents_get(c, me(), request.args)
     return jsonify(agents=[] if is_agent(g.user) else prop_agents(c, me()))
 
 
@@ -479,6 +486,9 @@ def proposal_request():
     if kind in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): own agents (office switches / the list's), own input (agents/asstprop.py)
         from ..agents.asstprop import ast_request
         return ast_request(c, uid, b)
+    if kind == "ideas":  # 2.156.0 A (#1201): the agents of the list, only the branch's path (agents/ideaprop.py)
+        from ..agents.ideaprop import idp_request
+        return idp_request(c, uid, b)
     try:
         aid = int(b.get("agent_id") or 0)
     except (TypeError, ValueError):
@@ -548,6 +558,8 @@ def prop_view(c, j):
     if j["kind"] in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): the target as it is now
         from ..agents.asstprop import ast_view_extra
         out.update(ast_view_extra(c, j))
+    if j["kind"] == "ideas":  # 2.156.0 A (#1201): the mind map of this list shows them
+        out["list_id"] = j["list_id"]
     return out
 
 
@@ -677,6 +689,10 @@ def prop_run(c, j, sel, ed, extra):
     if kind in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): the (edited) text into its field as the person
         from ..agents.asstprop import ast_run
         return ast_run(c, j, sel, ed, extra, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": {}, "tasks": [], "sections": [],
+                                              "changes": {}, "list": None, "undone": False})
+    if kind == "ideas":  # 2.156.0 A (#1201): the selected ideas as tasks under the branch (agents/ideaprop.py)
+        from ..agents.ideaprop import idp_run
+        return idp_run(c, j, sel, ed, extra, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": {}, "tasks": [], "sections": [],
                                               "changes": {}, "list": None, "undone": False})
     prop, inp = json.loads(j["proposal"]), json.loads(j["input"] or "{}")
     edits = {k: prop_edit(kind, k, v, inp, prop) for k, v in ed.items()}
@@ -1176,6 +1192,9 @@ def v1_agent_job_proposal(jid):
     if j["kind"] in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): the office switches still on / the list still shared
         from ..agents.asstprop import ast_need_agent
         ast_need_agent(c, j, aid)
+    if j["kind"] == "ideas":  # 2.156.0 A (#1201): the list still shared, nothing taken over yet
+        from ..agents.ideaprop import idp_need_agent
+        idp_need_agent(c, j, aid)
     if j["prop_state"] not in ("requested", "ready") or j["state"] not in ("running", "waiting"):
         raise Denied(409, tr("This proposal was already applied or discarded"))
     if len(request.data or b"") > PROP_MAX_BYTES:

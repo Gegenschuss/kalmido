@@ -151,6 +151,24 @@ Calendar: answer invitations from the phone, own repeat rules, holidays and abse
 - Calendar: public holidays (German state or Austria, chosen per person or by the organisation) and your absences show in all views; the team's absences on request, as "away" only; switches in *Calendars*. Absences and holidays as a subscription link for the phone (#2076).
 - Events: while inviting, a free / busy bar for you and every invited person of your organisation - busy and away times only, never titles (#2077).
 
+## [2.156.0] - 2026-10-21
+
+Lists and views: tasks and the mind map go five levels deep, the mind map shows task properties on demand and can ask a connected agent for ideas, new field kinds and formulas with functions, a calendar view per list, *My tasks* as a board, folded sections on every device and section templates, saved sidebar views.
+
+### Added
+- Mind map: *Add ideas…* (key `I`) asks an agent the list is shared with for sub-branches; they appear as faint branches you take over one by one or all at once, or drop. The agent only gets the list name and the branch path; Kalmido itself calls no language model (#1201).
+- Mind map: *Show properties* (key `E`) puts priority, due date, person, repeat, subtask progress, tags and list fields under each branch - the same choice as the task row; off, the selected branch still shows them; the export takes the current state along (#1948).
+- List fields: new kinds multiple choice, currency, rating (stars) and a link to another task; only people who may see the linked task see its title (#2069).
+- Formula fields use the functions of the sheets: `IF`/`WENN`, `SUM`/`SUMME`, `ROUND`/`RUNDEN`, `MIN`, `MAX`, `AVERAGE`, `COUNT` and comparisons; a failed calculation (division by 0) shows a short text in the field (#2070).
+- Lists have a calendar view: month, week, day and agenda with only the list's tasks; dragging onto a day sets the date, a new entry on a day lands in the list (#2071).
+- *My tasks* as a board: columns by due date, priority or list; dragging changes exactly that; the choice is the same on every device (#2072).
+- Section templates: save the sections of a list (private or for the organisation) and add the missing ones to another list; nothing is deleted (#2073).
+- Sidebar views: a view remembers which groups are open and which entries are visible, optionally a start page; each view is a tile above the favourites, hidden entries wait under *Others (N)*, a second tap on the active tile goes back to *Everything*; views and the active view are per person and the same on every device (#2186).
+
+### Changed
+- Tasks and the mind map have up to five levels instead of three; on phones each level indents less; imports flatten anything deeper into level five (#1949).
+- Folded sections stay folded on all your devices (#2073).
+
 ## [2.147.1] - 2026-10-21
 
 Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.

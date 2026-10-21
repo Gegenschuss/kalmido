@@ -98,7 +98,7 @@ function tplParse(text, old, list) {
   for (const raw of String(text).split('\n')) {
     if (!raw.trim()) continue;
     if (list && /^#\s*\S/.test(raw)) { sections.push(raw.replace(/^#\s*/, '').trim().slice(0, 200)); sec = sections.length - 1; stack.length = 0; continue; }
-    const lvl = Math.min(2, Math.floor(raw.match(/^\s*/)[0].replace(/\t/g, '  ').length / 2));
+    const lvl = Math.min(maxDepth() - (list ? 1 : 2), Math.floor(raw.match(/^\s*/)[0].replace(/\t/g, '  ').length / 2));
     const title = raw.trim().replace(/^[-*]\s+(\[[ xX]\]\s+)?/, '').slice(0, 500);
     if (!title) continue;
     const n = take(title), depth = Math.min(lvl, stack.length);
@@ -122,7 +122,7 @@ function templateModal(tp, done) {
       <h4>${tr('Subtasks')}</h4>`
     : `<div class="row"><label for="tp-lname">${tr('List name')}</label><input id="tp-lname" value="${esc(d.name || '')}"></div>${d.rel ? `<div class="shint keep">${esc(tr('Dates count from the project start (Start + n days); the last task is due on day {0}. Using it asks for the start.', d.span || 0))}${d.deps?.length ? ' ' + esc(trn('{0} dependency is kept.', '{0} dependencies are kept.', d.deps.length)) : ''}</div>` : ''}${d.fields?.length ? `<div class="row"><label>${tr('Custom fields')}</label><span class="muted">${esc(d.fields.map(f => f.name).join(', '))}</span></div>` : ''}<h4>${tr('Sections and tasks')}</h4>`}
     <textarea id="tp-outline" class="tpoutline" rows="9" spellcheck="false">${esc(task ? tplOutline(root.children || []) : tplListOutline(d))}</textarea>
-    <div class="shint keep">${task ? tr('One subtask per line, indent with two spaces for a further level (at most 3 levels in total).') : tr('One task per line, indent with two spaces for subtasks. A line “# Name” starts a section.')} ${tr('Lines that keep their title keep their dates, priority and notes.')}</div>
+    <div class="shint keep">${task ? tr('One subtask per line, indent with two spaces for a further level (at most {0} levels in total).', maxDepth()) : tr('One task per line, indent with two spaces for subtasks. A line “# Name” starts a section.')} ${tr('Lines that keep their title keep their dates, priority and notes.')}</div>
     <div class="foot"><button class="btn danger" data-m="del">${tr('Delete')}</button><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.classList.add('tpmodal');
   md.addEventListener('click', async e => {

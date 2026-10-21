@@ -675,7 +675,7 @@ TOOLS = [
            "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]}, "log": {"type": "string"}}, ["title"]),
      lambda api, a: api.call("POST", "/agent/jobs", body=a)),
     ("get_job", "One of the agent's jobs. A proposal job (event job_request) also carries kind (project | subtasks | triage | "
-                "extract | dayplan | cleanup | inquiry | setup | merge | office_text | doc_summary | report), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
+                "extract | dayplan | cleanup | inquiry | setup | merge | office_text | doc_summary | report | ideas), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
      _obj({"job_id": S_ID}, ["job_id"]), lambda api, a: api.call("GET", f"/agent/jobs/{int(a['job_id'])}")),
     ("submit_proposal", "Answer a job_request with ONE structured proposal; the person reviews, edits and applies it. Never create "
                         "the lists / tasks yourself. proposal by kind -- project: {name, folder?, sections: [names], tasks: [{title, "
@@ -707,6 +707,9 @@ TOOLS = [
                         "input.report and its fixed input.report.markdown): {text} (Markdown). For these three: word the text from "
                         "the input only (and input.wish), invent nothing, no placeholders for unknown facts, in the language of the "
                         "document (input.doc.lang) / input.lang; the person edits and takes it over, nothing is sent. "
+                        "ideas (2.156.0, sub-branches for a branch of a mind map; input: list, path, levels, hint, lang only): "
+                        "{items: [{title, children?: [{title}] (only when input.levels is 2)}]} -- short titles in input.lang, at "
+                        "most 50 entries in all; the person takes single ideas or all over. "
                         "Every kind may add summary (a short explanation). Dates YYYY-MM-DD, priority none | low | medium | high. "
                         "At most 200 entries; resubmitting replaces the proposal until the person applied or discarded it.",
      _obj({"job_id": S_ID, "proposal": {"type": "object"}}, ["job_id", "proposal"]), t_submit_proposal),
@@ -1102,7 +1105,7 @@ def _q(v):
 TASK_PLACE = {"list_id": S_ID, "section_id": {"type": ["integer", "null"]}, "parent_id": {"type": ["integer", "null"]},
               "before_id": S_ID, "after_id": S_ID, "position": {"type": "string", "enum": ["top", "bottom"]}}
 LIST_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "folder": {"type": "string", "description": "path, e.g. Clients/Acme"},
-              "view": {"type": "string", "enum": ["list", "kanban", "timeline", "mindmap"]}, "kind": {"type": "string", "enum": ["list", "project"]},
+              "view": {"type": "string", "enum": ["list", "kanban", "timeline", "mindmap", "calendar"]}, "kind": {"type": "string", "enum": ["list", "project"]},
               "done_at_bottom": {"type": "boolean"}, "nag": {"type": "string"}, "day_hours": {"type": ["number", "null"]},
               "time_tracking": {"type": "boolean", "description": "2.41.0: time tracking on for this list (any type, default off)"}}
 LIST_PROPS["points_on"] = {"type": "boolean", "description": "2.60.0: story points shown in the app (owner; default off)"}  # 2.60.0 (#1511)
@@ -1259,9 +1262,14 @@ TOOLS += [
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/fields")),
     ("create_field", "Create a custom field in a list (owner / list admins; 2.39.1: any list, switches the module Custom fields on for the "
                      "list's owner, the answer's modules_on names it): type text | number | date | select | person | url | checkbox "
-                     "| formula; options for select: {options: [{id?, name, color?}]}. 2.43.0: type formula + formula = a calculation "
-                     "with + - * / ( ), numbers, {Field name} of number / formula / checkbox fields and round(x, n); the server computes "
-                     "it, tasks show it in fields, nobody sets it (options.empty = blank: empty when a field is empty, default 0).",
+                     "| formula | multiselect | currency | rating | task (2.156.0); options for select / multiselect: {options: [{id?, name, "
+                     "color?}]}, currency: {currency: \"EUR\"}, rating: {max: 3-10}. Values in a task's fields: multiselect = option ids "
+                     "joined by \",\" (a list works too), rating \"1\"..max, task = the id of a task you can see (read it with get_task; "
+                     "others see its title only if they may see that task). 2.43.0: type formula + formula = a calculation "
+                     "with + - * / ( ), numbers, {Field name} of number / currency / rating / formula / checkbox fields; 2.156.0: comparisons "
+                     "and WENN/IF, SUMME/SUM, RUNDEN/ROUND, MIN, MAX, MITTELWERT/AVERAGE, ANZAHL/COUNT like in tables (; or , between "
+                     "arguments). The server computes it, tasks show it in fields (a failed calculation: \"#div0\" / \"#type\"), nobody sets "
+                     "it (options.empty = blank: empty when a field is empty, default 0).",
      _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1}, "type": {"type": "string"}, "options": {"type": "object"},
            "pinned": {"type": "boolean"}, "formula": {"type": "string"}}, ["list_id", "name", "type"]),
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/fields", body=_without(a, "list_id"))),

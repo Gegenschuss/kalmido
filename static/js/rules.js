@@ -58,7 +58,7 @@ function rxActField(a, n) {
   if (n.field_type === 'checkbox') return tr('check the field {0}', f);
   return tr('set the field {0} to {1}', f, rul_q(n.value_to || a.value));
 }
-const rxFields = lid => fieldsAll(lid).filter(f => f.type !== 'formula');
+const rxFields = lid => fieldsAll(lid).filter(f => !['formula', 'multiselect', 'task'].includes(f.type));  // 2.156.0 B (#2069): no rule sets a multiple choice / task link
 const rxOpt = (v, n, cur) => `<option value="${esc(String(v))}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`;
 function rxTrigValHtml(lid, fid, cur) {  // "set to" of a selection / checkbox field (else: any change)
   const f = fieldById(+fid); if (!f || !['select', 'checkbox'].includes(f.type)) return '';
@@ -72,7 +72,7 @@ function rxActValHtml(l, fid, cur) {  // the fixed value, as the field type asks
   if (f.type === 'select') return lab + `<select id="rul-fval">${rxOpt('', tr('Empty|value'), c)}${(f.options?.options || []).map(o => rxOpt(o.id, o.name, c)).join('')}</select>`;
   if (f.type === 'person') return lab + `<select id="rul-fval">${rxOpt('', tr('Empty|value'), c)}${listPeople(l).map(p => rxOpt(p.user_id, p.name, c)).join('')}</select>`;
   if (f.type === 'date') return lab + dateIn('rul-fval', c, {label: tr('Value')});
-  return lab + `<input id="rul-fval" ${f.type === 'number' ? 'inputmode="decimal"' : ''} maxlength="1000" value="${esc(String(c))}" placeholder="${esc(tr('Empty|value'))}">`;
+  return lab + `<input id="rul-fval" ${['number', 'currency', 'rating'].includes(f.type) ? 'inputmode="decimal"' : ''} maxlength="1000" value="${esc(String(c))}" placeholder="${esc(tr('Empty|value'))}">`;
 }
 const rul_sentence = r => tr('When {0}, then {1}.', rul_trigText(r), rul_actText(r));
 

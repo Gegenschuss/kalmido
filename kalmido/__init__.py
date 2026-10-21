@@ -57,6 +57,7 @@ ORDER = (
     "lists.grouppics",  # 2.46.0 (#1605)
     "lists.ownership",
     "lists.sections",
+    "lists.sectpl",  # 2.156.0 C (#2073)
     "lists.folders",
     "lists.foldershare",  # 2.41.0 (#1420)
     "lists.listhead",  # 2.83.0 C (#1427)
@@ -81,6 +82,7 @@ ORDER = (
     "lists.listexport",  # 2.116.0 C (#2064)
     "accounts.layouts",  # 2.32.0 (#1063, #983)
     "accounts.layoutsets",  # 2.55.0 (#1069, #1068, #1066)
+    "accounts.sideviews",  # 2.156.0 D (#2186): the sidebar's saved views (no routes: user settings side_views / side_view)
     "accounts.onboarding",
     "accounts.users",
     "accounts.orgs",
@@ -391,6 +393,7 @@ ORDER = (
     "agents.dupprop",  # 2.70.0 B (#1357): duplicate contacts as a proposal (no routes)
     "agents.contractprop",  # 2.70.0 C (#1359): contract_notice + the proposal kind notice (no routes of its own)
     "agents.asstprop",  # 2.126.1 A (#2123 #2124): office texts, document summaries, client reports by an agent (no routes of its own)
+    "agents.ideaprop",  # 2.156.0 A (#1201): "Add ideas" in the mind map -- an agent proposes sub-branches
     "lists.rules",  # 2.71.0 A (#1457): rules of a list (When ... then ...), after api.v1
     "admin.supporter",  # 2.74.0 (#338): the supporter licence (self-hosted only, a badge, unlocks nothing)
     "admin.operator",  # 2.144.0 D (#797): the hosting operator's interface (off unless a token file is configured)

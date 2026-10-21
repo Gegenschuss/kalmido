@@ -449,7 +449,7 @@ function renderDetail0() {
   // 2.0.7: private lists with collaboration keep the folded "History" of 2.0.5 (every change, mine included, the
   // import line too); it stays out of the notes above, so they have no activity noise
   const hist = collab() && t.id > 0 && !ck && !t.context && !shared;
-  const mdOpen = !tlkR && !ck && t.content && /^\s*[-*]\s+\[ \]\s*\S/m.test(t.content) && depthOf(t) < 2;
+  const mdOpen = !tlkR && !ck && t.content && /^\s*[-*]\s+\[ \]\s*\S/m.test(t.content) && depthOf(t) < maxDepth() - 1;
   // 2.0.2 (#242): the comments sit right below the description, folded to the newest one (per device); long descriptions
   // fold after ~8 lines. 2.31.0 (#1054): no "Details | Comments" tabs on phones any more, a small jump to the comments instead
   const mdLong = mdMode && mdIsLong(t.content), mdClamp = mdLong && !LS.get('mdOpen', false);  // 2.101.0 (#2157): one device setting for all tasks
@@ -463,7 +463,7 @@ function renderDetail0() {
   // 2.0.6 (#316 / #322): the order of the sections below the description, in one place
   const SEC = {
     subtasks: ck || msT ? '' : `<div class="dsec subsec"><h5>${isOcc(t) && famOn() ? tr('Gift ideas') : tr('Subtasks')}</h5><div class="subs">${kids.map(k => taskRow(k, {compact: true, subRow: true})).join('')}
-        ${ro ? '' : depthOf(t) < 2 ? `<div class="subadd">${ic('plus', 's')}<input id="d-sub" placeholder="${isOcc(t) && famOn() ? tr('Add a gift idea') : tr('Add subtask')}" aria-label="${esc(isOcc(t) && famOn() ? tr('Add a gift idea') : tr('Add subtask'))}" enterkeyhint="done"></div>` : `<div class="muted" style="font-size:var(--fs-s);padding:.25rem">${tr('At most 3 levels')}</div>`}</div></div>`,
+        ${ro ? '' : depthOf(t) < maxDepth() - 1 ? `<div class="subadd">${ic('plus', 's')}<input id="d-sub" placeholder="${isOcc(t) && famOn() ? tr('Add a gift idea') : tr('Add subtask')}" aria-label="${esc(isOcc(t) && famOn() ? tr('Add a gift idea') : tr('Add subtask'))}" enterkeyhint="done"></div>` : `<div class="muted" style="font-size:var(--fs-s);padding:.25rem">${tr('At most {0} levels', maxDepth())}</div>`}</div></div>`,
     comments: cm === 'full' ? `<div class="dsec cmsec ${cmtNew() ? 'cmnew' : ''}" id="d-tl">${timelineHtml(t)}</div>` : '',
     history: hist ? `<details class="dsec cmsec cmro" id="d-hist"><summary><span>${tr('History')}</span></summary><div class="cms" id="d-hist-items">${S.tl.id === t.id ? histItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div></details>` : '',
     deps: ck ? '' : `${t.id > 0 && dFor(t) && !t.context ? `<div class="dsec depsec" id="d-deps">${depsHtml(t)}</div>` : waitExtHtml(t, ro, true)}`,  // 2.22.0 (#686)
@@ -551,7 +551,7 @@ function renderDetail0() {
 }
 // U17: the open "- [ ]" lines of a description become real subtasks (one undo step); ticked lines stay in the text
 async function mdToSubtasks() {
-  const t = taskById(S.sel); if (!t || !canEdit(t) || depthOf(t) >= 2) return;
+  const t = taskById(S.sel); if (!t || !canEdit(t) || depthOf(t) >= maxDepth() - 1) return;
   const keep = [], items = [];
   // 2.40.0 (#1409): the lines indented below an item (up to the next line that is not) become the new subtask's description
   const lines = String(t.content || '').split('\n'), ind = x => x.match(/^\s*/)[0].replace(/\t/g, '    ').length;

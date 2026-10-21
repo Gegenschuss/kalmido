@@ -126,11 +126,11 @@ function filterModal(id) {
   const r = {op: 'and', lists: [], dates: [], prios: [], types: [], tags: [], ...JSON.parse(JSON.stringify(f.rules || {}))};
   r.cf = r.cf && typeof r.cf === 'object' ? r.cf : {};
   // custom fields of the visible lists that the filter engine understands
-  const cfs = (fieldsOn() ? S.fields || [] : []).filter(x => ['select', 'checkbox', 'date', 'number'].includes(x.type) && listById(x.list_id) && !listById(x.list_id).archived);
+  const cfs = (fieldsOn() ? S.fields || [] : []).filter(x => ['select', 'checkbox', 'date', 'number', 'multiselect', 'currency', 'rating'].includes(x.type) && listById(x.list_id) && !listById(x.list_id).archived);
   const cfChips = (fd, kind, opts) => `<div class="fchips" data-cf="${fd.id}" data-cfk="${kind}">${opts.map(([v, n]) => `<button class="${(r.cf[fd.id]?.[kind] || []).includes(v) ? 'on' : ''}" data-v="${esc(v)}">${esc(n)}</button>`).join('')}</div>`;
   const cfRow = fd => {
     const cur = r.cf[fd.id] || {};
-    const ctl = fd.type === 'select' ? cfChips(fd, 'sel', [...(fd.options?.options || []).map(o => [o.id, o.name]), ['', tr('empty')]])
+    const ctl = fd.type === 'select' || fd.type === 'multiselect' ? cfChips(fd, 'sel', [...(fd.options?.options || []).map(o => [o.id, o.name]), ['', tr('empty')]])
       : fd.type === 'checkbox' ? cfChips(fd, 'chk', [['1', tr('checked')], ['0', tr('not checked')]])
       : fd.type === 'date' ? cfChips(fd, 'date', DATE_OPTS.map(([v, n]) => [v, tr(n)]))
       : `<div class="cfnumf"><select data-cfnum="${fd.id}"><option value="">–</option>${[['gt', '>'], ['lt', '<'], ['eq', '='], ['set', tr('has a value')], ['empty', tr('empty')]].map(([k, n]) => `<option value="${k}" ${cur.num?.op === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select><input data-cfnumv="${fd.id}" inputmode="decimal" value="${esc(cur.num?.v ?? '')}" style="max-width:6.875rem">${fd.options?.unit ? `<span class="muted">${esc(fd.options.unit)}</span>` : ''}</div>`;
@@ -310,8 +310,9 @@ function sideOrder() {  // lists as shown: top-level lists first, then folder by
   return [...ls.filter(l => !l.folder), ...folderNames().flatMap(f => ls.filter(l => l.folder === f))];
 }
 // open / closed folders: S.collapsed "fold:<path>" (as before) + the user setting folders_closed (all devices)
-const foldClosed = p => S.collapsed.has('fold:' + p);
+const foldClosed = p => sv_fold(p) ?? S.collapsed.has('fold:' + p);  // 2.156.0 D (#2186): in a sidebar view only for now (sideviews.js)
 function foldSet(p, closed) {
+  if (sv_foldSet(p, closed)) return;
   if (closed) S.collapsed.add('fold:' + p); else S.collapsed.delete('fold:' + p);
   LS.set('collapsed', [...S.collapsed]);
   S.settings.folders_closed = JSON.stringify([...S.collapsed].filter(k => k.startsWith('fold:')).map(k => k.slice(5)));

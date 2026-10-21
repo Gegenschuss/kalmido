@@ -2278,7 +2278,20 @@ explanation, Markdown, at most 2,000 characters) and `kind` (must match the job)
 // office_text (2.126.1): field = input.field (intro | closing); doc_summary: text at most 4000 characters; report: Markdown
 {"field": "intro", "text": "Thank you for your inquiry. As discussed, we offer you ..."}
 {"text": "Hotel invoice for two nights during the trade fair, 19 % VAT ..."}
+// ideas (2.156.0): sub-branches for input.path; children only when input.levels is 2; at most 50 entries in all
+{"items": [{"title": "Venue", "children": [{"title": "Book the hall"}, {"title": "Catering"}]}, {"title": "Invitations"}]}
 ```
+
+**Ideas for a branch of the mind map (2.156.0, kind `ideas`).** In a list's mind map a person picks a branch (the list
+itself, a section or a task) and *Add ideas*; only agents the list is shared with (and that the person may address there)
+can be asked, `GET /api/proposals/agents?kind=ideas&list_id=`. The agent gets `input` = `list` (the list's name), `path`
+(the titles from the top down to the branch), `branch` (list | section | task), `levels` (1 or 2: whether the ideas may
+carry sub-ideas; the five levels of tasks count), `hint` (the person's wish or null), `lang`, `target` (the branch's key) --
+nothing else of the list. Answer `{items: [{title, children?: [{title}]}]}` (titles at most 300 characters, at most 50
+entries in all; `children` are cut when `levels` is 1). The ideas show as pale branches under their branch; the person
+takes single ones or all over (tasks created as the person, history "from a proposal by <agent>") or discards them. When
+every idea is decided the job ends and you get the event `job` (approve with `created` / `dropped`, or reject). The list
+no longer shared when you submit: 403; replacing a proposal after the person took an idea over: 409.
 
 **Texts worded by an agent (2.126.1, kinds `office_text`, `doc_summary`, `report`).** Kalmido never runs a model for
 these: a person asks one of their agents, the agent words the text and the person edits, takes over or discards it.

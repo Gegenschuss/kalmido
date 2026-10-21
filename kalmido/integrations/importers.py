@@ -27,7 +27,7 @@ from ..core.pages import valid_url
 from ..lists.lists import FOLDER_MAX, folder_seg, LIST_NAME_MAX
 from ..tasks.validation import (
     ancestors, as_int, clean_reminders, clean_task, CONTENT_MAX, depth, descendants, DURATION_MAX, PRIORITIES,
-    REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm, rr_problem, TITLE_MAX, valid_date, valid_hm,
+    REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm, rr_problem, subtree_height, TITLE_MAX, valid_date, valid_hm,
 )
 from ..tasks.tasks import set_tags
 from ..core.errors import BadInput, UnknownFields
@@ -170,7 +170,8 @@ def import_ticktick(c, text, uid):
             pl = c.execute("SELECT list_id FROM tasks WHERE id=?", (idmap[p],)).fetchone()
             me_l = c.execute("SELECT list_id FROM tasks WHERE id=?", (r["_id"],)).fetchone()
             if not pl or not me_l or pl[0] != me_l[0] or r["_id"] in ancestors(c, idmap[p]) \
-                    or idmap[p] in descendants(c, r["_id"]):
+                    or idmap[p] in descendants(c, r["_id"]) \
+                    or depth(c, idmap[p]) + 1 + subtree_height(c, r["_id"]) >= MAX_DEPTH:  # 2.156.0 review (#1949): no task below level 5
                 stats.setdefault("parents_skipped", 0)
                 stats["parents_skipped"] += 1
                 continue

@@ -43,6 +43,14 @@ def lex_value(c, f, raw, names):
         return names.get(int(raw), "") if str(raw).isdigit() else ""
     if t == "checkbox":
         return tr("Yes") if raw == "1" else ""
+    if t == "multiselect":  # 2.156.0 B (#2069): the option names, in the order of the options
+        on = {o.get("id"): o.get("name") or "" for o in json.loads(f["options"] or "{}").get("options", [])}
+        return ", ".join(on[x] for x in str(raw).split(",") if x in on)
+    if t == "task":  # 2.156.0 B (#2069): the title, only when the person exporting may see the task
+        from .fields import fd_uid
+        from ..core.access import task_visible
+        r = c.execute("SELECT title FROM tasks WHERE id=? AND deleted_at IS NULL", (int(raw),)).fetchone() if str(raw).isdigit() else None
+        return r["title"] if r and task_visible(c, int(raw), fd_uid()) else ""
     return raw
 
 

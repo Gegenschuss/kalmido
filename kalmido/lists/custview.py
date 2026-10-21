@@ -51,7 +51,7 @@ def cv_clean(c, lid, v, cur):
         f = v["fields"]
         if not isinstance(f, list) or len(f) > CV_MAX_FIELDS or any(not isinstance(x, int) or isinstance(x, bool) for x in f):
             raise BadInput(tr("Invalid value: {0}", "fields"))
-        have = {r[0] for r in c.execute("SELECT id FROM list_fields WHERE list_id=? AND type!='formula'", (lid,))}
+        have = {r[0] for r in c.execute("SELECT id FROM list_fields WHERE list_id=? AND type NOT IN ('formula', 'task')", (lid,))}  # 2.156.0 B (#2069): + task
         if any(x not in have for x in f):
             raise BadInput(tr("Invalid value: {0}", "fields"))
         out["fields"] = list(dict.fromkeys(f))
@@ -68,7 +68,7 @@ def cv_options(c, lid):
     """What the share dialog offers: the list's tags and custom fields."""
     return {"tags": [{"id": r["id"], "name": r["name"]} for r in c.execute("SELECT id, name FROM list_tags WHERE list_id=? ORDER BY sort, id", (lid,))],
             "fields": [{"id": r["id"], "name": r["name"], "type": r["type"]}
-                       for r in c.execute("SELECT id, name, type FROM list_fields WHERE list_id=? AND type!='formula' ORDER BY sort, id", (lid,))]}
+                       for r in c.execute("SELECT id, name, type FROM list_fields WHERE list_id=? AND type NOT IN ('formula', 'task') ORDER BY sort, id", (lid,))]}  # 2.156.0 B (#2069)
 
 
 def cv_tag_sql(show):
@@ -93,7 +93,7 @@ def _field_text(f, val, lg, names, day):
     t = f["type"]
     if t == "checkbox":
         return tr("yes", lg=lg) if val in ("1", "true") else ""
-    if t == "select":
+    if t in ("select", "multiselect"):  # 2.156.0 B (#2069): + multiselect
         try:
             opts = (json.loads(f["options"] or "{}") or {}).get("options") or []
         except ValueError:
@@ -116,6 +116,14 @@ def _field_text(f, val, lg, names, day):
         except ValueError:
             unit = ""
         return f"{val} {unit}".strip()
+    if t in ("currency", "rating"):  # 2.156.0 B (#2069): 12.5 EUR, 3/5
+        try:
+            o = json.loads(f["options"] or "{}") or {}
+        except ValueError:
+            o = {}
+        return f"{val} {o.get('currency') or 'EUR'}" if t == "currency" else f"{val}/{o.get('max') or 5}"
+    if t == "task":  # never shown outside (the title may not be for the link's viewers)
+        return ""
     return str(val)[:300]
 
 

@@ -51,7 +51,7 @@ def group_field_check(c, lid, v):
     r = c.execute("SELECT type FROM list_fields WHERE id=? AND list_id=?", (int(m.group(1)), lid)).fetchone()
     return f"cf:{int(m.group(1))}" if r and r["type"] in GROUP_FIELD_TYPES else None
 LIST_SORT_RE = r"cf:\d{1,9}(_desc)?|col:(who|tags|time|progress|deps)(_desc)?"
-LIST_VIEWS = ("list", "kanban", "timeline", "mindmap")  # 2.49.0 (#1201): + mind map
+LIST_VIEWS = ("list", "kanban", "timeline", "mindmap", "calendar")  # 2.49.0 (#1201): + mind map; 2.156.0 C (#2071): + calendar
 LIST_COLOR_RE = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
 LIST_NAME_MAX, FOLDER_MAX = 200, 100
 

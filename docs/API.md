@@ -286,8 +286,9 @@ had been made in the app. Webhooks fire too.
 | `POST /tasks/{id}/restore` | delete | 2.15.0: restore a task from the trash (`409` if it is not there) |
 | `GET /tasks/{id}/dependencies` · `POST …` · `DELETE …/{blocker_id}` | read · tasks:write | 2.15.0: `blocked_by` / `blocking`; add `{blocked_by}` (project lists, no cycles), remove |
 | `GET /lists/{id}/fields` · `POST …` | read · structure | 2.15.0: custom field definitions; create `{name, type, options?, pinned?}` (2.39.1: any list, owner / list admins; switches the module *Custom fields* on for the list's owner, the answer's `modules_on` names it: `["fields"]` or `[]`). Values: the task's `fields` |
+| Field types | structure | `text`, `number`, `select`, `date`, `checkbox`, `person`, `url`, `formula`; 2.156.0 B (#2069): `multiselect` (`options.options` like `select`; value = option ids joined by `,`, a list is accepted; a removed option leaves the values), `currency` (`options.currency`, ISO code, default `EUR`; value like a number), `rating` (`options.max` 3-10, default 5; value `"1"`..max, `0` / `null` clears), `task` (value = the id of a task you may see, else `400`; the web app shows its title only to people who may see that task, `GET /api/fields/task-refs?ids=` answers only those; agents read it with `GET /tasks/{id}`). Rules cannot set multiselect or task fields; a customer view never shows task fields |
 | `PATCH /fields/{id}` · `DELETE …` | structure · delete | 2.15.0: change `{name?, options?, pinned?, sort?}` (the type stays); delete with its values (agents: approval) |
-| Formula fields | structure | 2.43.0 (#1328): `type: "formula"` with `formula` (create / change): `+ - * /`, brackets, numbers, `{Field name}` of number, formula or checkbox fields and `round(x, n)` (n 0-6). Stored with field ids (`options.expr`, `{#12}`), shown with today's names (`options.formula`), so renaming a field keeps it working; no field may use itself, circular references -> `400` naming the field, syntax errors -> `400` with the character. The server computes the value into the task's `fields` (as text like a number); empty fields count as 0 (`options.empty: "blank"`: the result stays empty), division by 0 = empty. Writing a formula value -> `400` |
+| Formula fields | structure | 2.43.0 (#1328): `type: "formula"` with `formula` (create / change): `+ - * /`, brackets, numbers, `{Field name}` of number, formula or checkbox fields and `round(x, n)` (n 0-6). Stored with field ids (`options.expr`, `{#12}`), shown with today's names (`options.formula`), so renaming a field keeps it working; no field may use itself, circular references -> `400` naming the field, syntax errors -> `400` with the character. The server computes the value into the task's `fields` (as text like a number); empty fields count as 0 (`options.empty: "blank"`: the result stays empty), division by 0 = empty. Writing a formula value -> `400`. 2.156.0 B (#2070): the formula engine of tables: comparisons (`= <> < > <= >=`), `WENN/IF`, `SUMME/SUM`, `RUNDEN/ROUND`, `MIN`, `MAX`, `MITTELWERT/AVERAGE`, `ANZAHL/COUNT` (German and English names, `;` or `,` between arguments), `currency` / `rating` fields as numbers; an unknown function -> `400`; a calculation that fails gives `"#div0"` / `"#type"` in `fields` (empty while none of the fields it reads has a value) |
 | `GET /lists/{id}/kpis` | read | 2.43.0 (#1328): the key figures of a list (tiles of its project page): `{data: [{id, title, agg: sum\|count\|avg\|ratio, value, unit, n}]}` over the tasks you may see; `value` null = nothing to compute. Health lists: `404` for agents. Set up by people (web: `PATCH /api/lists/{id}` `{kpis: [{title, agg, field?, field2?, state: all\|open\|done, cond_field?, cond_value?}]}`, owner / list admins; the sum row of a list: `{col_sums: {"f:<id>": sum\|avg\|count\|min\|max}}`) |
 | `GET /templates` · `POST …` | read · structure | 2.15.0: your templates; create from `{task_id}`, `{list_id, relative?}` or `{kind, data}`, `name?` |
 | `PATCH /templates/{id}` · `DELETE …` · `POST …/apply` | structure · delete · structure | 2.15.0: rename / replace data; delete; use it (task template: `{list_id?, section_id?}`; list template: `{name?, folder?, start?, end?}`) |
@@ -1278,6 +1279,15 @@ star in `fav_lists` (pushes, agents and *Only favourites* read only that); `PUT 
 list's `l:` key at the end of `fav_items` / takes it out and answers `fav_items` too. A key whose target the person cannot
 see (any more) stays stored and is simply not shown. Agents do not see `fav_items`.
 
+2.156.0 D (#2186): **saved views of the sidebar** (e.g. "On the road", "Planning"), per person and the same on every device.
+The setting `side_views` (`PATCH /api/settings`, a json list of at most 20 views) holds them: `{id, name, icon, open, fclosed,
+hide, start}` with `id` = 1-16 lowercase letters / digits, `name` up to 60 characters, `icon` = the name of an app icon
+(default `panel`), `open` = the groups shown open (`focus`, `lists`, `views`, `areas`, `filters`, `tags`, `team`, `more`),
+`fclosed` = closed folders, `hide` = the hidden entries (`g:<group>` or a `fav_items` key; they wait under "Others (N)" in the
+sidebar) and `start` = an optional start page (a route such as `today` or `l/12`). `side_view` is the id of the active view
+(`''` = "Everything"); switching on one device switches every device. An invalid value is `400` and nothing is stored;
+doubles in the lists are dropped. No route of its own, nothing for agents.
+
 ## My tasks in an own order (2.40.0)
 
 *My tasks* can be put in a personal order by dragging (the default view; *Grouped by list* shows the list groups as before).
@@ -1297,6 +1307,24 @@ agents have none (`403`).
 `GET /api/state` carries it as `mine_order` (`{task id: position}`, 0 = on top). A task without a position (new, or newly
 assigned) stands above the placed ones, newest first; assigning a task to a person takes its old position away. The setting
 `mine_view` (`PATCH /api/settings`) is `own` (default) or `lists`.
+
+2.156.0 C (#2072): "My tasks" as a board: `mine_board` is `0` (the list, default) or `1`; `mine_board_by` names its columns:
+`due` (Overdue / Today / This week / Later / No date, default), `prio` or `list`. Dropping a card on a column is a plain task
+change (date, priority or list). 2.156.0 C (#2071): a list's `view` may also be `calendar` (the calendar with only that list's
+tasks; owner for everyone, a member for themself, like `kanban`). 2.156.0 C (#2073): `sections_closed` is a JSON list of the
+section ids the person folded in list views (at most 2000; all devices).
+
+2.156.0 C (#2073), web API (a person in the app, never an agent or an API token): section templates -- a name and the ordered
+names of a list's sections, the person's own (`space: "private"`) or an organisation's (`"org:<id>"`: every member reads it,
+its creator and the organisation's admins change it; another organisation / person gets 404).
+
+| Route | Meaning |
+|---|---|
+| `GET /api/section-templates` | the templates the person sees: `{templates: [{id, name, sections: [names], space, org_id, mine, can_edit, updated_at}]}` |
+| `POST /api/section-templates` | `{name, space?, list_id \| sections}`: `list_id` = that list's section names (who may write the list; a list with the lock: 409), `sections` = names (blanks and doubles dropped, at most 50) |
+| `PATCH /api/section-templates/{id}` | `{name?, sections?}` (its creator or an admin of its organisation, else 403) |
+| `DELETE /api/section-templates/{id}` | the same people; lists made with it keep their sections |
+| `POST /api/lists/{id}/sections/from-template` | `{template_id}`: the template's names the list lacks (any case) are added at the end in the template's order; nothing is removed or renamed. Answer `{added: [section rows], skipped: [names already there]}` |
 
 2.56.1 (#1799): the symbols of a task row and the sidebar's markers are settings too (`PATCH /api/settings`): `row_icons`
 is `all`, `key` (default), `calm` or `custom`; `row_icons_custom` is a comma list of the symbols shown with `custom` (`due`,
@@ -1529,6 +1557,20 @@ draft: 409 once finalised or sent; document: the right edit), `.../undo` / `.../
 when someone changed it since). `GET /api/lists/{id}/status-report` (web) also carries `agents` and `agent_text`
 (`{job, text, at}` of the report taken over for exactly this period, else null); the fixed `markdown` stays as it is.
 `GET /api/docs/{id}` and `GET /api/v1/documents/{id}` carry `summary` (the text taken over, '' without one).
+
+## Ideas for the mind map (2.156.0)
+
+Who may be asked: `GET /api/proposals/agents?kind=ideas&list_id=` (agents the list is shared with and that the person may
+address there) -> `{agents: [...]}` as above. A person who may change the list asks with `POST /api/proposals {agent_id,
+kind: "ideas", list_id, branch: "r" | "s<section id>" | "t<task id>", hint?}` (a task on the deepest level: 400; hint at
+most 2000 characters). The agent answers `{items: [{title, children?: [{title}]}]}` (AGENTS.md *Ideas for a branch*).
+`GET /api/lists/{id}/ideas` (the person who asked) -> `{jobs: [{id, state: requested | ready, agent {id, name}, target,
+path, items, taken {key: task id}, dropped [keys], created_at, updated_at}]}` of the open requests in that list.
+`POST /api/proposals/{id}/ideas {take: ["0", "0.1", ...], drop: [...]}` creates the taken ideas as tasks of the person
+under the branch (a sub-idea brings its idea along) and marks the dropped ones -> `{state, taken, dropped, open, tasks}`;
+once nothing is open the job ends (applied / discarded). `POST /api/proposals/{id}/apply {select}` takes the selected ones
+over and discards the rest; `.../discard`, `.../undo`, `.../redo` as for other proposals. `GET /api/state` carries
+`max_depth` (2.156.0, #1949: the levels of tasks, 5).
 | `GET /lists/{id}/rules` | read | people: owner / list admin (like the web), agents: write access to the list (else 403); `trigger` {kind section / done / reopen / ltag / due / created / assigned / field (2.138.0), section_id, tag_id, user_id (assigned: null = anybody), field_id + value (field: option id, "1" / "0" for a checkbox, null = any change)}, `action` {kind assign / due / comment / move / priority / tag / field (2.138.0), user_id, days, text, list_id, section_id, priority (none / low / medium / high), tag_id (a list tag), field_id + value (null clears)}, `names`, `active`, `paused_reason`, `created_by` |
 | `POST /lists/{id}/rules/proposals` | structure | agents only: `name`, `trigger`, `action`, `summary`, `title`, `user_id`; 201 = a ready proposal job (kind `rule`) |
 | `POST /agent/proposals/sheet-tasks` | sheets:read | 2.126.1: agents only: `sheet_id`, `rows` (row ids or `{row_id, title}`, at most 200), `list_id`, `title_col`, `due_col`, `notes_col`, `summary`, `for_user_id`; the table and the list shared with the agent, same space; 201 = a ready proposal job (kind `sheet_tasks`) + `skipped` (rows carried over before; all of them = 409). `GET /api/proposals/{id}` adds `sheet`, `list`, `sheet_rows` (`key, row_id, n, title, cell_title, due, notes, state: "" \| done \| gone \| empty`); apply `{select, edits: {"0": {title, due}}}` runs the table's rows -> tasks as the person (`created`, `skipped`), undo / redo = that batch |

@@ -45,6 +45,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   access point provider account (UBL, Peppol ID, status); **data protection sheets** for clients (DPA, privacy
   information, consent) with mail, signing link and status; agents' receipt suggestions in the office; an industry pack
   per calculation part; a hint when duplicating an invoice made from times.
+- **2.156.0** (2026-10-21): tasks and the mind map go **five levels** deep; the mind map shows **task properties on
+  demand** and can ask a connected agent to **add ideas** you take over or drop; list fields get **multiple choice,
+  currency, rating and task links**, formulas get **IF, SUM, ROUND** and more; a **calendar view per list**, **My tasks as
+  a board**, folded sections on every device and **section templates**; **sidebar views** as tiles, the same on every device.
 - **2.147.1** (2026-10-21): **drag tasks into the chats** (team chat, thread, agent chat) as references, several at once, with
   *Insert reference* on phones; **overdue invoices suggest a payment reminder** as a draft (nothing is sent) and
   invoices / reminders in EUR carry a **GiroCode** for banking apps; moving many documents to another workspace shows
@@ -548,7 +552,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   selects a task (a bar with *Move*, *Date*, *Complete*, *More*; tap more tasks to add them, drag by the grip), and in
   the open task a swipe left or right goes to the next or previous task
 - Drop files from the desktop on a list: one new task per file, with the file attached
-- Subtasks up to three levels, drag and drop between lists and levels
+- Subtasks up to five levels, drag and drop between lists and levels
 - Priorities, tags, pinned tasks (the smart list *Pinned* collects them from every list, 2.16), Markdown notes, attachments (images, PDFs, documents)
 - Long descriptions fold to a few lines; *Show more* keeps the following tasks unfolded too until *Show less* (per device, 2.101).
 - A website link per task, shown as a small domain chip (paste a URL in quick add or share a page from Android)
@@ -655,7 +659,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Waiting on someone** (2.1.0): mark a task as waiting for someone outside (a client, an office, a delivery) with a note and a follow-up day (task menu > *Waiting on someone…*, or *Waiting on…* in the task panel, which also offers *Another task*). It shows an hourglass chip, sits in the smart view *Waiting on someone*, and on the follow-up day you get a reminder and a News item, while agents that follow the task get the event `followup_due`. One click (the × on the bar in the task panel) ends it. API: `PUT` / `DELETE /api/v1/tasks/{id}/waiting`, `GET /api/v1/tasks?waiting=true`; MCP `set_waiting`, `clear_waiting`, `list_waiting`
 - **Project status and progress:** a progress bar per list, a status (*On track*, *At risk*, *Off track*, *On hold*, *Complete*) with a short note, and the **project status** (*Where is it stuck?*) with the overdue, blocked and unassigned tasks across all lists
 - **Project page:** every project list has a tab next to List / Kanban / Timeline with its description (Markdown), key links, milestones (also in the timeline), project files plus the files of its tasks, members, status updates and the tracked time
-- **Custom fields** per list: text, number (with unit), selection with colours, date, checkbox, person or link; shown as chips or columns, usable in filters, sorting and search
+- **Custom fields** per list: text, number (with unit), currency, selection with colours, multiple choice, rating, date, checkbox, person, link or a link to another task; formulas with IF, SUM, ROUND, MIN, MAX; shown as chips or columns, usable in filters, sorting and search
 - **Shown fields per list** (2.14): list *…* > *Shown fields…* (or the button in the list header) picks which columns the
   rows show and in which order: task number, date, priority, assignee, tags, tracked time, subtasks, dependencies,
   created and the list's custom fields. The setting belongs to the list, so every member sees the same; the owner and
@@ -936,7 +940,7 @@ own list with the same name is reused) or one existing list you can edit. The im
 
 | From | Export there | What comes along |
 |---|---|---|
-| **Todoist** | Project > … > *Export as a CSV file* (one file per project), or *Settings > Backups* (a ZIP with every project). A JSON from the Sync API works too. | Sections, subtasks (indent, at most 3 levels), `@labels` as tags, priorities (the CSV scale is detected, or choose it), dates including English and German date texts (*every monday at 9am*, *jeden Montag*, *15. Okt*, *morgen um 10 Uhr*) and recurring dates, durations, deadlines, comments and attachment links (into the notes). Texts it cannot read (other languages, *every 3rd friday*) stay in the notes. |
+| **Todoist** | Project > … > *Export as a CSV file* (one file per project), or *Settings > Backups* (a ZIP with every project). A JSON from the Sync API works too. | Sections, subtasks (indent, at most 5 levels), `@labels` as tags, priorities (the CSV scale is detected, or choose it), dates including English and German date texts (*every monday at 9am*, *jeden Montag*, *15. Okt*, *morgen um 10 Uhr*) and recurring dates, durations, deadlines, comments and attachment links (into the notes). Texts it cannot read (other languages, *every 3rd friday*) stay in the notes. |
 | **Trello** | Board > Menu > *Print, export and share* > *Export as JSON* | Lists as sections of one list, or one list each in a folder named after the board; cards with description, due date and time, start, reminder, *complete*; labels as tags; checklists as subtasks (several checklists: one subtask each); members assigned when they can see the list, otherwise named in the notes; comments and attachment links in the notes. Archived cards and lists are skipped, or imported as completed. Custom fields are not imported. |
 | **Asana** | Project > arrow next to the name > *Export / Print* > *CSV* | Sections, subtasks (*Parent task*), tags, start and due dates, completion, priority; other columns (custom fields, dependencies) in the notes. An assignee is assigned when the e-mail or name matches someone who can see the target list, otherwise the name goes into the notes. |
 | **Microsoft To Do** | No export of its own. Classic Outlook for Windows: *File > Open & Export > Import/Export > Export to a file > Comma Separated Values > Tasks* (Outlook for Mac: *File > Export > Tasks*). CSV files of export tools and ICS files work too. | Title, list, due and start date, status, importance / priority, categories as tags, notes, reminders, steps (when the export has them). English and German Outlook columns, also in Windows-1252. |

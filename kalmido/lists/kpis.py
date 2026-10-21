@@ -46,7 +46,7 @@ def fx_clean_kpis(c, lid, v):
     if not isinstance(v, list) or len(v) > FX_KPI_MAX:
         raise ValueError(tr("At most {0} key figures", FX_KPI_MAX))
     fs = {r["id"]: r for r in c.execute("SELECT id, name, type, options FROM list_fields WHERE list_id=?", (lid,)).fetchall()}
-    num = {i for i, f in fs.items() if f["type"] in ("number", "formula")}
+    num = {i for i, f in fs.items() if f["type"] in ("number", "formula", "currency", "rating")}  # 2.156.0 B (#2069): + currency, rating
     out, seen = [], set()
     for k in v:
         if not isinstance(k, dict):
@@ -156,7 +156,7 @@ def fx_kpi_values(c, lid):
         val, unit = None, ""
         f = fs.get(k.get("field"))
         if f:
-            unit = fx_json(f["options"], {}).get("unit", "")
+            unit = fx_json(f["options"], {}).get("unit", "") or fx_json(f["options"], {}).get("currency", "")  # 2.156.0 B (#2069)
         if k["agg"] == "count":
             val = len(sel)
             unit = ""

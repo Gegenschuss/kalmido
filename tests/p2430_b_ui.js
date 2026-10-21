@@ -5,7 +5,7 @@
 //   "Blocking" (both directions, gone after the drag); the task menu has "Waiting on a task…" with the task search
 // - #1003: with a selection a drag takes all (the drag image says "3 tasks"); dropped onto the middle of a task they become
 //   its subtasks in their order (ONE request, ONE Undo puts them back); a task with own subtasks that would go deeper than
-//   three levels stays and the message counts it; subtasks dropped on a section header become standalone tasks there
+//   five levels (2.156.0, #1949) stays and the message counts it; subtasks dropped on a section header become standalone tasks there
 //   (order kept); above a row the block lands before it; the multi panel's "Subtasks of…" / "Out of the parent task" and
 //   the phone's selection menu offer the same
 const {boot, errs, sleep, B, login} = require('./boot');
@@ -106,7 +106,8 @@ const rowBox = el => { el.getBoundingClientRect = () => ({top: 100, bottom: 140,
   const PARENT = await mo('Quarterly report', SA);
   const A1 = await mo('Collect numbers', SA), A2 = await mo('Draw charts', SA), A3 = await mo('Write summary', SA);
   const DEEP = await mo('Appendix', SA);
-  await mo('Tables', SA, {parent_id: DEEP});
+  // 2.156.0 (#1949): five levels -> Appendix needs three levels below it to be too deep under Chapter one
+  await mo('Row', SA, {parent_id: await mo('Column', SA, {parent_id: await mo('Tables', SA, {parent_id: DEEP})})});
   const MID = await mo('Chapter one', SA, {parent_id: PARENT});
   w = await boot({user: 'alice', hash: 'l/' + L, ls: {hintsSeen: ['dgalt'], ['tasks.sort2.l:' + L]: '"prio"'}}); d = w.document;
   check(await until(() => row(A1) && row(A3)), 'the office list renders');
@@ -137,7 +138,7 @@ const rowBox = el => { el.getBoundingClientRect = () => ({top: 100, bottom: 140,
   dnd(w, rowBox(row(MID)), 'dragover', {clientY: 120}); dnd(w, row(MID), 'drop', {clientY: 120}); dnd(w, row(A1), 'dragend');
   check(await until(async () => (await taskOf(A1)).parent_id === MID), '#1003: Collect numbers is now on level 3');
   check(!(await taskOf(DEEP)).parent_id, '#1003: Appendix (own subtasks) stays');
-  check(await until(() => /1 task stays: its own subtasks would go deeper than 3 levels/.test(toastText(d))), '#1003: the message counts it: ' + toastText(d));
+  check(await until(() => /1 task stays: its own subtasks would go deeper than 5 levels/.test(toastText(d))), '#1003: the message counts it: ' + toastText(d));
   // out onto a section header: standalone in "Later", order kept
   await w.eval('load().then(render)'); await sleep(300);
   await call('PATCH', '/api/tasks/' + A1, {parent_id: PARENT}); await call('PATCH', '/api/tasks/' + A2, {parent_id: PARENT});

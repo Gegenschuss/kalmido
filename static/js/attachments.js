@@ -152,7 +152,9 @@ async function textView(o) {
   } catch (e) { fail = e instanceof TypeError ? tr('Could not load the file') : e.message; }
   if (m.isConnected) draw();
 }
-function depthOf(t) { let n = 0, p = t; while (p && p.parent_id && n < 5) { p = S.tasks.get(p.parent_id); n++; } return n; }
+function depthOf(t) { let n = 0, p = t; while (p && p.parent_id && n < 12) { p = S.tasks.get(p.parent_id); n++; } return n; }
+// 2.156.0 A (#1949): the levels of tasks from the server (state max_depth); depthOf(t) < maxDepth() - 1 = t may get subtasks
+const maxDepth = () => S.maxDepth || 3;
 // small, safe markdown: everything is escaped first, only whitelisted inline / block syntax is turned into html
 // Tokenized: code spans, [label](url) links and bare links are cut out of the RAW text first, so no later
 // rule can ever run inside an href (the old regex chain let a bare link inside a markdown link's URL

@@ -578,7 +578,7 @@ function settingsModal(focus) {
       <div class="row">${chk('s-sideprog', s.side_progress !== '0', tr('Progress in the sidebar'))}</div>
       ${hint(tr('Applies to the thin line and the progress rings, on all your devices.')) /* 2.118.0 (#2297) */}
       ${hint(tr('Lines: a calm grey icon for the emoji at the start of a list name (the emoji stays in the name), its dot in the list colour. Dot: only the list colour. A project can also hide its progress in its own settings. For all your devices.'))}
-      ${rsy_sideSetHtml(chk) /* 2.56.1 (#1799) */}${lc_favSetHtml(chk, hint)}`,
+      ${rsy_sideSetHtml(chk) /* 2.56.1 (#1799) */}${lc_favSetHtml(chk, hint)}${sv_setHtml() /* 2.156.0 D (#2186) */}`,
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
       ${hint(tr('Applies to all devices and to the notifications. Quick add understands English, German and the language chosen here.'))}

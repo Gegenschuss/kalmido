@@ -5,12 +5,15 @@
 // ---- the formula field in "New field" / "Edit field": the formula with field names ({Name}), a button per number field
 // that inserts it, what empty fields count as, the unit
 const FX_AGGS = [['sum', N_('Sum')], ['avg', N_('Average')], ['count', N_('Count')], ['min', N_('Minimum')], ['max', N_('Maximum')]];
-const fxNumFields = (lid, not) => fieldsAll(lid).filter(f => (f.type === 'number' || f.type === 'formula' || f.type === 'checkbox') && f.id !== not);
+const FX_NUM_TYPES = ['number', 'formula', 'currency', 'rating'];  // 2.156.0 B (#2069): what sums up / counts as a number
+const fxNumFields = (lid, not) => fieldsAll(lid).filter(f => (FX_NUM_TYPES.includes(f.type) || f.type === 'checkbox') && f.id !== not);
 function fxModalExtra(lid, f) {
   const o = f?.options || {}, fs = fxNumFields(lid, f?.id);
   return `<div class="row fxrow"><label for="fd-fx">${tr('Formula')}</label><textarea id="fd-fx" rows="2" maxlength="500" spellcheck="false" placeholder="${esc(tr('e.g. {Amount} - {Refunded}'))}">${esc(o.formula || '')}</textarea></div>
     <div class="fxins" role="group" aria-label="${esc(tr('Insert a field'))}">${fs.length ? fs.map(x => `<button type="button" class="btn sm" data-fxins="${esc(x.name)}">${esc(x.name)}</button>`).join('') : `<span class="muted">${esc(tr('Add a number field first.'))}</span>`}</div>
-    <div class="shint keep">${esc(tr('Allowed: + - * / ( ), numbers, field names in braces and round(value, 2). Division by 0 stays empty.'))}</div>
+    <div class="shint keep fxhelp">${esc(tr('Allowed: + - * / ( ), numbers, field names in braces, comparisons (= <> < > <= >=) and the functions of tables:'))}
+      <code>WENN/IF</code> <code>SUMME/SUM</code> <code>RUNDEN/ROUND</code> <code>MIN</code> <code>MAX</code> <code>MITTELWERT/AVERAGE</code> <code>ANZAHL/COUNT</code>.
+      ${esc(tr('Separate the values with ; or , e.g. WENN({Hours} > 8; {Hours} * 1.5; {Hours}). Division by 0 shows as an error in the field.'))}</div>
     <div class="row"><label for="fd-fxe">${tr('Empty fields')}</label><select id="fd-fxe"><option value="zero">${tr('count as 0')}</option><option value="blank" ${o.empty === 'blank' ? 'selected' : ''}>${tr('leave the result empty')}</option></select></div>
     <div class="row"><label for="fd-unit">${tr('Unit')}</label><input id="fd-unit" value="${esc(o.unit || '')}" maxlength="12" placeholder="${tr('optional, e.g. € or h')}" style="max-width:8.75rem"></div>`;
 }
@@ -52,12 +55,16 @@ const fxSumAgg = (l, k) => (LS.get('fxsum.' + l.id) || {})[k] || (l.col_sums || 
 function fxSumRow(l, lc, tasks) {
   if (!l || !lc || isMobile()) return '';
   const cs = fxSumCols(l, lc);
-  if (!cs.some(([, f]) => f && (f.type === 'number' || f.type === 'formula'))) return '';
+  if (!cs.some(([, f]) => f && FX_NUM_TYPES.includes(f.type))) return '';
   const ts = tasks.filter(t => t.id && !t.context);
   return `<div class="fxsum" data-lid="${l.id}" role="group" aria-label="${esc(tr('Sum row'))}"><span class="spacer"><span class="fxsn">${esc(trn('{0} task', '{0} tasks', ts.length))}</span></span>${cs.map(([k, f], i) => {
-    if (!f || (f.type !== 'number' && f.type !== 'formula')) return `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}"></span>`;
+    if (!f || !FX_NUM_TYPES.includes(f.type)) return `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}"></span>`;
     const a = fxSumAgg(l, k), xs = ts.map(t => t.fields?.[f.id]).filter(v => v != null && v !== '').map(Number).filter(Number.isFinite);
     const v = fxAgg(a, xs, ts.length), an = tr((FX_AGGS.find(x => x[0] === a) || FX_AGGS[0])[1]);
+    if (f.type === 'currency' && a !== 'count' && v != null) {  // 2.156.0 B (#2069): the sum in the field's currency
+      const m = cfk_money(v, f.options?.currency);
+      return `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}"><button type="button" class="fxsb" data-fxsum="${esc(k)}" title="${esc(an + ': ' + f.name)}" aria-label="${esc(an + ' ' + f.name + ': ' + m)}" aria-haspopup="menu"><i>${esc(an)}</i> ${esc(m)}</button></span>`;
+    }
     return `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}"><button type="button" class="fxsb" data-fxsum="${esc(k)}" title="${esc(an + ': ' + f.name)}" aria-label="${esc(an + ' ' + f.name + ': ' + fxFmt(v, a === 'count' ? '' : f.options?.unit))}" aria-haspopup="menu"><i>${esc(an)}</i> ${esc(fxFmt(v, a === 'count' ? '' : f.options?.unit))}</button></span>`;
   }).join('')}</div>`;
 }
@@ -111,7 +118,7 @@ function fxKpiPart(l) {  // the block "Key figures" of the project page (POV_BLO
 document.addEventListener('click', e => { const b = e.target.closest?.('[data-fxkpi-edit]'); if (b) { e.preventDefault(); fxKpiModal(+b.dataset.fxkpiEdit); } });
 function fxKpiModal(lid, add) {  // add = a new tile to start with (from the sum row)
   const l = listById(lid); if (!l || !canManage(l)) return;
-  const fs = fieldsAll(lid), nums = fs.filter(f => f.type === 'number' || f.type === 'formula'), conds = fs.filter(f => f.type === 'select' || f.type === 'checkbox');
+  const fs = fieldsAll(lid), nums = fs.filter(f => FX_NUM_TYPES.includes(f.type)), conds = fs.filter(f => f.type === 'select' || f.type === 'checkbox');
   let ks = JSON.parse(JSON.stringify(l.kpis || []));
   if (add) ks.push(add);
   if (!ks.length) ks.push({title: '', agg: 'sum', field: nums[0]?.id ?? null, state: 'all'});

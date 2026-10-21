@@ -121,6 +121,8 @@ KINDS = {
                             "member of the same organisation, a person without organisation: no decision by anyone (404)"),
     # 2.97.0 A (#1950): bookmarks belong to one organisation (every member reads, the owner / its admins change) or one person
     "bookmark": ("matrix", "p297_a_api_test.py: a bookmark of another organisation / person: 404 (read, change, delete, picture, move)"),
+    # 2.156.0 C (#2073): section templates belong to one person or one organisation (members read, its creator / admins change)
+    "sectpl": ("matrix", "p2156_c_api_test.py: a section template of another organisation / person: 404 (list, use, change, delete, save into it)"),
     # 2.98.0 A (#1953): scheduling polls belong to one organisation (every member reads, the owner / its admins change) or one person
     "poll": ("matrix", "p298_a_api_test.py: a poll of another organisation / person: 404 (read, change, delete, choose, move, list); "
                        "the public link reads inside the poll's organisation only"),
@@ -252,6 +254,9 @@ ROUTES = {
     "PATCH /api/bookmarks/{}": "bookmark", "DELETE /api/bookmarks/{}": "bookmark", "POST /api/bookmarks/{}/restore": "bookmark",
     "POST /api/bookmarks/{}/refresh": "bookmark", "GET /api/bookmarks/{}/image": "bookmark",
     "POST /api/bookmarks/move-space": "bookmark",
+    # 2.156.0 C (#2073): section templates (p2156_c_api_test.py)
+    "GET /api/section-templates": "sectpl", "POST /api/section-templates": "sectpl", "PATCH /api/section-templates/{}": "sectpl",
+    "DELETE /api/section-templates/{}": "sectpl", "POST /api/lists/{}/sections/from-template": "sectpl",
     # 2.96.0 C (#2015): job cards in the agent chat (p296_c_api_test.py)
     "POST /api/agents/{}/chat/{}/reactions": "agent", "POST /api/agents/{}/wake": "agent",
     "GET /api/proposals/agents": "agent", "POST /api/proposals": "agent", "GET /api/proposals/{}": "agent",
@@ -562,6 +567,7 @@ ROUTES = {
     "GET /api/folders/people/diff": "folder", "GET /api/folders/groups/{}/diff": "folder",  # 2.46.0 (#1606): roles set per list
     "GET /api/v1/lists/{}/notify-template": "list", "POST /api/notify-templates/asked": "own",
     "GET /api/search": "aggregate",  # 2.116.0 B (#2065): full-text search, the visibility of the task search (p2116_b_api_test.py)
+    "GET /api/fields/task-refs": "aggregate",  # 2.156.0 B (#2069): titles of linked tasks, only those the person may see (p2156_b_fields_test.py)
     "GET /api/search/messages": "aggregate",  # 2.33.0 (#1080): only what the person may read (vis_sql, rooms, own agent chats)
     "GET /api/admin/client-ip": "admin",  # 2.33.0 (#834)
     "GET /api/admin/health": "admin",  # 2.102.0 D (#1994): numbers only (pool, threads, role, loops), no user data
@@ -1103,6 +1109,8 @@ ROUTES = {
     # 2.148.0 A (#2471): locked periods + the export for the tax auditor; B (#2470): DATEV batch with receipt images (p2148_a_api_test.py / p2148_b_api_test.py)
     "GET /api/office/periods": "office", "POST /api/office/periods/lock": "office", "GET /api/office/gobd/export": "office",
     "GET /api/office/datev/zip": "office",
+    # 2.156.0 A (#1201): the ideas of the mind map -- the asking person's open requests of a list, taking ideas over (p2156_a_api_test.py)
+    "GET /api/lists/{}/ideas": "agent", "POST /api/proposals/{}/ideas": "agent",
 }
 
 # ---- 1. every route is classified, nothing stale

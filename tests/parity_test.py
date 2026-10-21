@@ -368,7 +368,8 @@ APP_ONLY = [
     ("agents are managed by people (admins / owners), not by tokens", ("* /api/my/agents",
                                                                        "PATCH /api/agents/{}/color")),  # 2.47.1 (#1721)
     ("approvals and proposals come only from people (the agent's side: /agent/jobs, POST /agent/jobs/{id}/proposal)", (
-        "* /api/agents/jobs", "* /api/proposals", "POST /api/comments/{}/apply", "POST /api/comments/{}/decide")),
+        "* /api/agents/jobs", "* /api/proposals", "POST /api/comments/{}/apply", "POST /api/comments/{}/decide",
+        "=GET /api/lists/{}/ideas")),  # 2.156.0 A (#1201): the asking person's ideas requests of a list (the mind map)
     ("people's side of the agent chat (2.39.0: also editing one's own message), waking and sharing with agents (the agent uses /agent/*)", (
         "=GET /api/agents/{}/chat", "=POST /api/agents/{}/chat", "=PATCH /api/agents/{}/chat/{}", "POST /api/agents/{}/wake", "POST /api/agents/{}/abort", "POST /api/tasks/{}/wake", "* /api/agents/{}/share", "PUT /api/lists/{}/agent",
         "* /api/agents/{}/autoshare", "GET /api/agents/usage")),
@@ -485,6 +486,8 @@ APP_ONLY = [
      "with PATCH /lists/{id} itself", ("GET /api/lists/{}/folder-preview",)),
     ("2.40.0 (#1192): the app counts the tasks with a value of a field for its delete confirmation; the API answers the "
      "count with DELETE /fields/{id} itself (values)", ("GET /api/fields/{}/count",)),
+    ("2.156.0 B (#2069): the titles of linked tasks for the web app's task fields; an agent reads a linked task with GET /tasks/{id} "
+     "(the same visibility)", ("=GET /api/fields/task-refs",)),
     ("2.40.0 (#1344 / #1361): the own order of My tasks and the favourite star are personal app settings of a person; "
      "agents never set them; 2.46.1: the favourite suggestion asks the person", ("PUT /api/tasks/mine-order", "* /api/lists/{}/favorite",
                                                                                    "POST /api/favorites/suggestion")),
@@ -580,6 +583,9 @@ APP_ONLY = [
     # 2.97.0 A (#1950): bookmarks are for people in 2.97.0 (the preview is fetched by the server; agent access is its own step)
     ("2.97.0 (#1950): bookmarks are only for people in 2.97.0 (private or an organisation's; the server fetches the preview; "
      "agent access via REST v1 / MCP comes as its own step of the agents list)", ("* /api/bookmarks",)),
+    # 2.156.0 C (#2073): section templates are a person's shortcut in the app; agents create sections directly (sections API)
+    ("2.156.0 (#2073): section templates (save a list's section names, add the missing ones to another list) are for people in the "
+     "app; agents create and order sections with the sections tools", ("* /api/section-templates", "=POST /api/lists/{}/sections/from-template")),
     # 2.89.0 (#1916, D): tables step 2 -- only a person by button (no approval pattern for agents in the agent API)
     ("2.89.0 (#1916, D): carrying table rows over into tasks / a quotation draft and a list as rows are a person's button press "
      "(each one undo step); agents work inside a sheet through the table tools and create tasks / office drafts their own ways",
