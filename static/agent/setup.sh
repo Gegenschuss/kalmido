@@ -89,6 +89,7 @@ msg_de() {
     dry_file) echo "  (Probelauf) %s:" ;;
     launchfail) echo "launchctl konnte %s nicht laden" ;;
     launchok) echo "  LaunchAgent %s (startet bei der Anmeldung, startet nach einem Absturz neu; Protokoll: %s)" ;;
+    launchbg) echo "  %s ist nicht am Bildschirm angemeldet (z. B. per SSH): der Agent läuft jetzt im Hintergrund bis zum nächsten Neustart; danach startet er, sobald du dich am Mac anmeldest" ;;
     sysfail) echo "systemctl --user konnte %s nicht starten" ;;
     sysok) echo "  systemd-Benutzerdienst %s (Protokoll: %s)" ;;
     linger) echo "  er läuft, solange du angemeldet bist; damit er auch nach dem Abmelden läuft: loginctl enable-linger %s" ;;
@@ -146,6 +147,7 @@ msg_en() {
     dry_file) echo "  (dry run) %s:" ;;
     launchfail) echo "launchctl could not load %s" ;;
     launchok) echo "  LaunchAgent %s (starts at login, restarts after a crash; log: %s)" ;;
+    launchbg) echo "  %s is not logged in at the screen (e.g. over SSH): the agent runs in the background now until the next restart; after that it starts as soon as you log in on the Mac" ;;
     sysfail) echo "systemctl --user could not start %s" ;;
     sysok) echo "  systemd --user service %s (log: %s)" ;;
     linger) echo "  it runs while you are logged in; to keep it running after logout: loginctl enable-linger %s" ;;
@@ -163,9 +165,11 @@ dief() { local f; f=$(msg "$1"); shift; die "$(printf "$f" "$@")"; }
 
 say() { printf '%s\n' "$*"; }
 step() { printf '\n== %s\n' "$*"; }
-REDEEMED=0
+REDEEMED=0 AUTOFILE=""
 die() {
   printf 'agent-setup: %s\n' "$*" >&2
+  # 2.157.0 (#1517): an autostart file written by this run goes too, else launchd / systemd keep starting a deleted folder
+  [ -z "$AUTOFILE" ] || rm -f "$AUTOFILE"
   if [ "$REDEEMED" = 1 ]; then revoke; rm -rf "$INST"; sayf undone >&2; fi
   exit 1
 }
@@ -251,6 +255,8 @@ PYEOF
 stop_autostart() {
   if [ "$OS" = mac ]; then
     [ -f "$PLIST" ] && run launchctl bootout "gui/$(id -u)" "$PLIST" 2>/dev/null
+    # 2.157.0 (#1517): the background copy of a setup without a screen login (see launch_bg)
+    [ -f "$INST/launchd-now.plist" ] && run launchctl bootout "user/$(id -u)/$LABEL.now" 2>/dev/null
   else
     [ -f "$UNITF" ] && run systemctl --user disable --now "$UNIT" 2>/dev/null
   fi
@@ -396,8 +402,18 @@ elif [ "$OS" = mac ]; then
   if [ "$DRY" = 1 ]; then sayf dry_file "$PLIST"; printf '%s\n' "$plist"
   else
     mkdir -p "$(dirname "$PLIST")"
-    printf '%s\n' "$plist" > "$PLIST"
-    launchctl bootstrap "gui/$(id -u)" "$PLIST" 2>/dev/null || launchctl load -w "$PLIST" || dief launchfail "$PLIST"
+    printf '%s\n' "$plist" > "$PLIST"; AUTOFILE=$PLIST
+    # 2.157.0 (#1517): without a screen login of this user (setup over SSH) there is no gui domain: the LaunchAgent above
+    # starts at the next login; until then a copy runs in the user's background domain (until the next restart). The
+    # runner lock (#1448) keeps the two from working at the same time once the person logs in.
+    launch_bg() {
+      launchctl print "gui/$(id -u)" >/dev/null 2>&1 && return 1
+      printf '%s\n' "$plist" | sed -e "s#<string>$LABEL</string>#<string>$LABEL.now</string>#" \
+        -e 's#<key>RunAtLoad</key>#<key>LimitLoadToSessionType</key><string>Background</string><key>RunAtLoad</key>#' > "$INST/launchd-now.plist"
+      launchctl bootstrap "user/$(id -u)" "$INST/launchd-now.plist" 2>/dev/null || return 1
+      sayf launchbg "$(id -un)"
+    }
+    launchctl bootstrap "gui/$(id -u)" "$PLIST" 2>/dev/null || launch_bg || launchctl load -w "$PLIST" || dief launchfail "$PLIST"
   fi
   sayf launchok "$LABEL" "$INST/agent.log"
 else
@@ -420,7 +436,7 @@ WantedBy=default.target"
   if [ "$DRY" = 1 ]; then sayf dry_file "$UNITF"; printf '%s\n' "$unit"
   else
     mkdir -p "$(dirname "$UNITF")"
-    printf '%s\n' "$unit" > "$UNITF"
+    printf '%s\n' "$unit" > "$UNITF"; AUTOFILE=$UNITF
     systemctl --user daemon-reload && systemctl --user enable --now "$UNIT" || dief sysfail "$UNIT"
   fi
   sayf sysok "$UNIT" "$INST/agent.log"
