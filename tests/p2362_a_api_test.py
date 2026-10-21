@@ -321,6 +321,9 @@ SCAN_EXCEPT = {"GET /api/v1/agent/jobs/<int:jid>", "GET /api/v1/attachments/<int
                "GET /api/v1/lists/<int:lid>/files/<file_id>",
                # 2.51.0 (#1348): the office draft routes check the token's "Office" permission before any lookup
                "GET /api/v1/office/docs/<int:did>", "GET /api/v1/office/docs/<int:did>/pdf",
+               # 2.161.0 (#2028): the agent's letters go through the same office context (token permission "Office", then
+               # office admin) before any lookup; past it a letter the agent did not make answers 404
+               "GET /api/v1/office/letters/<int:lid>",
                # 2.88.0 (#1980): the delete dialog's info answers 403 to anyone who is no admin anywhere (role check before
                # any lookup, the same for every id); an organisation admin outside gets 404
                "GET /api/users/<int:uid>/delete-info",

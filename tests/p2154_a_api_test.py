@@ -262,7 +262,7 @@ r = Fr.post(B + f"/api/docs/{OID}/task/link", json={"task_id": FT})
 check(r.ok and r.json()["task"]["title"] == "Strom bezahlen" and r.json()["prev_task_id"] is None, f"freelancer: link with her task ({r.status_code} {r.text[:120]})")
 check((doc(Fr, OID).get("task") or {}).get("id") == FT, "the document shows the task")
 check([x["id"] for x in Fr.get(B + f"/api/tasks/{FT}/docs").json()["docs"]] == [OID], "the task shows the document")
-check(Ca.get(B + f"/api/tasks/{FT}/docs").json()["docs"] == [], "carol: nothing about another's task")
+check(Ca.get(B + f"/api/tasks/{FT}/docs").status_code == 404, "carol: nothing about another's task (2.161.0: 404)")
 check(Fr.post(B + f"/api/docs/{OID}/task/link", json={"task_id": "x"}).status_code == 400, "link: a task id must be a number")
 CL = Ca.post(B + "/api/lists", json={"name": "Beta Aufgaben", "org_id": ORG2}).json()["id"]
 CT2 = Ca.post(B + "/api/tasks", json={"title": "Fremde Aufgabe", "list_id": CL}).json()["id"]
@@ -282,7 +282,7 @@ APD = up(A, "privat.pdf", stack_pdf(["Privater Brief"]), "private")
 check(A.post(B + f"/api/docs/{AD}/task/link", json={"task_id": AT}).ok, "an organisation's document with its task")
 check(APT and A.post(B + f"/api/docs/{AD}/task/link", json={"task_id": APT}).ok, "an organisation's document with a private task")
 check(A.post(B + f"/api/docs/{APD}/task/link", json={"task_id": AT}).status_code == 400, "a private document never with an organisation's task")
-check(Ca.get(B + f"/api/tasks/{AT}/docs").json()["docs"] == [], "carol: the documents of Alpha's task: nothing")
+check(Ca.get(B + f"/api/tasks/{AT}/docs").status_code == 404, "carol: the documents of Alpha's task: nothing (2.161.0: 404)")
 
 # ================================================================ #1356 who confirmed the agent's suggestion
 FAG, FAGS = new_agent(A, FID, None, "fridabot")

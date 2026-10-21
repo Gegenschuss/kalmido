@@ -7,7 +7,7 @@ freelancer-matrix: office
    ("bis zum 31.10.2026", "spätestens am", "Frist", "innerhalb von 14 Tagen" / "within two weeks" from the document date);
    payment terms and periods are no deadline
  - the document side: GET /api/office/letters/doc/<nid> (letters of both directions, deadline, references); a member,
-   another organisation, a document outside the office's space -> {available: false}
+   another organisation, a document outside the office's space -> 404 (2.161.0, was {available: false})
  - a new letter answering a document: recipient from the sender (the client with that name: address + e-mail), subject
    "Ihr Schreiben vom <date>" (the letter's language), DIN 5008 reference line, the link "answers"; a foreign / private document 404
  - links: set / remove (both kinds, also at a sent letter), bad kind 400, the reference line filled at a draft without one
@@ -175,12 +175,12 @@ check(x.get("available") is True and x["letters"] == [] and x["task"] is None, f
 check((x.get("deadline") or {}).get("date") == "2026-10-31" and "31.10.2026" in (x["deadline"].get("text") or ""), f"document: the deadline {x.get('deadline')}")
 check(("theirs", "VB-2026/4711") in [(r["kind"], r["value"]) for r in x.get("refs", [])] and
       ("policy", "123 456 789") in [(r["kind"], r["value"]) for r in x.get("refs", [])], f"document: the references {x.get('refs')}")
-check(Bo.get(B + f"{LT}/doc/{D1}").json() == {"available": False}, "document: a member of the organisation gets nothing")
-check(Ca.get(B + f"{LT}/doc/{D1}").json() == {"available": False}, "document: another organisation gets nothing")
-check(A.get(B + f"{LT}/doc/{DP}").json() == {"available": False}, "document: a private document is not of the organisation's office")
-check(A.get(B + f"{LT}/doc/{DC}").json() == {"available": False}, "document: a document of another organisation")
-check(A.get(B + f"{LT}/doc/99999999").json() == {"available": False}, "document: unknown id")
-check(Do.get(B + f"{LT}/doc/{D1}").json() == {"available": False}, "document: a person without organisation, a foreign document")
+check(Bo.get(B + f"{LT}/doc/{D1}").status_code == 404, "document: a member of the organisation gets nothing")
+check(Ca.get(B + f"{LT}/doc/{D1}").status_code == 404, "document: another organisation gets nothing")
+check(A.get(B + f"{LT}/doc/{DP}").status_code == 404, "document: a private document is not of the organisation's office")
+check(A.get(B + f"{LT}/doc/{DC}").status_code == 404, "document: a document of another organisation")
+check(A.get(B + f"{LT}/doc/99999999").status_code == 404, "document: unknown id")
+check(Do.get(B + f"{LT}/doc/{D1}").status_code == 404, "document: a person without organisation, a foreign document")
 
 # ---- a letter answering D1
 r = A.post(B + LT, json={"answers": D1})
@@ -277,7 +277,7 @@ check(x["task_id"] == r3 and x["answered"] is False, f"follow-up: shown at the l
 check(A.delete(B + f"/api/files/nodes/{D2}").ok, "delete the answer document")
 x = A.get(B + f"{LT}/{L1['id']}/links").json()
 check(D2 not in [l["node_id"] for l in x["links"]] and x["followup"]["answered"] is False, f"bin: the link is hidden {x}")
-check(A.get(B + f"{LT}/doc/{D2}").json() == {"available": False}, "bin: the document side is empty")
+check(A.get(B + f"{LT}/doc/{D2}").status_code == 404, "bin: the document side is empty")
 check(("doc", D2) not in [(i["type"], i["id"]) for i in A.get(B + f"{LT}/{L1['id']}/thread").json()["items"]], "bin: not in the history")
 
 # ---- a person without organisation (personal office, private documents)
@@ -290,7 +290,7 @@ check(r.status_code == 201 and "Ihr Zeichen: ESt 2025-17" in (r.json().get("ref_
       f"freelancer: the answer ({r.text[:250]})")
 LD = r.json()["id"]
 check(A.get(B + f"{LT}/{LD}").status_code == 404 and A.get(B + f"{LT}/{LD}/links").status_code == 404, "freelancer: the letter is not the others'")
-check(A.get(B + f"{LT}/doc/{DD}").json() == {"available": False}, "freelancer: the document is not the others'")
+check(A.get(B + f"{LT}/doc/{DD}").status_code == 404, "freelancer: the document is not the others'")
 check(Do.post(B + f"{LT}/{LD}/links", json={"node_id": D1, "kind": "reply"}).status_code == 404, "freelancer: a foreign document 404")
 r = Do.post(B + f"{LT}/doc/{DD}/deadline-task", json={})
 check(r.status_code == 201 and r.json()["due"] == "2026-10-29", f"freelancer: deadline task ({r.text[:200]})")

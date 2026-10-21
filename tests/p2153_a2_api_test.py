@@ -187,7 +187,7 @@ for path in (LT, f"{LT}/{L1}", LT + "/recipients?q=a", LT + "/profile"):
 ws(Fr, f"org:{KAP}")
 DK = upload(Fr, "Kappa.txt", "Lieferant Beispiel\nDatum: 03.10.2026\nIhre Bestellung.\n", f"org:{KAP}")
 check(Fr.get(B + LT).status_code == 200 and Fr.get(B + f"{LT}/doc/{DK}").json().get("available") is True, "A3: the admin reads the letters")
-check(Bo.get(B + f"{LT}/doc/{DK}").json() == {"available": False}, "A3: accounting sees no letters at a document")
+check(Bo.get(B + f"{LT}/doc/{DK}").status_code == 404, "A3: accounting sees no letters at a document (2.161.0: 404)")
 
 print(f"\np2153_a2: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
