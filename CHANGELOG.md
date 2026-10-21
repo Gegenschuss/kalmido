@@ -7,6 +7,12 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+### Changed
+- Office, cash book: the change log keeps its lines even if an entry were ever removed by a maintenance tool (GoBD); lists and checks decrypt only the entries they show, so large cash books stay fast (#2354).
+
+### Fixed
+- Office, cash book: after a failed load the tab offers *Try again* instead of keeping the error until the page is reloaded; the receipt hint "in the cash book" follows the office switch like every cash book view (#2354).
+
 ## [2.147.1] - 2026-10-21
 
 Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.
