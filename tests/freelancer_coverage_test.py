@@ -185,7 +185,7 @@ ROUTES = {
     "GET /api/files/nodes/{}/share-targets": "files", "GET /api/files/search": "files", "GET /api/v1/documents": "files",
     "GET /api/v1/documents/{}": "files", "GET /api/v1/files": "files", "GET /api/v1/files/search": "files",
     "GET /api/v1/files/{}": "files", "GET /api/v1/files/{}/content": "files", "GET /api/v1/files/{}/text": "files",
-    "POST /api/docs/fields": "files", "PATCH /api/docs/fields/{}": "files", "DELETE /api/docs/fields/{}": "files",  # 2.108.0 (#2179)
+    "POST /api/docs/fields": "files", "PATCH /api/docs/fields/{}": "files", "DELETE /api/docs/fields/{}": "files",  # 2.153.0 (#2179)
     "PATCH /api/docs/labels/{}/{}": "files", "PATCH /api/docs/rules/{}": "files", "PATCH /api/docs/{}": "files",
     "PATCH /api/files/nodes/{}": "files", "PATCH /api/files/shares/{}": "files", "PATCH /api/v1/documents/{}": "files",
     # 2.122.0 A (#2097): file requests of a folder (p2122_a_api_test.py as a freelancer: the private folder's requests)

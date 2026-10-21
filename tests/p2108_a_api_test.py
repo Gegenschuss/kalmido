@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.108.0 API tests (#2179): custom fields of documents ("Eigene Felder"), POST/PATCH/DELETE /api/docs/fields, values via
+"""2.153.0 API tests (#2179): custom fields of documents ("Eigene Felder"), POST/PATCH/DELETE /api/docs/fields, values via
 PATCH /api/docs/<id> {custom_fields}. Invented names only, generated file contents.
  - a person without an organisation (freelancer fixture) is the admin of the own documents: fields of every type, nothing
    preset, the checks (name, type, options, duplicates), values set / cleared / validated, sealed in the database, found by

@@ -1,4 +1,4 @@
-// 2.108.0 UI tests (#2179, own container, start.sh; P2108A_NOSTART=1: the container runs already). jsdom:
+// 2.153.0 UI tests (#2179, own container, start.sh; P2108A_NOSTART=1: the container runs already). jsdom:
 // - a person without an organisation: Documents > Settings > Custom fields, "New field" (a selection with options), the list
 //   shows it; one undo step removes it again, redo brings it back
 // - the document's sheet shows the fields of its workspace; a value typed in is saved, one undo step takes it back

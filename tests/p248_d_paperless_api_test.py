@@ -251,7 +251,7 @@ if pb and tn:
     check((pb.get("folder") or {}).get("name") == "Archive 2025" and not tn.get("folder"), f"a tag as folder ({pb.get('folder')})")
     full = A.get(B + f"/api/docs/{pb['id']}").json()
     t = full.get("text") or ""
-    # 2.108.0 (#2179): custom fields are real fields of the document now, no longer lines below the text
+    # 2.153.0 (#2179): custom fields are real fields of the document now, no longer lines below the text
     check("Power bill May total 42.00 EUR" in t and "Archive serial number: 17" in t and "Contract number" not in t and "Paid on 10 May" in t,
           f"text + serial number + note, no custom field lines ({t[:300]!r})")
     cf = {x["name"]: x for x in full.get("custom_fields") or []}
@@ -316,7 +316,7 @@ check(until(lambda: any(d["name"] == "New letter.pdf" and d["state"] in ("done",
       "following: the new document came in by itself")  # 2.80.3: and is recognised (an import makes its preview since 2.80.2)
 nl = next((d for d in docs(A) if d["name"] == "New letter.pdf"), None)
 if nl:
-    cf3 = {x["name"]: x for x in A.get(B + f"/api/docs/{nl['id']}").json().get("custom_fields") or []}  # 2.108.0 (#2179): a field
+    cf3 = {x["name"]: x for x in A.get(B + f"/api/docs/{nl['id']}").json().get("custom_fields") or []}  # 2.153.0 (#2179): a field
     check(cf3.get("Status", {}).get("label") == "Overdue" and nl["date"] == "2025-06-02", f"old server: select option by index, date of a timestamp ({nl['date']}, {cf3.get('Status')})")
 log = pl_log()
 check(log and all(x["m"] == "GET" for x in log), f"Kalmido only reads in Paperless-ngx ({sorted({x['m'] for x in log})})")
