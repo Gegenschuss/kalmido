@@ -2,14 +2,15 @@
 //   jsdom: an organisation-wide list offers no "Join" (joining would bring no writing), a member still gets it; in that list
 //   there is no + button (noFab) and a typed task says "you can only read" instead of silently doing nothing (no task made).
 //   Firefox at phone size (412 x 783, touch): the office opens for read-only like for its admin (direct start #office and
-//   #office/offers) -- no page left on "Loading…".
+//   #office/offers, the settings module not loaded) -- no page left on "Loading…".
 // P21472A_NOSTART=1 = the server already runs.
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login, errs} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
-const firefox = require('./ff')({tag: 'p21472_a_ui', check, shots: 'P21472A_SHOTS'});
+// lazy: the app loads its modules itself (the settings module that held the role words is not there on a direct start)
+const firefox = require('./ff')({tag: 'p21472_a_ui', check, shots: 'P21472A_SHOTS', lazy: true});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P21472A_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
