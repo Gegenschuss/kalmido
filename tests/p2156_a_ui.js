@@ -127,7 +127,14 @@ const toastText = d => d.querySelector('#toast')?.textContent || '';
   await until(() => d.querySelector(`#view [data-mmn="t${A2}"]`));
   w.eval(`mm_select('t${A2}')`);
   key(w, stage(), 'i');
-  const dlg = await until(() => d.querySelector('.cdlg #cdlg-in'));
+  let dlg = await until(() => d.querySelector('.cdlg #cdlg-in'), 20);
+  if (!dlg) {  // diagnostics: what the client sees
+    const dia = await w.eval(`mm_ideaAgents().then(x => JSON.stringify({x, lid: MM.lid, sel: MM.sel, n: !!mm_node(MM.sel), ok: mm_kidOk(mm_node(MM.sel)), ro: mm_ro(listById(MM.lid))}))`);
+    console.log('diag', dia, 'active:', d.activeElement?.className);
+    w.eval(`mm_ideasAsk(mm_node('t${A2}')).catch(e => console.log('ask error', e))`);
+    dlg = await until(() => d.querySelector('.cdlg #cdlg-in'));
+    check(false, '#1201: the key I did not open the request (mm_ideasAsk directly: ' + !!dlg + ')');
+  }
   check(dlg && /gets the path of this branch and the name of the list, nothing else/.test(d.querySelector('.cdlg').textContent), '#1201: I opens the request with what the agent gets ' + toastText(d) + ' ' + (d.querySelector('.cdlg')?.textContent || '').slice(0, 200));
   if (dlg) { dlg.value = 'Pages for a small shop'; d.querySelector('.cdlg form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true})); }
   const job = await until(async () => (await call('GET', `/api/lists/${L}/ideas`)).jobs?.[0]);
