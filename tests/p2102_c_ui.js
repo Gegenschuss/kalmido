@@ -38,7 +38,7 @@ const loaded = (d, f) => [...d.querySelectorAll('script[src*="/static/js/"]')].s
   const e0 = errs.length;
   let w = await boot({user: 'alice', hash: 'cal', lazy: true}), d = w.document;
   const html = await (await fetch(B)).text(), sw = await (await fetch(B + 'sw.js')).text();
-  check(!/static\/js\/(polls|formq)\.js/.test(html) && /const LAZY = \[[^\]]*'\/static\/js\/polls\.js', '\/static\/js\/formq\.js'[^\]]*\]/s.test(sw),  // 2.139.0 (#2128): later modules follow (voice.js)
+  check(!/static\/js\/(polls|formq)\.js/.test(html) && /const LAZY = \[[^\]]*'\/static\/js\/polls\.js',\s*'\/static\/js\/formq\.js'[^\]]*\]/s.test(sw),  // 2.139.0 (#2128): later modules follow (voice.js); 2.149.0: the list wraps between the two
     'no script tag for polls.js / formq.js, both in the service worker\'s LAZY list');
   check(!loaded(d, 'polls') && !loaded(d, 'formq'), 'the start loads neither polls.js nor formq.js');
   check(w.eval(`typeof tpo_on === 'function' && typeof tpo_list === 'function' && typeof tpo_forClient === 'function' && typeof fq_clientLink === 'function' && typeof fq_dialogHtml === 'undefined'`),

@@ -68,7 +68,7 @@ def idt_plan(c, oid, r):
     ids = {did} | {x["id"] for x in credits}
     reminders, block = [], None
     for x in c.execute("SELECT id, number, kind, status, totals, locked_at, ref_doc_ids FROM office_docs WHERE org_id=? AND kind='reminder' "
-                       "AND ref_doc_ids LIKE ? ORDER BY id", (oid, f"%{int(did)}%")).fetchall():
+                       "AND ref_doc_ids LIKE ? ORDER BY id", (oid, f"%{int(did)}%")).fetchall():  # pg-ok: digits only, case does not matter
         refs = _ids_in(_j(x["ref_doc_ids"], []))
         if did not in refs:
             continue
@@ -79,7 +79,7 @@ def idt_plan(c, oid, r):
     ids |= {x["id"] for x in reminders}
     q = ",".join("?" * len(ids))
     if not block:
-        for x in c.execute(f"SELECT id, number FROM office_docs WHERE org_id=? AND abs_refs LIKE ? AND id NOT IN ({q})",
+        for x in c.execute(f"SELECT id, number FROM office_docs WHERE org_id=? AND abs_refs LIKE ? AND id NOT IN ({q})",  # pg-ok: digits only, case does not matter
                            [oid, f"%{int(did)}%", *ids]).fetchall():
             row = c.execute("SELECT abs_refs FROM office_docs WHERE id=?", (x["id"],)).fetchone()
             if did in _ids_in(_j(row["abs_refs"], [])):
@@ -165,7 +165,7 @@ def _archive_copies(c, oid, uid, ids):
     key = ofm_ws_key(ofm_ws(c, oid))
     out = []
     for did in ids:
-        for x in c.execute("SELECT id, org_id, file, copy_of FROM office_archive WHERE copy_of LIKE ?", (f'%"doc": {int(did)},%',)).fetchall():
+        for x in c.execute("SELECT id, org_id, file, copy_of FROM office_archive WHERE copy_of LIKE ?", (f'%"doc": {int(did)},%',)).fetchall():  # pg-ok: digits only, case does not matter
             cp = _j(x["copy_of"], {})
             if cp.get("doc") == did and cp.get("from") == key and office_role(c, uid, x["org_id"]) == "admin":
                 out.append(x)

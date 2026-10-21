@@ -323,7 +323,10 @@ SCAN_EXCEPT = {"GET /api/v1/agent/jobs/<int:jid>", "GET /api/v1/attachments/<int
                "GET /api/v1/office/docs/<int:did>", "GET /api/v1/office/docs/<int:did>/pdf",
                # 2.88.0 (#1980): the delete dialog's info answers 403 to anyone who is no admin anywhere (role check before
                # any lookup, the same for every id); an organisation admin outside gets 404
-               "GET /api/users/<int:uid>/delete-info"}
+               "GET /api/users/<int:uid>/delete-info",
+               # 2.144.11 (#2354): the cash book hint of a receipt goes through the office gate first (office off: 403, the
+               # same for every id, before any lookup); with the office on a person outside gets 404
+               "GET /api/docs/<int:nid>/cashbook"}
 bad = [b for b in bad if " ".join(b.split(" ")[:2]) not in SCAN_EXCEPT]
 check(not bad, f"route scan: every id route refuses a person outside ({len(bad)} of {len(routes)}):\n  " + "\n  ".join(bad[:80]))
 check(S["alice"].get(B + f"/api/tasks/{TA}").ok and MARK in S["alice"].get(B + f"/api/tasks/{TA}").text, "route scan: alice's data is untouched")

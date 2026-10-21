@@ -85,7 +85,9 @@ const textPdf = line => {  // a one-page PDF with a text layer, written by hand
   };
   await swipe(-200);
   check(w.eval('S.sel') === order[1], `left: the next unread (${w.eval('S.sel')} / ${order[1]})`);
-  const st = await call('bob', 'GET', '/api/news');
+  // 2.147.2 CI: marking read goes out after the swipe; on a slow runner it can take longer than the 900 ms
+  let st = {};
+  for (let i = 0; i < 20; i++) { st = await call('bob', 'GET', '/api/news'); if ((st.items || []).filter(x => x.task_id === order[1]).every(x => x.read)) break; await sleep(200); }
   check((st.items || []).filter(x => x.task_id === order[1]).every(x => x.read), 'the one reached is marked read');
   await swipe(200);
   check(w.eval('S.sel') === order[1] && /No more unread news/.test(d.querySelector('#toast')?.textContent || ''), 'right: nothing unread before it, a notice and the task stays');

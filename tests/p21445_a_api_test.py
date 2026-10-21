@@ -269,6 +269,8 @@ Ms = sess("mia")
 dbx("UPDATE users SET password_hash=NULL WHERE id=?", (ids["mia"],))
 r = Sv.put(B + f"/api/orgs/{ORG}/members", json={"email": "mia@example.com", "role": "admin"})
 assert r.ok, r.text
+r = Ms.post(B + f"/api/orgs/{ORG}/join")  # 2.148.1 A (#2480): a new member is invited and accepts, no direct add any more
+assert r.ok, r.text
 Ms.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done", "workspace": f"org:{ORG}"})
 r = show(Ms, ORG)
 check(r.ok and r.json().get("recovery_key", "").startswith("R2-"), f"#2387: a fresh non-OIDC sign-in still counts {r.status_code} {r.text[:120]}")

@@ -87,6 +87,7 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   w.eval('closeDetail()');
   // ---- API tokens (Settings > Account)
   w.eval(`settingsModal('account')`); await sleep(600);
+  for (let i = 0; i < 40 && !/No tokens yet/.test(d.querySelector('.smodal #s-toks')?.textContent || ''); i++) await sleep(150);  // 2.147.2 CI: the token list loads late on a slow runner
   md = d.querySelector('.smodal');
   check(md.querySelector('#s-api-h') && /No tokens yet/.test(md.querySelector('#s-toks').textContent), 'account: API tokens section');
   click(w, md.querySelector('[data-tok="new"]')); await sleep(200);

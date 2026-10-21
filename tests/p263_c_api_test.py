@@ -165,6 +165,10 @@ r = A.put(B + f"/api/lists/{P}/layout", json={"layout": json.dumps(lay), "scope"
 check(r.ok, f"standard arrangement {r.status_code} {r.text[:200]}")
 for blk, col in ((f"np{N1}", "yellow"), ("desc", "blue")):
     check(A.put(B + f"/api/lists/{P}/page-style", json={"block": blk, "color": col}).ok, f"colour {blk}")
+# 2.148.1 H (#2483): a template of an organisation's list leaves the organisation -> only one of its admins makes it
+r = A.post(B + "/api/templates", json={"list_id": P, "name": "Site template"})
+check(r.status_code == 403, f"template from list: a plain member of the organisation may not {r.status_code} {r.text[:200]}")
+dbx("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=?", (ORG, ids["alice"]))  # admin for the rest of the suite
 r = A.post(B + "/api/templates", json={"list_id": P, "name": "Site template"})
 check(r.ok, f"template from list {r.status_code} {r.text[:200]}")
 TP = r.json()["id"]
@@ -214,8 +218,11 @@ dbx("INSERT INTO list_notepads(list_id,title,body,created_by,created_at,updated_
 td2 = A.post(B + "/api/templates", json={"list_id": P, "name": "Again"}).json().get("data") or {}
 td2 = json.loads(td2) if isinstance(td2, str) else td2
 check(len(td2.get("notepads") or []) == 2, "agent notepads are not copied")
-# a member (editor) may save the template too; a participant may not (unchanged)
-check(Bo.post(B + "/api/templates", json={"list_id": P, "name": "Bob copy"}).ok, "editor saves a template")
+# a member (editor) may save the template too; a participant may not (unchanged).
+# 2.148.1 H (#2483): not of an organisation's list -- bob is a plain member of its organisation
+check(Bo.post(B + "/api/templates", json={"list_id": P, "name": "Bob copy"}).status_code == 403, "editor of an organisation list (no org admin) saves no template")
+dbx("UPDATE lists SET org_id=NULL WHERE id=?", (P,))
+check(Bo.post(B + "/api/templates", json={"list_id": P, "name": "Bob copy"}).ok, "editor saves a template (private list)")
 
 print(f"p263_c_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
