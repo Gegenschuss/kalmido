@@ -2982,6 +2982,9 @@ MIGRATIONS = [
     ("budget_entries", "ikey", "ALTER TABLE budget_entries ADD COLUMN ikey TEXT NOT NULL DEFAULT ''"),
     ("budget_entries", "import_run", "ALTER TABLE budget_entries ADD COLUMN import_run TEXT NOT NULL DEFAULT ''"),
     ("budget_meta", "runs", "ALTER TABLE budget_meta ADD COLUMN runs TEXT NOT NULL DEFAULT '[]'"),
+    # 2.144.5 C (#1523): the list (project) a position was made from (invoice from times), so "billed, stays" finds it after
+    # the list was renamed; NULL = older positions (matched by the list's name as before). Internal, never in e-invoices
+    ("office_doc_items", "list_id", "ALTER TABLE office_doc_items ADD COLUMN list_id BIGINT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

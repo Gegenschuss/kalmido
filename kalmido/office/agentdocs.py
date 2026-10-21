@@ -317,6 +317,8 @@ def _doc_v1(c, oid, r, items=True):
     d = doc_public(c, oid, r, False, items=items)
     for k in ("recipient_snapshot", "tax_snapshot", "sender", "cost_enc"):
         d.pop(k, None)
+    for it in d.get("items") or []:  # 2.144.5 C (#1523): the source list of a position is internal
+        it.pop("list_id", None)
     d["app_url"] = f"#office/offers/{r['id']}"  # every kind opens in the tab "Quotes & invoices"
     return d
 

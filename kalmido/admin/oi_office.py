@@ -357,7 +357,7 @@ SPECS = [
         "series_id": "office_inv_series"}, people={**_P, "locked_by": "null", "agent_id": "null"}, private="office", prep=_p_doc, after=_a_doc),
     OiT("office/document_parts.json", "office_doc_parts", refs={"doc_id": "office_docs"}, need=("doc_id",), private="office", prep=_p_part),
     OiT("office/document_items.json", "office_doc_items", refs={"doc_id": "office_docs", "service_id": "office_services",
-        "part_id": "office_doc_parts", "ref_part_id": "office_doc_parts"}, need=("doc_id",), private="office", prep=_p_item),
+        "part_id": "office_doc_parts", "ref_part_id": "office_doc_parts", "list_id": "lists"}, need=("doc_id",), private="office", prep=_p_item),
     OiT("office/purchases.json", "office_purchases", refs={"doc_id": "office_docs"}, need=("doc_id",), private="office", prep=_p_purchase),
     OiT("office/invoice_series.json", "office_inv_series", refs={"template_id": "office_docs"}, need=("template_id",), people=_P, private="office"),
     OiT("office/payments.json", "office_payments", refs={"doc_id": "office_docs"}, need=("doc_id",), people=_P, private="office"),

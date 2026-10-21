@@ -192,7 +192,9 @@ questions stays the classic form.
 
 - **Who sees whose time.** In the window "Tracked time" of a project, the time reports and the CSV, the owner of the list,
   its admins and the admins of its organisation see everyone's entries. Everyone else sees their own there, and the window
-  says "Your time only". The time list in a task's detail still shows everyone's entries of that task.
+  says "Your time only". The time list in a task's detail still shows everyone's entries of that task. 2.144.5: the time
+  sum in the list header follows the same rule (members see their own hours there); the project page's "Tracked", the status
+  report and the office figures stay sums of everyone.
 - **Excel export (2.125.0).** Next to *CSV* the time view and the client page have *Excel (XLSX)*: the same filters,
   columns, rounding and visibility as the CSV, but hours and amounts as numbers, start and end as date-time cells and a
   sum row at the end. The workload view has the same button: people x weeks with the planned and the capacity hours per
@@ -203,7 +205,9 @@ questions stays the classic form.
   the project page and the block colours. A project made from the template gets its own copies of the notepads, placed and
   coloured as in the original. Notepads written by agents stay with their project.
 - **Undo after "Delete all times of this project"** brings the entries back exactly as they were, including the link to a
-  timer started on a phone, so a stop that arrives later from that phone still finds its entry.
+  timer started on a phone, so a stop that arrives later from that phone still finds its entry. Entries already billed stay:
+  2.144.5 recognises them by the invoice position made from the project's times (also after the project was renamed, and in
+  the personal office of a person without an organisation); older invoices still by the project's name.
 
 ## Monthly timesheets: close, approve, send back (2.125.0)
 
