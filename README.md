@@ -2127,7 +2127,7 @@ published it), while the API line keeps using the app port. With the built-in lo
 
 ## Configuration
 
-All settings are environment variables in `.env` (see [.env.example](.env.example)).
+All settings are environment variables in `.env` (see [.env.example](.env.example)); [docs/ENV.md](docs/ENV.md) lists every variable the server reads with its default (2.149, generated from the code). Switches accept `1`/`true`/`yes`/`on` and `0`/`false`/`no`/`off`.
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -2440,8 +2440,8 @@ How to update depends on how you installed:
 | Installed with | Update |
 |---|---|
 | the installer | `~/kalmido/update.sh` (Windows: `update.ps1`): backs up the database to `data/backups/` (from 2.37 a `pg_dump`; Windows: in-app backups), adds a database password to `.env` if missing, then fetches the latest release and restarts |
-| prebuilt image (`KALMIDO_IMAGE`) | set the new version in `KALMIDO_IMAGE` (or use `:latest`), then `docker compose pull && docker compose up -d` |
-| git + local build | `git fetch --tags && git checkout "$(git tag --sort=-v:refname \| head -n 1)" && docker compose up -d --build` |
+| prebuilt image (`KALMIDO_IMAGE`) | set the new version in `KALMIDO_IMAGE` (or use `:latest`), then `docker compose pull && docker compose up -d` (2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`) |
+| git + local build | `git fetch --tags && git checkout "$(git tag --sort=-v:refname \| head -n 1)" && docker compose up -d --build` (2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`, and Docker Compose 2.20+; the installer adds it) |
 
 Back up first (*Back up now*, see *Backups and restore*). The database migrates itself on start; migrations only add, so the data of
 an older version stays readable.
