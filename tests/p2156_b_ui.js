@@ -41,8 +41,10 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     const ready = async (expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
     const act = actions => cmd('input.performActions', {context: ctx, actions}).then(() => cmd('input.releaseActions', {context: ctx}));
     const clickAt = (x, y) => act([{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: Math.round(x), y: Math.round(y)}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]);
-    const mid = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const b = e.getBoundingClientRect(); return {x: b.left + b.width / 2, y: b.top + b.height / 2}; })()`);
-    const click = async sel => { const p = await mid(sel); if (!p) return false; await clickAt(p.x, p.y); return true; };
+    // into view first; a note when something else lies on top (the row's hover tools, a toast)
+    const mid = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; e.scrollIntoView({block: 'center'}); const b = e.getBoundingClientRect(), x = b.left + b.width / 2, y = b.top + b.height / 2, top = document.elementFromPoint(x, y);
+      return {x, y, over: top && !e.contains(top) ? (top.className?.baseVal ?? top.className) + ' ' + top.tagName : ''}; })()`);
+    const click = async sel => { const p = await mid(sel); if (!p) return false; if (p.over) console.log('note: on top of', sel, '->', p.over); await clickAt(p.x, p.y); return true; };
     const until = async (fn, n = 20) => { for (let i = 0; i < n; i++) { if (await fn()) return true; await sleep(250); } return false; };
     const cell = fid => `#tc-${T1} .lc[data-k="f:${fid}"]`;
     await nav(B + 'static/icon.svg');
@@ -51,6 +53,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});
     await nav(B + '#l/' + L);
     check(await ready(`!!document.querySelector('${cell(RT)}')`), 'Firefox: the list with the new columns');
+    await ev(`(() => { window.__errs = []; addEventListener('error', e => __errs.push(String(e.message))); addEventListener('unhandledrejection', e => __errs.push(String(e.reason?.stack || e.reason))); return 1; })()`);
+    const errs = async () => { const x = await ev('JSON.stringify(window.__errs || [])').catch(() => '?'); if (x !== '[]') console.log('note: page errors', x); };
     await sleep(400);
 
     // ================= #2070 formula values, #2069 task link title
@@ -65,14 +69,18 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     check(await until(async () => (await fv(T1))[RT] === '3'), '#2069: a click on the third star saves 3');
     check(await ready(`document.querySelectorAll('${cell(RT)} button.on').length === 3`), '#2069: three stars lit');
     await shot('p2156b-list.png');
+    await sleep(600);
     await click(`${cell(RT)} [data-n="3"]`);
     check(await until(async () => !(RT in (await fv(T1)))), '#2069: the same star again clears it');
+    await errs();
 
     // ================= #2069 multiple choice in the detail panel
     await ev(`openDetail(${T1})`);
     check(await ready(`!!document.querySelector('[data-cfkms="${MS.id}"][data-o="${GREEN}"]')`), '#2069: the options in the detail panel');
+    await sleep(500);
     await click(`[data-cfkms="${MS.id}"][data-o="${GREEN}"]`);
     check(await until(async () => (await fv(T1))[MS.id] === GREEN), '#2069: tapping Green chooses it');
+    await errs(); console.log('note: value', JSON.stringify((await fv(T1))[MS.id]), await ev(`document.querySelector('[data-cfkms="${MS.id}"][data-o="${GREEN}"]')?.outerHTML.slice(0, 300)`));
     await sleep(300);
     await click(`[data-cfkms="${MS.id}"][data-o="${RED}"]`);
     check(await until(async () => (await fv(T1))[MS.id] === `${RED},${GREEN}`), '#2069: tapping Red adds it (order of the options)');
