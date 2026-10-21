@@ -276,10 +276,10 @@ def ltl_contact_match(c, oid, uid, name, text=""):
                      list(books) + [LTL_CONTACTS_MAX]).fetchall()
     key = (name or "").strip().casefold()
     if key:
-        for r in rows:
-            names = (r["fn"], " ".join(x for x in (r["given"], r["family"]) if x), r["org"])
-            if any((x or "").strip().casefold() == key for x in names):
-                return r
+        hits = [r for r in rows if any((x or "").strip().casefold() == key
+                                       for x in (r["fn"], " ".join(x for x in (r["given"], r["family"]) if x), r["org"]))]
+        if hits:  # review A6: a company name -> the organisation's own card before a person working there, then the oldest
+            return min(hits, key=lambda r: (0 if r["kind"] == "org" else 1 if not (r["given"] or r["family"]) else 2, r["id"]))
     low = (text or "")[:LTL_TEXT_CAP].casefold()
     if not low:
         return None
@@ -542,12 +542,13 @@ def ltl_doc_get(nid):
     """For the document detail: the letters linked with the document (both directions), the deadline and references found,
     the deadline task. {available: false} (no error) when there is no office, the person is no admin of it or the
     document is not in the office's documents space."""
-    from .model import office_gate, office_org
+    from .model import office_gate
+    from .letters import lt_org
     from ..core.db import db
     c = db()
     try:
         uid = office_gate(c)
-        oid = office_org(c, uid, admin=True)
+        oid = lt_org(c, uid)
         m, n = ltl_doc(c, oid, nid)
     except (Denied, BadInput):
         return jsonify(available=False)
