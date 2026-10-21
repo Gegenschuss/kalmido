@@ -221,6 +221,36 @@ print(m.mail_fetch(x, "INBOX", lambda c, raw: True), len(x.fetched), len(x.seen)
 r = subprocess.run(["docker", "exec", "-i", CT, "python", "-c", code], capture_output=True, text=True, timeout=120)
 check(r.stdout.strip().splitlines()[-1:] == ["0 0 1"], f"mail fetch: a too large mail is skipped and marked seen {r.stdout[-120:]} {r.stderr[-300:]}")
 
+# 2.148.1 G (#2485): a slowly answering bookmark server ends at the sync's deadline
+code = """
+import socket, threading, time, urllib.request
+from kalmido.life import karakeep as kk
+from kalmido.calendars import subscriptions as sub
+srv = socket.socket(); srv.bind(("127.0.0.1", 0)); srv.listen(1)
+def slow():
+    s, _ = srv.accept(); s.recv(4096)
+    s.sendall(b"HTTP/1.1 200 OK\\r\\nContent-Type: application/json\\r\\nContent-Length: 100000\\r\\n\\r\\n")
+    for _ in range(40):
+        time.sleep(0.25)
+        try: s.sendall(b" ")
+        except OSError: break
+    s.close()
+threading.Thread(target=slow, daemon=True).start()
+kk.unseal = lambda *a: "key"
+sub.cal_allow = lambda c: None
+sub._cal_opener = lambda allow: urllib.request.build_opener()
+kk._KK_END.t = time.monotonic() + 1.5
+t0 = time.monotonic()
+try:
+    kk.kk_req(None, {"user_id": 1, "token": "x", "url": "http://127.0.0.1:%d" % srv.getsockname()[1]}, "/bookmarks")
+    print("answer", round(time.monotonic() - t0, 1))
+except kk.KkError as e:
+    print("stopped", round(time.monotonic() - t0, 1))
+"""
+r = subprocess.run(["docker", "exec", "-i", CT, "python", "-c", code], capture_output=True, text=True, timeout=120)
+last = (r.stdout.strip().splitlines() or [""])[-1].split()
+check(last[:1] == ["stopped"] and float(last[1]) < 5, f"bookmark sync: a slow server stops at the deadline {r.stdout[-120:]} {r.stderr[-300:]}")
+
 # ================================================================== #2488 filed mail files
 r = A.post(B + "/api/files/folders", json={"name": "E-Mails", "space": f"org:{ORG}"})
 check(r.ok, "alice makes the mail folder " + r.text[:160])
