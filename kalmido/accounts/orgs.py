@@ -326,14 +326,13 @@ def _orgs_w(c, uid):
 
 def ws_obj_default(c, uid):
     """2.30.0 (#1036): the workspace of a new calendar / address book when the client names none: an agent's own workspace,
-    else the person's first organisation (as a new list up to 2.148), else private."""
+    else the chosen / only organisation (ws_chosen_org, 2.148.1 H #2480: as a new list), else private."""
     if not has_workspaces(c):
         return None
     u = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
     if u and (u["kind"] or "user") == "agent":
         return agent_org(c, uid)
-    mine = _orgs_w(c, uid)  # 2.143.0 A (#2151): never into an organisation where uid only reads / is a guest
-    return mine[0] if mine else None
+    return ws_chosen_org(c, uid)  # 2.148.1 H (#2480): the chosen / only organisation, else private (was the first one)
 
 
 def ws_chosen_org(c, uid):
@@ -345,10 +344,13 @@ def ws_chosen_org(c, uid):
         return agent_org(c, uid)
     from ..core.db import usettings
     mine = _orgs_w(c, uid)  # 2.143.0 A (#2151): never where uid only reads / is a guest
-    m = re.fullmatch(r"org:(\d{1,9})", str(usettings(c, uid).get("workspace") or ""))
+    ws = str(usettings(c, uid).get("workspace") or "")
+    m = re.fullmatch(r"org:(\d{1,9})", ws)
     oid = int(m.group(1)) if m else None
     if oid and oid in mine:
         return oid
+    if ws == "private":  # 2.148.1 H (#2480): the switch on "Private" means private
+        return None
     return mine[0] if len(mine) == 1 else None
 
 
@@ -374,6 +376,9 @@ def obj_org_set(c, table, oid_col, members, obj_id, v, kind):
             p = ws_fit_problem(c, oid, uid, kind)
             if p:
                 raise Denied(409, p)
+    from .orgout import org_out  # 2.148.1 H (#2483): out of an organisation only through its admin (logged)
+    org_out(c, r["org_id"], oid, "book" if table == "books" else "calendar",
+            c.execute(f"SELECT name FROM {table} WHERE id=?", (obj_id,)).fetchone()[0])
     c.execute(f"UPDATE {table} SET org_id=? WHERE id=?", (oid, obj_id))
     return True
 
@@ -456,6 +461,8 @@ def ws_private_for(c, lid):
                       WHERE m.list_id=? AND a.org_id IS NOT NULL ORDER BY m.user_id LIMIT 1""", (lid,)).fetchone()
     if ag:
         raise Denied(409, tr("{0} works in another workspace ({1}): an agent joins only lists of its own workspace", ag["display_name"] or ag["username"], _org_name(c, oid)))
+    from .orgout import org_out  # 2.148.1 H (#2483): out of an organisation only through its admin (logged)
+    org_out(c, oid, None, "list", c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], list_id=lid)
     c.execute("UPDATE lists SET org_id=NULL WHERE id=?", (lid,))
     from ..admin.orgcrypt_cli import oc_settle_kick
     oc_settle_kick([lid])  # 2.64.0 (#1864): its files get the owner's account key
