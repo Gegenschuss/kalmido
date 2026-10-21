@@ -215,6 +215,12 @@ def bp_upload():
     raw = f.read(BP_MAX_MB * 1024 * 1024 + 1)
     if len(raw) > BP_MAX_MB * 1024 * 1024:
         return err(tr("The file is too large (at most {0} MB)", BP_MAX_MB), 413)
+    from ..files.scan import sc_scan  # 2.148.1 E (#2496): virus scan like every upload
+    from ..files.upsafe import UploadRefused
+    try:
+        sc_scan(f.filename or "letterhead.pdf", raw)
+    except UploadRefused as e:
+        return err(str(e))
     try:
         pages, sizes = bp_check(raw)
     except (BpError, ValueError, IndexError, KeyError, TypeError, RecursionError, MemoryError) as e:  # 2.120.0 review H1: + MemoryError

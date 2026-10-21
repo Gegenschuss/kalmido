@@ -252,18 +252,24 @@ def fq_text_of(qs, ans):
     return " ".join(" ".join(v) if isinstance(v, list) else str(v) for v in ans.values())
 
 
+def fq_md(v):
+    """2.148.1 E (#2496): an answer from outside as plain Markdown text: no links, images, HTML, headings or lists of its own."""
+    v = re.sub(r"([\\`*_\[\]()<>!|~])", r"\\\1", str(v))
+    return re.sub(r"(?m)^(\s*)([#+\-]|\d+[.)])", r"\1\\\2", v)
+
+
 def fq_shown(q, v, lg):
     if v is None or v == "" or v == []:
         return "—"
     if q["kind"] == "yesno":
         return tr(FQ_YES if v == "yes" else FQ_NO, lg=lg)
     if q["kind"] == "multi":
-        return "\n".join("- " + x for x in v)
+        return "\n".join("- " + fq_md(x) for x in v)
     if q["kind"] == "choice":
-        return "- " + v
+        return "- " + fq_md(v)
     if q["kind"] == "file":
-        return tr("{0} (attachment)", v, lg=lg)
-    return v
+        return tr("{0} (attachment)", fq_md(v), lg=lg)
+    return fq_md(v)
 
 
 def fq_markdown(qs, ans, lg):
