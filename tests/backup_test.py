@@ -600,6 +600,7 @@ except (ValueError, IndexError):
     res = {"error": (r.stdout + r.stderr)[-400:]}
 check(res.get("bad_ok") == [] and res.get("good_refused") == [], f"statement check (second floor): {res}")
 
+_drop_kept("restores of the own-named functions")
 # ---- 2.37.0 (review K2-5): pg_restore itself fails (the dump's data breaks a foreign key) -> way back: the data as before,
 # the safety backup listed, no folder left over
 old_safety = {x["name"] for x in state()["items"] if x["kind"] == "safety"}
