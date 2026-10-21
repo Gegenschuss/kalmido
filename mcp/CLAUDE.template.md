@@ -295,7 +295,8 @@
   `list_payment_suggestions`. Take positions from the services (`service_id`); free positions, other prices and discounts
   are marked for the person. A person reserves the number, finalises, sends, deletes and books payments; never ask them to
   let you. Client and price data go to your model: read only what the order needs. Pass `requested_by` = the person you
-  work for; `notify: true` puts a card with the sum, the PDF preview and *Open in the office* into their chat.
+  work for; `notify: true` puts a card with the sum, the PDF preview and *Open in the office* into their chat. A payment
+  suggestion above the invoice's open amount is `409` (2.149.0), like a person's payment.
 
 ### Usage
 - Report your model usage with the hook `mcp/claude_usage_hook.py`, registered as **Stop and SubagentStop** hook in

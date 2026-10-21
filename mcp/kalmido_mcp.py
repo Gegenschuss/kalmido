@@ -1841,7 +1841,7 @@ TOOLS += [
      lambda api, a: api.call("POST", "/office/reminders", body=_pick(a, ("invoice_ids", "level", "notify", "requested_by")))),
     ("suggest_payment", "2.51.0: suggest an incoming payment for an open invoice, read from what a person gave you (e.g. a pasted bank statement): "
                         "amount, date, reference, confidence high / medium / low, note = why this invoice. An admin books or rejects it; you never "
-                        "book. Kalmido has no bank access.",
+                        "book. Kalmido has no bank access. 2.149.0: above the invoice's open amount -> 409.",
      _obj({"invoice_id": S_ID, "amount": {"type": "string", "description": "Decimal text, e.g. 1190.00"}, "date": D, "reference": {"type": "string"},
            "confidence": {"type": "string", "enum": ["high", "medium", "low"]}, "note": {"type": "string"}, **_RB}, ["invoice_id", "amount"]),
      lambda api, a: api.call("POST", "/office/payment-suggestions", body=_pick(a, ("invoice_id", "amount", "date", "reference", "confidence", "note", "requested_by")))),
