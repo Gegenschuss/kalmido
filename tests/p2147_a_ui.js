@@ -105,7 +105,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ev(`(() => { document.querySelector('[data-ocf="choose"]').click(); return 1; })()`);
     const se = await srv(CE, j => j.pack_choose === false);
     check(!!se && se.settings.pack === 'XX' && se.features['books.datev'] === false, 'P4 #2462: Use sets the base pack, DATEV is not part of it');
-    check(await ready(ev, `!document.querySelector('.ocf-choose')`), 'P4 #2462: the question is gone');
+    check(await ready(ev, `!document.querySelector('.ocf-choose')`), 'P4 #2462: the question is gone ' + JSON.stringify(await ev(`({pc: OFC.info?.pack_choose, pack: OFC.info?.settings?.pack, tab: S.route.tab, mod: S.route.mod, il: OFC.infoLoading, pw: OFC.pbWait, n: document.querySelectorAll('.ocf-choose').length})`)));
   }, false);
 
   console.log(`p2147_a_ui: ${ok} ok, ${F.length} failed`);
