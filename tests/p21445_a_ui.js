@@ -50,11 +50,14 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   const h = w.eval(`ocStateHtml({enabled: true, active: true, rotating: true})`), h0 = w.eval(`ocStateHtml({enabled: true, active: true, rotating: false})`);
   check(/ocrotsearch/.test(h) && /search may not find/.test(h) && !/ocrotsearch/.test(h0), 'F9: the search hint only while the key is renewed');
   // ---- #2387: the step-up of an SSO account
-  w.eval(`window._ask = 0; askConfirm = async () => { window._ask++; return false; }`);
-  const r1 = await w.eval(`ocStepUp(5, 'fresh', 'Show recovery key', {stepup: 'oidc', fresh: false})`);
-  check(r1 === null && w.eval('window._ask') === 1, '#2387: without a fresh sign-in it asks first; cancelled = nothing sent');
+  w.eval(`window._p = ocStepUp(5, 'fresh', 'Show recovery key', {stepup: 'oidc', fresh: false})`);
+  const dl = await until(() => w.document.querySelector('.cdlg'));
+  check(dl && /login provider/.test(dl.textContent) && dl.querySelector('[data-cd="yes"]')?.textContent === 'Sign in again', '#2387: without a fresh sign-in it asks first: ' + (dl ? dl.textContent.slice(0, 160) : 'no dialog'));
+  dl?.querySelector('[data-cd="no"]').click();
+  const r1 = await w.eval('window._p');
+  check(r1 === null && w.location.pathname === '/', '#2387: cancelled = nothing sent, no navigation');
   const r2 = await w.eval(`ocStepUp(5, 'fresh', 'Show recovery key', {stepup: 'oidc', fresh: true})`);
-  check(r2 && typeof r2 === 'object' && w.eval('window._ask') === 1, '#2387: after the step-up sign-in it goes on without asking');
+  check(r2 && typeof r2 === 'object' && !w.document.querySelector('.cdlg'), '#2387: after the step-up sign-in it goes on without asking');
   w.eval(`history.replaceState(null, '', '/#rck-stepup-error=auth_time'); ocStepUpBack()`);
   const tt = await until(() => { const e = w.document.querySelector('#toast'); return e && /auth_time/.test(e.textContent) ? e.textContent : ''; });
   check(/did not say when you signed in/.test(tt) && w.location.hash === '', '#2387: back with an error the app says why: ' + tt);

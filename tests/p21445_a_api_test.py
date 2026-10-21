@@ -147,6 +147,7 @@ def show(s, org):
 start()
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice Admin", "password": "password123"}).ok
 A = sess("alice")
+A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True, "modules": ["comments"]})
 assert A.patch(B + "/api/admin/settings", json={"cal_allow_hosts": "127.0.0.1:9990"}).ok
 A.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
 ids = {}
@@ -156,6 +157,52 @@ for u, n, pw in (("sven", "Sven Single", None), ("ed", "Ed Editor", "password123
     assert r.ok, r.text
     ids[u] = r.json()["id"]
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
+
+# ================================================================== #2001: approval cards only for approvers
+# (before the first organisation exists: everyone sees everyone, as on a server without organisations)
+ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "robo", "display_name": "Robo"}).json()
+AGH = {"Authorization": "Bearer " + ag.get("token", "x")}
+Ed = sess("ed")
+Ed.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
+Mi = sess("max")
+Mi.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
+L = A.post(B + "/api/lists", json={"name": "Release work"}).json()["id"]
+for uid, role in ((ids["ed"], "edit"), (ids["max"], "admin"), (ag.get("id"), "edit")):
+    r = A.put(B + f"/api/lists/{L}/members", json={"user_id": uid, "role": role})
+    assert r.ok, (uid, role, r.text)
+A.patch(B + f"/api/lists/{L}", json={"agent_members": True})
+T = A.post(B + "/api/tasks", json={"title": "Publish the cut", "list_id": L}).json()["id"]
+
+
+def card(tid, title, h=AGH):
+    r = requests.post(V + f"/tasks/{tid}/comments", headers=h, json={"body": "May I?", "approval": {"title": title}})
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+def can(s, tid, cid):
+    x = [c for c in s.get(B + f"/api/tasks/{tid}/timeline").json().get("comments", []) if c["id"] == cid]
+    return x[0].get("choice_can") if x else "missing"
+
+
+C1 = card(T, "Publish the cut")
+check(can(Ed, T, C1) is False and can(Mi, T, C1) is True and can(A, T, C1) is True, f"#2001: choice_can ed / max / alice {can(Ed, T, C1)} {can(Mi, T, C1)} {can(A, T, C1)}")
+r = Ed.post(B + f"/api/comments/{C1}/choice", json={"choice_ids": ["yes"]})
+check(r.status_code == 403 and "approval" in r.json().get("error", ""), f"#2001: an editor who is no approver: 403 {r.status_code} {r.text[:150]}")
+check(Ed.get(B + f"/api/comments/{C1}/choice").json().get("choice_state") == "open", "#2001: the card stays open")
+r = Mi.post(B + f"/api/comments/{C1}/choice", json={"choice_ids": ["yes"]})
+check(r.ok and r.json().get("choice_state") == "answered" and r.json().get("choice_can") is True, f"#2001: a list admin decides {r.status_code} {r.text[:150]}")
+C2 = card(T, "Send the invoice")
+A.patch(B + f"/api/tasks/{T}", json={"assignee_id": ids["ed"]})
+check(can(Ed, T, C2) is True, "#2001: the assignee may decide (choice_can)")
+r = Ed.post(B + f"/api/comments/{C2}/choice", json={"choice_ids": ["no"]})
+check(r.ok and r.json().get("choice", {}).get("ids") == ["no"], f"#2001: the assignee decides {r.status_code} {r.text[:150]}")
+T2 = A.post(B + "/api/tasks", json={"title": "Plain buttons", "list_id": L}).json()["id"]
+r = requests.post(V + f"/tasks/{T2}/comments", headers=AGH, json={"body": "Which one?", "choices": ["Short", "Long"]})
+QC = r.json().get("id")
+r = Ed.post(B + f"/api/comments/{QC}/choice", json={"choice_ids": ["Short"]})
+check(r.ok and "choice_can" not in r.json(), f"#2001: plain answer buttons stay open to editors {r.status_code} {r.text[:150]}")
+
 
 # ================================================================== #2387: the normal login is unchanged
 r = sess().get(B + "/api/auth/oidc/start", allow_redirects=False)
@@ -197,7 +244,8 @@ check(show(Sv, ORG).status_code == 403, "#2387: ten minutes after the step-up it
 # an account without a password that signed in another way (here: the password before it was removed) keeps the earlier rule
 Ms = sess("mia")
 dbx("UPDATE users SET password_hash=NULL WHERE id=?", (ids["mia"],))
-assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": "mia@example.com", "role": "admin"}).ok
+r = Sv.put(B + f"/api/orgs/{ORG}/members", json={"email": "mia@example.com", "role": "admin"})
+assert r.ok, r.text
 Ms.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done", "workspace": f"org:{ORG}"})
 r = show(Ms, ORG)
 check(r.ok and r.json().get("recovery_key", "").startswith("R2-"), f"#2387: a fresh non-OIDC sign-in still counts {r.status_code} {r.text[:120]}")
@@ -226,51 +274,9 @@ check(r.status_code == 403 and "does not say" not in r.json().get("error", ""), 
 r = A.get(B + "/api/me/share/httpshortcuts.zip", headers={"Sec-Fetch-Site": "same-origin"})
 check(r.ok and r.headers.get("Content-Type", "").startswith("application/zip"), f"F8: from the app's own page: the file {r.status_code}")
 
-# ================================================================== #2001: approval cards only for approvers
-ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "robo", "display_name": "Robo"}).json()
-AGH = {"Authorization": "Bearer " + ag.get("token", "x")}
-Ed = sess("ed")
-Ed.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
-Mi = sess("max")
-Mi.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
-L = A.post(B + "/api/lists", json={"name": "Release work"}).json()["id"]
-for uid, role in ((ids["ed"], "edit"), (ids["max"], "admin"), (ag.get("id"), "edit")):
-    assert A.put(B + f"/api/lists/{L}/members", json={"user_id": uid, "role": role}).ok, (uid, role)
-A.patch(B + f"/api/lists/{L}", json={"agent_members": True})
-T = A.post(B + "/api/tasks", json={"title": "Publish the cut", "list_id": L}).json()["id"]
-
-
-def card(tid, title, h=AGH):
-    r = requests.post(V + f"/tasks/{tid}/comments", headers=h, json={"body": "May I?", "approval": {"title": title}})
-    assert r.status_code == 201, r.text
-    return r.json()["id"]
-
-
-def can(s, tid, cid):
-    x = [c for c in s.get(B + f"/api/tasks/{tid}/timeline").json().get("comments", []) if c["id"] == cid]
-    return x[0].get("choice_can") if x else "missing"
-
-
-C1 = card(T, "Publish the cut")
-check(can(Ed, T, C1) is False and can(Mi, T, C1) is True and can(A, T, C1) is True, f"#2001: choice_can ed / max / alice {can(Ed, T, C1)} {can(Mi, T, C1)} {can(A, T, C1)}")
-r = Ed.post(B + f"/api/comments/{C1}/choice", json={"choice_ids": ["yes"]})
-check(r.status_code == 403 and "approval" in r.json().get("error", ""), f"#2001: an editor who is no approver: 403 {r.status_code} {r.text[:150]}")
-check(Ed.get(B + f"/api/comments/{C1}/choice").json().get("choice_state") == "open", "#2001: the card stays open")
-r = Mi.post(B + f"/api/comments/{C1}/choice", json={"choice_ids": ["yes"]})
-check(r.ok and r.json().get("choice_state") == "answered" and r.json().get("choice_can") is True, f"#2001: a list admin decides {r.status_code} {r.text[:150]}")
-C2 = card(T, "Send the invoice")
-A.patch(B + f"/api/tasks/{T}", json={"assignee_id": ids["ed"]})
-check(can(Ed, T, C2) is True, "#2001: the assignee may decide (choice_can)")
-r = Ed.post(B + f"/api/comments/{C2}/choice", json={"choice_ids": ["no"]})
-check(r.ok and r.json().get("choice", {}).get("ids") == ["no"], f"#2001: the assignee decides {r.status_code} {r.text[:150]}")
-T2 = A.post(B + "/api/tasks", json={"title": "Plain buttons", "list_id": L}).json()["id"]
-r = requests.post(V + f"/tasks/{T2}/comments", headers=AGH, json={"body": "Which one?", "choices": ["Short", "Long"]})
-QC = r.json().get("id")
-r = Ed.post(B + f"/api/comments/{QC}/choice", json={"choice_ids": ["Short"]})
-check(r.ok and "choice_can" not in r.json(), f"#2001: plain answer buttons stay open to editors {r.status_code} {r.text[:150]}")
-
 # ---- a person without an organisation (freelancer-matrix: approvals): the own agent in the own list
 FU, Fr = freelancer(B, A, "frida")
+A.put(B + "/api/admin/agent-policy", json={"user_agents": True})  # personal agents allowed
 r = Fr.post(B + "/api/my/agents", json={"username": "fridabot", "display_name": "Frida's bot", "scopes": ["read", "tasks:write", "comments"]})
 FA = r.json().get("id")
 FH = {"Authorization": "Bearer " + Fr.post(B + f"/api/my/agents/{FA}/token").json().get("token", "")}
