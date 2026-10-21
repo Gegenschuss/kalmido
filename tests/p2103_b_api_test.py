@@ -2,7 +2,7 @@
 """2.152.0 API tests, part B (#2165: trash periods; #2172: backups), own container (start.sh). Invented people and
 addresses only (example.com).
  - #2165: in every area one object goes into the trash and is dated back past the period (files with the stored file,
-   wiki page, hub mail with its word index, table + a deleted row / column of a live table, pipeline deal, invoice series,
+   wiki page (its own run wiki_trash_tick), hub mail with its word index, table + a deleted row / column of a live table, pipeline deal, invoice series,
    team chat tombstone, emptied comment); the run with the switch off deletes nothing and reports the numbers per area
    (GET /api/admin/retention); with KALMIDO_RETENTION_PURGE=1 they are gone (the stored file from the disk too, the hub
    mail's folder in the file store's trash); what was deleted today stays; the file store's trash view says the period
@@ -223,7 +223,8 @@ CM = one("SELECT id FROM comments WHERE task_id=?", (T,))
 check(Fr.delete(B + f"/api/comments/{CM}").ok, "setup: the comment deleted (emptied row)")
 sql("UPDATE comments SET deleted_at=? WHERE id=?", (OLD, CM), write=True)
 
-WANT = {"files": 1, "wiki": 1, "sheets": 1, "sheet_rows": 1, "sheet_columns": 1, "hub_mails": 1, "deals": 1, "series": 1,
+# 2.152.0 (#2165): no "wiki" here -- main's own run wiki/pages.py wiki_trash_tick deletes the pages with their files (below)
+WANT = {"files": 1, "sheets": 1, "sheet_rows": 1, "sheet_columns": 1, "hub_mails": 1, "deals": 1, "series": 1,
         "chat_tombstones": 1, "comments": 1}
 
 # ---- the switch off: nothing goes, the numbers are reported
@@ -248,6 +249,9 @@ check(not sql("SELECT 1 FROM fs_nodes WHERE id=?", (F_OLD,)) and not sql("SELECT
       "files: the old node and its versions are gone")
 check(not os.path.exists(P_OLD), "files: the stored file is gone from the disk")
 check(sql("SELECT deleted_at IS NOT NULL FROM fs_nodes WHERE id=?", (F_NEW,)) == [(1,)], "files: deleted today stays in the trash")
+check(sql("SELECT 1 FROM wiki_pages WHERE id=?", (W_OLD,)), "wiki: the trash run leaves the pages to their own run")
+out = in_app("from kalmido.wiki.pages import wiki_trash_tick\nprint('wiki', wiki_trash_tick(c, True))")
+check("'pages': 1" in out, "wiki: its own run deletes the old page " + out[-300:])
 check(not sql("SELECT 1 FROM wiki_pages WHERE id=?", (W_OLD,)) and sql("SELECT 1 FROM wiki_pages WHERE id=?", (W_NEW,)), "wiki: old gone, fresh stays")
 check(not sql("SELECT 1 FROM sheets WHERE id=?", (S_OLD,)) and not sql("SELECT 1 FROM sheet_cells WHERE sheet_id=?", (S_OLD,)), "tables: the old table and its cells gone")
 check(not sql("SELECT 1 FROM sheet_rows WHERE id=?", (ROW,)) and not sql("SELECT 1 FROM sheet_columns WHERE id=?", (COL,))
