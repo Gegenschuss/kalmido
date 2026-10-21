@@ -26,6 +26,20 @@ Package 2.144.5 "Leftovers: small fixes and UI from older packages" (version num
 ### Security
 - Recovery key of accounts without a password (single sign-on): showing or renewing it needs a real new sign-in at the provider (prompt=login, max_age=0, a fresh auth_time from the ID token), bound to the organisation and the purpose; a link alone triggers nothing. The key-rotation test switch only works in test mode, a refused shortcut download says why, the settings hint at the incomplete search during a key rotation (#2387).
 
+## [2.144.6] - 2026-10-21
+
+Office fixes: tracked time to the invoice without billing it twice, small items from the 2.138 review, one wording for moving into an organisation.
+
+### Added
+- Time entries are billable or not (default billable). "Invoice from time" takes only open billable hours and binds them to the draft as billed; the same hours never land on two invoices, billed entries are locked (only the note stays editable). Deleting the draft frees them again; on a cancelled invoice the office admin frees them with "Release the time again". Works the same in a personal office without an organisation (#2053).
+
+### Fixed
+- Legacy import: raising the invoice counter asks for a reason like the number ranges (GoBD); the reason is in the office log (#2400).
+- Legacy import: undo puts the order of the services back (#2400).
+- List rules: asking for an approval (or for changes) no longer counts as "assigned", the task stays with the approver (#2400).
+- Legacy import: archiving the rest of an undone import leaves entries you restored by hand alone (#2400).
+- Office settings > Data: one section "Transfer into an organisation" with both ways (a new organisation or an existing one) instead of two wordings (#2436).
+
 ## [2.147.1] - 2026-10-21
 
 Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.

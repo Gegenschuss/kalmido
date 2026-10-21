@@ -1388,11 +1388,14 @@ TOOLS += [
                       "them without asking.",
      _obj({"user_id": S_ID, "days": {"type": "integer", "minimum": 1, "maximum": 31}}),
      lambda api, a: api.call("GET", "/time/gaps", _pick(a, ("user_id", "days")))),
-    ("add_time_entry", "Add a time entry: task_id or list_id, start (YYYY-MM-DDTHH:MM), end or minutes, note.",
+    ("add_time_entry", "Add a time entry: task_id or list_id, start (YYYY-MM-DDTHH:MM), end or minutes, note; billable (2.144.6, "
+                       "default true) = may go onto an invoice.",
      _obj({"task_id": S_ID, "list_id": S_ID, "start": {"type": "string"}, "end": {"type": "string"}, "minutes": {"type": "number"},
-           "note": {"type": "string"}}, ["start"]), lambda api, a: api.call("POST", "/time/entries", body=a)),
-    ("update_time_entry", "Change your time entry.", _obj({"entry_id": S_ID, "start": {"type": "string"}, "end": {"type": "string"},
-                                                           "minutes": {"type": "number"}, "note": {"type": "string"}, "task_id": S_ID, "list_id": S_ID},
+           "note": {"type": "string"}, "billable": {"type": "boolean"}}, ["start"]), lambda api, a: api.call("POST", "/time/entries", body=a)),
+    ("update_time_entry", "Change your time entry (2.144.6: billable true / false; an entry with billed true is on an invoice and "
+                          "keeps everything but its note, 409).",
+     _obj({"entry_id": S_ID, "start": {"type": "string"}, "end": {"type": "string"},
+           "minutes": {"type": "number"}, "note": {"type": "string"}, "task_id": S_ID, "list_id": S_ID, "billable": {"type": "boolean"}},
                                                           ["entry_id"]),
      lambda api, a: api.call("PATCH", f"/time/entries/{_id(a, 'entry_id')}", body=_without(a, "entry_id"))),
     ("delete_time_entry", "Delete your time entry.", _obj({"entry_id": S_ID}, ["entry_id"]),

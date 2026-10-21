@@ -88,6 +88,7 @@ UMZ_DROP = {
     "list_files": {"path"},
     "events": {"href"},
     "contacts": {"href"},
+    "time_entries": {"billed_at"},  # 2.144.6 A (#2053): the invoice (billed_doc_id) stays behind, the entry comes open
 }
 
 _UMI = {}  # user id -> running check / import thread

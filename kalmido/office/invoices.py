@@ -482,22 +482,9 @@ def inv_from_time(c, oid, uid, b):
     d_from, d_to = _date(b.get("from"), "from"), _date(b.get("to"), "to")
     if not d_from or not d_to or d_to < d_from:
         raise BadInput(tr("Invalid value: {0}", "from/to"))
-    pid = b.get("project_id")
-    # the WHERE part first (a fragment: pg_prepare only checks the complete statement below)
-    from ..core.access import vis_sql
-    # 2.86.0 (N16): only the lists the person making the invoice sees (their hours, names); 2.126.0 A (#1967): the
-    # personal office's lists are the owner's private ones (org_id NULL)
-    sql = ("FROM time_entries e JOIN lists l ON l.id=e.list_id "
-           f"WHERE l.client_id=? AND {pb_cl_sql(c, oid, 'l.org_id', 'l.owner_id')} AND l.id IN {vis_sql()} AND e.\"end\" IS NOT NULL AND e.start>=? AND e.start<?")
-    args = [cid, uid, uid, d_from + "T00:00:00", (date.fromisoformat(d_to) + timedelta(days=1)).isoformat() + "T00:00:00"]
-    if pid not in (None, "", 0):
-        try:
-            pid = int(pid)
-        except (TypeError, ValueError):
-            raise BadInput(tr("Invalid value: {0}", "project_id"))
-        sql += " AND e.list_id=?"
-        args.append(pid)
-    groups = c.execute(f"SELECT e.list_id, l.name AS lname, SUM(e.seconds) AS secs {sql} GROUP BY e.list_id, l.name ORDER BY l.name", args).fetchall()
+    # 2.144.6 A (#2053): only billable, still open entries; they are bound to the draft (office/timebill.py)
+    from .timebill import tbill_take, tbill_where
+    sql, args = tbill_where(c, oid, uid, cid, d_from, d_to, b.get("project_id"))
     s = office_settings(c, oid)
     row = inv_new_row(c, oid, s, "invoice", s.get("lang") or "de")
     row.update(client_id=cid, recipient=json.dumps({k: v for k, v in _recipient_from_client(dict(cl), None, cdn_home(c, oid)).items() if k != "missing"}, ensure_ascii=False), service_from=d_from, service_to=d_to,
@@ -505,6 +492,7 @@ def inv_from_time(c, oid, uid, b):
     if "payment_terms_days" in cl.keys() and cl["payment_terms_days"]:
         row["payment_days"] = int(cl["payment_terms_days"])
     did = _insert_doc(c, oid, uid, row)
+    groups, g.tbill_stat = tbill_take(c, did, sql, args)
     rate = cl["rate"] if "rate" in cl.keys() and cl["rate"] else 0
     rows = []
     for gr in groups:
@@ -994,7 +982,9 @@ def inv_from_time_post():
     ofx_log(c, oid, "create", doc_id=nid, detail={"kind": "invoice", "from": "time", "positions": n})
     bump(c)
     c.commit()
-    return _answer(c, oid, uid, nid, 201)
+    from .docs import doc_public, doc_row
+    d = doc_public(c, oid, doc_row(c, oid, nid), office_role(c, uid, oid) == "admin")
+    return jsonify({**d, "time": g.tbill_stat}), 201  # 2.144.6 A (#2053): entries taken / skipped
 
 
 @app.post("/api/office/docs/reminder")

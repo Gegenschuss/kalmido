@@ -1001,6 +1001,7 @@ def fi_import(c, oid, uid, b):
         raise BadInput(tr("Invalid data"))
     areas = bk_areas(b.get("areas"))  # 2.46.1 (#1557): only the areas switched on (absent: all); the others are not even checked
     lists = {k: v if k in areas else [] for k, v in lists.items()}
+    pre = {r["id"]: r.get("sort") for r in office_rows(c, oid, "services")} if lists["services"] else {}  # 2.144.6 B (#2400 F1)
     rid = _run_new(c, oid, uid, "data")
     counts = {"clients": 0, "merged": 0, "contacts": 0, "services": 0, "equipment": 0, "skipped": 0, "services_filled": 0, "equipment_filled": 0,
               "roles": 0, "roles_filled": 0, "crew": 0, "crew_filled": 0}
@@ -1028,8 +1029,11 @@ def fi_import(c, oid, uid, b):
         imr_renumber(c, oid, imr_file_order(lists["services"]))
         for v in (filled.get("services") or {}).values():  # the order is renumbered, never emptied again by the undo
             v.pop("sort", None)
+    # 2.144.6 B (#2400 F1): {service id: [sort before the import, sort after]} so the undo puts the old order back
+    order = {str(r["id"]): [pre[r["id"]], r.get("sort")] for r in (office_rows(c, oid, "services") if pre else [])
+             if r["id"] in pre and r.get("sort") != pre[r["id"]]}
     c.execute("UPDATE office_import_runs SET counts=?, detail=? WHERE id=? AND org_id=?",
-              (json.dumps(counts), json.dumps({"merged": merged, "filled": filled, "areas": list(areas)}), rid, oid))
+              (json.dumps(counts), json.dumps({"merged": merged, "filled": filled, "areas": list(areas), **({"order": order} if order else {})}), rid, oid))
     return rid, counts
 
 
@@ -1221,6 +1225,10 @@ def fi_undo(c, oid, uid, rid, kinds=None):
                 continue
             c.execute(f"DELETE FROM {table} WHERE id=? AND org_id=?", (row["id"], oid))
             removed[kind] += 1
+    # 2.144.6 B (#2400 F1): the services the import renumbered get their old order back while nobody reordered them since
+    order = detail.get("order") if "services" in todo and isinstance(detail.get("order"), dict) else {}
+    for sid, (old, new) in ((k, v) for k, v in order.items() if str(k).isdigit() and isinstance(v, list) and len(v) == 2):
+        c.execute("UPDATE office_services SET sort=?, updated_at=? WHERE id=? AND org_id=? AND sort=?", (old, iso(now_utc()), int(sid), oid, new))
     merged = (detail.get("merged") or {}) if "clients" in todo else {}
     for cid, fill in merged.items():  # merged clients: empty the filled fields again while they still hold the imported value
         cur = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (int(cid),)).fetchone()
@@ -1301,14 +1309,33 @@ def imr_leftover_ids(c, oid, r):
     undone = bk_detail(r).get("undone")
     undone = undone if isinstance(undone, dict) else {}
     prod = office_settings(c, oid).get("producing_service_id")
+    kept = bk_detail(r).get("restored")  # 2.144.6 B (#2400 F4): entries restored on purpose stay active
+    kept = kept if isinstance(kept, dict) else {}
     out = []
     for kind in IMR_KINDS:
         if not (r["undone_at"] or kind in undone):
             continue
         for x in c.execute(f"SELECT id FROM {MD[kind]['table']} WHERE org_id=? AND import_run_id=? AND archived=0 ORDER BY id", (oid, r["id"])):
-            if not (kind == "services" and x["id"] == prod):
+            if not (kind == "services" and x["id"] == prod) and x["id"] not in (kept.get(kind) or []):
                 out.append((kind, x["id"]))
     return out
+
+
+def imr_restored(c, oid, kind, old, new):
+    """2.144.6 B (#2400 F4): an archived service / device of an import restored by hand (archived 1 -> 0) is noted in its
+    run's detail ({"restored": {kind: [ids]}}, no new column); "Archive leftover entries" leaves it alone."""
+    if kind not in IMR_KINDS or not old.get("import_run_id") or not old.get("archived") or new.get("archived"):
+        return
+    write_lock(c, f"office_import_{int(oid)}")
+    r = c.execute("SELECT * FROM office_import_runs WHERE id=? AND org_id=?", (old["import_run_id"], oid)).fetchone()
+    if not r:
+        return
+    d = bk_detail(r)
+    kept = d.get("restored") if isinstance(d.get("restored"), dict) else {}
+    if old["id"] not in kept.setdefault(kind, []):
+        kept[kind].append(old["id"])
+        d["restored"] = kept
+        c.execute("UPDATE office_import_runs SET detail=? WHERE id=? AND org_id=?", (json.dumps(d), r["id"], oid))
 
 
 def imr_tidy(c, oid, rid):
@@ -2133,7 +2160,8 @@ def fi_counter_get():
 
 @app.post("/api/office/legacy/counter")
 def fi_counter_post():
-    """Org admin. {kind: invoice | offer, last} -> the counter continues after last (never lowered)."""
+    """Org admin. {kind: invoice | offer, last, reason?} -> the counter continues after last (never lowered); raising the
+    invoice counter needs a reason like the number ranges (2.144.6 B, #2400 F2)."""
     c, uid, oid = _ctx()
     b = body() or {}
     kind = b.get("kind")
@@ -2147,10 +2175,14 @@ def fi_counter_post():
     cur = fi_counter(c, oid, kind)
     if isinstance(b.get("last"), bool) or last < cur["last"] or last > 10 ** 9:
         raise BadInput(tr("The counter can only be raised (now {0})", cur["last"]))
+    from .numranges import onum_reason  # 2.144.6 B (#2400 F2): the same reason duty (GoBD) as the number ranges
+    reason = onum_reason(kind, last - cur["last"], b.get("reason"))
+    if reason is None:
+        raise BadInput(tr("The number skips {0} numbers of the series; give a reason (GoBD)", last - cur["last"]))
     c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,?,?) ON CONFLICT(org_id, kind, period) DO UPDATE SET last=excluded.last",
               (oid, kind, cur["period"], last))
     from .ledger import ofx_log
-    ofx_log(c, oid, "number", target="legacy", detail={"kind": kind, "from": cur["last"], "to": last})
+    ofx_log(c, oid, "number", target="legacy", detail={"kind": kind, "from": cur["last"], "to": last, **({"reason": reason} if reason else {})})
     c.commit()
     return jsonify(fi_counter(c, oid, kind))
 

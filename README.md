@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.144.6** (2026-10-21): office fixes - **tracked time to the invoice**: entries are billable or not, "invoice
+  from time" binds the open hours as billed so they never land on two invoices, a deleted draft or a cancelled invoice
+  frees them; the legacy import asks for a reason when raising the invoice counter and its undo restores the order of
+  the services; asking for an approval no longer fires "assigned" rules; one "transfer into an organisation" section.
 - **2.147.1** (2026-10-21): **drag tasks into the chats** (team chat, thread, agent chat) as references, several at once, with
   *Insert reference* on phones; **overdue invoices suggest a payment reminder** as a draft (nothing is sent) and
   invoices / reminders in EUR carry a **GiroCode** for banking apps; moving many documents to another workspace shows

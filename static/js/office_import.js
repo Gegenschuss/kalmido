@@ -345,7 +345,13 @@ document.addEventListener('click', async e => {
   else if (a === 'arch-go') oimArchiveGo();
   else if (a === 'arch-edit') r81b_archEdit(+b.dataset.id);
   else if (a === 'counter') {
-    try { await api('POST', '/api/office/legacy/counter', {kind: b.dataset.kind, last: +b.dataset.last}); toast(tr('Saved')); await oimLoad(); await ofcInfo(true); } catch (x) { toast(x.message || ''); }
+    // 2.144.6 B (#2400 F2): raising the invoice counter skips numbers -> a reason like the number ranges (GoBD, office log)
+    const x = OIM.counter?.[b.dataset.kind], last = +b.dataset.last, skip = last - (x?.last || 0);
+    const reason = b.dataset.kind === 'invoice' && skip > 0 ? await askDialog({title: tr('Continue after the archive: next {0}', x?.next_after || ''),
+      body: tr('The number skips {0} numbers of the series; give a reason (GoBD)', skip), ok: tr('Save'),
+      input: {placeholder: tr('Reason for the jump (kept in the office log)'), max: 300}}) : '';
+    if (reason === null) return;
+    try { await api('POST', '/api/office/legacy/counter', {kind: b.dataset.kind, last, ...(reason ? {reason} : {})}); toast(tr('Saved')); await oimLoad(); await ofcInfo(true); } catch (x) { toast(x.message || ''); }
   } else if (a === 'area-skip') bk_skipAll(b.dataset.area);
   else if (a === 'undo') {
     const kind = b.dataset.kind;  // 2.46.1 (#1557): one area only; 2.138.0 E (#2241): the texts say that used services / devices are archived

@@ -398,6 +398,9 @@ def doc_public(c, oid, r, admin, items=True):
             cr = c.execute("SELECT id, number, status, locked_at, totals FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? ORDER BY id",
                            (oid, r["id"])).fetchall() if r["kind"] == "invoice" else []
             d["credits_of"] = [{"id": x["id"], "number": x["number"], "status": x["status"], "locked": bool(x["locked_at"]), "gross": _j(x["totals"], {}).get("gross")} for x in cr]
+            if r["kind"] == "invoice":  # 2.144.6 A (#2053): the time entries it billed
+                from .timebill import tbill_doc_time
+                d["time_billed"] = tbill_doc_time(c, r["id"])
             if r["kind"] == "credit" and d.get("cancels_id"):
                 x = c.execute("SELECT id, number FROM office_docs WHERE id=? AND org_id=?", (d["cancels_id"], oid)).fetchone()
                 d["cancels"] = {"id": x["id"], "number": x["number"]} if x else None
@@ -1307,6 +1310,8 @@ def odoc_delete(did):
         raise Denied(409, tr("The customer has signed this quotation; the record is kept"))  # 2.50.0 (#1200 review)
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net"),
                                                   **({"locked": True} if locked else {})})  # 2.114.2 A (#2263): the number gap stays traceable
+    from .timebill import tbill_free
+    tbill_free(c, did)  # 2.144.6 A (#2053): the time entries of the deleted document are open again
     c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
     bump(c)
     c.commit()

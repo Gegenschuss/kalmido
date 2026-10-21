@@ -502,6 +502,7 @@ function ofdMoreItems(d, inList) {
         if (!await askConfirm(tr('Back to a draft?'), tr('The quotation can be changed again and keeps its number {0}.', d.number || ''), {ok: tr('Undo finalising')})) return;
         try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/unlock`); OFD.list = null; OFD.log = null; if (inList) ofdLoadList(true); else { OFD.doc = j; ofdDraw(); } toast(tr('Back to a draft')); } catch (x) { toast(x.message || tr('unknown')); }
       }} : null,
+      d.kind === 'invoice' && d.status === 'cancelled' && d.time_billed?.entries && ofcAdmin() ? {label: tr('Release the time again'), icon: 'clock', fn: () => tbill_release(d)} : null,  // 2.144.6 A (#2053)
       d.can_delete ? '-' : null,
       d.can_delete ? {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
         if (!await askConfirm(tr('Delete {0}?', d.number || ofdKindName(d.kind, true)), d.locked ? tr('Its number stays used and shows as a gap in the office log.') : tr('Its number stays used.'), {ok: tr('Delete'), danger: true})) return;  // 2.114.2 A (#2263)
@@ -649,9 +650,33 @@ function ofdFromTimeDialog() {
   const cl = ofdClientOpts();
   if (!cl.length) { toast(tr('No clients in this organisation yet')); return; }
   const today = new Date(), first = new Date(today.getFullYear(), today.getMonth(), 1), iso = x => x.toISOString().slice(0, 10);
-  ofdDlg(tr('Invoice from time entries'), ofdF('ft-client', tr('Client'), ofcSel('ofd-ft-client', '', cl)) + ofdF('ft-from', tr('From'), dateIn('ofd-ft-from', iso(first), {label: tr('From'), clear: false}))
-    + ofdF('ft-to', tr('Until'), dateIn('ofd-ft-to', iso(today), {label: tr('Until'), clear: false, after: 'ofd-ft-from'})) + `<p class="muted ofchint">${tr('One position per list with the hours of the period; the rate comes from the client or is filled in afterwards.')}</p>`,
-    tr('Create'), async md => { const j = await rawFetch('POST', '/api/office/docs/from-time', {client_id: +$('#ofd-ft-client', md).value, from: $('#ofd-ft-from', md).value, to: $('#ofd-ft-to', md).value}); OFD.list = null; OFD.kind = 'invoice'; OFD.doc = j; go(`office/offers/${j.id}`); });
+  const md = ofdDlg(tr('Invoice from time entries'), ofdF('ft-client', tr('Client'), ofcSel('ofd-ft-client', '', cl)) + ofdF('ft-from', tr('From'), dateIn('ofd-ft-from', iso(first), {label: tr('From'), clear: false}))
+    + ofdF('ft-to', tr('Until'), dateIn('ofd-ft-to', iso(today), {label: tr('Until'), clear: false, after: 'ofd-ft-from'})) + `<p class="muted ofchint">${tr('One position per list with the hours of the period; the rate comes from the client or is filled in afterwards.')}</p><p class="ofchint tbill-open" role="status" aria-live="polite"></p>`,
+    tr('Create'), async m => { const j = await rawFetch('POST', '/api/office/docs/from-time', {client_id: +$('#ofd-ft-client', m).value, from: $('#ofd-ft-from', m).value, to: $('#ofd-ft-to', m).value}); OFD.list = null; OFD.kind = 'invoice'; OFD.doc = j; tbill_ftDone(j.time); go(`office/offers/${j.id}`); });
+  tbill_ftPreview(md); md.addEventListener('change', () => tbill_ftPreview(md));
+}
+// 2.144.6 A (#2053): the open billable hours of the period before the draft is made, the skipped entries after it
+const tbill_h = s => fmtNum(s / 3600, 2);
+async function tbill_ftPreview(md) {
+  const out = $('.tbill-open', md); if (!out) return;
+  const q = new URLSearchParams({client_id: $('#ofd-ft-client', md).value, from: $('#ofd-ft-from', md).value, to: $('#ofd-ft-to', md).value});
+  let j; try { j = await rawFetch('GET', `/api/office/time-open?${q}`); } catch { out.textContent = ''; return; }
+  const more = [j.billed_entries ? tr('{0} h already billed', tbill_h(j.billed_seconds)) : '', j.unbillable_entries ? tr('{0} h not billable', tbill_h(j.unbillable_seconds)) : ''].filter(Boolean);
+  out.textContent = tr('Open billable: {0} h', tbill_h(j.open_seconds)) + (more.length ? ` (${more.join(', ')})` : '');
+}
+// the time entries of a cancelled invoice can be billed again (one undo step binds them again)
+async function tbill_release(d) {
+  const h = tbill_h(d.time_billed.seconds);
+  if (!await askConfirm(tr('Release the time again?'), tr('{0} h of this cancelled invoice can then go onto a new invoice.', h), {ok: tr('Release')})) return;
+  let j; try { j = await api('POST', `/api/office/docs/${d.id}/time-release`, {}); } catch { return; }
+  const ids = j.released || [], again = async undo => { await api('POST', `/api/office/docs/${d.id}/time-release`, undo ? {undo: ids} : {}); await ofdLoadDoc(d.id, true); return {}; };
+  await ofdLoadDoc(d.id, true);
+  offerUndo(tr('Time released ({0} h)', h), histAdd({label: tr('Time released ({0} h)', h), res: j, lids: [], undo: () => again(true), redo: () => again(false)}));
+}
+function tbill_ftDone(t) {
+  if (!t) return;
+  if (!t.taken_entries) toast(tr('No open billable time in this period'));
+  else if (t.skipped_billed || t.skipped_unbillable) toast(tr('{0} entries taken; skipped: {1} already billed, {2} not billable', t.taken_entries, t.skipped_billed, t.skipped_unbillable));
 }
 function ofdPaymentDialog(d) {
   ofdDlg(tr('Record payment'), ofdF('p-date', tr('Date'), dateIn('ofd-p-date', new Date().toISOString().slice(0, 10), {label: tr('Date'), clear: false}))

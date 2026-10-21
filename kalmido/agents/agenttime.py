@@ -360,10 +360,12 @@ def atm_prop_undo(c, j, rec, back=True):
     if back:
         keep = []
         for eid, row in zip(rec.get("made") or [], rec.get("copies") or []):
-            r = c.execute("SELECT updated_at, user_id, start FROM time_entries WHERE id=?", (eid,)).fetchone()
+            r = c.execute("SELECT updated_at, user_id, start, billed_doc_id FROM time_entries WHERE id=?", (eid,)).fetchone()
             from ..personal.timesheet import tsl_is_locked
-            if r and r["user_id"] == me() and r["updated_at"] <= rec["at"] and not tsl_is_locked(c, me(), r["start"]):  # 2.125.0 B (#2119)
-                c.execute("DELETE FROM time_entries WHERE id=?", (eid,))
+            # 2.144.6 A (#2053 review 5): billed time stays, explicitly (not only because billing touches updated_at)
+            if (r and r["user_id"] == me() and r["updated_at"] <= rec["at"] and not r["billed_doc_id"]
+                    and not tsl_is_locked(c, me(), r["start"])  # 2.125.0 B (#2119)
+                    and c.execute("DELETE FROM time_entries WHERE id=? AND billed_doc_id IS NULL", (eid,)).rowcount):
                 n += 1
                 keep.append(row)
             elif r:

@@ -282,6 +282,8 @@ def office_row_patch(kind, rid):
     from .undo import oun_post, oun_pre
     oun_pre(c, uid, oid, kind, rid)  # 2.111.0 A (#2233): the state before, for "Saved · Undo"
     r = office_update(c, oid, kind, rid, b)
+    from .legacyimport import imr_restored
+    imr_restored(c, oid, kind, old, r)  # 2.144.6 B (#2400 F4): restored on purpose -> "Archive leftover entries" skips it
     diff = ofx_diff(old, r)
     diff["after"].pop("updated_at", None)
     diff["before"].pop("updated_at", None)

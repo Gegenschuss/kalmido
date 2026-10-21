@@ -46,7 +46,7 @@ delete them - members added there would reach the personal office.
 A person in an organisation who opens "Private" for the first time finds an empty personal office with a hint and a
 button to the organisation's office.
 
-**Moving into an organisation** (Settings tab, "Move into an organisation"; one way, after a confirmation): the personal
+**Moving into a new organisation** (Settings > Data, section "Transfer into an organisation", button "Transfer into a new organisation…"; one way, after a confirmation): the personal
 office becomes a new organisation with its owner as admin - documents, numbers (no duplicates: it is the same area),
 settings, master data, files and the private clients go with it; "Private" is a new, empty personal office afterwards.
 Only where organisations can be created (an instance admin, not in the mode `shared`). Moving into an existing
@@ -482,15 +482,17 @@ where they are used.
 - **Numbers**: an archived number is never given to a new document (the automatic number skips it, a manual one is
   refused). The import page proposes to continue the invoice / quotation counter after the highest archived number (a
   number that follows today's scheme, else the project number of the file name); the person confirms, the counter is
-  never lowered.
+  never lowered. 2.144.6: raising the invoice counter asks for a reason like the number ranges (GoBD); it goes into the
+  office log.
 - **Undo**: every confirmed import is a run (list with date, person, count). Undoing removes what the run added unless
   something builds on it by now - a client with a list, document, framework contract or archived document of another run
   stays, as does the service the calculation rules name as the producing one; the answer says what stayed. 2.138.0: a
   service used in a document or framework contract and a device in a set are archived instead of staying active
   (documents keep showing them with name and price); the page lists them with the document or set they are in, each with
   **Restore**. A run undone before 2.138 shows **Archive leftover entries** once: it archives what that run left active
-  (only its own services and devices, never the producing service, nothing deleted). Fields a merge filled are emptied
-  again while they still hold the imported value.
+  (only its own services and devices, never the producing service, nothing deleted; 2.144.6: an entry restored by hand
+  stays active). Fields a merge filled are emptied again while they still hold the imported value. 2.144.6: the undo of
+  the services also puts back the order the import renumbered, for every service nobody reordered since.
 
 Routes (organisation admin; members read the archive and, 2.81.0, correct it): `POST /api/office/legacy/preview` (multipart `file`, stores
 nothing; 2.146.0: .xlsx or CSV, the optional form field `map` = `{name, contact, address, street, house, zip, city, country: column index}`,
@@ -1333,7 +1335,15 @@ settings, sheet}`), `DELETE /api/office/docs/<id>/parts/<pid>` (with its positio
 - **from time entries** (`POST /api/office/docs/from-time` with `{client_id, from, to, project_id?}`): the finished time
   entries of the client's lists in the period, one position per list with the hours; the rate is the client's hourly
   rate when set, else 0 to fill in; 2.144.5: each such position remembers its list internally (never in the PDF, the
-  e-invoice or an export for the client), so "Delete all times" keeps billed entries after a rename;
+  e-invoice or an export for the client), so "Delete all times" keeps billed entries after a rename.
+  2.144.6: only **billable**, still **open** entries count (each entry has the switch
+  *Billable*, on by default; `GET /api/office/time-open?client_id=&from=&to=` shows open / billed / not billable hours
+  first). The draft takes them (`billed`): they keep their duration, date and task (only the note can change), cannot be
+  deleted and never land on a second invoice, also when two invoices are made at the same moment. The answer's `time`
+  says how many entries were taken and skipped. Deleting the draft frees them again; a finalised invoice keeps them,
+  also once cancelled - on a cancelled invoice the office admin frees them with *Release the time again*
+  (`POST /api/office/docs/{id}/time-release`, undoable). Without an organisation the personal office bills the
+  person's private lists the same way;
 - **empty** (`POST /api/office/docs` with `{"kind": "invoice"}`).
 
 Invoices have no producing / raw data / discount automation: a document is exactly its positions. A discount is a

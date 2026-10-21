@@ -871,7 +871,7 @@ def rul_spec(paths, schemas, op, ok, errs, ref, pid):
         "id": {"type": "integer"}, "list_id": {"type": "integer"}, "name": {"type": "string", "maxLength": RUL_NAME_MAX},
         "trigger": {"type": "object", "description": "kind: section (a task comes into column section_id), done (completed), "
                     "reopen (opened again), ltag (gets the list tag tag_id), due (its due day is today), created (a task is created "
-                    "in the list), assigned (a person is newly assigned; user_id = only that person, null = anybody), field (a value "
+                    "in the list), assigned (a person is newly assigned, not by an approval; user_id = only that person, null = anybody), field (a value "
                     "of the list's custom field field_id changes; value = only when set to that option id of a selection field / "
                     "\"1\" checked, \"0\" unchecked of a checkbox field, null = any change; formula fields never trigger)",
                     "properties": {"kind": {"type": "string", "enum": list(RUL_TRIGGERS)}, "section_id": {"type": "integer"},

@@ -230,6 +230,7 @@ def th_sql(a="e."):
 
 
 def entry_out(r, uid, vis, ref, rm):
+    from ..office.timebill import tbill_out
     sec, seen = entry_secs(r, ref), r["list_id"] in vis
     hid = "l_life" in r.keys() and r["l_life"] in HIDDEN_LIFE and health_hidden()  # #476 M6 (e.g. my running timer)
     if seen and r["task_id"] and isinstance(vis, VisIds):  # 1.10.0: a task a participant no longer sees
@@ -243,7 +244,8 @@ def entry_out(r, uid, vis, ref, rm):
             "task_id": r["task_id"] if seen else None, "list_id": r["list_id"] if seen else None,
             "title": title or "", "start": r["start"], "end": r["end"], "seconds": sec, "rounded": rnd_up(sec, rm),
             "note": "" if hid else r["note"], "source": r["source"], "running": r["end"] is None, "mine": r["user_id"] == uid,
-            "auto_stopped": bool(r["auto_stopped"]), "client_id": r["client_id"] if r["user_id"] == uid else None}
+            "auto_stopped": bool(r["auto_stopped"]), "client_id": r["client_id"] if r["user_id"] == uid else None,
+            **tbill_out(r, uid)}  # 2.144.6 A (#2053): billable / billed
 
 
 def one_entry(c, eid):
@@ -497,11 +499,13 @@ def time_create():
     start, end, sec = entry_times(b, None, None, 0, tz_of(c, uid))
     tsl_check(c, uid, start)  # 2.125.0 B (#2119)
     src = b.get("source") if b.get("source") in TIME_SOURCES else "manual"
+    from ..office.timebill import tbill_billable
+    bill = tbill_billable(b["billable"]) if b.get("billable") is not None else 1  # 2.144.6 A (#2053)
     try:
         with c.savepoint():
-            eid = insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,client_id,created_at,updated_at)
-                               VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
-                            (uid, tid, lid, title, iso(start), iso(end), sec, str(b.get("note") or "").strip()[:500], src, cid, ts, ts))
+            eid = insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,client_id,created_at,updated_at,billable)
+                               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                            (uid, tid, lid, title, iso(start), iso(end), sec, str(b.get("note") or "").strip()[:500], src, cid, ts, ts, bill))
     except IntegrityError:  # 2.143.0 C2 (#2153): the same client_id sent twice at once (tab + service worker): the first one wins
         r = c.execute("SELECT id FROM time_entries WHERE user_id=? AND client_id=?", (uid, cid)).fetchone() if cid else None
         if not r:
@@ -526,7 +530,12 @@ def time_update(eid):
     from .timesheet import tsl_check, tz_of
     zone = tz_of(c, r["user_id"])
     tsl_check(c, r["user_id"], r["start"], zone=zone)  # 2.125.0 B (#2119): nothing changes in a closed month
+    from ..office.timebill import tbill_billable, tbill_guard, tbill_lost, tbill_need_open
+    tbill_need_open(c, r, b)  # 2.144.6 A (#2053): a billed entry keeps everything but its note (409)
     sets, args = [], []
+    if "billable" in b:
+        sets.append("billable=?")
+        args.append(tbill_billable(b.get("billable")))
     if "note" in b:
         sets.append("note=?")
         args.append(str(b.get("note") or "").strip()[:500])
@@ -548,7 +557,9 @@ def time_update(eid):
         sets += ["start=?", "\"end\"=?", "seconds=?"]
         args += [iso(start), iso(end), sec]
     if sets:
-        c.execute(f"UPDATE time_entries SET {', '.join(sets)}, updated_at=? WHERE id=?", (*args, iso(now_utc()), eid))
+        guard = " AND billed_doc_id IS NULL" if tbill_guard(r, b) else ""  # 2.144.6 A (#2053 review 1): billed meanwhile -> 409
+        if c.execute(f"UPDATE time_entries SET {', '.join(sets)}, updated_at=? WHERE id=?{guard}", (*args, iso(now_utc()), eid)).rowcount == 0:
+            tbill_lost(c, eid, False)
         bump(c)
         c.commit()
     return jsonify(one_entry(c, eid))
@@ -563,8 +574,11 @@ def time_delete(eid):
         return r
     from .timesheet import tsl_check
     tsl_check(c, r["user_id"], r["start"])  # 2.125.0 B (#2119)
+    from ..office.timebill import tbill_lost, tbill_need_open
+    tbill_need_open(c, r, None)  # 2.144.6 A (#2053): billed time stays (409)
     old = one_entry(c, eid)
-    c.execute("DELETE FROM time_entries WHERE id=?", (eid,))
+    if c.execute("DELETE FROM time_entries WHERE id=? AND billed_doc_id IS NULL", (eid,)).rowcount == 0:
+        tbill_lost(c, eid, True)  # 2.144.6 A (#2053 review 1): billed between the check and the delete
     bump(c)
     c.commit()
     return jsonify(ok=True, entry=old)

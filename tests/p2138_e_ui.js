@@ -82,6 +82,12 @@ const absOk = async (w, d) => { const b = await until(() => d.querySelector('.mo
   check(await until(() => /Restored/.test(d.querySelector('.oim .imrarc')?.textContent || ''), 30), '#2241: the entry shows as restored');
 
   // ================= #2241: "Archive leftover entries" for a run undone before
+  // 2.144.6 B (#2400 F4): an entry restored by hand is no leftover; a run undone before 2.112 (no restore note) is
+  // simulated by taking the note out of the run's detail
+  w.eval(`OIM.arcd = null; oimLoad()`);
+  await sleep(1200);
+  check(!d.querySelector(`.oim [data-imr="tidy"][data-id="${imp.run_id}"]`), '#2400 F4: no "Archive leftover entries" for an entry restored by hand');
+  execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, "UPDATE office_import_runs SET detail=(detail::jsonb - 'restored')::text WHERE id=?", JSON.stringify([imp.run_id])]);
   w.eval(`OIM.arcd = null; oimLoad()`);
   const tidy = await until(() => d.querySelector(`.oim [data-imr="tidy"][data-id="${imp.run_id}"]`), 40);
   check(!!tidy && /Archive leftover entries/.test(tidy.textContent) && /\(1\)/.test(tidy.textContent), '#2241: the undone run offers "Archive leftover entries" (1)');
