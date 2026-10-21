@@ -1006,7 +1006,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             nid = insert_id(c, f"INSERT INTO hub_mailboxes({', '.join(v)}) VALUES({','.join('?' * len(v))})", tuple(v.values()))
             run.created.setdefault("hub_mailboxes", []).append(nid)
             run.count("mailbox")
-            run.warning(N_("Mailbox taken over without its passwords: enter them again in the settings."))
+            run.warning(N_("Mailbox taken over without its passwords and switched off: enter them in the settings and switch it on."))
     cur = usettings(c, uid)
     for r in data.get("settings", []):
         k, v = r.get("key"), r.get("value")
@@ -1411,7 +1411,8 @@ def umz_undo(c, uid, r):
     for day in cr.get("journal") or []:
         c.execute("DELETE FROM journal WHERE user_id=? AND day=?", (uid, day))
     for mid in cr.get("hub_mailboxes") or []:  # 2.144.5 B (#2410): a mailbox the import set up (not changed since: no password yet)
-        c.execute("DELETE FROM hub_mailboxes WHERE id=? AND created_by=? AND secret=''", (int(mid), uid))
+        # 2.144.5 A2 (#2410, review R7): + still error "password" (saving it in the settings clears that, even without a password)
+        c.execute("DELETE FROM hub_mailboxes WHERE id=? AND created_by=? AND secret='' AND error='password'", (int(mid), uid))
     cur = usettings(c, uid)
     for k, v in (cr.get("settings") or {}).items():
         if k in UMZ_SETTINGS and isinstance(v, dict) and cur.get(k) == v.get("new"):

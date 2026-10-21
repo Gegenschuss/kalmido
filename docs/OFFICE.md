@@ -554,7 +554,9 @@ Since 2.141 a workspace can bring its **own mailbox** and Kalmido can **send** f
 - **Agents and kid accounts** cannot send (no API route, no MCP tool in 2.141).
 - **Exports and moves (2.144.5)**: the organisation export, the account export (the private space's mailbox) and their
   imports carry the mailbox's servers, ports, user names and sender, never the passwords. After an import the mailbox asks
-  for them again (*The password is missing*) and fetches nothing until then; a workspace that already has a mailbox keeps
+  for them again (*The password is missing*) and is switched off: nothing is fetched and mail goes out through the server
+  until the passwords are entered and the mailbox is switched on again in the settings; undoing the import removes it only
+  while it is unchanged. A workspace that already has a mailbox keeps
   its own. The nightly boundary check reports a mailbox whose workspace does not match its organisation or owner.
 
 ## Travel expenses: taking over a per diem spreadsheet (2.95)

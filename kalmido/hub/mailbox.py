@@ -240,7 +240,7 @@ def mbx_check(c, r, secret=None):
 def mbx_take_values(src):
     """2.144.5 B (#2410): the settings of a mailbox row from an export (organisation export / account export; untrusted) as
     columns, checked like mbx_put. The passwords never come with an export: secret stays empty and error "password" makes the
-    settings ask for them again (nothing is fetched until then). None = neither a server for receiving nor for sending."""
+    settings ask for them again (nothing is fetched or sent until then). None = neither a server for receiving nor for sending."""
     if not isinstance(src, dict):
         return None
     v = {}
@@ -261,7 +261,9 @@ def mbx_take_values(src):
         x = src.get(k)
         v[k] = x if isinstance(x, int) and not isinstance(x, bool) and 0 <= x <= 65535 else 0
     v["imap_ssl"] = 0 if src.get("imap_ssl") in (0, False) else 1
-    v["active"] = 0 if src.get("active") in (0, False) else 1
+    # 2.144.5 A2 (#2410, review R6): switched off until the passwords are entered again (_sender takes the server's SMTP
+    # meanwhile, the poller leaves it alone); the person switches it on in the settings
+    v["active"] = 0
     v["smtp_tls"] = src.get("smtp_tls") if src.get("smtp_tls") in MBX_TLS else "starttls"
     if not v["imap_host"] and not v["smtp_host"]:
         return None

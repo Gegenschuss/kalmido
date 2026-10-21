@@ -136,7 +136,7 @@ def _mbx(c, run, src, d, ctx):
     if not v:
         return False
     d.update(v)
-    run.warning(N_("Mailbox taken over without its passwords: enter them again in the settings."))
+    run.warning(N_("Mailbox taken over without its passwords and switched off: enter them in the settings and switch it on."))
     return d
 
 
