@@ -25,7 +25,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
-from freelancer_fixture import freelancer  # noqa: E402
+from freelancer_fixture import freelancer, org_join  # noqa: E402; 2.148.1 (#2480): an invited member accepts
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -219,7 +219,7 @@ now = office_rows(PB)
 check(all(now.get(t) == BEFORE.get(t) for t in MAIN) and INV in docs(Fr), f"after the refusal nothing moved {now}")
 
 # ================================================================ preview and transfer
-assert Fr.put(B + f"/api/orgs/{KAP}/members", json={"email": "bob@example.com", "role": "member"}).ok
+assert (Fr.put(B + f"/api/orgs/{KAP}/members", json={"email": "bob@example.com", "role": "member"}).ok and org_join(B, "bob", KAP))
 ws(Fr, "private")
 r = Fr.get(B + CHK + f"?org={KAP}")
 j = r.json()

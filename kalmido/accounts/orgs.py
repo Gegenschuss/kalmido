@@ -326,7 +326,7 @@ def _orgs_w(c, uid):
 
 def ws_obj_default(c, uid):
     """2.30.0 (#1036): the workspace of a new calendar / address book when the client names none: an agent's own workspace,
-    else the person's first organisation (as for a new list), else private."""
+    else the person's first organisation (as a new list up to 2.148), else private."""
     if not has_workspaces(c):
         return None
     u = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
@@ -334,6 +334,22 @@ def ws_obj_default(c, uid):
         return agent_org(c, uid)
     mine = _orgs_w(c, uid)  # 2.143.0 A (#2151): never into an organisation where uid only reads / is a guest
     return mine[0] if mine else None
+
+
+def ws_chosen_org(c, uid):
+    """2.148.1 A (#2480): the organisation a person chose in the workspace switch (setting workspace = org:<id>) while they
+    may add content there; else their only organisation (one they may add content to); with several, None (private) --
+    never simply the first one. An agent: its own workspace."""
+    u = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
+    if u and (u["kind"] or "user") == "agent":
+        return agent_org(c, uid)
+    from ..core.db import usettings
+    mine = _orgs_w(c, uid)  # 2.143.0 A (#2151): never where uid only reads / is a guest
+    m = re.fullmatch(r"org:(\d{1,9})", str(usettings(c, uid).get("workspace") or ""))
+    oid = int(m.group(1)) if m else None
+    if oid and oid in mine:
+        return oid
+    return mine[0] if len(mine) == 1 else None
 
 
 def obj_org_set(c, table, oid_col, members, obj_id, v, kind):
@@ -411,8 +427,8 @@ def list_org_set(c, lid, v):
 
 def ws_default_org(c, uid, folder=""):
     """The workspace a new list of uid gets when the client names none: the workspace of the other lists of that folder (all
-    of them in one), else the person's first organisation (a server with an organisation worked like that up to 2.27: every
-    list was the organisation's), else private."""
+    of them in one), else the organisation chosen in the workspace switch or the only one (2.148.1 A, #2480: with several
+    no longer simply the first), else private."""
     if not has_workspaces(c):
         return None
     if folder:
@@ -421,8 +437,7 @@ def ws_default_org(c, uid, folder=""):
         oids = {r[0] for r in rows}
         if len(oids) == 1 and (None in oids or oids <= set(_orgs_w(c, uid))):  # 2.143.0 A (#2151)
             return oids.pop()
-    mine = _orgs_w(c, uid)
-    return mine[0] if mine else None
+    return ws_chosen_org(c, uid)  # 2.148.1 A (#2480): the chosen / only organisation, else private (was the first one)
 
 
 def ws_apply_default(c, uid, lid, folder=""):
@@ -777,8 +792,10 @@ def orgs_mine():
     oids = user_orgs(c, uid)
     rows = c.execute(f"SELECT * FROM orgs WHERE id IN ({','.join('?' * len(oids)) or 'NULL'}) ORDER BY id", oids).fetchall()
     m = instance_mode(c)
+    from .orginvite import ojn_mine
     return jsonify(orgs=[org_mine_dict(c, r, uid) for r in rows], mode=m, manage=m == "workspaces", workspaces=has_workspaces(c),
-                   mismatches={str(k): v for k, v in ws_mismatches(c, uid).items()})
+                   mismatches={str(k): v for k, v in ws_mismatches(c, uid).items()},
+                   joins=ojn_mine(c, uid))  # 2.148.1 A (#2480): invitations waiting for my answer
 
 
 @app.patch("/api/orgs/<int:oid>")
@@ -883,7 +900,9 @@ def org_icon_get(oid, tok):
 @app.put("/api/orgs/<int:oid>/members")
 def org_member_put(oid):
     """2.28.0 (#935): {user_id | email, role?: member | admin | guest | readonly | accounting (2.143.0 A, #2151)} -- an organisation admin adds a person (one they may see, or by
-    e-mail address: the answer never says whether the address has an account) or changes a member's role."""
+    e-mail address: the answer never says whether the address has an account) or changes a member's role. 2.148.1 A (#2480):
+    a person who is not a member yet gets an invitation to accept (accounts/orginvite.py ojn_*); only an instance admin adds
+    directly."""
     c, b = db(), body()
     _need_org_admin(c, oid)
     if instance_mode(c) != "workspaces":
@@ -908,17 +927,25 @@ def org_member_put(oid):
     cur = c.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
     if cur and uid == me() and role != "admin" and _admins(c, oid) <= 1:
         return err(tr("The last admin of an organisation cannot step down: make somebody else an admin first"), 409)
+    pending = False
     if cur:
         c.execute("UPDATE org_members SET role=? WHERE org_id=? AND user_id=?", (role, oid, uid))
         from ..core.access import acx_drop
         acx_drop()  # 2.143.0 A (#2151): the cached roles of this request
+    elif uid != me() and not g.user["is_admin"]:  # 2.148.1 A (#2480): an existing account joins only by accepting an invitation
+        from .orginvite import ojn_invite
+        ojn_invite(c, oid, uid, role)
+        pending = True
     else:
         org_member_add(c, oid, uid, role)
         from ..collab.news import news_add
         news_add(c, uid, "share", list_id=None, data={"org": True, "name": c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0], "role": role})
     bump(c)
     c.commit()
-    return jsonify(ok=True, by_email=bool(b.get("email")), **({} if b.get("email") else {"org": org_mine_dict(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone(), me())}))
+    if b.get("email"):  # 2.148.1 A (#2480): the same answer for every address (account or not, added or invited)
+        return jsonify(ok=True, by_email=True)
+    return jsonify(ok=True, by_email=False, **({"pending": True} if pending else {}),
+                   org=org_mine_dict(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone(), me()))
 
 
 def _admins(c, oid):
@@ -935,6 +962,8 @@ def org_leave(c, oid, uid, heir):
         if heir and heir != uid:
             owner_transfer(c, lr, heir, force=True)  # 2.64.1 (#1817): a list with the lock too (the heir waits for its key)
             c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lr["id"], uid))
+            from .orglists import _ol_log
+            _ol_log(c, oid, lr, "owner", to_id=heir)  # 2.148.1 A (#2480): the handover is in the admins' history
             n += 1
         elif lr["deleted_at"]:  # 2.102.0 A (#1988): a list in the trash stays the organisation's (never the leaver's private one)
             continue
@@ -1025,7 +1054,9 @@ def org_member_remove(oid, uid):
         print("organisation", oid, "last admin", uid, "left: operator", operator, "took it over,", n, "lists", flush=True)
     if uid != me():
         from ..collab.news import news_add
-        news_add(c, uid, "unshare", list_id=None, data={"org": True, "name": oname})
+        from ..collab.comments import user_names
+        # 2.148.1 A (#2480): the person learns that their lists of the organisation stayed with it (and with whom)
+        news_add(c, uid, "unshare", list_id=None, data={"org": True, "name": oname, **({"lists": n, "to": user_names(c, [heir]).get(heir, "")} if n else {})})
     bump(c)
     c.commit()
     print("organisation", oid, "member", uid, "removed by" if uid != me() else "left,", g.user["username"], "lists transferred:", n, flush=True)

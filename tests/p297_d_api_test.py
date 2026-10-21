@@ -24,7 +24,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
-from freelancer_fixture import FEATURES, freelancer  # noqa: E402
+from freelancer_fixture import FEATURES, freelancer, org_join  # noqa: E402; 2.148.1 (#2480): an invited member accepts
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else ""
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -237,7 +237,7 @@ check(dbx("SELECT org_id FROM wiki_pages WHERE id=?", (SEC,))[0]["org_id"] == GA
 
 # ================================================================ no key of the target space
 r = Ca.put(B + f"/api/orgs/{GAMMA}/members", json={"email": "bob@example.com", "role": "member"})
-assert r.ok, r.text
+assert r.ok and org_join(B, "bob", GAMMA), r.text  # 2.148.1 (#2480): bob accepts the invitation
 BP = page(Bo, "Bob idea", "plain")
 r = mv(Bo, pages=[BP], space="private", to=GSP, dry=1)
 check(r.ok and "cannot unlock" in (r.json().get("block") or ""), "bob without a key of Gamma: the dry run blocks " + r.text[:200])

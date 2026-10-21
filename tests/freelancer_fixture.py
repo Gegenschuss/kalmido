@@ -37,3 +37,12 @@ def freelancer(base, admin, name="frida", features=FEATURES):
     ws = s.get(base + "/api/state").json()["me"].get("workspaces") or []
     assert ws == [], f"the freelancer {name} must not be in an organisation: {ws}"
     return uid, s
+
+
+def org_join(base, user, oid, pw=PASSWORD):
+    """2.148.1 (#2480): an existing account an organisation admin added by e-mail / id is only invited: the person accepts
+    (POST /api/orgs/<oid>/join). True once they are a member (also when an instance admin added them directly)."""
+    s = login(base, user, pw)
+    if s.post(base + f"/api/orgs/{oid}/join").ok:
+        return True
+    return any(o["id"] == oid for o in s.get(base + "/api/orgs").json().get("orgs", []))

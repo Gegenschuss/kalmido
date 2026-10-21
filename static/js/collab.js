@@ -18,7 +18,7 @@ function bellBtn() {
 const NEWS_CHIPS = [['mention', 'at', N_('Mentions'), ['mention']], ['comment', 'comment', N_('Comments'), ['comment']],
   ['assign', 'user', N_('Assignments'), ['assign', 'unassign', 'take']], ['newtask', 'plus', N_('New tasks'), ['newtask', 'errreport']],
   ['complete', 'check', N_('Completed'), ['complete', 'unblock']], ['status', 'pulse', N_('Status'), ['status']],
-  ['agents', 'bot', N_('Agents'), ['approval', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner']],
+  ['agents', 'bot', N_('Agents'), ['approval', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner', 'orgjoin']],
   ['followup', 'hourglass', N_('Follow-ups'), ['followup']]];
 const newsKindOk = (it, k = S.nf.kind) => { const c = k && NEWS_CHIPS.find(x => x[0] === k); return !c || c[3].includes(it.kind); };
 function newsChipsHtml(items, attr) {
@@ -214,8 +214,12 @@ function newsText(it, U) {
         : d.role === 'admin' ? tr('{0} shared the list {1} with you as an admin', who, q(newsListName(it)))
           : d.group ? tr('{0} shared the list {1} with your group {2}', who, q(newsListName(it)), q(d.group)) : tr('{0} shared the list {1} with you', who, q(newsListName(it)));
     case 'role': return tr('{0} changed your role in {1} to {2}', who, q(newsListName(it)), q(roleLabel(d.role)));
-    case 'unshare': return d.org ? tr('{0} removed you from the organisation {1}', who, q(d.name || '')) : tr('{0} removed you from the list {1}', who, q(newsListName(it)));  // 2.28.0 (#935)
-    case 'owner': return tr('{0} made you the owner of the list {1}', who, q(newsListName(it)));  // 2.1.2 (#349)
+    case 'unshare': return d.org ? tr('{0} removed you from the organisation {1}', who, q(d.name || ''))  // 2.28.0 (#935)
+      + (d.lists ? ' ' + esc(trn('Your {0} list of the organisation stayed with it ({1}).', 'Your {0} lists of the organisation stayed with it ({1}).', d.lists, d.to || '')) : '')  // 2.148.1 A (#2480)
+      : tr('{0} removed you from the list {1}', who, q(newsListName(it)));
+    case 'owner': return (d.self ? tr('You took over the list {1} from {0}', who, q(newsListName(it))) : tr('{0} made you the owner of the list {1}', who, q(newsListName(it))))  // 2.1.2 (#349)
+      + ((d.reset || []).includes('link') ? ' ' + esc(tr('Its public link was reset: share the new link again if needed.')) : '')  // 2.148.1 A (#2478)
+      + ((d.reset || []).includes('hook') ? ' ' + esc(tr('Its deploy webhooks were switched off: switch them on again under environments if needed.')) : '');
     case 'orglist': return ({archive: tr('{0} archived the list {1} (admin of {2})', who, q(d.name || ''), q(d.org || '')),  // 2.35.0 (#1101)
       restore: tr('{0} restored the list {1} from the archive (admin of {2})', who, q(d.name || ''), q(d.org || '')),
       delete: tr('{0} deleted the list {1} for good (admin of {2}). Its tasks are in the trash of the owner’s basket.', who, q(d.name || ''), q(d.org || '')),
@@ -235,6 +239,7 @@ function newsText(it, U) {
       restyle: tr('{0} changed the icon or colour of the list {1} (admin of {2})', who, q(d.name || ''), q(d.org || ''))})[d.action] || tr('{0} changed something', who);
     case 'unblock': return d.hidden ? tr('{0} completed a task you cannot see: your task is unblocked', who) : tr('{0} completed {1}: your task is unblocked', who, q(d.title || ''));
     case 'newtask': return tr('{0} added a task', who);
+    case 'orgjoin': return tr('{0} invites you to join the organisation {1}', who, q(d.name || ''));  // 2.148.1 A (#2480): oinvview.js
     case 'connreq': return tr('{0} wants to connect with you', who);  // 2.49.0 (#1106)
     case 'connok': return tr('{0} accepted your connection request', who);
     case 'lytpl': return tr('{0} sent you the arrangement {1}', who, q(d.name || ''));  // 2.55.0 (#1068)
@@ -414,6 +419,7 @@ async function newsOpen(i, opts) {
   if (it.kind === 'evinvite' && it.data?.event_id) { evOpen(it.data.event_id); return; }  // 2.21.0 (#659 / #658)
   if (it.kind === 'evshare') { go('cal'); setTimeout(evCalsModal, 150); return; }
   if (it.kind === 'abshare') { go('contacts'); return; }
+  if (it.kind === 'orgjoin') { ojn_open(it.data || {}); return; }  // 2.148.1 A (#2480): accept or decline
   if (it.kind === 'connreq' || it.kind === 'connok') { dsc_open(); return; }  // 2.49.0 (#1106)
   if (it.kind === 'lytpl') { lyv_offerOpen(it.data?.offer); return; }  // 2.55.0 (#1068)
   if (it.kind === 'dispo') { if (workloadOn()) { WLV.tab = dp_on() ? 'dispo' : 'wl'; go('workload'); } return; }  // 2.50.0 (#1194)
@@ -438,7 +444,7 @@ async function newsOpen(i, opts) {
 // ---- 2.122.0 (#2314): phones: a sideways swipe on the task opened from the news goes to the next (left) / previous (right)
 // UNREAD news in the order and with the filter (tab, kind, workspace) of the list; it is marked read like on opening. None left:
 // a short notice, the view stays. Same exceptions as the swipe on tasks (detail.js, #1071); the swipe on the list rows stays.
-const NSW_SKIP = /^(proposal|playbook_proposal|evinvite|evshare|abshare|connreq|connok|lytpl|dispo|usage|upscan|signup|leavereq|leavedecide|tsheet|wiki_shared)$/;  // 2.125.0 A (#2117) + B (#2119): + leave, timesheets
+const NSW_SKIP = /^(proposal|playbook_proposal|evinvite|evshare|abshare|connreq|connok|orgjoin|lytpl|dispo|usage|upscan|signup|leavereq|leavedecide|tsheet|wiki_shared)$/;  // 2.125.0 A (#2117) + B (#2119): + leave, timesheets
 const nswOn = () => !!S.nswTask && S.sel === S.nswTask;
 function nswTarget(dir) {
   const its = S.nf.items || [], cur = its.findIndex(x => x.id === S.nswId);

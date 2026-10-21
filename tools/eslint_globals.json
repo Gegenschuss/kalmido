@@ -4333,6 +4333,8 @@
 "oinvRedraw",
 "oinvRoleSel",
 "oinvSend",
+"oinvUid",
+"ojn_open",
 "ole_edit",
 "ole_logDetail",
 "ole_mark",

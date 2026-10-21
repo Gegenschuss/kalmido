@@ -16,6 +16,7 @@ import subprocess
 import sys
 
 import requests
+from freelancer_fixture import org_join  # 2.148.1 (#2480): an invited member accepts
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
@@ -86,7 +87,7 @@ assert r.status_code == 201, r.text
 ORG = r.json()["id"]
 ORG2 = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": ERIN}).json()["id"]
 Bo = sess("bob")
-check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok, "setup: carol joins Alpha")
+check((Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok and org_join(B, "carol", ORG)), "setup: carol joins Alpha")
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write"], "username": "alphabot", "display_name": "Alpha bot"})
 AG, AGH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
 dbx("UPDATE agents SET org_id=? WHERE user_id=?", (ORG, AG), write=True)

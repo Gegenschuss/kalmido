@@ -24,6 +24,7 @@ import sys
 import time
 
 import requests
+from freelancer_fixture import org_join  # 2.148.1 (#2480): an invited member accepts
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
@@ -172,7 +173,7 @@ r = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ids["bob"]}
 assert r.status_code == 201, r.text
 ORG = r.json()["id"]
 Bo = sess("bob")
-check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok, "setup: carol joins Alpha")
+check((Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok and org_join(B, "carol", ORG)), "setup: carol joins Alpha")
 dbx("DELETE FROM org_members WHERE org_id=? AND user_id NOT IN (?,?)", (ORG, ids["bob"], ids["carol"]), write=True)
 dbx("DELETE FROM org_members WHERE user_id=?", (ids["erin"],), write=True)  # erin: a freelancer without an organisation
 r = A.post(B + "/api/admin/agents", json={"username": "plbot", "display_name": "Plbot"})

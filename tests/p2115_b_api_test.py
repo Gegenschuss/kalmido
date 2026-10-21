@@ -210,10 +210,18 @@ check(not DB.execute("SELECT 1 FROM users WHERE email LIKE 'x_@example.com'").fe
 r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "Nina.New@example.com", "role": "admin"})
 j = r.json() if r.ok else {}
 inv = j.get("invitation") or {}
-# 2.115.0 review (M2): once mailed, the link is only in the mail, not in the admin's answer
-check(r.ok and j.get("invited") and inv.get("sent") and "link" not in inv and "#invite/" not in r.text,
-      "a new address: account + invitation, mailed, no link in the answer " + r.text[:300])
-NU = j.get("user_id")
+# 2.115.0 review (M2): once mailed, the link is only in the mail, not in the admin's answer. 2.148.1 (#2480): the answer of an
+# organisation admin is the same for every address (no "invited", no "user_id", no invitation details)
+check(r.ok and set(j) == {"ok", "by_email", "invites"} and "#invite/" not in r.text,
+      "a new address: account + invitation, mailed, the same answer as for any address " + r.text[:300])
+
+
+def uid_of(mail):
+    row = DB.execute("SELECT id FROM users WHERE lower(email)=lower(?)", (mail,)).fetchone()
+    return row[0] if row else None
+
+
+NU = uid_of("Nina.New@example.com")
 u = DB.execute("SELECT username, password_hash, email, disabled FROM users WHERE id=?", (NU,)).fetchone()
 check(u and u["username"] == "nina.new" and not u["password_hash"] and u["email"] == "Nina.New@example.com" and not u["disabled"],
       f"the account: user name from the address, no password: {dict(u) if u else None}")
@@ -232,9 +240,9 @@ iv = r.json()["invites"] if r.ok else []
 check(len(iv) == 1 and iv[0]["user_id"] == NU and iv[0]["role"] == "admin" and iv[0]["state"] == "invited", f"the open invitation is listed: {iv}")
 check(Fk.get(B + f"/api/orgs/{ORG}/invites").status_code == 404, "another organisation's admin does not see it")
 r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "nina.new@example.com", "role": "admin"})
-check(r.ok and r.json() == {"ok": True, "by_email": True}, "the address again (it has an account now): the old answer " + r.text[:200])
+check(r.ok and set(r.json()) == {"ok", "by_email", "invites"}, "the address again (it has an account now): the same answer " + r.text[:200])  # 2.148.1 (#2480)
 r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "carol@example.com"})
-check(r.ok and r.json() == {"ok": True, "by_email": True} and "invitation" not in r.text, "an address with an account: added as before, no invitation")
+check(r.ok and set(r.json()) == {"ok", "by_email", "invites"} and "invitation" not in r.text, "an address with an account: the same answer, no invitation link")  # 2.148.1 (#2480)
 check(DB.execute("SELECT COUNT(*) FROM users WHERE lower(email)='carol@example.com'").fetchone()[0] == 1, "no second account")
 
 # ---- resend: a new link, the old one stops working
@@ -264,9 +272,9 @@ check(Bo.get(B + f"/api/orgs/{ORG}/invites").json()["invites"] == [], "no longer
 
 # ---- withdraw: only this organisation's never used account
 r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "otto@example.com"})
-OU = r.json().get("user_id") if r.ok else None
+OU = uid_of("otto@example.com") if r.ok else None  # 2.148.1 (#2480): the answer carries no user id
 r = Fk.post(B + f"/api/orgs/{ORG2}/invites", json={"email": "petra@example.com"})
-PU = r.json().get("user_id") if r.ok else None
+PU = uid_of("petra@example.com") if r.ok else None
 check(OU and PU, "two more invitations (two organisations)")
 check(Bo.delete(B + f"/api/orgs/{ORG}/invites/{PU}").status_code == 404 and DB.execute("SELECT 1 FROM users WHERE id=?", (PU,)).fetchone(),
       "withdrawing another organisation's invitation: 404, the account stays")
@@ -277,9 +285,9 @@ check(not DB.execute("SELECT 1 FROM users WHERE id=?", (OU,)).fetchone(), "the n
 check(DB.execute("SELECT 1 FROM users WHERE id=?", (uid["frank"],)).fetchone() and DB.execute("SELECT 1 FROM users WHERE id=?", (NU,)).fetchone(),
       "nobody else is deleted")
 r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "otto@example.com"})
-check(r.ok and r.json().get("invited"), "the undo: the same address invited again")
+check(r.ok and uid_of("otto@example.com"), "the undo: the same address invited again")  # 2.148.1 (#2480)
 r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "rita@example.com"})
-RU = r.json().get("user_id") if r.ok else None
+RU = uid_of("rita@example.com") if r.ok else None
 check(RU and Bo.delete(B + f"/api/orgs/{ORG}/members/{RU}").ok, "an invited person removed from the organisation")
 check(Bo.delete(B + f"/api/orgs/{ORG}/invites/{RU}").status_code == 404 and DB.execute("SELECT 1 FROM users WHERE id=?", (RU,)).fetchone()
       and not any(v["user_id"] == RU for v in Bo.get(B + f"/api/orgs/{ORG}/invites").json()["invites"]),

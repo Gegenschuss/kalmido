@@ -36,7 +36,7 @@ async function shsOpen(sh) {
       || `<div class="muted mhint">${tr('Not shared yet')}</div>`;
   };
   draw();
-  const add = async b => { const r = await api('POST', shsUrl(sid), b); shares = r.shares; draw(); shsAfter(sid); return r; };
+  const add = async b => { const r = await api('POST', shsUrl(sid), b); shares = r.shares || shares; draw(); shsAfter(sid); return r; };  // 2.148.1 A (#2490): by address no list
   const idOf = uid => (shares.find(q => q.user_id === uid) || {}).id;
   md.addEventListener('click', async e => {
     const t = /** @type {any} */ (e.target);

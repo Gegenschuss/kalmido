@@ -248,6 +248,11 @@ CHECKS = {
     "office_receipt": ("SELECT n.id, n.owner_id FROM fs_nodes n JOIN (SELECT node_id AS nid, org_id FROM office_cash_entries WHERE node_id IS NOT NULL "
                        "UNION SELECT receipt_node_id, org_id FROM office_equipment WHERE receipt_node_id IS NOT NULL) r ON r.nid=n.id "
                        "JOIN orgs o ON o.id=r.org_id WHERE n.org_id IS DISTINCT FROM r.org_id AND NOT (n.org_id IS NULL AND o.personal_of=n.owner_id)"),
+    # 2.148.1 A (#2478): a public link of an organisation's list made by someone who is neither its owner nor a member of it
+    # (the owner change gives the link a new token; counted only) -- (list, creator)
+    "public_link_creator": ("SELECT p.list_id, p.created_by FROM public_links p JOIN lists l ON l.id=p.list_id WHERE l.org_id IS NOT NULL "
+                            "AND p.created_by IS NOT NULL AND p.created_by!=l.owner_id AND NOT EXISTS (SELECT 1 FROM list_members m "
+                            "WHERE m.list_id=p.list_id AND m.user_id=p.created_by)"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 
@@ -362,7 +367,8 @@ def boundary_tick(c):
 # 2.46.0 (#1563): what each finding is, for the administration (kind prefix -> (type, table of the object))
 OA_OBJ = {"list": ("list", "lists"), "group": ("list", "lists"), "cal": ("calendar", "ev_cals"), "book": ("book", "books"),
           "client": ("client", "clients"),  # 2.59.0 A (#1735)
-          "att": ("event", "events")}  # 2.87.0 (#1983): an invitation to an organisation's event
+          "att": ("event", "events"),  # 2.87.0 (#1983): an invitation to an organisation's event
+          "public": ("list", "lists")}  # 2.148.1 A (#2478): a public link of an organisation's list (public_link_creator)
 OA_DETAIL_MAX = 100
 
 

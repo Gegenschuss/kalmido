@@ -243,7 +243,8 @@ check(share(Bo, OS, user_id=uid["erin"], role="read").status_code == 409, "an or
 r = share(Bo, OS, email="erin@example.com", role="read")
 check(r.status_code == 201 and r.json().get("by_email") is True, "by e-mail: the same answer " + r.text[:200])
 r2 = share(Bo, OS, email="nobody@example.com", role="read")
-check(r2.status_code == 201 and set(r2.json()) == set(r.json()) and r2.json()["shares"] == r.json()["shares"], "an unknown address: the same answer")
+# 2.148.1 (#2490): by address the answer carries no share list
+check(r2.status_code == 201 and r2.json() == r.json() == {"by_email": True}, "an unknown address: the same answer " + r2.text[:200])
 check(Er.get(B + f"/api/sheets/{OS}").status_code == 404 and not ids(Er, "shared"), "erin got nothing")
 
 # ================================================================ moving ends the shares
