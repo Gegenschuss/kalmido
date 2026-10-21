@@ -73,12 +73,15 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
     const mm = window.matchMedia; window.matchMedia = q => q === 'print' ? mq : mm.call(window, q);
     SHV.sh = {id: 987654, title: 'Print me', columns: [], rows: [], _rowNo: new Map()};
     const on = () => document.body.classList.contains('shkprint') && !!document.getElementById('shk-print');
-    window.print = () => { mq.matches = true; mqL?.(); dispatchEvent(new Event('afterprint')); setTimeout(() => { mq.matches = false; mqL?.(); }, 30); };
+    let mqEnd = false; window.print = () => { mq.matches = true; mqL?.(); dispatchEvent(new Event('afterprint')); setTimeout(() => { mq.matches = false; mqL?.(); mqEnd = true; }, 30); };
     shk_print(); await new Promise(r => setTimeout(r, 900));
     out.kept = on();
     dispatchEvent(new FocusEvent('focus')); out.focusNoBlur = on();  // a focus without leaving first is no return
     dispatchEvent(new FocusEvent('blur')); dispatchEvent(new FocusEvent('focus'));
     out.goneBack = !on();
+    // 2.144.2 (#2370): on a slow runner the media end of the first run (30 ms timer) can come late and hit the second run before
+    // its print() (early end -> view kept) -> wait for it first
+    for (let i = 0; i < 200 && !mqEnd; i++) await new Promise(r => setTimeout(r, 20));
     let printedAt = 0; window.print = () => { printedAt = performance.now(); };  // desktop: print() blocks, afterprint comes when the dialog closes
     // 2.145.0: wait for the real print() call, then past the 500 ms early window (a fixed 700 ms was flaky on a busy first run)
     shk_print(); for (let i = 0; i < 100 && !printedAt; i++) await new Promise(r => setTimeout(r, 20));

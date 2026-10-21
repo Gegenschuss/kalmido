@@ -45,7 +45,7 @@ Q2 = Decimal("0.01")
 UBL_NS = ("urn:oasis:names:specification:ubl:schema:xsd:Invoice-2", "urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2")
 CII_NS = ("urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100", "urn:ferd:CrossIndustryDocument:invoice:1p0")
 CREDIT_TYPES = {"381", "396", "532"}  # UNTDID 1001: credit note (factored), forwarder's credit note
-_CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f​-‏‪-‮⁦-⁩]")
+_CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069]")  # escapes, not the characters (bandit B613)
 _NUM = re.compile(r"^\s*([+-]?\d{1,15}(?:\.\d{1,8})?)\s*$")
 _ROOT = re.compile(rb"<(?:[A-Za-z_][\w.-]*:)?(Invoice|CreditNote|CrossIndustryInvoice|CrossIndustryDocument)[\s>/]")
 
