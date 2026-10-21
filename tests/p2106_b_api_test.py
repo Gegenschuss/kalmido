@@ -328,7 +328,7 @@ x = answer(A, D1)
 check(x.get("client_id") == CL and not x.get("contact_id") and "Versicherungsweg 2" in (x.get("rcpt_address") or ""),
       f"#2229: a client of that name goes first {x}")
 for nm in ("Privatkontakt Beispiel", "Fremdfirma Beispiel"):
-    dx = upload(A, nm + ".txt", "Datum: 11.10.2026\nEin Schreiben.\n", f"org:{ORG}")
+    dx = upload(A, nm + ".txt", f"Datum: 11.10.2026\nEin Schreiben von {nm}.\n", f"org:{ORG}")  # own content: no duplicate
     A.patch(B + f"/api/docs/{dx}", json={"sender": nm})
     x = answer(A, dx)
     check(not x.get("contact_id") and x.get("rcpt_name") == nm and not (x.get("rcpt_address") or ""),
