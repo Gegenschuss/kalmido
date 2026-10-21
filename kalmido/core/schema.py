@@ -2990,6 +2990,8 @@ MIGRATIONS = [
     ("budget_entries", "ikey", "ALTER TABLE budget_entries ADD COLUMN ikey TEXT NOT NULL DEFAULT ''"),
     ("budget_entries", "import_run", "ALTER TABLE budget_entries ADD COLUMN import_run TEXT NOT NULL DEFAULT ''"),
     ("budget_meta", "runs", "ALTER TABLE budget_meta ADD COLUMN runs TEXT NOT NULL DEFAULT '[]'"),
+    # 2.154.0 D (#2567): the invoice a copy was made from while the copy keeps the client + period of its hours (hint on the draft)
+    ("office_docs", "dup_times_from", "ALTER TABLE office_docs ADD COLUMN dup_times_from TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

@@ -12568,5 +12568,9 @@
   "Suggest after": "Proposer après",
   "suggested": "proposé",
   "Suggest payment reminders for overdue invoices": "Proposer des relances pour les factures en retard",
-  "Read|section": "Lu"
+  "Read|section": "Lu",
+  "Copy of {0}: the hours of that invoice are already billed. This copy binds no times.": "Copie de {0} : les heures de cette facture sont déjà facturées. Cette copie ne lie aucun temps.",
+  "Duplicate this invoice?": "Dupliquer cette facture ?",
+  "The hours of this invoice are already billed; the copy binds no times.": "Les heures de cette facture sont déjà facturées ; la copie ne lie aucun temps.",
+  "Add calculation: {0}": "Ajouter un calcul : {0}"
 }

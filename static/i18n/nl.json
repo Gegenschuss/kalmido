@@ -12568,5 +12568,9 @@
   "Suggest after": "Voorstellen na",
   "suggested": "voorgesteld",
   "Suggest payment reminders for overdue invoices": "Betalingsherinneringen voorstellen voor achterstallige facturen",
-  "Read|section": "Gelezen"
+  "Read|section": "Gelezen",
+  "Copy of {0}: the hours of that invoice are already billed. This copy binds no times.": "Kopie van {0}: de uren van die factuur zijn al gefactureerd. Deze kopie koppelt geen tijden.",
+  "Duplicate this invoice?": "Deze factuur dupliceren?",
+  "The hours of this invoice are already billed; the copy binds no times.": "De uren van deze factuur zijn al gefactureerd; de kopie koppelt geen tijden.",
+  "Add calculation: {0}": "Calculatie toevoegen: {0}"
 }

@@ -737,6 +737,12 @@ def tp_part_create(did):
     kind = b.get("kind") or "items"
     if kind not in PART_KINDS or (kind == "shoot" and not tp_shoot_ok(c, oid)):
         raise BadInput(tr("Invalid value: {0}", "kind"))
+    code = None
+    if kind == "shoot":  # 2.154.0 D (#1876): the industry pack of a new calculation part: one of those switched on (default: the first one)
+        on = _dk("dk_packs_on")(office_settings(c, oid)) if _dk("dk_packs_on") is not None else []
+        code = b.get("pack") or ("film" if "film" in on or not on else on[0])
+        if not isinstance(code, str) or (on and code not in on):
+            raise BadInput(tr("Invalid value: {0}", "pack"))
     n = c.execute("SELECT COUNT(*) FROM office_doc_parts WHERE doc_id=? AND org_id=?", (did, oid)).fetchone()[0]
     if n >= MAX_PARTS:
         raise BadInput(tr("Too many parts (at most {0})", MAX_PARTS))
@@ -746,9 +752,9 @@ def tp_part_create(did):
     sort = (c.execute("SELECT MAX(sort) FROM office_doc_parts WHERE doc_id=? AND org_id=?", (did, oid)).fetchone()[0] or 0) + 1
     pid = insert_id(c, "INSERT INTO office_doc_parts(org_id, doc_id, sort, kind, title, print, settings, sheet, totals, created_at, updated_at) "
                        "VALUES(?,?,?,?,?,?,?,?,?,?,?)", (oid, did, sort, kind, title, 0 if b.get("print") in (0, False, "0") else 1, "{}", "{}", "{}", ts, ts))
-    if kind == "shoot":  # a new sheet with the film pack's presets (part C), then what the body brings
+    if kind == "shoot":  # a new sheet with the chosen pack's presets (part C), then what the body brings
         new, pk = _dk("dk_sheet_new"), _dk("dk_pack")
-        sh = new(pk("film") if pk is not None else None) if new is not None else {}
+        sh = new(pk(code) if pk is not None else None) if new is not None else {}
         if isinstance(b.get("sheet"), dict):
             sh = _dk("dk_sheet_clean")(c, oid, b["sheet"], sh, admin)
         c.execute("UPDATE office_doc_parts SET sheet=? WHERE id=? AND org_id=?", (_sheet_store(c, oid, sh), pid, oid))

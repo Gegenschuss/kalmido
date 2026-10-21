@@ -58,6 +58,13 @@ function tpItemRow(it, i, d, line, mv) {
 }
 
 // ---- the section "Parts" below the title page's positions
+
+// 2.154.0 D (#1876): one button per industry pack that is switched on (one pack = the plain button, as before)
+function tpPackBtns(packs) {
+  const nm = x => (typeof x?.name === 'string' ? x.name : x?.name?.[uiLang()] || x?.name?.en || x?.name?.de || x?.code || '');
+  if (packs.length < 2) return `<button type="button" class="btn sm" data-ofd="tp-add" data-kind="shoot" data-pack="${esc(packs[0].code)}">${ic('plus', 's')}<span>${tr('Add shoot calculation')}</span></button>`;
+  return packs.map(x => `<button type="button" class="btn sm" data-ofd="tp-add" data-kind="shoot" data-pack="${esc(x.code)}">${ic('plus', 's')}<span>${esc(tr('Add calculation: {0}', nm(x)))}</span></button>`).join('');
+}
 function tpPartsHtml(d, adm) {
   if (d.kind !== 'offer') return '';
   const ps = d.parts || [];
@@ -69,7 +76,7 @@ function tpPartsHtml(d, adm) {
       <b class="ofdlt">${esc(tpMoney(p.totals?.net, d))}</b><span class="tpfchev" aria-hidden="true">${ic('right', 's')}</span></a>
     ${on ? '' : `<label class="chkl tpprint"><input type="checkbox" data-tp="print" data-pid="${p.id}" ${p.print ? 'checked' : ''}> ${tr('Print')}</label>`}
     <span class="ofdmv"><button type="button" class="ib" data-ofd="tp-up" data-pid="${p.id}" ${i === 0 ? 'disabled' : ''} aria-label="${esc(tr('Move up'))}">${ic('up', 's')}</button><button type="button" class="ib" data-ofd="tp-down" data-pid="${p.id}" ${i === ps.length - 1 ? 'disabled' : ''} aria-label="${esc(tr('Move down'))}">${ic('down', 's')}</button><button type="button" class="ib" data-ofd="tp-del" data-pid="${p.id}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></span>${on ? `<div class="tpfbox" data-pid="${p.id}">${tpPartEditorHtml(d, adm, p.id)}</div>` : ''}</li>`; }).join('');
-  const add = `<div class="ofdadd"><button type="button" class="btn sm" data-ofd="tp-add" data-kind="items">${ic('plus', 's')}<span>${tr('Add part')}</span></button>${d.parts_shoot && OFC.info?.industry?.length ? `<button type="button" class="btn sm" data-ofd="tp-add" data-kind="shoot">${ic('plus', 's')}<span>${tr('Add shoot calculation')}</span></button>` : ''}</div>`;
+  const add = `<div class="ofdadd"><button type="button" class="btn sm" data-ofd="tp-add" data-kind="items">${ic('plus', 's')}<span>${tr('Add part')}</span></button>${d.parts_shoot && OFC.info?.industry?.length ? tpPackBtns(OFC.info.industry) : ''}</div>`;
   return ofdSec('parts', tr('Parts'), `${ps.length ? `<ul class="ofdits tplist" role="list">${rows}</ul>` : `<p class="muted">${tr('A part is an own page of the quotation (e.g. a module or a shooting day). The title page lists it with a quantity.')}</p>`}${add}`,
     ps.length ? `<span class="c muted">${ps.length}</span>` : '');
 }
@@ -132,7 +139,7 @@ async function tpClick(a, b) {
   if (!d.can_edit) return;
   if (a === 'tp-add') {
     for (let n = 0; OFD.saving && n < 50; n++) await new Promise(r => setTimeout(r, 100));  // 2.138.0 A (#2239): a running save of the title page first
-    const j = await ofdSave('POST', `/api/office/docs/${d.id}/parts`, {kind: b.dataset.kind || 'items'});
+    const j = await ofdSave('POST', `/api/office/docs/${d.id}/parts`, {kind: b.dataset.kind || 'items', ...(b.dataset.pack ? {pack: b.dataset.pack} : {})});
     if (j?.part) { tpf_set(d, j.part.id, true); OFD.open.parts = true; ofdDraw(); setTimeout(() => { const el = $(`.tpfbox[data-pid="${j.part.id}"] .tptitle`); el?.focus(); el?.select?.(); }, 0); }  // 2.113.0 (#2248)
     return;
   }

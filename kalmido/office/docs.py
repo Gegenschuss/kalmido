@@ -1210,7 +1210,7 @@ DUP_SKIP = {"id", "number", "status", "created_at", "updated_at", "sent_at", "cr
             "terms",  # 2.113.2 (#2253): a copy takes the terms when it is finalised itself
             "version_of", "cashflow",  # 2.88.0 (#1915): set below (a quotation's copy = its next version, cash flow auto)
             "series_id", "series_period", "abs_refs",  # 2.120.0 A (#2087): abs_refs  # 2.91.0 A (#1923): a copy is no invoice of the series (office/recurring.py sets them itself)
-            "reminder_fee_state", "agent_id", "list_id"}  # 2.126.0 A (#1979 F6): a fresh fee state, made by the person copying
+            "reminder_fee_state", "agent_id", "list_id", "dup_times_from"}  # 2.126.0 A (#1979 F6): a fresh fee state, made by the person copying
 DUP_ITEM_SKIP = {"id", "tax_pct", "net", "tax_amount"}
 
 
@@ -1229,6 +1229,8 @@ def odoc_duplicate(did):
                valid_until=(today + timedelta(days=int(s.get("offer_valid_days") or 30))).isoformat() if r["kind"] == "offer" else "")
     if r["kind"] == "offer":  # 2.88.0 (#1915): the chain of versions points at its first quotation (a copy of a copy too)
         row["version_of"] = r["version_of"] or r["id"]
+    if r["kind"] == "invoice" and r["client_id"] and r["service_from"] and r["service_to"]:
+        row["dup_times_from"] = r["number"] or f"#{did}"  # 2.154.0 D (#2567): its hours are billed on the original; the copy binds none
     nid = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     from ..integrations.webhooks import who_note
     who_note("invoice.created", "invoice", nid)  # 2.115.0 A (#2061): a copy
