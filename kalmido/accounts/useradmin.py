@@ -330,10 +330,6 @@ def ua8_lists_settle(c, u, by):
                             lists=bad), 409), None
         with system_ctx(c):  # review M3 (#1969: receipts are kept 10 years): a list with project receipts is only handed over
             bad = [lr["id"] for lr in lists if c.execute("SELECT 1 FROM budget_files WHERE list_id=? LIMIT 1", (lr["id"],)).fetchone()]
-        from ..admin.hosting import hosted
-        if bad and hosted() and request.args.get("retention") in ("exported", "waived"):
-            bad = []  # 2.146.0 D (#2468): hosted, the keeping lies with the person: after the retention export / its waiver
-            # (user_delete checks it in the same transaction) the receipts go along, files included (list_purge)
         if bad:
             return (jsonify(error=tr("Lists with receipts cannot be deleted along (receipts are kept): hand them over instead."),
                             lists=bad), 409), None

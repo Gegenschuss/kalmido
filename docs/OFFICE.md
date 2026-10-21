@@ -1749,10 +1749,6 @@ finished export, are noted (table `retention_log`) and land in the security log.
 first. An organisation admin can no longer delete an account whose personal office holds invoices or a cash book (only the
 person can export it; a server admin deletes it after that).
 
-On a hosted instance (`KALMIDO_HOSTED=1`) the keeping lies with the customer: after the retention export or its waiver,
-lists with project receipts may be deleted along with the account (files included); on your own server they are still
-only handed over (receipts are kept).
-
 Routes (people only, an API token 403): `GET /api/retention/me`, `GET /api/retention/me/export.zip`,
 `GET /api/retention/org/<id>` (the organisation's admins; an instance admin sees only whether records exist),
 `GET /api/retention/org/<id>/export.zip`.
