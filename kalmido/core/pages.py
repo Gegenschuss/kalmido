@@ -1,8 +1,10 @@
 """HTML pages, security headers, /api/version, the share target, quick capture, /drop and the ntfy share inbox."""
+import hashlib
 import json
 import mimetypes
 import os
 import re
+import threading
 import uuid
 import time
 import urllib.error
@@ -47,7 +49,51 @@ def headers(resp):
         resp.headers["X-Robots-Tag"] = "noindex, nofollow"
     if request.path.startswith("/api/") and not request.path.startswith(("/api/attachments/", "/api/chat-files/", "/api/avatar/", "/api/group-avatar/", "/api/list-icon/", "/api/list-files/", "/api/list-header/")):
         resp.headers["Cache-Control"] = "no-store"
+    # 2.149.0 B (#2505): a static file asked for with ?v=<its content hash> never changes: the browser keeps it a year without
+    # asking again. Any other ?v= (the version of the code, an old hash after an update) and no ?v= stay as before.
+    v = request.args.get("v")
+    if v and resp.status_code in (200, 304) and request.path.startswith("/static/") and v == static_hash(request.path[8:]):
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return resp
+
+
+# ---------------------------------------------------------------- 2.149.0 B (#2505 #2506): content hashes of static files
+
+_SHASH, _SHASH_LOCK = {}, threading.Lock()
+_ASSET_RE = re.compile(r'(<(?:script|link)\b[^>]*?\b(?:src|href)="/static/)([\w./-]+\.(?:js|css))"')
+_SW_LISTS_RE = re.compile(r"const (?:SHELL|LAZY|LAZY_CSS) = \[(.*?)\];", re.S)
+
+
+def static_hash(rel):
+    """The first 12 hex digits of the SHA-256 of static/<rel> (None: no such file), kept until the file changes."""
+    root = os.path.realpath(app.static_folder)
+    path = os.path.realpath(os.path.join(root, rel))
+    if not path.startswith(root + os.sep):
+        return None
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    key = (st.st_mtime_ns, st.st_size)
+    hit = _SHASH.get(path)
+    if hit and hit[0] == key:
+        return hit[1]
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 16), b""):
+            h.update(chunk)
+    with _SHASH_LOCK:
+        _SHASH[path] = (key, h.hexdigest()[:12])
+    return _SHASH[path][1]
+
+
+def _versioned(html):
+    """index.html: every start script and stylesheet under /static/ gets ?v=<content hash> (the file list itself stays in
+    index.html; tools/check_layout.py compares it with sw.js)."""
+    def sub(m):
+        h = static_hash(m.group(2))
+        return m.group(0) if not h else f'{m.group(1)}{m.group(2)}?v={h}"'
+    return _ASSET_RE.sub(sub, html)
 
 
 _INDEX = {}
@@ -58,10 +104,11 @@ def index_page():
     when the server runs a newer version than the code in the browser."""
     path = os.path.join(app.static_folder, "index.html")
     mt = os.path.getmtime(path)
-    if _INDEX.get("mt") != mt:
+    if _INDEX.get("mt") != mt or time.monotonic() - _INDEX.get("at", 0) > 5:  # 2.149.0 B (#2505): the hashes follow changed files
         with open(path, encoding="utf-8") as f:
-            _INDEX.update(mt=mt, html=f.read().replace('<meta name="kalmido-version" content="">',
-                                                       f'<meta name="kalmido-version" content="{APP_VERSION}">', 1))
+            _INDEX.update(mt=mt, at=time.monotonic(),
+                          html=_versioned(f.read().replace('<meta name="kalmido-version" content="">',
+                                                           f'<meta name="kalmido-version" content="{APP_VERSION}">', 1)))
     r = Response(_INDEX["html"], mimetype="text/html")
     r.headers["Cache-Control"] = "no-cache"
     return r
@@ -468,6 +515,30 @@ def manifest():
 @app.get("/sw.js")
 def sw():
     r = send_from_directory(app.static_folder, "sw.js")
+    r.headers["Cache-Control"] = "no-cache"
+    return r
+
+
+_SWM = {}
+
+
+@app.get("/sw-manifest.json")
+def sw_manifest():
+    """2.149.0 B (#2506): what the service worker precaches (the lists SHELL / LAZY / LAZY_CSS in static/sw.js stay the one
+    source), each static file with its content hash. The worker keeps a file under "<url>?v=<hash>" and takes an unchanged
+    one over from its old cache on an update instead of loading it again. Computed here, so it can never be out of date."""
+    path = os.path.join(app.static_folder, "sw.js")
+    mt = os.path.getmtime(path)
+    if _SWM.get("mt") != mt or time.monotonic() - _SWM.get("at", 0) > 5:
+        with open(path, encoding="utf-8") as f:
+            urls = [u for blk in _SW_LISTS_RE.findall(f.read()) for u in re.findall(r"'(/static/[\w./-]+)'", blk)]
+        _SWM.update(mt=mt, at=time.monotonic(), urls=list(dict.fromkeys(urls)))
+    files = {}
+    for u in _SWM["urls"]:
+        h = static_hash(u[8:])
+        if h:
+            files[u] = h
+    r = jsonify(v=1, files=files)
     r.headers["Cache-Control"] = "no-cache"
     return r
 

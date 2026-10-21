@@ -26,6 +26,7 @@ ORDER = (
     "core.schema",
     "core.i18n",
     "core.pg",  # 2.37.0 (#1150): the Postgres layer (core.db re-exports it)
+    "core.reqtime",  # 2.149.0 B (#2504): request timing (Server-Timing, slow log); first hooks = whole request measured
     "core.db",
     "core.tokenhash",  # 2.138.0 C (#1907): upload / calendar tokens as hashes
     "core.rls",  # 2.37.0 (#1150): row-level security, applied by init_db

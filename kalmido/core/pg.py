@@ -177,6 +177,24 @@ ADAPTERS = _adapters()
 SYSTEM = (None, (), "system")
 LOOKUP = object()  # context hook answer: "read the memberships first" (see Conn._resolve_ctx)
 _CTX_HOOK = [None]
+# 2.149.0 B (#2504): per thread [statements, seconds in the database] of the running request (core/reqtime.py); None = not counted
+# (background threads, start-up, CLI). Thread-local, so no lock: a request runs on one waitress thread.
+_RT = threading.local()
+
+
+def rt_begin():
+    _RT.s = [0, 0.0]
+
+
+def rt_end():
+    """The counters of this thread's request ([n, seconds] or None); counting stops."""
+    st = getattr(_RT, "s", None)
+    _RT.s = None
+    return st
+
+
+def rt_peek():
+    return getattr(_RT, "s", None)
 
 
 def set_ctx_hook(fn):
@@ -235,9 +253,21 @@ class Conn:
 
     def _apply_ctx(self):
         uid, orgs, role = self._ctx
-        self._pg.execute("SELECT set_config('app.user_id', %s, true), set_config('app.org_ids', %s, true), "
-                         "set_config('app.role', %s, true)",
-                         ("" if uid is None else str(uid), ",".join(str(int(o)) for o in orgs), role))
+        self._pgx("SELECT set_config('app.user_id', %s, true), set_config('app.org_ids', %s, true), "
+                  "set_config('app.role', %s, true)",
+                  ("" if uid is None else str(uid), ",".join(str(int(o)) for o in orgs), role))
+
+    def _pgx(self, sql, args=None):
+        """2.149.0 B (#2504): one statement on the driver; inside a request (rt_begin) it is counted with its time."""
+        st = getattr(_RT, "s", None)
+        if st is None:
+            return self._pg.execute(sql, args)
+        t0 = time.perf_counter()
+        try:
+            return self._pg.execute(sql, args)
+        finally:
+            st[0] += 1
+            st[1] += time.perf_counter() - t0
 
     def _begin(self):
         idle = self._pg.info.transaction_status == TransactionStatus.IDLE
@@ -275,20 +305,26 @@ class Conn:
     def execute(self, sql, args=None):
         self._begin()
         if args is None or (not args and "?" not in sql):
-            return self._pg.execute(sql.replace("%", "%%") if args is not None else _raw(sql), None if args is None else ())
+            return self._pgx(sql.replace("%", "%%") if args is not None else _raw(sql), None if args is None else ())
         if isinstance(args, dict):
             raise ProgrammingError("named parameters are not supported; use ?")
-        return self._pg.execute(translate(sql), tuple(args))
+        return self._pgx(translate(sql), tuple(args))
 
     def executemany(self, sql, seq):
         self._begin()
         cur = self._pg.cursor()
-        cur.executemany(translate(sql), [tuple(a) for a in seq])
+        st, t0 = getattr(_RT, "s", None), time.perf_counter()  # 2.149.0 B (#2504): counted as one statement
+        try:
+            cur.executemany(translate(sql), [tuple(a) for a in seq])
+        finally:
+            if st is not None:
+                st[0] += 1
+                st[1] += time.perf_counter() - t0
         return cur
 
     def executescript(self, sql):
         self._begin()
-        return self._pg.execute(_raw(sql))
+        return self._pgx(_raw(sql))
 
     def commit(self):
         self._pg.commit()
@@ -317,15 +353,15 @@ class Conn:
         transaction on an error unless it ran inside a savepoint."""
         self._begin()
         name = f"sp{next(self._sp)}"
-        self._pg.execute(f"SAVEPOINT {name}")
+        self._pgx(f"SAVEPOINT {name}")
         try:
             yield self
         except BaseException:
-            self._pg.execute(f"ROLLBACK TO SAVEPOINT {name}")
+            self._pgx(f"ROLLBACK TO SAVEPOINT {name}")
             self._apply_ctx()  # 2.37.0 (#1150): a context set inside the savepoint was rolled back with it
             raise
         else:
-            self._pg.execute(f"RELEASE SAVEPOINT {name}")
+            self._pgx(f"RELEASE SAVEPOINT {name}")
 
     def __enter__(self):  # like sqlite3: `with c:` commits on success, rolls back on an error (does not close)
         return self
