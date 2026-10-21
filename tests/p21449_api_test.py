@@ -104,6 +104,17 @@ def run(S, who):
     check(re.fullmatch(r"KV-\d\d-V1", n4) is not None, f"{who}: with a version block {n4!r}")
     r = S.post(B + f"{D}/{root}/duplicate")
     check(r.status_code == 201 and r.json().get("number") == n4[:-1] + "2", f"{who}: the duplicate keeps the running number, V2 {r.text[:200]}")
+    # review: a prefix keeps its separator before the counter ("KV-{project}{seq:02}" -> "KV-07", not "KV07")
+    S.put(B + SET, json={"offer_scheme": "KV-{project}{seq:02}"})
+    r = S.post(B + D, json={"kind": "offer", "lang": "de", "date": "2030-03-01"})
+    check(re.fullmatch(r"KV-\d\d", r.json().get("number") or "") is not None, f"{who}: the prefix keeps its hyphen {r.json().get('number')!r}")
+    # review: a number of the old form (given before 2.144.9, "-KV09-V1") is still read: its duplicate keeps 09
+    S.put(B + SET, json={"offer_scheme": "{project}-KV{seq:02}-V{version}"})
+    r = S.post(B + D, json={"kind": "offer", "lang": "de", "date": "2030-03-01"})
+    od = r.json().get("id")
+    dbx("UPDATE office_docs SET number='-KV91-V1' WHERE id=?", (od,))
+    r = S.post(B + f"{D}/{od}/duplicate")
+    check(r.status_code == 201 and r.json().get("number") == "KV91-V2", f"{who}: an old-form number is read back: KV91-V2 {r.text[:200]}")
     S.put(B + SET, json={"offer_scheme": "{project}-KV{seq:02}-{initials}"})
 
     # ---- 2. an invoice from a quotation names it in the head
@@ -148,11 +159,19 @@ def run(S, who):
     doc = S.get(B + f"{D}/{did}").json()
     pp = next((p for p in doc.get("parts") or [] if p["id"] == pid), {})
     check(pp.get("title") == "Test teil 4" and [x["title"] for x in part_lines(doc, pid)] == ["Test teil 4"], f"{who}: stored both ways")
+    # review: a new line with its own text (no id: a stale editor) does not rename the part, it takes the part's name
+    r = S.put(B + f"{D}/{did}/items", json={"items": body(doc["items"]) + [{"kind": "part", "ref_part_id": pid, "title": "Stale", "qty": 1}],
+                                            "parts_known": [pid]})
+    pp = next((p for p in r.json().get("parts") or [] if p["id"] == pid), {})
+    check(r.ok and pp.get("title") == "Test teil 4" and [x["title"] for x in part_lines(r.json(), pid)] == ["Test teil 4", "Test teil 4"],
+          f"{who}: a new line never renames {pp.get('title')!r} {[x['title'] for x in part_lines(r.json(), pid)]}")
+    doc = r.json()
+    doc["items"] = [x for i, x in enumerate(doc["items"]) if not (x.get("ref_part_id") == pid and i == len(doc["items"]) - 1)]
     # an unchanged save (another position edited) keeps the name
     items = body(doc["items"])
     items[0]["qty"] = 2
     r = S.put(B + f"{D}/{did}/items", json={"items": items, "parts_known": [pid]})
-    check(r.ok and [x["title"] for x in part_lines(r.json(), pid)] == ["Test teil 4"], f"{who}: another edit leaves the name alone")
+    check(r.ok and set(x["title"] for x in part_lines(r.json(), pid)) == {"Test teil 4"}, f"{who}: another edit leaves the name alone")
     r = S.get(B + f"{D}/{did}/pdf")
     check(r.ok and r.content[:5] == b"%PDF-", f"{who}: the quotation PDF with the part {r.status_code}")
 
