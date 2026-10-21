@@ -1520,6 +1520,8 @@ fresh; run p2116_d_ui node p2116_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.143.0 part A (#2151: organisation roles guest / read-only / accounting)
 fresh; run p2143_a_api "$PY" p2143_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2143_a_ui node p2143_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p21472_a_ui node p21472_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p21472_b_ui node p21472_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.143.0 part B (#2152 #2211: off-site backup target, wiki trash emptied for good)
 fresh; run p2143_b_api "$PY" p2143_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2143_b_ui node p2143_b_ui.js "$KALMIDO_TEST_DATA"
