@@ -47,7 +47,7 @@ function sd_move(x, y) {
   const dy = y - SD.y0;
   const now = performance.now(), dt = Math.max(1, now - SD.lastT);
   SD.v = 0.6 * SD.v + 0.4 * ((y - SD.lastY) / dt); SD.lastY = y; SD.lastT = now;
-  const vh = sd_vh(), maxH = Math.round(vh * 0.94), minH = Math.min(SD.h0, Math.round(vh * 0.4));
+  const vh = sd_vh(), maxH = Math.max(SD.h0, Math.round(vh * 0.94)), minH = Math.min(SD.h0, Math.round(vh * 0.4));
   let h = SD.h0, ty = 0;
   if (sd_resizable(el)) {
     h = Math.max(minH, Math.min(maxH, SD.h0 - dy));
@@ -78,7 +78,7 @@ function sd_end(cancel) {
     }, 180);
   } else {
     if (SD.sized) {  // snap: half or almost full (a quick move up / down picks the side)
-      const vh = sd_vh(), cur = h - SD.ty, half = Math.round(vh * 0.5), full = Math.round(vh * 0.94);
+      const vh = sd_vh(), cur = h - SD.ty, half = Math.round(vh * 0.5), full = Math.max(SD.h0, Math.round(vh * 0.94));  // 2.161.0: a sheet that opens taller than 94 % never shrinks on a drag up
       const to = SD.v < -0.4 ? full : SD.v > 0.4 ? half : (Math.abs(cur - half) <= Math.abs(cur - full) ? half : full);
       el.style.height = Math.max(Math.min(to, full), Math.min(SD.h0, half)) + 'px';
     }
