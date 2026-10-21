@@ -65,7 +65,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const fbar = await until(() => d.querySelector('#side .sbhead .wsbar'), 60);  // 2.138.2 (#2392)
   check(fbar && /Private/.test(fbar.querySelector('.wsn')?.textContent || ''), '#1933: without an organisation the button stays and shows the private space');
   if (fbar) click(w, fbar);
-  const fitems = await until(() => { const x = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim()); return x.length && x; });
+  // 2.161.2 (#2607): the brand's menu adds Start and Hide the sidebar under the workspaces (wsm-home / wsm-side)
+  const fitems = await until(() => { const x = [...d.querySelectorAll('#pop [role="menuitem"]:not(.wsm-home):not(.wsm-side)')].map(b => b.textContent.trim()); return x.length && x; });
   check(fitems && fitems.length === 1 && /Private/.test(fitems[0]), '#1933: its menu offers only the private space: ' + fitems);
   w.close();
 

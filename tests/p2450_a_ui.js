@@ -59,7 +59,8 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   check(gs.indexOf('focus') < gs.indexOf('lists') && gs.indexOf('lists') < gs.indexOf('views') && gs.indexOf('views') < gs.indexOf('areas') && gs.indexOf('team') < gs.indexOf('more') && gs[gs.length - 1] === 'more', '#1503: Plan, Lists, Views, Areas … Conversations, More ' + gs.join());
   const more = () => d.querySelector('#side .sg-more');
   check(more()?.querySelector('.sgh.closed') && more().querySelector('.sgfold[hidden] .srow[data-go="trash"]') && /3/.test(more().querySelector('.sgh .c')?.textContent || ''), '#1502: More folded on a new device, its number = 3 entries');
-  check([...d.querySelectorAll('#side .sfoot > *')].map(x => x.dataset.act || x.dataset.go).join() === 'settings,home', '#1502: Settings alone at the bottom (2.145.0 #2437: plus the small Kalmido mark that opens Start)');
+  // 2.161.2 (#2607): the small mark at the bottom is gone (the brand on top opens Start from its menu)
+  check([...d.querySelectorAll('#side .sfoot > *')].map(x => x.dataset.act || x.dataset.go).join() === 'settings', '#1502: Settings alone at the bottom');
   click(w, more().querySelector('[data-act="side-group"]')); await sleep(150);
   check(more().querySelector(':scope > .srow[data-go="all"]') && more().querySelector(':scope > .srow[data-go="done"]') && JSON.parse(w.__store['tasks.sideOpenG'] || '[]').includes('more'), '#1502: opened, remembered per device');
   click(w, more().querySelector('[data-act="side-group"]')); await sleep(150);

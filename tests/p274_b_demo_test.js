@@ -70,7 +70,11 @@ const srv = http.createServer((req, res) => {
   await w.eval('load().then(render)'); await sleep(300);
   // 2.125.0 D (#1653): every module runs in the demo now: the purpose switches like on a server (events, contacts included)
   check(w.eval(`feat('office') && feat('clients')`) && /contacts/.test(pu.features) && /events/.test(pu.features), 'purpose office: office + clients on, the modules of the purpose like on a server: ' + pu.features);
+  // 2.161.2 (#2616): the office opens on the point used last, else the pipeline for its admin: the default page has no error
   w.eval(`go('office')`); await sleep(1500);
+  const vd = d.querySelector('#view')?.textContent || '';
+  check(!/Error|Fehler|nicht verfügbar/.test(vd), 'office: its default page (pipeline) works in the demo: ' + vd.slice(0, 200));
+  w.eval(`go('office/offers')`); await sleep(1500);
   const v0 = d.querySelector('#view')?.textContent || '';
   check(/Angebote/.test(v0) && /Neues Angebot/.test(v0), 'office view: quotations tab with "Neues Angebot": ' + v0.slice(0, 160));
   // 2. client (module clients), service with a day rate
