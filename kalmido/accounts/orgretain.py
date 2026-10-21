@@ -2,7 +2,7 @@
 when it is deleted.
 
 odl_retention(c, oid) counts the office data under a legal retention period (finalised documents and archive entries:
-books, 10 years; booked receipts, receipts of trips taken into DATEV, the logbook: 8 years -- core/retention.py
+books, cash book, bank statements: 10 years; booked receipts, receipts of trips taken into DATEV, entertainment receipts, the logbook: 8 years -- core/retention.py
 RET_LEGAL_YEARS, from the end of the calendar year) and gives the latest end. An organisation with such data is not
 deleted but retired (orgs.retired_at / retain_until): members out, data and key stay, nobody sees it in the app any more
 but the instance admins (list "Organisations": kept until ..., export only); the watchdog removes it for good after
@@ -35,6 +35,10 @@ ODL_LEGAL = (
     ("trip_receipts", "receipt", "SELECT substr(COALESCE(NULLIF(i.date, ''), t.date_from, i.created_at), 1, 4) FROM office_trip_items i "
                                  "JOIN office_trips t ON t.id=i.trip_id WHERE i.org_id=? AND i.datev=1"),
     ("drives", "logbook", "SELECT substr(COALESCE(NULLIF(day, ''), created_at), 1, 4) FROM office_drives WHERE org_id=?"),
+    # 2.152.0 (#2167, review A6): the cash book and the bank statements are books (10 years), approved entertainment receipts receipts
+    ("cash", "book", "SELECT substr(day, 1, 4) FROM office_cash_entries WHERE org_id=?"),
+    ("bank", "book", "SELECT substr(day, 1, 4) FROM office_bank_tx WHERE org_id=?"),
+    ("meals", "receipt", "SELECT substr(date, 1, 4) FROM office_meals WHERE org_id=? AND status<>'draft'"),
 )
 # what goes along with an organisation without legal data: shown before (409), deleted only with ?confirm=1
 ODL_CONTENT = (
@@ -58,8 +62,11 @@ def _year(v):
 
 
 def _until(kind, years):
+    """The latest end of the periods of rows from `years`; None when there is none or it is over already (2.152.0 #2167,
+    review A8: an expired period keeps nothing, it neither retires an organisation nor a personal office)."""
     ys = [y for y in (_year(v) for v in years) if y]
-    return f"{max(ys) + RET_LEGAL_YEARS[kind]}-12-31" if ys else None
+    end = f"{max(ys) + RET_LEGAL_YEARS[kind]}-12-31" if ys else None
+    return end if end and end >= date.today().isoformat() else None
 
 
 def odl_retention(c, oid):
@@ -72,9 +79,10 @@ def odl_retention(c, oid):
     with system_ctx(c):  # counts and years only, no content: the deleting admin need not be a member
         for key, kind, sql in ODL_LEGAL:
             years = [r[0] for r in c.execute(sql, (int(oid),)).fetchall()]
-            if years:
+            end = _until(kind, years)
+            if end:  # review A8: only what is still kept
                 counts[key] = len(years)
-                ends.append(_until(kind, years))
+                ends.append(end)
     ends = [e for e in ends if e]
     return {"counts": counts, "until": max(ends) if ends else None}
 
@@ -103,10 +111,18 @@ def odl_retired(c, oid):
     return (r["retain_until"] or "") if r and r["retired_at"] else None
 
 
+def odl_admin_export(c, oid):
+    """2.152.0 (#2167, review A4): whether any instance admin may export organisation oid: a retired organisation, never
+    the retired personal office of a deleted person (private data, the boundary rule)."""
+    with system_ctx(c):  # instance structure
+        r = c.execute("SELECT retired_at, retired_personal FROM orgs WHERE id=?", (int(oid),)).fetchone()
+    return bool(r and r["retired_at"] and not r["retired_personal"])
+
+
 def odl_retire(c, oid, until, gone=None):
     """Retires organisation oid until `until`: members (people and agents) out, its calendars / address books stay with
     their owners (private, as on a deletion), its agents leave it, the e-mail domains no longer let anybody in, invoice
-    series stop; the data, the file store and the key stay. The caller commits."""
+    series, mailboxes and the newsletter sync stop; the data, the file store and the key stay. The caller commits."""
     oid = int(oid)
     with system_ctx(c):  # the instance admin (or an account deletion) retires an organisation they need not be in
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
@@ -114,6 +130,9 @@ def odl_retire(c, oid, until, gone=None):
         c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))
         c.execute("DELETE FROM org_members WHERE org_id=?", (oid,))
         c.execute("UPDATE office_inv_series SET active=0 WHERE org_id=?", (oid,))
+        # 2.152.0 (#2167, review A7): no new data flows in any more (mail polling, newsletter sync)
+        c.execute("UPDATE hub_mailboxes SET active=0 WHERE org_id=?", (oid,))
+        c.execute("UPDATE nl_conns SET auto=0 WHERE org_id=?", (oid,))
         keeper = odl_custodian(c, gone)  # review F6: only the deleted person is left out, never the acting admin
         if keeper:  # its files must not go with the account of a former member later (fs_nodes.owner_id cascades)
             c.execute("UPDATE fs_nodes SET owner_id=? WHERE org_id=?", (keeper, oid))
@@ -198,13 +217,15 @@ def upg_personal_state(c, uid):
     """(personal office id | None, odl_retention of it incl. the booked receipts of the private file store, their node ids)."""
     with system_ctx(c):  # the deleted person's own office and private receipts (counts / ids, nothing handed out)
         r = c.execute("SELECT id FROM orgs WHERE personal_of=?", (int(uid),)).fetchone()
-        rows = c.execute(UPG_BOOKED, (int(uid),)).fetchall()
+        from ..admin.hosting import hosted  # 2.152.0 (#2164, review A3): the hosted instance keeps nothing for others (rx_gate first)
+        rows = [] if hosted() else c.execute(UPG_BOOKED, (int(uid),)).fetchall()
     poid = r[0] if r else None
     ret = odl_retention(c, poid)
-    if rows:
-        ret["counts"]["receipts"] = ret["counts"].get("receipts", 0) + len(rows)
-        ends = [e for e in (ret["until"], _until("receipt", [x[1] for x in rows])) if e]
-        ret["until"] = max(ends)
+    end = _until("receipt", [x[1] for x in rows])  # review A8: None when their period is over
+    if not end:
+        return poid, ret, []
+    ret["counts"]["receipts"] = ret["counts"].get("receipts", 0) + len(rows)
+    ret["until"] = max(e for e in (ret["until"], end) if e)
     return poid, ret, [x[0] for x in rows]
 
 
@@ -268,12 +289,22 @@ def upg_rest(c, uid):
     from ..lists.lists import list_purge
     uid, todo = int(uid), []
     with system_ctx(c):  # the deleted person's rows in every organisation (an instance admin deletes accounts of organisations they are not in)
-        mine = g.user["id"] if has_request_context() and g.get("user") is not None else None
+        from ..lists.ownership import owner_transfer
         for (aid, av) in c.execute("SELECT a.user_id, u.avatar FROM agents a JOIN users u ON u.id=a.user_id WHERE a.owner_id=?", (uid,)).fetchall():
-            heir = mine if mine and mine != uid else odl_custodian(c, uid)
-            if not heir:
-                raise Denied(409, tr("Nobody could take over the lists of this account's agents. Disable the account instead."))
-            todo += agent_delete(c, aid, heir)  # its token goes with it (api_tokens cascade)
+            # 2.152.0 (#2164, review A5): the agent's lists never cross the boundary: an organisation's list goes to a person
+            # of that organisation, a private one goes like the inbox
+            for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND is_inbox=0", (aid,)).fetchall():
+                if lr["org_id"]:
+                    heir = upg_heir(c, lr["org_id"], uid)
+                    if not heir:
+                        raise Denied(409, tr("Nobody could take over the lists of this account's agents. Disable the account instead."))
+                    owner_transfer(c, lr, heir, force=True)  # must happen, as on leaving an organisation
+                    continue
+                lid = lr["id"]
+                files = hard_delete(c, [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))], lists={lid})
+                icon, lfiles = list_purge(c, lid, None)
+                todo.append(lambda lid=lid, icon=icon, f=lfiles + files: otr_drop_files(lid, icon, f))
+            todo += agent_delete(c, aid, None)  # no lists left to hand on; its token goes with it (api_tokens cascade)
             todo.append(lambda aid=aid, av=av: avatar_drop_file(aid, av))
         for (xid, oid) in c.execute("SELECT id, org_id FROM ev_cals WHERE owner_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
             heir = upg_heir(c, oid, uid)

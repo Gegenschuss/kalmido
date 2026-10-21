@@ -415,6 +415,16 @@ def user_delete(uid):
 def user_purge(c, uid):
     """Deletes user uid (no own lists besides the inbox left; the caller checked and commits). Returns the files to unlink
     (2.152.0 A: and clean-ups to run after the commit, see serializers.unlink_files)."""
+    from ..admin.hosting import hosted
+    from ..office.olock import OLK_BYPASS
+    tok = OLK_BYPASS.set(hosted())  # 2.152.0 (#2164, review A2): the hosted instance keeps no booked receipts (rx_gate passed)
+    try:
+        return _user_purge(c, uid)
+    finally:
+        OLK_BYPASS.reset(tok)
+
+
+def _user_purge(c, uid):
     from ..accounts.orgretain import upg_personal, upg_rest
     from ..admin.backup import bkr_journal
     bkr_journal(c, uid)  # 2.152.0 B (#2172): the journal of deleted accounts (a restore deletes them again)

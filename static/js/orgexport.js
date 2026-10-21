@@ -61,7 +61,8 @@ function rxBoxHtml(kind, id) {
 }
 // the step before a deletion: resolves 'exported' | 'waived' | null (cancelled); info = the server's retention object
 async function rxAsk(info, title) {
-  const L = {documents: tr('Finalised documents'), receipts: tr('Receipts'), project_receipts: tr('Receipts of lists'), cash: tr('Cash book entries'), bank: tr('Bank transactions'), archive: tr('Archived documents')};
+  const L = {documents: tr('Finalised documents'), receipts: tr('Receipts'), project_receipts: tr('Receipts of lists'), cash: tr('Cash book entries'), bank: tr('Bank transactions'), archive: tr('Archived documents'),
+    drives: tr('Drives'), trip_receipts: tr('Travel receipts in DATEV'), meals: tr('Entertainment receipts')};  // 2.152.0 (#2167, review A9)
   const counts = Object.entries(info.counts || {}).map(([k, n]) => `<li>${esc(L[k] || k)}: ${n}</li>`).join('');
   const md = modal(`<h3>${esc(tr('Retention export before deleting “{0}”', title))}</h3>
     <div class="shint keep warn">${ic('alert', 's')} ${esc(info.note)}</div>

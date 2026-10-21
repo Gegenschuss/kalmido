@@ -797,7 +797,10 @@ const ODL_WORDS = {
   office_documents: n => trn('{0} document', '{0} documents', n), documents: n => trn('{0} document', '{0} documents', n),
   office_archive: n => trn('{0} archive entry', '{0} archive entries', n), archive: n => trn('{0} archive entry', '{0} archive entries', n),
   trips: n => trn('{0} trip', '{0} trips', n), drives: n => trn('{0} drive', '{0} drives', n), clients: n => trn('{0} client', '{0} clients', n),
-  receipts: n => trn('{0} receipt', '{0} receipts', n), trip_receipts: n => trn('{0} receipt', '{0} receipts', n)};
+  receipts: n => trn('{0} receipt', '{0} receipts', n), trip_receipts: n => trn('{0} receipt', '{0} receipts', n),
+  // 2.152.0 (#2167, review A6)
+  cash: n => trn('{0} cash book entry', '{0} cash book entries', n), bank: n => trn('{0} bank transaction', '{0} bank transactions', n),
+  meals: n => trn('{0} entertainment receipt', '{0} entertainment receipts', n)};
 const odlCounts = c => Object.entries(c || {}).filter(([k, n]) => n && ODL_WORDS[k]).map(([k, n]) => ODL_WORDS[k](n)).join(', ');
 const odlRetiredLabel = o => esc(tr('kept until {0}', fmtDate(o.retain_until))) + (o.retired_personal ? ' · ' + esc(tr('office of a deleted account')) : '');
 // the delete button of the organisations list: lists / files block as before (the server says it); a retired organisation

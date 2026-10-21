@@ -99,6 +99,10 @@ def rx_counts(c, sub, along=True):
             out["archive"] = c.execute("SELECT COUNT(*) FROM office_archive WHERE org_id=?", (oid,)).fetchone()[0]
             out["cash"] = c.execute("SELECT COUNT(*) FROM office_cash_entries WHERE org_id=?", (oid,)).fetchone()[0]
             out["bank"] = c.execute("SELECT COUNT(*) FROM office_bank_tx WHERE org_id=?", (oid,)).fetchone()[0]
+            # 2.152.0 (#2167, review A9): the logbook, travel receipts in DATEV and approved entertainment receipts (all in RX_TABLES)
+            out["drives"] = c.execute("SELECT COUNT(*) FROM office_drives WHERE org_id=?", (oid,)).fetchone()[0]
+            out["trip_receipts"] = c.execute("SELECT COUNT(*) FROM office_trip_items WHERE org_id=? AND datev=1", (oid,)).fetchone()[0]
+            out["meals"] = c.execute("SELECT COUNT(*) FROM office_meals WHERE org_id=? AND status<>'draft'", (oid,)).fetchone()[0]
         out["receipts"] = c.execute("SELECT COUNT(*) FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id WHERE d.ws=?",
                                     (sub["ws"],)).fetchone()[0]
         if along:

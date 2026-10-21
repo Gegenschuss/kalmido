@@ -714,7 +714,13 @@ def org_delete(oid):
         if bad:
             return bad
         oname = (c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0]
-        todo = odl_dismantle(c, oid)  # 2.152.0 A: the steps shared with the account deletion and the retention run
+        from ..admin.hosting import hosted
+        from ..office.olock import OLK_BYPASS
+        tok = OLK_BYPASS.set(hosted())  # 2.152.0 (#2167, review A2): the hosted instance keeps no booked receipts (rx_gate passed)
+        try:
+            todo = odl_dismantle(c, oid)  # 2.152.0 A: the steps shared with the account deletion and the retention run
+        finally:
+            OLK_BYPASS.reset(tok)
         bump(c)
         c.commit()
         from ..core.serializers import unlink_files
@@ -728,21 +734,24 @@ def org_delete(oid):
 def odl_delete_info(c, oid):
     """2.152.0 A (#2167): what deleting organisation oid means (the caller is an instance admin, system context): content
     that goes along, office data kept by law (retain_until), kept_until of an organisation retired already, whether the
-    caller may export it (an admin of it; any instance admin for a retired one)."""
-    from .orgretain import odl_content, odl_retention, odl_retired
+    caller may export it (an admin of it; any instance admin for a retired one, review A4: not a retired personal office)."""
+    from .orgretain import odl_admin_export, odl_content, odl_retention, odl_retired
     kept = odl_retired(c, oid)
     ret = odl_retention(c, oid) if kept is None else {"counts": {}, "until": None}
     from ..files.store import fs_org_live
     return {"content": odl_content(c, oid), "kept": ret["counts"], "retain_until": ret["until"], "kept_until": kept or None,
             "retired": kept is not None, "lists": c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (oid,)).fetchone()[0],
-            "files": fs_org_live(c, oid), "can_export": kept is not None or org_role(c, me(), oid) == "admin"}
+            "files": fs_org_live(c, oid), "can_export": odl_admin_export(c, oid) or org_role(c, me(), oid) == "admin"}
 
 
 ODL_WORDS = {"wiki_pages": ("{0} knowledge page", "{0} knowledge pages"), "tables": ("{0} table", "{0} tables"),
              "office_documents": ("{0} document", "{0} documents"), "documents": ("{0} document", "{0} documents"),
              "office_archive": ("{0} archive entry", "{0} archive entries"), "archive": ("{0} archive entry", "{0} archive entries"),
              "trips": ("{0} trip", "{0} trips"), "drives": ("{0} drive", "{0} drives"), "clients": ("{0} client", "{0} clients"),
-             "receipts": ("{0} receipt", "{0} receipts"), "trip_receipts": ("{0} receipt", "{0} receipts")}
+             "receipts": ("{0} receipt", "{0} receipts"), "trip_receipts": ("{0} receipt", "{0} receipts"),
+             # 2.152.0 (#2167, review A6)
+             "cash": ("{0} cash book entry", "{0} cash book entries"), "bank": ("{0} bank transaction", "{0} bank transactions"),
+             "meals": ("{0} entertainment receipt", "{0} entertainment receipts")}
 
 
 def odl_text(counts):

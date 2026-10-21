@@ -12628,5 +12628,9 @@
   "The message and its files are deleted for good. This cannot be undone.": "Het bericht en de bijbehorende bestanden worden definitief verwijderd. Dit kan niet ongedaan worden gemaakt.",
   "Delete history": "Geschiedenis verwijderen",
   "The whole conversation with {0} and its files are deleted for good. This cannot be undone.": "Het hele gesprek met {0} en de bijbehorende bestanden worden definitief verwijderd. Dit kan niet ongedaan worden gemaakt.",
-  "History deleted": "Geschiedenis verwijderd"
+  "History deleted": "Geschiedenis verwijderd",
+  "{0} cash book entry": ["{0} kasboeking", "{0} kasboekingen"],
+  "{0} bank transaction": ["{0} banktransactie", "{0} banktransacties"],
+  "{0} entertainment receipt": ["{0} representatiebon", "{0} representatiebonnen"],
+  "Travel receipts in DATEV": "Reisbonnen in DATEV"
 }

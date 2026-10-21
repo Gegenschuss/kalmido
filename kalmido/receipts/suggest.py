@@ -22,7 +22,7 @@ from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields, v1_args, v1_json, v1_view
 from ..files.store import fs_log_add, fs_on_delete, fs_subtree, need_node
 from ..docs import store as S
-from ..office.olock import olk_active, olk_kept_text, olk_until
+from ..office.olock import OLK_BYPASS, olk_active, olk_kept_text, olk_until
 
 RC_CAT_MAX = 60
 RC_NOTE_MAX = 500
@@ -479,6 +479,8 @@ def olk_fs_locked(c, node_id):
 def olk_on_delete(c, nid):
     """fs_on_delete hook (first in the list): 409 before anything of the purge happens. A folder checks its whole subtree, so
     the purge of a folder stops before the hooks of its first file ran (fs_purge calls the root first)."""
+    if OLK_BYPASS.get():  # 2.152.0 (#2164 #2167, review A2): a hosted deletion after rx_gate
+        return
     n = c.execute("SELECT kind FROM fs_nodes WHERE id=?", (int(nid),)).fetchone()
     for i in (fs_subtree(c, nid) if n and n["kind"] == "folder" else [nid]):
         until = olk_fs_locked(c, i)

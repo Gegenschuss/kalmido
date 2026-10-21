@@ -12628,5 +12628,9 @@
   "The message and its files are deleted for good. This cannot be undone.": "Die Nachricht und ihre Dateien werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.",
   "Delete history": "Verlauf löschen",
   "The whole conversation with {0} and its files are deleted for good. This cannot be undone.": "Das ganze Gespräch mit {0} und seine Dateien werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.",
-  "History deleted": "Verlauf gelöscht"
+  "History deleted": "Verlauf gelöscht",
+  "{0} cash book entry": ["{0} Kassenbuchung", "{0} Kassenbuchungen"],
+  "{0} bank transaction": ["{0} Bankumsatz", "{0} Bankumsätze"],
+  "{0} entertainment receipt": ["{0} Bewirtungsbeleg", "{0} Bewirtungsbelege"],
+  "Travel receipts in DATEV": "Reisebelege in DATEV"
 }

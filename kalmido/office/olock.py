@@ -6,6 +6,7 @@ them: travel receipts ticked "in DATEV" or billed on a finalised document, booke
 (receipts/suggest.py olk_fs_locked), logbook drives (office/logbook.py). Corrections stay possible where the law wants
 them traceable (a reversal payment, a correcting drive). The periods: core/retention.py RET_LEGAL_YEARS.
 """
+import contextvars
 import re
 from datetime import date
 
@@ -17,6 +18,10 @@ from ..core.retention import RET_LEGAL_YEARS
 OLK_DATEV = N_("This receipt is in DATEV and has to be kept: it can no longer be deleted.")
 OLK_BILLED = N_("This receipt was billed on a finalised document and has to be kept: it can no longer be deleted.")
 OLK_KEPT = N_("Kept by law until {0}: this can no longer be deleted.")
+# 2.152.0 (#2164 #2167, review A2): set while the hosted instance deletes an organisation / account after the retention
+# export or waiver (admin/retexport.py rx_gate): it keeps nothing for others, so the purge hook of booked receipts stands
+# aside (self-hosting keeps the lock: there the booked rows were retired / moved first)
+OLK_BYPASS = contextvars.ContextVar("olk_bypass", default=False)
 
 
 def olk_until(day, kind):
