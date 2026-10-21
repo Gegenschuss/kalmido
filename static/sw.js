@@ -29,7 +29,36 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinv
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell
 // 2.65.0 (#1824): the stylesheets of the modules loaded on demand (static/css/, LD_CSS in lazyload.js, same order)
 const LAZY_CSS = ['/static/css/settings.css', '/static/css/contacts.css', '/static/css/office.css', '/static/css/agentchat.css', '/static/css/pdf.css', '/static/css/mindmap.css', '/static/css/wiki.css', '/static/css/stats.css', '/static/css/calendar.css', '/static/css/docs.css', '/static/css/life.css', '/static/css/integrations.css', '/static/css/playbook.css', '/static/css/timeline.css', '/static/css/feeds.css', '/static/css/bookmarks.css', '/static/css/sheets.css', '/static/css/videorev.css', '/static/css/tagsel.css', '/static/css/filereq.css', '/static/css/abscan.css'];
-self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).then(() => c.addAll(LAZY.concat(LAZY_CSS)).catch(() => 0))).then(() => self.skipWaiting())); });
+self.addEventListener('install', e => { e.waitUntil(swInstall().then(() => self.skipWaiting())); });
+// 2.149.0 B (#2506): the server names every precached static file with its content hash (/sw-manifest.json). A file is kept
+// under "<url>?v=<hash>" (the address index.html asks for), so an update copies every unchanged file from the old cache and
+// loads only the changed ones. Without the manifest (an older server, a sign-in page in between) everything is loaded as before.
+const SW_HASH = /^[0-9a-f]{12}$/;
+async function swManifest() {
+  try {
+    const r = await fetch('/sw-manifest.json', {cache: 'no-store', credentials: 'same-origin'});
+    if (!r.ok || r.redirected || !/json/.test(r.headers.get('content-type') || '')) return null;
+    const m = await r.json();
+    return m && m.v === 1 && m.files && typeof m.files === 'object' ? m.files : null;
+  } catch { return null; }
+}
+// one precached file: an unchanged copy from an old cache, else from the network (non-2xx = an error, like addAll)
+async function swPrecache(c, url, files) {
+  const h = files[url];
+  if (!SW_HASH.test(h || '')) { await c.add(url); return; }
+  const key = `${url}?v=${h}`, old = await caches.match(key);
+  if (old) { await c.put(key, old); return; }
+  const r = await fetch(key, {credentials: 'same-origin'});
+  if (!r.ok || r.redirected) throw new TypeError(`precache ${url}: ${r.status}`);
+  // the server confirms the hash with an immutable answer; else (an update in between) the copy is kept without a hash
+  await c.put(/immutable/.test(r.headers.get('cache-control') || '') ? key : url, r);
+}
+async function swInstall() {
+  const c = await caches.open(CACHE), files = await swManifest();
+  if (!files) return c.addAll(SHELL).then(() => c.addAll(LAZY.concat(LAZY_CSS)).catch(() => 0));
+  await Promise.all(SHELL.map(u => swPrecache(c, u, files)));  // a failure drops this install (the old worker and cache stay)
+  await Promise.all(LAZY.concat(LAZY_CSS).map(u => swPrecache(c, u, files).catch(() => 0)));
+}
 self.addEventListener('activate', e => { e.waitUntil(swCleanup().then(() => self.clients.claim())); });
 async function swCleanup() {
   const c = await caches.open(CACHE);
@@ -44,10 +73,17 @@ async function swAnyCache(req, opt) {
   return undefined;
 }
 async function swShell(req, url) {
-  const opt = {ignoreSearch: url.pathname === '/' || url.pathname.startsWith('/static/js/')};  // 2.53.0 (#1410): modules on demand come with ?v=
+  // 2.53.0 (#1410): modules on demand come with ?v=; 2.149.0 B (#2505): every start script / stylesheet too (a content hash)
+  const opt = {ignoreSearch: url.pathname === '/' || url.pathname.startsWith('/static/')};
+  // 2.149.0 B (#2506): ?v=<content hash> never changes: a kept copy of exactly that address is the file, no network needed
+  const hashed = url.pathname.startsWith('/static/') && SW_HASH.test(url.searchParams.get('v') || '');
+  if (hashed) { const hit = await caches.match(req); if (hit) return hit; }
   let r = null;
   try { r = await fetch(req); } catch { r = null; }
-  if (r && r.ok && !r.redirected && r.type === 'basic') { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); return r; }  // 2.138.0 A (#2257): a refused put is no uncaught error
+  // 2.149.0 B (#2506): a hashed address is kept only when the server confirmed the hash (immutable), so it never holds other bytes
+  const keep = r && r.ok && !r.redirected && r.type === 'basic' && (!hashed || /immutable/.test(r.headers.get('cache-control') || ''));
+  if (keep) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); return r; }  // 2.138.0 A (#2257): a refused put is no uncaught error
+  if (r && r.ok) return r;
   // network error or 5xx (server restarting): any cached copy beats a broken answer; 2.4.0 (#187): the quick capture page is the app shell too
   if (!r || r.status >= 500) {
     const hit = (await swAnyCache(req, opt)) || (url.pathname === '/capture' ? await swAnyCache('/', {ignoreSearch: true}) : undefined);

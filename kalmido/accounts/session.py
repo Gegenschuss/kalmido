@@ -221,6 +221,8 @@ def authenticate():
     from ..agents.core import is_agent
     from ..family.family import KID_WRITE
     g.user, g.auth_via, g.auth_error, g.proxy_login, g.pushes = None, None, None, "", []
+    if request.path.startswith("/static/") or request.path in ("/sw.js", "/sw-manifest.json", "/robots.txt"):
+        return None  # 2.149.0 B (#2505): files that are the same for everyone: no session and no database access
     if request.path.startswith(API_PREFIX) or request.path == API_PREFIX.rstrip("/"):
         return api_authenticate()  # bearer token only (package B)
     if request.path.startswith(("/dav/", "/.well-known/")) or request.path == "/dav":
