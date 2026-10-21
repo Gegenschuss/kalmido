@@ -1,6 +1,6 @@
 // 2.165.0 UI tests (#2612 the very first start greets once on the first tour card, #2613 an error or the connection's loss
 // startles the figures on screen, #2614 pull to refresh shows the bot figure, it hops while the refresh runs), own
-// container (start.sh), Firefox: one run with motion on, one with reduced motion (the ff.js default: no motion at all).
+// container (start.sh, KALMIDO_ONBOARDING=1: the tour of a new account), Firefox: one run with motion on, one with reduced motion (the ff.js default: no motion at all).
 // P4: no new route (client-side motion only); frida and gina have no organisation and run every check.
 // P2165_NOSTART=1 = the container is running.
 const path = require('path');
@@ -12,7 +12,7 @@ const firefox = require('./ff')({tag: 'p2165_ui', check, shots: 'P2165_SHOTS'});
 const firefoxMoving = require('./ff')({tag: 'p2165_ui_move', check, shots: 'P2165_SHOTS', prefs: [['ui.prefersReducedMotion', 0]]});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
-if (process.env.P2165_NOSTART !== '1') execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
+if (process.env.P2165_NOSTART !== '1') execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env, KALMIDO_ONBOARDING: '1'}});
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };
 
 (async () => {
@@ -105,8 +105,13 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     s = await ev(STARTLE);
     check(!s.on, '#2613: a plain 404 of a read does not ' + JSON.stringify(s));
 
-    // #2614: phone, pull to refresh
+  }, false);
+
+  // #2614: phone (touch), pull to refresh
+  await firefoxMoving(async o => {
+    const {cmd, ev, ctx, nav} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
+    check(await signIn(o, 'frida') === 200, 'frida: login on the phone');
     await nav(B + '#l/' + EMPTY);
     check(await ready(ev, `!!document.querySelector('#view .hempty .bot') && S.booted`, 80), '#2614: phone: the list');
     const p = await ev(PULL);
@@ -114,7 +119,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     check(p.far && /\bfar\b/.test(p.far.cls) && /b-wartet/.test(p.far.bot), '#2614: far enough: the figure looks up ' + JSON.stringify(p.far));
     check(p.go && /\bgo\b/.test(p.go.cls) && p.go.hop === 'b-hop', '#2614: let go: it hops while the refresh runs ' + JSON.stringify(p.go));
     check(p.after && !/\b(on|go|far)\b/.test(p.after.cls) && /b-ruhig/.test(p.after.bot), '#2614: done: gone again, calm ' + JSON.stringify(p.after));
-  }, false);
+  }, true);
 
   // ===== reduced motion (the ff.js default): the greeting stays, nothing moves
   await firefox(async o => {
@@ -133,12 +138,16 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     const s = await ev(STARTLE);
     check(s.fig && !s.on && !s.logo, '#2613: reduced motion: not startled ' + JSON.stringify(s));
     await ev(`(() => { setOnline(true); return 1; })()`);
+  }, false);
+  await firefox(async o => {
+    const {cmd, ev, ctx, nav} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
-    await nav(B + '#l/' + lid);
+    check(await signIn(o, 'frida') === 200, 'reduced motion: frida on the phone');
+    await nav(B + '#l/' + EMPTY);
     await ready(ev, `!!document.querySelector('#view .hempty .bot') && S.booted`, 80);
     const p = await ev(PULL);
     check(p.go && /\bgo\b/.test(p.go.cls) && /b-wartet/.test(p.go.bot) && p.go.hop === 'none', '#2614: reduced motion: the figure, but no hop ' + JSON.stringify(p.go));
-  }, false);
+  }, true);
 
   console.log(`p2165_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

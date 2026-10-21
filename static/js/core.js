@@ -415,7 +415,7 @@ function obxSyncReg() { if (OBX.on && navigator.serviceWorker?.ready) navigator.
 if (globalThis.navigator?.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data?.type === 'outbox-flush' && OUT.q.length) flush(); });
 // 2.21.0 (#673): before the first render there is no top bar to update (renderTop on an empty state threw, so a start while
 // the server was down showed the error page instead of the cached data); the boot's render shows the state
-function setOnline(b) { if (OUT.online !== b) { OUT.online = b; if (S.booted) renderTop(); if (!b && S.booted) botStartle();  /* 2.165.0 (#2613) */ if (b) flush(); setTimeout(() => typeof staleDraw === 'function' && staleDraw(), 0); } }
+function setOnline(b) { if (OUT.online !== b) { OUT.online = b; if (S.booted) renderTop(); if (!b && S.booted && typeof botStartle === 'function') botStartle();  /* 2.165.0 (#2613) */ if (b) flush(); setTimeout(() => typeof staleDraw === 'function' && staleDraw(), 0); } }
 // 2.13.4 (p210 flake, a real race): every write counts up when it starts and when it ends (S.wseq), so load() can tell that
 // a write finished while its GET /api/state was on the way: that answer may predate the write and would undo it locally
 // (S.settings went back to the old value; an Undo right after then saw "changed elsewhere" and skipped the step)
@@ -454,7 +454,7 @@ async function rawFetch0(method, url, body) {
   if ((r.status === 401 || r.status === 403) && j.auth) { authScreen(j); throw new Error('auth'); }  // built-in login
   if (r.status === 401) { location.reload(); throw new Error('auth'); }
   if (!r.ok) { const e = new Error(j.error || tr('Error {0}', r.status)); e.status = r.status; e.data = j;
-    if (method !== 'GET' || r.status >= 500) botStartle();  // 2.165.0 (#2613): a refused write or a server error
+    if ((method !== 'GET' || r.status >= 500) && typeof botStartle === 'function') botStartle();  // 2.165.0 (#2613): a refused write or a server error
     if (j.code === 'quota_exceeded') { e.shown = true; setTimeout(() => quotaDialog(j), 0); }  // 2.24.0 (#910): storage full
     if (j.code === 'agent_bridge') e.shown = true;  // 2.30.0 (#919): bridgeTry asks and repeats it
     if (j.pin && S.me?.kid) { e.shown = true; kd_pinClosed(); }  // 2.49.0 (#1551): the PIN time ran out: ask again

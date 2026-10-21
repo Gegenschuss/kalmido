@@ -540,7 +540,7 @@ function tourHiFig() {
   if (!TOUR.hi) return botFig('ruhig', 'htour');
   const wave = !TOUR.hiShown && !reducedMotion(); TOUR.hiShown = true; LS.set('botHi', true);
   const nm = (S.me?.display_name || S.me?.username || '').trim().split(/\s+/)[0];
-  return `<span class="thi">${botFig('erledigt', 'htour' + (wave ? ' bhi' : ''))}<span><b>${esc(nm ? tr('Hello, {0}', nm) + '!' : tr('Hello!'))}</b><span class="muted">${esc(tr('Nice to have you here. A quick look at the most important things:'))}</span></span></span>`;
+  return `<span class="thi">${botFig('erledigt', 'htour' + (wave ? ' bhi' : ''))}<span><b>${esc(nm ? tr('Hello, {0}!', nm) : tr('Hello!'))}</b><span class="muted">${esc(tr('Nice to have you here. A quick look at the most important things:'))}</span></span></span>`;
 }
 // ring around the target + card placement: right of narrow targets on the left (sidebar, rail), else below / above
 function tourPlace(r, vw, vh, mh) {  // mh: the card's measured height (2.5.2, K05: was a fixed 210 px)
