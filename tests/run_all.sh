@@ -1572,6 +1572,19 @@ fresh; run p2144_d_ui node p2144_d_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21442_a_ui node p21442_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.144.2 part B: optimistic subtasks, calendar draft popup, sheet print, focus, receipts account row (#2467 #1811 #2370 #1644 #2352 #2372 #2375)
 fresh; run p21442_b_ui node p21442_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.149.0 part A: office - web and agent paths aligned (offer status, locks, log lines), invoice texts via tr() (#2521 #2520)
+fresh; run p2149_a_api "$PY" p2149_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.149.0 part B: request timing / SQL count / Server-Timing, static files without session, service worker hash manifest (#2504 #2505 #2506)
+fresh; run p2149_b_api "$PY" p2149_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2149_b_ui node p2149_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.149.0 part C: version poll signatures, request context cache, hot indexes, watchdog (#2507 #2508 #2515 #2516)
+fresh; run p2149_c_api "$PY" p2149_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.149.0 part D: downgrade / restore guard, self-hosting defaults, environment variable registry (#2509 #2510 #2511)
+fresh; run p2149_d_api "$PY" p2149_d_api_test.py "$KALMIDO_TEST_DATA"
+# 2.149.0 part E: test clock into the server, wait for state instead of sleeps, shards by timing (#2512 #2513 #2514)
+fresh; run p2149_e_api "$PY" p2149_e_api_test.py "$KALMIDO_TEST_DATA"
+# 2.149.0 part F: module start files loaded lazily, guarded lazy calls, missing CSS variables (#2518 #2519)
+fresh; run p2149_f_ui node p2149_f_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
