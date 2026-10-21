@@ -140,6 +140,7 @@ check(A.post(B + f"{D}/{Q1}/finalize").ok, "the quotation finalised")
 r = A.post(B + f"{D}/{Q1}/invoice")
 check(r.status_code == 201, "an invoice from the quotation " + r.text[:200])
 INV = r.json()["id"]
+A.patch(B + f"{D}/{INV}", json={"service_from": Y5, "service_to": T0})
 r = A.post(B + f"{D}/{INV}/finalize")
 check(r.ok, "the invoice finalised " + r.text[:200])
 NUM = number(A, INV)
