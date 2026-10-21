@@ -12565,5 +12565,6 @@
   " (paid)|document": " (betaald)",
   " (open)|document": " (open)",
   "Amount remaining|document": "Restbedrag",
-  "When paid by {date} {pct} % cash discount (= {amt}), payable {pay}.|document": "Bij betaling vóór {date} {pct} % betalingskorting (= {amt}), te betalen {pay}."
+  "When paid by {date} {pct} % cash discount (= {amt}), payable {pay}.|document": "Bij betaling vóór {date} {pct} % betalingskorting (= {amt}), te betalen {pay}.",
+  "The backup was made with Kalmido {0}, a newer version than this server ({1}). Update Kalmido first, then restore it.": "De back-up is gemaakt met Kalmido {0}, een nieuwere versie dan deze server ({1}). Werk eerst Kalmido bij en zet hem daarna terug."
 }

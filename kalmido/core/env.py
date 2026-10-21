@@ -36,6 +36,7 @@ VARS = (
     _v("TASKS_TEXT_CACHE", "<data dir>/textcache", "Folder of the extracted text of attachments (search, previews).", "core"),
     _v("TASKS_MAX_FILE_MB", "50", "Largest upload in MB.", "core"),
     _v("KALMIDO_ALLOW_DOWNGRADE", "0", "Switch: start on a database (or restore a backup) that a newer minor version of Kalmido wrote. Only for an emergency; the older version may not understand newer data.", "core"),
+    _v("KALMIDO_SLOW_REQUEST_MS", "500", "Requests slower than this many milliseconds get a log line with route, duration and statement count (0 = off).", "core"),
     _v("KALMIDO_ACX_TTL", "10", "Seconds the access context of a person (roles, organisations) is cached per process (0 = off).", "core"),
     _v("KALMIDO_ROLE", "all", "What this process runs: all (web + background work), web (requests only) or worker (background work only).", "core"),
     _v("KALMIDO_REPLICAS", "1", "Number of web processes behind one database (only for the connection check at start).", "core"),

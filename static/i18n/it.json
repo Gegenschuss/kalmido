@@ -12565,5 +12565,6 @@
   " (paid)|document": " (pagata)",
   " (open)|document": " (aperta)",
   "Amount remaining|document": "Importo residuo",
-  "When paid by {date} {pct} % cash discount (= {amt}), payable {pay}.|document": "Pagando entro il {date} sconto del {pct} % (= {amt}), da pagare {pay}."
+  "When paid by {date} {pct} % cash discount (= {amt}), payable {pay}.|document": "Pagando entro il {date} sconto del {pct} % (= {amt}), da pagare {pay}.",
+  "The backup was made with Kalmido {0}, a newer version than this server ({1}). Update Kalmido first, then restore it.": "Il backup è stato creato con Kalmido {0}, una versione più recente di questo server ({1}). Aggiorna prima Kalmido, poi ripristinalo."
 }

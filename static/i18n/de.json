@@ -12565,5 +12565,6 @@
   " (paid)|document": " (bezahlt)",
   " (open)|document": " (offen)",
   "Amount remaining|document": "Restbetrag",
-  "When paid by {date} {pct} % cash discount (= {amt}), payable {pay}.|document": "Bei Zahlung bis {date} {pct} % Skonto (= {amt}), zahlbar {pay}."
+  "When paid by {date} {pct} % cash discount (= {amt}), payable {pay}.|document": "Bei Zahlung bis {date} {pct} % Skonto (= {amt}), zahlbar {pay}.",
+  "The backup was made with Kalmido {0}, a newer version than this server ({1}). Update Kalmido first, then restore it.": "Die Sicherung wurde mit Kalmido {0} erstellt, einer neueren Version als dieser Server ({1}). Aktualisiere zuerst Kalmido und spiele sie dann zurück."
 }
