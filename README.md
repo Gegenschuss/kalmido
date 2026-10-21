@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.144.6** (2026-10-21): office fixes - **tracked time to the invoice**: entries are billable or not, "invoice
+  from time" binds the open hours as billed so they never land on two invoices, a deleted draft or a cancelled invoice
+  frees them; the legacy import asks for a reason when raising the invoice counter and its undo restores the order of
+  the services; asking for an approval no longer fires "assigned" rules; one "transfer into an organisation" section.
 - **2.146.0** (2026-10-21): imports from everyday life - e-invoices (XRechnung, ZUGFeRD) are received and read from
   their XML, duplicate receipts are found and kept out of DATEV, several files / ZIP / winmail.dat at once, iPhone HEIC
   photos, household import with debit/credit column and undo, CAMT.052 pending entries handled, legacy import with

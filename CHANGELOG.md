@@ -7,6 +7,20 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.144.6] - 2026-10-21
+
+Office fixes: tracked time to the invoice without billing it twice, small items from the 2.138 review, one wording for moving into an organisation.
+
+### Added
+- Time entries are billable or not (default billable). "Invoice from time" takes only open billable hours and binds them to the draft as billed; the same hours never land on two invoices, billed entries are locked (only the note stays editable). Deleting the draft frees them again; on a cancelled invoice the office admin frees them with "Release the time again". Works the same in a personal office without an organisation (#2053).
+
+### Fixed
+- Legacy import: raising the invoice counter asks for a reason like the number ranges (GoBD); the reason is in the office log (#2400).
+- Legacy import: undo puts the order of the services back (#2400).
+- List rules: asking for an approval (or for changes) no longer counts as "assigned", the task stays with the approver (#2400).
+- Legacy import: archiving the rest of an undone import leaves entries you restored by hand alone (#2400).
+- Office settings > Data: one section "Transfer into an organisation" with both ways (a new organisation or an existing one) instead of two wordings (#2436).
+
 ## [2.146.0] - 2026-10-21
 
 Imports from everyday life: e-invoices are received and read, duplicates are found, several files and ZIPs go in at once, and a retention export comes before deleting an account or organisation.
