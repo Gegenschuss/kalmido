@@ -60,7 +60,7 @@ function moSubHtml(t) {
 }
 // the view menu (render.js topMoreItems)
 function moViewItems() {
-  if (!moActive()) return [];
+  if (!moActive() || moBoard()) return [];  // 2.156.0 C (#2072): the board has its own columns
   const set = v => () => { if (moView() === v) return; S.settings.mine_view = v; render(); api('PATCH', '/api/settings', {mine_view: v}).catch(() => {}); };
   return [{label: tr('Own order'), icon: 'sort', on: moView() === 'own', fn: set('own')}, {label: tr('Grouped by list'), icon: 'list', on: moView() === 'lists', fn: set('lists')}];
 }
