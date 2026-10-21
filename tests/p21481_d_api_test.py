@@ -198,6 +198,8 @@ check(errs and all(cells[a].get("error_text") for a in errs), f"over the range b
 r = put(Fr, [(f"C{i}", "x") for i in range(1, 11)])
 check(r.status_code == 400 and "table is full" in r.text, f"over the cell cap of the table: 400 {r.status_code} {r.text[:160]}")
 check(put(Fr, [("A1", "7")]).ok, "changing a stored cell still works when full")
+r = Fr.post(B + f"/api/sheets/{SH}/tabs", json={"copy_of": SH})  # 2.148.1 G (#2485)
+check(r.status_code == 400 and "table is full" in r.text, f"a sheet copy over the cell cap of the table: 400 {r.status_code} {r.text[:160]}")
 # an .xlsx import of a sparse sheet (one cell far right, one far down) works
 sparse = '<row r="1"><c r="A1"><v>1</v></c></row><row r="40"><c r="H40"><v>2</v></c></row>'
 r = Fr.post(B + "/api/sheets/import", files={"file": ("sparse.xlsx", book("A1:A1", sparse), "application/octet-stream")}, data={"space": "private"})
