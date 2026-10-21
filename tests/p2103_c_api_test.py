@@ -154,7 +154,13 @@ sql("UPDATE office_trip_items SET billed_doc_id=?, billed_at=? WHERE id=?", (INV
 r = A.delete(B + f"{T}/{TR['id']}/items/{I_BILL}")
 check(r.status_code == 409 and "finalised" in r.text, "#2168: a receipt billed on a finalised invoice is kept (409) " + r.text[:160])
 check(A.delete(B + f"{T}/{TR['id']}/items/{I_FREE}").ok, "#2168: an unbooked receipt is deleted as before")
-A.patch(B + f"{T}/{TR['id']}/items/{I_DATEV}", json={"datev": 0})
+# 2.152.0 (#2168, review B-M1): the tick of a locked receipt cannot be taken back (was: PATCH datev 0 unlocked it)
+r = A.patch(B + f"{T}/{TR['id']}/items/{I_DATEV}", json={"datev": 0})
+check(r.status_code == 409 and "DATEV" in r.text, "#2168 B-M1: the DATEV tick of a locked receipt stays (409) " + r.text[:160])
+check(A.patch(B + f"{T}/{TR['id']}/items/{I_DATEV}", json={"amount": "81.00"}).status_code == 409, "#2168 B-M1: its amount stays (409)")
+check(A.patch(B + f"{T}/{TR['id']}/items/{I_BILL}", json={"date": DAY(19)}).status_code == 409, "#2168 B-M1: the date of a billed receipt stays (409)")
+r = A.patch(B + f"{T}/{TR['id']}/items/{I_DATEV}", json={"text": "Bahn Hamburg", "datev": 1, "amount": "80.00"})
+check(r.ok, "#2168 B-M1: the text of a locked receipt can change, unchanged locked values pass " + r.text[:160])
 check(A.delete(B + f"{T}/{TR['id']}").status_code == 409, "#2168: the billed receipt still keeps the trip")
 
 # ---------------------------------------------------------------- #2168 booked receipts in the document store
