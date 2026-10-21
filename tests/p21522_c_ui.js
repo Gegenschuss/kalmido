@@ -31,12 +31,14 @@ const v1 = async (method, url, body) => { const r = await fetch(B + 'api/v1' + u
   const ag = await call(CA, 'POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'devbot', display_name: 'Dev Bot'});
   const CL = ag.id; TOK = ag.token;
   await call(CA, 'PATCH', `/api/admin/agents/${CL}`, {org_id: ORG});
-  const J = (await v1('POST', '/agent/jobs', {title: 'Knox: Release 2.152.2', user_id: me.id, state: 'running'})).id;
+  const W = (await call(CA, 'POST', '/api/lists', {name: 'Work', org_id: ORG})).id;
+  await call(CA, 'PUT', `/api/lists/${W}/members`, {user_id: CL, role: 'edit'});
+  const jr = await v1('POST', '/agent/jobs', {title: 'Knox: Release 2.152.2', user_id: me.id, state: 'running'}), J = jr.id;
   await call(CA, 'POST', `/api/agents/${CL}/chat`, {body: 'Please build the release'});
   const say = (body, kw = {}) => v1('POST', `/agent/chats/${me.id}`, {body, ...kw});
   await say('Hello, a plain answer');
   await say('Knox: started the build', {job_id: J, job_msg: 'say'});
-  check(J, 'setup: a job in the chat');
+  check(J, 'setup: a job in the chat ' + JSON.stringify(jr));
   // frida: no organisation (P4)
   await call(CA, 'POST', '/api/users', {username: 'frida', display_name: 'Frida', password: 'password123', email: 'frida@example.com'});
   const CF = await login('frida');
