@@ -224,7 +224,8 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
     out = []
     docs = c.execute("SELECT d.*, cl.customer_no AS dx_customer_no, cl.name AS dx_client_name FROM office_docs d "
                      "LEFT JOIN clients cl ON cl.id=d.client_id WHERE d.org_id=? AND d.kind IN ('invoice','credit') "
-                     "AND d.locked_at IS NOT NULL AND d.number != '' AND d.date>=? AND d.date<=? ORDER BY d.date, d.number",
+                     "AND d.locked_at IS NOT NULL AND d.number != '' AND d.date>=? AND d.date<=? AND d.trial=0 "
+                     "ORDER BY d.date, d.number",
                      (oid, d_from, d_to)).fetchall()
     for r in docs:
         t = _j(r["totals"])
@@ -262,7 +263,7 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
     pays = c.execute("SELECT p.date AS p_date, p.amount AS p_amount, p.method AS p_method, d.*, cl.customer_no AS dx_customer_no, "
                      "cl.name AS dx_client_name FROM office_payments p JOIN office_docs d ON d.id=p.doc_id "
                      "LEFT JOIN clients cl ON cl.id=d.client_id WHERE p.org_id=? AND d.org_id=? AND p.date>=? AND p.date<=? "
-                     "ORDER BY p.date, p.id", (oid, oid, d_from, d_to)).fetchall()
+                     "AND d.trial=0 ORDER BY p.date, p.id", (oid, oid, d_from, d_to)).fetchall()
     for r in pays:
         t = _j(r["totals"])
         amount = money(dec(r["p_amount"] or 0) / _fx(r, t))

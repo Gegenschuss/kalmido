@@ -164,8 +164,10 @@ def _eur_bases(items, pack):
 def abs_progress_of(c, oid, offer_id, locked_only=False):
     """The progress invoices of quotation offer_id (not cancelled), oldest first."""
     q = " AND locked_at IS NOT NULL" if locked_only else ""
+    # 2.144.10 B (#2576): only invoices of the quotation's own kind count (a real chain never counts trial ones, a trial chain in itself)
     return c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind='invoice' AND inv_type='progress' AND source_doc_id=? AND status<>'cancelled'"
-                     + q + " ORDER BY date, id", (oid, offer_id)).fetchall()
+                     + q + " AND trial=(SELECT COALESCE(MAX(o.trial), 0) FROM office_docs o WHERE o.id=? AND o.org_id=?) ORDER BY date, id",
+                     (oid, offer_id, offer_id, oid)).fetchall()
 
 
 def _pack(c, oid):
@@ -200,7 +202,9 @@ def abs_final_done(c, oid, offer_id, but=None):
     """2.120.0 (review M3): a finalised, not cancelled final invoice of quotation offer_id exists (other than id but) --
     then no second final invoice and no further progress invoice."""
     r = c.execute("SELECT id FROM office_docs WHERE org_id=? AND kind='invoice' AND inv_type='final' AND source_doc_id=? AND id<>? "
-                  "AND locked_at IS NOT NULL AND locked_at<>'' AND status NOT IN ('draft', 'cancelled') LIMIT 1", (oid, offer_id, but or 0)).fetchone()
+                  "AND locked_at IS NOT NULL AND locked_at<>'' AND status NOT IN ('draft', 'cancelled') "
+                  "AND trial=(SELECT COALESCE(MAX(o.trial), 0) FROM office_docs o WHERE o.id=? AND o.org_id=?) LIMIT 1",  # 2.144.10 B (#2576)
+                  (oid, offer_id, but or 0, offer_id, oid)).fetchone()
     if r:
         raise BadInput(tr("The quotation already has a final invoice"))
 

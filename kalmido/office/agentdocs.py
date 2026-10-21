@@ -613,6 +613,8 @@ def v1_office_pp_post():
     r = doc_row(c, oid, did)
     if r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid", "draft"):
         raise Denied(409, tr("Payments go on finalised, open invoices only"))
+    if r["trial"]:  # 2.144.10 B (#2576): no payment suggestions for trial invoices
+        raise Denied(409, tr("Trial documents do not go to the accounting"))
     amt = dec(b.get("amount"), "NaN") if b.get("amount") not in (None, "") else Decimal("NaN")
     if amt.is_nan() or amt <= 0 or amt > Decimal("100000000"):
         raise BadInput(tr("Invalid value: {0}", "amount"))

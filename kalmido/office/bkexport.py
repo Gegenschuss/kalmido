@@ -85,7 +85,7 @@ def bx_rows(c, oid, frm, to):
     rows, docs, recs = [], [], []
     for r in c.execute("SELECT d.*, cl.name AS bx_client FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id WHERE d.org_id=? "
                        "AND d.kind IN ('invoice','credit') AND d.locked_at IS NOT NULL AND d.number != '' AND d.date>=? AND d.date<=? "
-                       "ORDER BY d.date, d.number", (oid, frm, to)).fetchall():
+                       "AND d.trial=0 ORDER BY d.date, d.number", (oid, frm, to)).fetchall():  # 2.144.10 B (#2576): no trial documents
         t, fx, sign = _j(r["totals"]), _fx(r, home), (-1 if r["kind"] == "credit" else 1)
         who = (_j(r["recipient"]).get("name") or r["bx_client"] or "").strip()
         f = "documents/" + epdf_name(r) + ".pdf"
