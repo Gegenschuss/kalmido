@@ -22,7 +22,7 @@ from flask import g, jsonify
 
 from ..core.config import app
 from ..core.access import Denied
-from ..core.db import body, db, err, gset, gsetting, uset, usettings
+from ..core.db import body, db, err, gset, gsetting, local_now, uset, usettings
 from ..core.i18n import tr
 from ..accounts.session import me
 
@@ -136,7 +136,7 @@ def sup_person(c, uid):
 def _instance_age_days(c):
     r = c.execute("SELECT MIN(created_at) FROM users").fetchone()
     try:
-        return (date.today() - date.fromisoformat(str(r[0])[:10])).days if r and r[0] else 0
+        return (local_now().date() - date.fromisoformat(str(r[0])[:10])).days if r and r[0] else 0
     except ValueError:
         return 0
 
@@ -155,7 +155,7 @@ def sup_nudge_due(c, u, s=None):
         last = date.fromisoformat((s.get("sup_nudge_at") or "")[:10])
     except ValueError:
         return True
-    return date.today() - last >= timedelta(days=SUP_NUDGE_DAYS)
+    return local_now().date() - last >= timedelta(days=SUP_NUDGE_DAYS)
 
 
 def sup_about(c, u):
@@ -265,6 +265,6 @@ def sup_nudge():
             return err(tr("Invalid value: {0}", "on"))
         uset(c, me(), "sup_nudge", "1" if b["on"] else "0")
     if b.get("seen") is True:
-        uset(c, me(), "sup_nudge_at", date.today().isoformat())
+        uset(c, me(), "sup_nudge_at", local_now().date().isoformat())
     c.commit()
     return _out(c)

@@ -19,7 +19,6 @@ calls a language model here; the variables are replaced by a plain regular expre
 import hashlib
 import re
 import urllib.parse
-from datetime import datetime, timezone
 
 from flask import Response, g, jsonify, request
 
@@ -493,7 +492,7 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     for n, p in enumerate(pages, 1):
         # 2.114.4 A (#2282): the page count only from two pages on
         P.pdf_draw_footer(p, foot, tr("Page {0} of {1}", n, total, lg=lang) if total >= 2 else "")
-    meta = {"when": datetime.now(timezone.utc), "producer": f"Kalmido v{APP_VERSION}"}
+    meta = {"when": now_utc(), "producer": f"Kalmido v{APP_VERSION}"}
     return P.pdf_write(pages, images, title=title, author=co.get("name") or "", meta=meta)
 
 

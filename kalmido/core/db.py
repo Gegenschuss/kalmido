@@ -27,7 +27,46 @@ from ..core.i18n import LANGS, tr
 FEATS_2480 = ("files", "docs")  # 2.48.0 (#1207, #1111): the file store and the documents, on for everyone once
 
 
+# 2.149.0 E (#2512): test clock. KALMIDO_TEST_NOW (ISO instant, e.g. 2026-10-18T23:30:00Z) moves the server's clock, but only
+# together with KALMIDO_TEST=1 (tests/start.sh sets both, the product image neither); the start-up log says so loudly. The clock
+# runs on from that instant (timers, windows and "x minutes ago" keep working): KALMIDO_TEST_NOW_AT (Unix seconds, set by
+# start.sh) is the real moment that instant stands for, so the app and its worker processes share one shifted clock.
+def _test_offset():
+    v = os.environ.get("KALMIDO_TEST_NOW")
+    if not v:
+        return None
+    if os.environ.get("KALMIDO_TEST") != "1":
+        print("WARNING KALMIDO_TEST_NOW is ignored: it needs KALMIDO_TEST=1 (test containers only)", flush=True)
+        return None
+    try:
+        t = datetime.fromisoformat(v.strip().replace("Z", "+00:00"))
+        at = float(os.environ.get("KALMIDO_TEST_NOW_AT") or 0) or datetime.now(timezone.utc).timestamp()
+    except ValueError:
+        print("WARNING KALMIDO_TEST_NOW is ignored: not an ISO time", flush=True)
+        return None
+    t = t if t.tzinfo else t.replace(tzinfo=TZ)
+    print("WARNING test clock: the server's time is shifted to", t.astimezone(timezone.utc).isoformat(), "(KALMIDO_TEST_NOW)",
+          flush=True)
+    return t - datetime.fromtimestamp(at, timezone.utc)
+
+
+_TEST_OFFSET = _test_offset()
+
+
+def test_seconds(name, default):
+    """2.149.0 E (#2513): a time window (seconds) a test container may shorten through the environment - read only with
+    KALMIDO_TEST=1, so a server outside the tests always keeps its default (rate limits are a protection)."""
+    if os.environ.get("KALMIDO_TEST") != "1" or not os.environ.get(name):
+        return default
+    try:
+        return max(1, int(os.environ[name]))
+    except ValueError:
+        return default
+
+
 def now_utc():
+    if _TEST_OFFSET is not None:
+        return datetime.now(timezone.utc) + _TEST_OFFSET
     return datetime.now(timezone.utc)
 
 
@@ -45,6 +84,8 @@ def parse_iso(s):
 
 
 def local_now():
+    if _TEST_OFFSET is not None:  # 2.149.0 E (#2512)
+        return now_utc().astimezone(TZ)
     return datetime.now(TZ)
 
 

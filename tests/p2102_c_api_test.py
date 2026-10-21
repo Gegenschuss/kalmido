@@ -82,13 +82,16 @@ SENDS = [0]
 def send(t, data, s):
     """A send; at most 6 per address and minute (FORM_SEND_RATE): every sixth waits for the next minute."""
     if SENDS[0] and SENDS[0] % 6 == 0:
-        time.sleep(61)
+        time.sleep(RATE_S + 1)  # 2.149.0 (#2513): a new rate window
     SENDS[0] += 1
     return s.post(B + "/f/" + t, data=data, headers=H)
 
 
+# 2.149.0 (#2513): the minute of the rate limits shortened to RATE_S (test containers only, KALMIDO_TEST_RATE_WINDOW_S)
+RATE_S = 60 if os.environ.get("P2102C_NOSTART") else 10
 if not os.environ.get("P2102C_NOSTART"):
-    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True)
+    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True,
+                       env=dict(os.environ, EXTRA=(os.environ.get("EXTRA", "") + f" -e KALMIDO_TEST_RATE_WINDOW_S={RATE_S}").strip()))
     assert r.returncode == 0, r.stdout + r.stderr
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")

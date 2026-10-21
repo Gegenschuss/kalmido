@@ -16,6 +16,9 @@
 #   KALMIDO_ONBOARDING      1 = sample list + welcome tour for new accounts (default 0: suites start from empty accounts)
 #   KALMIDO_ADMIN_ALERTS    1 = admin alerts via ntfy on (default 0: they would add pushes to the admin's topic)
 #   KALMIDO_TIDY_QUIET_S    seconds a new task waits for its tidy event (default 0 here: at once, as the suites before 2.27 expect)
+#   KALMIDO_TEST_NOW        2.149.0 (#2512): ISO instant the server's clock starts at (default unset: the real time); the
+#                           clock runs on from there. KALMIDO_TEST_NOW_AT = the real Unix second it stands for (default: now).
+#                           The container always gets KALMIDO_TEST=1, without it the app ignores KALMIDO_TEST_NOW
 #   KALMIDO_NOTIF_TEMPLATE  notification template of a share without one (default all here: the suites before 2.33 expect every push; the app itself starts with read)
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -65,9 +68,12 @@ if [[ -n "${KALMIDO_TEST_DB_LOGIN:-}" ]]; then
   "${PSQL[@]}" -c "DO \$\$BEGIN CREATE ROLE $DBU LOGIN PASSWORD 'kalmido'; EXCEPTION WHEN duplicate_object THEN NULL; END\$\$" \
     -c "ALTER ROLE $DBU LOGIN $ATTR" -c "ALTER DATABASE $DBN OWNER TO $DBU" >/dev/null || exit 1
 fi
+# 2.149.0 E (#2512): the test clock (run_all.sh `now <instant>; fresh`)
+TNOW=(-e KALMIDO_TEST=1)
+[[ -z "${KALMIDO_TEST_NOW:-}" ]] || TNOW+=(-e "KALMIDO_TEST_NOW=$KALMIDO_TEST_NOW" -e "KALMIDO_TEST_NOW_AT=${KALMIDO_TEST_NOW_AT:-$(date +%s)}")
 # shellcheck disable=SC2086
 docker run -d --name "$NAME" --network bridge --user "$(id -u):$(id -g)" --security-opt no-new-privileges:true --cap-drop ALL \
-  -e TZ=Europe/Berlin -e TASKS_DB=/data/tasks.db -e PUBLIC_URL=https://kalmido.example \
+  -e TZ=Europe/Berlin "${TNOW[@]}" -e TASKS_DB=/data/tasks.db -e PUBLIC_URL=https://kalmido.example \
   --link "$DBC:db" -e DATABASE_URL="postgresql://$DBU:kalmido@db/$DBN" \
   -e AUTH_PROXY_HEADER=Remote-User -e AUTH_TRUSTED_PROXIES="$GW" -e AUTH_PROXY_PORT=3045 \
   -e KALMIDO_SETUP_CODE="${KALMIDO_SETUP_CODE-off}" -e KALMIDO_NO_SECRET_KEY="${KALMIDO_NO_SECRET_KEY-1}" \

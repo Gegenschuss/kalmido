@@ -57,7 +57,7 @@ def _year(v):
     y = str(v or "")
     if not y:
         return local_now().year
-    if not (y.isdigit() and len(y) == 4 and 2000 <= int(y) <= date.today().year + 1):
+    if not (y.isdigit() and len(y) == 4 and 2000 <= int(y) <= local_now().year + 1):
         raise BadInput(tr("Invalid value: {0}", "year"))
     return int(y)
 

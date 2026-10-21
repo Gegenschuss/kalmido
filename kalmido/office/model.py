@@ -14,7 +14,7 @@ from flask import g, has_request_context
 
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, like_escape, table_columns
-from ..core.db import db, iso, now_utc, usettings
+from ..core.db import db, iso, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
@@ -492,12 +492,12 @@ def office_scheme_clean(v, name=None, offer=True):
 
 def office_scheme_period(scheme, d=None):
     """The counter's period of a scheme: the year when it holds {yyyy}/{yy}, else '' (one counter for ever)."""
-    d = d or date.today()
+    d = d or local_now().date()
     return str(d.year) if ("{yyyy}" in scheme or "{yy}" in scheme) else ""
 
 
 def office_number_format(scheme, seq, d=None, project="", client="", initials="", version=1):
-    d = d or date.today()
+    d = d or local_now().date()
 
     def rep(m):
         t = m.group(1)
@@ -646,7 +646,7 @@ def onc_version(c, oid, r, scheme, ctx_of):
     seq = onc_parse(scheme, first["number"])[0] if first is not None and first["number"] else None
     if seq is None:
         return ver, None
-    d = date.fromisoformat(first["date"]) if first["date"] else date.today()
+    d = date.fromisoformat(first["date"]) if first["date"] else local_now().date()
     for _ in range(50):
         num = office_number_format(scheme, seq, d, version=ver, **ctx_of(first))
         if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, r["id"])).fetchone() \

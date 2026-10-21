@@ -79,7 +79,7 @@ def stamp(t, s=None):
 def up(t, files, st, name="", js=False, s=None, extra=None):
     """One send (at most FRQ_SEND_RATE per address and minute: every 25th waits for the next minute)."""
     if SENDS[0] and SENDS[0] % 25 == 0:
-        time.sleep(61)
+        time.sleep(RATE_S + 1)  # 2.149.0 (#2513): a new rate window
     SENDS[0] += 1
     hd = {"X-Kalmido-Upload": "1"} if js else {}
     return (s or requests).post(B + "/u/" + t, data={"stamp": st, "name": name, **(extra or {})},
@@ -90,8 +90,11 @@ def kids(fid):
     return [r[0] for r in dbx("SELECT name FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL ORDER BY id", (fid,))]
 
 
+# 2.149.0 (#2513): the minute of the rate limits shortened to RATE_S (test containers only, KALMIDO_TEST_RATE_WINDOW_S)
+RATE_S = 60 if os.environ.get("P2122A_NOSTART") else 10
 if not os.environ.get("P2122A_NOSTART"):
-    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True)
+    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True,
+                       env=dict(os.environ, EXTRA=(os.environ.get("EXTRA", "") + f" -e KALMIDO_TEST_RATE_WINDOW_S={RATE_S}").strip()))
     assert r.returncode == 0, r.stdout + r.stderr
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")

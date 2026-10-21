@@ -172,6 +172,6 @@ def kpi_get():
     """?year=YYYY (default: this one) -> kpi_build."""
     c, uid, oid = _ctx()
     y = request.args.get("year") or ""
-    if y and not (y.isdigit() and len(y) == 4 and 2000 <= int(y) <= date.today().year + 1):
+    if y and not (y.isdigit() and len(y) == 4 and 2000 <= int(y) <= local_now().year + 1):
         raise BadInput(tr("Invalid value: {0}", "year"))
     return jsonify(kpi_build(c, uid, oid, int(y) if y else None))
