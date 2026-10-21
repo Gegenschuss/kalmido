@@ -37,8 +37,9 @@ def tz_no_agent():
 
 def tz_billed_sql(a="e."):
     """SQL fragment: the entry is covered by an invoice (not cancelled) of the list's client with a position of the list
-    (2.144.5 C (#1523): its list_id; a position without one = older invoices, by the list's name as before)."""
-    return (f"EXISTS (SELECT 1 FROM office_docs d JOIN lists bl ON bl.id={a}list_id "
+    (2.144.5 C (#1523): its list_id; a position without one = older invoices, by the list's name as before).
+    2.144.6 A (#2053): or an invoice took it (billed_doc_id)."""
+    return (f"({a}billed_doc_id IS NOT NULL OR EXISTS (SELECT 1 FROM office_docs d JOIN lists bl ON bl.id={a}list_id "
             f"WHERE d.kind='invoice' AND d.status<>'cancelled' AND bl.client_id IS NOT NULL AND d.client_id=bl.client_id "
             # 2.144.5 C (#1523): a private list (org_id NULL) is billed from its owner's personal office (its client is a private one)
             # 2.144.5 A2 (#1523, review R9): only that office, never another organisation's invoice for the same client id
@@ -46,7 +47,7 @@ def tz_billed_sql(a="e."):
             f"AND COALESCE(d.service_from, d.service_to) IS NOT NULL "
             f"AND substr({a}start,1,10)>=COALESCE(d.service_from, d.service_to) AND substr({a}start,1,10)<=COALESCE(d.service_to, d.service_from) "
             f"AND EXISTS (SELECT 1 FROM office_doc_items i WHERE i.doc_id=d.id AND (i.list_id=bl.id "
-            f"OR i.list_id IS NULL AND lower(trim(i.title))=lower(trim(bl.name)))))")  # review V2
+            f"OR i.list_id IS NULL AND lower(trim(i.title))=lower(trim(bl.name))))))")  # review V2
 
 
 def tz_scope(c, lid):
