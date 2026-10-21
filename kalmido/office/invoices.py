@@ -260,8 +260,9 @@ def inv_check_date(c, oid, r, s):
         raise BadInput(tr("The due date must not lie before the date"))
     scheme = inv_scheme(s, r["kind"])
     period = office_scheme_period(scheme, date.fromisoformat(d))
-    for row in c.execute("SELECT date FROM office_docs WHERE org_id=? AND kind=? AND locked_at IS NOT NULL AND id<>? AND date>? ORDER BY date DESC",
-                         (oid, r["kind"], r["id"], d)):
+    # 2.144.10 B (#2576): trial documents have their own series; they neither count for real ones nor the other way round
+    for row in c.execute("SELECT date FROM office_docs WHERE org_id=? AND kind=? AND locked_at IS NOT NULL AND id<>? AND date>? AND trial=? "
+                         "ORDER BY date DESC", (oid, r["kind"], r["id"], d, 1 if _col(r, "trial") else 0)):
         try:
             if office_scheme_period(scheme, date.fromisoformat(row["date"])) == period:
                 raise BadInput(tr("The date must not lie before the last finalised document of this series ({0})", row["date"]))
@@ -520,13 +521,16 @@ def inv_from_time(c, oid, uid, b):
 def inv_reminder_rows(c, oid, ids):
     """The invoices a reminder lists (snapshot rows for totals.lines): open, finalised invoices of the organisation."""
     pm = inv_paid_map(c, oid, ids)
-    rows = []
+    rows, trial = [], set()
     for did in ids:
         r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice'", (did, oid)).fetchone()
         if r is None:
             raise Denied(404)
         if not ofx_locked(r) or r["status"] in ("cancelled", "paid"):
             raise BadInput(tr("Only open, finalised invoices can be reminded of ({0})", r["number"] or did))
+        trial.add(bool(_col(r, "trial")))
+        if len(trial) > 1:  # 2.144.10 B (#2576): one reminder never mixes trial and real invoices
+            raise BadInput(tr("A reminder cannot mix trial and real invoices"))
         mf = inv_money_fields(r, pm)
         rows.append({"kind": "ref", "id": r["id"], "number": r["number"], "date": r["date"], "due_date": _col(r, "due_date") or "", "gross": _j(r["totals"], {}).get("gross"),
                      "open": mf["open"], "currency": r["currency"]})
@@ -799,6 +803,8 @@ def inv_datev_ready(c, oid, r, s):
         raise Denied(409, tr("No DATEV inbox address in the settings"))
     if not ofx_locked(r):
         raise Denied(409, tr("Finalise the document first"))
+    if _col(r, "trial"):  # 2.144.10 B (#2576)
+        raise Denied(409, tr("Trial documents do not go to the accounting"))
 
 
 def inv_send(c, oid, uid, r, b):
@@ -821,7 +827,9 @@ def inv_send(c, oid, uid, r, b):
     explicit = b.get("datev") in (1, True, "1", "true")
     if explicit:  # 2.147.0 (#2460): DATEV switched off -> no copy, also not the automatic one
         office_need_feature(c, oid, "books.datev", s)
+    # 2.144.10 B (#2576): no automatic DATEV copy of a trial document (an explicit one is refused by inv_datev_ready)
     datev = r["kind"] in ("invoice", "credit") and (explicit or (b.get("datev") is None and s.get("datev_auto") and not _col(r, "datev_sent_at")
+                                                                 and not _col(r, "trial")
                                                                  and office_feature(c, oid, "books.datev", s)))
     if datev:
         inv_datev_ready(c, oid, r, s)

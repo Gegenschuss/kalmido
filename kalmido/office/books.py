@@ -191,7 +191,9 @@ def _income_label(key):
 
 def bk_payments(c, oid, frm, to, home):
     """[(payment row, document row)] of invoices / credit notes paid in [frm, to] (ISO days, both included)."""
-    docs = {r["id"]: r for r in c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit')", (oid,))}
+    # 2.144.10 B (#2576): trial documents never reach the books
+    docs = {r["id"]: r for r in c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit') AND trial=0",
+                                          (oid,))}
     out = []
     for p in c.execute("SELECT id, doc_id, date, amount FROM office_payments WHERE org_id=? AND date>=? AND date<=? ORDER BY date, id",
                        (oid, frm, to)):
@@ -340,7 +342,7 @@ def bk_ustva(c, oid, year, period):
                           "source": "payment"})
     else:
         for r in c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind IN ('invoice','credit') AND locked_at IS NOT NULL "
-                           "AND number != '' AND date>=? AND date<=? ORDER BY date, number", (oid, frm, to)).fetchall():
+                           "AND trial=0 AND number != '' AND date>=? AND date<=? ORDER BY date, number", (oid, frm, to)).fetchall():
             t = _j(r["totals"])
             fx, sign = _fx(r, home), (-1 if r["kind"] == "credit" else 1)
             gross = dec(t.get("gross") or 0) / fx * sign

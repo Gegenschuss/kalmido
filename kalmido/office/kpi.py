@@ -159,7 +159,8 @@ def kpi_build(c, uid, oid, year=None, today=None):
     home = (office_settings(c, oid).get("currency") or "EUR").upper()
     today = today or local_now().date().isoformat()
     year = year or int(today[:4])
-    docs = c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit', 'offer')", (oid,)).fetchall()
+    # 2.144.10 B (#2576): no trial documents in the figures (their payments drop out through by_id)
+    docs = c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit', 'offer') AND trial=0", (oid,)).fetchall()
     pm = inv_paid_map(c, oid, [r["id"] for r in docs if r["kind"] == "invoice" and r["locked_at"]])
     cf = rk_cashflow(c, oid, today[:7], 3, today)
     return {"currency": home, "today": today, "year": year, "revenue": kpi_revenue(c, oid, home, docs, year, today),

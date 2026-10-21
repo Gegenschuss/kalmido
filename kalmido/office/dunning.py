@@ -48,7 +48,7 @@ def dun_tick(c, now=None):
     today = (now or local_now()).date().isoformat()
     with system_ctx(c):  # which office areas have an overdue open invoice at all; each is then handled in its admin's own context
         oids = [r[0] for r in c.execute("SELECT DISTINCT org_id FROM office_docs WHERE kind='invoice' AND locked_at IS NOT NULL AND status IN ('issued','sent') "
-                                        "AND COALESCE(due_date, '')<>'' AND due_date<? ORDER BY org_id LIMIT 2000", (today,)).fetchall()]
+                                        "AND trial=0 AND COALESCE(due_date, '')<>'' AND due_date<? ORDER BY org_id LIMIT 2000", (today,)).fetchall()]
     c.commit()
     for oid in oids:
         try:
@@ -107,8 +107,9 @@ def _dun_as(c, oid, today, people):
 def dun_due(c, oid, today, grace):
     """{(client key, currency, level): [invoice ids]} of area oid that get a suggestion today (see the module text)."""
     from .invoices import inv_money_fields, inv_paid_map, inv_state
+    # 2.144.10 B (#2576): the automatic dunning run never picks trial invoices
     invs = c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind='invoice' AND locked_at IS NOT NULL AND status IN ('issued','sent') "
-                     "AND COALESCE(due_date, '')<>'' AND due_date<? ORDER BY due_date, id LIMIT 2000", (oid, today)).fetchall()
+                     "AND trial=0 AND COALESCE(due_date, '')<>'' AND due_date<? ORDER BY due_date, id LIMIT 2000", (oid, today)).fetchall()
     if not invs:
         return {}
     pm = inv_paid_map(c, oid, [r["id"] for r in invs])
