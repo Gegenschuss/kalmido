@@ -243,7 +243,7 @@ def clean_setting(k, v):
         return json.dumps(o, ensure_ascii=False)
     if k == "trial_hint_seen":  # 2.144.10 (#2576): ["<org id>:offer" | "<org id>:invoice", ...]
         try:
-            o = v if isinstance(v, list) else json.loads(sv or "[]")
+            o = json.loads(sv or "[]")  # a JSON string like wgstd_hide (lists are refused above)
         except ValueError:
             raise bad from None
         if not isinstance(o, list) or len(o) > 200 or not all(isinstance(x, str) and re.fullmatch(r"\d{1,12}:(offer|invoice)", x) for x in o):

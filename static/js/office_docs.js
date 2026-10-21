@@ -621,7 +621,7 @@ function tri_markSeen(kind) {
   if (OFD.office == null || tri_seen().includes(tri_key(kind))) return;
   const a = [...tri_seen(), tri_key(kind)];
   if (S.settings) S.settings.trial_hint_seen = JSON.stringify(a);
-  api('PATCH', '/api/settings', {trial_hint_seen: a}).catch(() => { /* the local copy holds until the next load */ });
+  api('PATCH', '/api/settings', {trial_hint_seen: JSON.stringify(a)}).catch(() => { /* the local copy holds until the next load */ }); // a JSON string like wgstd_hide: lists are refused by clean_setting
 }
 function tri_switchHtml(kind) {
   const hint = tri_hintOn(kind) ? `<div class="onehint tri-hint" data-trial-hint="${kind}">${ic('info', 's')}<span>${esc(tr('To try things out, choose "Just to try": TEST number, watermark MUSTER, deletable any time. Real documents are locked once finalised.'))}</span><button type="button" class="iconbtn hx" data-tri="x" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>` : '';
