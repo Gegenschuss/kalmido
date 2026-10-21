@@ -59,7 +59,7 @@ Kalmido 2.9.0 is a CalDAV server for tasks. Every list you can see appears as a 
   link (ICS) too. Join the list to get all its tasks.
 - Participants see and change only the tasks assigned to them, and new tasks they create are assigned to them.
 - Deleting a task in an app moves it to the trash in Kalmido.
-- Lists are created, renamed and deleted in Kalmido (`MKCALENDAR`, `PROPPATCH` and deleting a collection are refused).
+- Lists are created, renamed and deleted in Kalmido (`PROPPATCH`, deleting a collection and a `MKCALENDAR` only for tasks are refused).
 - Moving a task to another list in a client (the same UID in another calendar) moves the Kalmido task, with its history and comments.
 
 Changes made over CalDAV show "via CalDAV" in the task history. Webhooks and agent events carry `"via": "caldav"`.
@@ -111,8 +111,13 @@ You need three things: the **server** (your host name), your **user name** and a
 
 Everything else a calendar app writes (Apple's travel time and structured location, conference links, other alarms …)
 is kept as it came and sent back unchanged. Each of your calendars is one collection (`/dav/calendars/<user>/e<id>/`);
-events you are invited to by someone else come in a read-only calendar **Invitations** (`…/inv/`). Calendars are
-created, shared and deleted in Kalmido; a calendar shared with you *view only* is read-only in the apps.
+events you are invited to by someone else come in a calendar **Invitations** (`…/inv/`). There you answer them in
+your calendar app (accept, maybe, decline): Kalmido takes only your own answer (`PARTSTAT` of your `ATTENDEE`), the
+organiser sees it as if you had answered in the app; other changes to an invitation are ignored, and deleting one counts
+as declined (it stays in the calendar, marked as declined). A new calendar created in a calendar app (`MKCALENDAR`) is an
+own calendar in Kalmido, in the same workspace a new calendar in the app would get (without an organisation: your private
+space), with its name, colour and description; the app keeps the address it chose. Calendars are shared and deleted in
+Kalmido; a calendar shared with you *view only* is read-only in the apps.
 
 ### What syncs (contacts)
 

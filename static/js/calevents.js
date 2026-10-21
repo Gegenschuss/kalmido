@@ -485,7 +485,7 @@ function davGuide() {
     ${step(tr('Thunderbird'), [tr('Calendar: New Calendar > On the network, user name and the address {0}; Thunderbird finds every calendar.', `<code>${esc(base)}</code>`),
       tr('Contacts: Address book > New address book > Add CardDAV address book, the same address and user name.'),
       tr('Enter the app password when Thunderbird asks for it.')])}
-    <div class="shint">${tr('Sharing a calendar or an address book with someone puts it into their phone too. Events you are invited to appear in a calendar “Invitations” (read-only).')}</div>
+    <div class="shint">${tr('Sharing a calendar or an address book with someone puts it into their phone too. Events you are invited to appear in a calendar “Invitations”; answer them there or in the app.')}</div>
     <div class="foot"><span class="spacer"></span><button class="btn pri" data-dg="close">${tr('Done')}</button></div>`);
   md.classList.add('dgmodal');
   md.addEventListener('click', e => {

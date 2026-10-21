@@ -5050,7 +5050,7 @@
   "Calendar: New Calendar > On the network, user name and the address {0}; Thunderbird finds every calendar.": "Calendario: Nuovo calendario > Sulla rete, nome utente e l’indirizzo {0}; Thunderbird trova tutti i calendari.",
   "Contacts: Address book > New address book > Add CardDAV address book, the same address and user name.": "Contatti: Rubrica > Nuova rubrica > Aggiungi rubrica CardDAV, lo stesso indirizzo e nome utente.",
   "Enter the app password when Thunderbird asks for it.": "Inserisci la password per app quando Thunderbird la chiede.",
-  "Sharing a calendar or an address book with someone puts it into their phone too. Events you are invited to appear in a calendar “Invitations” (read-only).": "Un calendario o una rubrica condivisi appaiono anche sul telefono dell’altra persona. Gli eventi a cui sei invitato appaiono in un calendario «Inviti» (sola lettura).",
+  "Sharing a calendar or an address book with someone puts it into their phone too. Events you are invited to appear in a calendar “Invitations”; answer them there or in the app.": "Un calendario o una rubrica condivisi appaiono anche sul telefono dell’altra persona. Gli eventi a cui sei invitato appaiono in un calendario «Inviti»; rispondi lì o nell’app.",
   "{0} invited you: {1}": "{0} ti ha invitato: {1}",
   "{0} shared the calendar {1} with you": "{0} ha condiviso con te il calendario {1}",
   "{0} shared the calendar {1} with you (view only)": "{0} ha condiviso con te il calendario {1} (sola lettura)",
