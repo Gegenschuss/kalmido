@@ -323,6 +323,9 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
 - The event contract_notice (2.70.0): a contract's last day to cancel is near. Send ONE sentence with
   propose_contract_notice (what it costs, until when they can decide, no pressure); the person takes it as a note.
   Since 2.92.0 business contracts and insurances of the office come the same way (data.office true).
+- The event letter_draft_requested (2.153.0): an office admin asks for a draft answer to a document shared with you. Read it
+  (get_document), then ONE create_letter_draft with answers = node_id and requested_by: subject and text only; the person
+  checks, signs and sends it. Your own drafts: list_letter_drafts, update_letter_draft, link_letter_document.
 - Set your status (set_status) while you work on something, and back to idle when done.
 - Before you answer a task event, read the whole task: description, properties and all comments (get_task).
 - Answer task events only with a comment on the task, never with a copy in your chat.
@@ -553,7 +556,9 @@ chat messages of one person that arrive together: one run). It does what a hoste
   neutral first names) and `--parent ID` makes it a part job (`Alma B`); the chat shows the name on the job's messages, the
   colour follows the name, a part job looks like its leader, a little lighter. 2.96.0: all messages of a job form ONE card in the
   chat (name, version, state, the newest line; a tap shows the whole history), the result and errors stay visible under it
-  (`agent_job.py` marks them with `job_msg`), and a filter in the chat header (2.144.0: the icon on every width) shows *All*, *Only me and <agent>* or *Jobs*. The job is an own background run of the same command (it survives a restart of the runner), shows as a job in the Agents
+  (`agent_job.py` marks them with `job_msg`), and a filter in the chat header (2.144.0: the icon on every width) shows *All*, *Only me and <agent>* or *Jobs*. 2.153.0: each job has
+  its own chat (*Open the job chat*); the whole chat keeps its card with the newest results, questions and errors under it. A message typed in a
+  job's chat comes with `job_id`: the runner answers it in a chat run about that job and posts the answer into the job's chat. The job is an own background run of the same command (it survives a restart of the runner), shows as a job in the Agents
   tab with its steps and progress lines (`agent_job.py progress ID "..."`), and posts its complete result, with the files in its own
   outbox, into the chat. 2.46.6: then it **wakes the chat agent** -- exactly one chat run for that person with the outcome and the
   start of the result, in which the agent goes on (the next step or a short note); a stopped job wakes it with the hint not to

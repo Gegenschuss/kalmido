@@ -1197,6 +1197,21 @@ fresh; run p296_b_ui node p296_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.96.0 part C (#2015): one thread card per job in the agent chat, the chat filter
 fresh; run p296_c_api "$PY" p296_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p296_c_ui node p296_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.153.0 part A: correspondence -- letters, PDF, signature, status (#2028)
+fresh; run p2106_a_api "$PY" p2106_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2106_a_ui node p2106_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.153.0 part B: letter <-> document links, history, deadline task, follow-up, reference line (#2028)
+fresh; run p2106_b_api "$PY" p2106_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2106_b_ui node p2106_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.153.0 part C: letters by e-mail with the answer linked, text blocks (#2029 #2030)
+fresh; run p2106_c_api "$PY" p2106_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2106_c_ui node p2106_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.153.0 part D: agents draft letters (#2031)
+fresh; run p2106_d_api "$PY" p2106_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2106_d_ui node p2106_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.153.0 (#1962): a chat of its own per job (job_id on a person's message, start line, progress in the job's chat)
+fresh; run p2107_api "$PY" p2107_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2107_ui node p2107_ui.js "$KALMIDO_TEST_DATA"
 # 2.96.0 part D (#1941 / #1918): an organisation's export into the private space, the own absence area in "Private"
 fresh; run p296_d_api "$PY" p296_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.96.0 part E (#1941): the separation after a move between private and organisation; moved documents are learned by the target
@@ -1252,6 +1267,9 @@ fresh; run p298_b_ui node p298_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p298_c_ui node p298_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.98.0 part D: longer tick / create animation, document guesses only where they fit, comment names (#2163 #2178 #2184)
 fresh; run p298_d_api "$PY" p298_d_api_test.py "$KALMIDO_TEST_DATA"
+# 2.153.0: custom fields of documents (#2179)
+fresh; run p2108_a_api "$PY" p2108_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2108_a_ui node p2108_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.87.9 part E (#1914 #1920 #1909 #1933 #1937 #1952 #1963): polish
 fresh; run p287b_e_ui node p287b_e_ui.js "$KALMIDO_TEST_DATA"
 shard 15  # 2.124.2: the 2.90-2.93 and 2.99.1 suites (was shard 11: over 45 min)
@@ -1713,6 +1731,12 @@ fresh; run p2149_e_api "$PY" p2149_e_api_test.py "$KALMIDO_TEST_DATA"
 # 2.149.0 part F: module start files loaded lazily, guarded lazy calls, missing CSS variables (#2518 #2519)
 fresh; run p2149_f_ui node p2149_f_ui.js "$KALMIDO_TEST_DATA"
 _group_end
+# 2.153.0 part C: receipt list with filters, its CSV + ZIP for the tax adviser; e-invoice becomes a receipt (#2055)
+fresh; run p2110_b_api "$PY" p2110_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2110_b_ui node p2110_b_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2153_c_api "$PY" p2153_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.153.0 part A2: review fixes of the correspondence (office move with signature + letter links, accounting role)
+fresh; run p2153_a2_api "$PY" p2153_a2_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

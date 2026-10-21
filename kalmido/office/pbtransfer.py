@@ -12,7 +12,9 @@ sealed with the target's (core/orgcrypt.py FIELDS, JSON_KEYS, the purchase price
 it carries a protected key, oc_log_detail). Finalised documents keep status, lock and number (B4, #1969): numbers are
 never rewritten -- a number the target already uses (documents or archive) refuses the transfer (409 with the list).
 The private clients move along like in pb_move_post (org_id NULL & created_by -> the target, their contact persons too,
-the links of those to private address books end).
+the links of those to private address books end). The letters' links to the owner's private documents and address
+books end (review A2, 2.153.0: the documents stay private, pb_letter_detach); a signature the person has in the target
+already stays, the personal office keeps the other one (review A1).
 What stays in the personal office: its settings and company data (bank, tax: the target's are never overwritten), the
 start balance and the real balances of the cash flow (the bank account of the company), the number counters (the
 person's own sequence never restarts; a counter the target does not have yet is copied, so the target continues after
@@ -188,6 +190,10 @@ def pbt_plan(c, uid, src, dst):
     if rec:
         notes.append(trn("{0} receipt stays in your private file store: only you can open it",
                          "{0} receipts stay in your private file store: only you can open them", rec))
+    lk = pb_letter_links(c, src)
+    if lk:
+        notes.append(trn("{0} link of a letter to a private document ends: the document stays in your private documents",
+                         "{0} links of letters to private documents end: the documents stay in your private documents", lk))
     if counts.get("office_texts") and c.execute("SELECT 1 FROM office_texts WHERE org_id=? LIMIT 1", (dst,)).fetchone():
         notes.append(trn("{0} text block is added to those of the organisation (the same text can show twice there)",
                          "{0} text blocks are added to those of the organisation (the same text can show twice there)", counts["office_texts"]))
@@ -222,6 +228,24 @@ def pbt_reseal(c, t, r, src, dst):
     return ofm_reseal(c, t, r, src, dst)
 
 
+def pb_letter_links(c, src):
+    """The links of the letters of personal office src to documents: link rows + filed letter PDFs (review A2, 2.153.0).
+    A personal office links only the owner's private documents, which stay private when the office moves."""
+    links = c.execute("SELECT COUNT(*) FROM office_letter_links WHERE org_id=?", (src,)).fetchone()[0]
+    pdfs = c.execute("SELECT COUNT(*) FROM office_letters WHERE org_id=? AND node_id IS NOT NULL", (src,)).fetchone()[0]
+    return links + pdfs
+
+
+def pb_letter_detach(c, src):
+    """Before personal office src moves (pbt_post, web.py pb_move_post): the letters' links to the owner's private
+    documents and address books end -- only the links, the documents and contacts stay as they are (the frozen recipient
+    of a letter stays). -> the number of document links ended."""
+    n = c.execute("DELETE FROM office_letter_links WHERE org_id=?", (src,)).rowcount
+    n += c.execute("UPDATE office_letters SET node_id=NULL WHERE org_id=? AND node_id IS NOT NULL", (src,)).rowcount
+    c.execute("UPDATE office_letters SET contact_id=NULL WHERE org_id=? AND contact_id IS NOT NULL", (src,))
+    return n
+
+
 def pbt_rows(c, src, dst, tables):
     """org_id src -> dst in every office table (protected fields sealed anew) -> {table: n}."""
     out = {}
@@ -233,6 +257,9 @@ def pbt_rows(c, src, dst, tables):
         if t == "office_pack_installs":  # a pack the target has installed itself stays (one active install per pack)
             extra = (" AND NOT (removed_at IS NULL AND EXISTS (SELECT 1 FROM office_pack_installs x WHERE x.org_id=? AND x.removed_at IS NULL "
                      "AND x.kind=office_pack_installs.kind AND x.code=office_pack_installs.code))")
+            args = (dst,)
+        elif t == "office_letter_profiles":  # review A1 (2.153.0): one signature per person and area; the target's own stays
+            extra = (" AND NOT EXISTS (SELECT 1 FROM office_letter_profiles x WHERE x.org_id=? AND x.user_id=office_letter_profiles.user_id)")
             args = (dst,)
         if t in PBT_SEALED:
             if "id" not in table_columns(c, t):
@@ -282,6 +309,7 @@ def pbt_post():
             os.chmod(to, 0o600)
         own_default = c.execute("SELECT 1 FROM office_cashbooks WHERE org_id=? AND is_default=1", (dst,)).fetchone()
         moved_books = [r[0] for r in c.execute("SELECT id FROM office_cashbooks WHERE org_id=?", (src,))]
+        unlinked = pb_letter_detach(c, src)
         counts = pbt_rows(c, src, dst, p["tables"])
         if own_default and moved_books:  # the target keeps its own default cash box
             q = ",".join("?" * len(moved_books))
@@ -298,7 +326,8 @@ def pbt_post():
                 c.execute(f"UPDATE office_client_contacts SET org_id=? WHERE client_id IN ({q})", (dst, *cl))
                 c.execute(f"UPDATE office_client_contacts SET contact_id=NULL WHERE client_id IN ({q})", cl)  # own address books stay private
         ofx_log(c, dst, "move", target="settings", detail={"from_personal": 1, "clients": len(cl), "files": len(p["files"]),
-                                                           "rows": {k: v for k, v in counts.items() if v}})
+                                                           "rows": {k: v for k, v in counts.items() if v},
+                                                           "letter_links": unlinked})
         uset(c, uid, "workspace", f"org:{dst}")  # afterwards the app shows the organisation's office
         bump(c)
         c.commit()
@@ -320,5 +349,5 @@ def pbt_post():
     g.pop("pb_owner", None)
     acx_drop()
     print("personal office", src, "moved into organisation", dst, "by", g.user["username"], flush=True)
-    return jsonify(ok=True, org_id=dst, name=name, clients=len(p["clients"]), files=len(p["files"]),
+    return jsonify(ok=True, org_id=dst, name=name, clients=len(p["clients"]), files=len(p["files"]), letter_links=unlinked,
                    rows=sum(counts.values()))

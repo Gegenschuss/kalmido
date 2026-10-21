@@ -72,6 +72,7 @@ DOC_JOBS = [("doc_meta", "node_id", col, f"doc_meta.{col}") for col in ("text", 
     ("pl_uploads", "id", "mapping", "pl_sources.mapping"),  # the upload's mapping is sealed like the source's
     ("pl_sources", "id", "mapping", "pl_sources.mapping"),
     ("file_text", "id", "text", "file_text.text"),
+    ("doc_field_values", "id", "value", "doc_field_values.value"),  # 2.153.0 (#2179): custom field values (docs/fields.py)
 ]
 
 
@@ -1031,7 +1032,8 @@ ROT_WS = (("doc_rules", "id", "data", "doc_rules.data"), ("doc_models", "id", "d
           ("doc_meta", "node_id", "trained", "doc_meta.trained"), ("doc_meta", "node_id", "extracted", "doc_meta.extracted"),
           ("rc_suggest", "id", "amount", "rc_suggest.amount"), ("rc_suggest", "id", "prev_amount", "rc_suggest.prev_amount"),
           ("doc_meta", "node_id", "summary", "doc_meta.summary"),  # 2.138.0 (#1972): document summaries of 2.126.1 (#2123)
-          ("pl_uploads", "id", "mapping", "pl_sources.mapping"))  # 2.138.0 (#1972): the mapping chosen for an uploaded export
+          ("pl_uploads", "id", "mapping", "pl_sources.mapping"),  # 2.138.0 (#1972): the mapping chosen for an uploaded export
+          ("doc_field_values", "id", "value", "doc_field_values.value"))  # 2.153.0 (#2179): custom field values (docs/fields.py)
 ROT_SETTLE = float(os.environ.get("KALMIDO_ORGCRYPT_ROT_SETTLE", "5"))  # seconds after the key switch (requests that hold the old key end)
 
 

@@ -680,7 +680,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `mention` | someone mentions the agent in a comment, or writes `@agentname` in a task title or notes | `task`, `list`, `comment` (or `null`), `where`: `comment` or `task` |
 | `comment` | a new comment on a task the agent follows (assigned to it, created by it, or it commented before); 2.13.1: in a list where the agent **reads every comment**, every comment a person writes there; 2.41.0 (#1383): a person pressed a button under one of the agent's comments ([Answer buttons and approval cards in comments](#answer-buttons-and-approval-cards-in-comments-2410)); 2.63.0 (#1513): the customer of a [customer report](#customer-reports-2630) wrote on its status page | `task`, `list`, `comment`; 2.41.0: `answer` `{comment_id, choice_ids, labels, via, user, approval?, approval_request?}`; 2.63.0: `comment.portal` (the customer sees it), a customer's comment has `author_id` null and `comment.ext_name` |
 | `assigned` / `unassigned` | a task is assigned to the agent or taken away from it | `task`, `list` |
-| `chat` | a person writes in their chat with the agent | `message` `{id, body, task_id, created_at, attachments}`, `user` `{id, name}`; fetching it marks the message *delivered* (2.7.2); 2.13.1: `attachments` `[{id, name, mime, size, url}]` (images / files, `body` may then be empty) |
+| `chat` | a person writes in their chat with the agent | `message` `{id, body, task_id, created_at, attachments}`, `user` `{id, name}`; fetching it marks the message *delivered* (2.7.2); 2.13.1: `attachments` `[{id, name, mime, size, url}]` (images / files, `body` may then be empty); 2.153.0 (#1962): `message.job_id` + `job` (the job) when it was typed in that job's own chat |
 | `reaction` | someone reacts to one of the agent's comments; 2.7.2: or to one of its chat messages | comments: `task`, `list`, `comment` `{id, text}`, `reaction` `{emoji, user}`, `approval`: `approved`, `rejected` or `null`; chat: `chat_message` `{id, text, from, created_at}`, `reaction`, `approval`, `user`; 2.30.0: `stale: true` when a 👍 / 👎 hit a permission question that is already answered or expired (act on `approval`, never on the emoji) ([Chat reactions](#chat-reactions-and-delivery-272)) |
 | `job` | someone presses Approve, Reject or Stop on one of the agent's jobs; 2.3.0: a proposal was applied (`approve`) or discarded (`reject`); 2.56.0: someone wrote to a running job from its card (`message`) | `job`, `action`: `approve`, `reject`, `stop` or `message` (2.56.0, with `text`; the job itself does not change), `user`; for proposals also `proposal` `{state: applied \| discarded, created, changed, list_id}` |
 | `tidy` | a person creates a task in a list with tidy mode `suggest` or `auto`; 2.4.1: only to the list's tidy agent (`list.tidy_agent_id`); 2.29.0: not for tasks created in bulk through the API beyond the first five; 2.30.0: also for a task a person moves into the list (not in a bulk move beyond the first five) | `task`, `list`, `mode` |
@@ -709,6 +709,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `chat_pinned` | 2.62.0 (#1848): the person pinned or unpinned a message of the agent's chat (see [Pinned chat messages](#pinned-chat-messages-2620)); information only, nothing to answer (the reference launcher starts no run) | `message` (the chat message, with `pinned_at` / `pinned_by`), `pinned` (true / false), `user` `{id, name}` |
 | `contract_notice` | 2.70.0 (#1359): the last day to cancel a contract (Home & life) in a list shared with the agent is near: from the contract's own lead (else 30 days) before it; once per contract, deadline and agent; never from a health list; only while the person has the module *Contracts* on. 2.92.0 (#1925): also a business contract of the office (Office > Contracts & insurance, its deadline task carries `fam.office_agreement`; `office` true; the person needs the office module instead). Answer with ONE `propose_contract_notice` (see [Contracts and notice deadlines](#contracts-and-notice-deadlines-2700)) | `task_id`, `list_id`, `name`, `provider`, `cost`, `per`, `monthly`, `yearly`, `notice`, `notice_unit`, `due` (cancel by), `ends`, `renew_months`, `days`, `user` `{id, name}`, `lang`, `office` (2.92.0), `hint` |
 | `abort` | 2.144.0 (#2412): the person pressed **Stop** in the agent's chat (the button while the agent works, or Esc / Ctrl+C, see [Stopping a running answer](#stopping-a-running-answer-21440)); end the running answer at once, then confirm with `POST /api/v1/agent/aborted` | `user`, `source` (`chat`), `job_id` + `job` when it was pressed in a job's history (stop only that job's current step) |
+| `letter_draft_requested` | 2.153.0 (#2031): an admin of the agent's office pressed *Let an agent draft the answer* at an incoming document shared with the agent: `node_id`, `title`, `requested_by`, `note`, `office` {id, personal}, `org_id`, `hint`. Answer with ONE `create_letter_draft` (`answers` = `node_id`); see [Letter drafts](#letter-drafts-21060) |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -1283,6 +1284,17 @@ without. The reference starter sends `result` / `error` with a job's result (`ag
 or an answer to a message addressed to a job) is left out, also with buttons, except an open approval or permission question
 that waits for me. *Jobs* shows the job cards and the job messages with buttons, plus my messages addressed to a job.
 
+2.153.0 (#1962): **a chat of its own per job.** In the whole chat a job is its card: under it the newest results,
+questions and errors (long ones cut to a few lines) and the link *Open the job chat*; its other messages stay folded in
+the card. When you create a job for a person (`user_id`), Kalmido writes its start line into
+that person's chat: a notice (`kind` `notice`, no push, never unread) with `job_id`, `job_msg` `start` and the job's
+title as text. The job's own chat (in the app: the job's name, *Open the job chat*, *Conversation* on its card) shows its
+messages, the person's messages to it and its progress lines (`append_log`, only for the person it is for). What the
+person types there reaches you as the usual `chat` event with `message.job_id` and the job in `data.job`; the app still
+puts `Job 82: …` in front, so a host that reads only the text reaches the job as before. Hand it to that job and
+post the job's answers with its `job_id`. Messages without `job_id` stay in the whole chat. The reference starter answers
+such a message in a chat run and posts the answer with the `job_id` (`mcp/agent_run.py`).
+
 **What the person sees in the chat header (2.4.1).** Under the agent's name: typing dots while it writes to this person,
 then its state in words: *working on #51* (the status task, a link), *working*, *waiting for you*, *ready* (idle),
 *paused*, *limit reached* or *not connected* (2.6.0; was *offline*). The dots show while the agent's status is `working` on nothing in particular, on a
@@ -1718,7 +1730,7 @@ a folder above it) is shared with it, and every access is written into the file'
 | Documents shared with you (`q` = words of the text, `review=1` = waiting in *To review*; 2.122.0: `q` takes `tag:Name`, `sender:Name`, `type:Name`, `date:2025-01..2025-03`, `"exact phrase"`, `-word`; filters `tag` / `not_tag` / `tag_mode`, `sender`, `type`, `folder`, `added_from` / `added_to`, `no_tag`, `no_sender`, `ftype`) | `GET /api/v1/documents` | `list_documents` |
 | One document with its fields, open suggestions and the recognised text | `GET /api/v1/documents/{id}` | `get_document` |
 | A new document (2.122.0: `content_base64` + `name`, or multipart `file`; optional `title`, `parent_id`, `sender`, `type`, `tags`, `date`, `due`, `amount`, `currency`; without `parent_id` an agent writes into its own result folder) | `POST /api/v1/documents` | `create_document` |
-| Set fields (role *edit*): `date`, `due`, `amount`, `currency`, `sender`, `type`, `tags` (names) | `PATCH /api/v1/documents/{id}` | `update_document` |
+| Set fields (role *edit*): `date`, `due`, `amount`, `currency`, `sender`, `type`, `tags` (names), `custom_fields` (2.153.0: `{name or id: value}`, only fields the workspace has) | `PATCH /api/v1/documents/{id}` | `update_document` |
 | The file itself | `GET /api/v1/files/{id}/content` | -- |
 
 Scopes: `files:read` / `files:write` (the file store's). Values an agent sets are marked *set by an agent*. Where the
@@ -1777,6 +1789,9 @@ area's clients, documents or lists answer `404`.
 | Suggest an incoming payment / your suggestions | `POST` / `GET /api/v1/office/payment-suggestions` | `suggest_payment` / `list_payment_suggestions` |
 | 2.94.0: the leads (stage lead, by follow-up day; `due=1` = the day has come) / add a lead (source `agent` by default) | `GET` / `POST /api/v1/office/leads` | `list_office_leads` / `create_office_lead` |
 | 2.94.0: change a lead's next step, follow-up day or note (only while it is a lead; `409` once converted) | `PATCH /api/v1/office/leads/{id}` | `update_office_lead` |
+| 2.153.0: your letters (status `draft` by default; `sent`, `delivered`, `all`) / create a letter draft (`answers`, `client_id`, `rcpt_name`, `rcpt_address`, `rcpt_email`, `letter_date`, `subject`, `body`, `ref_line`, `greeting`, `lang`, `notify`) | `GET` / `POST /api/v1/office/letters` | `list_letter_drafts` / `create_letter_draft` |
+| 2.153.0: one of your letters / change your own draft (only while it is a draft; `400` once sent) | `GET` / `PATCH /api/v1/office/letters/{id}` | -- / `update_letter_draft` |
+| 2.153.0: link your draft with a document shared with you (`node_id`, `kind` answers / reply) | `POST /api/v1/office/letters/{id}/links` | `link_letter_document` |
 
 Positions: `{service_id, qty}` takes title, unit and price from the catalogue (or the client's framework contract); `text`
 + `price` without a service is a **free** position, a `price` other than the catalogue's is marked **price changed**, a
@@ -1793,6 +1808,26 @@ checks) or rejects each one.
 Every request of an agent is one line in the office's access log (agent, read / drafted, what, the document; no contents);
 the log has the filter *Agents*. The event `offer_accepted` reaches the agents of the area with the office switch on while
 the privacy switch is on.
+
+## Letter drafts (2.153.0)
+
+Correspondence of the office (#2031): an agent drafts letters, a person checks, signs and sends them. The switches are those
+of the office drafts (scope `office`, the agent's *May draft office documents*, the area's *Agents may read office data*);
+the person the agent acts for (`requested_by`, default its owner) must be an **admin** of the office, like every letter
+route of the people (`403` otherwise). An agent sees only the letters it made itself (`GET /api/v1/office/letters/{id}` of
+another letter: `404`).
+
+- At an incoming document a person sees *Let an agent draft the answer* when at least one agent of the office with both
+  switches may see the document (shared with it in the file store); with several agents they choose one and may add a note.
+  The agent gets the event `letter_draft_requested` and answers with ONE `create_letter_draft` `{answers: node_id, subject,
+  body, requested_by}`: recipient and reference line come prefilled from the document, the letter is linked as its answer.
+  A document not shared with the agent is never shared on its behalf: the button route answers `403` *Share the document
+  with the agent first*, `answers` / `node_id` of such a document (or of another workspace) `404`.
+- The draft has `agent_id` set and status `draft`; `notify` (default true on create) posts a card in the person's chat
+  (*Letter draft from ...*, button *Open in the office* -> `#office/letters/{id}`).
+- Never: sending, marking as sent or delivered, deleting, a letter of a person. Agent tokens get `403` on every route of
+  `/api/office/letters...`; there is no sending route in the API v1. Every request is one line in the office log
+  (what `letter`). Kalmido itself never phrases a letter.
 
 ## Pin board, weekly status, time check, shoot planning (2.51.0)
 
@@ -2831,7 +2866,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
 `chat_typing`, `check_in_habit`, `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `confirm_abort`,
 `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`, `create_event_calendar`, `create_field`,
-`create_file_folder`, `create_filter`, `create_form`, `create_habit`, `create_job`, `create_list`, `create_list_tag`,
+`create_file_folder`, `create_filter`, `create_form`, `create_habit`, `create_job`, `create_letter_draft`, `create_list`, `create_list_tag`,
 `create_note`, `create_offer_draft`, `create_office_lead`, `create_packing_list`, `create_section`, `create_task`, `create_template`,
 `create_text_file`, `create_trip`, `decide_reward`, `delete_address_book`, `delete_attachment`,
 `delete_chat_attachment`, `delete_client`, `delete_comment`, `delete_contact`, `delete_event`, `delete_event_calendar`,
@@ -2844,10 +2879,10 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_playbook`,
 `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`,
 `get_timer`, `get_usage`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`, `ingredients_to_shopping`,
-`link_contact`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_calendar_events`, `list_chats`,
+`link_contact`, `link_letter_document`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_calendar_events`, `list_chats`,
 `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`, `list_events`, `list_fields`,
 `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`, `list_jobs`, `list_kids`,
-`list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`, `list_notes`, `list_office_data`,
+`list_letter_drafts`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`, `list_notes`, `list_office_data`,
 `list_office_documents`, `list_office_leads`, `list_packing_templates`, `list_payment_suggestions`, `list_project_files`,
 `list_receipt_suggestions`, `list_repos`, `list_schedules`, `list_sections`, `list_stale_tasks`, `list_subtasks`,
 `list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`, `list_time_entries`, `list_trash`,
@@ -2865,7 +2900,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`,
 `unshare_list`, `unshare_list_from_group`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,
 `update_document`, `update_event`, `update_event_calendar`, `update_field`, `update_filter`, `update_form`,
-`update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_offer_draft`, `update_office_lead`,
+`update_habit`, `update_job`, `update_letter_draft`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_offer_draft`, `update_office_lead`,
 `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`, `upload_attachment`,
 `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`,
 `write_journal`

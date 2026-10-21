@@ -304,6 +304,14 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths):
                asn, _now(), nid))
     if m["extracted"]:  # 2.121.0 A (#2092): the recognised receipt values move along, sealed for the new workspace
         S.meta_set_json(c, nid, new, "extracted", S.meta_json(c, m, "extracted", {}))
+    # 2.153.0 (#2179): the custom field values go along (fields found / made by name and type in the target); the marks
+    # "automatic" of the fields follow their new ids
+    from ..docs.fields import df_move
+    cf = df_move(c, nid, old, new, uid)
+    auto = S.meta_json(c, m, "auto", {})
+    if any(k.startswith("cf") for k in auto):
+        S.meta_set_json(c, nid, new, "auto", {cf.get(k, k) if k.startswith("cf") else k: v for k, v in auto.items()
+                                              if not k.startswith("cf") or k in cf})
     new_tags = {t["id"]: S.label_id(c, new, "tag", t["name"]) for t in tags}
     S.set_tags(c, nid, [x for x in new_tags.values() if x], {new_tags[t["id"]]: t["auto"] for t in tags if new_tags[t["id"]]})
     # 2.96.0 (#1941): the target's models learn the document at once (sender, type, folder, tags as

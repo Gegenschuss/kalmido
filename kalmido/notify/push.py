@@ -646,6 +646,8 @@ def _watchdog_tick(c):
     _wd_section(c, "subscription reminders", abo_tick, now)  # 2.91.0 B (#1924): reminder tasks before a subscription renews
     from ..office.dunning import dun_tick
     _wd_section(c, "payment reminder suggestions", dun_tick, now)  # 2.147.1 B (#2054): reminder drafts for overdue invoices
+    from ..office.letterlinks import ltl_followup_tick
+    _wd_section(c, "letter follow-ups", ltl_followup_tick)  # 2.153.0 (#2028): a task when a sent letter got no answer in time
     from ..accounts.tenancy import boundary_tick
     from ..lists.rules import rul_due_tick
     _wd_section(c, "list rules", rul_due_tick)  # 2.71.0 A (#1457): rules "due date reached"

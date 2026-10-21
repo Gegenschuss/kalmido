@@ -250,10 +250,10 @@ def search_ids(c, ws_nodes, query):
             ids_ = sorted(cand)
             for i in range(0, len(ids_), 5000):  # 2.126.0 A (#1979 L3): in portions like above
                 part = ids_[i:i + 5000]
-                for r in c.execute(f"SELECT node_id, text FROM doc_meta WHERE node_id IN ({','.join('?' * len(part))})", tuple(part)).fetchall():
-                    have = set(index_words(doc_open(c, ws, "doc_meta.text", r["text"])))
+                for r in c.execute(f"SELECT * FROM doc_meta WHERE node_id IN ({','.join('?' * len(part))})", tuple(part)).fetchall():
                     name = c.execute("SELECT name FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
-                    have |= set(index_words(name[0] if name else ""))
+                    # 2.153.0 (#2179): everything the index holds (also sender, archive number, custom field values), not only text + name
+                    have = set(index_words(index_text(c, dict(r), name[0] if name else "", doc_open(c, ws, "doc_meta.text", r["text"]))))
                     if all(any(x.startswith(w) for x in have) for w in check):
                         ok.add(r["node_id"])
             cand = ok
@@ -386,10 +386,12 @@ def asn_taken(c, ws, n, nid=None):
 
 
 def index_text(c, m, name, text):
-    """What the word index of a document holds: name, sender, archive number and the recognised text."""
+    """What the word index of a document holds: name, sender, archive number, the custom field values (2.153.0) and the
+    recognised text."""
+    from .fields import df_index_text
     sender = label_name(c, m["ws"], "sender", m["sender_id"]) or ""
     asn = f"{cfg_get(c, m['ws'])['asn_prefix']}{m['asn']} {m['asn']}" if m.get("asn") else ""
-    return f"{name}\n{sender}\n{asn}\n{text}"
+    return f"{name}\n{sender}\n{asn}\n{df_index_text(c, m['node_id'], m['ws'])}\n{text}"
 
 
 def meta_row(c, nid):
@@ -842,9 +844,11 @@ def process(c, nid):
             "amount": str(given.get("amount") or ex["amount"] or ""), "currency": str(given.get("currency") or ex["currency"] or "")[:8]}
     auto_all = meta_json(c, m, "auto", {})
     if ei:                                   # 2.146.0 A (#2451): the e-invoice's values replace the recognition's
-        from ..office.einvoice_in import ei_details
+        from ..office.einvoice_in import ei_amount, ei_details
         ei_det = ei_details(ei)
-        for k, v in (("doc_date", ei["date"]), ("due_date", ei["due"]), ("amount", ei_det["gross"]), ("currency", ei["currency"])):
+        ei_first = not meta_json(c, m, "extracted", {}).get("_einv")  # 2.153.0 (#2055): read as an e-invoice for the first time
+        # 2.153.0 (#2055): a credit note's amount negative (ei_amount)
+        for k, v in (("doc_date", ei["date"]), ("due_date", ei["due"]), ("amount", ei_amount(ei)), ("currency", ei["currency"])):
             if v and not given.get({"doc_date": "date", "due_date": "due"}.get(k, k)):
                 vals[k] = str(v)[:8] if k == "currency" else v
                 auto_all[{"doc_date": "date", "due_date": "due"}.get(k, k)] = "e-invoice"
@@ -908,8 +912,10 @@ def process(c, nid):
                _now(), _now(), nid))
     from ..receipts.extracted import rx_compact
     if ei:                                   # 2.146.0 A (#2451): the e-invoice's values + the invoice for its readable view
-        from ..office.einvoice_in import ei_compact
+        from ..office.einvoice_in import ei_compact, ei_receipt
         meta_set_json(c, nid, ws, "extracted", {**rx_compact(ei_det), "_einv": ei_compact(ei)})
+        if ei_first:                         # 2.153.0 (#2055): in an office's documents space it becomes a receipt (not an own invoice)
+            ei_receipt(c, node, ws, ei, ei_det["vat_pct"])
     else:
         meta_set_json(c, nid, ws, "extracted", rx_compact(ex.get("details")))  # 2.121.0 A (#2092): a fresh run, a fresh suggestion
     doc_index(c, nid, ws, index_text(c, dict(meta_row(c, nid)), node["name"], text))

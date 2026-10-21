@@ -127,6 +127,11 @@ CHECKS = {
                   "FROM v.org_id) OR EXISTS (SELECT 1 FROM office_signoffs s WHERE s.video_id=v.id AND s.org_id IS DISTINCT FROM v.org_id "
                   "AND s.state='open' AND s.revoked_at IS NULL))"),  # 2.122.4 A (#2215 L3): a moved review keeps its old (closed) records
     "gen_doc_signoff": ("SELECT s.id, s.created_by FROM office_signoffs s JOIN office_gen_docs d ON d.id=s.gen_doc_id WHERE d.org_id IS DISTINCT FROM s.org_id"),
+    # 2.153.0 (#2028): a letter linked with a document outside the documents space of its office area (an organisation's
+    # space; a personal office: the owner's private documents), or a link row in another area than its letter
+    "letter_link": ("SELECT k.id, k.created_by FROM office_letter_links k JOIN office_letters t ON t.id=k.letter_id JOIN orgs o ON o.id=t.org_id "
+                    "JOIN fs_nodes n ON n.id=k.node_id WHERE k.org_id IS DISTINCT FROM t.org_id OR (o.personal_of IS NULL AND n.org_id IS DISTINCT FROM t.org_id) "
+                    "OR (o.personal_of IS NOT NULL AND (n.org_id IS NOT NULL OR n.owner_id IS DISTINCT FROM o.personal_of))"),
     "pay_prop": ("SELECT p.id, p.agent_id FROM office_pay_props p JOIN office_docs d ON d.id=p.doc_id WHERE d.org_id IS DISTINCT FROM p.org_id"),
     # 2.113.1 B (#2059): a member of an organisation's team chat channel who is not (any more) in it, an agent of another
     # workspace in a channel or a personal agent whose owner is not in it (the read layer ignores them: collab/teamchan.py

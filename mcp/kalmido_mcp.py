@@ -1752,7 +1752,9 @@ TOOLS += [
 # 2.48.0 (#1111): documents (files of the file store with recognised text, date, amount, sender, type, tags)
 _DOC = {"date": D, "due": D, "amount": {"type": "string", "description": "Decimal text, e.g. 119.00"},
         "currency": {"type": "string"}, "sender": {"type": "string"}, "type": {"type": "string", "description": "Document type"},
-        "tags": {"type": "array", "items": {"type": "string"}}, "text": {"type": "string", "description": "Only while none was recognised"}}
+        "tags": {"type": "array", "items": {"type": "string"}}, "text": {"type": "string", "description": "Only while none was recognised"},
+        "custom_fields": {"type": "object", "description": "2.153.0: custom field name (or id) -> value, null clears it; only fields "
+                          "the workspace has (get_document lists them)"}}
 TOOLS += [
     ("list_documents", "2.48.0: documents shared with you (scanned letters, invoices, contracts) with date, amount, sender, type, "
                        "tags and their state. q = words of the text; review = only those waiting in To review. 2.122.0: q takes a search "
@@ -1775,7 +1777,7 @@ TOOLS += [
     ("get_document", "2.48.0: one document with its fields, open suggestions and the recognised text (OCR / text layer).",
      _obj({"document_id": S_ID}, ["document_id"]),
      lambda api, a: api.call("GET", f"/documents/{int(a['document_id'])}")),
-    ("update_document", "2.48.0: set fields of a document (needs edit): date, due, amount, currency, sender, type, tags. Your values "
+    ("update_document", "2.48.0: set fields of a document (needs edit): date, due, amount, currency, sender, type, tags, custom_fields (2.153.0). Your values "
                         "are marked as set by an agent; where the workspace leaves a feature to an agent they become suggestions "
                         "in To review for a person to accept. Never moves a document.",
      _obj({"document_id": S_ID, **_DOC}, ["document_id"]),
@@ -1886,6 +1888,32 @@ TOOLS += [
     ("update_office_lead", "2.94.0: change the next step, the follow-up day or the note of a lead (only while it is a lead).",
      _obj({"lead_id": S_ID, **{k: _LEAD[k] for k in ("next_step", "follow_up", "note", "requested_by")}}, ["lead_id"]),
      lambda api, a: api.call("PATCH", f"/office/leads/{int(a['lead_id'])}", body=_pick(a, ("next_step", "follow_up", "note", "requested_by")))),
+]
+
+# 2.153.0 (#2031): letter drafts (correspondence) -- you write subject and text, a person checks, signs and sends. The person
+# you act for must be an admin of the office; answers / links only to documents shared with you (else 404).
+_LTR = {"client_id": S_ID, "rcpt_name": {"type": "string", "maxLength": 300}, "rcpt_address": {"type": "string", "maxLength": 600, "description": "Address lines, one per line"},
+        "rcpt_email": {"type": "string", "maxLength": 254}, "letter_date": D, "subject": {"type": "string", "maxLength": 300},
+        "body": {"type": "string", "maxLength": 60000, "description": "The text of the letter (without greeting and signature)"},
+        "ref_line": {"type": "string", "maxLength": 300, "description": "The reference line (your sign, your message of)"},
+        "greeting": {"type": "string", "maxLength": 300}, "lang": {"type": "string", "enum": ["", "de", "en"]},
+        "notify": {"type": "boolean", "description": "A card in the person's chat (default true on create)"}, **_RB}
+TOOLS += [
+    ("create_letter_draft", "2.153.0: create ONE letter draft in the office (after the event letter_draft_requested: answers = its node_id; "
+                            "recipient and reference line are then prefilled from the document). Subject or text required. A draft only: "
+                            "you never send it or mark it as sent; a person checks and sends it.",
+     _obj({"answers": {**S_ID, "description": "The incoming document (file id) this letter answers; shared with you"}, **_LTR}),
+     lambda api, a: api.call("POST", "/office/letters", body=_pick(a, ("answers",) + tuple(_LTR)))),
+    ("list_letter_drafts", "2.153.0: the letters you made in the office, newest first (status draft by default; sent, delivered, all).",
+     _obj({"status": {"type": "string", "enum": ["draft", "sent", "delivered", "all"]}, **_RB}),
+     lambda api, a: api.call("GET", "/office/letters", _pick(a, ("status", "requested_by")))),
+    ("update_letter_draft", "2.153.0: change your own letter draft (only while it is a draft).",
+     _obj({"letter_id": S_ID, **_LTR}, ["letter_id"]),
+     lambda api, a: api.call("PATCH", f"/office/letters/{int(a['letter_id'])}", body=_pick(a, tuple(_LTR)))),
+    ("link_letter_document", "2.153.0: link your letter draft with a document shared with you: kind answers (default, the letter answers "
+                             "it) or reply (the document is the answer to the letter).",
+     _obj({"letter_id": S_ID, "node_id": S_ID, "kind": {"type": "string", "enum": ["answers", "reply"]}, "requested_by": _RB["requested_by"]}, ["letter_id", "node_id"]),
+     lambda api, a: api.call("POST", f"/office/letters/{int(a['letter_id'])}/links", body=_pick(a, ("node_id", "kind", "requested_by")))),
 ]
 
 # 2.51.0 C (#1352 #1353 #1355): the pin board (own notepads, the weekly status), checking time, shoot planning
@@ -2070,7 +2098,8 @@ TOOL_SCOPES = {
     "files:write": ("write_file", "create_file_folder", "create_document"),
     "office": ("get_office", "list_office_data", "list_office_documents", "get_office_document", "create_offer_draft", "update_offer_draft",
                "draft_invoice_from_offer", "draft_reminder", "suggest_payment", "list_payment_suggestions",
-               "list_office_leads", "create_office_lead", "update_office_lead"),  # 2.51.0 (#1348, #1350); 2.94.0 (#1930): leads
+               "list_office_leads", "create_office_lead", "update_office_lead",
+               "create_letter_draft", "list_letter_drafts", "update_letter_draft", "link_letter_document"),  # 2.51.0 (#1348, #1350); 2.94.0 (#1930): leads; 2.153.0 (#2031): letters
     "pinboard": ("create_notepad", "update_notepad", "delete_notepad", "write_status_pad"),  # 2.51.0 (#1352)
 }
 TOOL_SCOPES["time"] += ("check_time_entries", "time_from_events", "propose_time_entries")  # 2.51.0 (#1353)

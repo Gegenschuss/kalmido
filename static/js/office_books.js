@@ -57,6 +57,7 @@ function bkTabHtml() {
   if (bkSub() === 'procdoc' && typeof pdHtml === 'function') return pdHtml();  // 2.148.0 C (#2472): the procedure documentation
   if (BK.oid !== OFC.info?.org_id || !BK.period) bkReset();  // another office area
   if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see the bookkeeping.')}</div>`;
+  if (bkSub() === 'receipts' && typeof rclHtml === 'function') return rclHtml();  // 2.110.0 B (#2055): all receipts (office_receipts.js)
   if (BK.err) return `<div class="empty">${esc(BK.err)}</div>`;
   if (!BK.info || !BK.euer || !BK.ustva) { if (!BK.loadingT) BK.loadingT = setTimeout(() => { BK.loadingT = 0; bkLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   if (bkSub() === 'ustva' && !BK.jumped) { BK.jumped = true; setTimeout(() => $('#bk-ustva')?.scrollIntoView({block: 'start'}), 0); }
@@ -93,7 +94,8 @@ function bkReceiptsHtml() {
   const billable = rs.some(r => !BK.billed[r.node_id]);
   return `<section class="bk-sec" aria-labelledby="bk-rch"><h3 class="ofcgrp" id="bk-rch">${tr('Receipts this month')}</h3>${missHtml}
     ${billable ? `<p><button type="button" class="btn" data-bk="bill">${tr('Bill receipts on to a client …')}</button></p>` : ''}
-    ${rs.length ? `<ul class="ofclist" role="list">${rs.slice(-30).reverse().map(bkRcRow).join('')}</ul>` : `<p class="muted lempty">${tr('No receipts this month yet.')}</p>`}</section>`;
+    ${rs.length ? `<ul class="ofclist" role="list">${rs.slice(-30).reverse().map(bkRcRow).join('')}</ul>` : `<p class="muted lempty">${tr('No receipts this month yet.')}</p>`}
+    <p class="bk-all"><a class="btn ghost" href="#office/books/receipts">${ic('list', 's')}<span>${tr('All receipts')}</span>${ic('chev', 's')}</a></p></section>`;  // 2.153.0 (#2055)
 }
 
 function bkTable(rows, total, count) {
@@ -347,6 +349,7 @@ async function bkSave(id, v) {
   await api('PATCH', `/api/docs/${id}`, v.doc);
   await api('PUT', `/api/docs/${id}/receipt`, v.rc);
   bkReload();
+  if (typeof rclReload === 'function') rclReload();  // 2.110.0 B (#2055)
   return {};
 }
 async function bkPoll(id, md, touched, n) {  // the recognition runs in the background: fill what the person has not typed yet

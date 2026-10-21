@@ -37,7 +37,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const w = await boot({user: 'alice', hash: `agents/${CL}`, mobile: true}), d = w.document;
   const card = () => d.querySelector(`#chat-msgs .jcd[data-jcd="${J}"]`);
   await until(() => card()?.querySelector('.jcdres'));
-  check(card() && !card().querySelector('.jcdhist'), '#2365: the card has no folded history');
+  // 2.153.0 (#1962): a job created for a person starts with its start line, folded in the card -- no message besides it
+  check(card() && !card().querySelector('.jcdhist .cmsg'), '#2365: the card has no folded messages (only the start line)');
   check(card().querySelector(`.jcdres [data-mid="a:${mr}"]`), '#2365: the end result stands under the card');
   check(card().querySelector('.jcdres.jcdclamp .jcdmore')?.textContent === 'Show more', '#2365: cut, with "Show more"');
   click(w, card().querySelector('.jcdmore'));

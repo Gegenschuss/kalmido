@@ -322,7 +322,7 @@ APP_ONLY = [
      "with /documents and add files with /files; 2.122.0 (#2098): create_document; (#2100) the CSV of chosen documents is a person's download", ("=POST /api/docs", "=POST /api/docs/export.csv", "=POST /api/docs/{}/accept", "=POST /api/docs/{}/review",
                                                    "=POST /api/docs/{}/redo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
                                                    "* /api/docs/{}/task", "* /api/docs/settings", "* /api/docs/rules", "* /api/docs/labels/",
-                                                   "* /api/docs/mail")),
+                                                   "* /api/docs/mail", "* /api/docs/fields")),  # 2.153.0 (#2179): agents fill in custom fields via /documents, never define them
     # 2.122.0 B (#2294 #2099)
     ("2.122.0 (#2294, #2099): a person's own steps on many documents at once (bulk tags / type / sender with its undo, the ZIP of a "
      "selection for the browser) and the tags of files / folders in the file store app; agents filter with /documents (the same "
@@ -678,6 +678,7 @@ for name, _, schema, fn in mcp.TOOLS:
 reached = {c for s in CALLS.values() for c in s}
 API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "GET /office/docs/{}/pdf": "2.51.0 (#1348): the PDF preview of a draft is binary; the chat card (notify) links it for the person",
+    "GET /office/letters/{}": "2.153.0 (#2031): list_letter_drafts returns the agent's letters with every field; one letter by id is for scripts",
     "GET /openapi.json": "the API description itself",
     "GET /lists/{}/notify-template": "2.33.0 (#927): the owner's notification ceiling of a list; agents get no pushes, it is read by scripts",
     "POST /import/{}": "imports of other apps' files: people upload them (multipart) in the app or with the REST API",

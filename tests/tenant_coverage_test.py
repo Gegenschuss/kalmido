@@ -69,7 +69,7 @@ KINDS = {
     # 2.36.1 (#1021): office & finance -- every row belongs to an organisation (org_id), read through office_org (the workspace
     # one works in); foreign ids 404; agents and kids 403 before any query; 2.47.3 (#1360): a private person works in the own
     # personal office (a hidden area only its owner reaches). No /api/v1, no MCP in stage 1
-    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p290_a_api_test.py (bookkeeping light), p290_b_api_test.py (bank reconciliation), p290_c_api_test.py (tax dates), p291_a_api_test.py (invoice series), p291_b_api_test.py (subscriptions and tools), p292_a_api_test.py (business contracts and insurances), p292_b_api_test.py (equipment value, insurance list), p293_a_api_test.py (document templates, signature), p293_b_api_test.py (logbook), p294_a_api_test.py (leads), p295_a_api_test.py (per diem, its report), p295_b_api_test.py (per diem spreadsheet import), p2113c_a_api_test.py (terms and conditions as PDF)"),
+    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p290_a_api_test.py (bookkeeping light), p290_b_api_test.py (bank reconciliation), p290_c_api_test.py (tax dates), p291_a_api_test.py (invoice series), p291_b_api_test.py (subscriptions and tools), p292_a_api_test.py (business contracts and insurances), p292_b_api_test.py (equipment value, insurance list), p293_a_api_test.py (document templates, signature), p293_b_api_test.py (logbook), p294_a_api_test.py (leads), p295_a_api_test.py (per diem, its report), p295_b_api_test.py (per diem spreadsheet import), p2113c_a_api_test.py (terms and conditions as PDF), p2110_b_api_test.py (receipts list, its export for the tax adviser)"),
     # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
     # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
     "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share; "
@@ -227,6 +227,25 @@ ROUTES = {
     # 2.111.0 A (#2233): undo of the office editors (p2111_a_api_test.py) - routes below this line
     "POST /api/office/undo/{}/{}": "office",
     # (2.111.0 spacer A)
+    # 2.153.0 (#2028): letters (p2106_a_api_test.py) - routes below this line
+    "GET /api/office/letters": "office", "POST /api/office/letters": "office", "GET /api/office/letters/recipients": "office",
+    "GET /api/office/letters/profile": "office", "PUT /api/office/letters/profile": "office",
+    "DELETE /api/office/letters/profile/image": "office", "GET /api/office/letters/{}": "office", "PATCH /api/office/letters/{}": "office",
+    "DELETE /api/office/letters/{}": "office", "POST /api/office/letters/{}/restore": "office", "GET /api/office/letters/{}/pdf": "office",
+    "POST /api/office/letters/{}/sent": "office", "POST /api/office/letters/{}/delivered": "office",
+    "DELETE /api/office/letters/{}/delivered": "office", "POST /api/office/letters/{}/template": "office",
+    # 2.153.0 (#2028): letter links (p2106_b_api_test.py) - routes below this line
+    "GET /api/office/letters/{}/links": "office", "POST /api/office/letters/{}/links": "office", "DELETE /api/office/letters/{}/links/{}": "office",
+    "GET /api/office/letters/{}/thread": "office", "GET /api/office/letters/threads": "office", "GET /api/office/letters/doc/{}": "office",
+    "POST /api/office/letters/doc/{}/deadline-task": "office",
+    # 2.153.0 (#2029 #2030): letter mail, text blocks (p2106_c_api_test.py) - routes below this line
+    "GET /api/office/letters/mail-info": "office", "GET /api/office/letters/{}/mail-draft": "office", "POST /api/office/letters/{}/send-mail": "office",
+    "GET /api/office/letter-blocks": "office", "GET /api/office/letter-blocks/starters": "office", "POST /api/office/letter-blocks": "office",
+    "PATCH /api/office/letter-blocks/{}": "office", "DELETE /api/office/letter-blocks/{}": "office", "POST /api/office/letter-blocks/{}/restore": "office",
+    # 2.153.0 (#2031): agents and letters (p2106_d_api_test.py) - routes below this line
+    "GET /api/v1/office/letters": "office", "POST /api/v1/office/letters": "office", "GET /api/v1/office/letters/{}": "office",
+    "PATCH /api/v1/office/letters/{}": "office", "POST /api/v1/office/letters/{}/links": "office",
+    "GET /api/office/letters/doc/{}/agents": "office", "POST /api/office/letters/doc/{}/ask-agent": "office",
     # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
     "GET /api/bookmarks": "bookmark", "POST /api/bookmarks": "bookmark", "GET /api/bookmarks/{}": "bookmark",
     "PATCH /api/bookmarks/{}": "bookmark", "DELETE /api/bookmarks/{}": "bookmark", "POST /api/bookmarks/{}/restore": "bookmark",
@@ -426,6 +445,7 @@ ROUTES = {
     # 2.90.0 A (#1921): bookkeeping light, office admins (p290_a_api_test.py)
     "GET /api/office/books": "office", "GET /api/office/books/euer": "office", "GET /api/office/books/ustva": "office",
     "GET /api/office/books/euer.csv": "office", "GET /api/office/books/euer.pdf": "office", "GET /api/office/books/export": "office",  # 2.147.0 (#2461): neutral export, admin only (p2147_a_api_test.py)
+    "GET /api/office/books/receipts": "office", "GET /api/office/books/receipts.csv": "office", "GET /api/office/books/receipts.zip": "office",  # 2.153.0 (#2055)
     # ---- office (C, 2.36.1 #1021): quotations of an organisation (10)
     "GET /api/office/docs": "office", "POST /api/office/docs": "office", "GET /api/office/docs/{}": "office",
     "PATCH /api/office/docs/{}": "office", "DELETE /api/office/docs/{}": "office", "PUT /api/office/docs/{}/items": "office",
@@ -908,6 +928,7 @@ ROUTES = {
     "GET /api/docs/{}/thumb": "document", "GET /api/docs/{}/file": "document", "POST /api/docs/{}/task": "document",
     "DELETE /api/docs/{}/task": "document", "GET /api/docs/settings": "document", "PUT /api/docs/settings": "document",
     "POST /api/docs/rules": "document", "PATCH /api/docs/rules/{}": "document", "DELETE /api/docs/rules/{}": "document",
+    "POST /api/docs/fields": "document", "PATCH /api/docs/fields/{}": "document", "DELETE /api/docs/fields/{}": "document",  # 2.153.0 (#2179)
     "PATCH /api/docs/labels/{}/{}": "document", "DELETE /api/docs/labels/{}/{}": "document", "POST /api/docs/labels/{}": "document", "POST /api/docs/mail": "document",
     "DELETE /api/docs/mail": "document", "GET /api/v1/documents": "document", "GET /api/v1/documents/{}": "document",
     "PATCH /api/v1/documents/{}": "document", "POST /api/v1/documents": "document", "POST /api/docs/export.csv": "document",  # 2.122.0 (#2098)

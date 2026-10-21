@@ -327,11 +327,15 @@ def v1_agent_job_create():
     c.execute("""DELETE FROM agent_jobs WHERE agent_id=? AND state NOT IN ('running','waiting') AND id<=(SELECT id FROM agent_jobs
                  WHERE agent_id=? ORDER BY id DESC LIMIT 1 OFFSET ?)""", (aid, aid, AGENT_JOBS_KEEP))
     job_notify(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), None)
+    from ..agents.jobchat import jcs_start_notice
+    jcs_start_notice(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone())  # 2.153.0 (#1962): its start line
     if log:
         from ..agents.steps import steps_job_log
         steps_job_log(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), log)  # 2.32.0 (#1081)
     bump(c)
     c.commit()
+    from ..agents.chat import chat_unlink_trimmed
+    chat_unlink_trimmed()
     return jsonify(job_dict(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone())), 201
 
 

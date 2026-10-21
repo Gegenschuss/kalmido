@@ -76,6 +76,7 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "chat_pinned",  # 2.62.0 (#1848): the person pinned / unpinned a message of its chat (message, pinned, user)
                 "contract_notice",  # 2.70.0 C (#1359): a shared contract's last day to cancel is near (once; agents/contractprop.py)
                 "abort",  # 2.144.0 A (#2412): the person pressed Stop in its chat (user, job_id?): end the running answer / the job's step
+                "letter_draft_requested",  # 2.153.0 (#2031): an office admin asks the agent to draft an answer to a shared document
                 )
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop", "message")  # 2.56.0 (#1791): message = text to a running job, no state change

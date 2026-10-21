@@ -292,10 +292,15 @@ ORDER = (
     "office.books",  # 2.90.0 A (#1921): bookkeeping light: income/expense statement (EUeR), VAT return figures, tax reserve, receipt photo
     "office.bkexport",  # 2.147.0 (#2461): the neutral bookkeeping export (booking list CSV + documents / receipts ZIP)
     "office.catacct",  # 2.121.0 (#2093): receipt categories with an SKR03 / SKR04 account (no routes; shown by office.books)
+    "office.receiptlist",  # 2.153.0 (#2055): receipts list over all months with filters + its CSV / ZIP for the tax adviser
     "office.bank",  # 2.90.0 B (#1921): bank reconciliation: CSV / CAMT import, matching bookings to invoices and receipts
     "office.doctpl_samples",  # 2.117.0 B (#2283): the letter samples of the document templates (data, no routes)
     "office.doctpl",  # 2.93.0 A (#1927): document templates with variables, documents as PDF, signature by customer link
     "office.terms",  # 2.113.2 (#2253): terms and conditions (AGB) as PDF per language, sent with quotations
+    "office.letters",  # 2.153.0 (#2028): letters (correspondence): recipient, text, signature, DIN 5008 PDF, status, filing
+    "office.letterlinks",  # 2.153.0 (#2028): letter <-> document links, history, deadline -> task, follow-up, reference line
+    "office.lettermail",  # 2.153.0 (#2029, #2030): letters by e-mail with the answer linked, text blocks
+    "office.letteragent",  # 2.153.0 (#2031): agents draft letters (API v1, MCP, event at a document)
     "videos.review",  # 2.99.1 A (#1959): video sign-off with comments at a timecode (links only), customer link = signoff kind video
     "office.logbook",  # 2.93.0 B (#1928): the logbook (vehicles, drives, change log, year report, mileage allowance)
     "office.cashbook",  # 2.121.0 B (#2095): the cash book (cash boxes, entries, cancellations, day closings, CSV / PDF)
@@ -349,6 +354,7 @@ ORDER = (
     "docs.web",  # 2.48.0 (#1111): the routes of the documents area
     "docs.dsearch",  # 2.122.0 B (#2294): filters + search syntax of the documents list (no routes)
     "docs.batch",  # 2.122.0 B (#2294): the chosen documents at once (tags / type / sender) and as one ZIP
+    "docs.fields",  # 2.153.0 (#2179): custom fields of documents (definitions + routes; values via docs.web)
     "docs.v1",  # 2.48.0 (#1111): documents for agents (API v1 + OpenAPI)
     "docs.csvx",  # 2.122.0 (#2100): the documents list as CSV
     "sheets.io",  # 2.89.0 C (#1916): tables to / from CSV and .xlsx (export, import as a new sheet)

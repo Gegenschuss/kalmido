@@ -26,7 +26,7 @@ KINDS = {
     "tasks": ("matrix", SUITE + ": tasks, comments, subtasks, attachments, tags, notes, search, trash, day plan, roadmap, export "
                         "and import in the private space; every GET of the area as the freelancer (no 403 / 5xx)"),
     "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET"),
-    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py, p2113c_a_api_test.py: the personal office (the freelancer is its admin): settings, company "
+    "office": ("matrix", SUITE + ", p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py, p2113c_a_api_test.py, p2110_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
                          "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0); undo of the editors (2.111.0); "
                          "p2137_a_api_test.py: the owner exports the personal office (export, recovery key) and imports an organisation's office into it (2.137.0); p2146_d_api_test.py: the retention export of the own records before a deletion (2.146.0)"),
@@ -130,6 +130,25 @@ ROUTES = {
     # 2.111.0 A (#2233): undo of the office editors (p2111_a_api_test.py) - routes below this line
     "POST /api/office/undo/{}/{}": "office",
     # (2.111.0 spacer A)
+    # 2.153.0 (#2028): letters (p2106_a_api_test.py) - routes below this line
+    "GET /api/office/letters": "office", "POST /api/office/letters": "office", "GET /api/office/letters/recipients": "office",
+    "GET /api/office/letters/profile": "office", "PUT /api/office/letters/profile": "office",
+    "DELETE /api/office/letters/profile/image": "office", "GET /api/office/letters/{}": "office", "PATCH /api/office/letters/{}": "office",
+    "DELETE /api/office/letters/{}": "office", "POST /api/office/letters/{}/restore": "office", "GET /api/office/letters/{}/pdf": "office",
+    "POST /api/office/letters/{}/sent": "office", "POST /api/office/letters/{}/delivered": "office",
+    "DELETE /api/office/letters/{}/delivered": "office", "POST /api/office/letters/{}/template": "office",
+    # 2.153.0 (#2028): letter links (p2106_b_api_test.py) - routes below this line
+    "GET /api/office/letters/{}/links": "office", "POST /api/office/letters/{}/links": "office", "DELETE /api/office/letters/{}/links/{}": "office",
+    "GET /api/office/letters/{}/thread": "office", "GET /api/office/letters/threads": "office", "GET /api/office/letters/doc/{}": "office",
+    "POST /api/office/letters/doc/{}/deadline-task": "office",
+    # 2.153.0 (#2029 #2030): letter mail, text blocks (p2106_c_api_test.py) - routes below this line
+    "GET /api/office/letters/mail-info": "office", "GET /api/office/letters/{}/mail-draft": "office", "POST /api/office/letters/{}/send-mail": "office",
+    "GET /api/office/letter-blocks": "office", "GET /api/office/letter-blocks/starters": "office", "POST /api/office/letter-blocks": "office",
+    "PATCH /api/office/letter-blocks/{}": "office", "DELETE /api/office/letter-blocks/{}": "office", "POST /api/office/letter-blocks/{}/restore": "office",
+    # 2.153.0 (#2031): agents and letters (p2106_d_api_test.py) - routes below this line
+    "GET /api/v1/office/letters": "office", "POST /api/v1/office/letters": "office", "GET /api/v1/office/letters/{}": "office",
+    "PATCH /api/v1/office/letters/{}": "office", "POST /api/v1/office/letters/{}/links": "office",
+    "GET /api/office/letters/doc/{}/agents": "office", "POST /api/office/letters/doc/{}/ask-agent": "office",
     # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
     "GET /api/bookmarks": "bookmarks", "POST /api/bookmarks": "bookmarks", "GET /api/bookmarks/{}": "bookmarks",
     "PATCH /api/bookmarks/{}": "bookmarks", "DELETE /api/bookmarks/{}": "bookmarks",
@@ -185,6 +204,7 @@ ROUTES = {
     "GET /api/files/nodes/{}/share-targets": "files", "GET /api/files/search": "files", "GET /api/v1/documents": "files",
     "GET /api/v1/documents/{}": "files", "GET /api/v1/files": "files", "GET /api/v1/files/search": "files",
     "GET /api/v1/files/{}": "files", "GET /api/v1/files/{}/content": "files", "GET /api/v1/files/{}/text": "files",
+    "POST /api/docs/fields": "files", "PATCH /api/docs/fields/{}": "files", "DELETE /api/docs/fields/{}": "files",  # 2.153.0 (#2179)
     "PATCH /api/docs/labels/{}/{}": "files", "PATCH /api/docs/rules/{}": "files", "PATCH /api/docs/{}": "files",
     "PATCH /api/files/nodes/{}": "files", "PATCH /api/files/shares/{}": "files", "PATCH /api/v1/documents/{}": "files",
     # 2.122.0 A (#2097): file requests of a folder (p2122_a_api_test.py as a freelancer: the private folder's requests)
@@ -777,6 +797,7 @@ ROUTES = {
     "GET /api/office/bank/tx/{}/candidates": "office", "GET /api/office/books": "office",
     "GET /api/office/books/euer": "office", "GET /api/office/books/euer.csv": "office", "GET /api/office/books/export": "office",  # 2.147.0 (#2461)
     "GET /api/office/books/euer.pdf": "office", "GET /api/office/books/ustva": "office",
+    "GET /api/office/books/receipts": "office", "GET /api/office/books/receipts.csv": "office", "GET /api/office/books/receipts.zip": "office",  # 2.153.0 (#2055)
     "GET /api/office/equipment/policies": "office", "GET /api/office/equipment/receipts": "office",
     "GET /api/office/equipment/receipts/{}": "office", "GET /api/office/equipment/value": "office",
     "GET /api/office/equipment/value.csv": "office", "GET /api/office/equipment/value.pdf": "office",

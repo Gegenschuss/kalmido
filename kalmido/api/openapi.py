@@ -728,6 +728,8 @@ def openapi_spec():
     ofa_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 A (#1348, #1350)
     from ..office.leads import lead_spec
     lead_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.94.0 A (#1930): leads for agents
+    from ..office.letteragent import lta_spec
+    lta_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.153.0 (#2031): letter drafts of agents
     from ..hub.absence import abs_spec
     abs_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.50.0 (#1195)
     hosting_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.24.0 (#907 #910)
