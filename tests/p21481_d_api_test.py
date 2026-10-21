@@ -295,7 +295,7 @@ check(r.status_code != 200 and b"hello" not in r.content, f"external folder link
 check(requests.get(B + XP + f"/d/{PLAIN}", timeout=30).content == b"just a file", "external folder link: the other file downloads")
 
 # 2.148.1 G (#2488): a sent mail's filed .eml follows the same rule
-CL = Ca.post(B + "/api/lists", json={"name": "Carol project", "org_id": ORG}).json()["id"]
+CL = Ca.post(B + "/api/lists", json={"name": "Carol project", "org_id": ORG, "kind": "project"}).json()["id"]
 r = Ca.post(B + "/api/hubmail/send", json={"list_id": CL, "to": "client@example.com", "subject": "Project news", "text": "Launch."})
 check(r.status_code == 201, f"carol sends a project mail {r.status_code} {r.text[:200]}")
 OM = (r.json().get("mail") or {}).get("id") if r.status_code == 201 else None
