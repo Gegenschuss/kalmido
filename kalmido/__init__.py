@@ -22,6 +22,7 @@ LAYERS = (
 LAYER_OF = {"admin.migrate": "core"}  # the move from SQLite runs inside init_db
 
 ORDER = (
+    "core.env",  # 2.149.0 D (#2511): the registry of the environment variables (no imports from the app)
     "core.config",
     "core.schema",
     "core.i18n",
