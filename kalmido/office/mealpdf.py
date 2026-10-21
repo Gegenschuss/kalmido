@@ -4,7 +4,7 @@ and the evaluation (one row per approved meal, the sums 70 / 30 and the input VA
 from datetime import date, timezone
 
 from ..core.config import TZ
-from ..core.db import parse_iso
+from ..core.db import local_now, parse_iso
 from ..core.i18n import lang, tr, trn
 from .pdf import A4_H, C_INK, C_INK2, C_RULE, C_RULE2, PDF_CW, PDF_L, _Page, pdf_date, pdf_money, pdf_wrap, pdf_write
 
@@ -155,7 +155,7 @@ def bw_meal_pdf_data(c, oid, m):
             t = tr("Approved on {0} by {1}", bw_when(e["at"], lg), e["user"] or "–") if e["action"] == "approve" else \
                 tr("Approval undone on {0} by {1}", bw_when(e["at"], lg), e["user"] or "–") + (f" – {e['reason']}" if e["reason"] else "")
             y += p.para(PDF_L, y, t, 8.2, PDF_CW, color=C_INK2)
-    p.text(PDF_L, A4_H - 40, tr("Created with Kalmido on {0}", pdf_date(date.today().isoformat(), lg)), 7.6, False, C_INK2)
+    p.text(PDF_L, A4_H - 40, tr("Created with Kalmido on {0}", pdf_date(local_now().date().isoformat(), lg)), 7.6, False, C_INK2)
     return pdf_write(pages, {}, title=f"{title} {m['date']}", author=co)
 
 

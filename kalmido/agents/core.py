@@ -89,6 +89,9 @@ AGENT_EVENTS_STALE_H = _env_int("KALMIDO_AGENT_EVENTS_STALE_H", 48)
 # ... and more than AGENT_BURST tasks added to one list by one person within AGENT_BURST_S become one 'tasks_added' event
 # (sent after AGENT_BURST_QUIET_S without more); bulk-created tasks get no 'tidy' event beyond the first AGENT_BURST
 AGENT_BURST, AGENT_BURST_S, AGENT_BURST_QUIET_S, AGENT_BURST_IDS = 5, 60, 15, 500
+# 2.149.0 E (#2513): the two windows from the environment (tests shorten them instead of waiting a minute)
+AGENT_BURST_S = _env_int("KALMIDO_AGENT_BURST_S", AGENT_BURST_S)
+AGENT_BURST_QUIET_S = _env_int("KALMIDO_AGENT_BURST_QUIET_S", AGENT_BURST_QUIET_S, 0)
 AGENT_JOBS_KEEP = 300                                       # per agent (finished ones beyond are removed)
 JOB_LOG_MAX, JOB_TITLE_MAX, AGENT_NOTE_MAX, STATUS_TEXT_MAX = 8000, 200, 2000, 200
 CHAT_MAX, CHAT_KEEP = 8000, 1000                            # characters per message, messages per person and agent

@@ -14,7 +14,7 @@ from flask import g, has_request_context, jsonify, request, Response
 from ..core.config import API_PREFIX, app, APP_NAME, APP_VERSION, PUB_PREFIX, TZ
 from ..core.pg import insert_id
 from ..core.i18n import N_, tr
-from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
+from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, test_seconds, uset, usettings
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, FAIL_WINDOW, client_ip, me, rate_ip
 from ..accounts.login import twofa_methods
 from ..core.access import collab_all, Denied, list_role, need_list, need_task, need_time, time_all, token_lists, tvis, vis_sql
@@ -100,8 +100,13 @@ V1_CODES = {400: "invalid", 401: "unauthorized", 403: "forbidden", 404: "not_fou
 _HITS, _HITS_LOCK = {}, threading.Lock()
 
 
-def hit_limit(key, limit, window=60):
-    """Sliding-window counter: True (= refuse) once `limit` hits of `key` fell into the last `window` seconds."""
+RATE_WINDOW_S = test_seconds("KALMIDO_TEST_RATE_WINDOW_S", 60)  # 2.149.0 E (#2513): the minute of hit_limit (tests only)
+
+
+def hit_limit(key, limit, window=None):
+    """Sliding-window counter: True (= refuse) once `limit` hits of `key` fell into the last `window` seconds (default: a
+    minute, RATE_WINDOW_S)."""
+    window = window or RATE_WINDOW_S
     now = time.time()
     with _HITS_LOCK:
         arr = [t for t in _HITS.get(key, ()) if now - t < window]

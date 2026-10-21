@@ -360,7 +360,7 @@ def push_dismiss_tick(c):
     c.commit()
     if not WEBPUSH_ON:
         return
-    day = date.today().isoformat()
+    day = local_now().date().isoformat()  # 2.149.0 E (#2512): the test clock
     subs = c.execute("""SELECT s.*, MIN(t.handled_at) AS first FROM push_tags t JOIN push_subs s ON s.id=t.sub_id
                         WHERE t.handled_at IS NOT NULL GROUP BY s.id""").fetchall()
     for s in subs:
