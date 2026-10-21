@@ -156,6 +156,10 @@ const absOk = async (w, d) => { const b = await until(() => d.querySelector('.mo
   check(!errs.length, 'no script errors ' + errs.join(' | ')); errs.splice(0);
   w.close();
 
+  // 2.144.7 (#2572): a sent quotation for the phone check below
+  const doc3 = await call('POST', '/api/office/docs', {kind: 'offer', lang: 'en', project_title: 'Phone bar', items: [item('Concept', 1, 800)]});
+  await call('POST', `/api/office/docs/${doc3.id}/finalize`, {});
+  await call('POST', `/api/office/docs/${doc3.id}/status`, {status: 'sent'});
   // ================= #2234: resizable dialogs (Firefox, desktop)
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
@@ -195,6 +199,18 @@ const absOk = async (w, d) => { const b = await until(() => d.querySelector('.mo
     await sleep(300);
     await ev(open); await sleep(300);
     check(await ev(`!document.querySelector('.p2138probe .dlggrip') || getComputedStyle(document.querySelector('.p2138probe .dlggrip')).display === 'none'`), '#2234: a narrow window has no grip');
+    await ev(`(() => { document.querySelectorAll('.p2138probe').forEach(m => m.remove()); return 1; })()`);
+    // 2.144.7 (#2572): on a phone the bar of a sent quotation keeps "Create invoice" visible and inside the screen
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
+    const fit = `(() => { const b = document.querySelector('.ofdhead [data-ofd="to-invoice"]'); if (!b) return 0; const r = b.getBoundingClientRect();
+      return r.width > 0 && r.height >= 43 && r.right <= innerWidth && document.documentElement.scrollWidth <= innerWidth ? 1 : 0; })()`;
+    for (const [st, pri] of [['sent', false], ['accepted', true]]) {
+      if (st === 'accepted') await call('POST', `/api/office/docs/${doc3.id}/status`, {status: 'accepted'});
+      await nav(B + `?p=${st}#office/offers/${doc3.id}`);  // a new query = a fresh load (the status changed behind its back)
+      check(await ready(ev, fit, 80), `#2572 phone (${st}): "Create invoice" visible in the bar, nothing wider than the screen`);
+      check(await ev(`document.querySelector('.ofdhead [data-ofd="to-invoice"]').classList.contains('pri')`) === pri, `#2572 phone (${st}): main button only once accepted`);
+      await shot(`p2144-7-phone-${st}.png`);
+    }
   }, false);
 
 
