@@ -12,6 +12,7 @@ import io
 import json
 import re
 from datetime import date
+from decimal import Decimal, InvalidOperation
 
 from flask import jsonify, request, Response
 
@@ -25,6 +26,7 @@ from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, office_settings
 from .ledger import ofx_items_brief, ofx_log, ofx_need_editable
+from .olock import olk_need_trip_items, olk_trip_item_reason
 from .vma import vma_trip
 from .periodlock import period_need_open
 
@@ -453,6 +455,8 @@ def rk_trip_delete(tid):
     """Deletes a trip with its receipts; answers the trip as it was (the client's undo posts it again)."""
     c, uid, oid = _ctx()
     _trip_need_open(c, oid, _trip(c, oid, tid))  # 2.148.0 A (#2471)
+    # 2.152.0 C (#2168): receipts in DATEV / billed on a finalised document are kept by law -> the trip stays (409)
+    olk_need_trip_items(c, oid, c.execute("SELECT * FROM office_trip_items WHERE trip_id=? AND org_id=?", (tid, oid)).fetchall())
     old = _one(c, oid, tid)
     c.execute("DELETE FROM office_trips WHERE id=? AND org_id=?", (tid, oid))
     bump(c)
@@ -487,6 +491,19 @@ def _item(c, oid, tid, iid):
     return r
 
 
+RK_LOCKED_KEYS = ("datev", "amount", "currency", "fx_rate", "amount_home", "date")
+
+
+def _rk_val(v):
+    """A receipt value made comparable (numbers as Decimal, empty as None)."""
+    if v is None or v == "":
+        return None
+    try:
+        return Decimal(str(v))
+    except InvalidOperation:
+        return str(v)
+
+
 @app.patch("/api/office/trips/<int:tid>/items/<int:iid>")
 def rk_item_patch(tid, iid):
     c, uid, oid = _ctx()
@@ -495,6 +512,14 @@ def rk_item_patch(tid, iid):
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     row = rk_item_clean(c, oid, b, cur, home=rk_home_cur(c, oid))
+    # 2.152.0 (#2168, review B-M1): a locked receipt (in DATEV / billed on a finalised document) keeps its tick, amount
+    # and date; text, DATEV number and category stay editable
+    why = olk_trip_item_reason(c, oid, cur)
+    if why and "amount_home" not in b and all(_rk_val(row.get(k)) == _rk_val(cur.get(k)) for k in ("amount", "currency", "fx_rate")):
+        for k in ("amount", "currency", "fx_rate", "amount_home"):
+            row.pop(k, None)  # the dialog sends the money unchanged: the stored amount in the office currency stays as it is
+    if why and any(_rk_val(row[k]) != _rk_val(cur.get(k)) for k in RK_LOCKED_KEYS if k in row):
+        raise Denied(409, why)
     if row:
         _trip_need_open(c, oid, _trip(c, oid, tid), cur["date"], row.get("date"), items=False)  # 2.148.0 A (#2471)
         row["updated_at"] = iso(now_utc())
@@ -511,6 +536,7 @@ def rk_item_delete(tid, iid):
     c, uid, oid = _ctx()
     r = _item(c, oid, tid, iid)
     _trip_need_open(c, oid, _trip(c, oid, tid), r["date"], items=False)  # 2.148.0 A (#2471)
+    olk_need_trip_items(c, oid, [r])  # 2.152.0 C (#2168): in DATEV / billed on a finalised document -> 409
     old = _item_public(c, oid, r, _docs_map(c, oid))
     c.execute("DELETE FROM office_trip_items WHERE id=? AND org_id=?", (iid, oid))
     bump(c)

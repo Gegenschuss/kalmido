@@ -44,6 +44,7 @@ TABLES = (
     "office_procdocs",  # 2.148.0 C (#2472): versions of the procedure documentation (GoBD)
     "office_suppliers", "office_opening_balances",  # 2.148.0 D (#2458): the DATEV import (creditors, opening balances)
     "office_letters", "office_letter_links", "office_letter_blocks", "office_letter_profiles",  # 2.153.0 (#2028, #2030): correspondence
+    "office_drive_closed",  # 2.152.0 C (#2169): closed months of the logbook
     "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")
     "wiki_pages",  # 2.49.0 C (#1199): knowledge pages (NULL = private, the app checks owner_id)
     "wiki_spaces",  # 2.64.3 A (#1817): the lock per knowledge space (NULL = a private space, the app checks owner_id)
@@ -67,6 +68,7 @@ TABLES = (
     "task_bell",  # 2.53.0 C (#1424): the bell of one task per person (NULL = a private list's task)
     "time_sheets",  # 2.125.0 B (#2119): monthly timesheets (NULL = a person without organisation, the app checks user_id)
     "nl_conns", "nl_segments", "nl_members", "nl_runs",  # 2.55.0 E (#1455): the newsletter connection (NULL = a person's own)
+    "nl_suppress", "nl_consent_log",  # 2.152.0 D (#2170): suppression list + consent log (hash only)
     "task_vectors",  # 2.59.0 B (#1375): the text vectors of related tasks (NULL = a private list's task)
     "upload_scan",  # 2.61.0 A (#1818): unchecked / infected uploads (NULL = a private file; files/scan.py)
     "file_text",  # 2.61.0 C (#1820): recognised text of stored files (NULL = a private file, the app checks the file)
@@ -163,7 +165,7 @@ def apply(c):
     # a database owner without superuser could not start
     c.execute("CREATE OR REPLACE FUNCTION kalmido_org_count() RETURNS bigint LANGUAGE plpgsql STABLE AS $f$"
               "DECLARE prev text := current_setting('app.role', true); n bigint; "
-              "BEGIN PERFORM set_config('app.role', 'system', true); SELECT COUNT(*) INTO n FROM orgs WHERE personal_of IS NULL; "
+              "BEGIN PERFORM set_config('app.role', 'system', true); SELECT COUNT(*) INTO n FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL; "
               "PERFORM set_config('app.role', COALESCE(prev, ''), true); RETURN n; END$f$")
     STATE["enforced"] = _app_role(c)
     if not STATE["enforced"]:

@@ -10,6 +10,8 @@ project the agent may see itself (its list restriction, the document's workspace
 The travel costs / receipts of the office (2.47b) can later hang their receipts on rc_receipts.node_id."""
 import re
 
+from datetime import date
+
 from flask import g, jsonify, request
 
 from ..core.config import app
@@ -19,8 +21,9 @@ from ..core.access import Denied, list_role
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
-from ..files.store import fs_log_add, need_node
+from ..files.store import fs_log_add, fs_on_delete, fs_subtree, need_node
 from ..docs import store as S
+from ..office.olock import OLK_BYPASS, olk_active, olk_kept_text, olk_until
 
 RC_CAT_MAX = 60
 RC_NOTE_MAX = 500
@@ -476,3 +479,32 @@ def _rc_hook():
 
 
 _rc_hook()
+
+
+# ---------------------------------------------------------------- 2.152.0 C (#2168): booked receipts are kept by law
+def olk_fs_locked(c, node_id):
+    """The last day (ISO) a booked receipt (paid or with its VAT rate set) has to be kept, while that period runs; else None.
+    The period runs from the end of the receipt's year (its document date, else paid / assigned day). Moving it into the
+    trash stays possible; deleting it for good (the trash's purge, the trash period run) is refused until then."""
+    r = c.execute("""SELECT r.paid_at, r.vat_pct, r.set_at, m.doc_date FROM rc_receipts r LEFT JOIN doc_meta m ON m.node_id=r.node_id
+                     WHERE r.node_id=?""", (int(node_id),)).fetchone()
+    if not r or (r["paid_at"] is None and r["vat_pct"] is None):
+        return None
+    until = olk_until(r["doc_date"] or r["paid_at"] or r["set_at"], "receipt")
+    return until.isoformat() if olk_active(until) else None
+
+
+def olk_on_delete(c, nid):
+    """fs_on_delete hook (first in the list): 409 before anything of the purge happens. A folder checks its whole subtree, so
+    the purge of a folder stops before the hooks of its first file ran (fs_purge calls the root first)."""
+    if OLK_BYPASS.get():  # 2.152.0 (#2164 #2167, review A2): a hosted deletion after rx_gate
+        return
+    n = c.execute("SELECT kind FROM fs_nodes WHERE id=?", (int(nid),)).fetchone()
+    for i in (fs_subtree(c, nid) if n and n["kind"] == "folder" else [nid]):
+        until = olk_fs_locked(c, i)
+        if until:
+            raise Denied(409, olk_kept_text(date.fromisoformat(until)))
+
+
+if olk_on_delete not in fs_on_delete:
+    fs_on_delete.insert(0, olk_on_delete)
