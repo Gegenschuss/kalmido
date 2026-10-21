@@ -371,6 +371,18 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .khead{display:flex;align-items:center;gap:.375rem;padding:.25rem .375rem .5rem;font-weight:600;font-size:var(--fs-m)}
 .khead .c{color:var(--muted);font:400 var(--fs-xs) var(--mono)}
 .khead .iconbtn{margin-left:auto;padding:.25rem}
+/* 2.156.0 C (#2072): My tasks: the switch List / Board and the board's columns (mineboard.js) */
+.mobar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.25rem 0 .625rem}
+.mboard .mbn{font-weight:400;font-size:var(--fs-xs)}
+.mboard .mblk{margin-left:auto;color:var(--muted);display:inline-flex}
+.mboard .kcards{min-height:2.5rem}
+@media (pointer:coarse){ .mobar .seg button{min-height:2.75rem;padding:0 .75rem} }
+/* 2.156.0 C (#2073): the section templates dialog (sectpl.js) */
+.sctrow{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.sctrow input{flex:1 1 12rem;min-width:0}
+.scth{margin:1rem 0 .25rem;font-size:var(--fs-m)}
+.sctt .n{display:flex;flex-direction:column;gap:.125rem;min-width:0;flex:1}
+.sctt .muted{font-size:var(--fs-xs);overflow:hidden;text-overflow:ellipsis}
 .kcards{display:flex;flex-direction:column;gap:.25rem;overflow-y:auto;min-height:1.875rem}
 .kcards .trow{background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);padding:.5rem .5rem .5rem .75rem}
 .kcards .trow:hover{background:var(--bg3)}
@@ -559,6 +571,10 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .trow{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .trow .ttl{-webkit-user-select:text;user-select:text}
 .trow.d2{margin-left:3.5rem}
+/* 2.156.0 A (#1949): five levels of tasks; on a phone each level indents less so level 5 stays readable */
+.trow.d3{margin-left:5.25rem}.trow.d4{margin-left:7rem}
+@media (max-width:899px){.trow.sub.d3{margin-left:5rem}.trow.sub.d4{margin-left:6.75rem}}
+@media (max-width:599px){.trow.sub.d1{margin-left:1.125rem}.trow.sub.d2{margin-left:2.25rem}.trow.sub.d3{margin-left:3.375rem}.trow.sub.d4{margin-left:4.5rem}}
 .trow.msel{background:color-mix(in srgb,var(--accent) 12%,var(--bg))}
 .trow.msel .chk{border-color:var(--accent)}
 .meta .pinm{color:var(--accent)}
@@ -3585,12 +3601,20 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
   .bot.b-erledigt .b-hop{animation:b-hop .75s cubic-bezier(.3,.7,.4,1) .15s 1}
   .bot.b-arbeitet .b-ant{animation:b-sway 1.6s ease-in-out infinite}
   .bot.b-wartet .b-ant{animation:b-bob 2.4s ease-in-out infinite}
+  /* 2.152.1 A (#2608): on an empty page the figure stays alive: after the opening move a calm loop, now and then a
+     blink or a glance (every 5-8 s), the happy one hops again every 10 s */
+  .hempty .bot.b-ruhig .b-eyes{animation:b-blink .36s ease-in-out .9s 1,b-idle 16s ease-in-out 4s infinite}
+  .hempty .bot.b-schaut .b-eyes{animation:b-look .7s cubic-bezier(.3,.7,.4,1) .25s 1 both,b-idle 16s ease-in-out 4s infinite}
+  .hempty .bot.b-offline .b-eyes{animation:b-idle 16s ease-in-out 4s infinite}
+  .hempty .bot.b-erledigt .b-hop{animation:b-hop .75s cubic-bezier(.3,.7,.4,1) .15s 1,b-hop-idle 10s ease-in-out 5s infinite}
 }
 @keyframes b-blink{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.15)}}
 @keyframes b-look{from{transform:translate(-7px,2px)}to{transform:none}}
 @keyframes b-hop{0%,100%{transform:none}35%{transform:translateY(-9px) scaleY(1.03)}62%{transform:translateY(0) scaleY(.95)}82%{transform:scaleY(1.01)}}
 @keyframes b-sway{0%,100%{transform:rotate(-14deg);opacity:.45}50%{transform:rotate(14deg);opacity:1}}
 @keyframes b-bob{0%,100%{transform:none}50%{transform:translateY(-3px)}}
+@keyframes b-idle{0%,22%,26%,52%,72%,86%,90%,100%{transform:none}24%,88%{transform:scaleY(.15)}56%,68%{transform:translate(-5px,1px)}}
+@keyframes b-hop-idle{0%,88%,100%{transform:none}93%{transform:translateY(-6px)}97%{transform:scaleY(.97)}}
 .empty svg.bot{width:6.5rem;height:6.5rem;opacity:1;margin:0 auto .75rem}
 .empty.hempty{display:flex;flex-direction:column;align-items:center;gap:.25rem;padding:2.5rem 1rem}
 .empty.hempty b{color:var(--text);font-weight:600}
@@ -7242,6 +7266,14 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 /* 2.66.0 B (#1835): the merges in a client's card (Undo next to the line) */
 .clmhist .ctlinks li{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;min-height:2.75rem}
 .clmhist .ctlinks li>span{flex:1 1 12rem;overflow-wrap:anywhere}
+/* 2.154.0 C (#2192): data protection sheets in the client card, the filter of the client list */
+.dsbsec .ctlinks li{display:flex;align-items:center;gap:.5rem;min-height:2.75rem}
+.dsbsec .ctlinks .iconbtn{margin-left:auto}
+.dsb-st{border:1px solid currentColor;border-radius:.375rem}
+.dsb-st-signed,.dsb-st-handed{color:var(--accent)}
+.dsb-st-declined{color:var(--danger)}
+.dsb-rev{border-style:dashed}
+.dsbflt{max-width:12rem}
 /* 2.66.0 A (#1835) contacts: the merge history on a contact's card (one line per merge, Undo while possible) */
 .ctmsec .ctmrow{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
 .ctmsec .ctmrow>span{min-width:0;overflow-wrap:anywhere}
@@ -7918,12 +7950,23 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 @media (pointer:coarse){ #side .sbdock .sbacct{width:2.75rem;height:2.75rem} }
 @media (forced-colors:active){ #side{border-top-color:Highlight} }
 
-/* 2.145.0 A (#2437): logo + word mark at the bottom of the sidebar, muted, a tap opens Start */
-#side .sbmark{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2rem;margin-top:.25rem;padding:.25rem .625rem;border:0;border-radius:var(--radius);background:none;color:var(--muted);cursor:pointer;overflow:hidden;font:inherit}
-#side .sbmark:hover,#side .sbmark:focus-visible{background:var(--bg3)}
-#side .sbmark svg.logo{width:1.0625rem;height:1.0625rem;flex:none;opacity:.9}
-#side .sbmark svg.kword{height:.75em;color:var(--muted);opacity:.8;min-width:0}
-@media (pointer:coarse){ #side .sbmark{min-height:2.75rem} }
+/* 2.152.1 A (#2607, variant B): the brand on top of the sidebar is the workspace switch: the bot icon + the word mark,
+   the shown workspace as a small line under it (dot + name), an arrow on the right; the small mark at the bottom
+   (2.145.0 A #2437) is gone. :root:root beats the plain head rules of the switch (2.138.2 C) and the compact density. */
+:root:root #side .sbhead .wsbar.sbbrand{flex:1 1 auto;width:auto;max-width:100%;min-height:2.25rem;padding:0 .375rem;margin-left:-.375rem;gap:.625rem;border:0;border-radius:var(--radius);background:none;color:var(--text);font-size:1rem;font-weight:600}
+:root:root #side .sbhead .wsbar.sbbrand:hover{background:var(--bg3)}
+#side .sbhead:has(.sbbrand) .spacer{display:none}
+#side .sbbrand svg.logo{width:2.25rem;height:2.25rem;flex:none}
+#side .sbbrand .sbbt{display:flex;flex-direction:column;align-items:flex-start;gap:.1875rem;flex:1 1 auto;min-width:0}
+#side .sbbrand svg.kword{width:auto;height:1.0625rem;color:var(--text)}
+#side .sbbrand .sbbsub{display:flex;align-items:center;gap:.375rem;max-width:100%;min-width:0;color:var(--text2);font-size:var(--fs-s,.8125rem);font-weight:500;line-height:1.2}
+#side .sbbrand .sbbsub .wsp-dot{width:.5rem;height:.5rem}
+#side .sbbrand .sbbsub svg.i{width:.75rem;height:.75rem;flex:none}
+#side .sbbrand > svg.i:last-child{flex:none;margin-left:auto}
+@media (pointer:coarse){ :root:root #side .sbhead .wsbar.sbbrand{min-height:2.75rem} }  /* the head keeps its height (2.25 rem, 2.75 on touch): it sits on the middle of #top (#2438) */
+/* 2.152.1 A (#2608): the brand's bot blinks now and then (wsBlink, workspace.js); nothing with reduced motion */
+#side .sbbrand svg.logo .lg-eyes{transform-box:fill-box;transform-origin:50% 50%}
+@media (prefers-reduced-motion: no-preference){ #side .sbbrand.blink svg.logo .lg-eyes{animation:b-blink .36s ease-in-out 1} }
 
 /* 2.145.0 A (#2438): the workspace head sits on the middle of the page header (#top). #top's content row is centred at
    .875rem + 1.1 rem (desktop, the 35 px title row), .625rem + 1.375rem + safe area (touch / narrow, 2.75 rem buttons) and the head is
@@ -7939,6 +7982,37 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .nelse .nerow{display:flex;align-items:center;gap:.75rem;justify-content:space-between;padding:.375rem .75rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);color:var(--text2);font-size:var(--fs-m)}
 .nelse .nerow span{min-width:0;overflow-wrap:anywhere}
 .nelse .nerow .btn{flex:none}
+
+/* 2.155.0 C (#2075): the own repeat rule dialog */
+.crrmon{display:flex;flex-direction:column;gap:.5rem;flex:1;min-width:0}
+.crropt{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
+.crropt .numin{width:4.5rem}
+.crrmodal .card{width:min(28rem,100%)}
+.crredit{flex:none}
+/* 2.156.0 B (#2069): field types multiple choice, currency, rating, task link (cfkinds.js) */
+.lc-f.t-currency,.lc-f.t-rating{justify-content:flex-end}
+.cfkrt{display:inline-flex;align-items:center;gap:.0625rem;color:var(--muted)}
+.cfkrt i{display:inline-flex;font-style:normal}
+.cfkrt .on,.cfkrt i.on{color:var(--accent)}
+.cfkrt .on svg,.cfkrt i.on svg{fill:currentColor}
+.cfkrt.ed button{display:inline-flex;align-items:center;justify-content:center;min-width:1.75rem;min-height:1.75rem;padding:0;border:0;border-radius:var(--r-s);background:none;color:inherit;cursor:pointer}
+.cfkrt.ed button.on{color:var(--accent)}
+.cfkrt.ed button:hover{background:var(--bg3)}
+.cfkrt.ed button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.fchip.cfkr{padding:0}
+.cfkms{display:inline-flex;flex-wrap:nowrap;gap:.1875rem;max-width:100%;overflow:hidden}
+.cfkmsed{display:flex;flex-wrap:wrap;gap:.25rem;padding:.25rem 0}
+.cfkmsed .fchip{min-height:1.75rem;padding:0 .625rem;border:1px solid var(--line);cursor:pointer;background:none;color:var(--text2);font:inherit}
+.cfkmsed .fchip.on{border-color:transparent;color:var(--fc);background:color-mix(in srgb,var(--fc) 16%,transparent)}
+.cfkmsed .fchip.on.fill{color:var(--fct);background:var(--fc)}
+.cfkmsed .fchip:disabled{cursor:default}
+.cfktask{display:inline-flex;align-items:center;gap:.25rem;min-width:0;max-width:100%}
+.cfktl{display:inline-flex;align-items:center;gap:.25rem;min-width:0;max-width:100%;padding:0 .25rem;border:0;border-radius:var(--r-s);background:none;color:var(--accent);font:inherit;cursor:pointer}
+.cfktl span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cfktl.done span{text-decoration:line-through;color:var(--muted)}
+.cfktl:hover{background:var(--bg3)}
+.fxhelp code{font:var(--fs-xs)/1.4 var(--mono);padding:0 .1875rem;border-radius:var(--r-s);background:var(--bg3)}
+
 /* 2.152.1 (#2609-#2611): bot moments. #2609: the figure of the view that just became empty nods once (palette.js botNod);
    #2610: the agent chat's "working" line shows the small bot at work instead of the dots (listedit.js typingHtml);
    #2611: long jobs show the bot at work beside their text / bar (palette.js botBusy). Motion only without reduced motion. */

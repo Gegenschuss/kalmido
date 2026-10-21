@@ -1793,7 +1793,6 @@ fresh; run p2162_a_api "$PY" p2162_a_invoice_delete_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2162_a_ui node p2162_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.152.1 part C: #2626 one News number, #2615 grip only for growing dialogs, #2616 office order + entry
 fresh; run p2152a_c_ui node p2152a_c_ui.js "$KALMIDO_TEST_DATA"
-
 # 2.152.1 part A: the sidebar brand is the workspace switch, the bot figure stays alive (#2607 #2608)
 fresh; run p2152a_ui node p2152a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres

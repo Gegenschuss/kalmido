@@ -127,7 +127,7 @@ function tabOn(items) {
 const GO_KEY = {team: 'g n', today: 'g t', tomorrow: 'g m', week: 'g w', doable: 'g d', inbox: 'g i', all: 'g a', cal: 'g c', habits: 'g h', pomo: 'g f', settings: 'g s'};
 function tabBtn(t, on, cls = '') {
   const tgt = t.go != null ? `data-go="${esc(t.go)}"` : `data-act="${t.act}"`;
-  const nb = t.id === 'news' && S.news?.unread ? `<span class="nbadge">${S.news.unread > 99 ? '99+' : S.news.unread}</span>` : t.id === 'team' && t.n ? `<span class="nbadge">${t.n > 99 ? '99+' : t.n}</span>` : '';
+  const nb = t.id === 'news' && S.news?.unread && bellCount() ? `<span class="nbadge">${bellCount() > 99 ? '99+' : bellCount()}</span>` : t.id === 'team' && t.n ? `<span class="nbadge">${t.n > 99 ? '99+' : t.n}</span>` : '';
   return `<button class="${cls} ${on ? 'on' : ''}" ${tgt} title="${esc(GO_KEY[t.mod || t.key || t.id] ? kt(t.label, GO_KEY[t.mod || t.key || t.id]) : t.label)}"><span class="tico">${t.icon}</span><span>${esc(t.label)}</span>${t.mod === 'pomo' && S.pomo ? '<span class="dot"></span>' : ''}${t.mod === 'time' && S.timer ? '<span class="dot rec"></span>' : ''}${t.upd ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}${nb}</button>`;
 }
 // 2.8.0 (#434): no icon rail any more. The desktop has one sidebar with grouped text navigation (renderSide) and the
@@ -166,7 +166,7 @@ function tabsMore(anchor) {
   // the tab bar, set apart
   const grp = t => ['team', 'news', 'agents'].includes(t.id) ? 1 : ['search', 'settings'].includes(t.id) ? 2 : 0;
   const ord = [0, 1, 2].flatMap(g => [...(g === 1 ? [{head: tr('Conversations|nav')}] : g === 2 ? ['-'] : [{head: tr('Views')}]), ...more.filter(t => grp(t) === g)]);
-  menu(anchor, [...wk.map(a => ({label: tr('{0} is working', a.name) + (a.status_text ? ' · ' + a.status_text : ''), dot: 'working', fn: () => go('agents')})), ...(wk.length ? ['-'] : []), ...ord.map(t => t === '-' || t.head ? t : ({label: t.id === 'news' && S.news?.unread ? `${t.label} (${S.news.unread})` : t.label, icon: t.ico ? t.ico : t.id === 'settings' ? 'gear' : t.id === 'search' ? 'search' : t.id === 'news' ? 'bell' : t.id === 'stats' ? 'chart' : t.id === 'time' ? 'clock' : t.id === 'overview' ? 'pulse' : t.id === 'agents' ? 'bot' : t.mod ? MODS.find(x => x[0] === t.mod)?.[1] || ({team: 'comment', home: 'home', notes: 'file'}[t.mod]) || 'dots' : t.id.startsWith('f:') ? 'filter' : t.id.startsWith('tag:') ? 'tag' : t.id.startsWith('s:') ? SMART[t.key].icon : 'list',
+  menu(anchor, [...wk.map(a => ({label: tr('{0} is working', a.name) + (a.status_text ? ' · ' + a.status_text : ''), dot: 'working', fn: () => go('agents')})), ...(wk.length ? ['-'] : []), ...ord.map(t => t === '-' || t.head ? t : ({label: t.id === 'news' && S.news?.unread && bellCount() ? `${t.label} (${bellCount()})` : t.label, icon: t.ico ? t.ico : t.id === 'settings' ? 'gear' : t.id === 'search' ? 'search' : t.id === 'news' ? 'bell' : t.id === 'stats' ? 'chart' : t.id === 'time' ? 'clock' : t.id === 'overview' ? 'pulse' : t.id === 'agents' ? 'bot' : t.mod ? MODS.find(x => x[0] === t.mod)?.[1] || ({team: 'comment', home: 'home', notes: 'file'}[t.mod]) || 'dots' : t.id.startsWith('f:') ? 'filter' : t.id.startsWith('tag:') ? 'tag' : t.id.startsWith('s:') ? SMART[t.key].icon : 'list',
     fn: () => t.act === 'side' ? sideOpenDrawer() : t.act === 'palette' ? openPalette() : t.act ? settingsModal() : go(t.go)})), '-', {label: tr('Customize tab bar'), icon: 'edit', fn: () => settingsModal('tabbar')}]);
 }
 function counts() {
@@ -231,8 +231,8 @@ const sideGroupOrder = () => {  // an own order stays; unknown groups go to the 
   if (o.length && !o.includes('areas')) o.splice(o.includes('views') ? o.indexOf('views') + 1 : o.length, 0, 'areas');
   return [...new Set([...o, ...SIDE_GROUPS])];
 };
-const sideOpen = g => SIDE_FOLDED.includes(g) ? (LS.get('sideOpenG', []) || []).includes(g) : !(LS.get('sideGroups', []) || []).includes(g);
-function sideGroupToggle(g) { const key = SIDE_FOLDED.includes(g) ? 'sideOpenG' : 'sideGroups', x = new Set(LS.get(key, []) || []); x.has(g) ? x.delete(g) : x.add(g); LS.set(key, [...x]); renderSide(); }
+const sideOpen = g => sv_open(g) ?? (SIDE_FOLDED.includes(g) ? (LS.get('sideOpenG', []) || []).includes(g) : !(LS.get('sideGroups', []) || []).includes(g));  // 2.156.0 D (#2186): an active sidebar view decides (sideviews.js)
+function sideGroupToggle(g) { if (sv_toggle(g)) return; const key = SIDE_FOLDED.includes(g) ? 'sideOpenG' : 'sideGroups', x = new Set(LS.get(key, []) || []); x.has(g) ? x.delete(g) : x.add(g); LS.set(key, [...x]); renderSide(); }
 function teamPeople() {
   if (!collab()) return [];
   const seen = new Map();
@@ -423,7 +423,7 @@ function renderSide() {
   const oldAcct = $('#side .sbacct');  // 2.47.0 (#1654): keep the account node (same <img>) when nothing about it changed
   $('#side').innerHTML = `
     <div class="sbfix">${'' /* 2.57.0 (#1798): the fixed head (workspace, favourites) stays while the rest scrolls */}
-    <div class="sbhead">${'' /* 2.138.2 C (#2392): the 4 px stripe of #2389 is #side's top border (app.css); fold + fold-all show on hover / focus, the dot only offline or while syncing. 2.152.1 A (#2607): the brand (logo + word mark) is the workspace switch, the small mark at the bottom (2.145.0 A #2437) is gone */}${wsBarHtml()}${netDotHtml()}<span class="spacer"></span><span class="sbtools">${kbFoldAllBtn()}${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</span></div>
+    <div class="sbhead">${'' /* 2.138.2 C (#2392): the 4 px stripe of #2389 is #side's top border (app.css); fold + fold-all show on hover / focus, the dot only offline or while syncing. 2.152.1 A (#2607): the brand (logo + word mark) is the workspace switch, the small mark at the bottom (2.145.0 A #2437) is gone */}${wsBarHtml()}${netDotHtml()}<span class="spacer"></span><span class="sbtools">${kbFoldAllBtn()}${fv2_svToolBtn() /* 2.156.0 D (#2186) */}${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</span></div>
     ${favSideHtml(lists, listRow, head)}</div>
     ${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('')}
     <div class="sgroup sfoot">
@@ -432,6 +432,7 @@ function renderSide() {
     <div class="sbdock">${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}</button>` : '' /* 2.138.2 C (#2392): the account picture, without dots, next to the search */}<button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button></div>`;  // 2.138.0 B (#2161)
   const newAcct = $('#side .sbacct');
   if (oldAcct && newAcct && oldAcct.innerHTML === newAcct.innerHTML && oldAcct.title === newAcct.title) newAcct.replaceWith(oldAcct);
+  sv_after();  // 2.156.0 D (#2186): what the active view hides goes under "Others (N)" (sideviews.js)
   sideRove();
 }
 // 2.13.0 (#453 A9): the sidebar is ONE tab stop (roving tabindex): Tab lands on the open view's row (or the first one),
@@ -710,10 +711,11 @@ function routeList() {
   if (S.route.mod !== 'tasks') return null;
   return k === 'inbox' ? inbox() : k.startsWith('l:') ? listById(+k.slice(2)) : null;
 }
-const listView = l => !l.is_inbox && ((l.view === 'kanban' && feat('kanban')) || (l.view === 'timeline' && feat('timeline')) || l.view === 'mindmap') ? l.view : 'list';  // 2.49.0 (#1201): + mind map  // 2.25.0 (UX-38): the inbox is always a list
+const listView = l => !l.is_inbox && ((l.view === 'kanban' && feat('kanban')) || (l.view === 'timeline' && feat('timeline')) || l.view === 'mindmap' || (l.view === 'calendar' && feat('cal'))) ? l.view : 'list';  // 2.156.0 C (#2071): + calendar  // 2.49.0 (#1201): + mind map  // 2.25.0 (UX-38): the inbox is always a list
 function isKanban() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'kanban'; }
 function isTimeline() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'timeline'; }
 function isMindmap() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'mindmap'; }  // 2.49.0 (#1201)
+function isListCal() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'calendar'; }  // 2.156.0 C (#2071): listcal.js
 // 2.13.0 (#453 P15): week / day view: the hour grid fills exactly the room below its header, so only the grid scrolls
 // (before, the page scrolled too: two scroll bars nested)
 function calFit() {
@@ -724,7 +726,7 @@ function calFit() {
   const h = Math.max(240, Math.floor(innerHeight - tb - wb.getBoundingClientRect().top - 12));
   wb.style.height = h + 'px';
 }
-window.addEventListener('resize', () => { if (S.route?.mod === 'cal') calFit(); });
+window.addEventListener('resize', () => { if (S.route?.mod === 'cal' || isListCal()) calFit(); });  // 2.156.0 C (#2071): + a list's calendar
 // 2.13.2 (#478 N2): a re-render (live updates of agents, comments, jobs) never takes the keyboard focus away: a focused
 // button / link / cell of the rebuilt area gets its focus back on its new copy (same tag + data-* / id, same position
 // among equal ones), so Tab goes on from there instead of falling back to the start (the "tab ping-pong")
@@ -914,8 +916,10 @@ function renderView0() {
   else if (isRoadmap()) setHtml(el, viewRoadmap());
   else if (isOverview()) setHtml(el, viewProjOv());  // 2.7.1 (#410)
   else if (isMindmap()) setHtml(el, vsegHtml(routeList()) + viewMindmap(routeList()));  // 2.49.0 (#1201)
+  else if (isListCal()) { setHtml(el, lcal_view(routeList())); requestAnimationFrame(calFit); }  // 2.156.0 C (#2071): listcal.js (module calendar)
   else if (isKanban()) setHtml(el, viewKanban());
   else if (isTimeline()) setHtml(el, vsegHtml(routeList()) + viewTimeline(routeList().id));  // 2.13.0 (#453 A7)
+  else if (moActive() && moBoard()) setHtml(el, mb_view());  // 2.156.0 C (#2072): My tasks as a board (mineboard.js)
   else setHtml(el, viewList());
   el.scrollTop = scroll;
   if (m === 'agents' && $('#view .chview')) { chatFit(); chatPatch({bottom: true}); } else document.body.classList.remove('kb-open');  // 2.12.2 (#451): a chat opens at its newest message
@@ -1040,7 +1044,7 @@ function taskRow(t, opts = {}) {
     ${opts.trash ? `<span class="chk ${chk}">${t.status === 2 ? ic('check') : ''}</span>` : `<button class="chk ${chk}" data-act="toggle" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(isMs(t) ? tr('Complete milestone: {0}', mdPlain(t.title)) : tr('Complete: {0}', mdPlain(t.title)))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : t.status === -1 ? ic('x') : ''}</button>`}${gut}
     <div class="tmain" data-act="${opts.trash ? '' : 'open'}"><div class="ttl"${opts.trash ? '' : ` data-kt role="button" tabindex="-1" aria-describedby="${lc ? `tc-${t.id} ` : ''}tm-${t.id}"`}>${typeof le2u_locked === 'function' && le2u_locked(t) ? le2u_ttlHtml(t) : mdTitle(t.title) /* 2.64.1 (#1817): locked list, not decrypted */}${tlkIs(t) && !opts.trash && rs('blocked') ? `<span class="tlkr" role="img" title="${esc(tr('Locked'))}" aria-label="${esc(tr('Locked'))}">${ic('lock', 's')}</span>` : ''}${t.priority && !opts.checklist && !opts.trash && t.status === 0 && !(lc && lc.includes('prio')) ? prioMark(t.priority) : ''}</div><div class="meta" id="tm-${t.id}">${meta.join('')}</div></div>
     ${!opts.trash && !ro && t.id > 0 && !isTouch() ? `<button class="iconbtn rpin ${t.pinned ? 'on' : ''}" data-act="pin" title="${esc(t.pinned ? tr('Unpin') : tr('Pin'))}" aria-label="${esc(t.pinned ? tr('Unpin') : tr('Pin'))}" aria-pressed="${!!t.pinned}">${ic(t.pinned ? 'pinf' : 'pin', 's')}</button>` : ''}
-    ${opts.cols ? `<div class="fcols" data-act="open">${opts.cols.map(f => `<span class="fcell t-${esc(f.type)}">${fieldCell(f, t.fields?.[f.id], t.list_id)}</span>`).join('')}</div>` : ''}
+    ${opts.cols ? `<div class="fcols" data-act="open">${opts.cols.map(f => `<span class="fcell t-${esc(f.type)}">${fieldCell(f, t.fields?.[f.id], t.list_id, t)}</span>`).join('')}</div>` : ''}
     ${cols}${lcH}
     ${ac ? `<span class="wcell">${who}</span>` : ''}
     ${opts.ckback && !ro ? `<button class="iconbtn ckback" data-act="toggle" title="${tr('Put back on the list')}" aria-label="${tr('Put back on the list')}">${ic('undo', 's')}</button>` : ''}
@@ -1104,6 +1108,8 @@ const numFmt = v => { const x = +v; return Number.isFinite(x) ? x.toLocaleString
 const selOpt = (f, v) => (f.options?.options || []).find(o => o.id === v);
 function fieldText(f, v, lid) {
   if (v == null || v === '') return '';
+  if (CFK_TYPES.includes(f.type)) return cfkText(f, v) || '';  // 2.156.0 B (#2069): cfkinds.js
+  if (f.type === 'formula' && cfkFxErr(v)) return cfkFxErr(v);  // 2.156.0 B (#2070): "Division by 0"
   switch (f.type) {
     case 'number': case 'formula': return numFmt(v) + (f.options?.unit ? ' ' + f.options.unit : '');  // 2.43.0 (#1328): + formula
     case 'select': return selOpt(f, v)?.name || '';
@@ -1115,6 +1121,7 @@ function fieldText(f, v, lid) {
   return String(v);
 }
 function fieldChip(f, v, lid) {
+  if (CFK_TYPES.includes(f.type)) return cfkChip(f, v);  // 2.156.0 B (#2069)
   const txt = fieldText(f, v, lid); if (!txt) return '';
   const tip = esc(f.name + ': ' + (f.type === 'url' ? v : f.type === 'date' ? fmtDate(v) : txt));
   if (f.type === 'select') { const o = selOpt(f, v); return `<span class="fchip sel${lrSelFill(o)}" ${lrSelStyle(o)} title="${tip}">${esc(o.name)}</span>`; }
@@ -1124,12 +1131,145 @@ function fieldChip(f, v, lid) {
   if (f.type === 'date') return `<span class="fchip ${v < today() ? 'over' : ''}" title="${tip}">${ic('cal', 's')}${esc(txt)}</span>`;
   return `<span class="fchip" title="${tip}">${f.type === 'number' ? `<i>${esc(f.name)}</i> ` : ''}${esc(txt.length > 40 ? txt.slice(0, 39) + '…' : txt)}</span>`;
 }
-function fieldCell(f, v, lid) {  // column view (desktop)
+function fieldCell(f, v, lid, t) {  // column view (desktop); 2.156.0 B (#2069): t = the task (stars to tap)
+  if (CFK_TYPES.includes(f.type)) return cfkCell(f, v, t);
   if (v == null || v === '') return '';
   if (f.type === 'select') { const o = selOpt(f, v); return o ? `<span class="fchip sel${lrSelFill(o)}" ${lrSelStyle(o)}>${esc(o.name)}</span>` : ''; }
   if (f.type === 'checkbox') return v === '1' ? ic('check', 's') : '';
   if (f.type === 'url') return flkLink(v, 'lnk', esc(urlHost(v)), true);
   return `<span title="${esc(fieldText(f, v, lid))}">${esc(fieldText(f, v, lid))}</span>`;
+}
+// ---- 2.156.0 B (#2069): the field types multiselect, currency, rating and task: how their values read (task rows, columns,
+// detail panel) and the taps that change them; the pickers and the dialog parts load on demand (cfkinds.js, module cfkinds).
+// A task link shows the title only when the person may see the task: from the own state, else asked from the server
+// (/api/fields/task-refs), never guessed.
+const CFK_TYPES = ['multiselect', 'currency', 'rating', 'task'];
+const cfk_ids = v => String(v || '').split(',').filter(Boolean);
+const cfk_opts = (f, v) => cfk_ids(v).map(id => selOpt(f, id)).filter(Boolean);
+const cfk_max = f => Math.min(10, Math.max(3, +(f.options?.max || 5)));
+function cfk_money(v, cur) {
+  const x = +v; if (!Number.isFinite(x)) return String(v ?? '');
+  try { return x.toLocaleString(LOCALE(), {style: 'currency', currency: cur || 'EUR'}); } catch { return numFmt(v) + ' ' + (cur || 'EUR'); }
+}
+// 2.156.0 B (#2070): the error values of a formula result
+const CFK_FX_ERR = {'#div0': N_('Division by 0'), '#type': N_('Not a number')};
+const cfkFxErr = v => typeof v === 'string' && v.startsWith('#') ? tr(CFK_FX_ERR[v] || 'Error') : '';
+
+// ---- the linked task: {title, status} | null (not visible to me) | {off: true} (could not ask) | undefined (asking)
+/** @type {Object<string, any>} */
+const CFK_T = {};
+let cfk_q = new Set(), cfk_tm = 0;
+function cfk_task(id) {
+  const t = taskById(+id);
+  if (t && t.id > 0) return {title: t.title, status: t.status};
+  if (id in CFK_T) return CFK_T[id];
+  if (!cfk_q.has(+id)) { cfk_q.add(+id); clearTimeout(cfk_tm); cfk_tm = setTimeout(cfk_fetch, 30); }
+  return undefined;
+}
+async function cfk_fetch() {
+  const ids = [...cfk_q]; cfk_q = new Set(); if (!ids.length) return;
+  try {
+    const j = await rawFetch('GET', '/api/fields/task-refs?ids=' + ids.join(','));
+    for (const id of ids) CFK_T[id] = null;
+    for (const x of j?.tasks || []) CFK_T[x.id] = {title: String(x.title || '').startsWith('e2e') ? '' : x.title, status: x.status};
+  } catch { for (const id of ids) CFK_T[id] = {off: true}; }
+  render(); if (S.sel) renderDetail();
+}
+const cfk_tname = (x, id) => x && !x.off && x.title ? x.title : tr('Task') + ' #' + id;
+function cfk_taskText(v) {
+  const x = cfk_task(v);
+  return x === undefined ? '…' : x === null ? tr('Task not visible') : cfk_tname(x, v);
+}
+
+// ---- display: undefined = not one of these types (render.js fieldText / fieldChip / fieldCell go on)
+function cfkText(f, v) {
+  switch (f.type) {
+    case 'multiselect': return cfk_opts(f, v).map(o => o.name).join(', ');
+    case 'currency': return cfk_money(v, f.options?.currency);
+    case 'rating': return tr('{0} of {1}', +v, cfk_max(f));
+    case 'task': return cfk_taskText(v);
+  }
+  return undefined;
+}
+function cfk_stars(f, v, tid) {  // tid = may set it (tap sets, the same value again clears)
+  const n = +v || 0, mx = cfk_max(f), lab = esc(f.name + ': ' + tr('{0} of {1}', n, mx));
+  if (!tid) return `<span class="cfkrt" role="img" aria-label="${lab}" title="${lab}">${Array.from({length: mx}, (_, i) => `<i class="${i < n ? 'on' : ''}">${ic('star', 's')}</i>`).join('')}</span>`;
+  return `<span class="cfkrt ed" role="group" aria-label="${lab}">${Array.from({length: mx}, (_, i) => `<button type="button" class="${i < n ? 'on' : ''}" data-cfkrt="${f.id}" data-tid="${tid}" data-n="${i + 1}" aria-pressed="${i + 1 === n}" aria-label="${esc(tr('{0} of {1}', i + 1, mx))}">${ic('star', 's')}</button>`).join('')}</span>`;
+}
+const cfk_selChip = o => `<span class="fchip sel${lrSelFill(o)}" ${lrSelStyle(o)}>${esc(o.name)}</span>`;
+function cfk_msChips(f, v, most) {
+  const os = cfk_opts(f, v), more = os.length - most;
+  return os.slice(0, most).map(cfk_selChip).join('') + (more > 0 ? `<span class="fchip" title="${esc(os.slice(most).map(o => o.name).join(', '))}">+${more}</span>` : '');
+}
+function cfk_taskLink(v, cls) {
+  const x = cfk_task(v), txt = cfk_taskText(v);
+  if (!x || x.off) return `<span class="${cls} muted">${ic('link', 's')}${esc(txt)}</span>`;
+  return `<button type="button" class="${cls} cfktl${x.status === 2 ? ' done' : ''}" data-cfkopen="${esc(String(v))}" title="${esc(txt)}">${ic('link', 's')}<span>${esc(txt)}</span></button>`;
+}
+function cfkChip(f, v, t) {  // the task row / card
+  if (v == null || v === '') return '';
+  const tip = esc(f.name + ': ' + (cfkText(f, v) || ''));
+  if (f.type === 'multiselect') return `<span class="cfkms" title="${tip}">${cfk_msChips(f, v, 3)}</span>`;
+  if (f.type === 'rating') return `<span class="fchip cfkr" title="${tip}">${cfk_stars(f, v, 0)}</span>`;
+  if (f.type === 'task') return cfk_taskLink(v, 'fchip');
+  return `<span class="fchip" title="${tip}"><i>${esc(f.name)}</i> ${esc(cfkText(f, v) || '')}</span>`;
+}
+function cfkCell(f, v, t) {  // a column (desktop); stars can be tapped right there
+  if (f.type === 'rating') return cfk_stars(f, v, t && t.id > 0 && canEdit(t) && !isTouch() ? t.id : 0);
+  if (v == null || v === '') return '';
+  if (f.type === 'multiselect') return cfk_msChips(f, v, 2);
+  if (f.type === 'task') return cfk_taskLink(v, 'cfktc');
+  const s = cfkText(f, v) || '';
+  return `<span title="${esc(s)}">${esc(s)}</span>`;
+}
+
+// ---- the detail panel (projects.js fieldEditor)
+function cfkEditor(f, t, ro) {
+  const v = t.fields?.[f.id] ?? '', id = `cf-${f.id}`, can = !ro && t.id > 0;
+  if (f.type === 'currency') return `<span class="cfnum"><input id="${id}" data-cf="${f.id}" inputmode="decimal" value="${esc(v === '' ? '' : (+v).toLocaleString(LOCALE(), {useGrouping: false, maximumFractionDigits: 2}))}" ${ro ? 'readonly' : ''} placeholder="–"><span class="muted">${esc(f.options?.currency || 'EUR')}</span></span>`;
+  if (f.type === 'rating') return `<span id="${id}">${cfk_stars(f, v, can ? t.id : 0)}</span>`;
+  if (f.type === 'multiselect') {
+    const on = new Set(cfk_ids(v));
+    return `<span id="${id}" class="cfkmsed" role="group" aria-label="${esc(f.name)}">${(f.options?.options || []).map(o => `<button type="button" class="fchip sel${on.has(o.id) ? lrSelFill(o) + ' on' : ''}" ${on.has(o.id) ? lrSelStyle(o) : ''} data-cfkms="${f.id}" data-o="${esc(o.id)}" data-tid="${t.id}" aria-pressed="${on.has(o.id)}" ${can ? '' : 'disabled'}>${esc(o.name)}</button>`).join('')}</span>`;
+  }
+  if (f.type === 'task') return `<span id="${id}" class="cfktask">${v ? cfk_taskLink(v, 'cfktc') : '<span class="muted">–</span>'}${can ? `<button type="button" class="iconbtn" data-cfkpick="${f.id}" data-tid="${t.id}" title="${esc(tr('Choose a task'))}" aria-label="${esc(tr('Choose a task'))}">${ic('search', 's')}</button>${v ? `<button type="button" class="iconbtn" data-cfkclr="${f.id}" data-tid="${t.id}" title="${esc(tr('Empty the field'))}" aria-label="${esc(tr('Empty the field'))}">${ic('x', 's')}</button>` : ''}` : ''}</span>`;
+  return '';
+}
+function cfk_put(tid, fid, v) {
+  if (typeof tcSave === 'function') return tcSave(tid, fid, v);  // at once on screen, back on an error, Ctrl+Z
+  return patchTask(tid, {fields: {[fid]: v}}).catch(() => {});
+}
+document.addEventListener('click', e => {
+  const tg = /** @type {any} */ (e.target), b = tg.closest?.('[data-cfkrt],[data-cfkms],[data-cfkpick],[data-cfkclr],[data-cfkopen]'); if (!b) return;
+  e.preventDefault(); e.stopImmediatePropagation();  // not the row's / cell's own click (tablecells.js listens on document too)
+  if (b.dataset.cfkopen) { const id = +b.dataset.cfkopen; if (typeof openTaskById === 'function') openTaskById(id); else openDetail(id); return; }
+  const t = taskById(+b.dataset.tid), f = fieldById(+(b.dataset.cfkrt || b.dataset.cfkms || b.dataset.cfkpick || b.dataset.cfkclr)); if (!t || !f) return;
+  if (!canEdit(t)) { roToast(); return; }
+  const v = t.fields?.[f.id] ?? null;
+  if (b.dataset.cfkrt) { const n = +b.dataset.n; cfk_put(t.id, f.id, n === +(v || 0) ? null : String(n)); return; }
+  if (b.dataset.cfkms) { const ids = new Set(cfk_ids(v)), o = b.dataset.o; ids.has(o) ? ids.delete(o) : ids.add(o); cfk_put(t.id, f.id, cfk_msVal(f, ids)); return; }
+  if (b.dataset.cfkclr) { cfk_put(t.id, f.id, null); return; }
+  cfkPick(t, f, x => cfk_put(t.id, f.id, x));
+}, true);
+const cfk_msVal = (f, ids) => (f.options?.options || []).filter(o => ids.has(o.id)).map(o => o.id).join(',') || null;
+
+function cfkModalOpts(md, type) {
+  if (type === 'currency') return {currency: /** @type {HTMLSelectElement} */ ($('#fd-cur', md)).value};
+  if (type === 'rating') return {max: +/** @type {HTMLSelectElement} */ ($('#fd-rmax', md)).value};
+  return {};
+}
+
+// ---- typed / pasted text (sheetgrid.js sgParse): {v} | {err} | undefined = not one of these types
+function cfkParse(f, s) {
+  if (f.type === 'currency') { const v = numIn(s.replace(/[^\d.,'\s-]/g, '')); return v !== '' && Number.isFinite(+v) ? {v: String(+v)} : {err: tr('Number expected')}; }
+  if (f.type === 'rating') { const n = +s; return Number.isInteger(n) && n >= 0 && n <= cfk_max(f) ? {v: n ? String(n) : null} : {err: tr('Number expected')}; }
+  if (f.type === 'multiselect') {
+    const os = f.options?.options || [], names = s.split(/[,;]/).map(x => x.trim().toLowerCase()).filter(Boolean);
+    const hit = names.map(n => os.find(o => o.name.toLowerCase() === n));
+    return hit.every(Boolean) ? {v: cfk_msVal(f, new Set(hit.map(o => o.id)))} : {err: tr('Unknown option')};
+  }
+  if (f.type === 'task') { const m = s.match(/^#?(\d+)$/); return m ? {v: m[1]} : {err: tr('Task not found')}; }
+  return undefined;
 }
 // ---- 2.136.0 (#2193): the bot figure (empty states, search, done, agents, welcome, offline, errors) instead of the heron
 // of 2.14.0. The drawing of the design files (100 grid, the plate of the variants hell / dunkel): plate, body and eyes take
@@ -1191,7 +1331,7 @@ function lcCell(k, t, x) {
     case 'deps': return t.blocked && t.status === 0 && dFor(t) ? `<span class="blk" title="${esc(blockedTitle(t))}">${ic('lock', 's')}<span class="lbl">${tr('blocked')}</span></span>` : '';
     case 'created': return t.created_at ? `<span class="crd" title="${esc(tr('Created {0}', fmtWhen(t.created_at)))}">${ic('plus', 's')}${dayLabel(ds(new Date(t.created_at)))}</span>` : '';
   }
-  if (k.startsWith('f:')) { const f = fieldsOf(t.list_id).find(y => y.id === +k.slice(2)); return f ? fieldCell(f, t.fields?.[f.id], t.list_id) : ''; }
+  if (k.startsWith('f:')) { const f = fieldsOf(t.list_id).find(y => y.id === +k.slice(2)); return f ? fieldCell(f, t.fields?.[f.id], t.list_id, t) : ''; }
   return '';
 }
 // "Columns…": tick what the rows show, order by dragging the handle or with the arrows (Alt+↑/↓ on the keyboard). Saved for
@@ -1525,6 +1665,7 @@ function viewListBody() {
   // the marker becomes the block "tasks"
   const tdc = S.route.key === 'today' ? {brief: briefCard(), wait: waitCard(), review: reviewCard(), overdue: odHead ? '' : overdueBanner(), events: cevTodayBlock()} : null;  // 2.24.0 (UX-35): the planners in "…"  // 2.10.0 (#440): review + planner
   if (tdc) h += '\u0001';
+  h += moSegHtml();  // 2.156.0 C (#2072): My tasks: List / Board (mineorder.js)
   h += favViewNote();  // 2.40.0 (#1361): a view filtered to favourites says so
   h += sgFilterNote(rl);  // 2.43.0 (#1331): a column filter of the list says so (sheetgrid.js)
   if (rl && sortOwn()) h += `<div class="onehint sortown">${ic('sort', 's')}<span>${esc(tr('You see your own sort of this shared list.'))}</span><button type="button" class="btn sm" data-act="sort-shared">${tr('Back to the shared sort')}</button></div>`;  // 2.27.0 (#988)
