@@ -13,7 +13,7 @@ from ..core.db import body, err, like_escape
 from ..accounts.session import me
 from ..core.access import Denied
 from ..collab.comments import user_names
-from ..agents.core import agent_emit, jc_job_name, JOB_MESSAGE_MAX, job_dict, job_visible
+from ..agents.core import agent_emit, jc_job_name, JOB_MESSAGE_MAX, job_dict, job_may_act, job_visible
 
 
 
@@ -117,7 +117,9 @@ JCS_PROGRESS_MAX = 300
 
 
 def jcs_job_in(c, aid, v, uid):
-    """The job a person's message is addressed to (job_id of the POST): a job of agent aid that uid may see, else BadInput."""
+    """The job a person's message is addressed to (job_id of the POST): a job of agent aid that uid may see, else BadInput;
+    review B2: like the job's message action only who may stop it may write to it (Denied 403). Ended jobs stay allowed
+    (a message wakes them, #2176)."""
     from ..personal.timetrack import BadInput
     from ..tasks.validation import as_int
     if v in (None, ""):
@@ -125,6 +127,8 @@ def jcs_job_in(c, aid, v, uid):
     j = c.execute("SELECT * FROM agent_jobs WHERE id=? AND agent_id=?", (as_int(v, "job_id", 1), aid)).fetchone()
     if not j or not job_visible(c, j, uid):
         raise BadInput(tr("Invalid value: {0}", "job_id"))
+    if not job_may_act(c, j, uid, "stop"):
+        raise Denied(403, tr("Only the list owner, a list admin, the assignee or the person the job is for can do this"))
     return j
 
 

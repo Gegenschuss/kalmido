@@ -5,6 +5,8 @@
  - POST /api/agents/{id}/chat {job_id} (JSON and multipart): the message is stored with the job (job_id, job_parent), the
    agent gets the usual 'chat' event with message.job_id and data.job; a job of another agent, an unknown one or one the
    person cannot see: 400, nothing stored
+   2.153.0 (review B2): one the person sees but may not stop (only through the task, list role view): 403, nothing stored;
+   an ended job of the person: allowed
  - GET ?job=: the start line, my message to the job, the agent's job messages and progress [{text, at}] (the job's
    append_log lines, only for the person it is for); the whole chat keeps messages without job_id
  - a person without an organisation (freelancer fixture) with an own agent: the same
@@ -141,6 +143,25 @@ for bad, why in ((OTJ, "a job of another agent"), (999999, "an unknown job"), (C
 check(len(chat(Bo).get("messages", [])) == n0, "the refused messages are not stored")
 r = Bo.post(B + f"/api/agents/{CL}/chat", json={"body": "to an unknown job", "job_id": None})
 check(r.status_code == 201 and r.json().get("job_id") is None, "job_id null = the whole chat " + r.text[:200])
+# 2.153.0 (review B2): writing into a job's chat needs the right to stop it (like the job's message action): dora sees bob's
+# job only through its task (list role view) -> 403, nothing stored; bob also writes into his ended job (a message wakes it)
+r = A.post(B + "/api/users", json={"orgs": [ORG], "username": "dora", "display_name": "Dora", "password": "password123", "email": "dora@example.com"})
+assert r.ok, r.text
+check(A.put(B + f"/api/lists/{W}/members", json={"user_id": r.json()["id"], "role": "view"}).ok, "setup: dora views the list")
+Do = sess("dora")
+TJ = A.post(B + "/api/tasks", json={"list_id": W, "title": "Release notes"}).json()["id"]
+JT = job(CLH, "Tara: on a task", task_id=TJ)
+nd = len(chat(Do).get("messages", []))
+r = Do.post(B + f"/api/agents/{CL}/chat", json={"body": "stop that", "job_id": JT})
+check(r.status_code == 403, f"seen only through the task: a message to the job 403 ({r.status_code} {r.text[:120]})")
+check(len(chat(Do).get("messages", [])) == nd, "the refused message is not stored")
+r = Do.post(B + f"/api/agents/{CL}/chat", json={"body": "hello"})
+check(r.status_code == 201, f"dora's message to the whole chat still works ({r.status_code} {r.text[:120]})")
+r = Bo.post(B + f"/api/agents/{CL}/chat", json={"body": "and the notes?", "job_id": JT})
+check(r.status_code == 201 and r.json().get("job_id") == JT, "the person the job is for may write to it " + r.text[:200])
+JD = job(CLH, "Dana: ended", state="done")
+r = Bo.post(B + f"/api/agents/{CL}/chat", json={"body": "one more thing", "job_id": JD})
+check(r.status_code == 201 and r.json().get("job_id") == JD, "an ended job: its owner may still write (it wakes) " + r.text[:200])
 
 # ================================================================== the job's own chat: progress lines
 check(requests.patch(V + f"/agent/jobs/{J}", headers=CLH, json={"append_log": "Tests are running"}).ok, "the agent adds a progress line")
