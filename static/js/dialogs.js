@@ -395,6 +395,8 @@ function listMenuItems(id, anchor) {
   if (!l.is_inbox && !l.archived && canEditList(id)) items.push({label: tr('Add section…'), icon: 'plus', cls: 'msecadd', fn: async () => {
     const n = await askPrompt(tr('Name of the section / column'), '', {ok: tr('Add')}); if (n && n.trim()) await sectionCreate(id, n.trim());
   }});
+  // 2.156.0 C (#2073): save the sections as a template / add a template's sections (sectpl.js, people in the app only)
+  if (!l.is_inbox && !l.archived && canEditList(id) && !S.me?.kid && S.me?.kind !== 'agent') items.push({label: tr('Section templates…'), icon: 'copy', cls: 'msectpl', rare: 1, fn: () => sct_open(id), ...(l.e2e ? {dis: true, title: tr('Not available in encrypted lists')} : {})});
   // 2.14.0 (#425): "Columns…" replaces "Show task numbers" and "Hide / Show assignee column" (per device until then); high up
   if (!l.archived) items.push(colItem(id));
   // 2.17.0 (#442 #419): the list's notes and (shared) its team chat

@@ -711,10 +711,11 @@ function routeList() {
   if (S.route.mod !== 'tasks') return null;
   return k === 'inbox' ? inbox() : k.startsWith('l:') ? listById(+k.slice(2)) : null;
 }
-const listView = l => !l.is_inbox && ((l.view === 'kanban' && feat('kanban')) || (l.view === 'timeline' && feat('timeline')) || l.view === 'mindmap') ? l.view : 'list';  // 2.49.0 (#1201): + mind map  // 2.25.0 (UX-38): the inbox is always a list
+const listView = l => !l.is_inbox && ((l.view === 'kanban' && feat('kanban')) || (l.view === 'timeline' && feat('timeline')) || l.view === 'mindmap' || (l.view === 'calendar' && feat('cal'))) ? l.view : 'list';  // 2.156.0 C (#2071): + calendar  // 2.49.0 (#1201): + mind map  // 2.25.0 (UX-38): the inbox is always a list
 function isKanban() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'kanban'; }
 function isTimeline() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'timeline'; }
 function isMindmap() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'mindmap'; }  // 2.49.0 (#1201)
+function isListCal() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'calendar'; }  // 2.156.0 C (#2071): listcal.js
 // 2.13.0 (#453 P15): week / day view: the hour grid fills exactly the room below its header, so only the grid scrolls
 // (before, the page scrolled too: two scroll bars nested)
 function calFit() {
@@ -725,7 +726,7 @@ function calFit() {
   const h = Math.max(240, Math.floor(innerHeight - tb - wb.getBoundingClientRect().top - 12));
   wb.style.height = h + 'px';
 }
-window.addEventListener('resize', () => { if (S.route?.mod === 'cal') calFit(); });
+window.addEventListener('resize', () => { if (S.route?.mod === 'cal' || isListCal()) calFit(); });  // 2.156.0 C (#2071): + a list's calendar
 // 2.13.2 (#478 N2): a re-render (live updates of agents, comments, jobs) never takes the keyboard focus away: a focused
 // button / link / cell of the rebuilt area gets its focus back on its new copy (same tag + data-* / id, same position
 // among equal ones), so Tab goes on from there instead of falling back to the start (the "tab ping-pong")
@@ -915,8 +916,10 @@ function renderView0() {
   else if (isRoadmap()) setHtml(el, viewRoadmap());
   else if (isOverview()) setHtml(el, viewProjOv());  // 2.7.1 (#410)
   else if (isMindmap()) setHtml(el, vsegHtml(routeList()) + viewMindmap(routeList()));  // 2.49.0 (#1201)
+  else if (isListCal()) { setHtml(el, lcal_view(routeList())); requestAnimationFrame(calFit); }  // 2.156.0 C (#2071): listcal.js (module calendar)
   else if (isKanban()) setHtml(el, viewKanban());
   else if (isTimeline()) setHtml(el, vsegHtml(routeList()) + viewTimeline(routeList().id));  // 2.13.0 (#453 A7)
+  else if (moActive() && moBoard()) setHtml(el, mb_view());  // 2.156.0 C (#2072): My tasks as a board (mineboard.js)
   else setHtml(el, viewList());
   el.scrollTop = scroll;
   if (m === 'agents' && $('#view .chview')) { chatFit(); chatPatch({bottom: true}); } else document.body.classList.remove('kb-open');  // 2.12.2 (#451): a chat opens at its newest message
@@ -1525,6 +1528,7 @@ function viewListBody() {
   // the marker becomes the block "tasks"
   const tdc = S.route.key === 'today' ? {brief: briefCard(), wait: waitCard(), review: reviewCard(), overdue: odHead ? '' : overdueBanner(), events: cevTodayBlock()} : null;  // 2.24.0 (UX-35): the planners in "…"  // 2.10.0 (#440): review + planner
   if (tdc) h += '\u0001';
+  h += moSegHtml();  // 2.156.0 C (#2072): My tasks: List / Board (mineorder.js)
   h += favViewNote();  // 2.40.0 (#1361): a view filtered to favourites says so
   h += sgFilterNote(rl);  // 2.43.0 (#1331): a column filter of the list says so (sheetgrid.js)
   if (rl && sortOwn()) h += `<div class="onehint sortown">${ic('sort', 's')}<span>${esc(tr('You see your own sort of this shared list.'))}</span><button type="button" class="btn sm" data-act="sort-shared">${tr('Back to the shared sort')}</button></div>`;  // 2.27.0 (#988)

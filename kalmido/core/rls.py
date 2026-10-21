@@ -87,6 +87,7 @@ TABLES = (
     "org_invites",  # 2.115.0 B (#2062): accounts an organisation invited by e-mail (always an organisation's)
     "webhooks",  # 2.115.0 A (#2061): outgoing webhooks (NULL = a person's own / an agent's, else its organisation's admins)
     "notify_channels",  # 2.142.0 A (#2145): notification channels (NULL = a person's own, else its organisation's admins)
+    "section_templates",  # 2.156.0 C (#2073): section templates (NULL = a person's own, the app checks user_id)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

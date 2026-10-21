@@ -180,7 +180,7 @@ async function setListView(l, v) {  // List / Kanban / Timeline (stored on the s
   render();
 }
 // 2.13.0: in projects the overview comes first
-const viewChoices = l => l.is_inbox ? [['list', N_('List'), 'list']] : [...(l.kind === 'project' && !l.is_inbox ? [['overview', N_('Project page'), 'brief']] : []), ['list', N_('List'), 'list'], ...(feat('kanban') ? [['kanban', N_('Kanban'), 'kanban']] : []), ...(feat('timeline') ? [['timeline', N_('Timeline'), 'timeline']] : []), ['mindmap', N_('Mind map'), 'mindmap']];  // 2.49.0 (#1201)
+const viewChoices = l => l.is_inbox ? [['list', N_('List'), 'list']] : [...(l.kind === 'project' && !l.is_inbox ? [['overview', N_('Project page'), 'brief']] : []), ['list', N_('List'), 'list'], ...(feat('kanban') ? [['kanban', N_('Kanban'), 'kanban']] : []), ...(feat('timeline') ? [['timeline', N_('Timeline'), 'timeline']] : []), ['mindmap', N_('Mind map'), 'mindmap'], ...(feat('cal') ? [['calendar', N_('Calendar'), 'cal']] : [])];  // 2.49.0 (#1201); 2.156.0 C (#2071): + calendar
 const curView = l => povOn(l) ? 'overview' : listView(l);
 async function povLoad(lid, force) {
   const d = S.povD[lid] || (S.povD[lid] = {});

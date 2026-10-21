@@ -459,7 +459,7 @@ document.addEventListener('click', async e => {
     case 'close-detail': closeDetail(); break;
     case 'collapse': {
       if (e.target.closest('.gact, .shandle') || secHeld) break;
-      const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); an_rowsIn(renderView); break;  // 2.46.1 (#1559): opened rows fade in
+      const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); an_rowsIn(renderView); if (k.startsWith('s:')) scl_push(); break;  // 2.46.1 (#1559): opened rows fade in; 2.156.0 C (#2073): a section's fold on every device
     }
     case 'palette': closeSide(); openPalette(); break;
     case 'new-task': { const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); break; }
@@ -520,7 +520,7 @@ document.addEventListener('click', async e => {
     case 'list-menu': listMenu(a, id); break;
     case 'top-more': menu(a, topMoreItems()); break;
     case 'fview': if (a.classList.contains('on')) break; if (a.dataset.k === 'matrix') { mxSet({scope: 'folder:' + a.dataset.f}); go('matrix'); } else go('folder/' + encodeURIComponent(a.dataset.f)); break;  // 2.4.2 (#390)
-    case 'view-list': case 'view-kanban': case 'view-timeline': case 'view-overview': case 'view-mindmap': {  // 2.49.0 (#1201)
+    case 'view-list': case 'view-kanban': case 'view-timeline': case 'view-overview': case 'view-mindmap': case 'view-calendar': {  // 2.49.0 (#1201); 2.156.0 C (#2071): + calendar
       const l = routeList();
       // phones: only the current view is shown (room for ← / →), a tap on it offers the others
       if (isTouch() && a.classList.contains('on') && a.closest('.vseg')) {

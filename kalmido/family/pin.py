@@ -25,7 +25,8 @@ PIN_TRIES = 5      # wrong PINs in a row, then the lock
 PIN_LOCK = 900     # s: the lock after PIN_TRIES wrong PINs
 PIN_OPEN = 300     # s: how long a correct PIN opens account / settings / log out in this session
 # what a kid's app writes by itself (#1537): never asks for the PIN
-PIN_FREE_SETTINGS = {"tour", "folders_closed", "detail_split", "detail_cm_fold", "fav_suggest"}
+PIN_FREE_SETTINGS = {"tour", "folders_closed", "detail_split", "detail_cm_fold", "fav_suggest",
+                     "sections_closed"}  # 2.156.0 C (#2073): folded sections
 # the routes the PIN guards (a kid's other writes are limited by family.KID_WRITE already)
 PIN_GUARD = re.compile(r"^/api/(auth/.+|me|me/(avatar|2fa/.+|passkeys(/.*)?|sessions/.+))$")  # 2.115.0 B (#2062): + sessions
 

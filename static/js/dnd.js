@@ -69,6 +69,7 @@ async function dropTask0(id, el, clientY) {
   $$('.dragging,.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dragging', 'dropbefore', 'dropafter', 'drop'));
   document.body.classList.remove('tdrag');
   if (el.closest('#detail')) return;
+  if (await mbDropHook(t, el)) return;  // 2.156.0 C (#2072): the board of My tasks (its column = date / priority / list)
   if (await ml_drop(t, {sec, kcol, row, side, cell, wcol, wad, quad, y: clientY})) return;  // 2.71.0 B (#1459): in a further list only the link moves
   if (sec && sec.dataset.newsec) { taskToNewSection(id); return; }  // (sec is false over a row)
   if (sec) { taskToSection(id, sec.dataset.section ? +sec.dataset.section : null); return; }

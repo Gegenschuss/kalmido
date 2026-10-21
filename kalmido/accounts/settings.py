@@ -200,6 +200,22 @@ def clean_setting(k, v):
         if sv not in ("own", "lists"):
             raise bad
         return sv
+    if k == "mine_board":  # 2.156.0 C (#2072): "My tasks" as a board
+        if sv not in ("0", "1"):
+            raise bad
+        return sv
+    if k == "mine_board_by":  # 2.156.0 C (#2072): the board's columns
+        if sv not in ("due", "prio", "list"):
+            raise bad
+        return sv
+    if k == "sections_closed":  # 2.156.0 C (#2073): folded sections (ids; the client drops ids of sections that are gone)
+        try:
+            arr = json.loads(sv or "[]")
+        except ValueError:
+            raise bad from None
+        if not isinstance(arr, list) or len(arr) > 2000 or not all(isinstance(x, int) and not isinstance(x, bool) and 0 < x < 2 ** 53 for x in arr):
+            raise bad
+        return json.dumps(list(dict.fromkeys(arr)))
     if k == "fav_views":  # 2.40.0 (#1361): the views filtered to favourites (route keys of the smart views)
         ks = [x.strip() for x in sv.split(",") if x.strip()]
         if len(ks) > 40 or not all(re.fullmatch(r"[a-z]{2,12}", x) for x in ks):

@@ -52,6 +52,7 @@ ORDER = (
     "lists.grouppics",  # 2.46.0 (#1605)
     "lists.ownership",
     "lists.sections",
+    "lists.sectpl",  # 2.156.0 C (#2073)
     "lists.folders",
     "lists.foldershare",  # 2.41.0 (#1420)
     "lists.listhead",  # 2.83.0 C (#1427)
