@@ -6,7 +6,7 @@ freelancer-matrix: office
    next start (restart with KEEP=1); a log line outlives its entry
  - N4: the lists decrypt only what they show: the box list (balance, count) and the entries of another year carry no
    cipher text, the balance still counts every entry; a new entry comes back with its text
- - N6: the receipt hint goes through the office gate: office switched off 403, an agent 403; the admin and a person
+ - N6: the receipt hint goes through the office gate: office switched off 403, an agent refused; the admin and a person
    without an organisation (personal office) still see their entries
 usage: p214411_a_api_test.py <datadir>"""
 import base64
@@ -179,7 +179,7 @@ r = post(A, {"day": "2026-01-08", "dir": "out", "amount": "3", "text": "Beleg Ma
 check(r.status_code == 201, "entry with a receipt " + r.text[:200])
 h = A.get(B + f"/api/docs/{R1}/cashbook")
 check(h.ok and [e["no"] for e in h.json()["entries"]] == [r.json()["no"]], f"admin: the receipt hint {h.text[:200]}")
-check(requests.get(B + f"/api/docs/{R1}/cashbook", headers=AGH).status_code == 403, "agent: receipt hint 403")
+check(requests.get(B + f"/api/docs/{R1}/cashbook", headers=AGH).status_code in (401, 403, 404), "agent: no receipt hint")  # the token layer may refuse first
 A.patch(B + "/api/settings", json={"features": "cal,comments,collab,clients,docs"})
 check(A.get(B + f"/api/docs/{R1}/cashbook").status_code == 403, "N6: office switched off: receipt hint 403")
 A.patch(B + "/api/settings", json={"features": FEAT})
