@@ -125,6 +125,7 @@ ab = about(Bo)
 # 2.84.0: + the supporter licence fields of 2.74.0 (#338, self-hosted: shown to every person) - still no update info
 SUPF = {"supporter", "support_url", "supporter_me"}
 SUPF |= {"client_errors"}  # 2.102.0 E (#1999): whether the browser reports its errors (a switch, no update info)
+SUPF |= {"support_prices"}  # 2.144.0 D (#2158): the fixed supporter licence prices (public, the same for everyone; no update info)
 check(set(ab) - SUPF == {"version"}, f"non-admin: only the version, no update info: {ab}")
 check(A.get(B + "/api/state").json()["collab_all"] is True, "collab_all on by default")
 
