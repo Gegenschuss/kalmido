@@ -429,15 +429,17 @@ where they are used.
 - **Numbers**: an archived number is never given to a new document (the automatic number skips it, a manual one is
   refused). The import page proposes to continue the invoice / quotation counter after the highest archived number (a
   number that follows today's scheme, else the project number of the file name); the person confirms, the counter is
-  never lowered.
+  never lowered. 2.144.6: raising the invoice counter asks for a reason like the number ranges (GoBD); it goes into the
+  office log.
 - **Undo**: every confirmed import is a run (list with date, person, count). Undoing removes what the run added unless
   something builds on it by now - a client with a list, document, framework contract or archived document of another run
   stays, as does the service the calculation rules name as the producing one; the answer says what stayed. 2.138.0: a
   service used in a document or framework contract and a device in a set are archived instead of staying active
   (documents keep showing them with name and price); the page lists them with the document or set they are in, each with
   **Restore**. A run undone before 2.138 shows **Archive leftover entries** once: it archives what that run left active
-  (only its own services and devices, never the producing service, nothing deleted). Fields a merge filled are emptied
-  again while they still hold the imported value.
+  (only its own services and devices, never the producing service, nothing deleted; 2.144.6: an entry restored by hand
+  stays active). Fields a merge filled are emptied again while they still hold the imported value. 2.144.6: the undo of
+  the services also puts back the order the import renumbered, for every service nobody reordered since.
 
 Routes (organisation admin; members read the archive and, 2.81.0, correct it): `POST /api/office/legacy/preview` (multipart `file`, stores
 nothing; 2.146.0: .xlsx or CSV, the optional form field `map` = `{name, contact, address, street, house, zip, city, country: column index}`,
