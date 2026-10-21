@@ -33,9 +33,9 @@ from ..accounts.session import (
 
 
 # 2.148.1 C (#2494): failed sign-ins in the server log name neither the typed name (it may be a password typed into the
-# wrong field) nor the full address: "user#<8 hex of its SHA-256>" and the address shortened like the alerts (IPv4 /24,
-# IPv6 /48); KALMIDO_LOG_FULL_IP=1 keeps the full address (fail2ban, docs/SELF-HOSTING.md)
-LOG_FULL_IP = os.environ.get("KALMIDO_LOG_FULL_IP", "0") == "1"
+# wrong field): "user#<8 hex of its SHA-256>". The address stays in full by default (fail2ban bans by it);
+# KALMIDO_LOG_FULL_IP=0 shortens it like the alerts (IPv4 /24, IPv6 /48), docs/SELF-HOSTING.md
+LOG_FULL_IP = os.environ.get("KALMIDO_LOG_FULL_IP", "1") != "0"
 
 
 def login_log_name(name):
