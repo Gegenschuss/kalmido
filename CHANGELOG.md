@@ -5,6 +5,71 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.161.0] - 2026-10-21
+
+Bundle of the packages 2.152.0 (deletion rules and legal retention), 2.153.0 (correspondence, job chat, document fields, receipt list), 2.154.0 (documents: stack scans, task links, Peppol, privacy sheets), 2.155.0 (calendar: answers, rules, absences, availability, year), 2.156.0 (lists and views), 2.157.0 (project agents, job chat) and 2.161.0 (small interface fixes).
+
+### Added
+- Office: new area *Correspondence* - letters to authorities, insurers and others after DIN 5008 with letterhead, signature (optional signature picture), channel, status and tracking number; recipients from clients or the address book; the PDF is filed with the client. Letters and filed documents link both ways (*Answer to*, *Write answer*), the thread per contact and topic shows the history, a deadline in an incoming letter becomes a task, a follow-up date creates a task when no answer comes (#2028).
+- Correspondence: send a letter by e-mail with its PDF; the answer arrives through the documents address and is linked to the letter automatically (#2029). Text blocks per office (also without an organisation) are inserted at the cursor (#2030).
+- Agents: *Let an agent draft the answer* at a document (only agents the document is shared with); event `letter_draft_requested`, API v1 and MCP `create_letter_draft` create drafts only - a person checks, signs and sends (#2031).
+- *Write answer* also takes the address from an address-book contact when the sender is no client; a company card wins over single persons of the company (#2229).
+- Documents: custom fields per workspace (text, number, amount, date, checkbox, choice, link), nothing preset; organisation admins define them, in the private space the person; values are encrypted like the text, searchable, move along between workspaces; the Paperless import takes custom fields as real fields; agents read and fill existing fields (#2179).
+- Agents: every job has its own chat - start line, progress lines and messages of the job; *Open job chat* under each job card; questions show under the card; messages typed there carry the job (#1962).
+- Bookkeeping: *All receipts* across all months with filters (period, paid / open, receipt or payment date, category, supplier, project, without VAT rate, search) and totals; export exactly the filtered receipts as CSV or as ZIP with the original files for the tax advisor, behind the country pack switch of the export (#2055).
+- Incoming e-invoices in an office's documents become a receipt on the first read (own invoices not, credit notes negative) (#2055).
+- Documents: a stack scan with several archive numbers (or separator sheets) is marked *Stack - split?* and splits into single documents after a preview with movable cuts; blank back pages can be left out; one undo step brings the stack back. A separator sheet to print is in the documents' settings (#1111).
+- Documents: a document can be linked with an existing task (and unlinked); the task shows *Document: <name>* to everyone who may see the document (#1111).
+- Office: the receipt sheet shows the open suggestions of agents (accept / reject, with undo) and "Suggested by …, confirmed by …" (#1356).
+- Office: e-invoices over the Peppol network through your own Peppol access point provider account (set up in the office settings, off by default): Peppol ID for the office and clients with format and check digit test and a suggestion from the VAT ID, receiver check, status sent / delivered / rejected, protection against double sending; UBL download (Peppol BIS Billing 3.0, XRechnung UBL), checked in CI with KoSIT and the OpenPeppol rules (#1960).
+- Office: data protection sheets for a client - data processing agreement, privacy information and consent as samples (sample text, no legal advice); a PDF in the client's folder, sent by mail with a link to sign, signed back by the link, by upload or by a reply mail with a tag in the subject (a person confirms); status per sheet and a data protection filter in the client list (#2192).
+- Office: when a calculation part is added, the industry pack can be chosen (only switched-on packs; with one pack nothing changes); existing parts keep theirs (#1876).
+- Calendar on the phone: invitations in the calendar *Invitations* can be accepted, answered with *Maybe* or declined in the phone's calendar app (CalDAV); only your own answer is taken, deleting an invitation there declines it (#2074).
+- Calendar on the phone: a calendar created in the phone's calendar app becomes a Kalmido calendar with its name and colour (MKCALENDAR) (#2079).
+- Events: *Own …* in *Repeat* opens a small rule dialog - every N days / weeks / months / years, weekdays to tap, *on the 15th* or *on the 2nd Tuesday* / *the last Friday* (#2075).
+- Calendar: a year view with twelve small months; days with events or due tasks are tinted, a tap opens the day, a month name the month (#2078).
+- Calendar: public holidays (German state or Austria, chosen per person or by the organisation) and your absences show in all views; the team's absences on request, as "away" only; switches in *Calendars*. Absences and holidays as a subscription link for the phone (#2076).
+- Events: while inviting, a free / busy bar for you and every invited person of your organisation - busy and away times only, never titles (#2077).
+- Mind map: *Add ideas…* (key `I`) asks an agent the list is shared with for sub-branches; they appear as faint branches you take over one by one or all at once, or drop. The agent only gets the list name and the branch path; Kalmido itself calls no language model (#1201).
+- Mind map: *Show properties* (key `E`) puts priority, due date, person, repeat, subtask progress, tags and list fields under each branch - the same choice as the task row; off, the selected branch still shows them; the export takes the current state along (#1948).
+- List fields: new kinds multiple choice, currency, rating (stars) and a link to another task; only people who may see the linked task see its title (#2069).
+- Formula fields use the functions of the sheets: `IF`/`WENN`, `SUM`/`SUMME`, `ROUND`/`RUNDEN`, `MIN`, `MAX`, `AVERAGE`, `COUNT` and comparisons; a failed calculation (division by 0) shows a short text in the field (#2070).
+- Lists have a calendar view: month, week, day and agenda with only the list's tasks; dragging onto a day sets the date, a new entry on a day lands in the list (#2071).
+- *My tasks* as a board: columns by due date, priority or list; dragging changes exactly that; the choice is the same on every device (#2072).
+- Section templates: save the sections of a list (private or for the organisation) and add the missing ones to another list; nothing is deleted (#2073).
+- Sidebar views: a view remembers which groups are open and which entries are visible, optionally a start page; each view is a tile above the favourites, hidden entries wait under *Others (N)*, a second tap on the active tile goes back to *Everything*; views and the active view are per person and the same on every device (#2186).
+- Trash periods for the file store, hub mails, tables, pipeline deals, invoice series, chat and comments (`KALMIDO_TRASH_DAYS`, 30 days); every run only counts until the retention switch is on; *Admin > Retention* shows the numbers (#2165).
+- Logbook: months close after 7 days or by hand; a closed drive is corrected with a reason, the change log is visible in the dialog and the exports (#2169).
+- Newsletter: unsubscriptions and bounces survive deleting or merging a contact (suppression list as a hash), with a consent log (#2170).
+- Agent chat: delete one of your messages or the whole history with an agent for good (#2175).
+
+### Changed
+- Correspondence is for office admins (and the person in the private office); the accounting role does not see letters.
+- Moving a private office into an organisation keeps an existing letter signature there and unlinks letters from private documents (named in the preview).
+- Writing into a job's chat needs the right to stop that job, like the job's message button.
+- Office: duplicating an invoice made from times asks first and the copy says "Copy of …: the hours of that invoice are already billed" while it is a draft (#2567).
+- Tasks and the mind map have up to five levels instead of three; on phones each level indents less; imports flatten anything deeper into level five (#1949).
+- Folded sections stay folded on all your devices (#2073).
+- Admin > Organisation > *Edit organisation*: an admin of the organisation uploads or removes the organisation's own picture right next to the symbol (as in Settings > Workspaces); the emoji stays the fallback without a picture. Server admins who do not administer the organisation see a hint instead (#2594).
+- Deleting an organisation shows what goes with it. Self-hosting: an organisation or personal office with records the law keeps is retired (read only, export by the instance admins, deleted after the period). Hosted instance: nothing is kept for others - retention export or waiver, then it is deleted (#2167, #2164).
+- Office: booked receipts, DATEV / billed travel receipts and edited archive imports cannot be deleted; payments of finalised invoices are reversed instead of deleted; a client in use is archived (#2168).
+- Clean-up of old logs, sessions, expired tokens, invitations and setup codes (`KALMIDO_LOG_DAYS`) (#2171).
+- Backups: safety backups have an age limit, weekly backups at most 52, daily rotation, a journal of deleted accounts that a restore applies again; list headers, table files, team chat files and bookmark pictures are in the backup (#2172).
+- Files: failed deletions are retried, an orphan sweep, at most 20 file versions, import undo removes its files (#2173).
+- Foreign keys for task, list and person references; orphans are cleaned at the start (#2174).
+
+### Fixed
+- Agent setup on a Mac over SSH (nobody logged in at the screen): the agent now starts in the background right away and at the next screen login, instead of the setup stopping with "launchctl could not load" (#1517).
+- Agent setup: when a setup stops half-way, the autostart file it wrote is removed too, so launchd / systemd no longer try to start a deleted folder (#1517).
+- Agent starter: when the launcher is killed hard, its event runner ends as well, so the restarted launcher takes over and an uninstall leaves nothing running (#1517).
+- Agent starter: after *Remove computer* (or deleting the agent) the launcher stops the agent with one log line and waits quietly, instead of logging "Kalmido not reachable" every minute and restarting again and again; Mac/Linux and Windows (#1517).
+
+### Security
+- Security fix: deletion of accounts and organisations (personal office, files, agents, direct messages) (#2164, #2167).
+
+### Note
+- A rollback to 2.147.1 is not recommended: it knows neither logbook corrections nor payment reversals (corrected drives would count twice, the original of a reversed payment could be deleted again).
+
 ## [2.151.0] - 2026-10-21
 
 Bundle of the packages 2.148.0 (DATEV Unternehmen online replaced: locked periods, receipt images with the DATEV batch, export for the tax auditor, procedure documentation, DATEV import), 2.148.1 (security release: findings of the follow-up audit), 2.149.0 (clean-up: architecture and maintainability) and 2.151.0 (a task knows its build state).
@@ -104,87 +169,6 @@ Bundle of the packages 2.144.5 to 2.144.11 and 2.147.2 (leftovers, office fixes:
 
 ### Security
 - Recovery key of accounts without a password (single sign-on): showing or renewing it needs a real new sign-in at the provider (prompt=login, max_age=0, a fresh auth_time from the ID token), bound to the organisation and the purpose; a link alone triggers nothing. The key-rotation test switch only works in test mode, a refused shortcut download says why, the settings hint at the incomplete search during a key rotation (#2387).
-
-## [2.153.0] - 2026-10-21
-
-Correspondence in the office (letters, e-mail, text blocks, agent drafts), custom fields for documents, an own chat per job and a filtered receipts list with an export for the tax advisor.
-
-### Added
-- Office: new area *Correspondence* - letters to authorities, insurers and others after DIN 5008 with letterhead, signature (optional signature picture), channel, status and tracking number; recipients from clients or the address book; the PDF is filed with the client. Letters and filed documents link both ways (*Answer to*, *Write answer*), the thread per contact and topic shows the history, a deadline in an incoming letter becomes a task, a follow-up date creates a task when no answer comes (#2028).
-- Correspondence: send a letter by e-mail with its PDF; the answer arrives through the documents address and is linked to the letter automatically (#2029). Text blocks per office (also without an organisation) are inserted at the cursor (#2030).
-- Agents: *Let an agent draft the answer* at a document (only agents the document is shared with); event `letter_draft_requested`, API v1 and MCP `create_letter_draft` create drafts only - a person checks, signs and sends (#2031).
-- *Write answer* also takes the address from an address-book contact when the sender is no client; a company card wins over single persons of the company (#2229).
-- Documents: custom fields per workspace (text, number, amount, date, checkbox, choice, link), nothing preset; organisation admins define them, in the private space the person; values are encrypted like the text, searchable, move along between workspaces; the Paperless import takes custom fields as real fields; agents read and fill existing fields (#2179).
-- Agents: every job has its own chat - start line, progress lines and messages of the job; *Open job chat* under each job card; questions show under the card; messages typed there carry the job (#1962).
-- Bookkeeping: *All receipts* across all months with filters (period, paid / open, receipt or payment date, category, supplier, project, without VAT rate, search) and totals; export exactly the filtered receipts as CSV or as ZIP with the original files for the tax advisor, behind the country pack switch of the export (#2055).
-- Incoming e-invoices in an office's documents become a receipt on the first read (own invoices not, credit notes negative) (#2055).
-
-### Changed
-- Correspondence is for office admins (and the person in the private office); the accounting role does not see letters.
-- Moving a private office into an organisation keeps an existing letter signature there and unlinks letters from private documents (named in the preview).
-- Writing into a job's chat needs the right to stop that job, like the job's message button.
-
-## [2.154.0] - 2026-10-21
-
-Office and documents: stack scans split into documents, documents linked with tasks, agents' receipt suggestions in the office, e-invoices over the Peppol network, data protection sheets for clients, an industry pack per calculation part.
-
-### Added
-- Documents: a stack scan with several archive numbers (or separator sheets) is marked *Stack - split?* and splits into single documents after a preview with movable cuts; blank back pages can be left out; one undo step brings the stack back. A separator sheet to print is in the documents' settings (#1111).
-- Documents: a document can be linked with an existing task (and unlinked); the task shows *Document: <name>* to everyone who may see the document (#1111).
-- Office: the receipt sheet shows the open suggestions of agents (accept / reject, with undo) and "Suggested by …, confirmed by …" (#1356).
-- Office: e-invoices over the Peppol network through your own Peppol access point provider account (set up in the office settings, off by default): Peppol ID for the office and clients with format and check digit test and a suggestion from the VAT ID, receiver check, status sent / delivered / rejected, protection against double sending; UBL download (Peppol BIS Billing 3.0, XRechnung UBL), checked in CI with KoSIT and the OpenPeppol rules (#1960).
-- Office: data protection sheets for a client - data processing agreement, privacy information and consent as samples (sample text, no legal advice); a PDF in the client's folder, sent by mail with a link to sign, signed back by the link, by upload or by a reply mail with a tag in the subject (a person confirms); status per sheet and a data protection filter in the client list (#2192).
-- Office: when a calculation part is added, the industry pack can be chosen (only switched-on packs; with one pack nothing changes); existing parts keep theirs (#1876).
-
-### Changed
-- Office: duplicating an invoice made from times asks first and the copy says "Copy of …: the hours of that invoice are already billed" while it is a draft (#2567).
-
-## [2.155.0] - 2026-10-21
-
-Calendar: answer invitations from the phone, own repeat rules, holidays and absences, colleagues' availability, a year view.
-
-### Added
-- Calendar on the phone: invitations in the calendar *Invitations* can be accepted, answered with *Maybe* or declined in the phone's calendar app (CalDAV); only your own answer is taken, deleting an invitation there declines it (#2074).
-- Calendar on the phone: a calendar created in the phone's calendar app becomes a Kalmido calendar with its name and colour (MKCALENDAR) (#2079).
-- Events: *Own …* in *Repeat* opens a small rule dialog - every N days / weeks / months / years, weekdays to tap, *on the 15th* or *on the 2nd Tuesday* / *the last Friday* (#2075).
-- Calendar: a year view with twelve small months; days with events or due tasks are tinted, a tap opens the day, a month name the month (#2078).
-- Calendar: public holidays (German state or Austria, chosen per person or by the organisation) and your absences show in all views; the team's absences on request, as "away" only; switches in *Calendars*. Absences and holidays as a subscription link for the phone (#2076).
-- Events: while inviting, a free / busy bar for you and every invited person of your organisation - busy and away times only, never titles (#2077).
-
-## [2.156.0] - 2026-10-21
-
-Lists and views: tasks and the mind map go five levels deep, the mind map shows task properties on demand and can ask a connected agent for ideas, new field kinds and formulas with functions, a calendar view per list, *My tasks* as a board, folded sections on every device and section templates, saved sidebar views.
-
-### Added
-- Mind map: *Add ideas…* (key `I`) asks an agent the list is shared with for sub-branches; they appear as faint branches you take over one by one or all at once, or drop. The agent only gets the list name and the branch path; Kalmido itself calls no language model (#1201).
-- Mind map: *Show properties* (key `E`) puts priority, due date, person, repeat, subtask progress, tags and list fields under each branch - the same choice as the task row; off, the selected branch still shows them; the export takes the current state along (#1948).
-- List fields: new kinds multiple choice, currency, rating (stars) and a link to another task; only people who may see the linked task see its title (#2069).
-- Formula fields use the functions of the sheets: `IF`/`WENN`, `SUM`/`SUMME`, `ROUND`/`RUNDEN`, `MIN`, `MAX`, `AVERAGE`, `COUNT` and comparisons; a failed calculation (division by 0) shows a short text in the field (#2070).
-- Lists have a calendar view: month, week, day and agenda with only the list's tasks; dragging onto a day sets the date, a new entry on a day lands in the list (#2071).
-- *My tasks* as a board: columns by due date, priority or list; dragging changes exactly that; the choice is the same on every device (#2072).
-- Section templates: save the sections of a list (private or for the organisation) and add the missing ones to another list; nothing is deleted (#2073).
-- Sidebar views: a view remembers which groups are open and which entries are visible, optionally a start page; each view is a tile above the favourites, hidden entries wait under *Others (N)*, a second tap on the active tile goes back to *Everything*; views and the active view are per person and the same on every device (#2186).
-
-### Changed
-- Tasks and the mind map have up to five levels instead of three; on phones each level indents less; imports flatten anything deeper into level five (#1949).
-- Folded sections stay folded on all your devices (#2073).
-
-## [2.157.0] - 2026-10-21
-
-Setting up a project agent with one command, tried end to end on a Mac: four fixes for SSH setups, crashes and removed computers.
-
-### Fixed
-- Agent setup on a Mac over SSH (nobody logged in at the screen): the agent now starts in the background right away and at the next screen login, instead of the setup stopping with "launchctl could not load" (#1517).
-- Agent setup: when a setup stops half-way, the autostart file it wrote is removed too, so launchd / systemd no longer try to start a deleted folder (#1517).
-- Agent starter: when the launcher is killed hard, its event runner ends as well, so the restarted launcher takes over and an uninstall leaves nothing running (#1517).
-- Agent starter: after *Remove computer* (or deleting the agent) the launcher stops the agent with one log line and waits quietly, instead of logging "Kalmido not reachable" every minute and restarting again and again; Mac/Linux and Windows (#1517).
-
-## [2.161.0] - 2026-10-21
-
-An organisation's own picture can also be set in the admin dialog.
-
-### Changed
-- Admin > Organisation > *Edit organisation*: an admin of the organisation uploads or removes the organisation's own picture right next to the symbol (as in Settings > Workspaces); the emoji stays the fallback without a picture. Server admins who do not administer the organisation see a hint instead (#2594).
 
 ## [2.147.1] - 2026-10-21
 

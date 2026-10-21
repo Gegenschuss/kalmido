@@ -20,6 +20,27 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.161.0** (2026-10-21): the **organisation's own picture** can also be uploaded and removed in the admin dialog
+  *Edit organisation*, not only in Settings > Workspaces.
+- **2.157.0** (2026-10-21): **agent setup with one command, tried on a real Mac**: setup over SSH works without a screen
+  login, a half-done setup leaves no autostart behind, a hard-killed launcher leaves no runner behind, and after
+  *Remove computer* the agent stops quietly. Details: [docs/AGENTS.md](docs/AGENTS.md#set-up-on-a-computer-with-one-command-2440).
+- **2.156.0** (2026-10-21): tasks and the mind map go **five levels** deep; the mind map shows **task properties on
+  demand** and can ask a connected agent to **add ideas** you take over or drop; list fields get **multiple choice,
+  currency, rating and task links**, formulas get **IF, SUM, ROUND** and more; a **calendar view per list**, **My tasks as
+  a board**, folded sections on every device and **section templates**; **sidebar views** as tiles, the same on every device.
+- **2.154.0** (2026-10-21): **stack scans split into documents** by archive numbers or separator sheets (preview with cuts,
+  blank pages left out, undo), documents **linked with tasks**; **e-invoices over the Peppol network** through your own
+  access point provider account (UBL, Peppol ID, status); **data protection sheets** for clients (DPA, privacy
+  information, consent) with mail, signing link and status; agents' receipt suggestions in the office; an industry pack
+  per calculation part; a hint when duplicating an invoice made from times.
+- **2.153.0** (2026-10-21): **correspondence** in the office - letters after DIN 5008 with signature, sent by post or
+  e-mail with the answer linked automatically, text blocks, deadlines and follow-ups as tasks, answer drafts by agents;
+  **custom fields for documents** (also from Paperless); an **own chat per job**; **all receipts** with filters and an
+  export of the filtered receipts for the tax advisor; incoming e-invoices become receipts.
+- **2.152.0** (2026-10-21): **deletion rules and legal retention** - every trash has a period, deleted accounts and
+  organisations really go (files included), office records the law keeps stay locked (a personal office with such
+  records is retired, not deleted), and the logbook can be closed; deletion runs only count until the operator switches them on.
 - **2.151.0** (2026-10-21): **a task knows its build state** - in a list with a repository the task shows *In version
   2.150.0*, *In main, not released yet* or *Built, not in main yet* with the branch, straight from the repository; a
   **hint when a task is still open although its package / version is already released**, also in the task row; agents
@@ -36,24 +57,6 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   from time" binds the open hours as billed so they never land on two invoices, a deleted draft or a cancelled invoice
   frees them; the legacy import asks for a reason when raising the invoice counter and its undo restores the order of
   the services; asking for an approval no longer fires "assigned" rules; one "transfer into an organisation" section.
-- **2.153.0** (2026-10-21): **correspondence** in the office - letters after DIN 5008 with signature, sent by post or
-  e-mail with the answer linked automatically, text blocks, deadlines and follow-ups as tasks, answer drafts by agents;
-  **custom fields for documents** (also from Paperless); an **own chat per job**; **all receipts** with filters and an
-  export of the filtered receipts for the tax advisor; incoming e-invoices become receipts.
-- **2.154.0** (2026-10-21): **stack scans split into documents** by archive numbers or separator sheets (preview with cuts,
-  blank pages left out, undo), documents **linked with tasks**; **e-invoices over the Peppol network** through your own
-  access point provider account (UBL, Peppol ID, status); **data protection sheets** for clients (DPA, privacy
-  information, consent) with mail, signing link and status; agents' receipt suggestions in the office; an industry pack
-  per calculation part; a hint when duplicating an invoice made from times.
-- **2.156.0** (2026-10-21): tasks and the mind map go **five levels** deep; the mind map shows **task properties on
-  demand** and can ask a connected agent to **add ideas** you take over or drop; list fields get **multiple choice,
-  currency, rating and task links**, formulas get **IF, SUM, ROUND** and more; a **calendar view per list**, **My tasks as
-  a board**, folded sections on every device and **section templates**; **sidebar views** as tiles, the same on every device.
-- **2.157.0** (2026-10-21): **agent setup with one command, tried on a real Mac**: setup over SSH works without a screen
-  login, a half-done setup leaves no autostart behind, a hard-killed launcher leaves no runner behind, and after
-  *Remove computer* the agent stops quietly. Details: [docs/AGENTS.md](docs/AGENTS.md#set-up-on-a-computer-with-one-command-2440).
-- **2.161.0** (2026-10-21): the **organisation's own picture** can also be uploaded and removed in the admin dialog
-  *Edit organisation*, not only in Settings > Workspaces.
 - **2.147.1** (2026-10-21): **drag tasks into the chats** (team chat, thread, agent chat) as references, several at once, with
   *Insert reference* on phones; **overdue invoices suggest a payment reminder** as a draft (nothing is sent) and
   invoices / reminders in EUR carry a **GiroCode** for banking apps; moving many documents to another workspace shows
