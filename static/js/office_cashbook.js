@@ -164,7 +164,7 @@ async function cbEntryModal(e) {
     } catch (x) { const el = cb$('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
 }
-const CB_ACT = {create: N_('Created'), change: N_('Changed'), cancel: N_('Cancelled'), close: N_('Day closed'), book_create: N_('Cash box created'), book_change: N_('Cash box changed')};
+const CB_ACT = {create: N_('Created'), change: N_('Changed'), cancel: N_('Cancelled'), close: N_('Day closed'), book_create: N_('Cash box created'), book_change: N_('Cash box changed'), delete: N_('Deleted')};  // 2.162.0 A (#2603): test phase, with a deleted invoice
 const CB_FLD = {day: N_('Date'), dir: N_('Kind'), amount: N_('Amount'), vat_pct: N_('VAT rate'), text: N_('Text'), category: N_('Category'), node_id: N_('Receipt'), invoice_id: N_('Invoice')};
 function cbPrev(p) {
   return Object.entries(p || {}).filter(([k]) => CB_FLD[k]).map(([k, v]) => {

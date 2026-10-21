@@ -1713,6 +1713,9 @@ fresh; run p2149_e_api "$PY" p2149_e_api_test.py "$KALMIDO_TEST_DATA"
 # 2.149.0 part F: module start files loaded lazily, guarded lazy calls, missing CSS variables (#2518 #2519)
 fresh; run p2149_f_ui node p2149_f_ui.js "$KALMIDO_TEST_DATA"
 _group_end
+# 2.162.0 part A (#2603): test phase - an admin deletes a finalised / sent invoice (typed number, cash book on request)
+fresh; run p2162_a_api "$PY" p2162_a_invoice_delete_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2162_a_ui node p2162_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

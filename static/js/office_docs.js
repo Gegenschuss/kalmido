@@ -509,11 +509,48 @@ function ofdMoreItems(d, inList) {
       d.kind === 'invoice' && d.status === 'cancelled' && d.time_billed?.entries && ofcAdmin() ? {label: tr('Release the time again'), icon: 'clock', fn: () => tbill_release(d)} : null,  // 2.144.6 A (#2053)
       d.can_delete ? '-' : null,
       d.can_delete ? {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
+        if (d.delete_confirm && !d.trial) { await ofdInvDelete(d, gone); return; }  // 2.162.0 A (#2603): test phase, a finalised / sent invoice
         if (d.trial) { if (!await askConfirm(tr('Delete trial document?'), tr('{0} is a trial document and disappears for good.', d.number || ofdKindName(d.kind, true)), {ok: tr('Delete'), danger: true})) return; }  // 2.144.10 C (#2576)
         else if (!await askConfirm(tr('Delete {0}?', d.number || ofdKindName(d.kind, true)), (d.locked ? tr('Its number stays used and shows as a gap in the office log.') : tr('Its number stays used.')) + (d.delete_sent ? ' ' + tr('The quotation was sent; it disappears anyway.') : ''), {ok: tr('Delete'), danger: true})) return;  // 2.114.2 A (#2263); 2.144.8 (#2573): test phase, a sent one too
         try { await api('DELETE', `/api/office/docs/${d.id}`); gone(); toast(tr('Deleted')); } catch (x) { toast(x.message || tr('unknown')); }
       }} : null];
   return inList ? [{label: tr('Open'), icon: 'edit', fn: () => go(`office/offers/${d.id}`)}, ...items] : items;
+}
+// 2.162.0 A (#2603): test phase - deleting a finalised / sent invoice: the number is typed (Delete stays off until it matches),
+// the hint names what goes with it (the server sends delete_info); cash book entries only after a second question
+async function ofdInvDelete(d, gone) {
+  let info;  // 2.162.0 A (#2603 review): the hint is loaded for the dialog only (fresh, not with every document view)
+  try { const j = await api('GET', `/api/office/docs/${d.id}?delete_info=1`); if (!j.can_delete) { toast(j.delete_block || tr('unknown')); return; } info = j.delete_info; }
+  catch (x) { toast(x.message || tr('unknown')); return; }
+  if (!info) return;
+  const num = String(info.number || d.number || '');
+  const lines = [tr('The number {0} stays used and shows as a gap in the office log.', num)];
+  if (info.sent) lines.push(tr('The invoice was sent to the client.'));
+  if (info.einvoice) lines.push(tr('It went out as an e-invoice.'));
+  if (info.export) lines.push(tr('It is already in an accounting export (DATEV / CSV); correct it there as well.'));
+  if (info.credits?.length) lines.push(tr('The cancellation invoice goes with it: {0}', info.credits.filter(Boolean).join(', ') || '-'));
+  if (info.reminders?.length) lines.push(tr('Its reminders go with it: {0}', info.reminders.filter(Boolean).join(', ') || '-'));
+  if (info.payments || info.bank) lines.push(tr('Its payments go with it; matched bank bookings are open again.'));
+  if (info.time) lines.push(tr('The billed time entries are open again.'));
+  if (info.cash_closed) lines.push(tr('Cash book entries on a closed day stay.'));
+  const val = await askDialog({title: tr('Delete invoice {0}?', num), danger: true, ok: tr('Delete'),
+    html: lines.map(x => `<p>${esc(x)}</p>`).join('') + `<p><b>${esc(tr('Type the number to confirm.'))}</b></p>`,
+    input: {placeholder: num, max: 120},
+    after: md => { const inp = $('#cdlg-in', md), btn = $('[data-cd="yes"]', md); const upd = () => { btn.disabled = inp.value.trim() !== num; }; inp.addEventListener('input', upd); upd(); }});
+  if (val == null || String(val).trim() !== num) return;
+  let cash = '';
+  for (;;) {
+    try {
+      const j = await rawFetch('DELETE', `/api/office/docs/${d.id}?confirm_number=${encodeURIComponent(num)}${cash ? `&cash=${cash}` : ''}`);
+      gone(); toast(j.cash_kept ? tr('Deleted; cash book entries on a closed day stay') : tr('Deleted')); return;
+    } catch (x) {
+      if (x.data?.code === 'cash' && !cash) {
+        cash = await askConfirm(tr('Delete the cash book entries ({0}) too?', x.data.cash), tr('No: they stay in the cash book without the invoice.'), {ok: tr('Delete'), cancel: tr('No'), danger: true}) ? '1' : '0';
+        continue;
+      }
+      toast(x.message || tr('unknown')); return;
+    }
+  }
 }
 // 2.87.9 (#1920): right click / long press on a row opens the same menu as the dots button
 function ofdRowMenu(id, anchor) {
