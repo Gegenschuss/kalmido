@@ -261,7 +261,7 @@ OM = (r.json().get("mail") or {}).get("id") if r.status_code == 201 else None
 row = dbx("SELECT eml_id, folder_id FROM hub_mails WHERE id=?", (OM,)) if OM else []
 OEML = row[0][0] if row else None
 check(OEML and dbx("SELECT hub_mail_id FROM fs_nodes WHERE id=?", (OEML,))[0][0] == OM, f"the sent mail's .eml is marked {row}")
-check(OEML and A.get(B + f"/api/files/nodes/{OEML}").status_code == 404, "an org admin without the project: the sent .eml 404")
+check(OEML and Bo.get(B + f"/api/files/nodes/{OEML}").status_code == 404, "a member without the project: the sent .eml 404")
 check(OEML and Ca.get(B + f"/api/files/nodes/{OEML}").ok, "the sender reads it")
 
 # ================================================================== #2489 assistant: own lists only
