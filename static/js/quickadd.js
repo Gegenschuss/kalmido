@@ -18,6 +18,18 @@ const ttChip = t => { const x = TTYPES.find(y => y[0] === t.ttype); return x ? `
 const isMs = t => !!t?.ms;
 const msOfList = lid => [...S.tasks.values()].filter(x => x.ms && x.list_id === lid && !x.deleted_at).sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || a.id - b.id);
 const msGlyph = t => isMs(t) ? `<i class="msd" aria-hidden="true"></i><span class="sr">${esc(tr('Milestone'))}: </span>` : '';
+// 2.149.0 F (#2518): from envs.js (loaded on demand): where a milestone runs, for the task rows and the task panel
+const env_day = iso => { const d = new Date(iso); return isNaN(d) ? '' : fmtDateLoc(ds(d)); };
+const env_text = e => tr('{0} since {1}', e.name, env_day(e.since));
+const env_ms = (lid, mid) => (listById(lid)?.milestones || []).find(m => m.id === mid);
+function env_taskNote(t) {  // under "Belongs to" in a task's panel: where its milestone runs
+  const es = t.milestone_id ? env_ms(t.list_id, t.milestone_id)?.envs : null;
+  return es?.length ? `<div class="muted envnote">${esc(es.map(env_text).join(' · '))}</div>` : '';
+}
+function env_chipText(t) {  // the milestone chip of a task row
+  const es = t.milestone_id ? env_ms(t.list_id, t.milestone_id)?.envs : null;
+  return es?.length ? ' · ' + es.map(env_text).join(', ') : '';
+}
 function msChip(t) {  // the milestone a task belongs to, small (hidden on phones: rows stay calm)
   const m = t.milestone_id && S.tasks.get(t.milestone_id);
   if (m?.deleted_at) return '';  // 2.18.0: a milestone in the trash keeps its link (back on restore) but shows nowhere

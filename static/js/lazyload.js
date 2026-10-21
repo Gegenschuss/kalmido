@@ -7,7 +7,8 @@
 
 // module -> its files in static/js/, in load order (the same files as LAZY in sw.js)
 const LD_MODS = {
-  settings: ['acctset', 'sesview', 'oinvview', 'settings'],  // 2.65.0 (#1823): acctset.js = the settings sections of account.js; 2.115.0 B (#2062): sessions, organisation invitations
+  settings: ['acctset', 'sesview', 'oinvview', 'servers', 'settings'],  // 2.149.0 F (#2518): servers.js (Settings > Account > other servers)
+   // 2.65.0 (#1823): acctset.js = the settings sections of account.js; 2.115.0 B (#2062): sessions, organisation invitations
   contacts: ['contacts', 'newsletter'],  // 2.65.0 (#1823): newsletter.js
   office: ['office', 'office_docs', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow', 'office_doctpl', 'office_logbook', 'office_cashbook',  // 2.93.0 (#1927, #1928); 2.121.0 B (#2095): office_cashbook
     'office_pipeline', 'office_kpi', 'office_datev', 'officeagents', 'office_packs',
@@ -25,7 +26,8 @@ const LD_MODS = {
   stats: ['stats'],
   calendar: ['calview', 'caldrag', 'apptbook'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings
   docs: ['docs', 'paperless', 'receipts'],
-  life: ['life', 'devlink'],  // 2.140.0 B (#2136): devlink.js = a device <-> office equipment
+  life: ['life', 'devlink', 'budget'],  // 2.149.0 F (#2518): budget.js (its view and dialogs used life.js already)
+   // 2.140.0 B (#2136): devlink.js = a device <-> office equipment
   integrations: ['integrations'],
   playbook: ['playbook'],
   timeline: ['timeline', 'roadmap'],
@@ -43,7 +45,14 @@ const LD_MODS = {
   formq: ['formq'],  // 2.102.0 C (#2208): questionnaires (#1954), with the forms dialog of a list
   ofundo: ['office_undo'],  // 2.111.0 A (#2233): undo of the office editors, clients and tables (office, sheets and the client dialog load it)
   voice: ['voice'],  // 2.139.0 B (#2128): voice messages of the team chat (the composer's microphone, the audio player)
-  hubmailbox: ['hubmailbox'],  // 2.141.0 A (#2141, #2138): the mailbox of a workspace + writing from the e-mail filing (hubmail.js draws its buttons)
+  hubmailbox: ['hubmailbox'],
+  listprint: ['listprint'],
+  evinvite: ['evinvite'],
+  projtime: ['projtime'],
+  envs: ['envs'],
+  dayplan: ['dpmodal'],
+  gitrepo: ['gitrepo'],  // 2.149.0 F (#2518): the repository editor of the list dialog / the folder settings (git.js keeps the rest)  // 2.149.0 F (#2518): the dialog of "Plan my day" (Today's cards stay in dayplan.js)  // 2.149.0 F (#2518): the environments of a project (its page, a milestone's panel); the texts of the rows stay in quickadd.js  // 2.149.0 F (#2518): the tracked time of a project / folder (a click on its "Tracked" figure)  // 2.149.0 F (#2518): invitations by e-mail of an event (the event editor loads it with its people)  // 2.149.0 F (#2518): the print view of a list (its menu's "Print"); the CSV export stays below
+   // 2.141.0 A (#2141, #2138): the mailbox of a workspace + writing from the e-mail filing (hubmail.js draws its buttons)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
@@ -64,7 +73,8 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   polls: ['tpo_list', 'tpo_edit', 'tpo_forClient'], formq: ['fq_clientLink'],  // 2.102.0 C (#2208)
   abscan: ['abm_scanOpen'],  // 2.112.1 (#2058)
   hookin: ['whiMount'],  // 2.115.0 (#2061)
-  hubmailbox: ['hmb_dialog', 'hmb_compose']};  // 2.141.0 A (#2141, #2138)
+  hubmailbox: ['hmb_dialog', 'hmb_compose'],  // 2.141.0 A (#2141, #2138)
+  listprint: ['lexPrint'], evinvite: ['evf_modal'], projtime: ['tz_open'], dayplan: ['dayplanModal'], gitrepo: ['repoWire', 'folderRepoModal']};  // 2.149.0 F (#2518)
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)
 const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 'chatTypers', 'chatStHtml'], timeline: ['tlKbSync', 'tlAfterRender', 'rmAfterRender']};
 // drawing functions: the stand-in draws "Loading…" (views) or nothing (parts of another view), loads, and redraws the view
@@ -77,7 +87,7 @@ const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_ti
   // 2.65.0 (#1823)
   chatViewHtml: ['agentchat', 1], jobStepsHtml: ['agentchat'], aiuCardHtml: ['agentchat'], aiuNewsText: ['agentchat'], chatInner: ['agentchat'],
   chatMsgs: ['agentchat'], chatWinBtns: ['agentchat'], viewWiki: ['wiki', 1], viewMindmap: ['mindmap', 1],
-  mm_blockHtml: ['mindmap'], viewStats: ['stats', 1], viewCal: ['calendar', 1], viewDocs: ['docs', 1], viewLife: ['life', 1], viewReview: ['life', 1], pbNewsText: ['playbook'], viewTimeline: ['timeline', 1], viewRoadmap: ['timeline', 1],
+  mm_blockHtml: ['mindmap'], viewStats: ['stats', 1], viewCal: ['calendar', 1], viewDocs: ['docs', 1], viewLife: ['life', 1], viewReview: ['life', 1], viewBudget: ['life', 1], pbNewsText: ['playbook'], viewTimeline: ['timeline', 1], viewRoadmap: ['timeline', 1],
   tlNdBtn: ['timeline'], tlNdOn: ['timeline'],
   viewFeeds: ['feeds', 1], rss_homeCard: ['feeds'],  // 2.85.0 B (#1162)
   viewBookmarks: ['bookmarks', 1],  // 2.97.0 A (#1950)
@@ -254,6 +264,18 @@ function tlReaches(from, target) {  // does `from` (transitively) wait on `targe
   while (todo.length) { const x = todo.pop(); if (x === target) return true; if (seen.has(x) || seen.size > 5000) continue; seen.add(x); todo.push(...(S.tasks.get(x)?.blockers || [])); }
   return false;
 }
+// 2.149.0 F (#2518) environments (envs.js, module envs): the project page's block and a milestone's panel load the module
+// (the module's own first draw is the same "Loading…" / nothing; it fetches and draws again)
+window.env_ovHtml = (l, can, hasMs = true) => { ld_later('envs'); return hasMs ? `<div class="muted envbox">${esc(tr('Loading…'))}</div>` : ''; };
+window.env_msHtml = t => { if (t?.id > 0) loadModule('envs').then(() => { if (S.sel === t.id) renderDetail(); }, () => {}); return ''; };
+// 2.149.0 F (#2518): a list's "Export as CSV" (from listprint.js, now loaded on demand): the download starts inside the click
+function lexCsv(lid) {
+  const l = listById(lid); if (!l) return;
+  const a = document.createElement('a');
+  a.href = `/api/lists/${lid}/export.csv?done=${LS.get('lexDone', true) ? 1 : 0}`;
+  a.download = ''; a.hidden = true;
+  document.body.appendChild(a); a.click(); a.remove();
+}
 const pv_attr = o => ` data-pview="${esc(JSON.stringify(o))}"`;
 // 2.92.0 C (#1926): a Word / Excel file opens in the document preview (docpreview.js, module pdf) like a PDF:
 // <a href="…" data-dview='{"url": preview route, "name", "size", "dlUrl", "aid"?}'>; a modifier key keeps the download
@@ -271,7 +293,7 @@ document.addEventListener('click', e => {
 // statistics, PDF, playbooks), so their first click stays quick without slowing the start
 /** @type {[string, () => boolean][]} */
 const LD_IDLE = [['settings', () => true], ['calendar', () => feat('cal')], ['timeline', () => feat('timeline')], ['wiki', () => feat('wiki')],
-  ['docs', () => feat('docs')], ['life', () => lifeOn()]];
+  ['docs', () => feat('docs')], ['life', () => lifeOn() || feat('budget')]];  // 2.149.0 F (#2518): + the budget
 function ld_idle(i) {
   const m = LD_IDLE[i]; if (!m) return;
   (window.requestIdleCallback || (f => setTimeout(f, 0)))(() => {

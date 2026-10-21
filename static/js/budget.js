@@ -2,7 +2,6 @@
    (lists.life 'budget'), its dialogs (entry, categories, recurring entries, taking over contracts, CSV import) and the
    card on Home & life. Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
-// lazy-ok-module life: 2.149.0 F (#2519): the budget view draws only once life.js is loaded (viewBudget below), its dialogs open from it
 
 // 2.72.0 (#1333): a budget is a list without tasks; sharing it = sharing the list (reading = visible, writing = write
 // access). Entries are always positive with a kind ("in" / "out"); plan per category = its monthly limit, else the

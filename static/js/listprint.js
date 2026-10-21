@@ -4,13 +4,6 @@
    like the timesheet (time.js): an overlay with the page, "Print / save as PDF" = window.print(), only the page is printed.
    2.145.0 C (#2432): a project gets a compact head on top (description, status, period + progress, members, milestones) from
    the project page's own source (GET /api/lists/<id>/overview, the same visibility); empty parts are left out. */
-function lexCsv(lid) {
-  const l = listById(lid); if (!l) return;
-  const a = document.createElement('a');
-  a.href = `/api/lists/${lid}/export.csv?done=${LS.get('lexDone', true) ? 1 : 0}`;
-  a.download = ''; a.hidden = true;
-  document.body.appendChild(a); a.click(); a.remove();
-}
 function lexRows(lid, done) {  // [{t, depth}] by section (null = no section), subtasks right under their parent
   const all = [...S.tasks.values()].filter(t => t.list_id === lid && !t.deleted_at && (done || t.status === 0));
   const byParent = new Map(), ids = new Set(all.map(t => t.id));
