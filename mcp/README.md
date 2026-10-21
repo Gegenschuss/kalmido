@@ -8,7 +8,7 @@ Kalmido never starts AI processes itself. You run this server (and your agent) o
 ## Before you start
 
 1. An admin creates the agent in **Settings > Agents > Status > Add agent**, or (2.7.2, when an admin allows it) you create your own personal agent in **Settings > Agents > Set up > Create agent**. Copy its API token (it is shown once). Step-by-step guides for Linux, macOS and Windows: **Settings > Agents > Set up** and [docs/AGENTS.md](../docs/AGENTS.md#set-up-an-agent).
-2. Share the lists that the agent should work in with the agent (role Member, Participant or Viewer).
+2. Share the projects that the agent should work in with the agent (role Member, Participant or Viewer).
 
 ## Claude Code
 
@@ -44,15 +44,17 @@ By default the server binds to `127.0.0.1`. It rejects requests with an `Origin`
 
 ## Tools
 
+Projects are called lists in the API (`list_id`, `/api/v1/lists`, `kind=list|project`); `kind=project` is the switch "Progress and status".
+
 | Tool | What it does | REST call |
 |---|---|---|
 | `get_agent` | agent user, enabled state, status, job counts, latest event cursor, runtime settings (2.4.1) | `GET /api/v1/agent` |
-| `list_lists` | visible lists, including their sections `[{id, name}]`, list tags and agent tidy mode | `GET /api/v1/lists` |
-| `list_list_tags` | shared tags of a list | `GET /api/v1/lists/{id}/tags` |
-| `list_tasks` | tasks filtered by list, status, tag, list tag or assignee; `compact: true` = only the fields to scan a list with (id, title, list_id, section_id, parent_id, status, due, due_time, priority, tags, list_tags, assignee_id), `false` = full tasks, not given = full up to 25 tasks per page, compact above (`"compact": true` in the result) | `GET /api/v1/tasks` (`?fields=compact`) |
+| `list_lists` | visible projects, including their sections `[{id, name}]`, project tags and agent tidy mode | `GET /api/v1/lists` |
+| `list_list_tags` | shared tags of a project | `GET /api/v1/lists/{id}/tags` |
+| `list_tasks` | tasks filtered by project, status, tag, project tag or assignee; `compact: true` = only the fields to scan a list with (id, title, list_id, section_id, parent_id, status, due, due_time, priority, tags, list_tags, assignee_id), `false` = full tasks, not given = full up to 25 tasks per page, compact above (`"compact": true` in the result) | `GET /api/v1/tasks` (`?fields=compact`) |
 | `search_tasks` | full-text search | `GET /api/v1/search?q=` |
 | `search_messages` | 2.33.0: full-text search in task comments, team chat channels and your own chats (only what the token may read; snippet + marks, newest first; filters art, sender, room, chat_with, task) | `GET /api/v1/search?scope=messages&q=` |
-| `get_task` | a task plus its comments (reactions, suggestions); 2.2.0: `code` (linked pull requests + CI, commits) and `repo` (the list's repository, a suggested branch) | `GET /api/v1/tasks/{id}` + `/comments` |
+| `get_task` | a task plus its comments (reactions, suggestions); 2.2.0: `code` (linked pull requests + CI, commits) and `repo` (the project's repository, a suggested branch) | `GET /api/v1/tasks/{id}` + `/comments` |
 | `create_task` / `update_task` / `complete_task` | change tasks | `POST /api/v1/tasks`, `PATCH /api/v1/tasks/{id}`, `POST .../complete` |
 | `add_comment` | comment, optionally with a structured tidy suggestion | `POST /api/v1/tasks/{id}/comments` |
 | `react` | 👍 / 👎 / ❤️ on a comment (or take one back) | `POST /api/v1/comments/{id}/reactions`, `DELETE .../reactions/{emoji}` |
@@ -67,25 +69,25 @@ By default the server binds to `127.0.0.1`. It rejects requests with an `Origin`
 | `read_attachment` | 2.34.0: a task / comment file as text: a PDF's text layer (read on the server, `no_text_layer` for scans; 2.61.0: the text recognised in the background with `source: ocr` when there is one) or a text file, `max_chars` (default and max 200000, `truncated`); images come back as an image | `GET /api/v1/attachments/{id}/text` |
 | `chat_typing` | typing dots in one person's chat for 10 s (2.4.1) | `POST /api/v1/agent/typing` |
 | `react_to_chat` | 2.7.2: 👍 / 👎 / ❤️ on a chat message (`user_id`, `message_id`, `emoji`, `on`, default true); a person's 👍 on your message arrives as a `reaction` event with `approval: "approved"` | `POST /api/v1/agent/chats/{user_id}/messages/{id}/reactions` |
-| `tidy_task` | tidy a task (lists in tidy mode "auto") | `POST /api/v1/tasks/{id}/tidy` |
+| `tidy_task` | tidy a task (projects in tidy mode "auto") | `POST /api/v1/tasks/{id}/tidy` |
 | `set_waiting` / `clear_waiting` | 2.1.0: mark a task as waiting on external (`note`, follow-up day `until`) or end it | `PUT` / `DELETE /api/v1/tasks/{id}/waiting` |
 | `list_waiting` | 2.1.0: open tasks waiting on external (`list_tasks` also takes `waiting: true / false`) | `GET /api/v1/tasks?waiting=true` |
-| `list_stale_tasks` | 2.34.0: tasks lying idle (no change, comment or time entry for the list's threshold, default 7 days; waiting without a follow-up day) | `GET /api/v1/stale` |
+| `list_stale_tasks` | 2.34.0: tasks lying idle (no change, comment or time entry for the project's threshold, default 7 days; waiting without a follow-up day) | `GET /api/v1/stale` |
 | `get_time_gaps` | 2.34.0: working days with work on tasks but no tracked time (`user_id` = the person you work for) | `GET /api/v1/time/gaps` |
 | `list_groups` | 2.10.0: groups of people with their members (`mine` = yours) | `GET /api/v1/groups` |
-| `list_list_groups` | 2.10.0: the groups a list is shared with (role, directly or via a folder) | `GET /api/v1/lists/{id}/groups` |
+| `list_list_groups` | 2.10.0: the groups a project is shared with (role, directly or via a folder) | `GET /api/v1/lists/{id}/groups` |
 | `get_day_plan` | 2.10.0: the built-in day plan of your user (preview; `mode` day or fill) | `GET /api/v1/dayplan` |
 | `get_day_review` | 2.10.0: the daily review (done, open, moved, next working day) | `GET /api/v1/dayplan/review` |
-| `report_usage` | 2.1.1: report the agent's model usage (model, tokens, optional cost, task / list / job, short note; numbers only) | `POST /api/v1/agent/usage` |
-| `list_repos` | 2.2.0: repositories connected to a list (never a token) | `GET /api/v1/lists/{id}/repos` |
-| `get_project_overview` | 2.7.1: the overview of a project list (description, key links, milestones, files, members, status, time), read-only | `GET /api/v1/lists/{id}/overview` |
+| `report_usage` | 2.1.1: report the agent's model usage (model, tokens, optional cost, task / project / job, short note; numbers only) | `POST /api/v1/agent/usage` |
+| `list_repos` | 2.2.0: repositories connected to a project (never a token) | `GET /api/v1/lists/{id}/repos` |
+| `get_project_overview` | 2.7.1: the overview of a project with progress and status (description, key links, milestones, files, members, status, time), read-only | `GET /api/v1/lists/{id}/overview` |
 | `request_merge_approval` | 2.2.0: a *Ready to merge* comment for your pull request (`task_id`, `pr_url`, `summary`); wait for the `reaction` event with `approval: "approved"` before merging | `POST /api/v1/tasks/{id}/comments` with `suggestion.kind = merge_request` |
-| `get_usage` | 2.1.1: the agent's own usage by day, task, list or model, with its limit | `GET /api/v1/agent/usage` |
+| `get_usage` | 2.1.1: the agent's own usage by day, task, project (`list`) or model, with its limit | `GET /api/v1/agent/usage` |
 | `report_plan_usage` | 2.33.0: the plan usage (e.g. 5-hour and weekly window, percent and reset time, an own limit) -- the ring in the chat header; takes Claude Code's `rate_limits` as it is | `PUT /api/v1/agent/quota` |
 | `get_plan_usage` / `clear_plan_usage` | 2.33.0: read / remove that report | `GET` / `DELETE /api/v1/agent/quota` |
 | `list_schedules` | 2.34.0: your planned jobs (people plan them in the app; when one is due you get the event `scheduled_job` and answer in the chat with that person); read-only | `GET /api/v1/agent/schedules` |
-| `read_briefing` | 2.34.0: the morning briefing of a person who may chat with you (only the lists they share with you): due today / overdue, blocked, changed since the last briefing, lying idle; data only | `GET /api/v1/briefing?user_id=` |
-| `read_project_status` | 2.34.0: the status report of a list shared with you for a period (default 7 days): done, in progress, blocked, overdue, next dates, milestones, tracked time + a plain Markdown text | `GET /api/v1/lists/{id}/status-report` |
+| `read_briefing` | 2.34.0: the morning briefing of a person who may chat with you (only the projects they share with you): due today / overdue, blocked, changed since the last briefing, lying idle; data only | `GET /api/v1/briefing?user_id=` |
+| `read_project_status` | 2.34.0: the status report of a project shared with you for a period (default 7 days): done, in progress, blocked, overdue, next dates, milestones, tracked time + a plain Markdown text | `GET /api/v1/lists/{id}/status-report` |
 
 2.15.0 (#479): the rest of the REST API as tools. Each needs the permission (scope) of its REST call; `tools/list`
 shows only the tools the token may use (from `GET /api/v1/me`, refreshed every 5 minutes):
@@ -93,9 +95,9 @@ shows only the tools the token may use (from `GET /api/v1/me`, refreshed every 5
 | Tools | Scope | REST calls |
 |---|---|---|
 | `get_me`, `get_list`, `list_members`, `list_sections`, `list_folders`, `list_fields`, `list_templates`, `list_filters`, `list_subtasks`, `get_dependencies`, `list_trash`, `list_tags`, `get_roadmap`, `get_group`, `list_project_files`, `get_timer`, `list_time_entries`, `list_habits`, `list_news`, `list_agents` | read | `GET` routes |
-| `move_task` (list / section / parent + `before_id`, `after_id` or `position` top / bottom), `batch_tasks` (update, complete, reopen, wont_do; delete / restore also need *delete*), `reopen_task`, `skip_occurrence`, `take_task`, `add_subtask`, `add_dependency`, `remove_dependency`, `create_habit`, `update_habit`, `check_in_habit`, `shift_list_dates` | tasks:write | `POST /tasks/{id}/move`, `POST /tasks/batch`, … |
+| `move_task` (project / section / parent + `before_id`, `after_id` or `position` top / bottom), `batch_tasks` (update, complete, reopen, wont_do; delete / restore also need *delete*), `reopen_task`, `skip_occurrence`, `take_task`, `add_subtask`, `add_dependency`, `remove_dependency`, `create_habit`, `update_habit`, `check_in_habit`, `shift_list_dates` | tasks:write | `POST /tasks/{id}/move`, `POST /tasks/batch`, … |
 | `update_comment`, `delete_comment`, `mark_news_read`, `delete_chat_attachment` | comments | `PATCH` / `DELETE /comments/{id}`, `POST /news/read` |
-| `create_list`, `update_list`, `share_list`, `unshare_list`, `share_list_with_group`, `unshare_list_from_group`, `create_section`, `rename_section`, `reorder_sections`, `rename_folder`, `delete_folder`, `create_field`, `update_field`, `create_list_tag`, `update_list_tag`, `delete_list_tag`, `create_template`, `update_template`, `apply_template`, `create_filter`, `update_filter`, `set_project_overview`, `set_project_status`, `add_project_link`, `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`, `delete_milestone` | structure | lists, sections, folders, fields, list tags, templates, filters, overview |
+| `create_list`, `update_list`, `share_list`, `unshare_list`, `share_list_with_group`, `unshare_list_from_group`, `create_section`, `rename_section`, `reorder_sections`, `rename_folder`, `delete_folder`, `create_field`, `update_field`, `create_list_tag`, `update_list_tag`, `delete_list_tag`, `create_template`, `update_template`, `apply_template`, `create_filter`, `update_filter`, `set_project_overview`, `set_project_status`, `add_project_link`, `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`, `delete_milestone` | structure | projects, sections, folders, fields, project tags, templates, filters, overview |
 | `delete_task`, `restore_task`, `empty_trash`, `delete_list`, `delete_section`, `delete_field`, `delete_template`, `delete_filter`, `delete_habit` | delete | `DELETE …`, `POST /tasks/{id}/restore` |
 | `get_attachment` (also `source: project` + `list_id`), `read_attachment` (2.34.0) | attachments:read | `GET /attachments/{id}`, `/attachments/{id}/text`, `/lists/{id}/files/{id}` |
 | `upload_attachment` (`files: [{name, base64, mime?}]`), `delete_attachment`, `upload_project_file`, `delete_project_file` | attachments:write | multipart uploads |
@@ -108,7 +110,7 @@ shows only the tools the token may use (from `GET /api/v1/me`, refreshed every 5
 | `list_event_calendars`, `create_event_calendar`, `update_event_calendar`, `delete_event_calendar`, `share_event_calendar`, `unshare_event_calendar`, `import_ics`, `export_ics`, `list_calendar_events`, `get_event`, `create_event`, `update_event`, `delete_event`, `restore_event`, `reply_to_event`, `add_preparation_task` (also tasks:write), `get_task_events` (2.21.0) | calendar | `/event-calendars…`, `/events…`, `/tasks/{id}/events` |
 | `list_address_books`, `create_address_book`, `update_address_book`, `delete_address_book`, `share_address_book`, `unshare_address_book`, `import_vcards`, `export_vcards`, `search_contacts`, `get_contact`, `create_contact`, `update_contact`, `delete_contact`, `bulk_contacts` (2.46.1), `link_contact` / `unlink_contact` (also tasks:write) (2.21.0) | contacts | `/address-books…`, `/contacts…`, `/tasks/{id}/contacts` |
 
-An agent's dangerous requests (deleting a list or a field, emptying the trash, batches of 10+ tasks, moving lists,
+An agent's dangerous requests (deleting a project or a field, emptying the trash, batches of 10+ tasks, moving projects,
 folders, sharing) answer `approval_required` with a waiting job: a person approves it in Kalmido and the agent gets the
 result as a `job` event. `tests/parity_test.py` fails when a REST route has no tool (or no documented reason).
 
@@ -181,9 +183,9 @@ The env file holds `KALMIDO_URL` and `KALMIDO_TOKEN` (optional `KALMIDO_USAGE_PR
 
 ## Security
 
-- The token has exactly the agent's permissions: only the lists shared with it, only its scopes (2.15.0), never admin rights. An admin can pause the agent at any time. A paused agent's token stops working at once.
+- The token has exactly the agent's permissions: only the projects shared with it, only its scopes (2.15.0), never admin rights. An admin can pause the agent at any time. A paused agent's token stops working at once.
 - Keep the token out of shared config files. The server never prints or logs it.
-- A person can chat with the agent even if they cannot see every list the agent sees. The agent must not quote content from lists that this person cannot see.
+- A person can chat with the agent even if they cannot see every project the agent sees. The agent must not quote content from projects that this person cannot see.
 
 ## Tests
 
