@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.110.0 API tests, part B (#2055): the receipts list of the bookkeeping over all months and the export for the tax
+"""2.153.0 API tests, part B (#2055): the receipts list of the bookkeeping over all months and the export for the tax
 adviser. Invented companies, people and figures only.
 tenant-matrix: office
 freelancer-matrix: office
@@ -260,8 +260,15 @@ zc = list(csv.reader(io.StringIO(z.read("belege.csv").decode("utf-8").lstrip("ï»
 check(sorted(x[16] for x in zc[1:]) == sorted(files), f"ZIP: the CSV names the files in the ZIP {[x[16] for x in zc[1:]]} {files}")
 r = A.get(B + RL + ".zip?" + ALL + "&q=nichtvorhanden")
 check(r.ok and zipfile.ZipFile(io.BytesIO(r.content)).namelist() == ["belege.csv"], "ZIP: empty filter = only the CSV")
+# 2.153.0 (#2055, review): a file lost on the disk does not break the whole ZIP, its CSV row stays
+lost = dbx("SELECT path FROM fs_versions WHERE node_id=? ORDER BY no DESC LIMIT 1", (R2,))[0][0]
+dbx("UPDATE fs_versions SET path=? WHERE node_id=?", ("files/0/lost-on-disk.pdf", R2), write=True)
+r = A.get(B + RL + ".zip?" + ALL + f"&project={P1}")
+check(r.ok and len([n for n in zipfile.ZipFile(io.BytesIO(r.content)).namelist() if n.startswith("belege/")]) == 1,
+      f"ZIP: a lost file is skipped, the rest comes ({r.status_code})")
+dbx("UPDATE fs_versions SET path=? WHERE node_id=?", (lost, R2), write=True)
 logs = dbx("SELECT detail FROM office_doc_log WHERE org_id=? AND action='export' AND target='books'", (ORG,))
-check(sum(1 for x in logs if "receipts.zip" in str(x[0])) == 2 and any("receipts.csv" in str(x[0]) for x in logs), f"export log entries {logs}")
+check(sum(1 for x in logs if "receipts.zip" in str(x[0])) == 3 and any("receipts.csv" in str(x[0]) for x in logs), f"export log entries {logs}")
 
 # ---------------------------------------------------------------- rights with data
 check(get(Ca, ALL)["rows"] == [], "another organisation (its own office) sees nothing of Alpha")
@@ -287,6 +294,14 @@ zn = zipfile.ZipFile(io.BytesIO(r.content)).namelist() if r.ok else []
 check(r.ok and len(zn) == 2 and any(n.endswith(f"_{F1}.pdf") for n in zn), f"freelancer: ZIP only the own receipt {zn}")
 check(get(A, ALL)["total"]["count"] == 6, "Alpha unchanged by the freelancer")
 check(F1 not in ids(get(A, f"from={Y}-01-01&to={Y}-12-31")), "Alpha does not see the freelancer's receipt")
+
+# 2.153.0 (#2055): the export follows the country pack's switch books.export_csv (as the booking list, #2460); the list stays
+r = A.put(B + O + "/settings", json={"features_off": ["books.export_csv"]})
+check(r.ok, "switch the export off " + r.text[:160])
+check(A.get(B + RL + ".csv?" + ALL).status_code == 404 and A.get(B + RL + ".zip?" + ALL).status_code == 404, "export switched off: CSV / ZIP 404")
+check(get(A, ALL)["total"]["count"] == 6, "export switched off: the list stays")
+A.put(B + O + "/settings", json={"features_off": []})
+check(A.get(B + RL + ".csv?" + ALL).ok, "export on again")
 
 print(f"p2110_b_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

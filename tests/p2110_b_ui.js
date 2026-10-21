@@ -1,4 +1,4 @@
-// 2.110.0 UI tests, part B (#2055, all receipts + export for the tax adviser), own container (start.sh, mode workspaces),
+// 2.153.0 UI tests, part B (#2055, all receipts + export for the tax adviser), own container (start.sh, mode workspaces),
 // Firefox (desktop + phone width). Invented companies, people and figures only.
 // - the bookkeeping has "All receipts" below the receipts of this month -> #office/books/receipts with the filter bar
 // - the receipts of the year (all months) with their sums; a category filter makes the list shorter and the sum follows

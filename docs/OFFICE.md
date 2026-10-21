@@ -825,7 +825,6 @@ chart SKR03 or SKR04 (Settings → DATEV) it is booked on - the default the expo
 6837), or your own. **Change account** sets your own account for this category (empty = the default again; one undo step); the
 DATEV batch and the lines of the income/expense statement use the same account.
 
-
 ### All receipts and the export for the tax adviser (2.153)
 
 **All receipts** below "Receipts this month" opens the receipts of every month (`#office/books/receipts`). Filters: the
