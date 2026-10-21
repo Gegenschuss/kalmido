@@ -115,7 +115,7 @@ def pep_id_clean(v):
     s = re.sub(r"(?i)^iso6523-actorid-upis::", "", s)
     m = re.fullmatch(r"(\d{4}):([A-Za-z0-9._\-:/]{1,80})", s)
     if not m or m.group(1) not in PEP_ICD:
-        raise BadInput(tr("Invalid Peppol ID: use <scheme>:<id>, e.g. 0088:4000001000005 or 9930:DE123456789"))
+        raise BadInput(tr("Invalid Peppol ID: use scheme:number, e.g. 0088:4000001000005 or 9930:DE123456789"))
     sch, ident = m.group(1), m.group(2)
     if sch in ("9930", "9925", "9944", "9914", "9957", "0204"):
         ident = ident.upper()

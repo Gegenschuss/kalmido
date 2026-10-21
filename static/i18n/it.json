@@ -6858,7 +6858,7 @@
   "The document has no client": "Il documento non ha un cliente",
   "The client has no Peppol ID": "Il cliente non ha un ID Peppol",
   "Peppol needs a buyer reference, an order number or a customer number (client or document)": "Peppol richiede un riferimento dell’acquirente, un numero d’ordine o un numero cliente (cliente o documento)",
-  "Invalid Peppol ID: use <scheme>:<id>, e.g. 0088:4000001000005 or 9930:DE123456789": "ID Peppol non valido: usa <schema>:<id>, ad es. 0088:4000001000005 o 9930:DE123456789",
+  "Invalid Peppol ID: use scheme:number, e.g. 0088:4000001000005 or 9930:DE123456789": "ID Peppol non valido: usa schema:numero, ad es. 0088:4000001000005 o 9930:DE123456789",
   "Invalid Peppol ID: the number does not fit scheme {0}": "ID Peppol non valido: il numero non corrisponde allo schema {0}",
   "Sent over Peppol": "Inviata tramite Peppol",
   "Delivered over Peppol": "Consegnata tramite Peppol",
