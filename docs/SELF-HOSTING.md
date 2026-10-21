@@ -1155,6 +1155,9 @@ Paperless-ngx…* and *Connect Paperless-ngx*.
   private* imports from the organisation's connection or export into the starter's own private space instead (an admin's
   own space only, never someone else's). Every other importer (tasks, contacts, calendar files, budget, office, knowledge
   pages, an account move, feeds) asks the same way.
+  Since 2.144.5 the task import with the sidebar on *All* goes into the private space by default and offers *Rather into
+  <organisation>* (the first one) instead; the calendar import offers *Rather into private* also when there is no private
+  calendar yet (one is made, like the contact import's private address book).
 - **In the background:** progress, the target and *Stop* in the settings; the import runs on on the server (the window can be
   closed), only the upload of an export ZIP needs the window open; optionally *Bring in new documents automatically* every
   15 minutes up to once a day (only Paperless-ngx -> Kalmido).

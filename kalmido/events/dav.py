@@ -276,7 +276,20 @@ def ev_report(c, u, coll, raw):
     raise DavError(403, "Unsupported report", "<D:supported-report/>")
 
 
-def ev_put(c, u, coll, name):
+def ev_att_learn(c, pw_row, v):
+    """2.144.5 B (#2379): True when the client behind this app password has ever written ATTENDEE (remembered in
+    app_passwords.caps like CATEGORIES / RELATED-TO of the task lists, calendars/caldav.py dav_caps_learn)."""
+    if pw_row is None:
+        return True  # no app password to learn with: as before (the PUT's attendees replace the stored ones)
+    have = set(filter(None, (pw_row["caps"] or "").split(",")))
+    if v["attendees_raw"] and "ATTENDEE" not in have:
+        c.execute("UPDATE app_passwords SET caps=? WHERE id=?", (",".join(sorted(have | {"ATTENDEE"})), pw_row["id"]))
+        c.commit()
+        return True
+    return "ATTENDEE" in have
+
+
+def ev_put(c, u, coll, name, pw_row=None):
     if coll["role"] not in ("owner", "edit"):
         raise DavError(403, "Read only", "<D:need-privileges/>")
     if "text/calendar" not in (request.content_type or "text/calendar").lower():
@@ -294,6 +307,7 @@ def ev_put(c, u, coll, name):
         raise DavError(e.code, e.text, e.cond) from None
     except (ValueError, TypeError, OverflowError, KeyError, AttributeError):
         raise DavError(400, "The calendar data could not be read", "<C:valid-calendar-data/>") from None
+    knows_att = ev_att_learn(c, pw_row, v)
     have = member_now(c, u, coll, name)
     inm, im = request.headers.get("If-None-Match", "").strip(), request.headers.get("If-Match", "").strip()
     if have and inm == "*":
@@ -305,7 +319,9 @@ def ev_put(c, u, coll, name):
         if v["uid"] != have[0]["uid"] and c.execute("SELECT 1 FROM events WHERE cal_id=? AND uid=? AND id!=? AND deleted_at IS NULL",
                                                     (coll["id"], v["uid"], eid)).fetchone():
             raise DavError(403, "This UID exists already", "<C:no-uid-conflict/>")
-        store_parsed(c, u["id"], coll["id"], v, eid=eid)
+        # 2.144.5 B (#2379): a PUT without any ATTENDEE from a client that never wrote one keeps the attendees (and their
+        # answers); a client that writes them removes them by leaving them out
+        store_parsed(c, u["id"], coll["id"], v, eid=eid, keep_attendees=not v["attendees_raw"] and not knows_att)
         if v["uid"] != have[0]["uid"]:
             c.execute("UPDATE events SET uid=? WHERE id=?", (v["uid"], eid))
         c.commit()
@@ -371,7 +387,7 @@ def evdav(m, c, u, pw_row, kind, key, name):
     if m == "PUT":
         if kind != "evmember":
             raise DavError(405, "PUT works on an event inside a calendar")
-        return ev_put(c, u, coll, name)
+        return ev_put(c, u, coll, name, pw_row)
     if m == "DELETE":
         if kind != "evmember":
             raise DavError(403, "Calendars are deleted in the app")

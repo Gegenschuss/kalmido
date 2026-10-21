@@ -155,7 +155,8 @@ _spec.loader.exec_module(KX)
 SKIP_KEYS = re.compile(r"^(id|.*_id|.*_by|.*_at|org_id|owner_id|user_id|a|b|ws|uid|href|tt_id|path|sort|email_hash|token|"
                        r"trig_val|act_val|rule|files|data|review|res_label|personal_of|list_name|icon|name_key|log|"
                        r"reply_to|last_at|synced_at|updated|created|changed|added|at|day_key|enc_by|kenc|fetched)$")
-SKIP_IN = {"newsletter/connection.json": ("auto", "error")}  # on purpose: no automatic sync until connected again
+SKIP_IN = {"newsletter/connection.json": ("auto", "error"),  # on purpose: no automatic sync until connected again
+           "hub/mailbox.json": ("error",)}  # 2.144.5 B (#2410): the mailbox asks for its passwords again
 DEPENDS = {"hub/bookings.json": "office/equipment.json"}  # bookings of equipment come with part A (office)
 SKIP_ENTRIES = {"manifest.json", "organisation.json", "members.json"}
 
