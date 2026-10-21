@@ -427,7 +427,8 @@ ROUTES = {
     # ---- orgadmin (23; 2.137.0 A (#2344): export of the own personal office -> "office")
     "GET /api/org-icon/{}/{}.png": "orgadmin", "POST /api/orgs/{}/icon": "orgadmin", "DELETE /api/orgs/{}/icon": "orgadmin",  # 2.87.9 (#1913)
     "DELETE /api/admin/orgs/{}": "orgadmin",
-    "GET /api/admin/orgs/{}/delete-info": "orgadmin",  # 2.152.0 A (#2167) "DELETE /api/orgs/{}/export": "office",
+    "GET /api/admin/orgs/{}/delete-info": "orgadmin",  # 2.152.0 A (#2167)
+    "DELETE /api/orgs/{}/export": "office",
     "DELETE /api/orgs/{}/lists/{}": "orgadmin", "DELETE /api/orgs/{}/lists/{}/icon": "orgadmin",
     "DELETE /api/orgs/{}/members/{}": "orgadmin", "GET /api/admin/orgs": "orgadmin", "GET /api/orgs/{}/encryption": "orgcrypt",
     "GET /api/orgs/{}/export": "office", "GET /api/retention/me": "office", "GET /api/retention/me/export.zip": "office", "GET /api/retention/org/{}": "orgadmin", "GET /api/retention/org/{}/export.zip": "orgadmin",

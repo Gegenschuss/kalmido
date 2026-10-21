@@ -161,7 +161,7 @@ info = A.get(B + f"/api/users/{FRI}/delete-info").json()
 p = info.get("purge") or {}
 check(p.get("office") == "keep" and p.get("kept_until") == "2036-12-31" and p.get("kept", {}).get("documents") == 1,
       f"delete-info: the personal office keeps 1 document until 2036-12-31 {p}")
-r = A.delete(B + f"/api/users/{FRI}")
+r = A.delete(B + f"/api/users/{FRI}", params={"retention": "waived"})  # 2.152.0: main's retention step (#2468) first
 check(r.ok, "frida deleted " + r.text[:200])
 if not r.ok:
     app_log()
@@ -210,6 +210,7 @@ APL = Ca.post(B + "/api/lists", json={"name": "Bot scratch"}).json()["id"]
 AOL = Ca.post(B + "/api/lists", json={"name": "Bot studio list", "org_id": ORG}).json()["id"]
 ATK = Ca.post(B + "/api/tasks", json={"title": "Private bot note", "list_id": APL}).json().get("id")
 sql("UPDATE lists SET owner_id=? WHERE id IN (?, ?)", (CAG, APL, AOL), write=True)
+sql("UPDATE lists SET org_id=NULL WHERE id=?", (APL,), write=True)  # private (carol's workspace is the organisation)
 check(requests.get(B + "/api/v1/me", headers=AGH).ok, "the agent's token works")
 DM = Bo.post(B + "/api/team/dm", json={"user_id": CAROL}).json().get("id")
 Ca.post(B + f"/api/team/rooms/{DM}/messages", json={"body": "The cut is ready"})
@@ -361,7 +362,8 @@ if os.environ.get("P2103A_NOSTART") != "1":
     HO = A.post(B + "/api/admin/orgs", json={"name": "Hosted Studio", "admin_id": ALICE}).json()["id"]
     A.patch(B + "/api/settings", json={"workspace": f"org:{HO}"})
     HN = booked(A, f"org:{HO}", "beleg-org.txt")
-    check(A.delete(B + f"/api/files/nodes/{HN}").ok, "hosted: the receipt into the organisation's trash")
+    roots = [x[0] for x in sql("SELECT id FROM fs_nodes WHERE org_id=? AND deleted_at IS NULL AND parent_id IS NULL", (HO,))]
+    check(HN and roots and all(A.delete(B + f"/api/files/nodes/{x}").ok for x in roots), "hosted: the receipt (with its folder) into the organisation's trash")
     A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
     r = A.delete(B + f"/api/admin/orgs/{HO}", params={"confirm": "1", "retention": "waived"})
     check(r.ok and not r.json().get("retired") and not sql("SELECT 1 FROM orgs WHERE id=?", (HO,)) and not sql("SELECT 1 FROM fs_nodes WHERE id=?", (HN,)),

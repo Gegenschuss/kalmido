@@ -136,7 +136,7 @@ RN = r.json()["ids"][0] if r.status_code == 201 else 0
 Gr.patch(B + f"/api/docs/{RN}", json={"amount": "119.00", "date": "2026-10-01"})
 r = Gr.put(B + f"/api/docs/{RN}/receipt", json={"category": "Software", "vat_pct": "19", "keep": True})
 check(r.ok, "#2164 setup: booked (VAT rate) " + r.text[:200])
-r = A.delete(B + f"/api/users/{G}")
+r = A.delete(B + f"/api/users/{G}", params={"retention": "waived"})  # 2.152.0: main's retention step (#2468) first
 check(r.ok, f"#2164: the person with a booked private receipt is deleted {r.status_code} {r.text[:300]}")
 row = sql("SELECT n.org_id, o.retired_at FROM fs_nodes n JOIN orgs o ON o.id=n.org_id WHERE n.id=?", (RN,))
 check(row and row[0][1], f"#2164: the receipt sits in the retired office {row}")

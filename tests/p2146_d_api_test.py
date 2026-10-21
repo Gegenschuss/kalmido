@@ -266,9 +266,9 @@ vid = A.post(B + O + "/vehicles", json={"name": "Kombi", "kind": "private", "odo
 r = A.post(B + O + "/drives", json={"vehicle_id": vid, "day": time.strftime("%Y-%m-%d"), "dest": "Kunde", "purpose": "Dreh", "km": 30, "kind": "business"})
 sql("UPDATE office_drives SET day='2014-03-02' WHERE org_id=?", (G,), write=True)  # period over: no retirement, the step stays
 check(r.ok and A.get(B + RX + f"/org/{G}").json().get("counts", {}).get("drives") == 1, "review A9: the logbook drive is counted " + r.text[:200])
-r = A.delete(B + f"/api/admin/orgs/{G}")
+r = A.delete(B + f"/api/admin/orgs/{G}", params={"confirm": "1"})  # the drive goes along (confirmed)
 check(r.status_code == 409 and r.json().get("code") == "retention", "review A9: Epsilon (logbook only): 409 without the step " + r.text[:200])
-check(A.delete(B + f"/api/admin/orgs/{G}", params={"retention": "waived"}).ok, "review A9: Epsilon goes with the waiver")
+check(A.delete(B + f"/api/admin/orgs/{G}", params={"confirm": "1", "retention": "waived"}).ok, "review A9: Epsilon goes with the waiver")
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 check(A.delete(B + f"/api/admin/orgs/{ORG2}").ok, "an organisation without records: deleted as before")
 
