@@ -7,7 +7,9 @@
    counts taken / skipped; a second call takes nothing (skipped as billed)
  - a billed entry: duration / date / task / billable 409, delete 409, the note can change; an unchanged billable passes
  - deleting the draft frees the entries; two parallel calls never bill the same entry twice
- - a cancelled invoice: a member cannot release (403), the admin releases, the undo binds them again; a draft: 409
+ - a cancelled invoice: a member cannot release (403), the admin releases, the undo binds them again (only what that
+   release freed); a draft: 409
+ - the person who tracked the time sees the invoice number only with a role in the invoice's office
  - an entry bound to a document that no longer exists (an older version deleted it) is open again
  - somebody else cannot change the entry (403); another organisation: time-open / release 404 (tenant-matrix: office);
    an agent: 403
@@ -190,9 +192,13 @@ check(requests.post(B + f"{D}/{WIN}/time-release", json={}, headers=AGH).status_
 r = A.post(B + f"{D}/{WIN}/time-release", json={})
 check(r.ok and sorted(r.json()["released"]) == sorted([E1["id"], E3["id"]]) and r.json()["time_billed"]["entries"] == 0, "the admin releases " + r.text[:160])
 check(entry(A, E1["id"])["billed"] is None, "released: the entry is open")
-r = A.post(B + f"{D}/{WIN}/time-release", json={"undo": [E1["id"], E3["id"], E2["id"] + 999999]})
+# 2.144.6 (#2053, review 2): the undo binds only what this release freed (not E2: not billable; not E5: open, never on it)
+E5 = add(A, LID, "2026-05-06T08:00:00Z", 30)
+r = A.post(B + f"{D}/{WIN}/time-release", json={"undo": [E1["id"], E3["id"], E2["id"], E5["id"], E2["id"] + 999999]})
 check(r.ok and r.json()["time_billed"]["entries"] == 2, "the undo binds them again " + r.text[:160])
 check(entry(A, E1["id"])["billed"]["id"] == WIN, "after the undo the entry is billed again")
+check(entry(A, E5["id"])["billed"] is None and entry(A, E2["id"])["billed"] is None,
+      "the undo leaves entries the release did not free open (other open / not billable entry)")
 check(A.post(B + f"{D}/{WIN}/time-release", json={"undo": "x"}).status_code == 400, "undo: invalid ids 400")
 check(A.delete(B + f"{D}/{WIN}").status_code == 409, "a finalised invoice cannot be deleted (the entries stay billed)")
 # 2.144.6 (#2053, review): someone else who sees the entry (list member) gets "billed" without the invoice id / number
@@ -201,6 +207,25 @@ for q in (None, {"user": "all"}, {"list_id": LID}):
     if eb is not None:
         check(eb["billed"] and eb["billed"]["id"] is None and eb["billed"]["number"] == "", f"a list member sees billed without the number: {eb['billed']}")
         break
+
+# 2.144.6 (#2053, review 3): the person who tracked the time but has no role in the invoice's office (here: someone of
+# another organisation, like a guest of a private list or a former member) sees "billed", not the number / id
+r = Ca.post(B + "/api/lists", json={"name": "Carl privat", "time_tracking": True})
+check(r.ok, "carl: a list " + r.text[:120])
+EC = add(Ca, r.json()["id"], "2026-05-05T08:00:00Z", 30) if r.ok else {"id": 0}
+dbx("UPDATE time_entries SET billed_doc_id=?, billed_at='2026-06-01T00:00:00' WHERE id=?", (WIN, EC["id"]))
+r = Ca.patch(B + f"{T}/{EC['id']}", json={"note": "Abstimmung"})
+check(r.ok and (r.json()["billed"] or {}).get("id", 0) is None and r.json()["billed"]["number"] == "",
+      "no role in the invoice's office: billed without id / number " + r.text[:160])
+r = Ca.patch(B + f"{T}/{EC['id']}", json={"minutes": 40})
+check(r.status_code == 409 and "already billed" in r.json().get("error", "") and "RE-2026-901" not in r.text,
+      "no role in the invoice's office: the lock names no number " + r.text[:160])
+r = Ca.delete(B + f"{T}/{EC['id']}")
+check(r.status_code == 409 and "RE-2026-901" not in r.text, "no role: delete 409 without the number " + r.text[:160])
+# review 1: the guarded write (AND billed_doc_id IS NULL) keeps the note-only PATCH of a billed entry working
+r = A.patch(B + f"{T}/{E1['id']}", json={"note": "Schnitt"})
+check(r.ok and r.json()["billed"]["number"] == "RE-2026-901", "billed entry: note-only PATCH passes the guarded update " + r.text[:120])
+check(A.delete(B + f"{T}/{E1['id']}").status_code == 409 and entry(A, E1["id"]) is not None, "billed entry: delete stays 409, entry kept")
 
 # ---------------------------------------------------------------- a vanished document frees the entry
 E4 = add(A, LID, "2026-05-07T08:00:00Z", 45)

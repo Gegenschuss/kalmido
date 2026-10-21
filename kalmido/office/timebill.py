@@ -22,16 +22,19 @@ from .model import office_role, pb_cl_sql
 
 TBL_LOCKED = N_("This time is on invoice {0}: duration, date, task and billable can no longer be changed")
 TBL_LOCKED_DEL = N_("This time is on invoice {0} and cannot be deleted")
+TBL_LOCKED_ANON = N_("This time is already billed: duration, date, task and billable can no longer be changed")
+TBL_LOCKED_DEL_ANON = N_("This time is already billed and cannot be deleted")
+TBL_LOG_IDS = 5000  # 2.144.6 A (#2053 review 2): released ids kept in the office log for the undo (fits OFX_DETAIL_MAX)
 
 
 def tbill_doc(c, did):
-    """The document an entry was billed on, if it still exists: {id, number, kind, status} or None."""
+    """The document an entry was billed on, if it still exists: {id, org_id, number, kind, status} or None."""
     if not did:
         return None
     # system_ctx: only whether the billing document still exists and its number (to explain the lock to the person who
     # tracked the time, e.g. a guest of a private list), never its content
     with system_ctx(c):
-        r = c.execute("SELECT id, number, kind, status FROM office_docs WHERE id=?", (did,)).fetchone()
+        r = c.execute("SELECT id, org_id, number, kind, status FROM office_docs WHERE id=?", (did,)).fetchone()
     return dict(r) if r else None
 
 
@@ -48,7 +51,47 @@ def tbill_need_open(c, r, b):
     if d is None:
         c.execute("UPDATE time_entries SET billed_doc_id=NULL, billed_at=NULL WHERE id=?", (r["id"],))
         return
-    raise Denied(409, tr(TBL_LOCKED_DEL if b is None else TBL_LOCKED, d["number"] or tr("Draft")))
+    tbill_locked(c, d, b is None)
+
+
+def tbill_shows(c, d, uid):
+    """2.144.6 A (#2053 review 3): whether uid may see the number / id of billing document d -- only with a role in its
+    office (in a personal office: its owner); a guest or former member learns "billed", not another area's numbering."""
+    if not d or uid is None or not d.get("org_id"):
+        return False
+    from flask import g, has_request_context
+    if c is None:
+        from ..core.db import db
+        c = db()
+    cache = g.setdefault("tbill_roles", {}) if has_request_context() else {}
+    k = (uid, d["org_id"])
+    if k not in cache:
+        cache[k] = office_role(c, uid, d["org_id"]) is not None
+    return cache[k]
+
+
+def tbill_locked(c, d, delete):
+    """409 for an entry billed on document d (None = number unknown); the number only for someone with a role there."""
+    from flask import g
+    u = getattr(g, "user", None)
+    if tbill_shows(c, d, u["id"] if u is not None else None):
+        raise Denied(409, tr(TBL_LOCKED_DEL if delete else TBL_LOCKED, d["number"] or tr("Draft")))
+    raise Denied(409, tr(TBL_LOCKED_DEL_ANON if delete else TBL_LOCKED_ANON))
+
+
+def tbill_guard(r, b):
+    """2.144.6 A (#2053 review 1): whether the UPDATE / DELETE of entry r must carry "AND billed_doc_id IS NULL" -- always,
+    except for the note-only PATCH of a billed entry (tbill_need_open let it through). Without the condition a draft made
+    between tbill_need_open and the write would keep hours whose entry was then changed or deleted."""
+    return not ("billed_doc_id" in r.keys() and r["billed_doc_id"]) or b is None
+
+
+def tbill_lost(c, eid, delete):
+    """The guarded write changed no row: entry eid was billed meanwhile (409 like tbill_need_open) or is gone (404)."""
+    r = c.execute("SELECT billed_doc_id FROM time_entries WHERE id=?", (eid,)).fetchone()
+    if r is None:
+        raise Denied(404)
+    tbill_locked(c, tbill_doc(c, r["billed_doc_id"]), delete)
 
 
 def tbill_billable(v):
@@ -62,7 +105,8 @@ def tbill_billable(v):
 def tbill_out(r, uid=None):
     """The billing fields of an entry row: billable, billed {id, number, at} (None = open). The number comes from tbill_doc
     (cached per request); a document that no longer exists shows the entry open. Only the person who tracked the time
-    (uid) sees the document's id and number; others (colleagues, guests, agents) see "billed" without them."""
+    (uid) sees the document's id and number, and only with a role in the document's office (tbill_shows); others
+    (colleagues, guests, former members, agents) see "billed" without them."""
     from flask import g, has_request_context
     from ..core.db import db
     k = r.keys()
@@ -70,13 +114,13 @@ def tbill_out(r, uid=None):
     d = None
     if bid:
         if not has_request_context():  # no lookup outside a request: billed, number unknown
-            d = {"number": ""}
+            d = {"number": "", "org_id": None}
         else:
             cache = g.setdefault("tbill_docs", {})
             if bid not in cache:
                 cache[bid] = tbill_doc(db(), bid)
             d = cache[bid]
-    own = uid is not None and "user_id" in k and r["user_id"] == uid
+    own = uid is not None and "user_id" in k and r["user_id"] == uid and tbill_shows(None, d, uid)
     return {"billable": bool(r["billable"]) if "billable" in k else True,
             "billed": ({"id": bid, "number": d["number"] or "", "at": r["billed_at"]} if own
                        else {"id": None, "number": "", "at": r["billed_at"]}) if d else None}
@@ -178,6 +222,18 @@ def tbill_open_get():
     return jsonify(tbill_summary(c, sql, args))
 
 
+def tbill_released_ids(c, oid, did):
+    """2.144.6 A (#2053 review 2): the ids the last release of document did freed (office log), empty without a release,
+    None when the log kept only the count (more than TBL_LOG_IDS entries): then the undo's other conditions alone apply."""
+    from .ledger import _log_public
+    r = c.execute("SELECT * FROM office_doc_log WHERE org_id=? AND doc_id=? AND action='time_release' ORDER BY id DESC LIMIT 1",
+                  (oid, did)).fetchone()
+    if r is None:
+        return set()
+    ids = _log_public(c, r)["detail"].get("ids")
+    return set(ids) if isinstance(ids, list) else None
+
+
 @app.post("/api/office/docs/<int:did>/time-release")
 def tbill_release_post(did):
     """The office admin frees the time entries of a cancelled invoice (they can be billed again) -> {released: [ids]}.
@@ -195,10 +251,14 @@ def tbill_release_post(did):
         ids = b["undo"]
         if not isinstance(ids, list) or not all(isinstance(x, int) for x in ids) or len(ids) > 20000:
             raise BadInput(tr("Invalid value: {0}", "undo"))
+        freed = tbill_released_ids(c, oid, did)
+        if freed is not None:  # 2.144.6 A (#2053 review 2): only what this invoice's last release really freed
+            ids = [x for x in ids if x in freed]
         if ids:
-            # only open entries of the invoice's client's lists in this office (what the release freed)
+            # only open, billable, finished entries of the invoice's client's lists in this office
             ts = iso(now_utc())
             c.execute(f"UPDATE time_entries SET billed_doc_id=?, billed_at=?, updated_at=? WHERE billed_doc_id IS NULL "
+                      f"AND billable=1 AND \"end\" IS NOT NULL "
                       f"AND id IN ({','.join('?' * len(ids))}) AND list_id IN (SELECT l.id FROM lists l WHERE l.client_id=? "
                       f"AND {pb_cl_sql(c, oid, 'l.org_id', 'l.owner_id')})", [did, ts, ts] + ids + [r["client_id"]])
         ofx_log(c, oid, "time_rebind", doc_id=did, detail={"entries": len(ids)})
@@ -207,7 +267,8 @@ def tbill_release_post(did):
         return jsonify(released=[], time_billed=tbill_doc_time(c, did))
     ids = [x[0] for x in c.execute("SELECT id FROM time_entries WHERE billed_doc_id=? ORDER BY id", (did,))]
     tbill_free(c, did)
-    ofx_log(c, oid, "time_release", doc_id=did, detail={"entries": len(ids)})
+    # 2.144.6 A (#2053 review 2): the freed ids, the undo checks against them (a huge release keeps only the count)
+    ofx_log(c, oid, "time_release", doc_id=did, detail={"entries": len(ids), **({"ids": ids} if len(ids) <= TBL_LOG_IDS else {})})
     bump(c)
     c.commit()
     return jsonify(released=ids, time_billed=tbill_doc_time(c, did))

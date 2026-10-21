@@ -527,7 +527,7 @@ def time_update(eid):
     from .timesheet import tsl_check, tz_of
     zone = tz_of(c, r["user_id"])
     tsl_check(c, r["user_id"], r["start"], zone=zone)  # 2.125.0 B (#2119): nothing changes in a closed month
-    from ..office.timebill import tbill_billable, tbill_need_open
+    from ..office.timebill import tbill_billable, tbill_guard, tbill_lost, tbill_need_open
     tbill_need_open(c, r, b)  # 2.144.6 A (#2053): a billed entry keeps everything but its note (409)
     sets, args = [], []
     if "billable" in b:
@@ -554,7 +554,9 @@ def time_update(eid):
         sets += ["start=?", "\"end\"=?", "seconds=?"]
         args += [iso(start), iso(end), sec]
     if sets:
-        c.execute(f"UPDATE time_entries SET {', '.join(sets)}, updated_at=? WHERE id=?", (*args, iso(now_utc()), eid))
+        guard = " AND billed_doc_id IS NULL" if tbill_guard(r, b) else ""  # 2.144.6 A (#2053 review 1): billed meanwhile -> 409
+        if c.execute(f"UPDATE time_entries SET {', '.join(sets)}, updated_at=? WHERE id=?{guard}", (*args, iso(now_utc()), eid)).rowcount == 0:
+            tbill_lost(c, eid, False)
         bump(c)
         c.commit()
     return jsonify(one_entry(c, eid))
@@ -569,10 +571,11 @@ def time_delete(eid):
         return r
     from .timesheet import tsl_check
     tsl_check(c, r["user_id"], r["start"])  # 2.125.0 B (#2119)
-    from ..office.timebill import tbill_need_open
+    from ..office.timebill import tbill_lost, tbill_need_open
     tbill_need_open(c, r, None)  # 2.144.6 A (#2053): billed time stays (409)
     old = one_entry(c, eid)
-    c.execute("DELETE FROM time_entries WHERE id=?", (eid,))
+    if c.execute("DELETE FROM time_entries WHERE id=? AND billed_doc_id IS NULL", (eid,)).rowcount == 0:
+        tbill_lost(c, eid, True)  # 2.144.6 A (#2053 review 1): billed between the check and the delete
     bump(c)
     c.commit()
     return jsonify(ok=True, entry=old)
