@@ -1396,6 +1396,9 @@ instances the numbers can be set and the work can be split:
   the threads (configured, busy now, the peak, requests served), the pool (size, available, waiting, timeouts), the
   connection budget and the state of every background loop (`running` here, `waiting` = another container runs it).
   With a worker it also shows the worker's last heartbeat. It holds numbers only, no user data.
+  Since 2.149.0 also `requests`: p50 / p95 / max of duration, statements and database time of the last 1000 requests;
+  every answer carries a `Server-Timing` header, and a request slower than `KALMIDO_SLOW_REQUEST_MS` (default 500,
+  0 = off) leaves one log line (method, route pattern, numbers; no user data).
 - **Each background loop runs once per instance.** Every loop takes a lock of its own in the database before its rounds
   (also in the role `all`). Two containers on one database therefore never send a reminder twice, deliver a webhook
   twice or write two backups; the second one waits and takes over when the first one stops.
