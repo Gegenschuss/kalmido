@@ -234,8 +234,13 @@ if len(P) == 4:
     check(all(x[0] is None for x in sql(f"SELECT asn FROM doc_meta WHERE node_id IN ({','.join('?' * len(P))})", tuple(P))), "undo: the parts gave their numbers up")
     check((doc(Fr, SID).get("split") or {}).get("stack") is True, "undo: the stack carries its mark again")
     check(Fr.post(B + f"/api/docs/{SID}/unsplit").status_code == 409, "undo twice: 409")
-    # redo
-    r = Fr.post(B + f"/api/docs/{SID}/split", json={"parts": [[1], [2, 3], [5], [7]]})
+    # redo -- 2.154.0 E (#1111, A4): as a double click (two requests at once) it splits once
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(2) as ex:
+        rs = list(ex.map(lambda _: Fr.post(B + f"/api/docs/{SID}/split", json={"parts": [[1], [2, 3], [5], [7]]}), range(2)))
+    codes = sorted(x.status_code for x in rs)
+    check(codes[0] == 201 and codes[1] in (404, 409), f"double split: once ({codes})")
+    r = next((x for x in rs if x.status_code == 201), rs[0])
     check(r.status_code == 201, f"split again ({r.status_code} {r.text[:120]})")
     if r.status_code == 201:
         P2 = r.json()["ids"]

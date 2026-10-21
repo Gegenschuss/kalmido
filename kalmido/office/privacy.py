@@ -42,6 +42,7 @@ DSB_KINDS = {"dpa": (N_("Data processing agreement"), "privacy_dpa", True),
 DSB_STATUS = {"open": N_("Open"), "sent": N_("Sent"), "handed": N_("Handed over"), "signed": N_("Signed"), "declined": N_("Declined")}
 DSB_HINT_DPA = N_("Only needed when you process personal data on behalf of the client (Art. 28 GDPR).")
 DSB_REVIEW = N_("Signed (by mail, please check)")
+DSB_REPLY = N_("Reply received (please check)")  # 2.154.0 E (#2192): review=2, a reply that was not filed
 DSB_CODE_ABC = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0 / O / 1 / I
 DSB_CODE_LEN = 12
 DSB_SUBJ_RE = re.compile(r"\[DS-([A-Za-z2-9]{12})\]")
@@ -79,6 +80,8 @@ def dsb_code(c, r):
 
 
 def dsb_status_label(r):
+    if r["review"] == 2:
+        return tr(DSB_REPLY)
     return tr(DSB_REVIEW) if r["status"] == "signed" and r["review"] else tr(DSB_STATUS.get(r["status"], r["status"]))
 
 
@@ -246,10 +249,11 @@ def dsb_patch(sid):
 
 @app.post("/api/office/privacy-sheets/<int:sid>/confirm")
 def dsb_confirm(sid):
-    """A person checked the signed sheet that came by mail: "please check" ends (the status stays signed)."""
+    """A person checked the signed sheet that came by mail (or a reply that was not filed): "please check" ends (the
+    status stays)."""
     c, uid, oid = _ctx()
     r = dsb_sheet(c, oid, sid)
-    if r["status"] != "signed":
+    if r["status"] != "signed" and r["review"] != 2:
         raise Denied(409, tr("Only a signed sheet can be confirmed"))
     c.execute("UPDATE office_privacy_sheets SET review=0, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
     bump(c)
@@ -441,6 +445,10 @@ def dsb_upload(sid):
     c, uid, oid = _ctx()
     write_lock(c, f"office_privacy_{int(sid)}")
     r = dsb_sheet(c, oid, sid)
+    if r["archived"]:  # 2.154.0 E (#2192)
+        raise Denied(409, tr("This sheet is archived"))
+    if not DSB_KINDS.get(r["kind"], ("", "", False))[2]:
+        raise Denied(409, tr("This sheet needs no signature"))
     f = request.files.get("file")
     if f is None:
         raise BadInput(tr("Invalid value: {0}", "file"))
@@ -493,6 +501,39 @@ def dsb_pdf_get(sid):
     return resp
 
 
+def dsb_mail_pick(c, r, files):
+    """2.154.0 E (#2192): the attachment that is most likely the signed sheet -- PDFs first (not the sheet as it was
+    sent: same SHA-256 as its filed PDF), then pictures of 30 KB or more (no logos / signature images); None = none."""
+    from ..files.store import fs_read
+    ok = [(dsb_kind_of(data), data) for _name, _mime, data in files if 0 < len(data) <= DSB_MAIL_MB * 1024 * 1024]
+    pdfs = [x for x in ok if x[0] == "application/pdf"]
+    if pdfs:
+        sent = None
+        nid = c.execute("SELECT node_id FROM office_gen_docs WHERE id=? AND org_id=?", (r["gen_doc_id"], r["org_id"])).fetchone() if r["gen_doc_id"] else None
+        if nid and nid["node_id"]:
+            try:
+                sent = hashlib.sha256(fs_read(c, nid["node_id"])).hexdigest()
+            except (Denied, OSError, ValueError):
+                sent = None
+        pdfs = [x for x in pdfs if hashlib.sha256(x[1]).hexdigest() != sent]
+    return next(iter(pdfs), None) or next((x for x in ok if x[0] in ("image/jpeg", "image/png") and len(x[1]) >= 30 * 1024), None)
+
+
+def dsb_reply_note(c, r, msg, subj, text):
+    """2.154.0 E (#2192): a reply with a known code that is not filed (a revocation, a question, a DOCX / HEIC file, an
+    archived sheet) never goes silently: an office log entry with sender, subject and the start of its text, and a sheet
+    that is not archived shows "Reply received (please check)" (review=2) until a person confirms it."""
+    import email.utils
+    from .ledger import ofx_log
+    sender = email.utils.parseaddr(str(msg.get("From", "")))[1]
+    ofx_log(c, r["org_id"], "privacy_reply", target="privacy_sheet",
+            detail={"privacy_sheet": r["id"], "subject": subj[:200], "from": sender[:200], "text": (text or "").strip()[:2000], "taken": 0})
+    if not r["archived"]:
+        c.execute("UPDATE office_privacy_sheets SET review=2, updated_at=? WHERE id=?", (iso(now_utc()), r["id"]))
+    c.commit()
+    return 0
+
+
 def dsb_mail_import(c, msg, raw):
     """integrations/mail.py mail_import, first: a reply with the code of a mailed sheet that wants a signature (subject
     "[DS-<code>]" or the plus address "+ds-<code>@") -> its first PDF / picture is filed into that sheet's office area,
@@ -510,22 +551,17 @@ def dsb_mail_import(c, msg, raw):
                               for k in dict.fromkeys(codes)) if x), None)
         if not r:
             return None
-        if r["archived"] or r["status"] != "sent" or not DSB_KINDS.get(r["kind"], ("", "", False))[2]:
-            return 0  # known, but nothing to take in (already signed / not mailed): never a task
         uid = r["created_by"]
         u = c.execute("SELECT disabled FROM users WHERE id=?", (uid,)).fetchone() if uid else None
         owner = pb_owner(c, r["org_id"])
         if not u or u["disabled"] or (owner is None and int(r["org_id"]) not in acx_of(c, uid).org_ids):
             return 0
-        _text, files = mail_text(msg)
-        pick = None
-        for name, mime, data in files[:20]:
-            kind = dsb_kind_of(data)
-            if kind and 0 < len(data) <= DSB_MAIL_MB * 1024 * 1024:
-                pick = (kind, data)
-                break
+        text, files = mail_text(msg)
+        if r["archived"] or r["status"] != "sent" or not DSB_KINDS.get(r["kind"], ("", "", False))[2]:
+            return dsb_reply_note(c, r, msg, subj, text)  # known, but nothing to take in (already signed / not mailed): never a task
+        pick = dsb_mail_pick(c, r, files[:20])
         if not pick:
-            return 0
+            return dsb_reply_note(c, r, msg, subj, text)
         d = c.execute("SELECT title, lang FROM office_gen_docs WHERE id=? AND org_id=?", (r["gen_doc_id"], r["org_id"])).fetchone() if r["gen_doc_id"] else None
         ext = {"application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png"}[pick[0]]
         mid = str(msg.get("Message-ID", "")).strip()[:200] or ("sha:" + hashlib.sha256(raw).hexdigest())
@@ -535,8 +571,7 @@ def dsb_mail_import(c, msg, raw):
                                f"privacy:{r['id']}:mail:{hashlib.sha256(mid.encode()).hexdigest()[:24]}")
         except (Denied, ValueError, QuotaExceeded) as e:
             print("privacy sheet: mail attachment refused", type(e).__name__, flush=True)
-            c.commit()
-            return 0
+            return dsb_reply_note(c, r, msg, subj, text)
         ts = iso(now_utc())
         c.execute("UPDATE office_privacy_sheets SET status='signed', signed_via='mail', signed_at=?, signed_node_id=?, review=1, updated_at=? "
                   "WHERE id=? AND status='sent'", (ts, nid, ts, r["id"]))

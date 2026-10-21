@@ -407,7 +407,7 @@ def pep_missing(c, oid, r, conf=None):
     out = []
     if not office_feature(c, oid, "docs.einvoice"):
         out.append("feature")
-    if r["kind"] not in ("invoice", "credit") or not ofx_locked(r):
+    if r["kind"] not in ("invoice", "credit") or not ofx_locked(r) or r["status"] == "cancelled":  # 2.154.0 E (#1960): no cancelled ones
         out.append("kind")
     if not conf["provider"]:
         out.append("setup")
@@ -519,13 +519,18 @@ def pep_send(c, oid, uid, r, again=False):
     if not reach:
         raise Denied(409, tr(PEP_ERR["unreachable"]) + f" ({receiver})")
     ts = iso(now_utc())
-    ref = str(uuid.uuid4())
-    from ..core.pg import insert_id
+    sha = hashlib.sha256(ubl).hexdigest()
+    # 2.154.0 E (#1960): a retry after a timeout / network error keeps the idempotency key of the failed send when the
+    # provider never confirmed it and the XML is the same, so a send that did arrive is not delivered twice.
+    last = sends[0] if sends else None
+    ref = (last["idem"] if again and last and last["status"] == "error" and not last["provider_ref"] and last["xml_sha256"] == sha
+           and last["idem"] else str(uuid.uuid4()))
+    from ..core.pg import IntegrityError, insert_id
     try:
         sid = insert_id(c, "INSERT INTO office_peppol_sends(org_id, doc_id, provider, provider_ref, sender_id, receiver_id, profile, xml_sha256, status, "
                         "message, idem, created_by, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                        (oid, r["id"], conf["provider"], "", conf["sender_id"], receiver, prof, hashlib.sha256(ubl).hexdigest(), "sending", "", ref, uid, ts, ts))
-    except Exception:  # noqa: BLE001 -- the unique index: a second request at the same time
+                        (oid, r["id"], conf["provider"], "", conf["sender_id"], receiver, prof, sha, "sending", "", ref, uid, ts, ts))
+    except IntegrityError:  # the unique index: a second request at the same time
         c.rollback()
         raise Denied(409, tr("This document went over the Peppol network already")) from None
     c.commit()  # the row stands before anything goes out: a crash never leaves a sent document without its record
@@ -610,7 +615,7 @@ def pep_ubl_get(did):
     from .pdfweb import _file_response, epdf_name
     c, uid, oid = _ctx()
     r = _doc(c, oid, did)
-    if r["kind"] not in ("invoice", "credit") or not ofx_locked(r):
+    if r["kind"] not in ("invoice", "credit") or not ofx_locked(r) or r["status"] == "cancelled":
         raise Denied(409, tr("The e-invoice XML exists for finalised invoices and credit notes only."))
     office_need_feature(c, oid, "docs.einvoice")
     data, _prof = pep_ubl(c, oid, r)

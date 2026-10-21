@@ -274,6 +274,12 @@ S_CONS = A.post(B + PS, json={"client_id": CL, "kind": "consent", "template_id":
 drop(f"Re: Einwilligung [DS-{code}]", files=[("unterschrieben.pdf", PDF, "application/pdf")])  # the DPA's code: already signed
 poll()
 check(sheet(A, S_DPA["id"])["signed_via"] == "link", "#2192: a reply for a sheet already signed changes nothing")
+# 2.154.0 E (#2192): ... but it is never silently gone: office log entry + "Reply received (please check)" (review 2)
+x = sheet(A, S_DPA["id"])
+check(x["status"] == "signed" and x["review"] == 2 and x["status_label"] == "Reply received (please check)", f"#2192 E C1: a reply not filed is shown {x}")
+check(sql("SELECT count(*) FROM office_doc_log WHERE org_id=? AND action='privacy_reply'", (ORG,))[0][0] >= 1, "#2192 E C1: the reply is in the office log")
+r = A.post(B + PS + f"/{S_DPA['id']}/confirm")
+check(r.ok and r.json()["status"] == "signed" and not r.json()["review"] and r.json()["signed_via"] == "link", "#2192 E C1: reply checked, status stays")
 m = A.get(B + PS + f"/{S_CONS['id']}/mail").json()
 c2 = re.search(r"\[DS-([A-Z2-9]{12})\]", m["subject"]).group(1)
 drop(f"Re: Einwilligung [DS-{c2}]", files=[("x.pdf", PDF, "application/pdf")])  # not mailed yet: nothing
@@ -283,12 +289,15 @@ check(A.post(B + PS + f"/{S_CONS['id']}/send", json={"to": "kunde@example.com"})
 drop(f"Re: Einwilligung [DS-{c2}]", files=[("notiz.txt", b"nur Text", "text/plain")])
 poll()
 check(sheet(A, S_CONS["id"])["status"] == "sent", "#2192: a reply without PDF / picture changes nothing")
+check(sheet(A, S_CONS["id"])["review"] == 2, "#2192 E C1: a reply without PDF / picture (e.g. a revocation) marks the sheet")
+r = A.post(B + PS + f"/{S_CONS['id']}/confirm")
+check(r.ok and r.json()["status"] == "sent" and not r.json()["review"], f"#2192 E C1: confirm also a sheet that is not signed ({r.status_code})")
 drop("Re: Einwilligung [DS-ABCDEFGHJKLM]", files=[("x.pdf", PDF, "application/pdf")])
 poll()
 check(sheet(A, S_CONS["id"])["status"] == "sent", "#2192: an unknown code changes nothing")
 drop(f"Re: Einwilligung [DS-{c2.lower()}]", files=[("Einwilligung signiert.pdf", PDF, "application/pdf")])
 poll()
-x = until(lambda: (sheet(A, S_CONS["id"]) or {}).get("review") and sheet(A, S_CONS["id"]))
+x = until(lambda: (sheet(A, S_CONS["id"]) or {}).get("status") == "signed" and sheet(A, S_CONS["id"]))
 check(x and x["status"] == "signed" and x["signed_via"] == "mail" and x["review"] and x["signed_node_id"], f"#2192: a reply with the code: signed, please check {x}")
 check(x and "please check" in x["status_label"], "#2192: the status says so")
 nd = sql("SELECT org_id FROM fs_nodes WHERE id=?", (x["signed_node_id"],)) if x else []
@@ -304,10 +313,15 @@ check(r.ok and r.json()["status"] == "signed" and not r.json()["review"], "#2192
 S_C2 = A.post(B + PS, json={"client_id": CL, "kind": "consent", "template_id": T_CONS}).json()["sheet"]
 A.post(B + PS + f"/{S_C2['id']}/send", json={"to": "kunde@example.com"})
 c3 = re.search(r"\[DS-([A-Z2-9]{12})\]", A.get(B + PS + f"/{S_C2['id']}/mail").json()["subject"]).group(1)
-drop("Unterschrift", to=f"tasks+ds-{c3.lower()}@example.test", files=[("scan.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 64, "image/png")])
+# 2.154.0 E (#2192, C3): the sheet as it was sent and a small logo are skipped, the scan (30 KB or more) is filed
+SENT = A.get(B + PS + f"/{S_C2['id']}/pdf").content
+SCAN = b"\x89PNG\r\n\x1a\n" + b"\x00" * (40 * 1024)
+drop("Unterschrift", to=f"tasks+ds-{c3.lower()}@example.test", files=[("original.pdf", SENT, "application/pdf"),
+     ("logo.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 64, "image/png"), ("scan.png", SCAN, "image/png")])
 poll()
 x = until(lambda: (sheet(A, S_C2["id"]) or {}).get("review") and sheet(A, S_C2["id"]))
 check(x and x["status"] == "signed" and x["signed_via"] == "mail", f"#2192: the plus address with the code (a picture) {x}")
+check(SENT.startswith(b"%PDF-") and A.get(B + PS + f"/{S_C2['id']}/pdf?signed=1").content == SCAN, "#2192 E C3: not the sent PDF, not the logo: the scan")
 r = A.patch(B + PS + f"/{S_C2['id']}", json={"status": "sent"})
 check(r.ok and r.json()["status"] == "sent" and not r.json()["review"], "#2192: not the signed sheet: back to sent")
 
@@ -372,8 +386,14 @@ x = until(lambda: (sheet(Fr, FS2) or {}).get("review") and sheet(Fr, FS2))
 nd = sql("SELECT org_id, owner_id FROM fs_nodes WHERE id=?", (x["signed_node_id"],)) if x else []
 check(x and x["signed_via"] == "mail" and nd and nd[0][0] is None and nd[0][1] == FID, f"freelancer: the reply lands in the own space {nd}")
 check(Fr.post(B + PS + f"/{FS2}/confirm").ok, "freelancer: confirm")
+# 2.154.0 E (#2192, C4): the information needs no signature -> 409; the upload on a DPA; an archived sheet 409
 r = Fr.post(B + PS + f"/{FS}/signed", files={"file": ("i.pdf", PDF, "application/pdf")})
+check(r.status_code == 409, f"freelancer: no upload for the information ({r.status_code})")
+FS3 = Fr.post(B + PS, json={"client_id": FCL, "kind": "dpa", "template_id": FT2}).json()["sheet"]["id"]
+r = Fr.post(B + PS + f"/{FS3}/signed", files={"file": ("i.pdf", PDF, "application/pdf")})
 check(r.ok and r.json()["status"] == "signed", "freelancer: upload")
+check(Fr.delete(B + PS + f"/{FS3}").ok and Fr.post(B + PS + f"/{FS3}/signed", files={"file": ("i.pdf", PDF, "application/pdf")}).status_code == 409,
+      "freelancer: no upload for an archived sheet")
 check(Fr.patch(B + PS + f"/{FS}", json={"status": "handed"}).ok and Fr.delete(B + PS + f"/{FS}").ok and Fr.post(B + PS + f"/{FS}/restore").ok,
       "freelancer: status, archive, restore")
 check(Fr.get(B + PS + f"/{S_DPA['id']}/pdf").status_code == 404 and Fr.get(B + PS + f"?client_id={CL}").status_code == 404,

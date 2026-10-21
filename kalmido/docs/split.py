@@ -26,6 +26,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import threading
 
 from flask import Response, g, jsonify, request
 
@@ -46,6 +47,7 @@ SP_INK_SURE = 0.0008         # ... and without text recognition: only this littl
 SP_TEXT = 12                 # visible characters at most on a blank page
 SP_THUMB_W = 180
 SP_THUMBS = 12               # previews per request
+_THUMB_SEM = threading.BoundedSemaphore(2)  # 2.154.0 E (#1111): preview renders at the same time at most
 
 
 def _now():
@@ -133,16 +135,21 @@ logging.disable(logging.CRITICAL)
 warnings.simplefilter("ignore")
 from pypdf import PdfReader, PdfWriter
 parts = json.loads(sys.argv[1])
-r = PdfReader(io.BytesIO(sys.stdin.buffer.read()))
+src = sys.stdin.buffer.read()
+r = PdfReader(io.BytesIO(src))
 if r.is_encrypted and not r.decrypt(""):
     sys.exit(3)
 out = sys.stdout.buffer
+budget = 4 * len(src) + (32 << 20)  # 2.154.0 E (#1111): the parts together never grow far past the stack
 for pages in parts:
     w = PdfWriter()
     for p in pages:
         w.add_page(r.pages[p - 1])
     b = io.BytesIO()
     w.write(b)
+    budget -= len(b.getvalue())
+    if budget < 0:
+        sys.exit(4)
     out.write(struct.pack(">Q", len(b.getvalue())) + b.getvalue())
 """
 
@@ -169,13 +176,16 @@ def sp_scan(data, pages, prefix):
             src = os.path.join(tmp, "in.pdf")
             with open(src, "wb") as f:
                 f.write(data)
+            fails = 0
             for i in range(1, n + 1):
                 base = os.path.join(tmp, f"p-{i}")
                 try:
                     O._run(["pdftoppm", "-r", str(SP_DPI), "-gray", "-f", str(i), "-l", str(i), "-singlefile", "-png", src, base],
-                           O.OCR_PAGE_S, fsize=128 << 20)
+                           O.OCR_PAGE_S, fsize=32 << 20)
                 except subprocess.TimeoutExpired:
-                    pass
+                    fails += 1  # 2.154.0 E (#1111): a stack of slow pages does not hold the reader for minutes
+                    if fails >= 2:
+                        return None
             try:
                 p = subprocess.run([sys.executable, "-I", "-c", SCAN_WORKER, tmp, str(n)], capture_output=True, timeout=300,
                                    close_fds=True, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
@@ -299,7 +309,7 @@ def docs_split_get(nid):
         return err(tr("The document is still being recognised"), 409)
     v = _get(m)
     pages = v.get("pages")
-    if not isinstance(pages, list) or v.get("state") == "done":
+    if not isinstance(pages, list):  # 2.154.0 E (#1111): a split stack keeps its scan (no new read)
         if (m["pages"] or 0) > SP_PAGES:
             return err(tr("A stack has at most {0} pages", SP_PAGES), 413)
         data = _pdf_of(c, nid, m, n)
@@ -333,6 +343,18 @@ def docs_split_thumbs(nid):
     data = _pdf_of(c, nid, m, n)
     if data is None:
         return jsonify(thumbs=[])
+    if not _THUMB_SEM.acquire(timeout=20):
+        return err(tr("The pages cannot be read right now, try again later"), 503)
+    try:
+        out = _thumbs(data, first, last)
+    finally:
+        _THUMB_SEM.release()
+    resp = jsonify(thumbs=out)
+    resp.headers["Cache-Control"] = "private, max-age=300"
+    return resp
+
+
+def _thumbs(data, first, last):
     out = []
     with tempfile.TemporaryDirectory(prefix="ksth-") as tmp:
         src = os.path.join(tmp, "in.pdf")
@@ -350,9 +372,7 @@ def docs_split_thumbs(nid):
             except (OSError, subprocess.SubprocessError):
                 src_uri = None
             out.append({"page": i, "src": src_uri})
-    resp = jsonify(thumbs=out)
-    resp.headers["Cache-Control"] = "private, max-age=300"
-    return resp
+    return out
 
 
 def _parts_clean(raw, n):
@@ -378,7 +398,7 @@ def _cut(data, parts):
     p = subprocess.run([sys.executable, "-I", "-c", CUT_WORKER, json.dumps(parts)], input=data, capture_output=True,
                        timeout=180, close_fds=True, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
     if p.returncode != 0:
-        raise ValueError("encrypted" if p.returncode == 3 else "unreadable")
+        raise ValueError("encrypted" if p.returncode == 3 else "unreadable")  # 4 = output budget exceeded
     out, b, i = [], p.stdout, 0
     while i + 8 <= len(b):
         ln = struct.unpack(">Q", b[i:i + 8])[0]
@@ -398,6 +418,8 @@ def docs_split(nid):
     _no_agent()
     c = db()
     uid = me()
+    from ..core.pg import write_lock
+    write_lock(c, f"docs_split_{int(nid)}")  # 2.154.0 E (#1111): a double click splits once (the second one sees state done)
     m, n = _stack(c, nid, write=True)
     if m["state"] in ("wait", "run"):
         return err(tr("The document is still being recognised"), 409)
@@ -421,11 +443,11 @@ def docs_split(nid):
     scan = v.get("pages") if isinstance(v.get("pages"), list) else []
     asn_of = lambda ps: next((scan[p - 1].get("asn") for p in ps if p - 1 < len(scan) and scan[p - 1].get("asn") is not None), None)  # noqa: E731
     own_asn = m["asn"]
-    c.execute("UPDATE doc_meta SET asn=NULL WHERE node_id=?", (nid,))  # the stack's number goes to its part
     stem = re.sub(r"\.pdf$", "", n["name"], flags=re.I)[:110] or "document"
     ids, have_code = [], False
     try:
         with c.savepoint():
+            c.execute("UPDATE doc_meta SET asn=NULL WHERE node_id=?", (nid,))  # the stack's number goes to its part (2.154.0 E: undone on a failure)
             for i, (ps, pdf) in enumerate(zip(parts, pdfs), 1):
                 a = asn_of(ps)
                 pid = docs_ingest(c, uid, n["org_id"], f"{stem} ({i}).pdf", pdf, "application/pdf", m["source"], parent_id=n["parent_id"])
@@ -447,6 +469,9 @@ def docs_split(nid):
     except ValueError as e:
         c.rollback()
         return err(str(e))
+    except Denied as e:  # 2.154.0 E (#1111): e.g. no write right in the stack's folder
+        c.rollback()
+        return err(e.msg or tr("No permission (view only)"), 403)
     c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?", (_now(), uid, nid))
     fs_log_add(c, nid, "trash", "split")
     _put(c, nid, {**v, "state": "done", "parts": ids, "asn": own_asn})

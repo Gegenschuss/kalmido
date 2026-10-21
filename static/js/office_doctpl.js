@@ -391,10 +391,10 @@ function dsb_menu(b, x) {
   menu(b, [draft ? {label: tr('Edit and finish'), icon: 'edit', fn: () => { DT.data = null; DT.pv = null; go(`office/gendocs/${x.gen_doc_id}`); }} : null,
     !draft && x.node_id ? {label: tr('Open PDF'), icon: 'file', fn: () => dsb_open(x, false)} : null,
     x.signed_node_id ? {label: tr('Open the signed sheet'), icon: 'file', fn: () => dsb_open(x, true)} : null,
-    x.review ? {label: tr('Checked: signature is fine'), icon: 'check', fn: async () => { try { await api('POST', `${DSB_API}/${x.id}/confirm`); dsb_clReload(); } catch (e) { toast(e.message || ''); } }} : null,
+    x.review ? {label: x.review === 2 ? tr('Checked: reply handled') : tr('Checked: signature is fine'), icon: 'check',  /* 2.154.0 E (#2192): review 2 = a reply that was not filed (office log) */ fn: async () => { try { await api('POST', `${DSB_API}/${x.id}/confirm`); dsb_clReload(); } catch (e) { toast(e.message || ''); } }} : null,
     !draft && !(x.sign && x.status === 'signed') ? {label: tr('Send by e-mail…'), icon: 'mail', fn: () => dsb_mail(x)} : null,
     !draft && x.sign && x.status !== 'signed' ? {label: tr('Upload the signed sheet…'), icon: 'upload', fn: () => dsb_upload(x)} : null,
-    ...(draft ? [] : x.sign ? [st('signed', tr('Mark as signed')), st('declined', tr('Mark as declined')), x.review ? st('sent', tr('Not the signed sheet: back to sent')) : null]
+    ...(draft ? [] : x.sign ? [st('signed', tr('Mark as signed')), st('declined', tr('Mark as declined')), x.review === 1 ? st('sent', tr('Not the signed sheet: back to sent')) : null]
       : [st('handed', tr('Mark as handed over'))]),
     done || x.status === 'declined' ? st('open', tr('Mark as open')) : null,
     {label: tr('Archive'), icon: 'archive', fn: async () => {

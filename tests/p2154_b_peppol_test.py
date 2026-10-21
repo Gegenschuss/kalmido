@@ -248,6 +248,18 @@ r = Ca.post(B + f"{D}/{D3}/peppol", json={})
 check(r.status_code == 502, f"provider failure: 502: {r.status_code} {r.text[:200]}")
 v = view(Ca, D3).json()
 check(v["sends"] and v["sends"][0]["status"] == "error" and v["sends"][0]["message"] and v["can_retry"], f"recorded as error: {v['sends']}")
+# 2.154.0 E (#1960, B2): a retry after a failure the provider never confirmed keeps the idempotency key (same XML)
+n3 = len(stub_log())
+check(Ca.post(B + f"{D}/{D3}/peppol", json={"again": 1}).status_code == 502, "retry of the failure: 502 again")
+idems = [x["idem"] for x in stub_log() if x["path"] == "/own/documents" and x["receiver"] == "9930:DE111111111"]
+check(len(idems) >= 2 and idems[-1] == idems[-2] and len(stub_log()) > n3, f"retry keeps the idempotency key: {idems}")
+# 2.154.0 E (#1960, B1): a cancelled invoice (full credit note) is not sent and has no UBL
+D4 = invoice(Ca, CL2)
+r = Ca.post(B + f"{D}/{D4}/credit")
+check(r.status_code == 201 and Ca.post(B + f"{D}/{r.json()['id']}/finalize").ok, f"credit note for the whole invoice: {r.text[:200]}")
+check(Ca.get(B + f"{D}/{D4}").json().get("status") == "cancelled", "the invoice is cancelled")
+check(any(m["key"] == "kind" for m in view(Ca, D4).json()["missing"]), "cancelled: not sendable")
+check(Ca.post(B + f"{D}/{D4}/peppol", json={}).status_code == 409 and Ca.get(B + f"{D}/{D4}/ubl").status_code == 409, "cancelled: send 409, UBL 409")
 
 # ---------------------------------------------------------------- a person without an organisation (freelancer-matrix: office)
 FID, Fr = freelancer(B, A)
