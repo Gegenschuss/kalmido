@@ -8020,7 +8020,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
   .bot.bnod .b-hop{animation:b-nod .9s cubic-bezier(.3,.7,.4,1) 1}
   .bot.bnod .b-ant{animation:b-wave .9s ease-in-out 1}
 }
-@keyframes b-nod{0%,100%{transform:none}25%{transform:translateY(4px) rotate(-5deg)}55%{transform:translateY(-3px) rotate(3deg)}80%{transform:translateY(1px)}}
+@keyframes b-nod{0%,100%{transform:none}25%{transform:translateY(.25rem) rotate(-5deg)}55%{transform:translateY(-3px) rotate(3deg)}80%{transform:translateY(1px)}}
 @keyframes b-wave{0%,100%{transform:none}25%{transform:rotate(-20deg)}50%{transform:rotate(16deg)}75%{transform:rotate(-8deg)}}
 .atyping>.bot.bchat{width:1.5rem;height:1.5rem;margin:0 .34375rem}  /* the dots' width: the steps stay where they were */
 .botbusy{display:flex;align-items:center;gap:.75rem;min-width:0}
