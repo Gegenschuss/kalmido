@@ -110,6 +110,12 @@ r = dec(A, uid["alice"], "approve")
 check(r.status_code == 403, f"with a second admin: no approving of one's own month ({r.status_code})")
 r = dec(Ca, uid["alice"], "approve")
 check(r.ok, f"the second admin approves it ({r.status_code} {r.text[:120]})")
+# 2.148.1 G (#2496): a deactivated second admin does not count
+check(dec(Ca, uid["alice"], "unapprove").ok, "setup: Undo again")
+check(A.patch(B + f"/api/users/{uid['carol']}", json={"disabled": True}).ok, "setup: the second admin deactivated")
+r = dec(A, uid["alice"], "approve")
+check(r.ok, f"the other admin deactivated: the only active admin approves ({r.status_code} {r.text[:120]})")
+A.patch(B + f"/api/users/{uid['carol']}", json={"disabled": False})
 
 # ================================================================ #2496: inbound webhook
 big = requests.post(B + "/api/hooks/in/" + "a" * 30, data=b"x" * (2 * 1024 * 1024), headers={"Content-Type": "application/json"})
