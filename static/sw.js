@@ -57,7 +57,7 @@ async function swShell(req, url) {
   return r;
 }
 // Android share sheet (share_target POST): keep the shared files in a cache and open the app,
-// which then creates the task + uploads with the normal (Authelia) session.
+// which then creates the task + uploads with the normal (login) session.
 // 2.126.0 D (#1992 O6): only the system's share sheet (no referrer) or the app itself fills the capture form
 function shareFromOutside(req) {
   const site = req.headers.get('Sec-Fetch-Site');
