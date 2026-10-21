@@ -301,6 +301,8 @@ def logbook(s, who):
     check(s.post(B + LB + "/close", json={"month": nxt}).status_code == 400 and s.post(B + LB + "/close", json={"month": "2026-13"}).status_code == 400,
           f"{who}: a future / wrong month 400")
     fresh = s.post(B + DR, json={"vehicle_id": vid, "day": TODAY.isoformat(), "dest": "Studio", "km": 5}).json()["id"]
+    gone = s.post(B + DR, json={"vehicle_id": vid, "day": TODAY.isoformat(), "dest": "Probe", "km": 3}).json()["id"]
+    check(s.delete(B + f"{DR}/{gone}").ok, f"{who}: an open drive is deleted before its month is closed")
     r = s.post(B + LB + "/close", json={"month": m, "vehicle_id": vid})
     check(r.ok and {"vehicle_id": vid, "month": m} in r.json()["closed"], f"{who}: the month is closed " + r.text[:160])
     check(s.post(B + LB + "/close", json={"month": m, "vehicle_id": vid}).ok, f"{who}: closing twice is fine")
@@ -310,10 +312,16 @@ def logbook(s, who):
     r = s.post(B + DR, json={"vehicle_id": vid, "day": TODAY.isoformat(), "dest": "Studio", "km": 6, "corrects_id": fresh, "correct_note": "Tippfehler"})
     check(r.status_code == 201, f"{who}: a correction in a closed month is possible " + r.text[:160])
     check(s.get(B + DR + f"?vehicle_id={vid}").json()["closed"], f"{who}: the drives answer lists the closed months")
+    # 2.152.0 (#2169, review B-M8): a deleted drive does not come back into a closed month
+    r = s.post(B + f"{DR}/{gone}/restore")
+    check(r.status_code == 409 and "month is closed" in r.text, f"{who} B-M8: no restore into a closed month (409) " + r.text[:160])
     # a deleted drive stays until the legal period ends
     tmp = s.post(B + DR, json={"vehicle_id": vid, "day": DAY(40), "dest": "Weg", "km": 2}).json()["id"]  # a month before: not closed
     check(s.delete(B + f"{DR}/{tmp}").ok and s.post(B + f"{DR}/{tmp}/restore").ok and s.delete(B + f"{DR}/{tmp}").ok,
           f"{who}: delete + restore while the drive is open")
+    sql("UPDATE office_drives SET created_at=? WHERE id=?", ((testclock.now() - timedelta(days=10)).isoformat(timespec="seconds"), tmp), write=True)
+    r = s.post(B + f"{DR}/{tmp}/restore")
+    check(r.status_code == 409 and "a week after" in r.text, f"{who} B-M8: no restore after the week (409) " + r.text[:160])
     out = in_app(f"from kalmido.core.pg import system_ctx\nfrom kalmido.office.logbook import lbc_purge_ok\nwith system_ctx(c):\n"
                  f"    r = dict(c.execute('SELECT * FROM office_drives WHERE id=?', ({tmp},)).fetchone())\n"
                  f"    print('purge', lbc_purge_ok(c, r), lbc_purge_ok(c, dict(r, day='2010-05-01')))")
