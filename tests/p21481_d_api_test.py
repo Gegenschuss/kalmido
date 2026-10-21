@@ -253,6 +253,17 @@ r = requests.get(B + XP + f"/d/{EML}", timeout=30, allow_redirects=False)
 check(r.status_code != 200 and b"hello" not in r.content, f"external folder link: no download of the filed mail {r.status_code}")
 check(requests.get(B + XP + f"/d/{PLAIN}", timeout=30).content == b"just a file", "external folder link: the other file downloads")
 
+# 2.148.1 G (#2488): a sent mail's filed .eml follows the same rule
+CL = Ca.post(B + "/api/lists", json={"name": "Carol project", "org_id": ORG}).json()["id"]
+r = Ca.post(B + "/api/hubmail/send", json={"list_id": CL, "to": "client@example.com", "subject": "Project news", "text": "Launch."})
+check(r.status_code == 201, f"carol sends a project mail {r.status_code} {r.text[:200]}")
+OM = (r.json().get("mail") or {}).get("id") if r.status_code == 201 else None
+row = dbx("SELECT eml_id, folder_id FROM hub_mails WHERE id=?", (OM,)) if OM else []
+OEML = row[0][0] if row else None
+check(OEML and dbx("SELECT hub_mail_id FROM fs_nodes WHERE id=?", (OEML,))[0][0] == OM, f"the sent mail's .eml is marked {row}")
+check(OEML and A.get(B + f"/api/files/nodes/{OEML}").status_code == 404, "an org admin without the project: the sent .eml 404")
+check(OEML and Ca.get(B + f"/api/files/nodes/{OEML}").ok, "the sender reads it")
+
 # ================================================================== #2489 assistant: own lists only
 AL = A.post(B + "/api/lists", json={"name": "Alice work", "org_id": ORG}).json()["id"]
 A.put(B + f"/api/lists/{AL}/members", json={"user_id": BOB, "role": "edit"})
