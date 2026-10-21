@@ -34,7 +34,7 @@ const FEAT = 'cal,comments,collab,clients';
   // ================= jsdom: off by default
   let w = await boot({hash: 'office'}); let d = w.document;
   await sleep(800);
-  check(!d.querySelector('#side [data-mgside="office"]') && !d.querySelector('.office'), 'off: no sidebar entry, no view');
+  check(!d.querySelector('#side [data-go^="office"]') && !d.querySelector('.office'), 'off: no sidebar entry, no view');
   check(w.eval('officeOn()') === false, 'off: officeOn() false');
   // Settings > Modules: the group with the switch
   w.eval(`settingsModal('modules')`); await until(() => d.querySelector('.smodal'));
@@ -47,8 +47,8 @@ const FEAT = 'cal,comments,collab,clients';
   check(w.eval(`feat('office')`), 'the switch turns the module on');
   d.querySelector('.smodal')?.remove(); w.eval('render()');
   // 2.93.1: poll instead of a fixed 400 ms (CI shard twice too slow for the sidebar after render)
-  // 2.152.1 (#2616): the entry opens the office on its first / last point (data-go office/…), the area marks it
-  check(await until(() => !!d.querySelector('#side [data-mgside="office"]')), 'on: sidebar entry');
+  // 2.152.1 (#2616): the entry opens the office on its first / last point (data-go office/…)
+  check(await until(() => !!d.querySelector('#side [data-go^="office"]')), 'on: sidebar entry');
 
   // ================= the view (admin)
   w.eval(`go('office/services')`); await until(() => d.querySelector('.office[data-ofctab="services"] .ofcbar'), 60);
