@@ -321,7 +321,7 @@ print(before, after, res)
 """
 rc, out, err_ = py(code)
 check(rc == 0 and out.split()[:2] == ["True", "True"], f"#2487: the organisation's own file stays sealed before the deletion {out[-200:]} {err_[-400:]}")
-r = A.delete(B + f"/api/admin/orgs/{ORG3}")
+r = A.delete(B + f"/api/admin/orgs/{ORG3}", params={"confirm": "1"})  # bundle C: 2.152.0 (#2164) asks to confirm an organisation with content
 check(r.ok and not one("SELECT 1 FROM orgs WHERE id=?", (ORG3,)), f"#2487: the organisation is deleted {r.status_code} {r.text[:200]}")
 
 # ================================================================== #2493 approval records, the office log, old bookings
