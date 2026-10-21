@@ -1228,7 +1228,7 @@ def rotate_org(c, oid, stop=None, rounds=3, force=False):
             time.sleep(ROT_SETTLE)
         out = {"org": oid, "fields": 0, "files": 0, "unreadable": 0, "finished": False, "secret": None}
         empty = 0
-        for _ in range(rounds + 1):
+        for _ in range(rounds + 1 if rounds else 0):  # (rounds=0: stop right after the key switch)
             nf, bf = rot_fields(c, oid, k1, k2, stop)
             ns, bs = rot_files(c, oid, k1, k2, stop)
             out["fields"] += nf

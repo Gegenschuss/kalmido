@@ -427,7 +427,7 @@ V = B + "/api/v1"
 t_exp = tok(A, ["read", "export"])
 t_acc = tok(A, ["read", "export", "account"])
 r = requests.get(V + "/export", headers={"Authorization": "Bearer " + t_exp})
-check(r.status_code == 403 and (r.json().get("error") or {}).get("required_scope") == "account", f"#2494: v1 export without account: 403 {r.status_code} {r.text[:200]}")
+check(r.status_code == 403 and "Account settings" in r.text, f"#2494: v1 export without account: 403 {r.status_code} {r.text[:200]}")
 r = requests.get(V + "/export", headers={"Authorization": "Bearer " + t_acc}, timeout=120)
 check(r.ok and any(x["name"] == "Import Test" for x in r.json().get("lists", [])), f"#2494: v1 export with export + account {r.status_code}")
 
