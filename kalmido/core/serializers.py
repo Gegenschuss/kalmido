@@ -207,13 +207,13 @@ def unlink_files(paths):
     root = os.path.realpath(ATT_DIR)
     failed = []
     for p in paths:
-        full = os.path.join(ATT_DIR, p)
         if callable(p):  # 2.152.0 A (#2164): a clean-up after the commit outside ATT_DIR (an office folder, a picture)
             try:
                 p()
             except Exception as e:  # noqa: BLE001 - the data is gone already; what is left is logged
                 print("clean-up after a deletion failed:", type(e).__name__, flush=True)
             continue
+        full = os.path.join(ATT_DIR, p)
         try:
             if not os.path.realpath(full).startswith(root + os.sep):  # 2.143.0 B (#2211, review): only files under ATT_DIR
                 continue

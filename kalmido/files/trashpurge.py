@@ -12,7 +12,7 @@ wiki/pages.py wiki_trash_tick with the pages' files, events/model.py)."""
 import time
 from datetime import timedelta
 
-from ..core.db import iso, now_utc
+from ..core.db import iso, iso_ms, now_utc
 from ..core.access import Denied
 from ..core.retention import ret_days, ret_on, ret_report
 
@@ -24,7 +24,9 @@ TP_PLAIN = (
     ("sheet_columns", "sheet_columns", " AND sheet_id IN (SELECT id FROM sheets WHERE deleted_at IS NULL)"),
     ("deals", "office_deals", ""),  # office_docs.deal_id: ON DELETE SET NULL
     ("series", "office_inv_series", ""),  # the invoices made stay (series_id is a plain number)
-    ("chat_tombstones", "tchat_msgs", ""),  # body is empty already; tchat_rx cascade
+    # body is empty already; tchat_rx cascade. 2.152.0 (#2165, review C-H2): a thread's first message stays while replies point
+    # at it (thread_of has no FK; without the root the replies can no longer be reached) -- it goes once its replies went
+    ("chat_tombstones", "tchat_msgs", " AND NOT EXISTS (SELECT 1 FROM tchat_msgs r WHERE r.thread_of=tchat_msgs.id)"),
     ("comments", "comments", ""),  # body is empty, the files went at the delete; reactions cascade
 )
 
@@ -91,9 +93,23 @@ def tp_tick(c, force=False):
             w = f"FROM {table} WHERE deleted_at IS NOT NULL AND deleted_at<?{extra}"
             if purge:
                 if table == "sheets":  # 2.152.0 (#2165): the stored files of their file cells go too (sheet_files cascade)
-                    paths += [r[0] for r in c.execute("SELECT f.path FROM sheet_files f JOIN sheets s ON s.id=f.sheet_id "
-                                                      "WHERE s.deleted_at IS NOT NULL AND s.deleted_at<?", (cut,))]
+                    # 2.152.0 (#2165, review C-M1): also those of the further sheets of the table (book_id, they cascade with
+                    # it), and the scan / text rows of all these files (kind 'sheet', no FK) before the rows go
+                    fr = c.execute("SELECT f.id, f.path FROM sheet_files f JOIN sheets s ON s.id=f.sheet_id "
+                                   "WHERE (s.deleted_at IS NOT NULL AND s.deleted_at<?) OR s.book_id IN "
+                                   "(SELECT id FROM sheets WHERE deleted_at IS NOT NULL AND deleted_at<?)", (cut, cut)).fetchall()
+                    paths += [r["path"] for r in fr]
+                    for i in range(0, len(fr), 500):
+                        fids = [r["id"] for r in fr[i:i + 500]]
+                        q = ",".join("?" * len(fids))
+                        c.execute(f"DELETE FROM upload_scan WHERE kind='sheet' AND ref_id IN ({q})", fids)
+                        c.execute(f"DELETE FROM file_text WHERE kind='sheet' AND ref_id IN ({q})", fids)
                 counts[key] = c.execute(f"DELETE {w}", (cut,)).rowcount
+                if key in ("sheet_rows", "sheet_columns") and counts[key]:
+                    # 2.152.0 (#2165, review C-M2): a file the purged cells held (and no other cell holds) goes to the
+                    # files' trash; shk_tick (sheets/shkinds.py) removes it with its scan / text rows after its period
+                    c.execute("UPDATE sheet_files SET deleted_at=? WHERE deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM sheet_cells x "
+                              "WHERE x.sheet_id=sheet_files.sheet_id AND trim(x.raw)='file:' || sheet_files.id)", (iso_ms(now_utc()),))
             else:
                 counts[key] = c.execute(f"SELECT COUNT(*) {w}", (cut,)).fetchone()[0]
         ret_report(c, "trash", counts, purge)

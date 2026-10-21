@@ -92,7 +92,10 @@ BK_PG_TIMEOUT = _env_int("KALMIDO_BACKUP_PG_TIMEOUT", 6 * 3600)   # s for one pg
 # budget receipts) and attachments/docthumbs/<file> (document previews): their rows were in the dump, the files were not
 # 2.99.0 (#2182, review H1): + attachments/wiki/<page>/<file> (the files of knowledge pages)
 # 2.152.0 B (#2172): + attachments/listheads/<file> (the header pictures of lists)
-BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|avatars|listicons|listheads|docthumbs|(?:files|lists|budget|wiki)/\d{1,12}|chat/\d{1,12}-\d{1,12})"
+# 2.152.0 (#2172, review C-H3): + attachments/sheets/<table>/<file> (file cells), tchat/<message>/<file> (team chat files) and
+# bookmarks/<file> (bookmark pictures): their rows were in the dump, the files were not (and a restore removed them)
+BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|avatars|listicons|listheads|docthumbs|bookmarks"
+                          r"|(?:files|lists|budget|wiki|sheets|tchat)/\d{1,12}|chat/\d{1,12}-\d{1,12})"
                           r"/([^/\\\x00-\x1f]{1,255})")
 BK_ERR = {"busy": N_("Another backup or restore is running, please try again in a moment."),
           "disk": N_("Not enough free disk space for the backup."),
