@@ -18,6 +18,7 @@ import io
 import json
 import os
 import dbx as dbxm
+import shutil
 import stat
 import struct
 import subprocess
@@ -380,6 +381,16 @@ check("deleted after backup" in after and "created after backup" not in after an
 att = A.get(B + f"/api/tasks/{T1}").json()["attachments"]
 check(sorted(a["name"] for a in att) == ["note.txt", "pic.png"], f"attachments of the backup: {[a['name'] for a in att]}")
 check(A.get(B + f"/api/attachments/{ATT1['id']}").content == b"attachment one\n" * 20, "attachment file content restored")
+# 2.148.1 G (#2482): files the archive does not bring (here late.txt / late.png, made after the backup) are never deleted
+# unseen: the folder of before stays once, holding them; this test removes it so the checks below see no leftovers
+def _kept(prefix, fname):
+    ks = [n for n in os.listdir(DATA) if n.startswith(prefix + ".pre-restore-")]
+    has = [k for k in ks if any(f.endswith(fname) for _r, _d, fs in os.walk(os.path.join(DATA, k)) for f in fs)]
+    for k in ks:
+        shutil.rmtree(os.path.join(DATA, k), ignore_errors=True)
+    return ks, has
+ks, has = _kept("attachments", "late.txt")
+check(len(ks) == 1 and has == ks, f"the attachments of before stay once, with the file made after the backup: {ks}")
 check(not any(n.startswith("attachments.") for n in os.listdir(DATA)), f"no leftover attachment folders: {os.listdir(DATA)}")
 check(state()["keep_daily"] == 9, "backup settings are kept across a restore")
 check(dbx("SELECT value FROM kalmido_meta WHERE key='schema_version'")[0][0] == "2"
@@ -394,6 +405,8 @@ check([r[0] for r in dbx("SELECT name FROM orgs WHERE id IN (?, ?) ORDER BY id",
       and len(dbx("SELECT 1 FROM lists WHERE org_id IN (?, ?)", tuple(ORGS))) == 2, "both organisations and their lists are back")
 check(os.path.isfile(os.path.join(OFF, "logo.png")) and not os.path.exists(os.path.join(OFF, "late.png"))
       and open(os.path.join(OFF, "logo.png"), "rb").read().endswith(b"office logo"), "office files: the backup's state")
+ks, has = _kept("office", "late.png")
+check(len(ks) == 1 and has == ks, f"the office files of before stay once, with late.png: {ks}")
 check(not any(n.startswith("office.") for n in os.listdir(DATA)), "no leftover office folders")
 rls = dbx("SELECT COUNT(*) FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relrowsecurity AND relforcerowsecurity")[0][0]
 check(rls >= 10 and dbx("SELECT COUNT(*) FROM pg_policies WHERE schemaname='public'")[0][0] >= rls,
