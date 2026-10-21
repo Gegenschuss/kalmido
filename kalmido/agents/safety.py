@@ -56,9 +56,16 @@ def agent_bridge_resp(e):
 
 # ---- circles and bridges
 def list_circle(c, lid):
-    """The people circle of list lid: owner + members that are persons (frozenset of user ids)."""
+    """The people circle of list lid: owner + members that are persons (frozenset of user ids). 2.148.1 D (#2495): a list
+    open to "Everyone in the organisation" also counts the people of its organisation who read it that way (core/access.py
+    _ov_sql: members, admins, read-only)."""
+    from ..core.access import collab_all, ov_open
+    row = c.execute("SELECT org_id, life, family, org_visibility FROM lists WHERE id=?", (lid,)).fetchone()
+    org = row["org_id"] if row and collab_all() and ov_open(row) else None
     return frozenset(r[0] for r in c.execute("""SELECT id FROM users WHERE COALESCE(kind,'user')!='agent' AND (id=(SELECT owner_id FROM lists
-                                                WHERE id=?) OR id IN (SELECT user_id FROM list_members WHERE list_id=?))""", (lid, lid)))
+                                                WHERE id=?) OR id IN (SELECT user_id FROM list_members WHERE list_id=?)
+                                                OR id IN (SELECT user_id FROM org_members WHERE org_id=? AND role IN ('admin', 'member', 'readonly'))
+                                                AND id NOT IN (SELECT user_id FROM agents))""", (lid, lid, org)))
 
 
 def ids_parse(raw):

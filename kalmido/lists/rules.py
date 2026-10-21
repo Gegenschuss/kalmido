@@ -677,6 +677,8 @@ def rul_comment(c, r, tid, text):
     from ..collab.comments import comment_pushes
     from ..integrations.webhooks import wh_note
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+    from ..collab.comments import clean_mentions
+    text, _ = clean_mentions(c, t["list_id"], text, tid)  # 2.148.1 H (#2490): mention tokens only of people of the list
     cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,rule_name) VALUES(?,?,?,?,?,?)",
                     (tid, me(), text, "", iso_ms(now_utc()), r["name"]))
     if collab_all():

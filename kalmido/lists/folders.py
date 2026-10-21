@@ -125,12 +125,19 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                     continue
                 if want:
                     clean_org_id(c, want, uid)
+                from ..accounts.orgout import OO_ADMIN_ONLY, org_out, org_out_ok
+                cur = list_org(c, lid) or None
+                if not org_out_ok(c, cur, want):  # 2.148.1 B (#2483): out of an organisation only through its admin
+                    skipped.append({"key": k, "reason": tr(OO_ADMIN_ONLY)})
+                    continue
                 bad = [r[0] for r in c.execute("SELECT user_id FROM list_members WHERE list_id=?", (lid,)) if ws_member_problem(c, lid, r[0], org_id=want or 0)]
                 if bad:
                     names = ", ".join(r[0] or r[1] for r in c.execute(f"SELECT display_name, username FROM users WHERE id IN ({','.join('?' * len(bad))})", bad))
                     skipped.append({"key": k, "reason": tr("Not in the workspace: {0}", names)})
                     continue
                 if not dry:
+                    lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
+                    org_out(c, cur, want, "list", lname, list_id=lid)  # 2.148.1 B (#2483): logged, admins told
                     c.execute("UPDATE lists SET org_id=? WHERE id=?", (want, lid))
                     from ..admin.orgcrypt_cli import oc_settle_kick
                     oc_settle_kick([lid])  # 2.42.0 (#828), 2.64.0 (#1864): the list's files get the key of its new space

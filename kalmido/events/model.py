@@ -878,6 +878,9 @@ def att_set(c, eid, rows, r=None):
     evi_restore(c, eid, keep)
 
 
+EV_INVITE_PUSH_HOUR = 10  # 2.148.1 D (#2495): invitation pushes from one person to another per hour
+
+
 def invite_push(c, uid, r):
     from ..collab.comments import lang_of
     from ..collab.news import notif_ok
@@ -886,6 +889,9 @@ def invite_push(c, uid, r):
         return
     s = usettings(c, uid)
     if not notif_ok(c, uid, s, "assign", "push"):  # an invitation is like an assignment: News + push by default
+        return
+    from ..api.v1 import hit_limit
+    if hit_limit(f"evip:{me()}:{uid}", EV_INVITE_PUSH_HOUR, 3600):  # 2.148.1 D (#2495): no push flood (News still lists them)
         return
     lg = lang_of(s)
     who = user_names(c, [me()]).get(me(), "?")

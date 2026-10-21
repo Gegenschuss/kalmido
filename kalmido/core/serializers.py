@@ -226,4 +226,4 @@ def running_pomo(c, uid=None):
 def csv_cell(s):
     """2.122.4 B (#2317): free text for a CSV cell, no formulas in spreadsheet programs (= + - @ TAB CR LF at the start)."""
     s = str(s or "")
-    return "'" + s if s[:1] in ("=", "+", "-", "@", "\t", "\r", "\n") else s
+    return "'" + s if s.lstrip(" \t\r\n\u00a0")[:1] in ("=", "+", "-", "@") or s[:1] in ("\t", "\r", "\n") else s  # 2.148.1 E (#2496): also after leading blanks

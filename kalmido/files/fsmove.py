@@ -23,7 +23,7 @@ from flask import jsonify
 
 from ..core.config import app, ATT_DIR
 from ..core.db import body, bump, db
-from ..core.i18n import tr, trn
+from ..core.i18n import N_, tr, trn
 from ..core.access import Denied
 from ..core.orgcrypt import OrgCryptError, oc_active_for, oc_copy_file, oc_is_sealed_file, oc_write_file
 from ..accounts.session import me
@@ -139,9 +139,13 @@ def fsm_list_ok(c, lid, to, uid):
     return bool(r) and (r["org_id"] == to if to else (r["org_id"] is None and r["owner_id"] == uid))
 
 
+FSM_RECEIPT_STAYS = N_("Receipts of the cash book or of the equipment list stay in their workspace.")
+
+
 def fsm_plan(c, uid, b, to, dry):
     """Everything the move would do (no change): {roots: [(row, parent, owner, name)], moved, stay, notes, block, code}."""
     from ..accounts.orgs import is_org_admin
+    from ..accounts.orgout import OO_ADMIN_ONLY, org_out_ok
     items = fsm_items(b)
     base = fsm_parent(b.get("parent"))
     chosen = {i for i, _, _ in items}
@@ -163,6 +167,8 @@ def fsm_plan(c, uid, b, to, dry):
     files = folders = size = shares = opened = 0
     for n, parent, name in roots:
         moved, stay = fsm_walk(c, c.execute("SELECT * FROM fs_nodes WHERE id=?", (n["id"],)).fetchone())
+        if not plan["block"] and src and not org_out_ok(c, src, to):  # 2.148.1 B (#2483): out of an organisation only by its admin
+            plan["block"], plan["code"] = tr(OO_ADMIN_ONLY), 403
         if not plan["block"] and not admin and any(r["owner_id"] != uid and not (src and r["created_by"] == uid)
                                                     for r in moved + stay):  # review 2.96 (L5): also what stays behind
             plan["block"], plan["code"] = (tr("Only the owner or an admin of the organisation can move this out of it") if src
@@ -197,6 +203,10 @@ def fsm_plan(c, uid, b, to, dry):
             notes.append(trn("{0} folder with everything in it", "{0} folders with everything in them", folders))
     big = ids[:SMV_MAX]
     q = ",".join("?" * len(big))
+    if big and not plan["block"] and c.execute(f"""SELECT 1 FROM office_cash_entries WHERE node_id IN ({q}) UNION ALL
+                            SELECT 1 FROM office_equipment WHERE receipt_node_id IN ({q}) LIMIT 1""", big + big).fetchone():
+        # 2.148.1 B (#2483): receipts the cash book or the equipment list points to stay in their workspace
+        plan["block"], plan["code"] = tr(FSM_RECEIPT_STAYS), 409
     if big:
         docs = c.execute(f"SELECT COUNT(*) FROM doc_meta WHERE node_id IN ({q})", big).fetchone()[0]
         if c.execute(f"""SELECT 1 FROM doc_meta WHERE node_id IN ({q}) AND state='run' UNION ALL
@@ -391,6 +401,8 @@ def files_move_space():
     src, ts = plan["src"], _now()
     new_paths, old_paths, out = [], [], []
     try:
+        from ..accounts.orgout import org_out  # 2.148.1 B (#2483): logged, the organisation's other admins told
+        org_out(c, src, to, "file", ", ".join(n["name"] for n, _, _, _ in plan["roots"]))
         ids = [r["id"] for r, _ in plan["moved"]]
         for i in range(0, len(ids), 500):  # the recognition queues skip locked rows: none starts until the commit
             part = ids[i:i + 500]

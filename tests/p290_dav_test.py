@@ -11,6 +11,7 @@ client), moving a task between lists, viewers read-only, participants only their
 refused, history "via CalDAV", HTTP refused without KALMIDO_CALDAV_HTTP when PUBLIC_URL is http;
 #438 OIDC settings stored in the database (environment wins per field, the secret sealed, admin e-mail domains, check).
 usage: p290_dav_test.py <datadir>"""
+import hashlib
 import os
 import re
 import dbx
@@ -548,7 +549,9 @@ check(r.status_code == 429 and r.headers.get("Retry-After"), "after 10 failures 
 check(req(D, "PROPFIND", "/dav/", "", 0).status_code == 207, "other people are not affected")
 logs = subprocess.run(["docker", "logs", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")], capture_output=True, text=True)
 out = logs.stdout + logs.stderr
-check("caldav login failed for 'dave'" in out and PW not in out and DPW not in out and "wrong-pass" not in out,
+# 2.148.1 (#2494): the log names a hash of the typed name, never the name itself
+check("caldav login failed for user#" + hashlib.sha256(b"dave").hexdigest()[:8] in out and "failed for 'dave'" not in out
+      and PW not in out and DPW not in out and "wrong-pass" not in out,
       "failed logins are logged without the password")
 # ---------------------------------------------------------------- OIDC settings in the database (#438)
 r = A.put(B + "/api/admin/oidc", json={"issuer": "https://id.example.com/realms/x", "client_id": "kalmido", "admin_domains": "example.com, @corp.example"})

@@ -271,6 +271,11 @@ to *deny* and allow each app per group, so a new account does not open every app
   downloaded, never shown inline, except pictures and PDFs.
 - **Only Web Push?** Then remove ntfy topics you do not use: a topic on the public `ntfy.sh` can be read by anyone who
   knows its name.
+- **The ntfy fallback (2.148.1).** A person with the channel *Web Push* gets a message over ntfy when no device takes
+  the push (no subscribed device, an expired subscription). When that goes to the public `ntfy.sh` (the default `NTFY_URL`
+  without `NTFY_TOKEN`), it carries only "New notification in Kalmido" and the app's address, no title, no text and no
+  task link. With your own ntfy server (`NTFY_URL` elsewhere or `NTFY_TOKEN` set) or for people who chose *ntfy* as their
+  channel the messages stay as before.
 - **Your own ntfy server:** for the phone's battery set the server's `keepalive-interval` to about 3 minutes, use the
   WebSocket protocol in the Android app, and let your proxy pass WebSocket upgrades.
 - **Share inbox per person (ntfy):** 2.142.0 (#2150): everyone switches it on in *Settings > Notifications > Share inbox*
@@ -462,6 +467,13 @@ docker compose up -d kalmido
   previews (`attachments/docthumbs/`), which archives up to 2.78 left out although their rows were in the dump; the manifest
   counts files outside the known folders (`skipped_files`, the server log names their folders). An older server refuses
   an archive with these members, restore it with 2.79 or newer.
+  2.148.1: also the team chat files (`attachments/tchat/<id>/`), the files of table cells (`attachments/sheets/<id>/`),
+  the list header pictures (`attachments/listheads/`) and the bookmark pictures (`attachments/bookmarks/`); restore such an
+  archive with 2.148.1 or newer. After a restore the attachment folder of before is only removed when it holds nothing the
+  archive format does not cover; otherwise it stays next to the data folder (`attachments.pre-restore-…`, the server log
+  names the folders) and you delete it by hand once you have checked it. A restore needs one server process
+  (`KALMIDO_ROLE=all`, `KALMIDO_REPLICAS=1`): with separate web and worker processes it is refused, stop the others and
+  start a single one for the restore.
 
 - **Fail closed when the data disk is missing.** Keep the data folder on its own disk or volume and mount it so that
   Docker refuses to start without it, instead of creating an empty folder (an empty start shows the setup page again;
@@ -590,13 +602,14 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
   Run it with the master key the server uses, and finish it before changing `KALMIDO_SECRET_KEY`. Version 2.137 and
   earlier read the organisation's data only after the renewal has finished.
 - **Commands:** `python -m kalmido.admin.orgcrypt_cli status` (per organisation: key, encrypted / plain fields and
-  files, recovery key, renewal), `encrypt-all`, `decrypt-all`, `rewrap`, `rotate`, `recovery --org <id> [--new]
+  files of every protected table, recovery key, renewal; 2.148.1: `status`, `encrypt-all`, `decrypt-all` and the recovery
+  check cover every protected table, before only the company, contract and document fields), `encrypt-all`, `decrypt-all`, `rewrap`, `rotate`, `recovery --org <id> [--new]
   [--recovery-out FILE]`. All of them can be repeated and print counts only (`rotate` and `recovery` print the recovery key
   unless it goes into a file).
 - **Before a downgrade below 2.42** run `decrypt-all` (it switches the encryption off first, then turns every field and
   file back into plain text and exits with 0 only when nothing is left encrypted); then start the older image.
 - **Deleting an organisation** deletes its key and its office folder: whatever of it is left encrypted can no longer
-  be read on this server. Files of lists that moved to another workspace are re-sealed first. Older backups still
+  be read on this server (2.148.1: its own files are never decrypted on the way, only files that live on elsewhere). Files of lists that moved to another workspace are re-sealed first. Older backups still
   contain the wrapped key, so with the master key a restored old backup can read that organisation's data again.
 
 ## Encryption of private files
@@ -821,6 +834,12 @@ access data of connections (calendar and address book subscriptions, Karakeep, n
 set them up again), lists of other people (the file names them and contains your own comments there), the trash, and
 organisation data that is not yours (use the organisation export for a whole organisation).
 
+**2.148.1 (Art. 15):** the file also holds the list of your private files (name, type, size, dates; not their content),
+your private knowledge pages, your chats with agents, what you wrote in direct messages, your absences and timesheets
+(`private_files`, `wiki_pages`, `agent_chats`, `direct_messages`, `absences`, `timesheets`; the import does not take them
+over yet). `not_included` in the manifest names what is still missing (content of private files, other people's chat
+messages, booking pages, polls and forms, holiday allowances, the organisation's office).
+
 **The file** (`kalmido-account-<date>.zip`, readable without Kalmido):
 
 - `manifest.json`: `format` (`kalmido-account`), `v` (1), Kalmido version, `created_at`, `source` (`url`, `hosted`),
@@ -854,7 +873,11 @@ playbooks, project notes and notepads, time entries, customer reports and browse
 
 **Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file; the data parts may hold at
 most 32 MB of JSON per table and 96 MB together, and `KALMIDO_ACCOUNT_IMPORT_MAX_ROWS` (default 500000) rows per table
-(also for an organisation export); the storage quota of the
+(also for an organisation export); 2.148.1: at most `KALMIDO_ACCOUNT_IMPORT_PARALLEL` (default 2) checks / imports run at
+once on the whole server, a further one gets `429` (try again later). Taken-over files are scanned like uploads (a file
+the scanner could not check is marked *unchecked* and scanned later; the type is the one found in the content); a file
+counts as browser-encrypted only with the format's header. Comments of other people come over with their name as text,
+never as their account; an export that holds lists of an organisation is noted in its list history; the storage quota of the
 person (hosting) is checked before the upload and for every file during the import -- when it is full, the import stops
 and what came over so far can be undone. The import refuses ZIP files with unsafe names, duplicate parts, encryption,
 extreme compression ratios or wrong checksums; ids, owners, organisations and authors in the file are never taken over
@@ -873,9 +896,11 @@ A short checklist for a new server:
 - **Docker ports bypass ufw.** A published port (`3040:3040`) is reachable from outside even when ufw blocks it,
   because Docker writes its own firewall rules. Publish ports only on `127.0.0.1` (as the shipped `docker-compose.yml`
   does) and write the reason as a comment next to the line, so nobody "fixes" it later.
-- **fail2ban for failed logins.** Kalmido logs `login failed for '<user>' from <address>` and has its own lockout; to
-  block repeat offenders at the firewall, send the container log to journald (`logging: {driver: journald}`) and add a
-  filter and a jail:
+- **fail2ban for failed logins.** Kalmido logs `login failed for user#<hash> from <address>` and has its own lockout.
+  2.148.1: the log names a short hash of the typed name (never the name: it may be a password typed into the wrong field)
+  and keeps the full address, which fail2ban needs. Without fail2ban, `KALMIDO_LOG_FULL_IP=0` shortens it like the alerts
+  (IPv4 `203.0.113.x`, IPv6 `/48`). To block repeat offenders at the firewall, send the container log to journald
+  (`logging: {driver: journald}`) and add a filter and a jail:
 
   ```ini
   # /etc/fail2ban/filter.d/kalmido.conf
@@ -1322,6 +1347,12 @@ stored in the table `task_vectors`: per organisation like its tasks (row-level s
 key when its data is encrypted, deleted with the task; they are not part of the organisation export (Kalmido computes them
 again). Thresholds for another model: `KALMIDO_RELATED_MIN`, `KALMIDO_RELATED_DUP`, `KALMIDO_RELATED_SEARCH`,
 `KALMIDO_RELATED_MIX`, `KALMIDO_RELATED_NORM` (see `.env.example`). A Raspberry Pi works too, only slower; leave the service out if the box is busy.
+
+`KALMIDO_EMBED_URL` must be `https://`, or `http://` to this server (`localhost`, `127.0.0.1`) or to a container name
+without a dot (like `embed`); any other address is ignored and the feature stays off (2.148.1). Task texts go to that
+address, so an outside https service sees them. With encryption at rest switched on, organisation tasks are only sent to
+a service on this server (localhost or a container); with an outside address they get no related tasks. Health lists
+and lists with the lock are never sent.
 
 ## Several servers in one app (2.73)
 

@@ -922,7 +922,8 @@ TOOLS += [
     ("update_address_book", "2.21.0: rename / recolour an address book, or choose the list for its birthdays (owner).",
      _obj({"book_id": S_ID, "name": {"type": "string"}, "color": {"type": "string"}, "birthdays_list_id": {"type": ["integer", "null"]}, "org_id": {"type": ["integer", "null"], "description": "2.30.0: its workspace (an organisation id of yours; null = private)"}}, ["book_id"]),
      lambda api, a: api.call("PATCH", f"/address-books/{int(a['book_id'])}", body=_pick(a, ("name", "color", "birthdays_list_id", "org_id")))),
-    ("delete_address_book", "2.21.0: delete an address book with its contacts (owner).", _obj({"book_id": S_ID}, ["book_id"]),
+    ("delete_address_book", "2.21.0: delete an address book with its contacts (owner). 2.148.1: waits for a person's approval "
+                            "(202 + a waiting job; the result comes as a job event).", _obj({"book_id": S_ID}, ["book_id"]),
      lambda api, a: api.call("DELETE", f"/address-books/{int(a['book_id'])}")),
     ("share_address_book", "2.21.0: share an address book: view or edit (owner). Contacts are personal data.",
      _obj({"book_id": S_ID, "user_id": S_ID, "role": {"type": "string", "enum": ["view", "edit"]}}, ["book_id", "user_id"]),
@@ -1418,7 +1419,7 @@ TOOLS += [
     ("mark_news_read", "Mark News read: ids, or all=true.", _obj({"ids": {"type": "array", "items": {"type": "integer"}}, "all": {"type": "boolean"}}),
      lambda api, a: api.call("POST", "/news/read", body=a)),
     ("list_agents", "The agents in your lists with their state and running jobs.", _obj({}), lambda api, a: api.call("GET", "/agents")),
-    ("export_data", "Everything the token's user owns as JSON (lists, tasks, comments, time, habits ...). Large.", _obj({}),
+    ("export_data", "Everything the token's user owns as JSON (lists, tasks, comments, time, habits ...). Large. A personal token needs the scopes export and account.", _obj({}),
      lambda api, a: api.call("GET", "/export", timeout=120)),
 ]
 TOOL_MAP = {t[0]: t for t in TOOLS}
@@ -1670,9 +1671,11 @@ TOOLS += [
      lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/forms")),
     ("create_form", "2.23.0: a form for a list: a link whose page creates a task (subject, description, name, e-mail); access org = "
                     "signed-in people of the organisation, public = anyone with the link. 2.98.0: questions = a questionnaire (own "
-                    "questions instead of subject / description; the answers land in the task's description).", _obj({"list_id": S_ID, **_FORM}, ["list_id", "title"]),
+                    "questions instead of subject / description; the answers land in the task's description). 2.148.1: access public waits "
+                    "for a person's approval (202 + a waiting job).", _obj({"list_id": S_ID, **_FORM}, ["list_id", "title"]),
      lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/forms", body=_pick(a, tuple(_FORM)))),
-    ("update_form", "2.23.0: change a form (enabled false = closed; regenerate true = a new link).",
+    ("update_form", "2.23.0: change a form (enabled false = closed; regenerate true = a new link). 2.148.1: making it public, "
+                    "turning a public form on or a new link for it waits for a person's approval (202).",
      _obj({"form_id": S_ID, **_FORM, "enabled": {"type": "boolean"}, "regenerate": {"type": "boolean"}}, ["form_id"]),
      lambda api, a: api.call("PATCH", f"/forms/{int(a['form_id'])}", body=_pick(a, (*_FORM, "enabled", "regenerate")))),
     ("delete_form", "2.23.0: delete a form (tasks it created stay).", _obj({"form_id": S_ID}, ["form_id"]),

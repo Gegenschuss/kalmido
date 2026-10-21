@@ -24,7 +24,7 @@ from flask import g, jsonify, request, Response
 
 from ..core.config import app, ATT_DIR, MAX_FILE_MB
 from ..core.pg import insert_id, system_ctx
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.db import body, db, err, iso, iso_ms, now_utc
 from ..core.access import Denied
 from ..core.serializers import unlink_files
@@ -166,13 +166,24 @@ def tcx_agents_for(c, uid, oid):
     return [r[0] for r in rows if r[1] == uid or (r[1] is None and adm)]
 
 
+TCX_MEMBERS_ONLY = N_("Only members of the channel can do this. Organisation admins can archive it.")
+
+
+def tcx_insider(c, r, uid):
+    """2.148.1 B (#2491): uid is a member or the creator of channel / group r (an organisation admin alone is not)."""
+    return uid in tcx_members(c, r) or (r["created_by"] or None) == uid
+
+
 def tcx_may_add(c, r, actor, uid):
     """None when actor may add uid to channel / group r, else the reason (shown as it is)."""
     from .teamchat import tchat_coworkers
+    from ..accounts.orgs import may_see
+    if not is_agent_id(c, uid) and not may_see(c, actor, uid):  # 2.148.1 A (#2490): no name or reason for an unseen account
+        return tr("This person cannot be added to this conversation")
     name = user_names(c, [uid]).get(uid, "?")
     if is_agent_id(c, uid):
         if r["kind"] != "channel" or uid not in tcx_agents_for(c, actor, r["org_id"]):
-            return tr("{0} cannot be added to this conversation", name)
+            return tr("This person cannot be added to this conversation")  # 2.148.1 H (#2491): no name of a foreign agent
         return None
     if not tcx_person_ok(c, uid):
         return tr("{0} cannot be added to this conversation", name)
@@ -344,6 +355,8 @@ def tcx_room_patch(rid):
     if "open" in b:
         if not isinstance(b["open"], bool) or (b["open"] and not r["org_id"]):
             return err(tr("Invalid value: {0}", "open"))
+        if b["open"] and not r["is_open"] and not tcx_insider(c, r, me()):  # 2.148.1 B (#2491): only its members open it
+            raise Denied(403, tr(TCX_MEMBERS_ONLY))
         c.execute("UPDATE tchat_rooms SET is_open=? WHERE id=?", (int(b["open"]), rid))
     if "archived" in b:
         if not isinstance(b["archived"], bool):
@@ -372,6 +385,9 @@ def tcx_member_add(rid):
     elif not tcx_can_manage(c, r, uid):
         raise Denied(403, tr("Only the creator of the channel or an admin of the organisation can change it"))
     else:
+        # 2.148.1 B (#2491): an agent only by a member of the channel; 2.148.1 H (#2491): into a closed one, too, nobody else
+        if (is_agent_id(c, u) or not r["is_open"]) and not tcx_insider(c, r, uid):
+            raise Denied(403, tr(TCX_MEMBERS_ONLY))
         why = tcx_may_add(c, r, uid, u)
         if why:
             return err(why)

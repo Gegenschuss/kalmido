@@ -103,13 +103,24 @@ def _shares_role(c, ids, uid, agent):
 def fs_role(c, nid, uid=None, chain=None):
     """'owner' | 'edit' | 'view' | None: the role account uid (default: the signed-in one) has on node nid -- inherited
     from the folders above, shares with an expiry, the organisation boundary and the agent rules (module docstring).
-    Ignores the trash (need_node decides about deleted nodes)."""
+    Ignores the trash (need_node decides about deleted nodes).
+    2.148.1 D (#2488): a node filed with a hub mail (or below one) also needs the mail's rule (hub/hubmail.py hbm_can):
+    the folder's owner or an organisation admin does not read mails the mail filing hides from them."""
     uid = uid or _uid()
     if not uid:
         return None
     chain = chain if chain is not None else fs_chain(c, nid)
     if not chain:
         return None
+    mails = {r["hub_mail_id"] for r in chain if r["hub_mail_id"]}
+    if mails:
+        from ..hub.hubmail import hbm_node_ok
+        if not all(hbm_node_ok(c, uid, m) for m in mails):
+            return None
+    return _fs_role(c, uid, chain)
+
+
+def _fs_role(c, uid, chain):
     n = chain[0]
     org = n["org_id"]
     ctx = acx_of(c, uid)
@@ -240,7 +251,32 @@ def fs_visible_sql_c(c, uid):
             f"UNION SELECT n.id FROM fs_nodes n JOIN fv ON n.parent_id = fv.id WHERE ({orgs})), "
             f"fd(id) AS (SELECT id FROM fs_nodes WHERE deleted_at IS NOT NULL "
             f"UNION SELECT n.id FROM fs_nodes n JOIN fd ON n.parent_id = fd.id) "
-            f"SELECT id FROM fv WHERE id NOT IN (SELECT id FROM fd))")
+            f"SELECT id FROM fv WHERE id NOT IN (SELECT id FROM fd){_mail_hidden(c, uid)})")
+
+
+def fs_mail_rows(c, uid, rows):
+    """2.148.1 D (#2488): rows without the nodes filed with a hub mail uid may not read (a folder's listing)."""
+    seen, out = {}, []
+    for r in rows:
+        m = r["hub_mail_id"]
+        if m:
+            if m not in seen:
+                from ..hub.hubmail import hbm_node_ok
+                seen[m] = hbm_node_ok(c, uid, m)
+            if not seen[m]:
+                continue
+        out.append(r)
+    return out
+
+
+def _mail_hidden(c, uid):
+    """2.148.1 D (#2488): the clause that leaves out nodes filed with a hub mail uid may not read ('' when there are none)."""
+    if not c.execute("SELECT 1 FROM fs_nodes WHERE hub_mail_id IS NOT NULL LIMIT 1").fetchone():
+        return ""
+    from ..hub.hubmail import hbm_node_mail_ids
+    ok = sorted(hbm_node_mail_ids(c, uid))
+    keep = f" AND hub_mail_id NOT IN ({','.join(str(int(x)) for x in ok)})" if ok else ""
+    return f" AND id NOT IN (SELECT id FROM fs_nodes WHERE hub_mail_id IS NOT NULL{keep})"
 
 
 def fs_visible_ids(c, uid=None):

@@ -666,6 +666,12 @@ def bw_file_post(mid):
     if not kind:
         raise BadInput(tr("Only PDF, JPEG or PNG files can be attached"))
     name = _fname(f.filename, kind[2])
+    from ..files.scan import sc_scan  # 2.148.1 E (#2496): virus scan like every upload
+    from ..files.upsafe import UploadRefused
+    try:
+        sc_scan(name, data)
+    except UploadRefused as e:
+        raise BadInput(str(e)) from None
     file = f"meal{int(mid)}-{uuid.uuid4().hex[:16]}{kind[2]}"
     os.makedirs(bw_dir(oid), mode=0o700, exist_ok=True)
     path = bw_path(oid, file)

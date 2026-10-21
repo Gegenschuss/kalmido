@@ -6,8 +6,8 @@ from datetime import date
 from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id
-from ..core.i18n import tr
+from ..core.pg import insert_id, system_ctx
+from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied, MANAGE_ROLES, list_role, need_feat, tvis, vis_sql
@@ -287,15 +287,14 @@ def client_get(cid):
 @app.post("/api/clients")
 def client_create():
     """{name, icon?, color?, contact?, contacts?, email?, phone?, address?, note?, rate?, budget_h?, budget_amount?, org_id?} -> 201.
-    org_id: one of my organisations (default: my first one). contacts (2.40.0): [{name, role?, email?, phone?, is_default?}]."""
+    org_id: one of my organisations (default: the chosen / only one, else private). contacts (2.40.0): [{name, role?, email?, phone?, is_default?}]."""
     c = db()
     uid = me()
     _gate(c)
     f = clean_client(c, uid, body(), new=True)
-    if "org_id" not in f:
-        from ..accounts.orgroles import user_orgs_full
-        mine = user_orgs_full(c, uid, write=True)  # 2.143.0 A (#2151): never into an organisation where uid only reads
-        f["org_id"] = mine[0] if mine else None
+    if "org_id" not in f:  # 2.148.1 H (#2480): the chosen / only organisation where uid may add, else private (was the first)
+        from ..accounts.orgs import ws_chosen_org
+        f["org_id"] = ws_chosen_org(c, uid)
     ts = iso(now_utc())
     f.update(created_by=uid, created_at=ts, updated_at=ts)
     cid = insert_id(c, f"INSERT INTO clients({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values()))
@@ -329,9 +328,9 @@ def client_update(cid):
         f.pop("org_id")  # unchanged (the dialog sends it with every save)
     if "org_id" in f:
         h6c_client_move_ok(c, uid, old)
-        if old["org_id"] and c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND client_id=? AND locked_at IS NOT NULL LIMIT 1",
-                                       (old["org_id"], cid)).fetchone():  # 2.126.0 A (#1979 F7): its finalised documents keep it
-            raise Denied(409, tr("Finalised documents of this organisation refer to this client, so it stays here. “Move to another workspace…” in the office takes a copy along."))
+        if cl_locked_docs(c, cid):  # 2.126.0 A (#1979 F7): its finalised documents keep it; 2.148.1 B (#2484): also a personal office's
+            raise Denied(409, tr("Finalised documents of this organisation refer to this client, so it stays here. “Move to another workspace…” in the office takes a copy along.")
+                         if old["org_id"] else tr(CL_LOCKED_PRIVATE))
     if f:
         f["updated_at"] = iso(now_utc())
         c.execute(f"UPDATE clients SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), cid])
@@ -350,6 +349,24 @@ def client_update(cid):
     return jsonify(client_public(c, uid, need_client(c, cid, uid), stats=True))
 
 
+CL_LOCKED_PRIVATE = N_("Finalised documents of your office refer to this client, so it stays here.")
+CL_LOCKED_DELETE = N_("Finalised documents refer to this client, so it cannot be deleted. Archive it instead.")
+
+
+def cl_locked_docs(c, cid):
+    """2.148.1 B (#2484): do finalised documents (of its organisation or of a personal office) refer to client cid?"""
+    with system_ctx(c):  # existence only: the documents of the office area the client belongs to
+        return bool(c.execute("SELECT 1 FROM office_docs WHERE client_id=? AND locked_at IS NOT NULL LIMIT 1", (cid,)).fetchone())
+
+
+def cl_may_delete(c, uid, r):
+    """2.148.1 B (#2484): client r is deleted by its creator or an admin of its organisation (the server admin only without
+    workspaces, like h6c_client_move_ok)."""
+    from ..accounts.orgs import is_org_admin
+    return (r["created_by"] == uid or bool(r["org_id"] and is_org_admin(c, uid, r["org_id"]))
+            or bool(g.user["is_admin"] and not _org_boundary(c)))
+
+
 def h6c_client_move_ok(c, uid, r):
     """2.86.0 (N11): moving a client into another workspace takes its creator or an admin of the workspace it is in now
     (clean_client already allows only the mover's own organisations as the target)."""
@@ -363,13 +380,16 @@ def h6c_client_move_ok(c, uid, r):
 
 @app.delete("/api/clients/<int:cid>")
 def client_delete(cid):
-    """Only its creator or an admin; the lists stay (they lose the client)."""
+    """Only its creator or an admin of its organisation; the lists stay (they lose the client). 2.148.1 B (#2484): an admin
+    of its organisation instead of the server admin (who only without workspaces), 409 while finalised documents refer to it."""
     c = db()
     uid = me()
     _gate(c)
     r = need_client(c, cid, uid)
-    if not (g.user["is_admin"] or r["created_by"] == uid):
+    if not cl_may_delete(c, uid, r):
         return err(tr("Only the person who created the client or an admin can delete it"), 403)
+    if cl_locked_docs(c, cid):
+        return err(tr(CL_LOCKED_DELETE), 409)
     c.execute("UPDATE lists SET client_id=NULL WHERE client_id=?", (cid,))
     c.execute("DELETE FROM clients WHERE id=?", (cid,))
     bump(c)

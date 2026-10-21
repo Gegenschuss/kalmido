@@ -56,6 +56,14 @@ def can_move(c, src, dst):
 
 
 def check_move(c, src, dst):
+    if src != dst:  # 2.148.1 H (#2483): tasks leave an organisation's list only through its admin
+        q = "SELECT org_id FROM lists WHERE id=?"
+        so, do = c.execute(q, (src,)).fetchone(), c.execute(q, (dst,)).fetchone()
+        src_org, dst_org = (so[0] if so else None), (do[0] if do else None)
+        if src_org and (dst_org or None) != src_org:
+            from ..accounts.orgout import org_out_ok, OO_ADMIN_ONLY
+            if not org_out_ok(c, src_org, dst_org):
+                raise Denied(403, tr(OO_ADMIN_ONLY))
     if not can_move(c, src, dst):
         raise Denied(403, tr("Only the list owner can move tasks out of this shared list"))
     if src != dst:  # 2.64.0 (#1864): into another space -> the moved tasks' files get its key (after the commit)

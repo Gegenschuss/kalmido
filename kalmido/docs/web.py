@@ -503,6 +503,10 @@ def docs_thumb(nid):
     m, _n = _doc(c, nid)
     if not m["thumb"]:
         raise Denied(404)
+    v = fs_version_row(c, nid)
+    if v:
+        from ..files.scan import sc_guard
+        sc_guard(c, "fs", nid, v["no"])  # 2.148.1 E (#2496): no preview of a version found infected later
     try:
         data = S.thumb_read(c, m["ws"], os.path.join(ATT_DIR, m["thumb"]))  # 2.48.0 review (L3): private ones sealed
     except (OSError, OrgCryptError):

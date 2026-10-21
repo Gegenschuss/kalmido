@@ -442,6 +442,8 @@ ROUTES = {
     # 2.115.0 B (#2062): inviting into an organisation needs one (a person without one has no members)
     "GET /api/orgs/{}/invites": "orgadmin", "POST /api/orgs/{}/invites": "orgadmin", "POST /api/orgs/{}/invites/{}/resend": "orgadmin",
     "DELETE /api/orgs/{}/invites/{}": "orgadmin",
+    # 2.148.1 A (#2480): the invited person (also one without an organisation) accepts / declines (p21481_a_api_test.py)
+    "POST /api/orgs/{}/join": "own", "DELETE /api/orgs/{}/join": "own",
     # ---- own (61)
     "DELETE /api/account/export": "own", "DELETE /api/account/import/{}": "own", "DELETE /api/me/app-passwords/{}": "own",
     "DELETE /api/me/avatar": "own", "GET /api/me/ntfy-inbox": "own", "PUT /api/me/ntfy-inbox": "own",

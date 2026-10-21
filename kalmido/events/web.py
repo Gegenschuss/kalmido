@@ -72,7 +72,8 @@ def op_cal_delete(c, uid, cid):
     c.execute("DELETE FROM ev_cals WHERE id=?", (cid,))
     bump(c)
     c.commit()
-    evi_send(mails)
+    if not _by_agent():  # 2.148.1 G (#2495): no cancellation mails through an agent's change
+        evi_send(mails)
 
 
 def op_member_set(c, uid, cid, b):
@@ -177,10 +178,18 @@ def op_event_delete(c, uid, eid, occ=None):
     else:
         ev_delete(c, r)
     c.commit()
+    if _by_agent():  # 2.148.1 D (#2495): invitation / cancellation mails only by people, never through an agent's change
+        return
     if occ:  # 2.111.0 B (#2056): who got an invitation gets the series without that date / a cancellation
         evi_after_save(c, uid, eid, snap, True, only_invited=True)
     else:
         evi_after_delete(c, uid, eid)
+
+
+def _by_agent():
+    from flask import g
+    from ..agents.core import is_agent
+    return is_agent(getattr(g, "user", None))
 
 
 def op_event_restore(c, uid, eid):
@@ -189,7 +198,8 @@ def op_event_restore(c, uid, eid):
     cal_touch(c, r["cal_id"])
     bump(c)
     c.commit()
-    evi_after_restore(c, uid, eid)  # 2.111.0 B (#2056): the cancelled attendees are invited again
+    if not _by_agent():  # 2.148.1 D (#2495)
+        evi_after_restore(c, uid, eid)  # 2.111.0 B (#2056): the cancelled attendees are invited again
     return ev_dict(c, c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone(), uid)
 
 

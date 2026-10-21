@@ -116,6 +116,22 @@ def sig_list_tasks(c, r):
                                        "ORDER BY sort, id LIMIT 500", (r["list_id"], *args))]
 
 
+def sig_fk_migrate(c):
+    """2.148.1 C (#2493): office_signoffs.video_id ON DELETE SET NULL (was CASCADE): deleting a video review keeps its
+    approval records. Idempotent, at every start (init_db); an older version runs with the changed key as well."""
+    rows = c.execute(
+        "SELECT con.conname, con.confdeltype FROM pg_constraint con JOIN pg_class cl ON cl.oid=con.conrelid "  # pg-ok: pg_catalog oid (PostgreSQL system column)
+        "JOIN pg_namespace n ON n.oid=cl.relnamespace "  # pg-ok: pg_catalog oid (PostgreSQL system column)
+        "JOIN pg_attribute a ON a.attrelid=con.conrelid AND a.attnum=con.conkey[1] "
+        "WHERE con.contype='f' AND cl.relname='office_signoffs' AND a.attname='video_id' AND n.nspname=current_schema()").fetchall()
+    if rows and all(r[1] == "n" for r in rows):
+        return
+    for r in rows:
+        c.execute('ALTER TABLE office_signoffs DROP CONSTRAINT "' + r[0].replace('"', '""') + '"')
+    c.execute("ALTER TABLE office_signoffs ADD CONSTRAINT office_signoffs_video_id_fkey FOREIGN KEY (video_id) "
+              "REFERENCES video_reviews(id) ON DELETE SET NULL")
+
+
 def sig_crypt_org(c, r):
     """2.50.0 (#1200 review): the organisation whose key protects the signer's data of approval r: its own, or for a
     private list's sign-off the personal office of the list's owner (None without one: stored plain like other private data)."""
@@ -659,7 +675,9 @@ def sig_decide(token):
     vals = sig_enc(c, r, {"signer_name": name, "signer_email": email or None, "reason": reason or None, "ip": ip, "user_agent": ua})
     c.execute("UPDATE office_signoffs SET state=?, signed_at=?, signer_name=?, signer_email=?, reason=?, ip=?, user_agent=? WHERE id=?",
               (st, ts, vals["signer_name"], vals["signer_email"], vals["reason"], vals["ip"], vals["user_agent"], r["id"]))
-    proto = {"signoff": r["id"], "state": st, "name": name, "email": email, "reason": reason, "at": ts, "ip": ip, "user_agent": ua,
+    # 2.148.1 C (#2493): e-mail, reason, address and device stay in office_signoffs (encrypted there); the log names the
+    # record and the signer, "sig_proto" marks the detail for encryption (orgcrypt LOG_MARKERS)
+    proto = {"signoff": r["id"], "state": st, "name": name, "at": ts, "sig_proto": 1,
              "doc_hash": r["doc_hash"], "signature": "simple electronic signature"}
     if r["kind"] in ("offer", "document"):  # 2.113.2 (#2253): the terms state the customer decided on
         from .terms import agb_sig_proto

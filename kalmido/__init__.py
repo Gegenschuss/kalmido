@@ -81,6 +81,7 @@ ORDER = (
     "accounts.orgs",
     "accounts.orgroles",  # 2.143.0 A (#2151): organisation roles guest / read-only / accounting
     "accounts.spacemove",  # 2.96.0 (#1941): the shared rules of moving data between the private space and an organisation (no routes)
+    "accounts.orgout",  # 2.148.1 B (#2483): data leaves an organisation only through its admin (no routes)
     "accounts.tenancy",
     "accounts.orglists",  # 2.35.0 (#1101)
     "accounts.useradmin",  # 2.88.0 (#1980)

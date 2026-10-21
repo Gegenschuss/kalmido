@@ -896,6 +896,12 @@ def bud_files_save(c, uid, eid, files, saved):
         except UploadRefused as e:  # up_check_path removed the file
             saved.remove(rel)
             raise BadInput(str(e))
+        from ..files.scan import _sc_magic
+        from ..core.config import INLINE_TYPES
+        with open(full, "rb") as fh:  # 2.148.1 E (#2496): a picture / PDF is stored with the type of its content, not the client's claim
+            got = _sc_magic(fh.read(4096))
+        if got in INLINE_TYPES:
+            mime = got
         oc.oc_seal_path(c, sid, full, fresh=True)  # like attachments: the space key of the list (organisation / owner)
         ids.append(insert_id(c, "INSERT INTO budget_files(entry_id,list_id,name,mime,size,path,user_id,created_at) VALUES(?,?,?,?,?,?,?,?)",
                              (r["id"], lid, name, mime, size, rel, uid, _ts())))

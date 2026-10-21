@@ -67,7 +67,7 @@ async function onumApply(kind) {
 }
 
 // ---- the draft's number in the document editor (office_docs.js: the head calls onumDocHtml, a click on the number opens it)
-const onumDocCan = d => !!d && !d.locked && d.can_edit && d.status === 'draft';
+const onumDocCan = d => !!d && !d.locked && d.can_edit && d.status === 'draft' && ofcAdmin();  // 2.148.1 (#2496): numbers by office admins only
 function onumDocHtml(d) {
   if (!onumDocCan(d)) return '';
   const e = ONUM.doc && ONUM.doc.id === d.id ? ONUM.doc : null;

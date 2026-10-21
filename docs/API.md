@@ -37,7 +37,7 @@ Create a token under **Settings > Account > API tokens**:
   | `files:read` (2.48.0) | the file store: list and read the folders and files shared with the token's account (agents: plus their own result folder) |
   | `files:write` (2.48.0) | the file store: add files and folders, upload new versions where the account may edit; new agents get both `files:` scopes |
   | `time` | the timer and time entries |
-  | `export` | `GET /export` |
+  | `export` | `GET /export` (2.148.1: a personal token also needs `account`) |
   | `calendar` (2.21.0) | events and event calendars, reading included: `/event-calendars…`, `/events…`, `/tasks/{id}/events` |
   | `contacts` (2.21.0) | address books and contacts, reading included (personal data of other people: never part of the old `write`, never an agent's default) |
   | `private` (2.22.0) | health lists and the journal, reading included (never part of the old `write`; an agent never gets it and never sees a health list) |
@@ -307,7 +307,7 @@ had been made in the app. Webhooks fire too.
 | `POST /habits` · `PATCH /habits/{id}` · `DELETE …` | tasks:write · delete | 2.15.0: habits `{name, color?, goal?, days?, per_week?, remind_at?, remind_times? (up to 6 × HH:MM, 2.140.0), archived?}` |
 | `GET /time/timer` · `POST …` · `DELETE …` | read · time | 2.15.0: the running timer; start `{task_id \| list_id, note?}` (a running one stops); stop |
 | `PATCH /time/entries/{id}` · `DELETE …` | time | 2.15.0: change / delete your entry `{start?, end?, minutes?, note?, task_id? \| list_id?, billable?}`. 2.144.6: a billed entry keeps everything but its note (`409`) and cannot be deleted (`409`) |
-| `GET /export` | export | 2.15.0: everything you own as JSON (as Settings > Data > Export) |
+| `GET /export` | export | 2.15.0: everything you own as JSON (as Settings > Data > Export). 2.148.1: a personal token needs `account` as well (`403` with `required_scope`), an agent's token `export` only |
 | `GET /openapi.json` | none | This API as OpenAPI 3.1 |
 
 **Task filters** (`GET /tasks`): `list_id`, `status` (`open` default, `done`, `wont_do`, `all`), `due_from`, `due_to`,
@@ -513,7 +513,8 @@ Reminders are minutes before the start (all day: before midnight, so `-540` = 9:
 2.138.1: `send_invites: true` on `POST /events` / `PATCH /events/{id}` mails the invitation (an `.ics` with METHOD:REQUEST,
 Reply-To = the inviting person) to the new external attendees (addresses, contacts) and, when time, place, title, repeat or
 status changed, to all of them; default `false` (nothing is mailed). Removed or deleted: who had an invitation gets a
-cancellation. At most 200 invitation mails per person and day (`429`), see [CALDAV.md](CALDAV.md).
+cancellation. At most 200 invitation mails per person and day (`429`), see [CALDAV.md](CALDAV.md). 2.148.1: deleting or
+restoring an event (or one date) with an agent's token mails nothing (no cancellation, no new invitation).
 Agent tokens get `403` with `send_invites: true`: invitations go out in the person's name, so only people send them.
 
 ## Contacts (2.21.0)
@@ -524,7 +525,7 @@ a task needs `tasks:write` too. A contact is only visible to people who see its 
 | Endpoint | |
 |---|---|
 | `GET /address-books` · `POST` | the address books you see (`count`, `role`, `imported`, `birthdays_list_id`, 2.30.0: `org_id`); `{name, color?, org_id?}` |
-| `PATCH /address-books/{id}` · `DELETE` | rename, recolour, `birthdays_list_id` (birthdays + anniversaries of its contacts become yearly tasks of that list; owner), 2.30.0: `org_id` (owner; `409` while a member does not fit); delete with its contacts |
+| `PATCH /address-books/{id}` · `DELETE` | rename, recolour, `birthdays_list_id` (birthdays + anniversaries of its contacts become yearly tasks of that list; owner), 2.30.0: `org_id` (owner; `409` while a member does not fit); delete with its contacts (2.148.1: from an agent it waits for a person's approval, `202` + a waiting job) |
 | `PUT /address-books/{id}/members/{user_id}` · `DELETE` | share `{role: view\|edit}` (owner; 2.30.0: the same workspace rule as calendars); stop sharing, or leave it |
 | `POST /address-books/{id}/import` · `GET …/export` | `{vcf}`: vCard 3 / 4 text (the same UID is updated; at most 20 MB, never more than the server's request limit `4 × TASKS_MAX_FILE_MB`; larger: `400` / `413` with `error` naming the limit) -> `{created, updated, unchanged, errors}`; 2.41.0: stored in batches of 200, each committed (a failure keeps the batches before it); the book as `{vcf}`. The app's own `POST /api/books/{id}/import?background=1` (multipart `file`) answers a file of more than 100 cards with 202 `{import_id, state: running, total, done, …}` at once and `GET /api/books/imports/{import_id}` (only for the person who started it) tells `state` running / done / failed, `done` of `total`, the counts and `error`; 2.119.1: the app's own import also takes a CSV file (`?preview=1` answers `{format: csv, columns, guess, sample, rows, delimiter, encoding}`, the form field `mapping` = a field per column), its answer adds `dupes` / `dupe_groups` (new contacts that look like one the person sees), `GET /api/books/{id}/export.csv` is the CSV export; 2.146.0: the app's import also takes several vCard files (multipart field `files`) or a ZIP of them (only `.vcf` / `.vcard` entries, other files and nested ZIPs skipped, each file and all together at most 20 MB), the answer adds `files` `{files, errors: [{file, error}], skipped}`; the REST API's import stays vCard only |
 | `GET /contacts?q=&book_id=&group=&limit=&cursor=` | search name, company, e-mail, phone (also without spaces), address, group; `{data, next_cursor, total, groups}` |
@@ -1068,7 +1069,9 @@ lists the sent documents of the signed-in address's clients in that space, each 
 sign-in link (409 when the setting or mail is off, 429 after three per address and hour). Web app only, no `/api/v1`.
 
 `GET|POST /lists/{id}/forms`, `PATCH|DELETE /forms/{id}` (`structure`; owner / list admins): a form's `url`, `access`
-(`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link. 2.63.0: `ttype` (`''` | `bug` | `feature` |
+(`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link. 2.148.1: an agent opening a public form
+(`access: "public"`, turning a public form on, a new link) waits for a person's approval (`202` + a waiting job); `org`
+in a list without an organisation is for the people who see the list; a form of a list in the trash takes nothing in. 2.63.0: `ttype` (`''` | `bug` | `feature` |
 `task`, the type of a sent task), `files` (one file allowed), `portal` (a sender without an account gets a status link on
 the thank-you page and once by mail; turns `ask_email` on). 2.98.0 (#1954): `questions` (a questionnaire: at most 30
 `{id?, kind: short | long | choice | multi | date | number | file | yesno, label, help?, required?, options?}`; a choice
@@ -1312,13 +1315,7 @@ number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENT
 | `PATCH /office/offers/{id}` | office | The agent's own draft while it is a draft (`items` replaces the list; 2.88: `cashflow` auto / yes / no = its share in the cash flow plan once sent); `403` for a person's draft, `409` once sent |
 | `POST /office/offers/{id}/invoice` | office | An accepted quotation -> `201 {doc}` an invoice draft (`parts_mode?`, `notify?`; 2.120.0: `inv_type?` `progress` with `amount?` (net) or `pct?` of the quotation's net, or `final` = the whole quotation less its finalised progress invoices) |
 | `POST /office/reminders` | office | `{invoice_ids, level?: 1-3, notify?}` -> `201 {doc}` a reminder draft over open invoices of one client |
-<<<<<<< HEAD
-| `POST /office/payment-suggestions` | office | `{invoice_id, amount, date?, reference?, confidence?: high\|medium\|low, note?}` -> `201` an open suggestion (`exceeds_open` when above the open amount); `409` for a trial invoice (trial documents never reach the books) |
-||||||| fda0e61f
-| `POST /office/payment-suggestions` | office | `{invoice_id, amount, date?, reference?, confidence?: high\|medium\|low, note?}` -> `201` an open suggestion (`exceeds_open` when above the open amount) |
-=======
-| `POST /office/payment-suggestions` | office | `{invoice_id, amount, date?, reference?, confidence?: high\|medium\|low, note?}` -> `201` an open suggestion (`exceeds_open` when above the open amount); 2.148: `409` when `date` lies in a locked month of the office (GoBD) |
->>>>>>> job/788
+| `POST /office/payment-suggestions` | office | `{invoice_id, amount, date?, reference?, confidence?: high\|medium\|low, note?}` -> `201` an open suggestion (`exceeds_open` when above the open amount); `409` for a trial invoice (trial documents never reach the books); 2.148: `409` when `date` lies in a locked month of the office (GoBD) |
 | `GET /office/payment-suggestions` | office | `?state=open` (default) `\| accepted \| rejected \| all`: the agent's own suggestions |
 | `GET /office/leads` | office | 2.94.0: the leads of the area by follow-up day (`?due=1` = the day has come) -> `{data: [{id, title, contact, company, email, phone, source, next_step, follow_up, note, app_url}]}`; the person (`requested_by`) must be an admin of the office |
 | `POST /office/leads` | office | 2.94.0: `{title?, contact?, company?, email?, phone?, source?, next_step?, follow_up?, note?}` -> `201` a lead (stage lead; `source` default `agent`) |

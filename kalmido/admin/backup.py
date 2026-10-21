@@ -86,7 +86,12 @@ BK_PG_TIMEOUT = _env_int("KALMIDO_BACKUP_PG_TIMEOUT", 6 * 3600)   # s for one pg
 # 2.79.0 (#476 M8): + attachments/chat/<agent>-<person>/<file> (agent chat files), attachments/budget/<list>/<file> (household
 # budget receipts) and attachments/docthumbs/<file> (document previews): their rows were in the dump, the files were not
 # 2.99.0 (#2182, review H1): + attachments/wiki/<page>/<file> (the files of knowledge pages)
-BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|avatars|listicons|docthumbs|(?:files|lists|budget|wiki)/\d{1,12}|chat/\d{1,12}-\d{1,12})"
+# 2.148.1 C (#2482): every folder below ATT_DIR in one place (a test compares them with the folders the code writes to):
+# BK_FLAT = files directly in the folder, BK_PER_ID = <folder>/<id>/<file>; + tchat (team chat files), sheets (table
+# files), listheads (list header pictures), bookmarks (bookmark pictures)
+BK_FLAT = ("avatars", "listicons", "docthumbs", "listheads", "bookmarks")
+BK_PER_ID = ("files", "lists", "budget", "wiki", "tchat", "sheets")
+BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|" + "|".join(BK_FLAT) + "|(?:" + "|".join(BK_PER_ID) + r")/\d{1,12}|chat/\d{1,12}-\d{1,12})"
                           r"/([^/\\\x00-\x1f]{1,255})")
 BK_ERR = {"busy": N_("Another backup or restore is running, please try again in a moment."),
           "disk": N_("Not enough free disk space for the backup."),
@@ -107,6 +112,8 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           "not_found": N_("Backup not found."),
           "confirm": N_("Type {0} to confirm."),
           "maint": N_("The server is still busy; the restore did not start. Please try again."),
+          # 2.148.1 C (#2482): the maintenance mode of a restore holds in this process only
+          "procs": N_("A restore needs a single server process (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1). Stop the other processes first, see SELF-HOSTING.md."),
           "restore": N_("The restore failed ({0}); nothing was changed.")}
 _BK = {"running": "", "started": 0.0, "next_try": 0.0, "stale_at": 0.0, "meta": {}}
 _BK_LOCK = threading.Lock()
@@ -232,6 +239,26 @@ def _dir_size(d):
             except OSError:
                 pass
     return n
+
+
+def bk_outside(base, prefix, listed):
+    """2.148.1 C (#2482): {top folder: n} of the regular files below base that the archive does not bring (names never).
+    2.148.1 G (#2482): judged by the archive's own file list, so an archive of an older version keeps the old folder."""
+    out = {}
+    if not os.path.isdir(base):
+        return out
+    for root, dirs, fns in os.walk(base):
+        dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(root, d)) and not (root == base and d == ".wikitmp")]
+        for fn in fns:
+            full = os.path.join(root, fn)
+            rel = prefix + os.path.relpath(full, base).replace(os.sep, "/")
+            if os.path.islink(full) or not os.path.isfile(full) or rel in listed:
+                continue
+            if prefix == "office/" and fn.endswith((".tmp", ".part")):
+                continue
+            top = prefix + (rel[len(prefix):].split("/", 1)[0] if "/" in rel[len(prefix):] else ".")
+            out[top] = out.get(top, 0) + 1
+    return out
 
 
 def bk_name(kind, encrypted):
@@ -1087,6 +1114,9 @@ def _reset_caches():
 
 def bk_restore(path, pw, admin, via):
     """The whole restore (see the section comment). Returns (new session token or None, safety backup name)."""
+    from .worker import WRK_REPLICAS, WRK_ROLE
+    if WRK_ROLE != "all" or WRK_REPLICAS > 1:  # 2.148.1 C (#2482): other processes would keep writing during the swap
+        raise BackupError("procs")
     if not _BK_LOCK.acquire(blocking=False):
         raise BackupError("busy")
     _BK.update(running="restore", started=time.time())
@@ -1161,8 +1191,12 @@ def bk_restore(path, pw, admin, via):
             if omoved:
                 os.rename(off_old, OFFICE_DIR)
             raise
-        shutil.rmtree(att_old, ignore_errors=True)
-        shutil.rmtree(off_old, ignore_errors=True)
+        for old, prefix in ((att_old, "attachments/"), (off_old, "office/")):  # 2.148.1 C (#2482): files outside the archive
+            left = bk_outside(old, prefix, man["_listed"])  # format stay in the folder of before (never deleted unseen)
+            if left:
+                print(f"restore: kept {os.path.basename(old)}: files the backup format does not cover:", json.dumps(left, sort_keys=True), flush=True)
+            else:
+                shutil.rmtree(old, ignore_errors=True)
         print(f"restore: {os.path.basename(path)} restored by {admin} (safety backup {safety})", flush=True)
         aa_now("security", f"restore:{int(time.time())}", N_("{0} restored a backup from {1} (safety backup of the previous state: {2})."),
                [admin, str(man.get("created_at", "?"))[:16].replace("T", " ") + " UTC", safety])

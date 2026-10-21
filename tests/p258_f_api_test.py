@@ -157,6 +157,7 @@ r = Bo.post(B + f"/api/lists/{PRIV}/icon", files={"file": ("i.png", png(), "imag
 pp, _v = icon_file(PRIV)
 check(r.ok and head(pp) == b"\x89PNG\r\n" and Bo.get(B + r.json()["icon"]).status_code == 200, "#1805: a private list's picture stays plain (as attachments)")
 base = f"/api/orgs/{ORG}/lists/{TEAM}"
+check(Bo.put(B + f"/api/lists/{TEAM}/members", json={"user_id": 1, "role": "view"}).ok, "setup: Team shared")  # 2.148.1 (#2480): admins act on shared lists only
 r = A.post(B + base + "/icon", files={"file": ("i.png", png(5, 5), "image/png")}, headers=H)
 pa, _v = icon_file(TEAM)
 check(r.ok and head(pa) == b"KENC1\n", "#1805: the organisation admin's way seals as well " + r.text[:160])
@@ -166,6 +167,7 @@ check(A.get(B + r.json().get("icon", "")).status_code == 200 if r.ok else False,
 A.delete(B + base + "/icon")
 LIST2 = Bo.post(B + "/api/lists", json={"name": "\U0001F680 Rockets", "org_id": ORG}).json()["id"]
 b2 = f"/api/orgs/{ORG}/lists/{LIST2}"
+check(Bo.put(B + f"/api/lists/{LIST2}/members", json={"user_id": 1, "role": "view"}).ok, "setup: Rockets shared")  # 2.148.1 (#2480)
 
 
 def news2():

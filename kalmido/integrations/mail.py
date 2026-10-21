@@ -236,11 +236,27 @@ def mail_import(c, raw):
     return tid
 
 
+MAIL_LITERAL_MAX = 40 * 1024 * 1024  # 2.148.1 D (#2485): largest literal read from an IMAP server (whatever size it announces)
+
+
+def mail_cap_literals(M, limit):
+    """2.148.1 D (#2485): a literal over limit ends the session (IMAP4.abort) instead of being read into memory."""
+    read = M.read
+
+    def capped(size):
+        if size > limit:
+            raise imaplib.IMAP4.abort("literal too large")
+        return read(size)
+    M.read = capped
+
+
 def mail_fetch(M, folder, importer, max_bytes=None):
     """2.141.0 A (#2141): the unseen mails of folder (a logged-in IMAP connection) -> importer(c, raw), each one marked \\Seen
     afterwards (also when it was for nobody or failed: it is never looked at again). Returns how many were taken in.
     max_bytes (review): a mail whose RFC822.SIZE is larger is not fetched (marked seen) -- a workspace's own server."""
     n = 0
+    max_bytes = max_bytes or MAIL_LITERAL_MAX  # 2.148.1 G (#2485): a too large mail is skipped (seen), never fetched again
+    mail_cap_literals(M, max_bytes + 1024 * 1024)  # 2.148.1 D (#2485)
     typ, _ = M.select(folder)
     if typ != "OK":
         raise imaplib.IMAP4.error("could not select the folder")

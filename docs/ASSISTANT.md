@@ -50,7 +50,9 @@ Settings > **Assistant** (the section only shows when the operator configured an
 1. *Use the assistant*: on. The line below it says to which provider and host your texts go, and the model.
 2. *Lists the assistant may read*: tick the lists it may use. The basket is not in the list: basket items go only when
    you pick them yourself (sort the basket, or the assistant menu of a basket task). Archived lists and health lists
-   cannot be ticked.
+   cannot be ticked. Only lists you own can be ticked (2.148.1): a list someone shared with you holds their notes and
+   comments, so only its owner decides whether they go to the assistant. A list ticked earlier that you do not own is
+   no longer used.
 
 Children's accounts and agents never get the assistant. Switching it off again hides every entry point at once.
 

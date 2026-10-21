@@ -1627,6 +1627,17 @@ fresh; run p2148_c_ui node p2148_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.148.0 part D: DATEV import of master data + opening balances (#2458)
 fresh; run p2148_d_api "$PY" p2148_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2148_d_ui node p2148_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.148.1 part A: security fixes - organisation membership, invitations, public links (#2478 #2480 #2486 #2490)
+fresh; run p21481_a_api "$PY" p21481_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21481_a_ui node p21481_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.148.1 part B: security fixes - organisation boundary, account deletion, clients (#2479 #2483 #2484 #2491)
+fresh; run p21481_b_api "$PY" p21481_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.148.1 part C: security fixes - encryption, backup, retention, account import/export (#2481 #2482 #2487 #2492 #2493 #2494)
+fresh; run p21481_c_api "$PY" p21481_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.148.1 part D: security fixes - resource limits, mail filing, assistant, agents (#2485 #2488 #2489 #2495)
+fresh; run p21481_d_api "$PY" p21481_d_api_test.py "$KALMIDO_TEST_DATA"
+# 2.148.1 part E: hardening (#2496)
+fresh; run p21481_e_api "$PY" p21481_e_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

@@ -451,6 +451,10 @@ def tsl_decide():
         raise Denied(404)  # no sheet, a private one or another organisation's: nothing to see
     if r["org_id"] not in tsl_admin_orgs(c, uid):
         raise Denied(403, tr("Only an admin of the organisation can approve timesheets"))
+    if who == uid and act == "approve" and c.execute(  # 2.148.1 G (#2496): only an active person counts as the second admin
+            """SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND m.user_id!=?
+               AND u.disabled=0 AND COALESCE(u.kind, 'user')!='agent'""", (r["org_id"], uid)).fetchone():
+        raise Denied(403, tr("Another admin of the organisation has to approve your own timesheet"))  # 2.148.1 E (#2496): four eyes; the only admin may
     st, ts = r["state"], iso(now_utc())
     enote = oc_enc_fields(c, r["org_id"], "time_sheets", {"note": note})["note"]  # 2.125.0 R (#2119): sealed like the leave's note
     if act == "approve":

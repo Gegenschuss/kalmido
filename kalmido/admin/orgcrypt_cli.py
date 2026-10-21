@@ -49,13 +49,14 @@ BATCH = 200
 
 # (table, id column, column, kind): text = the whole column, log = office log detail (only entries with protected keys),
 # json = protected keys inside a JSON column (orgcrypt.JSON_KEYS)
-FIELD_JOBS = [("office_company", "org_id", col, "text") for col in oc.FIELDS["office_company"]] + [
-    ("office_contracts", "id", "rates", "text"),
-    ("office_docs", "id", "sender", "text"),
-    ("office_docs", "id", "totals", "json"),
-    ("office_settings", "org_id", "data", "json"),
-    ("office_doc_log", "id", "detail", "log"),
-]
+# 2.148.1 C (#2481): derived from oc.FIELDS / oc.JSON_KEYS (every protected table, a test compares them); the household
+# budget (sid, bud_settle) and the knowledge pages (wkh_settle) have their own passes; tables with one row per organisation
+# use org_id as their id column
+FIELD_SETTLED = ("budget_", "wiki_")
+FIELD_ORG_ROWS = ("office_company", "office_settings", "office_cf_start")
+FIELD_JOBS = [(t, "org_id" if t in FIELD_ORG_ROWS else "id", col, "log" if (t, col) == ("office_doc_log", "detail") else "text")
+              for t, cols in oc.FIELDS.items() if not t.startswith(FIELD_SETTLED) for col in cols] + [
+    (t, "org_id" if t in FIELD_ORG_ROWS else "id", col, "json") for (t, col) in oc.JSON_KEYS]
 # 2.126.0 A (#1971): (table, id column, column, sealing context) of the documents' values: sealed per workspace (column ws)
 # by docs/store.py doc_seal, the organisation's key or the person's own key
 DOC_JOBS = [("doc_meta", "node_id", col, f"doc_meta.{col}") for col in ("text", "amount", "suggest", "trained", "extracted", "summary")] + [  # 2.138.0: + summary (2.126.1 #2123)
@@ -150,6 +151,8 @@ def fields_pass(c, oid, enc, key, stop=None):
             with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
                 write_lock(c, "orgcrypt")
                 sql = f"SELECT {idc} AS rid, {col} AS v FROM {table} WHERE org_id=?"
+                if enc:  # 2.148.1 G (#2481): sealed / empty values need no pass (every start runs this)
+                    sql += f" AND {col} IS NOT NULL AND CAST({col} AS TEXT) NOT LIKE '{oc.PREFIX}%'"  # pg-ok: the prefix has no case
                 args = [oid]
                 if last is not None:
                     sql += f" AND {idc} > ?"
@@ -862,7 +865,9 @@ def before_org_delete(c, oid):
         t = att.get(p)
         return t if (t and t != oid) else None
     _bud().bud_settle(c, force_from=oid, commit=False)  # 2.72.0 (#1333): budget rows of this key in lists of another space now
-    return files_decrypt(c, list(att), only_org=oid, reseal=target)
+    # 2.148.1 C (#2487): only files that live on in another space; the organisation's own ones are never opened (they go
+    # with it and stay sealed with the dropped key)
+    return files_decrypt(c, [p for p, t in att.items() if t != oid], only_org=oid, reseal=target)
 
 
 # ---- start-up thread --------------------------------------------------------------------------------------------------
@@ -1041,7 +1046,7 @@ ROT_SETTLE = float(os.environ.get("KALMIDO_ORGCRYPT_ROT_SETTLE", "5"))  # second
 
 
 # 2.138.0 C (#1972): tables with one row per organisation (no id column; office_cf_start since 2.123)
-ROT_ORG_ROWS = ("office_company", "office_settings", "office_cf_start")
+ROT_ORG_ROWS = FIELD_ORG_ROWS  # 2.148.1 C (#2481): one list
 
 
 def _rot_jobs(oid):
@@ -1224,7 +1229,8 @@ def rotate_org(c, oid, stop=None, rounds=3, force=False):
         if started and ROT_SETTLE > 0:
             time.sleep(ROT_SETTLE)
         out = {"org": oid, "fields": 0, "files": 0, "unreadable": 0, "finished": False, "secret": None}
-        for _ in range(rounds):
+        empty = 0
+        for _ in range(rounds + 1 if rounds else 0):  # (rounds=0: stop right after the key switch)
             nf, bf = rot_fields(c, oid, k1, k2, stop)
             ns, bs = rot_files(c, oid, k1, k2, stop)
             out["fields"] += nf
@@ -1232,8 +1238,15 @@ def rotate_org(c, oid, stop=None, rounds=3, force=False):
             out["unreadable"] = bf + bs
             if stop and stop():
                 return out
-            if not nf and not ns:
+            if nf or ns:
+                empty = 0
+                continue
+            empty += 1
+            # 2.148.1 C (#2481): K1 goes only after two empty rounds with a settle pause between them (a request that
+            # still held K1 during the last round has ended and its value is re-encrypted in the second one)
+            if empty >= 2 or ROT_SETTLE <= 0:
                 break
+            time.sleep(ROT_SETTLE)
         else:
             return out  # still changing: K1 stays, the next run continues
         if out["unreadable"] and not force:

@@ -230,7 +230,8 @@ KA = KA["id"]
 EA = Bo.post(B + "/api/events", json={"title": f"{MARK} event", "start": "2026-10-21T10:00", "end": "2026-10-21T11:00", "cal_id": KA}).json()["id"]
 BA = book(Bo, f"{MARK} book")["id"]
 CTA = Bo.post(B + "/api/contacts", json={"book_id": BA, "given": MARK, "family": "Contact"}).json()["id"]
-TPA = Bo.post(B + "/api/templates", json={"task_id": TA, "name": f"{MARK} template"}).json()["id"]
+# 2.148.1 (#2483): a template of an organisation's task only by its admins -> bob's own template from the editor
+TPA = Bo.post(B + "/api/templates", json={"kind": "task", "data": {"task": {"title": f"{MARK} task"}}, "name": f"{MARK} template"}).json()["id"]
 r = Bo.post(B + f"/api/lists/{LA}/forms", json={"title": f"{MARK} form"})
 check(r.status_code == 201, "setup: a form " + r.text[:100])
 FA, FURL = r.json()["id"], r.json()["url"].replace("https://kalmido.example", "")

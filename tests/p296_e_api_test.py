@@ -36,7 +36,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
-from freelancer_fixture import FEATURES, freelancer  # noqa: E402
+from freelancer_fixture import FEATURES, freelancer, org_join  # noqa: E402; 2.148.1 (#2480): an invited member accepts
 
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -213,7 +213,7 @@ ORG2 = r.json()["id"]
 SP = f"org:{ORG}"
 Bo = sess("bob")
 for u in ("carol", "erin"):
-    check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": f"{u}@example.com"}).ok, f"setup: {u} joins Alpha")
+    check((Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": f"{u}@example.com"}).ok and org_join(B, u, ORG)), f"setup: {u} joins Alpha")
 dbx("DELETE FROM org_members WHERE (org_id=? AND user_id NOT IN (?,?,?)) OR (org_id=? AND user_id NOT IN (?))", (ORG, BOB, CAROL, ERIN, ORG2, DAVE))
 r = A.post(B + "/api/admin/agents", json={"username": "alphabot", "display_name": "Alphabot",
                                           "scopes": ["read", "files:read", "attachments:read"]})
@@ -262,6 +262,9 @@ OLD_FW = {r[0] for r in dbx("SELECT w.h FROM file_words w JOIN file_text f ON f.
 LOG_BEFORE = {(x["action"], x.get("at")) for x in Ca.get(B + f"/api/files/nodes/{AKTE}").json().get("log") or []}
 check(all(head_space(p) == ORG for p in OLD_V) and OLD_DW and OLD_FW, "before: sealed for Alpha, word indexes there")
 
+# 2.148.1 (#2483): out of an organisation only through its admin -- carol moves as an admin of Alpha from here on
+check(fmove(Ca, {"ids": [AKTE, DOC], "to": "private"}).status_code == 403, "#2483: a member does not move them out of Alpha (403)")
+dbx("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=?", (ORG, CAROL))
 r = fmove(Ca, {"ids": [AKTE, DOC], "to": "private", "dry": 1})
 check(r.ok and r.json().get("block") is None and r.json().get("shares") == 3, f"dry run: 3 shares end, no block ({r.text[:300]})")
 r = fmove(Ca, {"ids": [AKTE, DOC], "to": "private", "parent": None})

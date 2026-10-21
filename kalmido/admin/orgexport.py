@@ -54,6 +54,7 @@ from ..accounts.session import me
 
 EXPORT_DIR = os.environ.get("TASKS_EXPORT_DIR", os.path.join(os.path.dirname(DB), "exports"))
 OX_KEEP_H = 24  # a finished archive waits this long, then the watchdog removes it
+PART_STALE_S = 6 * 3600  # 2.148.1 C (#2482): an unfinished export file older than this is left over (runs end long before)
 OX_MAGIC = b"KALMIDO-ORGX\n"
 OX_FORMAT = 1
 OX_BLOCK = 1 << 20  # 1 MiB of plaintext per block
@@ -653,7 +654,9 @@ def ox_cleanup(c=None, force=False):
             for fn in os.listdir(p):
                 fp = os.path.join(p, fn)
                 old = time.time() - os.path.getmtime(fp) > OX_KEEP_H * 3600
-                if fn.endswith(".part") or (fn.endswith(OX_SUFFIX) and (fn != st.get("file") or st.get("expires_at", "") <= now or old)):
+                # 2.148.1 C (#2482): a .part only when stale (a run of another process writes it right now)
+                if (fn.endswith(".part") and time.time() - os.path.getmtime(fp) > PART_STALE_S) or (
+                        fn.endswith(OX_SUFFIX) and (fn != st.get("file") or st.get("expires_at", "") <= now or old)):
                     os.remove(fp)
                     n += 1
             if st.get("state") == "done" and not os.path.isfile(os.path.join(p, st.get("file") or "-")):

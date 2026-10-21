@@ -426,7 +426,7 @@ def doc_public(c, oid, r, admin, items=True):
             d["parts"] = tp_public(c, oid, r, admin)
             d["parts_shoot"] = tp_shoot_ok(c, oid)
         from .contacts_cl import fk_contacts
-        d["client_contacts"] = fk_contacts(c, r["client_id"]) if r["client_id"] else []  # 2.40.0 (#1380): the choice of contact_id
+        d["client_contacts"] = fk_contacts(c, r["client_id"], oid) if r["client_id"] else []  # 2.40.0 (#1380); 2.148.1 B (#2484): same area only
         d["contract"] = _contract(c, oid, d.get("contract_id"))
         if d["contract"]:
             d["contract"] = {k: d["contract"][k] for k in ("id", "name", "raw_included", "rates", "rights_time_id", "rights_territory_id",
@@ -1189,8 +1189,9 @@ def odoc_items_put(did):
 @app.post("/api/office/docs/<int:did>/number")
 def odoc_number(did):
     """{number?} sets a number by hand (unique within the organisation) or reserves the next one of the scheme.
-    A finalised document: 409. 2.126.0 A (#1966): the next number of a kind numbered at finalising only comes then (409)."""
-    c, uid, oid = _ctx()
+    A finalised document: 409. 2.126.0 A (#1966): the next number of a kind numbered at finalising only comes then (409).
+    2.148.1 E (#2496): office admin / accounting only (a plain member's number comes at finalising)."""
+    c, uid, oid = _ctx(admin=True)
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
     b = body()

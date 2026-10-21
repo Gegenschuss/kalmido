@@ -46,6 +46,8 @@ FI_XLSX_MAX = 10 * 1024 * 1024  # the uploaded spreadsheet
 FI_XLSX_UNZIPPED_MAX = 80 * 1024 * 1024  # all members unpacked (zip bomb guard)
 FI_PDF_MAX = 20 * 1024 * 1024
 FI_ROWS_MAX = 2000  # rows per sheet taken into the preview
+FI_COLS_MAX = 200  # 2.148.1 D (#2485): columns per sheet / table range
+FI_PARTS_MAX = 64  # 2.148.1 D (#2485): sheets and tables read per workbook
 FI_NAME_MAX = 80  # clients.name
 
 # ---------------------------------------------------------------- reasons shown next to an uncertain split
@@ -75,7 +77,8 @@ def _xml(z, name, budget):
     if budget[0] > FI_XLSX_UNZIPPED_MAX:
         raise BadInput(tr("The file is too large"))
     data = z.read(name)
-    if b"<!DOCTYPE" in data[:4096].upper() or b"<!ENTITY" in data.upper():  # no entity tricks in a spreadsheet
+    if b"<!DOCTYPE" in data[:4096].upper() or b"<!ENTITY" in data.upper() \
+            or data[:2] in (b"\xff\xfe", b"\xfe\xff") or b"\x00" in data[:4]:  # no entity tricks; 2.148.1 G (#2496): single-byte encodings only
         raise BadInput(tr("This is not a spreadsheet file (.xlsx)"))
     return ET.fromstring(data)
 
@@ -93,7 +96,9 @@ def _range(ref):
         return None
     c1, r1 = _col_index(m.group(1)), int(m.group(2))
     c2, r2 = (_col_index(m.group(3)), int(m.group(4))) if m.group(3) else (c1, r1)
-    return c1, r1, c2, r2
+    if c1 > FI_COLS_MAX:  # 2.148.1 D (#2485): cap the column span like the sheet reader does
+        return None
+    return c1, r1, min(c2, FI_COLS_MAX), r2
 
 
 def _rels(z, path, budget):
@@ -135,9 +140,13 @@ def fi_xlsx_read(raw):
         wb = _xml(z, "xl/workbook.xml", budget)
         wrels = _rels(z, "xl/workbook.xml", budget)
         out = {}
+        parts = 0
         for sh in wb.iter():
             if _local(sh.tag) != "sheet":
                 continue
+            parts += 1
+            if parts > FI_PARTS_MAX:  # 2.148.1 D (#2485): bounded number of sheets / tables
+                raise BadInput(tr("The file is too large"))
             rid = next((v for k, v in sh.attrib.items() if _local(k) == "id"), None)
             path = wrels.get(rid)
             if not path or path not in names:
@@ -146,6 +155,9 @@ def fi_xlsx_read(raw):
             out.setdefault((sh.get("name") or "").strip().lower(), grid)
             for t in _rels(z, path, budget).values():  # the sheet's tables (Excel "Format as table"; Power Query output)
                 if t in names and "/tables/" in t:
+                    parts += 1
+                    if parts > FI_PARTS_MAX:
+                        raise BadInput(tr("The file is too large"))
                     tb = _xml(z, t, budget)
                     rg = _range(tb.get("ref"))
                     if not rg:
@@ -157,7 +169,8 @@ def fi_xlsx_read(raw):
                         if nm:
                             out.setdefault(nm.strip().lower(), rows)
         return out
-    except (ET.ParseError, KeyError, ValueError, zipfile.BadZipFile, zlib.error, EOFError):  # broken file -> 400, not 500
+    # 2.148.1 D (#2485): encrypted / unsupported compression (RuntimeError, NotImplementedError) -> 400 as well
+    except (ET.ParseError, KeyError, ValueError, zipfile.BadZipFile, zlib.error, EOFError, RuntimeError, NotImplementedError):  # broken file -> 400, not 500
         raise BadInput(tr("This is not a spreadsheet file (.xlsx)")) from None
 
 

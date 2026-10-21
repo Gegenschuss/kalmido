@@ -95,7 +95,7 @@ def db_error(e):
         raise e
     import traceback
     code = 403 if denied else 400
-    path = re.sub(r"^(/api/hooks/(?:issues|deploy)/[0-9]+/)[^/]+", r"\1***", request.path)  # 2.126.0 B (#1979 I8): no hook token in the log; 2.138.4 (#2381): the deploy hook too
+    path = re.sub(r"^(/api/hooks/(?:issues|deploy)/[0-9]+/|/api/hooks/in/)[^/]+", r"\1***", request.path)  # 2.148.1 E (#2496): + inbound hooks;  # 2.126.0 B (#1979 I8): no hook token in the log; 2.138.4 (#2381): the deploy hook too
     print(f"database error ({code}) {request.method} {path}:\n" + "".join(traceback.format_exception(e)).rstrip(), flush=True)
     if denied:  # the second floor caught what an app check missed: the admins hear it (security alerts)
         from ..notify.alerts import aa_count
@@ -371,6 +371,8 @@ def init_db(guard=True, load=None):
         c.executescript(SCHEMA)
         flags0 = mig_flags_sync(c)  # 2.102.0 D (#1996): the one-shots done before this start (recorded if not yet)
         mig_apply(c)  # 2.102.0 D (#1996): only the MIGRATIONS steps not yet recorded in kalmido_migrations
+        from ..office.signoff import sig_fk_migrate
+        sig_fk_migrate(c)  # 2.148.1 C (#2493): video approval records stay when their review goes
         if load is not None:
             load(c)  # 2.37.0 (#1150): the move from SQLite (migrate-sqlite)
         # 2.10.0 (#441): member rows from before groups (or written by a path that sets no own_role) are personal shares

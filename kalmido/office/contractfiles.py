@@ -181,6 +181,12 @@ def dma_files_post(cid):
         raise BadInput(tr("{0}: larger than {1} MB", name, MAX_FILE_MB))
     if not data.startswith(b"%PDF-"):
         raise BadInput(tr(DMA_NOT_PDF))
+    from ..files.scan import sc_scan  # 2.148.1 E (#2496): virus scan like every upload
+    from ..files.upsafe import UploadRefused
+    try:
+        sc_scan(name, data)
+    except UploadRefused as e:
+        raise BadInput(str(e)) from None
     file = f"contract{int(cid)}-{uuid.uuid4().hex[:16]}.pdf"
     os.makedirs(dma_dir(oid), mode=0o700, exist_ok=True)
     path = dma_path(oid, file)

@@ -413,8 +413,40 @@ def user_delete(uid):
     return jsonify(ok=True, lists=n)
 
 
+UP_RETENTION = N_("Retention duty: the personal office holds finalised documents or cash book entries, so the account cannot be deleted. Export the office first and disable the account instead.")
+
+
+def _up_mail_nodes(c, uid):
+    """2.148.1 H (#2488): the filed copies (fs_nodes marked with hub_mail_id) of the mails that go with the account (see the
+    hub_mails DELETE in user_purge) go, too -- a folder only when everything in it belongs to those mails. Returns the files."""
+    from ..files.store import fs_purge, fs_subtree
+    paths, done = [], set()
+    with system_ctx(c):  # the nodes may lie in an organisation's tree
+        gone = {r[0] for r in c.execute("SELECT id FROM hub_mails WHERE owner_id=? AND (org_id IS NULL OR (client_id IS NULL AND list_id IS NULL))", (uid,))}
+        if not gone:
+            return paths
+        q = ",".join("?" * len(gone))
+        for (nid,) in c.execute(f"SELECT id FROM fs_nodes WHERE hub_mail_id IN ({q}) ORDER BY id", list(gone)).fetchall():
+            if nid in done:
+                continue
+            ids = fs_subtree(c, nid)
+            marks = c.execute(f"SELECT hub_mail_id FROM fs_nodes WHERE id IN ({','.join('?' * len(ids))})", ids).fetchall()
+            if all(m[0] in gone for m in marks):
+                gone_ids, gone_paths = fs_purge(c, nid)
+                done.update(gone_ids)
+                paths += gone_paths
+    return paths
+
+
 def user_purge(c, uid):
     """Deletes user uid (no own lists besides the inbox left; the caller checked and commits). Returns the files to unlink."""
+    with system_ctx(c):  # 2.148.1 B (#2479): retention -- finalised documents / cash book of the personal office never go along
+        kept = c.execute("""SELECT 1 FROM orgs o WHERE o.personal_of=? AND (
+                              EXISTS (SELECT 1 FROM office_docs d WHERE d.org_id=o.id AND d.locked_at IS NOT NULL)
+                              OR EXISTS (SELECT 1 FROM office_cash_entries e WHERE e.org_id=o.id)
+                              OR EXISTS (SELECT 1 FROM office_cash_log x WHERE x.org_id=o.id))""", (uid,)).fetchone()
+    if kept:
+        raise Denied(409, tr(UP_RETENTION))
     inbox = [r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=?", (uid,))]
     files = attachment_files(c, [r[0] for r in c.execute(
         f"SELECT id FROM tasks WHERE list_id IN ({','.join('?' * len(inbox)) or 'NULL'})", inbox)])
@@ -432,6 +464,7 @@ def user_purge(c, uid):
     a = c.execute("SELECT webhook_id FROM agents WHERE user_id=?", (uid,)).fetchone()
     if a and a["webhook_id"]:
         c.execute("DELETE FROM webhooks WHERE id=?", (a["webhook_id"],))
+    files += _up_mail_nodes(c, uid)  # 2.148.1 H (#2488): before the tree is handed on
     from ..files.store import fs_user_purge
     files += fs_user_purge(c, uid)  # 2.48.0 (#1207): the file store (organisation branches go to an admin, the own tree goes)
     # 2.84.0 A (#1198): the person's private filed mails and their mails nobody else sees (not assigned) go; an organisation's

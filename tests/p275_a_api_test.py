@@ -192,8 +192,12 @@ check(r.status_code in (401, 403, 404), f"agent token: run refused ({r.status_co
 check(requests.get(V + "/assistant", headers=AGH).status_code in (401, 403, 404), "no v1 route")
 
 # lists: only what the person sees, never basket / health / archived / someone else's
-r = call(A, "put", "/api/assistant/lists", json={"list_ids": [W, HL, AR, BL, INBOX, 99999, BV]})
-check(r.ok and sorted(x["id"] for x in r.json()["lists"]) == sorted([W, BV]), "share: only Work + the visible list stay " + r.text)
+# 2.148.1 (#2489): only own lists: a visible list of someone else is refused (403), the rest is left out silently as before
+r = call(A, "put", "/api/assistant/lists", json={"list_ids": [W, HL, AR, BL, INBOX, 99999]})
+check(r.ok and sorted(x["id"] for x in r.json()["lists"]) == [W], "share: only Work stays " + r.text)
+r = call(A, "put", "/api/assistant/lists", json={"list_ids": [W, BV]})
+check(r.status_code == 403 and [x["id"] for x in call(A, "get", "/api/assistant").json()["lists"]] == [W],
+      "share: a visible list of someone else 403, nothing changed " + r.text)
 n0 = len(ai_log())
 r = run(A, kind="extract", text="x", list_id=BV)
 check(r.status_code == 403 and len(ai_log()) == n0, "extract into a read-only list: 403 before any call " + r.text)
@@ -201,7 +205,12 @@ r = call(A, "put", "/api/assistant/lists", json={"list_ids": [W]})
 check(A.get(B + "/api/state").json()["assistant"]["list_ids"] == [W], "state: list_ids")
 check(call(A, "put", "/api/assistant/lists", json={"list_ids": "all"}).status_code == 400, "share: bad body 400")
 Bo.patch(B + "/api/settings", json={"assistant_on": "1"})
-check([x["id"] for x in call(Bo, "put", "/api/assistant/lists", json={"list_ids": [W, BL]}).json()["lists"]] == [W, BL], "bob shares Work + own")
+# 2.148.1 (#2489): bob cannot share alice's list Work; a stored share of it (from before) is ignored, not deleted
+check(call(Bo, "put", "/api/assistant/lists", json={"list_ids": [W, BL]}).status_code == 403, "bob: alice's Work 403")
+check([x["id"] for x in call(Bo, "put", "/api/assistant/lists", json={"list_ids": [BL]}).json()["lists"]] == [BL], "bob shares his own")
+dbx("INSERT INTO assistant_access(user_id,list_id,created_at) VALUES(?,?,?)", (BOB, W, "2026-10-01T00:00:00Z"))
+check([x["id"] for x in call(Bo, "get", "/api/assistant").json()["lists"]] == [BL], "bob: an older share of Work is not used")
+check(dbx("SELECT 1 FROM assistant_access WHERE user_id=? AND list_id=?", (BOB, W)), "bob: ... and not deleted while he sees Work")
 
 # ---- summary / draft
 n0 = len(ai_log())

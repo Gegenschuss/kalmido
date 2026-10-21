@@ -15,7 +15,7 @@ from ..core.db import bump, db
 from ..accounts.session import me
 from ..core.access import Denied, acx_of
 from ..api.v1 import BadInput, v1_args, v1_json, v1_view, UnknownFields
-from .store import (fs_chain, fs_log_add, fs_new_version, fs_put, fs_read, fs_visible_ids, need_node, safe_fs_name, _free_name,
+from .store import (fs_chain, fs_log_add, fs_mail_rows, fs_new_version, fs_put, fs_read, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place)
 from .web import fs_agent_folder, fs_node_json, _crumbs, _items, _send, _versions
 
@@ -50,7 +50,7 @@ def v1_files_list():
         n = need_node(c, pid)
         if n["kind"] != "folder":
             raise Denied(409, tr("Not a folder"))
-        rows = c.execute("SELECT * FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL ORDER BY id", (pid,)).fetchall()
+        rows = fs_mail_rows(c, me(), c.execute("SELECT * FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL ORDER BY id", (pid,)).fetchall())  # 2.148.1 D (#2488)
         fs_log_add(c, pid, "list")
         c.commit()
         items = _items(c, rows, n["role"])
@@ -81,7 +81,7 @@ def v1_file_get(nid):
     n = need_node(c, nid)
     out = _v1_node(c, n)
     if n["kind"] == "folder":
-        rows = c.execute("SELECT * FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL ORDER BY id", (nid,)).fetchall()
+        rows = fs_mail_rows(c, me(), c.execute("SELECT * FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL ORDER BY id", (nid,)).fetchall())  # 2.148.1 D (#2488)
         out["children"] = _items(c, rows, n["role"])
     elif n["kind"] == "file":
         out["versions"] = _versions(c, nid)

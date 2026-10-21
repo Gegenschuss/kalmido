@@ -245,7 +245,7 @@ function wsPaneWire(md) {
     const b = e.target.closest('[data-wsadd],[data-wsrm],[data-wssave]'); if (!b) return;
     const oid = +(b.dataset.oidx || b.closest('[data-oid]')?.dataset.oid || 0);
     try {
-      if (b.dataset.wsadd) { const em = $('#ws-add-' + oid, md).value.trim(); if (!em) return; const r = await api('PUT', `/api/orgs/${oid}/members`, {email: em}); toast(r.by_email ? tr('If this address has an account, the person is now a member.') : tr('Added')); }
+      if (b.dataset.wsadd) { const em = $('#ws-add-' + oid, md).value.trim(); if (!em) return; const r = await api('PUT', `/api/orgs/${oid}/members`, {email: em}); toast(S.me?.is_admin ? (r.by_email ? tr('If this address has an account, the person is now a member.') : tr('Added')) : tr('Invitation sent. With an account, the person accepts it in their News.')); }  // 2.148.1 A (#2480)
       else if (b.dataset.wssave) { await api('PATCH', `/api/orgs/${oid}`, {name: $('#ws-name-' + oid, md).value.trim(), domains: $('#ws-dom-' + oid, md).value}); toast(tr('Saved')); }
       else if (b.dataset.wsrm) {
         const uid = +b.dataset.wsrm, self = uid === S.me?.id, o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === oid), m = o?.members.find(x => x.id === uid);
@@ -275,7 +275,9 @@ async function wsIconPick(md, oid, how) {
 // private lists, private sharing or inboxes) with owner, numbers and the last change - never their contents. Archive / restore,
 // hand over to another person of the organisation, delete for good from the archive (the name typed to confirm); a history.
 const OADM_ACT = {archive: N_('{0} archived {1}'), restore: N_('{0} restored {1}'), delete: N_('{0} deleted {1} for good'), trash: N_('{0} moved {1} to the trash'), undelete: N_('{0} restored {1} from the trash'), purge: N_('{0} deleted {1} for good'), owner: N_('{0} handed {1} to {2}'),
-  edit: N_('{0} changed {1}'), icon: N_('{0} changed the icon of {1}')};  // 2.56.0 (#1795)
+  edit: N_('{0} changed {1}'), icon: N_('{0} changed the icon of {1}'),  // 2.56.0 (#1795)
+  moveout: N_('{0} moved {1} out of the organisation'),  // 2.148.1 B (#2483)
+  export: N_('{0} exported {1} with the account export')};  // 2.148.1 C (#2492)
 function oadmRow(x) {
   const sub = [x.owner_agent ? tr('Owner: {0} (agent)', x.owner_name) : tr('Owner: {0}', x.owner_name), tr('{0} open', x.open) + ' / ' + trn('{0} task', '{0} tasks', x.tasks),
     trn('{0} member', '{0} members', x.members), tr('changed {0}', fmtDateLoc(String(x.changed_at || '').slice(0, 10)) || '–'), x.folder && tr('Folder: {0}', fDisp(x.folder))].filter(Boolean);  // 2.39.1 (#1188): + folder path

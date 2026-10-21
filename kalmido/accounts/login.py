@@ -32,6 +32,21 @@ from ..accounts.session import (
 )
 
 
+# 2.148.1 C (#2494): failed sign-ins in the server log name neither the typed name (it may be a password typed into the
+# wrong field): "user#<8 hex of its SHA-256>". The address stays in full by default (fail2ban bans by it);
+# KALMIDO_LOG_FULL_IP=0 shortens it like the alerts (IPv4 /24, IPv6 /48), docs/SELF-HOSTING.md
+LOG_FULL_IP = os.environ.get("KALMIDO_LOG_FULL_IP", "1") != "0"
+
+
+def login_log_name(name):
+    return "user#" + hashlib.sha256(str(name or "").strip().lower().encode()).hexdigest()[:8]
+
+
+def login_log_ip(ip):
+    from ..notify.alerts import fx2_mask_ip
+    return ip if LOG_FULL_IP else fx2_mask_ip(ip)
+
+
 @app.get("/api/auth/info")
 def auth_info():
     """What the login screen needs (open): setup needed?, language, why a proxy login failed, the extra
@@ -117,7 +132,7 @@ def auth_login():
                 aa_now("security", "ratelimit:u:?",
                        N_("Login rate limit reached for an unknown user name (logins refused for {0} min)."), [FAIL_WINDOW // 60])
         aa_count("security", "logins", client_ip(), user=username if u else "?")
-        print("login failed for", repr(username), "from", client_ip(), flush=True)
+        print("login failed for", login_log_name(username), "from", login_log_ip(client_ip()), flush=True)  # 2.148.1 C (#2494)
         return err(tr("Wrong username or password", lg=_accept_lang(lang())), 401)  # 2.13.0 (#453 P7): the page's language
     remember = bool(b.get("remember", True))
     methods = twofa_methods(c, u)
@@ -400,7 +415,7 @@ def _code_fail(u, p=None):
     keys = _rate_keys(u["username"])
     _rate_fail(keys)
     aa_count("security", "logins", client_ip(), user=u["username"])
-    print("second factor failed for", repr(u["username"]), "from", client_ip(), flush=True)
+    print("second factor failed for", login_log_name(u["username"]), "from", login_log_ip(client_ip()), flush=True)  # 2.148.1 C (#2494)
     if p is not None:
         p["tries"] += 1
         if p["tries"] >= PEND_TRIES:

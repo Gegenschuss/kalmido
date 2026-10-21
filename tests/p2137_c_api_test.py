@@ -156,7 +156,8 @@ SKIP_KEYS = re.compile(r"^(id|.*_id|.*_by|.*_at|org_id|owner_id|user_id|a|b|ws|u
                        r"trig_val|act_val|rule|files|data|review|res_label|personal_of|list_name|icon|name_key|log|"
                        r"reply_to|last_at|synced_at|updated|created|changed|added|at|day_key|enc_by|kenc|fetched)$")
 SKIP_IN = {"newsletter/connection.json": ("auto", "error"),  # on purpose: no automatic sync until connected again
-           "hub/mailbox.json": ("error",)}  # 2.144.5 B (#2410): the mailbox asks for its passwords again
+           "hub/mailbox.json": ("error",),  # 2.144.5 B (#2410): the mailbox asks for its passwords again
+           "comments.json": ("ext_name",)}  # 2.148.1 (#2492): comments of others come by name only (ext_name), never as their account
 DEPENDS = {"hub/bookings.json": "office/equipment.json"}  # bookings of equipment come with part A (office)
 SKIP_ENTRIES = {"manifest.json", "organisation.json", "members.json"}
 
