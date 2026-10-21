@@ -243,13 +243,13 @@ def area(s, who):
     gross4 = s.get(B + f"{D}/{t4}").json()["totals"]["gross"]
     de = TODAY.strftime("%d.%m.%Y")
     amount = f"{float(gross4):.2f}".replace(".", ",")
-    csv_text = (f"Kontoinhaber;Studio Example GmbH\nKonto;{TEST_IBAN}\n\n"
-                "Buchungstag;Valuta;Auftraggeber/Empfänger;Verwendungszweck;IBAN;Betrag\n"
-                f"{de};{de};Example Client AG;Rechnung {number(s, t4)};DE89370400440532013000;{amount}\n")
+    csv_text = ("Buchungstag;Valuta;Auftraggeber/Empfänger;Verwendungszweck;IBAN;Betrag\n"
+                f"{de};{de};Example Client AG;Rechnung {number(s, t4)};DE89370400440532013000;{amount}\n"
+                f"{de};{de};Example Shop;Paper;;-4,50\n")
     mp = {"date": 0, "amount": 5, "amount_in": None, "amount_out": None, "title": 3, "counterpart": 2, "decimal": ",", "date_format": "DD.MM.YYYY"}
     r = s.post(B + O + "/bank/import", json={"text": csv_text, "filename": "account.csv", "mapping": mp})
-    check(r.status_code == 201 and r.json().get("count") == 1, f"{who}: bank booking imported " + r.text[:200])
-    tx = (s.get(B + O + "/bank/tx").json().get("items") or [{}])[0]
+    check(r.status_code == 201 and r.json().get("count") == 2, f"{who}: bank bookings imported " + r.text[:200])
+    tx = next((x for x in s.get(B + O + "/bank/tx").json().get("items") or [] if x.get("purpose", "").startswith("Rechnung")), {})
     check(tx.get("id") and t4 not in [x.get("id") for x in tx.get("suggestions") or [] if x.get("kind") == "invoice"],
           f"{who}: the bank suggests no trial invoice {tx.get('suggestions')}")
     r = s.get(B + O + f"/bank/tx/{tx.get('id')}/candidates")
