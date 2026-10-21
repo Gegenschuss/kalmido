@@ -94,8 +94,10 @@ def task_by(title):
     return r[0] if r else None
 
 
+# 2.149.0 (#2513): the minute of the rate limits shortened to RATE_S (test containers only) instead of waiting 61 s per batch
+RATE_S = 10
 env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_SMTP_HOST=127.0.0.1 -e KALMIDO_SMTP_PORT=1025"
-           " -e KALMIDO_SMTP_TLS=none -e KALMIDO_MAIL_FROM=kalmido@example.test")
+           " -e KALMIDO_SMTP_TLS=none -e KALMIDO_MAIL_FROM=kalmido@example.test" + f" -e KALMIDO_TEST_RATE_WINDOW_S={RATE_S}")
 r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
 assert r.returncode == 0, r.stdout + r.stderr
 shutil.copy(os.path.join(N, "stub_mail.py"), DATA)
@@ -197,7 +199,7 @@ p = anon.post(B + "/f/" + tok, data={"subject": "Script file", "email": "eve@exa
 t2 = task_by("Script file")
 att2 = dbx("SELECT name FROM attachments WHERE task_id=?", (t2[0],)) if t2 else []
 check(p.ok and att2 and att2[0][0] == "run.sh.txt", "an executable ending gets .txt " + str(att2))
-time.sleep(61)
+time.sleep(RATE_S + 1)  # 2.149.0 (#2513): a new rate window
 # batch 2
 p = anon.post(B + "/f/" + tok, data={"subject": "No address", "stamp": sts.pop()})
 check(p.status_code == 400 and "e-mail address" in p.text and not task_by("No address"), "the status link needs an address")
@@ -213,7 +215,7 @@ time.sleep(1)
 check(len(mails("xample.com")) == 3, "at most 3 confirmations per address and hour " + str(len(mails("xample.com"))))
 pts = dbx("SELECT COUNT(*) FROM portal_tickets WHERE form_id=?", (F["id"],))[0][0]
 check(pts == 5, "every report a ticket " + str(pts))
-time.sleep(61)
+time.sleep(RATE_S + 1)  # 2.149.0 (#2513): a new rate window
 # batch 3
 p = anon.post(B + "/f/" + tok, data={"subject": "Big", "email": "big@example.com", "stamp": sts.pop()}, files={"file": ("big.bin", b"0" * (10 * 1024 * 1024 + 10), "application/octet-stream")})
 check(p.status_code in (400, 413) and not task_by("Big"), "a file over 10 MB: refused " + str(p.status_code))
@@ -243,7 +245,7 @@ check(p.ok and "/p/" not in p.text and t5 and t5[1] == "feature" and not dbx("SE
       and not dbx("SELECT 1 FROM portal_tickets WHERE task_id=?", (t5[0],)), "a form without status link / files: a feature task, no file, no ticket")
 check(Ca.get(B + "/f/" + tok).ok, "the public form also opens for another organisation")
 # 2.81.0 (#1866): batch 4: a used stamp is refused; at most 50 confirmation mails per form and day
-time.sleep(61)
+time.sleep(RATE_S + 1)  # 2.149.0 (#2513): a new rate window
 p = anon.post(B + "/f/" + tok, data={"subject": "Replayed", "email": "re@example.com", "stamp": st_used})
 check(p.status_code == 400 and "once more" in p.text and not task_by("Replayed"), "#1866: a stamp that was sent once is refused")
 day = time.strftime("%Y-%m-%d", time.gmtime())

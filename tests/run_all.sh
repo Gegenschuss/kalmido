@@ -9,9 +9,10 @@
 #   ONLY_GROUPS="a b" tests/run_all.sh  2.149.0 (#2514): the whole groups of these suites (every suite of each group, in order;
 #                                the other groups start no container) - the CI rerun: a suite that needs the state of the
 #                                one before it (news_ui after api) passes alone too
-#   now 2026-10-20T10:00:00+02:00; fresh; run ...   2.149.0 (#2512): this group runs at that test time (KALMIDO_TEST_NOW for the
-#                                server via start.sh and for the suites via testclock; the clock runs on from there); the other
-#                                groups run at the real time (or at a KALMIDO_TEST_NOW set for the whole run)
+#   now wed 10:00; fresh; run ...  2.149.0 (#2512): this group runs at that test time (an ISO instant, HH:MM today or
+#                                mon..sun HH:MM of this week, Berlin): KALMIDO_TEST_NOW for the server (start.sh) and for the
+#                                suites (testclock), the clock runs on from there; the other groups run at the real time (or at
+#                                a KALMIDO_TEST_NOW set for the whole run)
 #   Timings: every suite and every group (container start included) -> $KALMIDO_TIMINGS (default tests/timings.csv, appended:
 #                                shard,group,suite,seconds,rc; group = its first suite, suite "*" = the whole group); tools/shards.py
 # Needs: docker, python3 with tests/requirements.txt, node 18+ with `npm ci` done in tests/.
@@ -49,11 +50,27 @@ _timing() {  # _timing <suite> <ms> <rc>
   printf '%s,%s,%s,%d.%03d,%s\n' "$SHARD" "${GFIRST[$GI]:-g$GI}" "$1" $(($2 / 1000)) $(($2 % 1000)) "$3" >> "$TIMINGS" 2>/dev/null || true
 }
 _group_end() { [[ -n "$GRAN" ]] && _timing "*" $(( $(_ms) - GT0 )) ""; GRAN=; }
-now() { NEXT_NOW=$1; }  # now <ISO instant>: the test time of the next group (#2512)
+now() { NEXT_NOW="$*"; }  # now <when>: the test time of the next group (#2512), see _now_iso
+_now_iso() {  # <ISO instant> | HH:MM (today in Berlin) | mon..sun HH:MM (that day of this Monday-Sunday week in Berlin)
+  [[ "$*" == *T* ]] && { echo "$*"; return 0; }
+  "$PY" - "$@" <<'PY'
+import sys
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+a, tz = sys.argv[1:], ZoneInfo("Europe/Berlin")
+d = datetime.now(tz).date()
+if len(a) == 2:
+    d += timedelta(days=["mon", "tue", "wed", "thu", "fri", "sat", "sun"].index(a[0].lower()[:3]) - d.weekday())
+h, m = (int(x) for x in a[-1].split(":"))
+print(datetime(d.year, d.month, d.day, h, m, tzinfo=tz).isoformat())
+PY
+}
 mine() {
   if [[ "${FUNCNAME[1]:-}" == fresh ]]; then
     _group_end; GI=$((GI + 1)); GT0=$(_ms)
-    if [[ -n "${NEXT_NOW:-$BASE_NOW}" ]]; then export KALMIDO_TEST_NOW=${NEXT_NOW:-$BASE_NOW} KALMIDO_TEST_NOW_AT=$(date +%s)
+    if [[ -n "${NEXT_NOW:-$BASE_NOW}" ]]; then
+      KALMIDO_TEST_NOW=$(_now_iso ${NEXT_NOW:-$BASE_NOW}) || { echo "run_all.sh: now ${NEXT_NOW:-$BASE_NOW}: not a time"; exit 2; }
+      export KALMIDO_TEST_NOW KALMIDO_TEST_NOW_AT=$(date +%s)
     else unset KALMIDO_TEST_NOW KALMIDO_TEST_NOW_AT; fi
     NEXT_NOW=
   fi
@@ -85,7 +102,8 @@ fresh; run api "$PY" api_test.py "$KALMIDO_TEST_DATA"
        run news_ui node news_ui.js
        run offline node offline_test.js
 fresh; run news "$PY" news_test.py "$KALMIDO_TEST_DATA"
-fresh; run p1_api "$PY" p1_api_test.py "$KALMIDO_TEST_DATA"
+# 2.149.0 (#2512): p1_api and p294_b_api at a fixed day time (they failed at night / on Sundays: UTC day, week start)
+now wed 10:00; fresh; run p1_api "$PY" p1_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p1_ui node p1_ui_test.js
 fresh; run time_api "$PY" time_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run time_ui node time_ui_test.js
@@ -1135,7 +1153,7 @@ fresh; run p292_d_ui node p292_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.94.0 (#1929, #1930, #2024): appointment booking, leads, chat Enter
 fresh; run p294_a_api "$PY" p294_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p294_a_ui node p294_a_ui.js "$KALMIDO_TEST_DATA"
-fresh; run p294_b_api "$PY" p294_b_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p294_b_api "$PY" p294_b_api_test.py "$KALMIDO_TEST_DATA"  # 2.149.0 (#2512)
 fresh; run p294_b_ui node p294_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p294_c_ui node p294_c_ui.js "$KALMIDO_TEST_DATA"
 shard 4  # 2.99.0: the 2.99 suites run in shard 4 (23 min in run 212; shard 12 got the 2.98 suites, shard 13 ran past the 45 min CI limit)

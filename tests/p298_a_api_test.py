@@ -90,8 +90,11 @@ def visitor():
     return v
 
 
+# 2.149.0 (#2513): the minute of the rate limits shortened to RATE_S (test containers only, KALMIDO_TEST_RATE_WINDOW_S)
+RATE_S = 60 if os.environ.get("P298A_NOSTART") else 20
 if not os.environ.get("P298A_NOSTART"):
-    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True)
+    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True,
+                       env=dict(os.environ, EXTRA=(os.environ.get("EXTRA", "") + f" -e KALMIDO_TEST_RATE_WINDOW_S={RATE_S}").strip()))
     assert r.returncode == 0, r.stdout + r.stderr
 
 s0 = requests.Session()
@@ -229,7 +232,7 @@ for who, s in (("another member", Ca), ("another organisation", Fr), ("the admin
           and s.delete(B + f"/api/polls/{PID}").status_code == 404 and s.post(B + f"/api/polls/{PID}/decide", json={"option_id": o1}).status_code == 404
           and s.post(B + f"/api/polls/{PID}/move-space", json={"to": SP}).status_code == 404 and PID not in [x["id"] for x in s.get(B + "/api/polls").json()["items"]],
           f"{who}: a private poll is 404 (read, change, delete, choose, move, list)")
-time.sleep(61)  # the per-address minute of the votes above passes (TPO_VOTE_RATE)
+time.sleep(RATE_S + 1)  # 2.149.0 (#2513): the per-address minute of the votes above passes (TPO_VOTE_RATE)
 r = mk(Bo, title="Org planning", space=SP)
 check(r.status_code == 201 and r.json()["poll"]["space"] == SP, "an organisation's poll")
 OP = r.json()["poll"]

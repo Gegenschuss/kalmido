@@ -24,7 +24,7 @@ import shutil
 import subprocess
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 from zoneinfo import ZoneInfo
 
 import requests
@@ -32,6 +32,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
+import testclock  # noqa: E402  (2.149.0, #2512: the group's test time, run_all.sh `now`)
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -115,9 +116,11 @@ def book(slug, tid, key, name, mail, extra=None, headers=None):
     return pub.post(f"{B}/s/b/{slug}/{tid}/{key}", data=data, headers=headers or {}, allow_redirects=False)
 
 
+# 2.149.0 (#2513): the minute of the rate limits shortened to RATE_S (test containers only, KALMIDO_TEST_RATE_WINDOW_S)
+RATE_S = 60 if os.environ.get("P294B_NOSTART") else 20
 if not os.environ.get("P294B_NOSTART"):
     env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_SMTP_HOST=127.0.0.1 -e KALMIDO_SMTP_PORT=1025"
-               " -e KALMIDO_SMTP_TLS=none -e KALMIDO_MAIL_FROM=kalmido@example.test")
+               " -e KALMIDO_SMTP_TLS=none -e KALMIDO_MAIL_FROM=kalmido@example.test" + f" -e KALMIDO_TEST_RATE_WINDOW_S={RATE_S}")
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
     shutil.copy(os.path.join(N, "stub_mail.py"), DATA)
@@ -197,7 +200,7 @@ check(r.ok and r.json()["page"]["enabled"] is True and r.json()["page"]["cal_id"
 ACAL = r.json()["page"]["cal_id"]
 
 # ================================================================== free times
-D = datetime.now(BER).date() + timedelta(days=3)
+D = testclock.now().date() + timedelta(days=3)  # 2.149.0 (#2512)
 MON = D - timedelta(days=D.weekday())
 K = D.strftime("%Y%m%d")
 A.post(B + "/api/events", json={"title": "Geheimes Treffen", "cal_id": ACAL, "start": f"{D}T11:00", "end": f"{D}T12:00", "tz": "Europe/Berlin"})
@@ -297,7 +300,7 @@ check(tuple(row[:3]) == ("cancelled", "guest", "Krank") and dbx("SELECT deleted_
 check(f"{K}T1000" in slots(pub.get(f"{B}/s/b/alice-termine/{T1}?w={MON}").text, "alice-termine", T1), "the time is free again")
 check("Appointment cancelled" in pub.get(f"{B}/s/b/x/{CX1}").text, "the cancel link shows the state afterwards")
 
-time.sleep(61)  # the rate limit per client address (10 posts a minute) of the steps above
+time.sleep(RATE_S + 1)  # 2.149.0 (#2513): the rate limit per client address (10 posts a minute) of the steps above
 
 # the person cancels
 check(Ca.post(B + f"{AP}/bookings/{B2}/cancel", json={}).status_code == 404, "another person cannot cancel: 404")
@@ -317,7 +320,7 @@ check(r.status_code == 429 and dbx("SELECT COUNT(*) FROM appt_bookings WHERE ema
 ms3 = wait_mail(M3, 3)
 TOK3 = link_in(ms3[0], "c") if ms3 else None
 B3 = dbx("SELECT id FROM appt_bookings WHERE email=? ORDER BY id LIMIT 1", (M3,))[0][0]
-dbx("UPDATE appt_bookings SET created_at=? WHERE id=?", ((datetime.now(ZoneInfo("UTC")) - timedelta(minutes=31)).isoformat(timespec="seconds"), B3))
+dbx("UPDATE appt_bookings SET created_at=? WHERE id=?", ((testclock.now().astimezone(ZoneInfo("UTC")) - timedelta(minutes=31)).isoformat(timespec="seconds"), B3))
 A.get(B + AP + "/bookings")
 check(dbx("SELECT status FROM appt_bookings WHERE id=?", (B3,))[0][0] == "expired", "an unconfirmed booking expires after 30 minutes")
 r = pub.get(f"{B}/s/b/c/{TOK3}")
