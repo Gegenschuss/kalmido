@@ -383,6 +383,16 @@ check(sorted(a["name"] for a in att) == ["note.txt", "pic.png"], f"attachments o
 check(A.get(B + f"/api/attachments/{ATT1['id']}").content == b"attachment one\n" * 20, "attachment file content restored")
 # 2.148.1 G (#2482): files the archive does not bring (here late.txt / late.png, made after the backup) are never deleted
 # unseen: the folder of before stays once, holding them; this test removes it so the checks below see no leftovers
+def _drop_kept(what):
+    """2.148.1 G (#2482): a successful restore keeps the folders of before while they hold files the archive does not list;
+    the checks of refused archives below are about their own leftovers, so the kept ones of successful restores go here
+    (named in the log)."""
+    for k in [n for n in os.listdir(DATA) if ".pre-restore-" in n]:
+        fs = [os.path.relpath(os.path.join(r, f), os.path.join(DATA, k)) for r, _d, ff in os.walk(os.path.join(DATA, k)) for f in ff]
+        print(f"{what}: kept {k} with {len(fs)} file(s): {sorted(fs)[:5]}", flush=True)
+        shutil.rmtree(os.path.join(DATA, k), ignore_errors=True)
+
+
 def _kept(prefix, fname):
     ks = [n for n in os.listdir(DATA) if n.startswith(prefix + ".pre-restore-")]
     has = [k for k in ks if any(f.endswith(fname) for _r, _d, fs in os.walk(os.path.join(DATA, k)) for f in fs)]
@@ -439,6 +449,7 @@ A = sess("alice")
 check(r.ok and "before upload restore" not in titles(A), "restored from the uploaded file")
 check(not os.listdir(os.path.join(BK, ".uploads")), "the uploaded file is removed afterwards")
 check(restore(upload="upload-../../tasks.db").status_code == 404, "upload id with a path -> 404")
+_drop_kept("proxy + upload restore")
 
 # ---- refused archives (nothing changes)
 ref = titles(A)
