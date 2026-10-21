@@ -12,7 +12,7 @@ from ..core.i18n import LANGS, md_plain, tr
 from ..core.db import body, db, err, inbox_default, local_now, now_utc, parse_iso, usettings
 from ..core.tokenhash import tkh_match, tkh_set_ical
 from ..accounts.session import _rate_blocked, _rate_fail, client_ip, me, rate_ip
-from ..core.access import tvis, vis_sql
+from ..core.access import tvis, vis_sql, acx_token_bind
 from ..tasks.validation import rmd_export, rr_feasible, rr_norm
 from ..tasks.lifecycle import rr_count, rr_with_count
 
@@ -32,6 +32,12 @@ ICAL_MAX = 3000
 def ics_text(s):
     return (str(s or "").replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
             .replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\\n"))
+
+
+def ics_unfold(text):
+    """RFC 5545 unfolding: the content lines of a calendar text (any line ends). 2.149.0 G (#2517): was a copy in
+    calendars/caldav.py (_ics_unfold) and events/ics.py (_unfold)."""
+    return re.sub(r"\r?\n[ \t]", "", text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")).split("\r\n")
 
 
 def ics_fold(line):
@@ -245,7 +251,6 @@ def ical_feed(token):
         _rate_fail(keys)
         aa_count("security", "ics", client_ip())
         return Response("Not found\n", 404, content_type="text/plain; charset=utf-8")
-    from ..core.access import acx_token_bind
     acx_token_bind(u["id"])  # 2.37.0 (#1150): the feed reads with its owner's context (row-level security)
     return Response(ics_build(c, u), content_type="text/calendar; charset=utf-8",
                     headers={"Cache-Control": "no-cache, private", "Content-Disposition": 'inline; filename="kalmido.ics"',

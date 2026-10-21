@@ -13,8 +13,8 @@ from flask import jsonify
 from ..core.config import app
 from ..core.db import iso, now_utc
 from ..core.i18n import tr
-from ..core.pg import insert_id
-from ..personal.timetrack import BadInput
+from ..core.pg import insert_id, like_escape
+from ..core.errors import BadInput
 
 FK_MAX = {"name": 120, "role": 120, "email": 200, "phone": 60}
 FK_LIMIT = 50  # contact persons per client
@@ -250,7 +250,6 @@ def ckl_candidates(c, uid, cl, q="", limit=20):
              if ckl_book_fits(cl, b, c, b["id"])}
     if not books:
         return []
-    from ..core.pg import like_escape
     sql = f"SELECT * FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND kind != 'group'"
     args = list(books)
     q = re.sub(r"\s+", " ", q or "").strip()[:100]

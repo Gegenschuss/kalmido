@@ -23,7 +23,7 @@ from flask import g, jsonify, request, Response
 from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.db import db, local_now
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dec, money
 from .model import office_gate, office_need_feature, office_org, office_settings
 from .ledger import ofx_log

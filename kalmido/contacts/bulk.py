@@ -14,8 +14,8 @@ from ..core.db import body, bump, db, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
 from ..tasks.validation import as_int
-from ..personal.timetrack import BadInput, UnknownFields
-from ..api.v1 import v1_args, v1_json, v1_view
+from ..core.errors import BadInput, UnknownFields
+from ..api.common import v1_args, v1_json, v1_view
 from ..contacts.model import book_touch, contact_copy, contacts_on, my_book_ids, need_book, occ_sync, search_text, CONTACTS_PER_BOOK, FIELD_MAX, ITEMS_MAX, NOTE_MAX
 
 BULK_MAX = 5000      # contacts in one request (an address book holds up to CONTACTS_PER_BOOK; the app sends what it shows)

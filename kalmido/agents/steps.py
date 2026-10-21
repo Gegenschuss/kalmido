@@ -29,8 +29,8 @@ from ..core.i18n import tr
 from ..core.db import db, iso, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.access import Denied
-from ..personal.timetrack import BadInput, UnknownFields
-from ..api.v1 import hit_limit, v1_args, v1_err, v1_json, v1_view
+from ..core.errors import BadInput, UnknownFields
+from ..api.common import hit_limit, v1_args, v1_err, v1_json, v1_view
 from ..agents.core import agent_shares, is_agent, need_agent
 
 STEP_KEEP_CHARS = 500      # stored per step
@@ -203,7 +203,15 @@ def host_info_set(c, a, new):
 # ---- the person's side (session; never an agent, never anyone but the person the steps are for)
 def steps_sig(c, uid):
     """For /api/version: changes when a step for uid arrives (the open chat then fetches)."""
-    r = c.execute("SELECT MAX(id) FROM agent_steps WHERE user_id=?", (uid,)).fetchone()
+    return steps_sig_fmt(c.execute(*steps_sig_q(uid)).fetchone())
+
+
+def steps_sig_q(uid):
+    """2.149.0 C (#2507): the query of steps_sig (one row, 1 column; /api/version runs it inside one statement)."""
+    return "SELECT MAX(id) FROM agent_steps WHERE user_id=?", (uid,)
+
+
+def steps_sig_fmt(r):
     return (r[0] or 0) if r else 0
 
 

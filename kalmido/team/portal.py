@@ -22,12 +22,15 @@ import threading
 import time
 from datetime import date, timedelta
 
-from ..core.config import app, PUBLIC_URL
-from ..core.db import db, iso, now_utc
-from ..core.i18n import N_
-from ..core.pg import insert_id
+from ..core.config import app, PUBLIC_URL, APP_NAME
+from ..core.db import db, iso, now_utc, body, bump, err, iso_ms, parse_iso
+from ..core.i18n import N_, lang, LANGS, short_day, tr
+from ..core.pg import insert_id, system_ctx
 from ..accounts.session import _token_hash
 from ..accounts.login import auth_key, seal, unseal
+from ..core.access import acx_anon_bind, need_task, task_visible  # 2.149.0 G (#2517): pulled up from functions
+from ..api.common import hit_budget, hit_limit  # 2.149.0 G (#2517): pulled up from functions
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 PT_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{20,64}")
 PT_EMAIL_MAX = 200
@@ -119,8 +122,6 @@ def pt_find(c, token):
     """The live ticket of a status-link token (+ the task's fields, the list's owner) or None. Binds the request to the
     ticket's space as nobody."""
     from flask import g
-    from ..core.access import acx_anon_bind
-    from ..core.pg import system_ctx
     if not PT_TOKEN_RE.fullmatch(token or ""):
         return None
     with system_ctx(c):  # resolve the token (one row) across organisations ...
@@ -156,7 +157,6 @@ def pt_open(c, token):
 
 def pt_lang(c, p):
     from flask import request
-    from ..core.i18n import lang, LANGS
     for part in (request.headers.get("Accept-Language") or "").split(","):
         code = part.split(";")[0].strip().lower()[:2]
         if code in LANGS:
@@ -209,8 +209,6 @@ def pt_answers(c, task_id):
 
 
 def pt_day(s, lg):
-    from ..core.db import parse_iso
-    from ..core.i18n import short_day
     try:
         return short_day(parse_iso(s).date() if "T" in s else date.fromisoformat(s[:10]), lg, year=True)
     except (TypeError, ValueError):
@@ -229,8 +227,6 @@ def _pt_paras(text):
 
 def pt_render(c, p, token, lg, note=""):
     from flask import request
-    from ..core.config import APP_NAME
-    from ..core.i18n import tr
     e = html.escape
     t = lambda s, *a: tr(s, *a, lg=lg)  # noqa: E731
     st = pt_state(c, p)
@@ -267,7 +263,6 @@ def pt_render(c, p, token, lg, note=""):
 @app.get("/p/<token>")
 def pt_page(token):
     from ..accounts.session import _accept_lang, rate_ip
-    from ..api.v1 import hit_limit
     c = db()
     if hit_limit("ptv:" + rate_ip(), PT_VIEW_RATE):
         return _pt_rt().pub_limited(_accept_lang())
@@ -287,7 +282,6 @@ def pt_page(token):
 
 
 def _pt_denied(lg):
-    from ..core.i18n import tr
     return _pt_rt().pub_html(tr("Not allowed", lg=lg), f'<div class="msg"><h1>{html.escape(tr("Not allowed", lg=lg))}</h1></div>', lg, 403)
 
 
@@ -301,10 +295,7 @@ def pt_comment(token):
     """The reporter answers: a comment with portal = 1 and their name (no account), News + push to the team like a comment
     on their task, a comment event to the agents that follow the task."""
     from flask import redirect, request
-    from ..core.db import bump, iso_ms
-    from ..core.i18n import tr
     from ..accounts.session import rate_ip
-    from ..api.v1 import hit_budget, hit_limit
     from ..agents.core import agent_comment_events
     c = db()
     p, bad = pt_open(c, token)
@@ -334,8 +325,6 @@ def pt_team_news(c, t, cid, text, name):
     """News + push for the people of task t (owner, creator, assignee, "urgent" bell) like a customer's comment through a
     public link (lists/public.py cv_fb_post); the caller commits."""
     from flask import g
-    from ..core.access import task_visible
-    from ..core.i18n import tr
     from ..collab.comments import collab_user, lang_of
     from ..collab.news import KIND_ROW, news_add, notif_ok
     from ..notify.push import push_prio, push_reachable
@@ -359,7 +348,6 @@ def pt_team_news(c, t, cid, text, name):
 # previews open every link of a mail, a plain GET must not turn the mails off -- and the page offers the way back)
 @app.get("/p/<token>/stop")
 def pt_stop_ask(token):
-    from ..core.i18n import tr
     c = db()
     p, bad = pt_open(c, token)
     if bad:
@@ -375,7 +363,6 @@ def pt_stop_ask(token):
 
 @app.post("/p/<token>/stop")
 def pt_stop(token):
-    from ..core.i18n import tr
     c = db()
     p, bad = pt_open(c, token)
     if bad:
@@ -411,7 +398,6 @@ def pt_notify_on(token):
 # ---- the portal: a sign-in link by mail (one-time, PT_LOGIN_TTL), then a cookie for /portal (signed, PT_COOKIE_DAYS days)
 # that lists every ticket of the same address in the same space. The request always gets the same answer.
 def _pt_mail_bg(to, subject, text, html_body):
-    from ..core.config import APP_NAME
     from ..integrations.mail import mail_send
     try:
         mail_send(to, subject, text, html_body, from_name=APP_NAME)
@@ -431,9 +417,6 @@ def pt_limit_note(c, org_id, owner_id):
     """2.138.4 C (#2380): the space's budget of sign-in mails (ptls) is used up: a News item for its admins (an organisation)
     or its owner (the private space), at most once per window and process; no push, no mail. Caller commits."""
     import json
-    from ..api.v1 import hit_limit
-    from ..core.db import iso_ms
-    from ..core.pg import system_ctx
     if hit_limit(f"ptlsn:{org_id or ''}:{owner_id or ''}", 1, PT_LOGIN_WIN):
         return 0
     with system_ctx(c):  # who administers the space (structure); the notice names no customer
@@ -453,9 +436,7 @@ def pt_limit_note(c, org_id, owner_id):
 @app.post("/p/<token>/login")
 def pt_login_ask(token):
     from flask import redirect, request
-    from ..core.i18n import tr
     from ..accounts.session import rate_ip
-    from ..api.v1 import hit_limit
     from ..admin.hosting import mail_budget
     from ..integrations.mail import MAIL_OUT_ON
     t0 = time.monotonic()
@@ -501,8 +482,6 @@ def pt_login_ask(token):
 
 
 def _pt_login_row(c, tok):
-    from ..core.db import parse_iso
-    from ..core.pg import system_ctx
     if not re.fullmatch(r"[A-Za-z0-9_-]{30,64}", tok or ""):
         return None
     with system_ctx(c):  # resolve the one-time token (one row) across organisations
@@ -513,7 +492,6 @@ def _pt_login_row(c, tok):
 
 
 def _pt_link_gone(lg):
-    from ..core.i18n import tr
     e = html.escape
     return _pt_rt().pub_html(tr("Link not available", lg=lg), f'<div class="msg"><h1>{e(tr("Link not available", lg=lg))}</h1>'
                              f'<p>{e(tr("This sign-in link has expired or was used already. Ask for a new one on the status page of a report.", lg=lg))}</p></div>', lg, 404)
@@ -523,7 +501,6 @@ def _pt_link_gone(lg):
 def pt_login_page(tok):
     """A button, not the sign-in itself: mail scanners that open links must not use the one-time link up."""
     from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, rate_ip
-    from ..core.i18n import tr
     c = db()
     lg = _accept_lang()
     bad = [("ptbad:" + rate_ip(), PT_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
@@ -553,7 +530,6 @@ def r81c_cookie_login(c):
     """2.81.0 (#1866): the sign-in row of a valid, signed, unexpired portal cookie that was not revoked, else None.
     Cookies from before 2.81.0 (without the sign-in id) no longer count: the customer signs in once more."""
     from flask import request
-    from ..core.pg import system_ctx
     v = request.cookies.get(PT_COOKIE, "")
     m = re.fullmatch(r"([0-9a-f]{64})\.(\d+)\.(\d+)\.(\d+)\.(\d+)\.([0-9a-f]{64})", v)
     if not m or int(m.group(4)) < time.time():
@@ -578,7 +554,6 @@ def pt_cookie_read(c):
 def pt_login(tok):
     from flask import redirect, request
     from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, rate_ip
-    from ..core.access import acx_anon_bind
     c = db()
     lg = _accept_lang()
     bad = [("ptbad:" + rate_ip(), PT_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
@@ -615,10 +590,6 @@ def pt_my_tickets(c, eh, org_id, owner_id):
 def pt_portal():
     from flask import g
     from ..accounts.session import _accept_lang, rate_ip
-    from ..api.v1 import hit_limit
-    from ..core.access import acx_anon_bind
-    from ..core.config import APP_NAME
-    from ..core.i18n import tr
     c = db()
     lg = _accept_lang()
     if hit_limit("ptv:" + rate_ip(), PT_VIEW_RATE):
@@ -630,7 +601,6 @@ def pt_portal():
                                  f'<p>{e(tr("Open the status link of one of your reports and choose “All my reports”: we send you a sign-in link.", lg=lg))}</p></div>', lg)
     acx_anon_bind(c, who[1])  # nobody, inside exactly the space of the sign-in
     g.user, g.auth_via = _pt_rt().PUB_ACTOR, "public"
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the owners' accounts (disabled = gone); the query itself is bound to the cookie's address and space
         rows = pt_my_tickets(c, *who)
     items = []
@@ -704,7 +674,6 @@ def pt_ticket_of(c, tid):
 def pt_ticket_info(c, tid, uid):
     """{..} for the task panel (GET /timeline: ticket) or None. Everyone who sees the task sees that it is a customer's
     report and the name; the address, the status link and the mail switch only people who may change the task."""
-    from ..core.access import task_visible
     p = pt_ticket_of(c, tid)
     if not p:
         return None
@@ -721,9 +690,6 @@ def pt_ticket_info(c, tid, uid):
 def pt_comment_flag(c, tid, uid, v):
     """2.63.0 B (#1513): the portal flag of a new comment: 1 only when asked for, the task has a ticket and the writer may
     change the task. Raises BadInput otherwise (the client never sends it without a ticket)."""
-    from ..core.access import task_visible
-    from ..core.i18n import tr
-    from ..personal.timetrack import BadInput
     if v in (None, False, 0, "0", "false", ""):
         return 0
     if v not in (True, 1, "1", "true", "on"):
@@ -739,9 +705,6 @@ def pt_comment_flag(c, tid, uid, v):
 def pt_ticket_set(tid):
     """{notify: bool}: mails to the reporter on / off (people who may change the task)."""
     from flask import jsonify
-    from ..core.db import body, bump, err
-    from ..core.access import need_task
-    from ..core.i18n import tr
     from ..accounts.session import me
     c = db()
     need_task(c, tid, write=True)
@@ -761,7 +724,6 @@ def pt_ticket_set(tid):
 
 def pt_client_tickets(c, uid, cid):
     """The reports of a client the person may see (client card): newest first, at most 50."""
-    from ..core.access import task_visible
     out = []
     for r in c.execute(f"""SELECT p.task_id, p.name, p.created_at, t.title, t.status FROM portal_tickets p JOIN tasks t ON t.id=p.task_id
                            JOIN lists l ON l.id=t.list_id WHERE (p.client_id=? OR (p.client_id IS NULL AND l.client_id=?))
@@ -776,9 +738,6 @@ def pt_client_tickets(c, uid, cid):
 # ---- mails to the reporter: a public answer and "done" (only with notify and an address; at most one mail per ticket
 # within PT_MAIL_GAP -- what happened in between goes out together). The watchdog (notify/push.py) calls this.
 def pt_mail_tick(c):
-    from ..core.db import parse_iso
-    from ..core.i18n import lang, tr
-    from ..core.pg import system_ctx
     from ..admin.hosting import mail_budget
     from ..integrations.mail import MAIL_OUT_ON
     if not MAIL_OUT_ON:

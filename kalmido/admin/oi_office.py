@@ -17,6 +17,8 @@ import uuid
 from ..core.config import OFFICE_DIR
 from ..core.i18n import N_
 from .orgimport import OiFix, OiT  # noqa: F401
+from ..core.orgcrypt import oc_item_store, oc_json_store, oc_log_detail  # 2.149.0 G (#2517): pulled up from functions
+from ..core.db import insert_id, iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
 
 # ids inside JSON texts: key -> map kind (unknown -> None)
 OI_JSON_IDS = {"service_id": "office_services", "producing_service_id": "office_services", "role_id": "office_roles",
@@ -125,7 +127,6 @@ def _p_once(table, text):
 
 
 def _p_settings(c, run, src, d, ctx):
-    from ..core.orgcrypt import oc_json_store
     if _oi_has(c, "office_settings", ctx.space):
         run.warning(N_("The target office already has its own office settings; they were kept."))
         return None
@@ -186,7 +187,6 @@ def _p_contract_file(c, run, src, d, ctx):
 
 
 def _p_doc(c, run, src, d, ctx):
-    from ..core.orgcrypt import oc_json_store
     if _oi_number_taken(c, ctx.space, d.get("number")):
         run.warning(N_("A document number already exists in the target office, the document was skipped: {0}"), d.get("number"))
         return None
@@ -222,7 +222,6 @@ def _a_doc(c, run, src, nid, ctx):
 
 
 def _p_part(c, run, src, d, ctx):
-    from ..core.orgcrypt import oc_json_store
     if "sheet" in d:
         d["sheet"] = json.dumps(_oi_ids(run, _oi_json(src.get("sheet"), {})), ensure_ascii=False)
     if "settings" in d:
@@ -234,7 +233,6 @@ def _p_part(c, run, src, d, ctx):
 
 
 def _p_item(c, run, src, d, ctx):
-    from ..core.orgcrypt import oc_item_store
     return oc_item_store(c, ctx.space, d)
 
 
@@ -245,7 +243,6 @@ def _p_purchase(c, run, src, d, ctx):
 
 
 def _p_signoff(c, run, src, d, ctx):
-    from ..core.db import iso, now_utc
     from ..office.signoff import sig_purpose, sig_token_new
     _tok, h, sealed = sig_token_new(c, sig_purpose({k: d.get(k) for k in ("kind", "doc_id", "list_id", "gen_doc_id", "video_id")}))
     d["token_hash"], d["token"] = h, sealed  # a new secret nobody knows: the link of the old server ends here
@@ -311,7 +308,6 @@ def _p_bank_balance(c, run, src, d, ctx):
     """Balances hang on their statement import; without it (an older export) on one import row of this run."""
     if d.get("import_id"):
         return d
-    from ..core.db import insert_id, iso, now_utc
     key = ("oi_bank_import", ctx.space)
     bid = run.__dict__.get(key)
     if not bid:
@@ -324,7 +320,6 @@ def _p_bank_balance(c, run, src, d, ctx):
 
 
 def _p_log(c, run, src, d, ctx):
-    from ..core.orgcrypt import oc_log_detail
     if d.get("detail"):
         d["detail"] = oc_log_detail(c, ctx.space, d["detail"])  # like the app: only entries with protected keys sealed
     return d

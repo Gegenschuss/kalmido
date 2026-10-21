@@ -9,8 +9,8 @@ from dateutil.rrule import rrulestr
 from flask import has_request_context
 
 from ..core.config import PUBLIC_URL, TZ
-from ..core.pg import insert_id
-from ..core.i18n import N_, short_day, tr
+from ..core.pg import insert_id, system_ctx
+from ..core.i18n import N_, short_day, tr, lang
 from ..core.db import bump, gset, gsetting, iso, iso_ms, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import acx_org_ok, collab_all, Denied, task_visible
@@ -19,7 +19,7 @@ from ..tasks.validation import (
     as_int, clean_reminders, rmd_export, rr_feasible, rr_norm, rr_problem, valid_date, valid_hm,
 )
 from ..collab.comments import user_names
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 
 
 # ---------------------------------------------------------------- 2.21.0 (#659): events
@@ -208,8 +208,6 @@ def cal_create(c, uid, b):
 
 def default_cal(c, uid, create=True):
     """The person's first own calendar (created as "Calendar" when there is none)."""
-    from ..core.i18n import lang
-    from ..core.pg import system_ctx
     with system_ctx(c):  # 2.37.0 (#1150): also asked for other people (invitations): their calendar's id, in their workspace
         r = c.execute("SELECT id FROM ev_cals WHERE owner_id=? ORDER BY sort, id LIMIT 1", (uid,)).fetchone()
         if r:
@@ -901,7 +899,6 @@ def invite_push(c, uid, r):
 
 
 def when_text(r, lg=None, occ=None):
-    from ..core.i18n import short_day
     s, _ = _span(r, occ or r["start"])
     if r["all_day"]:
         return short_day(s, lg)
@@ -1073,7 +1070,6 @@ def _wd_events(c, users, S, LG, now):
 def migrate_family_events(c):
     if gsetting(c, "migr_ev221") == "1":
         return 0
-    from ..core.i18n import lang
     n = 0
     rows = c.execute("""SELECT t.*, l.owner_id AS l_owner FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.deleted_at IS NULL
                         AND t.due IS NOT NULL AND EXISTS (SELECT 1 FROM task_people p WHERE p.task_id=t.id)

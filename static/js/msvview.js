@@ -8,8 +8,6 @@
 // server with the stored token); nothing is synced. Their data lives in S.msvv, NEVER in S.tasks (ids are per server;
 // undo, the offline outbox and the live updates hang on S.tasks); foreign rows carry data-msv="<sid>:<id>".
 // Without a linked server nothing changes: one GET /api/servers at the start (a 404 before part A is taken quietly).
-S.msvv = {self: null, links: [], data: {}, news: {}, cal: {key: '', ev: {}}, search: {q: '', res: {}}, loaded: false, at: 0, busy: false};
-S.msvvQ = null;  // the quick add target picked by hand: {key, sid, lid}
 const MSVV_POLL = 60e3, MSVV_NEWS = 300e3;
 const MSVV_ERR = {offline: N_('not reachable'), auth: N_('sign-in no longer valid'), denied: N_('no access'), notfound: N_('not found'),
   rate: N_('too many requests, please wait a moment'), busy: N_('too many requests, please wait a moment'), version: N_('needs a newer Kalmido version'), invalid: N_('unexpected answer')};
@@ -43,15 +41,15 @@ const msvvFail = (sid, e) => toast(tr('{0}: {1}', msvvName(sid), e?.message || m
 async function msvvLoad() {
   if (S.msvv.busy) return; S.msvv.busy = true;
   try {
-    let j;
-    try { j = await msvvFetch('GET', '/api/servers'); } catch { S.msvv.loaded = true; return; }  // 404 before part A, offline: as it is
+    let j = S.msvv.pre; S.msvv.pre = null;  // 2.149.0 F (#2518): the answer of the start's probe (render.js), once
+    if (!j) try { j = await msvvFetch('GET', '/api/servers'); } catch { S.msvv.loaded = true; return; }  // 404 before part A, offline: as it is
     const had = msvvOn();
     S.msvv.self = j.self && typeof j.self === 'object' ? j.self : null;
     S.msvv.links = msvvArr(j.links).filter(l => l && +l.id > 0).map(l => ({...l, id: +l.id}))
       .sort((a, b) => (+a.position || 0) - (+b.position || 0) || a.id - b.id);
     S.msvv.loaded = true; S.msvv.at = Date.now();
     for (const k of Object.keys(S.msvv.data)) if (!msvvLink(k)) delete S.msvv.data[k];
-    if (!msvvOn()) { if (had) { S.msvv.sig = ''; msvvDraw(); } return; }
+    if (!msvvOn()) { if (had || S.route.mod === 'msv') { S.msvv.sig = ''; msvvDraw(); } return; }  // 2.149.0 F (#2518): + a list of a server that is not linked, opened before the module was there
     // 2.73.0 A (#661) review H1: at most three at once (the server answers "busy" at once instead of waiting for a slot)
     const q = S.msvv.links.map(l => l.id);
     await Promise.all([0, 1, 2].map(async () => { while (q.length) await msvvData(q.shift()); }));

@@ -13,17 +13,19 @@ services:
     env_file: .env
     environment:
       # 2.37.0: the data lives in PostgreSQL (service "db" below). An own / managed server instead: set DATABASE_URL in
-      # .env and remove the db service and depends_on (docs/SELF-HOSTING.md). Use letters and digits for the password.
+      # .env and leave "localdb" out of COMPOSE_PROFILES there (docs/SELF-HOSTING.md). Use letters and digits for the password.
       DATABASE_URL: ${DATABASE_URL:-postgresql://kalmido:${POSTGRES_PASSWORD}@db:5432/kalmido}
       # 2.45.0: without KALMIDO_SECRET_KEY in .env the server key is created once in this file (own folder ./secret,
       # never inside ./data: a backup must not carry the key next to the data it protects). Keep a copy of it.
       KALMIDO_SECRET_FILE: ${KALMIDO_SECRET_FILE:-/secret/kalmido.key}
       # 2.61.0: uploads are scanned by the virus scanner (service "clamav" below). Switch it off on small servers: set
-      # KALMIDO_CLAMD= (empty) in .env and remove the clamav service (docs/SELF-HOSTING.md "Virus scan of uploads")
+      # KALMIDO_CLAMD= (empty) in .env and leave "clamav" out of COMPOSE_PROFILES there (docs/SELF-HOSTING.md "Virus scan of uploads")
       KALMIDO_CLAMD: ${KALMIDO_CLAMD-clamav:3310}
     depends_on:
       db:
         condition: service_healthy
+        # 2.149.0 D (#2510): only while the profile "localdb" is on (Compose 2.20 or newer)
+        required: false
     volumes:
       # attachments, backups, office files; an old tasks.db here moves to PostgreSQL on the first start of 2.37
       - ./data:/data
@@ -49,8 +51,11 @@ services:
 
   db:
     # PostgreSQL 17 (2.37.0). Stay on 17 when updating; a new major version needs a dump + restore (docs/SELF-HOSTING.md).
+    # 2.149.0 D (#2510): runs with the profile "localdb" (COMPOSE_PROFILES in .env; the installer writes the line). An own
+    # database server: DATABASE_URL in .env and "localdb" left out of COMPOSE_PROFILES. Updates never bring it back.
     image: postgres:17
     container_name: kalmido-db
+    profiles: ["localdb"]
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -96,9 +101,11 @@ services:
   clamav:
     # 2.61.0: ClamAV checks every upload before it is stored (about 1-1.5 GB RAM). freshclam inside the container updates the
     # signatures by itself. Not reachable (e.g. still loading after a start): uploads are taken, marked "Unchecked" and
-    # checked once it runs. Without it: KALMIDO_CLAMD= in .env and delete this block.
+    # checked once it runs. Without it: KALMIDO_CLAMD= in .env and leave "clamav" out of COMPOSE_PROFILES there
+    # (2.149.0 D, #2510: a profile instead of deleting this block - updates replace this file and kept bringing it back).
     image: clamav/clamav:1.4
     container_name: kalmido-clamav
+    profiles: ["clamav"]
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true

@@ -13,12 +13,13 @@ from datetime import date
 from flask import g, has_request_context
 
 from ..core.i18n import N_, tr
-from ..core.pg import insert_id, like_escape, table_columns
-from ..core.db import db, iso, now_utc, usettings
+from ..core.pg import insert_id, like_escape, table_columns, system_ctx
+from ..core.db import db, iso, local_now, now_utc, usettings
 from ..accounts.session import me
-from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.access import Denied, acx_drop
+from ..core.errors import BadInput
 from .packs import office_pack, office_pack_codes, office_pack_for
+from ..core.orgcrypt import oc_enc_fields, oc_json_store  # 2.149.0 G (#2517): pulled up from functions
 
 OFFICE_FEAT = "office"
 OFFICE_NO_ORG = N_("Choose a workspace at the top (Private or an organisation) to open its office")  # 2.47.3 (#1360)
@@ -170,6 +171,19 @@ def office_org(c, uid, admin=False):
     return oid
 
 
+def office_ctx(admin=False):
+    """2.149.0 G (#2517): the context of an office route (was a _ctx() copy in 22 office modules): the connection, the
+    person (office_gate) and the office area (office_org)."""
+    c = db()
+    uid = office_gate(c)
+    return c, uid, office_org(c, uid, admin=admin)
+
+
+def office_ctx_admin(admin=True):
+    """office_ctx that requires the admin role unless told otherwise (the routes that only an office admin uses)."""
+    return office_ctx(admin)
+
+
 def office_role(c, uid, oid):
     """The role of uid in office area oid: admin | member | None. 2.47.3 (#1360): a personal office has exactly one
     person, its owner (admin); nobody else has a role there."""
@@ -198,7 +212,6 @@ def pb_personal(c, uid, create=True):
     """The id of uid's personal office: a hidden orgs row (personal_of = uid, no members) that shows nowhere as an
     organisation; made on the first use (create=False: None while there is none). The owner's access context carries it
     (core/access.py _ctx_build), so row-level security lets only the owner read and write its office_* rows."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # instance structure: the person's own hidden area, never somebody else's
         r = c.execute("SELECT id FROM orgs WHERE personal_of=?", (uid,)).fetchone()
         if r or not create:
@@ -207,7 +220,6 @@ def pb_personal(c, uid, create=True):
                   (f"private-{int(uid)}", "", iso(now_utc()), uid))
         oid = c.execute("SELECT id FROM orgs WHERE personal_of=?", (uid,)).fetchone()[0]
     c.commit()  # at once (also on a reading request): the area exists before anything is written into it
-    from ..core.access import acx_drop
     acx_drop()  # the next statement runs with the new id in app.org_ids
     return oid
 
@@ -490,7 +502,6 @@ def fe_office_rules_migrate(c):
 
 
 def office_settings_save(c, oid, data):
-    from ..core.orgcrypt import oc_json_store
     data = oc_json_store(c, oid, "office_settings", "data", data)  # 2.42.0 (#828): the company lines encrypted at rest
     c.execute("INSERT INTO office_settings(org_id, data, updated_at) VALUES(?,?,?) ON CONFLICT(org_id) DO UPDATE SET data=excluded.data, "
               "updated_at=excluded.updated_at", (oid, json.dumps(data, ensure_ascii=False), iso(now_utc())))
@@ -533,12 +544,12 @@ def office_scheme_clean(v, name=None, offer=True):
 
 def office_scheme_period(scheme, d=None):
     """The counter's period of a scheme: the year when it holds {yyyy}/{yy}, else '' (one counter for ever)."""
-    d = d or date.today()
+    d = d or local_now().date()
     return str(d.year) if ("{yyyy}" in scheme or "{yy}" in scheme) else ""
 
 
 def office_number_format(scheme, seq, d=None, project="", client="", initials="", version=1):
-    d = d or date.today()
+    d = d or local_now().date()
 
     def rep(m):
         t = m.group(1)
@@ -746,7 +757,7 @@ def onc_version(c, oid, r, scheme, ctx_of):
     seq = onc_parse(scheme, first["number"])[0] if first is not None and first["number"] else None
     if seq is None:
         return ver, None
-    d = date.fromisoformat(first["date"]) if first["date"] else date.today()
+    d = date.fromisoformat(first["date"]) if first["date"] else local_now().date()
     for _ in range(50):
         num = office_number_format(scheme, seq, d, version=ver, **ctx_of(first))
         if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, r["id"])).fetchone() \
@@ -1065,7 +1076,6 @@ def _sr_costs(c, oid, cols, vals, cur):
             del cols[i], vals[i]
         if v is not None:
             j[k] = v
-    from ..core.orgcrypt import oc_enc_fields
     cols.append("costs")
     vals.append(oc_enc_fields(c, oid, "office_roles", {"costs": json.dumps(j)})["costs"])
 
@@ -1075,7 +1085,6 @@ def _md_crypt(c, oid, kind, cols, vals):
     t = MD[kind].get("crypt")
     if not t:
         return
-    from ..core.orgcrypt import oc_enc_fields
     enc = oc_enc_fields(c, oid, t, dict(zip(cols, vals)))
     vals[:] = [enc[k] for k in cols]
 

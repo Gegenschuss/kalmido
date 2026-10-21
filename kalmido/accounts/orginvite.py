@@ -22,6 +22,10 @@ from ..core.i18n import LANGS, tr
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gsetting, iso, iso_ms, now_utc, uset, usettings, write_lock
 from ..core.access import Denied
 from ..accounts.session import me
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
+from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions
+from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 OINV_DAY = 20  # new invitations per inviting person and day
 OINV_RESEND_DAY = 3  # 2.148.1 A (#2486): resends per invitation and day
@@ -102,7 +106,6 @@ def org_invite_new(oid):
         return err(tr("Please enter a valid e-mail address"))
     if b.get("lang") is not None and b.get("lang") not in LANGS:
         return err(tr("Invalid value: {0}", "lang"))
-    from ..api.v1 import hit_limit
     # 2.115.0 review (L1): a withdraw deletes the row, this counter stays. Job #692 review: counted before the address lookup,
     # so trying addresses (an existing one takes the add path below, a new one gets an invitation) is limited the same way
     if hit_limit(f"oinv:{me()}", OINV_DAY, 86400):
@@ -124,7 +127,6 @@ def org_invite_new(oid):
     username = _username(c, email)
     uid = create_user(c, username, name or username, None, onboard=True)
     c.execute("UPDATE users SET email=? WHERE id=?", (email, uid))
-    from ..core.schema import USER_DEFAULTS
     fs = [x for x in (gsetting(c, "default_features") or USER_DEFAULTS["features"]).split(",") if x]
     uset(c, uid, "features", ",".join(fs + ([] if "agents" in fs else ["agents"])))  # like a new account of the admins
     lg = b.get("lang") or usettings(c, me()).get("lang") or "en"
@@ -160,7 +162,6 @@ def _no_link_if_sent(inv, uid=None):
 def org_invite_resend(oid, uid):
     """A new link for an open invitation of this organisation (the old one stops working), by e-mail when possible."""
     from ..accounts.invite import invite_new
-    from ..api.v1 import hit_limit
     c = db()
     _need(c, oid)
     _row(c, oid, uid)
@@ -179,8 +180,6 @@ def org_invite_withdraw(oid, uid):
     """Withdraws an open invitation of this organisation: the account (never signed in) is deleted. -> {email, role} for
     the undo (invite again)."""
     from ..accounts.users import user_purge
-    from ..core.serializers import unlink_files
-    from ..core.pg import system_ctx
     c = db()
     _need(c, oid)
     write_lock(c, "accounts")

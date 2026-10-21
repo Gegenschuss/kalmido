@@ -16,7 +16,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_item_store, oc_json_store
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
 from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, RAW_MODES, TAX_KEYS, dec, fmt_money, inv_calc, office_calc
 from .packs import office_pack_for
@@ -37,10 +37,7 @@ MAX_ITEMS = 300
 MAX_FIELDS = 20
 
 
-def _ctx(admin=False):
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=admin)
+from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _j(s, default):
@@ -959,7 +956,8 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
     if not re.match(r"^#[0-9a-fA-F]{6}$", color):
         color = "#2f5d8a"
     valid_text = _fmt_date(r["valid_until"], pack)
-    meta = [[L.get("offer_no", "Angebot Nr."), r["number"]], [L.get("date", "Datum"), _fmt_date(r["date"], pack)]]
+    # 2.149.0 A (#2520): the documents' own words (when the pack has no label) through tr() in the document's language
+    meta = [[L.get("offer_no", tr("Quotation no.|document", lg=lang)), r["number"]], [L.get("date", tr("Date|document", lg=lang)), _fmt_date(r["date"], pack)]]
     # 2.114.4 A (#2277): no "Kunde" row any more, the name heads the address field (pdf.py adds it when the lines lack it)
     # 2.97.1 (#2224): the customer number as on the invoice; a document finalised before prints as it did
     if locked and "sender_line" in co:
@@ -970,15 +968,15 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
     else:
         cno = ""
     if cno:
-        meta.append([L.get("customer_no", "Customer no." if lang == "en" else "Kunden-Nr."), cno])
+        meta.append([L.get("customer_no", tr("Customer no.|document", lg=lang)), cno])
     if r["project_ref"]:
-        meta.append([L.get("ref", "Ref./PO-Nr."), r["project_ref"]])
+        meta.append([L.get("ref", tr("Ref./PO no.|document", lg=lang)), r["project_ref"]])
     if r["valid_until"]:
-        meta.append([L.get("valid_until", "Gültig bis"), valid_text])
+        meta.append([L.get("valid_until", tr("Valid until|document", lg=lang)), valid_text])
     sf, st = (r["service_from"] or "", r["service_to"] or "") if "service_from" in r.keys() else ("", "")
     if sf or st:  # 2.36.2: period of service
         per = _fmt_date(sf, pack) if sf == st or not st else (_fmt_date(st, pack) if not sf else f"{_fmt_date(sf, pack)} – {_fmt_date(st, pack)}")
-        meta.append([L.get("service_period", "Period of service" if lang == "en" else "Leistungszeitraum"), per])
+        meta.append([L.get("service_period", tr("Period of service|document", lg=lang)), per])
     rows = [[L.get("net_total", t["labels"]["net"]), fmt_money(t["net"], lang, cur)]]
     if t.get("net_incl_raw") is not None:
         rows.append([L.get("incl_raw", t["labels"]["net_incl_raw"]), fmt_money(t["net_incl_raw"], lang, cur)])
@@ -987,14 +985,14 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
     rrows = [[L.get("rights_" + dim, dim), (rights.get(dim) or {}).get("text") or ""] for dim in ("time", "territory", "media")]
     rrows = [x for x in rrows if x[1]]
     if rights.get("exceptions"):
-        rrows.append([L.get("rights_exceptions", "Ausnahmen"), rights["exceptions"]])
+        rrows.append([L.get("rights_exceptions", tr("Exceptions|document", lg=lang)), rights["exceptions"]])
     if rights.get("exclusive"):
-        rrows.append([L.get("rights_exclusive", "Exklusiv"), "ja" if lang == "de" else "yes"])
+        rrows.append([L.get("rights_exclusive", tr("Exclusive|document", lg=lang)), tr("yes|document", lg=lang)])
     texts = pack.get("texts") or {}
     valid_note = ((texts.get("valid_note") or {}).get(lang) or "").replace("{date}", valid_text) if r["valid_until"] else ""
     labels = {k: v for k, v in L.items() if not isinstance(v, dict)}
     labels["units"] = L.get("units") or {}
-    labels["page_of"] = L.get("page_of") or ("Page {x} of {y}" if lang == "en" else "Seite {x} von {y}")
+    labels["page_of"] = L.get("page_of") or tr("Page {x} of {y}|document", lg=lang)
     role = office_role(c, g.user["id"], oid) if getattr(g, "user", None) is not None else None
     # 2.97.1 (#2224): with the company name; a document finalised before keeps the line it was printed with
     sender_line = co["sender_line"] if locked and "sender_line" in co else (" · ".join(x for x in (co.get("lines") or []) if x) if locked else ofx_sender_line(co))
@@ -1125,6 +1123,7 @@ def odoc_update(did):
     A finalised document: 409."""
     c, uid, oid = _ctx()
     admin = office_role(c, uid, oid) == "admin"
+    write_lock(c, f"office_doc_{int(did)}")  # 2.149.0 A (#2521): like the agents' change: never in between finalising / sending
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
     oun_pre(c, uid, oid, "doc", did)  # 2.111.0 A (#2233): the state before, for the editor's undo
@@ -1165,6 +1164,7 @@ def odoc_items_put(did):
     A finalised document: 409."""
     c, uid, oid = _ctx()
     admin = office_role(c, uid, oid) == "admin"
+    write_lock(c, f"office_doc_{int(did)}")  # 2.149.0 A (#2521): like the agents' change: never in between finalising / sending
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
     oun_pre(c, uid, oid, "doc", did)  # 2.111.0 A (#2233)

@@ -33,6 +33,8 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from ..core.config import APP_VERSION, DATABASE_URL, DB
 from ..core.db import DataDirError, DbError, connect_direct, init_db, iso, now_utc
 from ..core.schema import MIGRATIONS, SCHEMA
+from ..core.i18n import N_  # 2.149.0 G (#2517): pulled up from functions
+from ..core.pg import pool_refresh  # 2.149.0 G (#2517): pulled up from functions
 
 TAG = "migrate-sqlite:"
 _Q4 = Decimal("0.0001")
@@ -632,7 +634,6 @@ def mig_finish(m):
 
 
 def _alert(m):
-    from ..core.i18n import N_
     from ..notify.alerts import aa_now
     rows = sum(x.get("written", 0) for x in m.tables.values())
     aa_now("storage", f"migrated:{m.sha[:16]}", N_("Move to Postgres finished: {0} tables, {1} rows (report in the backups folder)."),
@@ -656,7 +657,6 @@ def mig_restore(path):
         c.commit()
     finally:
         c.close()
-    from ..core.pg import pool_refresh
     pool_refresh()
     m = mig_run(path, restore=True)
     _alert(m)

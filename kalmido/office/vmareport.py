@@ -13,8 +13,9 @@ from xml.sax.saxutils import escape
 from flask import Response, jsonify, request
 
 from ..core.config import app
+from ..core.db import local_now
 from ..core.i18n import lang, tr, trn
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dstr, money
 from .ledger import ofx_log
 from .model import office_settings
@@ -25,7 +26,7 @@ VMR_CUR = "EUR"  # the BMF rates are in euros, whatever the office currency
 
 
 def vmr_year():
-    y = request.args.get("year") or str(date.today().year)
+    y = request.args.get("year") or str(local_now().year)
     if not re.fullmatch(r"\d{4}", y):
         raise BadInput(tr("Invalid value: {0}", "year"))
     return int(y)
@@ -315,7 +316,7 @@ def vmr_pdf():
     page, y = new_page(), 60.0
     page.text(PDF_L, y, title, 16, True)
     y += 24
-    page.text(PDF_L, y, " · ".join(v for v in (co, pdf_date(date.today().isoformat(), lg)) if v), 9, False, C_INK2)
+    page.text(PDF_L, y, " · ".join(v for v in (co, pdf_date(local_now().date().isoformat(), lg)) if v), 9, False, C_INK2)
     y += 14
     if rep["source"]:
         y += page.para(PDF_L, y, tr("Rates: {0}", "; ".join(rep["source"])), 8, PDF_CW, color=C_INK2)

@@ -14,6 +14,7 @@ from ..accounts.session import me
 from ..accounts.pictures import avatar_map
 from ..core.access import acx_task_ok, list_role, plists, pvis
 from ..collab.comments import collab_on, collab_user, lang_of, MENTION_RE, user_names
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- News feed ("Neuigkeiten")
@@ -205,7 +206,6 @@ def notif_matrix(s):
 
 def notif_update(s, v):
     """A change of the matrix (partial {event: {news?, push?}}) -> {setting: stored value} (notify + news_kinds)."""
-    from ..personal.timetrack import BadInput
     bad = BadInput(tr("Invalid value: {0}", "notify"))
     if isinstance(v, str):
         try:
@@ -255,7 +255,6 @@ def bell_custom_of(raw):
 
 def bell_custom_clean(v):
     """A custom choice from a client -> the stored json; BadInput if invalid."""
-    from ..personal.timetrack import BadInput
     bad = BadInput(tr("Invalid value: {0}", "custom"))
     if v is None:
         return "{}"
@@ -368,8 +367,15 @@ def news_read_job(c, j, ts=None):
 
 def news_sig(c, uid):
     """Cheap change marker of my unread items (in /api/version): clients reload the state when it moves."""
-    r = c.execute("SELECT COUNT(*), COALESCE(MAX(id),0) FROM notifications WHERE user_id=? AND read_at IS NULL",
-                  (uid,)).fetchone()
+    return news_sig_fmt(c.execute(*news_sig_q(uid)).fetchone())
+
+
+def news_sig_q(uid):
+    """2.149.0 C (#2507): the query of news_sig (one row, 2 columns; /api/version runs it inside one statement)."""
+    return "SELECT COUNT(*), COALESCE(MAX(id),0) FROM notifications WHERE user_id=? AND read_at IS NULL", (uid,)
+
+
+def news_sig_fmt(r):
     return f"{r[0]}.{r[1]}"
 
 

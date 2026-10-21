@@ -14,7 +14,7 @@ from ..tasks.validation import as_int, CONTENT_MAX, descendants, log_act, PRIORI
 from ..tasks.tasks import one_task
 from ..tasks.lifecycle import apply_update
 from ..collab.comments import comment_plain, need_live_comment, user_names
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields
 from ..api.v1 import _tag_arg, PRIO_NAMES, PRIO_VALUES
 from ..agents.core import (
     agent_emit, agent_ids, agent_task_data, is_agent, is_approver, list_agents, LTAG_MAX, LTAG_NAME_MAX,

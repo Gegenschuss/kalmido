@@ -118,6 +118,7 @@ def titles(s):
 
 def make_zip(members, manifest=None, fix=True, schema=None, fv=2):
     """A zip with members {name: bytes}; manifest built from them (fix=True) unless given."""
+    # 2.149.0 (#2509): app_version 2.0.0 (was 9.9.9): a backup of a newer minor is refused before the checks below
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         files = []
@@ -130,7 +131,7 @@ def make_zip(members, manifest=None, fix=True, schema=None, fv=2):
             if isinstance(data, zipfile.ZipInfo):
                 z.writestr(data, b"target")
         if manifest is None and fix:
-            manifest = {"format": "kalmido-backup", "format_version": fv, "app_version": "9.9.9", "schema_version": schema or 2,
+            manifest = {"format": "kalmido-backup", "format_version": fv, "app_version": "2.0.0", "schema_version": schema or 2,
                         "created_at": "2026-01-01T00:00:00+00:00", "kind": "manual", "counts": {}, "files": files}
         if manifest is not None:
             z.writestr("manifest.json", json.dumps(manifest))
@@ -451,9 +452,9 @@ refused(make_zip({"kalmido.dump": src_dump, "other.txt": b"x"}), "members", "une
 link = zipfile.ZipInfo("attachments/1/link")
 link.external_attr = (stat.S_IFLNK | 0o777) << 16
 refused(make_zip({"kalmido.dump": src_dump, "attachments/1/link": link}), "members", "symlink member")
-refused(make_zip({"kalmido.dump": src_dump}, manifest={"format": "kalmido-backup", "format_version": 2, "app_version": "9.9.9", "schema_version": 2,
+refused(make_zip({"kalmido.dump": src_dump}, manifest={"format": "kalmido-backup", "format_version": 2, "app_version": "2.0.0", "schema_version": 2,
                                                   "files": [["kalmido.dump", len(src_dump), "0" * 64]]}), "hash", "checksum mismatch")
-refused(make_zip({"kalmido.dump": src_dump}, manifest={"format": "kalmido-backup", "format_version": 2, "app_version": "9.9.9", "schema_version": 2,
+refused(make_zip({"kalmido.dump": src_dump}, manifest={"format": "kalmido-backup", "format_version": 2, "app_version": "2.0.0", "schema_version": 2,
                                                   "files": [["kalmido.dump", len(src_dump) - 1, hashlib.sha256(src_dump).hexdigest()]]}), None, "size mismatch")
 refused(make_zip({"kalmido.dump": src_dump, "attachments/1/zeros.bin": b"\0" * (3 * 1024 * 1024)}), "bomb", "zip bomb (ratio)")  # 2.22.0: 3 MB (the bigger schema + 4 MB passed the 5 MB size limit first)
 refused(make_zip({"kalmido.dump": src_dump, "attachments/1/big.bin": os.urandom(6 * 1024 * 1024)}), None, "larger than KALMIDO_BACKUP_MAX_MB")

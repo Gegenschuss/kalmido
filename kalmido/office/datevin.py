@@ -21,8 +21,9 @@ from flask import jsonify
 
 from ..core.config import app
 from ..core.i18n import N_, tr
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dec, money
+from ..core.db import db  # 2.149.0 G (#2517): pulled up from functions
 
 # keyword (casefolded, part of the category) -> (SKR03, SKR04); the first match wins
 DV_CAT_DEFAULTS = (
@@ -340,7 +341,6 @@ def dv_accounts(c, oid, st):
 @app.get("/api/office/datev/accounts")
 def dv_accounts_get():
     """Org admin (a personal office: its owner): the accounts of the input side for the DATEV settings (see dv_accounts)."""
-    from ..core.db import db
     from .datev import dx_settings
     from .model import office_gate, office_need_feature, office_org, office_settings
     c = db()

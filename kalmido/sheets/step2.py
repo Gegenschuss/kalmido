@@ -23,13 +23,13 @@ import secrets
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.access import Denied, WRITE_ROLES, list_role, need_feat, task_visible
+from ..core.access import Denied, WRITE_ROLES, list_role, need_feat, task_visible, tvis, vis_sql
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id
 from ..accounts.session import me
 from ..collab.comments import user_names
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .core import SH_ROWS_MAX, ShBook, sh_eval, sh_is_agent, sh_need, sh_reload, sh_set_cells, sh_touch
 from .formula import sh_parse_date, sh_parse_number
 from .vars import sh_list_ok, sh_task_ok
@@ -304,7 +304,6 @@ def sh2_rows_from_list(c, sheet, uid, b):
     lrow = sh_list_ok(c, sheet, uid, lid)
     if lrow in (None, "deleted"):
         raise Denied(404)
-    from ..core.access import tvis
     tasks = [r[0] for r in c.execute(f"SELECT id FROM tasks WHERE list_id=? AND parent_id IS NULL AND deleted_at IS NULL AND {tvis(c, uid)} "
                                      f"ORDER BY status=0 DESC, sort, id LIMIT {SH2_ROWS_MAX + 1}", (lid,)).fetchall()]
     book = ShBook(c, sheet)
@@ -401,7 +400,6 @@ def sh2_links(c, sheet, uid):
 
 def sh2_offers(c, sheet, uid):
     """What the dialogs need: lists of the space (writable ones for tasks), the office (on? its clients)."""
-    from ..core.access import vis_sql
     lists = []
     for r in c.execute(f"SELECT id, name, kind, org_id, archived FROM lists WHERE id IN {vis_sql()} AND e2e IS NULL ORDER BY lower(name), id",
                        (uid, uid)).fetchall():

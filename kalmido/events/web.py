@@ -8,9 +8,9 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso_ms, now_utc, uset, usettings
 from ..accounts.session import me
-from ..core.access import Denied, need_feat
+from ..core.access import Denied, need_feat, need_task
 from ..tasks.validation import as_int, valid_date
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..events.model import (
     att_clean, cal_create, cal_fields, cal_member_set, cal_public, cal_touch, cals_for, default_cal, ev_delete, ev_dict,
     ev_fields, ev_occ_change, ev_ov_tidy, ev_range, ev_store, EV_KEYS, EV_PARTSTAT, EV_RANGE_DAYS, EV_TITLE_MAX, need_event, need_evcal,
@@ -18,12 +18,13 @@ from ..events.model import (
 )
 from ..events.ics import ics_export
 from ..events.invite import evi_after_delete, evi_after_restore, evi_after_save, evi_cal_cancel, evi_estimate, evi_flag, evi_precheck, evi_send, evi_snap
+from ..api.common import v1_call  # 2.149.0 G (#2517): pulled up from functions
 
 
 def _unknown(b, allowed):
     bad = sorted(k for k in b if k not in allowed)
     if bad:
-        from ..personal.timetrack import UnknownFields
+        from ..core.errors import UnknownFields
         raise UnknownFields(bad)
 
 
@@ -220,7 +221,6 @@ def op_rsvp(c, uid, eid, b):
 
 def op_prep_task(c, uid, eid, b):
     """A task to prepare the event: due the given days before its (next) start, in the inbox or a list, linked both ways."""
-    from ..api.v1 import v1_call
     from ..tasks.tasks import task_create
     _unknown(b, ("title", "list_id", "days_before"))
     r, role = need_event(c, eid, write=True)
@@ -241,7 +241,6 @@ def op_prep_task(c, uid, eid, b):
 
 def op_task_events(c, uid, tid):
     """The events a task prepares (that the person sees)."""
-    from ..core.access import need_task
     need_task(c, tid, write=False)
     out = []
     for r in c.execute("SELECT * FROM events WHERE task_id=? AND deleted_at IS NULL ORDER BY start", (tid,)):

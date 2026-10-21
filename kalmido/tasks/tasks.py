@@ -16,6 +16,7 @@ from ..lists.groups import check_group_assignee, grp_assign_events
 from ..tasks.validation import (
     check_parent, check_url, clean_task, log_act, TASK_FIELDS, ticket_template, valid_date, valid_hm,
 )
+from ..core.errors import BadInput, field_alias, UnknownFields, web_fields  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---- 2.18.0 (#430): milestones. A milestone is a task with ms = 1 (top level, no subtasks, a date is optional); a task
@@ -197,7 +198,6 @@ WEB_COMMENT |= {"portal"}  # 2.63.0 B (#1513): an answer the customer sees
 def task_create():
     from ..tasks.lifecycle import repeat_problem
     from ..collab.comments import task_event
-    from ..personal.timetrack import field_alias, web_fields
     from ..tasks.dependencies import newtask_events
     from ..lists.fields import set_field_values
     from ..agents.core import agent_added_events, agent_task_mentions, agent_tidy_events
@@ -337,7 +337,6 @@ WAIT_NOTE_MAX = 300
 
 def set_waiting(c, tid, b):
     """{note?, until?} -> sets / changes the waiting state (caller commits). BadInput on invalid values."""
-    from ..personal.timetrack import BadInput, UnknownFields
     unknown = sorted(k for k in b if k not in ("note", "until"))
     if unknown:
         raise UnknownFields(unknown)
@@ -491,7 +490,6 @@ def _wd_followup(c, t, users, S, LG, now):
 @app.patch("/api/tasks/<int:tid>")
 def task_update(tid):
     from ..tasks.lifecycle import apply_update, need_live
-    from ..personal.timetrack import field_alias, web_fields
     c = db()
     need_task(c, tid)
     need_live(c, tid)  # 2.126.0 D (#1992 A3)

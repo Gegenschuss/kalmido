@@ -8,7 +8,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..accounts.session import me, user_public
 from ..core.access import Denied, need_feat, tvis, vis_sql
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 
 
 # ---------------------------------------------------------------- 2.23.0 (#463): workload

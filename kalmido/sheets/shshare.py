@@ -19,7 +19,7 @@ from ..core.config import app
 from ..core.access import Denied, acx_org_ok, collab_all, need_feat
 from ..core.db import body, bump, db, err, iso_ms, now_utc
 from ..core.i18n import N_, tr
-from ..core.pg import insert_id
+from ..core.pg import insert_id, system_ctx
 from ..accounts.session import me
 
 SHS_ROLES = ("read", "write")
@@ -139,7 +139,6 @@ def shs_flags(c, r, uid):
 def shs_targets(c, r, uid):
     """{people, agents} uid may share sheet r with (never uid itself, never an account outside the table's workspace)."""
     from ..accounts.orgs import visible_people
-    from ..core.pg import system_ctx
     vis = visible_people(c, uid)
     org = r["org_id"]
     with system_ctx(c):  # which accounts are agents / members of the table's organisation (ids; vis filters the people)

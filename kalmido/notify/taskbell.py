@@ -21,10 +21,10 @@ from flask import g, has_request_context, jsonify
 
 from ..core.config import app, PUBLIC_URL
 from ..core.i18n import N_, tr
-from ..core.db import body, db, err, iso, local_now, now_utc
+from ..core.db import body, db, err, iso, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied, MANAGE_ROLES, list_people, need_collab, need_task, task_visible
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 
 TBL_LEVELS = ("list", "mute", "urgent")
 TBL_PRIO = "5"  # ntfy 5 = urgent (Web Push: urgency high)
@@ -183,7 +183,6 @@ def _people(c, tid, lid):
 
 
 def tbl_info(c, tid, role):
-    from ..core.db import usettings
     lid, _ = _org_of_task(c, tid)
     st = c.execute("SELECT status FROM tasks WHERE id=?", (tid,)).fetchone()[0]
     uid = me()

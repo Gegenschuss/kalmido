@@ -9,7 +9,7 @@ from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.db import body, db, err, now_utc, parse_iso, USER_DEFAULTS
 from ..core.pg import like_escape, system_ctx
-from ..core.access import Denied, list_role
+from ..core.access import Denied, list_role, my_inbox
 from ..accounts.session import me, user_public
 
 
@@ -316,7 +316,6 @@ def ua8_lists_settle(c, u, by):
     from ..lists.ownership import owner_transfer
     from ..accounts.orgs import need_visible
     from ..agents.core import is_agent
-    from ..core.access import my_inbox
     uid = u["id"]
     lists = ua8_owned(c, uid)
     mode = request.args.get("lists") or ""

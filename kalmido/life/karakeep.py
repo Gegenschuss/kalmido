@@ -12,7 +12,7 @@ from ..core.db import iso, now_utc, parse_iso
 from ..core.access import Denied, list_role, WRITE_ROLES
 from ..accounts.login import seal, unseal
 from ..tasks.validation import as_int, TITLE_MAX
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..life.model import _dump, life_list, need_life
 
 

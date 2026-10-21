@@ -12,7 +12,7 @@ from ..core.db import body, bump, db
 from ..core.pg import system_ctx
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..contacts.model import book_public, book_touch, need_book, obk_can_take
 
 OBK_ROLES = ("view", "edit", "none")

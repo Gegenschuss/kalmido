@@ -99,12 +99,3 @@ async function tz_wipe(lid, name) {
     offerUndo(msg, x);
   });
 }
-// the click (and Enter / Space on the focusable span) on "Tracked"
-function tz_hit(e) {
-  const el = e.target.closest?.('.tsum[data-tsum]'); if (!el || MW_ON) return;
-  const ids = el.dataset.tsum.split(',').map(Number).filter(Boolean), ls = ids.map(listById).filter(Boolean); if (!ls.length) return;
-  e.preventDefault(); e.stopPropagation();
-  tz_open(ids, ls.length === 1 ? lname(ls[0]) : (el.dataset.tsumName || lname(ls[0])));
-}
-document.addEventListener('click', tz_hit, true);
-document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.tsum[data-tsum]')) tz_hit(e); }, true);

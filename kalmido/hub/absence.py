@@ -19,14 +19,14 @@ from datetime import date, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id
+from ..core.pg import insert_id, system_ctx
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, local_now, now_utc, usettings
 from ..core.access import Denied
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..accounts.session import me, user_public
-from ..personal.timetrack import BadInput
-from ..api.v1 import v1_args, v1_view
+from ..core.errors import BadInput
+from ..api.common import v1_args, v1_view
 
 ABS_KINDS = ("vacation", "sick", "off", "other")
 ABS_HALF = ("", "am", "pm")
@@ -98,7 +98,6 @@ def abs_holidays(state, first, last):
 def abs_state(c, oid):
     if not oid:
         return ""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the organisation's own setting (also read for its members' workload)
         r = c.execute("SELECT hub_holiday_state FROM orgs WHERE id=?", (oid,)).fetchone()
     return (r[0] or "") if r else ""
@@ -135,7 +134,6 @@ def abs_admin(c, uid, oid):
 
 def abs_people(c, oid):
     """The people of area oid (no agents, no kids): the organisation's members, or the owner of a personal area."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # membership structure of an area the caller belongs to (checked by abs_org)
         own = c.execute("SELECT personal_of FROM orgs WHERE id=?", (oid,)).fetchone()
         if own and own[0]:
@@ -415,7 +413,6 @@ def abs_set_state():
     st = b.get("state") or ""
     if st and st not in ABS_STATES:
         raise BadInput(tr("Invalid value: {0}", "state"))
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the organisation's own row (orgs is structure); the admin right is checked above
         c.execute("UPDATE orgs SET hub_holiday_state=? WHERE id=?", (st, oid))
     bump(c)

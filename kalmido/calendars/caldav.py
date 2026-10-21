@@ -38,8 +38,10 @@ from ..tasks.validation import (
 )
 from ..tasks.tasks import my_tags, task_create, task_update
 from ..tasks.lifecycle import task_complete, task_delete, task_reopen, task_restore
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..calendars.icalfeed import hm_minutes, ics_dur, ics_fold, ics_rrule, ics_text, ics_utc, ics_vtimezone
+from ..core.env import env_bool
+from ..api.common import hit_limit, v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- CalDAV server for tasks (2.9.0, #435)
@@ -67,8 +69,8 @@ from ..calendars.icalfeed import hm_minutes, ics_dur, ics_fold, ics_rrule, ics_t
 # DAV_SYNC_KEEP sets per person and list are kept (dav_sync) for the deltas of sync-collection; an unknown token answers
 # 403 valid-sync-token and the client loads the collection again. Rendered collections are cached per person, list and
 # change counter (settings.version), so the clients' frequent polls cost no rendering.
-DAV_ON = os.environ.get("KALMIDO_CALDAV", "1").strip().lower() not in ("0", "false", "no", "off")
-DAV_HTTP_OK = os.environ.get("KALMIDO_CALDAV_HTTP", "0").strip().lower() in ("1", "true", "yes", "on")
+DAV_ON = env_bool("KALMIDO_CALDAV", True)
+DAV_HTTP_OK = env_bool("KALMIDO_CALDAV_HTTP", False)
 try:
     DAV_DONE_DAYS = max(0, int(os.environ.get("KALMIDO_CALDAV_DONE_DAYS", "") or 90))
 except ValueError:
@@ -370,7 +372,6 @@ def dav_401():
 def dav_login():
     """The person of this request (HTTP Basic: user name + app password) or raises DavError / returns a 401."""
     from ..notify.alerts import aa_count, aa_now, fx2_mask_ip
-    from ..api.v1 import hit_limit
     from ..agents.core import is_agent
     if not dav_secure():
         raise DavError(403, "CalDAV needs HTTPS")
@@ -831,8 +832,7 @@ def dav_member(c, u, lst, name):
 
 
 # ---- reading a VTODO from a client
-def _ics_unfold(text):
-    return re.sub(r"\r?\n[ \t]", "", text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")).split("\r\n")
+from ..calendars.icalfeed import ics_unfold as _ics_unfold  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def dav_split(text):
@@ -1084,7 +1084,6 @@ def dav_meta_set(c, tid, **kv):
 
 def dav_adopt_children(c, u, lid, tid, uid_):
     """Tasks that arrived before their parent (RELATED-TO to a UID not here yet) get this task as their parent."""
-    from ..api.v1 import v1_call, V1Error
     for r in c.execute("""SELECT m.task_id FROM dav_meta m JOIN tasks t ON t.id=m.task_id WHERE m.parent_uid=? AND t.list_id=?
                           AND t.deleted_at IS NULL AND t.parent_id IS NULL""", (uid_, lid)).fetchall():
         if not check_parent(c, r[0], tid) and task_visible(c, r[0], u["id"], write=True):
@@ -1137,7 +1136,6 @@ def dav_patch(c, u, cur, v, caps, lid):
 
 
 def dav_status(tid, cur_status, want, done_occurrence=False):
-    from ..api.v1 import v1_call
     if done_occurrence and cur_status == 0:
         want = 2
     if want == cur_status:
@@ -1151,7 +1149,6 @@ def dav_status(tid, cur_status, want, done_occurrence=False):
 
 
 def dav_put(c, u, pw_row, lst, name):
-    from ..api.v1 import v1_call
     if "text/calendar" not in (request.content_type or "text/calendar").lower():
         raise DavError(415, "Expected text/calendar", "<C:supported-calendar-data/>")
     raw = dav_body()
@@ -1381,7 +1378,6 @@ def dav_wellknown():
 @app.route("/dav/", methods=DAV_METHODS, provide_automatic_options=False, defaults={"p": ""})
 @app.route("/dav/<path:p>", methods=DAV_METHODS, provide_automatic_options=False)
 def dav(p):
-    from ..api.v1 import v1_call, V1Error
     if not DAV_ON:
         return Response("Not found\n", 404, content_type="text/plain; charset=utf-8")
     m = request.method

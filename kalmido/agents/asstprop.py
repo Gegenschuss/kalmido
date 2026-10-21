@@ -27,11 +27,11 @@ from datetime import date
 from flask import g, jsonify
 
 from ..core.config import app  # noqa: F401  (the routes are hooks of agents/proposals.py and lists/report.py)
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, tr, LANGS
 from ..core.db import bump, err, iso, local_now, now_utc
 from ..core.pg import insert_id, system_ctx
 from ..core.access import Denied, list_role
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..agents.core import agent_active, agent_emit, agent_row, agent_shares, job_dict, JOB_TITLE_MAX
 from ..agents.proposals import PROP_LIMITS, PROP_OPEN_MAX, PROP_TEXT_MAX, _p_keys, _p_str, prop_mode
 from ..collab.comments import user_names
@@ -224,7 +224,6 @@ def _doc_input(c, aid, n, wish):
 
 def _report_input(c, uid, aid, lid, b):
     """The status report of list lid as the AGENT sees it (no comments, notes, names) + the fixed Markdown text."""
-    from ..core.i18n import LANGS
     from ..lists.report import project_status, report_period, status_markdown, time_allowed, _time_of
     from ..collab.liste2eguard import le2b_net
     frm, to = report_period({k: b.get(k) for k in ("from", "to", "days") if b.get(k) not in (None, "")})

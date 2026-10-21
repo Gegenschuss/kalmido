@@ -437,7 +437,7 @@ async function newsOpen(i, opts) {
   if (it.kind === 'connreq' || it.kind === 'connok') { dsc_open(); return; }  // 2.49.0 (#1106)
   if (it.kind === 'lytpl') { lyv_offerOpen(it.data?.offer); return; }  // 2.55.0 (#1068)
   if (it.kind === 'dispo') { if (workloadOn()) { WLV.tab = dp_on() ? 'dispo' : 'wl'; go('workload'); } return; }  // 2.50.0 (#1194)
-  if (it.kind === 'leavereq' || it.kind === 'leavedecide') { if (workloadOn()) { WLV.tab = 'abs'; AB2.org = it.data?.org_id || AB2.org; AB2.start = (it.data?.start || '').slice(0, 7) + '-01'; AB2.data = null; go('workload'); } return; }  // 2.125.0 A (#2117)
+  if (it.kind === 'leavereq' || it.kind === 'leavedecide') { if (workloadOn()) loadModule('team').then(() => { WLV.tab = 'abs'; AB2.org = it.data?.org_id || AB2.org; AB2.start = (it.data?.start || '').slice(0, 7) + '-01'; AB2.data = null; go('workload'); }, () => {}); return; }  // 2.125.0 A (#2117); 2.149.0 F (#2518): absence.js loads on demand
   if (it.kind === 'usage') { if (feat('agents') && agentsOn()) go('agents'); else settingsModal('usage'); return; }  // 2.1.1 (#326)
   if (it.kind === 'approval' && !it.task_id && feat('agents') && agentsOn()) { go('agents'); return; }
   if (it.kind === 'upscan' && it.data?.where === 'fs') { go('ablage/' + it.data.ref); return; }  // 2.61.0 (#1818): the locked file

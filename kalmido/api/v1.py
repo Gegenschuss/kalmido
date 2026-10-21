@@ -12,9 +12,9 @@ from datetime import datetime, timedelta
 from flask import g, has_request_context, jsonify, request, Response
 
 from ..core.config import API_PREFIX, app, APP_NAME, APP_VERSION, PUB_PREFIX, TZ
-from ..core.pg import insert_id
+from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, tr
-from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
+from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, test_seconds, uset, usettings
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, FAIL_WINDOW, client_ip, me, rate_ip
 from ..accounts.login import twofa_methods
 from ..core.access import collab_all, Denied, list_role, need_list, need_task, need_time, time_all, token_lists, tvis, vis_sql
@@ -33,16 +33,19 @@ from ..tasks.lifecycle import task_complete, task_reopen, trash_task
 from ..collab.comments import att_dicts, comment_create, comment_dict, comment_plain, user_names
 from ..collab.news import bell_custom_clean, bell_custom_of, BELL_MODES, notif_matrix, notif_update
 from ..personal.habits import habit_log, habit_times, need_habit
-from ..personal.timetrack import (
-    BadInput, clean_day_hours, entry_out, field_alias, reject_unknown, time_create, time_rounding, time_rows,
-    UnknownFields, vis_ids,
-)
+from ..personal.timetrack import clean_day_hours, entry_out, time_create, time_rounding, time_rows, vis_ids
+from ..core.errors import BadInput, field_alias, reject_unknown, UnknownFields
 from ..lists.templates import PTYPES
 from ..lists.projects import bell_store, ms_report
 from ..calendars.caldav import apppw_create, apppw_delete, apppw_list, dav_info
 from ..integrations.importers import imp_request, imp_undo
 from ..notify.alerts import _env_int, aa_count, aa_now, fx2_mask_ip
 from ..admin.backup import BK_ON_ENV
+from ..core.env import env_bool
+from ..api.common import (  # noqa: F401  2.149.0 G (#2517): the route helpers moved to api/common.py, re-exported here
+    _HITS, _HITS_LOCK, act_via, cursor_dec, cursor_enc, hit_budget, hit_limit, RATE_WINDOW_S, v1_args, v1_call, v1_err,
+    v1_error, v1_feature, v1_json, v1_out, v1_page, v1_view, V1_CODES, V1Error,
+)
 
 
 # ---------------------------------------------------------------- package B: REST API with personal access tokens
@@ -59,7 +62,7 @@ from ..admin.backup import BK_ON_ENV
 # are reported to the admins. KALMIDO_API=0 turns the whole API off (404). Spec: GET /api/v1/openapi.json (no data,
 # served without a token), docs/API.md in the repository.
 def _env_on(name, dflt="1"):
-    return os.environ.get(name, dflt).strip().lower() not in ("0", "false", "no", "off")
+    return env_bool(name, dflt.strip().lower() not in ("0", "false", "no", "off"))  # 2.149.0 D (#2511)
 
 
 API_ON = _env_on("KALMIDO_API")
@@ -95,40 +98,6 @@ API_VERSION = "1.0"
 PRIO_NAMES = {0: "none", 1: "low", 3: "medium", 5: "high"}
 PRIO_VALUES = {v: k for k, v in PRIO_NAMES.items()}
 STATUS_NAMES = {0: "open", 2: "done", -1: "wont_do"}
-V1_CODES = {400: "invalid", 401: "unauthorized", 403: "forbidden", 404: "not_found", 405: "method_not_allowed",
-            409: "conflict", 413: "too_large", 429: "rate_limited", 503: "unavailable"}
-_HITS, _HITS_LOCK = {}, threading.Lock()
-
-
-def hit_limit(key, limit, window=60):
-    """Sliding-window counter: True (= refuse) once `limit` hits of `key` fell into the last `window` seconds."""
-    now = time.time()
-    with _HITS_LOCK:
-        arr = [t for t in _HITS.get(key, ()) if now - t < window]
-        if len(arr) >= limit:
-            _HITS[key] = arr
-            return True
-        arr.append(now)
-        _HITS[key] = arr
-        if len(_HITS) > 20000:  # forget idle keys
-            for k in [k for k, v in _HITS.items() if not v or now - v[-1] >= window]:
-                _HITS.pop(k, None)
-    return False
-
-
-def hit_budget(key, limit, ip, window=3600, share=3):
-    """2.126.0 C (#1979 I1): a per-resource budget (a form, a link per hour) of which one address uses at most a share,
-    so a single address cannot use it up for everyone else. Refused by the address part = the resource is not counted."""
-    return hit_limit(f"{key}@{ip}", max(1, limit // share), window) or hit_limit(key, limit, window)
-
-
-def act_via():
-    """How the current request acts: 'api' (personal access token), 'public_link' or None (the app)."""
-    if not has_request_context():
-        return None
-    v = g.get("auth_via")
-    return "api" if v == "token" else "public_link" if v == "public" else "caldav" if v == "dav" else \
-        "webhook" if v == "hook_in" else None  # 2.115.0 A (#2061): the inbound webhook of a list
 
 
 def api_scopes(csv_):
@@ -137,15 +106,6 @@ def api_scopes(csv_):
     if "write" in s:
         s.add("read")
     return s
-
-
-def v1_err(code, msg, headers=None, name=None, **extra):
-    """{"error": {"code", "message", **extra}}; name overrides the code's default name (2.2.1: unknown_field + fields)."""
-    r = jsonify(error={"code": name or V1_CODES.get(code, "error"), "message": msg, **extra})
-    r.status_code = code
-    for k, v in (headers or {}).items():
-        r.headers[k] = v
-    return r
 
 
 def api_authenticate():
@@ -224,101 +184,8 @@ def api_authenticate():
     return None
 
 
-def v1_view(fn):
-    """Route wrapper: Denied / BadInput / the internal views' error tuples -> the API's error format."""
-    @functools.wraps(fn)
-    def wrapper(*a, **k):
-        try:
-            return v1_out(fn(*a, **k))
-        except Denied as e:  # 2.125.0 B (#2119): v1_name = an own error code (month_closed)
-            return v1_err(e.code, e.text() if e.code != 404 else tr("Not found"), name=getattr(e, "v1_name", None))
-        except UnknownFields as e:  # 2.2.1 (#359): the client can see which of its fields the API does not know
-            return v1_err(400, str(e), name="unknown_field", fields=e.fields)
-        except BadInput as e:
-            return v1_err(400, str(e))
-    return wrapper
-
-
-def v1_out(r):
-    if isinstance(r, tuple) and len(r) == 2 and isinstance(r[1], int) and r[1] >= 400:
-        resp, code = r
-        msg = (resp.get_json(silent=True) or {}).get("error") if isinstance(resp, Response) else str(resp)
-        return v1_err(code, str(msg or tr("Error")))
-    return r
-
-
-def v1_call(view, *a, body=None):
-    """Runs an internal view with `body` as its JSON body: the web client's endpoint = the business rules.
-    Returns the view's JSON; an error response is raised as V1Error (-> the route answers it)."""
-    g.body = body if body is not None else {}
-    try:
-        r = view(*a)
-    finally:
-        g.body = None
-    if isinstance(r, tuple):
-        raise V1Error(v1_out(r))
-    return r.get_json()
-
-
-class V1Error(Exception):
-    def __init__(self, resp):
-        super().__init__("v1")
-        self.resp = resp
-
-
-@app.errorhandler(V1Error)
-def v1_error(e):
-    return e.resp
-
-
-def v1_json():
-    """The request body as a JSON object (400 otherwise)."""
-    if not request.data:
-        return {}
-    b = request.get_json(silent=True)
-    if not isinstance(b, dict):
-        raise BadInput(tr("The body must be a JSON object"))
-    return b
-
-
-def v1_args(allowed):
-    extra = sorted(k for k in request.args if k not in allowed)
-    if extra:
-        raise BadInput(tr("Unknown parameter: {0}", ", ".join(extra)[:200]))
-    return request.args
-
-
 def v1_limit(a):
     return as_int(a.get("limit", API_PAGE_DEFAULT), "limit", 1, API_PAGE_MAX)
-
-
-def cursor_enc(kind, n):
-    return base64.urlsafe_b64encode(f"{kind}:{n}".encode()).decode().rstrip("=")
-
-
-def cursor_dec(kind, s):
-    if not s:
-        return 0
-    try:
-        k, _, n = base64.urlsafe_b64decode(s + "=" * (-len(s) % 4)).decode().partition(":")
-        if k == kind and n.isdigit():
-            return int(n)
-    except (ValueError, UnicodeDecodeError):
-        pass
-    raise BadInput(tr("Invalid value: {0}", "cursor"))
-
-
-def v1_page(items, offset, limit):
-    """Offset pages (search, time entries): {data, next_cursor}."""
-    part = items[offset:offset + limit]
-    return jsonify(data=part, next_cursor=cursor_enc("o", offset + limit) if len(items) > offset + limit else None)
-
-
-def v1_feature(f):
-    """The API also respects the user's own module switches (Settings > Layout / Collaboration)."""
-    if f not in (usettings(db(), me()).get("features") or "").split(","):
-        raise Denied(403, tr("Collaboration is turned off in your settings") if f == "collab"
-                     else tr("Time tracking is turned off in your settings"))
 
 
 def _reminders_list(v):
@@ -692,7 +559,6 @@ def v1_apppw_create():
     b = v1_json()
     reject_unknown(b, ("name",))
     v1_person()
-    from ..core.access import token_lists
     if token_lists() is not None or not {"calendar", "contacts"} <= set(g.scopes):  # 2.79.0 (#476 M1): an app password
         # opens CalDAV / CardDAV without any limit, so only a token that may already do all of that creates one
         return v1_err(403, tr("Only a token for all lists with the permissions “Calendar” and “Contacts” may create an app password"),
@@ -1450,7 +1316,6 @@ def v1_admin_status():
     c = db()
     info, n = update_state(c), lambda q: c.execute(q).fetchone()[0]
     latest, cur = semver(info.get("latest")), semver(APP_VERSION)
-    from ..core.pg import system_ctx
     with system_ctx(c):  # 2.37.0 (#1150): instance counts over every organisation (numbers only)
         n_lists = n("SELECT COUNT(*) FROM lists")
     return jsonify(version=APP_VERSION, users=n("SELECT COUNT(*) FROM users WHERE disabled=0"), lists=n_lists,

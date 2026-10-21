@@ -10,8 +10,9 @@ from ..core.db import db, local_day, local_now
 from ..core.i18n import tr
 from ..core.access import Denied, need_time, tvis, vis_sql
 from ..accounts.session import me
-from ..api.v1 import v1_args, v1_feature, v1_view
-from ..personal.timetrack import BadInput, local_bounds, MT_TIME_SQL
+from ..api.common import v1_args, v1_feature, v1_view
+from ..personal.timetrack import local_bounds, MT_TIME_SQL
+from ..core.errors import BadInput
 
 GAP_DAYS, GAP_DAYS_MAX = 14, 31   # look back this many days (today not included: the day is not over yet)
 GAP_TASKS = 5                      # task examples per day

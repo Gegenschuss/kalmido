@@ -7,13 +7,14 @@ import re
 
 from flask import jsonify, request
 
-from ..core.config import app
+from ..core.config import app, PUBLIC_URL
 from ..core.i18n import tr
-from ..core.db import body, bump, db, iso, now_utc
+from ..core.db import body, bump, db, iso, now_utc, uset
 from ..accounts.session import me
-from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.access import Denied, collab_all, is_project, list_role
+from ..core.errors import BadInput
 from .layouts import WG_STD_KEYS, clean_layout, need_person
+from ..core.pg import insert_id, system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 LYV_MAX = 12          # saved arrangements per person and view
 LYV_NAME_MAX = 60
@@ -47,7 +48,6 @@ def lyv_name(c, uid, key, name, skip=0):
 def lyv_save(c, uid, key, name, layout, source="", source_ref=None):
     """Store one more saved arrangement of view key for person uid and return its id (no commit, no bump: the caller does).
     layout = json text / dict as the view stores it (cleaned here). 409 at LYV_MAX per view."""
-    from ..core.pg import insert_id
     if not lyv_key_ok(key) or source not in LYV_SOURCES:
         raise BadInput(tr("Invalid layout"))
     v = lyv_clean(key, layout)
@@ -88,7 +88,6 @@ def lyv_own(c, uid, key):
 
 
 def _own_put(c, uid, key, v):
-    from ..core.db import uset
     if not _lid(key):
         uset(c, uid, key, v)
     elif v:
@@ -298,7 +297,6 @@ LYO_PAIR_MAX = 3      # open templates from one sender to one recipient (one sen
 def _pair_ok(c, a, b):
     """a and b see each other, b is an enabled person (not an agent) and b did not block a."""
     from ..accounts.orgs import may_see
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the recipient's account kind / state and their block list (ids only, no content)
         u = c.execute("SELECT kind, disabled FROM users WHERE id=?", (b,)).fetchone()
         blocked = c.execute("SELECT 1 FROM conn_blocks WHERE user_id=? AND blocked_id=?", (b, a)).fetchone()
@@ -310,14 +308,11 @@ def _page_ok(c, key, uid):
     """A project page template: uid has access to that project page (always True for the other views)."""
     if not _lid(key):
         return True
-    from ..core.access import is_project, list_role
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the role of ANOTHER person in a list the sender sees (no content read)
         return bool(list_role(c, _lid(key), uid)) and is_project(c, _lid(key))
 
 
 def _uname(c, uid):
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the sender's display name, shown to a recipient who sees them (_pair_ok)
         r = c.execute("SELECT display_name, username FROM users WHERE id=?", (uid,)).fetchone()
     return (r["display_name"] or r["username"]) if r else ""
@@ -327,10 +322,7 @@ def _uname(c, uid):
 def lyo_send():
     """{key, name, layout, to: [user ids]}: send an arrangement as a template -> {sent}. 404 for a person the sender may not
     send to (as unknown); a recipient with LYO_OPEN_MAX open templates or who blocked the sender is skipped silently."""
-    from ..core.access import collab_all
-    from ..core.pg import insert_id
     from ..collab.news import news_add, list_push
-    from ..core.config import PUBLIC_URL
     need_person()
     b = body()
     if set(b) - {"key", "name", "layout", "to"}:

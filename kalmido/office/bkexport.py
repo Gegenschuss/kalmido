@@ -21,7 +21,7 @@ from ..core.access import Denied
 from ..core.config import app
 from ..core.db import db, local_now
 from ..core.i18n import N_, tr
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import office_gate, office_need_feature, office_org, office_settings
 

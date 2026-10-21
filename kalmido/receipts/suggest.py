@@ -17,7 +17,8 @@ from ..core.db import body, bump, db, err, insert_id, iso, now_utc
 from ..core.i18n import tr
 from ..core.access import Denied, list_role
 from ..accounts.session import me
-from ..api.v1 import BadInput, UnknownFields, v1_args, v1_json, v1_view
+from ..api.v1 import BadInput, UnknownFields
+from ..api.common import v1_args, v1_json, v1_view
 from ..files.store import fs_log_add, need_node
 from ..docs import store as S
 
@@ -29,8 +30,7 @@ RC_AMOUNT_MAX = 100_000_000  # as docs.extract.MAX_AMOUNT
 _KEEP = object()
 
 
-def _now():
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _is_agent():

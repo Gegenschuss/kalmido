@@ -261,7 +261,12 @@ The most used helpers:
    lists, calendars, office, ...), `integrations` (api, admin, mail, webhooks, importers, ...) and `agents` (`LAYERS` in
    `kalmido/__init__.py`, `LAYER_OF` for a single module). At module level a module imports only from its own or a lower
    layer; a higher one inside the function. `python3 tools/check_layers.py -v` checks it in CI; the upward imports the
-   code already had stand in its `KNOWN` list, which may only shrink.
+   code already had stand in its `KNOWN` list, which may only shrink. Since 2.149.0 it also counts the function-local
+   imports -- upward ones, and needless ones whose target loads earlier in `ORDER` and could stand at the top -- and
+   wall-clock calls (`datetime.now()`, `date.today()`) outside `core/db.py`; the counts live in
+   `tools/layers_budget.json` and may only sink (`--update` lowers the file). Shared basics sit in the core layer:
+   `core/errors.py` (`BadInput`, `Denied`, `UnknownFields`), `core/ctx.py` (`me()`) and `api/common.py` (the /api/v1
+   route helpers, `LAYER_OF` core); the old import paths re-export them.
 
 ## Web client: `static/js/`
 
@@ -340,11 +345,13 @@ registering the ones of its area.
 | `agents.js` | Agents, reactions, shared list tags, tidy suggestions. |
 | `cleanup.js` | "Tidy up the list": the request to the list's tidy agent and the review of its cleanup proposal (2.39.0). |
 | `dayplan.js` | Day planning and the evening review. |
+| `dpmodal.js` | 2.149.0 F (#2518): the "Plan my day" dialog (module `dayplan`, loaded on demand). |
 | `agentchat.js` | The chat with an agent (side panel / view) and Settings > Agents: lists, setup guides, behaviour rules, activity log, usage, runtime. Loaded on demand (2.65.0, module `agentchat`). |
 | `chatbase.js` | 2.65.0 (#1823): what the start uses of the agent chat: the phone / desktop switch, the pop-up button, reaction rows, `patchKids`, the task panel's usage line. |
 | `listedit.js` | List editing, keyboard reordering, recent lists. |
 | `playbook.js` | The Playbook of a list or folder (2.39.0): the area in the list and folder dialogs, editor with preview, versions with a line diff and restore, agents' proposals, regular checks, the help examples. |
 | `git.js` | Git integration of project lists: repositories, pull requests + CI, agents' merge requests. |
+| `gitrepo.js` | 2.149.0 F (#2518): the repository editor of the list dialog / folder settings (module `gitrepo`, on demand). |
 | `chat.js` | Team chat and notes of a list / project. |
 | `sheetgrid.js` | 2.43.0 (#1331): lists with columns work like a spreadsheet: active cell, arrow keys / Tab / Enter, paste ranges with a preview, fill down, select several cells, column filter. |
 | `formula.js` | 2.43.0 (#1328): formula fields in the client, the totals row under number columns and the key figures on the project page (server side `kalmido/lists/formula.py`, `kalmido/lists/kpis.py`). |
@@ -381,6 +388,21 @@ registering the ones of its area.
 2. Add its `<script>` tag to `static/index.html` (before `main.js`, after the files whose functions it calls while it
    loads), add it to `SHELL` in `static/sw.js` in the same order and bump `CACHE` there.
 3. `python3 tools/check_layout.py` compares the three lists; `node --check` runs on every file in CI.
+
+### Caching of static files and request timing (2.149.0)
+
+- The served `index.html` gives every start script and stylesheet `?v=<content hash>` (the first 12 hex digits of its
+  SHA-256, `core/pages.py`); the file stays plain in `static/index.html`. A static file asked for with its own hash is
+  answered `Cache-Control: public, max-age=31536000, immutable`; any other `?v=` and no `?v=` are revalidated as before.
+- `GET /sw-manifest.json` lists every static file of `SHELL` / `LAZY` / `LAZY_CSS` in `static/sw.js` with that hash
+  (computed by the server, never out of date; the lists in `sw.js` stay the one source). The service worker keeps each
+  file as `<url>?v=<hash>`, copies unchanged files from the old cache on an update and loads only the changed ones.
+  `CACHE` is still bumped once per version: it is what makes the browser install the new worker.
+- Static files, `/sw.js`, `/sw-manifest.json` and `/robots.txt` are served without a session lookup (no database access).
+- Every answer carries `Server-Timing: app;dur=…, db;dur=…;desc="n=<statements>"` (`core/reqtime.py`, counted per
+  thread in `core/pg.py`). A request slower than `KALMIDO_SLOW_REQUEST_MS` (default 500, 0 = off) logs one line with
+  method, route pattern, duration, statements and database time; `GET /api/admin/health` has p50 / p95 / max of the
+  last 1000 requests under `requests` (static files, `/api/health` and long polls with `?wait=` are left out).
 
 ### Type check (2.102.0)
 
@@ -448,6 +470,12 @@ settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn`
 - Code loaded at start calls a module's functions only through the stand-ins in `lazyload.js` (`LD_CALL`: load, then
   call; `LD_VIEW`: draw "Loading…", load, draw the view again) or after `await loadModule(...)`. Constants of an
   on-demand module do not exist before it is loaded (`typeof X` to ask).
+- 2.149.0 F (#2519): `tools/check_lazy_calls.py` (CI, job lint) finds calls from a start file into a function that only an
+  on-demand file declares. Allowed: a stand-in, a guard (`typeof X`, `window.X`, `X?.(`, `loadModule(` up to four lines
+  before), or a mark with the reason why the module is loaded there: `// lazy-ok: <reason>` on the line (in a template
+  literal `${''/* lazy-ok: <reason> */}`), `// lazy-ok-begin: <reason>` … `// lazy-ok-end` around a run of lines (the click
+  cases of what the timeline drew), `// lazy-ok-module <module>: <reason>` once for a start file that only works inside
+  that module. It also checks that every `var(--x)` without a fallback names a defined custom property.
 - Moving a file to on demand: check with `grep` which of its globals other files use, keep those in a file loaded at
   start or give them a stand-in, then move the file from the script tags / `SHELL` to `LD_MODS` / `LAZY`.
 - Tests: `tests/boot.js` (jsdom) and `tests/ff.js` (Firefox) load every on-demand module right after the start, so suites
@@ -468,6 +496,14 @@ settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn`
 | `playbook` | `playbook.js` | the playbook area of a list / folder dialog, Settings |
 | `timeline` | `timeline.js`, `roadmap.js` | a list's timeline, the roadmap, the calendar's timeline |
 | `feeds` | `feeds.js` (+ `css/feeds.css`) | 2.85.0 (#1162): the view Feeds, the card Feeds on Home & life |
+| `life` + `budget.js` | 2.149.0 F (#2518) | the budget view (it needed life.js already) |
+| `settings` + `servers.js` | 2.149.0 F | Settings > Account > other servers |
+| `msvview` | `msvview.js` | 2.149.0 F: only with a linked server (the start asks `/api/servers` once) or a list of one; `S.msvv` and the stand-ins in `render.js` |
+| `hubmail` | `hubmail.js` | 2.149.0 F: the e-mail filing; the mail link of a task / event stays in `clientpage.js` |
+| `timesheet` | `timesheet.js` | 2.149.0 F: the time page's card, Settings (`LD_NEED`); News texts / lock mark in `time.js` |
+| `team` | `absence.js`, `leave.js`, `dispo.js` | 2.149.0 F: the tabs Absences / Disposition, vacation, Settings (`LD_NEED`); tabs, `dp_on`, day hint in `clients.js` |
+| `listprint`, `evinvite`, `projtime`, `envs` | one file each | 2.149.0 F: "Print", the event editor, the "Tracked" figure (its click stays in `projects.js`), a project's environments (row texts in `quickadd.js`) |
+| `dayplan`, `gitrepo`, `sprints` | `dpmodal.js`, `gitrepo.js`, `sprints2.js` | 2.149.0 F: the dialogs split off `dayplan.js`, `git.js`, `sprints.js` (what rows, the task panel and Today draw stays there) |
 
 `contacts` now also loads `newsletter.js`, `settings` first `acctset.js` (the settings sections of `account.js`; sign-in,
 invitations and logout stay in `account.js`). What the start needs of them stays at start: `chatbase.js` (the phone /

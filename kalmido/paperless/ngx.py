@@ -29,11 +29,13 @@ import urllib.parse
 import urllib.request
 from datetime import timedelta
 
-from ..core.config import app, MAX_FILE_MB
+from ..core.config import app, MAX_FILE_MB, SECRET_KEY
 from ..core.db import connect, iso, now_utc, parse_iso
 from ..core.i18n import N_, tr
-from ..core.pg import system_ctx
+from ..core.pg import system_ctx, write_lock
 from ..docs import store as S
+from ..core.orgcrypt import oc_enc_k  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
 
 PL_TIMEOUT = 20               # s per request
 PL_API_VERSIONS = (10, 9, 5)  # 2.56.4 (#1859): Accept: application/json; version=N, the first one the server takes. Paperless-ngx
@@ -84,8 +86,7 @@ def pl_err_text(stored):
     return cal_err_text(stored)
 
 
-def _now():
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def pl_src(url):
@@ -125,7 +126,6 @@ _TKEYS = {}
 def _token_key(ws):
     """2.48.0 review (S2): the token is always sealed, also with the organisation's encryption off -- a key derived from the
     server key per workspace (like docs/store.py _ws_key for private spaces). None without a server key."""
-    from ..core.config import SECRET_KEY
     if not SECRET_KEY:
         return None
     k = _TKEYS.get(ws)
@@ -139,7 +139,6 @@ def _token_key(ws):
 
 def pl_seal_token(ws, tok):
     """The sealed token; None without a server key (then it is not stored at all)."""
-    from ..core.orgcrypt import oc_enc_k
     key = _token_key(ws)
     return oc_enc_k(key, S.ws_org(ws) or 0, f"pl_sources.token.v2|{ws}", tok) if key and tok else None
 
@@ -515,7 +514,6 @@ def pl_run_target(c, uid, org, ws, raw):
     """2.87.9 (#1940): the run_ws an import start asks for: '' (the workspace itself) or, from an organisation, the starter's
     own private space (target 'private'). Anything else is refused: an import only ever goes into the workspace it belongs
     to or into the starter's own space."""
-    from ..core.access import Denied
     if raw in (None, "", "same") or raw == ws:
         return ""
     if raw == "private" and org:
@@ -570,7 +568,6 @@ def pl_run(c, sid):
     """One import run of connection sid (claimed: run_state 'busy'). kind 'all' = every document (oldest first), 'new' =
     newest first until a page holds nothing new. Commits after every document."""
     from ..admin.hosting import QuotaExceeded
-    from ..core.access import Denied
     from ..docs.ingest import docs_kick as kick
     r = c.execute("SELECT * FROM pl_sources WHERE id=?", (sid,)).fetchone()
     uid = r["run_by"]
@@ -659,7 +656,6 @@ def pl_claim(c):
     pl_uploads.id), or None. 2.69.0 A (#1846): one import per server at a time -- across all processes (the advisory lock
     serializes the claim, a fresh busy / stop run of either table blocks it); the others wait in the order they were queued
     (run_beat), a run cut off (no heartbeat for PL_STALE minutes) goes back to the queue and never blocks it for good."""
-    from ..core.pg import write_lock
     from .zipimp import plh_sweep
     stale = iso(now_utc() - timedelta(minutes=PL_STALE))
     c.execute("UPDATE pl_sources SET run_state='queued' WHERE run_state='busy' AND (run_beat IS NULL OR run_beat < ?)", (stale,))
@@ -686,7 +682,6 @@ def pl_claim(c):
 
 def plh_queue_place(c, table, rid):
     """2.69.0 A (#1846): the place of a waiting run in the server's queue (1 = next), None when it does not wait."""
-    from ..core.pg import system_ctx
     r = c.execute(f"SELECT run_state, run_beat FROM {table} WHERE id=?", (rid,)).fetchone()
     if not r or r["run_state"] != "queued":
         return None

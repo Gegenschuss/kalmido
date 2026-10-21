@@ -17,7 +17,7 @@ from ..tasks.validation import (
     clean_reminders, clean_ticket_tpl, log_act, POINTS, rr_feasible, rr_norm, rr_problem, TICKET_TPL, TICKET_TYPES, valid_date,
 )
 from ..tasks.tasks import ms_target, one_task, set_tags
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 
 
 # ---------------------------------------------------------------- templates (private per user)

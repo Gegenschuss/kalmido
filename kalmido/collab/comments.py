@@ -12,11 +12,12 @@ from ..core.pg import insert_id
 from ..core.i18n import LANGS, short_day, tr, trn
 from ..core.db import body, bump, db, err, inbox_default, iso, iso_ms, local_now, now_utc, usettings
 from ..accounts.session import me
-from ..core.access import collab_all, Denied, list_people, list_role, MANAGE_ROLES, need_feat, need_task, task_visible
+from ..core.access import collab_all, Denied, list_people, list_role, MANAGE_ROLES, need_feat, need_task, task_visible, pvis
 from ..core.serializers import unlink_files
 from ..tasks.tasks import WEB_COMMENT
 from ..tasks.attachments import save_attachments
 from .replies import reply_check, with_replies
+from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- comments + activity timeline
@@ -42,7 +43,6 @@ def user_names(c, ids):
 def h6r_shared_people(c, lid, uid):
     """2.86.0 (N20 review): the people a participant uid of list lid may see in it -- the owner, uid and everybody who
     shares a task with uid (full roles see every task, other participants only their own); None = uid is no participant."""
-    from ..core.access import pvis
     if list_role(c, lid, uid) != "participant":
         return None
     own = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()
@@ -209,7 +209,6 @@ def timeline_seen(tid):
 
 def comment_input():
     """(text, files) from a JSON body or a multipart form (comment with files)."""
-    from ..personal.timetrack import web_fields
     if request.files or request.form:
         web_fields({k: 1 for k in [*request.form, *request.files]}, {"body", "file", "reply_to", "portal"}, "POST /api/tasks/{tid}/comments (form)")
         return (request.form.get("body") or "").strip(), [f for f in request.files.getlist("file") if f and f.filename]
@@ -226,7 +225,6 @@ def comment_reply_in():
 def comment_create(tid):
     """2.0.6 (#315): also without collaboration (a personal note). Only with collaboration on (instance switch):
     @mentions, pushes, News and agent events; comments off in my settings: refused (409), agents excepted."""
-    from ..personal.timetrack import BadInput
     from ..integrations.webhooks import wh_note
     from ..agents.core import agent_comment_events, is_agent, tidy_agent_of
     from ..collab.reactions import clean_suggestion, with_reactions
@@ -334,7 +332,6 @@ def comment_create(tid):
 @app.patch("/api/comments/<int:cid>")
 def comment_update(cid):
     """Only the author edits a comment; people mentioned for the first time are notified (with collaboration on)."""
-    from ..personal.timetrack import web_fields
     from ..agents.core import agent_comment_events, is_agent
     from ..collab.reactions import with_reactions
     c = db()

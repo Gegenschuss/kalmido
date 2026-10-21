@@ -29,7 +29,8 @@ from ..collab.msgsearch import INDEX_VERSION as MSG_INDEX_VERSION, MSG_TERMS, _v
 from ..collab.comments import comment_plain, MENTION_RE, user_names
 from ..collab.teamchat import md_brief
 from ..tasks.validation import as_int
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
+from ..api.common import cursor_dec, cursor_enc  # 2.149.0 G (#2517): pulled up from functions
 
 FTS_VERSION = "1"
 FTS_CAP = 100000         # characters of notes / a comment that the index reads
@@ -195,7 +196,6 @@ def fts_args(a, lim_default=20):
 @app.get("/api/search")
 def fts_web():
     """?q, limit (1-50), cursor -- {hits: [{task, where, snippet: {text, marks}, comment_id?}], next}."""
-    from ..api.v1 import cursor_dec, cursor_enc
     a = request.args
     try:
         q, lim = fts_args(a)
@@ -214,7 +214,7 @@ def fts_web():
 
 def fts_v1(a, v1_task):
     """GET /api/v1/search?fulltext=1: the same ranked hits as tasks (v1 shape) + match {where, snippet, comment_id}."""
-    from ..api.v1 import API_PAGE_MAX, cursor_dec, cursor_enc
+    from ..api.v1 import API_PAGE_MAX
     q, _ = fts_args({"q": a.get("q")})
     lim = min(as_int(a.get("limit", FTS_LIMIT), "limit", 1, API_PAGE_MAX), FTS_LIMIT)  # a bigger page asked for: 50
     off = cursor_dec("fs", a.get("cursor"))

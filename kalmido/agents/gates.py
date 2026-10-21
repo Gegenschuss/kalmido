@@ -18,7 +18,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, need_collab, task_visible
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields
 
 GATE_KINDS = ("integrate", "deploy")
 DEPLOY_TAG = (os.environ.get("KALMIDO_DEPLOY_TAG") or "deploy").strip() or "deploy"

@@ -25,13 +25,13 @@ from ..core.i18n import N_, tr
 from ..core.db import body, db, err, iso, local_now, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_anon_bind, Denied, need_list
-from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
+from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_read_file
 from .model import office_role
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, rate_ip
 from ..accounts.login import auth_key, seal, unseal
-from ..api.v1 import hit_budget, hit_limit
+from ..api.common import hit_budget, hit_limit
 from ..notify.alerts import aa_count
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..tasks.validation import valid_date
 from ..lists.public import PUB_ACTOR, PUB_TOKEN_RE, pub_gone, pub_html, pub_limited, public_links_on
 
@@ -547,7 +547,6 @@ def h6c_sig_pdf_ok(c, r):
 def sig_pdf_get(token):
     from .pdfweb import _file_response, _render, _stored_or_missing, epdf_name
     from .docs import doc_row
-    from ..core.orgcrypt import oc_read_file
     c = db()
     if hit_limit("sigv:" + rate_ip(), SIG_VIEW_RATE):
         return pub_limited(_accept_lang())

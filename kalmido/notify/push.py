@@ -29,6 +29,8 @@ from ..collab.comments import collab_on, task_push_tick
 from ..collab.news import news_cleanup, news_unread, notif_ok
 from ..personal.habits import habit_times, pomo_close, pomo_elapsed, pomo_planned_end
 from ..personal.timetrack import _num, time_watchdog
+from ..core.env import env_bool
+from ..core.merges import mg_prune  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- watchdog / ntfy
@@ -83,7 +85,7 @@ def ntfy(title, msg, prio="4", click=None, topic=None, actions=None, admin=False
 # only in the DB, never sent to a client); the push service sees the endpoint, size and timing, never the text.
 # SSRF: the server only ever POSTs to endpoints on WEBPUSH_HOSTS (https, port 443). KALMIDO_WEBPUSH_HOSTS adds
 # entries: "host", "*.domain" or an exact origin "http(s)://host:port" (the only way to allow plain http).
-WEBPUSH_ON = os.environ.get("KALMIDO_WEBPUSH", "1").strip().lower() not in ("0", "false", "no", "off")
+WEBPUSH_ON = env_bool("KALMIDO_WEBPUSH", True)
 WEBPUSH_HOSTS = ["fcm.googleapis.com",            # Chrome, Edge (Android), Samsung Internet, Opera, Brave, Vivaldi
                  "*.push.services.mozilla.com",   # Firefox (updates.push.services.mozilla.com)
                  "web.push.apple.com", "*.push.apple.com",  # Safari (macOS 13+), iOS / iPadOS 16.4+ home-screen apps
@@ -360,7 +362,7 @@ def push_dismiss_tick(c):
     c.commit()
     if not WEBPUSH_ON:
         return
-    day = date.today().isoformat()
+    day = local_now().date().isoformat()  # 2.149.0 E (#2512): the test clock
     subs = c.execute("""SELECT s.*, MIN(t.handled_at) AS first FROM push_tags t JOIN push_subs s ON s.id=t.sub_id
                         WHERE t.handled_at IS NOT NULL GROUP BY s.id""").fetchall()
     for s in subs:
@@ -449,7 +451,6 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
         finally:
             c.close()
     from ..collab.liste2eguard import le2b_net
-    from ..core.i18n import LANGS
     lg = s.get("lang") if s.get("lang") in LANGS else "en"
     title, msg = le2b_net(title, lg), le2b_net(msg, lg)  # 2.64.2 D (#1817): the neutral word in the recipient's language
     from .channels import chn_kind, chn_push
@@ -501,11 +502,38 @@ def _wd_fail(c, what, key, e):
         pass
 
 
+WD_SLOW_MS = 200  # 2.149.0 C (#2516): a watchdog section that takes longer leaves a log line (name + duration only)
+
+
 def _wd_section(c, name, fn, *a):
+    t0 = time.monotonic()
     try:
         fn(c, *a)
     except Exception as e:  # noqa: BLE001
         _wd_fail(c, "section", name, e)
+    ms = (time.monotonic() - t0) * 1000
+    if ms > WD_SLOW_MS:
+        print(f"watchdog: section {name} took {ms:.0f} ms", flush=True)
+
+
+def _wd_settings(c, users):
+    """2.149.0 C (#2516): usettings() of every account in one query (was one per account); on an error the old way, per
+    account (a broken account falls back to the defaults and is logged)."""
+    S = {uid: dict(USER_DEFAULTS) for uid in users}
+    try:
+        for r in c.execute("SELECT user_id, key, value FROM user_settings WHERE user_id = ANY(CAST(? AS BIGINT[]))",
+                           (list(users),)):
+            S[r[0]][r[1]] = r[2]
+        return S
+    except Exception as e:  # noqa: BLE001
+        _wd_fail(c, "settings of users", "all", e)
+    for uid in users:
+        try:
+            S[uid] = usettings(c, uid)
+        except Exception as e:  # noqa: BLE001
+            _wd_fail(c, "settings of user", uid, e)
+            S[uid] = dict(USER_DEFAULTS)
+    return S
 
 
 # 2.38.0 (#1155): the office log keeps every write for good (GoBD); reads (opening, the print view, the PDF) go after
@@ -547,13 +575,8 @@ def _watchdog_tick(c):
     from ..life.model import _wd_care
     from ..life.karakeep import _wd_reading
     users = {r["id"]: r for r in c.execute("SELECT * FROM users WHERE disabled=0")}
-    S, LG = {}, {}
+    S, LG = _wd_settings(c, users), {}
     for uid in users:
-        try:
-            S[uid] = usettings(c, uid)
-        except Exception as e:  # noqa: BLE001
-            _wd_fail(c, "settings of user", uid, e)
-            S[uid] = dict(USER_DEFAULTS)
         LG[uid] = S[uid].get("lang") if S[uid].get("lang") in LANGS else "en"
     _wd_section(c, "collab pushes", task_push_tick, users, S, LG)
     _wd_section(c, "dismiss pushes", push_dismiss_tick)
@@ -567,7 +590,6 @@ def _watchdog_tick(c):
     _wd_section(c, "team chat files cleanup", tcx_files_gc)  # 2.113.1 (#2059)
     from ..admin.orgexport import ox_cleanup
     _wd_section(c, "org export cleanup", ox_cleanup)  # 2.42.0 (#833): archives after 24 h
-    from ..core.merges import mg_prune
     _wd_section(c, "merge snapshots", mg_prune, False)  # 2.66.0 (#1835): the undo data of merges after 30 days
     from ..office.undo import oun_prune
     _wd_section(c, "office undo copies", oun_prune)  # 2.111.0 A (#2233): the editors' undo copies after a day

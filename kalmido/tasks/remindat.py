@@ -11,13 +11,14 @@ from ..core.config import PUBLIC_URL, TZ
 from ..core.i18n import short_day, tr
 from ..core.db import inbox_default
 from ..tasks.validation import valid_plan_start
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions
 
 RAT_MISS_H = 6  # the same grace as the offset reminders
 
 
 def rat_clean(v):
     """Client value -> column value: None / '' = none, else a valid local "YYYY-MM-DDTHH:MM" (BadInput otherwise)."""
-    from ..personal.timetrack import BadInput
     if v in (None, ""):
         return None
     if not valid_plan_start(v):
@@ -58,7 +59,6 @@ def rat_tick(c, users, S, LG, now):
 
 def rat_fire(c, t, users, S, LG, now):
     from ..collab.news import notif_ok
-    from ..core.schema import USER_DEFAULTS
     from ..family.v1 import reminder_people
     from ..notify.push import notify, push_prio, reminder_recipient
     fired = json.loads(t["reminded"] or "[]")

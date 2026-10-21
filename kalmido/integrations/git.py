@@ -27,11 +27,12 @@ from ..core.access import Denied, is_project, list_role, MANAGE_ROLES, need_list
 from ..tasks.validation import log_act
 from ..tasks.tasks import one_task
 from ..tasks.lifecycle import do_complete, signed, undo_status
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields
 from ..notify.push import _b64u, _b64u_dec
 from ..notify.alerts import _env_int, aa_count
 from ..calendars.subscriptions import _cal_opener, cal_allow, cal_err_text, cal_rate, CAL_TIMEOUT, CalError
 from ..agents.core import is_agent
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.2.0 (#271): Git integration, (#339) tickets for agents
@@ -1073,7 +1074,6 @@ def git_refresh(cid):
 @app.post("/api/hooks/git/<int:cid>")
 def git_hook(cid):
     """Inbound webhook (GitHub / Gitea / Forgejo / GitLab / Bitbucket): a valid signature only triggers the next poll at once."""
-    from ..api.v1 import hit_limit
     from ..accounts.session import rate_ip
     # 2.126.0 B (#1979 I5): a limit and a size cap before the signature; review: per address, so one sender cannot hold up
     # the hooks of a connection for the repository host (a wider cap per connection stays)

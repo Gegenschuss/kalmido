@@ -38,11 +38,12 @@ from flask import g, jsonify, request
 from ..core.config import EMAIL_RE, app
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, lang, tr
-from ..core.db import body, bump, db, err, iso, now_utc
+from ..core.db import body, bump, db, err, iso, now_utc, connect
 from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, need_list
 from ..core.orgcrypt import oc_active, oc_enc_fields
 from ..accounts.session import me
 from . import hubmail as H
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 MBX_TLS = ("starttls", "ssl", "none")
 MBX_MAIL_MAX = 50 * 1024 * 1024  # review: a larger mail of a workspace's own server is not fetched (marked seen)
@@ -66,8 +67,7 @@ MBX_WAKE = threading.Event()
 _DUE = set()  # workspaces whose mailbox is fetched in the next round (Fetch now)
 
 
-def _now():
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _gate():
@@ -427,7 +427,6 @@ def mbx_put():
     c.commit()
     r = mbx_row(c, ws)
     chk = None
-    from ..api.v1 import hit_limit
     if d.get("check") is True and not hit_limit(f"mbxcheck:{me()}", 20, 600):  # review: the same limit as /mailbox/check
         chk = mbx_check(c, r, secret)
         code = chk.get("imap") or chk.get("smtp") or ""
@@ -446,7 +445,6 @@ def mbx_check_route():
     r = mbx_row(c, ws)
     if not r:
         raise Denied(404, tr("No mailbox is set up"))
-    from ..api.v1 import hit_limit
     if hit_limit(f"mbxcheck:{me()}", 20, 600):
         return err(tr("Too many tests, please wait a few minutes"), 429)
     chk = mbx_check(c, r)
@@ -551,7 +549,6 @@ def mbx_import(c, box, raw):
 def _bg(fn):
     """fn(c) with a connection of its own inside the background gate (never nested: the IMAP session runs outside it)."""
     from ..accounts.session import GATE
-    from ..core.db import connect
     with GATE.bg():
         c = connect()
         try:
@@ -861,7 +858,6 @@ def mbx_send():
     if not via:
         return jsonify(error=tr("Sending is not set up: an admin of the workspace enters the mailbox's SMTP access (E-mail filing > Mailbox)."),
                        code="no_smtp"), 409
-    from ..api.v1 import hit_limit
     if hit_limit(f"hubsend:{uid}", MBX_SEND_HOUR, 3600):
         return err(tr("Too many e-mails, please wait a few minutes"), 429)
     if via == "server":  # the server's own SMTP: its daily e-mail limit per person and recipient (a workspace's SMTP is its own)

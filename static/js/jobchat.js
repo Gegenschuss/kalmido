@@ -55,12 +55,14 @@ function jc_bodyHtml(html, jb) {
   const re = new RegExp('^((?:<[a-z0-9]+(?:\\s[^>]*)?>)*)' + esc(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=[:\\s(])');
   return html.replace(re, (_, pre) => `${pre}<button type="button" class="jc-name" data-act="jc-open" data-jid="${jb.no}" data-aid="${+S.chat.aid}">${esc(n)}</button>`);
 }
+// lazy-ok-begin: 2.149.0 F (#2519): the job bar and the job rows are drawn inside the agent chat (agentchat.js loaded)
 function jc_barHtml() {
   if (!S.chat.job) return '';
   const j = jc_cur(), end = jc_ended(), rest = jc_rest(j);
   const pj = +j.parent_id || 0, jb = {no: +j.id, name: j.name || '', parent: pj, pname: pj ? S.jc.jobs[pj]?.name || '' : ''};  // 2.59.0 (#1827)
   return `<div class="jcbar${jn9_part(jb) ? ' jpart' : ''}" id="jc-bar" style="--jcol:${jn9_jobColor(jb)}"><button type="button" class="iconbtn jcback" data-act="jc-back" title="${esc(tr('Back to the whole chat'))}" aria-label="${esc(tr('Back to the whole chat'))}">${ic('back', 's')}</button><i class="jcdot" aria-hidden="true"></i><div class="jcn"><b>${esc(jc_label(j))}</b>${rest ? `<span>${esc(rest)}</span>` : ''}</div>${end ? `<span class="jcend">${esc(tr('Job has ended'))}</span>` : ''}</div>`;
 }
+// lazy-ok-end
 const jc_ph = a => S.chat.job ? (jc_ended() ? tr('Job has ended') : tr('Message to {0}…', jc_label(jc_cur()))) : tr('Message to {0}…', a.name);
 // what the box sends: in a job's history "Job 220: <text>" (unless it already starts with that or the job's name) --
 // review: always the number, a title like "Release: 2.56" would otherwise address a job "Release" nobody knows
@@ -203,7 +205,7 @@ function jcd_jobNo(m, byId) {
 // open approvals / permission questions that wait for me. "Jobs": the job rows and my messages addressed to a job.
 function jcd_pass(m, f, no) {
   if (f === 'all') return true;
-  if (f === 'me') return !no || (apvHeld(m) && chatChoiceSt(m) === 'open');
+  if (f === 'me') return !no || (apvHeld(m) && chatChoiceSt(m) === 'open');  // lazy-ok: 2.149.0 F (#2519): the agent chat's filter
   return !!no || (m.from !== 'agent' && m.kind !== 'notice' && !!jcd_addr(m.body));
 }
 const jcd_filter = () => S.chat.job || !S.jcd.n ? 'all' : LS.get('jcdFilt', 'all');
@@ -238,6 +240,7 @@ function jcd_line(body) {
   const l = String(body || '').split('\n').map(x => x.replace(/^[\s#>*_`-]+/, '').replace(/[*_`]+/g, '').trim()).find(Boolean) || '';
   return l.length > 160 ? l.slice(0, 159) + '…' : l;
 }
+// lazy-ok-begin: 2.149.0 F (#2519): a job's card in the agent chat (agentchat.js loaded)
 function jcd_cardHtml(no, list, row) {
   const j = S.jc.jobs[no] || {}; if (!S.jc.jobs[no]) jc_need(no);
   const src = list.map(ux_jobOf).find(x => x && x.no === no) || {};
@@ -255,6 +258,7 @@ function jcd_cardHtml(no, list, row) {
     : `<div class="jcdh">${hd}</div>`;
   return `<div class="jcd${open ? ' open' : ''}${jn9_part(jb) ? ' jpart' : ''}${st === 'failed' || st === 'stopped' ? ' jcderr' : ''}" data-k="jcd${no}" data-jcd="${no}" style="--jcol:${jn9_jobColor(jb)}">${head}${hid.length ? `<div class="jcdhist" id="jcdh-${no}"${open ? '' : ' hidden'}>${hid.map(row).join('')}</div>` : ''}${vis.map(m => jcd_resHtml(m, row)).join('')}</div>`;
 }
+// lazy-ok-end
 // the end result / an error under the card: 5 lines, "Show more" for longer ones
 function jcd_resHtml(m, row) {
   const long = jcf_long(m), more = S.jcd.more.has(m.id);

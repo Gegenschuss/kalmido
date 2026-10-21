@@ -13,11 +13,12 @@ from flask import g, jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import body, bump, db, err, iso, now_utc
+from ..core.db import body, bump, db, err, iso, now_utc, iso_ms
 from ..accounts.session import me
 from ..core.access import Denied, my_inbox
 from ..accounts.orgs import _need_org_admin, user_orgs
 from ..accounts.pictures import list_icon_url
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 OL_LOG_MAX = 50
 
@@ -65,7 +66,6 @@ F8F_NEWS_JOIN_S = 120
 def f8f_news_join(c, uid, lid, action, data):
     """True when an unread rename / restyle of lid by me (newer than F8F_NEWS_JOIN_S) took this change in."""
     from datetime import timedelta
-    from ..core.db import iso_ms
     r = c.execute("SELECT id, data FROM notifications WHERE user_id=? AND kind='orglist' AND list_id=? AND actor_id=? AND read_at IS NULL "
                   "AND created_at>=? ORDER BY id DESC LIMIT 1", (uid, lid, me(), iso_ms(now_utc() - timedelta(seconds=F8F_NEWS_JOIN_S)))).fetchone()
     try:
@@ -257,7 +257,6 @@ def ole_patch(oid, lid):
     """{name?, color?}: an organisation admin renames / recolours a list of the organisation (the emoji is part of the name).
     Any other field: 403 (the owner's and the list admins' way stays PATCH /api/lists/{id})."""
     from ..lists.lists import clean_list_value
-    from ..personal.timetrack import BadInput
     c, b = db(), body()
     _need_org_admin(c, oid)
     lr = _ol_list(c, oid, lid)

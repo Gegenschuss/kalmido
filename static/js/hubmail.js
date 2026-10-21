@@ -77,8 +77,6 @@ function hbm_projHtml(l) {
   if (!j || (!j.enabled && !j.can_send && !j.total && !(HBM.s[key].q || '').trim())) return '';  // shown once loaded (2.141.0 A: or sending works)
   return `<section class="povs hbmsec hbmpov" id="pov-mails"><div class="povh"><h3>${tr('E-mails')}</h3></div>${hbm_bodyHtml(key)}</section>`;
 }
-// the entry in Office > Clients
-const hbm_hubBtn = () => `<a class="btn sm" href="#mailhub" title="${esc(tr('E-mail filing'))}">${ic('inbox', 's')}<span class="cdl">${tr('E-mail filing')}</span></a>`;
 function hbm_hubView() {
   const key = 'inbox:0', j = hbm_state(key).j;
   const sp = (j?.spaces || []).map(x => `<li class="hbmsp"><span class="hbmspn"><b>${esc(x.name)}</b><small class="muted">${x.address ? esc(x.address) : tr('No address yet')}</small></span>
@@ -188,26 +186,6 @@ async function hbm_make(m, key, kind) {
     toast(ev ? tr('Event created') : tr('Task created'), () => hbm_go(ev ? 'event' : 'task', ev ? j.event_id : j.task_id), 6000, tr('Open'));
   });
 }
-// the mail a task / an event was made from: "E-mail: <subject>" (a tap opens it); only "E-mail" for who may not read the
-// mail (the server sends neither subject nor id then). Filled after the answer (cached a minute), the detail is not redrawn
-const HBML = {};  // 'task:<id>' | 'event:<id>' -> {at, links}
-function hbm_linkHtml(kind, id) {
-  if (!(id > 0)) return '';
-  const k = `${kind}:${id}`, c = HBML[k];
-  if (!c || Date.now() - c.at > 60000) hbm_linkLoad(k);
-  return `<div class="hbmlnk" data-hbmlnk="${k}">${c ? hbm_linkInner(c.links) : ''}</div>`;
-}
-const hbm_linkInner = links => (links || []).map(x => x.mail_id
-  ? `<button type="button" class="linkbtn" data-hbmopen="${x.mail_id}" data-hbmk="link">${ic('mail', 's')}<span>${esc(tr('E-mail: {0}', x.subject || tr('(no subject)')))}</span></button>`
-  : `<span class="muted">${ic('mail', 's')} ${tr('E-mail')}</span>`).join('');
-async function hbm_linkLoad(k) {
-  const [kind, id] = k.split(':');
-  HBML[k] = {at: Date.now(), links: HBML[k]?.links || []};
-  let j; try { j = await rawFetch('GET', `/api/hubmail/links?${kind}_id=${id}`); } catch { return; }
-  HBML[k] = {at: Date.now(), links: j.links || []};
-  for (const el of document.querySelectorAll(`[data-hbmlnk="${k}"]`)) el.innerHTML = hbm_linkInner(j.links);
-}
-const hbm_taskLinkHtml = t => t && !t.context ? hbm_linkHtml('task', t.id) : '';
 
 // ---- assign, delete (one undo step each)
 const hbm_send = (id, t) => api('POST', `/api/hubmail/mails/${id}/assign`, {client_id: t.client_id || null, list_id: t.list_id || null});
@@ -276,8 +254,6 @@ document.addEventListener('input', e => {
   s.q = e.target.value; clearTimeout(s.t); s.t = setTimeout(() => hbm_load(k), 200);
 });
 document.addEventListener('click', e => {
-  const o = e.target.closest('[data-hbmopen]');
-  if (o) { e.preventDefault(); if (o.closest('#pop') && typeof closePop === 'function') closePop(); hbm_open(+o.dataset.hbmopen, o.dataset.hbmk); return; }
   const a = e.target.closest('[data-hbmasg]');
   if (a) { const m = (HBM.s[a.dataset.hbmk]?.j?.mails || []).find(x => x.id === +a.dataset.hbmasg); if (m) hbm_assign(m); return; }
   const d = e.target.closest('[data-hbmdel]');

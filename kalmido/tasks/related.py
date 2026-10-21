@@ -42,8 +42,11 @@ from ..core.config import app, SECRET_KEY
 from ..core.db import body, connect, db, err, gset, gsetting, iso_ms, now_utc
 from ..core.i18n import tr
 from ..core.pg import system_ctx
-from ..core.access import Denied, need_task, tvis, vis_sql
-from ..api.v1 import v1_args, v1_view
+from ..core.access import Denied, need_task, tvis, vis_sql, acx_lists_sql
+from ..api.common import v1_args, v1_view
+from ..core.env import env_bool
+from ..core.orgcrypt import oc_active, oc_dec, oc_enc, OrgCryptError, PREFIX  # 2.149.0 G (#2517): pulled up from functions
+from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
 
 # ---- the one place for the model-dependent values (part M's measurement; environment overrides for other models) ----------
 EMBED_URL = (os.environ.get("KALMIDO_EMBED_URL") or "").strip().rstrip("/")
@@ -160,12 +163,10 @@ def emb_unpack(s, dim):
 
 def emb_store_val(c, org_id, v):
     """The stored text of vector v: base64 of float16; sealed with the organisation's key when its data is encrypted."""
-    from ..core.orgcrypt import oc_enc
     return oc_enc(c, org_id, EMB_CTX, emb_pack(v)) if org_id else emb_pack(v)
 
 
 def emb_load_val(c, org_id, s, dim):
-    from ..core.orgcrypt import oc_dec
     return emb_unpack(oc_dec(c, org_id, EMB_CTX, s) if org_id else s, dim)
 
 
@@ -222,7 +223,7 @@ _STALE_SQL = """SELECT t.id, t.title, t.content, t.list_id, t.updated_at, l.org_
 
 def emb_kick():
     """Start the worker (once per process) and wake it."""
-    if not EMBED_URL or os.environ.get("TASKS_WATCHDOG", "1") != "1":
+    if not EMBED_URL or not env_bool("TASKS_WATCHDOG", True):
         return
     with _WLOCK:
         if _W["thread"] is None or not _W["thread"].is_alive():
@@ -317,7 +318,6 @@ def _emb_model(c):
 
 
 def _emb_batch(c):
-    from ..core.orgcrypt import oc_active, OrgCryptError, PREFIX
     model = _emb_model(c)
     enc = " OR (l.org_id IS NOT NULL AND v.vec NOT LIKE ?)" if oc_active(c) else ""  # pg-ok: kenc1: prefix is case-exact
     now = time.monotonic()
@@ -406,7 +406,6 @@ def _org_vectors(c, org_id, ids=()):
     """{task id: vector} of one organisation (None: the private lists), decoded once and kept while nothing changed.
     Only ever used after the caller's visibility filter decided which ids may be compared. 2.82.0 (#1880): the private
     lists of all people are no shared bucket in the cache: for org_id None only the given ids are read, nothing is kept."""
-    from ..core.orgcrypt import OrgCryptError
     if org_id is None:
         return fr2a_private_vectors(c, ids)
     cond = "org_id=?" if org_id is not None else "org_id IS NULL"
@@ -440,7 +439,6 @@ def _org_vectors(c, org_id, ids=()):
 
 def fr2a_private_vectors(c, ids):
     """2.82.0 (#1880): {task id: vector} of the given tasks of private lists (no cache: a person's own vectors only)."""
-    from ..core.orgcrypt import OrgCryptError
     ids, model, vecs = sorted({int(x) for x in ids}), _W["model"], {}
     with system_ctx(c):  # derived numbers of tasks the caller already filtered by visibility
         for i in range(0, len(ids), 1000):
@@ -476,7 +474,6 @@ def _visible(c, uid, exclude=()):
 def _visible_agent(c, aid, exclude=()):
     """{task id: org id} an agent sees outside a request of its own (events): its lists (the list scope without the
     request's token filter), never a health list, only its selected lists (agents.list_ids), only its workspace."""
-    from ..core.access import acx_lists_sql
     from ..agents.core import agent_row
     from ..agents.safety import ids_parse
     a = agent_row(c, aid)
@@ -679,7 +676,6 @@ def rt9_semantic(c, uid, q, have, limit=20):
 
 def rt9_search_extend(c, uid, q, rows, limit):
     """2.59.0 B (#1375): the search with semantic=1 -- the text hits, then the visible tasks of similar meaning (flag "similar")."""
-    from ..core.serializers import load_tasks
     ids = rt9_semantic(c, uid, q, {r["id"] for r in rows}, max(0, min(20, limit - len(rows))))
     if not ids:
         return rows

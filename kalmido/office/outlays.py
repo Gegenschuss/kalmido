@@ -11,12 +11,12 @@ import re
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_item_store
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dec, money
 from .books import bk_receipts, bk_ws
 from .ledger import ofx_items_brief, ofx_log
@@ -26,10 +26,7 @@ from .travel import MAX_ITEMS, _amount, _bill_doc, _fmt_day
 AU_ALL = ("0001-01-01", "9999-12-31")
 
 
-def _ctx():
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=True)
+from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def au_ids(v, name):
@@ -79,7 +76,6 @@ def au_bill_post():
     r = _bill_doc(c, oid, b.get("doc_id"))
     ids = au_ids(b.get("node_ids"), "node_ids")
     mk = _amount(b.get("markup_pct"), "markup_pct", 0, 1000, allow_none=True) or dec(0)
-    from ..core.pg import write_lock
     write_lock(c, f"office_receipts_bill_{int(oid)}")  # two parallel billings of one receipt: the second sees it billed (409)
     have = {x["node_id"]: x for x in bk_receipts(c, oid, *AU_ALL, uid=uid)}
     if not set(ids) <= set(have):

@@ -33,7 +33,8 @@ from ..core.db import db
 from ..core.i18n import dec_comma, lang, tr
 from ..accounts.session import me
 from ..office.legacyimport import _col_index, _local, _rels
-from ..personal.timetrack import BadInput, _csv_cell
+from ..personal.timetrack import _csv_cell
+from ..core.errors import BadInput
 from .shkinds import shk_export, shk_guess  # 2.124.0 B (#2110)
 from .core import (SH_COLS_MAX, SH_ROWS_MAX, ShBook, _write_cells, sh_brief, sh_create, sh_currency, sh_eval, sh_need, sh_options,
                    sh_reload, sh_to_display, sh_to_internal, sh_touch)

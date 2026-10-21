@@ -5,16 +5,18 @@ import re
 from datetime import timedelta
 from flask import g, jsonify, request
 
-from ..core.config import app, APP_NAME, PUBLIC_URL
+from ..core.config import app, APP_NAME, PUBLIC_URL, EMAIL_RE
 from ..core.i18n import tr
 from ..core.db import body, bump, connect, db, err, gset, gsetting, iso, now_utc, parse_iso, usettings
 from ..accounts.session import me
-from ..api.v1 import v1_args, v1_err, v1_json, v1_view
+from ..api.common import v1_args, v1_err, v1_json, v1_view
+from ..core.env import env_bool
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 # ---- the kind of server (#905). KALMIDO_HOSTED=1: an instance run as a service for others (no private networks behind it):
 # integrations may only reach public HTTPS addresses (the admin's internal-host allow-list does not apply).
 # Self-hosted servers (the default) keep everything as before.
-HOSTED = os.environ.get("KALMIDO_HOSTED", "0").strip().lower() in ("1", "true", "yes", "on")
+HOSTED = env_bool("KALMIDO_HOSTED", False)
 SELFHOST_DOCS = "https://github.com/Gegenschuss/kalmido#readme"
 
 
@@ -275,7 +277,7 @@ def v1_announce_put():
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("text", "level", "starts_at", "ends_at", "minutes", "push"))
     if unknown:
-        from ..personal.timetrack import UnknownFields
+        from ..core.errors import UnknownFields
         raise UnknownFields(unknown)
     e = announce_set(c, b, g.user["username"])
     if e:
@@ -337,7 +339,6 @@ def mail_budget(c, sender, rcpt):
 # ---- admin settings (PATCH /api/admin/settings) and what the admin sees (about_info)
 def hosting_settings(c, b):
     """storage_quota_mb (null/'' = the server default), storage_pool user | org, support_email, mail_day_limit. Error or None."""
-    from ..core.config import EMAIL_RE
     if "storage_quota_mb" in b:
         v = b["storage_quota_mb"]
         if v in (None, ""):
@@ -394,7 +395,6 @@ def user_storage(c, uid):
 def org_activity(c):
     """2.143.0 D (#2156): per organisation numbers only (members, last sign-in date, bytes, lists, tasks) + one row "private"
     for the people without an organisation. No names of people, no contents."""
-    from ..core.pg import system_ctx
     one = lambda q, a=(): c.execute(q, a).fetchone()[0]
     def row(uids, org_id):
         if not uids:

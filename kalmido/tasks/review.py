@@ -7,9 +7,10 @@ from ..core.config import app, PUBLIC_URL
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
-from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_list, need_task, task_visible
+from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_list, need_task, task_visible, need_collab
 from ..tasks.validation import log_act
 from ..tasks.tasks import one_task
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.60.0 C (#1512): review step
@@ -196,8 +197,6 @@ def rvw_approved_by_pr(c, tid, label, url, uid=None):
 
 def rvw_apply(c, tid, b):
     """One step of body b on task tid (see above); returns the task dict. Denied / BadInput on errors."""
-    from ..personal.timetrack import BadInput
-    from ..core.access import need_collab
     need_collab()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
@@ -305,7 +304,6 @@ def task_review(tid):
 
 def rvw_cfg_clean(c, lid, b):
     """The stored json of a review setting body {on, reviewer?, section?, gate?} (BadInput on bad values)."""
-    from ..personal.timetrack import BadInput
     if not isinstance(b, dict) or any(k not in ("on", "reviewer", "section", "gate") for k in b):
         raise BadInput(tr("Invalid data"))
     if not b.get("on"):
@@ -325,7 +323,6 @@ def rvw_cfg_clean(c, lid, b):
 def list_review_put(lid):
     """The review step of a list (editors): {on, reviewer?: user id, section?: section id (default: the one named Review),
     gate?: done only after approval}. Answers {review_cfg} (the stored json, '' = off)."""
-    from ..personal.timetrack import BadInput
     c = db()
     need_list(c, lid)
     try:
@@ -339,8 +336,8 @@ def list_review_put(lid):
 
 
 # ---- API v1 (+ MCP review_task / set_list_review)
-from ..api.v1 import v1_args, v1_call, v1_json, v1_view  # noqa: E402
-from ..personal.timetrack import reject_unknown  # noqa: E402
+from ..api.common import v1_args, v1_call, v1_json, v1_view  # noqa: E402
+from ..core.errors import reject_unknown  # noqa: E402
 
 
 @app.post("/api/v1/tasks/<int:tid>/review")

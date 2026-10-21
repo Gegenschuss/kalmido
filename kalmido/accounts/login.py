@@ -24,7 +24,7 @@ from werkzeug.security import check_password_hash
 
 from ..core.config import app, APP_NAME, COOKIE, MIN_PASSWORD, NTFY_TOPIC, PUBLIC_URL, USERNAME_RE
 from ..core.pg import insert_id
-from ..core.i18n import lang, languages, N_, tr
+from ..core.i18n import lang, languages, N_, tr, LANGS
 from ..core.db import adopt_orphans, body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, local_now, now_utc, uset, write_lock
 from ..accounts.session import (
     _accept_lang, _DUMMY_HASH, _peer_trusted, _rate_blocked, _rate_fail, _rate_keys, _rate_reset, _token_hash,
@@ -175,7 +175,6 @@ def auth_setup():
                       onboard=not c.execute("SELECT 1 FROM tasks LIMIT 1").fetchone())
     adopt_orphans(c, uid)
     ensure_inbox(c, uid)
-    from ..core.i18n import LANGS
     if b.get("lang") in LANGS:  # 2.24.0 (UX-22): the language of the setup page (a reload in step 2 keeps it, the sample too)
         uset(c, uid, "lang", b["lang"])
         gset(c, "default_lang", b["lang"])

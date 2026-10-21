@@ -33,7 +33,8 @@ from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
 from ..accounts.session import me, rate_ip
 from ..accounts.login import auth_key
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 VDR_URL_MAX, VDR_TITLE_MAX, VDR_BODY_MAX, VDR_NAME_MAX = 2000, 200, 2000, 120
 VDR_AT_MAX = 86400.0                     # a timecode lies within 24 hours
@@ -719,7 +720,6 @@ def vdr_sig_html(c, s, lg, token, prefix):
 def vdr_pub_comment(token):
     """A customer's comment through the approval link (name >= 2 characters, a text, an optional timecode) while it is open."""
     from ..office.signoff import SIG_PREFIX, sig_lang, sig_open
-    from ..api.v1 import hit_limit
     from ..lists.public import pub_gone, pub_headers, pub_html, pub_limited
     c = db()
     s, bad = sig_open(c, token)

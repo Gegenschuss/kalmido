@@ -19,6 +19,8 @@ import re
 
 from ..core.i18n import N_
 from .orgimport import OiT
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..core.config import ATT_DIR  # 2.149.0 G (#2517): pulled up from functions
 
 _LOCKED = "e2e1:"
 _FILE_CELL = re.compile(r"file:(\d{1,15})")
@@ -169,7 +171,6 @@ def _wiki_locked(c, ctx):
 
 def _video_version(c, run, src, d, ctx):
     """2.137.0 review M1: the link is checked like a pasted one (videos/review.py vdr_parse); provider and embed id come from it."""
-    from ..personal.timetrack import BadInput
     from ..videos.review import vdr_parse
     from .acctimport import tr, umz_cols
     try:
@@ -362,7 +363,6 @@ def _finish_store(c, run, oi):
 
 
 def _finish_docs(c, run):
-    from ..core.config import ATT_DIR
     from ..docs import store as S
     from ..files.store import fs_read
     from ..tasks.attachtext import file_kind

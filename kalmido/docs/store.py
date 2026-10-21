@@ -18,13 +18,16 @@ import hmac
 import json
 import re
 
-from ..core.config import SECRET_KEY
+from ..core.config import SECRET_KEY, ATT_DIR
 from ..core.db import insert_id, iso, now_utc
 from ..core.i18n import N_
 from ..core.orgcrypt import OrgCryptError, PREFIX, oc_active, oc_dec_k, oc_enc_k, oc_key
 from . import classify as CL
 from . import extract as EX
 from . import rules as RU
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import acx_of, Denied  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_file_org, oc_open_k, oc_read_file, oc_seal_k, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 
 STATES = ("wait", "run", "done", "failed")
 LABEL_KINDS = {"sender": "doc_senders", "type": "doc_types", "tag": "doc_tags"}
@@ -46,8 +49,7 @@ ERRORS = {
 }
 
 
-def _now():
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 # ---- workspaces and keys --------------------------------------------------------------------------------------------
@@ -88,7 +90,6 @@ def ws_user(ws):
 
 def docs_ukey_on(c):
     """The instance setting docs_account_key (default on; docs-to-server-key sets "0")."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # orgcrypt: an instance setting, no content
         r = c.execute("SELECT value FROM settings WHERE key='docs_account_key'").fetchone()
     return (r[0] if r else "1") != "0"
@@ -296,7 +297,6 @@ def label_id(c, ws, kind, name, create=True):
     if not create:
         return None
     val = doc_seal(c, ws, "doc_senders.name", name) if kind == "sender" else name
-    from ..core.db import insert_id
     from flask import g, has_request_context
     if has_request_context():
         g.setdefault("doc_labels", {}).pop((ws, kind), None)
@@ -463,7 +463,6 @@ def root_folder(c, uid, org_id):
     An organisation's folder belongs to one of its admins, whoever adds the first document: members file their documents
     into it as their own (fs_add_hooks, root_add_ok) and see only those and what is shared with them; admins see all."""
     from ..files.store import fs_folder, _free_name
-    from ..core.access import Denied, acx_of
     ws = doc_ws(org_id, uid)
     rid = root_id(c, ws)
     if rid:
@@ -500,7 +499,6 @@ def doc_root_marked(c, ws, rid):
 
 def root_add_ok(c, uid, chain):
     """fs_add_hooks: a person who is a member of the organisation may add their own file directly into its documents folder."""
-    from ..core.access import acx_of
     top = chain[0]
     if len(chain) != 1 or top["kind"] != "folder" or not top["org_id"]:
         return False
@@ -720,8 +718,6 @@ def thumb_store(c, m, node, data, kind):
     """Make the preview image of a document (sealed like its file) and note its path in doc_meta.thumb."""
     import os
     import uuid
-    from ..core.config import ATT_DIR
-    from ..core.orgcrypt import oc_write_file
     from .ocr import thumb_bytes
     if kind not in ("pdf", "image"):
         return
@@ -748,7 +744,6 @@ def _thumb_ctx(ws):
 
 def thumb_seal(c, ws, data):
     """The preview of a private document sealed with the space's derived key (unchanged: encryption off, no server key)."""
-    from ..core.orgcrypt import oc_seal_k
     if ws_org(ws) or not oc_active(c):
         return data
     key = _ws_key(c, ws)
@@ -757,7 +752,6 @@ def thumb_seal(c, ws, data):
 
 def thumb_read(c, ws, path):
     """The plain preview image: a private one with the space's key (header org 0), else like any stored file."""
-    from ..core.orgcrypt import oc_file_org, oc_open_k, oc_read_file
     with open(path, "rb") as f:
         data = f.read()
     if oc_file_org(data) == 0 and not ws_org(ws):
@@ -773,7 +767,6 @@ def thumb_read(c, ws, path):
 
 def thumb_drop(rel):
     import os
-    from ..core.config import ATT_DIR
     if rel and rel.startswith(THUMB_DIR + os.sep) and ".." not in rel:
         try:
             os.remove(os.path.join(ATT_DIR, rel))
@@ -801,7 +794,6 @@ def process(c, nid):
     """The recognition run of one document: text (text layer / OCR), preview, date / due date / amount, sorting, index.
     Returns the new state. Runs in the background queue (docs/ingest.py) -- never inside a request."""
     from ..files.store import fs_read
-    from ..core.access import Denied
     from .ocr import doc_text
     m = meta_row(c, nid)
     node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()

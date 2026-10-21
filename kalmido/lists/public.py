@@ -12,19 +12,21 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..core.config import app, APP_NAME, PUB_PREFIX, PUBLIC_URL, TZ
 from ..core.i18n import lang, LANGS, N_, short_day, tr, trn
-from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso
+from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, iso_ms
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
-from ..core.access import acx_anon_bind, Denied, need_list
+from ..core.access import acx_anon_bind, Denied, need_list, task_visible
 from ..core.pg import insert_id, system_ctx
 from ..tasks.validation import log_act, valid_date
 from ..tasks.lifecycle import complete_stale, do_complete, trash_task
 from ..collab.comments import task_event
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..tasks.dependencies import completed_ids, unblock_events
 from ..notify.alerts import _env_int, aa_count, aa_now
-from ..api.v1 import hit_budget, hit_limit, PUB_ENV
+from ..api.v1 import PUB_ENV
+from ..api.common import hit_budget, hit_limit
 from .custview import CV_FB_HOUR, CV_FB_NAME, CV_FB_RATE, CV_FB_TEXT, CV_FILE_RATE, cv_brand, cv_clean, cv_extras, cv_file, cv_options, cv_progress, cv_show, cv_size, cv_tag_sql
+from ..core.orgcrypt import oc_send_file  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- package B: public links + checklist mode
@@ -296,8 +298,6 @@ def cv_fb_clean(v, mx):
 
 @app.post("/s/<token>/feedback")
 def cv_fb_post(token):
-    from ..core.db import iso_ms
-    from ..core.access import task_visible
     from ..collab.comments import collab_user, lang_of
     from ..collab.news import KIND_ROW, news_add, notif_ok
     from ..notify.push import push_prio, push_reachable
@@ -478,7 +478,6 @@ def cv_gate(c, token):
 
 @app.get("/s/<token>/file/<int:aid>")
 def cv_file_get(token, aid):
-    from ..core.orgcrypt import oc_send_file
     c = db()
     link, bad = cv_gate(c, token)
     if bad:
@@ -499,7 +498,6 @@ def cv_file_get(token, aid):
 
 @app.get("/s/<token>/logo")
 def cv_logo_get(token):
-    from ..core.orgcrypt import oc_send_file
     c = db()
     link, bad = cv_gate(c, token)
     if bad:

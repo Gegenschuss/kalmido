@@ -11,6 +11,7 @@ from ..accounts.session import me
 from ..core.access import Denied, need_list
 from ..lists.lists import clean_folder, FOLDER_DEPTH, FOLDER_SEP, folder_under
 from ..lists.groups import grp_list_ids, grp_sync
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 @app.post("/api/filters")
@@ -181,7 +182,6 @@ def _sec_tasks(c, sid):
 
 
 def _sec_sort(v):
-    from ..personal.timetrack import BadInput
     try:
         v = float(v)
     except (TypeError, ValueError):

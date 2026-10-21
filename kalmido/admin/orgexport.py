@@ -51,6 +51,7 @@ from ..core.pg import system_ctx
 from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..accounts.session import me
+from ..core.orgcrypt import _org_admin, oc_dec, oc_dec_row, oc_enabled, oc_read_file, oc_status  # 2.149.0 G (#2517): pulled up from functions
 
 EXPORT_DIR = os.environ.get("TASKS_EXPORT_DIR", os.path.join(os.path.dirname(DB), "exports"))
 OX_KEEP_H = 24  # a finished archive waits this long, then the watchdog removes it
@@ -134,7 +135,6 @@ def _jdef(v):
 
 def _ox_dec_row(c, oid, table, row):
     """The row with every field the server encrypted with the organisation key in plain text (core/orgcrypt.py)."""
-    from ..core.orgcrypt import oc_dec, oc_dec_row
     if table.startswith("doc_") and row.get("ws"):  # 2.48.0 (#1111): documents seal with the workspace in the context (docs/store.py)
         from ..docs.store import doc_open
         for k, v in list(row.items()):
@@ -380,7 +380,6 @@ def _put_bytes(zf, man, name, data):
 
 
 def _read(c, full):
-    from ..core.orgcrypt import oc_read_file
     return oc_read_file(c, full)
 
 
@@ -672,7 +671,6 @@ def _need(c, oid, own=False):
     from ..accounts.orgs import _need_org_admin
     if not own:  # 2.137.0 A (#2344): own = the person's own personal office, reached as organisation 0 (_ox_area)
         _need_org_admin(c, oid)
-    from ..core.orgcrypt import oc_enabled
     return oc_enabled()
 
 
@@ -684,7 +682,6 @@ def _ox_area(c, oid):
     from flask import g
     if getattr(g, "auth_via", None) == "token":
         raise Denied(403)
-    from ..core.orgcrypt import _org_admin
     return _org_admin(c, 0), True
 
 
@@ -704,7 +701,6 @@ def ox_start(oid):
     oid, own = _ox_area(c, oid)
     if not _need(c, oid, own):
         return err(tr(OX_NO_KEY), 409)
-    from ..core.orgcrypt import oc_status
     if oc_status(c, oid).get("rotating"):  # 2.138.0 C (#1972, review F2): the archive's recovery header needs the finished key
         return err(tr("The organisation’s key is being renewed on the server. Try again when that is finished."), 409)
     with _OX_LOCK:

@@ -13,12 +13,11 @@ import tempfile
 import threading
 import time
 import zipfile
-from datetime import datetime
 
 from flask import g, jsonify, send_file
 
 from ..core.config import app
-from ..core.db import body, bump, db, err
+from ..core.db import body, bump, db, err, local_now
 from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
@@ -231,7 +230,7 @@ def docs_zip_get(tok):
     finally:
         DSR_BUSY.release()
     resp = send_file(fh, mimetype="application/zip", as_attachment=True, max_age=0,
-                     download_name=f"{tr('Documents')}-{datetime.now().strftime('%Y-%m-%d')}.zip")
+                     download_name=f"{tr('Documents')}-{local_now().strftime('%Y-%m-%d')}.zip")
     resp.headers["Cache-Control"] = "private, no-cache"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp

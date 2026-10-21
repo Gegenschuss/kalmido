@@ -8,13 +8,14 @@ from zoneinfo import ZoneInfo, available_timezones
 from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL, TZ
-from ..core.db import body, bump, db, iso, now_utc, parse_iso, usettings
+from ..core.db import body, bump, db, iso, now_utc, parse_iso, usettings, inbox_default
 from ..core.i18n import tr
 from ..core.access import Denied, need_time
 from ..core.pg import insert_id
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.schema import USER_DEFAULTS
 from ..accounts.session import me
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.125.0 B (#2120): the person's time zone
@@ -49,7 +50,6 @@ def tz_zone(name):
 
 def tz_clean(sv):
     """The setting tz from the client -> the stored string; BadInput if it is no known IANA name."""
-    from .timetrack import BadInput
     sv = (sv or "").strip()
     if sv and (len(sv) > TZ_NAME_MAX or sv not in tz_names()):
         raise BadInput(tr("Invalid value: {0}", "tz"))
@@ -103,7 +103,6 @@ def tz_rows(c, uid, rep):
     """2.125.0 R (#2120, #2122): THE rows of the time exports (CSV and XLSX) of a time report rep: times in my time zone, an
     entry over midnight = one row per day (its share; the amount split like the rounded time). -> dicts list, title, user,
     start, end (aware, None = running), seconds, rounded, amount, note (plain values, the caller formats them)."""
-    from ..core.db import inbox_default
     zone = tz_of(c, uid)
     names = {l["id"]: l["name"] for l in rep["lists"]}
     for e in rep["entries"]:
@@ -269,7 +268,7 @@ def tsl_clean_month(v, zone):
     if not v:
         return now_utc().astimezone(zone).strftime("%Y-%m")
     if not TSL_MONTH_RE.fullmatch(v):
-        from .timetrack import BadInput
+        from ..core.errors import BadInput
         raise BadInput(tr("Invalid value: {0}", "month"))
     return v
 

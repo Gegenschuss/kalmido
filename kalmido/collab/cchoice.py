@@ -20,8 +20,8 @@ from ..core.pg import insert_id
 from ..core.db import body, bump, db, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, need_feat, need_task, task_visible
-from ..personal.timetrack import BadInput, reject_unknown
-from ..api.v1 import v1_args, v1_json, v1_view
+from ..core.errors import BadInput, reject_unknown
+from ..api.common import v1_args, v1_json, v1_view
 
 CHOICE_KEYS = ("choices", "multi", "approval", "expires_in")
 

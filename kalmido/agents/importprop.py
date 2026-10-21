@@ -32,8 +32,8 @@ from ..core.i18n import tr
 from ..core.db import bump, db, iso, now_utc, parse_iso
 from ..core.access import Denied
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
-from ..api.v1 import v1_args, v1_err, v1_json, v1_view
+from ..core.errors import BadInput
+from ..api.common import v1_args, v1_err, v1_json, v1_view
 
 AIM_KIND = "import"
 AIM_AREAS = ("fixed_costs",)  # later: further areas of the office (the format keeps the field)

@@ -24,6 +24,8 @@ from ..core.db import connect, iso, now_utc, parse_iso
 from ..core.i18n import N_, tr
 from ..core.pg import system_ctx
 from .adapters import NWL_KINDS, NwlError, nwl_adapter
+from ..core.config import SECRET_KEY  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_dec_k, oc_enc_k, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
 
 NWL_STATUS = ("", "yes", "pending", "unsub", "bounce")
 NWL_BLOCKED = ("unsub", "bounce")
@@ -58,8 +60,7 @@ def nwl_err_text(stored):
     return cal_err_text(stored)
 
 
-def _now():
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def nwl_email_ok(e):
@@ -71,7 +72,6 @@ _KEYS = {}
 
 
 def _key(ws):
-    from ..core.config import SECRET_KEY
     if not SECRET_KEY:
         return None
     k = _KEYS.get(ws)
@@ -92,14 +92,12 @@ def _ws_org(ws):
 
 
 def nwl_seal(ws, secret):
-    from ..core.orgcrypt import oc_enc_k
     key = _key(ws)
     return oc_enc_k(key, _ws_org(ws) or 0, f"nl_conns.secret.v1|{ws}", json.dumps(secret)) if key and secret else ""
 
 
 def nwl_secret(r):
     """The plain access data {user?, token} of a connection row ({} when they cannot be opened)."""
-    from ..core.orgcrypt import OrgCryptError, oc_dec_k
     key = _key(r["ws"])
     if not key or not r["secret"]:
         return {}

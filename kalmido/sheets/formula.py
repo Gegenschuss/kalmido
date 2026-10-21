@@ -17,6 +17,7 @@ import math
 import re
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
+from ..core.db import local_now  # 2.149.0 G (#2517): pulled up from functions
 
 SH_RAW_MAX = 10_000
 SH_ERR_KINDS = ("deleted", "denied", "cycle", "syntax", "div0", "ref", "type", "na")  # 2.124.0 A (#2109): + na = not found
@@ -749,7 +750,6 @@ def sh_fn_key(name):
 
 
 def sh_today():
-    from ..core.db import local_now
     return local_now().date()
 
 

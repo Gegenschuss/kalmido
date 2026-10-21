@@ -22,6 +22,9 @@ import time
 
 import requests
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kt import until  # noqa: E402  (2.149.0, #2513)
+
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -69,7 +72,10 @@ def members(s, lid):
     return {m["user_id"]: m["role"] for m in lists_of(s)[lid].get("members", [])}
 
 
-subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL)
+# 2.149.0 (#2513): the burst windows shortened (the server reads them from the environment) instead of waiting a minute
+BURST_S, QUIET_S = 10, 2
+subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL,
+               env=dict(os.environ, EXTRA=(os.environ.get("EXTRA", "") + f" -e KALMIDO_AGENT_BURST_S={BURST_S} -e KALMIDO_AGENT_BURST_QUIET_S={QUIET_S}").strip()))
 s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
@@ -149,8 +155,9 @@ cur = j2["cursor"] if j2["data"] else j["cursor"]
 # a bulk: 9 tasks into one list within a minute -> at most 5 single task_added, then one tasks_added
 for i in range(9):
     Bo.post(B + "/api/tasks", json={"title": f"bulk {i}", "list_id": W["id"]})
-time.sleep(18)  # AGENT_BURST_QUIET_S = 15 + the watchdog tick
-evs = requests.get(V + f"/agent/events?since={cur}&limit=200", headers=CLH).json()["data"]
+evs = until(lambda: (lambda d: d if any(e["event"] == "tasks_added" for e in d) else None)(
+    requests.get(V + f"/agent/events?since={cur}&limit=200", headers=CLH).json()["data"]), 30)  # 2.149.0 (#2513): QUIET_S + the tick
+evs = evs or requests.get(V + f"/agent/events?since={cur}&limit=200", headers=CLH).json()["data"]
 single = [e for e in evs if e["event"] == "task_added"]
 bulk = [e for e in evs if e["event"] == "tasks_added"]
 check(len(single) <= 5, f"#1031: at most five single task_added in a burst ({len(single)})")
@@ -164,14 +171,15 @@ time.sleep(1)
 cur = requests.get(V + "/agent/events?since=latest", headers=CLH).json()["cursor"]
 r = Bo.post(B + "/api/tasks/batch", json={"ids": tids, "action": "patch", "data": {"list_id": W["id"]}})
 check(r.ok, "#1031: batch move " + r.text[:80])
-time.sleep(18)
-evs = requests.get(V + f"/agent/events?since={cur}&limit=200", headers=CLH).json()["data"]
+evs = until(lambda: (lambda d: d if any(e["event"] == "tasks_added" for e in d) else None)(
+    requests.get(V + f"/agent/events?since={cur}&limit=200", headers=CLH).json()["data"]), 30)  # 2.149.0 (#2513)
+evs = evs or requests.get(V + f"/agent/events?since={cur}&limit=200", headers=CLH).json()["data"]
 check(len([e for e in evs if e["event"] == "task_added"]) <= 5 and any(e["event"] == "tasks_added" and e["data"]["how"] == "moved" for e in evs),
       "#1031: a bulk move: a few single events, then one tasks_added (moved) " + str([e["event"] for e in evs]))
 # tidy: bulk-created tasks get no tidy event each
 A.patch(B + f"/api/lists/{W['id']}", json={"agent_tidy": "suggest"})
 cur = requests.get(V + "/agent/events?since=latest", headers=CLH).json()["cursor"]
-time.sleep(61)  # a new burst window
+time.sleep(BURST_S + 1)  # a new burst window (2.149.0, #2513: 10 s instead of a minute)
 for i in range(9):
     Bo.post(B + "/api/tasks", json={"title": f"tidy bulk {i}", "list_id": W["id"]})
 time.sleep(3)
@@ -181,7 +189,7 @@ check(len([e for e in evs if e["event"] == "tidy"]) == 9, "#1031: typing in the 
 r = Bo.post(B + "/api/me/tokens", json={"name": "script", "scopes": ["read", "write"]})
 if r.ok and r.json().get("token"):
     BT = {"Authorization": "Bearer " + r.json()["token"]}
-    time.sleep(61)
+    time.sleep(BURST_S + 1)  # 2.149.0 (#2513)
     cur = requests.get(V + "/agent/events?since=latest", headers=CLH).json()["cursor"]
     for i in range(9):
         requests.post(V + "/tasks", headers=BT, json={"title": f"api bulk {i}", "list_id": W["id"]})

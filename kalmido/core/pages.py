@@ -1,8 +1,10 @@
 """HTML pages, security headers, /api/version, the share target, quick capture, /drop and the ntfy share inbox."""
+import hashlib
 import json
 import mimetypes
 import os
 import re
+import threading
 import uuid
 import time
 import urllib.error
@@ -15,7 +17,11 @@ from .pg import insert_id
 from ..core.i18n import lang, N_, tr, trn
 from ..core.db import bump, connect, db, default_uid, err, gset, gsetting, iso, now_utc, usettings
 from ..accounts.session import client_ip, GATE, me
-from ..core.access import Denied, my_inbox, time_all
+from ..core.access import Denied, my_inbox, time_all, acx_token_bind, collab_all
+from ..core.orgcrypt import oc_task_org  # 2.149.0 G (#2517): pulled up from functions
+from ..core.tokenhash import tkh_hash, tkh_match  # 2.149.0 G (#2517): pulled up from functions
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..core.db import GLOBAL_DEFAULTS, lv_versions_fmt, lv_versions_q  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- pages
@@ -47,7 +53,51 @@ def headers(resp):
         resp.headers["X-Robots-Tag"] = "noindex, nofollow"
     if request.path.startswith("/api/") and not request.path.startswith(("/api/attachments/", "/api/chat-files/", "/api/avatar/", "/api/group-avatar/", "/api/list-icon/", "/api/list-files/", "/api/list-header/")):
         resp.headers["Cache-Control"] = "no-store"
+    # 2.149.0 B (#2505): a static file asked for with ?v=<its content hash> never changes: the browser keeps it a year without
+    # asking again. Any other ?v= (the version of the code, an old hash after an update) and no ?v= stay as before.
+    v = request.args.get("v")
+    if v and resp.status_code in (200, 304) and request.path.startswith("/static/") and v == static_hash(request.path[8:]):
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return resp
+
+
+# ---------------------------------------------------------------- 2.149.0 B (#2505 #2506): content hashes of static files
+
+_SHASH, _SHASH_LOCK = {}, threading.Lock()
+_ASSET_RE = re.compile(r'(<(?:script|link)\b[^>]*?\b(?:src|href)="/static/)([\w./-]+\.(?:js|css))"')
+_SW_LISTS_RE = re.compile(r"const (?:SHELL|LAZY|LAZY_CSS) = \[(.*?)\];", re.S)
+
+
+def static_hash(rel):
+    """The first 12 hex digits of the SHA-256 of static/<rel> (None: no such file), kept until the file changes."""
+    root = os.path.realpath(app.static_folder)
+    path = os.path.realpath(os.path.join(root, rel))
+    if not path.startswith(root + os.sep):
+        return None
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    key = (st.st_mtime_ns, st.st_size)
+    hit = _SHASH.get(path)
+    if hit and hit[0] == key:
+        return hit[1]
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 16), b""):
+            h.update(chunk)
+    with _SHASH_LOCK:
+        _SHASH[path] = (key, h.hexdigest()[:12])
+    return _SHASH[path][1]
+
+
+def _versioned(html):
+    """index.html: every start script and stylesheet under /static/ gets ?v=<content hash> (the file list itself stays in
+    index.html; tools/check_layout.py compares it with sw.js)."""
+    def sub(m):
+        h = static_hash(m.group(2))
+        return m.group(0) if not h else f'{m.group(1)}{m.group(2)}?v={h}"'
+    return _ASSET_RE.sub(sub, html)
 
 
 _INDEX = {}
@@ -58,10 +108,11 @@ def index_page():
     when the server runs a newer version than the code in the browser."""
     path = os.path.join(app.static_folder, "index.html")
     mt = os.path.getmtime(path)
-    if _INDEX.get("mt") != mt:
+    if _INDEX.get("mt") != mt or time.monotonic() - _INDEX.get("at", 0) > 5:  # 2.149.0 B (#2505): the hashes follow changed files
         with open(path, encoding="utf-8") as f:
-            _INDEX.update(mt=mt, html=f.read().replace('<meta name="kalmido-version" content="">',
-                                                       f'<meta name="kalmido-version" content="{APP_VERSION}">', 1))
+            _INDEX.update(mt=mt, at=time.monotonic(),
+                          html=_versioned(f.read().replace('<meta name="kalmido-version" content="">',
+                                                           f'<meta name="kalmido-version" content="{APP_VERSION}">', 1)))
     r = Response(_INDEX["html"], mimetype="text/html")
     r.headers["Cache-Control"] = "no-cache"
     return r
@@ -162,7 +213,6 @@ def save_attachment_bytes(c, tid, name, mime, data, owner=None):
     from ..tasks.attachments import safe_name
     from ..notify.alerts import aa_count, aa_oserr
     from ..admin.hosting import quota_fits
-    from ..core.orgcrypt import oc_task_org
     from ..files.upsafe import up_check, up_after_store, UploadRefused
     name = safe_name(name)
     from ..collab.liste2efile import le2f_plain_skip
@@ -347,7 +397,6 @@ def drop_user(c, auth):
     """User whose personal drop token is in the Authorization header (2.138.0 C #1907: looked up by its hash)."""
     if not auth.startswith("Bearer ") or not auth[7:]:
         return None
-    from ..core.tokenhash import tkh_hash, tkh_match
     got = auth[7:]
     # 2.86.0 (N3): never a child account (its writes are limited to family.KID_WRITE; /api/me hides its token)
     r = c.execute("SELECT * FROM users WHERE drop_token_hash=? AND disabled=0 AND kid=0", (tkh_hash(got),)).fetchone()
@@ -370,7 +419,6 @@ def drop_post():
         print("drop: 403, auth header", "missing" if not auth else
               f"len {len(auth)} starts {auth[:7]!r} ends-with-space {auth != auth.rstrip()}", flush=True)
         return Response(tr("not allowed") + "\n", 403, mimetype="text/plain")
-    from ..core.access import acx_token_bind
     acx_token_bind(u["id"])  # 2.37.0 (#1150): reads and writes with the token owner's context (row-level security)
     lg = lang(c, u["id"])
     files = [f for key in request.files for f in request.files.getlist(key) if f and f.filename]
@@ -413,7 +461,6 @@ def drop_agent(c, uid, to):
 
 def drop_to_agent(c, u, lg, to, text, files):
     from ..collab.comments import user_names
-    from ..personal.timetrack import BadInput
     from ..agents.core import agent_active, agent_row, CHAT_MAX
     from ..agents.chat import chat_emit, CHAT_FILES_MAX, chat_post, chat_unlink_trimmed
     aid = drop_agent(c, u["id"], to)
@@ -472,6 +519,30 @@ def sw():
     return r
 
 
+_SWM = {}
+
+
+@app.get("/sw-manifest.json")
+def sw_manifest():
+    """2.149.0 B (#2506): what the service worker precaches (the lists SHELL / LAZY / LAZY_CSS in static/sw.js stay the one
+    source), each static file with its content hash. The worker keeps a file under "<url>?v=<hash>" and takes an unchanged
+    one over from its old cache on an update instead of loading it again. Computed here, so it can never be out of date."""
+    path = os.path.join(app.static_folder, "sw.js")
+    mt = os.path.getmtime(path)
+    if _SWM.get("mt") != mt or time.monotonic() - _SWM.get("at", 0) > 5:
+        with open(path, encoding="utf-8") as f:
+            urls = [u for blk in _SW_LISTS_RE.findall(f.read()) for u in re.findall(r"'(/static/[\w./-]+)'", blk)]
+        _SWM.update(mt=mt, at=time.monotonic(), urls=list(dict.fromkeys(urls)))
+    files = {}
+    for u in _SWM["urls"]:
+        h = static_hash(u[8:])
+        if h:
+            files[u] = h
+    r = jsonify(v=1, files=files)
+    r.headers["Cache-Control"] = "no-cache"
+    return r
+
+
 @app.get("/api/health")
 def health():
     db().execute("SELECT 1").fetchone()
@@ -480,14 +551,34 @@ def health():
 
 @app.get("/api/version")
 def version():
-    from ..collab.news import news_sig
-    from ..calendars.subscriptions import cal_sig
-    from ..collab.teamchat import tchat_sig
     from ..agents.chat import task_typing_for
-    from ..agents.steps import steps_sig
-    from ..core.db import lv_versions
     c = db()
-    return jsonify(v=int(gsetting(c, "version")), app=APP_VERSION, n=news_sig(c, me()), c=cal_sig(c, me()), t=tchat_sig(c, me()),  # app: 2.27.0 (#968), t: 2.17.0 (#419)
+    v, n, cs, t, sp, a = version_sigs(c, me())  # 2.149.0 C (#2507): one statement instead of ten (same values)
+    return jsonify(v=v, app=APP_VERSION, n=n, c=cs, t=t,  # app: 2.27.0 (#968), t: 2.17.0 (#419)
                    ty=task_typing_for(c, me()),  # ty: 2.22.0 (#693) who is writing a comment where
-                   sp=steps_sig(c, me()),  # sp: 2.32.0 (#1081) a new step of an agent for me (the open chat fetches)
-                   a=lv_versions(c))  # a: 2.41.0 (#1376) a change counter per area (tasks, comments, agentchat, team, office, ...)
+                   sp=sp,  # sp: 2.32.0 (#1081) a new step of an agent for me (the open chat fetches)
+                   a=a)  # a: 2.41.0 (#1376) a change counter per area (tasks, comments, agentchat, team, office, ...)
+
+
+def version_sigs(c, uid):
+    """2.149.0 C (#2507): the values of the 4-second poll -- the version, news_sig, cal_sig, tchat_sig, steps_sig and
+    lv_versions -- read in ONE statement (each module keeps its query + formatting: *_sig_q / *_sig_fmt, the single
+    functions use the same). Returns (v, n, c, t, sp, a)."""
+    from ..collab.news import news_sig_fmt, news_sig_q
+    from ..calendars.subscriptions import cal_sig_fmt, cal_sig_q
+    from ..collab.teamchat import TCHAT_SIG_COLS, tchat_sig_fmt, tchat_sig_q
+    from ..agents.steps import steps_sig_fmt, steps_sig_q
+    parts = [("SELECT (SELECT value FROM settings WHERE key='version')", (), 1), (*news_sig_q(uid), 2), (*cal_sig_q(uid), 3),
+             (*steps_sig_q(uid), 1), (*lv_versions_q(), 2)]
+    chat = collab_all()
+    if chat:
+        parts.append((*tchat_sig_q(uid), TCHAT_SIG_COLS))
+    sql = "SELECT * FROM " + " CROSS JOIN ".join(f"({q}) p{i}" for i, (q, _, _) in enumerate(parts))
+    row = c.execute(sql, tuple(x for _, a, _ in parts for x in a)).fetchone()
+    cols, i = [], 0
+    for _, _, k in parts:
+        cols.append(tuple(row[i:i + k]))
+        i += k
+    v = cols[0][0] if cols[0][0] is not None else GLOBAL_DEFAULTS.get("version", "")
+    return (int(v), news_sig_fmt(cols[1]), cal_sig_fmt(cols[2]), tchat_sig_fmt(cols[5]) if chat else "",
+            steps_sig_fmt(cols[3]), lv_versions_fmt(cols[4]))

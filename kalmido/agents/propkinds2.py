@@ -21,12 +21,13 @@ from flask import g, jsonify
 from ..core.config import app
 from ..core.db import bump, db, iso, now_utc
 from ..core.i18n import N_, tr
-from ..core.pg import insert_id
-from ..core.access import Denied, list_role, my_max_sort
+from ..core.pg import insert_id, write_lock
+from ..core.access import Denied, list_role, my_max_sort, list_other_agent
 from ..accounts.session import me
 from ..core.db import usettings, uset
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields
 from ..lists.lists import list_created, clean_color, clean_folder, FOLDER_MAX
+from ..api.common import v1_err  # 2.149.0 G (#2517): pulled up from functions
 
 PK2_KINDS = ("inquiry", "setup")
 PK2_TITLES = {"inquiry": N_("Project from an inquiry"), "setup": N_("Set up Kalmido")}
@@ -351,7 +352,6 @@ def _pk2_new_list(c, uid, name, color="", folder="", kind="list", org="auto"):
 
 def _pk2_share(c, aid, lid, rec):
     """The box "Share the new list with <agent>" (the same checks as kind project)."""
-    from ..core.access import list_other_agent
     from ..accounts.orgs import ws_member_problem
     from ..agents.core import agent_active, agent_row
     from ..agents.safety import bridge_blocks
@@ -595,8 +595,13 @@ def pk2_undo(c, j, rec):
             ev_stayed = True
     if rec.get("offer"):  # the quotation draft goes while it is a draft without a number nobody changed since applying
         oid = rec.get("offer_area")
-        r = c.execute("SELECT status, number, updated_at, project_title FROM office_docs WHERE id=? AND org_id=?", (rec["offer"], oid)).fetchone()
+        from ..office.docs import bga_offer_block
+        from ..office.model import office_role
+        write_lock(c, f"office_mail_{int(oid or 0)}")  # 2.149.0 A (#2521): the same locks and checks as deleting it in the office (docs.odoc_delete)
+        write_lock(c, f"office_doc_{int(rec['offer'])}")
+        r = c.execute("SELECT id, kind, status, number, sent_at, updated_at, project_title FROM office_docs WHERE id=? AND org_id=?", (rec["offer"], oid)).fetchone()
         if r and r["status"] == "draft" and not r["number"] and rec.get("offer_at") and r["updated_at"] == rec["offer_at"] \
+                and office_role(c, uid, oid) == "admin" and bga_offer_block(c, oid, r) is None \
                 and not c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? LIMIT 1", (rec["offer"],)).fetchone() \
                 and not c.execute("SELECT 1 FROM office_doc_log WHERE org_id=? AND doc_id=? AND id>? AND action IN ('update','items','number','status') LIMIT 1",
                                   (oid, rec["offer"], rec.get("offer_log") or 0)).fetchone():  # changes within the same second
@@ -683,7 +688,6 @@ def pk2_agent_proposal(aid, b):
     from .proposals import _p_keys, _p_int, _p_str, prop_agent_ok, prop_ready_notify, prop_validate, PROP_TITLE_MAX, PROP_MAX_BYTES
     from ..agents.core import agent_row, agent_shares, job_dict, JOB_TITLE_MAX
     from ..agents.usage import usage_block
-    from ..api.v1 import v1_err
     from ..collab.comments import user_names
     from flask import request
     _p_keys(b, "", ("kind", "user_id", "title", "offer_id", "proposal"))

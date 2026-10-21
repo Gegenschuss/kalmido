@@ -26,9 +26,10 @@ from flask import jsonify
 from ..core.config import app, ATT_DIR
 from ..core.i18n import N_, tr
 from ..core.db import db, err
-from ..core.access import Denied
+from ..core.access import Denied, collab_all, task_visible
 from ..accounts.session import me
 from ..tasks import attachtext as AT
+from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 
 DPV_VER = "1"                 # bump when the model changes (cache key)
 DPV_FILE_MB = 20              # larger files get no preview (the download stays)
@@ -568,7 +569,6 @@ def dpv_attachment_preview(aid):
     """The preview model of a task / comment file (.docx / .xlsx). Same rights as the download (need_attachment: sees the
     task, a live comment, not locked by the virus scan); a file encrypted in the browser has no preview (409)."""
     from ..tasks.attachments import need_attachment
-    from ..core.orgcrypt import oc_read_file
     c = db()
     a = need_attachment(c, aid, False)
     if a["enc"]:
@@ -591,7 +591,6 @@ def dpv_node_preview(nid):
 def dpv_list_file_preview(fid):
     """The preview model of a project file. Rights as the download (need_list_file)."""
     from ..lists.projects import need_list_file
-    from ..core.orgcrypt import oc_read_file
     c = db()
     f = need_list_file(c, fid, False)
     return _answer(c, f["name"], f["mime"], f["size"], lambda: oc_read_file(c, os.path.join(ATT_DIR, f["path"])))
@@ -605,7 +604,6 @@ def dpv_agents(c, a):
     from ..agents.core import agent_active, agent_row, list_agents
     from ..agents.safety import ids_parse
     from ..collab.comments import task_people
-    from ..core.access import collab_all, task_visible
     if not collab_all() or a["enc"]:
         return []
     t = c.execute("""SELECT t.id, t.list_id, t.deleted_at, l.org_id, l.life, l.e2e FROM tasks t JOIN lists l ON l.id=t.list_id

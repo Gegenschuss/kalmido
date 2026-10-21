@@ -20,6 +20,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_day, local_now, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, is_project, list_role, need_list, pvis, WRITE_ROLES
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 SPR_WEEKS = (0, 1, 2)       # 0 = free length (the dates of each sprint are set by hand; the next one keeps the last length)
 SPR_FREE_DAYS = 14          # length of a new sprint of a list with a free length and no sprint before
@@ -56,7 +57,6 @@ def spr_today():
 
 
 def spr_day(v, what):
-    from ..personal.timetrack import BadInput
     try:
         if isinstance(v, str) and len(v) == 10:
             return date.fromisoformat(v)
@@ -354,7 +354,6 @@ def spr_need_project(c, lid):
 
 def spr_clean_fields(b, cur=None):
     """name / goal / start / end of a body -> column values (BadInput on bad ones)."""
-    from ..personal.timetrack import BadInput
     out = {}
     if "name" in b:
         out["name"] = str(b["name"] or "").strip()[:SPR_NAME_MAX]
@@ -384,7 +383,6 @@ def sprints_get(lid):
 @app.put("/api/lists/<int:lid>/sprint-settings")
 def sprint_settings(lid):
     """{on?, weeks?, dow?, carry?} (edit rights, project lists). Switching on starts sprint 1 when the list has no active one."""
-    from ..personal.timetrack import BadInput
     b = body()
     c = db()
     need_list(c, lid)
@@ -574,8 +572,8 @@ def sprints_assign(lid):
 
 
 # ---------------------------------------------------------------- the token API (scopes: reads read, changes write)
-from ..api.v1 import v1_args, v1_call, v1_json, v1_view  # noqa: E402
-from ..personal.timetrack import UnknownFields  # noqa: E402
+from ..api.common import v1_args, v1_call, v1_json, v1_view  # noqa: E402
+from ..core.errors import UnknownFields  # noqa: E402
 
 
 @app.get("/api/v1/lists/<int:lid>/sprints")

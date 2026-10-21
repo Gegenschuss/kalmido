@@ -23,7 +23,7 @@ from xml.etree import ElementTree as ET
 
 try:
     from ..core.i18n import tr
-    from ..personal.timetrack import BadInput
+    from ..core.errors import BadInput
 except ImportError:  # loaded as a single file (tests/office_einvoice_test.py, no package)
     def tr(key, *a, lg=None):
         return key.format(*a) if a else key

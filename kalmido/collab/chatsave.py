@@ -28,7 +28,10 @@ from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, my_inbox, need_list
 from ..tasks.validation import TITLE_MAX, as_int, log_act
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields
+from ..core.pg import insert_id  # 2.149.0 G (#2517): pulled up from functions
+from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
+from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 
 CHAT_SAVE_KINDS = ("agent", "team", "comment")  # 2.42.0 (#1383): + comment (of an agent, on a task)
 CHAT_SAVE_FIELDS = ("kind", "msg_id", "list_id", "due", "title", "as")
@@ -124,7 +127,6 @@ def _copy_files(c, tid, uid, files):
     from ..admin.hosting import quota_fits
     from ..files.scan import sc_locked, sc_marks
     from ..files.upsafe import up_after_store
-    from ..core.pg import insert_id
     skipped, ts = [], iso(now_utc())
     from .liste2efile import le2f_plain_skip
     if le2f_plain_skip(c, tid):  # 2.64.2 B (#1817): no plain file in a list with the lock
@@ -153,9 +155,7 @@ def _copy_files(c, tid, uid, files):
 def chat_save():
     """{kind: agent | team, msg_id, list_id? (default: the inbox), due? (YYYY-MM-DD), title? (default: the first heading or
     line)} -> 201 {task, skipped_files} | 200 {already: true, task_id, task: {id, title}} when this person saved it already."""
-    from ..core.serializers import unlink_files
     from ..agents.core import is_agent
-    from ..api.v1 import V1Error, v1_call
     from ..tasks.tasks import one_task, task_create
     c, b = db(), body()
     if is_agent(g.user):

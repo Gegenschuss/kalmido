@@ -4,9 +4,10 @@ from flask import g, has_request_context
 
 from ..core.config import ATT_DIR
 from ..core.i18n import tr
-from ..accounts.session import me
+from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
 from ..core.access import plists, PROJ_SQL, pvis
 from ..core.pg import st_ids
+from ..core.db import iso_ms, now_utc  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- serializers
@@ -103,7 +104,6 @@ def load_tasks(c, where, args=(), full_snips=False):
         from ..files.scan import sc_up
         sc_up(c, "att", [d for v in atts.values() for d in v])
     # comment count + unread (comments of others newer than the last one I have seen)
-    from ..core.db import iso_ms, now_utc
     cms, uid = {}, (g.user["id"] if has_request_context() and getattr(g, "user", None) else None)
     if uid and ids:
         # 2.41.0 (#1383): + a = open approval cards of agents in the comments (the task's badge)

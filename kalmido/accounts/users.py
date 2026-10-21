@@ -12,7 +12,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..core.config import app, COOKIE, EMAIL_RE, MIN_PASSWORD, PUBLIC_URL, USERNAME_RE
 from ..core.i18n import lang, LANGS, N_, tr, trn
-from ..core.db import body, bump, create_user, db, ensure_inbox, err, gsetting, now_utc, uset, usettings
+from ..core.db import body, bump, create_user, db, ensure_inbox, err, gsetting, now_utc, uset, usettings, iso
 from ..core.pg import system_ctx
 from ..accounts.session import _rate_blocked, _rate_fail, _rate_keys, _token_hash, me, user_public
 from ..accounts.pictures import (
@@ -22,7 +22,9 @@ from ..accounts.pictures import (
 from ..accounts.login import session_via, twofa_clear, twofa_methods
 from ..core.access import collab_all, Denied, list_role, need_list, vis_sql
 from ..core.serializers import attachment_files, unlink_files
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
+from ..core.orgcrypt import oc_drop_key, oc_list_org, oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
+from ..core.tokenhash import tkh_set_drop  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- users / account
@@ -93,7 +95,6 @@ def om_admin_all(c, uid):
     organisation's own admins. Listing: GET /api/users?all=1."""
     if not g.user["is_admin"]:
         return False
-    from ..core.pg import system_ctx
     with system_ctx(c):  # membership structure
         in_org = c.execute("SELECT 1 FROM org_members WHERE user_id=? LIMIT 1", (uid,)).fetchone()
         pending = c.execute("SELECT 1 FROM users WHERE id=? AND signup='pending'", (uid,)).fetchone()
@@ -281,7 +282,7 @@ def user_update(uid):
             make_agent(c, uid)
             if was:  # 2.37.0 (#1150): the converted account keeps working in its organisation (row-level security: a private
                 from ..agents.admin import agent_org_set  # agent never reads an organisation's lists, not even its own)
-                from ..personal.timetrack import BadInput as _BadInput
+                from ..core.errors import BadInput as _BadInput
                 try:
                     with c.savepoint():
                         agent_org_set(c, uid, was[0])
@@ -479,7 +480,6 @@ def user_purge(c, uid):
     from ..collab.teamchan import tcx_user_purge
     files += tcx_user_purge(c, uid)  # 2.113.1 (#2059): its team chat files sealed with its own key
     from ..admin.orgcrypt_cli import before_user_delete
-    from ..core.orgcrypt import oc_drop_key
     if before_user_delete(c, uid)[1]:  # a file that lives on could not be sealed for its new place: keep the key
         raise Denied(409, tr("Some files could not be encrypted again for their new place. Nothing was deleted; see the server log."))
     oc_drop_key(c, -int(uid))
@@ -514,7 +514,6 @@ def h6a_first_password_check(c):
     sign-in of this session (a stolen, older session cannot add a second way in). Behind the login proxy there is no
     session to judge: an admin sets the first password there (Settings > Users). An error response or None."""
     from datetime import timedelta
-    from ..core.db import iso
     if g.auth_via != "session":
         return err(tr("An admin can set a first password for this account."), 403)
     tok = request.cookies.get(COOKIE)
@@ -569,7 +568,6 @@ def me_update():
 def me_drop_token():
     if g.user["kid"]:  # 2.86.0 (N3 review): a child account has no upload token (also if KID_WRITE ever widens)
         return err(tr("Not possible with a child account"), 403)
-    from ..core.tokenhash import tkh_set_drop
     c = db()
     tok = tkh_set_drop(c, me())  # 2.138.0 C (#1907): only the hash is stored; this answer is the one time the token is shown
     c.commit()
@@ -634,7 +632,6 @@ def me_share_httpshortcuts():
             # 2.144.5 A (#2387, review F8): an older browser that names no origin at all stays refused, but is told why
             return err(tr("This browser does not say which page the download comes from, so it is refused for safety. Use a current browser or allow the referrer for this site."), 403)
         return err(tr("Not allowed"), 403)
-    from ..core.tokenhash import tkh_set_drop
     c = db()
     tok = tkh_set_drop(c, me())
     c.commit()
@@ -766,7 +763,6 @@ def list_icon_store(lid):
         return err(str(e))
     tok = secrets.token_urlsafe(12)
     os.makedirs(LIST_ICON_DIR, exist_ok=True)
-    from ..core.orgcrypt import oc_list_org, oc_write_file
     c = db()  # 2.58.0 (#1805): an organisation list's picture is sealed with its key at rest (private lists plain, as attachments)
     oc_write_file(c, oc_list_org(c, lid), list_icon_path(lid, tok), png)
     return "u:" + tok
@@ -791,7 +787,6 @@ def list_icon_get(lid, tok):
     p = list_icon_path(lid, tok)
     if not os.path.isfile(p):
         raise Denied(404)
-    from ..core.orgcrypt import oc_send_file
     rs = oc_send_file(c, p, mimetype="image/png", max_age=31536000)  # 2.58.0 (#1805): sealed -> decrypted, older plain ones as before
     rs.headers["Cache-Control"] = "private, max-age=31536000, immutable"
     return rs

@@ -40,9 +40,10 @@ from ..core.config import app, APP_VERSION, ATT_DIR, PUBLIC_URL, SECRET_KEY
 from ..core.db import connect, db, err, iso, now_utc
 from ..core.pg import system_ctx
 from ..core.i18n import tr
-from ..core.access import Denied
+from ..core.access import Denied, acx_of
 from ..accounts.session import me
 from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _jdef, _safe_part, _under
+from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 
 UMZ_DIR = os.path.join(EXPORT_DIR, "account")
 UMZ_KEEP_H = 24
@@ -372,7 +373,6 @@ def umz_build(c, uid, stream, export_id):
     """Writes the ZIP of person uid into stream; returns the manifest."""
     from ..accounts.settings import umz_export_queries
     from ..admin.hosting import hosted
-    from ..core.orgcrypt import oc_read_file
     out = _Out()
     have = {r[0] for r in c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema()")}
     u = c.execute("SELECT id, username, display_name, email FROM users WHERE id=?", (uid,)).fetchone()
@@ -475,7 +475,6 @@ def umz_log_org_lists(c, uid):
 
 def umz_user_conn(c, uid):
     """The background thread works in the person's own access context (row-level security as in their requests)."""
-    from ..core.access import acx_of
     with system_ctx(c):  # the person's memberships (structure) for their context
         ax = acx_of(c, uid)
     c.set_ctx(uid, ax.org_ids, "user")

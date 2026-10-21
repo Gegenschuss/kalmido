@@ -25,7 +25,7 @@ from ..core.i18n import N_, lang, tr
 from ..core.pg import insert_id
 from ..accounts.session import me
 from ..collab.comments import user_names
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .formula import (SH_FUNCS, SH_RAW_MAX, SH_TEXT_BUDGET, ShErr, ShEval, sh_col_index, sh_col_letter, sh_fmt, sh_freeze_dump, sh_freeze_load,
                       sh_fn_key, sh_json_value, sh_name_ok, sh_parse, sh_parse_date, sh_plain_value, sh_slug, sh_today, sh_tokens, sh_vtype)
 from .shfuncs import SHF_HELP

@@ -25,8 +25,8 @@ from ..core.access import Denied, WRITE_ROLES, list_role
 from ..core.db import bump, db, iso, now_utc, usettings
 from ..core.i18n import N_, tr
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
-from ..api.v1 import v1_args, v1_err, v1_json, v1_view
+from ..core.errors import BadInput
+from ..api.common import v1_args, v1_err, v1_json, v1_view
 
 SHT_KIND = "sheet_tasks"
 SHT_ROWS_MAX = 200            # rows per proposal (PROP_MAX_ITEMS: what one apply may select; step 2 allows 500 per press)

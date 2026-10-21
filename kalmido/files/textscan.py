@@ -27,15 +27,17 @@ from flask import jsonify, request
 from ..core.config import app, ATT_DIR
 from ..core.db import connect, db, gsetting, gset, iso, now_utc
 from ..core.i18n import tr
-from ..core.pg import system_ctx
+from ..core.pg import system_ctx, like_escape
 from ..accounts.session import me
 from ..core.access import Denied, acx_of, vis_sql
 from ..docs import store as S
+from ..core.env import env_bool
+from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 
 KINDS = ("att", "list", "fs")
 COL = {"att": "att_id", "list": "list_file_id", "fs": "node_id"}
-ON = os.environ.get("KALMIDO_FILE_OCR", "on").strip().lower() not in ("off", "0", "false", "no")
-BACKFILL = ON and os.environ.get("KALMIDO_FILE_OCR_BACKFILL", "on").strip().lower() not in ("off", "0", "false", "no")
+ON = env_bool("KALMIDO_FILE_OCR", True)
+BACKFILL = ON and env_bool("KALMIDO_FILE_OCR_BACKFILL", True)
 BACKFILL_S = max(1, int(os.environ.get("KALMIDO_FILE_OCR_BACKFILL_S", "20") or 20))  # s between two files of the catch-up
 MAX_MB = max(1, int(os.environ.get("KALMIDO_FILE_OCR_MAX_MB", "50") or 50))  # larger files are not read
 REHOME_S = max(1, int(os.environ.get("KALMIDO_FILE_OCR_REHOME_S", "300") or 300))  # s between two workspace sweeps
@@ -57,8 +59,7 @@ _LOCK = threading.Lock()
 _HAS = {}
 
 
-def _now():
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _wanted(name, mime):
@@ -94,7 +95,6 @@ def _read(c, kind, ref_id, ref):
     if kind == "fs":
         from .store import fs_read
         return fs_read(c, ref_id)
-    from ..core.orgcrypt import oc_read_file
     return oc_read_file(c, os.path.join(ATT_DIR, ref["path"]))
 
 
@@ -446,7 +446,6 @@ def ts_task_hits(c, uid, raw):
 
 
 def _like(raw):
-    from ..core.pg import like_escape
     return f"%{like_escape(raw)}%"
 
 

@@ -18,8 +18,8 @@ from ..core.pg import insert_id, write_lock
 from ..core.i18n import tr
 from ..core.db import bump, db, iso, local_now, now_utc
 from ..core.access import Denied, tvis
-from ..personal.timetrack import BadInput
-from ..api.v1 import v1_args, v1_json, v1_view
+from ..core.errors import BadInput
+from ..api.common import v1_args, v1_json, v1_view
 from ..agents.core import is_agent
 from ..accounts.layouts import WG_PADS_MAX, _wg_pad_text
 from ..collab.comments import user_names

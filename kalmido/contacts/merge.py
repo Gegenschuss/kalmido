@@ -21,8 +21,9 @@ from ..core.merges import (mg_cascade_rows, mg_fk_refs, mg_history, mg_mark_undo
 from ..accounts.session import me
 from ..core.access import Denied, need_feat
 from ..tasks.validation import as_int
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..contacts.model import _jl, book_touch, contact_store, contacts_on, need_book, need_contact, ITEMS_MAX
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 CTM_SINGLE = ("kind", "fn", "given", "family", "middle", "prefix", "suffix", "nickname", "org", "dept", "title", "bday", "anniversary",
               "note", "photo")
@@ -236,7 +237,6 @@ def ctm_cascade(c, others):
     """2.80.0 (#1885): what deleting the merged contacts removes or empties (mg_cascade_rows) for the undo snapshot, and how
     many emptied contact person links of clients the person cannot see (another workspace: mg_repoint left them, the
     database empties them on delete). Only numbers leave here; a set-null row keeps just its id and the old value."""
-    from ..core.pg import system_ctx
     # system: read only -- the snapshot must know the rows of every workspace the foreign keys reach, else undo cannot
     # put them back (the right to merge is checked in ctm_load; nothing of these rows goes to the person)
     with system_ctx(c):
@@ -324,7 +324,6 @@ def ctm_undo(c, uid, rid):
             raise Denied(409, tr("The address book has this contact already"))
     for r in rows:
         mg_reinsert(c, "contacts", r)
-    from ..core.pg import system_ctx
     with system_ctx(c):  # system: 2.80.0 (#1885) exactly the rows of the snapshot go back, in every workspace they came from
         mg_undo_cascade(c, snap.get("cascade"))
         mg_undo_refs(c, snap.get("refs"), target_gone=t is None)

@@ -11,7 +11,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied, MANAGE_ROLES, list_role, need_feat, tvis, vis_sql
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 
 
 # ---------------------------------------------------------------- 2.23.0 (#463): clients

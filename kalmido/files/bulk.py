@@ -17,12 +17,11 @@ import tempfile
 import threading
 import warnings
 import zipfile
-from datetime import datetime
 
 from flask import jsonify, request, send_file
 
-from ..core.config import app
-from ..core.db import bump, db, body, err
+from ..core.config import app, MAX_FILE_MB
+from ..core.db import bump, db, body, err, local_now
 from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
@@ -202,7 +201,7 @@ def fs_zip_build(c, roots, can_read, on_file=None, max_files=None, max_mb=None):
     if len(roots) == 1 and roots[0]["kind"] == "folder":
         name = abm_zip_name(roots[0]["name"]) + ".zip"
     else:
-        name = f"Kalmido-Dateien-{datetime.now().strftime('%Y-%m-%d')}.zip"
+        name = f"Kalmido-Dateien-{local_now().strftime('%Y-%m-%d')}.zip"
     fd, path = tempfile.mkstemp(prefix="kalmido-zip-", suffix=".zip")
     try:
         with os.fdopen(fd, "wb") as f, zipfile.ZipFile(f, "w", allowZip64=True) as z:
@@ -320,10 +319,9 @@ def files_scan():
     out_pdf = request.form.get("out") == "pdf"
     pid, oid = _parent_arg(c, request.form) if not out_pdf else (None, None)
     uid = me()
-    name = str(request.form.get("name") or "").strip()[:150] or f"Scan {datetime.now().strftime('%Y-%m-%d %H-%M')}"
+    name = str(request.form.get("name") or "").strip()[:150] or f"Scan {local_now().strftime('%Y-%m-%d %H-%M')}"
     if not name.lower().endswith(".pdf"):
         name += ".pdf"
-    from ..core.config import MAX_FILE_MB
     datas = []
     for f in pages:
         d = h6d_read(f)

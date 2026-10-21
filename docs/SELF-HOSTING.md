@@ -36,6 +36,7 @@ addresses and paths to your setup.
 - [Moving to a new server](#moving-to-a-new-server)
 - [Trash period of tasks (2.116)](#trash-period-of-tasks-2116)
 - [Production updates](#production-updates)
+  - [Update, downgrade and restore (2.149)](#update-downgrade-and-restore-2149)
 - [Run by a hoster: the operator interface (2.144)](#run-by-a-hoster-the-operator-interface-2144)
 - [Support Kalmido (supporter licence)](#support-kalmido-supporter-licence)
 
@@ -85,7 +86,14 @@ the organisations (encryption at rest, below). Two ways to provide it:
 2. As a file (2.45.0, the default of `docker-compose.yml`): `KALMIDO_SECRET_FILE=/secret/kalmido.key`, mounted from
    `./secret`. If the file is missing, the server creates it on the first start (32 random bytes, base64, mode 0600,
    never overwritten) and uses it from then on. Create the folder yourself (`mkdir secret`; the installer does), so the
-   container's user may write it.
+   container's user may write it. Without Docker Compose (2.149): the image uses `/secret/kalmido.key` by itself when a
+   volume is mounted at `/secret` (`docker run -v ./secret:/secret ...`); a folder inside the container is never used,
+   because a key there would be gone with the container.
+
+**A new server needs a key (2.149).** A new install (empty database, empty data folder) does not start without a
+server key: the log names the reason (no key set, the key file cannot be written, an invalid key) and the two ways
+above. To start a test or demo server without encryption on purpose, set `KALMIDO_NO_SECRET_KEY=1`. Servers that
+already have data keep starting without a key as before (with the warning).
 
 The key must not live in the data folder: the in-app backups contain the data folder, and a backup that carries its
 own key protects nothing. A key file inside the data or backup folder is therefore refused (warning in the log and in
@@ -93,10 +101,19 @@ the app). Keep a copy of the key apart from the backups (a password manager): ba
 backup alone does not reveal the encrypted data. Without any key *Administration > Server* shows a red warning, no
 token can be stored and organisation data stays unencrypted.
 
-A new key never makes data unreadable that was readable before: without a key nothing can be sealed. If you lose a key
-and the server creates a new one in the file, what was sealed with the old one stays lost (tokens are entered again,
-organisations need their recovery keys, see below); if the old key turns up, put it into `.env`, where it wins over the
-file.
+A new key never makes data unreadable that was readable before: without a key nothing can be sealed. Since 2.149 the
+server also never creates a new key file for a database that already holds organisation or account keys (the key
+file got lost, a container was recreated without its `/secret` volume): it removes the file it just created, names
+the reason in the log and does not start. Put the old key back (the file, or `KALMIDO_SECRET_KEY` in `.env`, where it
+wins over the file). If it is lost for good, set a new `KALMIDO_SECRET_KEY` yourself and rewrap each organisation
+with its recovery key (see below); what was sealed only with the old key stays lost (tokens are entered again).
+
+**Address and data folder (2.149).** Set `PUBLIC_URL` to the address people open: links in notifications and mails,
+passkeys and the origin check use it. Without it the server uses `http://localhost:3040` and warns in the log at
+every start. If the data folder is not writable for the
+container's user (Docker creates a missing bind-mount folder as root), the start stops with a message that names the
+user id and the command: `mkdir -p data secret && sudo chown 1000:1000 data secret`. Every environment variable is
+listed with its default in [ENV.md](ENV.md).
 
 ### Organisations and private spaces (2.46)
 
@@ -343,7 +360,9 @@ version: [Upgrade to 2.37](#upgrade-to-237-postgresql-required).
 
 ### Own or managed PostgreSQL server
 
-Set `DATABASE_URL` in `.env` and remove the `db` service and the `depends_on` block from `docker-compose.yml`.
+Set `DATABASE_URL` in `.env` and leave `localdb` out of `COMPOSE_PROFILES` there (2.149, e.g. `COMPOSE_PROFILES=clamav`):
+the `db` service then does not start, and the next update does not bring it back (before 2.149 the `db` block had to be
+deleted from `docker-compose.yml`, which every update restored). Needs Docker Compose 2.20 or newer.
 
 - **Best: a user that owns the database and has neither superuser nor `BYPASSRLS`.** The organisation policies then
   apply to it directly (Kalmido forces row-level security also for the table owner); nothing else to set up.
@@ -1071,8 +1090,11 @@ published). ClamAV needs **about 1 to 1.5 GB of RAM**; `freshclam` inside the co
 | `KALMIDO_CLAMD_TIMEOUT` | `60` | seconds one scan may take |
 | `KALMIDO_CLAMD_STRICT` | on when `KALMIDO_CLAMD` is set | 2.79.0: `1` = unchecked files are held back until the later scan (not those too large for the scanner), `0` = they stay readable (as up to 2.78) |
 
-**Switch it off** on a small server (e.g. a Raspberry Pi with 1 GB): set `KALMIDO_CLAMD=` (empty) in `.env` and delete the
-`clamav:` block (and the `clamav-db` volume entry) from `docker-compose.yml`, then `docker compose up -d --remove-orphans`.
+**Switch it off** on a small server (e.g. a Raspberry Pi with 1 GB): set `KALMIDO_CLAMD=` (empty) in `.env` and remove
+`clamav` from `COMPOSE_PROFILES` there (2.149, e.g. `COMPOSE_PROFILES=localdb`), then `docker compose up -d --remove-orphans`.
+Updates keep it off (before 2.149 the `clamav:` block had to be deleted from `docker-compose.yml`, and every update
+brought it back). The installer adds the `COMPOSE_PROFILES` line to an older `.env` once: `clamav` only when
+`KALMIDO_CLAMD=` is not set empty, `localdb` only when no `DATABASE_URL` is set.
 Uploads are then taken without a scan and without a mark. An own ClamAV elsewhere: `KALMIDO_CLAMD=host:3310`.
 
 **ZIP downloads of the file store (2.138.1).** Several chosen items or a folder are packed on the server into a temporary
@@ -1432,6 +1454,9 @@ instances the numbers can be set and the work can be split:
   the threads (configured, busy now, the peak, requests served), the pool (size, available, waiting, timeouts), the
   connection budget and the state of every background loop (`running` here, `waiting` = another container runs it).
   With a worker it also shows the worker's last heartbeat. It holds numbers only, no user data.
+  Since 2.149.0 also `requests`: p50 / p95 / max of duration, statements and database time of the last 1000 requests;
+  every answer carries a `Server-Timing` header, and a request slower than `KALMIDO_SLOW_REQUEST_MS` (default 500,
+  0 = off) leaves one log line (method, route pattern, numbers; no user data).
 - **Each background loop runs once per instance.** Every loop takes a lock of its own in the database before its rounds
   (also in the role `all`). Two containers on one database therefore never send a reminder twice, deliver a webhook
   twice or write two backups; the second one waits and takes over when the first one stops.
@@ -1524,6 +1549,23 @@ trash for 30 days and are then deleted for good, with their comments and attachm
   attachments) against the values before. If anything is off, roll back automatically to the previous version and the
   backup.
 - **Keep the previous image** until the new version has proven itself; do not prune images right after an update.
+
+### Update, downgrade and restore (2.149)
+
+- **Which version ran last.** After every successful start Kalmido stores in the database the newest version that ran
+  on it (`app_version` in the table `kalmido_meta`) and the version that ran before the last upgrade
+  (`app_version_prev`). Going back changes neither, so the next upgrade works as before.
+- **Downgrade guard.** An image of an older minor version (2.148 on a database 2.150 ran on) refuses to start with a
+  clear message: older code does not know newer columns and data and could damage them. Allowed are every patch of the
+  same minor (2.150.0 on 2.150.3 and back) and **one step back** to the version that ran before the last upgrade (the
+  automatic rollback of an update, or keeping the previous image as above). In an emergency `KALMIDO_ALLOW_DOWNGRADE=1`
+  starts anyway; go back to the newer image soon. The first version with the guard is 2.149: a database is stamped on
+  its first start with it.
+- **Installer.** The first start after an update migrates the database, which can take minutes on a big one; the
+  installer keeps waiting (up to 30 minutes) while the container runs and stops at once when it exits.
+- **Restore.** A backup made with a newer minor version than the running server is refused ("update Kalmido first, then
+  restore it"); older backups restore as before. The same `KALMIDO_ALLOW_DOWNGRADE=1` lets a newer backup through.
+  The database schema number in the backup (`schema_version`) stays a second, independent guard.
 
 ## Run by a hoster: the operator interface (2.144)
 

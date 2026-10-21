@@ -24,10 +24,12 @@ from ..core.schema import SCHEMA_TRIGGERS, SCHEMA_VERSION
 from ..core import pg as _pg
 from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, gset, gsetting, init_db, iso, local_now, now_utc, parse_iso
+from ..core.db import appver_newer_minor
+from ..core.env import env_bool
 from ..accounts.session import _rate_blocked, _rate_fail, _rate_keys, GATE, set_cookie, start_session
 from ..accounts.login import _AUTH_KEY, _PEND, _PEND_LOCK, seal, unseal
 from ..accounts.oidc import _OIDC_LOCK, _OIDC_STATES, oidc_reset
-from ..core.access import Denied
+from ..core.access import Denied, acx_drop
 from ..tasks.validation import valid_hm
 from ..tasks.lifecycle import UNDO_KEY
 from ..collab.news import NEWS_CLEAN
@@ -60,7 +62,7 @@ from ..calendars.subscriptions import _CAL_KEY
 # Backups of format 1 (tasks.db, SQLite, up to 2.36) can still be listed, uploaded and checked, but not restored here.
 # Row-level security (2.37): pg_dump / pg_restore always run with --enable-row-security and PGOPTIONS="-c app.role=system"
 # (the policies let the system role through; the password goes through the environment, never on the command line).
-BK_ON_ENV = os.environ.get("KALMIDO_BACKUPS", "1").strip().lower() not in ("0", "false", "no", "off")
+BK_ON_ENV = env_bool("KALMIDO_BACKUPS", True)
 BK_DIR = os.path.abspath(os.environ.get("KALMIDO_BACKUP_DIR", "").strip() or os.path.join(os.path.dirname(os.path.abspath(DB)), "backups"))
 BK_PASS_ENV = os.environ.get("KALMIDO_BACKUP_PASSPHRASE", "")
 BK_TICK = _env_int("KALMIDO_BACKUP_TICK", 60)                          # s between schedule checks
@@ -103,6 +105,8 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           "hash": N_("The backup is damaged: a file does not match its checksum."),
           "integrity": N_("The database in the backup is damaged (integrity check failed)."),
           "schema": N_("The backup is from a newer Kalmido version (database schema {0}); update Kalmido first."),
+          # 2.149.0 D (#2509): the manifest's app_version is a newer minor than this server's
+          "newer": N_("The backup was made with Kalmido {0}, a newer version than this server ({1}). Update Kalmido first, then restore it."),
           "objects": N_("The database in the backup contains unexpected objects or statements and was refused."),
           "legacy": N_("This backup is from a version before 2.37 (SQLite). Restore it with Kalmido 2.36, then update to 2.37: the data is moved over during the update."),
           "tools": N_("The database tools (pg_dump / pg_restore) are missing on this server."),
@@ -698,6 +702,9 @@ def bk_check_zip(z):
         raise BackupError("format")
     if sv > SCHEMA_VERSION:
         raise BackupError("schema", sv)
+    av = str(man.get("app_version") or "")[:20]
+    if appver_newer_minor(av) and not env_bool("KALMIDO_ALLOW_DOWNGRADE", False):  # 2.149.0 D (#2509)
+        raise BackupError("newer", av, APP_VERSION)
     listed = {}
     for f in man["files"]:
         if not (isinstance(f, list) and len(f) == 3 and isinstance(f[0], str) and isinstance(f[1], int) and isinstance(f[2], str)):
@@ -1100,6 +1107,7 @@ def _reset_caches():
     """In-process state that belongs to the database (after a restore)."""
     for d in (_CAL_KEY, UNDO_KEY, _AUTH_KEY, _BK["meta"]):
         d.clear()
+    acx_drop()  # 2.149.0 review: cached access contexts belong to the old database
     _VAPID.clear()
     with _PEND_LOCK:
         _PEND.clear()

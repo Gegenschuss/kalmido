@@ -669,3 +669,14 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-rpt="open"]'); if (!b) return;
   e.preventDefault(); rptModal(+b.dataset.id);
 });
+// 2.149.0 F (#2518): from projtime.js (now loaded on demand): the "Tracked" figure this file draws stays clickable at
+// once (capture, prevents the default synchronously); tz_open is a stand-in that loads the module
+// the click (and Enter / Space on the focusable span) on "Tracked"
+function tz_hit(e) {
+  const el = e.target.closest?.('.tsum[data-tsum]'); if (!el || MW_ON) return;
+  const ids = el.dataset.tsum.split(',').map(Number).filter(Boolean), ls = ids.map(listById).filter(Boolean); if (!ls.length) return;
+  e.preventDefault(); e.stopPropagation();
+  tz_open(ids, ls.length === 1 ? lname(ls[0]) : (el.dataset.tsumName || lname(ls[0])));
+}
+document.addEventListener('click', tz_hit, true);
+document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.tsum[data-tsum]')) tz_hit(e); }, true);

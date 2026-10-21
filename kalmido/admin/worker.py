@@ -20,6 +20,7 @@ from flask import g, jsonify
 from ..core.config import app, APP_VERSION, DATABASE_URL
 from ..core.db import connect, db, gset, gsetting, iso, now_utc
 from ..core.pg import POOL_MAX, WEB_THREADS, connect_direct, pool_stats
+from ..core.reqtime import rt_stats
 from ..accounts.session import _BG_TURN, GATE
 from ..accounts.users import need_admin
 
@@ -235,7 +236,8 @@ def wrk_health(c):
             "worker": hb if isinstance(hb, dict) else None,
             "threads": {"configured": WEB_THREADS, "busy": busy["n"], "peak": busy["peak"], "served": busy["served"],
                         "since_s": int(time.time() - busy["since"])},
-            "pool": pool_stats(), "connections": wrk_conn_budget(c)}
+            "pool": pool_stats(), "connections": wrk_conn_budget(c),
+            "requests": rt_stats()}  # 2.149.0 B (#2504): p50 / p95 / max of the last 1000 requests
 
 
 @app.get("/api/admin/health")

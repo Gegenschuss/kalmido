@@ -11,6 +11,7 @@ import os
 from ..core.i18n import N_
 from ..core.db import gset, gsetting, iso, local_now, now_utc
 from ..accounts.orgs import PRIVATE_FOLDER_RE, has_workspaces
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 # when the check runs: once a day at this local hour or later; KALMIDO_TENANT_CHECK=always = at every watchdog tick (tests)
 TENANT_CHECK_HOUR = int(os.environ.get("KALMIDO_TENANT_CHECK_HOUR", "3") or 3)
@@ -453,7 +454,6 @@ def rg4_oa_owner(c, table, oid_):
 def boundary_summary(c, viewer_uid=None):
     """For GET /api/admin/orgs: the live count + when the nightly check ran last. 2.122.4 A (#1724): viewer_uid = the
     instance admin asking (names only inside their organisations, see oa_details)."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # 2.37.0 (#1150): counts and ids over every organisation, no content
         res = boundary_check(c)
         details = oa_details(c, viewer_uid=viewer_uid) if res["n"] else []  # 2.46.0 (#1563): names of the objects and people, for the admin

@@ -7,8 +7,8 @@ from ..core.i18n import tr
 from ..core.pg import write_lock
 from ..core.access import Denied
 from ..accounts.session import me
-from ..api.v1 import v1_args, v1_call, v1_json, v1_view
-from ..personal.timetrack import BadInput, reject_unknown, UnknownFields
+from ..api.common import v1_args, v1_call, v1_json, v1_view
+from ..core.errors import BadInput, reject_unknown, UnknownFields
 from ..tasks.validation import as_int
 from ..collab.comments import user_names
 

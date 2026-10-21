@@ -20,9 +20,9 @@ from flask import Response, jsonify, request
 
 from ..core.config import app
 from ..core.db import db, local_now
-from ..core.i18n import N_, lang, tr
+from ..core.i18n import N_, lang, tr, trn
 from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import ofx_name1, office_gate, office_org, office_rows, office_settings, pb_owner
 
@@ -47,11 +47,7 @@ _VAT_RE = re.compile(r"(?:mwst|ust|umsatzsteuer|mehrwertsteuer|vat|tva|iva|btw)\
                      r"|(\d{1,2})(?:[.,]0{1,2})?\s*%\s*(?:mwst|ust|umsatzsteuer|mehrwertsteuer|vat|tva|iva|btw)", re.I)
 
 
-def _ctx():
-    """-> (c, uid, oid): the value side of the equipment is the office admins' (members 403, agents / kids 403)."""
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=True)
+from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _today():
@@ -428,5 +424,4 @@ def bnk_pdf_w(s):
 
 
 def bnk_devices(n):
-    from ..core.i18n import trn
     return trn("{0} device", "{0} devices", n, n)

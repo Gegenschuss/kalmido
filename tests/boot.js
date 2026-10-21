@@ -42,7 +42,8 @@ exports.allCssSync = () => {
 // 2.20.0 (#646): the web client is static/js/*.js (the order of the script tags in index.html); this is all of it as one text
 exports.clientSource = async () => {
   const html = await (await fetch(B)).text();
-  const mods = [...html.matchAll(/<script src="\/static\/js\/([\w-]+\.js)"><\/script>/g)].map(m => m[1]);
+  // 2.149.0 (#2505): the served page adds ?v=<content hash>
+  const mods = [...html.matchAll(/<script src="\/static\/js\/([\w-]+\.js)(?:\?v=\w+)?"><\/script>/g)].map(m => m[1]);
   if (!mods.length) throw new Error('index.html loads no static/js/ modules');
   // 2.53.0 (#1410): + the modules loaded on demand (LAZY in sw.js)
   const lazy = ((await (await fetch(B + 'sw.js')).text()).match(/const LAZY = \[(.*?)\];/s) || [, ''])[1];

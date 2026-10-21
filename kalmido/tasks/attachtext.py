@@ -21,7 +21,7 @@ from ..core.access import Denied, need_task
 from ..tasks.attachments import file_ext, need_attachment, TEXT_MIME
 from ..tasks.validation import as_int
 from ..accounts.session import me
-from ..api.v1 import hit_limit, v1_args, v1_err, v1_view
+from ..api.common import hit_limit, v1_args, v1_err, v1_view
 
 TEXT_FILE_MB = 20          # larger files are refused (413)
 TEXT_CAP = 200_000         # characters at most (the rest: truncated: true)

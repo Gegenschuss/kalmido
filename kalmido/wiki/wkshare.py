@@ -24,15 +24,17 @@ from urllib.parse import quote
 
 from flask import g, jsonify, request
 
-from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
+from ..core.config import app, APP_NAME, PUBLIC_URL, TZ, ATT_DIR
 from ..core.i18n import lang, LANGS, short_day, tr
 from ..core.db import body, bump, db, iso, local_day, local_now, now_utc
 from ..core.pg import insert_id, system_ctx
 from ..core.access import Denied, acx_anon_bind
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..collab.comments import user_names
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .pages import wiki_clean_path, wiki_dict, wiki_need, wiki_space, wiki_space_key
+from ..core.orgcrypt import oc_send_file  # 2.149.0 G (#2517): pulled up from functions
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 WSH_PREFIX = "/s/w/"
 WSH_MAX = 300  # live shares per space
@@ -425,8 +427,6 @@ def wsh_file_url(base, f):
 def wsh_send(c, f, public):
     """A shared file like wikiatt.wka_get (SVG in a sandbox, a file found infected stays locked); public: never cached."""
     import os
-    from ..core.config import ATT_DIR
-    from ..core.orgcrypt import oc_send_file
     from ..files.scan import sc_guard
     from ..tasks.attachments import send_stored
     from .wikiatt import SVG
@@ -489,7 +489,6 @@ def wsh_lang(c, s):
 
 def wsh_open(c, token, files=False):
     """Common checks of every /s/w/ request -> (share, None) or (None, response): the rate limits of the list links."""
-    from ..api.v1 import hit_limit
     from ..lists.custview import CV_FILE_RATE
     from ..lists.public import PUB_BAD_LIMIT, PUB_VIEW_RATE, pub_gone, pub_limited
     from ..notify.alerts import aa_count

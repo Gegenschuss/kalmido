@@ -6,7 +6,6 @@
 'use strict';
 
 const DPV = {data: null, start: null, days: 7, org: null, seq: 0, loading: false, filter: 'all', mine: null, free: null};
-const dp_on = () => feat('dispo');
 const DP_GROUPS = [['people', N_('People')], ['contacts', N_('Contacts')], ['equipment', N_('Equipment')], ['sets', N_('Equipment sets')]];
 
 async function dp_load() {

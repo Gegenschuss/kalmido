@@ -19,9 +19,9 @@ from ..accounts.session import me
 from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_list
 from ..tasks.validation import log_act
 from ..tasks.lifecycle import do_complete
-from ..personal.timetrack import UnknownFields, web_fields
+from ..core.errors import UnknownFields, web_fields
 from ..agents.core import agent_emit, is_agent, list_agents
-from ..api.v1 import v1_args, v1_call, v1_json, v1_view
+from ..api.common import v1_args, v1_call, v1_json, v1_view
 from .projects import need_overview
 
 ENV_MAX = 8            # environments per list

@@ -24,7 +24,7 @@ from ..core.db import body, db, iso_ms, now_utc
 from ..core.i18n import tr
 from ..core.pg import insert_id
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .formula import ShErr
 
 SHB_TABS_MAX = 30          # sheets of one table
@@ -691,7 +691,7 @@ def shb_xlsx(c, sheet_row):
 
 
 # ---------------------------------------------------------------- API v1 (agents, scripts)
-from ..api.v1 import v1_args, v1_json, v1_view  # noqa: E402  (api.v1 comes earlier in ORDER; sheets.v1 later: imported in the routes)
+from ..api.common import v1_args, v1_json, v1_view  # noqa: E402  (api.v1 comes earlier in ORDER; sheets.v1 later: imported in the routes)
 
 
 @app.get("/api/v1/sheets/<int:sid>/tabs")
