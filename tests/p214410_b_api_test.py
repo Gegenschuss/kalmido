@@ -246,14 +246,14 @@ def area(s, who):
     csv_text = (f"Kontoinhaber;Studio Example GmbH\nKonto;{TEST_IBAN}\n\n"
                 "Buchungstag;Valuta;Auftraggeber/Empfänger;Verwendungszweck;IBAN;Betrag\n"
                 f"{de};{de};Example Client AG;Rechnung {number(s, t4)};DE89370400440532013000;{amount}\n")
-    g = s.post(B + O + "/bank/import/preview", json={"text": csv_text, "filename": "account.csv"}).json().get("guess") or {}
-    mp = {k: g.get(k) for k in ("date", "amount", "amount_in", "amount_out", "title", "counterpart", "decimal", "date_format")}
+    mp = {"date": 0, "amount": 5, "amount_in": None, "amount_out": None, "title": 3, "counterpart": 2, "decimal": ",", "date_format": "DD.MM.YYYY"}
     r = s.post(B + O + "/bank/import", json={"text": csv_text, "filename": "account.csv", "mapping": mp})
     check(r.status_code == 201 and r.json().get("count") == 1, f"{who}: bank booking imported " + r.text[:200])
     tx = (s.get(B + O + "/bank/tx").json().get("items") or [{}])[0]
     check(tx.get("id") and t4 not in [x.get("id") for x in tx.get("suggestions") or [] if x.get("kind") == "invoice"],
           f"{who}: the bank suggests no trial invoice {tx.get('suggestions')}")
-    cand = s.get(B + O + f"/bank/tx/{tx.get('id')}/candidates").json().get("items") or []
+    r = s.get(B + O + f"/bank/tx/{tx.get('id')}/candidates")
+    cand = (r.json().get("items") or []) if r.ok else []
     check(not any(x["kind"] == "invoice" and x["id"] in (t1, t2, t3, t4) for x in cand), f"{who}: no trial invoice among the candidates {cand}")
     check(any(x["kind"] == "invoice" and x["id"] == r4 for x in cand), f"{who}: the real open invoice is a candidate {cand}")
     r = s.post(B + O + f"/bank/tx/{tx.get('id')}/match", json={"kind": "invoice", "id": t4})
