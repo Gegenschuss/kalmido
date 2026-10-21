@@ -12603,5 +12603,7 @@
   "This stack was not split": "Questa pila non è stata separata",
   "Put this sheet between two documents of a stack scan.": "Metti questo foglio tra due documenti di una scansione a pila.",
   "Kalmido starts a new document after it; the sheet itself is left out.": "Kalmido inizia dopo un nuovo documento; il foglio stesso viene escluso.",
-  "Choose a task of this workspace": "Scegli un’attività di questo spazio di lavoro"
+  "Choose a task of this workspace": "Scegli un’attività di questo spazio di lavoro",
+  "A stack scan with several codes can be split into documents; a separator sheet between two letters splits there too.": "Una scansione a pila con più codici si può separare in documenti; un foglio separatore tra due lettere separa anche lì.",
+  "Separator sheet to print (PDF)": "Foglio separatore da stampare (PDF)"
 }

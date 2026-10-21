@@ -12603,5 +12603,7 @@
   "This stack was not split": "Deze stapel is niet gesplitst",
   "Put this sheet between two documents of a stack scan.": "Leg dit blad tussen twee documenten van een stapelscan.",
   "Kalmido starts a new document after it; the sheet itself is left out.": "Kalmido begint daarna een nieuw document; het blad zelf vervalt.",
-  "Choose a task of this workspace": "Kies een taak van deze werkruimte"
+  "Choose a task of this workspace": "Kies een taak van deze werkruimte",
+  "A stack scan with several codes can be split into documents; a separator sheet between two letters splits there too.": "Een stapelscan met meerdere codes kan in documenten worden gesplitst; een scheidingsblad tussen twee brieven splitst daar ook.",
+  "Separator sheet to print (PDF)": "Scheidingsblad om af te drukken (pdf)"
 }

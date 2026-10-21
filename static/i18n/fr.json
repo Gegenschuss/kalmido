@@ -12603,5 +12603,7 @@
   "This stack was not split": "Ce lot n’a pas été séparé",
   "Put this sheet between two documents of a stack scan.": "Placez cette feuille entre deux documents d’un lot numérisé.",
   "Kalmido starts a new document after it; the sheet itself is left out.": "Kalmido commence ensuite un nouveau document ; la feuille elle-même est écartée.",
-  "Choose a task of this workspace": "Choisissez une tâche de cet espace de travail"
+  "Choose a task of this workspace": "Choisissez une tâche de cet espace de travail",
+  "A stack scan with several codes can be split into documents; a separator sheet between two letters splits there too.": "Un lot numérisé avec plusieurs codes peut être séparé en documents ; une feuille de séparation entre deux lettres sépare aussi à cet endroit.",
+  "Separator sheet to print (PDF)": "Feuille de séparation à imprimer (PDF)"
 }
