@@ -94,7 +94,7 @@ function mm_propItems(t) {
   if (!t || !t.list_id) return [];
   const out = [], rs = typeof rsy_on === 'function' ? rsy_on : () => true, kids = children(t.id).filter(k => !k.deleted_at);
   if (t.priority) out.push({k: 'prio', dot: t.priority, txt: ''});
-  if (t.due && (rs('due') || dueClass(t) === 'over')) out.push({k: 'due', ic: 'cal', txt: fmtDateLoc(t.due) + (t.due_time ? ' ' + t.due_time : '')});
+  if (t.due && (rs('due') || dueClass(t) === 'over')) out.push({k: 'due', ic: 'cal', txt: dueLabel(t)});
   if (t.assignee_id && rs('person')) { const who = personName(t.list_id, t.assignee_id); if (who) out.push({k: 'person', ic: 'user', txt: who}); }
   if (t.repeat && rs('repeat')) out.push({k: 'repeat', ic: 'repeat', txt: ''});
   if (kids.length && rs('sub')) out.push({k: 'sub', ic: 'sub', txt: `${kids.filter(k => k.status).length}/${kids.length}`});

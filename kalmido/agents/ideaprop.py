@@ -67,7 +67,7 @@ def _target(c, lid, branch):
         r = c.execute("SELECT id, name, list_id FROM sections WHERE id=?", (n,)).fetchone()
         if not r or r["list_id"] != lid:
             raise Denied(404)
-        return "section", n, r
+        return "section", None, r
     if b[:1] == "t":
         need_task(c, n)
         r = c.execute("SELECT * FROM tasks WHERE id=?", (n,)).fetchone()
@@ -132,7 +132,7 @@ def idp_request(c, uid, b):
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()["name"]
     inp = {"list": lname, "path": _path(c, kind, row), "branch": kind, "levels": min(IDP_KIDS, _levels(c, kind, tid)),
            "hint": _p_str(b.get("hint"), "hint", PROP_HINT_MAX, line=False) or None, "lang": lang_of(usettings(c, uid)),
-           "target": "r" if kind == "list" else ("s" if kind == "section" else "t") + str(tid if kind == "task" else row["id"])}
+           "target": "r" if kind == "list" else ("t" + str(tid) if kind == "task" else "s" + str(row["id"]))}
     title = tr(IDP_TITLE, (inp["path"][-1] if inp["path"] else lname)[:80])
     ts = iso(now_utc())
     jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id)
@@ -233,7 +233,7 @@ def idp_take(c, j, take, drop, edits=None):
                     raise BadInput(m)
                 srt = x + 1
             else:
-                title, parent, srt = prop["items"][int(k)]["title"], tid, top + n + 1
+                title, parent, srt = prop["items"][int(k)]["title"], tid if kind == "task" else None, top + n + 1
             if isinstance(e.get("title"), str) and e["title"].strip():
                 title = _p_str(e["title"], "title", PROP_TITLE_MAX, True)
             nid = prop_insert(c, j["agent_id"], lid, ts, title, "", sec, parent, sort=srt)

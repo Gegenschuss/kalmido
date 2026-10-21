@@ -362,7 +362,8 @@ APP_ONLY = [
     ("agents are managed by people (admins / owners), not by tokens", ("* /api/my/agents",
                                                                        "PATCH /api/agents/{}/color")),  # 2.47.1 (#1721)
     ("approvals and proposals come only from people (the agent's side: /agent/jobs, POST /agent/jobs/{id}/proposal)", (
-        "* /api/agents/jobs", "* /api/proposals", "POST /api/comments/{}/apply", "POST /api/comments/{}/decide")),
+        "* /api/agents/jobs", "* /api/proposals", "POST /api/comments/{}/apply", "POST /api/comments/{}/decide",
+        "=GET /api/lists/{}/ideas")),  # 2.156.0 A (#1201): the asking person's ideas requests of a list (the mind map)
     ("people's side of the agent chat (2.39.0: also editing one's own message), waking and sharing with agents (the agent uses /agent/*)", (
         "=GET /api/agents/{}/chat", "=POST /api/agents/{}/chat", "=PATCH /api/agents/{}/chat/{}", "POST /api/agents/{}/wake", "POST /api/agents/{}/abort", "POST /api/tasks/{}/wake", "* /api/agents/{}/share", "PUT /api/lists/{}/agent",
         "* /api/agents/{}/autoshare", "GET /api/agents/usage")),
