@@ -12570,5 +12570,6 @@
   "Suggest payment reminders for overdue invoices": "Betalingsherinneringen voorstellen voor achterstallige facturen",
   "Read|section": "Gelezen",
   "Visible to everyone in the organisation. Your role there is read-only: you can look, not change.": "Zichtbaar voor iedereen in de organisatie. Je rol daar is alleen-lezen: bekijken wel, wijzigen niet.",
-  "You can only read “{0}”: no new tasks there.": "Je kunt „{0}” alleen lezen: daar maak je geen taken aan."
+  "You can only read “{0}”: no new tasks there.": "Je kunt „{0}” alleen lezen: daar maak je geen taken aan.",
+  "Region|storage": "Regio"
 }

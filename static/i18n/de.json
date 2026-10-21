@@ -12570,5 +12570,6 @@
   "Suggest payment reminders for overdue invoices": "Zahlungserinnerungen für überfällige Rechnungen vorschlagen",
   "Read|section": "Gelesen",
   "Visible to everyone in the organisation. Your role there is read-only: you can look, not change.": "Für alle in der Organisation sichtbar. Deine Rolle dort ist nur lesend: ansehen ja, ändern nein.",
-  "You can only read “{0}”: no new tasks there.": "„{0}“ kannst du nur lesen: dort legst du keine Aufgaben an."
+  "You can only read “{0}”: no new tasks there.": "„{0}“ kannst du nur lesen: dort legst du keine Aufgaben an.",
+  "Region|storage": "Region"
 }
