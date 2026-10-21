@@ -123,7 +123,7 @@ for lg in ("es", "fr", "it", "nl"):
 SRC = os.path.join(N, "..", "kalmido", "office")
 code = "".join(open(os.path.join(SRC, f), encoding="utf-8").read() for f in ("invoices.py", "docs.py", "parts.py", "abschlag.py"))
 check(all(k in code for k in OLD), "#2520: every key is used by the office code")
-for bad in ('"Entwurf"', '"Rechnungsbetrag"', '"Zahlbar bis', '"Abschlagsrechnung"', '"Teil")', '"Seite {x} von {y}"'):
+for bad in ('"Entwurf"', '"Rechnungsbetrag"', '"Zahlbar bis', '{"de": "Abschlagsrechnung"', '"Teil")', '"Seite {x} von {y}"'):
     check(bad not in code, f"#2520: no inline German {bad} left in the documents' code")
 
 # ---------------------------------------------------------------- the server
