@@ -218,7 +218,8 @@ check(requests.get(B + "/s/" + FT).status_code == 200 and pub_token(Fr, FL) == F
 
 # ================================================================ #2486 the invitation link never to an organisation admin
 r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "nolink@example.com"})
-check(r.ok and "#invite/" not in r.text and "invitation" not in r.json() and r.json().get("notice"), "no mail went: no link to the organisation admin " + r.text[:200])
+# 2.148.1 (#2480, review): no notice either -- the answer is the same as for an existing account
+check(r.ok and "#invite/" not in r.text and "invitation" not in r.json() and "notice" not in r.json(), "no mail went: no link to the organisation admin " + r.text[:200])
 NL = dbx("SELECT id FROM users WHERE email='nolink@example.com'")[0][0]
 rs = [Bo.post(B + f"/api/orgs/{ORG}/invites/{NL}/resend") for _ in range(4)]
 check(all(x.ok and "#invite/" not in x.text for x in rs[:3]) and rs[3].status_code == 429, "resend: no link, at most three a day " + str([x.status_code for x in rs]))
@@ -243,6 +244,43 @@ r2 = Bo.post(B + f"/api/sheets/{SID}/shares", json={"email": "ghost@example.com"
 check(r1.status_code == r2.status_code == 201 and r1.json() == r2.json() == {"by_email": True}, "a table shared by address: the same answer, no list " + r1.text[:200])
 check(Bo.get(B + "/api/me/storage").json().get("support") == "", "no support address set: none (not an admin's)")
 check(Fr.get(B + "/api/me/storage").json().get("support") == "", "freelancer: the same")
+
+# ================================================================ review fixes (part H)
+# #2480 open invitations: an existing account is listed like a new one (no account id)
+r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "erin@example.com"})
+inv = {x["email"]: x for x in Bo.get(B + f"/api/orgs/{ORG}/invites").json().get("invites", [])}
+check(r.ok and "erin@example.com" in inv and inv["erin@example.com"]["user_id"] is None and inv["erin@example.com"]["state"] == "invited",
+      "open invitations list an existing account, too " + str(inv.get("erin@example.com")))
+check("nolink@example.com" in inv and set(inv["erin@example.com"]) - {"join_id"} <= set(inv["nolink@example.com"]), "... in the same form")
+# #2480 an invitation the existing path refuses: a clean error, no server error
+r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "bob@example.com", "role": "member"})
+check(400 <= r.status_code < 500, "an invitation that cannot be done answers with an error, not a server error " + str(r.status_code) + r.text[:200])
+# #2480 a list open to everyone in the organisation counts as shared (the admins' list trash)
+OV = Da.post(B + "/api/lists", json={"name": "Dave open", "org_id": ORG}).json()["id"]
+dbx("UPDATE lists SET org_visibility='org' WHERE id=?", (OV,), write=True)
+Da.patch(B + f"/api/lists/{OV}", json={"archived": True})
+check(Da.delete(B + f"/api/lists/{OV}").ok, "setup: an organisation-wide list in the trash")
+check(OV in [x["id"] for x in Bo.get(B + "/api/trash/lists").json()["lists"]] and Bo.post(B + f"/api/trash/lists/{OV}/restore").ok,
+      "an organisation-wide list: the admin restores it from the trash")
+# #2480 the default workspace of a new address book / calendar follows the switch
+Er = sess("erin")
+Er.patch(B + "/api/settings", json={"workspace": "all"})
+r = Er.post(B + "/api/books", json={"name": "Erin book"})
+check(r.ok and dbx("SELECT org_id FROM books WHERE id=?", (r.json()["id"],))[0][0] is None, "several organisations, none chosen: a new address book is private " + r.text[:200])
+Da.patch(B + "/api/settings", json={"workspace": "private"})
+r = Da.post(B + "/api/books", json={"name": "Dave private book"})
+check(r.ok and dbx("SELECT org_id FROM books WHERE id=?", (r.json()["id"],))[0][0] is None, "the switch on Private: a new address book is private " + r.text[:200])
+Da.patch(B + "/api/settings", json={"workspace": "all"})
+r = Da.post(B + "/api/books", json={"name": "Dave team book"})
+check(r.ok and dbx("SELECT org_id FROM books WHERE id=?", (r.json()["id"],))[0][0] == ORG, "one organisation: a new address book is its book " + r.text[:200])
+r = Fr.post(B + "/api/books", json={"name": "Freelance book"})
+check(r.ok and dbx("SELECT org_id FROM books WHERE id=?", (r.json()["id"],))[0][0] is None, "freelancer: a new address book is private")
+# #2490 a list rule's comment: mention tokens only of people of the list
+r = Ca.post(B + f"/api/lists/{CL}/rules", json={"name": "Greet", "trigger": {"kind": "created"}, "action": {"kind": "comment", "text": f"hi <@{ERIN}>"}})
+check(r.status_code in (200, 201), "setup: a rule with a comment " + r.text[:200])
+RT = Ca.post(B + "/api/tasks", json={"title": "Ruled", "list_id": CL}).json()["id"]
+body = dbx("SELECT body FROM comments WHERE task_id=? AND rule_name IS NOT NULL", (RT,))
+check(body and f"<@{ERIN}>" not in body[0][0] and "Erin" not in body[0][0], "a rule comment keeps no mention of an unseen account " + str(body))
 
 print(f"\np21481_a_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
