@@ -1786,6 +1786,9 @@ fresh; run p2156_c_api "$PY" p2156_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2156_c_ui node p2156_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.161.0 part A: the own organisation picture also in the admin dialog "Edit organisation" (#2594)
 fresh; run p2161_a_ui node p2161_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.162.0 part A (#2603): test phase - an admin deletes a finalised / sent invoice (typed number, cash book on request)
+fresh; run p2162_a_api "$PY" p2162_a_invoice_delete_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2162_a_ui node p2162_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

@@ -40,6 +40,9 @@ TITLE_FALLBACK = {"invoice": N_("Invoice|document"), "credit": N_("Credit note|d
                   "reminder_3": N_("Final reminder|document"),
                   "delivery": N_("Delivery note|document"), "delivery_service": N_("Proof of service|document"),  # 2.120.0 D (#2089)
                   "offer": N_("Quotation|document")}  # 2.113.2 (#2253): a finalised quotation is mailed too
+# 2.162.0 A (#2603): test phase - an admin may delete a finalised / sent invoice (typing its number; with its payments,
+# credit notes, reminders, see office/invdelete.py). False = exactly the rule before: finalised or sent invoices stay.
+INVOICE_DELETE_TESTPHASE = True  # #2604: vor Launch auf False
 
 
 def _j(s, default):
