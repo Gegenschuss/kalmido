@@ -365,6 +365,7 @@ ORDER = (
     "office.undo",  # 2.111.0 A (#2233): undo of the office editors (copies before each own change, restore with conflict check)
     "office.numranges",  # 2.138.0 D (#2256): the next running number of every number series (office admin)
     "office.timebill",  # 2.144.6 A (#2053): time entries billable / billed by an invoice, never twice
+    "office.invdelete",  # 2.162.0 A (#2603): test phase - deleting a finalised / sent invoice (no routes of its own)
     "agents.importprop",  # 2.68.0 A (#1839): agents propose old data for the office (fixed costs), the person takes it over
     "agents.sheetprop",  # 2.126.1 B (#2125): table rows -> tasks as an agent's proposal (after api.v1, sheets.step2)
     "agents.meetprop",  # 2.70.0 A (#1354): a meeting becomes tasks (extract with photos, the chat's cards)
