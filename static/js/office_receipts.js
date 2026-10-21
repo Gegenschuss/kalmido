@@ -107,14 +107,15 @@ function rclListHtml() {
 const rclHere = () => S.route?.mod === 'office' && ofcTab() === 'books' && bkSub() === 'receipts';
 let rclQT = 0;
 document.addEventListener('input', e => {
-  if (e.target.id !== 'rcl-q' || !rclHere()) return;
+  const t = /** @type {any} */ (e.target);
+  if (t.id !== 'rcl-q' || !rclHere()) return;
   clearTimeout(rclQT);
-  const v = e.target.value.trim();
+  const v = t.value.trim();
   rclQT = setTimeout(() => { if (v !== RCL.f.q) rclSet({q: v}); }, 300);
 });
 document.addEventListener('change', e => {
   if (!rclHere()) return;
-  const t = e.target;
+  const t = /** @type {any} */ (e.target);
   if (t.id === 'rcl-per') { const per = t.value; if (per === 'custom') { RCL.f.per = per; rclSave(); ofcDraw(); return; } const [from, to] = rclPeriod(per); rclSet({per, from, to}); return; }
   if (t.id === 'rcl-from' || t.id === 'rcl-to') {
     const k = t.id === 'rcl-from' ? 'from' : 'to', v = t.value;
@@ -128,9 +129,9 @@ document.addEventListener('change', e => {
   if (t.id === 'rcl-pro') { rclSet({project: t.value}); return; }
   if (t.id === 'rcl-novat') { rclSet({novat: t.checked}); }
 });
-document.addEventListener('toggle', e => { if (e.target.classList?.contains('rcl-filters')) RCL.open = e.target.open; }, true);
+document.addEventListener('toggle', e => { const t = /** @type {any} */ (e.target); if (t.classList?.contains('rcl-filters')) RCL.open = t.open; }, true);
 document.addEventListener('click', e => {
-  const b = e.target.closest('[data-rcl]'); if (!b || !rclHere()) return;
+  const b = /** @type {any} */ (e.target).closest?.('[data-rcl]'); if (!b || !rclHere()) return;
   const k = b.dataset.rcl;
   if (k === 'rc') { bkSheet(+b.dataset.id, false); return; }
   if (k === 'more') { b.disabled = true; rclLoad(true); return; }
