@@ -60,7 +60,7 @@ function moSubHtml(t) {
 }
 // the view menu (render.js topMoreItems)
 function moViewItems() {
-  if (!moActive()) return [];
+  if (!moActive() || moBoard()) return [];  // 2.156.0 C (#2072): the board has its own columns
   const set = v => () => { if (moView() === v) return; S.settings.mine_view = v; render(); api('PATCH', '/api/settings', {mine_view: v}).catch(() => {}); };
   return [{label: tr('Own order'), icon: 'sort', on: moView() === 'own', fn: set('own')}, {label: tr('Grouped by list'), icon: 'list', on: moView() === 'lists', fn: set('lists')}];
 }
@@ -108,4 +108,30 @@ async function mtSet(id, on, o = {}) {
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-mt="show"]'); if (!b) return;
   e.preventDefault(); e.stopPropagation(); mtSet(+b.dataset.id, true);
+}, true);
+
+// ---- 2.156.0 C (#2072): "My tasks" as a board (mineboard.js, module mineboard, loaded on demand): the switch List / Board
+// and the board's columns (by due date, priority or list) at the top of the view; settings mine_board (0 | 1) and
+// mine_board_by (due | prio | list), per person on every device
+const moBoard = () => S.settings?.mine_board === '1';
+const moBoardBy = () => ['prio', 'list'].includes(S.settings?.mine_board_by) ? S.settings.mine_board_by : 'due';
+function moSetPref(k, v) {
+  if (!S.settings || S.settings[k] === v) return;
+  S.settings[k] = v; render();
+  api('PATCH', '/api/settings', {[k]: v}).catch(() => {});
+}
+function moSegHtml() {
+  if (!moActive()) return '';
+  const b = moBoard(), btn = (act, k, on, ico, label) => `<button type="button" class="${on ? 'on' : ''}" data-act="${act}"${k ? ` data-k="${k}"` : ''} aria-pressed="${on}" title="${esc(label)}">${ico ? ic(ico, 's') : ''}<span>${esc(label)}</span></button>`;
+  let h = `<div class="mobar"><div class="seg mbseg" role="group" aria-label="${esc(tr('View'))}">${btn('mo-view', 'list', !b, 'list', tr('List'))}${btn('mo-view', 'board', b, 'kanban', tr('Board'))}</div>`;
+  if (b) h += `<div class="seg mbby" role="group" aria-label="${esc(tr('Columns by'))}">${[['due', N_('Due')], ['prio', N_('Priority')], ['list', N_('List')]].map(([k, n]) => btn('mo-by', k, moBoardBy() === k, '', tr(n))).join('')}</div>`;
+  return h + '</div>';
+}
+// dnd.js dropTask0: a drop inside the board -> true when handled there (mineboard.js mb_drop)
+const mbDropHook = (t, el) => moActive() && moBoard() && typeof mb_drop === 'function' ? mb_drop(t, el) : false;
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('#view .mobar [data-act="mo-view"], #view .mobar [data-act="mo-by"]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  if (b.dataset.act === 'mo-view') moSetPref('mine_board', b.dataset.k === 'board' ? '1' : '0');
+  else moSetPref('mine_board_by', b.dataset.k);
 }, true);

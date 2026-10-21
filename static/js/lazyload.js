@@ -23,7 +23,7 @@ const LD_MODS = {
   mindmap: ['mindmap'],
   wiki: ['wiki', 'wkshare', 'wkhist', 'wkembed'],  // 2.123.0 B (#2104): wkshare.js = shares; A (#2102, #2106): wkhist.js = history + text search; C (#2103, #2107, #2108): wkembed.js = Ablage pictures, links, checkboxes
   stats: ['stats'],
-  calendar: ['calview', 'caldrag', 'apptbook'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings
+  calendar: ['calview', 'caldrag', 'apptbook', 'listcal'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings; 2.156.0 C (#2071): listcal.js = a list's calendar view
   docs: ['docs', 'paperless', 'receipts'],
   life: ['life', 'devlink'],  // 2.140.0 B (#2136): devlink.js = a device <-> office equipment
   integrations: ['integrations'],
@@ -32,6 +32,8 @@ const LD_MODS = {
   feeds: ['feeds'],  // 2.85.0 B (#1162)
   bookmarks: ['bookmarks'],  // 2.97.0 A (#1950)
   cfkinds: ['cfkinds'],  // 2.156.0 B (#2069): editing multiple choice / rating cells, the task link picker, the field dialog's currency / rating part
+  mineboard: ['mineboard'],  // 2.156.0 C (#2072): My tasks as a board
+  sectpl: ['sectpl'],  // 2.156.0 C (#2073): the section templates dialog of a list
   asstprop: ['asstprop', 'sheetprop'],  // 2.126.1 A (#2123 #2124): texts worded by an agent (office, documents, status report, the proposal card); B (#2125): sheetprop.js (table rows as tasks)
   sheets: ['sheets', 'sheets2', 'sheetsio', 'sheetsize', 'sheetshare', 'sheetchart', 'sheetkinds', 'sheetbook'],  // 2.89.0 (#1916); D: sheets2.js (step 2), C: sheetsio.js (import/export); 2.98.0 C (#2181): sheetsize.js (the frame); 2.124.0 A (#2115): sheetchart.js; C (#2113): sheetshare.js; B (#2110): sheetkinds.js; E (#2116): sheetbook.js
   tagsel: ['tagsel'],  // 2.122.0 B (#2099 #2294 #2295): tag picker, tag filter buttons, Shift ranges (file store + documents); 2.124.2: before videos (polls / formq stay last, p2102_c_ui)
@@ -66,6 +68,7 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   abscan: ['abm_scanOpen'],  // 2.112.1 (#2058)
   cfkinds: ['cfkTcEdit', 'cfkPick', 'cfkModalExtra'],  // 2.156.0 B (#2069)
   hookin: ['whiMount'],  // 2.115.0 (#2061)
+  sectpl: ['sct_open'],  // 2.156.0 C (#2073)
   hubmailbox: ['hmb_dialog', 'hmb_compose']};  // 2.141.0 A (#2141, #2138)
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)
 const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 'chatTypers', 'chatStHtml'], timeline: ['tlKbSync', 'tlAfterRender', 'rmAfterRender']};
@@ -84,6 +87,7 @@ const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_ti
   viewFeeds: ['feeds', 1], rss_homeCard: ['feeds'],  // 2.85.0 B (#1162)
   viewBookmarks: ['bookmarks', 1],  // 2.97.0 A (#1950)
   viewSheets: ['sheets', 1],  // 2.89.0 (#1916)
+  lcal_view: ['calendar', 1], mb_view: ['mineboard', 1],  // 2.156.0 C (#2071, #2072): a list's calendar, the board of My tasks
   hmb_hubSection: ['hubmailbox'], hmb_newBtn: ['hubmailbox'], hmb_replyBtn: ['hubmailbox'],  // 2.141.0 A (#2141, #2138): parts of the e-mail filing
   tvc_micHtml: ['voice'], tvc_playerHtml: ['voice']};  // 2.139.0 B (#2128): the team chat's composer / an audio file load voice.js
 // 2.102.0 C (#2208) scheduling polls (polls.js, module polls): the switch and the start points' clicks stay at start (moved

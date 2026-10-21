@@ -290,7 +290,7 @@ function evNewAt(day, hm, endHm) {
 // 2.52.0 (#1016): dragging over free time (and moving / resizing events) lives in caldrag.js: a block "New event" in the grid
 // the quick sheet opened from a free slot of the calendar: "Event" turns what was typed into an event at that time
 function evSheetBtn(preset) {
-  const q = $('.qadd.sheet'); if (!q || !evOn() || !preset?.due || q.querySelector('.qevbtn')) return;
+  const q = $('.qadd.sheet'); if (!q || !evOn() || !preset?.due || q.querySelector('.qevbtn') || isListCal()) return;  // 2.156.0 C (#2071): a list's calendar makes tasks only
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'btn sm qevbtn'; b.innerHTML = `${ic('cal', 's')}<span>${esc(tr('Event'))}</span>`;
   b.title = tr('Create an event at this time instead'); b.setAttribute('aria-label', tr('Create an event at this time instead'));

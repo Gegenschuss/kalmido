@@ -1594,6 +1594,9 @@ fresh; run p2156_b_ui node p2156_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.156.0 part A: tasks and mind map with five levels, mind map properties on demand, "Add ideas" by an agent (#1949 #1948 #1201)
 fresh; run p2156_a_api "$PY" p2156_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2156_a_ui node p2156_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.156.0 part C: calendar view per list, My tasks as a board, folded sections on every device + section templates (#2071 #2072 #2073)
+fresh; run p2156_c_api "$PY" p2156_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2156_c_ui node p2156_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

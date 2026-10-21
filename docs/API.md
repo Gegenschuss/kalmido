@@ -1297,6 +1297,24 @@ agents have none (`403`).
 assigned) stands above the placed ones, newest first; assigning a task to a person takes its old position away. The setting
 `mine_view` (`PATCH /api/settings`) is `own` (default) or `lists`.
 
+2.156.0 C (#2072): "My tasks" as a board: `mine_board` is `0` (the list, default) or `1`; `mine_board_by` names its columns:
+`due` (Overdue / Today / This week / Later / No date, default), `prio` or `list`. Dropping a card on a column is a plain task
+change (date, priority or list). 2.156.0 C (#2071): a list's `view` may also be `calendar` (the calendar with only that list's
+tasks; owner for everyone, a member for themself, like `kanban`). 2.156.0 C (#2073): `sections_closed` is a JSON list of the
+section ids the person folded in list views (at most 2000; all devices).
+
+2.156.0 C (#2073), web API (a person in the app, never an agent or an API token): section templates -- a name and the ordered
+names of a list's sections, the person's own (`space: "private"`) or an organisation's (`"org:<id>"`: every member reads it,
+its creator and the organisation's admins change it; another organisation / person gets 404).
+
+| Route | Meaning |
+|---|---|
+| `GET /api/section-templates` | the templates the person sees: `{templates: [{id, name, sections: [names], space, org_id, mine, can_edit, updated_at}]}` |
+| `POST /api/section-templates` | `{name, space?, list_id \| sections}`: `list_id` = that list's section names (who may write the list; a list with the lock: 409), `sections` = names (blanks and doubles dropped, at most 50) |
+| `PATCH /api/section-templates/{id}` | `{name?, sections?}` (its creator or an admin of its organisation, else 403) |
+| `DELETE /api/section-templates/{id}` | the same people; lists made with it keep their sections |
+| `POST /api/lists/{id}/sections/from-template` | `{template_id}`: the template's names the list lacks (any case) are added at the end in the template's order; nothing is removed or renamed. Answer `{added: [section rows], skipped: [names already there]}` |
+
 2.56.1 (#1799): the symbols of a task row and the sidebar's markers are settings too (`PATCH /api/settings`): `row_icons`
 is `all`, `key` (default), `calm` or `custom`; `row_icons_custom` is a comma list of the symbols shown with `custom` (`due`,
 `repeat`, `remind`, `deadline`, `occ`, `note`, `attach`, `link`, `sub`, `cmt`, `code`, `tracked`, `plan`, `ttype`, `ms`, `blocked`,

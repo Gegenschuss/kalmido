@@ -315,6 +315,7 @@ function dgDrop(e, id) {
     else dgBlock(ids, row, zn === 'after');
     return true;
   }
+  if (kcol && kcol.dataset.mbcol != null) { DG.ids = null; return false; }  // 2.156.0 C (#2072): the board of My tasks: the dragged task alone
   if (kcol) { const sid = kcol.dataset.kcol ? +kcol.dataset.kcol : null, lid = S.tasks.get(ids[0])?.list_id; if (lid) dgToSection(ids, lid, sid); return true; }
   if (cell) { batch('patch', {due: cell.dataset.day}, false, may); return true; }
   if (wad) { batch('patch', {due: wad.dataset.day, due_time: null}, false, may); return true; }

@@ -469,6 +469,7 @@ settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn`
 | `playbook` | `playbook.js` | the playbook area of a list / folder dialog, Settings |
 | `timeline` | `timeline.js`, `roadmap.js` | a list's timeline, the roadmap, the calendar's timeline |
 | `feeds` | `feeds.js` (+ `css/feeds.css`) | 2.85.0 (#1162): the view Feeds, the card Feeds on Home & life |
+| `calendar` (+ `listcal.js`), `mineboard`, `sectpl` | `listcal.js`, `mineboard.js`, `sectpl.js` | 2.156.0 C (#2071 #2072 #2073): a list's calendar view, "My tasks" as a board, the section templates dialog of a list |
 
 `contacts` now also loads `newsletter.js`, `settings` first `acctset.js` (the settings sections of `account.js`; sign-in,
 invitations and logout stay in `account.js`). What the start needs of them stays at start: `chatbase.js` (the phone /

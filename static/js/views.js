@@ -303,7 +303,7 @@ function quickDefaults() {
   if (k.startsWith('tag:')) d.tags = [k.slice(4)];
   if (k.startsWith('folder:')) { const fl = folderLists(k.slice(7)).filter(l => canEditList(l.id)); if (fl.length) d.list_id = fl[0].id; }
   if (k.startsWith('lists:')) { const fl = dx_listIds(k).filter(id => canEditList(id)); if (fl.length) d.list_id = fl[0]; }  // 2.47.3 (#1727)  // the folder's first list (~list picks another)
-  if (S.route.mod === 'cal') d.due = S.calSel;
+  if (S.route.mod === 'cal' || isListCal()) d.due = S.calSel;  // 2.156.0 C (#2071): + a list's calendar (the day picked there)
   if (k.startsWith('f:')) {  // new task in a filter view should show up in it
     const r = (S.filters.find(f => f.id === +k.slice(2)) || {}).rules || {};
     if (r.lists?.length === 1) d.list_id = r.lists[0];

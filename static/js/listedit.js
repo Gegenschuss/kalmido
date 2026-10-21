@@ -65,7 +65,7 @@ function secAddOpen(sec) {
     return;
   }
   S.secAdd = {key: S.route.key, sec: sec || 0, v: ''};
-  S.collapsed.delete('s:' + (sec || 0)); LS.set('collapsed', [...S.collapsed]);
+  S.collapsed.delete('s:' + (sec || 0)); LS.set('collapsed', [...S.collapsed]); scl_push();  // 2.156.0 C (#2073)
   renderView();
   $('#view .secadd-in')?.focus();
 }
@@ -107,7 +107,7 @@ function collapseKeys() {
 function collapseAll(close) {
   const keys = collapseKeys(); if (!keys.length) return;
   for (const k of keys) close ? S.collapsed.add(k) : S.collapsed.delete(k);
-  LS.set('collapsed', [...S.collapsed]); renderView();
+  LS.set('collapsed', [...S.collapsed]); renderView(); scl_push();  // 2.156.0 C (#2073)
   toast(close ? tr('Everything collapsed') : tr('Everything expanded'));
 }
 const collapseAnyOpen = () => collapseKeys().some(k => !S.collapsed.has(k));
@@ -299,3 +299,28 @@ document.addEventListener('dragover', e => {
 const dsStop = () => { DS.on = false; DS.box = null; if (DS.raf) cancelAnimationFrame(DS.raf); DS.raf = 0; };
 document.addEventListener('dragend', dsStop, true);
 document.addEventListener('drop', dsStop, true);
+
+// ---- 2.156.0 C (#2073): folded sections follow the person (setting sections_closed: json list of section ids, every device).
+// S.collapsed keeps "s:<id>" as before (the device's quick copy); "s:0" (Unassigned, the same key in every list) stays on the
+// device. Like foldSync / foldSet (sidebar.js): after a load the server's list wins, the first time a device has folded
+// sections the server lacks, they go up; ids of sections that are gone (or of lists no longer mine) drop out on the next save
+const scl_keys = () => [...S.collapsed].filter(k => /^s:[1-9]\d*$/.test(k));
+function scl_push() {
+  if (!S.settings) return;
+  const ids = new Set(S.sections.map(x => x.id)), v = JSON.stringify(scl_keys().map(k => +k.slice(2)).filter(id => ids.has(id)));
+  if (v === (S.settings.sections_closed || '[]')) return;
+  S.settings.sections_closed = v;
+  clearTimeout(scl_push.t); scl_push.busy = true;
+  scl_push.t = setTimeout(() => api('PATCH', '/api/settings', {sections_closed: S.settings.sections_closed}).catch(() => {}).finally(() => { scl_push.busy = false; }), 400);
+}
+function scl_sync() {
+  if (scl_push.busy || !S.settings) return;
+  let arr; try { arr = JSON.parse(S.settings.sections_closed || '[]'); } catch { return; }
+  if (!Array.isArray(arr)) return;
+  const mine = scl_keys();
+  if (!arr.length && mine.length && !LS.get('secUp', false)) { LS.set('secUp', true); scl_push(); return; }
+  LS.set('secUp', true);
+  mine.forEach(k => S.collapsed.delete(k));
+  arr.forEach(id => S.collapsed.add('s:' + id));
+  LS.set('collapsed', [...S.collapsed]);
+}

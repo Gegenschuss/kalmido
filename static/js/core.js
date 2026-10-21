@@ -761,6 +761,7 @@ function applyState(j) {
   lookAdopt();  // 2.143.0 D (#2155)
   o3c_ringsMigrate();  // 2.118.0 (#2297): old device switch for rings -> account setting, once
   foldSync();  // 2.4.0 (#361): folded folders follow the user (all devices)
+  scl_sync();  // 2.156.0 C (#2073): folded sections too (listedit.js)
   S.tasks = new Map(j.tasks.map(t => [t.id, t]));
   S.filters = j.filters || [];
   S.notify = j.notify || null;  // 2.1.0 (#317) the notification matrix (the server's view)
