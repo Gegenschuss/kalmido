@@ -284,6 +284,8 @@ def ofm_plan(c, uid, what, src, rows, own=False):
         for r in rows:
             docs, issued = [], []
             for d in c.execute("SELECT * FROM office_docs WHERE org_id=? AND client_id=? ORDER BY id", (src, r["id"])).fetchall():
+                if d["trial"]:  # 2.144.10 (#2576, review): trial documents stay where they are (no archive copy, no TEST number clash)
+                    continue
                 why = ofm_doc_hold(c, d)
                 if why == "issued":
                     issued.append(d)

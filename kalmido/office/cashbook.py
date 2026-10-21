@@ -203,7 +203,7 @@ def cb_links_get():
     rcs = [{"node_id": r["node_id"], "title": r["title"], "date": r["date"], "amount": dstr(r["amount"])} for r in reversed(rcs)][:300]
     inv = [{"id": r["id"], "number": r["number"], "date": r["date"], "client": r["name"] or ""} for r in c.execute(
         "SELECT d.id, d.number, d.date, cl.name FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id "
-        "WHERE d.org_id=? AND d.kind='invoice' AND d.status<>'draft' ORDER BY d.date DESC, d.id DESC LIMIT 300", (oid,))]
+        "WHERE d.org_id=? AND d.kind='invoice' AND d.status<>'draft' AND d.trial=0 ORDER BY d.date DESC, d.id DESC LIMIT 300", (oid,))]
     return jsonify(receipts=rcs, invoices=inv)
 
 
@@ -311,7 +311,9 @@ def _invoice_ok(c, oid, v):
     iid = _id(v, "invoice_id")
     if iid is None:
         return None
-    if not c.execute("SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND kind='invoice' AND status<>'draft'", (iid, oid)).fetchone():
+    # 2.144.10 B (#2576): a cash book entry never names a trial invoice
+    if not c.execute("SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND kind='invoice' AND status<>'draft' AND trial=0",
+                     (iid, oid)).fetchone():
         raise Denied(404)
     return iid
 

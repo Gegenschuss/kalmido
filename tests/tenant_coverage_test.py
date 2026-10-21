@@ -1046,6 +1046,8 @@ ROUTES = {
     # 2.144.6 A (#2053): time entries to an invoice (office/timebill.py: the office area's client lists, release = office admin;
     # p21446_a_api_test.py)
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",
+    # 2.144.10 A (#2576): delete every trial document of the area one works in, admins only (p214410_a_api_test.py)
+    "POST /api/office/trial/delete-all": "office",
 }
 
 # ---- 1. every route is classified, nothing stale

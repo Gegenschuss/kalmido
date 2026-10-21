@@ -135,6 +135,8 @@ def rin_template_ok(c, oid, tid):
         raise Denied(404)
     if r["status"] == "cancelled":
         raise BadInput(tr("A cancelled invoice cannot be repeated"))
+    if r["trial"]:  # 2.144.10 A (#2576): a series is real business
+        raise Denied(409, tr("A trial invoice cannot be repeated; create a real invoice for a series"))
     return r
 
 
@@ -244,7 +246,7 @@ def rin_make(c, oid, uid, s, period):
     from .ledger import ofx_log, ofx_number_at_finalize
     from .packs import office_pack_for
     t = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (s["template_id"], oid)).fetchone() if s["template_id"] else None
-    if t is None or t["kind"] != "invoice" or t["status"] == "cancelled":
+    if t is None or t["kind"] != "invoice" or t["status"] == "cancelled" or t["trial"]:  # 2.144.10 A (#2576): never from a trial one
         return None
     from ..core.orgcrypt import oc_dec_fields
     t = oc_dec_fields(c, oid, "office_docs", t)

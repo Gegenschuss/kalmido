@@ -346,7 +346,8 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True
         """A planned day in the past = expected now (the current month)."""
         return today if not day or day < today else day
 
-    docs = c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind IN ('offer', 'invoice', 'credit')", (oid,)).fetchall()
+    # 2.144.10 B (#2576): trial documents never enter the forecast (their payments drop out through by_id)
+    docs = c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind IN ('offer', 'invoice', 'credit') AND trial=0", (oid,)).fetchall()
     inv = [r for r in docs if r["kind"] == "invoice" and r["locked_at"] and r["status"] not in ("draft", "cancelled")]
     pm = inv_paid_map(c, oid, [r["id"] for r in inv])
     by_id = {r["id"]: r for r in docs}

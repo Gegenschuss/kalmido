@@ -247,6 +247,8 @@ def pl2_offer_status(c, oid, doc_id, status):
     Declined / others: nothing (the view shows the quotation's state). Returns the ids of the deals moved."""
     if status != "accepted":
         return []
+    if c.execute("SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND trial<>0", (doc_id, oid)).fetchone():
+        return []  # 2.144.10 B (#2576): a trial quotation never wins a deal
     ids = [r[0] for r in c.execute("SELECT id FROM office_deals WHERE org_id=? AND offer_id=? AND deleted_at IS NULL AND stage!='won'",
                                    (oid, doc_id)).fetchall()]
     for did in ids:
@@ -298,7 +300,7 @@ def pl2_patch(did):
     if "offer_id" in b:
         v = b.get("offer_id")
         if v is not None and (not isinstance(v, int) or isinstance(v, bool) or not c.execute(
-                "SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND kind='offer'", (v, oid)).fetchone()):
+                "SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND kind='offer' AND trial=0", (v, oid)).fetchone()):  # 2.144.10 B (#2576)
             raise BadInput(tr("Invalid value: {0}", "offer_id"))
         row["offer_id"] = v
     before = {k: cur.get(k) for k in row}

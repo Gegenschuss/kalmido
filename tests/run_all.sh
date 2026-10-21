@@ -1611,6 +1611,10 @@ fresh; run p21446_b_ui node p21446_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21446_c_ui node p21446_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.144.9: office PDF - number without a leading separator, invoice label on the rights page, quotation reference, part name one source, option row on part pages (#2575)
 fresh; run p21449_api "$PY" p21449_api_test.py "$KALMIDO_TEST_DATA"
+# 2.144.10 (#2576): trial documents (A core, B exclusions, C UI)
+fresh; run p214410_a_api "$PY" p214410_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p214410_b_api "$PY" p214410_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p214410_c_ui node p214410_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

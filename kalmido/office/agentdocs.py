@@ -255,7 +255,7 @@ def ofa_draft_create(c, uid, oid, data, agent_id=None):
     from .model import NAME_MAX, TEXT_MAX
     if office_role(c, uid, oid) not in ("admin", "member") or not office_on(c, uid):
         raise PermissionError("office")
-    if not isinstance(data, dict) or any(k not in OFA_DATA_KEYS for k in data):
+    if not isinstance(data, dict) or any(k not in OFA_DATA_KEYS + ("trial",) for k in data):
         raise BadInput(tr("Invalid data"))
     lid = _list_ok(c, oid, uid, data.get("list_id"))  # a person applies it (part B) or the v1 route checked the agent's view
     office_seed_texts(c, oid)
@@ -264,6 +264,9 @@ def ofa_draft_create(c, uid, oid, data, agent_id=None):
         b["client_id"] = data["client_id"]
     if data.get("intro") not in (None, ""):
         b["intro"] = _text(data["intro"], "intro", TEXT_MAX)
+    if data.get("trial") not in (None, False, 0, True, 1):
+        raise BadInput(tr("Invalid value: {0}", "trial"))
+    b["trial"] = bool(data.get("trial"))  # 2.144.10 A (#2576): a trial draft (TEST number at once, set only here)
     did = doc_create(c, oid, uid, b, False, number=False)
     r = doc_row(c, oid, did)
     items, flags = ofa_items(c, oid, r, data.get("items"))
@@ -290,8 +293,11 @@ def ofa_doc_extra(c, d):
 
 def ofa_offer_accepted(c, oid, did):
     """odoc_set_status -> accepted: the event offer_accepted to every agent of the area with its office switch on (only
-    while the area lets agents read office data). A person's or the customer's acceptance alike."""
+    while the area lets agents read office data). A person's or the customer's acceptance alike. 2.144.10 A (#2576): never
+    for a trial quotation (no real business)."""
     if not office_settings(c, oid).get("agents_read"):
+        return
+    if c.execute("SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND trial=1", (did, oid)).fetchone():
         return
     ids = [aid for aid, on in ofa_area_agents(c, oid) if on]
     if ids and pb_owner(c, oid) is None:  # 2.51.0 (#1348) review: a personal agent in an organisation only while its owner works in its office
@@ -378,7 +384,7 @@ def v1_office_master(kind):
 def v1_office_docs():
     from .docs import DOC_KINDS, doc_brief
     from .invoices import inv_paid_map
-    a = _args(("kind", "client_id", "open", "status"))
+    a = _args(("kind", "client_id", "open", "status", "trial"))
     c = db()
     aid, oid, uid = _v1ctx(c, a.get("requested_by"), target="docs")
     kind = a.get("kind") or "offer"
@@ -392,6 +398,11 @@ def v1_office_docs():
     if a.get("status"):
         sql += " AND status=?"
         args.append(str(a["status"])[:20])
+    if a.get("trial") not in (None, ""):  # 2.144.10 A (#2576): 1 only trial documents, 0 only real ones
+        if str(a["trial"]) not in ("0", "1"):
+            raise BadInput(tr("Invalid value: {0}", "trial"))
+        sql += " AND trial=?"
+        args.append(int(a["trial"]))
     pm = inv_paid_map(c, oid) if kind in ("invoice", "credit") else {}
     rows = []
     for r in c.execute(sql + " ORDER BY date DESC, id DESC LIMIT 500", args).fetchall():
@@ -470,14 +481,15 @@ def _flag_notify(b):
 @app.post("/api/v1/office/offers")
 @v1_view
 def v1_office_offer_post():
-    """{client_id?, title, intro?, items, list_id?, notify?, requested_by?} -> 201 {doc, chat_message_id?}."""
-    b = _json(OFA_DATA_KEYS + ("notify",))
+    """{client_id?, title, intro?, items, list_id?, trial?, notify?, requested_by?} -> 201 {doc, chat_message_id?}.
+    2.144.10 A (#2576): trial = a trial quotation (TEST number, SAMPLE on the PDF, never in bookkeeping)."""
+    b = _json(OFA_DATA_KEYS + ("notify", "trial"))
     c = db()
     notify = _flag_notify(b)
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True, target="offer")
     _list_ok(c, oid, uid, b.get("list_id"), aid)  # the agent itself must see the project list
     try:
-        did = ofa_draft_create(c, uid, oid, {k: v for k, v in b.items() if k in OFA_DATA_KEYS}, agent_id=aid)
+        did = ofa_draft_create(c, uid, oid, {k: v for k, v in b.items() if k in OFA_DATA_KEYS + ("trial",)}, agent_id=aid)
     except PermissionError:
         raise Denied(403, tr("This person does not work in this office")) from None
     return _draft_answer(c, aid, uid, oid, did, notify, N_("Quotation draft"))
@@ -615,6 +627,8 @@ def v1_office_pp_post():
     r = doc_row(c, oid, did)
     if r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid", "draft"):
         raise Denied(409, tr("Payments go on finalised, open invoices only"))
+    if r["trial"]:  # 2.144.10 B (#2576): no payment suggestions for trial invoices
+        raise Denied(409, tr("Trial documents do not go to the accounting"))
     amt = dec(b.get("amount"), "NaN") if b.get("amount") not in (None, "") else Decimal("NaN")
     if amt.is_nan() or amt <= 0 or amt > Decimal("100000000"):
         raise BadInput(tr("Invalid value: {0}", "amount"))
@@ -785,7 +799,8 @@ def ofa_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "list_id": {"type": ["integer", "null"], "description": "The project list (in the office's workspace)"},
         "notify": {"type": "boolean", "description": "A card in the person's chat: sum, PDF preview, Open in the office"},
         "requested_by": {"type": "integer"}}}
-    schemas["OfficeDraftInput"] = draft
+    schemas["OfficeDraftInput"] = {"type": "object", "properties": {**draft["properties"], "trial": {  # 2.144.10 A (#2576): set at creation only
+        "type": "boolean", "description": "A trial quotation (2.144.10): TEST number, SAMPLE on the PDF, never in bookkeeping, exports or reports; can be deleted at any time"}}}
     # 2.88.0 (#1915): a change may also set the draft's share in the cash flow plan
     schemas["OfficeDraftPatch"] = {"type": "object", "properties": {**draft["properties"], "cashflow": {
         "type": "string", "enum": ["auto", "yes", "no"], "description": "In the cash flow plan once sent: auto (the newest version of the chain), yes, no"}}}
@@ -798,7 +813,8 @@ def ofa_spec(paths, schemas, op, ok, errs, ref, pid, q):
                                           q("q", "Search", {"type": "string"}), rb], scope="office", desc="Never purchase prices or markups.")}
     paths["/office/docs"] = {"get": op("Quotations, invoices or reminders of the office, newest first (2.51.0)", T, ok(o) | errs("400", "403", "404"),
                                        [q("kind", "offer (default), invoice, credit, reminder", {"type": "string"}), q("client_id", "Only this client", {"type": "integer"}),
-                                        q("status", "Stored status", {"type": "string"}), q("open", "1 = only open invoices (issued, sent, partial, overdue)", {"type": "string"}), rb],
+                                        q("status", "Stored status", {"type": "string"}), q("open", "1 = only open invoices (issued, sent, partial, overdue)", {"type": "string"}),
+                                        q("trial", "2.144.10: 1 = only trial documents, 0 = only real ones (each document carries trial)", {"type": "string"}), rb],
                                        scope="office")}
     paths["/office/docs/{id}"] = {"get": op("One document with its positions (2.51.0)", T, ok(o) | errs("400", "403", "404"), [pid("id", "Document id"), rb], scope="office")}
     paths["/office/docs/{id}/pdf"] = {"get": {**op("The PDF preview of a draft (2.51.0)", T, errs("400", "403", "404", "409"), [pid("id", "Document id"), rb], scope="office"),

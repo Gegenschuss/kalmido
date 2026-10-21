@@ -30,7 +30,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, need_list, vis_sql
 from ..personal.timetrack import BadInput
-from .model import office_gate, office_org, office_settings, pb_cl_sql, pb_owner
+from .model import office_gate, office_org, office_settings, pb_cl_sql, pb_owner, trial_flag
 from .doctpl_samples import DMA_SAMPLES  # 2.117.0 B (#2283)
 
 DT_KINDS = (("contract", N_("Contract")), ("confirmation", N_("Order confirmation")), ("nda", N_("Non-disclosure agreement")),
@@ -386,6 +386,8 @@ def dt_pdf(c, oid, d, signed=None, client=None):
             images["Logo"] = logo
     title = d.get("title") or dt_kind_label(d.get("kind"), lang)
     draft = tr("Draft", lg=lang).upper() if d.get("status") == "draft" else ""  # a preview of a draft says so on every page
+    if d.get("trial"):  # 2.144.10 A (#2576): a trial document says SAMPLE / MUSTER instead (one mark) and carries it diagonally
+        draft = tr("SAMPLE", lg=lang)  # the watermark word (de MUSTER)
     body_sz, lh = 9.6, 9.6 * 1.42
     pages = []
 
@@ -494,6 +496,9 @@ def dt_pdf(c, oid, d, signed=None, client=None):
         # 2.114.4 A (#2282): the page count only from two pages on
         P.pdf_draw_footer(p, foot, tr("Page {0} of {1}", n, total, lg=lang) if total >= 2 else "")
     meta = {"when": datetime.now(timezone.utc), "producer": f"Kalmido v{APP_VERSION}"}
+    if d.get("trial"):
+        for p in pages:
+            p.mark(draft)
     return P.pdf_write(pages, images, title=title, author=co.get("name") or "", meta=meta)
 
 
@@ -702,6 +707,7 @@ def dt_doc_public(c, oid, r, names=None, sigs=None):
             "list_name": names["lists"].get(d["list_id"], ""), "doc_id": d["doc_id"], "offer_number": names["offers"].get(d["doc_id"], ""),
             "node_id": d["node_id"], "signed_node_id": d["signed_node_id"], "status": d["status"], "archived": int(d["archived"] or 0),
             "created_at": d["created_at"], "updated_at": d["updated_at"], "final_at": d.get("final_at"),
+            "trial": bool(d.get("trial")),  # 2.144.10 A (#2576)
             "signoff": sig_public(c, s) if s else None}
 
 
@@ -757,6 +763,9 @@ def dt_docs_list():
             raise BadInput(tr("Invalid value: {0}", "status"))
         sql += " AND status=?"
         args.append(st)
+    if request.args.get("trial") in ("0", "1"):  # 2.144.10 A (#2576): only trial / only real documents
+        sql += " AND trial=?"
+        args.append(int(request.args["trial"]))
     rows = c.execute(sql + " ORDER BY id DESC LIMIT ?", args + [LIST_MAX]).fetchall()
     if dt_signed_sync(c, oid, uid, rows):
         rows = c.execute(sql + " ORDER BY id DESC LIMIT ?", args + [LIST_MAX]).fetchall()
@@ -776,8 +785,8 @@ def dt_docs_list():
                         c.execute(f"SELECT l.id, l.name FROM lists l WHERE l.id IN {vis_sql()} AND {lsql} AND l.archived=0 AND l.is_inbox=0 "
                                   "ORDER BY lower(l.name) LIMIT ?", (uid, uid, owner if owner is not None else oid, LIST_MAX))]
         out["offers"] = [{"id": r["id"], "number": r["number"] or "", "client_id": r["client_id"], "project_title": r["project_title"] or "",
-                          "status": r["status"]} for r in
-                         c.execute("SELECT id, number, client_id, project_title, status FROM office_docs WHERE org_id=? AND kind='offer' "
+                          "status": r["status"], "trial": bool(r["trial"])} for r in  # 2.144.10 A (#2576)
+                         c.execute("SELECT id, number, client_id, project_title, status, trial FROM office_docs WHERE org_id=? AND kind='offer' "
                                    "AND client_id IS NOT NULL ORDER BY id DESC LIMIT ?", (oid, LIST_MAX))]
         tpls = c.execute("SELECT * FROM office_doc_templates WHERE org_id=? AND archived=0 ORDER BY lower(name), id LIMIT ?", (oid, LIST_MAX)).fetchall()
         out["templates"] = [dt_tpl_public(oc_dec_fields(c, oid, "office_doc_templates", r)) for r in tpls]
@@ -805,7 +814,8 @@ def dt_doc_post():
     if b.get("copy_of") not in (None, ""):
         src = oc_dec_fields(c, oid, "office_gen_docs", dt_doc(c, oid, b["copy_of"]))
         b = {"template_id": src["template_id"], "client_id": src["client_id"], "list_id": src["list_id"], "doc_id": src["doc_id"],
-             "title": src["title"], "body": src["body"], "sign": src.get("sign"), "lang": src.get("lang"), "kind": src["kind"]}
+             "title": src["title"], "body": src["body"], "sign": src.get("sign"), "lang": src.get("lang"), "kind": src["kind"],
+             "trial": src.get("trial")}  # 2.144.10 A (#2576): a copy of a trial document stays one
     t = dt_tpl(c, oid, b["template_id"]) if b.get("template_id") not in (None, "") else None
     row = dt_refs(c, oid, b)
     row["template_id"] = t["id"] if t else None
@@ -814,6 +824,9 @@ def dt_doc_post():
     row["title"] = _text(b.get("title"), "title", TITLE_MAX) or (t["name"] if t else "") or dt_kind_label(row["kind"], row["lang"])
     row["body"] = dt_body(b["body"]) if b.get("body") is not None else (t["body"] if t else "")
     row["sign"] = (1 if b.get("sign") else 0) if "sign" in b and b.get("sign") is not None else (int(t["sign"] or 0) if t else 0)
+    # 2.144.10 A (#2576): a trial document when asked for or when its quotation is one (set at creation only)
+    row["trial"] = 1 if trial_flag(b.get("trial")) or (row["doc_id"] and c.execute(
+        "SELECT trial FROM office_docs WHERE id=? AND org_id=?", (row["doc_id"], oid)).fetchone()["trial"]) else 0
     ts = iso(now_utc())
     row.update(org_id=oid, status="draft", created_by=uid, created_at=ts, updated_at=ts)
     row = oc_enc_fields(c, oid, "office_gen_docs", row)

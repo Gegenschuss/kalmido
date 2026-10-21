@@ -333,9 +333,9 @@ def who_obj(c, kind, oid, event):
         return r["org_id"], r["owner_id"], {"file": {"id": r["id"], "name": r["name"], "mime": r["mime"] or "", "size": r["size"] or 0,
                                                      "folder_id": r["parent_id"], "created_at": r["created_at"]}}
     if kind == "invoice":
-        r = c.execute("SELECT id, org_id, kind, number, status, date, currency, client_id, totals, sent_at, paid_at FROM office_docs WHERE id=?",
+        r = c.execute("SELECT id, org_id, kind, number, status, date, currency, client_id, totals, sent_at, paid_at, trial FROM office_docs WHERE id=?",
                       (oid,)).fetchone()
-        if not r or r["kind"] not in ("invoice", "credit"):
+        if not r or r["kind"] not in ("invoice", "credit") or r["trial"]:  # 2.144.10 A (#2576): trial documents send no event
             return None
         try:
             t = json.loads(r["totals"] or "{}")

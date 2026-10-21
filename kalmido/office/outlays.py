@@ -132,8 +132,8 @@ def au_unbill_post():
     q = ",".join("?" * len(ids))
     docs = {x[0] for x in c.execute(f"SELECT billed_doc_id FROM rc_receipts WHERE ws=? AND node_id IN ({q}) AND billed_doc_id IS NOT NULL", [ws] + ids)}
     c.execute(f"UPDATE rc_receipts SET billed_doc_id=NULL, billed_at=NULL WHERE ws=? AND node_id IN ({q}) AND NOT EXISTS "
-              "(SELECT 1 FROM office_docs d WHERE d.id=rc_receipts.billed_doc_id AND ((d.locked_at IS NOT NULL AND d.locked_at != '') OR d.status='sent'))",
-              [ws] + ids)  # 2.121.0 review M1: a sent document counts as final like in bill (ofx_need_editable)
+              "(SELECT 1 FROM office_docs d WHERE d.id=rc_receipts.billed_doc_id AND d.trial=0 AND ((d.locked_at IS NOT NULL AND d.locked_at != '') OR d.status='sent'))",
+              [ws] + ids)  # 2.121.0 review M1: a sent document counts as final like in bill (ofx_need_editable); 2.144.10 (#2576, review): a trial one frees them
     removed = 0
     for did in docs:
         r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()

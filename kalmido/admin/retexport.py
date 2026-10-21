@@ -95,7 +95,9 @@ def rx_counts(c, sub, along=True):
     out = {}
     with system_ctx(c):  # counts only (no content): the deleting admin may not see the records themselves
         if oid:
-            out["documents"] = c.execute("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL", (oid,)).fetchone()[0]
+            # 2.144.10 B (#2576): trial documents are no records to keep
+            out["documents"] = c.execute("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL AND trial=0",
+                                         (oid,)).fetchone()[0]
             out["archive"] = c.execute("SELECT COUNT(*) FROM office_archive WHERE org_id=?", (oid,)).fetchone()[0]
             out["cash"] = c.execute("SELECT COUNT(*) FROM office_cash_entries WHERE org_id=?", (oid,)).fetchone()[0]
             out["bank"] = c.execute("SELECT COUNT(*) FROM office_bank_tx WHERE org_id=?", (oid,)).fetchone()[0]
@@ -280,7 +282,8 @@ def _invoices(c, z, sub, done):
     from ..office.pdfweb import _render, _stored, epdf_name
     from .orgexport import _safe_part
     oid = sub["office"]
-    for r in c.execute("SELECT * FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL ORDER BY date, id", (oid,)).fetchall():
+    # 2.144.10 B (#2576): no trial documents (the tables below keep their rows with the trial column)
+    for r in c.execute("SELECT * FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL AND trial=0 ORDER BY date, id", (oid,)).fetchall():
         stem = "invoices/" + _safe_part(epdf_name(r), 100)
         p, x = _stored(oid, r, "pdf"), _stored(oid, r, "xml")
         try:
