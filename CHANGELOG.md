@@ -62,6 +62,9 @@ Small fixes from the phone test of 2.143: the read-only role and dialogs on phon
 ### Fixed
 - Office: *Create invoice* is a visible button on every quotation (the main button once accepted, before that it asks once) and is in the row menu of the quotation list; it left the editor's "…" menu (#2572).
 
+### Changed
+- Office, test phase: an admin can delete a quotation also after it was sent, answered or signed by the client (the confirmation says so); only one an invoice or a document was made from stays, and "Undo finalising" keeps the old rule. This is taken back before the launch (#2573, #2574).
+
 ## [2.147.1] - 2026-10-21
 
 Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.

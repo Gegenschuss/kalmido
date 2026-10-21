@@ -11826,6 +11826,7 @@
   "This quotation was sent to the client; the record is kept": "Ce devis a été envoyé au client ; l'enregistrement est conservé",
   "An invoice or a document was made from this quotation; the record is kept": "Une facture ou un document a déjà été créé à partir de ce devis ; l'enregistrement est conservé",
   "Its number stays used and shows as a gap in the office log.": "Son numéro reste attribué et apparaît comme un trou dans le journal du bureau.",
+  "The quotation was sent; it disappears anyway.": "Le devis a été envoyé ; il disparaît quand même.",
   "Undo finalising": "Annuler la finalisation",
   "Back to a draft?": "Revenir au brouillon ?",
   "The quotation can be changed again and keeps its number {0}.": "Le devis peut à nouveau être modifié et garde son numéro {0}.",

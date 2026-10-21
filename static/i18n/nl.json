@@ -11826,6 +11826,7 @@
   "This quotation was sent to the client; the record is kept": "Deze offerte is naar de klant verstuurd; het record blijft bewaard",
   "An invoice or a document was made from this quotation; the record is kept": "Van deze offerte is al een factuur of document gemaakt; het record blijft bewaard",
   "Its number stays used and shows as a gap in the office log.": "Het nummer blijft vergeven en staat als gat in het kantoorlogboek.",
+  "The quotation was sent; it disappears anyway.": "De offerte is verstuurd; ze verdwijnt toch.",
   "Undo finalising": "Definitief maken ongedaan maken",
   "Back to a draft?": "Terug naar concept?",
   "The quotation can be changed again and keeps its number {0}.": "De offerte kan weer worden gewijzigd en houdt haar nummer {0}.",

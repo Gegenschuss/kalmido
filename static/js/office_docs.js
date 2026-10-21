@@ -508,7 +508,7 @@ function ofdMoreItems(d, inList) {
       d.kind === 'invoice' && d.status === 'cancelled' && d.time_billed?.entries && ofcAdmin() ? {label: tr('Release the time again'), icon: 'clock', fn: () => tbill_release(d)} : null,  // 2.144.6 A (#2053)
       d.can_delete ? '-' : null,
       d.can_delete ? {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
-        if (!await askConfirm(tr('Delete {0}?', d.number || ofdKindName(d.kind, true)), d.locked ? tr('Its number stays used and shows as a gap in the office log.') : tr('Its number stays used.'), {ok: tr('Delete'), danger: true})) return;  // 2.114.2 A (#2263)
+        if (!await askConfirm(tr('Delete {0}?', d.number || ofdKindName(d.kind, true)), (d.locked ? tr('Its number stays used and shows as a gap in the office log.') : tr('Its number stays used.')) + (d.delete_sent ? ' ' + tr('The quotation was sent; it disappears anyway.') : ''), {ok: tr('Delete'), danger: true})) return;  // 2.114.2 A (#2263); 2.144.8 (#2573): test phase, a sent one too
         try { await api('DELETE', `/api/office/docs/${d.id}`); gone(); toast(tr('Deleted')); } catch (x) { toast(x.message || tr('unknown')); }
       }} : null];
   return inList ? [{label: tr('Open'), icon: 'edit', fn: () => go(`office/offers/${d.id}`)}, ...items] : items;
