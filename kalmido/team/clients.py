@@ -27,9 +27,10 @@ CLIENT_FIELDS = ("name", "name_extra", "display_name", "icon", "color", "contact
                  "org_id", "archived")
 CLIENT_TEXT_MAX = {"name": 80, "name_extra": 120, "display_name": 80, "icon": 8, "color": 20, "contact": 120, "email": 200, "phone": 60, "address": 500, "note": 4000}
 # 2.36.2 (#1021, E): structured billing fields (office & finance; people only, never in agent answers)
-CLIENT_BILLING = ("street", "address_extra", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days")
+CLIENT_BILLING = ("street", "address_extra", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days",
+                  "peppol_id")  # 2.154.0 B (#1960): the Peppol id "<scheme>:<id>" of e-invoices over Peppol
 CLIENT_BILLING_MAX = {"street": 200, "address_extra": 200, "zip": 20, "city": 120, "country": 2, "vat_id": 20, "customer_no": 40, "buyer_reference": 60,
-                      "email_invoice": 200}
+                      "email_invoice": 200, "peppol_id": 90}
 COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
 
 
@@ -159,6 +160,9 @@ def clean_client(c, uid, b, new=False):
             v = fk_country(v)
         if k == "vat_id":
             v = v.replace(" ", "").upper()
+        if k == "peppol_id":  # 2.154.0 B (#1960): known scheme, check digits (office/peppol.py)
+            from ..office.peppol import pep_id_clean
+            v = pep_id_clean(v)
         if len(v) > CLIENT_BILLING_MAX[k]:
             raise BadInput(tr("Invalid value: {0}", k))
         if k == "email_invoice" and v and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", v):

@@ -64,6 +64,13 @@
 .ostok.err{color:var(--danger)}
 .ostok.err .i{color:var(--danger)}
 .ofcset [aria-invalid]{border-color:var(--danger)}
+/* 2.154.0 B (#1960): e-invoices over Peppol - the settings block, the status line of a document, the send dialog */
+.pep-ok{color:var(--ok)}
+.pep-bad{color:var(--danger)}
+.pepline{margin:.25rem 0 .5rem;display:flex;flex-wrap:wrap;gap:.25rem;align-items:center}
+.pepmiss ul,.peplist{margin:.25rem 0 .75rem;padding-left:1.25rem}
+.peplist li{margin:.25rem 0}
+.pepset code,.ofddlg code{font-size:.875rem}
 @media (prefers-reduced-motion:no-preference) { .ostok{transition:opacity .2s} }
 @media (max-width:899px) { .ofcset .ostsub button{flex:none;padding:.25rem .375rem} }
 @media (pointer:coarse) { .ofcset .ostsub button{min-height:2.75rem} }

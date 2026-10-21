@@ -396,6 +396,10 @@ ROUTES = {
     "POST /api/office/docs/from-time": "office", "POST /api/office/docs/reminder": "office",
     "POST /api/office/docs/{}/delivery": "office", "GET /api/office/docs/{}/timesheet.pdf": "office",  # 2.120.0 D (#2089)
     "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/{}/datev": "office",
+    # 2.154.0 B (#1960): e-invoices over Peppol (p2154_b_peppol_test.py: the freelancer sets up and sends in the personal office)
+    "GET /api/office/peppol": "office", "PUT /api/office/peppol": "office", "POST /api/office/peppol/check": "office",
+    "GET /api/office/docs/{}/ubl": "office", "GET /api/office/docs/{}/peppol": "office", "POST /api/office/docs/{}/peppol": "office",
+    "POST /api/office/docs/{}/peppol/lookup": "office",
     "POST /api/office/docs/{}/cashflow": "office", "POST /api/office/docs/{}/duplicate": "office", "POST /api/office/docs/{}/fee": "office",
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
     "POST /api/office/docs/{}/invoice": "office",

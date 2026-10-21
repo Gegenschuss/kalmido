@@ -255,6 +255,7 @@ ORDER = (
     "office.signoff",  # 2.50.0 C (#1200): approval links with a simple electronic signature (quotations, list acceptance)
     "office.ledger",  # 2.36.2 (#1021, #1142, E): finalising, structured company data, office log
     "office.invoices",  # 2.38.0 (#1021, F1): invoices, credit notes, reminders, payments, sending, DATEV inbox
+    "office.peppol",  # 2.154.0 B (#1960): e-invoices over Peppol (own provider account): ids, connection, UBL, send + status
     "office.delivery",  # 2.120.0 D (#2089): delivery notes / proofs of service, the timesheet of an invoice
     "office.abschlag",  # 2.120.0 A (#2087): progress / final invoices, cash discount (Skonto)
     "office.doclang",  # 2.40.0 (#1381): language switch of drafts swaps the standard texts (no routes; used by office.docs)
