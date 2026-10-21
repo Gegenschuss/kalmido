@@ -31,6 +31,7 @@ const LD_MODS = {
   timeline: ['timeline', 'roadmap'],
   feeds: ['feeds'],  // 2.85.0 B (#1162)
   bookmarks: ['bookmarks'],  // 2.97.0 A (#1950)
+  cfkinds: ['cfkinds'],  // 2.156.0 B (#2069): editing multiple choice / rating cells, the task link picker, the field dialog's currency / rating part
   asstprop: ['asstprop', 'sheetprop'],  // 2.126.1 A (#2123 #2124): texts worded by an agent (office, documents, status report, the proposal card); B (#2125): sheetprop.js (table rows as tasks)
   sheets: ['sheets', 'sheets2', 'sheetsio', 'sheetsize', 'sheetshare', 'sheetchart', 'sheetkinds', 'sheetbook'],  // 2.89.0 (#1916); D: sheets2.js (step 2), C: sheetsio.js (import/export); 2.98.0 C (#2181): sheetsize.js (the frame); 2.124.0 A (#2115): sheetchart.js; C (#2113): sheetshare.js; B (#2110): sheetkinds.js; E (#2116): sheetbook.js
   tagsel: ['tagsel'],  // 2.122.0 B (#2099 #2294 #2295): tag picker, tag filter buttons, Shift ranges (file store + documents); 2.124.2: before videos (polls / formq stay last, p2102_c_ui)
@@ -63,6 +64,7 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   asstprop: ['ast_rpt'],  // 2.126.1 A (#2124): the status report dialog (projects.js)
   polls: ['tpo_list', 'tpo_edit', 'tpo_forClient'], formq: ['fq_clientLink'],  // 2.102.0 C (#2208)
   abscan: ['abm_scanOpen'],  // 2.112.1 (#2058)
+  cfkinds: ['cfkTcEdit', 'cfkPick', 'cfkModalExtra'],  // 2.156.0 B (#2069)
   hookin: ['whiMount'],  // 2.115.0 (#2061)
   hubmailbox: ['hmb_dialog', 'hmb_compose']};  // 2.141.0 A (#2141, #2138)
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)

@@ -1249,9 +1249,14 @@ TOOLS += [
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/fields")),
     ("create_field", "Create a custom field in a list (owner / list admins; 2.39.1: any list, switches the module Custom fields on for the "
                      "list's owner, the answer's modules_on names it): type text | number | date | select | person | url | checkbox "
-                     "| formula; options for select: {options: [{id?, name, color?}]}. 2.43.0: type formula + formula = a calculation "
-                     "with + - * / ( ), numbers, {Field name} of number / formula / checkbox fields and round(x, n); the server computes "
-                     "it, tasks show it in fields, nobody sets it (options.empty = blank: empty when a field is empty, default 0).",
+                     "| formula | multiselect | currency | rating | task (2.156.0); options for select / multiselect: {options: [{id?, name, "
+                     "color?}]}, currency: {currency: \"EUR\"}, rating: {max: 3-10}. Values in a task's fields: multiselect = option ids "
+                     "joined by \",\" (a list works too), rating \"1\"..max, task = the id of a task you can see (read it with get_task; "
+                     "others see its title only if they may see that task). 2.43.0: type formula + formula = a calculation "
+                     "with + - * / ( ), numbers, {Field name} of number / currency / rating / formula / checkbox fields; 2.156.0: comparisons "
+                     "and WENN/IF, SUMME/SUM, RUNDEN/ROUND, MIN, MAX, MITTELWERT/AVERAGE, ANZAHL/COUNT like in tables (; or , between "
+                     "arguments). The server computes it, tasks show it in fields (a failed calculation: \"#div0\" / \"#type\"), nobody sets "
+                     "it (options.empty = blank: empty when a field is empty, default 0).",
      _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1}, "type": {"type": "string"}, "options": {"type": "object"},
            "pinned": {"type": "boolean"}, "formula": {"type": "string"}}, ["list_id", "name", "type"]),
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/fields", body=_without(a, "list_id"))),

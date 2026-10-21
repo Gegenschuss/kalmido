@@ -4,13 +4,13 @@ import math
 import re
 import secrets
 from datetime import date
-from flask import jsonify
+from flask import g, has_app_context, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, like_escape
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
-from ..core.access import collab_all, Denied, list_people, list_role, need_list, vis_sql
+from ..core.access import collab_all, Denied, list_people, list_role, need_list, task_visible, vis_sql
 from ..core.pages import valid_link
 from ..lists.lists import COL_MAX, columns_out
 from ..tasks.validation import log_act
@@ -25,7 +25,12 @@ from .formula import fx_check_cycles, fx_compile, fx_display
 # values, but only the fields of its current list are shown / filtered (moving it back brings them back).
 # Deleting a field deletes its values. Values are stored as text: number canonical ("12.5"), select =
 # option id, date = YYYY-MM-DD, checkbox = "1" (unchecked = no row), person = user id (a member of the list).
-FIELD_TYPES = ("text", "number", "select", "date", "checkbox", "person", "url", "formula")  # 2.43.0 (#1328): + formula
+# 2.156.0 B (#2069): multiselect = option ids joined by "," (in the order of the options), currency = number canonical (the
+# currency is the field's option), rating = "1".."max" (0 = no row), task = id of a task the person who set it could see.
+FIELD_TYPES = ("text", "number", "select", "date", "checkbox", "person", "url", "formula",  # 2.43.0 (#1328): + formula
+               "multiselect", "currency", "rating", "task")  # 2.156.0 B (#2069)
+FIELD_CURRENCY_RE = re.compile(r"[A-Z]{3}")  # 2.156.0 B (#2069): ISO code of a currency field, EUR when none
+FIELD_RATING_MAX = (3, 10, 5)  # 2.156.0 B (#2069): lowest, highest, default maximum of a rating field
 FIELD_MAX = 20          # per list
 FIELD_PINNED_MAX = 2    # chips on the task rows
 COLOR_RE = re.compile(r"#[0-9a-fA-F]{3,8}")
@@ -60,7 +65,16 @@ def field_clean_def(b, old=None):
             opts["formula"] = str(raw["formula"])[:500]
         if raw.get("empty") == "blank":
             opts["empty"] = "blank"
-    if ftype == "select":
+    if ftype == "currency":  # 2.156.0 B (#2069)
+        cur = str(raw.get("currency") or "EUR").strip().upper()[:3]
+        opts["currency"] = cur if FIELD_CURRENCY_RE.fullmatch(cur) else "EUR"
+    if ftype == "rating":  # 2.156.0 B (#2069): the number of stars, 3 to 10
+        try:
+            mx = int(raw.get("max") or FIELD_RATING_MAX[2])
+        except (TypeError, ValueError):
+            mx = FIELD_RATING_MAX[2]
+        opts["max"] = min(max(mx, FIELD_RATING_MAX[0]), FIELD_RATING_MAX[1])
+    if ftype in ("select", "multiselect"):  # 2.156.0 B (#2069): + multiselect, the same options
         items, seen = [], set()
         for o in (raw.get("options") if isinstance(raw.get("options"), list) else [])[:50]:
             if not isinstance(o, dict):
@@ -102,6 +116,8 @@ def field_value(c, f, v, lid):
     t, name = f["type"], f["name"]
     if v is None or v == "" or v is False:
         return None
+    if t == "multiselect":  # 2.156.0 B (#2069): a list of option ids (or "a,b"); an empty list = no value
+        return fd_multi_value(f, v)
     if isinstance(v, (dict, list)):
         raise BadInput(tr("{0}: invalid value", name))
     if t == "formula":  # 2.43.0 (#1328): computed by the server, never written
@@ -115,7 +131,7 @@ def field_value(c, f, v, lid):
         if not valid_link(s):  # 2.35.0 (#186): file links too
             raise BadInput(tr("The link must be a web address (https://…) or a file link (smb://…, file://…)"))
         return s
-    if t == "number":
+    if t in ("number", "currency"):  # 2.156.0 B (#2069): + currency
         try:
             x = float(str(v).strip().replace(",", "."))
         except ValueError:
@@ -142,7 +158,44 @@ def field_value(c, f, v, lid):
         if uid not in list_people(c, lid) or (not collab_all() and list_role(c, lid, uid) != "owner"):
             raise BadInput(tr("Only the owner or a member of the list can be assigned"))
         return str(uid)
+    if t == "rating":  # 2.156.0 B (#2069): 1 to max, 0 = no value
+        try:
+            x = int(str(v).strip())
+        except ValueError:
+            raise BadInput(tr("{0}: number expected", name)) from None
+        mx = json.loads(f["options"] or "{}").get("max") or FIELD_RATING_MAX[2]
+        if not 0 <= x <= mx:
+            raise BadInput(tr("{0}: a rating from 0 to {1}", name, mx))
+        return str(x) if x else None
+    if t == "task":  # 2.156.0 B (#2069): a task the person setting it may see (agents the same way)
+        try:
+            tid = int(str(v).strip().lstrip("#"))
+        except ValueError:
+            raise BadInput(tr("{0}: task not found", name)) from None
+        if tid <= 0 or not c.execute("SELECT 1 FROM tasks WHERE id=? AND deleted_at IS NULL", (tid,)).fetchone() \
+                or not task_visible(c, tid, fd_uid()):
+            raise BadInput(tr("{0}: task not found", name))
+        return str(tid)
     raise BadInput(tr("Unknown field type"))
+
+
+def fd_uid():
+    """2.156.0 B (#2069): the person of the request (None outside one: nothing can be linked then)."""
+    u = g.get("user") if has_app_context() else None
+    return u["id"] if u else None
+
+
+def fd_multi_value(f, v):
+    """2.156.0 B (#2069): the stored value of a multiselect: known option ids in the order of the options, None when empty."""
+    if isinstance(v, str):
+        v = [x for x in v.split(",") if x.strip()]
+    if not isinstance(v, list) or len(v) > 50:
+        raise BadInput(tr("{0}: invalid value", f["name"]))
+    ids = [o["id"] for o in json.loads(f["options"] or "{}").get("options", [])]
+    want = {str(x).strip() for x in v}
+    if want - set(ids):
+        raise BadInput(tr("{0}: unknown option", f["name"]))
+    return ",".join(i for i in ids if i in want) or None
 
 
 def field_act(c, f, v):
@@ -151,10 +204,15 @@ def field_act(c, f, v):
     if v is not None and f["type"] == "select":
         o = next((o for o in json.loads(f["options"] or "{}").get("options", []) if o["id"] == v), None)
         d["v"] = o["name"] if o else None
+    if v is not None and f["type"] == "multiselect":  # 2.156.0 B (#2069): the option names
+        on = {o["id"]: o["name"] for o in json.loads(f["options"] or "{}").get("options", [])}
+        d["v"] = ", ".join(on.get(x, "?") for x in v.split(","))
     if v is not None and f["type"] == "person":
         d["v"] = user_names(c, [int(v)]).get(int(v), "?")
     if f["type"] == "number":
         d["unit"] = json.loads(f["options"] or "{}").get("unit", "")
+    if f["type"] == "currency":  # 2.156.0 B (#2069); a task field keeps only the id (its title is not for everyone)
+        d["unit"] = json.loads(f["options"] or "{}").get("currency", "EUR")
     return d
 
 
@@ -265,6 +323,15 @@ def field_update(fid):
         for (oid,) in c.execute("SELECT DISTINCT value FROM task_field_values WHERE field_id=?", (fid,)).fetchall():
             if oid not in keep:
                 c.execute("DELETE FROM task_field_values WHERE field_id=? AND value=?", (fid, oid))
+    if r["type"] == "multiselect":  # 2.156.0 B (#2069): a removed option leaves the values that hold it
+        keep = {o["id"] for o in opts["options"]}
+        for (val,) in c.execute("SELECT DISTINCT value FROM task_field_values WHERE field_id=?", (fid,)).fetchall():
+            left = ",".join(x for x in val.split(",") if x in keep)
+            if left != val:
+                if left:
+                    c.execute("UPDATE task_field_values SET value=? WHERE field_id=? AND value=?", (left, fid, val))
+                else:
+                    c.execute("DELETE FROM task_field_values WHERE field_id=? AND value=?", (fid, val))
     c.execute("UPDATE list_fields SET name=?, options=? WHERE id=?", (name, json.dumps(opts, ensure_ascii=False), fid))
     bump(c)
     c.commit()
@@ -278,6 +345,24 @@ def field_count(fid):
     need_field(c, fid)
     return jsonify(tasks=c.execute("SELECT COUNT(DISTINCT task_id) FROM task_field_values WHERE field_id=?", (fid,)).fetchone()[0],
                    used_by=fx_used_by(c, fid))
+
+
+@app.get("/api/fields/task-refs")
+def field_task_refs():
+    """2.156.0 B (#2069): ?ids=1,2,3 -> {tasks: [{id, title, status, list_id}]} of the linked tasks (task fields) the person may
+    see; the others are left out (the client shows "Task not visible", never a title)."""
+    c = db()
+    try:
+        ids = sorted({int(x) for x in (request.args.get("ids") or "").split(",") if x.strip()})[:200]
+    except ValueError:
+        return err(tr("Invalid data"))
+    out = []
+    uid = fd_uid()
+    for r in c.execute(f"SELECT id, title, status, list_id FROM tasks WHERE id IN ({','.join('?' * len(ids))}) AND deleted_at IS NULL",
+                       ids).fetchall() if ids else []:
+        if task_visible(c, r["id"], uid):
+            out.append({"id": r["id"], "title": r["title"], "status": r["status"], "list_id": r["list_id"]})
+    return jsonify(tasks=out)
 
 
 def fx_used_by(c, fid):
@@ -314,6 +399,12 @@ def search_field_ids(c, uid, q):
             for oid in oids:
                 hits.update(r[0] for r in c.execute("""SELECT v.task_id FROM task_field_values v JOIN tasks t ON t.id=v.task_id
                                                        WHERE v.field_id=? AND t.list_id=? AND v.value=?""", (f["id"], f["list_id"], oid)))
+        elif f["type"] == "multiselect":  # 2.156.0 B (#2069): one of the chosen options matches
+            oids = {o["id"] for o in json.loads(f["options"] or "{}").get("options", []) if ql in o["name"].casefold()}
+            if oids:
+                hits.update(r[0] for r in c.execute("""SELECT v.task_id, v.value FROM task_field_values v JOIN tasks t ON t.id=v.task_id
+                                                       WHERE v.field_id=? AND t.list_id=?""", (f["id"], f["list_id"]))
+                            if oids & set(r[1].split(",")))
     return hits
 
 

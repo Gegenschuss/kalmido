@@ -126,11 +126,11 @@ function filterModal(id) {
   const r = {op: 'and', lists: [], dates: [], prios: [], types: [], tags: [], ...JSON.parse(JSON.stringify(f.rules || {}))};
   r.cf = r.cf && typeof r.cf === 'object' ? r.cf : {};
   // custom fields of the visible lists that the filter engine understands
-  const cfs = (fieldsOn() ? S.fields || [] : []).filter(x => ['select', 'checkbox', 'date', 'number'].includes(x.type) && listById(x.list_id) && !listById(x.list_id).archived);
+  const cfs = (fieldsOn() ? S.fields || [] : []).filter(x => ['select', 'checkbox', 'date', 'number', 'multiselect', 'currency', 'rating'].includes(x.type) && listById(x.list_id) && !listById(x.list_id).archived);
   const cfChips = (fd, kind, opts) => `<div class="fchips" data-cf="${fd.id}" data-cfk="${kind}">${opts.map(([v, n]) => `<button class="${(r.cf[fd.id]?.[kind] || []).includes(v) ? 'on' : ''}" data-v="${esc(v)}">${esc(n)}</button>`).join('')}</div>`;
   const cfRow = fd => {
     const cur = r.cf[fd.id] || {};
-    const ctl = fd.type === 'select' ? cfChips(fd, 'sel', [...(fd.options?.options || []).map(o => [o.id, o.name]), ['', tr('empty')]])
+    const ctl = fd.type === 'select' || fd.type === 'multiselect' ? cfChips(fd, 'sel', [...(fd.options?.options || []).map(o => [o.id, o.name]), ['', tr('empty')]])
       : fd.type === 'checkbox' ? cfChips(fd, 'chk', [['1', tr('checked')], ['0', tr('not checked')]])
       : fd.type === 'date' ? cfChips(fd, 'date', DATE_OPTS.map(([v, n]) => [v, tr(n)]))
       : `<div class="cfnumf"><select data-cfnum="${fd.id}"><option value="">–</option>${[['gt', '>'], ['lt', '<'], ['eq', '='], ['set', tr('has a value')], ['empty', tr('empty')]].map(([k, n]) => `<option value="${k}" ${cur.num?.op === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select><input data-cfnumv="${fd.id}" inputmode="decimal" value="${esc(cur.num?.v ?? '')}" style="max-width:6.875rem">${fd.options?.unit ? `<span class="muted">${esc(fd.options.unit)}</span>` : ''}</div>`;

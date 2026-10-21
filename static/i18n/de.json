@@ -7582,7 +7582,6 @@
   "Add a number field first.": "Leg zuerst ein Zahlenfeld an.",
   "Add key figure": "Kennzahl hinzufügen",
   "All tasks": "Alle Aufgaben",
-  "Allowed: + - * / ( ), numbers, field names in braces and round(value, 2). Division by 0 stays empty.": "Erlaubt: + - * / ( ), Zahlen, Feldnamen in geschweiften Klammern und round(Wert, 2). Division durch 0 bleibt leer.",
   "At most {0} key figures": "Höchstens {0} Kennzahlen",
   "Average": "Durchschnitt",
   "Calculation": "Rechenart",
@@ -12592,5 +12591,18 @@
   "Suggest after": "Vorschlagen nach",
   "suggested": "vorgeschlagen",
   "Suggest payment reminders for overdue invoices": "Zahlungserinnerungen für überfällige Rechnungen vorschlagen",
-  "Read|section": "Gelesen"
+  "Read|section": "Gelesen",
+  "Division by 0": "Division durch 0",
+  "Not a number": "Keine Zahl",
+  "Task not visible": "Aufgabe nicht sichtbar",
+  "Choose a task": "Aufgabe wählen",
+  "Multiple choice": "Mehrfachauswahl",
+  "Rating": "Bewertung",
+  "Task link": "Aufgaben-Verknüpfung",
+  "Links one other task. Everyone sees its title only if they may see that task.": "Verknüpft eine andere Aufgabe. Den Titel sieht nur, wer diese Aufgabe sehen darf.",
+  "Allowed: + - * / ( ), numbers, field names in braces, comparisons (= <> < > <= >=) and the functions of tables:": "Erlaubt: + - * / ( ), Zahlen, Feldnamen in geschweiften Klammern, Vergleiche (= <> < > <= >=) und die Funktionen der Tabellen:",
+  "Separate the values with ; or , e.g. WENN({Hours} > 8; {Hours} * 1.5; {Hours}). Division by 0 shows as an error in the field.": "Werte mit ; oder , trennen, z. B. WENN({Stunden} > 8; {Stunden} * 1,5; {Stunden}). Division durch 0 erscheint als Fehler im Feld.",
+  "{0}: a rating from 0 to {1}": "{0}: eine Bewertung von 0 bis {1}",
+  "{0}: task not found": "{0}: Aufgabe nicht gefunden",
+  "unknown function “{0}”": "unbekannte Funktion „{0}“"
 }

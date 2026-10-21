@@ -7582,7 +7582,6 @@
   "Add a number field first.": "Añade primero un campo numérico.",
   "Add key figure": "Añadir indicador",
   "All tasks": "Todas las tareas",
-  "Allowed: + - * / ( ), numbers, field names in braces and round(value, 2). Division by 0 stays empty.": "Permitido: + - * / ( ), números, nombres de campo entre llaves y round(valor, 2). La división entre 0 queda vacía.",
   "At most {0} key figures": "Como máximo {0} indicadores",
   "Average": "Promedio",
   "Calculation": "Cálculo",
@@ -12592,5 +12591,18 @@
   "Suggest after": "Sugerir tras",
   "suggested": "sugerido",
   "Suggest payment reminders for overdue invoices": "Sugerir recordatorios de pago para facturas vencidas",
-  "Read|section": "Leído"
+  "Read|section": "Leído",
+  "Division by 0": "División por 0",
+  "Not a number": "No es un número",
+  "Task not visible": "Tarea no visible",
+  "Choose a task": "Elegir una tarea",
+  "Multiple choice": "Selección múltiple",
+  "Rating": "Valoración",
+  "Task link": "Enlace a tarea",
+  "Links one other task. Everyone sees its title only if they may see that task.": "Enlaza otra tarea. Solo ve su título quien puede ver esa tarea.",
+  "Allowed: + - * / ( ), numbers, field names in braces, comparisons (= <> < > <= >=) and the functions of tables:": "Permitido: + - * / ( ), números, nombres de campo entre llaves, comparaciones (= <> < > <= >=) y las funciones de las tablas:",
+  "Separate the values with ; or , e.g. WENN({Hours} > 8; {Hours} * 1.5; {Hours}). Division by 0 shows as an error in the field.": "Separa los valores con ; o , p. ej. SI({Horas} > 8; {Horas} * 1,5; {Horas}). La división por 0 aparece como error en el campo.",
+  "{0}: a rating from 0 to {1}": "{0}: una valoración de 0 a {1}",
+  "{0}: task not found": "{0}: tarea no encontrada",
+  "unknown function “{0}”": "función desconocida «{0}»"
 }

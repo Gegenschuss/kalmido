@@ -478,6 +478,8 @@ APP_ONLY = [
      "with PATCH /lists/{id} itself", ("GET /api/lists/{}/folder-preview",)),
     ("2.40.0 (#1192): the app counts the tasks with a value of a field for its delete confirmation; the API answers the "
      "count with DELETE /fields/{id} itself (values)", ("GET /api/fields/{}/count",)),
+    ("2.156.0 B (#2069): the titles of linked tasks for the web app's task fields; an agent reads a linked task with GET /tasks/{id} "
+     "(the same visibility)", ("=GET /api/fields/task-refs",)),
     ("2.40.0 (#1344 / #1361): the own order of My tasks and the favourite star are personal app settings of a person; "
      "agents never set them; 2.46.1: the favourite suggestion asks the person", ("PUT /api/tasks/mine-order", "* /api/lists/{}/favorite",
                                                                                    "POST /api/favorites/suggestion")),
