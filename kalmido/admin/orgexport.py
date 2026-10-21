@@ -285,6 +285,7 @@ OX_AREAS = (
     ("office/drives.json", "office_drives", "org_id=?"),
     ("office/drive_log.json", "office_drive_log", "org_id=?"),
     ("office/sub_reminders.json", "office_sub_reminders", "org_id=?"),  # 2.91.0 B (#1924): reminder tasks before a subscription renews
+    ("office/dunning_marks.json", "office_dunning_marks", "org_id=?"),  # 2.144.3 B (#2054): invoices + levels with a suggested reminder
     ("office/agreements.json", "office_agreements", "org_id=?"),  # 2.92.0 A (#1925): business contracts and insurances
     ("office/deals.json", "office_deals", "org_id=?"),  # 2.50.0 (#1196): the sales pipeline
     ("office/archive.json", "office_archive", "org_id=?"),

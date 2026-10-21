@@ -496,15 +496,15 @@ async function dc_smvMove(sel, what) {
   if (orgs.size !== 1) { toast(tr('Choose items of one workspace')); return null; }
   const ids = [...sel.keys()], from = [...orgs][0];
   let last = null;
-  const r = await smv_open({what, from,
+  const r = await smv_open({what, from, total: ids.length,  // 2.144.3 B (#2230): batches + progress
     check: async to => { try { return await rawFetch('POST', '/api/files/move-space', {ids, to: smv_ws(to), parent: 'docs', dry: 1}); } catch (x) { return {block: x.message || tr('The check failed. Please try again.')}; } },
-    run: to => { last = {ids, to: smv_ws(to), parent: 'docs'}; return api('POST', '/api/files/move-space', last); }});
+    run: (to, _p, _o, step) => { last = {ids, to: smv_ws(to), parent: 'docs'}; return smv_post('/api/files/move-space', last, 'ids', step); }});
   if (!r?.moved || !last) return null;
   DC.sel = new Map(); DC.selOn = false; DC.facets = null;
   dc_load();
-  const req = async b => { try { await api('POST', '/api/files/move-space', b); } catch { /* shown */ } DC.facets = null; dc_load(); return {}; };
+  const req = async (b, key) => { try { await smv_post('/api/files/move-space', b, key); } catch { /* shown */ } DC.facets = null; dc_load(); return {}; };
   const back = {items: r.moved.map(m => ({id: m.id, parent: m.parent_was, name: m.name_was})), to: smv_ws(r.org_was)}, again = last;
-  offerUndo(tr('Moved to {0}', wsName(r.to)), histAdd({label: tr('Move to another workspace'), undo: () => req(back), redo: () => req(again)}));
+  offerUndo(smv_label(r, ids.length), histAdd({label: tr('Move to another workspace'), undo: () => req(back, 'items'), redo: () => req(again, 'ids')}));
   return r;
 }
 document.addEventListener('click', e => {
