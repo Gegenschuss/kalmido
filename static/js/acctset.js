@@ -208,14 +208,24 @@ async function orgModal(o, done) {
   // 2.138.3 B (#2407): members as a list like Users (search, filter Members / All, a Member and an Admin box per row) instead of
   // one button per person; the symbol shows the picture / an app icon, never an emoji placeholder; the domain hint under the field
   const icPrev = v => orgIconHtml(v ? {icon: v} : {icon_url: o?.icon_url});  // a typed symbol replaces the picture on saving
+  // 2.161.0 (#2594): an own picture also here (as in Settings > Workspaces, the same routes: only an admin of this organisation)
+  const picAdm = !!o && (o.admins || []).includes(S.me?.id);
+  const picRow = () => picAdm ? `<button type="button" class="iconbtn" data-ogpic="up" title="${esc(tr('Upload a picture…'))}" aria-label="${esc(tr('Upload a picture…'))}">${ic('picture', 's')}</button>${o.icon_url ? `<button type="button" class="iconbtn" data-ogpic="rm" title="${esc(tr('Remove the picture'))}" aria-label="${esc(tr('Remove the picture'))}">${ic('x', 's')}</button>` : ''}` : '';
+  const picDone = async () => {
+    try { S.orgs = (await api('GET', '/api/admin/orgs')).orgs; } catch { return; }
+    const f = S.orgs.find(x => x.id === o.id); if (!f) return;
+    Object.assign(o, {icon: f.icon, icon_url: f.icon_url});
+    const inp = $('#og-icon', md); if (inp) inp.value = f.icon || '';  // the picture replaced the emoji: saving must not bring it back
+    $('#og-icprev', md).innerHTML = icPrev(f.icon || ''); $('#og-pic', md).innerHTML = picRow();
+  };
   const md = modal(`<h3>${o ? tr('Edit organisation') : tr('New organisation')}</h3>
     <div class="row"><label for="og-name">${tr('Name')}</label><input id="og-name" maxlength="60" value="${esc(o?.name || '')}"></div>
-    <div class="row"><label for="og-icon">${tr('Symbol')}</label><span class="wsicprev" id="og-icprev">${icPrev(o?.icon || '')}</span><input id="og-icon" maxlength="8" class="numin" value="${esc(o?.icon || '')}" placeholder="${esc(tr('optional'))}"></div>
+    <div class="row"><label for="og-icon">${tr('Symbol')}</label><span class="wsicprev" id="og-icprev">${icPrev(o?.icon || '')}</span><input id="og-icon" maxlength="8" class="numin" value="${esc(o?.icon || '')}" placeholder="${esc(tr('optional'))}"${o && !picAdm ? ' aria-describedby="og-pich"' : ''}>${o ? `<span id="og-pic">${picRow()}</span>` : ''}</div>
     <div class="row"><label for="og-dom">${tr('E-mail domains')}</label><div class="ogfld"><input id="og-dom" maxlength="500" value="${esc(o?.domains || '')}" placeholder="example.com" autocapitalize="off" aria-describedby="og-domh"><span class="muted" id="og-domh">${tr('registrations with these addresses join it')}</span></div></div>
     ${o ? `<div class="oghd"><b id="og-mh">${tr('Members')}</b><span class="muted" id="og-cnt" aria-live="polite"></span></div>
     <div class="ua8bar"><input type="search" id="og-q" placeholder="${esc(tr('Name, user name or e-mail'))}" aria-label="${esc(tr('Search users'))}" autocomplete="off" autocapitalize="off" spellcheck="false"><select id="og-flt" aria-label="${esc(tr('Filter'))}"><option value="mem">${tr('Members')}</option><option value="all">${tr('All')}</option></select></div>
     <div class="members ogml" id="og-list" role="group" aria-labelledby="og-mh"></div>
-    <div class="shint">${tr('Admins of an organisation manage its members, name and e-mail domains (Settings > Workspaces); they are not admins of the server.')}</div>` : `<div class="shint">${tr('You become its first member and admin; add people afterwards.')}</div>`}
+    <div class="shint">${tr('Admins of an organisation manage its members, name and e-mail domains (Settings > Workspaces); they are not admins of the server.')}${picAdm ? '' : ` <span id="og-pich">${tr('Only an admin of the organisation can upload a picture.')}</span>`}</div>` : `<div class="shint">${tr('You become its first member and admin; add people afterwards.')}</div>`}
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${o ? tr('Save') : tr('Create')}</button></div>`);
   md.classList.add('ogmodal');
   const row = u => `<div class="mrow ogrow" data-ogrow="${u.id}">${uRowAv(u)}<span class="n">${esc(u.display_name)} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}</span></span>`
@@ -247,6 +257,7 @@ async function orgModal(o, done) {
     count();
   });
   md.addEventListener('click', async e => {
+    const pb = e.target.closest('[data-ogpic]'); if (pb) { wsIconPick(md, o.id, pb.dataset.ogpic, picDone); return; }  // 2.161.0 (#2594)
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     try {

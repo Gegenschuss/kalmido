@@ -20,6 +20,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.161.0** (2026-10-21): the **organisation's own picture** can also be uploaded and removed in the admin dialog
+  *Edit organisation*, not only in Settings > Workspaces.
 - **2.147.1** (2026-10-21): **drag tasks into the chats** (team chat, thread, agent chat) as references, several at once, with
   *Insert reference* on phones; **overdue invoices suggest a payment reminder** as a draft (nothing is sent) and
   invoices / reminders in EUR carry a **GiroCode** for banking apps; moving many documents to another workspace shows

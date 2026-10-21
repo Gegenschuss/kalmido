@@ -6176,6 +6176,7 @@
   "An organisation with this name exists": "Esiste già un'organizzazione con questo nome",
   "This organisation still has {0} lists: their owners move or delete them first": "Questa organizzazione ha ancora {0} liste: i loro proprietari le spostano o eliminano prima",
   "Only an admin of this organisation can do this": "Solo un amministratore di questa organizzazione può farlo",
+  "Only an admin of the organisation can upload a picture.": "Solo un amministratore dell'organizzazione può caricare un'immagine.",
   "The last admin of an organisation cannot step down: make somebody else an admin first": "L'ultimo amministratore di un'organizzazione non può farsi da parte: rendi prima qualcun altro amministratore",
   "The last admin of an organisation cannot leave it: make somebody else an admin first": "L'ultimo amministratore di un'organizzazione non può lasciarla: rendi prima qualcun altro amministratore",
   "A personal agent of another person: only its owner changes it (you can pause it)": "Un agente personale di un'altra persona: solo il proprietario lo modifica (puoi metterlo in pausa)",

@@ -7,6 +7,13 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.161.0] - 2026-10-21
+
+An organisation's own picture can also be set in the admin dialog.
+
+### Changed
+- Admin > Organisation > *Edit organisation*: an admin of the organisation uploads or removes the organisation's own picture right next to the symbol (as in Settings > Workspaces); the emoji stays the fallback without a picture. Server admins who do not administer the organisation see a hint instead (#2594).
+
 ## [2.147.1] - 2026-10-21
 
 Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.
