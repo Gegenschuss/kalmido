@@ -159,8 +159,9 @@ check(r.status_code == 200 and "Visible task" in r.text, f"#1979 I2: the valid l
 
 # ============================================================ #1979 I1: per-link budgets shared per address (static)
 srcs = {p: open(os.path.join(ROOT, p), encoding="utf-8").read() for p in
-        ("kalmido/team/forms.py", "kalmido/lists/public.py", "kalmido/office/signoff.py", "kalmido/team/portal.py", "kalmido/api/v1.py")}
-check("def hit_budget(" in srcs["kalmido/api/v1.py"], "#1979 I1: the shared budget helper exists")
+        ("kalmido/team/forms.py", "kalmido/lists/public.py", "kalmido/office/signoff.py", "kalmido/team/portal.py", "kalmido/api/common.py")}
+# 2.149.0: the helper moved with the rate limits from api/v1.py into api/common.py (v1.py imports it)
+check("def hit_budget(" in srcs["kalmido/api/common.py"], "#1979 I1: the shared budget helper exists")
 for p, key in (("kalmido/team/forms.py", "formh:"), ("kalmido/lists/public.py", "pubfbl:"), ("kalmido/office/signoff.py", "sigl:"),
                ("kalmido/team/portal.py", "ptch:")):
     check(f'hit_budget(f"{key}' in srcs[p] and f'hit_limit(f"{key}' not in srcs[p], f"#1979 I1: {p}: the hourly budget is shared per address")

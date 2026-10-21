@@ -163,7 +163,9 @@ check(not dbx("SELECT 1 FROM app_passwords WHERE user_id=?", (ids["kiddo"],)), "
 check(Ki.get(B + "/api/state").ok, "M5: the web session of the child keeps working")
 
 # ============================================================ M6: time entries of health lists need "private"
-HL = A.post(B + "/api/lists", json={"name": "Physio", "time_tracking": True}).json()["id"]
+# 2.148.1 (#2480/#2483): a new list lands in alice's only organisation, and a health list made of it would leave it
+# (only its admins may) -> the health list is made private right away
+HL = A.post(B + "/api/lists", json={"name": "Physio", "time_tracking": True, "org_id": None}).json()["id"]
 HT = A.post(B + "/api/tasks", json={"title": "Knee therapy", "list_id": HL}).json()["id"]
 r = A.post(B + "/api/time/entries", json={"task_id": HT, "start": D(-1) + "T09:00", "minutes": 45, "note": "left knee"})
 check(r.ok, f"M6: setup: a time entry {r.status_code} {r.text[:200]}")
