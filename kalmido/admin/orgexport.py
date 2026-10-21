@@ -281,6 +281,7 @@ OX_AREAS = (
     ("office/bank_tx.json", "office_bank_tx", "org_id=?"),
     ("office/doc_templates.json", "office_doc_templates", "org_id=?"),
     ("office/gen_docs.json", "office_gen_docs", "org_id=?"),
+    ("office/privacy_sheets.json", "office_privacy_sheets", "org_id=?"),  # 2.154.0 C (#2192): data protection sheets of a client
     ("office/vehicles.json", "office_vehicles", "org_id=?"),
     ("office/drives.json", "office_drives", "org_id=?"),
     ("office/drive_log.json", "office_drive_log", "org_id=?"),

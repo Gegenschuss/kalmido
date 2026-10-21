@@ -380,6 +380,12 @@ ROUTES = {
     "DELETE /api/office/gen-docs/{}": "office", "POST /api/office/gen-docs/{}/restore": "office", "POST /api/office/gen-docs/preview": "office",
     "POST /api/office/gen-docs/{}/final": "office", "GET /api/office/gen-docs/{}/pdf": "office", "POST /api/office/gen-docs/{}/signoff": "office",
     "GET /api/office/gen-docs/{}/signoffs": "office",
+    # 2.154.0 C (#2192): data protection sheets of a client (p2154_c_api_test.py)
+    "GET /api/office/privacy-sheets": "office", "POST /api/office/privacy-sheets": "office", "PATCH /api/office/privacy-sheets/{}": "office",
+    "DELETE /api/office/privacy-sheets/{}": "office", "POST /api/office/privacy-sheets/{}/restore": "office",
+    "POST /api/office/privacy-sheets/{}/confirm": "office", "GET /api/office/privacy-sheets/{}/mail": "office",
+    "POST /api/office/privacy-sheets/{}/send": "office", "POST /api/office/privacy-sheets/{}/signed": "office",
+    "GET /api/office/privacy-sheets/{}/pdf": "office",
 
     # 2.93.0 B (#1928): the logbook, office admins (p293_b_api_test.py)
     "GET /api/office/vehicles": "office", "POST /api/office/vehicles": "office", "PATCH /api/office/vehicles/{}": "office",

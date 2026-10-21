@@ -46,7 +46,7 @@ async function ms_clGdLoad(id) {
 function ms_clDraw() { if (S.route.mod === 'clients') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('clients', viewClients()))); } }
 const ms_clDirty = () => { MSC.items = null; MSC.inv = null; };
 const ms_clShown = () => (MSC.items || []).filter(c => (MSC.arch || !c.archived) && (!MSC.q.trim() || [c.name, c.name_extra, c.display_name, c.label, c.contact, c.email, c.phone, c.note, c.billing?.customer_no]
-  .some(v => (v || '').toLowerCase().includes(MSC.q.trim().toLowerCase()))));
+  .some(v => (v || '').toLowerCase().includes(MSC.q.trim().toLowerCase()))) && dsb_clPass(c));  // 2.154.0 C (#2192): + the data protection filter
 const ms_clAv = (c, big) => `<span class="avatar ctav mscav ${big ? 'big' : ''}" style="${cssColor(c.color) ? '--cc:' + cssColor(c.color) : ''}" aria-hidden="true">${c.icon ? esc(c.icon) : ic('brief', big ? '' : 's')}</span>`;
 const ms_tag = (kind) => kind === 'client' ? `<span class="mstag mstag-cl">${ic('brief', 's')}${tr('Client')}</span>` : `<span class="mstag">${ic('user', 's')}${tr('Contact')}</span>`;
 
@@ -75,7 +75,7 @@ function ms_clView() {
     : d.error ? `<div class="ctcard ctnone muted">${ic('brief')}${tr('This client does not exist or you cannot see it.')}${mob ? `<a class="btn" href="#clients">${tr('All clients')}</a>` : ''}</div>` : ms_clCard(d);
   const head = '';  // 2.87.9 (#1917): no "Office › Clients" heading (it looked like a way back); the office menu shows the place, the path only on a client
   const bar = `<div class="ctbar"><div class="ctsearch">${ic('search', 's')}<input id="mscl-q" type="search" value="${esc(MSC.q)}" placeholder="${esc(tr('Search clients'))}" aria-label="${esc(tr('Search clients'))}" autocomplete="off" enterkeyhint="search"></div>
-    <label class="chkl"><input type="checkbox" id="mscl-arch" ${MSC.arch ? 'checked' : ''}> ${tr('Archived')}</label><span class="spacer"></span>${typeof hbm_hubBtn === 'function' ? hbm_hubBtn() : ''}
+    <label class="chkl"><input type="checkbox" id="mscl-arch" ${MSC.arch ? 'checked' : ''}> ${tr('Archived')}</label>${dsb_clFilter()}<span class="spacer"></span>${typeof hbm_hubBtn === 'function' ? hbm_hubBtn() : ''}
     ${(MSC.items || []).length ? `<button class="iconbtn ${MSC.pick ? 'on' : ''}" data-mscl="pick" aria-pressed="${!!MSC.pick}" aria-label="${esc(tr(MSC.pick ? 'End selection' : 'Select'))}" title="${esc(tr(MSC.pick ? 'End selection' : 'Select'))}">${ic('select')}</button>` : ''}
     <button class="btn sm pri" data-act="client-new">${ic('plus', 's')}<span class="cdl">${tr('New client')}</span></button></div>`;
   const items = MSC.items === null ? null : ms_clShown();
@@ -111,6 +111,7 @@ function ms_clCard(c) {
     </div>`,
       persons: ks.length ? `<div class="ctsec"><h4>${tr('Contact persons')}</h4><ul class="ctlinks msclks">${ks.map(k => `<li>${ic('user', 's')} ${k.contact_id && feat('contacts') ? `<a href="#contacts/${k.contact_id}" title="${esc(tr('Open contact'))}"><b>${esc(k.name)}</b></a>` : `<b>${esc(k.name)}</b>`}${k.role ? ` <span class="muted">${esc(k.role)}</span>` : ''}${k.is_default && ks.length > 1 ? ` <span class="rotag">${tr('Default')}</span>` : ''}${k.email ? ` · <a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : ''}${k.phone ? ` · <a href="tel:${esc(k.phone.replace(/[^\d+]/g, ''))}">${esc(k.phone)}</a>` : ''}</li>`).join('')}</ul></div>` : '',
       invoices: typeof officeOn === 'function' && officeOn() && MSC.inv !== null ? `<div class="ctsec"><h4>${tr('Open invoices')}</h4>${inv.length ? `<ul class="ctlinks">${inv.map(x => `<li><a class="linkbtn" href="#office/offers/${x.id}">${ic('receipt', 's')} ${esc(x.number || tr('Draft'))}</a><span class="muted"> · ${esc(x.date ? fmtDateLoc(x.date) : '')} · ${esc(x.open_text || '')} · ${esc(x.status_text || '')}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No open invoices.')}</p>`}</div>` : '',
+      privacy: dsb_clHtml(c),  // 2.154.0 C (#2192): the data protection sheets (office admins)
       tickets: typeof ptl_clientHtml === 'function' ? ptl_clientHtml(c) : '',  // 2.63.0 B (#1513): the client's reports
       gendocs: ms_clGdHtml(c),  // 2.93.0 A (#1927): the documents made from templates (office admins)
       ...clientDetailParts(c)})}${clm_histHtml(c)}${typeof hbm_clientHtml === 'function' ? hbm_clientHtml(c) : ''}${typeof vdr_clientHtml === 'function' ? vdr_clientHtml(c) : ''}${''/* 2.99.1 A (#1959): video sign-offs */}</div>
@@ -288,3 +289,47 @@ function ofm_clients(ids) {
   ofm_move({what: 'clients', ids: sel.map(c => c.id), from, label: sel.length === 1 ? qn(sel[0].name) : trn('{0} client', '{0} clients', sel.length),
     after: async () => { if (MSC.pick) ms_clEnd(); await ms_clAfter(); }});
 }
+
+// ---- 2.154.0 C (#2192): data protection sheets of the client (office/privacy.py; office admins, else no section / filter):
+// the section with each sheet's status and the filter of the list; the dialogs and the menu live in office_doctpl.js
+const DSB = {cl: null, all: null, f: '', no: false};  // no = the server said no (a member): no filter
+function dsb_clHtml(c) {
+  if (typeof officeOn !== 'function' || !officeOn()) return '';
+  if (DSB.cl?.id !== c.id) { if (!DSB.cl?.busy) { DSB.cl = {id: c.id, busy: 1}; dsb_clLoad(c.id); } return ''; }
+  const ss = DSB.cl.sheets; if (!ss) return '';
+  const li = x => `<li>${ic('shield', 's')} <b>${esc(x.kind_label)}</b> <span class="rotag dsb-st dsb-st-${esc(x.status)}${x.review ? ' dsb-rev' : ''}">${esc(x.gen_status === 'draft' ? tr('Draft') : x.status_label)}</span><button type="button" class="iconbtn" data-dsb="menu" data-id="${x.id}" aria-haspopup="menu" aria-label="${esc(tr('More'))}: ${esc(x.kind_label)}" title="${esc(tr('More'))}">${ic('dots', 's')}</button></li>`;
+  return `<div class="ctsec dsbsec"><h4>${tr('Data protection')}</h4>${ss.length ? `<ul class="ctlinks">${ss.map(li).join('')}</ul>` : ''}<button type="button" class="btn sm" data-dsb="new" data-cl="${c.id}">${ic('plus', 's')} ${tr('Data protection sheet')}</button></div>`;
+}
+async function dsb_clLoad(id) {
+  let ss = null;
+  try { ss = (await rawFetch('GET', `/api/office/privacy-sheets?client_id=${id}&brief=1`)).sheets || []; } catch { ss = null; DSB.no = true; }  // quiet: members (403) see no section
+  DSB.cl = {id, sheets: ss};
+  ms_clDraw();
+}
+const dsb_clReload = () => { DSB.cl = null; DSB.all = null; ms_clDraw(); };
+// the list filter: the newest sheet of each kind counts (open = not yet signed / handed over)
+function dsb_clFilter() {
+  if (typeof officeOn !== 'function' || !officeOn() || DSB.no) return '';
+  const o = [['', tr('Data protection')], ['dpa', tr('DPA open')], ['consent', tr('Consent open')], ['info', tr('Information not handed over')], ['review', tr('To check')]];
+  return `<select id="mscl-dsb" class="dsbflt" aria-label="${esc(tr('Data protection'))}">${o.map(([k, l]) => `<option value="${k}" ${DSB.f === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+}
+function dsb_clPass(c) {
+  if (!DSB.f) return true;
+  if (!DSB.all) return false;
+  const ss = DSB.all.filter(x => x.client_id === c.id);
+  if (DSB.f === 'review') return ss.some(x => x.review);
+  const x = ss.find(y => y.kind === DSB.f);  // newest first
+  return !!x && (DSB.f === 'info' ? x.status === 'open' : ['open', 'sent'].includes(x.status));
+}
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'mscl-dsb') return;
+  DSB.f = e.target.value;
+  if (DSB.f) { try { DSB.all = (await rawFetch('GET', '/api/office/privacy-sheets?brief=1')).sheets || []; } catch { DSB.f = ''; DSB.no = true; } }  // fresh on every choice (another device may have changed a sheet)
+  ms_clDraw();
+});
+document.addEventListener('click', async e => {
+  const b = e.target.closest?.('#view [data-dsb]'); if (!b) return;
+  await loadModule('office');
+  if (b.dataset.dsb === 'new') dsb_new(+b.dataset.cl);
+  else dsb_menu(b, (DSB.cl?.sheets || []).find(x => x.id === +b.dataset.id));
+});

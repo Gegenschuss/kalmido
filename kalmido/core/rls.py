@@ -37,6 +37,7 @@ TABLES = (
     "office_inv_series", "office_sub_reminders",  # 2.91.0 A (#1923), B (#1924)
     "office_dunning_marks",  # 2.147.1 B (#2054): suggested payment reminders
     "office_doc_templates", "office_gen_docs",  # 2.93.0 A (#1927): document templates and the documents made from them
+    "office_privacy_sheets",  # 2.154.0 C (#2192): data protection sheets of a client
     "office_vehicles", "office_drives", "office_drive_log",  # 2.93.0 B (#1928): the logbook
     "office_cashbooks", "office_cash_entries", "office_cash_closings", "office_cash_log",  # 2.121.0 B (#2095): the cash book
     "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")

@@ -1589,6 +1589,9 @@ fresh; run p21443_c_ui node p21443_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2154_d_dup "$PY" p2154_d_dup_test.py "$KALMIDO_TEST_DATA"
 # 2.154.0 part D: industry pack chosen per calculation part (#1876)
 fresh; run p2154_d_pack "$PY" p2154_d_pack_test.py "$KALMIDO_TEST_DATA"
+# 2.154.0 part C: data protection sheets of a client - DPA, privacy information, consent; mail, signed back by link / upload / reply mail (#2192)
+fresh; run p2154_c_api "$PY" p2154_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2154_c_ui node p2154_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

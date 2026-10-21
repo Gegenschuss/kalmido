@@ -367,6 +367,8 @@ SPECS = [
         "doc_id": "office_docs"}, late={"node_id": "fs_nodes", "signed_node_id": "fs_nodes"}, people=_P, private="office"),
     OiT("office/signoffs.json", "office_signoffs", refs={"doc_id": "office_docs", "list_id": "lists", "section_id": "sections", "task_id": "tasks",
         "gen_doc_id": "office_gen_docs"}, late={"video_id": "video_reviews"}, people=_P, private="office", prep=_p_signoff, after=_a_signoff),
+    OiT("office/privacy_sheets.json", "office_privacy_sheets", refs={"client_id": "clients", "gen_doc_id": "office_gen_docs"},
+        late={"signed_node_id": "fs_nodes"}, people=_P, private="office"),  # 2.154.0 C (#2192): the mail code is new on the target (code_hash dropped)
     OiT("office/trip_purposes.json", "office_trip_purposes", people=_P, private="office"),
     OiT("office/trips.json", "office_trips", refs={"client_id": "clients"}, people=_P, private="office"),
     OiT("office/trip_items.json", "office_trip_items", refs={"trip_id": "office_trips", "billed_doc_id": "office_docs"}, need=("trip_id",),
