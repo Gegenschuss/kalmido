@@ -5,7 +5,7 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
-## [Unreleased]
+## [2.147.2] - 2026-10-21
 
 Bundle of the packages 2.144.5 to 2.144.11 and 2.147.2 (leftovers, office fixes: time to the invoice, invoice from a quotation, test-phase deletion, office PDF numbers, trial documents, cash book; phone-test fixes of 2.143). The version number is set when it is pushed.
 
