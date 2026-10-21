@@ -21,7 +21,7 @@ from . import store as S
 from .web import doc_json, doc_query, doc_update
 
 CREATE_FIELDS = ("name", "title", "mime", "content_base64", "parent_id", "ws", "sender", "type", "tags", "date", "due", "amount", "currency")
-V1_FIELDS = ("date", "due", "amount", "currency", "sender", "type", "tags", "text")
+V1_FIELDS = ("date", "due", "amount", "currency", "sender", "type", "tags", "text", "custom_fields")  # 2.153.0 (#2179): + custom_fields
 
 
 def _v1_doc(c, m, node, full=False, role=None):
@@ -152,7 +152,7 @@ def v1_doc_get(nid):
 @v1_view
 def v1_doc_patch(nid):
     """Set fields (role edit): date, due, amount, currency, sender, type, tags (names), text (only while none was
-    recognised). An agent's values are marked "set by an agent"; features on level agent become suggestions."""
+    recognised), custom_fields {id or name: value} (2.153.0). An agent's values are marked "set by an agent"; features on level agent become suggestions."""
     b = v1_json()
     extra = sorted(k for k in b if k not in V1_FIELDS)
     if extra:
@@ -196,7 +196,11 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
                       "a suggestion a person takes over (supplier, vat_id, tax_no, invoice_no, vat_pct 19|7|0, vat_rates [{pct, net, vat}], "
                       "net, vat, gross, currency; new = fields a take-over would change, hidden = dismissed)"},
         # 2.126.1 A (#2123)
-        "summary": {"type": "string", "description": "Single document only: the summary a person took over from an agent's draft ('' = none)"}}}
+        "summary": {"type": "string", "description": "Single document only: the summary a person took over from an agent's draft ('' = none)"},
+        "custom_fields": {"type": "array", "description": "2.153.0: the custom fields of the document's workspace with this document's "
+                          "value (single document only): id, name, type (text, number, money, date, checkbox, select, url), options "
+                          "(select: id, name), value (null = none; money '12.50 EUR', checkbox '1', select the option id), label",
+                          "items": {"type": "object"}}}}
     schemas["DocumentPage"] = {"type": "object", "properties": {"data": {"type": "array", "items": ref("Document")},
                                                                 "next_cursor": {"type": ["string", "null"]}}}
     T = "Documents"
@@ -205,7 +209,9 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "date": {"type": ["string", "null"], "format": "date"}, "due": {"type": ["string", "null"], "format": "date"},
         "amount": {"type": ["string", "null"]}, "currency": {"type": ["string", "null"]}, "sender": {"type": ["string", "null"]},
         "type": {"type": ["string", "null"]}, "tags": {"type": "array", "items": {"type": "string"}},
-        "text": {"type": "string", "description": "Only taken while the document has no recognised text"}}}
+        "text": {"type": "string", "description": "Only taken while the document has no recognised text"},
+        "custom_fields": {"type": "object", "description": "2.153.0: field id or name -> value (null clears it). Only fields the "
+                          "workspace has; an agent cannot add fields. Select: the option's id or name", "additionalProperties": True}}}
     paths["/documents"] = {"get": op("Documents shared with you (2.48.0)", T, ok(ref("DocumentPage")) | errs("400", "403"),
                                      [q("q", "Words of the text (whole words; 4+ letters also as a prefix). 2.122.0: search syntax tag:Name, "
                                          "sender:Name, type:Name, date:2025 | 2025-03 | 2025-01..2025-06 | >2025-01-01, added:<date>, "

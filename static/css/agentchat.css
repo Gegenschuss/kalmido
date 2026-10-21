@@ -390,3 +390,8 @@ body .chath.agcol{border-top:.1875rem solid var(--agcol);padding-top:.5625rem}
 .chcomp.agcol:focus-within{border-top-color:var(--agcol)}
 .cmsg.jcfcut .cbub{max-height:7.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
 .jcfbtn[aria-pressed="true"]{color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
+/* 2.153.0 (#1962): a chat of its own per job -- in the whole chat the link to the job's chat under its card; in the job's
+   chat its progress lines */
+.jcsgo{display:inline-flex;align-items:center;gap:.375rem;align-self:flex-start;min-height:2.75rem;margin-left:.75rem;padding:0 .5rem;color:var(--accent)}
+.jcsgo:focus-visible{outline:.125rem solid var(--accent);outline-offset:.125rem}
+.jcsp span::before{content:"";display:inline-block;width:.375rem;height:.375rem;margin-right:.375rem;border-radius:50%;background:var(--jcol,var(--muted));vertical-align:middle}

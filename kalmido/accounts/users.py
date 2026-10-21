@@ -434,6 +434,7 @@ def user_purge(c, uid):
         c.execute("DELETE FROM webhooks WHERE id=?", (a["webhook_id"],))
     from ..files.store import fs_user_purge
     files += fs_user_purge(c, uid)  # 2.48.0 (#1207): the file store (organisation branches go to an admin, the own tree goes)
+    c.execute("DELETE FROM doc_fields WHERE ws=?", (f"u{int(uid)}",))  # 2.153.0 (#2179): the own documents' custom fields
     # 2.84.0 A (#1198): the person's private filed mails and their mails nobody else sees (not assigned) go; an organisation's
     # client / project mails stay with the client / project
     c.execute("DELETE FROM hub_mails WHERE owner_id=? AND (org_id IS NULL OR (client_id IS NULL AND list_id IS NULL))", (uid,))

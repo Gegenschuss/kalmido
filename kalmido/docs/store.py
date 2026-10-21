@@ -249,10 +249,10 @@ def search_ids(c, ws_nodes, query):
             ids_ = sorted(cand)
             for i in range(0, len(ids_), 5000):  # 2.126.0 A (#1979 L3): in portions like above
                 part = ids_[i:i + 5000]
-                for r in c.execute(f"SELECT node_id, text FROM doc_meta WHERE node_id IN ({','.join('?' * len(part))})", tuple(part)).fetchall():
-                    have = set(index_words(doc_open(c, ws, "doc_meta.text", r["text"])))
+                for r in c.execute(f"SELECT * FROM doc_meta WHERE node_id IN ({','.join('?' * len(part))})", tuple(part)).fetchall():
                     name = c.execute("SELECT name FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
-                    have |= set(index_words(name[0] if name else ""))
+                    # 2.153.0 (#2179): everything the index holds (also sender, archive number, custom field values), not only text + name
+                    have = set(index_words(index_text(c, dict(r), name[0] if name else "", doc_open(c, ws, "doc_meta.text", r["text"]))))
                     if all(any(x.startswith(w) for x in have) for w in check):
                         ok.add(r["node_id"])
             cand = ok
@@ -386,10 +386,12 @@ def asn_taken(c, ws, n, nid=None):
 
 
 def index_text(c, m, name, text):
-    """What the word index of a document holds: name, sender, archive number and the recognised text."""
+    """What the word index of a document holds: name, sender, archive number, the custom field values (2.153.0) and the
+    recognised text."""
+    from .fields import df_index_text
     sender = label_name(c, m["ws"], "sender", m["sender_id"]) or ""
     asn = f"{cfg_get(c, m['ws'])['asn_prefix']}{m['asn']} {m['asn']}" if m.get("asn") else ""
-    return f"{name}\n{sender}\n{asn}\n{text}"
+    return f"{name}\n{sender}\n{asn}\n{df_index_text(c, m['node_id'], m['ws'])}\n{text}"
 
 
 def meta_row(c, nid):

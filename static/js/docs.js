@@ -10,6 +10,8 @@ const DC_FEATS = [['sender', N_('Sender')], ['type', N_('Document type')], ['tag
 const DC_LEVELS = [['learn', N_('Learns from your documents')], ['rules', N_('Rules only')], ['agent', N_('Left to an agent')], ['off', N_('Off')]];
 const DC_KINDS = [['any', N_('contains one of the words')], ['all', N_('contains all words')], ['exact', N_('contains the exact phrase')],
   ['fuzzy', N_('contains the phrase (tolerates typos)')], ['regex', N_('matches the pattern (regular expression)')]];
+// 2.153.0 (#2179): the types of the custom fields of documents (docs/fields.py DF_TYPES)
+const DC_FTYPES = [['text', N_('Text')], ['number', N_('Number')], ['money', N_('Amount')], ['date', N_('Date')], ['checkbox', N_('Checkbox')], ['select', N_('Selection')], ['url', N_('Link')]];
 const DC_STATE = {wait: N_('Waiting for recognition'), run: N_('Recognising…'), done: N_('Recognised'), failed: N_('Recognition failed')};
 const DC_BY = {rule: N_('set by a rule'), learn: N_('learnt from your documents'), agent: N_('set by an agent'), import: N_('imported'), code: N_('read from the code on the document'), photo: N_('from the capture date of the photo')};  // 2.61.0 B (#1819): photo
 
@@ -200,8 +202,20 @@ function dc_mdDraw(md) {
       ${field('asn', tr('Archive number'), `<span class="dc-amt"><input type="number" min="1" id="dc-asn" data-dcp="asn" value="${esc(d.asn || '')}" ${ro}>${w && !d.asn ? `<button type="button" class="btn sm" data-dc="asnnext">${tr('Next free number')}</button>` : ''}</span>`)}
       ${opt('amount', tr('Amount'), `<span class="dc-amt"><input id="dc-amount" data-dcp="amount" inputmode="decimal" value="${esc(d.amount ? String(d.amount).replace('.', LOCALE().startsWith('en') ? '.' : ',') : '')}" ${ro}><input id="dc-currency" data-dcp="currency" value="${esc(d.currency || '')}" maxlength="3" aria-label="${esc(tr('Currency'))}" placeholder="EUR" ${ro}></span>`, noAmt)}
       ${!ro && (noDue || noAmt) ? `<div class="row dc-f dc-optbtn"><button type="button" class="linkbtn" data-dc="showopt">${tr('Add')}: ${tr('Due')} / ${tr('Amount')}</button></div>` : ''}
+      ${(d.custom_fields || []).map(f => dc_cfRow(d, f, ro)).join('')}
     </div>
     <details class="dc-text"><summary>${tr('Recognised text')}</summary>${d.text ? `<pre>${esc(d.text)}</pre>` : `<p class="muted">${tr('No text recognised.')}</p>`}</details>`;
+}
+function dc_cfRow(d, f, ro) {  // 2.153.0 (#2179): one custom field of the document
+  const id = `dc-cf${f.id}`, v = f.value ?? '', a = `data-dcf="${f.id}"`;
+  const input = f.type === 'checkbox' ? `<input type="checkbox" id="${id}" ${a} ${v === '1' ? 'checked' : ''} ${ro}>`
+    : f.type === 'select' ? `<select id="${id}" ${a} ${ro}><option value=""></option>${(f.options || []).map(o => `<option value="${esc(o.id)}" ${o.id === v ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`
+    : f.type === 'date' ? dateIn(id, v, {label: f.name, ro: !!ro, attrs: a})
+    : f.type === 'money' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? (LOCALE().startsWith('en') ? v : v.replace('.', ',')) : '')}" placeholder="0,00 EUR" ${ro}>`
+    : f.type === 'number' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? (LOCALE().startsWith('en') ? v : v.replace('.', ',')) : '')}" ${ro}>`
+    : f.type === 'url' ? `<span class="dc-amt"><input type="url" id="${id}" ${a} value="${esc(v)}" placeholder="https://" ${ro}>${v && /^https?:\/\//i.test(v) ? `<a class="iconbtn" href="${esc(v)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(tr('Open'))}">${ic('link')}</a>` : ''}</span>`
+    : `<input id="${id}" ${a} value="${esc(v)}" maxlength="1000" ${ro}>`;
+  return `<div class="row dc-f dc-cf"><label for="${id}">${esc(f.name)}</label>${input}${dc_auto(d, 'cf' + f.id)}</div>`;
 }
 function dc_val(f, el) {
   const v = el.value.trim();
@@ -211,15 +225,16 @@ function dc_val(f, el) {
   if (f === 'asn') return v ? +v : null;
   return v;
 }
-function dc_cur(d, f) {  // the value of a field as the server takes it back (for the undo)
+function dc_cur(d, f, only) {  // the value of a field as the server takes it back (for the undo)
   if (f === 'sender' || f === 'type') return d[f]?.name || '';
   if (f === 'tags') return d.tags.map(t => t.name);
   if (f === 'folder') return d.folder?.id || '';
   if (f === 'asn') return d.asn || null;
+  if (f === 'custom_fields') return Object.fromEntries((d.custom_fields || []).filter(x => !only || String(x.id) in only).map(x => [x.id, x.value ?? null]));  // only the changed ones (their marks stay)
   return d[f] ?? '';
 }
 async function dc_patch(id, body, label) {
-  const before = DC.doc && DC.doc.id === id ? Object.fromEntries(Object.keys(body).map(k => [k, dc_cur(DC.doc, k)])) : null;
+  const before = DC.doc && DC.doc.id === id ? Object.fromEntries(Object.keys(body).map(k => [k, dc_cur(DC.doc, k, body[k])])) : null;
   let d;
   try { d = await api('PATCH', `/api/docs/${id}`, body); } catch { dc_mdDraw($('.dc-md')); return; }
   if (DC.doc?.id === id) { DC.doc = d; dc_mdDraw($('.dc-md')); }
@@ -230,6 +245,11 @@ async function dc_patch(id, body, label) {
   dc_load();
 }
 async function dc_mdChange(e) {
+  const cf = e.target.closest('[data-dcf]');
+  if (cf && DC.doc) {  // 2.153.0 (#2179)
+    const v = cf.type === 'checkbox' ? cf.checked : cf.value.trim();
+    return dc_patch(DC.doc.id, {custom_fields: {[cf.dataset.dcf]: v === '' ? null : v}}, tr('Edited {0}', DC.doc.name));
+  }
   const el = e.target.closest('[data-dcp]'); if (!el || !DC.doc) return;
   const f = el.dataset.dcp, id = DC.doc.id;
   if (f === 'folder' && el.value === 'new') {
@@ -344,10 +364,63 @@ function dc_sDraw(md) {
       `<details class="dc-lbls"><summary>${tr(n)} (${(s[key] || []).length})</summary>${(s[key] || []).length ? `<ul class="dc-rules">${s[key].map(x => `<li class="dc-rule"><span>${esc(x.name)}</span><span>
         <button type="button" class="iconbtn" data-dcs="lren:${k}:${x.id}" aria-label="${esc(tr('Rename'))}" title="${esc(tr('Rename'))}">${ic('edit')}</button>
         <button type="button" class="iconbtn" data-dcs="ldel:${k}:${x.id}" aria-label="${esc(tr('Delete {0}', x.name))}" title="${esc(tr('Delete {0}', x.name))}">${ic('trash')}</button></span></li>`).join('')}</ul>` : ''}</details>`).join('')}` : ''}
+    ${can ? dc_cfSettings(s) : ''}
     ${s.mail.enabled ? `<h4>${tr('Forward by e-mail')}</h4><p class="muted">${tr('PDFs and images attached to mails sent to this address become documents here.')}</p>
       ${s.mail.address ? `<p class="dc-mail"><code>${esc(s.mail.address)}</code> <button type="button" class="linkbtn" data-dcs="mailnew">${tr('New address')}</button> <button type="button" class="linkbtn" data-dcs="maildel">${tr('Turn off')}</button></p>`
         : `<button type="button" class="btn sm" data-dcs="mailnew">${tr('Create address')}</button>`}` : ''}
     ${typeof pl_slot === 'function' ? pl_slot(s) : ''}`;  // 2.48.0 (#1152): Paperless-ngx (paperless.js, self-hosted only)
+}
+function dc_cfSettings(s) {  // 2.153.0 (#2179): the custom fields of the workspace (nothing preset)
+  const fs = s.fields || [];
+  return `<h4>${tr('Custom fields')}</h4>
+    <p class="muted">${tr('Extra fields every document of this workspace can have, e.g. a contract or customer number.')}</p>
+    ${fs.length ? `<ul class="dc-rules">${fs.map(f => `<li class="dc-rule"><span>${esc(f.name)} <span class="muted">${esc(tr(DC_FTYPES.find(t => t[0] === f.type)?.[1] || f.type))}${f.type === 'select' ? `: ${esc((f.options || []).map(o => o.name).join(', '))}` : ''}</span></span><span>
+      ${f.type === 'select' ? `<button type="button" class="iconbtn" data-dcs="fopt:${f.id}" aria-label="${esc(tr('Options'))}" title="${esc(tr('Options'))}">${ic('list')}</button>` : ''}
+      <button type="button" class="iconbtn" data-dcs="fren:${f.id}" aria-label="${esc(tr('Rename'))}" title="${esc(tr('Rename'))}">${ic('edit')}</button>
+      <button type="button" class="iconbtn" data-dcs="fdel:${f.id}" aria-label="${esc(tr('Delete {0}', f.name))}" title="${esc(tr('Delete {0}', f.name))}">${ic('trash')}</button></span></li>`).join('')}</ul>` : ''}
+    <details class="dc-radd dc-fadd"><summary>${tr('New field')}</summary>
+      <div class="row"><label for="dcf-name">${tr('Name')}</label><input id="dcf-name" maxlength="60" autocomplete="off"></div>
+      <div class="row"><label for="dcf-type">${tr('Type')}</label><select id="dcf-type" data-dcs="ftype">${DC_FTYPES.map(([v, l]) => `<option value="${v}">${tr(l)}</option>`).join('')}</select></div>
+      <div class="row dcf-opts" hidden><label for="dcf-opts">${tr('Options')}</label><input id="dcf-opts" maxlength="600" placeholder="${esc(tr('comma-separated'))}" autocomplete="off"></div>
+      <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-dcs="fadd">${tr('Add field')}</button></div></details>`;
+}
+async function dc_cfAct(a, s, md) {  // 2.153.0 (#2179): add / rename / options / delete a custom field
+  const draw = j => { if (DC.set && j?.fields) { DC.set.fields = j.fields; dc_sDraw($('.dc-smd')); } if (DC.doc && typeof dc_open === 'function') dc_open(DC.doc.id); };
+  if (a === 'fadd') {
+    const b = {ws: s.ws, name: ($('#dcf-name', md)?.value || '').trim(), type: $('#dcf-type', md)?.value || 'text', options: ($('#dcf-opts', md)?.value || '')};
+    if (!b.name) { $('#dcf-name', md)?.focus(); return; }
+    let j; try { j = await api('POST', '/api/docs/fields', b); } catch { return; }
+    draw(j);
+    const st = {id: j.id};
+    histToast(tr('Field added: {0}', b.name), histAdd({label: tr('Field added: {0}', b.name), sett: true,
+      undo: async () => { draw(await api('DELETE', `/api/docs/fields/${st.id}`)); return {}; },
+      redo: async () => { const x = await api('POST', '/api/docs/fields', b); st.id = x.id; draw(x); return {}; }}));
+    return;
+  }
+  const id = +a.split(':')[1], f = (s.fields || []).find(x => x.id === id); if (!f) return;
+  if (a.startsWith('fren:')) {
+    const name = ((await askPrompt(tr('Rename'), f.name, {ok: tr('Rename')})) || '').trim();
+    if (!name || name === f.name) return;
+    const put = v => async () => { draw(await api('PATCH', `/api/docs/fields/${id}`, {name: v})); return {}; };
+    try { await put(name)(); } catch { return; }
+    histToast(tr('Renamed: {0}', name), histAdd({label: tr('Renamed: {0}', name), sett: true, undo: put(f.name), redo: put(name)}));
+    return;
+  }
+  if (a.startsWith('fopt:')) {
+    const old = (f.options || []).map(o => o.name).join(', ');
+    const txt = ((await askPrompt(tr('Options'), old, {ok: tr('Save')})) || '').trim();
+    if (!txt || txt === old) return;
+    const opts = txt.split(',').map(x => x.trim()).filter(Boolean).map(n => ({name: n, id: (f.options || []).find(o => o.name.toLowerCase() === n.toLowerCase())?.id}));
+    const gone = (f.options || []).filter(o => !opts.some(x => x.id === o.id));
+    if (gone.length && !await askConfirm(tr('Remove options?'), tr('Documents with {0} lose this value.', gone.map(o => o.name).join(', ')), {ok: tr('Save'), danger: true})) return;
+    try { draw(await api('PATCH', `/api/docs/fields/${id}`, {options: opts})); } catch { /* the server said why */ }
+    return;
+  }
+  if (a.startsWith('fdel:')) {
+    if (!await askConfirm(tr('Delete {0}', f.name), tr('The field and its values on every document of this workspace are deleted.'), {ok: tr('Delete'), danger: true})) return;
+    try { draw(await api('DELETE', `/api/docs/fields/${id}`)); } catch { return; }
+    toast(tr('Deleted: {0}', f.name));
+  }
 }
 async function dc_sChange(e) {
   const s = DC.set, md = e.target.closest('.dc-smd');
@@ -366,12 +439,14 @@ async function dc_sChange(e) {
     histToast(tr('Changed setting: {0}', tr('Prefix of the archive numbers')), histAdd({label: tr('Changed setting: {0}', tr('Prefix of the archive numbers')), sett: true, undo: put(from), redo: put(to)}));
     return;
   }
+  if (e.target.matches('[data-dcs="ftype"]')) { const o = md.querySelector('.dcf-opts'); if (o) o.hidden = e.target.value !== 'select'; return; }  // 2.153.0 (#2179)
   if (e.target.matches('[data-dcs="inbox"]')) { DC.set = await api('PUT', '/api/docs/settings', {ws: s.ws, inbox: e.target.checked}).catch(() => s); dc_sDraw(md); }
 }
 async function dc_sClick(e) {
   const b = e.target.closest('[data-dcs]'); if (!b || b.matches('input')) return;
   const s = DC.set, md = b.closest('.dc-smd'), a = b.dataset.dcs;
   if (a === 'close') { md.remove(); return; }
+  if (a === 'fadd' || /^f(ren|opt|del):/.test(a)) return dc_cfAct(a, s, md);  // 2.153.0 (#2179)
   if (a === 'radd') {
     const v = id => ($(`#${id}`, md)?.value || '').trim();
     const r = {ws: s.ws, kind: v('dcr-kind'), match: v('dcr-match'), sender: v('dcr-sender'), type: v('dcr-type'), tags: v('dcr-tags'), folder: v('dcr-folder')};

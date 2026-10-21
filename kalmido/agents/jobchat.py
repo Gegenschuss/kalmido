@@ -104,3 +104,44 @@ def jcd_jobs(c, aid, msgs, uid):
                        "state": j["state"], "parent_id": par["id"] if par else None,
                        "parent_name": jc_job_name(par["title"], par["name"]) if par else None, "updated_at": j["updated_at"]}
     return out
+
+
+# ---- 2.153.0 (#1962): a chat of its own per job. What a person types in a job's chat is stored with that job_id (POST
+# /api/agents/<id>/chat {job_id}) and reaches the agent as the usual 'chat' event, its message carrying job_id plus the job
+# (data.job) -- the agent's host may route it by that; the app still puts "Job 82: …" in front, so hosts that read only
+# the text reach the job as before.
+# A job created for a person starts with one grey line in that person's chat (kind notice, job_msg start, body = the
+# job's title; no push, never unread): the whole chat shows a job as one short card with a link from its start on. The
+# job's own chat (?job=) also carries its progress lines (the job's log, only for the person it is for).
+JCS_PROGRESS_MAX = 300
+
+
+def jcs_job_in(c, aid, v, uid):
+    """The job a person's message is addressed to (job_id of the POST): a job of agent aid that uid may see, else BadInput."""
+    from ..personal.timetrack import BadInput
+    from ..tasks.validation import as_int
+    if v in (None, ""):
+        return None
+    j = c.execute("SELECT * FROM agent_jobs WHERE id=? AND agent_id=?", (as_int(v, "job_id", 1), aid)).fetchone()
+    if not j or not job_visible(c, j, uid):
+        raise BadInput(tr("Invalid value: {0}", "job_id"))
+    return j
+
+
+def jcs_start_notice(c, j):
+    """The grey start line of job j in the chat of the person it is for (caller commits; trimmed files: chat_unlink_trimmed)."""
+    if not j or not j["user_id"]:
+        return None
+    from ..agents.chat import chat_add
+    from ..core.db import iso_ms, now_utc
+    r = chat_add(c, j["agent_id"], j["user_id"], "agent", (j["title"] or "").strip() or f"#{j['id']}", None)
+    c.execute("UPDATE agent_chat SET kind='notice', job_id=?, job_parent=?, job_msg='start', read_at=? WHERE id=?",
+              (j["id"], j["parent_id"] if "parent_id" in j.keys() else None, iso_ms(now_utc()), r["id"]))
+    return r["id"]
+
+
+def jcs_progress(c, jid, uid):
+    """[{text, at}] the progress lines of job jid (oldest first, the newest JCS_PROGRESS_MAX) -- only the person it is for."""
+    rows = c.execute("SELECT text, created_at FROM agent_steps WHERE job_id=? AND user_id=? AND state='log' ORDER BY id DESC LIMIT ?",
+                     (jid, uid, JCS_PROGRESS_MAX)).fetchall()
+    return [{"text": r["text"], "at": r["created_at"]} for r in reversed(rows)]
