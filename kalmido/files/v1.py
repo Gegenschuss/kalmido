@@ -14,7 +14,8 @@ from ..core.i18n import tr
 from ..core.db import bump, db
 from ..accounts.session import me
 from ..core.access import Denied, acx_of
-from ..api.v1 import BadInput, v1_args, v1_json, v1_view, UnknownFields
+from ..api.v1 import BadInput, UnknownFields
+from ..api.common import v1_args, v1_json, v1_view
 from .store import (fs_chain, fs_log_add, fs_mail_rows, fs_new_version, fs_put, fs_read, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place)
 from .web import fs_agent_folder, fs_node_json, _crumbs, _items, _send, _versions

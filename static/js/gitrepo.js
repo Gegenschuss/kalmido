@@ -39,7 +39,16 @@ function repoWire(md, lid, folder) {
         <div class="row rprow"><span class="spacer"></span><button class="btn sm pri" data-rp="add">${ic('plus', 's')} ${tr('Connect')}</button></div></div>` : '';
     box.innerHTML = rows + (isProj() ? add : `<div class="muted mhint">${tr('Make this list a project to connect a repository')}</div>`)
       + (!folder && !j.may && !j.repos.length && isProj() ? `<div class="muted mhint">${tr('The list owner and list admins connect repositories.')}</div>` : '')
-      + (folder ? folderSumHtml() : foldHtml() + errHookHtml());
+      + (folder ? folderSumHtml() : foldHtml() + verHtml() + errHookHtml());
+  };
+  // 2.151.0 A (#2558): which field holds the package / target version (compared with the repository's version tags)
+  const verHtml = () => {
+    const v = j.version_field; if (!v || listById(lid)?.kind !== 'project' || !(j.repos.length || j.folder_repos?.length)) return '';
+    const cur = v.setting === 'auto' ? 'auto' : v.setting === 'off' ? 'off' : String(v.setting);
+    const autoLbl = v.setting === 'auto' && v.field ? tr('Automatic ({0})', v.field.name) : tr('Automatic');
+    const ctl = j.may ? `<select id="rp-ver" aria-label="${esc(tr('Version field'))}"><option value="auto"${cur === 'auto' ? ' selected' : ''}>${esc(autoLbl)}</option><option value="off"${cur === 'off' ? ' selected' : ''}>${esc(tr('Off'))}</option>${v.fields.map(f => `<option value="${f.id}"${cur === String(f.id) ? ' selected' : ''}>${esc(f.name)}</option>`).join('')}</select>`
+      : `<span class="muted">${esc(v.field ? v.field.name : tr('Off'))}</span>`;
+    return `<div class="row rpver"><label for="rp-ver">${tr('Version field')}</label>${ctl}</div><div class="shint lhint">${esc(tr('A task whose version is already released but which is still open gets a hint. Automatic: a text field named Package, Version or Release.'))}</div>`;
   };
   // 2.33.0 (#934): the repositories this list takes from its folder
   const repoNames = rs => rs.map(r => r.full_name).join(', ');
@@ -145,7 +154,14 @@ function repoWire(md, lid, folder) {
     const hs = [host($('#rp-name', box)?.value), host($('#rp-base', box)?.value)].filter(Boolean);
     h.hidden = !(($('#rp-prov', box)?.value || 'github') === 'github' && hs.some(x => !/^(github\.com|gitlab\.com|bitbucket\.org)$/.test(x)));
   };
-  box.addEventListener('change', e => { if (e.target.id === 'rp-prov') { provHint(); selfHint(); } });
+  box.addEventListener('change', async e => {
+    if (e.target.id === 'rp-prov') { provHint(); selfHint(); }
+    if (e.target.id === 'rp-ver') {  // 2.151.0 A (#2558)
+      const v = e.target.value;
+      try { j.version_field = await api('PUT', `/api/lists/${lid}/repos/version-field`, {field: /^\d+$/.test(v) ? +v : v}); toast(tr('Saved')); } catch { /* shown */ }
+      draw(); $('#rp-ver', box)?.focus(); await load(); render();
+    }
+  });
   box.addEventListener('input', e => {  // 2.18.0: a cloud address picks its provider
     if (e.target.id === 'rp-name' || e.target.id === 'rp-base') { const ce = $('#rp-cerr', box); if (ce?.textContent) { ce.textContent = ''; $('#rp-name', box)?.removeAttribute('aria-invalid'); } }
     if (e.target.id === 'rp-base') { selfHint(); return; }

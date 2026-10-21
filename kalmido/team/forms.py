@@ -13,13 +13,13 @@ from flask import g, jsonify, request
 from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import lang, LANGS, N_, tr
-from ..core.db import body, bump, db, err, iso, now_utc
+from ..core.db import body, bump, db, err, iso, now_utc, usettings
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_feat, need_list
 from ..tasks.validation import log_act
-from ..personal.timetrack import BadInput
-from ..api.v1 import hit_budget, hit_limit
+from ..core.errors import BadInput
+from ..api.common import hit_budget, hit_limit
 from ..lists.public import BOT_ERROR, pub_html, public_links_on
 
 
@@ -74,7 +74,6 @@ def h6d_form_bytes(form_id, n):
 
 
 def forms_on(c, uid):
-    from ..core.db import usettings
     return "forms" in (usettings(c, uid).get("features") or "").split(",")
 
 

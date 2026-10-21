@@ -19,17 +19,16 @@ calls a language model here; the variables are replaced by a plain regular expre
 import hashlib
 import re
 import urllib.parse
-from datetime import datetime, timezone
 
 from flask import Response, g, jsonify, request
 
-from ..core.config import app, APP_VERSION
+from ..core.config import app, APP_VERSION, OFFICE_DIR
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, need_list, vis_sql
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .model import office_gate, office_org, office_settings, pb_cl_sql, pb_owner, trial_flag
 from .doctpl_samples import DMA_SAMPLES  # 2.117.0 B (#2283)
 
@@ -162,11 +161,7 @@ This agreement applies from {{today}} and ends three years after the end of the 
 }
 
 
-def _ctx():
-    """Admins of the office area only (like the travel expenses)."""
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=True)
+from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _iid(v, name):
@@ -222,7 +217,6 @@ def dt_company(c, oid, lang):
     """The printed company of the office area (like a quotation's print model): name, lines, contact / register / bank
     lines, logo path, accent colour."""
     import os
-    from ..core.config import OFFICE_DIR
     from .ledger import ofx_company, ofx_company_print
     s = office_settings(c, oid)
     co = ofx_company_print(ofx_company(c, oid), s.get("company") or {}, lang, _pack(c, oid))
@@ -495,7 +489,7 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     for n, p in enumerate(pages, 1):
         # 2.114.4 A (#2282): the page count only from two pages on
         P.pdf_draw_footer(p, foot, tr("Page {0} of {1}", n, total, lg=lang) if total >= 2 else "")
-    meta = {"when": datetime.now(timezone.utc), "producer": f"Kalmido v{APP_VERSION}"}
+    meta = {"when": now_utc(), "producer": f"Kalmido v{APP_VERSION}"}
     if d.get("trial"):
         for p in pages:
             p.mark(draft)

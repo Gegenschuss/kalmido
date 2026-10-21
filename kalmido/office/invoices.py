@@ -21,8 +21,8 @@ from ..core.config import app
 from ..core.pg import insert_id, write_lock
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
-from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.access import Denied, vis_sql
+from ..core.errors import BadInput
 from .calc import INV_VAT_NOTES, dec, dstr, fmt_money, inv_calc, inv_open, money
 from .packs import office_pack_for
 from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql, trial_flag
@@ -34,11 +34,12 @@ INV_STATUSES = {"invoice": ("draft", "issued", "sent", "paid", "cancelled"), "cr
 PAY_METHODS = ("transfer", "cash", "card", "other")
 REMINDER_LEVELS = (1, 2, 3)
 STATE_TXT = {"issued": N_("Finalised"), "paid": N_("Paid"), "partial": N_("Partly paid"), "overdue": N_("Overdue"), "cancelled": N_("Cancelled")}
-TITLE_FALLBACK = {"invoice": {"de": "Rechnung", "en": "Invoice"}, "credit": {"de": "Gutschrift", "en": "Credit note"},
-                  "reminder_1": {"de": "Zahlungserinnerung", "en": "Payment reminder"}, "reminder_2": {"de": "Mahnung", "en": "Reminder"},
-                  "reminder_3": {"de": "Letzte Mahnung", "en": "Final reminder"},
-                  "delivery": {"de": "Lieferschein", "en": "Delivery note"}, "delivery_service": {"de": "Leistungsnachweis", "en": "Proof of service"},  # 2.120.0 D (#2089)
-                  "offer": {"de": "Angebot", "en": "Quotation"}}  # 2.113.2 (#2253): a finalised quotation is mailed too
+# 2.149.0 A (#2520): the documents' own words (when the pack has no label) through tr() in the document's language
+TITLE_FALLBACK = {"invoice": N_("Invoice|document"), "credit": N_("Credit note|document"),
+                  "reminder_1": N_("Payment reminder|document"), "reminder_2": N_("Reminder|document"),
+                  "reminder_3": N_("Final reminder|document"),
+                  "delivery": N_("Delivery note|document"), "delivery_service": N_("Proof of service|document"),  # 2.120.0 D (#2089)
+                  "offer": N_("Quotation|document")}  # 2.113.2 (#2253): a finalised quotation is mailed too
 
 
 def _j(s, default):
@@ -53,10 +54,7 @@ def _col(r, k, default=None):
     return r[k] if r is not None and k in r.keys() and r[k] is not None else default
 
 
-def _ctx(admin=False):
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=admin)
+from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 # ---------------------------------------------------------------- schemes and numbers
@@ -604,6 +602,16 @@ def inv_make_reminder(c, oid, uid, b):
     return did
 
 
+def inv_reminder_new(c, oid, uid, b):
+    """2.149.0 A (#2521): a reminder draft with its totals and the office log line "create", shared by a person's route
+    and the agent's (v1). Returns the id."""
+    from .docs import recalc
+    nid = inv_make_reminder(c, oid, uid, b)
+    recalc(c, oid, nid)
+    ofx_log(c, oid, "create", doc_id=nid, detail={"kind": "reminder", "doc_ids": b.get("doc_ids")})
+    return nid
+
+
 # ---------------------------------------------------------------- the print model (invoice kinds), on top of docs.odoc_render
 def inv_level(r):
     """The level argument of inv_title for row r: a reminder's level; 2.120.0 D (#2089) a delivery note: 2 = "proof of service"."""
@@ -616,7 +624,7 @@ def inv_title(L, lang, kind, level=1):
     key = kind if kind != "reminder" else f"reminder_{level if level in REMINDER_LEVELS else 1}"
     if kind == "delivery" and level == 2:  # 2.120.0 D (#2089): level 2 = "Leistungsnachweis" (delivery_title 'service')
         key = "delivery_service"
-    return L.get(key) or TITLE_FALLBACK[key][lang]
+    return L.get(key) or tr(TITLE_FALLBACK[key], lg=lang)
 
 
 def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
@@ -656,14 +664,14 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
         from .docs import fk_doc_contact
         k = fk_doc_contact(c, r["client_id"], _col(r, "contact_id"))
         m["recipient"]["contact"] = {"name": k["name"], "email": k["email"], "phone": k["phone"]} if k else None
-    num_label = L.get(kind + "_no") or (L.get("invoice_no", "Rechnung Nr.") if kind == "invoice" else m["title"] + (" No." if lang == "en" else " Nr."))
-    meta = [[num_label, r["number"] or ("Draft" if lang == "en" else "Entwurf")]]
+    num_label = L.get(kind + "_no") or (L.get("invoice_no", tr("Invoice no.|document", lg=lang)) if kind == "invoice" else tr("{0} No.|document", m["title"], lg=lang))
+    meta = [[num_label, r["number"] or tr("Draft|document number", lg=lang)]]
     cancels = None
     if kind == "credit" and _col(r, "cancels_id"):
         ci = c.execute("SELECT id, number, date FROM office_docs WHERE id=? AND org_id=?", (r["cancels_id"], oid)).fetchone()
         if ci is not None:
             cancels = {"id": ci["id"], "number": ci["number"], "date_text": fmt_date(ci["date"], pack)}
-            meta.append([L.get("to_invoice", "zu Rechnung Nr." if lang == "de" else "Credit note for invoice no."), f"{ci['number']} ({cancels['date_text']})"])
+            meta.append([L.get("to_invoice", tr("Credit note for invoice no.|document", lg=lang)), f"{ci['number']} ({cancels['date_text']})"])
     m["cancels"] = cancels
     # 2.144.9 (#2575): an invoice made from a quotation names it in the head ("zu Angebot Nr. KV02-M (21.10.2026)")
     if kind == "invoice" and _col(r, "source_doc_id"):
@@ -673,18 +681,18 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
             meta.append([L.get("to_offer", "zu Angebot Nr." if lang == "de" else "Re quotation No."),
                          so["number"] + (f" ({m['source_offer']['date_text']})" if m["source_offer"]["date_text"] else "")])
     if m["order_ref"]:
-        meta.append([L.get("ref", "Ref./PO-Nr."), m["order_ref"]])
+        meta.append([L.get("ref", tr("Ref./PO no.|document", lg=lang)), m["order_ref"]])
     if r["project_title"]:
-        meta.append([L.get("project", "Projekttitel"), r["project_title"]])
+        meta.append([L.get("project", tr("Project title|document", lg=lang)), r["project_title"]])
     if m["recipient"].get("customer_no"):
-        meta.append([L.get("customer_no", "Kunden-Nr." if lang == "de" else "Customer no."), m["recipient"]["customer_no"]])
-    meta.append([L.get("date", "Datum"), m["date_text"]])
+        meta.append([L.get("customer_no", tr("Customer no.|document", lg=lang)), m["recipient"]["customer_no"]])
+    meta.append([L.get("date", tr("Date|document", lg=lang)), m["date_text"]])
     if m["service_period_text"]:
-        meta.append([L.get("service_period", "Leistungszeitraum" if lang == "de" else "Service period"), m["service_period_text"]])
+        meta.append([L.get("service_period", tr("Service period|document", lg=lang)), m["service_period_text"]])
     if kind == "invoice" and m["due_date"]:
-        meta.append([L.get("due", "Fällig am" if lang == "de" else "Due on"), m["due_date_text"]])
+        meta.append([L.get("due", tr("Due on|document", lg=lang)), m["due_date_text"]])
     if cur == "USD" and t.get("fx_rate"):
-        meta.append([L.get("fx", "Wechselkurs 1 €" if lang == "de" else "Exchange rate €1"), t.get("fx_note") or ""])
+        meta.append([L.get("fx", tr("Exchange rate €1|document", lg=lang)), t.get("fx_note") or ""])
     m["meta"] = meta
     tot = m["totals"]
     tot["show_tax_lines"] = kind != "reminder"
@@ -703,21 +711,20 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     tot["vat_note"] = m["vat_note_text"] if r["vat_mode"] == "novat" else ""
     tot["fx_line"] = ""
     if cur == "USD" and t.get("tax_eur") is not None:
-        tot["fx_line"] = ((texts.get("fx_tax_note") or {}).get(lang) or ("Steuerbetrag entspricht {tax} EUR, Kurs 1 EUR = {rate} USD" if lang == "de" else
-                                                                       "Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}")).replace(
+        tot["fx_line"] = ((texts.get("fx_tax_note") or {}).get(lang) or tr("Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}|document", lg=lang)).replace(
             "{tax}", fmt_money(t["tax_eur"], lang, "EUR").replace(" €", "").replace("€", "")).replace("{rate}", str(t.get("fx_rate") or "").replace(".", "," if lang == "de" else "."))
     if kind == "reminder":
-        rows = [[L.get("open_total", "Offener Betrag" if lang == "de" else "Amount outstanding"), tot["net_text"]]]
+        rows = [[L.get("open_total", tr("Amount outstanding|document", lg=lang)), tot["net_text"]]]
         if dec(t.get("fee") or 0) > 0:
-            rows.append([L.get("reminder_fee", "Mahngebühr" if lang == "de" else "Reminder fee"), t.get("fee_text") or ""])
-        rows.append([L.get("reminder_total", "Gesamtbetrag" if lang == "de" else "Total amount due"), tot["gross_text"]])  # 2.40.0 (#1368)
+            rows.append([L.get("reminder_fee", tr("Reminder fee|document", lg=lang)), t.get("fee_text") or ""])
+        rows.append([L.get("reminder_total", tr("Total amount due|document", lg=lang)), tot["gross_text"]])  # 2.40.0 (#1368)
         deadline = ""
         if r["date"] and _col(r, "reminder_deadline_days"):
             deadline = fmt_date((date.fromisoformat(r["date"]) + timedelta(days=int(r["reminder_deadline_days"]))).isoformat(), pack)
         m["reminder"] = {"level": level, "title": m["title"], "fee": t.get("fee") or "0.00", "fee_text": t.get("fee_text") or "", "deadline_days": int(_col(r, "reminder_deadline_days") or 0),
                          "deadline_text": deadline,
-                         "columns": [L.get("col_invoice", "Rechnung" if lang == "de" else "Invoice"), L.get("date", "Datum"), L.get("col_due", "Fällig" if lang == "de" else "Due"),
-                                     L.get("amount", "Betrag" if lang == "de" else "Amount")],
+                         "columns": [L.get("col_invoice", tr("Invoice|document", lg=lang)), L.get("date", tr("Date|document", lg=lang)), L.get("col_due", tr("Due|document", lg=lang)),
+                                     L.get("amount", tr("Amount|document", lg=lang))],
                          "rows": [{"id": ln.get("id"), "number": ln.get("number"), "date_text": fmt_date(ln.get("date"), pack), "due_text": fmt_date(ln.get("due_date"), pack),
                                    "open": ln.get("open"), "open_text": ln.get("open_text") or fmt_money(ln.get("open") or 0, lang, cur)} for ln in t.get("lines") or []],
                          "total_open": t.get("net"), "total_open_text": tot["net_text"]}
@@ -726,25 +733,25 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
         # the closing may carry {days} / {date} (pack text or the organisation's own): the deadline of this reminder
         m["closing"] = (m.get("closing") or "").replace("{days}", str(int(_col(r, "reminder_deadline_days") or 0))).replace("{date}", deadline)
     else:
-        rows = [[L.get("subtotal", "Zwischensumme" if lang == "de" else "Subtotal"), tot["net_text"]]]
+        rows = [[L.get("subtotal", tr("Subtotal|document", lg=lang)), tot["net_text"]]]
         for tl in tot["tax_lines"]:
             rows.append([tl.get("label") or "", tl.get("amount_text") or fmt_money(tl.get("amount") or 0, lang, cur)])
-        rows.append([L.get("credit_total" if kind == "credit" else "invoice_total", ("Gutschriftsbetrag" if kind == "credit" else "Rechnungsbetrag") if lang == "de" else "Total"), tot["gross_text"]])
+        rows.append([L.get("credit_total" if kind == "credit" else "invoice_total", tr("Total|credit note" if kind == "credit" else "Total|invoice", lg=lang)), tot["gross_text"]])
         if kind == "invoice" and dec(mf["paid"]) > 0:
-            rows.append([L.get("paid", "Bereits bezahlt" if lang == "de" else "Already paid"), fmt_money(mf["paid"], lang, cur)])
-            rows.append([L.get("open", "Offener Betrag" if lang == "de" else "Amount outstanding"), tot["open_text"]])
+            rows.append([L.get("paid", tr("Already paid|document", lg=lang)), fmt_money(mf["paid"], lang, cur)])
+            rows.append([L.get("open", tr("Amount outstanding|document", lg=lang)), tot["open_text"]])
         m["reminder"] = None
     tot["rows"] = rows
     if kind == "delivery":  # 2.120.0 D (#2089): no prices, no totals, no tax, no payment info; the receipt box is drawn by pdf.py
         tot["rows"], tot["tax_lines"], tot["vat_note"], tot["fx_line"] = [], [], "", ""
         m["noprice"], m["vat_note_text"], m["signature"] = True, "", ""
         m["rights"] = {"title": "", "rows": [], "exceptions": "", "exclusive": 0, "note": ""}
-        m["receipt_label"] = L.get("delivery_receipt") or (("Received / accepted" if lang == "en" else "Erhalten / abgenommen"))
+        m["receipt_label"] = L.get("delivery_receipt") or tr("Received / accepted|document", lg=lang)
         m["lines"] = [ln for ln in m["lines"] if ln.get("kind") in ("item", "heading", "text")]
     sfd = m["sender_fields"]
     ptext = ""
     if kind == "invoice":
-        ptext = ((texts.get("payment_note") or {}).get(lang) or ("Zahlbar bis {date} ohne Abzug." if lang == "de" else "Payable by {date} without deduction.")).replace("{date}", m["due_date_text"]) if m["due_date"] else ""
+        ptext = ((texts.get("payment_note") or {}).get(lang) or tr("Payable by {date} without deduction.|document", lg=lang)).replace("{date}", m["due_date_text"]) if m["due_date"] else ""
     m["payment"] = {"iban": sfd["iban"], "bic": sfd["bic"], "bank_name": sfd["bank_name"], "text": ptext} if kind not in ("credit", "delivery") else None
     from .girocode import gcq_model
     gcq_model(r, m, None if ofx_locked(r) else office_settings(c, oid), snd)  # 2.147.1 B (#2054): the GiroCode (EPC QR text)
@@ -947,30 +954,43 @@ def _answer(c, oid, uid, did, code=200):
     return jsonify(doc_public(c, oid, doc_row(c, oid, did), office_role(c, uid, oid) == "admin")), code
 
 
-@app.post("/api/office/docs/<int:did>/invoice")
-def inv_from_offer_post(did):
-    """An invoice draft from quotation did (every quotation line becomes a position; rights, framework contract, recipient,
-    project, language, currency, rate and PO number are taken over; source_doc_id). 201 the invoice."""
-    from .docs import doc_row, recalc
-    c, uid, oid = _ctx()
-    r = doc_row(c, oid, did)
+def inv_offer_invoice(c, oid, uid, r, b, parts_mode=None, parts_title=None):
+    """2.149.0 A (#2521): the invoice draft from quotation r, shared by a person's route and the agent's (v1): {inv_type?:
+    progress {amount | pct} / final} or the full invoice (parts_mode / parts_title for a quotation with parts), totals and
+    the office log line "create". The callers check the quotation's status; returns the new id."""
+    from .docs import recalc
     if r["kind"] != "offer":
         raise Denied(409, tr("Only a quotation can be turned into an invoice"))
-    b = body()  # 2.47.0 (#1215): {parts_mode?: full|title|summary, parts_title?} for a quotation with parts
-    b = b if isinstance(b, dict) else {}
     typ = b.get("inv_type") or ""  # 2.120.0 A (#2087): progress {amount | pct} / final invoice
     if typ == "progress":
         from .abschlag import abs_progress
         nid = abs_progress(c, oid, uid, r, b.get("amount"), b.get("pct"))
     elif typ == "final":
         from .abschlag import abs_final
-        nid = abs_final(c, oid, uid, r, b.get("parts_mode") or None, b.get("parts_title") if isinstance(b.get("parts_title"), str) else None)
+        nid = abs_final(c, oid, uid, r, parts_mode, parts_title)
     elif typ:
         raise BadInput(tr("Invalid value: {0}", "inv_type"))
     else:
-        nid = inv_from_offer(c, oid, uid, r, b.get("parts_mode") or None, b.get("parts_title") if isinstance(b.get("parts_title"), str) else None)
+        nid = inv_from_offer(c, oid, uid, r, parts_mode, parts_title)
     recalc(c, oid, nid)
-    ofx_log(c, oid, "create", doc_id=nid, detail={"kind": "invoice", "from_id": did, "from_number": r["number"], **({"inv_type": typ} if typ else {})})
+    ofx_log(c, oid, "create", doc_id=nid, detail={"kind": "invoice", "from_id": r["id"], "from_number": r["number"], **({"inv_type": typ} if typ else {})})
+    return nid
+
+
+@app.post("/api/office/docs/<int:did>/invoice")
+def inv_from_offer_post(did):
+    """An invoice draft from quotation did (every quotation line becomes a position; rights, framework contract, recipient,
+    project, language, currency, rate and PO number are taken over; source_doc_id). 201 the invoice.
+    2.149.0 A (#2521): from every status on purpose (#2235: the app asks first, no block); the agents' route needs an
+    accepted quotation."""
+    from .docs import doc_row
+    c, uid, oid = _ctx()
+    r = doc_row(c, oid, did)
+    if r["kind"] != "offer":
+        raise Denied(409, tr("Only a quotation can be turned into an invoice"))
+    b = body()  # 2.47.0 (#1215): {parts_mode?: full|title|summary, parts_title?} for a quotation with parts
+    b = b if isinstance(b, dict) else {}
+    nid = inv_offer_invoice(c, oid, uid, r, b, b.get("parts_mode") or None, b.get("parts_title") if isinstance(b.get("parts_title"), str) else None)
     bump(c)
     c.commit()
     return _answer(c, oid, uid, nid, 201)
@@ -1020,9 +1040,7 @@ def inv_reminder_post():
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
-    nid = inv_make_reminder(c, oid, uid, b)
-    recalc(c, oid, nid)
-    ofx_log(c, oid, "create", doc_id=nid, detail={"kind": "reminder", "doc_ids": b.get("doc_ids")})
+    nid = inv_reminder_new(c, oid, uid, b)
     bump(c)
     c.commit()
     return _answer(c, oid, uid, nid, 201)

@@ -3232,6 +3232,18 @@ CREATE TABLE IF NOT EXISTS git_branches (
   task_id BIGINT REFERENCES tasks(id) ON DELETE SET NULL, ahead BIGINT, sha TEXT NOT NULL DEFAULT '',
   cmp_sha TEXT NOT NULL DEFAULT '', cmp_main TEXT NOT NULL DEFAULT '', seen_at TEXT NOT NULL DEFAULT '', PRIMARY KEY (conn_id, name));
 CREATE INDEX IF NOT EXISTS git_branches_task ON git_branches(task_id) WHERE task_id IS NOT NULL;
+-- 2.149.0 C (#2515): the hot task / calendar reads. Done tasks per list by completion (the 14 days of /api/state, the done
+-- page, the done count of the delta), open tasks with a due day (reminders, digests, overdue), the calendar range by the
+-- first day of a series (events/model.py ev_range). tasks_open stays: the open tasks (status 0) are not in these
+CREATE INDEX IF NOT EXISTS tasks_done ON tasks(list_id, completed_at) WHERE status<>0 AND deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS tasks_due ON tasks(due) WHERE due IS NOT NULL AND status=0 AND deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS events_range ON events(cal_id, first_day) WHERE deleted_at IS NULL;
+-- 2.149.0 C (#2515): the main search (core/state.py search_tasks: ILIKE '%x%') finds title / notes / link by trigram index,
+-- with the same matches as the scan before (pg_trgm, see init_db), and the few tasks with code snippets directly
+CREATE INDEX IF NOT EXISTS tasks_trgm_title ON tasks USING gin (title gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS tasks_trgm_content ON tasks USING gin (content gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS tasks_trgm_url ON tasks USING gin (url gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS tasks_snippets ON tasks(id) WHERE snippets IS NOT NULL;
 """
 # 2.40.0 (#1336): office_doc_log_action serves the daily count of own-text mails (N7), which now reads one day's sends only
 MAX_DEPTH = 3  # task > subtask > sub-subtask
