@@ -12,12 +12,11 @@
 // long-press menu picks the task with the task search.
 // ------------------------------------------------------------------ 2.43.0 (#1003): several tasks at once
 // A drag that starts on a selected row takes the whole selection (badge "3 tasks" on the drag image). Upper / lower part of
-// a row = the block goes before / after it (order kept), the middle = they become its subtasks (at most three levels: a
+// a row = the block goes before / after it (order kept), the middle = they become its subtasks (at most maxDepth() levels: a
 // task whose own subtasks would go deeper stays, the message counts it). A section header, a kanban column or a list in
 // the sidebar takes them as standalone tasks. One batch request = one Undo. Without dragging: the multi panel and the
 // phone's selection menu have "Subtasks of…" and "Out of the parent task".
 const DG = {ids: null, zones: false};
-const DG_MAX_DEPTH = 3;  // kalmido/core/schema.py MAX_DEPTH (task > subtask > sub-subtask)
 const dgShort = s => { s = String(s || ''); return s.length > 40 ? s.slice(0, 39) + '…' : s; };
 const dgRowsOrder = () => new Map(vl_ids().map((id, i) => [id, i]));  // 2.65.0 (#1825): also the rows a long list does not draw
 // the ids in the order the user sees them (rows on screen first, then by sort)
@@ -29,7 +28,7 @@ function dgAncestors(id) { const out = []; let p = S.tasks.get(id)?.parent_id; f
 // a selected task whose parent (any level) is selected too moves with that parent
 const dgRoots = ids => { const set = new Set(ids); return ids.filter(i => !dgAncestors(i).some(a => set.has(a))); };
 function dgHeight(id, n = 0) { const k = children(id); return !k.length || n > 6 ? 0 : 1 + Math.max(...k.map(x => dgHeight(x.id, n + 1))); }
-const dgFits = (pid, id) => depthOf(S.tasks.get(pid)) + 1 + dgHeight(id) < DG_MAX_DEPTH;
+const dgFits = (pid, id) => depthOf(S.tasks.get(pid)) + 1 + dgHeight(id) < maxDepth();
 
 // ---- dependencies
 function dgDepOk(w, b) {
@@ -126,7 +125,7 @@ async function dgMakeSubs(ids, pid) {
   const s0 = kids.length ? Math.max(...kids.map(k => k.sort || 0)) + 1 : 0;
   const items = {};
   list.forEach((i, k) => { items[i] = {parent_id: pid, sort: s0 + k}; });
-  const notes = [deep.length ? trn('{0} task stays: its own subtasks would go deeper than {1} levels', '{0} tasks stay: their own subtasks would go deeper than {1} levels', deep.length, DG_MAX_DEPTH) : '',
+  const notes = [deep.length ? trn('{0} task stays: its own subtasks would go deeper than {1} levels', '{0} tasks stay: their own subtasks would go deeper than {1} levels', deep.length, maxDepth()) : '',
     ro.length ? trn('{0} task skipped (view only)', '{0} tasks skipped (view only)', ro.length) : '',
     ms.length ? tr('A milestone cannot be a subtask') : ''];
   return dgApply(items, trn('{0} task is now a subtask of “{1}”', '{0} tasks are now subtasks of “{1}”', list.length, dgShort(p.title)), notes);
@@ -153,7 +152,7 @@ function dgSubPick(ids) {
   const set = new Set(ids), roots = dgRoots(ids);
   dgPick({title: tr('Subtasks of…'), hint: trn('The {0} selected task becomes a subtask of the chosen task.', 'The {0} selected tasks become subtasks of the chosen task.', roots.length),
     near: S.tasks.get(roots[0]),
-    filter: x => !set.has(x.id) && !dgAncestors(x.id).some(a => set.has(a)) && canEdit(x) && !isMs(x) && depthOf(x) < DG_MAX_DEPTH - 1,
+    filter: x => !set.has(x.id) && !dgAncestors(x.id).some(a => set.has(a)) && canEdit(x) && !isMs(x) && depthOf(x) < maxDepth() - 1,
     pick: x => dgMakeSubs(ids, x.id)});
 }
 // a block before / after a row: the same parent, list and section as the row, sorted between it and its neighbour
@@ -186,7 +185,7 @@ async function dgBlock(ids, row, after) {
     items[id] = it;
   });
   if (((mode === 'date' || mode === 'title' || mode === 'creator' || mode.startsWith('created') || sortByCol(mode)) && !kcol) || mode === 'flow') LS.set('sort2.' + S.route.key, 'prio');  // a manual drop: prio + manual (as one task)
-  return dgApply(items, trn('{0} task moved', '{0} tasks moved', n), [deep.length ? trn('{0} task stays: its own subtasks would go deeper than {1} levels', '{0} tasks stay: their own subtasks would go deeper than {1} levels', deep.length, DG_MAX_DEPTH) : '',
+  return dgApply(items, trn('{0} task moved', '{0} tasks moved', n), [deep.length ? trn('{0} task stays: its own subtasks would go deeper than {1} levels', '{0} tasks stay: their own subtasks would go deeper than {1} levels', deep.length, maxDepth()) : '',
     ro.length ? trn('{0} task skipped (view only)', '{0} tasks skipped (view only)', ro.length) : '']);
 }
 // into a section / kanban column of a list as standalone tasks, at its top, order kept

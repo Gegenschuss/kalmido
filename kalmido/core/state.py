@@ -5,6 +5,7 @@ from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, IOS_SHORTCUT_URL, NTFY_IN, NTFY_URL, PUBLIC_URL
 from ..core.i18n import languages, tr
+from ..core.schema import MAX_DEPTH
 from ..core.db import ag_cursor, ag_cursor_parse, db, err, gsetting, inbox_names, iso, like_escape, local_now, now_utc, usettings
 from ..accounts.session import me, user_public
 from ..accounts.pictures import avatar_map, list_icon_url
@@ -321,6 +322,7 @@ def state():
         notify=notif_matrix(s),  # 2.1.0 (#317)
         ntfy_inbox={"enabled": bool(NTFY_IN["token"]), "server": NTFY_IN["public"], "topic": NTFY_IN["topic"]},
         ntfy_url=NTFY_URL,
+        max_depth=MAX_DEPTH,  # 2.156.0 A (#1949): the levels of tasks (dragging, mind map, detail read it)
         webpush={"enabled": WEBPUSH_ON, "key": vapid_public() if WEBPUSH_ON else "", "devices": webpush_count(c, uid)},
         languages=languages(),
         news={"unread": sum(1 for x in nitems if not x["read"]), "unread_me": news_unread_me(c, uid, s, nitems), "sig": news_sig(c, uid)},  # 2.28.0 (#987): + "For you"

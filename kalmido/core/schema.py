@@ -3139,7 +3139,7 @@ CREATE TABLE IF NOT EXISTS retention_log (
 CREATE INDEX IF NOT EXISTS retention_log_subject ON retention_log(subject, kind, id);
 """
 # 2.40.0 (#1336): office_doc_log_action serves the daily count of own-text mails (N7), which now reads one day's sends only
-MAX_DEPTH = 3  # task > subtask > sub-subtask
+MAX_DEPTH = 5  # 2.156.0 A (#1949): levels of tasks (task > subtask > ... ); the one number, the client gets it via /api/state (max_depth)
 # per user (table user_settings)
 USER_DEFAULTS = {
     "allday_time": "09:00",     # reminder base time for all-day tasks

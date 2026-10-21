@@ -30,6 +30,31 @@
 .mmot{flex:0 1 auto;min-width:0;overflow-wrap:anywhere}
 .mmtog{width:1.75rem;flex:none}
 .mmblock{overflow:auto;max-width:100%;padding:.5rem 0}
+/* 2.156.0 A (#1948): the properties of a branch (second line), the peek below the selected one, the outline */
+.mmnode .mmp{fill:var(--muted);font:.6875rem system-ui,-apple-system,"Segoe UI",sans-serif}
+.mmnode .mmpi{color:var(--muted);stroke-width:1.8}
+.mmpd.p5{fill:var(--p5);background:var(--p5)}.mmpd.p3{fill:var(--p3);background:var(--p3)}.mmpd.p1{fill:var(--p1);background:var(--p1)}
+.mmbar .iconbtn.on{color:var(--accent);background:var(--accent-soft)}
+.mmpeek{position:absolute;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .5rem;padding:.25rem .5rem;border:1px solid var(--line2);border-radius:.5rem;background:var(--bg2);color:var(--muted);font-size:var(--fs-xs);pointer-events:none;box-shadow:0 .125rem .5rem rgba(0,0,0,.08)}
+.mmpeek .mmpx,.mmop .mmpx{display:inline-flex;align-items:center;gap:.1875rem;white-space:nowrap;max-width:12rem;overflow:hidden;text-overflow:ellipsis}
+.mmpeek .i,.mmop .i{width:.75rem;height:.75rem}
+i.mmpd{display:inline-block;width:.5rem;height:.5rem;border-radius:50%}
+/* 2.156.0 A (#1201): ideas of an agent -- pale, dashed branches with take over / drop; the request line above the map */
+.mmnode.idea,.mmnode.ideawait{opacity:.72}
+.mmnode.idea rect,.mmnode.ideawait rect{fill:var(--accent-soft);stroke:var(--accent);stroke-dasharray:5 4}
+.mmnode.idea .mmt,.mmnode.ideawait .mmt{fill:var(--text2,var(--muted));font-style:italic}
+.mmnode.idea.sel{opacity:1}
+.mmib{cursor:pointer}
+.mmib rect{fill:var(--bg);stroke:var(--line2);stroke-dasharray:none}
+.mmib .mmpi{color:var(--muted)}
+.mmib.take:hover rect,.mmib.take:focus rect{stroke:var(--accent)}.mmib.take:hover .mmpi{color:var(--accent)}
+.mmib.drop:hover .mmpi{color:var(--danger)}
+.mmideas{display:flex;flex-direction:column;gap:.25rem}
+.mmir{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.375rem .625rem;border:1px dashed var(--accent);border-radius:var(--r-s);background:var(--accent-soft);font-size:var(--fs-s)}
+.mmir>span{flex:1 1 12rem;min-width:0}
+.mmir .i{color:var(--accent)}
+.mmoi.mmoidea{opacity:.75;font-style:italic;border:1px dashed var(--accent);background:var(--accent-soft)}
+.mmop{display:inline-flex;flex:0 1 auto;min-width:0;overflow:hidden;flex-wrap:nowrap;align-items:center;gap:.5rem;margin-left:.25rem}
 @media (max-width:899px) {
   .mmstage{height:calc(100vh - 17rem)}
   .mmbar .btn span{display:none}
@@ -38,5 +63,5 @@
   .mmnode rect{transition:stroke .15s}
 }
 @media (pointer:coarse) {
-  .mmbar .btn,.mmbar .iconbtn,.mmbar .seg button{min-height:2.75rem;min-width:2.75rem}
+  .mmbar .btn,.mmbar .iconbtn,.mmbar .seg button,.mmir .btn{min-height:2.75rem;min-width:2.75rem}
 }

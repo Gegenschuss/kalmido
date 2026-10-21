@@ -758,7 +758,7 @@ function taskMenu(anchor, id, o = {}) {
     ...(t.id > 0 && !t.context && canEdit(t) && !snipShown(t) ? [{label: tr('Add code snippet'), icon: 'code', fn: () => snipOpen(id, 'new')}] : []),  // 2.35.0 (#1095)
     // structure + more
     ...(isMs(t) || (!t.parent_id && !children(t.id).length && t.id > 0) ? [{label: isMs(t) ? tr('Make it a normal task') : tr('Make it a milestone'), icon: 'flag', fn: () => msToggle(id)}] : []),  // 2.18.0 (#430)
-    ...(i > 0 && depthOf(sib[i - 1]) < 2 && !isMs(t) && !isMs(sib[i - 1]) ? [{label: tr('Indent (under “{0}”)', sib[i - 1].title.slice(0, 24)), icon: 'indent', fn: () => patchTask(id, {parent_id: sib[i - 1].id})}] : []),
+    ...(i > 0 && depthOf(sib[i - 1]) < maxDepth() - 1 && !isMs(t) && !isMs(sib[i - 1]) ? [{label: tr('Indent (under “{0}”)', sib[i - 1].title.slice(0, 24)), icon: 'indent', fn: () => patchTask(id, {parent_id: sib[i - 1].id})}] : []),
     ...(t.parent_id ? [{label: tr('Outdent'), icon: 'outdent', fn: () => patchTask(id, {parent_id: S.tasks.get(t.parent_id)?.parent_id || null})}] : []),
     ...(t.parent_id && S.tasks.get(t.parent_id)?.parent_id ? [{label: tr('Make it a main task'), icon: 'arrow', fn: () => patchTask(id, {parent_id: null})}] : []),
     ...(propBreakOk(t) ? [{label: propWith(N_('Break down with {0}…'), N_('Break down with an agent…')), icon: 'bot', fn: () => propRequest('subtasks', {tid: id})}] : []),  // 2.3.0 (#261)
@@ -769,7 +769,7 @@ function taskMenu(anchor, id, o = {}) {
     ...(canDelete(t) ? [{label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}] : []),
   ]);
 }
-const propBreakOk = t => propOn() && t && t.id > 0 && t.status === 0 && depthOf(t) < 2 && canEditList(t.list_id);
+const propBreakOk = t => propOn() && t && t.id > 0 && t.status === 0 && depthOf(t) < maxDepth() - 1 && canEditList(t.list_id);
 function siblings(t) {  // same parent (or same list at top level), in custom order
   return [...S.tasks.values()].filter(x => x.status === 0 && x.parent_id === t.parent_id && (t.parent_id || x.list_id === t.list_id)).sort(bySort);
 }
