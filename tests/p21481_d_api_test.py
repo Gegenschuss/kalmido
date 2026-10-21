@@ -186,6 +186,11 @@ cells = {x["addr"]: x for x in Fr.get(B + f"/api/sheets/{SH}").json()["cells"]}
 check(cells.get("B1", {}).get("value") == 55 and not cells["B1"].get("error"), f"a sum within the budget: 55 {cells.get('B1')}")
 r = put(Fr, [(f"B{i}", "=SUM(A1:A10)") for i in range(2, 11)])
 check(r.ok, "nine more sums " + r.text[:160])
+# 2.148.1 G (#2485): the same range in every row counts once per evaluation
+cells = {x["addr"]: x for x in Fr.get(B + f"/api/sheets/{SH}").json()["cells"]}
+check(all(cells.get(f"B{i}", {}).get("value") == 55 for i in range(1, 11)), f"the same range in ten rows fits the budget {[cells.get(f'B{i}', {}).get('value') for i in range(1, 11)]}")
+r = put(Fr, [(f"B{i}", f"=SUM(A1:A{i})") for i in range(2, 11)])
+check(r.ok, "nine running totals " + r.text[:160])
 cells = {x["addr"]: x for x in Fr.get(B + f"/api/sheets/{SH}").json()["cells"]}
 errs = [a for a, x in cells.items() if x.get("error") == "type"]
 check(errs and all(cells[a].get("error_text") for a in errs), f"over the range budget: an error value with a text {errs}")
@@ -196,6 +201,24 @@ check(put(Fr, [("A1", "7")]).ok, "changing a stored cell still works when full")
 sparse = '<row r="1"><c r="A1"><v>1</v></c></row><row r="40"><c r="H40"><v>2</v></c></row>'
 r = Fr.post(B + "/api/sheets/import", files={"file": ("sparse.xlsx", book("A1:A1", sparse), "application/octet-stream")}, data={"space": "private"})
 check(r.status_code == 201, f"a sparse .xlsx imports {r.status_code} {r.text[:200]}")
+
+# 2.148.1 G (#2485): a mail over the size cap is marked seen and skipped (never fetched), also without a workspace cap
+code = """
+from kalmido.integrations import mail as m
+class M:
+    def __init__(s): s.fetched, s.seen = [], []
+    def read(s, n): return b""
+    def select(s, f): return "OK", [b"1"]
+    def uid(s, cmd, *a):
+        if cmd == "SEARCH": return "OK", [b"7"]
+        if cmd == "FETCH" and a[1] == "(RFC822.SIZE)": return "OK", [b"7 (UID 7 RFC822.SIZE 99999999999)"]
+        if cmd == "FETCH": s.fetched.append(a[0]); return "OK", []
+        if cmd == "STORE": s.seen.append(a[0]); return "OK", []
+x = M()
+print(m.mail_fetch(x, "INBOX", lambda c, raw: True), len(x.fetched), len(x.seen))
+"""
+r = subprocess.run(["docker", "exec", "-i", CT, "python", "-c", code], capture_output=True, text=True, timeout=120)
+check(r.stdout.strip().splitlines()[-1:] == ["0 0 1"], f"mail fetch: a too large mail is skipped and marked seen {r.stdout[-120:]} {r.stderr[-300:]}")
 
 # ================================================================== #2488 filed mail files
 r = A.post(B + "/api/files/folders", json={"name": "E-Mails", "space": f"org:{ORG}"})
