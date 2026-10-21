@@ -283,8 +283,8 @@ def ev_att_learn(c, pw_row, v):
         return True  # no app password to learn with: as before (the PUT's attendees replace the stored ones)
     have = set(filter(None, (pw_row["caps"] or "").split(",")))
     if v["attendees_raw"] and "ATTENDEE" not in have:
-        c.execute("UPDATE app_passwords SET caps=? WHERE id=?", (",".join(sorted(have | {"ATTENDEE"})), pw_row["id"]))
-        c.commit()
+        from ..calendars.caldav import dav_caps_add
+        dav_caps_add(c, pw_row["id"], {"ATTENDEE"})  # 2.144.5 A2 (#2379, review R8): atomic
         return True
     return "ATTENDEE" in have
 
@@ -307,13 +307,13 @@ def ev_put(c, u, coll, name, pw_row=None):
         raise DavError(e.code, e.text, e.cond) from None
     except (ValueError, TypeError, OverflowError, KeyError, AttributeError):
         raise DavError(400, "The calendar data could not be read", "<C:valid-calendar-data/>") from None
-    knows_att = ev_att_learn(c, pw_row, v)
     have = member_now(c, u, coll, name)
     inm, im = request.headers.get("If-None-Match", "").strip(), request.headers.get("If-Match", "").strip()
     if have and inm == "*":
         raise DavError(412, "The resource exists already")
     if im and (not have or (im != "*" and have[1] not in [x.strip() for x in im.split(",")])):
         raise DavError(412, "The resource was changed meanwhile")
+    knows_att = ev_att_learn(c, pw_row, v)  # 2.144.5 A2 (#2379, review R8): only from a PUT that passed the preconditions
     if have:
         eid = have[0]["id"]
         if v["uid"] != have[0]["uid"] and c.execute("SELECT 1 FROM events WHERE cal_id=? AND uid=? AND id!=? AND deleted_at IS NULL",

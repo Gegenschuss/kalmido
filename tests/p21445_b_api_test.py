@@ -4,10 +4,11 @@
    names and sender but never the passwords; imported into an empty organisation and into the private space (org ->
    private) it keeps server / user and asks for the passwords again (error "password", *_password_set false); the account
    export carries the private mailbox (no passwords), its import into an organisation (private -> org) keeps server / user,
-   undo removes it again; a workspace that has a mailbox keeps its own (warning); the boundary check reports a mailbox whose
+   undo removes it again (2.144.5 A2, review R6/R7: imported switched off, undo keeps a changed one); a workspace that has a mailbox keeps its own (warning); the boundary check reports a mailbox whose
    ws does not match its organisation / owner; a person without organisation exports and imports their own mailbox
  - #2379 CalDAV: a PUT without any ATTENDEE from a client (app password) that never wrote one keeps the attendees and their
-   answers; a client that wrote ATTENDEE before removes them by leaving them out (as before)
+   answers; a client that wrote ATTENDEE before removes them by leaving them out (as before); 2.144.5 A2 (review R8): a PUT
+   refused by If-Match learns nothing, learning adds to the known properties
 usage: p21445_b_api_test.py <datadir>      (P21445B_NOSTART=1: the server already runs like that)"""
 # freelancer-matrix: hub
 import base64
@@ -211,8 +212,11 @@ b3 = box(f"o{ORG3}")
 check(b3 and b3["org_id"] == ORG3 and b3["owner_id"] is None and b3["imap_host"] == "imap.example.com" and b3["imap_user"] == "team@example.com"
       and b3["smtp_user"] == "team@example.com" and b3["from_name"] == "Alpha Team", f"#2410: Gamma has the mailbox with server and user {b3}")
 check(b3 and b3["secret"] == "" and b3["error"] == "password", f"#2410: without passwords, asks for them {b3 and (b3['secret'][:4], b3['error'])}")
+# 2.144.5 A2 (#2410, review R6): switched off until the passwords are back (sending goes through the server meanwhile)
+check(one("SELECT active FROM hub_mailboxes WHERE ws=?", (f"o{ORG3}",)) == 0, "R6: the imported mailbox is switched off")
 g3 = A.get(B + f"/api/hubmail/mailbox?ws=org:{ORG3}").json().get("box") or {}
-check(g3.get("imap_password_set") is False and g3.get("smtp_password_set") is False and g3.get("error") == "password" and g3.get("error_text"),
+check(g3.get("imap_password_set") is False and g3.get("smtp_password_set") is False and g3.get("error") == "password" and g3.get("error_text")
+      and g3.get("active") is False,
       f"#2410: the settings show 'enter the password' {g3}")
 check("passwords" in warnings(j), f"#2410: the report says the passwords must be entered again: {warnings(j)}")
 r = A.put(B + "/api/hubmail/mailbox", json={"ws": f"org:{ORG3}", "imap_host": "imap.example.com"})
@@ -254,6 +258,13 @@ check(box(f"u{ALICE}")["secret"] != "", "#2410: the private mailbox itself is un
 iid_db = (j.get("result") or {}).get("import_id")
 r = A.post(B + f"/api/imports/{iid_db}/undo")
 check(r.ok and box(f"o{ORG4}") is None, f"#2410: undo removes the mailbox again {r.text[:200]}")
+# 2.144.5 A2 (#2410, review R7): a mailbox changed after the import (saved in the settings: error cleared, e.g. an SMTP
+# box without a user and so without a password) stays on undo
+iid = opened(A, EXP)
+j = run(A, iid, ORG4)
+dbx("UPDATE hub_mailboxes SET error='' WHERE ws=?", (f"o{ORG4}",))
+r = A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
+check(r.ok and box(f"o{ORG4}") is not None, f"R7: undo keeps a mailbox changed since the import {r.text[:200]}")
 
 # ================================================================== #2410 the boundary check
 dbx("INSERT INTO hub_mailboxes(org_id, owner_id, ws, imap_host, imap_user, created_by, created_at, updated_at) "
@@ -303,8 +314,9 @@ class Dav:
         self.s.auth = (user, pw)
         self.s.headers["User-Agent"] = ua
 
-    def put(self, path, body):
-        return self.s.request("PUT", B + path, data=body.encode(), headers={"Content-Type": "text/calendar; charset=utf-8"}, allow_redirects=False)
+    def put(self, path, body, h=None):
+        return self.s.request("PUT", B + path, data=body.encode(), headers={"Content-Type": "text/calendar; charset=utf-8", **(h or {})},
+                              allow_redirects=False)
 
 
 def ics(uid, title, *extra):
@@ -343,10 +355,16 @@ check(one("SELECT caps FROM app_passwords WHERE name='Client A'") in ("", None),
 # client B: writes ATTENDEE first, then leaves them out = removed
 pb = A.post(B + "/api/me/app-passwords", json={"name": "Client B"}).json()["password"]
 cb = Dav("alice", pb, "OtherCal/2.0")
+# 2.144.5 A2 (#2379, review R8): a PUT refused by If-Match teaches nothing; learning adds to what the password knew
+dbx("UPDATE app_passwords SET caps='CATEGORIES' WHERE name='Client B'")
+r = cb.put(WC + HREF, ics(UID_, "Abstimmung B", f"ATTENDEE;CN=Bob:urn:kalmido:user:{BOB}"), {"If-Match": '"stale-etag"'})
+check(r.status_code == 412 and one("SELECT caps FROM app_passwords WHERE name='Client B'") == "CATEGORIES",
+      f"R8: a refused PUT (If-Match) learns nothing {r.status_code} {one('SELECT caps FROM app_passwords WHERE name=?', ('Client B',))}")
 r = cb.put(WC + HREF, ics(UID_, "Abstimmung B", "ORGANIZER:mailto:alice@example.com",
                           f"ATTENDEE;CN=Bob;PARTSTAT=ACCEPTED;X-KALMIDO-USER={BOB}:urn:kalmido:user:{BOB}", "ATTENDEE;CN=Guest:mailto:guest@example.net"))
 check(r.status_code == 204 and len(atts(EID)) == 2 and (str(BOB), "accepted") in atts(EID), f"#2379: client B writes both attendees {r.status_code} {atts(EID)}")
-check("ATTENDEE" in (one("SELECT caps FROM app_passwords WHERE name='Client B'") or ""), "#2379: client B is known to write ATTENDEE")
+check(sorted((one("SELECT caps FROM app_passwords WHERE name='Client B'") or "").split(",")) == ["ATTENDEE", "CATEGORIES"],
+      "#2379: client B is known to write ATTENDEE (R8: next to what it knew)")
 r = cb.put(WC + HREF, ics(UID_, "Abstimmung B2"))
 check(r.status_code == 204 and atts(EID) == [], f"#2379: client B leaves them out = removed (as before) {atts(EID)}")
 # client A again: no attendees now, still nothing to keep; a new event without ATTENDEE from A stays without

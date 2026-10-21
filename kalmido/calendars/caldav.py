@@ -1042,12 +1042,20 @@ def dav_read(raw, allday_min):
 
 
 # ---- writing
+def dav_caps_add(c, pw_id, names):
+    """2.144.5 A2 (#2379, review R8): adds the properties names to app_passwords.caps in one statement each (two PUTs of the
+    same app password at once cannot write each other's away). Commits."""
+    for n in sorted(names):
+        c.execute("UPDATE app_passwords SET caps = CASE WHEN caps='' THEN ? ELSE caps || ',' || ? END "
+                  "WHERE id=? AND (',' || caps || ',') NOT LIKE ?", (n, n, pw_id, f"%,{n},%"))
+    c.commit()
+
+
 def dav_caps_learn(c, pw_row, v):
     have = set(filter(None, (pw_row["caps"] or "").split(",")))
     new = have | ({"CATEGORIES", "RELATED-TO"} & v["has"])
     if new != have:
-        c.execute("UPDATE app_passwords SET caps=? WHERE id=?", (",".join(sorted(new)), pw_row["id"]))
-        c.commit()
+        dav_caps_add(c, pw_row["id"], new - have)  # 2.144.5 A2 (#2379, review R8): atomic
     return new
 
 
@@ -1151,13 +1159,13 @@ def dav_put(c, u, pw_row, lst, name):
         raise DavError(413, "Too large", "<C:max-resource-size/>")
     s = usettings(c, u["id"])
     v = dav_read(raw, hm_minutes(s.get("allday_time") or "09:00"))
-    caps = dav_caps_learn(c, pw_row, v)
     have = dav_member(c, u, lst, name)
     inm, im = request.headers.get("If-None-Match", "").strip(), request.headers.get("If-Match", "").strip()
     if have and inm == "*":
         raise DavError(412, "The resource exists already")
     if im and (not have or (im != "*" and have[1] not in [x.strip() for x in im.split(",")])):
         raise DavError(412, "The resource was changed meanwhile")
+    caps = dav_caps_learn(c, pw_row, v)  # 2.144.5 A2 (#2379, review R8): only from a PUT that passed If-Match / If-None-Match
     lid = lst["id"]
     if have:
         cur = have[0]
