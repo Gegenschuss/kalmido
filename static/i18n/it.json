@@ -7582,7 +7582,6 @@
   "Add a number field first.": "Aggiungi prima un campo numerico.",
   "Add key figure": "Aggiungi indicatore",
   "All tasks": "Tutte le attività",
-  "Allowed: + - * / ( ), numbers, field names in braces and round(value, 2). Division by 0 stays empty.": "Consentito: + - * / ( ), numeri, nomi di campo tra parentesi graffe e round(valore, 2). La divisione per 0 resta vuota.",
   "At most {0} key figures": "Al massimo {0} indicatori",
   "Average": "Media",
   "Calculation": "Calcolo",

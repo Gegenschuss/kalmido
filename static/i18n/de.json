@@ -7582,7 +7582,6 @@
   "Add a number field first.": "Leg zuerst ein Zahlenfeld an.",
   "Add key figure": "Kennzahl hinzufügen",
   "All tasks": "Alle Aufgaben",
-  "Allowed: + - * / ( ), numbers, field names in braces and round(value, 2). Division by 0 stays empty.": "Erlaubt: + - * / ( ), Zahlen, Feldnamen in geschweiften Klammern und round(Wert, 2). Division durch 0 bleibt leer.",
   "At most {0} key figures": "Höchstens {0} Kennzahlen",
   "Average": "Durchschnitt",
   "Calculation": "Rechenart",

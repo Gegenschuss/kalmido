@@ -7582,7 +7582,6 @@
   "Add a number field first.": "Voeg eerst een getalveld toe.",
   "Add key figure": "Kengetal toevoegen",
   "All tasks": "Alle taken",
-  "Allowed: + - * / ( ), numbers, field names in braces and round(value, 2). Division by 0 stays empty.": "Toegestaan: + - * / ( ), getallen, veldnamen tussen accolades en round(waarde, 2). Delen door 0 blijft leeg.",
   "At most {0} key figures": "Hoogstens {0} kengetallen",
   "Average": "Gemiddelde",
   "Calculation": "Berekening",

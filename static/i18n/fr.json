@@ -7582,7 +7582,6 @@
   "Add a number field first.": "Ajoutez d’abord un champ numérique.",
   "Add key figure": "Ajouter un indicateur",
   "All tasks": "Toutes les tâches",
-  "Allowed: + - * / ( ), numbers, field names in braces and round(value, 2). Division by 0 stays empty.": "Autorisé : + - * / ( ), nombres, noms de champ entre accolades et round(valeur, 2). Une division par 0 reste vide.",
   "At most {0} key figures": "Au plus {0} indicateurs",
   "Average": "Moyenne",
   "Calculation": "Calcul",
