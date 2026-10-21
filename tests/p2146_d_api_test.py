@@ -57,10 +57,14 @@ def sess(user, pw="password123"):
     return s
 
 
-def sql(q, args=()):
+def sql(q, args=(), write=False):
     c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
-        return c.execute(q, args).fetchall()
+        r = c.execute(q, args)
+        if write:  # 2.152.0 (#2167, review A9): backdated rows
+            c.commit()
+            return None
+        return r.fetchall()
     finally:
         c.close()
 
@@ -245,6 +249,8 @@ for name, how in (("Gamma", "waived"), ("Delta", "exported")):
     A.patch(B + "/api/settings", json={"workspace": f"org:{G}"})
     company(A, name + " GmbH")
     cash(A, "Kasse " + name)
+    # 2.152.0 (#2167): the cash book is kept by law now (self-hosting retires); an expired period (2014) still needs the step
+    sql("UPDATE office_cash_entries SET day='2014-03-02' WHERE org_id=?", (G,), write=True)
     check(A.delete(B + f"/api/admin/orgs/{G}").status_code == 409, f"{name}: 409 without the step")
     if how == "exported":
         check(A.delete(B + f"/api/admin/orgs/{G}", params={"retention": "exported"}).status_code == 409, f"{name}: exported without an export 409")
@@ -258,8 +264,10 @@ G = A.post(B + "/api/admin/orgs", json={"name": "Epsilon", "admin_id": ALICE}).j
 A.patch(B + "/api/settings", json={"workspace": f"org:{G}"})
 vid = A.post(B + O + "/vehicles", json={"name": "Kombi", "kind": "private", "odo_start": "1000"}).json().get("id")
 r = A.post(B + O + "/drives", json={"vehicle_id": vid, "day": time.strftime("%Y-%m-%d"), "dest": "Kunde", "purpose": "Dreh", "km": 30, "kind": "business"})
+sql("UPDATE office_drives SET day='2014-03-02' WHERE org_id=?", (G,), write=True)  # period over: no retirement, the step stays
 check(r.ok and A.get(B + RX + f"/org/{G}").json().get("counts", {}).get("drives") == 1, "review A9: the logbook drive is counted " + r.text[:200])
-check(A.delete(B + f"/api/admin/orgs/{G}").status_code == 409, "review A9: Epsilon (logbook only): 409 without the step")
+r = A.delete(B + f"/api/admin/orgs/{G}")
+check(r.status_code == 409 and r.json().get("code") == "retention", "review A9: Epsilon (logbook only): 409 without the step " + r.text[:200])
 check(A.delete(B + f"/api/admin/orgs/{G}", params={"retention": "waived"}).ok, "review A9: Epsilon goes with the waiver")
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 check(A.delete(B + f"/api/admin/orgs/{ORG2}").ok, "an organisation without records: deleted as before")
