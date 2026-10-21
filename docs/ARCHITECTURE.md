@@ -382,6 +382,21 @@ registering the ones of its area.
    loads), add it to `SHELL` in `static/sw.js` in the same order and bump `CACHE` there.
 3. `python3 tools/check_layout.py` compares the three lists; `node --check` runs on every file in CI.
 
+### Caching of static files and request timing (2.149.0)
+
+- The served `index.html` gives every start script and stylesheet `?v=<content hash>` (the first 12 hex digits of its
+  SHA-256, `core/pages.py`); the file stays plain in `static/index.html`. A static file asked for with its own hash is
+  answered `Cache-Control: public, max-age=31536000, immutable`; any other `?v=` and no `?v=` are revalidated as before.
+- `GET /sw-manifest.json` lists every static file of `SHELL` / `LAZY` / `LAZY_CSS` in `static/sw.js` with that hash
+  (computed by the server, never out of date; the lists in `sw.js` stay the one source). The service worker keeps each
+  file as `<url>?v=<hash>`, copies unchanged files from the old cache on an update and loads only the changed ones.
+  `CACHE` is still bumped once per version: it is what makes the browser install the new worker.
+- Static files, `/sw.js`, `/sw-manifest.json` and `/robots.txt` are served without a session lookup (no database access).
+- Every answer carries `Server-Timing: app;dur=…, db;dur=…;desc="n=<statements>"` (`core/reqtime.py`, counted per
+  thread in `core/pg.py`). A request slower than `KALMIDO_SLOW_REQUEST_MS` (default 500, 0 = off) logs one line with
+  method, route pattern, duration, statements and database time; `GET /api/admin/health` has p50 / p95 / max of the
+  last 1000 requests under `requests` (static files, `/api/health` and long polls with `?wait=` are left out).
+
 ### Type check (2.102.0)
 
 TypeScript checks the client without a build step and without changing the code: `jsconfig.json` makes every file of
