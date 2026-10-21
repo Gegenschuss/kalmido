@@ -133,13 +133,14 @@ function scan() {
   await call('POST', '/api/team/absences', {kind: 'vacation', start_date: in2, end_date: in2, note: 'Away for Bravo', org: Bo});
   // 2.161.0 (#2076): a colleague in each organisation, an absence each that alice (their admin) enters; alice shows the team's
   const mate = async (name, oid) => {
-    const id = (await call('POST', '/api/users', {username: name, display_name: name[0].toUpperCase() + name.slice(1), password: 'password123', email: name + '@example.com'})).id;
-    await call('PUT', `/api/orgs/${oid}/members`, {user_id: id});
-    const ck = await login(name); await call('POST', `/api/orgs/${oid}/join`, null, ck);
-    const ab = await call('POST', '/api/team/absences', {user_id: id, kind: 'vacation', start_date: t, end_date: t, org: oid});
-    return id > 0 && ab.http === 201;
+    const u = await call('POST', '/api/users', {username: name, display_name: name[0].toUpperCase() + name.slice(1), password: 'password123', email: name + '@example.com'});
+    const m = await call('PUT', `/api/orgs/${oid}/members`, {email: name + '@example.com'});  // an invitation, accepted below
+    const ck = await login(name); const j = await call('POST', `/api/orgs/${oid}/join`, null, ck);
+    const ab = await call('POST', '/api/team/absences', {user_id: u.id, kind: 'vacation', start_date: t, end_date: t, org: oid});
+    return u.id > 0 && ab.http === 201 ? '' : `${name}: user ${u.http} member ${m.http} join ${j.http} absence ${ab.http} ${JSON.stringify(ab).slice(0, 160)}`;
   };
-  check(await mate('cleo', A) && await mate('dirk', Bo), 'a colleague with an absence in Alpha and one in Bravo');
+  const mt = (await mate('cleo', A)) + (await mate('dirk', Bo));
+  check(!mt, 'a colleague with an absence in Alpha and one in Bravo ' + mt);
   await call('PATCH', '/api/settings', {cal_abs_team: '1'});
 
   const w = await boot({user: 'alice', hash: 'docs'}); const d = w.document;
