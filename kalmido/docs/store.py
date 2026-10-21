@@ -850,9 +850,11 @@ def process(c, nid):
             "amount": str(given.get("amount") or ex["amount"] or ""), "currency": str(given.get("currency") or ex["currency"] or "")[:8]}
     auto_all = meta_json(c, m, "auto", {})
     if ei:                                   # 2.146.0 A (#2451): the e-invoice's values replace the recognition's
-        from ..office.einvoice_in import ei_details
+        from ..office.einvoice_in import ei_amount, ei_details
         ei_det = ei_details(ei)
-        for k, v in (("doc_date", ei["date"]), ("due_date", ei["due"]), ("amount", ei_det["gross"]), ("currency", ei["currency"])):
+        ei_first = not meta_json(c, m, "extracted", {}).get("_einv")  # 2.153.0 (#2055): read as an e-invoice for the first time
+        # 2.153.0 (#2055): a credit note's amount negative (ei_amount)
+        for k, v in (("doc_date", ei["date"]), ("due_date", ei["due"]), ("amount", ei_amount(ei)), ("currency", ei["currency"])):
             if v and not given.get({"doc_date": "date", "due_date": "due"}.get(k, k)):
                 vals[k] = str(v)[:8] if k == "currency" else v
                 auto_all[{"doc_date": "date", "due_date": "due"}.get(k, k)] = "e-invoice"
@@ -916,8 +918,10 @@ def process(c, nid):
                _now(), _now(), nid))
     from ..receipts.extracted import rx_compact
     if ei:                                   # 2.146.0 A (#2451): the e-invoice's values + the invoice for its readable view
-        from ..office.einvoice_in import ei_compact
+        from ..office.einvoice_in import ei_compact, ei_receipt
         meta_set_json(c, nid, ws, "extracted", {**rx_compact(ei_det), "_einv": ei_compact(ei)})
+        if ei_first:                         # 2.153.0 (#2055): in an office's documents space it becomes a receipt (not an own invoice)
+            ei_receipt(c, node, ws, ei, ei_det["vat_pct"])
     else:
         meta_set_json(c, nid, ws, "extracted", rx_compact(ex.get("details")))  # 2.121.0 A (#2092): a fresh run, a fresh suggestion
     doc_index(c, nid, ws, index_text(c, dict(meta_row(c, nid)), node["name"], text))

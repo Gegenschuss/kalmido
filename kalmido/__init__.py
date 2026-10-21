@@ -281,6 +281,7 @@ ORDER = (
     "office.books",  # 2.90.0 A (#1921): bookkeeping light: income/expense statement (EUeR), VAT return figures, tax reserve, receipt photo
     "office.bkexport",  # 2.147.0 (#2461): the neutral bookkeeping export (booking list CSV + documents / receipts ZIP)
     "office.catacct",  # 2.121.0 (#2093): receipt categories with an SKR03 / SKR04 account (no routes; shown by office.books)
+    "office.receiptlist",  # 2.153.0 (#2055): receipts list over all months with filters + its CSV / ZIP for the tax adviser
     "office.bank",  # 2.90.0 B (#1921): bank reconciliation: CSV / CAMT import, matching bookings to invoices and receipts
     "office.doctpl_samples",  # 2.117.0 B (#2283): the letter samples of the document templates (data, no routes)
     "office.doctpl",  # 2.93.0 A (#1927): document templates with variables, documents as PDF, signature by customer link

@@ -10,6 +10,8 @@ ei_of_file(name, mime, data)   -> the parsed invoice of a document's file or Non
 ei_details(inv)                -> the receipt suggestion keys of receipts/extracted.py (supplier, vat_id, ..., gross)
 ei_text(inv)                   -> readable text of the invoice (the document's text and search index)
 ei_html(inv)                   -> the readable view (HTML, every value escaped, no script)
+ei_amount(inv)                 -> 2.153.0 (#2055): the document amount (a credit note negative)
+ei_receipt(c, node, ws, inv, vat) -> 2.153.0 (#2055): in an office's documents space a receipt (not an own invoice; once)
 
 Safety: at most XML_MAX bytes; a DOCTYPE or an ENTITY is refused before parsing (like core/csvimport.py camt_rows: no
 entity expansion, no external references, no new dependency); the parse runs as a pull parser that stops beyond
@@ -478,6 +480,65 @@ def ei_compact(inv):
     keep = ("format", "kind", "number", "date", "due", "currency", "seller", "buyer", "iban", "bic", "payment_ref", "terms",
             "net", "vat", "gross", "payable", "vat_rates", "lines", "lines_more", "note", "source")
     return {k: inv.get(k) for k in keep if inv.get(k) not in (None, "", [], {})}
+
+
+# ---- 2.153.0 (#2055): an incoming e-invoice in an office's documents space becomes a receipt ---------------------------------
+def ei_amount(inv):
+    """The document amount of an invoice (gross, else the amount due); a credit note negative (it lowers the expenses)."""
+    a = inv.get("gross") or inv.get("payable")
+    if not a or inv.get("kind") != "credit_note":
+        return a
+    try:
+        v = Decimal(str(a))
+    except InvalidOperation:
+        return a
+    return format(-v if v > 0 else v, "f")
+
+
+def _ei_office(c, ws):
+    """The office area whose documents space ws is (office/books.py bk_ws), or None when no office is set up there."""
+    if ws and ws[0] == "o" and ws[1:].isdigit():
+        oid = int(ws[1:])
+        used = c.execute("SELECT 1 FROM office_settings WHERE org_id=? UNION ALL SELECT 1 FROM office_company WHERE org_id=? "
+                         "UNION ALL SELECT 1 FROM office_docs WHERE org_id=? LIMIT 1", (oid, oid, oid)).fetchone()
+        return oid if used else None
+    if not ws or ws[0] != "u" or not ws[1:].isdigit():
+        return None
+    from .model import office_on, pb_personal
+    uid = int(ws[1:])
+    return pb_personal(c, uid, create=False) if office_on(c, uid) else None
+
+
+def _ei_norm(s):
+    return re.sub(r"[^0-9a-z]+", "", str(s or "").lower())
+
+
+def ei_own(c, oid, inv):
+    """True when inv was issued by office area oid itself (seller VAT id / tax number / name = the own company)."""
+    from .ledger import ofx_company
+    co, s = ofx_company(c, oid), inv.get("seller") or {}
+    vat = re.sub(r"\s+", "", co.get("vat_id") or "").upper()
+    if vat and vat == re.sub(r"\s+", "", s.get("vat_id") or "").upper():
+        return True
+    tax = re.sub(r"\D+", "", co.get("tax_number") or "")
+    if len(tax) >= 6 and tax == re.sub(r"\D+", "", s.get("tax_no") or ""):
+        return True
+    return bool(_ei_norm(co.get("name")) and _ei_norm(co.get("name")) == _ei_norm(s.get("name")))
+
+
+def ei_receipt(c, node, ws, inv, vat_pct):
+    """docs/store.py process, the first time a document is read as an e-invoice: in the documents space of an office it
+    becomes a receipt (rc_receipts, VAT rate of the invoice) unless it is one already or the office issued it itself.
+    Never raises (an ordinary document stays)."""
+    try:
+        with c.savepoint():
+            oid = _ei_office(c, ws)
+            if not oid or ei_own(c, oid, inv) or c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone():
+                return
+            from ..receipts.suggest import rc_set
+            rc_set(c, node, ws, None, "", None, vat=vat_pct, keep=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"WARNING e-invoice receipt of document {node['id']}: {type(e).__name__}", flush=True)
 
 
 KIND_LABEL = {"invoice": N_("Invoice"), "credit_note": N_("Credit note")}

@@ -810,3 +810,29 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 @media (pointer:coarse) {
   .cb-bar select,#cb-vat,#bkb-doc{height:2.75rem;line-height:1.25}
 }
+/* 2.110.0 B (#2055): all receipts (office_receipts.js) */
+.bk-all{margin:.5rem 0 0}
+.bk-all .btn{min-height:2.75rem;gap:.375rem}
+.rcl-filters{border:1px solid var(--line2);border-radius:var(--radius);padding:0 .75rem;margin:.5rem 0 .75rem}
+.rcl-filters>summary{cursor:pointer;min-height:2.75rem;display:flex;align-items:center;gap:.5rem;font-weight:600}
+.rcl-grid{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.75rem 1rem;padding:.25rem 0 .75rem}
+.rcl-f{display:flex;flex-direction:column;gap:.25rem;min-width:0}
+.rcl-f select,.rcl-f input[type=search]{min-height:2.75rem;max-width:100%}
+.rcl-days{flex-direction:row;flex-wrap:wrap;align-items:center;gap:.5rem}
+.rcl-q{flex:1 1 14rem}
+.rcl-q input{width:100%}
+.rcl-novat{min-height:2.75rem;display:inline-flex;align-items:center;gap:.5rem}
+.rcl-f .seg button{min-height:2.75rem}
+.rcl-exp{margin:.25rem 0 .5rem}
+.rcl-exp .btn{min-height:2.75rem}
+.rcl-open{color:var(--muted)}
+.rcl-more{display:flex;justify-content:center;margin:.75rem 0}
+.rcl-more .btn{min-height:2.75rem;min-width:10rem}
+@media (max-width:600px) {
+  .rcl-grid{flex-direction:column;align-items:stretch}
+  .rcl-f select,.rcl-q{width:100%}
+  .rcl-f .seg{display:flex}
+  .rcl-f .seg button{flex:1}
+  .rcl-exp{justify-content:stretch}
+  .rcl-exp .btn{flex:1;justify-content:center}
+}
