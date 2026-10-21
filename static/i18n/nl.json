@@ -13299,5 +13299,7 @@
   "Delete the cash book entries ({0}) too?": "Ook de kasboekposten ({0}) verwijderen?",
   "No: they stay in the cash book without the invoice.": "Nee: ze blijven in het kasboek, zonder de factuur.",
   "Invoice {0} deleted in the test phase": "Factuur {0} verwijderd in de testfase",
-  "{0} deleted in the test phase": "{0} verwijderd in de testfase"
+  "{0} deleted in the test phase": "{0} verwijderd in de testfase",
+  "Hello!": "Hallo!",
+  "Nice to have you here. A quick look at the most important things:": "Fijn dat je er bent. Even kort het belangrijkste:"
 }

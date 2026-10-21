@@ -852,7 +852,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .menu-list button.danger,.menu-list button.danger .i{color:var(--danger)}
 .iconbtn.spin svg{animation:spin 0.9s linear infinite}
 .ptr{position:absolute;left:50%;top:.25rem;z-index:5;width:2rem;height:2rem;margin-left:-1rem;border-radius:50%;background:var(--bg2);box-shadow:var(--shadow);display:grid;place-items:center;color:var(--accent);opacity:0;pointer-events:none;transition:opacity .15s}
-.ptr.on{opacity:1}.ptr.go svg{animation:spin .9s linear infinite}
+.ptr.on{opacity:1}.ptr.go svg.i{animation:spin .9s linear infinite}
 .avpick{display:flex;flex-wrap:wrap;gap:.375rem;flex:1}
 .avopt{width:2.5rem;height:2.5rem;border-radius:50%;padding:0;border:2px solid transparent;background:var(--bg3);display:grid;place-items:center;overflow:hidden;cursor:pointer;color:var(--muted);font:600 .75rem var(--mono)}
 .avopt img{width:100%;height:100%;object-fit:cover;display:block}
@@ -8029,3 +8029,26 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .bot.bbusy{width:2rem;height:2rem}
 .ctimp>.bot.bbusy{width:1.75rem;height:1.75rem}
 .ctimp.done>.bot.bbusy{display:none}
+
+/* 2.165.0 (#2612-#2614): more bot moments. #2612: the very first start greets once on the first tour card (palette.js
+   tourHiFig: the figure pops up and waves, the hello next to it); #2613: an error or the connection's loss startles the
+   figures on screen for a moment (palette.js botStartle: big eyes, a jolt, the antenna twitches); #2614: pull to refresh
+   shows the figure, it hops while the refresh runs (core.js). Motion only without reduced motion. */
+.tcard h3 .thi{display:flex;align-items:center;gap:.75rem;margin:0 0 .625rem;font-size:var(--fs-m);font-weight:400;letter-spacing:0}
+.tcard h3 .thi .bot.htour{margin:0}
+.tcard h3 .thi>span{display:grid;gap:.125rem;min-width:0}
+.tcard h3 .thi b{font-size:var(--fs-l);font-weight:600}
+.ptr.pbot{width:2.5rem;height:2.5rem;margin-left:-1.25rem;border-radius:22.5%;background:none}
+.ptr.pbot .bot{width:100%;height:100%}
+@media (prefers-reduced-motion: no-preference){
+  .bot.bhi .b-hop{animation:b-hi-in .55s cubic-bezier(.3,.7,.4,1.3) both,b-hop .75s cubic-bezier(.3,.7,.4,1) .6s 1}
+  .bot.bhi .b-ant{animation:b-wave .9s ease-in-out .5s 2}
+  .bot.bstartle .b-hop,.hempty .bot.bstartle .b-hop{animation:b-jolt .7s cubic-bezier(.3,.7,.4,1) 1}
+  .bot.bstartle .b-eyes,.hempty .bot.bstartle .b-eyes,#side .sbbrand svg.logo.bstartle .lg-eyes{animation:b-startle .7s ease-out 1}
+  .bot.bstartle .b-ant,.hempty .bot.bstartle .b-ant{animation:b-twitch .5s ease-in-out 1}
+  .ptr.pbot.go .bot .b-hop{animation:b-hop .75s cubic-bezier(.3,.7,.4,1) infinite}
+}
+@keyframes b-hi-in{from{transform:translateY(6px) scale(.6);opacity:0}to{transform:none;opacity:1}}
+@keyframes b-jolt{0%,100%{transform:none}18%{transform:translateY(-5px) scale(1.04)}45%{transform:translateY(1px)}}
+@keyframes b-startle{0%,100%{transform:none}15%,60%{transform:scale(1.25,1.4) translateY(-2px)}}
+@keyframes b-twitch{0%,100%{transform:none}20%{transform:rotate(-18deg)}45%{transform:rotate(12deg)}70%{transform:rotate(-5deg)}}

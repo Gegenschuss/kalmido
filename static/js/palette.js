@@ -529,7 +529,18 @@ function tourStart() {
   el.addEventListener('change', e => { if (e.target.id === 't-sample') TOUR.sampleOn = e.target.checked; if (e.target.id === 't-ptype') TOUR.ptype = e.target.value; });
   el.addEventListener('click', e => { const b = e.target.closest('[data-tpurpose]'); if (!b) return; TOUR.purpose = TOUR.purpose === b.dataset.tpurpose ? '' : b.dataset.tpurpose; tourGo(TOUR.i); $(`.tour [data-tpurpose="${b.dataset.tpurpose}"]`)?.focus(); });  // 2.19.0 (#653)
   TOUR.ptype = ''; TOUR.purpose = '';
+  // 2.165.0 (#2612): the very first start of the account greets once: the figure waves on the first card (tourGo)
+  TOUR.hi = S.settings.tour === 'pending' && !LS.get('botHi', false); TOUR.hiShown = false;
   setTimeout(() => tourGo(0), 60);
+}
+// 2.165.0 (#2612): the figure of the first card. On the very first start (once per account and device: the tour is still
+// pending, LS botHi) it pops up and waves (happy eyes, bhi in app.css, only the first drawing of the card) and says hello
+// above the step; reduced motion: the same greeting, the figure stays still. A restarted tour shows the calm figure.
+function tourHiFig() {
+  if (!TOUR.hi) return botFig('ruhig', 'htour');
+  const wave = !TOUR.hiShown && !reducedMotion(); TOUR.hiShown = true; LS.set('botHi', true);
+  const nm = (S.me?.display_name || S.me?.username || '').trim().split(/\s+/)[0];
+  return `<span class="thi">${botFig('erledigt', 'htour' + (wave ? ' bhi' : ''))}<span><b>${esc(nm ? tr('Hello, {0}', nm) + '!' : tr('Hello!'))}</b><span class="muted">${esc(tr('Nice to have you here. A quick look at the most important things:'))}</span></span></span>`;
 }
 // ring around the target + card placement: right of narrow targets on the left (sidebar, rail), else below / above
 function tourPlace(r, vw, vh, mh) {  // mh: the card's measured height (2.5.2, K05: was a fixed 210 px)
@@ -552,7 +563,7 @@ function tourGo(i) {
   const card = $('.tcard', el), ring = $('.tring', el);
   el.dataset.step = st.id; el.dataset.sel = st.sel || '';
   card.innerHTML = `<div class="tstep"><span>${TOUR.i + 1}/${n}</span><span class="tdots">${TOUR.steps.map((_, j) => `<i class="${j === TOUR.i ? 'on' : j < TOUR.i ? 'past' : ''}"></i>`).join('')}</span></div>
-    <h3>${TOUR.i === 0 ? botFig('ruhig', 'htour') : ''}${tr(st.t)}</h3><p>${esc(tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
+    <h3>${TOUR.i === 0 ? tourHiFig() : ''}${tr(st.t)}</h3><p>${esc(tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
     ${last && TOUR.sample && !TOUR.sampleSent ? `<label class="tsample"><input type="checkbox" id="t-sample" ${TOUR.sampleOn ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small>${tr('A small video production with dates, dependencies and a packing list. Remove it any time under Settings > Data.')}</small></span></label>` : ''}
     ${last ? pk2_setupHtml() : ''}
     <div class="tfoot"><button class="btn sm tskip" data-tour="skip">${tr('Skip tour')}</button><span class="spacer"></span>${TOUR.i ? `<button class="btn sm" data-tour="back">${tr('Back')}</button>` : ''}<button class="btn sm pri" data-tour="next">${last ? tr('Done') : tr('Next')}</button></div>`;
@@ -738,3 +749,18 @@ function botNod() {
 // layout). Decorative (aria-hidden, botFig): the text says what happens. Still with reduced motion (app.css).
 const botBusy = (html = null, cls = '') => html == null ? botFig('arbeitet', 'bbusy')
   : `<div class="botbusy${cls ? ' ' + cls : ''}">${botFig('arbeitet', 'bbusy')}<div class="bbusy-c">${html}</div></div>`;
+// 2.165.0 (#2613): an error or the connection's loss: the figures on screen (an empty page's, the brand's bot in the
+// sidebar) look startled for a moment (big eyes, a jolt, the antenna twitches; app.css bstartle), once, at most every 5 s;
+// nothing with reduced motion or a hidden page. The message itself stays where it was (toast, offline hint).
+const BOT_STARTLE = {t: 0};
+function botStartle() {
+  if (reducedMotion() || document.hidden || Date.now() - BOT_STARTLE.t < 5000) return;
+  const fs = [...$$('#view svg.bot, .modal svg.bot, #side .sbbrand svg.logo')].filter(f => f.getClientRects().length);
+  if (!fs.length) return;
+  BOT_STARTLE.t = Date.now();
+  for (const f of fs) {
+    f.classList.remove('bstartle'); void f.getBoundingClientRect();
+    f.classList.add('bstartle');
+    setTimeout(() => f.classList.remove('bstartle'), 900);
+  }
+}
