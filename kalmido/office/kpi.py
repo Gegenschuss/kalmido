@@ -18,15 +18,12 @@ from flask import jsonify, request
 from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import db, local_now
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, office_settings, pb_cl_sql
 
 
-def _ctx():
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=True)
+from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _j(s):

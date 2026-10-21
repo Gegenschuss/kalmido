@@ -16,8 +16,9 @@ from ..core.access import access_note, Denied
 from ..core.db import db
 from ..core.i18n import N_, tr
 from ..accounts.session import me
-from ..api.v1 import BadInput, v1_args, v1_json, v1_view
-from ..personal.timetrack import reject_unknown
+from ..api.v1 import BadInput
+from ..api.common import v1_args, v1_json, v1_view
+from ..core.errors import reject_unknown
 from .review import vdr_comment_add, vdr_comment_row, vdr_dict, vdr_list_of, vdr_may, vdr_reload, vdr_tc, vdr_touch, vdr_versions
 
 VDR_V1_LIMIT = 200

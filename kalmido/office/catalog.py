@@ -35,6 +35,7 @@ from ..calendars.subscriptions import CalError, cal_allow_parse, cal_host_allowe
 from .packs import PACK_DIR, office_pack, office_pack_validate
 from .model import office_gate, office_org, office_role, office_settings
 from .sheet import IND_DATA_DIR, IND_DIR, dk_pack, dk_pack_validate, prd_data_packs
+from ..core.orgcrypt import oc_dec_fields  # 2.149.0 G (#2517): pulled up from functions
 
 PKC_URL = os.environ.get("KALMIDO_PACKS_CATALOG", "").strip()
 PKC_ALLOW_ENV = os.environ.get("KALMIDO_PACKS_ALLOW_HOSTS", "")
@@ -411,7 +412,6 @@ def pkc_in_use(c, oid, kind, code):
         return tr(PKC_E_USE_COUNTRY) if s.get("pack") == code else ""
     if code in (s.get("industry_packs") or []):
         return tr(PKC_E_USE_RULES)
-    from ..core.orgcrypt import oc_dec_fields
     docs = set()
     for r in c.execute("SELECT p.* FROM office_doc_parts p JOIN office_docs d ON d.id=p.doc_id WHERE p.org_id=? AND d.org_id=? "
                        "AND p.kind='shoot' AND d.kind='offer' AND d.locked_at IS NULL", (oid, oid)).fetchall():
@@ -524,11 +524,7 @@ def pkc_packs_extra(c, oid):
 
 
 # ---------------------------------------------------------------- routes
-def _ctx(admin=False):
-    c = db()
-    uid = office_gate(c)
-    oid = office_org(c, uid, admin=admin)
-    return c, uid, oid
+from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 @app.get("/api/office/catalog")

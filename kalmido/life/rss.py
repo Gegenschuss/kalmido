@@ -14,7 +14,7 @@ from ..core.db import connect, iso, now_utc, parse_iso
 from ..core.pg import IntegrityError, insert_id
 from ..core.access import Denied, task_visible
 from ..tasks.validation import as_int, TITLE_MAX
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..calendars.caldav import _DtdRefused, xml_no_dtd
 from ..calendars.subscriptions import CalError, cal_allow, cal_err_text, cal_http, cal_norm_url, cal_rate
 from ..life.model import _insert, life_list, need_life

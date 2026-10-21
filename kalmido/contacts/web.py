@@ -14,12 +14,13 @@ from ..core.db import body, bump, connect, db, err, iso
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
 from ..tasks.validation import as_int
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields
 from ..contacts.model import (
     book_create, book_fields, book_member_set, book_public, book_touch, books_for, contact_brief, contact_dict, contact_fields,
     contact_copy, contact_store, contacts_query, CT_KEYS, default_book, import_vcards, link_remove, link_set, my_book_ids, need_book, need_contact,
     occ_sync, render_vcard, split_vcards, CONTACTS_PER_BOOK, IMPORT_BATCH,
 )
+from ..core.zipread import base_name, is_zip, zip_read, ZipLimit  # 2.149.0 G (#2517): pulled up from functions
 
 # 2.41.0 (#1437): never above the request limit (MAX_CONTENT_LENGTH answers 413 before the route), whole MB for the message
 VCF_MAX = min(20, (app.config.get("MAX_CONTENT_LENGTH") or 0) // (1024 * 1024) or 20) * 1024 * 1024
@@ -398,7 +399,6 @@ def _vcf_text(data):
 def ct_gather(ups):
     """The uploads -> (vCard bytes of all readable files, info {files, errors [{file, error}], skipped [names]}); None when
     it is one plain file (the single import reads it as before, CSV included)."""
-    from ..core.zipread import ZipLimit, base_name, is_zip, zip_read
     if len(ups) == 1 and not is_zip(ups[0][0], ups[0][1]):
         return None
     parts, errors, skipped, total = [], [], [], 0

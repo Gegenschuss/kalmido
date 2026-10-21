@@ -19,10 +19,12 @@ from datetime import date, timedelta
 
 from flask import g
 
-from ..core.config import app
+from ..core.config import app, WATCHDOG_INTERVAL
 from ..core.db import iso, local_now, now_utc
 from ..core.i18n import N_, lang, tr
 from ..core.pg import system_ctx, write_lock
+from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 DUN_EVERY_TICKS = 10          # like the invoice series: whole days matter, not seconds
 _DUN_LAST = {"at": 0.0}
@@ -41,7 +43,6 @@ def _j(s, default):
 
 def dun_tick(c, now=None):
     """Every office area with an overdue open invoice: the suggestions of dun_area (see the module text)."""
-    from ..core.config import WATCHDOG_INTERVAL
     if time.monotonic() - _DUN_LAST["at"] < DUN_EVERY_TICKS * WATCHDOG_INTERVAL:
         return
     _DUN_LAST["at"] = time.monotonic()
@@ -150,8 +151,6 @@ def dun_make(c, oid, uid, ids, level):
     from .docs import recalc
     from .invoices import inv_make_reminder
     from .ledger import ofx_log
-    from ..core.access import Denied
-    from ..personal.timetrack import BadInput
     try:
         with c.savepoint():
             did = inv_make_reminder(c, oid, uid, {"doc_ids": ids, "level": level})

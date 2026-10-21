@@ -17,6 +17,7 @@ from ..core.db import bump, iso, now_utc
 from ..core.serializers import unlink_files
 from .tasks import hard_delete
 from ..core.env import env_bool
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 try:
     from ..core.retention import ret_days, ret_on, ret_report
@@ -96,7 +97,6 @@ def ttp_tick(c, force=False):
     TTP_TICK["at"] = time.time()
     if ret_days("trash") < 1:  # 2.116.0 review F1: a period of 0 switches the run off instead of emptying every trash
         return {}
-    from ..core.pg import system_ctx
     purge, cut, counts, files = ret_on("trash"), ttp_cut(), {}, []
     # the trash of every organisation and private space (row-level security); nothing is handed to a person, rows only go
     with system_ctx(c):

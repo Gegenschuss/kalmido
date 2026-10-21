@@ -91,10 +91,7 @@ def opdf_logo_process(raw):
         raise ValueError(tr("This picture cannot be read")) from None
 
 
-def _ctx(admin=False):
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=admin)
+from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 # ---------------------------------------------------------------- 2.38.0 (#1021 P5): the stored files of a finalised document

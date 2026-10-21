@@ -15,7 +15,7 @@ from ..core.i18n import N_, tr
 from ..core.db import db
 from ..core.access import Denied
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..contacts.model import _jl, contacts_on, need_book, book_role
 from ..contacts.merge import ctm_merge, ctm_undo
 from ..core.merges import mg_dumps, mg_run, MG_MAX

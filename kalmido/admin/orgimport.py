@@ -19,6 +19,8 @@ import uuid
 from ..core.config import ATT_DIR, MAX_FILE_MB, OFFICE_DIR
 from ..core.i18n import N_
 from .acctimport import UmzStop, _BAD, _coerce, _oid, _read_entry, _txt, tr, umz_cols, umz_insert, umz_row
+from ..core.orgcrypt import oc_enc_fields, oc_user_space, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
+from ..core.db import iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
 
 
 class OiT:
@@ -128,7 +130,6 @@ def oi_prepare(c, run, uid, data):
 
 def oi_file(ctx, path, sub, name, space=None, base=ATT_DIR, check=True, mime="", seal=True):
     from ..admin.hosting import QuotaExceeded, quota_guard
-    from ..core.orgcrypt import oc_user_space, oc_write_file
     from ..files.upsafe import up_check, UploadRefused
     from ..tasks.attachments import safe_name
     from .acctimport import _file_bytes
@@ -170,8 +171,6 @@ def oi_file(ctx, path, sub, name, space=None, base=ATT_DIR, check=True, mime="",
 
 def oi_write(c, run, uid, man, zf, files, data, who):
     """Creates the rows of every area (inside the run's transaction; the caller commits)."""
-    from ..core.orgcrypt import oc_enc_fields, oc_user_space
-    from ..core.db import iso, now_utc
     oi = data.get("oi") or {}
     ts = iso(now_utc())
     run.created.setdefault("oi", [])

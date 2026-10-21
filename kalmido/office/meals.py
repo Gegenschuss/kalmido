@@ -36,8 +36,8 @@ from ..core.config import MAX_FILE_MB, OFFICE_DIR, app
 from ..core.db import body, bump, iso, local_now, now_utc
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_read_file, oc_write_file
-from ..core.pg import insert_id, write_lock
-from ..personal.timetrack import BadInput
+from ..core.pg import insert_id, write_lock, system_ctx
+from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .ledger import ofx_log
 from .travel import _amount, _csv_safe, _ctx, _date, _text, rk_home_cur, rk_people, rka_person_arg, rka_pkey
@@ -332,7 +332,6 @@ def bw_purge(c, oid):
 def bw_purge_tick(c):
     """Watchdog: the trash goes after BW_PURGE_DAYS also in office areas nobody opens."""
     import time
-    from ..core.pg import system_ctx
     if time.time() - BW_TICK["at"] < 6 * 3600:
         return 0
     BW_TICK["at"] = time.time()

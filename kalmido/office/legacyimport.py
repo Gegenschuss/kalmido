@@ -38,9 +38,12 @@ from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .model import (MD, pb_cl_org, pb_cl_sql, office_create, office_gate, office_in_use, office_number_format, office_org, office_role, office_rows, office_scheme_period,
                     office_settings, office_update)
+from ..core.csvimport import csv_table  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_seal, oc_send_file  # 2.149.0 G (#2517): pulled up from functions
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 FI_XLSX_MAX = 10 * 1024 * 1024  # the uploaded spreadsheet
 FI_XLSX_UNZIPPED_MAX = 80 * 1024 * 1024  # all members unpacked (zip bomb guard)
@@ -660,7 +663,6 @@ def fi_book(raw, name=""):
         raise BadInput(tr("This is not a spreadsheet file (.xlsx)"))
     if b"\x00" in raw[:4096] or raw.startswith(FI_NOT_CSV) or (name or "").lower().endswith((".pdf", ".zip", ".png", ".jpg", ".jpeg", ".heic")):
         raise BadInput(tr("This is not a spreadsheet file (.xlsx or CSV)"))
-    from ..core.csvimport import csv_table
     try:
         text = raw.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -1550,7 +1552,6 @@ def fi_archive_add(c, oid, uid, raw, file_name, b):
     # 2.40.0 (#1335): only the ".part" is written here; the caller renames it to its name after the commit (fk_archive_done)
     # and removes it when the commit fails -- an archive-*.pdf never exists without its row
     fd = os.open(p + ".part", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0), 0o600)
-    from ..core.orgcrypt import oc_seal
     try:  # 2.81.0 (#1462): any failure after the open leaves no orphan ".part" (the caller only cleans up after a return)
         with os.fdopen(fd, "wb") as fh:
             fh.write(oc_seal(c, oid, raw, fresh=True))  # 2.42.0 (#828): sealed with the organisation's key at rest (sha256 = the original)
@@ -1874,11 +1875,7 @@ def fi_counter(c, oid, kind):
 
 
 # ---------------------------------------------------------------- routes (org admins; members read the archive)
-def _ctx(admin=True):
-    c = db()
-    uid = office_gate(c)
-    oid = office_org(c, uid, admin=admin)
-    return c, uid, oid
+from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _upload(name, mx):
@@ -2031,7 +2028,6 @@ def fk_archive_address_post():
     """2.40.0 (#1421) org admin. multipart 'file' (PDF) + client_id? (the file name's proposal) -> the recipient's address
     read from the text layer of page 1 and the proposals (new client / contact person / address differs); nothing stored."""
     c, uid, oid = _ctx()
-    from ..api.v1 import hit_limit
     from ..tasks.attachtext import PDF_RATE
     if hit_limit(f"pdftext:{uid}", PDF_RATE, 600):  # 2.81.0 (#1463): the same budget as POST /api/pdf-text
         raise Denied(429, tr("Too many requests, please slow down"))
@@ -2117,7 +2113,6 @@ def fi_archive_pdf(aid):
     ofx_log(c, oid, "pdf", target="archive", detail={"archive_id": aid}, dedupe_min=10)
     c.commit()
     name = re.sub(r"[^A-Za-z0-9._-]+", "-", r["file_name"] or "").strip("-") or f"archive-{aid}.pdf"
-    from ..core.orgcrypt import oc_send_file
     resp = oc_send_file(c, p, mimetype="application/pdf", download_name=name, as_attachment=request.args.get("download") == "1")  # 2.42.0 (#828)
     resp.headers["Cache-Control"] = "private, no-store"
     resp.headers["X-Content-Type-Options"] = "nosniff"

@@ -20,7 +20,7 @@ from datetime import timedelta
 from flask import g, jsonify
 
 from ..core.config import app, APP_NAME, PUBLIC_URL
-from ..core.db import body, db, err, iso, now_utc
+from ..core.db import body, db, err, iso, now_utc, parse_iso
 from ..core.i18n import N_, tr
 from ..core.pg import system_ctx
 from ..core.access import acx_anon_bind, Denied
@@ -29,6 +29,8 @@ from ..lists.public import PUB_ACTOR, pub_gone, pub_limited, public_links_on
 from ..team.portal import (PT_LOGIN_ADDR, PT_LOGIN_SPACE, PT_LOGIN_TTL, PT_LOGIN_WIN, PT_VIEW_RATE, _pt_mail_html, pt_cookie_read,
                            pt_day, pt_email_hash, pt_email_norm)
 from .model import office_settings, pb_cl_sql, pb_owner
+from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 KP_KINDS = ("offer", "invoice", "credit")
 KP_MAX = 200
@@ -99,7 +101,6 @@ def kp_docs(c, oid, cids, did=None):
 
 def kp_sign_url(c, oid, d):
     """The open approval page of quotation d (office/signoff.py), or None."""
-    from ..core.db import parse_iso
     from .signoff import sig_check, sig_url
     r = c.execute("SELECT * FROM office_signoffs WHERE org_id=? AND doc_id=? AND kind='offer' AND state='open' AND revoked_at IS NULL "
                   "ORDER BY id DESC LIMIT 1", (oid, d["id"])).fetchone()
@@ -163,8 +164,6 @@ def kp_portal_html(c, who, lg):
 def kp_pdf(did):
     """The PDF of one visible document of the signed-in address (404 for anything else, also without cookie / switched off)."""
     from .pdfweb import _file_response, _render, _stored_or_missing, epdf_name
-    from ..core.orgcrypt import oc_read_file
-    from ..api.v1 import hit_limit
     c = db()
     lg = _accept_lang()
     if hit_limit("ptv:" + rate_ip(), PT_VIEW_RATE):
@@ -201,7 +200,6 @@ def kp_link_send(cid):
     from .invoices import _mail
     from .ledger import ofx_company, ofx_log
     from ..admin.hosting import mail_budget
-    from ..api.v1 import hit_limit
     from ..integrations.mail import MAIL_OUT_ON
     c, uid, oid = _ctx()
     cl = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (cid,)).fetchone()

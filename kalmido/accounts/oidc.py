@@ -22,6 +22,8 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip, set_cookie, start_session
 from ..accounts.login import _user
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- OIDC login (generic OpenID Connect provider)
@@ -68,7 +70,6 @@ OIDC_ERRORS = {"no_account": N_("There is no account for this login yet. Please 
 
 
 def oidc_seal(secret):
-    from ..personal.timetrack import BadInput
     from ..notify.push import _b64u
     if not SECRET_KEY:
         raise BadInput(tr("Set KALMIDO_SECRET_KEY on the server to store the client secret (32 random bytes, base64)"))
@@ -319,7 +320,6 @@ def _truthy(v):
 def oidc_account(c, claims, sess_uid=None):
     """The user for these claims (links / creates as configured) or OidcError(no_account|disabled|group|taken|link).
     sess_uid: the person already signed in in this browser (a first link of their own account needs no other proof)."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # 2.37.0 (#1150): before the login nobody is signed in: linking / creating the account and syncing its
         return _oidc_account(c, claims, sess_uid)  # groups (memberships of their lists) is account structure across organisations
 

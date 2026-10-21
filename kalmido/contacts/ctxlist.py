@@ -32,7 +32,7 @@ from ..core.db import body, db, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, need_feat
 from ..core.pg import like_escape
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields
 from ..contacts.model import (contact_brief, contacts_on, my_book_ids, need_book, render_vcard, vc_date, FIELD_MAX, ITEMS_MAX,
                               NOTE_MAX)
 

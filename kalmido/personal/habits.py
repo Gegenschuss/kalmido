@@ -11,6 +11,7 @@ from ..core.access import Denied, need_feat, need_task, tvis, vis_sql
 from ..core.serializers import running_pomo
 from ..lists.lists import clean_color, clean_list_value
 from ..tasks.validation import as_int, valid_hm
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- habits (private per user)
@@ -21,7 +22,6 @@ REMIND_MAX = 6  # 2.140.0 C (#2135): reminder times per habit
 
 def clean_habit_value(k, v):
     """One habit column from the client, validated (BadInput)."""
-    from ..personal.timetrack import BadInput
     if k == "name":
         if not isinstance(v, str) or not v.strip():
             raise BadInput(tr("Name missing"))
@@ -52,7 +52,6 @@ def clean_habit_value(k, v):
 
 def clean_remind_times(v):
     """2.140.0 C (#2135): a list of "HH:MM" (or a comma string) -> sorted, unique, at most REMIND_MAX, as "HH:MM,HH:MM"."""
-    from ..personal.timetrack import BadInput
     if v in (None, ""):
         return ""
     if isinstance(v, str):

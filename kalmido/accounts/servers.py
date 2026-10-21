@@ -31,7 +31,7 @@ from datetime import timedelta
 
 from flask import g, jsonify, request
 
-from ..core.config import app, APP_NAME, APP_VERSION, PUBLIC_URL
+from ..core.config import app, APP_NAME, APP_VERSION, PUBLIC_URL, SECRET_KEY
 from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, uset, usettings
@@ -40,6 +40,8 @@ from ..core.serializers import load_tasks
 from ..accounts.session import me
 from ..accounts.colors import ACCOUNT_COLORS
 from ..calendars.subscriptions import _CalHTTPConnection, _CalHTTPSConnection, cal_allow, cal_host_allowed, cal_ip_public, CalError
+from ..core.orgcrypt import oc_dec_k, oc_enc_k, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
+from ..api.common import hit_limit, v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 
 MSV_MAX = 10                       # accounts per person
 MSV_TIMEOUT = 8                    # s per request to the other server (socket + whole answer)
@@ -128,7 +130,6 @@ _KEYS = {}
 
 
 def _msv_key(uid):
-    from ..core.config import SECRET_KEY
     if not SECRET_KEY:
         return None
     k = _KEYS.get(uid)
@@ -141,13 +142,11 @@ def _msv_key(uid):
 
 
 def msv_seal(uid, tok):
-    from ..core.orgcrypt import oc_enc_k
     key = _msv_key(uid)
     return oc_enc_k(key, 0, f"msv_links.token|{uid}", tok) if key and tok else None
 
 
 def msv_token(r):
-    from ..core.orgcrypt import OrgCryptError, oc_dec_k
     v = r["token_enc"] or ""
     key = _msv_key(r["user_id"])
     if not v or not key:
@@ -596,7 +595,6 @@ def _check_account(c, uid, base, tok, skip=None):
     """GET /api/v1/me over there -> (remote_me, effective scopes); refuses this server and a second link to the same account."""
     if msv_is_self(base):
         raise MsvBad(tr("That is this server. Connect another Kalmido server."))
-    from ..api.v1 import hit_limit
     if hit_limit(f"msv-try:{uid}", MSV_TRIES, 3600):  # each try is a request to an address the person chose
         raise MsvBusy(tr("Too many requests, please slow down"))
     try:
@@ -766,7 +764,7 @@ def msv_self_patch():
 def msv_code():
     """{name?} -> {code, token_id}: a personal API token ON THIS server with just the scopes the other app needs (the
     usual limits of Settings > Account > API tokens; visible and revocable there), packed with this server's address."""
-    from ..api.v1 import token_create, v1_call, V1Error
+    from ..api.v1 import token_create
     msv_gate()
     b = body()
     _unknown(b, ("name",))
@@ -798,7 +796,6 @@ def _link_lock(sid):
 
 def msv_read_gate():
     """review H1: the reads of other servers per person and minute (a person, not an agent: msv_gate came first)."""
-    from ..api.v1 import hit_limit
     if hit_limit(f"msv:{me()}", MSV_READS, 60):
         raise MsvError("busy", retry=10)
 
@@ -1028,7 +1025,6 @@ def msv_news_read(sid):
 
 # ---- moving a task between servers = copy, then the source into the trash (restorable there)
 def _local_err(e):
-    from ..api.v1 import V1Error
     if isinstance(e, V1Error):
         resp, code = e.resp if isinstance(e.resp, tuple) else (e.resp, e.resp.status_code)
         x = (resp.get_json(silent=True) or {}).get("error")
@@ -1074,7 +1070,8 @@ def _dst_create(c, srv, lid, s):
     if lid is not None:
         p["list_id"] = lid
     if srv is None:
-        from ..api.v1 import v1_call, v1_task_in
+        from ..api.v1 import v1_task_in
+        from ..api.common import v1_call
         from ..tasks.tasks import task_create
         if lid is not None and list_role(c, lid) not in WRITE_ROLES:
             raise Denied(403 if list_role(c, lid) else 404)
@@ -1117,7 +1114,6 @@ def msv_move():
     """{from: {server: 0 | sid, task}, to: {server: 0 | sid, list_id | null}} -> {ok, task: {server, id}, lost: {comments,
     attachments, note, subtasks (not created over there)}, source_kept?}. Copies title, note, due date, priority and the titles of open subtasks, then moves the source
     into the trash. server 0 = this server; list_id null = the inbox there. Nothing is deleted when the copy fails."""
-    from ..api.v1 import V1Error
     uid = msv_gate()
     b, c = body(), db()
     _unknown(b, ("from", "to"))

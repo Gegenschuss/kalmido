@@ -16,7 +16,7 @@ from flask import Response, request
 from ..core.config import app
 from ..core.i18n import dec_comma, lang, tr
 from ..core.db import db, local_now
-from ..core.access import Denied, list_role, tvis
+from ..core.access import Denied, list_role, tvis, vis_sql
 from ..accounts.session import me
 from ..personal.timetrack import _csv_cell
 
@@ -66,7 +66,6 @@ def lex_extra(c, uid, lid, rows, ids):
     task view's total (time_totals: finished entries the user may see); subs: subtasks per parent the user may change (tvis)."""
     from ..collab.comments import h6r_shared_people, user_names
     from ..personal.timetrack import evis, th_sql
-    from ..core.access import vis_sql
     out = {"names": {}, "ms": {}, "sprints": {}, "secs": {}, "subs": {}}
     if not ids:
         return out

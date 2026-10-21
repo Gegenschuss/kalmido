@@ -21,8 +21,8 @@ from ..core.config import app
 from ..core.pg import insert_id, write_lock
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
-from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.access import Denied, vis_sql
+from ..core.errors import BadInput
 from .calc import INV_VAT_NOTES, dec, dstr, fmt_money, inv_calc, inv_open, money
 from .packs import office_pack_for
 from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql
@@ -54,10 +54,7 @@ def _col(r, k, default=None):
     return r[k] if r is not None and k in r.keys() and r[k] is not None else default
 
 
-def _ctx(admin=False):
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=admin)
+from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 # ---------------------------------------------------------------- schemes and numbers
@@ -485,7 +482,6 @@ def inv_from_time(c, oid, uid, b):
         raise BadInput(tr("Invalid value: {0}", "from/to"))
     pid = b.get("project_id")
     # the WHERE part first (a fragment: pg_prepare only checks the complete statement below)
-    from ..core.access import vis_sql
     # 2.86.0 (N16): only the lists the person making the invoice sees (their hours, names); 2.126.0 A (#1967): the
     # personal office's lists are the owner's private ones (org_id NULL)
     sql = ("FROM time_entries e JOIN lists l ON l.id=e.list_id "

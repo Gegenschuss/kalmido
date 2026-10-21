@@ -28,7 +28,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import ofx_name1, office_gate, office_org, office_settings, office_settings_save
 
@@ -45,11 +45,7 @@ MAX_ODO = Decimal(10 ** 9)
 MAX_VEHICLES = 100
 
 
-def _ctx():
-    """Admins of the office area only (like the travel expenses)."""
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=True)
+from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _body():

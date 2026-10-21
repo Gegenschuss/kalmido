@@ -15,15 +15,15 @@ from ..core.pg import insert_id, system_ctx
 from ..core.i18n import lang, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, iso_ms, now_utc
 from ..accounts.session import me
-from ..core.access import acx_anon_bind, is_project, list_people, MANAGE_ROLES, need_list, task_visible
+from ..core.access import acx_anon_bind, is_project, list_people, MANAGE_ROLES, need_list, task_visible, list_role
 from ..core.pages import valid_url
 from ..tasks.validation import CONTENT_MAX, log_act, ticket_template
 from ..collab.comments import collab_user, lang_of
 from ..collab.news import news_add, notif_ok
-from ..personal.timetrack import UnknownFields
+from ..core.errors import UnknownFields
 from ..notify.push import push_prio, push_reachable
 from ..notify.alerts import _env_int
-from ..api.v1 import v1_args, v1_call, v1_json, v1_view
+from ..api.common import v1_args, v1_call, v1_json, v1_view
 from ..agents.core import agent_ids, agent_tidy_events, is_agent
 from ..integrations.git import _gd, git_need_manage, GIT_PROVIDERS, git_public
 
@@ -509,7 +509,6 @@ def cer_settings(c, b):
         return None
     if not isinstance(v, int) or isinstance(v, bool):
         return err(tr("Invalid value: {0}", "client_errors_list"))
-    from ..core.access import list_role
     ok = c.execute("SELECT 1 FROM issue_hooks h JOIN lists l ON l.id=h.list_id WHERE h.list_id=?",
                    (v,)).fetchone()
     if not ok or list_role(c, v, me()) not in MANAGE_ROLES:

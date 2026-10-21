@@ -35,7 +35,7 @@ from urllib.parse import quote
 from flask import g, jsonify, redirect, request, Response
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from ..core.config import app, APP_NAME, ATT_DIR, PUBLIC_URL
+from ..core.config import app, APP_NAME, ATT_DIR, PUBLIC_URL, TZ
 from ..core.i18n import lang, LANGS, N_, short_day, tr, trn
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso
 from ..core.pg import insert_id, system_ctx
@@ -48,6 +48,7 @@ from ..lists.public import (PUB_ACTOR, PUB_BAD_LIMIT, PUB_BURST, PUB_BURST_S, PU
                             PUB_VIEW_RATE, pub_gone, pub_headers, pub_html, pub_limited, public_links_on)
 from ..lists.custview import CV_FILE_RATE, cv_size
 from .store import fs_chain, fs_role, fs_version_row, need_node
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 XL_PREFIX = "/s/f/"
 XL_DAYS = {"1d": 1, "7d": 7, "30d": 30}
@@ -262,7 +263,6 @@ def xl_pw_page(token, lg, folder, wrong=False):
 def xl_until(link, lg):
     if not link["expires_at"]:
         return ""
-    from ..core.config import TZ
     d = parse_iso(link["expires_at"]).astimezone(TZ).date()
     return tr("Available until {0}", short_day(d, lg, year=True), lg=lg)
 
@@ -320,7 +320,6 @@ def xl_render(c, link, chain, token, lg, cur):
 
 @app.get("/s/f/<token>")
 def xl_page(token):
-    from ..api.v1 import hit_limit
     c = db()
     if hit_limit("pubv:" + rate_ip(), PUB_VIEW_RATE):
         return pub_limited(_accept_lang())
@@ -366,7 +365,6 @@ def xl_unlock(token):
 
 def xl_gate(c, token, nid):
     """A file of a live, unlocked link -> (link, node row, None) or (None, None, response)."""
-    from ..api.v1 import hit_limit
     if hit_limit("pubf:" + rate_ip(), CV_FILE_RATE):
         return None, None, pub_limited(_accept_lang())
     link, chain, bad = xl_open(c, token)
@@ -430,7 +428,6 @@ def xl_preview(token, nid):
 @app.get("/s/f/<token>/zip")
 def xl_zip(token):
     """The shared folder (or the subfolder ?p=) as a ZIP: only what lies inside the shared tree (files/bulk.py of part A)."""
-    from ..api.v1 import hit_limit
     c = db()
     if hit_limit("pubz:" + rate_ip(), XL_ZIP_RATE):
         return pub_limited(_accept_lang())

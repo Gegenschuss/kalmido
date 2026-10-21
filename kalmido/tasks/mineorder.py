@@ -7,8 +7,8 @@ from flask import g, jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import body, bump, db, write_lock
-from ..core.access import Denied, tvis, vis_sql
+from ..core.db import body, bump, db, write_lock, iso, now_utc
+from ..core.access import Denied, tvis, vis_sql, list_role
 from ..accounts.session import me
 
 VW_MINE_MAX = 5000  # tasks in one order (more are cut: the oldest placed ones fall back to "not placed")
@@ -65,8 +65,6 @@ def mt_mine_hidden(c, uid):
 def mt_in_mine_put(lid):
     """{on: true | false}: show the list's tasks in the signed-in person's "My tasks" (default) or not. Only for the person
     (shared lists: everyone decides for themselves). 404 for a list the person cannot see."""
-    from ..core.access import list_role
-    from ..core.db import iso, now_utc
     c = db()
     uid = me()
     if not list_role(c, lid, uid):

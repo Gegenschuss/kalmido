@@ -18,12 +18,14 @@ from datetime import date, timedelta
 
 from flask import Response, jsonify
 
-from ..core.config import PUBLIC_URL, app
+from ..core.config import PUBLIC_URL, app, WATCHDOG_INTERVAL
 from ..core.db import iso, local_now, now_utc
 from ..core.i18n import N_, lang, tr
 from ..core.pg import insert_id
-from ..personal.timetrack import BadInput, _csv_cell
+from ..personal.timetrack import _csv_cell
+from ..core.errors import BadInput
 from .calc import dec, dstr, money
+from ..core.access import my_inbox  # 2.149.0 G (#2517): pulled up from functions
 
 ABO_NOTICE_MAX = 730
 ABO_REMIND_MAX = 90
@@ -274,7 +276,6 @@ def abo_csv():
 def abo_task_new(c, person, label, due, text):
     """The reminder task in the person's inbox, theirs and assigned to them (the pattern of fci_task_new): the name, never an
     amount; due on the last day to cancel; a link to the view."""
-    from ..core.access import my_inbox
     from ..tasks.validation import log_act
     lid = my_inbox(c, person)
     lg = lang(c, person)
@@ -298,7 +299,6 @@ def abo_tick(c, now=None, force=False):
     when the person is no longer an office admin of the area, their account is disabled or the office is off for them
     (fci_people). A task once made stays (also when the row is deleted or the reminder switched off). Runs at most every
     ABO_EVERY_TICKS watchdog intervals."""
-    from ..core.config import WATCHDOG_INTERVAL
     from .cashflow import _fixed_public
     from .fixedimport import fci_people
     if not force and time.monotonic() - _ABO_LAST["at"] < ABO_EVERY_TICKS * WATCHDOG_INTERVAL:

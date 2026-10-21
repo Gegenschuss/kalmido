@@ -19,10 +19,13 @@ from flask import jsonify, request
 from ..core.config import app
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.i18n import N_, tr
-from ..core.pg import IntegrityError
+from ..core.pg import IntegrityError, system_ctx
 from ..core.access import Denied
 from ..accounts.session import me
 from ..collab.liste2e import (LE2EDenied, _LE2A_CIPHER, _LE2A_OLD, _LE2A_PLAIN, le2e_is_cipher, le2e_parse, le2e_writer_ok)
+from ..core.orgcrypt import oc_is_enc  # 2.149.0 G (#2517): pulled up from functions
+from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 WKE_BULK_MAX = 200     # pages per todo / bulk call
 WKE_KEYS_MAX = 500     # entries per start / keys / rotate call (an organisation may have more members than a list)
@@ -233,7 +236,6 @@ def _wke_lost(c, mode, gen, w, a):
     """2.139.0 C (#2386): [{id, path}] of the pages whose name is converted but whose text (sealed at rest) cannot be opened."""
     if mode == "decrypting":
         return []  # the texts still to convert are the browser's ciphertexts, never sealed at rest
-    from ..core.orgcrypt import oc_is_enc
     from .wkhist import WikiUnreadable, wkh_body
     out = []
     for r in c.execute(f"SELECT id, org_id, owner_id, path, body FROM wiki_pages WHERE {w} AND {_wke_cond(mode, gen, ('body',))} "
@@ -404,7 +406,6 @@ def wke_start():
         if p["user_id"] not in given:
             c.execute("INSERT INTO wiki_key_pending(space_id,user_id,since) VALUES(?,?,?) ON CONFLICT DO NOTHING", (sp["id"], p["user_id"], ts))
     from .wikiatt import wka_drop_trashed
-    from ..core.serializers import unlink_files
     gone = wka_drop_trashed(c, oid, uid)  # 2.99.0 (#2182, review M2): no plain file in the trash of an encrypted space
     from .wkhist import wkh_drop_space
     wkh_drop_space(c, oid, None if oid else uid)  # 2.123.0 A (#2102, #2106): no history / word index of a locked space
@@ -448,7 +449,6 @@ def wke_bulk():
     generation (body also ''), decrypting = plain texts (a name taken in the space gets " (2)" ..., answered in renamed; links
     and frontmatter are rebuilt from the plain text). A value already in the target format stays (someone saved meanwhile);
     no history, one live update per call, repeating a call is harmless."""
-    from ..personal.timetrack import BadInput
     from .pages import WIKI_BODY_MAX, wiki_clean_path, wiki_frontmatter, wiki_set_links
     c = db()
     b = body()
@@ -714,7 +714,6 @@ def wke_user_purge(c, uid):
     """Account deletion (accounts/users.py user_purge): the spaces whose key uid held are marked "rotation pending". The trigger
     on org_members does the same, but it only sees the spaces of the deleting person's organisations (row-level security: an
     instance admin outside the organisation deletes the account) -- so this asks across organisations, before the cascade."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the spaces of every organisation the deleted person held a key of (no content is read)
         c.execute("UPDATE wiki_spaces SET e2e_rotate=e2e_gen WHERE e2e IS NOT NULL AND org_id IS NOT NULL AND id IN "
                   "(SELECT space_id FROM wiki_keys WHERE user_id=?)", (uid,))

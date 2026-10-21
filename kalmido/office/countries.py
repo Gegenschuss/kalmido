@@ -4,7 +4,7 @@ the server accepts nothing else: UK -> GB and EL -> GR (the EU's own codes) are 
 400. Stored values from before that are not in the list stay as they are (the dialogs mark them); the e-invoice refuses
 to finalise with one (einvoice._country) instead of writing DE."""
 from ..core.i18n import tr
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 
 ISO_ALPHA2 = frozenset("""
 AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF

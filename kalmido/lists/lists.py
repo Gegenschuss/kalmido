@@ -12,6 +12,9 @@ from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
 from ..core.access import collab_all, Denied, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, ROLES
 from ..core.state import visible_lists
+from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import list_other_agent, ONE_AGENT_MSG  # 2.149.0 G (#2517): pulled up from functions
+from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- lists / sections
@@ -54,7 +57,6 @@ LIST_NAME_MAX, FOLDER_MAX = 200, 100
 
 
 def clean_color(v):
-    from ..personal.timetrack import BadInput
     v = v.strip() if isinstance(v, str) else v
     if v in ("", None):
         return ""
@@ -105,7 +107,6 @@ def folder_seg(v):
 def clean_folder(v, strict=True):
     """A folder path from a client: every name trimmed (at most FOLDER_MAX characters), empty names dropped. Deeper than
     FOLDER_DEPTH: BadInput (strict) or cut to FOLDER_DEPTH (repairs, stored data)."""
-    from ..personal.timetrack import BadInput
     if v is None:
         return ""
     if not isinstance(v, str):
@@ -154,7 +155,6 @@ COL_DOC = ("2.14.0 (#425): the columns of the list's rows in order, the same for
 
 def clean_columns(c, lid, v):
     """The columns of list lid from a client -> the JSON text to store (None = default). BadInput on anything odd."""
-    from ..personal.timetrack import BadInput
     if v is None:
         return None
     if not isinstance(v, list) or len(v) > COL_MAX:
@@ -188,7 +188,6 @@ def columns_out(raw, fids):
 def clean_list_value(k, v, member=False):
     """One list column from the client, validated (BadInput)."""
     from ..tasks.validation import NAG_VALUES
-    from ..personal.timetrack import BadInput
     from ..family.family import FAM_LIST_KINDS
     if k == "name":
         if not isinstance(v, str) or not v.strip():
@@ -247,7 +246,6 @@ def clean_list_value(k, v, member=False):
 def list_create():
     from ..lists.groups import grp_touch
     from ..tasks.tasks import WEB_LIST_NEW
-    from ..personal.timetrack import web_fields
     from ..lists.templates import ptype_create
     from ..family.family import fam_list_create
     b = web_fields(body(), WEB_LIST_NEW, "POST /api/lists")
@@ -307,7 +305,7 @@ def list_update(lid):
     from ..tasks.validation import clean_ticket_tpl
     from ..tasks.tasks import WEB_LIST_EDIT
     from ..tasks.lifecycle import _norm
-    from ..personal.timetrack import BadInput, clean_day_hours, web_fields
+    from ..personal.timetrack import clean_day_hours
     from ..lists.templates import list_ptype_set
     from ..agents.core import list_listen_update
     from ..collab.reactions import list_tidy_update
@@ -777,7 +775,6 @@ def _folder_member_add(c, lid, uid, role, actor):
         return False
     if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone():
         return False
-    from ..core.access import list_other_agent
     if list_other_agent(c, lid, uid):  # 2.26.0: one agent per list (the list is skipped)
         return False
     from ..accounts.orgs import ws_member_problem
@@ -901,7 +898,6 @@ def folder_people_put():
     prev = c.execute("SELECT role FROM folder_people WHERE owner_id=? AND folder=? AND user_id=?", (me(), f, uid)).fetchone()
     c.execute("INSERT INTO folder_people(owner_id,folder,user_id,role,created_at) VALUES(?,?,?,?,?) ON CONFLICT(owner_id,folder,user_id) "
               "DO UPDATE SET role=excluded.role", (me(), f, uid, role, iso(now_utc())))
-    from ..core.access import ONE_AGENT_MSG, list_other_agent
     rows = [r for r in c.execute("SELECT id, name, folder FROM lists WHERE owner_id=? AND archived=0 AND is_inbox=0", (me(),)).fetchall()
             if _in_folder(r["folder"], f)]
     # 2.26.0: one agent per list -- lists that already have another agent are skipped and named in the answer
@@ -931,7 +927,6 @@ def folder_people_put():
 def folder_people_delete():
     """{folder, user_id, remove?}: new lists of the folder are no longer shared with that person; 2.29.0 (#929) remove: true
     also takes them out of the folder's lists now (like removing them from each list; a share via a group stays)."""
-    from ..api.v1 import V1Error, v1_call
     c, b = db(), body()
     f = clean_folder(b.get("folder") or "", strict=False)
     try:
@@ -994,7 +989,6 @@ def agent_share_add(c, lid, aid, actor):
     """Share list lid with agent aid (role edit) like PUT /api/lists/<lid>/members; False if it was a member already."""
     from ..collab.news import news_add
     from ..integrations.webhooks import wh_note_list
-    from ..core.access import list_other_agent
     from ..accounts.orgs import ws_member_problem
     if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, aid)).fetchone() or \
             c.execute("SELECT 1 FROM lists WHERE id=? AND life IN ('health', 'budget')", (lid,)).fetchone() or \
@@ -1062,7 +1056,6 @@ def list_agent_set(lid):
     """2.26.0: {agent_id: int | null, role?} -- THE agent of list lid (one agent per list): removes the current agent
     member (if another) and shares the list with the new one in one step; null = no agent. Owner / list admins.
     Answers {previous: id | null, agent_id} so the client can offer Undo."""
-    from ..api.v1 import v1_call
     from ..agents.core import agent_ids
     need_collab()
     c, b = db(), body()
@@ -1103,7 +1096,6 @@ def agent_share_all(aid):
     agent_share_target(c, aid)
     d = agent_share_get(c, me())
     skip = set(d["skip"].get(str(aid), []))
-    from ..core.access import ONE_AGENT_MSG, list_other_agent
     from ..agents.safety import bridge_blocks
     n, other, bridged = 0, [], []
     for (lid, name) in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND COALESCE(archived,0)=0 ORDER BY id",

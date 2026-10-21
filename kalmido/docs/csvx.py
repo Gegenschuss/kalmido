@@ -16,6 +16,7 @@ from ..accounts.session import me
 from ..files.store import need_node
 from . import store as S
 from .web import _no_agent, doc_json
+from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 CSV_MAX = 2000  # review: one request reads every id (visibility, labels, amount) -> a bound + a rate limit
 _NUM = re.compile(r"-?\d+(?:[.,]\d+)?")
@@ -55,7 +56,6 @@ def docs_export_csv():
     b = request.get_json(silent=True) or {}
     ids = [int(x) for x in (b.get("ids") or []) if str(x).isdigit()] if isinstance(b.get("ids"), list) else []
     ids = list(dict.fromkeys(ids))[:CSV_MAX]
-    from ..api.v1 import hit_limit
     if hit_limit(f"docs-csv:{me()}", 6):
         raise Denied(429)
     c = db()

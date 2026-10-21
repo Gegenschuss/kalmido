@@ -22,7 +22,7 @@ from ..core.db import db, err
 from ..core.access import Denied, list_people, need_collab, need_list
 from ..accounts.session import me
 from ..collab.comments import user_names
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields
 from ..agents.core import agent_ids, agent_row, is_agent, list_sections, need_chat_agent
 from ..agents.chat import chat_post, chat_unlink_trimmed
 from ..agents.proposals import (

@@ -27,11 +27,12 @@ from flask import jsonify, request
 from ..core.config import app, ATT_DIR
 from ..core.db import connect, db, gsetting, gset, iso, now_utc
 from ..core.i18n import tr
-from ..core.pg import system_ctx
+from ..core.pg import system_ctx, like_escape
 from ..accounts.session import me
 from ..core.access import Denied, acx_of, vis_sql
 from ..docs import store as S
 from ..core.env import env_bool
+from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 
 KINDS = ("att", "list", "fs")
 COL = {"att": "att_id", "list": "list_file_id", "fs": "node_id"}
@@ -58,8 +59,7 @@ _LOCK = threading.Lock()
 _HAS = {}
 
 
-def _now():
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _wanted(name, mime):
@@ -95,7 +95,6 @@ def _read(c, kind, ref_id, ref):
     if kind == "fs":
         from .store import fs_read
         return fs_read(c, ref_id)
-    from ..core.orgcrypt import oc_read_file
     return oc_read_file(c, os.path.join(ATT_DIR, ref["path"]))
 
 
@@ -447,7 +446,6 @@ def ts_task_hits(c, uid, raw):
 
 
 def _like(raw):
-    from ..core.pg import like_escape
     return f"%{like_escape(raw)}%"
 
 

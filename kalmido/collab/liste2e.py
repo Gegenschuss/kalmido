@@ -29,6 +29,8 @@ import json
 import re
 
 from ..core.i18n import N_, tr
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import collab_all, ov_open  # 2.149.0 G (#2517): pulled up from functions
 
 LE2E_PREFIX = "e2e1:"
 LE2E_MODES = ("encrypting", "on", "decrypting")
@@ -387,7 +389,6 @@ def le2a_task_set(c, tid, vals):
 
 def le2a_snip_store(v):
     """A snippets value for the jsonb column: a ciphertext as a JSON string, a plain list (or its JSON text) as JSON, '' -> NULL."""
-    from ..personal.timetrack import BadInput
     if v in (None, "", []):
         return None
     if le2e_is_cipher(v):
@@ -406,7 +407,6 @@ def le2a_comment_in(c, lid, text, tid=None):
     """A comment in a locked list: the body is a ciphertext (guarded); mentions come from the browser (mentions: [ids] or the
     form field "mentions" = "1,2"), only people of the list count."""
     from .comments import task_people
-    from ..core.access import collab_all
     le2e_guard(c, lid, {"comment": text})
     raw = request.form.get("mentions") if (request.files or request.form) else body().get("mentions")
     if isinstance(raw, str):
@@ -446,7 +446,6 @@ def le2a_api_refuse(c, *lids):
 def le2a_field_value(c, f, v, lid):
     """field_value: a value for custom field f (row) in list lid. Text fields of a locked list take ciphertexts only (guarded);
     any other type never takes one (decision E2: select / number / date / url stay readable)."""
-    from ..personal.timetrack import BadInput
     if f["type"] != "text":
         if le2e_is_cipher(v):
             raise BadInput(tr("{0}: invalid value", f["name"]))
@@ -465,7 +464,6 @@ def le2a_text_max(v, plain_max):
 
 def le2a_clean_cipher(v, what):
     """clean_task & co.: a ciphertext stays as it is (never stripped or cut); a broken one is refused (400)."""
-    from ..personal.timetrack import BadInput
     if not le2e_parse(v):
         raise BadInput(tr("Invalid value: {0}", what))
     return v
@@ -614,7 +612,6 @@ def le2a_people(c, lr):
 
 def le2a_blockers(c, lr, agents):
     """Why the lock cannot be switched on now: [{code, text}]."""
-    from ..core.access import ov_open
     from ..lists.groups import grp_shares_of_list
     from ..lists.lists import _in_folder
     lid, out = lr["id"], []
@@ -901,7 +898,6 @@ def le2a_bulk(lid):
     of the current generation (or ''), decrypting = plain texts, on (2.64.2 A: re-encryption after a key change) = ciphertexts of
     the current generation that replace an older ciphertext or a plain text (a value already of the current generation -- someone
     edited it meanwhile -- stays). No history entries, one live update per call; repeating a call is harmless."""
-    from ..personal.timetrack import BadInput
     from ..tasks.validation import CONTENT_MAX, TITLE_MAX
     from .notes import NOTE_BODY_MAX, NOTE_TITLE_MAX
     from .comments import MAX_COMMENT

@@ -9,7 +9,7 @@ from ..core.config import app
 from ..core.db import db
 from ..core.access import list_role, need_list, pvis
 from ..accounts.session import me
-from ..api.v1 import v1_args, v1_view
+from ..api.common import v1_args, v1_view
 from ..agents import lyprop as _lyp
 
 SPT_SPRINTS = 6  # closed sprints in the velocity (the newest ones)

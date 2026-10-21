@@ -20,7 +20,7 @@ import zipfile
 
 from flask import jsonify, request, send_file
 
-from ..core.config import app
+from ..core.config import app, MAX_FILE_MB
 from ..core.db import bump, db, body, err, local_now
 from ..core.i18n import tr
 from ..core.access import Denied
@@ -322,7 +322,6 @@ def files_scan():
     name = str(request.form.get("name") or "").strip()[:150] or f"Scan {local_now().strftime('%Y-%m-%d %H-%M')}"
     if not name.lower().endswith(".pdf"):
         name += ".pdf"
-    from ..core.config import MAX_FILE_MB
     datas = []
     for f in pages:
         d = h6d_read(f)

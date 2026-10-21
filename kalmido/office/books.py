@@ -26,8 +26,8 @@ from flask import Response, g, has_request_context, jsonify, request
 from ..core.config import app
 from ..core.db import db, local_now
 from ..core.access import Denied
-from ..core.i18n import N_, tr
-from ..personal.timetrack import BadInput
+from ..core.i18n import N_, tr, lang
+from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import ofx_name1, office_feature, office_gate, office_need_feature, office_org, office_settings, pb_owner
 
@@ -38,10 +38,7 @@ DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 BK_LIST_MAX = 500  # rows behind the VAT return figures / of the receipts list
 
 
-def _ctx():
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=True)
+from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _j(s):
@@ -516,7 +513,6 @@ def bk_euer_pdf_bytes(c, oid, d, lang):
 @app.get("/api/office/books/euer.pdf")
 def bk_euer_pdf():
     """?year=YYYY -> the EUeR as PDF."""
-    from ..core.i18n import lang
     from .ledger import ofx_log
     c, uid, oid = _ctx()
     d = bk_euer(c, oid, _year(request.args.get("year")))

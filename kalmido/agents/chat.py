@@ -19,9 +19,10 @@ from ..core.serializers import unlink_files
 from ..tasks.validation import as_int, log_act
 from ..tasks.attachments import safe_name, send_stored, unexec_name
 from ..collab.comments import user_names
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields, web_fields
 from ..notify.alerts import aa_count, aa_oserr
-from ..api.v1 import hit_limit, task_for, v1_args, v1_json, v1_view
+from ..api.v1 import task_for
+from ..api.common import hit_limit, v1_args, v1_json, v1_view
 from ..agents.core import (
     agent_active, agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_public, agent_row, agent_task_data, agent_usable, agents_for,
     CHAT_KEEP, CHAT_MAX, is_agent, JOB_ACTIONS, job_dict, job_may_act, job_visible, list_agents, lst_brief,
@@ -993,7 +994,6 @@ def med_chat_edit(c, m, text):
 @app.patch("/api/agents/<int:aid>/chat/<int:mid>")
 def agent_chat_edit(aid, mid):
     """2.39.0 (#1179): {body} -- I change the text of my own message to agent aid. Same text: nothing changes."""
-    from ..personal.timetrack import web_fields
     c = db()
     need_chat_agent(c, aid)
     m = c.execute("SELECT * FROM agent_chat WHERE id=? AND agent_id=? AND user_id=?", (mid, aid, me())).fetchone()

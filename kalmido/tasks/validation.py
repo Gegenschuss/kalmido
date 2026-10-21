@@ -11,6 +11,8 @@ from ..core.schema import MAX_DEPTH
 from ..core.i18n import N_, tr
 from ..core.db import iso_ms, now_utc, parse_iso
 from ..core.pages import valid_link
+from ..api.common import act_via  # 2.149.0 G (#2517): pulled up from functions
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- tasks
@@ -43,7 +45,6 @@ ACT_MERGE_S = 600
 
 
 def log_act(c, tid, kind, data=None, uid=None):
-    from ..api.v1 import act_via
     from ..integrations.webhooks import wh_note
     if uid is None and has_request_context() and getattr(g, "user", None):
         uid = g.user["id"] or None  # 0 = someone via a public link (no user)
@@ -176,7 +177,6 @@ def valid_hm(v):
 
 def as_int(v, what, lo=None, hi=None):
     """int from a client value (int or digit string, never bool / float text); BadInput otherwise."""
-    from ..personal.timetrack import BadInput
     if isinstance(v, bool) or not isinstance(v, (int, str)) or (isinstance(v, str) and not re.fullmatch(r"-?\d{1,12}", v.strip())):
         raise BadInput(tr("Invalid value: {0}", what))
     v = int(v)
@@ -187,7 +187,6 @@ def as_int(v, what, lo=None, hi=None):
 
 def clean_reminders(v):
     """'0,15' / [0, 15] -> '0,15' (minutes before due, ints within bounds); BadInput otherwise."""
-    from ..personal.timetrack import BadInput
     if v in (None, ""):
         return ""
     items = v if isinstance(v, list) else str(v).split(",") if isinstance(v, (str, int)) and not isinstance(v, bool) else None
@@ -319,7 +318,6 @@ def rr_rule(rep, d0):
 
 
 def clean_repeat(v):
-    from ..personal.timetrack import BadInput
     rep = rr_norm(v) if isinstance(v, str) else None
     if rep is None:
         raise BadInput(tr("Repeat: invalid rule"))
@@ -344,7 +342,6 @@ TICKET_TPL_MAX = 5000
 
 def clean_ticket_tpl(v):
     """{bug?, feature?} from a client -> the stored json ('' = both built-in)."""
-    from ..personal.timetrack import BadInput
     if v in (None, ""):
         return ""
     if not isinstance(v, dict) or any(k not in TICKET_TPL for k in v):
@@ -375,7 +372,6 @@ def ticket_template(c, lid, kind):
 
 def spt_clean(v):
     """2.60.0 (#1511): story points from a client value: None / '' / 0 = none, else one of POINTS (BadInput otherwise)."""
-    from ..personal.timetrack import BadInput
     if v in (None, "", 0, "0"):
         return None
     v = as_int(v, tr("Story points"))
@@ -386,7 +382,6 @@ def spt_clean(v):
 
 def clean_task(b):
     """Client values -> column values (validated; BadInput with a message otherwise)."""
-    from ..personal.timetrack import BadInput
     from ..family.family import clean_fam, clean_rotation, STARS_MAX
     from ..collab.liste2e import le2a_clean_cipher, le2e_is_cipher
     out = {}
@@ -495,7 +490,6 @@ _LOCK_CB = re.compile(r"^(\s*(?:[-*+]|\d+[.)])\s+\[)[ xX](\])", re.M)
 
 def lock_applies():
     """True when the current request is bound by task locks (the app or a public link, not the API / CalDAV)."""
-    from ..api.v1 import act_via
     return has_request_context() and act_via() not in ("api", "caldav")
 
 

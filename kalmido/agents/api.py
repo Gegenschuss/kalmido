@@ -9,13 +9,13 @@ from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import bump, connect, db, iso, now_utc, parse_iso, usettings
 from ..accounts.session import GATE
-from ..core.access import Denied, task_visible
+from ..core.access import Denied, task_visible, acx_task_ok, list_role
 from ..tasks.validation import as_int
 from ..collab.comments import collab_user, lang_of, user_names
 from ..collab.news import news_add, notif_ok
-from ..personal.timetrack import BadInput, UnknownFields
+from ..core.errors import BadInput, UnknownFields
 from ..notify.push import push_prio
-from ..api.v1 import v1_args, v1_err, v1_json, v1_view
+from ..api.common import v1_args, v1_err, v1_json, v1_view
 from ..agents.core import (
     _AGENT_COND, _AGENT_GEN, _AGENT_WAITERS, agent_active, AGENT_EVENTS, AGENT_EVENTS_STALE_H, agent_ids, AGENT_JOBS_KEEP, AGENT_OFFLINE_S,
     AGENT_POLL_WRITE_S, agent_public, agent_row, agent_runtime, agent_shares, AGENT_STATUSES, AGENT_WAIT_MAX,
@@ -160,7 +160,6 @@ def _agent_events_after(c, aid, since, n):
 def h6e_events_visible(c, aid, envs):
     """2.86.0 (N32): queued events of a list the agent no longer sees (removed, limited by list_ids, list deleted) or of a task
     it can no longer see are left out when read (the cursor still moves past them)."""
-    from ..core.access import acx_task_ok, list_role
     roles, out = {}, []
     for env in envs:
         d = env.get("data") if isinstance(env.get("data"), dict) else {}

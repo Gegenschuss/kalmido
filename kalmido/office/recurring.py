@@ -19,13 +19,13 @@ from datetime import date, timedelta
 
 from flask import g, jsonify, request
 
-from ..core.config import PUBLIC_URL, app
+from ..core.config import PUBLIC_URL, app, WATCHDOG_INTERVAL
 from ..core.db import IntegrityError, body, bump, db, iso, local_now, now_utc
-from ..core.access import Denied
+from ..core.access import Denied, my_inbox
 from ..core.i18n import N_, lang, tr
 from ..core.pg import insert_id, system_ctx, write_lock
-from ..core.orgcrypt import oc_item_store
-from ..personal.timetrack import BadInput
+from ..core.orgcrypt import oc_item_store, oc_dec_fields
+from ..core.errors import BadInput
 from .calc import dec, dstr, fmt_money, money
 from .model import office_gate, office_on, office_org, office_role, office_settings, onc_ready, pb_cl_sql, pb_owner
 
@@ -44,10 +44,7 @@ RIN_TASK_FAIL = N_("Invoice of series {0} not sent")
 RIN_TASK_PAUSED = N_("Invoice series {0} paused")
 
 
-def _ctx():
-    c = db()
-    uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=True)
+from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _j(s):
@@ -245,7 +242,6 @@ def rin_make(c, oid, uid, s, period):
     t = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (s["template_id"], oid)).fetchone() if s["template_id"] else None
     if t is None or t["kind"] != "invoice" or t["status"] == "cancelled":
         return None
-    from ..core.orgcrypt import oc_dec_fields
     t = oc_dec_fields(c, oid, "office_docs", t)
     st = office_settings(c, oid)
     pack = office_pack_for(st) or {}
@@ -341,7 +337,6 @@ def rin_people(c, oid, s):
 
 def rin_task(c, person, title, text, doc_id=None):
     """A task in the person's inbox, theirs and assigned to them, due today: a link into the office, never an amount."""
-    from ..core.access import my_inbox
     from ..tasks.validation import log_act
     lid = my_inbox(c, person)
     ts = iso(now_utc())
@@ -406,7 +401,6 @@ def rin_step(c, oid, uid, s, period, people, missed=()):
 def rin_tick(c, now=None):
     """Every active series with next_date up to today (local): one period each (see the module text). Runs at most every
     RIN_EVERY_TICKS watchdog intervals. A series whose template is gone or cancelled is paused with a task."""
-    from ..core.config import WATCHDOG_INTERVAL
     if time.monotonic() - _RIN_LAST["at"] < RIN_EVERY_TICKS * WATCHDOG_INTERVAL:
         return
     _RIN_LAST["at"] = time.monotonic()

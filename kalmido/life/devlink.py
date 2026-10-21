@@ -22,7 +22,7 @@ from ..core.db import body, bump, db, iso, now_utc
 from ..core.i18n import tr
 from ..core.access import Denied, need_task
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..tasks.tasks import one_task
 from ..tasks.validation import as_int, log_act
 from .model import _cost, _dump, _name, device_create, life_clean_fam, need_life

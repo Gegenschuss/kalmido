@@ -25,8 +25,9 @@ from ..core.i18n import tr
 from ..core.db import body, bump, iso, local_now, now_utc, usettings, uset
 from ..core.access import Denied
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .absence import _gate, _row, abs_admin, abs_holidays, abs_org, abs_people, abs_public, abs_state
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 WT_DEFAULT = (0, 1, 2, 3, 4)  # Monday..Friday
 LV_STATES = ("approved", "pending", "rejected")
@@ -81,7 +82,6 @@ def lv_count(start, end, half, wd, hol, first=None, last=None):
 # ---------------------------------------------------------------- #2117: requests
 def lv_approval_on(c, oid):
     """True when area oid is an organisation whose admins switched on approvals for vacation."""
-    from ..core.pg import system_ctx
     if not oid:
         return False
     with system_ctx(c):  # the organisation's own setting (read for its members)
@@ -112,7 +112,6 @@ def lv_status_edit(c, uid, r, v):
 
 
 def lv_admins(c, oid):
-    from ..core.pg import system_ctx
     with system_ctx(c):  # membership structure of the caller's own organisation (checked by abs_org)
         return [r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? "
                                         "AND m.role='admin' AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent'", (oid,)).fetchall()]
@@ -243,7 +242,6 @@ def lv_get():
             continue
         hol = abs_holidays(st, date.fromisoformat(r["start_date"]), date.fromisoformat(r["end_date"]))
         pend.append({**abs_public(r, True, c), "days": lv_count(r["start_date"], r["end_date"], r["half_day"], wt_workdays(c, r["user_id"]), hol)})
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the area's own row (personal or not)
         o = c.execute("SELECT personal_of FROM orgs WHERE id=?", (oid,)).fetchone()
     return jsonify(org_id=oid, year=year, admin=adm, personal=bool(o and o[0]), approval=lv_approval_on(c, oid),
@@ -292,7 +290,6 @@ def lv_set_approval():
     if not is_org_admin(c, uid, oid):
         raise Denied(403, tr("Only admins of the organisation can change this"))
     on = 1 if b.get("on") else 0
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the organisation's own row (orgs is structure); the admin right is checked above
         c.execute("UPDATE orgs SET hub_leave_approval=? WHERE id=? AND personal_of IS NULL", (on, oid))
     bump(c)

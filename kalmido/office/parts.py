@@ -19,7 +19,7 @@ from ..core.access import Denied
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store, oc_json_load, oc_json_store
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import RAW_MODES, TAX_KEYS, dec, fmt_money, fmt_qty, label, money, office_calc, pack_tax, unit_text, _num
 from .model import UNITS, office_role, office_settings
 from .packs import office_pack_for

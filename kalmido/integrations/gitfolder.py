@@ -20,7 +20,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_list
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..agents.core import is_agent
 
 

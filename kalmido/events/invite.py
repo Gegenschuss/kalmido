@@ -20,7 +20,7 @@ from ..core.i18n import short_day, tr
 from ..core.db import db, iso, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..events.model import EV_ATT_MAX, need_event, wall
 
 EVI_DAY_MAX = 200  # invitation mails per person and day

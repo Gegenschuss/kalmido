@@ -9,6 +9,7 @@ task and comment files save_attachments / save_attachment_bytes, project files, 
 Browser-encrypted files (e2e, 2.42.0 #828) never come here: the server cannot read them.
 kind names the stored row: "fs" (fs_nodes id), "att" (attachments id), "list" (list_files id), "chat" (chat_files id), "wiki" (wiki_files id, 2.99.0 A #2182), "sheet" (sheet_files id, 2.124.0 B #2110)."""
 import os
+from ..core.config import MAX_FILE_MB  # 2.149.0 G (#2517): pulled up from functions
 
 KINDS = ("fs", "att", "list", "chat", "tchat")  # 2.113.1 (#2059): tchat = tchat_files id
 
@@ -22,7 +23,6 @@ H6D_SLACK = 1024 * 1024  # form fields + multipart framing around one file
 
 
 def h6d_cap():
-    from ..core.config import MAX_FILE_MB
     return MAX_FILE_MB * 1024 * 1024
 
 

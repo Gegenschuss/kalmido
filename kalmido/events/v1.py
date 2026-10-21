@@ -7,8 +7,8 @@ from ..core.db import db
 from ..accounts.session import me
 from ..core.access import need_feat
 from ..tasks.validation import as_int
-from ..personal.timetrack import BadInput, reject_unknown
-from ..api.v1 import v1_args, v1_json, v1_view
+from ..core.errors import BadInput, reject_unknown
+from ..api.common import v1_args, v1_json, v1_view
 from ..events.model import EV_PARTSTAT, EV_ROLES, EV_STATUS, need_evcal
 from ..events.ics import ics_export, import_ics, IMPORT_MAX_BYTES
 from ..events.web import (

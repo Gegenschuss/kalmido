@@ -17,8 +17,8 @@ from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.i18n import tr
 from ..core.db import body, db, iso, now_utc, usettings
 from ..accounts.session import _rate_blocked, _rate_fail, client_ip, me
-from ..core.access import need_feat
-from ..personal.timetrack import BadInput
+from ..core.access import need_feat, acx_token_bind
+from ..core.errors import BadInput
 from ..events.model import ev_role, need_evcal
 
 EVF_FAIL_LIMIT = 30  # wrong links per client address within the login fail window, then 429 (as calendars/icalfeed.py)
@@ -72,7 +72,6 @@ def evf_feed(token):
         _rate_fail(keys)
         aa_count("security", "ics", client_ip())
         return _nf()
-    from ..core.access import acx_token_bind
     acx_token_bind(f["user_id"])  # reads with the link owner's context (row-level security), like the task feed
     cal = c.execute("SELECT * FROM ev_cals WHERE id=?", (f["cal_id"],)).fetchone()
     if not ev_role(c, f["user_id"], cal):  # the person may no longer see the calendar (left the organisation, sharing ended)

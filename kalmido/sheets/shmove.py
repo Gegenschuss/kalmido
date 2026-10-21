@@ -23,6 +23,7 @@ from ..accounts.session import me
 from ..accounts.orgs import is_org_admin
 from ..accounts.spacemove import smv_answer, smv_refuse_agent, smv_same, smv_target
 from .core import sh_dict, sh_need, sh_reload, sh_space_key, sh_touch
+from ..core.pg import insert_id  # 2.149.0 G (#2517): pulled up from functions
 
 SHM_REF_RE = re.compile(r"\{(p|l|k|t):(\d{1,18})\}")
 SHM_ONLY = N_("Only who created this table or an admin of the organisation can move it out of it")
@@ -135,7 +136,6 @@ def sheets_move_space(sid):
             if out:  # a task moved on in between: its link stays ended
                 c.execute(f"UPDATE sheet_links SET undone_at=? WHERE id IN ({','.join('?' * len(out))})", [ts, *out])
     detail = {"list_id": r["list_id"] if unbind else None, "links": links, "at": ts}
-    from ..core.pg import insert_id
     mid = insert_id(c, "INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('sheet',?,?,?,?,?,?)",
                     (sid, r["org_id"], to, uid, ts, json.dumps(detail)))
     sh_touch(c, sid, uid)

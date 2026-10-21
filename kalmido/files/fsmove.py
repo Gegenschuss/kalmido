@@ -30,6 +30,7 @@ from ..accounts.session import me
 from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same, smv_target
 from .fstags import dt_move
 from .store import FS_DIR, DEPTH_MAX, fs_chain, fs_height, fs_log_add, fs_space, fs_visible_sql_c, need_node, safe_fs_name, _free_name, _now, _place
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 _KEEP = object()   # an item without its own parent: the request's parent
 _BAD = object()    # a sealed value that cannot be opened
@@ -105,7 +106,6 @@ def fsm_dest(c, uid, to, parent, is_file, dry):
 
 def fsm_agent_in(c, aid, to, uid):
     """Does agent aid belong to the target workspace (an organisation's agent / a private agent of uid or of nobody)?"""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the agent's workspace (structure: which accounts belong to the target workspace)
         a = c.execute("SELECT org_id, owner_id FROM agents WHERE user_id=?", (int(aid),)).fetchone()
     if not a:
@@ -115,7 +115,6 @@ def fsm_agent_in(c, aid, to, uid):
 
 def fsm_share_ends(c, s, to, uid):
     """Does share row s end when its node moves into workspace `to`?"""
-    from ..core.pg import system_ctx
     if s["agent_id"]:
         return not fsm_agent_in(c, s["agent_id"], to, uid)
     if not to:
@@ -442,7 +441,6 @@ FSM_GC = {"at": 0.0, "after": -1}
 
 def fsm_orphans_gc(c):
     import time
-    from ..core.pg import system_ctx
     every = float(os.environ.get("KALMIDO_FS_GC_EVERY") or 86400)
     if FSM_GC["after"] < 0:
         if time.time() - FSM_GC["at"] < every:

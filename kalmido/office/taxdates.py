@@ -12,10 +12,11 @@ from ..core.config import PUBLIC_URL, app
 from ..core.db import body, bump, iso, local_now, now_utc, write_lock
 from ..core.i18n import N_, lang, tr
 from ..core.pg import insert_id
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .cashflow import _ctx
 from .fixedimport import fci_people, fci_task_end
 from .model import office_need_feature, office_settings, office_settings_save
+from ..core.access import my_inbox  # 2.149.0 G (#2517): pulled up from functions
 
 TXD_KINDS = ("ustva", "est", "gewst")
 TXD_USTVA = ("none", "month", "quarter", "year")  # 2.122.0 D (#2315): year = only the annual VAT return
@@ -111,7 +112,6 @@ def txd_sig(kind, cfg, person):
 
 def txd_task_new(c, kind, cfg, person):
     """The recurring task in the person's inbox (theirs, assigned to them), due at the next deadline minus the lead."""
-    from ..core.access import my_inbox
     from ..tasks.validation import log_act
     lead = cfg["lead_days"]
     today = local_now().date()

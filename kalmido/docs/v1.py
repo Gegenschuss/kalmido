@@ -15,7 +15,8 @@ from ..core.db import bump, db
 from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
-from ..api.v1 import BadInput, UnknownFields, cursor_dec, cursor_enc, v1_args, v1_json, v1_limit, v1_view
+from ..api.v1 import BadInput, UnknownFields, v1_limit
+from ..api.common import cursor_dec, cursor_enc, v1_args, v1_json, v1_view
 from ..files.store import fs_log_add, need_node
 from . import store as S
 from .web import doc_json, doc_query, doc_update

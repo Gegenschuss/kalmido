@@ -22,7 +22,10 @@ from flask import jsonify
 
 from ..core.config import app, ATT_DIR, INLINE_TYPES
 from ..core.i18n import tr
-from ..core.db import db, iso, iso_ms, now_utc
+from ..core.db import db, iso, iso_ms, now_utc, bump
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 
 SC_CHUNK = 64 * 1024      # bytes per INSTREAM chunk
 SC_CONNECT_S = 3          # connect timeout
@@ -280,7 +283,6 @@ def sc_after_store(c, kind, ref_id, org_id, info):
     """Remember an unchecked file for the later scan (the caller commits)."""
     if (info or {}).get("scan") != "unchecked":
         return None
-    from ..core.pg import system_ctx
     with system_ctx(c):  # only the mark of the file this request just stored (mail / share intake runs without a person)
         ver = _sc_ver(c, kind, ref_id)
         f = _sc_file(c, kind, ref_id, ver)
@@ -292,7 +294,6 @@ def sc_after_store(c, kind, ref_id, org_id, info):
 
 
 def _sc_rows(c, kind, ids, infected_only=False):
-    from ..core.pg import system_ctx
     ids = [int(i) for i in ids if i]
     if not ids:
         return []
@@ -345,7 +346,6 @@ def sc_strict():
 
 
 def _sc_state_row(c, kind, ref_id, ver, state, more=""):
-    from ..core.pg import system_ctx
     if kind == "fs":
         cur, args = ("?", (int(ver),)) if ver else ("COALESCE((SELECT cur_version FROM fs_nodes WHERE id=?), 0)", (int(ref_id),))
     else:
@@ -375,7 +375,6 @@ def sc_waiting(c, kind, ref_id, ver=None):
 def sc_guard(c, kind, ref_id, ver=None):
     """Raises Denied(403) when the file was found infected (or, strict mode, is not checked yet): no download, no preview,
     no text. Deleting it stays possible (write paths do not call this)."""
-    from ..core.access import Denied
     sig = sc_locked(c, kind, ref_id, ver)
     if sig:
         raise Denied(403, tr("Locked: malware was found in this file ({0})", sig))
@@ -432,7 +431,6 @@ def sc_news_live(c, data):
         kind, ref, ver = d.get("where"), int(d.get("ref") or 0), int(d.get("ver") or 0)
     except (ValueError, TypeError, AttributeError):
         return False
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the person's own upload (any organisation); only "is it still locked"
         return bool(c.execute("SELECT 1 FROM upload_scan WHERE kind=? AND ref_id=? AND ver=? AND state='infected'",
                               (kind, ref, ver)).fetchone())
@@ -441,7 +439,6 @@ def sc_news_live(c, data):
 def _sc_gc(c):
     """2.61.0 review: the rows of deleted files go (every state, also with the scanner off): 200 rows every 10 minutes,
     walking through the table by id."""
-    from ..core.pg import system_ctx
     if time.time() - _SC["gc_at"] < 600:
         return
     _SC["gc_at"] = time.time()
@@ -458,9 +455,6 @@ def _sc_gc(c):
 def sc_tick(c, force=False):
     """Watchdog: scans up to SC_BATCH unchecked files (oldest first, at most SC_BUDGET_S seconds) while clamd answers.
     Returns the number of files checked."""
-    from ..core.db import bump
-    from ..core.orgcrypt import oc_read_file
-    from ..core.pg import system_ctx
     _sc_gc(c)
     t = sc_target()
     if not t or (not force and time.time() - _SC["tick_at"] < _env_int("KALMIDO_CLAMD_TICK_S", SC_TICK_S, 1, 3600)):
@@ -525,7 +519,6 @@ def sc_tick(c, force=False):
 @app.get("/api/admin/upload-scan")
 def sc_admin_state():
     from ..accounts.users import need_admin
-    from ..core.pg import system_ctx
     need_admin()
     c = db()
     t = sc_target()

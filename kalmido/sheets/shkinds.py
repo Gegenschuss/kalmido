@@ -20,13 +20,14 @@ from flask import jsonify, request
 
 from ..core.access import Denied, list_people, need_feat
 from ..core.config import ATT_DIR, MAX_FILE_MB, app
-from ..core.db import db, err, insert_id, iso_ms, now_utc
+from ..core.db import db, err, insert_id, iso_ms, now_utc, body
 from ..core.i18n import tr
 from ..core.orgcrypt import OrgCryptError, oc_read_file, oc_user_space, oc_write_file
 from ..core.serializers import unlink_files
 from ..accounts.session import me
 from ..collab.comments import user_names
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 SHK_KINDS = ("checkbox", "person", "link", "file")
 SHK_TRUE = {"1", "x", "✓", "true", "wahr", "yes", "ja", "si", "sí", "oui", "vrai", "waar"}
@@ -304,7 +305,6 @@ def shk_file_get(sid, fid, name=None):
 @app.post("/api/sheets/<int:sid>/fixed")
 def shk_fixed(sid):
     """{rows, cols}: the first N rows / columns stay in view while scrolling (0 = none) -> {ok, rev, freeze_rows, freeze_cols}."""
-    from ..core.db import body
     from .core import sh_need, sh_reload, sh_touch
     need_feat("sheets")
     c = db()
@@ -329,7 +329,6 @@ def shk_fixed(sid):
 def shk_tick(c):
     """Watchdog (rule "deleting = really gone"): a file no cell holds any more is removed for good after SHK_TRASH_DAYS --
     row, scan / text marks, the stored file after the commit. Files of a table in the trash stay with it (its Undo)."""
-    from ..core.pg import system_ctx
     cut = iso_ms(now_utc() - timedelta(days=SHK_TRASH_DAYS))
     with system_ctx(c):  # housekeeping over every space: rows are only deleted, nothing is handed to a person
         rows = c.execute("SELECT f.id, f.path FROM sheet_files f JOIN sheets s ON s.id=f.sheet_id WHERE f.deleted_at IS NOT NULL "

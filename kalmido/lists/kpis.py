@@ -11,7 +11,8 @@ from ..core.db import db, err
 from ..core.i18n import tr
 from ..core.access import Denied, MANAGE_ROLES, need_list
 from ..lists.fields import fmt_num
-from ..api.v1 import v1_args, v1_view
+from ..api.common import v1_args, v1_view
+from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
 
 FX_AGGS = ("sum", "avg", "count", "min", "max")         # the sum row
 FX_KPI_AGGS = ("sum", "count", "avg", "ratio")          # a tile: ratio = sum(field) / sum(field2) in %
@@ -126,7 +127,6 @@ def fx_list_out(d, r):
 def fx_kpi_values(c, lid):
     """[{id, title, agg, value, unit, n}] of list lid over the tasks the current user may see. value = null when nothing
     to compute (no tasks, a ratio over 0)."""
-    from ..core.serializers import load_tasks
     r = c.execute("SELECT fx_kpis FROM lists WHERE id=?", (lid,)).fetchone()
     kp = fx_json(r[0] if r else None, [])
     if not kp:

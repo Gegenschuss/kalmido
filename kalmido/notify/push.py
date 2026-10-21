@@ -30,6 +30,7 @@ from ..collab.news import news_cleanup, news_unread, notif_ok
 from ..personal.habits import habit_times, pomo_close, pomo_elapsed, pomo_planned_end
 from ..personal.timetrack import _num, time_watchdog
 from ..core.env import env_bool
+from ..core.merges import mg_prune  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- watchdog / ntfy
@@ -450,7 +451,6 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
         finally:
             c.close()
     from ..collab.liste2eguard import le2b_net
-    from ..core.i18n import LANGS
     lg = s.get("lang") if s.get("lang") in LANGS else "en"
     title, msg = le2b_net(title, lg), le2b_net(msg, lg)  # 2.64.2 D (#1817): the neutral word in the recipient's language
     from .channels import chn_kind, chn_push
@@ -576,7 +576,6 @@ def _watchdog_tick(c):
     _wd_section(c, "team chat files cleanup", tcx_files_gc)  # 2.113.1 (#2059)
     from ..admin.orgexport import ox_cleanup
     _wd_section(c, "org export cleanup", ox_cleanup)  # 2.42.0 (#833): archives after 24 h
-    from ..core.merges import mg_prune
     _wd_section(c, "merge snapshots", mg_prune, False)  # 2.66.0 (#1835): the undo data of merges after 30 days
     from ..office.undo import oun_prune
     _wd_section(c, "office undo copies", oun_prune)  # 2.111.0 A (#2233): the editors' undo copies after a day

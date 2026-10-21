@@ -27,9 +27,10 @@ from flask import g, has_request_context
 
 from ..core.config import ATT_DIR, MAX_FILE_MB
 from ..core.i18n import tr
-from ..core.db import insert_id, iso, now_utc, write_lock
+from ..core.db import insert_id, iso, now_utc, write_lock, db
 from ..core.access import Denied, acx_of, collab_all
-from ..core.orgcrypt import oc_read_file, oc_write_file
+from ..core.orgcrypt import oc_read_file, oc_write_file, oc_user_space
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 FS_DIR = "files"  # below ATT_DIR
 KINDS = ("folder", "file", "link", "page")
@@ -45,8 +46,7 @@ fs_on_delete = []
 fs_add_hooks = []
 
 
-def _now():
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 def _uid():
@@ -202,7 +202,6 @@ def fs_link_target(c, n):
 def fs_visible_sql(uid, c=None):
     """Subquery (no ? parameters, ids inlined) of the ids of every node account uid can see -- not in the trash, the
     organisation boundary applied. Use as `id IN <fs_visible_sql(uid)>`. c: the connection (default: the request's)."""
-    from ..core.db import db
     return fs_visible_sql_c(c if c is not None else db(), uid)
 
 
@@ -318,7 +317,6 @@ def _check_data(name, data):
 
 def fs_space(org_id, owner_id):
     """2.64.0 (#1864): the key space of a node's files: its organisation, else its owner's account."""
-    from ..core.orgcrypt import oc_user_space
     return int(org_id) if org_id else oc_user_space(owner_id)
 
 
@@ -551,7 +549,6 @@ def fs_user_purge(c, uid):
     """A person is deleted (accounts/users.py user_purge): the branches they own in an organisation's tree go to an admin of
     that organisation (else another member) and stay; their own tree is removed (the hooks of fs_on_delete run). Returns
     the stored files to unlink after the commit (paths relative to ATT_DIR)."""
-    from ..core.pg import system_ctx
     paths = []
     with system_ctx(c):  # the person's nodes in every organisation (an instance admin deletes accounts of organisations they are not in)
         for (oid,) in c.execute("SELECT DISTINCT org_id FROM fs_nodes WHERE owner_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
@@ -572,14 +569,12 @@ def fs_user_purge(c, uid):
 
 def fs_org_live(c, oid):
     """Folders and files of organisation oid outside the trash (an organisation is deleted only without them)."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the instance admin deletes an organisation they need not be in
         return c.execute("SELECT COUNT(*) FROM fs_nodes WHERE org_id=? AND deleted_at IS NULL", (int(oid),)).fetchone()[0]
 
 
 def fs_org_purge(c, oid):
     """The trash of organisation oid before the organisation is deleted: hooks, rows; returns the files to unlink."""
-    from ..core.pg import system_ctx
     paths = []
     with system_ctx(c):  # see fs_org_live
         for (nid,) in c.execute("SELECT id FROM fs_nodes WHERE org_id=? AND parent_id IS NULL", (int(oid),)).fetchall():

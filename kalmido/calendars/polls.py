@@ -36,8 +36,8 @@ from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..core.access import Denied, acx_anon_bind, acx_org_ok, need_feat
-from ..personal.timetrack import BadInput
-from ..api.v1 import hit_limit
+from ..core.errors import BadInput
+from ..api.common import hit_limit
 from ..lists.public import BOT_ERROR, PUB_CSP, pub_html, public_links_on
 from ..events.model import ev_zone, tz_ok, wall, wall_s
 

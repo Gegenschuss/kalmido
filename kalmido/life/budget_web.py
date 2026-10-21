@@ -16,6 +16,7 @@ from ..life.budget import (
     bud_month_view, bud_need_on, bud_obj, bud_overview, bud_this_month, cat_create, cat_delete, cat_update, entry_create,
     entry_delete, entry_update, rec_book, rec_create, rec_delete, rec_list, rec_update,
 )
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 def _done(c, out, code=200):
@@ -186,7 +187,6 @@ def budget_import_undo(lid, run):
 @app.post("/api/budget/entries/<int:eid>/files")
 def budget_files_upload(eid):
     """multipart file (several allowed) -> {files: [..]} of the entry."""
-    from ..personal.timetrack import BadInput
     c, uid = db(), me()
     files = request.files.getlist("file")
     if not files:

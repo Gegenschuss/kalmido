@@ -19,7 +19,7 @@ LAYERS = (
     ("integrations", ("integrations", "api", "admin", "paperless", "newsletter")),
     ("agents", ("agents", "assistant", "startup")),
 )
-LAYER_OF = {"admin.migrate": "core"}  # the move from SQLite runs inside init_db
+LAYER_OF = {"admin.migrate": "core", "api.common": "core"}  # the move from SQLite runs inside init_db; 2.149.0 G (#2517): the v1 helpers are infrastructure
 
 ORDER = (
     "core.env",  # 2.149.0 D (#2511): the registry of the environment variables (no imports from the app)
@@ -29,6 +29,9 @@ ORDER = (
     "core.pg",  # 2.37.0 (#1150): the Postgres layer (core.db re-exports it)
     "core.reqtime",  # 2.149.0 B (#2504): request timing (Server-Timing, slow log); first hooks = whole request measured
     "core.db",
+    "core.errors",  # 2.149.0 G (#2517): BadInput, Denied, UnknownFields (re-exported at the old places)
+    "core.ctx",  # 2.149.0 G (#2517): me()
+    "api.common",  # 2.149.0 G (#2517): the /api/v1 route helpers (core layer, see LAYER_OF)
     "core.tokenhash",  # 2.138.0 C (#1907): upload / calendar tokens as hashes
     "core.rls",  # 2.37.0 (#1150): row-level security, applied by init_db
     "core.orgcrypt",  # 2.42.0 (#828): keys per organisation, encryption at rest

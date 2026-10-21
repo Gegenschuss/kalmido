@@ -28,8 +28,8 @@ from ..core.config import app
 from ..core.i18n import N_, tr, trn
 from ..core.db import connect, db, iso, local_now, now_utc
 from ..accounts.session import GATE, me
-from ..core.access import Denied, list_role, MANAGE_ROLES, need_list
-from ..personal.timetrack import BadInput
+from ..core.access import Denied, list_role, MANAGE_ROLES, need_list, access_note
+from ..core.errors import BadInput
 
 AGENT_ACCESS_DAYS = 30
 LIST_IDS_MAX = 500
@@ -47,7 +47,7 @@ def agent_bridge_resp(e):
     parts = [f"“{x['name']}”" for x in e.items] + ([trn("{0} list you cannot see", "{0} lists you cannot see", e.hidden)] if e.hidden else [])
     msg = tr(BRIDGE_MSG, ", ".join(e.agents) or tr("the agent"), ", ".join(parts))
     if request.path.startswith("/api/v1/"):
-        from ..api.v1 import v1_err
+        from ..api.common import v1_err
         return v1_err(409, msg, name="agent_bridge", bridges=e.items, hidden=e.hidden)
     r = jsonify(error=msg, code="agent_bridge", bridges=e.items, hidden=e.hidden)
     r.status_code = 409
@@ -327,7 +327,6 @@ _ACC_EVT = threading.Event()
 
 def access_events(data):
     """The lists of the events an agent just fetched (they carry tasks, comments, chat of those lists): read access."""
-    from ..core.access import access_note
     for ev in data or []:
         d = ev.get("data") if isinstance(ev, dict) else None
         if isinstance(d, dict):

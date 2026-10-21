@@ -24,11 +24,11 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import tr
-from ..core.db import bump, db, iso, local_now, now_utc
-from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
+from ..core.db import bump, db, iso, local_now, now_utc, usettings
+from ..core.access import Denied, list_role, need_feat, WRITE_ROLES, FEAT_OFF, token_lists
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
-from ..api.v1 import v1_args, v1_err, v1_json, v1_view
+from ..core.errors import BadInput
+from ..api.common import v1_args, v1_err, v1_json, v1_view
 from .dispo import DSP_DAYS_MAX, DSP_KINDS, dsp_conflicts, dsp_public, dsp_resources, dsp_units, _res_index, _ts
 from .absence import abs_days, abs_holidays, abs_org, abs_state
 
@@ -81,8 +81,6 @@ def adz_area(c, want=None):
 def _adz_feat(c, oid, owner):
     """2.51.0 (#1355): an agent reads the disposition only while the module is on -- for a personal agent at its owner, for
     an organisation's agent at one of the organisation's admins (people need it themselves, need_feat("dispo"))."""
-    from ..core.access import FEAT_OFF
-    from ..core.db import usettings
     if owner:
         uids = [owner]
     else:
@@ -93,7 +91,6 @@ def _adz_feat(c, oid, owner):
 
 def adz_hidden(lid):
     """2.51.0 (#1355): a booking of a list outside the token's list limit (agents.list_ids) is shown only as "booked"."""
-    from ..core.access import token_lists
     tl = token_lists()
     return tl is not None and lid not in tl
 

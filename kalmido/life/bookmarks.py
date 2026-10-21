@@ -23,7 +23,7 @@ from ..accounts.session import me
 from ..accounts.orgs import is_org_admin, user_orgs
 from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_target
 from ..tasks.validation import as_int
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..calendars.subscriptions import CalError, cal_allow_parse, cal_err_text, cal_http, cal_rate
 from ..life.model import need_life
 from ..life.rss import rss_url

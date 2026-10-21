@@ -32,7 +32,7 @@ from ..core.db import body, connect, db, err, gsetting, iso, iso_ms, local_now, 
 from ..accounts.session import FAIL_WINDOW, GATE, me
 from ..core.access import Denied
 from ..tasks.validation import RR_FREQS, RR_PROBE_DAYS
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..calendars.caldav import _DtdRefused, xml_no_dtd
 from ..notify.push import _b64u, _b64u_dec
 from ..notify.alerts import _env_int, aa_count, aa_now

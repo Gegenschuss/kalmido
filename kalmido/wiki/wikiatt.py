@@ -30,10 +30,11 @@ from ..accounts.session import me
 from ..core.access import Denied
 from ..core.orgcrypt import OrgCryptError, oc_read_file, oc_send_file, oc_user_space, oc_write_file
 from ..core.serializers import unlink_files
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from ..tasks.attachments import file_ext, safe_name, send_stored
 from .pages import (WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, wiki_clean_path, wiki_frontmatter, wiki_insert, wiki_need,
                     wiki_set_links, wiki_space, wiki_space_sql)
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 WKA_FILE_MAX = 25 * 1024 * 1024  # bytes per file (upload and import)
 WKA_ZIP_TOTAL = 500 * 1024 * 1024  # bytes of a ZIP to import, and of everything unpacked from it (zip bombs)
@@ -349,7 +350,6 @@ def wka_tick(c):
     for good after WKA_TRASH_DAYS -- row, scan / text marks, the stored file after the commit. Files of a page in the trash
     stay with it (undo of the page); they go with the final deletion of pages (wka_page_files)."""
     from datetime import timedelta
-    from ..core.pg import system_ctx
     cut = iso_ms(now_utc() - timedelta(days=WKA_TRASH_DAYS))
     with system_ctx(c):  # housekeeping over every space: rows are only deleted, nothing is handed to a person
         rows = c.execute("SELECT f.id, f.path FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id WHERE f.deleted_at IS NOT NULL "

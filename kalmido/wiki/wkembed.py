@@ -22,7 +22,7 @@ from ..core.db import body, db
 from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 
 WEM_EMBED_RE = re.compile(r"/api/files/nodes/(\d{1,15})/content\b")
 WEM_LINK_RE = re.compile(r"\[\[\s*(datei|tabelle)\s*:\s*([^\[\]|#\n]{1,250}?)\s*(?:\|[^\[\]\n]*)?\]\]", re.I)

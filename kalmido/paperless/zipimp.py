@@ -32,12 +32,14 @@ from datetime import datetime, timedelta
 from flask import jsonify, request
 
 from ..core.config import app, DB, MAX_FILE_MB, TZ
-from ..core.db import body, db, err, iso, now_utc
+from ..core.db import body, db, err, iso, now_utc, connect
 from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..accounts.session import me
 from ..docs import store as S
 from . import ngx as P
+from ..core.orgcrypt import oc_active, oc_seal_k  # 2.149.0 G (#2517): pulled up from functions
+from ..core.pg import insert_id, system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
 
 
 def _env_mb(name, default):
@@ -81,14 +83,12 @@ class PlhError(Exception):
         self.code = code
 
 
-def _now():
-    return iso(now_utc())
+from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 
 
 # ---- storage of the parts ---------------------------------------------------------------------------------------------
 def _key(c, ws):
     """The key the parts of ws are sealed with (None: stored plain, like an organisation's files with the encryption off)."""
-    from ..core.orgcrypt import oc_active
     if S.ws_org(ws) and not oc_active(c):
         return None
     return S._ws_key(c, ws)
@@ -103,7 +103,6 @@ def _part_path(rid, n):
 
 
 def _write_part(c, r, n, data):
-    from ..core.orgcrypt import oc_seal_k
     os.makedirs(PLH_DIR, mode=0o700, exist_ok=True)
     os.makedirs(_dir(r["id"]), mode=0o700, exist_ok=True)
     key = _key(c, r["ws"])
@@ -375,8 +374,6 @@ def _check_one(c):
 
 def _check_loop():
     from ..accounts.session import GATE
-    from ..core.db import connect
-    from ..core.pg import system_ctx
     try:
         while True:
             with _CK_LOCK:
@@ -627,7 +624,6 @@ def plh_zip_new():
         pass
     name = d.get("name") if isinstance(d.get("name"), str) else ""
     name = re.sub(r"[\x00-\x1f\x7f/\\\\]", "", name).strip()[-120:]
-    from ..core.pg import insert_id, write_lock
     write_lock(c, f"pl_uploads:{ws}")
     r = _row(c, ws)
     if r and (_running(r) or (r["created_by"] != uid and r["state"] in ("upload", "check", "ready") and r["updated_at"] > iso(now_utc() - timedelta(hours=PLH_ORPHAN_H)))):
@@ -647,7 +643,6 @@ def plh_zip_new():
 def plh_zip_part():
     """multipart: ws, n (the part's number: the next one, or the last one again), part (the bytes: PLH_CHUNK, the last one
     less). After the last part the ZIP is checked in the background (2.81.0 #1874: state check -> ready | bad; the app asks again)."""
-    from ..core.pg import write_lock
     c = db()
     uid, org, ws, r = _mine(c, request.form.get("ws"), "upload")
     write_lock(c, f"pl_uploads:{ws}")  # two sends of one part at once: one after the other

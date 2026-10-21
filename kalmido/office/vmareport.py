@@ -15,7 +15,7 @@ from flask import Response, jsonify, request
 from ..core.config import app
 from ..core.db import local_now
 from ..core.i18n import lang, tr, trn
-from ..personal.timetrack import BadInput
+from ..core.errors import BadInput
 from .calc import dstr, money
 from .ledger import ofx_log
 from .model import office_settings

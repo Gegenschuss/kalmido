@@ -18,7 +18,8 @@ from ..core.access import Denied, need_feat
 from ..core.db import db
 from ..core.i18n import tr
 from ..accounts.session import me
-from ..api.v1 import BadInput, UnknownFields, v1_args, v1_json, v1_view
+from ..api.v1 import BadInput, UnknownFields
+from ..api.common import v1_args, v1_json, v1_view
 from .core import (SH_KINDS, sh_add_col, sh_add_rows, sh_brief, sh_check_list, sh_clean_title, sh_create, sh_dict, sh_index,
                    sh_may_rebind, sh_need, sh_reload, sh_set_cells, sh_touch, sh_undo_batch, sh_vars)
 

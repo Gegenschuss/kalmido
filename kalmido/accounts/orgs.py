@@ -5,12 +5,14 @@ import re
 
 from flask import g, jsonify, request
 
-from ..core.config import app
+from ..core.config import app, OFFICE_DIR
 from ..core.pg import insert_id, like_escape, system_ctx
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc
 from ..accounts.session import me
-from ..core.access import Denied
+from ..core.access import Denied, acx_drop
+from ..core.orgcrypt import oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.22.0 (#752): organisations
@@ -145,7 +147,6 @@ def user_orgs(c, uid):
 def org_member_add(c, oid, uid, role="member"):
     """2.36.2 (#1142): add uid to organisation oid (nothing when already in) and refresh the request's access contexts."""
     c.execute("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,?) ON CONFLICT (org_id, user_id) DO NOTHING", (oid, uid, role))
-    from ..core.access import acx_drop
     acx_drop()
 
 
@@ -726,7 +727,6 @@ def org_delete(oid):
 def oc_drop_office_dir(oid):
     """2.42.0 (#828): remove the office folder of a deleted organisation (stored documents, archive PDFs, logos)."""
     import shutil
-    from ..core.config import OFFICE_DIR
     d = os.path.join(OFFICE_DIR, str(int(oid)))
     if os.path.isdir(d) and not os.path.islink(d):
         shutil.rmtree(d, ignore_errors=True)
@@ -822,8 +822,6 @@ def org_icon_upload(oid):
     in the app) as its symbol instead of the emoji. Re-encoded like a list icon (square PNG, no metadata), sealed with the
     organisation's key; the old picture file goes."""
     from flask import request
-    from ..core.orgcrypt import oc_write_file
-    from ..personal.timetrack import BadInput
     from .pictures import AVATAR_MAX_MB, LIST_ICON_DIR, list_icon_process, org_icon_drop_file, org_icon_path
     import secrets
     c = db()
@@ -872,7 +870,6 @@ def org_icon_delete(oid):
 @app.get("/api/org-icon/<int:oid>/<tok>.png")
 def org_icon_get(oid, tok):
     """An organisation's own picture: only for its members (404 for everybody else, also a wrong / old token)."""
-    from ..core.orgcrypt import oc_send_file
     from .pictures import org_icon_path
     if g.get("user") is None:
         raise Denied(401)
@@ -985,7 +982,6 @@ def org_leave(c, oid, uid, heir):
     c.execute("DELETE FROM task_bell WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
     from ..sheets.shshare import shs_leave
     shs_leave(c, oid, [uid, *ags])  # 2.124.0 C (#2113): their shares of the organisation's tables end
-    from ..core.access import acx_drop
     acx_drop()  # 2.36.2 (#1142): the request's access contexts follow the new memberships
     return n
 

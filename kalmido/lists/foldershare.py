@@ -17,6 +17,8 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, need_collab
+from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..api.common import v1_call  # 2.149.0 G (#2517): pulled up from functions
 
 
 def sh_folder_agents(c, owner, folder):
@@ -173,7 +175,6 @@ def sh_agents_put():
     The first agent is the default of the folder's lists: they follow it (apply all, default) or only new lists do (new).
     listen reaches the folder's lists where this agent is the agent. -> the folder's agents + {changed, skipped}."""
     from ..lists.folders import _clean_props
-    from ..personal.timetrack import BadInput
     need_collab()
     if g.user["kind"] == "agent":
         raise Denied(403)
@@ -233,7 +234,6 @@ def sh_agents_put():
 def sh_agents_delete():
     """{folder, agent_id, remove?: true}: the agent is no longer one of my folder's agents; remove also takes it out of the
     folder's lists now (else they keep it). The next agent becomes the default for new lists."""
-    from ..api.v1 import v1_call
     from ..lists.lists import list_agent_set
     if g.user["kind"] == "agent":
         raise Denied(403)
