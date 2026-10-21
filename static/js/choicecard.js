@@ -51,7 +51,9 @@ function ccCommentHtml(c, ro = false) {
   if (ch.approval) {
     const open = st === 'open', who = ans?.user_name || '';
     const t = ans ? ((ans.ids || []).includes('yes') ? tr('{0} from {1}, {2}', ccApvLbl(ch, 'yes'), who, ccWhen(ans.at)) : tr('{0} from {1}, {2}', ccApvLbl(ch, 'no'), who, ccWhen(ans.at))) : '';
-    return `<div class="cccard apv${open ? ' apvopen' : ''}" role="group" aria-label="${esc(tr('Approval needed'))}">${ccApvHead(ch.approval, open)}${open ? (can ? ccApvBtns(ch, attrs, `data-ccpen="${c.id}" data-ch="yes"`) : `<div class="cpermst exp"><span>${esc(tr('Waiting for an answer'))}</span></div>`) : ccApvState(ch, ans, st, t)}</div>`;
+    // 2.144.5 A (#2001): only an approver decides (the server's choice_can: a manager of the list, the assignee, an admin)
+    const dec = can && c.choice_can !== false, wait = can ? tr('Waiting for a decision by the list’s managers, the assignee or an admin') : tr('Waiting for an answer');
+    return `<div class="cccard apv${open ? ' apvopen' : ''}" role="group" aria-label="${esc(tr('Approval needed'))}">${ccApvHead(ch.approval, open)}${open ? (dec ? ccApvBtns(ch, attrs, `data-ccpen="${c.id}" data-ch="yes"`) : `<div class="cpermst exp"><span>${esc(wait)}</span></div>`) : ccApvState(ch, ans, st, t)}</div>`;
   }
   if (st !== 'open' && st !== 'answered') return '';  // expired / withdrawn: gone, as in the chat
   if (st === 'open' && !can) return '';
@@ -67,7 +69,7 @@ async function ccAnswer(cid, id, send = false) {
   try { j = await capi('POST', `/api/comments/${cid}/choice`, {choice_ids: ids}); }
   catch { if (S.sel) loadTimeline(S.sel); return; }  // capi said it (409: no longer current, 403): the card follows the server
   delete S.ccPick[cid];
-  Object.assign(c, {choices: j.choices, choice: j.choice, choice_state: j.choice_state});
+  Object.assign(c, {choices: j.choices, choice: j.choice, choice_state: j.choice_state, choice_can: j.choice_can});
   const t = taskById(S.sel); if (t && c.choices?.approval && t.approvals_open) { t.approvals_open--; viewSafeRender(); }
   drawTimeline();
   if (j.answer_comment_id && S.sel) loadTimeline(S.sel);  // a suggestion was sent as my comment

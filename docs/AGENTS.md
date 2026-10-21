@@ -1429,7 +1429,9 @@ the answer (activity `choice`) and the task row shows open approval cards (`appr
 
 Only people who may edit the task **and** may instruct you in that list ([Who may address an agent](#who-may-address-an-agent-2260))
 answer (`POST /api/comments/{id}/choice` in the app, `POST /api/v1/comments/{id}/choice` with a person's token); agent
-accounts never. A pressed plain button is posted as the person's comment with its text (a reply to yours). You get ONE
+accounts never. An approval card is decided only by an **approver** (2.144.5, #2001: a manager of the list, the
+assignee or an admin, as listed under [Approvals](#approvals)); other editors get `403` and see no buttons (the app's
+comments carry `choice_can`). A pressed plain button is posted as the person's comment with its text (a reply to yours). You get ONE
 event `comment` with `answer` (`approval` `approved` / `rejected` and `approval_request` for a card, `labels` for
 buttons); `comment` is the person's new comment, or your card. A 👍 / 👎 on the comment keeps working as before. No
 answer is never a yes. Health lists never reach an agent.

@@ -189,9 +189,16 @@ check(A.post(B + f"/api/comments/{AP}/choice", json={"choice_ids": ["maybe"]}).s
 r = Ca.post(B + f"/api/comments/{AP}/choice", json={"choice_ids": ["yes"]})
 check(r.status_code == 403, f"#1383: an editor the agent does not take instructions from (#928) cannot answer {r.status_code}")
 A.patch(B + f"/api/lists/{L}", json={"agent_members": True})  # "Members may see and use the agent"
+# 2.144.5 (#2001): an approval card is decided only by an approver (list manager, assignee, admin): an editor alone gets
+# 403 and sees no buttons (choice_can false); as the assignee Carol decides it
+r = Ca.post(B + f"/api/comments/{AP}/choice", json={"choice_ids": ["yes"]})
+check(r.status_code == 403, f"#2001: an editor who is no approver cannot decide an approval card {r.status_code}")
+c1 = [x for x in Ca.get(B + f"/api/tasks/{T}/timeline").json()["comments"] if x["id"] == AP]
+check(c1 and c1[0].get("choice_can") is False, f"#2001: the editor's timeline says choice_can false {c1[:1]}")
+A.patch(B + f"/api/tasks/{T}", json={"assignee_id": ids.get("carol")})
 r = Ca.post(B + f"/api/comments/{AP}/choice", json={"choice_ids": ["yes"]})
 check(r.ok and r.json()["choice_state"] == "answered" and r.json()["choice"]["ids"] == ["yes"] and r.json()["choice"]["user_name"] == "Carol"
-      and r.json()["answer_comment_id"] is None, f"#1383: an editor answers yes {r.status_code} {r.text[:300]}")
+      and r.json()["answer_comment_id"] is None, f"#1383: the assignee answers yes {r.status_code} {r.text[:300]}")
 check(A.post(B + f"/api/comments/{AP}/choice", json={"choice_ids": ["no"]}).status_code == 409, "#1383: the answer is written once")
 acts = A.get(B + f"/api/tasks/{T}/timeline").json()["activity"]
 check(any(a["kind"] == "choice" and a["data"].get("approval") == "approved" and a["data"].get("comment") == AP for a in acts),
