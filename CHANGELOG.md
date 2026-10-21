@@ -27,6 +27,25 @@ Imports from everyday life: e-invoices are received and read, duplicates are fou
 ### Security
 - Security fix: file uploads, ZIP and XML reading, retention export.
 
+## [2.145.0] - 2026-10-21
+
+Own windows open faster, the list CSV has more columns, the printable project starts with a project head, the sidebar shows the Kalmido mark.
+
+### Added
+- List CSV export: new columns at the end - start date, deadline, duration, tracked time (hours with the decimal comma of the language), created by, completed by, milestone, sprint and the checklist (checkbox lines of the notes and the subtasks) in one cell; comments and attachments stay out (#2431).
+- Printable list / PDF of a project begins with a compact project head: description, status with its note, time span and progress, members with role, milestones with date and state; empty parts are left out, plain lists show only their name (#2432).
+- Sidebar: a small Kalmido logo with the word mark at the bottom under *Settings*, a tap opens Start (#2437).
+- News: when unread items for you lie in another workspace, the view says how many and where, with *Switch* (the bell keeps counting all workspaces) (#2444).
+
+### Changed
+- Own windows (list, task, chat) take the state of the open main window and catch up in the background: usable in about 0.5 s instead of 0.8 s on the test machine, more over slow connections (#2424).
+- The logo has the fixed brand colours of the app icon (lilac plate) everywhere, independent of the accent colour (#2433).
+
+### Fixed
+- Sidebar: the workspace head sits on the line of the page title (phone with notch, desktop), the colour stripe stays flush (#2438).
+- Team chat: a message that arrived in the first seconds after opening a conversation shows at once instead of with the next change.
+- List CSV: open tasks are called "Offen" in German again (was "Öffnen").
+
 ## [2.144.2] - 2026-10-21
 
 Small fixes and UI polish: subtasks appear at once, touch targets of at least 44 px in office and settings dialogs, Android print view and office search focus.

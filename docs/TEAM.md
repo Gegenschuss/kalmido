@@ -732,3 +732,14 @@ Someone who gets no pushes still learns when a task is assigned to them or they 
   no longer see by then is left out, a list with end-to-end encryption shows only the neutral word.
 - Agents never get these e-mails (they have their events). Server settings: `KALMIDO_EVENT_MAIL_DELAY` and
   `KALMIDO_EVENT_MAIL_GAP` (seconds, default 600 each).
+
+## A list as CSV, a project on paper (2.145.0)
+
+- **More columns in the CSV.** *Export as CSV* in a list's menu adds, after the columns it always had (their order stays, so
+  your sheets and importers keep working): start date, deadline, duration (h), tracked time (h, the total you also see in the
+  task), created by, completed by, milestone, sprint and the checklist. The checklist is one cell, one point per line:
+  `[x] Text` done, `[ ] Text` open, from the checkboxes in the notes and then the subtasks. Comments, attachments and the project
+  description stay out. Participants get their own tasks as before; names show only for people they see in the list.
+- **Project head in the printable view.** *Print* on a project starts with a compact head: the description, the status with
+  its note (who, when), the period of the tasks and the progress, the members with their role and the milestones with date
+  and state. It uses what the project page shows you; parts without content are left out. A plain list prints its name only.

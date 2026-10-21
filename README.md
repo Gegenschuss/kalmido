@@ -24,6 +24,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   their XML, duplicate receipts are found and kept out of DATEV, several files / ZIP / winmail.dat at once, iPhone HEIC
   photos, household import with debit/credit column and undo, CAMT.052 pending entries handled, legacy import with
   address columns and CSV, several vCards or a ZIP, and a retention export before deleting an account or organisation.
+- **2.145.0** (2026-10-21): **own windows open faster** (a list, task or chat window takes the open app's state and
+  catches up in the background), the **list CSV** gets start, deadline, duration, tracked time, created / completed by,
+  milestone, sprint and the checklist, the **printable project** starts with a project head (description, status,
+  time span, members, milestones), the **logo** keeps the lilac of the app icon, a small Kalmido mark sits at the
+  bottom of the sidebar (a tap opens Start), the workspace head lines up with the page title, and the news say when
+  unread items wait in another workspace.
 - **2.144.2** (2026-10-21): small fixes - subtasks appear at once while you type, touch targets of at least 44 px
   in office and settings dialogs, the Android print view and office search focus, Undo on vacation decisions.
 - **2.144.1** (2026-10-21): office fixes - the bank import takes several statements or a ZIP at once and says which

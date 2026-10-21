@@ -1526,6 +1526,15 @@ fresh; run p2143_c_ui node p2143_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.143.0 part D (#2155 #2156 #2259: appearance across devices, activity per organisation, unused terms PDFs)
 fresh; run p2143_d_api "$PY" p2143_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2143_d_ui node p2143_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.145.0 part A: sidebar logo purple + footer logo, workspace head aligned, news hint for other workspaces (#2433 #2437 #2438 #2444)
+fresh; run p2145_a_api "$PY" p2145_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2145_a_ui node p2145_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.145.0 part B: own window (mini mode) starts fast (#2424)
+fresh; run p2145_b_api "$PY" p2145_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2145_b_ui node p2145_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.145.0 part C: list CSV more columns, print view project head (#2431 #2432)
+fresh; run p2145_c_api "$PY" p2145_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2145_c_ui node p2145_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.140.0 part A: shopping list quantity / price + offline in the shop, recipes -> shopping list, meal plan beyond 7 days (#2131 #2132)
 fresh; run p2140_a_api "$PY" p2140_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2140_a_ui node p2140_a_ui.js "$KALMIDO_TEST_DATA"

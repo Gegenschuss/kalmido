@@ -79,8 +79,10 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
     dispatchEvent(new FocusEvent('focus')); out.focusNoBlur = on();  // a focus without leaving first is no return
     dispatchEvent(new FocusEvent('blur')); dispatchEvent(new FocusEvent('focus'));
     out.goneBack = !on();
-    window.print = () => {};  // desktop: print() blocks, afterprint comes when the dialog closes
-    shk_print(); await new Promise(r => setTimeout(r, 700));
+    let printedAt = 0; window.print = () => { printedAt = performance.now(); };  // desktop: print() blocks, afterprint comes when the dialog closes
+    // 2.145.0: wait for the real print() call, then past the 500 ms early window (a fixed 700 ms was flaky on a busy first run)
+    shk_print(); for (let i = 0; i < 100 && !printedAt; i++) await new Promise(r => setTimeout(r, 20));
+    await new Promise(r => setTimeout(r, Math.max(0, printedAt + 650 - performance.now())));
     out.desk1 = on(); dispatchEvent(new Event('afterprint')); out.desk2 = !on();
     window.matchMedia = mm; SHV.sh = null; return JSON.stringify(out);
   })()`);
