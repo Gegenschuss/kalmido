@@ -130,7 +130,8 @@ start() {  # start the command with the current settings (its own process group,
   local acs=off; [[ "$AC" == 1 ]] && acs="on at ${PCT/#-/the default }%"
   log "starting (fresh session): ${args[0]}, model ${MODEL/#-/default}, auto-compact $acs"
   # ${envs[@]+...}: bash 3.2 calls an empty array unbound under set -u
-  env -u DISABLE_AUTO_COMPACT -u CLAUDE_AUTOCOMPACT_PCT_OVERRIDE ${envs[@]+"${envs[@]}"} "${NEWSESS[@]}" "${args[@]}" &
+  # 2.157.0 (#1517): KALMIDO_LAUNCHER_PID -- the event runner ends when this launcher was killed hard (no orphan left behind)
+  env -u DISABLE_AUTO_COMPACT -u CLAUDE_AUTOCOMPACT_PCT_OVERRIDE KALMIDO_LAUNCHER_PID=$$ ${envs[@]+"${envs[@]}"} "${NEWSESS[@]}" "${args[@]}" &
   PID=$!
   STARTED=$(date +%s)
 }
