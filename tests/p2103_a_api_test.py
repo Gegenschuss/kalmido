@@ -362,8 +362,8 @@ if os.environ.get("P2103A_NOSTART") != "1":
     HO = A.post(B + "/api/admin/orgs", json={"name": "Hosted Studio", "admin_id": ALICE}).json()["id"]
     A.patch(B + "/api/settings", json={"workspace": f"org:{HO}"})
     HN = booked(A, f"org:{HO}", "beleg-org.txt")
-    roots = [x[0] for x in sql("SELECT id FROM fs_nodes WHERE org_id=? AND deleted_at IS NULL AND parent_id IS NULL", (HO,))]
-    check(HN and roots and all(A.delete(B + f"/api/files/nodes/{x}").ok for x in roots), "hosted: the receipt (with its folder) into the organisation's trash")
+    live = [x[0] for x in sql("SELECT id FROM fs_nodes WHERE org_id=? AND deleted_at IS NULL ORDER BY (id=?) DESC, id DESC", (HO, HN))]
+    check(HN and live and all(A.delete(B + f"/api/files/nodes/{x}").ok for x in live), "hosted: the receipt (and its folder) into the organisation's trash")
     A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
     r = A.delete(B + f"/api/admin/orgs/{HO}", params={"confirm": "1", "retention": "waived"})
     check(r.ok and not r.json().get("retired") and not sql("SELECT 1 FROM orgs WHERE id=?", (HO,)) and not sql("SELECT 1 FROM fs_nodes WHERE id=?", (HN,)),
