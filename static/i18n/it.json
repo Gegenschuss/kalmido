@@ -12528,8 +12528,9 @@
   "Waiting for a decision by the list’s managers, the assignee or an admin": "In attesa della decisione di chi gestisce la lista, della persona assegnata o di un amministratore",
   "Only the list’s managers, the assignee or an admin can decide this approval": "Solo chi gestisce la lista, la persona assegnata o un amministratore può decidere questa approvazione",
   "The workspace already has a mailbox: the one of the export was not taken over.": "L’area di lavoro ha già una casella di posta: quella dell’esportazione non è stata ripresa.",
-  "Mailbox taken over without its passwords: enter them again in the settings.": "Casella di posta ripresa senza password: inseriscile di nuovo nelle impostazioni.",
   "Rather into {0}": "Meglio in {0}",
   "Notice period missed, next chance {0}": "Termine scaduto, prossima possibilità {0}",
-  "Notice period missed": "Termine scaduto"
+  "Notice period missed": "Termine scaduto",
+  "Your account at the login provider is no longer allowed to use this app.": "Il tuo account presso il provider di accesso non può più usare questa app.",
+  "Mailbox taken over without its passwords and switched off: enter them in the settings and switch it on.": "Casella di posta ripresa senza le password e disattivata: inseriscile nelle impostazioni e attivala."
 }

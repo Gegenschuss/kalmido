@@ -12528,8 +12528,9 @@
   "Waiting for a decision by the list’s managers, the assignee or an admin": "Wacht op een beslissing van de lijstbeheerders, de toegewezen persoon of een beheerder",
   "Only the list’s managers, the assignee or an admin can decide this approval": "Alleen de lijstbeheerders, de toegewezen persoon of een beheerder kunnen over deze goedkeuring beslissen",
   "The workspace already has a mailbox: the one of the export was not taken over.": "De werkruimte heeft al een mailbox: die uit de export is niet overgenomen.",
-  "Mailbox taken over without its passwords: enter them again in the settings.": "Mailbox overgenomen zonder wachtwoorden: voer ze opnieuw in bij de instellingen.",
   "Rather into {0}": "Liever naar {0}",
   "Notice period missed, next chance {0}": "Termijn gemist, volgende mogelijkheid {0}",
-  "Notice period missed": "Termijn gemist"
+  "Notice period missed": "Termijn gemist",
+  "Your account at the login provider is no longer allowed to use this app.": "Je account bij de inlogdienst mag deze app niet meer gebruiken.",
+  "Mailbox taken over without its passwords and switched off: enter them in the settings and switch it on.": "Mailbox zonder wachtwoorden overgenomen en uitgeschakeld: vul ze in bij de instellingen en zet hem aan."
 }
