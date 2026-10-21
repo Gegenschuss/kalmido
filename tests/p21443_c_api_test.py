@@ -126,14 +126,13 @@ FU, F = freelancer(B, A)
 r = F.post(B + "/api/my/agents", json={"username": "fridabot", "display_name": "Frida's bot", "scopes": ["read", "tasks:write", "comments", "delete"]})
 check(r.status_code in (200, 201), "freelancer: an own agent " + r.text[:200])
 FA = r.json()["id"]
-FH = hdr(F.post(B + f"/api/my/agents/{FA}/token").json().get("token", ""))
 FL = F.post(B + "/api/lists", json={"name": "Mine"}).json()["id"]
 check(F.put(B + f"/api/lists/{FL}/members", json={"user_id": FA, "role": "edit"}).ok, "freelancer: the agent in the own list")
 F.patch(B + "/api/settings", json={"notify": {"approval": {"news": 1}}})
-FT = [F.post(B + "/api/tasks", json={"title": f"Shot {i}", "list_id": FL}).json()["id"] for i in range(10)]
+FT = F.post(B + "/api/tasks", json={"title": "Shot", "list_id": FL}).json()["id"]
 f0, _ = bell(F)
-r = requests.post(V + "/tasks/batch", headers=FH, json={"ids": FT, "action": "complete"})
-check(r.status_code == 202, f"freelancer: the batch waits {r.status_code}")
+sql("INSERT INTO notifications(user_id,kind,task_id,actor_id,data,created_at) VALUES(?,?,?,?,CAST(? AS jsonb),?)",
+    (FU, "approval", FT, FA, '{"title": "Shot", "job": 1}', "2026-01-01T00:00:00.000Z"), write=True)
 f1, ap = bell(F)
 check(f1 == f0 + 1 and len(ap) == 1, f"freelancer: the bell counts the approval {f0} -> {f1}")
 

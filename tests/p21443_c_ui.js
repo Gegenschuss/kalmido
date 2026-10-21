@@ -39,13 +39,13 @@ const FEAT = 'comments,collab,agents';
     [ME.id, 'approval', T, ag.id, '{"title": "Prepare the offer"}', '2026-04-01T10:00:00Z', null],
     [ME.id, 'approval', T2, ag.id, '{"title": "Old thing"}', '2026-03-01T10:00:00Z', '2026-03-02T10:00:00Z']]);
   const w = await boot({user: 'alice', hash: 'news'}), d = w.document;
-  await until(() => d.querySelector('.nbund .ngroup'));
+  await until(() => d.querySelector('.nlist .nitem')); await sleep(300);
   const bell = +(d.querySelector('.bell .nbadge')?.textContent || 0);
-  const meSec = d.querySelector('#ns-need')?.closest('.nsect');
   check(bell === 1, '#2405: the bell number counts the agent approval ' + bell);
-  check(meSec && +meSec.querySelector('.nsh .c')?.textContent === bell, `#2405: section "For you" equals the bell number (${bell})`);
-  const rd = d.querySelector('#ns-read')?.closest('.nsect')?.querySelector('.nsh');
-  check(rd && /^\s*Read\s*$/.test(rd.textContent.replace(/\d+/g, '')), '#2405: the divider reads "Read": ' + (rd && rd.textContent));
+  const sec = d.querySelector('.nsec.me .c.nunread');
+  check(sec && +sec.textContent === bell, `#2405: section "For you" equals the bell number (${bell}) ` + sec?.textContent);
+  const rd = d.querySelector('.nsec.read span');
+  check(rd && rd.textContent.trim() === 'Read', '#2405: the divider reads "Read": ' + (rd && rd.textContent));
   w.close();
   console.log(`p21443_c_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
