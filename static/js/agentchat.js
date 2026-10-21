@@ -581,18 +581,15 @@ async function acdDeleteAll() {
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-act="chat-head-menu"]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();
-  // 2.161.0 (#1107): on a narrow touch screen the steps toggle moves in here (agentchat.css hides it in the header)
-  const narrow = matchMedia('(pointer:coarse) and (max-width:37.5rem)').matches;
-  menu(b, [...narrow && b.closest('.chath')?.querySelector('.chstog') ? [{label: tr('Always show steps'), icon: 'list', on: stepsAlwaysOn(), fn: () => stepsAlways()}, '-'] : [],
-    {label: tr('Delete history'), icon: 'trash', fn: () => acdDeleteAll()}]);
+  // 2.152.2 C (#2627): filter, long messages and steps live in this menu (the header shows only search + menu)
+  const filt = !S.chat.job && S.jcd.n;
+  menu(b, [...filt ? [{label: tr('Filter: {0}', jcd_filterName()), icon: 'filter', more: jcd_choices()}] : [],
+    {label: tr('Fold long messages'), icon: 'collapse', on: jcf_on(), fn: () => jcf_toggle()},
+    {label: tr('Always show steps'), icon: 'list', on: stepsAlwaysOn(), fn: () => stepsAlways()},
+    ...S.chat.job ? [] : ['-', {label: tr('Delete history'), icon: 'trash', fn: () => acdDeleteAll()}]]);
 });
-function chatStepsTog() {
-  const on = stepsAlwaysOn(), t = tr('Always show steps');
-  return `<button type="button" class="iconbtn chstog${on ? ' on' : ''}" data-act="steps-always" aria-pressed="${on}" title="${esc(t)}" aria-label="${esc(t)}">${ic('list', 's')}</button>`;
-}
 function stepsAlways() {
   const on = !stepsAlwaysOn(); stepsSet('agent_steps_always', on); S.jobOpen = {};
-  $$('.chstog').forEach(b => { b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
   toast(on ? tr('Steps are shown above every answer') : tr('Steps are shown only while the agent works'));
   jobStepsRedraw(true);
 }
@@ -657,7 +654,7 @@ function chatInner(aid) {
   // 2.13.0 (#453): the note that used to sit under the input is behind the (i) next to the name
   const gc = ac_color(a.id), gcs = gc ? ` agcol" style="--agcol:${gc}` : '';  // 2.144.0 B (#2411): the agent's own colour on the header and the box
   return `<div class="chath${gcs}">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${chatRingHtml(a)}${chatModeHtml(a)}</span><span class="chl2">${chatStHtml(a)}${chatModelHtml(a)}${chatPausedHtml(a)}</span></div><span class="spacer"></span>
-      ${msgSearchBtn('a', a.id)}${jcd_fbtnHtml()}${jcf_btnHtml()}${chatStepsTog()}${S.chat.job ? '' : `<button type="button" class="iconbtn" data-act="chat-head-menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}" aria-haspopup="menu">${ic('dots', 's')}</button>`}${back ? '' : chatWinBtns()}${typeof cw_headBtns === 'function' ? cw_headBtns('a:' + a.id) : ''}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</div>
+      ${msgSearchBtn('a', a.id)}${jcd_fbtnHtml() /* 2.152.2 C (#2627): the menu button */}${back ? '' : chatWinBtns()}${typeof cw_headBtns === 'function' ? cw_headBtns('a:' + a.id) : ''}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</div>
     ${jc_barHtml()}${jcd_filtHtml()}${msBarHtml('a', a.id)}<div class="apvpins" id="chat-apv" hidden></div>${cpnBarHtml('a:' + a.id)}<div class="chmsgs" id="chat-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${chatMsgs()}</div>
     <button type="button" class="chnew hidden" id="chat-new" data-act="chat-bottom">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${typingHtml(chatTypers(a), 'chat-typing')}

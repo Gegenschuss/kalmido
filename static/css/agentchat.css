@@ -211,8 +211,6 @@ button.chmode:hover{color:var(--text);border-color:var(--muted)}
 .chring:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .chqp{flex:none;color:var(--danger);font-size:var(--fs-s);white-space:nowrap}
 .chqp::before{content:"·";margin-right:.375rem;color:var(--muted)}
-.chstog{color:var(--muted)}
-.chstog.on{color:var(--accent)}
 .jobv{margin-top:.375rem;font-size:var(--fs-s)}
 .jobv>summary{cursor:pointer;color:var(--text2);min-height:1.5rem}
 .jvb{display:flex;flex-direction:column;gap:.125rem;margin-top:.25rem;color:var(--muted);font-size:var(--fs-xs);line-height:1.4;max-height:24rem;overflow:auto;overflow-wrap:anywhere}
@@ -293,7 +291,6 @@ button.chmode .pmlong::after{content:"\a0\25BE";font-size:.75em}
   .chnm button.chmode[data-short]{padding:0}
 }
 @media (pointer:coarse) and (max-width:37.5rem) {
-  .chath:has([data-act="chat-head-menu"]) .chstog{display:none}
   .chath .chn{row-gap:.625rem}
   .chath .chnm .chmode,.chath .chnm .chmode[data-short]{margin:0 .5rem 0 .125rem}
   .chath .chmode[data-short]::before{content:attr(data-short)}
@@ -390,7 +387,6 @@ body .chath.agcol{border-top:.1875rem solid var(--agcol);padding-top:.5625rem}
 .chcomp.agcol{border-top-color:color-mix(in srgb,var(--agcol) 55%,var(--line))}
 .chcomp.agcol:focus-within{border-top-color:var(--agcol)}
 .cmsg.jcfcut .cbub{max-height:7.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
-.jcfbtn[aria-pressed="true"]{color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
 /* 2.153.0 (#1962): a chat of its own per job -- in the whole chat the link to the job's chat under its card; in the job's
    chat its progress lines */
 .jcsgo{display:inline-flex;align-items:center;gap:.375rem;align-self:flex-start;min-height:2.75rem;margin-left:.75rem;padding:0 .5rem;color:var(--accent)}

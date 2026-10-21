@@ -50,7 +50,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(!filt() && !d.querySelector('.jcdseg'), 'no filter row above the messages');  // 2.144.0 (#2419): the icon on every width
   check(!fbtn().querySelector('.jcdfdot'), 'filter All: no dot');
   await openFilter();
-  const items = [...d.querySelectorAll('[role=menuitem]')];
+  const items = [...d.querySelectorAll('[role=menuitem]:not(.mback)')];  // 2.152.2 (#2627): the submenu has a Back entry
   check(items.length === 3 && /All/.test(items[0].textContent) && /Only me and Dev Bot/.test(items[1].textContent) && /Jobs/.test(items[2].textContent), 'the menu: All / Only me and <agent> / Jobs');
   click(w, items.find(x => /Jobs/.test(x.textContent)));
   await until(() => w.eval(`LS.get('jcdFilt')`) === 'jobs');

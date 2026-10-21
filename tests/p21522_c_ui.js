@@ -23,13 +23,14 @@ const v1 = async (method, url, body) => { const r = await fetch(B + 'api/v1' + u
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   const CA = await login('alice');
-  await call(CA, 'POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal', 'comments']});
+  await call(CA, 'POST', '/api/admin/setup', {org_name: 'Alpha', lang: 'en', collab_all: true, modules: ['cal', 'comments']});
   const st = await call(CA, 'GET', '/api/state'), feats = new Set(((st.settings || {}).features || '').split(',').filter(Boolean)); feats.add('agents');
   await call(CA, 'PATCH', '/api/settings', {tour: 'done', lang: 'en', workspace: 'all', features: [...feats].join(',')});
   const me = (await call(CA, 'GET', '/api/state')).me;
-  await call(CA, 'POST', '/api/admin/orgs', {name: 'Alpha', admin_id: me.id});
+  const ORG = me.workspaces[0].id;
   const ag = await call(CA, 'POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'devbot', display_name: 'Dev Bot'});
   const CL = ag.id; TOK = ag.token;
+  await call(CA, 'PATCH', `/api/admin/agents/${CL}`, {org_id: ORG});
   const J = (await v1('POST', '/agent/jobs', {title: 'Knox: Release 2.152.2', user_id: me.id, state: 'running'})).id;
   await call(CA, 'POST', `/api/agents/${CL}/chat`, {body: 'Please build the release'});
   const say = (body, kw = {}) => v1('POST', `/agent/chats/${me.id}`, {body, ...kw});

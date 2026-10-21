@@ -7963,7 +7963,12 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #side .sbbrand .sbbsub .wsp-dot{width:.5rem;height:.5rem}
 #side .sbbrand .sbbsub svg.i{width:.75rem;height:.75rem;flex:none}
 #side .sbbrand > svg.i:last-child{flex:none;margin-left:auto}
-@media (pointer:coarse){ :root:root #side .sbhead .wsbar.sbbrand{min-height:2.75rem} }  /* the head keeps its height (2.25 rem, 2.75 on touch): it sits on the middle of #top (#2438) */
+@media (pointer:coarse){ :root:root #side .sbhead .wsbar.sbbrand{min-height:2.75rem} }
+/* 2.152.2 C (#2660): in the 300 px drawer the line under the mark ("Alle Arbeitsbereiche") was cut ("Alle Arbeitsber…", 88 of 110 px):
+   the mark takes the free width - slimmer gaps, and the touch tool buttons give back 0.5 rem each (still 2.25 rem) */
+:root:root #side .sbhead:has(.sbbrand) .wsbar.sbbrand{gap:.375rem;padding:0 .25rem}
+@media (pointer:coarse){ #side .sbhead:has(.sbbrand) .sbtools .iconbtn{min-width:2.25rem}  }
+  /* the head keeps its height (2.25 rem, 2.75 on touch): it sits on the middle of #top (#2438) */
 /* 2.161.2 A (#2608): the brand's bot blinks now and then (wsBlink, workspace.js); nothing with reduced motion */
 #side .sbbrand svg.logo .lg-eyes{transform-box:fill-box;transform-origin:50% 50%}
 @media (prefers-reduced-motion: no-preference){ #side .sbbrand.blink svg.logo .lg-eyes{animation:b-blink .36s ease-in-out 1} }
