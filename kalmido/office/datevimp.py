@@ -33,7 +33,7 @@ from ..core.db import body, bump, db, iso, now_utc
 from ..core.access import Denied
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..personal.timetrack import BadInput
-from .model import office_gate, office_org, office_settings, pb_cl_org, pb_cl_sql
+from .model import office_gate, office_need_feature, office_org, office_settings, pb_cl_org, pb_cl_sql
 
 DI_MAX = 10 * 1024 * 1024       # the uploaded file
 DI_ROWS_MAX = 20000             # data rows of one file
@@ -600,6 +600,7 @@ def di_check_post():
     """Org admin (a personal office: its owner). multipart 'file' (DATEV EXTF, category 16 or 21) -> the preview
     {category, kind master | opening, counts, hints, total, rows (the first 20)}. Nothing is stored."""
     c, uid, oid = _ctx()
+    office_need_feature(c, oid, "books.datev")  # 2.147.0 (#2460): DATEV switched off -> no DATEV import
     p, plan, counts = di_plan(c, oid, _upload())
     return jsonify(_public(p, plan, counts, c, oid))
 
@@ -608,6 +609,7 @@ def di_check_post():
 def di_import_post():
     """Org admin. multipart 'file' -> takes the file over as the preview showed it: {run_id, category, counts}."""
     c, uid, oid = _ctx()
+    office_need_feature(c, oid, "books.datev")  # 2.147.0 (#2460): DATEV switched off -> no DATEV import
     rid, p, plan, counts = di_import(c, oid, uid, _upload())
     from .ledger import ofx_log
     ofx_log(c, oid, "import", target="datev_in", detail={"run_id": rid, "kind": p["category"], "counts": counts})

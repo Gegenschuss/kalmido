@@ -1188,6 +1188,8 @@ def v1_export():
     v1_args(())
     if token_lists() is not None:  # 2.30.0 (#919): the export holds every list and personal data: not for a limited token
         raise Denied(403, tr("A token limited to selected lists cannot export everything"))
+    if not is_agent(g.user):  # 2.148.1 C (#2494): a person's whole account (budget, journal ...) also needs "account"
+        need_scope("account")
     return export_json()
 
 
@@ -1401,7 +1403,7 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                             "billable": {"type": "boolean"}}},
                         desc="2.144.6: an entry an invoice billed (billed: true) keeps everything but its note (409)."),
             "delete": op("Delete your time entry", "Time tracking", nobody | errs("403", "404", "409"), [pid("id", "Entry id")], scope="time")},
-        "/export": {"get": op("Export everything you own as JSON", "Account", ok(obj) | errs(), scope="export")},
+        "/export": {"get": op("Export everything you own as JSON (a personal token needs the scope account as well; 2.148.1)", "Account", ok(obj) | errs("403"), scope="export")},
         "/lists/{id}/status": {"put": op("Post a status update of a project", L, ok(obj) | errs("400", "403", "404", "409"), [lp], scope="structure",
                                          body={"type": "object", "properties": {"status": {"type": "string", "enum": [*LIST_STATUSES, ""]},
                                                                                 "note": {"type": "string"}}},

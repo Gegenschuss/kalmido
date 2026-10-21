@@ -10,7 +10,7 @@ const DX_CHART = {SKR03: {standard: '8400', reduced: '8300', exempt: '8100', rev
 const dx_months = () => Array.from({length: 12}, (_, i) => [i + 1, new Date(2026, i, 1).toLocaleDateString(S.lang || undefined, {month: 'long'})]);
 const dx_ph = (st, k) => { const d = (DX_CHART[st.chart] || DX_CHART.SKR03)[k] || ''; return d.padEnd((+st.acct_len || 4) + (k === 'debtor' ? 1 : 0), '0'); };
 
-// the block in Office > Settings > Invoices (admins edit, members see)
+// the block in Office > Settings > Invoices (admins edit, members see); 2.148.0 D (#2458): + the DATEV import (office_datevimp.js)
 function dx_settingsHtml(s, dis) {
   const st = Object.assign({advisor_no: '', client_no: '', fy_start: 1, acct_len: 4, chart: 'SKR03', accounts: {}, bu: {}, debtor: '', bank: '', cash: ''}, s.datev_extf || {});
   const num = (id, v, mx, ph) => `<input id="${id}" value="${esc(String(v ?? ''))}" inputmode="numeric" maxlength="${mx}" class="numin" ${ph ? `placeholder="${esc(ph)}"` : ''} ${dis}>`;
@@ -26,6 +26,7 @@ function dx_settingsHtml(s, dis) {
     ${ofcRowF('dx-bank', tr('Bank account'), num('dx-bank', st.bank, 8, dx_ph(st, 'bank')), tr('payments by transfer or card'))}
     ${ofcRowF('dx-cash', tr('Cash account'), num('dx-cash', st.cash, 8, dx_ph(st, 'cash')), tr('payments in cash'))}
     ${typeof ofcAdmin === 'function' && ofcAdmin() && !dis ? dv_settingsHtml(st) : ''}
+    ${!dis && typeof dimp_sectionHtml === 'function' ? dimp_sectionHtml() : ''}
   </details>`;
 }
 function dx_settingsBody(form) {
@@ -41,19 +42,43 @@ const dx_btn = () => typeof ofcAdmin === 'function' && ofcAdmin() ? `<button cla
 const dx_iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 function dx_dialog() {
   const n = new Date(), from = new Date(n.getFullYear(), n.getMonth() - 1, 1), to = new Date(n.getFullYear(), n.getMonth(), 0);
+  let checked = '';  // 2.148.0 B (#2470): with receipt images the first press checks, the second downloads
   const md = ofdDlg(tr('DATEV export'), `<p class="muted ofchint">${tr('Finalised invoices, credit notes and payments of the period as a DATEV booking batch (CSV) for your tax advisor.')}</p>
     <div class="row"><label id="dx-fl">${tr('From')}</label>${dateIn('dx-from', dx_iso(from), {label: tr('From'), clear: false})}</div>
     <div class="row"><label id="dx-tl">${tr('To')}</label>${dateIn('dx-to', dx_iso(to), {label: tr('To'), clear: false, after: 'dx-from'})}</div>
     ${ofcChk('dx-in', tr('Include receipts and travel expenses'), (OFC.info?.settings?.datev_extf || {}).in_on ?? 1)}
+    ${ofcChk('dx-img', tr('With receipt images (ZIP for DATEV Unternehmen online)'), 1)}
+    ${ofcChk('dx-locked', tr('Only locked months'), 0)}
     ${ofcChk('dx-dups', tr('Include possibly duplicate receipts'), 0)}
-    <p class="muted" id="dx-res" aria-live="polite"></p>`, tr('Download'), async m => {
+    <div class="muted" id="dx-res" aria-live="polite"></div>`, tr('Download'), async m => {
+    const img = !!$('#dx-img', m)?.checked;
     // 2.146.0 B (#2452): possible duplicates stay out unless ticked (the toast names how many)
-    const q = `from=${encodeURIComponent($('#dx-from', m).value)}&to=${encodeURIComponent($('#dx-to', m).value)}${$('#dx-in', m)?.checked ? '' : '&in=0'}${$('#dx-dups', m)?.checked ? '&dups=1' : ''}`;
-    const j = await api('GET', `/api/office/datev/extf?${q}&check=1`);
-    const a = document.createElement('a'); a.href = `/api/office/datev/extf?${q}`; a.download = j.file || ''; document.body.appendChild(a); a.click(); a.remove();
-    toast([j.count === 1 ? tr('1 booking exported') : tr('{0} bookings exported', j.count), ...(j.hints || []).map(h => h.text)].join('. '));  // 2.120.0 C (#2090)
+    const q = `from=${encodeURIComponent($('#dx-from', m).value)}&to=${encodeURIComponent($('#dx-to', m).value)}${$('#dx-in', m)?.checked ? '' : '&in=0'}${$('#dx-locked', m)?.checked ? '&locked=1' : ''}${$('#dx-dups', m)?.checked ? '&dups=1' : ''}`;
+    const url = img ? '/api/office/datev/zip' : '/api/office/datev/extf';
+    if (img && checked !== q) {  // first press (or changed fields): show what is missing before the download
+      const j = await api('GET', `${url}?${q}&check=1`);
+      checked = q;
+      const res = $('#dx-res', m); if (res) res.innerHTML = dx_checkHtml(j);
+      const ok = $('[data-m="ok"]', m); if (ok) ok.textContent = tr('Download');
+      return false;
+    }
+    const j = img ? null : await api('GET', `${url}?${q}&check=1`);
+    const a = document.createElement('a'); a.href = `${url}?${q}`; a.download = j?.file || ''; document.body.appendChild(a); a.click(); a.remove();
+    if (j) toast([j.count === 1 ? tr('1 booking exported') : tr('{0} bookings exported', j.count), ...(j.hints || []).map(h => h.text)].join('. '));  // 2.120.0 C (#2090)
   });
+  const ok = $('[data-m="ok"]', md); if (ok) ok.textContent = tr('Check');
+  md.addEventListener('change', e => { if (/** @type {any} */ (e.target).id === 'dx-img') { const b = $('[data-m="ok"]', md); if (b) b.textContent = /** @type {any} */ (e.target).checked && !checked ? tr('Check') : tr('Download'); } });
   return md;
+}
+// 2.148.0 B (#2470): the check of the ZIP: bookings, files, receipts without a booking, bookings without a receipt
+function dx_checkHtml(j) {
+  const li = x => `<li>${esc([fmtDateLoc(x.date), x.title || x.text || '', x.amount ? ofcMoney(x.amount) : ''].filter(Boolean).join(' · '))}</li>`;
+  const nb = j.no_booking || [], nr = j.no_receipt || [];
+  return `<p>${esc(tr('{0} bookings, {1} receipt files ({2} to {3})', j.count, j.files, fmtDateLoc(j.from), fmtDateLoc(j.to)))}</p>
+    ${(j.hints || []).map(h => `<p>${esc(h.text)}</p>`).join('')}
+    ${nb.length ? `<details class="dxchk"><summary>${esc(trn('{0} receipt without a booking (no amount)', '{0} receipts without a booking (no amount)', nb.length))}</summary><ul>${nb.map(li).join('')}</ul></details>` : ''}
+    ${nr.length ? `<details class="dxchk"><summary>${esc(trn('{0} booking without a receipt', '{0} bookings without a receipt', nr.length))}</summary><ul>${nr.map(li).join('')}</ul></details>` : ''}
+    ${!nb.length && !nr.length ? `<p>${esc(tr('Every booking has its receipt.'))}</p>` : ''}`;
 }
 document.addEventListener('click', e => { const b = e.target.closest?.('[data-dx="extf"]'); if (b) dx_dialog(); });
 

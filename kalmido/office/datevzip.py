@@ -27,7 +27,7 @@ from ..core.db import db
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .calc import dec, dstr, money
-from .model import office_gate, office_org, office_settings
+from .model import office_gate, office_need_feature, office_org, office_settings
 from .ledger import ofx_log
 
 DZ_NS = uuid.UUID("6f0a4c2e-1d8b-4f7e-9a3c-5b2d8e7f1a90")  # the name space of Kalmido's receipt GUIDs (never change)
@@ -206,6 +206,7 @@ def dz_zip_get():
     c = db()
     uid = office_gate(c)
     oid = office_org(c, uid, admin=True)
+    office_need_feature(c, oid, "books.datev")  # 2.147.0 (#2460): the country switch also closes the ZIP
     d_from, d_to = _period()
     u = g.user
     by = (u["display_name"] if "display_name" in u.keys() else "") or u["username"]
