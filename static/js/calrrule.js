@@ -3,14 +3,6 @@
 // has a "Custom…" entry that opens this small dialog; the result is a plain RRULE body (without the end, the editor's own
 // "Ends" row keeps that). Parts the form cannot show (BYMONTH, ...) are kept as they are.
 const CRR_FREQS = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'];
-const CRR_ORD = [N_('first|nth'), N_('second|nth'), N_('third|nth'), N_('fourth|nth')];
-// the n-th weekday of a parsed rule ({BYDAY: '2TU'} or {BYDAY: 'TU', BYSETPOS: '2'}) -> {pos: 1..4 | -1, wd}, else null
-function crr_nthOf(p) {
-  const m = /^(-?\d)([A-Z]{2})$/.exec(p.BYDAY || '');
-  const pos = m ? +m[1] : /^[A-Z]{2}$/.test(p.BYDAY || '') && /^-?\d$/.test(p.BYSETPOS || '') ? +p.BYSETPOS : 0, wd = m ? m[2] : p.BYDAY;
-  return pos && RR_WD.includes(wd) ? {pos: pos > 0 && pos < 5 ? pos : -1, wd} : null;
-}
-
 // the rule body -> the form's state; `start` (YYYY-MM-DD...) supplies the defaults (its day, weekday, n-th weekday)
 function crr_parse(base, start) {
   const p = /** @type {Record<string, string>} */ ({});
@@ -40,8 +32,6 @@ function crr_build(st) {
   return [...parts, ...st.rest].join(';');
 }
 const crr_ordWord = pos => pos < 0 ? tr('last|nth') : tr(CRR_ORD[pos - 1]);
-// "the second Tuesday" / "the last Friday" for the monthly label
-const crr_nthLabel = (pos, wd) => (pos < 0 ? tr('on the last {0}', WDL[RR_WD.indexOf(wd)]) : tr('on the {0} {1}', tr(CRR_ORD[pos - 1]), WDL[RR_WD.indexOf(wd)]));
 
 function crr_html(st) {
   const plural = trn('day', 'days', st.n), units = [['DAILY', plural], ['WEEKLY', trn('week', 'weeks', st.n)], ['MONTHLY', trn('month', 'months', st.n)], ['YEARLY', trn('year', 'years', st.n)]];

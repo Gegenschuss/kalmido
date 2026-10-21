@@ -151,6 +151,7 @@ async function evEditor(o = {}) {
     st.occEnd = ov?.end || (ev.all_day ? addDays(o.occ, Math.max(1, diffDays(ev.start.slice(0, 10), ev.end.slice(0, 10)))) : evAddMin(o.occ, evMin(ev.start, ev.end)));
   }
   const people = await evPeople();
+  await loadModule('calrrule').catch(() => { /* offline without the copy: the list has no own rules */ });  // 2.155.0 C (#2075)
   const ppl = new Map(people.map(u => [u.id, u.display_name]));
   const atts = (st.attendees || []).map(a => ({...a}));
   const endDay = s => st.all_day ? addDays(s, -1) : s.slice(0, 10);  // all day: the shown end is the last day (stored exclusive)
@@ -193,7 +194,7 @@ async function evEditor(o = {}) {
     evi_draw(md, atts);  // 2.111.0 B (#2056): the invitation switch (evinvite.js)
   };
   drawRems(); drawAtts(); dvw_rows(md); evi_init(md, ev, atts);
-  crr_wire(md, st, () => val('ev-sd') || st.start);  // 2.155.0 C (#2075)
+  if (typeof crr_wire === 'function') crr_wire(md, st, () => val('ev-sd') || st.start);  // 2.155.0 C (#2075)
   const attList = async q => {  // suggestions: people of this server + contacts (name / e-mail)
     const opts = people.filter(u => !atts.some(a => a.user_id === u.id) && (!q || u.display_name.toLowerCase().includes(q.toLowerCase()))).slice(0, 8).map(u => ({v: u.display_name, k: 'u' + u.id}));
     if (feat('contacts') && q.length >= 2) {

@@ -23,7 +23,8 @@ const LD_MODS = {
   mindmap: ['mindmap'],
   wiki: ['wiki', 'wkshare', 'wkhist', 'wkembed'],  // 2.123.0 B (#2104): wkshare.js = shares; A (#2102, #2106): wkhist.js = history + text search; C (#2103, #2107, #2108): wkembed.js = Ablage pictures, links, checkboxes
   stats: ['stats'],
-  calendar: ['calview', 'caldrag', 'apptbook'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings
+  calendar: ['calview', 'caldrag', 'apptbook', 'calyear'],  // 2.155.0 C (#2078): calyear.js = the year view
+  calrrule: ['calrrule'],  // 2.155.0 C (#2075): the own repeat rule dialog, loaded by the event editor  // 2.94.0 B (#1929): apptbook.js = appointment booking settings
   docs: ['docs', 'paperless', 'receipts'],
   life: ['life', 'devlink'],  // 2.140.0 B (#2136): devlink.js = a device <-> office equipment
   integrations: ['integrations'],
