@@ -37,14 +37,14 @@ function calByDay(lo, hi) {
   for (const t of S.tasks.values()) {
     if (!t.due || t.due < lo || t.due > hi || archivedTask(t) || t.context) continue;  // a participant's context parent is not theirs
     if (t.status && !showDoneCal()) continue;
-    if (!cvxTaskOn(t)) continue;  // 2.36.1 (#1127): tasks / lists switched off for the calendar views
+    if (S.lcal ? !lcal_has(t) : !cvxTaskOn(t)) continue;  // 2.36.1 (#1127): tasks / lists switched off for the calendar views; 2.156.0 C (#2071): a list's calendar = only its tasks
     add(t.due, t);
   }
   // future repeats of recurring tasks (server-computed RRULE), shown as ghosts. While a newer answer loads, the old
   // items stay visible; one whose task lost its repeat or moved past that day is dropped right away
   for (const o of S.occ.items) {
     const t = S.tasks.get(o.id);
-    if (t && t.status === 0 && t.repeat && t.due && o.date > t.due && o.date >= lo && o.date <= hi && !archivedTask(t) && cvxTaskOn(t)) add(o.date, {...t, due: o.date, ghost: true});
+    if (t && t.status === 0 && t.repeat && t.due && o.date > t.due && o.date >= lo && o.date <= hi && !archivedTask(t) && (S.lcal ? lcal_has(t) : cvxTaskOn(t))) add(o.date, {...t, due: o.date, ghost: true});
   }
   for (const a of byDay.values()) a.sort((a, b) => a.status - b.status || (a.due_time || '99').localeCompare(b.due_time || '99') || b.priority - a.priority);
   ensureOcc(lo, hi);
@@ -66,14 +66,16 @@ async function ensureOcc(lo, hi) {
     const j = await api('GET', `/api/occurrences?from=${lo}&to=${hi}`);
     if (S.occ.want !== key) return;  // a newer request replaced this one
     S.occ = {key, items: j.items, want: ''};
-    if (S.route.mod === 'cal') renderView();
+    if (S.route.mod === 'cal' || isListCal()) renderView();  // 2.156.0 C (#2071): + a list's calendar
   } catch { if (S.occ.want === key) S.occ.want = ''; }
 }
 // ------------------------------------------------------------------ external calendars (read-only events)
 // Events of the user's calendar subscriptions (Settings > Integrations > Calendars), synced by the server. Fetched
 // per visible range (not part of /api/state), kept in S.cal; the last few ranges stay in localStorage for offline
 // use. Events never behave like tasks: no drag, no checkbox; a click opens a small popover (cevPop).
-const calEvOn = () => !!((S.calendars?.enabled && S.calendars.subs > 0) || (feat('events') && ((S.evcals || []).length || S.cal.items.some(e => e.own) || +String(S.evsig || '').split('|')[0] > 0)) || abcOn());  // 2.21.0 (#659): own events too; 2.102.0 A (#2006): invitations alone
+// 2.156.0 C (#2071): S.lcal = the list whose calendar view is being drawn (listcal.js): only its tasks, no events
+const lcal_has = t => t.list_id === S.lcal || ml_in(t, S.lcal);
+const calEvOn = () => !S.lcal && !!((S.calendars?.enabled && S.calendars.subs > 0) || (feat('events') && ((S.evcals || []).length || S.cal.items.some(e => e.own) || +String(S.evsig || '').split('|')[0] > 0)) || abcOn());  // 2.21.0 (#659): own events too; 2.102.0 A (#2006): invitations alone
 // 2.155.0 B (#2076): public holidays / absences come with the events answer (hub/abscal.py), switched in the "Calendars" window
 const abcOn = () => !S.me?.kid && (S.settings?.cal_holidays !== '0' || S.settings?.cal_abs !== '0' || S.settings?.cal_abs_team === '1');
 const abcX = e => e.holiday || e.absence;  // a read-only holiday / absence entry
@@ -233,6 +235,7 @@ async function calReq(method, url, body) {
   catch (e) { throw new Error(e instanceof Offline ? tr('Offline: only works again with a connection') : e.message); }
 }
 function calBar(title, done = true, extra = '') {
+  if (S.lcal && typeof lcal_bar === 'function') return lcal_bar(title, done);  // 2.156.0 C (#2071): a list's calendar (listcal.js)
   // 1.8.1: completed tasks in the calendar, per user (show_done_views entry "cal", shown unless hidden here)
   const on = showDoneCal(), dn = done ? `<button class="btn sm chip ${on ? 'on' : ''}" data-act="cal-done" aria-pressed="${on}" aria-label="${esc(tr('Completed'))}" title="${esc(on ? tr('Hide completed') : tr('Show completed'))}">${ic('eye', 's')}<span class="cdl">${tr('Completed')}</span></button>` : '';
   const modes = [['month', N_('Month')], ['week', N_('Week')], ['day', N_('Day')], ['year', N_('Year')], ...(feat('events') ? [['agenda', N_('Agenda')]] : []), ...(feat('timeline') ? [['timeline', N_('Timeline')]] : [])].map(([k, n]) => [k, tr(n)]);

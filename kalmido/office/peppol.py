@@ -409,6 +409,8 @@ def pep_missing(c, oid, r, conf=None):
         out.append("feature")
     if r["kind"] not in ("invoice", "credit") or not ofx_locked(r) or r["status"] == "cancelled":  # 2.154.0 E (#1960): no cancelled ones
         out.append("kind")
+    elif "trial" in r.keys() and r["trial"]:  # 2.144.10 (#2576): a trial document never leaves as an e-invoice
+        out.append("kind")
     if not conf["provider"]:
         out.append("setup")
     elif not conf["secret"]:

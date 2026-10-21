@@ -1,23 +1,24 @@
 """2.43.0 (#1328): formula fields -- a small calculator over the number fields of a list, computed on the server.
 
-Syntax: + - * /, brackets, numbers (decimal point), field names ({Field name} or a single word) and round(x, n) as the only
-function. Stored with field ids ({#12}), shown with the current names, so renaming a field keeps every formula working.
-Never eval: a tokenizer and a recursive descent parser build a tiny tree that is evaluated per task. Division by zero
-gives an empty value; empty fields count as 0 (or make the result empty, the field's setting "empty": "blank")."""
+Field names ({Field name} or a single word) are stored with field ids ({#12}), shown with the current names, so renaming a field
+keeps every formula working. Empty fields count as 0 (or make the result empty, the field's setting "empty": "blank").
+2.156.0 B (#2070): the formula engine of tables (sheets/formula.py: tokenizer, parser, evaluation) does the work, so lists get
+comparisons (= <> < > <= >=), WENN/IF, SUMME/SUM, RUNDEN/ROUND, MIN, MAX, MITTELWERT/AVERAGE and ANZAHL/COUNT with German and
+English names, ";" or "," between arguments, like in tables. Every other part of the typed formula is stored as typed. A mistake
+in the formula is refused when it is saved (with the position); a calculation that fails for one task (division by 0, a value
+that is no number) gives a short error value "#div0" / "#type" -- or an empty result while none of the fields it reads has a
+value yet. Never eval."""
 import json
 import math
-import re
 
 from ..core.i18n import tr
 from ..core.errors import BadInput
+from ..sheets.formula import SH_BOOLS, ShErr, ShEval, _Parser as _ShParser, sh_fn_key, sh_parse, sh_tokens
 
-FX_REF_TYPES = ("number", "formula", "checkbox")   # what a formula may read
+FX_REF_TYPES = ("number", "formula", "checkbox", "currency", "rating")  # what a formula may read; 2.156.0 B (#2069): + currency, rating
 FX_MAX_LEN = 500
-# 2.144.5 C (#1523): explicit depth limits like the sheets (SH_MAX_DEPTH / SH_MAX_NEST); RecursionError stays caught as a net
-FX_MAX_DEPTH = 200  # depth of the tree (1+1+...+1 nests to the left)
-FX_MAX_NEST = 64  # brackets / round() / signs inside each other
-_WORD = re.compile(r"[^\W\d]\w*")
-_NUM = re.compile(r"\d+(\.\d+)?|\.\d+")
+FX_FUNCS = ("sum", "avg", "min", "max", "count", "if", "round")  # 2.156.0 B (#2070): the functions of tables a list formula may use
+FX_ERRORS = ("div0", "type")  # 2.156.0 B (#2070): error values of a result ("#div0"), shown as a short text by the client
 
 
 class FxError(BadInput):
@@ -28,142 +29,117 @@ def _err(msg, pos):
     return FxError(tr("Formula: {0} (at character {1})", msg, pos + 1))
 
 
-def fx_tokens(s):
-    """[(kind, value, pos)]: kind num | ref (name or #id) | op | ( | ) | , | fn."""
-    out, i, n = [], 0, len(s)
+def _mask(s):
+    """2.156.0 B (#2070): the formula with every {…} turned into a reference the tables' tokenizer reads: {#12} -> {c:12},
+    {Name} -> {x:<n>} (n = index into names). Returns (masked text, names, map of each masked character to the typed one)."""
+    out, pm, names, i, n, quote = [], [], [], 0, len(s), False
     while i < n:
         ch = s[i]
-        if ch.isspace():
-            i += 1
-            continue
-        if ch in "+-*/":
-            out.append(("op", ch, i))
-            i += 1
-            continue
-        if ch in "(),":
-            out.append((ch, ch, i))
-            i += 1
-            continue
-        if ch == "{":
+        if ch == '"':
+            quote = not quote
+        if ch == "{" and not quote:
             j = s.find("}", i + 1)
             if j < 0:
                 raise _err(tr("a “}” is missing"), i)
             name = s[i + 1:j].strip()
             if not name:
                 raise _err(tr("a field name is missing"), i)
-            out.append(("ref", name, i))
+            if name.startswith("#") and name[1:].isdigit() and len(name) < 19:
+                rep = "{c:%d}" % int(name[1:])
+            else:
+                rep = "{x:%d}" % len(names)
+                names.append(name)
+            out.append(rep)
+            pm.extend([i] * len(rep))
             i = j + 1
             continue
-        m = _NUM.match(s, i)
-        if m:
-            if not math.isfinite(float(m.group())):  # review S1: "999...9" is inf
-                raise _err(tr("Invalid value: {0}", m.group()[:20]), i)
-            out.append(("num", float(m.group()), i))
-            i = m.end()
-            continue
-        m = _WORD.match(s, i)
-        if m:
-            w = m.group()
-            out.append(("fn" if w.lower() == "round" else "ref", w, i))
-            i = m.end()
-            continue
-        raise _err(tr("“{0}” is not allowed", ch), i)
-    return out
+        out.append(ch)
+        pm.append(i)
+        i += 1
+    return "".join(out), names, pm
 
 
-class _Parser:
-    """Recursive descent: expr = term (+|- term)*, term = factor (*|/ factor)*, factor = -factor | num | ref |
-    round(expr[, num]) | (expr). Nodes: ("n", x) ("r", key) ("neg", a) ("+"/"-"/"*"/"/", a, b) ("round", a, digits)."""
+def _is_ref(tok):
+    k, v = tok[0], tok[1]
+    return k in ("idref", "a1", "xref") or (k == "ident" and str(v).lower() not in SH_BOOLS)
 
-    def __init__(self, toks, resolve, end):
-        self.t, self.i, self.resolve, self.end, self.nest = toks, 0, resolve, end, 0
 
-    def deeper(self):
-        self.nest += 1
-        if self.nest > FX_MAX_NEST:
-            raise FxError(tr("The formula is nested too deeply"))
+def _ref_key(tok, masked, names):
+    """The name of a reference token ("#12" for a stored id), None when it is no field reference."""
+    k, v, a, b = tok
+    if k == "idref":
+        if v[2]:
+            return None
+        if v[0] == "c":
+            return "#%d" % v[1]
+        return names[v[1]] if v[0] == "x" and v[1] < len(names) else None
+    if k in ("ident", "a1"):
+        return masked[a:b]
+    return None
 
-    def peek(self):
-        return self.t[self.i] if self.i < len(self.t) else (None, None, self.end)
 
-    def take(self, kind, what):
-        k, v, p = self.peek()
-        if k != kind:
-            raise _err(tr("{0} expected", what), p)
-        self.i += 1
-        return v
+def _parse(text, lookup):
+    """(tree, tokens, masked) of a formula; lookup(name, position) -> field id (raises BadInput). Raises FxError with the
+    position: a sign that is not allowed, an unknown function, brackets, the end."""
+    masked, names, pm = _mask(text)
 
-    def parse(self):
-        if not self.t:
-            raise _err(tr("the formula is empty"), 0)
-        node = self.expr()
-        k, v, p = self.peek()
-        if k is not None:
-            raise _err(tr("“{0}” is not expected here", v if k != "num" else fmt_fx(v)), p)
-        stack = [(node, 1)]  # 2.144.5 C (#1523): checked without recursion, render/eval recurse over the tree
-        while stack:
-            n, d = stack.pop()
-            if d > FX_MAX_DEPTH:
-                raise FxError(tr("The formula is nested too deeply"))
-            stack.extend((a, d + 1) for a in n[1:] if isinstance(a, tuple))
-        return node
+    def pos(k):
+        return pm[k] if 0 <= k < len(pm) else len(text)
+    try:
+        toks = sh_tokens(masked)
+    except ShErr as e:
+        d = '"' if e.detail == "quote" else (e.detail or "")[:12]
+        k = masked.find(d) if d else -1
+        raise _err(tr("“{0}” is not allowed", d), pos(k) if k >= 0 else 0) from None
+    for k, v, a, _b in toks:
+        if k == "fn" and sh_fn_key(v) not in FX_FUNCS:
+            raise _err(tr("unknown function “{0}”", v), pos(a))
+        if k in (":", "xref"):
+            raise _err(tr("“{0}” is not allowed", masked[a:_b][:12]), pos(a))
 
-    def expr(self):
-        a = self.term()
-        while self.peek()[0] == "op" and self.peek()[1] in "+-":
-            op = self.t[self.i][1]
-            self.i += 1
-            a = (op, a, self.term())
-        return a
+    def res(tok):
+        key = _ref_key(tok, masked, names)
+        if key is None:
+            raise _err(tr("“{0}” is not allowed", masked[tok[2]:tok[3]][:12]), pos(tok[2]))
+        return ("cell", lookup(key, pos(tok[2])))
+    if not toks:
+        raise _err(tr("the formula is empty"), 0)
+    try:
+        tree = sh_parse(masked, res)
+    except ShErr as e:
+        if e.kind == "syntax" and e.detail == "deep":  # 2.144.5 C (#1523): the sheets' depth limits, named as before
+            raise FxError(tr("The formula is nested too deeply")) from None
+        if e.kind != "syntax":
+            raise BadInput(tr("Invalid value: {0}", "formula")) from None
+        p = _ShParser(toks, res)  # again, to know where it stopped
+        try:
+            p.parse()
+        except ShErr:
+            pass
+        if e.detail == ")":
+            raise _err(tr("{0} expected", "“)”"), pos(toks[p.i][2] if p.i < len(toks) else len(masked))) from None
+        if p.i >= len(toks):
+            raise _err(tr("the formula ends too early"), len(text)) from None
+        t = toks[p.i]
+        raise _err(tr("“{0}” is not expected here", masked[t[2]:t[3]][:20]), pos(t[2])) from None
+    except RecursionError:  # review S1: "-(-(-(..." nested deeper than Python's stack -> 400, not 500
+        raise BadInput(tr("Invalid value: {0}", "formula")) from None
+    for k, v, a, _b in toks:  # 2.43.0 (#1328): round(value, digits) with digits 0 to 6 when typed as a number
+        if k == "fn" and sh_fn_key(v) == "round":
+            _fx_round_digits(tree, pos(a))
+            break
+    return tree, toks, masked, names
 
-    def term(self):
-        a = self.factor()
-        while self.peek()[0] == "op" and self.peek()[1] in "*/":
-            op = self.t[self.i][1]
-            self.i += 1
-            a = (op, a, self.factor())
-        return a
 
-    def factor(self):
-        k, v, p = self.peek()
-        if k == "op" and v in "+-":
-            self.i += 1
-            self.deeper()
-            f = self.factor()
-            self.nest -= 1
-            return ("neg", f) if v == "-" else f
-        if k == "num":
-            self.i += 1
-            return ("n", v)
-        if k == "ref":
-            self.i += 1
-            return ("r", self.resolve(v, p))
-        if k == "fn":
-            self.i += 1
-            self.take("(", "“(”")
-            self.deeper()
-            a = self.expr()
-            self.nest -= 1
-            digits = 0
-            if self.peek()[0] == ",":
-                self.i += 1
-                k2, v2, p2 = self.peek()
-                if k2 != "num" or v2 != int(v2) or v2 > 6:
-                    raise _err(tr("round(value, digits): digits 0 to 6"), p2)
-                self.i += 1
-                digits = int(v2)
-            self.take(")", "“)”")
-            return ("round", a, digits)
-        if k == "(":
-            self.i += 1
-            self.deeper()
-            a = self.expr()
-            self.nest -= 1
-            self.take(")", "“)”")
-            return a
-        if k is None:
-            raise _err(tr("the formula ends too early"), p)
-        raise _err(tr("“{0}” is not expected here", v), p)
+def _fx_round_digits(node, at):
+    if isinstance(node, tuple):
+        if node[0] == "fn" and node[1] == "round" and len(node[2]) > 1 and node[2][1] and node[2][1][0] == "n":
+            d = node[2][1][1]
+            if d != int(d) or not 0 <= d <= 6:
+                raise _err(tr("round(value, digits): digits 0 to 6"), at)
+        for a in node[1:]:
+            for x in (a if isinstance(a, list) else [a]):
+                _fx_round_digits(x, at)
 
 
 def fmt_fx(x):
@@ -172,37 +148,53 @@ def fmt_fx(x):
 
 
 def fx_refs(node, acc=None):
+    """The field ids a tree reads."""
     acc = set() if acc is None else acc
-    if node[0] == "r":
-        acc.add(node[1])
-    elif node[0] in ("neg", "round"):
-        fx_refs(node[1], acc)
-    elif node[0] in "+-*/":
-        fx_refs(node[1], acc)
-        fx_refs(node[2], acc)
+    if isinstance(node, tuple):
+        if node[0] == "cell":
+            acc.add(node[1])
+            return acc
+        for a in node[1:]:
+            for x in (a if isinstance(a, list) else [a]):
+                fx_refs(x, acc)
     return acc
 
 
 _CACHE = {}
 
 
+def _stored_lookup(v, p):
+    if not v.startswith("#") or not v[1:].isdigit():
+        raise _err(tr("unknown field “{0}”", v), p)
+    return int(v[1:])
+
+
 def fx_tree(expr):
     """Tree of a stored formula ({#id} refs); None when it cannot be read (a deleted field...)."""
     if expr in _CACHE:
         return _CACHE[expr]
-
-    def res(v, p):
-        if not v.startswith("#") or not v[1:].isdigit():
-            raise _err(tr("unknown field “{0}”", v), p)
-        return int(v[1:])
     try:
-        t = _Parser(fx_tokens(expr), res, len(expr)).parse()
+        t = _parse(expr, _stored_lookup)[0]
     except (BadInput, RecursionError):  # 2.43.0 (#1328): review S1, deep nesting
         t = None
     if len(_CACHE) > 2000:
         _CACHE.clear()
     _CACHE[expr] = t
     return t
+
+
+def _rebuild(toks, masked, names, ref_text):
+    """The formula text with every field reference replaced by ref_text(key); everything else as typed."""
+    out, last = [], 0
+    for tok in toks:
+        if not _is_ref(tok):
+            continue
+        key = _ref_key(tok, masked, names)
+        out.append(masked[last:tok[2]])
+        out.append(ref_text(key))
+        last = tok[3]
+    out.append(masked[last:])
+    return "".join(out).strip()
 
 
 def fx_compile(text, fields, self_id=None):
@@ -215,7 +207,7 @@ def fx_compile(text, fields, self_id=None):
     for f in fields:
         by_name.setdefault(f["name"].strip().casefold(), f)
 
-    def res(v, p):
+    def find(v, p):
         f = None
         if v.startswith("#") and v[1:].isdigit():
             f = next((x for x in fields if x["id"] == int(v[1:])), None)
@@ -227,41 +219,22 @@ def fx_compile(text, fields, self_id=None):
         if f["type"] not in FX_REF_TYPES:
             raise BadInput(tr("Formula: “{0}” is not a number field", f["name"]))
         return f["id"]
-    try:
-        tree = _Parser(fx_tokens(text), res, len(text)).parse()
-        return fx_render(tree), fx_refs(tree)
-    except RecursionError:  # review S1: "-(-(-(..." nested deeper than Python's stack -> 400, not 500
-        raise BadInput(tr("Invalid value: {0}", "formula")) from None
-
-
-_PREC = {"+": 1, "-": 1, "*": 2, "/": 2}
-
-
-def fx_render(node, names=None, prec=0):
-    """The tree as text: {#id} (names None) or {Name}."""
-    k = node[0]
-    if k == "n":
-        return fmt_fx(node[1])
-    if k == "r":
-        if names is None:
-            return "{#%d}" % node[1]
-        nm = names.get(node[1])
-        return "{%s}" % nm if nm is not None else "{?}"
-    if k == "neg":
-        return "-" + fx_render(node[1], names, 3)
-    if k == "round":
-        return "round(%s%s)" % (fx_render(node[1], names), ", %d" % node[2] if node[2] else "")
-    p = _PREC[k]
-    s = "%s %s %s" % (fx_render(node[1], names, p), k, fx_render(node[2], names, p + (1 if k in "-/" else 0)))
-    return "(" + s + ")" if p < prec else s
+    tree, toks, masked, names = _parse(text, find)
+    return _rebuild(toks, masked, names, lambda k: "{#%d}" % find(k, 0)), fx_refs(tree)
 
 
 def fx_display(expr, fields):
     """Stored formula -> text with the current field names (shown in the field's dialog)."""
-    t = fx_tree(expr or "")
-    if t is None:
+    if fx_tree(expr or "") is None:
         return ""
-    return fx_render(t, {f["id"]: f["name"] for f in fields})
+    nm = {f["id"]: f["name"] for f in fields}
+    masked, names, _ = _mask(expr)
+    toks = sh_tokens(masked)
+
+    def name(k):
+        n = nm.get(int(k[1:])) if k and k.startswith("#") and k[1:].isdigit() else None
+        return "{%s}" % n if n is not None else "{?}"
+    return _rebuild(toks, masked, names, name)
 
 
 def fx_check_cycles(fields, fid, refs):
@@ -284,34 +257,21 @@ def fx_check_cycles(fields, fid, refs):
         stack.extend(deps.get(x, ()))
 
 
-def _eval(node, get):
-    k = node[0]
-    if k == "n":
-        return node[1]
-    if k == "r":
-        return get(node[1])
-    if k == "neg":
-        a = _eval(node[1], get)
-        return None if a is None else -a
-    if k == "round":
-        a = _eval(node[1], get)
-        return None if a is None else round(a, node[2])
-    a, b = _eval(node[1], get), _eval(node[2], get)
-    if a is None or b is None:
-        return None
-    if k == "+":
-        return a + b
-    if k == "-":
-        return a - b
-    if k == "*":
-        return a * b
-    if b == 0:
-        return None
-    return a / b
+class _FxEnv:
+    """2.156.0 B (#2070): what the tables' evaluation asks for: only cells (= fields of the task); no ranges, columns, variables."""
+    lg = "en"
+
+    def __init__(self, get):
+        self.cell = get
+
+    def _none(self, *a):
+        raise ShErr("ref")
+    rng = col = var = here = today = _none
 
 
 def fx_values(fields, vals):
-    """{field id (int): stored text} of one task -> {formula field id: text or None}. fields = rows of the task's list."""
+    """{field id (int): stored text} of one task -> {formula field id: text or None}. fields = rows of the task's list.
+    2.156.0 B (#2070): a failed calculation gives "#div0" / "#type" (None while no field it reads has a value)."""
     fx = {f["id"]: f for f in fields if f["type"] == "formula"}
     if not fx:
         return {}
@@ -327,15 +287,20 @@ def fx_values(fields, vals):
         o = json.loads(fx[fid]["options"] or "{}")
         t = fx_tree(o.get("expr") or "")
         blank = o.get("empty") == "blank"
-        miss = []
+        miss, seen = [], []
 
         def get(r):
             if typ.get(r) == "formula":
                 v = calc(r)
+                if v is not None and v.startswith("#"):
+                    seen.append(r)
+                    raise ShErr(v[1:] if v[1:] in FX_ERRORS else "type")
                 x = None if v is None else float(v)
-            elif typ.get(r) == "checkbox":
-                x = 1.0 if vals.get(r) == "1" else 0.0
-            elif typ.get(r) == "number":
+            elif typ.get(r) == "checkbox":  # unticked = 0, never empty
+                if vals.get(r) != "1":
+                    return 0.0
+                x = 1.0
+            elif typ.get(r) in ("number", "currency", "rating"):
                 try:
                     x = float(vals[r]) if vals.get(r) not in (None, "") else None
                 except ValueError:
@@ -348,18 +313,29 @@ def fx_values(fields, vals):
                     miss.append(r)
                     return None
                 return 0.0
+            seen.append(r)
             return x
-        r = None
+        r, bad = None, None
         if t is not None:
             try:
-                r = _eval(t, get)
-            except (OverflowError, ValueError):
-                r = None
-        if miss or r is None or not math.isfinite(r) or abs(r) >= 1e15:
-            r = None
-        out[fid] = None if r is None else fmt_fx(r)
+                r = ShEval(_FxEnv(get)).run(t)
+            except ShErr as e:
+                bad = e.kind if e.kind in FX_ERRORS else "type"
+            except (RecursionError, ValueError, ArithmeticError):  # review: + decimal.InvalidOperation (ROUND of a huge value)
+                bad = "type"
+        if isinstance(r, bool):
+            r = 1.0 if r else 0.0
+        if r is not None and not bad and (not isinstance(r, float) or not math.isfinite(r) or abs(r) >= 1e15):
+            bad = "type"  # a text or date as the result, or too big
+        if miss or t is None:
+            res = None
+        elif bad:
+            res = "#" + bad if seen else None
+        else:
+            res = None if r is None else fmt_fx(r)
+        out[fid] = res
         busy.discard(fid)
-        return out[fid]
+        return res
     for fid in fx:
         calc(fid)
     return out

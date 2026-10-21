@@ -37,11 +37,13 @@ TABLES = (
     "office_inv_series", "office_sub_reminders",  # 2.91.0 A (#1923), B (#1924)
     "office_dunning_marks",  # 2.147.1 B (#2054): suggested payment reminders
     "office_doc_templates", "office_gen_docs",  # 2.93.0 A (#1927): document templates and the documents made from them
+    "office_privacy_sheets",  # 2.154.0 C (#2192): data protection sheets of a client
     "office_vehicles", "office_drives", "office_drive_log",  # 2.93.0 B (#1928): the logbook
     "office_cashbooks", "office_cash_entries", "office_cash_closings", "office_cash_log",  # 2.121.0 B (#2095): the cash book
     "office_period_locks",  # 2.148.0 A (#2471): locked accounting periods
     "office_procdocs",  # 2.148.0 C (#2472): versions of the procedure documentation (GoBD)
     "office_suppliers", "office_opening_balances",  # 2.148.0 D (#2458): the DATEV import (creditors, opening balances)
+    "office_letters", "office_letter_links", "office_letter_blocks", "office_letter_profiles",  # 2.153.0 (#2028, #2030): correspondence
     "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")
     "wiki_pages",  # 2.49.0 C (#1199): knowledge pages (NULL = private, the app checks owner_id)
     "wiki_spaces",  # 2.64.3 A (#1817): the lock per knowledge space (NULL = a private space, the app checks owner_id)
@@ -51,6 +53,7 @@ TABLES = (
     "fs_nodes",  # 2.48.0 (#1207): the file store (org_id NULL = a person's own tree)
     "fs_upload_requests",  # 2.122.0 A (#2097): file requests of a folder (NULL = private, the app checks the folder)
     "doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_rules", "doc_models", "doc_cfg", "doc_mail",  # 2.48.0 (#1111): documents
+    "doc_fields", "doc_field_values",  # 2.153.0 (#2179): custom fields of documents (NULL = a person's own workspace)
     "pl_sources", "pl_imported",  # 2.48.0 (#1152): the Paperless-ngx connection + what came in
     "pl_rules",  # 2.69.0 B (#1847): where a document rule from Paperless-ngx came from
     "rc_receipts", "rc_suggest",  # 2.48.0 (#1356): receipts: project / category, the agents' suggestions
@@ -91,6 +94,8 @@ TABLES = (
     "webhooks",  # 2.115.0 A (#2061): outgoing webhooks (NULL = a person's own / an agent's, else its organisation's admins)
     "notify_channels",  # 2.142.0 A (#2145): notification channels (NULL = a person's own, else its organisation's admins)
     "org_joins",  # 2.148.1 A (#2480): invitations of existing accounts (the invited person reads its own rows in system_ctx)
+    "office_peppol", "office_peppol_sends",  # 2.154.0 B (#1960): the Peppol connection of an office area + its sends
+    "section_templates",  # 2.156.0 C (#2073): section templates (NULL = a person's own, the app checks user_id)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

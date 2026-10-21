@@ -120,7 +120,7 @@ function evZones(cur) {
   return [...new Set([cur, evTz(), ...z].filter(Boolean))];
 }
 const EV_REP = [['', N_('Does not repeat')], ['FREQ=DAILY', N_('Daily')], ['FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', N_('Weekdays')], ['W', N_('Weekly')],
-  ['W2', N_('Every 2 weeks')], ['M', N_('Monthly')], ['FREQ=YEARLY', N_('Yearly')]];
+  ['W2', N_('Every 2 weeks')], ['M', N_('Monthly')], ['FREQ=YEARLY', N_('Yearly')], ['__custom', N_('Custom…')]];  // 2.155.0 C (#2075): the own rule (calrrule.js)
 function evRepRule(k, start) {
   const d = pd(start.slice(0, 10));
   if (k === 'W') return `FREQ=WEEKLY;BYDAY=${RR_WD[d.getDay()]}`;
@@ -150,7 +150,8 @@ async function evEditor(o = {}) {
     st.occStart = ov?.start || o.occ;
     st.occEnd = ov?.end || (ev.all_day ? addDays(o.occ, Math.max(1, diffDays(ev.start.slice(0, 10), ev.end.slice(0, 10)))) : evAddMin(o.occ, evMin(ev.start, ev.end)));
   }
-  const [people] = await Promise.all([evPeople(), loadModule('evinvite').catch(() => {})]);  // 2.149.0 F (#2518): evinvite.js loads with the people
+  const [people] = await Promise.all([evPeople(), loadModule('evinvite').catch(() => {}),  // 2.149.0 F (#2518): evinvite.js loads with the people
+    loadModule('calrrule').catch(() => { /* offline without the copy: the list has no own rules */ })]);  // 2.155.0 C (#2075)
   const ppl = new Map(people.map(u => [u.id, u.display_name]));
   const atts = (st.attendees || []).map(a => ({...a}));
   const endDay = s => st.all_day ? addDays(s, -1) : s.slice(0, 10);  // all day: the shown end is the last day (stored exclusive)
@@ -188,11 +189,13 @@ async function evEditor(o = {}) {
     $('#ev-rems', md).innerHTML = all.map(m => `<button type="button" class="chip evchip ${on.has(m) ? 'on' : ''}" data-evrem="${m}" aria-pressed="${on.has(m)}">${esc(evRemLabel(m, ad))}</button>`).join('');
   };
   const drawAtts = () => {
+    efb_go(md, atts, ev);  // 2.155.0 B (#2077): the availability bar (calabs.js)
     $('#ev-atts', md).innerHTML = atts.length ? atts.map((a, i) => `<span class="evatp ps-${esc(a.partstat || 'needs-action')}">${a.user_id ? av(a.user_id, a.name || ppl.get(a.user_id) || '') : ic(a.contact_id ? 'user' : 'at', 's')}<span>${esc(a.name || ppl.get(a.user_id) || a.email)}</span><span class="muted evps">${esc(tr(EV_PS_WORD[a.partstat || 'needs-action']))}</span><button type="button" class="iconbtn" data-evatrm="${i}" aria-label="${esc(tr('Remove {0}', a.name || a.email || ''))}">${ic('x', 's')}</button></span>`).join('')
       : `<span class="muted">${tr('Only you')}</span>`;
     if (typeof evi_draw === 'function') evi_draw(md, atts);  // 2.111.0 B (#2056): the invitation switch (evinvite.js)
   };
   drawRems(); drawAtts(); dvw_rows(md); if (typeof evi_init === 'function') evi_init(md, ev, atts);
+  if (typeof crr_wire === 'function') crr_wire(md, st, () => val('ev-sd') || st.start);  // 2.155.0 C (#2075)
   const attList = async q => {  // suggestions: people of this server + contacts (name / e-mail)
     const opts = people.filter(u => !atts.some(a => a.user_id === u.id) && (!q || u.display_name.toLowerCase().includes(q.toLowerCase()))).slice(0, 8).map(u => ({v: u.display_name, k: 'u' + u.id}));
     if (feat('contacts') && q.length >= 2) {
@@ -355,10 +358,11 @@ async function evCalsModal() {
       <i class="cevdot"></i><span class="evcn">${esc(c.name)}</span>${sw(c.key, 'show', c.on, false, tr('Show {0} in my calendar', c.name))}${three(c)}
       <button class="iconbtn" data-cvxmenu="${c.key}" data-name="${esc(c.name)}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', c.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`).join('')
       : `<p class="muted">${tr('No subscriptions yet. Add one under Settings > Integrations > Calendars.')}</p>`}`;
-    $('#evc-body', md).innerHTML = tl + own + sb;
+    $('#evc-body', md).innerHTML = tl + own + sb + (typeof abc_group === 'function' ? abc_group() : '');  // 2.155.0 B (#2076)
   };
   await cvxCals(true).catch(() => {});
   draw();
+  loadModule('calabs').then(() => { abc_wire(md, draw); draw(); }).catch(() => {});  // 2.155.0 B (#2076): holidays + absences
   const redraw = () => { cvxRedraw(); draw(); };
   const refresh = async () => { await load().catch(() => {}); await cvxCals(true).catch(() => {}); redraw(); };
   md.addEventListener('change', async e => {
@@ -487,7 +491,7 @@ function davGuide() {
     ${step(tr('Thunderbird'), [tr('Calendar: New Calendar > On the network, user name and the address {0}; Thunderbird finds every calendar.', `<code>${esc(base)}</code>`),
       tr('Contacts: Address book > New address book > Add CardDAV address book, the same address and user name.'),
       tr('Enter the app password when Thunderbird asks for it.')])}
-    <div class="shint">${tr('Sharing a calendar or an address book with someone puts it into their phone too. Events you are invited to appear in a calendar “Invitations” (read-only).')}</div>
+    <div class="shint">${tr('Sharing a calendar or an address book with someone puts it into their phone too. Events you are invited to appear in a calendar “Invitations”; answer them there or in the app.')}</div>
     <div class="foot"><span class="spacer"></span><button class="btn pri" data-dg="close">${tr('Done')}</button></div>`);
   md.classList.add('dgmodal');
   md.addEventListener('click', e => {
