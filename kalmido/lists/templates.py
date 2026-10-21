@@ -563,6 +563,9 @@ def list_duplicate(lid):
     org = src["org_id"] if src["org_id"] is None or src["org_id"] in user_orgs_full(c, uid, write=True) else "auto"
     if org != "auto":
         g.list_keep = ("org_id",)  # list_created: the original's workspace beats the folder's default (like an explicit org_id)
+    elif src["org_id"]:  # 2.148.1 B (#2483): a copy of an organisation's list outside it only by its admin (logged)
+        from ..accounts.orgout import org_out
+        org_out(c, src["org_id"], None, "list", d["name"], list_id=lid)
     new = tpl_apply_list(c, uid, d, name, folder, base, org_id=org)
     bump(c)
     c.commit()

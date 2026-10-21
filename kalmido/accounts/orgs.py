@@ -392,6 +392,8 @@ def list_org_set(c, lid, v):
         raise Denied(409, tr(WS_MSG_PRIVATE_ONLY))
     if (oid or None) == (list_org(c, lid) or None):
         return False
+    from .orgout import org_out  # 2.148.1 B (#2483): out of an organisation only through its admin (logged, admins told)
+    org_out(c, lr["org_id"], oid, "list", c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], list_id=lid)
     for (uid,) in c.execute("SELECT user_id FROM list_members WHERE list_id=? ORDER BY user_id", (lid,)).fetchall():
         ws_check_member(c, lid, uid, org_id=oid or 0)
     c.execute("UPDATE lists SET org_id=? WHERE id=?", (oid, lid))

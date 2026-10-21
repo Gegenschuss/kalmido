@@ -403,8 +403,18 @@ def user_delete(uid):
     return jsonify(ok=True, lists=n)
 
 
+UP_RETENTION = N_("Retention duty: the personal office holds finalised documents or cash book entries, so the account cannot be deleted. Export the office first and disable the account instead.")
+
+
 def user_purge(c, uid):
     """Deletes user uid (no own lists besides the inbox left; the caller checked and commits). Returns the files to unlink."""
+    with system_ctx(c):  # 2.148.1 B (#2479): retention -- finalised documents / cash book of the personal office never go along
+        kept = c.execute("""SELECT 1 FROM orgs o WHERE o.personal_of=? AND (
+                              EXISTS (SELECT 1 FROM office_docs d WHERE d.org_id=o.id AND d.locked_at IS NOT NULL)
+                              OR EXISTS (SELECT 1 FROM office_cash_entries e WHERE e.org_id=o.id)
+                              OR EXISTS (SELECT 1 FROM office_cash_log x WHERE x.org_id=o.id))""", (uid,)).fetchone()
+    if kept:
+        raise Denied(409, tr(UP_RETENTION))
     inbox = [r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=?", (uid,))]
     files = attachment_files(c, [r[0] for r in c.execute(
         f"SELECT id FROM tasks WHERE list_id IN ({','.join('?' * len(inbox)) or 'NULL'})", inbox)])

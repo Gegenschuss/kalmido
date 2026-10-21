@@ -422,7 +422,7 @@ def doc_public(c, oid, r, admin, items=True):
             d["parts"] = tp_public(c, oid, r, admin)
             d["parts_shoot"] = tp_shoot_ok(c, oid)
         from .contacts_cl import fk_contacts
-        d["client_contacts"] = fk_contacts(c, r["client_id"]) if r["client_id"] else []  # 2.40.0 (#1380): the choice of contact_id
+        d["client_contacts"] = fk_contacts(c, r["client_id"], oid) if r["client_id"] else []  # 2.40.0 (#1380); 2.148.1 B (#2484): same area only
         d["contract"] = _contract(c, oid, d.get("contract_id"))
         if d["contract"]:
             d["contract"] = {k: d["contract"][k] for k in ("id", "name", "raw_included", "rates", "rights_time_id", "rights_territory_id",

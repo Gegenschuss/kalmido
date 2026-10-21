@@ -247,7 +247,7 @@ check(r.ok and not r.json()["can_delete"] and r.json()["org_id"] == ORG and any(
       "org admin: delete-info says no + names the members for Remove " + r.text[:300])
 check(deluser(Er, "alice").status_code in (403, 400), "org admin: the server admin -> 403")
 KP = mklist(Ki, "Kim private")
-check(deluser(Er, "kim", lists="transfer", to=uid["bob"]).status_code == 403, "org admin: an account with private lists -> 403")
+check(deluser(Er, "kim", lists="transfer", to=uid["bob"]).status_code == 409, "org admin: an account with private lists -> 409")  # 2.148.1 (#2479): 409 + areas
 r = Er.get(B + f"/api/users/{uid['kim']}/delete-info")
 check(r.ok and not r.json()["can_delete"], "org admin: delete-info for private lists: no " + r.text[:200])
 check(Ki.get(B + f"/api/lists/{KP}/owner").json().get("owner", {}).get("id") == uid["kim"], "Kim's private list untouched")
@@ -264,7 +264,7 @@ check(No.post(B + "/api/tasks", json={"title": "Call the dentist"}).ok, "setup: 
 r = Er.get(B + f"/api/users/{uid['nora']}/delete-info")
 check(r.ok and not r.json()["can_delete"] and "private space" in r.json().get("reason", "") and r.json()["org_id"] == ORG,
       "N1: delete-info: no, only Remove from the organisation " + r.text[:300])
-check(deluser(Er, "nora").status_code == 403, "N1: org admin cannot delete an account with a basket task")
+check(deluser(Er, "nora").status_code == 409, "N1: org admin cannot delete an account with a basket task")  # 2.148.1 (#2479): 409 + areas
 check(No.get(B + "/api/me").ok, "N1: Nora's account is still there")
 check(A.get(B + f"/api/users/{uid['nora']}/delete-info").json().get("can_delete") is True, "N1: the server admin still may")
 # remove from the organisation with a chosen heir

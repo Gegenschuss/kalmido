@@ -228,6 +228,8 @@ function newsText(it, U) {
       ltrash: tr('{0} moved your list {1} to the trash (list admin)', who, q(d.name || '')),
       lrename: tr('{0} renamed your list {1} to {2} (list admin)', who, q(d.old || ''), q(d.name || '')),  // 2.40.0 (#1431)
       owner: tr('{0} handed the list {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || '')),
+      moveout: tr('{0} moved {1} out of the organisation {2}', who, q(d.name || ''), q(d.org || '')),  // 2.148.1 B (#2483)
+      takeover: tr('{0} (server admin) handed your list {1} to {2}', who, q(d.name || ''), q(d.to || '')),  // 2.148.1 B (#2491)
       // 2.56.0 (#1795): an organisation admin renamed it / changed its icon or colour
       rename: tr('{0} renamed the list {1} to {2} (admin of {3})', who, q(d.old || ''), q(d.name || ''), q(d.org || '')),
       restyle: tr('{0} changed the icon or colour of the list {1} (admin of {2})', who, q(d.name || ''), q(d.org || ''))})[d.action] || tr('{0} changed something', who);

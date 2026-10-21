@@ -9,7 +9,7 @@ from flask import jsonify, request, Response
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from ..core.config import app
-from ..core.i18n import tr
+from ..core.i18n import tr, trn
 from ..core.db import body, bump, connect, db, err, iso
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
@@ -175,6 +175,9 @@ def op_contact_edit(c, uid, cid, b):
             raise Denied(409, tr("An imported address book is updated from its source; contacts cannot be moved into it"))
         if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND (uid=? OR href=?)", (nb, r["uid"], r["href"])).fetchone():
             raise Denied(409, tr("The address book has this contact already"))
+        from ..accounts.orgout import org_out  # 2.148.1 B (#2483): as the bulk move (only an admin takes it out of an organisation)
+        so, to = (c.execute("SELECT org_id FROM books WHERE id=?", (x,)).fetchone()[0] for x in (r["book_id"], nb))
+        org_out(c, so, to, "contacts", trn("{0} contact", "{0} contacts", 1))
         if c.execute("SELECT src_id FROM books WHERE id=?", (r["book_id"],)).fetchone()[0]:  # 2.138.4 C (#2378): out of a mirror = a copy
             ncid = contact_copy(c, uid, cid, nb)
             contact_store(c, uid, nb, contact_fields({k: v for k, v in b.items() if k != "book_id"}, r), cid=ncid)

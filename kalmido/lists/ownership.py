@@ -126,6 +126,19 @@ def owner_transfer(c, lr, new, force=False):
     return old, names.get(new, "")
 
 
+def own_takeover_log(c, lr, old, to_name):
+    """2.148.1 B (#2491): a server admin took over the list of a disabled account / an agent: the security log, and the
+    person whose list it was finds it in their News (also while disabled, for when the account comes back)."""
+    from ..collab.news import news_add
+    from ..core.db import usettings
+    from ..core.i18n import N_
+    from ..notify.alerts import aa_now
+    aa_now("security", f"takeover:{lr['id']}:{old}", N_("{0} took over the list {1} of a disabled account or agent and gave it to {2}."),
+           [g.user["username"], lr["name"], to_name])
+    if old and c.execute("SELECT 1 FROM users WHERE id=? AND COALESCE(kind,'user')!='agent'", (old,)).fetchone():
+        news_add(c, old, "orglist", data={"action": "takeover", "name": lr["name"], "to": to_name}, s=usettings(c, old))
+
+
 @app.post("/api/lists/<int:lid>/owner")
 def list_owner_set(lid):
     """{user_id}: the owner hands the list to another active person; an admin takes over a list of an agent / a disabled user."""
@@ -158,6 +171,8 @@ def list_owner_set(lid):
     if lr["org_id"] and not org_writes(c, new, lr["org_id"]):  # 2.143.0 A (#2151, review): guest / read-only / accounting own no list
         return err(tr("Only a member or admin of the organisation can own its lists"), 409)
     old, nname = owner_transfer(c, lr, new)
+    if mode == "takeover":
+        own_takeover_log(c, lr, old, nname)
     bump(c)
     c.commit()
     print("list", lid, "ownership", old, "->", new, "by", g.user["username"], f"({mode})", flush=True)

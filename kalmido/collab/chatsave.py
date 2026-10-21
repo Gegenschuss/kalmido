@@ -111,6 +111,14 @@ def dl_comment_message(c, cid):
     return k["body"] or "", files, tr("Comment on {0}", t["title"]), who, k["created_at"], f"#t/{t['id']}"
 
 
+def _team_org(c, mid):
+    """2.148.1 B (#2483): the organisation a team chat message belongs to (its channel / group, or the list of a list
+    chat), None for a direct message or a private list."""
+    r = c.execute("""SELECT COALESCE(r.org_id, l.org_id) FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
+                     LEFT JOIN lists l ON l.id=r.list_id WHERE m.id=?""", (mid,)).fetchone()
+    return r[0] if r else None
+
+
 def _copy_files(c, tid, uid, files):
     """Copies the message's files to the task (the person's storage counts; what does not fit is skipped). -> skipped names."""
     from ..admin.hosting import quota_fits
@@ -177,6 +185,11 @@ def chat_save():
         lid, parent = ct["list_id"], (ct["id"] if b.get("as", "sub") == "sub" else None)
     lid = lid or my_inbox(c, uid)
     need_list(c, lid)  # 404 unknown / not visible, 403 without the right to change the list
+    from ..accounts.orgout import OO_ADMIN_ONLY, org_out, org_out_ok
+    src_org = _team_org(c, mid) if kind == "team" else None
+    to_org = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
+    if not org_out_ok(c, src_org, to_org):  # 2.148.1 B (#2483): a team chat message leaves its organisation only through its admin
+        raise Denied(403, tr(OO_ADMIN_ONLY))
     title = b.get("title")
     if title is not None and not isinstance(title, str):
         return err(tr("Invalid value: {0}", "title"))
@@ -197,6 +210,7 @@ def chat_save():
     g.chat_save_new = []
     try:
         skipped = _copy_files(c, tid, uid, files)
+        org_out(c, src_org, to_org, "chat", where)  # 2.148.1 B (#2483): logged, the organisation's other admins told
         if files and len(skipped) < len(files):
             log_act(c, tid, "attach", {"names": [f[0] for f in files if f[0] not in skipped][:20], "n": len(files) - len(skipped)})
         c.execute("""INSERT INTO chat_saves(user_id,kind,msg_id,task_id,created_at) VALUES(?,?,?,?,?)

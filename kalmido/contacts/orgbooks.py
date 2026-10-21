@@ -7,7 +7,7 @@ account is deleted, so the book, its contacts, its birthday list and the links t
 from flask import g, jsonify
 
 from ..core.config import app
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.db import body, bump, db
 from ..core.pg import system_ctx
 from ..accounts.session import me
@@ -126,6 +126,9 @@ def obk_edit(bid):
     return _answer(c, bid, uid)
 
 
+OBK_STAYS = N_("The address book stays with the organisation. Export or copy the contacts instead.")
+
+
 @app.delete("/api/books/<int:bid>/org")
 def obk_drop(bid):
     """An admin of the organisation makes its address book a person's book again: their own (it stays in the organisation's
@@ -135,6 +138,8 @@ def obk_drop(bid):
     bk, role = need_book(c, bid, manage=True)
     if not bk["owner_org_id"]:
         raise Denied(409, tr("This address book does not belong to an organisation"))
+    if bk["owner_id"] != uid:  # 2.148.1 B (#2491): only the undo of one's own hand-over; nobody takes the organisation's book
+        raise Denied(403, tr(OBK_STAYS))
     c.execute("DELETE FROM book_members WHERE book_id=? AND user_id=?", (bid, uid))
     c.execute("UPDATE books SET owner_org_id=NULL, owner_id=? WHERE id=?", (uid, bid))
     book_touch(c, bid)

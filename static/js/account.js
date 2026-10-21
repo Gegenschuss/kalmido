@@ -274,7 +274,8 @@ async function wsIconPick(md, oid, how) {
 // private lists, private sharing or inboxes) with owner, numbers and the last change - never their contents. Archive / restore,
 // hand over to another person of the organisation, delete for good from the archive (the name typed to confirm); a history.
 const OADM_ACT = {archive: N_('{0} archived {1}'), restore: N_('{0} restored {1}'), delete: N_('{0} deleted {1} for good'), trash: N_('{0} moved {1} to the trash'), undelete: N_('{0} restored {1} from the trash'), purge: N_('{0} deleted {1} for good'), owner: N_('{0} handed {1} to {2}'),
-  edit: N_('{0} changed {1}'), icon: N_('{0} changed the icon of {1}')};  // 2.56.0 (#1795)
+  edit: N_('{0} changed {1}'), icon: N_('{0} changed the icon of {1}'),  // 2.56.0 (#1795)
+  moveout: N_('{0} moved {1} out of the organisation')};  // 2.148.1 B (#2483)
 function oadmRow(x) {
   const sub = [x.owner_agent ? tr('Owner: {0} (agent)', x.owner_name) : tr('Owner: {0}', x.owner_name), tr('{0} open', x.open) + ' / ' + trn('{0} task', '{0} tasks', x.tasks),
     trn('{0} member', '{0} members', x.members), tr('changed {0}', fmtDateLoc(String(x.changed_at || '').slice(0, 10)) || '–'), x.folder && tr('Folder: {0}', fDisp(x.folder))].filter(Boolean);  // 2.39.1 (#1188): + folder path

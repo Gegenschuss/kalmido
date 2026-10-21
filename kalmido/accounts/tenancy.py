@@ -243,6 +243,11 @@ CHECKS = {
     # 2.112.1 B (#2058): an external share link whose workspace is not its node's (the page refuses it: files/extlinks.py
     # xl_find; counted only) -- (link, creator)
     "file_ext_link": ("SELECT x.id, x.created_by FROM fs_ext_links x JOIN fs_nodes n ON n.id=x.node_id WHERE x.org_id IS DISTINCT FROM n.org_id"),
+    # 2.148.1 B (#2483): a receipt file the cash book or the equipment list points to outside that office's workspace (a
+    # personal office's receipts lie in its owner's private files)
+    "office_receipt": ("SELECT n.id, n.owner_id FROM fs_nodes n JOIN (SELECT node_id AS nid, org_id FROM office_cash_entries WHERE node_id IS NOT NULL "
+                       "UNION SELECT receipt_node_id, org_id FROM office_equipment WHERE receipt_node_id IS NOT NULL) r ON r.nid=n.id "
+                       "JOIN orgs o ON o.id=r.org_id WHERE n.org_id IS DISTINCT FROM r.org_id AND NOT (n.org_id IS NULL AND o.personal_of=n.owner_id)"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 

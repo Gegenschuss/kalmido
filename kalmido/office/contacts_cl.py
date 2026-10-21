@@ -27,8 +27,16 @@ def _line(v, k):
     return re.sub(r"\s+", " ", v).strip()[:FK_MAX[k]]
 
 
-def fk_contacts(c, cid):
-    """The contact persons of client cid, the default first, then in their order."""
+def fk_contacts(c, cid, oid=None):
+    """The contact persons of client cid, the default first, then in their order. 2.148.1 B (#2484): oid = the office area of
+    the document asking -- none while the client lies in another workspace now (a personal office: its owner's private clients)."""
+    if oid is not None:
+        from ..core.pg import system_ctx
+        with system_ctx(c):  # structure only: where the client lies, whose personal office oid is
+            here = c.execute("""SELECT 1 FROM clients k LEFT JOIN orgs o ON o.id=? WHERE k.id=?
+                                AND (k.org_id=o.id OR (k.org_id IS NULL AND o.personal_of=k.created_by))""", (oid, cid)).fetchone()
+        if not here:
+            return []
     return [{"id": r["id"], "name": r["name"], "role": r["role"], "email": r["email"], "phone": r["phone"], "is_default": bool(r["is_default"]),
              "contact_id": r["contact_id"]}  # 2.59.0 (#1735): the linked address book contact (None = not linked)
             for r in c.execute("SELECT * FROM office_client_contacts WHERE client_id=? ORDER BY is_default DESC, sort, id", (cid,))]
