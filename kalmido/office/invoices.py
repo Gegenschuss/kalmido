@@ -24,8 +24,8 @@ from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .calc import INV_VAT_NOTES, dec, dstr, fmt_money, inv_calc, inv_open, money
-from .packs import office_pack
-from .model import office_gate, office_org, office_role, office_settings, pb_cl_sql
+from .packs import office_pack_for
+from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql
 from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
 
 INV_KINDS = ("invoice", "credit", "reminder")
@@ -217,6 +217,8 @@ def inv_missing(c, oid, r, s, pack, items):
     from .countries import fk_country_code  # 2.40.0 (#1372): an unknown country code stops here, never silently DE
     if co.get("country") and fk_country_code(co["country"]) is None:
         miss.append(tr("valid country of the company (ISO code, now {0})", co["country"]))
+    elif not co.get("country") and (pack or {}).get("neutral"):  # 2.147.0 (#2461): the base pack assumes no country (the e-invoice needs one)
+        miss.append(tr("country of the company"))
     if cl is not None and "country" in cl.keys() and cl["country"] and fk_country_code(cl["country"]) is None:
         miss.append(tr("valid country of the client (ISO code, now {0})", cl["country"]))
     if r["kind"] == "invoice" and not (_col(r, "due_date") or _col(r, "payment_days")) and not s.get("payment_days"):
@@ -311,7 +313,7 @@ def _lines_eur(c, oid, r):
     from .docs import _calc_doc, doc_items
     from .calc import office_calc
     s = office_settings(c, oid)
-    pack = office_pack(s["pack"]) or office_pack("DE")
+    pack = office_pack_for(s)
     d = _calc_doc(r)
     d["currency"] = "EUR"
     return office_calc(d, doc_items(c, r["id"], oid), pack)["lines"]
@@ -373,7 +375,7 @@ def _put_rows(c, oid, did, rows):
 def inv_default_texts(c, oid, s, kind, lang, level=1):
     """intro / closing of an invoice, credit note or reminder: the organisation's text (settings), else the pack's.
     2.40.0 (#1368): credit notes have their own closing (credit_closing), reminders an intro / closing per level 1-3."""
-    pack = office_pack(s["pack"]) or office_pack("DE") or {}
+    pack = office_pack_for(s) or {}
     texts = pack.get("texts") or {}
     sal = (texts.get("salutation") or {}).get(lang) or ""
     sfx = f"_{level}" if kind == "reminder" and level in (2, 3) else ""
@@ -564,6 +566,7 @@ def inv_make_reminder(c, oid, uid, b):
     s = office_settings(c, oid)
     rows = inv_reminder_rows(c, oid, ids)
     first = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (ids[0], oid)).fetchone()
+    write_lock(c, f"office_dunning_{int(oid)}")  # 2.147.1 (#2054, review): the same lock as the suggestion run (no second draft at once)
     inv_check_reminder(c, oid, ids, rows)
     level = b.get("level", 1)
     if level not in REMINDER_LEVELS:
@@ -720,6 +723,8 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     if kind == "invoice":
         ptext = ((texts.get("payment_note") or {}).get(lang) or ("Zahlbar bis {date} ohne Abzug." if lang == "de" else "Payable by {date} without deduction.")).replace("{date}", m["due_date_text"]) if m["due_date"] else ""
     m["payment"] = {"iban": sfd["iban"], "bic": sfd["bic"], "bank_name": sfd["bank_name"], "text": ptext} if kind not in ("credit", "delivery") else None
+    from .girocode import gcq_model
+    gcq_model(r, m, None if ofx_locked(r) else office_settings(c, oid), snd)  # 2.147.1 B (#2054): the GiroCode (EPC QR text)
     m["valid_note"] = ""
     m["valid_until"] = ""
     m["valid_until_text"] = ""
@@ -775,6 +780,7 @@ def _mail(to, subject, text, **kw):
 def inv_datev_ready(c, oid, r, s):
     """409 when the DATEV copy cannot go out (no SMTP, no inbox address, not finalised)."""
     from ..integrations.mail import MAIL_OUT_ON
+    office_need_feature(c, oid, "books.datev", s)  # 2.147.0 (#2459, #2460)
     if not MAIL_OUT_ON:
         raise Denied(409, tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
     if not s.get("datev_email"):
@@ -801,11 +807,14 @@ def inv_send(c, oid, uid, r, b):
         raise BadInput(tr("Invalid value: {0}", "to"))
     s = office_settings(c, oid)
     explicit = b.get("datev") in (1, True, "1", "true")
-    datev = r["kind"] in ("invoice", "credit") and (explicit or (b.get("datev") is None and s.get("datev_auto") and not _col(r, "datev_sent_at")))
+    if explicit:  # 2.147.0 (#2460): DATEV switched off -> no copy, also not the automatic one
+        office_need_feature(c, oid, "books.datev", s)
+    datev = r["kind"] in ("invoice", "credit") and (explicit or (b.get("datev") is None and s.get("datev_auto") and not _col(r, "datev_sent_at")
+                                                                 and office_feature(c, oid, "books.datev", s)))
     if datev:
         inv_datev_ready(c, oid, r, s)
     lang = "en" if r["lang"] == "en" else "de"
-    pack = office_pack(s["pack"]) or office_pack("DE") or {}
+    pack = office_pack_for(s) or {}
     title = inv_title((pack.get("labels") or {}).get(lang) or {}, lang, r["kind"], inv_level(r))
     subject = inv_clean_subject(b.get("subject")) or f"{title} {r['number']}"
     text = (b.get("text") or "").strip() if isinstance(b.get("text"), str) else ""
@@ -1131,7 +1140,9 @@ def inv_mail_status():
     from ..integrations.mail import MAIL_OUT_ON
     c, uid, oid = _ctx()
     s = office_settings(c, oid)
-    return jsonify(smtp=bool(MAIL_OUT_ON), datev_email=s.get("datev_email") or "", datev_auto=int(s.get("datev_auto") or 0))
+    if not office_feature(c, oid, "books.datev", s):  # 2.147.0 (#2460): the send dialog shows no DATEV choice
+        return jsonify(smtp=bool(MAIL_OUT_ON), datev_email="", datev_auto=0, datev_on=False)
+    return jsonify(smtp=bool(MAIL_OUT_ON), datev_email=s.get("datev_email") or "", datev_auto=int(s.get("datev_auto") or 0), datev_on=True)
 
 
 # ---------------------------------------------------------------- 2.40.0 (#1368 points 8 + 9): reminder fee as an open item, settled reminders

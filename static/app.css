@@ -5206,7 +5206,8 @@ mark.mshl{background:color-mix(in srgb,var(--accent) 28%,transparent);color:inhe
 .mquote.del{flex-direction:row;align-items:center;gap:.25rem;cursor:default;border-left-color:var(--line2);font-style:italic;color:var(--faint)}
 .rbar{display:flex;align-items:center;gap:.5rem;padding:.25rem .5rem .25rem .75rem;border-top:1px solid var(--line);background:var(--bg2);font-size:.8125rem;color:var(--text2)}
 .rbar>svg{flex:none;color:var(--accent)}
-.rbar+.chcomp{border-top:0}
+/* 2.147.1 B (#2411, #2502): only a visible reply bar takes the top line (a hidden one kept .chcomp.agcol's agent colour off) */
+.rbar:not(.hidden)+.chcomp{border-top:0}
 .rbq{flex:1;min-width:0;display:flex;flex-direction:column;border-left:.1875rem solid var(--accent);padding-left:.5rem}
 .rbq b{font-size:.75rem;color:var(--text)}
 .rbq span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -6842,6 +6843,10 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 #side .srow[data-wsc]{background-image:linear-gradient(var(--wsc),var(--wsc));background-size:.1875rem 60%;background-repeat:no-repeat;background-position:0 50%}
 .wsbadge[data-wsc]{color:var(--text);background:color-mix(in srgb,var(--wsc) 14%,transparent);border-color:color-mix(in srgb,var(--wsc) 55%,transparent)}
 .wsbadge[data-wsc]:hover{border-color:var(--wsc)}
+/* 2.147.1 B (#2231): the workspace of an agent as a thin stripe on the left of its entries (sidebar, window bar, Agents
+   view); the chat header and the input keep the agent's own colour (#2411), so the two never meet in one place */
+.cwswb[data-wsc]{box-shadow:inset .1875rem 0 0 var(--wsc)}
+.agb-a[data-wsc],.agcard[data-wsc]{border-left:.1875rem solid var(--wsc)}
 :is(.wsbadge,.wschip,.wsbar)[data-wsc] svg.i:first-child,:is(.wsbadge,.wschip,.wsbar)[data-wsc] .wsemo{color:var(--wsc)}
 .wschip[data-wsc]{background:color-mix(in srgb,var(--wsc) 14%,transparent);border-color:color-mix(in srgb,var(--wsc) 40%,transparent)}
 .wschip[data-wsc]:hover{border-color:var(--wsc)}
@@ -7773,6 +7778,11 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .smv .smv-notes{margin:.75rem 0 .25rem;font-size:.875rem}
 .smv .smv-notes ul{margin:0;padding-left:1.125rem}
 .smv .smv-notes li{margin:.125rem 0}
+.smv .smv-prog{margin:.75rem 0 .25rem}
+.smv .smv-bar{height:.5rem;border-radius:.25rem;background:var(--bg4);overflow:hidden}
+.smv .smv-bar i{display:block;height:100%;background:var(--accent);transform:scaleX(0);transform-origin:left center;transition:transform .2s ease-out}
+.smv .smv-pt{margin:.375rem 0 0;font-size:.875rem;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.smv .smv-bar i{transition:none}}
 .smv .smv-block{display:flex;gap:.375rem;align-items:flex-start;color:var(--danger, #c0392b);margin:0 0 .375rem}
 /* 2.97.0 C (#2049): the tick box of a move (copies of issued documents) */
 .smv .smv-opt{min-height:2.75rem;gap:.5rem;cursor:pointer}

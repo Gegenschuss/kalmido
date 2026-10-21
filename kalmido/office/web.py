@@ -11,7 +11,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
-from .packs import office_pack, office_pack_codes, office_pack_validate
+from .packs import office_features, office_pack, office_pack_codes, office_pack_for, office_pack_validate, pack_features, pack_retention
 from .model import (
     MD_KINDS, office_create, office_delete, office_export, office_gate, office_import, office_org, office_role, office_row,
     office_rows, office_seed_texts, office_settings, office_settings_clean, office_settings_save, office_update, office_number_format,
@@ -37,15 +37,75 @@ def office_settings_get():
     if office_seed_texts(c, oid):
         c.commit()
     s = office_settings(c, oid)
-    pack = office_pack(s["pack"]) or office_pack("DE")
+    pack = office_pack_for(s)
+    feats = office_features(s, pack)  # 2.147.0 (#2459, #2460): before the member view strips anything
     role = office_role(c, uid, oid)
     cf = ofx_company(c, oid)
     if role != "admin":  # 2.86.0 (N15): members never get the bank lines and the DATEV master data (admins only)
         s, cf = h6c_member_settings(s), {k: ("" if k in H6C_BANK_COLS else v) for k, v in cf.items()}
-    return jsonify(settings=s, company_fields=cf, org_id=oid, role=role, pack={"code": pack["code"], "name": pack["name"], "tax": pack["tax"],
-                                                                               "formats": pack["formats"], "currency": pack["currency"]},
+    return jsonify(settings=s, company_fields=cf, org_id=oid, role=role, pack=office_pack_info(pack, s),
+                   features=feats,  # 2.147.0 (#2459, #2460): {key: on} -- menus, tabs and buttons follow it, the routes check it too
                    number_preview=onc_preview(c, oid, s, s["offer_scheme"]),  # 2.118.0 A (#2265): onc_preview
-                   industry=_industry(s), **pb_info(c, uid, oid))
+                   industry=_industry(s), **of_pack_choice(c, oid, role, cf), **pb_info(c, uid, oid))
+
+
+def of_pack_choice(c, oid, role, cf):
+    """2.147.0 (#2462): {pack_choose, pack_suggest}: a NEW office area (no saved settings, no documents) asks its admin once for
+    its country; the suggestion: the company's country when a pack exists for it, else the neutral base pack -- without a
+    company country the language (German -> DE). Offices from before never see the question (they stay DE as they were)."""
+    if role != "admin" or c.execute("SELECT 1 FROM office_settings WHERE org_id=?", (oid,)).fetchone() \
+            or c.execute("SELECT 1 FROM office_docs WHERE org_id=? LIMIT 1", (oid,)).fetchone() \
+            or c.execute("SELECT 1 FROM office_doc_log WHERE org_id=? LIMIT 1", (oid,)).fetchone():  # (review: an office in use is never "new")
+        return {"pack_choose": False, "pack_suggest": None}
+    from ..core.i18n import lg_base
+    codes = office_pack_codes()
+    cc = str((cf or {}).get("country") or "").upper()
+    sug = (cc if cc in codes else "XX") if cc else ("DE" if lg_base() == "de" else "XX")
+    return {"pack_choose": True, "pack_suggest": sug if sug in codes else "DE"}
+
+
+def of_reseed_texts(c, oid, old_code):
+    """2.147.0 (#2462): a new office opened before its country was chosen got the text blocks of DE (seeded on the first
+    look); the first choice of another country swaps the ones still unchanged for the new pack's (own texts stay)."""
+    old = office_pack_for({"pack": old_code}) or {}
+    tx = old.get("texts") or {}
+    want = {(k, t["key"]): (t["de"], t["en"]) for k in ("rights_time", "rights_territory", "rights_media") for t in tx.get(k) or []}
+    want.update({(k, "default"): (tx[k]["de"], tx[k]["en"]) for k in ("intro", "closing") if tx.get(k)})
+    if tx.get("rights_note"):
+        want[("note", "rights_note")] = (tx["rights_note"]["de"], tx["rights_note"]["en"])
+    rows = office_rows(c, oid, "texts")
+    gone = [r["id"] for r in rows if want.get((r.get("kind"), r.get("key"))) == (r.get("text_de"), r.get("text_en"))]
+    if not gone or len(gone) != len(rows):
+        return 0  # own texts (or none seeded): left as they are
+    for rid in gone:
+        c.execute("DELETE FROM office_texts WHERE id=? AND org_id=?", (rid, oid))
+    return office_seed_texts(c, oid)
+
+
+def of_pack_switch(c, oid, s, code):
+    """2.147.0 (#2462): what a change of the country pack to code does -- shown before it is saved: functions hidden / shown,
+    open documents recalculated with the new rates and texts, finalised documents that keep their state. Nothing is deleted."""
+    new = office_pack_for(dict(s, pack=code))
+    if not new or new.get("code") != code:
+        raise Denied(404)
+    before, after = office_features(s), office_features(dict(s, pack=code), new)
+    n_open = c.execute("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NULL AND kind IN ('offer','invoice','credit','reminder')",
+                       (oid,)).fetchone()[0]
+    n_locked = c.execute("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL", (oid,)).fetchone()[0]
+    return {"from": s.get("pack") or "DE", "to": code, "name": new.get("name"), "name_en": new.get("name_en", new.get("name")),
+            "hidden": sorted(k for k, on in before.items() if on and not after.get(k)),
+            "shown": sorted(k for k, on in after.items() if on and not before.get(k)),
+            "open_docs": n_open, "locked_docs": n_locked, "tax": new.get("tax"), "tax_editable": bool((new.get("tax") or {}).get("editable"))}
+
+
+def office_pack_info(pack, s):
+    """2.147.0 (#2459, #2461): what the office client needs of its country pack: tax (the office's own rates in a pack that allows
+    them), formats, currency, the functions it offers (ready / planned), the retention and whether it is the neutral base pack."""
+    tax = pack.get("tax") or {}
+    return {"code": pack["code"], "name": pack["name"], "name_en": pack.get("name_en", pack["name"]), "tax": tax, "formats": pack["formats"],
+            "currency": pack["currency"], "neutral": bool(pack.get("neutral")), "tax_editable": bool(tax.get("editable")),
+            "offers": pack_features(pack), "retention": pack_retention(pack, s),
+            "einvoice_formats": [f for f in ((pack.get("einvoice") or {}).get("formats") or []) if f in ("zugferd", "xrechnung")]}
 
 
 H6C_BANK_COLS = ("iban", "bic", "bank_name")
@@ -78,6 +138,7 @@ def office_settings_put():
         from ..core.pg import write_lock
         write_lock(c, f"office_packs_{int(oid)}")
     cur = office_settings(c, oid)
+    fresh = "pack" in b and of_pack_choice(c, oid, "admin", None)["pack_choose"]  # 2.147.0 (#2462): the first choice of the country
     new = office_settings_clean(c, oid, b, cur)
     if "company_fields" in b:
         cf = ofx_company(c, oid)
@@ -87,11 +148,15 @@ def office_settings_put():
             ofx_company_save(c, oid, ncf)
             ofx_log(c, oid, "update", target="company", detail=diff)
     office_settings_save(c, oid, new)
+    if fresh and new["pack"] != cur["pack"] and not any(v for k in ("intro_text_id", "closing_text_id", "rights_default") for v in (new.get(k) or {}).values()):
+        of_reseed_texts(c, oid, cur["pack"])
     diff = ofx_diff(cur, new)
     if diff["after"]:
         ofx_log(c, oid, "update", target="settings", detail=diff)
     c.commit()
-    return jsonify(settings=office_settings(c, oid), company_fields=ofx_company(c, oid), number_preview=onc_preview(c, oid, new, new["offer_scheme"]))  # 2.118.0 A (#2265)
+    s2 = office_settings(c, oid)
+    return jsonify(settings=s2, company_fields=ofx_company(c, oid), number_preview=onc_preview(c, oid, new, new["offer_scheme"]),  # 2.118.0 A (#2265)
+                   features=office_features(s2), pack=office_pack_info(office_pack_for(s2), s2))  # 2.147.0 (#2460)
 
 
 @app.get("/api/office/number-preview")
@@ -122,12 +187,21 @@ def office_packs_get():
     src, industry = pkc_packs_extra(c, oid)  # 2.76.0 (#1023): + the packs installed in my office area, source / badge, industry packs
     out = []
     for code in office_pack_codes():
-        p = office_pack(code)
-        if p:
+        p = office_pack_for({"pack": code})  # 2.147.0 (#2461): tax labels with {rate} filled in
+        if p and p.get("code") == code:
             out.append({"code": p["code"], "name": p["name"], "name_en": p.get("name_en", p["name"]), "currency": p["currency"],
+                        "neutral": bool(p.get("neutral")), "offers": pack_features(p),  # 2.147.0 (#2459, #2461)
                         "version": p["version"], "community": p.get("community", False), "tax": p["tax"],
                         "source": src.get(code, ("builtin", "verified"))[0], "badge": src.get(code, ("builtin", "verified"))[1]})
     return jsonify(packs=out, industry=industry)
+
+
+@app.get("/api/office/pack-switch")
+def office_pack_switch_get():
+    """Office admin. ?code=XX -> of_pack_switch (the warning before the country pack changes; 2.147.0, #2462)."""
+    c, uid, oid = _ctx(admin=True)
+    s = office_settings(c, oid)
+    return jsonify(of_pack_switch(c, oid, s, str(request.args.get("code") or "").strip().upper()))
 
 
 @app.get("/api/office/packs/<code>")

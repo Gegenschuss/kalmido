@@ -11,11 +11,32 @@
 //   check(to, place): async -> {notes: [text …], block: text | null} (the server's dry run: POST … {dry: 1}),
 //   run(to, place): async -> the result of the move (the caller reloads and offers the undo: the same move back).
 //   option: {label} (optional, 2.97.0 C #2049) -- one tick box; its state is the third argument of check and run.
+//   total: (optional, 2.147.1 B #2230) how many items run moves; from SMV_BAR on the dialog shows "x of n moved" as a bar and
+//   passes onStep(done, total) as run's fourth argument (smv_post below moves in batches and calls it). While run works the
+//   dialog always shows "Moving…" on the button (aria-busy, nothing else clickable).
 // Resolves the result of run, or null when cancelled. Without an organisation there is no other workspace: callers show the
 // action only when smv_can() (a person without an organisation never sees it; their private space is the only one).
 const smv_can = from => wsOn() && wsOptions().filter(w => w !== 'all' && w !== wsOf({org_id: from})).length > 0;
+// 2.147.1 B (#2230): move id lists in batches of SMV_CHUNK so the dialog can show the progress. Posts b with b[key] (ids | items)
+// split up, returns the merged answer ({moved, org_was, to, count, shares}). A later batch that fails keeps what moved so far:
+// the answer then has failed = the error text (api() already toasted it) and the caller offers the undo for the moved part.
+const SMV_CHUNK = 20, SMV_BAR = 20;
+async function smv_post(url, b, key, onStep) {
+  const all = b[key] || [], out = {moved: [], count: 0, shares: 0};
+  for (let i = 0; i < all.length || !i; i += SMV_CHUNK) {
+    let r;
+    try { r = await api('POST', url, {...b, [key]: all.slice(i, i + SMV_CHUNK)}); }
+    catch (x) { if (!out.moved.length) throw x; out.failed = x.message || 'error'; break; }
+    out.moved.push(...(r.moved || [])); out.org_was = r.org_was; out.to = r.to;
+    out.count += r.count || 0; out.shares += +r.shares || 0;
+    if (onStep) onStep(Math.min(i + SMV_CHUNK, all.length), all.length);
+  }
+  return out;
+}
+// the undo label of a move: "Moved to X", or how far a failed one got
+const smv_label = (r, total) => r.failed ? tr('Only {0} of {1} moved to {2}', r.moved.length, total, wsName(r.to)) : tr('Moved to {0}', wsName(r.to));
 const smv_ws = org => org ? 'org:' + org : 'private';
-function smv_open({what, from = null, places = null, check, run, option = null}) {
+function smv_open({what, from = null, places = null, check, run, option = null, total = 0}) {
   const tos = wsOptions().filter(w => w !== 'all' && w !== smv_ws(from));
   if (!tos.length) { toast(tr('There is no other workspace')); return Promise.resolve(null); }
   return new Promise(res => {
@@ -28,6 +49,7 @@ function smv_open({what, from = null, places = null, check, run, option = null})
       ${places ? `<label class="smv-row"><span class="smv-l">${esc(tr('Into|place'))}</span><select id="smv-place"><option value="">${esc(tr('Top level'))}</option></select></label>` : ''}
       ${option ? `<label class="smv-row smv-opt chkl"><input type="checkbox" id="smv-opt"> ${esc(option.label)}</label>` : ''}
       <div class="smv-notes" aria-live="polite"></div>
+      ${total >= SMV_BAR ? `<div class="smv-prog" hidden><div class="smv-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="0" aria-label="${esc(tr('Progress'))}"><i></i></div><p class="smv-pt" aria-live="polite"></p></div>` : ''}
       <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-smv="no">${esc(tr('Cancel'))}</button><button type="submit" class="btn pri" data-smv="yes" disabled>${esc(tr('Move'))}</button></div></form>`);
     md.classList.add('smv-dlg');
     md.setAttribute('aria-labelledby', 'smv-t');
@@ -57,8 +79,16 @@ function smv_open({what, from = null, places = null, check, run, option = null})
     md.addEventListener('click', e => { if (e.target.closest('[data-smv="no"]')) fin(null); });
     $('form', md).addEventListener('submit', async e => {
       e.preventDefault(); if (blocked) return;
-      ok.disabled = true;
-      let r; try { r = await run(toOrg(), place, opt); } catch { ok.disabled = false; return; }
+      ok.disabled = true; blocked = true;
+      const label = ok.textContent, no = $('[data-smv="no"]', md), prog = $('.smv-prog', md), bar = $('.smv-bar', md);
+      ok.textContent = tr('Moving…'); ok.setAttribute('aria-busy', 'true'); no.disabled = true;
+      const step = (n, t) => {
+        if (!prog) return;
+        prog.hidden = false; bar.setAttribute('aria-valuenow', String(n)); $('i', bar).style.transform = `scaleX(${t ? n / t : 0})`;
+        $('.smv-pt', prog).textContent = tr('{0} of {1} moved', n, t);
+      };
+      step(0, total);
+      let r; try { r = await run(toOrg(), place, opt, step); } catch { ok.textContent = label; ok.removeAttribute('aria-busy'); no.disabled = false; ok.disabled = false; blocked = false; if (prog) prog.hidden = true; return; }
       fin(r || true);
     });
     onRemove(md, () => fin(null));

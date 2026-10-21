@@ -1759,7 +1759,7 @@ area's clients, documents or lists answer `404`.
 
 | What | Endpoint | MCP |
 |---|---|---|
-| The area, the person, the rules | `GET /api/v1/office` | `get_office` |
+| The area, the person, the rules; 2.147: `country_pack` and `features` (the office functions as switched on, e.g. `books.datev: false`) | `GET /api/v1/office` | `get_office` |
 | Services, text blocks, framework contracts, clients (`q`) -- never purchase prices | `GET /api/v1/office/{services\|texts\|contracts\|clients}` | `list_office_data` |
 | Documents (`kind` offer / invoice / credit / reminder, `client_id`, `status`, `open=1`) | `GET /api/v1/office/docs` | `list_office_documents` |
 | One document with its positions | `GET /api/v1/office/docs/{id}` | `get_office_document` |

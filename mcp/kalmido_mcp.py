@@ -1812,7 +1812,8 @@ _ODRAFT = {"client_id": S_ID, "title": {"type": "string"}, "intro": {"type": "st
 _OCF = {"cashflow": {"type": "string", "enum": ["auto", "yes", "no"], "description": "In the cash flow plan once sent: auto = the newest version of the chain, yes, no"}}
 TOOLS += [
     ("get_office", "2.51.0: the office area you work in (your workspace; a personal agent without one: your owner's personal office), the "
-                   "person you act for and the rules. Drafts only: a person reserves the number, finalises, sends and books.",
+                   "person you act for and the rules. Drafts only: a person reserves the number, finalises, sends and books. 2.147: "
+                   "country_pack + features (office functions on / off, e.g. books.datev): leave out what is off.",
      _obj(_RB), lambda api, a: api.call("GET", "/office", _pick(a, ("requested_by",)))),
     ("list_office_data", "2.51.0: master data of the office: services (catalogue prices), texts (text blocks), contracts (framework contracts with "
                          "their rates) or clients (q = name). Never purchase prices. Client and price data go to your model: read only what the order needs.",

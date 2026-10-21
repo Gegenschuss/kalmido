@@ -213,9 +213,9 @@ def dt_kind_label(k, lg=None):
 
 # ---------------------------------------------------------------- the variables
 def _pack(c, oid):
-    from .model import office_pack
+    from .packs import office_pack_for
     s = office_settings(c, oid)
-    return office_pack(s.get("pack")) or office_pack("DE") or {}
+    return office_pack_for(s) or {}
 
 
 def dt_company(c, oid, lang):

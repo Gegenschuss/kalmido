@@ -189,3 +189,65 @@ document.addEventListener('input', e => {
   clearTimeout(PKC.t); PKC.t = setTimeout(() => pkc_load(), 250);
 });
 document.addEventListener('keydown', e => { if (e.target.id === 'pkc-q' && e.key === 'Enter') { e.preventDefault(); clearTimeout(PKC.t); pkc_load(); } });
+
+// ---- 2.147.0 (#2459, #2460, #2462): the country pack decides which office functions exist (DATEV, e-invoices, VAT return
+// figures, tax dates, the export for any tax advisor); the admin switches single ones off under Settings > Functions.
+// Off only hides: the server keeps every value and answers the routes of a function that is off with 404 (office.js ofcFeat).
+// Keys with an area prefix so later functions sit next to them (2.148: receipt images, period lock, procedure documentation)
+const OCF_FEATS = [
+  ['books.datev', 'upload', N_('DATEV'), N_('Booking batch, document inbox and accounts for a tax advisor working with DATEV')],
+  ['docs.einvoice', 'file', N_('E-invoices'), N_('The XML of every finalised invoice and credit note (ZUGFeRD / Factur-X, XRechnung where the pack offers it)')],
+  ['books.vat_return', 'chart', N_('VAT return figures'), N_('The figures of the advance VAT return in the bookkeeping; filing stays with your tax software')],
+  ['books.tax_dates', 'cal', N_('Tax dates'), N_('Deadlines of the VAT return and tax prepayments as recurring tasks')],
+  ['books.export_csv', 'download', N_('Export for the tax advisor'), N_('Booking list as CSV, with invoices and receipts as ZIP - readable by any tax advisor')],
+  ['books.gobd', 'lock', N_('Finalising rules'), N_('Finalised documents stay locked, number gaps need a reason. Always on.')]];
+const OCF_FIXED = ['books.gobd'];  // cannot be switched off (packs.PACK_FEATURES switch false)
+const ocf_offers = () => OFC.info?.pack?.offers || {};
+const ocf_name = code => { const p = (PKC.packs?.country || []).find(x => x.code === code); return p ? pkc_nm(p) : code; };
+OFC_II.functions = N_('Which functions the office shows comes from its country pack. Switching one off only hides it: nothing is deleted, switching it on again brings everything back. Finalised documents and the retention periods stay in force.');
+function ocf_settingsHtml(dis) {
+  pkc_sync();
+  if (!PKC.packs && !PKC.packsBusy) setTimeout(pkc_loadPacks, 0);
+  const p = OFC.info.pack || {}, of = ocf_offers(), off = OFC.info.settings?.features_off || [];
+  const mine = OCF_FEATS.filter(f => of[f[0]] === 'ready'), not = OCF_FEATS.filter(f => of[f[0]] !== 'ready');
+  const rt = p.retention || {};
+  return `<h3>${tr('Functions')}</h3>${ofcII('functions')}
+    <p class="muted">${esc(tr('Country pack: {0}', `${pkc_de() ? p.name : p.name_en || p.name} (${p.code})`))} · <button type="button" class="linkbtn" data-ostgo="packs">${tr('Change country')}</button></p>
+    <div class="ocf-list">${mine.map(([k, i, n, d]) => {
+      const fixed = OCF_FIXED.includes(k), on = fixed || !off.includes(k);
+      return `<div class="row ocf-row"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" id="ocf-${esc(k.replace('.', '-'))}" data-feat="${esc(k)}" ${on ? 'checked' : ''} ${fixed ? 'disabled' : dis}><span class="swt" aria-hidden="true"></span></span><span>${ic(i, 's')} ${esc(tr(n))}</span></label><span class="muted ofchint">${esc(tr(d))}</span></div>`;
+    }).join('')}</div>
+    ${not.length ? `<p class="muted ofchint">${esc(tr('Not part of this country pack: {0}', not.map(f => tr(f[2])).join(', ')))}</p>` : ''}
+    <p class="muted ofchint">${esc(tr('Receipts are kept {0} years, books {1} years.', rt.receipts ?? 10, rt.books ?? 10))}</p>`;
+}
+// the new list of switched off functions when one switch changes (office.js ost_part)
+const ocf_off = (k, off) => { const l = (OFC.info.settings?.features_off || []).filter(x => x !== k); return off ? [...l, k].sort() : l; };
+// ---- the country of a NEW office (no saved settings, no documents): asked once, on top of the office (admins only)
+function ocf_chooseHtml() {
+  if (!OFC.info?.pack_choose || OFC.info.role !== 'admin') return '';
+  pkc_sync();
+  if (!PKC.packs && !PKC.packsBusy) setTimeout(pkc_loadPacks, 0);
+  const opts = (PKC.packs?.country || []).map(p => [p.code, p.neutral ? pkc_nm(p) : `${pkc_nm(p)} (${p.code})`]);
+  const sug = OFC.info.pack_suggest || 'DE';
+  return `<section class="ocf-choose card" aria-labelledby="ocf-ch-h"><h3 id="ocf-ch-h">${ic('globe', 's')} ${tr('Where is your office?')}</h3>
+    <p class="muted">${tr('The country decides tax rates, texts and which functions you see (for example DATEV in Germany). Without an own pack the international base pack works without country assumptions. You can change it later under Settings.')}</p>
+    <div class="lacts">${opts.length ? ofcSel('ocf-ch', sug, opts) : `<span class="muted">${tr('Loading…')}</span>`}<button type="button" class="btn sm pri" data-ocf="choose" ${opts.length ? '' : 'disabled'}>${tr('Use')}</button></div></section>`;
+}
+async function ocf_choose() {
+  const code = $('#ocf-ch')?.value; if (!code) return;
+  try { await api('PUT', '/api/office/settings', {pack: code}); toast(tr('Country set: {0}', ocf_name(code))); }
+  catch (x) { toast(x.message || tr('unknown')); return; }
+  $('.ocf-choose')?.remove();  // (the quotations keep their drawn part while they reload)
+  await ofcInfo(true);
+}
+// ---- the warning before the country pack changes (office.js ost_save): what is hidden / shown, open documents
+async function ocf_confirmSwitch(code) {
+  let j; try { j = await api('GET', `/api/office/pack-switch?code=${encodeURIComponent(code)}`); } catch (x) { toast(x.message || tr('unknown')); return false; }
+  const nm = k => tr(OCF_FEATS.find(f => f[0] === k)?.[2] || k);
+  const lines = [tr('Finalised invoices keep their state ({0} documents); new documents use the new pack.', j.locked_docs)];
+  if (j.open_docs) lines.push(tr('{0} open documents will be calculated with the new rates and texts.', j.open_docs));
+  if (j.hidden?.length) lines.push(tr('Hidden (nothing is deleted): {0}', j.hidden.map(nm).join(', ')));
+  if (j.shown?.length) lines.push(tr('New: {0}', j.shown.map(nm).join(', ')));
+  return askConfirm(tr('Change the country to “{0}”?', pkc_de() ? j.name : j.name_en || j.name), lines.join(' '), {ok: tr('Change')});
+}
+document.addEventListener('click', e => { const b = e.target.closest?.('[data-ocf="choose"]'); if (b) { e.preventDefault(); ocf_choose(); } });

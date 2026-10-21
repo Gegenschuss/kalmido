@@ -44,7 +44,7 @@ async function ofdLoadList(force) {
   if (OFD.list && !force) return;
   if (OFD.kind === 'archive') { if (typeof OIM !== 'undefined') OIM.list = null; OFD.list = []; ofdDraw(); return; }  // 2.39.1 (#1182): office_import.js loads it
   OFD.loading = true;
-  try { const j = await api('GET', `/api/office/docs?kind=${OFD.kind}${OFD.status ? '&status=' + OFD.status : ''}`); OFD.list = j.docs || []; OFD.role = j.role; OFD.err = ''; }
+  try { const j = await api('GET', `/api/office/docs?kind=${OFD.kind}${OFD.status ? '&status=' + OFD.status : ''}`); OFD.list = j.docs || []; OFD.role = j.role; OFD.err = ''; OFD.dunning = j.dunning || null; }  // 2.147.1 B (#2054): dunning
   catch (x) { OFD.list = []; OFD.err = x.message || tr('unknown'); }
   OFD.loading = false;
   ofdDraw();
@@ -96,7 +96,7 @@ function ofdListHtml() {
   if (k === 'archive') return `<div class="seg ofdkinds" role="tablist" aria-label="${esc(tr('Document kind'))}">${OFD_KINDS.map(([v, n]) => `<button type="button" role="tab" data-ofd="kind" data-kind="${v}" aria-selected="${v === k}" class="${v === k ? 'on' : ''}">${tr(n)}</button>`).join('')}</div><div class="ofcbar ofdbar"><div class="ctsearch">${ic('search', 's')}<input id="ofd-q" type="search" value="${esc(OFD.q)}" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search documents'))}" autocomplete="off" enterkeyhint="search"></div></div>` + (typeof oimArchiveListHtml === 'function' ? oimArchiveListHtml(q) : '');
   const sts = k === 'offer' ? OFD_STATUS : (k === 'invoice' ? ['draft', 'issued', 'sent', 'partial', 'overdue', 'paid', 'cancelled'] : OFD_INV_STATUS[k]).map(v => [v, OFD_STATE[v]]);
   const newBtn = k === 'offer' ? `<button class="btn sm pri" data-ofd="new">${ic('plus', 's')}<span>${tr('New quotation')}</span></button>`
-    : k === 'invoice' ? `${typeof dx_btn === 'function' ? dx_btn() : ''}<button class="btn sm" data-ofd="remind">${ic('clock', 's')}<span>${tr('Create reminder')}</span></button><button class="btn sm pri" data-ofd="new-inv" aria-haspopup="menu">${ic('plus', 's')}<span>${tr('New invoice')}</span></button>`
+    : k === 'invoice' ? `${typeof dx_btn === 'function' && ofcFeat('books.datev') ? dx_btn() : ''}<button class="btn sm" data-ofd="remind">${ic('clock', 's')}<span>${tr('Create reminder')}</span></button><button class="btn sm pri" data-ofd="new-inv" aria-haspopup="menu">${ic('plus', 's')}<span>${tr('New invoice')}</span></button>`
     : k === 'reminder' ? `<button class="btn sm pri" data-ofd="remind">${ic('plus', 's')}<span>${tr('Create reminder')}</span></button>`
     : k === 'delivery' ? `<button class="btn sm pri" data-ofd="new-ls">${ic('plus', 's')}<span>${tr('New delivery note')}</span></button>` : '';  // 2.120.0 D (#2089)
   const kinds = `<div class="seg ofdkinds" role="tablist" aria-label="${esc(tr('Document kind'))}">${OFD_KINDS.map(([v, n]) => `<button type="button" role="tab" data-ofd="kind" data-kind="${v}" aria-selected="${v === k}" class="${v === k ? 'on' : ''}">${tr(n)}</button>`).join('')}</div>`;
@@ -116,8 +116,8 @@ function ofdListHtml() {
   const grp = k === 'reminder' && list.some(r => r.settled) && list.some(r => !r.settled);
   if (k === 'reminder') list.sort((a, b) => (a.settled ? 1 : 0) - (b.settled ? 1 : 0));
   const feeTxt = r => +r.fee_open > 0 ? `<small class="ofdfee">${esc(k === 'reminder' ? tr('fee open: {0}', r.fee_open_text || r.fee_open) : tr('reminder fee open: {0}', r.fee_open_text || r.fee_open))}</small>` : '';
-  return bar + (k === 'invoice' && typeof oa_ppBox === 'function' ? oa_ppBox() : '') + (k === 'invoice' && typeof rinListHtml === 'function' ? rinListHtml() : '') /* 2.91.0 A (#1923) */ + `<ul class="ofclist ofdlist" role="list">${list.map((r, i) => `${grp && r.settled && !list[i - 1]?.settled ? `<li class="ofdgrp muted" role="presentation">${tr('Settled')}</li>` : ''}<li class="ofdli"><button type="button" class="ofcrow ofdrow st-${r.state || r.status}" data-ofd="open" data-id="${r.id}">
-    <span class="ofcn"><b>${r.locked ? `<span class="ofdlk" title="${esc(tr('Finalised'))}">${ic('lock', 's')}</span>` : ''}${esc(r.number || tr('(no number)'))}${r.recipient_name ? ` · ${esc(r.recipient_name)}` : ''}</b><small class="muted">${esc([r.project_title, r.date ? fmtDateLoc(r.date) : '', inv && r.due_date && !['paid', 'cancelled'].includes(r.state) ? tr('due {0}', fmtDateLoc(r.due_date)) : ''].filter(Boolean).join(' · '))}</small>${k === 'invoice' && typeof rinRowTag === 'function' ? rinRowTag(r) : ''}${k === 'invoice' && r.inv_type ? `<small class="rin-tag abs-tag">${esc(absKindName(r))}</small>` : ''}</span>
+  return bar + (k === 'invoice' && typeof oa_ppBox === 'function' ? oa_ppBox() : '') + (k === 'invoice' && typeof rinListHtml === 'function' ? rinListHtml() : '') /* 2.91.0 A (#1923) */ + (typeof dun_listHint === 'function' ? dun_listHint(k) : '') /* 2.147.1 B (#2054) */ + `<ul class="ofclist ofdlist" role="list">${list.map((r, i) => `${grp && r.settled && !list[i - 1]?.settled ? `<li class="ofdgrp muted" role="presentation">${tr('Settled')}</li>` : ''}<li class="ofdli"><button type="button" class="ofcrow ofdrow st-${r.state || r.status}" data-ofd="open" data-id="${r.id}">
+    <span class="ofcn"><b>${r.locked ? `<span class="ofdlk" title="${esc(tr('Finalised'))}">${ic('lock', 's')}</span>` : ''}${esc(r.number || tr('(no number)'))}${r.recipient_name ? ` · ${esc(r.recipient_name)}` : ''}${typeof dun_rowTag === 'function' ? dun_rowTag(r) : '' /* 2.147.1 B (#2054) */}</b><small class="muted">${esc([r.project_title, r.date ? fmtDateLoc(r.date) : '', inv && r.due_date && !['paid', 'cancelled'].includes(r.state) ? tr('due {0}', fmtDateLoc(r.due_date)) : ''].filter(Boolean).join(' · '))}</small>${k === 'invoice' && typeof rinRowTag === 'function' ? rinRowTag(r) : ''}${k === 'invoice' && r.inv_type ? `<small class="rin-tag abs-tag">${esc(absKindName(r))}</small>` : ''}</span>
     <span class="ofdsum"><b>${esc(k === 'delivery' ? '' : inv ? r.gross_text : r.net_text)}</b>${inv && r.open && !['draft', 'paid', 'cancelled'].includes(r.state) && r.open !== r.gross ? `<small class="muted">${esc(tr('open: {0}', r.open_text || r.open))}</small>` : ''}${feeTxt(r)}<small class="rotag st-${r.state || r.status}">${esc(r.status_text)}</small></span></button><button type="button" class="iconbtn ofdrmore" data-ofd="rowmore" data-id="${r.id}" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots', 's')}</button></li>`).join('')}</ul>`;
 }
 
@@ -173,7 +173,7 @@ function ofdEditorHtml() {
     ${kind === 'invoice' ? ofdF('due_date', tr('Due on'), dateIn('ofd-due_date', d.due_date || '', {label: tr('Due on'), attrs: 'data-f="due_date"'})) : ''}
     ${kind === 'invoice' ? absHeadFields(d) : ''}
     ${d.vat_mode === 'novat' && kind !== 'delivery' ? ofdF('vat_note', tr('VAT note'), ofdSel('vat_note', d.vat_note || '', OFD_VATN.map(([v, n]) => [v, tr(n)])), tr('printed on the invoice; required when finalising')) : ''}
-    ${kind === 'delivery' ? '' : ofdF('einvoice_format', tr('E-invoice format'), ofdSel('einvoice_format', d.einvoice_format || 'zugferd', [['zugferd', 'ZUGFeRD (PDF with XML)'], ['xrechnung', 'XRechnung (XML, public clients)']]))}` : '';  // 2.120.0 D (#2089): no e-invoice
+    ${kind === 'delivery' || !ofcFeat('docs.einvoice') ? '' : ofdF('einvoice_format', tr('E-invoice format'), ofdSel('einvoice_format', d.einvoice_format || 'zugferd', ofdEinvOpts()))}` : '';  // 2.147.0 (#2460, #2461): only while e-invoices are on, the pack's formats  // 2.120.0 D (#2089): no e-invoice
   const remFields = kind === 'reminder' ? `
     ${ofdF('reminder_level', tr('Reminder level'), ofdSel('reminder_level', d.reminder_level || 1, [[1, tr('1 - payment reminder')], [2, tr('2 - reminder')], [3, tr('3 - final reminder')]]))}
     ${ofdF('reminder_fee', tr('Reminder fee'), `<span class="lacts">${ofdIn('reminder_fee', ofdNumIn(d.reminder_fee), {num: true, max: 10})}<span class="muted">${d.currency === 'USD' ? '$' : '€'}</span></span>`)}
@@ -494,8 +494,8 @@ function ofdMoreItems(d, inList) {
       !inList && d.kind === 'offer' && d.status !== 'accepted' ? {label: tr('Create invoice'), icon: 'receipt', fn: () => kvaToInvoice(d)} : null,  // 2.138.0 E (#2235): always reachable
       {label: tr('Preview (PDF)'), icon: 'eye', fn: () => !inList && !d.locked && d.can_edit && d.status === 'draft' ? ofdPdfAskGo(d, false) : ofdPdfOpen(d, false)},  // 2.40.0 (#1364): the PDF, not the JSON print model; 2.138.2 A (#2393): a draft asks first (a list row opens marked)
       ...(typeof ls_moreItems === 'function' ? ls_moreItems(d, inList) : []),  // 2.120.0 D (#2089)
-      ofdIsInv(d) && d.kind !== 'reminder' && d.kind !== 'delivery' && d.locked ? {label: tr('E-invoice XML'), icon: 'download', fn: () => window.open(`/api/office/docs/${d.id}/xml`, '_blank', 'noopener')} : null,
-      ofdIsInv(d) && d.kind !== 'reminder' && d.kind !== 'delivery' && d.locked ? {label: tr('Send to the DATEV inbox'), icon: 'send', fn: async () => { const j = await ofdSave('POST', `/api/office/docs/${d.id}/datev`); if (j) toast(tr('Sent to the DATEV inbox')); }} : null,
+      ofdIsInv(d) && d.kind !== 'reminder' && d.kind !== 'delivery' && d.locked && (ofcFeat('docs.einvoice') || d.xml_sha256) ? {label: tr('E-invoice XML'), icon: 'download', fn: () => window.open(`/api/office/docs/${d.id}/xml`, '_blank', 'noopener')} : null,
+      ofdIsInv(d) && d.kind !== 'reminder' && d.kind !== 'delivery' && d.locked && ofcFeat('books.datev') ? {label: tr('Send to the DATEV inbox'), icon: 'send', fn: async () => { const j = await ofdSave('POST', `/api/office/docs/${d.id}/datev`); if (j) toast(tr('Sent to the DATEV inbox')); }} : null,
       d.status === 'draft' && !d.locked && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? {label: tr('Move to another workspace…'), icon: 'brief',  // 2.97.0 C (#2049)
         fn: () => ofm_move({what: 'drafts', ids: [d.id], from: ofm_officeFrom(), label: qn(d.number || d.project_title || ofdKindName(d.kind, true)), after: async () => gone()})} : null,
       d.can_unlock ? {label: tr('Undo finalising'), icon: 'undo', fn: async () => {  // 2.114.2 A (#2263): a finalised quotation never sent
@@ -532,6 +532,7 @@ async function ofdClick(e) {
   if (a === 'rowmore') { ofdRowMenu(b.dataset.id, b); return; }
   if (a === 'back') { OFD.doc = null; OFD.list = null; go('office/offers'); return; }
   if (a === 'kind') { OFD.kind = b.dataset.kind; OFD.status = ''; OFD.list = null; ofdLoadList(true); return; }
+  if (a === 'dun-open') { dun_open(); return; }  // 2.147.1 B (#2054): the suggested reminder drafts
   if (a === 'new-inv') {
     menu(b, [{label: tr('Empty invoice'), icon: 'plus', fn: () => ofdCreate({kind: 'invoice'})}, {label: tr('From time entries…'), icon: 'clock', fn: ofdFromTimeDialog},
       {label: tr('From a quotation: open it and press "Create invoice"'), fn: () => { OFD.kind = 'offer'; OFD.list = null; ofdLoadList(true); }}]);
@@ -683,6 +684,11 @@ function ofdPaymentDialog(d) {
     + ofdF('p-method', tr('Method'), ofcSel('ofd-p-method', 'transfer', OFD_PAY.map(([v, n]) => [v, tr(n)]))) + ofdF('p-note', tr('Note'), `<input id="ofd-p-note" maxlength="500">`),
     tr('Record'), async md => { const j = await ofdSave('POST', `/api/office/docs/${d.id}/payments`, {date: $('#ofd-p-date', md).value, amount: ofcNum($('#ofd-p-amount', md).value), method: $('#ofd-p-method', md).value, note: $('#ofd-p-note', md).value}); if (!j) return false; toast(j.state === 'paid' ? tr('Paid in full') : tr('Payment recorded')); });
 }
+// 2.147.0 (#2461): the e-invoice formats of the country pack (the base pack: ZUGFeRD / Factur-X only)
+function ofdEinvOpts() {
+  const fm = OFC.info?.pack?.einvoice_formats?.length ? OFC.info.pack.einvoice_formats : ['zugferd', 'xrechnung'];
+  return [['zugferd', fm.includes('xrechnung') ? 'ZUGFeRD (PDF with XML)' : 'ZUGFeRD / Factur-X (PDF with XML)'], ['xrechnung', 'XRechnung (XML, public clients)']].filter(o => fm.includes(o[0]));
+}
 async function ofdSendDialog(d) {
   let ms = {smtp: true, datev_email: ''}, tm = null;
   try { ms = await api('GET', '/api/office/mail-status'); } catch {}
@@ -697,7 +703,7 @@ async function ofdSendDialog(d) {
     + ofdF('s-subject', tr('Subject'), `<input id="ofd-s-subject" value="${esc(`${ofdKindName(d.kind, true)} ${d.number || ''}`)}" maxlength="200" ${ms.smtp ? '' : 'disabled'}>`)
     + ofdF('s-text', tr('Text'), `<textarea id="ofd-s-text" rows="4" maxlength="8000" placeholder="${esc(tr('empty = the standard text'))}" ${ms.smtp ? '' : 'disabled'}></textarea>`)
     + (d.timesheet_ok ? `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-s-ts"> ${tr('Attach the timesheet')}</label></div>` : '')  // 2.120.0 D (#2089)
-    + (d.kind !== 'reminder' && d.kind !== 'delivery' ? `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-s-datev" ${ms.datev_email && ms.datev_auto ? 'checked' : ''} ${ms.datev_email && ms.smtp ? '' : 'disabled'}> ${tr('Copy to the DATEV inbox')}${ms.datev_email ? ` <span class="muted">(${esc(ms.datev_email)})</span>` : ` <span class="muted">${tr('(no address in the settings)')}</span>`}</label></div>` : '')
+    + (d.kind !== 'reminder' && d.kind !== 'delivery' && ms.datev_on !== false ? `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-s-datev" ${ms.datev_email && ms.datev_auto ? 'checked' : ''} ${ms.datev_email && ms.smtp ? '' : 'disabled'}> ${tr('Copy to the DATEV inbox')}${ms.datev_email ? ` <span class="muted">(${esc(ms.datev_email)})</span>` : ` <span class="muted">${tr('(no address in the settings)')}</span>`}</label></div>` : '')
     + (typeof agbSendRow === 'function' ? agbSendRow(tm, ms.smtp) : ''),
     ms.smtp ? tr('Send|mail') : tr('Download PDF'), async md => { if (!ms.smtp) { const a = document.createElement('a'); a.href = ofdPdfUrl(d.id); a.download = ''; document.body.appendChild(a); a.click(); a.remove(); return; } const j = await ofdSave('POST', `/api/office/docs/${d.id}/send`, {to: $('#ofd-s-to', md).value.trim(), cc: $('#ofd-s-cc', md).value.trim(), subject: $('#ofd-s-subject', md).value, text: $('#ofd-s-text', md).value, datev: !!$('#ofd-s-datev', md)?.checked, timesheet: !!$('#ofd-s-ts', md)?.checked, terms: !!$('#ofd-s-terms', md)?.checked}); if (!j) return false; toast(tr('Sent')); });
 }

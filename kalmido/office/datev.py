@@ -25,7 +25,7 @@ from ..core.i18n import N_, tr
 from ..core.db import db, local_now
 from ..personal.timetrack import BadInput
 from .calc import dec, money
-from .model import office_gate, office_org, office_settings
+from .model import office_gate, office_need_feature, office_org, office_settings
 from .ledger import ofx_log
 
 # tax cases -> the default revenue accounts per chart (automatic accounts: DATEV adds the VAT itself, no tax key needed)
@@ -346,6 +346,7 @@ def dx_extf_get():
     c = db()
     uid = office_gate(c)
     oid = office_org(c, uid, admin=True)
+    office_need_feature(c, oid, "books.datev")  # 2.147.0 (#2459, #2460)
     d_from, d_to = _period()
     u = g.user
     by = (u["display_name"] if "display_name" in u.keys() else "") or u["username"]

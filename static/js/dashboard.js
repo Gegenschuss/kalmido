@@ -57,7 +57,7 @@ function newsBundledHtml(vis, pop, pre = '') {
   const sect = (id, title, n, body, cls) => `<section class="nsect ${cls}" aria-labelledby="${id}"><h2 id="${id}" class="nsh">${title}${n ? `<span class="c">${n}</span>` : ''}</h2>${body}</section>`;
   return (needs.length || pre ? sect('ns-need', tr('For you'), bellCount(), pre + needs.map(g => newsGroupHtml(g, pop)).join(''), 'me') : '')
     + (info.length ? sect('ns-info', tr('Also new'), info.length, info.map(g => newsGroupHtml(g, pop)).join(''), 'also') : '')
-    + (done.length ? sect('ns-read', tr('Read'), 0, done.map(g => newsGroupHtml(g, pop)).join(''), 'done') : '');
+    + (done.length ? sect('ns-read', tr('Read|section'), 0, done.map(g => newsGroupHtml(g, pop)).join(''), 'done') : '');
 }
 async function newsGroupRead(ids) {
   try { await rawFetch('POST', '/api/news/read', {ids}); } catch (e) { toast(e.message); return; }

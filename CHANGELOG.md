@@ -20,6 +20,36 @@ Office fixes: tracked time to the invoice without billing it twice, small items 
 - List rules: asking for an approval (or for changes) no longer counts as "assigned", the task stays with the approver (#2400).
 - Legacy import: archiving the rest of an undone import leaves entries you restored by hand alone (#2400).
 - Office settings > Data: one section "Transfer into an organisation" with both ways (a new organisation or an existing one) instead of two wordings (#2436).
+## [2.147.1] - 2026-10-21
+
+Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.
+
+### Added
+- Chats: tasks, lists, contacts and events can be dragged into the team chat, a thread or an agent chat; they go in as a reference (`#123` or a link card) at the cursor. Several selected tasks at once give one reference each; phones and tablets get *Insert reference* in the chat input row (#2523).
+- Office: an invoice overdue for more than the grace days (default 7) gets a suggested payment reminder as a draft per client - nothing is sent, a task and a hint in the list point to it; switchable in the office settings (#2054).
+- Office: invoices and reminders in EUR carry a GiroCode (EPC QR code) next to the bank details, so banking apps fill in the transfer; switchable, documents finalised earlier stay as they were (#2054).
+
+### Changed
+- Moving many documents to another workspace goes in batches with a progress bar "x of n moved"; smaller moves show *Moving…* on the button; undo still takes back everything at once (#2230).
+- Agents carry the colour of their workspace as a thin stripe in the sidebar, the window bar and the Agents view; chat header and input keep the agent's own colour (#2231).
+- Bell: unread approvals an agent waits for count in the bell and in *For you* (#2405).
+
+### Fixed
+- Bell: the section of read news is called "Gelesen" in German (was "Lesen") (#2405, #2420).
+- Organisation card: the member count leaves agent accounts out, like the members dialog (#2420).
+- Agent chat on Android: the coloured line on top of the input shows again (#2411, #2502).
+
+## [2.147.0] - 2026-10-21
+
+The country pack decides which office functions exist, single ones can be switched off, and an international base pack
+lets offices outside Germany work without German assumptions.
+
+### Added
+- The country pack lists the office functions it offers (DATEV, e-invoices, VAT return figures, tax dates, export for the tax advisor, finalising rules); menus, settings, buttons and the server follow it. Offices from before stay as they were: Germany, everything on (#2459).
+- *Office > Settings > Functions*: one switch per function. Off only hides - nothing is deleted, the DATEV address and settings stay, switching on brings everything back; finalised documents and retention periods stay in force. Admins only, in a personal office its owner (#2460).
+- International base pack: own VAT rates, EN 16931 e-invoices (ZUGFeRD / Factur-X), retention set by the office, texts without country assumptions; the export for any tax advisor (booking list as CSV, with invoices and receipts as ZIP) in every pack. docs/PACKS.md: how the community builds a country pack (#2461).
+- A new office asks for its country once (suggestion from the company country or the language); changing it later says first what is hidden and that finalised invoices keep their state (#2462).
+- Agents: `get_office` names the country pack and the functions as switched on.
 
 ## [2.146.0] - 2026-10-21
 

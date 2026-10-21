@@ -96,6 +96,10 @@ Book crew and equipment for shoot days and see who and what is free.
 - **Phone / tablet:** the link button next to the comment box (and *Insert reference* under the description) opens the
   search; the pick goes in at the cursor. It finds lists, folders, open tasks, contacts, appointments of the coming
   months and the files of the Ablage folder that is open.
+- **Into a chat (2.147.1):** the same works for the message boxes of the team chat, a thread and the agent chat (also a
+  window of the split chat panel): drop a task and it goes in as `#123` at the drop point, the sent message shows it as a
+  reference. Several selected tasks dragged at once go in as one reference each. A dropped file still becomes an
+  attachment. On a phone / tablet the link button sits in the chat's input row.
 - **Cards:** a link to this instance shows as a small card with an icon (list, folder, task, contact, appointment,
   document) and the name *the reader* sees now - never the label the author typed. A target the reader cannot see (or one
   that was deleted) is a grey *No access* card without a name and without a link.
