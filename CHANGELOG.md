@@ -5,6 +5,15 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.161.3] - 2026-10-22
+
+Follow-ups to 2.153.0 (correspondence, receipt list) and the organisation import.
+
+### Fixed
+- Organisation import: the ids inside the task and list history are mapped to the new ones (unknown ones dropped), undoing an import also removes the document settings it created, and a failed import into the private space removes the personal office it made while that stayed empty (#2399).
+- Correspondence: the signature picture goes through the virus scan like every upload; the letter PDF date uses the server clock consistently (#2028).
+- An incoming e-invoice dated in a locked month stays an ordinary document instead of becoming a receipt; the check also works in the document worker (#2055).
+
 ## [2.161.2] - 2026-10-21
 
 Package 2.152.1 (small fixes: navigation, News number).
