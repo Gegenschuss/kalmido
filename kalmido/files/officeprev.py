@@ -86,7 +86,7 @@ def part(name):
     BUDGET[0] += len(b)
     if BUDGET[0] > UNZ:
         raise Stop("too_large")
-    if DTD.search(b):
+    if DTD.search(b) or b[:2] in (b"\xff\xfe", b"\xfe\xff") or b"\x00" in b[:4]:  # 2.148.1 E (#2496): UTF-16 / UTF-32 hide the DOCTYPE from the check
         raise Stop("unsafe")
     return ET.fromstring(b)
 

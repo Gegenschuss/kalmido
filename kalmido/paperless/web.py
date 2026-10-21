@@ -43,6 +43,9 @@ def _public(c, ws, uid, org):
                    "synced_at": r["synced_at"], "error": r["error"], "error_text": P.pl_err_text(r["error"]), "run": run}
     if not r["error"] and P.pl_token_lost(c, r):  # 2.138.4 C (#2382): after a new server key: enter the token again
         out["conn"].update(error_text=P.pl_err_text("key"), token_lost=True)
+    if not can:  # 2.148.1 E (#2496): the address and the error texts of the server are for the managers only
+        out["conn"].update(url="", error=("error" if out["conn"]["error"] else ""), error_text="")
+        out["conn"]["run"].update(error=("error" if out["conn"]["run"]["error"] else ""), error_text="")
     return out
 
 

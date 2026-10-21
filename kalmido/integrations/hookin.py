@@ -30,6 +30,7 @@ from ..api.v1 import hit_limit, PRIO_VALUES
 # the answer ("ignored"), so a flow keeps running when the list changes; invalid values (date, priority, a field value)
 # are a 400. Limits: WHI_MAX_BYTES per body, WHI_PER_MIN / WHI_PER_DAY requests per webhook, WHI_LIST_MAX per list.
 WHI_MAX_BYTES = 64 * 1024
+WHI_UNKNOWN_PER_MIN = 30  # 2.148.1 E (#2496): unknown tokens per address and minute
 WHI_PER_MIN = _env_int("KALMIDO_HOOK_IN_PER_MIN", 60)
 WHI_PER_DAY = _env_int("KALMIDO_HOOK_IN_PER_DAY", 1000)
 WHI_LIST_MAX = 10
@@ -283,6 +284,8 @@ def whi_in(token):
     from ..agents.core import is_agent
     from ..tasks.tasks import task_create
     c = db()
+    if (request.content_length or 0) > WHI_MAX_BYTES:  # 2.148.1 E (#2496): size first, before anything is read
+        return err(tr("The request is too large (at most {0} KB)", WHI_MAX_BYTES // 1024), 413)
     h = whi_hash(token) if len(token) <= 200 else ""
     with system_ctx(c):  # 2.115.0 A (#2061): resolve the token (one row by its hash) across organisations, then act as its owner
         r = c.execute("""SELECT h.*, l.archived FROM hook_in h JOIN lists l ON l.id=h.list_id
@@ -290,8 +293,10 @@ def whi_in(token):
         u = c.execute("SELECT * FROM users WHERE id=?", (r["created_by"],)).fetchone() if r and r["created_by"] else None
     if not r:
         aa_count("security", "hookin", client_ip())
+        if hit_limit(f"whiu:{client_ip()}", WHI_UNKNOWN_PER_MIN):  # 2.148.1 E (#2496): guessing tokens is slowed down per address
+            return err(tr("Too many attempts, please wait a few minutes"), 429)
         return err(tr("unknown"), 404)
-    if (request.content_length or 0) > WHI_MAX_BYTES or len(request.get_data(cache=True) or b"") > WHI_MAX_BYTES:
+    if len(request.get_data(cache=True) or b"") > WHI_MAX_BYTES:
         return err(tr("The request is too large (at most {0} KB)", WHI_MAX_BYTES // 1024), 413)
     if hit_limit(f"whi:{r['id']}", WHI_PER_MIN) or hit_limit(f"whid:{r['id']}", WHI_PER_DAY, 86400):
         return err(tr("Too many attempts, please wait a few minutes"), 429)

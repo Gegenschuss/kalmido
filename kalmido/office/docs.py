@@ -1137,8 +1137,9 @@ def odoc_items_put(did):
 @app.post("/api/office/docs/<int:did>/number")
 def odoc_number(did):
     """{number?} sets a number by hand (unique within the organisation) or reserves the next one of the scheme.
-    A finalised document: 409. 2.126.0 A (#1966): the next number of a kind numbered at finalising only comes then (409)."""
-    c, uid, oid = _ctx()
+    A finalised document: 409. 2.126.0 A (#1966): the next number of a kind numbered at finalising only comes then (409).
+    2.148.1 E (#2496): office admin / accounting only (a plain member's number comes at finalising)."""
+    c, uid, oid = _ctx(admin=True)
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
     b = body()

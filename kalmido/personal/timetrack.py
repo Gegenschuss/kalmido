@@ -423,7 +423,11 @@ def time_stop():
     uid, ref = me(), now_utc().replace(microsecond=0)
     at = time_at(b.get("at"), ref)
     if b.get("id"):
-        r = c.execute("SELECT * FROM time_entries WHERE id=? AND user_id=?", (int(b["id"]), uid)).fetchone()
+        try:  # 2.148.1 E (#2496): a bad id is 400, not 500
+            eid = int(b["id"])
+        except (TypeError, ValueError):
+            raise BadInput(tr("Invalid value: {0}", "id")) from None
+        r = c.execute("SELECT * FROM time_entries WHERE id=? AND user_id=?", (eid, uid)).fetchone()
     elif b.get("client_id"):
         r = c.execute("SELECT * FROM time_entries WHERE client_id=? AND user_id=?", (str(b["client_id"])[:64], uid)).fetchone()
     else:
@@ -453,7 +457,7 @@ def entry_times(b, start, end, sec, tz=None):
     if b.get("minutes") not in (None, ""):
         try:
             sec = int(round(float(str(b["minutes"]).replace(",", ".")) * 60))
-        except ValueError:
+        except (ValueError, OverflowError):
             raise BadInput(tr("Duration: number of minutes expected")) from None
         end = start + timedelta(seconds=sec)
     elif "end" in b and b.get("end"):
@@ -664,7 +668,11 @@ def time_list():
     from .timesheet import tsl_mark
     tsl_mark(c, uid, out)  # 2.125.0 B (#2119): my entries of a closed month
     out.reverse()
-    return jsonify(entries=out[:int(request.args.get("limit", 2000))], seconds=sum(e["seconds"] for e in out),
+    try:
+        lim = max(0, int(request.args.get("limit", 2000)))
+    except ValueError:  # 2.148.1 E (#2496)
+        raise BadInput(tr("Invalid value: {0}", "limit")) from None
+    return jsonify(entries=out[:lim], seconds=sum(e["seconds"] for e in out),
                    mine=sum(e["seconds"] for e in out if e["mine"]))
 
 

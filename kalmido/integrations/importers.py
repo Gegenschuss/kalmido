@@ -75,6 +75,8 @@ def import_ticktick(c, text, uid):
     if i < 0:
         raise ValueError(tr("Not a TickTick CSV (header 'Folder Name' missing)", lg=lang(c, uid)))
     rows = list(csv.DictReader(io.StringIO(text[i:])))
+    if len(rows) > IMPORT_MAX_TASKS:  # 2.148.1 E (#2496)
+        raise ValueError(tr("Too many rows (more than {0} tasks)", IMPORT_MAX_TASKS, lg=lang(c, uid)))
     lists = {r["name"]: r["id"] for r in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND e2e IS NULL", (uid,))}
     inbox = my_inbox(c, uid)
     sections = {}
@@ -182,8 +184,11 @@ def import_api():
     f = request.files.get("file")
     if not f:
         return err(tr("File missing"))
+    raw = f.read(IMPORT_MAX_MB * 1048576 + 1)  # 2.148.1 E (#2496): the limits of the other importers
+    if len(raw) > IMPORT_MAX_MB * 1048576:
+        return err(tr("The file is too large (at most {0} MB)", IMPORT_MAX_MB), 413)
     try:
-        stats = import_ticktick(db(), f.read().decode("utf-8-sig"), me())
+        stats = import_ticktick(db(), raw.decode("utf-8-sig"), me())
     except (ValueError, KeyError) as e:
         return err(str(e))
     return jsonify(stats)
