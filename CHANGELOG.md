@@ -7,6 +7,25 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.153.0] - 2026-10-21
+
+Correspondence in the office (letters, e-mail, text blocks, agent drafts), custom fields for documents, an own chat per job and a filtered receipts list with an export for the tax advisor.
+
+### Added
+- Office: new area *Correspondence* - letters to authorities, insurers and others after DIN 5008 with letterhead, signature (optional signature picture), channel, status and tracking number; recipients from clients or the address book; the PDF is filed with the client. Letters and filed documents link both ways (*Answer to*, *Write answer*), the thread per contact and topic shows the history, a deadline in an incoming letter becomes a task, a follow-up date creates a task when no answer comes (#2028).
+- Correspondence: send a letter by e-mail with its PDF; the answer arrives through the documents address and is linked to the letter automatically (#2029). Text blocks per office (also without an organisation) are inserted at the cursor (#2030).
+- Agents: *Let an agent draft the answer* at a document (only agents the document is shared with); event `letter_draft_requested`, API v1 and MCP `create_letter_draft` create drafts only - a person checks, signs and sends (#2031).
+- *Write answer* also takes the address from an address-book contact when the sender is no client; a company card wins over single persons of the company (#2229).
+- Documents: custom fields per workspace (text, number, amount, date, checkbox, choice, link), nothing preset; organisation admins define them, in the private space the person; values are encrypted like the text, searchable, move along between workspaces; the Paperless import takes custom fields as real fields; agents read and fill existing fields (#2179).
+- Agents: every job has its own chat - start line, progress lines and messages of the job; *Open job chat* under each job card; questions show under the card; messages typed there carry the job (#1962).
+- Bookkeeping: *All receipts* across all months with filters (period, paid / open, receipt or payment date, category, supplier, project, without VAT rate, search) and totals; export exactly the filtered receipts as CSV or as ZIP with the original files for the tax advisor, behind the country pack switch of the export (#2055).
+- Incoming e-invoices in an office's documents become a receipt on the first read (own invoices not, credit notes negative) (#2055).
+
+### Changed
+- Correspondence is for office admins (and the person in the private office); the accounting role does not see letters.
+- Moving a private office into an organisation keeps an existing letter signature there and unlinks letters from private documents (named in the preview).
+- Writing into a job's chat needs the right to stop that job, like the job's message button.
+
 ## [2.147.1] - 2026-10-21
 
 Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.

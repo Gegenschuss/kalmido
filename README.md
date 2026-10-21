@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.153.0** (2026-10-21): **correspondence** in the office - letters after DIN 5008 with signature, sent by post or
+  e-mail with the answer linked automatically, text blocks, deadlines and follow-ups as tasks, answer drafts by agents;
+  **custom fields for documents** (also from Paperless); an **own chat per job**; **all receipts** with filters and an
+  export of the filtered receipts for the tax advisor; incoming e-invoices become receipts.
 - **2.147.1** (2026-10-21): **drag tasks into the chats** (team chat, thread, agent chat) as references, several at once, with
   *Insert reference* on phones; **overdue invoices suggest a payment reminder** as a draft (nothing is sent) and
   invoices / reminders in EUR carry a **GiroCode** for banking apps; moving many documents to another workspace shows
