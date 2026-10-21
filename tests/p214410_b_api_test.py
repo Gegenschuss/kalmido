@@ -9,7 +9,7 @@ Own container (start.sh), invented companies and people only (@example.com / .ex
  - the automatic dunning run suggests a reminder for the overdue real invoice, never for the overdue trial invoice;
    a reminder cannot mix trial and real invoices (400)
  - the bank: a booking naming the trial invoice gets no trial suggestion / candidate, matching it is refused (409)
- - no invoice series from a trial invoice (400), no deal bound to a trial quotation (400), no DATEV copy of it (409)
+ - no invoice series from a trial invoice (409), no deal bound to a trial quotation (400), no DATEV copy of it (409)
  - chronology: a trial invoice dated today does not keep a real one dated yesterday from being finalised
  - a person without an organisation (freelancer-matrix: office) gets the same in the personal office
 usage: p214410_b_api_test.py <datadir>      (a fresh container; P214410B_NOSTART=1 = the server already runs)"""
@@ -264,7 +264,7 @@ def area(s, who):
     r = s.post(B + O + "/series", json=dict(sr, template_id=r4))
     check(r.status_code == 201, f"{who}: a series from a real invoice " + r.text[:200])
     r = s.post(B + O + "/series", json=dict(sr, template_id=t4))
-    check(r.status_code == 400, f"{who}: no series from a trial invoice " + r.text[:200])
+    check(r.status_code == 409, f"{who}: no series from a trial invoice " + r.text[:200])
     r = s.post(B + O + "/deals", json={"title": "Example deal"})
     check(r.status_code == 201, f"{who}: a deal " + r.text[:200])
     dl = r.json().get("id")

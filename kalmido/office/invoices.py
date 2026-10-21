@@ -588,10 +588,8 @@ def inv_make_reminder(c, oid, uid, b):
     s = office_settings(c, oid)
     rows = inv_reminder_rows(c, oid, ids)
     first = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (ids[0], oid)).fetchone()
-    # 2.144.10 A (#2576): a reminder is a trial document when its invoices are; trial and real ones never share one
-    if len({x["trial"] for x in c.execute("SELECT trial FROM office_docs WHERE org_id=? AND id IN (" + ",".join("?" * len(ids)) + ")",
-                                          [oid, *ids]).fetchall()}) > 1:
-        raise BadInput(tr("Trial and real invoices cannot share a reminder"))
+    # 2.144.10 A (#2576): a reminder is a trial document when its invoices are (inherited via inv_new_row); trial and real
+    # ones never share one (inv_reminder_rows)
     write_lock(c, f"office_dunning_{int(oid)}")  # 2.147.1 (#2054, review): the same lock as the suggestion run (no second draft at once)
     inv_check_reminder(c, oid, ids, rows)
     level = b.get("level", 1)
