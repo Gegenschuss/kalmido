@@ -75,10 +75,15 @@ const ago = n => { const d = new Date(Date.now() - n * 864e5); return d.toISOStr
     await shot('p21443-b-hint-phone.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     // ================= the settings
-    await nav(B + '#office/settings');
-    check(await ready(ev, `!!document.querySelector('#os-dun-on') && !!document.querySelector('#os-girocode')`, 80), 'the settings: suggestions and GiroCode');
+    // 2.144.3 (#2054): the office settings come in areas and save each field on its own (#2247): the area "docs" holds both
+    await nav(B + 'static/icon.svg'); await nav(B + '#office/settings');
+    await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub="docs"]')`, 80);
+    await ev(`(() => { document.querySelector('#ofc-set [data-ostsub="docs"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('#os-dun-on')?.getClientRects().length && !!document.querySelector('#os-girocode')`, 80), 'the settings: suggestions and GiroCode in the area of documents');
     check(await ev(`document.querySelector('#os-dun-on').checked && document.querySelector('#os-dun-days').value === '7' && document.querySelector('#os-girocode').checked`), 'the settings: defaults on, 7 days');
-    await ev(`(() => { document.querySelector('#os-dun-days').value = '5'; document.querySelector('#os-girocode').checked = false; document.querySelector('[data-ofc="save-settings"]').click(); return 1; })()`);
+    await ev(`(() => { const d = document.querySelector('#os-dun-days'); d.focus(); d.value = '5'; d.dispatchEvent(new Event('input', {bubbles: true})); d.dispatchEvent(new FocusEvent('focusout', {bubbles: true})); return 1; })()`);
+    await ready(ev, `fetch('/api/office/settings', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.settings.dunning_grace_days === 5)`, 60);
+    await ev(`(() => { const g = document.querySelector('#os-girocode'); g.checked = false; g.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     check(await ready(ev, `fetch('/api/office/settings', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.settings.dunning_grace_days === 5 && j.settings.girocode === 0 && j.settings.dunning_suggest === 1)`, 60),
       'the settings are saved');
     await shot('p21443-b-settings.png');
