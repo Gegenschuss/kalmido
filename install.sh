@@ -233,8 +233,11 @@ ensure_pg_password() {
 ensure_compose_profiles() {
   grep -q '^COMPOSE_PROFILES=' "$DIR/.env" 2>/dev/null && return 0
   prof=""
-  grep -q '^DATABASE_URL=.' "$DIR/.env" 2>/dev/null || prof="localdb"
-  if ! grep -Eq '^KALMIDO_CLAMD=[[:space:]]*$' "$DIR/.env" 2>/dev/null; then
+  # 2.149.0 review: a DATABASE_URL that points at the compose service "db" still needs the local database container
+  if ! grep -q '^DATABASE_URL=.' "$DIR/.env" 2>/dev/null || grep -Eq '^DATABASE_URL=.*@db(:|/)' "$DIR/.env" 2>/dev/null; then
+    prof="localdb"
+  fi
+  if ! grep -Eq '^KALMIDO_CLAMD=[[:space:]]*("")?[[:space:]]*$' "$DIR/.env" 2>/dev/null; then
     prof="${prof:+$prof,}clamav"
   fi
   printf '\n# Optional services of docker-compose.yml: localdb (the PostgreSQL container), clamav (virus scan). Added by the installer.\nCOMPOSE_PROFILES=%s\n' "$prof" >> "$DIR/.env"

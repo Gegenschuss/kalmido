@@ -213,8 +213,8 @@
   $envText = [IO.File]::ReadAllText($envFile)
   if ($envText -notmatch '(?m)^COMPOSE_PROFILES=') {
     $prof = @()
-    if ($envText -notmatch '(?m)^DATABASE_URL=\S') { $prof += 'localdb' }
-    if ($envText -notmatch '(?m)^KALMIDO_CLAMD=[ \t]*$') { $prof += 'clamav' }
+    if ($envText -notmatch '(?m)^DATABASE_URL=\S' -or $envText -match '(?m)^DATABASE_URL=.*@db[:/]') { $prof += 'localdb' }  # 2.149.0 review: @db = the compose database
+    if ($envText -notmatch '(?m)^KALMIDO_CLAMD=[ \t]*(""|'''')?[ \t]*$') { $prof += 'clamav' }
     $envText = $envText.TrimEnd("`n") + "`n`n# Optional services of docker-compose.yml: localdb (the PostgreSQL container), clamav (virus scan). Added by the installer.`nCOMPOSE_PROFILES=$($prof -join ',')`n"
     [IO.File]::WriteAllText($envFile, $envText, (New-Object Text.UTF8Encoding($false)))
     Say "Added COMPOSE_PROFILES=$($prof -join ',') to .env (which optional services run)"
