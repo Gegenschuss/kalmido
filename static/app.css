@@ -6154,6 +6154,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 @keyframes an_fade1{from{opacity:0}to{opacity:1}}
 @keyframes an_fade2{from{opacity:0}to{opacity:1}}
 @keyframes an_line{from{opacity:0;transform:scaleX(.2)}to{opacity:1;transform:none}}
+@keyframes an_dropout{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-.5rem)}}
 @keyframes an_drop{from{opacity:0;transform:translateY(-.5rem)}to{opacity:1;transform:none}}
 .an-v1{animation:an_view1 .18s ease-out}.an-v2{animation:an_view2 .18s ease-out}
 #view.an-cn1>.calbar~*{animation:an_next1 .2s ease-out}#view.an-cn2>.calbar~*{animation:an_next2 .2s ease-out}
@@ -6164,6 +6165,9 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 @media (max-width:899px){
   .modal.palette{animation:an_fadein .18s ease-out}
   .modal.palette>.card{animation:an_drop .2s ease-out}
+  /* 2.144.5 D (#1560): closing plays it backwards (palette.js closePalette; reduced motion = the central 0.01 ms rule) */
+  .modal.palette.an-out{animation:an_fadeout .18s ease-in forwards;pointer-events:none}
+  .modal.palette.an-out>.card{animation:an_dropout .18s ease-in forwards}
 }
 /* 2.46.0 C (#1606 / #1605): the question before a folder role replaces roles set per list (three buttons, wrap on a phone);
    a group's picture in the chip of a task assigned to it */

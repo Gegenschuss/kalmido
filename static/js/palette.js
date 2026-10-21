@@ -425,7 +425,7 @@ function palDraw() {
 function openPalette(mode = null) {
   if (S.me?.kid) return;  // 2.19.0: no commands for a child account
   const ret = document.activeElement && document.activeElement !== document.body && !document.activeElement.closest?.('.palette') ? document.activeElement : PAL.ret;
-  closePalette(); closePop(); PAL.ret = ret;
+  closePalette(true); closePop(); PAL.ret = ret;
   PAL.q = ''; PAL.i = 0; PAL.mode = mode;
   if (!mode) palSubLoad();  // 2.87.9 (#1934)
   const t = curTask();
@@ -453,9 +453,13 @@ function openPalette(mode = null) {
   if (isTouch()) inp.focus();
   setTimeout(() => inp.focus(), 0);
 }
-function closePalette() {
-  if (!$('.palette')) return;
-  $('.palette').remove();
+function closePalette(now = false) {
+  // 2.144.5 D (#1560): a phone's search leaves with the opening animation backwards; a palette already leaving goes at once
+  $$('.palette.an-out').forEach(an_kill);
+  const pl = $('.palette');
+  if (!pl) return;
+  if (!now && an_on()) { pl._anOut = true; pl.classList.add('an-out'); pl.setAttribute('inert', ''); pl._anT = setTimeout(() => an_kill(pl), AN_MS); }
+  else pl.remove();
   // 2.16.2: the focus goes back to where it was (a row, a button), not to the page
   const r = PAL.ret; PAL.ret = null;
   if (r && r.isConnected && (!document.activeElement || document.activeElement === document.body)) { try { r.focus({preventScroll: true}); } catch { /* gone */ } }
