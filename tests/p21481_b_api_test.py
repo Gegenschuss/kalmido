@@ -272,5 +272,49 @@ r = A.post(B + f"/api/lists/{LH}/owner", json={"user_id": uid["bob"]})
 check(r.ok, "the server admin takes over a disabled account's list " + r.text[:200])
 check(any(x.get("name") == "Hank private" for x in news(uid["hank"], "takeover")), "the person finds the takeover in their News")
 
+# ================================================================ review fixes (part H): more ways out of an organisation
+LF = Bo.post(B + "/api/lists", json={"name": "Team shopping", "org_id": ORG}).json()["id"]
+r = Bo.patch(B + f"/api/lists/{LF}", json={"family": "shopping"})
+check(r.status_code == 403 and sql("SELECT org_id FROM lists WHERE id=?", (LF,))[0][0] == ORG,
+      "'Used for' does not make a plain member's organisation list private (403) " + r.text[:200])
+BPL = Bo.post(B + "/api/lists", json={"name": "Bob own", "org_id": None}).json()["id"]
+TB = Bo.post(B + "/api/tasks", json={"title": "Team task", "list_id": LB}).json()["id"]
+r = Bo.patch(B + f"/api/tasks/{TB}", json={"list_id": BPL})
+check(r.status_code == 403 and sql("SELECT list_id FROM tasks WHERE id=?", (TB,))[0][0] == LB,
+      "a plain member does not move a task out of an organisation list (403) " + r.text[:200])
+LB2 = Bo.post(B + "/api/lists", json={"name": "Team plan two", "org_id": ORG}).json()["id"]
+check(Bo.patch(B + f"/api/tasks/{TB}", json={"list_id": LB2}).ok, "inside the organisation tasks move as before")
+r = Bo.post(B + "/api/templates", json={"list_id": LB})
+check(r.status_code == 403, "a plain member saves no organisation list as a template (403) " + r.text[:200])
+r = Bo.post(B + "/api/templates", json={"task_id": TB})
+check(r.status_code == 403, "... nor one of its tasks (403) " + r.text[:200])
+LE2 = Er.post(B + "/api/lists", json={"name": "Admin plan", "org_id": ORG}).json()["id"]
+r = Er.post(B + "/api/templates", json={"list_id": LE2})
+check(r.ok and moveouts("template"), "an organisation admin saves it as a template, logged " + r.text[:200])
+EPL = Er.post(B + "/api/lists", json={"name": "Erin own", "org_id": None}).json()["id"]
+TE = Er.post(B + "/api/tasks", json={"title": "Admin task", "list_id": LE2}).json()["id"]
+check(Er.patch(B + f"/api/tasks/{TE}", json={"list_id": EPL}).ok, "an organisation admin moves a task out")
+r = Bo.patch(B + f"/api/books/{BO}", json={"org_id": None})
+check(r.status_code == 403 and sql("SELECT org_id FROM books WHERE id=?", (BO,))[0][0] == ORG,
+      "a plain member does not move an organisation's address book to private (403) " + r.text[:200])
+r = Bo.post(B + "/api/evcals", json={"name": "Team dates", "org_id": ORG})
+EC = r.json().get("id") if r.ok else None
+r = Bo.patch(B + f"/api/evcals/{EC}", json={"org_id": None})
+check(EC and r.status_code == 403, "... nor an organisation's calendar (403) " + r.text[:200])
+check(Fr.patch(B + f"/api/books/{F2}", json={"org_id": None}).ok, "freelancer: the own address book stays editable")
+# a closed channel: only its members add people
+r = Bo.post(B + "/api/team/channels", json={"name": "Closed two", "org_id": ORG, "open": False})
+CH2 = r.json().get("id") if r.status_code == 201 else None
+r = Er.post(B + f"/api/team/rooms/{CH2}/members", json={"user_id": uid["carol"]})
+check(CH2 and r.status_code == 403, "an organisation admin who is no member adds nobody to a closed channel (403) " + r.text[:200])
+r = Bo.post(B + f"/api/team/rooms/{CH2}/members", json={"user_id": uid["carol"]})
+check(r.ok, "its member adds a colleague " + r.text[:200])
+# the boundary check names a receipt finding as a file
+r = Er.post(B + "/api/files/upload", data={"space": "private"}, files=[("file", ("bill.txt", b"Bill 3.20 EUR", "text/plain"))])
+RP = r.json()["items"][0]["id"] if r.status_code == 201 else 0
+sql("INSERT INTO office_equipment(org_id,name,created_at,updated_at,receipt_node_id) VALUES(?,?,?,?,?)", (ORG, "Tripod", TS, TS, RP), write=True)
+det = [x for x in ((A.get(B + "/api/admin/orgs").json().get("boundary") or {}).get("details") or []) if x["kind"] == "office_receipt"]
+check(RP and any(x["id"] == RP and x["type"] == "file" and x["name"] == "bill.txt" for x in det), "a receipt finding is shown as a file " + str(det[:2]))
+
 print(f"p21481_b_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

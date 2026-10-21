@@ -6,8 +6,7 @@ answer, too, to copy without e-mail). An address that has an account is added as
 answer says nothing more). 2.148.1 A (#2480): an existing account is never added silently: it gets an invitation (org_joins,
 a News item) and joins when the person accepts (POST /api/orgs/<id>/join; DELETE declines); only an instance admin still
 adds directly. Both ways answer the same (no "invited" / "user_id"). 2.148.1 A (#2486): the link of a new account goes only
-by e-mail (an organisation admin never sees it, also not on a mail error or with the mail budget used up); an instance admin
-still gets it then (servers without SMTP), logged. At most OINV_RESEND_DAY resends per invitation and day. The instance admins can switch this off (Settings > Users > Sign-in, global setting org_invites;
+to the invited address (an instance admin gets it when no mail went, logged). At most OINV_RESEND_DAY resends per invitation and day. The instance admins can switch this off (Settings > Users > Sign-in, global setting org_invites;
 default on: like the instance admins' own invitations it does not depend on the registration mode of the login page).
 Limits: only an admin of THIS organisation (agents never), OINV_DAY new invitations per inviting person and day, the
 e-mails count against the daily mail budget (admin/hosting.py). Resend and withdraw only for accounts this organisation
@@ -65,6 +64,15 @@ def oinv_list(c, oid):
         if oinv_pending(c, r["user_id"]) and c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, r["user_id"])).fetchone():
             out.append({"user_id": r["user_id"], "email": r["email"] or "", "name": r["display_name"] or r["username"],
                         "role": r["role"], "created_at": r["created_at"], "state": invite_state(c, r["user_id"]) or "expired"})
+    # 2.148.1 H (#2480): the open invitations of existing accounts are listed, too (same form, no account id)
+    from ..core.pg import system_ctx
+    since = iso(now_utc() - timedelta(days=OJN_DAYS))
+    with system_ctx(c):  # the invited person is no member yet; the caller checked the organisation admin
+        joins = c.execute("""SELECT j.id, j.role, j.created_at, u.email FROM org_joins j JOIN users u ON u.id=j.user_id WHERE j.org_id=?
+                             AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=j.org_id AND m.user_id=j.user_id)""", (oid,)).fetchall()
+    out += [{"user_id": None, "join_id": r["id"], "email": r["email"] or "", "name": r["email"] or "", "role": r["role"],
+             "created_at": r["created_at"], "state": "invited" if r["created_at"] > since else "expired"} for r in joins]
+    out.sort(key=lambda v: v["created_at"] or "", reverse=True)
     return out
 
 
@@ -104,7 +112,8 @@ def org_invite_new(oid):
         c.rollback()
         from ..accounts.orgs import org_member_put
         r = org_member_put(oid)  # the existing path with the same body (an invitation to accept, accounts/orgs.py)
-        if r.status_code >= 400:
+        code = r[1] if isinstance(r, tuple) else r.status_code  # 2.148.1 H (#2480): err() answers (body, code)
+        if code >= 400:
             return r
         return jsonify(ok=True, by_email=True, invites=oinv_list(c, oid))  # 2.148.1 A (#2480): the same answer as a new account
     since = iso(now_utc() - timedelta(days=1))
@@ -131,14 +140,12 @@ def org_invite_new(oid):
     # a notice); an instance admin sees every account anyway and keeps the id (undo) and the link
     if g.user["is_admin"]:
         return jsonify(ok=True, by_email=True, invited=True, user_id=uid, invitation=inv, invites=oinv_list(c, oid))
-    return jsonify(ok=True, by_email=True, invites=oinv_list(c, oid), **({"notice": inv["error"]} if inv.get("error") else {}))
+    return jsonify(ok=True, by_email=True, invites=oinv_list(c, oid))  # 2.148.1 H (#2480): no notice -- the same answer as for an existing account
 
 
 def _no_link_if_sent(inv, uid=None):
-    """2.115.0 review (M2): the link goes only to the invited address once the mail is out. 2.148.1 A (#2486): an
-    organisation admin never sees it (also not on a mail error or with the mail budget used up: the admin could set the
-    password of an account that carries somebody else's address); an instance admin still gets it when no mail went
-    (servers without SMTP), logged."""
+    """2.115.0 review (M2): the link goes only to the invited address once the mail is out. 2.148.1 A (#2486): the link
+    goes only to the invited address (an instance admin gets it when no mail went, logged)."""
     if inv.get("sent"):
         inv.pop("link", None)
     elif g.user["is_admin"]:

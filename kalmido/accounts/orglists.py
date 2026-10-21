@@ -33,8 +33,10 @@ def _ol_list(c, oid, lid):
 
 def ol_shared(c, lr):
     """2.148.1 A (#2480): list row lr is shared with at least one more person (not an agent) -- the lists an organisation's
-    admins see and act on (_ol_out); a member's own unshared list stays theirs."""
-    return bool(c.execute("SELECT 1 FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=? AND m.user_id!=? "
+    admins see and act on (_ol_out); a member's own unshared list stays theirs. 2.148.1 H (#2480): a list open to everyone
+    in the organisation counts as shared."""
+    from ..core.access import ov_open
+    return ov_open(lr) or bool(c.execute("SELECT 1 FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=? AND m.user_id!=? "
                           "AND COALESCE(u.kind,'user')!='agent' LIMIT 1", (lr["id"], lr["owner_id"])).fetchone())
 
 

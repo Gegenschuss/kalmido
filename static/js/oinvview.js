@@ -18,10 +18,11 @@ async function oinvDraw(box) {
     if (!j.enabled) continue;
     $('.oinvbox', det)?.remove();
     const add = $('.wsadd', det);
+    // 2.148.1 H (#2480): invitations of existing accounts are listed without an account id (no Resend / Withdraw)
     const html = `<div class="oinvbox"><div class="row"><button type="button" class="btn sm" data-oinv="new">${ic('send', 's')} ${tr('Invite by e-mail')}</button></div>
-      ${j.invites.length ? `<div class="shint">${tr('Open invitations')}</div><div class="members">${j.invites.map(v => `<div class="mrow oinvrow" data-oinvu="${v.user_id}"><span class="avatar">${ic('mail', 's')}</span>
+      ${j.invites.length ? `<div class="shint">${tr('Open invitations')}</div><div class="members">${j.invites.map(v => `<div class="mrow oinvrow" data-oinvu="${v.user_id || ''}"><span class="avatar">${ic('mail', 's')}</span>
         <span class="n"><b>${esc(v.email || v.name)}</b><small class="muted">${esc([oinvRoleSel.label(v.role), v.state === 'invited' ? tr('Invited') : tr('Invitation expired'), fmtWhen(v.created_at)].join(' · '))}</small></span>
-        <button type="button" class="btn sm" data-oinv="resend">${tr('Resend')}</button><button type="button" class="btn sm" data-oinv="withdraw">${tr('Withdraw')}</button></div>`).join('')}</div>` : ''}</div>`;
+        ${v.user_id ? `<button type="button" class="btn sm" data-oinv="resend">${tr('Resend')}</button><button type="button" class="btn sm" data-oinv="withdraw">${tr('Withdraw')}</button>` : ''}</div>`).join('')}</div>` : ''}</div>`;
     if (add) add.insertAdjacentHTML('afterend', html); else det.insertAdjacentHTML('beforeend', html);
   }
 }

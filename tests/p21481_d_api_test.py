@@ -403,5 +403,24 @@ check(r.status_code == 403, f"the assignee alone cannot decide {r.status_code} {
 r = A.post(B + f"/api/comments/{K}/decide", json={"decision": "approve"})
 check(r.ok, "the list owner decides " + r.text[:160])
 
+# ================================================================== review fix (part H, #2488): filed mail files on account deletion
+r = A.post(B + "/api/users", json={"orgs": [ORG], "username": "zed", "display_name": "Zed", "password": "password123", "email": "zed@example.com"})
+ZED = r.json()["id"]
+Ze = sess("zed")
+Ze.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
+r = Ze.post(B + "/api/files/upload", files={"file": ("zed.eml", b"From: y@example.com\r\nSubject: note\r\n\r\nhi", "message/rfc822")},
+            data={"parent_id": str(FOLD)})
+ZEML = r.json()["items"][0]["id"] if r.status_code == 201 else 0
+r = Ze.post(B + "/api/files/upload", files={"file": ("zed.txt", b"team notes", "text/plain")}, data={"parent_id": str(FOLD)})
+ZTXT = r.json()["items"][0]["id"] if r.status_code == 201 else 0
+ZM = dbx("INSERT INTO hub_mails(org_id, owner_id, ws, message_id, subject, eml_id, folder_id, created_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id",
+         (ORG, ZED, ws, "<z1@example.com>", "", ZEML, FOLD, "2026-10-21T09:00:00Z"))[0][0]
+dbx("UPDATE fs_nodes SET hub_mail_id=? WHERE id=?", (ZM, ZEML))
+r = A.delete(B + f"/api/users/{ZED}")
+check(ZEML and ZTXT and r.ok, "setup: the account is deleted " + r.text[:160])
+check(not dbx("SELECT 1 FROM fs_nodes WHERE id=?", (ZEML,)), "the filed copy of a mail that goes with the account goes, too")
+check(dbx("SELECT 1 FROM fs_nodes WHERE id=?", (ZTXT,)) and dbx("SELECT 1 FROM fs_nodes WHERE id=?", (FOLD,)) and dbx("SELECT 1 FROM fs_nodes WHERE id=?", (EML,)),
+      "the person's other organisation files, the folder and other people's mail files stay")
+
 print(f"p21481_d_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

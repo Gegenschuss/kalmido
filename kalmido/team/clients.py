@@ -287,15 +287,14 @@ def client_get(cid):
 @app.post("/api/clients")
 def client_create():
     """{name, icon?, color?, contact?, contacts?, email?, phone?, address?, note?, rate?, budget_h?, budget_amount?, org_id?} -> 201.
-    org_id: one of my organisations (default: my first one). contacts (2.40.0): [{name, role?, email?, phone?, is_default?}]."""
+    org_id: one of my organisations (default: the chosen / only one, else private). contacts (2.40.0): [{name, role?, email?, phone?, is_default?}]."""
     c = db()
     uid = me()
     _gate(c)
     f = clean_client(c, uid, body(), new=True)
-    if "org_id" not in f:
-        from ..accounts.orgroles import user_orgs_full
-        mine = user_orgs_full(c, uid, write=True)  # 2.143.0 A (#2151): never into an organisation where uid only reads
-        f["org_id"] = mine[0] if mine else None
+    if "org_id" not in f:  # 2.148.1 H (#2480): the chosen / only organisation where uid may add, else private (was the first)
+        from ..accounts.orgs import ws_chosen_org
+        f["org_id"] = ws_chosen_org(c, uid)
     ts = iso(now_utc())
     f.update(created_by=uid, created_at=ts, updated_at=ts)
     cid = insert_id(c, f"INSERT INTO clients({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values()))
