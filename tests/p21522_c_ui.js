@@ -60,7 +60,8 @@ const v1 = async (method, url, body) => { const r = await fetch(B + 'api/v1' + u
     const {ev, nav, shot} = o;
     await nav(B + '#agents/' + CL);
     check(await ready(ev, `!!document.querySelector('.chath [data-act="ms-toggle"]') && !!document.querySelector('#jcd-fbtn')`, 80), label + ': the chat is up');
-    const head = await ev(HEAD);
+    await ready(ev, `S.jcd && S.jcd.n > 0`, 60);
+    const head = (await ev(HEAD)).filter(x => x !== 'iconbtn');  // the window button of the desktop (dw_winBtn) has no data-act
     check(head.length === 2 && head.includes('ms-toggle') && head.includes('chat-head-menu'), label + ': the header shows exactly search + menu ' + JSON.stringify(head));
     check(await ev(`!document.querySelector('.chath .jcfbtn, .chath .chstog')`), label + ': no fold / steps icon in the header');
     check(await ev(`!document.querySelector('#jcd-fbtn .jcdfdot')`), label + ': filter All: no dot');
