@@ -279,11 +279,11 @@ check(dbx("SELECT count FROM forms WHERE id=?", (FQ["id"],))[0][0] == 1, "the fo
 p = send(tok(FC), {"subject": "Printer broken", "text": "Second floor.", "name": "Dan", "email": "dan@example.com", "stamp": stc.pop()}, s=anon)
 r = dbx("SELECT id, content FROM tasks WHERE title='Printer broken'")
 check(p.ok and r and r[0][1].startswith("Second floor.") and "###" not in r[0][1] and not entry_of(FC["id"]), "the classic form: the task as before, no entry")
-# 2.148.1 G (#2496): the sender's name stays plain text in the task's Markdown
+# 2.148.1 G (#2496): the sender's name stays plain text in the task's Markdown (F: the escaped ] already breaks the link, ( ) stay)
 p = send(tok(FC), {"subject": "Printer two", "text": "Ground floor.", "name": "[Confirm](https://x.example.com)", "email": "dan2@example.com",
                    "stamp": stc.pop()}, s=anon)
 r = dbx("SELECT content FROM tasks WHERE title='Printer two'")
-check(p.ok and r and "\\[Confirm\\]\\(https://x.example.com\\)" in r[0][0] and "[Confirm](" not in r[0][0] and "<dan2@example.com>" in r[0][0],
+check(p.ok and r and "\\[Confirm\\](https://x.example.com)" in r[0][0] and "[Confirm](" not in r[0][0] and "<dan2@example.com>" in r[0][0],
       "the sender's name as plain text " + (r[0][0][-200:] if r else p.text[-200:]))
 
 # ================================================================== the client: only the list's space
