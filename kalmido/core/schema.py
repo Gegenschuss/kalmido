@@ -2982,6 +2982,9 @@ MIGRATIONS = [
     ("budget_entries", "ikey", "ALTER TABLE budget_entries ADD COLUMN ikey TEXT NOT NULL DEFAULT ''"),
     ("budget_entries", "import_run", "ALTER TABLE budget_entries ADD COLUMN import_run TEXT NOT NULL DEFAULT ''"),
     ("budget_meta", "runs", "ALTER TABLE budget_meta ADD COLUMN runs TEXT NOT NULL DEFAULT '[]'"),
+    # 2.144.5 A (#2387): when this session re-did the sign-in at the OIDC provider for a step-up (prompt=login, a fresh
+    # auth_time); showing the recovery key of an account without a password asks for it. Older versions ignore it
+    ("sessions", "stepup_at", "ALTER TABLE sessions ADD COLUMN stepup_at TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

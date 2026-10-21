@@ -1159,8 +1159,21 @@ def _rck_fresh(c):
     tok = request.cookies.get(COOKIE)
     if g.auth_via != "session" or not tok:
         return False
-    r = c.execute("SELECT created_at FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone()
-    return bool(r) and str(r[0]) >= iso(now_utc() - timedelta(minutes=RCK_FRESH_MIN))
+    r = c.execute("SELECT created_at, via, stepup_at FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone()
+    since = iso(now_utc() - timedelta(minutes=RCK_FRESH_MIN))
+    if not r:
+        return False
+    # 2.144.5 A (#2387): an OIDC sign-in counts only as the step-up sign-in (prompt=login + a fresh auth_time, oidc.py):
+    # a new session alone may come from a live session at the provider without anyone typing anything
+    if str(r[2] or "") >= since:
+        return True
+    return r[1] != "oidc" and str(r[0]) >= since
+
+
+def rck_stepup_via(c, u):
+    """2.144.5 A (#2387): how an account without a password signs in again for the step-up: oidc (linked, provider on) or ''."""
+    from ..accounts.oidc import oidc_cfg
+    return "oidc" if not u["password_hash"] and u["oidc_subject"] and oidc_cfg(c)["on"] else ""
 
 
 def rck_stepup(c, u, b):
@@ -1174,7 +1187,11 @@ def rck_stepup(c, u, b):
         return jsonify(error=tr("You are signed in through the server’s login proxy. Ask the server admin for the recovery key (command line, SELF-HOSTING.md)."),
                        need="proxy"), 403
     if step == "fresh":
-        return None if _rck_fresh(c) else (jsonify(error=tr("Please sign in again, then try again."), need="fresh"), 403)
+        if _rck_fresh(c):
+            return None
+        if rck_stepup_via(c, u):  # 2.144.5 A (#2387)
+            return jsonify(error=tr("Sign in again with your login provider, then try again."), need="fresh", stepup="oidc"), 403
+        return jsonify(error=tr("Please sign in again, then try again."), need="fresh"), 403
     e = _reauth(u, b)
     if e is not None:
         return e
@@ -1236,8 +1253,10 @@ def oc_route_status(oid):
     c = db()
     oid = _org_admin(c, oid)
     u = c.execute("SELECT * FROM users WHERE id=?", (g.user["id"],)).fetchone()
+    step = rck_step(c, u)
+    extra = {"stepup": rck_stepup_via(c, u), "fresh": _rck_fresh(c)} if step == "fresh" else {}  # 2.144.5 A (#2387)
     return jsonify(**oc_status(c, oid), password=bool(u and u["password_hash"]),  # password: showing the key asks for it
-                   step=rck_step(c, u), scope=pm_crypt_scope())  # 2.46.1 (#1641)
+                   step=step, scope=pm_crypt_scope(), **extra)  # 2.46.1 (#1641)
 
 
 @app.post("/api/orgs/<int:oid>/encryption/recovery/passkey")

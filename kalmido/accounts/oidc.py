@@ -53,6 +53,7 @@ OIDC_COOKIE = "kalmido_oidc"
 OIDC_STATE_TTL = 600
 OIDC_CACHE = 3600
 OIDC_LEEWAY = 60
+OIDC_STEPUP_AGE = 300  # 2.144.5 A (#2387): s an auth_time of the step-up sign-in may be old
 OIDC_ALGS = {"RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA"}
 _OIDC = {"doc": None, "doc_at": 0.0, "jwks": None, "jwks_at": 0.0, "err": "", "err_at": ""}
 _OIDC_STATES, _OIDC_LOCK = {}, threading.Lock()
@@ -407,8 +408,9 @@ def _oidc_account(c, claims, sess_uid=None):
     return _user(c, u["id"])
 
 
-def _oidc_fail_redirect(code):
-    resp = redirect("/#login-error=" + code, 303)
+def _oidc_fail_redirect(code, stepup=False):
+    # 2.144.5 A (#2387): a failed step-up goes back to the signed-in app (rck-stepup-error), not to the login page
+    resp = redirect(("/#rck-stepup-error=" if stepup else "/#login-error=") + code, 303)
     resp.delete_cookie(OIDC_COOKIE, path="/api/auth/oidc")
     return resp
 
@@ -428,6 +430,16 @@ def oidc_start():
     except OidcError as e:
         print("OIDC discovery failed:", e.code, e.detail, flush=True)
         return _oidc_fail_redirect("failed")
+    # 2.144.5 A (#2387): ?stepup=show|new&org=<id>: a real sign-in again before the recovery key of an account without a
+    # password is shown (prompt=login, max_age=0; the callback checks auth_time). Only for the person signed in here
+    stepup = request.args.get("stepup") if request.args.get("stepup") in ("show", "new") else ""
+    sess_uid = g.user["id"] if g.get("auth_via") == "session" and g.get("user") is not None else None
+    if stepup and sess_uid is None:
+        return _oidc_fail_redirect("session", True)
+    try:
+        so = max(0, int(request.args.get("org") or 0))
+    except ValueError:
+        so = 0
     state, nonce, verifier, bind = (secrets.token_urlsafe(32) for _ in range(4))
     now = time.time()
     with _OIDC_LOCK:
@@ -437,9 +449,13 @@ def oidc_start():
             del _OIDC_STATES[min(_OIDC_STATES, key=lambda k: _OIDC_STATES[k]["exp"])]
         _OIDC_STATES[state] = {"bind": _token_hash(bind), "nonce": nonce, "verifier": verifier, "exp": now + OIDC_STATE_TTL,
                                "remember": request.args.get("remember", "1") != "0"}
+        if stepup:
+            _OIDC_STATES[state].update(stepup=stepup, org=so, uid=sess_uid)
     q = {"response_type": "code", "client_id": oidc_cfg(c)["client_id"], "redirect_uri": OIDC_REDIRECT, "scope": oidc_cfg(c)["scopes"],
          "state": state, "nonce": nonce, "code_challenge_method": "S256",
          "code_challenge": _b64u(hashlib.sha256(verifier.encode()).digest())}
+    if stepup:
+        q.update(prompt="login", max_age="0")  # 2.144.5 A (#2387): the provider asks again even with a live session there
     ae = doc["authorization_endpoint"]
     resp = redirect(ae + ("&" if "?" in ae else "?") + urllib.parse.urlencode(q), 302)
     secure = request.is_secure or request.headers.get("X-Forwarded-Proto", "") == "https"
@@ -458,11 +474,12 @@ def oidc_callback():
     bind = request.cookies.get(OIDC_COOKIE) or ""
     if not st or st["exp"] < time.time() or not bind or not hmac.compare_digest(st["bind"], _token_hash(bind)):
         return _oidc_fail_redirect("state")
+    su = bool(st.get("stepup"))  # 2.144.5 A (#2387)
     if request.args.get("error"):
-        return _oidc_fail_redirect("denied")
+        return _oidc_fail_redirect("denied", su)
     code = request.args.get("code") or ""
     if not code or len(code) > 4000:
-        return _oidc_fail_redirect("failed")
+        return _oidc_fail_redirect("failed", su)
     c = db()
     try:
         doc = oidc_doc(c)
@@ -487,6 +504,8 @@ def oidc_callback():
                     claims = {**{k: v for k, v in ui.items() if k not in ("iss", "aud", "exp", "iat", "nbf", "nonce", "azp")}, **claims}
             except OidcError as e:
                 print("OIDC userinfo skipped:", e.code, e.detail, flush=True)
+        if su:
+            return _oidc_stepup_done(c, st, claims)
         u = oidc_account(c, claims, g.user["id"] if g.get("auth_via") == "session" and g.get("user") is not None else None)
     except OidcError as e:
         c.rollback()
@@ -497,7 +516,7 @@ def oidc_callback():
         print("OIDC login failed:", e.code, e.detail, flush=True)
         _OIDC.update(err=e.code + (":" + e.detail if e.detail else ""), err_at=iso(now_utc()))
         aa_fail("oidc", e.code)
-        return _oidc_fail_redirect("failed")
+        return _oidc_fail_redirect("failed", su)
     aa_ok("oidc")
     _OIDC["err"] = ""
     old = request.cookies.get(COOKIE)
@@ -506,6 +525,33 @@ def oidc_callback():
     tok, age = start_session(c, u["id"], st["remember"], "oidc")
     c.commit()
     resp = set_cookie(redirect("/", 303), tok, age)
+    resp.delete_cookie(OIDC_COOKIE, path="/api/auth/oidc")
+    return resp
+
+
+def _oidc_stepup_done(c, st, claims):
+    """2.144.5 A (#2387): the step-up sign-in came back. It counts only for the person signed in in this browser (the same
+    linked subject) and only with an auth_time of the last OIDC_STEPUP_AGE seconds (the provider really asked again);
+    then this session gets stepup_at (orgcrypt _rck_fresh) and the app opens the recovery key. Nothing is linked or made."""
+    from ..core.pg import system_ctx
+    tok = request.cookies.get(COOKIE) or ""
+    uid = g.user["id"] if g.get("auth_via") == "session" and g.get("user") is not None else None
+    if not tok or uid is None or uid != st.get("uid"):
+        return _oidc_fail_redirect("session", True)
+    with system_ctx(c):  # the account of the provider's subject (structure), compared with the signed-in one
+        r = c.execute("SELECT id FROM users WHERE oidc_subject=?", (f"{claims['iss']}|{claims['sub']}",)).fetchone()
+    if not r or r[0] != uid:
+        return _oidc_fail_redirect("account", True)
+    at = claims.get("auth_time")
+    if isinstance(at, bool) or not isinstance(at, (int, float)):
+        print("OIDC step-up refused: the ID token has no auth_time", flush=True)
+        return _oidc_fail_redirect("auth_time", True)
+    if not -OIDC_LEEWAY <= time.time() - at <= OIDC_STEPUP_AGE:
+        print("OIDC step-up refused: auth_time is not fresh", flush=True)
+        return _oidc_fail_redirect("old", True)
+    c.execute("UPDATE sessions SET stepup_at=? WHERE token_hash=? AND user_id=?", (iso(now_utc()), _token_hash(tok), uid))
+    c.commit()
+    resp = redirect(f"/#rck-stepup/{int(st.get('org') or 0)}/{st['stepup']}", 303)
     resp.delete_cookie(OIDC_COOKIE, path="/api/auth/oidc")
     return resp
 
