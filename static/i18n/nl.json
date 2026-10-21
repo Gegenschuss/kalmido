@@ -12613,8 +12613,6 @@
   "Visible to everyone in the organisation. Your role there is read-only: you can look, not change.": "Zichtbaar voor iedereen in de organisatie. Je rol daar is alleen-lezen: bekijken wel, wijzigen niet.",
   "You can only read “{0}”: no new tasks there.": "Je kunt „{0}” alleen lezen: daar maak je geen taken aan.",
   "Region|storage": "Regio",
-  "Move into an organisation": "Naar een organisatie verhuizen",
-  "Create organisation…": "Organisatie aanmaken…",
   "SAMPLE": "VOORBEELD",
   "A trial document keeps its TEST number": "Een proefdocument houdt zijn TEST-nummer",
   "A trial invoice cannot be repeated; create a real invoice for a series": "Een proeffactuur kan niet worden herhaald; maak een echte factuur aan voor een reeks",

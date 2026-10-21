@@ -12613,8 +12613,6 @@
   "Visible to everyone in the organisation. Your role there is read-only: you can look, not change.": "Für alle in der Organisation sichtbar. Deine Rolle dort ist nur lesend: ansehen ja, ändern nein.",
   "You can only read “{0}”: no new tasks there.": "„{0}“ kannst du nur lesen: dort legst du keine Aufgaben an.",
   "Region|storage": "Region",
-  "Move into an organisation": "In eine Organisation umziehen",
-  "Create organisation…": "Organisation anlegen…",
   "SAMPLE": "MUSTER",
   "A trial document keeps its TEST number": "Ein Probe-Beleg behält seine TEST-Nummer",
   "A trial invoice cannot be repeated; create a real invoice for a series": "Eine Probe-Rechnung kann nicht wiederholt werden; lege für eine Serie eine echte Rechnung an",
