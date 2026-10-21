@@ -2718,7 +2718,8 @@ MCP tools for this: `get_task` (with `code` and `repo`), `list_repos`, `list_bui
 
 2.151.0 (#2558): `code.build` / `repo.build` of a task and `list_build_status` (`GET /api/v1/lists/{id}/build-status`) tell
 what Kalmido saw in the repository: `state` `released` (a linked commit or the merge commit of a linked pull request is in
-a version tag; `version` = the highest one, null when it is older than every tag Kalmido compared), `main` (in the default
+a version tag; `version` = the highest one, null = in an earlier version, which one unknown: it is in the default branch but not in
+the newest version tag...default branch), `main` (in the default
 branch, no tag yet), `branch` (only on a branch / an open pull request) or `none`; `branches` = the task's branches with
 commits the default branch lacks (`ahead`); `package` = the list's package / version field (a text field named Package,
 Version, Release, Target version ..., or the one picked in the repository dialog) with `released` = a tag with exactly that
