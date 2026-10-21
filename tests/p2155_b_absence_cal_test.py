@@ -26,7 +26,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
-from freelancer_fixture import freelancer  # noqa: E402
+from freelancer_fixture import freelancer, org_join  # noqa: E402
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -101,7 +101,7 @@ r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": DAVE})
 assert r.status_code == 201, r.text
 ORG2 = r.json()["id"]
 Bo = sess("bob")
-check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok, "setup: carol joins Alpha")
+check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok and org_join(B, "carol", ORG), "setup: carol joins Alpha")  # bundle C: 2.148.1 (#2480) the invited member accepts
 dbx("DELETE FROM org_members WHERE (org_id=? AND user_id NOT IN (?,?)) OR (org_id=? AND user_id!=?)", (ORG, BOB, CAROL, ORG2, DAVE), write=True)
 FID, Fr = freelancer(B, A, "fiona")
 Bo, Ca, Da = sess("bob"), sess("carol"), sess("dave")

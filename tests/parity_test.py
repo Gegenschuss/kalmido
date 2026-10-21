@@ -598,6 +598,12 @@ APP_ONLY = [
     ("2.94.0 B (#1929): the appointment booking page (settings, appointment types, the bookings and cancelling one) is a person's "
      "own page; customers book on the public page without an account, agents get no access (no agent API in 2.94)",
      ("* /api/appt/",)),
+    # bundle C (2.152.0 D #2175, 2.155.0 B #2076 #2077): routes of packages built in parallel, judged after the merge
+    ("2.152.0 D (#2175): a person deletes messages of their own agent chat (retention); agents never delete chat messages",
+     ("=DELETE /api/agents/{}/chat", "=DELETE /api/agents/{}/chat/{}")),
+    ("2.155.0 B (#2076, #2077): the availability bar of the event editor and the absences feed are a person's views of the "
+     "team calendar; agents read events and absences through their own tools",
+     ("=GET /api/events/freebusy", "=GET /api/team/absences/feed")),
 ]
 
 

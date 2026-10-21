@@ -123,7 +123,8 @@ r = Ca.patch(B + f"/api/clients/{CC}", json={"org_id": ORG})
 check(r.status_code == 409 and r.json().get("error"), "a private client with a finalised document of the personal office stays (409) " + r.text[:200])
 check(sql("SELECT org_id FROM clients WHERE id=?", (CC,))[0][0] is None, "the private client is still private")
 r = Ca.delete(B + f"/api/clients/{CC}")
-check(r.status_code == 409, "a client with a finalised document is not deleted (409) " + r.text[:200])
+# bundle C: 2.152.0 (#2168) archives a client in use instead of the 409 of 2.148.1 (#2484); the row and its documents stay
+check(r.ok and r.json().get("archived") is True and sql("SELECT archived FROM clients WHERE id=?", (CC,))[0][0] == 1, "a client with a finalised document is not deleted, archived " + r.text[:200])
 CC2 = Ca.post(B + "/api/clients", json={"name": "Second Client Ltd", "org_id": None}).json()["id"]
 r = Ca.patch(B + f"/api/clients/{CC2}", json={"org_id": ORG})
 check(r.ok, "a private client without finalised documents moves as before " + r.text[:200])
@@ -134,7 +135,8 @@ r = Er.delete(B + f"/api/clients/{CD}")
 check(r.ok, "an admin of the organisation deletes its client " + r.text[:200])
 CK = Bo.post(B + "/api/clients", json={"name": "Org Client Two", "org_id": ORG}).json()["id"]
 doc(Bo, CK, lock=True)
-check(Er.delete(B + f"/api/clients/{CK}").status_code == 409, "an organisation's client with a finalised document: 409")
+r = Er.delete(B + f"/api/clients/{CK}")
+check(r.ok and r.json().get("archived") is True, "an organisation's client with a finalised document: archived (2.152.0) " + r.text[:200])
 check(sql("SELECT COUNT(*) FROM clients WHERE id=?", (CK,))[0][0] == 1, "the client is still there")
 # contact persons only in the client's own workspace
 CX = Bo.post(B + "/api/clients", json={"name": "Moving Client", "org_id": ORG, "contacts": [{"name": "Petra Example"}]}).json()["id"]
@@ -147,7 +149,8 @@ check(Bo.get(B + f"/api/office/docs/{DX}").json().get("client_contacts") == [], 
 # freelancer-matrix: contacts -- the own private client
 FC = Fr.post(B + "/api/clients", json={"name": "Freelance Client", "org_id": None}).json()["id"]
 doc(Fr, FC, lock=True)
-check(Fr.delete(B + f"/api/clients/{FC}").status_code == 409, "freelancer: a client with a finalised invoice stays (409)")
+r = Fr.delete(B + f"/api/clients/{FC}")
+check(r.ok and r.json().get("archived") is True and sql("SELECT COUNT(*) FROM clients WHERE id=?", (FC,))[0][0] == 1, "freelancer: a client with a finalised invoice stays (archived, 2.152.0) " + r.text[:200])
 FC2 = Fr.post(B + "/api/clients", json={"name": "Old Client", "org_id": None}).json()["id"]
 check(Fr.delete(B + f"/api/clients/{FC2}").ok, "freelancer: an own client without documents is deleted")
 
