@@ -55,11 +55,13 @@ const WS_VIEWS = {
   'static/js/paperless.js': 'draw',           // Settings > Integrations: the Paperless section takes the shown workspace when drawn (#1936)
   'static/js/settings.js': 'helper',          // the task import's default target (#1940, confirmed in the dialog)
   'static/js/listadmin.js': 'draw',           // 2.102.0 A (#1988): the deleted lists of the trash filtered by wsObjIn while drawing
+  'static/js/dashboard.js': 'draw',           // 2.144.0 C (#2418): the start page names overdue tasks of other workspaces (wsCur / wsHidden while drawing)
   'static/js/devlink.js': 'helper',           // 2.140.1 (#2136): "open the equipment" switches to the office's workspace first (no view)
   'kalmido/hub/absence.py': 'check:absences', // abs_org: the area of the saved setting; absences and disposition load again
                                               // with the state that follows the saved setting (core.js)
   'kalmido/office/model.py': 'check:office',  // office_org: the saved setting
   'kalmido/personal/timesheet.py': 'helper',  // 2.125.0 (#2119): tsl_org - which organisation a closed month goes to (no view)
+  'kalmido/accounts/orgs.py': 'helper',       // 2.148.1 (#2480): ws_chosen_org - the default workspace of a new list (no view)
 };
 const ROOT = path.join(__dirname, '..');
 const CLIENT_RE = /\bwsCur\(|\bdc_ws\(|settings\.workspace|\bp61b_wsOn\(|\bwsObjIn\(|\binWs\(|\bwsHidden\(|\bwsAgentIn\(/;
