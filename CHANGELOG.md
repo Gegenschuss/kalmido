@@ -179,6 +179,13 @@ Setting up a project agent with one command, tried end to end on a Mac: four fix
 - Agent starter: when the launcher is killed hard, its event runner ends as well, so the restarted launcher takes over and an uninstall leaves nothing running (#1517).
 - Agent starter: after *Remove computer* (or deleting the agent) the launcher stops the agent with one log line and waits quietly, instead of logging "Kalmido not reachable" every minute and restarting again and again; Mac/Linux and Windows (#1517).
 
+## [2.161.0] - 2026-10-21
+
+An organisation's own picture can also be set in the admin dialog.
+
+### Changed
+- Admin > Organisation > *Edit organisation*: an admin of the organisation uploads or removes the organisation's own picture right next to the symbol (as in Settings > Workspaces); the emoji stays the fallback without a picture. Server admins who do not administer the organisation see a hint instead (#2594).
+
 ## [2.147.1] - 2026-10-21
 
 Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.

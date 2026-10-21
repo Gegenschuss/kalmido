@@ -6173,6 +6173,7 @@
   "An organisation with this name exists": "Er bestaat al een organisatie met deze naam",
   "This organisation still has {0} lists: their owners move or delete them first": "Deze organisatie heeft nog {0} lijsten: hun eigenaren verplaatsen of verwijderen ze eerst",
   "Only an admin of this organisation can do this": "Alleen een beheerder van deze organisatie kan dit",
+  "Only an admin of the organisation can upload a picture.": "Alleen een beheerder van de organisatie kan een afbeelding uploaden.",
   "The last admin of an organisation cannot step down: make somebody else an admin first": "De laatste beheerder van een organisatie kan niet terugtreden: maak eerst iemand anders beheerder",
   "The last admin of an organisation cannot leave it: make somebody else an admin first": "De laatste beheerder van een organisatie kan haar niet verlaten: maak eerst iemand anders beheerder",
   "A personal agent of another person: only its owner changes it (you can pause it)": "Een persoonlijke agent van iemand anders: alleen de eigenaar wijzigt hem (je kunt hem pauzeren)",

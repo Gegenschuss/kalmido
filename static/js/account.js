@@ -257,9 +257,10 @@ function wsPaneWire(md) {
     wsPaneDraw(md);
   });
 }
-// 2.87.9 (#1913): an organisation admin sets an own picture as its symbol (cropped square like a list icon) or removes it
-async function wsIconPick(md, oid, how) {
-  const done = async () => { toast(tr('Saved')); await load(); render(); wsPaneDraw(md); };
+// 2.87.9 (#1913): an organisation admin sets an own picture as its symbol (cropped square like a list icon) or removes it;
+// 2.161.0 (#2594): after = what to redraw instead of the workspaces pane (the admin dialog "Edit organisation")
+async function wsIconPick(md, oid, how, after) {
+  const done = async () => { toast(tr('Saved')); await load(); render(); after ? await after() : wsPaneDraw(md); };
   if (how === 'rm') { try { await api('DELETE', `/api/orgs/${oid}/icon`); await done(); } catch { /* api() showed it */ } return; }
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif';
   inp.addEventListener('change', async () => {
