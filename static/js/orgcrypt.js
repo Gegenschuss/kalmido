@@ -43,8 +43,10 @@ async function ocLoad(box) {
 // session did that in the last minutes (st.fresh); the provider sends it back to #rck-stepup/<org>/<show|new> (ocStepUpBack)
 async function ocStepUp(oid, step, title, st = {}, isNew = false) {
   if (step === 'proxy') { toast(tr('You are signed in through the server’s login proxy. Ask the server admin for the recovery key (command line, SELF-HOSTING.md).')); return null; }
-  if (step === 'fresh' && st.stepup === 'oidc' && !st.fresh) {
+  if (step === 'fresh' && st.stepup === 'oidc' && !(isNew ? st.fresh_new : st.fresh)) {
     if (!await askConfirm(title, tr('Sign in again with your login provider to confirm. Kalmido then shows the key.'), {ok: tr('Sign in again')})) return null;
+    // 2.144.5 A2 (#2387, review R1): only a step-up started here counts on the way back (ocStepUpBack), never a bare link
+    try { sessionStorage.setItem('rck-stepup', `${+oid || 0}:${isNew ? 'new' : 'show'}`); } catch { /* storage off: the way back does nothing */ }
     location.href = `/api/auth/oidc/start?stepup=${isNew ? 'new' : 'show'}&org=${+oid || 0}`;
     return null;
   }
@@ -89,16 +91,21 @@ function ocDraw(root) {
 const OC_STEPUP_ERR = {auth_time: N_('Your login provider did not say when you signed in, so it cannot confirm a fresh sign-in. Ask the server admin (the provider must send auth_time).'),
   old: N_('Your login provider did not ask for a new sign-in. Try again; if it keeps happening, ask the server admin.'),
   account: N_('That sign-in belongs to another account. Sign in again with your own account.'),
-  denied: N_('The sign-in was cancelled.')};
+  denied: N_('The sign-in was cancelled.'),
+  group: N_('Your account at the login provider is no longer allowed to use this app.')};  // 2.144.5 A2 (#2387, review R4)
 function ocStepUpBack() {
   const h = location.hash, m = h.match(/^#rck-stepup\/(\d+)\/(show|new)$/), e = (h.match(/^#rck-stepup-error=([a-z_]+)$/) || [])[1];
   if (!m && !e) return;
   history.replaceState(null, '', '/');
+  // 2.144.5 A2 (#2387, review R1): a link to #rck-stepup/… (comment, chat, task text) without an own step-up just before
+  // does nothing; the pending one is used up either way
+  let want = null; try { want = sessionStorage.getItem('rck-stepup'); sessionStorage.removeItem('rck-stepup'); } catch { /* no storage */ }
+  if (!want || (m && want !== `${m[1]}:${m[2]}`)) return;
   let n = 0;
   const wait = () => {
     if (!(S.booted && S.me)) { if (++n < 120) setTimeout(wait, 500); return; }
     if (e) toast(tr(OC_STEPUP_ERR[e] || N_('Signing in again did not work. Try again.')));
-    else ocShowRecovery(+m[1], {step: 'fresh', fresh: true}, m[2] === 'new', true);
+    else ocShowRecovery(+m[1], {step: 'fresh', fresh: true, fresh_new: m[2] === 'new'}, m[2] === 'new', true);
   };
   wait();
 }

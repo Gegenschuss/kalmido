@@ -440,6 +440,14 @@ def oidc_start():
         so = max(0, int(request.args.get("org") or 0))
     except ValueError:
         so = 0
+    soid = 0
+    if stepup:  # 2.144.5 A2 (#2387, review F11): only for an organisation (or the own office) this person administers
+        from ..core.access import Denied
+        from ..core.orgcrypt import _org_admin
+        try:
+            soid = _org_admin(c, so)
+        except Denied:
+            return _oidc_fail_redirect("org", True)
     state, nonce, verifier, bind = (secrets.token_urlsafe(32) for _ in range(4))
     now = time.time()
     with _OIDC_LOCK:
@@ -450,7 +458,7 @@ def oidc_start():
         _OIDC_STATES[state] = {"bind": _token_hash(bind), "nonce": nonce, "verifier": verifier, "exp": now + OIDC_STATE_TTL,
                                "remember": request.args.get("remember", "1") != "0"}
         if stepup:
-            _OIDC_STATES[state].update(stepup=stepup, org=so, uid=sess_uid)
+            _OIDC_STATES[state].update(stepup=stepup, org=so, oid=soid, uid=sess_uid)
     q = {"response_type": "code", "client_id": oidc_cfg(c)["client_id"], "redirect_uri": OIDC_REDIRECT, "scope": oidc_cfg(c)["scopes"],
          "state": state, "nonce": nonce, "code_challenge_method": "S256",
          "code_challenge": _b64u(hashlib.sha256(verifier.encode()).digest())}
@@ -501,7 +509,7 @@ def oidc_callback():
             try:
                 ui = oidc_http_json(c, doc["userinfo_endpoint"], headers={"Authorization": "Bearer " + at})
                 if ui.get("sub") == claims["sub"]:
-                    claims = {**{k: v for k, v in ui.items() if k not in ("iss", "aud", "exp", "iat", "nbf", "nonce", "azp")}, **claims}
+                    claims = {**{k: v for k, v in ui.items() if k not in ("iss", "aud", "exp", "iat", "nbf", "nonce", "azp", "auth_time")}, **claims}
             except OidcError as e:
                 print("OIDC userinfo skipped:", e.code, e.detail, flush=True)
         if su:
@@ -542,6 +550,10 @@ def _oidc_stepup_done(c, st, claims):
         r = c.execute("SELECT id FROM users WHERE oidc_subject=?", (f"{claims['iss']}|{claims['sub']}",)).fetchone()
     if not r or r[0] != uid:
         return _oidc_fail_redirect("account", True)
+    oc = oidc_cfg(c)  # 2.144.5 A2 (#2387, review R4): the same group rule as a sign-in (_oidc_account)
+    if oc["required_group"] and oc["required_group"] not in _oidc_groups(claims.get(oc["groups_claim"])):
+        print("OIDC step-up refused: not in the required group", flush=True)
+        return _oidc_fail_redirect("group", True)
     at = claims.get("auth_time")
     if isinstance(at, bool) or not isinstance(at, (int, float)):
         print("OIDC step-up refused: the ID token has no auth_time", flush=True)
@@ -549,7 +561,9 @@ def _oidc_stepup_done(c, st, claims):
     if not -OIDC_LEEWAY <= time.time() - at <= OIDC_STEPUP_AGE:
         print("OIDC step-up refused: auth_time is not fresh", flush=True)
         return _oidc_fail_redirect("old", True)
-    c.execute("UPDATE sessions SET stepup_at=? WHERE token_hash=? AND user_id=?", (iso(now_utc()), _token_hash(tok), uid))
+    # 2.144.5 A2 (#2387, review R5): the step-up counts only for the organisation and purpose it was started for
+    c.execute("UPDATE sessions SET stepup_at=?, stepup_for=? WHERE token_hash=? AND user_id=?",
+              (iso(now_utc()), f"{int(st.get('oid') or 0)}:{st['stepup']}", _token_hash(tok), uid))
     c.commit()
     resp = redirect(f"/#rck-stepup/{int(st.get('org') or 0)}/{st['stepup']}", 303)
     resp.delete_cookie(OIDC_COOKIE, path="/api/auth/oidc")

@@ -10,6 +10,8 @@ provider inside (stub_oidc.py) and a KALMIDO_SECRET_KEY; invented names and the 
    ten minutes later it is gone again; a password session of an account without a password keeps the earlier rule
  - as an organisation admin and as a person without an organisation (freelancer-matrix: orgcrypt, auth): the own
    personal office (organisation id 0)
+ - 2.144.5 A2 (review): no step-up start for a foreign organisation (F11), auth_time only from the ID token (R3), the
+   required group (R4), bound to organisation + purpose (R1/R5), a sign-in link is no fresh sign-in (R2)
  - F7: KALMIDO_TEST_ROT_ABORT alone is ignored (the rotation runs to the end), with KALMIDO_TEST_MODE=1 it aborts
  - F8: the HTTP Shortcuts download without Sec-Fetch-Site, Origin and Referer stays 403 but says why
 #2001 (freelancer-matrix: approvals): an editor who is no approver gets 403 and choice_can false; a list admin and the
@@ -108,11 +110,11 @@ def query(loc):
     return dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(loc).query))
 
 
-def give_code(q, claims):
+def give_code(q, claims, userinfo=None):
     p = os.path.join(DATA, "oidc", "codes.json")
     codes = json.load(open(p))
     code = secrets.token_urlsafe(16)
-    codes[code] = {"nonce": q["nonce"], "challenge": q["code_challenge"], "claims": claims, "mode": "ok", "userinfo": None, "kid": None}
+    codes[code] = {"nonce": q["nonce"], "challenge": q["code_challenge"], "claims": claims, "mode": "ok", "userinfo": userinfo, "kid": None}
     json.dump(codes, open(p, "w"))
     return code
 
@@ -128,14 +130,14 @@ def oidc_login(claims):
     return s, q
 
 
-def stepup(s, org, claims, what="show"):
+def stepup(s, org, claims, what="show", userinfo=None):
     """-> (authorization query, where the callback sends the browser)."""
     r = s.get(B + "/api/auth/oidc/start", params={"stepup": what, "org": org}, allow_redirects=False)
     loc = r.headers.get("Location", "")
     if not loc.startswith(ISS + "/authorize?"):
         return {}, loc
     q = query(loc)
-    r = s.get(B + "/api/auth/oidc/callback", params={"code": give_code(q, claims), "state": q["state"]}, allow_redirects=False)
+    r = s.get(B + "/api/auth/oidc/callback", params={"code": give_code(q, claims, userinfo), "state": q["state"]}, allow_redirects=False)
     return q, r.headers.get("Location", "")
 
 
@@ -241,6 +243,27 @@ r = show(Sv, ORG)
 check(r.ok and r.json().get("recovery_key", "").startswith("R2-"), f"#2387: after the step-up the key is shown {r.status_code} {r.text[:120]}")
 dbx("UPDATE sessions SET stepup_at='2020-01-01T00:00:00Z' WHERE user_id=?", (ids["sven"],))
 check(show(Sv, ORG).status_code == 403, "#2387: ten minutes after the step-up it no longer counts")
+# 2.144.5 A2 (#2387, review F11/R3/R4/R1/R5): only for an organisation the person administers; auth_time only from the
+# ID token; the provider's group rule; the step-up is bound to the organisation and the purpose it was started for
+r = Sv.get(B + "/api/auth/oidc/start", params={"stepup": "new", "org": 999999}, allow_redirects=False)
+check(r.status_code == 303 and r.headers.get("Location") == "/#rck-stepup-error=org", f"F11: no step-up for a foreign organisation {r.headers.get('Location')}")
+q, loc = stepup(Sv, ORG, {"sub": "sub-sven", "preferred_username": "sven"}, userinfo={"sub": "sub-sven", "auth_time": int(time.time())})
+check(loc == "/#rck-stepup-error=auth_time" and show(Sv, ORG).status_code == 403, f"R3: an auth_time from userinfo does not count {loc}")
+check(A.put(B + "/api/admin/oidc", json={"required_group": "studio"}).ok, "R4: a required group")
+q, loc = stepup(Sv, ORG, {"sub": "sub-sven", "preferred_username": "sven", "groups": ["guests"], "auth_time": int(time.time())})
+check(loc == "/#rck-stepup-error=group" and show(Sv, ORG).status_code == 403, f"R4: out of the required group = no step-up {loc}")
+check(A.put(B + "/api/admin/oidc", json={"required_group": ""}).ok, "R4: the group rule off again")
+ORG2 = A.post(B + "/api/admin/orgs", json={"name": "Suedwind", "admin_id": ids["sven"]}).json()["id"]
+q, loc = stepup(Sv, ORG, {"sub": "sub-sven", "preferred_username": "sven", "auth_time": int(time.time())})
+check(loc == f"/#rck-stepup/{ORG}/show", f"R1: a step-up for showing {loc}")
+check(one("SELECT stepup_for FROM sessions WHERE user_id=? AND stepup_at<>''", (ids["sven"],)) == f"{ORG}:show", "R5: the session notes org + purpose")
+st = Sv.get(B + f"/api/orgs/{ORG}/encryption").json()
+check(st.get("fresh") is True and st.get("fresh_new") is False, f"R5: fresh for showing, not for a new key {st}")
+r = Sv.post(B + f"/api/orgs/{ORG}/encryption/recovery", json={"new": True})
+check(r.status_code == 403 and r.json().get("need") == "fresh", f"R5: a step-up for showing makes no new key {r.status_code} {r.text[:150]}")
+r = show(Sv, ORG2)
+check(r.status_code == 403 and r.json().get("need") == "fresh", f"R5: a step-up for organisation X does not count for Y {r.status_code} {r.text[:150]}")
+check(show(Sv, ORG).ok, "R5: the step-up still counts for its own purpose")
 # an account without a password that signed in another way (here: the password before it was removed) keeps the earlier rule
 Ms = sess("mia")
 dbx("UPDATE users SET password_hash=NULL WHERE id=?", (ids["mia"],))
@@ -249,6 +272,9 @@ assert r.ok, r.text
 Ms.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done", "workspace": f"org:{ORG}"})
 r = show(Ms, ORG)
 check(r.ok and r.json().get("recovery_key", "").startswith("R2-"), f"#2387: a fresh non-OIDC sign-in still counts {r.status_code} {r.text[:120]}")
+dbx("UPDATE sessions SET via='link' WHERE user_id=?", (ids["mia"],))  # 2.144.5 A2 (#2387, review R2)
+r = show(Ms, ORG)
+check(r.status_code == 403 and r.json().get("need") == "fresh", f"R2: a sign-in link is no fresh sign-in {r.status_code} {r.text[:120]}")
 
 # ---- a person without an organisation (freelancer-matrix: orgcrypt, auth): the own personal office
 FID, _ = freelancer(B, A, "fenna")

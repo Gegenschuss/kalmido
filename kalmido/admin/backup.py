@@ -1140,7 +1140,7 @@ def bk_restore(path, pw, admin, via):
                     tok = None
                     u = c.execute("SELECT * FROM users WHERE username=? AND is_admin=1 AND disabled=0", (admin,)).fetchone()
                     if u and via == "session":
-                        tok, _ = start_session(c, u["id"], True, "password")
+                        tok, _ = start_session(c, u["id"], True, "restore")  # 2.144.5 A2 (#2387, review R2): no password typed
                 c.commit()
             finally:
                 c.close()

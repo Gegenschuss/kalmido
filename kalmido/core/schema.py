@@ -2988,6 +2988,8 @@ MIGRATIONS = [
     # 2.144.5 A (#2387): when this session re-did the sign-in at the OIDC provider for a step-up (prompt=login, a fresh
     # auth_time); showing the recovery key of an account without a password asks for it. Older versions ignore it
     ("sessions", "stepup_at", "ALTER TABLE sessions ADD COLUMN stepup_at TEXT NOT NULL DEFAULT ''"),
+    # 2.144.5 A2 (#2387, review R5): what that step-up was for, "<org id>:<show|new>"; stepup_at counts only for it
+    ("sessions", "stepup_for", "ALTER TABLE sessions ADD COLUMN stepup_for TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

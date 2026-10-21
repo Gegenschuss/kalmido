@@ -3,7 +3,8 @@
 //   buttons, an editor sees the waiting line instead; plain answer buttons stay for the editor
 // - #2387: the recovery key box says, while the organisation's key is renewed, that the search may miss documents (F9);
 //   the step-up of an SSO account: without a fresh sign-in it asks first (cancelled = nothing sent), with one it goes on;
-//   back from the provider with an error the app says why (#rck-stepup-error=...)
+//   back from the provider with an error the app says why (#rck-stepup-error=...); 2.144.5 A2 (review R1): only after an own
+//   step-up of the same organisation + purpose (sessionStorage), a bare #rck-stepup link does nothing
 // - #2387 F8: the HTTP Shortcuts download is fetched: a refusal shows the server's reason instead of a silent failure
 // P21445A_NOSTART=1 = the container is running.
 const {execFileSync} = require('child_process');
@@ -58,7 +59,21 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(r1 === null && w.location.pathname === '/', '#2387: cancelled = nothing sent, no navigation');
   const r2 = await w.eval(`ocStepUp(5, 'fresh', 'Show recovery key', {stepup: 'oidc', fresh: true})`);
   check(r2 && typeof r2 === 'object' && !w.document.querySelector('.cdlg'), '#2387: after the step-up sign-in it goes on without asking');
-  w.eval(`history.replaceState(null, '', '/#rck-stepup-error=auth_time'); ocStepUpBack()`);
+  // 2.144.5 A2 (#2387, review R1): the way back counts only with the own pending step-up (sessionStorage), never a bare link
+  w.eval(`window._oc = []; window._ocs = ocShowRecovery; window.ocShowRecovery = (...a) => { window._oc.push(a); }; sessionStorage.removeItem('rck-stepup')`);
+  w.eval(`history.replaceState(null, '', '/#rck-stepup/5/new'); ocStepUpBack()`);
+  await sleep(300);
+  check(w.eval('window._oc.length') === 0 && w.location.hash === '' && !w.document.querySelector('.cdlg'), 'R1: a link to #rck-stepup without an own step-up does nothing');
+  w.eval(`sessionStorage.setItem('rck-stepup', '5:show'); history.replaceState(null, '', '/#rck-stepup/5/new'); ocStepUpBack()`);
+  await sleep(300);
+  check(w.eval('window._oc.length') === 0 && w.eval(`sessionStorage.getItem('rck-stepup')`) === null, 'R1: a step-up for showing does not open a new key, the pending one is used up');
+  w.eval(`sessionStorage.setItem('rck-stepup', '5:new'); history.replaceState(null, '', '/#rck-stepup/5/new'); ocStepUpBack()`);
+  await sleep(300);
+  const oc = w.eval('JSON.stringify(window._oc)');
+  check(oc === JSON.stringify([[5, {step: 'fresh', fresh: true, fresh_new: true}, true, true]]) && w.eval(`sessionStorage.getItem('rck-stepup')`) === null,
+    'R1: the own step-up goes on to the key: ' + oc);
+  w.eval('window.ocShowRecovery = window._ocs');
+  w.eval(`sessionStorage.setItem('rck-stepup', '5:show'); history.replaceState(null, '', '/#rck-stepup-error=auth_time'); ocStepUpBack()`);
   const tt = await until(() => { const e = w.document.querySelector('#toast'); return e && /auth_time/.test(e.textContent) ? e.textContent : ''; });
   check(/did not say when you signed in/.test(tt) && w.location.hash === '', '#2387: back with an error the app says why: ' + tt);
   // ---- #2387 F8: a refused download shows the reason

@@ -1150,7 +1150,10 @@ def rck_step(c, u):
     return "proxy" if g.auth_via == "proxy" else "fresh"
 
 
-def _rck_fresh(c):
+def _rck_fresh(c, want=""):
+    """2.144.5 A2 (#2387, review R2/R5): a fresh sign-in of this session: a step-up at the login provider for want
+    ("<org id>:<show|new>"; one for new also allows show) or a sign-in with password / second factor / passkey in the
+    last RCK_FRESH_MIN minutes (a sign-in link, a restore or an OIDC session without step-up never count)."""
     from flask import g, request
     from datetime import timedelta
     from ..core.config import COOKIE
@@ -1159,15 +1162,16 @@ def _rck_fresh(c):
     tok = request.cookies.get(COOKIE)
     if g.auth_via != "session" or not tok:
         return False
-    r = c.execute("SELECT created_at, via, stepup_at FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone()
+    r = c.execute("SELECT created_at, via, stepup_at, stepup_for FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone()
     since = iso(now_utc() - timedelta(minutes=RCK_FRESH_MIN))
     if not r:
         return False
     # 2.144.5 A (#2387): an OIDC sign-in counts only as the step-up sign-in (prompt=login + a fresh auth_time, oidc.py):
     # a new session alone may come from a live session at the provider without anyone typing anything
-    if str(r[2] or "") >= since:
+    oid = want.split(":")[0]
+    if want and str(r[2] or "") >= since and str(r[3] or "") in (want, f"{oid}:new"):
         return True
-    return r[1] != "oidc" and str(r[0]) >= since
+    return r[1] in ("password", "2fa", "passkey") and str(r[0]) >= since
 
 
 def rck_stepup_via(c, u):
@@ -1176,7 +1180,7 @@ def rck_stepup_via(c, u):
     return "oidc" if not u["password_hash"] and u["oidc_subject"] and oidc_cfg(c)["on"] else ""
 
 
-def rck_stepup(c, u, b):
+def rck_stepup(c, u, b, want=""):
     """2.138.0 C (#1972): the step-up before a recovery key is shown or made new (rck_step); an error response or None.
     Rate-limited like a login (password and second factor count as failed logins)."""
     from ..core.db import err
@@ -1187,7 +1191,7 @@ def rck_stepup(c, u, b):
         return jsonify(error=tr("You are signed in through the server’s login proxy. Ask the server admin for the recovery key (command line, SELF-HOSTING.md)."),
                        need="proxy"), 403
     if step == "fresh":
-        if _rck_fresh(c):
+        if _rck_fresh(c, want):
             return None
         if rck_stepup_via(c, u):  # 2.144.5 A (#2387)
             return jsonify(error=tr("Sign in again with your login provider, then try again."), need="fresh", stepup="oidc"), 403
@@ -1254,7 +1258,8 @@ def oc_route_status(oid):
     oid = _org_admin(c, oid)
     u = c.execute("SELECT * FROM users WHERE id=?", (g.user["id"],)).fetchone()
     step = rck_step(c, u)
-    extra = {"stepup": rck_stepup_via(c, u), "fresh": _rck_fresh(c)} if step == "fresh" else {}  # 2.144.5 A (#2387)
+    extra = {"stepup": rck_stepup_via(c, u), "fresh": _rck_fresh(c, f"{oid}:show"),  # 2.144.5 A (#2387)
+             "fresh_new": _rck_fresh(c, f"{oid}:new")} if step == "fresh" else {}  # 2.144.5 A2 (#2387, review R5)
     return jsonify(**oc_status(c, oid), password=bool(u and u["password_hash"]),  # password: showing the key asks for it
                    step=step, scope=pm_crypt_scope(), **extra)  # 2.46.1 (#1641)
 
@@ -1290,12 +1295,12 @@ def oc_route_recovery(oid):
     if not SECRET_KEY:
         return err(tr("Organisation encryption is off: the server has no KALMIDO_SECRET_KEY."), 409)
     u = c.execute("SELECT * FROM users WHERE id=?", (g.user["id"],)).fetchone()
-    e = rck_stepup(c, u, b)
+    new = b.get("new") in (True, 1, "1", "true")
+    e = rck_stepup(c, u, b, f"{oid}:{'new' if new else 'show'}")  # 2.144.5 A2 (#2387, review R5): bound to org + purpose
     if e is not None:
         c.commit()  # a used second factor stays used
         return e
     write_lock(c, f"orgkey-recovery-{oid}")
-    new = b.get("new") in (True, 1, "1", "true")
     r = rck_row(c, oid)
     if r is not None and r["wrapped_rot"]:
         return err(tr("The organisation’s key is being renewed on the server. Try again when that is finished."), 409)
