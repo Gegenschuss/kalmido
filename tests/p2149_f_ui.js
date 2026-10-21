@@ -28,7 +28,7 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { let x; try {
 const get = async u => (await fetch(B + u)).text();
 // module -> its files (LD_MODS) that were start files before 2.149.0
 const MOVED = {life: ['budget'], settings: ['servers'], listprint: ['listprint'], evinvite: ['evinvite'], projtime: ['projtime'],
-  envs: ['envs'], dayplan: ['dpmodal'], gitrepo: ['gitrepo'], timesheet: ['timesheet'], team: ['absence', 'leave', 'dispo'], hubmail: ['hubmail'], msvview: ['msvview']};
+  envs: ['envs'], dayplan: ['dpmodal'], gitrepo: ['gitrepo'], timesheet: ['timesheet'], team: ['absence', 'leave', 'dispo'], hubmail: ['hubmail'], msvview: ['msvview'], sprints: ['sprints2']};
 const FILES = Object.values(MOVED).flat();
 
 (async () => {
@@ -46,7 +46,7 @@ const FILES = Object.values(MOVED).flat();
     const own = ((mods.match(new RegExp(`\\b${m}: \\[([^\\]]*)\\]`)) || [, ''])[1].match(/'[\w-]+'/g) || []).map(x => x.slice(1, -1));
     check(fs.every(f => own.includes(f) && LAZY.includes(f) && !tags.includes(f)), `module ${m}: ${fs.join(', ')} in LD_MODS + LAZY, no script tag (${own.join(' ')})`);
   }
-  check(['quickadd', 'dayplan', 'git', 'projects', 'lazyload', 'calevents', 'time', 'clients', 'clientpage', 'render'].every(f => tags.includes(f)), 'the start parts of the split files stay at start');
+  check(['quickadd', 'dayplan', 'git', 'projects', 'lazyload', 'calevents', 'time', 'clients', 'clientpage', 'render', 'sprints'].every(f => tags.includes(f)), 'the start parts of the split files stay at start');
 
   // ================= setup
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
@@ -143,6 +143,13 @@ const FILES = Object.values(MOVED).flat();
   check(/envbox/.test(eh), 'environments: the stand-in draws the same "Loading…" box');
   await until(() => loaded().includes('envs') && w.eval(`typeof ENV`) === 'object');
   check(loaded().includes('envs') && !/ld_later/.test(w.eval('String(env_ovHtml)')), 'environments: envs.js loaded, the real env_ovHtml replaced the stand-in');
+
+  // sprints: the header / filter / menu entries stay at start, the settings dialog loads sprints2.js
+  check(['sprKeep', 'sprHead', 'spr_menuItems', 'spr_meField', 'spr_dropTask', 'spr_dlgRow'].every(n => w.eval(`typeof ${n}`) === 'function') && !loaded().includes('sprints2'), 'sprints: the start parts are there, sprints2.js not loaded');
+  w.eval(`spr_cfgModal(${LID})`);
+  await until(() => loaded().includes('sprints2') && d.querySelector('.modal #sp-w'));
+  check(loaded().includes('sprints2') && !!d.querySelector('.modal #sp-w'), 'sprints: the settings dialog loads sprints2.js and opens');
+  d.querySelectorAll('.modal').forEach(m => m.remove());
 
   // "Plan my day" (dpmodal.js)
   w.eval(`dayplanModal('day')`);
