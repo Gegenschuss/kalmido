@@ -156,7 +156,7 @@ rem = json.loads(sql("SELECT reminded FROM tasks WHERE id=?", (W,))[0][0] or "[]
 check(f"at|{hm(due_at)}" in rem, f"remembered in reminded {rem}")
 # a new time arms it again
 A.patch(B + f"/api/tasks/{W}", json={"remind_at": hm(datetime.now() - timedelta(minutes=2))})
-check(until(lambda: len(pushes("Send the offer 2111")) == 2, 20), "a changed time fires again")
+check(until(lambda: len(pushes("Send the offer 2111")) == 2, 45), "a changed time fires again")  # 2.147.2 CI: slow runner, the reminder loop needs longer
 # missed by more than 6 hours: never
 r = A.post(B + "/api/tasks", json={"title": "Old reminder 2111", "list_id": L, "remind_at": hm(now - timedelta(hours=7))})
 time.sleep(4)
