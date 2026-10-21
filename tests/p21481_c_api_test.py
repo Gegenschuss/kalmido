@@ -447,7 +447,8 @@ logs = subprocess.run(["docker", "logs", CT], capture_output=True, text=True)
 tail = (logs.stdout + logs.stderr)[max(0, nb - 2000):]
 line = [x for x in tail.splitlines() if "login failed for" in x]
 check(line and "MySecretPassword99" not in tail and "user#" + hashlib.sha256(b"mysecretpassword99").hexdigest()[:8] in line[-1]
-      and re.search(r"from \S+(\.x|/48)$", line[-1].strip()), f"#2494: a failed sign-in is logged with a hash of the name and a shortened address {line[-1:]}")
+      and re.search(r"from \S+$", line[-1].strip()), f"#2494: a failed sign-in is logged with a hash of the name {line[-1:]}")
+# 2.148.1 (#2494): the address stays in full by default (fail2ban bans by it); KALMIDO_LOG_FULL_IP=0 shortens it
 
 # ================================================================== a person without an organisation
 # freelancer-matrix: own

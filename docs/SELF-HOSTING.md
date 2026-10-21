@@ -896,8 +896,8 @@ A short checklist for a new server:
   does) and write the reason as a comment next to the line, so nobody "fixes" it later.
 - **fail2ban for failed logins.** Kalmido logs `login failed for user#<hash> from <address>` and has its own lockout.
   2.148.1: the log names a short hash of the typed name (never the name: it may be a password typed into the wrong field)
-  and shortens the address like the alerts (IPv4 `203.0.113.x`, IPv6 `/48`). fail2ban needs the full address: set
-  `KALMIDO_LOG_FULL_IP=1`. Then, to block repeat offenders at the firewall, send the container log to journald
+  and keeps the full address, which fail2ban needs. Without fail2ban, `KALMIDO_LOG_FULL_IP=0` shortens it like the alerts
+  (IPv4 `203.0.113.x`, IPv6 `/48`). To block repeat offenders at the firewall, send the container log to journald
   (`logging: {driver: journald}`) and add a filter and a jail:
 
   ```ini
