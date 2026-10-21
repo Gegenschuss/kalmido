@@ -330,6 +330,14 @@ def logbook(s, who):
 
 
 VID = logbook(A, "office")
+# 2.152.0 (#2169, review B-L1): a corrected odometer typo no longer seeds the next drive
+V2 = A.post(B + V, json={"name": "Transporter", "kind": "company", "odo_start": "1000"}).json()["id"]
+TYPO = A.post(B + DR, json={"vehicle_id": V2, "day": DAY(10), "dest": "Lager", "odo_start": "1000", "odo_end": "10050"}).json()["id"]
+sql("UPDATE office_drives SET created_at=? WHERE id=?", ((testclock.now() - timedelta(days=10)).isoformat(timespec="seconds"), TYPO), write=True)
+r = A.post(B + DR, json={"vehicle_id": V2, "day": DAY(10), "dest": "Lager", "odo_start": "1000", "odo_end": "1050",
+                         "corrects_id": TYPO, "correct_note": "Tippfehler Tacho"})
+lo = {v["id"]: v["last_odo"] for v in A.get(B + V).json()["vehicles"]}.get(V2)
+check(r.status_code == 201 and lo == "1050.0", f"#2169 B-L1: the next drive starts at the corrected odometer {lo} " + r.text[:160])
 check(Bo.post(B + LB + "/close", json={"month": TODAY.isoformat()[:7]}).status_code == 403, "a member cannot close a month (403)")
 FID, Fr = freelancer(B, A)
 logbook(Fr, "freelancer")
