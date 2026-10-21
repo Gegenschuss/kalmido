@@ -65,12 +65,13 @@ def docs_task_link(nid):
 
 @app.get("/api/tasks/<int:tid>/docs")
 def task_docs(tid):
-    """The documents linked with task tid that I may see: {docs: [{id, name}]} (empty when I do not see the task)."""
+    """The documents linked with task tid that I may see: {docs: [{id, name}]}; 404 when I do not see the task (2.161.0,
+    p2362_a route scan)."""
     _no_agent()
     c = db()
     uid = me()
     if not task_visible(c, tid, uid):
-        return jsonify(docs=[])
+        return err(tr("Task not found"), 404)
     rows = c.execute(f"SELECT d.node_id, n.name FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE d.task_id=? AND n.deleted_at IS NULL "
                      f"AND d.node_id IN {fs_visible_sql(uid, c)} ORDER BY d.node_id LIMIT 20", (tid,)).fetchall()
     return jsonify(docs=[{"id": r["node_id"], "name": r["name"]} for r in rows])

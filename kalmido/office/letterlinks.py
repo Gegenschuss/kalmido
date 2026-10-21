@@ -540,8 +540,8 @@ def ltl_threads_get():
 @app.get("/api/office/letters/doc/<int:nid>")
 def ltl_doc_get(nid):
     """For the document detail: the letters linked with the document (both directions), the deadline and references found,
-    the deadline task. {available: false} (no error) when there is no office, the person is no admin of it or the
-    document is not in the office's documents space."""
+    the deadline task. 404 when there is no office, the person is no admin of it or the document is not in the office's
+    documents space (2.161.0, p2362_a route scan: the same refusal for every case, a stored object's GET answers 404)."""
     from .model import office_gate
     from .letters import lt_org
     from ..core.db import db
@@ -551,7 +551,7 @@ def ltl_doc_get(nid):
         oid = lt_org(c, uid)
         m, n = ltl_doc(c, oid, nid)
     except (Denied, BadInput):
-        return jsonify(available=False)
+        raise Denied(404) from None
     info = ltl_doc_info(c, m, n)
     letters = []
     for r in c.execute("SELECT t.*, l.kind AS link_kind FROM office_letter_links l JOIN office_letters t ON t.id=l.letter_id "
