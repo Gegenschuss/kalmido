@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.103.0 API tests, part D (#2170 #2171 #2173 #2175), own container (fresh server). Invented accounts only (example.com).
+"""2.152.0 API tests, part D (#2170 #2171 #2173 #2175), own container (fresh server). Invented accounts only (example.com).
 tenant-matrix: agent
 freelancer-matrix: agents
  - #2170 newsletter: an unsubscription survives deleting the contact and a re-import ("yes" on the same address stays
@@ -10,7 +10,7 @@ freelancer-matrix: agents
  - #2173 files: a failing unlink is counted and queued; an old orphan file goes only with the switch, a young one and a
    referenced one stay; version 21 of a file replaces version 1 (switch); the undo of an account import takes the
    attachment files along; a subtask in a foreign list stays alive there, detached, when its parent is deleted for good
-   (2.103.0 review F2: whoever deletes the parent must not remove work of a list they do not own)
+   (2.152.0 review F2: whoever deletes the parent must not remove work of a list they do not own)
  - #2175 agent chat: own message / whole history deleted for good with the files; another person's conversation 404
 usage: p2103_d_api_test.py <datadir>      (P2103D_NOSTART=1: a running server on KALMIDO_TEST_PORT)
 """
@@ -225,7 +225,7 @@ r = Fr.post(B + f"/api/imports/{iid}/undo")
 check(r.ok, f"#2173: undo of the import {r.status_code} {r.text[:150]}")
 check(not os.path.exists(os.path.join(DATA, "attachments", rel_imp)), "#2173: ... its attachment file is gone from the disk")
 
-# 2.103.0 review F2: a subtask in a foreign list stays in its list (detached, not in the trash) when the parent is deleted for good
+# 2.152.0 review F2: a subtask in a foreign list stays in its list (detached, not in the trash) when the parent is deleted for good
 TP = Fr.post(B + "/api/tasks", json={"title": "Parent"}).json()["id"]
 TS = A.post(B + "/api/tasks", json={"title": "Foreign subtask"}).json()["id"]
 sql("UPDATE tasks SET parent_id=? WHERE id=?", (TP, TS), write=True)

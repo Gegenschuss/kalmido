@@ -1,4 +1,4 @@
-// 2.103.0 UI tests, part D (#2175 delete messages / the history of the agent chat), own container (start.sh;
+// 2.152.0 UI tests, part D (#2175 delete messages / the history of the agent chat), own container (start.sh;
 // P2103D_NOSTART=1: a running server). jsdom:
 // - the menu of a message (mine and the agent's answer) offers "Delete message"; it asks first, then the message leaves
 //   the chat and the server (for good)

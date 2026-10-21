@@ -1,4 +1,4 @@
-// 2.103.0 UI tests, part A (#2164 deleting an account, #2167 deleting an organisation), own container (start.sh;
+// 2.152.0 UI tests, part A (#2164 deleting an account, #2167 deleting an organisation), own container (start.sh;
 // P2103A_NOSTART=1: a running server). jsdom:
 // - the organisations list: deleting one with a knowledge page asks with the numbers ("1 knowledge page") and offers the
 //   export; confirming deletes it

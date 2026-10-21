@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.103.0 API tests, part A (#2164 deleting an account, #2167 deleting an organisation), own container (start.sh, mode
+"""2.152.0 API tests, part A (#2164 deleting an account, #2167 deleting an organisation), own container (start.sh, mode
 workspaces). Invented people, companies and addresses only (example.com).
 tenant-matrix: org
 freelancer-matrix: orgadmin

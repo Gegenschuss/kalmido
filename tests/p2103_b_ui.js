@@ -1,4 +1,4 @@
-// 2.103.0 UI tests, part B (#2165 the trash period in the file store, #2172 the backup limits), own container (start.sh;
+// 2.152.0 UI tests, part B (#2165 the trash period in the file store, #2172 the backup limits), own container (start.sh;
 // P2103B_NOSTART=1: a running server). jsdom:
 // - the file store's Trash names the period from the server ("deleted for good after 30 days"), the other spaces do not
 // - Settings > Users > Backups: weekly at most 52 (input limit + the data protection note), the note that backups are not

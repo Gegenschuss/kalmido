@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.103.0 API tests, part B (#2165: trash periods; #2172: backups), own container (start.sh). Invented people and
+"""2.152.0 API tests, part B (#2165: trash periods; #2172: backups), own container (start.sh). Invented people and
 addresses only (example.com).
  - #2165: in every area one object goes into the trash and is dated back past the period (files with the stored file,
    wiki page, hub mail with its word index, table + a deleted row / column of a live table, pipeline deal, invoice series,
@@ -284,7 +284,7 @@ GINA = one("SELECT id FROM users WHERE username='gina'")
 HUGO = one("SELECT id FROM users WHERE username='hugo'")
 Hu = sess("hugo")
 HL = Hu.post(B + "/api/lists", json={"name": "Hugo's project"}).json()["id"]
-# 2.103.0 review F7: an account deleted in the last 7 days is only disabled by a restore; gina is an old account deleted
+# 2.152.0 review F7: an account deleted in the last 7 days is only disabled by a restore; gina is an old account deleted
 # 10 days ago (created_at and the journal row moved back), ida one deleted today
 OLD30 = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat(timespec="seconds")
 sql("UPDATE users SET created_at=? WHERE id=?", (OLD30, GINA), write=True)

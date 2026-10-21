@@ -227,7 +227,7 @@ ROUTES = {
     # 2.111.0 A (#2233): undo of the office editors (p2111_a_api_test.py) - routes below this line
     "POST /api/office/undo/{}/{}": "office",
     # (2.111.0 spacer A)
-    "DELETE /api/agents/{}/chat": "agent", "DELETE /api/agents/{}/chat/{}": "agent",  # 2.103.0 D (#2175): p2103_d_api_test.py
+    "DELETE /api/agents/{}/chat": "agent", "DELETE /api/agents/{}/chat/{}": "agent",  # 2.152.0 D (#2175): p2103_d_api_test.py
     # 2.97.0 A (#1950): bookmarks (p297_a_api_test.py) - routes below this line
     "GET /api/bookmarks": "bookmark", "POST /api/bookmarks": "bookmark", "GET /api/bookmarks/{}": "bookmark",
     "PATCH /api/bookmarks/{}": "bookmark", "DELETE /api/bookmarks/{}": "bookmark", "POST /api/bookmarks/{}/restore": "bookmark",
@@ -398,7 +398,7 @@ ROUTES = {
     "PATCH /api/office/cash-entries/{}": "office", "POST /api/office/cash-entries/{}/cancel": "office", "GET /api/office/cash-entries/{}/log": "office",
     "GET /api/office/cashbooks/{}/closing": "office", "POST /api/office/cashbooks/{}/closing": "office", "GET /api/office/cashbooks/{}/log": "office",
     "GET /api/docs/{}/cashbook": "office", "GET /api/office/cashbook.csv": "office", "GET /api/office/cashbook.pdf": "office",
-    "POST /api/office/logbook/close": "office",  # 2.103.0 (#2169): close a month of the logbook, office admins (p2103_c_api_test.py)
+    "POST /api/office/logbook/close": "office",  # 2.152.0 (#2169): close a month of the logbook, office admins (p2103_c_api_test.py)
     # 2.50.0 (#1196, #1197): the sales pipeline and the business figures, admins of the office area only (p250_b_api_test.py: other org 404, member 403)
     "GET /api/office/deals": "office", "POST /api/office/deals": "office", "PATCH /api/office/deals/{}": "office", "DELETE /api/office/deals/{}": "office",
     "POST /api/office/deals/{}/restore": "office", "POST /api/office/deals/{}/offer": "office", "POST /api/office/deals/{}/project": "office",
@@ -531,7 +531,7 @@ ROUTES = {
     "GET /api/search/messages": "aggregate",  # 2.33.0 (#1080): only what the person may read (vis_sql, rooms, own agent chats)
     "GET /api/admin/client-ip": "admin",  # 2.33.0 (#834)
     "GET /api/admin/health": "admin",  # 2.102.0 D (#1994): numbers only (pool, threads, role, loops), no user data
-    "GET /api/admin/retention": "admin",  # 2.103.0 (#2165): the retention runs in numbers (switch, period, last result)
+    "GET /api/admin/retention": "admin",  # 2.152.0 (#2165): the retention runs in numbers (switch, period, last result)
     # ---- form (10)
     "GET /api/lists/{}/forms": "form", "POST /api/lists/{}/forms": "form", "PATCH /api/forms/{}": "form",
     "DELETE /api/forms/{}": "form", "GET /f/{}": "form", "POST /f/{}": "form", "GET /api/v1/lists/{}/forms": "form",
@@ -613,7 +613,7 @@ ROUTES = {
     "GET /api/admin/orgs": "org", "POST /api/admin/orgs/boundary/repair": "org",  # 2.46.0 (#1563)
      "POST /api/admin/orgs": "org", "PATCH /api/admin/orgs/{}": "org",
     "DELETE /api/admin/orgs/{}": "org", "PUT /api/admin/orgs/visibility": "org", "GET /api/orgs": "org",
-    "GET /api/admin/orgs/{}/delete-info": "org",  # 2.103.0 A (#2167): numbers for the delete dialog (instance admin)
+    "GET /api/admin/orgs/{}/delete-info": "org",  # 2.152.0 A (#2167): numbers for the delete dialog (instance admin)
     "PATCH /api/orgs/{}": "org", "PUT /api/orgs/{}/members": "org", "DELETE /api/orgs/{}/members/{}": "org",
     # 2.115.0 B (#2062): an organisation's invitations by e-mail (p2115_b_api_test.py: other organisation 404, member 403)
     "GET /api/orgs/{}/invites": "org", "POST /api/orgs/{}/invites": "org", "POST /api/orgs/{}/invites/{}/resend": "org",

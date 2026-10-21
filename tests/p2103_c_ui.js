@@ -1,4 +1,4 @@
-// 2.103.0 UI tests, part C (#2169): the closed logbook, own container (start.sh, mode workspaces), Firefox (desktop + phone
+// 2.152.0 UI tests, part C (#2169): the closed logbook, own container (start.sh, mode workspaces), Firefox (desktop + phone
 // width). Invented companies, people and figures only.
 // - the drives bar has "Close month"; its dialog offers the months of the year that are still open
 // - a drive of a closed month opens read-only: the closing note, its change log right in the dialog, no delete, "Correct"

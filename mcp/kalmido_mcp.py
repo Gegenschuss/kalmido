@@ -1627,7 +1627,7 @@ TOOLS += [
      _obj(_CLIENT, ["name"]), lambda api, a: api.call("POST", "/clients", body=_pick(a, tuple(_CLIENT)))),
     ("update_client", "2.23.0: change a client.", _obj({"client_id": S_ID, **_CLIENT}, ["client_id"]),
      lambda api, a: api.call("PATCH", f"/clients/{int(a['client_id'])}", body=_pick(a, tuple(_CLIENT)))),
-    ("delete_client", "2.23.0: delete a client (its creator or an admin); its lists stay. 2.103.0: a client used in quotations, invoices or contracts is archived instead (answer archived: true).", _obj({"client_id": S_ID}, ["client_id"]),
+    ("delete_client", "2.23.0: delete a client (its creator or an admin); its lists stay. 2.152.0: a client used in quotations, invoices or contracts is archived instead (answer archived: true).", _obj({"client_id": S_ID}, ["client_id"]),
      lambda api, a: api.call("DELETE", f"/clients/{int(a['client_id'])}")),
     ("bulk_clients", "2.47.3: several clients at once (ids from list_clients, up to 1000). delete: a client used in quotations, invoices or "
                      "framework contracts is archived instead (only its creator or an admin deletes; others are skipped); archive / "

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.103.0 API tests, part C (#2168 #2169 #2174): legal retention instead of deleting, own container (start.sh). Invented
+"""2.152.0 API tests, part C (#2168 #2169 #2174): legal retention instead of deleting, own container (start.sh). Invented
 people, firms and addresses only (example.com).
 tenant-matrix: office
 freelancer-matrix: office

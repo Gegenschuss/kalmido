@@ -17,7 +17,7 @@ addresses and paths to your setup.
 - [Database (PostgreSQL)](#database-postgresql)
 - [Upgrade to 2.37 (PostgreSQL required)](#upgrade-to-237-postgresql-required)
 - [Backup and encryption](#backup-and-encryption)
-- [Deletion periods (2.103)](#deletion-periods-2103)
+- [Deletion periods (2.152)](#deletion-periods-2152)
 - [Encryption of organisation data](#encryption-of-organisation-data)
 - [Encryption of private files](#encryption-of-private-files)
 - [Encryption in the browser (2.64)](#encryption-in-the-browser-264)
@@ -509,16 +509,16 @@ docker compose up -d kalmido
   - Restoring from the target: download the backup there and use *Restore from a file* (or copy it into the backup folder).
 - **Old snapshots contain plain text.** Filesystem, VM or provider snapshots taken before you switched on encryption
   still hold the data unencrypted: delete them.
-- **Backup retention and deleted accounts (2.103).** Weekly backups are kept for at most 52 weeks (an older, higher setting
+- **Backup retention and deleted accounts (2.152).** Weekly backups are kept for at most 52 weeks (an older, higher setting
   reads as 52). The rotation runs once a day even while the automatic backups are switched off. Safety backups (written
   before every restore) go after `KALMIDO_SAFETY_BACKUP_DAYS` days (30), also among the last three, once the deletion runs
-  are switched on (see [Deletion periods](#deletion-periods-2103)). Every deleted account is noted in a journal (the account
+  are switched on (see [Deletion periods](#deletion-periods-2152)). Every deleted account is noted in a journal (the account
   id and salted hashes of its e-mail and user name, no plain text); after a restore, accounts the backup brought back are
   deleted again, and one that still owns lists is disabled for the admin to decide (an admin alert gives the numbers). The
   archive now also holds the list header pictures (`attachments/listheads/`). Hosting for others:
   `KALMIDO_BACKUP_ENCRYPT_REQUIRED=1` writes no backup without a passphrase (an admin alert says so); off by default.
 
-## Deletion periods (2.103)
+## Deletion periods (2.152)
 
 Data whose period ran out is deleted for good by background runs of the watchdog. Every run first **counts**: by default
 the switch is off and nothing is deleted (a dry run), so an update never removes anything by surprise. The admin reads the
@@ -1277,7 +1277,7 @@ Newsletter…* an organisation's admin connects the service for the organisation
   bounced address is never subscribed again by Kalmido and stays blocked in Kalmido; if the person
   subscribes again through the service's own form, Kalmido leaves that subscription alone. Manually with
   *Sync now*, or once a day. Every run is logged (numbers and error codes, never addresses or access data).
-- **Suppression list (2.103.0):** an unsubscription or bounce is also kept as a hash (SHA-256 of the lower-case address, per
+- **Suppression list (2.152.0):** an unsubscription or bounce is also kept as a hash (SHA-256 of the lower-case address, per
   workspace; never the address itself), so deleting or merging the contact does not make the address mailable again, and a
   new import marked "yes" on that address stays unsubscribed. Consent, confirmation and unsubscription are logged as well
   (event, source, time, again only the hash) as proof of consent.

@@ -181,7 +181,7 @@ check(r.ok and d2["state"] == "partial" and d2["open"] == "295.00", f"match: a s
 r = A.post(B + f"{K}/tx/{t2['id']}/unmatch")
 d2 = doc(A, I2["id"])
 check(r.ok and r.json()["was"] == {"kind": "invoice", "id": I2["id"]} and r.json()["item"]["match"] is None and d2["open"] == "595.00"
-      # 2.103.0 (#2168): the payment is reversed (a second line with the negative amount), not deleted
+      # 2.152.0 (#2168): the payment is reversed (a second line with the negative amount), not deleted
       and len(d2["payments"]) == 2 and d2["payments"][1]["reverses_id"] == d2["payments"][0]["id"] and sum(float(p["amount"]) for p in d2["payments"]) == 0,
       "unmatch: the payment is reversed, the booking open again " + r.text[:200])
 check(A.post(B + f"{K}/tx/{t2['id']}/unmatch").status_code == 409, "unmatch: an open booking is refused (409)")

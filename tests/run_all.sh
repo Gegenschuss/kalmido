@@ -1196,18 +1196,18 @@ fresh; run p298_b_ui node p298_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p298_c_ui node p298_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.98.0 part D: longer tick / create animation, document guesses only where they fit, comment names (#2163 #2178 #2184)
 fresh; run p298_d_api "$PY" p298_d_api_test.py "$KALMIDO_TEST_DATA"
-# 2.103.0 (#2165): retention switch + GET /api/admin/retention (leader)
+# 2.152.0 (#2165): retention switch + GET /api/admin/retention (leader)
 fresh; run p2103_r_api "$PY" p2103_r_api_test.py "$KALMIDO_TEST_DATA"
-# 2.103.0 part A (#2164 #2167 #2174): account purge, organisation delete with retention, foreign keys
+# 2.152.0 part A (#2164 #2167 #2174): account purge, organisation delete with retention, foreign keys
 fresh; run p2103_a_api "$PY" p2103_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2103_a_ui node p2103_a_ui.js "$KALMIDO_TEST_DATA"
-# 2.103.0 part B (#2165 #2172): trash periods, backups (age limit, deletion journal, list heads)
+# 2.152.0 part B (#2165 #2172): trash periods, backups (age limit, deletion journal, list heads)
 fresh; run p2103_b_api "$PY" p2103_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2103_b_ui node p2103_b_ui.js "$KALMIDO_TEST_DATA"
-# 2.103.0 part C (#2168 #2169): office locks for taxable records, logbook closing + visible change log
+# 2.152.0 part C (#2168 #2169): office locks for taxable records, logbook closing + visible change log
 fresh; run p2103_c_api "$PY" p2103_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2103_c_ui node p2103_c_ui.js "$KALMIDO_TEST_DATA"
-# 2.103.0 part D (#2170 #2171 #2173 #2175): newsletter suppression, log/session periods, file orphans, agent chat delete
+# 2.152.0 part D (#2170 #2171 #2173 #2175): newsletter suppression, log/session periods, file orphans, agent chat delete
 fresh; run p2103_d_api "$PY" p2103_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2103_d_ui node p2103_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.87.9 part E (#1914 #1920 #1909 #1933 #1937 #1952 #1963): polish

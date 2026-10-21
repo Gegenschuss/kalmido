@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.103.0 API test (leader, #2165): the switch of the retention runs and GET /api/admin/retention.
+"""2.152.0 API test (leader, #2165): the switch of the retention runs and GET /api/admin/retention.
 Invented accounts only (example.com).
  - instance admins only (an organisation member, a person without an organisation and nobody get 401 / 403)
  - every kind (trash, logs, backups, files, chat) with its period, its env names and the switch; the test server runs

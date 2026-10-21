@@ -663,7 +663,7 @@ The group no longer grows with every person you share a list with:
 - The pins are personal settings (`side_people`, `side_agents`) and hold on every device. A pinned person you no longer
   share a list with drops out quietly.
 
-## Deleting accounts and organisations: what the law keeps (2.103.0)
+## Deleting accounts and organisations: what the law keeps (2.152.0)
 
 - **Deleting an account** removes it completely, files on the disk included: the personal office (its documents, the
   logo, the stored PDFs and XML) and the own files go, the inbox goes with its attachments, the person's own agents go

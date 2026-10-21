@@ -250,7 +250,7 @@ dbx("UPDATE office_docs SET client_id=? WHERE id=?", (M, I2), write=True)
 # ---- undo after the target was deleted
 r = A.post(M_URL, json={"target": T, "ids": [M]})
 RID3 = r.json()["run_id"]
-# 2.103.0 (#2168): a client with documents is archived instead of deleted -> the target goes by hand (as an org delete would)
+# 2.152.0 (#2168): a client with documents is archived instead of deleted -> the target goes by hand (as an org delete would)
 r = A.delete(B + f"/api/clients/{T}")
 check(r.ok and r.json().get("archived") is True, "the target in use: archived instead of deleted " + r.text[:160])
 dbx("UPDATE lists SET client_id=NULL WHERE client_id=?", (T,), write=True)
