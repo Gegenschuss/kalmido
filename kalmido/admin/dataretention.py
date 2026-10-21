@@ -134,7 +134,7 @@ def orf_path_columns(c):
     """(table, column) of every text column that can name a stored file (path / *_path), read from the schema."""
     return [(r[0], r[1]) for r in c.execute(
         "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema=current_schema() "
-        "AND data_type='text' AND (column_name='path' OR column_name LIKE '%\\_path')")]
+        "AND data_type='text' AND (column_name='path' OR column_name LIKE '%\\_path')")]  # pg-ok: schema column names are lower case
 
 
 def orf_known(c, cols, rel):

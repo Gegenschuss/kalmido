@@ -338,8 +338,8 @@ def upg_mentions(c, uid):
     tok, word = UPG_MENTION.format(int(uid)), "@" + tr("Deleted user")
     for table in ("comments", "tchat_msgs"):
         extra = " AND enc IS NULL" if table == "tchat_msgs" else ""
-        c.execute(f"UPDATE {table} SET body=replace(body, ?, ?) WHERE body LIKE ?{extra}", (tok, word, f"%{tok}%"))
-    for r in c.execute("SELECT id, mentions FROM comments WHERE ','||mentions||',' LIKE ?", (f"%,{int(uid)},%",)).fetchall():
+        c.execute(f"UPDATE {table} SET body=replace(body, ?, ?) WHERE body LIKE ?{extra}", (tok, word, f"%{tok}%"))  # pg-ok: the token is <@digits>, case does not matter
+    for r in c.execute("SELECT id, mentions FROM comments WHERE ','||mentions||',' LIKE ?", (f"%,{int(uid)},%",)).fetchall():  # pg-ok: digits only, case does not matter
         rest = [x for x in str(r["mentions"]).split(",") if x and x != str(int(uid))]
         c.execute("UPDATE comments SET mentions=? WHERE id=?", (",".join(rest), r["id"]))
 
@@ -370,9 +370,9 @@ def upg_fk_once(c):
     a / b ON DELETE SET NULL instead of CASCADE). 2.102 runs on with it (it never writes NULL there)."""
     n = 0
     for table, col, rule in UPG_FK:
-        rows = c.execute("""SELECT con.conname, con.confdeltype FROM pg_constraint con JOIN pg_class t ON t.oid=con.conrelid
-                            JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=ANY(con.conkey)
-                            WHERE con.contype='f' AND t.relname=? AND a.attname=? AND t.relnamespace=to_regnamespace(current_schema())""",
+        rows = c.execute("SELECT con.conname, con.confdeltype FROM pg_constraint con JOIN pg_class t ON t.oid=con.conrelid "  # pg-ok: catalog oid (Postgres only)
+                         "JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=ANY(con.conkey) "  # pg-ok: catalog oid (Postgres only)
+                         "WHERE con.contype='f' AND t.relname=? AND a.attname=? AND t.relnamespace=to_regnamespace(current_schema())",
                          (table, col)).fetchall()
         if any(r[1] == "n" for r in rows):
             continue

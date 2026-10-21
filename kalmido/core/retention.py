@@ -68,7 +68,7 @@ def ret_status(c):
     out = {}
     for k in RET_KINDS:
         runs = {}
-        for r in c.execute("SELECT key, value FROM settings WHERE key=? OR key LIKE ?", (f"ret_last_{k}", f"ret_last_{k}.%")):
+        for r in c.execute("SELECT key, value FROM settings WHERE key=? OR key LIKE ?", (f"ret_last_{k}", f"ret_last_{k}.%")):  # pg-ok: own lower-case setting keys, case-sensitive on purpose
             try:
                 v = json.loads(r[1] or "null")
             except ValueError:
