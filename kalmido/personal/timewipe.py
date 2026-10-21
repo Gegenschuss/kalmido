@@ -36,12 +36,13 @@ def tz_no_agent():
 
 
 def tz_billed_sql(a="e."):
-    """SQL fragment: the entry is covered by an invoice (not cancelled) of the list's client that carries the list's name."""
-    return (f"EXISTS (SELECT 1 FROM office_docs d JOIN lists bl ON bl.id={a}list_id "
+    """SQL fragment: the entry is covered by an invoice (not cancelled) of the list's client that carries the list's name.
+    2.144.6 A (#2053): or an invoice took it (billed_doc_id)."""
+    return (f"({a}billed_doc_id IS NOT NULL OR EXISTS (SELECT 1 FROM office_docs d JOIN lists bl ON bl.id={a}list_id "
             f"WHERE d.kind='invoice' AND d.status<>'cancelled' AND bl.client_id IS NOT NULL AND d.client_id=bl.client_id "
             f"AND d.org_id=bl.org_id AND COALESCE(d.service_from, d.service_to) IS NOT NULL "
             f"AND substr({a}start,1,10)>=COALESCE(d.service_from, d.service_to) AND substr({a}start,1,10)<=COALESCE(d.service_to, d.service_from) "
-            f"AND EXISTS (SELECT 1 FROM office_doc_items i WHERE i.doc_id=d.id AND lower(trim(i.title))=lower(trim(bl.name))))")  # review V2
+            f"AND EXISTS (SELECT 1 FROM office_doc_items i WHERE i.doc_id=d.id AND lower(trim(i.title))=lower(trim(bl.name)))))")  # review V2
 
 
 def tz_scope(c, lid):

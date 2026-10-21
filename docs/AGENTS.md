@@ -2775,7 +2775,8 @@ with the scope it needs). The tools:
   `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`,
   `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `list_repos`, `list_environments` (2.60.0), `set_deployment` (2.60.0)
 - time and habits: `get_timer`, `start_timer`, `stop_timer`, `list_time_entries`, `get_time_gaps` (2.34.0), `add_time_entry`, `update_time_entry`,
-  `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`, `get_habit_stats` (2.138.1)
+  `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`, `get_habit_stats` (2.138.1). 2.144.6: time entries
+  carry `billable` (settable in `add_time_entry` / `update_time_entry`) and `billed` (on an invoice: only the note changes)
 - News: `list_news`, `mark_news_read`
 - day plans: `get_day_plan`, `get_day_review`
 - family (2.19.0): `get_family`, `add_occasion`, `list_deadline_types`, `add_deadline`, `ingredients_to_shopping`,

@@ -1042,6 +1042,9 @@ ROUTES = {
     "GET /api/office/number-ranges": "office", "POST /api/office/number-ranges/{}": "office",
     # 2.144.0 A (#2412): Stop in the agent chat (who may write the agent) and the agent's confirmation (p2144_a_api_test.py)
     "POST /api/agents/{}/abort": "agent", "POST /api/v1/agent/aborted": "agent",
+    # 2.144.6 A (#2053): time entries to an invoice (office/timebill.py: the office area's client lists, release = office admin;
+    # p21446_a_api_test.py)
+    "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",
 }
 
 # ---- 1. every route is classified, nothing stale

@@ -1270,7 +1270,14 @@ settings, sheet}`), `DELETE /api/office/docs/<id>/parts/<pid>` (with its positio
   (`source_doc_id` points back);
 - **from time entries** (`POST /api/office/docs/from-time` with `{client_id, from, to, project_id?}`): the finished time
   entries of the client's lists in the period, one position per list with the hours; the rate is the client's hourly
-  rate when set, else 0 to fill in;
+  rate when set, else 0 to fill in. 2.144.6: only **billable**, still **open** entries count (each entry has the switch
+  *Billable*, on by default; `GET /api/office/time-open?client_id=&from=&to=` shows open / billed / not billable hours
+  first). The draft takes them (`billed`): they keep their duration, date and task (only the note can change), cannot be
+  deleted and never land on a second invoice, also when two invoices are made at the same moment. The answer's `time`
+  says how many entries were taken and skipped. Deleting the draft frees them again; a finalised invoice keeps them,
+  also once cancelled - on a cancelled invoice the office admin frees them with *Release the time again*
+  (`POST /api/office/docs/{id}/time-release`, undoable). Without an organisation the personal office bills the
+  person's private lists the same way;
 - **empty** (`POST /api/office/docs` with `{"kind": "invoice"}`).
 
 Invoices have no producing / raw data / discount automation: a document is exactly its positions. A discount is a

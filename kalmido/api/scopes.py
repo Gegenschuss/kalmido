@@ -1155,7 +1155,7 @@ def v1_timer_stop():
 def v1_time_update(eid):
     v1_args(())
     need_time()
-    b = _v1_body(("start", "end", "minutes", "note", "task_id", "list_id"))
+    b = _v1_body(("start", "end", "minutes", "note", "task_id", "list_id", "billable"))  # 2.144.6 A (#2053): + billable
     return jsonify(v1_entry(v1_call(time_update, eid, body=b)))
 
 
@@ -1395,10 +1395,12 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                        body={"type": "object", "properties": {"task_id": {"type": "integer"}, "list_id": {"type": "integer"}, "note": {"type": "string"}}}),
             "delete": op("Stop the timer", "Time tracking", ok(obj) | errs("403"), scope="time")},
         "/time/entries/{id}": {
-            "patch": op("Change your time entry", "Time tracking", ok(ref("TimeEntry")) | errs("400", "403", "404"), [pid("id", "Entry id")], scope="time",
+            "patch": op("Change your time entry", "Time tracking", ok(ref("TimeEntry")) | errs("400", "403", "404", "409"), [pid("id", "Entry id")], scope="time",
                         body={"type": "object", "properties": {k: {"type": "string"} for k in ("start", "end", "note")} | {
-                            "minutes": {"type": "number"}, "task_id": {"type": "integer"}, "list_id": {"type": "integer"}}}),
-            "delete": op("Delete your time entry", "Time tracking", nobody | errs("403", "404"), [pid("id", "Entry id")], scope="time")},
+                            "minutes": {"type": "number"}, "task_id": {"type": "integer"}, "list_id": {"type": "integer"},
+                            "billable": {"type": "boolean"}}},
+                        desc="2.144.6: an entry an invoice billed (billed: true) keeps everything but its note (409)."),
+            "delete": op("Delete your time entry", "Time tracking", nobody | errs("403", "404", "409"), [pid("id", "Entry id")], scope="time")},
         "/export": {"get": op("Export everything you own as JSON", "Account", ok(obj) | errs(), scope="export")},
         "/lists/{id}/status": {"put": op("Post a status update of a project", L, ok(obj) | errs("400", "403", "404", "409"), [lp], scope="structure",
                                          body={"type": "object", "properties": {"status": {"type": "string", "enum": [*LIST_STATUSES, ""]},

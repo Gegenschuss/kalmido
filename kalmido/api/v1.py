@@ -1294,7 +1294,7 @@ def v1_comment_create(tid):
 
 def v1_entry(e):
     return {k: e[k] for k in ("id", "user_id", "user_name", "task_id", "list_id", "title", "start", "end", "seconds", "rounded",
-                              "note", "source", "running")}
+                              "note", "source", "running", "billable")} | {"billed": bool(e.get("billed"))}  # 2.144.6 A (#2053)
 
 
 @app.get("/api/v1/time/entries")
@@ -1334,7 +1334,7 @@ def v1_time_create():
     need_time()
     v1_feature("time")
     b = v1_json()
-    unknown = sorted(k for k in b if k not in ("task_id", "list_id", "start", "end", "minutes", "note"))
+    unknown = sorted(k for k in b if k not in ("task_id", "list_id", "start", "end", "minutes", "note", "billable"))  # 2.144.6 A (#2053): + billable
     if unknown:
         raise UnknownFields(unknown)
     j = v1_call(time_create, body=b)
