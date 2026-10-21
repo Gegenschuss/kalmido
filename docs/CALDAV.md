@@ -114,6 +114,10 @@ is kept as it came and sent back unchanged. Each of your calendars is one collec
 events you are invited to by someone else come in a read-only calendar **Invitations** (`…/inv/`). Calendars are
 created, shared and deleted in Kalmido; a calendar shared with you *view only* is read-only in the apps.
 
+**Attendees and apps that leave them out (2.144.5).** Kalmido remembers per app password whether its app ever sent an
+`ATTENDEE`. An app that never did cannot remove the attendees (and their answers) of an event by saving it without them; an
+app that sends attendees removes one by leaving it out, as before.
+
 ### What syncs (contacts)
 
 vCard 3.0 and 4.0, each contact in the version its app wrote (a client can ask for the other one). Name parts, display
