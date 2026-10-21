@@ -136,6 +136,8 @@ async function hmb_compose(src) {
   md.classList.add('hmbcdlg');
   const ta = hmb_q(md, '#hmb-text');
   setTimeout(() => { if (j.reply) { ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0; } else hmb_q(md, to ? '#hmb-sub' : '#hmb-to')?.focus(); }, 0);
+  // 2.144.2 A (#2441): the first tap into an untouched reply keeps the cursor above the quote (touch put it at the end)
+  if (j.reply) { const v0 = ta.value; ta.addEventListener('pointerup', () => setTimeout(() => { if (ta.value === v0) { ta.setSelectionRange(0, 0); ta.scrollTop = 0; } }, 0), {once: true}); }
   const errEl = hmb_q(md, '.hmb-err');
   md.addEventListener('click', async e => {
     if (/** @type {any} */ (e.target).closest('[data-m="close"]')) { modalClose(md); return; }

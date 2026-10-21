@@ -12412,6 +12412,7 @@
   "Skipped: {0}": "Omitidos: {0}",
   "The columns apply to every CSV file.": "Las columnas se aplican a todos los archivos CSV.",
   "Not a bank statement (only XML, CSV or ZIP)": "No es un extracto bancario (solo XML, CSV o ZIP)",
+  "Channel type": "Tipo",
   "Kalmido - Start": "Kalmido: inicio",
   "Unread in other workspaces": "Sin leer en otros espacios de trabajo",
   "1 unread in {0}": "1 sin leer en {0}",

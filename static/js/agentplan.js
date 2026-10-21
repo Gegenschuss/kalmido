@@ -65,8 +65,10 @@ const ap_propHint = v => v.kind === 'time'
 
 // ---- drafts in the calendar: tentative events
 const ap_draftCls = e => e?.status === 'tentative' ? ' evdraft' : '';
+// 2.144.2 B (#1811): the status on its way per event; a popover opened again meanwhile (the GET can overtake the PATCH) shows it
+const AP_EVPEND = new Map();
 async function ap_evStatus(ev, st, label) {
-  const put = async x => { await api('PATCH', `/api/events/${ev.id}`, {status: x}); calInvalidate(); renderView(); return {}; };
+  const put = async x => { AP_EVPEND.set(ev.id, x); try { await api('PATCH', `/api/events/${ev.id}`, {status: x}); } finally { AP_EVPEND.delete(ev.id); } calInvalidate(); renderView(); return {}; };
   try { await put(st); } catch { return; }
   if (!$('#pop').classList.contains('hidden') && $('#pop .apdraftact')) closePop();  // 2.58.0 (#1811): a popup still showing the draft is closed, not left with Draft + Confirm
   histToast(label, histAdd({label, undo: () => put(ev.status), redo: () => put(st)}));

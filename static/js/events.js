@@ -141,7 +141,7 @@ function qMismatch(r) {
   return off ? `<span class="qnote" role="note">${ic('alert', 's')}${esc(tr('first on {0}, then {1}', dayLabel(r.due), repeatLabelBase(rrBase(r.repeat))))}</span>` : '';
 }
 // 2.46.1 (#1634): a render that rebuilds an input keeps its text, caret and focus (typing goes on while a save runs)
-let subAddQ = Promise.resolve();
+let subAddQ = Promise.resolve(), subTmpN = 0;  // 2.144.2 B (#2467): subTmpN orders the provisional rows
 function renderKeepField(sel, fn) {
   const o = $(sel), v = o?.value || '', a = o?.selectionStart ?? v.length, b = o?.selectionEnd ?? v.length;
   const f = !o || document.activeElement === o || document.activeElement === document.body;
@@ -789,10 +789,21 @@ document.addEventListener('keydown', async e => {
       e.preventDefault();
       const p = taskById(S.sel), v = t.value; if (!p) return;
       t.value = '';
+      // 2.144.2 B (#2467): a provisional row shows at once (optimistic like #1501, kept on top of a state fetched meanwhile);
+      // the queue keeps the POSTs in order and the answer replaces the row (putTask), no GET /api/state per subtask
+      const r = parseQuick(v.trim(), new Set()), now = new Date().toISOString();
+      const tmp = {id: -Date.now() * 1000 - (++subTmpN % 1000), list_id: p.list_id, section_id: p.section_id ?? null, parent_id: p.id, title: r.title || v, content: '',
+        priority: r.priority || 0, status: 0, due: r.due || null, due_time: r.due_time || null, start: null, reminders: '', repeat: '', repeat_from: 'due', url: null,
+        sort: 1e9 + subTmpN, created_at: now, updated_at: now, completed_at: null, deleted_at: null, tags: [], fields: {}, blocked: 0, blockers: [], blocking: 0, sub_tmp: 1};
+      const op = {put: () => { putTask(tmp); return null; }};
+      const drop = () => { OPT.delete(op); S.tasks.delete(tmp.id); _kidsIx = null; };
+      OPT.add(op); op.put(); renderKeepField('#d-sub', () => { renderDetail(); render(); });
       subAddQ = subAddQ.then(async () => {
-        const r = parseQuick(v.trim(), new Set());
-        const nt = await api('POST', '/api/tasks', qa2_body(r, {title: r.title || v, parent_id: p.id, list_id: p.list_id, due: r.due, due_time: r.due_time, priority: r.priority || 0}));  // 2.111.0 C (#2057)
-        await load(); renderKeepField('#d-sub', () => { renderDetail(); render(); });
+        let nt;
+        try { nt = await api('POST', '/api/tasks', qa2_body(r, {title: r.title || v, parent_id: p.id, list_id: p.list_id, due: r.due, due_time: r.due_time, priority: r.priority || 0})); }  // 2.111.0 C (#2057)
+        catch (x) { drop(); renderKeepField('#d-sub', () => { renderDetail(); render(); }); throw x; }
+        drop(); if (nt?.id) putTask(nt);
+        renderKeepField('#d-sub', () => { renderDetail(); render(); });
         if (nt?.id) histCreate(tr('Subtask {0} added', qn(String(nt.title || r.title || v).slice(0, 40))), nt);
       }).catch(() => { const f = $('#d-sub'); if (f && !f.value) f.value = v; });  // not saved: the text comes back (api() showed why)
       return;

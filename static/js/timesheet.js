@@ -132,3 +132,10 @@ function tsl_tzDevice(b) {
   sel.dispatchEvent(new Event('change', {bubbles: true}));
   b.remove();
 }
+// 2.144.2 B (#2375): another zone chosen: "Use this device" is there at once (it was only drawn when the page opened)
+document.addEventListener('change', e => {
+  const sel = /** @type {any} */ (e.target); if (sel?.id !== 's-ttz') return;
+  const dev = tsl_deviceTz(), b = sel.parentElement?.querySelector('[data-tsl="tzdev"]');
+  if (!dev || sel.value === dev) { b?.remove(); return; }
+  if (!b) sel.insertAdjacentHTML('afterend', `<button type="button" class="linkbtn" data-tsl="tzdev" data-tz="${esc(dev)}">${esc(tr('Use this device: {0}', dev.replace(/_/g, ' ')))}</button>`);
+});

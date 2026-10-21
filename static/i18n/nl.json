@@ -12412,6 +12412,7 @@
   "Skipped: {0}": "Overgeslagen: {0}",
   "The columns apply to every CSV file.": "De kolommen gelden voor alle CSV-bestanden.",
   "Not a bank statement (only XML, CSV or ZIP)": "Geen bankafschrift (alleen XML, CSV of ZIP)",
+  "Channel type": "Soort",
   "Kalmido - Start": "Kalmido – Start",
   "Unread in other workspaces": "Ongelezen in andere werkruimtes",
   "1 unread in {0}": "1 ongelezen in {0}",

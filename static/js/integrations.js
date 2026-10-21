@@ -457,12 +457,13 @@ function chn_modal(ch, j, base, done, org) {
   const kind = ch?.kind || 'slack';
   const fields = k => CHN_FIELDS[k].map(([f, n, ph]) => `<div class="row"><label for="chn-${f}">${tr(n)}</label><input id="chn-${f}" data-chnf="${f}" ${f === 'url' ? 'type="url"' : ''} placeholder="${esc(ch ? tr('unchanged') + ' (' + ch.hint + ')' : ph)}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>`).join('')
     + `<div class="shint keep chnhelp">${esc(tr(CHN_HELP[k]))}</div>`;
+  // 2.144.2 A (#2447): event rows use .chkl (44 px on touch, like "Active"); #2448: own key for the type label (not the office "Service")
   const md = modal(`<h3>${ch ? tr('Edit channel') : tr('Add channel')}</h3>
-    <div class="row"><label for="chn-kind">${tr('Service')}</label><select id="chn-kind" ${ch ? 'disabled' : ''}>${Object.entries(CHN_KINDS).map(([k, n]) => `<option value="${k}" ${k === kind ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    <div class="row"><label for="chn-kind">${tr('Channel type')}</label><select id="chn-kind" ${ch ? 'disabled' : ''}>${Object.entries(CHN_KINDS).map(([k, n]) => `<option value="${k}" ${k === kind ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
     <div class="row"><label for="chn-name">${tr('Name')}</label><input id="chn-name" maxlength="60" value="${esc(ch?.name || '')}" placeholder="${tr('optional')}"></div>
     <div id="chn-fields">${fields(kind)}</div>
     <div class="shint keep">${tr('https:// only; http:// and addresses in your own network only for hosts an admin allowed (Settings > Administration > Advanced).')}</div>
-    <div class="whevg"><b class="muted">${tr('What to send')}</b><div class="featgrid">${evs.map(e => `<label><input type="checkbox" data-chnev="${esc(e)}" ${on.has(e) ? 'checked' : ''}> ${esc(chn_evName(e, org))}</label>`).join('')}</div></div>
+    <div class="whevg"><b class="muted">${tr('What to send')}</b><div class="featgrid">${evs.map(e => `<label class="chkl"><input type="checkbox" data-chnev="${esc(e)}" ${on.has(e) ? 'checked' : ''}> ${esc(chn_evName(e, org))}</label>`).join('')}</div></div>
     ${ch ? `<div class="row"><label></label><label class="chkl"><input type="checkbox" id="chn-on" ${ch.enabled ? 'checked' : ''}> ${tr('Active')}</label></div>` : ''}
     <div class="calerr" role="alert" id="chn-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
