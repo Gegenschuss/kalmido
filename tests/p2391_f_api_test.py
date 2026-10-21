@@ -394,7 +394,9 @@ check(A.put(B + "/api/office/settings", json={"invoice_scheme": "{seq}_R"}).ok, 
 r = A.get(B + L + "/counter")
 check(r.ok and r.json()["invoice"]["highest"] == 664 and r.json()["invoice"]["proposal"] == 664 and r.json()["invoice"]["last"] == 0, "counter: proposal from the archive " + r.text[:300])
 check(Bo.get(B + L + "/counter").status_code == 403, "rights: member cannot read the counter proposal")
-check(A.post(B + L + "/counter", json={"kind": "invoice", "last": 664}).ok, "counter: set to the proposal")
+# 2.144.6 B (#2400 F2): raising the invoice counter needs a reason like the number ranges (GoBD)
+check(A.post(B + L + "/counter", json={"kind": "invoice", "last": 664}).status_code == 400, "counter: no reason -> 400")
+check(A.post(B + L + "/counter", json={"kind": "invoice", "last": 664, "reason": "Continue after the old invoices"}).ok, "counter: set to the proposal")
 check(A.post(B + L + "/counter", json={"kind": "invoice", "last": 10}).status_code == 400, "counter: never lowered")
 check(dbx("SELECT last FROM office_numbers WHERE org_id=? AND kind='invoice'", (ORG,))[0][0] == 664, "counter stored")
 # an archived number that the scheme would make next: the new invoice skips it

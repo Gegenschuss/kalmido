@@ -13,7 +13,7 @@
  - rights (tenant-matrix: office): a member reads, writes 403; an agent 403; another organisation has its own counters
  - a person without an organisation (freelancer-matrix: office): the same in the personal office, own counters
 #2060 rules (freelancer-matrix: lists):
- - triggers created, assigned (one person / anybody; only when the person is new, also via an approval request) and field
+ - triggers created, assigned (one person / anybody; only when the person is new, not via an approval request) and field
    (any change / a selection option / checked / unchecked); actions priority, tag (a list tag), field (a fixed value)
  - loop protection depth 0 stays: a value set by a rule never starts a "field changed" rule
  - invalid references 400 (formula field, wrong value type, unknown option, a tag of another list, a person outside the
@@ -322,7 +322,8 @@ def part_rules():
     check("hot" in ltags(A, t2b), "created with carol as assignee: the person is new -> tag hot")
     t2c = task(A, L2, "Needs a yes")
     ap = A.post(B + f"/api/tasks/{t2c}/approval", json={"action": "request", "approver_id": CAROL})
-    check(ap.ok and "hot" in ltags(A, t2c), f"an approval request makes carol the assignee -> tag hot ({ap.status_code} {ltags(A, t2c)})")
+    # 2.144.6 B (#2400 F3): an approval request hands the task to the approver, but that is no "assigned" for the rules
+    check(ap.ok and "hot" not in ltags(A, t2c), f"an approval request makes carol the assignee, no rule runs ({ap.status_code} {ltags(A, t2c)})")
 
     # ---- field triggers / field action + loop protection
     L3 = mklist(A, "Pipeline")
