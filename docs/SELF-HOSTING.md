@@ -550,7 +550,9 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
   (2.138: `R2-` and 13 groups of four characters). It is not the organisation's key itself but a separate secret that
   unlocks a copy of that key stored in the database, so it works with any master key. Showing it asks for a second
   step: the password and, when set up, the authenticator app code or the passkey; accounts without a password
-  (single sign-on) need a sign-in from the last ten minutes, accounts signed in by a login proxy ask the server admin
+  (single sign-on) sign in again at the OIDC provider (2.144.5: Kalmido asks it with `prompt=login` and `max_age=0`
+  and accepts the sign-in only with an `auth_time` of the last five minutes in the ID token, valid for ten minutes;
+  a provider that does not send `auth_time` cannot confirm it), accounts signed in by a login proxy ask the server admin
   (`orgcrypt_cli recovery --org <id>`). Every showing is noted in the office log, and the organisation's other admins
   get a notice in their News (who and when, never the key). *New recovery key* replaces it: the earlier one stops
   working at once. A person without an organisation finds the recovery key of the personal office under

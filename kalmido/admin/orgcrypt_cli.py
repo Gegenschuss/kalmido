@@ -1261,6 +1261,17 @@ def rot_announce(c, oid, what):
     c.commit()
 
 
+def _test_switch(name):
+    """2.144.5 A (#2387, review F7): a KALMIDO_TEST_* switch counts only in a test run (KALMIDO_TEST_MODE=1 next to it);
+    set alone, e.g. left over in a server's .env, it is ignored with a note."""
+    if os.environ.get(name) != "1":
+        return False
+    if os.environ.get("KALMIDO_TEST_MODE") == "1":
+        return True
+    print(TAG, name, "is ignored: not a test run (KALMIDO_TEST_MODE)", flush=True)
+    return False
+
+
 def _write_secret(path, text):
     """The recovery key into a new file with mode 0600 (never over an existing one)."""
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -1441,7 +1452,7 @@ def main(argv):
                 print(TAG, "rotate: the file for the recovery key exists already - nothing changed", flush=True)
                 return 2
             print(TAG, "rotate: do not go back to a version before 2.138 until this has finished - it reads the organisation's data only after the end", flush=True)  # 2.138.0 C (#1972, review F5)
-            t = rotate_org(c, a.org, force=a.force, rounds=0 if os.environ.get("KALMIDO_TEST_ROT_ABORT") == "1" else 3)  # tests: stop after the key switch
+            t = rotate_org(c, a.org, force=a.force, rounds=0 if _test_switch("KALMIDO_TEST_ROT_ABORT") else 3)  # tests: stop after the key switch
             sec = t.pop("secret")
             print(TAG, "rotate:", json.dumps(t), flush=True)
             if not t["finished"]:

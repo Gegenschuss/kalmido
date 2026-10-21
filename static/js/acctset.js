@@ -28,12 +28,16 @@ function tkh_dropHtml(tok) {
 }
 function tkh_dropDraw(md, tok) { const w = $('#s-dropw', md); if (w) w.innerHTML = tkh_dropHtml(tok); }
 // 2.138.0 C (#1907): every HTTP Shortcuts download carries a new token (the server cannot read the old one back)
+// 2.144.5 A (#2387, review F8): fetched, so a refusal (e.g. an older browser that names no origin) shows the server's reason
+// instead of a silently failed download
 async function tkh_zipClick(e, a, md) {
-  if (a.dataset.ok) { delete a.dataset.ok; } else {
-    e.preventDefault();
-    if (S.me?.drop_token_set && !await askConfirm(tr('Download a new HTTP Shortcuts import?'), tr('The file contains a new upload token. The previous shortcut stops working then (also the one on the iPhone).'), {ok: tr('Download')})) return;
-    a.dataset.ok = '1'; a.click(); return;
-  }
+  e.preventDefault();
+  if (S.me?.drop_token_set && !await askConfirm(tr('Download a new HTTP Shortcuts import?'), tr('The file contains a new upload token. The previous shortcut stops working then (also the one on the iPhone).'), {ok: tr('Download')})) return;
+  let r;
+  try { r = await fetch(a.getAttribute('href'), {headers: {'X-Requested-With': 'kalmido'}, credentials: 'same-origin'}); } catch { toast(tr('Only available online.')); return; }
+  if (!r.ok) { let m = ''; try { m = (await r.json()).error || ''; } catch { /* not JSON */ } toast(m || tr('Download failed')); return; }
+  const d = document.createElement('a'); d.href = URL.createObjectURL(await r.blob()); d.download = a.getAttribute('download') || 'kalmido-http-shortcuts.zip';
+  document.body.append(d); d.click(); d.remove(); setTimeout(() => URL.revokeObjectURL(d.href), 4000);
   if (S.me) Object.assign(S.me, {drop_token_set: true, drop_token_at: new Date().toISOString()});
   setTimeout(() => tkh_dropDraw(md), 0);
 }

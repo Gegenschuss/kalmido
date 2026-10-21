@@ -15,9 +15,10 @@ function ocStateHtml(j) {
   // 2.46.0 (#1563): one text, so one "More information" link
   // 2.138.0 C (#1972): show (the same key again) or make a new one (the earlier one stops working); the full renewal of the
   // organisation's key runs on the server's command line (orgcrypt_cli rotate); a key of the earlier kind counts until then
+  // 2.144.5 A (#2387, review F9): while it runs the search index is made again at the end, so the search may miss documents
   return `<div class="shint">${esc(j.active ? tr('On: bank and tax data, purchase prices, framework contract rates and the files of the organisation’s lists and documents are stored encrypted with the organisation’s own key. Everyone who may see them sees them as before.')
       : tr('Paused by the server admin: new data is stored unencrypted, encrypted data stays readable.'))} ${esc(tr('The recovery key opens the organisation’s data if the server key is ever lost. Keep it offline, e.g. printed in a safe. Without the server key and without the recovery key the encrypted data is lost for good.'))}</div>
-    ${j.rotating ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('The organisation’s key is being renewed on the server. The recovery key can be shown again when that is finished.'))}</div>`
+    ${j.rotating ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('The organisation’s key is being renewed on the server. The recovery key can be shown again when that is finished.'))}</div><div class="mhint muted ocrotsearch">${esc(tr('Until the renewal is finished, the search may not find all of the organisation’s documents, files and pages.'))}</div>`
       : `<div class="row"><button type="button" class="btn sm" data-oc="show">${ic('key', 's')} ${tr('Show recovery key')}</button><button type="button" class="btn sm" data-oc="new">${ic('sync', 's')} ${tr('New recovery key')}</button>${j.recovery_shown_at ? `<span class="muted">${esc(tr('last shown {0}', when(j.recovery_shown_at)))}</span>` : ''}</div>`}
     ${j.recovery_stale && !j.rotating ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('The recovery key cannot be shown with the current server key. The one you kept stays valid; “New recovery key” makes a new one.'))}</div>` : ''}
     ${!j.recovery && j.recovery_shown_at && !j.rotated_at ? `<div class="mhint muted">${esc(tr('A recovery key of the earlier kind (13 groups without “R2-”) was shown before. It stays valid until the server admin renews the organisation’s key.'))}</div>` : ''}
@@ -38,8 +39,15 @@ async function ocLoad(box) {
 }
 // 2.138.0 C (#1972): the step-up the server asks (status "step"): password, + code of the app / a recovery code (totp), + the
 // passkey (passkey); without a password a fresh sign-in (fresh); signed in by the login proxy: only the server admin (proxy)
-async function ocStepUp(oid, step, title) {
+// 2.144.5 A (#2387): an SSO account (st.stepup 'oidc') signs in again at its login provider (prompt=login), unless this
+// session did that in the last minutes (st.fresh); the provider sends it back to #rck-stepup/<org>/<show|new> (ocStepUpBack)
+async function ocStepUp(oid, step, title, st = {}, isNew = false) {
   if (step === 'proxy') { toast(tr('You are signed in through the server’s login proxy. Ask the server admin for the recovery key (command line, SELF-HOSTING.md).')); return null; }
+  if (step === 'fresh' && st.stepup === 'oidc' && !st.fresh) {
+    if (!await askConfirm(title, tr('Sign in again with your login provider to confirm. Kalmido then shows the key.'), {ok: tr('Sign in again')})) return null;
+    location.href = `/api/auth/oidc/start?stepup=${isNew ? 'new' : 'show'}&org=${+oid || 0}`;
+    return null;
+  }
   if (step === 'fresh') return {};
   const p = await pwPrompt(title, {code: step === 'totp', text: esc(step === 'password' ? tr('Confirm with your password. Showing the key is noted in the office log.')
     : tr('Confirm with your password and your second factor. Showing the key is noted in the office log and the other admins are told.'))});
@@ -49,10 +57,10 @@ async function ocStepUp(oid, step, title) {
   if (step === 'passkey') { try { b.credential = await pkGet(await api('POST', `/api/orgs/${oid}/encryption/recovery/passkey`)); } catch (e) { if (e?.name) toast(pkErr(e)); return null; } }
   return b;
 }
-async function ocShowRecovery(oid, st, isNew = false) {
+async function ocShowRecovery(oid, st, isNew = false, confirmed = false) {
   const step = st?.step || (st?.password === false ? 'fresh' : 'password');
-  if (isNew && !await askConfirm(tr('Make a new recovery key?'), tr('The current recovery key stops working at once. Keep the new one offline, e.g. printed in a safe.'), {ok: tr('New recovery key')})) return;
-  const b = await ocStepUp(oid, step, isNew ? tr('New recovery key') : tr('Show recovery key'));
+  if (isNew && !confirmed && !await askConfirm(tr('Make a new recovery key?'), tr('The current recovery key stops working at once. Keep the new one offline, e.g. printed in a safe.'), {ok: tr('New recovery key')})) return;
+  const b = await ocStepUp(oid, step, isNew ? tr('New recovery key') : tr('Show recovery key'), st || {}, isNew);
   if (!b) return;
   let j; try { j = await api('POST', `/api/orgs/${oid}/encryption/recovery`, {...b, new: isNew}); } catch { return; /* api() showed it */ }
   const md = modal(`<h3>${tr('Recovery key')}</h3>
@@ -76,6 +84,26 @@ function ocDraw(root) {
     if (b.dataset.oc === 'show' || b.dataset.oc === 'new') { await ocShowRecovery(oid, box._j, b.dataset.oc === 'new'); ocLoad(box); }  // 2.138.0 C (#1972)
   });
 }
+// 2.144.5 A (#2387): back from the step-up sign-in at the login provider (oidc.py _oidc_stepup_done): show the key (the
+// "new" was confirmed before leaving) or say why the sign-in did not count
+const OC_STEPUP_ERR = {auth_time: N_('Your login provider did not say when you signed in, so it cannot confirm a fresh sign-in. Ask the server admin (the provider must send auth_time).'),
+  old: N_('Your login provider did not ask for a new sign-in. Try again; if it keeps happening, ask the server admin.'),
+  account: N_('That sign-in belongs to another account. Sign in again with your own account.'),
+  denied: N_('The sign-in was cancelled.')};
+function ocStepUpBack() {
+  const h = location.hash, m = h.match(/^#rck-stepup\/(\d+)\/(show|new)$/), e = (h.match(/^#rck-stepup-error=([a-z_]+)$/) || [])[1];
+  if (!m && !e) return;
+  history.replaceState(null, '', '/');
+  let n = 0;
+  const wait = () => {
+    if (!(S.booted && S.me)) { if (++n < 120) setTimeout(wait, 500); return; }
+    if (e) toast(tr(OC_STEPUP_ERR[e] || N_('Signing in again did not work. Try again.')));
+    else ocShowRecovery(+m[1], {step: 'fresh', fresh: true}, m[2] === 'new', true);
+  };
+  wait();
+}
+window.addEventListener('hashchange', ocStepUpBack);
+ocStepUpBack();
 // Administration > Organisation: the instance switch (with the boxes of the organisations I administer)
 const ocAdminHtml = hint => `<h4 id="s-orgenc-h">${tr('Encryption of organisation data')}</h4>
   ${hint(tr('Bank and tax data, purchase prices, framework contract rates and the files of organisations are stored encrypted with a key per organisation, made from the server key KALMIDO_SECRET_KEY. Switched off, new data is stored unencrypted; encrypted data stays readable.'))}

@@ -449,7 +449,8 @@ WW0 = {x[0] for x in dbx("SELECT h FROM wiki_words WHERE page_id=?", (WP,))}
 
 # ---------------------------------------------------------------- rotate: aborted after the switch, then finished
 WR0 = one("SELECT wrapped FROM org_keys WHERE org_id=?", (ORG,))
-rc, out, err_ = cli("rotate", "--org", str(ORG), env=("KALMIDO_TEST_ROT_ABORT=1", "KALMIDO_ORGCRYPT_ROT_SETTLE=0"))
+# 2.144.5 (#2387, F7): the abort switch counts only in a test run (KALMIDO_TEST_MODE=1)
+rc, out, err_ = cli("rotate", "--org", str(ORG), env=("KALMIDO_TEST_MODE=1", "KALMIDO_TEST_ROT_ABORT=1", "KALMIDO_ORGCRYPT_ROT_SETTLE=0"))
 check(rc == 1 and "not finished" in out and "R2-" not in out, f"rotate aborted after the key switch {rc} {out[-300:]} {err_[-300:]}")
 check(one("SELECT wrapped_rot FROM org_keys WHERE org_id=?", (ORG,)) == WR0 and one("SELECT wrapped FROM org_keys WHERE org_id=?", (ORG,)) != WR0,
       "during the rotation: the earlier key kept in wrapped_rot")
