@@ -75,7 +75,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     await errs();
 
     // ================= #2069 multiple choice in the detail panel
-    await ev(`openDetail(${T1})`);
+    await ev(`(LS.set('dMore', true), openDetail(${T1}), 1)`);  // the fields sit in "More details"
     check(await ready(`!!document.querySelector('[data-cfkms="${MS.id}"][data-o="${GREEN}"]')`), '#2069: the options in the detail panel');
     await sleep(500);
     await mid(`[data-cfkms="${MS.id}"][data-o="${GREEN}"]`); await shot('p2156b-detail0.png');

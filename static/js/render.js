@@ -1237,7 +1237,7 @@ function cfk_put(tid, fid, v) {
 }
 document.addEventListener('click', e => {
   const tg = /** @type {any} */ (e.target), b = tg.closest?.('[data-cfkrt],[data-cfkms],[data-cfkpick],[data-cfkclr],[data-cfkopen]'); if (!b) return;
-  e.preventDefault(); e.stopPropagation();  // not the row's / cell's own click
+  e.preventDefault(); e.stopImmediatePropagation();  // not the row's / cell's own click (tablecells.js listens on document too)
   if (b.dataset.cfkopen) { const id = +b.dataset.cfkopen; if (typeof openTaskById === 'function') openTaskById(id); else openDetail(id); return; }
   const t = taskById(+b.dataset.tid), f = fieldById(+(b.dataset.cfkrt || b.dataset.cfkms || b.dataset.cfkpick || b.dataset.cfkclr)); if (!t || !f) return;
   if (!canEdit(t)) { roToast(); return; }
