@@ -340,6 +340,19 @@ r = A.post(B + "/api/events", json={"title": "Alice meeting", "start": f"{D}T12:
 E2 = r.json().get("id")
 check(len(wait_mail("guest2@example.com", 1)) == 1, "a person invites: one mail")
 check(A.delete(B + f"/api/events/{E2}").ok and len(wait_mail("guest2@example.com", 2)) == 2, "a person deletes: the cancellation goes out")
+# 2.148.1 G (#2495): an agent deleting its calendar sends no cancellations either
+r = requests.post(V + "/event-calendars", headers=AGH, json={"name": "Agent calendar", "org_id": ORG})
+check(r.status_code == 201, "the agent makes a calendar " + r.text[:160])
+ACAL = r.json().get("id")
+r = requests.put(V + f"/event-calendars/{ACAL}/members/{ALICE}", headers=AGH, json={"role": "edit"})
+check(r.ok, "... shares it with alice " + r.text[:160])
+r = A.post(B + "/api/events", json={"cal_id": ACAL, "title": "Shared meeting", "start": f"{D}T14:00", "end": f"{D}T15:00", "tz": "Europe/Berlin",
+                                    "send_invites": True, "attendees": [{"email": "guest3@example.com", "name": "Guest Three"}]})
+check(r.status_code == 201 and len(wait_mail("guest3@example.com", 1)) == 1, "alice invites a guest into it: one mail " + r.text[:160])
+r = requests.delete(V + f"/event-calendars/{ACAL}", headers=AGH)
+check(r.status_code == 204, "the agent deletes the calendar " + r.text[:160])
+time.sleep(1.5)
+check(len(mails("guest3@example.com")) == 1, f"no cancellation through the agent {len(mails('guest3@example.com'))}")
 
 # forms: public = approval, internal private form of a freelancer, trash
 r = requests.post(V + "/lists", headers=AGH, json={"name": "Agent intake"})
