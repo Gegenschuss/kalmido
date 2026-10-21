@@ -106,6 +106,10 @@ def doc_json(c, m, node, full=False, role=None):
         dv = dup_view(c, m, me()) if has_request_context() and getattr(g, "user", None) else None
         if dv:
             d["duplicate_of"] = dv
+    from .split import sp_view
+    sp = sp_view(m)  # 2.154.0 A (#1111): a stack waiting to be split / a part of one
+    if sp:
+        d["split"] = sp
     if role:
         d["role"] = role
     if full:
@@ -279,7 +283,10 @@ def docs_get(nid):
     c = db()
     m, n = _doc(c, nid)
     fs_log_add(c, nid, "meta")
-    return jsonify(doc_json(c, m, n, full=True, role=n["role"]))
+    d = doc_json(c, m, n, full=True, role=n["role"])
+    from .tasklink import dtl_doc_extra
+    dtl_doc_extra(c, d, m, me())  # 2.154.0 A (#1111): the linked task (title) when I see it
+    return jsonify(d)
 
 
 def _feature_value(c, ws, node, f, v, uid):

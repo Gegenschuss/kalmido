@@ -2990,6 +2990,9 @@ MIGRATIONS = [
     ("budget_entries", "ikey", "ALTER TABLE budget_entries ADD COLUMN ikey TEXT NOT NULL DEFAULT ''"),
     ("budget_entries", "import_run", "ALTER TABLE budget_entries ADD COLUMN import_run TEXT NOT NULL DEFAULT ''"),
     ("budget_meta", "runs", "ALTER TABLE budget_meta ADD COLUMN runs TEXT NOT NULL DEFAULT '[]'"),
+    # 2.154.0 A (#1111): the page scan of a stack (archive number codes / separator sheets / blank pages per page, numbers
+    # only) and its decision (docs/split.py); older versions ignore it
+    ("doc_meta", "split_scan", "ALTER TABLE doc_meta ADD COLUMN split_scan TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

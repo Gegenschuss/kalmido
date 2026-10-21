@@ -106,7 +106,7 @@ function dc_card(d) {
     <span class="dc-th">${thumb}</span><span class="dc-ct"><b class="dc-nm">${esc(d.sender?.name || d.name)}</b>
     <span class="dc-mt">${meta}${d.amount ? ` · ${esc(dc_money(d.amount, d.currency))}` : ''}</span>
     ${d.tags.length ? `<span class="dc-tags">${d.tags.map(t => `<span class="dc-tag">${esc(t.name)}</span>`).join('')}</span>` : ''}
-    ${st}${d.review ? `<span class="dc-revdot">${tr('To review')}</span>` : ''}</span></button></li>`;
+    ${st}${d.review ? `<span class="dc-revdot">${tr('To review')}</span>` : ''}${d.split?.stack ? `<span class="dc-revdot dsp-dot">${tr('Stack - split?')}</span>` : '' /* 2.154.0 A (#1111) */}</span></button></li>`;
 }
 
 // ---- upload (button, dragging, the share sheet)
@@ -172,7 +172,9 @@ function dc_mdDraw(md) {
     ${sug.map(([f, s]) => `<div class="dc-sug"><span>${esc(tr(DC_FEATS.find(x => x[0] === f)?.[1] || f))}: <b>${esc(s.label)}</b>${s.by === 'agent' ? ` <span class="muted">(${tr('from the agent')})</span>` : ''}</span>${w ? `<button type="button" class="btn sm" data-dc="take:${esc(f)}">${tr('Accept')}</button>` : ''}</div>`).join('')}
     ${sug.length ? '' : `<p class="muted">${tr('Check sender and type, then mark the document as checked.')}</p>`}
     ${w ? `<div class="dc-revact">${sug.length > 1 ? `<button type="button" class="btn sm" data-dc="takeall">${tr('Accept all')}</button>` : ''}<button type="button" class="btn sm pri" data-dc="checked">${ic('check', 's')} ${tr('Checked')}</button></div>` : ''}</div>` : '';
-  const due = d.due && !d.task_id && w ? `<div class="dc-due">${ic('alarm', 's')} <span>${esc(tr('Due on {0}', dc_day(d.due)))}</span><button type="button" class="btn sm" data-dc="task">${tr('Create task')}</button></div>`
+  // 2.154.0 A (#1111): docsplit.js draws the due date / task line (+ link with an existing task) and the stack hint; right
+  // after "Create task" (no task title from the server yet) the line below
+  const due = typeof dsp_sheetHtml === 'function' && (d.task !== undefined || !d.task_id) ? dsp_sheetHtml(d, w) : d.due && !d.task_id && w ? `<div class="dc-due">${ic('alarm', 's')} <span>${esc(tr('Due on {0}', dc_day(d.due)))}</span><button type="button" class="btn sm" data-dc="task">${tr('Create task')}</button></div>`
     : d.task_id ? `<div class="dc-due muted">${ic('done', 's')} <a href="#t/${d.task_id}">${tr('Task created')}</a></div>` : '';
   const ro = w ? '' : 'disabled';
   $('.dc-body', md).innerHTML = `<div class="lhdr"><h3 id="dc-h">${esc(d.name)}</h3><span class="spacer"></span><button class="iconbtn" data-dc="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
@@ -182,6 +184,7 @@ function dc_mdDraw(md) {
         <button type="button" class="btn sm" data-dc="view">${ic('eye', 's')} ${tr('Show')}</button>
         ${d.einvoice ? `<a class="btn sm dc-einv" href="/api/docs/${d.id}/einvoice" target="_blank" rel="noopener">${ic('receipt', 's')} ${tr('Readable view')}</a>` /* 2.146.0 A (#2451) */ : ''}
         <a class="btn sm" href="${dc_fileUrl(d, true)}" download>${ic('archive', 's')} ${tr('Download')}</a>
+        ${typeof dsp_actBtn === 'function' ? dsp_actBtn(d, w) : '' /* 2.154.0 A (#1111): split a stack */}
         ${d.parent_id ? `<a class="btn sm" href="#ablage/${d.parent_id}" data-dc="close">${ic('folder', 's')} ${tr('Show in the file store')}</a>` : ''}
         ${w && smv_can(d.org_id) ? `<button type="button" class="btn sm" data-dc="space">${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''}
         ${w ? `<button type="button" class="btn sm danger" data-dc="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}

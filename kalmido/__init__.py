@@ -337,6 +337,8 @@ ORDER = (
     "docs.web",  # 2.48.0 (#1111): the routes of the documents area
     "docs.dsearch",  # 2.122.0 B (#2294): filters + search syntax of the documents list (no routes)
     "docs.batch",  # 2.122.0 B (#2294): the chosen documents at once (tags / type / sender) and as one ZIP
+    "docs.split",  # 2.154.0 A (#1111): a stack scan split into documents by its archive number codes / separator sheets
+    "docs.tasklink",  # 2.154.0 A (#1111): a document linked with an existing task, the documents of a task
     "docs.v1",  # 2.48.0 (#1111): documents for agents (API v1 + OpenAPI)
     "docs.csvx",  # 2.122.0 (#2100): the documents list as CSV
     "sheets.io",  # 2.89.0 C (#1916): tables to / from CSV and .xlsx (export, import as a new sheet)
