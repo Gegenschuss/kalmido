@@ -48,8 +48,8 @@ def cb_log_fk_migrate(c):
     constraint (also one a restore of an older backup brings back); there is no delete path, so older versions behave the
     same with either rule (rollback needs nothing)."""
     for (name,) in c.execute(
-            "SELECT con.conname FROM pg_constraint con JOIN pg_class t ON t.oid=con.conrelid "
-            "JOIN pg_namespace n ON n.oid=t.relnamespace JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=ANY(con.conkey) "
+            "SELECT con.conname FROM pg_constraint con JOIN pg_class t ON t.oid=con.conrelid "  # pg-ok: catalog oid (Postgres only)
+            "JOIN pg_namespace n ON n.oid=t.relnamespace JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=ANY(con.conkey) "  # pg-ok: catalog oid (Postgres only)
             "WHERE n.nspname=current_schema() AND t.relname='office_cash_log' AND con.contype='f' "
             "AND a.attname='entry_id' AND con.confdeltype='c'").fetchall():
         c.execute(f'ALTER TABLE office_cash_log DROP CONSTRAINT "{name}"')

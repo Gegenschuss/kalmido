@@ -1047,7 +1047,7 @@ def dav_caps_add(c, pw_id, names):
     same app password at once cannot write each other's away). Commits."""
     for n in sorted(names):
         c.execute("UPDATE app_passwords SET caps = CASE WHEN caps='' THEN ? ELSE caps || ',' || ? END "
-                  "WHERE id=? AND (',' || caps || ',') NOT LIKE ?", (n, n, pw_id, f"%,{n},%"))
+                  "WHERE id=? AND (',' || caps || ',') NOT LIKE ?", (n, n, pw_id, f"%,{n},%"))  # pg-ok: exact capability names, case-sensitive on purpose
     c.commit()
 
 

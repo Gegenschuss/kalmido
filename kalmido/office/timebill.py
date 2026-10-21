@@ -128,7 +128,7 @@ def tbill_out(r, uid=None):
 
 def tbill_where(c, oid, uid, cid, d_from, d_to, pid):
     """The FROM / WHERE part over the finished time entries of client cid's lists in [d_from, d_to] that uid sees (the lists
-    of office area oid: an organisation's lists, in a personal office the owner's private lists) -> (sql, args)."""
+    of the office area (org id): an organisation's lists, in a personal office the owner's private lists) -> (sql, args)."""
     from ..core.access import vis_sql
     # 2.144.6 A (#2053): a personal office (no organisation) bills the owner's private lists (before: l.org_id = the hidden
     # office id, which no list carries)
