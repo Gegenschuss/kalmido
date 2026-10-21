@@ -819,7 +819,6 @@ const ODL_WORDS = {
   cash: n => trn('{0} cash book entry', '{0} cash book entries', n), bank: n => trn('{0} bank transaction', '{0} bank transactions', n),
   meals: n => trn('{0} entertainment receipt', '{0} entertainment receipts', n)};
 const odlCounts = c => Object.entries(c || {}).filter(([k, n]) => n && ODL_WORDS[k]).map(([k, n]) => ODL_WORDS[k](n)).join(', ');
-const odlRetiredLabel = o => esc(tr('kept until {0}', fmtDate(o.retain_until))) + (o.retired_personal ? ' · ' + esc(tr('office of a deleted account')) : '');
 // the delete button of the organisations list: lists / files block as before (the server says it); a retired organisation
 // shows its period and the export; content going along or a retirement asks with the numbers and the export first
 async function odlDelete(o) {

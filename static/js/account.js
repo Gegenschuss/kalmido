@@ -170,6 +170,8 @@ function shareGroupsHtml(cur, mng, roleSel) {
 // 2.41.0 (#1420): sharing a folder with a group is part of the folder's Share dialog (folderShareModal, sharedlg.js)
 // 2.22.0 (#752): organisations (admins): name, emoji, members; whom people see (everyone / own organisation / own contacts)
 const VIS_UI = [['all', N_('Everyone on this server')], ['org', N_('Only people of their own organisations')], ['contacts', N_('Only people they are connected with (no directory, share by e-mail address)')]];
+// 2.152.0 (#2164): the label of a retired organisation (bundle C: here, since acctset.js loads on demand since 2.149.0)
+const odlRetiredLabel = o => esc(tr('kept until {0}', fmtDate(o.retain_until))) + (o.retired_personal ? ' · ' + esc(tr('office of a deleted account')) : '');
 async function orgsDraw(md) {
   const box = $('#a-orgs', md); if (!box) return;
   let j; try { j = await api('GET', '/api/admin/orgs'); } catch { return; }
