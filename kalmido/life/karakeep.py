@@ -1,6 +1,8 @@
 """Home & life: "Read later" from Karakeep (a person's own connection: bookmarks -> tasks of a reading list, archive back)."""
 import json
 import re
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -28,6 +30,8 @@ KK_ARCHIVE_MAX = 50
 KK_EVERY = 3600            # s between background syncs of one connection
 KK_TIMEOUT = 15
 KK_MAX_BYTES = 5 * 1024 * 1024
+KK_SYNC_S = 60             # 2.148.1 D (#2485): time one sync may take in all (the watchdog runs it)
+_KK_END = threading.local()  # 2.148.1 D (#2485): the deadline of the running sync of this thread
 KK_TOKEN_MAX = 400
 
 
@@ -138,9 +142,20 @@ def kk_req(c, r, path, method="GET", body=None):
         hdr["Content-Type"] = "application/json"
         data = json.dumps(body).encode()
     req = urllib.request.Request(r["url"] + "/api/v1" + path, data=data, headers=hdr, method=method)
+    end = getattr(_KK_END, "t", None)  # 2.148.1 D (#2485): a sync stops at its deadline, also on a slowly answering server
+    left = (end - time.monotonic()) if end else KK_TIMEOUT
+    if left <= 0:
+        raise KkError("network")
     try:
-        with _cal_opener(cal_allow(c)).open(req, timeout=KK_TIMEOUT) as resp:
-            raw = resp.read(KK_MAX_BYTES + 1)
+        with _cal_opener(cal_allow(c)).open(req, timeout=min(KK_TIMEOUT, max(left, 1))) as resp:
+            raw = b""
+            while len(raw) <= KK_MAX_BYTES:
+                part = resp.read(65536)
+                if not part:
+                    break
+                raw += part
+                if end and time.monotonic() > end:
+                    raise KkError("network")
             if len(raw) > KK_MAX_BYTES:
                 raise KkError("too_large")
             return json.loads(raw or b"null")
@@ -180,6 +195,7 @@ def kk_sync(c, uid):
     if not r:
         raise BadInput(tr("Karakeep is not connected"))
     added = archived = 0
+    _KK_END.t = time.monotonic() + KK_SYNC_S  # 2.148.1 D (#2485)
     try:
         lid = r["list_id"] if r["list_id"] and list_role(c, r["list_id"], uid) in WRITE_ROLES else None
         if not lid:
@@ -253,6 +269,8 @@ def kk_sync(c, uid):
         c.execute("UPDATE kk_conns SET synced_at=?, error=? WHERE user_id=?", (iso(now_utc()), str(e)[:40], uid))
         c.commit()
         raise BadInput(kk_err_text(str(e))) from None
+    finally:
+        _KK_END.t = None
     return {"added": added, "archived": archived, "list_id": lid}
 
 

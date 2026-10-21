@@ -2964,6 +2964,16 @@ MIGRATIONS = [
     # 2.144.0 C (#2414): the list view grouped by a custom field (text / select) for every member, like sort_mode:
     # '' = the sections as before, 'cf:<field id>' = one group per value (2.143 ignores it)
     ("lists", "group_field", "ALTER TABLE lists ADD COLUMN group_field TEXT NOT NULL DEFAULT ''"),
+    # 2.148.1 D (#2488): a node of the file store filed with a hub mail (its .eml, attachments, its folder): hub_mails.id.
+    # Who may read such a node also needs the mail's rule (hub/hubmail.py hbm_can). No FK: a missing mail = not readable.
+    # Filled once for the mails filed so far; the previous version ignores the column
+    ("fs_nodes", "hub_mail_id", "ALTER TABLE fs_nodes ADD COLUMN hub_mail_id BIGINT"),
+    ("fs_nodes", "hub_mail_id", "UPDATE fs_nodes n SET hub_mail_id=m.id FROM hub_mails m WHERE n.id=m.eml_id"),
+    ("fs_nodes", "hub_mail_id", "UPDATE fs_nodes n SET hub_mail_id=m.id FROM hub_mails m, jsonb_array_elements(CASE WHEN m.files LIKE '[%' "
+                                "THEN m.files::jsonb ELSE '[]'::jsonb END) f WHERE jsonb_typeof(f)='number' AND n.id=(f::text)::bigint "
+                                "AND n.hub_mail_id IS NULL"),
+    ("fs_nodes", "hub_mail_id", "UPDATE fs_nodes n SET hub_mail_id=m.id FROM hub_mails m WHERE n.id=m.folder_id AND n.hub_mail_id IS NULL"),
+    ("fs_nodes", "hub_mail_id", "CREATE INDEX IF NOT EXISTS fs_nodes_hub_mail ON fs_nodes(hub_mail_id) WHERE hub_mail_id IS NOT NULL"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

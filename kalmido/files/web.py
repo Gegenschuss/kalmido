@@ -16,7 +16,7 @@ from ..core.access import Denied, acx_of, collab_all
 from ..core.orgcrypt import oc_send_file
 from .upsafe import h6d_one_file_request, h6d_read
 from .store import (fs_chain, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_purge, fs_purge_files, fs_put, fs_read,
-                    fs_height, fs_role, fs_version_row, DEPTH_MAX, fs_visible_ids, need_node, safe_fs_name, _free_name,
+                    fs_height, fs_mail_rows, fs_role, fs_version_row, DEPTH_MAX, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place, ROLE_RANK)
 
 SHARE_MAX = 200  # shares per node
@@ -120,6 +120,7 @@ def files_list():
         if n["kind"] != "folder":
             raise Denied(409, tr("Not a folder"))
         rows = c.execute("SELECT * FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL ORDER BY id", (pid,)).fetchall()
+        rows = fs_mail_rows(c, uid, rows)  # 2.148.1 D (#2488): filed mail files follow the mail's rule
         fs_log_add(c, pid, "list")
         c.commit()
         chain = fs_chain(c, pid)
@@ -133,8 +134,8 @@ def files_list():
         return jsonify(items=_trash(c, uid), node=None, crumbs=[], space="trash")
     vis = fs_visible_ids(c, uid)
     if space == "private":
-        rows = c.execute("SELECT * FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=? AND deleted_at IS NULL ORDER BY id",
-                         (uid,)).fetchall()
+        rows = fs_mail_rows(c, uid, c.execute("SELECT * FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=? "
+                                              "AND deleted_at IS NULL ORDER BY id", (uid,)).fetchall())  # 2.148.1 D (#2488)
         role = "owner"
     elif space == "org":
         rows = [r for r in c.execute("SELECT * FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND deleted_at IS NULL ORDER BY id", (oid,))

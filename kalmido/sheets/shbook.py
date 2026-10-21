@@ -239,11 +239,14 @@ def _sub(ev, cid):
         sub.shb, sub.shb_stack = ctx, stack + (tab["id"],)
         # 2.124.0 review: one text / function budget for the whole chain (a sheet does not get a fresh one per sheet it reads)
         from .shfuncs import SHF_WORK_BUDGET
+        from .core import SH_RANGE_BUDGET  # 2.148.1 D (#2485): the range budget is shared along the chain, too
         sub.text_left, sub.shf_work = ev.text_left, getattr(ev, "shf_work", SHF_WORK_BUDGET)
+        sub.rng_work = getattr(ev, "rng_work", SH_RANGE_BUDGET)
         try:
             sub.run()
         finally:
             ev.text_left, ev.shf_work = sub.text_left, getattr(sub, "shf_work", SHF_WORK_BUDGET)
+            ev.rng_work = getattr(sub, "rng_work", SH_RANGE_BUDGET)
         ctx["done"][key] = sub
     return sub
 

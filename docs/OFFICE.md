@@ -502,6 +502,11 @@ e-mail* (the server's mailbox, see SELF-HOSTING.md "Mail"); without it the addre
   that is not assigned only its recipient - never across workspaces. Assigning and deleting need the right to change the
   project / see the client (taking a mail back to *Not assigned*: its recipient). Both are one undo step each; a deleted
   mail can be restored with Undo. The attachments of a mail can be opened by everybody who sees the mail.
+- **The mail's files in the file store** (2.148.1): the `.eml`, the attachments and the mail's own folder follow the same
+  rule as the mail, not the rights of the folder they sit in. Whoever owns the *E-Mails* folder, has it shared or opened
+  for the organisation, and organisation admins see a filed mail's files only when they may read the mail itself (a
+  client's mail: they see the client; a project's mail: they see the project; a mail not assigned: only its recipient).
+  Listing, search, preview and download in the file store all check this.
 - **Search**: subject, sender and text (a hashed word index, no plain index).
 - **HTML view** (2.141): a mail with an HTML part opens in that view (*Text / HTML* switches). The HTML is cleaned on the
   server (scripts, frames, forms, event attributes and script links removed) and shown in a sandboxed frame without scripts

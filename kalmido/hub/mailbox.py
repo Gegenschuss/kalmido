@@ -46,6 +46,7 @@ from . import hubmail as H
 
 MBX_TLS = ("starttls", "ssl", "none")
 MBX_MAIL_MAX = 50 * 1024 * 1024  # review: a larger mail of a workspace's own server is not fetched (marked seen)
+MBX_BOX_S = 300         # 2.148.1 D (#2485): time one mailbox gets in a round before its connection is closed
 MBX_SEND_HOUR = 30      # mails one person sends from the filing in an hour
 MBX_RCPT = 20           # recipients of one mail (To + Cc)
 MBX_TEXT_MAX = 100000   # characters of a mail's text
@@ -525,13 +526,16 @@ def _bg(fn):
             c.close()
 
 
-def mbx_poll_one(box):
-    """Fetch one mailbox (a row as dict); stores polled_at / the error code. Returns how many mails were filed."""
+def mbx_poll_one(box, hold=None):
+    """Fetch one mailbox (a row as dict); stores polled_at / the error code. Returns how many mails were filed.
+    hold (2.148.1 D, #2485): a list that gets the open connection, so the round can close it after its time."""
     from ..integrations.mail import mail_fetch
     n, code = 0, ""
     try:
         secret, allow = _bg(lambda c: (mbx_secret(c, box), _allow(c)))
         M = _imap_open(None, box, secret, allow=allow)
+        if hold is not None:
+            hold.append(M)
         try:
             n = mail_fetch(M, _folder_arg(box["imap_folder"] or "INBOX"), lambda c2, raw: mbx_import(c2, box, raw), max_bytes=MBX_MAIL_MAX)
         finally:
@@ -565,11 +569,32 @@ def mbx_poll_all(only=None):
     for box in _bg(boxes):
         if only is not None and box["ws"] not in only:
             continue
+        n += _poll_in_time(box)
+    return n
+
+
+def _poll_in_time(box):
+    """2.148.1 D (#2485): one mailbox in a thread of its own with MBX_BOX_S seconds: a slow server is cut off (its socket
+    closed) and the round goes on with the next mailbox."""
+    out, hold = [0], []
+
+    def run():
         try:
-            n += mbx_poll_one(box)
+            out[0] = mbx_poll_one(box, hold)
         except Exception as e:  # noqa: BLE001 -- one mailbox never stops the others
             print("mailbox:", type(e).__name__, e, flush=True)
-    return n
+    t = threading.Thread(target=run, name="mailbox-poll", daemon=True)
+    t.start()
+    t.join(MBX_BOX_S)
+    if t.is_alive():
+        print("mailbox: ws", box["ws"], "over time, cut off", flush=True)
+        for M in hold:
+            try:
+                M.shutdown()
+            except Exception:  # noqa: BLE001
+                pass
+        t.join(10)
+    return out[0]
 
 
 def mbx_loop():

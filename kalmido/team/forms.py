@@ -12,7 +12,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.pg import insert_id, system_ctx
-from ..core.i18n import lang, LANGS, tr
+from ..core.i18n import lang, LANGS, N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
@@ -145,6 +145,13 @@ def _form_row(c, fid):
     return r
 
 
+def _public_approval(c, lid, title):
+    """2.148.1 D (#2495): a public form takes input from anyone in the owner's name: an agent opening one (make a form
+    public, turn a public one on, give it a new link) waits for a person's approval (api/scopes.py need_approval, 202)."""
+    from ..api.scopes import need_approval
+    need_approval(c, N_("Open the public form “{0}”"), ((title or "")[:80],), list_id=lid)
+
+
 def _gate():
     from ..agents.core import is_agent
     if not is_agent(g.user):
@@ -168,6 +175,8 @@ def form_create(lid):
     need_form_manager(c, lid)
     f = clean_form(c, lid, body(), new=True)
     f.setdefault("access", "org")
+    if f["access"] == "public":
+        _public_approval(c, lid, f.get("title"))
     if f.get("portal"):
         f["ask_email"] = 1  # 2.63.0 (#1513): the status link goes to the reporter's address
     if f["access"] == "public" and not public_links_on(c):
@@ -190,6 +199,8 @@ def form_update(fid):
     r = _form_row(c, fid)
     b = body()
     f = clean_form(c, r["list_id"], {k: v for k, v in b.items() if k != "regenerate"})
+    if (f.get("access") == "public" and r["access"] != "public") or (r["access"] == "public" and (f.get("enabled") or b.get("regenerate") is True)):
+        _public_approval(c, r["list_id"], f.get("title") or r["title"])
     if f.get("access") == "public" and not public_links_on(c):
         return err(tr("Public links are turned off on this server"), 409)
     if f.get("portal", r["portal"]):
@@ -231,7 +242,8 @@ def _find(c, token):
         return None
     with system_ctx(c):  # 2.37.0 (#1150): resolve the token (one row) across organisations ...
         r = c.execute("""SELECT f.*, l.owner_id AS l_owner, l.name AS l_name, l.org_id AS l_org FROM forms f JOIN lists l ON l.id=f.list_id
-                         JOIN users u ON u.id=l.owner_id WHERE f.token_hash=? AND f.enabled=1 AND u.disabled=0 AND l.archived=0""",
+                         JOIN users u ON u.id=l.owner_id WHERE f.token_hash=? AND f.enabled=1 AND u.disabled=0 AND l.archived=0
+                         AND l.deleted_at IS NULL""",  # 2.148.1 D (#2495): a list in the trash takes nothing in
                       (_token_hash(token),)).fetchone()
     if r is not None and g.user and r["access"] == "public" and r["l_org"]:
         from ..accounts.orgroles import user_orgs_full
@@ -288,6 +300,9 @@ def _may_use(c, f):
     # its owner); in the mode workspaces instance admins are no exception (as everywhere there)
     if f["l_org"]:
         owner_orgs = {f["l_org"]}
+    if not owner_orgs:  # 2.148.1 D (#2495): an internal form of someone without an organisation is private: who sees the list
+        from ..core.access import list_role
+        return None if g.user["id"] == f["l_owner"] or list_role(c, f["list_id"], g.user["id"]) else _gone(lg)
     if owner_orgs and not owner_orgs & mine and not (g.user["is_admin"] and instance_mode(c) != "workspaces"):
         return _gone(lg)
     return None

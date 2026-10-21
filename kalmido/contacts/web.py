@@ -9,7 +9,7 @@ from flask import jsonify, request, Response
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from ..core.config import app
-from ..core.i18n import tr, trn
+from ..core.i18n import N_, tr, trn
 from ..core.db import body, bump, connect, db, err, iso
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
@@ -93,7 +93,9 @@ def op_book_edit(c, uid, bid, b):
 
 
 def op_book_delete(c, uid, bid):
-    need_book(c, bid, manage=True)
+    b, _ = need_book(c, bid, manage=True)
+    from ..api.scopes import need_approval  # 2.148.1 D (#2495): an agent deleting a whole address book waits for a person
+    need_approval(c, N_("Delete the address book “{0}” with all its contacts"), ((b["name"] or "")[:80],))
     c.execute("DELETE FROM books WHERE id=?", (bid,))
     # 2.66.0 (#1835): the undo data of merges into this book goes with it (the history line stays)
     c.execute("UPDATE merge_runs SET snapshot='{}' WHERE kind='contact' AND book_id=?", (bid,))

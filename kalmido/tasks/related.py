@@ -2,8 +2,9 @@
 while adding, "also similar meaning" in the search, the related tasks in agent events, API v1 / MCP related_tasks.
 
 Kalmido calls no language model. The optional service kalmido-embed (embed/ in the repository, docker compose --profile
-embed, KALMIDO_EMBED_URL) turns a text into numbers (a vector) with a small embedding model on the own CPU; nothing leaves
-the server. Without the service, or with the instance switch "Related tasks" off (Administration > Server), everything works
+embed, KALMIDO_EMBED_URL) turns a text into numbers (a vector) with a small embedding model on the own CPU. 2.148.1 D (#2489):
+the texts go to that address: https, or http only to this server / a container (emb_url_kind); with encryption at rest,
+organisation tasks only go to a service on this server. Without the service, or with the instance switch "Related tasks" off (Administration > Server), everything works
 as before and the new parts are hidden (enabled: false, empty lists, never an error).
 
 - task_vectors: one row per task (task_id, org_id + list_id like the task's list, model, dim, vec, text_hash, updated_at).
@@ -30,6 +31,7 @@ import struct
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import timedelta
 from operator import mul
@@ -45,6 +47,27 @@ from ..api.v1 import v1_args, v1_view
 
 # ---- the one place for the model-dependent values (part M's measurement; environment overrides for other models) ----------
 EMBED_URL = (os.environ.get("KALMIDO_EMBED_URL") or "").strip().rstrip("/")
+
+
+def emb_url_kind(url):
+    """2.148.1 D (#2489): "internal" (http(s) to localhost / 127.0.0.1 / ::1 or a host name without a dot = a container of the
+    same compose file), "https" (another host over https), "" (anything else: not used)."""
+    try:
+        u = urllib.parse.urlsplit(url)
+        host = (u.hostname or "").lower()
+    except ValueError:
+        return ""
+    if u.scheme not in ("http", "https") or not host:
+        return ""
+    if host in ("localhost", "127.0.0.1", "::1") or "." not in host and ":" not in host:
+        return "internal"
+    return "https" if u.scheme == "https" else ""
+
+
+EMB_KIND = emb_url_kind(EMBED_URL) if EMBED_URL else ""
+if EMBED_URL and not EMB_KIND:
+    print("embed: KALMIDO_EMBED_URL must use https (or point to this server / a container); related tasks stay off", flush=True)
+    EMBED_URL = ""
 # 2.59.0 part M (measurement on the dev lists, 16.10.2026): multilingual-e5-small int8, cosine thresholds of that model
 EMB_DUP = float(os.environ.get("KALMIDO_RELATED_DUP") or 0.96)     # cosine from which two tasks are "probably duplicates"
 EMB_REL = float(os.environ.get("KALMIDO_RELATED_MIN") or 0.90)     # lowest cosine of a related task
@@ -302,6 +325,8 @@ def _emb_batch(c):
         del _BADORG[k]
     bad = sorted(_BADORG)
     skip = f" AND (l.org_id IS NULL OR l.org_id NOT IN ({','.join('?' * len(bad))}))" if bad else ""
+    if enc and EMB_KIND != "internal":  # 2.148.1 D (#2489): encrypted organisation data only goes to a service on this server
+        skip += " AND l.org_id IS NULL"
     rows = c.execute(_STALE_SQL.format(enc=enc, skip=skip), (*bad, model, *((PREFIX + "%",) if enc else ()), EMB_BATCH)).fetchall()
     if not rows:
         return 0
@@ -752,8 +777,8 @@ def rt9_spec(paths, schemas, op, ok, errs, ref, pid, q):
             "pending": {"type": "boolean", "description": "true: the task's vector is not computed yet (try again in a minute)"},
             "items": {"type": "array", "items": ref("RelatedTask"), "description": "at most 5, best first"}}}) | errs("404"),
         [pid("id", "Task id")],
-        desc="Up to five tasks close in meaning to this one, among the tasks you may see. Computed on the server by a local "
-             "embedding model (no language model, nothing leaves the server). Read-only.")}
+        desc="Up to five tasks close in meaning to this one, among the tasks you may see. Computed by the embedding service "
+             "the server administrator set up (no language model). Read-only.")}
     s = paths.get("/search", {}).get("get")
     if s is not None:
         s.setdefault("parameters", []).append(q("semantic", "2.59.0 (#1375): 1 = after the text hits also tasks of similar meaning "

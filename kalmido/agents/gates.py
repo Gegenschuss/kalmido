@@ -3,8 +3,8 @@
 "Ready to integrate" (suggestion kind integrate): an agent working in its own branch / worktree asks to bring source into
 target (e.g. feat/x -> main) and attaches its evidence (build, start, logs, tests -- free text). "Ready to deploy" (kind
 deploy): bundles approved integrations (the comment ids) and a checklist: every open task of the list with the list tag
-"deploy" (KALMIDO_DEPLOY_TAG). Like a merge request (#339) only an approver decides (list owner / admin, the task's
-assignee, an instance admin; never an agent): 👍 approves, 👎 rejects. A deploy request with open checklist items is NOT
+"deploy" (KALMIDO_DEPLOY_TAG). Like a merge request (#339) only an approver decides (list owner / admin, an instance
+admin; never an agent; 2.148.1 D (#2495): not the task's assignee alone): 👍 approves, 👎 rejects. A deploy request with open checklist items is NOT
 approved by 👍: the approver either finishes those tasks first or approves on purpose with "Approve anyway" (POST
 /api/comments/<id>/decide {decision: approve, skip_checklist: true}); the skipped tasks are recorded in the request.
 Kalmido never integrates or deploys anything: the agent does, after the approval event ("reaction" with data.gate).
@@ -120,8 +120,9 @@ def gate_decide_route(cid):
         raise Denied(404)
     if b.get("decision") not in ("approve", "reject") or not isinstance(b.get("skip_checklist", False), bool):
         return err(tr("Invalid value: {0}", "decision"))
-    if is_agent(g.user) or not is_approver(c, t, me(), agent=k["user_id"]):  # 2.126.0 B (#1975): and may address the agent
-        return err(tr("Only the list owner, a list admin, the assignee or an admin can decide"), 403)
+    # 2.148.1 D (#2495): the assignee alone does not decide (as approval jobs, #1974)
+    if is_agent(g.user) or not is_approver(c, t, me(), agent=k["user_id"], assignee=False):  # 2.126.0 B (#1975): and may address the agent
+        return err(tr("Only the list owner, a list admin or an admin can decide"), 403)
     if sug.get("state") != "open":
         return err(tr("This request was already decided"), 409)
     approve = b["decision"] == "approve"

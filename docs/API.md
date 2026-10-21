@@ -513,7 +513,8 @@ Reminders are minutes before the start (all day: before midnight, so `-540` = 9:
 2.138.1: `send_invites: true` on `POST /events` / `PATCH /events/{id}` mails the invitation (an `.ics` with METHOD:REQUEST,
 Reply-To = the inviting person) to the new external attendees (addresses, contacts) and, when time, place, title, repeat or
 status changed, to all of them; default `false` (nothing is mailed). Removed or deleted: who had an invitation gets a
-cancellation. At most 200 invitation mails per person and day (`429`), see [CALDAV.md](CALDAV.md).
+cancellation. At most 200 invitation mails per person and day (`429`), see [CALDAV.md](CALDAV.md). 2.148.1: deleting or
+restoring an event (or one date) with an agent's token mails nothing (no cancellation, no new invitation).
 Agent tokens get `403` with `send_invites: true`: invitations go out in the person's name, so only people send them.
 
 ## Contacts (2.21.0)
@@ -524,7 +525,7 @@ a task needs `tasks:write` too. A contact is only visible to people who see its 
 | Endpoint | |
 |---|---|
 | `GET /address-books` · `POST` | the address books you see (`count`, `role`, `imported`, `birthdays_list_id`, 2.30.0: `org_id`); `{name, color?, org_id?}` |
-| `PATCH /address-books/{id}` · `DELETE` | rename, recolour, `birthdays_list_id` (birthdays + anniversaries of its contacts become yearly tasks of that list; owner), 2.30.0: `org_id` (owner; `409` while a member does not fit); delete with its contacts |
+| `PATCH /address-books/{id}` · `DELETE` | rename, recolour, `birthdays_list_id` (birthdays + anniversaries of its contacts become yearly tasks of that list; owner), 2.30.0: `org_id` (owner; `409` while a member does not fit); delete with its contacts (2.148.1: from an agent it waits for a person's approval, `202` + a waiting job) |
 | `PUT /address-books/{id}/members/{user_id}` · `DELETE` | share `{role: view\|edit}` (owner; 2.30.0: the same workspace rule as calendars); stop sharing, or leave it |
 | `POST /address-books/{id}/import` · `GET …/export` | `{vcf}`: vCard 3 / 4 text (the same UID is updated; at most 20 MB, never more than the server's request limit `4 × TASKS_MAX_FILE_MB`; larger: `400` / `413` with `error` naming the limit) -> `{created, updated, unchanged, errors}`; 2.41.0: stored in batches of 200, each committed (a failure keeps the batches before it); the book as `{vcf}`. The app's own `POST /api/books/{id}/import?background=1` (multipart `file`) answers a file of more than 100 cards with 202 `{import_id, state: running, total, done, …}` at once and `GET /api/books/imports/{import_id}` (only for the person who started it) tells `state` running / done / failed, `done` of `total`, the counts and `error`; 2.119.1: the app's own import also takes a CSV file (`?preview=1` answers `{format: csv, columns, guess, sample, rows, delimiter, encoding}`, the form field `mapping` = a field per column), its answer adds `dupes` / `dupe_groups` (new contacts that look like one the person sees), `GET /api/books/{id}/export.csv` is the CSV export; the REST API's import stays vCard only |
 | `GET /contacts?q=&book_id=&group=&limit=&cursor=` | search name, company, e-mail, phone (also without spaces), address, group; `{data, next_cursor, total, groups}` |
@@ -1068,7 +1069,9 @@ lists the sent documents of the signed-in address's clients in that space, each 
 sign-in link (409 when the setting or mail is off, 429 after three per address and hour). Web app only, no `/api/v1`.
 
 `GET|POST /lists/{id}/forms`, `PATCH|DELETE /forms/{id}` (`structure`; owner / list admins): a form's `url`, `access`
-(`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link. 2.63.0: `ttype` (`''` | `bug` | `feature` |
+(`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link. 2.148.1: an agent opening a public form
+(`access: "public"`, turning a public form on, a new link) waits for a person's approval (`202` + a waiting job); `org`
+in a list without an organisation is for the people who see the list; a form of a list in the trash takes nothing in. 2.63.0: `ttype` (`''` | `bug` | `feature` |
 `task`, the type of a sent task), `files` (one file allowed), `portal` (a sender without an account gets a status link on
 the thank-you page and once by mail; turns `ask_email` on). 2.98.0 (#1954): `questions` (a questionnaire: at most 30
 `{id?, kind: short | long | choice | multi | date | number | file | yesno, label, help?, required?, options?}`; a choice
