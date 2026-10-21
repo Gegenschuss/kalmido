@@ -926,7 +926,7 @@ function renderView0() {
   const wb = $('#wbody'); if (wb) wb.scrollTop = wbs ?? 7 * weekH() - 12;  // 2.15.1 (#633): the 07:00 label in full, not cut at the top
   const tl = $('#tlscroll');
   if (tl && isRoadmap()) { const keep = wasRm && !S.rmScrollReset; S.rmScrollReset = false; rmAfterRender(tl, keep ? tls : undefined, keep ? tlt : undefined); }
-  else if (tl) { tl.scrollLeft = tls ?? Math.max(0, diffDays(S.tlStart, today()) - 2) * tlDW(); tlAfterRender(tl); }
+  else if (tl) { tl.scrollLeft = tls ?? Math.max(0, diffDays(S.tlStart, today()) - 2) * tlDW(); tlAfterRender(tl); }  // lazy-ok: 2.149.0 F (#2519): #tlscroll = timeline.js drew it
   else if (S.tlPick) S.tlPick = null;  // left the timeline: "Connect to…" ends
   renderMultiBar();
   const f2 = fk && fk();

@@ -463,6 +463,12 @@ settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn`
 - Code loaded at start calls a module's functions only through the stand-ins in `lazyload.js` (`LD_CALL`: load, then
   call; `LD_VIEW`: draw "Loading…", load, draw the view again) or after `await loadModule(...)`. Constants of an
   on-demand module do not exist before it is loaded (`typeof X` to ask).
+- 2.149.0 F (#2519): `tools/check_lazy_calls.py` (CI, job lint) finds calls from a start file into a function that only an
+  on-demand file declares. Allowed: a stand-in, a guard (`typeof X`, `window.X`, `X?.(`, `loadModule(` up to four lines
+  before), or a mark with the reason why the module is loaded there: `// lazy-ok: <reason>` on the line (in a template
+  literal `${''/* lazy-ok: <reason> */}`), `// lazy-ok-begin: <reason>` … `// lazy-ok-end` around a run of lines (the click
+  cases of what the timeline drew), `// lazy-ok-module <module>: <reason>` once for a start file that only works inside
+  that module. It also checks that every `var(--x)` without a fallback names a defined custom property.
 - Moving a file to on demand: check with `grep` which of its globals other files use, keep those in a file loaded at
   start or give them a stand-in, then move the file from the script tags / `SHELL` to `LD_MODS` / `LAZY`.
 - Tests: `tests/boot.js` (jsdom) and `tests/ff.js` (Firefox) load every on-demand module right after the start, so suites

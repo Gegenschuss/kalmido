@@ -208,14 +208,14 @@ async function wsPaneDraw(md) {
     ${o.role === 'admin' ? ocBoxHtml(o) : ''}${''/* 2.42.0 (#828): encryption + recovery key */}
     ${o.role === 'admin' ? oxBoxHtml(o) : ''}
     ${o.role === 'admin' && typeof rxBoxHtml === 'function' ? rxBoxHtml('org', o.id) : ''}${''/* 2.146.0 D (#2468): the retention export */}
-    ${o.role === 'admin' ? whoBoxHtml(o) : ''}${''/* 2.115.0 A (#2061): the organisation's webhooks */}
+    ${o.role === 'admin' ? whoBoxHtml(o) : ''}${''/* 2.115.0 A (#2061): the organisation's webhooks; lazy-ok: 2.149.0 F (#2519): settings dialog only (LD_NEED loads integrations) */}
     ${o.role === 'admin' && typeof chn_orgBoxHtml === 'function' ? chn_orgBoxHtml(o) : ''}${''/* 2.142.0 A (#2145): its notification channels */}
     ${o.role !== 'admin' || !j.manage ? `<div class="row"><button class="btn sm" data-wsrm="${S.me?.id}" data-oidx="${o.id}">${ic('logout', 's')} ${tr('Leave the organisation')}</button></div>` : ''}</details>`;
   box.innerHTML = (j.orgs.length ? j.orgs.map(org).join('') : `<div class="muted mhint">${tr('You belong to no organisation: everything is private.')}</div>`)
     + (mm ? `<div class="shint keep">${ic('alert', 's')} ${esc(trn('{0} list of yours has an agent of another workspace (from before the workspaces). Open the list’s Share dialog to take it out or keep it.', '{0} lists of yours have an agent of another workspace (from before the workspaces). Open the lists’ Share dialogs to take it out or keep it.', mm))}</div>` : '');
   if (!S.me?.kid) box.insertAdjacentHTML('beforeend', `<div class="ocorg">${ocBoxHtml({id: 0}, {title: `${tr('Your personal office')}: ${tr('Encryption')}`})}</div>`);  // 2.138.0 C (#1972): its recovery key (hidden without encrypted data)
   oxDraw(box);  // 2.42.0 (#833): the export sections of the organisations I administer
-  whoDraw(box);  // 2.115.0 A (#2061): their webhooks
+  whoDraw(box);  // 2.115.0 A (#2061): their webhooks; lazy-ok: settings dialog only (LD_NEED settings -> integrations)
   if (typeof chn_orgDraw === 'function') chn_orgDraw(box);  // 2.142.0 A (#2145): their notification channels
   ocDraw(box);  // 2.42.0 (#828): their encryption sections
   wsc_paneDraw(box);  // 2.53.0 (#1474): each organisation's colour (its admins choose)
@@ -238,7 +238,7 @@ function wsPaneWire(md) {
     const wd = e.target.closest('[data-wsdel]');
     if (wd) {  // 2.88.0 (#1980): an organisation admin deletes an account of only this organisation (else: remove, lists to a member)
       const o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === +wd.closest('[data-oid]').dataset.oid), m = o?.members.find(x => x.id === +wd.dataset.wsdel);
-      const r = m && await ua8_delete({id: m.id, display_name: m.name});
+      const r = m && await ua8_delete({id: m.id, display_name: m.name});  // lazy-ok: 2.149.0 F (#2519): the settings dialog (acctset.js) drew this pane
       if (r) { if (r === true) toast(tr('Deleted')); await load(); render(); wsPaneDraw(md); }
       return;
     }
@@ -889,7 +889,7 @@ async function bkDraw(md, j) {
       <small class="muted" style="display:block">${x.unreadable ? tr('unreadable') : `${trn('{0} task', '{0} tasks', x.counts.tasks || 0)}, ${trn('{0} file', '{0} files', x.attachment_files || 0)}, ${trn('{0} user', '{0} users', x.counts.users || 0)} · v${esc(x.app_version)}`}</small></span>
       <a class="iconbtn" href="/api/admin/backups/${encodeURIComponent(x.name)}/download" download="${esc(x.name)}" title="${tr('Download')}">${ic('download', 's')}</a>
       <button class="iconbtn" data-bk="verify" title="${tr('Check')}">${ic('check', 's')}</button><button class="iconbtn" data-bk="restore" title="${tr('Restore')}">${ic('undo', 's')}</button><button class="iconbtn" data-bk="del" title="${tr('Delete')}">${ic('trash', 's')}</button></div>`).join('')}</div>` : `<div class="muted mhint">${tr('No backups yet.')}</div>`;
-  h += `<div class="row"><label for="bk-file">${tr('Restore from a file')}</label>${fileBtn('bk-file', '.zip,.enc,application/zip')}</div>
+  h += `<div class="row"><label for="bk-file">${tr('Restore from a file')}</label>${fileBtn('bk-file', '.zip,.enc,application/zip')}${''/* lazy-ok: 2.149.0 F (#2519): settings dialog only */}</div>
     ${hint(tr('Larger files: copy them into the backup folder on the server instead, they then show up in the list.'))}`;
   box.innerHTML = h;
   box._body = bkBody(md);

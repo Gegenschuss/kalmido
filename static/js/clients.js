@@ -362,7 +362,7 @@ async function formsModal(lid) {
     const ed = modal(`<h3>${f ? tr('Edit form') : tr('New form')}</h3>
       <div class="row"><label for="fm-title">${tr('Title')}</label><input id="fm-title" maxlength="120" value="${esc(f?.title || '')}" placeholder="${esc(tr('e.g. IT request, bug report'))}"></div>
       <div class="row"><label for="fm-intro">${tr('Intro')}</label><textarea id="fm-intro" rows="3" maxlength="2000">${esc(f?.intro || '')}</textarea></div>
-      ${fq_dialogHtml(f)}
+      ${fq_dialogHtml(f)}${''/* lazy-ok: 2.149.0 F (#2519): formsModal loaded formq first */}
       <div class="row"><label for="fm-access">${tr('Who can send it')}</label><select id="fm-access"><option value="org">${tr('Signed-in people of your organisation')}</option><option value="public" ${f?.access === 'public' ? 'selected' : ''} ${j.public_links ? '' : 'disabled'}>${tr('Anyone with the link (no login)')}</option></select></div>
       ${secs.length ? `<div class="row"><label for="fm-sec">${tr('Section')}</label><select id="fm-sec"><option value="">${tr('None')}</option>${secs.map(s => `<option value="${s.id}" ${s.id === f?.section_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>` : ''}
       <div class="row"><label>${tr('E-mail')}</label><label class="chkl"><input type="checkbox" id="fm-email" ${f?.ask_email !== false ? 'checked' : ''} ${f?.portal ? 'disabled' : ''}> ${tr('Ask for an e-mail address (without login)')}</label></div>
@@ -376,7 +376,7 @@ async function formsModal(lid) {
       <div class="aerr" role="alert"></div>
       <div class="foot">${f ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${f ? tr('Save') : tr('Create')}</button></div>`);
     // 2.63.0 (#1513): the status link goes by mail -> the e-mail field is on while it is
-    fq_bind(ed, f);  // 2.98.0 B (#1954): the own questions (formq.js)
+    fq_bind(ed, f);  // 2.98.0 B (#1954): the own questions (formq.js); lazy-ok: formsModal loaded it first
     $('#fm-portal', ed).addEventListener('change', e => { const m = $('#fm-email', ed); if (e.target.checked) m.checked = true; m.disabled = e.target.checked; });
     ed.addEventListener('click', async e => {
       const b = e.target.closest('[data-m]'); if (!b) return;
