@@ -1724,6 +1724,44 @@ document texts are encrypted at rest in organisations with encryption.
   `POST .../send` takes `timesheet: true` to attach it as a second file (the invoice's own PDF / ZUGFeRD file is unchanged;
   the DATEV copy never gets it). The document answer has `timesheet_ok`.
 
+## Correspondence: letters (2.153.0)
+
+Tab *Correspondence* (admins of the office area; members `403`, agents `403`, another area `404`; a person without an
+organisation writes in the personal office). For letters to authorities, insurers, landlords or clients.
+
+**Writing**: *New letter* (from a letter template, optionally for a client: its variables are filled) opens the editor.
+The recipient search offers the clients of the office (also with a contact person as "z. Hd.") and the address book
+contacts the person sees in the office's space (an organisation's office: the organisation's address books; a personal
+office: the private ones). Picking one copies name, address lines and e-mail into the letter; they stay free to edit and
+do not change when the client changes later. Further fields: date (today), reference line (e.g. "Your letter of …"),
+subject, text (paragraphs separated by an empty line, `-` starts a list item), greeting and name (from the own
+*Signature*), *Use the signature picture*, channel (post, e-mail, registered mail with tracking number, fax) and the
+follow-up in days. A draft saves itself while typing; *Save* saves at once with an undo step.
+
+**PDF**: DIN 5008 form B like the other office PDFs: letterhead (logo or company name), fold marks, the sender line and
+the recipient in the window, the date on the right, then reference line, subject (bold), text, greeting, the signature
+picture and the name; following pages with a small head; the footer with the company fields. A draft says *ENTWURF*
+(*DRAFT*).
+
+**Sending**: *Mark as sent* asks for the channel (tracking number with registered mail) and the follow-up (suggested: 14
+days). The letter is then fixed: its PDF is written once and filed into the office documents space, in the folder of the
+client (without a client in the folder *Correspondence*). A change afterwards = *Edit a copy* (a new draft). *Delivered*
+marks the arrival (undo possible). *Save as template* makes a document template of kind *Letter* from the text; the tab
+*Documents* shows it too. *Delete* archives the letter (undo restores it; a filed PDF stays). The client page lists the
+client's letters.
+
+**Signature**: per person and office area a greeting, a name and optionally a picture of the handwritten signature (PNG
+or JPEG, at most 300 KB). New letters take greeting and name from it; the picture is only printed in the letters of the
+person it belongs to.
+
+Routes (office admins only): `GET/POST /api/office/letters` (`?status=&client_id=&q=&archived=1&brief=1`; `POST` with
+`{copy_of: id}`, `{template_id, client_id?}` or `{answers: <document id>}`), `GET /api/office/letters/recipients?q=`,
+`GET/PUT /api/office/letters/profile`, `DELETE /api/office/letters/profile/image`,
+`GET/PATCH/DELETE /api/office/letters/<id>` (`PATCH` of a sent letter `409`), `POST /api/office/letters/<id>/restore`,
+`GET /api/office/letters/<id>/pdf` (`?dl=1` download), `POST /api/office/letters/<id>/sent`,
+`POST/DELETE /api/office/letters/<id>/delivered`, `POST /api/office/letters/<id>/template`. Recipient, subject, text,
+reference line and the signature picture are encrypted at rest in areas with encryption.
+
 ## Access log
 
 Every change and every read of documents and master data is written to the office log (`office_doc_log`): who, when,
@@ -1732,6 +1770,31 @@ PDF, preview, export, import, logo) and on which document or master data. Repeat
 minutes are written once. Organisation admins see the history of a document in its editor ("History") and the latest
 entries under Settings > Access log. The log is never part of alerts. An agent token on `/api/office/*` gets `403` without
 content; every request of an agent on `/api/v1/office` is one line in the log (2.51.0).
+
+## Letters and incoming documents: reference, history, deadlines (2.106)
+
+Letters of the tab "Correspondence" and documents of the documents area can be linked in both directions:
+
+- **Write an answer** at an incoming document (documents area, detail) opens a new letter with the recipient (the
+  client whose name is the sender's, with address and e-mail; otherwise the sender's name), the subject "Your letter of
+  <date>" and the reference line prefilled, linked as "Answer to". The block "Correspondence" there lists the linked
+  letters.
+- At a letter, **Choose a reference** links a document of the office's documents space ("Answer to"); after sending,
+  **Assign an answer** links the document that answers it. Links can be removed (one undo step each); deleting a
+  document only removes the link, a document in the bin is not shown.
+- **Reference line (DIN 5008):** made from the answered document: "Your reference" (the sender's "Unser Zeichen",
+  "Aktenzeichen", "Az.", "Geschäftszeichen", "Our ref"), "Your message of <date>", "Our reference" (the sender's "Ihr
+  Zeichen") and numbers such as policy, customer or tax number. Filled in at a draft without a reference line, or by the
+  button "Reference line from the reference".
+- **History:** all letters and documents connected over links, in time order; per client all such histories.
+- **Deadlines:** a date after "bis zum", "spätestens", "Frist", "no later than", or "innerhalb von 14 Tagen" / "within two
+  weeks" counted from the document date, becomes a task with that due date in one click (the document linked in the
+  task). Payment terms stay the due date of the documents area. Plain rules, no language model.
+- **Follow-up:** a letter sent with a follow-up (e.g. 14 days) that has no answer linked by then gets a task
+  "Follow-up: <subject>" in the inbox of the person who wrote it, once. An answer that comes later leaves the task alone.
+
+Rights: admins of the office area (a person without organisation: the own personal office and the own private
+documents). A letter links only documents of its office's documents space that the person sees.
 
 ## Agents (2.51.0)
 
@@ -1752,6 +1815,35 @@ personal agent without a workspace: its owner's personal office), it acts for on
 and never sees another area. Each request is one line in the access log (filter *Agents*). Details: docs/AGENTS.md.
 People's routes: `GET/PATCH /api/office/agents/<id>` (the switch), `GET /api/office/pay-props`, `POST /api/office/pay-props/<id>`
 `{action: accept|reject}` (admins). The event `offer_accepted` tells the area's office agents about an accepted quotation.
+
+**Letter drafts (2.153.0, #2031).** At an incoming document an admin of the office sees *Let an agent draft the answer*
+when the document is shared with at least one agent of the office that has both switches (else, when such agents exist, a
+short hint to share the document first; nothing is shared automatically). With several agents you choose one and may add a
+note. The agent drafts ONE letter that answers the document (recipient and reference line prefilled, linked to it) and
+posts a card in your chat with it (*Open in the office*). You check, sign and send it: an agent never sends, marks as sent
+or deletes a letter, and it sees only the letters it made. People's routes: `GET /api/office/letters/doc/<id>/agents`,
+`POST /api/office/letters/doc/<id>/ask-agent` `{agent_id, note?}`; agents: docs/AGENTS.md *Letter drafts*.
+
+## Letters by e-mail and text blocks (2.106)
+
+A draft letter can go out by e-mail: **Send by e-mail** (only shown when the server has a mail server,
+`KALMIDO_SMTP_HOST`) opens a form with the recipient (the letter's e-mail address), Cc, subject and a short covering
+text. The letter's PDF is attached, the letter is marked as sent with the channel e-mail. Nothing is sent without this
+button; the day's limits of the office mails apply (like invoices).
+
+Answers find their way back: when you have a **document address** for the documents space of this office (Documents >
+settings > mail address), the mail carries it as Reply-To. An answer to that address becomes a document, and because it
+names the letter's Message-ID (In-Reply-To / References), the document is linked to the letter as its reply. Only a
+letter of the same office (the same organisation, or your personal office) is ever linked. Without a document address
+answers go to the company e-mail and are assigned to the letter by hand. A reply without a PDF or image attachment
+creates no document (as every mail to the document address).
+
+**Text blocks** are reusable paragraphs per office: **Insert text block** above the letter text opens a searchable list
+and puts the chosen block at the cursor. New, change and delete (with undo) in the same list; four samples (cancellation,
+objection, payment reminder, request for an extension; German and English) can be taken over. Sample text, no legal
+advice. API: `GET/POST /api/office/letter-blocks`, `PATCH/DELETE /api/office/letter-blocks/<id>`, `POST .../<id>/restore`,
+`GET .../starters`; `GET /api/office/letters/mail-info`, `GET /api/office/letters/<id>/mail-draft`,
+`POST /api/office/letters/<id>/send-mail` (admins of the office, like every letter route).
 
 ## PDF layout
 

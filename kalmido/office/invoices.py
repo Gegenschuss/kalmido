@@ -783,7 +783,7 @@ def _mail(to, subject, text, **kw):
     """mail_send with a readable 409 when the mail server refuses; the details only go to the server log."""
     from ..integrations.mail import mail_send
     try:
-        mail_send(to, subject, text, **kw)
+        return mail_send(to, subject, text, **kw)  # 2.153.0 (#2029): the message sent (a letter keeps its Message-ID)
     except (smtplib.SMTPException, OSError) as e:
         app.logger.warning("office mail failed: %s", type(e).__name__)  # 2.39.0 (#1209 audit N6): no addresses in the log
         raise Denied(409, tr("Mail server refused the message"))

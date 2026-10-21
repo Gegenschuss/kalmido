@@ -34,7 +34,7 @@ from .model import office_gate, office_org, office_settings, pb_cl_sql, pb_owner
 from .doctpl_samples import DMA_SAMPLES  # 2.117.0 B (#2283)
 
 DT_KINDS = (("contract", N_("Contract")), ("confirmation", N_("Order confirmation")), ("nda", N_("Non-disclosure agreement")),
-            ("other", N_("Other")))
+            ("other", N_("Other")), ("letter", N_("Letter")))  # 2.153.0 (#2028): letter templates (office/letters.py)
 DT_KIND_KEYS = tuple(k for k, _ in DT_KINDS)
 DT_STATUS = ("draft", "final", "signed", "declined")
 DT_NOTE = N_("Sample text, no legal advice.")

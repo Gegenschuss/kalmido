@@ -51,6 +51,8 @@ KNOWN = {
     ("sheets.shbook", "api.v1"),
     # the parked releases 2.113.1 / 2.116.0 (#2059 team chat channels, #2067 focus in API v1): v1 route decorators at module level
     ("collab.teamchan", "api.v1"), ("personal.v1focus", "api.v1"),
+    # 2.153.0 (#2031, built on 2.106.0 before the check): the letter draft routes of API v1 (decorators at module level)
+    ("office.letteragent", "api.v1"),
 }
 
 

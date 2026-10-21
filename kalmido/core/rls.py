@@ -39,6 +39,7 @@ TABLES = (
     "office_doc_templates", "office_gen_docs",  # 2.93.0 A (#1927): document templates and the documents made from them
     "office_vehicles", "office_drives", "office_drive_log",  # 2.93.0 B (#1928): the logbook
     "office_cashbooks", "office_cash_entries", "office_cash_closings", "office_cash_log",  # 2.121.0 B (#2095): the cash book
+    "office_letters", "office_letter_links", "office_letter_blocks", "office_letter_profiles",  # 2.153.0 (#2028, #2030): correspondence
     "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")
     "wiki_pages",  # 2.49.0 C (#1199): knowledge pages (NULL = private, the app checks owner_id)
     "wiki_spaces",  # 2.64.3 A (#1817): the lock per knowledge space (NULL = a private space, the app checks owner_id)

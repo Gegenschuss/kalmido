@@ -256,7 +256,7 @@ def docs_mail_import(c, msg, raw):
             return 0  # no longer a member: nothing goes in
         mid = str(msg.get("Message-ID", "")).strip()[:200] or ("sha:" + hashlib.sha256(raw).hexdigest())
         _text, files = mail_text(msg)
-        first = 0
+        first, made = 0, []
         for i, (name, mime, data) in enumerate(files[:MAIL_FILES]):
             parts = doc_unpack(name, data, MAIL_UNPACKED)  # 2.146.0 B (#2453): a ZIP / winmail.dat -> its files
             if parts is not None:
@@ -275,8 +275,16 @@ def docs_mail_import(c, msg, raw):
                     with c.savepoint():  # 2.146.0 B (#2452): a file already there is linked, not stored again
                         nid = docs_ingest(c, uid, org, pname, pdata, pmime, "mail", {"ext_id": pext}, dedup=True)
                     first = first or nid
+                    made.append(nid)
                 except (Denied, ValueError, QuotaExceeded) as e:
                     print("docs: mail attachment refused", type(e).__name__, flush=True)
+        if made:  # 2.153.0 (#2029): the answer to a letter sent by e-mail (In-Reply-To / References) -> linked to it
+            try:
+                from ..office.lettermail import ltm_link_replies
+                with c.savepoint():
+                    ltm_link_replies(c, uid, org, msg, made)
+            except Exception as e:  # noqa: BLE001 -- the documents are in; a failed link is assigned by hand
+                print("docs: letter link failed", type(e).__name__, flush=True)
     c.commit()
     if first:
         docs_kick()

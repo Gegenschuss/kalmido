@@ -16,7 +16,8 @@ const LD_MODS = {
     'office_agreements', 'office_assets',  // 2.92.0 (#1925, #1931)
     'office_meals',  // 2.119.0 A (#2288): entertainment receipts
     'office_leads', 'office_cfiles',  // 2.94.0 A (#1930), 2.117.0 B (#2285)  // 2.76.0 A (#1023): office_packs
-    'office_letterhead', 'office_numranges', 'office_terms'],  // 2.120.0 E (#2091); 2.138.0 D (#2256): office_numranges; 2.113.2 (#2253): office_terms
+    'office_letterhead', 'office_numranges', 'office_terms',  // 2.120.0 E (#2091); 2.138.0 D (#2256): office_numranges; 2.113.2 (#2253): office_terms
+    'office_letters', 'office_letterlinks', 'office_lettermail'],  // 2.153.0 (#2028-#2030)
   // 2.65.0 (#1823): more areas load on first use (the start loads about a third less)
   agentchat: ['agentchat', 'agentsetup'],
   pdf: ['pdfview', 'docpreview'],  // 2.92.0 C (#1926): docpreview.js = the Word / Excel preview
@@ -24,7 +25,7 @@ const LD_MODS = {
   wiki: ['wiki', 'wkshare', 'wkhist', 'wkembed'],  // 2.123.0 B (#2104): wkshare.js = shares; A (#2102, #2106): wkhist.js = history + text search; C (#2103, #2107, #2108): wkembed.js = Ablage pictures, links, checkboxes
   stats: ['stats'],
   calendar: ['calview', 'caldrag', 'apptbook'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings
-  docs: ['docs', 'paperless', 'receipts'],
+  docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent'],  // 2.153.0 (#2028, #2031): letterdoc.js, letteragent.js
   life: ['life', 'devlink'],  // 2.140.0 B (#2136): devlink.js = a device <-> office equipment
   integrations: ['integrations'],
   playbook: ['playbook'],

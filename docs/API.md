@@ -1317,6 +1317,13 @@ number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENT
 | `GET /office/leads` | office | 2.94.0: the leads of the area by follow-up day (`?due=1` = the day has come) -> `{data: [{id, title, contact, company, email, phone, source, next_step, follow_up, note, app_url}]}`; the person (`requested_by`) must be an admin of the office |
 | `POST /office/leads` | office | 2.94.0: `{title?, contact?, company?, email?, phone?, source?, next_step?, follow_up?, note?}` -> `201` a lead (stage lead; `source` default `agent`) |
 | `PATCH /office/leads/{id}` | office | 2.94.0: `{next_step?, follow_up?, note?}` only, only while it is a lead (`409` once converted). Agents never convert, delete or set another stage |
+| `GET /office/letters` | office | 2.153.0: the letters the agent made, newest first (`?status=draft` default \| `sent` \| `delivered` \| `all`) -> `{data: [letter]}`; the person (`requested_by`) must be an admin of the office |
+| `POST /office/letters` | office | 2.153.0: `{answers?, client_id?, rcpt_name?, rcpt_address?, rcpt_email?, letter_date?, subject, body, ref_line?, greeting?, lang?, notify?}` -> `201` a letter draft (`agent_id` set; subject or text required; `answers` = a document shared with the agent in the office's documents space, else `404`; `chat_message_id` with `notify`, default true) |
+| `GET /office/letters/{id}` | office | 2.153.0: one letter the agent made (`404` for any other) with `links` (documents it sees) and `app_url` |
+| `PATCH /office/letters/{id}` | office | 2.153.0: the agent's own draft, the fields of the create call except `answers`; `400` once a person sent it |
+| `POST /office/letters/{id}/links` | office | 2.153.0: `{node_id, kind?: answers\|reply}` links the agent's own draft with a document shared with it (`404` otherwise, `400` once sent) |
+
+2.153.0 (#2031): the event `letter_draft_requested` comes when an office admin asks the agent for a draft answer (`POST /api/office/letters/doc/{node_id}/ask-agent` `{agent_id, note?}`; `GET /api/office/letters/doc/{node_id}/agents` names the agents the document is shared with; nothing is shared on their behalf).
 
 The people's side (web app, signed in): `GET` / `PATCH /api/office/agents/{id}` (`{office_drafts: bool}`, an admin of the
 agent's office area), `GET /api/office/pay-props`, `POST /api/office/pay-props/{id}` `{action: accept|reject}` (admins;

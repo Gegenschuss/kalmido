@@ -86,6 +86,8 @@ FIELDS = {
     "office_vehicles": ("plate",), "office_drives": ("start_place", "dest", "purpose"),  # 2.93.0 B (#1928): the logbook
     "office_drive_log": ("prev",),  # 2.93.0 B (#1928): the change log of the logbook
     "office_cash_entries": ("text",), "office_cash_log": ("prev",),  # 2.121.0 B (#2095): the cash book
+    "office_letters": ("rcpt_name", "rcpt_address", "rcpt_email", "subject", "body", "ref_line"),  # 2.153.0 (#2028): letters
+    "office_letter_blocks": ("body",), "office_letter_profiles": ("image",),  # 2.153.0 (#2030, #2028): text blocks, signature picture
     "office_deals": ("value", "contact", "note", "lost_reason",
                      "next_step", "email", "phone", "company"),  # 2.50.0 (#1196): the sales pipeline; 2.94.0 A (#1930): leads
     "time_sheets": ("note",),  # 2.125.0 R (#2119): the note of a timesheet decision
@@ -127,6 +129,7 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_doc_templates": N_("Document templates and documents"), "office_gen_docs": N_("Document templates and documents"),  # 2.93.0 A (#1927)
                  "office_vehicles": N_("Logbook"), "office_drives": N_("Logbook"), "office_drive_log": N_("Logbook"),  # 2.93.0 B (#1928)
                  "office_cash_entries": N_("Cash book"), "office_cash_log": N_("Cash book"),  # 2.121.0 B (#2095)
+                 "office_letters": N_("Letters"), "office_letter_blocks": N_("Letters"), "office_letter_profiles": N_("Letters"),  # 2.153.0 (#2028)
                  "hub_absences": N_("Kind and note of absences"),  # 2.50.0 (#1195)
                  "time_sheets": N_("Notes on timesheet decisions"),  # 2.125.0 R (#2119)
                  # 2.72.0 (#1333): amounts, texts and limits of the household budget, its receipts
