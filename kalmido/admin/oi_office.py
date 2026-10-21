@@ -392,6 +392,8 @@ SPECS = [
     OiT("office/fixed_costs.json", "office_fixed_costs", people={**_P, "remind_user": "null"}, private="office"),
     OiT("office/sub_reminders.json", "office_sub_reminders", refs={"fixed_id": "office_fixed_costs", "task_id": "tasks"}, need=("fixed_id",),
         people={"user_id": "null"}, private="office"),
+    OiT("office/dunning_marks.json", "office_dunning_marks", refs={"doc_id": "office_docs", "reminder_id": "office_docs"}, need=("doc_id",),
+        private="office"),  # 2.144.3 (#2054, review): a suggested reminder deleted by hand stays not suggested after an import
     OiT("office/cashflow_start.json", "office_cf_start", people={"updated_by": "null"}, private="office", rid=False, key=("org_id",),
         prep=_p_once("office_cf_start", N_("The target office already has its own cash flow start balance; it was kept."))),
     OiT("office/cashflow_adjust.json", "office_cf_adjust", people=_P, private="office"),

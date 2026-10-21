@@ -42,11 +42,25 @@ def gcq_payload(name, iban, bic, amount, ref, currency="EUR"):
     bic = re.sub(r"\s+", "", str(bic or "")).upper()
     if not GCQ_BIC_RE.match(bic):
         bic = ""
-    els = ["BCD", "002", "1", "SCT", bic, name, iban, f"EUR{amt}", "", "", _clean(ref, GCQ_REF_MAX)]
-    while els[-1] == "":  # EPC069-12: unused trailing elements are left out (a draft has no number yet)
-        els.pop()
-    out = "\n".join(els)
-    return out if len(out.encode("utf-8")) <= 331 else None  # EPC069-12: at most 331 bytes
+    ref = _clean(ref, GCQ_REF_MAX)
+    while True:
+        els = ["BCD", "002", "1", "SCT", bic, name, iban, f"EUR{amt}", "", "", ref]
+        while els[-1] == "":  # EPC069-12: unused trailing elements are left out (a draft has no number yet)
+            els.pop()
+        out = "\n".join(els)
+        over = len(out.encode("utf-8")) - 331  # EPC069-12: at most 331 bytes
+        if over <= 0:
+            return out
+        # 2.144.3 (#2054, review): a long multi-byte name / reference is shortened instead of dropping the code; the name
+        # first (the document number in the reference matches the payment), down to 20 characters, then the reference
+        if len(name) > 20:
+            name = name[:-1].rstrip()
+        elif ref:
+            ref = ref[:-1].rstrip()
+        elif len(name) > 1:
+            name = name[:-1].rstrip()
+        else:
+            return None
 
 
 def gcq_matrix(payload):
