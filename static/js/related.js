@@ -107,7 +107,7 @@ const rt9_simHead = (t, prev) => t.similar && !prev?.similar ? `<div class="ghea
 // ---- Administration > Server: the switch and the state of the service
 function rt9_adminHtml(hint) {
   return `<h4 id="s-rt9-h">${tr('Related tasks')}</h4>
-    ${hint(tr('Shows tasks of similar meaning in a task, a hint on likely duplicates while adding and “also similar meaning” in the search; agents get them too. A small local model on this server computes them (the optional service kalmido-embed); nothing leaves the server.'))}
+    ${hint(tr('Shows tasks of similar meaning in a task, a hint on likely duplicates while adding and “also similar meaning” in the search; agents get them too. A small model computes them in the optional service kalmido-embed that the administrator set up (on this server or at an https address).'))}
     <div id="s-rt9" aria-labelledby="s-rt9-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 }
 async function rt9_adminDraw(md) {

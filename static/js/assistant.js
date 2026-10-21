@@ -15,7 +15,8 @@ const asst_avail = () => !!S.assistant && !!S.me && !S.me.kid;  // configured; c
 const asst_ready = () => asst_avail() && !!S.assistant.on;
 const asst_shared = lid => (S.assistant?.list_ids || []).includes(+lid);
 const asst_myInbox = () => S.lists.find(l => l.is_inbox && isOwner(l));
-const asst_canList = l => !!l && !l.is_inbox && !l.archived && l.life !== 'health' && l.life !== 'budget' && !l.e2e;  // vorint: no budget (2.72), no list with the lock (2.64a)
+const asst_canList = l => !!l && !l.is_inbox && !l.archived && l.life !== 'health' && l.life !== 'budget' && !l.e2e  // vorint: no budget (2.72), no list with the lock (2.64a)
+  && l.owner_id === S.me?.id;  // 2.148.1 D (#2489): only own lists
 const asst_taskOk = t => { const l = t && listById(t.list_id); return !!l && (asst_shared(l.id) || (l.is_inbox && isOwner(l))); };
 const asst_onSync = v => { if (!S.assistant) return; S.assistant.on = String(v) === '1'; render(); };  // settings switch + its undo
 
