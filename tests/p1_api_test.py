@@ -198,9 +198,10 @@ e = A.patch(B + f"/api/templates/{tj['id']}", json={"name": "Trip", "data": nd})
 check(e["name"] == "Trip" and e["count"] == 4 and e["data"]["task"]["due_offset"] == 10, "template edit + rename")
 check(A.patch(B + f"/api/templates/{tj['id']}", json={"data": {"task": {"title": ""}}}).status_code == 400, "template edit validates (empty title)")
 check(A.patch(B + f"/api/templates/{tj['id']}", json={"name": " "}).status_code == 400, "rename to empty refused")
-deep = {"task": {"title": "a", "children": [{"title": "b", "children": [{"title": "c", "children": [{"title": "d"}]}]}]}}
+# 2.156.0 (#1949): five levels -> six given, five kept
+deep = {"task": {"title": "a", "children": [{"title": "b", "children": [{"title": "c", "children": [{"title": "d", "children": [{"title": "e", "children": [{"title": "f"}]}]}]}]}]}}
 dj = A.post(B + "/api/templates", json={"kind": "task", "data": deep, "name": "deep"}).json()
-check(dj["count"] == 3, "template depth capped at 3 levels")
+check(dj["count"] == 5, "template depth capped at 5 levels")
 check(A.post(B + "/api/templates", json={"kind": "task", "data": {"task": {"title": "x", "url": "javascript:alert(1)", "due_time": "25:00", "priority": 4}}}).json()["data"]["task"]
       == {**A.post(B + "/api/templates", json={"kind": "task", "data": {"task": {"title": "x"}}}).json()["data"]["task"]}, "template sanitizes url / time / priority")
 # list template

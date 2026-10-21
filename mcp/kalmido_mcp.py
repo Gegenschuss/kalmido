@@ -666,7 +666,7 @@ TOOLS = [
            "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]}, "log": {"type": "string"}}, ["title"]),
      lambda api, a: api.call("POST", "/agent/jobs", body=a)),
     ("get_job", "One of the agent's jobs. A proposal job (event job_request) also carries kind (project | subtasks | triage | "
-                "extract | dayplan | cleanup | inquiry | setup | merge | office_text | doc_summary | report), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
+                "extract | dayplan | cleanup | inquiry | setup | merge | office_text | doc_summary | report | ideas), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
      _obj({"job_id": S_ID}, ["job_id"]), lambda api, a: api.call("GET", f"/agent/jobs/{int(a['job_id'])}")),
     ("submit_proposal", "Answer a job_request with ONE structured proposal; the person reviews, edits and applies it. Never create "
                         "the lists / tasks yourself. proposal by kind -- project: {name, folder?, sections: [names], tasks: [{title, "
@@ -698,6 +698,9 @@ TOOLS = [
                         "input.report and its fixed input.report.markdown): {text} (Markdown). For these three: word the text from "
                         "the input only (and input.wish), invent nothing, no placeholders for unknown facts, in the language of the "
                         "document (input.doc.lang) / input.lang; the person edits and takes it over, nothing is sent. "
+                        "ideas (2.156.0, sub-branches for a branch of a mind map; input: list, path, levels, hint, lang only): "
+                        "{items: [{title, children?: [{title}] (only when input.levels is 2)}]} -- short titles in input.lang, at "
+                        "most 50 entries in all; the person takes single ideas or all over. "
                         "Every kind may add summary (a short explanation). Dates YYYY-MM-DD, priority none | low | medium | high. "
                         "At most 200 entries; resubmitting replaces the proposal until the person applied or discarded it.",
      _obj({"job_id": S_ID, "proposal": {"type": "object"}}, ["job_id", "proposal"]), t_submit_proposal),

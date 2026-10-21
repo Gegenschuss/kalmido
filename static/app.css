@@ -557,6 +557,10 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .trow{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .trow .ttl{-webkit-user-select:text;user-select:text}
 .trow.d2{margin-left:3.5rem}
+/* 2.156.0 A (#1949): five levels of tasks; on a phone each level indents less so level 5 stays readable */
+.trow.d3{margin-left:5.25rem}.trow.d4{margin-left:7rem}
+@media (max-width:899px){.trow.sub.d3{margin-left:5rem}.trow.sub.d4{margin-left:6.75rem}}
+@media (max-width:599px){.trow.sub.d1{margin-left:1.125rem}.trow.sub.d2{margin-left:2.25rem}.trow.sub.d3{margin-left:3.375rem}.trow.sub.d4{margin-left:4.5rem}}
 .trow.msel{background:color-mix(in srgb,var(--accent) 12%,var(--bg))}
 .trow.msel .chk{border-color:var(--accent)}
 .meta .pinm{color:var(--accent)}

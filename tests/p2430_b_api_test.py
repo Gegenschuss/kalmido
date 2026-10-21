@@ -5,7 +5,7 @@
    a viewer of a shared project cannot let a task wait, an editor cannot use a blocker in a project they do not see, a
    task outside projects gets no dependency; DELETE (the undo) removes it again
  - #1003 several tasks at once (one POST /api/tasks/batch patch_each = one undo step): several tasks become subtasks of
-   one, in the given order; a task whose own subtasks would go deeper than three levels is refused (the others move);
+   one, in the given order; a task whose own subtasks would go deeper than five levels (2.156.0, #1949) is refused (the others move);
    subtasks out of their parent keep their order, assignee and dates; the undo (patch_each back with _prev) restores the
    parents; a viewer changes nothing, nobody nests under a task of a list they cannot see; moving into another list takes
    the subtasks along
@@ -117,6 +117,8 @@ TOP = task(A, "Release notes", W)
 X, Y, Z = task(A, "Collect changes", W), task(A, "Write intro", W), task(A, "Proofread", W)
 DEEP = task(A, "Screenshots", W)
 DK = task(A, "Shot of the list", W, parent_id=DEEP)
+# 2.156.0 (#1949): five levels -> Screenshots needs three levels below it to be too deep under MID
+DK3 = task(A, "Export", W, parent_id=task(A, "Crop", W, parent_id=DK))
 MID = task(A, "Chapter one", W, parent_id=TOP)
 # several onto one: X, Y, Z under TOP in this order (after its own subtask)
 r = batch(A, {X: {"parent_id": TOP, "sort": 10}, Y: {"parent_id": TOP, "sort": 11}, Z: {"parent_id": TOP, "sort": 12}})
@@ -125,12 +127,12 @@ check(r.ok and j.get("count") == 3 and not j.get("errors"), f"#1003: three tasks
 st = state(A)
 kids = sorted([t for t in st.values() if t.get("parent_id") == TOP], key=lambda t: t["sort"])
 check([t["id"] for t in kids] == [MID, X, Y, Z], f"#1003: their order is kept after the own subtask: {[t['title'] for t in kids]}")
-# depth: DEEP has a subtask; under MID (level 2) it would be level 3 with its child on level 4 -> refused, X2 moves
+# depth: DEEP has three levels below it; under MID (level 2) it would be level 3 with its last one on level 6 -> refused, X2 moves
 X2 = task(A, "Index", W)
 r = batch(A, {X2: {"parent_id": MID, "sort": 0}, DEEP: {"parent_id": MID, "sort": 1}})
 j = r.json()
 st = state(A)
-check(j.get("count") == 1 and any("levels" in x for x in j.get("errors", [])), f"#1003: the one with own subtasks is refused (3 levels), the rest moves: {j}")
+check(j.get("count") == 1 and any("levels" in x for x in j.get("errors", [])), f"#1003: the one with own subtasks is refused (5 levels), the rest moves: {j}")
 check(st[X2]["parent_id"] == MID and st[DEEP]["parent_id"] is None and st[DK]["parent_id"] == DEEP, "#1003: X2 is on level 3, Screenshots stays with its subtask")
 # out of the parent: order, assignee and dates stay
 O1 = task(A, "Order flowers", W, parent_id=TOP, assignee_id=ids["bob"], due="2030-05-02")

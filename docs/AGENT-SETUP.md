@@ -320,6 +320,8 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
   (same e-mail / phone, a name variant with a shared detail), ids from the input; the person merges them.
 - A text for a person (job_request kind office_text / doc_summary / report, 2.126.1): word it from the input only,
   invent nothing, in the document's language; answer {field, text} or {text}. The person takes it over; nothing is sent.
+- Ideas for a branch of the mind map (job_request kind ideas, 2.156.0): the input is only the branch's path, the list's
+  name, the levels still free and the person's hint; answer {items: [{title, children?}]} with short titles in input.lang.
 - The event contract_notice (2.70.0): a contract's last day to cancel is near. Send ONE sentence with
   propose_contract_notice (what it costs, until when they can decide, no pressure); the person takes it as a note.
   Since 2.92.0 business contracts and insurances of the office come the same way (data.office true).

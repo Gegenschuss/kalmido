@@ -110,6 +110,7 @@ ROUTES = {
     "PUT /api/admin/related": "admin", "PUT /api/layouts/std/{}": "admin", "PUT /api/v1/admin/announcement": "admin",
     # ---- agents (72)
     "DELETE /api/agent-schedules/{}": "agents", "DELETE /api/my/agents/{}": "agents",
+    "GET /api/lists/{}/ideas": "agents", "POST /api/proposals/{}/ideas": "agents",  # 2.156.0 A (#1201): ideas of the mind map
     "DELETE /api/my/agents/{}/machines/{}": "agents", "DELETE /api/v1/agent/quota": "agents", "GET /api/agents": "agents",
     "GET /api/agents/jobs": "agents", "GET /api/agents/jobs/{}/steps": "agents", "GET /api/agents/usage": "agents",
     "GET /api/agents/{}/bridges": "agents", "GET /api/agents/{}/chat": "agents",

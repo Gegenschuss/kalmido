@@ -1514,6 +1514,20 @@ draft: 409 once finalised or sent; document: the right edit), `.../undo` / `.../
 when someone changed it since). `GET /api/lists/{id}/status-report` (web) also carries `agents` and `agent_text`
 (`{job, text, at}` of the report taken over for exactly this period, else null); the fixed `markdown` stays as it is.
 `GET /api/docs/{id}` and `GET /api/v1/documents/{id}` carry `summary` (the text taken over, '' without one).
+
+## Ideas for the mind map (2.156.0)
+
+Who may be asked: `GET /api/proposals/agents?kind=ideas&list_id=` (agents the list is shared with and that the person may
+address there) -> `{agents: [...]}` as above. A person who may change the list asks with `POST /api/proposals {agent_id,
+kind: "ideas", list_id, branch: "r" | "s<section id>" | "t<task id>", hint?}` (a task on the deepest level: 400; hint at
+most 2000 characters). The agent answers `{items: [{title, children?: [{title}]}]}` (AGENTS.md *Ideas for a branch*).
+`GET /api/lists/{id}/ideas` (the person who asked) -> `{jobs: [{id, state: requested | ready, agent {id, name}, target,
+path, items, taken {key: task id}, dropped [keys], created_at, updated_at}]}` of the open requests in that list.
+`POST /api/proposals/{id}/ideas {take: ["0", "0.1", ...], drop: [...]}` creates the taken ideas as tasks of the person
+under the branch (a sub-idea brings its idea along) and marks the dropped ones -> `{state, taken, dropped, open, tasks}`;
+once nothing is open the job ends (applied / discarded). `POST /api/proposals/{id}/apply {select}` takes the selected ones
+over and discards the rest; `.../discard`, `.../undo`, `.../redo` as for other proposals. `GET /api/state` carries
+`max_depth` (2.156.0, #1949: the levels of tasks, 5).
 | `GET /lists/{id}/rules` | read | people: owner / list admin (like the web), agents: write access to the list (else 403); `trigger` {kind section / done / reopen / ltag / due / created / assigned / field (2.138.0), section_id, tag_id, user_id (assigned: null = anybody), field_id + value (field: option id, "1" / "0" for a checkbox, null = any change)}, `action` {kind assign / due / comment / move / priority / tag / field (2.138.0), user_id, days, text, list_id, section_id, priority (none / low / medium / high), tag_id (a list tag), field_id + value (null clears)}, `names`, `active`, `paused_reason`, `created_by` |
 | `POST /lists/{id}/rules/proposals` | structure | agents only: `name`, `trigger`, `action`, `summary`, `title`, `user_id`; 201 = a ready proposal job (kind `rule`) |
 | `POST /agent/proposals/sheet-tasks` | sheets:read | 2.126.1: agents only: `sheet_id`, `rows` (row ids or `{row_id, title}`, at most 200), `list_id`, `title_col`, `due_col`, `notes_col`, `summary`, `for_user_id`; the table and the list shared with the agent, same space; 201 = a ready proposal job (kind `sheet_tasks`) + `skipped` (rows carried over before; all of them = 409). `GET /api/proposals/{id}` adds `sheet`, `list`, `sheet_rows` (`key, row_id, n, title, cell_title, due, notes, state: "" \| done \| gone \| empty`); apply `{select, edits: {"0": {title, due}}}` runs the table's rows -> tasks as the person (`created`, `skipped`), undo / redo = that batch |

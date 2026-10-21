@@ -134,7 +134,7 @@ check(j["created"]["tasks"] == 12 and j["created"]["lists"] == 1 and j["created"
       "preview: exact counts " + str(j.get("created")))
 check(count() == n0 and not lst("Haushalt") and not dbx("SELECT 1 FROM imports"), "preview: nothing written (tasks, lists, import records)")
 check(len(j["samples"]) == 8 and j["samples"][0]["title"] == "Müll rausbringen", "preview: sample rows")
-check(warn_has(j, "Date not understood") and warn_has(j, "Nested deeper than 3") and warn_has(j, "Headings without a checkbox")
+check(warn_has(j, "Date not understood") and not warn_has(j, "Nested deeper than") and warn_has(j, "Headings without a checkbox")
       and warn_has(j, "p1 (highest)"), "preview: warnings for what cannot be mapped")
 w = [x for x in j["warnings"] if "Date not understood" in x["text"]][0]
 check(w["examples"] == ["Kompost umsetzen"] and "irgendwann mal" in w["text"], "warning names the task and the text")
@@ -154,7 +154,8 @@ check(s_["due"] == oct15, "15. Okt -> the coming 15 October " + str(s_["due"]))
 check(s_["priority"] == 5 and tags(s_["id"]) == ["büro", "wichtig"], "PRIORITY 1 = p1 -> high (scale detected), two labels")
 be, ko, tief = task("Belege sammeln"), task("Kontoauszüge"), task("Sehr tief")
 check(be["parent_id"] == s_["id"] and ko["parent_id"] == be["id"], "INDENT 2 / 3 -> subtask / sub-subtask")
-check(tief["parent_id"] == be["id"], "INDENT 4 -> moved up below the level-2 task (at most 3 levels)")
+# 2.156.0 (#1949): five levels -> INDENT 4 stays on level 4 (the cap at level 6: tests/p2156_a_depth_test.py)
+check(tief["parent_id"] == ko["id"], "INDENT 4 -> level 4 below the sub-subtask (at most 5 levels)")
 check("quittung.pdf" in tief["content"] and "https://files.todoist.com/abc/quittung.pdf" in tief["content"] and "Bitte bis Freitag" in tief["content"],
       "note row -> comment in the notes, attachment as a link")
 check(not dbx("SELECT 1 FROM attachments"), "attachments are never downloaded")

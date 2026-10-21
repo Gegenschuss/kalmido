@@ -255,7 +255,7 @@
       counts: {done: live().filter(t => t.status !== 0).length, trash: DB.tasks.filter(t => t.deleted_at).length},
       settings: clone(DB.settings), notify: {},
       mine_hidden: [...(DB.mineHidden || [])],  // 2.41.0 (#1365)
-      ntfy_inbox: {enabled: false, server: '', topic: ''}, ntfy_url: '', webpush: {devices: 0, enabled: false, key: ''},
+      ntfy_inbox: {enabled: false, server: '', topic: ''}, ntfy_url: '', max_depth: 5, /* 2.156.0 A (#1949) */ webpush: {devices: 0, enabled: false, key: ''},
       languages: [{beta: false, code: 'de', name: 'Deutsch'}, {beta: false, code: 'en', name: 'English'}, {beta: true, code: 'es', name: 'Español'},
         {beta: true, code: 'fr', name: 'Français'}, {beta: true, code: 'it', name: 'Italiano'}, {beta: true, code: 'nl', name: 'Nederlands'}],
       news: {unread: 0, sig: '0'}, avatars: {[AGENT]: 'static/avatars/robot.svg'}, templates: [],
