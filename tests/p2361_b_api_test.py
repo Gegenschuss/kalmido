@@ -152,7 +152,7 @@ check(r.ok and [p["code"] for p in r.json()["packs"]] == ["DE", "XX"], "packs: D
 r = A.get(B + O + "/packs/DE")
 check(r.ok and r.json()["pack"]["labels"]["en"]["rights_time"] == "Duration of License" and r.json()["pack"]["labels"]["de"]["rights"] == "Rechteübertragung", "packs: DE labels")
 check(r.json()["pack"]["texts"]["vat_note"]["de"] == "Alle Preise zuzüglich 7 % bzw. 19 % MwSt." and r.json()["pack"]["einvoice"]["status"] == "ready", "packs: vat note + e-invoice ready (2.38.0)")
-check(A.get(B + O + "/packs/XX").status_code == 404 and A.get(B + O + "/packs/..").status_code == 404, "packs: unknown -> 404")
+check(A.get(B + O + "/packs/ZZ").status_code == 404 and A.get(B + O + "/packs/..").status_code == 404, "packs: unknown -> 404")
 r = A.post(B + O + "/packs/validate", json={"pack": A.get(B + O + "/packs/DE").json()["pack"]})
 check(r.ok and r.json()["problems"] == [], "validator: the DE pack is valid " + r.text[:100])
 bad = json.loads(json.dumps(A.get(B + O + "/packs/DE").json()["pack"]))
@@ -178,7 +178,7 @@ check(S1["company"]["name"] == "Studio Nordlicht GmbH" and S1["company"]["lines"
 check(S1["color"] == "#2f5d8a" and S1["lang"] == "en" and S1["fx_usd"] == 1.12 and S1["producing_rate"] == 650.5 and S1["raw_factor"] == 0.25 and S1["offer_valid_days"] == 21, "settings: colour lower-cased, decimals with a comma " + json.dumps(S1)[:300])
 check(S1["rights_default"] == {"time_id": RT["id"], "territory_id": RR["id"], "media_id": RM["id"]}, "settings: default rights")
 for body, what in (({"color": "blue"}, "colour"), ({"lang": "fr"}, "language"), ({"currency": "CHF"}, "currency"), ({"fx_usd": "abc"}, "rate"), ({"offer_scheme": "KVA-{yyyy}"}, "scheme without {seq}"),
-                   ({"offer_scheme": "KVA-{foo}"}, "unknown placeholder"), ({"offer_scheme": "<b>{seq}</b>"}, "markup in the scheme"), ({"pack": "XX"}, "unknown pack"), ({"producing_service_id": 999999}, "foreign service"), ({"rights_default": {"time_id": 999999}}, "foreign text")):
+                   ({"offer_scheme": "KVA-{foo}"}, "unknown placeholder"), ({"offer_scheme": "<b>{seq}</b>"}, "markup in the scheme"), ({"pack": "ZZ"}, "unknown pack"), ({"producing_service_id": 999999}, "foreign service"), ({"rights_default": {"time_id": 999999}}, "foreign text")):
     r = A.put(B + O + "/settings", json=body)
     check(r.status_code == 400, f"settings: {what} -> 400 " + str(r.status_code))
 check(A.get(B + O + "/settings").json()["settings"]["color"] == "#2f5d8a", "settings: nothing changed by the bad ones")

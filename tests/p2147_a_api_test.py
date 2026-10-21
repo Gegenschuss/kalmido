@@ -239,7 +239,8 @@ check(A.get(B + X).status_code == 404, "export: switched off -> 404")
 A.put(B + O + "/settings", json={"features_off": []})
 
 # ---------------------------------------------------------------- agents see the functions
-check(A.patch(B + f"{O}/agents/{AG}", json={"office_drafts": True}).ok, "agents: the area's admin lets the agent into the office")
+check(A.patch(B + f"{O}/agents/{AG}", json={"office_drafts": True}).ok and A.put(B + O + "/settings", json={"agents_read": 1}).ok,
+      "agents: the area's admin lets the agent into the office (both switches)")
 A.put(B + O + "/settings", json={"features_off": ["books.datev"]})
 r = requests.get(B + "/api/v1/office", headers=AH)
 check(r.ok and r.json().get("country_pack") == "DE" and r.json().get("features", {}).get("books.datev") is False
@@ -248,11 +249,14 @@ A.put(B + O + "/settings", json={"features_off": []})
 
 # ---------------------------------------------------------------- P4: a person without an organisation
 j = Er.get(B + O + "/settings").json()
-check(j.get("personal") is True and j.get("pack_choose") is True and j.get("role") == "admin", "P4: the own office asks its owner for the country")
+check(j.get("personal") in (1, True) and j.get("pack_choose") is True and j.get("role") == "admin",
+      f"P4: the own office asks its owner for the country ({j.get('personal')}, {j.get('pack_choose')}, {j.get('role')}, {j.get('error')})")
 r = Er.put(B + O + "/settings", json={"pack": "XX", "company": {"name": "Erin Design"},
                                       "company_fields": {"name": "Erin Design", "street": "Rue 1", "zip": "1000", "city": "Bruxelles",
                                                          "vat_id": "BE0999999999", "iban": "BE68539007547034"}})
 check(r.ok and Er.get(B + O + "/settings").json().get("pack_choose") is False, "P4: the base pack chosen in the personal office " + r.text[:120])
+keys = {x["key"] for x in Er.get(B + O + "/texts").json().get("items", []) if x.get("kind") == "rights_territory"}
+check(keys == {"world", "region", "national"}, f"#2462: the first choice swaps the unchanged DE text blocks for the base pack's ({keys})")
 check(Er.put(B + O + "/settings", json={"features_off": ["books.export_csv"]}).ok and Er.put(B + O + "/settings", json={"features_off": []}).ok,
       "P4: the owner switches functions of the personal office")
 EC = Er.post(B + "/api/clients", json={"name": "Client SA", "street": "Avenue 2", "zip": "1050", "city": "Bruxelles", "country": "BE"}).json()["id"]
