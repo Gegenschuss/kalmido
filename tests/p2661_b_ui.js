@@ -30,6 +30,7 @@ const WS_VIEWS = {
   'static/js/office.js': 'check:office',      // office: pb_wsChanged (its tabs compare OFC.info.org_id)
   'static/js/clientpage.js': 'check:office',  // clients: MSC.ws, part of the office check (same area)
   'static/js/calendar.js': 'check:calendar',  // appointments: own calendars filtered by wsObjIn while drawing
+                                              // 2.161.0: + the hook 'calteam' (the colleagues' absences, see abscal.py)
   'static/js/calevents.js': 'draw',           // the calendars one may write into (dialogs)
   'static/js/contacts.js': 'check:contacts',  // contacts: address books filtered by wsObjIn while drawing
   'static/js/render.js': 'draw',              // lists, tasks, News (checked in p2280_ui)
@@ -62,6 +63,9 @@ const WS_VIEWS = {
   'kalmido/hub/absence.py': 'check:absences', // abs_org: the area of the saved setting; absences and disposition load again
                                               // with the state that follows the saved setting (core.js)
   'kalmido/office/model.py': 'check:office',  // office_org: the saved setting
+  'kalmido/hub/abscal.py': 'check:calteam',   // 2.155.0 B (#2076): the colleagues' absences in the calendar for the saved
+                                              // workspace (abc_team_orgs); calendar.js reloads the range once the server knows it
+  'static/js/sideviews.js': 'draw',           // #2186 (bundle C): the sidebar views' editor lists the lists of the shown workspace (inWs while drawing)
   'kalmido/personal/timesheet.py': 'helper',  // 2.125.0 (#2119): tsl_org - which organisation a closed month goes to (no view)
   'kalmido/accounts/orgs.py': 'helper',       // 2.148.1 (#2480): ws_chosen_org - the default workspace of a new list (no view)
 };
@@ -127,6 +131,16 @@ function scan() {
   const in2 = dstr(new Date(Date.now() + 2 * 864e5));
   await call('POST', '/api/team/absences', {kind: 'vacation', start_date: in2, end_date: in2, note: 'Away for Alpha', org: A});
   await call('POST', '/api/team/absences', {kind: 'vacation', start_date: in2, end_date: in2, note: 'Away for Bravo', org: Bo});
+  // 2.161.0 (#2076): a colleague in each organisation, an absence each that alice (their admin) enters; alice shows the team's
+  const mate = async (name, oid) => {
+    const id = (await call('POST', '/api/users', {username: name, display_name: name[0].toUpperCase() + name.slice(1), password: 'password123', email: name + '@example.com'})).id;
+    await call('PUT', `/api/orgs/${oid}/members`, {user_id: id});
+    const ck = await login(name); await call('POST', `/api/orgs/${oid}/join`, null, ck);
+    const ab = await call('POST', '/api/team/absences', {user_id: id, kind: 'vacation', start_date: t, end_date: t, org: oid});
+    return id > 0 && ab.http === 201;
+  };
+  check(await mate('cleo', A) && await mate('dirk', Bo), 'a colleague with an absence in Alpha and one in Bravo');
+  await call('PATCH', '/api/settings', {cal_abs_team: '1'});
 
   const w = await boot({user: 'alice', hash: 'docs'}); const d = w.document;
   const view = () => d.querySelector('#view')?.textContent || '';
@@ -180,6 +194,14 @@ function scan() {
   await sw('private');
   check(await until(has(['Private dentist'], ['Alpha standup']), 60), 'calendar: Alpha -> Private shows Private\'s appointment');
   CHECKED.add('calendar');
+  // 2.161.0 (#2076): the colleagues' absences follow the switch without opening the calendar again
+  await sw(WA);
+  check(await until(has(['Cleo: away'], ['Dirk: away']), 60), 'calendar: -> Alpha shows the absence of Alpha\'s colleague: ' + view().slice(0, 300));
+  await sw(WB);
+  check(await until(has(['Dirk: away'], ['Cleo: away']), 60), 'calendar: Alpha -> Bravo shows the absence of Bravo\'s colleague');
+  await sw('private');
+  check(await until(has([], ['Cleo: away', 'Dirk: away']), 60), 'calendar: Bravo -> Private shows no colleague\'s absence');
+  CHECKED.add('calteam');
 
   // ================= contacts
   w.eval(`go('contacts')`);
