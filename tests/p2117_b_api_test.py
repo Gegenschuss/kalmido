@@ -112,7 +112,8 @@ CL = A.post(B + "/api/clients", json={"name": "Kunde Eins GmbH", "street": "Kund
 # ================================================================ #2283: samples
 st = A.get(B + TP + "/starters").json()
 keys = [x["key"] for x in st["starters"]]
-check(keys == ["contract", "confirmation", "nda"] + LETTERS, f"#2283: ten samples in order {keys}")
+# 2.154.0 (#2192): the three data protection sheets follow the letters
+check(keys == ["contract", "confirmation", "nda"] + LETTERS + ["privacy_dpa", "privacy_info", "privacy_consent"], f"#2283: the samples in order {keys}")
 check(st["lang"] == "de" and all(x["lang"] == "de" and x["name"] and x["body"] for x in st["starters"]), "#2283: German in a German office")
 names = {x["key"]: x["name"] for x in st["starters"]}
 check(names["reminder"] == "Zahlungserinnerung" and names["dunning"] == "Mahnung" and names["authority"] == "Vollmacht"
@@ -237,7 +238,7 @@ check(sql("SELECT COUNT(*) FROM office_contract_files WHERE contract_id=?", (C2,
 # ================================================================ a person without organisation (freelancer-matrix: office)
 FID, Fr = freelancer(B, A)
 st = Fr.get(B + TP + "/starters").json()
-check(len(st["starters"]) == 10, "freelancer: the samples in the personal office")
+check(len(st["starters"]) == 13, "freelancer: the samples in the personal office")  # 2.154.0 (#2192): + three data protection sheets
 r = Fr.post(B + TP, json={"starter": "credit"})
 check(r.status_code == 201 and r.json()["kind"] == "other", "freelancer: use sample " + r.text[:200])
 check([t["id"] for t in Fr.get(B + TP).json()["templates"]] == [r.json()["id"]], "freelancer: only the own template")

@@ -7220,6 +7220,14 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 /* 2.66.0 B (#1835): the merges in a client's card (Undo next to the line) */
 .clmhist .ctlinks li{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;min-height:2.75rem}
 .clmhist .ctlinks li>span{flex:1 1 12rem;overflow-wrap:anywhere}
+/* 2.154.0 C (#2192): data protection sheets in the client card, the filter of the client list */
+.dsbsec .ctlinks li{display:flex;align-items:center;gap:.5rem;min-height:2.75rem}
+.dsbsec .ctlinks .iconbtn{margin-left:auto}
+.dsb-st{border:1px solid currentColor;border-radius:.375rem}
+.dsb-st-signed,.dsb-st-handed{color:var(--accent)}
+.dsb-st-declined{color:var(--danger)}
+.dsb-rev{border-style:dashed}
+.dsbflt{max-width:12rem}
 /* 2.66.0 A (#1835) contacts: the merge history on a contact's card (one line per merge, Undo while possible) */
 .ctmsec .ctmrow{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
 .ctmsec .ctmrow>span{min-width:0;overflow-wrap:anywhere}

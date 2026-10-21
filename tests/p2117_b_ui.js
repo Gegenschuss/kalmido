@@ -64,7 +64,7 @@ const PDF = '%PDF-1.4\\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Typ
     await ev(`(() => { document.querySelector('[data-dt="tnew"]').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.modal [data-m="starters"]')`), '#2283: the new template dialog offers "Start from a sample"');
     await ev(`(() => { document.querySelector('.modal [data-m="starters"]').click(); return 1; })()`);
-    check(await ready(ev, `document.querySelectorAll('.modal .dtp-starters li').length === 10 && !document.querySelector('#dt-tbody')`), '#2283: ten samples instead of the empty dialog');
+    check(await ready(ev, `document.querySelectorAll('.modal .dtp-starters li').length === 13 && !document.querySelector('#dt-tbody')`), '#2283: the samples instead of the empty dialog');  // 2.154.0 (#2192): 13 with the data protection sheets
     check(await ev(`(() => { const li = [...document.querySelectorAll('.modal .dtp-starters li')]; const t = k => li.find(x => x.querySelector('[data-k="' + k + '"]'))?.textContent || ''; return /Legal text/.test(t('dunning')) && /Legal text/.test(t('authority')) && !/Legal text/.test(t('letter')); })()`),
       '#2283: legal samples are marked');
     await shot('p2117-b-samples.png');
@@ -123,7 +123,7 @@ const PDF = '%PDF-1.4\\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Typ
     check(await ev(`document.querySelectorAll('.modal .dma-f').length === 1 && !!document.querySelector('.modal [data-dma="rm"]')`), 'freelancer: the file with its buttons (own admin)');
     await ev(`(() => { document.querySelector('.modal [data-m="close"]').click(); return 1; })()`);
     const st = await ev(api('GET', '/api/office/doc-templates/starters'));
-    check(st.starters?.length === 10, 'freelancer: the samples');
+    check(st.starters?.length === 13, 'freelancer: the samples');  // 2.154.0 (#2192): + three data protection sheets
   }, false);
 
   console.log(`p2117_b_ui: ${ok} ok, ${F.length} failed`);
