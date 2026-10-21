@@ -2,7 +2,8 @@
 """2.149.0 API tests, part B: measuring (#2504), static files without a session (#2505), the service worker's hash
 manifest (#2506). Own container (start.sh) with KALMIDO_SLOW_REQUEST_MS=1, so every request counts as slow.
 freelancer-matrix: public
- - #2504: every answer carries Server-Timing (app;dur, db;dur;desc="n=..."); a signed-in /api/state counts statements; the
+ - #2504: every signed-in answer carries Server-Timing (app;dur, db;dur;desc="n=..."), none without signing in (2.149.0
+   review); a signed-in /api/state counts statements; the
    slow log line names method + route pattern only (no query string, no id, no user name); GET /api/admin/health has
    p50 / p95 / max of the last requests for the instance admin, 403 for a person without an organisation
  - #2505: a static file costs no database statement, with a valid, a wrong or no session cookie; it is served without
@@ -68,7 +69,9 @@ check(t is not None and t[2] > 0 and t[1] > 0 and t[0] >= t[1], f"#2504: stateme
 r = Fr.get(B + "/api/state")
 check(r.ok and (timing(r) or (0, 0, 0))[2] > 0, f"#2504: also for a person without an organisation {r.headers.get('Server-Timing')!r}")
 r = anon.get(B + "/api/health")
-check(r.ok and timing(r) is not None, "#2504: an answer without signing in carries it too")
+# 2.149.0 review (#2504): Server-Timing only for signed-in requests (statement counts on login / password reset leaked
+# whether an account exists), so an answer without signing in carries none
+check(r.ok and "Server-Timing" not in r.headers, f"#2504: an answer without signing in carries no Server-Timing {r.headers.get('Server-Timing')!r}")
 r = A.get(B + "/api/nope-does-not-exist")
 check(timing(r) is not None, f"#2504: an error answer carries it too ({r.status_code})")
 for i in range(5):
@@ -103,7 +106,9 @@ bad = requests.Session()
 bad.cookies.set("kalmido_session", "not-a-session")
 for p in ("/static/js/core.js", "/sw.js", "/robots.txt", "/sw-manifest.json"):
     r = bad.get(B + p)
-    check(r.ok and (timing(r) or (0, 0, 1))[2] == 0, f"#2505: {p} with a wrong cookie: served, no statement {r.status_code} {r.headers.get('Server-Timing')!r}")
+    t = timing(r)
+    # 2.149.0 review (#2504): a wrong cookie is no sign-in, and static files skip the session: header absent or n=0
+    check(r.ok and (t is None or t[2] == 0), f"#2505: {p} with a wrong cookie: served, no statement {r.status_code} {r.headers.get('Server-Timing')!r}")
 r = anon.get(B + "/manifest.json")
 check(r.ok, "the app manifest still answers without signing in")
 r = anon.get(B + "/api/state")
