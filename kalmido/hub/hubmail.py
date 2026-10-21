@@ -116,7 +116,8 @@ def hbm_node_mail_ids(c, uid):
     from ..team.clients import client_rows
     cids = [int(r["id"]) for r in client_rows(c, uid)]
     cl = f" OR (m.list_id IS NULL AND m.client_id IN ({','.join(map(str, cids))}))" if cids else ""
-    rows = c.execute(f"""SELECT m.* FROM hub_mails m WHERE (m.eml_id IS NOT NULL OR m.folder_id IS NOT NULL)
+    # 2.148.1 G (#2488): only the columns hbm_can reads (no bodies on every file view)
+    rows = c.execute(f"""SELECT m.id, m.list_id, m.client_id, m.owner_id, m.org_id FROM hub_mails m WHERE (m.eml_id IS NOT NULL OR m.folder_id IS NOT NULL)
                          AND (m.list_id IN {vis_sql()} OR (m.list_id IS NULL AND m.client_id IS NULL AND m.owner_id=?){cl})""",
                      (uid, uid, uid)).fetchall()
     roles, out = {}, set()

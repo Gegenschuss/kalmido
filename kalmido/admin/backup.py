@@ -241,8 +241,9 @@ def _dir_size(d):
     return n
 
 
-def bk_outside(base, prefix):
-    """2.148.1 C (#2482): {top folder: n} of the regular files below base that BK_MEMBER_RE does not cover (names never)."""
+def bk_outside(base, prefix, listed):
+    """2.148.1 C (#2482): {top folder: n} of the regular files below base that the archive does not bring (names never).
+    2.148.1 G (#2482): judged by the archive's own file list, so an archive of an older version keeps the old folder."""
     out = {}
     if not os.path.isdir(base):
         return out
@@ -251,7 +252,7 @@ def bk_outside(base, prefix):
         for fn in fns:
             full = os.path.join(root, fn)
             rel = prefix + os.path.relpath(full, base).replace(os.sep, "/")
-            if os.path.islink(full) or not os.path.isfile(full) or BK_MEMBER_RE.fullmatch(rel):
+            if os.path.islink(full) or not os.path.isfile(full) or rel in listed:
                 continue
             if prefix == "office/" and fn.endswith((".tmp", ".part")):
                 continue
@@ -1191,7 +1192,7 @@ def bk_restore(path, pw, admin, via):
                 os.rename(off_old, OFFICE_DIR)
             raise
         for old, prefix in ((att_old, "attachments/"), (off_old, "office/")):  # 2.148.1 C (#2482): files outside the archive
-            left = bk_outside(old, prefix)  # format stay in the folder of before (never deleted unseen)
+            left = bk_outside(old, prefix, man["_listed"])  # format stay in the folder of before (never deleted unseen)
             if left:
                 print(f"restore: kept {os.path.basename(old)}: files the backup format does not cover:", json.dumps(left, sort_keys=True), flush=True)
             else:

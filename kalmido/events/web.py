@@ -72,7 +72,8 @@ def op_cal_delete(c, uid, cid):
     c.execute("DELETE FROM ev_cals WHERE id=?", (cid,))
     bump(c)
     c.commit()
-    evi_send(mails)
+    if not _by_agent():  # 2.148.1 G (#2495): no cancellation mails through an agent's change
+        evi_send(mails)
 
 
 def op_member_set(c, uid, cid, b):

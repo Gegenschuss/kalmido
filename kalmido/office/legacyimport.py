@@ -77,7 +77,8 @@ def _xml(z, name, budget):
     if budget[0] > FI_XLSX_UNZIPPED_MAX:
         raise BadInput(tr("The file is too large"))
     data = z.read(name)
-    if b"<!DOCTYPE" in data[:4096].upper() or b"<!ENTITY" in data.upper():  # no entity tricks in a spreadsheet
+    if b"<!DOCTYPE" in data[:4096].upper() or b"<!ENTITY" in data.upper() \
+            or data[:2] in (b"\xff\xfe", b"\xfe\xff") or b"\x00" in data[:4]:  # no entity tricks; 2.148.1 G (#2496): single-byte encodings only
         raise BadInput(tr("This is not a spreadsheet file (.xlsx)"))
     return ET.fromstring(data)
 

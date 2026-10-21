@@ -17,6 +17,7 @@ usage: p21481_d_api_test.py <datadir>      (P21481D_NOSTART=1: a running server 
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -167,6 +168,15 @@ r = Fr.post(B + "/api/office/legacy/preview", files={"file": ("old.xlsx", encryp
 check(r.status_code == 400, f"an encrypted .xlsx: 400 {r.status_code} {r.text[:160]}")
 r = Fr.post(B + "/api/office/legacy/preview", files={"file": ("old.xlsx", book("A1:A2"), "application/octet-stream")})
 check(r.ok, f"a normal file still reads {r.status_code} {r.text[:160]}")
+# 2.148.1 G (#2496): a part in a two-byte encoding is refused (legacy import and table import)
+z16 = zipfile.ZipFile(io.BytesIO(book("A1:A2")))
+w16 = {n: z16.read(n) for n in z16.namelist()}
+w16["xl/workbook.xml"] = w16["xl/workbook.xml"].decode().replace('<?xml version="1.0"?>', '<?xml version="1.0" encoding="UTF-16"?>').encode("utf-16")
+w16 = xlsx(w16)
+r = Fr.post(B + "/api/office/legacy/preview", files={"file": ("old.xlsx", w16, "application/octet-stream")})
+check(r.status_code == 400, f"legacy import: a two-byte encoded part 400 {r.status_code} {r.text[:160]}")
+r = Fr.post(B + "/api/sheets/import", files={"file": ("w16.xlsx", w16, "application/octet-stream")}, data={"space": "private"})
+check(r.status_code == 400, f"table import: a two-byte encoded part 400 {r.status_code} {r.text[:160]}")
 
 # sheets (the test server: range budget 50 cells, at most 25 stored cells per table)
 r = Fr.post(B + "/api/sheets", json={"title": "Budget", "space": "private"})
@@ -186,16 +196,71 @@ cells = {x["addr"]: x for x in Fr.get(B + f"/api/sheets/{SH}").json()["cells"]}
 check(cells.get("B1", {}).get("value") == 55 and not cells["B1"].get("error"), f"a sum within the budget: 55 {cells.get('B1')}")
 r = put(Fr, [(f"B{i}", "=SUM(A1:A10)") for i in range(2, 11)])
 check(r.ok, "nine more sums " + r.text[:160])
+# 2.148.1 G (#2485): the same range in every row counts once per evaluation
+cells = {x["addr"]: x for x in Fr.get(B + f"/api/sheets/{SH}").json()["cells"]}
+check(all(cells.get(f"B{i}", {}).get("value") == 55 for i in range(1, 11)), f"the same range in ten rows fits the budget {[cells.get(f'B{i}', {}).get('value') for i in range(1, 11)]}")
+r = put(Fr, [(f"B{i}", f"=SUM(A1:A{i})") for i in range(2, 11)])
+check(r.ok, "nine running totals " + r.text[:160])
 cells = {x["addr"]: x for x in Fr.get(B + f"/api/sheets/{SH}").json()["cells"]}
 errs = [a for a, x in cells.items() if x.get("error") == "type"]
 check(errs and all(cells[a].get("error_text") for a in errs), f"over the range budget: an error value with a text {errs}")
 r = put(Fr, [(f"C{i}", "x") for i in range(1, 11)])
 check(r.status_code == 400 and "table is full" in r.text, f"over the cell cap of the table: 400 {r.status_code} {r.text[:160]}")
 check(put(Fr, [("A1", "7")]).ok, "changing a stored cell still works when full")
+r = Fr.post(B + f"/api/sheets/{SH}/tabs", json={"copy_of": SH})  # 2.148.1 G (#2485)
+check(r.status_code == 400 and "table is full" in r.text, f"a sheet copy over the cell cap of the table: 400 {r.status_code} {r.text[:160]}")
 # an .xlsx import of a sparse sheet (one cell far right, one far down) works
 sparse = '<row r="1"><c r="A1"><v>1</v></c></row><row r="40"><c r="H40"><v>2</v></c></row>'
 r = Fr.post(B + "/api/sheets/import", files={"file": ("sparse.xlsx", book("A1:A1", sparse), "application/octet-stream")}, data={"space": "private"})
 check(r.status_code == 201, f"a sparse .xlsx imports {r.status_code} {r.text[:200]}")
+
+# 2.148.1 G (#2485): a mail over the size cap is marked seen and skipped (never fetched), also without a workspace cap
+code = """
+from kalmido.integrations import mail as m
+class M:
+    def __init__(s): s.fetched, s.seen = [], []
+    def read(s, n): return b""
+    def select(s, f): return "OK", [b"1"]
+    def uid(s, cmd, *a):
+        if cmd == "SEARCH": return "OK", [b"7"]
+        if cmd == "FETCH" and a[1] == "(RFC822.SIZE)": return "OK", [b"7 (UID 7 RFC822.SIZE 99999999999)"]
+        if cmd == "FETCH": s.fetched.append(a[0]); return "OK", []
+        if cmd == "STORE": s.seen.append(a[0]); return "OK", []
+x = M()
+print(m.mail_fetch(x, "INBOX", lambda c, raw: True), len(x.fetched), len(x.seen))
+"""
+r = subprocess.run(["docker", "exec", "-i", CT, "python", "-c", code], capture_output=True, text=True, timeout=120)
+check(r.stdout.strip().splitlines()[-1:] == ["0 0 1"], f"mail fetch: a too large mail is skipped and marked seen {r.stdout[-120:]} {r.stderr[-300:]}")
+
+# 2.148.1 G (#2485): a slowly answering bookmark server ends at the sync's deadline
+code = """
+import socket, threading, time, urllib.request
+from kalmido.life import karakeep as kk
+from kalmido.calendars import subscriptions as sub
+srv = socket.socket(); srv.bind(("127.0.0.1", 0)); srv.listen(1)
+def slow():
+    s, _ = srv.accept(); s.recv(4096)
+    s.sendall(b"HTTP/1.1 200 OK\\r\\nContent-Type: application/json\\r\\nContent-Length: 100000\\r\\n\\r\\n")
+    for _ in range(40):
+        time.sleep(0.25)
+        try: s.sendall(b" ")
+        except OSError: break
+    s.close()
+threading.Thread(target=slow, daemon=True).start()
+kk.unseal = lambda *a: "key"
+sub.cal_allow = lambda c: None
+sub._cal_opener = lambda allow: urllib.request.build_opener()
+kk._KK_END.t = time.monotonic() + 1.5
+t0 = time.monotonic()
+try:
+    kk.kk_req(None, {"user_id": 1, "token": "x", "url": "http://127.0.0.1:%d" % srv.getsockname()[1]}, "/bookmarks")
+    print("answer", round(time.monotonic() - t0, 1))
+except kk.KkError as e:
+    print("stopped", round(time.monotonic() - t0, 1))
+"""
+r = subprocess.run(["docker", "exec", "-i", CT, "python", "-c", code], capture_output=True, text=True, timeout=120)
+last = (r.stdout.strip().splitlines() or [""])[-1].split()
+check(last[:1] == ["stopped"] and float(last[1]) < 5, f"bookmark sync: a slow server stops at the deadline {r.stdout[-120:]} {r.stderr[-300:]}")
 
 # ================================================================== #2488 filed mail files
 r = A.post(B + "/api/files/folders", json={"name": "E-Mails", "space": f"org:{ORG}"})
@@ -219,6 +284,26 @@ check(EML not in kids and PLAIN in kids, f"... not in the listing, the other fil
 check(Bo.get(B + f"/api/files/nodes/{EML}").status_code == 404, "a member with folder access: 404")
 check(Ca.get(B + f"/api/files/nodes/{EML}").ok, "the mail's recipient reads it")
 check(Ca.get(B + f"/api/files/nodes/{EML}/content").ok, "... and downloads it")
+# 2.148.1 G (#2488): an external link of the folder follows the same rule (its creator's rights)
+r = A.post(B + f"/api/files/nodes/{FOLD}/ext-links", json={})
+check(r.ok and r.json().get("links"), "an external link of the folder " + r.text[:160])
+XP = re.sub(r"^https?://[^/]+", "", r.json()["links"][0]["url"]) if r.ok else "/s/f/x"
+page = requests.get(B + XP, timeout=30).text
+check("mail.eml" not in page and "plain.txt" in page, "external folder link: the filed mail is not listed, the other file is")
+r = requests.get(B + XP + f"/d/{EML}", timeout=30, allow_redirects=False)
+check(r.status_code != 200 and b"hello" not in r.content, f"external folder link: no download of the filed mail {r.status_code}")
+check(requests.get(B + XP + f"/d/{PLAIN}", timeout=30).content == b"just a file", "external folder link: the other file downloads")
+
+# 2.148.1 G (#2488): a sent mail's filed .eml follows the same rule
+CL = Ca.post(B + "/api/lists", json={"name": "Carol project", "org_id": ORG, "kind": "project"}).json()["id"]
+r = Ca.post(B + "/api/hubmail/send", json={"list_id": CL, "to": "client@example.com", "subject": "Project news", "text": "Launch."})
+check(r.status_code == 201, f"carol sends a project mail {r.status_code} {r.text[:200]}")
+OM = (r.json().get("mail") or {}).get("id") if r.status_code == 201 else None
+row = dbx("SELECT eml_id, folder_id FROM hub_mails WHERE id=?", (OM,)) if OM else []
+OEML = row[0][0] if row else None
+check(OEML and dbx("SELECT hub_mail_id FROM fs_nodes WHERE id=?", (OEML,))[0][0] == OM, f"the sent mail's .eml is marked {row}")
+check(OEML and Bo.get(B + f"/api/files/nodes/{OEML}").status_code == 404, "a member without the project: the sent .eml 404")
+check(OEML and Ca.get(B + f"/api/files/nodes/{OEML}").ok, "the sender reads it")
 
 # ================================================================== #2489 assistant: own lists only
 AL = A.post(B + "/api/lists", json={"name": "Alice work", "org_id": ORG}).json()["id"]
@@ -255,6 +340,19 @@ r = A.post(B + "/api/events", json={"title": "Alice meeting", "start": f"{D}T12:
 E2 = r.json().get("id")
 check(len(wait_mail("guest2@example.com", 1)) == 1, "a person invites: one mail")
 check(A.delete(B + f"/api/events/{E2}").ok and len(wait_mail("guest2@example.com", 2)) == 2, "a person deletes: the cancellation goes out")
+# 2.148.1 G (#2495): an agent deleting its calendar sends no cancellations either
+r = requests.post(V + "/event-calendars", headers=AGH, json={"name": "Agent calendar", "org_id": ORG})
+check(r.status_code == 201, "the agent makes a calendar " + r.text[:160])
+ACAL = r.json().get("id")
+r = requests.put(V + f"/event-calendars/{ACAL}/members/{ALICE}", headers=AGH, json={"role": "edit"})
+check(r.ok, "... shares it with alice " + r.text[:160])
+r = A.post(B + "/api/events", json={"cal_id": ACAL, "title": "Shared meeting", "start": f"{D}T14:00", "end": f"{D}T15:00", "tz": "Europe/Berlin",
+                                    "send_invites": True, "attendees": [{"email": "guest3@example.com", "name": "Guest Three"}]})
+check(r.status_code == 201 and len(wait_mail("guest3@example.com", 1)) == 1, "alice invites a guest into it: one mail " + r.text[:160])
+r = requests.delete(V + f"/event-calendars/{ACAL}", headers=AGH)
+check(r.status_code == 204, "the agent deletes the calendar " + r.text[:160])
+time.sleep(1.5)
+check(len(mails("guest3@example.com")) == 1, f"no cancellation through the agent {len(mails('guest3@example.com'))}")
 
 # forms: public = approval, internal private form of a freelancer, trash
 r = requests.post(V + "/lists", headers=AGH, json={"name": "Agent intake"})

@@ -249,6 +249,14 @@ g0 = pub.get(f"{B}/s/b/alice-termine/{T1}/{K}T0800")
 r = pub.post(f"{B}/s/b/alice-termine/{T1}/{K}T0800", data={"f": fkey(g0.text), "name": "X Y", "email": "x@example.com"}, headers={"Sec-Fetch-Site": "cross-site"},
              allow_redirects=False)
 check(r.status_code == 403, "a cross-site post: 403")
+# 2.148.1 G (#2485): a booking refused at the address's daily limit does not use up the page's own mail quota
+from datetime import datetime as _dt, timezone as _tz
+_day = _dt.now(_tz.utc).strftime("%Y-%m-%d")
+dbx("INSERT INTO mail_counts(k,day,n) VALUES('r:full@example.com',?,99) ON CONFLICT(k) DO UPDATE SET n=99, day=excluded.day", (_day,))
+_q = lambda: (dbx("SELECT n FROM mail_counts WHERE k=? AND day=?", (f"apb:{ALICE}", _day)) or [(0,)])[0][0]
+q0 = _q()
+r = book("alice-termine", T1, f"{K}T0800", "Kunde Voll", "full@example.com")
+check(r.status_code == 429 and _q() == q0, f"address at its daily limit: 429, the page quota unchanged {r.status_code} {q0} {_q()}")
 
 # confirming
 r = pub.get(f"{B}/s/b/c/{TOK1}")

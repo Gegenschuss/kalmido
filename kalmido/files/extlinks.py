@@ -190,6 +190,10 @@ def xl_in_tree(c, link, nid):
     if any(r["deleted_at"] or r["agent_id"] or r["kind"] not in ("file", "folder") or (r["org_id"] or None) != (link["org_id"] or None)
            for r in part):
         return None
+    if any(r["hub_mail_id"] for r in part):  # 2.148.1 G (#2488): filed mail only for who may read the mail (the link's creator)
+        from ..hub.hubmail import hbm_node_ok
+        if any(r["hub_mail_id"] and not hbm_node_ok(c, link["created_by"], r["hub_mail_id"]) for r in part):
+            return None
     return part
 
 
@@ -281,10 +285,12 @@ def xl_render(c, link, chain, token, lg, cur):
                 f'<p class="xl-act"><a class="xl-btn" href="{base}/d/{root["id"]}" download rel="nofollow">{e(tr("Download", lg=lg))}</a></p>')
         return pub_html(f"{root['name']} · {APP_NAME}", main, lg)
     folder = cur[0]
-    rows = c.execute("""SELECT id, kind, name, size, mime FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL AND agent_id IS NULL
+    rows = c.execute("""SELECT id, kind, name, size, mime, hub_mail_id FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL AND agent_id IS NULL
                         AND kind IN ('folder', 'file') AND (org_id=? OR (? IS NULL AND org_id IS NULL))
                         ORDER BY kind='file', lower(name), id LIMIT ?""",
                      (folder["id"], link["org_id"], link["org_id"], XL_LIST_MAX + 1)).fetchall()
+    from .store import fs_mail_rows  # 2.148.1 G (#2488): the same rule for filed mail as in the app
+    rows = fs_mail_rows(c, link["created_by"], rows)
     more = len(rows) > XL_LIST_MAX
     rows = rows[:XL_LIST_MAX]
     from .upsafe import up_marks

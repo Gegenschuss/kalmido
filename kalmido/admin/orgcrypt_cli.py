@@ -151,6 +151,8 @@ def fields_pass(c, oid, enc, key, stop=None):
             with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
                 write_lock(c, "orgcrypt")
                 sql = f"SELECT {idc} AS rid, {col} AS v FROM {table} WHERE org_id=?"
+                if enc:  # 2.148.1 G (#2481): sealed / empty values need no pass (every start runs this)
+                    sql += f" AND {col} IS NOT NULL AND CAST({col} AS TEXT) NOT LIKE '{oc.PREFIX}%'"
                 args = [oid]
                 if last is not None:
                     sql += f" AND {idc} > ?"

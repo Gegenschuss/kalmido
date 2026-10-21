@@ -462,7 +462,10 @@ def form_send(token):
     name = re.sub(r"\s+", " ", vals["name"])[:FORM_NAME_MAX]
     olg = lang(c, f["l_owner"])
     sender = (g.user["display_name"] or g.user["username"]) if g.user else (name or tr("someone", lg=olg))
-    meta = tr("Sent with the form “{0}” by {1}", f["title"], sender, lg=olg) + (f" <{email}>" if email and not g.user else "")
+    # 2.148.1 G (#2496): the sender's name and address as plain Markdown text (like the answers)
+    from .formq import fq_md
+    shown = (f" <{email}>" if re.fullmatch(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+", email) else " · " + fq_md(email)) if email and not g.user else ""
+    meta = tr("Sent with the form “{0}” by {1}", f["title"], fq_md(sender), lg=olg) + shown
     if portal:
         meta += " · " + tr("the sender has a status link", lg=olg)
     if qs:  # 2.98.0 B (#1954): the title names the form and the sender, the answers as Markdown

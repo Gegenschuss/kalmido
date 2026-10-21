@@ -230,6 +230,10 @@ check(st.get(ORG, {}).get("fields", {}).get("enc") == 0 and st.get(ORG, {}).get(
 rc, out, err_ = cli("encrypt-all")
 check(rc == 0 and str(one("SELECT plate FROM office_vehicles WHERE id=?", (VID,))).startswith("kenc1:"),
       f"#2481: encrypt-all seals a value written while the encryption was off {rc} {out[-200:]} {err_[-300:]}")
+# 2.148.1 G (#2481): a second pass leaves sealed values as they are
+sealed = one("SELECT plate FROM office_vehicles WHERE id=?", (VID,))
+rc, out, err_ = cli("encrypt-all")
+check(rc == 0 and one("SELECT plate FROM office_vehicles WHERE id=?", (VID,)) == sealed, f"#2481: encrypt-all again: the sealed value unchanged {rc} {err_[-300:]}")
 rc, out, err_ = cli("rotate", "--org", str(ORG))
 check(rc == 0 and one("SELECT wrapped_rot FROM org_keys WHERE org_id=?", (ORG,)) is None, f"#2481: key renewal finished {rc} {out[-200:]} {err_[-400:]}")
 vs = A.get(B + O + "/vehicles").json().get("vehicles", [])
@@ -275,6 +279,18 @@ check(len(kept) == 1, f"#2482: the folder of before stays while it holds a file 
 code = "import os, sys, shutil\nbase = os.path.dirname(sys.argv[1].rstrip('/'))\nfor n in os.listdir(base):\n" \
        "    if '.pre-restore-' in n: shutil.rmtree(os.path.join(base, n))\n"
 subprocess.run(["docker", "exec", CT, "python", "-c", code, ATT], capture_output=True, text=True)
+# 2.148.1 G (#2482): a file of a known folder that the archive does not bring keeps the folder of before (older archives)
+NEWER = "tchat/7/after-backup.txt"
+code = "import os, sys\np = os.path.join(sys.argv[1], sys.argv[2]); os.makedirs(os.path.dirname(p), exist_ok=True); open(p, 'w').write('newer')\n"
+subprocess.run(["docker", "exec", CT, "python", "-c", code, ATT, NEWER], capture_output=True, text=True)
+r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
+check(r.ok and r.json().get("ok"), f"#2482: second restore {r.status_code} {r.text[:300]}")
+A = sess("alice")
+code = "import os, sys\nbase = os.path.dirname(sys.argv[1].rstrip('/')); pre = os.path.basename(sys.argv[1].rstrip('/')) + '.pre-restore-'\n" \
+       "print(sum(os.path.exists(os.path.join(base, n, sys.argv[2])) for n in os.listdir(base) if n.startswith(pre)))\n" \
+       "for n in os.listdir(base):\n    if n.startswith(pre): __import__('shutil').rmtree(os.path.join(base, n))\n"
+r = subprocess.run(["docker", "exec", CT, "python", "-c", code, ATT, NEWER], capture_output=True, text=True)
+check(r.stdout.strip() == "1", f"#2482: a file the archive does not list stays in the folder of before {r.stdout[-100:]} {r.stderr[-200:]}")
 for s in (A,):
     s.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 Bo = sess("bruno")
