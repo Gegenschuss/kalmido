@@ -1572,6 +1572,14 @@ fresh; run p2144_d_ui node p2144_d_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21442_a_ui node p21442_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.144.2 part B: optimistic subtasks, calendar draft popup, sheet print, focus, receipts account row (#2467 #1811 #2370 #1644 #2352 #2372 #2375)
 fresh; run p21442_b_ui node p21442_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.6 part A: billable / billed time entries, invoice from time binds them, no double billing (#2053)
+fresh; run p21446_a_api "$PY" p21446_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21446_a_ui node p21446_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.6 part B: office fixes from the 2.138 review - legacy counter reason, import order undo, approval rule, archive rest (#2400)
+fresh; run p21446_b_api "$PY" p21446_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21446_b_ui node p21446_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.6 part C: office settings - one "transfer into an organisation" section (#2436)
+fresh; run p21446_c_ui node p21446_c_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
