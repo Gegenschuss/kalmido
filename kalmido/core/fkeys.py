@@ -11,7 +11,8 @@ from rows it just read or created) -- and deleting the parent now empties the re
 
 Not here, with the reason (schema.py "-- no FK"): office_docs.contact_id (0 = "no contact person", a deleted contact person
 falls back to the client's default), the log tables (agent_audit, dl_changes, org_list_log, assistant_log: they keep ids of
-what is gone on purpose).
+what is gone on purpose), playbooks.author_id (2.152.0, review B-M7: a version keeps its author's id like the log tables;
+NULL would make a gone author's text the owner's own text, which the agent follows -- #1978: a foreign text stays foreign).
 """
 import json
 
@@ -30,8 +31,8 @@ FK_2103 = (
     ("agent_jobs", "list_id", "lists", "SET NULL"),
     ("notes", "created_by", "users", "SET NULL"),
     ("notes", "updated_by", "users", "SET NULL"),
-    ("playbooks", "author_id", "users", "SET NULL"),  # the version outlives its author, only the name goes
-    ("agents", "owner_id", "users", "SET NULL"),  # a safety net: deleting an account hands over / removes its agents first
+    ("agents", "owner_id", "users", "SET NULL"),  # a safety net: deleting an account hands over / removes its agents first;
+    # 2.152.0 (#2174, review B-M6): fk_ensure pauses its orphans instead of making them team agents
     ("habits", "user_id", "users", "CASCADE"),
     ("pomos", "user_id", "users", "CASCADE"),
 )
@@ -69,6 +70,10 @@ def fk_ensure(c):
                 cond = f"{col} IS NOT NULL AND NOT EXISTS (SELECT 1 FROM {ref} r WHERE r.id={table}.{col})"
                 if act == "CASCADE":
                     c.execute(f"DELETE FROM {table} WHERE {cond}")
+                elif (table, col) == ("agents", "owner_id"):
+                    # 2.152.0 (#2174, review B-M6): an agent of a gone person does not become a team agent that runs on: it
+                    # is paused by the admin, without office drafts, until an admin decides
+                    c.execute(f"UPDATE agents SET owner_id=NULL, admin_paused=1, office_drafts=0 WHERE {cond}")
                 else:
                     c.execute(f"UPDATE {table} SET {col}=NULL WHERE {cond}")
             c.execute(f"ALTER TABLE {table} ADD CONSTRAINT fk2103_{table}_{col} FOREIGN KEY ({col}) REFERENCES {ref}(id) ON DELETE {act}")

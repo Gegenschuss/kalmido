@@ -151,7 +151,7 @@ def lb_vehicles(c, oid):
     """Every vehicle of the area (archived ones too), with last_odo = the odometer to start the next drive with."""
     last = {r["vehicle_id"]: r["m"] for r in c.execute(
         "SELECT vehicle_id, MAX(odo_end) AS m FROM office_drives WHERE org_id=? AND deleted_at IS NULL AND odo_end IS NOT NULL "
-        "GROUP BY vehicle_id", (oid,))}
+        "AND " + LBC_LIVE + " GROUP BY vehicle_id", (oid, oid))}  # 2.152.0 (#2169, review B-L1): without corrected drives
     out = []
     for r in c.execute("SELECT * FROM office_vehicles WHERE org_id=? ORDER BY archived, lower(name), id", (oid,)):
         d = oc_dec_fields(c, oid, "office_vehicles", r)
@@ -530,6 +530,9 @@ def lb_drive_delete(did):
 def lb_drive_restore(did):
     c, uid, oid = _ctx()
     r = _drive(c, oid, did, deleted=True)
+    why = lbc_lock(c, oid, oc_dec_fields(c, oid, "office_drives", r))  # 2.152.0 (#2169, review B-M8): not back into a closed month / after the week
+    if why:
+        raise Denied(409, tr(LBC_MONTH if why == "month" else LBC_AUTO))
     if r["corrects_id"] and lbc_successors(c, oid, [r["corrects_id"]]):  # 2.152.0 C (#2169): one correction per drive
         raise Denied(409, tr(LBC_DONE))
     c.execute("UPDATE office_drives SET deleted_at=NULL, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), did, oid))
