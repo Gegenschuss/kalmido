@@ -162,6 +162,14 @@ check(A.patch(B + f"{T}/{TR['id']}/items/{I_BILL}", json={"date": DAY(19)}).stat
 r = A.patch(B + f"{T}/{TR['id']}/items/{I_DATEV}", json={"text": "Bahn Hamburg", "datev": 1, "amount": "80.00"})
 check(r.ok, "#2168 B-M1: the text of a locked receipt can change, unchanged locked values pass " + r.text[:160])
 check(A.delete(B + f"{T}/{TR['id']}").status_code == 409, "#2168: the billed receipt still keeps the trip")
+# 2.152.0 (#2168, review B-H1): the undo of a VMA import (several trips at once) keeps a trip with a receipt in DATEV
+TR2 = A.post(B + T, json={"date_from": DAY(15), "dest": "Berlin", "purpose": "job",
+                          "items": [{"date": DAY(15), "category": "train", "amount": "40.00", "datev": 1}]}).json()["id"]
+TR3 = A.post(B + T, json={"date_from": DAY(14), "dest": "Bremen", "purpose": "job",
+                          "items": [{"date": DAY(14), "category": "train", "amount": "30.00"}]}).json()["id"]
+r = A.post(B + T + "/delete", json={"ids": [TR2, TR3]})
+check(r.ok and r.json()["deleted"] == 1 and r.json()["skipped"] == [TR2] and sql("SELECT 1 FROM office_trips WHERE id=?", (TR2,))
+      and not sql("SELECT 1 FROM office_trips WHERE id=?", (TR3,)), "#2168 B-H1: the multi delete skips the trip in DATEV " + r.text[:200])
 
 # ---------------------------------------------------------------- #2168 booked receipts in the document store
 WSO = f"org:{ORG}"
