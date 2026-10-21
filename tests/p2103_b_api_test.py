@@ -185,6 +185,10 @@ sql("INSERT INTO tchat_rooms(kind, a, b, created_at) VALUES('dm',?,?,?)", (min(A
 ROOM = one("SELECT id FROM tchat_rooms WHERE kind='dm' AND a=? AND b=?", (min(ALICE, FID), max(ALICE, FID)))
 sql("INSERT INTO tchat_msgs(room_id, user_id, body, created_at, deleted_at) VALUES(?,?,?,?,?)", (ROOM, FID, "", OLD, OLD), write=True)
 sql("INSERT INTO tchat_msgs(room_id, user_id, body, created_at) VALUES(?,?,?,?)", (ROOM, FID, "Hello", OLD), write=True)
+# 2.152.0 (#2165, review C-H2): an old tombstone that opened a thread with a live reply stays (the reply needs it)
+sql("INSERT INTO tchat_msgs(room_id, user_id, body, created_at, deleted_at) VALUES(?,?,?,?,?)", (ROOM, FID, "", OLD, OLD), write=True)
+TROOT = one("SELECT MAX(id) FROM tchat_msgs WHERE room_id=?", (ROOM,))
+sql("INSERT INTO tchat_msgs(room_id, user_id, body, created_at, thread_of) VALUES(?,?,?,?,?)", (ROOM, ALICE, "A reply", OLD, TROOT), write=True)
 
 # comments: an emptied row of a deleted comment
 T = Fr.post(B + "/api/tasks", json={"title": "Invented task"}).json()["id"]
@@ -229,7 +233,11 @@ check(sql("SELECT deleted_at IS NOT NULL FROM fs_nodes WHERE id=?", (HF,)) == [(
 check(sql("SELECT 1 FROM hub_mails WHERE message_id='fresh-1@example.com'"), "hub mail: deleted today stays")
 check(sql("SELECT title FROM office_deals WHERE org_id=?", (ORG,)) == [("Live deal",)], "pipeline: the old deal gone, the live one stays")
 check(not sql("SELECT 1 FROM office_inv_series WHERE org_id=?", (ORG,)), "invoice series: gone")
-check(sql("SELECT body FROM tchat_msgs WHERE room_id=?", (ROOM,)) == [("Hello",)], "team chat: the tombstone gone, the live message stays")
+# 2.152.0 (#2165, review C-H2): the room holds a thread now (its tombstone and reply are checked below)
+check(sql("SELECT body FROM tchat_msgs WHERE room_id=? AND id<>? AND thread_of IS NULL", (ROOM, TROOT)) == [("Hello",)],
+      "team chat: the tombstone gone, the live message stays")
+check(sql("SELECT deleted_at IS NOT NULL FROM tchat_msgs WHERE id=?", (TROOT,)) == [(1,)]
+      and sql("SELECT body FROM tchat_msgs WHERE thread_of=?", (TROOT,)) == [("A reply",)], "team chat: a thread's tombstone stays with its live reply")
 check(not sql("SELECT 1 FROM comments WHERE id=?", (CM,)) and sql("SELECT 1 FROM tasks WHERE id=?", (T,)), "comments: the emptied row gone, the task stays")
 
 # ================================================================== #2172 backups
