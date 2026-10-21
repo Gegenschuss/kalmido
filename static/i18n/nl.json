@@ -12531,5 +12531,8 @@
   "{0} h already billed": "{0} u al gefactureerd",
   "{0} h not billable": "{0} u niet factureerbaar",
   "{0} h of this cancelled invoice can then go onto a new invoice.": "{0} u van deze geannuleerde factuur kunnen dan op een nieuwe factuur.",
-  "Transfer into a new organisation…": "Overdragen naar een nieuwe organisatie…"
+  "Transfer into a new organisation…": "Overdragen naar een nieuwe organisatie…",
+  "This time is already billed: duration, date, task and billable can no longer be changed": "Deze tijd is al gefactureerd: duur, datum, taak en factureerbaar kunnen niet meer worden gewijzigd",
+  "This time is already billed and cannot be deleted": "Deze tijd is al gefactureerd en kan niet worden verwijderd",
+  "Already billed: duration, date and task are locked, the note can still change.": "Al gefactureerd: duur, datum en taak zijn vergrendeld, de notitie kan nog worden gewijzigd."
 }

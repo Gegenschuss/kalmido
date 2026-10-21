@@ -12531,5 +12531,8 @@
   "{0} h already billed": "{0} h già fatturate",
   "{0} h not billable": "{0} h non fatturabili",
   "{0} h of this cancelled invoice can then go onto a new invoice.": "Le {0} h di questa fattura annullata potranno allora andare in una nuova fattura.",
-  "Transfer into a new organisation…": "Trasferisci in una nuova organizzazione…"
+  "Transfer into a new organisation…": "Trasferisci in una nuova organizzazione…",
+  "This time is already billed: duration, date, task and billable can no longer be changed": "Questo tempo è già fatturato: durata, data, attività e fatturabile non si possono più modificare",
+  "This time is already billed and cannot be deleted": "Questo tempo è già fatturato e non può essere eliminato",
+  "Already billed: duration, date and task are locked, the note can still change.": "Già fatturato: durata, data e attività sono bloccate, la nota si può ancora modificare."
 }

@@ -12531,5 +12531,8 @@
   "{0} h already billed": "{0} Std. schon abgerechnet",
   "{0} h not billable": "{0} Std. nicht abrechenbar",
   "{0} h of this cancelled invoice can then go onto a new invoice.": "{0} Std. dieser stornierten Rechnung können dann auf eine neue Rechnung.",
-  "Transfer into a new organisation…": "In eine neue Organisation übertragen…"
+  "Transfer into a new organisation…": "In eine neue Organisation übertragen…",
+  "This time is already billed: duration, date, task and billable can no longer be changed": "Diese Zeit ist schon abgerechnet: Dauer, Datum, Aufgabe und Abrechenbar lassen sich nicht mehr ändern",
+  "This time is already billed and cannot be deleted": "Diese Zeit ist schon abgerechnet und kann nicht gelöscht werden",
+  "Already billed: duration, date and task are locked, the note can still change.": "Schon abgerechnet: Dauer, Datum und Aufgabe sind gesperrt, die Notiz lässt sich noch ändern."
 }
