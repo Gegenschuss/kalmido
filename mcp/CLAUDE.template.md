@@ -250,6 +250,14 @@
   boundary, login, injection, files), commit messages, changelog and public comments name only "Security fix" and the
   area, never how to exploit it. Deploy the fix to the running instances first, then publish it (push, release);
   details, if at all, only after the rollout.
+- **The task list is the truth for tickets and releases.** A task is done only when its code is on the default branch
+  and published (released / live); never tick it off or report it done before that. Done only in part: comment what is
+  left and enter a new version (the list's version field) for the rest at once. Never end work on an unmerged branch:
+  merge it, or park it explicitly with the reason as a comment on the task. Name the task in every commit and pull
+  request (`#123`; `fixes #123` completes it on merge) or call the branch `kalmido-<id>`. Before every "done" report
+  call `list_build_status` (list_id) and settle each open task that already has a published version or an open
+  branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
+  although published).
 
 ### When you are stuck
 - Never stall silently. **Park a blocker** with a short note on the task (what is missing, who has to act) and a chat
