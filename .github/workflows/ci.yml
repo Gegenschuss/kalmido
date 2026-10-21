@@ -180,8 +180,9 @@ jobs:
         env:
           TZ: Europe/Berlin
           PYTHON: python
-        # 2.80.1: suites that failed run once more (ONLY=..., like the Mac runner): single UI suites fail now and then on
-        # the shared runners only; a suite red twice stays red
+        # 2.80.1: suites that failed run once more: single UI suites fail now and then on the shared runners only; a suite
+        # red twice stays red. 2.149.0 (#2514): the rerun runs the whole groups of the failed suites (ONLY_GROUPS) and starts
+        # no other container; every run writes tests/timings.csv (the rerun tests/timings-rerun.csv) for tools/shards.py
         run: |
           set +e
           tests/run_all.sh --shard ${{ matrix.shard }}/19 | tee /tmp/run_all.log
@@ -189,8 +190,16 @@ jobs:
           [ "$rc" -eq 0 ] && exit 0
           failed=$(sed -n 's/^FAILED suites: //p' /tmp/run_all.log | tail -1)
           [ -n "$failed" ] || exit "$rc"
-          echo "== rerun of the failed suites: $failed"
-          ONLY="$failed" tests/run_all.sh --shard ${{ matrix.shard }}/19
+          echo "== rerun of the groups of the failed suites: $failed"
+          KALMIDO_TIMINGS="$PWD/tests/timings-rerun.csv" ONLY_GROUPS="$failed" tests/run_all.sh --shard ${{ matrix.shard }}/19
+      - name: Suite timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: timings-shard-${{ matrix.shard }}
+          path: tests/timings*.csv
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Container log on failure
         if: failure()
         run: docker logs kalmido-test 2>&1 | tail -100 || true

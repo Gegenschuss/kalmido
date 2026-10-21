@@ -5,6 +5,15 @@
 #                                The `shard N` lines below split the groups; each group (a `fresh` container and the
 #                                suites after it) stays whole. Keep the shards about equal (~14 min each on CI) by moving
 #                                a marker when one grows; new suites go at the end (the last shard).
+#   ONLY="a b" tests/run_all.sh   just these suites (the containers of their groups are still started)
+#   ONLY_GROUPS="a b" tests/run_all.sh  2.149.0 (#2514): the whole groups of these suites (every suite of each group, in order;
+#                                the other groups start no container) - the CI rerun: a suite that needs the state of the
+#                                one before it (news_ui after api) passes alone too
+#   now 2026-10-20T10:00:00+02:00; fresh; run ...   2.149.0 (#2512): this group runs at that test time (KALMIDO_TEST_NOW for the
+#                                server via start.sh and for the suites via testclock; the clock runs on from there); the other
+#                                groups run at the real time (or at a KALMIDO_TEST_NOW set for the whole run)
+#   Timings: every suite and every group (container start included) -> $KALMIDO_TIMINGS (default tests/timings.csv, appended:
+#                                shard,group,suite,seconds,rc; group = its first suite, suite "*" = the whole group); tools/shards.py
 # Needs: docker, python3 with tests/requirements.txt, node 18+ with `npm ci` done in tests/.
 # Exit code 0 = everything passed.
 set -u
@@ -22,7 +31,34 @@ if [[ "${1:-}" == "--shard" ]]; then
     || { echo "run_all.sh: the markers define $SHARDS_DEFINED shards (--shard 1/$SHARDS_DEFINED .. $SHARDS_DEFINED/$SHARDS_DEFINED)"; exit 2; }
 fi
 shard() { CUR=$1; }
-mine() { [[ $SHARD -eq 0 || $CUR -eq $SHARD ]]; }
+# 2.149.0 E (#2514): groups by number (one per `fresh` line, the same count as tools/shards.py): GFIRST = first suite of each,
+# WANT_G = the groups ONLY_GROUPS asks for. Called from fresh, mine() opens the next group (timing, test time).
+GI=0; GT0=0; GRAN=; NEXT_NOW=; BASE_NOW=${KALMIDO_TEST_NOW:-}; GFIRST=(); WANT_G=
+TIMINGS=${KALMIDO_TIMINGS:-$HERE/timings.csv}
+while read -r g n; do
+  [[ -n "${GFIRST[$g]:-}" ]] || GFIRST[$g]=$n
+  [[ -n "${ONLY_GROUPS:-}" && " $ONLY_GROUPS " == *" $n "* && "$WANT_G " != *" $g "* ]] && WANT_G+=" $g"
+done < <(awk '/^(now [^;]*; *)?fresh;/ {g++}
+  /^(now [^;]*; *)?(fresh;)?[ \t]*run [A-Za-z0-9_]+ / {s = $0; sub(/^(now [^;]*; *)?(fresh;)?[ \t]*run /, "", s); sub(/ .*/, "", s); print g, s}' \
+  "$HERE/run_all.sh")
+if [[ -n "${ONLY_GROUPS:-}" ]]; then [[ -n "$WANT_G" ]] || { echo "ONLY_GROUPS: no such suite in run_all.sh"; exit 2; }; WANT_G+=" "; fi
+_ms() { local t=${EPOCHREALTIME:-}; [[ -n "$t" ]] || { echo $((SECONDS * 1000)); return; }; t=${t/,/.}; local f=${t#*.}000
+  echo $(( ${t%.*} * 1000 + 10#${f:0:3} )); }
+_timing() {  # _timing <suite> <ms> <rc>
+  [[ -f "$TIMINGS" ]] || echo "shard,group,suite,seconds,rc" > "$TIMINGS" 2>/dev/null || return 0
+  printf '%s,%s,%s,%d.%03d,%s\n' "$SHARD" "${GFIRST[$GI]:-g$GI}" "$1" $(($2 / 1000)) $(($2 % 1000)) "$3" >> "$TIMINGS" 2>/dev/null || true
+}
+_group_end() { [[ -n "$GRAN" ]] && _timing "*" $(( $(_ms) - GT0 )) ""; GRAN=; }
+now() { NEXT_NOW=$1; }  # now <ISO instant>: the test time of the next group (#2512)
+mine() {
+  if [[ "${FUNCNAME[1]:-}" == fresh ]]; then
+    _group_end; GI=$((GI + 1)); GT0=$(_ms)
+    if [[ -n "${NEXT_NOW:-$BASE_NOW}" ]]; then export KALMIDO_TEST_NOW=${NEXT_NOW:-$BASE_NOW} KALMIDO_TEST_NOW_AT=$(date +%s)
+    else unset KALMIDO_TEST_NOW KALMIDO_TEST_NOW_AT; fi
+    NEXT_NOW=
+  fi
+  [[ $SHARD -eq 0 || $CUR -eq $SHARD ]] && [[ -z "$WANT_G" || "$WANT_G" == *" $GI "* ]]
+}
 if [[ -n "${BUILD:-}" ]]; then docker build -q -t "$KALMIDO_TEST_IMAGE" "$HERE/.." >/dev/null || exit 1; fi
 FAILED=()
 run() {  # run <name> <cmd...>: prints the summary line, remembers failures
@@ -30,8 +66,10 @@ run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   local name=$1; shift
   # ONLY="a b" tests/run_all.sh: just these suites (2.7.2; the containers of their groups are still started)
   [[ -n "${ONLY:-}" && " $ONLY " != *" $name "* ]] && return 0
-  local out rc
+  local out rc t0
+  t0=$(_ms); GRAN=1
   out=$("$@" 2>&1); rc=$?
+  _timing "$name" $(( $(_ms) - t0 )) $rc  # 2.149.0 E (#2514)
   echo "$out" | grep -E "^FAIL|^PERF|ok, [0-9]+ failed|Error|Traceback" | head -40
   if [[ $rc -ne 0 ]]; then FAILED+=("$name"); echo "== $name: FAILED (exit $rc)"; echo "$out" | tail -15
     # GitHub Actions: an annotation, readable on the run page (and via the API) without the full log
@@ -1585,6 +1623,7 @@ fresh; run p2149_d_api "$PY" p2149_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2149_e_api "$PY" p2149_e_api_test.py "$KALMIDO_TEST_DATA"
 # 2.149.0 part F: module start files loaded lazily, guarded lazy calls, missing CSS variables (#2518 #2519)
 fresh; run p2149_f_ui node p2149_f_ui.js "$KALMIDO_TEST_DATA"
+_group_end
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
