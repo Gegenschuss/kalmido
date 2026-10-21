@@ -5,6 +5,12 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.151.1] - 2026-10-21
+
+### Security
+- pypdf 6.20.1 (was 6.19.0): fixes CVE-2026-113792, CVE-2026-113793, CVE-2026-113794 and CVE-2026-113795 in reading PDF files
+  (attachments, receipts, incoming e-invoices).
+
 ## [2.151.0] - 2026-10-21
 
 Bundle of the packages 2.148.0 (DATEV Unternehmen online replaced: locked periods, receipt images with the DATEV batch, export for the tax auditor, procedure documentation, DATEV import), 2.148.1 (security release: findings of the follow-up audit), 2.149.0 (clean-up: architecture and maintainability) and 2.151.0 (a task knows its build state).
