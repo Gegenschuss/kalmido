@@ -43,7 +43,8 @@ async function teamChanged() {
   await loadTeam();
   if (S.route.mod === 'team' && S.tc.rid) await loadRoom(S.tc.rid);
   if (S.tc.th) await tth_load();  // 2.139.0 A (#2127): the open thread (team view or a live chat panel window)
-  if (S.route.mod === 'team' && !editingTeam()) renderView();
+  if (S.route.mod === 'team' && typeof rswBusy === 'function' && rswBusy()) S.rswRedraw = true;  // 2.151.1: a swipe to reply is under way (collab.js)
+  else if (S.route.mod === 'team' && !editingTeam()) renderView();
   else if (S.route.mod === 'team') tcPatch();
   if (typeof cw_teamLive === 'function') cw_teamLive();  // 2.47.1 (#1720): the team chats in the chat panel
   renderSide(); renderTabs(); renderTop();
