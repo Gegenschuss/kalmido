@@ -7,6 +7,20 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.144.1] - 2026-10-21
+
+Office fixes: the office side bar stays put on touch tablets, the bank import says which file to take and reads several statements or a ZIP at once.
+
+### Added
+- Bank reconciliation: several statements or one ZIP file (CAMT XML / CSV inside) in one import - one shared preview sorted by date, the same booking in a daily and a monthly statement counts once, the balances of every statement are kept (the newest is the current one), one undo step for all (#2450).
+- The import window explains which file to export from online banking: CAMT.053 (XML) with booked transactions recommended, CSV possible, not pending transactions / CAMT.052 or MT940/MT942 (an MT940 file gets a clear message); files can also be dropped into the window. The cash flow opens the same import next to the bank balance (#2446).
+
+### Fixed
+- Touch tablets: the office side bar is a real column, only the page next to it scrolls; the scroll position stays when the page redraws (#2445).
+
+### Security
+- Security fix: bank statement upload.
+
 ## [2.144.0] - 2026-10-20
 
 Agent chat with a stop button, agent colours and a quieter filter; the home block Today shows today's events; lists grouped by a custom field; groundwork for hosting (operator interface) and supporter licence prices.
