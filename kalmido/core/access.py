@@ -206,7 +206,10 @@ _BG_CTX = {}
 # 0 = off). An entry is only taken while the instance-wide generation in kalmido_meta 'acx_gen' is unchanged; database
 # triggers renew it on every write to org_members / agents (org, account) / orgs (personal office), in the writing
 # transaction, so a change reaches every process with the next request. The session itself is never cached.
-ACX_TTL = float(os.environ.get("KALMIDO_ACX_TTL", "10").strip() or 0)
+try:
+    ACX_TTL = float(os.environ.get("KALMIDO_ACX_TTL", "10").strip() or 0)
+except ValueError:
+    ACX_TTL = 10.0
 _REQ_CTX = {}
 
 ACX_GEN_FN = """CREATE OR REPLACE FUNCTION kalmido_acx_bump() RETURNS trigger LANGUAGE plpgsql AS $fn$
