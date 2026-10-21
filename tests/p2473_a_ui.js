@@ -1,6 +1,6 @@
 // 2.47.3 UI tests, part A (#1360 Office & finance without an organisation), own container (start.sh). jsdom, invented data:
 // - a freelancer (no organisation) opens the office: the personal office ("Private"), the switch "small business (section
-//   19 UStG)" is saved, the instance admin sees "Move into an organisation"
+//   19 UStG)" is saved, the instance admin sees "Transfer into a new organisation" (2.144.6, #2436: one section)
 // - a member of one organisation in the workspace "Private": the empty personal office names the organisation's office with
 //   a button; the button switches the workspace and the office follows (the organisation's office), back to "Private" again
 // - 2.56.3 (#1842): in the organisation's office a document's client field offers the organisation's clients

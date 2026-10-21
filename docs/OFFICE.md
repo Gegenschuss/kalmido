@@ -46,7 +46,7 @@ delete them - members added there would reach the personal office.
 A person in an organisation who opens "Private" for the first time finds an empty personal office with a hint and a
 button to the organisation's office.
 
-**Moving into an organisation** (Settings tab, "Move into an organisation"; one way, after a confirmation): the personal
+**Moving into a new organisation** (Settings > Data, section "Transfer into an organisation", button "Transfer into a new organisation…"; one way, after a confirmation): the personal
 office becomes a new organisation with its owner as admin - documents, numbers (no duplicates: it is the same area),
 settings, master data, files and the private clients go with it; "Private" is a new, empty personal office afterwards.
 Only where organisations can be created (an instance admin, not in the mode `shared`). Moving into an existing
