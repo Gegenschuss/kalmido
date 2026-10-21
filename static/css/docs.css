@@ -134,3 +134,8 @@
 /* 2.138.4 A (#2362): on a phone the choosing bar sits right above the tab bar (it floated ~100 px higher and covered the second row);
    the grid keeps room below for it */
 @media (max-width:899px){.dc-selbar{position:fixed;left:.75rem;right:.75rem;bottom:calc(var(--tabs-h) + var(--safe-b) + .5rem);margin:0;z-index:42}}
+/* 2.144.2 A (#2352): receipt sheet buttons / fields reach 44 px on touch (were 40 px) */
+@media (pointer:coarse) {
+  .rc-acts .btn, .rc-money input, .rc-money select, .rx-no .linkbtn { min-height: 2.75rem; }
+  .rc-money select { height: 2.75rem; }
+}

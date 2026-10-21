@@ -6613,7 +6613,8 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .lvbox>summary{cursor:pointer;font-weight:600;min-height:2.25rem;display:flex;align-items:center}
 .lvsw{margin-top:.5rem}
 .wtdays{flex-wrap:wrap}
-.wtdays button{min-width:2.75rem;min-height:2.25rem}
+.wtdays button{min-width:2.75rem;min-height:2.75rem}  /* 2.144.2 A (#2375): 44 px high */
+.row .chkl.wtfocus{min-width:0;flex:1 1 12rem;align-items:flex-start;overflow-wrap:anywhere}  /* 2.144.2 A (#2375): wraps instead of being cut off */
 @media (max-width:599px){.lvreq{flex-wrap:wrap}.lvbtns{width:100%}.lvbtns .btn{flex:1;justify-content:center}}
 .wlc.ab2wl .wlbar{outline:1px dashed color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:1px}
 @media (max-width:599px){.ab2grid{display:none}.ab2tabs{display:flex}.ab2tabs button{flex:1;justify-content:center}}

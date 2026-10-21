@@ -183,10 +183,24 @@ function shk_print() {
   // 2.138.4 A (#2370): Android Chrome fires afterprint ~30 ms after print(), before the preview is made -> keep the view until
   // the print media really ends (matchMedia change); without it, a fallback timer after afterprint
   /** @type {any} */
-  const mq = window.matchMedia?.('print') || {matches: false}; let timer = 0, t0 = Infinity;
-  const done = () => { clearTimeout(timer); document.body.classList.remove('shkprint'); box.remove(); removeEventListener('afterprint', onAfter); mq.removeEventListener?.('change', onMq); if (shkPrintDone === done) shkPrintDone = null; };
-  const onMq = () => { clearTimeout(timer); if (!mq.matches) done(); };
-  const onAfter = () => { clearTimeout(timer); if (mq.matches || performance.now() - t0 < 500) timer = setTimeout(done, 30000); else done(); };  // desktop: print() blocks until the dialog closes
+  const mq = window.matchMedia?.('print') || {matches: false}; let timer = 0, t0 = Infinity, armed = false, quick = false, away = false;
+  // 2.144.2 B (#2370): Android also ends the print media ~30 ms after print() (matches=false) while the preview is still being
+  // made; an early end no longer removes the view: it goes once the user is back in the app (tap / key, the page shown or
+  // focused again after it was hidden / blurred). The view is print-only, so keeping it longer never shows on screen
+  const BACK = ['pointerdown', 'keydown', 'focus', 'blur', 'pagehide'];
+  const onBack = e => {
+    if ((e.type === 'focus' || e.type === 'blur') && e.target !== window) return;  // the window's own focus, not a field's
+    if (e.type === 'blur' || e.type === 'pagehide' || (e.type === 'visibilitychange' && document.hidden)) { away = true; return; }
+    if ((e.type === 'focus' || e.type === 'visibilitychange') && !away) return;
+    done();
+  };
+  const arm = () => { if (armed) return; armed = true; clearTimeout(timer); BACK.forEach(k => addEventListener(k, onBack, true)); document.addEventListener('visibilitychange', onBack, true); timer = setTimeout(done, 600000); };
+  const done = () => { clearTimeout(timer); document.body.classList.remove('shkprint'); box.remove(); removeEventListener('afterprint', onAfter); mq.removeEventListener?.('change', onMq);
+    BACK.forEach(k => removeEventListener(k, onBack, true)); document.removeEventListener('visibilitychange', onBack, true); if (shkPrintDone === done) shkPrintDone = null; };
+  const early = () => performance.now() - t0 < 500;
+  // an early end (Android) waits for the user; a late one (desktop, after the dialog) ends at once as before
+  const onMq = () => { if (quick || mq.matches) return; if (early()) { quick = true; arm(); } else done(); };
+  const onAfter = () => { if (quick) return; if (early()) { quick = true; arm(); } else if (mq.matches) arm(); else done(); };  // desktop: print() blocks until the dialog closes
   shkPrintDone = done;
   addEventListener('afterprint', onAfter);
   mq.addEventListener?.('change', onMq);

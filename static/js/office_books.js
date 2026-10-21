@@ -5,7 +5,7 @@
 // statement of the year (CSV / PDF), the VAT return figures of a month / quarter (#office/books/ustva jumps there), the
 // settings (tax reserve, VAT on payment / on invoicing) and the tax dates of part C (txdSectionHtml). Server:
 // kalmido/office/books.py. No tax advice: every part carries the same short note.
-const BK = {oid: null, year: new Date().getFullYear(), info: null, euer: null, ustva: null, mode: null, period: null, err: null, seq: 0, jumped: false};
+const BK = {oid: null, year: new Date().getFullYear(), info: null, euer: null, ustva: null, mode: null, period: null, err: null, seq: 0, jumped: false, acc: null};
 BK.billed = {};  // 2.121.0 C (#2094): receipts billed on to a client {node_id: {doc_id, number, kind}}
 const BK_VATS = [['19', '19 %'], ['7', '7 %'], ['0', '0 %']];
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['books', 'book', N_('Bookkeeping'), 1, () => bkTabHtml(), 'money']);  // admins only; 2.92.1 (#1917): in the menu group Money
@@ -23,7 +23,7 @@ function bkReset() {
   const m = OFC.info?.settings?.tax_dates?.ustva;
   BK.mode = m === 'month' ? 'month' : m === 'year' ? 'year' : 'quarter';
   const p = bkDefaultPeriod(BK.mode);
-  Object.assign(BK, {oid: OFC.info?.org_id, info: null, euer: null, ustva: null, err: null, period: p.period, pyear: p.year, jumped: false});
+  Object.assign(BK, {oid: OFC.info?.org_id, acc: null, info: null, euer: null, ustva: null, err: null, period: p.period, pyear: p.year, jumped: false});
 }
 async function bkLoad() {
   const seq = ++BK.seq, y = BK.year, q = `year=${BK.pyear}&period=${BK.period}`;
@@ -33,6 +33,7 @@ async function bkLoad() {
     BK.billed = await bkBilledLoad(info);
     if (seq !== BK.seq) return;
     Object.assign(BK, {info, euer, ustva, err: null});
+    bkAcctLines();  // 2.144.2 B (#2352)
   } catch (x) { if (seq === BK.seq) BK.err = x.message || tr('unknown'); }
   ofcDraw();
 }
@@ -255,14 +256,19 @@ async function bkSheet(id, fresh) {
 }
 // 2.121.0 (#2093): the SKR03 / SKR04 account of a receipt category (the one the DATEV export books on); changed here through
 // the office settings (datev_extf.cat_accounts), one undo step. BK.info.accounts is null without the DATEV input side.
+// 2.144.2 B (#2352): while BK.info is reloading (after Take over / undo) the last known accounts keep the line (BK.acc);
+// an open receipt sheet draws its account line again once fresh data is there
+const bkAccs = () => { if (BK.info) BK.acc = BK.info.accounts; return BK.acc; };
+const bkAcctLines = () => document.querySelectorAll('.bk-sheet').forEach(md => { if (!$('#bk-acctin', md)) bkAcctLine(md); });
+async function bkAcctFresh() { try { BK.info = await api('GET', `/api/office/books?year=${BK.year}`); } catch { /* drawn on the next visit */ } bkAcctLines(); }
 const bkAcct = cat => {
-  const a = BK.info?.accounts, k = (cat || '').toLowerCase();
+  const a = bkAccs(), k = (cat || '').toLowerCase();
   if (!a || !k) return null;
   const n = Object.keys(a.categories).find(x => x.toLowerCase() === k);
   return n ? a.categories[n] : null;
 };
 function bkAcctLine(md) {
-  const el = $('.bk-acct', md), a = BK.info?.accounts, cat = ($('#bk-cat', md)?.value || '').trim();
+  const el = $('.bk-acct', md), a = bkAccs(), cat = ($('#bk-cat', md)?.value || '').trim();
   if (!el) return;
   if (!a || !cat) { el.innerHTML = ''; return; }
   const x = bkAcct(cat);
@@ -284,10 +290,10 @@ async function bkAcctSave(md) {
   const from = {...(BK.info?.accounts?.own || {})}, to = {...from};
   if (val) to[cat.toLowerCase()] = val; else delete to[cat.toLowerCase()];
   try { await bkAcctPut(to); } catch (x) { $('.aerr', md).textContent = x.message || ''; return; }
-  try { BK.info = await api('GET', `/api/office/books?year=${BK.year}`); } catch (x) { /* drawn on the next visit */ }
-  bkAcctLine(md);
+  await bkAcctFresh(); bkAcctLine(md);
   const label = tr('Changed account');
-  histToast(label, histAdd({label, undo: async () => { await bkAcctPut(from); ofcDraw(); return {}; }, redo: async () => { await bkAcctPut(to); ofcDraw(); return {}; }}));
+  // 2.144.2 B (#2352): undo / redo draw the line of an open sheet from the data put back
+  histToast(label, histAdd({label, undo: async () => { await bkAcctPut(from); await bkAcctFresh(); ofcDraw(); return {}; }, redo: async () => { await bkAcctPut(to); await bkAcctFresh(); ofcDraw(); return {}; }}));
 }
 // 2.121.0 C (#2094): bill receipts on to a client (positions "external costs"; one undo step)
 async function bkBillModal(pre) {

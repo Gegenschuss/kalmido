@@ -151,13 +151,19 @@ function ofcListHtml(kind) {
   const d = OFC.data[kind];
   if (!d) return `<p class="muted lempty">${tr('Loading…')}</p>`;
   if (d.error) return `<div class="empty">${esc(d.error)}</div>`;
-  const q = OFC.q.trim().toLowerCase(), adm = ofcAdmin();
-  const hit = r => !q || [r.name, r.name_de, r.name_en, r.category, r.key, r.text_de, r.text_en, r.note].some(v => (v || '').toLowerCase().includes(q));
+  const adm = ofcAdmin();
   const bar = `<div class="ofcbar"><div class="ctsearch">${ic('search', 's')}<input id="ofc-q" type="search" value="${esc(OFC.q)}" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" autocomplete="off" enterkeyhint="search"></div>
     <label class="chkl"><input type="checkbox" id="ofc-arch" ${OFC.arch ? 'checked' : ''}> ${tr('Archived')}</label><span class="spacer"></span>
     ${adm ? `<button class="btn sm pri" data-ofc="new" data-kind="${kind}">${ic('plus', 's')}<span>${kind === 'services' ? tr('New service') : kind === 'equipment' ? tr('New device') : kind === 'texts' ? tr('New text block') : tr('New contract')}</span></button>` : ''}
     ${kind === 'services' && adm && d.length > 1 ? `<button class="btn sm" data-imr="renumber">${ic('sort', 's')}<span>${tr('Renumber')}</span></button>` : ''}
     ${kind === 'equipment' && adm ? `<button class="btn sm" data-ofc="new" data-kind="sets">${ic('plus', 's')}<span>${tr('New set')}</span></button>` : ''}</div>`;
+  // 2.144.2 B (#1644): typing in the search redraws only the results (ofcListBody), never the field itself (Android lost it)
+  return bar + `<div class="ofclistw" data-kind="${kind}">${ofcListBody(kind)}</div>`;
+}
+function ofcListBody(kind) {
+  const d = OFC.data[kind]; if (!Array.isArray(d)) return '';
+  const q = OFC.q.trim().toLowerCase(), adm = ofcAdmin();
+  const hit = r => !q || [r.name, r.name_de, r.name_en, r.category, r.key, r.text_de, r.text_en, r.note].some(v => (v || '').toLowerCase().includes(q));
   const rows = d.filter(r => hit(r) && (OFC.arch || !r.archived));
   let list;
   if (kind === 'services') list = ofcGrouped(rows, r => r.category || tr('No category'), r => ofcRowBtn('services', r, r.name_de, [r.name_en, r.unit === 'percent' && r.daily_rate != null ? `${fmtNum(r.daily_rate, 2)} %` : r.unit === 'hour' && r.hourly_rate != null ? `${ofcMoney(r.hourly_rate)}/${tr('h|unit')}` : r.daily_rate != null ? `${ofcMoney(r.daily_rate)}/${tr('Day|unit')}` : '', ofcTax(r.tax), r.raw_fee ? tr('raw data') : '', r.producing ? tr('producing') : '', r.intext === 'intern' ? tr('internal') : r.intext === 'shooting' ? tr('Shoot') : ''].filter(Boolean).join(' · ')));
@@ -170,7 +176,7 @@ function ofcListHtml(kind) {
   else list = rows.length ? `<ul class="ofclist" role="list">${rows.map(r => ofcRowBtn('contracts', r, r.name, [r.date ? fmtDateLoc(r.date) : '', r.raw_included ? tr('raw data included') : '', r.client_id && cdn_label((S.clients || []).find(c => c.id === r.client_id))].filter(Boolean).join(' · '), typeof dmaClip === 'function' ? dmaClip(r.files) : '')).join('')}</ul>` : '';
   if (!rows.length && !list) list = `<div class="empty nempty eact">${ic(kind === 'texts' ? 'note' : 'list')}<span>${q ? tr('Nothing matches.') : adm ? tr('Nothing here yet. Add the first entry or import a file under Settings.') : tr('Nothing here yet.')}</span></div>`;
   if (!q && (kind === 'services' || kind === 'equipment')) list += oim_link('master', !rows.length);  // 2.122.3 A (#2335)
-  return bar + list + (kind === 'services' ? sr_roleSections(hit) : '');  // 2.47.0 (#1649)
+  return list + (kind === 'services' ? sr_roleSections(hit) : '');  // 2.47.0 (#1649)
 }
 // 2.47.0 (#1649): the masters Freelancer-Rollen (purchase price per day / hour, a service points to its role) and
 // Drehpersonal (for the shoot calculation) below the services, like the sets below the equipment. Members get no prices.
@@ -763,7 +769,7 @@ function ofcGrow(ta, max = 3) {
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset?.grow) ofcGrow(t, +t.dataset.grow || 3);
-  if (t.id === 'ofc-q') { OFC.q = t.value; ofcDraw(); }
+  if (t.id === 'ofc-q') { OFC.q = t.value; const w = $('#view .ofclistw'); if (w && !OFCP.stale) fl_set(w, ofcListBody(w.dataset.kind)); else ofcDraw(); }  // 2.144.2 B (#1644)
   else if (t.id === 'os-color') { const sw = $('.ofcsw'); if (sw) sw.style.background = /^#[0-9a-fA-F]{6}$/.test(t.value.trim()) ? t.value.trim() : 'var(--accent)'; }
   else if (t.dataset?.scheme) ofcSchemePv(t);  // 2.40.0 (#1382): every number scheme with its preview
 });

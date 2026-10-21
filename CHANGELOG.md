@@ -27,6 +27,17 @@ Imports from everyday life: e-invoices are received and read, duplicates are fou
 ### Security
 - Security fix: file uploads, ZIP and XML reading, retention export.
 
+## [2.144.2] - 2026-10-21
+
+Small fixes and UI polish: subtasks appear at once, touch targets of at least 44 px in office and settings dialogs, Android print view and office search focus.
+
+### Fixed
+- Subtasks typed quickly one after another appear at once and in order, without a reload per entry (#2467); the office search (services, equipment, text blocks, contracts) keeps the focus on Android (#1644).
+- Sheets: print / PDF on Android shows the print view instead of the app (#2370); cash flow: "Take over as actual" sits in its own bar under the table, reachable above the phone tab bar (#2372).
+- Calendar: a confirmed draft no longer shows Draft + Confirm in its popup (#1811); vacation approved / rejected comes with Undo, the vacation accounts stay open after a save, "Use this device" shows right after a time zone change (#2375).
+- Touch targets of at least 44 px in the channel dialog, the receipt sheet, the cash book, the bill-on dialog and the work week (#2447 #2352 #2375); the channel kind is labelled "Type" (#2448); the receipt sheet keeps its account line after Undo (#2352).
+- Reply to a stored mail: the cursor starts above the quote (#2441); the setup dialog starts without an error when the modules fit no purpose (#2369); the folder share icon on the phone stays in the lists' column (#1730); the read-receipt label is tied to its box (#2435).
+
 ## [2.144.1] - 2026-10-21
 
 Office fixes: the office side bar stays put on touch tablets, the bank import says which file to take and reads several statements or a ZIP at once.

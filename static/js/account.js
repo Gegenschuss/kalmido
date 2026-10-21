@@ -1008,7 +1008,8 @@ async function setupChoices(el, logo) {
   const STARTS = [['', N_('Empty|start'), 'list', N_('Your Basket and Today, nothing else')], ['sample', N_('Sample project'), 'eye', N_('A small video production with dates and a packing list, to look around; remove it any time under Settings > Data')],
     ...PTYPE_UI.slice(1).map(([k, n, i, d]) => [k, n, i, d])];
   const row = ([k, n, d]) => `<label class="suse"><input type="checkbox" data-use="${k}" ${picked.has(k) ? 'checked' : ''}><span><b>${tr(n)}</b><small class="muted">${tr(d)}</small></span></label>`;
-  const matches = k => all.every(x => picked.has(x) === !SETUP_PRESETS[k].off.includes(x));
+  // 2.144.2 A (#2369): preset '' (modules fit no purpose) matches nothing, so "Start" switches nothing extra off
+  const matches = k => !!SETUP_PRESETS[k] && all.every(x => picked.has(x) === !SETUP_PRESETS[k].off.includes(x));
   const draw = () => {
     el.innerHTML = `<div class="card setupcard">${logo}
       <div class="seg" id="su-lang">${langs.map(L => `<button type="button" data-su-lang="${esc(L.code)}" class="${L.code === lang ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div>

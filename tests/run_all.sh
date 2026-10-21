@@ -1559,6 +1559,10 @@ fresh; run p2144_c_ui node p2144_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.144.0 part D: hosting - operator role without content access, supporter licence purchase link (#797 #2158)
 fresh; run p2144_d_api "$PY" p2144_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2144_d_ui node p2144_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.2 part A: small UI fixes (touch targets, labels, focus, setup dialog) (#2447 #2448 #2352 #2375 #2435 #2441 #2369 #1730)
+fresh; run p21442_a_ui node p21442_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.2 part B: optimistic subtasks, calendar draft popup, sheet print, focus, receipts account row (#2467 #1811 #2370 #1644 #2352 #2372 #2375)
+fresh; run p21442_b_ui node p21442_b_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
