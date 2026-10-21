@@ -371,6 +371,8 @@ def init_db(guard=True, load=None):
         c.executescript(SCHEMA)
         flags0 = mig_flags_sync(c)  # 2.102.0 D (#1996): the one-shots done before this start (recorded if not yet)
         mig_apply(c)  # 2.102.0 D (#1996): only the MIGRATIONS steps not yet recorded in kalmido_migrations
+        from ..office.signoff import sig_fk_migrate
+        sig_fk_migrate(c)  # 2.148.1 C (#2493): video approval records stay when their review goes
         if load is not None:
             load(c)  # 2.37.0 (#1150): the move from SQLite (migrate-sqlite)
         # 2.10.0 (#441): member rows from before groups (or written by a path that sets no own_role) are personal shares

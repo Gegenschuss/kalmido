@@ -1415,7 +1415,7 @@ TOOLS += [
     ("mark_news_read", "Mark News read: ids, or all=true.", _obj({"ids": {"type": "array", "items": {"type": "integer"}}, "all": {"type": "boolean"}}),
      lambda api, a: api.call("POST", "/news/read", body=a)),
     ("list_agents", "The agents in your lists with their state and running jobs.", _obj({}), lambda api, a: api.call("GET", "/agents")),
-    ("export_data", "Everything the token's user owns as JSON (lists, tasks, comments, time, habits ...). Large.", _obj({}),
+    ("export_data", "Everything the token's user owns as JSON (lists, tasks, comments, time, habits ...). Large. A personal token needs the scopes export and account.", _obj({}),
      lambda api, a: api.call("GET", "/export", timeout=120)),
 ]
 TOOL_MAP = {t[0]: t for t in TOOLS}

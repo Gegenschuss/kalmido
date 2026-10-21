@@ -35,6 +35,7 @@ from ..tasks.validation import as_int, valid_date, valid_hm
 APB_PREFIX = "/s/b/"
 APB_HOLD_MIN = 30            # an unconfirmed booking holds its time this long
 APB_PURGE_DAYS = 7           # expired (never confirmed) bookings are deleted after this
+APB_CANCEL_DAYS = 30         # 2.148.1 C (#2493): cancelled, never confirmed bookings are deleted after this
 APB_PENDING_MAIL = 3         # open bookings per customer e-mail and page
 APB_PENDING_PAGE = 50        # open bookings per page
 APB_VIEW_RATE = 60           # page views per client address and minute
@@ -390,6 +391,9 @@ def apb_expire(c, uid):
     c.execute("UPDATE appt_bookings SET status='expired' WHERE user_id=? AND status='pending' AND created_at<?",
               (uid, iso(now - timedelta(minutes=APB_HOLD_MIN))))
     c.execute("DELETE FROM appt_bookings WHERE user_id=? AND status='expired' AND created_at<?", (uid, iso(now - timedelta(days=APB_PURGE_DAYS))))
+    # 2.148.1 C (#2493): cancelled bookings that were never confirmed (address, contact data) go after APB_CANCEL_DAYS
+    c.execute("DELETE FROM appt_bookings WHERE user_id=? AND status='cancelled' AND COALESCE(confirmed_at, '')='' AND COALESCE(cancelled_at, '')<>'' "
+              "AND cancelled_at<?", (uid, iso(now - timedelta(days=APB_CANCEL_DAYS))))
 
 
 def apb_booking_out(r, tnames):

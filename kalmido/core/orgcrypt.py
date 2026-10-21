@@ -499,7 +499,8 @@ def oc_json_store(c, org_id, table, col, j):
 # fields, purchase prices, contract rates. Other entries stay plain (the daily count of own-text mails reads them)
 LOG_MARKERS = ('"iban"', '"bic"', '"bank_name"', '"tax_number"', '"vat_id"', '"cost"', '"costs"', '"margin"', '"rates"', '"company"', '"bank_lines"',
                '"cost_day"', '"cost_hour"', '"markup_pct"',  # 2.47.0 (#1649): the roles' purchase prices / markup
-               '"purchase_net"', '"new_value"', '"current_value"', '"serial_no"')  # 2.92.0 review (#1931): equipment value
+               '"purchase_net"', '"new_value"', '"current_value"', '"serial_no"',  # 2.92.0 review (#1931): equipment value
+               '"sig_proto"')  # 2.148.1 C (#2493): the decision of an approval link (the signer's name)
 
 
 def oc_log_detail(c, org_id, text):

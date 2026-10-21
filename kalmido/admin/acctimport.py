@@ -91,6 +91,10 @@ UMZ_DROP = {
 }
 
 _UMI = {}  # user id -> running check / import thread
+# 2.148.1 C (#2492, #2485): at most this many checks / imports at once on the whole server (every process): a slot is a
+# session advisory lock (class UMZ_SLOT_CLASS, key 0..n-1) on an own connection that the thread holds until it ends
+UMZ_PARALLEL = max(1, _env_mb("KALMIDO_ACCOUNT_IMPORT_PARALLEL", 2))
+UMZ_SLOT_CLASS = 21481
 _UMI_LOCK = threading.Lock()
 _PIECE_LOCK = threading.Lock()  # one piece at a time: two requests at the same offset must not both append
 _L = threading.local()  # the language of the person a background thread works for
@@ -721,7 +725,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
     from ..admin.hosting import QuotaExceeded, quota_guard
     from ..core.access import my_inbox, my_max_sort
     from ..core.orgcrypt import oc_user_space, oc_write_file
-    from ..files.upsafe import up_check, UploadRefused
+    from ..files.upsafe import up_after_store, up_check, UploadRefused
     from ..lists.lists import clean_folder, list_created, LIST_NAME_MAX
     from ..lists.projects import LIST_FILES_SUB
     from ..tasks.attachments import safe_name
@@ -858,7 +862,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         tid = run.m("tasks", r.get("task_id"))
         if not tid:
             continue
-        au = who(r.get("user_id"))
+        au = uid if _oid(r.get("user_id")) == me_old else None  # 2.148.1 C (#2492): others' comments by name only, never as an account
         ext = None if au else (names.get(_oid(r.get("user_id"))) or _txt(r.get("ext_name"), 100) or tr("Unknown"))
         d = umz_row(c, "comments", r, {"task_id": tid, "user_id": au, "ext_name": ext, "reply_to": run.m("comments", r.get("reply_to")),
                                         "mentions": ""}, ts)
@@ -890,10 +894,13 @@ def umz_write(c, run, uid, man, zf, files, data, people):
                 run.stopped = "quota"
                 raise UmzStop() from None
             name = safe_name(_txt(r.get("name"), 150))
+            if enc and raw[:5] != b"KENC\x01":  # 2.148.1 C (#2492): only a real browser-encrypted file (collab/e2e.py) skips the checks
+                enc = 0
+            mime, info = "application/octet-stream", None
             if not enc:  # 2.61.0 (#1818 #1819): a taken-over file is new content for this server: virus scan + photo metadata
                 try:
-                    raw, _mime, _info = up_check(c, name, raw, _txt(r.get("mime"), 120) or "application/octet-stream", uid,
-                                                 run.list_org.get(run.task_list.get(parent) if kind == "tasks" else parent), "att")
+                    raw, mime, info = up_check(c, name, raw, _txt(r.get("mime"), 120) or "application/octet-stream", uid,
+                                               run.list_org.get(run.task_list.get(parent) if kind == "tasks" else parent), "att")
                 except UploadRefused:
                     run.warning(N_("A file could not be taken over: {0}"), name)
                     continue
@@ -906,7 +913,8 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             # 2.42.0 (#828), 2.64.0 (#1864): sealed with the key of the list's space (organisation, else my account: I own the
             # taken-over lists); bytes from outside
             oc_write_file(c, lorg or oc_user_space(uid), full, raw, fresh=True)
-            fixed = {"name": name, "size": len(raw), "path": rel, "user_id": uid, "created_at": _txt(r.get("created_at"), 40) or ts}
+            fixed = {"name": name, "size": len(raw), "path": rel, "user_id": uid, "created_at": _txt(r.get("created_at"), 40) or ts,
+                     "mime": mime[:120]}  # 2.148.1 C (#2492): the type found in the content, not the one in the file
             if kind == "tasks":
                 fixed.update({"task_id": parent, "comment_id": run.m("comments", r.get("comment_id")), "enc": 1 if enc else 0,
                               "enc_by": uid if enc else None})
@@ -918,6 +926,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
                 run.warning(N_("A file could not be taken over: {0}"), name)
                 continue
             run.put(table, r.get("id"), nid)  # 2.137.0 B (#2344): the links of the file store point at them (oi_store.py)
+            up_after_store(c, "att" if kind == "tasks" else "list", nid, lorg or None, info)  # 2.148.1 C (#2492): unchecked = scanned later
             if kind == "tasks":
                 run.created["files"].append(rel)
             run.count(table)
@@ -1355,11 +1364,37 @@ def umz_unlock(uid, iid, okey, can_invite):
             _UMI.pop(int(uid), None)
 
 
+def _slot():
+    """2.148.1 C (#2492): an own connection holding a free import slot of the server, None when all are taken."""
+    from ..core.config import DATABASE_URL
+    from ..core.pg import connect_direct
+    lc = connect_direct(DATABASE_URL)
+    try:
+        for i in range(UMZ_PARALLEL):
+            if lc.execute("SELECT pg_try_advisory_lock(?, ?)", (UMZ_SLOT_CLASS, i)).fetchone()[0]:
+                lc.commit()
+                return lc
+    except Exception:
+        lc.close()
+        raise
+    lc.close()
+    return None
+
+
 def _thread(uid, fn, *args):
     with _UMI_LOCK:
         if _busy(uid):
             raise Denied(409, tr("An import is already running"))
-        t = threading.Thread(target=fn, args=(uid, *args), daemon=True)
+        lc = _slot()
+        if lc is None:
+            raise Denied(429, tr("Too many imports are running on this server right now. Please try again in a few minutes."))
+
+        def run():
+            try:
+                fn(uid, *args)
+            finally:
+                lc.close()  # (the slot's lock ends with its connection)
+        t = threading.Thread(target=run, daemon=True)
         _UMI[int(uid)] = t
         t.start()
 
