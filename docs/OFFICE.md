@@ -2202,16 +2202,62 @@ reminders). A draft invoice, credit note or reminder is rendered on request with
 attaches the stored files (PDF, and the XML for invoices / credit notes). A finalised quotation is not stored; its PDF is
 rendered from the snapshot on every request.
 
+## E-invoices over the Peppol network (2.154)
+
+A finalised invoice or credit note can go to the client over the Peppol network -- through **your own account** at a Peppol
+access point provider. Kalmido is no access point and charges nothing for it; the provider bills you directly (per document
+or as a package, see its price list). Nothing is sent before you set it up, and you can stop using it at any time.
+
+**Set up** (Office -> Settings -> Invoices -> *E-invoices over the Peppol network*; admins of the office area, without an
+organisation you yourself): choose the provider, enter the API key from your provider account (stored sealed with the
+server key, never shown again; a new provider or address drops it unless you enter a new one), *Test mode* while you try it
+with a sandbox key, and your own Peppol ID. **Check connection** asks the provider with the key (nothing is sent).
+
+- *Storecove*: the account ID is the id of your company there (legal entity). Kalmido hands the UBL file over for sending
+  (`document_submissions`, the raw document parsed by the provider), asks before sending whether the recipient is
+  reachable (`discovery/receives`) and reads the delivery evidence when you refresh the status.
+- *Own endpoint (URL)*: any bridge to an access point (your own one, another provider's API behind a small adapter) that
+  speaks this protocol, `https` (plain `http` only for a host the instance admin allowed like a calendar host); every call
+  carries `Authorization: Bearer <API key>`:
+
+| Call | Answer |
+|---|---|
+| `GET <url>/check` | `200` when the key is accepted |
+| `GET <url>/participants/<scheme>:<id>` | `{"reachable": true\|false}` (`404` = not reachable) |
+| `POST <url>/documents` -- body: the UBL (`application/xml`), headers `X-Peppol-Sender`, `X-Peppol-Receiver` (`<scheme>:<id>`), `Idempotency-Key` (the same key = the same document, never send twice), `X-Peppol-Test` (`1` in test mode) | `{"id": "<your reference>", "status": "sent\|delivered\|rejected\|error", "message": "..."}` |
+| `GET <url>/documents/<id>` | `{"status": "...", "message": "..."}` |
+
+**Peppol IDs** are written `<scheme>:<number>` with the ICD / EAS code of the scheme: `0088` GLN, `0208` Belgian enterprise
+number, `9930` German VAT ID (`9930:DE123456789`), `0204` Leitweg-ID, `0192` Norwegian organisation number, `0106` Dutch
+KvK number and the other codes of the EAS list. Unknown codes and numbers with a wrong check digit (0088, 0208, 0192) are
+refused. Your own ID is proposed from the company's VAT ID, the client's in the send dialog from its VAT ID where that is
+unambiguous (Germany -> 9930, Belgium -> 0208); the client's ID is the field *Peppol ID* in its billing details.
+
+**Send**: the menu of a finalised invoice / credit note -> *Send e-invoice over the Peppol network*. The dialog names what
+is still missing (setup, your ID, the client's ID), checks that the recipient is reachable and sends the UBL e-invoice
+(Peppol BIS Billing 3.0; a document in the XRechnung format as XRechnung UBL). The document is then *sent*, the office log
+has the entry, and the status (sent, delivered, rejected with the reason, failed) is fetched when you open the dialog or
+press *Refresh* -- nothing polls in the background. A document goes out once: a second send is refused unless the last one
+failed or was rejected (then *Send again*, after checking with the provider). Peppol needs a buyer reference or an order
+number; without them the client's customer number stands in. Agents read the status in the document (`peppol` in
+`GET /api/v1/office/docs/{id}`) but never send. Receiving invoices over Peppol is not part of 2.154.
+
+The UBL file of any finalised invoice / credit note is also downloadable (`GET /api/office/docs/<id>/ubl`, menu
+*E-invoice UBL (Peppol)*): with the Peppol IDs when they are set, else the e-mail addresses as electronic addresses.
+
 ## Validators
 
 Two real validators run in CI (job "E-invoice validators", blocking) on the files `tests/office_einvoice_test.py` writes
 to `tests/.data/einvoice/`: veraPDF (PDF/A-3b, Docker image `ghcr.io/verapdf/cli`) for the PDFs and the KoSIT validator
 (Java 17, the release jar plus the XRechnung scenario configuration, both downloaded once with their SHA-256 checked and
 cached) for the XML -- the configuration validates XRechnung files against the XRechnung rules and plain EN 16931 files
-against the EN 16931 Schematron. Locally:
+against the EN 16931 Schematron. 2.154.0: the UBL files of `tests/p2154_b_ubl_test.py` as well (EN 16931, XRechnung UBL and
+Peppol BIS Billing 3.0 -- the latter with the OpenPeppol rules `PEPPOL-EN16931-UBL`, taken from the phive rules jar on Maven
+Central with its SHA-256 checked; `tools/kosit_peppol_scenarios.py` adds their scenarios to the configuration). Locally:
 
 ```
 python3 tests/office_einvoice_test.py
+python3 tests/p2154_b_ubl_test.py
 tools/einvoice_validate.sh tests/.data/einvoice/*.pdf tests/.data/einvoice/*.xml
 ```
 

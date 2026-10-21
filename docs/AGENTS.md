@@ -1780,7 +1780,7 @@ area's clients, documents or lists answer `404`.
 | The area, the person, the rules; 2.147: `country_pack` and `features` (the office functions as switched on, e.g. `books.datev: false`) | `GET /api/v1/office` | `get_office` |
 | Services, text blocks, framework contracts, clients (`q`) -- never purchase prices | `GET /api/v1/office/{services\|texts\|contracts\|clients}` | `list_office_data` |
 | Documents (`kind` offer / invoice / credit / reminder, `client_id`, `status`, `open=1`, 2.144.10: `trial=1\|0`) | `GET /api/v1/office/docs` | `list_office_documents` |
-| One document with its positions | `GET /api/v1/office/docs/{id}` | `get_office_document` |
+| One document with its positions (2.154: `peppol` = the status of its send over the Peppol network, read only -- a person sends) | `GET /api/v1/office/docs/{id}` | `get_office_document` |
 | The PDF preview of a draft (marked as a draft) | `GET /api/v1/office/docs/{id}/pdf` | -- (binary; the chat card links it) |
 | A quotation draft (`client_id`, `title`, `intro`, `items`, `list_id`, `notify`; 2.144.10: `trial` = a trial quotation) | `POST /api/v1/office/offers` | `create_offer_draft` |
 | Change your own draft (only while it is a draft; 2.88: also `cashflow` auto / yes / no, its share in the cash flow plan once sent) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |

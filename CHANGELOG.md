@@ -124,6 +124,21 @@ Correspondence in the office (letters, e-mail, text blocks, agent drafts), custo
 - Moving a private office into an organisation keeps an existing letter signature there and unlinks letters from private documents (named in the preview).
 - Writing into a job's chat needs the right to stop that job, like the job's message button.
 
+## [2.154.0] - 2026-10-21
+
+Office and documents: stack scans split into documents, documents linked with tasks, agents' receipt suggestions in the office, e-invoices over the Peppol network, data protection sheets for clients, an industry pack per calculation part.
+
+### Added
+- Documents: a stack scan with several archive numbers (or separator sheets) is marked *Stack - split?* and splits into single documents after a preview with movable cuts; blank back pages can be left out; one undo step brings the stack back. A separator sheet to print is in the documents' settings (#1111).
+- Documents: a document can be linked with an existing task (and unlinked); the task shows *Document: <name>* to everyone who may see the document (#1111).
+- Office: the receipt sheet shows the open suggestions of agents (accept / reject, with undo) and "Suggested by …, confirmed by …" (#1356).
+- Office: e-invoices over the Peppol network through your own Peppol access point provider account (set up in the office settings, off by default): Peppol ID for the office and clients with format and check digit test and a suggestion from the VAT ID, receiver check, status sent / delivered / rejected, protection against double sending; UBL download (Peppol BIS Billing 3.0, XRechnung UBL), checked in CI with KoSIT and the OpenPeppol rules (#1960).
+- Office: data protection sheets for a client - data processing agreement, privacy information and consent as samples (sample text, no legal advice); a PDF in the client's folder, sent by mail with a link to sign, signed back by the link, by upload or by a reply mail with a tag in the subject (a person confirms); status per sheet and a data protection filter in the client list (#2192).
+- Office: when a calculation part is added, the industry pack can be chosen (only switched-on packs; with one pack nothing changes); existing parts keep theirs (#1876).
+
+### Changed
+- Office: duplicating an invoice made from times asks first and the copy says "Copy of …: the hours of that invoice are already billed" while it is a draft (#2567).
+
 ## [2.147.1] - 2026-10-21
 
 Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.

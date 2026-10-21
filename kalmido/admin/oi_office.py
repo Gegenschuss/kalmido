@@ -369,6 +369,8 @@ SPECS = [
         "doc_id": "office_docs"}, late={"node_id": "fs_nodes", "signed_node_id": "fs_nodes"}, people=_P, private="office"),
     OiT("office/signoffs.json", "office_signoffs", refs={"doc_id": "office_docs", "list_id": "lists", "section_id": "sections", "task_id": "tasks",
         "gen_doc_id": "office_gen_docs"}, late={"video_id": "video_reviews"}, people=_P, private="office", prep=_p_signoff, after=_a_signoff),
+    OiT("office/privacy_sheets.json", "office_privacy_sheets", refs={"client_id": "clients", "gen_doc_id": "office_gen_docs"},
+        late={"signed_node_id": "fs_nodes"}, people=_P, private="office"),  # 2.154.0 C (#2192): the mail code is new on the target (code_hash dropped)
     OiT("office/trip_purposes.json", "office_trip_purposes", people=_P, private="office"),
     OiT("office/trips.json", "office_trips", refs={"client_id": "clients"}, people=_P, private="office"),
     OiT("office/trip_items.json", "office_trip_items", refs={"trip_id": "office_trips", "billed_doc_id": "office_docs"}, need=("trip_id",),
@@ -402,6 +404,8 @@ SPECS = [
         people={"user_id": "null"}, private="office"),
     OiT("office/dunning_marks.json", "office_dunning_marks", refs={"doc_id": "office_docs", "reminder_id": "office_docs"}, need=("doc_id",),
         private="office"),  # 2.147.1 (#2054, review): a suggested reminder deleted by hand stays not suggested after an import
+    OiT("office/peppol_sends.json", "office_peppol_sends", refs={"doc_id": "office_docs"}, need=("doc_id",), people=_P,
+        private="office"),  # 2.154.0 B (#1960): the history of sends over Peppol (the connection itself is set up again)
     OiT("office/cashflow_start.json", "office_cf_start", people={"updated_by": "null"}, private="office", rid=False, key=("org_id",),
         prep=_p_once("office_cf_start", N_("The target office already has its own cash flow start balance; it was kept."))),
     OiT("office/cashflow_adjust.json", "office_cf_adjust", people=_P, private="office"),

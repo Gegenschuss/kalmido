@@ -345,3 +345,90 @@ document.addEventListener('input', e => {
   if (e.target.id === 'dt-body') dtPvSoon(S.route.id);
   dtSaveSoon(S.route.id);
 });
+
+// ---- 2.154.0 C (#2192): data protection sheets of a client (office/privacy.py): the dialog of the client card's button
+// "Data protection sheet" (which sheet, which text), the sheet's menu (PDF, mail, signed upload, check, status, archive)
+// and the mail dialog (recipient, subject and text to look at and change). The section itself: clientpage.js dsb_clHtml.
+const DSB_API = '/api/office/privacy-sheets';
+async function dsb_new(cid) {
+  let d; try { d = await api('GET', `${DSB_API}?client_id=${cid}`); } catch (x) { toast(x.message || ''); return; }
+  const kinds = d.kinds || [], hint = k => kinds.find(x => x.key === k)?.hint || '';
+  const md = modal(`<h3>${tr('Data protection sheet')}</h3>
+    ${ofcRowF('dsb-kind', tr('Sheet'), ofcSel('dsb-kind', 'dpa', kinds.map(k => [k.key, k.label])))}
+    <p class="muted ofchint" id="dsb-hint">${esc(hint('dpa'))}</p>
+    ${ofcRowF('dsb-tpl', tr('Text'), ofcSel('dsb-tpl', '', (d.templates || []).map(t => [t.id, t.name]), tr('Sample')))}
+    <p class="muted ofchint">${esc(tr('A text with [placeholders] opens in the editor first; the PDF is filed with the client when it is finished.'))} ${esc(d.note || '')}</p>
+    <div class="aerr" role="alert"></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button></div>`);
+  md.classList.add('ofcdlg', 'dsbdlg');
+  const close = fgModal(md);
+  md.addEventListener('change', e => { if (e.target.id === 'dsb-kind') { const el = $('#dsb-hint', md); if (el) el.textContent = hint(e.target.value); } });
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { close(); return; }
+    b.disabled = true;
+    try {
+      const j = await api('POST', DSB_API, {client_id: cid, kind: $('#dsb-kind', md).value, template_id: +$('#dsb-tpl', md).value || null});
+      md.remove(); dsb_clReload();
+      const undo = async () => { await api('DELETE', `${DSB_API}/${j.sheet.id}`); dsb_clReload(); };
+      if (j.edit) { DT.data = null; DT.pv = null; go(`office/gendocs/${j.sheet.gen_doc_id}`); toast(tr('Fill in the [placeholders], then finish the document'), undo); }
+      else toast(tr('Created'), undo);
+    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+  });
+}
+async function dsb_set(x, body) {
+  try { await api('PATCH', `${DSB_API}/${x.id}`, body); dsb_clReload(); } catch (e) { toast(e.message || ''); }
+}
+function dsb_open(x, signed) {
+  const u = `${DSB_API}/${x.id}/pdf${signed ? '?signed=1' : ''}`;
+  if (!signed && typeof pdfView === 'function') pdfView({url: u, name: (x.title || 'sheet') + '.pdf', dlUrl: u});
+  else window.open(u, '_blank', 'noopener');  // the signed sheet may be a photo (upload / mail): the browser shows either
+}
+function dsb_menu(b, x) {
+  if (!x) return;
+  const draft = x.gen_status === 'draft', done = ['signed', 'handed'].includes(x.status);
+  const st = (k, l) => x.status !== k ? {label: l, icon: 'edit', fn: () => dsb_set(x, {status: k})} : null;
+  menu(b, [draft ? {label: tr('Edit and finish'), icon: 'edit', fn: () => { DT.data = null; DT.pv = null; go(`office/gendocs/${x.gen_doc_id}`); }} : null,
+    !draft && x.node_id ? {label: tr('Open PDF'), icon: 'file', fn: () => dsb_open(x, false)} : null,
+    x.signed_node_id ? {label: tr('Open the signed sheet'), icon: 'file', fn: () => dsb_open(x, true)} : null,
+    x.review ? {label: x.review === 2 ? tr('Checked: reply handled') : tr('Checked: signature is fine'), icon: 'check',  /* 2.154.0 E (#2192): review 2 = a reply that was not filed (office log) */ fn: async () => { try { await api('POST', `${DSB_API}/${x.id}/confirm`); dsb_clReload(); } catch (e) { toast(e.message || ''); } }} : null,
+    !draft && !(x.sign && x.status === 'signed') ? {label: tr('Send by e-mail…'), icon: 'mail', fn: () => dsb_mail(x)} : null,
+    !draft && x.sign && x.status !== 'signed' ? {label: tr('Upload the signed sheet…'), icon: 'upload', fn: () => dsb_upload(x)} : null,
+    ...(draft ? [] : x.sign ? [st('signed', tr('Mark as signed')), st('declined', tr('Mark as declined')), x.review === 1 ? st('sent', tr('Not the signed sheet: back to sent')) : null]
+      : [st('handed', tr('Mark as handed over'))]),
+    done || x.status === 'declined' ? st('open', tr('Mark as open')) : null,
+    {label: tr('Archive'), icon: 'archive', fn: async () => {
+      try { await api('DELETE', `${DSB_API}/${x.id}`); dsb_clReload(); toast(tr('Archived'), async () => { await api('POST', `${DSB_API}/${x.id}/restore`); dsb_clReload(); }); } catch (e) { toast(e.message || ''); }
+    }}].filter(Boolean));
+}
+function dsb_upload(x) {
+  const i = document.createElement('input'); i.type = 'file'; i.accept = 'application/pdf,.pdf,image/jpeg,image/png';
+  i.onchange = async () => {
+    const f = i.files?.[0]; if (!f) return;
+    const fd = new FormData(); fd.append('file', f, f.name || 'signed.pdf');
+    try { await api('POST', `${DSB_API}/${x.id}/signed`, fd); toast(tr('Signed sheet filed with the client')); dsb_clReload(); } catch (e) { toast(e.message || ''); }
+  };
+  i.click();
+}
+async function dsb_mail(x) {
+  let m; try { m = await api('GET', `${DSB_API}/${x.id}/mail`); } catch (e) { toast(e.message || ''); return; }
+  if (!m.smtp) { toast(tr('Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)')); return; }
+  const md = modal(`<h3>${tr('Send by e-mail')} · ${esc(x.kind_label)}</h3>
+    ${ofcRowF('dsb-to', tr('To'), `<input id="dsb-to" type="email" value="${esc(m.to || '')}" maxlength="200" autocomplete="off">`)}
+    ${ofcRowF('dsb-subj', tr('Subject'), ofcIn('dsb-subj', m.subject, {max: 200}))}
+    <label for="dsb-text" class="dtp-lab">${tr('Text')}</label><textarea id="dsb-text" class="dtp-ta" rows="9" maxlength="5000">${esc(m.text || '')}</textarea>
+    <p class="muted ofchint">${esc([tr('The PDF goes along as attachment.'), m.link ? tr('[Link] becomes the link to sign online.') : '', m.reply_in ? tr('A reply with the signed PDF is filed with the client; keep the code in the subject.') : ''].filter(Boolean).join(' '))}</p>
+    <div class="aerr" role="alert"></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="send">${ic('mail', 's')} ${tr('Send|mail')}</button></div>`);
+  md.classList.add('ofcdlg', 'dsbdlg');
+  const close = fgModal(md);
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { close(); return; }
+    b.disabled = true;
+    try {
+      await api('POST', `${DSB_API}/${x.id}/send`, {to: $('#dsb-to', md).value.trim(), subject: $('#dsb-subj', md).value, text: $('#dsb-text', md).value});
+      md.remove(); toast(tr('Sent')); dsb_clReload();
+    } catch (er) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = er.message || ''; }
+  });
+}

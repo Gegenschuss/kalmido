@@ -40,6 +40,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   e-mail with the answer linked automatically, text blocks, deadlines and follow-ups as tasks, answer drafts by agents;
   **custom fields for documents** (also from Paperless); an **own chat per job**; **all receipts** with filters and an
   export of the filtered receipts for the tax advisor; incoming e-invoices become receipts.
+- **2.154.0** (2026-10-21): **stack scans split into documents** by archive numbers or separator sheets (preview with cuts,
+  blank pages left out, undo), documents **linked with tasks**; **e-invoices over the Peppol network** through your own
+  access point provider account (UBL, Peppol ID, status); **data protection sheets** for clients (DPA, privacy
+  information, consent) with mail, signing link and status; agents' receipt suggestions in the office; an industry pack
+  per calculation part; a hint when duplicating an invoice made from times.
 - **2.147.1** (2026-10-21): **drag tasks into the chats** (team chat, thread, agent chat) as references, several at once, with
   *Insert reference* on phones; **overdue invoices suggest a payment reminder** as a draft (nothing is sent) and
   invoices / reminders in EUR carry a **GiroCode** for banking apps; moving many documents to another workspace shows

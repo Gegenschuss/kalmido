@@ -2,6 +2,7 @@
 # 2.38.0 (#1021 P5): validates the e-invoice files Kalmido writes -- PDF/A-3b with veraPDF and the CII XML (EN 16931 /
 # XRechnung) with the KoSIT validator. Runs in CI (job "E-invoice validators") and locally:
 #   tools/einvoice_validate.sh tests/.data/einvoice/*.pdf tests/.data/einvoice/*.xml
+# 2.154.0 B (#1960): + the UBL files (EN 16931, XRechnung UBL, Peppol BIS Billing 3.0 with the OpenPeppol rules).
 # PDFs go to veraPDF (the Docker image ghcr.io/verapdf/cli, profile 3b); XML files go to the KoSIT validator (Java 17+,
 # the release jar + the XRechnung scenario configuration, both downloaded once with their SHA-256 checked into
 # $KALMIDO_VALIDATOR_CACHE, default ~/.cache/kalmido-validators). Exit 1 when any file fails, 2 on setup problems.
@@ -15,6 +16,11 @@ KOSIT_JAR_SHA=799e64befca97d4080e03608c80b85dd5a5ecc5f4ae4f35d1116ec2855b9a7c9
 XR_CONF_VERSION=2026-08-31
 XR_CONF_URL="https://github.com/itplr-kosit/validator-configuration-xrechnung/releases/download/v${XR_CONF_VERSION}/xrechnung-3.0.2-validator-configuration-${XR_CONF_VERSION}.zip"
 XR_CONF_SHA=2530cd107c414511c5d0462ec10f886910395abfca820db82e83d70bf01221a8
+# 2.154.0 B (#1960): the OpenPeppol rules (Peppol BIS Billing 3.0, compiled Schematron PEPPOL-EN16931-UBL.xslt) from the
+# phive rules jar on Maven Central; tools/kosit_peppol_scenarios.py adds their scenarios (UBL with the Peppol CustomizationID)
+PEPPOL_JAR_URL="https://repo1.maven.org/maven2/com/helger/phive/rules/phive-rules-peppol/3.2.10/phive-rules-peppol-3.2.10.jar"
+PEPPOL_JAR_SHA=9f03f404186ad72b484d95cd2d405f8bc694440b9125d07275fd0749c10fbef9
+PEPPOL_XSLT=external/schematron/openpeppol/2024.11/xslt/PEPPOL-EN16931-UBL.xslt
 mkdir -p "$CACHE/reports"
 pdfs=(); xmls=()
 for f in "$@"; do
@@ -56,9 +62,15 @@ if [[ ${#xmls[@]} -gt 0 ]]; then
     rm -rf "$conf"; mkdir -p "$conf"
     (cd "$conf" && unzip -q "$CACHE/xrechnung-conf-${XR_CONF_VERSION}.zip") || { echo "unzip failed"; exit 2; }
   fi
-  echo "== KoSIT validator ${KOSIT_VERSION} + XRechnung configuration ${XR_CONF_VERSION}: ${xmls[*]}"
+  fetch "$PEPPOL_JAR_URL" "$CACHE/phive-rules-peppol-3.2.10.jar" "$PEPPOL_JAR_SHA" || exit 2
+  if [[ ! -s "$conf/resources/peppol/PEPPOL-EN16931-UBL.xslt" ]]; then
+    mkdir -p "$conf/resources/peppol"
+    unzip -p "$CACHE/phive-rules-peppol-3.2.10.jar" "$PEPPOL_XSLT" > "$conf/resources/peppol/PEPPOL-EN16931-UBL.xslt" || { echo "Peppol rules not in the jar"; exit 2; }
+  fi
+  python3 "$(dirname "$0")/kosit_peppol_scenarios.py" "$conf" || exit 2
+  echo "== KoSIT validator ${KOSIT_VERSION} + XRechnung configuration ${XR_CONF_VERSION} + Peppol BIS 3.0: ${xmls[*]}"
   rep="$CACHE/reports"; rm -f "$rep"/*
-  java -jar "$CACHE/validator-${KOSIT_VERSION}-standalone.jar" -s "$conf/scenarios.xml" -r "$conf" -h -o "$rep" "${xmls[@]}" 2>&1 | grep -vE "^\s*$" | tail -40
+  java -jar "$CACHE/validator-${KOSIT_VERSION}-standalone.jar" -s "$conf/scenarios-peppol.xml" -r "$conf" -h -o "$rep" "${xmls[@]}" 2>&1 | grep -vE "^\s*$" | tail -40
   for f in "${xmls[@]}"; do
     b=$(basename "$f" .xml); r="$rep/$b-report.xml"
     if [[ ! -f "$r" ]]; then echo "FAIL $f: no report"; rc=1; continue; fi

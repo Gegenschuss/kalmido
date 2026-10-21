@@ -377,6 +377,7 @@ function ofcSettingsHtml() {
     ${typeof dun_settingsHtml === 'function' ? dun_settingsHtml(s, dis) : '' /* 2.147.1 B (#2054) */}
     ${typeof tpSettingsHtml === 'function' ? tpSettingsHtml(s, dis) : ''}
     ${ofcFeat('docs.einvoice') ? ofcEinvRow(s) : ''}
+    ${ofcFeat('docs.einvoice') && typeof pep_settingsHtml === 'function' ? pep_settingsHtml() : '' /* 2.154.0 B (#1960) */}
     </fieldset>${ost_p('data', dis)}
     ${ofcFeat('books.datev') ? `${ofcRowF('os-datev', tr('DATEV inbox'), `<input id="os-datev" type="email" value="${esc(s.datev_email || '')}" maxlength="200" placeholder="${esc(tr('e-mail address of the document inbox'))}" ${dis}>`, tr('finalised invoices are mailed there as PDF + XML'))}${ofcII('datev')}
     ${ofcChk('os-datev-auto', tr('Send every invoice to the DATEV inbox when it is sent'), s.datev_auto)}${ofcII('datev_auto')}` : ''}
@@ -555,6 +556,7 @@ const OFC_II = {
   register_court: N_('From the commercial register, e.g. Amtsgericht Hamburg, HRB 12345. Needed for GmbH, UG, AG and eGbR; empty for sole proprietors and a GbR.'),
   vat_id: N_('VAT identification number (USt-IdNr.), e.g. DE123456789: needed on invoices to companies in other EU countries.'),
   tax_number: N_('The tax number from your tax office, e.g. 12/345/67890; printed when there is no VAT ID.'),
+  cl_peppol_id: N_('For e-invoices over the Peppol network: scheme and number of the client, e.g. 0208:0123456749 (Belgium), 9930:DE123456789 or 0088:GLN. The client or its software provider knows it.'),  // 2.154.0 B (#1960)
   cl_buyer_reference: N_('Public clients give you a routing ID (Leitweg-ID, e.g. 991-12345-67); companies sometimes an order or reference number. It is printed and goes into the e-invoice.'),
   cl_email_invoice: N_('Where invoices of this client are sent, e.g. the accounting department; empty = the client\'s normal e-mail.'),
   cl_payment_terms_days: N_('Days this client has to pay; empty = the payment terms of the settings.'),

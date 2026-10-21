@@ -100,6 +100,7 @@ jobs:
         run: |
           python tests/office_pdf_test.py
           python tests/office_einvoice_test.py
+          python tests/p2154_b_ubl_test.py  # 2.154.0 B (#1960): UBL (Peppol BIS 3.0, XRechnung UBL, EN 16931), after the CII files
       - name: veraPDF + KoSIT
         run: tools/einvoice_validate.sh tests/.data/einvoice/*.pdf tests/.data/einvoice/*.xml
       - name: Reports on failure

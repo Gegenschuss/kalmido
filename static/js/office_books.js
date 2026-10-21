@@ -230,7 +230,7 @@ async function bkSheet(id, fresh) {
   try { [doc, rc] = await Promise.all([api('GET', `/api/docs/${id}`), api('GET', `/api/docs/${id}/receipt`)]); } catch (x) { toast(x.message || tr('unknown')); return; }
   const r = rc.receipt || {}, cats = [...new Set([...(BK.info?.categories || []), ...(rc.categories || [])])];
   const wait = doc.state === 'wait' || doc.state === 'run';
-  const md = modal(`<h3>${tr('Receipt')}</h3><p class="muted bk-sname">${esc(doc.name)}${doc.einvoice ? ` · <a class="bk-einv" href="/api/docs/${id}/einvoice" target="_blank" rel="noopener">${tr('Readable view')}</a>` : ''}</p><div class="bk-rx"></div>
+  const md = modal(`<h3>${tr('Receipt')}</h3><p class="muted bk-sname">${esc(doc.name)}${doc.einvoice ? ` · <a class="bk-einv" href="/api/docs/${id}/einvoice" target="_blank" rel="noopener">${tr('Readable view')}</a>` : ''}</p><div class="bk-rx"></div><div class="bk-rcs"></div>
     <p class="muted bk-rec" role="status">${wait ? tr('Being recognised…') : ''}</p>
     ${ofcRowF('bk-cat', tr('Category'), ofcIn('bk-cat', r.category, {max: 60, list: 'bk-cats', ph: tr('e.g. Travel, Material, Software')}) + `<datalist id="bk-cats">${cats.map(k => `<option value="${esc(k)}"${bkAcct(k) ? ` label="${esc(bkAcct(k).account)}"` : ''}>`).join('')}</datalist>`)}
     <div class="bk-acct muted" aria-live="polite"></div>
@@ -243,6 +243,8 @@ async function bkSheet(id, fresh) {
   md.classList.add('ofcdlg', 'bk-sheet');
   md.dataset.rxid = String(id);
   // 2.121.0 A (#2092): the recognised values (supplier, VAT rate, net / gross) with Take over (receipts.js of the documents)
+  // 2.154.0 A (#1356): the agents' open suggestions of the receipt (Accept / Reject) and who confirmed one (receipts.js)
+  if (rc.suggestions?.length || rc.confirmed) loadModule('docs').then(() => { if (typeof rc_bkSlot === 'function') rc_bkSlot(md, id, rc); }).catch(() => 0);
   if (doc.extracted || doc.duplicate_of) loadModule('docs').then(() => { const el = $('.bk-rx', md); if (el && typeof rx_html === 'function') el.innerHTML = rx_html(doc); }).catch(() => 0);
   const close = fgModal(md), touched = new Set();
   md.addEventListener('input', e => { if (e.target.id) touched.add(e.target.id); });

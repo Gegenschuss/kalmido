@@ -184,7 +184,19 @@ def rc_state(c, node, m, uid):
         "SELECT id, name FROM lists WHERE kind='project' AND archived=0 AND org_id IS NOT DISTINCT FROM ? ORDER BY lower(name)",
         (node["org_id"],)) if list_role(c, x["id"], uid)][:300]
     return {"receipt": cur, "suggestions": sugs, "categories": rc_categories(c, m["ws"]), "projects": projects,
-            "can_edit": node["role"] in ("owner", "edit")}
+            "can_edit": node["role"] in ("owner", "edit"), "confirmed": rc_confirmed(c, node["id"], r)}
+
+
+def rc_confirmed(c, nid, r):
+    """2.154.0 A (#1356): {agent, by, at} when the receipt's assignment is still the one a person took over from an agent's
+    suggestion (nobody changed it since: same person, set before the decision was written), else None."""
+    if not r or not r["set_by"]:
+        return None
+    s = c.execute("SELECT agent_id, decided_by, decided_at FROM rc_suggest WHERE node_id=? AND state='accepted' AND decided_by=? "
+                  "ORDER BY decided_at DESC, id DESC LIMIT 1", (nid, r["set_by"])).fetchone()
+    if not s or not s["decided_at"] or str(r["set_at"] or "") > str(s["decided_at"]):
+        return None
+    return {"agent": _who(c, s["agent_id"]), "by": _who(c, s["decided_by"]), "at": s["decided_at"]}
 
 
 # ---- people (the app) ---------------------------------------------------------------------------------------------------

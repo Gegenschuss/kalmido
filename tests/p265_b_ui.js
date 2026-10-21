@@ -51,6 +51,7 @@ const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview', 'docprevie
   // 2.141.0 (#2140 #2141): + the HTML view / mailbox styles on top of 2.140.0 -- 4.05 MB / 634.2 KB on purpose
   // 2.143.0 (#2153 #2155): + the outbox / install hint / appearance sync at start on top of 2.142.0 -- 4.08 MB on purpose
   // 2.145.0 (#2437 #2438 #2444 #2432): sidebar mark, workspace head, news hint, print head styles on top of 2.144.2 -- 4.10 MB / 640.5 KB on purpose = tools/perf_budget.json start_css_bytes (measured 4089619 / 637192)
+  // 2.154.0 (#1111 #1960 #2192 #1876): hooks of stack split / task documents, Peppol and data protection sheets at start -- 4.12 MB on purpose (measured 4113574 / 639319)
   // 2.153.0 (#1962 #2179): job chat link / progress lines and the agent rules on custom fields + the job chat -- 4.12 MB on purpose (measured 4110616)
   // 2.144.6 A (#2053): billable / billed in the time rows and the invoice-from-time dialog (time.js, office_docs.js at start) -- 4.11 MB on purpose (measured 4103574 / 638107); 4.12 MB on top of main 2.147.1 (measured 4110402 / 639038)
   // 2.149.0 F (#2519): app.css 642 KB (base 2.146 already measured 637959 bytes; + the 5 defined variables); start 4.15 MB from the 2.147.1 CI fix

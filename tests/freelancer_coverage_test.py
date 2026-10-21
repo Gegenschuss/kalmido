@@ -31,7 +31,8 @@ KINDS = {
                          "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0); undo of the editors (2.111.0); "
                          "p2137_a_api_test.py: the owner exports the personal office (export, recovery key) and imports an organisation's office into it (2.137.0); p2146_d_api_test.py: the retention export of the own records before a deletion (2.146.0)"),
     "files": ("matrix", SUITE + ", p21121_a_api_test.py, p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
-                         "file requests of a private folder, tags of files / folders, the tag filter, the documents' filters, bulk change, ZIP, CSV, documents via the API (2.122.0)"),
+                         "file requests of a private folder, tags of files / folders, the tag filter, the documents' filters, bulk change, ZIP, CSV, documents via the API (2.122.0); "
+                         "p2154_a_api_test.py: a stack split in the private space, its undo, a private document linked with a private task (2.154.0)"),
     "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private space (create, change, search, export, trash; "
                        "2.99.0: page files, ZIP import with PDFs / pictures; 2.123.0: p2123_b_api_test.py shares of pages / folders, p2123_a_api_test.py page history, text search; 2.143.0: p2143_b_api_test.py the trash, delete for good, empty)"),
     "pim": ("matrix", SUITE + ", p294_b_api_test.py, p21191_a_api_test.py, p2111_b_api_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password; "
@@ -198,6 +199,9 @@ ROUTES = {
     # ---- files (51)
     "DELETE /api/docs/labels/{}/{}": "files", "DELETE /api/docs/mail": "files", "DELETE /api/docs/rules/{}": "files",
     "DELETE /api/docs/{}/task": "files", "DELETE /api/files/nodes/{}": "files", "DELETE /api/files/shares/{}": "files",
+    "GET /api/docs/{}/split": "files", "GET /api/docs/{}/split/thumbs": "files", "POST /api/docs/{}/split": "files",  # 2.154.0 A (#1111)
+    "POST /api/docs/{}/unsplit": "files", "POST /api/docs/{}/split/dismiss": "files", "POST /api/docs/{}/task/link": "files",
+    "GET /api/tasks/{}/docs": "files", "GET /api/docs/split-sheet.pdf": "files",
     "GET /api/docs": "files", "GET /api/docs/settings": "files", "GET /api/docs/{}": "files", "GET /api/docs/{}/file": "files",
     "GET /api/docs/{}/receipt": "files", "GET /api/docs/{}/thumb": "files", "GET /api/files": "files",
     "GET /api/files/folders": "files", "GET /api/files/nodes/{}": "files", "GET /api/files/nodes/{}/content": "files",
@@ -417,6 +421,10 @@ ROUTES = {
     "POST /api/office/docs/from-time": "office", "POST /api/office/docs/reminder": "office",
     "POST /api/office/docs/{}/delivery": "office", "GET /api/office/docs/{}/timesheet.pdf": "office",  # 2.120.0 D (#2089)
     "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/{}/datev": "office",
+    # 2.154.0 B (#1960): e-invoices over Peppol (p2154_b_peppol_test.py: the freelancer sets up and sends in the personal office)
+    "GET /api/office/peppol": "office", "PUT /api/office/peppol": "office", "POST /api/office/peppol/check": "office",
+    "GET /api/office/docs/{}/ubl": "office", "GET /api/office/docs/{}/peppol": "office", "POST /api/office/docs/{}/peppol": "office",
+    "POST /api/office/docs/{}/peppol/lookup": "office",
     "POST /api/office/docs/{}/cashflow": "office", "POST /api/office/docs/{}/duplicate": "office", "POST /api/office/docs/{}/fee": "office",
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
     "POST /api/office/docs/{}/invoice": "office",
@@ -817,6 +825,12 @@ ROUTES = {
     "DELETE /api/office/gen-docs/{}": "office", "POST /api/office/gen-docs/{}/restore": "office", "POST /api/office/gen-docs/preview": "office",
     "POST /api/office/gen-docs/{}/final": "office", "GET /api/office/gen-docs/{}/pdf": "office", "POST /api/office/gen-docs/{}/signoff": "office",
     "GET /api/office/gen-docs/{}/signoffs": "office",
+    # 2.154.0 C (#2192): data protection sheets of a client (p2154_c_api_test.py)
+    "GET /api/office/privacy-sheets": "office", "POST /api/office/privacy-sheets": "office", "PATCH /api/office/privacy-sheets/{}": "office",
+    "DELETE /api/office/privacy-sheets/{}": "office", "POST /api/office/privacy-sheets/{}/restore": "office",
+    "POST /api/office/privacy-sheets/{}/confirm": "office", "GET /api/office/privacy-sheets/{}/mail": "office",
+    "POST /api/office/privacy-sheets/{}/send": "office", "POST /api/office/privacy-sheets/{}/signed": "office",
+    "GET /api/office/privacy-sheets/{}/pdf": "office",
     # 2.93.0 B (#1928): the logbook, the personal office of a freelancer in p293_b_api_test.py
     "GET /api/office/vehicles": "office", "POST /api/office/vehicles": "office", "PATCH /api/office/vehicles/{}": "office",
     "GET /api/office/drives": "office", "POST /api/office/drives": "office", "PATCH /api/office/drives/{}": "office", "DELETE /api/office/drives/{}": "office",

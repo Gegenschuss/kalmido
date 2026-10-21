@@ -51,7 +51,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     check(await ready(ev, `!!document.querySelector('[data-dt="starters"]')`), 'the templates view');
     await ev(`(() => { document.querySelector('[data-dt="starters"]').click(); return 1; })()`);
     // 2.117.0 (#2283): three contract samples + seven letters
-    check(await ready(ev, `document.querySelectorAll('.modal .dtp-starters li').length === 10`), 'the ten samples');
+    check(await ready(ev, `document.querySelectorAll('.modal .dtp-starters li').length === 13`), 'the thirteen samples');  // 2.154.0 (#2192): + three data protection sheets
     check(await ev(`/legal advice|Rechtsberatung/.test(document.querySelector('.modal').textContent)`), 'the note: sample text, no legal advice');
     await ev(`(() => { document.querySelector('.modal [data-m="take"][data-k="contract"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal') && document.querySelectorAll('.dtp-list .ofcrow').length === 1`), 'use sample: the contract is an own template');

@@ -470,7 +470,8 @@ document.addEventListener('change', e => { if (e.target.id === 'wl-org') { WLV.o
 // reference, invoice e-mail, payment terms); folded away, the free address above stays
 const OFX_CL_FIELDS = [['street', N_('Street'), 200], ['address_extra', N_('Address extra'), 200], ['zip', N_('Postcode'), 20], ['city', N_('City'), 120], ['country', N_('Country'), 2],
   ['vat_id', N_('VAT ID'), 20], ['customer_no', N_('Customer number'), 40], ['buyer_reference', N_('Buyer reference (e.g. routing ID)'), 60],
-  ['email_invoice', N_('E-mail for invoices'), 200], ['payment_terms_days', N_('Payment terms (days)'), 3]];
+  ['email_invoice', N_('E-mail for invoices'), 200], ['payment_terms_days', N_('Payment terms (days)'), 3],
+  ['peppol_id', N_('Peppol ID'), 90]];  // 2.154.0 B (#1960): e-invoices over the Peppol network
 // 2.97.0 B (#1951): the address (street, extra line, postcode, city, country) stands in the form itself, the rest of the
 // billing details below it; the free "Address" text is gone (the server keeps it in its column)
 const CDN_ADDR = ['street', 'address_extra', 'zip', 'city', 'country'];

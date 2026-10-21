@@ -185,6 +185,10 @@ def mail_target(c, msg):
 def mail_import(c, raw):
     """One message (bytes) -> one task. Returns the task id, None when it is for nobody or already imported."""
     msg = email.message_from_bytes(raw, policy=email.policy.default)
+    from ..office.privacy import dsb_mail_import  # 2.154.0 C (#2192): a reply with the code of a mailed data protection sheet
+    p = dsb_mail_import(c, msg, raw)
+    if p is not None:
+        return p or None
     from ..docs.ingest import docs_mail_import  # 2.48.0 (#1111): a document address -> its attachments become documents
     d = docs_mail_import(c, msg, raw)
     if d is not None:
