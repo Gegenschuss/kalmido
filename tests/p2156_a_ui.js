@@ -126,17 +126,12 @@ const toastText = d => d.querySelector('#toast')?.textContent || '';
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   await until(() => d.querySelector(`#view [data-mmn="t${A2}"]`));
   w.eval(`mm_select('t${A2}')`);
+  w.__dialogs = 'manual';  // the dialog is checked and answered here (boot.js dialogBridge)
   key(w, stage(), 'i');
-  let dlg = await until(() => d.querySelector('.cdlg #cdlg-in'), 20);
-  if (!dlg) {  // diagnostics: what the client sees
-    const dia = await w.eval(`mm_ideaAgents().then(x => JSON.stringify({x, lid: MM.lid, sel: MM.sel, n: !!mm_node(MM.sel), ok: mm_kidOk(mm_node(MM.sel)), ro: mm_ro(listById(MM.lid))}))`);
-    console.log('diag', dia, 'active:', d.activeElement?.className);
-    w.eval(`mm_ideasAsk(mm_node('t${A2}')).catch(e => console.log('ask error', e))`);
-    dlg = await until(() => d.querySelector('.cdlg #cdlg-in'));
-    check(false, '#1201: the key I did not open the request (mm_ideasAsk directly: ' + !!dlg + ')');
-  }
+  const dlg = await until(() => d.querySelector('.cdlg #cdlg-in'));
   check(dlg && /gets the path of this branch and the name of the list, nothing else/.test(d.querySelector('.cdlg').textContent), '#1201: I opens the request with what the agent gets ' + toastText(d) + ' ' + (d.querySelector('.cdlg')?.textContent || '').slice(0, 200));
   if (dlg) { dlg.value = 'Pages for a small shop'; d.querySelector('.cdlg form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true})); }
+  w.__dialogs = undefined;
   const job = await until(async () => (await call('GET', `/api/lists/${L}/ideas`)).jobs?.[0]);
   check(job && job.state === 'requested' && job.target === 't' + A2, '#1201: the request is there: ' + JSON.stringify(job));
   check(await until(() => d.querySelector('#view .mmnode.ideawait') && d.querySelector('#view .mmideas [data-mm="ideas-stop"]')), '#1201: the map shows the waiting request');
