@@ -54,7 +54,8 @@ async function ltMakeFromHash(h) {
 // ---- the tab
 function ltTabHtml() {
   if (LT.oid !== OFC.info?.org_id) Object.assign(LT, {oid: OFC.info?.org_id, data: null, cur: null, err: null, fStatus: '', fClient: '', q: ''});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see the correspondence.')}</div>`;
+  // review A3 (2.153.0): the role accounting reads the bookkeeping, not the correspondence (the server answers 403)
+  if (OFC.info?.role !== 'admin') return `<div class="empty">${tr('Only the admins of the office see the correspondence.')}</div>`;
   if (/^#office\/letters\/new\b/.test(location.hash)) { setTimeout(() => ltMakeFromHash(location.hash), 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   if (LT.err) return `<div class="empty">${esc(LT.err)}</div>`;
   if (!LT.data) { if (!LT.loading) setTimeout(ltLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }

@@ -340,6 +340,17 @@ DF = upload(Do, "Hausverwaltung.txt", "Hausverwaltung Beispiel\nDatum: 12.10.202
 Do.patch(B + f"/api/docs/{DF}", json={"sender": "Hausverwaltung Beispiel"})
 x = answer(Do, DF)
 check(x.get("contact_id") == FCT and "Hausweg 9" in (x.get("rcpt_address") or ""), f"#2229 freelancer: the own contact fills the recipient {x}")
+# review A6 (2.153.0): a company name -> the organisation's own card, not the first person working there
+CTW = A.post(B + "/api/contacts", json={"book_id": BKO, "given": "Max", "family": "Werker", "org": "Werkstatt Beispiel GmbH",
+                                        "addresses": [{"street": "Personenweg 3", "city": "Kassel"}]}).json()["id"]
+CTF = A.post(B + "/api/contacts", json={"book_id": BKO, "fn": "Werkstatt Beispiel GmbH", "org": "Werkstatt Beispiel GmbH",
+                                        "addresses": [{"street": "Firmenweg 7", "code": "34000", "city": "Kassel"}]}).json()["id"]
+sql("UPDATE contacts SET kind='org' WHERE id=?", (CTF,), write=True)
+DW = upload(A, "Werkstatt.txt", "Werkstatt Beispiel GmbH\nDatum: 13.10.2026\nIhr Auftrag.\n", f"org:{ORG}")
+A.patch(B + f"/api/docs/{DW}", json={"sender": "Werkstatt Beispiel GmbH"})
+x = answer(A, DW)
+check(CTW < CTF and x.get("contact_id") == CTF and "Firmenweg 7" in (x.get("rcpt_address") or ""),
+      f"review A6: the organisation's card goes before a person of it {x}")
 
 # ---- the nightly boundary check knows letter links across the boundary
 BC = "import json\nfrom kalmido.core.db import connect\nfrom kalmido.accounts.tenancy import boundary_check\nc = connect()\nprint(json.dumps(boundary_check(c)['kinds']))\nc.close()"
