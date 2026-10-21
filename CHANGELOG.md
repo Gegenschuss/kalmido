@@ -7,6 +7,9 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+### Added
+- Office: trial documents. Creating a quotation or an invoice offers *Just to try*: such a document gets its own number series (TEST-001, ...), a large SAMPLE watermark (MUSTER in German) on every page and never an e-invoice; real number series stay gapless. Invoices, credit notes, reminders, delivery notes and documents made from a trial document are trial documents too. They never go into bookkeeping, VAT returns, DATEV and accounting exports, cash flow, reports, dunning, bank matching, the cash book, recurring invoices, the client portal or webhooks. An admin (a person without an organisation in their private space) deletes them at any time - one by one or all at once - and billed receipts and trip items become free again. The list marks them *Trial* and filters by them; the first quotation and the first invoice of an office area point to the trial mode once (#2576).
+
 ### Changed
 - Office, test phase: an admin can delete a quotation also after it was sent, answered or signed by the client (the confirmation says so); only one an invoice or a document was made from stays, and "Undo finalising" keeps the old rule. This is taken back before the launch (#2573, #2574).
 
