@@ -154,6 +154,25 @@ r = Fr.post(B + "/api/sheets", json={"title": "Old table", "space": "private"})
 check(r.status_code == 201, "setup: table " + r.text[:160])
 S_OLD = r.json()["id"]
 S_LIVE = Fr.post(B + "/api/sheets", json={"title": "Live table", "space": "private"}).json()["id"]
+PDF = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
+
+
+def sheet_file(sid, rid, name):
+    """A file column on the sheet and a file into the row's cell -> (sheet_files id, stored path on the disk)."""
+    cid = Fr.post(B + f"/api/sheets/{sid}/columns", json={"title": "Doc", "kind": "file"}).json()["column"]["id"]
+    r = Fr.post(B + f"/api/sheets/{sid}/files", data={"row_id": str(rid), "col_id": str(cid)}, files={"file": (name, PDF, "application/pdf")})
+    check(r.status_code == 201, f"setup: file {name} into a table cell " + r.text[:160])
+    fid = r.json().get("file", {}).get("id") if r.ok else 0
+    return fid, os.path.join(DATA, "attachments", one("SELECT path FROM sheet_files WHERE id=?", (fid,)) or "-")
+
+
+# 2.152.0 (#2165, review C-M1): a further sheet of the old table holds a file (with a text row): all of it goes with the table
+r = Fr.post(B + f"/api/sheets/{S_OLD}/tabs", json={})
+check(r.status_code == 201, "setup: a second sheet of the old table " + r.text[:160])
+S_TAB = r.json()["tab"]["id"] if r.ok else 0
+TF, TF_PATH = sheet_file(S_TAB, one("SELECT id FROM sheet_rows WHERE sheet_id=? ORDER BY pos LIMIT 1", (S_TAB,)), "tab-receipt.pdf")
+check(os.path.isfile(TF_PATH), "setup: the further sheet's file is on the disk")
+sql("INSERT INTO file_text(kind, ref_id, ws, state, created_at, updated_at) VALUES('sheet',?,?,'found',?,?)", (TF, f"u{FID}", OLD, OLD), write=True)
 check(Fr.delete(B + f"/api/sheets/{S_OLD}").ok, "setup: the old table into the trash")
 ROW = one("SELECT id FROM sheet_rows WHERE sheet_id=? ORDER BY pos LIMIT 1", (S_LIVE,))
 COL = one("SELECT id FROM sheet_columns WHERE sheet_id=? ORDER BY pos LIMIT 1", (S_LIVE,))
@@ -228,6 +247,9 @@ check(not sql("SELECT 1 FROM sheet_rows WHERE id=?", (ROW,)) and not sql("SELECT
       and sql("SELECT 1 FROM sheets WHERE id=? AND deleted_at IS NULL", (S_LIVE,)), "tables: the deleted row / column gone, the live table stays")
 r = Fr.get(B + f"/api/sheets/{S_LIVE}")
 check(r.ok, "tables: the live table still opens " + r.text[:120])
+check(not os.path.exists(TF_PATH) and not sql("SELECT 1 FROM sheet_files WHERE id=?", (TF,))
+      and not sql("SELECT 1 FROM file_text WHERE kind='sheet' AND ref_id=?", (TF,))
+      and not sql("SELECT 1 FROM upload_scan WHERE kind='sheet' AND ref_id=?", (TF,)), "tables: the further sheet's file, text and scan rows gone with the table")
 check(not sql("SELECT 1 FROM hub_mails WHERE id=?", (HM,)) and not sql("SELECT 1 FROM hub_words WHERE mail_id=?", (HM,)), "hub mail: row and word index gone")
 check(sql("SELECT deleted_at IS NOT NULL FROM fs_nodes WHERE id=?", (HF,)) == [(1,)], "hub mail: its folder is in the file store's trash now")
 check(sql("SELECT 1 FROM hub_mails WHERE message_id='fresh-1@example.com'"), "hub mail: deleted today stays")
