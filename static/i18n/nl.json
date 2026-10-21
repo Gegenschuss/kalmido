@@ -12568,5 +12568,14 @@
   "Suggest after": "Voorstellen na",
   "suggested": "voorgesteld",
   "Suggest payment reminders for overdue invoices": "Betalingsherinneringen voorstellen voor achterstallige facturen",
-  "Read|section": "Gelezen"
+  "Read|section": "Gelezen",
+  "first|nth": "eerste",
+  "second|nth": "tweede",
+  "third|nth": "derde",
+  "fourth|nth": "vierde",
+  "last|nth": "laatste",
+  "on the last {0}": "op de laatste {0}",
+  "on the {0} {1}": "op de {0} {1}",
+  "on the": "op de",
+  "Weekday": "Weekdag"
 }

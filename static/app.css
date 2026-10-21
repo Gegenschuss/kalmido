@@ -7917,3 +7917,10 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .nelse .nerow{display:flex;align-items:center;gap:.75rem;justify-content:space-between;padding:.375rem .75rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);color:var(--text2);font-size:var(--fs-m)}
 .nelse .nerow span{min-width:0;overflow-wrap:anywhere}
 .nelse .nerow .btn{flex:none}
+
+/* 2.155.0 C (#2075): the own repeat rule dialog */
+.crrmon{display:flex;flex-direction:column;gap:.5rem;flex:1;min-width:0}
+.crropt{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
+.crropt .numin{width:4.5rem}
+.crrmodal .card{width:min(28rem,100%)}
+.crredit{flex:none}

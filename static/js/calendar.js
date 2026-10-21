@@ -232,7 +232,7 @@ async function calReq(method, url, body) {
 function calBar(title, done = true, extra = '') {
   // 1.8.1: completed tasks in the calendar, per user (show_done_views entry "cal", shown unless hidden here)
   const on = showDoneCal(), dn = done ? `<button class="btn sm chip ${on ? 'on' : ''}" data-act="cal-done" aria-pressed="${on}" aria-label="${esc(tr('Completed'))}" title="${esc(on ? tr('Hide completed') : tr('Show completed'))}">${ic('eye', 's')}<span class="cdl">${tr('Completed')}</span></button>` : '';
-  const modes = [['month', N_('Month')], ['week', N_('Week')], ['day', N_('Day')], ...(feat('events') ? [['agenda', N_('Agenda')]] : []), ...(feat('timeline') ? [['timeline', N_('Timeline')]] : [])].map(([k, n]) => [k, tr(n)]);
+  const modes = [['month', N_('Month')], ['week', N_('Week')], ['day', N_('Day')], ['year', N_('Year')], ...(feat('events') ? [['agenda', N_('Agenda')]] : []), ...(feat('timeline') ? [['timeline', N_('Timeline')]] : [])].map(([k, n]) => [k, tr(n)]);
   // 2.21.0 (#659): "+ Event" and the calendars (own, shared: show, share, import, the phone)
   // 2.36.1 (#1127): the "Calendars" window (own calendars, subscriptions, tasks) opens here too, also without own events
   const evb = (feat('events') ? `<button class="btn sm pri evnew" data-act="ev-new" title="${esc(tr('New event'))}" aria-label="${esc(tr('New event'))}">${ic('plus', 's')}<span class="cdl">${tr('Event')}</span></button>` : '')

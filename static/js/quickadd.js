@@ -353,6 +353,15 @@ function repeatLabel(r) {
   const suffix = e.type === 'count' ? ' · ' + tr('{0}× left', e.val) : e.type === 'until' ? ' · ' + tr('until {0}', fmtDate(e.val)) : '';
   return repeatLabelBase(rrBase(r)) + suffix;
 }
+const CRR_ORD = [N_('first|nth'), N_('second|nth'), N_('third|nth'), N_('fourth|nth')];
+// the n-th weekday of a parsed rule ({BYDAY: '2TU'} or {BYDAY: 'TU', BYSETPOS: '2'}) -> {pos: 1..4 | -1, wd}, else null
+function crr_nthOf(p) {
+  const m = /^(-?\d)([A-Z]{2})$/.exec(p.BYDAY || '');
+  const pos = m ? +m[1] : /^[A-Z]{2}$/.test(p.BYDAY || '') && /^-?\d$/.test(p.BYSETPOS || '') ? +p.BYSETPOS : 0, wd = m ? m[2] : p.BYDAY;
+  return pos && RR_WD.includes(wd) ? {pos: pos > 0 && pos < 5 ? pos : -1, wd} : null;
+}
+// "the second Tuesday" / "the last Friday" for the monthly label
+const crr_nthLabel = (pos, wd) => (pos < 0 ? tr('on the last {0}', WDL[RR_WD.indexOf(wd)]) : tr('on the {0} {1}', tr(CRR_ORD[pos - 1]), WDL[RR_WD.indexOf(wd)]));
 function repeatLabelBase(r) {
   if (!r) return '';
   const p = Object.fromEntries(r.replace(/^RRULE:/, '').split(';').map(x => x.split('=')));
@@ -364,7 +373,10 @@ function repeatLabelBase(r) {
     if (p.BYDAY === 'MO,TU,WE,TH,FR') return tr('Weekdays');
     return (n === 1 ? tr('Weekly') : tr('Every {0} weeks', n)) + (days ? ` (${days})` : '');
   }
-  if (p.FREQ === 'MONTHLY') return (n === 1 ? tr('Monthly') : tr('Every {0} months', n)) + (p.BYMONTHDAY ? ' ' + tr('on day {0}', p.BYMONTHDAY) : '');
+  if (p.FREQ === 'MONTHLY') {
+    const nth = crr_nthOf(p);  // 2.155.0 C (#2075): "on the second Tuesday" (calrrule.js)
+    return (n === 1 ? tr('Monthly') : tr('Every {0} months', n)) + (p.BYMONTHDAY ? ' ' + tr('on day {0}', p.BYMONTHDAY) : nth ? ' ' + crr_nthLabel(nth.pos, nth.wd) : '');
+  }
   if (p.FREQ === 'YEARLY') return n === 1 ? tr('Yearly') : tr('Every {0} years', n);
   return tr('Repeats');
 }

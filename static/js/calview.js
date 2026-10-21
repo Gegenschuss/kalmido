@@ -160,6 +160,7 @@ function calEditModal(x, colors, done) {
   });
 }
 function viewCal() {
+  if (S.calMode === 'year') return cyr_view();  // 2.155.0 C (#2078): calyear.js
   if (S.calMode === 'timeline' && !feat('timeline')) S.calMode = 'month';
   if (S.calMode === 'agenda') { if (feat('events')) return viewAgenda(); S.calMode = 'month'; }
   if (S.calMode === 'week' || S.calMode === 'day') return viewWeek();
