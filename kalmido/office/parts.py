@@ -555,7 +555,7 @@ def tp_render(c, oid, r, m, pack, lang, locked):
             rows.append([L.get("excl_raw", labels.get("net_excl_raw") or label(pack, lang, "net_excl_raw")), fmt_money(pc["net_excl_raw"], lang, cur)])
         out.append({"id": p["id"], "kind": "items", "title": p["title"], "head": [], "lines": lines, "totals": {"rows": rows}})
     m["parts"] = out
-    m["part_label"] = L.get("part") or ("Part" if lang == "en" else "Teil")
+    m["part_label"] = L.get("part") or tr("Part|document", lg=lang)  # 2.149.0 A (#2520)
     for ln in m.get("lines") or []:
         if ln.get("part_id") is not None and ln.get("kind") == "item":
             ln.pop("taxes", None)
@@ -594,7 +594,7 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
         return label(pack, lang, "tax_" + k, pct=fmt_qty(pct[k], lang))
 
     if mode == "summary":
-        ttl = (title or "").strip()[:500] or s.get("parts_summary_title_" + lang) or ("Film production" if lang == "en" else "Filmherstellung")
+        ttl = (title or "").strip()[:500] or s.get("parts_summary_title_" + lang) or tr("Film production|document", lg=lang)  # 2.149.0 A (#2520)
         out = []
         bases = {tl["rate_key"]: tl["base"] for tl in t["tax_lines"]} if t["vat_mode"] != "novat" else {"standard": t["net"]}
         for n, (k, b) in enumerate((k, bases[k]) for k in TAX_KEYS if k in bases and dec(bases[k])):

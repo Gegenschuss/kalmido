@@ -6,7 +6,7 @@ an English text keeps its German text with the note "no English text stored". Fi
 (odoc_update refuses them first)."""
 import json
 
-from ..core.i18n import N_, tr
+from ..core.i18n import LANGS, N_, tr
 from .model import office_settings
 
 FIELD_TXT = {"intro": N_("Introduction"), "closing": N_("Closing text"), "time": N_("Duration of use"), "territory": N_("Territory"),
@@ -15,6 +15,12 @@ FIELD_TXT = {"intro": N_("Introduction"), "closing": N_("Closing text"), "time":
 LEGACY = {"invoice_closing": {
     "de": "Der Gesamtbetrag wird mit Erhalt dieser Rechnung zur Zahlung fällig. Es gelten unsere allgemeinen Geschäftsbedingungen.",
     "en": "Please remit the invoice amount to the account specified above. Our general terms and conditions apply."}}
+
+
+def doc_lg(lang):
+    """2.149.0 A (#2520): the language a document's own words are printed in (tr(..., lg=)): its language when Kalmido has
+    it, else German (as before for an empty one)."""
+    return lang if lang == "en" or lang in LANGS else "de"
 
 
 def _norm(t):

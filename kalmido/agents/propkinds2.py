@@ -21,7 +21,7 @@ from flask import g, jsonify
 from ..core.config import app
 from ..core.db import bump, db, iso, now_utc
 from ..core.i18n import N_, tr
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.access import Denied, list_role, my_max_sort
 from ..accounts.session import me
 from ..core.db import usettings, uset
@@ -595,8 +595,13 @@ def pk2_undo(c, j, rec):
             ev_stayed = True
     if rec.get("offer"):  # the quotation draft goes while it is a draft without a number nobody changed since applying
         oid = rec.get("offer_area")
-        r = c.execute("SELECT status, number, updated_at, project_title FROM office_docs WHERE id=? AND org_id=?", (rec["offer"], oid)).fetchone()
+        from ..office.docs import bga_offer_block
+        from ..office.model import office_role
+        write_lock(c, f"office_mail_{int(oid or 0)}")  # 2.149.0 A (#2521): the same locks and checks as deleting it in the office (docs.odoc_delete)
+        write_lock(c, f"office_doc_{int(rec['offer'])}")
+        r = c.execute("SELECT id, kind, status, number, sent_at, updated_at, project_title FROM office_docs WHERE id=? AND org_id=?", (rec["offer"], oid)).fetchone()
         if r and r["status"] == "draft" and not r["number"] and rec.get("offer_at") and r["updated_at"] == rec["offer_at"] \
+                and office_role(c, uid, oid) == "admin" and bga_offer_block(c, oid, r) is None \
                 and not c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? LIMIT 1", (rec["offer"],)).fetchone() \
                 and not c.execute("SELECT 1 FROM office_doc_log WHERE org_id=? AND doc_id=? AND id>? AND action IN ('update','items','number','status') LIMIT 1",
                                   (oid, rec["offer"], rec.get("offer_log") or 0)).fetchone():  # changes within the same second

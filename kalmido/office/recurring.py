@@ -27,7 +27,7 @@ from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_item_store
 from ..personal.timetrack import BadInput
 from .calc import dec, dstr, fmt_money, money
-from .model import office_gate, office_on, office_org, office_role, office_settings, pb_cl_sql, pb_owner
+from .model import office_gate, office_on, office_org, office_role, office_settings, onc_ready, pb_cl_sql, pb_owner
 
 RIN_EVERY = ("monthly", "quarterly", "yearly")
 RIN_STEP = {"monthly": 1, "quarterly": 3, "yearly": 12}
@@ -239,7 +239,7 @@ def _made(c, oid, sids):
 def rin_make(c, oid, uid, s, period):
     """A new invoice draft of series row s for the period starting at period (see the module text); its id, or None when
     the period has its invoice already (unique index) or the template is gone. The caller commits."""
-    from .docs import DUP_ITEM_SKIP, DUP_SKIP, _assign_number, doc_items, recalc
+    from .docs import DUP_ITEM_SKIP, DUP_SKIP, _assign_number, doc_items, doc_row, recalc
     from .ledger import ofx_log, ofx_number_at_finalize
     from .packs import office_pack
     t = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (s["template_id"], oid)).fetchone() if s["template_id"] else None
@@ -267,12 +267,14 @@ def rin_make(c, oid, uid, s, period):
             nid = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     except IntegrityError:
         return None  # this period has its invoice already
+    from ..integrations.webhooks import who_note
+    who_note("invoice.created", "invoice", nid)  # 2.149.0 A (#2521): like a person's copy (docs.odoc_duplicate)
     for it in doc_items(c, t["id"], oid):
         it = {k: v for k, v in it.items() if k not in DUP_ITEM_SKIP}
         it.update(doc_id=nid, org_id=oid, title=fill(it.get("title")), detail=fill(it.get("detail")))
         it = oc_item_store(c, oid, it)
         c.execute(f"INSERT INTO office_doc_items({','.join(it)}) VALUES({','.join('?' * len(it))})", list(it.values()))
-    if not ofx_number_at_finalize(st, "invoice"):
+    if not ofx_number_at_finalize(st, "invoice") and onc_ready(st, doc_row(c, oid, nid)):  # 2.149.0 A (#2521): onc_ready like odoc_duplicate
         _assign_number(c, oid, nid, st)
     recalc(c, oid, nid)
     ofx_log(c, oid, "series", doc_id=nid, detail={"series_id": s["id"], "period": period, "from_id": t["id"], "from_number": t["number"]})
@@ -421,6 +423,20 @@ def rin_tick(c, now=None):
             print("invoice series", d["id"], "failed:", e, flush=True)
 
 
+def rin_webhooks(c):
+    """2.149.0 A (#2521): the webhooks the series run collected (invoice.created / invoice.sent), queued like after a
+    person's request (webhooks.wh_flush); a failure never undoes the invoice."""
+    n = g.pop("wh", None)
+    if not n:
+        return
+    from ..integrations.webhooks import wh_enqueue
+    try:
+        wh_enqueue(c, n)
+    except Exception as e:  # noqa: BLE001
+        c.rollback()
+        print("invoice series: queueing webhooks failed:", type(e).__name__, e, flush=True)
+
+
 def _rin_one(c, oid, sid, today):
     with system_ctx(c):  # who acts for this area (its admins), read before entering their context
         s0 = c.execute("SELECT * FROM office_inv_series WHERE id=? AND org_id=?", (sid, oid)).fetchone()
@@ -468,6 +484,7 @@ def _rin_as(c, oid, sid, today, actor, people):
         did, sent, datev, _why = rin_step(c, oid, actor, s, period, people, [_period_txt(p, rin_after(s["start"], s["every"], p)) for p in missed[-12:]])
         bump(c)
         c.commit()
+        rin_webhooks(c)
         if sent and datev:
             rin_datev(c, oid, did)
 

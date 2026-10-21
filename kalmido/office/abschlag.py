@@ -18,26 +18,26 @@ from decimal import Decimal
 from flask import jsonify
 
 from ..core.config import app
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .calc import TAX_KEYS, dec, dstr, fmt_money, inv_calc, money
 
 ABS_TYPES = ("", "progress", "final")
 ABS_TYPE_CODE = {"progress": "326", "final": "380"}  # UNTDID 1001: 326 partial invoice (XRechnung + EN 16931 accept it)
-ABS_TITLE = {"progress": {"de": "Abschlagsrechnung", "en": "Progress invoice"}, "final": {"de": "Schlussrechnung", "en": "Final invoice"}}
+# 2.149.0 A (#2520): the documents' words through tr() in the document's language (placeholders {name} filled by _t)
+ABS_TITLE = {"progress": N_("Progress invoice|document"), "final": N_("Final invoice|document")}
 ABS_TXT = {
-    "progress": {"de": "Abschlag Nr. {n} auf Angebot {num}", "en": "Progress payment no. {n} on quotation {num}"},
-    "share": {"de": "Anteil {pct} % USt", "en": "Share at {pct} % VAT"},
-    "share_of": {"de": "{p} % des Angebots-Netto", "en": "{p} % of the quotation's net"},
-    "heading": {"de": "Abzüglich bereits berechneter Abschläge", "en": "Less progress invoices already issued"},
-    "deduct": {"de": "Abzüglich Abschlagsrechnung Nr. {num} vom {date}", "en": "Less progress invoice no. {num} of {date}"},
-    "deduct_detail": {"de": "Netto {net}, USt {pct} % {tax}, brutto {gross}{paid}", "en": "Net {net}, VAT {pct} % {tax}, gross {gross}{paid}"},
-    "paid": {"de": " (bezahlt)", "en": " (paid)"},
-    "open": {"de": " (offen)", "en": " (open)"},
-    "rest": {"de": "Restbetrag", "en": "Amount remaining"},
-    "skonto": {"de": "Bei Zahlung bis {date} {pct} % Skonto (= {amt}), zahlbar {pay}.",
-               "en": "When paid by {date} {pct} % cash discount (= {amt}), payable {pay}."},
+    "progress": N_("Progress payment no. {n} on quotation {num}|document"),
+    "share": N_("Share at {pct} % VAT|document"),
+    "share_of": N_("{p} % of the quotation's net|document"),
+    "heading": N_("Less progress invoices already issued|document"),
+    "deduct": N_("Less progress invoice no. {num} of {date}|document"),
+    "deduct_detail": N_("Net {net}, VAT {pct} % {tax}, gross {gross}{paid}|document"),
+    "paid": N_(" (paid)|document"),
+    "open": N_(" (open)|document"),
+    "rest": N_("Amount remaining|document"),
+    "skonto": N_("When paid by {date} {pct} % cash discount (= {amt}), payable {pay}.|document"),
 }
 
 
@@ -54,7 +54,8 @@ def _col(r, k, default=None):
 
 
 def _t(key, lang, **kw):
-    s = ABS_TXT[key]["en" if lang == "en" else "de"]
+    from .doclang import doc_lg
+    s = tr(ABS_TXT[key], lg=doc_lg(lang))
     for k, v in kw.items():
         s = s.replace("{" + k + "}", str(v))
     return s
@@ -327,10 +328,10 @@ def abs_render(r, m, L, lang):
     m["inv_type"] = typ if r["kind"] == "invoice" else ""
     m["type_code"] = ABS_TYPE_CODE.get(m["inv_type"]) or ""
     if m["inv_type"]:
-        m["title"] = L.get(typ + "_invoice") or ABS_TITLE[typ]["en" if lang == "en" else "de"]
+        m["title"] = L.get(typ + "_invoice") or tr(ABS_TITLE[typ], lg=lang)
     tot = m.get("totals") or {}
     if m["inv_type"] == "final" and isinstance(tot.get("rows"), list):
-        lab = L.get("invoice_total", "Rechnungsbetrag" if lang == "de" else "Total")
+        lab = L.get("invoice_total", tr("Total|invoice", lg=lang))
         tot["rows"] = [[_t("rest", lang), x[1]] if x and x[0] == lab else x for x in tot["rows"]]
     m["skonto"] = None
     sk = abs_skonto_numbers(r, tot.get("gross") or 0) if r["kind"] == "invoice" else None
