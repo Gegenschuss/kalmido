@@ -7,7 +7,11 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
-Package 2.144.5 "Leftovers: small fixes and UI from older packages" (version number set when it is merged).
+Bundle of the packages 2.144.5 to 2.144.11 and 2.147.2 (leftovers, office fixes: time to the invoice, invoice from a quotation, test-phase deletion, office PDF numbers, trial documents, cash book; phone-test fixes of 2.143). The version number is set when it is pushed.
+
+### Added
+- Time entries are billable or not (default billable). "Invoice from time" takes only open billable hours and binds them to the draft as billed; the same hours never land on two invoices, billed entries are locked (only the note stays editable). Deleting the draft frees them again; on a cancelled invoice the office admin frees them with "Release the time again". Works the same in a personal office without an organisation (#2053).
+- Office: trial documents. Creating a quotation or an invoice offers *Just to try*: such a document gets its own number series (TEST-001, ...), a large SAMPLE watermark (MUSTER in German) on every page and never an e-invoice; real number series stay gapless. Invoices, credit notes, reminders, delivery notes and documents made from a trial document are trial documents too. They never go into bookkeeping, VAT returns, DATEV and accounting exports, cash flow, reports, dunning, bank matching, the cash book, recurring invoices, the client portal or webhooks. An admin (a person without an organisation in their private space) deletes them at any time - one by one or all at once - and billed receipts and trip items become free again. The list marks them *Trial* and filters by them; the first quotation and the first invoice of an office area point to the trial mode once (#2576).
 
 ### Changed
 - Approval cards in comments are decided only by the list's managers, the assignee or an admin; others see who decides (#2001).
@@ -15,6 +19,8 @@ Package 2.144.5 "Leftovers: small fixes and UI from older packages" (version num
 - Time: the sum in the list header shows members only their own hours, as the time window does; owners and admins see everyone's (#1523).
 - Subscriptions & tools: a missed notice period shows the next chance, sorts by it and reminds of it; invoice series without an own name are named without placeholders like {month} (#2021).
 - Phone: the full-screen search closes with a soft animation (#1560).
+- Office, cash book: the change log keeps its lines even if an entry were ever removed by a maintenance tool (GoBD); lists and checks decrypt only the entries they show, so large cash books stay fast (#2354).
+- Office, test phase: an admin can delete a quotation also after it was sent, answered or signed by the client (the confirmation says so); only one an invoice or a document was made from stays, and "Undo finalising" keeps the old rule. This is taken back before the launch (#2573, #2574).
 
 ### Fixed
 - Sheets on the phone: the suggestions after "=" stay above the keyboard and never cover the field, the cell editor stays inside the screen, the side panel shows the right button right after "Freeze value" / "Live again" (#2011).
@@ -22,56 +28,22 @@ Package 2.144.5 "Leftovers: small fixes and UI from older packages" (version num
 - The workspace mailbox moves along with the organisation export / move and the account export (server, user, sender; passwords never) and stays switched off until the passwords are entered again; the tenancy check knows it (#2410).
 - "Delete all times" recognises billed entries by the invoice position's list, also after a rename and in the personal office; list formulas have a fixed depth limit (#1523).
 - Test p2400_e_ui waits for all saved settings (#2026).
-
-### Security
-- Recovery key of accounts without a password (single sign-on): showing or renewing it needs a real new sign-in at the provider (prompt=login, max_age=0, a fresh auth_time from the ID token), bound to the organisation and the purpose; a link alone triggers nothing. The key-rotation test switch only works in test mode, a refused shortcut download says why, the settings hint at the incomplete search during a key rotation (#2387).
-
-## [2.144.6] - 2026-10-21
-
-Office fixes: tracked time to the invoice without billing it twice, small items from the 2.138 review, one wording for moving into an organisation.
-
-### Added
-- Time entries are billable or not (default billable). "Invoice from time" takes only open billable hours and binds them to the draft as billed; the same hours never land on two invoices, billed entries are locked (only the note stays editable). Deleting the draft frees them again; on a cancelled invoice the office admin frees them with "Release the time again". Works the same in a personal office without an organisation (#2053).
-
-### Fixed
 - Legacy import: raising the invoice counter asks for a reason like the number ranges (GoBD); the reason is in the office log (#2400).
 - Legacy import: undo puts the order of the services back (#2400).
 - List rules: asking for an approval (or for changes) no longer counts as "assigned", the task stays with the approver (#2400).
 - Legacy import: archiving the rest of an undone import leaves entries you restored by hand alone (#2400).
 - Office settings > Data: one section "Transfer into an organisation" with both ways (a new organisation or an existing one) instead of two wordings (#2436).
-
-### Changed
-- Office, cash book: the change log keeps its lines even if an entry were ever removed by a maintenance tool (GoBD); lists and checks decrypt only the entries they show, so large cash books stay fast (#2354).
-
-### Fixed
 - Office, cash book: after a failed load the tab offers *Try again* instead of keeping the error until the page is reloaded; the receipt hint "in the cash book" follows the office switch like every cash book view (#2354).
-
-## [2.147.2] - 2026-10-21
-
-Small fixes from the phone test of 2.143: the read-only role and dialogs on phones.
-
-### Fixed
 - Read-only role: the office opens straight away again (it stayed on *Loading…* when opened directly or after a reload) (#2500).
 - Read-only role: an organisation-wide list no longer offers *Join* (it would bring no writing) but says the role is read-only; a list you may only read has no + button, and a typed task says you can only read it instead of silently doing nothing (#2500).
 - Organisation settings on phones: the role picker is 44 px high and shows *Read-only* in full; *What the roles mean* shows the list when opened (#2501).
 - Off-site backup on Android: a tapped field scrolls above the keyboard; the S3 field *Region* has its own label (was "Bundesland / Region" in German) (#2501).
 - Pages trash: long page names wrap instead of being cut (#2501).
-
-## [2.144.7] - 2026-10-21
-
-### Fixed
 - Office: *Create invoice* is a visible button on every quotation (the main button once accepted, before that it asks once) and is in the row menu of the quotation list; it left the editor's "…" menu (#2572).
-
-### Added
-- Office: trial documents. Creating a quotation or an invoice offers *Just to try*: such a document gets its own number series (TEST-001, ...), a large SAMPLE watermark (MUSTER in German) on every page and never an e-invoice; real number series stay gapless. Invoices, credit notes, reminders, delivery notes and documents made from a trial document are trial documents too. They never go into bookkeeping, VAT returns, DATEV and accounting exports, cash flow, reports, dunning, bank matching, the cash book, recurring invoices, the client portal or webhooks. An admin (a person without an organisation in their private space) deletes them at any time - one by one or all at once - and billed receipts and trip items become free again. The list marks them *Trial* and filters by them; the first quotation and the first invoice of an office area point to the trial mode once (#2576).
-
-### Changed
-- Office, test phase: an admin can delete a quotation also after it was sent, answered or signed by the client (the confirmation says so); only one an invoice or a document was made from stays, and "Undo finalising" keeps the old rule. This is taken back before the launch (#2573, #2574).
-
-## [2.144.9] - 2026-10-21
-
-### Fixed
 - Office PDF: an empty block of the number scheme (no project, client or initials) takes its separator along - `KV02-M` instead of `-KV02-M`, no double hyphens; numbers given before stay as they are; the rights page and the part pages of an invoice say "Rechnung Nr." instead of "Angebot Nr."; an invoice made from a quotation names it in its head ("zu Angebot Nr. …" with its date); part pages show the row "+ Optional …" before the total with the option; the part's name is one source - renaming it in *Parts* or on the title page changes both, printed as typed (#2575).
+
+### Security
+- Recovery key of accounts without a password (single sign-on): showing or renewing it needs a real new sign-in at the provider (prompt=login, max_age=0, a fresh auth_time from the ID token), bound to the organisation and the purpose; a link alone triggers nothing. The key-rotation test switch only works in test mode, a refused shortcut download says why, the settings hint at the incomplete search during a key rotation (#2387).
 
 ## [2.147.1] - 2026-10-21
 
