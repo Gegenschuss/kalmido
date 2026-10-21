@@ -920,5 +920,7 @@ def process(c, nid):
         meta_set_json(c, nid, ws, "extracted", {**rx_compact(ei_det), "_einv": ei_compact(ei)})
     else:
         meta_set_json(c, nid, ws, "extracted", rx_compact(ex.get("details")))  # 2.121.0 A (#2092): a fresh run, a fresh suggestion
+    from .split import sp_detect
+    sp_detect(c, nid, data, res)             # 2.154.0 A (#1111): a stack scan with several archive number codes
     doc_index(c, nid, ws, index_text(c, dict(meta_row(c, nid)), node["name"], text))
     return state

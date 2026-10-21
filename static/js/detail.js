@@ -525,6 +525,7 @@ function renderDetail0() {
       ${ck ? '' : e2eNoteHtml(t)}${''/* 2.42.0 (#828): my encrypted note (e2e.js) */}
       ${ck ? '' : wk_mentionHtml(t)}${''/* 2.49.0 (#1199): mentioned in knowledge pages (wiki.js) */}
       ${ck || typeof hbm_taskLinkHtml !== 'function' ? '' : hbm_taskLinkHtml(t)}${''/* 2.141.0 B (#2139): the e-mail the task was made from (hubmail.js) */}
+      ${ck ? '' : dlk_taskHtml(t)}${''/* 2.154.0 A (#1111): the documents linked with the task */}
       ${ck || typeof rt9_detailHtml !== 'function' ? '' : rt9_detailHtml(t)}${''/* 2.59.0 B (#1375): related tasks (related.js) */}
       ${msT && t.id > 0 ? `<div class="dsec mssec" id="d-ms">${msReportHtml(t)}</div>` : ''}
       ${(() => {  // 2.24.0 (UX-41)
@@ -714,4 +715,20 @@ function detailKbFit(kb) {
   const vv = window.visualViewport, a = document.activeElement;
   const on = !!(kb && vv && vv.offsetTop > 1 && isMobile() && editFocused() && a?.closest?.('#detail .dbot'));
   if (d.classList.contains('vvfix') !== on) d.classList.toggle('vvfix', on);
+}
+// 2.154.0 A (#1111): "Document: <title>" for every document linked with the task that I may see (a tap opens it; the server
+// names none of the others). Filled after the answer (cached a minute), the detail is not redrawn
+const DLK = {};  // task id -> {at, docs}
+function dlk_taskHtml(t) {
+  if (!t || t.context || !(t.id > 0) || !S.me) return '';
+  const c = DLK[t.id];
+  if (!c || Date.now() - c.at > 60000) dlk_load(t.id);
+  return `<div class="dlklnk" data-dlklnk="${t.id}">${c ? dlk_inner(c.docs) : ''}</div>`;
+}
+const dlk_inner = docs => (docs || []).map(x => `<a class="linkbtn" href="#docs/${+x.id}">${ic('file', 's')}<span>${esc(tr('Document: {0}', x.name))}</span></a>`).join('');
+async function dlk_load(tid) {
+  DLK[tid] = {at: Date.now(), docs: DLK[tid]?.docs || []};
+  let j; try { j = await rawFetch('GET', `/api/tasks/${tid}/docs`); } catch { return; }
+  DLK[tid] = {at: Date.now(), docs: j.docs || []};
+  for (const el of document.querySelectorAll(`[data-dlklnk="${tid}"]`)) el.innerHTML = dlk_inner(j.docs);
 }

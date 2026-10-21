@@ -322,6 +322,11 @@ APP_ONLY = [
                                                    "=POST /api/docs/{}/redo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
                                                    "* /api/docs/{}/task", "* /api/docs/settings", "* /api/docs/rules", "* /api/docs/labels/",
                                                    "* /api/docs/mail")),
+    # 2.154.0 A (#1111): splitting a stack and linking a document with a task are a person's steps (an agent suggests, a person confirms)
+    ("2.154.0 A (#1111): a stack scan split into documents (its pages, previews, split, undo, \"no stack\", the separator sheet) and a "
+     "document linked with an existing task / the documents of a task are a person's steps in the app; agents read documents with "
+     "/documents and never split, link or delete", ("* /api/docs/{}/split", "=POST /api/docs/{}/unsplit", "=GET /api/docs/split-sheet.pdf",
+                                                    "=GET /api/tasks/{}/docs")),
     # 2.122.0 B (#2294 #2099)
     ("2.122.0 (#2294, #2099): a person's own steps on many documents at once (bulk tags / type / sender with its undo, the ZIP of a "
      "selection for the browser) and the tags of files / folders in the file store app; agents filter with /documents (the same "

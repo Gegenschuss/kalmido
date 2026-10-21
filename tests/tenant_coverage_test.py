@@ -73,7 +73,8 @@ KINDS = {
     # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
     # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
     "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share; "
-                           "p2122_b_api_test.py (2.122.0): bulk change, ZIP and the new filters / search syntax never reach another workspace"),
+                           "p2122_b_api_test.py (2.122.0): bulk change, ZIP and the new filters / search syntax never reach another workspace; "
+                           "p2154_a_api_test.py (2.154.0 A): splitting a stack, its pages, undo and the link with a task of another organisation / person: 404 or refused, a task's documents only the visible ones"),
     # 2.48.0 (#1207 / #1152 / #1356): the file store (fs_role / need_node / fs_visible_sql, org boundary before shares), the
     # Paperless-ngx connection of one workspace, receipt data / agent suggestions on a visible document
     "file_request": ("matrix", "p2122_a_api_test.py: a file request of another organisation's folder (list, create, change, remove): 404; the link writes only into its own folder as its creator, the page shows nothing of the folder (2.122.0 A, #2097)"),
@@ -908,6 +909,11 @@ ROUTES = {
     "PATCH /api/docs/labels/{}/{}": "document", "DELETE /api/docs/labels/{}/{}": "document", "POST /api/docs/labels/{}": "document", "POST /api/docs/mail": "document",
     "DELETE /api/docs/mail": "document", "GET /api/v1/documents": "document", "GET /api/v1/documents/{}": "document",
     "PATCH /api/v1/documents/{}": "document", "POST /api/v1/documents": "document", "POST /api/docs/export.csv": "document",  # 2.122.0 (#2098)
+    # 2.154.0 A (#1111): a stack split into documents, the link with an existing task, the documents of a task; the separator
+    # sheet is the same PDF for everyone (no data)
+    "GET /api/docs/{}/split": "document", "GET /api/docs/{}/split/thumbs": "document", "POST /api/docs/{}/split": "document",
+    "POST /api/docs/{}/unsplit": "document", "POST /api/docs/{}/split/dismiss": "document", "POST /api/docs/{}/task/link": "document",
+    "GET /api/tasks/{}/docs": "document", "GET /api/docs/split-sheet.pdf": "public",
     # 2.122.0 B (#2294 #2099): the chosen documents at once / as a ZIP; tags of files and folders (p2122_b_api_test.py: another
     # organisation / person: nothing changed, nothing in the ZIP, 404 on the tags of a node, no hit in the tag filter)
     "POST /api/docs/bulk": "document", "POST /api/docs/zip": "document", "GET /api/docs/zip/{}": "document",
