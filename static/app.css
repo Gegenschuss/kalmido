@@ -4974,6 +4974,8 @@ body.msel #view .qdock{visibility:hidden}
 @media (max-width:599px){ .wschip span{display:none} .wschip{padding:.25rem .4375rem} }
 .wsorg summary{display:flex;align-items:center;gap:.5rem;cursor:pointer;min-height:2.25rem}
 .wsorg .mrow select{max-width:7rem}
+/* 2.147.2 B (#2501): role select: 44 px high, the longest role name fits */
+select.orgrolesel,.wsorg .mrow select.orgrolesel{min-height:2.75rem;min-width:8.5rem;max-width:100%}
 .wsadd{gap:.375rem}.wsadd input{flex:1;min-width:8rem}
 .row input.unin{max-width:14rem}
 /* 2.28.0 (#985): the robot badge on an agent's picture */
@@ -5305,6 +5307,9 @@ button.flk.linkchip{padding:.3125rem .625rem;background:var(--bg3);color:var(--a
 .oadmh{margin:1rem 0 .25rem;font-size:var(--fs-s);color:var(--muted)}
 .oadmlog{margin-top:.75rem}
 @media (pointer:coarse){ .oadmb .btn.sm{height:auto;min-height:2.75rem} }
+/* 2.147.2 B (#2501): trash dialog: wrap long page names instead of cutting them */
+.wktrow .n{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+.wktrow .n small{display:block}
 /* 2.35.0 (#1095): code snippets of a task (git.js snipHtml): plain code, highlighted like description code blocks */
 .snipsec h5{display:flex;align-items:center;gap:.375rem}
 .snip{margin:.375rem 0;border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg3);min-width:0;max-width:100%}
