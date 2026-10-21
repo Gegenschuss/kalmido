@@ -5,13 +5,15 @@
      name the READER sees (client state or the read routes, which check the access); the label the author typed is never
      shown, a target the reader cannot see (or a deleted one) is a grey "No access" card without a name.
    - Phone / touch: a button "Insert reference" at the comment box and the description opens the search (palette mode 'ref').
+   - 2.144.3 A (#2523): the same drop and button in the chat boxes (team chat, thread, agent chat, also a parked window of the
+     split panel); several selected tasks dragged at once go in as several references.
    - Mouse only: resting on a task number or a card for 0.4 s shows a preview card next to the pointer. */
 'use strict';
 
 const RF_MIME = 'application/x-kalmido-ref';
 const RF_KEY_RE = /^(?:[ltcef]:\d{1,9}|d:[^\n]{1,300})$/;
 const RF_ICON = {l: 'list', d: 'folder', t: 'check', c: 'user', e: 'cal', f: 'file'};
-const RF = {cache: new Map(), wait: new Map(), ta: null, at: null, ct: null, ctq: null, ev: null};
+const RF = {cache: new Map(), wait: new Map(), ta: null, tael: null, at: null, ct: null, ctq: null, ev: null};
 const RF_TTL = 5 * 60e3;  // a fetched name is used for five minutes (renames show after that or a reload)
 
 // ---- keys: "l:80" list, "d:<path>" folder, "t:5" task, "c:3" contact, "e:7" event, "f:12" file / folder in the Ablage
@@ -86,22 +88,31 @@ function rf_srcKey(el) {
   if ((r = el.closest('[data-cev]')) && /^\d+$/.test(r.dataset.cev)) return {k: 'e:' + +r.dataset.cev, n: r.querySelector('.cevn')?.textContent || r.getAttribute('title') || ''};
   return null;
 }
+// 2.144.3 A (#2523): the chat boxes (the live ids and a parked window's data-cwid, chatwins.js) and the team chat's inline edit
+const RF_CHAT = ['tc-in', 'tth-in', 'chat-in'];
+const RF_TA_SEL = '#c-input, #d-content, .c-edit-input, .tc-edit, ' + RF_CHAT.map(i => `#${i}, [data-cwid="${i}"]`).join(', ');
 // contacts and calendar entries are no drag sources of their own: while a comment box / description is on screen they
 // become draggable under the mouse (not an event the calendar moves by pointer, .cgok)
 const RF_DYN = '.ctrow[data-ctopen], .cevrow[data-cev], .cev[data-cev]:not(.cgok)';
 document.addEventListener('pointerover', e => {
   if (e.pointerType !== 'mouse') return;
   const r = e.target.closest?.(RF_DYN);
-  if (r && !r.hasAttribute('draggable') && (document.getElementById('c-input') || document.getElementById('d-content'))) r.setAttribute('draggable', 'true');
+  if (r && !r.hasAttribute('draggable') && document.querySelector(RF_TA_SEL)) r.setAttribute('draggable', 'true');  // 2.144.3 A (#2523): + the chat boxes
 });
 document.addEventListener('dragstart', e => {
   const s = rf_srcKey(e.target); if (!s || !RF_KEY_RE.test(s.k) || !e.dataTransfer) return;
+  // 2.144.3 A (#2523): a drag that takes the whole selection (dragmulti.js) carries all selected tasks, in the order seen
+  const id = s.k[0] === 't' ? +s.k.slice(2) : 0;
+  if (id && e.target.closest?.('#view .trow') && S.multi?.size >= 2 && S.multi.has(id)) {
+    const ids = typeof dgOrder === 'function' ? dgOrder([...S.multi]) : [...S.multi];
+    s.ks = ids.filter(i => i > 0 && S.tasks.has(i)).slice(0, 50).map(i => 't:' + i);
+  }
   try { e.dataTransfer.setData(RF_MIME, JSON.stringify(s)); } catch { return; }
   if (e.target.closest?.(RF_DYN)) { e.dataTransfer.effectAllowed = 'copy'; e.dataTransfer.setData('text/plain', rf_text(s.k, s.n)); }
 }, true);
 const rf_has = e => !!e.dataTransfer && [...(e.dataTransfer.types || [])].includes(RF_MIME);
 function rf_dropTa(el) {  // the field a reference may be dropped into (only these; everything else keeps its old drop)
-  const ta = el?.closest?.('#c-input, #d-content, .c-edit-input');
+  const ta = el?.closest?.(RF_TA_SEL);  // 2.144.3 A (#2523): + the chat boxes
   if (ta) return ta.readOnly || ta.disabled ? null : ta;
   if (el?.closest?.('#detail #d-md')) { const d = document.getElementById('d-content'); return d && !d.readOnly ? d : null; }
   return null;
@@ -118,8 +129,12 @@ window.addEventListener('drop', e => {
   let s; try { s = JSON.parse(e.dataTransfer.getData(RF_MIME)); } catch { return; }
   if (!s || typeof s.k !== 'string' || !RF_KEY_RE.test(s.k)) return;
   const v = rf_get(s.k), name = v?.name || s.n || '';
-  if (ta.classList.contains('hidden')) { editContent(); rf_insert(ta, rf_text(s.k, name)); return; }  // the rendered description
-  rf_insert(ta, rf_text(s.k, name), rf_caretAt(ta, e.clientX, e.clientY));
+  // 2.144.3 A (#2523): several tasks = several references, one space apart
+  const ks = Array.isArray(s.ks) ? s.ks.filter(k => typeof k === 'string' && /^t:\d{1,9}$/.test(k)).slice(0, 50) : [];
+  const txt = ks.length > 1 ? ks.map(k => rf_text(k)).join(' ') : rf_text(s.k, name);
+  if (ta.classList.contains('hidden')) { editContent(); rf_insert(ta, txt); return; }  // the rendered description
+  // a parked chat window (data-cwid) becomes the live one by the focus in rf_insert (chatwins.js), ids swap in place
+  rf_insert(ta, txt, rf_caretAt(ta, e.clientX, e.clientY));
 }, true);
 function rf_caretAt(ta, x, y) {
   try { const p = document.caretPositionFromPoint?.(x, y); if (p && p.offsetNode === ta) return p.offset; } catch { /* old browser */ }
@@ -139,19 +154,23 @@ function rf_insert(ta, txt, at) {
 function rf_btnHtml(where, off) {
   if (off || !isTouch()) return '';
   const l = esc(tr('Insert reference'));
-  return where === 'c' ? `<button type="button" class="iconbtn rfins" data-rfins="c" title="${l}" aria-label="${l}">${ic('link', 's')}</button>`
+  // 2.144.3 A (#2523): the chat boxes ('tc-in', 'tth-in', 'chat-in') get the same quiet button in their row
+  return where === 'c' || RF_CHAT.includes(where) ? `<button type="button" class="iconbtn rfins" data-rfins="${where}" title="${l}" aria-label="${l}">${ic('link', 's')}</button>`
     // the description's button as a quiet link row like "Lock note" (a .btn there widened the narrow panel, p252_ui)
     : `<div class="lnbar rfinsbar"><button type="button" class="linkbtn lnlock rfins" data-rfins="d">${ic('link', 's')}<span>${l}</span></button></div>`;
 }
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-rfins]'); if (!b) return;
   e.preventDefault();
-  const ta = document.getElementById(b.dataset.rfins === 'c' ? 'c-input' : 'd-content'); if (!ta || ta.readOnly) return;
-  RF.ta = ta.id; RF.at = document.activeElement === ta ? ta.selectionStart : null;
+  const w = b.dataset.rfins, ci = RF_CHAT.includes(w);
+  // 2.144.3 A (#2523): a chat button takes the box of its own row (a parked window's box carries data-cwid)
+  const ta = ci ? b.closest('.chcomp')?.querySelector(`#${w}, [data-cwid="${w}"]`) : document.getElementById(w === 'c' ? 'c-input' : 'd-content');
+  if (!ta || ta.readOnly || ta.disabled) return;
+  RF.ta = ta.id || w; RF.tael = ci ? ta : null; RF.at = document.activeElement === ta ? ta.selectionStart : null;
   rf_palReset(); openPalette('ref');
 });
 function rf_pick(k, name) {
-  const ta = document.getElementById(RF.ta); if (!ta) return;
+  const ta = RF.tael?.isConnected ? RF.tael : document.getElementById(RF.ta); if (!ta || ta.disabled) return;  // 2.144.3 A (#2523): the chat box itself (redrawn: by its id)
   if (ta.classList.contains('hidden')) editContent();
   rf_insert(ta, rf_text(k, name), RF.at);
 }
