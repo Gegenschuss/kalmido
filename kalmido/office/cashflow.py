@@ -348,8 +348,10 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True
     inv = [r for r in docs if r["kind"] == "invoice" and r["locked_at"] and r["status"] not in ("draft", "cancelled")]
     pm = inv_paid_map(c, oid, [r["id"] for r in inv])
     by_id = {r["id"]: r for r in docs}
-    # in: payments of invoices (actual; out: refunds on credit notes)
-    for p in c.execute("SELECT doc_id, date, amount FROM office_payments WHERE org_id=? AND date>=? AND date<?", (oid, first, last)):
+    # in: payments of invoices (actual; out: refunds on credit notes). 2.161.0 (#2016 after #2168): a reversed payment and its
+    # reversal line stay in the books (GoBD), but no money moved: both leave the cash flow
+    for p in c.execute("SELECT doc_id, date, amount FROM office_payments p WHERE org_id=? AND date>=? AND date<? AND reverses_id IS NULL "
+                       "AND NOT EXISTS (SELECT 1 FROM office_payments x WHERE x.org_id=p.org_id AND x.reverses_id=p.id)", (oid, first, last)):
         r = by_id.get(p["doc_id"])
         if r is None:
             continue
