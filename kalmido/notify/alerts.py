@@ -23,6 +23,7 @@ from ..accounts.users import need_admin
 from ..notify.push import (
     ntfy, NTFY_TOPIC_RE, push_channel, PUSH_PRIORITIES, webpush_count, WEBPUSH_ON, webpush_payload, webpush_user,
 )
+from ..core.env import env_bool
 
 
 # ---------------------------------------------------------------- admin alerts (ntfy, admins only)
@@ -40,7 +41,7 @@ def _env_int(name, dflt, lo=1):
         return dflt
 
 
-AA_ENV = os.environ.get("KALMIDO_ADMIN_ALERTS", "1").strip().lower() not in ("0", "false", "no", "off")
+AA_ENV = env_bool("KALMIDO_ADMIN_ALERTS", True)
 AA_TOPIC_ENV = os.environ.get("KALMIDO_ADMIN_TOPIC", "").strip()
 AA_WINDOW = _env_int("KALMIDO_ADMIN_ALERT_WINDOW", 3600)  # s: counted events are summed up over this window
 AA_KINDS = ("update", "webpush", "watchdog", "integration", "security", "storage")

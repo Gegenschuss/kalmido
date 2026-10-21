@@ -42,6 +42,7 @@ from ..core.i18n import tr
 from ..core.pg import system_ctx
 from ..core.access import Denied, need_task, tvis, vis_sql
 from ..api.v1 import v1_args, v1_view
+from ..core.env import env_bool
 
 # ---- the one place for the model-dependent values (part M's measurement; environment overrides for other models) ----------
 EMBED_URL = (os.environ.get("KALMIDO_EMBED_URL") or "").strip().rstrip("/")
@@ -199,7 +200,7 @@ _STALE_SQL = """SELECT t.id, t.title, t.content, t.list_id, t.updated_at, l.org_
 
 def emb_kick():
     """Start the worker (once per process) and wake it."""
-    if not EMBED_URL or os.environ.get("TASKS_WATCHDOG", "1") != "1":
+    if not EMBED_URL or not env_bool("TASKS_WATCHDOG", True):
         return
     with _WLOCK:
         if _W["thread"] is None or not _W["thread"].is_alive():

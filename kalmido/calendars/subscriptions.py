@@ -36,6 +36,7 @@ from ..personal.timetrack import BadInput
 from ..calendars.caldav import _DtdRefused, xml_no_dtd
 from ..notify.push import _b64u, _b64u_dec
 from ..notify.alerts import _env_int, aa_count, aa_now
+from ..core.env import env_bool
 
 
 # ---------------------------------------------------------------- external calendars (read-only subscriptions)
@@ -54,7 +55,7 @@ from ..notify.alerts import _env_int, aa_count, aa_now
 # KALMIDO_CALENDAR_ALLOW_HOSTS) may be internal. Credentials only ever go to the host they were entered for.
 # The ICS link (itself a secret) and the CalDAV password are stored encrypted (AES-GCM, key derived from a random
 # server secret in the settings table) and are never sent back to the client, nor logged.
-CAL_ON = os.environ.get("KALMIDO_CALENDARS", "1").strip().lower() not in ("0", "false", "no", "off")
+CAL_ON = env_bool("KALMIDO_CALENDARS", True)
 CAL_ALLOW_ENV = os.environ.get("KALMIDO_CALENDAR_ALLOW_HOSTS", "")
 CAL_MAX_BYTES = _env_int("KALMIDO_CALENDAR_MAX_MB", 10) * 1024 * 1024  # per download (ICS file / CalDAV answer)
 CAL_MAX_EVENTS = _env_int("KALMIDO_CALENDAR_MAX_EVENTS", 5000)        # stored occurrences per subscription

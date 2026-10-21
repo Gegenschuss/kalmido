@@ -43,6 +43,7 @@ from ..calendars.caldav import apppw_create, apppw_delete, apppw_list, dav_info
 from ..integrations.importers import imp_request, imp_undo
 from ..notify.alerts import _env_int, aa_count, aa_now, fx2_mask_ip
 from ..admin.backup import BK_ON_ENV
+from ..core.env import env_bool
 
 
 # ---------------------------------------------------------------- package B: REST API with personal access tokens
@@ -59,7 +60,7 @@ from ..admin.backup import BK_ON_ENV
 # are reported to the admins. KALMIDO_API=0 turns the whole API off (404). Spec: GET /api/v1/openapi.json (no data,
 # served without a token), docs/API.md in the repository.
 def _env_on(name, dflt="1"):
-    return os.environ.get(name, dflt).strip().lower() not in ("0", "false", "no", "off")
+    return env_bool(name, dflt.strip().lower() not in ("0", "false", "no", "off"))  # 2.149.0 D (#2511)
 
 
 API_ON = _env_on("KALMIDO_API")
