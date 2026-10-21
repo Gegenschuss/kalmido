@@ -850,7 +850,7 @@ def apb_pub_book(slug, tid, slot):
         c.commit()
         return apb_gone_slot(c, p, t, s, lg)
     from ..admin.hosting import mail_budget
-    if not apb_mail_quota(c, uid) or not mail_budget(c, None, em):  # 2.148.1 D (#2485): own quota, not the owner's
+    if not mail_budget(c, None, em) or not apb_mail_quota(c, uid):  # 2.148.1 D (#2485): own quota, not the owner's; G: refused address first
         c.commit()
         return apb_msg(c, p, lg, tr("No more e-mails to this address today", lg=lg), [tr("Please try again tomorrow.", lg=lg)], code=429)
     tok = secrets.token_urlsafe(32)  # 256 bits; only the hash is stored

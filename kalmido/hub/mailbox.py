@@ -786,6 +786,10 @@ def _file_sent(c, uid, org, cid, lid, ws, m, raw, plain):
     except (Denied, ValueError, UploadRefused, QuotaExceeded) as e:
         print("hubmail: sent mail without .eml", type(e).__name__, flush=True)
         notes.append(tr("The original mail and its attachments could not be filed", lg=lg))
+    if eml_id:  # 2.148.1 G (#2488): the filed nodes follow the mail's rights, as for received mail
+        c.execute("UPDATE fs_nodes SET hub_mail_id=? WHERE id=?", (mid, eml_id))
+    if folder:
+        c.execute("UPDATE fs_nodes SET hub_mail_id=? WHERE id=? AND hub_mail_id IS NULL", (mid, folder))
     c.execute("UPDATE hub_mails SET folder_id=?, eml_id=?, note=? WHERE id=?", (folder, eml_id, "\n".join(notes)[:2000], mid))
     H._index(c, mid, ws, plain)
     return mid

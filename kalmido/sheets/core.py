@@ -536,7 +536,7 @@ class _Env:
         if not book.live(book.cells.get(a)) or not book.live(book.cells.get(b)):
             raise ShErr("ref")
         cells = _range_cells(book, a, b)
-        self.work(len(cells))
+        self.work(len(cells), (a, b))
         return [self.ev.value_of(x["id"]) for x in cells]
 
     def col(self, col_id):
@@ -544,11 +544,17 @@ class _Env:
         if col_id not in book.col_idx:
             raise ShErr("ref")
         cells = book.col_cells(col_id)
-        self.work(len(cells))
+        self.work(len(cells), col_id)
         return [self.ev.value_of(x["id"]) for x in cells if x["id"] != self.cell_row["id"]]
 
-    def work(self, n):
-        """2.148.1 D (#2485): cells the ranges / columns of one evaluation may read (running totals over 5,000 rows fit)."""
+    def work(self, n, key=None):
+        """2.148.1 D (#2485): cells the ranges / columns of one evaluation may read (running totals over 5,000 rows fit).
+        2.148.1 G (#2485): each column / range counts once per evaluation (a column total in every row is no square)."""
+        seen = self.ev.__dict__.setdefault("rng_seen", set())
+        if key is not None:
+            if key in seen:
+                return
+            seen.add(key)
         self.ev.rng_work = getattr(self.ev, "rng_work", SH_RANGE_BUDGET) - n
         if self.ev.rng_work < 0:
             raise ShErr("type", "big")
