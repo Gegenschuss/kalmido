@@ -7,6 +7,39 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.149.0] - 2026-10-21
+
+Cleanup release: faster start and fewer database round trips, measurements built in, a downgrade guard, one register of
+environment variables, office web and agent paths aligned, steadier tests. Nothing changes in how Kalmido is used.
+
+### Action needed (self-hosting)
+- `docker-compose.yml` now starts the optional services through `COMPOSE_PROFILES` in `.env` (`localdb` = the PostgreSQL container, `clamav` = virus scan) instead of "delete the block". The installer / `update.sh` adds the line once; if you update by hand (git or prebuilt image), add `COMPOSE_PROFILES=localdb,clamav` (or only what you use) to `.env`. Needs Docker Compose 2.20 or newer (#2510).
+- A new installation no longer starts without a server key (`KALMIDO_SECRET_KEY` or a key file on its own volume, the image uses `/secret/kalmido.key` when `/secret` is mounted); existing installations keep the warning. Tests and demos: `KALMIDO_NO_SECRET_KEY=1` (#2510).
+
+### Added
+- Every signed-in answer carries a `Server-Timing` header (app time, database time, statement count); requests slower than `KALMIDO_SLOW_REQUEST_MS` (default 500) leave a log line without user data; *Admin > Server* health shows p50 / p95 / max of the last 1000 requests (#2504).
+- Downgrade guard: the database remembers the newest Kalmido version that ran on it. An older minor version refuses to start (one step back, e.g. the automatic rollback after a failed update, still works); restoring a backup made by a newer minor version is refused. Emergency switch `KALMIDO_ALLOW_DOWNGRADE=1` (#2509).
+- `docs/ENV.md` lists every environment variable the server reads, generated from one register (`kalmido/core/env.py`); the CI checks that nothing undocumented is read. Switches understand `1/true/yes/on` and `0/false/no/off` everywhere, also `TASKS_WATCHDOG` (#2511).
+- Clear start errors when `/data` is not writable; the installer waits patiently for long first migrations (#2510).
+
+### Changed
+- Faster start: scripts and styles carry a content hash and stay in the browser cache; static files are served without a session lookup; twelve start files of modules (time sheets, team tabs, sprints, mail filing, other servers, household budget, list print, event invitations, project time, environments, day plan, repository editor) load when first used (#2505, #2518).
+- Updates only fetch the changed files into the offline store instead of the whole app (#2506).
+- The 4-second sync check needs one database query instead of about ten; team chat counters are read in bulk; access rights are cached briefly per process and every membership change still takes effect at once; deltas for list participants (#2507, #2508).
+- New indexes for the done list, due dates, the calendar range and the search (same hits as before); the background watchdog reads all settings in one query and writes nothing while idle (#2515, #2516).
+- Office: agent drafts (offer, change, invoice, reminder) appear in the office log like a person's; header and item changes no longer run in parallel with finalising or sending; undoing a project proposal deletes the offer only for admins and only if nothing was made from it; recurring invoices send the `invoice.created` webhook. Invoice from an offer stays possible from any status on the web (#2235); agents still need an accepted offer (#2521).
+- Office: a payment proposal by an agent above the open amount is refused (409) instead of being flagged (#2521).
+- Office: document words come from the language files instead of inline texts; German and English documents read exactly as before (#2520).
+
+### Fixed
+- Start files no longer call functions of modules that are not loaded yet without a guard (a fresh device could hit a script error, e.g. the design command in the command bar); five CSS variables that were used but never defined (#2519).
+
+### Maintenance
+- The server knows the test clock (`KALMIDO_TEST_NOW`, only in test containers with `KALMIDO_TEST=1`); suites with night / Sunday failures run at a fixed time of day (#2512).
+- `tests/kt.py` (check, sess, until, fresh); shorter rate-limit and burst windows in tests instead of waiting a minute (about 10 min less per CI run) (#2513).
+- `run_all.sh` writes `timings.csv` (CI artefact), `tools/shards.py` shows a measured shard split, a CI rerun repeats only the failed groups (#2514).
+- Layers: basic types in `core/errors.py` / `core/ctx.py` / `api/common.py` (old imports keep working), `tools/check_layers.py` counts function-local imports against `tools/layers_budget.json` (may only go down), 514 needless local imports pulled up, shared office / time / ICS helpers (#2517).
+
 ## [2.147.1] - 2026-10-21
 
 Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.
