@@ -485,6 +485,12 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 
 /* 2.91.0 A (#1923) */
 .rin-sec{margin:.5rem 0}
+/* 2.144.3 B (#2054): suggested payment reminders */
+.dun-hint{display:flex;align-items:center;gap:.5rem;width:100%;margin:.5rem 0;padding:.625rem .75rem;border-radius:.625rem;background:var(--accent-soft);color:inherit;font:inherit;text-align:left;border:0;min-height:2.75rem}
+.dun-hint span:first-of-type{flex:1}
+button.dun-hint{cursor:pointer}
+button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset:.125rem}
+.dun-tag{margin-left:.375rem}
 .rin-list .rin-it{display:flex;align-items:center;flex-wrap:wrap;gap:.25rem .75rem;padding:.375rem 0;border-bottom:1px solid var(--line2)}
 .rin-list .rin-it:last-child{border-bottom:0}
 .rin-it .ofcn{flex:1 1 12rem;min-width:0}

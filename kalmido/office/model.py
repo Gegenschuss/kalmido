@@ -108,7 +108,11 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # 2.120.0 E (#2091): the own letterhead PDF + margins (set only by its own routes, office/letterhead.py)
                      "letterhead": {},
                      # 2.113.2 (#2253): the terms and conditions as PDF per language (set only by their own routes, office/terms.py)
-                     "terms": {}}
+                     "terms": {},
+                     # 2.144.3 B (#2054): suggest payment reminders for overdue invoices (office/dunning.py: on, days after
+                     # the due date / the last reminder's deadline) and the GiroCode on invoices + reminders (office/girocode.py)
+                     "dunning_suggest": 1, "dunning_grace_days": 7, "girocode": 1}
+
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 
 
@@ -369,6 +373,10 @@ def office_settings_clean(c, oid, b, cur):
         elif k == "industry_packs":  # 2.47.0 (#1216)
             from .sheet import dk_packs_clean
             out[k] = dk_packs_clean(v)
+        elif k in ("dunning_suggest", "girocode"):  # 2.144.3 B (#2054)
+            out[k] = 1 if v in (1, True, "1", "true") else 0
+        elif k == "dunning_grace_days":  # 2.144.3 B (#2054)
+            out[k] = int(_num(v, k, 0, 90))
         elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs"):  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k in ("invoice_closing_de", "invoice_closing_en", "reminder_text_de", "reminder_text_en"):

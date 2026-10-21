@@ -453,7 +453,7 @@ function cw_switchHtml(k) {
   if (ks.length < 2) return '';
   return `<nav class="cwsw" aria-label="${esc(tr('Open chats'))}">${ks.map(x => {
     const on = x === k, n = cw_name(x) || '?', ico = x[0] === 'a' ? av(cw_id(x), n, 'avatar sm') : (() => { const r = (S.tc.rooms || []).find(y => y.id === cw_id(x)); return r ? roomIcon(r) : ic('users', 's'); })();
-    return `<button type="button" class="cwswb${on ? ' on' : ''}" data-cwsw="${x}" ${on ? 'aria-current="true"' : ''}>${ico}<span>${esc(n)}</span>${!on && cw_unread(x) ? `<span class="cwdot" aria-label="${esc(tr('Unread messages'))}"></span>` : ''}</button>`
+    return `<button type="button" class="cwswb${on ? ' on' : ''}" data-cwsw="${x}"${x[0] === 'a' ? acw_attr(agentById(cw_id(x))?.org_id) : ''} ${on ? 'aria-current="true"' : ''}>${ico}<span>${esc(n)}</span>${!on && cw_unread(x) ? `<span class="cwdot" aria-label="${esc(tr('Unread messages'))}"></span>` : ''}</button>`
       + (on && cw_has(x) ? `<button type="button" class="iconbtn cwswx" data-cwsw="${x}" data-rm="1" title="${esc(tr('Remove from the open chats'))}" aria-label="${esc(tr('Remove from the open chats'))}">${ic('x', 's')}</button>` : '');
   }).join('')}</nav>`;
 }
