@@ -512,6 +512,8 @@ def vmi_import_post():
             rows.append(rk_trip_clean(c, oid, uid, {k: t.get(k) for k in VMI_FIELDS}))
         except BadInput as x:
             raise BadInput(tr("Row {0}: {1}", i + 1, str(x.args[0] if x.args else x))) from None
+    from .periodlock import period_need_open
+    period_need_open(c, oid, *[d for r in rows for d in (r.get("date_from"), r.get("date_to"))])  # 2.148.0 A (#2471)
     ts, ids = iso(now_utc()), []
     from .travel import rka_purposes_adopt
     rka_purposes_adopt(c, oid, uid, [r["purpose"] for r in rows])  # 2.117.0 A (#2292): unknown purposes become own ones
@@ -543,6 +545,9 @@ def vmi_delete_many():
     billed = {r[0] for r in c.execute(f"SELECT DISTINCT trip_id FROM office_trip_items WHERE org_id=? AND billed_doc_id IS NOT NULL "
                                       f"AND trip_id IN ({q})", [oid] + ids)}
     gone = sorted(mine - billed)
+    from .travel import _trip, _trip_need_open
+    for i in gone:
+        _trip_need_open(c, oid, _trip(c, oid, i))  # 2.148.0 A (#2471)
     old = [t for i in gone for t in rk_trips(c, oid, trip_id=i)]
     if gone:
         c.execute(f"DELETE FROM office_trip_items WHERE org_id=? AND trip_id IN ({','.join('?' * len(gone))})", [oid] + gone)

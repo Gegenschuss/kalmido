@@ -243,6 +243,11 @@ def ofm_rights(c, uid, what, src, dst, rows):
         raise Denied(403, tr(OFFICE_ADMIN_ONLY))
     if pb_owner(c, src) is None and rs != "admin" and any(r["created_by"] != uid for r in rows):
         raise Denied(403, tr(OFM_ONLY))
+    if what == "travel":  # 2.148.0 A (#2471): a trip leaves / enters no locked month
+        from .travel import _trip_need_open
+        for r in rows:
+            _trip_need_open(c, src, r)
+            _trip_need_open(c, dst, r)
 
 
 # ---------------------------------------------------------------- the plan (dry run and move share it)

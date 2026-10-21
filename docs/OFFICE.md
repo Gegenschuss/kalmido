@@ -1053,6 +1053,70 @@ Routes (office admins only; members 403, other areas 404, agents 403; no agent A
 `GET|POST /api/office/cashbooks/<id>/closing` `{day}`, `GET /api/office/cashbooks/<id>/log`,
 `GET /api/office/cashbook.csv|pdf?book_id=&year=`, `GET /api/docs/<id>/cashbook` (the hint on a receipt).
 
+## Procedure documentation (GoBD) (2.148)
+
+**Bookkeeping -> Procedure documentation** gives a prefilled *Verfahrensdokumentation* in the outline of the GoBD (sections
+1 general description, 2 user documentation, 3 technical system documentation, 4 operating documentation, 5 internal
+control system). Kalmido fills in what it knows: the company data, the members of the office with their role (names
+only), the country pack, number ranges, e-invoice format, cash books, bank imports, the locked months, the DATEV numbers
+(on file yes / no), the encryption and the automatic backup as set by the operator, the retention periods of the German
+pack. Everything Kalmido cannot know (legal form, server location, where backup copies are kept, the last restore test)
+is a marked gap "[ ... to fill in ]" in the view and in the exports; the view counts the open gaps.
+
+- Each field has an own text; **Save new version** stores the own texts together with the prefilled texts of that
+  moment as the next version (1, 2, ...). There is no autosave here on purpose: every save is a version.
+- Older versions open read only from the version picker, exactly as they were saved.
+- **Markdown** and **PDF** of the current state or of a version, with the company, the version, its date and the Kalmido
+  version in the head.
+- The document is in German when the app is in German, else in English. No legal advice: have it checked.
+
+Everybody with access to the office reads (members, read-only, accounting); admins save (without an organisation: your
+personal office, you are its admin). Saved data are encrypted at rest like the other office texts, every save and export
+is in the office log. No agent API (the office is closed to agents).
+
+Routes: `GET /api/office/procdoc?version=&lang=de|en`, `PUT /api/office/procdoc` `{own: {field: text}, base?}` (admins; 409
+when `base` is not the latest version), `GET /api/office/procdoc/versions`, `GET /api/office/procdoc.md|pdf?version=&lang=`.
+
+
+## Locking periods and the export for the tax auditor (GoBD) (2.148)
+
+**Bookkeeping -> Lock periods (GoBD)** shows the months of the year with their lock. **Lock up to ...** locks every open
+month up to and including the chosen one (only finished months, always in order, from the first month with data). The
+dialog explains it and asks to type the month: a locked month is never unlocked. The lock is an entry "period_lock" in the
+office log.
+
+In a locked month the server refuses (409) every change of booking data with a date in it: finalising an invoice or credit
+note dated there, moving a draft's date into it, payments (by hand, from the bank reconciliation or an agent's
+suggestion), matching or unmatching bank bookings, a receipt's amount, date, currency, category, VAT rate or payment day,
+moving it to the trash (also inside a folder), restoring it, a new file version or a new recognition, moving it to another
+workspace, cash entries, trips and their receipts (also imported or moved), entertainment receipts and the undo of a DATEV
+import. Corrections go into an open month, e.g. a credit note dated today. Importing a bank statement stays possible (the
+lines are not bookings until they are matched). A personal office with locked months cannot move into an organisation,
+and nothing moves into a locked month of the organisation.
+
+**Export for the tax auditor** (also in that section): one ZIP for a period (default: the previous calendar year, at most
+eleven years) with the tables bookings (the lines of the DATEV batch), invoices / credit notes, positions, payments,
+receipts, cash book, clients, opening balances and the office log as CSV (UTF-8, `;`, decimal comma, dates DD.MM.YYYY, no
+header line; a text starting with `= + - @` gets a leading apostrophe), described in `index.xml` in the description
+standard of the GDPdU. The DTD `gdpdu-01-09-2004.dtd` that `index.xml` names is not part of the ZIP; the auditor's
+software brings it. Admins (and the accounting role) only.
+
+## DATEV export with receipt images (2.148)
+
+The DATEV export dialog has **With receipt images (ZIP for DATEV Unternehmen online)** (on by default) and **Only locked
+months**. The first press checks the period and lists receipts without a booking (no amount) and bookings without a
+receipt (money paid out on the bank account without a matched receipt, cash paid out without a file); the second press
+downloads one ZIP:
+
+- `EXTF_Buchungsstapel_<from>_<to>.csv`: the booking batch as before; every line of an invoice / credit note or a receipt
+  carries `BEDI "<GUID>"` in the column Beleglink.
+- `Belege_<from>_<to>.zip`: `document.xml` (DATEV XML interface, schema Document_v05.0) with one document per GUID, and the
+  files: the PDF of every finalised invoice / credit note and the file of every receipt you see.
+
+The GUID of a document stays the same in every export of the office area (a repeated export links the same receipts). With
+**Only locked months** the period ends at the last locked month and the batch says Festschreibung 1. Limits: 1500 files and
+80 MB per export (choose a shorter period above).
+
 ## Travel expenses: per diem (2.95)
 
 Every trip computes the German per diem (*Verpflegungsmehraufwand*) per participant with the flat rates of its year:
@@ -1597,6 +1661,33 @@ without input tax (`travel` {fares, hotel, vma, other}; defaults for an organisa
 6674 / 6680). `check=1` also answers `hints`: receipts without an amount (not exported), without a category (booked on
 the other expenses account), without a VAT rate (booked without input tax). `GET /api/office/datev/accounts` (admin)
 lists the receipt categories with their default and own account and the travel accounts for the settings page.
+
+### DATEV import: master data and opening balances from the tax advisor (2.148)
+
+Settings → DATEV → **Read DATEV data** (admins; a personal office: its owner) takes a DATEV file the tax advisor sends
+(EXTF, Windows-1252 or UTF-8 with / without BOM, semicolons, CRLF; at most 10 MB and 20 000 rows). The columns are read by
+their names in line 2, not by position. A preview comes first (new / updated / skipped with the reason, the first 20
+rows); nothing is stored until **Take over**. Every import is a run with **Undo** (the toast, and the list on the import
+page).
+
+- **Debtors / creditors** (category 16): a debtor account (ledger length + 1 digits, first digit 1-6) becomes a client
+  with that customer number (company or first + last name, address, VAT id from EU country + VAT number, e-mail). A client
+  with the same customer number (else the same name without a number) only gets its **empty** fields filled; what differs
+  is named in the preview and stays as it is. A creditor account (first digit 7-9) becomes a **supplier** (list under the
+  DATEV settings: rename, delete with undo; name, address, VAT id and IBAN are encrypted at rest). The DATEV booking batch
+  books a receipt whose sender (else the recognised supplier) matches exactly one supplier's name - compared without legal
+  form - on that supplier's creditor account instead of the collective creditor.
+- **Booking batch** (category 21): only the opening bookings (account or counter account 9000 / 9008 / 9009, or a booking
+  text starting with "EB") become the **opening balances** of their year (shown in the bookkeeping); all other bookings are
+  counted and left out - Kalmido is no financial accounting. Importing the same account and year again replaces it (the
+  preview says so; undoing the import puts the earlier balance back). An opening booking in a locked month refuses the
+  whole file.
+
+Routes (admin, never agents): `POST /api/office/datev/import/check` and `POST /api/office/datev/import` (multipart
+`file`), `POST /api/office/datev/import/<run>/undo`, `GET /api/office/datev/suppliers`, `PUT` / `DELETE
+/api/office/datev/suppliers/<id>` (`{name}`), `POST /api/office/datev/suppliers/<id>/restore` (deleted suppliers are
+removed for good after 30 days), `GET /api/office/datev/opening?year=` (`{year, years, items, debit, credit}`). The import
+is in the office log (`import` / `undo`, target `datev_in`).
 
 Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit_scheme`, `reminder_scheme`,
 `payment_days` (14), `reminder_fee` (0), `reminder_deadline_days` (10), `einvoice_format`, `datev_email`, `datev_auto`,

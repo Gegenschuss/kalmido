@@ -330,6 +330,8 @@ def ofx_finalize(c, oid, uid, did):
         write_lock(c, f"office_num_{int(oid)}")  # 2.126.0 A (#1979 F5): the date check and the number in one go (docs._assign_number)
         inv_before_finalize(c, oid, r, s, pack)
         r = doc_row(c, oid, did)
+        from .periodlock import period_need_open
+        period_need_open(c, oid, r["date"])  # 2.148.0 A (#2471): no new booking in a locked month
     if not r["number"]:
         _assign_number(c, oid, did, s)
         r = doc_row(c, oid, did)

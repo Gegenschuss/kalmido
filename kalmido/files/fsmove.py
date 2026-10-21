@@ -174,6 +174,10 @@ def fsm_plan(c, uid, b, to, dry):
         plan["moved"] += [(r, owner) for r in moved]
         plan["stay"] += stay
     ids = [r["id"] for r, _ in plan["moved"]]
+    from ..office.periodlock import pl_receipt_need_open
+    for r, _ in plan["moved"][:SMV_MAX]:
+        if r["kind"] == "file":
+            pl_receipt_need_open(c, r["id"])  # 2.148.0 A (#2471): a receipt of a locked month stays in its office's books
     for r, _ in plan["moved"]:
         if r["kind"] == "folder":
             folders += 1

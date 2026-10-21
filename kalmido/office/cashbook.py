@@ -353,6 +353,8 @@ def _entry_clean(c, oid, uid, b, cur=None):
 
 
 def _day_rules(c, book, day):
+    from .periodlock import period_need_open
+    period_need_open(c, book["org_id"], day)  # 2.148.0 A (#2471): no entry in a locked month
     last = cb_last_closed(c, book["id"])
     if last and day <= last:
         raise _locked(N_("This day is closed already: book on a later day, or cancel the entry."))
@@ -488,6 +490,8 @@ def cb_entry_patch(eid):
     last = cb_last_closed(c, bid)
     if last and cur["day"] <= last:
         raise _locked(N_("This entry lies on a closed day and cannot change any more; cancel it instead."))
+    from .periodlock import period_need_open
+    period_need_open(c, oid, cur["day"])  # 2.148.0 A (#2471)
     rows = _rows(c, oid, bid)
     if cur.get("storno_of") or any(r.get("storno_of") == eid for r in rows):
         raise _locked(N_("A cancelled entry or a cancellation cannot change."))

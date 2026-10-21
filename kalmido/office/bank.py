@@ -578,6 +578,8 @@ def bnk_match(tid):
     t = _tx_dec(c, oid, _tx_row(c, oid, tid))
     if t["match_kind"]:
         raise Denied(409, tr("This booking is matched already"))
+    from .periodlock import period_need_open
+    period_need_open(c, oid, t["day"])  # 2.148.0 A (#2471): bookings of a locked month stay as they are
     mid = pid = None
     if kind in ("invoice", "receipt"):
         try:
@@ -624,6 +626,8 @@ def bnk_unmatch(tid):
     t = _tx_row(c, oid, tid)
     if not t["match_kind"]:
         raise Denied(409, tr("This booking is not matched"))
+    from .periodlock import period_need_open
+    period_need_open(c, oid, t["day"])  # 2.148.0 A (#2471)
     was = {"kind": t["match_kind"], "id": t["match_id"]}
     if t["match_kind"] == "invoice" and t["payment_id"]:
         try:

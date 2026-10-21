@@ -355,6 +355,13 @@ def doc_update(c, nid, d, uid, by=None):
             from ..files.store import _free_name, safe_fs_name
             c.execute("UPDATE fs_nodes SET name=?, updated_at=? WHERE id=?",
                       (_free_name(c, node["parent_id"], node["owner_id"], node["org_id"], safe_fs_name(name), skip=nid), _now(), nid))
+    if any(k in sets for k in ("doc_date", "amount", "currency")):  # 2.148.0 A (#2471): a receipt of a locked month stays as it is
+        new_amt = str(d.get("amount") or "").strip().replace(",", ".")[:20] if "amount" in d else None
+        if (("doc_date" in sets and (sets["doc_date"] or None) != (m["doc_date"] or None))
+                or ("currency" in sets and sets["currency"] != (m["currency"] or ""))
+                or (new_amt is not None and new_amt != (S.doc_open(c, ws, "doc_meta.amount", m["amount"]) or ""))):
+            from ..office.periodlock import pl_receipt_need_open
+            pl_receipt_need_open(c, nid, sets.get("doc_date"))
     if sets:
         c.execute(f"UPDATE doc_meta SET {', '.join(k + '=?' for k in sets)}, updated_at=? WHERE node_id=?", (*sets.values(), _now(), nid))
         if "asn" in sets:
@@ -480,6 +487,8 @@ def docs_redo(nid):
     c = db()
     _no_agent()
     _doc(c, nid, write=True)
+    from ..office.periodlock import pl_receipt_need_open
+    pl_receipt_need_open(c, nid)  # 2.148.0 A (#2471): a new recognition could change a locked receipt's amount
     c.execute("UPDATE doc_meta SET state='wait', tries=0, error='', updated_at=? WHERE node_id=?", (_now(), nid))
     c.commit()
     docs_kick()

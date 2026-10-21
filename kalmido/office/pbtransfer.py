@@ -36,7 +36,8 @@ from .ledger import ofx_log
 from .model import office_gate, office_org, pb_owner
 from .officemove import ofm_reseal
 
-PBT_KEEP = ("office_settings", "office_company", "office_cf_start", "office_cf_actual", "office_numbers")
+PBT_KEEP = ("office_settings", "office_company", "office_cf_start", "office_cf_actual", "office_numbers",
+            "office_period_locks")  # 2.148.0 A (#2471): the locks of each area stay its own
 PBT_SEALED = set(FIELDS) | {t for t, _c in JSON_KEYS} | {"office_doc_items"}
 PBT_STAY_FILE = re.compile(r"logo\.png|letterhead-[0-9a-f]{16}\.pdf")  # the settings' own files (pdfweb.LOGO_FILE, letterhead.BP_FILE_RE)
 PBT_SAME_FILE = re.compile(r"logo-[0-9a-f]{16}\.png|lhs-[0-9a-f]{16}\.pdf")  # content-addressed copies: the same name = the same content
@@ -118,6 +119,12 @@ def pbt_plan(c, uid, src, dst):
     """What a transfer of personal office src into organisation dst would do: {moves, keeps, conflicts, counts, files, ...}."""
     counts, keeps, conflicts, notes = {}, [], [], []
     tables = pbt_tables(c)
+    from .periodlock import pl_first_month, pl_label, pl_through
+    lk, first = pl_through(c, dst), pl_first_month(c, src)
+    if lk and first and first <= lk:  # 2.148.0 A (#2471): nothing lands in a locked month of the organisation
+        conflicts.append(tr("The organisation is locked up to {0}; the personal office has data from {1}", pl_label(lk), pl_label(first)))
+    if pl_through(c, src):  # its own locks stay behind: the moved data would be editable again in the organisation
+        conflicts.append(tr("The personal office is locked up to {0}; locked data cannot move", pl_label(pl_through(c, src))))
     for t in tables:
         w, n = pbt_where(t)
         k = c.execute(f"SELECT COUNT(*) FROM {t} WHERE {w}", (src,) * n).fetchone()[0]

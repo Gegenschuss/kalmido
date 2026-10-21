@@ -369,6 +369,8 @@ def files_version_upload(nid):
     n = need_node(c, nid, write=True)
     if n["kind"] != "file":
         raise Denied(409, tr("Not a file"))
+    from ..office.periodlock import pl_receipt_need_open
+    pl_receipt_need_open(c, nid)  # 2.148.0 A (#2471): the image of a locked receipt stays
     h6d_one_file_request()  # 2.86.0 (N22): one file -- a longer body is refused before it is read
     f = request.files.get("file")
     if not f:
@@ -389,6 +391,8 @@ def files_version_restore(nid, no):
     """An older version becomes the newest again (a new version with its content; nothing is lost)."""
     c = db()
     n = need_node(c, nid, write=True)
+    from ..office.periodlock import pl_receipt_need_open
+    pl_receipt_need_open(c, nid)  # 2.148.0 A (#2471)
     v = fs_version_row(c, nid, no)
     if n["kind"] != "file" or not v:
         raise Denied(404)
@@ -479,6 +483,8 @@ def files_node_delete(nid):
     n = need_node(c, nid, write=True)
     if n["parent_id"] is None and n["role"] != "owner":
         raise Denied(403)
+    from ..office.periodlock import pl_tree_need_open
+    pl_tree_need_open(c, nid)  # 2.148.0 A (#2471): a receipt of a locked month (also inside a folder) cannot go into the trash
     c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?", (_now(), uid, nid))
     fs_log_add(c, nid, "trash")
     bump(c)
@@ -494,6 +500,8 @@ def files_node_restore(nid):
         return jsonify(fs_node_json(c, n, n["role"]))
     if n["role"] != "owner" and n["deleted_by"] != me():
         raise Denied(403)
+    from ..office.periodlock import pl_tree_need_open
+    pl_tree_need_open(c, nid)  # 2.148.0 A (#2471)
     nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=nid)
     c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, nid))
     fs_log_add(c, nid, "restore")

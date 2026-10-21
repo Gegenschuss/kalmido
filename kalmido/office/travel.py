@@ -26,6 +26,7 @@ from .calc import dec, dstr, money
 from .model import office_gate, office_org, office_settings
 from .ledger import ofx_items_brief, ofx_log, ofx_need_editable
 from .vma import vma_trip
+from .periodlock import period_need_open
 
 RK_CATS = (("car", N_("Car / fuel")), ("train", N_("Train")), ("flight", N_("Flight")), ("rental_car", N_("Rental car")),
            ("taxi", N_("Taxi / public transport")), ("parking", N_("Parking")), ("hotel", N_("Hotel")), ("meals", N_("Meals")),
@@ -359,6 +360,14 @@ def rk_trips(c, oid, year=None, trip_id=None):
     return [rk_trip_public(c, oid, t, by.get(t["id"], []), docs) for t in trips]
 
 
+def _trip_need_open(c, oid, t, *days, items=True):
+    """2.148.0 A (#2471): 409 when trip t (its days, its receipts' days when items) or one of days lies in a locked month."""
+    ds = [t["date_from"], t["date_to"], *days]
+    if items:
+        ds += [r["date"] for r in c.execute("SELECT date FROM office_trip_items WHERE trip_id=? AND org_id=?", (t["id"], oid)).fetchall()]
+    period_need_open(c, oid, *ds)
+
+
 def _trip(c, oid, tid):
     r = c.execute("SELECT * FROM office_trips WHERE id=? AND org_id=?", (tid, oid)).fetchone()
     if not r:
@@ -410,6 +419,7 @@ def rk_trip_post():
         raise BadInput(tr("Invalid value: {0}", "items"))
     home = rk_home_cur(c, oid)
     clean = [rk_item_clean(c, oid, x if isinstance(x, dict) else {}, home=home) for x in its]
+    period_need_open(c, oid, row.get("date_from"), row.get("date_to"), *[x.get("date") for x in clean])  # 2.148.0 A (#2471)
     ts = iso(now_utc())
     row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)
     row = oc_enc_fields(c, oid, "office_trips", row)
@@ -433,6 +443,7 @@ def rk_trip_patch(tid):
         raise BadInput(tr("Invalid data"))
     row = rk_trip_clean(c, oid, uid, b, t)
     if row:
+        _trip_need_open(c, oid, t, row.get("date_from"), row.get("date_to"))  # 2.148.0 A (#2471)
         row["updated_at"] = iso(now_utc())
         row = oc_enc_fields(c, oid, "office_trips", row)
         c.execute(f"UPDATE office_trips SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [tid, oid])
@@ -445,7 +456,7 @@ def rk_trip_patch(tid):
 def rk_trip_delete(tid):
     """Deletes a trip with its receipts; answers the trip as it was (the client's undo posts it again)."""
     c, uid, oid = _ctx()
-    _trip(c, oid, tid)
+    _trip_need_open(c, oid, _trip(c, oid, tid))  # 2.148.0 A (#2471)
     old = _one(c, oid, tid)
     c.execute("DELETE FROM office_trips WHERE id=? AND org_id=?", (tid, oid))
     bump(c)
@@ -464,6 +475,7 @@ def rk_item_post(tid):
     if c.execute("SELECT COUNT(*) FROM office_trip_items WHERE trip_id=? AND org_id=?", (tid, oid)).fetchone()[0] >= MAX_ITEMS:
         raise BadInput(tr("Too many entries"))
     row = rk_item_clean(c, oid, b, home=rk_home_cur(c, oid))
+    _trip_need_open(c, oid, _trip(c, oid, tid), row.get("date"), items=False)  # 2.148.0 A (#2471)
     mx = c.execute("SELECT COALESCE(MAX(sort), 0) FROM office_trip_items WHERE trip_id=? AND org_id=?", (tid, oid)).fetchone()[0]
     iid = _insert_item(c, oid, tid, row, (mx or 0) + 1)
     c.execute("UPDATE office_trips SET updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), tid, oid))
@@ -488,6 +500,7 @@ def rk_item_patch(tid, iid):
         raise BadInput(tr("Invalid data"))
     row = rk_item_clean(c, oid, b, cur, home=rk_home_cur(c, oid))
     if row:
+        _trip_need_open(c, oid, _trip(c, oid, tid), cur["date"], row.get("date"), items=False)  # 2.148.0 A (#2471)
         row["updated_at"] = iso(now_utc())
         row = oc_enc_fields(c, oid, "office_trip_items", row)
         c.execute(f"UPDATE office_trip_items SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [iid, oid])
@@ -501,6 +514,7 @@ def rk_item_delete(tid, iid):
     """Deletes a receipt; answers the trip and the receipt as it was (for the undo)."""
     c, uid, oid = _ctx()
     r = _item(c, oid, tid, iid)
+    _trip_need_open(c, oid, _trip(c, oid, tid), r["date"], items=False)  # 2.148.0 A (#2471)
     old = _item_public(c, oid, r, _docs_map(c, oid))
     c.execute("DELETE FROM office_trip_items WHERE id=? AND org_id=?", (iid, oid))
     bump(c)

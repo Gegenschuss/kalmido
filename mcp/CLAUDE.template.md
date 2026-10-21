@@ -294,7 +294,8 @@
   `draft_invoice_from_offer` (an accepted quotation, event `offer_accepted`), `draft_reminder`, `suggest_payment` /
   `list_payment_suggestions`. Take positions from the services (`service_id`); free positions, other prices and discounts
   are marked for the person. A person reserves the number, finalises, sends, deletes and books payments; never ask them to
-  let you. Client and price data go to your model: read only what the order needs. Pass `requested_by` = the person you
+  let you. A month the office has locked (GoBD) refuses a payment suggestion dated in it (409): tell the person instead of
+  retrying with another date. Client and price data go to your model: read only what the order needs. Pass `requested_by` = the person you
   work for; `notify: true` puts a card with the sum, the PDF preview and *Open in the office* into their chat.
   2.147: `get_office` also names the area's `country_pack` and its `features` (`books.datev`, `docs.einvoice`,
   `books.vat_return`, `books.tax_dates`, `books.export_csv`: true / false). Leave out what is off - no DATEV hints, no

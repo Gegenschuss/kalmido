@@ -1080,6 +1080,8 @@ def inv_pay_add(c, oid, uid, did, b):
     d = _date(b.get("date"), "date") or local_now().date().isoformat()
     if d > local_now().date().isoformat():
         raise BadInput(tr("The date must not lie in the future"))
+    from .periodlock import period_need_open
+    period_need_open(c, oid, d)  # 2.148.0 A (#2471): also for the bank reconciliation and the agents' payment proposals
     if money(amt) > dec(inv_money_fields(r, inv_paid_map(c, oid, [did]))["open"]):
         raise Denied(409, tr("The payment exceeds the open amount"))
     method = b.get("method") or "transfer"
@@ -1114,6 +1116,8 @@ def inv_pay_del(c, oid, did, pid):
     p = c.execute("SELECT * FROM office_payments WHERE id=? AND doc_id=? AND org_id=?", (pid, did, oid)).fetchone()
     if p is None:
         raise Denied(404)
+    from .periodlock import period_need_open
+    period_need_open(c, oid, p["date"])  # 2.148.0 A (#2471)
     c.execute("DELETE FROM office_payments WHERE id=? AND org_id=?", (pid, oid))
     inv_refresh_paid(c, oid, did)
     ofx_log(c, oid, "payment_delete", doc_id=did, detail={"id": pid, "date": p["date"], "amount": dstr(p["amount"])})
