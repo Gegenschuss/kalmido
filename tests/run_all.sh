@@ -1448,6 +1448,11 @@ fresh; run p2142_b_ui node p2142_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.142.0 part C: export to Todoist CSV / Markdown, admin "fetch mail now", ntfy share inbox per person (#2148 #2149 #2150)
 fresh; run p2142_c_api "$PY" p2142_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2142_c_ui node p2142_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.1 part A: office side bar stays put in tablet mode (#2445)
+fresh; run p21441_a_ui node p21441_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.1 part B: bank import - format hint, several files or a ZIP in one import (#2446 #2450)
+fresh; run p21441_b_api "$PY" p21441_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21441_b_ui node p21441_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.111.0: Buero-Rueckgaengig (a), Termin-Einladungen + Abo-Link (b), Schnellerfassung (c)
 fresh; run p2111_a_api "$PY" p2111_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2111_a_ui node p2111_a_ui.js "$KALMIDO_TEST_DATA"
