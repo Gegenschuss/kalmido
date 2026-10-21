@@ -612,6 +612,8 @@ ROUTES = {
     # 2.115.0 B (#2062): an organisation's invitations by e-mail (p2115_b_api_test.py: other organisation 404, member 403)
     "GET /api/orgs/{}/invites": "org", "POST /api/orgs/{}/invites": "org", "POST /api/orgs/{}/invites/{}/resend": "org",
     "DELETE /api/orgs/{}/invites/{}": "org",
+    # 2.148.1 A (#2480): only the invited person answers an open invitation (p21481_a_api_test.py: others 404)
+    "POST /api/orgs/{}/join": "org", "DELETE /api/orgs/{}/join": "org",
     # 2.35.0 (#1101): an organisation admin's lists of the organisation (p2350_c_api_test.py: other organisation, private list, member 403)
     "GET /api/orgs/{}/lists": "org", "POST /api/orgs/{}/lists/{}/archive": "org", "DELETE /api/orgs/{}/lists/{}": "org",
     "POST /api/orgs/{}/lists/{}/owner": "org",

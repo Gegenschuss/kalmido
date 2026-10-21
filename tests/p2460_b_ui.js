@@ -31,6 +31,7 @@ const state = async who => (await call(who, 'GET', '/api/state')).j;
   const org = (await call('alice', 'POST', '/api/admin/orgs', {name: 'Alpha', admin_id: ids.bob})).j.id;
   for (const u of ['bob', 'carol', 'dave']) { ck[u] = await login(u); await call(u, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,comments'}); }
   for (const u of ['carol', 'dave']) await call('bob', 'PUT', `/api/orgs/${org}/members`, {email: `${u}@example.com`});
+  for (const u of ['carol', 'dave']) await call(u, 'POST', `/api/orgs/${org}/join`);  // 2.148.1 (#2480): they accept the invitation
   for (const u of ['bob', 'carol', 'dave']) ck[u] = await login(u);  // the new memberships in the session
   const L = (await call('bob', 'POST', '/api/lists', {name: 'Orgwide plan', org_id: org})).j.id;
   const P = (await call('bob', 'POST', '/api/lists', {name: 'Own notes', org_id: null})).j.id;

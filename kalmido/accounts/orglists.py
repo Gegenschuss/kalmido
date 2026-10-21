@@ -26,9 +26,16 @@ def _ol_list(c, oid, lid):
     """The list lid of organisation oid (never an inbox), else 404 -- the same answer for a private list, another
     organisation's list and a list that does not exist."""
     lr = c.execute("SELECT * FROM lists WHERE id=? AND org_id=? AND is_inbox=0 AND deleted_at IS NULL", (lid, oid)).fetchone()  # 2.102.0 A (#1988)
-    if not lr:
+    if not lr or not ol_shared(c, lr):  # 2.148.1 A (#2480): only the lists the overview shows (shared with someone)
         raise Denied(404)
     return lr
+
+
+def ol_shared(c, lr):
+    """2.148.1 A (#2480): list row lr is shared with at least one more person (not an agent) -- the lists an organisation's
+    admins see and act on (_ol_out); a member's own unshared list stays theirs."""
+    return bool(c.execute("SELECT 1 FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=? AND m.user_id!=? "
+                          "AND COALESCE(u.kind,'user')!='agent' LIMIT 1", (lr["id"], lr["owner_id"])).fetchone())
 
 
 def _ol_people(c, lr):

@@ -19,6 +19,7 @@ import sys
 import time
 
 import requests
+from freelancer_fixture import org_join  # 2.148.1 (#2480): an invited member accepts
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
@@ -105,7 +106,7 @@ for who in ("bob", "erin"):
 r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": CAROL})
 assert r.status_code == 201, r.text
 BETA = r.json()["id"]
-check(Ca.put(B + f"/api/orgs/{BETA}/members", json={"email": "bob@example.com", "role": "member"}).ok, "setup: bob is also in Beta")
+check((Ca.put(B + f"/api/orgs/{BETA}/members", json={"email": "bob@example.com", "role": "member"}).ok and org_join(B, "bob", BETA)), "setup: bob is also in Beta")
 for s in (A, Bo, Er):
     s.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 Ca.patch(B + "/api/settings", json={"workspace": f"org:{BETA}"})

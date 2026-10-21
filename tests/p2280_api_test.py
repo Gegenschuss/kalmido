@@ -25,6 +25,7 @@ import subprocess
 import sys
 
 import requests
+from freelancer_fixture import org_join  # 2.148.1 (#2480): an invited member accepts
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -293,6 +294,7 @@ check(Ca.post(B + "/api/admin/orgs", json={"name": "Gamma"}).status_code == 403,
 # carol leaves the first organisation (bob removes her) -> she is only in Beta; dave goes to Beta too (by e-mail)
 check(Bo.delete(B + f"/api/orgs/{ORG}/members/{CAROL}").ok, "workspaces: an organisation admin removes a member")
 check(Ca.put(B + f"/api/orgs/{BETA}/members", json={"email": "DAVE@example.com"}).json().get("by_email") is True, "workspaces: the organisation admin adds dave by e-mail")
+check(org_join(B, "dave", BETA), "workspaces: dave accepts the invitation")  # 2.148.1 (#2480)
 check(Ca.put(B + f"/api/orgs/{BETA}/members", json={"email": "nobody@example.com"}).json().get("by_email") is True, "workspaces: an unknown address is not revealed")
 check(Bo.delete(B + f"/api/orgs/{ORG}/members/{DAVE}").ok, "workspaces: dave out of the first organisation")
 check(Da.put(B + f"/api/orgs/{BETA}/members", json={"user_id": CAROL, "role": "admin"}).status_code == 403, "workspaces: a plain member manages nothing")

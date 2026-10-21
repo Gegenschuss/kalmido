@@ -243,6 +243,11 @@ CHECKS = {
     # 2.112.1 B (#2058): an external share link whose workspace is not its node's (the page refuses it: files/extlinks.py
     # xl_find; counted only) -- (link, creator)
     "file_ext_link": ("SELECT x.id, x.created_by FROM fs_ext_links x JOIN fs_nodes n ON n.id=x.node_id WHERE x.org_id IS DISTINCT FROM n.org_id"),
+    # 2.148.1 A (#2478): a public link of an organisation's list made by someone who is neither its owner nor a member of it
+    # (the owner change gives the link a new token; counted only) -- (list, creator)
+    "public_link_creator": ("SELECT p.list_id, p.created_by FROM public_links p JOIN lists l ON l.id=p.list_id WHERE l.org_id IS NOT NULL "
+                            "AND p.created_by IS NOT NULL AND p.created_by!=l.owner_id AND NOT EXISTS (SELECT 1 FROM list_members m "
+                            "WHERE m.list_id=p.list_id AND m.user_id=p.created_by)"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 
@@ -357,7 +362,8 @@ def boundary_tick(c):
 # 2.46.0 (#1563): what each finding is, for the administration (kind prefix -> (type, table of the object))
 OA_OBJ = {"list": ("list", "lists"), "group": ("list", "lists"), "cal": ("calendar", "ev_cals"), "book": ("book", "books"),
           "client": ("client", "clients"),  # 2.59.0 A (#1735)
-          "att": ("event", "events")}  # 2.87.0 (#1983): an invitation to an organisation's event
+          "att": ("event", "events"),  # 2.87.0 (#1983): an invitation to an organisation's event
+          "public": ("list", "lists")}  # 2.148.1 A (#2478): a public link of an organisation's list (public_link_creator)
 OA_DETAIL_MAX = 100
 
 

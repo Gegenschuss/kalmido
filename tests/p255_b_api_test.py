@@ -19,6 +19,7 @@ import subprocess
 import sys
 
 import requests
+from freelancer_fixture import org_join  # 2.148.1 (#2480): an invited member accepts
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
@@ -104,7 +105,7 @@ ORG = r.json()["id"]
 r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": DAVE})
 ORG2 = r.json()["id"]
 Bo = sess("bob")
-check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok, "setup: carol joins Alpha")
+check((Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok and org_join(B, "carol", ORG)), "setup: carol joins Alpha")
 AG, AGS = agent("lybot", ["read", "tasks:write", "comments", "layouts"], org=ORG)
 AG0, AG0S = agent("plainbot", ["read", "tasks:write", "comments"], org=ORG)
 PAG, PAGS = agent("erinbot", ["read", "comments", "layouts"], owner=ERIN)

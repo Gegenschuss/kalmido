@@ -284,7 +284,8 @@ def _e2e_parse(v):
 
 def tchat_clean_mentions(c, r, text):
     allowed = tchat_room_members(c, r)
-    names = user_names(c, [int(x) for x in MENTION_RE.findall(text)])
+    from ..collab.comments import mention_names
+    names = mention_names(c, [int(x) for x in MENTION_RE.findall(text)])  # 2.148.1 A (#2490): '@?' for unseen accounts
     found = []
 
     def sub(m):

@@ -244,7 +244,7 @@ function wsPaneWire(md) {
     const b = e.target.closest('[data-wsadd],[data-wsrm],[data-wssave]'); if (!b) return;
     const oid = +(b.dataset.oidx || b.closest('[data-oid]')?.dataset.oid || 0);
     try {
-      if (b.dataset.wsadd) { const em = $('#ws-add-' + oid, md).value.trim(); if (!em) return; const r = await api('PUT', `/api/orgs/${oid}/members`, {email: em}); toast(r.by_email ? tr('If this address has an account, the person is now a member.') : tr('Added')); }
+      if (b.dataset.wsadd) { const em = $('#ws-add-' + oid, md).value.trim(); if (!em) return; const r = await api('PUT', `/api/orgs/${oid}/members`, {email: em}); toast(S.me?.is_admin ? (r.by_email ? tr('If this address has an account, the person is now a member.') : tr('Added')) : tr('Invitation sent. With an account, the person accepts it in their News.')); }  // 2.148.1 A (#2480)
       else if (b.dataset.wssave) { await api('PATCH', `/api/orgs/${oid}`, {name: $('#ws-name-' + oid, md).value.trim(), domains: $('#ws-dom-' + oid, md).value}); toast(tr('Saved')); }
       else if (b.dataset.wsrm) {
         const uid = +b.dataset.wsrm, self = uid === S.me?.id, o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === oid), m = o?.members.find(x => x.id === uid);

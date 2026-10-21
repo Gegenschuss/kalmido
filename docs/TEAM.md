@@ -644,6 +644,31 @@ the three). Before version 2.143 a server read an unknown role as *Member*: goin
 while nobody holds one of the new roles. From 2.143 on a stored role the server does not know reads as *Guest* (and is
 noted in the server log).
 
+## Joining an organisation needs your yes (2.148.1)
+
+An organisation admin who adds an existing account (by e-mail address under *Settings > Workspaces*, or with *Invite by
+e-mail*) no longer makes the person a member at once: the person gets an invitation in their News (*X invites you to join
+the organisation Y*, no push) and chooses *Join*, *Later* or *Decline the invitation*. Only after *Join* are they a member
+in the chosen role. An open invitation ends after two weeks; inviting again renews it. The answer to the admin is the same
+for every address (with or without an account), so nobody learns through it who has an account. The instance admin still
+adds people directly. A new address (without an account) works as before: a new account in the organisation and the
+invitation mail; the link to choose a password goes only by e-mail, an organisation admin never sees it (also not when the
+mail failed); *Resend* works three times a day per invitation.
+
+Related changes in the same release:
+
+- A new list without a chosen workspace (from an import, the REST API, a template or a proposal) goes to the organisation
+  the workspace switch in the sidebar shows, else to your only organisation; with several organisations and the switch on
+  *All* or *Private* it is private (it no longer lands in the first organisation by itself).
+- The organisation admins' *Lists of the organisation* acts only on the lists it shows (shared with at least one more
+  person): a member's unshared list stays theirs, also in the list trash. When a person leaves or is removed, their lists
+  of the organisation still go to an admin; that now shows in the dialog's history, and the person is told in their News.
+- A list that changes its owner gets a new public link (the old one stops working; the new owner shares the new one) and
+  its deploy webhooks switch off; the new owner is told in their News.
+
+API for scripts of the web app: `GET /api/orgs` carries `joins` (my open invitations: `org_id`, `name`, `role`, `by`),
+`POST /api/orgs/{org}/join` accepts, `DELETE /api/orgs/{org}/join` declines (404 without an open invitation).
+
 ## The group "Conversations" in the sidebar (2.99.0)
 
 The group no longer grows with every person you share a list with:

@@ -169,6 +169,9 @@ def tcx_agents_for(c, uid, oid):
 def tcx_may_add(c, r, actor, uid):
     """None when actor may add uid to channel / group r, else the reason (shown as it is)."""
     from .teamchat import tchat_coworkers
+    from ..accounts.orgs import may_see
+    if not is_agent_id(c, uid) and not may_see(c, actor, uid):  # 2.148.1 A (#2490): no name or reason for an unseen account
+        return tr("This person cannot be added to this conversation")
     name = user_names(c, [uid]).get(uid, "?")
     if is_agent_id(c, uid):
         if r["kind"] != "channel" or uid not in tcx_agents_for(c, actor, r["org_id"]):

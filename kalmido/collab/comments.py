@@ -74,10 +74,20 @@ def task_people(c, lid, tid=None):
     return out
 
 
+def mention_names(c, ids):
+    """2.148.1 A (#2490): {id: name} for the '@name' of a mention that is not kept -- only people the writer may see
+    (else '@?', so a mention never tells the name of an unknown account)."""
+    from ..accounts.orgs import visible_people
+    names = user_names(c, ids)
+    vis = visible_people(c, me()) if has_request_context() and getattr(g, "user", None) is not None else set()
+    return names if vis is None else {k: v for k, v in names.items() if k in vis}
+
+
 def clean_mentions(c, lid, text, tid=None):
-    """Keeps <@id> tokens of people who see the list; any other token becomes plain '@name'."""
+    """Keeps <@id> tokens of people who see the list; any other token becomes plain '@name' (2.148.1 A, #2490: '@?' for
+    someone the writer may not see)."""
     allowed = {p["id"] for p in task_people(c, lid, tid)}  # 2.86.0 (N20): tid narrows it for a participant
-    names = user_names(c, [int(x) for x in MENTION_RE.findall(text)])
+    names = mention_names(c, [int(x) for x in MENTION_RE.findall(text)])
     found = []
 
     def sub(m):

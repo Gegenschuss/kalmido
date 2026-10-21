@@ -3,7 +3,7 @@
 //   on the other one (confirmation) ends it (its cookie is 401), the list redraws with one row and no "everywhere else" button;
 //   "Log out everywhere else" with a third session: the toast with the count.
 //   Settings > Organisation as its admin (not admin of the server): "Invite by e-mail" opens the dialog (address + role),
-//   inviting shows the link (no e-mail on this server) and the open invitation; withdraw (confirmation) removes it and the
+//   inviting shows a notice (no e-mail on this server; 2.148.1: never the link) and the open invitation; withdraw (confirmation) removes it and the
 //   account, ONE undo step invites the address again; a plain member sees no invite button.
 // P2115B_NOSTART=1 = the server already runs.
 const {execFileSync} = require('child_process');
@@ -66,9 +66,8 @@ const loginUA = async (user, ua) => {
   check(mi && d.querySelector('#oinv-role option[value="admin"]'), 'the dialog: address + role');
   mi.value = 'nora@example.com'; d.querySelector('#oinv-role').value = 'member';
   mi.closest('form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
-  const lk = await until(() => d.querySelector('#inv-link'));
-  check(lk && /#invite\//.test(lk.value), 'no e-mail on this server: the link to copy');
-  lk?.closest('.modal')?.remove();
+  // 2.148.1 (#2486): an organisation admin never gets the link (no e-mail on this server: a notice instead)
+  check(await until(() => /could not be sent/.test(d.body.textContent)) && !d.querySelector('#inv-link'), 'no e-mail on this server: a notice, no link');
   const orow = await until(() => [...d.querySelectorAll('.oinvrow')].find(r => /nora@example\.com/.test(r.textContent)));
   check(orow && /Invited/.test(orow.textContent) && orow.querySelector('[data-oinv="resend"]') && orow.querySelector('[data-oinv="withdraw"]'), 'the open invitation with Resend + Withdraw');
   let inv = await call('GET', `/api/orgs/${ORG}/invites`, null, await login('bob'));

@@ -622,6 +622,7 @@ def push_test():
 
 def umz_export_queries(uid):
     """2.73.0 B (#1473): the tables of "my data" (GET /api/export.json and the account export) -> {name: (sql, args)}."""
+    from ..core.access import acx_lists_sql
     own = "(SELECT id FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL))"  # 2.102.0 review F3: an organisation's list in its trash is the organisation's
     task_ids = f"(SELECT id FROM tasks WHERE list_id IN {own})"
     q = {
@@ -657,7 +658,8 @@ def umz_export_queries(uid):
         "list_layouts": ("SELECT * FROM list_layouts WHERE user_id=?", (uid,)),
         "view_layouts": ("SELECT * FROM view_layouts WHERE user_id=?", (uid,)),  # 2.55.0 (#1069): my saved arrangements
         "view_layout_offers": ("SELECT * FROM view_layout_offers WHERE from_user=? OR to_user=?", (uid, uid)),  # 2.55.0 (#1068)
-        "list_notepads": ("SELECT * FROM list_notepads WHERE created_by=?", (uid,)),  # 2.43.0 (#1346)
+        # 2.43.0 (#1346); 2.148.1 A (#2478): only from lists the person still sees
+        "list_notepads": (f"SELECT * FROM list_notepads WHERE created_by=? AND list_id IN {acx_lists_sql(req=False)}", (uid, uid, uid)),
         "list_notif": (f"SELECT * FROM list_notif WHERE list_id IN {own}", (uid,)),  # 2.33.0 (#927): my notification templates
         "folder_notif": ("SELECT * FROM folder_notif WHERE owner_id=?", (uid,)),
         "task_bell": ("SELECT task_id, level, until, set_by, created_at, updated_at FROM task_bell WHERE user_id=?", (uid,)),  # 2.53.0 C (#1424)

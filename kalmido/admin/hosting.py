@@ -103,11 +103,9 @@ def quota_info(c, uid):
 
 
 def support_email(c):
-    v = gsetting(c, "support_email") or SUPPORT_EMAIL_ENV
-    if v:
-        return v
-    r = c.execute("SELECT email FROM users WHERE is_admin=1 AND disabled=0 AND email IS NOT NULL AND email!='' ORDER BY id LIMIT 1").fetchone()
-    return r[0] if r else ""
+    """The support address when one is set (setting / KALMIDO_SUPPORT_EMAIL), else '' -- 2.148.1 A (#2490): never an
+    admin's own address (the client then says to ask the admin)."""
+    return gsetting(c, "support_email") or SUPPORT_EMAIL_ENV or ""
 
 
 def quota_guard(c, uid, incoming=None):

@@ -19,6 +19,7 @@ import subprocess
 import sys
 
 import requests
+from freelancer_fixture import org_join  # 2.148.1 (#2480): an invited member accepts
 
 import dbx as dbxm
 
@@ -102,7 +103,7 @@ ORG = r.json()["id"]
 r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": DAVE})
 ORG2 = r.json()["id"]
 Bo = sess("bob")
-check(Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok, "setup: carol joins Alpha")
+check((Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": "carol@example.com"}).ok and org_join(B, "carol", ORG)), "setup: carol joins Alpha")
 AG, AGS = agent("devbot", ["read", "tasks:write", "structure"], org=ORG)
 AGR, AGRS = agent("readbot", ["read", "tasks:write"], org=ORG)
 AGX, AGXS = agent("betabot", ["read", "tasks:write", "structure"], org=ORG2)

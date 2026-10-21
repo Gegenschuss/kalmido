@@ -90,6 +90,21 @@ def list_owner_get(lid):
                    history=list_owner_log(c, lid))
 
 
+def owner_reset_secrets(c, lid, new):
+    """2.148.1 A (#2478): a new owner gets the list without the secrets of the old one: the public link gets a new token
+    (settings stay, the new owner copies the new link) and the deploy webhooks switch off. Returns what was reset."""
+    from .public import pub_new_token
+    out = []
+    if c.execute("SELECT 1 FROM public_links WHERE list_id=?", (lid,)).fetchone():
+        _, h, sealed = pub_new_token(c, lid)
+        c.execute("UPDATE public_links SET token_hash=?, token=?, pw_rev=pw_rev+1, views=0, last_used_at=NULL, created_by=?, created_at=? "
+                  "WHERE list_id=?", (h, sealed, new, iso(now_utc()), lid))
+        out.append("link")
+    if c.execute("UPDATE list_envs SET token_hash='' WHERE list_id=? AND token_hash!=''", (lid,)).rowcount:
+        out.append("hook")
+    return out
+
+
 def owner_transfer(c, lr, new, force=False):
     """Moves list lr to user id new (checked by the caller); returns (old owner id, new owner name). force (2.64.1, #1817): a
     transfer that must happen (leaving an organisation) also to someone without the key of a list with the lock."""
@@ -120,7 +135,10 @@ def owner_transfer(c, lr, new, force=False):
     c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
               (lid, me(), "owner", json.dumps({"from": old, "to": new, "from_name": names.get(old, ""), "to_name": names.get(new, "")},
                                               ensure_ascii=False), ts))
-    news_add(c, new, "owner", list_id=lid, data={"name": lr["name"], "from": names.get(old, "")})
+    reset = owner_reset_secrets(c, lid, new)
+    news_add(c, new, "owner", list_id=lid, data={"name": lr["name"], "from": names.get(old, ""), **({"reset": reset} if reset else {})})
+    if reset and new == me() and old:  # 2.148.1 A (#2478): taking a list over myself -- I am told about the reset too
+        news_add(c, new, "owner", list_id=lid, data={"name": lr["name"], "from": names.get(old, ""), "reset": reset, "self": True}, actor=old)
     who = names.get(me(), "?")
     list_push(c, new, "share", lid, lambda lg: tr("{0} made you the owner of a list", who, lg=lg), lambda lg: lr["name"])
     return old, names.get(new, "")

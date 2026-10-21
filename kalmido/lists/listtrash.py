@@ -54,8 +54,10 @@ def otr_can(c, uid, r):
         role = org_role(c, uid, r["org_id"])
         if not role or role in ("guest", "readonly", "accounting"):
             return False  # 2.143.0 A (#2151): the limited roles restore / delete nothing of the organisation
-        if role == "admin":
-            return True
+        if role == "admin" and r["owner_id"] != uid:  # 2.148.1 A (#2480): only a shared list (as the overview of the admins)
+            from ..accounts.orglists import ol_shared
+            if ol_shared(c, r):
+                return True
     if r["owner_id"] == uid:
         return True
     return collab_all() and bool(c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=? AND role='admin'",
