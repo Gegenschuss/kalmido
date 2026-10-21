@@ -106,7 +106,7 @@ class H(BaseHTTPRequestHandler):
             both = urllib.parse.unquote('/'.join(rest[1:]))
             head = both.split('...', 1)[-1]
             cmp = r.get('compare', {})
-            return self._send(200, {'commits': cmp[both] if both in cmp else cmp.get(head, [])}, st)
+            return self._cmp(cmp[both] if both in cmp else cmp.get(head, []), st)
         if rest[0] == 'commits' and len(rest) == 3 and rest[2] == 'status':
             return self._send(200, r.get('status', {}).get(rest[1], {'state': 'pending', 'total_count': 0, 'statuses': []}), st)
         if rest[0] == 'commits' and len(rest) == 3 and rest[2] == 'check-runs':
@@ -115,6 +115,13 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, {'total_count': len(r.get('checks', {}).get(rest[1], [])), 'check_runs': r.get('checks', {}).get(rest[1], [])}, st)
         return self._send(404, {'message': 'Not Found'}, st)
 
+
+    def _cmp(self, v, st):
+        """2.151.0 A2 (#2558 review): a compare entry is a list of commits, or a whole answer {commits, ahead_by}, or
+        {status: 404 | 500} (an error)."""
+        if isinstance(v, dict) and v.get('status'):
+            return self._send(v['status'], {'message': 'error'}, st, etag=False)
+        return self._send(200, v if isinstance(v, dict) else {'commits': v}, st)
 
     def _authed(self, r, st):
         want = r.get('token')
@@ -150,7 +157,7 @@ class H(BaseHTTPRequestHandler):
         if rest == ['repository', 'compare']:
             cmp, to = r.get('compare', {}), (q.get('to') or [''])[0]
             both = (q.get('from') or [''])[0] + '...' + to
-            return self._send(200, {'commits': cmp[both] if both in cmp else cmp.get(to, [])}, st)
+            return self._cmp(cmp[both] if both in cmp else cmp.get(to, []), st)
         if rest == ['repository', 'branches']:
             return self._send(200, r.get('branches', []), st)
         if rest[:2] == ['repository', 'commits'] and len(rest) == 4 and rest[3] == 'statuses':

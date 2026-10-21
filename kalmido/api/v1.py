@@ -493,6 +493,9 @@ def v1_one(c, tid):
     out = v1_task(rows[0])
     if not rows[0].get("context"):  # 2.2.0 (#271 / #339): linked pull requests / commits + the list's repository
         out["code"] = rows[0].get("code") or {"prs": [], "commits": []}
+        if out["code"].get("build"):  # 2.151.0 A2 (#2558 review): branch names marked untrusted also without repo below
+            from ..integrations.gitbuild import gb_untrusted
+            out["code"] = {**out["code"], "build": gb_untrusted(out["code"]["build"])}
         rp = git_repo_for_task(c, rows[0])
         if rp:
             out["repo"] = rp

@@ -14,6 +14,10 @@ freelancer-matrix: lists
    and the branches marked untrusted; a stranger (person or agent) 404
  - GitLab and Bitbucket: tag compare + branch list in their shapes; a person without an organisation (Gitea) the same
  - the rate: per poll at most the usual requests + the branch list; no tag compare twice
+ - 2.151.0 A2 (review): released without a known tag = exact (one compare newest tag...main per head, only a complete answer
+   marks; old commit dates merged today stay "main"), a failing tag compare gives up after 3 tries (404 at once), a branch
+   that is gone before it was measured merged: compare default...head, merged -> its commits in main, else no open branch,
+   build-status leaves out a participant's context tasks, code.build branches marked untrusted in v1
 usage: p2151_a_api_test.py <datadir>   (P2151A_NOSTART=1 / KMT_NOSTART=1: the container runs already, with
 KALMIDO_GIT_POLL=2, KALMIDO_GIT_TICK=1, KALMIDO_CALENDAR_ALLOW_HOSTS=127.0.0.1 and fake_git.py started)"""
 import json
@@ -178,7 +182,9 @@ g = STATE["8090"]["acme/app"] = {
     "commits": {"main": [gh_cm("a3", f"Polish #{T[3]}", D[1]), gh_cm("a2", f"Later work #{T[2]}", D[2]), gh_cm("a1", f"Feature #{T[1]}", D[3]),
                          gh_cm("a0", f"Ancient #{T[11]}", D[9])]},
     "tags": [{"name": "nightly"}, {"name": "v2.10.0"}, {"name": "v2.9.3"}],
-    "compare": {"v2.9.3...v2.10.0": [gh_cm("a1", f"Feature #{T[1]}", D[3])]},
+    "compare": {"v2.9.3...v2.10.0": [gh_cm("a1", f"Feature #{T[1]}", D[3])],
+                # 2.151.0 A2 (#2558 review): newest tag...main = in main, not released (a0 is not: an earlier version)
+                "v2.10.0...main": [gh_cm("a2", f"Later work #{T[2]}", D[2]), gh_cm("a3", f"Polish #{T[3]}", D[1])]},
     "branches": [{"name": "main", "commit": {"sha": "a3"}}, {"name": f"kalmido-{T[4]}", "commit": {"sha": "b4"}},
                  {"name": f"kalmido-{T[6]}-done", "commit": {"sha": "b6"}}, {"name": "kalmido-99999999", "commit": {"sha": "b9"}},
                  {"name": "random-work", "commit": {"sha": "b0"}}]}
@@ -189,7 +195,8 @@ check(r.status_code == 201, f"GitHub connected {r.status_code} {r.text[:150]}")
 CID = r.json().get("id")
 check(until(lambda: dbq("SELECT tag FROM git_commits WHERE conn_id=? AND sha='a1'", (CID,)) == [("v2.10.0",)]),
       f"fill: the commit of v2.10.0 got its tag {dbq('SELECT sha, tag FROM git_commits WHERE conn_id=?', (CID,))}")
-cmps = [x["path"] for x in git_log() if x["port"] == 8090 and "/compare/v" in x["path"]]
+# 2.151.0 A2 (#2558 review): not the compare newest tag...main
+cmps = [x["path"] for x in git_log() if x["port"] == 8090 and "/compare/v" in x["path"] and not x["path"].endswith("...main")]
 check(cmps == ["/api/v3/repos/acme/app/compare/v2.9.3...v2.10.0"], f"fill: numeric order, nightly ignored, one compare: {cmps}")
 check(dbq("SELECT tag FROM git_commits WHERE conn_id=? AND sha IN ('a2','a3')", (CID,)) == [("",), ("",)], "commits after the tag: no tag")
 b = build(A, T[1])
@@ -199,8 +206,11 @@ b = build(A, T[3])
 check(b and b["state"] == "main" and b["version"] is None and not b["stale"], f"task 3: in main, not released {b}")
 t3 = task_of(A, T[3])
 b = build(A, T[11])
-check(b and b["state"] == "released" and b["version"] is None and b["stale"], f"task 11: older than every compared tag = an earlier version {b}")
+# 2.151.0 A2 (#2558 review): in main but not in v2.10.0...main (was: older than the oldest compared commit)
+check(b and b["state"] == "released" and b["version"] is None and b["stale"], f"task 11: not in newest tag...main = an earlier version {b}")
 check(t3["code"]["commits"][0]["tag"] is None and task_of(A, T[1])["code"]["commits"][0]["tag"] == "v2.10.0", "commits carry tag")
+check(task_of(A, T[11])["code"]["commits"][0]["tag"] is None and dbq("SELECT tag FROM git_commits WHERE conn_id=? AND sha='a0'", (CID,)) == [("~",)],
+      "an earlier version: stored ~, tag null in the API")
 
 # branches
 check(until(lambda: dbq("SELECT ahead FROM git_branches WHERE conn_id=? AND name=?", (CID, f"kalmido-{T[4]}")) == [(1,)]),
@@ -236,13 +246,14 @@ g["tags"].insert(0, {"name": "v2.11.0"})
 g["compare"]["v2.10.0...v2.11.0"] = [gh_cm("a1", f"Feature #{T[1]}", D[3]), gh_cm("a2", f"Later work #{T[2]}", D[2]),
                                      gh_cm("m5", "Squashed feature", D[2]), gh_cm("a9", f"Old fix #{T[10]}", D[2])]
 g["compare"]["main...open-6"] = []
+g["compare"]["v2.11.0...main"] = [gh_cm("a3", f"Polish #{T[3]}", D[1])]
 put_state()
 check(until(lambda: dbq("SELECT tag FROM git_commits WHERE conn_id=? AND sha='a2'", (CID,)) == [("v2.11.0",)]), "a new tag: its commits")
 check(dbq("SELECT tag FROM git_commits WHERE conn_id=? AND sha='a1'", (CID,)) == [("v2.10.0",)], "the first tag wins (a1 stays v2.10.0)")
 check(dbq("SELECT merge_sha, tag FROM git_prs WHERE conn_id=? AND number=5", (CID,)) == [("m5", "v2.11.0")], "squash merge: the pull request's tag")
 check(dbq("SELECT merge_sha FROM git_prs WHERE conn_id=? AND number=6", (CID,)) == [("",)], "an open pull request keeps no merge commit")
 check(dbq("SELECT tag FROM git_commits WHERE conn_id=? AND sha='a9'", (CID,)) == [("v2.11.0",)], "a commit only in the tag compare is linked + tagged")
-cmps = [x["path"] for x in git_log() if x["port"] == 8090 and "/compare/v" in x["path"]]
+cmps = [x["path"] for x in git_log() if x["port"] == 8090 and "/compare/v" in x["path"] and not x["path"].endswith("...main")]
 check(sorted(cmps) == ["/api/v3/repos/acme/app/compare/v2.10.0...v2.11.0", "/api/v3/repos/acme/app/compare/v2.9.3...v2.10.0"],
       f"each tag compared once: {cmps}")
 b = build(A, T[5])
@@ -304,7 +315,8 @@ check(Ca.get(B + f"/api/lists/{P}/build-status").status_code == 404, "a stranger
 check(ag.get(f"/lists/{P}/build-status?x=1").status_code == 400, "unknown parameter: 400")
 r = ag.get(f"/tasks/{T[4]}")
 j = r.json()
-check(r.ok and j["code"]["build"]["state"] == "branch" and j["repo"]["build"]["branches"][0]["untrusted"] is True,
+check(r.ok and j["code"]["build"]["state"] == "branch" and j["repo"]["build"]["branches"][0]["untrusted"] is True
+      and j["code"]["build"]["branches"][0]["untrusted"] is True and j["code"]["build"]["branches"][0]["origin"] == "git",
       f"v1 get_task: code.build + repo.build {r.status_code} {str(j.get('code'))[:200]}")
 spec = requests.get(V + "/openapi.json").json()
 check("/lists/{id}/build-status" in spec.get("paths", {}) and "build" in spec["components"]["schemas"]["Code"]["properties"], "OpenAPI")
@@ -313,6 +325,7 @@ check("/lists/{id}/build-status" in spec.get("paths", {}) and "build" in spec["c
 n0 = len(git_log())
 g["branches"] = [x for x in g["branches"] if not x["name"].startswith(f"kalmido-{T[6]}")]
 g["commits"]["main"].insert(0, gh_cm("a4", "Unrelated"))
+g["compare"]["v2.11.0...main"] = [gh_cm("a3", f"Polish #{T[3]}", D[1]), gh_cm("a4", "Unrelated")]
 put_state()
 check(until(lambda: not dbq("SELECT 1 FROM git_branches WHERE conn_id=? AND name=?", (CID, f"kalmido-{T[6]}-done"))), "a deleted branch disappears")
 until(lambda: [x for x in git_log()[n0:] if x["path"].endswith(f"compare/main...kalmido-{T[4]}")])
@@ -325,6 +338,107 @@ put_state()
 check(until(lambda: dbq("SELECT ahead FROM git_branches WHERE conn_id=? AND name=?", (CID, f"kalmido-{T[4]}")) == [(0,)]), "merged: ahead 0")
 b = build(A, T[4])
 check(b and b["state"] == "main" and not b["branches"], f"task 4 after the merge: in main {b}")
+
+# ================================================================== 2.151.0 A2 (#2558 review)
+T.update({k: A.post(B + "/api/tasks", json={"title": f"Task {k}", "list_id": P}).json()["id"] for k in range(12, 17)})
+
+
+def rel_n():
+    return len([x for x in git_log() if x["path"].endswith("/compare/v2.11.0...main")])
+
+
+def rel_check():
+    return (dbq("SELECT rel_check FROM git_conns WHERE id=?", (CID,)) or [("",)])[0][0]
+
+
+# 1. merged today, its commits nine days old: in main, not released. A cut-off compare (ahead_by > its list) marks nothing
+n_rel = rel_n()
+c12, c13 = gh_cm("c12", f"Old work #{T[12]}", D[9]), gh_cm("c13", f"Repair #{T[13]}", D[8])
+g["commits"]["main"][:0] = [gh_cm("mg12", "Merge pull request 12"), c12, c13]
+g["compare"]["v2.11.0...main"] = {"commits": [gh_cm("a3", f"Polish #{T[3]}", D[1]), gh_cm("a4", "Unrelated"), c12], "ahead_by": 300}
+put_state()
+check(until(lambda: rel_check() == "v2.11.0 mg12 x"), f"a cut-off compare: done for this head without marks ({rel_check()!r})")
+for k in (12, 13):
+    b = build(A, T[k])
+    check(b and b["state"] == "main" and b["version"] is None and not b["stale"], f"task {k}: cut-off answer -> stays main {b}")
+polls(CID, 2)
+check(rel_n() == n_rel + 1, f"a cut-off answer is not asked again for the same head ({rel_n() - n_rel})")
+# 2. complete: c13 is not in v2.11.0...main (its tag compare was cut off) -> an earlier version; c12 (old date) stays main
+g["commits"]["main"].insert(0, gh_cm("c14", "Docs"))
+g["compare"]["v2.11.0...main"] = [gh_cm("a3", f"Polish #{T[3]}", D[1]), gh_cm("a4", "Unrelated"), c12, gh_cm("mg12", "Merge pull request 12"), gh_cm("c14", "Docs")]
+put_state()
+check(until(lambda: (build(A, T[13]) or {}).get("state") == "released"), f"task 13: not in newest tag...main -> released {build(A, T[13])}")
+b = build(A, T[13])
+check(b["version"] is None and b["stale"], f"task 13: an earlier version, stale {b}")
+b = build(A, T[12])
+check(b and b["state"] == "main" and not b["stale"], f"task 12: merged today with old commit dates -> main, no alarm {b}")
+check(rel_check() == "v2.11.0 c14 ok" and rel_n() == n_rel + 2, f"one compare per head ({rel_check()!r}, {rel_n() - n_rel})")
+j = A.get(B + f"/api/lists/{P}/build-status").json()
+check(T[13] in {x["id"] for x in j["data"]} and T[12] not in {x["id"] for x in j["data"]}, "build-status: 13 stale, 12 not")
+# 3. a new tag: the commits get it, the compare newest tag...main follows the tag
+g["tags"].insert(0, {"name": "v2.12.0"})
+g["compare"]["v2.11.0...v2.12.0"] = [c12, gh_cm("mg12", "Merge pull request 12"), gh_cm("c14", "Docs")]
+g["compare"]["v2.12.0...main"] = []
+put_state()
+check(until(lambda: (build(A, T[12]) or {}).get("version") == "2.12.0"), f"task 12: released 2.12.0 {build(A, T[12])}")
+check(until(lambda: rel_check() == "v2.12.0 c14 ok"), f"the newest tag moved: compared again ({rel_check()!r})")
+check(dbq("SELECT tag FROM git_commits WHERE conn_id=? AND sha='c13'", (CID,)) == [("~",)], "c13 keeps: an earlier version")
+
+# 4. a tag compare that fails: 500 is tried in 3 polls, 404 (tag gone) given up at once
+g["tags"][:0] = [{"name": "v2.14.0"}, {"name": "v2.13.0"}]
+g["compare"]["v2.12.0...v2.13.0"] = {"status": 500}
+g["compare"]["v2.13.0...v2.14.0"] = {"status": 404}
+g["compare"]["v2.14.0...main"] = []
+put_state()
+
+
+def tcmp(name):
+    return (dbq("SELECT cmp FROM git_tags WHERE conn_id=? AND name=?", (CID, name)) or [(None,)])[0][0]
+
+
+def tries(path):
+    return len([x for x in git_log() if x["path"].endswith(path)])
+
+
+check(until(lambda: tcmp("v2.14.0") == 2), f"404: given up at once ({tcmp('v2.14.0')})")
+check(until(lambda: tcmp("v2.13.0") == 2), f"500: given up after its tries ({tcmp('v2.13.0')})")
+polls(CID, 2)
+check(tries("/compare/v2.13.0...v2.14.0") == 1 and tries("/compare/v2.12.0...v2.13.0") == 3,
+      f"tries: 404 once, 500 three times ({tries('/compare/v2.13.0...v2.14.0')}, {tries('/compare/v2.12.0...v2.13.0')})")
+
+# 5. branches that are gone before they were measured merged: compare main...<last head>
+g["branches"] += [{"name": f"kalmido-{T[15]}", "commit": {"sha": "h15b"}}, {"name": f"kalmido-{T[16]}", "commit": {"sha": "h16"}}]
+g["compare"][f"kalmido-{T[15]}"] = [gh_cm("h15a", "step one"), gh_cm("h15b", "step two")]
+g["compare"][f"kalmido-{T[16]}"] = [gh_cm("h16", "a try")]
+put_state()
+check(until(lambda: dbq("SELECT name, ahead FROM git_branches WHERE conn_id=? AND name IN (?,?) ORDER BY name",
+                        (CID, f"kalmido-{T[15]}", f"kalmido-{T[16]}")) == [(f"kalmido-{T[15]}", 2), (f"kalmido-{T[16]}", 1)]),
+      "two task branches ahead")
+g["branches"] = [x for x in g["branches"] if x["name"] not in (f"kalmido-{T[15]}", f"kalmido-{T[16]}")]
+g["compare"]["main...h15b"] = []
+g["compare"]["main...h16"] = [gh_cm("h16", "a try")]
+put_state()
+check(until(lambda: not dbq("SELECT 1 FROM git_branches WHERE conn_id=? AND name IN (?,?)", (CID, f"kalmido-{T[15]}", f"kalmido-{T[16]}"))),
+      "the gone branches are decided and removed")
+check(tries("/compare/main...h15b") == 1 and tries("/compare/main...h16") == 1, "one compare each")
+b = build(A, T[15])
+check(b and b["state"] == "main" and not b["branches"], f"task 15: merged, then deleted -> main {b}")
+check(sorted(dbq("SELECT branch FROM git_commits WHERE conn_id=? AND sha IN ('h15a','h15b')", (CID,))) == [("main",), ("main",)],
+      "its commits moved to the default branch")
+b = build(A, T[16])
+check(b and b["state"] == "branch" and not b["branches"], f"task 16: deleted unmerged -> branch, no open branch listed {b}")
+
+# 6. build-status of a participant: not the context tasks (the parent of their subtask)
+r = A.post(B + "/api/users", json={"username": "dave", "display_name": "Dave", "password": "password123"})
+assert r.ok, r.text
+DID, Dv = r.json()["id"], login(B, "dave")
+assert A.put(B + f"/api/lists/{P}/members", json={"user_id": DID, "role": "participant"}).ok
+r = A.post(B + "/api/tasks", json={"title": "Sub for Dave", "list_id": P, "parent_id": T[1], "assignee_id": DID})
+check(r.ok, f"subtask for the participant {r.status_code} {r.text[:100]}")
+r = Dv.get(B + f"/api/lists/{P}/build-status")
+check(r.ok and T[1] not in {x["id"] for x in r.json()["data"]}, f"participant: the context task (stale) is left out {r.status_code} {r.text[:200]}")
+r = A.get(B + f"/api/lists/{P}/build-status")
+check(T[1] in {x["id"] for x in r.json()["data"]}, "the owner still sees task 1")
 
 # ================================================================== GitLab + Bitbucket shapes
 GLP = A.post(B + "/api/lists", json={"name": "GL", "kind": "project"}).json()["id"]
