@@ -5,6 +5,8 @@
  - #1523 invoice positions with list_id: an invoice from times remembers the list of each position (kept when the draft is
    saved); "Delete all times" keeps those entries as billed after the list was renamed; an older position (no list_id) is
    still matched by the name; a person without an organisation in the personal office too (freelancer-matrix: office)
+ - 2.144.5 A2 (review R9/R10): another organisation's invoice with the same client id does not bill a private list; the
+   personal office moved into an organisation leaves the positions' list behind (list_id NULL)
  - #1523 list header sum: time_lists in /api/state shows a member only their own entries, the owner everyone's; the project
    page's "Tracked" stays everyone's
  - #2021 (a) a series without own title is named after the template's project title without placeholders
@@ -165,7 +167,19 @@ def billed_case(S, who, uid):
 
 
 LORG = billed_case(A, "Alpha", ALICE)
-billed_case(Fr, "Frida", FID)  # freelancer-matrix: office
+FLID = billed_case(Fr, "Frida", FID)  # freelancer-matrix: office
+
+# 2.144.5 A2 (#1523, review R9): a private list counts only invoices of its owner's personal office, never another
+# organisation's invoice that carries the same client id
+FCL = sql("SELECT client_id FROM lists WHERE id=?", (FLID,))[0][0]
+LR9 = list_for(Fr, "Privatprojekt R9", FCL)
+entry(FID, LR9, "2026-08-04T08:00:00Z", "2026-08-04T10:00:00Z", 7200)
+CLA = A.post(B + "/api/clients", json={"name": "Kunde R9", "street": "Weg 9", "zip": "20000", "city": "Beispielstadt", "country": "DE"}).json()["id"]
+r = A.post(B + D, json={"kind": "invoice", "client_id": CLA, "service_from": "2026-08-01", "service_to": "2026-08-31",
+                        "items": [{"kind": "service", "title": "Privatprojekt R9", "qty": 2, "unit": "hour", "rate": 50}]})
+check(r.status_code == 201, f"R9: an invoice of the organisation {r.text[:200]}")
+sql("UPDATE office_docs SET client_id=? WHERE id=?", (FCL, r.json()["id"]), write=True)
+check(billed(Fr, LR9) == 0, "R9: another organisation's invoice does not bill a private list")
 
 # ================================================================== #1523 the list header's time sum
 LT = A.post(B + "/api/lists", json={"name": "Teamzeit", "kind": "project"}).json()["id"]
@@ -228,6 +242,18 @@ for S, who in ((A, "org"), (Fr, "freelancer")):
     check(MM.get("cancel_missed") == 1 and MM.get("cancel_next") >= TODAY, f"{who}: a long notice on a monthly cost skips to a reachable one {MM}")
     labels = [f["label"] for f in S.get(B + O + "/subs").json()["items"] if f["label"] in (f"Domain {who}", f"Tool {who}")]
     check(labels == [f"Tool {who}", f"Domain {who}"], f"{who}: the missed one sorts by its next chance {labels}")
+
+# ================================================================== 2.144.5 A2 (#1523, review R10)
+# the personal office into an organisation: the positions forget the list they came from (it stays behind)
+FIT = sql("SELECT id FROM office_doc_items WHERE list_id=?", (FLID,))
+check(len(FIT) == 1, f"R10 setup: the freelancer's position with its list {FIT}")
+ZET = A.post(B + "/api/admin/orgs", json={"name": "Zeta", "admin_id": FID}).json()["id"]
+Fr.patch(B + "/api/settings", json={"workspace": "private"})
+r = Fr.post(B + O + "/move/org", json={"org": ZET, "confirm": True})
+check(r.ok, f"R10: the personal office into the organisation {r.status_code} {r.text[:300]}")
+if FIT:
+    row = sql("SELECT org_id, list_id FROM office_doc_items WHERE id=?", (FIT[0][0],))
+    check(row and row[0][1] is None, f"R10: the moved position has no list of the old office {row}")
 
 print(f"p21445_c_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

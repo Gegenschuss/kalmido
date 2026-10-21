@@ -233,6 +233,8 @@ def pbt_rows(c, src, dst, tables):
             k = 0
             for r in c.execute(f"SELECT * FROM {t} WHERE {w}{extra} ORDER BY id", (src,) * n + args).fetchall():
                 cols = {"org_id": dst, **pbt_reseal(c, t, r, src, dst)}
+                if t == "office_doc_items":  # 2.144.5 A2 (#1523, review R10): the source list of a position stays behind
+                    cols["list_id"] = None
                 c.execute(f"UPDATE {t} SET {', '.join(x + '=?' for x in cols)} WHERE id=?", [*cols.values(), r["id"]])
                 k += 1
             out[t] = k
