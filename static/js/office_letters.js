@@ -180,7 +180,7 @@ const ltSaveSoon = () => { clearTimeout(ltSaveTimer); ltSaveTimer = setTimeout((
 
 // ---- dialogs
 function ltNewModal() {
-  const d = LT.data, ts = d.templates || [];
+  const d = LT.data || {}, ts = d.templates || [];
   if (!ts.length) { ltCreate({}); return; }
   /** @type {any} */
   const md = modal(`<h3>${tr('New letter')}</h3>
@@ -300,6 +300,7 @@ async function ltAsTemplate(d) {
 document.addEventListener('click', async e => {
   if (!/** @type {any} */ (e.target).closest?.('.lt-rc')) { const s = $('#lt-sug'); if (s && !s.hidden) s.hidden = true; }  // the suggestions close outside
   const b = /** @type {any} */ (e.target).closest?.('[data-lt]'); if (!b || b.tagName === 'INPUT' || b.tagName === 'SELECT') return;
+  if (b.closest('.modal')) return;  // letters have no data-lt in dialogs; the list dialog's list tags (agents.js) use data-lt too
   const a = b.dataset.lt, d = S.route.tab === 'letters' && S.route.id && LT.cur?.id === S.route.id ? LT.cur : null;
   if (a === 'pdf') {  // a draft is saved first, then the PDF opens (the viewer when there is one)
     e.preventDefault();
