@@ -581,7 +581,10 @@ async function acdDeleteAll() {
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-act="chat-head-menu"]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();
-  menu(b, [{label: tr('Delete history'), icon: 'trash', fn: () => acdDeleteAll()}]);
+  // 2.161.0 (#1107): on a narrow touch screen the steps toggle moves in here (agentchat.css hides it in the header)
+  const narrow = matchMedia('(pointer:coarse) and (max-width:37.5rem)').matches;
+  menu(b, [...narrow && b.closest('.chath')?.querySelector('.chstog') ? [{label: tr('Always show steps'), icon: 'list', on: stepsAlwaysOn(), fn: () => stepsAlways()}, '-'] : [],
+    {label: tr('Delete history'), icon: 'trash', fn: () => acdDeleteAll()}]);
 });
 function chatStepsTog() {
   const on = stepsAlwaysOn(), t = tr('Always show steps');

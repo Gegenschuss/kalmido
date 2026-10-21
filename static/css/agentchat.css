@@ -293,6 +293,7 @@ button.chmode .pmlong::after{content:"\a0\25BE";font-size:.75em}
   .chnm button.chmode[data-short]{padding:0}
 }
 @media (pointer:coarse) and (max-width:37.5rem) {
+  .chath:has([data-act="chat-head-menu"]) .chstog{display:none}
   .chath .chn{row-gap:.625rem}
   .chath .chnm .chmode,.chath .chnm .chmode[data-short]{margin:0 .5rem 0 .125rem}
   .chath .chmode[data-short]::before{content:attr(data-short)}
