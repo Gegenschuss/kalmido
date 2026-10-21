@@ -112,7 +112,7 @@ def sct_index():
 
 @app.post("/api/section-templates")
 def sct_create():
-    """{name, space?, list_id | sections}: list_id = the sections of that list (read right is enough), sections = names."""
+    """{name, space?, list_id | sections}: list_id = the sections of that list (who may write it), sections = names."""
     sct_need_person()
     b = body()
     c, uid = db(), me()
