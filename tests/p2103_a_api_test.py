@@ -205,6 +205,11 @@ r = Ca.post(B + "/api/my/agents", json={"username": "carolbot", "scopes": ["read
 check(r.status_code == 201 and r.json().get("token"), "carol: a personal agent with a token " + r.text[:160])
 CAG, CTOK = (r.json().get("id"), r.json().get("token")) if r.status_code == 201 else (None, "")
 AGH = {"Authorization": "Bearer " + CTOK}
+# 2.152.0 (#2164, review A5): the agent owns a private list and a list of the organisation (owner set here, made by carol)
+APL = Ca.post(B + "/api/lists", json={"name": "Bot scratch"}).json()["id"]
+AOL = Ca.post(B + "/api/lists", json={"name": "Bot studio list", "org_id": ORG}).json()["id"]
+ATK = Ca.post(B + "/api/tasks", json={"title": "Private bot note", "list_id": APL}).json().get("id")
+sql("UPDATE lists SET owner_id=? WHERE id IN (?, ?)", (CAG, APL, AOL), write=True)
 check(requests.get(B + "/api/v1/me", headers=AGH).ok, "the agent's token works")
 DM = Bo.post(B + "/api/team/dm", json={"user_id": CAROL}).json().get("id")
 Ca.post(B + f"/api/team/rooms/{DM}/messages", json={"body": "The cut is ready"})
@@ -228,6 +233,9 @@ check(not sql("SELECT 1 FROM time_entries WHERE list_id=?", (CINBOX,)), "the pri
 check(sql("SELECT owner_id, org_id FROM ev_cals WHERE id=?", (CAL,)) == [(ALICE, ORG)], "the organisation calendar went to the organisation's admin")
 check(CAG and not sql("SELECT 1 FROM users WHERE id=?", (CAG,)) and requests.get(B + "/api/v1/me", headers=AGH).status_code == 401,
       "the own agent is deleted, its token refused (401)")
+check(not sql("SELECT 1 FROM lists WHERE id=?", (APL,)) and not sql("SELECT 1 FROM tasks WHERE id=?", (ATK,)),
+      "review A5: the agent's private list goes with its tasks (never to the deleting admin)")
+check(sql("SELECT owner_id, org_id FROM lists WHERE id=?", (AOL,)) == [(ALICE, ORG)], "review A5: the agent's organisation list goes to a person of the organisation")
 check(sql("SELECT a IS NULL OR b IS NULL FROM tchat_rooms WHERE id=?", (DM,)) == [(True,)], "the direct conversation stays")
 msgs = Bo.get(B + f"/api/team/rooms/{DM}/messages")
 bodies = [m.get("body") for m in (msgs.json().get("messages") or [])] if msgs.ok else []
