@@ -41,7 +41,10 @@ NM_NEWS_NEW.leave = 1; NM_PUSH.leave = 1;
 const LV = {data: null, key: '', seq: 0, open: false};  // 2.144.2 B (#2375): open = the vacation accounts stay open across a reload
 const lv_num = n => fmtNum(n || 0, 1);
 // 2.144.2 B (#2375): the section is drawn anew after each save (data reloaded), so its open state lives in LV
-document.addEventListener('toggle', e => { if (e.target.classList?.contains('lvbox')) LV.open = e.target.open; }, true);
+document.addEventListener('toggle', e => {
+  const d = /** @type {HTMLDetailsElement} */ (e.target);
+  if (d.classList?.contains('lvbox')) LV.open = d.open;
+}, true);
 function lv_reset() { LV.data = null; LV.key = ''; }
 async function lv_load(org, year) {
   const seq = ++LV.seq, key = `${org || ''}:${year}`;
