@@ -912,6 +912,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     for f in m.get("fields") or []:
         if isinstance(f, dict) and str(f.get("name") or "").strip():
             info.append((str(f["name"]), str(f.get("value") or "")))
+    # 2.144.9 (#2575): the number's label of this document (the head row that carries the number: "Rechnung Nr." on an
+    # invoice) for the part pages and the rights appendix -- not the quotation's label
+    num_l = next((k for k, v in info if number and v == number), L["number"])
     info_x = PDF_L + PDF_ADDR_W + 8 * MM
     info_w = PDF_CW - PDF_ADDR_W - 8 * MM
     info_lh = 8.6 * 1.45
@@ -1273,11 +1276,11 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         if not isinstance(part, dict):
             continue
         ptitle = str(part.get("title") or "")
-        psub = " · ".join(x for x in (f"{L['number']} {number}" if number else "", str(m.get("project_title") or "")) if x)
+        psub = " · ".join(x for x in (f"{num_l} {number}" if number else "", str(m.get("project_title") or "")) if x)
 
         # 2.138.0 A (#2240): number + project as a small line above the title (was right beside it, a long title ran over it);
         # the title wraps over the full width, the accent line under its last line
-        pt_lines = pb_wrap(ptitle.upper(), 14, PDF_CW, True, 0.8)
+        pt_lines = pb_wrap(ptitle, 14, PDF_CW, True, 0.8)  # 2.144.9 (#2575): as typed, the same spelling as on the title page
         ps_lines = pdf_wrap(psub, 8.6, PDF_CW) if psub else []
         pt_top = 4 + 12 * len(ps_lines) if ps_lines else 6
         pt_line = pt_top + (len(pt_lines) - 1) * 17.5 + 20
@@ -1294,22 +1297,30 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 block(lh, lambda p, y, a=str(hr[0]), b=str(hr[1]): (p.text(PDF_L, y, a, 9, False, C_INK2), p.text(PDF_L + 112, y, b, 9)), keep_next=True)
         table_rows([x for x in (part.get("lines") or []) if isinstance(x, dict)])
         prow = [(str(r[0]), str(r[1])) for r in ((part.get("totals") or {}).get("rows") or []) if isinstance(r, (list, tuple)) and len(r) >= 2]
+        # 2.144.9 (#2575): the part's optional raw data as a row of its own before "net total with option", as on the title page
+        p_opt = next((x for x in (part.get("lines") or []) if isinstance(x, dict) and x.get("kind") == "raw" and x.get("optional")), None)
+        pw_ = 190
+        if prow and p_opt:
+            ot = str(p_opt.get("title") or "").strip()
+            prow[1:1] = [("+ " + (ot if ot.lower().startswith(L["optional"].lower()) else L["optional"] + (": " + ot if ot else "")),
+                          str(p_opt.get("total_text") or "") or money(p_opt.get("total") or 0))]
+            pw_ = 230
         if prow:
-            def draw_part_sum(p, y, prow=prow):
+            def draw_part_sum(p, y, prow=prow, pw_=pw_):
                 yy = y + 8
                 for j, (lab, val) in enumerate(prow):
                     if j == 0:
-                        p.line(PDF_L + PDF_CW - 190, yy, PDF_L + PDF_CW, yy, 1.1, C_INK)
+                        p.line(PDF_L + PDF_CW - pw_, yy, PDF_L + PDF_CW, yy, 1.1, C_INK)
                         yy += 5
-                    p.text(PDF_L + PDF_CW - 190, yy, lab, 10.4 if j == 0 else 9, j == 0)
-                    p.text(PDF_L + PDF_CW - 190, yy, val, 10.4 if j == 0 else 8.8, j == 0, align="r", width=190)
+                    p.text(PDF_L + PDF_CW - pw_, yy, lab, 10.4 if j == 0 else 9, j == 0)
+                    p.text(PDF_L + PDF_CW - pw_, yy, val, 10.4 if j == 0 else 8.8, j == 0, align="r", width=pw_)
                     yy += (10.4 if j == 0 else 9) * 1.5
             block(14 + sum((10.4 if j == 0 else 9) * 1.5 for j in range(len(prow))) + 5, draw_part_sum, keep_prev=True)
 
     # -- 2.114.1 C (#2258): the rights block as an appendix on its own last page, after the parts
     if bfc_rights:
         rtitle = str(rights.get("title") or L["rights"])
-        rsub = " · ".join(x for x in (f"{L['number']} {number}" if number else "", str(m.get("project_title") or "")) if x)
+        rsub = " · ".join(x for x in (f"{num_l} {number}" if number else "", str(m.get("project_title") or "")) if x)
 
         def bfc_draw_rights_head(p, y, rtitle=rtitle, rsub=rsub):
             p.text(PDF_L, y + 6, rtitle.upper(), 14, True, C_INK, spacing=0.8)

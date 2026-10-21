@@ -395,10 +395,31 @@ def tp_clean_item(c, oid, r, it, i, prev):
     if unit not in UNITS:
         raise BadInput(tr("Invalid value: {0}", "items.unit"))
     net = _j(p["totals"], {}).get("net") or 0
-    return {"sort": i, "kind": "part", "service_id": None, "ref_part_id": pid, "title": _text(it.get("title"), "items.title", 500) or p["title"] or "",
+    # 2.144.9 (#2575, decision 21.10.2026): the part's name is the one source of its title page lines -- a line whose text was
+    # changed here (or a new line with an own text) renames the part; an unchanged line takes the part's name
+    t = _text(it.get("title"), "items.title", 500)
+    title = p["title"] or t or ""
+    if t and t[:300] != (p["title"] or "") and t != (prev or {}).get("title"):
+        title = t[:300]
+        c.execute("UPDATE office_doc_parts SET title=?, updated_at=? WHERE id=? AND org_id=?", (title, iso(now_utc()), pid, oid))
+        from .ledger import ofx_log
+        ofx_log(c, oid, "part", doc_id=r["id"], detail={"part": pid, "before": {"title": p["title"] or ""}, "after": {"title": title}})
+    return {"sort": i, "kind": "part", "service_id": None, "ref_part_id": pid, "title": title,
             "detail": _text(it.get("detail"), "items.detail", 4000), "qty": 1 if qty is None else qty, "unit": unit, "rate": net,
             "tax": (prev or {}).get("tax") or "standard", "raw_fee": 0, "producing": 0, "intext": "intern", "cost": 0,
             "discountable": 0 if it.get("discountable") in (0, False, "0", "false") else 1}
+
+
+def tp_line_titles(c, oid, r, rows):
+    """2.144.9 (#2575): after the title page list was cleaned every part line carries its part's (possibly just changed) name."""
+    pids = {x["ref_part_id"] for x in rows if x.get("kind") == "part"}
+    if not pids:
+        return rows
+    names = {x["id"]: x["title"] or "" for x in c.execute("SELECT id, title FROM office_doc_parts WHERE doc_id=? AND org_id=?", (r["id"], oid))}
+    for x in rows:
+        if x.get("kind") == "part" and names.get(x["ref_part_id"]):
+            x["title"] = names[x["ref_part_id"]]
+    return rows
 
 
 def kva_keep_unseen_parts(c, oid, r, before, known):
@@ -796,9 +817,10 @@ def tp_part_patch(did, pid):
         diff = ofx_diff(before, f)
         f["updated_at"] = iso(now_utc())
         c.execute(f"UPDATE office_doc_parts SET {','.join(k + '=?' for k in f)} WHERE id=? AND org_id=?", [*f.values(), pid, oid])
-        if f.get("title") and f["title"] != p["title"]:  # 2.138.0 A (#2239): the title page lines of the part follow a rename (own texts stay)
-            c.execute("UPDATE office_doc_items SET title=? WHERE doc_id=? AND org_id=? AND kind='part' AND ref_part_id=? AND part_id IS NULL "
-                      "AND (title=? OR title='' OR title IS NULL)", (f["title"], did, oid, pid, p["title"] or ""))
+        if f.get("title") and f["title"] != p["title"]:  # 2.138.0 A (#2239): the title page lines of the part follow a rename
+            # 2.144.9 (#2575, decision 21.10.2026): all of them -- the part's name is the one source (no own texts any more)
+            c.execute("UPDATE office_doc_items SET title=? WHERE doc_id=? AND org_id=? AND kind='part' AND ref_part_id=? AND part_id IS NULL",
+                      (f["title"], did, oid, pid))
         if "sheet" in f:
             diff.setdefault("after", {})["sheet"] = "changed"  # the sheet itself stays out of the log
         if diff.get("after"):

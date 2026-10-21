@@ -67,15 +67,18 @@ def inv_scheme(s, kind):
 
 def inv_manual_seq(scheme, num):
     """The counter value a manual number carries under the scheme, None when it does not follow the scheme."""
-    from .model import SCHEME_RE
-    parts, pos, pat = [], 0, ""
-    for m in SCHEME_RE.finditer(scheme):
-        pat += re.escape(scheme[pos:m.start()])
-        pat += r"(\d+)" if m.group(1).startswith("seq") else r".+?"
-        pos = m.end()
-    pat += re.escape(scheme[pos:])
-    m = re.fullmatch(pat, num)
-    if not m or not m.groups():
+    from .model import SCHEME_RE, scheme_variants
+    for sv in scheme_variants(scheme):  # 2.144.9 (#2575): also with empty text blocks left out
+        pos, pat = 0, ""
+        for m in SCHEME_RE.finditer(sv):
+            pat += re.escape(sv[pos:m.start()])
+            pat += r"(\d+)" if m.group(1).startswith("seq") else r".+?"
+            pos = m.end()
+        pat += re.escape(sv[pos:])
+        m = re.fullmatch(pat, num)
+        if m and m.groups():
+            break
+    else:
         return None
     try:
         return int(m.group(1))
@@ -661,6 +664,13 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
             cancels = {"id": ci["id"], "number": ci["number"], "date_text": fmt_date(ci["date"], pack)}
             meta.append([L.get("to_invoice", "zu Rechnung Nr." if lang == "de" else "Credit note for invoice no."), f"{ci['number']} ({cancels['date_text']})"])
     m["cancels"] = cancels
+    # 2.144.9 (#2575): an invoice made from a quotation names it in the head ("zu Angebot Nr. KV02-M (21.10.2026)")
+    if kind == "invoice" and _col(r, "source_doc_id"):
+        so = c.execute("SELECT number, date FROM office_docs WHERE id=? AND org_id=? AND kind='offer'", (r["source_doc_id"], oid)).fetchone()
+        if so is not None and so["number"]:
+            m["source_offer"] = {"number": so["number"], "date_text": fmt_date(so["date"], pack) if so["date"] else ""}
+            meta.append([L.get("to_offer", "zu Angebot Nr." if lang == "de" else "Re quotation No."),
+                         so["number"] + (f" ({m['source_offer']['date_text']})" if m["source_offer"]["date_text"] else "")])
     if m["order_ref"]:
         meta.append([L.get("ref", "Ref./PO-Nr."), m["order_ref"]])
     if r["project_title"]:

@@ -745,6 +745,9 @@ def clean_items(c, oid, r, items, admin, part=None):
         elif not row["title"] and not row["detail"]:
             raise BadInput(tr("Invalid value: {0}", "items.title"))
         out.append(row)
+    if r["kind"] == "offer" and part is None:  # 2.144.9 (#2575): part lines carry their part's name
+        from .parts import tp_line_titles
+        tp_line_titles(c, oid, r, out)
     return out
 
 

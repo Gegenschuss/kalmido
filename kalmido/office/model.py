@@ -562,7 +562,36 @@ def office_number_format(scheme, seq, d=None, project="", client="", initials=""
         if t == "version":  # 2.118.0 A (#2265)
             return str(version)
         return m.group(0)
-    return SCHEME_RE.sub(rep, scheme)
+    out = SCHEME_RE.sub(lambda m: rep(m) or "\x00", scheme)
+    return scheme_collapse(out) if "\x00" in out else out
+
+
+# 2.144.9 (#2575): a block without a value (no project / client / initials) is left out together with one separator next to
+# it: "{project}-KV{seq:2}-{initials}" without a project gives "KV02-M", not "-KV02-M"; no double or trailing separators.
+# Numbers already given stay as they are (nothing is renumbered).
+SCHEME_TEXT = ("project", "client", "initials")
+
+
+def scheme_collapse(s):
+    """s with every empty block marked \x00 -> the separators (- _ . / space) before it go, a leading one after it too."""
+    s = re.sub(r"[-_./ ]*\x00", "\x00", s)
+    s = re.sub(r"^\x00+[-_./ ]*", "", s)
+    return s.replace("\x00", "")
+
+
+def scheme_variants(scheme):
+    """The scheme and every form of it with one or more of its text blocks left out (as office_number_format writes them)."""
+    toks = [m for m in SCHEME_RE.finditer(scheme) if m.group(1) in SCHEME_TEXT][:4]
+    out = [scheme]
+    for mask in range(1, 1 << len(toks)):
+        v, pos = "", 0
+        for i, m in enumerate(toks):
+            v += scheme[pos:m.start()] + ("\x00" if mask >> i & 1 else m.group(0))
+            pos = m.end()
+        v = scheme_collapse(v + scheme[pos:])
+        if v not in out:
+            out.append(v)
+    return out
 
 
 def _slug(s):
@@ -616,20 +645,24 @@ def onc_ready(s, r):
 
 
 def onc_parse(scheme, num):
-    """(seq, version) number num carries under scheme; None each when it does not follow the scheme / has no such block."""
-    pat, pos, names = "", 0, []
-    for m in SCHEME_RE.finditer(scheme):
-        pat += re.escape(scheme[pos:m.start()])
-        t = m.group(1)
-        if t.startswith("seq") or t == "version":
-            pat += r"(\d+)"
-            names.append("version" if t == "version" else "seq")
-        else:
-            pat += {"yyyy": r"\d{4}", "yy": r"\d{2}", "date": r"\d{8}", "isodate": r"\d{4}-\d{2}-\d{2}"}.get(t, r".+?")
-        pos = m.end()
-    pat += re.escape(scheme[pos:])
-    m = re.fullmatch(pat, num or "")
-    if not m:
+    """(seq, version) number num carries under scheme; None each when it does not follow the scheme / has no such block.
+    2.144.9 (#2575): also a number whose text blocks were empty (scheme_variants)."""
+    for sv in scheme_variants(scheme):
+        pat, pos, names = "", 0, []
+        for m in SCHEME_RE.finditer(sv):
+            pat += re.escape(sv[pos:m.start()])
+            t = m.group(1)
+            if t.startswith("seq") or t == "version":
+                pat += r"(\d+)"
+                names.append("version" if t == "version" else "seq")
+            else:
+                pat += {"yyyy": r"\d{4}", "yy": r"\d{2}", "date": r"\d{8}", "isodate": r"\d{4}-\d{2}-\d{2}"}.get(t, r".+?")
+            pos = m.end()
+        pat += re.escape(sv[pos:])
+        m = re.fullmatch(pat, num or "")
+        if m:
+            break
+    else:
         return None, None
     got = {}
     for n, v in zip(names, m.groups()):
