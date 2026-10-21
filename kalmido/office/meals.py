@@ -49,7 +49,7 @@ BW_MAX_GUESTS = 40
 BW_MAX_LINES = 20
 BW_MAX_CHOICES = 500
 BW_PURGE_DAYS = 30
-BW_KEEP_YEARS = 8  # receipts: 8 years after the end of the year (since 2025)
+BW_KEEP_YEARS = 8  # receipts: 8 years after the end of the year (since 2025); 2.147.0 (#2459): the DE pack's value, see bw_years
 BW_BILL_HINT = dec(250)  # from 250 EUR gross the bill must name the company
 BW_SHARE = dec("0.7")  # deductible share of the net amount
 # an occasion that only says "a business meal" is not enough (the tax office asks for the concrete reason)
@@ -191,23 +191,33 @@ def bw_calc(lines, tip):
             "deductible": dstr(ded), "not_deductible": dstr(money(net - ded))}
 
 
-def bw_keep_until(d):
-    """The day before which an ever approved meal of date d may not be deleted (end of its year + BW_KEEP_YEARS)."""
+def bw_years(c, oid):
+    """2.147.0 (#2459, #2461): the retention of receipts in years of office area oid (its country pack; the neutral base pack:
+    the office's own value). DE stays at 8."""
+    from .model import office_settings
+    from .packs import office_pack_for, pack_retention
+    s = office_settings(c, oid)
+    return int(pack_retention(office_pack_for(s), s).get("receipts") or BW_KEEP_YEARS)
+
+
+def bw_keep_until(d, years=BW_KEEP_YEARS):
+    """The day before which an ever approved meal of date d may not be deleted (end of its year + the retention in years)."""
     y = int(d[:4]) if d and re.match(r"^\d{4}", d) else local_now().year
-    return f"{y + BW_KEEP_YEARS + 1}-01-01"
+    return f"{y + years + 1}-01-01"
 
 
-def bw_kept_from(date, approvals):
+def bw_kept_from(date, approvals, years=BW_KEEP_YEARS):
     """2.119.0 (#2288, review): the keep period counts from the later of the meal date and its last approval, so moving the date of an
     unlocked meal back cannot shorten it. None = never approved."""
     if not approvals:
         return None
-    return bw_keep_until(max([date or ""] + [a[:10] for a in approvals if a]))
+    return bw_keep_until(max([date or ""] + [a[:10] for a in approvals if a]), years)
 
 
-def bw_kept(c, oid, mid, date):
+def bw_kept(c, oid, mid, date, years=None):
     return bw_kept_from(date, [r["at"] for r in c.execute(
-        "SELECT at FROM office_meal_log WHERE meal_id=? AND org_id=? AND action='approve'", (mid, oid)).fetchall()])
+        "SELECT at FROM office_meal_log WHERE meal_id=? AND org_id=? AND action='approve'", (mid, oid)).fetchall()],
+        years if years is not None else bw_years(c, oid))
 
 
 def bw_logs(c, oid, ids):
@@ -231,7 +241,7 @@ def bw_files(c, oid, ids):
     return out
 
 
-def bw_public(c, oid, r, logs=None, files=None):
+def bw_public(c, oid, r, logs=None, files=None, years=None):
     d = oc_dec_fields(c, oid, "office_meals", r)
     lines = _j(d.get("amounts"), [])
     host = _j(d.get("host"), {})
@@ -241,7 +251,8 @@ def bw_public(c, oid, r, logs=None, files=None):
             "host": host or None, "guests": guests, "amounts": lines, "tip": d["tip"] or "0.00", "currency": d["currency"], "note": d.get("note") or "",
             "status": d["status"], "locked": d["status"] == "approved", "approved_at": d.get("approved_at"), "approved_by": d.get("approved_by"),
             "approved_name": d.get("approved_name") or "", "calc": bw_calc(lines, d["tip"]), "log": lg,
-            "files": (files or {}).get(d["id"], []), "kept_until": bw_kept_from(d["date"], [x["at"] for x in lg if x["action"] == "approve"]),
+            "files": (files or {}).get(d["id"], []), "kept_until": bw_kept_from(d["date"], [x["at"] for x in lg if x["action"] == "approve"],
+                                                                                    years if years is not None else bw_years(c, oid)),
             "deleted": 1 if d.get("deleted_at") else 0, "created_at": d["created_at"], "updated_at": d["updated_at"]}
 
 
@@ -258,7 +269,8 @@ def bw_rows(c, oid, year=None, mid=None, deleted=False):
     rows = c.execute(sql + " ORDER BY date DESC, id DESC", args).fetchall()
     ids = [r["id"] for r in rows]
     logs, files = bw_logs(c, oid, ids), bw_files(c, oid, ids)
-    return [bw_public(c, oid, r, logs, files) for r in rows]
+    years = bw_years(c, oid)
+    return [bw_public(c, oid, r, logs, files, years) for r in rows]
 
 
 def bw_people(c, oid, uid):
@@ -291,13 +303,13 @@ def bw_purge(c, oid):
     q = ",".join("?" * len(ids)) or "NULL"
     files = c.execute(f"SELECT id, meal_id, file FROM office_meal_files WHERE org_id=? AND ((deleted_at IS NOT NULL AND deleted_at<?) OR meal_id IN ({q}))",
                       [oid, old] + ids).fetchall()
-    n, today, kept = 0, local_now().date().isoformat(), {}
+    n, today, kept, years = 0, local_now().date().isoformat(), {}, bw_years(c, oid)
     for f in files:
         # 2.119.0 (#2288, review): a removed / replaced bill of an ever approved meal stays as long as the meal is kept
         if f["meal_id"] not in ids:
             if f["meal_id"] not in kept:
                 m = c.execute("SELECT date FROM office_meals WHERE id=? AND org_id=?", (f["meal_id"], oid)).fetchone()
-                k = bw_kept(c, oid, f["meal_id"], m["date"]) if m else None
+                k = bw_kept(c, oid, f["meal_id"], m["date"], years) if m else None
                 kept[f["meal_id"]] = bool(k and today < k)
             if kept[f["meal_id"]]:
                 continue

@@ -72,6 +72,14 @@
 .pkc-on .swl{min-height:2.25rem;cursor:pointer}
 .pkc-on:has(input:checked) .pkc-onst{color:var(--text);font-weight:600}
 @media (pointer:coarse) { .pkc-on .swl{min-height:2.75rem} }
+/* 2.147.0 (#2460, #2462): the functions of the country pack (one switch each) and the country question of a new office */
+.ocf-row{flex-wrap:wrap;align-items:center}
+.ocf-row .swl{min-width:0;cursor:pointer;gap:.5rem}
+.ocf-row .ofchint{flex-basis:100%}
+@media (pointer:coarse) { .ocf-row .swl{min-height:2.75rem} }
+.ocf-choose{border:1px solid var(--accent);border-radius:var(--radius);background:var(--bg2);padding:.75rem 1rem;margin:0 0 1rem}
+.ocf-choose h3{display:flex;align-items:center;gap:.5rem;margin:0 0 .25rem}
+.ocf-choose .lacts{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
 @media (max-width:599px) {
   .ofcset .row label{min-width:100%}
   .ofcbar .chkl{font-size:var(--fs-s)}

@@ -7,6 +7,18 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.147.0] - 2026-10-21
+
+The country pack decides which office functions exist, single ones can be switched off, and an international base pack
+lets offices outside Germany work without German assumptions.
+
+### Added
+- The country pack lists the office functions it offers (DATEV, e-invoices, VAT return figures, tax dates, export for the tax advisor, finalising rules); menus, settings, buttons and the server follow it. Offices from before stay as they were: Germany, everything on (#2459).
+- *Office > Settings > Functions*: one switch per function. Off only hides - nothing is deleted, the DATEV address and settings stay, switching on brings everything back; finalised documents and retention periods stay in force. Admins only, in a personal office its owner (#2460).
+- International base pack: own VAT rates, EN 16931 e-invoices (ZUGFeRD / Factur-X), retention set by the office, texts without country assumptions; the export for any tax advisor (booking list as CSV, with invoices and receipts as ZIP) in every pack. docs/PACKS.md: how the community builds a country pack (#2461).
+- A new office asks for its country once (suggestion from the company country or the language); changing it later says first what is hidden and that finalised invoices keep their state (#2462).
+- Agents: `get_office` names the country pack and the functions as switched on.
+
 ## [2.146.0] - 2026-10-21
 
 Imports from everyday life: e-invoices are received and read, duplicates are found, several files and ZIPs go in at once, and a retention export comes before deleting an account or organisation.
