@@ -15,6 +15,8 @@ freelancer-matrix: office
  - deadline -> task (due = the deadline, the document linked; a second call sets the due date of the same task)
  - follow-up: a sent letter past its follow-up day without an answer -> one task; with an answer -> none
  - a document in the bin is not shown; the personal office of a person without organisation works the same
+ - 2.153.0 (#2229): no client of that name -> an address book contact of the office's space (name or e-mail in the text)
+   fills the recipient; a client goes first; contacts of a private book / another organisation never; also without organisation
 usage: p2106_b_api_test.py <datadir>      (P2106B_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
 import base64
 import json
@@ -34,7 +36,7 @@ CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
 FAILS, OKS = [], [0]
-FEAT = "cal,comments,collab,office,clients,docs,files"
+FEAT = "cal,comments,collab,office,clients,docs,contacts,files"  # 2.153.0 (#2229): + contacts
 LT = "/api/office/letters"
 
 
@@ -293,6 +295,51 @@ check(Do.post(B + f"{LT}/{LD}/links", json={"node_id": D1, "kind": "reply"}).sta
 r = Do.post(B + f"{LT}/doc/{DD}/deadline-task", json={})
 check(r.status_code == 201 and r.json()["due"] == "2026-10-29", f"freelancer: deadline task ({r.text[:200]})")
 check(Do.get(B + f"{LT}/{LD}/thread").ok and Do.get(B + f"{LT}/{LD}/links").json()["docs_ws"] == "private", "freelancer: history + space of the picker")
+
+# ---- 2.153.0 (#2229): the sender is an address book contact of the office's space
+BKO = A.post(B + "/api/books", json={"name": "Partner", "org_id": ORG}).json()["id"]
+CTO = A.post(B + "/api/contacts", json={"book_id": BKO, "given": "Erika", "family": "Beispiel", "org": "Stadtwerke Beispiel",
+                                        "addresses": [{"street": "Werkstraße 5", "code": "30000", "city": "Hannover"}],
+                                        "emails": [{"value": "erika@stadtwerke.example.com"}]}).json()["id"]
+CTM = A.post(B + "/api/contacts", json={"book_id": BKO, "fn": "Amt Beispiel", "emails": [{"value": "post@amt.example.com"}]}).json()["id"]
+A.post(B + "/api/contacts", json={"book_id": BKO, "fn": "Versicherung Beispiel AG", "addresses": [{"street": "Falschweg 1", "city": "Kiel"}]})
+BKP = A.post(B + "/api/books", json={"name": "Privat", "org_id": None}).json()["id"]
+A.post(B + "/api/contacts", json={"book_id": BKP, "fn": "Privatkontakt Beispiel", "addresses": [{"street": "Privatweg 1", "city": "Bonn"}]})
+BKC = Ca.post(B + "/api/books", json={"name": "Fremd", "org_id": ORG2}).json()["id"]
+Ca.post(B + "/api/contacts", json={"book_id": BKC, "fn": "Fremdfirma Beispiel", "addresses": [{"street": "Fremdweg 1", "city": "Essen"}]})
+
+
+def answer(s, nid):
+    r = s.post(B + LT, json={"answers": nid})
+    check(r.status_code == 201, f"#2229 answer {nid}: created ({r.status_code} {r.text[:200]})")
+    return r.json() if r.status_code == 201 else {}
+
+
+D5 = upload(A, "Stadtwerke.txt", "Stadtwerke Beispiel\nDatum: 09.10.2026\nIhre Abrechnung.\n", f"org:{ORG}")
+A.patch(B + f"/api/docs/{D5}", json={"sender": "Stadtwerke Beispiel"})
+x = answer(A, D5)
+check(x.get("contact_id") == CTO and not x.get("client_id") and x.get("rcpt_name") == "Stadtwerke Beispiel"
+      and "Werkstraße 5" in (x.get("rcpt_address") or "") and "30000 Hannover" in (x.get("rcpt_address") or "")
+      and x.get("rcpt_email") == "erika@stadtwerke.example.com", f"#2229: the contact by name fills the recipient {x}")
+D6 = upload(A, "Bescheid.txt", "Datum: 10.10.2026\nRückfragen an post@amt.example.com\n", f"org:{ORG}")
+x = answer(A, D6)
+check(x.get("contact_id") == CTM and x.get("rcpt_email") == "post@amt.example.com", f"#2229: the contact by its e-mail in the text {x}")
+x = answer(A, D1)
+check(x.get("client_id") == CL and not x.get("contact_id") and "Versicherungsweg 2" in (x.get("rcpt_address") or ""),
+      f"#2229: a client of that name goes first {x}")
+for nm in ("Privatkontakt Beispiel", "Fremdfirma Beispiel"):
+    dx = upload(A, nm + ".txt", "Datum: 11.10.2026\nEin Schreiben.\n", f"org:{ORG}")
+    A.patch(B + f"/api/docs/{dx}", json={"sender": nm})
+    x = answer(A, dx)
+    check(not x.get("contact_id") and x.get("rcpt_name") == nm and not (x.get("rcpt_address") or ""),
+          f"#2229: a contact outside the office's space ({nm}) is not used {x}")
+FBK = Do.post(B + "/api/books", json={"name": "Meine Kontakte", "org_id": None}).json()["id"]
+FCT = Do.post(B + "/api/contacts", json={"book_id": FBK, "fn": "Hausverwaltung Beispiel",
+                                         "addresses": [{"street": "Hausweg 9", "code": "10000", "city": "Berlin"}]}).json()["id"]
+DF = upload(Do, "Hausverwaltung.txt", "Hausverwaltung Beispiel\nDatum: 12.10.2026\nNebenkosten.\n", "private")
+Do.patch(B + f"/api/docs/{DF}", json={"sender": "Hausverwaltung Beispiel"})
+x = answer(Do, DF)
+check(x.get("contact_id") == FCT and "Hausweg 9" in (x.get("rcpt_address") or ""), f"#2229 freelancer: the own contact fills the recipient {x}")
 
 # ---- the nightly boundary check knows letter links across the boundary
 BC = "import json\nfrom kalmido.core.db import connect\nfrom kalmido.accounts.tenancy import boundary_check\nc = connect()\nprint(json.dumps(boundary_check(c)['kinds']))\nc.close()"
