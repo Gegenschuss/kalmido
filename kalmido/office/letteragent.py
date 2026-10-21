@@ -15,7 +15,8 @@ from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from ..api.v1 import v1_view
-from .model import office_gate, office_on, office_org, office_role, office_settings, pb_owner
+from .letters import lt_org
+from .model import office_gate, office_on, office_role, office_settings, pb_owner
 
 LTA_EVENT = "letter_draft_requested"
 LTA_FIELDS = ("client_id", "rcpt_name", "rcpt_address", "rcpt_email", "letter_date", "subject", "body", "ref_line", "greeting", "lang")
@@ -91,7 +92,7 @@ def lta_doc_agents(nid):
     others: the number of agents that could, once it is shared}."""
     c = db()
     uid = office_gate(c)
-    oid = office_org(c, uid, admin=True)
+    oid = lt_org(c, uid)
     lta_doc_ok(c, oid, nid, uid=uid)
     data, others = [], 0
     for aid, name in lta_agents(c, oid, uid):
@@ -109,7 +110,7 @@ def lta_ask_agent(nid):
     from ..agents.core import agent_emit
     c = db()
     uid = office_gate(c)
-    oid = office_org(c, uid, admin=True)
+    oid = lt_org(c, uid)
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))

@@ -25,7 +25,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, err, iso, local_now, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
-from .model import office_gate, office_org, pb_cl_sql, pb_owner
+from .model import OFFICE_ADMIN_ONLY, office_gate, office_org, office_role, pb_cl_sql, pb_owner
 
 LT_CHANNELS = (("post", N_("Post")), ("email", N_("E-mail")), ("registered", N_("Registered mail")), ("fax", N_("Fax")))
 LT_CHANNEL_KEYS = tuple(k for k, _ in LT_CHANNELS)
@@ -595,12 +595,22 @@ def lt_meta(c, oid, uid):
 
 
 # ---------------------------------------------------------------- routes
+def lt_org(c, uid):
+    """The office area of uid for the correspondence: its admins only (like the document templates). office_org(admin=True)
+    lets the accounting role read since 2.143.0 (#2151); letters are not bookkeeping, so the role itself must be admin
+    (review A3, as letteragent._v1ctx)."""
+    oid = office_org(c, uid, admin=True)
+    if office_role(c, uid, oid) != "admin":
+        raise Denied(403, tr(OFFICE_ADMIN_ONLY))
+    return oid
+
+
 def lt_ctx():
     """Admins of the office area only (like the document templates)."""
     from ..core.db import db
     c = db()
     uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=True)
+    return c, uid, lt_org(c, uid)
 
 
 def lt_iid(v, name):

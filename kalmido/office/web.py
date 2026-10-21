@@ -357,6 +357,7 @@ def pb_move_post():
     from ..core.db import uset
     from ..core.pg import system_ctx
     from .model import pb_owner
+    from .pbtransfer import pb_letter_detach
     c, uid, oid = _ctx(admin=True)
     b = body()
     if pb_owner(c, oid) != uid:
@@ -380,10 +381,11 @@ def pb_move_post():
             c.execute(f"UPDATE clients SET org_id=? WHERE id IN ({q})", (oid, *moved))
             c.execute(f"UPDATE office_client_contacts SET org_id=? WHERE client_id IN ({q})", (oid, *moved))
             c.execute(f"UPDATE office_client_contacts SET contact_id=NULL WHERE client_id IN ({q})", moved)  # 2.59.0 (#1735): own books stay private
+    unlinked = pb_letter_detach(c, oid)  # review A2 (2.153.0): the owner's private documents and address books stay private
     g.pop("pb_owner", None)
     acx_drop()
     uset(c, uid, "workspace", f"org:{oid}")
-    ofx_log(c, oid, "move", target="settings", detail={"name": name, "clients": len(moved)})
+    ofx_log(c, oid, "move", target="settings", detail={"name": name, "clients": len(moved), "letter_links": unlinked})
     bump(c)
     c.commit()
     print("organisation", name, "(id", oid, ") made from a personal office by", g.user["username"], flush=True)
