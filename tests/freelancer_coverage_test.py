@@ -263,7 +263,9 @@ ROUTES = {
     "GET /api/lists/{}/notify-template": "lists", "GET /api/lists/{}/overview": "lists", "GET /api/lists/{}/owner": "lists",
     "GET /api/lists/{}/playbook": "lists", "GET /api/lists/{}/playbook/versions": "lists",
     "GET /api/lists/{}/playbook/versions/{}": "lists", "GET /api/lists/{}/public-link": "lists",
-    "GET /api/lists/{}/repos": "lists", "GET /api/lists/{}/rules": "lists", "GET /api/lists/{}/signoffs": "lists",
+    "GET /api/lists/{}/repos": "lists", "GET /api/lists/{}/build-status": "lists", "GET /api/v1/lists/{}/build-status": "lists",
+    "PUT /api/lists/{}/repos/version-field": "lists",  # 2.151.0 A (#2558)
+    "GET /api/lists/{}/rules": "lists", "GET /api/lists/{}/signoffs": "lists",
     "GET /api/lists/{}/sprints": "lists", "GET /api/lists/{}/status": "lists", "GET /api/lists/{}/status-report": "lists",
     "GET /api/lists/{}/time/delete-all": "lists", "GET /api/lists/{}/velocity": "lists", "GET /api/templates": "lists",
     "GET /api/v1/filters": "lists", "GET /api/v1/folders": "lists", "GET /api/v1/groups": "lists",

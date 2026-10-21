@@ -993,6 +993,7 @@ function taskRow(t, opts = {}) {
   }
   if (planOf(t) && !opts.trash && rs('plan')) meta.push(`<span class="pchip" title="${esc(tr('Planned: {0}', planLabel(t)))}">${ic('clock', 's')}<b>${esc(planLabel(t, true))}</b></span>`);  // 2.11.0
   if (t.code?.prs?.length && !opts.trash && rs('code')) meta.push(codeChip(t));  // 2.2.0 (#271)
+  if (t.code?.build && !opts.trash && rs('code')) { const h = buildRowHint(t); if (h) meta.push(h); }  // 2.151.0 A (#2558): stale / only on a branch
   if (t.comment_count && cmtOn() && rs('cmt')) meta.push(`<span class="cmc ${t.unread ? 'unread' : ''}" title="${esc(t.unread ? trn('{0} new comment', '{0} new comments', t.unread) : trn('{0} comment', '{0} comments', t.comment_count))}">${ic('comment', 's')}${t.comment_count}</span>`);
   if (t.approvals_open) meta.push(`<span class="apvc" title="${esc(apvCount(t.approvals_open))}">${ic('lock', 's')}${t.approvals_open}<span class="sr"> ${esc(apvCount(t.approvals_open))}</span></span>`);  // 2.41.0 (#1383): open approval cards in its comments
   const ac = !lc && !opts.trash && t.id > 0 && acolOn(t.list_id);  // 1.10.0: assignee column (own cell, click = assign)

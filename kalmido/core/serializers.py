@@ -148,6 +148,8 @@ def load_tasks(c, where, args=(), full_snips=False):
                 aiu[r["task_id"]] = {"tokens": r["tok"] or 0, "cost": round(r["cost"], 4) if r["cost"] is not None else None,
                                      "calls": r["n"]}
     gcode = git_code_for(c, ids) if ids else {}  # 2.2.0 (#271): linked pull requests + commits
+    from ..integrations.gitbuild import git_build_for
+    gbuild = git_build_for(c, [r for r in rows if r["id"] not in ctx]) if ids else {}  # 2.151.0 A (#2558): the build state
     from ..collab.e2e import e2e_note_flags
     encn = e2e_note_flags(c, ids, viewer)  # 2.42.0 (#828): tasks with an encrypted note (never its content)
     from ..collab.notelock import ln_locked_ids
@@ -159,6 +161,9 @@ def load_tasks(c, where, args=(), full_snips=False):
         d["ltags"] = ltags.get(r["id"], [])
         if r["id"] in gcode and r["id"] not in ctx:
             d["code"] = gcode[r["id"]]
+        b = gbuild.get(r["id"])
+        if b and (b["state"] != "none" or b["package"]):  # 2.151.0 A (#2558): only where there is something to say
+            d["code"] = {**d.get("code", {"prs": [], "commits": []}), "build": b}
         d["attachments"] = atts.get(r["id"], [])
         if r["id"] in encn and r["id"] not in ctx:
             d["encrypted_note"] = True

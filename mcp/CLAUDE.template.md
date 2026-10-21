@@ -250,6 +250,14 @@
   boundary, login, injection, files), commit messages, changelog and public comments name only "Security fix" and the
   area, never how to exploit it. Deploy the fix to the running instances first, then publish it (push, release);
   details, if at all, only after the rollout.
+- **The task list is the truth for tickets and releases.** A task is done only when its code is on the default branch
+  and published (released / live); never tick it off or report it done before that. Done only in part: comment what is
+  left and enter a new version (the list's version field) for the rest at once. Never end work on an unmerged branch:
+  merge it, or park it explicitly with the reason as a comment on the task. Name the task in every commit and pull
+  request (`#123`; `fixes #123` completes it on merge) or call the branch `kalmido-<id>`. Before every "done" report
+  call `list_build_status` (list_id) and settle each open task that already has a published version or an open
+  branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
+  although published).
 
 ### When you are stuck
 - Never stall silently. **Park a blocker** with a short note on the task (what is missing, who has to act) and a chat
@@ -556,7 +564,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`,
 `get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`,
 `get_usage`, `get_velocity`, `get_video_review`, `get_view_layout`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`,
-`ingredients_to_shopping`, `link_contact`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_environments`,
+`ingredients_to_shopping`, `link_contact`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_environments`,
 `set_deployment`,
 `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`,
 `list_events`, `list_fields`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`,

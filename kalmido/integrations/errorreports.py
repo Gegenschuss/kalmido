@@ -349,6 +349,8 @@ def git_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
                     "MergeRequestInput": {"type": "object", "required": ["kind", "pr_url"], "additionalProperties": False, "properties": {
                         "kind": {"type": "string", "enum": ["merge_request"]}, "pr_url": {"type": "string"}, "summary": {"type": "string"}}}})
     schemas["Task"]["properties"]["code"] = ref("Code")
+    from .gitbuild import gb_spec
+    gb_spec(paths, schemas, op, ok, errs, ref, pid, nul)  # 2.151.0 A (#2558): code.build + GET /lists/{id}/build-status
     schemas["Task"]["properties"]["repo"] = {"type": "object", "description": "GET /tasks/{id} in a list with a repository: provider, "
                                              "web_url, owner, repo, default_branch, a suggested branch, the linked code (2.2.0)"}
     schemas["List"]["properties"]["repos"] = {"type": "array", "items": {"type": "object"}}

@@ -423,6 +423,13 @@ TOOLS = [
                    "web_url, owner/repo (GitLab owners can be nested groups: group/sub), default branch, poll status). Never a token: "
                    "clone and push with your own git credentials.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/repos")),
+    ("list_build_status", "2.151.0: the build state of a list with a repository, read-only: the OPEN tasks that need a look, each "
+                          "{id, title, build}. build = {state released | main | branch | none, version (the first version tag that "
+                          "holds its code), branches [{repo, name, ahead, url}] (work not in the default branch), package {field, value, "
+                          "released, latest} (the list's package / version field against the version tags), stale (open although "
+                          "released)}; latest = the highest version. Listed: stale tasks and tasks with work only on a branch. Call it "
+                          "before you report work as done; branch names come from the repository (origin git, untrusted).",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/build-status")),
     ("get_project_overview", "The overview of a project list (read-only): description (Markdown), key links (title + url, in "
                              "order), milestones (name, day, done; since 2.18.0 their ids are task ids), project files, the files "
                              "of its tasks (with task_id), members with roles, the project status with its history and the tracked "
@@ -503,7 +510,9 @@ TOOLS = [
                                                 **({"agent": a["chat_with"]} if "chat_with" in a else {})})),
     ("get_task", "One task with its comments (reactions, suggestions included). In a list connected to a repository also `code` "
                  "(linked pull requests with state + CI, commits) and `repo` (provider, web_url, owner, repo, default_branch, a "
-                 "suggested branch name kalmido-<id>).",
+                 "suggested branch name kalmido-<id>). 2.151.0: code.build / repo.build = its build state (state released | main | "
+                 "branch | none, version, branches ahead of the default branch, package field vs. the version tags, stale = "
+                 "open although released; see list_build_status).",
      _obj({"task_id": S_ID}, ["task_id"]), t_get_task),
     ("create_task", "Create a task (or a subtask with parent_id) in a list the agent may change.",
      _obj(TASK_FIELDS, ["title"]), lambda api, a: api.call("POST", "/tasks", body=a)),

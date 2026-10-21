@@ -212,6 +212,7 @@ CASES = [
     ("list_schedules", {}, "GET", "/api/v1/agent/schedules", None, {}),  # 2.34.0 (#272)
     # 2.2.0 (#271 / #339) code
     ("list_repos", {"list_id": 4}, "GET", "/api/v1/lists/4/repos", None, {}),
+    ("list_build_status", {"list_id": 4}, "GET", "/api/v1/lists/4/build-status", None, {}),  # 2.151.0 A (#2558)
     ("get_project_overview", {"list_id": 4}, "GET", "/api/v1/lists/4/overview", None, {}),  # 2.7.1 (#410)
     ("set_list_columns", {"list_id": 4, "columns": ["id", "due", "f:3"]}, "PATCH", "/api/v1/lists/4", {"columns": ["id", "due", "f:3"]}, {}),  # 2.14.0
     ("set_list_columns", {"list_id": 4, "columns": None}, "PATCH", "/api/v1/lists/4", {"columns": None}, {}),

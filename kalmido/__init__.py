@@ -140,6 +140,7 @@ ORDER = (
     "lists.public",
     "integrations.git",
     "integrations.gitfolder",  # 2.33.0 (#934)
+    "integrations.gitbuild",  # 2.151.0 A (#2558)
     "integrations.errorreports",
     "api.projects",
     "lists.sprints",  # 2.60.0 (#343): sprints of project lists (after api.v1: it has token routes)
