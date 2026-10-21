@@ -103,6 +103,36 @@ def hbm_can(c, uid, m, write=False):
     return not m["org_id"] or int(m["org_id"]) in acx_of(c, uid).org_ids
 
 
+def hbm_node_ok(c, uid, mail_id):
+    """2.148.1 D (#2488): may uid read a file-store node filed with hub mail mail_id? Only who may read the mail (hbm_can,
+    also an organisation admin only then); a mail that is gone or not readable = no."""
+    m = c.execute("SELECT * FROM hub_mails WHERE id=?", (mail_id,)).fetchone()
+    return bool(m) and hbm_can(c, uid, m)
+
+
+def hbm_node_mail_ids(c, uid):
+    """2.148.1 D (#2488): the ids of the hub mails with filed nodes that uid may read (files/store.py fs_visible_sql_c)."""
+    from ..core.access import vis_sql
+    from ..team.clients import client_rows
+    cids = [int(r["id"]) for r in client_rows(c, uid)]
+    cl = f" OR (m.list_id IS NULL AND m.client_id IN ({','.join(map(str, cids))}))" if cids else ""
+    rows = c.execute(f"""SELECT m.* FROM hub_mails m WHERE (m.eml_id IS NOT NULL OR m.folder_id IS NOT NULL)
+                         AND (m.list_id IN {vis_sql()} OR (m.list_id IS NULL AND m.client_id IS NULL AND m.owner_id=?){cl})""",
+                     (uid, uid, uid)).fetchall()
+    roles, out = {}, set()
+    for m in rows:
+        if m["list_id"]:  # hbm_can's list case, the list read once
+            if m["list_id"] not in roles:
+                l = _list_row(c, m["list_id"])
+                roles[m["list_id"]] = ((l["org_id"] or None) if l else -1, bool(l) and bool(list_role(c, m["list_id"], uid)))
+            lorg, ok = roles[m["list_id"]]
+            if ok and lorg == (m["org_id"] or None):
+                out.add(m["id"])
+        elif hbm_can(c, uid, m):
+            out.add(m["id"])
+    return out
+
+
 def _need_mail(c, mid, write=False, deleted=False):
     m = c.execute("SELECT * FROM hub_mails WHERE id=?", (mid,)).fetchone()
     if not m or (bool(m["deleted_at"]) != deleted) or not hbm_can(c, me(), m):
@@ -721,5 +751,11 @@ def _import(c, r, msg, raw, mail_text):
                 notes.append(f"{name}: {e}"[:300] if str(e) else name)
     c.execute("UPDATE hub_mails SET folder_id=?, files=?, eml_id=?, note=? WHERE id=?",
               (folder, json.dumps([x for x in node_ids if x != eml_id]), eml_id, "\n".join(notes)[:2000], mid))
+    # 2.148.1 D (#2488): the filed nodes follow the mail's rule in the file store (files/store.py fs_role, fs_visible_sql)
+    marked = [x for x in node_ids + [eml_id] if x]
+    if marked:
+        c.execute(f"UPDATE fs_nodes SET hub_mail_id=? WHERE id IN ({','.join('?' * len(marked))})", (mid, *marked))
+    if folder:
+        c.execute("UPDATE fs_nodes SET hub_mail_id=? WHERE id=? AND hub_mail_id IS NULL", (mid, folder))
     _index(c, mid, ws, plain)
     return mid
