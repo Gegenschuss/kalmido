@@ -65,6 +65,11 @@ Small fixes from the phone test of 2.143: the read-only role and dialogs on phon
 ### Changed
 - Office, test phase: an admin can delete a quotation also after it was sent, answered or signed by the client (the confirmation says so); only one an invoice or a document was made from stays, and "Undo finalising" keeps the old rule. This is taken back before the launch (#2573, #2574).
 
+## [2.144.9] - 2026-10-21
+
+### Fixed
+- Office PDF: an empty block of the number scheme (no project, client or initials) takes its separator along - `KV02-M` instead of `-KV02-M`, no double hyphens; numbers given before stay as they are; the rights page and the part pages of an invoice say "Rechnung Nr." instead of "Angebot Nr."; an invoice made from a quotation names it in its head ("zu Angebot Nr. …" with its date); part pages show the row "+ Optional …" before the total with the option; the part's name is one source - renaming it in *Parts* or on the title page changes both, printed as typed (#2575).
+
 ## [2.147.1] - 2026-10-21
 
 Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.

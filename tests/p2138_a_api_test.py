@@ -102,18 +102,20 @@ def run(S, who):
     check([x["title"] for x in part_lines(r.json(), p1)] == ["Part 3"], f"{who}: the new part is on the title page {part_lines(r.json(), p1)}")
     r = S.patch(B + f"{D}/{did}/parts/{p1}", json={"title": "Module web"})
     check(r.ok and [x["title"] for x in part_lines(r.json(), p1)] == ["Module web"], f"{who}: #2239 rename -> title page line follows {r.text[:200]}")
-    # a second line of the same part with an own text, one with an empty title
+    # a second line of the same part, one with an empty title
+    # 2.144.9 (#2575, decision 21.10.2026): the part's name is the one source -- a new line with an own text renames the part
+    # and every line of it (was: the own text stayed beside the part's name)
     cur = r.json()
-    items = body(cur["items"]) + [{"kind": "part", "ref_part_id": p1, "title": "Own text", "qty": 2},
+    items = body(cur["items"]) + [{"kind": "part", "ref_part_id": p1, "title": "", "qty": 2},
                                   {"kind": "part", "ref_part_id": p1, "title": "", "qty": 1}]
     r = S.put(B + f"{D}/{did}/items", json={"items": items, "parts_known": [p1]})
-    check(r.ok and sorted(x["title"] for x in part_lines(r.json(), p1)) == ["Module web", "Module web", "Own text"],
+    check(r.ok and sorted(x["title"] for x in part_lines(r.json(), p1)) == ["Module web", "Module web", "Module web"],
           f"{who}: the empty title takes the part's name {[x['title'] for x in part_lines(r.json(), p1)]}")
     r = S.patch(B + f"{D}/{did}/parts/{p1}", json={"title": "Module app"})
-    check(r.ok and sorted(x["title"] for x in part_lines(r.json(), p1)) == ["Module app", "Module app", "Own text"],
-          f"{who}: #2239 rename: lines with the old name follow, the own text stays {[x['title'] for x in part_lines(r.json(), p1)]}")
+    check(r.ok and sorted(x["title"] for x in part_lines(r.json(), p1)) == ["Module app", "Module app", "Module app"],
+          f"{who}: #2239 / #2575 rename: every line follows {[x['title'] for x in part_lines(r.json(), p1)]}")
     r = S.patch(B + f"{D}/{did}/parts/{p1}", json={"title": ""})
-    check(r.ok and sorted(x["title"] for x in part_lines(r.json(), p1)) == ["Module app", "Module app", "Own text"],
+    check(r.ok and sorted(x["title"] for x in part_lines(r.json(), p1)) == ["Module app", "Module app", "Module app"],
           f"{who}: an empty part name leaves the title page lines alone")
     S.patch(B + f"{D}/{did}/parts/{p1}", json={"title": "Module app"})
     # ---- #2239: a stale title page save keeps the line of a part it did not know
@@ -269,7 +271,7 @@ if pp is not None:
     tl = [t for t in pp.rec if t["size"] == 14 and t["bold"]]
     sub = [t for t in pp.rec if "Angebot Nr. KVA-2026-077" in t["s"]]
     check(len(tl) >= 2, f"the long part title stands in 2+ lines ({len(tl)})")
-    check(" ".join(t["s"] for t in tl) == LONG.upper(), "the title lines together give the whole title (upper case)")
+    check(" ".join(t["s"] for t in tl) == LONG, "the title lines together give the whole title (as typed, 2.144.9 #2575; was upper case)")
     check(all(t["x"] + t["w"] <= pdf.PDF_L + pdf.PDF_CW + 0.5 for t in tl), "no title line runs past the right margin")
     check(len(sub) == 1 and "Serie Beispielprojekt" in sub[0]["s"], "the number + project line is printed once on the part page")
     if sub and tl:
@@ -284,7 +286,7 @@ if pp is not None:
 # a short part title stays on one line
 data, r, pages = render(pmodel(parts=[dict(part, title="Trailer")]))
 pp = next((p for p in pages[1:] if any(t["size"] == 14 for t in p.rec)), None)
-check(pp is not None and [t["s"] for t in pp.rec if t["size"] == 14] == ["TRAILER"], "a short part title: one line")
+check(pp is not None and [t["s"] for t in pp.rec if t["size"] == 14] == ["Trailer"], "a short part title: one line (as typed, 2.144.9 #2575)")
 
 # ---------------------------------------------------------------- 2. #2240: the title page heading wraps over the full width
 LONG_T = "Kostenvoranschlag für die Herbstkampagne mit drei Filmen und Social Media Schnittfassungen"

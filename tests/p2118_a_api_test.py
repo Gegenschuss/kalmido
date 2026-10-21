@@ -145,7 +145,8 @@ nid2, _ = offer(A)
 A.put(B + f"{D}/{nid2}/items", json={"items": [{"title": "Shoot", "qty": 1, "rate": 900}]})
 A.patch(B + f"{D}/{nid2}", json={"recipient": {"name": "", "lines": []}})
 r = A.post(B + f"{D}/{nid2}/finalize")
-check(r.ok and r.json().get("number") == "KV--2030-04", "finalised without a client: the organisation's counter " + r.text[:200])
+# 2.144.9 (#2575): the empty client block takes its separator along (was "KV--2030-04")
+check(r.ok and r.json().get("number") == "KV-2030-04", "finalised without a client: the organisation's counter " + r.text[:200])
 
 # ================================================================== back to the organisation's counter
 settings(A, offer_counter="org")
