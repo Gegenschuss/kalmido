@@ -121,10 +121,10 @@ office tab without one appears at the end of its group (`OFC_TABS` field 5, else
 
 ## Settings: areas, every field saves itself (2.113)
 
-Office & finance > Settings > General shows its fields in five **areas**, with the same strip of tabs as
+Office & finance > Settings > General shows its fields in six **areas**, with the same strip of tabs as
 Settings > Administration: **Company** (company data, logo, brand colour, master data file), **Documents** (documents,
 invoices, invoice from parts, closing texts, calculation rules, default texts), **Packs** (country pack, packs list),
-**Data** (DATEV inbox and booking export, legacy import, moving a personal office into an organisation) and **Access**
+**Functions** (the functions of the country pack, 2.147, see below), **Data** (DATEV inbox and booking export, legacy import, moving a personal office into an organisation) and **Access**
 (agents' read access, access log). Only one area is shown; the last one chosen is remembered on the device. On a phone the
 strip scrolls sideways.
 
@@ -137,6 +137,49 @@ Members see every field locked.
 
 In the area Packs, every industry pack's card says **Switched on** or **Off** and has its own switch; it changes
 `industry_packs` at once, like the box of the same pack in the calculation rules.
+
+## Country pack functions and switches (2.147)
+
+The country pack decides which office functions exist at all; the office admin switches single ones off in the area
+**Functions** (one switch each, saved at once, one undo step; in a personal office its owner is the admin).
+
+| Function | Key | Germany (`DE`) | Base pack (`XX`) |
+|---|---|---|---|
+| DATEV: booking batch, document inbox, SKR accounts, travel receipts "in DATEV" | `books.datev` | yes | - |
+| E-invoice XML on finalising and mailing (ZUGFeRD / Factur-X, XRechnung) | `docs.einvoice` | yes | ZUGFeRD / Factur-X only |
+| VAT return figures (advance return; filing stays with your tax software) | `books.vat_return` | yes | - |
+| Tax dates as recurring tasks | `books.tax_dates` | yes | - |
+| Export for any tax advisor (booking list CSV, ZIP with invoices and receipts) | `books.export_csv` | yes | yes |
+| Finalising rules (locked documents, number gaps with a reason, date order) | `books.gobd` | always on | always on |
+
+- **Off only hides.** Nothing is deleted: the DATEV address and booking settings, tax date settings and stored XML files
+  stay; switching on again brings everything back. The server checks too: the routes of a function that is off answer
+  `404` ("This function is not switched on in this office"), the automatic DATEV copy is skipped, a newly finalised
+  invoice gets no XML (an XML stored before stays reachable).
+- **Always in force**, whatever the switches say: finalised documents stay locked with their snapshot, and receipts are
+  kept for the retention period of the pack (`DE`: receipts 8 years, books 10 years).
+- Settings keys: `features_off` (list of switched off keys; empty = everything the pack offers is on, so offices from
+  before 2.147 stay exactly as they were), `GET /api/office/settings` answers `features` (`{key: true|false}`) and
+  `pack.offers`, `pack.retention`, `pack.einvoice_formats`. Agents read the same in `GET /api/v1/office` (`country_pack`,
+  `features`) and leave out what is off.
+
+**Choosing the country.** A new office area (no saved settings, no documents) shows its admin the question *Where is your
+office?* on top of the office, with a suggestion (the company's country when a pack exists for it, otherwise the
+international base pack; without a company country the language: German -> `DE`). Offices from before never see it and
+stay `DE`. **Changing** the country under Settings > Packs asks first and says what changes (`GET /api/office/pack-switch?code=XX`:
+hidden / new functions, open documents recalculated with the new rates and texts, finalised documents that keep their
+state). `DE -> XX -> DE` loses nothing.
+
+**International base pack (`XX`).** For countries without an own pack: no country assumptions in the texts, the VAT
+rates are set by the office (`tax_rates: {standard, reduced}`, labels like "21 % VAT"; empty = 20 / 10), the retention
+is set by the office (`retention_years`, default 10), e-invoices as EN 16931 ZUGFeRD / Factur-X (an XRechnung setting
+becomes ZUGFeRD), and the company country is needed before an invoice is finalised. Currency: EUR or USD as before
+(other home currencies come later).
+
+**Export for the tax advisor** (Bookkeeping, `GET /api/office/books/export?from=&to=`, admins only): every finalised
+invoice and credit note (one row per tax rate), payments received, receipts and travel expenses of the period in one
+list, amounts signed in the office currency; `&zip=1` adds the invoice PDFs / XML (`documents/`) and the receipt files
+(`receipts/`); `&check=1` only counts. The CSV follows the pack's number format (decimal comma = semicolon separated).
 
 ## Tabs
 
@@ -243,7 +286,8 @@ v1 / MCP tool), the same in the personal office of a person without an organisat
 ## Country packs
 
 Tax rates, number and date formats, the labels of the documents and the default texts are not in the code but in a
-**country pack**: one JSON file per country under `kalmido/office/packs/<code>.json` (shipped: `DE`). A pack holds data
+**country pack**: one JSON file per country under `kalmido/office/packs/<code>.json` (shipped: `DE` and the
+international base pack `XX`, 2.147). A pack holds data
 only - no code - and is checked by a validator before it is used (`POST /api/office/packs/validate` runs the same check
 on a pack you paste, a dry run for community packs; packs from a catalogue: see *Packs* below).
 
@@ -257,9 +301,18 @@ Shape (see `de.json`):
  "labels": {"de": {"offer": "Kostenvoranschlag", ..., "units": {"day": "Tage", ...}}, "en": {...}},
  "texts": {"intro": {"de","en"}, "closing": {...}, "vat_note": {...}, "rights_time": [{"key","de","en"}, ...], ...},
  "numbering": {"offer": "KVA-{yyyy}-{seq:03}"},
- "einvoice": {"formats": ["zugferd", "xrechnung"], "status": "planned"},
- "bookkeeping": {"export": "datev", "status": "planned"}}
+ "einvoice": {"formats": ["zugferd", "xrechnung"], "status": "ready"},
+ "bookkeeping": {"export": "datev", "status": "ready"},
+ "features": {"books.datev": {"status": "ready"}, "docs.einvoice": {"status": "ready"}, ...,
+              "books.period_lock": {"status": "planned"}},
+ "retention": {"receipts": 8, "books": 10, "min_years": 8, "editable": false}}
 ```
+
+2.147: `features` lists the office functions the pack offers (see *Country pack functions and switches*); a pack without
+it (made before 2.147) offers what its `einvoice` / `bookkeeping` blocks say plus the export and the finalising rules.
+`retention` gives the years receipts and books are kept (`editable`: the office sets its own value, never below
+`min_years`). `tax.editable: true` lets the office set its own rates; labels may then hold `{rate}`. `neutral: true`
+marks the base pack.
 
 Labels and default texts come from the pack and the **document's** language, not from the app language of the person
 who writes the document.
