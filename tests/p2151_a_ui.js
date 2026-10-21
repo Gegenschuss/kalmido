@@ -55,7 +55,9 @@ const txt = el => (el?.textContent || '').replace(/\s+/g, ' ').trim();
   STATE['8090']['acme/app'] = {default_branch: 'main', pulls: [],
     commits: {main: [cm('c3', `Polish #${T[3]}`, 1), cm('c1', `Feature #${T[1]}`, 3)]},
     tags: [{name: 'v1.1.0'}, {name: 'v1.0.0'}],
-    compare: {'v1.0.0...v1.1.0': [cm('c1', `Feature #${T[1]}`, 3)], [`kalmido-${T[2]}`]: [cm('b1', 'first step', 1), cm('b2', 'second step', 0)]},
+    compare: {'v1.0.0...v1.1.0': [cm('c1', `Feature #${T[1]}`, 3)], [`kalmido-${T[2]}`]: [cm('b1', 'first step', 1), cm('b2', 'second step', 0)],
+      // 2.151.0 A2 (#2558 review): newest tag...main = in main, not released (without it c3 counts as an earlier version)
+      'v1.1.0...main': [cm('c3', `Polish #${T[3]}`, 1)]},
     branches: [{name: 'main', commit: {sha: 'c3'}}, {name: `kalmido-${T[2]}`, commit: {sha: 'b2'}}]};
   putState();
   const r = await call('POST', `/api/lists/${P}/repos`, {provider: 'github', base_url: GH, repo: 'acme/app'});
