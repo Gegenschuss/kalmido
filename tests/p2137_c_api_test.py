@@ -371,6 +371,16 @@ dbx("INSERT INTO nl_members(seg_id,org_id,email,remote_ref,state,synced_at) VALU
 dbx("INSERT INTO nl_runs(conn_id,org_id,kind,state,started_at,counts) VALUES(?,?,?,?,?,?)", (NC, ORG, "manual", "done", NOW, '{"added": 1}'))
 # harmless settings of the organisation
 dbx("UPDATE orgs SET color=?, hub_leave_approval=1 WHERE id=?", ("#336699", ORG))
+# 2.137.1 (#2399): ids inside the history data (bob ticked, dora not; an id of a row that does not come along)
+dbx("INSERT INTO activity(task_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
+    (TO, BOB, "ml_add", json.dumps({"list_id": LO2, "section_id": SEC, "user_id": BOB, "gone_id": 987654321}), NOW))
+dbx("INSERT INTO activity(task_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)", (TO, BOB, "assign", json.dumps({"to": DORA, "from": BOB}), NOW))
+dbx("INSERT INTO activity(task_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
+    (TO, BOB, "subtask", json.dumps({"id": 987654321, "title": "Weg"}), NOW))
+dbx("INSERT INTO activity(task_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
+    (TO, BOB, "tidy", json.dumps({"by": DORA, "via": "webhook", "hook": 987654321}), NOW))  # review: person + webhook of the old server
+dbx("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
+    (LO, BOB, "owner", json.dumps({"from": DORA, "to": BOB, "from_name": "Dora", "to_name": "Bob"}), NOW))
 
 # ---------------------------------------------------------------- export, import into the empty organisation
 OX1, RK1 = export(A, ORG)
@@ -449,6 +459,14 @@ check(one("SELECT COUNT(*) FROM notes WHERE list_id=? AND title='Kick-off'", (NL
 check(one("SELECT COUNT(*) FROM list_notepads WHERE list_id=?", (NL,)) == 1, "notepad")
 check(one("SELECT body FROM playbooks WHERE list_id=? ORDER BY version DESC LIMIT 1", (NL,)) == "Kunden binnen eines Tages antworten.", "playbook")
 check(one("SELECT COUNT(*) FROM activity WHERE task_id=?", (NT,)) >= 1, "task history came along")
+# 2.137.1 (#2399): the ids inside the history point at the new rows, unknown old ids are gone
+ha = [(k, json.loads(d) if isinstance(d, str) else d) for k, d in T("SELECT kind, data FROM activity WHERE task_id=? ORDER BY id", (NT,))]
+check(("ml_add", {"list_id": NL2, "section_id": NSEC, "user_id": BOB}) in ha, f"history: list, column and person mapped, the unknown id dropped {ha}")
+check(("assign", {"to": -1, "from": BOB}) in ha, f"history: an assignee not ticked shows as a deleted user {ha}")
+check(("subtask", {"title": "Weg"}) in ha, f"history: a task that did not come along is dropped {ha}")
+check(("tidy", {"via": "webhook"}) in ha, f"history: a person not ticked and the old webhook are dropped {ha}")
+hl = [json.loads(d) if isinstance(d, str) else d for (d,) in T("SELECT data FROM list_activity WHERE list_id=? AND kind='owner'", (NL,))]
+check(hl == [{"to": BOB, "from_name": "Dora", "to_name": "Bob"}], f"list history: dora dropped, bob mapped {hl}")
 # the organisation's settings (empty target)
 check(T("SELECT color, hub_leave_approval FROM orgs WHERE id=?", (ORG3,)) == [("#336699", 1)], "harmless settings came along")
 # another organisation's rows are not touched

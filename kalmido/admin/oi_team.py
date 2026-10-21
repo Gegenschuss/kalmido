@@ -207,6 +207,43 @@ def _rule(c, run, src, d, ctx):
     return d
 
 
+# 2.137.1 (#2399): ids inside the history data (activity / list_activity .data) -> the target's ids; an id that did not come
+# along (or a key not known here ending in _id) is dropped, never left pointing at a row of this server
+_ACT_IDS = {"list_id": "lists", "section_id": "sections", "task_id": "tasks", "parent_id": "tasks", "milestone_id": "tasks",
+            "comment": "comments", "sheet": "sheets", "signoff": "office_signoffs"}
+_ACT_KIND_IDS = {"field": {"id": "list_fields"}, "subtask": {"id": "tasks"}, "milestone": {"id": "tasks"}, "dep_add": {"id": "tasks"},
+                 "dep_rm": {"id": "tasks"}, "blocks_add": {"id": "tasks"}, "blocks_rm": {"id": "tasks"}, "unblocked": {"id": "tasks"}}
+_ACT_PEOPLE = ("user_id", "assignee_id", "agent_id", "agent", "approver", "reviewer", "by")  # by: tidy (comments.py names it)
+_ACT_DROP = ("hook",)  # the inbound webhook of the old server (log_act "via": "webhook")
+_ACT_KIND_PEOPLE = {"assign": ("to", "from"), "owner": ("from", "to")}
+
+
+def _act_data(run, who, kind, v):
+    v = dict(v)
+    ids = {**_ACT_IDS, **_ACT_KIND_IDS.get(kind, {})}
+    people = (*_ACT_PEOPLE, *_ACT_KIND_PEOPLE.get(kind, ()))
+    for k in list(v):
+        if k in people:
+            if _oid(v[k]) is None:  # a name (agentjoin), empty, or not an id
+                continue
+            new = who(v[k])
+        elif k in ids:
+            if _oid(v[k]) is None:
+                continue
+            new = run.m(ids[k], v[k])
+        elif (k.endswith("_id") or k in _ACT_DROP) and _oid(v[k]) is not None:
+            new = None
+        else:
+            continue
+        if new:
+            v[k] = new
+        elif kind == "assign" and k == "to":
+            v[k] = -1  # still "assigned to" (the history shows "Deleted user"), not "removed the assignee"
+        else:
+            del v[k]
+    return v
+
+
 def _activity(c, run, src, d, ctx):
     v = src.get("data")
     if isinstance(v, str):
@@ -214,7 +251,8 @@ def _activity(c, run, src, d, ctx):
             v = json.loads(v)
         except ValueError:
             v = {}
-    d["data"] = json.dumps(v if isinstance(v, dict) else {}, ensure_ascii=False)
+    v = _act_data(run, ctx.who, str(src.get("kind") or ""), v) if isinstance(v, dict) else {}
+    d["data"] = json.dumps(v, ensure_ascii=False)
     return d
 
 
@@ -284,7 +322,7 @@ SPECS = [
     OiT("lists/rules.json", "list_rules", refs={"list_id": "lists", "target_list_id": "lists"}, need=("list_id",),
         people={"created_by": "null"}, label=N_("Rules"), prep=_rule),
     OiT("lists/history.json", "list_activity", refs={"list_id": "lists"}, need=("list_id",), people={"user_id": "null"}, space=(),
-        label=N_("History")),
+        label=N_("History"), prep=_activity),
     OiT("lists/admin_log.json", "org_list_log", refs={"list_id": "lists"},
         people={"by_id": "null", "owner_id": "null", "to_id": "null"}, private=False, label=N_("History")),
     OiT("portal/tickets.json", "portal_tickets", refs={"task_id": "tasks", "list_id": "lists", "form_id": "forms", "client_id": "clients"},

@@ -1202,6 +1202,8 @@ def umz_run(uid, iid, opts):
         print(f"account import of user {uid}: {run.stats.get('tasks', 0)} tasks", flush=True)
     except UmzBad as e:
         c.rollback()
+        from .orgimport import oi_drop_empty_pb
+        oi_drop_empty_pb(c, run, uid)  # 2.137.1 review (#2399): also when the file turns out bad while writing
         _set(uid, iid, state="invalid", error=tr(e.text, *e.args_))
     except Exception as e:  # noqa: BLE001 -- the state says it failed; never content in the message
         try:
@@ -1213,6 +1215,8 @@ def umz_run(uid, iid, opts):
                 os.remove(p)
             except OSError:
                 pass
+        from .orgimport import oi_drop_empty_pb
+        oi_drop_empty_pb(c, run, uid)  # 2.137.1 (#2399): the personal office made for this run, if it stayed empty
         print(f"account import of user {uid} failed: {type(e).__name__}", flush=True)
         _set(uid, iid, state="failed", error=tr("The import failed. Nothing was taken over. Please try again later or ask the server admin (server log)."))
     finally:
