@@ -269,5 +269,5 @@ const fv2_svToolBtn = () => `<button type="button" class="iconbtn svtool" data-s
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-svt]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();
-  fv2_svLoad().then(() => sv_toolMenu($('#side [data-svt]') || b), () => {});
+  fv2_svLoad().then(() => sv_toolMenu($('#side [data-svt]') || b), () => {});  // lazy-ok: fv2_svLoad loaded sideviews.js first
 }, true);

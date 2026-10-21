@@ -279,6 +279,7 @@ VARS = (
     _v("KALMIDO_TEST_MODE", "0", "Test containers only: allows the test switches of the organisation key tool (1); left alone in a server's .env it is ignored.", "test"),
     _v("KALMIDO_SHEET_RANGE_BUDGET", "15000000", "Tests: range cells one evaluation of a table may read (2.148.1).", "test"),
     _v("KALMIDO_SHEET_CELLS_MAX", "1000000", "Tests: stored cells over all sheets of one table (2.148.1).", "test"),
+    _v("KALMIDO_PEPPOL_STORECOVE_URL", "", "Tests: the address of a stand-in for the Storecove Peppol API (empty = the real one, 2.154.0).", "test"),
     _v("KALMIDO_AGENT_BURST_S", "60", "Seconds in which several new tasks of an agent count as one burst (one summary event).", "agents"),
     _v("KALMIDO_AGENT_BURST_QUIET_S", "15", "Seconds without more new tasks after which the burst summary of an agent is sent.", "agents"),
 )

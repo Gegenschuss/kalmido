@@ -53,7 +53,7 @@ function crr_html(st) {
 function crr_open(parent, base, start, done) {
   const st = crr_parse(base, start);
   modalSub(parent, () => {
-    const md = modal(crr_html(st));
+    const md = /** @type {any} */ (modal(crr_html(st)));  // bundle C: $() takes the dialog as its root
     md.classList.add('evmodal', 'crrmodal');
     const redraw = (focus) => { md.firstElementChild && (md.firstElementChild.innerHTML = crr_html(st)); if (focus) /** @type {HTMLElement|null} */ ($(focus, md))?.focus(); };
     const prev = () => { const el = $('#crr-prev', md); if (el) el.textContent = repeatLabelBase(crr_build(st)); };
