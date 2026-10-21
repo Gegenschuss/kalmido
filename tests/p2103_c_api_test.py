@@ -340,8 +340,10 @@ def fk_name(table, col):
 
 
 check(all(fk_name(t, c_) for t, c_ in (("doc_meta", "task_id"), ("rc_receipts", "list_id"), ("notes", "created_by"), ("agents", "owner_id"),
-                                       ("habits", "user_id"), ("budget_recurring", "contract_task_id"), ("playbooks", "author_id"))),
+                                       ("habits", "user_id"), ("budget_recurring", "contract_task_id"))),
       "#2174: a new database has the keys")
+# 2.152.0 (#2174, review B-M7): playbooks.author_id keeps the id of a gone author (no key; NULL would mean the owner's text)
+check(fk_name("playbooks", "author_id") is None, "#2174 B-M7: playbooks.author_id has no foreign key")
 INBOX = sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (ALICE,))[0][0]
 TK = A.post(B + "/api/tasks", json={"title": "Beleg prüfen", "list_id": INBOX}).json()["id"]
 sql(f"ALTER TABLE doc_meta DROP CONSTRAINT {fk_name('doc_meta', 'task_id')}", write=True)
