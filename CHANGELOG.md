@@ -7,6 +7,16 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.151.0] - 2026-10-21
+
+A task knows its build state: first version, main or branch, and whether its package is already released; software agents learn that the task list is the truth.
+
+### Added
+- Git integration: a task in a list with a repository shows its build state at the top of *Code* - *In version …* (the first version tag that holds its commits or merged pull request), *In main, not released yet* or *Built, not in main yet* with the branch and how far it is ahead; commit rows show their version or branch (#2558).
+- Git integration: the list's version field (*Package*, *Version*, *Release*, *Target version*, or picked in the repository dialog) is checked against the tags; an open task whose version is already released gets a hint at the task and a mark in its row (#2558).
+- Agents: `build` at every task of a list with a repository and the MCP tool `list_build_status` (`GET /api/v1/lists/{id}/build-status`) (#2558).
+- Agent rules: the task list is the truth for tickets and releases - done only when the code is in main and released, the rest gets a new version, no work ends on an unmerged branch, `list_build_status` before every "done" report; in the rules, the template, the in-app rules and the setup guide (#2560).
+
 ## [2.147.1] - 2026-10-21
 
 Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.

@@ -20,6 +20,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.151.0** (2026-10-21): **a task knows its build state** - in a list with a repository the task shows *In version
+  2.150.0*, *In main, not released yet* or *Built, not in main yet* with the branch, straight from the repository; a
+  **hint when a task is still open although its package / version is already released**, also in the task row; agents
+  read it as `build` and with the new MCP tool `list_build_status`, and software agents get the rule *the task list is
+  the truth for tickets and releases*.
 - **2.147.1** (2026-10-21): **drag tasks into the chats** (team chat, thread, agent chat) as references, several at once, with
   *Insert reference* on phones; **overdue invoices suggest a payment reminder** as a draft (nothing is sent) and
   invoices / reminders in EUR carry a **GiroCode** for banking apps; moving many documents to another workspace shows
@@ -1686,6 +1691,15 @@ folder's owner connects it; the token stays sealed.
   (`X-Hub-Signature-256`, `X-Gitea-Signature`, `X-Forgejo-Signature`, GitLab's *Secret token* `X-Gitlab-Token`,
   Bitbucket's *Secret* `X-Hub-Signature`) triggers the next check at once. The body is
   never trusted, polling stays the source of truth.
+- **Build state** (2.151.0): every linked commit and merged pull request knows the **first version tag** that holds it
+  (a new tag is compared once with the version before it; tags are versions like `v2.151.0`, sorted by number), and
+  branches named after a task are compared with the default branch. *Code* starts with one line: *In version 2.151.0*,
+  *In main, not released yet* or *Built, not in main yet* with the branch and how many commits it is ahead. The list's
+  **version field** (a text field named *Package*, *Version*, *Release* or *Target version*, or the one picked in the
+  repository dialog; *Off* turns it off) is checked against the tags: a task that is still open although a tag with
+  exactly its version exists gets a hint at the task and a small mark in its row. Values like `2.46c` are not checked.
+  Agents read it as `build` (`get_task`, `GET /api/v1/tasks/{id}`) and per list with `list_build_status`
+  (`GET /api/v1/lists/{id}/build-status`).
 - **Releases** (2.18.0): a new tag like `v2.18.0` completes the open milestone "2.18.0" or "Release 2.18.0" of the list
   once, with *Undo*; tags that existed before the connection never do.
 - **Error reports** (2.18.0): *Error reports > Turn on* gives the list a secret URL (shown once; *New URL*, *Turn off*).
