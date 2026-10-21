@@ -7,11 +7,12 @@ minor one, anything that needs action on your side a major one.
 
 ## [2.147.2] - 2026-10-21
 
-Bundle of the packages 2.144.5 to 2.144.11 and 2.147.2 (leftovers, office fixes: time to the invoice, invoice from a quotation, test-phase deletion, office PDF numbers, trial documents, cash book; phone-test fixes of 2.143). The version number is set when it is pushed.
+Bundle of the packages 2.144.5 to 2.144.11, 2.147.2 and #2603 (leftovers, office fixes: time to the invoice, invoice from a quotation, test-phase deletion, office PDF numbers, trial documents, cash book; phone-test fixes of 2.143). The version number is set when it is pushed.
 
 ### Added
 - Time entries are billable or not (default billable). "Invoice from time" takes only open billable hours and binds them to the draft as billed; the same hours never land on two invoices, billed entries are locked (only the note stays editable). Deleting the draft frees them again; on a cancelled invoice the office admin frees them with "Release the time again". Works the same in a personal office without an organisation (#2053).
 - Office: trial documents. Creating a quotation or an invoice offers *Just to try*: such a document gets its own number series (TEST-001, ...), a large SAMPLE watermark (MUSTER in German) on every page and never an e-invoice; real number series stay gapless. Invoices, credit notes, reminders, delivery notes and documents made from a trial document are trial documents too. They never go into bookkeeping, VAT returns, DATEV and accounting exports, cash flow, reports, dunning, bank matching, the cash book, recurring invoices, the client portal or webhooks. An admin (a person without an organisation in their private space) deletes them at any time - one by one or all at once - and billed receipts and trip items become free again. The list marks them *Trial* and filters by them; the first quotation and the first invoice of an office area point to the trial mode once (#2576).
+- Office (test phase): an admin can delete a finalised or sent invoice after typing its number; credit notes and reminders of it, payments and bank matches go with it, billed time is free again, cash book entries only on request; the number stays a gap in the office log (#2603).
 
 ### Changed
 - Approval cards in comments are decided only by the list's managers, the assignee or an admin; others see who decides (#2001).
