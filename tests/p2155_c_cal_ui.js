@@ -36,7 +36,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     change(w, md.querySelector('#ev-rep'), '__custom');
     return until(() => d.querySelector('.modal.crrmodal'));
   };
-  const saved = async title => until(async () => (await call('GET', `/api/events?from=${day(-1)}&to=${day(400)}`)).items.find(x => x.title === title));
+  const saved = async title => until(async () => (await call('GET', `/api/events?from=${day(-1)}&to=${day(60)}`)).items.find(x => x.title === title));
   let md = await newEvent('Club night');
   check([...md.querySelectorAll('#ev-rep option')].some(o => o.value === '__custom' && /Custom/.test(o.textContent)), 'the Repeat list has "Custom…"');
   let cm = await openCustom(md);
