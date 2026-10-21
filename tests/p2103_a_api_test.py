@@ -34,6 +34,7 @@ H = {"X-Requested-With": "kalmido"}
 FAILS, OKS = [], [0]
 FEAT = "cal,comments,collab,fields,events,files,time,office,wiki,clients"
 O = "/api/office"
+KEYENV = " -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY=" + "A" * 43 + "="
 
 
 def check(cond, what):
@@ -97,7 +98,8 @@ def run_prune(purge):
 
 
 if os.environ.get("P2103A_NOSTART") != "1":
-    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_INSTANCE_MODE=workspaces")
+    # 2.152.0 (#2167, review A4): with the server key (the organisation export needs it)
+    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_INSTANCE_MODE=workspaces" + KEYENV)
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
     time.sleep(0.8)
@@ -176,12 +178,14 @@ check(PR in orgs and orgs[PR]["retain_until"] == "2036-12-31" and orgs[PR]["reti
 check(all(w.get("id") != PR for w in (Bo.get(B + "/api/me").json().get("workspaces") or [])), "bob: not among his workspaces")
 check(Bo.get(B + f"/api/orgs/{PR}/export").status_code in (403, 404), "bob: no export of it")
 check(Bo.get(B + "/api/admin/orgs").status_code == 403, "bob: no admin list")
-check(A.get(B + f"/api/orgs/{PR}/export").ok, "instance admin: the export of the retired office is reachable")
+# 2.152.0 (#2164, review A4): the retired office of a deleted person is private: no instance admin exports it
+check(A.get(B + f"/api/orgs/{PR}/export").status_code in (403, 404) and A.post(B + f"/api/orgs/{PR}/export").status_code in (403, 404),
+      "instance admin: no export of the retired office of a deleted person")
 r = A.delete(B + f"/api/admin/orgs/{PR}?confirm=1")
 check(r.status_code == 409 and "2036-12-31" in r.text, "retired: not deleted before the period ends " + r.text[:160])
 check(A.patch(B + f"/api/admin/orgs/{PR}", json={"name": "Taken over"}).status_code == 409, "retired: no change (read only)")
 di = A.get(B + f"/api/admin/orgs/{PR}/delete-info").json()
-check(di.get("retired") is True and di.get("kept_until") == "2036-12-31" and di.get("can_export") is True, f"delete-info of the retired office {di}")
+check(di.get("retired") is True and di.get("kept_until") == "2036-12-31" and di.get("can_export") is False, f"delete-info of the retired office {di}")  # 2.152.0 (#2164): review A4
 r = A.put(B + f"/api/orgs/{PR}/members", json={"email": "bob@example.com", "role": "member"})
 check(r.status_code in (403, 404), "retired: nobody can be added as a member " + str(r.status_code))
 
@@ -272,6 +276,19 @@ check(all(w.get("id") != GAM for w in (Bo.get(B + "/api/me").json().get("workspa
 check(Bo.patch(B + "/api/settings", json={"workspace": f"org:{GAM}"}).status_code in (200, 400, 403, 404)
       and Bo.get(B + O + "/settings").json().get("org_id") != GAM, "bob cannot open Gamma's office")
 
+# 2.152.0 (#2167, review A4): the instance admin (no member) exports the retired organisation and downloads the file
+check(A.get(B + f"/api/admin/orgs/{GAM}/delete-info").json().get("can_export") is True, "Gamma retired: delete-info offers the export")
+r = A.post(B + f"/api/orgs/{GAM}/export")
+check(r.status_code == 202, f"Gamma retired: the instance admin starts the export {r.status_code} {r.text[:160]}")
+for _ in range(480):
+    if A.get(B + f"/api/orgs/{GAM}/export").json().get("state") != "running":
+        break
+    time.sleep(0.25)
+r = A.get(B + f"/api/orgs/{GAM}/export/file")
+check(r.ok and r.content[:8] == b"KALMIDO-", f"Gamma retired: the download works (logged in the office log) {r.status_code} {r.content[:80]}")
+if not r.ok:
+    app_log()
+
 # ---- the retention run after the period (backdated): counts with the switch off, deletes with it on
 sql("UPDATE orgs SET retain_until='2020-12-31' WHERE id=?", (GAM,), write=True)
 sql("UPDATE office_docs SET date='2010-05-01' WHERE id=?", (GDOC,), write=True)
@@ -296,7 +313,7 @@ def booked(s, ws, name):
 
 
 if os.environ.get("P2103A_NOSTART") != "1":
-    env = dict(os.environ, KEEP="1", EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_HOSTED=1")
+    env = dict(os.environ, KEEP="1", EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_HOSTED=1" + KEYENV)
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
     time.sleep(0.8)
