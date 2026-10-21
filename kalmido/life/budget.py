@@ -29,6 +29,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.access import Denied, health_hidden, list_role, vis_sql, WRITE_ROLES
 from ..core import orgcrypt as oc
 from ..core import csvimport as cx  # 2.140.0 B (#2134): the shared statement reader
+from ..core import stmtfiles as sf  # 2.146.0 C (#2455): several files / a ZIP in one import
 from ..personal.timetrack import BadInput
 
 BUD_TABLES = ("budget_cats", "budget_recurring", "budget_entries")
@@ -36,6 +37,11 @@ BUD_AMOUNT_MAX = Decimal("10000000")
 BUD_TITLE_MAX, BUD_NOTE_MAX, BUD_CP_MAX, BUD_CAT_MAX = 200, 1000, 200, 60
 BUD_CATS_MAX, BUD_REC_MAX, BUD_FILES_MAX = 100, 500, 20
 BUD_CSV_MAX, BUD_CSV_ROWS = 2 * 1024 * 1024, 3000
+# 2.146.0 C (#2455): one import reads up to BUD_ROWS_MAX rows (several files / a ZIP, like the office's BNK_ROWS_MAX); the
+# app takes them over in parts of at most BUD_CSV_ROWS rows per request, all under one import run (BUD_RUNS remembered)
+BUD_ROWS_MAX, BUD_RUNS = 20000, 20
+BUD_RUN_RE = re.compile(r"^[0-9a-f]{16}$")
+IBAN_RE = cx.IBAN_RE
 BUD_PER = {"month": 1, "quarter": 3, "year": 12}
 BUD_KINDS = ("out", "in")
 BUD_SOURCES = ("manual", "csv", "recurring")
@@ -461,8 +467,9 @@ def _booked(c, rid, month, but=None):
     return bool(r) and r[0] != but
 
 
-def entry_insert(c, uid, lid, v, source):
-    """Inserts checked values v (plain) -> the new id. 409 when the template v.recurring_id is booked in that month."""
+def entry_insert(c, uid, lid, v, source, imp=None):
+    """Inserts checked values v (plain) -> the new id. 409 when the template v.recurring_id is booked in that month.
+    2.146.0 C (#2455): imp = {import_run, rkeys, ikey} of an imported row."""
     if v["recurring_id"] and _booked(c, v["recurring_id"], v["rmonth"]):
         raise Denied(409, tr("This item is already booked in this month"))
     sid0 = bud_sid(c, lid)
@@ -470,6 +477,13 @@ def entry_insert(c, uid, lid, v, source):
     ts = _ts()
     try:
         with c.savepoint():
+            if imp:  # 2.146.0 C (#2455): the import run and the keys of the duplicate check
+                return insert_id(c, """INSERT INTO budget_entries(list_id,day,amount,kind,title,note,counterpart,cat_id,recurring_id,rmonth,source,
+                                                         dkey,sid,created_by,created_at,updated_at,import_run,rkeys,ikey)
+                                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                 (lid, v["day"], enc["amount"], v["kind"], enc["title"], enc["note"], enc["counterpart"], v["cat_id"], v["recurring_id"],
+                                  v["rmonth"], source, bud_dkey(c, lid, sid, v["day"], v["amount"], v["kind"], v["title"]), sid, uid, ts, ts,
+                                  imp["import_run"], imp["rkeys"], imp["ikey"]))
             return insert_id(c, """INSERT INTO budget_entries(list_id,day,amount,kind,title,note,counterpart,cat_id,recurring_id,rmonth,source,
                                                      dkey,sid,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                              (lid, v["day"], enc["amount"], v["kind"], enc["title"], enc["note"], enc["counterpart"], v["cat_id"], v["recurring_id"],
@@ -905,24 +919,26 @@ _mapping = cx.csv_mapping
 
 
 def bud_csv_table(text):
-    """CSV text -> (delimiter, header, rows) (core/csvimport.csv_table)."""
-    return cx.csv_table(text, BUD_CSV_ROWS)
+    """CSV text -> (delimiter, header, rows) (core/csvimport.csv_table); 2.146.0 C (#2455): up to BUD_ROWS_MAX rows."""
+    return cx.csv_table(text, BUD_ROWS_MAX)
 
 
 def _row_of(r, m):
-    """One CSV row with mapping m -> {day, amount, kind, title, counterpart, error}."""
+    """One CSV row with mapping m -> {day, amount, kind, title, counterpart, error} (2.146.0 C: with the S/H mark)."""
     return cx.csv_row(r, m, BUD_TITLE_MAX, BUD_CP_MAX, BUD_AMOUNT_MAX)
 
 
 def _camt_rows(text):
     """2.140.0 B (#2134): a CAMT.052 / .053 statement -> budget rows like _row_of (text = purpose, else the counterpart).
-    The budget has no currency of its own: a booking in another currency than most of the file is refused."""
+    The budget has no currency of its own: a booking in another currency than most of the file is refused.
+    2.146.0 C (#2469): + pending (a CAMT.052 entry not booked yet), iban, ref (AcctSvcrRef), e2e (EndToEndId)."""
     rows = cx.camt_rows(text)
     curs = [r["currency"] for r in rows if r["currency"]]
     main = max(set(curs), key=curs.count) if curs else ""
     out = []
     for r in rows:
-        x = {"day": r["day"], "amount": None, "kind": "out", "title": "", "counterpart": (r["counterpart"] or "")[:BUD_CP_MAX], "error": r["error"]}
+        x = {"day": r["day"], "amount": None, "kind": "out", "title": "", "counterpart": (r["counterpart"] or "")[:BUD_CP_MAX], "error": r["error"],
+             "pending": r["pending"], "iban": r["iban"], "ref": r["svc_ref"], "e2e": r["e2e"]}
         x["title"] = re.sub(r"\s+", " ", r["purpose"] or r["counterpart"] or "").strip()[:BUD_TITLE_MAX]
         a = r["amount"]
         if a is not None:
@@ -934,8 +950,23 @@ def _camt_rows(text):
         elif x["error"] is None and not x["title"]:
             x["error"] = tr("The row has no text")
         out.append(x)
-    if len(out) > BUD_CSV_ROWS:
-        raise BadInput(tr("At most {0} rows per import", BUD_CSV_ROWS))
+    if len(out) > BUD_ROWS_MAX:
+        raise BadInput(tr("At most {0} rows per import", BUD_ROWS_MAX))
+    return out
+
+
+def _csv_rows(text, m):
+    """2.146.0 C (#2455): a CSV file with mapping m -> budget rows (+ iban of the counterpart's IBAN column)."""
+    _d, header, body = bud_csv_table(text)
+    m = _mapping(m, len(header))
+    if len(body) > BUD_ROWS_MAX:
+        raise BadInput(tr("At most {0} rows per import", BUD_ROWS_MAX))
+    ic = cx.csv_iban_col(header)
+    out = []
+    for r in body:
+        x = _row_of(r, m)
+        iban = (r[ic] if ic is not None and ic < len(r) else "").replace(" ", "").upper()
+        out.append({**x, "pending": False, "iban": iban if IBAN_RE.match(iban) else None, "ref": None, "e2e": None})
     return out
 
 
@@ -955,36 +986,6 @@ def _meta_put(c, lid, hk, mapping):
         m.pop(next(iter(m)))
     c.execute("INSERT INTO budget_meta(list_id, mappings, updated_at) VALUES(?,?,?) ON CONFLICT(list_id) DO UPDATE SET "
               "mappings=excluded.mappings, updated_at=excluded.updated_at", (lid, json.dumps(m, separators=(",", ":")), _ts()))
-
-
-def _row_of(r, m):
-    """One CSV row with mapping m -> {day, amount, kind, title, counterpart, error}."""
-    def col(k):
-        i = m.get(k)
-        return r[i] if i is not None and i < len(r) else ""
-    out = {"day": None, "amount": None, "kind": "out", "title": "", "counterpart": col("counterpart")[:BUD_CP_MAX], "error": None}
-    out["day"] = _parse_day(col("date"), m["date_format"])
-    amt = None
-    if m.get("amount") is not None:
-        amt = _parse_amount(col("amount"), m["decimal"])
-    else:
-        a_in = _parse_amount(col("amount_in"), m["decimal"]) if m.get("amount_in") is not None else None
-        a_out = _parse_amount(col("amount_out"), m["decimal"]) if m.get("amount_out") is not None else None
-        if a_in:
-            amt = abs(a_in)
-        elif a_out:
-            amt = -abs(a_out)
-    title = (col("title") or col("counterpart")).strip()
-    out["title"] = re.sub(r"\s+", " ", title)[:BUD_TITLE_MAX]
-    if out["day"] is None:
-        out["error"] = tr("The date cannot be read")
-    elif amt is None or amt == 0 or abs(amt) > BUD_AMOUNT_MAX:
-        out["error"] = tr("The amount cannot be read")
-    elif not out["title"]:
-        out["error"] = tr("The row has no text")
-    if amt is not None and amt != 0:
-        out["amount"], out["kind"] = _f(abs(amt)), "out" if amt < 0 else "in"
-    return out
 
 
 def _suggest_maps(c, lid):
@@ -1008,14 +1009,6 @@ def _dkey_counts(c, lid):
     return counts, sids
 
 
-def _is_dup(c, lid, row, counts, sids):
-    """True (and one match used up) when an equal entry exists: two equal rows of one file need two existing ones."""
-    for s in sids | {bud_sid(c, lid)}:
-        if cx.csv_dup_take(counts, bud_dkey(c, lid, s, row["day"], row["amount"], row["kind"], row["title"])):
-            return True
-    return False
-
-
 def _open_recs(c, lid):
     """{month: [template rows due and not booked]} -- computed per month when asked."""
     recs = _rec_rows(c, lid)
@@ -1030,54 +1023,199 @@ def _open_recs(c, lid):
     return get
 
 
-def bud_import_parse(c, uid, lid, b):
-    """{text, mapping?}: without a mapping the columns, a sample and a guess (the remembered mapping of this header
-    first, then a known bank layout); with one the checked rows (suggested category / template, duplicates).
-    2.140.0 B (#2134): a CAMT.052 / .053 statement (like the office's bank import) -> the checked rows at once (fmt camt)."""
+def _dup_key():
+    sk = SECRET_KEY or b""
+    return hashlib.sha256(b"kalmido-budget-ref|" + (sk.encode() if isinstance(sk, str) else bytes(sk))).digest()
+
+
+def bud_ikey(lid, day, amount, kind, iban):
+    """2.146.0 C (#2455): the duplicate key without the text -- day + amount + kind + the counterpart's IBAN (so a CSV and a
+    CAMT file of the same account find each other although their texts differ); only for rows with an IBAN. Keyed with a
+    key from the server key (not the space key: it stays valid while a list is resealed), the list id is part of it."""
+    if not iban:
+        return ""
+    msg = f"i|{int(lid)}|{day}|{_amt_s(amount)}|{kind}|{iban}".encode()
+    return hmac.new(_dup_key(), msg, hashlib.sha256).hexdigest()[:40]
+
+
+def bud_rkeys(lid, amount, kind, ref, e2e):
+    """2.146.0 C (#2469): the keyed reference keys of a row (core/csvimport.csv_ref_parts), space separated."""
+    a = Decimal(str(amount)) if amount is not None else None
+    parts = cx.csv_ref_parts({"amount": None if a is None else (a if kind == "in" else -a), "svc_ref": ref, "e2e": e2e})
+    return " ".join(hmac.new(_dup_key(), f"r|{int(lid)}|{p}".encode(), hashlib.sha256).hexdigest()[:40] for p in parts)
+
+
+class _Dups:
+    """2.146.0 C (#2455 #2469): the duplicate check of one import (preview and commit alike). A row is there already when
+    one of its references is in the list or in an EARLIER file of this import (a pending entry booked later with another
+    day or text is found so), else by day + amount + counterpart IBAN, else by the old key with the text (dkey; entries of
+    earlier versions only have that one, so it stays checked). Rows of one file are distinct: two equal rows need two
+    existing ones; across files the larger number counts, never the sum (like the office's import, 2.144.1)."""
+
+    def __init__(self, c, lid):
+        self.c, self.lid = c, lid
+        self.dk, self.sids = _dkey_counts(c, lid)
+        self.sid = bud_sid(c, lid)
+        self.sids |= {self.sid}
+        self.ik, self.refs = {}, set()
+        for r in c.execute("SELECT ikey, rkeys FROM budget_entries WHERE list_id=?", (lid,)):
+            if r[0]:
+                self.ik[r[0]] = self.ik.get(r[0], 0) + 1
+            if r[1]:
+                self.refs.update(r[1].split())
+        self.fi = None
+        self._start()
+
+    def _start(self):
+        self.l_dk, self.l_ik, self.s_dk, self.s_ik, self.s_refs = dict(self.dk), dict(self.ik), {}, {}, set()
+
+    def _end(self):
+        for mine, have in ((self.s_dk, self.dk), (self.s_ik, self.ik)):
+            for k, n in mine.items():
+                have[k] = max(have.get(k, 0), n)
+        self.refs |= self.s_refs
+
+    def check(self, x, fi=0):
+        """x: day, amount, kind, title, iban?, rkeys (str) -> True when it is there already; the row counts as seen."""
+        if fi != self.fi:
+            if self.fi is not None:
+                self._end()
+            self.fi = fi
+            self._start()
+        rk, ik = (x.get("rkeys") or "").split(), x.get("ikey") or ""
+        dks = [bud_dkey(self.c, self.lid, s, x["day"], x["amount"], x["kind"], x["title"]) for s in self.sids]
+        dup = any(k in self.refs for k in rk) or bool(ik and cx.csv_dup_take(self.l_ik, ik)) or any(cx.csv_dup_take(self.l_dk, k) for k in dks)
+        self.s_refs.update(rk)
+        cur = bud_dkey(self.c, self.lid, self.sid, x["day"], x["amount"], x["kind"], x["title"])
+        self.s_dk[cur] = self.s_dk.get(cur, 0) + 1
+        if ik:
+            self.s_ik[ik] = self.s_ik.get(ik, 0) + 1
+        return dup
+
+
+def _fail(fs):
+    return BadInput(fs.errors[0]["error"] if len(fs.errors) == 1 else
+                    "; ".join(f"{e['file']}: {e['error']}" for e in fs.errors[:5]) if fs.errors else tr("No statement found in the files"))
+
+
+def bud_import_parse(c, uid, lid, b, fs=None):
+    """{text, mapping?} or the uploads of the request (2.146.0 C #2455: several files / a ZIP, core/stmtfiles): without a
+    mapping the columns, a sample and a guess (the remembered mapping of this header first, then a known bank layout); with
+    one the checked rows (suggested category / template, duplicates). 2.140.0 B (#2134): a CAMT.052 / .053 statement (like
+    the office's bank import) -> the checked rows at once (fmt camt). 2.146.0 C (#2469): a pending CAMT.052 entry comes
+    with pending (shown apart, never taken over); camt052 = a day report was read (the dialog recommends CAMT.053). Every
+    CSV file of one import needs the same columns. Rows carry fi + file (several files: one list by day)."""
     bud_need_on(c, uid)
     bud_need_list(c, uid, lid, True)
-    text = b.get("text")
-    if isinstance(text, str) and cx.camt_is(text):
-        cx.csv_decode(text)  # the size limit
-        parsed, fmt = _camt_rows(text), "camt"
-    else:
-        d, header, body = bud_csv_table(text)
-        if b.get("mapping") is None:
-            g_ = _meta(c, lid).get(_hkey(header)) or _guess(header, body)
-            return {"fmt": "csv", "columns": header, "sample": body[:8], "delimiter": d, "guess": g_}
-        m = _mapping(b["mapping"], len(header))
-        if len(body) > BUD_CSV_ROWS:
-            raise BadInput(tr("At most {0} rows per import", BUD_CSV_ROWS))
-        parsed, fmt = [_row_of(r, m) for r in body], "csv"
+    fs = fs or sf.stmt_uploads(b)
+    n_files = len(fs.files) + len(fs.errors)
+    parts = []
+    for f in fs.files:
+        if cx.camt_is(f["text"]):
+            parts.append({**f, "fmt": "camt"})
+        elif sf.is_mt940(f["text"]):
+            fs.errors.append({"file": f["name"], "error": tr("MT940 / MT942 is not read; please export CAMT.053 (XML) from your online banking")})
+        else:
+            parts.append({**f, "fmt": "csv"})
+    if not parts:
+        raise _fail(fs)
+    csvs = [p for p in parts if p["fmt"] == "csv"]
+    first = None
+    for p in csvs:
+        try:
+            d, header, sample = bud_csv_table(p["text"])
+        except BadInput as x:
+            if len(parts) == 1:
+                raise
+            p["error"] = x.args[0] if x.args else tr("The file cannot be read")
+            continue
+        if first is None:
+            first = (d, header, sample)
+        elif _hkey(header) != _hkey(first[1]):
+            raise BadInput(tr("CSV files with different columns: please import them one by one"))
+    info = {"files": n_files, "file_errors": fs.errors, "skipped_files": fs.skipped[:100], "label": ", ".join(fs.labels)[:200]}
+    if first is not None and b.get("mapping") is None:
+        d, header, sample = first
+        g_ = _meta(c, lid).get(_hkey(header)) or _guess(header, sample)
+        return {"fmt": "csv", "columns": header, "sample": sample[:8], "delimiter": d, "guess": g_, **info}
+    parsed = []
+    for fi, p in enumerate(parts):
+        if p.get("error"):
+            fs.errors.append({"file": p["name"], "error": p["error"]})
+            continue
+        try:
+            got = _camt_rows(p["text"]) if p["fmt"] == "camt" else _csv_rows(p["text"], b["mapping"])
+        except BadInput as x:
+            if len(parts) == 1:
+                raise
+            fs.errors.append({"file": p["name"], "error": x.args[0] if x.args else tr("The file cannot be read")})
+            p["error"] = True
+            continue
+        for n, x in enumerate(got, 1):
+            x["n"], x["fi"], x["file"] = n, fi, p["name"]
+        parsed += got
+        if len(parsed) > BUD_ROWS_MAX:
+            raise BadInput(tr("At most {0} rows per import", BUD_ROWS_MAX))
+    ok_parts = [p for p in parts if not p.get("error")]
+    if not ok_parts:
+        raise _fail(fs)
     by_cp, by_title = _suggest_maps(c, lid)
-    counts, sids = _dkey_counts(c, lid)
+    dups = _Dups(c, lid)
     open_for = _open_recs(c, lid)
     used_rec = set()
-    rows = []
-    for n, x in enumerate(parsed, 1):
-        x["n"] = n
+    for x in parsed:
         x["cat_id"] = x["recurring_id"] = None
         x["dup"] = False
-        if not x["error"]:
-            x["cat_id"] = by_cp.get(_norm(x["counterpart"])) if x["counterpart"] else None
-            if x["cat_id"] is None:
-                x["cat_id"] = by_title.get(_norm(x["title"]))
-            x["dup"] = _is_dup(c, lid, x, counts, sids)
-            if not x["dup"]:
-                for rr in open_for(x["day"][:7]):
-                    if rr["id"] not in used_rec and rr["kind"] == x["kind"] and _num(rr["amount"]) == Decimal(str(x["amount"])).quantize(Decimal("0.01")):
-                        x["recurring_id"] = rr["id"]
-                        used_rec.add(rr["id"])
-                        x["cat_id"] = x["cat_id"] or rr["cat_id"]
-                        break
-        rows.append(x)
-    return {"fmt": fmt, "rows": rows, "skipped": sum(1 for x in rows if x["error"])}
+        if x["error"] or x["pending"]:
+            continue
+        x["cat_id"] = by_cp.get(_norm(x["counterpart"])) if x["counterpart"] else None
+        if x["cat_id"] is None:
+            x["cat_id"] = by_title.get(_norm(x["title"]))
+        x["dup"] = dups.check({**x, "rkeys": bud_rkeys(lid, x["amount"], x["kind"], x["ref"], x["e2e"]),
+                               "ikey": bud_ikey(lid, x["day"], x["amount"], x["kind"], x["iban"])}, x["fi"])
+        if not x["dup"]:
+            for rr in open_for(x["day"][:7]):
+                if rr["id"] not in used_rec and rr["kind"] == x["kind"] and _num(rr["amount"]) == Decimal(str(x["amount"])).quantize(Decimal("0.01")):
+                    x["recurring_id"] = rr["id"]
+                    used_rec.add(rr["id"])
+                    x["cat_id"] = x["cat_id"] or rr["cat_id"]
+                    break
+    if len(ok_parts) > 1:  # one list by day: day, then file, then row (rows without a day at the end)
+        parsed.sort(key=lambda r: (r["day"] is None, r["day"] or "", r["fi"], r["n"]))
+    kinds = {p["fmt"] for p in ok_parts}
+    return {"fmt": kinds.pop() if len(kinds) == 1 else "mixed", "rows": parsed, "skipped": sum(1 for x in parsed if x["error"]),
+            "pending": sum(1 for x in parsed if x["pending"] and not x["error"]),
+            "camt052": any(p["fmt"] == "camt" and cx.camt_version(p["text"]) == "052" for p in ok_parts), **info}
+
+
+def _runs(c, lid):
+    r = c.execute("SELECT runs FROM budget_meta WHERE list_id=?", (lid,)).fetchone()
+    try:
+        v = json.loads(r[0]) if r and r[0] else []
+    except ValueError:
+        v = []
+    return [x for x in v if isinstance(x, dict) and BUD_RUN_RE.match(str(x.get("id") or ""))] if isinstance(v, list) else []
+
+
+def _runs_put(c, lid, runs):
+    c.execute("INSERT INTO budget_meta(list_id, runs, updated_at) VALUES(?,?,?) ON CONFLICT(list_id) DO UPDATE SET "
+              "runs=excluded.runs, updated_at=excluded.updated_at", (lid, json.dumps(runs[-BUD_RUNS:], separators=(",", ":")), _ts()))
+
+
+def _ref_txt(v):
+    if v in (None, ""):
+        return None
+    if not isinstance(v, str):
+        raise BadInput(tr("Invalid value: {0}", "ref"))
+    return cx.csv_clean(v, 120) or None
 
 
 def bud_import_commit(c, uid, lid, b):
-    """{rows: [{day, amount, kind, title, counterpart?, cat_id?, recurring_id?}], mapping?, columns?} -> {created, skipped_dup}.
-    Everything is checked again; an equal entry of the list is never created twice; a template link only when that
-    template is due and still open in the row's month."""
+    """{rows: [{day, amount, kind, title, counterpart?, cat_id?, recurring_id?, iban?, ref?, e2e?, fi?}], mapping?, columns?,
+    run?, label?, fmt?} -> {created, skipped_dup, run}. Everything is checked again; an equal entry of the list is never
+    created twice; a template link only when that template is due and still open in the row's month.
+    2.146.0 C (#2455): every import is one run (an id, remembered in budget_meta.runs with its label and count): the app
+    sends a long import in parts with the run of the first part; rows of a pending CAMT entry are refused."""
     bud_need_on(c, uid)
     bud_need_list(c, uid, lid, True)
     rows = b.get("rows")
@@ -1085,33 +1223,112 @@ def bud_import_commit(c, uid, lid, b):
         raise BadInput(tr("Nothing to import"))
     if len(rows) > BUD_CSV_ROWS:
         raise BadInput(tr("At most {0} rows per import", BUD_CSV_ROWS))
-    counts, sids = _dkey_counts(c, lid)
+    runs = _runs(c, lid)
+    run = b.get("run")
+    if run is not None:
+        if not isinstance(run, str) or not any(x["id"] == run and not x.get("undone_at") for x in runs):
+            raise BadInput(tr("Invalid value: {0}", "run"))
     open_for = _open_recs(c, lid)
     used_rec = set()
     vals = []
     for x in rows:
         if not isinstance(x, dict):
             raise BadInput(tr("Invalid value: {0}", "rows"))
+        if x.get("pending"):
+            raise BadInput(tr("Pending bookings are not taken over"))
         v = {"day": _day(x.get("day")), "amount": _amt_s(_amt(x.get("amount"))), "kind": _kind(x.get("kind")),
              "title": _txt(x.get("title"), BUD_TITLE_MAX, "title", need=True), "note": "",
              "counterpart": _txt(x.get("counterpart"), BUD_CP_MAX, "counterpart"), "cat_id": _cat_of(c, lid, x.get("cat_id")),
              "recurring_id": None, "rmonth": ""}
+        iban = x.get("iban")
+        iban = iban.replace(" ", "").upper() if isinstance(iban, str) else ""
+        fi = x.get("fi")
+        imp = {"rkeys": bud_rkeys(lid, v["amount"], v["kind"], _ref_txt(x.get("ref")), _ref_txt(x.get("e2e"))),
+               "ikey": bud_ikey(lid, v["day"], v["amount"], v["kind"], iban if IBAN_RE.match(iban) else None),
+               "fi": fi if isinstance(fi, int) and not isinstance(fi, bool) and 0 <= fi < 10000 else 0}
         rr = _rec_of(c, lid, x.get("recurring_id"))
         if rr and rr["id"] not in used_rec and any(o["id"] == rr["id"] for o in open_for(v["day"][:7])):
             v["recurring_id"], v["rmonth"] = rr["id"], v["day"][:7]
             used_rec.add(rr["id"])
-        vals.append(v)
+        vals.append((v, imp))
+    if run is None:
+        import secrets  # noqa: PLC0415
+        run = secrets.token_hex(8)
+        fmt = b.get("fmt") if b.get("fmt") in ("csv", "camt", "mixed") else "csv"
+        runs.append({"id": run, "at": iso(now_utc()), "label": cx.csv_clean(b.get("label"), 200), "fmt": fmt, "count": 0, "by": uid})
+    dups = _Dups(c, lid)
     created = dup = 0
-    for v in vals:
-        if _is_dup(c, lid, v, counts, sids):
+    for v, imp in sorted(vals, key=lambda t: t[1]["fi"]):  # the rows of one file together (stable: the app's order inside)
+        if dups.check({**v, **imp}, imp["fi"]):
             dup += 1
             continue
-        entry_insert(c, uid, lid, v, "csv")
+        entry_insert(c, uid, lid, v, "csv", {"import_run": run, "rkeys": imp["rkeys"], "ikey": imp["ikey"]})
         created += 1
+    for x in runs:
+        if x["id"] == run:
+            x["count"] = int(x.get("count") or 0) + created
+    _runs_put(c, lid, runs)
     cols = b.get("columns")
     if b.get("mapping") is not None and isinstance(cols, list) and 0 < len(cols) <= 200 and all(isinstance(x, str) for x in cols):
         _meta_put(c, lid, _hkey([x[:80] for x in cols]), _mapping(b["mapping"], len(cols)))
-    return {"created": created, "skipped_dup": dup}
+    return {"created": created, "skipped_dup": dup, "run": run}
+
+
+def _run_entries(c, lid, run):
+    """The entries of an import run still there: (untouched ids, [edited entries]) -- edited = changed after the import
+    or with a receipt."""
+    rows = c.execute("SELECT * FROM budget_entries WHERE list_id=? AND import_run=? ORDER BY day, id", (lid, run)).fetchall()
+    with_files = {r[0] for r in c.execute("SELECT DISTINCT entry_id FROM budget_files WHERE list_id=?", (lid,))} if rows else set()
+    plain, edited = [], []
+    for r in rows:
+        if r["updated_at"] != r["created_at"] or r["id"] in with_files:
+            edited.append(r)
+        else:
+            plain.append(r["id"])
+    return plain, edited
+
+
+def bud_import_runs(c, uid, lid):
+    """2.146.0 C (#2455): the list's last import runs, newest first: {id, at, label, fmt, count, left, edited, undone_at}."""
+    bud_need_on(c, uid)
+    bud_need_list(c, uid, lid, True)
+    left = {}
+    for r in c.execute("SELECT import_run, COUNT(*) FROM budget_entries WHERE list_id=? AND import_run<>'' GROUP BY import_run", (lid,)):
+        left[r[0]] = r[1]
+    out = []
+    for x in reversed(_runs(c, lid)):
+        n = left.get(x["id"], 0)
+        out.append({"id": x["id"], "at": x.get("at") or "", "label": x.get("label") or "", "fmt": x.get("fmt") or "csv",
+                    "count": int(x.get("count") or 0), "left": n, "edited": len(_run_entries(c, lid, x["id"])[1]) if n else 0,
+                    "undone_at": x.get("undone_at")})
+    return {"items": out}
+
+
+def bud_import_undo(c, uid, lid, run, b):
+    """2.146.0 C (#2455): takes an import run back -- deletes exactly its entries still there (with their receipts; the budget
+    has no trash: like deleting an entry). Entries changed after the import (or with a receipt) are kept and named,
+    unless edited = "delete" -> ({deleted, kept: [entries]}, file paths to remove after the commit)."""
+    bud_need_on(c, uid)
+    bud_need_list(c, uid, lid, True)
+    if not isinstance(run, str) or not BUD_RUN_RE.match(run):
+        raise Denied(404)
+    runs = _runs(c, lid)
+    it = next((x for x in runs if x["id"] == run), None)
+    if it is None:
+        raise Denied(404)
+    plain, edited = _run_entries(c, lid, run)
+    take = plain + ([r["id"] for r in edited] if b.get("edited") == "delete" else [])
+    kept = [] if b.get("edited") == "delete" else [entry_out(bud_dec(c, "budget_entries", r)) for r in edited]
+    paths = []
+    for i in range(0, len(take), 500):
+        ids = take[i:i + 500]
+        q = ",".join("?" * len(ids))
+        paths += [r[0] for r in c.execute(f"SELECT path FROM budget_files WHERE entry_id IN ({q})", ids)]
+        c.execute(f"DELETE FROM budget_entries WHERE list_id=? AND id IN ({q})", [lid, *ids])
+    if not kept:
+        it["undone_at"] = iso(now_utc())
+    _runs_put(c, lid, runs)
+    return {"deleted": len(take), "kept": kept}, paths
 
 
 # ---------------------------------------------------------------- the person's export

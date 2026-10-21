@@ -356,6 +356,8 @@ check(r.ok and d.get("date") == "2026-06-01" and "date" not in (d.get("auto") or
       f"#1819 documents: a date set by hand drops the mark, the capture date stays ({d.get('auto')})")
 
 Bo.patch(B + "/api/settings", json={"photo_meta_strip": "0"})
+# 2.146.0 (#2452): the same photo again would be a duplicate of D1 (not stored twice) -- D1 goes into the trash first
+check(Bo.delete(B + f"/api/files/nodes/{D1}").ok, "#1819 documents: the first photo into the trash")
 D2 = doc_up(Bo, "kept.jpg", orig)
 d = doc_done(Bo, D2) or {}
 check(d.get("taken_at") == "2026-05-04T13:14:15", "#1819 documents: the capture date also with the setting off")

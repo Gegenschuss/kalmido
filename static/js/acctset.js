@@ -318,7 +318,9 @@ function accountWire(md) {
       if (a === 'org-new') orgModal(null, () => { orgsDraw(md); load().then(render).catch(() => {}); });  // 2.28.0 (#935)
       if (a === 'org-del') {
         const o = (S.orgs || []).find(x => x.id === +b.dataset.oid);
-        if (o && await askConfirm(tr('Delete the organisation “{0}”?', o.name), tr('Only possible while it has no lists. Its members keep their accounts.'), {ok: tr('Delete'), danger: true})) { await api('DELETE', `/api/admin/orgs/${o.id}`); toast(tr('Deleted')); orgsDraw(md); load().then(render).catch(() => {}); }
+        let rx = '';  // 2.146.0 D (#2468): an organisation with records to keep: the retention step first
+        if (o) { const ri = await api('GET', `/api/retention/org/${o.id}`).catch(() => null); if (ri?.needed && !(rx = await rxAsk(ri, o.name))) return; }
+        if (o && await askConfirm(tr('Delete the organisation “{0}”?', o.name), tr('Only possible while it has no lists. Its members keep their accounts.'), {ok: tr('Delete'), danger: true})) { await api('DELETE', `/api/admin/orgs/${o.id}${rx ? '?retention=' + rx : ''}`); toast(tr('Deleted')); orgsDraw(md); load().then(render).catch(() => {}); }
       }
       if (a === 'user-edit') userModal(users.find(u => u.id === +b.dataset.uid), () => { drawUsers(); orgsDraw(md); });
       if (a === 'agent-edit') {
@@ -723,9 +725,13 @@ async function ua8_delete(u) {
   let j; try { j = await api('GET', `/api/users/${u.id}/delete-info`); } catch { return false; }
   const name = u.display_name || u.name || '';
   if (!j.can_delete) return ua8_orgRemove(u, name, j);
+  // 2.146.0 D (#2468): records to keep (the personal office): the retention step first (the server checks it too)
+  let rx = '';
+  if (j.retention?.needed) { rx = await rxAsk(j.retention, name); if (!rx) return false; }
+  const rxq = () => rx ? `retention=${rx}` : '';
   if (!j.lists.length) {
     if (!await askConfirm(tr('Delete user “{0}”?', name), tr('Their basket, habits, filters and focus history are deleted.'), {ok: tr('Delete user'), danger: true})) return false;
-    try { await api('DELETE', '/api/users/' + u.id); } catch { return false; }
+    try { await api('DELETE', '/api/users/' + u.id + (rx ? '?' + rxq() : '')); } catch { return false; }
     return true;
   }
   const shared = j.lists.filter(l => l.shared).length, locked = j.lists.some(l => l.locked && !l.key_alone), cand = j.candidates, foreign = j.lists.some(l => l.foreign);
@@ -759,9 +765,10 @@ async function ua8_delete(u) {
     md.addEventListener('click', async e => {
       const b = e.target.closest('button[data-m]'); if (!b) return;
       if (b.dataset.m === 'close') { md.remove(); return; }
+      if (how() === 'delete' && !rx && j.retention?.needed_along) { rx = await rxAsk(j.retention, name); if (!rx) return; }  // 2.146.0 D: receipts of lists go along
       const q = how() === 'transfer' ? `lists=transfer&to=${+$('#ua8-to', md).value}` : `lists=delete&confirm=${encodeURIComponent($('#ua8-conf', md).value.trim())}`;
       b.disabled = true;
-      try { await api('DELETE', `/api/users/${u.id}?${q}`); } catch { b.disabled = false; return; }
+      try { await api('DELETE', `/api/users/${u.id}?${q}${rx ? '&' + rxq() : ''}`); } catch { b.disabled = false; return; }
       res(true); md.remove();
     });
   });

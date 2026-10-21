@@ -1453,6 +1453,21 @@ fresh; run p21441_a_ui node p21441_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.144.1 part B: bank import - format hint, several files or a ZIP in one import (#2446 #2450)
 fresh; run p21441_b_api "$PY" p21441_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21441_b_ui node p21441_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.146.0 part A: e-invoices received: XRechnung / ZUGFeRD read from XML (#2451)
+fresh; run p2146_a_api "$PY" p2146_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2146_a_ui node p2146_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.146.0 part B: receipts: duplicates, several files / ZIP / pages to one receipt, HEIC photos (#2452 #2453 #2454)
+fresh; run p2146_b_api "$PY" p2146_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2146_b_ui node p2146_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.146.0 part C: household + bank import: debit/credit column, several files / ZIP, undo an import, CAMT.052 pending entries and duplicates by reference (#2455 #2469)
+fresh; run p2146_c_api "$PY" p2146_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2146_c_ui node p2146_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.146.0 part D: retention export before deleting an account / organisation (#2468)
+fresh; run p2146_d_api "$PY" p2146_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2146_d_ui node p2146_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.146.0 part E: legacy import with address columns, CSV and .xls; contacts from several .vcf files or a ZIP (#2456 #2457)
+fresh; run p2146_e_api "$PY" p2146_e_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2146_e_ui node p2146_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.111.0: Buero-Rueckgaengig (a), Termin-Einladungen + Abo-Link (b), Schnellerfassung (c)
 fresh; run p2111_a_api "$PY" p2111_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2111_a_ui node p2111_a_ui.js "$KALMIDO_TEST_DATA"

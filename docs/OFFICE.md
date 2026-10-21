@@ -167,7 +167,11 @@ In the area Packs, every industry pack's card says **Switched on** or **Off** an
   API: `GET|POST /api/office/contracts/<id>/files` (multipart `file`, `date?`, `replace?`),
   `GET|PATCH|DELETE /api/office/contracts/<id>/files/<file id>`, `POST .../<file id>/restore`.
 - **Bookkeeping** (admins, 2.90) - income/expense statement, VAT return figures, tax reserve, receipt photo and tax
-  dates, see below.
+  dates, see below. Since 2.146 the receipt buttons take several files at once (at most 50, also a ZIP or a
+  `winmail.dat`); several photos can be merged into one receipt (the pages of a long till receipt become one PDF). A file
+  that is already there is not stored again (*This file already exists*, Open shows it); a receipt that looks like the
+  same invoice as an older one is marked *Possibly a duplicate of ...* with a link and *No duplicate*. The DATEV export
+  leaves such receipts out unless *Include possibly duplicate receipts* is ticked.
 - **Bank** (admins, 2.90) - bank reconciliation, see below.
 - **Settings** - company name and address lines, contact / register / bank lines (printed in the footer), logo, own letterhead PDF (2.120, see "Own letterhead"),
   brand colour (accent in the print only), document language (de / en), currency (EUR / USD + rate), number scheme with
@@ -383,6 +387,13 @@ where they are used.
   file follow in their category. **Renumber** in the services list does the same for the order shown (one undo step). Excel error values like `#NV` count as empty; `intext` may be `intern`, `extern` or `shooting`; a
   service named "Künstlersozialkasse" becomes a rate in percent (`0.05` -> 5 %). `rawfee` / `producingfee` are always
   read. A table renamed by Excel (`Services_2`) is found too.
+- **Client columns and CSV (2.146.0)**: the clients' address may also stand in columns of their own (company, contact,
+  street, house number, postcode, city, country; German and English headers like `Firma`, `Straße`, `PLZ`, `Ort`, `Land`,
+  `company`, `street`, `zip`, `city`, `country` are found). The preview shows a box "Columns" with a choice per field;
+  changing it reads the file again. Without street / postcode / city columns the one-cell address and its splitter stay.
+  A country name becomes its code, a 5-digit postcode without a country counts as Germany. Instead of the .xlsx a CSV
+  file (UTF-8 or Windows-1252, delimiter found) is read as the sheet `Contacts` (or as `Services` / `Equipment` when the
+  file is named so). Old Excel files (.xls) are not read: the message asks to save them as .xlsx or CSV.
 - **Fill instead of skip (2.47.0)**: a service, device, role or crew row whose name exists already is proposed as "fill":
   only the EMPTY fields of the existing entry take the file's value (empty = no text / no number; for the flags and the
   order also 0), set values are never overwritten. The preview lists the fields per row (`fill`); with nothing to fill
@@ -429,7 +440,8 @@ where they are used.
   again while they still hold the imported value.
 
 Routes (organisation admin; members read the archive and, 2.81.0, correct it): `POST /api/office/legacy/preview` (multipart `file`, stores
-nothing), `POST /api/office/legacy/split` `{address}`, `POST /api/office/legacy/import` `{clients, roles, crew, services, equipment}`
+nothing; 2.146.0: .xlsx or CSV, the optional form field `map` = `{name, contact, address, street, house, zip, city, country: column index}`,
+the answer's `columns` = `{head, map, mode: columns | one}`), `POST /api/office/legacy/split` `{address}`, `POST /api/office/legacy/import` `{clients, roles, crew, services, equipment}`
 (the preview's rows with `action` new / merge / fill / skip and `merge_id`; 2.46.1: `areas` = only these of clients / roles /
 crew / services / equipment, the others are neither written nor checked), `GET /api/office/legacy/runs` (2.46.1: a data run lists its
 `areas` with `count` and `undone_at`), `POST /api/office/legacy/runs/<id>/undo` (2.46.1: `{kinds: [...]}` undoes only these
@@ -747,6 +759,14 @@ is billed net (the input tax stays yours), without a rate or in a small business
 is never billed twice, and Undo takes the positions back while the document is a draft. Agents may suggest amount, currency and VAT
 rate of a receipt as well; you change them in the suggestion card before you accept (Undo brings the old values back).
 
+**Receiving e-invoices (2.146):** XRechnung files (.xml, UBL or CII syntax) and ZUGFeRD / Factur-X PDFs (the XML embedded in
+the PDF) are read as e-invoices - uploaded with **Photograph receipt** or **Add documents**, or attached to a mail to your
+documents' forwarding address (any other .xml in a mail is left out). Date, due date, gross amount, currency and the seller
+(as sender) come from the invoice data instead of the text recognition; invoice number, net, VAT per rate and the VAT rate wait
+in the suggestion line of the receipt. The document says "E-invoice" and offers **Readable view**: the invoice as a plain page
+(seller, recipient, lines, VAT, totals, IBAN) to read, print or save as PDF with the browser. An XML with a DOCTYPE, a broken one
+or one beyond the limits (5 MB, nesting, number of elements) stays an ordinary file.
+
 **Accounts per category (2.121):** with the DATEV export set up, a receipt's sheet shows under the category the account of the
 chart SKR03 or SKR04 (Settings → DATEV) it is booked on - the default the export finds for the category (e.g. Software 4964 /
 6837), or your own. **Change account** sets your own account for this category (empty = the default again; one undo step); the
@@ -785,9 +805,18 @@ invoices and receipts. Kalmido has no bank access: you import the file you downl
   taken back. Amount and account are encrypted at rest.
 - **Which file** (2.144.1): **Import bank statement** first opens the dialog with a short hint: take the XML export
   **CAMT.053, booked transactions** (version V2 or V8 does not matter; only it brings the balance along); a CSV export works
-  too (columns chosen by hand, a balance only with a balance column); do not take pending transactions / CAMT.052 (not
-  booked yet, they would come twice later) or MT940 / MT942 (not read: such a file gets a clear message). The cash flow
-  has the same button next to the balance according to the bank; it opens this dialog and loads the cash flow again.
+  too (columns chosen by hand, a balance only with a balance column); better not CAMT.052 (day reports, see below) and
+  not MT940 / MT942 (not read: such a file gets a clear message). The cash flow has the same button next to the balance
+  according to the bank; it opens this dialog and loads the cash flow again.
+- **CAMT.052 day reports** (2.146): an entry's status (`Sts`, in camt.052.001.08 `Sts/Cd`) is read. Pending entries (PDNG,
+  anything not BOOK) are shown in the preview as "pending – not imported" and are never imported; the booked version comes
+  with a later report. A booking found by its bank reference (`AcctSvcrRef`, else the `EndToEndId`; `NOTPROVIDED` /
+  `NONREF` do not count; always together with the amount) in the office area or in an earlier file of the import counts
+  once, also with another day or text (pending first, booked later). The references are kept as keyed hashes only
+  (`office_bank_tx.rkeys`). When day reports were read the preview recommends the account statement (CAMT.053) for the
+  bookkeeping. CSV: a debit / credit mark column (S/H, Soll/Haben, D/C, -/+) next to an amount without a sign is guessed
+  (also an unnamed column right after the amount, and the Volksbank / Raiffeisenbank layouts); dates also as
+  `DD-MM-YYYY` and `YYYYMMDD`.
 - **Several files or a ZIP** (2.144.1): choose several statements at once, a ZIP file (e.g. one statement per day from the
   bank) or drop them onto the dialog. Everything becomes one preview sorted by day (then file, then row) and one import
   (one **Take back** / undo for all). A ZIP is read in memory only, never unpacked to disk: only `.xml`, `.csv` and `.txt`
@@ -807,7 +836,8 @@ Routes (office admins only; members 403, other areas 404, agents 403): `POST /ap
 Tables `office_bank_imports`, `office_bank_tx`, `office_bank_balances` (2.124, see Database). Both import routes take the JSON body `{text,
 filename?, mapping?, account?}` (one file) or, since 2.144.1, `multipart/form-data` with the field `files` (several, a ZIP
 is opened) and `mapping` (a JSON string) / `account` as form fields; the answer adds `files`, `file_errors [{file, error}]`
-and `skipped_files`, each preview row its `file`. `fmt` of a mixed import is `mixed`.
+and `skipped_files`, each preview row its `file`. `fmt` of a mixed import is `mixed`. Since 2.146 the answers add `pending_count` and `camt052`,
+each row `pending`; the mapping may name `sign` (the column of the debit / credit mark).
 
 ## Tax dates as tasks (2.90)
 
@@ -1712,6 +1742,39 @@ from a half read letterhead.
 Routes: `GET / POST / PUT / DELETE /api/office/letterhead` (state, multipart `file`, `{m1, m2, hide_head, hide_footer}`
 with `m1` / `m2` = `[top, right, bottom, left]` in mm, removal), `POST /api/office/letterhead/restore` (`{file}`: the
 previous file again, the undo) and `GET /api/office/letterhead/preview` (the sample as PDF).
+
+## Retention export before deleting an account or an organisation (2.146.0)
+
+Invoices and receipts must be kept for 8 years, books (cash book, logs, bank statements) for 10 years. The duty lies with
+the person or organisation that issued / received them, not with the server: once an account or an organisation is
+deleted, its records are gone. So before that, download the **retention export**: a readable ZIP (no recovery key needed)
+with
+
+- `invoices/`: every finalised document as its stored PDF (ZUGFeRD with the XML inside) and the XRechnung XML, rendered
+  from the frozen snapshot where an older document has no stored file; the documents, positions, payments, clients and
+  company data as CSV;
+- `receipts/`: the receipts of the documents space with their files (also those in the trash) and `receipts.csv`;
+  `project-receipts/`: the receipt files of lists and projects;
+- `cashbook/`: every cash book as PDF and CSV over its whole time (entries, day closings, change log);
+- `bank/`, `expenses/`, `archive/`, `logs/` (the office log and the change logs, GoBD) as CSV; `office-files/`: every other
+  file of the office folder (archived PDFs, accepted quotations, entertainment bills ...);
+- `00-index.txt` (contents, the retention note, files that could not be read) and `manifest.json` (SHA-256 of every file).
+
+Who downloads it: the person themself for their own records (*Office -> Settings -> Data*, also without an organisation)
+and the admins of an organisation for its office (*Settings -> Organisation*). Nobody else -- an instance admin neither
+(the organisation boundary). The ZIP is streamed, nothing is written to the server's disk; only a download that ran to its
+end counts.
+
+Deleting an account (`DELETE /api/users/<id>`) or an organisation (`DELETE /api/admin/orgs/<id>`) that has such records
+answers `409` (`code: "retention"`) until the request carries `?retention=exported` (a finished export of that account /
+organisation within the last 7 days) or `?retention=waived` (the deleting admin does without it explicitly). Both, and every
+finished export, are noted (table `retention_log`) and land in the security log. The delete dialogs ask for this step
+first. An organisation admin can no longer delete an account whose personal office holds invoices or a cash book (only the
+person can export it; a server admin deletes it after that).
+
+Routes (people only, an API token 403): `GET /api/retention/me`, `GET /api/retention/me/export.zip`,
+`GET /api/retention/org/<id>` (the organisation's admins; an instance admin sees only whether records exist),
+`GET /api/retention/org/<id>/export.zip`.
 
 ## Database
 

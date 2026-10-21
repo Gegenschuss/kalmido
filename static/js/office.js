@@ -424,6 +424,7 @@ function ofcSettingsHtml() {
     ${adm && OFC.info.personal && OFC.info.can_move ? `<h3>${tr('Move into an organisation')}</h3><p class="muted">${tr('Turns this personal office into a new organisation with you as its admin: documents, numbers, settings, master data and your private clients go with it. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-move">${ic('building', 's')} ${tr('Create organisation…')}</button></div>` : ''}
     ${adm && OFC.info.personal && OFC.info.move_orgs?.length ? `<h3>${tr('Transfer into an organisation')}</h3><p class="muted">${tr('Moves documents, clients, master data and files of this personal office into an organisation in which you are an admin. Finalised invoices stay locked and keep their numbers. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-transfer">${ic('building', 's')} ${tr('Transfer into an organisation…')}</button></div>` : ''}
     ${adm && OFC.info.personal && typeof ox_pbBoxHtml === 'function' ? ox_pbBoxHtml(0) : ''}${''/* 2.137.0 A (#2344): export of the personal office */}
+    ${adm && OFC.info.personal && typeof rxBoxHtml === 'function' ? rxBoxHtml('me') : ''}${''/* 2.146.0 D (#2468): the retention export of the own records */}
     </fieldset>
   </form>`;
 }

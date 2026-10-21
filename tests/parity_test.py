@@ -442,6 +442,8 @@ APP_ONLY = [
     # 2.73.0 B (#1473): moving an account between servers: export and import of a person's own data, people only (agents 403)
     ("2.73.0 B (#1473): the account export / import (moving to an own server and back): a person's own data, people only",
      ("* /api/account/export", "* /api/account/import")),
+    ("2.146.0 D (#2468): the retention export before deleting an account / organisation: a person's own records or an "
+     "organisation's admins, people only (an API token 403)", ("* /api/retention",)),
     ("2.42.0 (#828, #909): end-to-end encryption happens in a person's browser (keys, encrypted note / files, the switch of an encrypted DM); "
      "agents see only placeholders (encrypted_note, encrypted files) and never take part in DMs", (
         "* /api/e2e/", "* /api/tasks/{}/enc-note", "=POST /api/tasks/{}/enc-attachments", "=POST /api/team/rooms/{}/e2e")),
@@ -524,6 +526,8 @@ APP_ONLY = [
     # 2.121.0 (#2092): the recognised receipt values are taken over / discarded by people; agents read them with GET /documents/{id}
     ("2.121.0 (#2092): the values the recognition read off a receipt (supplier, VAT, net / gross, invoice number) are taken over or "
      "discarded by people only; agents read them as `extracted` of GET /documents/{id}", ("=POST /api/docs/{}/extracted",)),
+    ("2.146.0 A (#2451): the readable HTML view of a received e-invoice is for people in the browser; agents read the same values "
+     "as `extracted` of GET /documents/{id} and the file itself", ("=GET /api/docs/{}/einvoice",)),
     # 2.121.0 (#2095): the hint on a receipt which cash entries point at it -- part of the cash book, which is office admins only
     # (no agent API for the cash book in 2.121, like the rest of /api/office)
     ("2.121.0 (#2095): the cash book hint on a receipt (office admins only, like the cash book itself)",

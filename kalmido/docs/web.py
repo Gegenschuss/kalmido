@@ -100,12 +100,21 @@ def doc_json(c, m, node, full=False, role=None):
          "tags": S.node_tags(c, m["node_id"]), "folder": folder, "auto": auto, "suggest": out_sug, "review": bool(m["review"]),
          "thumb": bool(m["thumb"]), "task_id": m["task_id"], "asn": m["asn"], "source": m["source"], "created_at": node["created_at"],
          "updated_at": m["updated_at"], "parent_id": node["parent_id"]}
+    if m["dup_of"] and not m["dup_ok"]:  # 2.146.0 B (#2452): an older document that looks like the same invoice
+        from flask import has_request_context
+        from .dups import dup_view
+        dv = dup_view(c, m, me()) if has_request_context() and getattr(g, "user", None) else None
+        if dv:
+            d["duplicate_of"] = dv
     if role:
         d["role"] = role
     if full:
         d["text"] = S.meta_text(c, m)
         from ..receipts.extracted import rx_doc_view
         d["extracted"] = rx_doc_view(c, m)  # 2.121.0 A (#2092): what the recognition read off a receipt (a suggestion)
+        einv = S.meta_json(c, m, "extracted", {}).get("_einv")  # 2.146.0 A (#2451): an e-invoice (its readable view)
+        if isinstance(einv, dict):
+            d["einvoice"] = {k: einv.get(k) for k in ("format", "kind", "source", "number")}
         from ..agents.asstprop import ast_doc_extra
         ast_doc_extra(c, d, m)  # 2.126.1 A (#2123): the summary a person took over from an agent
     return d
@@ -220,7 +229,9 @@ def docs_list():
 
 @app.post("/api/docs")
 def docs_upload():
-    """Multipart files (field "files", several) -> documents in the workspace ws (form field: private | org:<id>)."""
+    """Multipart files (field "files", several) -> documents in the workspace ws (form field: private | org:<id>).
+    2.146.0 B (#2452 #2453): a file whose bytes are already a document of the workspace is not stored again (answer "dups":
+    [{id, name}]); unzip=1 (the receipt upload) takes the PDFs / pictures out of a ZIP or a winmail.dat."""
     from ..admin.hosting import QuotaExceeded
     c = db()
     uid = me()
@@ -229,23 +240,38 @@ def docs_upload():
     files = request.files.getlist("files") or request.files.getlist("file")
     if not files:
         return err(tr("No file"))
-    ids, errors = [], []
+    ids, errors, dups = [], [], []
     from ..files.upsafe import h6d_read
+    from .unpack import doc_unpack
+    unzip = request.form.get("unzip") == "1"
+    src = "share" if request.form.get("source") == "share" else "upload"
     for f in files[:50]:
         data = h6d_read(f)  # 2.86.0 (N22): at most MAX_FILE_MB + 1 bytes in memory (refused in fs_put)
-        try:
-            with c.savepoint():
-                nid = docs_ingest(c, uid, org, f.filename or "document", data, f.mimetype, "share" if request.form.get("source") == "share" else "upload")
-                fs_log_add(c, nid, "upload")
-            ids.append(nid)
-        except QuotaExceeded:
-            errors.append(tr("{0}: no space left in your storage", f.filename or ""))
-        except ValueError as e:
-            errors.append(str(e))
+        parts = doc_unpack(f.filename or "", data) if unzip else None  # 2.146.0 B (#2453)
+        if parts is not None:
+            errors += parts[1]
+            parts = parts[0]
+        else:
+            parts = [(f.filename or "document", data, f.mimetype)]
+        for name, pdata, pmime in parts:
+            info = {}
+            try:
+                with c.savepoint():
+                    nid = docs_ingest(c, uid, org, name, pdata, pmime, src, dedup=True, info=info)
+                    if not info.get("dup"):
+                        fs_log_add(c, nid, "upload")
+                if info.get("dup"):
+                    dups.append({"id": nid, "name": name})
+                elif nid not in ids:
+                    ids.append(nid)
+            except QuotaExceeded:
+                errors.append(tr("{0}: no space left in your storage", name))
+            except ValueError as e:
+                errors.append(str(e))
     bump(c)
     c.commit()
     docs_kick()
-    return jsonify(ids=ids, errors=errors), 201 if ids else 400
+    return jsonify(ids=ids, errors=errors, dups=dups), 201 if ids else (200 if dups else 400)
 
 
 @app.get("/api/docs/<int:nid>")
@@ -393,6 +419,9 @@ def docs_patch(nid):
     e = doc_update(c, nid, d, me())
     if e:
         return e
+    if isinstance(d, dict) and {"amount", "date", "sender"} & set(d):  # 2.146.0 B (#2452): corrected values: look for a duplicate again
+        from .dups import dup_on_done
+        dup_on_done(c, nid, False)
     fs_log_add(c, nid, "edit")
     bump(c)
     c.commit()
@@ -488,6 +517,25 @@ def docs_file(nid):
     fs_log_add(c, nid, "download" if request.args.get("dl") == "1" else "read")
     c.commit()
     return send_stored({"id": nid, "path": v["path"], "name": n["name"], "mime": v["mime"] or n["mime"], "size": v["size"]})
+
+
+@app.get("/api/docs/<int:nid>/einvoice")
+def docs_einvoice(nid):
+    """2.146.0 A (#2451): the readable view of an e-invoice (XRechnung / ZUGFeRD) -- a plain page to read and print; every value
+    escaped, no script (CSP sandbox)."""
+    from flask import Response
+    from ..office.einvoice_in import ei_html
+    c = db()
+    m, n = _doc(c, nid)
+    inv = S.meta_json(c, m, "extracted", {}).get("_einv")
+    if not isinstance(inv, dict):
+        raise Denied(404)
+    fs_log_add(c, nid, "read")
+    c.commit()
+    r = Response(ei_html(inv, n["name"]), mimetype="text/html")
+    r.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox allow-modals"
+    r.headers["Cache-Control"] = "private, no-store"
+    return r
 
 
 @app.post("/api/docs/<int:nid>/task")

@@ -44,7 +44,9 @@ ORDER = (
     "core.instance",
     "core.state",
     "core.csvimport",  # 2.140.0 B (#2134): the statement reader of budget and bank reconciliation
+    "core.zipread",  # 2.146.0 (#2453 #2455 #2457): the in-memory ZIP reader of the importers
     "core.merges",  # 2.66.0 (#1835): merging contacts / clients (reversible)
+    "core.stmtfiles",  # 2.146.0 C (#2455): the uploaded statements of the bank imports (office + budget)
     "lists.lists",
     "lists.groups",
     "lists.grouppics",  # 2.46.0 (#1605)
@@ -248,6 +250,7 @@ ORDER = (
     "office.docs",  # 2.36.1 (#1021): quotations (C)
     "office.pdf",  # 2.36.1 (#1021): the PDF writer (D, no kalmido imports)
     "office.einvoice",  # 2.38.0 (#1021 P5, F2): e-invoice XML (CII EN 16931 / XRechnung) from the snapshot, used by office.pdfweb
+    "office.einvoice_in",  # 2.146.0 A (#2451): incoming e-invoices (UBL / CII, embedded in ZUGFeRD PDFs; no routes, used by docs.store)
     "office.pdfweb",  # 2.36.1 (#1021): quotation PDF + company logo routes (D; the writer office.pdf has no routes)
     "office.signoff",  # 2.50.0 C (#1200): approval links with a simple electronic signature (quotations, list acceptance)
     "office.ledger",  # 2.36.2 (#1021, #1142, E): finalising, structured company data, office log
@@ -312,6 +315,7 @@ ORDER = (
     "agents.agenttime",  # 2.51.0 C (#1353): agents check time tracking + propose entries from events
     "agents.lyprop",  # 2.55.0 B (#1066): agents propose arrangements of views (the person accepts)
     "admin.orgexport",  # 2.42.0 (#833): organisation export (encrypted archive)
+    "admin.retexport",  # 2.146.0 D (#2468): the retention export before deleting an account / organisation
     "admin.acctexport",  # 2.73.0 B (#1473): account export (moving between servers, GDPR copy)
     "admin.acctimport",  # 2.73.0 B (#1473): account import with the mapping of people
     "admin.orgimport",  # 2.137.0 (#2344): organisation import of the remaining areas (no routes)
@@ -326,6 +330,8 @@ ORDER = (
     "docs.store",  # 2.48.0 (#1111): documents: tables, sealing, word index, recognition run (no routes)
     "docs.ingest",  # 2.48.0 (#1111): docs_ingest + the background queue, mail / inbox folder
     "docs.thumbfill",  # 2.66.1 (#1944): one-time catch-up of the previews of imported documents (no routes)
+    "docs.unpack",  # 2.146.0 B (#2453): ZIP / winmail.dat of an upload or a mail -> its files (no routes)
+    "docs.dups",  # 2.146.0 B (#2452): the same file / the same invoice twice (no routes; hooks into the recognition)
     "files.textscan",  # 2.61.0 C (#1820): text recognition of normal stored files (queue, search, Ablage search route)
     "docs.web",  # 2.48.0 (#1111): the routes of the documents area
     "docs.dsearch",  # 2.122.0 B (#2294): filters + search syntax of the documents list (no routes)

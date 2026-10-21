@@ -50,4 +50,25 @@ file with the same reader as the bank import of the office (same formats and che
    open recurring entry is linked to it (so it is not counted twice). The category can be changed per row.
 3. *Take over N entries* imports the chosen rows. The column mapping is remembered for the next file of the same bank.
 
+Since 2.146:
+
+- **Several files or a ZIP**: choose several statements at once or a ZIP (e.g. one day report per file), or drop them
+  onto the dialog; they become one preview sorted by day, each row names its file (same limits as the office: 20 MB upload,
+  400 statements, 2 MB per statement, 60 MB unpacked, 20000 rows). More than 3000 rows are taken over in parts, all as one
+  import.
+- **Debit / credit mark**: for exports with an amount without a sign and a column S/H (Soll/Haben, D/C, -/+), choose the
+  column under *Debit / credit mark*; Kalmido guesses it (also the Volksbank / Raiffeisenbank layouts), so expenses never
+  become income. Dates also as `DD-MM-YYYY` and `YYYYMMDD`.
+- **CAMT.052 day reports**: pending bookings are listed apart ("not taken over") and never imported; a booking that is in
+  several reports (pending first, booked later, with another day or text) counts once by its bank reference. For a full
+  statement better export CAMT.053.
+- **Duplicates without the text**: a row with the counterpart's IBAN is also found again by day + amount + IBAN, so a CSV
+  and a CAMT export of the same account overlap without double entries (entries of earlier versions are still found by
+  their text).
+- **Take an import back**: the dialog lists the last imports; *Take this import back* deletes exactly that import's entries
+  with their receipts (the budget has no trash). Entries you changed after the import (or gave a receipt) are named and
+  kept, unless you tick *Delete the changed ones too*. Routes: `GET /api/budget/<list>/import/runs`,
+  `POST /api/budget/<list>/import/runs/<run>/undo` `{edited: keep | delete}`; `import/parse` takes `multipart/form-data`
+  (field `files`, `mapping` as JSON) as well as the JSON body.
+
 Amounts, titles, notes and receipts are stored encrypted on the server.

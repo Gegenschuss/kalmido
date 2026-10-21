@@ -554,9 +554,10 @@ function ctImport(bookId, kind, file) {  // 2.143.0 C (#2154): file = a .vcf sha
   const books = (S.books || []).filter(b => ctWrite(b) && wsObjIn(b));
   const run = async bid => {
     const inp = document.createElement('input');
-    inp.type = 'file'; inp.accept = kind === 'csv' ? '.csv,.txt,.tsv,text/csv,text/plain' : '.vcf,text/vcard,text/x-vcard';  // 2.119.1 A (#2080)
+    inp.type = 'file'; inp.accept = kind === 'csv' ? '.csv,.txt,.tsv,text/csv,text/plain' : '.vcf,.vcard,.zip,text/vcard,text/x-vcard,application/zip';  // 2.119.1 A (#2080)
+    if (kind !== 'csv') inp.multiple = true;  // 2.146.0 E (#2457): one .vcf per contact (Outlook) or a ZIP (Google Takeout)
     inp.onchange = async () => {
-      const f = file || inp.files[0]; if (!f) return;
+      const fs = file ? [file] : [...inp.files], f = fs[0]; if (!f) return;
       // 2.87.9 (#1940): where the contacts go, in words; from an organisation's book also into an own private book
       const b = (S.books || []).find(x => x.id === bid);
       const to = await importTargetConfirm({what: tr('the contacts'), ws: wsOf(b), place: b?.name || '', privOk: true});
@@ -566,7 +567,8 @@ function ctImport(bookId, kind, file) {  // 2.143.0 C (#2154): file = a .vcf sha
         if (!pb) { try { pb = await api('POST', '/api/books', {name: tr('Contacts'), org_id: null}); await load(); } catch { return; } }
         bid = pb.id;
       }
-      if (kind === 'csv' || !/\.vcf$/i.test(f.name)) ctx_csvMap(bid, f); else ctImpRun(bid, f);  // 2.119.1 A (#2080): CSV: the columns first
+      if (fs.length > 1 || /\.zip$/i.test(f.name)) ctImpRun(bid, fs);  // 2.146.0 E (#2457): the server reads the vCards of all files
+      else if (kind === 'csv' || !/\.vcf$/i.test(f.name)) ctx_csvMap(bid, f); else ctImpRun(bid, f);  // 2.119.1 A (#2080): CSV: the columns first
     };
     if (file) inp.onchange(); else inp.click();
   };
@@ -597,8 +599,10 @@ function ctImpPanel() {
 }
 function ctImpRun(bid, f, mapping) {
   const p = ctImpPanel();
+  let fi = null;  // 2.146.0 E (#2457): several files / a ZIP: how many were read, which not
   const done = async j => {
-    p.set(tr('Imported: {0} new, {1} updated', j.created, j.updated) + (j.errors ? ' · ' + trn('{0} not readable', '{0} not readable', j.errors) : '') + (j.dupes ? ' · ' + trn('{0} possible duplicate', '{0} possible duplicates', j.dupes) : ''), null, true);
+    const bad = fi?.errors?.length ? ' · ' + trn('{0} file not read', '{0} files not read', fi.errors.length) + ': ' + fi.errors.slice(0, 3).map(e => e.file).join(', ') : '';
+    p.set((fi?.files > 1 ? trn('{0} file', '{0} files', fi.files) + ' · ' : '') + tr('Imported: {0} new, {1} updated', j.created, j.updated) + (j.errors ? ' · ' + trn('{0} not readable', '{0} not readable', j.errors) : '') + (j.dupes ? ' · ' + trn('{0} possible duplicate', '{0} possible duplicates', j.dupes) : '') + bad, null, true);
     if (j.dupes && (j.dupe_groups || []).length) ctx_dupBtn(p.el, j.dupe_groups);  // 2.119.1 A (#2084)
     await load().catch(() => {}); ctLoad();
   };
@@ -612,6 +616,7 @@ function ctImpRun(bid, f, mapping) {
     let j = {}; try { j = JSON.parse(x.responseText); } catch {}
     // 2.41.0 (#1437): 413 from a proxy in front comes without JSON -> still say why
     if (x.status >= 400) { fail(j.error || (x.status === 413 ? tr('File too large') : '')); return; }
+    fi = j.files || null;
     if (!j.import_id) { await done(j); return; }  // small file: answered at once
     let misses = 0;
     for (;;) {
@@ -624,7 +629,7 @@ function ctImpRun(bid, f, mapping) {
       p.set(tr('Import running…') + ' ' + tr('{0} of {1} contacts', st.done, st.total), .3 + .7 * (st.total ? st.done / st.total : 0));
     }
   };
-  x.send((() => { const fd = new FormData(); fd.append('file', f); if (mapping) fd.append('mapping', JSON.stringify(mapping)); return fd; })());
+  x.send((() => { const fd = new FormData(); if (Array.isArray(f)) f.forEach(y => fd.append('files', y)); else fd.append('file', f); if (mapping) fd.append('mapping', JSON.stringify(mapping)); return fd; })());
 }
 // 2.119.1 A (#2080): a CSV file (Outlook, Google Contacts, a spreadsheet): the server reads it (delimiter, encoding) and suggests
 // a field per column; here the person checks / changes them, then the rows take the vCard import's way (ctImpRun: progress, background)

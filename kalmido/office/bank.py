@@ -9,11 +9,7 @@ Every route: office_gate + office_org(admin=True) -- admins of the office area o
 agents and kids 403, foreign ids 404. amount / counterpart / purpose / iban are encrypted at rest (orgcrypt)."""
 import hashlib
 import hmac
-import io
-import json
 import re
-import struct
-import zipfile
 import unicodedata
 from collections import Counter
 from datetime import date, timedelta
@@ -22,6 +18,7 @@ from flask import jsonify, request
 
 from ..core.config import SECRET_KEY, app
 from ..core import csvimport as cx  # 2.140.0 B (#2134): the shared statement reader
+from ..core import stmtfiles as sf  # 2.146.0 C (#2455): uploads, several files / a ZIP
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import tr
@@ -47,7 +44,6 @@ BNK_UNPACKED_MAX = 60 * 1024 * 1024  # all statements together, unpacked
 BNK_ROWS_MAX = 20000  # rows of one import
 BNK_ZIP_ENTRIES_MAX = 2000  # entries in a ZIP's central directory, checked before anything is read
 BNK_EXTS = (".xml", ".csv", ".txt")
-MT940_RE = re.compile(r"^:(20|25|28C|60[FM]|61|62[FM]):", re.M)
 
 
 def _ctx():
@@ -77,6 +73,21 @@ def bnk_hash(oid, day, amount, counterpart, purpose, ref):
     return hmac.new(key, msg.encode(), hashlib.sha256).hexdigest()[:40]
 
 
+def bnk_rkey(oid, part):
+    """2.146.0 C (#2469): the keyed reference key of a booking in area oid (core/csvimport.csv_ref_parts: AcctSvcrRef /
+    EndToEndId with the amount) -- stored space separated in office_bank_tx.rkeys, never the reference itself."""
+    key = SECRET_KEY if isinstance(SECRET_KEY, bytes) else str(SECRET_KEY).encode()
+    return hmac.new(key, f"bank-ref\x1f{oid}\x1f{part}".encode(), hashlib.sha256).hexdigest()[:40]
+
+
+def _rkeys(c, oid):
+    """2.146.0 C (#2469): the reference keys of the area's active bookings."""
+    out = set()
+    for r in c.execute("SELECT rkeys FROM office_bank_tx WHERE org_id=? AND deleted_at IS NULL AND rkeys<>''", (oid,)):
+        out.update(r[0].split())
+    return out
+
+
 # ---------------------------------------------------------------- reading statements
 # 2.140.0 B (#2134): CSV and CAMT are read by core/csvimport.py (shared with the household budget); the names stay
 # (cfbank.py reads the balances with the CAMT helpers)
@@ -90,8 +101,7 @@ def bnk_camt(text):
     return cx.camt_rows(text, BNK_TEXT_MAX)
 
 
-def _iban_col(header):
-    return next((i for i, h in enumerate(header) if "iban" in (h or "").casefold()), None)
+_iban_col = cx.csv_iban_col  # 2.146.0 C (#2455): the counterpart's IBAN column (an own-account IBAN column only when alone)
 
 
 def bnk_csv(text, mapping):
@@ -112,7 +122,7 @@ def bnk_csv(text, mapping):
         purpose = _clean(r[m["title"]] if m.get("title") is not None and m["title"] < len(r) else "")
         iban = (r[ic] if ic is not None and ic < len(r) else "").replace(" ", "").upper()
         out.append({"day": x["day"], "amount": amt, "currency": "", "counterpart": cp, "purpose": purpose,
-                    "iban": iban if IBAN_RE.match(iban) else None, "ref": None, "error": x["error"]})
+                    "iban": iban if IBAN_RE.match(iban) else None, "ref": None, "error": x["error"], "pending": False})
     return out
 
 
@@ -120,142 +130,22 @@ def _hashes(c, oid):
     return Counter(r[0] for r in c.execute("SELECT hash FROM office_bank_tx WHERE org_id=? AND deleted_at IS NULL", (oid,)))
 
 
-def _fname(v):
-    """Only the file name of an upload / a ZIP entry (no path, no control characters) -- shown, never used as a path."""
-    v = v if isinstance(v, str) else ""
-    return _clean(v.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1], 200)
-
-
-def _decode(data):
-    """Bytes of a statement -> text: UTF-8 (a BOM dropped), else windows-1252 (as the client did before)."""
-    try:
-        return data.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        return data.decode("cp1252", "replace")
-
-
-class _Files:
-    """The statements of one request: files [{name, text}], errors [{file, error}] (unreadable ones), skipped [names]
-    (ZIP entries that are no statement), label (the import's file name)."""
-
-    def __init__(self):
-        self.files, self.errors, self.skipped, self.labels, self.unpacked = [], [], [], [], 0
-
-    def add(self, name, data):
-        if len(self.files) + len(self.errors) >= BNK_FILES_MAX:
-            raise BadInput(tr("At most {0} files per import", BNK_FILES_MAX))
-        if len(data) > BNK_FILE_MAX:
-            self.errors.append({"file": name, "error": tr("The file is too large (at most {0} MB)", 2)})
-            return
-        self.unpacked += len(data)
-        if self.unpacked > BNK_UNPACKED_MAX:
-            raise BadInput(tr("The files are too large together (at most {0} MB)", BNK_UNPACKED_MAX // (1024 * 1024)))
-        text = _decode(data)
-        if not text.strip():
-            self.errors.append({"file": name, "error": tr("The file is empty")})
-        else:
-            self.files.append({"name": name, "text": text})
-
-    def add_zip(self, name, data):
-        # 2.144.1 (review): the entry count of the end record before zipfile builds an object per entry; zip64 is not taken
-        e = data.rfind(b"PK\x05\x06")
-        cnt = struct.unpack_from("<H", data, e + 10)[0] if 0 <= e <= len(data) - 22 else None
-        if cnt is not None and cnt > BNK_ZIP_ENTRIES_MAX:
-            raise BadInput(tr("The ZIP file holds too many entries (at most {0})", BNK_ZIP_ENTRIES_MAX))
-        if cnt is None or cnt == 0xFFFF:
-            self.errors.append({"file": name, "error": tr("The ZIP file cannot be read")})
-            return
-        try:
-            zf = zipfile.ZipFile(io.BytesIO(data))
-            infos = zf.infolist()
-        except Exception:  # BadZipFile, a broken zip64 locator (struct.error) ...: never a 500
-            self.errors.append({"file": name, "error": tr("The ZIP file cannot be read")})
-            return
-        if len(infos) > BNK_ZIP_ENTRIES_MAX:
-            raise BadInput(tr("The ZIP file holds too many entries (at most {0})", BNK_ZIP_ENTRIES_MAX))
-        n = 0
-        for info in infos:
-            raw = info.filename.replace("\\", "/")
-            base = _fname(raw)
-            if info.is_dir() or not base or raw.startswith("__MACOSX/") or "/__MACOSX/" in raw or base.startswith("._") or base.startswith("."):
-                continue  # folders and the hidden files of the packing system
-            if not base.casefold().endswith(BNK_EXTS):
-                self.skipped.append(base)  # nested ZIPs included: never opened
-                continue
-            n += 1
-            if info.flag_bits & 0x1:
-                self.errors.append({"file": base, "error": tr("The file is encrypted; please pack it without a password")})
-                continue
-            try:  # the sizes in the ZIP's header are never trusted: reading stops one byte after the limit
-                with zf.open(info) as f:
-                    part = f.read(BNK_FILE_MAX + 1)
-            except Exception:  # BadZipFile, zlib.error, an unknown compression ...: a broken entry never stops the others
-                self.errors.append({"file": base, "error": tr("The file cannot be read")})
-                continue
-            self.add(base, part)
-        self.labels.append(tr("{0} ({1} files)", name, n) if n != 1 else name)
+# 2.146.0 C (#2455): the uploads of a request are read by core/stmtfiles (shared with the household budget's import;
+# the same limits and messages as 2.144.1)
+_LIMITS = {"file_max": BNK_FILE_MAX, "upload_max": BNK_UPLOAD_MAX, "files_max": BNK_FILES_MAX, "unpacked_max": BNK_UNPACKED_MAX,
+           "entries_max": BNK_ZIP_ENTRIES_MAX, "exts": BNK_EXTS}
+_fname, _decode = sf.stmt_fname, sf.stmt_decode
+bnk_is_mt940 = sf.is_mt940  # a SWIFT MT940 / MT942 statement -- not read; the dialog asks for CAMT.053
 
 
 def _uploads(b):
     """The statements of the request: multipart (field files, several; a ZIP is opened) or the JSON body {text, filename}."""
-    fs = _Files()
-    if request.files:
-        ups = [f for f in request.files.getlist("files") if f]
-        if not ups:
-            raise BadInput(tr("The file is empty"))
-        total, names = 0, []
-        for f in ups:
-            name = _fname(f.filename) or tr("File")
-            data = f.stream.read(BNK_UPLOAD_MAX + 1 - total)
-            total += len(data)
-            if total > BNK_UPLOAD_MAX:
-                raise BadInput(tr("The upload is too large (at most {0} MB)", BNK_UPLOAD_MAX // (1024 * 1024)))
-            if name.casefold().endswith(".zip") or data[:4] == b"PK\x03\x04":
-                fs.add_zip(name, data)
-            elif not name.casefold().endswith(BNK_EXTS) and not bnk_is_mt940(_decode(data[:20000])):  # MT940 (.sta ...) gets its own message
-                fs.errors.append({"file": name, "error": tr("Not a bank statement (only XML, CSV or ZIP)")})  # 2.144.1 (review)
-            else:
-                fs.add(name, data)
-                fs.labels.append(name)
-            names.append(name)
-        if len(ups) > 1:
-            fs.labels = [_clean(tr("{0} files: {1}", len(ups), ", ".join(names)), 200)]
-        return fs
-    text = b.get("text")
-    if not isinstance(text, str) or not text.strip():
-        raise BadInput(tr("The file is empty"))
-    if len(text.encode("utf-8", "ignore")) > BNK_FILE_MAX:
-        raise BadInput(tr("The file is too large (at most {0} MB)", 2))
-    fs.files.append({"name": _fname(b.get("filename")), "text": text})
-    fs.labels.append(_clean(b.get("filename"), 200))
-    return fs
+    return sf.stmt_uploads(b, _LIMITS)
 
 
 def _req():
     """The request as a dict: the JSON body, or the form fields of a multipart upload (mapping as a JSON string, account)."""
-    request.max_content_length = BNK_UPLOAD_MAX + 1024 * 1024  # 2.144.1 (review): werkzeug refuses a longer body itself, on any server
-    if (request.content_length or 0) > request.max_content_length:  # before the form is parsed
-        raise BadInput(tr("The upload is too large (at most {0} MB)", BNK_UPLOAD_MAX // (1024 * 1024)))
-    if not request.files:
-        b = body()
-        if not isinstance(b, dict):
-            raise BadInput(tr("Invalid data"))
-        return b
-    b = {}
-    m = request.form.get("mapping")
-    if m:
-        try:
-            b["mapping"] = json.loads(m)
-        except ValueError:
-            raise BadInput(tr("Invalid data"))
-    if request.form.get("account"):
-        b["account"] = request.form.get("account")
-    return b
-
-
-def bnk_is_mt940(text):
-    """A SWIFT MT940 / MT942 statement (its :20: / :60F: / :61: fields) -- not read; the dialog asks for CAMT.053."""
-    return len(MT940_RE.findall((text or "")[:20000])) >= 2
+    return sf.stmt_req(BNK_UPLOAD_MAX)
 
 
 def bnk_parse(c, oid, b, fs=None):
@@ -323,33 +213,42 @@ def bnk_parse(c, oid, b, fs=None):
     if not parts:
         raise BadInput("; ".join(f"{e['file']}: {e['error']}" for e in fs.errors[:5]))
     have = _hashes(c, oid)
+    refs = _rkeys(c, oid)  # 2.146.0 C (#2469): references of the database and of the earlier files of this import
     for fi in sorted({r["fi"] for r in rows}):
         mine, local = [r for r in rows if r["fi"] == fi], Counter(have)
-        seen = Counter()
+        seen, got_refs = Counter(), set()
         for r in mine:
             r["dup"] = False
+            r["pending"] = bool(r.get("pending"))  # 2.146.0 C (#2469): a pending CAMT.052 entry is shown, never imported
             r["currency"] = r["currency"] or home
             if r["error"] is None and r["currency"] != home:
                 r["error"] = tr("Other currency than the office ({0})", home)
-            if r["error"] is None:
+            if r["error"] is None and not r["pending"]:
                 r["hash"] = bnk_hash(oid, r["day"], r["amount"], r["counterpart"], r["purpose"], r["ref"])
-                r["dup"] = cx.csv_dup_take(local, r["hash"])
+                # 2.146.0 C (#2469): the same reference in an earlier file / import = the same booking (also with another
+                # day or text, e.g. pending first, booked later); else the fingerprint as before
+                r["rkeys"] = [bnk_rkey(oid, x) for x in cx.csv_ref_parts(r)]
+                r["dup"] = any(k in refs for k in r["rkeys"]) or cx.csv_dup_take(local, r["hash"])
+                got_refs.update(r["rkeys"])
                 seen[r["hash"]] += 1
+        refs |= got_refs
         for h, k in seen.items():
             have[h] = max(have.get(h, 0), k)
     if len(parts) > 1:  # one list by day: day, then file, then row (rows without a day at the end)
         rows.sort(key=lambda r: (r["day"] is None, r["day"] or "", r["fi"], r["n"]))
     kinds = {p["fmt"] for p in parts}
+    info["camt052"] = any(p["fmt"] == "camt" and cx.camt_version(p["text"]) == "052" for p in parts)  # 2.146.0 C (#2469): the hint
     return (kinds.pop() if len(kinds) == 1 else "mixed"), rows, None, parts, info
 
 
 def _row_out(r):
     return {k: (dstr(r[k]) if k == "amount" and r[k] is not None else r.get(k)) for k in
-            ("n", "day", "amount", "currency", "counterpart", "purpose", "iban", "ref", "error", "dup", "file")}
+            ("n", "day", "amount", "currency", "counterpart", "purpose", "iban", "ref", "error", "dup", "file", "pending")}
 
 
 def _info_out(info):
-    return {"files": info["files"], "file_errors": info["file_errors"], "skipped_files": info["skipped_files"][:100]}
+    return {"files": info["files"], "file_errors": info["file_errors"], "skipped_files": info["skipped_files"][:100],
+            "camt052": bool(info.get("camt052"))}  # 2.146.0 C (#2469)
 
 
 @app.post("/api/office/bank/import/preview")
@@ -363,9 +262,10 @@ def bnk_preview():
     extra = cfb_preview(c, oid, fmt, b, cols, parts)  # 2.124.0 D (#2342): the statement's balances / the guessed balance column
     if rows is None:
         return jsonify(fmt=fmt, **cols, **extra, **_info_out(info))
-    ok = [r for r in rows if not r["error"]]
+    ok = [r for r in rows if not r["error"] and not r["pending"]]  # 2.146.0 C (#2469): pending ones counted apart
     return jsonify(fmt=fmt, rows=[_row_out(r) for r in rows], count=sum(1 for r in ok if not r["dup"]),
-                   dup_count=sum(1 for r in ok if r["dup"]), skipped=len(rows) - len(ok), **extra, **_info_out(info))
+                   dup_count=sum(1 for r in ok if r["dup"]), pending_count=sum(1 for r in rows if not r["error"] and r["pending"]),
+                   skipped=sum(1 for r in rows if r["error"]), **extra, **_info_out(info))
 
 
 def _import_public(r):
@@ -383,7 +283,7 @@ def bnk_import():
         raise BadInput(tr("Please choose the columns for the date and the amount"))
     write_lock(c, f"office_bank_import_{oid}")
     fmt, rows, _cols, parts, info = bnk_parse(c, oid, b, fs)
-    new = [r for r in rows if not r["error"] and not r["dup"]]
+    new = [r for r in rows if not r["error"] and not r["dup"] and not r["pending"]]  # 2.146.0 C (#2469): never a pending one
     dup = sum(1 for r in rows if not r["error"] and r["dup"])
     if not new and not dup:
         raise BadInput(tr("Nothing to import"))
@@ -394,7 +294,7 @@ def bnk_import():
     for r in new:
         row = {"org_id": oid, "import_id": iid, "day": r["day"], "amount": dstr(r["amount"]), "currency": r["currency"],
                "counterpart": r["counterpart"], "purpose": r["purpose"], "iban": r["iban"], "ref": r["ref"], "hash": r["hash"],
-               "created_at": ts}
+               "rkeys": " ".join(r["rkeys"]), "created_at": ts}
         row = oc_enc_fields(c, oid, "office_bank_tx", row)
         c.execute(f"INSERT INTO office_bank_tx({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     from .cfbank import cfb_store
@@ -403,6 +303,7 @@ def bnk_import():
     c.commit()
     imp = c.execute("SELECT * FROM office_bank_imports WHERE id=?", (iid,)).fetchone()
     return jsonify({"import": _import_public(imp), "count": len(new), "dup_count": dup,
+                    "pending_count": sum(1 for r in rows if not r["error"] and r["pending"]),
                     "skipped": sum(1 for r in rows if r["error"]), "balances": bal_n, **_info_out(info)}), 201
 
 
@@ -447,10 +348,10 @@ def bnk_import_restore(iid):
     r = _import_row(c, oid, iid)
     if not r["undone_at"]:
         raise Denied(409, tr("This import is active"))
-    have = _hashes(c, oid)
+    have, refs = _hashes(c, oid), _rkeys(c, oid)
     back = 0
-    for t in c.execute("SELECT id, hash FROM office_bank_tx WHERE org_id=? AND import_id=? AND deleted_at=?", (oid, iid, r["undone_at"])).fetchall():
-        if have.get(t["hash"]):
+    for t in c.execute("SELECT id, hash, rkeys FROM office_bank_tx WHERE org_id=? AND import_id=? AND deleted_at=?", (oid, iid, r["undone_at"])).fetchall():
+        if have.get(t["hash"]) or any(k in refs for k in (t["rkeys"] or "").split()):  # 2.146.0 C (#2469): or by reference
             continue
         c.execute("UPDATE office_bank_tx SET deleted_at=NULL WHERE id=? AND org_id=?", (t["id"], oid))
         back += 1

@@ -34,8 +34,8 @@ function oimHtml() {
   const back = `<div class="ofcbar"><a class="btn sm" href="#office/settings">${ic('back', 's')} ${tr('Settings')}</a></div>`;
   return `<div class="oim">${back}<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('Take over your clients, services and equipment from a spreadsheet and keep old invoices and quotations as an archive. You see everything before it is saved; every import can be undone.')}</p>
     <section class="oimsec" id="oim-master"><h4>${ic('list', 's')} ${tr('Master data from a spreadsheet')}</h4>
-    <p class="muted">${tr('An .xlsx file with the sheets or tables Contacts (one address per cell), Services and Equipment.')}</p>
-    <div class="lacts"><input type="file" id="oim-xlsx" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden><button type="button" class="btn sm pri" data-oim="pick-xlsx" ${OIM.busy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose file')}</button>${OIM.busy ? `<span class="muted">${tr('Reading…')}</span>` : ''}</div>
+    <p class="muted">${tr('An .xlsx or CSV file with the sheets or tables Contacts (the address in one cell or in the columns street, postcode, city), Services and Equipment.')}</p>
+    <div class="lacts"><input type="file" id="oim-xlsx" accept=".xlsx,.csv,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden><button type="button" class="btn sm pri" data-oim="pick-xlsx" ${OIM.busy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose file')}</button>${OIM.busy ? `<span class="muted">${tr('Reading…')}</span>` : ''}</div>
     ${OIM.pv ? oimPreviewHtml() : ''}</section>${oim_moreHtml()}
     <section class="oimsec" id="oim-archive"><h4>${ic('archive', 's')} ${tr('Old invoices and quotations')}</h4>
     <p class="muted">${tr('PDF files are archived unchanged: never renumbered, never sent again, no e-invoice. Key data come from the file name; please add amount and payment.')}</p>
@@ -77,7 +77,7 @@ function oimPreviewHtml() {
   const other = Object.entries(p.other || {}).filter(([, v]) => v);
   const otherNames = {staff: N_('Staff'), freelancer: N_('Freelancers')};
   return `<div class="oimpv">
-    ${cl.length ? `${bk_areaHead(p, 'clients', tr('Clients'))}${bk_off(p, 'clients') ? '' : `${chips}<ul class="oimcards" role="list">${rows.map(([c, i]) => oimClientCard(c, i)).join('')}</ul>`}` : `<p class="muted">${tr('No sheet Contacts found.')}</p>`}
+    ${cl.length || p.columns?.head?.length ? `${bk_areaHead(p, 'clients', tr('Clients'))}${bk_off(p, 'clients') ? '' : `${e46_mapHtml(p)}${chips}<ul class="oimcards" role="list">${rows.map(([c, i]) => oimClientCard(c, i)).join('')}</ul>`}` : `<p class="muted">${tr('No sheet Contacts found.')}</p>`}
     ${sr_area(p, 'roles', tr('Freelancer roles'), s => [s.cost_day != null ? `${tr('Purchase')} ${ofcMoney(s.cost_day)}/${tr('Day|unit')}` : '', s.cost_hour != null ? `${ofcMoney(s.cost_hour)}/${tr('h|unit')}` : ''])}
     ${sr_area(p, 'crew', tr('Crew'), s => [s.name_en, s.rate_day != null ? `${ofcMoney(s.rate_day)}/${tr('Day|unit')}` : '', s.intext === 'intern' ? tr('internal') : tr('external')])}
     ${(p.services || []).length ? `${bk_areaHead(p, 'services', tr('Services'))}${bk_off(p, 'services') ? '' : `<ul class="oimcards" role="list">${p.services.map((s, i) => oimSimpleCard('services', s, i, s.name_de, [s.category, s.unit === 'percent' ? (s.daily_rate != null ? `${fmtNum(s.daily_rate, 2)} %` : '') : s.daily_rate != null ? `${ofcMoney(s.daily_rate)}/${tr('Day|unit')}` : '', s.unit !== 'percent' && s.hourly_rate != null ? `${ofcMoney(s.hourly_rate)}/${tr('h|unit')}` : '', s.intext === 'shooting' ? tr('Shoot') : ''])).join('')}</ul>`}` : ''}
@@ -105,6 +105,23 @@ function bk_skipAll(k) {  // "Skip all" of an area (and back: every row gets the
     else x.action = bk_back(x);
   }
   ofcDraw();
+}
+
+// 2.146.0 E (#2456): which column holds what (found from the header; the person may change it): the whole address in one
+// column, or company / street / postcode / city / country in columns of their own. A change reads the file again.
+const E46_FIELDS = [['name', N_('Company')], ['contact', N_('Contact person')], ['address', N_('Whole address')], ['street', N_('Street')],
+  ['house', N_('House number')], ['zip', N_('Postcode')], ['city', N_('City')], ['country', N_('Country')]];
+function e46_mapHtml(p) {
+  const c = p.columns; if (!c?.head?.length) return '';
+  const m = c.map || {}, opts = cur => `<option value="">${esc(tr('not in the file'))}</option>` + c.head.map((h, j) => `<option value="${j}" ${m[cur] === j ? 'selected' : ''}>${esc(h || tr('Column {0}', j + 1))}</option>`).join('');
+  return `<details class="e46map" ${c.mode === 'columns' || !(p.clients || []).length ? 'open' : ''}><summary>${esc(tr('Columns'))} <span class="muted">${esc(c.mode === 'columns' ? tr('Address in separate columns') : tr('Address in one column'))}</span></summary>
+    <div class="oimgrid">${E46_FIELDS.map(([k, t]) => `<label class="oimfl"><span>${esc(tr(t))}</span><select data-e46-map="${k}" ${OIM.busy ? 'disabled' : ''}>${opts(k)}</select></label>`).join('')}</div></details>`;
+}
+function e46_remap(k, v) {
+  const p = OIM.pv; if (!p?.columns || !OIM.file) return;
+  const m = {...p.columns.map};
+  if (v === '') delete m[k]; else { for (const x of Object.keys(m)) if (m[x] === +v) delete m[x]; m[k] = +v; }
+  oimPreview(OIM.file, m);
 }
 
 function oimClientCard(c, i) {
@@ -245,10 +262,11 @@ function oimArchiveListHtml(q) {
 const oim_copyLabel = cp => tr('Read-only copy from {0}', cp.from === 'private' ? tr('Private|workspace') : (cp.name || tr('Organisation')));
 
 // ---- actions
-async function oimPreview(file) {
+async function oimPreview(file, map) {
   if (!file) return;
-  OIM.busy = true; ofcDraw();
+  OIM.busy = true; OIM.file = file; ofcDraw();
   const fd = new FormData(); fd.append('file', file);
+  if (map) fd.append('map', JSON.stringify(map));  // 2.146.0 E (#2456): the person's column choice
   try {
     const r = await fetch('/api/office/legacy/preview', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
     const j = await r.json().catch(() => ({}));
@@ -271,7 +289,7 @@ async function oimImport() {
     const c = j.counts || {}, roles = (c.roles || 0) + (c.crew || 0), filled = ['services', 'equipment', 'roles', 'crew'].reduce((a, k) => a + (c[k + '_filled'] || 0), 0);
     toast(tr('Imported: {0} clients, {1} services, {2} devices', c.clients || 0, c.services || 0, c.equipment || 0) + (c.contacts ? ' · ' + trn('{0} contact person added', '{0} contact persons added', c.contacts) : '')
       + (roles ? ' · ' + trn('{0} role', '{0} roles', roles) : '') + (filled ? ' · ' + trn('{0} entry completed', '{0} entries completed', filled) : ''));  // 2.47.0 (#1648, #1649)
-    OIM.pv = null; ofcReload('services'); ofcReload('equipment'); ofcReload('roles'); ofcReload('crew');
+    OIM.pv = null; OIM.file = null; ofcReload('services'); ofcReload('equipment'); ofcReload('roles'); ofcReload('crew');
     if (c.clients && typeof load === 'function') await load();  // 2.80.0 (#1842): the documents' client field knows the imported clients
     await oimLoad();
   } catch (x) { const el = $('.oimpv .aerr'); if (el) el.textContent = x.message || ''; else toast(x.message || ''); }
@@ -320,7 +338,7 @@ document.addEventListener('click', async e => {
   if (a === 'pick-xlsx') { const i = $('#oim-xlsx'); if (i) { i.onchange = () => { oimPreview(i.files[0]); i.value = ''; }; i.click(); } }
   else if (a === 'pick-pdf') { const i = $('#oim-pdf'); if (i) { i.onchange = () => { oimPickPdf(i.files); i.value = ''; }; i.click(); } }
   else if (a === 'filter') { OIM.filter = b.dataset.f || ''; ofcDraw(); }
-  else if (a === 'cancel') { OIM.pv = null; ofcDraw(); }
+  else if (a === 'cancel') { OIM.pv = null; OIM.file = null; ofcDraw(); }
   else if (a === 'import') oimImport();
   else if (a === 'arch-rm') { OIM.arch.splice(+b.dataset.i, 1); ofcDraw(); }
   else if (a === 'arch-clear') { OIM.arch = []; ofcDraw(); }
@@ -344,6 +362,7 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.dataset?.e46Map && OIM.pv) { e46_remap(t.dataset.e46Map, t.value); return; }  // 2.146.0 E (#2456)
   if (t.dataset?.oimArea && OIM.pv) { OIM.pv.off = {...OIM.pv.off, [t.dataset.oimArea]: !t.checked}; ofcDraw(); return; }  // 2.46.1 (#1557)
   if (t.dataset?.oimOn && OIM.pv) {
     const list = t.dataset.oimOn === 'c' ? OIM.pv.clients : OIM.pv[t.dataset.oimOn], x = list?.[+t.dataset.i];

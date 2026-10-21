@@ -61,7 +61,8 @@ function bkTabHtml() {
   const yNow = new Date().getFullYear(), years = [];
   for (let y = yNow + 1; y >= yNow - 6; y--) years.push([y, String(y)]);
   const head = `<div class="ofcbar bk-bar"><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('bk-year', BK.year, years)}</label><span class="spacer"></span></div>
-    <div class="bk-photo"><label class="btn pri bk-shot">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="bk-file" accept="image/*,application/pdf" capture="environment" hidden></label>
+    <div class="bk-photo"><label class="btn pri bk-shot">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="bk-file" accept="image/*,application/pdf,.xml,application/xml,text/xml" capture="environment" multiple hidden></label>
+    <label class="btn bk-files">${ic('upload')}<span>${tr('Upload files')}</span><input type="file" id="bk-files" accept="${BK_ACCEPT}" multiple hidden></label>
     <span class="muted bk-photohint">${tr('The receipt goes into the documents; amount and date are recognised.')}</span></div>`;
   const txd = typeof txdSectionHtml === 'function' ? txdSectionHtml() : '';  // part C: the tax dates
   return head + bkReceiptsHtml() + bkEuerHtml() + bkUstvaHtml() + bkSettingsHtml() + txd;
@@ -150,22 +151,71 @@ async function bkSetUndo(key, val) {
 }
 
 // ---- the receipt sheet (after a photo, or a tap on a receipt)
-async function bkUpload(file) {
-  const fd = new FormData(); fd.append('files', file, file.name || 'receipt.jpg'); fd.append('ws', BK.info.upload_ws);
+// 2.146.0 B (#2453): several files at once (at most BK_FILES_MAX, as in the file store), a ZIP / winmail.dat is unpacked on
+// the server; several photos can become ONE receipt (the phone scan's PDF, abscan.js); a file already there is not stored
+// again (#2452: the answer's dups, "Open" shows it)
+const BK_FILES_MAX = 50, BK_MERGE_MAX = 30;
+const BK_ACCEPT = 'image/*,application/pdf,.pdf,.heic,.heif,.zip,application/zip,.dat,application/ms-tnef,.xml,application/xml,text/xml';  // 2.146.0 A (#2451): e-invoice XML
+const bkIsImg = f => /^image\//.test(f.type || '') || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name || '');
+async function bkFiles(files) {
+  files = files.filter(f => f && f.size);
+  if (!files.length) return;
+  if (files.length > BK_FILES_MAX) { toast(tr('At most {0} files at once', BK_FILES_MAX)); files = files.slice(0, BK_FILES_MAX); }
+  if (files.length >= 2 && files.length <= BK_MERGE_MAX && files.every(bkIsImg)) {
+    let how = 'each';
+    const ok = await askDialog({title: tr('{0} photos', files.length), ok: tr('Upload'),
+      html: `<fieldset class="bk-merge"><legend>${esc(tr('How should the photos be filed?'))}</legend>
+        <label class="chkl"><input type="radio" name="bk-merge" value="each" checked> ${esc(tr('One receipt per photo'))}</label>
+        <label class="chkl"><input type="radio" name="bk-merge" value="one"> ${esc(tr('Merge into one receipt (pages of a long receipt)'))}</label></fieldset>`,
+      after: md => md.addEventListener('change', e => { if (e.target.name === 'bk-merge') how = e.target.value; })});
+    if (!ok) return;
+    if (how === 'one') { const pdf = await bkMerge(files); if (pdf) bkUpload([pdf]); return; }
+  }
+  bkUpload(files);
+}
+async function bkMerge(files) {  // the photos -> one PDF (abscan.js: smaller on the phone, the server builds the PDF)
+  try {
+    await loadModule('abscan');
+    const fd = new FormData(), name = abm_scanName();
+    for (const [i, f] of files.entries()) { fd.append('page', await abm_shrink(f), `page-${i + 1}.jpg`); fd.append('rot', '0'); }
+    fd.append('name', name); fd.append('bw', '0'); fd.append('out', 'pdf');
+    const r = await fetch('/api/files/scan', {method: 'POST', body: fd, headers: {'X-Requested-With': 'kalmido'}});
+    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || tr('Error {0}', r.status)); }
+    return new File([await r.blob()], name + '.pdf', {type: 'application/pdf'});
+  } catch (x) { toast(x?.message || tr('unknown')); return null; }
+}
+function bkDups(dups) {
+  if (!dups.length) return;
+  if (dups.length === 1) { toast(tr('This file already exists: {0}', dups[0].name), () => bkSheet(dups[0].id, false), 8000, tr('Open')); return; }
+  toast(tr('{0} files already exist', dups.length), () => {
+    const md = modal(`<h3>${tr('Already there')}</h3><ul class="ofclist" role="list">${dups.map(d => `<li><button type="button" class="ofcrow" data-bk="rc" data-id="${+d.id}"><span class="ofcn"><b>${esc(d.name)}</b></span>${ic('chev', 's')}</button></li>`).join('')}</ul>
+      <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
+    md.classList.add('ofcdlg'); fgModal(md);
+    md.addEventListener('click', e => { if (e.target.closest('[data-bk="rc"]')) md.remove(); });
+  }, 8000, tr('Show'));
+}
+async function bkUpload(files) {
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f, f.name || 'receipt.jpg');
+  fd.append('ws', BK.info.upload_ws); fd.append('unzip', '1');
   let j; try { j = await api('POST', '/api/docs', fd); } catch (x) { toast(x.message || tr('unknown')); return; }
   for (const e of j.errors || []) toast(e);
-  const id = j.ids?.[0]; if (!id) return;
-  const label = tr('Receipt added');
-  histToast(label, histAdd({label, undo: async () => { await api('DELETE', `/api/files/nodes/${id}`); bkReload(); return {}; },
-    redo: async () => { await api('POST', `/api/files/nodes/${id}/restore`); bkReload(); return {}; }}));
-  bkSheet(id, true);
+  const ids = j.ids || [], dups = j.dups || [];
+  if (ids.length) {
+    const label = ids.length === 1 ? tr('Receipt added') : tr('{0} receipts added', ids.length);
+    histToast(label, histAdd({label, undo: async () => { for (const id of ids) await api('DELETE', `/api/files/nodes/${id}`); bkReload(); return {}; },
+      redo: async () => { for (const id of ids) await api('POST', `/api/files/nodes/${id}/restore`); bkReload(); return {}; }}));
+  }
+  bkDups(dups);  // after the undo toast: the hint with its Open button is the last word
+  if (ids.length === 1 && !dups.length) bkSheet(ids[0], true);
+  else if (ids.length) bkReload();
 }
 async function bkSheet(id, fresh) {
   let doc, rc;
   try { [doc, rc] = await Promise.all([api('GET', `/api/docs/${id}`), api('GET', `/api/docs/${id}/receipt`)]); } catch (x) { toast(x.message || tr('unknown')); return; }
   const r = rc.receipt || {}, cats = [...new Set([...(BK.info?.categories || []), ...(rc.categories || [])])];
   const wait = doc.state === 'wait' || doc.state === 'run';
-  const md = modal(`<h3>${tr('Receipt')}</h3><p class="muted bk-sname">${esc(doc.name)}</p><div class="bk-rx"></div>
+  const md = modal(`<h3>${tr('Receipt')}</h3><p class="muted bk-sname">${esc(doc.name)}${doc.einvoice ? ` · <a class="bk-einv" href="/api/docs/${id}/einvoice" target="_blank" rel="noopener">${tr('Readable view')}</a>` : ''}</p><div class="bk-rx"></div>
     <p class="muted bk-rec" role="status">${wait ? tr('Being recognised…') : ''}</p>
     ${ofcRowF('bk-cat', tr('Category'), ofcIn('bk-cat', r.category, {max: 60, list: 'bk-cats', ph: tr('e.g. Travel, Material, Software')}) + `<datalist id="bk-cats">${cats.map(k => `<option value="${esc(k)}"${bkAcct(k) ? ` label="${esc(bkAcct(k).account)}"` : ''}>`).join('')}</datalist>`)}
     <div class="bk-acct muted" aria-live="polite"></div>
@@ -178,7 +228,7 @@ async function bkSheet(id, fresh) {
   md.classList.add('ofcdlg', 'bk-sheet');
   md.dataset.rxid = String(id);
   // 2.121.0 A (#2092): the recognised values (supplier, VAT rate, net / gross) with Take over (receipts.js of the documents)
-  if (doc.extracted) loadModule('docs').then(() => { const el = $('.bk-rx', md); if (el && typeof rx_html === 'function') el.innerHTML = rx_html(doc); }).catch(() => 0);
+  if (doc.extracted || doc.duplicate_of) loadModule('docs').then(() => { const el = $('.bk-rx', md); if (el && typeof rx_html === 'function') el.innerHTML = rx_html(doc); }).catch(() => 0);
   const close = fgModal(md), touched = new Set();
   md.addEventListener('input', e => { if (e.target.id) touched.add(e.target.id); });
   md.addEventListener('change', e => { if (e.target.id) touched.add(e.target.id); });
@@ -293,6 +343,7 @@ async function bkPoll(id, md, touched, n) {  // the recognition runs in the back
   if (!md.isConnected) return;
   if (d.state === 'wait' || d.state === 'run') { bkPoll(id, md, touched, n + 1); return; }
   const st = $('.bk-rec', md); if (st) st.textContent = d.state === 'done' ? tr('Recognised') : (d.error_text || '');
+  if (d.einvoice && !$('.bk-einv', md)) $('.bk-sname', md)?.insertAdjacentHTML('beforeend', ` · <a class="bk-einv" href="/api/docs/${id}/einvoice" target="_blank" rel="noopener">${tr('Readable view')}</a>`);  // 2.146.0 A (#2451)
   if (d.amount && !touched.has('bk-amount') && !$('#bk-amount', md).value) $('#bk-amount', md).value = fmtNum(+d.amount, 2);
   const di = $('#bk-date', md);
   if (d.date && di && !touched.has('bk-date') && !di.value) { di.value = d.date; if (typeof dpSync === 'function') dpSync(di); }
@@ -302,7 +353,7 @@ async function bkPoll(id, md, touched, n) {  // the recognition runs in the back
 document.addEventListener('change', e => {
   if (S.route?.mod !== 'office' || ofcTab() !== 'books') return;
   const t = e.target;
-  if (t.id === 'bk-file') { const f = t.files?.[0]; t.value = ''; if (f) bkUpload(f); return; }
+  if (t.id === 'bk-file' || t.id === 'bk-files') { const fs = [...(t.files || [])]; t.value = ''; if (fs.length) bkFiles(fs); return; }  // 2.146.0 B (#2453)
   if (t.id === 'bk-year') { BK.year = +t.value; BK.info = null; BK.euer = null; ofcDraw(); return; }
   if (t.id === 'bk-period') { BK.period = t.value; bkLoadUstva(); return; }
   if (t.id === 'bk-pyear') { BK.pyear = +t.value; bkLoadUstva(); return; }

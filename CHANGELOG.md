@@ -7,6 +7,26 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.146.0] - 2026-10-21
+
+Imports from everyday life: e-invoices are received and read, duplicates are found, several files and ZIPs go in at once, and a retention export comes before deleting an account or organisation.
+
+### Added
+- E-invoices received: XRechnung (UBL / CII) as .xml in the mail inbox, the document upload and the receipt button; the XML inside ZUGFeRD / Factur-X PDFs is read too. Supplier, number, dates, net / VAT per rate, gross, currency and IBAN come from the XML instead of text recognition; a readable view prints or saves the invoice as PDF (#2451).
+- Receipts: the same file is not stored twice ("This file exists already" with a link); the same invoice (supplier + number, or supplier + amount + date) is marked "Possibly a duplicate" and left out of the DATEV export unless chosen (#2452).
+- Receipts: several files at once, ZIP files and winmail.dat are unpacked (also in the mail inbox), several photos can be joined into one receipt (#2453).
+- Household import: a debit/credit column (S/H, Soll/Haben, D/C, -/+) with a Volksbank / Raiffeisenbank preset, several files or a ZIP, a whole import can be taken back, duplicates without the title (day + amount + counterpart IBAN), the date formats DD-MM-YYYY and YYYYMMDD, more than 3000 rows (#2455).
+- Legacy import: client addresses from separate columns (company, street, postcode, town, country), found by the header or chosen by hand; CSV files are read, old .xls files get a clear hint (#2456).
+- Contacts: several vCard files at once or one ZIP (e.g. Google Takeout), duplicates and limits as in the single import (#2457).
+- Retention export before deleting an account or an organisation: a readable ZIP with invoices (incl. e-invoices), receipts with their files, cash books, bank statements and the office log, with a table of contents and checksums. Deleting needs a finished export or an explicit waiver, both logged; the hint says: invoices and receipts 8 years, books 10 years (#2468).
+
+### Fixed
+- Bank import (office and household): CAMT.052 pending entries (status PDNG) are shown apart and never imported; the same booking in several reports is found by its reference (AcctSvcrRef / EndToEndId), also when it came first as pending; the dialog recommends CAMT.053 (#2469).
+- iPhone photos in HEIC format are read (text recognition, preview) (#2454).
+
+### Security
+- Security fix: file uploads, ZIP and XML reading, retention export.
+
 ## [2.145.0] - 2026-10-21
 
 Own windows open faster, the list CSV has more columns, the printable project starts with a project head, the sidebar shows the Kalmido mark.

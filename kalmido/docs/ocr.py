@@ -187,6 +187,11 @@ for k, v in ((resource.RLIMIT_AS, 768 << 20), (resource.RLIMIT_CPU, 20), (resour
         pass
 from PIL import Image, ImageOps
 Image.MAX_IMAGE_PIXELS = 80_000_000
+try:  # 2.146.0 B (#2454): HEIC / HEIF photos (pi-heif, read only); an image without it: no preview of them
+    import pi_heif
+    pi_heif.register_heif_opener()
+except Exception:
+    pass
 W = int(sys.argv[1])
 im = Image.open(io.BytesIO(sys.stdin.buffer.read()))
 im.draft("RGB", (W * 2, W * 3))
@@ -224,6 +229,46 @@ def thumb_bytes(data, kind):
     return None
 
 
+# 2.146.0 B (#2454): a HEIC / HEIF photo -> a JPEG for the text recognition (Tesseract reads no HEIF). Exit 3 = pi-heif is
+# missing in this image (the server says so, never a 500), any other failure = unreadable
+HEIF_WORKER = r"""
+import io, resource, sys
+for k, v in ((resource.RLIMIT_AS, 1024 << 20), (resource.RLIMIT_CPU, 30), (resource.RLIMIT_FSIZE, 0)):
+    try:
+        resource.setrlimit(k, (v, v))
+    except (ValueError, OSError):
+        pass
+from PIL import Image, ImageOps
+Image.MAX_IMAGE_PIXELS = 80_000_000
+have = True
+try:
+    import pi_heif
+    pi_heif.register_heif_opener()
+except ImportError:
+    have = False
+try:
+    im = Image.open(io.BytesIO(sys.stdin.buffer.read()))
+    im = ImageOps.exif_transpose(im).convert("RGB")
+except Exception:
+    sys.exit(2 if have else 3)
+b = io.BytesIO()
+im.save(b, "JPEG", quality=90)
+sys.stdout.buffer.write(b.getvalue())
+"""
+
+
+def heif_jpeg(data):
+    """(JPEG bytes, None) of a HEIC / HEIF photo, else (None, "no_heif" | "unreadable")."""
+    try:
+        p = subprocess.run([sys.executable, "-I", "-c", HEIF_WORKER], input=data, capture_output=True, timeout=OCR_PAGE_S,
+                           close_fds=True, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
+    except (OSError, subprocess.SubprocessError):
+        return None, "unreadable"
+    if p.returncode == 0 and p.stdout[:2] == b"\xff\xd8":
+        return p.stdout, None
+    return None, "no_heif" if p.returncode == 3 else "unreadable"
+
+
 QR_WORKER = r"""
 import ctypes, ctypes.util, io, json, resource, sys
 for k, v in ((resource.RLIMIT_AS, 768 << 20), (resource.RLIMIT_CPU, 20), (resource.RLIMIT_FSIZE, 0)):
@@ -233,6 +278,11 @@ for k, v in ((resource.RLIMIT_AS, 768 << 20), (resource.RLIMIT_CPU, 20), (resour
         pass
 from PIL import Image
 Image.MAX_IMAGE_PIXELS = 80_000_000
+try:  # 2.146.0 B (#2454): HEIC / HEIF photos
+    import pi_heif
+    pi_heif.register_heif_opener()
+except Exception:
+    pass
 lib = ctypes.CDLL(ctypes.util.find_library("zbar") or "libzbar.so.0")
 P = ctypes.c_void_p
 for fn, res, args in (("zbar_image_scanner_create", P, []), ("zbar_image_scanner_set_config", ctypes.c_int, [P, ctypes.c_int, ctypes.c_int, ctypes.c_int]),
@@ -321,6 +371,12 @@ def doc_text(name, mime, data, owner=None, lang=None):
             return {"error": "encrypted", "kind": kind}
     if kind not in ("pdf", "image"):
         return {"text": "", "method": "none", "kind": kind}
+    if kind == "image":
+        from ..files.photometa import pm_kind
+        if pm_kind(data[:64]) == "heif":  # 2.146.0 B (#2454): an iPhone photo -> JPEG first
+            data, e = heif_jpeg(data)
+            if e:
+                return {"error": e, "kind": kind}
     o = ocr_bytes(data, kind, lang)
     if o.get("error"):
         return {"error": o["error"], "kind": kind}
