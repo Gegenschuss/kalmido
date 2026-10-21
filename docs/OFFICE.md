@@ -1237,6 +1237,33 @@ there. Kalmido itself never runs a language model for this: the agent connected 
   they are empty, a plain address in the old free "Address lines" (street, postcode + city, maybe a country) is shown in
   the fields; saving the settings keeps it there, the free lines stay as they were.
 
+## Trial documents (2.144.10)
+
+To try the office out without touching the real number ranges, switch on **"Just to try"** when creating a document:
+the dialog of "New quotation", of "New invoice" ("Empty invoice") and of "Invoice from time entries" has this switch. It
+is off by default and the focus sits on "Create", so Enter creates a real document as before.
+
+A trial document
+
+- takes a number of its own range `TEST-001`, `TEST-002`, ... (one range per organisation or personal office, for all kinds);
+  the real ranges keep counting without gaps;
+- prints a large watermark "MUSTER" on every page and never becomes an e-invoice;
+- stays out of bookkeeping, exports, VAT, figures and reminders; documents made from it (invoice, credit note, reminder,
+  delivery note, progress invoice, document from a template) are trial documents too;
+- can be deleted by an admin at any time, also when it is finalised, sent, accepted or signed (the question reads
+  "Delete trial document?"). A person without an organisation is the admin of the personal office.
+
+The lists mark trial documents with a small tag "Trial", the editor head as well; documents from templates show the same
+tag. As soon as the office has trial documents, the list gets a filter "All / Real only / Trial only" (kept on this
+device) and admins see the line "Delete all trial documents": after a confirmation that names the number, all trial
+documents of the office go for good, with their payments, share links and stored PDFs. Real documents stay.
+
+A real document cannot be turned into a trial one later, nor the other way round.
+
+The first time someone creates a quotation or an invoice in an office that has no real one yet, the create dialog shows a
+hint about "Just to try". It goes away with its X or with "Create" and does not come back for this person and office
+(user setting `trial_hint_seen`).
+
 ## Finalising
 
 A document can be finalised (button "Finalise" in the editor, after a confirmation; any member of the organisation).

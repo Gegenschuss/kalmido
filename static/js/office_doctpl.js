@@ -78,7 +78,7 @@ function dtDocsHtml(seg) {
     <select id="dt-fs" aria-label="${esc(tr('Status'))}"><option value="">${tr('All states')}</option>${Object.entries(DT_ST).map(([k, n]) => `<option value="${k}" ${k === DT.fStatus ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select>
     <span class="spacer"></span><button class="btn sm pri" data-dt="new">${ic('plus', 's')}<span>${tr('New document')}</span></button></div>`;
   if (!docs.length) return bar + `<div class="empty nempty eact">${ic('file')}<span>${(d.docs || []).length ? tr('No documents match the filter.') : (d.templates || []).length ? tr('No documents yet. Create one from a template for a client.') : tr('No documents yet. Start with a template: take over a sample under Templates.')}</span>${!(d.templates || []).length ? `<button class="btn" data-dt="view" data-v="templates">${tr('Templates')}</button>` : ''}</div>`;
-  return bar + `<ul class="ofclist dtp-list" role="list">${docs.map(x => `<li><button type="button" class="ofcrow" data-dt="open" data-id="${x.id}"><span class="ofcn"><b>${esc(x.title || x.kind_label)}</b>
+  return bar + `<ul class="ofclist dtp-list" role="list">${docs.map(x => `<li><button type="button" class="ofcrow" data-dt="open" data-id="${x.id}"><span class="ofcn"><b>${esc(x.title || x.kind_label)}${typeof tri_tag === 'function' ? tri_tag(x) : '' /* 2.144.10 C (#2576) */}</b>
     <small class="muted">${esc([cdn_name(x.client_id, x.client_name), x.list_name, x.kind_label, fmtDateLoc((x.final_at || x.created_at || '').slice(0, 10))].filter(Boolean).join(' · '))}</small></span>${dtStTag(x)}${ic('chev', 's')}</button></li>`).join('')}</ul>`;
 }
 function dtTplsHtml(seg) {
@@ -95,7 +95,7 @@ function dtDocHtml(d) {
   const meta = [d.client_name ? `${ic('brief', 's')} <a href="#client/${d.client_id}">${esc(cdn_name(d.client_id, d.client_name))}</a>` : '', d.list_id ? `${ic('list', 's')} <a href="#l/${d.list_id}">${esc(d.list_name || tr('Project'))}</a>` : '',
     d.doc_id ? `${ic('receipt', 's')} <a href="#office/offers/${d.doc_id}">${esc(d.offer_number || tr('Quotation'))}</a>` : '', esc(d.kind_label)].filter(Boolean).join('<span class="muted"> · </span>');
   const head = `<div class="ofcbar">${back}<span class="spacer"></span>${draft ? '' : pdfBtn(pdf, 'PDF')}${d.status === 'signed' ? pdfBtn(spdf, tr('Signed PDF')) : ''}<button class="iconbtn" data-dt="more" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>
-    <div class="dtp-head"><h3>${esc(d.title || d.kind_label)} ${dtStTag(d)}</h3><p class="dtp-meta">${meta}</p></div>`;
+    <div class="dtp-head"><h3>${esc(d.title || d.kind_label)} ${dtStTag(d)}${typeof tri_tag === 'function' ? tri_tag(d) : ''}</h3><p class="dtp-meta">${meta}</p></div>`;
   if (draft) {
     const pv = DT.pv && DT.pv.id === d.id ? DT.pv : null;
     if (!pv) setTimeout(() => dtPreview(d.id), 0);

@@ -810,3 +810,9 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 @media (pointer:coarse) {
   .cb-bar select,#cb-vat,#bkb-doc{height:2.75rem;line-height:1.25}
 }
+/* 2.144.10 C (#2576): trial documents - a neutral tag, the "Delete all" line, the hint in the create dialog */
+.tri-tag{display:inline-flex;align-items:center;margin-left:.375rem;padding:0 .375rem;border:1px solid var(--line2);border-radius:.375rem;color:var(--muted);font-size:var(--fs-s);font-weight:500;line-height:1.5;vertical-align:.1em}
+.tri-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem;margin:.25rem 0 .5rem;font-size:var(--fs-s)}
+.tri-bar .tri-delall{display:inline-flex;align-items:center;gap:.25rem;min-height:2.75rem;color:var(--danger)}
+.tri-hint{background:var(--accent-soft);border-color:transparent}
+.tri-row .swl{min-width:0}
