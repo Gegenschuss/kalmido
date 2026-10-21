@@ -309,6 +309,19 @@ password. Every person who sees the calendar has their own link, and it only wor
 calendar (sharing ended, organisation left: the link stops). The feed lists the events with their repeat rules, without
 attendees and without your reminders; the subscribing app refreshes about every 15 minutes.
 
+**Holidays and absences (2.155).** The calendar views show the public holidays of your state and your own absences
+(vacation, days off, ...) as quiet all-day entries; with *Team absences* switched on also your colleagues' absences, only as
+"away" (never the kind or the note) and only of your own organisations. Calendar > Calendars > *Holidays and absences* has
+the three switches, the state of your holidays (German states and Austria, computed on the server without any service;
+empty = your organisation's state, a person without an organisation picks it here) and a *Subscription link* of your own
+absences plus the holidays (`…/ical/abs/<id>.<secret>.ics`; a sick leave shows as "Away"; new link / off as above).
+
+**Availability when inviting (2.155).** The event editor shows a free / busy bar for you and every invited colleague of your
+organisation for the day of the event (7 to 20 o'clock, wider when the event lies outside): busy spans grey, absences and
+holidays hatched, the event's time marked. The server sends only the spans (`GET /api/events/freebusy`), never titles,
+places or calendars; events shown as free, all-day and cancelled events do not count. People of other organisations get no
+bar; without an organisation you see your own. A CalDAV `free-busy-query` REPORT is still answered with 403.
+
 ## For admins
 
 ### Settings

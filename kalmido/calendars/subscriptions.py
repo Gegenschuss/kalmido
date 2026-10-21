@@ -1108,6 +1108,8 @@ def cal_events():
         evcals = {x["id"]: {"name": x["name"], "color": x["color"], "role": x["role"]} for x in cals_for(c, uid)}
     from ..hub.dispo import dsp_cal
     own = own + dsp_cal(c, uid, lo, hi)  # 2.50.0 (#1194): my bookings of the disposition, read-only
+    from ..hub.abscal import abc_cal
+    own = own + abc_cal(c, uid, lo, hi)  # 2.155.0 B (#2076): public holidays, my absences (+ the colleagues'), read-only
     if not CAL_ON:
         return jsonify(events=own, subs={}, evcals=evcals)
     # 2.52.0 B (#1128): w = a writable CalDAV subscription; its events carry uid, dvw_write and dvw_rec (a repeating series)

@@ -12568,5 +12568,18 @@
   "Suggest after": "Voorstellen na",
   "suggested": "voorgesteld",
   "Suggest payment reminders for overdue invoices": "Betalingsherinneringen voorstellen voor achterstallige facturen",
-  "Read|section": "Gelezen"
+  "Read|section": "Gelezen",
+  "Team absences": "Afwezigheid van het team",
+  "Holidays of": "Feestdagen van",
+  "As my organisation ({0})": "Zoals mijn organisatie ({0})",
+  "Holidays and absences": "Feestdagen en afwezigheid",
+  "no state chosen": "geen deelstaat gekozen",
+  "My absences": "Mijn afwezigheid",
+  "only “away”": "alleen ‘afwezig’",
+  "Anyone who has the link sees your absences. Keep it to yourself.": "Iedereen met de link ziet je afwezigheid. Houd hem voor jezelf.",
+  "busy": "bezet",
+  "{0}: {1} at this time": "{0}: op dit tijdstip {1}",
+  "Availability": "Beschikbaarheid",
+  "{0}: away": "{0}: afwezig",
+  "My absences and the public holidays of my state, for the calendar app of your phone. Nobody else’s absences are in it; a sick leave shows as “Away”.": "Je afwezigheid en de feestdagen van je deelstaat, voor de agenda-app van je telefoon. Afwezigheid van anderen staat er niet in; ziekteverlof verschijnt als ‘Afwezig’."
 }

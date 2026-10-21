@@ -73,7 +73,10 @@ async function ensureOcc(lo, hi) {
 // Events of the user's calendar subscriptions (Settings > Integrations > Calendars), synced by the server. Fetched
 // per visible range (not part of /api/state), kept in S.cal; the last few ranges stay in localStorage for offline
 // use. Events never behave like tasks: no drag, no checkbox; a click opens a small popover (cevPop).
-const calEvOn = () => !!((S.calendars?.enabled && S.calendars.subs > 0) || (feat('events') && ((S.evcals || []).length || S.cal.items.some(e => e.own) || +String(S.evsig || '').split('|')[0] > 0)));  // 2.21.0 (#659): own events too; 2.102.0 A (#2006): invitations alone
+const calEvOn = () => !!((S.calendars?.enabled && S.calendars.subs > 0) || (feat('events') && ((S.evcals || []).length || S.cal.items.some(e => e.own) || +String(S.evsig || '').split('|')[0] > 0)) || abcOn());  // 2.21.0 (#659): own events too; 2.102.0 A (#2006): invitations alone
+// 2.155.0 B (#2076): public holidays / absences come with the events answer (hub/abscal.py), switched in the "Calendars" window
+const abcOn = () => !S.me?.kid && (S.settings?.cal_holidays !== '0' || S.settings?.cal_abs !== '0' || S.settings?.cal_abs_team === '1');
+const abcX = e => e.holiday || e.absence;  // a read-only holiday / absence entry
 const fmtHM = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 function cevPrep(e) {  // local first / last day (+ Date objects for timed events)
   if (e.all_day) { e.d0 = e.start; e.d1 = e.end > e.start ? addDays(e.end, -1) : e.start; }
@@ -112,8 +115,8 @@ function calInvalidate() { S.cal.key = ''; S.cal.loading = ''; }
 const cevWs = e => !e.own || e.cal == null || wsObjIn(evCal(e.cal));
 const cevOn = d => S.cal.items.filter(e => e.d0 <= d && e.d1 >= d && cevWs(e));
 const cevSort = (a, b) => (b.all_day - a.all_day) || a.start.localeCompare(b.start) || a.title.localeCompare(b.title);
-const cevColor = e => e.booking ? 'var(--accent)' : e.own ? evCalColor(e) : cssColor(S.cal.subs[e.sub]?.color) || '#94a3b8';  // 2.50.0 (#1194): bookings
-const cevCal = e => e.booking ? tr('Disposition') : e.own ? evCalName(e) : S.cal.subs[e.sub]?.name || tr('Calendar');
+const cevColor = e => e.booking ? 'var(--accent)' : abcX(e) ? 'var(--muted)' : e.own ? evCalColor(e) : cssColor(S.cal.subs[e.sub]?.color) || '#94a3b8';  // 2.50.0 (#1194): bookings
+const cevCal = e => e.booking ? tr('Disposition') : e.holiday ? tr('Public holidays') : e.absence ? (e.absence === 'team' ? tr('Team absences') : tr('Absences')) : e.own ? evCalName(e) : S.cal.subs[e.sub]?.name || tr('Calendar');
 const cevTitle = e => e.title || tr('(no title)');
 // a timed event on day d is a block in the week grid, except on the middle days of a multi-day event (all-day row)
 const cevTimed = (e, d) => !e.all_day && !(e.d0 < d && e.d1 > d);
@@ -127,7 +130,7 @@ function cevTime(e, d) {
   return `${e.d0 === d ? fmtHM(e.s) : '…'}–${e.d1 === d ? fmtHM(e.e) : '…'}`;
 }
 // 2.52.0 (#1016): cgok = may be dragged into other days (caldrag.js)
-const cevChip = (e, d) => `<div class="cev${cevTimed(e, d) ? '' : ' allday'}${ap_draftCls(e)}${cg_canDrag(e) ? ' cgok' : ''}" data-cev="${e.id}" style="--cc:${cevColor(e)}" title="${esc(cevTitle(e))}">${cevTimed(e, d) && e.d0 === d ? `<span class="muted">${fmtHM(e.s)}</span> ` : ''}${esc(cevTitle(e))}</div>`;
+const cevChip = (e, d) => `<div class="cev${cevTimed(e, d) ? '' : ' allday'}${abcX(e) ? ' cevx' : ''}${ap_draftCls(e)}${cg_canDrag(e) ? ' cgok' : ''}" data-cev="${e.id}" style="--cc:${cevColor(e)}" title="${esc(cevTitle(e))}">${cevTimed(e, d) && e.d0 === d ? `<span class="muted">${fmtHM(e.s)}</span> ` : ''}${esc(cevTitle(e))}</div>`;
 const cevRow = (e, d) => `<div class="cevrow${ap_draftCls(e)}" data-cev="${e.id}" style="--cc:${cevColor(e)}" role="button" tabindex="0"><i class="cevdot"></i><span class="cevt">${cevTime(e, d)}</span><span class="cevn">${esc(cevTitle(e))}</span>${e.location ? `<span class="cevl">${esc(e.location)}</span>` : ''}<span class="cevc">${esc(cevCal(e))}</span></div>`;
 function cevTodayBlock() {  // "Events today" at the top of Today (setting cal_today)
   if (!feat('cal') || !calEvOn() || S.settings.cal_today === '0') return '';  // Calendar module off: gone here too
@@ -167,7 +170,7 @@ function cevPop(anchor, id) {
     ${e.location ? `<div class="cevm">${ic('mappin', 's')}<span>${esc(e.location)}</span></div>` : ''}
     <div class="cevm">${ic('cal', 's')}<span>${esc(cevCal(e))} · ${tr('read-only')}</span></div>
     ${desc ? `<div class="cevdesc">${cevLinkify(desc)}${e.description.length > 2000 ? '…' : ''}</div>` : ''}
-    <div class="cevact"><button class="btn sm pri" data-cevtask>${ic('plus', 's')} ${tr('Create task from event')}</button></div></div>`);
+    ${abcX(e) ? '' : `<div class="cevact"><button class="btn sm pri" data-cevtask>${ic('plus', 's')} ${tr('Create task from event')}</button></div>`}</div>`);  // 2.155.0 B (#2076)
   p.onclick = ev => { if (ev.target.closest('[data-cevtask]')) { closePop(); cevToTask(e); } };
 }
 // the task gets the event's title and start (date + time + duration), in the inbox; the panel opens to edit it
@@ -242,7 +245,7 @@ function calBar(title, done = true, extra = '') {
     <div class="calnav"><button class="iconbtn" data-act="cal-prev" title="${esc(tr('Previous period'))}" aria-label="${esc(tr('Previous period'))}">${ic('left')}</button><button class="btn sm" data-act="cal-today">${tr('Today')}</button><button class="iconbtn" data-act="cal-next" title="${esc(tr('Next period'))}" aria-label="${esc(tr('Next period'))}">${ic('right')}</button></div></div>`;
 }
 function isoWeek(s) { const d = pd(s); d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7); const w1 = new Date(d.getFullYear(), 0, 4); return 1 + Math.round(((d - w1) / 864e5 - 3 + (w1.getDay() + 6) % 7) / 7); }
-const cvxKey = e => e.own ? `e:${e.cal}` : `s:${e.sub}`;
+const cvxKey = e => e.holiday ? 'x:hol' : e.absence ? `x:${e.absence === 'team' ? 'team' : 'abs'}` : e.own ? `e:${e.cal}` : `s:${e.sub}`;  // 2.155.0 B (#2076): x = holidays / absences
 function cvxList(k) { try { const a = JSON.parse(S.settings?.[k] || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } }
 const cvxTodayOn = e => (e.own && e.cal == null) || !cvxList('today_cals_hidden').includes(cvxKey(e));
 const cvxTaskOn = t => S.settings?.cal_tasks !== '0' && !cvxList('cal_lists_hidden').includes(t.list_id);
@@ -268,6 +271,7 @@ function cvxVisibleCals(all) {
 // "Show in my calendar" for one calendar; draw = redraw the views (false while several are switched in a row)
 async function cvxShow(key, on, draw = true) {
   const [k, id] = key.split(':'), n = +id;
+  if (k === 'x') { await cvxSave(ABC_SET[id], on ? '1' : '0'); if (draw) cvxRedraw(); return true; }  // 2.155.0 B (#2076)
   try {
     if (k === 'e') { await api('PATCH', `/api/evcals/${n}`, {hidden: !on}); const c = evCal(n); if (c) c.hidden = !on; }
     else {
@@ -279,6 +283,12 @@ async function cvxShow(key, on, draw = true) {
   } catch { return false; }
   if (draw) cvxRedraw();
   return true;
+}
+const ABC_SET = {hol: 'cal_holidays', abs: 'cal_abs', team: 'cal_abs_team'};
+// 2.155.0 B (#2077): the event editor's availability bar lives in calabs.js (loaded on demand)
+function efb_go(md, atts, ev) {
+  if (!feat('events') || S.me?.kid) return;
+  if (typeof efb_draw === 'function') efb_draw(md, atts, ev); else loadModule('calabs').then(() => efb_draw(md, atts, ev)).catch(() => {});
 }
 function cvxRedraw() { calInvalidate(); renderView(); }  // the events are fetched again (hidden calendars send none)
 async function cvxTlHide(key, name) {  // timeline: a tap on the name hides the calendar, the toast takes it back

@@ -120,7 +120,7 @@ const utc = (d, h) => { const x = new Date(`${d}T${String(h).padStart(2, '0')}:0
   click(w, d.querySelector('#view .calbar [data-act="ev-cals"]'));
   await until(() => d.querySelector('.modal.evcmodal .cvxrow'));
   let md = d.querySelector('.modal.evcmodal');
-  check(md.querySelector('[data-cvx="tasks"]')?.checked === true && md.querySelectorAll('.evcrow').length === 2 && md.querySelectorAll('.cvxrow:not(.sub) [data-cvx="show"]').length === 2,
+  check(md.querySelector('[data-cvx="tasks"]')?.checked === true && md.querySelectorAll('.evcrow').length === 2 && md.querySelectorAll('.cvxrow:not(.sub):not(.abcrow) [data-cvx="show"]').length === 2,  // 2.155.0 B (#2076): + the rows of holidays / absences (abcrow)
     'window: Tasks (on), two own calendars, two subscriptions with a "show" switch');
   check(md.querySelectorAll('[data-cvx="today"]').length === 4 && md.querySelectorAll('[data-cvx="plan"]').length === 4 && [...md.querySelectorAll('[data-cvx="today"],[data-cvx="plan"]')].every(x => x.checked && !x.disabled),
     'window: Today + planning switches on every calendar row, all on');

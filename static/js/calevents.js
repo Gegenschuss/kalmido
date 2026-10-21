@@ -188,6 +188,7 @@ async function evEditor(o = {}) {
     $('#ev-rems', md).innerHTML = all.map(m => `<button type="button" class="chip evchip ${on.has(m) ? 'on' : ''}" data-evrem="${m}" aria-pressed="${on.has(m)}">${esc(evRemLabel(m, ad))}</button>`).join('');
   };
   const drawAtts = () => {
+    efb_go(md, atts, ev);  // 2.155.0 B (#2077): the availability bar (calabs.js)
     $('#ev-atts', md).innerHTML = atts.length ? atts.map((a, i) => `<span class="evatp ps-${esc(a.partstat || 'needs-action')}">${a.user_id ? av(a.user_id, a.name || ppl.get(a.user_id) || '') : ic(a.contact_id ? 'user' : 'at', 's')}<span>${esc(a.name || ppl.get(a.user_id) || a.email)}</span><span class="muted evps">${esc(tr(EV_PS_WORD[a.partstat || 'needs-action']))}</span><button type="button" class="iconbtn" data-evatrm="${i}" aria-label="${esc(tr('Remove {0}', a.name || a.email || ''))}">${ic('x', 's')}</button></span>`).join('')
       : `<span class="muted">${tr('Only you')}</span>`;
     evi_draw(md, atts);  // 2.111.0 B (#2056): the invitation switch (evinvite.js)
@@ -355,10 +356,11 @@ async function evCalsModal() {
       <i class="cevdot"></i><span class="evcn">${esc(c.name)}</span>${sw(c.key, 'show', c.on, false, tr('Show {0} in my calendar', c.name))}${three(c)}
       <button class="iconbtn" data-cvxmenu="${c.key}" data-name="${esc(c.name)}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', c.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`).join('')
       : `<p class="muted">${tr('No subscriptions yet. Add one under Settings > Integrations > Calendars.')}</p>`}`;
-    $('#evc-body', md).innerHTML = tl + own + sb;
+    $('#evc-body', md).innerHTML = tl + own + sb + (typeof abc_group === 'function' ? abc_group() : '');  // 2.155.0 B (#2076)
   };
   await cvxCals(true).catch(() => {});
   draw();
+  loadModule('calabs').then(() => { abc_wire(md, draw); draw(); }).catch(() => {});  // 2.155.0 B (#2076): holidays + absences
   const redraw = () => { cvxRedraw(); draw(); };
   const refresh = async () => { await load().catch(() => {}); await cvxCals(true).catch(() => {}); redraw(); };
   md.addEventListener('change', async e => {

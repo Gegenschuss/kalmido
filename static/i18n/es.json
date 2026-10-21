@@ -12568,5 +12568,18 @@
   "Suggest after": "Sugerir tras",
   "suggested": "sugerido",
   "Suggest payment reminders for overdue invoices": "Sugerir recordatorios de pago para facturas vencidas",
-  "Read|section": "Leído"
+  "Read|section": "Leído",
+  "Team absences": "Ausencias del equipo",
+  "Holidays of": "Festivos de",
+  "As my organisation ({0})": "Como mi organización ({0})",
+  "Holidays and absences": "Festivos y ausencias",
+  "no state chosen": "ninguna región elegida",
+  "My absences": "Mis ausencias",
+  "only “away”": "solo «ausente»",
+  "Anyone who has the link sees your absences. Keep it to yourself.": "Quien tenga el enlace ve tus ausencias. Guárdalo para ti.",
+  "busy": "ocupado",
+  "{0}: {1} at this time": "{0}: {1} a esta hora",
+  "Availability": "Disponibilidad",
+  "{0}: away": "{0}: ausente",
+  "My absences and the public holidays of my state, for the calendar app of your phone. Nobody else’s absences are in it; a sick leave shows as “Away”.": "Tus ausencias y los festivos de tu región, para la app de calendario de tu móvil. No incluye ausencias de otras personas; una baja por enfermedad aparece como «Ausente»."
 }

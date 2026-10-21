@@ -87,3 +87,5 @@
 .tpo-o .btn{align-self:flex-start;min-height:2.5rem}
 .tpo-dw{font-size:1.0625rem;margin:.25rem 0}
 @media (max-width:40rem){.tpo-row{grid-template-columns:minmax(0,1fr) minmax(0,6rem) auto}.tpo-o .btn{align-self:stretch;justify-content:center}}
+/* 2.155.0 B (#2076): public holidays / absences in the month and week views: a quiet outlined chip (calendar.js abcX) */
+.cal .cev.cevx,.week .cev.cevx{background:transparent;border-style:dashed;color:var(--text2)}

@@ -12568,5 +12568,18 @@
   "Suggest after": "Vorschlagen nach",
   "suggested": "vorgeschlagen",
   "Suggest payment reminders for overdue invoices": "Zahlungserinnerungen für überfällige Rechnungen vorschlagen",
-  "Read|section": "Gelesen"
+  "Read|section": "Gelesen",
+  "Team absences": "Abwesenheiten im Team",
+  "Holidays of": "Feiertage von",
+  "As my organisation ({0})": "Wie meine Organisation ({0})",
+  "Holidays and absences": "Feiertage und Abwesenheiten",
+  "no state chosen": "kein Bundesland gewählt",
+  "My absences": "Meine Abwesenheiten",
+  "only “away”": "nur „abwesend“",
+  "Anyone who has the link sees your absences. Keep it to yourself.": "Wer den Link hat, sieht deine Abwesenheiten. Behalte ihn für dich.",
+  "busy": "belegt",
+  "{0}: {1} at this time": "{0}: zu dieser Zeit {1}",
+  "Availability": "Verfügbarkeit",
+  "{0}: away": "{0}: abwesend",
+  "My absences and the public holidays of my state, for the calendar app of your phone. Nobody else’s absences are in it; a sick leave shows as “Away”.": "Deine Abwesenheiten und die Feiertage deines Bundeslands, für die Kalender-App deines Handys. Abwesenheiten anderer sind nicht dabei; eine Krankmeldung erscheint als „Abwesend“."
 }
