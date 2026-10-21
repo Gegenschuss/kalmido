@@ -100,7 +100,7 @@ async function wpSweep(only = null, all = false) {
 // the number on the app icon: unread News + unread chat messages (Badging API where there is one; 0 clears it)
 let badgeN = -1;
 function badgeSync() {
-  const n = collab() ? bellCount() : (teamOn() ? S.team?.unread || 0 : 0);  // 2.152.1 (#2626): the same number as the bell
+  const n = collab() ? bellCount() : (teamOn() ? S.team?.unread || 0 : 0);  // 2.161.2 (#2626): the same number as the bell
   if (n === badgeN || !navigator.setAppBadge) return;
   badgeN = n;
   (n > 0 ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});

@@ -22,7 +22,7 @@ function modal(html) {
 const DLG_SKIP = /^(modal|cdlg|authscreen|shopmode|smodal|lmodal|fgrqdlg|hidden|open|closing)$/;
 const dlg_key = m => { const c = [...m.classList].filter(x => !DLG_SKIP.test(x)).sort().join('.'); return c ? 'kalmido.dlgsize.' + c : ''; };
 const dlg_wide = () => { try { return matchMedia('(min-width: 900px) and (pointer: fine)').matches; } catch { return false; } };
-// 2.152.1 (#2615): only a dialog whose content can grow gets the grip: a text field, an editor, a preview, a scrolling list / table,
+// 2.161.2 (#2615): only a dialog whose content can grow gets the grip: a text field, an editor, a preview, a scrolling list / table,
 // or content that already overflows; a short one (confirm, password, one input) has none and forgets a size kept earlier
 const DLG_GROWS = 'textarea,[contenteditable="true"],[contenteditable=""],.editor,iframe,img,embed,object,canvas,table,.tbl,.list,.scroll,[class*="editor"]';
 function dlg_grows(card) {

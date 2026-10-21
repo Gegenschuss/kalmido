@@ -78,7 +78,7 @@ const V = B + 'api/v1';
   const bar = d.querySelector('#side .wsbar');
   check(bar && /All workspaces/.test(bar.textContent) && !bar.classList.contains('on') && !d.querySelector('#top .wschip'), '#935: the switch in the sidebar says "All workspaces" at first, no chip ' + (bar?.textContent || ''));
   click(w, bar); await until(() => d.querySelector('#pop [role="menuitem"]'));
-  const wsItems = [...d.querySelectorAll('#pop [role="menuitem"]:not(.wsm-home):not(.wsm-side)')].map(x => x.textContent.trim());  // 2.152.1 (#2607): + Start, Hide the sidebar
+  const wsItems = [...d.querySelectorAll('#pop [role="menuitem"]:not(.wsm-home):not(.wsm-side)')].map(x => x.textContent.trim());  // 2.161.2 (#2607): + Start, Hide the sidebar
   check(wsItems.length === 3 && /Private/.test(wsItems[0]) && wsItems[1].includes(ORGN) && /All workspaces/.test(wsItems[2]), '#935: the menu Private | organisation | All ' + wsItems.join('|'));
   w.eval('closePop()');
   const names = () => [...d.querySelectorAll('#side .srow[data-list] .n')].map(x => x.textContent.trim());

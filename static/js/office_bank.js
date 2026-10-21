@@ -188,7 +188,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
   };
   const take = fl => {
     files = [...(fl || [])]; if (!files.length) return;
-    Object.assign(st, {p: null, mapping: null}); card.innerHTML = botBusy(`<p class="muted">${tr('Loading…')}</p>`); preview(null);  // 2.152.1 (#2611): + the bot at work
+    Object.assign(st, {p: null, mapping: null}); card.innerHTML = botBusy(`<p class="muted">${tr('Loading…')}</p>`); preview(null);  // 2.161.2 (#2611): + the bot at work
   };
   md.addEventListener('click', async e => {
     const am = e.target.closest('#bi-am [data-am]');

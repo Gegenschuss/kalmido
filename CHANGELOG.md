@@ -5,6 +5,27 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.161.2] - 2026-10-21
+
+Package 2.152.1 (small fixes: navigation, News number).
+
+### Changed
+- Sidebar: the Kalmido brand (bot icon + word mark) is back on top and is the workspace switch; the shown workspace stands
+  under it (dot + name). Its menu also offers *Start* and *Hide the sidebar*; the small mark at the bottom is gone (#2607).
+- The bot figure stays alive: empty views keep a calm loop (a blink, a glance), the brand's bot blinks now and then;
+  nothing moves with the system setting *reduce motion* (#2608).
+- The bot nods once when the last open task of Today or of a list is ticked off (#2609), works in the agent chat instead
+  of the typing dots (#2610) and next to the progress of long jobs (ZIP / contacts import, bank statement, organisation
+  export, task import) (#2611).
+- Office: *Documents* follows *Quotes & invoices* in the menu; on a computer the office opens on the point used last on
+  this device, else the pipeline (admins) or quotes & invoices (#2616).
+
+### Fixed
+- The News number in the menu, the sidebar, the tab bar and the app badge is the same as the bell's ("For you" + direct
+  messages); activity only counts at its tab in the News view (#2626).
+- Dialogs: the resize grip only shows where the content can grow (text field, editor, list, preview), not on short
+  confirmations (#2615).
+
 ## [2.161.0] - 2026-10-21
 
 Bundle of the packages 2.152.0 (deletion rules and legal retention), 2.153.0 (correspondence, job chat, document fields, receipt list), 2.154.0 (documents: stack scans, task links, Peppol, privacy sheets), 2.155.0 (calendar: answers, rules, absences, availability, year), 2.156.0 (lists and views), 2.157.0 (project agents, job chat) and 2.161.0 (small interface fixes).

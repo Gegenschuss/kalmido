@@ -64,14 +64,14 @@ function wsBadge(l) {
 }
 // the switch in the sidebar (under the brand): one button naming the shown workspace (a long organisation name fits), the
 // menu offers Private | <organisations> | All workspaces
-// 2.152.1 A (#2607, variant B): the brand IS the switch: the bot icon + the word mark, big, on top; the shown workspace as
+// 2.161.2 A (#2607, variant B): the brand IS the switch: the bot icon + the word mark, big, on top; the shown workspace as
 // a small line under it (dot + name), an arrow on the right. The menu adds Start and "Hide the sidebar" (wsMenu).
 function wsBarHtml() {
   // 2.87.9 (#1933, P4): without an organisation the button stays and shows the private space (its menu has only that)
   const cur = wsOn() ? wsCur() : 'private';
   return `<button type="button" class="wsbar sbbrand ${cur === 'all' ? '' : 'on'}" data-act="ws-menu" aria-haspopup="menu" aria-label="${esc(APP_NAME + ' · ' + tr('Workspace') + ': ' + wsName(cur))}" title="${esc(tr('Workspace') + ' · ' + tr('Only this workspace is shown'))}"${wsp_attr(cur) /* 2.53.0 (#1474), 2.57.0 B (#1807) */}>${logoSvg(36)}<span class="sbbt">${wordSvg()}<span class="sbbsub">${cur === 'all' ? ic('brief', 's') : wsp_dot(cur) /* 2.138.0 B (#2161): colour dot (or the icon for "All") in front of the name */}<span class="wsn">${esc(wsName(cur))}</span></span></span>${ic('chev', 's') /* 2.138.0 B (#2161): name + arrow */}</button>`;
 }
-// 2.152.1 A (#2608): the brand's bot blinks now and then (every 20-60 s, by chance), never while something is typed, the
+// 2.161.2 A (#2608): the brand's bot blinks now and then (every 20-60 s, by chance), never while something is typed, the
 // page is hidden or a menu is open; no timer at all with reduced motion (the system setting; it can change while open)
 let wsBlinkT = 0;
 const wsBlinkCalm = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return true; } };
@@ -98,7 +98,7 @@ function wsChip() {
 function wsMenu(anchor) {
   const cur = wsOn() ? wsCur() : 'private';
   const opts = wsOn() ? wsOptions() : ['private'];
-  // 2.152.1 A (#2607): from the brand on top of the sidebar: a heading, then Start and hiding the sidebar (the drawer on a
+  // 2.161.2 A (#2607): from the brand on top of the sidebar: a heading, then Start and hiding the sidebar (the drawer on a
   // phone closes; on a computer the sidebar folds away into the header's menu button, the same switch as side-fold)
   const brand = !!anchor?.closest?.('.sbbrand'), fold = !!LS.get('sideFold', false), drawer = isMobile() || !!$('#app')?.classList.contains('side-rail');
   const p = menu(anchor, [...(brand ? [{head: tr('Workspace')}] : []), ...opts.map(ws => ({label: wsName(ws), icon: ws === 'private' ? 'home' : ws === 'all' ? 'grid' : 'brief', on: ws === cur, fn: () => wsSet(ws)})),

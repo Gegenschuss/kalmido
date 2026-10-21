@@ -64,7 +64,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     await nav(B + '#office/offers');
     check(await ready(ev, `!!document.querySelector('#view .ofwrap > .ofrail') && typeof OFC === 'object' && !!OFC.info`, 80), '#2180: the rail left of the page');
     const pts = await ev(`[...document.querySelectorAll('#view .ofrail .ofrg')].map(g => g.dataset.ofmg + ':' + [...g.querySelectorAll('.ofri')].map(b => b.dataset.ofm).join('+')).join(' ')`);
-    // 2.152.1 (#2616): Documents follow Quotes & invoices
+    // 2.161.2 (#2616): Documents follow Quotes & invoices
     // 2.153.0 (#2028): + letters (tab Correspondence) at the end of 'sell'
     check(pts === 'sell:pipeline+offers+gendocs+clients+contacts+contracts+letters money:cashflow+kpi+bank+books+subs+travel+meals+cashbook admin:equipment+agreements+settings', '#2180: groups and points in order (P4: all of them) ' + pts);  // 2.121.0 (#2095): + cashbook under Money  // 2.119.0 (#2288): + meals (entertainment receipts) under Money
     check(await ev(`[...document.querySelectorAll('#view .ofrail .ofrh')].map(h => h.textContent.trim()).join('|') === 'Sell|Money|Administration' && !document.querySelector('#view .ofrail .ofrh svg')`), '#2180: three small caps headings without icons');

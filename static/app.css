@@ -3601,7 +3601,7 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
   .bot.b-erledigt .b-hop{animation:b-hop .75s cubic-bezier(.3,.7,.4,1) .15s 1}
   .bot.b-arbeitet .b-ant{animation:b-sway 1.6s ease-in-out infinite}
   .bot.b-wartet .b-ant{animation:b-bob 2.4s ease-in-out infinite}
-  /* 2.152.1 A (#2608): on an empty page the figure stays alive: after the opening move a calm loop, now and then a
+  /* 2.161.2 A (#2608): on an empty page the figure stays alive: after the opening move a calm loop, now and then a
      blink or a glance (every 5-8 s), the happy one hops again every 10 s */
   .hempty .bot.b-ruhig .b-eyes{animation:b-blink .36s ease-in-out .9s 1,b-idle 16s ease-in-out 4s infinite}
   .hempty .bot.b-schaut .b-eyes{animation:b-look .7s cubic-bezier(.3,.7,.4,1) .25s 1 both,b-idle 16s ease-in-out 4s infinite}
@@ -7950,7 +7950,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 @media (pointer:coarse){ #side .sbdock .sbacct{width:2.75rem;height:2.75rem} }
 @media (forced-colors:active){ #side{border-top-color:Highlight} }
 
-/* 2.152.1 A (#2607, variant B): the brand on top of the sidebar is the workspace switch: the bot icon + the word mark,
+/* 2.161.2 A (#2607, variant B): the brand on top of the sidebar is the workspace switch: the bot icon + the word mark,
    the shown workspace as a small line under it (dot + name), an arrow on the right; the small mark at the bottom
    (2.145.0 A #2437) is gone. :root:root beats the plain head rules of the switch (2.138.2 C) and the compact density. */
 :root:root #side .sbhead .wsbar.sbbrand{flex:1 1 auto;width:auto;max-width:100%;min-height:2.25rem;padding:0 .375rem;margin-left:-.375rem;gap:.625rem;border:0;border-radius:var(--radius);background:none;color:var(--text);font-size:1rem;font-weight:600}
@@ -7964,7 +7964,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #side .sbbrand .sbbsub svg.i{width:.75rem;height:.75rem;flex:none}
 #side .sbbrand > svg.i:last-child{flex:none;margin-left:auto}
 @media (pointer:coarse){ :root:root #side .sbhead .wsbar.sbbrand{min-height:2.75rem} }  /* the head keeps its height (2.25 rem, 2.75 on touch): it sits on the middle of #top (#2438) */
-/* 2.152.1 A (#2608): the brand's bot blinks now and then (wsBlink, workspace.js); nothing with reduced motion */
+/* 2.161.2 A (#2608): the brand's bot blinks now and then (wsBlink, workspace.js); nothing with reduced motion */
 #side .sbbrand svg.logo .lg-eyes{transform-box:fill-box;transform-origin:50% 50%}
 @media (prefers-reduced-motion: no-preference){ #side .sbbrand.blink svg.logo .lg-eyes{animation:b-blink .36s ease-in-out 1} }
 
@@ -8013,7 +8013,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .cfktl:hover{background:var(--bg3)}
 .fxhelp code{font:var(--fs-xs)/1.4 var(--mono);padding:0 .1875rem;border-radius:var(--r-s);background:var(--bg3)}
 
-/* 2.152.1 (#2609-#2611): bot moments. #2609: the figure of the view that just became empty nods once (palette.js botNod);
+/* 2.161.2 (#2609-#2611): bot moments. #2609: the figure of the view that just became empty nods once (palette.js botNod);
    #2610: the agent chat's "working" line shows the small bot at work instead of the dots (listedit.js typingHtml);
    #2611: long jobs show the bot at work beside their text / bar (palette.js botBusy). Motion only without reduced motion. */
 @media (prefers-reduced-motion: no-preference){

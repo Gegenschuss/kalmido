@@ -28,7 +28,7 @@ const mg_feats = id => (mg_area(id)?.[3] || []).flatMap(p => p[4]());
 // the tab the area opens with: the one last used on this device (LS mgTab), else its first switched-on part
 function mg_target(id) {
   const ps = mg_parts(mg_area(id)), last = (LS.get('mgTab', {}) || {})[id];
-  if (id === 'office' && !isMobile() && ps.some(p => p[0] === 'office')) return ofm_entry().go;  // 2.152.1 (#2616)
+  if (id === 'office' && !isMobile() && ps.some(p => p[0] === 'office')) return ofm_entry().go;  // 2.161.2 (#2616)
   return (ps.find(p => p[0] === last) || ps[0] || [id])[0];
 }
 function mg_seen(mod) {
@@ -109,7 +109,7 @@ function ofm_cur(mod) {
   if (mod === S.route.mod && t && t !== 'start') ofm_remember(t);
   return t === 'start' || ofm_all().some(i => i.key === t && i.go.startsWith('office/')) ? t : isMobile() ? 'start' : (ofm_entry().key);
 }
-// 2.152.1 (#2616): the office opens on the point used last on this device (LS ofmLast); nothing kept, or gone / not allowed: the
+// 2.161.2 (#2616): the office opens on the point used last on this device (LS ofmLast); nothing kept, or gone / not allowed: the
 // Pipeline for admins (a person without an organisation is the admin of the own office), else Quotes & invoices
 function ofm_remember(key) { const o = LS.get('ofmLast', null); if (o !== key) LS.set('ofmLast', key); }
 function ofm_entry() {

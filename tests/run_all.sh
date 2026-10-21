@@ -1486,7 +1486,7 @@ fresh; run p2151_a_api "$PY" p2151_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2151_a_ui node p2151_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.151.0 part B: rule for software agents - the task list is the truth for tickets and releases (#2560)
 fresh; run p2151_b_api "$PY" p2151_b_api_test.py "$KALMIDO_TEST_DATA"
-# 2.152.1 part B: bot moments - a nod for the last task ticked off, the bot at work in the agent chat and beside long jobs (#2609 #2610 #2611)
+# 2.161.2 part B: bot moments - a nod for the last task ticked off, the bot at work in the agent chat and beside long jobs (#2609 #2610 #2611)
 fresh; run p21521_b_ui node p21521_b_ui.js "$KALMIDO_TEST_DATA"
 shard 18  # 2.142.2: shard 17 hit the 45 min CI limit - the 2.138-2.142 groups moved here; 20.10.2026 (job #692): the parked releases 2.111-2.113.0 (new suites still go to shard 17 above)
 # 2.138.0 part A: office quotations - unit in percent rows, part rename on the title page, wrapped part headings, unit words by quantity; service worker other origins (#2236 #2239 #2240 #2249 #2257)
@@ -1791,9 +1791,9 @@ fresh; run p2161_a_ui node p2161_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.162.0 part A (#2603): test phase - an admin deletes a finalised / sent invoice (typed number, cash book on request)
 fresh; run p2162_a_api "$PY" p2162_a_invoice_delete_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2162_a_ui node p2162_a_ui.js "$KALMIDO_TEST_DATA"
-# 2.152.1 part C: #2626 one News number, #2615 grip only for growing dialogs, #2616 office order + entry
+# 2.161.2 part C: #2626 one News number, #2615 grip only for growing dialogs, #2616 office order + entry
 fresh; run p2152a_c_ui node p2152a_c_ui.js "$KALMIDO_TEST_DATA"
-# 2.152.1 part A: the sidebar brand is the workspace switch, the bot figure stays alive (#2607 #2608)
+# 2.161.2 part A: the sidebar brand is the workspace switch, the bot figure stays alive (#2607 #2608)
 fresh; run p2152a_ui node p2152a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi

@@ -1,4 +1,4 @@
-// 2.152.1 UI tests, part A (#2607 the brand on top of the sidebar is the workspace switch, #2608 the bot figure stays
+// 2.161.2 UI tests, part A (#2607 the brand on top of the sidebar is the workspace switch, #2608 the bot figure stays
 // alive), own container (start.sh, mode workspaces), Firefox (desktop + phone; reduced motion on = the ff.js default,
 // one run with motion on). P2152A_NOSTART=1 = the container is running.
 const path = require('path');

@@ -77,7 +77,7 @@ function fitLayout(quiet) {
   const narrow = innerWidth - (panelRem('side') + (det ? detR : 0)) * rem - (yieldC ? 0 : chatW) < LIST_MIN_PX;  // 2.26.0 (#932): the sidebar's own width
   // 2.13.0 (#453 A15): below ~1100 px (an unfolded Fold, small windows) the sidebar can be folded away by hand (remembered
   // per device); the header's menu button opens it as a drawer then, like on a phone
-  // 2.152.1 A (#2607): "Hide the sidebar" in the brand's menu folds it away on any width (the button in the head stays < 1100 px)
+  // 2.161.2 A (#2607): "Hide the sidebar" in the brand's menu folds it away on any width (the button in the head stays < 1100 px)
   const on = !isMobile() && (narrow || !!LS.get('sideFold', false));
   if (app.classList.contains('side-rail') === on) return;
   app.classList.toggle('side-rail', on);

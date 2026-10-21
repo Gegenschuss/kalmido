@@ -94,7 +94,7 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
   // the menu of the switch: a dot in front of each workspace, none in front of "All"
   click(w, bar());
   await until(() => d.querySelector('#pop:not(.hidden) [role="menuitem"]'));
-  const items = [...d.querySelectorAll('#pop [role="menuitem"]:not(.wsm-home):not(.wsm-side)')];  // 2.152.1 (#2607): the brand's menu adds Start + Hide the sidebar
+  const items = [...d.querySelectorAll('#pop [role="menuitem"]:not(.wsm-home):not(.wsm-side)')];  // 2.161.2 (#2607): the brand's menu adds Start + Hide the sidebar
   check(items.length === 3 && items.filter(x => x.querySelector('.wsp-dot')).length === 2 && items[0].querySelector('.wsp-dot[data-wsc]')?.getAttribute('style')?.includes('#2dd4bf'), '#1807: the switch menu: a dot per workspace (Private in my teal), none for "All"');
   w.eval('closePop()');
   // Private shown: my colour; "All": neutral

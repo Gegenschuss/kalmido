@@ -720,10 +720,10 @@ function celeCheck(b) {
     }
   }
   if (!hit) return;
-  botNod();  // 2.152.1 (#2609)
+  botNod();  // 2.161.2 (#2609)
   if (S.settings.celebrate !== '0') celebrate(...hit);
 }
-// 2.152.1 (#2609): the last open task of Today or of a list ticked off: the figure of the now empty view nods once (also
+// 2.161.2 (#2609): the last open task of Today or of a list ticked off: the figure of the now empty view nods once (also
 // with the celebration switched off: it is part of the empty view, not the celebration). Not for every task (celeCheck
 // only gets here for the last one), never a loop, nothing at all with reduced motion.
 function botNod() {
@@ -733,7 +733,7 @@ function botNod() {
   f.classList.add('bnod');
   f.addEventListener('animationend', e => { if (e.animationName === 'b-nod') f.classList.remove('bnod'); });
 }
-// 2.152.1 (#2611): a long job (a ZIP import, a bank statement being read, an export) shows the bot at work next to what it
+// 2.161.2 (#2611): a long job (a ZIP import, a bank statement being read, an export) shows the bot at work next to what it
 // shows anyway: html = the text / bar beside it (they stay as they were), no html = the figure alone (for a box of its own
 // layout). Decorative (aria-hidden, botFig): the text says what happens. Still with reduced motion (app.css).
 const botBusy = (html = null, cls = '') => html == null ? botFig('arbeitet', 'bbusy')

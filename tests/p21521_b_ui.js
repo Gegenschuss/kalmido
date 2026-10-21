@@ -1,4 +1,4 @@
-// 2.152.1 part B UI tests (#2609 #2610 #2611): bot moments, own container (start.sh), jsdom, a person without an organisation.
+// 2.161.2 part B UI tests (#2609 #2610 #2611): bot moments, own container (start.sh), jsdom, a person without an organisation.
 // - #2609: only the LAST open task of a list ticked off makes the figure of the now empty view nod (class bnod), the first
 //   one not; also with the celebration switched off; with reduced motion nothing
 // - #2610: the agent chat's line under the messages shows the bot at work (svg.bot.b-arbeitet) instead of the dots, the
@@ -86,7 +86,7 @@ const RM = '(prefers-reduced-motion: reduce)';
   w.close();
 
   // ================= the CSS: the new motion only without reduced motion
-  const a = css('app.css'), blk = a.slice(a.indexOf('/* 2.152.1 (#2609-#2611)'));
+  const a = css('app.css'), blk = a.slice(a.indexOf('/* 2.161.2 (#2609-#2611)'));
   check(blk.length > 50 && /@media \(prefers-reduced-motion: no-preference\)\{\s*\.bot\.bnod \.b-hop\{animation:b-nod[^}]*\}\s*\.bot\.bnod \.b-ant\{animation:b-wave/.test(blk), 'CSS: the nod only with motion allowed');
   check(!/animation:/.test(blk.replace(/@media \(prefers-reduced-motion: no-preference\)\{[\s\S]*?\n\}/, '')), 'CSS: no animation outside the no-preference block');
   check(/@media \(prefers-reduced-motion: no-preference\)\{[^@]*\.bot\.b-arbeitet \.b-ant\{animation:b-sway/.test(a), 'CSS: the bot at work sways only with motion allowed (2.136.0 block)');

@@ -47,7 +47,7 @@ const FEAT = 'cal,comments,collab,clients';
   check(w.eval(`feat('office')`), 'the switch turns the module on');
   d.querySelector('.smodal')?.remove(); w.eval('render()');
   // 2.93.1: poll instead of a fixed 400 ms (CI shard twice too slow for the sidebar after render)
-  // 2.152.1 (#2616): the entry opens the office on its first / last point (data-go office/…)
+  // 2.161.2 (#2616): the entry opens the office on its first / last point (data-go office/…)
   check(await until(() => !!d.querySelector('#side [data-go^="office"]')), 'on: sidebar entry');
 
   // ================= the view (admin)

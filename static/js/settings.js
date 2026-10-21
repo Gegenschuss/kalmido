@@ -1075,7 +1075,7 @@ function impInit(md) {
   }
   async function preview() {
     if (!I.file) return;
-    out.innerHTML = botBusy(`<div class="muted mhint">${tr('Reading the file…')}</div>`);  // 2.152.1 (#2611): the bot at work
+    out.innerHTML = botBusy(`<div class="muted mhint">${tr('Reading the file…')}</div>`);  // 2.161.2 (#2611): the bot at work
     try { I.last = await api('POST', `/api/import/${I.src}`, form(true)); draw(I.last); }
     catch { out.innerHTML = ''; }
   }

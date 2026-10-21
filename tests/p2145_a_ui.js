@@ -1,4 +1,4 @@
-// 2.145.0 UI tests, part A (#2433 lilac logo, #2437 logo + word mark at the bottom (2.152.1 #2607: on top, the workspace switch), #2438 head centred on the page header,
+// 2.145.0 UI tests, part A (#2433 lilac logo, #2437 logo + word mark at the bottom (2.161.2 #2607: on top, the workspace switch), #2438 head centred on the page header,
 // #2444 hint for unread news in other workspaces), own container (start.sh, mode workspaces), Firefox (desktop + phone).
 // P2145A_NOSTART=1 = the container is running.
 const path = require('path');
@@ -42,7 +42,7 @@ const FEAT = 'cal,comments,collab';
   // geometry for failure messages
   const dbg = `(() => { const r = e => { if (!e) return null; const b = e.getBoundingClientRect(); return [Math.round(b.top), Math.round(b.height)]; }, q = s => document.querySelector(s), cs = getComputedStyle(q('#side'));
     return JSON.stringify({side: r(q('#side')), pt: cs.paddingTop, bt: cs.borderTopWidth, fix: r(q('#side .sbfix')), head: r(q('#side .sbhead')), ws: r(q('#side .wsbar')), top: r(q('#top')), h1: r(q('#top h1')), menu: r(q('#top .menu')), tools: r(q('#side .sbtools')), st: q('#side').scrollTop, fcs: [getComputedStyle(q('#side .sbfix')).marginTop, getComputedStyle(q('#side .sbfix')).top, getComputedStyle(q('#side .sbfix')).position], first: q('#side').firstElementChild.className, ot: q('#side .sbfix').offsetTop, tr: cs.transform, ptsb: cs.getPropertyValue('--sbpt')}); })()`;
-  // 2.152.1 (#2607): the small mark at the bottom is gone; the brand on top (logo + word mark) is the workspace switch, its
+  // 2.161.2 (#2607): the small mark at the bottom is gone; the brand on top (logo + word mark) is the workspace switch, its
   // menu has Start
   const sbmark = `(() => { const b = document.querySelector('#side .sbhead .sbbrand'); if (!b) return null; const lg = b.querySelector('svg.logo'), w = b.querySelector('svg.kword');
     return {act: b.dataset.act, plate: lg && lg.querySelector('rect').getAttribute('fill'), word: !!w, inside: b.scrollWidth <= b.clientWidth + 1, tag: b.tagName, old: !!document.querySelector('#side .sbmark')}; })()`;
@@ -55,7 +55,7 @@ const FEAT = 'cal,comments,collab';
     await signIn(ev, 'alice');
     await nav(B + '#news');
     check(await ready(ev, `!!document.querySelector('#side .sbhead .wsbar')`, 80), 'the app is up');
-    // ===== #2433 / #2437; 2.152.1 (#2607): the mark moved to the top (the brand = the workspace switch), Start in its menu
+    // ===== #2433 / #2437; 2.161.2 (#2607): the mark moved to the top (the brand = the workspace switch), Start in its menu
     const mk = await ev(sbmark);
     check(mk && mk.tag === 'BUTTON' && mk.act === 'ws-menu' && !mk.old, '#2607: the brand on top is a button opening the workspace menu, no mark at the bottom: ' + JSON.stringify(mk));
     check(mk && mk.plate === '#6d4bd8' && mk.word && mk.inside, '#2433: the logo plate is lilac, the word mark shows, nothing overflows: ' + JSON.stringify(mk));
@@ -86,7 +86,7 @@ const FEAT = 'cal,comments,collab';
     m = await ev(mids);
     check(m && Math.abs(m[0] - m[1]) <= 2.5, '#2438: phone, drawer open, the head and the page header share a middle: ' + JSON.stringify(m) + ' ' + await ev(dbg));
     await shot('p2145-a-drawer-phone.png');
-    check(await ev(brandStart), '#2607: on the phone the brand menu has Start');  // 2.152.1 (#2607): was the mark at the bottom
+    check(await ev(brandStart), '#2607: on the phone the brand menu has Start');  // 2.161.2 (#2607): was the mark at the bottom
     check(await ready(ev, `S.route.mod === 'home' && !document.querySelector('#side.open')`), '#2437: on the phone Start opens the start page and closes the drawer');
   }, false);
 

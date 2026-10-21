@@ -1,4 +1,4 @@
-// 2.152.1 UI tests, part C (#2626 #2615 #2616). Own container (start.sh), jsdom. freelancer-matrix: office / news
+// 2.161.2 UI tests, part C (#2626 #2615 #2616). Own container (start.sh), jsdom. freelancer-matrix: office / news
 // - #2626: unread Activity only (For you 0): the bell count is 0, the "More" menu and the sidebar row show no number,
 //   the app badge number is the bell's; with something for me every place shows the same number
 // - #2615: a short dialog (password) is not "growing" (no grip, a kept size is dropped), one with a text field is

@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.161.2** (2026-10-21): the **Kalmido brand is back on top of the sidebar** and is the workspace switch, the
+  **bot figure comes alive** (empty views, a nod for the last task ticked off, at work in the agent chat and beside long
+  imports and exports; still with *reduce motion*), the **News number is the bell's number everywhere**, the office opens
+  on the point used last.
 - **2.161.0** (2026-10-21): the **organisation's own picture** can also be uploaded and removed in the admin dialog
   *Edit organisation*, not only in Settings > Workspaces.
 - **2.157.0** (2026-10-21): **agent setup with one command, tried on a real Mac**: setup over SSH works without a screen
