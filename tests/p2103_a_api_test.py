@@ -312,6 +312,17 @@ if os.environ.get("P2103A_NOSTART") != "1":
           "hosted A2: the organisation goes with the booked receipt in its trash after the waiver " + r.text[:200])
     if not r.ok:
         app_log()
+    # 2.152.0 (#2164, review A3): a person with a booked private receipt: no retired office, the account goes with it
+    HID, Hr = freelancer(B, A, "hanna")
+    HR = booked(Hr, "private", "beleg-privat.txt")
+    p = A.get(B + f"/api/users/{HID}/delete-info").json().get("purge") or {}
+    check(p.get("office") != "keep" and not p.get("kept_until") and not p.get("kept"), f"hosted A3: delete-info keeps nothing {p}")
+    r = A.delete(B + f"/api/users/{HID}", params={"retention": "waived"})
+    check(r.ok and not sql("SELECT 1 FROM users WHERE id=?", (HID,)) and not sql("SELECT 1 FROM fs_nodes WHERE id=?", (HR,))
+          and not sql("SELECT 1 FROM orgs WHERE retired_personal=1 AND name=?", ("Hanna",)),
+          "hosted A3: the account goes with its booked receipt, no office is retired " + r.text[:200])
+    if not r.ok:
+        app_log()
 
 print(f"p2103_a_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
