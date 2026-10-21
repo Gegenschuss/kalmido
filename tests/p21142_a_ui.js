@@ -1,6 +1,7 @@
 // 2.114.2 part A UI test (#2263), own container (start.sh): the "More" menu of a finalised quotation that was never sent
 // offers "Undo finalising" and "Delete" (the confirmation names the gap in the office log); a sent one offers neither; the
-// row menu of the list follows the server's can_delete. Invented names only. P21142A_NOSTART=1 = the server already runs.
+// row menu of the list follows the server's can_delete. 2.144.8 (#2573), test phase: a sent one offers "Delete" (not "Undo
+// finalising"), the confirmation says it was sent. Invented names only. P21142A_NOSTART=1 = the server already runs.
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, errs, sleep, B, login} = require('./boot');
@@ -57,10 +58,10 @@ const FEAT = 'clients,office';
   check(asked.some(m => /gap in the office log/.test(m)), 'the confirmation names the gap ' + asked.join(' || '));
   w.close();
 
-  // ================= sent: neither
+  // ================= sent: no undo finalising; 2.144.8 (#2573) test phase: delete
   w = await boot({user: 'alice', hash: 'office/offers/' + S.id}); d = w.document;
   await open(w, d);
-  check(names(d).length && !names(d).includes('Delete') && !names(d).includes('Undo finalising'), 'sent: no delete, no undo finalising ' + names(d).join(' | '));
+  check(names(d).includes('Delete') && !names(d).includes('Undo finalising'), 'sent: delete, no undo finalising ' + names(d).join(' | '));
   w.close();
 
   // ================= the list's row menu
@@ -74,7 +75,17 @@ const FEAT = 'clients,office';
   await sleep(300);
   row(S.id)?.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
   await until(() => items(d).some(b => b.textContent.trim() === 'Open'));
-  check(!names(d).includes('Delete') && !names(d).includes('Undo finalising'), 'row menu, sent: neither ' + names(d).join(' | '));
+  check(names(d).includes('Delete') && !names(d).includes('Undo finalising'), 'row menu, sent: delete only (test phase) ' + names(d).join(' | '));
+  w.close();
+
+  // ================= 2.144.8 (#2573): the sent one goes, the confirmation says it was sent
+  asked.length = 0;
+  w = await boot({user: 'alice', hash: 'office/offers/' + S.id}); d = w.document;
+  w.confirm = m => { asked.push(String(m)); return true; };
+  await open(w, d);
+  items(d).find(b => b.textContent.trim() === 'Delete')?.click();
+  check(await until(async () => (await fetch(B + 'api/office/docs/' + S.id, {headers: {...H, Cookie: CK}})).status === 404), 'the sent quotation deleted');
+  check(asked.some(m => /was sent; it disappears anyway/.test(m)), 'the confirmation says it was sent ' + asked.join(' || '));
   w.close();
 
   check(errs.length === 0, 'no JS errors: ' + errs.slice(0, 3).join(' | '));

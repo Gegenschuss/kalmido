@@ -11828,6 +11828,7 @@
   "This quotation was sent to the client; the record is kept": "Questo preventivo è stato inviato al cliente; il registro viene conservato",
   "An invoice or a document was made from this quotation; the record is kept": "Da questo preventivo è già stata creata una fattura o un documento; il registro viene conservato",
   "Its number stays used and shows as a gap in the office log.": "Il suo numero resta assegnato e compare come lacuna nel registro dell'ufficio.",
+  "The quotation was sent; it disappears anyway.": "Il preventivo è stato inviato; scompare comunque.",
   "Undo finalising": "Annulla la finalizzazione",
   "Back to a draft?": "Tornare a bozza?",
   "The quotation can be changed again and keeps its number {0}.": "Il preventivo si può di nuovo modificare e mantiene il numero {0}.",

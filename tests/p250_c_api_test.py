@@ -242,7 +242,9 @@ check(x["state"] == "accepted" and x["signer_name"] == "Max <b>Muster</b>" and x
 y = Bo.get(B + f"/api/office/docs/{DOC}/signoffs").json()["signoffs"][0]
 check(y["signer_name"] == "Max <b>Muster</b>" and y["signer_email"] is None and y["ip"] is None and y["user_agent"] is None,
       f"a member: no e-mail / address / device {y}")
-check(A.delete(B + f"/api/office/docs/{DOC}").status_code == 409, "a signed quotation cannot be deleted (the record is kept)")
+# 2.144.8 (#2573) test phase: a signed quotation may be deleted by the admin (not done here: DOC is used below)
+d = A.get(B + f"/api/office/docs/{DOC}").json()
+check(d["can_delete"] is True and d.get("delete_sent") is True, f"a signed quotation: can_delete (test phase), the confirmation says it was sent {d.get('can_delete')} {d.get('delete_sent')}")
 log = A.get(B + f"/api/office/docs/{DOC}/log").json().get("log") or []
 acts = [e["action"] for e in log]
 check("signoff_accepted" in acts and "signoff_link" in acts and "status" in acts, f"office log {acts}")

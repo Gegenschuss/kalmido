@@ -438,8 +438,12 @@ def doc_public(c, oid, r, admin, items=True):
         u = c.execute("SELECT display_name, username FROM users WHERE id=?", (r["locked_by"],)).fetchone()
         d["locked_by_name"] = (u["display_name"] or u["username"]) if u else ""
     d["can_edit"] = not locked and r["status"] != "sent"  # 2.38.0: sent documents are locked as well
-    d["can_unlock"] = bool(admin) and locked and not bga_offer_block(c, oid, r)  # 2.114.2 A (#2263): back to a draft, or delete
-    d["can_delete"] = d["can_unlock"] if locked else bool(admin) and r["status"] != "sent" and not odoc_seq_numbered(r)
+    d["can_unlock"] = bool(admin) and locked and not bga_offer_block(c, oid, r)  # 2.114.2 A (#2263): back to a draft
+    if OFFER_DELETE_TESTPHASE and r["kind"] == "offer":  # 2.144.8 (#2573): delete has its own, wider rule in the test phase
+        d["can_delete"] = bool(admin) and not bga_offer_delete_block(c, oid, r)
+        d["delete_sent"] = d["can_delete"] and bga_offer_was_sent(c, oid, r)  # the confirmation says it went out
+    else:
+        d["can_delete"] = d["can_unlock"] if locked else bool(admin) and r["status"] != "sent" and not odoc_seq_numbered(r)
     d["number_at_finalize"] = ofx_number_at_finalize(office_settings(c, oid), r["kind"])
     if r["kind"] == "invoice":  # 2.120.0 D (#2089): "attach timesheet" is offered when the invoice has a client and a period
         d["timesheet_ok"] = bool(r["client_id"] and r["service_from"] and r["service_to"])
@@ -1033,6 +1037,11 @@ def odoc_list():
         for b, r in zip(rows, raw):
             if b["locked"] and r["status"] == "draft":
                 b["can_delete"] = b["can_unlock"] = not bga_offer_block(c, oid, r)
+        if OFFER_DELETE_TESTPHASE:  # 2.144.8 (#2573): every quotation nothing was made from (two queries for the whole list)
+            used, sent = bga_offer_marks(c, oid)
+            for b, r in zip(rows, raw):
+                b["can_delete"] = r["id"] not in used
+                b["delete_sent"] = b["can_delete"] and (r["status"] != "draft" or bool(r["sent_at"]) or r["id"] in sent)
     if kind in ("invoice", "reminder"):  # 2.40.0 (#1368 points 8 + 9): open reminder fees, settled reminders ("done")
         from .invoices import fd_reminder_extra
         fd_reminder_extra(c, oid, rows)
@@ -1276,16 +1285,50 @@ def bga_offer_block(c, oid, r):
         return BGA_SENT
     if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (r["id"], oid)).fetchone():
         return N_("The customer has signed this quotation; the record is kept")
-    if c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND source_doc_id=? LIMIT 1", (oid, r["id"])).fetchone() or \
-            c.execute("SELECT 1 FROM office_gen_docs WHERE org_id=? AND doc_id=? LIMIT 1", (oid, r["id"])).fetchone():
+    if bga_offer_used(c, oid, r):
         return BGA_USED
     return None
+
+
+# 2.144.8 (#2573): test phase - an admin may delete a quotation even after it was sent, answered or signed by the customer;
+# only one that an invoice or a document was made from stays. "Undo finalising" keeps the rule above (bga_offer_block).
+# False = exactly the rule of 2.114.2 again.
+OFFER_DELETE_TESTPHASE = True  # #2574: vor Launch auf False
+
+
+def bga_offer_used(c, oid, r):
+    return bool(c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND source_doc_id=? LIMIT 1", (oid, r["id"])).fetchone() or
+                c.execute("SELECT 1 FROM office_gen_docs WHERE org_id=? AND doc_id=? LIMIT 1", (oid, r["id"])).fetchone())
+
+
+def bga_offer_delete_block(c, oid, r):
+    """2.144.8 (#2573): why finalised document r cannot be deleted (None = it can); outside the test phase = bga_offer_block."""
+    if OFFER_DELETE_TESTPHASE and r["kind"] == "offer":
+        return BGA_USED if bga_offer_used(c, oid, r) else None
+    return bga_offer_block(c, oid, r)
+
+
+def bga_offer_was_sent(c, oid, r):
+    """2.144.8 (#2573): the quotation left the house (a status past draft, mailed, a logged send, answered by the customer)."""
+    return bool(r["status"] != "draft" or r["sent_at"] or
+                c.execute("SELECT 1 FROM office_doc_log WHERE org_id=? AND doc_id=? AND action='send' LIMIT 1", (oid, r["id"])).fetchone() or
+                c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (r["id"], oid)).fetchone())
+
+
+def bga_offer_marks(c, oid):
+    """2.144.8 (#2573): for the list - the ids of the quotations something was made from, and of those sent / answered."""
+    used = {x[0] for x in c.execute("SELECT source_doc_id FROM office_docs WHERE org_id=? AND source_doc_id IS NOT NULL", (oid,)).fetchall()}
+    used |= {x[0] for x in c.execute("SELECT doc_id FROM office_gen_docs WHERE org_id=? AND doc_id IS NOT NULL", (oid,)).fetchall()}
+    sent = {x[0] for x in c.execute("SELECT doc_id FROM office_doc_log WHERE org_id=? AND action='send' AND doc_id IS NOT NULL", (oid,)).fetchall()}
+    sent |= {x[0] for x in c.execute("SELECT doc_id FROM office_signoffs WHERE org_id=? AND state <> 'open' AND doc_id IS NOT NULL", (oid,)).fetchall()}
+    return used, sent
 
 
 @app.delete("/api/office/docs/<int:did>")
 def odoc_delete(did):
     """The organisation's admin only (members: 403); a finalised document: 409 (2.114.2 A, #2263: except a finalised
-    quotation that was never sent, see bga_offer_block)."""
+    quotation that was never sent, see bga_offer_block; 2.144.8, #2573: in the test phase every quotation nothing was made
+    from, see bga_offer_delete_block). The office log has no foreign key to the document: its entries stay."""
     c, uid, oid = _ctx()
     write_lock(c, f"office_mail_{int(oid)}")  # 2.114.2 (#2263 review): no mail send / unlock / finalise in between
     write_lock(c, f"office_doc_{int(did)}")
@@ -1293,15 +1336,16 @@ def odoc_delete(did):
     if office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     locked = ofx_locked(r)
-    if locked:
-        why = bga_offer_block(c, oid, r)
+    test = OFFER_DELETE_TESTPHASE and r["kind"] == "offer"  # 2.144.8 (#2573): the same rule as can_delete
+    if locked or test:
+        why = bga_offer_delete_block(c, oid, r)
         if why:
             raise Denied(409, tr(why))
     else:
         ofx_need_editable(r)
         if odoc_seq_numbered(r):  # 2.126.0 A (#1966)
             raise Denied(409, tr(ODOC_SEQ_KEPT))
-    if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (did, oid)).fetchone():
+    if not test and c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (did, oid)).fetchone():
         raise Denied(409, tr("The customer has signed this quotation; the record is kept"))  # 2.50.0 (#1200 review)
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net"),
                                                   **({"locked": True} if locked else {})})  # 2.114.2 A (#2263): the number gap stays traceable
