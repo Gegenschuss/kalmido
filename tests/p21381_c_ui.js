@@ -35,8 +35,9 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   await until(() => d.querySelector('#side .sbhead .wsbar'), 60);
   const fix = d.querySelector('#side .sbfix');
   check(fix && fix.firstElementChild?.classList.contains('sbhead'), '#2392: the head opens the fixed part (the stripe is #side\'s top border)');
-  // 2.145.0 (#2437): the logo + word mark came back at the BOTTOM of the sidebar (.sfoot .sbmark, p2145_a_ui); the head stays without them
-  check(!d.querySelector('#side .sbrand') && !d.querySelector('#side .sbhead svg.logo') && !d.querySelector('#side .sbfix svg.logo') && !d.querySelector('#side .sbhome'), '#2392: no logo, no app name in the sidebar head');
+  // 2.145.0 (#2437): the logo + word mark came back at the BOTTOM of the sidebar; 2.152.1 (#2607): they moved into the head,
+  // the brand IS the workspace switch (p2152a_ui), no extra brand row / home button
+  check(!d.querySelector('#side .sbrand') && d.querySelector('#side .sbhead .wsbar.sbbrand svg.logo') && d.querySelectorAll('#side svg.logo').length === 1 && !d.querySelector('#side .sbhome'), '#2392 / #2607: the logo only inside the workspace switch on top');
   const bar = d.querySelector('#side .sbhead .wsbar');
   check(bar && bar === d.querySelector('#side .sbhead button') && bar.dataset.act === 'ws-menu' && /Private/.test(bar.querySelector('.wsn')?.textContent || '') && bar.querySelector('.wsp-dot') && bar.querySelector('svg.i:last-child'), '#2392: row 1 = the workspace switch: dot + name + arrow');
   check(d.querySelector('#side .sbhead .sbtools .kbfoldall'), '#2392: fold-all sits in the head\'s tools (hover / focus)');
