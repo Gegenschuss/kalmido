@@ -115,6 +115,7 @@ APP_TO_API = {
     "GET /api/lists/{}/status": ["GET /lists/{}/overview"],
     "POST /api/lists/{}/status": ["PUT /lists/{}/status"],
     "GET /api/lists/{}/repos": ["GET /lists/{}/repos"],
+    "GET /api/lists/{}/build-status": ["GET /lists/{}/build-status"],  # 2.151.0 A (#2558)
     "GET /api/lists/{}/notify-template": ["GET /lists/{}/notify-template"],  # 2.33.0 (#927): agents read it, never change it
     "POST /api/filters": ["POST /filters"],
     "PATCH /api/filters/{}": ["PATCH /filters/{}"],
@@ -384,7 +385,8 @@ APP_ONLY = [
      ("* /api/tasks/{}/bell",)),
     ("repositories: their secrets are entered by people; the API reads them (GET /lists/{id}/repos)", (
         "POST /api/lists/{}/repos", "* /api/repos/", "POST /api/hooks/git/", "POST /api/tasks/{}/git-undo",
-        "* /api/folders/repos", "PUT /api/lists/{}/folder-repo")),  # 2.33.0 (#934): folder repositories, read through /lists/{id}/repos
+        "* /api/folders/repos", "PUT /api/lists/{}/folder-repo",
+        "PUT /api/lists/{}/repos/version-field")),  # 2.151.0 A (#2558): which field holds the version, set with the repository  # 2.33.0 (#934): folder repositories, read through /lists/{id}/repos
     ("2.18.0: the error-report webhook of a list: its secret URL is shown once to people (owner / list admins); the inbound hook "
      "is called by the error service, not by a client", ("* /api/lists/{}/error-hook", "POST /api/hooks/issues/")),
     # 2.115.0 A (#2061): inbound webhooks of a list -- a secret URL shown once to people (owner / list admins), called by the

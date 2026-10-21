@@ -416,7 +416,9 @@ check(rp and rp["full_name"] == "acme/app" and rp["default_branch"] == "main" an
       and rp["provider"] == "github" and rp["web_url"] == f"{GH}/acme/app" and rp["api_url"] == GH + "/api/v3"
       and rp["others"][0]["full_name"] == "team/tool" and "token" not in json.dumps(rp), f"assigned event: repo: {rp}")
 j = ag.get(f"/tasks/{T9}").json()
-check(j.get("repo", {}).get("branch") == f"kalmido-{T9}" and j.get("code") == {"prs": [], "commits": []}, f"get_task: repo + code: {j.get('repo')}")
+# 2.151.0 (#2558): code also carries the build state (nothing linked yet: none)
+check(j.get("repo", {}).get("branch") == f"kalmido-{T9}" and {k: v for k, v in j.get("code", {}).items() if k != "build"} == {"prs": [], "commits": []}
+      and j["code"].get("build", {}).get("state") == "none", f"get_task: repo + code: {j.get('repo')}")
 j = ag.get(f"/tasks/{T1}").json()
 check({p["n"] for p in j.get("code", {}).get("prs", [])} == {5, 10} and j["code"]["prs"][0]["n"] == 5, f"get_task code (open first): {j.get('code')}")
 url = f"{GH}/acme/app/pull/11"

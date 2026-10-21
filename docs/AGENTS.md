@@ -2713,8 +2713,17 @@ You are the coding agent of the Kalmido list "<list>". You work through the Kalm
 - If you are stuck or unsure: ask in a comment and wait; do not guess on anything irreversible.
 ```
 
-MCP tools for this: `get_task` (with `code` and `repo`), `list_repos`, `request_merge_approval`, `wait_for_events`,
-`set_status`, `add_comment`, `report_usage`.
+MCP tools for this: `get_task` (with `code` and `repo`), `list_repos`, `list_build_status` (2.151.0), `request_merge_approval`,
+`wait_for_events`, `set_status`, `add_comment`, `report_usage`.
+
+2.151.0 (#2558): `code.build` / `repo.build` of a task and `list_build_status` (`GET /api/v1/lists/{id}/build-status`) tell
+what Kalmido saw in the repository: `state` `released` (a linked commit or the merge commit of a linked pull request is in
+a version tag; `version` = the highest one, null when it is older than every tag Kalmido compared), `main` (in the default
+branch, no tag yet), `branch` (only on a branch / an open pull request) or `none`; `branches` = the task's branches with
+commits the default branch lacks (`ahead`); `package` = the list's package / version field (a text field named Package,
+Version, Release, Target version ..., or the one picked in the repository dialog) with `released` = a tag with exactly that
+version exists (2.151 = 2.151.0; "2.46c" is never released) and `latest`; `stale` = the task is open although its package or
+its code is released. `list_build_status` lists the open tasks of a list that are stale or have work only on a branch.
 
 ## Example: a Claude Code session that polls Kalmido
 
@@ -2781,7 +2790,7 @@ with the scope it needs). The tools:
   `delete_chat_attachment`
 - projects: `get_project_overview`, `set_project_overview`, `set_project_status`, `add_project_link`,
   `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`,
-  `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `list_repos`, `list_environments` (2.60.0), `set_deployment` (2.60.0)
+  `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `list_repos`, `list_build_status` (2.151.0), `list_environments` (2.60.0), `set_deployment` (2.60.0)
 - time and habits: `get_timer`, `start_timer`, `stop_timer`, `list_time_entries`, `get_time_gaps` (2.34.0), `add_time_entry`, `update_time_entry`,
   `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`, `get_habit_stats` (2.138.1)
 - News: `list_news`, `mark_news_read`
@@ -2825,7 +2834,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_playbook`,
 `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`,
 `get_timer`, `get_usage`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`, `ingredients_to_shopping`,
-`link_contact`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_calendar_events`, `list_chats`,
+`link_contact`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_calendar_events`, `list_chats`,
 `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`, `list_events`, `list_fields`,
 `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`, `list_jobs`, `list_kids`,
 `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`, `list_notes`, `list_office_data`,

@@ -12568,5 +12568,18 @@
   "Suggest after": "Voorstellen na",
   "suggested": "voorgesteld",
   "Suggest payment reminders for overdue invoices": "Betalingsherinneringen voorstellen voor achterstallige facturen",
-  "Read|section": "Gelezen"
+  "Read|section": "Gelezen",
+  "In version {0}": "In versie {0}",
+  "In an earlier version": "In een eerdere versie",
+  "In {0}, not released yet": "In {0}, nog niet uitgebracht",
+  "Built, not in {0} yet": "Gebouwd, nog niet in {0}",
+  "Branch {0}": "Branch {0}",
+  "Package {0} is already released, but the task is still open.": "Pakket {0} is al uitgebracht, maar de taak staat nog open.",
+  "Its code is in version {0}, but the task is still open.": "De code zit in versie {0}, maar de taak staat nog open.",
+  "Its code is already released, but the task is still open.": "De code is al uitgebracht, maar de taak staat nog open.",
+  "{0} commit ahead": ["{0} commit voor", "{0} commits voor"],
+  "Not built yet": "Nog niet gebouwd",
+  "Automatic ({0})": "Automatisch ({0})",
+  "Version field": "Versieveld",
+  "A task whose version is already released but which is still open gets a hint. Automatic: a text field named Package, Version or Release.": "Een taak waarvan de versie al is uitgebracht maar die nog open staat, krijgt een hint. Automatisch: een tekstveld met de naam Pakket, Versie of Release."
 }
