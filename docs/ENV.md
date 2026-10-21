@@ -242,6 +242,8 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `KALMIDO_AGENT_BURST_QUIET_S` | `15` | Seconds without more new tasks after which the burst summary of an agent is sent. |
+| `KALMIDO_AGENT_BURST_S` | `60` | Seconds in which several new tasks of an agent count as one burst (one summary event). |
 | `KALMIDO_AGENT_EVENTS_STALE_H` | `48` | Hours after which unread agent events count as stale. |
 | `KALMIDO_AGENT_PUSH_DAY` | `500` | Push notifications per agent and day. |
 | `KALMIDO_AGENT_WAITERS` | `6` | Agent connections waiting for events on the whole server at the same time. |
@@ -296,4 +298,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `KALMIDO_TEST` | `0` | Switch: marks a test container (set by tests/start.sh); only then KALMIDO_TEST_NOW and KALMIDO_TEST_RATE_WINDOW_S work. Never on a real server. |
+| `KALMIDO_TEST_NOW` | `(empty)` | Test containers only (with KALMIDO_TEST=1): the server clock starts at this ISO time and runs on from there. |
+| `KALMIDO_TEST_NOW_AT` | `(empty)` | Test containers only: the real Unix second KALMIDO_TEST_NOW belongs to (app and worker share one shifted clock). |
 | `KALMIDO_TEST_ROT_ABORT` | `(empty)` | Tests: stop the key rotation right after the switch (1). |

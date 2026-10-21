@@ -271,6 +271,11 @@ VARS = (
 
     # ---- tests and development
     _v("KALMIDO_TEST_ROT_ABORT", "", "Tests: stop the key rotation right after the switch (1).", "test"),
+    _v("KALMIDO_TEST", "0", "Switch: marks a test container (set by tests/start.sh); only then KALMIDO_TEST_NOW and KALMIDO_TEST_RATE_WINDOW_S work. Never on a real server.", "test"),
+    _v("KALMIDO_TEST_NOW", "", "Test containers only (with KALMIDO_TEST=1): the server clock starts at this ISO time and runs on from there.", "test"),
+    _v("KALMIDO_TEST_NOW_AT", "", "Test containers only: the real Unix second KALMIDO_TEST_NOW belongs to (app and worker share one shifted clock).", "test"),
+    _v("KALMIDO_AGENT_BURST_S", "60", "Seconds in which several new tasks of an agent count as one burst (one summary event).", "agents"),
+    _v("KALMIDO_AGENT_BURST_QUIET_S", "15", "Seconds without more new tasks after which the burst summary of an agent is sent.", "agents"),
 )
 
 _BY = {v[0]: v for v in VARS}

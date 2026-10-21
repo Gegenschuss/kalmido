@@ -464,7 +464,7 @@ def appver_stamp(c):
     have = appver_parse(r[0]) if r else None
     if have and have >= mine:
         return
-    if have:
+    if have and have[:2] < mine[:2]:  # 2.149.0 review: only a minor step moves prev (a failed x.y.0 + its patch keep the way back)
         c.execute("INSERT INTO kalmido_meta(key,value) VALUES('app_version_prev',?) ON CONFLICT(key) DO UPDATE SET "
                   "value=excluded.value", (r[0],))
     c.execute("INSERT INTO kalmido_meta(key,value) VALUES('app_version',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",

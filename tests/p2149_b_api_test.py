@@ -95,7 +95,10 @@ if STARTED:
 for who, s in (("signed in", A), ("freelancer", Fr), ("no cookie", anon)):
     r = s.get(B + "/static/app.css")
     t = timing(r)
-    check(r.ok and t is not None and t[2] == 0, f"#2505: a static file costs no database statement ({who}: {t})")
+    # 2.149.0 review: Server-Timing only for signed-in requests; static files skip the session, so no header (or n=0)
+    check(r.ok and (t is None or t[2] == 0), f"#2505: a static file costs no database statement ({who}: {t})")
+r = anon.get(B + "/api/state")
+check("Server-Timing" not in r.headers, f"review: no Server-Timing without signing in {r.headers.get('Server-Timing')!r}")
 bad = requests.Session()
 bad.cookies.set("kalmido_session", "not-a-session")
 for p in ("/static/js/core.js", "/sw.js", "/robots.txt", "/sw-manifest.json"):

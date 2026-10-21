@@ -45,7 +45,8 @@ def rt_out(resp):
     ms = (time.perf_counter() - t0) * 1000
     n, dbs = st if st else (0, 0.0)
     dbms = dbs * 1000
-    resp.headers["Server-Timing"] = f'app;dur={ms:.1f}, db;dur={dbms:.1f};desc="n={n}"'
+    if getattr(g, "user", None):  # 2.149.0 review: only for signed-in people (counts would differ on login / reset paths)
+        resp.headers["Server-Timing"] = f'app;dur={ms:.1f}, db;dur={dbms:.1f};desc="n={n}"'
     if not _skip_ring(request.path):
         with _RLOCK:
             _RING.append((ms, n, dbms))

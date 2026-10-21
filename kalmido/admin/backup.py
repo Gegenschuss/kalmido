@@ -29,7 +29,7 @@ from ..core.env import env_bool
 from ..accounts.session import _rate_blocked, _rate_fail, _rate_keys, GATE, set_cookie, start_session
 from ..accounts.login import _AUTH_KEY, _PEND, _PEND_LOCK, seal, unseal
 from ..accounts.oidc import _OIDC_LOCK, _OIDC_STATES, oidc_reset
-from ..core.access import Denied
+from ..core.access import Denied, acx_drop
 from ..tasks.validation import valid_hm
 from ..tasks.lifecycle import UNDO_KEY
 from ..collab.news import NEWS_CLEAN
@@ -38,7 +38,6 @@ from ..calendars.caldav import _DAV_CACHE, _DAV_CACHE_LOCK, _DAV_INST
 from ..notify.push import _b64u, _b64u_dec, _VAPID
 from ..notify.alerts import _clamp_int, _env_int, aa_count, aa_disk, aa_now, aa_oserr, aa_switch
 from ..calendars.subscriptions import _CAL_KEY
-from ..core.env import env_bool
 
 
 # ---------------------------------------------------------------- backups + restore (admins)
@@ -1081,6 +1080,7 @@ def _reset_caches():
     """In-process state that belongs to the database (after a restore)."""
     for d in (_CAL_KEY, UNDO_KEY, _AUTH_KEY, _BK["meta"]):
         d.clear()
+    acx_drop()  # 2.149.0 review: cached access contexts belong to the old database
     _VAPID.clear()
     with _PEND_LOCK:
         _PEND.clear()

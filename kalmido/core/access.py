@@ -230,6 +230,9 @@ def acx_gen_setup(c):
     c.execute(ACX_GEN_FN)
     for t, ev in ACX_GEN_TRIGGERS.items():
         c.execute(f"CREATE OR REPLACE TRIGGER kalmido_acx_{t} AFTER {ev} ON {t} FOR EACH STATEMENT EXECUTE FUNCTION kalmido_acx_bump()")
+    # 2.149.0 review: a new generation on every start / after a restore (the dump brings an old value along)
+    c.execute("INSERT INTO kalmido_meta(key, value) VALUES ('acx_gen', md5(random()::text || clock_timestamp()::text)) "
+              "ON CONFLICT (key) DO UPDATE SET value = excluded.value")
 
 
 def _acx_gen(c):
