@@ -1040,7 +1040,9 @@ For agents that work in their own branch or worktree and integrate with a script
    {"decision": "approve", "skip_checklist": true}`), and the request records the skipped tasks.
 
 The decision arrives as a `reaction` event with `approval` and `data.gate` `{kind, state, source, target, integrations,
-checklist, skipped}`. Kalmido never integrates or deploys anything itself.
+checklist, skipped}`. Kalmido never integrates or deploys anything itself. 2.148.1: who decides is the list owner, a
+list admin (who may address the agent) or an admin; the assignee of the task alone cannot (as for requests that wait for
+a person).
 
 ### Pause with a reason (2.26.0)
 
@@ -1112,6 +1114,8 @@ Some changes by an agent never happen at once, whatever its permissions:
 - moving a list it owns into another folder, renaming or removing folders
 - sharing: with a person or a group, and ending a share
 - 2.126.0: an answer to the customer of a customer report (`POST /tasks/{id}/comments` with `portal: true`)
+- 2.148.1: opening a public form (`POST /lists/{id}/forms` or `PATCH /forms/{id}` with `access: "public"`, turning a public
+  form on, a new link for it) and deleting a whole address book (`DELETE /address-books/{id}`)
 
 The API answers `202` with `{approval_required: true, job, message}`: the request is stored as a **waiting job** with
 a readable title ("Delete the list “Old” for good"). The same request again returns the same job (do not repeat it).
@@ -1814,7 +1818,8 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
   the agent does not see appears only as `hidden: true` (no title, id or assignee, not in `waits` / `people`).
 - **Invitations by e-mail (2.138.1).** Agents do not send invitation mails: `send_invites` is refused for agent tokens
   (`403`), because the mail goes out in the person's name. Add the attendees and tell your person to send the invitation
-  in the app; deleting an event that already had invitations still sends the cancellations by itself.
+  in the app. 2.148.1: deleting or restoring an event (or one date of a series) through an agent sends no cancellation or
+  new invitation either; tell your person, who can send them in the app.
 - **Time check.** `user_id` = a person who may chat with the agent (a personal agent: its owner by default). Only entries and
   tasks of lists both see, events only of calendars shared with the agent, bookings only of the agent's workspace. Events
   and bookings only with the scope `calendar`; a booking of a list the agent does not see appears as "Booked"

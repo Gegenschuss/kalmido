@@ -40,8 +40,8 @@
 - Your token has fine permissions (scopes): `GET /api/v1/me` shows them in `token.effective_scopes`, and the MCP
   server lists only the tools you may use. A 403 with `required_scope` means: ask an owner to grant it in Kalmido; never
   work around it with other access.
-- Deleting lists or fields, emptying the trash, changing 10 or more tasks at once, moving lists and sharing wait for a
-  person: the answer is 202 with a waiting job. Do not repeat the request; the result comes as a `job` event.
+- Deleting lists or fields, emptying the trash, changing 10 or more tasks at once, moving lists and sharing, opening a
+  public form and deleting an address book wait for a person: the answer is 202 with a waiting job. Do not repeat the request; the result comes as a `job` event.
 - A denied or unanswered permission request (of Kalmido or of your host) is a no: do not retry it or work around it;
   say in your answer what was denied. Your host's permission questions are answered only by your operator; when someone
   else's order needs one, the step is denied and that person is told so.
