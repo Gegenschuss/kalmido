@@ -17,6 +17,7 @@ usage: p21481_d_api_test.py <datadir>      (P21481D_NOSTART=1: a running server 
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -242,6 +243,15 @@ check(EML not in kids and PLAIN in kids, f"... not in the listing, the other fil
 check(Bo.get(B + f"/api/files/nodes/{EML}").status_code == 404, "a member with folder access: 404")
 check(Ca.get(B + f"/api/files/nodes/{EML}").ok, "the mail's recipient reads it")
 check(Ca.get(B + f"/api/files/nodes/{EML}/content").ok, "... and downloads it")
+# 2.148.1 G (#2488): an external link of the folder follows the same rule (its creator's rights)
+r = A.post(B + f"/api/files/nodes/{FOLD}/ext-links", json={})
+check(r.ok and r.json().get("links"), "an external link of the folder " + r.text[:160])
+XP = re.sub(r"^https?://[^/]+", "", r.json()["links"][0]["url"]) if r.ok else "/s/f/x"
+page = requests.get(B + XP, timeout=30).text
+check("mail.eml" not in page and "plain.txt" in page, "external folder link: the filed mail is not listed, the other file is")
+r = requests.get(B + XP + f"/d/{EML}", timeout=30, allow_redirects=False)
+check(r.status_code != 200 and b"hello" not in r.content, f"external folder link: no download of the filed mail {r.status_code}")
+check(requests.get(B + XP + f"/d/{PLAIN}", timeout=30).content == b"just a file", "external folder link: the other file downloads")
 
 # ================================================================== #2489 assistant: own lists only
 AL = A.post(B + "/api/lists", json={"name": "Alice work", "org_id": ORG}).json()["id"]
