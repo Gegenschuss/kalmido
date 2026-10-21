@@ -32,7 +32,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
 FAILS, OKS = [], [0]
-FEAT = "cal,comments,collab,fields,events,files,time,office,wiki,clients"
+FEAT = "cal,comments,collab,fields,events,files,docs,time,office,wiki,clients"  # 2.152.0 review A2: + docs (receipts)
 O = "/api/office"
 KEYENV = " -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY=" + "A" * 43 + "="
 
@@ -261,6 +261,18 @@ check(sql("SELECT COUNT(*) FROM wiki_pages WHERE org_id=?", (BETA,)) == [(1,)], 
 r = A.delete(B + f"/api/admin/orgs/{BETA}?confirm=1")
 check(r.ok and not sql("SELECT 1 FROM orgs WHERE id=?", (BETA,)) and not sql("SELECT 1 FROM wiki_pages WHERE org_id=?", (BETA,)),
       "Beta: deleted with confirm=1, the page with it " + r.text[:160])
+
+# 2.152.0 (#2167, review A6): an organisation with only a cash book entry keeps it (books, 10 years)
+DEL = A.post(B + "/api/admin/orgs", json={"name": "Delta Kiosk", "admin_id": ALICE}).json()["id"]
+A.patch(B + "/api/settings", json={"workspace": f"org:{DEL}"})
+A.get(B + O + "/settings")
+j = A.get(B + O + "/cashbooks").json()
+r = A.post(B + O + f"/cashbooks/{j['books'][0]['id']}/entries", json={"day": j["today"], "dir": "in", "amount": "15", "text": "Kiosk sale", "vat_pct": "7"})
+check(r.status_code == 201, "Delta: a cash book entry " + r.text[:160])
+A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
+r = A.delete(B + f"/api/admin/orgs/{DEL}")
+check(r.status_code == 409 and r.json().get("kept", {}).get("cash") == 1 and r.json().get("retain_until") == f"{int(j['today'][:4]) + 10}-12-31"
+      and "1 cash book entry" in r.json().get("error", ""), "review A6: the cash book is kept by law (retired, not deleted) " + r.text[:200])
 
 # ================================================================== #2167 an organisation with a finalised invoice: retired
 GAM = A.post(B + "/api/admin/orgs", json={"name": "Gamma Media", "admin_id": ALICE}).json()["id"]
