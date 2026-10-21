@@ -2992,16 +2992,17 @@ MIGRATIONS = [
     ("budget_meta", "runs", "ALTER TABLE budget_meta ADD COLUMN runs TEXT NOT NULL DEFAULT '[]'"),
     # 2.151.0 A (#2558): the build state of a task (integrations/gitbuild.py). git_commits.tag / git_prs.tag = the first version
     # tag that holds the commit / the merge (squash) commit of the merged pull request ('' = none yet), git_prs.merge_sha = that
-    # merge commit, git_tags.cmp = 1 once the commits up to the tag were looked up (2 = the compare failed), git_conns.main_sha =
-    # the default branch's newest commit (branches are compared again when it moves), git_conns.tags_floor = the oldest commit
-    # time the tag compares covered (an untagged default-branch commit before it is in an older version), lists.git_ver_field
+    # merge commit, git_tags.cmp = 1 once the commits up to the tag were looked up (2 = given up, -n = failed n times), git_conns.main_sha =
+    # the default branch's newest commit (branches are compared again when it moves), git_conns.rel_check = "<newest version tag>
+    # <main_sha> <ok | x | failed tries>" of the last compare newest tag...default branch (git_commits.tag / git_prs.tag '~' =
+    # on the default branch but not in that compare: in an earlier version, which one unknown), lists.git_ver_field
     # = the field with the package / target version (NULL = found by its name, 0 = off). 2.150 ignores them all
     ("git_commits", "tag", "ALTER TABLE git_commits ADD COLUMN tag TEXT NOT NULL DEFAULT ''"),
     ("git_prs", "tag", "ALTER TABLE git_prs ADD COLUMN tag TEXT NOT NULL DEFAULT ''"),
     ("git_prs", "merge_sha", "ALTER TABLE git_prs ADD COLUMN merge_sha TEXT NOT NULL DEFAULT ''"),
     ("git_tags", "cmp", "ALTER TABLE git_tags ADD COLUMN cmp BIGINT NOT NULL DEFAULT 0"),
     ("git_conns", "main_sha", "ALTER TABLE git_conns ADD COLUMN main_sha TEXT NOT NULL DEFAULT ''"),
-    ("git_conns", "tags_floor", "ALTER TABLE git_conns ADD COLUMN tags_floor TEXT NOT NULL DEFAULT ''"),
+    ("git_conns", "rel_check", "ALTER TABLE git_conns ADD COLUMN rel_check TEXT NOT NULL DEFAULT ''"),
     ("lists", "git_ver_field", "ALTER TABLE lists ADD COLUMN git_ver_field BIGINT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
@@ -3152,7 +3153,8 @@ CREATE TABLE IF NOT EXISTS retention_log (
 CREATE INDEX IF NOT EXISTS retention_log_subject ON retention_log(subject, kind, id);
 -- 2.151.0 A (#2558): branches of a connection that carry a task (kalmido-<id>, task-<id>, <id>-slug, or the branch of an open
 -- pull request of a task) and how far they are ahead of the default branch (NULL = not compared yet, 0 = merged). cmp_sha /
--- cmp_main = the branch / default branch heads of the last compare (a new compare only when one moved)
+-- cmp_main = the branch / default branch heads of the last compare (a new compare only when one moved). 2.151.0 A2: sha '' =
+-- the branch is gone, cmp_sha its last head, until the poll found out whether it was merged
 CREATE TABLE IF NOT EXISTS git_branches (
   conn_id BIGINT NOT NULL REFERENCES git_conns(id) ON DELETE CASCADE, name TEXT NOT NULL,
   task_id BIGINT REFERENCES tasks(id) ON DELETE SET NULL, ahead BIGINT, sha TEXT NOT NULL DEFAULT '',

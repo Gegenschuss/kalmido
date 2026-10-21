@@ -627,7 +627,7 @@ def git_ci_of(k, sha, gh):
 def git_poll(c, cid):
     """One poll of connection cid (the background thread). Never raises for provider problems (stored in last_error)."""
     from ..integrations.gitfolder import gf_rehome
-    from ..integrations.gitbuild import gb_branches, gb_main, gb_tags
+    from ..integrations.gitbuild import gb_branches, gb_main, gb_released, gb_tags
     gf_rehome(c, cid)  # 2.33.0 (#934): a folder repository hangs on a list that is still in its folder
     r = c.execute("SELECT k.*, l.archived FROM git_conns k JOIN lists l ON l.id=k.list_id WHERE k.id=?", (cid,)).fetchone()
     if not r:
@@ -655,6 +655,8 @@ def git_poll(c, cid):
         if k["low"]:
             raise GitRate(k["low"])
         return j if st == 200 else None
+    # 2.151.0 A2 (#2558 review): an unchanged answer (304) holds nothing; gb_released asks again without ETag
+    get.forget = lambda key: (etags.pop(key, None), keep.pop(key, None))
     try:
         default = r["default_branch"]
         if not default:
@@ -681,6 +683,7 @@ def git_poll(c, cid):
             changed |= git_take_tags(c, r, j)
         if r["tags_at"]:  # 2.151.0 A (#2558): the first version tag of the linked commits (after the baseline)
             changed |= gb_tags(c, r, k, prov)
+            changed |= gb_released(c, r, k, get, prov)  # 2.151.0 A2 (#2558 review): untagged commits in an earlier version
         # branches of open pull requests that name a task: their own commits (compare with the default branch)
         refs = [x[0] for x in c.execute("""SELECT p.head_ref FROM git_prs p WHERE p.conn_id=? AND p.state='open' AND p.head_ref!=''
                                            AND p.head_ref!=? GROUP BY p.head_ref ORDER BY MAX(p.updated_at) DESC""", (cid, default))][:GIT_BRANCHES]
@@ -755,7 +758,7 @@ def git_code_for(c, ids):
             if len(lst) < GIT_TASK_PRS:
                 lst.append({"repo": f"{x['owner']}/{x['repo']}", "conn": x["conn_id"], "n": x["number"], "title": x["title"],
                             "state": x["state"], "ci": x["ci"] or None, "author": x["author"], "url": x["url"], "branch": x["head_ref"],
-                            "merged_at": x["merged_at"], "tag": x["tag"] or None})  # 2.151.0 A (#2558): its first version tag
+                            "merged_at": x["merged_at"], "tag": git_tag_out(x["tag"])})  # 2.151.0 A (#2558): its first version tag
     for x in c.execute("""SELECT l.task_id, m.*, k.owner, k.repo FROM git_links l JOIN git_conns k ON k.id=l.conn_id
                           JOIN git_commits m ON m.conn_id=l.conn_id AND m.sha=l.ref WHERE l.kind='commit' ORDER BY m.at DESC"""):
         if x["task_id"] in ids:
@@ -763,8 +766,13 @@ def git_code_for(c, ids):
             if len(lst) < GIT_TASK_COMMITS:
                 lst.append({"repo": f"{x['owner']}/{x['repo']}", "sha": x["sha"], "short": x["sha"][:7], "message": x["message"],
                             "author": x["author"], "url": x["url"], "branch": x["branch"], "at": x["at"],
-                            "tag": x["tag"] or None})  # 2.151.0 A (#2558): the first version tag that holds it
+                            "tag": git_tag_out(x["tag"])})  # 2.151.0 A (#2558): the first version tag that holds it
     return out
+
+
+def git_tag_out(t):
+    """2.151.0 A2 (#2558 review): a stored tag for the API; '~' (in an earlier version, which one unknown) is null."""
+    return t if t and t != "~" else None
 
 
 def git_repos_of_lists(c, ids):

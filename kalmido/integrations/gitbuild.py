@@ -17,7 +17,7 @@ from .git import (CalError, git_api, git_branch_id, git_commit_norm, git_conn_li
 # Kalmido is the ground truth for tickets and releases, not the tools next to it: every task of a list with a
 # repository carries code.build = {state, version, branches, package, stale}:
 #  state "released" = a linked commit (or the merge commit of a linked merged pull request) is in a version tag (version = the
-#  highest such tag; null when it is older than every tag Kalmido looked at), "main" = in the default branch, no tag yet,
+#  highest such tag; null = in an earlier version, which one unknown: see gb_released), "main" = in the default branch, no tag yet,
 #  "branch" = only on a branch / an open pull request, "none" = nothing linked.
 #  branches = branches of the task (kalmido-<id>, task-<id>, <id>-slug, or the branch of its open pull request) with commits
 #  the default branch does not have (ahead > 0), also after a release (new work).
@@ -26,12 +26,16 @@ from .git import (CalError, git_api, git_branch_id, git_commit_norm, git_conn_li
 #  released). Deliberately no "lower than the newest version": packages are built in parallel and renumbered.
 #  stale = the task is still open although its package or its code is released.
 # The poll (git.py git_poll) finds it out with few requests: per NEW version tag one compare with the version before it
-# (the first tag that holds a commit wins), once for an existing connection the newest GB_FILL_TAGS tags; one branch list
-# (ETag) and a compare only for a branch whose head or the default branch moved (at most GB_BRANCH_CMP per poll).
+# (the first tag that holds a commit wins), once for an existing connection the newest GB_FILL_TAGS tags; one compare newest
+# version tag...default branch when either moved (gb_released); one branch list (ETag) and a compare only for a branch whose
+# head or the default branch moved (at most GB_BRANCH_CMP per poll, a branch that is gone included).
 GB_FILL_TAGS = 11          # newest version tags compared pairwise once (10 compares) for a connection made before 2.151
 GB_TAG_CMP = 3             # tag compares per poll
 GB_BRANCH_CMP = 5          # branch compares per poll
 GB_CMP_MAX = 250           # commits of one compare that are looked at
+GB_TRIES = 3               # 2.151.0 A2 (#2558 review): polls a compare is tried in before Kalmido gives up on it
+GB_LASTING = ("not_found", "auth")  # errors that do not go away by trying again (tag / commit gone, no access)
+GB_EARLIER = "~"           # git_commits.tag / git_prs.tag: in an earlier version, which one unknown (no tag name has a ~)
 GB_VER_NAMES = ("paket", "package", "version", "release", "ziel-version", "target version")
 GB_VER_RE = re.compile(r"[vV]?(\d{1,9}(?:\.\d{1,9}){0,3})")
 
@@ -98,38 +102,99 @@ def gb_main(c, r, item):
 
 def gb_tags(c, r, k, prov):
     """The first version tag of the linked commits: compare each version tag not looked at yet with the version before it
-    (ascending, at most GB_TAG_CMP per poll; tags seen after the baseline, or among the newest GB_FILL_TAGS). A compare that
-    fails (tag gone, no access) is not tried again (cmp 2)."""
+    (ascending, at most GB_TAG_CMP per poll; tags seen after the baseline, or among the newest GB_FILL_TAGS). git_tags.cmp:
+    0 = to do, -n = failed n times, 1 = done, 2 = given up (a lasting error at once, any other after GB_TRIES polls).
+    A compare of more than GB_CMP_MAX commits links only the newest of them: the older ones get no tag here, and gb_released
+    then finds them in an earlier version (they are not in newest tag...default branch)."""
     rows = c.execute("SELECT name, cmp, seen_at FROM git_tags WHERE conn_id=?", (r["id"],)).fetchall()
     vt = sorted(((gb_key(x["name"]), x["name"], x) for x in rows if gb_key(x["name"])), key=lambda y: (y[0], y[1]))
     if len(vt) < 2:
         return False
     window, base = {x[1] for x in vt[-GB_FILL_TAGS:]}, r["tags_at"] or ""
-    todo = [i for i, (_, n, x) in enumerate(vt) if i and not x["cmp"] and (n in window or (x["seen_at"] or "") > base)][:GB_TAG_CMP]
-    changed, floor = False, r["tags_floor"] or ""
+    todo = [i for i, (_, n, x) in enumerate(vt) if i and x["cmp"] <= 0 and (n in window or (x["seen_at"] or "") > base)][:GB_TAG_CMP]
+    changed = False
     for i in todo:
-        prev, name = vt[i - 1][1], vt[i][1]
+        prev, name, tries = vt[i - 1][1], vt[i][1], 1 - vt[i][2]["cmp"]
         try:
             lst, _ = _gb_cmp(_gb_get(k, _gb_api(prov, k, "tagcmp", prev, name)), prov)
-        except CalError:
-            lst = None
+        except CalError as e:  # 2.151.0 A2 (#2558 review): only a lasting error gives up at once
+            lst, tries = None, GB_TRIES if e.code in GB_LASTING else tries
         if lst is None:
-            c.execute("UPDATE git_tags SET cmp=2 WHERE conn_id=? AND name=?", (r["id"], name))
+            c.execute("UPDATE git_tags SET cmp=? WHERE conn_id=? AND name=?", (2 if tries >= GB_TRIES else -tries, r["id"], name))
             continue
         changed |= _gb_link(c, r, lst, r["default_branch"] or "")
         shas = _gb_shas(lst)
         for j in range(0, len(shas), 100):
             part = shas[j:j + 100]
             q = ",".join("?" * len(part))
-            changed |= bool(c.execute(f"UPDATE git_commits SET tag=? WHERE conn_id=? AND tag='' AND sha IN ({q})", (name, r["id"], *part)).rowcount)
-            changed |= bool(c.execute(f"UPDATE git_prs SET tag=? WHERE conn_id=? AND tag='' AND merge_sha IN ({q})", (name, r["id"], *part)).rowcount)
-        ats = [m["commit"]["committer"]["date"] for m in lst if isinstance(m, dict) and isinstance(m.get("commit"), dict)
-               and isinstance(m["commit"].get("committer"), dict) and isinstance(m["commit"]["committer"].get("date"), str)]
-        if ats and (not floor or min(ats) < floor):
-            floor = min(ats)
+            # a commit gb_released put in an earlier version (~) gets the exact one
+            changed |= bool(c.execute(f"UPDATE git_commits SET tag=? WHERE conn_id=? AND tag IN ('', ?) AND sha IN ({q})",
+                                      (name, r["id"], GB_EARLIER, *part)).rowcount)
+            changed |= bool(c.execute(f"UPDATE git_prs SET tag=? WHERE conn_id=? AND tag IN ('', ?) AND merge_sha IN ({q})",
+                                      (name, r["id"], GB_EARLIER, *part)).rowcount)
         c.execute("UPDATE git_tags SET cmp=1 WHERE conn_id=? AND name=?", (r["id"], name))
-    if floor != (r["tags_floor"] or ""):
-        c.execute("UPDATE git_conns SET tags_floor=? WHERE id=?", (floor, r["id"]))
+    return changed
+
+
+def _gb_all(j, prov):
+    """The shas of a compare answer when it holds ALL its commits (ahead <= the commits listed; Bitbucket: no next page),
+    else None."""
+    if isinstance(j, dict) and isinstance(j.get("commits"), list):
+        lst = j["commits"]
+        n = j.get("ahead_by") if isinstance(j.get("ahead_by"), int) else j.get("total_commits") if isinstance(j.get("total_commits"), int) else len(lst)
+        if n > len(lst) or j.get("compare_timeout"):  # GitHub lists 250 at most; GitLab may stop early
+            return None
+    elif prov == "bitbucket" and git_items(j) is not None and not (isinstance(j, dict) and j.get("next")):
+        lst = git_items(j)
+    else:
+        return None
+    return {_gs(git_commit_norm(x, prov).get("sha"), 64) for x in lst if isinstance(x, dict)} - {""}
+
+
+def gb_released(c, r, k, get, prov):
+    """2.151.0 A2 (#2558 review): which linked default-branch commits are in an earlier version without a known tag. Once
+    the newest version tag or the default branch moved: ONE compare newest tag...default branch (the poll's get with ETag,
+    it counts like every request); its commits = in the default branch, not released. A linked commit on the default branch
+    (or in a branch measured merged at its current head) and the merge commit of a merged pull request, without a tag and NOT
+    in that set, are released (tag ~ = "in an earlier version"). Only when the answer holds all its commits: a cut-off list
+    (GitHub: 250) leaves everything "main" -- rather no alarm than a wrong one. Without a version tag all stays "main".
+    Exact, unlike commit dates (a merge keeps the old date of a branch's commits)."""
+    cid, default = r["id"], r["default_branch"] or ""
+    x = c.execute("SELECT main_sha, rel_check FROM git_conns WHERE id=?", (cid,)).fetchone()
+    names = [y["name"] for y in c.execute("SELECT name FROM git_tags WHERE conn_id=?", (cid,)) if gb_key(y["name"])]
+    if not x or not x["main_sha"] or not names or not default:
+        return False
+    top, main = max(names, key=lambda n: (gb_key(n), n)), x["main_sha"]
+    was = (x["rel_check"] or "").split(" ")
+    tries = 0
+    if was[:2] == [top, main]:
+        if len(was) < 3 or not was[2].isdigit():
+            return False  # done (ok) or given up (x) for this tag + head
+        tries = int(was[2])
+    try:
+        j = get("rel", _gb_api(prov, k, "tagcmp", top, default))
+        if j is None and getattr(get, "forget", None):
+            get.forget("rel")  # an unchanged (304) answer holds nothing: the next try asks without ETag
+        shas = _gb_all(j, prov)
+        # an answer without all its commits stays so for this head: no new try until the tag or the head moves
+        tries = GB_TRIES if j is not None and shas is None else tries + 1
+    except CalError as e:
+        shas, tries = None, GB_TRIES if e.code in GB_LASTING else tries + 1
+    if shas is None:
+        c.execute("UPDATE git_conns SET rel_check=? WHERE id=?", (f"{top} {main} {'x' if tries >= GB_TRIES else tries}", cid))
+        return False
+    c.execute("UPDATE git_conns SET rel_check=? WHERE id=?", (f"{top} {main} ok", cid))
+    done = [y["sha"] for y in c.execute("""SELECT m.sha FROM git_commits m WHERE m.conn_id=? AND m.tag='' AND (m.branch=? OR m.branch IN
+                                          (SELECT b.name FROM git_branches b WHERE b.conn_id=m.conn_id AND b.ahead=0 AND b.sha=b.cmp_sha
+                                           AND b.sha<>''))""", (cid, default)) if y["sha"] not in shas]
+    prs = [y["merge_sha"] for y in c.execute("SELECT merge_sha FROM git_prs WHERE conn_id=? AND state='merged' AND tag='' AND merge_sha<>''",
+                                             (cid,)) if y["merge_sha"] not in shas]
+    changed = False
+    for tbl, col, lst in (("git_commits", "sha", done), ("git_prs", "merge_sha", prs)):
+        for j in range(0, len(lst), 100):
+            part = lst[j:j + 100]
+            changed |= bool(c.execute(f"UPDATE {tbl} SET tag=? WHERE conn_id=? AND tag='' AND {col} IN ({','.join('?' * len(part))})",
+                                      (GB_EARLIER, cid, *part)).rowcount)
     return changed
 
 
@@ -143,8 +208,13 @@ def _gb_branch_of(x, prov):
 
 def gb_branches(c, r, k, get, prov):
     """Branches with a task's name (or the branch of an open pull request of a task) and how far they are ahead of the
-    default branch. get = the poll's GET with ETag (None = unchanged since the last poll)."""
+    default branch. get = the poll's GET with ETag (None = unchanged since the last poll). A branch that is gone keeps its
+    row with sha '' (its last head in cmp_sha) until gb_gone found out whether it was merged."""
     cid, default = r["id"], r["default_branch"] or ""
+    x = c.execute("SELECT main_sha FROM git_conns WHERE id=?", (cid,)).fetchone()
+    if not x:  # 2.151.0 A2 (#2558 review): the connection was removed while it was polled
+        return False
+    main, budget = x["main_sha"] or "", [GB_BRANCH_CMP]
     try:  # optional like the tags: a server without the endpoint never breaks the poll
         j = git_items(get("branches", _gb_api(prov, k, "branches")))
     except CalError:
@@ -163,20 +233,22 @@ def gb_branches(c, r, k, get, prov):
                AND l.ref=CAST(p.number AS TEXT) WHERE p.conn_id=? AND p.state='open' AND p.head_ref<>'' GROUP BY p.head_ref""", (cid,))}
         want = {n: (ids[n] if ids[n] in live else pr.get(n)) for n in heads}
         want = {n: t for n, t in want.items() if t}
-        for x in c.execute("SELECT name, ahead FROM git_branches WHERE conn_id=?", (cid,)).fetchall():
-            if x["name"] not in want:  # gone (deleted after the merge) or no task any more
-                if x["ahead"] == 0:  # merged: its commits are in the default branch
-                    c.execute("UPDATE git_commits SET branch=? WHERE conn_id=? AND branch=?", (default, cid, x["name"]))
-                c.execute("DELETE FROM git_branches WHERE conn_id=? AND name=?", (cid, x["name"]))
+        for x in c.execute("SELECT name, sha, cmp_sha FROM git_branches WHERE conn_id=? AND sha<>''", (cid,)).fetchall():
+            if x["name"] not in want:  # gone (deleted after the merge) or no task any more: gb_gone decides below
+                # its last head; ahead stays only if it was measured at that head
+                c.execute("""UPDATE git_branches SET sha='', ahead=CASE WHEN sha=cmp_sha THEN ahead END, cmp_sha=?
+                             WHERE conn_id=? AND name=?""", (x["sha"] or x["cmp_sha"], cid, x["name"]))
                 changed = True
         for n, t in want.items():
             changed |= bool(c.execute("""INSERT INTO git_branches(conn_id,name,task_id,sha) VALUES(?,?,?,?) ON CONFLICT(conn_id,name)
                                          DO UPDATE SET task_id=excluded.task_id, sha=excluded.sha
                                          WHERE git_branches.task_id IS DISTINCT FROM excluded.task_id OR git_branches.sha<>excluded.sha""",
                                       (cid, n, t, heads[n])).rowcount)
-    main = c.execute("SELECT main_sha FROM git_conns WHERE id=?", (cid,)).fetchone()["main_sha"] or ""
-    for x in c.execute("""SELECT name, sha, ahead FROM git_branches WHERE conn_id=? AND (ahead IS NULL OR sha<>cmp_sha OR cmp_main<>?)
-                          ORDER BY seen_at, name LIMIT ?""", (cid, main, GB_BRANCH_CMP)).fetchall():
+    for x in c.execute("SELECT name, cmp_sha, ahead FROM git_branches WHERE conn_id=? AND sha='' ORDER BY seen_at, name",
+                       (cid,)).fetchall():
+        changed |= gb_gone(c, r, k, prov, x, budget)
+    for x in c.execute("""SELECT name, sha, ahead FROM git_branches WHERE conn_id=? AND sha<>'' AND (ahead IS NULL OR sha<>cmp_sha OR cmp_main<>?)
+                          ORDER BY seen_at, name LIMIT ?""", (cid, main, max(budget[0], 0))).fetchall():
         try:
             lst, n = _gb_cmp(_gb_get(k, git_api(prov, k, "compare", default, x["name"])), prov)
         except CalError:
@@ -187,6 +259,35 @@ def gb_branches(c, r, k, get, prov):
                   (n, x["sha"], main, iso(now_utc()), cid, x["name"]))
         changed |= n is not None and n != x["ahead"]  # a new compare with the same result changes nothing the client shows
     return changed
+
+
+def gb_gone(c, r, k, prov, x, budget):
+    """2.151.0 A2 (#2558 review): a task branch that is gone (row with sha '', its last head in cmp_sha). Merged = it was
+    measured 0 ahead at that head, or the head is a known default-branch commit, or a compare default branch...head says 0
+    ahead (budget = the poll's branch compares left; none left: next poll): its commits move to the default branch. Not
+    merged (or the head is gone too): only the row goes; its commits keep the branch name, so the task shows "branch" until
+    something proves the default branch has it (a merged pull request, the commit in the default branch's list)."""
+    cid, default, head = r["id"], r["default_branch"] or "", x["cmp_sha"]
+    merged = None
+    if x["ahead"] == 0:
+        merged = True  # measured at this head (gb_branches cleared ahead when the head had moved since)
+    elif head and c.execute("SELECT 1 FROM git_commits WHERE conn_id=? AND sha=? AND branch=?", (cid, head, default)).fetchone():
+        merged = True
+    elif not head:
+        merged = False
+    elif budget[0] > 0:
+        budget[0] -= 1
+        try:
+            _, n = _gb_cmp(_gb_get(k, git_api(prov, k, "compare", default, head)), prov)
+            merged = None if n is None else n == 0
+        except CalError as e:
+            merged = False if e.code in GB_LASTING else None
+    if merged is None:
+        return False  # not known yet: the next poll asks again (the row lists no open branch meanwhile)
+    if merged:
+        c.execute("UPDATE git_commits SET branch=? WHERE conn_id=? AND branch=?", (default, cid, x["name"]))
+    c.execute("DELETE FROM git_branches WHERE conn_id=? AND name=? AND sha=''", (cid, x["name"]))
+    return True
 
 
 # ---- the version field of a list
@@ -285,7 +386,7 @@ def git_build_for(c, rows):
         ev.setdefault(x["task_id"], []).append(("p", x["conn_id"], x["tag"], x["state"], x["head_ref"]))
     refs = sorted({(e[1], e[4]) for v in ev.values() for e in v if e[0] == "p" and e[3] == "open" and e[4]})
     brs, merged = {}, {}
-    for x in c.execute("SELECT * FROM git_branches WHERE conn_id = ANY(CAST(? AS BIGINT[]))", (cids,)):
+    for x in c.execute("SELECT * FROM git_branches WHERE conn_id = ANY(CAST(? AS BIGINT[])) AND sha<>''", (cids,)):  # not the gone ones
         merged[(x["conn_id"], x["name"])] = x["ahead"] == 0
         if x["task_id"] is not None or (x["conn_id"], x["name"]) in refs:
             brs.setdefault(x["task_id"], []).append(x)
@@ -305,17 +406,16 @@ def git_build_for(c, rows):
         known = {}
         for k in cs:
             known.update(vers.get(k["id"], {}))
-        tags, main, branch, floor_rel = [], False, False, False
+        tags, main, branch, earlier = [], False, False, False
         for e in ev.get(t["id"], []):
             k = conn.get(e[1])
             if not k or e[1] not in mine:
                 continue
             if e[2] and gb_key(e[2]):
                 tags.append(e[2])
+            earlier |= e[2] == GB_EARLIER  # 2.151.0 A2 (#2558 review): gb_released, exact (no commit dates)
             if e[0] == "c":
                 on_main = e[3] == (k["default_branch"] or "") or merged.get((e[1], e[3]), False)
-                if on_main and not e[2] and k["tags_floor"] and e[4] and e[4] < k["tags_floor"]:
-                    floor_rel = True  # older than every tag looked at: in some earlier version
                 main |= on_main
                 branch |= not on_main
             else:
@@ -329,7 +429,7 @@ def git_build_for(c, rows):
         if tags:
             top = max(tags, key=lambda n: (gb_key(n), n))
             state, version = "released", git_version(top)
-        elif floor_rel:
+        elif earlier:
             state, version = "released", None
         else:
             state, version = ("main" if main else "branch" if branch else "none"), None
@@ -369,8 +469,8 @@ def gb_status(c, lid, agent=False):
                      (lid,)).fetchall()
     viewer = g.user["id"] if getattr(g, "user", None) else None
     if viewer and rows and lid in set(plists(c, viewer)):  # a participant: only the tasks shared with them
-        pv = pvis(c, viewer)[0]
-        rows = [r for r in rows if r["id"] in pv]
+        pv, _, ctx = pvis(c, viewer, lid)  # 2.151.0 A2 (#2558 review): not the context tasks (no build there, as in load_tasks)
+        rows = [r for r in rows if r["id"] in pv and r["id"] not in ctx]
     bs = git_build_for(c, rows)
     data = []
     for r in rows:
@@ -409,8 +509,8 @@ def gb_spec(paths, schemas, op, ok, errs, ref, pid, nul):
                                            "url": {"type": "string"}, "origin": {"type": "string"}, "untrusted": {"type": "boolean"}}}
     build = {"type": "object", "description": "2.151.0 (#2558): the build state of the task from the list's repository",
              "properties": {"state": {"type": "string", "enum": ["released", "main", "branch", "none"]},
-                            "version": nul("string", description="The highest version tag that holds its code (null: none, or older "
-                                                                 "than every tag Kalmido looked at)"),
+                            "version": nul("string", description="The highest version tag that holds its code (null: none, or in an "
+                                                                 "earlier version, which one unknown)"),
                             "branches": {"type": "array", "items": br, "description": "Branches of the task with commits the default branch lacks"},
                             "package": {"type": ["object", "null"], "description": "The list's package / version field: field, value, released "
                                         "(a tag with exactly this version exists), latest (the highest version)",
