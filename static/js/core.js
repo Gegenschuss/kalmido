@@ -794,7 +794,7 @@ function applyState(j) {
   if (S.booted && S.route?.mod === 'clients') clReload();  // a change elsewhere: the client's sums again
   // 2.50.0 (#1195, #1194); 2.50.1: the shown tab loads again and keeps its rows until the new ones are there (a null
   // without a redraw left absence and booking rows that no longer opened on a tap)
-  if (S.booted && S.route?.mod === 'workload') { const t = WLV.tab === 'dispo' && !dp_on() ? 'wl' : WLV.tab; if (t !== 'abs') AB2.data = null; if (t !== 'dispo') DPV.data = null; if (t !== 'wl') WLV.data = null; if (t === 'abs') ab2_load(); else if (t === 'dispo') dp_load(); else wlLoad(); }
+  if (S.booted && S.route?.mod === 'workload') { const t = WLV.tab === 'dispo' && !dp_on() ? 'wl' : WLV.tab, ld = typeof AB2 !== 'undefined'; if (ld && t !== 'abs') AB2.data = null; if (ld && t !== 'dispo') DPV.data = null; if (t !== 'wl') WLV.data = null; if (t === 'wl') wlLoad(); else if (ld) { if (t === 'abs') ab2_load(); else dp_load(); } }  // 2.149.0 F (#2518): absence.js / dispo.js load on demand (not there yet: their stand-in loads and fetches); lazy-ok: ld = the module is loaded
   // 2.21.0 (#659 / #658): event calendars (a changed event refetches the calendar range), address books, links of tasks
   S.evcals = j.evcals || []; S.evlinks = j.evlinks || {}; S.books = j.books || []; S.tcontacts = j.tcontacts || {};
   if (j.evsig !== undefined && j.evsig !== S.evsig) { S.evsig = j.evsig; if (S.booted) calInvalidate(); }

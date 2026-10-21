@@ -51,13 +51,15 @@ const LD_MODS = {
   projtime: ['projtime'],
   envs: ['envs'],
   dayplan: ['dpmodal'],
-  gitrepo: ['gitrepo'],  // 2.149.0 F (#2518): the repository editor of the list dialog / the folder settings (git.js keeps the rest)  // 2.149.0 F (#2518): the dialog of "Plan my day" (Today's cards stay in dayplan.js)  // 2.149.0 F (#2518): the environments of a project (its page, a milestone's panel); the texts of the rows stay in quickadd.js  // 2.149.0 F (#2518): the tracked time of a project / folder (a click on its "Tracked" figure)  // 2.149.0 F (#2518): invitations by e-mail of an event (the event editor loads it with its people)  // 2.149.0 F (#2518): the print view of a list (its menu's "Print"); the CSV export stays below
+  gitrepo: ['gitrepo'],
+  timesheet: ['timesheet'],
+  team: ['absence', 'leave', 'dispo'],  // 2.149.0 F (#2518): the tabs Absences / Disposition of the workload view, vacation, the working week of the settings  // 2.149.0 F (#2518): the monthly timesheets of the time page, the time zone rows of the settings  // 2.149.0 F (#2518): the repository editor of the list dialog / the folder settings (git.js keeps the rest)  // 2.149.0 F (#2518): the dialog of "Plan my day" (Today's cards stay in dayplan.js)  // 2.149.0 F (#2518): the environments of a project (its page, a milestone's panel); the texts of the rows stay in quickadd.js  // 2.149.0 F (#2518): the tracked time of a project / folder (a click on its "Tracked" figure)  // 2.149.0 F (#2518): invitations by e-mail of an event (the event editor loads it with its people)  // 2.149.0 F (#2518): the print view of a list (its menu's "Print"); the CSV export stays below
    // 2.141.0 A (#2141, #2138): the mailbox of a workspace + writing from the e-mail filing (hubmail.js draws its buttons)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
 // uses the token dialogs, a knowledge page embeds mind maps; 2.87.9 (#1936): Paperless-ngx (paperless.js) is in Integrations
-const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs'], agentchat: ['integrations'], wiki: ['mindmap'], docs: ['tagsel', 'asstprop'], office: ['asstprop', 'ofundo'], sheets: ['ofundo']};  // 2.122.0 B: docs -> tagsel; 2.126.1 A (#2123): docs / office -> asstprop
+const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs', 'timesheet', 'team'], agentchat: ['integrations'], wiki: ['mindmap'], docs: ['tagsel', 'asstprop'], office: ['asstprop', 'ofundo'], sheets: ['ofundo']};  // 2.122.0 B: docs -> tagsel; 2.126.1 A (#2123): docs / office -> asstprop
 // functions of a module that code loaded at start calls: a stand-in loads the module and then calls the real one (the
 // module's own function declaration replaces the stand-in on window)
 const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved', 'setLocal'],  // 2.149.0 F (#2519): setLocal (the command bar's "Theme: …")
@@ -76,7 +78,8 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   hubmailbox: ['hmb_dialog', 'hmb_compose'],  // 2.141.0 A (#2141, #2138)
   listprint: ['lexPrint'], evinvite: ['evf_modal'], projtime: ['tz_open'], dayplan: ['dayplanModal'], gitrepo: ['repoWire', 'folderRepoModal']};  // 2.149.0 F (#2518)
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)
-const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 'chatTypers', 'chatStHtml'], timeline: ['tlKbSync', 'tlAfterRender', 'rmAfterRender']};
+const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 'chatTypers', 'chatStHtml'], timeline: ['tlKbSync', 'tlAfterRender', 'rmAfterRender'],
+  timesheet: ['tsl_printNote']};  // 2.149.0 F (#2518): the printed timesheet's month line (nothing before the card loaded the month)
 // drawing functions: the stand-in draws "Loading…" (views) or nothing (parts of another view), loads, and redraws the view
 // 2.65.0 (#1824): module -> its stylesheets in static/css/ (the same files as LAZY_CSS in sw.js, same order); loadModule loads
 // them next to the scripts and resolves only once they apply (no unstyled flash when the area opens)
@@ -93,7 +96,8 @@ const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_ti
   viewBookmarks: ['bookmarks', 1],  // 2.97.0 A (#1950)
   viewSheets: ['sheets', 1],  // 2.89.0 (#1916)
   hmb_hubSection: ['hubmailbox'], hmb_newBtn: ['hubmailbox'], hmb_replyBtn: ['hubmailbox'],  // 2.141.0 A (#2141, #2138): parts of the e-mail filing
-  tvc_micHtml: ['voice'], tvc_playerHtml: ['voice']};  // 2.139.0 B (#2128): the team chat's composer / an audio file load voice.js
+  tvc_micHtml: ['voice'], tvc_playerHtml: ['voice'],  // 2.139.0 B (#2128): the team chat's composer / an audio file load voice.js
+  tsl_card: ['timesheet']};  // 2.149.0 F (#2518): the time page's timesheet card (it fetches the month itself)
 // 2.102.0 C (#2208) scheduling polls (polls.js, module polls): the switch and the start points' clicks stay at start (moved
 // here): "Find a date" in the calendar bar and in a task (calevents.js), a client's "…" menu (tpo_forClient, a stand-in)
 const tpo_on = () => feat('events') && S.me?.kind !== 'agent';

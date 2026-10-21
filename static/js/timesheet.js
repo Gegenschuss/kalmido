@@ -8,7 +8,6 @@
 // and the switch "Entries over midnight" (count on each day with their share). The rules live in kalmido/personal/timesheet.py.
 const TSL = {month: '', data: /** @type {any} */ (null), loading: false, key: ''};
 const TSL_STATE = {open: N_('Open|month'), closed: N_('Closed|month'), approved: N_('Approved')};
-const tsl_monthName = m => new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1).toLocaleDateString(LOCALE(), {month: 'long', year: 'numeric'});
 const tsl_when = v => v ? fmtDate(ds(new Date(v))) : '';
 // the month the report shows (YYYY-MM) when its range is exactly one calendar month, else ''
 function tsl_monthOf() {
@@ -50,7 +49,6 @@ function tsl_card() {
   }
   return h;
 }
-const tsl_lockMark = () => `<span class="teacts tslock" title="${esc(tr('This month is closed'))}" aria-label="${esc(tr('This month is closed'))}">${ic('lock', 's')}</span>`;
 // a line on the printed timesheet: the state of the month it covers
 function tsl_printNote(j) {
   const d = TSL.data, m = tsl_monthOf();
@@ -98,22 +96,6 @@ document.addEventListener('click', e => {
   if (b.dataset.tsl === 'tzdev') { tsl_tzDevice(b); return; }
   tsl_act(b.dataset.tsl, b.closest('[data-uid]'));
 });
-// News
-/** @type {any} */ (NEWS_ICON).tsheet = 'clock';
-function tsl_newsText(it, d, who, q) {
-  const m = tsl_monthName(String(d.month || '0000-01'));
-  if (d.act === 'closed') return tr('{0} closed the timesheet {1} and waits for your approval', who, q(m));
-  if (d.act === 'approve') return tr('{0} approved your timesheet {1}', who, q(m));
-  return tr('{0} sent your timesheet {1} back', who, q(m));  // 2.125.0 R (#2119): the note only in the app (sealed), never in News
-}
-function tsl_open(d) {
-  const m = String(d?.month || '');
-  if (/^\d{4}-\d{2}$/.test(m)) { S.tv.period = 'custom'; S.tv.from = m + '-01'; S.tv.to = monthEnd(m + '-01'); S.tv.client = null; }
-  go('time');
-}
-// notification settings: the event "timesheet"
-NOTIF_ROWS.push(['timesheet', N_('Timesheets'), N_('a member closed a month, or an admin approved or sent back yours')]);
-/** @type {any} */ (NM_NEWS_NEW).timesheet = 1; /** @type {any} */ (NM_PUSH).timesheet = 1;
 // ---- 2.125.0 B (#2120): settings rows (Settings > Modules > Time tracking)
 const tsl_deviceTz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } };
 function tsl_setRows(s, hint) {

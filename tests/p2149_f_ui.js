@@ -28,7 +28,7 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { let x; try {
 const get = async u => (await fetch(B + u)).text();
 // module -> its files (LD_MODS) that were start files before 2.149.0
 const MOVED = {life: ['budget'], settings: ['servers'], listprint: ['listprint'], evinvite: ['evinvite'], projtime: ['projtime'],
-  envs: ['envs'], dayplan: ['dpmodal'], gitrepo: ['gitrepo']};
+  envs: ['envs'], dayplan: ['dpmodal'], gitrepo: ['gitrepo'], timesheet: ['timesheet'], team: ['absence', 'leave', 'dispo']};
 const FILES = Object.values(MOVED).flat();
 
 (async () => {
@@ -46,7 +46,7 @@ const FILES = Object.values(MOVED).flat();
     const own = ((mods.match(new RegExp(`\\b${m}: \\[([^\\]]*)\\]`)) || [, ''])[1].match(/'[\w-]+'/g) || []).map(x => x.slice(1, -1));
     check(fs.every(f => own.includes(f) && LAZY.includes(f) && !tags.includes(f)), `module ${m}: ${fs.join(', ')} in LD_MODS + LAZY, no script tag (${own.join(' ')})`);
   }
-  check(['quickadd', 'dayplan', 'git', 'projects', 'lazyload', 'calevents'].every(f => tags.includes(f)), 'the start parts of the split files stay at start');
+  check(['quickadd', 'dayplan', 'git', 'projects', 'lazyload', 'calevents', 'time', 'clients'].every(f => tags.includes(f)), 'the start parts of the split files stay at start');
 
   // ================= setup
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
@@ -55,7 +55,7 @@ const FILES = Object.values(MOVED).flat();
   await call('PATCH', '/api/settings', {tour: 'done', lang: 'en'});
   const st0 = await call('GET', '/api/state');
   const feats = (st0.settings.features || '').split(',').filter(Boolean);
-  await call('PATCH', '/api/settings', {features: [...new Set([...feats, 'cal', 'budget', 'time', 'contracts'])].join(',')});
+  await call('PATCH', '/api/settings', {features: [...new Set([...feats, 'cal', 'budget', 'time', 'contracts', 'workload', 'dispo'])].join(',')});
   const LID = (await call('POST', '/api/lists', {name: 'Lazy project', kind: 'project'})).id;
   const TID = (await call('POST', '/api/tasks', {list_id: LID, title: 'Lazy task'})).id;
   check(LID > 0 && TID > 0, 'setup: a project list and a task');
@@ -67,7 +67,8 @@ const FILES = Object.values(MOVED).flat();
   await ready(w);
   const loaded = () => [...d.querySelectorAll('script[src*="/static/js/"]')].map(s => (s.getAttribute('src').match(/\/static\/js\/([\w-]+)\.js/) || [])[1]).filter(Boolean);
   check(!FILES.some(f => loaded().includes(f)), 'cold start: none of the moved files loaded ' + loaded().filter(f => FILES.includes(f)).join(' '));
-  check(['env_chipText', 'env_taskNote', 'lexCsv', 'tz_hit', 'dpTimeline', 'propDayplanHtml', 'codeChip', 'repoBoxHtml', 'tz_open', 'dayplanModal', 'repoWire', 'folderRepoModal', 'lexPrint', 'evf_modal', 'env_ovHtml', 'env_msHtml', 'viewBudget']
+  check(['env_chipText', 'env_taskNote', 'lexCsv', 'tz_hit', 'dpTimeline', 'propDayplanHtml', 'codeChip', 'repoBoxHtml', 'tz_open', 'dayplanModal', 'repoWire', 'folderRepoModal', 'lexPrint', 'evf_modal', 'env_ovHtml', 'env_msHtml', 'viewBudget',
+    'tsl_newsText', 'tsl_open', 'tsl_lockMark', 'tsl_card', 'tsl_printNote', 'ab2_tabs', 'ab2_dayHint', 'ab2_view', 'dp_view', 'dp_on', 'ab2_warnAssign']
     .every(n => w.eval(`typeof ${n}`) === 'function'), 'the start helpers and the stand-ins are there before the modules');
   check(w.eval(`env_chipText({id: 1, list_id: ${LID}, milestone_id: null})`) === '', 'a task row draws its milestone text without envs.js');
   // a task row and the task panel draw without the modules
@@ -82,10 +83,28 @@ const FILES = Object.values(MOVED).flat();
   check(['life', 'budget'].every(f => loaded().includes(f)) && loaded().indexOf('life') < loaded().indexOf('budget') && !!d.querySelector('#view .bgview'), 'budget: life.js then budget.js, the budget view drawn');
   w.eval(`go('today')`);
 
+  // the time page: its timesheet card loads timesheet.js
+  w.eval(`go('time')`);
+  await until(() => loaded().includes('timesheet') && d.querySelector('#view .timev'), 80);
+  check(loaded().includes('timesheet') && !!d.querySelector('#view .timev'), 'time page: timesheet.js loads with it, the page is drawn');
+  check(w.eval(`tsl_newsText({}, {act: 'approve', month: '2026-01'}, 'Bob', x => x)`).includes('Bob'), 'News: a timesheet text is there without the module');
+  // the workload view: the tabs are there at start, "Absences" / "Disposition" load the team module
+  w.eval(`go('workload')`);
+  await until(() => d.querySelector('#view .ab2tabs'), 80);
+  check(!!d.querySelector('#view .ab2tabs [data-v="abs"]') && !loaded().includes('absence'), 'workload: the tabs are drawn at start, absence.js not loaded yet');
+  d.querySelector('#view .ab2tabs [data-v="abs"]')?.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, button: 0}));
+  await until(() => ['absence', 'leave', 'dispo'].every(f => loaded().includes(f)) && d.querySelector('#view .ab2') && !/^\s*Loading…\s*$/.test((d.querySelector('#view .ab2')?.textContent || '').replace(/Workload|Absences|Disposition/g, '')), 100);
+  check(['absence', 'leave', 'dispo'].every(f => loaded().includes(f)) && !!d.querySelector('#view .dash.ab2 .ab2tabs'), 'workload: the Absences tab loads absence.js, leave.js, dispo.js and draws the absences');
+  d.querySelector('#view .ab2tabs [data-v="dispo"]')?.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, button: 0}));
+  await until(() => d.querySelector('#view .dash.dp'), 60);
+  check(!!d.querySelector('#view .dash.dp'), 'workload: the Disposition tab draws');
+  w.eval(`WLV.tab = 'wl'; go('today')`);
+
   // Settings > Account: servers.js comes with the settings module
   await w.eval(`settingsModal('account')`);
   await until(() => d.querySelector('.smodal') && loaded().includes('servers'));
   check(loaded().includes('servers') && loaded().indexOf('servers') < loaded().indexOf('settings') && w.eval(`typeof msvDraw`) === 'function', 'settings: servers.js loads with the settings module');
+  check(['timesheet', 'absence'].every(f => loaded().indexOf(f) >= 0 && loaded().indexOf(f) < loaded().indexOf('settings')) && w.eval(`typeof wt_setHtml`) === 'function', 'settings: the timesheet and team modules load before it (time zone rows, working week)');
   d.querySelectorAll('.smodal, .modal').forEach(m => m.remove());
 
   // a list's "Print" (listprint.js)

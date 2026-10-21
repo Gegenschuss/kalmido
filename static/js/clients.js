@@ -498,3 +498,32 @@ document.addEventListener('click', e => {
   const b = e.target.closest('#view [data-clm-undo]'); if (!b) return;
   b.disabled = true; clm_undo(+b.dataset.clmUndo);
 });
+// ---- 2.149.0 F (#2518): absences, vacation and disposition (absence.js, leave.js, dispo.js) load on demand (lazyload.js module
+// team). What the start needs stays here: the switch, the tabs of the workload view and their click, the kinds and the day
+// hint of "Plan my day", the notification row; stand-ins draw the tabs' own "Loading…" and load the module
+const dp_on = () => feat('dispo');
+const AB2_KINDS = [['vacation', N_('Vacation')], ['sick', N_('Sick leave')], ['off', N_('Day off')], ['other', N_('Other absence')]];
+const ab2_kindName = k => tr(AB2_KINDS.find(x => x[0] === k)?.[1] || 'Away');
+// the tabs on top of the workload view: Workload | Absences | Disposition (2.50.0, #1194, when switched on)
+function ab2_tabs(cur) {
+  const t = (k, label) => `<button type="button" data-act="ab2-tab" data-v="${k}" class="${cur === k ? 'on' : ''}" aria-pressed="${cur === k}">${esc(tr(label))}</button>`;
+  return `<div class="seg ab2tabs" role="group" aria-label="${esc(tr('Team'))}">${t('wl', N_('Workload'))}${t('abs', N_('Absences'))}${dp_on() ? t('dispo', N_('Disposition')) : ''}</div>`;
+}
+// "Plan my day" on a day away / a holiday: a hint instead of the proposal (the server leaves the proposal empty)
+function ab2_dayHint(a) {
+  if (!a) return '';
+  const what = a.holiday ? tr('Public holiday: {0}', a.holiday) : a.half_day ? tr('You are away for half of this day ({0}).', ab2_kindName(a.kind)) : tr('You are away on this day ({0}). No plan is proposed.', ab2_kindName(a.kind));
+  return `<div class="shint keep ab2hint" role="status">${ic('cal', 's')} ${esc(what)}</div>`;
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-act="ab2-tab"]'); if (!a || a.disabled) return;
+  e.preventDefault(); e.stopPropagation();
+  WLV.tab = a.dataset.v; const el = $('#view'); if (el) setHtml(el, viewWorkload());
+});
+window.ab2_view = () => { ld_later('team'); return `<div class="dash wload ab2">${ab2_tabs('abs')}<p class="muted lempty">${tr('Loading…')}</p></div>`; };
+window.dp_view = () => { ld_later('team'); return `<div class="dash wload dp">${ab2_tabs('dispo')}<p class="muted lempty">${tr('Loading…')}</p></div>`; };
+// assigning: the warning when the person is away (absence.js) - only where it can apply, so a solo user loads nothing
+window.ab2_warnAssign = (uid, t) => { if (uid && collab() && (t?.due || t?.plan_start)) loadModule('team').then(() => ab2_warnAssign(uid, t), () => {}); };
+// the notification row "leave" (account.js matrix): a new request (admins), the decision on my own
+NOTIF_ROWS.push(['leave', N_('Vacation requests'), N_('admins: a new request; everybody: the decision on their own')]);
+NM_NEWS_NEW.leave = 1; NM_PUSH.leave = 1;
