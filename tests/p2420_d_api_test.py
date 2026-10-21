@@ -147,7 +147,9 @@ check(Bo.get(B + "/api/state/delta?since=x").json().get("full") is True, "#1376:
 # a participant -> full (their visibility hangs on assignments)
 A.put(B + f"/api/lists/{L}/members", json={"user_id": ids["dave"], "role": "participant"})
 vd = Da.get(B + "/api/state").json()["v"]
-check(delta(Da, vd).get("full") is True, "#1376: a participant always gets full")
+# 2.149.0 C (#2508): a participant gets full only when a change touches their participant list (was: always full)
+A.patch(B + f"/api/tasks/{T2}", json={"title": "Second for the participant"})
+check(delta(Da, vd).get("full") is True, "#1376: a change in the participant list -> full for the participant")
 
 # an agent: only what is shared with it
 ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "claude", "display_name": "Claude"}).json()

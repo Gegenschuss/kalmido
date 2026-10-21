@@ -487,11 +487,38 @@ def _wd_fail(c, what, key, e):
         pass
 
 
+WD_SLOW_MS = 200  # 2.149.0 C (#2516): a watchdog section that takes longer leaves a log line (name + duration only)
+
+
 def _wd_section(c, name, fn, *a):
+    t0 = time.monotonic()
     try:
         fn(c, *a)
     except Exception as e:  # noqa: BLE001
         _wd_fail(c, "section", name, e)
+    ms = (time.monotonic() - t0) * 1000
+    if ms > WD_SLOW_MS:
+        print(f"watchdog: section {name} took {ms:.0f} ms", flush=True)
+
+
+def _wd_settings(c, users):
+    """2.149.0 C (#2516): usettings() of every account in one query (was one per account); on an error the old way, per
+    account (a broken account falls back to the defaults and is logged)."""
+    S = {uid: dict(USER_DEFAULTS) for uid in users}
+    try:
+        for r in c.execute("SELECT user_id, key, value FROM user_settings WHERE user_id = ANY(CAST(? AS BIGINT[]))",
+                           (list(users),)):
+            S[r[0]][r[1]] = r[2]
+        return S
+    except Exception as e:  # noqa: BLE001
+        _wd_fail(c, "settings of users", "all", e)
+    for uid in users:
+        try:
+            S[uid] = usettings(c, uid)
+        except Exception as e:  # noqa: BLE001
+            _wd_fail(c, "settings of user", uid, e)
+            S[uid] = dict(USER_DEFAULTS)
+    return S
 
 
 # 2.38.0 (#1155): the office log keeps every write for good (GoBD); reads (opening, the print view, the PDF) go after
@@ -533,13 +560,8 @@ def _watchdog_tick(c):
     from ..life.model import _wd_care
     from ..life.karakeep import _wd_reading
     users = {r["id"]: r for r in c.execute("SELECT * FROM users WHERE disabled=0")}
-    S, LG = {}, {}
+    S, LG = _wd_settings(c, users), {}
     for uid in users:
-        try:
-            S[uid] = usettings(c, uid)
-        except Exception as e:  # noqa: BLE001
-            _wd_fail(c, "settings of user", uid, e)
-            S[uid] = dict(USER_DEFAULTS)
         LG[uid] = S[uid].get("lang") if S[uid].get("lang") in LANGS else "en"
     _wd_section(c, "collab pushes", task_push_tick, users, S, LG)
     _wd_section(c, "dismiss pushes", push_dismiss_tick)

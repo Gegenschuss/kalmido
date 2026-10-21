@@ -255,7 +255,7 @@ def state():
     from ..agents.proposals import prop_agents
     from ..lists.public import public_links_on
     from ..collab.notes import notes_brief
-    from ..collab.teamchat import tchat_dm_unread, tchat_on, tchat_unread
+    from ..collab.teamchat import tchat_on, tchat_unread_both
     from ..accounts.orgs import has_workspaces, workspaces_for, ws_mismatches
     from ..family.family import kids_for
     from ..events.model import cals_for, events_on
@@ -340,7 +340,7 @@ def state():
         share={"drop_url": PUBLIC_URL.rstrip("/") + "/drop", "ios_shortcut": IOS_SHORTCUT_URL},
         sample=sample_state(c, uid),
         notes=notes_brief(c, uid),  # 2.17.0 (#442)
-        team={"enabled": tchat_on(c, uid), "unread": tchat_unread(c, uid), "dm_unread": tchat_dm_unread(c, uid)},  # 2.17.0 (#419); 2.28.0 (#987): + DMs
+        team=dict(zip(("enabled", "unread", "dm_unread"), (tchat_on(c, uid), *tchat_unread_both(c, uid)))),  # 2.17.0 (#419); 2.28.0 (#987): + DMs; 2.149.0 C (#2507): one tchat_rooms
         agents=agents_for(c, uid),
         proposers=prop_agents(c, uid),  # 2.3.0: agents I may ask for a proposal
         **asst_state(c, uid),  # 2.75.0 A (#1411): "assistant" only when the server configured one (assistant/web.py)
@@ -460,13 +460,17 @@ def search_tasks(c, uid, raw, limit, files=True):
     fids = sorted(set(fids) | set(sorted(fhit)[:2000]))
     # participants: only their own tasks match (a context parent's notes / link / fields are not theirs to search)
     # 2.64.1 B (#1817): lists with the lock are searched in the browser only (the server holds ciphertexts)
+    # 2.149.0 C (#2515): the same conditions as one set of ids per field (each can use its trigram index, core/schema.py
+    # tasks_trgm_*; an OR over all of them could only scan) -- the matches are exactly those of the OR before
     rows = load_tasks(c, f"list_id IN {vis_sql()} AND list_id NOT IN (SELECT id FROM lists WHERE e2e IS NOT NULL) "
                          f"AND deleted_at IS NULL AND {tvis(c, uid, write=True)} "
-                         "AND (title ILIKE ? ESCAPE '\\' OR content ILIKE ? ESCAPE '\\' OR url ILIKE ? ESCAPE '\\' OR (snippets IS NOT NULL AND EXISTS (SELECT 1 FROM "
+                         "AND id IN (SELECT id FROM tasks WHERE title ILIKE ? ESCAPE '\\' UNION SELECT id FROM tasks WHERE content ILIKE ? ESCAPE '\\' "
+                         "UNION SELECT id FROM tasks WHERE url ILIKE ? ESCAPE '\\' "
+                         "UNION SELECT id FROM tasks WHERE snippets IS NOT NULL AND EXISTS (SELECT 1 FROM "
                          "jsonb_array_elements(CASE WHEN jsonb_typeof(snippets)='array' THEN snippets ELSE '[]'::jsonb END) j "
-                         "WHERE (j->>'code') ILIKE ? ESCAPE '\\' OR (j->>'path') ILIKE ? ESCAPE '\\')) "
-                         f"OR id IN ({','.join('?' * len(fids)) or 'NULL'})) "
-                         "ORDER BY status, updated_at DESC LIMIT ?", (uid, uid, q, q, q, q, q, *fids, limit))
+                         "WHERE (j->>'code') ILIKE ? ESCAPE '\\' OR (j->>'path') ILIKE ? ESCAPE '\\') "
+                         "UNION SELECT unnest(CAST(? AS BIGINT[]))) "
+                         "ORDER BY status, updated_at DESC LIMIT ?", (uid, uid, q, q, q, q, q, list(fids), limit))
     for t in rows:  # 2.61.0 (#1820): "in file <name>" when only a file's text matched
         if t["id"] in fhit and not any(raw.casefold() in (t.get(k) or "").casefold() for k in ("title", "content", "url")):
             t["file_hit"] = fhit[t["id"]]

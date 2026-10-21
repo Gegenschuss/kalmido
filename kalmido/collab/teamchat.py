@@ -137,17 +137,15 @@ def tchat_rooms(c, uid):
     from .teamchan import tcx_room_brief, tcx_rooms_of
     rooms += tcx_rooms_of(c, uid)  # 2.113.1 (#2059): my channels and groups (also without messages)
     names = user_names(c, {x for r in rooms if r["kind"] == "dm" for x in (r["a"], r["b"])})
+    lasts, reads, unr, thr = _tchat_room_counts(c, [r["id"] for r in rooms], uid)
     out = []
     for r in rooms:
         # 2.139.0 A (#2127): the preview and the unread count: the main conversation + the threads I take part in
-        last = c.execute("SELECT * FROM tchat_msgs WHERE room_id=? AND deleted_at IS NULL AND thread_of IS NULL ORDER BY id DESC LIMIT 1",
-                         (r["id"],)).fetchone()
-        lr, muted = tchat_last_read(c, r["id"], uid)
-        unread = c.execute("SELECT COUNT(*) FROM tchat_msgs WHERE room_id=? AND id>? AND deleted_at IS NULL AND COALESCE(user_id,0)!=? "
-                           "AND thread_of IS NULL", (r["id"], lr, uid)).fetchone()[0]
-        tu, tm = tth_unread(c, r["id"], uid)
-        mention = (bool(unread) and c.execute("SELECT 1 FROM tchat_msgs WHERE room_id=? AND id>? AND deleted_at IS NULL AND thread_of IS NULL "
-                                              "AND body ILIKE ?", (r["id"], lr, f"%<@{uid}>%")).fetchone() is not None) or tm
+        last = lasts.get(r["id"])
+        muted = reads.get(r["id"], (0, False))[1]
+        unread, any_mention = unr.get(r["id"], (0, False))
+        tu, tm = thr.get(r["id"], (0, False))
+        mention = (bool(unread) and any_mention) or tm
         unread += tu
         d = {"id": r["id"], "kind": r["kind"], "unread": unread, "mention": mention, "muted": muted,
              "last": tchat_msg_brief(c, last) if last else None, "last_at": last["created_at"] if last else None}
@@ -166,27 +164,78 @@ def tchat_rooms(c, uid):
     return out
 
 
+def _tchat_room_counts(c, ids, uid):
+    """2.149.0 C (#2507): what tchat_rooms needs per room in four statements for all rooms (was four to five per room):
+    ({room: newest main message}, {room: (last read id, muted)}, {room: (unread main messages of others, a message after
+    my read mark @mentions me)}, {room: tth_unread()}). Same conditions as the per-room queries before."""
+    ids = sorted({int(i) for i in ids})
+    if not ids:
+        return {}, {}, {}, {}
+    lasts = {r["room_id"]: r for r in c.execute(
+        "SELECT DISTINCT ON (room_id) * FROM tchat_msgs WHERE room_id = ANY(CAST(? AS BIGINT[])) AND deleted_at IS NULL "
+        "AND thread_of IS NULL ORDER BY room_id, id DESC", (ids,))}
+    reads = {r[0]: (r[1], bool(r[2])) for r in c.execute(
+        "SELECT room_id, last_id, muted FROM tchat_reads WHERE user_id=? AND room_id = ANY(CAST(? AS BIGINT[]))", (uid, ids))}
+    pat = f"%<@{uid}>%"
+    unr = {r[0]: (r[1], bool(r[2])) for r in c.execute(
+        """SELECT m.room_id, COUNT(*) FILTER (WHERE COALESCE(m.user_id,0)!=?), bool_or(m.body ILIKE ?) FROM tchat_msgs m
+           LEFT JOIN tchat_reads d ON d.room_id=m.room_id AND d.user_id=?
+           WHERE m.room_id = ANY(CAST(? AS BIGINT[])) AND m.id>COALESCE(d.last_id,0) AND m.deleted_at IS NULL AND m.thread_of IS NULL
+           GROUP BY m.room_id""", (uid, pat, uid, ids))}
+    thr = {r[0]: (r[1], bool(r[2])) for r in c.execute(
+        """SELECT t.room_id, COUNT(*), COALESCE(SUM(CASE WHEN m.body ILIKE ? THEN 1 ELSE 0 END),0) FROM tchat_msgs m
+           JOIN tchat_thread_reads t ON t.root_id=m.thread_of AND t.user_id=? AND t.follow=1
+           WHERE t.room_id = ANY(CAST(? AS BIGINT[])) AND m.room_id=t.room_id AND m.id>t.last_id AND m.deleted_at IS NULL
+           AND COALESCE(m.user_id,0)!=? GROUP BY t.room_id""", (pat, uid, ids, uid))}
+    return lasts, reads, unr, thr
+
+
+def tchat_unread_both(c, uid):
+    """2.149.0 C (#2507): (tchat_unread, tchat_dm_unread) from one tchat_rooms (/api/state read it twice)."""
+    if not tchat_on(c, uid):
+        return 0, 0
+    rooms = tchat_rooms(c, uid)
+    return (sum(x["unread"] for x in rooms if not x["muted"] or x["mention"]),
+            sum(x["unread"] for x in rooms if x["kind"] in ("dm", "group") and not x["muted"]))
+
+
 def tchat_sig(c, uid):
     """Change marker for /api/version: the newest message id of my conversations + my read marks."""
     if not collab_all():
         return ""
-    r = c.execute("""SELECT COALESCE(MAX(m.id),0), COUNT(m.id), COUNT(m.pinned_at), COALESCE(MAX(m.pinned_at),'') FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
-                     WHERE (r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN """ + vis_sql(ov=False) + ")",
-                  (uid, uid, uid, uid)).fetchone()
-    e = c.execute("SELECT COALESCE(MAX(edited_at),'') FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id WHERE "
-                  "(r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN " + vis_sql(ov=False) + ")", (uid, uid, uid, uid)).fetchone()[0]
+    return tchat_sig_fmt(c.execute(*tchat_sig_q(uid)).fetchone())
+
+
+def tchat_sig_q(uid):
+    """2.149.0 C (#2507): the parts of tchat_sig as ONE statement (one row, 16 columns; was five queries, the messages of
+    the list / DM conversations were read twice). /api/version runs it inside its own one statement."""
+    from .teamchan import tcx_sig_q
+    # the list / DM conversations: newest id, count, pins, newest pin, newest edit (2.62.0 #1848: + the pins)
+    m = ("""SELECT COALESCE(MAX(m.id),0), COUNT(m.id), COUNT(m.pinned_at), COALESCE(MAX(m.pinned_at),''), COALESCE(MAX(m.edited_at),'')
+            FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
+            WHERE (r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN """ + vis_sql(ov=False) + ")")
     # 2.139.0 A (#2129, #2127): + the read marks of everyone (mine included) in the conversations I have read and in their
     # threads, so "Read by" shows without reloading
-    rd = c.execute("""SELECT (SELECT COALESCE(SUM(last_id),0) FROM tchat_reads WHERE room_id IN (SELECT room_id FROM tchat_reads WHERE user_id=?)),
-                             (SELECT COALESCE(SUM(last_id),0) + COUNT(*) FROM tchat_thread_reads
-                              WHERE room_id IN (SELECT room_id FROM tchat_reads WHERE user_id=?))""", (uid, uid)).fetchone()
-    rd = f"{rd[0]}-{rd[1]}"
+    rd = """SELECT (SELECT COALESCE(SUM(last_id),0) FROM tchat_reads WHERE room_id IN (SELECT room_id FROM tchat_reads WHERE user_id=?)),
+                   (SELECT COALESCE(SUM(last_id),0) + COUNT(*) FROM tchat_thread_reads
+                    WHERE room_id IN (SELECT room_id FROM tchat_reads WHERE user_id=?))"""
     # 2.113.1 (#2059): + the messages of my channels / groups and their names, states, members
-    from .teamchan import tcx_sig
-    x = c.execute("""SELECT COALESCE(MAX(m.id),0), COUNT(m.id), COALESCE(MAX(m.edited_at),''), COUNT(m.pinned_at) FROM tchat_msgs m
-                     WHERE m.room_id IN (SELECT room_id FROM tchat_members WHERE user_id=?)""", (uid,)).fetchone()
-    tx = f".{x[0]}.{x[1]}.{x[2][-6:]}.{x[3]}.{tcx_sig(c, uid)}"
-    return f"{r[0]}.{r[1]}.{rd}.{e[-6:] if e else ''}.{r[2]}{r[3][-6:]}{tx}"  # 2.62.0 (#1848): + the pins
+    x = """SELECT COALESCE(MAX(m.id),0), COUNT(m.id), COALESCE(MAX(m.edited_at),''), COUNT(m.pinned_at) FROM tchat_msgs m
+           WHERE m.room_id IN (SELECT room_id FROM tchat_members WHERE user_id=?)"""
+    tq, ta = tcx_sig_q(uid)
+    return (f"SELECT * FROM ({m}) s1 CROSS JOIN ({rd}) s2 CROSS JOIN ({x}) s3 CROSS JOIN ({tq}) s4",
+            (uid, uid, uid, uid, uid, uid, uid, *ta))
+
+
+TCHAT_SIG_COLS = 16
+
+
+def tchat_sig_fmt(row):
+    from .teamchan import tcx_sig_fmt
+    r, rd, x, t = row[0:5], row[5:7], row[7:11], row[11:16]
+    e = r[4]
+    tx = f".{x[0]}.{x[1]}.{x[2][-6:]}.{x[3]}.{tcx_sig_fmt(t)}"
+    return f"{r[0]}.{r[1]}.{rd[0]}-{rd[1]}.{e[-6:] if e else ''}.{r[2]}{r[3][-6:]}{tx}"
 
 
 def tchat_unread(c, uid):

@@ -153,12 +153,15 @@ def docs_run_once():
             c.commit()
         stale = iso(now_utc() - timedelta(minutes=RUN_STALE))
         with system_ctx(c):  # docs queue: server-side recognition of every workspace's documents, nothing handed to a person
-            c.execute("UPDATE doc_meta SET state='wait' WHERE state='run' AND updated_at < ?", (stale,))
-            c.execute("UPDATE doc_meta SET state='failed', error='failed' WHERE state='wait' AND tries >= ?", (TRIES,))
-            r = c.execute("""UPDATE doc_meta SET state='run', tries=tries+1, updated_at=? WHERE node_id=(
-                               SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id
-                               WHERE d.state='wait' AND n.deleted_at IS NULL ORDER BY d.created_at, d.node_id LIMIT 1
-                               FOR UPDATE OF d SKIP LOCKED) RETURNING node_id""", (_now(),)).fetchone()
+            r = None
+            # 2.149.0 C (#2516): the three writes below only touch waiting / running rows: none (the usual idle tick) -> no writes
+            if c.execute("SELECT 1 FROM doc_meta WHERE state IN ('wait', 'run') LIMIT 1").fetchone():
+                c.execute("UPDATE doc_meta SET state='wait' WHERE state='run' AND updated_at < ?", (stale,))
+                c.execute("UPDATE doc_meta SET state='failed', error='failed' WHERE state='wait' AND tries >= ?", (TRIES,))
+                r = c.execute("""UPDATE doc_meta SET state='run', tries=tries+1, updated_at=? WHERE node_id=(
+                                   SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id
+                                   WHERE d.state='wait' AND n.deleted_at IS NULL ORDER BY d.created_at, d.node_id LIMIT 1
+                                   FOR UPDATE OF d SKIP LOCKED) RETURNING node_id""", (_now(),)).fetchone()
         c.commit()
         if not r:
             from .thumbfill import p61a_thumb_fill  # 2.66.1 (#1944): previews of imports from before, while nothing waits
