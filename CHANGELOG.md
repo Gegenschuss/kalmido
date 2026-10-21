@@ -26,6 +26,9 @@ Package 2.152.1 (small fixes: navigation, News number).
 - Dialogs: the resize grip only shows where the content can grow (text field, editor, list, preview), not on short
   confirmations (#2615).
 
+### Security
+- pypdf 6.21.2 (was 6.20.1): fixes CVE-2026-113786 (unchecked JPEG image data in PDF files).
+
 ## [2.161.0] - 2026-10-21
 
 Bundle of the packages 2.152.0 (deletion rules and legal retention), 2.153.0 (correspondence, job chat, document fields, receipt list), 2.154.0 (documents: stack scans, task links, Peppol, privacy sheets), 2.155.0 (calendar: answers, rules, absences, availability, year), 2.156.0 (lists and views), 2.157.0 (project agents, job chat) and 2.161.0 (small interface fixes).
