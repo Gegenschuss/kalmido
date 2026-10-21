@@ -140,7 +140,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   // ================= A7: the view switch under the title on phones; the "…" menu without duplicates
   w = await boot({user: 'alice', mobile: true, hash: 'l/' + P}); d = w.document;
   const seg = d.querySelector('#view .vsegm');
-  check(seg && [...seg.querySelectorAll('button')].map(b => b.textContent.trim()).join('|') === 'Project|List|Kanban|Timeline|Mind map' /* 2.49.0 (#1201) */ && seg.querySelector('button.on[aria-pressed="true"]')?.textContent.trim() === 'List', 'A7: phone: Overview (first in projects) / List / Kanban / Timeline under the title, the active one marked');
+  check(seg && [...seg.querySelectorAll('button')].map(b => b.textContent.trim()).join('|') === 'Project|List|Kanban|Timeline|Mind map|Calendar' /* 2.49.0 (#1201); 2.156.0 (#2071): + Calendar */ && seg.querySelector('button.on[aria-pressed="true"]')?.textContent.trim() === 'List', 'A7: phone: Overview (first in projects) / List / Kanban / Timeline under the title, the active one marked');
   const more = w.eval('topMoreItems().filter(x => x !== "-" && !x.head).map(x => x.label || "")');
   check(!more.includes('List') && !more.includes('Kanban') && !more.includes('As a project') && more.includes('Edit list…') && new Set(more).size === more.length, 'A7: "…" without the views, no type entries (2.25.0), no duplicates: ' + more.join(' | '));
   click(w, seg.querySelector('[data-act="view-kanban"]')); await until(() => d.querySelector('#view .kanban'));
