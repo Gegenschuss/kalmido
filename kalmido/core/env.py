@@ -91,6 +91,7 @@ VARS = (
     _v("KALMIDO_PUBLIC_RATE", "60", "Page views of public links per client address and minute.", "security"),
     _v("KALMIDO_PUBLIC_BURST", "300", "Views of one public link in a short time that raise a security alert.", "security"),
     _v("KALMIDO_SUPPORTER_EXTRA_PUBKEYS", "", "Additional public keys accepted for supporter licences.", "security"),
+    _v("KALMIDO_LOG_FULL_IP", "1", "Switch: failed sign-ins in the server log keep the full address (fail2ban bans by it); 0 shortens it like the alerts (IPv4 /24, IPv6 /48).", "security"),
 
     # ---- notifications and push
     _v("NTFY_URL", "https://ntfy.sh", "ntfy server for push notifications.", "notify"),
@@ -258,6 +259,7 @@ VARS = (
     _v("KALMIDO_LOOP_LOCKS", "1", "Each background loop runs in one process of the instance; 0 = every process runs its loops.", "workers"),
     _v("KALMIDO_WORKER_HEARTBEAT", "30", "Seconds between two heartbeats of a background loop.", "workers"),
     _v("KALMIDO_STALE_HOUR", "09:00", "Local time from which the daily event about stale tasks goes out.", "workers"),
+    _v("KALMIDO_ACCOUNT_IMPORT_PARALLEL", "2", "At most this many account checks / imports run at once on the whole server (2.148.1).", "workers"),
 
     # ---- hosting, retention and quotas
     _v("KALMIDO_HOSTED", "0", "Switch: a server run as a service for others; integrations may only reach public HTTPS addresses.", "hosting"),
@@ -274,6 +276,9 @@ VARS = (
     _v("KALMIDO_TEST", "0", "Switch: marks a test container (set by tests/start.sh); only then KALMIDO_TEST_NOW and KALMIDO_TEST_RATE_WINDOW_S work. Never on a real server.", "test"),
     _v("KALMIDO_TEST_NOW", "", "Test containers only (with KALMIDO_TEST=1): the server clock starts at this ISO time and runs on from there.", "test"),
     _v("KALMIDO_TEST_NOW_AT", "", "Test containers only: the real Unix second KALMIDO_TEST_NOW belongs to (app and worker share one shifted clock).", "test"),
+    _v("KALMIDO_TEST_MODE", "0", "Test containers only: allows the test switches of the organisation key tool (1); left alone in a server's .env it is ignored.", "test"),
+    _v("KALMIDO_SHEET_RANGE_BUDGET", "15000000", "Tests: range cells one evaluation of a table may read (2.148.1).", "test"),
+    _v("KALMIDO_SHEET_CELLS_MAX", "1000000", "Tests: stored cells over all sheets of one table (2.148.1).", "test"),
     _v("KALMIDO_AGENT_BURST_S", "60", "Seconds in which several new tasks of an agent count as one burst (one summary event).", "agents"),
     _v("KALMIDO_AGENT_BURST_QUIET_S", "15", "Seconds without more new tasks after which the burst summary of an agent is sent.", "agents"),
 )

@@ -76,6 +76,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `KALMIDO_LOG_FULL_IP` | `1` | Switch: failed sign-ins in the server log keep the full address (fail2ban bans by it); 0 shortens it like the alerts (IPv4 /24, IPv6 /48). |
 | `KALMIDO_NO_SECRET_KEY` | `0` | Switch: let a NEW server start without a server key (data then stays unencrypted). Tests and demos only. |
 | `KALMIDO_ORGCRYPT_DELAY` | `(empty)` | Seconds before the background encryption pass starts after a start (default: 300). |
 | `KALMIDO_ORGCRYPT_PAUSE` | `0.2` | Seconds between two portions of the background encryption pass. |
@@ -275,6 +276,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `KALMIDO_ACCOUNT_IMPORT_PARALLEL` | `2` | At most this many account checks / imports run at once on the whole server (2.148.1). |
 | `KALMIDO_LOOP_LOCKS` | `1` | Each background loop runs in one process of the instance; 0 = every process runs its loops. |
 | `KALMIDO_STALE_HOUR` | `09:00` | Local time from which the daily event about stale tasks goes out. |
 | `KALMIDO_WORKER_HEARTBEAT` | `30` | Seconds between two heartbeats of a background loop. |
@@ -298,7 +300,10 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `KALMIDO_SHEET_CELLS_MAX` | `1000000` | Tests: stored cells over all sheets of one table (2.148.1). |
+| `KALMIDO_SHEET_RANGE_BUDGET` | `15000000` | Tests: range cells one evaluation of a table may read (2.148.1). |
 | `KALMIDO_TEST` | `0` | Switch: marks a test container (set by tests/start.sh); only then KALMIDO_TEST_NOW and KALMIDO_TEST_RATE_WINDOW_S work. Never on a real server. |
+| `KALMIDO_TEST_MODE` | `0` | Test containers only: allows the test switches of the organisation key tool (1); left alone in a server's .env it is ignored. |
 | `KALMIDO_TEST_NOW` | `(empty)` | Test containers only (with KALMIDO_TEST=1): the server clock starts at this ISO time and runs on from there. |
 | `KALMIDO_TEST_NOW_AT` | `(empty)` | Test containers only: the real Unix second KALMIDO_TEST_NOW belongs to (app and worker share one shifted clock). |
 | `KALMIDO_TEST_ROT_ABORT` | `(empty)` | Tests: stop the key rotation right after the switch (1). |

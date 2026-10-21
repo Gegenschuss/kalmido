@@ -65,7 +65,7 @@ const LD_MODS = {
 const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs', 'timesheet', 'team'], agentchat: ['integrations'], wiki: ['mindmap'], docs: ['tagsel', 'asstprop'], office: ['asstprop', 'ofundo'], sheets: ['ofundo']};  // 2.122.0 B: docs -> tagsel; 2.126.1 A (#2123): docs / office -> asstprop
 // functions of a module that code loaded at start calls: a stand-in loads the module and then calls the real one (the
 // module's own function declaration replaces the stand-in on window)
-const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved', 'setLocal'],  // 2.149.0 F (#2519): setLocal (the command bar's "Theme: …")
+const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved', 'setLocal', 'ojn_open'],  // 2.149.0 F (#2519): setLocal (the command bar's "Theme: …"); bundle B: ojn_open (2.148.1 #2480, bell item of an invitation)
   contacts: ['ctRoute', 'ctEditor'], filereq: ['frq_open'],
   // 2.65.0 (#1823)
   agentchat: ['chatOpen', 'chatClose', 'chatPop', 'chatDock', 'chatFloatMin', 'apvJump', 'chatChoice', 'shareDest', 'chatFileRm', 'chatReact',
