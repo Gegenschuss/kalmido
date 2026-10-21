@@ -397,7 +397,8 @@ def user_delete(uid):
     if keep:
         c.rollback()
         return keep
-    files = user_purge(c, uid)
+    # bundle B: only an instance admin's export / waiver lifts the 2.148.1 retention block (#2479: never an organisation admin's)
+    files = user_purge(c, uid, retained=bool(retained) and bool(g.user["is_admin"]))
     bump(c)
     c.commit()
     unlink_files(files)
@@ -439,14 +440,15 @@ def _up_mail_nodes(c, uid):
     return paths
 
 
-def user_purge(c, uid):
-    """Deletes user uid (no own lists besides the inbox left; the caller checked and commits). Returns the files to unlink."""
+def user_purge(c, uid, retained=False):
+    """Deletes user uid (no own lists besides the inbox left; the caller checked and commits). Returns the files to unlink.
+    retained = the 2.146.0 D retention gate (rx_gate) passed for an instance admin: a finished retention export or an explicit, logged waiver."""
     with system_ctx(c):  # 2.148.1 B (#2479): retention -- finalised documents / cash book of the personal office never go along
         kept = c.execute("""SELECT 1 FROM orgs o WHERE o.personal_of=? AND (
                               EXISTS (SELECT 1 FROM office_docs d WHERE d.org_id=o.id AND d.locked_at IS NOT NULL)
                               OR EXISTS (SELECT 1 FROM office_cash_entries e WHERE e.org_id=o.id)
                               OR EXISTS (SELECT 1 FROM office_cash_log x WHERE x.org_id=o.id))""", (uid,)).fetchone()
-    if kept:
+    if kept and not retained:  # bundle B: 2.146.0 D's export / waiver stays the one way to delete such an account
         raise Denied(409, tr(UP_RETENTION))
     inbox = [r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=?", (uid,))]
     files = attachment_files(c, [r[0] for r in c.execute(

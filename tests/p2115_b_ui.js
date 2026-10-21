@@ -3,7 +3,7 @@
 //   on the other one (confirmation) ends it (its cookie is 401), the list redraws with one row and no "everywhere else" button;
 //   "Log out everywhere else" with a third session: the toast with the count.
 //   Settings > Organisation as its admin (not admin of the server): "Invite by e-mail" opens the dialog (address + role),
-//   inviting shows a notice (no e-mail on this server; 2.148.1: never the link) and the open invitation; withdraw (confirmation) removes it and the
+//   inviting gives the neutral answer (2.148.1: never the link, no mail notice) and the open invitation; withdraw (confirmation) removes it and the
 //   account, ONE undo step invites the address again; a plain member sees no invite button.
 // P2115B_NOSTART=1 = the server already runs.
 const {execFileSync} = require('child_process');
@@ -66,8 +66,9 @@ const loginUA = async (user, ua) => {
   check(mi && d.querySelector('#oinv-role option[value="admin"]'), 'the dialog: address + role');
   mi.value = 'nora@example.com'; d.querySelector('#oinv-role').value = 'member';
   mi.closest('form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
-  // 2.148.1 (#2486): an organisation admin never gets the link (no e-mail on this server: a notice instead)
-  check(await until(() => /could not be sent/.test(d.body.textContent)) && !d.querySelector('#inv-link'), 'no e-mail on this server: a notice, no link');
+  // 2.148.1 (#2486): an organisation admin never gets the link; 2.148.1 H (#2480): nor a notice about the mail -- the same
+  // answer as for an existing account (bundle B: the test follows the review fix)
+  check(await until(() => /Invitation sent/.test(d.body.textContent)) && !/could not be sent/.test(d.body.textContent) && !d.querySelector('#inv-link'), 'the organisation admin: the neutral answer, no link');
   const orow = await until(() => [...d.querySelectorAll('.oinvrow')].find(r => /nora@example\.com/.test(r.textContent)));
   check(orow && /Invited/.test(orow.textContent) && orow.querySelector('[data-oinv="resend"]') && orow.querySelector('[data-oinv="withdraw"]'), 'the open invitation with Resend + Withdraw');
   let inv = await call('GET', `/api/orgs/${ORG}/invites`, null, await login('bob'));
