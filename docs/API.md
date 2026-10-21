@@ -1267,6 +1267,15 @@ star in `fav_lists` (pushes, agents and *Only favourites* read only that); `PUT 
 list's `l:` key at the end of `fav_items` / takes it out and answers `fav_items` too. A key whose target the person cannot
 see (any more) stays stored and is simply not shown. Agents do not see `fav_items`.
 
+2.156.0 D (#2186): **saved views of the sidebar** (e.g. "On the road", "Planning"), per person and the same on every device.
+The setting `side_views` (`PATCH /api/settings`, a json list of at most 20 views) holds them: `{id, name, icon, open, fclosed,
+hide, start}` with `id` = 1-16 lowercase letters / digits, `name` up to 60 characters, `icon` = the name of an app icon
+(default `panel`), `open` = the groups shown open (`focus`, `lists`, `views`, `areas`, `filters`, `tags`, `team`, `more`),
+`fclosed` = closed folders, `hide` = the hidden entries (`g:<group>` or a `fav_items` key; they wait under "Others (N)" in the
+sidebar) and `start` = an optional start page (a route such as `today` or `l/12`). `side_view` is the id of the active view
+(`''` = "Everything"); switching on one device switches every device. An invalid value is `400` and nothing is stored;
+doubles in the lists are dropped. No route of its own, nothing for agents.
+
 ## My tasks in an own order (2.40.0)
 
 *My tasks* can be put in a personal order by dragging (the default view; *Grouped by list* shows the list groups as before).
