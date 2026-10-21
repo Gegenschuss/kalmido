@@ -12402,7 +12402,6 @@
   "Which file from your online banking?": "Welche Datei aus dem Online-Banking?",
   "Recommended: XML (CAMT.053), booked transactions – version V2 or V8 does not matter. Only this brings the account balance along. Several files or one ZIP work too.": "Empfohlen: XML (CAMT.053), gebuchte Umsätze – Version V2 oder V8 egal. Nur damit kommt auch der Kontostand mit. Mehrere Dateien oder eine ZIP gehen auch.",
   "Also works: CSV export (you choose the columns) – the account balance only when the CSV has a balance column.": "Geht auch: CSV-Export (Spalten zuordnen) – den Kontostand nur, wenn die CSV eine Saldo-Spalte hat.",
-  "Do not use: pending transactions / CAMT.052 (not booked yet, they would come twice later) and MT940 / MT942 (not read).": "Nicht nehmen: vorgemerkte Umsätze / CAMT.052 (noch nicht gebucht, kämen später doppelt) und MT940 / MT942 (wird nicht gelesen).",
   "Choose files": "Dateien wählen",
   "or drop them here": "oder hier ablegen",
   "Skipped: {0}": "Übersprungen: {0}",

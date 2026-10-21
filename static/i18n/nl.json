@@ -12402,7 +12402,6 @@
   "Which file from your online banking?": "Welk bestand uit uw internetbankieren?",
   "Recommended: XML (CAMT.053), booked transactions – version V2 or V8 does not matter. Only this brings the account balance along. Several files or one ZIP work too.": "Aanbevolen: XML (CAMT.053), geboekte transacties – versie V2 of V8 maakt niet uit. Alleen zo komt ook het rekeningsaldo mee. Meerdere bestanden of één ZIP kan ook.",
   "Also works: CSV export (you choose the columns) – the account balance only when the CSV has a balance column.": "Kan ook: CSV-export (kolommen toewijzen) – het saldo alleen als de CSV een saldokolom heeft.",
-  "Do not use: pending transactions / CAMT.052 (not booked yet, they would come twice later) and MT940 / MT942 (not read).": "Niet gebruiken: voorgemerkte transacties / CAMT.052 (nog niet geboekt, komen later dubbel) en MT940 / MT942 (wordt niet gelezen).",
   "Choose files": "Bestanden kiezen",
   "or drop them here": "of zet ze hier neer",
   "Skipped: {0}": "Overgeslagen: {0}",
