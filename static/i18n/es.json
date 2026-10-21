@@ -12568,5 +12568,7 @@
   "Suggest after": "Sugerir tras",
   "suggested": "sugerido",
   "Suggest payment reminders for overdue invoices": "Sugerir recordatorios de pago para facturas vencidas",
-  "Read|section": "Leído"
+  "Read|section": "Leído",
+  "Visible to everyone in the organisation. Your role there is read-only: you can look, not change.": "Visible para toda la organización. Tu rol allí es de solo lectura: puedes ver, no cambiar.",
+  "You can only read “{0}”: no new tasks there.": "Solo puedes leer «{0}»: ahí no puedes crear tareas."
 }
