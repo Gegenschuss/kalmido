@@ -44,6 +44,8 @@ jobs:
         run: python tools/check_layers.py -v
       - name: Performance budget
         run: python tools/perf_budget.py
+      - name: Environment variables declared and documented (kalmido/core/env.py, docs/ENV.md)
+        run: python tools/env_check.py
       - name: Translations complete
         run: |
           python tools/i18n_check.py
@@ -225,7 +227,7 @@ jobs:
         run: |
           docker build -t kalmido:test .
           mkdir -p /tmp/zapdata
-          docker run -d --name kalmido-zap --user "$(id -u):$(id -g)" -e KALMIDO_UPDATE_CHECK=0 -e TASKS_DB=/data/tasks.db \
+          docker run -d --name kalmido-zap --user "$(id -u):$(id -g)" -e KALMIDO_UPDATE_CHECK=0 -e TASKS_DB=/data/tasks.db -e KALMIDO_NO_SECRET_KEY=1 \
             -e DATABASE_URL=postgresql://kalmido:zap@db:5432/kalmido --link kalmido-zap-db:db \
             -p 127.0.0.1:3040:3040 -v /tmp/zapdata:/data kalmido:test
           for i in $(seq 1 90); do curl -sf http://127.0.0.1:3040/api/health && break; sleep 1; done

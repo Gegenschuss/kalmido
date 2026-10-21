@@ -40,6 +40,7 @@ from ..tasks.tasks import my_tags, task_create, task_update
 from ..tasks.lifecycle import task_complete, task_delete, task_reopen, task_restore
 from ..personal.timetrack import BadInput
 from ..calendars.icalfeed import hm_minutes, ics_dur, ics_fold, ics_rrule, ics_text, ics_utc, ics_vtimezone
+from ..core.env import env_bool
 
 
 # ---------------------------------------------------------------- CalDAV server for tasks (2.9.0, #435)
@@ -67,8 +68,8 @@ from ..calendars.icalfeed import hm_minutes, ics_dur, ics_fold, ics_rrule, ics_t
 # DAV_SYNC_KEEP sets per person and list are kept (dav_sync) for the deltas of sync-collection; an unknown token answers
 # 403 valid-sync-token and the client loads the collection again. Rendered collections are cached per person, list and
 # change counter (settings.version), so the clients' frequent polls cost no rendering.
-DAV_ON = os.environ.get("KALMIDO_CALDAV", "1").strip().lower() not in ("0", "false", "no", "off")
-DAV_HTTP_OK = os.environ.get("KALMIDO_CALDAV_HTTP", "0").strip().lower() in ("1", "true", "yes", "on")
+DAV_ON = env_bool("KALMIDO_CALDAV", True)
+DAV_HTTP_OK = env_bool("KALMIDO_CALDAV_HTTP", False)
 try:
     DAV_DONE_DAYS = max(0, int(os.environ.get("KALMIDO_CALDAV_DONE_DAYS", "") or 90))
 except ValueError:

@@ -16,6 +16,7 @@ from datetime import timedelta
 from ..core.db import bump, iso, now_utc
 from ..core.serializers import unlink_files
 from .tasks import hard_delete
+from ..core.env import env_bool
 
 try:
     from ..core.retention import ret_days, ret_on, ret_report
@@ -35,7 +36,7 @@ except ImportError:  # 2.116.0 A (#2063): until 2.103.0 is merged -- same env na
             return True
         if one in ("0", "off", "false", "no"):
             return False
-        return os.environ.get("KALMIDO_RETENTION_PURGE", "").strip().lower() in ("1", "on", "true", "yes")
+        return env_bool("KALMIDO_RETENTION_PURGE", False)
 
     def ret_report(c, kind, counts, purged, run=None):
         counts = {k: int(v) for k, v in (counts or {}).items() if v}

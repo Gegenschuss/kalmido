@@ -26,6 +26,7 @@ from ..accounts.users import need_admin
 from ..notify.alerts import aa_err, aa_fail, aa_ok
 from ..agents.core import is_agent
 from ..collab.teamchat import tchat_unread
+from ..core.env import env_bool
 
 
 # ---------------------------------------------------------------- 2.17.0 (#443): tasks by e-mail + the daily summary by e-mail
@@ -40,7 +41,7 @@ MAIL_ADDRESS = os.environ.get("KALMIDO_MAIL_ADDRESS", "").strip()
 IMAP = {"host": os.environ.get("KALMIDO_IMAP_HOST", "").strip(), "port": int(os.environ.get("KALMIDO_IMAP_PORT", "0") or 0),
         "user": os.environ.get("KALMIDO_IMAP_USER", "").strip(), "password": os.environ.get("KALMIDO_IMAP_PASSWORD", ""),
         "folder": os.environ.get("KALMIDO_IMAP_FOLDER", "INBOX").strip() or "INBOX",
-        "ssl": os.environ.get("KALMIDO_IMAP_SSL", "1").strip().lower() not in ("0", "false", "no", "off"),
+        "ssl": env_bool("KALMIDO_IMAP_SSL", True),
         "interval": max(10, int(os.environ.get("KALMIDO_IMAP_INTERVAL", "60") or 60))}
 SMTP = {"host": os.environ.get("KALMIDO_SMTP_HOST", "").strip(), "port": int(os.environ.get("KALMIDO_SMTP_PORT", "0") or 0),
         "user": os.environ.get("KALMIDO_SMTP_USER", "").strip(), "password": os.environ.get("KALMIDO_SMTP_PASSWORD", ""),

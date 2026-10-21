@@ -29,6 +29,7 @@ from ..collab.comments import collab_on, task_push_tick
 from ..collab.news import news_cleanup, news_unread, notif_ok
 from ..personal.habits import habit_times, pomo_close, pomo_elapsed, pomo_planned_end
 from ..personal.timetrack import _num, time_watchdog
+from ..core.env import env_bool
 
 
 # ---------------------------------------------------------------- watchdog / ntfy
@@ -83,7 +84,7 @@ def ntfy(title, msg, prio="4", click=None, topic=None, actions=None, admin=False
 # only in the DB, never sent to a client); the push service sees the endpoint, size and timing, never the text.
 # SSRF: the server only ever POSTs to endpoints on WEBPUSH_HOSTS (https, port 443). KALMIDO_WEBPUSH_HOSTS adds
 # entries: "host", "*.domain" or an exact origin "http(s)://host:port" (the only way to allow plain http).
-WEBPUSH_ON = os.environ.get("KALMIDO_WEBPUSH", "1").strip().lower() not in ("0", "false", "no", "off")
+WEBPUSH_ON = env_bool("KALMIDO_WEBPUSH", True)
 WEBPUSH_HOSTS = ["fcm.googleapis.com",            # Chrome, Edge (Android), Samsung Internet, Opera, Brave, Vivaldi
                  "*.push.services.mozilla.com",   # Firefox (updates.push.services.mozilla.com)
                  "web.push.apple.com", "*.push.apple.com",  # Safari (macOS 13+), iOS / iPadOS 16.4+ home-screen apps

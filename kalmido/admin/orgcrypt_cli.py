@@ -40,6 +40,7 @@ import warnings
 from ..core.config import ATT_DIR, OFFICE_DIR
 from ..core.pg import system_ctx, write_lock
 from ..core import orgcrypt as oc
+from ..core.env import env_bool
 
 # `python -m kalmido.admin.orgcrypt_cli` finds this module already loaded by the package (kalmido/__init__.py ORDER):
 # harmless here (no routes, nothing at import time), so runpy's warning about it is not shown
@@ -922,7 +923,7 @@ def oc_migrate_start(delay=3.0):
 def oc_migrate_kick():
     """2.42.0 (#828): a list moved into an organisation -> its plain files / fields are encrypted now, not at the next start
     (a pass in the background after the usual short wait, so the moving request has committed). Not in helper processes."""
-    if oc.oc_enabled() and os.environ.get("TASKS_WATCHDOG", "1") == "1":
+    if oc.oc_enabled() and env_bool("TASKS_WATCHDOG", True):
         oc_migrate_start()
 
 
@@ -950,7 +951,7 @@ def oc_settle_kick(list_ids, delay=3.0):
     """2.64.0 (#1864): oc_settle_lists in the background after the usual short wait (the moving request has committed).
     Not in helper processes; nothing without a server key."""
     ids = {int(x) for x in list_ids or () if x}
-    if not ids or not oc.oc_enabled() or os.environ.get("TASKS_WATCHDOG", "1") != "1":
+    if not ids or not oc.oc_enabled() or not env_bool("TASKS_WATCHDOG", True):
         return
     from flask import g, has_request_context
     if has_request_context() and not getattr(g, "_oc_settle_after", False):

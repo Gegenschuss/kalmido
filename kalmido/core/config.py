@@ -60,6 +60,8 @@ from webauthn.helpers import structs as wa_structs
 from flask import Flask, Response, g, has_request_context, jsonify, redirect, request, send_file, send_from_directory
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from .env import env_bool  # 2.149.0 D (#2511): one reading of the switches
+
 DB = os.environ.get("TASKS_DB", "/data/tasks.db")
 # 2.37.0 (#1150): the database is Postgres (postgresql://user:password@host/db). TASKS_DB only names the data dir (its folder holds
 # attachments, office files, backups and the marker) and a SQLite file from before 2.37 that the move tool takes over.
@@ -69,6 +71,11 @@ NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "")  # topic of the first admin (seed)
 NTFY_URL = os.environ.get("NTFY_URL", "https://ntfy.sh")
 NTFY_TOKEN = os.environ.get("NTFY_TOKEN", "")  # optional ntfy access token (write access to NTFY_TOPIC)
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "http://localhost:3040")
+# 2.149.0 D (#2510): without PUBLIC_URL the log warns at every start (the published code's default is http://localhost:3040)
+PUBLIC_URL_SET = bool(os.environ.get("PUBLIC_URL", "").strip())
+if not PUBLIC_URL_SET:
+    print("WARNING: PUBLIC_URL is not set: links in notifications and mails, passkeys and the origin check use "
+          f"{PUBLIC_URL}. Set PUBLIC_URL to the address people open (e.g. https://tasks.example.com).", file=sys.stderr, flush=True)
 # 1.9.0: link to a signed, generic iOS shortcut ("Share to Kalmido", asks for address + upload token on import),
 # shown in Settings > Integrations > Share from your phone. Empty = the link is hidden.
 IOS_SHORTCUT_URL = os.environ.get("KALMIDO_IOS_SHORTCUT_URL", "").strip()
@@ -89,13 +96,13 @@ def _read_version():
 APP_VERSION = _read_version()
 # Update check (admins only, server side, never updates anything): once a day the latest GitHub release
 # is compared with VERSION. KALMIDO_UPDATE_CHECK=0 turns it off for good; admins can also switch it off.
-UPDATE_CHECK_ENV = os.environ.get("KALMIDO_UPDATE_CHECK", "1").strip().lower() not in ("0", "false", "no", "off")
+UPDATE_CHECK_ENV = env_bool("KALMIDO_UPDATE_CHECK", True)
 # v1.1: new users get a "Getting started" sample list and the welcome tour (existing users never do).
 # KALMIDO_ONBOARDING=0 turns both off (new users start empty, as before; the test suites use this).
 # 2.29.0 (#1026): search engines stay out by default (X-Robots-Tag on every answer + /robots.txt "Disallow: /");
 # KALMIDO_SEARCH_INDEX=1 lets an instance be indexed - public list links and forms stay noindex either way
-SEARCH_INDEX = os.environ.get("KALMIDO_SEARCH_INDEX", "0").strip().lower() in ("1", "true", "yes", "on")
-ONBOARDING_ENV = os.environ.get("KALMIDO_ONBOARDING", "1").strip().lower() not in ("0", "false", "no", "off")
+SEARCH_INDEX = env_bool("KALMIDO_SEARCH_INDEX", False)
+ONBOARDING_ENV = env_bool("KALMIDO_ONBOARDING", True)
 UPDATE_URL = os.environ.get("KALMIDO_UPDATE_URL", "https://api.github.com/repos/Gegenschuss/kalmido/releases/latest")
 UPDATE_EVERY = 6 * 3600  # s (1.9.0: was a day; releases come more often)
 UPDATE_RETRY = 3600      # s: after a failed check (e.g. GitHub's rate limit for anonymous requests, HTTP 403 / 429)
@@ -141,6 +148,11 @@ def _secret_key_env():
 # as KALMIDO_SECRET_KEY again and it wins over the file). Messages go to stderr: the container log shows them, scripts that
 # import the app and read its stdout stay clean.
 SECRET_FILE = os.environ.get("KALMIDO_SECRET_FILE", "").strip()
+# 2.149.0 D (#2510): the image without Compose: a volume mounted at /secret is the key folder (an explicitly empty
+# KALMIDO_SECRET_FILE= keeps it off). Never a folder of the container itself: a key there is gone with the container.
+if "KALMIDO_SECRET_FILE" not in os.environ and os.path.ismount("/secret"):
+    SECRET_FILE = "/secret/kalmido.key"
+SECRET_KEY_NEW = False  # 2.149.0 D (#2510): the key file was created during this start (core/db.py startup_guard)
 SECRET_KEY_SRC = "env" if os.environ.get("KALMIDO_SECRET_KEY", "").strip() else ""
 
 
@@ -150,7 +162,7 @@ def _sh_inside(path, folder):
 
 
 def sh_secret_file(again=False):
-    global SECRET_KEY_SRC
+    global SECRET_KEY_SRC, SECRET_KEY_NEW
     if not SECRET_FILE:
         return None, "unset"
     data = os.path.dirname(os.path.abspath(DB))
@@ -193,6 +205,7 @@ def sh_secret_file(again=False):
     print(f"A new server key was created in {SECRET_FILE}. Keep a copy of it apart from the backups: without it "
           "encrypted data in a backup cannot be read.", file=sys.stderr, flush=True)
     SECRET_KEY_SRC = "file"
+    SECRET_KEY_NEW = True
     return _secret_key_parse(raw), ""
 
 

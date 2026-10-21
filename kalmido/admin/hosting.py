@@ -10,11 +10,12 @@ from ..core.i18n import tr
 from ..core.db import body, bump, connect, db, err, gset, gsetting, iso, now_utc, parse_iso, usettings
 from ..accounts.session import me
 from ..api.v1 import v1_args, v1_err, v1_json, v1_view
+from ..core.env import env_bool
 
 # ---- the kind of server (#905). KALMIDO_HOSTED=1: an instance run as a service for others (no private networks behind it):
 # integrations may only reach public HTTPS addresses (the admin's internal-host allow-list does not apply).
 # Self-hosted servers (the default) keep everything as before.
-HOSTED = os.environ.get("KALMIDO_HOSTED", "0").strip().lower() in ("1", "true", "yes", "on")
+HOSTED = env_bool("KALMIDO_HOSTED", False)
 SELFHOST_DOCS = "https://github.com/Gegenschuss/kalmido#readme"
 
 
