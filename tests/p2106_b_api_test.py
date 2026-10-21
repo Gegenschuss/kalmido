@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.106.0 API tests, part B (#2028: letters <-> documents of the documents space), own container (start.sh, org
+"""2.153.0 API tests, part B (#2028: letters <-> documents of the documents space), own container (start.sh, org
 encryption on). Invented companies, people and figures only.
 tenant-matrix: office
 freelancer-matrix: office
@@ -186,7 +186,7 @@ check(r.status_code == 201, f"answer: created ({r.status_code} {r.text[:200]})")
 L1 = r.json()
 check(L1.get("client_id") == CL and L1.get("rcpt_name") == "Versicherung Beispiel AG" and "Versicherungsweg 2" in (L1.get("rcpt_address") or "")
       and "20000 Hamburg" in (L1.get("rcpt_address") or "") and L1.get("rcpt_email") == "post@versicherung.example.com", f"answer: the recipient {L1}")
-# 2.106.0 (#2028): the prefill speaks the letter's language (the office's document language, German here), not the reader's
+# 2.153.0 (#2028): the prefill speaks the letter's language (the office's document language, German here), not the reader's
 check(L1.get("subject") == "Ihr Schreiben vom 05.10.2026", f"answer: the subject {L1.get('subject')}")
 rl = L1.get("ref_line") or ""
 check("Ihr Zeichen: VB-2026/4711" in rl and "Ihre Nachricht vom 05.10.2026" in rl and "Versicherungsnummer: 123 456 789" in rl, f"answer: the reference line {rl}")
@@ -284,7 +284,7 @@ DD = upload(Do, "Finanzamt.txt", "Finanzamt Beispielstadt\nDatum: 01.10.2026\nSt
 x = Do.get(B + f"{LT}/doc/{DD}").json()
 check(x.get("available") is True and (x.get("deadline") or {}).get("date") == "2026-10-29", f"freelancer: the document side {x}")
 r = Do.post(B + LT, json={"answers": DD})
-check(r.status_code == 201 and "Ihr Zeichen: ESt 2025-17" in (r.json().get("ref_line") or "") and "Steuernummer: 12/345/67890" in r.json()["ref_line"],  # 2.106.0: the letter language (de)
+check(r.status_code == 201 and "Ihr Zeichen: ESt 2025-17" in (r.json().get("ref_line") or "") and "Steuernummer: 12/345/67890" in r.json()["ref_line"],  # 2.153.0: the letter language (de)
       f"freelancer: the answer ({r.text[:250]})")
 LD = r.json()["id"]
 check(A.get(B + f"{LT}/{LD}").status_code == 404 and A.get(B + f"{LT}/{LD}/links").status_code == 404, "freelancer: the letter is not the others'")

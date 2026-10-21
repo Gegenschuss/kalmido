@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.106.0 API tests, part C (#2029, #2030): a letter sent by e-mail and its answer linked; text blocks. Own container
+"""2.153.0 API tests, part C (#2029, #2030): a letter sent by e-mail and its answer linked; text blocks. Own container
 (start.sh) with the SMTP sink + IMAP stub (tests/stub_mail.py). Invented names, addresses @example.com only.
  - mail-info: mail server on, the reply address = the person's document address of the office's documents space ('' before)
  - send-mail: a draft goes out to its recipient's e-mail with the PDF attached, Reply-To = the document address, the
@@ -149,7 +149,7 @@ if not os.environ.get("P2106C_NOSTART"):
     time.sleep(0.8)
 s0 = requests.Session()
 s0.headers.update(H)
-for _ in range(60):  # 2.106.0: the server may still be starting after start.sh (seen once on the Mac: connection refused)
+for _ in range(60):  # 2.153.0: the server may still be starting after start.sh (seen once on the Mac: connection refused)
     try:
         s0.get(B + "/api/auth/state", timeout=2)
         break

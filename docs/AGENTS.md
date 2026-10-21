@@ -709,7 +709,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `chat_pinned` | 2.62.0 (#1848): the person pinned or unpinned a message of the agent's chat (see [Pinned chat messages](#pinned-chat-messages-2620)); information only, nothing to answer (the reference launcher starts no run) | `message` (the chat message, with `pinned_at` / `pinned_by`), `pinned` (true / false), `user` `{id, name}` |
 | `contract_notice` | 2.70.0 (#1359): the last day to cancel a contract (Home & life) in a list shared with the agent is near: from the contract's own lead (else 30 days) before it; once per contract, deadline and agent; never from a health list; only while the person has the module *Contracts* on. 2.92.0 (#1925): also a business contract of the office (Office > Contracts & insurance, its deadline task carries `fam.office_agreement`; `office` true; the person needs the office module instead). Answer with ONE `propose_contract_notice` (see [Contracts and notice deadlines](#contracts-and-notice-deadlines-2700)) | `task_id`, `list_id`, `name`, `provider`, `cost`, `per`, `monthly`, `yearly`, `notice`, `notice_unit`, `due` (cancel by), `ends`, `renew_months`, `days`, `user` `{id, name}`, `lang`, `office` (2.92.0), `hint` |
 | `abort` | 2.144.0 (#2412): the person pressed **Stop** in the agent's chat (the button while the agent works, or Esc / Ctrl+C, see [Stopping a running answer](#stopping-a-running-answer-21440)); end the running answer at once, then confirm with `POST /api/v1/agent/aborted` | `user`, `source` (`chat`), `job_id` + `job` when it was pressed in a job's history (stop only that job's current step) |
-| `letter_draft_requested` | 2.106.0 (#2031): an admin of the agent's office pressed *Let an agent draft the answer* at an incoming document shared with the agent: `node_id`, `title`, `requested_by`, `note`, `office` {id, personal}, `org_id`, `hint`. Answer with ONE `create_letter_draft` (`answers` = `node_id`); see [Letter drafts](#letter-drafts-21060) |
+| `letter_draft_requested` | 2.153.0 (#2031): an admin of the agent's office pressed *Let an agent draft the answer* at an incoming document shared with the agent: `node_id`, `title`, `requested_by`, `note`, `office` {id, personal}, `org_id`, `hint`. Answer with ONE `create_letter_draft` (`answers` = `node_id`); see [Letter drafts](#letter-drafts-21060) |
 
 2.39.0 (#1168): every event of a list (`mention`, `comment`, `assigned`, `tidy`, `task_added`, `tasks_added`, `team_message`,
 `scheduled_job` and `job_request` with a list, `playbook_proposal`, ...) carries `playbook` `{text, version, updated_at, list_id}`
@@ -1772,9 +1772,9 @@ area's clients, documents or lists answer `404`.
 | Suggest an incoming payment / your suggestions | `POST` / `GET /api/v1/office/payment-suggestions` | `suggest_payment` / `list_payment_suggestions` |
 | 2.94.0: the leads (stage lead, by follow-up day; `due=1` = the day has come) / add a lead (source `agent` by default) | `GET` / `POST /api/v1/office/leads` | `list_office_leads` / `create_office_lead` |
 | 2.94.0: change a lead's next step, follow-up day or note (only while it is a lead; `409` once converted) | `PATCH /api/v1/office/leads/{id}` | `update_office_lead` |
-| 2.106.0: your letters (status `draft` by default; `sent`, `delivered`, `all`) / create a letter draft (`answers`, `client_id`, `rcpt_name`, `rcpt_address`, `rcpt_email`, `letter_date`, `subject`, `body`, `ref_line`, `greeting`, `lang`, `notify`) | `GET` / `POST /api/v1/office/letters` | `list_letter_drafts` / `create_letter_draft` |
-| 2.106.0: one of your letters / change your own draft (only while it is a draft; `400` once sent) | `GET` / `PATCH /api/v1/office/letters/{id}` | -- / `update_letter_draft` |
-| 2.106.0: link your draft with a document shared with you (`node_id`, `kind` answers / reply) | `POST /api/v1/office/letters/{id}/links` | `link_letter_document` |
+| 2.153.0: your letters (status `draft` by default; `sent`, `delivered`, `all`) / create a letter draft (`answers`, `client_id`, `rcpt_name`, `rcpt_address`, `rcpt_email`, `letter_date`, `subject`, `body`, `ref_line`, `greeting`, `lang`, `notify`) | `GET` / `POST /api/v1/office/letters` | `list_letter_drafts` / `create_letter_draft` |
+| 2.153.0: one of your letters / change your own draft (only while it is a draft; `400` once sent) | `GET` / `PATCH /api/v1/office/letters/{id}` | -- / `update_letter_draft` |
+| 2.153.0: link your draft with a document shared with you (`node_id`, `kind` answers / reply) | `POST /api/v1/office/letters/{id}/links` | `link_letter_document` |
 
 Positions: `{service_id, qty}` takes title, unit and price from the catalogue (or the client's framework contract); `text`
 + `price` without a service is a **free** position, a `price` other than the catalogue's is marked **price changed**, a
@@ -1792,7 +1792,7 @@ Every request of an agent is one line in the office's access log (agent, read / 
 the log has the filter *Agents*. The event `offer_accepted` reaches the agents of the area with the office switch on while
 the privacy switch is on.
 
-## Letter drafts (2.106.0)
+## Letter drafts (2.153.0)
 
 Correspondence of the office (#2031): an agent drafts letters, a person checks, signs and sends them. The switches are those
 of the office drafts (scope `office`, the agent's *May draft office documents*, the area's *Agents may read office data*);

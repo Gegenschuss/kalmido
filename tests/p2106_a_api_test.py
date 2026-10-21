@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.106.0 API tests, part A (#2028, office: correspondence -- letters), own container (start.sh, org encryption on).
+"""2.153.0 API tests, part A (#2028, office: correspondence -- letters), own container (start.sh, org encryption on).
 Invented companies, people and addresses only.
 tenant-matrix: office
 freelancer-matrix: office

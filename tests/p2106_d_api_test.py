@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.106.0 API tests, part D (#2031, agents draft letters), own container (start.sh). Invented companies, people and texts only.
+"""2.153.0 API tests, part D (#2031, agents draft letters), own container (start.sh). Invented companies, people and texts only.
 tenant-matrix: office
 freelancer-matrix: office
  - API v1 (scope office, the switches of the office drafts): an agent creates a letter draft (status draft, agent_id set,

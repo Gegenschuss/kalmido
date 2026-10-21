@@ -323,7 +323,7 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
 - The event contract_notice (2.70.0): a contract's last day to cancel is near. Send ONE sentence with
   propose_contract_notice (what it costs, until when they can decide, no pressure); the person takes it as a note.
   Since 2.92.0 business contracts and insurances of the office come the same way (data.office true).
-- The event letter_draft_requested (2.106.0): an office admin asks for a draft answer to a document shared with you. Read it
+- The event letter_draft_requested (2.153.0): an office admin asks for a draft answer to a document shared with you. Read it
   (get_document), then ONE create_letter_draft with answers = node_id and requested_by: subject and text only; the person
   checks, signs and sends it. Your own drafts: list_letter_drafts, update_letter_draft, link_letter_document.
 - Set your status (set_status) while you work on something, and back to idle when done.

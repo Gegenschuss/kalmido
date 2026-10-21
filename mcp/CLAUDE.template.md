@@ -299,7 +299,7 @@
   2.147: `get_office` also names the area's `country_pack` and its `features` (`books.datev`, `docs.einvoice`,
   `books.vat_return`, `books.tax_dates`, `books.export_csv`: true / false). Leave out what is off - no DATEV hints, no
   XRechnung, no VAT return figures in an office that does not use them.
-  Letters (2.106.0) the same way: after the event `letter_draft_requested` ONE `create_letter_draft` (`answers` = the
+  Letters (2.153.0) the same way: after the event `letter_draft_requested` ONE `create_letter_draft` (`answers` = the
   document); a person checks, signs and sends it.
 
 ### Usage
@@ -419,7 +419,7 @@ switches as the office tools and for a person who is an **admin** of the office:
 note; source `agent` by default) and `update_office_lead` (only the next step, the follow-up day and the note, only while
 it is a lead). A person converts a lead into a client; you never convert, delete or move it to another stage.
 
-### Letter drafts (2.106.0)
+### Letter drafts (2.153.0)
 
 Correspondence of the office (letters to authorities, insurers, clients): you **draft**, a person checks, signs and sends.
 Same switches as the office tools, for a person who is an **admin** of the office. When a person presses *Let an agent

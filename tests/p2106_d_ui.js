@@ -1,4 +1,4 @@
-// 2.106.0 UI tests of part D (#2031: let an agent draft the answer to a document; own container, start.sh). jsdom:
+// 2.153.0 UI tests of part D (#2031: let an agent draft the answer to a document; own container, start.sh). jsdom:
 // - the slot at a document shared with an agent (both office switches on): the button "Let an agent draft the answer"
 // - a press: the dialog names the agent, a note; Ask the agent -> the toast, the event letter_draft_requested with the note
 // - a document not shared with the agent: no button, the hint to share it first

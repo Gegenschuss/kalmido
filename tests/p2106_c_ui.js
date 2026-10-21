@@ -1,4 +1,4 @@
-// 2.106.0 UI tests of part C (#2029, #2030; own container, start.sh without a mail server). jsdom on the phone page:
+// 2.153.0 UI tests of part C (#2029, #2030; own container, start.sh without a mail server). jsdom on the phone page:
 // - the hooks of part C in LT_HOOKS: a draft gets "Insert text block" (tools); a sent letter none; the list without an open
 //   letter gets "Text blocks" (sections, fn(null))
 // - insert: the picker lists the office's blocks, the search filters, a tap inserts the block at the cursor of #lt-body

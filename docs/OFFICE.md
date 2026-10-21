@@ -1699,7 +1699,7 @@ document texts are encrypted at rest in organisations with encryption.
   `POST .../send` takes `timesheet: true` to attach it as a second file (the invoice's own PDF / ZUGFeRD file is unchanged;
   the DATEV copy never gets it). The document answer has `timesheet_ok`.
 
-## Correspondence: letters (2.106.0)
+## Correspondence: letters (2.153.0)
 
 Tab *Correspondence* (admins of the office area; members `403`, agents `403`, another area `404`; a person without an
 organisation writes in the personal office). For letters to authorities, insurers, landlords or clients.
@@ -1791,7 +1791,7 @@ and never sees another area. Each request is one line in the access log (filter 
 People's routes: `GET/PATCH /api/office/agents/<id>` (the switch), `GET /api/office/pay-props`, `POST /api/office/pay-props/<id>`
 `{action: accept|reject}` (admins). The event `offer_accepted` tells the area's office agents about an accepted quotation.
 
-**Letter drafts (2.106.0, #2031).** At an incoming document an admin of the office sees *Let an agent draft the answer*
+**Letter drafts (2.153.0, #2031).** At an incoming document an admin of the office sees *Let an agent draft the answer*
 when the document is shared with at least one agent of the office that has both switches (else, when such agents exist, a
 short hint to share the document first; nothing is shared automatically). With several agents you choose one and may add a
 note. The agent drafts ONE letter that answers the document (recipient and reference line prefilled, linked to it) and

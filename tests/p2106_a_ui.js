@@ -1,4 +1,4 @@
-// 2.106.0 UI tests, part A (#2028, office: correspondence -- letters), own container (start.sh, mode workspaces),
+// 2.153.0 UI tests, part A (#2028, office: correspondence -- letters), own container (start.sh, mode workspaces),
 // Firefox (desktop + phone width). Invented companies, people and addresses only.
 // - the admin has the tab "Correspondence"; a new letter opens its editor; the recipient search offers the client and
 //   picking it fills name / address; typing saves the draft by itself; the list shows the letter

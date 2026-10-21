@@ -130,22 +130,22 @@ ROUTES = {
     # 2.111.0 A (#2233): undo of the office editors (p2111_a_api_test.py) - routes below this line
     "POST /api/office/undo/{}/{}": "office",
     # (2.111.0 spacer A)
-    # 2.106.0 A (#2028): letters (p2106_a_api_test.py) - routes below this line
+    # 2.153.0 (#2028): letters (p2106_a_api_test.py) - routes below this line
     "GET /api/office/letters": "office", "POST /api/office/letters": "office", "GET /api/office/letters/recipients": "office",
     "GET /api/office/letters/profile": "office", "PUT /api/office/letters/profile": "office",
     "DELETE /api/office/letters/profile/image": "office", "GET /api/office/letters/{}": "office", "PATCH /api/office/letters/{}": "office",
     "DELETE /api/office/letters/{}": "office", "POST /api/office/letters/{}/restore": "office", "GET /api/office/letters/{}/pdf": "office",
     "POST /api/office/letters/{}/sent": "office", "POST /api/office/letters/{}/delivered": "office",
     "DELETE /api/office/letters/{}/delivered": "office", "POST /api/office/letters/{}/template": "office",
-    # 2.106.0 B (#2028): letter links (p2106_b_api_test.py) - routes below this line
+    # 2.153.0 (#2028): letter links (p2106_b_api_test.py) - routes below this line
     "GET /api/office/letters/{}/links": "office", "POST /api/office/letters/{}/links": "office", "DELETE /api/office/letters/{}/links/{}": "office",
     "GET /api/office/letters/{}/thread": "office", "GET /api/office/letters/threads": "office", "GET /api/office/letters/doc/{}": "office",
     "POST /api/office/letters/doc/{}/deadline-task": "office",
-    # 2.106.0 C (#2029 #2030): letter mail, text blocks (p2106_c_api_test.py) - routes below this line
+    # 2.153.0 (#2029 #2030): letter mail, text blocks (p2106_c_api_test.py) - routes below this line
     "GET /api/office/letters/mail-info": "office", "GET /api/office/letters/{}/mail-draft": "office", "POST /api/office/letters/{}/send-mail": "office",
     "GET /api/office/letter-blocks": "office", "GET /api/office/letter-blocks/starters": "office", "POST /api/office/letter-blocks": "office",
     "PATCH /api/office/letter-blocks/{}": "office", "DELETE /api/office/letter-blocks/{}": "office", "POST /api/office/letter-blocks/{}/restore": "office",
-    # 2.106.0 D (#2031): agents and letters (p2106_d_api_test.py) - routes below this line
+    # 2.153.0 (#2031): agents and letters (p2106_d_api_test.py) - routes below this line
     "GET /api/v1/office/letters": "office", "POST /api/v1/office/letters": "office", "GET /api/v1/office/letters/{}": "office",
     "PATCH /api/v1/office/letters/{}": "office", "POST /api/v1/office/letters/{}/links": "office",
     "GET /api/office/letters/doc/{}/agents": "office", "POST /api/office/letters/doc/{}/ask-agent": "office",

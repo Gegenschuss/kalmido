@@ -1,4 +1,4 @@
-// 2.106.0 UI tests, part B (#2028: letters <-> documents), own container (start.sh, mode workspaces), Firefox (desktop + phone
+// 2.153.0 UI tests, part B (#2028: letters <-> documents), own container (start.sh, mode workspaces), Firefox (desktop + phone
 // width). Invented companies, people and figures only.
 // - the document detail of an incoming letter shows "Correspondence": "Write an answer", the deadline found in the text
 //   with "Create task" (the task is made, one undo step removes it again), the answer letter linked to the document
@@ -75,7 +75,7 @@ const TXT = 'Versicherung Beispiel AG\nDatum: 05.10.2026\nUnser Zeichen: VB-2026
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await ev(`(() => { document.querySelector('.ltd [data-ltd="answer"]').click(); return 1; })()`);
     check(await ready(ev, `/^#office\\/letters\\/(new\\?answers=${NID}|\\d+)$/.test(location.hash)`), 'answer: the new letter is opened ' + await ev('location.hash'));
-    // 2.106.0 (#2028): with part A merged the address really opens a new answering draft in the office; leave the editor
+    // 2.153.0 (#2028): with part A merged the address really opens a new answering draft in the office; leave the editor
     // again so the probe below is the only letter section on the page (one letter is open at a time)
     await sleep(800); await ev(`(() => { location.hash = '#docs'; return 1; })()`); await sleep(800);
     // ================= the letter side: the section of office_letterlinks.js (drawn into the page by hand)
