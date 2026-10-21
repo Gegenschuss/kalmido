@@ -680,6 +680,9 @@ def umz_export_queries(uid):
                                   "AND org_id IS NULL", (uid,)),
         "newsletter_segments": ("SELECT * FROM nl_segments WHERE conn_id IN (SELECT id FROM nl_conns WHERE owner_id=? AND org_id IS NULL)", (uid,)),
         "newsletter_runs": ("SELECT * FROM nl_runs WHERE conn_id IN (SELECT id FROM nl_conns WHERE owner_id=? AND org_id IS NULL)", (uid,)),
+        # 2.144.5 B (#2410): the mailbox of my private space (never the passwords)
+        "mailbox": ("SELECT active, imap_host, imap_port, imap_ssl, imap_user, imap_folder, smtp_host, smtp_port, smtp_tls, smtp_user, "
+                    "from_addr, from_name, created_at, updated_at FROM hub_mailboxes WHERE owner_id=? AND org_id IS NULL", (uid,)),
         # 2.22.0 (#663): my journal, whom I stay in touch with, my Karakeep connection (without the API key)
         "journal": ("SELECT day, text, mood, updated_at FROM journal WHERE user_id=? ORDER BY day", (uid,)),
         "contact_care": ("SELECT contact_id, every_days, last, note, updated_at FROM contact_care WHERE user_id=?", (uid,)),

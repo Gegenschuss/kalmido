@@ -243,6 +243,10 @@ CHECKS = {
     # 2.112.1 B (#2058): an external share link whose workspace is not its node's (the page refuses it: files/extlinks.py
     # xl_find; counted only) -- (link, creator)
     "file_ext_link": ("SELECT x.id, x.created_by FROM fs_ext_links x JOIN fs_nodes n ON n.id=x.node_id WHERE x.org_id IS DISTINCT FROM n.org_id"),
+    # 2.144.5 B (#2410): a workspace mailbox whose ws does not match its organisation / owner ('o<org>' | 'u<person>'; the
+    # mailbox code reads by ws only; counted only) -- (mailbox, its owner or creator)
+    "hub_mailbox": ("SELECT m.id, COALESCE(m.owner_id, m.created_by) FROM hub_mailboxes m WHERE m.ws IS DISTINCT FROM "
+                    "CASE WHEN m.org_id IS NOT NULL THEN 'o' || m.org_id ELSE 'u' || m.owner_id END"),
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
 

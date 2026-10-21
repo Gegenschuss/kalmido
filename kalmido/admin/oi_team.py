@@ -122,6 +122,24 @@ def _nl_conn(c, run, src, d, ctx):
     return d
 
 
+def _mbx(c, run, src, d, ctx):
+    """2.144.5 B (#2410): the workspace mailbox without its passwords (hub/mailbox.py mbx_take_values); a workspace that has a
+    mailbox keeps its own."""
+    from ..docs.store import doc_ws
+    from ..hub.mailbox import mbx_take_values
+    d["owner_id"] = None if run.org else ctx.uid
+    d["ws"] = doc_ws(run.org, ctx.uid)
+    if c.execute("SELECT 1 FROM hub_mailboxes WHERE ws=?", (d["ws"],)).fetchone():
+        run.warning(N_("The workspace already has a mailbox: the one of the export was not taken over."))
+        return False
+    v = mbx_take_values(src)
+    if not v:
+        return False
+    d.update(v)
+    run.warning(N_("Mailbox taken over without its passwords: enter them again in the settings."))
+    return d
+
+
 def _nl_seg(c, run, src, d, ctx):
     try:
         rule = json.loads(src.get("rule") or "{}") if isinstance(src.get("rule"), str) else (src.get("rule") or {})
@@ -314,5 +332,7 @@ SPECS = [
         prep=_person("user_id")),
     OiT("hub/mails.json", "hub_mails", refs={"client_id": "clients", "list_id": "lists", "eml_id": "fs_nodes", "folder_id": "fs_nodes"},
         people={"deleted_by": "null"}, fixed={"message_id": ""}, label=N_("Absences and bookings"), prep=_mail, after=_mail_index),
+    # 2.144.5 B (#2410): the workspace mailbox (into the private space: the importing person's own)
+    OiT("hub/mailbox.json", "hub_mailboxes", people={"created_by": "null"}, label=N_("Mailbox"), prep=_mbx),
 ]
 FIXES = [OiFix("tasks", "tasks", "sprint_id", "sprints")]  # the sprint of a task

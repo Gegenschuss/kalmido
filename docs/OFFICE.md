@@ -552,6 +552,10 @@ Since 2.141 a workspace can bring its **own mailbox** and Kalmido can **send** f
 - **Filed as sent**: the mail is filed before it goes out (with the same client / project, the `.eml` in the file store) and
   shows "Sent" in the list; when the SMTP fails it stays as "Not sent" with the reason (and the text stays in the dialog).
 - **Agents and kid accounts** cannot send (no API route, no MCP tool in 2.141).
+- **Exports and moves (2.144.5)**: the organisation export, the account export (the private space's mailbox) and their
+  imports carry the mailbox's servers, ports, user names and sender, never the passwords. After an import the mailbox asks
+  for them again (*The password is missing*) and fetches nothing until then; a workspace that already has a mailbox keeps
+  its own. The nightly boundary check reports a mailbox whose workspace does not match its organisation or owner.
 
 ## Travel expenses: taking over a per diem spreadsheet (2.95)
 

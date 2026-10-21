@@ -993,6 +993,20 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             if d and umz_insert(c, "journal", d, rid=False):
                 run.created["journal"].append(day)
                 run.count("journal")
+    # 2.144.5 B (#2410): the mailbox of the private space goes into the target workspace (an organisation or the private space)
+    # without its passwords, unless that workspace has one
+    if data.get("mailbox") and isinstance(data["mailbox"], list):
+        from ..docs.store import doc_ws
+        from ..hub.mailbox import mbx_take_values
+        mws, v = doc_ws(run.org, uid), mbx_take_values(data["mailbox"][0])
+        if v and c.execute("SELECT 1 FROM hub_mailboxes WHERE ws=?", (mws,)).fetchone():
+            run.warning(N_("The workspace already has a mailbox: the one of the export was not taken over."))
+        elif v:
+            v.update(org_id=run.org, owner_id=None if run.org else uid, ws=mws, created_by=uid, created_at=ts, updated_at=ts)
+            nid = insert_id(c, f"INSERT INTO hub_mailboxes({', '.join(v)}) VALUES({','.join('?' * len(v))})", tuple(v.values()))
+            run.created.setdefault("hub_mailboxes", []).append(nid)
+            run.count("mailbox")
+            run.warning(N_("Mailbox taken over without its passwords: enter them again in the settings."))
     cur = usettings(c, uid)
     for r in data.get("settings", []):
         k, v = r.get("key"), r.get("value")
@@ -1396,6 +1410,8 @@ def umz_undo(c, uid, r):
             c.execute(f"DELETE FROM {table} WHERE id IN ({','.join('?' * len(p))}) AND {col}=?", p + [uid])
     for day in cr.get("journal") or []:
         c.execute("DELETE FROM journal WHERE user_id=? AND day=?", (uid, day))
+    for mid in cr.get("hub_mailboxes") or []:  # 2.144.5 B (#2410): a mailbox the import set up (not changed since: no password yet)
+        c.execute("DELETE FROM hub_mailboxes WHERE id=? AND created_by=? AND secret=''", (int(mid), uid))
     cur = usettings(c, uid)
     for k, v in (cr.get("settings") or {}).items():
         if k in UMZ_SETTINGS and isinstance(v, dict) and cur.get(k) == v.get("new"):
