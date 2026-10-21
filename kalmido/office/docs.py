@@ -1077,7 +1077,7 @@ def trial_summary(c, oid):
     """2.144.10 A (#2576): trial_count (trial documents + trial documents from templates of the area), first (true = the
     area has no real quotation / invoice yet: the dialog shows the "try it first" hint) and office_id (the hint's key)."""
     n = c.execute("SELECT (SELECT COUNT(*) FROM office_docs WHERE org_id=? AND trial=1) + "
-                  "(SELECT COUNT(*) FROM office_gen_docs WHERE org_id=? AND trial=1) AS n", (oid, oid)).fetchone()["n"]
+                  "(SELECT COUNT(*) FROM office_gen_docs WHERE org_id=? AND trial=1 AND archived=0) AS n", (oid, oid)).fetchone()["n"]
     real = {r["kind"] for r in c.execute("SELECT DISTINCT kind FROM office_docs WHERE org_id=? AND trial=0 AND kind IN ('offer', 'invoice')", (oid,))}
     return {"trial_count": int(n or 0), "first": {"offer": "offer" not in real, "invoice": "invoice" not in real}, "office_id": oid}
 
@@ -1447,7 +1447,6 @@ def otrial_delete_all():
     if office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this organisation can do this"))
     write_lock(c, f"office_mail_{int(oid)}")  # the same locks as odoc_delete
-    write_lock(c, f"office_num_{int(oid)}")
     gens = c.execute("SELECT id, status, node_id, signed_node_id FROM office_gen_docs WHERE org_id=? AND trial=1 ORDER BY id", (oid,)).fetchall()
     fs_ids, fs_paths = [], []
     for g_ in gens:
@@ -1462,6 +1461,7 @@ def otrial_delete_all():
     for r in docs:
         write_lock(c, f"office_doc_{int(r['id'])}")
         paths += trial_drop_doc(c, oid, r)
+    write_lock(c, f"office_num_{int(oid)}")  # review: after the document locks, like ofx_finalize (doc -> num), no deadlock
     if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND trial=1 LIMIT 1", (oid,)).fetchone():
         c.execute("DELETE FROM office_numbers WHERE org_id=? AND kind='trial'", (oid,))  # TEST-001 again
     bump(c)

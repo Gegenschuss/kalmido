@@ -808,9 +808,10 @@ def rk_unbill_post():
         for x in c.execute(f"SELECT billed_doc_id FROM office_trip_items WHERE org_id=? AND id IN ({','.join('?' * len(ids))})", [oid] + ids):
             if x[0]:
                 docs.add(x[0])
-        # 2.47.3 (review S2): receipts on a finalised document stay billed (it can no longer lose its positions)
+        # 2.47.3 (review S2): receipts on a finalised document stay billed (it can no longer lose its positions);
+        # 2.144.10 (#2576, review): except on a trial document - they are free for the real invoice
         c.execute(f"UPDATE office_trip_items SET billed_doc_id=NULL, billed_at=NULL, updated_at=? WHERE org_id=? AND id IN ({','.join('?' * len(ids))}) "
-                  "AND NOT EXISTS (SELECT 1 FROM office_docs d WHERE d.id=office_trip_items.billed_doc_id AND d.locked_at IS NOT NULL AND d.locked_at != '')",
+                  "AND NOT EXISTS (SELECT 1 FROM office_docs d WHERE d.id=office_trip_items.billed_doc_id AND d.trial=0 AND d.locked_at IS NOT NULL AND d.locked_at != '')",
                   [iso(now_utc()), oid] + ids)
     removed = 0
     for did in docs:
