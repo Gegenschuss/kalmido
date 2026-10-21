@@ -339,7 +339,7 @@ check(not dbx("SELECT 1 FROM tasks WHERE id IN (?,?)", (a1, b1)), "cyclic pair d
 # ------------------------------------------------------------------ MEDIUM-4: list color / view / folder
 L = A.post(B + "/api/lists", json={"name": "colors"}).json()["id"]
 for body, what in (({"color": "red;background:url(https://e/x)"}, "css injection color"), ({"color": '"><img src=x onerror=alert(1)>'}, "html color"),
-                   ({"color": "#12345"}, "5-digit color"), ({"view": 'kanban"><img src=x>'}, "view"), ({"view": "calendar"}, "unknown view"),
+                   ({"color": "#12345"}, "5-digit color"), ({"view": 'kanban"><img src=x>'}, "view"), ({"view": "agenda"}, "unknown view"),
                    ({"folder": ["x"]}, "folder list"), ({"name": ""}, "empty name")):
     check(A.patch(B + f"/api/lists/{L}", json=body).status_code == 400, f"list update rejects {what}")
 check(A.post(B + "/api/lists", json={"name": "x", "color": "url(x)"}).status_code == 400, "list create rejects bad color")
