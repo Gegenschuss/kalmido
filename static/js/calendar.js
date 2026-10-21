@@ -92,7 +92,7 @@ function cevPrep(e) {  // local first / last day (+ Date objects for timed event
   else { e.s = new Date(e.start); e.e = new Date(e.end); if (!(e.e >= e.s)) e.e = e.s; e.d0 = ds(e.s); e.d1 = ds(new Date(Math.max(+e.s, +e.e - 1))); }
   return e;
 }
-function cevApply(j, key) { S.cal = {key, loading: '', items: (j.events || []).map(cevPrep), subs: j.subs || {}, evcals: j.evcals || {}}; }
+function cevApply(j, key) { S.cal = {key, loading: '', seq: S.cal.seq, items: (j.events || []).map(cevPrep), subs: j.subs || {}, evcals: j.evcals || {}}; }
 function cevCached(lo, hi) {
   const c = LS.get('calev', {});
   if (c[lo + '|' + hi]) return c[lo + '|' + hi];
@@ -100,13 +100,14 @@ function cevCached(lo, hi) {
   return k ? c[k] : null;
 }
 async function ensureCalEv(lo, hi) {
-  if (!calEvOn() && !feat('events')) { if (S.cal.items.length) S.cal = {key: '', loading: '', items: [], subs: {}, evcals: {}}; return; }
+  if (!calEvOn() && !feat('events')) { if (S.cal.items.length) S.cal = {key: '', loading: '', seq: S.cal.seq, items: [], subs: {}, evcals: {}}; return; }
   const key = `${lo}|${hi}`;
   if (S.cal.key === key || S.cal.loading === key) return;
   S.cal.loading = key;
+  const seq = S.cal.seq = (S.cal.seq || 0) + 1;  // 2.161.0: an answer that an invalidation overtook (calInvalidate) is dropped
   try {
     const j = await api('GET', `/api/calendars/events?from=${addDays(lo, -1)}&to=${addDays(hi, 1)}`);
-    if (S.cal.loading !== key) return;
+    if (S.cal.loading !== key || S.cal.seq !== seq) return;
     cevApply(j, key);
     const c = LS.get('calev', {});
     c[lo + '|' + hi] = {at: Date.now(), events: j.events, subs: j.subs, evcals: j.evcals};
@@ -114,12 +115,13 @@ async function ensureCalEv(lo, hi) {
     LS.set('calev', c);
   } catch {
     const hit = cevCached(lo, hi);  // offline: the last copy of this range
+    if (S.cal.seq !== seq) return;
     if (!hit || S.cal.loading !== key) { S.cal.loading = ''; return; }
     cevApply(hit, key);
   }
   if (S.route.mod === 'cal' || (S.route.mod === 'tasks' && S.route.key === 'today') || S.route.mod === 'home') renderView();  // 2.144.0 C (#2418): + the start page
 }
-function calInvalidate() { S.cal.key = ''; S.cal.loading = ''; }
+function calInvalidate() { S.cal.key = ''; S.cal.loading = ''; S.cal.seq = (S.cal.seq || 0) + 1; }
 // 2.30.0 (#1036): an own event of a calendar outside the shown workspace is left out (subscriptions and invitations stay)
 const cevWs = e => !e.own || e.cal == null || wsObjIn(evCal(e.cal));
 const cevOn = d => S.cal.items.filter(e => e.d0 <= d && e.d1 >= d && cevWs(e));
