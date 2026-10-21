@@ -51,7 +51,6 @@ const FILES = Object.values(MOVED).flat();
   // ================= setup
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
   await call('PATCH', '/api/settings', {tour: 'done', lang: 'en'});
   const st0 = await call('GET', '/api/state');
   const feats = (st0.settings.features || '').split(',').filter(Boolean);
@@ -104,7 +103,10 @@ const FILES = Object.values(MOVED).flat();
   // the workload view: the tabs are there at start, "Absences" / "Disposition" load the team module
   w.eval(`go('workload')`);
   await until(() => d.querySelector('#view .ab2tabs'), 80);
-  check(!!d.querySelector('#view .ab2tabs [data-v="abs"]') && !loaded().includes('absence'), 'workload: the tabs are drawn at start, absence.js not loaded yet');
+  // 2.149.0 leader: 5 s after the start the idle preload (lazyload.js LD_IDLE) loads the settings module, and settings needs
+  // the team module (LD_NEED: the working week); a slower run reaches this step after that, so absence.js may already be
+  // there - then only through that preload (settings loaded too), never through the workload view itself
+  check(!!d.querySelector('#view .ab2tabs [data-v="abs"]') && (!loaded().includes('absence') || loaded().includes('settings')), 'workload: the tabs are drawn at start, absence.js not loaded yet (or only by the idle preload of the settings) ' + loaded().filter(f => ['absence', 'settings'].includes(f)).join(' '));
   d.querySelector('#view .ab2tabs [data-v="abs"]')?.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, button: 0}));
   await until(() => ['absence', 'leave', 'dispo'].every(f => loaded().includes(f)) && d.querySelector('#view .ab2') && !/^\s*Loading…\s*$/.test((d.querySelector('#view .ab2')?.textContent || '').replace(/Workload|Absences|Disposition/g, '')), 100);
   check(['absence', 'leave', 'dispo'].every(f => loaded().includes(f)) && !!d.querySelector('#view .dash.ab2 .ab2tabs'), 'workload: the Absences tab loads absence.js, leave.js, dispo.js and draws the absences');
