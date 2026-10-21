@@ -38,7 +38,7 @@ function pep_settingsHtml() {
     ${ofcRowF('pep-key', tr('API key'), `<input id="pep-key" data-pep="api_key" type="password" autocomplete="off" maxlength="2000" value="" placeholder="${esc(s.key_set ? tr('saved - enter a new one to replace it') : tr('from your provider account'))}" ${dis}>`)}
     <div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="pep-sandbox" data-pep="sandbox" ${s.sandbox ? 'checked' : ''} ${dis}> ${esc(tr('Test mode (sandbox of the provider)'))}</label></div>
     ${ofcRowF('pep-sender', tr('Your Peppol ID'), `<span class="lacts"><input id="pep-sender" data-pep="sender_id" maxlength="90" value="${esc(s.sender_id || '')}" placeholder="9930:DE123456789" autocapitalize="characters" ${dis}>${s.sender_suggest && s.can_edit ? `<button type="button" class="btn sm" data-pepa="suggest" data-v="${esc(s.sender_suggest)}">${esc(tr('Use {0}', s.sender_suggest))}</button>` : ''}</span>`, tr('scheme:number, e.g. 0088 (GLN), 0208 (Belgian enterprise number), 9930 (German VAT ID), 0204 (routing ID)'))}
-    ${s.can_edit ? `<div class="row"><span class="lacts"><button type="button" class="btn sm" data-pepa="check" ${s.key_set ? '' : 'disabled'}>${ic('refresh', 's')}<span>${tr('Check connection')}</span></button><span aria-live="polite">${st}</span></span></div>` : st}` : ''}
+    ${s.can_edit ? `<div class="row"><span class="lacts"><button type="button" class="btn sm" data-pepa="check" ${s.key_set ? '' : 'disabled'}>${ic('sync', 's')}<span>${tr('Check connection')}</span></button><span aria-live="polite">${st}</span></span></div>` : st}` : ''}
     <p class="aerr" role="alert" id="pep-err"></p></details>`;
 }
 async function pep_save(el) {
@@ -89,7 +89,7 @@ function pep_viewHtml(d, v) {
 }
 async function pep_dialog(d) {
   const md = modal(`<h3>${esc(tr('Send e-invoice over the Peppol network'))}</h3><div class="ofddlg" id="pep-dlg"><p class="muted">${tr('Loading…')}</p></div>
-    <div class="foot"><span class="aerr" role="alert"></span><span class="spacer"></span><button type="button" class="btn" data-pepd="close">${tr('Close')}</button><button type="button" class="btn" data-pepd="refresh">${ic('refresh', 's')}<span>${tr('Refresh')}</span></button><button type="button" class="btn pri" data-pepd="send" hidden>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`);
+    <div class="foot"><span class="aerr" role="alert"></span><span class="spacer"></span><button type="button" class="btn" data-pepd="close">${tr('Close')}</button><button type="button" class="btn" data-pepd="refresh">${ic('sync', 's')}<span>${tr('Refresh')}</span></button><button type="button" class="btn pri" data-pepd="send" hidden>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`);
   const box = () => md.querySelector('#pep-dlg'), aerr = () => md.querySelector('.aerr');
   let v = null;
   const draw = () => {

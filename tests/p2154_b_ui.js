@@ -80,6 +80,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ready(ev, `!document.querySelector('#pep-set [data-pepa="check"]')?.disabled`, 40);
     await ev(`(() => { document.querySelector('#pep-set [data-pepa="check"]').click(); return 1; })()`);
     check(await ready(ev, `/Connection works/.test(document.querySelector('#pep-set').textContent)`, 60), 'check connection: it works');
+    await ev(`(() => { document.querySelector('#pep-set').scrollIntoView({block: 'center'}); return 1; })()`); await sleep(300);
     await shot('p2154-b-settings.png');
     // ================= the client field
     check(await ev(`(() => { const h = ofxClientBillingHtml({peppol_id: '0208:0123456749'}); return h.includes('id="clb-peppol_id"') && h.includes('0208:0123456749'); })()`), 'the client billing details have the Peppol ID field');
