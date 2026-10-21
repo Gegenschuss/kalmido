@@ -79,6 +79,13 @@ const calEvOn = () => !S.lcal && !!((S.calendars?.enabled && S.calendars.subs > 
 // 2.155.0 B (#2076): public holidays / absences come with the events answer (hub/abscal.py), switched in the "Calendars" window
 const abcOn = () => !S.me?.kid && (S.settings?.cal_holidays !== '0' || S.settings?.cal_abs !== '0' || S.settings?.cal_abs_team === '1');
 const abcX = e => e.holiday || e.absence;  // a read-only holiday / absence entry
+// 2.161.0 (#2076, p2661_b guard): the colleagues' absences come for the SAVED workspace (hub/abscal.py abc_team_orgs): once
+// the server knows the new one, the loaded range goes and an open calendar fetches its events again
+if (typeof p61b_wsOn === 'function') p61b_wsOn('calteam', after => {
+  if (!after || S.me?.kid || S.settings?.cal_abs_team !== '1') return;
+  calInvalidate();
+  if (S.route.mod === 'cal' || (S.route.mod === 'tasks' && S.route.key === 'today') || S.route.mod === 'home') renderView();
+});
 const fmtHM = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 function cevPrep(e) {  // local first / last day (+ Date objects for timed events)
   if (e.all_day) { e.d0 = e.start; e.d1 = e.end > e.start ? addDays(e.end, -1) : e.start; }
