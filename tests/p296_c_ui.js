@@ -45,6 +45,11 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(m1 && m2 && m3, 'setup: three job messages');
 
   const w = await boot({user: 'alice', hash: `agents/${CL}`, mobile: true}), d = w.document;
+  const openFilter = async () => {  // 2.152.2 (#2627): the header's menu -> the entry "Filter: …" -> the three choices
+    click(w, d.querySelector('#jcd-fbtn')); await until(() => d.querySelector('[role=menuitem]'));
+    click(w, [...d.querySelectorAll('[role=menuitem]')].find(x => /^Filter/.test(x.textContent.trim())));
+    await until(() => [...d.querySelectorAll('[role=menuitem]')].some(x => x.textContent.trim() === 'All'));
+  };
   const box = () => d.querySelector('#chat-msgs');
   const card = () => d.querySelector(`#chat-msgs .jcd[data-jcd="${J}"]`);
   await until(() => card() && /plain answer/.test(box()?.textContent || ''));
@@ -103,15 +108,15 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
 
   // ================= the filter
   // 2.144.0 (#2419): no filter row any more, the header icon (menu) on every width
-  check(!d.querySelector('#jcd-filt') && d.querySelector('#jcd-fbtn.jcdfbtn:not([hidden])'), 'with a job: the filter icon in the header, no filter row');
-  click(w, d.querySelector('#jcd-fbtn')); await until(() => d.querySelector('[role=menuitem]'));
+  check(!d.querySelector('#jcd-filt') && d.querySelector('#jcd-fbtn.jcdfbtn:not([hidden])'), 'with a job: the menu icon in the header, no filter row');
+  await openFilter();  // 2.152.2 (#2627)
   check(/Only me and Dev Bot/.test(d.querySelector('[role=menu]')?.textContent || [...d.querySelectorAll('[role=menuitem]')].map(x => x.textContent).join()), 'the filter names the agent');
   click(w, [...d.querySelectorAll('[role=menuitem]')].find(x => /Jobs/.test(x.textContent)));
   await until(() => !/plain answer/.test(box().textContent));
   check(card() && !/plain answer/.test(box().textContent) && !box().querySelector(':scope > .cmsg.me') && d.querySelector(`#chat-msgs [data-mid="a:${mq}"]`), 'Jobs: the card and the question, not the plain answer or my message');
   check(w.eval(`LS.get('jcdFilt')`) === 'jobs', 'the filter is kept per device');
-  click(w, d.querySelector('#jcd-fbtn')); await until(() => d.querySelector('[role=menuitem]'));  // 2.117.0 (#2260): the phone icon opens the menu
-  check(d.querySelector('#jcd-fbtn .jcdfdot'), 'the icon carries a dot while the filter is not All');
+  check(d.querySelector('#jcd-fbtn .jcdfdot'), 'the menu icon carries a dot while the filter is not All');  // 2.152.2 (#2627)
+  await openFilter();
   click(w, [...d.querySelectorAll('[role=menuitem]')].find(x => /Only me/.test(x.textContent)));
   await until(() => !card() && /plain answer/.test(box().textContent));
   // 2.144.0 (#2416): the job's question with plain buttons is a job message (only open approval cards stay, p2144_a_ui)
@@ -127,7 +132,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
         && w.eval(`jcd_kind({body: 'plain'})`) === 'say' && w.eval(`jcd_kind({body: '✅ x', job_msg: 'say'})`) === 'say', 'kind: job_msg first, else the leading sign');
   const html = w.eval(`(() => { const k = S.chat.msgs; S.chat.msgs = [{id: 1, from: 'agent', kind: 'message', body: 'plain', created_at: '2026-10-18T10:00:00Z', reactions: []}, {id: 2, from: 'user', kind: 'message', body: 'mine', created_at: '2026-10-18T10:01:00Z', reactions: []}]; const h = chatMsgs() + jcd_fbtnHtml(); S.chat.msgs = k; chatMsgs(); return h; })()`);
   const tmp = d.createElement('div'); tmp.innerHTML = html;
-  check(!tmp.querySelector('.jcd') && tmp.querySelector('#jcd-fbtn')?.hidden && tmp.querySelectorAll('.cmsg').length === 2, 'no job in the chat: no card, no filter, rows as before');
+  check(!tmp.querySelector('.jcd') && !tmp.querySelector('.jcdfdot') && tmp.querySelectorAll('.cmsg').length === 2, 'no job in the chat: no card, no filter, rows as before');
 
   // ================= phone: hit areas of the card and the filter >= 2.75rem (44 px at 16 px)
   const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'css', 'agentchat.css'), 'utf8');

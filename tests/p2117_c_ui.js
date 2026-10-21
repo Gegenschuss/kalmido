@@ -40,12 +40,16 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const w = await boot({user: 'alice', hash: `agents/${CL}`, mobile: true}), d = w.document;
   const hd = () => d.querySelector('.chath'), fbtn = () => d.querySelector('#jcd-fbtn'), filt = () => d.querySelector('#jcd-filt');
   await until(() => fbtn() && !fbtn().hidden);
+  const openFilter = async () => {  // 2.152.2 (#2627): the header's menu -> the entry "Filter: …" -> the three choices
+    click(w, fbtn()); await until(() => d.querySelector('[role=menuitem]'));
+    click(w, [...d.querySelectorAll('[role=menuitem]')].find(x => /^Filter/.test(x.textContent.trim())));
+    await until(() => [...d.querySelectorAll('[role=menuitem]')].some(x => x.textContent.trim() === 'All'));
+  };
   check(!d.querySelector('select.jcdsel'), 'no select.jcdsel any more');
-  check(fbtn() && !fbtn().hidden && hd().contains(fbtn()), 'the filter icon sits in the chat header');
+  check(fbtn() && !fbtn().hidden && hd().contains(fbtn()), 'the header menu icon (carries the filter dot) sits in the chat header');  // 2.152.2 (#2627)
   check(!filt() && !d.querySelector('.jcdseg'), 'no filter row above the messages');  // 2.144.0 (#2419): the icon on every width
   check(!fbtn().querySelector('.jcdfdot'), 'filter All: no dot');
-  click(w, fbtn());
-  await until(() => d.querySelector('[role=menuitem]'));
+  await openFilter();
   const items = [...d.querySelectorAll('[role=menuitem]')];
   check(items.length === 3 && /All/.test(items[0].textContent) && /Only me and Dev Bot/.test(items[1].textContent) && /Jobs/.test(items[2].textContent), 'the menu: All / Only me and <agent> / Jobs');
   click(w, items.find(x => /Jobs/.test(x.textContent)));
