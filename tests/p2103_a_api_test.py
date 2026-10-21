@@ -274,6 +274,19 @@ r = A.delete(B + f"/api/admin/orgs/{DEL}")
 check(r.status_code == 409 and r.json().get("kept", {}).get("cash") == 1 and r.json().get("retain_until") == f"{int(j['today'][:4]) + 10}-12-31"
       and "1 cash book entry" in r.json().get("error", ""), "review A6: the cash book is kept by law (retired, not deleted) " + r.text[:200])
 
+# 2.152.0 (#2167, review A8): an invoice of 2014 (period over at the end of 2024) keeps nothing: deleted, not retired
+OLD = A.post(B + "/api/admin/orgs", json={"name": "Epsilon Archive", "admin_id": ALICE}).json()["id"]
+A.patch(B + "/api/settings", json={"workspace": f"org:{OLD}"})
+A.get(B + O + "/settings")
+r = A.post(B + O + "/docs", json={"project_title": "Old film"})
+ODOC = r.json().get("id") if r.status_code == 201 else None
+lock_doc(ODOC, "2014-06-02", "RE-2014-007")
+A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
+di = A.get(B + f"/api/admin/orgs/{OLD}/delete-info").json()
+check(not di.get("retain_until") and not di.get("kept"), f"review A8: an expired period keeps nothing {di}")
+r = A.delete(B + f"/api/admin/orgs/{OLD}", params={"confirm": "1", "retention": "waived"})
+check(r.ok and not r.json().get("retired") and not sql("SELECT 1 FROM orgs WHERE id=?", (OLD,)), "review A8: deleted, not retired " + r.text[:200])
+
 # ================================================================== #2167 an organisation with a finalised invoice: retired
 GAM = A.post(B + "/api/admin/orgs", json={"name": "Gamma Media", "admin_id": ALICE}).json()["id"]
 assert A.put(B + f"/api/orgs/{GAM}/members", json={"email": "bob@example.com", "role": "member"}).ok
