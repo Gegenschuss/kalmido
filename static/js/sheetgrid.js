@@ -101,7 +101,7 @@ function sgText(t, k) {  // how the cell reads (copy)
   if (k === 'title') return mdPlain(t.title || '');
   if (k === 'due') return t.due || '';
   if (k === 'who') return t.assignee_id ? personName(t.list_id, t.assignee_id) || '' : '';
-  if (k.startsWith('f:')) { const f = fieldById(+k.slice(2)); return f ? (f.type === 'url' || f.type === 'text' ? t.fields?.[f.id] || '' : f.type === 'number' || f.type === 'formula' ? (t.fields?.[f.id] != null ? (+t.fields[f.id]).toLocaleString(LOCALE(), {useGrouping: false, maximumFractionDigits: 6}) : '') : fieldText(f, t.fields?.[f.id], t.list_id)) : ''; }
+  if (k.startsWith('f:')) { const f = fieldById(+k.slice(2)); return f ? (f.type === 'url' || f.type === 'text' ? t.fields?.[f.id] || '' : f.type === 'number' || f.type === 'currency' || (f.type === 'formula' && !cfkFxErr(t.fields?.[f.id])) ? (t.fields?.[f.id] != null ? (+t.fields[f.id]).toLocaleString(LOCALE(), {useGrouping: false, maximumFractionDigits: 6}) : '') : fieldText(f, t.fields?.[f.id], t.list_id)) : ''; }
   return (sgEl(t.id, k)?.textContent || '').trim();
 }
 function sgDay(s) {  // 2026-10-15, 15.10.2026, 15.10.26, 10/15/2026 -> YYYY-MM-DD (null = not a date)
@@ -125,6 +125,7 @@ function sgParse(t, k, raw) {
     return p ? {v: p.user_id} : {err: tr('Not a member of the list')};
   }
   const f = fieldById(+k.slice(2)); if (!f) return {err: tr('Unknown field')};
+  const x = cfkParse(f, s); if (x) return x;  // 2.156.0 B (#2069): multiselect, currency, rating, task (cfkinds.js)
   switch (f.type) {
     case 'number': { const v = numIn(s); return v !== '' && Number.isFinite(+v) ? {v: String(+v)} : {err: tr('Number expected')}; }
     case 'date': { const d = sgDay(s); return d ? {v: d} : {err: tr('Date expected')}; }

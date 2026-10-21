@@ -1281,10 +1281,18 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                        desc="2.39.1 (#1293): switches the module Custom fields on for the list's owner when it is off (never off); "
                             "the answer's modules_on names it ([\"fields\"] or []).",
                        scope="structure", body={"type": "object", "required": ["name", "type"], "properties": {
-                           "name": {"type": "string"}, "type": {"type": "string"}, "options": obj, "pinned": {"type": "boolean"},
+                           "name": {"type": "string"},
+                           "type": {"type": "string", "description": "text | number | select | date | checkbox | person | url | formula | "
+                                    "multiselect | currency | rating | task (2.156.0 B, #2069). options: select / multiselect {options: [{name, color?}]}, "
+                                    "number / formula {unit}, currency {currency: \"EUR\"}, rating {max: 3-10, default 5}. Values in a task's fields: "
+                                    "multiselect = option ids joined by \",\" (a list is accepted too), rating = \"1\"..max (0 / null clears), "
+                                    "task = the id of a task you may see (the value is shown to others only when they may see it as well)"},
+                           "options": obj, "pinned": {"type": "boolean"},
                            "formula": {"type": "string", "maxLength": 500, "description": "2.43.0 (#1328), type formula: + - * / ( ), numbers, "
-                                       "{Field name} of number / formula / checkbox fields, round(x, n). Computed by the server, read-only "
-                                       "in tasks; options.empty = blank leaves the result empty when a field is empty (default: 0)"}}})},
+                                       "{Field name} of number / currency / rating / formula / checkbox fields; 2.156.0 B (#2070): comparisons, "
+                                       "WENN/IF, SUMME/SUM, RUNDEN/ROUND, MIN, MAX, MITTELWERT/AVERAGE, ANZAHL/COUNT (\";\" or \",\" between arguments). "
+                                       "Computed by the server, read-only in tasks; a failed calculation gives \"#div0\" / \"#type\"; "
+                                       "options.empty = blank leaves the result empty when a field is empty (default: 0)"}}})},
         "/fields/{id}": {
             "patch": op("Change a custom field (the type stays)", S, ok(ref("Field")) | errs("400", "403", "404"), [pid("id", "Field id")],
                         scope="structure", body={"type": "object", "properties": {"name": {"type": "string"}, "options": obj,

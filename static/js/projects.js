@@ -455,8 +455,10 @@ function depPicker(tid, dir) {
 const blockedNames = t => { const n = (t.blockers || []).map(id => S.tasks.get(id)?.title).filter(Boolean); const h = Math.max(0, (t.blocked || 0) - n.length); return [...n.map(x => tr('“{0}”|quoted', x)), ...(h ? [trn('{0} task you cannot see', '{0} tasks you cannot see', h)] : [])].join(', '); };
 
 // ------------------------------------------------------------------ custom fields (package 3)
-const FTYPES = [['text', N_('Text')], ['number', N_('Number')], ['select', N_('Selection')], ['date', N_('Date')], ['checkbox', N_('Checkbox')], ['person', N_('Person')], ['url', N_('Link')], ['formula', N_('Formula')]];  // 2.43.0 (#1328): + formula
-const FT_ICON = {text: 'edit', number: 'chart', select: 'list', date: 'cal', checkbox: 'check', person: 'user', url: 'link', formula: 'chart'};
+const FTYPES = [['text', N_('Text')], ['number', N_('Number')], ['select', N_('Selection')], ['date', N_('Date')], ['checkbox', N_('Checkbox')], ['person', N_('Person')], ['url', N_('Link')], ['formula', N_('Formula')],  // 2.43.0 (#1328): + formula
+  ['multiselect', N_('Multiple choice')], ['currency', N_('Currency')], ['rating', N_('Rating')], ['task', N_('Task link')]];  // 2.156.0 B (#2069)
+const FT_ICON = {text: 'edit', number: 'chart', select: 'list', date: 'cal', checkbox: 'check', person: 'user', url: 'link', formula: 'chart',
+  multiselect: 'list', currency: 'chart', rating: 'star', task: 'link'};  // 2.156.0 B (#2069)
 const ftLabel = t => tr((FTYPES.find(x => x[0] === t) || [0, t])[1]);
 // 2.40.0 (#1193): a select option shows as a filled chip in its colour, the text dark or light, whichever reads better
 function lrInk(hex) {
@@ -472,8 +474,8 @@ const lrSelStyle = o => cssColor(o?.color) ? `style="--fc:${cssColor(o.color)};-
 const LR_STATUS_TPL = [[N_('Not started'), '#94a3b8'], [N_('In progress'), '#6d8cff'], [N_('Waiting'), '#f5b041'], [N_('Done|status'), '#4ade80']];
 function fieldEditor(f, t, ro) {
   const v = t.fields?.[f.id] ?? '', id = `cf-${f.id}`, dis = ro ? 'disabled' : '';
-  let c;
-  switch (f.type) {
+  let c = CFK_TYPES.includes(f.type) ? cfkEditor(f, t, ro) : '';  // 2.156.0 B (#2069): cfkinds.js
+  if (!c) switch (f.type) {
     case 'number': c = `<span class="cfnum"><input id="${id}" data-cf="${f.id}" inputmode="decimal" value="${esc(v === '' ? '' : (+v).toLocaleString(LOCALE(), {useGrouping: false, maximumFractionDigits: 6}))}" ${ro ? 'readonly' : ''} placeholder="–">${f.options?.unit ? `<span class="muted">${esc(f.options.unit)}</span>` : ''}</span>`; break;
     case 'select': { const so = selOpt(f, v); c = `<select id="${id}" data-cf="${f.id}" class="cfsel${so ? lrSelFill(so) : ''}" ${so ? lrSelStyle(so) : ''} ${dis}><option value="">–</option>${(f.options?.options || []).map(o => `<option value="${esc(o.id)}" ${o.id === v ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`; break; }
     case 'date': c = dateIn(id, v, {attrs: `data-cf="${f.id}"`, ro, label: f.name, empty: '–'}); break;
@@ -497,7 +499,7 @@ async function saveField(el) {
   if (!canEdit(t)) { roToast(); renderDetail(); return; }
   let v = f.type === 'checkbox' ? (el.checked ? '1' : null) : (el.value || '').trim() || null;
   if (v && f.type === 'url' && !/^https?:\/\//i.test(v) && /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(v)) v = 'https://' + v;
-  if (v && f.type === 'number') v = numIn(v);
+  if (v && (f.type === 'number' || f.type === 'currency')) v = numIn(v);  // 2.156.0 B (#2069): + currency
   if (f.type === 'select') { const o = selOpt(f, v); el.classList.toggle('fill', !!lrSelFill(o)); el.style.cssText = o && lrSelFill(o) ? `--fc:${cssColor(o.color)};--fct:${lrInk(cssColor(o.color))}` : ''; }  // #1193
   if ((t.fields?.[fid] ?? null) === v) return;
   try { await patchTask(t.id, {fields: {[fid]: v}}); } catch { renderDetail(); }
@@ -514,9 +516,10 @@ function fieldModal(lid, f, done) {
   const extra = () => {
     const x = $('#fd-extra', md);
     if (st.type === 'formula') { x.innerHTML = fxModalExtra(lid, f); return; }  // 2.43.0 (#1328)
+    if (['currency', 'rating', 'task'].includes(st.type)) { x.innerHTML = ''; cfkModalExtra(x, st.type, f); return; }  // 2.156.0 B (#2069): cfkinds.js, on demand
     if (st.type === 'number') x.innerHTML = `<div class="row"><label for="fd-unit">${tr('Unit')}</label><input id="fd-unit" value="${esc(f?.options?.unit || '')}" maxlength="12" placeholder="${tr('optional, e.g. € or h')}" style="max-width:8.75rem"></div>`;
     // 2.40.0 (#1193): a palette per option instead of cycling, a handle to drag (Alt+↑/↓), the Status template for a new field
-    else if (st.type === 'select') x.innerHTML = `<h4>${tr('Options')}</h4>${edit ? '' : `<div class="row lrtpl"><button type="button" class="btn sm" data-m="opt-tpl" title="${esc(tr('Not started, In progress, Waiting, Done'))}">${ic('list', 's')} ${tr('Template “Status”')}</button><button type="button" class="btn sm" data-m="opt-empty">${tr('Start empty')}</button></div>`}<div class="optlist" role="list">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}" role="listitem"><span class="colh" data-oh="${i}" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span><button type="button" class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${tr('Color')}" aria-label="${esc(tr('Color'))}" aria-expanded="${st.pal === i}"></button><input data-oname="${i}" value="${esc(o.name)}" maxlength="60" placeholder="${tr('Option')}" title="${esc(tr('Alt+↑ / Alt+↓ moves the option'))}"><button type="button" class="iconbtn" data-orm="${i}" title="${tr('Remove')}">${ic('x', 's')}</button></div>${st.pal === i ? `<div class="colors lrpal" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map((c, k) => `<button type="button" data-opal="${esc(c)}" style="background:${c || 'var(--bg4)'}" class="${(o.color || '') === c ? 'on' : ''}" aria-pressed="${(o.color || '') === c}" aria-label="${esc(c ? tr('Color {0}', k) : tr('No color'))}"></button>`).join('')}</div>` : ''}`).join('')}</div><button class="btn sm" data-m="opt-add">${ic('plus', 's')} ${tr('Option')}</button>${edit ? `<div class="shint keep">${tr('Removing an option clears it in all tasks.')}</div>` : ''}`;
+    else if (st.type === 'select' || st.type === 'multiselect') x.innerHTML = `<h4>${tr('Options')}</h4>${edit ? '' : `<div class="row lrtpl"><button type="button" class="btn sm" data-m="opt-tpl" title="${esc(tr('Not started, In progress, Waiting, Done'))}">${ic('list', 's')} ${tr('Template “Status”')}</button><button type="button" class="btn sm" data-m="opt-empty">${tr('Start empty')}</button></div>`}<div class="optlist" role="list">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}" role="listitem"><span class="colh" data-oh="${i}" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span><button type="button" class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${tr('Color')}" aria-label="${esc(tr('Color'))}" aria-expanded="${st.pal === i}"></button><input data-oname="${i}" value="${esc(o.name)}" maxlength="60" placeholder="${tr('Option')}" title="${esc(tr('Alt+↑ / Alt+↓ moves the option'))}"><button type="button" class="iconbtn" data-orm="${i}" title="${tr('Remove')}">${ic('x', 's')}</button></div>${st.pal === i ? `<div class="colors lrpal" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map((c, k) => `<button type="button" data-opal="${esc(c)}" style="background:${c || 'var(--bg4)'}" class="${(o.color || '') === c ? 'on' : ''}" aria-pressed="${(o.color || '') === c}" aria-label="${esc(c ? tr('Color {0}', k) : tr('No color'))}"></button>`).join('')}</div>` : ''}`).join('')}</div><button class="btn sm" data-m="opt-add">${ic('plus', 's')} ${tr('Option')}</button>${edit ? `<div class="shint keep">${tr('Removing an option clears it in all tasks.')}</div>` : ''}`;
     else x.innerHTML = st.type === 'person' ? `<div class="shint keep">${tr('Pick the owner or a member of the list.')}</div>` : '';
   };
   extra();
@@ -541,7 +544,7 @@ function fieldModal(lid, f, done) {
     }
     if (a === 'save') {
       const name = $('#fd-name', md).value.trim(); if (!name) { need($('#fd-name', md)); return; }
-      const options = st.type === 'number' ? {unit: $('#fd-unit', md).value.trim()} : st.type === 'select' ? {options: st.opts.filter(o => o.name.trim())} : {};
+      const options = st.type === 'number' ? {unit: $('#fd-unit', md).value.trim()} : st.type === 'select' || st.type === 'multiselect' ? {options: st.opts.filter(o => o.name.trim())} : cfkModalOpts(md, st.type);  // 2.156.0 B (#2069)
       const body = {name, options, pinned: $('#fd-pin', md).checked};
       if (st.type === 'formula') Object.assign(body, fxModalBody(md));  // 2.43.0 (#1328): the server checks it (position / field name)
       try { await api(edit ? 'PATCH' : 'POST', edit ? '/api/fields/' + f.id : `/api/lists/${lid}/fields`, edit ? body : {...body, type: st.type}); } catch { return; }
@@ -592,7 +595,7 @@ const cfRuleOn = r => !!r && (r.sel?.length || r.chk?.length || r.date?.length |
 function cfMatch(t, fid, r) {
   const f = fieldById(+fid); if (!f || f.list_id !== t.list_id) return false;
   const v = t.fields?.[fid] ?? null;
-  if (r.sel?.length) return r.sel.includes(v ?? '');
+  if (r.sel?.length) return f.type === 'multiselect' && v ? cfk_ids(v).some(x => r.sel.includes(x)) : r.sel.includes(v ?? '');  // 2.156.0 B (#2069): one of the chosen
   if (r.chk?.length) return r.chk.includes(v === '1' ? '1' : '0');
   if (r.date?.length) return r.date.some(d => dateMatch({due: v}, d));
   if (r.num) {
@@ -608,8 +611,9 @@ function cfSortCmp(fid, desc = false) {  // 2.31.0 (#354): desc = the other way 
   if (!f) return bySort;
   const key = t => {
     const v = t.fields?.[fid]; if (v == null) return null;
-    if (f.type === 'number' || f.type === 'formula') return +v;  // 2.43.0 (#1328): formulas sort as numbers
-    if (f.type === 'select') return (f.options?.options || []).findIndex(o => o.id === v);
+    if (f.type === 'number' || f.type === 'formula' || f.type === 'currency' || f.type === 'rating') { const x = +v; return Number.isFinite(x) ? x : null; }  // 2.43.0 (#1328): formulas sort as numbers; 2.156.0 B (#2069/#2070): + currency, rating, an error value last
+    if (f.type === 'select' || f.type === 'multiselect') return (f.options?.options || []).findIndex(o => o.id === cfk_ids(v)[0]);  // 2.156.0 B (#2069): by the first option
+    if (f.type === 'task') return cfk_taskText(v).toLowerCase();
     if (f.type === 'checkbox') return 0;
     if (f.type === 'person') return (personName(t.list_id, +v) || '').toLowerCase();
     return String(v).toLowerCase();
@@ -622,6 +626,8 @@ function actField(d) {
   if (d.type === 'date') return fmtDayAbs(d.v);
   if (d.type === 'checkbox') return tr('yes');
   if (d.type === 'url') return urlHost(d.v);
+  if (d.type === 'currency') return cfk_money(d.v, d.unit);  // 2.156.0 B (#2069); a task link: its title only when I may see it
+  if (d.type === 'task') return cfk_taskText(d.v);
   return String(d.v);
 }
 

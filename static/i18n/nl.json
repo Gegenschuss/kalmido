@@ -12568,5 +12568,18 @@
   "Suggest after": "Voorstellen na",
   "suggested": "voorgesteld",
   "Suggest payment reminders for overdue invoices": "Betalingsherinneringen voorstellen voor achterstallige facturen",
-  "Read|section": "Gelezen"
+  "Read|section": "Gelezen",
+  "Division by 0": "Deling door 0",
+  "Not a number": "Geen getal",
+  "Task not visible": "Taak niet zichtbaar",
+  "Choose a task": "Taak kiezen",
+  "Multiple choice": "Meerkeuze",
+  "Rating": "Beoordeling",
+  "Task link": "Taakkoppeling",
+  "Links one other task. Everyone sees its title only if they may see that task.": "Koppelt een andere taak. Alleen wie die taak mag zien, ziet de titel.",
+  "Allowed: + - * / ( ), numbers, field names in braces, comparisons (= <> < > <= >=) and the functions of tables:": "Toegestaan: + - * / ( ), getallen, veldnamen tussen accolades, vergelijkingen (= <> < > <= >=) en de functies van tabellen:",
+  "Separate the values with ; or , e.g. WENN({Hours} > 8; {Hours} * 1.5; {Hours}). Division by 0 shows as an error in the field.": "Scheid waarden met ; of , bijv. ALS({Uren} > 8; {Uren} * 1,5; {Uren}). Delen door 0 verschijnt als fout in het veld.",
+  "{0}: a rating from 0 to {1}": "{0}: een beoordeling van 0 tot {1}",
+  "{0}: task not found": "{0}: taak niet gevonden",
+  "unknown function “{0}”": "onbekende functie ‘{0}’"
 }

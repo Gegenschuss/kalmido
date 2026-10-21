@@ -63,7 +63,7 @@ def tpl_node_from_task(c, t, base, uid, depth=0, fidx=None, order=None, dup=None
         fv = {}
         for r in c.execute("SELECT field_id, value FROM task_field_values WHERE task_id=?", (t["id"],)):
             i, ty = fidx[0].get(r["field_id"]), fidx[1].get(r["field_id"])
-            if i is None or ty == "person":
+            if i is None or ty in ("person", "task"):  # 2.156.0 B (#2069): + task (a link into the old list)
                 continue
             try:
                 fv[str(i)] = (date.fromisoformat(r["value"]) - base).days if ty == "date" else r["value"]

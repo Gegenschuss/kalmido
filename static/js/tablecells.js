@@ -63,7 +63,7 @@ function tcColMove(cols, k, before) {
 // number / text / link = a field in the cell (Enter or a click next to it saves, Esc cancels, Tab = the next cell of the
 // row), choice = a menu with the option colours, person = a menu of the list's people, date = the calendar, checkbox =
 // toggles. Saved like every other change (at once on screen, back on an error, Ctrl+Z). Touch screens: in the task.
-const TC_INPUT = ['number', 'text', 'url'];
+const TC_INPUT = ['number', 'text', 'url', 'currency'];  // 2.156.0 B (#2069): + currency
 const tcField = k => k.startsWith('f:') ? fieldById(+k.slice(2)) : null;
 const tcOk = t => !!t && t.id > 0 && !isTouch() && canEdit(t);
 function tcAttr(k, t) {  // the attributes of an editable field cell (render.js lcCell row)
@@ -74,7 +74,7 @@ function tcAttr(k, t) {  // the attributes of an editable field cell (render.js 
 function tcVal(f, raw) {  // typed text -> the stored value (null = empty)
   let v = (raw || '').trim() || null;
   if (v && f.type === 'url' && !/^https?:\/\//i.test(v) && /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(v)) v = 'https://' + v;
-  if (v && f.type === 'number') v = numIn(v);
+  if (v && (f.type === 'number' || f.type === 'currency')) v = numIn(v);  // 2.156.0 B (#2069): + currency
   return v;
 }
 async function tcSave(tid, fid, v) {
@@ -101,6 +101,7 @@ function tcEdit(cell) {
   const t = taskById(+cell.dataset.tid), f = fieldById(+cell.dataset.fe); if (!t || !f || !tcOk(t) || cell.querySelector('.tcin')) return;
   const v = t.fields?.[f.id] ?? null, put = x => sgMultiPut('f:' + f.id, x) || tcSave(t.id, f.id, x);  // 2.43.0 (#1331): a range takes the pick
   if (f.type === 'checkbox') { put(v === '1' ? null : '1'); return; }
+  if (['multiselect', 'rating', 'task'].includes(f.type)) { cfkTcEdit(cell, t, f, v, put); return; }  // 2.156.0 B (#2069): cfkinds.js, on demand
   if (f.type === 'date') { dpOpen(cell, {kind: 'date', value: v || '', label: f.name, onPick: d => put(d || null)}); return; }
   if (f.type === 'select' || f.type === 'person') {
     const opts = f.type === 'select' ? (f.options?.options || []).map(o => ({label: o.name, swc: o.color || '', on: v === o.id, fn: () => put(o.id)}))
@@ -108,9 +109,9 @@ function tcEdit(cell) {
     menu(cell, [{label: f.name, dis: true, cls: 'mhead'}, '-', ...opts, ...(v != null || sgMulti() ? ['-', {label: tr('Empty the field'), icon: 'x', fn: () => put(null)}] : [])]);
     return;
   }
-  const shown = v == null ? '' : f.type === 'number' ? (+v).toLocaleString(LOCALE(), {useGrouping: false, maximumFractionDigits: 6}) : v;
+  const shown = v == null ? '' : f.type === 'number' || f.type === 'currency' ? (+v).toLocaleString(LOCALE(), {useGrouping: false, maximumFractionDigits: 6}) : v;
   cell.classList.add('tcon');
-  cell.innerHTML = `<input class="tcin" ${f.type === 'number' ? 'inputmode="decimal"' : f.type === 'url' ? 'type="url" inputmode="url"' : 'maxlength="1000"'} value="${esc(shown)}" aria-label="${esc(f.name)}" autocomplete="off">${f.type === 'number' && f.options?.unit ? `<span class="tcu">${esc(f.options.unit)}</span>` : ''}`;
+  cell.innerHTML = `<input class="tcin" ${f.type === 'number' || f.type === 'currency' ? 'inputmode="decimal"' : f.type === 'url' ? 'type="url" inputmode="url"' : 'maxlength="1000"'} value="${esc(shown)}" aria-label="${esc(f.name)}" autocomplete="off">${f.type === 'number' && f.options?.unit ? `<span class="tcu">${esc(f.options.unit)}</span>` : f.type === 'currency' ? `<span class="tcu">${esc(f.options?.currency || 'EUR')}</span>` : ''}`;
   const inp = cell.querySelector('.tcin');
   let done = false;
   const fin = (save, dir) => {

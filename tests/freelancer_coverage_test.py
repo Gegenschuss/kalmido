@@ -247,7 +247,7 @@ ROUTES = {
     "DELETE /api/v1/lists/{}/groups/{}": "lists", "DELETE /api/v1/lists/{}/links/{}": "lists",
     "DELETE /api/v1/lists/{}/members/{}": "lists", "DELETE /api/v1/lists/{}/milestones/{}": "lists",
     "DELETE /api/v1/lists/{}/tags/{}": "lists", "DELETE /api/v1/sections/{}": "lists", "DELETE /api/v1/templates/{}": "lists",
-    "GET /api/fields/{}/count": "lists", "GET /api/folder-heads": "lists", "GET /api/folders/agents": "lists",
+    "GET /api/fields/{}/count": "lists", "GET /api/fields/task-refs": "lists",  # 2.156.0 B (#2069) "GET /api/folder-heads": "lists", "GET /api/folders/agents": "lists",
     "GET /api/folders/groups": "lists", "GET /api/folders/groups/{}/diff": "lists",
     "GET /api/folders/notify-template": "lists", "GET /api/folders/people": "lists", "GET /api/folders/people/diff": "lists",
     "GET /api/folders/playbook": "lists", "GET /api/folders/playbook/versions": "lists",

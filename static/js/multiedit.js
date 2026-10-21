@@ -62,14 +62,18 @@ function meFields(ts) {
 function meCustom(f, lid) {
   const k = 'cf' + f.id, set = v => meApply(k, t => (t.fields?.[f.id] ?? null) !== v ? {fields: {[f.id]: v}} : null, f.name);
   const open = a => {
-    if (f.type === 'select') menu(a, [{label: '–', icon: 'x', fn: () => set(null)}, ...(f.options?.options || []).map(o => ({label: o.name, fn: () => set(o.id)}))]);
+    if (f.type === 'multiselect') menu(a, [{label: '–', icon: 'x', fn: () => set(null)}, ...(f.options?.options || []).map(o => ({label: o.name, icon: 'plus',  // 2.156.0 B (#2069): adds the option to every task
+      fn: () => meApply(k, t => { const ids = new Set(cfk_ids(t.fields?.[f.id])); if (ids.has(o.id)) return null; ids.add(o.id); return {fields: {[f.id]: cfk_msVal(f, ids)}}; }, f.name)}))]);
+    else if (f.type === 'rating') menu(a, [{label: '–', icon: 'x', fn: () => set(null)}, ...Array.from({length: cfk_max(f)}, (_, i) => ({label: tr('{0} of {1}', i + 1, cfk_max(f)), icon: 'star', fn: () => set(String(i + 1))}))]);
+    else if (f.type === 'task') cfkPick({id: 0, list_id: lid}, f, x => set(x));
+    else if (f.type === 'select') menu(a, [{label: '–', icon: 'x', fn: () => set(null)}, ...(f.options?.options || []).map(o => ({label: o.name, fn: () => set(o.id)}))]);
     else if (f.type === 'person') menu(a, [{label: '–', icon: 'x', fn: () => set(null)}, ...listPeople(listById(lid)).map(p => ({label: p.name, icon: 'user', fn: () => set(String(p.user_id))}))]);
     else if (f.type === 'checkbox') set(meTasks().every(t => t.fields?.[f.id] === '1') ? null : '1');
     else if (f.type === 'date') dpOpen(a, {kind: 'date', value: today(), clear: true, label: f.name, onPick: v => set(v || null)});
     else askPrompt(f.name, '', {ok: tr('Apply to all')}).then(v => {
       if (v == null) return;
       let x = v.trim() || null;
-      if (x && f.type === 'number') x = numIn(x);
+      if (x && (f.type === 'number' || f.type === 'currency')) x = numIn(x);  // 2.156.0 B (#2069): + currency
       if (x && f.type === 'url' && !/^https?:\/\//i.test(x) && !flkIs(x)) x = 'https://' + x;  // 2.35.0 (#186): file links stay
       set(x);
     });
