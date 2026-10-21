@@ -19,7 +19,7 @@ import json
 from datetime import date, timedelta
 from decimal import Decimal
 
-from flask import g, jsonify, request, Response
+from flask import jsonify, request, Response
 
 from ..core.config import app
 from ..core.pg import insert_id, write_lock
@@ -40,6 +40,21 @@ CB_ACTIONS = {"create": N_("Created"), "change": N_("Changed"), "cancel": N_("Ca
               "book_create": N_("Cash box created"), "book_change": N_("Cash box changed")}
 MAX_BOOKS = 20
 MAX_AMOUNT = Decimal(10 ** 9)
+
+
+def cb_log_fk_migrate(c):
+    """2.144.11 (#2354, review N3): office_cash_log.entry_id was ON DELETE CASCADE (2.121-2.144.10), now ON DELETE SET NULL:
+    should a tool ever remove an entry, its change log stays (GoBD). Runs on every start and changes only a CASCADE
+    constraint (also one a restore of an older backup brings back); there is no delete path, so older versions behave the
+    same with either rule (rollback needs nothing)."""
+    for (name,) in c.execute(
+            "SELECT con.conname FROM pg_constraint con JOIN pg_class t ON t.oid=con.conrelid "
+            "JOIN pg_namespace n ON n.oid=t.relnamespace JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=ANY(con.conkey) "
+            "WHERE n.nspname=current_schema() AND t.relname='office_cash_log' AND con.contype='f' "
+            "AND a.attname='entry_id' AND con.confdeltype='c'").fetchall():
+        c.execute(f'ALTER TABLE office_cash_log DROP CONSTRAINT "{name}"')
+        c.execute("ALTER TABLE office_cash_log ADD CONSTRAINT office_cash_log_entry_id_fkey FOREIGN KEY (entry_id) "
+                  "REFERENCES office_cash_entries(id) ON DELETE SET NULL")
 
 
 def _ctx():
@@ -98,10 +113,13 @@ def cb_last_closed(c, bid):
     return r[0] if r and r[0] else ""
 
 
-def _rows(c, oid, bid):
-    """Every entry of a box, decrypted, in booking order (day, number)."""
-    return [oc_dec_fields(c, oid, "office_cash_entries", r) for r in
-            c.execute("SELECT * FROM office_cash_entries WHERE org_id=? AND book_id=? ORDER BY day, no", (oid, bid))]
+def _rows(c, oid, bid, full=False):
+    """Every entry of a box in booking order (day, number). 2.144.11 (#2354, review N4): nothing is decrypted here -- the
+    balance, the counts and the checks need only the plain columns (default: no text at all); full=True = every column, the
+    text still encrypted (cb_list decrypts just the entries it shows)."""
+    cols = "*" if full else "id, no, day, dir, amount, storno_of, created_by"
+    return [dict(r) for r in
+            c.execute(f"SELECT {cols} FROM office_cash_entries WHERE org_id=? AND book_id=? ORDER BY day, no", (oid, bid))]
 
 
 def _signed(r):
@@ -185,7 +203,7 @@ def cb_links_get():
     rcs = [{"node_id": r["node_id"], "title": r["title"], "date": r["date"], "amount": dstr(r["amount"])} for r in reversed(rcs)][:300]
     inv = [{"id": r["id"], "number": r["number"], "date": r["date"], "client": r["name"] or ""} for r in c.execute(
         "SELECT d.id, d.number, d.date, cl.name FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id "
-        "WHERE d.org_id=? AND d.kind='invoice' AND d.status<>'draft' ORDER BY d.date DESC, d.id DESC LIMIT 300", (oid,))]
+        "WHERE d.org_id=? AND d.kind='invoice' AND d.status<>'draft' AND d.trial=0 ORDER BY d.date DESC, d.id DESC LIMIT 300", (oid,))]
     return jsonify(receipts=rcs, invoices=inv)
 
 
@@ -293,7 +311,9 @@ def _invoice_ok(c, oid, v):
     iid = _id(v, "invoice_id")
     if iid is None:
         return None
-    if not c.execute("SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND kind='invoice' AND status<>'draft'", (iid, oid)).fetchone():
+    # 2.144.10 B (#2576): a cash book entry never names a trial invoice
+    if not c.execute("SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND kind='invoice' AND status<>'draft' AND trial=0",
+                     (iid, oid)).fetchone():
         raise Denied(404)
     return iid
 
@@ -371,7 +391,7 @@ def _names(c, ids):
 
 def cb_list(c, oid, uid, book, frm=None, to=None):
     """The entries of a box in [frm, to] in booking order, each with the running balance after it."""
-    rows = _rows(c, oid, book["id"])
+    rows = _rows(c, oid, book["id"], full=True)
     last = cb_last_closed(c, book["id"])
     names = _names(c, [r.get("created_by") for r in rows])
     bal, out = dec(book["opening"]), []
@@ -379,14 +399,14 @@ def cb_list(c, oid, uid, book, frm=None, to=None):
         bal += _signed(r)
         if (frm and r["day"] < frm) or (to and r["day"] > to):
             continue
-        out.append(cb_public(c, oid, uid, rows, r, last, bal, names))
+        out.append(cb_public(c, oid, uid, rows, oc_dec_fields(c, oid, "office_cash_entries", r), last, bal, names))
     return out, rows, last
 
 
 def _one(c, oid, uid, eid):
     r = _entry(c, oid, eid)
     book = _book(c, oid, r["book_id"])
-    ents, _, _ = cb_list(c, oid, uid, book)
+    ents, _, _ = cb_list(c, oid, uid, book, r["day"], r["day"])  # 2.144.11 (#2354, N4): decrypts only that day
     return next(e for e in ents if e["id"] == eid)
 
 
@@ -537,8 +557,9 @@ def cb_log_rows(c, oid, bid, entry_id=None):
             prev = json.loads(d.get("prev") or "{}")
         except ValueError:
             prev = {}
-        out.append({"id": d["id"], "entry_id": d["entry_id"], "no": nos.get(d["entry_id"]), "action": d["action"],
-                    "prev": prev if isinstance(prev, dict) else {}, "by": d.get("display_name") or d.get("username") or "", "at": d["at"]})
+        prev = prev if isinstance(prev, dict) else {}
+        out.append({"id": d["id"], "entry_id": d["entry_id"], "no": nos.get(d["entry_id"]) if d["entry_id"] else prev.get("no"),  # #2603: a deleted one keeps its no
+                    "action": d["action"], "prev": prev, "by": d.get("display_name") or d.get("username") or "", "at": d["at"]})
     return out
 
 
@@ -621,16 +642,12 @@ def cb_book_log(bid):
 @app.get("/api/docs/<int:nid>/cashbook")
 def cb_doc_hint(nid):
     """-> {entries: [{id, no, day, book}]}: the cash entries pointing at this receipt -- only for the admin of the office
-    the document belongs to (everybody else: an empty list; a document the person does not see: 404)."""
+    the document belongs to (everybody else: an empty list; a document the person does not see: 404). 2.144.11 (#2354,
+    review N6): the office gate like every cash book route (agents, kids and persons without the office: 403)."""
     from ..files.store import fs_role
     from .model import office_role, pb_personal
     c = db()
-    u = g.user
-    if u is None:
-        raise Denied(401)
-    if (u["kind"] if "kind" in u.keys() else "user") == "agent":
-        raise Denied(403, tr("Agents cannot use this endpoint"))
-    uid = u["id"]
+    uid = office_gate(c)
     m = c.execute("SELECT ws FROM doc_meta WHERE node_id=?", (nid,)).fetchone()
     if not m or not fs_role(c, nid, uid):
         raise Denied(404)

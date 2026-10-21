@@ -36,8 +36,9 @@ KP_SIGN_MAX = 20           # quotations checked for an open approval link per pa
 KP_KIND_TXT = {"offer": N_("Quotation"), "invoice": N_("Invoice"), "credit": N_("Credit note")}
 KP_STATE_TXT = {"sent": N_("Open|payment state"), "issued": N_("Open|payment state"), "partial": N_("Partly paid"), "paid": N_("Paid"), "overdue": N_("Overdue"),
                 "cancelled": N_("Cancelled|invoice"), "accepted": N_("Accepted"), "declined": N_("Declined"), "credit": N_("Sent")}
-# the visible documents: sent quotations; finalised invoices / credit notes that went out (sent_at) or are paid
-KP_SQL = ("kind IN ('offer','invoice','credit') AND status<>'draft' AND ((kind='offer' AND status IN ('sent','accepted','declined')) "
+# the visible documents: sent quotations; finalised invoices / credit notes that went out (sent_at) or are paid;
+# 2.144.10 (#2576, review): never a trial document
+KP_SQL = ("trial=0 AND kind IN ('offer','invoice','credit') AND status<>'draft' AND ((kind='offer' AND status IN ('sent','accepted','declined')) "
           "OR (kind<>'offer' AND locked_at IS NOT NULL AND (sent_at IS NOT NULL OR status IN ('sent','paid'))))")
 
 

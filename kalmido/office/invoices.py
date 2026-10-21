@@ -25,7 +25,7 @@ from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .calc import INV_VAT_NOTES, dec, dstr, fmt_money, inv_calc, inv_open, money
 from .packs import office_pack_for
-from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql
+from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql, trial_flag
 from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
 
 INV_KINDS = ("invoice", "credit", "reminder")
@@ -39,6 +39,9 @@ TITLE_FALLBACK = {"invoice": {"de": "Rechnung", "en": "Invoice"}, "credit": {"de
                   "reminder_3": {"de": "Letzte Mahnung", "en": "Final reminder"},
                   "delivery": {"de": "Lieferschein", "en": "Delivery note"}, "delivery_service": {"de": "Leistungsnachweis", "en": "Proof of service"},  # 2.120.0 D (#2089)
                   "offer": {"de": "Angebot", "en": "Quotation"}}  # 2.113.2 (#2253): a finalised quotation is mailed too
+# 2.162.0 A (#2603): test phase - an admin may delete a finalised / sent invoice (typing its number; with its payments,
+# credit notes, reminders, see office/invdelete.py). False = exactly the rule before: finalised or sent invoices stay.
+INVOICE_DELETE_TESTPHASE = True  # #2604: vor Launch auf False
 
 
 def _j(s, default):
@@ -67,15 +70,18 @@ def inv_scheme(s, kind):
 
 def inv_manual_seq(scheme, num):
     """The counter value a manual number carries under the scheme, None when it does not follow the scheme."""
-    from .model import SCHEME_RE
-    parts, pos, pat = [], 0, ""
-    for m in SCHEME_RE.finditer(scheme):
-        pat += re.escape(scheme[pos:m.start()])
-        pat += r"(\d+)" if m.group(1).startswith("seq") else r".+?"
-        pos = m.end()
-    pat += re.escape(scheme[pos:])
-    m = re.fullmatch(pat, num)
-    if not m or not m.groups():
+    from .model import SCHEME_RE, scheme_variants
+    for sv in scheme_variants(scheme):  # 2.144.9 (#2575): also with empty text blocks left out
+        pos, pat = 0, ""
+        for m in SCHEME_RE.finditer(sv):
+            pat += re.escape(sv[pos:m.start()])
+            pat += r"(\d+)" if m.group(1).startswith("seq") else r".+?"
+            pos = m.end()
+        pat += re.escape(sv[pos:])
+        m = re.fullmatch(pat, num)
+        if m and m.groups():
+            break
+    else:
         return None
     try:
         return int(m.group(1))
@@ -260,8 +266,9 @@ def inv_check_date(c, oid, r, s):
         raise BadInput(tr("The due date must not lie before the date"))
     scheme = inv_scheme(s, r["kind"])
     period = office_scheme_period(scheme, date.fromisoformat(d))
-    for row in c.execute("SELECT date FROM office_docs WHERE org_id=? AND kind=? AND locked_at IS NOT NULL AND id<>? AND date>? ORDER BY date DESC",
-                         (oid, r["kind"], r["id"], d)):
+    # 2.144.10 B (#2576): trial documents have their own series; they neither count for real ones nor the other way round
+    for row in c.execute("SELECT date FROM office_docs WHERE org_id=? AND kind=? AND locked_at IS NOT NULL AND id<>? AND date>? AND trial=? "
+                         "ORDER BY date DESC", (oid, r["kind"], r["id"], d, 1 if _col(r, "trial") else 0)):
         try:
             if office_scheme_period(scheme, date.fromisoformat(row["date"])) == period:
                 raise BadInput(tr("The date must not lie before the last finalised document of this series ({0})", row["date"]))
@@ -355,8 +362,11 @@ def _insert_doc(c, oid, uid, row):
     ts = iso(now_utc())
     row.update(org_id=oid, number="", status="draft", totals="{}", created_by=uid, created_at=ts, updated_at=ts, sent_at=None)
     did = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+    if row.get("trial"):  # 2.144.10 A (#2576): a trial document takes its TEST number at once (no gap in a real series)
+        from .docs import _assign_number
+        _assign_number(c, oid, did)
     from ..integrations.webhooks import who_note
-    who_note("invoice.created", "invoice", did)  # 2.115.0 A (#2061)
+    who_note("invoice.created", "invoice", did)  # 2.115.0 A (#2061); a trial one is dropped in who_obj
     return did
 
 
@@ -408,6 +418,8 @@ def inv_new_row(c, oid, s, kind, lang, src=None):
             if k in src.keys() and src[k] is not None:
                 row[k] = src[k]
         row["order_ref"] = _col(src, "order_ref") or src["project_ref"] or ""
+        if _col(src, "trial"):  # 2.144.10 A (#2576): every follow-up of a trial document is a trial document
+            row["trial"] = 1
         if src["lang"] != lang:
             row["intro"], row["closing"] = inv_default_texts(c, oid, s, kind, src["lang"])
         if src["client_id"]:
@@ -482,29 +494,18 @@ def inv_from_time(c, oid, uid, b):
     d_from, d_to = _date(b.get("from"), "from"), _date(b.get("to"), "to")
     if not d_from or not d_to or d_to < d_from:
         raise BadInput(tr("Invalid value: {0}", "from/to"))
-    pid = b.get("project_id")
-    # the WHERE part first (a fragment: pg_prepare only checks the complete statement below)
-    from ..core.access import vis_sql
-    # 2.86.0 (N16): only the lists the person making the invoice sees (their hours, names); 2.126.0 A (#1967): the
-    # personal office's lists are the owner's private ones (org_id NULL)
-    sql = ("FROM time_entries e JOIN lists l ON l.id=e.list_id "
-           f"WHERE l.client_id=? AND {pb_cl_sql(c, oid, 'l.org_id', 'l.owner_id')} AND l.id IN {vis_sql()} AND e.\"end\" IS NOT NULL AND e.start>=? AND e.start<?")
-    args = [cid, uid, uid, d_from + "T00:00:00", (date.fromisoformat(d_to) + timedelta(days=1)).isoformat() + "T00:00:00"]
-    if pid not in (None, "", 0):
-        try:
-            pid = int(pid)
-        except (TypeError, ValueError):
-            raise BadInput(tr("Invalid value: {0}", "project_id"))
-        sql += " AND e.list_id=?"
-        args.append(pid)
-    groups = c.execute(f"SELECT e.list_id, l.name AS lname, SUM(e.seconds) AS secs {sql} GROUP BY e.list_id, l.name ORDER BY l.name", args).fetchall()
+    # 2.144.6 A (#2053): only billable, still open entries; they are bound to the draft (office/timebill.py)
+    from .timebill import tbill_take, tbill_where
+    sql, args = tbill_where(c, oid, uid, cid, d_from, d_to, b.get("project_id"))
     s = office_settings(c, oid)
     row = inv_new_row(c, oid, s, "invoice", s.get("lang") or "de")
     row.update(client_id=cid, recipient=json.dumps({k: v for k, v in _recipient_from_client(dict(cl), None, cdn_home(c, oid)).items() if k != "missing"}, ensure_ascii=False), service_from=d_from, service_to=d_to,
                project_title=cl["name"])
     if "payment_terms_days" in cl.keys() and cl["payment_terms_days"]:
         row["payment_days"] = int(cl["payment_terms_days"])
+    row["trial"] = trial_flag(b.get("trial"))  # 2.144.10 A (#2576)
     did = _insert_doc(c, oid, uid, row)
+    groups, g.tbill_stat = tbill_take(c, did, sql, args)
     rate = cl["rate"] if "rate" in cl.keys() and cl["rate"] else 0
     rows = []
     for gr in groups:
@@ -512,7 +513,8 @@ def inv_from_time(c, oid, uid, b):
         if hours <= 0:
             continue
         rows.append({"kind": "service", "service_id": None, "title": gr["lname"] or tr("Hours"), "detail": "", "qty": hours, "unit": "hour", "rate": rate,
-                     "tax": "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1})
+                     "tax": "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1,
+                     "list_id": gr["list_id"]})  # 2.144.5 C (#1523): "billed, stays" (personal/timewipe.py) by the list, not its name
     _put_rows(c, oid, did, rows)
     return did, len(rows)
 
@@ -520,13 +522,16 @@ def inv_from_time(c, oid, uid, b):
 def inv_reminder_rows(c, oid, ids):
     """The invoices a reminder lists (snapshot rows for totals.lines): open, finalised invoices of the organisation."""
     pm = inv_paid_map(c, oid, ids)
-    rows = []
+    rows, trial = [], set()
     for did in ids:
         r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice'", (did, oid)).fetchone()
         if r is None:
             raise Denied(404)
         if not ofx_locked(r) or r["status"] in ("cancelled", "paid"):
             raise BadInput(tr("Only open, finalised invoices can be reminded of ({0})", r["number"] or did))
+        trial.add(bool(_col(r, "trial")))
+        if len(trial) > 1:  # 2.144.10 B (#2576): one reminder never mixes trial and real invoices
+            raise BadInput(tr("A reminder cannot mix trial and real invoices"))
         mf = inv_money_fields(r, pm)
         rows.append({"kind": "ref", "id": r["id"], "number": r["number"], "date": r["date"], "due_date": _col(r, "due_date") or "", "gross": _j(r["totals"], {}).get("gross"),
                      "open": mf["open"], "currency": r["currency"]})
@@ -578,6 +583,8 @@ def inv_make_reminder(c, oid, uid, b):
     s = office_settings(c, oid)
     rows = inv_reminder_rows(c, oid, ids)
     first = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (ids[0], oid)).fetchone()
+    # 2.144.10 A (#2576): a reminder is a trial document when its invoices are (inherited via inv_new_row); trial and real
+    # ones never share one (inv_reminder_rows)
     write_lock(c, f"office_dunning_{int(oid)}")  # 2.147.1 (#2054, review): the same lock as the suggestion run (no second draft at once)
     inv_check_reminder(c, oid, ids, rows)
     level = b.get("level", 1)
@@ -661,6 +668,13 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
             cancels = {"id": ci["id"], "number": ci["number"], "date_text": fmt_date(ci["date"], pack)}
             meta.append([L.get("to_invoice", "zu Rechnung Nr." if lang == "de" else "Credit note for invoice no."), f"{ci['number']} ({cancels['date_text']})"])
     m["cancels"] = cancels
+    # 2.144.9 (#2575): an invoice made from a quotation names it in the head ("zu Angebot Nr. KV02-M (21.10.2026)")
+    if kind == "invoice" and _col(r, "source_doc_id"):
+        so = c.execute("SELECT number, date FROM office_docs WHERE id=? AND org_id=? AND kind='offer'", (r["source_doc_id"], oid)).fetchone()
+        if so is not None and so["number"]:
+            m["source_offer"] = {"number": so["number"], "date_text": fmt_date(so["date"], pack) if so["date"] else ""}
+            meta.append([L.get("to_offer", "zu Angebot Nr." if lang == "de" else "Re quotation No."),
+                         so["number"] + (f" ({m['source_offer']['date_text']})" if m["source_offer"]["date_text"] else "")])
     if m["order_ref"]:
         meta.append([L.get("ref", "Ref./PO-Nr."), m["order_ref"]])
     if r["project_title"]:
@@ -758,9 +772,8 @@ def inv_files(c, oid, did):
     m = odoc_render(c, did, oid)
     m.pop("internal", None)
     from .docs import doc_row
-    from .pdfweb import epdf_draft, epdf_is_draft
-    if epdf_is_draft(doc_row(c, oid, did)):
-        epdf_draft(m)  # 2.138.2 A (#2393): a draft goes out marked
+    from .pdfweb import epdf_mark
+    epdf_mark(doc_row(c, oid, did), m)  # 2.138.2 A (#2393): a draft goes out marked; 2.144.10 A (#2576): a trial one too
     number = re.sub(r"[^A-Za-z0-9._-]+", "-", str(m.get("number") or "")).strip("-") or f"doc-{did}"
     return [(f"{m['kind']}-{number}.pdf", office_pdf(m), "application/pdf")]
 
@@ -799,6 +812,8 @@ def inv_datev_ready(c, oid, r, s):
         raise Denied(409, tr("No DATEV inbox address in the settings"))
     if not ofx_locked(r):
         raise Denied(409, tr("Finalise the document first"))
+    if _col(r, "trial"):  # 2.144.10 B (#2576)
+        raise Denied(409, tr("Trial documents do not go to the accounting"))
 
 
 def inv_send(c, oid, uid, r, b):
@@ -821,7 +836,9 @@ def inv_send(c, oid, uid, r, b):
     explicit = b.get("datev") in (1, True, "1", "true")
     if explicit:  # 2.147.0 (#2460): DATEV switched off -> no copy, also not the automatic one
         office_need_feature(c, oid, "books.datev", s)
+    # 2.144.10 B (#2576): no automatic DATEV copy of a trial document (an explicit one is refused by inv_datev_ready)
     datev = r["kind"] in ("invoice", "credit") and (explicit or (b.get("datev") is None and s.get("datev_auto") and not _col(r, "datev_sent_at")
+                                                                 and not _col(r, "trial")
                                                                  and office_feature(c, oid, "books.datev", s)))
     if datev:
         inv_datev_ready(c, oid, r, s)
@@ -982,7 +999,7 @@ def inv_credit_post(did):
 
 @app.post("/api/office/docs/from-time")
 def inv_from_time_post():
-    """{client_id, from, to, project_id?} -> 201 an invoice draft from the client's time entries (one position per list)."""
+    """{client_id, from, to, project_id?, trial?} -> 201 an invoice draft from the client's time entries (one position per list)."""
     from .docs import recalc
     c, uid, oid = _ctx()
     b = body()
@@ -993,7 +1010,9 @@ def inv_from_time_post():
     ofx_log(c, oid, "create", doc_id=nid, detail={"kind": "invoice", "from": "time", "positions": n})
     bump(c)
     c.commit()
-    return _answer(c, oid, uid, nid, 201)
+    from .docs import doc_public, doc_row
+    d = doc_public(c, oid, doc_row(c, oid, nid), office_role(c, uid, oid) == "admin")
+    return jsonify({**d, "time": g.tbill_stat}), 201  # 2.144.6 A (#2053): entries taken / skipped
 
 
 @app.post("/api/office/docs/reminder")

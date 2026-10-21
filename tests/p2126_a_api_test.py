@@ -128,9 +128,10 @@ def numbers_case(S, who, cl):
     r = S.post(B + f"{D}/{inv['id']}/number", json={"number": f"RE-{time.localtime().tm_year}-001"})
     check(r.ok, f"{who}: a manual number is still possible " + r.text[:160])
     d = S.get(B + f"{D}/{inv['id']}").json()
-    check(d["can_delete"] is False, f"{who}: a numbered invoice draft offers no delete")
+    # 2.162.0 A (#2603): test phase (INVOICE_DELETE_TESTPHASE) - the admin may delete it, but only by typing its number
+    check(d["can_delete"] is True and d.get("delete_confirm") is True, f"{who}: a numbered invoice draft: delete only with its number (test phase)")
     r = S.delete(B + f"{D}/{inv['id']}")
-    check(r.status_code == 409 and r.json().get("error"), f"{who}: a numbered invoice draft is kept (409) " + r.text[:160])
+    check(r.status_code == 409 and r.json().get("error"), f"{who}: a numbered invoice draft is kept without the number (409) " + r.text[:160])
     check(S.get(B + f"{D}/{inv['id']}").ok, f"{who}: and still there")
     off = S.post(B + D, json={"kind": "offer", "client_id": cl, "items": [item("Kamera", 1, 500)]}).json()
     check(bool(off["number"]) and off["can_delete"], f"{who}: a numbered quotation draft can still be deleted")

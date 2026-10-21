@@ -362,7 +362,7 @@ def _rate_fail(keys):
 
 def start_session(c, uid, remember, via="password"):
     """A new session (always a new random token: a login never adopts a token the browser brought along).
-    via: password | 2fa | passkey | oidc."""
+    via: password | 2fa | passkey | oidc | link (sign-in link) | restore (the admin after a backup restore)."""
     tok = secrets.token_urlsafe(32)
     days = SESSION_DAYS if remember else 1
     c.execute("DELETE FROM sessions WHERE expires_at<?", (iso(now_utc()),))

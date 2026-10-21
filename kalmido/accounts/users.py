@@ -597,6 +597,9 @@ def me_share_httpshortcuts():
     if g.user["kid"]:
         return err(tr("Not possible with a child account"), 403)
     if not tkh_own_page():
+        if not any(request.headers.get(h) for h in ("Sec-Fetch-Site", "Origin", "Referer")):
+            # 2.144.5 A (#2387, review F8): an older browser that names no origin at all stays refused, but is told why
+            return err(tr("This browser does not say which page the download comes from, so it is refused for safety. Use a current browser or allow the referrer for this site."), 403)
         return err(tr("Not allowed"), 403)
     from ..core.tokenhash import tkh_set_drop
     c = db()

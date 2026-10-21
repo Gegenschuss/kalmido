@@ -1520,6 +1520,8 @@ fresh; run p2116_d_ui node p2116_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.143.0 part A (#2151: organisation roles guest / read-only / accounting)
 fresh; run p2143_a_api "$PY" p2143_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2143_a_ui node p2143_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p21472_a_ui node p21472_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p21472_b_ui node p21472_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.143.0 part B (#2152 #2211: off-site backup target, wiki trash emptied for good)
 fresh; run p2143_b_api "$PY" p2143_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2143_b_ui node p2143_b_ui.js "$KALMIDO_TEST_DATA"
@@ -1559,6 +1561,9 @@ fresh; run p2141_b_ui node p2141_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.141.0 part C: dispatch export CSV / ICS, newsletter consent import (#2142 #2143)
 fresh; run p2141_c_api "$PY" p2141_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2141_c_ui node p2141_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.11 part A: cash book review points - log SET NULL, fewer decryptions, error state, receipt hint gate (#2354)
+fresh; run p214411_a_api "$PY" p214411_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p214411_a_ui node p214411_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.144.0 part A: agent chat - filter only as the header icon, filter "only me" hides job results, stop a running answer (#2416 #2419 #2412)
 fresh; run p2144_a_api "$PY" p2144_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2144_a_ui node p2144_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1585,6 +1590,34 @@ fresh; run p21443_b2_ui node p21443_b2_ui.js "$KALMIDO_TEST_DATA"
 # 2.147.1 part C: bell "Read" section, approvals in the bell count, org card members, Mac icon (#2405 #2420 #2396)
 fresh; run p21443_c_api "$PY" p21443_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21443_c_ui node p21443_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.5 part A: recovery key step-up with a real SSO re-login, approval cards only for approvers (#2387 #2001)
+fresh; run p21445_a_api "$PY" p21445_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21445_a_ui node p21445_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.5 part B: workspace mailbox in org move/export/tenancy, CalDAV keeps attendees, import target defaults (#2410 #2379 #2002)
+fresh; run p21445_b_api "$PY" p21445_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21445_b_ui node p21445_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.5 part C: formula depth, invoice lines with list_id, own time in the list header, series names and missed notice dates (#1523 #2021)
+fresh; run p21445_c_api "$PY" p21445_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21445_c_ui node p21445_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.5 part D: phone - search closes animated, sheet cell editor and suggestions, freeze button (#1560 #2011)
+fresh; run p21445_d_ui node p21445_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.6 part A: billable / billed time entries, invoice from time binds them, no double billing (#2053)
+fresh; run p21446_a_api "$PY" p21446_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21446_a_ui node p21446_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.6 part B: office fixes from the 2.138 review - legacy counter reason, import order undo, approval rule, archive rest (#2400)
+fresh; run p21446_b_api "$PY" p21446_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21446_b_ui node p21446_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.6 part C: office settings - one "transfer into an organisation" section (#2436)
+fresh; run p21446_c_ui node p21446_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.9: office PDF - number without a leading separator, invoice label on the rights page, quotation reference, part name one source, option row on part pages (#2575)
+fresh; run p21449_api "$PY" p21449_api_test.py "$KALMIDO_TEST_DATA"
+# 2.144.10 (#2576): trial documents (A core, B exclusions, C UI)
+fresh; run p214410_a_api "$PY" p214410_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p214410_b_api "$PY" p214410_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p214410_c_ui node p214410_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.162.0 part A (#2603): test phase - an admin deletes a finalised / sent invoice (typed number, cash book on request)
+fresh; run p2162_a_api "$PY" p2162_a_invoice_delete_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2162_a_ui node p2162_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

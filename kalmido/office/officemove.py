@@ -284,6 +284,8 @@ def ofm_plan(c, uid, what, src, rows, own=False):
         for r in rows:
             docs, issued = [], []
             for d in c.execute("SELECT * FROM office_docs WHERE org_id=? AND client_id=? ORDER BY id", (src, r["id"])).fetchall():
+                if d["trial"]:  # 2.144.10 (#2576, review): trial documents stay where they are (no archive copy, no TEST number clash)
+                    continue
                 why = ofm_doc_hold(c, d)
                 if why == "issued":
                     issued.append(d)
@@ -378,7 +380,8 @@ def ofm_move_doc(c, rec, r, src, dst, cmap, kmap, ts):
         "contact_id": kmap.get(r["contact_id"]) if r["contact_id"] else None, "contract_id": None, "list_id": None,
         "agent_id": None, "source_doc_id": None, "version_of": None, "updated_at": ts})
     for it in c.execute("SELECT * FROM office_doc_items WHERE doc_id=? ORDER BY id", (r["id"],)).fetchall():
-        ofm_move_row(c, rec, "office_doc_items", it, src, dst, dst, {"service_id": None})
+        # 2.144.5 A2 (#1523, review R10): the list a position came from belongs to the old office
+        ofm_move_row(c, rec, "office_doc_items", it, src, dst, dst, {"service_id": None, "list_id": None})
     for pt in c.execute("SELECT * FROM office_doc_parts WHERE doc_id=? ORDER BY id", (r["id"],)).fetchall():
         ofm_move_row(c, rec, "office_doc_parts", pt, src, dst, dst)
     for t, col, d in ofm_fk_refs(c, "office_docs"):  # the deal / template document / other version pointing at it

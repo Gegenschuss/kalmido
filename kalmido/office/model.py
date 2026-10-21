@@ -562,7 +562,39 @@ def office_number_format(scheme, seq, d=None, project="", client="", initials=""
         if t == "version":  # 2.118.0 A (#2265)
             return str(version)
         return m.group(0)
-    return SCHEME_RE.sub(rep, scheme)
+    out = SCHEME_RE.sub(lambda m: rep(m) or "\x00", scheme)
+    return scheme_collapse(out) if "\x00" in out else out
+
+
+# 2.144.9 (#2575): a block without a value (no project / client / initials) is left out together with one separator next to
+# it: "{project}-KV{seq:2}-{initials}" without a project gives "KV02-M", not "-KV02-M"; no double or trailing separators.
+# Numbers already given stay as they are (nothing is renumbered).
+SCHEME_TEXT = ("project", "client", "initials")
+
+
+def scheme_collapse(s):
+    """s with every empty block marked \x00 -> the separators (- _ . / space) before it go when a separator, another empty
+    block or the end follows (a prefix like "RE-" before {seq} keeps its hyphen); at the start the ones after it go."""
+    s = re.sub(r"[-_./ ]+\x00(?=[-_./ ]|\x00|$)", "\x00", s)
+    s = re.sub(r"^\x00+[-_./ ]*", "", s)
+    return s.replace("\x00", "")
+
+
+def scheme_variants(scheme):
+    """Every form of the scheme with one or more of its text blocks left out (as office_number_format writes them), then the
+    scheme itself, then the forms numbers given before 2.144.9 have (the block empty, its separators kept: "-KV02-M")."""
+    toks = [m for m in SCHEME_RE.finditer(scheme) if m.group(1) in SCHEME_TEXT][:4]
+    out, old = [], []
+    for mask in range(1, 1 << len(toks)):
+        v, pos = "", 0
+        for i, m in enumerate(toks):
+            v += scheme[pos:m.start()] + ("\x00" if mask >> i & 1 else m.group(0))
+            pos = m.end()
+        v += scheme[pos:]
+        for x, into in ((scheme_collapse(v), out), (v.replace("\x00", ""), old)):
+            if x not in out and x not in old and x != scheme:
+                into.append(x)
+    return out + [scheme] + old
 
 
 def _slug(s):
@@ -581,6 +613,29 @@ def office_number_next(c, oid, kind, scheme, d=None, peek=False, start=0, **ctx)
         seq = c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,?,?) ON CONFLICT(org_id, kind, period) "
                         "DO UPDATE SET last=office_numbers.last+1 RETURNING last", (oid, kind, period, start + 1)).fetchone()[0]
     return office_number_format(scheme, seq, d, **ctx), seq
+
+
+# 2.144.10 A (#2576): trial documents ("Nur zum Ausprobieren") count in their own series TEST-001, TEST-002 ... (one counter
+# per office for all kinds, office_numbers kind 'trial', period ''); no real counter ever moves for them
+TRIAL_KIND = "trial"
+
+
+def trial_flag(v):
+    """1 when a request value asks for a trial document (true / 1 / "1" / "true"), else 0."""
+    return 1 if v in (1, True, "1", "true") else 0
+
+
+def office_trial_number(c, oid, did):
+    """Reserves the next free TEST number of office oid for document did (the caller holds the number lock)."""
+    from .legacyimport import fi_number_taken
+    for _ in range(50):
+        seq = c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,'',1) ON CONFLICT(org_id, kind, period) "
+                        "DO UPDATE SET last=office_numbers.last+1 RETURNING last", (oid, TRIAL_KIND)).fetchone()[0]
+        num = f"TEST-{seq:03d}"
+        if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone() \
+                and not fi_number_taken(c, oid, num):
+            return num
+    return num
 
 
 # 2.118.0 A (#2265): the quotation counter per organisation (as before), client or project. The scope sits in the
@@ -616,20 +671,24 @@ def onc_ready(s, r):
 
 
 def onc_parse(scheme, num):
-    """(seq, version) number num carries under scheme; None each when it does not follow the scheme / has no such block."""
-    pat, pos, names = "", 0, []
-    for m in SCHEME_RE.finditer(scheme):
-        pat += re.escape(scheme[pos:m.start()])
-        t = m.group(1)
-        if t.startswith("seq") or t == "version":
-            pat += r"(\d+)"
-            names.append("version" if t == "version" else "seq")
-        else:
-            pat += {"yyyy": r"\d{4}", "yy": r"\d{2}", "date": r"\d{8}", "isodate": r"\d{4}-\d{2}-\d{2}"}.get(t, r".+?")
-        pos = m.end()
-    pat += re.escape(scheme[pos:])
-    m = re.fullmatch(pat, num or "")
-    if not m:
+    """(seq, version) number num carries under scheme; None each when it does not follow the scheme / has no such block.
+    2.144.9 (#2575): also a number whose text blocks were empty (scheme_variants)."""
+    for sv in scheme_variants(scheme):
+        pat, pos, names = "", 0, []
+        for m in SCHEME_RE.finditer(sv):
+            pat += re.escape(sv[pos:m.start()])
+            t = m.group(1)
+            if t.startswith("seq") or t == "version":
+                pat += r"(\d+)"
+                names.append("version" if t == "version" else "seq")
+            else:
+                pat += {"yyyy": r"\d{4}", "yy": r"\d{2}", "date": r"\d{8}", "isodate": r"\d{4}-\d{2}-\d{2}"}.get(t, r".+?")
+            pos = m.end()
+        pat += re.escape(sv[pos:])
+        m = re.fullmatch(pat, num or "")
+        if m:
+            break
+    else:
         return None, None
     got = {}
     for n, v in zip(names, m.groups()):
@@ -643,7 +702,7 @@ def onc_start(c, oid, s, r, key, scheme, d=None):
     period = office_scheme_period(scheme, d)
     high = 0
     for x in c.execute("SELECT id, kind, number, date, client_id, list_id, project_title, recipient FROM office_docs "
-                       "WHERE org_id=? AND kind='offer' AND number<>'' AND id<>?", (oid, r["id"])).fetchall():
+                       "WHERE org_id=? AND kind='offer' AND number<>'' AND id<>? AND trial=0", (oid, r["id"])).fetchall():  # 2.144.10 A (#2576): never TEST numbers
         if (period and (x["date"] or "")[:4] != period) or onc_key(s, x) != key:
             continue
         seq = onc_parse(scheme, x["number"])[0]

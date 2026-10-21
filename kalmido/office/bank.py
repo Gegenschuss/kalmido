@@ -379,7 +379,8 @@ def bnk_open_invoices(c, oid):
     """Finalised, open invoices of the area: [{id, number, client, title, currency, open (Decimal), gross, date, due}]."""
     from .invoices import _j, inv_money_fields, inv_paid_map
     rows = c.execute("SELECT d.*, cl.name AS client_name FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id "
-                     "WHERE d.org_id=? AND d.kind='invoice' AND d.locked_at IS NOT NULL AND d.status NOT IN ('draft', 'cancelled', 'paid')",
+                     "WHERE d.org_id=? AND d.kind='invoice' AND d.locked_at IS NOT NULL AND d.status NOT IN ('draft', 'cancelled', 'paid') "
+                     "AND d.trial=0",  # 2.144.10 B (#2576): never suggest trial invoices
                      (oid,)).fetchall()
     pm = inv_paid_map(c, oid, [r["id"] for r in rows])
     out = []
@@ -586,6 +587,8 @@ def bnk_match(tid):
     if kind == "invoice":
         from .docs import doc_row
         r = doc_row(c, oid, mid)  # 404 outside the area
+        if r["trial"]:  # 2.144.10 B (#2576)
+            raise Denied(409, tr("Trial documents do not go to the accounting"))
         if t["amount"] <= 0:
             raise Denied(409, tr("Only money received can pay an invoice"))
         if (r["currency"] or "EUR").upper() != t["currency"]:

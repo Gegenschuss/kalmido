@@ -46,7 +46,7 @@ delete them - members added there would reach the personal office.
 A person in an organisation who opens "Private" for the first time finds an empty personal office with a hint and a
 button to the organisation's office.
 
-**Moving into an organisation** (Settings tab, "Move into an organisation"; one way, after a confirmation): the personal
+**Moving into a new organisation** (Settings > Data, section "Transfer into an organisation", button "Transfer into a new organisation…"; one way, after a confirmation): the personal
 office becomes a new organisation with its owner as admin - documents, numbers (no duplicates: it is the same area),
 settings, master data, files and the private clients go with it; "Private" is a new, empty personal office afterwards.
 Only where organisations can be created (an instance admin, not in the mode `shared`). Moving into an existing
@@ -243,7 +243,9 @@ Placeholders: `{yyyy}` `{yy}` year, `{seq}` or `{seq:03}` the counter (zero-padd
 In `{client}`, `{project}` and `{initials}` spaces and other punctuation become hyphens; letters (umlauts too), digits, `_` and `-`
 stay, at most 40 characters: `{client}_{project}_KV{seq:02}_{isodate}_{initials}` -> `DAF_Beteiligung_KV04_2026-04-15_MG`. The counter runs per
 organisation, document kind and period: with `{yyyy}` / `{yy}` in the scheme it starts again every year, without it
-never. A number is reserved once and never reused.
+never. A number is reserved once and never reused. An empty `{project}`, `{client}` or `{initials}` is left out together
+with one separator next to it (2.144.9): `{project}-KV{seq:02}-{initials}` without a project gives `KV02-MG`, not
+`-KV02-MG`; numbers given before stay as they are.
 
 When the number is assigned depends on the document kind: quotations get it when they are created (as before); the
 organisation can switch this to "when it is finalised" (settings key `offer_number_at`: `create` | `finalize`). Then a
@@ -482,15 +484,17 @@ where they are used.
 - **Numbers**: an archived number is never given to a new document (the automatic number skips it, a manual one is
   refused). The import page proposes to continue the invoice / quotation counter after the highest archived number (a
   number that follows today's scheme, else the project number of the file name); the person confirms, the counter is
-  never lowered.
+  never lowered. 2.144.6: raising the invoice counter asks for a reason like the number ranges (GoBD); it goes into the
+  office log.
 - **Undo**: every confirmed import is a run (list with date, person, count). Undoing removes what the run added unless
   something builds on it by now - a client with a list, document, framework contract or archived document of another run
   stays, as does the service the calculation rules name as the producing one; the answer says what stayed. 2.138.0: a
   service used in a document or framework contract and a device in a set are archived instead of staying active
   (documents keep showing them with name and price); the page lists them with the document or set they are in, each with
   **Restore**. A run undone before 2.138 shows **Archive leftover entries** once: it archives what that run left active
-  (only its own services and devices, never the producing service, nothing deleted). Fields a merge filled are emptied
-  again while they still hold the imported value.
+  (only its own services and devices, never the producing service, nothing deleted; 2.144.6: an entry restored by hand
+  stays active). Fields a merge filled are emptied again while they still hold the imported value. 2.144.6: the undo of
+  the services also puts back the order the import renumbered, for every service nobody reordered since.
 
 Routes (organisation admin; members read the archive and, 2.81.0, correct it): `POST /api/office/legacy/preview` (multipart `file`, stores
 nothing; 2.146.0: .xlsx or CSV, the optional form field `map` = `{name, contact, address, street, house, zip, city, country: column index}`,
@@ -605,6 +609,12 @@ Since 2.141 a workspace can bring its **own mailbox** and Kalmido can **send** f
 - **Filed as sent**: the mail is filed before it goes out (with the same client / project, the `.eml` in the file store) and
   shows "Sent" in the list; when the SMTP fails it stays as "Not sent" with the reason (and the text stays in the dialog).
 - **Agents and kid accounts** cannot send (no API route, no MCP tool in 2.141).
+- **Exports and moves (2.144.5)**: the organisation export, the account export (the private space's mailbox) and their
+  imports carry the mailbox's servers, ports, user names and sender, never the passwords. After an import the mailbox asks
+  for them again (*The password is missing*) and is switched off: nothing is fetched and mail goes out through the server
+  until the passwords are entered and the mailbox is switched on again in the settings; undoing the import removes it only
+  while it is unchanged. A workspace that already has a mailbox keeps
+  its own. The nightly boundary check reports a mailbox whose workspace does not match its organisation or owner.
 
 ## Travel expenses: taking over a per diem spreadsheet (2.95)
 
@@ -648,6 +658,9 @@ Routes (office admins): `GET /api/office/subs` {items, totals, candidates, peopl
 /api/office/subs.csv`; writing goes through the fixed cost routes with the fields `sub`, `notice_days`, `seats` (user ids
 of the office area or free names), `low_use`, `remind_days`, `remind_user`, `url` (http / https). Answers of the fixed
 costs carry `next_renewal`, `cancel_by`, `per_month` / `per_year` (gross) and `per_month_net` / `per_year_net`.
+When the last day to cancel before the next renewal has already passed, `cancel_missed` is 1 and `cancel_next` is the last
+day for the first later renewal that can still be reached (empty when the cost ends before); the list then shows "Notice
+period missed, next chance ...", sorts by that day and the reminder aims at it (`cancel_by` keeps the missed day).
 
 ## Sales pipeline and figures (2.50)
 
@@ -1169,6 +1182,29 @@ print model as JSON: all texts, labels and amounts already in the document's lan
 `POST /api/office/docs/<id>/finalize`, `GET /api/office/docs/<id>/log` and `GET /api/office/log?limit=` (organisation
 admins). The head also carries the period of service (`service_from`, `service_to`, dates; printed as one line).
 
+### Trial documents (2.144.10)
+
+"Only to try it out": `POST /api/office/docs` (every kind) and `POST /api/office/docs/from-time` take `trial: true`. A trial
+document is fixed at creation (no later switch) and:
+
+- counts in its own series `TEST-001`, `TEST-002` ... (one counter per organisation or personal office for all kinds,
+  `office_numbers` kind `trial`); it never takes a real number, a number by hand answers `400`, the real series stay
+  without gaps and the number ranges page does not show the TEST series;
+- passes trial on to everything made from it (invoice, progress / final invoice, credit note, reminder, delivery note,
+  copy, document from a template); a reminder never mixes trial and real invoices (`400`); an invoice series from a
+  trial invoice answers `409`;
+- prints SAMPLE / MUSTER large and diagonal on every page (instead of the draft mark) and has no e-invoice
+  (no ZUGFeRD / XRechnung XML; `GET .../xml` answers `409`); webhooks and agent events skip it;
+- can be deleted by an admin at any time (finalised, sent, signed, with follow-ups; the follow-ups stay, their link
+  is emptied). `POST /api/office/trial/delete-all` (admin; a person without an organisation is their own admin) deletes
+  every trial document and trial document from a template of the area with payments, links, stored PDF / XML files
+  and filed PDFs -> `{ok, docs, gen_docs}`; the TEST series starts again at 001.
+
+Every document (detail and list) carries `trial`; `GET /api/office/docs?trial=1|0` filters, the list also answers
+`trial_count` (trial documents + trial documents from templates), `first: {offer, invoice}` (true = no real quotation /
+invoice yet: the dialog shows the hint once per person, setting `trial_hint_seen`) and `office_id`.
+`GET /api/office/gen-docs` items carry `trial` too (`?trial=1|0`).
+
 Purchase and surplus (2.47): a new position of a service takes the purchase (`cost`) of the service's freelancer role
 for its unit (day / hour); a later change of the role's price reaches only new positions; the admin can change it per
 position. Admins get the surplus of every position (`items[].margin` = total minus purchase x quantity) and their sum
@@ -1236,6 +1272,33 @@ there. Kalmido itself never runs a language model for this: the agent connected 
   The company address has the same fixed fields as a client (street, address extra, postcode, city, country). While
   they are empty, a plain address in the old free "Address lines" (street, postcode + city, maybe a country) is shown in
   the fields; saving the settings keeps it there, the free lines stay as they were.
+
+## Trial documents (2.144.10)
+
+To try the office out without touching the real number ranges, switch on **"Just to try"** when creating a document:
+the dialog of "New quotation", of "New invoice" ("Empty invoice") and of "Invoice from time entries" has this switch. It
+is off by default and the focus sits on "Create", so Enter creates a real document as before.
+
+A trial document
+
+- takes a number of its own range `TEST-001`, `TEST-002`, ... (one range per organisation or personal office, for all kinds);
+  the real ranges keep counting without gaps;
+- prints a large watermark "MUSTER" on every page and never becomes an e-invoice;
+- stays out of bookkeeping, exports, VAT, figures and reminders; documents made from it (invoice, credit note, reminder,
+  delivery note, progress invoice, document from a template) are trial documents too;
+- can be deleted by an admin at any time, also when it is finalised, sent, accepted or signed (the question reads
+  "Delete trial document?"). A person without an organisation is the admin of the personal office.
+
+The lists mark trial documents with a small tag "Trial", the editor head as well; documents from templates show the same
+tag. As soon as the office has trial documents, the list gets a filter "All / Real only / Trial only" (kept on this
+device) and admins see the line "Delete all trial documents": after a confirmation that names the number, all trial
+documents of the office go for good, with their payments, share links and stored PDFs. Real documents stay.
+
+A real document cannot be turned into a trial one later, nor the other way round.
+
+The first time someone creates a quotation or an invoice in an office that has no real one yet, the create dialog shows a
+hint about "Just to try". It goes away with its X or with "Create" and does not come back for this person and office
+(user setting `trial_hint_seen`).
 
 ## Finalising
 
@@ -1308,6 +1371,8 @@ answers `409`): `POST /api/office/docs/<id>/parts` (`{kind: items|shoot, title, 
 on the title page once unless `add_to_title: false`), `PATCH /api/office/docs/<id>/parts/<pid>` (`{title, print, sort,
 settings, sheet}`), `DELETE /api/office/docs/<id>/parts/<pid>` (with its positions and its title page lines),
 `PUT /api/office/docs/<id>/parts/<pid>/items` (the whole list of the part's positions, like `PUT .../items`).
+The part's name is one source (2.144.9): a rename changes every title page line of the part, and a title page line
+(`kind: part`) whose text was changed in `PUT .../items` renames the part; part pages print the name as typed.
 `GET /api/office/docs/<id>` carries `parts: [{id, kind, title, print, sort, settings, items, totals, used}]`;
 `POST /api/office/docs/<id>/invoice` takes `{parts_mode, parts_title}`. Duplicating copies the parts.
 
@@ -1320,10 +1385,19 @@ settings, sheet}`), `DELETE /api/office/docs/<id>/parts/<pid>` (with its positio
   quotation becomes a plain position - the producing, raw data and discount lines the calculator made are condensed
   into positions with their amount, an uncounted raw data option is left out; rights, framework contract text,
   recipient, project title, language, currency and rate, period of service and the PO number are taken over
-  (`source_doc_id` points back);
+  (`source_doc_id` points back; the invoice's head names the quotation, "zu Angebot Nr. KV02-MG (20.10.2026)", 2.144.9);
 - **from time entries** (`POST /api/office/docs/from-time` with `{client_id, from, to, project_id?}`): the finished time
   entries of the client's lists in the period, one position per list with the hours; the rate is the client's hourly
-  rate when set, else 0 to fill in;
+  rate when set, else 0 to fill in; 2.144.5: each such position remembers its list internally (never in the PDF, the
+  e-invoice or an export for the client), so "Delete all times" keeps billed entries after a rename.
+  2.144.6: only **billable**, still **open** entries count (each entry has the switch
+  *Billable*, on by default; `GET /api/office/time-open?client_id=&from=&to=` shows open / billed / not billable hours
+  first). The draft takes them (`billed`): they keep their duration, date and task (only the note can change), cannot be
+  deleted and never land on a second invoice, also when two invoices are made at the same moment. The answer's `time`
+  says how many entries were taken and skipped. Deleting the draft frees them again; a finalised invoice keeps them,
+  also once cancelled - on a cancelled invoice the office admin frees them with *Release the time again*
+  (`POST /api/office/docs/{id}/time-release`, undoable). Without an organisation the personal office bills the
+  person's private lists the same way;
 - **empty** (`POST /api/office/docs` with `{"kind": "invoice"}`).
 
 Invoices have no producing / raw data / discount automation: a document is exactly its positions. A discount is a

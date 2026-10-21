@@ -237,6 +237,40 @@ def mbx_check(c, r, secret=None):
     return out
 
 
+def mbx_take_values(src):
+    """2.144.5 B (#2410): the settings of a mailbox row from an export (organisation export / account export; untrusted) as
+    columns, checked like mbx_put. The passwords never come with an export: secret stays empty and error "password" makes the
+    settings ask for them again (nothing is fetched or sent until then). None = neither a server for receiving nor for sending."""
+    if not isinstance(src, dict):
+        return None
+    v = {}
+    for k, n in (("imap_host", 253), ("smtp_host", 253), ("imap_user", 300), ("smtp_user", 300), ("from_name", 120), ("from_addr", 254),
+                 ("imap_folder", 200)):
+        x = src.get(k)
+        x = x.strip() if isinstance(x, str) else ""
+        v[k] = "" if len(x) > n or _CTRL.search(x) else x
+    for k in ("imap_host", "smtp_host"):
+        v[k] = v[k].lower().rstrip(".")
+        if v[k] and not _HOST_RE.fullmatch(v[k]):
+            v[k] = ""
+    if not v["imap_folder"] or '"' in v["imap_folder"] or "\\" in v["imap_folder"]:
+        v["imap_folder"] = "INBOX"
+    if v["from_addr"] and not EMAIL_RE.fullmatch(v["from_addr"]):
+        v["from_addr"] = ""
+    for k in ("imap_port", "smtp_port"):
+        x = src.get(k)
+        v[k] = x if isinstance(x, int) and not isinstance(x, bool) and 0 <= x <= 65535 else 0
+    v["imap_ssl"] = 0 if src.get("imap_ssl") in (0, False) else 1
+    # 2.144.5 A2 (#2410, review R6): switched off until the passwords are entered again (_sender takes the server's SMTP
+    # meanwhile, the poller leaves it alone); the person switches it on in the settings
+    v["active"] = 0
+    v["smtp_tls"] = src.get("smtp_tls") if src.get("smtp_tls") in MBX_TLS else "starttls"
+    if not v["imap_host"] and not v["smtp_host"]:
+        return None
+    v.update(secret="", error="password", error_at=_now(), polled_at=None)
+    return v
+
+
 # ---- the settings ---------------------------------------------------------------------------------------------------------
 def _public(c, ws, org, r=None, check=None):
     r = r if r is not None else mbx_row(c, ws)

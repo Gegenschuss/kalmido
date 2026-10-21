@@ -4,7 +4,7 @@
    other popstate handlers (detail panel, shopping mode) from also reacting to that Back. */
 const f8d_bk = {pushed: false, skip: false, queued: false};
 const f8d_open = () => {
-  if ($('.palette')) return 'palette';
+  if ($('.palette:not(.an-out)')) return 'palette';
   if ($('.lightbox')) return 'lightbox';
   const pop = $('#pop');
   if ((pop && !pop.classList.contains('hidden')) || $('.qadd.sheet')) return 'pop';

@@ -393,6 +393,8 @@ def init_db(guard=True, load=None):
         tkh_migrate(c)  # 2.138.0 C (#1907): plain upload / calendar tokens become hashes
         from ..office.ledger import ofx_migrate
         ofx_migrate(c)  # 2.36.2 (#1142, E): office positions carry their organisation
+        from ..office.cashbook import cb_log_fk_migrate
+        cb_log_fk_migrate(c)  # 2.144.11 (#2354): cash book log lines outlive their entry (SET NULL, was CASCADE)
         from ..office.contacts_cl import fk_migrate
         fk_migrate(c)  # 2.40.0 (#1380): the contact field of a client becomes its default contact person
         from ..office.model import fe_office_rules_migrate

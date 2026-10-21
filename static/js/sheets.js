@@ -564,6 +564,7 @@ async function shvFreeze(c) {
   const sh = SHV.sh, sid = sh.id, cid = c.id, to = !c.frozen;
   const set = async v => { const r = await rawFetch('POST', `/api/sheets/${sid}/cells/${cid}/freeze`, {frozen: v}); if (r?.cells) shvMerge(sid, r); else if (SHV.sh?.id === sid) await shvLoad(sid, true); };
   try { await set(to); } catch (e) { toast(e.message); return; }
+  { const sd = $('#shv-side'); if (sd && SHV.sh?.id === sid) { sd.innerHTML = shvSideHtml(SHV.sh); sd.querySelector('[data-shv="freeze"]')?.focus({preventScroll: true}); } }  // 2.144.5 D (#2011): the button just tapped kept the panel from redrawing
   const e = histAdd({label: to ? tr('Value frozen') : tr('Live again'), ids: [], snaps: [], lids: [], undo: async () => { await set(!to); return {skipped: []}; }, redo: async () => { await set(to); return {skipped: []}; }});
   histToast(to ? tr('Value frozen: it stays as it is until you make it live again') : tr('Live again'), e);
 }
@@ -598,6 +599,8 @@ function shvEditStart(typed, bar) {
   td.classList.add('editing');
   td.innerHTML = `<input class="shvin" id="shv-ed" value="${esc(val)}" autocomplete="off" spellcheck="false" aria-label="${esc(tr('Cell {0}', shvAddr(cur.r, cur.c)))}" ${col?.kind === 'date' ? `placeholder="${esc(tr('DD.MM.YYYY'))}"` : ''}>`;
   const inp = $('#shv-ed', td); inp.focus({preventScroll: true});
+  { const tr0 = td.getBoundingClientRect(), vw = window.visualViewport?.width || innerWidth;  // 2.144.5 D (#2011): the field ends at the visible edge
+    const room = vw - Math.max(tr0.left, 0) - 4; if (room < inp.offsetWidth) inp.style.width = Math.max(Math.min(tr0.width, room), 6 * 16) + 'px'; }
   const n = inp.value.length; inp.setSelectionRange(n, n);
   const b = $('#shv-in'); if (b) b.value = val;
   if (val.startsWith('=')) shvAcUpdate(inp);
@@ -713,12 +716,14 @@ function shvAcDraw() {
   let box = $('#shv-ac');
   if (!box) { box = document.createElement('div'); box.id = 'shv-ac'; box.className = 'shvac'; box.setAttribute('role', 'listbox'); box.setAttribute('aria-label', tr('Suggestions')); document.body.appendChild(box); }
   box.innerHTML = a.items.map((x, i) => `<button type="button" role="option" class="${i === a.i ? 'on' : ''}" aria-selected="${i === a.i}" data-shvac="${i}" ${x.help ? `title="${esc(x.help)}"` : ''}><code>${esc(x.token)}</code><span class="shvacl">${esc(x.label || '')}</span>${x.value_display != null && x.value_display !== '' ? `<span class="shvacv">${esc(x.value_display)}</span>` : ''}</button>`).join('');
-  const r = a.inp.getBoundingClientRect(), h = Math.min(box.offsetHeight || 240, 16 * 16);
-  // 2.138.4 A (#2372): the visual viewport (above the iOS keyboard), not innerHeight
-  const vv = window.visualViewport, vBot = vv ? vv.offsetTop + vv.height : innerHeight, vTop = vv ? vv.offsetTop : 0;
-  const below = r.bottom + 4 + h < vBot;
+  // 2.144.5 D (#2011): beside the field, never over it: below when it fits above the keyboard, else on the roomier side, shortened to fit
+  const r = a.inp.getBoundingClientRect(), vv = window.visualViewport;
+  const vBot = vv ? vv.offsetTop + vv.height : innerHeight, vTop = vv ? vv.offsetTop : 0;
+  box.style.maxHeight = ''; const h = Math.min(box.scrollHeight || 240, 16 * 16);
+  const roomB = vBot - r.bottom - 8, roomA = r.top - vTop - 8, below = h <= roomB || roomB >= roomA;
+  const mh = Math.max(4 * 16, Math.min(h, below ? roomB : roomA)); box.style.maxHeight = mh + 'px';
   box.style.left = Math.max(8, Math.min(r.left, innerWidth - box.offsetWidth - 8)) + 'px';
-  box.style.top = (below ? r.bottom + 4 : Math.max(vTop + 8, r.top - 4 - h)) + 'px';
+  box.style.top = (below ? r.bottom + 4 : Math.max(vTop + 4, r.top - 4 - box.offsetHeight)) + 'px';
   a.inp.setAttribute('aria-controls', 'shv-ac'); a.inp.setAttribute('aria-expanded', 'true');
   box.querySelector('.on')?.scrollIntoView?.({block: 'nearest'});
 }

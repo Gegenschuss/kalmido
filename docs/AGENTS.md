@@ -1429,7 +1429,9 @@ the answer (activity `choice`) and the task row shows open approval cards (`appr
 
 Only people who may edit the task **and** may instruct you in that list ([Who may address an agent](#who-may-address-an-agent-2260))
 answer (`POST /api/comments/{id}/choice` in the app, `POST /api/v1/comments/{id}/choice` with a person's token); agent
-accounts never. A pressed plain button is posted as the person's comment with its text (a reply to yours). You get ONE
+accounts never. An approval card is decided only by an **approver** (2.144.5, #2001: a manager of the list, the
+assignee or an admin, as listed under [Approvals](#approvals)); other editors get `403` and see no buttons (the app's
+comments carry `choice_can`). A pressed plain button is posted as the person's comment with its text (a reply to yours). You get ONE
 event `comment` with `answer` (`approval` `approved` / `rejected` and `approval_request` for a card, `labels` for
 buttons); `comment` is the person's new comment, or your card. A 👍 / 👎 on the comment keeps working as before. No
 answer is never a yes. Health lists never reach an agent.
@@ -1761,10 +1763,10 @@ area's clients, documents or lists answer `404`.
 |---|---|---|
 | The area, the person, the rules; 2.147: `country_pack` and `features` (the office functions as switched on, e.g. `books.datev: false`) | `GET /api/v1/office` | `get_office` |
 | Services, text blocks, framework contracts, clients (`q`) -- never purchase prices | `GET /api/v1/office/{services\|texts\|contracts\|clients}` | `list_office_data` |
-| Documents (`kind` offer / invoice / credit / reminder, `client_id`, `status`, `open=1`) | `GET /api/v1/office/docs` | `list_office_documents` |
+| Documents (`kind` offer / invoice / credit / reminder, `client_id`, `status`, `open=1`, 2.144.10: `trial=1\|0`) | `GET /api/v1/office/docs` | `list_office_documents` |
 | One document with its positions | `GET /api/v1/office/docs/{id}` | `get_office_document` |
 | The PDF preview of a draft (marked as a draft) | `GET /api/v1/office/docs/{id}/pdf` | -- (binary; the chat card links it) |
-| A quotation draft (`client_id`, `title`, `intro`, `items`, `list_id`, `notify`) | `POST /api/v1/office/offers` | `create_offer_draft` |
+| A quotation draft (`client_id`, `title`, `intro`, `items`, `list_id`, `notify`; 2.144.10: `trial` = a trial quotation) | `POST /api/v1/office/offers` | `create_offer_draft` |
 | Change your own draft (only while it is a draft; 2.88: also `cashflow` auto / yes / no, its share in the cash flow plan once sent) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
 | An invoice draft from an accepted quotation | `POST /api/v1/office/offers/{id}/invoice` | `draft_invoice_from_offer` |
 | A reminder draft over open invoices of one client | `POST /api/v1/office/reminders` | `draft_reminder` |
@@ -1942,7 +1944,8 @@ person's rights; it belongs to them, never to the agent. The answer comes as the
 rule proposals per agent and day.
 
 2.138.0 (#2060): new triggers `created` (a task is created in the list), `assigned` (`user_id`: only that person, null =
-anybody; fires only when the person is new on the task) and `field` (`field_id` of the list's custom fields; `value` = only
+anybody; fires only when the person is new on the task; 2.144.6 (#2400): not when an approval request or "changes" of an
+approval hands the task over) and `field` (`field_id` of the list's custom fields; `value` = only
 when set to that option id / `"1"` checked / `"0"` unchecked, null = any change; formula fields never trigger). New actions
 `priority` (`priority` none / low / medium / high), `tag` (`tag_id`: adds a tag of this list; personal tags never) and `field`
 (`field_id` + `value`, checked like a normal field value, null clears it). A deleted field or list tag pauses the rule
@@ -2775,7 +2778,8 @@ with the scope it needs). The tools:
   `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`,
   `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `list_repos`, `list_environments` (2.60.0), `set_deployment` (2.60.0)
 - time and habits: `get_timer`, `start_timer`, `stop_timer`, `list_time_entries`, `get_time_gaps` (2.34.0), `add_time_entry`, `update_time_entry`,
-  `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`, `get_habit_stats` (2.138.1)
+  `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`, `get_habit_stats` (2.138.1). 2.144.6: time entries
+  carry `billable` (settable in `add_time_entry` / `update_time_entry`) and `billed` (on an invoice: only the note changes)
 - News: `list_news`, `mark_news_read`
 - day plans: `get_day_plan`, `get_day_review`
 - family (2.19.0): `get_family`, `add_occasion`, `list_deadline_types`, `add_deadline`, `ingredients_to_shopping`,

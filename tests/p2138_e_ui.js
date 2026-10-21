@@ -6,7 +6,8 @@
 // - #2241: undoing an import lists the archived entries with name and where they are used, each with "Restore"; an
 //   import undone before shows "Archive leftover entries" once
 // - #2235: the bar shows the next step: draft -> Finalise (no "Create invoice" in front), finalised -> Mark as sent,
-//   sent -> Accepted / Declined, accepted -> Create invoice; before the acceptance "Create invoice" is in "…" and asks
+//   sent -> Accepted / Declined, accepted -> Create invoice; before the acceptance "Create invoice" (2.144.7, #2572: a plain button
+//   and in the list row menu, no longer in "…") asks
 //   once (cancel = no invoice, yes = the invoice dialog); the PDF button reads "Preview"
 // Firefox (desktop, mouse):
 // - #2234: a dialog gets a grip at the bottom right; dragging it makes the dialog bigger; closing + opening keeps the size
@@ -82,6 +83,12 @@ const absOk = async (w, d) => { const b = await until(() => d.querySelector('.mo
   check(await until(() => /Restored/.test(d.querySelector('.oim .imrarc')?.textContent || ''), 30), '#2241: the entry shows as restored');
 
   // ================= #2241: "Archive leftover entries" for a run undone before
+  // 2.144.6 B (#2400 F4): an entry restored by hand is no leftover; a run undone before 2.112 (no restore note) is
+  // simulated by taking the note out of the run's detail
+  w.eval(`OIM.arcd = null; oimLoad()`);
+  await sleep(1200);
+  check(!d.querySelector(`.oim [data-imr="tidy"][data-id="${imp.run_id}"]`), '#2400 F4: no "Archive leftover entries" for an entry restored by hand');
+  execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, "UPDATE office_import_runs SET detail=(detail::jsonb - 'restored')::text WHERE id=?", JSON.stringify([imp.run_id])]);
   w.eval(`OIM.arcd = null; oimLoad()`);
   const tidy = await until(() => d.querySelector(`.oim [data-imr="tidy"][data-id="${imp.run_id}"]`), 40);
   check(!!tidy && /Archive leftover entries/.test(tidy.textContent) && /\(1\)/.test(tidy.textContent), '#2241: the undone run offers "Archive leftover entries" (1)');
@@ -92,46 +99,57 @@ const absOk = async (w, d) => { const b = await until(() => d.querySelector('.mo
   w.close();
 
 
-  // ================= #2235: draft -> Finalise in front, invoice in "…" with one question; "Preview"
+  // ================= #2235: draft -> Finalise in front, invoice asks once; "Preview"
+  // 2.144.7 (#2572): "Create invoice" is a visible plain button before acceptance (no longer in "…"), and in the list row menu
   const doc2 = await call('POST', '/api/office/docs', {kind: 'offer', lang: 'en', project_title: 'Campaign', items: [item('Concept', 1, 800)]});
   check(doc2.http === 201, 'a quotation ' + doc2.http);
   w = await boot({user: 'alice', hash: `office/offers/${doc2.id}`}); d = w.document;
   await until(() => d.querySelector('.ofdhead [data-ofd="more"]'), 60);
-  check(d.querySelector('.ofdhead [data-ofd="finalize"]') && !d.querySelector('.ofdhead [data-ofd="to-invoice"]'), '#2235 draft: Finalise in front, no "Create invoice"');
+  const tib = () => d.querySelector('.ofdhead [data-ofd="to-invoice"]');
+  check(d.querySelector('.ofdhead [data-ofd="finalize"]') && tib() && !tib().classList.contains('pri'), '#2572 draft: Finalise in front, "Create invoice" a plain button');
   check(/^Preview$/.test(d.querySelector('.ofdhead .ofdpdf .ofdpdft')?.textContent || ''), '#2235: the PDF button reads "Preview" ' + d.querySelector('.ofdhead .ofdpdf')?.textContent);
+  click(w, d.querySelector('.ofdhead [data-ofd="more"]'));
+  await until(() => d.querySelector('#pop [role="menuitem"]'));
+  check(!menuInv(d), '#2572 draft: no "Create invoice" in "…" any more');
+  w.eval('document.body.click()');
   const n0 = await invCount();
   let asked = 0;
   w.confirm = () => { asked++; return false; };
-  click(w, d.querySelector('.ofdhead [data-ofd="more"]'));
-  await until(() => menuInv(d));
-  click(w, menuInv(d));
+  click(w, tib());
   await until(() => asked);
   await sleep(500);
   check(asked === 1 && await invCount() === n0 && w.eval('OFD.doc.kind') === 'offer', '#2235: cancelled question = no invoice ' + asked);
+  w.close();
+  // 2.144.7 (#2572): the list row menu has "Create invoice" with the same question
+  w = await boot({user: 'alice', hash: 'office/offers'}); d = w.document;
+  const rmb = await until(() => d.querySelector(`.ofdlist [data-ofd="rowmore"][data-id="${doc2.id}"]`), 60);
   w.confirm = () => { asked++; return true; };
-  click(w, d.querySelector('.ofdhead [data-ofd="more"]'));
+  click(w, rmb);
   await until(() => menuInv(d));
+  check(!!menuInv(d), '#2572: the list row menu has "Create invoice"');
   click(w, menuInv(d));
-  check(await absOk(w, d), '#2235: yes = the invoice dialog (full / progress / final)');
+  check(await absOk(w, d), '#2572 list: yes = the invoice dialog (full / progress / final)');
   await until(() => w.eval('OFD.doc && OFD.doc.kind') === 'invoice');
-  check(asked === 2 && w.eval('OFD.doc.kind') === 'invoice' && await invCount() === n0 + 1, '#2235: yes = the invoice draft from the draft quotation');
+  check(asked === 2 && w.eval('OFD.doc.kind') === 'invoice' && await invCount() === n0 + 1, '#2572 list: yes = the invoice draft from the draft quotation');
   check(!errs.length, 'no script errors ' + errs.join(' | ')); errs.splice(0);
   w.close();
 
-  // finalised -> Mark as sent -> Accepted / Declined -> Create invoice (no question)
+  // finalised -> Mark as sent -> Accepted / Declined -> Create invoice (no question); 2.144.7 (#2572): "Create invoice" always there
   const fin = await call('POST', `/api/office/docs/${doc2.id}/finalize`, {});
   check(fin.http === 200, 'finalise the quotation ' + fin.http + ' ' + (fin.error || ''));
   w = await boot({user: 'alice', hash: `office/offers/${doc2.id}`}); d = w.document;
   await until(() => d.querySelector('.ofdhead [data-ofd="kva-st"]'));
   const nb = () => [...d.querySelectorAll('.ofdhead .ofdnext')].map(b => b.dataset.st || b.dataset.ofd).join();
-  check(nb() === 'sent' && !d.querySelector('.ofdhead [data-ofd="finalize"]'), '#2235 finalised: "Mark as sent" in front ' + nb());
+  const tiPri = () => !!d.querySelector('.ofdhead [data-ofd="to-invoice"]')?.classList.contains('pri');
+  check(nb() === 'sent,to-invoice' && !tiPri() && !d.querySelector('.ofdhead [data-ofd="finalize"]'), '#2235 finalised: "Mark as sent" in front ' + nb());
   click(w, d.querySelector('.ofdhead [data-st="sent"]'));
-  await until(() => nb() === 'accepted,declined');
-  check(nb() === 'accepted,declined' && (await docStatus(doc2.id)) === 'sent', '#2235 sent: Accepted / Declined in front ' + nb());
+  await until(() => nb() === 'accepted,declined,to-invoice');
+  check(nb() === 'accepted,declined,to-invoice' && !tiPri() && (await docStatus(doc2.id)) === 'sent', '#2235 sent: Accepted / Declined in front ' + nb());
   check(d.querySelector('.ofdhead [data-st="declined"]')?.getAttribute('aria-label') === 'Declined', '#2235: the icon button keeps its name for screen readers');
+  check(d.querySelector('.ofdhead [data-ofd="to-invoice"]')?.getAttribute('aria-label') === 'Create invoice', '#2572: the invoice button keeps its name on the phone');
   click(w, d.querySelector('.ofdhead [data-st="accepted"]'));
   await until(() => nb() === 'to-invoice');
-  check(nb() === 'to-invoice' && (await docStatus(doc2.id)) === 'accepted', '#2235 accepted: "Create invoice" in front ' + nb());
+  check(nb() === 'to-invoice' && tiPri() && (await docStatus(doc2.id)) === 'accepted', '#2235 accepted: "Create invoice" the main button ' + nb());
   click(w, d.querySelector('.ofdhead [data-ofd="more"]'));
   await until(() => d.querySelector('#pop [role="menuitem"]'));
   check(!menuInv(d), '#2235 accepted: no second "Create invoice" in "…"');
@@ -144,6 +162,10 @@ const absOk = async (w, d) => { const b = await until(() => d.querySelector('.mo
   check(!errs.length, 'no script errors ' + errs.join(' | ')); errs.splice(0);
   w.close();
 
+  // 2.144.7 (#2572): a sent quotation for the phone check below
+  const doc3 = await call('POST', '/api/office/docs', {kind: 'offer', lang: 'en', project_title: 'Phone bar', items: [item('Concept', 1, 800)]});
+  await call('POST', `/api/office/docs/${doc3.id}/finalize`, {});
+  await call('POST', `/api/office/docs/${doc3.id}/status`, {status: 'sent'});
   // ================= #2234: resizable dialogs (Firefox, desktop)
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
@@ -183,6 +205,18 @@ const absOk = async (w, d) => { const b = await until(() => d.querySelector('.mo
     await sleep(300);
     await ev(open); await sleep(300);
     check(await ev(`!document.querySelector('.p2138probe .dlggrip') || getComputedStyle(document.querySelector('.p2138probe .dlggrip')).display === 'none'`), '#2234: a narrow window has no grip');
+    await ev(`(() => { document.querySelectorAll('.p2138probe').forEach(m => m.remove()); return 1; })()`);
+    // 2.144.7 (#2572): on a phone the bar of a sent quotation keeps "Create invoice" visible and inside the screen
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
+    const fit = `(() => { const b = document.querySelector('.ofdhead [data-ofd="to-invoice"]'); if (!b) return 0; const r = b.getBoundingClientRect();
+      return r.width > 0 && r.height >= 43 && r.right <= innerWidth && document.documentElement.scrollWidth <= innerWidth ? 1 : 0; })()`;
+    for (const [st, pri] of [['sent', false], ['accepted', true]]) {
+      if (st === 'accepted') await call('POST', `/api/office/docs/${doc3.id}/status`, {status: 'accepted'});
+      await nav(B + `?p=${st}#office/offers/${doc3.id}`);  // a new query = a fresh load (the status changed behind its back)
+      check(await ready(ev, fit, 80), `#2572 phone (${st}): "Create invoice" visible in the bar, nothing wider than the screen`);
+      check(await ev(`document.querySelector('.ofdhead [data-ofd="to-invoice"]').classList.contains('pri')`) === pri, `#2572 phone (${st}): main button only once accepted`);
+      await shot(`p2144-7-phone-${st}.png`);
+    }
   }, false);
 
 

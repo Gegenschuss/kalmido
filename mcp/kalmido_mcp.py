@@ -1388,11 +1388,14 @@ TOOLS += [
                       "them without asking.",
      _obj({"user_id": S_ID, "days": {"type": "integer", "minimum": 1, "maximum": 31}}),
      lambda api, a: api.call("GET", "/time/gaps", _pick(a, ("user_id", "days")))),
-    ("add_time_entry", "Add a time entry: task_id or list_id, start (YYYY-MM-DDTHH:MM), end or minutes, note.",
+    ("add_time_entry", "Add a time entry: task_id or list_id, start (YYYY-MM-DDTHH:MM), end or minutes, note; billable (2.144.6, "
+                       "default true) = may go onto an invoice.",
      _obj({"task_id": S_ID, "list_id": S_ID, "start": {"type": "string"}, "end": {"type": "string"}, "minutes": {"type": "number"},
-           "note": {"type": "string"}}, ["start"]), lambda api, a: api.call("POST", "/time/entries", body=a)),
-    ("update_time_entry", "Change your time entry.", _obj({"entry_id": S_ID, "start": {"type": "string"}, "end": {"type": "string"},
-                                                           "minutes": {"type": "number"}, "note": {"type": "string"}, "task_id": S_ID, "list_id": S_ID},
+           "note": {"type": "string"}, "billable": {"type": "boolean"}}, ["start"]), lambda api, a: api.call("POST", "/time/entries", body=a)),
+    ("update_time_entry", "Change your time entry (2.144.6: billable true / false; an entry with billed true is on an invoice and "
+                          "keeps everything but its note, 409).",
+     _obj({"entry_id": S_ID, "start": {"type": "string"}, "end": {"type": "string"},
+           "minutes": {"type": "number"}, "note": {"type": "string"}, "task_id": S_ID, "list_id": S_ID, "billable": {"type": "boolean"}},
                                                           ["entry_id"]),
      lambda api, a: api.call("PATCH", f"/time/entries/{_id(a, 'entry_id')}", body=_without(a, "entry_id"))),
     ("delete_time_entry", "Delete your time entry.", _obj({"entry_id": S_ID}, ["entry_id"]),
@@ -1807,6 +1810,8 @@ _ODRAFT = {"client_id": S_ID, "title": {"type": "string"}, "intro": {"type": "st
            "list_id": {**S_ID, "description": "The project list"}, "notify": {"type": "boolean", "description": "A card in the person's chat: sum, PDF preview, Open in the office"}, **_RB}
 # 2.88.0 (#1915): a draft's share in the cash flow plan (counts once it is sent)
 _OCF = {"cashflow": {"type": "string", "enum": ["auto", "yes", "no"], "description": "In the cash flow plan once sent: auto = the newest version of the chain, yes, no"}}
+# 2.144.10 A (#2576): a trial quotation, set at creation only (not in update_offer_draft)
+_OTRIAL = {"trial": {"type": "boolean", "description": "A trial quotation: TEST number, SAMPLE on the PDF, never in bookkeeping; can be deleted at any time"}}
 TOOLS += [
     ("get_office", "2.51.0: the office area you work in (your workspace; a personal agent without one: your owner's personal office), the "
                    "person you act for and the rules. Drafts only: a person reserves the number, finalises, sends and books. 2.147: "
@@ -1817,15 +1822,19 @@ TOOLS += [
      _obj({"kind": {"type": "string", "enum": ["services", "texts", "contracts", "clients"]}, "q": {"type": "string"}, **_RB}, ["kind"]),
      lambda api, a: api.call("GET", f"/office/{a['kind']}", _pick(a, ("q", "requested_by")))),
     ("list_office_documents", "2.51.0: quotations (kind offer, default), invoices, credit notes or reminders of the office, newest first; client_id = "
-                              "earlier quotations of a client (their positions as a model); open = only open invoices (issued, sent, partial, overdue).",
-     _obj({"kind": {"type": "string", "enum": ["offer", "invoice", "credit", "reminder"]}, "client_id": S_ID, "status": {"type": "string"}, "open": {"type": "boolean"}, **_RB}),
-     lambda api, a: api.call("GET", "/office/docs", {**_pick(a, ("kind", "client_id", "status", "requested_by")), **({"open": "1"} if a.get("open") else {})})),
+                              "earlier quotations of a client (their positions as a model); open = only open invoices (issued, sent, partial, overdue). "
+                              "2.144.10: every document carries trial (a trial document: TEST number, never real business); trial = true / false filters.",
+     _obj({"kind": {"type": "string", "enum": ["offer", "invoice", "credit", "reminder"]}, "client_id": S_ID, "status": {"type": "string"}, "open": {"type": "boolean"},
+           "trial": {"type": "boolean", "description": "true = only trial documents, false = only real ones"}, **_RB}),
+     lambda api, a: api.call("GET", "/office/docs", {**_pick(a, ("kind", "client_id", "status", "requested_by")), **({"open": "1"} if a.get("open") else {}),
+                                                      **({"trial": "1" if a["trial"] else "0"} if a.get("trial") is not None else {})})),
     ("get_office_document", "2.51.0: one document of the office with its positions, sums and state.",
      _obj({"doc_id": S_ID, **_RB}, ["doc_id"]), lambda api, a: api.call("GET", f"/office/docs/{int(a['doc_id'])}", _pick(a, ("requested_by",)))),
     ("create_offer_draft", "2.51.0: a quotation DRAFT (no number, never sent): client, title, positions (service_id + qty takes title, unit and price "
                            "from the catalogue or the client's framework contract; free positions, other prices and discounts are allowed but marked "
-                           "for the person). notify = a card in the person's chat with the sum, the PDF preview and \"Open in the office\".",
-     _obj(_ODRAFT, ["title"]), lambda api, a: api.call("POST", "/office/offers", body=_pick(a, tuple(_ODRAFT)))),
+                           "for the person). notify = a card in the person's chat with the sum, the PDF preview and \"Open in the office\". "
+                           "2.144.10: trial = a trial quotation (TEST number, SAMPLE on the PDF, never in bookkeeping), only when the person asks for one.",
+     _obj({**_ODRAFT, **_OTRIAL}, ["title"]), lambda api, a: api.call("POST", "/office/offers", body=_pick(a, tuple(_ODRAFT) + tuple(_OTRIAL)))),
     ("update_offer_draft", "2.51.0: change your own quotation draft while it is a draft (items replaces the whole list; 2.88.0: cashflow). Never status, number or sending.",
      _obj({"doc_id": S_ID, **_ODRAFT, **_OCF}, ["doc_id"]),
      lambda api, a: api.call("PATCH", f"/office/offers/{int(a['doc_id'])}", body=_pick(a, tuple(_ODRAFT) + tuple(_OCF)))),

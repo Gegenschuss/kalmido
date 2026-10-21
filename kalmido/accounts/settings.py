@@ -241,6 +241,14 @@ def clean_setting(k, v):
         if not isinstance(o, dict) or len(o) > 200 or not all(isinstance(a, str) and 0 < len(a) <= 80 and isinstance(b, str) and len(b) <= 40 for a, b in o.items()):
             raise bad
         return json.dumps(o, ensure_ascii=False)
+    if k == "trial_hint_seen":  # 2.144.10 (#2576): ["<org id>:offer" | "<org id>:invoice", ...]
+        try:
+            o = json.loads(sv or "[]")  # a JSON string like wgstd_hide (lists are refused above)
+        except ValueError:
+            raise bad from None
+        if not isinstance(o, list) or len(o) > 200 or not all(isinstance(x, str) and re.fullmatch(r"\d{1,12}:(offer|invoice)", x) for x in o):
+            raise bad
+        return json.dumps(list(dict.fromkeys(o)))
     if k == "group_order":  # 2.39.1 (#1221)
         return kb_clean_group_order(v)
     if k in CAL_LIST_KEYS:  # 2.36.1 (#1127, #956): json lists (list ids / calendar keys "e:<id>" | "s:<id>")
@@ -680,6 +688,9 @@ def umz_export_queries(uid):
                                   "AND org_id IS NULL", (uid,)),
         "newsletter_segments": ("SELECT * FROM nl_segments WHERE conn_id IN (SELECT id FROM nl_conns WHERE owner_id=? AND org_id IS NULL)", (uid,)),
         "newsletter_runs": ("SELECT * FROM nl_runs WHERE conn_id IN (SELECT id FROM nl_conns WHERE owner_id=? AND org_id IS NULL)", (uid,)),
+        # 2.144.5 B (#2410): the mailbox of my private space (never the passwords)
+        "mailbox": ("SELECT active, imap_host, imap_port, imap_ssl, imap_user, imap_folder, smtp_host, smtp_port, smtp_tls, smtp_user, "
+                    "from_addr, from_name, created_at, updated_at FROM hub_mailboxes WHERE owner_id=? AND org_id IS NULL", (uid,)),
         # 2.22.0 (#663): my journal, whom I stay in touch with, my Karakeep connection (without the API key)
         "journal": ("SELECT day, text, mood, updated_at FROM journal WHERE user_id=? ORDER BY day", (uid,)),
         "contact_care": ("SELECT contact_id, every_days, last, note, updated_at FROM contact_care WHERE user_id=?", (uid,)),

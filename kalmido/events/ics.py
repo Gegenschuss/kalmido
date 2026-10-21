@@ -497,15 +497,17 @@ def atts_resolve(c, uid, raw, eid=None, cal_id=None):
     return out
 
 
-def store_parsed(c, uid, cal_id, v, eid=None, href=None):
-    """Stores read_vevent() values as a new event (eid None) or into an existing one. Returns the id."""
+def store_parsed(c, uid, cal_id, v, eid=None, href=None, keep_attendees=False):
+    """Stores read_vevent() values as a new event (eid None) or into an existing one. Returns the id. keep_attendees: the
+    existing event's attendees stay as they are (2.144.5 B, #2379: a CalDAV client that never writes ATTENDEE)."""
     f = {k: v[k] for k in ("title", "location", "description", "all_day", "start", "end", "tz", "rrule", "exdates", "overrides",
                            "reminders", "status", "busy", "url", "extra")}
     me_ = c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone()
     if me_ and me_[0]:  # the writer's own address as organiser: Kalmido writes its own (no account e-mail reaches others)
         f["extra"] = "\n".join(x for x in f["extra"].split("\n")
                                if not (_prop_name(x) == "ORGANIZER" and x.split(":", 1)[-1].strip().lower() == "mailto:" + me_[0].lower()))
-    return ev_store(c, uid, cal_id, f, eid=eid, uid_=v["uid"], href=href, attendees=atts_resolve(c, uid, v["attendees_raw"], eid, cal_id))
+    atts = None if keep_attendees and eid else atts_resolve(c, uid, v["attendees_raw"], eid, cal_id)
+    return ev_store(c, uid, cal_id, f, eid=eid, uid_=v["uid"], href=href, attendees=atts)
 
 
 # ---- ICS import (a file, e.g. an export of another calendar) into one calendar

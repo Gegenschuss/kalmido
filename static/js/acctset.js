@@ -28,12 +28,16 @@ function tkh_dropHtml(tok) {
 }
 function tkh_dropDraw(md, tok) { const w = $('#s-dropw', md); if (w) w.innerHTML = tkh_dropHtml(tok); }
 // 2.138.0 C (#1907): every HTTP Shortcuts download carries a new token (the server cannot read the old one back)
+// 2.144.5 A (#2387, review F8): fetched, so a refusal (e.g. an older browser that names no origin) shows the server's reason
+// instead of a silently failed download
 async function tkh_zipClick(e, a, md) {
-  if (a.dataset.ok) { delete a.dataset.ok; } else {
-    e.preventDefault();
-    if (S.me?.drop_token_set && !await askConfirm(tr('Download a new HTTP Shortcuts import?'), tr('The file contains a new upload token. The previous shortcut stops working then (also the one on the iPhone).'), {ok: tr('Download')})) return;
-    a.dataset.ok = '1'; a.click(); return;
-  }
+  e.preventDefault();
+  if (S.me?.drop_token_set && !await askConfirm(tr('Download a new HTTP Shortcuts import?'), tr('The file contains a new upload token. The previous shortcut stops working then (also the one on the iPhone).'), {ok: tr('Download')})) return;
+  let r;
+  try { r = await fetch(a.getAttribute('href'), {headers: {'X-Requested-With': 'kalmido'}, credentials: 'same-origin'}); } catch { toast(tr('Only available online.')); return; }
+  if (!r.ok) { let m = ''; try { m = (await r.json()).error || ''; } catch { /* not JSON */ } toast(m || tr('Download failed')); return; }
+  const d = document.createElement('a'); d.href = URL.createObjectURL(await r.blob()); d.download = a.getAttribute('download') || 'kalmido-http-shortcuts.zip';
+  document.body.append(d); d.click(); d.remove(); setTimeout(() => URL.revokeObjectURL(d.href), 4000);
   if (S.me) Object.assign(S.me, {drop_token_set: true, drop_token_at: new Date().toISOString()});
   setTimeout(() => tkh_dropDraw(md), 0);
 }
@@ -556,6 +560,8 @@ function bkRestore(md, src) {
 }
 // 2.143.0 B (#2152): the off-site target: every field saved on change (credentials sent once, then only "set")
 function bkoWire(md) {
+  // 2.147.2 B (#2501): Android: bring the tapped field above the keyboard once it has opened
+  md.addEventListener('focusin', e => { if (e.target.closest?.('#s-bko') && e.target.matches('input,select')) setTimeout(() => e.target.scrollIntoView?.({block: 'center'}), 300); });
   const put = async v => { const box = $('#s-bko', md); try { await bkoDraw(md, await api('PATCH', '/api/admin/backups/offsite', v)); setSaved(null); } catch { await bkoDraw(md); } return box; };
   md.addEventListener('change', async e => {
     const el = e.target; if (!el.closest?.('#s-bko')) return;

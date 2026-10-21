@@ -123,7 +123,9 @@ const newsInWs = it => wsCur() === 'all' || !it.list_id || inWs(listById(it.list
 // space the import files into), what = the things, translated and counted where known ("182 documents"), place = the
 // container inside it (a list, a calendar, an address book), privOk = the importer can go into the private space instead
 // ("Rather into private", only with an organisation as the target). Resolves 'same' | 'private' | null (cancelled).
-function importTargetConfirm({what, ws = 'private', place = '', privOk = false}) {
+// 2.144.5 B (#2002): orgAlt = 'org:<id>' offered the other way round when the target is the private space ("Rather into
+// <organisation>", resolves 'org').
+function importTargetConfirm({what, ws = 'private', place = '', privOk = false, orgAlt = ''}) {
   const org = String(ws || '').startsWith('org:'), name = org ? wsName(ws) : '';
   let priv = false;
   const body = org
@@ -133,9 +135,14 @@ function importTargetConfirm({what, ws = 'private', place = '', privOk = false})
   return askDialog({title: org ? tr('Import into the organisation {0}?', name) : tr('Import into your private space?'), body, ok: tr('Import'),
     after: md => {
       md.classList.add('itc-dlg');
+      if (!org && orgAlt) {  // 2.144.5 B (#2002)
+        $('.foot', md).insertAdjacentHTML('afterbegin', `<button type="button" class="btn" data-itc="org">${wsIcon(orgAlt)} ${esc(tr('Rather into {0}', wsName(orgAlt)))}</button>`);
+        $('[data-itc]', md).addEventListener('click', () => { priv = 'org'; $('form', md).requestSubmit(); });
+        return;
+      }
       if (!org || !privOk) return;
       const f = $('.foot', md);
       f.insertAdjacentHTML('afterbegin', `<button type="button" class="btn" data-itc="private">${ic('home', 's')} ${esc(tr('Rather into private'))}</button>`);
       $('[data-itc]', md).addEventListener('click', () => { priv = true; $('form', md).requestSubmit(); });
-    }}).then(ok => ok ? (priv ? 'private' : 'same') : null);
+    }}).then(ok => ok ? (priv === 'org' ? 'org' : priv ? 'private' : 'same') : null);
 }

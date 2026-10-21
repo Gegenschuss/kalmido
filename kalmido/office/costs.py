@@ -117,7 +117,7 @@ def ek_purchases(c, oid, date_from=None, date_to=None):
     source, ref}]. For the cash flow (#1652, admins only; there is no route for others)."""
     from ..core.orgcrypt import oc_dec_fields
     sql, args = ("SELECT p.*, d.number FROM office_purchases p JOIN office_docs d ON d.id=p.doc_id AND d.org_id=p.org_id "
-                 "WHERE p.org_id=?"), [oid]
+                 "WHERE p.org_id=? AND d.trial=0"), [oid]  # 2.144.10 B (#2576): no purchases of trial quotations
     if date_from:
         sql += " AND p.date>=?"
         args.append(date_from)

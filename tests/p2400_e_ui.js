@@ -90,7 +90,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     // leaving the field stores it; nothing is left to ask about
     await typ('osc-city', 'Hamburg');
     await leave('osc-city');
-    const saved = await srv(j => j.company_fields?.city === 'Hamburg');
+    const saved = await srv(j => j.company_fields?.city === 'Hamburg' && j.settings?.offer_valid_days === 21);  // 2.144.5 (#2026): the valid days come in a second write
     check(saved && saved.company_fields.street === 'Hafenstraße 12' && saved.settings.offer_valid_days === 21, '#2247: every field stored by itself ' + JSON.stringify(saved?.company_fields || {}).slice(0, 120));
     check(await ready(ev, `!document.querySelector('#ofc-set .fgbar') && !Object.keys(FG.d['ofc-set:' + OFC.info.org_id]?.f || {}).length`) && !(await ev(unload)), '#2247: saved: no bar, no question on closing');
     // a dialog with changes asks before Cancel throws them away

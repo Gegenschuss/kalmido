@@ -9,7 +9,7 @@ OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any}
 
 /** @param {string} s @param {any} [r] @returns {any} */
 const cb$ = (s, r) => (r || document).querySelector(s);  // $ with a dialog as root (typed loosely)
-const cbReload = (all) => { if (all) CB.base = null; CB.list = null; ofcDraw(); };
+const cbReload = (all) => { if (all) CB.base = null; CB.list = null; CB.err = null; ofcDraw(); };  // 2.144.11 (#2354, N5): a failed load does not stick
 const cbBook = id => (CB.base?.books || []).find(b => b.id === id);
 const cbToday = () => CB.base?.today || new Date().toISOString().slice(0, 10);
 const cbVat = v => v ? `${v} %` : '';
@@ -33,7 +33,7 @@ async function cbLoad() {
 function cbHtml() {
   if (CB.oid !== OFC.info?.org_id) Object.assign(CB, {oid: OFC.info?.org_id, base: null, list: null, err: null, bid: null, links: null});  // another office area
   if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see the cash book.')}</div>`;
-  if (CB.err) return `<div class="empty">${esc(CB.err)}</div>`;
+  if (CB.err) return `<div class="empty">${esc(CB.err)}<p><button type="button" class="btn sm" data-cb="retry">${tr('Try again')}</button></p></div>`;  // 2.144.11 (#2354, N5)
   if (!CB.base || (CB.view !== 'books' && (!CB.list || CB.q !== `${CB.bid}:${CB.year}`))) { if (!CB.loading) setTimeout(cbLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const bs = CB.base.books, act = bs.filter(b => !b.archived || b.id === CB.bid), b = cbBook(CB.bid);
   const y0 = new Date().getFullYear(), years = [y0, y0 - 1, y0 - 2, y0 - 3, y0 - 4].map(String);
@@ -164,7 +164,7 @@ async function cbEntryModal(e) {
     } catch (x) { const el = cb$('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
 }
-const CB_ACT = {create: N_('Created'), change: N_('Changed'), cancel: N_('Cancelled'), close: N_('Day closed'), book_create: N_('Cash box created'), book_change: N_('Cash box changed')};
+const CB_ACT = {create: N_('Created'), change: N_('Changed'), cancel: N_('Cancelled'), close: N_('Day closed'), book_create: N_('Cash box created'), book_change: N_('Cash box changed'), delete: N_('Deleted')};  // 2.162.0 A (#2603): test phase, with a deleted invoice
 const CB_FLD = {day: N_('Date'), dir: N_('Kind'), amount: N_('Amount'), vat_pct: N_('VAT rate'), text: N_('Text'), category: N_('Category'), node_id: N_('Receipt'), invoice_id: N_('Invoice')};
 function cbPrev(p) {
   return Object.entries(p || {}).filter(([k]) => CB_FLD[k]).map(([k, v]) => {
@@ -235,6 +235,7 @@ document.addEventListener('click', e => {
   const a = b.dataset.cb;
   if (a === 'open') { const x = (CB.list?.entries || []).find(y => y.id === +b.dataset.id); if (x) cbEntryModal(x); }
   else if (a === 'view') { CB.view = b.dataset.v; ofcDraw(); }
+  else if (a === 'retry') cbReload(true);  // 2.144.11 (#2354, N5)
   else if (a === 'dir') { CB.dir = b.dataset.v; $$('[data-cb="dir"]').forEach(x => { const on = x.dataset.v === CB.dir; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); }); }
   else if (a === 'close') cbCloseModal();
   else if (a === 'bnew') cbBookNew();

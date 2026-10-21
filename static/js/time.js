@@ -151,8 +151,15 @@ function teRow(e, {task = true, day = true} = {}) {
     : e.auto_stopped ? `<span class="tesrc warn" title="${tr('Stopped automatically, please check the end')}">${ic('alert', 's')}</span>` : '';
   const who = e.mine ? '' : avBtn(e.user_id, e.user_name, 'who', `title="${esc(e.user_name)}"`);
   const title = task ? `<span class="tett" ${e.task_id ? `data-act="te-open" data-id="${e.task_id}"` : ''}>${esc((e.e2e && typeof le2eTitle === 'function' ? le2eTitle(e.task_id, e.title) : e.title) || tr('No task'))}</span>` : '';  // 2.64.1 (#1817): a locked list's title from this page
-  const acts = e.locked ? tsl_lockMark() : e.mine ? `<span class="teacts">${!e.running && (e.task_id || e.list_id) ? `<button class="iconbtn" data-act="te-resume" data-eid="${e.id}" title="${tr('Continue (same task and note)')}">${ic('play', 's')}</button>` : ''}<button class="iconbtn" data-act="te-edit" data-eid="${e.id}" title="${tr('Edit')}">${ic('edit', 's')}</button><button class="iconbtn danger" data-act="te-del" data-eid="${e.id}" title="${tr('Delete')}">${ic('trash', 's')}</button></span>` : '';  // 2.125.0 B (#2119): a closed month: a lock instead
-  return `<div class="terow ${e.running ? 'live' : ''}">${day ? `<span class="ted">${esc(dayLabel(ds(s)))}</span>` : ''}<span class="tet">${fmtClock(s)}–${en ? fmtClock(en) : tr('now')}</span>${title}<span class="ten">${esc(e.note)}</span>${src}${who}<b class="tedur" ${e.running ? 'data-timer-live' : ''}>${e.running ? fmtT(timerElapsed()) : hmm(e.seconds)}</b>${acts}</div>`;
+  const bill = tbill_tag(e);  // 2.144.6 A (#2053)
+  const acts = e.locked ? tsl_lockMark() : e.mine ? `<span class="teacts">${!e.running && (e.task_id || e.list_id) ? `<button class="iconbtn" data-act="te-resume" data-eid="${e.id}" title="${tr('Continue (same task and note)')}">${ic('play', 's')}</button>` : ''}<button class="iconbtn" data-act="te-edit" data-eid="${e.id}" title="${tr('Edit')}">${ic('edit', 's')}</button>${e.billed ? '' : `<button class="iconbtn danger" data-act="te-del" data-eid="${e.id}" title="${tr('Delete')}">${ic('trash', 's')}</button>`}</span>` : '';  // 2.125.0 B (#2119): a closed month: a lock instead
+  return `<div class="terow ${e.running ? 'live' : ''}">${day ? `<span class="ted">${esc(dayLabel(ds(s)))}</span>` : ''}<span class="tet">${fmtClock(s)}–${en ? fmtClock(en) : tr('now')}</span>${title}<span class="ten">${esc(e.note)}</span>${bill}${src}${who}<b class="tedur" ${e.running ? 'data-timer-live' : ''}>${e.running ? fmtT(timerElapsed()) : hmm(e.seconds)}</b>${acts}</div>`;
+}
+// 2.144.6 A (#2053): "billed RE-…" (opens the invoice) or "not billable" in the row; nothing for open billable time
+function tbill_tag(e) {
+  if (e.billed && !e.billed.id) return `<span class="tebill muted">${esc(tr('billed {0}', '').trim())}</span>`;  // someone else's entry: no invoice link
+  if (e.billed) return `<button class="tebill linkbtn" data-go="office/offers/${+e.billed.id}" title="${esc(tr('On this invoice; duration and date are locked'))}">${esc(tr('billed {0}', e.billed.number || tr('Draft')))}</button>`;
+  return e.billable === false ? `<span class="tebill">${esc(tr('not billable'))}</span>` : '';
 }
 const findEntry = id => [...(S.te.items || []), ...(S.tv.data?.entries || []), ...(S.timer ? [S.timer] : [])].find(e => e.id === id);
 // "1:30" = 90 min, "45m" = 45 min, "1.5" / "1,5h" = 90 min (a bare number means hours)
@@ -184,8 +191,11 @@ function entryModal(e, preset = {}) {
     <div class="row"><label>${run ? tr('Started at') : tr('From – to')}</label>${timeIn('te-from', s ? fmtClock(s) : '', {label: run ? tr('Started at') : tr('From'), empty: '–'})}${run ? '' : `<span class="muted">–</span>${timeIn('te-to', en ? fmtClock(en) : '', {label: tr('To'), empty: '–'})}`}</div>
     ${run ? '' : `<div class="row"><label for="te-dur">${tr('or duration')}</label><input id="te-dur" placeholder="${tr('e.g. 1:30, 45m or 1.5')}" inputmode="decimal" autocomplete="off"></div>`}
     <div class="row"><label for="te-note">${tr('Note')}</label><input id="te-note" value="${esc(e?.note || '')}" maxlength="500" autocomplete="off"></div>
+    <div class="row"><label for="te-bill">${tr('Billable')}</label><label class="swc"><input type="checkbox" id="te-bill" ${e?.billable === false ? '' : 'checked'} ${e?.billed ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Billable'))}</span></label></div>
+    ${e?.billed ? `<div class="shint tebill-hint">${esc(e.billed.id ? tr('On invoice {0}: duration, date and task are locked, the note can still change.', e.billed.number || tr('Draft')) : tr('Already billed: duration, date and task are locked, the note can still change.'))}</div>` : ''}
     ${run ? '' : `<div class="shint">${tr('An end before the start means the next day. Only a duration: the entry ends now (today) or starts at 9:00.')}</div>`}
-    <div class="foot">${e && !run ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+    <div class="foot">${e && !run && !e.billed ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  if (e?.billed) $$('#te-target, #te-date, #te-from, #te-to, #te-dur', md).forEach(x => { x.disabled = true; });  // 2.144.6 A (#2053)
   const times = () => {
     const date = $('#te-date', md).value, from = $('#te-from', md).value, to = $('#te-to', md)?.value, dur = parseDur($('#te-dur', md)?.value);
     if (!date) return null;
@@ -211,6 +221,8 @@ function entryModal(e, preset = {}) {
     const [k, v] = $('#te-target', md).value.split(':'), body = {note: $('#te-note', md).value.trim()};
     const target = k === 't' ? {task_id: +v} : {list_id: +v};
     if (!e || (k === 't' ? +v !== e.task_id : e.task_id || +v !== e.list_id)) Object.assign(body, target);
+    const bill = $('#te-bill', md).checked;  // 2.144.6 A (#2053)
+    if (!e || bill !== (e.billable !== false)) body.billable = bill;
     const iso = d => d.toISOString();
     if (!e || fmtClock(tm.start) !== fmtClock(s) || ds(tm.start) !== ds(s) || (!run && (!en || fmtClock(tm.end) !== fmtClock(en) || ds(tm.end) !== ds(en)))) {
       body.start = iso(tm.start); if (!run) body.end = iso(tm.end);
@@ -220,6 +232,11 @@ function entryModal(e, preset = {}) {
     md.remove();
     toast(j.queued ? tr('Will be sent as soon as the server is reachable') : e ? tr('Saved') : tr('Time added: {0}', hmm(j.seconds)));
     await timeChanged(j);
+    if (e && 'billable' in body) {  // 2.144.6 A (#2053): the switch is one undo step
+      const set = async v => { const r = await api('PATCH', `/api/time/entries/${e.id}`, {billable: v}); await timeChanged(r); return {q: r?._q || null}; };
+      histAdd({label: bill ? tr('Time marked billable') : tr('Time marked not billable'), res: j, lids: e.list_id ? [e.list_id] : [],
+        undo: () => set(!bill), redo: () => set(bill)});
+    }
   });
   md.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') $('[data-m="save"]', md).click(); });
   if (!isTouch()) setTimeout(() => $(e ? '#te-note' : run ? '#te-from' : '#te-dur', md)?.focus(), 50);  // 2.13.0: no keyboard popping up on touch
@@ -229,7 +246,7 @@ async function teDelete(id) {
   let r;
   try { r = await api('DELETE', `/api/time/entries/${id}`); } catch { return; }
   if (S.timer && S.timer.id === id) S.timer = null;
-  const back = {...(e.task_id ? {task_id: e.task_id} : {list_id: e.list_id}), start: e.start, end: e.end, seconds: e.seconds, note: e.note, source: e.source};
+  const back = {...(e.task_id ? {task_id: e.task_id} : {list_id: e.list_id}), start: e.start, end: e.end, seconds: e.seconds, note: e.note, source: e.source, billable: e.billable !== false};
   await timeChanged(r);
   if (e.end) {
     const x = histAdd({label: tr('Time entry deleted ({0})', hmm(e.seconds)), res: r, lids: e.list_id ? [e.list_id] : [],

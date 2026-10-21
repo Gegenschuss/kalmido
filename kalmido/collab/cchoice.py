@@ -6,7 +6,8 @@ choices.approval = {title, what, std?}) and expires_in. States as in the chat: o
 #1037: only the newest question of a task is live -- plain buttons expire as soon as a newer comment comes (an approval
 card does not, nor does it expire others); an approval card stays open until answered, its time ran out or the agent
 withdraws it. The answer {ids, at, user_id, via} is written once (never changed) and logged in the task's history
-(activity "choice"). Only people who may edit the task answer (never an agent account); the answer reaches the agent
+(activity "choice"). Only people who may edit the task answer (never an agent account), an approval card only an
+approver (2.144.5, #2001: a manager of the list, the assignee or an admin); the answer reaches the agent
 that wrote the comment as a `comment` event with `answer` (a pressed suggestion first becomes the person's comment with
 that text, as if typed). A 👍 / 👎 on the comment keeps working as before (the short form)."""
 import json
@@ -74,9 +75,12 @@ def lv_state(r, ch, ans, newest):
 
 
 def lv_with_choices(c, tid, rows, dicts):
-    """Adds choices, choice, choice_state (and choice.user_name) to the comment dicts of rows (same order)."""
+    """Adds choices, choice, choice_state (and choice.user_name) to the comment dicts of rows (same order).
+    2.144.5 A (#2001): + choice_can on an approval card: may the signed-in person decide it (lv_may_decide)."""
     from ..collab.comments import user_names
     newest = None
+    uid = g.user["id"] if g.get("user") is not None else None
+    may = {}
     anss = [lv_jload(r["choice"]) if "choice" in r.keys() else None for r in rows]
     # 2.41.0 (#1383): the answerers' names in one query (was one per answered comment)
     names = user_names(c, [a.get("user_id") for a in anss if isinstance(a, dict)])
@@ -87,7 +91,19 @@ def lv_with_choices(c, tid, rows, dicts):
         if ans and ans.get("user_id"):
             ans = {**ans, "user_name": names.get(ans["user_id"], "")}
         d.update(choices=ch, choice=ans, choice_state=lv_state(r, ch, ans, newest or 0))
+        if ch and ch.get("approval") and uid:
+            if r["user_id"] not in may:
+                may[r["user_id"]] = lv_may_decide(c, tid, uid, r["user_id"])
+            d["choice_can"] = may[r["user_id"]]
     return dicts
+
+
+def lv_may_decide(c, tid, uid, aid):
+    """2.144.5 A (#2001, decided 18.10.2026): an approval card is decided only by an approver of the task (a manager of the
+    list, the assignee or an admin: agents.core.is_approver), as the thumbs did before #1963."""
+    from ..agents.core import is_approver
+    t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+    return bool(t) and is_approver(c, t, uid, agent=aid)
 
 
 def lv_approvals_open(c, tid):
@@ -115,6 +131,8 @@ def lv_answer(c, r, uid, ids, via="button"):
     lid = c.execute("SELECT list_id FROM tasks WHERE id=?", (r["task_id"],)).fetchone()[0]
     if not agent_usable(c, r["user_id"], uid, lid):  # #928: the agent would never hear it (a silent answer helps nobody)
         raise Denied(403, tr("This agent does not take instructions from you in this list"))
+    if ch.get("approval") and not lv_may_decide(c, r["task_id"], uid, r["user_id"]):  # 2.144.5 A (#2001)
+        raise Denied(403, tr("Only the list’s managers, the assignee or an admin can decide this approval"))
     if r["choice"]:
         raise Denied(409, tr("This question was answered already"))
     if lv_state(r, ch, None, lv_newest(c, r["task_id"])) != "open":

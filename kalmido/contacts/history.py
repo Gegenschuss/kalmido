@@ -91,7 +91,8 @@ def ctk_docs(c, uid, clients):
             b = doc_brief(r, pm)
             name = mine[r["client_id"]]["name"]
             out.append({"kind": r["kind"], "id": r["id"], "title": b["number"] or "", "sub": " · ".join(x for x in (b["project_title"], name, b["status_text"],
-                        b["gross_text"]) if x), "at": r["date"] or r["created_at"]})
+                        b["gross_text"]) if x), "at": r["date"] or r["created_at"],
+                        "trial": bool(r["trial"])})  # 2.144.10 B (#2576): the list shows trial documents, marked
     return out
 
 

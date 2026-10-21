@@ -13,6 +13,9 @@ from ..personal.timetrack import BadInput
 
 FX_REF_TYPES = ("number", "formula", "checkbox")   # what a formula may read
 FX_MAX_LEN = 500
+# 2.144.5 C (#1523): explicit depth limits like the sheets (SH_MAX_DEPTH / SH_MAX_NEST); RecursionError stays caught as a net
+FX_MAX_DEPTH = 200  # depth of the tree (1+1+...+1 nests to the left)
+FX_MAX_NEST = 64  # brackets / round() / signs inside each other
 _WORD = re.compile(r"[^\W\d]\w*")
 _NUM = re.compile(r"\d+(\.\d+)?|\.\d+")
 
@@ -73,7 +76,12 @@ class _Parser:
     round(expr[, num]) | (expr). Nodes: ("n", x) ("r", key) ("neg", a) ("+"/"-"/"*"/"/", a, b) ("round", a, digits)."""
 
     def __init__(self, toks, resolve, end):
-        self.t, self.i, self.resolve, self.end = toks, 0, resolve, end
+        self.t, self.i, self.resolve, self.end, self.nest = toks, 0, resolve, end, 0
+
+    def deeper(self):
+        self.nest += 1
+        if self.nest > FX_MAX_NEST:
+            raise FxError(tr("The formula is nested too deeply"))
 
     def peek(self):
         return self.t[self.i] if self.i < len(self.t) else (None, None, self.end)
@@ -92,6 +100,12 @@ class _Parser:
         k, v, p = self.peek()
         if k is not None:
             raise _err(tr("“{0}” is not expected here", v if k != "num" else fmt_fx(v)), p)
+        stack = [(node, 1)]  # 2.144.5 C (#1523): checked without recursion, render/eval recurse over the tree
+        while stack:
+            n, d = stack.pop()
+            if d > FX_MAX_DEPTH:
+                raise FxError(tr("The formula is nested too deeply"))
+            stack.extend((a, d + 1) for a in n[1:] if isinstance(a, tuple))
         return node
 
     def expr(self):
@@ -114,7 +128,9 @@ class _Parser:
         k, v, p = self.peek()
         if k == "op" and v in "+-":
             self.i += 1
+            self.deeper()
             f = self.factor()
+            self.nest -= 1
             return ("neg", f) if v == "-" else f
         if k == "num":
             self.i += 1
@@ -125,7 +141,9 @@ class _Parser:
         if k == "fn":
             self.i += 1
             self.take("(", "“(”")
+            self.deeper()
             a = self.expr()
+            self.nest -= 1
             digits = 0
             if self.peek()[0] == ",":
                 self.i += 1
@@ -138,7 +156,9 @@ class _Parser:
             return ("round", a, digits)
         if k == "(":
             self.i += 1
+            self.deeper()
             a = self.expr()
+            self.nest -= 1
             self.take(")", "“)”")
             return a
         if k is None:
