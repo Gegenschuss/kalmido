@@ -13,7 +13,7 @@ const LD_MODS = {
   office: ['office', 'office_docs', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow', 'office_doctpl', 'office_logbook', 'office_cashbook',  // 2.93.0 (#1927, #1928); 2.121.0 B (#2095): office_cashbook
     'office_pipeline', 'office_kpi', 'office_datev', 'officeagents', 'office_packs',
     'office_books', 'office_bank', 'office_taxdates',  // 2.90.0 (#1921, #1922)
-    'office_recurring', 'office_subs',  // 2.91.0 (#1923, #1924)
+    'office_recurring', 'office_subs', 'office_dunning',  // 2.91.0 (#1923, #1924); 2.147.1 B (#2054): office_dunning
     'office_agreements', 'office_assets',  // 2.92.0 (#1925, #1931)
     'office_meals',  // 2.119.0 A (#2288): entertainment receipts
     'office_leads', 'office_cfiles',  // 2.94.0 A (#1930), 2.117.0 B (#2285)  // 2.76.0 A (#1023): office_packs

@@ -2,6 +2,7 @@
 // their receipts (Kalmido keeps no receipt images: they live in DATEV, only the tick "in DATEV" + an optional DATEV number),
 // the receipts still missing the tick, an evaluation by month / year / person / project / client / category (CSV) and billing
 // receipts on to a draft quotation / invoice (purchase = amount, never twice). Server: kalmido/office/travel.py.
+const rk_dv = () => typeof ofcFeat !== 'function' || ofcFeat('books.datev');  // 2.147.0 (#2460): DATEV on in this office
 const RK = {data: null, loading: false, err: null, year: String(new Date().getFullYear()), filter: 'all', person: '', open: null, view: 'trips', by: 'month', rep: null, sel: new Set()};
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['travel', 'plane', N_('Travel expenses'), 1, () => rk_travelHtml()]);  // admins only
 const RK_BY = [['month', N_('Month')], ['year', N_('Year')], ['person', N_('Person')], ['project', N_('Project')], ['client', N_('Client')], ['category', N_('Category')], ['purpose', N_('Purpose')]];  // 2.117.0 A (#2292): + purpose
@@ -52,8 +53,9 @@ function rk_travelHtml() {
   if (RK.view === 'logbook') return `<div class="ofcbar rkbar">${views}</div>` + lbHtml();
   const y0 = new Date().getFullYear(), years = [y0 + 1, y0, y0 - 1, y0 - 2, y0 - 3].map(String);
   const miss = RK.data.missing || 0;
+  if (!rk_dv()) RK.filter = 'all';  // 2.147.0 (#2460): without DATEV there is no "not in DATEV"
   const bar = `<div class="ofcbar rkbar"><select id="rk-year" aria-label="${esc(tr('Year'))}"><option value="">${tr('All years')}</option>${years.map(y => `<option ${y === RK.year ? 'selected' : ''}>${y}</option>`).join('')}</select>
-    <div class="seg" role="group" aria-label="${esc(tr('Show'))}"><button type="button" data-rk="filter" data-v="all" class="${RK.filter === 'all' ? 'on' : ''}" aria-pressed="${RK.filter === 'all'}">${tr('All')}</button><button type="button" data-rk="filter" data-v="missing" class="${RK.filter === 'missing' ? 'on' : ''}" aria-pressed="${RK.filter === 'missing'}">${tr('Not in DATEV')}${miss ? ` <span class="rkbadge">${miss}</span>` : ''}</button></div>
+    ${rk_dv() ? `<div class="seg" role="group" aria-label="${esc(tr('Show'))}"><button type="button" data-rk="filter" data-v="all" class="${RK.filter === 'all' ? 'on' : ''}" aria-pressed="${RK.filter === 'all'}">${tr('All')}</button><button type="button" data-rk="filter" data-v="missing" class="${RK.filter === 'missing' ? 'on' : ''}" aria-pressed="${RK.filter === 'missing'}">${tr('Not in DATEV')}${miss ? ` <span class="rkbadge">${miss}</span>` : ''}</button></div>` : ''}
     ${rk_personSel()}${views}
     <span class="spacer"></span><button class="btn sm pri" data-rk="new">${ic('plus', 's')}<span>${tr('New trip')}</span></button></div>`;
   return bar + (RK.view === 'report' ? rk_reportHtml() : rk_listHtml());
@@ -66,7 +68,7 @@ function rk_listHtml() {
   const rec = (RK.data.trips || []).some(t => (t.items || []).length);  // 2.114.4 D (#2286): receipt column only when there are receipts
   return `<ul class="ofclist rklist" role="list">${trips.map(t => `<li><button type="button" class="ofcrow" data-rk="open" data-id="${t.id}"><span class="ofcn"><b>${esc(t.dest || tr('Trip'))}</b>
     <small class="muted">${esc([rk_span(t), rk_purpose(t), (t.people || []).map(p => p.name).join(', ')].filter(Boolean).join(' · '))}</small></span>
-    ${t.missing ? `<span class="rotag rkmiss">${esc(trn('{0} not in DATEV', '{0} not in DATEV', t.missing))}</span>` : ''}${rk_vmaCols(t, rec)}</button>${rk_rowBtn(t)}</li>`).join('')}</ul>`;
+    ${t.missing && rk_dv() ? `<span class="rotag rkmiss">${esc(trn('{0} not in DATEV', '{0} not in DATEV', t.missing))}</span>` : ''}${rk_vmaCols(t, rec)}</button>${rk_rowBtn(t)}</li>`).join('')}</ul>`;
 }
 function rk_tripHtml(t) {
   const its = RK.filter === 'missing' ? t.items.filter(i => !i.datev) : t.items;
@@ -77,12 +79,12 @@ function rk_tripHtml(t) {
   const rows = its.map(i => `<li class="rkit"><label class="rksel"><input type="checkbox" data-rk="sel" data-id="${i.id}" ${RK.sel.has(i.id) ? 'checked' : ''} ${i.billed ? 'disabled' : ''} aria-label="${esc(tr('Select'))}"></label>
     <button type="button" class="ofcrow" data-rk="item" data-id="${i.id}"><span class="ofcn"><b>${esc(rk_cat(i.category))}${i.text ? ` · ${esc(i.text)}` : ''}</b><small class="muted">${esc([fmtDateLoc(i.date), i.currency !== rk_home() ? `${fmtNum(+i.amount, 2)} ${i.currency}` : '', i.datev_no ? tr('DATEV no. {0}', i.datev_no) : ''].filter(Boolean).join(' · '))}</small></span>
     ${i.billed ? `<span class="rotag">${esc(tr('Billed on {0}', i.billed.number || tr('Draft')))}</span>` : ''}<span class="rksum">${ofcMoney(i.amount_home)}</span></button>
-    <label class="chkl rkdatev"><input type="checkbox" data-rk="datev" data-id="${i.id}" ${i.datev ? 'checked' : ''}> ${tr('in DATEV')}</label></li>`).join('');
+    ${rk_dv() ? `<label class="chkl rkdatev"><input type="checkbox" data-rk="datev" data-id="${i.id}" ${i.datev ? 'checked' : ''}> ${tr('in DATEV')}</label>` : ''}</li>`).join('');
   const nsel = t.items.filter(i => RK.sel.has(i.id) && !i.billed).length;
   return head + rk_vmaCard(t) + `<div class="ofcbar"><b>${tr('Receipts')}</b><span class="muted">${ofcMoney(t.total)}</span><span class="spacer"></span>
     ${nsel ? `<button class="btn sm" data-rk="bill">${ic('receipt', 's')}<span>${esc(trn('Bill {0} receipt on', 'Bill {0} receipts on', nsel))}</span></button>` : ''}
     <button class="btn sm pri" data-rk="add" data-id="${t.id}">${ic('plus', 's')}<span>${tr('Add receipt')}</span></button></div>`
-    + (rows ? `<ul class="ofclist rkits" role="list">${rows}</ul><p class="muted ofchint">${tr('Receipts themselves stay in DATEV; tick them here once they are uploaded there.')}</p>` : `<div class="empty nempty">${tr('No receipts yet.')}</div>`);
+    + (rows ? `<ul class="ofclist rkits" role="list">${rows}</ul>${rk_dv() ? `<p class="muted ofchint">${tr('Receipts themselves stay in DATEV; tick them here once they are uploaded there.')}</p>` : ''}` : `<div class="empty nempty">${tr('No receipts yet.')}</div>`);
 }
 function rk_reportHtml() {
   const q = `by=${RK.by}` + (RK.year ? `&from=${RK.year}-01-01&to=${RK.year}-12-31` : '') + (RK.filter === 'missing' ? '&missing=1' : '') + rk_pq();
@@ -270,8 +272,8 @@ function rk_itemModal(t, i) {
     <div class="rkfx" ${cur === home ? 'hidden' : ''}>${ofcRowF('rk-fx', tr('Exchange rate (1 {0} = …)', home), ofcIn('rk-fx', i?.fx_rate ? fmtNum(+i.fx_rate, 4) : '', {num: true}))}
       <p class="muted ofchint rkfxout"></p></div>
     ${ofcRowF('rk-text', tr('Text'), ofcIn('rk-text', i?.text, {max: 300, ph: tr('e.g. ICE Hamburg – Berlin')}))}
-    ${ofcChk('rk-datev', tr('Receipt is in DATEV'), i?.datev)}
-    ${ofcRowF('rk-dno', tr('DATEV receipt number'), ofcIn('rk-dno', i?.datev_no, {max: 60, ph: tr('optional')}))}
+    ${rk_dv() ? `${ofcChk('rk-datev', tr('Receipt is in DATEV'), i?.datev)}
+    ${ofcRowF('rk-dno', tr('DATEV receipt number'), ofcIn('rk-dno', i?.datev_no, {max: 60, ph: tr('optional')}))}` : ''}
     <div class="aerr" role="alert"></div>
     <div class="foot">${i ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${i ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg');
@@ -293,7 +295,7 @@ function rk_itemModal(t, i) {
       }
       const v = id => $(id, md)?.value ?? '';
       const c = v('#rk-cur').trim().toUpperCase() || home;
-      const body = {date: v('#rk-date'), category: v('#rk-cat'), amount: ofcNum(v('#rk-amt')), currency: c, text: v('#rk-text'), datev: $('#rk-datev', md).checked ? 1 : 0, datev_no: v('#rk-dno')};
+      const body = {date: v('#rk-date'), category: v('#rk-cat'), amount: ofcNum(v('#rk-amt')), currency: c, text: v('#rk-text'), ...($('#rk-datev', md) ? {datev: $('#rk-datev', md).checked ? 1 : 0, datev_no: v('#rk-dno')} : {})};  // 2.147.0 (#2460): DATEV off = its marks stay as saved
       if (c !== home) body.fx_rate = ofcNum(v('#rk-fx'));
       if (i) {
         const old = {date: i.date, category: i.category, amount: i.amount, currency: i.currency, fx_rate: i.fx_rate, amount_home: i.amount_home, text: i.text, datev: i.datev, datev_no: i.datev_no};

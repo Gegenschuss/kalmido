@@ -29,7 +29,7 @@ from ..core.config import app, APP_VERSION, OFFICE_DIR
 from ..core.i18n import tr
 from ..core.db import db, err
 from ..core.access import Denied
-from .model import office_gate, office_logo_set, office_org, office_settings
+from .model import office_feature, office_gate, office_logo_set, office_need_feature, office_org, office_settings
 from ..core.orgcrypt import oc_read_file, oc_write_file
 from .pdf import office_pdf
 from .einvoice import ein_build
@@ -166,8 +166,11 @@ def epdf_draft(model):
 
 def epdf_format(c, oid, r):
     """The e-invoice format of row r: its own einvoice_format, else the organisation's setting, else zugferd."""
-    fmt = (r["einvoice_format"] if "einvoice_format" in r.keys() else "") or office_settings(c, oid).get("einvoice_format") or "zugferd"
-    return fmt if fmt in ("zugferd", "xrechnung") else "zugferd"
+    s = office_settings(c, oid)
+    fmt = (r["einvoice_format"] if "einvoice_format" in r.keys() else "") or s.get("einvoice_format") or "zugferd"
+    from .packs import office_pack_for
+    offered = [f for f in (((office_pack_for(s) or {}).get("einvoice") or {}).get("formats") or ["zugferd"]) if f in ("zugferd", "xrechnung")]
+    return fmt if fmt in offered else (offered[0] if offered else "zugferd")  # 2.147.0 (#2461): only what the country pack offers
 
 
 def _render(c, oid, r, model=None):
@@ -177,7 +180,7 @@ def _render(c, oid, r, model=None):
     if epdf_is_draft(r):
         epdf_draft(model)  # 2.138.2 A (#2393): never an unmarked draft, whichever model came in
     xml, fmt = None, ""
-    if r["kind"] in EPDF_KINDS_XML and ofx_locked(r):
+    if r["kind"] in EPDF_KINDS_XML and ofx_locked(r) and office_feature(c, oid, "docs.einvoice"):  # 2.147.0 (#2459, #2460)
         fmt = epdf_format(c, oid, r)
         xml = ein_build(model, fmt)
     when = None
@@ -316,9 +319,11 @@ def opdf_doc_xml(did):
     r = doc_row(c, oid, did)
     if r["kind"] not in EPDF_KINDS_XML or not ofx_locked(r):
         raise Denied(409, tr("The e-invoice XML exists for finalised invoices and credit notes only."))
+    x = _stored_or_missing(c, oid, r, "xml")
+    if not x:  # 2.147.0 (#2460): a stored XML stays reachable (it is part of the document); a new one only while e-invoices are on
+        office_need_feature(c, oid, "docs.einvoice")
     ofx_log(c, oid, "xml", doc_id=did, dedupe_min=10)
     c.commit()
-    x = _stored_or_missing(c, oid, r, "xml")
     if x:
         data = oc_read_file(c, x)  # 2.42.0 (#828)
     else:

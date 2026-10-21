@@ -1540,6 +1540,9 @@ fresh; run p21121_b_ui node p21121_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.113.0 part A: office settings in sections, autosave, industry pack switch (#2247 #2246)
 fresh; run p2113_a_api "$PY" p2113_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2113_a_ui node p2113_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.147.0 part A: the country pack decides the office functions, switches, base pack XX + export, country choice (#2459-#2462)
+fresh; run p2147_a_api "$PY" p2147_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2147_a_ui node p2147_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.113.0 part B: offer parts fold open on the title page with a colour each (#2248)
 fresh; run p2113_b_ui node p2113_b_ui.js "$KALMIDO_TEST_DATA"
 shard 19  # 20.10.2026 (job #692): the parked releases 2.113.1-2.116
@@ -1628,6 +1631,16 @@ fresh; run p2144_d_ui node p2144_d_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21442_a_ui node p21442_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.144.2 part B: optimistic subtasks, calendar draft popup, sheet print, focus, receipts account row (#2467 #1811 #2370 #1644 #2352 #2372 #2375)
 fresh; run p21442_b_ui node p21442_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.147.1 part A: drag tasks into the chats as references (#2523)
+fresh; run p21443_a_api "$PY" p21443_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21443_a_ui node p21443_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.147.1 part B: payment reminder suggestions + GiroCode, batch space move with progress, agent chat colours (#2054 #2230 #2231 #2411)
+fresh; run p21443_b_api "$PY" p21443_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21443_b_ui node p21443_b_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p21443_b2_ui node p21443_b2_ui.js "$KALMIDO_TEST_DATA"
+# 2.147.1 part C: bell "Read" section, approvals in the bell count, org card members, Mac icon (#2405 #2420 #2396)
+fresh; run p21443_c_api "$PY" p21443_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21443_c_ui node p21443_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.149.0 part A: office - web and agent paths aligned (offer status, locks, log lines), invoice texts via tr() (#2521 #2520)
 fresh; run p2149_a_api "$PY" p2149_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.149.0 part B: request timing / SQL count / Server-Timing, static files without session, service worker hash manifest (#2504 #2505 #2506)

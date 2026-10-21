@@ -1,0 +1,393 @@
+{
+  "code": "XX",
+  "name": "International (Grundpaket)",
+  "name_en": "International (base pack)",
+  "neutral": true,
+  "version": 1,
+  "community": false,
+  "currency": "EUR",
+  "lang": "en",
+  "tax": {
+    "standard": 20,
+    "reduced": 10,
+    "exempt": 0,
+    "labels": {
+      "de": {
+        "standard": "{rate} % USt.",
+        "reduced": "{rate} % USt.",
+        "exempt": "steuerfrei"
+      },
+      "en": {
+        "standard": "{rate} % VAT",
+        "reduced": "{rate} % VAT",
+        "exempt": "tax exempt"
+      }
+    },
+    "exempt_note": {
+      "de": "Steuerfrei oder Steuerschuldnerschaft des Leistungsempfängers (Reverse Charge).",
+      "en": "Tax exempt or reverse charge (VAT to be accounted for by the recipient)."
+    },
+    "editable": true
+  },
+  "formats": {
+    "date": "yyyy-mm-dd",
+    "decimal": ".",
+    "thousands": ",",
+    "currency_pos": "before"
+  },
+  "required_fields": [
+    "company_name",
+    "company_address",
+    "tax_number_or_vat_id",
+    "recipient_name",
+    "recipient_address",
+    "invoice_number",
+    "invoice_date",
+    "delivery_date_or_period",
+    "line_items",
+    "net_per_tax_rate",
+    "tax_rate_and_amount",
+    "gross_total"
+  ],
+  "labels": {
+    "de": {
+      "offer": "Angebot",
+      "offer_no": "Angebot Nr.",
+      "invoice": "Rechnung",
+      "invoice_no": "Rechnung Nr.",
+      "project": "Projekttitel",
+      "ref": "Ref./PO-Nr.",
+      "client": "Kunde",
+      "date": "Datum",
+      "valid_until": "Gültig bis",
+      "pos": "Pos.",
+      "title": "Leistung",
+      "qty": "Menge",
+      "unit_price": "Preis",
+      "vat": "USt.",
+      "total": "Gesamt",
+      "net_total": "Summe Netto",
+      "gross_total": "Summe Brutto",
+      "incl_raw": "Summe netto mit Option Rohdaten",
+      "excl_raw": "ohne Rohdaten",
+      "raw_optional": "Optional: Bereitstellung der Rohdaten",
+      "raw_included": "Bereitstellung der Rohdaten",
+      "producing": "Producing",
+      "discount": "Rabatt",
+      "rights": "Rechteübertragung",
+      "rights_time": "Zeitliche Auswertung",
+      "rights_territory": "Räumliche Auswertung",
+      "rights_media": "Mediale Auswertung",
+      "rights_exceptions": "Ausnahmen",
+      "rights_exclusive": "Exklusiv",
+      "page_of": "Seite {x} von {y}",
+      "signature": "Mit freundlichen Grüßen",
+      "order": "Auftragserteilung",
+      "order_hint": "Ort, Datum, Unterschrift",
+      "units": {
+        "day": "Tage",
+        "hour": "Std.",
+        "piece": "Stk.",
+        "minute": "Min.",
+        "flat": "pauschal"
+      },
+      "units_one": {
+        "day": "Tag",
+        "hour": "Std.",
+        "piece": "Stk.",
+        "minute": "Min.",
+        "flat": "pauschal"
+      },
+      "unit_one": {
+        "day": "Tag",
+        "hour": "Std.",
+        "piece": "Stk.",
+        "minute": "Min.",
+        "flat": "pauschal"
+      },
+      "credit": "Gutschrift",
+      "credit_no": "Gutschrift Nr.",
+      "reminder_1": "Zahlungserinnerung",
+      "reminder_2": "Mahnung",
+      "reminder_3": "Letzte Mahnung",
+      "reminder_no": "Mahnung Nr.",
+      "to_invoice": "zu Rechnung Nr.",
+      "customer_no": "Kunden-Nr.",
+      "service_period": "Leistungszeitraum",
+      "due": "Fällig am",
+      "fx": "Wechselkurs 1 €",
+      "subtotal": "Zwischensumme",
+      "invoice_total": "Rechnungsbetrag",
+      "reminder_total": "Gesamtbetrag",
+      "credit_total": "Gutschriftsbetrag",
+      "paid": "Bereits bezahlt",
+      "open": "Offener Betrag",
+      "open_total": "Offener Betrag",
+      "reminder_fee": "Mahngebühr",
+      "col_invoice": "Rechnung",
+      "amount": "Betrag",
+      "payment": "Zahlung",
+      "col_due": "Fällig"
+    },
+    "en": {
+      "offer": "Quotation",
+      "offer_no": "Quotation No.",
+      "invoice": "Invoice",
+      "invoice_no": "Invoice No.",
+      "project": "Project",
+      "ref": "Ref./PO No.",
+      "client": "Client",
+      "date": "Date",
+      "valid_until": "Valid until",
+      "pos": "No.",
+      "title": "Title",
+      "qty": "Qty",
+      "unit_price": "Unit Price",
+      "vat": "VAT",
+      "total": "Total",
+      "net_total": "Net Total",
+      "gross_total": "Gross Total",
+      "incl_raw": "Net total with option raw data",
+      "excl_raw": "excluding raw data",
+      "raw_optional": "Optional: delivery of raw data",
+      "raw_included": "Delivery of raw data",
+      "producing": "Producing",
+      "discount": "Discount",
+      "rights": "Transfer of rights",
+      "rights_time": "Duration of License",
+      "rights_territory": "Territorial Rights",
+      "rights_media": "Rights by Medium",
+      "rights_exceptions": "Exceptions",
+      "rights_exclusive": "Exclusive",
+      "page_of": "Page {x} of {y}",
+      "signature": "Kind regards",
+      "order": "Order confirmation",
+      "order_hint": "Place, date, signature",
+      "units": {
+        "day": "days",
+        "hour": "hrs",
+        "piece": "pcs",
+        "minute": "min",
+        "flat": "flat"
+      },
+      "units_one": {
+        "day": "day",
+        "hour": "hr",
+        "piece": "pc",
+        "minute": "min",
+        "flat": "flat"
+      },
+      "unit_one": {
+        "day": "day",
+        "hour": "hr",
+        "piece": "pc",
+        "minute": "min",
+        "flat": "flat"
+      },
+      "credit": "Credit note",
+      "credit_no": "Credit note No.",
+      "reminder_1": "Payment reminder",
+      "reminder_2": "Reminder",
+      "reminder_3": "Final reminder",
+      "reminder_no": "Reminder No.",
+      "to_invoice": "Credit note for invoice No.",
+      "customer_no": "Customer No.",
+      "service_period": "Service period",
+      "due": "Due on",
+      "fx": "Exchange rate €1",
+      "subtotal": "Subtotal",
+      "invoice_total": "Total",
+      "reminder_total": "Total amount due",
+      "credit_total": "Credit total",
+      "paid": "Already paid",
+      "open": "Amount outstanding",
+      "open_total": "Amount outstanding",
+      "reminder_fee": "Reminder fee",
+      "col_invoice": "Invoice",
+      "amount": "Amount",
+      "payment": "Payment",
+      "col_due": "Due"
+    }
+  },
+  "texts": {
+    "intro": {
+      "de": "vielen Dank für Ihre Anfrage. Gerne unterbreiten wir Ihnen folgendes Angebot:",
+      "en": "thank you for your enquiry. We are pleased to submit the following quotation:"
+    },
+    "salutation": {
+      "de": "Sehr geehrte Damen und Herren,",
+      "en": "Dear Sir or Madam,"
+    },
+    "closing": {
+      "de": "Wir freuen uns auf die Zusammenarbeit und stehen für Rückfragen gerne zur Verfügung.",
+      "en": "We look forward to working with you and are happy to answer any questions."
+    },
+    "vat_note": {
+      "de": "Alle Preise zuzüglich der gesetzlichen Umsatzsteuer.",
+      "en": "All prices plus statutory VAT."
+    },
+    "vat_note_novat": {
+      "de": "Alle Preise netto, ohne Umsatzsteuer.",
+      "en": "All prices net, without VAT."
+    },
+    "rights_note": {
+      "de": "Im Übrigen gelten unsere AGB.",
+      "en": "Our general terms and conditions apply."
+    },
+    "valid_note": {
+      "de": "Dieses Angebot ist gültig bis {date}.",
+      "en": "This quotation is valid until {date}."
+    },
+    "rights_time": [
+      {
+        "key": "unlimited",
+        "de": "unbegrenzt",
+        "en": "in perpetuity"
+      },
+      {
+        "key": "1y",
+        "de": "1 Jahr ab Erstveröffentlichung",
+        "en": "1 year from first publication"
+      },
+      {
+        "key": "2y",
+        "de": "2 Jahre ab Erstveröffentlichung",
+        "en": "2 years from first publication"
+      }
+    ],
+    "rights_territory": [
+      {
+        "key": "world",
+        "de": "weltweit",
+        "en": "worldwide"
+      },
+      {
+        "key": "region",
+        "de": "Region des Kunden",
+        "en": "the client's region"
+      },
+      {
+        "key": "national",
+        "de": "Land des Kunden",
+        "en": "the client's country"
+      }
+    ],
+    "rights_media": [
+      {
+        "key": "internal",
+        "de": "intern",
+        "en": "internal use"
+      },
+      {
+        "key": "internal_web_unpaid",
+        "de": "intern, web, unpaid media",
+        "en": "internal use, web, unpaid media"
+      },
+      {
+        "key": "all",
+        "de": "alle Medien",
+        "en": "all media"
+      },
+      {
+        "key": "web_social_paid",
+        "de": "web, social media, paid media",
+        "en": "web, social media, paid media"
+      }
+    ],
+    "invoice_intro": {
+      "de": "für das oben genannte Projekt erlauben wir uns, Ihnen folgende Leistungen in Rechnung zu stellen:",
+      "en": "regarding the project referenced above, we are pleased to submit the following charges for our services:"
+    },
+    "invoice_closing": {
+      "de": "Bitte überweisen Sie den Gesamtbetrag unter Angabe der Rechnungsnummer auf unser angegebenes Bankkonto. Es gelten unsere allgemeinen Geschäftsbedingungen.",
+      "en": "Please transfer the total amount, quoting the invoice number, to our bank account stated on this invoice. Our general terms and conditions apply."
+    },
+    "credit_intro": {
+      "de": "zu der unten genannten Rechnung erteilen wir Ihnen folgende Gutschrift:",
+      "en": "regarding the invoice referenced below we issue the following credit note:"
+    },
+    "credit_closing": {
+      "de": "Den Gutschriftsbetrag erstatten wir Ihnen oder verrechnen ihn mit offenen Rechnungen. Bei Fragen stehen wir Ihnen gerne zur Verfügung.",
+      "en": "We will refund the credited amount to you or offset it against open invoices. Please do not hesitate to contact us with any questions."
+    },
+    "reminder_intro": {
+      "de": "sicher ist Ihrer Aufmerksamkeit entgangen, dass folgende Rechnungen noch nicht beglichen sind:",
+      "en": "it may have escaped your attention that the following invoices are still outstanding:"
+    },
+    "reminder_closing": {
+      "de": "Wir bitten Sie darum, den kompletten Rechnungsbetrag innerhalb von {days} Werktagen auf unser oben genanntes Bankkonto zu überweisen.",
+      "en": "Please transfer the full amount within {days} working days to the bank account above."
+    },
+    "reminder_intro_2": {
+      "de": "leider konnten wir trotz unserer Zahlungserinnerung bis heute keinen Zahlungseingang für folgende Rechnungen feststellen:",
+      "en": "despite our payment reminder, we have not yet received payment for the following invoices:"
+    },
+    "reminder_closing_2": {
+      "de": "Wir bitten Sie, den offenen Gesamtbetrag innerhalb von {days} Werktagen auf unser oben genanntes Bankkonto zu überweisen. Sollten Sie die Zahlung inzwischen veranlasst haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.",
+      "en": "Please transfer the total amount outstanding within {days} working days to the bank account above. If you have already arranged payment, please disregard this letter."
+    },
+    "reminder_intro_3": {
+      "de": "trotz unserer Zahlungserinnerung und Mahnung sind folgende Rechnungen weiterhin unbezahlt:",
+      "en": "despite our payment reminder and our reminder notice, the following invoices remain unpaid:"
+    },
+    "reminder_closing_3": {
+      "de": "Wir fordern Sie hiermit letztmalig auf, den offenen Gesamtbetrag innerhalb von {days} Werktagen auf unser oben genanntes Bankkonto zu überweisen. Geht die Zahlung bis dahin nicht ein, werden wir ohne weitere Ankündigung rechtliche Schritte einleiten; die dadurch entstehenden Kosten gehen zu Ihren Lasten.",
+      "en": "This is our final request to transfer the total amount outstanding within {days} working days to the bank account above. If payment is not received by then, we will take legal action without further notice; any costs arising from this will be charged to you."
+    },
+    "payment_note": {
+      "de": "Zahlbar bis {date} ohne Abzug.",
+      "en": "Payable by {date} without deduction."
+    },
+    "fx_tax_note": {
+      "de": "Steuerbetrag entspricht {tax} EUR, Kurs 1 EUR = {rate} USD",
+      "en": "Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}"
+    },
+    "vat_note_reverse": {
+      "de": "Steuerschuldnerschaft des Leistungsempfängers (Reverse Charge).",
+      "en": "Reverse charge: VAT to be accounted for by the recipient."
+    },
+    "vat_note_abroad": {
+      "de": "Im Land des Leistenden nicht steuerbar.",
+      "en": "Not taxable in the supplier's country."
+    },
+    "vat_note_small": {
+      "de": "Kleinunternehmen: es wird keine Umsatzsteuer berechnet.",
+      "en": "Small business: no VAT is charged."
+    }
+  },
+  "numbering": {
+    "offer": "QUO-{yyyy}-{seq:03}",
+    "invoice": "INV-{yyyy}-{seq:03}",
+    "credit": "CN-{yyyy}-{seq:03}",
+    "reminder": "REM-{yyyy}-{seq:03}",
+    "delivery": "DN-{yyyy}-{seq:03}"
+  },
+  "einvoice": {
+    "formats": [
+      "zugferd"
+    ],
+    "status": "ready",
+    "profile": "EN16931"
+  },
+  "bookkeeping": {
+    "export": "csv",
+    "status": "ready"
+  },
+  "features": {
+    "docs.einvoice": {
+      "status": "ready"
+    },
+    "books.export_csv": {
+      "status": "ready"
+    },
+    "books.gobd": {
+      "status": "ready"
+    }
+  },
+  "retention": {
+    "receipts": 10,
+    "books": 10,
+    "min_years": 1,
+    "editable": true
+  }
+}

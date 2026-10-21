@@ -51,7 +51,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub]') && !!document.getElementById('os-name')`, 80), 'the settings page');
 
     // ================= #2247 the areas
-    check(await ev(`[...document.querySelectorAll('#ofc-set [data-ostsub]')].map(b => b.dataset.ostsub).join(',')`) === 'company,docs,packs,data,access', '#2247: five areas');
+    check(await ev(`[...document.querySelectorAll('#ofc-set [data-ostsub]')].map(b => b.dataset.ostsub).join(',')`) === 'company,docs,packs,functions,data,access', '#2247: the areas (2.147.0 #2460: + Functions)');  // 2.147.0 (#2460): six areas
     check(await ev(`!!document.querySelector('#ofc-set .seg.aisub[role="tablist"] [data-ostsub="company"][aria-selected="true"] svg')`), '#2247: the strip of Settings > Administration (icon, tab roles), Company first');
     check(await ev(shown) === 'company' && await ev(vis('os-name')) && !(await ev(vis('os-pack'))) && !(await ev(vis('os-paydays'))), '#2247: only the area Company is shown ' + await ev(shown));
     check(await ev(`!document.querySelector('[data-ofc="save-settings"]')`), '#2247: no Save button');

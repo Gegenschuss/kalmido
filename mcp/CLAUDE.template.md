@@ -297,6 +297,9 @@
   let you. Client and price data go to your model: read only what the order needs. Pass `requested_by` = the person you
   work for; `notify: true` puts a card with the sum, the PDF preview and *Open in the office* into their chat. A payment
   suggestion above the invoice's open amount is `409` (2.149.0), like a person's payment.
+  2.147: `get_office` also names the area's `country_pack` and its `features` (`books.datev`, `docs.einvoice`,
+  `books.vat_return`, `books.tax_dates`, `books.export_csv`: true / false). Leave out what is off - no DATEV hints, no
+  XRechnung, no VAT return figures in an office that does not use them.
 
 ### Usage
 - Report your model usage with the hook `mcp/claude_usage_hook.py`, registered as **Stop and SubagentStop** hook in

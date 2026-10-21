@@ -323,10 +323,10 @@ def bp_sample(c, oid):
     """A sample invoice over two pages in the office area's language with its company data, logo and colour, for the
     preview (nothing stored, no number used)."""
     from .ledger import ofx_company, ofx_company_print, ofx_sender_line
-    from .packs import office_pack
+    from .packs import office_pack_for
     s = office_settings(c, oid)
     lang = "en" if s.get("lang") == "en" else "de"
-    pack = office_pack(s["pack"]) or office_pack("DE") or {}
+    pack = office_pack_for(s) or {}
     co = ofx_company_print(ofx_company(c, oid), s.get("company") or {}, lang, pack)
     co["sender_line"] = ofx_sender_line(co)
     lp = os.path.join(_dir(oid), os.path.basename(s.get("logo") or ""))

@@ -55,6 +55,13 @@ the app has not yet been tested by people who use a screen reader every day (see
   touch screens). The account picture sits next to the search at the bottom without dots; the connection dot only
   appears offline or while changes go out (its state stays in the picture's name and the account menu), the update dot
   only at Settings. *Start* is in the account menu and in the search (Mod+K).
+- **Agents in their workspace's colour (2.147.1).** An agent's entries in the sidebar, the window bar of the chat and the
+  Agents view carry the same thin stripe as lists: the colour of the organisation the agent belongs to, for a private
+  agent your own colour of Private (none when you chose none). The chat header and the input keep the agent's own colour,
+  so one place never shows two colours. A hidden reply bar no longer hides the agent colour line above the input.
+- **Moving many items to another workspace (2.147.1).** From 20 documents or files on, the dialog moves them in batches
+  of 20 and shows a progress bar with "x of n moved" (announced to screen readers); with fewer the button says
+  *Moving…* while it works. One Undo still takes the whole move back.
 - **Calmer rows (2.56.1).** *Settings > Appearance > Task rows > Symbols in the row* sets how many small symbols a task
   row shows: *All*, *Important* (the default: due date, reminder, person, approvals and locks), *Calm* (only the title,
   the status circle and the due date) or *Custom* (a box per symbol, in groups). Overdue tasks, an agent waiting for

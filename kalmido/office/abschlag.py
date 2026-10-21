@@ -171,9 +171,9 @@ def abs_progress_of(c, oid, offer_id, locked_only=False):
 
 def _pack(c, oid):
     from .model import office_settings
-    from .packs import office_pack
+    from .packs import office_pack_for
     s = office_settings(c, oid)
-    return s, office_pack(s["pack"]) or office_pack("DE")
+    return s, office_pack_for(s)
 
 
 def abs_offer_info(c, oid, offer):

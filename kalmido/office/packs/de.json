@@ -376,5 +376,40 @@
   "bookkeeping": {
     "export": "datev",
     "status": "ready"
+  },
+  "features": {
+    "books.datev": {
+      "status": "ready"
+    },
+    "docs.einvoice": {
+      "status": "ready"
+    },
+    "books.vat_return": {
+      "status": "ready"
+    },
+    "books.tax_dates": {
+      "status": "ready"
+    },
+    "books.export_csv": {
+      "status": "ready"
+    },
+    "books.gobd": {
+      "status": "ready"
+    },
+    "books.receipt_images": {
+      "status": "planned"
+    },
+    "books.period_lock": {
+      "status": "planned"
+    },
+    "books.procedure_doc": {
+      "status": "planned"
+    }
+  },
+  "retention": {
+    "receipts": 8,
+    "books": 10,
+    "min_years": 8,
+    "editable": false
   }
 }

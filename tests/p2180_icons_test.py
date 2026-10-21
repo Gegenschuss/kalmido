@@ -169,8 +169,8 @@ check('<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">' in app
 # ---- in-app logo (sidebar, sign-in): the new mark, the sun in the accent (currentColor), no clipPath ids
 js = "\n".join(read(p) for p in CLIENT)
 m = re.search(r"const logoSvg = \(sz = 20\) => `(.*?)`;", js)
-check(m and 'viewBox="0 0 100 100"' in m.group(1) and "M58 6V15" in m.group(1) and 'stroke="currentColor"' in m.group(1)
-      and " id=" not in m.group(1), "logoSvg: the bot on the 100 grid, antenna = currentColor, no ids")  # 2.136.0 (#2193)
+check(m and 'viewBox="0 0 100 100"' in m.group(1) and "M58 6V15" in m.group(1) and 'fill="#6d4bd8"' in m.group(1)
+      and "currentColor" not in m.group(1) and " id=" not in m.group(1), "logoSvg: the bot on the 100 grid, the fixed lilac plate of the app icon, no ids")  # 2.136.0 (#2193); 2.145.0 (#2433): fixed brand colours instead of the accent (currentColor)
 check("M22 112 L78 168 L234 40" not in js, "app.js: the old check-mark logo is gone")
 check("botFig('erledigt'" in js and "fetch('/static/quips.json')" in js, "celebration: the bot figure (erledigt) + quips.json")  # 2.136.0 (#2193)
 # 2.136.0 (#2193): no heron drawing left in the app's pages (the profile picture presets are their own task)

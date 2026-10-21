@@ -16,6 +16,25 @@ PACK_RIGHTS_KINDS = ("rights_time", "rights_territory", "rights_media")
 _CODE_RE = re.compile(r"^[A-Z]{2}$")
 _cache = {}
 
+# 2.147.0 (#2459): the office functions a country pack offers ("features": {key: {"status": "ready"|"planned"}}). The key
+# names a area + function so later packages add functions next to them (2.148: books.receipt_images, books.period_lock,
+# books.procedure_doc are known as "planned" already). switch = the office admin may switch it off (#2460, settings
+# features_off); a function that is not switchable (the finalising rules) stays in force whatever the settings say.
+PACK_FEATURES = {
+    "books.datev": {"switch": True},         # DATEV: booking batch (EXTF), document inbox, SKR accounts, travel "in DATEV"
+    "docs.einvoice": {"switch": True},       # e-invoice XML (XRechnung / ZUGFeRD / Factur-X) on finalising and mailing
+    "books.vat_return": {"switch": True},    # the VAT return figures (UStVA); the filing itself (ELSTER) stays outside
+    "books.tax_dates": {"switch": True},     # tax dates as tasks (deadlines)
+    "books.export_csv": {"switch": True},    # neutral export for any tax advisor: booking list (CSV) + receipts (ZIP)
+    "books.gobd": {"switch": False},         # finalising rules: locked documents, number gaps with a reason, date order
+}
+PACK_FEATURES_PLANNED = ("books.receipt_images", "books.period_lock", "books.procedure_doc")  # 2.148 (#2470-#2472)
+PACK_FEATURE_STATUS = ("ready", "planned")
+# 2.147.0 (#2459, #2461): how long receipts and books are kept (years). editable = the office sets its own value (the
+# neutral base pack); never below min_years. A pack without the block keeps everything 10 years, editable.
+RETENTION_DEFAULT = {"receipts": 10, "books": 10, "min_years": 1, "editable": True}
+RETENTION_MAX = 30
+
 
 def _pkc(name, *a):
     """2.76.0 (#1023): office/catalog.py's view of the installed packs of the bound office area (None without the app, e.g.
@@ -131,6 +150,29 @@ def office_pack_validate(d):
     ev = d.get("einvoice")
     if ev is not None and (not isinstance(ev, dict) or not isinstance(ev.get("formats"), list) or ev.get("status") not in ("planned", "ready")):
         bad.append("einvoice: {formats: [], status: planned|ready}")
+    ft = d.get("features")
+    if ft is not None:
+        if not isinstance(ft, dict):
+            bad.append("features: object {key: {status}}")
+        else:
+            for k, v in ft.items():
+                if k not in PACK_FEATURES and k not in PACK_FEATURES_PLANNED:
+                    bad.append(f"features.{k}: unknown function")
+                elif not isinstance(v, dict) or v.get("status") not in PACK_FEATURE_STATUS:
+                    bad.append(f"features.{k}: {{status: planned|ready}}")
+                elif k in PACK_FEATURES_PLANNED and v.get("status") != "planned":
+                    bad.append(f"features.{k}: planned only")
+    rt = d.get("retention")
+    if rt is not None:
+        if not isinstance(rt, dict) or any(not isinstance(rt.get(k), int) or isinstance(rt.get(k), bool) or not 1 <= rt[k] <= RETENTION_MAX
+                                           for k in ("receipts", "books")) \
+                or not isinstance(rt.get("editable", False), bool) \
+                or not isinstance(rt.get("min_years", 1), int) or not 1 <= rt.get("min_years", 1) <= RETENTION_MAX:
+            bad.append(f"retention: {{receipts, books: years 1..{RETENTION_MAX}, min_years, editable}}")
+    if tax is not None and isinstance(tax, dict) and not isinstance(tax.get("editable", False), bool):
+        bad.append("tax.editable: true/false")
+    if not isinstance(d.get("neutral", False), bool):
+        bad.append("neutral: true/false")
     bk = d.get("bookkeeping")
     if bk is not None and (not isinstance(bk, dict) or not isinstance(bk.get("export"), str) or bk.get("status") not in ("planned", "ready")):
         bad.append("bookkeeping: {export, status: planned|ready}")
@@ -155,6 +197,84 @@ def _strings(d, path="pack"):
     elif isinstance(d, list):
         for i, v in enumerate(d):
             yield from _strings(v, f"{path}[{i}]")
+
+
+def pack_features(d):
+    """2.147.0 (#2459): {key: "ready"|"planned"} the pack offers. A pack without "features" (built before 2.147, e.g. an
+    installed community pack) offers what its einvoice / bookkeeping blocks say + the neutral export + the finalising rules."""
+    d = d or {}
+    ft = d.get("features")
+    if isinstance(ft, dict):
+        return {k: v.get("status") for k, v in ft.items() if isinstance(v, dict) and (k in PACK_FEATURES or k in PACK_FEATURES_PLANNED)}
+    # (review 2.147.0: an office on such a pack had the VAT return figures and tax dates before -- they stay)
+    out = {"books.export_csv": "ready", "books.gobd": "ready", "books.vat_return": "ready", "books.tax_dates": "ready"}
+    ev, bk = d.get("einvoice") or {}, d.get("bookkeeping") or {}
+    if ev.get("formats"):
+        out["docs.einvoice"] = ev.get("status") or "planned"
+    if bk.get("export") == "datev":
+        out["books.datev"] = bk.get("status") or "planned"
+    return out
+
+
+def office_features(s, pack=None):
+    """2.147.0 (#2459, #2460): {key: True|False} for every function of PACK_FEATURES in an office area with settings s: the
+    pack offers it as ready AND (it cannot be switched off OR it is not in s["features_off"]). Server routes check this,
+    the client only hides what is off."""
+    pack = pack if pack is not None else office_pack_for(s)
+    offered = pack_features(pack)
+    off = set((s or {}).get("features_off") or [])
+    return {k: offered.get(k) == "ready" and (not m["switch"] or k not in off) for k, m in PACK_FEATURES.items()}
+
+
+def office_feature_on(s, key, pack=None):
+    return bool(office_features(s, pack).get(key))
+
+
+def pack_retention(pack, s=None):
+    """2.147.0 (#2459, #2461): {"receipts": years, "books": years, "editable", "min_years"} of an office area: the pack's
+    values; an editable pack takes the office's retention_years (never below min_years)."""
+    rt = dict(RETENTION_DEFAULT)
+    if isinstance((pack or {}).get("retention"), dict):
+        rt.update({k: v for k, v in pack["retention"].items() if k in RETENTION_DEFAULT})
+        rt.setdefault("min_years", 1)
+    own = (s or {}).get("retention_years")
+    if rt.get("editable") and isinstance(own, int) and not isinstance(own, bool) and own > 0:
+        y = max(int(rt.get("min_years") or 1), min(own, RETENTION_MAX))
+        rt["receipts"] = rt["books"] = y
+    return rt
+
+
+def office_pack_for(s):
+    """2.147.0 (#2461): the country pack an office area with settings s works with (DE when its pack is gone, as before).
+    A pack with tax.editable (the neutral base pack) takes the office's own rates (settings tax_rates {standard, reduced});
+    its tax labels may hold {rate}. Documents finalised before keep their snapshot (ledger.ofx_finalize)."""
+    pack = office_pack((s or {}).get("pack")) or office_pack("DE")
+    if not pack:
+        return pack
+    tax = pack.get("tax") or {}
+    if not tax.get("editable"):
+        return pack
+    own = (s or {}).get("tax_rates") or {}
+    p = json.loads(json.dumps(pack))
+    t = p["tax"]
+    for k in ("standard", "reduced"):
+        v = own.get(k) if isinstance(own, dict) else None
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 100:
+            t[k] = v
+    for lg, L in (t.get("labels") or {}).items():
+        for k in PACK_TAX_KEYS:
+            if isinstance(L.get(k), str):
+                L[k] = L[k].replace("{rate}", _rate_text(t.get(k), lg))
+    return p
+
+
+def _rate_text(v, lg):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return ""
+    txt = f"{v:.2f}".rstrip("0").rstrip(".")
+    return txt.replace(".", ",") if lg == "de" else txt
 
 
 def office_pack_public(d):

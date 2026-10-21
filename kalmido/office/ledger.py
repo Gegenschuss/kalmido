@@ -36,7 +36,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_json_store, oc_log_
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .model import ofx_name1, ofx_name_clean, ofx_name_lines, office_gate, office_org, office_role, office_settings, pb_cl_sql
-from .packs import office_pack
+from .packs import office_pack_for
 
 # P2: does a document of this kind get its number only when it is finalised? (quotations: at creation, unless the
 # organisation chose otherwise; invoices / credit notes of a later release: always at finalising)
@@ -325,7 +325,7 @@ def ofx_finalize(c, oid, uid, did):
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
     s = office_settings(c, oid)
-    pack = office_pack(s["pack"]) or office_pack("DE") or {}
+    pack = office_pack_for(s) or {}
     if r["kind"] != "offer":  # 2.38.0 (#1021, F1): the required fields of an invoice (400 with the list), due date
         write_lock(c, f"office_num_{int(oid)}")  # 2.126.0 A (#1979 F5): the date check and the number in one go (docs._assign_number)
         inv_before_finalize(c, oid, r, s, pack)
@@ -350,6 +350,7 @@ def ofx_finalize(c, oid, uid, did):
     sender = {"company": ofx_company_print(fields, s.get("company") or {}, lang, pack), "fields": fields, "color": color,
               "logo": logo, "logo_sha256": sha, "pack": pack.get("code") or s["pack"]}
     sender["company"]["sender_line"] = ofx_sender_line(sender["company"])  # 2.97.1 (#2224): frozen with the rest
+    sender["girocode"] = 1 if int(s.get("girocode", 1) or 0) else 0  # 2.147.1 B (#2054): the GiroCode decision, frozen (girocode.py)
     from .letterhead import bp_snapshot
     lhs = bp_snapshot(c, oid, s)  # 2.120.0 E (#2091): the own letterhead frozen with the rest (only when there is one)
     if lhs:
