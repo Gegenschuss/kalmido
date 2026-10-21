@@ -38,6 +38,13 @@ def onum_range(c, oid, s, kind):
             "reason_needed": kind in ONUM_REASON_KINDS}
 
 
+def onum_reason(kind, skip, raw):
+    """2.144.6 B (#2400 F2): the cleaned reason of a jump by skip numbers; None when the series needs one (GoBD) and it is
+    missing. Shared with the legacy import's counter (legacyimport.fi_counter_post)."""
+    reason = raw.strip()[:300] if isinstance(raw, str) else ""
+    return None if kind in ONUM_REASON_KINDS and skip > 0 and len(reason) < INV_SKIP_REASON_MIN else reason
+
+
 @app.get("/api/office/number-ranges")
 def onum_list():
     """Every series of the office area I work in; members read (the settings page is the admins'), admin = may change."""
@@ -63,8 +70,6 @@ def onum_set(kind):
         nxt = int(str(b.get("next", "")).strip())
     except ValueError:
         return err(tr("Invalid value: {0}", "next"))
-    reason = b.get("reason") if isinstance(b.get("reason"), str) else ""
-    reason = reason.strip()[:300]
     write_lock(c, f"office_num_{int(oid)}")  # the same lock as the number of a new document (docs._assign_number)
     s = office_settings(c, oid)
     cur = onum_range(c, oid, s, kind)
@@ -72,7 +77,8 @@ def onum_set(kind):
         return err(tr("The next number must be at least {0}", cur["min_next"]))
     if nxt == cur["next"]:
         return jsonify(onum_range(c, oid, s, kind))
-    if kind in ONUM_REASON_KINDS and len(reason) < INV_SKIP_REASON_MIN:
+    reason = onum_reason(kind, nxt - cur["next"], b.get("reason"))
+    if reason is None:
         return err(tr("The number skips {0} numbers of the series; give a reason (GoBD)", nxt - cur["next"]))
     # never down, also against a document numbered in parallel (the lock above + the condition on the row)
     row = c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,?,?) ON CONFLICT(org_id, kind, period) "

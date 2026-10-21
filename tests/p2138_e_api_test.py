@@ -35,6 +35,8 @@ from xml.sax.saxutils import escape
 import requests
 from freelancer_fixture import freelancer
 
+import dbx as dbxm  # 2.144.6 B (#2400 F4): an undo before 2.112 is simulated in the database (a PATCH counts as a restore now)
+
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -143,6 +145,15 @@ def offer(s, title, sids):
     r = s.put(B + O + f"/docs/{did}/items", json={"items": [{"kind": "service", "service_id": sid, "qty": 1} for sid in sids]})
     assert r.ok, r.text
     return did
+
+
+def dbx(sql, args=()):
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    try:
+        c.execute(sql, args)
+        c.commit()
+    finally:
+        c.close()
 
 
 def run_of(s, rid):
@@ -256,11 +267,11 @@ A.post(B + O + "/sets", json={"name": "Alt-Set", "items": [{"equipment_id": E["A
 check(A.post(B + L + f"/runs/{RUN4}/tidy").status_code == 409, "#2241: tidy of a run not undone = 409")
 r = A.post(B + L + f"/runs/{RUN4}/undo")
 check(r.ok and len(r.json().get("archived", [])) == 3, "setup: undo " + r.text[:200])
-for n in ("Alt A", "Alt B"):  # as an undo before 2.112 left them: active
-    A.patch(B + O + f"/services/{S[n]['id']}", json={"archived": 0})
-A.patch(B + O + f"/equipment/{E['Alt Gerät']['id']}", json={"archived": 0})
-# RUN2: "Neu A" (restored) and "Prod X" (the rules name another producing service by now)
-check(run_of(A, RUN4).get("leftover") == 3 and run_of(A, RUN2).get("leftover") == 2, f"#2241: the runs count their leftovers {run_of(A, RUN4)}")
+# as an undo before 2.112 left them: active (2.144.6 B, #2400 F4: in the database; a PATCH archived 0 is a restore by hand)
+dbx("UPDATE office_services SET archived=0 WHERE id IN (?, ?)", (S["Alt A"]["id"], S["Alt B"]["id"]))
+dbx("UPDATE office_equipment SET archived=0 WHERE id=?", (E["Alt Gerät"]["id"],))
+# RUN2: "Prod X" (the rules name another producing service by now); "Neu A" was restored by hand -> no leftover (#2400 F4)
+check(run_of(A, RUN4).get("leftover") == 3 and run_of(A, RUN2).get("leftover") == 1, f"#2241: the runs count their leftovers {run_of(A, RUN4)} {run_of(A, RUN2)}")
 check(Bo.post(B + L + f"/runs/{RUN4}/tidy").status_code == 403, "rights: a member cannot tidy (403)")
 check(Ca.post(B + L + f"/runs/{RUN4}/tidy").status_code == 404, "tenant-matrix: office -- another organisation's run = 404")
 r = A.post(B + L + f"/runs/{RUN4}/tidy")
@@ -307,8 +318,8 @@ offer(Fr, "Hochzeitsfilm Probe", [by_name(Fr)["Frei A"]["id"]])
 r = Fr.post(B + L + f"/runs/{RF}/undo")
 check(r.ok and [x["name"] for x in r.json().get("archived", [])] == ["Frei A"] and r.json()["removed"]["services"] == 1, "freelancer: undo archives the used one " + r.text[:200])
 Fr.patch(B + O + f"/services/{by_name(Fr)['Frei A']['id']}", json={"archived": 0})
-r = Fr.post(B + L + f"/runs/{RF}/tidy")
-check(r.ok and [x["name"] for x in r.json().get("archived", [])] == ["Frei A"], "freelancer: tidy " + r.text[:200])
+r = Fr.post(B + L + f"/runs/{RF}/tidy")  # 2.144.6 B (#2400 F4): restored by hand -> tidy leaves it active
+check(r.ok and r.json().get("archived") == [] and by_name(Fr)["Frei A"]["archived"] == 0, "freelancer: tidy " + r.text[:200])
 check(Fr.post(B + L + f"/runs/{RUN4}/tidy").status_code == 404 and Fr.post(B + O + "/services/renumber", json={"sorts": {str(S["Kamera"]["id"]): 1}}).status_code == 400,
       "freelancer: no way into the organisation's runs / services")
 

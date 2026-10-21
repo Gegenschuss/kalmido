@@ -1942,7 +1942,8 @@ person's rights; it belongs to them, never to the agent. The answer comes as the
 rule proposals per agent and day.
 
 2.138.0 (#2060): new triggers `created` (a task is created in the list), `assigned` (`user_id`: only that person, null =
-anybody; fires only when the person is new on the task) and `field` (`field_id` of the list's custom fields; `value` = only
+anybody; fires only when the person is new on the task; 2.144.6 (#2400): not when an approval request or "changes" of an
+approval hands the task over) and `field` (`field_id` of the list's custom fields; `value` = only
 when set to that option id / `"1"` checked / `"0"` unchecked, null = any change; formula fields never trigger). New actions
 `priority` (`priority` none / low / medium / high), `tag` (`tag_id`: adds a tag of this list; personal tags never) and `field`
 (`field_id` + `value`, checked like a normal field value, null clears it). A deleted field or list tag pauses the rule
