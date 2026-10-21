@@ -93,12 +93,14 @@ function ofm_admSeen(adm) { const o = LS.get('ofmAdm', {}) || {}; if (!!o[ofm_ws
 // a tab of the office (OFC_TABS: [key, icon, name, admins only, html, group]) without an entry here joins its group
 // ([5], else Administration) once the office is loaded, so a new office part is never out of reach
 const ofm_all = () => typeof OFC_TABS === 'undefined' ? OFM_ITEMS : [...OFM_ITEMS, ...OFC_TABS.filter(t => !OFM_ITEMS.some(i => i.key === t[0]))
-  .map(t => ({key: t[0], go: 'office/' + t[0], icon: t[1], name: t[2], group: OFM_GROUPS.some(g => g[0] === t[5]) ? t[5] : 'admin', on: ofm_ofc, adm: t[3]}))];
+  .map(t => ({key: t[0], go: 'office/' + t[0], icon: t[1], name: t[2], group: OFM_GROUPS.some(g => g[0] === t[5]) ? t[5] : 'admin', on: ofm_ofc, adm: t[3], need: t[6]}))];  // 2.147.0: [6] = need
 // 2.98.0 C (#2180): the order inside the groups (a part not named here keeps its place at the end of its group);
 // tpl = a tab under Settings, not in the menu
 const OFR_ORDER = ['pipeline', 'offers', 'clients', 'contacts', 'gendocs', 'contracts', 'cashflow', 'kpi', 'bank', 'books', 'subs', 'travel', 'meals', 'equipment', 'agreements', 'settings'];
 const ofr_rank = i => { const n = OFR_ORDER.indexOf(i.key); return n < 0 ? OFR_ORDER.length : n; };
-const ofm_items = () => ofm_all().filter(i => !i.tpl && i.on() && (!i.adm || ofm_adm())).sort((a, b) => ofr_rank(a) - ofr_rank(b));
+// 2.147.0 (#2459): need = a function of the country pack ('books.…'); off in this office = no menu point (office.js ofcFeat)
+const ofm_need = i => !i.need || typeof ofcFeat !== 'function' || ofcFeat(i.need);
+const ofm_items = () => ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && (!i.adm || ofm_adm())).sort((a, b) => ofr_rank(a) - ofr_rank(b));
 // the point shown: the office's tab (import sits under Settings; no tab = the start page on a phone, quotations on a computer)
 function ofm_cur(mod) {
   if (mod !== 'office') return mod;

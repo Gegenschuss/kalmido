@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.147.0** (2026-10-21): **country pack functions** - the country pack decides which office functions appear (DATEV,
+  e-invoices, VAT return figures, tax dates), single ones can be **switched off** without losing data, an
+  **international base pack** with own VAT rates and an **export for any tax advisor** (CSV + ZIP), and a new office
+  asks for its country. Details: [docs/OFFICE.md](docs/OFFICE.md#country-pack-functions-and-switches-2147).
 - **2.146.0** (2026-10-21): imports from everyday life - e-invoices (XRechnung, ZUGFeRD) are received and read from
   their XML, duplicate receipts are found and kept out of DATEV, several files / ZIP / winmail.dat at once, iPhone HEIC
   photos, household import with debit/credit column and undo, CAMT.052 pending entries handled, legacy import with

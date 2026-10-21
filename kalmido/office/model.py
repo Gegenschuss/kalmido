@@ -18,7 +18,7 @@ from ..core.db import db, iso, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
-from .packs import office_pack, office_pack_codes
+from .packs import office_pack, office_pack_codes, office_pack_for
 
 OFFICE_FEAT = "office"
 OFFICE_NO_ORG = N_("Choose a workspace at the top (Private or an organisation) to open its office")  # 2.47.3 (#1360)
@@ -109,10 +109,12 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "letterhead": {},
                      # 2.113.2 (#2253): the terms and conditions as PDF per language (set only by their own routes, office/terms.py)
                      "terms": {},
-                     # 2.144.3 B (#2054): suggest payment reminders for overdue invoices (office/dunning.py: on, days after
-                     # the due date / the last reminder's deadline) and the GiroCode on invoices + reminders (office/girocode.py)
-                     "dunning_suggest": 1, "dunning_grace_days": 7, "girocode": 1}
-
+                     # 2.147.0 (#2460): office functions the admin switched off (keys of packs.PACK_FEATURES that may be
+                     # switched); empty = everything the country pack offers is on, so offices from before stay as they were
+                     "features_off": [],
+                     # 2.147.0 (#2461): own VAT rates {standard, reduced} and the retention in years -- only used by a pack
+                     # that allows it (tax.editable / retention.editable: the neutral base pack); None / {} = the pack's values
+                     "tax_rates": {}, "retention_years": None}
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 
 
@@ -279,6 +281,23 @@ def office_settings(c, oid):
     return out
 
 
+OF_FEATURE_OFF = N_("This function is not switched on in this office")
+
+
+def office_need_feature(c, oid, key, s=None):
+    """2.147.0 (#2459, #2460): the server half of the country pack's functions -- a route of a function the pack does not
+    offer or the admin switched off answers 404 (nothing is deleted; switching it on again brings everything back)."""
+    from .packs import office_feature_on
+    if not office_feature_on(s if s is not None else office_settings(c, oid), key):
+        raise Denied(404, tr(OF_FEATURE_OFF))
+
+
+def office_feature(c, oid, key, s=None):
+    """2.147.0 (#2459): True when the function is on in office area oid (background work: auto mailing, XML on finalising)."""
+    from .packs import office_feature_on
+    return office_feature_on(s if s is not None else office_settings(c, oid), key)
+
+
 def _num(v, name, lo=None, hi=None, allow_none=False):
     if v is None or v == "":
         if allow_none:
@@ -373,10 +392,6 @@ def office_settings_clean(c, oid, b, cur):
         elif k == "industry_packs":  # 2.47.0 (#1216)
             from .sheet import dk_packs_clean
             out[k] = dk_packs_clean(v)
-        elif k in ("dunning_suggest", "girocode"):  # 2.144.3 B (#2054)
-            out[k] = 1 if v in (1, True, "1", "true") else 0
-        elif k == "dunning_grace_days":  # 2.144.3 B (#2054)
-            out[k] = int(_num(v, k, 0, 90))
         elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs"):  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k in ("invoice_closing_de", "invoice_closing_en", "reminder_text_de", "reminder_text_en"):
@@ -387,6 +402,17 @@ def office_settings_clean(c, oid, b, cur):
             out[k] = v
         elif k in ("parts_summary_title_de", "parts_summary_title_en"):
             out[k] = re.sub(r"[\x00-\x1f\x7f]", "", v or "").strip()[:300] if isinstance(v, str) else ""
+        elif k == "features_off":  # 2.147.0 (#2460): only switchable functions; switching off hides, never deletes
+            from .packs import PACK_FEATURES
+            if not isinstance(v, list) or any(not isinstance(x, str) or not PACK_FEATURES.get(x, {}).get("switch") for x in v):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = sorted(set(v))
+        elif k == "tax_rates":  # 2.147.0 (#2461)
+            if not isinstance(v, dict):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = {f: round(_num(v[f], f, 0, 100), 2) for f in ("standard", "reduced") if f in v and v[f] not in (None, "")}
+        elif k == "retention_years":  # 2.147.0 (#2461): checked against the pack's minimum where it is used (packs.pack_retention)
+            out[k] = None if v in (None, "") else int(_num(v, k, 1, 30))
         elif k == "datev_extf":  # 2.47.3 (#1460)
             from .datev import dx_settings_clean
             out[k] = dx_settings_clean(v, out.get(k) or {})
@@ -1215,7 +1241,7 @@ def office_seed_texts(c, oid):
     """Copies the pack's rights catalogue + intro / closing into office_texts when the organisation has none yet."""
     if c.execute("SELECT 1 FROM office_texts WHERE org_id=? LIMIT 1", (oid,)).fetchone():
         return 0
-    pack = office_pack(office_settings(c, oid)["pack"]) or office_pack("DE")
+    pack = office_pack_for(office_settings(c, oid))
     if not pack:
         return 0
     n = 0

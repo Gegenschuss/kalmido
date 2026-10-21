@@ -176,3 +176,23 @@ stays. A changed file is read again at the next request; it never lands in the r
 - Only when a pack switched on offers an option does a new quotation get it (switch, fields, marks per position). Each
   quotation keeps its own values and can rename the line titles. Quotations made before keep their calculation, also
   when a pack is switched off later. The shipped pack "Film & Video" offers handling costs (4 %, on) and markup (10 %, off).
+
+## Building a country pack for your country (2.147)
+
+The shipped international base pack (`kalmido/office/packs/xx.json`) is the best starting point: copy it to
+`<code>.json` (two upper-case letters, ISO 3166), set `code`, `name`, `name_en`, remove `neutral`, and fill in:
+
+- `tax`: the rates of your country (`standard`, `reduced`, `exempt` = 0) and their labels in German and English; keep
+  `editable: true` only when offices must set their own rates
+- `formats`, `labels`, `texts`, `numbering`: how documents look and read in your country (both languages, plain text)
+- `einvoice.formats`: the e-invoice formats you can vouch for (`zugferd` = EN 16931 / Factur-X; `xrechnung` is German)
+- `features`: only the functions that are correct for your country, each `{"status": "ready"}` (or `planned`). Known keys:
+  `books.datev`, `docs.einvoice`, `books.vat_return`, `books.tax_dates`, `books.export_csv`, `books.gobd`; planned for
+  later packages: `books.receipt_images`, `books.period_lock`, `books.procedure_doc`. Unknown keys fail the check.
+- `retention`: years for receipts and books, the legal minimum as `min_years`
+
+Check the file with `POST /api/office/packs/validate` (or `tools/packs_catalog.py`) and publish it in a catalogue (see
+above). Ideas the community could take on - none of them is built yet: **Austria** with a BMD export, **France** with
+the FEC file (fichier des écritures comptables). Such an export needs code in the app; the pack then names it as a
+function, the way `DE` names `books.datev`.
+
