@@ -583,6 +583,29 @@ def office_number_next(c, oid, kind, scheme, d=None, peek=False, start=0, **ctx)
     return office_number_format(scheme, seq, d, **ctx), seq
 
 
+# 2.144.10 A (#2576): trial documents ("Nur zum Ausprobieren") count in their own series TEST-001, TEST-002 ... (one counter
+# per office for all kinds, office_numbers kind 'trial', period ''); no real counter ever moves for them
+TRIAL_KIND = "trial"
+
+
+def trial_flag(v):
+    """1 when a request value asks for a trial document (true / 1 / "1" / "true"), else 0."""
+    return 1 if v in (1, True, "1", "true") else 0
+
+
+def office_trial_number(c, oid, did):
+    """Reserves the next free TEST number of office oid for document did (the caller holds the number lock)."""
+    from .legacyimport import fi_number_taken
+    for _ in range(50):
+        seq = c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,'',1) ON CONFLICT(org_id, kind, period) "
+                        "DO UPDATE SET last=office_numbers.last+1 RETURNING last", (oid, TRIAL_KIND)).fetchone()[0]
+        num = f"TEST-{seq:03d}"
+        if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone() \
+                and not fi_number_taken(c, oid, num):
+            return num
+    return num
+
+
 # 2.118.0 A (#2265): the quotation counter per organisation (as before), client or project. The scope sits in the
 # counter's kind (no migration): "offer" (organisation), "offer:c<client id>", "offer:n<recipient name>" (no client),
 # "offer:p<list id>", "offer:t<project title>" (no list). Invoices, credit notes and reminders keep one counter.
@@ -643,7 +666,7 @@ def onc_start(c, oid, s, r, key, scheme, d=None):
     period = office_scheme_period(scheme, d)
     high = 0
     for x in c.execute("SELECT id, kind, number, date, client_id, list_id, project_title, recipient FROM office_docs "
-                       "WHERE org_id=? AND kind='offer' AND number<>'' AND id<>?", (oid, r["id"])).fetchall():
+                       "WHERE org_id=? AND kind='offer' AND number<>'' AND id<>? AND trial=0", (oid, r["id"])).fetchall():  # 2.144.10 A (#2576): never TEST numbers
         if (period and (x["date"] or "")[:4] != period) or onc_key(s, x) != key:
             continue
         seq = onc_parse(scheme, x["number"])[0]
