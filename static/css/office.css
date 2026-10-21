@@ -72,6 +72,14 @@
 .pkc-on .swl{min-height:2.25rem;cursor:pointer}
 .pkc-on:has(input:checked) .pkc-onst{color:var(--text);font-weight:600}
 @media (pointer:coarse) { .pkc-on .swl{min-height:2.75rem} }
+/* 2.147.0 (#2460, #2462): the functions of the country pack (one switch each) and the country question of a new office */
+.ocf-row{flex-wrap:wrap;align-items:center}
+.ocf-row .swl{min-width:0;cursor:pointer;gap:.5rem}
+.ocf-row .ofchint{flex-basis:100%}
+@media (pointer:coarse) { .ocf-row .swl{min-height:2.75rem} }
+.ocf-choose{border:1px solid var(--accent);border-radius:var(--radius);background:var(--bg2);padding:.75rem 1rem;margin:0 0 1rem}
+.ocf-choose h3{display:flex;align-items:center;gap:.5rem;margin:0 0 .25rem}
+.ocf-choose .lacts{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
 @media (max-width:599px) {
   .ofcset .row label{min-width:100%}
   .ofcbar .chkl{font-size:var(--fs-s)}
@@ -488,6 +496,12 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 
 /* 2.91.0 A (#1923) */
 .rin-sec{margin:.5rem 0}
+/* 2.147.1 B (#2054): suggested payment reminders */
+.dun-hint{display:flex;align-items:center;gap:.5rem;width:100%;margin:.5rem 0;padding:.625rem .75rem;border-radius:.625rem;background:var(--accent-soft);color:inherit;font:inherit;text-align:left;border:0;min-height:2.75rem}
+.dun-hint span:first-of-type{flex:1}
+button.dun-hint{cursor:pointer}
+button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset:.125rem}
+.dun-tag{margin-left:.375rem}
 .rin-list .rin-it{display:flex;align-items:center;flex-wrap:wrap;gap:.25rem .75rem;padding:.375rem 0;border-bottom:1px solid var(--line2)}
 .rin-list .rin-it:last-child{border-bottom:0}
 .rin-it .ofcn{flex:1 1 12rem;min-width:0}

@@ -22,7 +22,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store, oc_json
 from ..personal.timetrack import BadInput
 from .calc import RAW_MODES, TAX_KEYS, dec, fmt_money, fmt_qty, label, money, office_calc, pack_tax, unit_text, _num
 from .model import UNITS, office_role, office_settings
-from .packs import office_pack
+from .packs import office_pack_for
 
 try:  # the shoot calculation (part C, office/sheet.py); until it is there a shoot part counts nothing
     from . import sheet as _dk_sheet
@@ -363,7 +363,7 @@ def tp_recalc(c, oid, r, pack=None):
         return
     if pack is None:
         s = office_settings(c, oid)
-        pack = office_pack(s["pack"]) or office_pack("DE")
+        pack = office_pack_for(s)
     nets = {}
     for p in parts:
         t = tp_part_calc(c, oid, r, p, pack)
@@ -465,7 +465,7 @@ def tp_public(c, oid, r, admin, totals=None):
 def _shoot_calc_public(c, oid, r, p, admin):
     """The shoot calculation of part p for the editor (C's dk_calc_public strips the purchase side for members)."""
     s = office_settings(c, oid)
-    pack = office_pack(s["pack"]) or office_pack("DE")
+    pack = office_pack_for(s)
     t = tp_part_calc(c, oid, r, p, pack)
     calc = dict(t.get("sheet_calc") or {})
     pub = _dk("dk_calc_public")
@@ -575,7 +575,7 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
         return None
     from .docs import doc_items
     s = office_settings(c, oid)
-    pack = office_pack(s["pack"]) or office_pack("DE")
+    pack = office_pack_for(s)
     mode = mode or s.get("parts_invoice_mode") or "full"
     if mode not in INVOICE_MODES:
         raise BadInput(tr("Invalid value: {0}", "mode"))

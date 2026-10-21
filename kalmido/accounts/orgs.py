@@ -236,6 +236,8 @@ def org_public(c, r, roles=True):
     d = {"id": r["id"], "name": r["name"], "domains": r["domains"],  # 2.23.0 (#711): e-mail domains
          "members": [x[0] for x in c.execute("SELECT user_id FROM org_members WHERE org_id=? ORDER BY user_id", (r["id"],))]}
     d.update(org_icon_fields(r, member=g.get("user") is not None and g.user["id"] in d["members"]))  # 2.87.9 (#1913)
+    # 2.147.1 C (#2420): the people count of the card leaves agent accounts out (like the members dialog)
+    d["people"] = c.execute("SELECT COUNT(*) FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND COALESCE(u.kind,'user')!='agent'", (r["id"],)).fetchone()[0]
     if roles:  # 2.28.0 (#935): the organisation's admins
         d["admins"] = [x[0] for x in c.execute("SELECT user_id FROM org_members WHERE org_id=? AND role='admin' ORDER BY user_id", (r["id"],))]
     return d

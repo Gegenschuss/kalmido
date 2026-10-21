@@ -242,14 +242,14 @@ def rin_make(c, oid, uid, s, period):
     the period has its invoice already (unique index) or the template is gone. The caller commits."""
     from .docs import DUP_ITEM_SKIP, DUP_SKIP, _assign_number, doc_items, recalc
     from .ledger import ofx_log, ofx_number_at_finalize
-    from .packs import office_pack
+    from .packs import office_pack_for
     t = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (s["template_id"], oid)).fetchone() if s["template_id"] else None
     if t is None or t["kind"] != "invoice" or t["status"] == "cancelled":
         return None
     from ..core.orgcrypt import oc_dec_fields
     t = oc_dec_fields(c, oid, "office_docs", t)
     st = office_settings(c, oid)
-    pack = office_pack(st["pack"]) or office_pack("DE") or {}
+    pack = office_pack_for(st) or {}
     lg = "en" if t["lang"] == "en" else "de"
     nxt = rin_after(s["start"], s["every"], period)
 

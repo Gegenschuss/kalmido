@@ -358,7 +358,8 @@ ROUTES = {
     "GET /api/office/legacy/archive/{}/pdf": "office", "GET /api/office/legacy/counter": "office",
     "GET /api/office/legacy/runs": "office", "GET /api/office/log": "office", "GET /api/office/logo": "office",
     "GET /api/office/mail-status": "office", "GET /api/office/number-preview": "office", "GET /api/office/packs": "office",
-    "GET /api/office/packs/{}": "office", "GET /api/office/pay-props": "office", "GET /api/office/settings": "office",
+    "GET /api/office/packs/{}": "office", "GET /api/office/pack-switch": "office",  # 2.147.0 (#2462)
+    "GET /api/office/pay-props": "office", "GET /api/office/settings": "office",
     "GET /api/office/trips": "office", "GET /api/office/trips/bill-docs": "office", "GET /api/office/receipts/billed": "office", "GET /api/office/trips/report": "office",
     "GET /api/office/trips/vma": "office", "GET /api/office/trips/vma-rates": "office", "GET /api/office/trips/vma.csv": "office",  # 2.95.0 A (#1932)
     "GET /api/office/trips/vma.pdf": "office", "GET /api/office/trips/vma.xlsx": "office",
@@ -766,7 +767,7 @@ ROUTES = {
     "GET /api/office/agreements": "office", "GET /api/office/agreements/{}": "office",
     "GET /api/office/bank/imports": "office", "GET /api/office/bank/tx": "office",
     "GET /api/office/bank/tx/{}/candidates": "office", "GET /api/office/books": "office",
-    "GET /api/office/books/euer": "office", "GET /api/office/books/euer.csv": "office",
+    "GET /api/office/books/euer": "office", "GET /api/office/books/euer.csv": "office", "GET /api/office/books/export": "office",  # 2.147.0 (#2461)
     "GET /api/office/books/euer.pdf": "office", "GET /api/office/books/ustva": "office",
     "GET /api/office/equipment/policies": "office", "GET /api/office/equipment/receipts": "office",
     "GET /api/office/equipment/receipts/{}": "office", "GET /api/office/equipment/value": "office",

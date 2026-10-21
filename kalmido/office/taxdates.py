@@ -15,7 +15,7 @@ from ..core.pg import insert_id
 from ..personal.timetrack import BadInput
 from .cashflow import _ctx
 from .fixedimport import fci_people, fci_task_end
-from .model import office_settings, office_settings_save
+from .model import office_need_feature, office_settings, office_settings_save
 
 TXD_KINDS = ("ustva", "est", "gewst")
 TXD_USTVA = ("none", "month", "quarter", "year")  # 2.122.0 D (#2315): year = only the annual VAT return
@@ -168,7 +168,9 @@ def txd_public(c, oid, s):
 def txd_get():
     """Office admin. {ustva, ustva_ext, est, gewst, lead_days, user, tasks, people, small_business, lost, next: [{kind, date, due}]}."""
     c, uid, oid = _ctx()
-    return jsonify(txd_public(c, oid, office_settings(c, oid)))
+    s = office_settings(c, oid)
+    office_need_feature(c, oid, "books.tax_dates", s)  # 2.147.0 (#2459, #2460)
+    return jsonify(txd_public(c, oid, s))
 
 
 @app.put("/api/office/tax-dates")
@@ -182,6 +184,7 @@ def txd_put():
         raise BadInput(tr("Invalid data"))
     write_lock(c, f"office_taxdates_{int(oid)}")
     s = office_settings(c, oid)
+    office_need_feature(c, oid, "books.tax_dates", s)  # 2.147.0 (#2459, #2460)
     old = txd_clean(s)
     cfg = dict(old, tasks=dict(old["tasks"]), sig=dict(old["sig"]))
     if "ustva" in b:

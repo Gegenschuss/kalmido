@@ -258,7 +258,7 @@ for root, dirs, fs in os.walk(PACKS):
         words = set(re.findall(r"[a-z0-9_]+", (rel + " " + open(os.path.join(root, x), encoding="utf-8", errors="replace").read()).lower()))
         if any(hashlib.sha256(w.encode()).hexdigest() in PRIVATE for w in words):
             hits.append(rel)
-check(sorted(files) == ["de.json", os.path.join("industry", "film.json")], "#2251: only the shipped packs under kalmido/office/packs " + str(files))
+check(sorted(files) == ["de.json", os.path.join("industry", "film.json"), "xx.json"], "#2251: only the shipped packs under kalmido/office/packs " + str(files))
 check(not hits, "#2251: no private pack name under kalmido/office/packs " + str(hits))
 
 # ---------------------------------------------------------------- a person without an organisation (freelancer-matrix: office)

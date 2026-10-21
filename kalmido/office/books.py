@@ -29,7 +29,7 @@ from ..core.access import Denied
 from ..core.i18n import N_, tr
 from ..personal.timetrack import BadInput
 from .calc import dec, dstr, money
-from .model import ofx_name1, office_gate, office_org, office_settings, pb_owner
+from .model import ofx_name1, office_feature, office_gate, office_need_feature, office_org, office_settings, pb_owner
 
 BK_NOTE = N_("No tax advice; figures without guarantee.")
 BK_VAT = ("19", "7", "0")
@@ -395,7 +395,8 @@ def bk_get():
     from .catacct import ca_accounts
     cats = rc_categories(c, ws)
     return jsonify(upload_ws="private" if ws[0] == "u" else f"org:{oid}", categories=cats, currency=_home(s),
-                   accounts=ca_accounts(c, oid, cats),  # 2.121.0 (#2093): SKR03 / SKR04 account per category (None: no DATEV input side)
+                   # 2.121.0 (#2093): SKR03 / SKR04 account per category (None: no DATEV input side; 2.147.0 (#2460): or DATEV off)
+                   accounts=ca_accounts(c, oid, cats) if office_feature(c, oid, "books.datev", s) else None,
                    small_business=bool(s.get("small_business")), month=mo, receipts=month, year=year,
                    missing=[] if s.get("small_business") else missing, note=tr(BK_NOTE))
 
@@ -411,6 +412,7 @@ def bk_euer_get():
 def bk_ustva_get():
     """?year=YYYY&period=m01..m12|q1..q4|y -> bk_ustva."""
     c, uid, oid = _ctx()
+    office_need_feature(c, oid, "books.vat_return")  # 2.147.0 (#2459, #2460)
     return jsonify(bk_ustva(c, oid, _year(request.args.get("year")), request.args.get("period") or ""))
 
 

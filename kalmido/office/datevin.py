@@ -314,8 +314,10 @@ def dv_accounts_get():
     """Org admin (a personal office: its owner): the accounts of the input side for the DATEV settings (see dv_accounts)."""
     from ..core.db import db
     from .datev import dx_settings
-    from .model import office_gate, office_org, office_settings
+    from .model import office_gate, office_need_feature, office_org, office_settings
     c = db()
     uid = office_gate(c)
     oid = office_org(c, uid, admin=True)
-    return jsonify(dv_accounts(c, oid, dx_settings(office_settings(c, oid))))
+    s = office_settings(c, oid)
+    office_need_feature(c, oid, "books.datev", s)  # 2.147.0 (#2459, #2460)
+    return jsonify(dv_accounts(c, oid, dx_settings(s)))

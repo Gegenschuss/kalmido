@@ -497,9 +497,15 @@ for name, lines, sender, typ in TRAIN:
 check(all(one("SELECT trained FROM doc_meta WHERE node_id=?", (n,)) for n in tids), "setup: the four documents are trained in erin's workspace")
 
 
+GUESSES = []
+
+
 def guess(s, ws):
     """(sender, type) names the workspace's models set or suggest for a new similar document."""
-    nid = doc_up(s, "probe.pdf", PROBE, ws)
+    # 2.146.0 (#2452): the same bytes again in the same workspace come back as "already there" without a new id ->
+    # every probe gets its own last line (the models read the sender / type lines above it)
+    GUESSES.append(ws)
+    nid = doc_up(s, "probe.pdf", PROBE + [f"Vorgang {len(GUESSES)}"], ws)
     d = done(s, nid) or {}
     sg = d.get("suggest") or {}
     return nid, ((d.get("sender") or {}).get("name") or (sg.get("sender") or {}).get("label"),

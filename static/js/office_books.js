@@ -28,7 +28,8 @@ function bkReset() {
 async function bkLoad() {
   const seq = ++BK.seq, y = BK.year, q = `year=${BK.pyear}&period=${BK.period}`;
   try {
-    const [info, euer, ustva] = await Promise.all([api('GET', `/api/office/books?year=${y}`), api('GET', `/api/office/books/euer?year=${y}`), api('GET', `/api/office/books/ustva?${q}`)]);
+    const [info, euer, ustva] = await Promise.all([api('GET', `/api/office/books?year=${y}`), api('GET', `/api/office/books/euer?year=${y}`),
+      ofcFeat('books.vat_return') ? api('GET', `/api/office/books/ustva?${q}`) : {off: true}]);  // 2.147.0 (#2460): VAT return figures switched off / not in the pack
     if (seq !== BK.seq) return;
     BK.billed = await bkBilledLoad(info);
     if (seq !== BK.seq) return;
@@ -64,8 +65,16 @@ function bkTabHtml() {
     <div class="bk-photo"><label class="btn pri bk-shot">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="bk-file" accept="image/*,application/pdf,.xml,application/xml,text/xml" capture="environment" multiple hidden></label>
     <label class="btn bk-files">${ic('upload')}<span>${tr('Upload files')}</span><input type="file" id="bk-files" accept="${BK_ACCEPT}" multiple hidden></label>
     <span class="muted bk-photohint">${tr('The receipt goes into the documents; amount and date are recognised.')}</span></div>`;
-  const txd = typeof txdSectionHtml === 'function' ? txdSectionHtml() : '';  // part C: the tax dates
-  return head + bkReceiptsHtml() + bkEuerHtml() + bkUstvaHtml() + bkSettingsHtml() + txd;
+  const txd = typeof txdSectionHtml === 'function' && ofcFeat('books.tax_dates') ? txdSectionHtml() : '';  // part C: the tax dates; 2.147.0 (#2460): only while on
+  return head + bkReceiptsHtml() + bkEuerHtml() + (BK.ustva?.off ? '' : bkUstvaHtml()) + bkExportHtml() + bkSettingsHtml() + txd;
+}
+// 2.147.0 (#2461): the export for any tax advisor -- the booking list of the year as CSV, or with invoices and receipts as ZIP
+function bkExportHtml() {
+  if (!ofcFeat('books.export_csv')) return '';
+  const y = BK.year, q = `from=${y}-01-01&to=${y}-12-31`;
+  return `<section class="bk-sec" aria-labelledby="bk-exh"><div class="ofcbar"><h3 class="ofcgrp" id="bk-exh">${tr('Export for the tax advisor {0}', y)}</h3><span class="spacer"></span>
+    <a class="btn sm ghost" href="/api/office/books/export?${q}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/books/export?${q}&zip=1" download>${ic('download', 's')}<span>ZIP</span></a></div>
+    <p class="muted ofchint">${tr('All invoices, credit notes, payments, receipts and travel expenses of the year in one list; the ZIP also holds the invoice PDFs and the receipt files.')}</p></section>`;
 }
 
 function bkRcRow(r) {

@@ -18,7 +18,7 @@ from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
 from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, RAW_MODES, TAX_KEYS, dec, fmt_money, inv_calc, office_calc
-from .packs import office_pack
+from .packs import office_pack_for
 from .undo import oun_post, oun_pre
 from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts)
@@ -343,7 +343,7 @@ def _calc_doc(r):
 
 def doc_totals(c, oid, r, items=None):
     s = office_settings(c, oid)
-    pack = office_pack(s["pack"]) or office_pack("DE")
+    pack = office_pack_for(s)
     if r["kind"] == "reminder":  # 2.38.0: a reminder has no positions, its lines are the invoices it lists
         return inv_reminder_totals(c, oid, r, pack)
     calc = inv_calc if r["kind"] in ("invoice", "credit", "delivery") else office_calc
@@ -560,11 +560,11 @@ def _default_text(c, oid, s, kind, lang):
         if rows:
             t = (rows[0]["text_en"] if lang == "en" else rows[0]["text_de"]) or rows[0]["text_de"]
     if t is None:
-        pack = office_pack(s["pack"]) or office_pack("DE") or {}
+        pack = office_pack_for(s) or {}
         pt = (pack.get("texts") or {}).get(kind) or {}
         t = pt.get(lang) or pt.get("de") or ""
     if kind == "intro":
-        pack = office_pack(s["pack"]) or office_pack("DE") or {}
+        pack = office_pack_for(s) or {}
         sal = ((pack.get("texts") or {}).get("salutation") or {}).get(lang) or ""
         if sal and not t.startswith(sal.split(",")[0]):
             t = sal + "\n" + t
@@ -910,7 +910,7 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
         logo_path = ofx_logo_path(oid, snd.get("logo"))
         color = snd.get("color") or ""
     else:
-        pack = office_pack(s["pack"]) or office_pack("DE") or {}
+        pack = office_pack_for(s) or {}
         t = doc_totals(c, oid, r)
         co = ofx_company_print(ofx_company(c, oid), s.get("company") or {}, lang, pack)
         logo_path = None
@@ -1038,9 +1038,11 @@ def odoc_list():
     if kind in ("invoice", "reminder"):  # 2.40.0 (#1368 points 8 + 9): open reminder fees, settled reminders ("done")
         from .invoices import fd_reminder_extra
         fd_reminder_extra(c, oid, rows)
+    from .dunning import dun_list_extra
+    dun = dun_list_extra(c, oid, kind, rows)  # 2.147.1 B (#2054): suggested reminder drafts (count + mark)
     if st in ("partial", "overdue"):  # derived states: filtered after the fact
         rows = [x for x in rows if x["state"] == st]
-    return jsonify(docs=rows, role=role, org_id=oid)
+    return jsonify(docs=rows, role=role, org_id=oid, **({"dunning": dun} if dun else {}))
 
 
 @app.post("/api/office/docs")

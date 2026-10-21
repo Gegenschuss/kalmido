@@ -33,6 +33,7 @@ from ..personal.timetrack import BadInput
 from ..api.v1 import UnknownFields, v1_args, v1_json, v1_view
 from .calc import dec, dstr, fmt_money, money
 from .model import office_on, office_role, office_rows, office_seed_texts, office_settings, pb_cl_sql, pb_owner, pb_personal, sr_public
+from .packs import office_features
 
 OFA_ITEM_KEYS = ("kind", "service_id", "text", "detail", "qty", "unit", "price", "discount")
 OFA_DATA_KEYS = ("client_id", "title", "intro", "items", "list_id")
@@ -333,7 +334,8 @@ def v1_office_info():
     c.commit()
     return jsonify(area={"id": oid, "personal": pb_owner(c, oid) is not None}, person_id=uid, role=office_role(c, uid, oid),
                    currency=s.get("currency") or "EUR", lang=s.get("lang") or "de", small_business=bool(s.get("small_business")),
-                   rules=tr(OFA_RULES))
+                   # 2.147.0 (#2459, #2460): the country pack and its functions as switched on here (agents leave out what is off)
+                   country_pack=s.get("pack") or "DE", features=office_features(s), rules=tr(OFA_RULES))
 
 
 @app.get("/api/v1/office/<kind>")

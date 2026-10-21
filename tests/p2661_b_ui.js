@@ -37,6 +37,7 @@ const WS_VIEWS = {
   'static/js/sbnav.js': 'draw',
   'static/js/core.js': 'draw',                // also: the new state reloads the workload tabs (absences, disposition)
   'static/js/chat.js': 'draw',                // team chats of the workspace
+  'static/js/collab.js': 'draw',              // 2.145.0 (#2444): the news list's hint rows for the OTHER workspaces (newsElseHtml), drawn with the list
   'static/js/agents.js': 'draw',              // agents of the workspace (p2280_ui)
   'static/js/bookmarks.js': 'draw',           // 2.97.0 (#1950): bookmarks load the shown workspace (bm_sp) unless one is picked in the view
   'static/js/agentchat.js': 'helper',         // the default workspace of a new agent

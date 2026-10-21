@@ -1166,11 +1166,18 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         iban = str(pay.get("iban") or "").replace(" ", "")
         bank = " · ".join(x for x in (str(pay.get("bank_name") or ""), ("IBAN " + " ".join(iban[i:i + 4] for i in range(0, len(iban), 4))) if iban else "",
                                      ("BIC " + str(pay["bic"])) if pay.get("bic") else "") if x)
-        pt_lines = pdf_wrap(str(pay.get("text") or ""), body, PDF_CW) if pay.get("text") else []
-        pb_lines = pdf_wrap(bank, 8.4, PDF_CW) if bank else []
+        gcq = str(pay.get("girocode") or "")  # 2.147.1 B (#2054): the GiroCode right of the payment text (office/girocode.py)
+        if gcq:  # imported only then: this module also runs on its own (no package; tests/office_einvoice_test.py)
+            from .girocode import GCQ_SIZE, gcq_block_h, gcq_draw
+        pw = PDF_CW - GCQ_SIZE - 14 if gcq else PDF_CW
+        pt_lines = pdf_wrap(str(pay.get("text") or ""), body, pw) if pay.get("text") else []
+        pb_lines = pdf_wrap(bank, 8.4, pw) if bank else []
         pay_h = 6 + len(pt_lines) * lh + (len(pb_lines) * 8.4 * 1.42 + 2 if pb_lines else 0)
+        pay_h = max(pay_h, gcq_block_h() + 10) if gcq else pay_h
 
         def draw_pay(p, y, pt_lines=pt_lines, pb_lines=pb_lines):
+            if gcq:
+                gcq_draw(p, PDF_L + PDF_CW - GCQ_SIZE, y + 6, gcq, lang, C_INK, C_INK2)
             yy = y + 4
             for t_ in pt_lines:
                 p.text(PDF_L, yy, t_, body)
