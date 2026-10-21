@@ -73,7 +73,7 @@ def tchat_list_members(c, lid):
 
 def tchat_room_members(c, r):
     if r["kind"] == "dm":
-        return {r["a"], r["b"]}
+        return {x for x in (r["a"], r["b"]) if x}  # 2.152.0 A (#2164): a deleted partner is NULL (the room stays)
     if r["kind"] in TCX_KINDS:  # 2.113.1 (#2059): channels / groups (collab/teamchan.py)
         from .teamchan import tcx_members
         return tcx_members(c, r)

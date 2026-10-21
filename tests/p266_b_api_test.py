@@ -250,9 +250,9 @@ dbx("UPDATE office_docs SET client_id=? WHERE id=?", (M, I2), write=True)
 # ---- undo after the target was deleted
 r = A.post(M_URL, json={"target": T, "ids": [M]})
 RID3 = r.json()["run_id"]
-# 2.148.1 (#2484): a client with a finalised document is not deleted any more; the undo after a target gone (deleted by an
-# older version) is still checked: the row goes directly
-check(A.delete(B + f"/api/clients/{T}").status_code == 409, "#2484: the target with the finalised invoice is not deleted (409)")
+# 2.152.0 (#2168): a client with documents is archived instead of deleted -> the target goes by hand (as an org delete would) (bundle C: replaces the 409 of 2.148.1 #2484)
+r = A.delete(B + f"/api/clients/{T}")
+check(r.ok and r.json().get("archived") is True, "the target in use: archived instead of deleted " + r.text[:160])
 dbx("UPDATE lists SET client_id=NULL WHERE client_id=?", (T,), write=True)
 dbx("DELETE FROM clients WHERE id=?", (T,), write=True)
 r = A.post(undo_url(RID3))

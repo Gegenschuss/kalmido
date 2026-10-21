@@ -139,8 +139,11 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
     if (b.dataset.m === 'close') { close(); return; }
     try {
       if (b.dataset.m === 'del') {
-        if (!await askConfirm(tr('Delete the client “{0}”?', c.name), tr('Its lists stay; they only lose the client.'), {ok: tr('Delete'), danger: true})) return;
-        await api('DELETE', `/api/clients/${c.id}`); md.remove(); await load(); if (S.route.client === c.id) go('clients'); else render(); clReload(); return;
+        // 2.152.0 C (#2168): a client used in quotations / invoices / contracts is archived instead (the answer says so)
+        if (!await askConfirm(tr('Delete the client “{0}”?', c.name), tr('Clients used in quotations, invoices or contracts are archived instead. Their lists stay; they only lose the client.'), {ok: tr('Delete'), danger: true})) return;
+        const j = await api('DELETE', `/api/clients/${c.id}`); md.remove(); await load(); if (S.route.client === c.id) go('clients'); else render(); clReload();
+        if (j?.archived) toast(j.message, c.archived ? undefined : async () => { await api('PATCH', `/api/clients/${c.id}`, {archived: 0}); await load(); render(); clReload(); });
+        return;
       }
       const v = s => $(s, md)?.value ?? '';  // 2.97.0 B (#1951): the quick dialog (a document's "Add client") has name + address only
       const body = o.quick ? {name: v('#cl-name'), name_extra: v('#cl-nx')} : {name: v('#cl-name'), name_extra: v('#cl-nx'), icon: v('#cl-icon'), contacts: clkValue(md), email: v('#cl-email'),

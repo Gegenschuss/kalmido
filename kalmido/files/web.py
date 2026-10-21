@@ -132,7 +132,8 @@ def files_list():
     if space == "org" and oid not in ctx.org_ids:
         raise Denied(404)
     if space == "trash":
-        return jsonify(items=_trash(c, uid), node=None, crumbs=[], space="trash")
+        from ..core.retention import ret_days  # 2.152.0 B (#2165): the period of the trash, shown in the view
+        return jsonify(items=_trash(c, uid), node=None, crumbs=[], space="trash", trash_days=ret_days("trash"))
     vis = fs_visible_ids(c, uid)
     if space == "private":
         rows = fs_mail_rows(c, uid, c.execute("SELECT * FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=? "

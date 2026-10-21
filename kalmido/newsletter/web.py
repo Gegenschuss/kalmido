@@ -320,7 +320,9 @@ def nwl_consent():
         if (r["nl_status"] or "") in N.NWL_BLOCKED:
             kept += 1
             continue
-        N.nwl_set_status(c, cid, st, src.strip())
+        if N.nwl_set_status(c, cid, st, src.strip()) in N.NWL_BLOCKED and st not in N.NWL_BLOCKED:
+            kept += 1  # 2.152.0 D (#2170): the address is on the suppression list: stays unsubscribed
+            continue
         done.append(cid)
     c.commit()
     return jsonify({"changed": done, "kept": kept})

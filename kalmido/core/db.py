@@ -849,6 +849,12 @@ def init_db(guard=True, load=None):
         n = cdn_backfill(c)
         if n:
             print("clients: address fields filled from the free address for", n, "client(s)", flush=True)
+        if gsetting(c, "migr_upg2103") != "1":  # 2.152.0 A (#2164): time entries / direct messages outlive an account
+            from ..accounts.orgretain import upg_fk_once
+            upg_fk_once(c)
+            gset(c, "migr_upg2103", "1")
+        from .fkeys import fk_ensure
+        fk_ensure(c)  # 2.152.0 C (#2174): the missing foreign keys (orphans cleaned first), every start, idempotent
         from ..collab.msgsearch import msg_index_init
         msg_index_init(c)  # 2.33.0 (#1080) / 2.37.0: the message search (kalmido_fold + trigram GIN indexes)
         from ..tasks.ftsearch import fts_index_init

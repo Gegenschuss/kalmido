@@ -645,6 +645,14 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 .lgb-log li{display:flex;flex-direction:column;gap:.125rem;padding:.5rem .625rem;border-radius:var(--radius);background:var(--bg2)}
 .lgb-log small{color:var(--muted);overflow-wrap:anywhere}
 .lgb-foot{flex-wrap:wrap}
+/* 2.152.0 C (#2169): a closed drive, the change log in the dialog */
+.lgb-lock{display:flex;align-items:center;gap:.375rem;margin:0 0 .5rem;padding:.5rem .625rem;border-radius:var(--radius);background:var(--bg2);font-size:var(--fs-s)}
+.lgb-fixof{margin:0 0 .5rem;font-size:var(--fs-s);overflow-wrap:anywhere}
+.lgb-hist{margin:.5rem 0}
+.lgb-hist summary{display:flex;align-items:center;gap:.375rem;cursor:pointer;min-height:2.75rem;color:var(--muted)}
+.lgb-hlist{list-style:none;margin:.25rem 0;padding:0;display:flex;flex-direction:column;gap:.375rem;max-height:14rem;overflow:auto}
+.lgb-hlist li{display:flex;flex-direction:column;gap:.125rem;padding:.375rem .625rem;border-radius:var(--radius);background:var(--bg2);font-size:var(--fs-s)}
+.lgb-hlist small{color:var(--muted);overflow-wrap:anywhere}
 @media (max-width:40rem){
   .lgb-odo{grid-template-columns:1fr}
   .lgb-list .lgb-row{align-items:flex-start;padding:.625rem .75rem}

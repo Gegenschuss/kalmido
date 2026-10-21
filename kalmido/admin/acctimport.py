@@ -1428,11 +1428,13 @@ def umz_undo(c, uid, r):
         for t in c.execute(f"SELECT id, list_id FROM tasks WHERE id IN ({q}) AND created_by=? AND tt_id ILIKE 'kalmido:%'", part + [uid]).fetchall():
             if t["list_id"] not in own_lists and list_role(c, t["list_id"], uid) in WRITE_ROLES:
                 c.execute("UPDATE tasks SET parent_id=NULL WHERE parent_id=?", (t["id"],))
+                files += [x[0] for x in c.execute("SELECT path FROM attachments WHERE task_id=?", (t["id"],))]  # 2.152.0 D (#2173)
                 n_tasks += c.execute("DELETE FROM tasks WHERE id=?", (t["id"],)).rowcount
     gone, n_lists = [], 0
     for lid in own_lists:
         if c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=?", (lid, uid)).fetchone():
             n_tasks += c.execute("SELECT COUNT(*) FROM tasks WHERE list_id=?", (lid,)).fetchone()[0]
+            files += [x[0] for x in c.execute("SELECT a.path FROM attachments a JOIN tasks t ON t.id=a.task_id WHERE t.list_id=?", (lid,))]  # 2.152.0 D (#2173)
             n_lists += list_row_purge(c, lid, gone)
     for table, col in (("habits", "user_id"), ("filters", "user_id"), ("templates", "user_id"), ("ev_cals", "owner_id"),
                        ("books", "owner_id"), ("time_entries", "user_id")):

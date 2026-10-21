@@ -333,9 +333,7 @@ function accountWire(md) {
       if (a === 'org-new') orgModal(null, () => { orgsDraw(md); load().then(render).catch(() => {}); });  // 2.28.0 (#935)
       if (a === 'org-del') {
         const o = (S.orgs || []).find(x => x.id === +b.dataset.oid);
-        let rx = '';  // 2.146.0 D (#2468): an organisation with records to keep: the retention step first
-        if (o) { const ri = await api('GET', `/api/retention/org/${o.id}`).catch(() => null); if (ri?.needed && !(rx = await rxAsk(ri, o.name))) return; }
-        if (o && await askConfirm(tr('Delete the organisation “{0}”?', o.name), tr('Only possible while it has no lists. Its members keep their accounts.'), {ok: tr('Delete'), danger: true})) { await api('DELETE', `/api/admin/orgs/${o.id}${rx ? '?retention=' + rx : ''}`); toast(tr('Deleted')); orgsDraw(md); load().then(render).catch(() => {}); }
+        if (o && await odlDelete(o)) { orgsDraw(md); load().then(render).catch(() => {}); }  // 2.152.0 A (#2167): the numbers first
       }
       if (a === 'user-edit') userModal(users.find(u => u.id === +b.dataset.uid), () => { drawUsers(); orgsDraw(md); });
       if (a === 'agent-edit') {
@@ -747,7 +745,8 @@ async function ua8_delete(u) {
   if (j.retention?.needed) { rx = await rxAsk(j.retention, name); if (!rx) return false; }
   const rxq = () => rx ? `retention=${rx}` : '';
   if (!j.lists.length) {
-    if (!await askConfirm(tr('Delete user “{0}”?', name), tr('Their basket, habits, filters and focus history are deleted.'), {ok: tr('Delete user'), danger: true})) return false;
+    // 2.152.0 A (#2164): + what happens to the personal office, agents, calendars, time entries, direct messages
+    if (!await askConfirm(tr('Delete user “{0}”?', name), '', {html: `<p>${esc(tr('Their basket, habits, filters and focus history are deleted.'))}</p>${ua8PurgeHtml(j.purge)}`, ok: tr('Delete user'), danger: true})) return false;
     try { await api('DELETE', '/api/users/' + u.id + (rx ? '?' + rxq() : '')); } catch { return false; }
     return true;
   }
@@ -772,6 +771,7 @@ async function ua8_delete(u) {
         <div class="row"><label for="ua8-conf">${esc(tr('Type {0} to confirm', j.username))}</label><input id="ua8-conf" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
       </div>
     </fieldset>
+    ${ua8PurgeHtml(j.purge)}
     <div class="shint">${tr('Invoices and filed documents do not belong to a list: they stay.')}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" data-m="go">${tr('Delete user')}</button></div>`);
   const how = () => $('[name="ua8how"]:checked', md)?.value;
@@ -807,4 +807,55 @@ async function ua8_orgRemove(u, name, j) {
       toast(tr('Removed')); res('removed'); md.remove();
     });
   });
+}
+// ---- 2.152.0 A (#2164 #2167): what a deletion keeps by law, deletes along and hands on (orgretain.py)
+const ODL_WORDS = {
+  wiki_pages: n => trn('{0} knowledge page', '{0} knowledge pages', n), tables: n => trn('{0} table', '{0} tables', n),
+  office_documents: n => trn('{0} document', '{0} documents', n), documents: n => trn('{0} document', '{0} documents', n),
+  office_archive: n => trn('{0} archive entry', '{0} archive entries', n), archive: n => trn('{0} archive entry', '{0} archive entries', n),
+  trips: n => trn('{0} trip', '{0} trips', n), drives: n => trn('{0} drive', '{0} drives', n), clients: n => trn('{0} client', '{0} clients', n),
+  receipts: n => trn('{0} receipt', '{0} receipts', n), trip_receipts: n => trn('{0} receipt', '{0} receipts', n),
+  // 2.152.0 (#2167, review A6)
+  cash: n => trn('{0} cash book entry', '{0} cash book entries', n), bank: n => trn('{0} bank transaction', '{0} bank transactions', n),
+  meals: n => trn('{0} entertainment receipt', '{0} entertainment receipts', n)};
+const odlCounts = c => Object.entries(c || {}).filter(([k, n]) => n && ODL_WORDS[k]).map(([k, n]) => ODL_WORDS[k](n)).join(', ');
+const odlRetiredLabel = o => esc(tr('kept until {0}', fmtDate(o.retain_until))) + (o.retired_personal ? ' · ' + esc(tr('office of a deleted account')) : '');
+// the delete button of the organisations list: lists / files block as before (the server says it); a retired organisation
+// shows its period and the export; content going along or a retirement asks with the numbers and the export first
+async function odlDelete(o) {
+  let j; try { j = await api('GET', `/api/admin/orgs/${o.id}/delete-info`); } catch { return false; }
+  const today = new Date().toISOString().slice(0, 10), exp = j.can_export ? oxBoxHtml(o) : `<div class="shint">${esc(tr('Only an admin of the organisation can export it (Settings > Organisation).'))}</div>`;
+  if (j.kept_until && j.kept_until >= today) {
+    await askConfirm(tr('Delete the organisation “{0}”?', o.name), '', {ok: tr('Close'), after: md => oxDraw(md),
+      html: `<div class="shint keep">${esc(tr('This organisation is kept until {0} by law (invoices, receipts, logbook): it can be deleted after that', fmtDate(j.kept_until)))}</div>${exp}`});
+    return false;
+  }
+  const retire = !!j.retain_until && !j.kept_until, content = odlCounts(j.content);
+  // 2.146.0 D (#2468): records to keep and nothing retires it (the hosted instance keeps nothing): the retention step first
+  let rx = '';
+  if (!retire) { const ri = await api('GET', `/api/retention/org/${o.id}`).catch(() => null); if (ri?.needed && !(rx = await rxAsk(ri, o.name))) return false; }
+  const rxq = rx ? 'retention=' + rx : '';
+  if (!retire && !content) {
+    if (!await askConfirm(tr('Delete the organisation “{0}”?', o.name), tr('Only possible while it has no lists. Its members keep their accounts.'), {ok: tr('Delete'), danger: true})) return false;
+    try { await api('DELETE', `/api/admin/orgs/${o.id}${rxq ? '?' + rxq : ''}`); } catch { return false; }
+    toast(tr('Deleted')); return true;
+  }
+  const html = (retire ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(tr('It keeps {0} by law until {1}. It is retired instead of deleted: the members leave it, nobody sees it in the app any more, the instance admins can still export it, and it goes for good after that date.', odlCounts(j.kept), fmtDate(j.retain_until)))}</div>` : '')
+    + (content ? `<div class="shint keep odlcontent">${esc(tr('These go with it: {0}. Export the organisation first.', content))}</div>` : '') + exp;
+  if (!await askConfirm(tr('Delete the organisation “{0}”?', o.name), '', {html, ok: retire ? tr('Retire the organisation') : tr('Delete'), danger: true, after: md => oxDraw(md)})) return false;
+  try { await api('DELETE', `/api/admin/orgs/${o.id}?confirm=1${rxq ? '&' + rxq : ''}`); } catch { return false; }
+  toast(retire ? tr('Retired: kept until {0}', fmtDate(j.retain_until)) : tr('Deleted')); return true;
+}
+// the account's delete dialog: its personal office (deleted with its files, or retired by law), agents, organisation
+// calendars, time entries and direct messages
+function ua8PurgeHtml(p) {
+  if (!p) return '';
+  const rows = [];
+  if (p.office === 'keep') rows.push([true, tr('The personal office keeps {0} by law until {1}: it is retired (only the admins can export it), everything else of the account goes.', odlCounts(p.kept), fmtDate(p.kept_until))]);
+  else if (p.office === 'delete') rows.push([false, tr('The personal office goes with its files: {0}.', odlCounts(p.office_counts))]);
+  if (p.agents) rows.push([false, trn('{0} own agent is deleted with its access keys.', '{0} own agents are deleted with their access keys.', p.agents)]);
+  if (p.calendars) rows.push([false, trn('{0} calendar of an organisation goes to an admin of the organisation.', '{0} calendars of an organisation go to an admin of the organisation.', p.calendars)]);
+  if (p.time_kept) rows.push([false, trn('{0} time entry in projects of an organisation stays, without the name.', '{0} time entries in projects of an organisation stay, without the name.', p.time_kept)]);
+  if (p.dms) rows.push([false, trn('{0} direct conversation stays for the other person.', '{0} direct conversations stay for the other people.', p.dms)]);
+  return rows.map(([w, t]) => `<div class="shint keep ua8purge${w ? ' warn' : ''}">${w ? ic('alert', 's') + ' ' : ''}${esc(t)}</div>`).join('');
 }

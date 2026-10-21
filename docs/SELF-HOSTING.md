@@ -17,6 +17,7 @@ addresses and paths to your setup.
 - [Database (PostgreSQL)](#database-postgresql)
 - [Upgrade to 2.37 (PostgreSQL required)](#upgrade-to-237-postgresql-required)
 - [Backup and encryption](#backup-and-encryption)
+- [Deletion periods (2.152)](#deletion-periods-2152)
 - [Encryption of organisation data](#encryption-of-organisation-data)
 - [Encryption of private files](#encryption-of-private-files)
 - [Encryption in the browser (2.64)](#encryption-in-the-browser-264)
@@ -539,6 +540,66 @@ docker compose up -d kalmido
   - Restoring from the target: download the backup there and use *Restore from a file* (or copy it into the backup folder).
 - **Old snapshots contain plain text.** Filesystem, VM or provider snapshots taken before you switched on encryption
   still hold the data unencrypted: delete them.
+- **Backup retention and deleted accounts (2.152).** Weekly backups are kept for at most 52 weeks (an older, higher setting
+  reads as 52). The rotation runs once a day even while the automatic backups are switched off. Safety backups (written
+  before every restore) go after `KALMIDO_SAFETY_BACKUP_DAYS` days (30), also among the last three, once the deletion runs
+  are switched on (see [Deletion periods](#deletion-periods-2152)). Every deleted account is noted in a journal (the account
+  id and salted hashes of its e-mail and user name, no plain text); after a restore, accounts the backup brought back are
+  deleted again, and one that still owns lists is disabled for the admin to decide (an admin alert gives the numbers). The
+  archive now also holds the list header pictures (`attachments/listheads/`). Hosting for others:
+  `KALMIDO_BACKUP_ENCRYPT_REQUIRED=1` writes no backup without a passphrase (an admin alert says so); off by default.
+
+## Deletion periods (2.152)
+
+Data whose period ran out is deleted for good by background runs of the watchdog. Every run first **counts**: by default
+the switch is off and nothing is deleted (a dry run), so an update never removes anything by surprise. The admin reads the
+last result of every run as numbers only (no content) with `GET /api/admin/retention` (instance admins), and in the server
+log (`retention: trash would delete (dry run): files=3, wiki=1`).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `KALMIDO_RETENTION_PURGE` | off | `1` switches every deletion run on |
+| `KALMIDO_PURGE_TRASH`, `_LOGS`, `_BACKUPS`, `_FILES`, `_CHAT` | (general switch) | `1` / `0` for one run, wins over the general switch |
+| `KALMIDO_TRASH_DAYS` | 30 | days in a trash before deleted for good |
+| `KALMIDO_LOG_DAYS` | 400 | days of the activity and change logs |
+| `KALMIDO_SAFETY_BACKUP_DAYS` | 30 | days of a safety backup |
+| `KALMIDO_ORPHAN_DAYS` | 1 | age of a stored file without a row before the sweep removes it |
+| `KALMIDO_CHAT_KEEP_DAYS` | 0 | days of agent chat messages (0 = no day limit) |
+
+**Trash (`KALMIDO_TRASH_DAYS`).** At most hourly the run deletes what lies in a trash longer than the period: folders and
+files of the file store (every version, preview, recognised text, with the stored files on the disk), wiki pages, filed
+hub mails (with their word index; the mail's folder goes into the file store's trash and follows there), tables and the
+deleted rows and columns of a table, pipeline deals, invoice series, the placeholders of deleted team chat messages and
+the emptied rows of deleted comments. The file store's trash names the period. Lists, tasks and events have their own
+trash periods. Legal retention wins: a booked receipt or the logbook is locked until its period ends, never deleted early
+(such a node stays in the trash and is counted as `files_locked`).
+
+Expired credentials (sessions, tokens, codes past their end) are no data of a person any more and go without the switch.
+
+**Logs (`KALMIDO_LOG_DAYS`).** Once a day: the activity of tasks and lists, the file store's log, the log of organisation
+lists and the change log of tables after the period; admin alerts and the admin sign-in addresses after a year; finished
+agent jobs after 180 days. The office logs (documents, logbook, archive) belong to the bookkeeping and stay as long as
+their document.
+
+**Files (`KALMIDO_ORPHAN_DAYS`).** Once a week: stored attachment and agent chat files that no row names any more (older
+than the period), and file store versions beyond the newest 20 per file. A file that could not be removed is logged and
+tried again by this run.
+
+**Agent chat (`KALMIDO_CHAT_KEEP_DAYS`).** Optional day limit on top of the count limit. People can delete single
+messages and their whole history with an agent themselves at any time.
+
+**Retired organisations.** An organisation (or the personal office of a deleted account) that must keep invoices,
+archived documents, booked receipts, travel receipts in DATEV or a logbook by law is retired instead of deleted: no
+members, nothing visible in the app, export for instance admins only, public links answer 404. After the legal period
+(books 10 years, receipts and the logbook 8 years, from the end of the calendar year) the trash run deletes it for good.
+
+**Locks instead of deletion.** Booked receipts (paid or with a VAT rate), travel receipts in DATEV or billed on a finalised
+document, payments of finalised invoices (a reversal line instead), the logbook (closed after 7 days or per month,
+corrections as a new entry with a reason) and the archive import's undo (only within 24 hours, untouched) cannot be
+deleted for good while their period runs.
+
+**Database references.** On every start the server adds missing foreign keys for references to tasks, lists and people
+(`fk_ensure`); references to rows that no longer exist are cleared first, their number is logged once.
 
 ## Encryption of organisation data
 
@@ -1278,6 +1339,10 @@ Newsletter…* an organisation's admin connects the service for the organisation
   bounced address is never subscribed again by Kalmido and stays blocked in Kalmido; if the person
   subscribes again through the service's own form, Kalmido leaves that subscription alone. Manually with
   *Sync now*, or once a day. Every run is logged (numbers and error codes, never addresses or access data).
+- **Suppression list (2.152.0):** an unsubscription or bounce is also kept as a hash (SHA-256 of the lower-case address, per
+  workspace; never the address itself), so deleting or merging the contact does not make the address mailable again, and a
+  new import marked "yes" on that address stays unsubscribed. Consent, confirmation and unsubscription are logged as well
+  (event, source, time, again only the hash) as proof of consent.
 - **Access data** are stored sealed with a key derived from `KALMIDO_SECRET_KEY` (needed) and never shown again; the
   address goes through the same SSRF guard as calendar subscriptions (an instance in the local network: allow its host,
   e.g. `KALMIDO_CALENDAR_ALLOW_HOSTS=listmonk.example.com:9000`).

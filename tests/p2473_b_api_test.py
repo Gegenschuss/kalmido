@@ -168,6 +168,11 @@ d = A.get(B + f"{D}/{Q['id']}").json()
 check(r.ok and len(d["items"]) == 1 and d["items"][0]["title"] == "Reisekosten" and d["items"][0]["cost"] == 404.9, f"#1022: one position for all {d['items']}")
 check(A.post(B + f"{T}/bill", json={"doc_id": 999999, "item_ids": [TR2["items"][0]["id"]]}).status_code == 404, "#1022: an unknown document is 404")
 # delete + post back (undo)
+# 2.152.0 (#2168): a receipt ticked "in DATEV" keeps its trip (409); without the tick the trip is deleted as before
+check(A.delete(B + T + f"/{TR['id']}").status_code == 409, "#2168: a trip with a receipt in DATEV is kept")
+# 2.152.0 (#2168, review B-M1): the tick can no longer be taken back by PATCH (409); the test clears it in the database
+check(A.patch(B + f"{T}/{TR['id']}/items/{TR['items'][0]['id']}", json={"datev": 0}).status_code == 409, "#2168: the DATEV tick stays (409)")
+sql("UPDATE office_trip_items SET datev=0 WHERE id=?", (TR["items"][0]["id"],))
 r = A.delete(B + T + f"/{TR['id']}")
 old = r.json()["trip"]
 check(r.ok and not any(t["id"] == TR["id"] for t in A.get(B + T).json()["trips"]), "#1022: a trip is deleted with its receipts")

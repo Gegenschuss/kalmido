@@ -628,9 +628,9 @@ def bnk_unmatch(tid):
     was = {"kind": t["match_kind"], "id": t["match_id"]}
     if t["match_kind"] == "invoice" and t["payment_id"]:
         try:
-            inv_pay_del(c, oid, t["match_id"], t["payment_id"])
-        except Denied as e:  # removed by hand meanwhile
-            if e.code != 404:
+            inv_pay_del(c, oid, t["match_id"], t["payment_id"], uid=uid)
+        except Denied as e:  # removed by hand meanwhile (2.152.0 C (#2168): or already reversed by hand = 409)
+            if e.code not in (404, 409):
                 raise
     elif t["match_kind"] == "receipt":
         from .books import bk_receipt_set_paid

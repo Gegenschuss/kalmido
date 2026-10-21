@@ -708,6 +708,31 @@ The group no longer grows with every person you share a list with:
 - The pins are personal settings (`side_people`, `side_agents`) and hold on every device. A pinned person you no longer
   share a list with drops out quietly.
 
+## Deleting accounts and organisations: what the law keeps (2.152.0)
+
+- **Deleting an account** removes it completely, files on the disk included: the personal office (its documents, the
+  logo, the stored PDFs and XML) and the own files go, the inbox goes with its attachments, the person's own agents go
+  with their access keys. What belongs to others stays: time entries in projects of an organisation (without the
+  person's name), calendars of an organisation (to an admin of the organisation, as when leaving it), direct
+  conversations (for the other person). Mentions of the person read "@Deleted user"; the histories keep no id of it.
+- **Kept by law:** finalised invoices and archive entries (books, 10 years), booked receipts and receipts of trips taken
+  into DATEV, and the logbook (8 years), each counted from the end of its calendar year. A personal office or an
+  organisation with such data is **retired** instead of deleted: its members leave it, nobody sees it in the app any
+  more, the server admins see it in *Settings > Administration > Organisations* as "kept until ..." and export it (its delete
+  button shows the period and the export), nobody can change it. The account itself is deleted all the same. After the date the retention run deletes it
+  for good (only when the server's retention switch is on; until then it is counted, see SELF-HOSTING.md).
+- **Deleting an organisation** asks first when it would take knowledge pages, tables or office data along: the dialog
+  names them ("1 knowledge page, 2 tables") and offers the export of the organisation (its admins; for a retired one the
+  server admins). Lists and files in the file store still block the deletion as before.
+- The delete dialog of an account names the same: what is kept by law and until when, what goes with the personal office,
+  the agents, calendars, time entries and conversations.
+
+API for scripts of the web app (session): `GET /api/admin/orgs/{id}/delete-info` answers `{content, kept, retain_until,
+kept_until, retired, lists, files, can_export}`; `DELETE /api/admin/orgs/{id}` answers 409 with these numbers while
+content would go along or the organisation must be retired, `?confirm=1` deletes or retires it (`{retired: true,
+retain_until}`); `GET /api/admin/orgs` adds `retired_at`, `retain_until`, `retired_personal`; `GET /api/users/{id}/delete-info`
+adds `purge {office: delete | keep, office_counts, kept, kept_until, agents, calendars, time_kept, dms}`.
+
 ## Deleted lists in the trash (2.102.0)
 
 Deleting an archived list no longer scatters it: the list goes into the trash with everything in it (tasks, custom fields

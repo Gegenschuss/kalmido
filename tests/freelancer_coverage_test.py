@@ -90,6 +90,7 @@ ROUTES = {
     "GET /api/admin/agents/{}/machines": "admin", "GET /api/admin/alerts": "admin", "GET /api/admin/assistant": "admin",
     "GET /api/admin/backups": "admin", "GET /api/admin/backups/{}/download": "admin", "GET /api/admin/client-ip": "admin",
     "GET /api/admin/health": "admin",  # 2.102.0 D (#1994): the server's capacity numbers
+    "GET /api/admin/retention": "admin",  # 2.152.0 (#2165): the retention runs in numbers
     "GET /api/admin/lists/orphaned": "admin", "GET /api/admin/orgcrypt": "admin", "GET /api/admin/related": "admin",
     "GET /api/admin/storage-check": "admin", "GET /api/admin/upload-scan": "admin",
     "GET /api/v1/admin/agents/{}/audit": "admin", "GET /api/v1/admin/status": "admin", "GET /api/v1/admin/orgs/activity": "admin", "GET /api/admin/orgs/activity": "admin", "GET /api/v1/admin/users": "admin",
@@ -171,6 +172,7 @@ ROUTES = {
     "PATCH /api/agents/{}/color": "agents", "PATCH /api/my/agents/{}": "agents", "PATCH /api/v1/agent/jobs/{}": "agents",
     "POST /api/agent-schedules/{}/run": "agents", "POST /api/agents/jobs/{}/action": "agents",
     "POST /api/agents/{}/chat": "agents", "POST /api/agents/{}/chat/{}/choice": "agents",
+    "DELETE /api/agents/{}/chat": "agents", "DELETE /api/agents/{}/chat/{}": "agents",  # 2.152.0 D (#2175): p2103_d_api_test.py
     "POST /api/agents/{}/chat/{}/pin": "agents", "POST /api/agents/{}/chat/{}/reactions": "agents",
     "POST /api/agents/{}/meeting-images": "agents", "POST /api/agents/{}/schedules": "agents",
     "POST /api/agents/{}/share-all": "agents", "POST /api/agents/{}/wake": "agents", "POST /api/assistant/run": "agents",
@@ -464,7 +466,9 @@ ROUTES = {
     "PUT /api/office/docs/{}/parts/{}/items": "office", "PUT /api/office/settings": "office", "PUT /api/paperless": "office",
     # ---- orgadmin (23; 2.137.0 A (#2344): export of the own personal office -> "office")
     "GET /api/org-icon/{}/{}.png": "orgadmin", "POST /api/orgs/{}/icon": "orgadmin", "DELETE /api/orgs/{}/icon": "orgadmin",  # 2.87.9 (#1913)
-    "DELETE /api/admin/orgs/{}": "orgadmin", "DELETE /api/orgs/{}/export": "office",
+    "DELETE /api/admin/orgs/{}": "orgadmin",
+    "GET /api/admin/orgs/{}/delete-info": "orgadmin",  # 2.152.0 A (#2167)
+    "DELETE /api/orgs/{}/export": "office",
     "DELETE /api/orgs/{}/lists/{}": "orgadmin", "DELETE /api/orgs/{}/lists/{}/icon": "orgadmin",
     "DELETE /api/orgs/{}/members/{}": "orgadmin", "GET /api/admin/orgs": "orgadmin", "GET /api/orgs/{}/encryption": "orgcrypt",
     "GET /api/orgs/{}/export": "office", "GET /api/retention/me": "office", "GET /api/retention/me/export.zip": "office", "GET /api/retention/org/{}": "orgadmin", "GET /api/retention/org/{}/export.zip": "orgadmin",
@@ -855,6 +859,7 @@ ROUTES = {
     "PATCH /api/office/cash-entries/{}": "office", "POST /api/office/cash-entries/{}/cancel": "office", "GET /api/office/cash-entries/{}/log": "office",
     "GET /api/office/cashbooks/{}/closing": "office", "POST /api/office/cashbooks/{}/closing": "office", "GET /api/office/cashbooks/{}/log": "office",
     "GET /api/docs/{}/cashbook": "office", "GET /api/office/cashbook.csv": "office", "GET /api/office/cashbook.pdf": "office",
+    "POST /api/office/logbook/close": "office",  # 2.152.0 (#2169): close a month of the logbook, the personal office of a freelancer in p2103_c_api_test.py
     # 2.94.0 (#1930): leads (personal office, p294_a_api_test.py); (#1929): the booking page (own calendar, p294_b_api_test.py),
     # its public pages (a customer without an account, the same for a freelancer's page: p294_b_api_test.py books on one)
     "DELETE /api/appt/types/{}": "pim", "GET /api/appt/bookings": "pim", "GET /api/appt/page": "pim", "GET /api/appt/types": "pim",

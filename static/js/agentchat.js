@@ -563,6 +563,26 @@ function chatStepsKept(m) {
   const st = m.steps || []; if (!st.length) return '';
   return `<div class="csteps" role="note" aria-label="${esc(tr('Steps'))}">${st.map(x => `<span>${esc(x.text)}</span>`).join('')}</div>`;
 }
+// ---- 2.152.0 D (#2175): delete one message or the whole history with this agent for good (no undo step: asks first)
+async function acdDeleteMsg(mid) {
+  const aid = S.chat.aid, m = S.chat.msgs.find(x => x.id === mid); if (!aid || !m) return;
+  if (!await askDialog({title: tr('Delete message'), body: tr('The message and its files are deleted for good. This cannot be undone.'), ok: tr('Delete'), danger: true})) return;
+  try { await api('DELETE', `/api/agents/${aid}/chat/${mid}`); } catch (e) { toast(e.message || tr('Error')); return; }
+  if (S.chat.aid === aid) { S.chat.msgs = S.chat.msgs.filter(x => x.id !== mid); chatPatch({keep: true}); }
+  toast(tr('Message deleted'));
+}
+async function acdDeleteAll() {
+  const aid = S.chat.aid, a = agentById(aid); if (!aid) return;
+  if (!await askDialog({title: tr('Delete history'), body: tr('The whole conversation with {0} and its files are deleted for good. This cannot be undone.', a?.name || ''), ok: tr('Delete history'), danger: true})) return;
+  try { await api('DELETE', `/api/agents/${aid}/chat`); } catch (e) { toast(e.message || tr('Error')); return; }
+  if (S.chat.aid === aid) { S.chat.msgs = []; S.chat.more = false; chatPatch({}); }
+  toast(tr('History deleted'));
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-act="chat-head-menu"]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  menu(b, [{label: tr('Delete history'), icon: 'trash', fn: () => acdDeleteAll()}]);
+});
 function chatStepsTog() {
   const on = stepsAlwaysOn(), t = tr('Always show steps');
   return `<button type="button" class="iconbtn chstog${on ? ' on' : ''}" data-act="steps-always" aria-pressed="${on}" title="${esc(t)}" aria-label="${esc(t)}">${ic('list', 's')}</button>`;
@@ -634,7 +654,7 @@ function chatInner(aid) {
   // 2.13.0 (#453): the note that used to sit under the input is behind the (i) next to the name
   const gc = ac_color(a.id), gcs = gc ? ` agcol" style="--agcol:${gc}` : '';  // 2.144.0 B (#2411): the agent's own colour on the header and the box
   return `<div class="chath${gcs}">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${chatRingHtml(a)}${chatModeHtml(a)}</span><span class="chl2">${chatStHtml(a)}${chatModelHtml(a)}${chatPausedHtml(a)}</span></div><span class="spacer"></span>
-      ${msgSearchBtn('a', a.id)}${jcd_fbtnHtml()}${jcf_btnHtml()}${chatStepsTog()}${back ? '' : chatWinBtns()}${typeof cw_headBtns === 'function' ? cw_headBtns('a:' + a.id) : ''}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</div>
+      ${msgSearchBtn('a', a.id)}${jcd_fbtnHtml()}${jcf_btnHtml()}${chatStepsTog()}${S.chat.job ? '' : `<button type="button" class="iconbtn" data-act="chat-head-menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}" aria-haspopup="menu">${ic('dots', 's')}</button>`}${back ? '' : chatWinBtns()}${typeof cw_headBtns === 'function' ? cw_headBtns('a:' + a.id) : ''}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</div>
     ${jc_barHtml()}${jcd_filtHtml()}${msBarHtml('a', a.id)}<div class="apvpins" id="chat-apv" hidden></div>${cpnBarHtml('a:' + a.id)}<div class="chmsgs" id="chat-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${chatMsgs()}</div>
     <button type="button" class="chnew hidden" id="chat-new" data-act="chat-bottom">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${typingHtml(chatTypers(a), 'chat-typing')}

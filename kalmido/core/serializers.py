@@ -210,17 +210,36 @@ def attachment_files(c, task_ids):
 
 def unlink_files(paths):
     root = os.path.realpath(ATT_DIR)
+    failed = []
     for p in paths:
+        if callable(p):  # 2.152.0 A (#2164): a clean-up after the commit outside ATT_DIR (an office folder, a picture)
+            try:
+                p()
+            except Exception as e:  # noqa: BLE001 - the data is gone already; what is left is logged
+                print("clean-up after a deletion failed:", type(e).__name__, flush=True)
+            continue
+        full = os.path.join(ATT_DIR, p)
         try:
-            full = os.path.join(ATT_DIR, p)
             if not os.path.realpath(full).startswith(root + os.sep):  # 2.143.0 B (#2211, review): only files under ATT_DIR
                 continue
             os.remove(full)
+        except FileNotFoundError:
+            continue
+        except OSError as e:  # 2.152.0 D (#2173): counted + logged (path relative), tried again by the orphan sweep
+            from ..notify.alerts import aa_count, aa_oserr
+            aa_count("storage", "unlink", aa_oserr(e))
+            print(f"unlink failed: {p} {type(e).__name__}", flush=True)
+            failed.append(p)
+            continue
+        try:
             d = os.path.dirname(full)
             if d != ATT_DIR and not os.listdir(d):
                 os.rmdir(d)
         except OSError:
             pass
+    if failed:
+        from ..admin.dataretention import orf_queue
+        orf_queue(failed)
 
 
 def running_pomo(c, uid=None):

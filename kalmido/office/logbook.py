@@ -17,7 +17,7 @@ import csv
 import io
 import json
 import re
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from flask import jsonify, request, Response
@@ -26,11 +26,12 @@ from ..core.config import app
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, lang, tr
-from ..core.db import body, bump, db, iso, now_utc
+from ..core.db import body, bump, db, iso, local_now, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import ofx_name1, office_gate, office_org, office_settings, office_settings_save
+from .olock import olk_active, olk_until
 
 LB_VEH_KINDS = ("private", "company")
 LB_KINDS = (("business", N_("Business")), ("private", N_("Private|drive")), ("commute", N_("Home - workplace")))
@@ -146,7 +147,7 @@ def lb_vehicles(c, oid):
     """Every vehicle of the area (archived ones too), with last_odo = the odometer to start the next drive with."""
     last = {r["vehicle_id"]: r["m"] for r in c.execute(
         "SELECT vehicle_id, MAX(odo_end) AS m FROM office_drives WHERE org_id=? AND deleted_at IS NULL AND odo_end IS NOT NULL "
-        "GROUP BY vehicle_id", (oid,))}
+        "AND " + LBC_LIVE + " GROUP BY vehicle_id", (oid, oid))}  # 2.152.0 (#2169, review B-L1): without corrected drives
     out = []
     for r in c.execute("SELECT * FROM office_vehicles WHERE org_id=? ORDER BY archived, lower(name), id", (oid,)):
         d = oc_dec_fields(c, oid, "office_vehicles", r)
@@ -256,6 +257,70 @@ def _log(c, oid, did, action, prev, uid):
     c.execute(f"INSERT INTO office_drive_log({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
 
 
+# ---------------------------------------------------------------- 2.152.0 C (#2169): closing, corrections
+# BFH VI R 64/04, VI B 37/23: an electronic logbook counts only when later changes are impossible or documented in the file
+# itself. A drive is closed LBC_DAYS after its day (or after it was entered, whichever is later -- an entry made late can
+# still be fixed for a week) or when its month was closed ("Close month", per vehicle or the whole office; no way back).
+# A closed drive: PATCH / DELETE 409; the fix is a new drive with a reason (corrects_id = the old one, which stays visible,
+# marked "corrected by", and leaves the sums). Deleted drives stay until the legal period ends (lbc_purge_ok).
+LBC_DAYS = 7
+LBC_NOTE_MAX = 500
+LBC_AUTO = N_("This drive is closed (a week after the drive): correct it with a new entry.")
+LBC_MONTH = N_("This month is closed in the logbook: correct the drive with a new entry.")
+LBC_MONTH_NEW = N_("This month is closed in the logbook.")
+LBC_DONE = N_("This drive has already been corrected: correct the newer entry.")
+
+
+def lbc_closed(c, oid):
+    """{(vehicle_id or 0, "YYYY-MM")} of the closed months of office oid (vehicle 0 = every vehicle)."""
+    return {(r["vehicle_id"] or 0, r["month"]) for r in c.execute("SELECT vehicle_id, month FROM office_drive_closed WHERE org_id=?", (oid,))}
+
+
+def lbc_month_closed(closed, vid, day):
+    m = (day or "")[:7]
+    return bool(m) and ((0, m) in closed or ((vid or 0), m) in closed)
+
+
+def lbc_lock(c, oid, r, closed=None):
+    """None | "auto" | "month": why drive row r (a dict / row with day, vehicle_id, created_at) can no longer be changed."""
+    closed = lbc_closed(c, oid) if closed is None else closed
+    if lbc_month_closed(closed, r["vehicle_id"], r["day"]):
+        return "month"
+    ref = max(r["day"] or "", (r["created_at"] or "")[:10])
+    try:
+        return "auto" if ref and date.fromisoformat(ref) + timedelta(days=LBC_DAYS) < local_now().date() else None
+    except ValueError:
+        return None
+
+
+def lbc_need_open(c, oid, r):
+    why = lbc_lock(c, oid, r)
+    if why:
+        raise Denied(409, tr(LBC_MONTH if why == "month" else LBC_AUTO))
+    if lbc_successors(c, oid, [r["id"]]):
+        raise Denied(409, tr(LBC_DONE))
+
+
+def lbc_successors(c, oid, ids=None):
+    """{old drive id: id of the (not deleted) drive correcting it}."""
+    sql, args = "SELECT id, corrects_id FROM office_drives WHERE org_id=? AND corrects_id IS NOT NULL AND deleted_at IS NULL", [oid]
+    if ids is not None:
+        if not ids:
+            return {}
+        sql += f" AND corrects_id IN ({','.join('?' * len(ids))})"
+        args += list(ids)
+    return {r["corrects_id"]: r["id"] for r in c.execute(sql + " ORDER BY id", args)}
+
+
+LBC_LIVE = "id NOT IN (SELECT corrects_id FROM office_drives WHERE org_id=? AND corrects_id IS NOT NULL AND deleted_at IS NULL)"
+
+
+def lbc_purge_ok(c, r):
+    """May a deleted drive row r go for good (a trash period run)? Only after the legal period (8 years from the end of its
+    year, core/retention.py RET_LEGAL_YEARS["logbook"])."""
+    return not olk_active(olk_until(r["day"] or (r["created_at"] or "")[:10], "logbook"))
+
+
 def _drive_clean(c, oid, uid, b, cur=None):
     """The columns of a drive from body b (partial when cur, the decrypted row, is given). km from the odometer when both
     ends are given and km is not; the end never before the start."""
@@ -317,7 +382,8 @@ def _warns(c, oid, vid):
         return {}
     out, prev = {}, None
     for r in c.execute("SELECT id, odo_start, odo_end FROM office_drives WHERE org_id=? AND vehicle_id=? AND deleted_at IS NULL "
-                       "AND (odo_start IS NOT NULL OR odo_end IS NOT NULL) ORDER BY day, COALESCE(odo_start, odo_end), id", (oid, vid)):
+                       "AND (odo_start IS NOT NULL OR odo_end IS NOT NULL) AND " + LBC_LIVE  # 2.152.0 C (#2169)
+                       + " ORDER BY day, COALESCE(odo_start, odo_end), id", (oid, vid, oid)):
         s = dec(r["odo_start"]) if r["odo_start"] is not None else None
         if s is not None and prev is not None and s != prev:
             out[r["id"]] = {"kind": "gap" if s > prev else "overlap", "km": _km_str(abs(s - prev))}
@@ -326,7 +392,7 @@ def _warns(c, oid, vid):
     return out
 
 
-def lb_drive_public(c, oid, r, names=None, warns=None, trips=None):
+def lb_drive_public(c, oid, r, names=None, warns=None, trips=None, closed=None, succ=None):
     d = oc_dec_fields(c, oid, "office_drives", r)
     out = _vals(d)
     tid = d.get("trip_id")
@@ -337,6 +403,10 @@ def lb_drive_public(c, oid, r, names=None, warns=None, trips=None):
     hint = tr("The trip in the travel expenses still has {0} km.", tkm if lang() == "en" else _de(tkm)) if tkm is not None and tkm != out["km"] else ""
     out.update(id=d["id"], trip_id=tid, trip_km=tkm, trip_hint=hint, driver=(names or {}).get(d.get("user_id")) or "", deleted=bool(d.get("deleted_at")),
                warn=(warns or {}).get(d["id"]), created_at=d["created_at"], updated_at=d["updated_at"])
+    # 2.152.0 C (#2169): closed (auto | month), the correction it is (corrects_id + reason) / the one that corrected it
+    succ = lbc_successors(c, oid, [d["id"]]) if succ is None else succ
+    out.update(locked=lbc_lock(c, oid, d, closed), corrects_id=d.get("corrects_id"), correct_note=d.get("correct_note") or "",
+               corrected_by=succ.get(d["id"]))
     return out
 
 
@@ -361,7 +431,8 @@ def lb_drives(c, oid, uid, vehicle_id=None, year=None, deleted=False):
     for vid in {r["vehicle_id"] for r in rows if r["vehicle_id"]}:
         warns.update(_warns(c, oid, vid))
     trips = {r[0]: r[1] for r in c.execute("SELECT id, km FROM office_trips WHERE org_id=?", (oid,))}
-    return [lb_drive_public(c, oid, r, names, warns, trips) for r in rows]
+    closed, succ = lbc_closed(c, oid), lbc_successors(c, oid)
+    return [lb_drive_public(c, oid, r, names, warns, trips, closed, succ) for r in rows]
 
 
 def _one(c, oid, uid, did):
@@ -378,7 +449,8 @@ def lb_drives_get():
     if vid is not None:
         _vehicle(c, oid, vid)
     y = _year(request.args.get("year"))
-    return jsonify(drives=lb_drives(c, oid, uid, vid, y), year=y)
+    return jsonify(drives=lb_drives(c, oid, uid, vid, y), year=y, lock_days=LBC_DAYS,
+                   closed=[{"vehicle_id": v or None, "month": m} for v, m in sorted(lbc_closed(c, oid), key=lambda x: x[1])])
 
 
 @app.post("/api/office/drives")
@@ -386,13 +458,28 @@ def lb_drive_post():
     """A new drive {vehicle_id, day, start_place, dest, purpose, km | odo_start + odo_end, kind business|private|commute,
     client_id, project, user_id (driver, default: me)}. 201 the drive (warn: gap / overlap to the previous odometer)."""
     c, uid, oid = _ctx()
-    row = _drive_clean(c, oid, uid, _body())
+    b = _body()
+    row = _drive_clean(c, oid, uid, b)
+    old = None
+    if b.get("corrects_id") is not None:  # 2.152.0 C (#2169): a correction of a drive (also of a closed one), with its reason
+        write_lock(c, f"office_drive_fix_{oid}")
+        old = _drive(c, oid, _id(b.get("corrects_id"), "corrects_id"))
+        if lbc_successors(c, oid, [old["id"]]):
+            raise Denied(409, tr(LBC_DONE))
+        note = _text(b.get("correct_note"), "correct_note", LBC_NOTE_MAX).strip()
+        if not note:
+            raise BadInput(tr("A correction needs its reason"))
+        row.update(corrects_id=old["id"], correct_note=note)
+    elif lbc_month_closed(lbc_closed(c, oid), row.get("vehicle_id"), row.get("day")):
+        raise Denied(409, tr(LBC_MONTH_NEW))
     ts = iso(now_utc())
     row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)
     plain = dict(row)
     row = oc_enc_fields(c, oid, "office_drives", row)
     did = insert_id(c, f"INSERT INTO office_drives({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     _log(c, oid, did, "create", _vals(plain), uid)  # create: the values entered
+    if old is not None:
+        _log(c, oid, old["id"], "corrected", {"by": did, "note": plain["correct_note"]}, uid)
     bump(c)
     c.commit()
     return jsonify(_one(c, oid, uid, did)), 201
@@ -403,7 +490,12 @@ def lb_drive_patch(did):
     """Partial drive (keys as POST); logs the values before of every changed field."""
     c, uid, oid = _ctx()
     cur = oc_dec_fields(c, oid, "office_drives", _drive(c, oid, did))
+    lbc_need_open(c, oid, cur)  # 2.152.0 C (#2169): closed -> 409 (a correction is a new drive)
     row = _drive_clean(c, oid, uid, _body(), cur)
+    moved = ("day" in row and row["day"] != cur["day"]) or ("vehicle_id" in row and row["vehicle_id"] != cur["vehicle_id"])
+    # review F8: also a change of the vehicle alone must not put the drive into a month closed for that vehicle
+    if moved and lbc_month_closed(lbc_closed(c, oid), row.get("vehicle_id", cur["vehicle_id"]), row.get("day", cur["day"])):
+        raise Denied(409, tr(LBC_MONTH_NEW))
     before, after = _vals(cur), _vals(dict(cur, **row))
     prev = {k: before[k] for k in LB_FIELDS if before[k] != after[k]}
     if prev:
@@ -421,6 +513,7 @@ def lb_drive_delete(did):
     """Removes a drive (deleted_at; the row and its log stay; POST .../restore brings it back)."""
     c, uid, oid = _ctx()
     cur = oc_dec_fields(c, oid, "office_drives", _drive(c, oid, did))
+    lbc_need_open(c, oid, cur)  # 2.152.0 C (#2169): a closed drive stays (409)
     ts = iso(now_utc())
     c.execute("UPDATE office_drives SET deleted_at=?, updated_at=? WHERE id=? AND org_id=?", (ts, ts, did, oid))
     _log(c, oid, did, "delete", _vals(cur), uid)
@@ -432,7 +525,12 @@ def lb_drive_delete(did):
 @app.post("/api/office/drives/<int:did>/restore")
 def lb_drive_restore(did):
     c, uid, oid = _ctx()
-    _drive(c, oid, did, deleted=True)
+    r = _drive(c, oid, did, deleted=True)
+    why = lbc_lock(c, oid, oc_dec_fields(c, oid, "office_drives", r))  # 2.152.0 (#2169, review B-M8): not back into a closed month / after the week
+    if why:
+        raise Denied(409, tr(LBC_MONTH if why == "month" else LBC_AUTO))
+    if r["corrects_id"] and lbc_successors(c, oid, [r["corrects_id"]]):  # 2.152.0 C (#2169): one correction per drive
+        raise Denied(409, tr(LBC_DONE))
     c.execute("UPDATE office_drives SET deleted_at=NULL, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), did, oid))
     _log(c, oid, did, "restore", {}, uid)
     bump(c)
@@ -510,8 +608,8 @@ def lb_allowance_year(c, oid, year):
     rate = lb_rate(c, oid, year)
     km, n = Decimal(0), 0
     for r in c.execute("SELECT d.km FROM office_drives d JOIN office_vehicles v ON v.id=d.vehicle_id AND v.org_id=d.org_id "
-                       "WHERE d.org_id=? AND d.deleted_at IS NULL AND d.kind='business' AND v.kind='private' AND substr(d.day, 1, 4)=?",
-                       (oid, str(year))):
+                       "WHERE d.org_id=? AND d.deleted_at IS NULL AND d.kind='business' AND v.kind='private' AND substr(d.day, 1, 4)=? "
+                       "AND d." + LBC_LIVE, (oid, str(year), oid)):  # 2.152.0 C (#2169): a corrected drive counts through its correction
         km += dec(r["km"] or 0)
         n += 1
     return {"km": km, "amount": money(km * dec(rate)), "rate": rate, "count": n}
@@ -523,8 +621,8 @@ def lb_report(c, oid, uid, year, vehicle_id=None):
     vs = [v for v in lb_vehicles(c, oid) if vehicle_id is None or v["id"] == vehicle_id]
     sums = {v["id"]: {k: Decimal(0) for k in LB_KIND_KEYS} for v in vs}
     count = {v["id"]: 0 for v in vs}
-    for r in c.execute("SELECT vehicle_id, kind, km FROM office_drives WHERE org_id=? AND deleted_at IS NULL AND substr(day, 1, 4)=?",
-                       (oid, str(year))):
+    for r in c.execute("SELECT vehicle_id, kind, km FROM office_drives WHERE org_id=? AND deleted_at IS NULL AND substr(day, 1, 4)=? AND "
+                       + LBC_LIVE, (oid, str(year), oid)):  # 2.152.0 C (#2169): without corrected drives
         if r["vehicle_id"] in sums and r["kind"] in LB_KIND_KEYS:
             sums[r["vehicle_id"]][r["kind"]] += dec(r["km"] or 0)
             count[r["vehicle_id"]] += 1
@@ -589,6 +687,30 @@ def lb_settings_put():
     return jsonify(km_rate=lb_rate(c, oid, y), year=y)
 
 
+@app.post("/api/office/logbook/close")
+def lbc_close_post():
+    """2.152.0 C (#2169): {month: "YYYY-MM", vehicle_id?: id (none = every vehicle)} closes a month of the logbook for good:
+    its drives can then only be corrected by a new entry. Months up to the current one; closing twice is fine (200).
+    Logged in the office log. -> {closed: [{vehicle_id, month}]}"""
+    from .ledger import ofx_log
+    c, uid, oid = _ctx()
+    b = _body()
+    m = b.get("month")
+    if not isinstance(m, str) or not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", m) or m > local_now().date().isoformat()[:7]:
+        raise BadInput(tr("Invalid value: {0}", "month"))
+    vid = _id(b.get("vehicle_id"), "vehicle_id")
+    if vid is not None:
+        _vehicle(c, oid, vid)
+    write_lock(c, f"office_drive_close_{oid}")
+    if (vid or 0, m) not in lbc_closed(c, oid):
+        c.execute("INSERT INTO office_drive_closed(org_id, vehicle_id, month, closed_by, closed_at) VALUES(?,?,?,?,?)",
+                  (oid, vid, m, uid, iso(now_utc())))
+        ofx_log(c, oid, "close", target="logbook_month", detail={"month": m, "vehicle_id": vid})
+        bump(c)
+        c.commit()
+    return jsonify(closed=[{"vehicle_id": v or None, "month": x} for v, x in sorted(lbc_closed(c, oid), key=lambda z: z[1])])
+
+
 def _kind_label(k):
     return tr(dict(LB_KINDS).get(k, "Business"))
 
@@ -625,11 +747,16 @@ def lb_office_log(c, oid, year, vids, vs):
     from .ledger import _log_public
     labels = {"name": tr("Name"), "plate": tr("Plate"), "kind": tr("Kind"), "odo_start": tr("Odometer start"), "archived": tr("Archived")}
     out = []
-    for r in c.execute("SELECT * FROM office_doc_log WHERE org_id=? AND target IN ('vehicle', 'km_rate') ORDER BY id", (oid,)):
+    for r in c.execute("SELECT * FROM office_doc_log WHERE org_id=? AND target IN ('vehicle', 'km_rate', 'logbook_month') ORDER BY id", (oid,)):
         d = _log_public(c, r)
         det = d["detail"] if isinstance(d["detail"], dict) else {}
         b, a = det.get("before") or {}, det.get("after") or {}
-        if r["target"] == "km_rate":
+        if r["target"] == "logbook_month":  # 2.152.0 C (#2169): "Close month"
+            if str(det.get("month") or "")[:4] != str(year) or (det.get("vehicle_id") and det.get("vehicle_id") not in vids):
+                continue
+            name = (vs.get(det.get("vehicle_id")) or {}).get("name") or tr("All vehicles")
+            text = f"{tr('Month closed')} {det.get('month')}: {name}"
+        elif r["target"] == "km_rate":
             if str(det.get("year")) != str(year):
                 continue
             text = f"{tr('Mileage allowance per business km')} {year}: {_de(b.get('km_rate'))} -> {_de(a.get('km_rate'))}"
@@ -652,7 +779,7 @@ def _prev_text(prev, vs, clients):
     """The logged values as one readable line (field: value, ...)."""
     labels = {"vehicle_id": tr("Vehicle"), "user_id": tr("Driver"), "day": tr("Date"), "start_place": tr("Start"), "dest": tr("Destination"),
               "purpose": tr("Purpose"), "km": "km", "odo_start": tr("Odometer start"), "odo_end": tr("Odometer end"), "kind": tr("Kind"),
-              "client_id": tr("Client"), "project": tr("Project")}
+              "client_id": tr("Client"), "project": tr("Project"), "by": tr("Corrected by"), "note": tr("Reason")}  # 2.152.0 C (#2169)
     out = []
     for k, v in prev.items():
         if k == "vehicle_id":
@@ -668,7 +795,8 @@ def _prev_text(prev, vs, clients):
 
 
 LB_ACTIONS = {"create": N_("Created"), "change": N_("Changed"), "delete": N_("Deleted"), "restore": N_("Restored"),
-              "update": N_("Changed"), "trip": N_("Taken over into the travel expenses")}  # 2.93.0 B (#1928 review): update, trip
+              "update": N_("Changed"), "trip": N_("Taken over into the travel expenses"),  # 2.93.0 B (#1928 review): update, trip
+              "corrected": N_("Corrected"), "close": N_("Month closed")}  # 2.152.0 C (#2169)
 
 
 @app.get("/api/office/logbook.csv")
@@ -682,21 +810,26 @@ def lb_csv():
     w = csv.writer(buf, delimiter=";", lineterminator="\r\n")
     cell = bk_csv_cell
     w.writerow([tr("Date"), tr("Vehicle"), tr("Plate"), tr("Driver"), tr("Start"), tr("Destination"), tr("Purpose"), tr("Client"), tr("Project"),
-                tr("Kind"), tr("Odometer start"), tr("Odometer end"), "km"])
+                tr("Kind"), tr("Odometer start"), tr("Odometer end"), "km",
+                # 2.152.0 C (#2169): fixed columns at the end for a machine check (section 147 (2) AO): the drive's number, the one it
+                # corrects / that corrected it, the reason, closed yes / no
+                "ID", tr("Corrects"), tr("Corrected by"), tr("Reason"), tr("Closed")])
     for d in drives:
         v = vs.get(d["vehicle_id"]) or {}
         w.writerow([d["day"], cell(v.get("name")), cell(v.get("plate")), cell(d["driver"]), cell(d["start_place"]), cell(d["dest"]), cell(d["purpose"]),
-                    cell(clients.get(d["client_id"], "")), cell(d["project"]), cell(_kind_label(d["kind"])), _de(d["odo_start"]), _de(d["odo_end"]), _de(d["km"])])
+                    cell(clients.get(d["client_id"], "")), cell(d["project"]), cell(_kind_label(d["kind"])), _de(d["odo_start"]), _de(d["odo_end"]), _de(d["km"]),
+                    d["id"], d.get("corrects_id") or "", d.get("corrected_by") or "", cell(d.get("correct_note") or ""), 1 if d.get("locked") else 0])
     w.writerow([])
     w.writerow([cell(tr("Vehicle")), tr("km total"), tr("Business"), tr("Private|drive"), tr("Home - workplace"), tr("Business share"), tr("Mileage allowance")])
     for v in rep["vehicles"]:
         w.writerow([cell(v["name"]), _de(v["km_total"]), _de(v["km_business"]), _de(v["km_private"]), _de(v["km_commute"]), f"{v['business_pct']} %", _de(v["allowance"])])
     w.writerow([])
     w.writerow([cell(tr("Change log"))])
-    w.writerow([tr("Time"), tr("Date"), tr("Action"), tr("By"), tr("Values before")])
+    w.writerow([tr("Time"), tr("Date"), tr("Action"), tr("By"), tr("Values before"), "ID"])  # 2.152.0 C (#2169): + the drive's number
     days = {d["id"]: d["day"] for d in drives}
     for r in log:
-        w.writerow([r["at"], days.get(r["drive_id"], ""), cell(tr(LB_ACTIONS.get(r["action"], r["action"]))), cell(r["by"]), cell(r.get("text") or _prev_text(r["prev"], vs, clients))])
+        w.writerow([r["at"], days.get(r["drive_id"], ""), cell(tr(LB_ACTIONS.get(r["action"], r["action"]))), cell(r["by"]), cell(r.get("text") or _prev_text(r["prev"], vs, clients)),
+                    r["drive_id"] or ""])
     w.writerow([cell(tr(LB_NOTE))])
     ofx_log(c, oid, "export", target="logbook", detail={"what": "logbook.csv", "year": y})
     c.commit()
@@ -760,6 +893,12 @@ def lb_pdf_bytes(c, oid, y, vs, clients, drives, log, rep, lang):
         for (cx, cw, al), val, mx in zip(cols, vals, lim):
             pg().text(cx, st["y"], str(val)[:mx], 7, align=al, width=cw)
         st["y"] += 11
+        # 2.152.0 C (#2169): a corrected drive / a correction says so under its line (the reason in full in the change log)
+        fix = " · ".join(x for x in ((tr("Corrected by entry {0}", d["corrected_by"]) if d.get("corrected_by") else ""),
+                                      (tr("Correction of entry {0}: {1}", d["corrects_id"], d.get("correct_note") or "") if d.get("corrects_id") else "")) if x)
+        if fix:
+            pg().text(cols[1][0], st["y"] - 2, fix[:110], 6.5, color=C_INK2)
+            st["y"] += 9
     if not drives:
         pg().text(x0, st["y"], tr("No drives in this year."), 8, color=C_INK2)
         st["y"] += 12

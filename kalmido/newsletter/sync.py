@@ -230,8 +230,62 @@ def nwl_seg_counts(c, conn, seg_rule, rows=None):
 
 
 # ---- consent -----------------------------------------------------------------------------------------------------------
+# 2.152.0 D (#2170): the suppression list. An unsubscription / bounce is kept as the hash of the address per workspace, so
+# deleting or merging the contact never makes the address mailable again; a re-import that says "yes" stays "unsub".
+def nls_hash(email):
+    import hashlib
+    return hashlib.sha256((email or "").strip().lower().encode()).hexdigest()
+
+
+def nls_ws(c, cid):
+    """(ws, org_id, hash of the first address) of a contact, from its address book; (None, None, '') when unknown."""
+    r = c.execute("SELECT c.emails, b.owner_org_id, b.org_id, b.owner_id FROM contacts c JOIN books b ON b.id=c.book_id WHERE c.id=?",
+                  (cid,)).fetchone()
+    if not r:
+        return None, None, ""
+    oid = r["owner_org_id"] if r["owner_org_id"] and r["owner_org_id"] == r["org_id"] else None
+    return (f"o{oid}" if oid else f"u{r['owner_id']}"), oid, nls_hash(nwl_email(r))
+
+
+def nls_blocked(c, ws):
+    """The suppressed hashes of a workspace."""
+    return {r["email_hash"] for r in c.execute("SELECT email_hash FROM nl_suppress WHERE ws=?", (ws,))}
+
+
+def nls_add(c, ws, oid, h, kind):
+    if not h or h == nls_hash(""):
+        return
+    c.execute("INSERT INTO nl_suppress(ws, org_id, email_hash, kind, at) VALUES(?,?,?,?,?) ON CONFLICT (ws, email_hash) DO NOTHING",
+              (ws, oid, h, kind, _now()))
+
+
+def nls_log(c, ws, oid, h, event, source=""):
+    if h and h != nls_hash(""):
+        c.execute("INSERT INTO nl_consent_log(ws, org_id, email_hash, event, source, at) VALUES(?,?,?,?,?,?)",
+                  (ws, oid, h, event, (source or "")[:NWL_SOURCE_MAX], _now()))
+
+
+def nls_keep(c, ids):
+    """Before contacts are deleted or merged away: remember the blocked ones (older ones from before the list existed)."""
+    for cid in ids:
+        r = c.execute("SELECT nl_status FROM contacts WHERE id=?", (cid,)).fetchone()
+        if r and (r["nl_status"] or "") in NWL_BLOCKED:
+            ws, oid, h = nls_ws(c, cid)
+            if ws:
+                nls_add(c, ws, oid, h, r["nl_status"])
+
+
 def nwl_set_status(c, cid, status, source, at=None):
+    """Set the consent of a contact; returns the status really set (yes / pending on a suppressed address becomes unsub)."""
+    ws, oid, h = nls_ws(c, cid)
+    if ws and h and status in ("yes", "pending") and h in nls_blocked(c, ws):
+        status, source = "unsub", "suppression list"
     c.execute("UPDATE contacts SET nl_status=?, nl_at=?, nl_source=? WHERE id=?", (status, at or _now(), (source or "")[:NWL_SOURCE_MAX], cid))
+    if ws and h:
+        if status in NWL_BLOCKED:
+            nls_add(c, ws, oid, h, status)
+        nls_log(c, ws, oid, h, {"yes": "consent", "pending": "pending", "": "reset"}.get(status, status), source)
+    return status
 
 
 def nwl_contact_json(r):
@@ -321,6 +375,8 @@ def _run_conn(c, conn_id, rid):
                 fail("list" if e.code == "http" and e.detail == "404" else e.stored(), s["id"])
                 continue
             for email, m in remote[s["id"]].items():
+                if m["state"] in NWL_BLOCKED:  # 2.152.0 D (#2170): kept even when no contact carries the address any more
+                    nls_add(c, conn["ws"], conn["org_id"], nls_hash(email), m["state"])
                 for r in by_mail.get(email, []):
                     cur = cur_st[r["id"]]
                     new = None
@@ -336,8 +392,11 @@ def _run_conn(c, conn_id, rid):
                         cur_st[r["id"]] = new
         c.commit()
         status_of = {}  # an address is blocked when any of its contacts is (unsubscribed once = never again)
+        sup = nls_blocked(c, conn["ws"])  # 2.152.0 D (#2170): also when the contact that unsubscribed is gone
         for email, rs in by_mail.items():
             sts = {cur_st[x["id"]] for x in rs}
+            if nls_hash(email) in sup:
+                sts.add("unsub")
             status_of[email] = (next((b for b in NWL_BLOCKED if b in sts), None) or ("yes" if "yes" in sts else "pending" if "pending" in sts
                                 else ""), rs)
         # 2. Kalmido -> service

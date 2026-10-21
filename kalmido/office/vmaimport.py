@@ -530,7 +530,7 @@ def vmi_import_post():
 @app.post("/api/office/trips/delete")
 def vmi_delete_many():
     """Office admin. {ids: [...]} -> deletes these trips of the office (the undo of an import: one step) with their
-    receipts; a trip with a receipt billed on to a client stays (skipped). Answers the deleted trips as they were."""
+    receipts; a trip with a receipt billed on to a client or locked (olk_trip_item_reason) stays (skipped). Answers the deleted trips as they were."""
     from .travel import _ctx, rk_trips
     c, uid, oid = _ctx()
     b = body()
@@ -544,6 +544,10 @@ def vmi_delete_many():
     mine = {r[0] for r in c.execute(f"SELECT id FROM office_trips WHERE org_id=? AND id IN ({q})", [oid] + ids)}
     billed = {r[0] for r in c.execute(f"SELECT DISTINCT trip_id FROM office_trip_items WHERE org_id=? AND billed_doc_id IS NOT NULL "
                                       f"AND trip_id IN ({q})", [oid] + ids)}
+    # 2.152.0 (#2168, review B-H1): receipts ticked "in DATEV" lock their trip here as on the single delete
+    from .olock import olk_trip_item_reason
+    billed |= {r["trip_id"] for r in c.execute(f"SELECT * FROM office_trip_items WHERE org_id=? AND trip_id IN ({q})", [oid] + ids)
+               if olk_trip_item_reason(c, oid, r)}
     gone = sorted(mine - billed)
     from .travel import _trip, _trip_need_open
     for i in gone:

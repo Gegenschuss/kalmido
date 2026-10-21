@@ -886,8 +886,9 @@ invoices and receipts. Kalmido has no bank access: you import the file you downl
   open, invoice number in the purpose, customer name); money out -> receipts of the office's documents (same amount,
   date within 14 days, name). **Match** records a payment on the invoice (day and amount of the booking, transfer; a
   smaller amount = partly paid) or sets the receipt's payment day (used by the bookkeeping's cash principle). **Other …**
-  searches all open invoices / receipts; **Private** and **Ignore** only mark the booking. **Undo match** removes the
-  payment again; deleting the payment on the invoice opens the booking too. Every step can be undone.
+  searches all open invoices / receipts; **Private** and **Ignore** only mark the booking. **Undo match** takes the
+  payment back (2.152: as a reversal line, see "Payments and reminders"); reversing the payment on the invoice opens the
+  booking too. Every step can be undone.
 - **Imports**: the list of imported files; **Take back** removes its bookings (refused while one of them is matched -
   undo those matches first); its undo brings them back.
 - Amounts, counterparts, purposes and IBANs are encrypted at rest when the encryption of the organisation is on. The
@@ -1045,12 +1046,22 @@ personal office). First add a **vehicle**: name, plate, kind (**private car used
   company car and deleted drives do not count.
 - The tax office only accepts a logbook kept promptly and without gaps; Kalmido logs later changes but does not make a
   logbook "tamper-proof" in the legal sense. No tax advice; figures without guarantee.
+- **Closing (2.152)**: a drive can be changed or deleted for a week after its day (or after it was entered, whichever is
+  later); then it is closed. **Close month** (one vehicle or all) closes a month at once and cannot be undone; no new
+  drives go into a closed month. A closed drive opens read-only with its change log right in the dialog; **Correct**
+  makes a new entry with the old values and a required reason. The old drive stays visible ("Corrected"), leaves the
+  sums and points to its correction; the CSV has fixed columns for a machine check (ID, corrects, corrected by, reason,
+  closed) and the change log carries the drive's ID. Deleted drives are kept until the legal period (8 years from the
+  end of their year) has passed.
 
 Routes (office admins only; members 403, other areas 404, agents 403): `GET|POST /api/office/vehicles`,
 `PATCH /api/office/vehicles/<id>` (also `archived`), `GET /api/office/drives?vehicle_id=&year=`, `POST /api/office/drives`,
 `PATCH|DELETE /api/office/drives/<id>`, `POST /api/office/drives/<id>/restore`, `GET /api/office/drives/<id>/log`,
 `POST /api/office/drives/<id>/trip`, `GET /api/office/logbook/report?year=&vehicle_id=`,
-`GET /api/office/logbook.csv|pdf?year=&vehicle_id=`, `PUT /api/office/logbook/settings` `{km_rate, year}`.
+`GET /api/office/logbook.csv|pdf?year=&vehicle_id=`, `PUT /api/office/logbook/settings` `{km_rate, year}`,
+`POST /api/office/logbook/close` `{month: "YYYY-MM", vehicle_id?}` (2.152; a closed drive: `PATCH` / `DELETE` 409, a
+correction = `POST /api/office/drives` with `corrects_id` and `correct_note`; each drive answers `locked` auto | month,
+`corrects_id`, `corrected_by`).
 
 ## Cash book (2.121)
 
@@ -1549,6 +1560,19 @@ other, note}` by the organisation's admins (members 403, since 2.39.1) on a fina
 organisation's admin. The sum of the payments plus the finalised credit notes against the invoice's gross gives
 `paid`, `credits` and `open` in the answers; covered in full the invoice becomes `paid` with `paid_at`, a removed payment
 reverts that. The print model of an invoice with payments shows "already paid" and "amount outstanding".
+2.152: payments are never deleted. `DELETE .../payments/<pid>` (optional body `{note}` = the reason) books a **reversal**:
+a second line with the negative amount on the day of the correction, `reverses_id` = the payment; the list shows both
+(the payment marked `reversed`), the balance is right again, the books and the DATEV export see both lines. A reversal
+or a payment already reversed cannot be reversed (409).
+
+### Kept by law (2.152)
+
+Booked records are locked instead of deleted (section 147 AO, section 257 HGB, section 14b UStG, GoBD): a travel receipt
+ticked "in DATEV" or billed on a finalised / sent document cannot be deleted (nor its trip, 409); a receipt of the
+document store with a VAT rate or a payment day goes into the trash but is not deleted for good before the end of its
+period (8 years from the end of its year; 409 "Kept by law until …"); the undo of an old-invoice import works within 24
+hours and only while none of its invoices was edited or marked paid; a client used in quotations, invoices or contracts
+is archived instead of deleted (the answer says `archived: true`). No tax advice.
 
 Reminders (`kind` = `reminder`, "Create reminder" in the invoice list): `POST /api/office/docs/reminder` with
 `{doc_ids: [...], level: 1|2|3, fee?, deadline_days?}` makes a draft over open, finalised invoices (one client); the

@@ -17,10 +17,11 @@ from flask import g, jsonify
 from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import bump, db, err, iso, now_utc
+from ..core.retention import ret_days
 from ..accounts.session import me
 from ..core.access import collab_all, Denied, health_hidden, token_lists
 
-OTR_TRASH_DAYS = 30  # like the other trash periods (events, video sign-offs)
+OTR_TRASH_DAYS = ret_days("trash")  # 30 like the other trash periods; 2.152.0 (#2165): KALMIDO_TRASH_DAYS moves it
 OTR_PRUNE = {"at": 0.0}
 
 

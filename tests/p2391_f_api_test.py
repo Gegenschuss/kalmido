@@ -434,6 +434,12 @@ r = A.post(B + L + f"/runs/{RB}/undo")
 check(r.ok and r.json()["removed"]["archive"] == 1, "undo of an archive run removes its documents")
 check(not dbx("SELECT 1 FROM office_archive WHERE number='665_R'"), "archive row gone")
 check(os.path.isfile(p), "the other run's file stays")
+# 2.152.0 (#2168): an entry of this run was edited (paid, amount) -> the undo is refused and the files stay; without the
+# edits (their history removed by hand) it removes the run's files as before
+r = A.post(B + L + f"/runs/{RA}/undo")
+p1 = dbx("SELECT file FROM office_archive WHERE run_id=? LIMIT 1", (RA,))
+check(r.status_code == 409 and "edited or marked as paid" in r.text and p1 and os.path.isfile(p), "#2168: undo of an edited archive run 409, the entries stay " + r.text[:160])
+dbx("DELETE FROM office_archive_log WHERE archive_id IN (SELECT id FROM office_archive WHERE run_id=?)", (RA,), write=True)
 r = A.post(B + L + f"/runs/{RA}/undo")
 check(r.ok and r.json()["removed"]["archive"] == 3 and not os.path.isfile(p), "undo of the first archive run removes its files")
 

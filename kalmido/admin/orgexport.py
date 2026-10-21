@@ -43,7 +43,7 @@ import zipfile
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from flask import jsonify, send_file
+from flask import g, jsonify, send_file
 
 from ..core.config import app, APP_VERSION, ATT_DIR, DB, OFFICE_DIR
 from ..core.db import connect, db, err, iso, now_utc
@@ -673,7 +673,11 @@ def ox_cleanup(c=None, force=False):
 # ---------------------------------------------------------------- routes (people only: /api/orgs is APP_ONLY, agents 403)
 def _need(c, oid, own=False):
     from ..accounts.orgs import _need_org_admin
-    if not own:  # 2.137.0 A (#2344): own = the person's own personal office, reached as organisation 0 (_ox_area)
+    from ..accounts.orgretain import odl_admin_export
+    from ..agents.core import is_agent
+    # 2.137.0 A (#2344): own = the person's own personal office, reached as organisation 0 (_ox_area)
+    # 2.152.0 A (#2167): a retired one: the instance admins (review A4: not the personal office of a deleted person)
+    if not own and not (g.user["is_admin"] and not is_agent(g.user) and odl_admin_export(c, oid)):
         _need_org_admin(c, oid)
     return oc_enabled()
 
@@ -726,7 +730,8 @@ def ox_download(oid):
     if st.get("state") != "done":
         raise Denied(404)
     from ..office.ledger import ofx_log
-    ofx_log(c, oid, "export", target="org_download", detail={"file": st["file"]}, dedupe_min=10)
+    with system_ctx(c):  # 2.152.0 (#2167, review A4): an instance admin of a retired organisation is no member of it
+        ofx_log(c, oid, "export", target="org_download", detail={"file": st["file"]}, dedupe_min=10)
     c.commit()
     return send_file(os.path.join(_odir(oid), st["file"]), as_attachment=True, download_name=st["file"],
                      mimetype="application/octet-stream", conditional=False, max_age=0)

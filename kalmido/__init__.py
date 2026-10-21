@@ -34,6 +34,8 @@ ORDER = (
     "api.common",  # 2.149.0 G (#2517): the /api/v1 route helpers (core layer, see LAYER_OF)
     "core.tokenhash",  # 2.138.0 C (#1907): upload / calendar tokens as hashes
     "core.rls",  # 2.37.0 (#1150): row-level security, applied by init_db
+    "core.retention",  # 2.152.0 (#2165): deletion periods + the switch of the retention runs
+    "core.fkeys",  # 2.152.0 C (#2174): foreign keys of references that had none (orphans cleaned first)
     "core.orgcrypt",  # 2.42.0 (#828): keys per organisation, encryption at rest
     "admin.migrate",  # 2.37.0 (#1150): the move from SQLite (migrate-sqlite), used by init_db
     "accounts.session",
@@ -92,6 +94,7 @@ ORDER = (
     "accounts.tenancy",
     "accounts.orglists",  # 2.35.0 (#1101)
     "accounts.useradmin",  # 2.88.0 (#1980)
+    "accounts.orgretain",  # 2.152.0 A (#2164 #2167)
     "lists.templates",
     "tasks.dependencies",
     "tasks.depchain",  # 2.67.0 B (#1865)
@@ -197,6 +200,7 @@ ORDER = (
     "files.bulk",  # 2.112.1 A (#2058): several nodes into the trash / back, the ZIP download, the phone scan -> one PDF
     "files.v1",  # 2.48.0 (#1207): the file store in the REST API (files:read / files:write)
     "files.extlinks",  # 2.112.1 B (#2058): external share links of files / folders (/s/f/<token>, no login)
+    "files.trashpurge",  # 2.152.0 B (#2165): trash periods of files, wiki, hub mails, tables, pipeline, series, chat (no routes)
     "files.photometa",  # 2.61.0 B (#1819): photo metadata (GPS, camera) removed on upload (no routes; files/upsafe.py)
     "files.upsafe",  # 2.61.0 (#1818 #1819 #1820): the shared upload path - scan, metadata, text recognition (no routes)
     "files.filereq",  # 2.122.0 A (#2097): file requests - a public link /u/<token> through which a client uploads files
@@ -265,6 +269,7 @@ ORDER = (
     "office.pdfweb",  # 2.36.1 (#1021): quotation PDF + company logo routes (D; the writer office.pdf has no routes)
     "office.signoff",  # 2.50.0 C (#1200): approval links with a simple electronic signature (quotations, list acceptance)
     "office.ledger",  # 2.36.2 (#1021, #1142, E): finalising, structured company data, office log
+    "office.olock",  # 2.152.0 C (#2168 #2169): legal retention locks (booked receipts, logbook)
     "office.invoices",  # 2.38.0 (#1021, F1): invoices, credit notes, reminders, payments, sending, DATEV inbox
     "office.peppol",  # 2.154.0 B (#1960): e-invoices over Peppol (own provider account): ids, connection, UBL, send + status
     "office.delivery",  # 2.120.0 D (#2089): delivery notes / proofs of service, the timesheet of an invoice
@@ -346,6 +351,7 @@ ORDER = (
     "admin.oi_office",  # 2.137.0 (#2344): its office tables (no routes)
     "admin.oi_store",  # 2.137.0 (#2344): its file store, documents, knowledge pages, tables (no routes)
     "admin.oi_team",  # 2.137.0 (#2344): its chat, absences, forms and the rest (no routes)
+    "admin.dataretention",  # 2.152.0 D (#2171 #2173): old logs, expired credentials, orphan files (no routes)
     "admin.orgcrypt_cli",  # 2.42.0 (#828): the organisation keys' start-up pass + command line (no routes)
     "docs.extract",  # 2.48.0 (#1111): date / due date / amount from a text (no routes, standard library only)
     "docs.rules",  # 2.48.0 (#1111): sorting rules (no routes)

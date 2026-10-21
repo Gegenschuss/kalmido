@@ -33,6 +33,7 @@ from ..core.orgcrypt import oc_read_file, oc_write_file, oc_user_space
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 FS_DIR = "files"  # below ATT_DIR
+FS_VERSIONS_KEEP = 20  # 2.152.0 D (#2173): older versions of a file go (rows; the stored file by the orphan clean-up) while ret_on("files")
 KINDS = ("folder", "file", "link", "page")
 ROLE_RANK = {None: 0, "view": 1, "edit": 2, "owner": 3}
 CHAIN_MAX = 64  # a cycle guard for the walk to the root
@@ -374,6 +375,9 @@ def _store_version(c, nid, org_id, data, mime, uid):
     c.execute("INSERT INTO fs_versions(node_id,no,path,size,mime,sha256,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)",
               (nid, no, rel, len(data), mime, hashlib.sha256(data).hexdigest(), uid, ts))
     c.execute("UPDATE fs_nodes SET cur_version=?, size=?, mime=?, updated_at=? WHERE id=?", (no, len(data), mime, ts, nid))
+    if no > FS_VERSIONS_KEEP:
+        from ..admin.dataretention import orf_prune_versions
+        orf_prune_versions(c, nid)  # 2.152.0 D (#2173): rows only, in this transaction; the files follow with the orphan clean-up
     return no
 
 
@@ -590,6 +594,10 @@ def fs_user_purge(c, uid):
         for (oid,) in c.execute("SELECT DISTINCT org_id FROM fs_nodes WHERE owner_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
             heir = c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id!=?
                                 AND COALESCE(u.kind, '')!='agent' ORDER BY (m.role='admin') DESC, m.user_id LIMIT 1""", (oid, uid)).fetchone()
+            if not heir and c.execute("SELECT 1 FROM orgs WHERE id=? AND retired_at IS NOT NULL", (oid,)).fetchone():
+                from ..accounts.orgretain import odl_custodian  # 2.152.0 A (#2167): a retired organisation keeps its files (an instance admin)
+                keeper = odl_custodian(c, uid)
+                heir = (keeper,) if keeper else None
             if heir:
                 c.execute("UPDATE fs_nodes SET owner_id=? WHERE owner_id=? AND org_id=?", (heir[0], uid, oid))
         roots = [r[0] for r in c.execute("SELECT id FROM fs_nodes WHERE owner_id=? AND (parent_id IS NULL OR parent_id NOT IN "

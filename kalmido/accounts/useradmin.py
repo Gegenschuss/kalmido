@@ -281,9 +281,14 @@ def ua8_delete_info(uid):
     from ..admin.retexport import rx_user_info
     ret = rx_user_info(c, uid, along=False)  # 2.146.0 D (#2468): records to keep -> the retention export step first
     ret["needed_along"] = rx_user_info(c, uid, along=True)["needed"]  # ... also when the lists (with receipts) go along
+    from .orgretain import upg_info
+    purge = upg_info(c, uid)  # 2.152.0 A (#2164): personal office (deleted / kept by law until), agents, calendars, time, DMs
+    if by != "instance":  # an organisation admin: nothing about the person's private office (privat bleibt privat)
+        purge = {k: v for k, v in purge.items() if k in ("calendars", "time_kept", "agents", "dms")}
     return jsonify(**base, can_delete=True, by="instance" if by == "instance" else "org", org_id=None if by == "instance" else by,
                    username=u["username"], lists=ua8_list_info(c, lists, by), candidates=ua8_candidates(c, lists, uid) if lists else [],
-                   retention=ret)
+                   retention=ret,
+                   purge=purge)
 
 
 def ua8_foreign(c, lr):
@@ -395,7 +400,7 @@ def ua8_bulk():
         if not isinstance(oid, int) or isinstance(oid, bool):
             return err(tr("Invalid value: {0}", "org_id"))
         with system_ctx(c):  # does the organisation exist (structure)
-            if not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (oid,)).fetchone():
+            if not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL AND retired_at IS NULL", (oid,)).fetchone():
                 return err(tr("unknown"), 404)
     ok, failed = [], []
     saved = g.get("body")

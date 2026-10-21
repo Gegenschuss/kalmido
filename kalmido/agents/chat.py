@@ -874,6 +874,11 @@ def chat_add(c, aid, uid, sender, text, tid, choices=None):
     if cut:  # 2.13.1 (#465): the files of trimmed messages leave the disk
         g.chat_unlink = getattr(g, "chat_unlink", []) + chat_file_paths(c, "m.agent_id=? AND m.user_id=? AND m.id<=?", (aid, uid, cut[0]))
         c.execute("DELETE FROM agent_chat WHERE agent_id=? AND user_id=? AND id<=?", (aid, uid, cut[0]))
+    from ..core.retention import ret_days, ret_on
+    if ret_days("chat") and ret_on("chat"):  # 2.152.0 D (#2175): the optional day limit (KALMIDO_CHAT_KEEP_DAYS, 0 = none)
+        old = iso_ms(now_utc() - timedelta(days=ret_days("chat")))
+        g.chat_unlink = getattr(g, "chat_unlink", []) + chat_file_paths(c, "m.agent_id=? AND m.user_id=? AND m.created_at<?", (aid, uid, old))
+        c.execute("DELETE FROM agent_chat WHERE agent_id=? AND user_id=? AND created_at<? AND id<>?", (aid, uid, old, mid))
     return c.execute("SELECT * FROM agent_chat WHERE id=?", (mid,)).fetchone()
 
 
@@ -1060,6 +1065,43 @@ def med_team_edited(c, r, m, old_body):
             "message": {"id": m["id"], "user_id": uid, "task_id": m["task_id"], "created_at": m["created_at"], "edited_at": m["edited_at"]},
             "old": old[:AGENT_EVENT_COMMENT_CHARS], "new": new[:AGENT_EVENT_COMMENT_CHARS],
             "user": {"id": uid, "name": user_names(c, [uid]).get(uid, "")}})
+
+
+# ---- 2.152.0 D (#2175): a person deletes a message of their conversation with an agent, or the whole history, for good (the
+# conversation is theirs: the agent's answers in it go along). Hard delete, the files leave the disk; no new event for the agent.
+def acd_delete(c, aid, uid, mid=None):
+    """Deletes message mid (None: the whole conversation of uid with agent aid). Returns how many messages went."""
+    where, args = "m.agent_id=? AND m.user_id=?", [aid, uid]
+    if mid is not None:
+        where, args = where + " AND m.id=?", args + [mid]
+    paths = chat_file_paths(c, where, args)
+    n = c.execute("DELETE FROM agent_chat WHERE agent_id=? AND user_id=?" + (" AND id=?" if mid is not None else ""),
+                  [aid, uid] + ([mid] if mid is not None else [])).rowcount
+    g.chat_unlink = getattr(g, "chat_unlink", []) + paths
+    return n
+
+
+@app.delete("/api/agents/<int:aid>/chat/<int:mid>")
+def agent_chat_delete_one(aid, mid):
+    """One message of my conversation with the agent (mine or its answer), for good. 404 for anything else."""
+    c = db()
+    need_chat_agent(c, aid)
+    if not acd_delete(c, aid, me(), mid):
+        raise Denied(404)
+    c.commit()
+    chat_unlink_trimmed()
+    return jsonify(ok=True, message_id=mid)
+
+
+@app.delete("/api/agents/<int:aid>/chat")
+def agent_chat_delete_all(aid):
+    """My whole conversation with this agent, for good (the app asks first)."""
+    c = db()
+    need_chat_agent(c, aid)
+    n = acd_delete(c, aid, me())
+    c.commit()
+    chat_unlink_trimmed()
+    return jsonify(ok=True, deleted=n)
 
 
 def chat_unlink_trimmed():
