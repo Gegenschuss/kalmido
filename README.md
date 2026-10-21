@@ -24,7 +24,6 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   their XML, duplicate receipts are found and kept out of DATEV, several files / ZIP / winmail.dat at once, iPhone HEIC
   photos, household import with debit/credit column and undo, CAMT.052 pending entries handled, legacy import with
   address columns and CSV, several vCards or a ZIP, and a retention export before deleting an account or organisation.
-- **2.144.1** (2026-10-20): office fixes - the bank import takes several statements or a ZIP at once and says which
 - **2.144.1** (2026-10-21): office fixes - the bank import takes several statements or a ZIP at once and says which
   file to export from online banking (CAMT.053 recommended), the cash flow opens it next to the bank balance; the office
   side bar stays put on touch tablets.

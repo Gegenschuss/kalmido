@@ -27,8 +27,6 @@ Imports from everyday life: e-invoices are received and read, duplicates are fou
 ### Security
 - Security fix: file uploads, ZIP and XML reading, retention export.
 
-## [2.144.1] - 2026-10-20
-
 ## [2.144.1] - 2026-10-21
 
 Office fixes: the office side bar stays put on touch tablets, the bank import says which file to take and reads several statements or a ZIP at once.
