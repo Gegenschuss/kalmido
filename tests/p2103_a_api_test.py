@@ -285,5 +285,33 @@ check("purged 1" in out and not sql("SELECT 1 FROM orgs WHERE id=?", (GAM,)) and
 check(not os.path.exists(office_dir(GAM)), "switch on: its office folder is gone from the disk")
 check(sql("SELECT 1 FROM orgs WHERE id=?", (PR,)), "frida's office (period not over) stays")
 
+# ================================================================== hosted (KALMIDO_HOSTED=1): nothing is kept for others
+def booked(s, ws, name):
+    r = s.post(B + "/api/docs", data={"ws": ws}, files={"files": (name, b"Beleg 0815 Material", "text/plain")})
+    nid = r.json()["ids"][0] if r.status_code == 201 else 0
+    s.patch(B + f"/api/docs/{nid}", json={"amount": "11.90", "date": "2026-03-06"})
+    r = s.put(B + f"/api/docs/{nid}/receipt", json={"category": "Material", "vat_pct": "19", "keep": True})
+    check(nid and r.ok, f"hosted setup: a booked receipt in {ws} " + r.text[:160])
+    return nid
+
+
+if os.environ.get("P2103A_NOSTART") != "1":
+    env = dict(os.environ, KEEP="1", EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_HOSTED=1")
+    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+    time.sleep(0.8)
+    A, Bo = sess("alice"), sess("bob")
+    # 2.152.0 (#2167, review A2): an organisation with a booked receipt in its trash goes after the waiver (no 409 of the lock)
+    HO = A.post(B + "/api/admin/orgs", json={"name": "Hosted Studio", "admin_id": ALICE}).json()["id"]
+    A.patch(B + "/api/settings", json={"workspace": f"org:{HO}"})
+    HN = booked(A, f"org:{HO}", "beleg-org.txt")
+    check(A.delete(B + f"/api/files/nodes/{HN}").ok, "hosted: the receipt into the organisation's trash")
+    A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
+    r = A.delete(B + f"/api/admin/orgs/{HO}", params={"confirm": "1", "retention": "waived"})
+    check(r.ok and not r.json().get("retired") and not sql("SELECT 1 FROM orgs WHERE id=?", (HO,)) and not sql("SELECT 1 FROM fs_nodes WHERE id=?", (HN,)),
+          "hosted A2: the organisation goes with the booked receipt in its trash after the waiver " + r.text[:200])
+    if not r.ok:
+        app_log()
+
 print(f"p2103_a_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
