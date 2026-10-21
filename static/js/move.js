@@ -6,7 +6,7 @@ const UMZ = {timer: 0, up: null};
 const umzHtml = hint => `<h4 id="s-umz-h">${tr('Move and export everything')}</h4>
   ${hint(tr('One file with everything that is yours: lists, tasks, comments, files, calendars, contacts, habits and settings. Use it to move to your own Kalmido server (or back) or as your own copy of your data.'))}
   <div id="s-umz-exp" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div>
-  <div class="row"><label for="s-umz-file">${tr('Take over from a Kalmido export')}</label>${fileBtn('s-umz-file', '.zip,application/zip')}</div>
+  <div class="row"><label for="s-umz-file">${tr('Take over from a Kalmido export')}</label>${fileBtn('s-umz-file', '.zip,application/zip')}${''/* lazy-ok: 2.149.0 F (#2519): settings.js draws this section */}</div>
   <div id="s-umz-imp" aria-live="polite"></div>
   <details class="umzhow"><summary>${tr('Move to your own server')}</summary><ol class="umzsteps">
     <li>${tr('Here: “Export everything” and download the file.')}</li>

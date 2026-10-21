@@ -28,7 +28,7 @@ function dch_preview(d) {
   const days = d.mode === 'm' || d.mode === 'r' ? d.days : 0;
   if (d.dchDays === days) return;
   dch_clear(d); d.dchDays = days;
-  const px = days * tlDW();
+  const px = days * tlDW();  // lazy-ok: 2.149.0 F (#2519): runs in the timeline drag (timeline.js loaded)
   d.dchEls = dch_chainOf(d.t, days).flatMap(x => $$(`.tl-bar[data-id="${x.id}"]`));
   for (const el of d.dchEls) { el.classList.add('dch-ghost'); el.style.transform = `translateX(${px}px)`; }
 }

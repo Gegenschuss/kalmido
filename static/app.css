@@ -29,6 +29,8 @@
   --shadow:0 1rem 3rem rgba(0,0,0,.55),0 0 0 1px var(--line2);
   --safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px);
   --tabs-h:0px;--ui:1;
+  /* 2.149.0 F (#2519): names some rules used without defining them (the property was dropped); aliases of the scale above, both themes */
+  --shadow-s:0 1px .125rem rgba(0,0,0,.2);--fs:var(--fs-b);--fs-sm:var(--fs-s);--text3:var(--faint);--warn:var(--st-wait-t);
 }
 /* font size per device (Appearance): the root font size carries the whole rem scale */
 :root[data-fsize="s"]{--ui:.9}:root[data-fsize="l"]{--ui:1.12}:root[data-fsize="xl"]{--ui:1.25}

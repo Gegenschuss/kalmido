@@ -6,14 +6,7 @@
 'use strict';
 
 const AB2 = {data: null, start: null, org: null, seq: 0, loading: false};
-const AB2_KINDS = [['vacation', N_('Vacation')], ['sick', N_('Sick leave')], ['off', N_('Day off')], ['other', N_('Other absence')]];
-const ab2_kindName = k => tr(AB2_KINDS.find(x => x[0] === k)?.[1] || 'Away');
 
-// the tabs on top of the workload view: Workload | Absences | Disposition (2.50.0, #1194, when switched on)
-function ab2_tabs(cur) {
-  const t = (k, label) => `<button type="button" data-act="ab2-tab" data-v="${k}" class="${cur === k ? 'on' : ''}" aria-pressed="${cur === k}">${esc(tr(label))}</button>`;
-  return `<div class="seg ab2tabs" role="group" aria-label="${esc(tr('Team'))}">${t('wl', N_('Workload'))}${t('abs', N_('Absences'))}${dp_on() ? t('dispo', N_('Disposition')) : ''}</div>`;
-}
 
 async function ab2_load() {
   const seq = ++AB2.seq;
@@ -129,12 +122,6 @@ async function ab2_delete(it) {
 
 function ab2_reload() { AB2.data = null; lv_reset(); if (S.route.mod === 'workload') { WLV.data = null; ab2_load(); } }
 
-// "Plan my day" on a day away / a holiday: a hint instead of the proposal (the server leaves the proposal empty)
-function ab2_dayHint(a) {
-  if (!a) return '';
-  const what = a.holiday ? tr('Public holiday: {0}', a.holiday) : a.half_day ? tr('You are away for half of this day ({0}).', ab2_kindName(a.kind)) : tr('You are away on this day ({0}). No plan is proposed.', ab2_kindName(a.kind));
-  return `<div class="shint keep ab2hint" role="status">${ic('cal', 's')} ${esc(what)}</div>`;
-}
 
 // assigning: a warning when the person is away on the task's day (the assignment stays)
 async function ab2_warnAssign(uid, t) {
@@ -150,8 +137,7 @@ document.addEventListener('click', async e => {
   const a = e.target.closest?.('[data-act^="ab2-"]'); if (!a || a.disabled) return;
   e.preventDefault(); e.stopPropagation();
   const k = a.dataset.act;
-  if (k === 'ab2-tab') { WLV.tab = a.dataset.v; const el = $('#view'); if (el) setHtml(el, viewWorkload()); }
-  else if (k === 'ab2-move') { const n = +a.dataset.d, d = pd(AB2.data?.start || today().slice(0, 7) + '-01'); AB2.start = n === 0 ? null : ds(new Date(d.getFullYear(), d.getMonth() + n, 1)); AB2.data = null; ab2_load(); }
+  if (k === 'ab2-move') { const n = +a.dataset.d, d = pd(AB2.data?.start || today().slice(0, 7) + '-01'); AB2.start = n === 0 ? null : ds(new Date(d.getFullYear(), d.getMonth() + n, 1)); AB2.data = null; ab2_load(); }
   else if (k === 'ab2-new') ab2_sheet(null);
   else if (k === 'ab2-edit') { const it = AB2.data?.items.find(x => x.id === +a.dataset.id); if (it) ab2_sheet(it); }
 });

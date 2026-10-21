@@ -288,3 +288,34 @@ function ofm_clients(ids) {
   ofm_move({what: 'clients', ids: sel.map(c => c.id), from, label: sel.length === 1 ? qn(sel[0].name) : trn('{0} client', '{0} clients', sel.length),
     after: async () => { if (MSC.pick) ms_clEnd(); await ms_clAfter(); }});
 }
+// ---- 2.149.0 F (#2518): the e-mail filing (hubmail.js) loads on demand (lazyload.js module hubmail). What the start draws stays
+// here: the link to the mail a task / an event was made from, its click, the entry in Office > Clients; the client's card and the
+// project page draw their mail section once it has loaded (nothing before the first answer, as before)
+// the entry in Office > Clients
+const hbm_hubBtn = () => `<a class="btn sm" href="#mailhub" title="${esc(tr('E-mail filing'))}">${ic('inbox', 's')}<span class="cdl">${tr('E-mail filing')}</span></a>`;
+// the mail a task / an event was made from: "E-mail: <subject>" (a tap opens it); only "E-mail" for who may not read the
+// mail (the server sends neither subject nor id then). Filled after the answer (cached a minute), the detail is not redrawn
+const HBML = {};  // 'task:<id>' | 'event:<id>' -> {at, links}
+function hbm_linkHtml(kind, id) {
+  if (!(id > 0)) return '';
+  const k = `${kind}:${id}`, c = HBML[k];
+  if (!c || Date.now() - c.at > 60000) hbm_linkLoad(k);
+  return `<div class="hbmlnk" data-hbmlnk="${k}">${c ? hbm_linkInner(c.links) : ''}</div>`;
+}
+const hbm_linkInner = links => (links || []).map(x => x.mail_id
+  ? `<button type="button" class="linkbtn" data-hbmopen="${x.mail_id}" data-hbmk="link">${ic('mail', 's')}<span>${esc(tr('E-mail: {0}', x.subject || tr('(no subject)')))}</span></button>`
+  : `<span class="muted">${ic('mail', 's')} ${tr('E-mail')}</span>`).join('');
+async function hbm_linkLoad(k) {
+  const [kind, id] = k.split(':');
+  HBML[k] = {at: Date.now(), links: HBML[k]?.links || []};
+  let j; try { j = await rawFetch('GET', `/api/hubmail/links?${kind}_id=${id}`); } catch { return; }
+  HBML[k] = {at: Date.now(), links: j.links || []};
+  for (const el of document.querySelectorAll(`[data-hbmlnk="${k}"]`)) el.innerHTML = hbm_linkInner(j.links);
+}
+const hbm_taskLinkHtml = t => t && !t.context ? hbm_linkHtml('task', t.id) : '';
+document.addEventListener('click', e => {
+  const o = e.target.closest?.('[data-hbmopen]'); if (!o) return;
+  e.preventDefault(); if (o.closest('#pop') && typeof closePop === 'function') closePop(); hbm_open(+o.dataset.hbmopen, o.dataset.hbmk);
+});
+window.hbm_clientHtml = c => { if (c) ld_later('hubmail'); return ''; };
+window.hbm_projHtml = l => { if (l?.kind === 'project' && !l.e2e) ld_later('hubmail'); return ''; };
