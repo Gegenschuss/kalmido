@@ -175,7 +175,7 @@ def gb_branches(c, r, k, get, prov):
                                          WHERE git_branches.task_id IS DISTINCT FROM excluded.task_id OR git_branches.sha<>excluded.sha""",
                                       (cid, n, t, heads[n])).rowcount)
     main = c.execute("SELECT main_sha FROM git_conns WHERE id=?", (cid,)).fetchone()["main_sha"] or ""
-    for x in c.execute("""SELECT name, sha FROM git_branches WHERE conn_id=? AND (ahead IS NULL OR sha<>cmp_sha OR cmp_main<>?)
+    for x in c.execute("""SELECT name, sha, ahead FROM git_branches WHERE conn_id=? AND (ahead IS NULL OR sha<>cmp_sha OR cmp_main<>?)
                           ORDER BY seen_at, name LIMIT ?""", (cid, main, GB_BRANCH_CMP)).fetchall():
         try:
             lst, n = _gb_cmp(_gb_get(k, git_api(prov, k, "compare", default, x["name"])), prov)
@@ -185,7 +185,7 @@ def gb_branches(c, r, k, get, prov):
             changed |= _gb_link(c, r, lst[-GIT_ITEMS:], x["name"])
         c.execute("UPDATE git_branches SET ahead=COALESCE(?, ahead), cmp_sha=?, cmp_main=?, seen_at=? WHERE conn_id=? AND name=?",
                   (n, x["sha"], main, iso(now_utc()), cid, x["name"]))
-        changed |= n is not None
+        changed |= n is not None and n != x["ahead"]  # a new compare with the same result changes nothing the client shows
     return changed
 
 
