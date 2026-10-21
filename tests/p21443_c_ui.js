@@ -1,4 +1,4 @@
-// 2.144.3 C UI tests (#2405): News with an unread agent approval -- the bell number (S.news.unread_me) equals the count of
+// 2.147.1 C UI tests (#2405): News with an unread agent approval -- the bell number (S.news.unread_me) equals the count of
 // the section "For you" (one approval = 1), the divider of the read items reads "Read" (own key "Read|section", no suffix).
 // freelancer-matrix: news (the same page without an organisation is covered by p21443_c_api_test.py).
 const {execFileSync} = require('child_process');

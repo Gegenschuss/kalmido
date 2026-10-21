@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.144.3 API tests, part A (#2523): a task dragged into a chat is put in as "#123" (the client, refs.js); the server keeps
+"""2.147.1 API tests, part A (#2523): a task dragged into a chat is put in as "#123" (the client, refs.js); the server keeps
 that text as it is and the client draws the reference card from it. Own container (start.sh). Invented names only.
  - team chat (a channel of the organisation) and a thread reply: a message with "#<id>" and an app link is stored and
    comes back with the same text

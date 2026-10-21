@@ -85,7 +85,7 @@ function wsp_paneMark() {
 }
 const wsc_ofWs = ws => String(ws || '').startsWith('org:') ? +ws.slice(4) : 0;
 // the sidebar row of an organisation's list: a stripe on its left edge
-// 2.144.3 B (#2231): the colour of the workspace an agent (or a chat entry of one) belongs to, same data-wsc / --wsd / --wsl
+// 2.147.1 B (#2231): the colour of the workspace an agent (or a chat entry of one) belongs to, same data-wsc / --wsd / --wsl
 // mechanism as lists: an organisation's tone; Private = my own chosen colour, else neutral (null org = private). A chat entry
 // with agent_org_id / org_id (the job chats of 2.107) passes the entry: acw_of(entry). Without organisations (wsOn() false): none.
 const acw_attr = orgId => { const v = wsOn() ? wsp_vars(orgId ? 'org:' + +orgId : 'private') : ''; return v ? ` data-wsc="1" style="${v}"` : ''; };

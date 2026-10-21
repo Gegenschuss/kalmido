@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.144.3 API tests, part B (#2054, first built for 2.109): payment reminders suggested for overdue invoices + the GiroCode (EPC QR) on invoices and
+"""2.147.1 API tests, part B (#2054, first built for 2.109): payment reminders suggested for overdue invoices + the GiroCode (EPC QR) on invoices and
 reminders. Own container (start.sh, mode workspaces). Invented companies, people and figures only.
 tenant-matrix: office  freelancer-matrix: office
  - GiroCode: the EPC text of a draft invoice against a fixed example string (BCD / 002 / 1 / SCT / BIC / name / IBAN /

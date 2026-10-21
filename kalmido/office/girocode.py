@@ -1,11 +1,11 @@
-"""2.144.3 B (#2054): the GiroCode (EPC QR code, EPC069-12 version 002) on invoices and reminders.
+"""2.147.1 B (#2054): the GiroCode (EPC QR code, EPC069-12 version 002) on invoices and reminders.
 
 gcq_payload builds the code's text: BCD / 002 / 1 (UTF-8) / SCT / BIC (optional) / name of the payee (max 70) / IBAN /
 EUR amount / no purpose / no structured reference / the document number as the unstructured remittance (max 140). Only
 for EUR, a valid IBAN of the sender (the office's bank details) and an open amount above 0 -- else None and no code.
 gcq_model is called by invoices.inv_render: the setting "girocode" (office settings, default on) decides for drafts; a
 finalised document keeps the decision frozen in its sender snapshot (ledger.ofx_finalize notes "girocode"), so a
-document finalised before 2.144.3 never gets one when rendered again (GoBD: the archived PDF stays as it was).
+document finalised before 2.147.1 never gets one when rendered again (GoBD: the archived PDF stays as it was).
 gcq_matrix turns the text into the module matrix (segno, error correction M, UTF-8); pdf.py draws it as filled
 rectangles (vectors only, no image, no transparency: PDF/A-3 of ZUGFeRD stays valid). The e-invoice XML is unchanged."""
 import re
@@ -51,7 +51,7 @@ def gcq_payload(name, iban, bic, amount, ref, currency="EUR"):
         over = len(out.encode("utf-8")) - 331  # EPC069-12: at most 331 bytes
         if over <= 0:
             return out
-        # 2.144.3 (#2054, review): a long multi-byte name / reference is shortened instead of dropping the code; the name
+        # 2.147.1 (#2054, review): a long multi-byte name / reference is shortened instead of dropping the code; the name
         # first (the document number in the reference matches the payment), down to 20 characters, then the reference
         if len(name) > 20:
             name = name[:-1].rstrip()

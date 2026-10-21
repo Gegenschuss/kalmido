@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.144.3 C API tests (#2405, #2420, #2396). freelancer-matrix: news
+"""2.147.1 C API tests (#2405, #2420, #2396). freelancer-matrix: news
  - an agent's approval request that waits for me counts in the bell number (unread_me) and is flagged to_me
  - the organisation's card counts people only (2 people + 1 agent -> 2), in the admin list and in "my organisations"
  - the Mac icon (1024 px) is linked in the page head and served as a 1024 x 1024 PNG

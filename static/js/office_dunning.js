@@ -1,5 +1,5 @@
 // @ts-check
-// 2.144.3 B (#2054): payment reminders suggested for overdue invoices + the GiroCode. The watchdog makes reminder DRAFTS
+// 2.147.1 B (#2054): payment reminders suggested for overdue invoices + the GiroCode. The watchdog makes reminder DRAFTS
 // (server: kalmido/office/dunning.py); the invoice list shows how many wait with a jump to them, the reminder list marks
 // them. Nothing is sent without a person (the usual send dialog). The office settings: suggestions on / off, the days
 // after the due date, the GiroCode on invoices + reminders (kalmido/office/girocode.py).

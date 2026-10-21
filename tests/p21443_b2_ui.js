@@ -1,4 +1,4 @@
-// 2.144.3 UI tests of part B2 (#2230, #2231) (own container, start.sh; P21443B_NOSTART=1: the container runs already). jsdom:
+// 2.147.1 UI tests of part B2 (#2230, #2231) (own container, start.sh; P21443B_NOSTART=1: the container runs already). jsdom:
 // - #2230: moving 25 files into an organisation: the dialog shows "Moving…" (aria-busy) and the bar "x of 25 moved"
 //   (role progressbar), all 25 arrive, ONE undo step brings all 25 back (batches of 20)
 // - a few items: only the busy button, no bar
@@ -80,7 +80,7 @@ const upload = async (ck, name, text) => {
   v.eval(`S.agents.push({id: ${ag2.id}, name: 'Privbot', org_id: null, enabled: true, status: 'idle'})`);  // a private agent as the list shows it
   check(await until(() => v.eval(`!!agentById(${ag.id}) && !!agentById(${ag2.id})`)), 'both agents are in my list ' + v.eval(`JSON.stringify((S.agents || []).map(a => [a.id, a.org_id]))`) + ' ' + ag.id + ',' + ag2.id + ' ' + JSON.stringify(ag).slice(0, 120));
   check(v.eval(`agentById(${ag.id}).org_id`) === ORG, 'the agent list carries org_id');
-  // 2.144.3 B (#2231 with #2411): the workspace shows as a stripe on the agent's entries, the chat head keeps the agent colour
+  // 2.147.1 B (#2231 with #2411): the workspace shows as a stripe on the agent's entries, the chat head keeps the agent colour
   check(v.eval(`/data-wsc="1"/.test(acw_attr(${ORG}))`), 'an organisation agent gets the workspace stripe attributes');
   check(v.eval(`!/data-wsc/.test(chatInner(${ag.id})) && !/data-wsc/.test(chatInner(${ag2.id}))`), 'the chat head never carries the workspace colour');
   const srow = await until(() => vd.querySelector(`#side .srow.steam[data-aid="${ag.id}"]`), 30);

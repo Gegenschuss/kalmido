@@ -1,4 +1,4 @@
-// 2.144.3 UI tests, part A (#2523 a task dragged into a chat = a reference), Firefox (desktop + phone width). Own container
+// 2.147.1 UI tests, part A (#2523 a task dragged into a chat = a reference), Firefox (desktop + phone width). Own container
 // (start.sh; P21443A_NOSTART=1: the container runs already). Invented data only.
 // - agent chat: a task row dragged onto the box puts in "#id" (the draft keeps it like typed text); sent, the message shows
 //   the reference (a.tref[data-tref]); several selected tasks dragged at once = several references; a file dropped on the

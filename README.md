@@ -20,6 +20,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.147.1** (2026-10-21): **drag tasks into the chats** (team chat, thread, agent chat) as references, several at once, with
+  *Insert reference* on phones; **overdue invoices suggest a payment reminder** as a draft (nothing is sent) and
+  invoices / reminders in EUR carry a **GiroCode** for banking apps; moving many documents to another workspace shows
+  **progress**; agents show their workspace as a stripe; the bell counts agent approvals and says "Gelesen".
 - **2.147.0** (2026-10-21): **country pack functions** - the country pack decides which office functions appear (DATEV,
   e-invoices, VAT return figures, tax dates), single ones can be **switched off** without losing data, an
   **international base pack** with own VAT rates and an **export for any tax advisor** (CSV + ZIP), and a new office

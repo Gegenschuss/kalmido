@@ -1037,7 +1037,7 @@ def odoc_list():
         from .invoices import fd_reminder_extra
         fd_reminder_extra(c, oid, rows)
     from .dunning import dun_list_extra
-    dun = dun_list_extra(c, oid, kind, rows)  # 2.144.3 B (#2054): suggested reminder drafts (count + mark)
+    dun = dun_list_extra(c, oid, kind, rows)  # 2.147.1 B (#2054): suggested reminder drafts (count + mark)
     if st in ("partial", "overdue"):  # derived states: filtered after the fact
         rows = [x for x in rows if x["state"] == st]
     return jsonify(docs=rows, role=role, org_id=oid, **({"dunning": dun} if dun else {}))

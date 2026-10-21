@@ -1,4 +1,4 @@
-"""2.144.3 B (#2054): payment reminders suggested for overdue invoices (drafts only; nothing is sent automatically).
+"""2.147.1 B (#2054): payment reminders suggested for overdue invoices (drafts only; nothing is sent automatically).
 
 The watchdog (dun_tick, every DUN_EVERY_TICKS intervals) looks at every office area -- organisations AND the personal
 office of a person without one -- that has finalised, open invoices (issued / sent, an open amount, not cancelled) and

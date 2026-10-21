@@ -1426,7 +1426,7 @@ API: `POST /api/office/docs/<offer id>/invoice` takes `{inv_type: "progress", am
 `PATCH /api/office/docs/<id>` takes `skonto_pct`, `skonto_days`, `inv_type` on invoice drafts; the office settings
 `skonto_pct` / `skonto_days`. Agents: `draft_invoice_from_offer` with `inv_type`, `amount`, `pct`.
 
-### Suggested payment reminders (2.144.3)
+### Suggested payment reminders (2.147.1)
 
 Overdue invoices get a reminder **draft** on their own, nothing is sent: once a finalised, open invoice (issued / sent,
 an amount outstanding, not paid or cancelled) is more than "Suggest after" days past its due date (setting
@@ -1439,14 +1439,14 @@ invoice list shows "N payment reminders suggested" with a jump to the drafts (`G
 `dunning: {suggested, first}` for the invoice and reminder lists, the drafts carry `suggested: 1`); check and send them
 like any reminder. Switch: `dunning_suggest` (default on) in the office settings, section Invoices (admins only).
 
-### GiroCode (2.144.3)
+### GiroCode (2.147.1)
 
 Invoices and reminders print a GiroCode (EPC QR code, EPC069-12 version 002: UTF-8, SEPA credit transfer, the BIC
 when given, the company name, the IBAN, the amount in EUR and the document number as the remittance) right of the
 payment details: the invoice's gross, the reminder's total (the open amounts plus the fee). Only for EUR, a valid IBAN
 in the company details and an amount above 0; never on credit notes. It is drawn as vector rectangles (no image), so
 the PDF/A-3 of ZUGFeRD stays valid; the e-invoice XML is unchanged. Setting `girocode` (default on); a finalised
-document keeps the decision of its finalising day (the stored PDF never changes), documents finalised before 2.144.3 have
+document keeps the decision of its finalising day (the stored PDF never changes), documents finalised before 2.147.1 have
 none. The print model carries the code's text as `payment.girocode`.
 
 ## Invoice series (2.91)

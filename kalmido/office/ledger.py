@@ -350,7 +350,7 @@ def ofx_finalize(c, oid, uid, did):
     sender = {"company": ofx_company_print(fields, s.get("company") or {}, lang, pack), "fields": fields, "color": color,
               "logo": logo, "logo_sha256": sha, "pack": pack.get("code") or s["pack"]}
     sender["company"]["sender_line"] = ofx_sender_line(sender["company"])  # 2.97.1 (#2224): frozen with the rest
-    sender["girocode"] = 1 if int(s.get("girocode", 1) or 0) else 0  # 2.144.3 B (#2054): the GiroCode decision, frozen (girocode.py)
+    sender["girocode"] = 1 if int(s.get("girocode", 1) or 0) else 0  # 2.147.1 B (#2054): the GiroCode decision, frozen (girocode.py)
     from .letterhead import bp_snapshot
     lhs = bp_snapshot(c, oid, s)  # 2.120.0 E (#2091): the own letterhead frozen with the rest (only when there is one)
     if lhs:

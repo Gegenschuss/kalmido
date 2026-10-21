@@ -578,7 +578,7 @@ def inv_make_reminder(c, oid, uid, b):
     s = office_settings(c, oid)
     rows = inv_reminder_rows(c, oid, ids)
     first = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (ids[0], oid)).fetchone()
-    write_lock(c, f"office_dunning_{int(oid)}")  # 2.144.3 (#2054, review): the same lock as the suggestion run (no second draft at once)
+    write_lock(c, f"office_dunning_{int(oid)}")  # 2.147.1 (#2054, review): the same lock as the suggestion run (no second draft at once)
     inv_check_reminder(c, oid, ids, rows)
     level = b.get("level", 1)
     if level not in REMINDER_LEVELS:
@@ -736,7 +736,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
         ptext = ((texts.get("payment_note") or {}).get(lang) or ("Zahlbar bis {date} ohne Abzug." if lang == "de" else "Payable by {date} without deduction.")).replace("{date}", m["due_date_text"]) if m["due_date"] else ""
     m["payment"] = {"iban": sfd["iban"], "bic": sfd["bic"], "bank_name": sfd["bank_name"], "text": ptext} if kind not in ("credit", "delivery") else None
     from .girocode import gcq_model
-    gcq_model(r, m, None if ofx_locked(r) else office_settings(c, oid), snd)  # 2.144.3 B (#2054): the GiroCode (EPC QR text)
+    gcq_model(r, m, None if ofx_locked(r) else office_settings(c, oid), snd)  # 2.147.1 B (#2054): the GiroCode (EPC QR text)
     m["valid_note"] = ""
     m["valid_until"] = ""
     m["valid_until_text"] = ""

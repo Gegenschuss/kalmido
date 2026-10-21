@@ -1,4 +1,4 @@
-// 2.144.3 UI tests, part B (#2054): suggested payment reminders + the GiroCode setting, own container (start.sh, mode
+// 2.147.1 UI tests, part B (#2054): suggested payment reminders + the GiroCode setting, own container (start.sh, mode
 // workspaces), Firefox (desktop + phone width). Invented companies, people and figures only.
 // - an overdue invoice (watchdog): the invoice list shows "1 payment reminder suggested" with a jump; the jump opens the
 //   reminder list with its drafts, the suggested draft is marked and the list says nothing goes out automatically
@@ -75,7 +75,7 @@ const ago = n => { const d = new Date(Date.now() - n * 864e5); return d.toISOStr
     await shot('p21443-b-hint-phone.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     // ================= the settings
-    // 2.144.3 (#2054): the office settings come in areas and save each field on its own (#2247): the area "docs" holds both
+    // 2.147.1 (#2054): the office settings come in areas and save each field on its own (#2247): the area "docs" holds both
     await nav(B + 'static/icon.svg'); await nav(B + '#office/settings');
     await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub="docs"]')`, 80);
     await ev(`(() => { document.querySelector('#ofc-set [data-ostsub="docs"]').click(); return 1; })()`);

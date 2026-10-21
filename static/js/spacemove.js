@@ -11,13 +11,13 @@
 //   check(to, place): async -> {notes: [text …], block: text | null} (the server's dry run: POST … {dry: 1}),
 //   run(to, place): async -> the result of the move (the caller reloads and offers the undo: the same move back).
 //   option: {label} (optional, 2.97.0 C #2049) -- one tick box; its state is the third argument of check and run.
-//   total: (optional, 2.144.3 B #2230) how many items run moves; from SMV_BAR on the dialog shows "x of n moved" as a bar and
+//   total: (optional, 2.147.1 B #2230) how many items run moves; from SMV_BAR on the dialog shows "x of n moved" as a bar and
 //   passes onStep(done, total) as run's fourth argument (smv_post below moves in batches and calls it). While run works the
 //   dialog always shows "Moving…" on the button (aria-busy, nothing else clickable).
 // Resolves the result of run, or null when cancelled. Without an organisation there is no other workspace: callers show the
 // action only when smv_can() (a person without an organisation never sees it; their private space is the only one).
 const smv_can = from => wsOn() && wsOptions().filter(w => w !== 'all' && w !== wsOf({org_id: from})).length > 0;
-// 2.144.3 B (#2230): move id lists in batches of SMV_CHUNK so the dialog can show the progress. Posts b with b[key] (ids | items)
+// 2.147.1 B (#2230): move id lists in batches of SMV_CHUNK so the dialog can show the progress. Posts b with b[key] (ids | items)
 // split up, returns the merged answer ({moved, org_was, to, count, shares}). A later batch that fails keeps what moved so far:
 // the answer then has failed = the error text (api() already toasted it) and the caller offers the undo for the moved part.
 const SMV_CHUNK = 20, SMV_BAR = 20;

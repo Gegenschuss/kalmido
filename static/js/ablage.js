@@ -403,7 +403,7 @@ async function ab_smvSpace(ns) {
   if (ns.some(n => (n.org_id || null) !== from)) { toast(tr('Choose items of one workspace')); return; }
   const ids = ns.map(n => n.id), req = (to, p) => ({ids, to: smv_ws(to), parent: p ? +p : null});
   let last = null;
-  const r = await smv_open({what: ns.length === 1 ? `“${ns[0].name}”` : trn('{0} item', '{0} items', ns.length), from, places: ab_smvPlaces, total: ids.length,  // 2.144.3 B (#2230): batches + progress
+  const r = await smv_open({what: ns.length === 1 ? `“${ns[0].name}”` : trn('{0} item', '{0} items', ns.length), from, places: ab_smvPlaces, total: ids.length,  // 2.147.1 B (#2230): batches + progress
     check: (to, p) => ab_smvDry(req(to, p)), run: (to, p, _o, step) => { last = req(to, p); return smv_post('/api/files/move-space', last, 'ids', step); }});
   if (!r?.moved || !last) return;
   ab_smvEnd();

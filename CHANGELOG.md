@@ -7,6 +7,25 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.147.1] - 2026-10-21
+
+Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.
+
+### Added
+- Chats: tasks, lists, contacts and events can be dragged into the team chat, a thread or an agent chat; they go in as a reference (`#123` or a link card) at the cursor. Several selected tasks at once give one reference each; phones and tablets get *Insert reference* in the chat input row (#2523).
+- Office: an invoice overdue for more than the grace days (default 7) gets a suggested payment reminder as a draft per client - nothing is sent, a task and a hint in the list point to it; switchable in the office settings (#2054).
+- Office: invoices and reminders in EUR carry a GiroCode (EPC QR code) next to the bank details, so banking apps fill in the transfer; switchable, documents finalised earlier stay as they were (#2054).
+
+### Changed
+- Moving many documents to another workspace goes in batches with a progress bar "x of n moved"; smaller moves show *Moving…* on the button; undo still takes back everything at once (#2230).
+- Agents carry the colour of their workspace as a thin stripe in the sidebar, the window bar and the Agents view; chat header and input keep the agent's own colour (#2231).
+- Bell: unread approvals an agent waits for count in the bell and in *For you* (#2405).
+
+### Fixed
+- Bell: the section of read news is called "Gelesen" in German (was "Lesen") (#2405, #2420).
+- Organisation card: the member count leaves agent accounts out, like the members dialog (#2420).
+- Agent chat on Android: the coloured line on top of the input shows again (#2411, #2502).
+
 ## [2.147.0] - 2026-10-21
 
 The country pack decides which office functions exist, single ones can be switched off, and an international base pack

@@ -500,7 +500,7 @@ async function dc_smvMove(sel, what) {
   if (orgs.size !== 1) { toast(tr('Choose items of one workspace')); return null; }
   const ids = [...sel.keys()], from = [...orgs][0];
   let last = null;
-  const r = await smv_open({what, from, total: ids.length,  // 2.144.3 B (#2230): batches + progress
+  const r = await smv_open({what, from, total: ids.length,  // 2.147.1 B (#2230): batches + progress
     check: async to => { try { return await rawFetch('POST', '/api/files/move-space', {ids, to: smv_ws(to), parent: 'docs', dry: 1}); } catch (x) { return {block: x.message || tr('The check failed. Please try again.')}; } },
     run: (to, _p, _o, step) => { last = {ids, to: smv_ws(to), parent: 'docs'}; return smv_post('/api/files/move-space', last, 'ids', step); }});
   if (!r?.moved || !last) return null;
