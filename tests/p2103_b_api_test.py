@@ -287,10 +287,17 @@ os.makedirs(HD, exist_ok=True)
 HEAD = f"l{LID}-a1b2c3.jpg"
 with open(os.path.join(HD, HEAD), "wb") as f:
     f.write(b"\xff\xd8\xff invented picture")
+# 2.152.0 (#2172, review C-H3): table file cells, team chat files and bookmark pictures go into the archive too
+MORE = ("attachments/sheets/9001/a1b2c3-cell.pdf", "attachments/tchat/9002/a1b2c3-chat.png", "attachments/bookmarks/9003-a1b2c3.jpg")
+for m in MORE:
+    os.makedirs(os.path.dirname(os.path.join(DATA, m)), exist_ok=True)
+    with open(os.path.join(DATA, m), "wb") as f:
+        f.write(b"invented bytes")
 GOOD = backup_now()
 with zipfile.ZipFile(os.path.join(BK, GOOD)) as z:
     names = set(z.namelist())
 check(f"attachments/listheads/{HEAD}" in names, f"listheads in the archive ({len(names)} members)")
+check(all(m in names for m in MORE), f"table / team chat / bookmark files in the archive: {[m for m in MORE if m not in names]}")
 
 # encryption required, no passphrase: no backup
 n0 = len(os.listdir(BK))
