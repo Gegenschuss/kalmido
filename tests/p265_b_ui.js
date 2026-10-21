@@ -31,7 +31,8 @@ const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview', 'docprevie
 (async () => {
   // ================= layout (no browser)
   const html = await get(''), sw = await get('sw.js'), ld = await get('static/js/lazyload.js');
-  const tags = [...html.matchAll(/<script src="\/static\/js\/([\w-]+)\.js"><\/script>/g)].map(m => m[1]);
+  // 2.149.0 (#2505): the served page adds ?v=<content hash>
+  const tags = [...html.matchAll(/<script src="\/static\/js\/([\w-]+)\.js(?:\?v=\w+)?"><\/script>/g)].map(m => m[1]);
   const LAZY = [...(sw.match(/const LAZY = \[(.*?)\];/s) || [, ''])[1].matchAll(/'\/static\/js\/([\w-]+)\.js'/g)].map(m => m[1]);
   const LAZY_CSS = [...(sw.match(/const LAZY_CSS = \[(.*?)\];/s) || [, ''])[1].matchAll(/'\/static\/css\/([\w-]+)\.css'/g)].map(m => m[1]);
   const ldCss = [...(ld.match(/const LD_CSS = \{(.*?)\};/s) || [, ''])[1].replace(/\w+:/g, '').matchAll(/'([\w-]+)'/g)].map(m => m[1]);

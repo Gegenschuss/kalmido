@@ -694,6 +694,7 @@ ROUTES = {
     "GET /api/v1/announcement": "public", "GET /api/v1/openapi.json": "public", "GET /api/about": "public", "POST /api/client-errors": "clienterr",
     "GET /": "public", "GET /capture": "public", "GET /share": "public", "POST /share": "public", "POST /drop": "public",
     "POST /drop/drop": "public", "GET /robots.txt": "public", "GET /manifest.json": "public", "GET /sw.js": "public",
+    "GET /sw-manifest.json": "public",  # 2.149.0 B (#2506): the service worker's file hashes (no user data)
     "GET /api/health": "public", "GET /api/version": "public", "POST /api/qr": "public",
     # ---- publiclink (7)
     "GET /s/{}": "publiclink", "POST /s/{}/unlock": "publiclink", "POST /s/{}/tick": "publiclink",
