@@ -25,6 +25,7 @@ from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_or
                     office_seed_texts, office_trial_number, trial_flag)
 from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
                      ofx_number_at_finalize, ofx_snapshot_pack, OFX_LOCKED)
+from .invdelete import idt_applies, idt_delete, idt_info, idt_plan  # 2.162.0 A (#2603)
 from .invoices import (INV_KINDS, INV_STATUSES, STATE_TXT, inv_apply_client, inv_manual_number, inv_money_fields, inv_new_row, inv_paid_map, inv_payments,
                        inv_reminder_totals, inv_render, inv_scheme, inv_state)
 
@@ -449,6 +450,13 @@ def doc_public(c, oid, r, admin, items=True):
     elif OFFER_DELETE_TESTPHASE and r["kind"] == "offer":  # 2.144.8 (#2573): delete has its own, wider rule in the test phase
         d["can_delete"] = bool(admin) and not bga_offer_delete_block(c, oid, r)
         d["delete_sent"] = d["can_delete"] and bga_offer_was_sent(c, oid, r)  # the confirmation says it went out
+    elif idt_applies(r):  # 2.162.0 A (#2603): test phase, an admin deletes a finalised / sent invoice (typing its number)
+        why = idt_plan(c, oid, r)["block"] if admin else None
+        d["can_delete"] = bool(admin) and not why
+        d["delete_confirm"] = d["can_delete"]  # the dialog asks for the number; delete_info = what its hint says
+        d["delete_block"] = why or ""
+        if d["can_delete"] and items:
+            d["delete_info"] = idt_info(c, oid, r)
     else:
         d["can_delete"] = d["can_unlock"] if locked else bool(admin) and r["status"] != "sent" and not odoc_seq_numbered(r)
     d["number_at_finalize"] = ofx_number_at_finalize(office_settings(c, oid), r["kind"])
@@ -1067,6 +1075,10 @@ def odoc_list():
             for b, r in zip(rows, raw):
                 b["can_delete"] = r["id"] not in used
                 b["delete_sent"] = b["can_delete"] and (r["status"] != "draft" or bool(r["sent_at"]) or r["id"] in sent)
+    if kind == "invoice" and role == "admin":  # 2.162.0 A (#2603): test phase, the row menu offers Delete (the dialog loads the details)
+        for b, r in zip(rows, raw):
+            if idt_applies(r):
+                b["can_delete"] = b["delete_confirm"] = True
     for b in rows:  # 2.144.10 A (#2576): an admin deletes a trial document at any time
         if b["trial"]:
             b["can_delete"] = role == "admin"
@@ -1379,6 +1391,15 @@ def odoc_delete(did):
         c.commit()
         trial_drop_files(paths)
         return jsonify(ok=True)
+    if idt_applies(r):  # 2.162.0 A (#2603): test phase, a finalised / sent invoice with confirm_number (+ cash=0|1)
+        resp, paths = idt_delete(c, oid, uid, r)
+        if resp[1] != 200:
+            c.rollback()
+            return resp
+        bump(c)
+        c.commit()
+        trial_drop_files(paths)
+        return resp
     locked = ofx_locked(r)
     test = OFFER_DELETE_TESTPHASE and r["kind"] == "offer"  # 2.144.8 (#2573): the same rule as can_delete
     if locked or test:
