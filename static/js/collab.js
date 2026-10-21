@@ -1056,7 +1056,11 @@ function rswRowAt(e) {
     m.style.transition = reducedMotion() ? 'none' : 'transform .16s ease-out'; m.style.transform = '';
     setTimeout(() => { m.style.transition = ''; m.classList.remove('rsw'); m.querySelector(':scope > .rswarr')?.remove(); }, 180);
     if (go) { const [art, id] = String(m.dataset.mid).split(':'); replyStart(replyArt(m, art), +id); }
+    if (S.rswRedraw) { S.rswRedraw = false; setTimeout(() => { if (S.route.mod === 'team') { if (editingTeam()) tcPatch(); else renderView(); } }, 200); }  // 2.151.1: the live update held back during the swipe
   };
+  // 2.151.1: a live redraw of the team chat while a finger is on a message replaced the touched node: the swipe died silently
+  // (no touchend reaches the document). teamChanged() waits for the end of the swipe instead.
+  window.rswBusy = () => !!sw;
   document.addEventListener('touchstart', e => {
     if (sw) swEnd(true);
     if (e.touches?.length !== 1) return;

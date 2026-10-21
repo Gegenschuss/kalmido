@@ -5395,6 +5395,7 @@
 "rss_reload",
 "rss_stale",
 "rss_when",
+"rswBusy",
 "rswRowAt",
 "rsy_keySet",
 "rsy_level",
