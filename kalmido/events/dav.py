@@ -14,7 +14,7 @@ from flask import request, Response
 
 from ..core.config import APP_NAME, TZ
 from ..core.i18n import tr
-from ..core.db import gsetting, iso_ms, now_utc, parse_iso
+from ..core.db import IntegrityError, gsetting, iso_ms, now_utc, parse_iso
 from ..core.access import collab_all
 from ..calendars.caldav import (
     _el, _privs, _xe, A_, C_, CS_, D_, dav_body, dav_common, dav_href, dav_multistatus, dav_principal_href, dav_propfind_req,
@@ -420,9 +420,12 @@ def _rsvp_mine(u, raw):
     return None
 
 
-def _rsvp_member(c, u, coll, name):
-    """(row, etag) of an invitation the person answers, or DavError 403 like before (read-only, no new objects)."""
+def _rsvp_member(c, u, coll, name, missing=403):
+    """(row, etag) of an invitation the person answers, or DavError 403 like before (read-only, no new objects);
+    a DELETE of an unknown invitation gets 404 (review 2.155.0), so the device stops repeating it."""
     have = member_now(c, u, coll, name)
+    if not have and missing == 404:
+        raise DavError(404, "Not found")
     if not have or not c.execute("SELECT 1 FROM event_attendees WHERE event_id=? AND user_id=?", (have[0]["id"], u["id"])).fetchone():
         raise DavError(403, "Read only", "<D:need-privileges/>")
     return have
@@ -464,7 +467,7 @@ def ev_rsvp_delete(c, u, coll, name):
     """2.155.0 A (#2074): an invitation deleted on the device counts as declined (the app keeps declined invitations, so
     the event comes back marked as declined with the next sync)."""
     from ..events.web import op_rsvp
-    have = _rsvp_member(c, u, coll, name)
+    have = _rsvp_member(c, u, coll, name, missing=404)
     im = request.headers.get("If-Match", "").strip()
     if im and im != "*" and have[1] not in [x.strip() for x in im.split(",")]:
         raise DavError(412, "The resource was changed meanwhile")
@@ -525,7 +528,11 @@ def evdav_mkcal(m, c, u, p):
     if C_ + "calendar-description" in props:
         b["description"] = (props[C_ + "calendar-description"].text or "").strip()
     cid = cal_create(c, u["id"], b)
-    c.execute("UPDATE ev_cals SET dav_name=? WHERE id=?", (key, cid))
+    try:
+        c.execute("UPDATE ev_cals SET dav_name=? WHERE id=?", (key, cid))
+    except IntegrityError:  # 2.155.0 review: the same name created at the same time -> 405, the new calendar is rolled back
+        c.rollback()
+        raise DavError(405, "The calendar exists already") from None
     bump(c)
     c.commit()
     r = Response(status=201)

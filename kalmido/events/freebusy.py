@@ -50,7 +50,7 @@ def efb_allowed(c, uid, ids):
 
 def efb_spans(c, uid, day, zone, skip=None):
     """[(start minute, end minute, kind)] of person uid on day (0..1440 in zone), merged per kind. Run as system."""
-    from ..events.model import ev_expand, my_cal_ids
+    from ..events.model import ev_att_ok, ev_expand, my_cal_ids
     from ..hub.absence import abs_holidays_year
     from ..hub.abscal import abc_state
     d0 = datetime(day.year, day.month, day.day, tzinfo=zone)
@@ -60,17 +60,20 @@ def efb_spans(c, uid, day, zone, skip=None):
 
     def clip(s, e, out):
         a, b = max(s, d0), min(e, d1)
-        if b > a:
-            out.append((int((a - d0).total_seconds() // 60), int((b - d0).total_seconds() // 60)))
+        if b > a:  # wall-clock minutes in zone (review 2.155.0: right on DST days for UTC / other-zone times too)
+            a, b = a.astimezone(zone), b.astimezone(zone)
+            out.append((a.hour * 60 + a.minute, 1440 if b >= d1 else b.hour * 60 + b.minute))
     cals = list(my_cal_ids(c, uid, hidden=False))
     rows = []
     if cals:
         q = ",".join("?" * len(cals))
         rows = c.execute(f"""SELECT * FROM events WHERE cal_id IN ({q}) AND deleted_at IS NULL AND busy=1 AND status<>'cancelled'
                              AND all_day=0 AND first_day<=? AND (last_day='' OR last_day>=?)""", [*cals, hi.isoformat(), lo.isoformat()]).fetchall()
-    rows += c.execute("""SELECT e.* FROM events e JOIN event_attendees a ON a.event_id=e.id AND a.user_id=? WHERE a.partstat='accepted'
+    rows += [r for r in c.execute("""SELECT e.*, k.org_id AS efb_org FROM events e JOIN event_attendees a ON a.event_id=e.id AND a.user_id=?
+                         JOIN ev_cals k ON k.id=e.cal_id WHERE a.partstat='accepted'
                          AND e.deleted_at IS NULL AND e.busy=1 AND e.status<>'cancelled' AND e.all_day=0 AND e.first_day<=?
                          AND (e.last_day='' OR e.last_day>=?)""", (uid, hi.isoformat(), lo.isoformat())).fetchall()
+             if ev_att_ok(c, uid, r["efb_org"])]  # review 2.155.0: not the invitations of an organisation the person left
     seen = set()
     for r in rows:
         if r["id"] in seen or (skip and r["id"] == skip):
@@ -130,10 +133,15 @@ def efb_get():
         if not re.fullmatch(r"\d{1,12}", a["skip"].strip()):
             raise BadInput(tr("Invalid value: {0}", "skip"))
         skip = int(a["skip"])
+    c, uid = db(), u["id"]
+    if skip:  # review 2.155.0: only an event I have a role in may be left out (no probing of colleagues' event ids)
+        from ..events.model import ev_role_of
+        sr = c.execute("SELECT * FROM events WHERE id=?", (skip,)).fetchone()
+        if not sr or not ev_role_of(c, uid, sr):
+            skip = None
     from ..events.model import ev_zone, tz_ok
     tz = (a.get("tz") or "").strip()
     zone = ev_zone(tz if tz_ok(tz) else "")
-    c, uid = db(), u["id"]
     people = []
     allowed = efb_allowed(c, uid, ids)
     with system_ctx(c):  # the colleagues' calendars lie outside my rights; only merged spans leave this block

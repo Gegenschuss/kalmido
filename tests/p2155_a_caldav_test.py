@@ -168,6 +168,8 @@ check(r.status_code == 403, f"#2074: a new resource in the invitations: still 40
 check(not dbx("SELECT 1 FROM events WHERE uid='new-one'"), "#2074: ... nothing stored")
 r = bob.req("DELETE", H1)
 check(r.status_code == 204 and att(A, E1, uid["bob"]) == "declined", f"#2074: DELETE of an invitation = declined ({r.status_code})")
+r = bob.req("DELETE", H1.rsplit("/", 1)[0] + "/nope-2155.ics")  # 2.155.0 review: an unknown invitation = 404, not 403
+check(r.status_code == 404, f"#2074: DELETE of an unknown invitation = 404 ({r.status_code})")
 check(A.get(B + f"/api/events/{E1}").ok and not dbx("SELECT deleted_at FROM events WHERE id=?", (E1,))[0][0],
       "#2074: ... the event itself stays")
 r = A.post(B + "/api/events", json={"cal_id": TEAM, "title": "Owner's own", "start": f"{DAY}T12:00", "end": f"{DAY}T13:00"})
