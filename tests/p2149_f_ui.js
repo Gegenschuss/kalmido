@@ -28,7 +28,7 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { let x; try {
 const get = async u => (await fetch(B + u)).text();
 // module -> its files (LD_MODS) that were start files before 2.149.0
 const MOVED = {life: ['budget'], settings: ['servers'], listprint: ['listprint'], evinvite: ['evinvite'], projtime: ['projtime'],
-  envs: ['envs'], dayplan: ['dpmodal'], gitrepo: ['gitrepo'], timesheet: ['timesheet'], team: ['absence', 'leave', 'dispo']};
+  envs: ['envs'], dayplan: ['dpmodal'], gitrepo: ['gitrepo'], timesheet: ['timesheet'], team: ['absence', 'leave', 'dispo'], hubmail: ['hubmail'], msvview: ['msvview']};
 const FILES = Object.values(MOVED).flat();
 
 (async () => {
@@ -46,7 +46,7 @@ const FILES = Object.values(MOVED).flat();
     const own = ((mods.match(new RegExp(`\\b${m}: \\[([^\\]]*)\\]`)) || [, ''])[1].match(/'[\w-]+'/g) || []).map(x => x.slice(1, -1));
     check(fs.every(f => own.includes(f) && LAZY.includes(f) && !tags.includes(f)), `module ${m}: ${fs.join(', ')} in LD_MODS + LAZY, no script tag (${own.join(' ')})`);
   }
-  check(['quickadd', 'dayplan', 'git', 'projects', 'lazyload', 'calevents', 'time', 'clients'].every(f => tags.includes(f)), 'the start parts of the split files stay at start');
+  check(['quickadd', 'dayplan', 'git', 'projects', 'lazyload', 'calevents', 'time', 'clients', 'clientpage', 'render'].every(f => tags.includes(f)), 'the start parts of the split files stay at start');
 
   // ================= setup
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
@@ -82,6 +82,19 @@ const FILES = Object.values(MOVED).flat();
   await until(() => loaded().includes('budget') && d.querySelector('#view .bgview') && !/^\s*Loading…\s*$/.test(d.querySelector('#view').textContent || ''), 100);
   check(['life', 'budget'].every(f => loaded().includes(f)) && loaded().indexOf('life') < loaded().indexOf('budget') && !!d.querySelector('#view .bgview'), 'budget: life.js then budget.js, the budget view drawn');
   w.eval(`go('today')`);
+
+  // other servers (msvview.js): nothing linked -> the stand-ins answer like the module without a link, nothing is loaded
+  check(w.eval(`msvvCount(3, 'today')`) === 3 && w.eval(`msvvMoveItem({}).length`) === 0 && w.eval(`msvvCalChips('2026-01-01').length`) === 0 && w.eval(`msvvSide()`) === '' && !loaded().includes('msvview') && w.eval(`!!S.msvv && S.msvv.search.q === ''`),
+    'other servers: without a linked server the stand-ins answer, msvview.js is not loaded');
+  w.location.hash = '#srv/7/1';
+  await until(() => loaded().includes('msvview') && !/^\s*Loading…\s*$/.test(d.querySelector('#view')?.textContent || ''), 80);
+  check(loaded().includes('msvview') && w.eval(`typeof msvvLink`) === 'function', 'other servers: a list of another server (route) loads msvview.js');
+  w.location.hash = '#today'; await sleep(200);
+  // e-mail filing (hubmail.js): the task's mail link is drawn at start, a client's card loads the module
+  check(/data-hbmlnk="task:/.test(w.eval(`hbm_taskLinkHtml(taskById(${TID}))`)) && !loaded().includes('hubmail'), 'e-mail filing: the task panel draws its mail link without hubmail.js');
+  check(w.eval(`hbm_clientHtml({id: 1})`) === '', 'e-mail filing: the client card stand-in draws nothing');
+  await until(() => loaded().includes('hubmail') && w.eval(`typeof HBM`) === 'object');
+  check(loaded().includes('hubmail') && w.eval(`typeof hbm_load`) === 'function', 'e-mail filing: hubmail.js loads for the client card');
 
   // the time page: its timesheet card loads timesheet.js
   w.eval(`go('time')`);

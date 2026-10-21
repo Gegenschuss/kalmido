@@ -1705,3 +1705,29 @@ document.addEventListener('keydown', e => {
   if (q.trim() && !searchEnterOpen(q)) S.searchEnter = q;
   if (S.searchQ !== q) doSearch(q);
 });
+// ---- 2.149.0 F (#2518): the other servers' view (msvview.js) loads on demand (lazyload.js module msvview), only for someone who
+// has linked another server (or opens one of its lists). Its state stays here; before it is loaded the stand-ins answer what it
+// answers without a linked server (nothing, the own numbers). The start asks /api/servers once (as msvvBoot did) and loads the
+// module only when a server is linked; adding the first one in Settings (servers.js: msv:changed) loads it too
+S.msvv = {self: null, links: [], data: {}, news: {}, cal: {key: '', ev: {}}, search: {q: '', res: {}}, loaded: false, at: 0, busy: false};
+S.msvvQ = null;  // the quick add target picked by hand: {key, sid, lid}
+window.msvvSide = window.msvvNewsHtml = window.msvvSelfBadge = window.msvvRow = window.msvvSearchHtml = window.msvvSearch = window.msvvQSync = window.msvvSheetTarget
+  = window.msvvCalEnsure = window.msvvCalDay = () => '';
+window.msvvMerge = g => g;
+window.msvvCount = n => n;
+window.msvvMoveItem = () => [];
+window.msvvCalChips = () => [];
+window.msvvQuick = async () => false;
+window.msvvTitle = () => '?';
+// a list of another server opened straight away (a link, a reload): load and boot (its first answer draws the view)
+window.msvvViewList = () => { if (!S.msvv.ld) { S.msvv.ld = 1; loadModule('msvview').then(() => msvvBoot(), () => { S.msvv.ld = 0; }); } return botEmpty('ruhig', tr('Loading…')); };
+const msvv_probe = () => fetch('/api/servers', {headers: {'X-Requested-With': 'kalmido'}, redirect: 'manual', credentials: 'same-origin'})
+  .then(r => r.ok ? r.json() : null, () => null)
+  .then(j => { if ((Array.isArray(j?.links) && j.links.length) || S.route.mod === 'msv') { S.msvv.pre = j && typeof j === 'object' ? j : null; return loadModule('msvview').then(() => msvvBoot()); } })
+  .catch(() => {});
+window.msvvBoot = () => {
+  if (window.msvvBoot.done || S.me?.kid) return; window.msvvBoot.done = 1;
+  msvv_probe();
+  document.addEventListener('msv:changed', () => loadModule('msvview').then(() => msvvBoot()).catch(() => {}), {once: true});
+};
+window.msvvLoad = () => msvv_probe();  // "Sync now": a server linked meanwhile (on another device)

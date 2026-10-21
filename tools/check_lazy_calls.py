@@ -150,7 +150,8 @@ def lazy_calls(root):
     hits = []
     for f in start:
         lines = texts[f].split("\n")
-        code = blank(texts[f]).split("\n")
+        btext = blank(texts[f])  # without comments and string texts (a name in a text is no declaration)
+        code = btext.split("\n")
         for mod in OKMOD_RE.findall(texts[f]):
             if mod not in mods:
                 hits.append((f, 0, mod, "-", "lazy-ok-module names a module that LD_MODS does not know"))
@@ -168,7 +169,7 @@ def lazy_calls(root):
                 n = m.group(1)
                 if only[n] <= okf:
                     continue
-                if re.search(r"function\s*\*?\s*" + re.escape(n) + r"\s*\(", line) or shadowed(texts[f], n):
+                if re.search(r"function\s*\*?\s*" + re.escape(n) + r"\s*\(", line) or shadowed(btext, n):
                     continue
                 ctx = "\n".join(lines[max(0, k - 4):k + 1])
                 sib = set().union(*(tops.get(x, set()) for x in only[n])) | {n}
