@@ -24,7 +24,8 @@ const until = async (fn, n = 50) => { for (let i = 0; i < n; i++) { const x = aw
 const get = async u => (await fetch(B + u)).text();
 // 2.94.1 (#1929): apptbook.js (booking settings) loads with the calendar module
 const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview', 'docpreview'],  // 2.92.0 (#1926): the Word / Excel preview
-  mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag', 'apptbook'], docs: ['docs', 'paperless', 'receipts'],
+  // 2.155.0 C (#2078): calendar + calyear (the year view)
+  mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag', 'apptbook', 'calyear'], docs: ['docs', 'paperless', 'receipts'],
   life: ['life'], integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline', 'roadmap'],
   polls: ['polls'], formq: ['formq']};  // 2.102.0 C (#2208): scheduling polls and questionnaires load on demand
 
