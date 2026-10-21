@@ -1585,6 +1585,9 @@ fresh; run p21443_b2_ui node p21443_b2_ui.js "$KALMIDO_TEST_DATA"
 # 2.147.1 part C: bell "Read" section, approvals in the bell count, org card members, Mac icon (#2405 #2420 #2396)
 fresh; run p21443_c_api "$PY" p21443_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21443_c_ui node p21443_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.154.0 part B: Peppol dispatch of e-invoices - UBL (Peppol BIS 3.0) without a server, Peppol ids, provider connection, send + status (#1960)
+       run p2154_b_ubl "$PY" p2154_b_ubl_test.py
+fresh; run p2154_b_api "$PY" p2154_b_peppol_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

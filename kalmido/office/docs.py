@@ -448,6 +448,8 @@ def doc_public(c, oid, r, admin, items=True):
     if r["kind"] == "offer":
         from .cashflow import cf8_chain
         d["cf_chain"] = cf8_chain(c, oid, r)  # 2.88.0 (#1915): which version of the chain counts in the cash flow
+    from .peppol import pep_doc_extra
+    pep_doc_extra(c, oid, d)  # 2.154.0 B (#1960): the newest Peppol send of an invoice / credit note
     return d
 
 

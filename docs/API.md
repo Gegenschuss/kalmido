@@ -1306,7 +1306,7 @@ number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENT
 | `GET /office` | office | The area (`{id, personal}`), `person_id`, `role`, currency, language, the rules |
 | `GET /office/{services\|texts\|contracts\|clients}` | office | Master data of the area (`q` = search); never purchase prices or markups |
 | `GET /office/docs` | office | `?kind=offer\|invoice\|credit\|reminder&client_id=&status=&open=1` -> `{data: [brief documents]}` (2.88: quotations with `version_of` = the first quotation of their chain of versions, `cashflow`) |
-| `GET /office/docs/{id}` | office | One document with positions (`agent_flag` per position: `free`, `price`, `discount:<pct>`), sums, `agent_id`; 2.88: a quotation also `version_of`, `cashflow` and `cf_chain` (which version counts in the cash flow); 2.91: an invoice made by an invoice series carries `series_id` and `series_period` (the start of its period; null / empty otherwise) |
+| `GET /office/docs/{id}` | office | One document with positions (`agent_flag` per position: `free`, `price`, `discount:<pct>`), sums, `agent_id`; 2.88: a quotation also `version_of`, `cashflow` and `cf_chain` (which version counts in the cash flow); 2.91: an invoice made by an invoice series carries `series_id` and `series_period` (the start of its period; null / empty otherwise); 2.154: an invoice / credit note carries `peppol` = its newest send over the Peppol network `{status: sending\|sent\|delivered\|rejected\|error, status_text, message, at}` or null (read only: agents never send) |
 | `GET /office/docs/{id}/pdf` | office | The PDF preview of a draft (2.138.2: DRAFT / ENTWURF in bold at the number and on every page); `409` for others |
 | `POST /office/offers` | office | `{client_id?, title, intro?, items: [{service_id?, text?, detail?, qty?, unit?, price?, discount?, kind?}], list_id?, notify?}` -> `201 {doc, chat_message_id?}` |
 | `PATCH /office/offers/{id}` | office | The agent's own draft while it is a draft (`items` replaces the list; 2.88: `cashflow` auto / yes / no = its share in the cash flow plan once sent); `403` for a person's draft, `409` once sent |
@@ -1321,6 +1321,13 @@ number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENT
 The people's side (web app, signed in): `GET` / `PATCH /api/office/agents/{id}` (`{office_drafts: bool}`, an admin of the
 agent's office area), `GET /api/office/pay-props`, `POST /api/office/pay-props/{id}` `{action: accept|reject}` (admins;
 accept books the payment like *Record payment*), the settings key `agents_read` of `PUT /api/office/settings`.
+
+2.154.0 (#1960), e-invoices over the Peppol network (people only, details in [OFFICE.md](OFFICE.md#e-invoices-over-the-peppol-network-2154)):
+`GET` / `PUT /api/office/peppol` (`{provider: storecove|custom|"", endpoint_url?, account?, sandbox?, sender_id?, api_key?}`, admins;
+the key is never returned, `key_set` only), `POST /api/office/peppol/check`, `GET /api/office/docs/{id}/ubl` (the UBL file),
+`GET /api/office/docs/{id}/peppol` (`?refresh=1`: what is missing, the client's id or a suggestion, the sends), `POST
+/api/office/docs/{id}/peppol/lookup` (`{reachable}`), `POST /api/office/docs/{id}/peppol` (`{again?: 1}` -> `201`; `409` when
+something is missing or it went already, `502` when the provider failed). The client's billing field `peppol_id`.
 
 ## Documents (2.48.0)
 

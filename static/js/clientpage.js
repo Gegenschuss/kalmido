@@ -106,6 +106,7 @@ function ms_clCard(c) {
       ${f('hash', tr('Customer number'), esc(b.customer_no || ''), 'cl_customer_no')}
       ${f('receipt', tr('VAT ID'), esc(b.vat_id || ''), 'cl_vat_id')}
       ${f('tag', tr('Buyer reference (e.g. routing ID)'), esc(b.buyer_reference || ''), 'cl_buyer_reference')}
+      ${f('send', tr('Peppol ID'), esc(b.peppol_id || ''), 'cl_peppol_id')}${''/* 2.154.0 B (#1960) */}
       ${f('at', tr('E-mail for invoices'), b.email_invoice ? `<a href="mailto:${esc(b.email_invoice)}">${esc(b.email_invoice)}</a>` : '', 'cl_email_invoice')}
       ${f('clock', tr('Payment terms (days)'), b.payment_terms_days != null ? esc(String(b.payment_terms_days)) : '', 'cl_payment_terms_days')}
     </div>`,

@@ -87,6 +87,7 @@ TABLES = (
     "org_invites",  # 2.115.0 B (#2062): accounts an organisation invited by e-mail (always an organisation's)
     "webhooks",  # 2.115.0 A (#2061): outgoing webhooks (NULL = a person's own / an agent's, else its organisation's admins)
     "notify_channels",  # 2.142.0 A (#2145): notification channels (NULL = a person's own, else its organisation's admins)
+    "office_peppol", "office_peppol_sends",  # 2.154.0 B (#1960): the Peppol connection of an office area + its sends
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

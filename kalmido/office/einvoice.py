@@ -484,3 +484,312 @@ def ein_check(xml_bytes):
     if not se.findall("ram:SpecifiedTradeSettlementPaymentMeans", NS):
         out.append("BG-16 payment means missing")
     return out
+
+
+# ---------------------------------------------------------------- 2.154.0 B (#1960): UBL 2.1 (Peppol BIS Billing 3.0)
+# The same print model as OASIS UBL 2.1 Invoice / CreditNote: Peppol BIS Billing 3.0 (the Peppol network), the XRechnung
+# 3.0 UBL syntax (German public buyers, also through Peppol) or plain EN 16931. The CII above stays as it is; ein_ubl_build
+# repeats its rules (tax category by vat_note, discount lines as a negative quantity, BT-111 for a foreign currency).
+# EndpointID (BT-34 / BT-49): the Peppol ids "<scheme>:<id>" when given, else the e-mail (scheme EM).
+UBL_PROFILES = {"peppol": "urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0",
+                "xrechnung": "urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0",
+                "en16931": "urn:cen.eu:en16931:2017"}
+UBL_NS = {"inv": "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2",
+          "cn": "urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2",
+          "cac": "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
+          "cbc": "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"}
+
+
+def _u(parent, tag, text=None, **attrs):
+    """A UBL element (cac:/cbc:); an empty text is not written (PEPPOL-EN16931-R008: no empty elements)."""
+    ns, _, name = tag.partition(":")
+    el = ET.SubElement(parent, f"{{{UBL_NS[ns]}}}{name}", {k: v for k, v in attrs.items() if v not in (None, "")})
+    if text is not None:
+        el.text = str(text)
+    return el
+
+
+def _ut(parent, tag, text, **attrs):
+    """_u only when text is not empty."""
+    if text is None or not str(text).strip():
+        return None
+    return _u(parent, tag, str(text).strip(), **attrs)
+
+
+def _udate(iso):
+    m = re.fullmatch(r"(\d{4}-\d{2}-\d{2})", str(iso or "")[:10])
+    return m.group(1) if m else ""
+
+
+def ein_ubl_endpoint(pid):
+    """'<scheme>:<id>' -> (scheme, id) or None."""
+    m = re.fullmatch(r"\s*(\d{4}|EM):(\S{1,200})\s*", str(pid or ""))
+    return (m.group(1), m.group(2)) if m else None
+
+
+def _ubl_lines(m, cat):
+    """[(line dict, net, pct, qty, price)] like ein_build's loop; price and quantity agree with the net amount
+    (PEPPOL-EN16931-R120: net = quantity x price, rounded to cents) -- else the price gets four places, else qty 1."""
+    out = []
+    n = 0
+    for ln in m.get("lines") or []:
+        if not isinstance(ln, dict) or ln.get("kind") not in ("item", "discount", "producing", "surcharge", "raw"):
+            continue
+        if ln.get("kind") == "raw" and ln.get("optional"):
+            continue
+        n += 1
+        net = _d(ln.get("net") if ln.get("net") not in (None, "") else ln.get("total")).quantize(Q2, rounding=ROUND_HALF_UP)
+        pct = _d(ln.get("tax_pct")) if cat == "S" else Decimal("0")
+        qty = _d(ln.get("qty"), "1") if ln.get("qty") not in (None, "") else Decimal("1")
+        rate = _d(ln.get("rate")) if ln.get("rate") not in (None, "") else net
+        if qty == 0:
+            qty, rate = Decimal("1"), net
+        if rate < 0:
+            rate, qty = -rate, -qty
+        elif net < 0 and qty > 0:
+            qty = -qty
+        if (qty * rate).quantize(Q2, rounding=ROUND_HALF_UP) != net:
+            p4 = (net / qty).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP) if qty else net
+            if p4 >= 0 and (qty * p4).quantize(Q2, rounding=ROUND_HALF_UP) == net:
+                rate = p4
+            else:
+                qty, rate = (Decimal("-1"), -net) if net < 0 else (Decimal("1"), net)
+        out.append((ln, n, net, pct, qty, rate))
+    return out
+
+
+def _ubl_party(parent, tag, name, f, home, endpoint=None, email=None, contact=None, legal_id=None, seller=False):
+    """AccountingSupplierParty / AccountingCustomerParty in the UBL order: EndpointID, PostalAddress, PartyTaxScheme,
+    PartyLegalEntity, Contact."""
+    p = _u(_u(parent, tag), "cac:Party")
+    ep = ein_ubl_endpoint(endpoint)
+    if ep:
+        _u(p, "cbc:EndpointID", ep[1], schemeID=ep[0])
+    elif email:
+        _u(p, "cbc:EndpointID", email, schemeID="EM")
+    a = _u(p, "cac:PostalAddress")
+    _ut(a, "cbc:StreetName", f.get("street"))
+    _ut(a, "cbc:AdditionalStreetName", f.get("line2"))
+    _ut(a, "cbc:CityName", f.get("city"))
+    _ut(a, "cbc:PostalZone", f.get("zip"))
+    if f.get("line3"):
+        _ut(_u(a, "cac:AddressLine"), "cbc:Line", f["line3"])
+    _u(_u(a, "cac:Country"), "cbc:IdentificationCode", _country(f.get("country"), home))
+    if f.get("vat_id"):
+        ts = _u(p, "cac:PartyTaxScheme")
+        _u(ts, "cbc:CompanyID", f["vat_id"])
+        _u(_u(ts, "cac:TaxScheme"), "cbc:ID", "VAT")
+    if seller and f.get("tax_number"):  # BT-32: the seller's tax number (scheme FC, not VAT)
+        ts = _u(p, "cac:PartyTaxScheme")
+        _u(ts, "cbc:CompanyID", f["tax_number"])
+        _u(_u(ts, "cac:TaxScheme"), "cbc:ID", "FC")
+    le = _u(p, "cac:PartyLegalEntity")
+    _u(le, "cbc:RegistrationName", name or "-")
+    _ut(le, "cbc:CompanyID", legal_id)
+    if contact and (contact.get("name") or contact.get("phone") or contact.get("email")):
+        ct = _u(p, "cac:Contact")
+        _ut(ct, "cbc:Name", contact.get("name"))
+        _ut(ct, "cbc:Telephone", contact.get("phone"))
+        _ut(ct, "cbc:ElectronicMail", contact.get("email"))
+    return p
+
+
+def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
+    """The UBL 2.1 XML (bytes, UTF-8) of an invoice / credit note print model. profile: peppol (Peppol BIS Billing 3.0),
+    xrechnung (XRechnung 3.0 UBL: BT-10 mandatory -> BadInput) or en16931. sender_id / receiver_id: Peppol ids
+    "<scheme>:<id>" (BT-34 / BT-49); empty = the e-mail addresses (scheme EM)."""
+    m = model or {}
+    profile = profile if profile in UBL_PROFILES else "peppol"
+    lang = "en" if str(m.get("lang") or "de").lower().startswith("en") else "de"
+    kind = m.get("kind") or "invoice"
+    credit = kind == "credit"
+    sf = m.get("sender_fields") or {}
+    rc = m.get("recipient") or {}
+    tot = m.get("totals") or {}
+    pay = m.get("payment") or {}
+    cur = str(m.get("currency") or "EUR").upper()
+    home = _country(sf.get("country"), "DE")
+    novat = (m.get("vat_mode") == "novat") or bool(m.get("vat_note_key"))
+    cat, excode = VAT_CATEGORY.get(m.get("vat_note_key") or "", ("E", "")) if novat else ("S", "")
+    extext = EXEMPT_TEXT.get(m.get("vat_note_key") or "small", EXEMPT_TEXT["small"])[lang] if cat != "S" else ""
+    buyer_ref = str(rc.get("buyer_reference") or "").strip()
+    if profile == "xrechnung" and not buyer_ref:
+        raise BadInput(tr("XRechnung needs a buyer reference (billing details of the client)."))
+    if profile == "peppol" and not buyer_ref and not m.get("order_ref"):
+        buyer_ref = str(rc.get("customer_no") or "").strip()  # PEPPOL-EN16931-R003: BT-10 or BT-13; the customer number stands in
+
+    for p, u in (("cac", UBL_NS["cac"]), ("cbc", UBL_NS["cbc"])):
+        ET.register_namespace(p, u)
+    ET.register_namespace("", UBL_NS["cn" if credit else "inv"])
+    root = ET.Element(f"{{{UBL_NS['cn' if credit else 'inv']}}}{'CreditNote' if credit else 'Invoice'}")
+    _u(root, "cbc:CustomizationID", UBL_PROFILES[profile])
+    _u(root, "cbc:ProfileID", EIN_PROCESS)
+    _u(root, "cbc:ID", m.get("number") or "")
+    _u(root, "cbc:IssueDate", _udate(m.get("date")))
+    if not credit and _udate(m.get("due_date")):
+        _u(root, "cbc:DueDate", _udate(m.get("due_date")))
+    _u(root, "cbc:CreditNoteTypeCode" if credit else "cbc:InvoiceTypeCode", "381" if credit else (m.get("type_code") or "380"))
+    notes = [str(x) for x in (m.get("vat_note_text") or (tot.get("vat_note") if novat else ""), m.get("project_title") and
+             (("Projekt: " if lang == "de" else "Project: ") + str(m["project_title"]))) if x and str(x).strip()]
+    if novat and not m.get("vat_note_text"):
+        notes.insert(0, extext)
+    if notes:  # PEPPOL-EN16931-R002: one note on document level
+        _u(root, "cbc:Note", "\n".join(notes[:4]))
+    _u(root, "cbc:DocumentCurrencyCode", cur)
+    if cur != "EUR":
+        _u(root, "cbc:TaxCurrencyCode", "EUR")
+    if buyer_ref:
+        _u(root, "cbc:BuyerReference", buyer_ref)
+    if m.get("service_from") or m.get("service_to"):
+        ip = _u(root, "cac:InvoicePeriod")
+        _u(ip, "cbc:StartDate", _udate(m.get("service_from") or m.get("service_to")))
+        _u(ip, "cbc:EndDate", _udate(m.get("service_to") or m.get("service_from")))
+    if m.get("order_ref"):
+        _u(_u(root, "cac:OrderReference"), "cbc:ID", m["order_ref"])
+    cz = m.get("cancels") or {}
+    if credit and cz.get("number"):  # BT-25 / BT-26: the invoice this credit note cancels
+        dr = _u(_u(root, "cac:BillingReference"), "cac:InvoiceDocumentReference")
+        _u(dr, "cbc:ID", cz["number"])
+        _ut(dr, "cbc:IssueDate", _udate(cz.get("date")))
+
+    sname = " ".join(str(sf.get("name") or (m.get("company") or {}).get("name") or "").split())
+    _ubl_party(root, "cac:AccountingSupplierParty", sname, {**sf, "line2": sf.get("address_extra") or ""}, home, endpoint=sender_id,
+               email=sf.get("email"), legal_id=sf.get("register_no"), seller=True,
+               contact={"name": sf.get("managing_directors") or sname, "phone": sf.get("phone"), "email": sf.get("email")}
+               if (sf.get("phone") or sf.get("email")) else None)
+    rfields = {"street": rc.get("street"), "zip": rc.get("zip"), "city": rc.get("city"), "country": rc.get("country"), "vat_id": rc.get("vat_id")}
+    if rc.get("extra"):
+        rfields["line2"] = rc["extra"]
+    if not rfields["street"] and not rfields["city"]:
+        lines = [str(x) for x in (rc.get("lines") or []) if str(x).strip() and str(x).strip() not in (str(rc.get("name") or "").strip(), str(rc.get("name_extra") or "").strip())]
+        sp = fd_split_address(lines)
+        if rfields.get("country"):
+            sp.pop("country", None)
+        rfields.update(sp)
+    bname = " - ".join(x for x in (str(rc.get("name") or "").strip(), str(rc.get("name_extra") or "").strip()) if x)
+    person = rc.get("contact") if isinstance(rc.get("contact"), dict) else None
+    _ubl_party(root, "cac:AccountingCustomerParty", bname, rfields, home, endpoint=receiver_id, email=rc.get("email_invoice"), contact=person)
+
+    iban = str(pay.get("iban") or sf.get("iban") or "").replace(" ", "")
+    bic = str(pay.get("bic") or sf.get("bic") or "").replace(" ", "")
+    pm = _u(root, "cac:PaymentMeans")
+    _u(pm, "cbc:PaymentMeansCode", "58" if iban else "30")
+    if credit and _udate(m.get("due_date")):
+        _u(pm, "cbc:PaymentDueDate", _udate(m.get("due_date")))
+    if iban:
+        acc = _u(pm, "cac:PayeeFinancialAccount")
+        _u(acc, "cbc:ID", iban)
+        _ut(acc, "cbc:Name", str(sf.get("bank_name") or "")[:70])
+        if bic:
+            _u(_u(acc, "cac:FinancialInstitutionBranch"), "cbc:ID", bic)
+    if pay.get("skonto_bt20"):
+        first = str(pay.get("text") or "").split("\n")[0][:400]
+        terms = (first + "\n" if first else "") + pay["skonto_bt20"]
+    elif pay.get("text"):
+        terms = str(pay["text"])[:500]
+    elif credit:
+        terms = "Der Betrag wird erstattet oder verrechnet." if lang == "de" else "The amount will be refunded or offset."
+    elif not m.get("due_date"):
+        terms = "Zahlbar sofort ohne Abzug." if lang == "de" else "Payable on receipt."
+    else:
+        terms = ""
+    if terms:
+        _u(_u(root, "cac:PaymentTerms"), "cbc:Note", terms)
+
+    lines = _ubl_lines(m, cat)
+    line_sum = sum((x[2] for x in lines), Decimal("0"))
+    by_rate = {}
+    for x in lines:
+        by_rate[x[3]] = by_rate.get(x[3], Decimal("0")) + x[2]
+    tax_lines = [tl for tl in (tot.get("tax_lines") or []) if isinstance(tl, dict)]
+    tt = _u(root, "cac:TaxTotal")
+    ta = _u(tt, "cbc:TaxAmount", "0.00", currencyID=cur)
+    tax_sum = Decimal("0")
+    for pct in (sorted(by_rate) if by_rate else [Decimal("0")]):
+        base = by_rate.get(pct, Decimal("0"))
+        given = next((tl for tl in tax_lines if _d(tl.get("pct")) == pct), None)
+        amount = _d(given.get("amount")).quantize(Q2, rounding=ROUND_HALF_UP) if given else (base * pct / 100).quantize(Q2, rounding=ROUND_HALF_UP)
+        if cat != "S":
+            amount = Decimal("0")
+        st = _u(tt, "cac:TaxSubtotal")
+        _u(st, "cbc:TaxableAmount", _m(base), currencyID=cur)
+        _u(st, "cbc:TaxAmount", _m(amount), currencyID=cur)
+        tc = _u(st, "cac:TaxCategory")
+        _u(tc, "cbc:ID", cat)
+        _u(tc, "cbc:Percent", _pct(pct))
+        if cat != "S":
+            _ut(tc, "cbc:TaxExemptionReasonCode", excode)
+            _u(tc, "cbc:TaxExemptionReason", extext)
+        _u(_u(tc, "cac:TaxScheme"), "cbc:ID", "VAT")
+        tax_sum += amount
+    ta.text = _m(tax_sum)
+    if cur != "EUR":  # BT-111: the tax in EUR, its own TaxTotal without subtotals
+        _u(_u(root, "cac:TaxTotal"), "cbc:TaxAmount", _m(tot.get("tax_eur") if tot.get("tax_eur") not in (None, "") else tax_sum), currencyID="EUR")
+    gross = tot.get("gross") if tot.get("gross") not in (None, "") else line_sum + tax_sum
+    gross = _d(gross).quantize(Q2, rounding=ROUND_HALF_UP)
+    paid = _d(tot.get("paid")).quantize(Q2, rounding=ROUND_HALF_UP) if kind == "invoice" else Decimal("0")
+    mt = _u(root, "cac:LegalMonetaryTotal")
+    _u(mt, "cbc:LineExtensionAmount", _m(line_sum), currencyID=cur)
+    _u(mt, "cbc:TaxExclusiveAmount", _m(line_sum), currencyID=cur)
+    _u(mt, "cbc:TaxInclusiveAmount", _m(gross), currencyID=cur)
+    if paid:
+        _u(mt, "cbc:PrepaidAmount", _m(paid), currencyID=cur)
+    _u(mt, "cbc:PayableAmount", _m(gross - paid), currencyID=cur)
+
+    for ln, n, net, pct, qty, rate in lines:
+        li = _u(root, "cac:CreditNoteLine" if credit else "cac:InvoiceLine")
+        _u(li, "cbc:ID", str(ln.get("pos") or n))
+        _u(li, "cbc:CreditedQuantity" if credit else "cbc:InvoicedQuantity", _qty(qty), unitCode=UNIT_CODES.get(str(ln.get("unit") or ""), "C62"))
+        _u(li, "cbc:LineExtensionAmount", _m(net), currencyID=cur)
+        it = _u(li, "cac:Item")
+        _ut(it, "cbc:Description", str(ln.get("detail") or "")[:1000])
+        _u(it, "cbc:Name", str(ln.get("title") or "")[:200] or ("Position " + str(n)))
+        tc = _u(it, "cac:ClassifiedTaxCategory")
+        _u(tc, "cbc:ID", cat)
+        _u(tc, "cbc:Percent", _pct(pct))
+        _u(_u(tc, "cac:TaxScheme"), "cbc:ID", "VAT")
+        _u(_u(li, "cac:Price"), "cbc:PriceAmount", _m(rate) if rate == rate.quantize(Q2) else format(rate.quantize(Decimal("0.0001")), "f"), currencyID=cur)
+    ET.indent(root, space=" ")
+    return b'<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(root, encoding="utf-8")
+
+
+def ein_ubl_check(xml_bytes):
+    """The Peppol points the EN 16931 Schematron does not cover (list of strings, empty = fine): CustomizationID /
+    ProfileID of Peppol BIS 3.0, both electronic addresses with a scheme, BT-10 or BT-13, one note, one tax total with
+    subtotals, every amount with a currency, no empty element."""
+    out = []
+    try:
+        root = ET.fromstring(xml_bytes)
+    except ET.ParseError as e:
+        return [f"not well-formed: {e}"]
+    q = {"cac": UBL_NS["cac"], "cbc": UBL_NS["cbc"]}
+
+    def tx(path):
+        x = root.find(path, q)
+        return (x.text or "").strip() if x is not None else ""
+    if not tx("cbc:CustomizationID").startswith("urn:cen.eu:en16931:2017"):
+        out.append("BT-24 CustomizationID")
+    if tx("cbc:ProfileID") != EIN_PROCESS:
+        out.append("BT-23 ProfileID (PEPPOL-EN16931-R001)")
+    for who, path in (("BT-34 seller", "cac:AccountingSupplierParty/cac:Party/cbc:EndpointID"), ("BT-49 buyer", "cac:AccountingCustomerParty/cac:Party/cbc:EndpointID")):
+        el = root.find(path, q)
+        if el is None or not (el.text or "").strip() or not el.get("schemeID"):
+            out.append(f"{who} electronic address with scheme missing (PEPPOL-EN16931-R020 / R010)")
+    if not tx("cbc:BuyerReference") and not tx("cac:OrderReference/cbc:ID"):
+        out.append("BT-10 buyer reference or BT-13 order reference missing (PEPPOL-EN16931-R003)")
+    if len(root.findall("cbc:Note", q)) > 1:
+        out.append("more than one note (PEPPOL-EN16931-R002)")
+    if len([t for t in root.findall("cac:TaxTotal", q) if t.find("cac:TaxSubtotal", q) is not None]) != 1:
+        out.append("exactly one tax total with subtotals (PEPPOL-EN16931-R053)")
+    for el in root.iter():
+        if len(el) == 0 and not (el.text or "").strip():
+            out.append(f"empty element {el.tag.split('}')[-1]} (PEPPOL-EN16931-R008)")
+        if el.tag.endswith("Amount") and el.tag.startswith("{" + UBL_NS["cbc"]) and not el.get("currencyID"):
+            out.append(f"amount without currency: {el.tag.split('}')[-1]}")
+    for ln in root.findall("cac:InvoiceLine", q) + root.findall("cac:CreditNoteLine", q):
+        qe = ln.find("cbc:InvoicedQuantity", q)
+        qe = qe if qe is not None else ln.find("cbc:CreditedQuantity", q)
+        net, price = _d(ln.findtext("cbc:LineExtensionAmount", "", q)), _d(ln.findtext("cac:Price/cbc:PriceAmount", "", q))
+        if qe is not None and (_d(qe.text) * price).quantize(Q2, rounding=ROUND_HALF_UP) != net:
+            out.append(f"line {ln.findtext('cbc:ID', '', q)}: net != quantity x price (PEPPOL-EN16931-R120)")
+    return out

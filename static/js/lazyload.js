@@ -13,6 +13,7 @@ const LD_MODS = {
     'office_pipeline', 'office_kpi', 'office_datev', 'officeagents', 'office_packs',
     'office_books', 'office_bank', 'office_taxdates',  // 2.90.0 (#1921, #1922)
     'office_recurring', 'office_subs', 'office_dunning',  // 2.91.0 (#1923, #1924); 2.147.1 B (#2054): office_dunning
+    'office_peppol',  // 2.154.0 B (#1960): e-invoices over Peppol
     'office_agreements', 'office_assets',  // 2.92.0 (#1925, #1931)
     'office_meals',  // 2.119.0 A (#2288): entertainment receipts
     'office_leads', 'office_cfiles',  // 2.94.0 A (#1930), 2.117.0 B (#2285)  // 2.76.0 A (#1023): office_packs
