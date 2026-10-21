@@ -1572,6 +1572,17 @@ fresh; run p2144_d_ui node p2144_d_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21442_a_ui node p21442_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.144.2 part B: optimistic subtasks, calendar draft popup, sheet print, focus, receipts account row (#2467 #1811 #2370 #1644 #2352 #2372 #2375)
 fresh; run p21442_b_ui node p21442_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.5 part A: recovery key step-up with a real SSO re-login, approval cards only for approvers (#2387 #2001)
+fresh; run p21445_a_api "$PY" p21445_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21445_a_ui node p21445_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.5 part B: workspace mailbox in org move/export/tenancy, CalDAV keeps attendees, import target defaults (#2410 #2379 #2002)
+fresh; run p21445_b_api "$PY" p21445_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21445_b_ui node p21445_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.5 part C: formula depth, invoice lines with list_id, own time in the list header, series names and missed notice dates (#1523 #2021)
+fresh; run p21445_c_api "$PY" p21445_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p21445_c_ui node p21445_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.144.5 part D: phone - search closes animated, sheet cell editor and suggestions, freeze button (#1560 #2011)
+fresh; run p21445_d_ui node p21445_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
