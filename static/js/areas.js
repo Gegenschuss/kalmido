@@ -28,6 +28,7 @@ const mg_feats = id => (mg_area(id)?.[3] || []).flatMap(p => p[4]());
 // the tab the area opens with: the one last used on this device (LS mgTab), else its first switched-on part
 function mg_target(id) {
   const ps = mg_parts(mg_area(id)), last = (LS.get('mgTab', {}) || {})[id];
+  if (id === 'office' && !isMobile() && ps.some(p => p[0] === 'office')) return ofm_entry().go;  // 2.152.1 (#2616)
   return (ps.find(p => p[0] === last) || ps[0] || [id])[0];
 }
 function mg_seen(mod) {
@@ -96,7 +97,7 @@ const ofm_all = () => typeof OFC_TABS === 'undefined' ? OFM_ITEMS : [...OFM_ITEM
   .map(t => ({key: t[0], go: 'office/' + t[0], icon: t[1], name: t[2], group: OFM_GROUPS.some(g => g[0] === t[5]) ? t[5] : 'admin', on: ofm_ofc, adm: t[3], need: t[6]}))];  // 2.147.0: [6] = need
 // 2.98.0 C (#2180): the order inside the groups (a part not named here keeps its place at the end of its group);
 // tpl = a tab under Settings, not in the menu
-const OFR_ORDER = ['pipeline', 'offers', 'clients', 'contacts', 'gendocs', 'contracts', 'cashflow', 'kpi', 'bank', 'books', 'subs', 'travel', 'meals', 'equipment', 'agreements', 'settings'];
+const OFR_ORDER = ['pipeline', 'offers', 'gendocs', 'clients', 'contacts', 'contracts', 'cashflow', 'kpi', 'bank', 'books', 'subs', 'travel', 'meals', 'equipment', 'agreements', 'settings'];
 const ofr_rank = i => { const n = OFR_ORDER.indexOf(i.key); return n < 0 ? OFR_ORDER.length : n; };
 // 2.147.0 (#2459): need = a function of the country pack ('books.…'); off in this office = no menu point (office.js ofcFeat)
 const ofm_need = i => !i.need || typeof ofcFeat !== 'function' || ofcFeat(i.need);
@@ -105,7 +106,15 @@ const ofm_items = () => ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) &&
 function ofm_cur(mod) {
   if (mod !== 'office') return mod;
   const t = ['import', 'services', 'texts'].includes(S.route.tab) ? 'settings' : S.route.tab;  // 2.98.0 C (#2180): + the templates
-  return t === 'start' || ofm_all().some(i => i.key === t && i.go.startsWith('office/')) ? t : isMobile() ? 'start' : 'offers';
+  if (mod === S.route.mod && t && t !== 'start') ofm_remember(t);
+  return t === 'start' || ofm_all().some(i => i.key === t && i.go.startsWith('office/')) ? t : isMobile() ? 'start' : (ofm_entry().key);
+}
+// 2.152.1 (#2616): the office opens on the point used last on this device (LS ofmLast); nothing kept, or gone / not allowed: the
+// Pipeline for admins (a person without an organisation is the admin of the own office), else Quotes & invoices
+function ofm_remember(key) { const o = LS.get('ofmLast', null); if (o !== key) LS.set('ofmLast', key); }
+function ofm_entry() {
+  const its = ofm_items(), last = LS.get('ofmLast', null);
+  return its.find(i => i.key === last) || its.find(i => i.key === (ofm_adm() ? 'pipeline' : 'offers')) || its.find(i => i.key === 'offers') || its[0] || {key: 'offers', go: 'office/offers'};
 }
 const ofm_btn = (i, cur, cls) => `<button type="button" class="${cls} ${i.key === cur ? 'on' : ''}" data-go="${i.go}" data-ofm="${i.key}"${i.key === cur ? ' aria-current="page"' : ''}>${ic(i.icon, 's')}<span>${esc(tr(i.name))}</span></button>`;
 // the path of a detail page ("Clients › Example Ltd"), grey text, not a navigation

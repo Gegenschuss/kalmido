@@ -22,9 +22,20 @@ function modal(html) {
 const DLG_SKIP = /^(modal|cdlg|authscreen|shopmode|smodal|lmodal|fgrqdlg|hidden|open|closing)$/;
 const dlg_key = m => { const c = [...m.classList].filter(x => !DLG_SKIP.test(x)).sort().join('.'); return c ? 'kalmido.dlgsize.' + c : ''; };
 const dlg_wide = () => { try { return matchMedia('(min-width: 900px) and (pointer: fine)').matches; } catch { return false; } };
-function dlg_resizable(m) {
+// 2.152.1 (#2615): only a dialog whose content can grow gets the grip: a text field, an editor, a preview, a scrolling list / table,
+// or content that already overflows; a short one (confirm, password, one input) has none and forgets a size kept earlier
+const DLG_GROWS = 'textarea,[contenteditable="true"],[contenteditable=""],.editor,iframe,img,embed,object,canvas,table,.tbl,.list,.scroll,[class*="editor"]';
+function dlg_grows(card) {
+  if ($$(DLG_GROWS, card).some(x => !x.closest('.foot') && !x.classList.contains('dlggrip'))) return true;
+  return [card, ...$$('*', card)].some(x => x.scrollHeight > x.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(x).overflowY));
+}
+function dlg_resizable(m, again) {
   const card = m.querySelector(':scope > .card');
   if (!card || !m.isConnected || !dlg_wide() || m.classList.contains('authscreen') || m.classList.contains('cdlg') || m.classList.contains('shopmode') || m.classList.contains('smodal') || m.classList.contains('lmodal')) return;
+  if (!dlg_grows(card)) {
+    if (!again) { const k = dlg_key(m); if (k) try { localStorage.removeItem(k); } catch { /* private mode */ } setTimeout(() => dlg_resizable(m, true), 600); }  // content that loads after opening
+    return;
+  }
   const key = dlg_key(m);
   const mk = () => { const g = document.createElement('div'); g.className = 'dlggrip'; g.setAttribute('role', 'separator'); g.setAttribute('aria-label', tr('Drag to resize · double-click: default size')); g.title = tr('Drag to resize · double-click: default size'); return g; };
   card.style.transition = 'none';  // a size change must not glide (a drag follows the pointer, a reset is at once)

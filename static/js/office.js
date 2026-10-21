@@ -18,7 +18,7 @@ const ofcFeat = k => !OFC.info?.features || OFC.info.features[k] !== false;
 const pb_clOrg = () => OFC.info?.personal ? null : (OFC.info?.org_id || null);  // 2.47.3 (#1360): a personal office's clients are the private ones
 const ofcWs = () => pb_clOrg() ? 'org:' + pb_clOrg() : 'private';  // 2.87.9 (#1940): the workspace of the shown office (importTargetConfirm)
 const ofcTab = () => OFC_TABS.some(t => t[0] === S.route.tab && (!t[6] || ofcFeat(t[6]))) ? S.route.tab : S.route.tab === 'import' ? 'settings'
-  : S.route.tab === 'start' || (!S.route.tab && isMobile()) ? 'start' : 'offers';  // 2.39.1 (#1182): the import page sits under Settings; 2.87.9 (#1917): the start page (phone without a tab)
+  : S.route.tab === 'start' || (!S.route.tab && isMobile()) ? 'start' : (OFC_TABS.some(t => t[0] === ofm_entry().key) ? ofm_entry().key : 'offers');  // 2.39.1 (#1182): the import page sits under Settings; 2.87.9 (#1917): the start page (phone without a tab)
 // 2.147.0 (#2459): a tab with [6] = a function of the country pack that is off is no tab (a direct link opens the quotations)
 // money / numbers of the master data: in the person's locale, the organisation's currency
 const ofcCur = () => OFC.info?.settings?.currency || 'EUR';

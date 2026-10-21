@@ -364,7 +364,7 @@ function dashCard(k) {
     // 2.45.0 (#1504): compact, at most 5, a bundle is one line (what needs me first), "All news" below
     const all = newsGroups(vis), gs = [...all.filter(g => g.needs), ...all.filter(g => !g.needs)].slice(0, lyo_get('home', 'news', 'n', 5));  // 2.55.0 (#1065)
     if (!gs.length) return slim(tr('News: nothing new'));
-    return card(`<ul class="dwl hpnl">${gs.map(hpNewsRow).join('')}</ul><a class="linkbtn hpall" href="#news">${tr('All news')}</a>`, '', S.news?.unread || '');
+    return card(`<ul class="dwl hpnl">${gs.map(hpNewsRow).join('')}</ul><a class="linkbtn hpall" href="#news">${tr('All news')}</a>`, '', bellCount() || '');
   }
   if (k === 'kpi') return typeof kp_tile === 'function' ? kp_tile(card) : '';  // 2.50.0 (#1197)
   if (k === 'chat') {
