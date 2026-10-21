@@ -243,7 +243,9 @@ Placeholders: `{yyyy}` `{yy}` year, `{seq}` or `{seq:03}` the counter (zero-padd
 In `{client}`, `{project}` and `{initials}` spaces and other punctuation become hyphens; letters (umlauts too), digits, `_` and `-`
 stay, at most 40 characters: `{client}_{project}_KV{seq:02}_{isodate}_{initials}` -> `DAF_Beteiligung_KV04_2026-04-15_MG`. The counter runs per
 organisation, document kind and period: with `{yyyy}` / `{yy}` in the scheme it starts again every year, without it
-never. A number is reserved once and never reused.
+never. A number is reserved once and never reused. An empty `{project}`, `{client}` or `{initials}` is left out together
+with one separator next to it (2.144.9): `{project}-KV{seq:02}-{initials}` without a project gives `KV02-MG`, not
+`-KV02-MG`; numbers given before stay as they are.
 
 When the number is assigned depends on the document kind: quotations get it when they are created (as before); the
 organisation can switch this to "when it is finalised" (settings key `offer_number_at`: `create` | `finalize`). Then a
@@ -1308,6 +1310,8 @@ answers `409`): `POST /api/office/docs/<id>/parts` (`{kind: items|shoot, title, 
 on the title page once unless `add_to_title: false`), `PATCH /api/office/docs/<id>/parts/<pid>` (`{title, print, sort,
 settings, sheet}`), `DELETE /api/office/docs/<id>/parts/<pid>` (with its positions and its title page lines),
 `PUT /api/office/docs/<id>/parts/<pid>/items` (the whole list of the part's positions, like `PUT .../items`).
+The part's name is one source (2.144.9): a rename changes every title page line of the part, and a title page line
+(`kind: part`) whose text was changed in `PUT .../items` renames the part; part pages print the name as typed.
 `GET /api/office/docs/<id>` carries `parts: [{id, kind, title, print, sort, settings, items, totals, used}]`;
 `POST /api/office/docs/<id>/invoice` takes `{parts_mode, parts_title}`. Duplicating copies the parts.
 
@@ -1320,7 +1324,7 @@ settings, sheet}`), `DELETE /api/office/docs/<id>/parts/<pid>` (with its positio
   quotation becomes a plain position - the producing, raw data and discount lines the calculator made are condensed
   into positions with their amount, an uncounted raw data option is left out; rights, framework contract text,
   recipient, project title, language, currency and rate, period of service and the PO number are taken over
-  (`source_doc_id` points back);
+  (`source_doc_id` points back; the invoice's head names the quotation, "zu Angebot Nr. KV02-MG (20.10.2026)", 2.144.9);
 - **from time entries** (`POST /api/office/docs/from-time` with `{client_id, from, to, project_id?}`): the finished time
   entries of the client's lists in the period, one position per list with the hours; the rate is the client's hourly
   rate when set, else 0 to fill in;
