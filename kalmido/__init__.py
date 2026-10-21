@@ -216,6 +216,7 @@ ORDER = (
     "events.v1",
     "events.invite",  # 2.111.0 B (#2056): invitation mails to external attendees (iMIP)
     "events.evfeed",  # 2.111.0 B (#2056): subscription links of event calendars (GET /ical/ev/<token>.ics)
+    "events.freebusy",  # 2.155.0 B (#2077): free / busy of invited people (GET /api/events/freebusy)
     "contacts.model",
     "contacts.carddav",
     "contacts.web",
@@ -242,6 +243,7 @@ ORDER = (
     "team.workload",
     "hub.absence",  # 2.50.0 A (#1195): absences + German public holidays
     "hub.leave",  # 2.125.0 A (#2118, #2117): working days per person, vacation account + requests
+    "hub.abscal",  # 2.155.0 B (#2076): holidays + absences in the calendar views, their subscription link
     "hub.dispo",  # 2.50.0 A (#1194): resources and disposition (bookings of crew and equipment)
     "hub.agentdispo",  # 2.51.0 C (#1355): shoot planning by agents (event drafts, options), the disposition in the REST API
     "hub.hubmail",  # 2.84.0 A (#1198): e-mail as an input of the hub (mails filed with clients / projects)

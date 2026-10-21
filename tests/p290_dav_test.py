@@ -192,8 +192,9 @@ check(req(dav("alice", PW.replace("-", "").upper()), "PROPFIND", "/dav/", "", 0)
 check(req(dav("alice", "password123"), "PROPFIND", "/dav/", "", 0).status_code == 401, "the account password is refused")
 r = req(requests.Session(), "PROPFIND", "/dav/", "", 0)
 check(r.status_code == 401 and r.headers.get("WWW-Authenticate", "").startswith("Basic realm="), "no credentials: 401 + Basic challenge")
-check(req(requests.Session(), "OPTIONS", "/dav/").headers.get("DAV", "").replace(" ", "") == "1,3,calendar-access,addressbook",
-      "OPTIONS without login: DAV: 1, 3, calendar-access, addressbook (2.21.0: CardDAV)")
+# 2.155.0 (#2079): + extended-mkcol (calendars created on a device)
+check(req(requests.Session(), "OPTIONS", "/dav/").headers.get("DAV", "").replace(" ", "") == "1,3,calendar-access,addressbook,extended-mkcol",
+      "OPTIONS without login: DAV: 1, 3, calendar-access, addressbook (2.21.0: CardDAV), extended-mkcol (2.155.0)")
 time.sleep(1.1)
 check(db("SELECT last_used_at IS NOT NULL FROM app_passwords WHERE id=?", (PWID,))[0][0] == 1, "last use is recorded")
 # token API: persons only, write scope
@@ -503,7 +504,10 @@ put(TO, WORK + "parent.ics", mk("parent-1", "SUMMARY:Parent", "STATUS:COMPLETED"
 check(task(tc)["status"] == 2, "completing a parent completes its subtasks (as in the app)")
 check(TO.delete(B + WORK + "parent.ics").status_code == 204 and task(tc)["deleted_at"], "deleting a parent trashes its subtasks")
 check(req(TO, "DELETE", WORK).status_code == 403, "lists are not deleted over CalDAV")
-check(req(TO, "MKCALENDAR", "/dav/calendars/alice/new/").status_code == 403, "MKCALENDAR: 403 (lists are made in the app)")
+# 2.155.0 (#2079): MKCALENDAR creates event calendars now; a calendar only for tasks stays refused (lists are made in the app)
+check(req(TO, "MKCALENDAR", "/dav/calendars/alice/new/", '<C:mkcalendar xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><D:set><D:prop>'
+          '<C:supported-calendar-component-set><C:comp name="VTODO"/></C:supported-calendar-component-set></D:prop></D:set></C:mkcalendar>'
+          ).status_code == 403, "MKCALENDAR of a task list: 403 (lists are made in the app)")
 r = req(TO, "PROPPATCH", WORK, '<D:propertyupdate xmlns:D="DAV:"><D:set><D:prop><D:displayname>X</D:displayname></D:prop></D:set></D:propertyupdate>')
 check(r.status_code == 207 and b"403" in r.content and task(t1)["list_id"] == work, "PROPPATCH: 207 with 403 per property")
 

@@ -439,7 +439,8 @@ r = iph.req("PUT", f"/dav/calendars/alice/{lid}/ev-in-list.ics", IOS.replace("IO
 check(r.status_code == 403, "a VEVENT in a task list: 403")
 r = iph.req("PUT", WC + "dup.ics", IOS, **{"Content-Type": "text/calendar"})
 check(r.status_code == 403 and "no-uid-conflict" in r.text, "the same UID under another name: 403 no-uid-conflict")
-check(iph.req("MKCALENDAR", "/dav/calendars/alice/new/").status_code == 403, "MKCALENDAR: create calendars in the app")
+# 2.155.0 (#2079): MKCALENDAR creates calendars now (p2155_a_caldav_test.py); on an existing one: 405
+check(iph.req("MKCALENDAR", WC).status_code == 405, "MKCALENDAR on an existing calendar: 405")
 # Bob: edit on Work over DAV, Private does not exist for him; Eve: the invitations collection
 r = Bo.post(B + "/api/me/app-passwords", json={"name": "Phone"})
 bob = Dav("bob", r.json()["password"])
@@ -457,7 +458,7 @@ r = eve.req("PROPFIND", "/dav/calendars/eve/inv/", PF_ETAG, Depth="1")
 inv, _, _ = ms(r.text)
 check(r.status_code == 207 and len([h for h in inv if h.endswith(".ics")]) == 1, f"Eve: the invitations collection with the dinner {list(inv)}")
 r = eve.req("PUT", "/dav/calendars/eve/inv/x.ics", IOS.replace("IOS-ABC-1", "x"), **{"Content-Type": "text/calendar"})
-check(r.status_code == 403, "the invitations are read-only")
+check(r.status_code == 403, "the invitations take no new events")  # 2.155.0 (#2074): answers only (p2155_a_caldav_test.py)
 # DELETE over DAV -> sync says 404
 _, _, tok2 = ms(iph.req("REPORT", WC, SYNC.format(""), Depth="1").text)
 r = iph.req("DELETE", WC + "tb-1.ics")

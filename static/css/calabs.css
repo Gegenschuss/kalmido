@@ -1,0 +1,20 @@
+/* Kalmido web client: holidays + absences in the "Calendars" window and the availability bar of the event editor
+   (calabs.js, loaded on demand; 2.155.0 B, #2076 #2077) */
+.abchid{visibility:hidden}
+.abcsw{display:inline-flex;flex:none;width:2.25rem;height:1.25rem}
+.abcst{gap:.5rem;flex-wrap:wrap}
+.abcst select{flex:1;min-width:10rem}
+.abcfeed{margin-top:.25rem}
+.efb{display:flex;flex-direction:column;gap:.25rem;padding:.5rem .625rem;border:1px solid var(--line2);border-radius:.5rem;background:var(--bg2)}
+.efb:empty{display:none}
+.efbh{display:flex;justify-content:space-between;gap:.5rem;font-size:var(--fs-s);font-weight:600}
+.efbr{display:grid;grid-template-columns:minmax(0,7rem) minmax(0,1fr) auto;align-items:center;gap:.5rem;font-size:var(--fs-s)}
+.efbn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.efbt{position:relative;height:.875rem;border-radius:.25rem;background:var(--bg3);overflow:hidden}
+.efbb{position:absolute;top:0;bottom:0}
+.efbb.busy{background:var(--faint)}
+.efbb.away{background:repeating-linear-gradient(135deg,var(--faint) 0 .25rem,transparent .25rem .5rem)}
+.efbsel{position:absolute;top:0;bottom:0;border:2px solid var(--accent);border-radius:.25rem;min-width:2px}
+.efbs{color:var(--muted);min-width:4rem;text-align:right}
+.efbr.busy .efbs,.efbr.away .efbs{color:var(--text);font-weight:600}
+@media (max-width:40rem){.efbr{grid-template-columns:minmax(0,5rem) minmax(0,1fr) auto}.efbs{min-width:3.5rem}}

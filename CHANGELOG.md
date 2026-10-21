@@ -139,6 +139,18 @@ Office and documents: stack scans split into documents, documents linked with ta
 ### Changed
 - Office: duplicating an invoice made from times asks first and the copy says "Copy of …: the hours of that invoice are already billed" while it is a draft (#2567).
 
+## [2.155.0] - 2026-10-21
+
+Calendar: answer invitations from the phone, own repeat rules, holidays and absences, colleagues' availability, a year view.
+
+### Added
+- Calendar on the phone: invitations in the calendar *Invitations* can be accepted, answered with *Maybe* or declined in the phone's calendar app (CalDAV); only your own answer is taken, deleting an invitation there declines it (#2074).
+- Calendar on the phone: a calendar created in the phone's calendar app becomes a Kalmido calendar with its name and colour (MKCALENDAR) (#2079).
+- Events: *Own …* in *Repeat* opens a small rule dialog - every N days / weeks / months / years, weekdays to tap, *on the 15th* or *on the 2nd Tuesday* / *the last Friday* (#2075).
+- Calendar: a year view with twelve small months; days with events or due tasks are tinted, a tap opens the day, a month name the month (#2078).
+- Calendar: public holidays (German state or Austria, chosen per person or by the organisation) and your absences show in all views; the team's absences on request, as "away" only; switches in *Calendars*. Absences and holidays as a subscription link for the phone (#2076).
+- Events: while inviting, a free / busy bar for you and every invited person of your organisation - busy and away times only, never titles (#2077).
+
 ## [2.147.1] - 2026-10-21
 
 Drag tasks into the chats as references; overdue invoices suggest a payment reminder and carry a GiroCode; moving many documents shows progress; agents show their workspace; small bell fixes.

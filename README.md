@@ -1336,12 +1336,13 @@ calendar, CalDAV, sharing and the API work as everywhere.
 ## Events
 
 Kalmido keeps your appointments itself (module *Events*, on by default; *Settings > Modules*). They show next to your
-tasks in the month, week and day view, in the **agenda** (the coming two weeks, events and tasks by day) and in *Events
+tasks in the **year**, month, week and day view, in the **agenda** (the coming two weeks, events and tasks by day) and in *Events
 today*. **+ Event** in the calendar bar, the quick sheet of a free slot (*Event*) or a **drag over free time** in the
 week create one; a click opens it (details, your answer, *Edit*, *Delete*, *Preparation task*).
 
 - An event: title, from – to (all day or with times, over several days, in any **time zone**), place, notes, a link,
-  **repeat** (daily, weekdays, weekly, every two weeks, monthly, yearly; until a date or a number of times),
+  **repeat** (daily, weekdays, weekly, every two weeks, monthly, yearly, or an own rule such as *every 2nd Tuesday* or
+  *Mon, Wed and Fri*; until a date or a number of times),
   **reminders** (a push before the start), status and *busy*. A repeating event changes as a whole or **only this
   date**; a single date can be left out.
 - **Calendars**: as many as you like, each with a colour; *Calendars* in the calendar bar shows, hides, renames,
@@ -1351,8 +1352,14 @@ week create one; a click opens it (details, your answer, *Edit*, *Delete*, *Prep
   answer *Accept* / *Maybe* / *Decline*), your contacts or any e-mail address.
 - **Preparation**: a task linked to the event, due before it (*Preparation task*), or the other way round *Schedule as
   an event* in a task's panel.
+- **People's availability** (2.155): while you invite, a free / busy bar shows you and every invited person of your
+  organisation for the day - only busy and away times, never titles or places.
+- **Holidays and absences** (2.155): the public holidays of your state (Germany by state, Austria) and your absences show
+  in the calendar, your team's on request as "away" only; the state can be set per person, also without an
+  organisation. Your absences and holidays are also a subscription link for the phone's calendar app.
 - **On the phone**: each calendar is a calendar in the phone's own app (CalDAV), changes go both ways; invitations come
-  in a read-only calendar *Invitations*. See [Calendar and contacts on the phone](docs/CALDAV.md#calendar-and-contacts-on-the-phone).
+  in a calendar *Invitations* and are answered there (*Accept* / *Maybe* / *Decline*) or in the app; a calendar created on
+  the phone becomes a Kalmido calendar. See [Calendar and contacts on the phone](docs/CALDAV.md#calendar-and-contacts-on-the-phone).
 - The family events of 2.19 (tasks with people who come along) became events once, with those people invited; the
   task stays, marked done and linked to its event.
 

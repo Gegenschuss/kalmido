@@ -668,6 +668,7 @@ document.addEventListener('click', async e => {
       const dir = act === 'cal-next' ? 1 : -1;
       if (S.calMode === 'week') S.calSel = addDays(S.calSel, 7 * dir);
       else if (S.calMode === 'day') S.calSel = addDays(S.calSel, dir);
+      else if (S.calMode === 'year') S.calSel = `${+S.calSel.slice(0, 4) + dir}-${S.calSel.slice(5, 7)}-01`;  // 2.155.0 C (#2078)
       else if (S.calMode === 'agenda') S.calSel = addDays(S.calSel, 14 * dir);  // 2.21.0 (#659)
       else if (S.calMode === 'timeline') S.tlStart = addDays(S.tlStart, 14 * dir);
       else { const [y, m] = S.calMonth.split('-').map(Number); S.calMonth = ds(new Date(y, m - 1 + dir, 1)).slice(0, 7); }

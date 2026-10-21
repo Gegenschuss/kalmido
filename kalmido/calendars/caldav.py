@@ -91,7 +91,7 @@ D_, C_, CS_, A_ = "{DAV:}", "{urn:ietf:params:xml:ns:caldav}", "{http://calendar
 CR_ = "{urn:ietf:params:xml:ns:carddav}"  # 2.21.0 (#658): CardDAV (contacts/carddav.py)
 DAV_METHODS = ["OPTIONS", "PROPFIND", "PROPPATCH", "REPORT", "GET", "HEAD", "PUT", "DELETE", "MKCALENDAR", "MKCOL",
                "MOVE", "COPY", "POST", "LOCK", "UNLOCK", "ACL"]
-DAV_ALLOW = "OPTIONS, PROPFIND, PROPPATCH, REPORT, GET, HEAD, PUT, DELETE"
+DAV_ALLOW = "OPTIONS, PROPFIND, PROPPATCH, REPORT, GET, HEAD, PUT, DELETE, MKCALENDAR, MKCOL"  # 2.155.0 A (#2079)
 # the UID / resource name of a task no client named: kalmido-<task id>-<instance> (the instance id, random per database,
 # keeps tasks of two Kalmido servers in one client apart)
 DAV_UID_RE = re.compile(r"kalmido-(\d{1,12})-([0-9a-f]{8})")
@@ -700,7 +700,7 @@ def dav_props_principal(u):
 def dav_props_home(u):
     return {**dav_common(u), D_ + "resourcetype": "<D:collection/>", D_ + "displayname": _xe(APP_NAME),
             D_ + "owner": f"<D:href>{_xe(dav_principal_href(u))}</D:href>",
-            D_ + "current-user-privilege-set": _privs(["read"])}
+            D_ + "current-user-privilege-set": _privs(["read", "bind"])}  # 2.155.0 A (#2079): bind = MKCALENDAR
 
 
 def dav_props_cal(c, u, lst, order, coll_fn):
@@ -774,6 +774,9 @@ def dav_path(p, u):
         if len(parts) == 2:
             return "home", None, None
         if re.fullmatch(r"e\d{1,12}|inv", parts[2]):  # 2.21.0 (#659): an event calendar / the invitations (events/dav.py)
+            return ("evcoll", parts[2], None) if len(parts) == 3 else ("evmember", parts[2], parts[3])
+        if not parts[2].isdigit() and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", parts[2]):
+            # 2.155.0 A (#2079): an event calendar under the name its client chose (MKCALENDAR, events/dav.py)
             return ("evcoll", parts[2], None) if len(parts) == 3 else ("evmember", parts[2], parts[3])
         if not parts[2].isdigit():
             raise DavError(404, "Not found")
@@ -1357,7 +1360,7 @@ def dav_err_resp(e):
 
 def dav_options():
     r = Response(status=200)
-    r.headers["DAV"] = "1, 3, calendar-access, addressbook"
+    r.headers["DAV"] = "1, 3, calendar-access, addressbook, extended-mkcol"  # 2.155.0 A (#2079)
     r.headers["Allow"] = DAV_ALLOW
     r.headers["Content-Length"] = "0"
     return r
@@ -1391,8 +1394,9 @@ def dav(p):
         g.user, g.auth_via = u, "dav"
         c = db()
         dav_inst(c)
-        if m in ("MKCALENDAR", "MKCOL"):
-            raise DavError(403, "Create lists and calendars in the app", "<D:resource-must-be-null/>")
+        if m in ("MKCALENDAR", "MKCOL"):  # 2.155.0 A (#2079): a new event calendar from a device
+            from ..events.dav import evdav_mkcal
+            return evdav_mkcal(m, c, u, p)
         if p.split("/", 1)[0] == "addressbooks":  # 2.21.0 (#658): CardDAV
             from ..contacts.carddav import abdav
             return abdav(m, c, u, p)
@@ -1470,7 +1474,8 @@ def davs_propfind(c, u, kind, lst, name):
             out.append(dav_response(dav_home_href(u), want, dav_props_home(u)))
         return dav_multistatus(out)
     if kind in ("principals", "calendars"):
-        out.append(dav_response(DAV_ROOT + kind + "/", want, {**dav_props_home(u), D_ + "displayname": kind}))
+        out.append(dav_response(DAV_ROOT + kind + "/", want, {**dav_props_home(u), D_ + "displayname": kind,
+                                                                D_ + "current-user-privilege-set": _privs(["read"])}))
         if deep:
             out.append(dav_response(dav_principal_href(u), want, dav_props_principal(u)) if kind == "principals"
                        else dav_response(dav_home_href(u), want, dav_props_home(u)))

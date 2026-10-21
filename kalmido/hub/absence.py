@@ -39,7 +39,8 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 ABS_STATES = {"BW": "Baden-Württemberg", "BY": "Bayern", "BE": "Berlin", "BB": "Brandenburg", "HB": "Bremen",
               "HH": "Hamburg", "HE": "Hessen", "MV": "Mecklenburg-Vorpommern", "NI": "Niedersachsen",
               "NW": "Nordrhein-Westfalen", "RP": "Rheinland-Pfalz", "SL": "Saarland", "SN": "Sachsen",
-              "ST": "Sachsen-Anhalt", "SH": "Schleswig-Holstein", "TH": "Thüringen"}
+              "ST": "Sachsen-Anhalt", "SH": "Schleswig-Holstein", "TH": "Thüringen",
+              "AT": "Österreich"}  # 2.155.0 B (#2076): Austria (nationwide holidays only)
 # names stay German (they are German holidays); regional ones only where they hold in the whole state
 _FIXED = ((1, 1, "Neujahr", None), (1, 6, "Heilige Drei Könige", "BW BY ST"), (3, 8, "Internationaler Frauentag", "BE MV"),
           (5, 1, "Tag der Arbeit", None), (8, 15, "Mariä Himmelfahrt", "SL"), (9, 20, "Weltkindertag", "TH"),
@@ -47,6 +48,11 @@ _FIXED = ((1, 1, "Neujahr", None), (1, 6, "Heilige Drei Könige", "BW BY ST"), (
           (11, 1, "Allerheiligen", "BW BY NW RP SL"), (12, 25, "1. Weihnachtstag", None), (12, 26, "2. Weihnachtstag", None))
 _EASTER = ((-2, "Karfreitag", None), (0, "Ostersonntag", "BB"), (1, "Ostermontag", None), (39, "Christi Himmelfahrt", None),
            (49, "Pfingstsonntag", "BB"), (50, "Pfingstmontag", None), (60, "Fronleichnam", "BW BY HE NW RP SL"))
+# 2.155.0 B (#2076): Austria's nationwide public holidays (Good Friday is none since 2019)
+_AT_FIXED = ((1, 1, "Neujahr"), (1, 6, "Heilige Drei Könige"), (5, 1, "Staatsfeiertag"), (8, 15, "Mariä Himmelfahrt"),
+             (10, 26, "Nationalfeiertag"), (11, 1, "Allerheiligen"), (12, 8, "Mariä Empfängnis"), (12, 25, "Christtag"),
+             (12, 26, "Stefanitag"))
+_AT_EASTER = ((1, "Ostermontag"), (39, "Christi Himmelfahrt"), (50, "Pfingstmontag"), (60, "Fronleichnam"))
 
 
 def abs_easter(y):
@@ -67,6 +73,11 @@ def abs_holidays_year(y, state):
     """{ISO day: name} of the public holidays of year y in state (one of ABS_STATES; '' = none)."""
     if state not in ABS_STATES:
         return {}
+    if state == "AT":  # 2.155.0 B (#2076)
+        e = abs_easter(y)
+        out = {date(y, mo, d).isoformat(): name for mo, d, name in _AT_FIXED}
+        out.update({(e + timedelta(days=off)).isoformat(): name for off, name in _AT_EASTER})
+        return out
     out = {}
     for mo, d, name, only in _FIXED:
         if only is None or state in only.split():

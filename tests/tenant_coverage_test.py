@@ -320,6 +320,7 @@ ROUTES = {
     "PATCH /api/evcals/{}": "calendar", "DELETE /api/evcals/{}": "calendar", "PUT /api/evcals/{}/members": "calendar",
     "DELETE /api/evcals/{}/members/{}": "calendar", "GET /api/evcals/{}/export.ics": "calendar",
     "GET /api/evinvite": "calendar", "GET /api/evcals/{}/feed": "calendar", "POST /api/evcals/{}/feed": "calendar",  # 2.111.0 B (#2056)
+    "GET /api/events/freebusy": "calendar",  # 2.155.0 B (#2077): spans only, colleagues of the same organisation
     # ---- chatfile (4)
     "GET /api/chat-files/{}": "chatfile", "DELETE /api/chat-files/{}": "chatfile",
     "POST /api/chat-save": "chatsave",  # 2.37.0 (#1159)
@@ -579,6 +580,7 @@ ROUTES = {
     "DELETE /api/admin/groups/{}/avatar": "group", "GET /api/group-avatar/{}/{}.jpg": "group",  # (p2460_c_api_test.py: outside 404)
     # ---- ical (3)
     "GET /ical/{}.ics": "ical", "GET /ical/ev/{}.ics": "ical", "GET /api/ical": "ical", "POST /api/ical": "ical",
+    "GET /ical/abs/{}.ics": "ical",  # 2.155.0 B (#2076): own absences + holidays
     # ---- list (100)
     "GET /api/lists/{}/export.csv": "list",  # 2.116.0 C (#2064): the list CSV, role of the list + tvis
     "GET /api/lists/{}/agent-access": "list",  # 2.30.0 (#919): the agents' access log of a list (its members)
@@ -978,6 +980,7 @@ ROUTES = {
     "GET /api/team/absences": "hub", "POST /api/team/absences": "hub", "PATCH /api/team/absences/{}": "hub",
     "DELETE /api/team/absences/{}": "hub", "POST /api/team/absences/{}/restore": "hub", "PUT /api/team/absences/holidays": "hub",
     "GET /api/team/absences/check": "hub", "GET /api/team/leave": "hub", "PUT /api/team/leave/quota": "hub",  # 2.125.0 A (#2117)
+    "GET /api/team/absences/feed": "hub", "POST /api/team/absences/feed": "hub",  # 2.155.0 B (#2076)
     "PUT /api/team/leave/approval": "hub", "PUT /api/team/leave/worktime/{}": "hub", "POST /api/team/absences/{}/decide": "hub",
     "GET /api/team/dispo": "hub", "GET /api/team/dispo/free": "hub", "GET /api/team/dispo/export": "hub",
     "POST /api/team/dispo/bookings": "hub", "PATCH /api/team/dispo/bookings/{}": "hub", "DELETE /api/team/dispo/bookings/{}": "hub",

@@ -14,7 +14,7 @@ from flask import request, Response
 
 from ..core.config import APP_NAME, TZ
 from ..core.i18n import tr
-from ..core.db import gsetting, iso_ms, now_utc, parse_iso
+from ..core.db import IntegrityError, gsetting, iso_ms, now_utc, parse_iso
 from ..core.access import collab_all
 from ..calendars.caldav import (
     _el, _privs, _xe, A_, C_, CS_, D_, dav_body, dav_common, dav_href, dav_multistatus, dav_principal_href, dav_propfind_req,
@@ -38,12 +38,14 @@ def evdav_colls(c, u):
     if ids:
         q = ",".join("?" * len(ids))
         for r in c.execute(f"SELECT * FROM ev_cals WHERE id IN ({q}) ORDER BY owner_id!=?, sort, id", [*ids, u["id"]]):
-            out[f"e{r['id']}"] = {"key": f"e{r['id']}", "id": r["id"], "name": r["name"], "color": r["color"], "role": ids[r["id"]],
+            k = r["dav_name"] if r["dav_name"] and r["owner_id"] == u["id"] else f"e{r['id']}"  # 2.155.0 A (#2079)
+            out[k] = {"key": k, "id": r["id"], "name": r["name"], "color": r["color"], "role": ids[r["id"]],
                                   "description": r["description"]}
     if collab_all() and any(ev_att_ok(c, u["id"], r[0]) for r in c.execute(  # 2.87.0 (#1983): only invitations one may still see
             "SELECT DISTINCT k.org_id FROM event_attendees a JOIN events e ON e.id=a.event_id JOIN ev_cals k ON k.id=e.cal_id "
             "WHERE a.user_id=?", (u["id"],)).fetchall()):
-        out["inv"] = {"key": "inv", "id": None, "name": tr("Invitations"), "color": "#94a3b8", "role": "view", "description": ""}
+        # 2.155.0 A (#2074): role rsvp = read, and the own answer (PARTSTAT) may be written back (ev_rsvp_put)
+        out["inv"] = {"key": "inv", "id": None, "name": tr("Invitations"), "color": "#94a3b8", "role": "rsvp", "description": ""}
     return out
 
 
@@ -113,7 +115,7 @@ def sync_save(c, u, ec):
 
 
 def sync_load(c, u, key, token):
-    m = re.fullmatch(r"urn:kalmido:sync:([a-z0-9]+)-([0-9a-f]{20})", token or "")
+    m = re.fullmatch(r"urn:kalmido:sync:([A-Za-z0-9_.-]+)-([0-9a-f]{20})", token or "")  # 2.155.0 A (#2079): client names
     if not m or m.group(1) != key:
         return None
     r = c.execute("SELECT state FROM dav_sync2 WHERE user_id=? AND coll=? AND token=?", (u["id"], key, m.group(2))).fetchone()
@@ -126,6 +128,8 @@ def sync_load(c, u, key, token):
 def _privs_of(role):
     if role in ("owner", "edit"):
         return _privs(["read", "write", "write-content", "bind", "unbind"])
+    if role == "rsvp":  # 2.155.0 A (#2074): answers to invitations, no new objects (no bind)
+        return _privs(["read", "write-content"])
     return _privs(["read"])
 
 
@@ -385,12 +389,16 @@ def evdav(m, c, u, pw_row, kind, key, name):
             r.headers["Content-Length"] = str(len(text.encode("utf-8")))
         return r
     if m == "PUT":
+        if kind == "evmember" and coll["role"] in ("rsvp", "view"):  # 2.155.0 A (#2074): the own answer to an invitation
+            return ev_rsvp_put(c, u, coll, name)
         if kind != "evmember":
             raise DavError(405, "PUT works on an event inside a calendar")
         return ev_put(c, u, coll, name, pw_row)
     if m == "DELETE":
         if kind != "evmember":
             raise DavError(403, "Calendars are deleted in the app")
+        if coll["role"] == "rsvp":  # 2.155.0 A (#2074): an invitation removed on the device = declined
+            return ev_rsvp_delete(c, u, coll, name)
         if coll["role"] not in ("owner", "edit"):
             raise DavError(403, "Read only", "<D:need-privileges/>")
         have = member_now(c, u, coll, name)
@@ -411,3 +419,139 @@ def evdav(m, c, u, pw_row, kind, key, name):
     raise DavError(405, "Method not allowed")
 
 
+
+
+# ---- 2.155.0 A (#2074): answers to invitations from a device (PARTSTAT of the own ATTENDEE), 2.155.0 A (#2079): MKCALENDAR
+EV_DAVNAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")  # a collection name a client may choose (not e<id> / inv / digits)
+
+
+def _rsvp_mine(u, raw):
+    """The PARTSTAT (app value) the device wrote for the person's own ATTENDEE line, or None (no own line)."""
+    me_ = f"urn:kalmido:user:{u['id']}"
+    mail = "mailto:" + (u["email"] or "").strip().lower() if u["email"] else None
+    for a in raw:
+        addr = (a["addr"] or "").strip().lower()
+        if str(a.get("kuser") or "") == str(u["id"]) or addr == me_ or (mail and addr == mail):
+            return a["partstat"]
+    return None
+
+
+def _rsvp_member(c, u, coll, name, missing=403):
+    """(row, etag) of an invitation the person answers, or DavError 403 like before (read-only, no new objects);
+    a DELETE of an unknown invitation gets 404 (review 2.155.0), so the device stops repeating it."""
+    have = member_now(c, u, coll, name)
+    if not have and missing == 404:
+        raise DavError(404, "Not found")
+    if not have or not c.execute("SELECT 1 FROM event_attendees WHERE event_id=? AND user_id=?", (have[0]["id"], u["id"])).fetchone():
+        raise DavError(403, "Read only", "<D:need-privileges/>")
+    return have
+
+
+def ev_rsvp_put(c, u, coll, name):
+    """2.155.0 A (#2074): a device answers an invitation by writing the event back with a changed PARTSTAT of the own
+    ATTENDEE. Only that answer is taken (op_rsvp, like the answer in the app); every other change (time, title, other
+    attendees) is ignored without an error, so the device shows none. A new resource stays refused (403)."""
+    from ..events.web import op_rsvp
+    have = _rsvp_member(c, u, coll, name)
+    if "text/calendar" not in (request.content_type or "text/calendar").lower():
+        raise DavError(415, "Expected text/calendar", "<C:supported-calendar-data/>")
+    raw = dav_body()
+    if len(raw) > DAV_MAX_BODY:
+        raise DavError(413, "Too large", "<C:max-resource-size/>")
+    try:
+        v = read_vevent(raw.decode("utf-8"))
+    except UnicodeDecodeError:
+        raise DavError(400, "The calendar data must be UTF-8") from None
+    except EvError as e:
+        raise DavError(e.code, e.text, e.cond) from None
+    except (ValueError, TypeError, OverflowError, KeyError, AttributeError):
+        raise DavError(400, "The calendar data could not be read", "<C:valid-calendar-data/>") from None
+    inm, im = request.headers.get("If-None-Match", "").strip(), request.headers.get("If-Match", "").strip()
+    if inm == "*":
+        raise DavError(412, "The resource exists already")
+    if im and im != "*" and have[1] not in [x.strip() for x in im.split(",")]:
+        raise DavError(412, "The resource was changed meanwhile")
+    ps = _rsvp_mine(u, v["attendees_raw"])
+    eid = have[0]["id"]
+    cur = c.execute("SELECT partstat FROM event_attendees WHERE event_id=? AND user_id=?", (eid, u["id"])).fetchone()
+    if ps and cur and ps != cur[0]:
+        op_rsvp(c, u["id"], eid, {"partstat": ps})
+    return Response(status=204)
+
+
+def ev_rsvp_delete(c, u, coll, name):
+    """2.155.0 A (#2074): an invitation deleted on the device counts as declined (the app keeps declined invitations, so
+    the event comes back marked as declined with the next sync)."""
+    from ..events.web import op_rsvp
+    have = _rsvp_member(c, u, coll, name, missing=404)
+    im = request.headers.get("If-Match", "").strip()
+    if im and im != "*" and have[1] not in [x.strip() for x in im.split(",")]:
+        raise DavError(412, "The resource was changed meanwhile")
+    cur = c.execute("SELECT partstat FROM event_attendees WHERE event_id=? AND user_id=?", (have[0]["id"], u["id"])).fetchone()
+    if cur and cur[0] != "declined":
+        op_rsvp(c, u["id"], have[0]["id"], {"partstat": "declined"})
+    return Response(status=204)
+
+
+def _mk_props(root):
+    """{property tag: element} of the D:set / D:prop parts of a MKCALENDAR / extended MKCOL body."""
+    out = {}
+    for s_ in root:
+        if s_.tag != D_ + "set":
+            continue
+        for pr in s_:
+            if pr.tag == D_ + "prop":
+                out.update({x.tag: x for x in pr if isinstance(x.tag, str)})
+    return out
+
+
+def evdav_mkcal(m, c, u, p):
+    """2.155.0 A (#2079): MKCALENDAR (and extended MKCOL with resourcetype calendar, RFC 5689) creates a calendar of the
+    person like "new calendar" in the app (cal_create: workspace default, limit, colour). The client's name for it stays
+    its address (ev_cals.dav_name). Name, colour, description and the components are taken from the body. A calendar
+    only for tasks (VTODO without VEVENT) is refused: task lists are created in the app."""
+    from ..core.db import bump
+    from ..calendars.caldav import dav_lists
+    from ..events.model import cal_create
+    parts = [x for x in p.split("/") if x]
+    if len(parts) != 3 or parts[0] != "calendars" or parts[1].lower() != u["username"]:
+        raise DavError(403, "Create calendars in your calendar home", "<D:resource-must-be-null/>")
+    key = parts[2]
+    if key in evdav_colls(c, u) or (key.isdigit() and int(key) in dav_lists(c, u)):
+        raise DavError(405, "The calendar exists already", "<D:resource-must-be-null/>")
+    if not events_on(c, u["id"]):
+        raise DavError(403, "Create lists and calendars in the app", "<D:resource-must-be-null/>")
+    if not EV_DAVNAME_RE.fullmatch(key) or key.isdigit() or re.fullmatch(r"e\d+|inv", key) \
+            or c.execute("SELECT 1 FROM ev_cals WHERE owner_id=? AND dav_name=?", (u["id"], key)).fetchone():
+        raise DavError(403, "Choose another name for the calendar", "<D:resource-must-be-null/>")
+    raw = dav_body()
+    props = _mk_props(dav_xml(raw)) if raw.strip() else {}
+    if m == "MKCOL":
+        rt = props.get(D_ + "resourcetype")
+        if rt is None or rt.find(C_ + "calendar") is None:
+            raise DavError(403, "Create lists and calendars in the app", "<D:resource-must-be-null/>")
+    comps = props.get(C_ + "supported-calendar-component-set")
+    if comps is not None:
+        names = {(x.get("name") or "").upper() for x in comps.findall(C_ + "comp")}
+        if names and "VEVENT" not in names:
+            raise DavError(403, "Create task lists in the app", "<C:supported-calendar-component/>")
+    b = {"name": " ".join((props[D_ + "displayname"].text or "").split()) if D_ + "displayname" in props else ""}
+    if not b["name"]:
+        b["name"] = tr("Calendar")
+    col = (props[A_ + "calendar-color"].text or "").strip() if A_ + "calendar-color" in props else ""
+    if re.fullmatch(r"#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?", col):
+        b["color"] = col[:7]
+    if C_ + "calendar-description" in props:
+        b["description"] = (props[C_ + "calendar-description"].text or "").strip()
+    cid = cal_create(c, u["id"], b)
+    try:
+        c.execute("UPDATE ev_cals SET dav_name=? WHERE id=?", (key, cid))
+    except IntegrityError:  # 2.155.0 review: the same name created at the same time -> 405, the new calendar is rolled back
+        c.rollback()
+        raise DavError(405, "The calendar exists already") from None
+    bump(c)
+    c.commit()
+    r = Response(status=201)
+    r.headers["Location"] = dav_href("calendars", u["username"], key, coll=True)
+    r.headers["Cache-Control"] = "no-cache"
+    return r

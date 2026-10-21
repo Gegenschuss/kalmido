@@ -55,6 +55,7 @@ SETTINGS_FLAGS += ("photo_meta_strip",)  # 2.61.0 B (#1819): remove the metadata
 SETTINGS_FLAGS += ("assistant_on",)  # 2.75.0 A (#1411): the built-in assistant for this person (assistant/web.py)
 SETTINGS_FLAGS += ("time_split_midnight",)  # 2.125.0 B (#2120): entries over midnight count on each day (personal/timesheet.py)
 SETTINGS_FLAGS += ("chat_read_receipts",)  # 2.139.0 A (#2129): read receipts in the team chat (collab/teamchat.py)
+SETTINGS_FLAGS += ("cal_holidays", "cal_abs", "cal_abs_team")  # 2.155.0 B (#2076): holidays / absences in the calendar (hub/abscal.py)
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
@@ -274,6 +275,11 @@ def clean_setting(k, v):
         return sv
     if k == "comment_order":  # 2.4.2 (#386)
         if sv not in ("old", "new"):
+            raise bad
+        return sv
+    if k == "holiday_state":  # 2.155.0 B (#2076): my state of the public holidays ('' = my area's)
+        from ..hub.absence import ABS_STATES
+        if sv and sv not in ABS_STATES:
             raise bad
         return sv
     if k == "time_currency":

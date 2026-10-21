@@ -59,7 +59,7 @@ Kalmido 2.9.0 is a CalDAV server for tasks. Every list you can see appears as a 
   link (ICS) too. Join the list to get all its tasks.
 - Participants see and change only the tasks assigned to them, and new tasks they create are assigned to them.
 - Deleting a task in an app moves it to the trash in Kalmido.
-- Lists are created, renamed and deleted in Kalmido (`MKCALENDAR`, `PROPPATCH` and deleting a collection are refused).
+- Lists are created, renamed and deleted in Kalmido (`PROPPATCH`, deleting a collection and a `MKCALENDAR` only for tasks are refused).
 - Moving a task to another list in a client (the same UID in another calendar) moves the Kalmido task, with its history and comments.
 
 Changes made over CalDAV show "via CalDAV" in the task history. Webhooks and agent events carry `"via": "caldav"`.
@@ -111,8 +111,13 @@ You need three things: the **server** (your host name), your **user name** and a
 
 Everything else a calendar app writes (Apple's travel time and structured location, conference links, other alarms …)
 is kept as it came and sent back unchanged. Each of your calendars is one collection (`/dav/calendars/<user>/e<id>/`);
-events you are invited to by someone else come in a read-only calendar **Invitations** (`…/inv/`). Calendars are
-created, shared and deleted in Kalmido; a calendar shared with you *view only* is read-only in the apps.
+events you are invited to by someone else come in a calendar **Invitations** (`…/inv/`). There you answer them in
+your calendar app (accept, maybe, decline): Kalmido takes only your own answer (`PARTSTAT` of your `ATTENDEE`), the
+organiser sees it as if you had answered in the app; other changes to an invitation are ignored, and deleting one counts
+as declined (it stays in the calendar, marked as declined). A new calendar created in a calendar app (`MKCALENDAR`) is an
+own calendar in Kalmido, in the same workspace a new calendar in the app would get (without an organisation: your private
+space), with its name, colour and description; the app keeps the address it chose. Calendars are shared and deleted in
+Kalmido; a calendar shared with you *view only* is read-only in the apps.
 
 **Attendees and apps that leave them out (2.144.5).** Kalmido remembers per app password whether its app ever sent an
 `ATTENDEE`. An app that never did cannot remove the attendees (and their answers) of an event by saving it without them; an
@@ -312,6 +317,19 @@ new one (the old one stops at once) or turn it off. Anyone with the link sees th
 password. Every person who sees the calendar has their own link, and it only works while that person still sees the
 calendar (sharing ended, organisation left: the link stops). The feed lists the events with their repeat rules, without
 attendees and without your reminders; the subscribing app refreshes about every 15 minutes.
+
+**Holidays and absences (2.155).** The calendar views show the public holidays of your state and your own absences
+(vacation, days off, ...) as quiet all-day entries; with *Team absences* switched on also your colleagues' absences, only as
+"away" (never the kind or the note) and only of your own organisations. Calendar > Calendars > *Holidays and absences* has
+the three switches, the state of your holidays (German states and Austria, computed on the server without any service;
+empty = your organisation's state, a person without an organisation picks it here) and a *Subscription link* of your own
+absences plus the holidays (`…/ical/abs/<id>.<secret>.ics`; a sick leave shows as "Away"; new link / off as above).
+
+**Availability when inviting (2.155).** The event editor shows a free / busy bar for you and every invited colleague of your
+organisation for the day of the event (7 to 20 o'clock, wider when the event lies outside): busy spans grey, absences and
+holidays hatched, the event's time marked. The server sends only the spans (`GET /api/events/freebusy`), never titles,
+places or calendars; events shown as free, all-day and cancelled events do not count. People of other organisations get no
+bar; without an organisation you see your own. A CalDAV `free-busy-query` REPORT is still answered with 403.
 
 ## For admins
 
