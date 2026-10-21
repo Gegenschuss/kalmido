@@ -32,10 +32,34 @@ function rc_html() {
       ${w ? `<span class="rc-acts"><button type="button" class="btn sm" data-rc="reject:${s.id}">${tr('Reject')}</button><button type="button" class="btn sm pri" data-rc="accept:${s.id}">${tr('Accept')}</button></span>` : ''}</div>`).join('');
   const projOpts = `<option value="">${tr('No project')}</option>` + d.projects.map(p => `<option value="${p.id}" ${r.project?.id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')
     + (r.project && !d.projects.some(p => p.id === r.project.id) ? `<option value="${r.project.id}" selected>${esc(r.project.name || tr('Project #{0}', r.project.id))}</option>` : '');
-  return `<h4 class="rc-h">${tr('Receipt')}</h4>${sug}
+  return `<h4 class="rc-h">${tr('Receipt')}</h4>${sug}${rc_confHtml(d)}
     <div class="row"><label for="rc-proj">${tr('Project')}</label><select id="rc-proj" data-rcf="project" ${w ? '' : 'disabled'}>${projOpts}</select></div>
     <div class="row"><label for="rc-cat">${tr('Category')}</label><input id="rc-cat" data-rcf="category" value="${esc(r.category || '')}" maxlength="60" list="rc-cl" autocomplete="off" placeholder="${esc(tr('e.g. Travel, Material, Software'))}" ${w ? '' : 'disabled'}><datalist id="rc-cl">${d.categories.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
     <div class="row"><label for="rc-vat">${tr('VAT rate')}</label><select id="rc-vat" data-rcf="vat" ${w ? '' : 'disabled'}><option value="">${tr('unknown')}</option>${['19', '7', '0'].map(v => `<option value="${v}" ${r.vat_pct === v ? 'selected' : ''}>${v} %</option>`).join('')}</select></div>`;  // 2.90.0 A (#1921)
+}
+// 2.154.0 A (#1356): "Suggested by <agent>, confirmed by <person>" while the assignment is the one taken over
+const rc_confHtml = d => d?.confirmed ? `<p class="muted rc-conf">${ic('check', 's')} ${esc(tr('Suggested by {0}, confirmed by {1}', d.confirmed.agent?.name || tr('an agent'), d.confirmed.by?.name || ''))}</p>` : '';
+// 2.154.0 A (#1356): the office's receipt sheet (office_books.js bkSheet) shows the agents' open suggestions of a receipt
+// with Accept / Reject (one undo step each) and who confirmed one; afterwards the sheet opens again with the new values
+function rc_bkSlot(md, id, rc) {
+  const el = $('.bk-rcs', md); if (!el) return;
+  const w = rc.can_edit;
+  el.innerHTML = (rc.suggestions || []).map(s => `<div class="rc-sug" role="group" aria-label="${esc(tr('Suggestion of {0}', s.agent?.name || ''))}">
+      <span><span class="muted">${esc(tr('Suggestion of {0}', s.agent?.name || tr('an agent')))}:</span> ${[s.project && `<b>${esc(s.project.name || tr('Project #{0}', s.project.id))}</b>`, s.category && `<b>${esc(s.category)}</b>`,
+        (s.amount || s.vat_pct) && `<b>${esc([s.amount, s.currency].filter(Boolean).join(' '))}${s.vat_pct ? ` · ${esc(s.vat_pct)} %` : ''}</b>`].filter(Boolean).join(' · ')}
+      ${s.note ? `<br><span class="muted">${esc(s.note)}</span>` : ''}</span>
+      ${w ? `<span class="rc-acts"><button type="button" class="btn sm" data-rcb="reject:${s.id}">${tr('Reject')}</button><button type="button" class="btn sm pri" data-rcb="accept:${s.id}">${tr('Accept')}</button></span>` : ''}</div>`).join('') + rc_confHtml(rc);
+  el.onclick = async e => {
+    const b = e.target.closest('[data-rcb]'); if (!b) return;
+    const [act, sid] = b.dataset.rcb.split(':');
+    const again = async () => { if (typeof bkReload === 'function') bkReload(); if (md.isConnected) { md.remove(); if (typeof bkSheet === 'function') bkSheet(id); } return {}; };
+    const go = a => async () => { await api('POST', `/api/receipt-suggestions/${sid}/${a}`, a === 'accept' ? {} : undefined); return again(); };
+    b.disabled = true;
+    try { await go(act)(); } catch { b.disabled = false; return; }
+    const label = act === 'accept' ? tr('Suggestion accepted') : tr('Suggestion rejected');
+    histToast(label, histAdd({label, undo: async () => { await api('POST', `/api/receipt-suggestions/${sid}/reopen`); if (typeof bkReload === 'function') bkReload(); return {}; },
+      redo: async () => { await api('POST', `/api/receipt-suggestions/${sid}/${act}`, act === 'accept' ? {} : undefined); if (typeof bkReload === 'function') bkReload(); return {}; }}));
+  };
 }
 // 2.121.0 C (#2096): amount, currency and VAT rate of a suggestion, changeable before Accept
 function rc_money(s, w) {
