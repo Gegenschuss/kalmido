@@ -78,6 +78,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     await ev(`openDetail(${T1})`);
     check(await ready(`!!document.querySelector('[data-cfkms="${MS.id}"][data-o="${GREEN}"]')`), '#2069: the options in the detail panel');
     await sleep(500);
+    await mid(`[data-cfkms="${MS.id}"][data-o="${GREEN}"]`); await shot('p2156b-detail0.png');
     await click(`[data-cfkms="${MS.id}"][data-o="${GREEN}"]`);
     check(await until(async () => (await fv(T1))[MS.id] === GREEN), '#2069: tapping Green chooses it');
     await errs(); console.log('note: value', JSON.stringify((await fv(T1))[MS.id]), await ev(`document.querySelector('[data-cfkms="${MS.id}"][data-o="${GREEN}"]')?.outerHTML.slice(0, 300)`));
