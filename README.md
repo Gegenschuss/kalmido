@@ -20,6 +20,15 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.151.0** (2026-10-21): **a task knows its build state** - in a list with a repository the task shows *In version
+  2.150.0*, *In main, not released yet* or *Built, not in main yet* with the branch, straight from the repository; a
+  **hint when a task is still open although its package / version is already released**, also in the task row; agents
+  read it as `build` and with the new MCP tool `list_build_status`, and software agents get the rule *the task list is
+  the truth for tickets and releases*.
+- **2.148.1** (2026-10-21): security release - joining an organisation needs your yes, organisation data leaves it only
+  through an admin, public links reset on owner change, complete encryption tooling and backups, resource limits,
+  agent approvals for public forms and address books.
+- **2.148.0** (2026-10-21): DATEV Unternehmen online replaced - lock periods (GoBD), receipt images with the DATEV batch, export for the tax auditor, procedure documentation, DATEV import of master data and opening balances
 - **2.147.2** (2026-10-21): fixes for the **read-only role** (the office opens straight away, no *Join* that brings
   no writing, no + button in lists you may only read) and for **dialogs on phones** (role picker, role help, backup
   fields above the keyboard, long names in the pages trash).
@@ -27,11 +36,6 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   from time" binds the open hours as billed so they never land on two invoices, a deleted draft or a cancelled invoice
   frees them; the legacy import asks for a reason when raising the invoice counter and its undo restores the order of
   the services; asking for an approval no longer fires "assigned" rules; one "transfer into an organisation" section.
-- **2.151.0** (2026-10-21): **a task knows its build state** - in a list with a repository the task shows *In version
-  2.150.0*, *In main, not released yet* or *Built, not in main yet* with the branch, straight from the repository; a
-  **hint when a task is still open although its package / version is already released**, also in the task row; agents
-  read it as `build` and with the new MCP tool `list_build_status`, and software agents get the rule *the task list is
-  the truth for tickets and releases*.
 - **2.147.1** (2026-10-21): **drag tasks into the chats** (team chat, thread, agent chat) as references, several at once, with
   *Insert reference* on phones; **overdue invoices suggest a payment reminder** as a draft (nothing is sent) and
   invoices / reminders in EUR carry a **GiroCode** for banking apps; moving many documents to another workspace shows
