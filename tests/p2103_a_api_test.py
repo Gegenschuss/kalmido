@@ -288,10 +288,16 @@ A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 r = A.delete(B + f"/api/admin/orgs/{GAM}")
 check(r.status_code == 409 and r.json().get("retain_until") == "2035-12-31" and r.json().get("kept", {}).get("documents") == 1,
       "Gamma: 409, kept by law until 2035-12-31 " + r.text[:200])
+# 2.152.0 (#2167, review A7): a mailbox and a newsletter connection of Gamma (rows only, the services are tested elsewhere)
+NOW = datetime.now(timezone.utc).isoformat(timespec="seconds")
+sql("INSERT INTO hub_mailboxes(org_id, owner_id, ws, active, created_at, updated_at) VALUES(?,?,?,1,?,?)", (GAM, ALICE, f"org:{GAM}", NOW, NOW), write=True)
+sql("INSERT INTO nl_conns(org_id, owner_id, ws, kind, auto, created_at, updated_at) VALUES(?,?,?,'listmonk',1,?,?)", (GAM, ALICE, f"org:{GAM}", NOW, NOW), write=True)
 r = A.delete(B + f"/api/admin/orgs/{GAM}?confirm=1")
 check(r.ok and r.json().get("retired") is True and r.json().get("retain_until") == "2035-12-31", "Gamma: retired " + r.text[:160])
 check(not sql("SELECT 1 FROM org_members WHERE org_id=?", (GAM,)) and sql("SELECT 1 FROM office_docs WHERE id=?", (GDOC,)),
       "Gamma: members out, the invoice stays")
+check(sql("SELECT active FROM hub_mailboxes WHERE org_id=?", (GAM,)) == [(0,)] and sql("SELECT auto FROM nl_conns WHERE org_id=?", (GAM,)) == [(0,)],
+      "review A7: retired Gamma polls no mailbox and syncs no newsletter any more")
 check(all(w.get("id") != GAM for w in (Bo.get(B + "/api/me").json().get("workspaces") or [])), "bob no longer sees Gamma")
 check(Bo.patch(B + "/api/settings", json={"workspace": f"org:{GAM}"}).status_code in (200, 400, 403, 404)
       and Bo.get(B + O + "/settings").json().get("org_id") != GAM, "bob cannot open Gamma's office")
