@@ -496,6 +496,8 @@ def v1_one(c, tid):
         rp = git_repo_for_task(c, rows[0])
         if rp:
             out["repo"] = rp
+            if rp.get("build"):  # 2.151.0 A (#2558): the build state, branch names marked untrusted as in repo
+                out["code"] = {**out["code"], "build": rp["build"]}
     return out
 
 

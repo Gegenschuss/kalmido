@@ -360,7 +360,10 @@ def git_pr_of(p):
     return {"number": p["number"], "title": _gs(p.get("title"), 500), "body": str(p.get("body") or "")[:GIT_PR_BODY_MAX],
             "state": "merged" if merged else "open" if p.get("state") == "open" else "closed",
             "author": _gs(user.get("login"), 100), "url": _git_web(p.get("html_url")), "head_ref": _gs(head.get("ref"), 250),
-            "head_sha": _gs(head.get("sha"), 64), "updated_at": _gs(p.get("updated_at"), 40), "merged_at": _gs(p.get("merged_at"), 40) or None}
+            "head_sha": _gs(head.get("sha"), 64), "updated_at": _gs(p.get("updated_at"), 40), "merged_at": _gs(p.get("merged_at"), 40) or None,
+            # 2.151.0 A (#2558): the merge (squash) commit of a merged one: its first version tag is the pull request's
+            # (GitHub / Gitea send a test merge commit for open ones too: only kept once merged)
+            "merge_sha": _gs(p.get("merge_commit_sha"), 64) if merged else ""}
 
 
 def git_commit_of(x):
@@ -395,7 +398,8 @@ def git_pr_norm(p, prov):
                 "state": "open" if st in ("opened", "locked") else "closed",
                 "merged_at": (p.get("merged_at") or p.get("updated_at")) if st == "merged" else None,
                 "user": {"login": _gd(p, "author", "username")}, "html_url": p.get("web_url"),
-                "head": {"ref": p.get("source_branch"), "sha": p.get("sha")}, "updated_at": p.get("updated_at")}
+                "head": {"ref": p.get("source_branch"), "sha": p.get("sha")}, "updated_at": p.get("updated_at"),
+                "merge_commit_sha": p.get("squash_commit_sha") or p.get("merge_commit_sha")}  # 2.151.0 A (#2558)
     if not isinstance(p.get("id"), int):
         return None
     st = str(p.get("state") or "").upper()
@@ -405,7 +409,7 @@ def git_pr_norm(p, prov):
             "user": {"login": _gd(p, "author", "nickname") or _gd(p, "author", "display_name")},
             "html_url": _gd(p, "links", "html", "href"),
             "head": {"ref": _gd(p, "source", "branch", "name"), "sha": _gd(p, "source", "commit", "hash")},
-            "updated_at": p.get("updated_on")}
+            "updated_at": p.get("updated_on"), "merge_commit_sha": _gd(p, "merge_commit", "hash")}  # 2.151.0 A (#2558)
 
 
 def git_commit_norm(x, prov):
@@ -531,13 +535,15 @@ def git_take_prs(c, r, items, baseline):
         if not tids:
             continue
         old = c.execute("SELECT * FROM git_prs WHERE conn_id=? AND number=?", (r["id"], p["number"])).fetchone()
-        if not old or any(old[k] != p[k] for k in ("title", "state", "author", "url", "head_ref", "head_sha", "merged_at")):
+        if not old or any(old[k] != p[k] for k in ("title", "state", "author", "url", "head_ref", "head_sha", "merged_at", "merge_sha")):
             changed = True
-        c.execute("""INSERT INTO git_prs(conn_id,number,title,state,author,url,head_ref,head_sha,updated_at,merged_at)
-                     VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(conn_id,number) DO UPDATE SET title=excluded.title, state=excluded.state,
+        c.execute("""INSERT INTO git_prs(conn_id,number,title,state,author,url,head_ref,head_sha,updated_at,merged_at,merge_sha)
+                     VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(conn_id,number) DO UPDATE SET title=excluded.title, state=excluded.state,
                      author=excluded.author, url=excluded.url, head_ref=excluded.head_ref, head_sha=excluded.head_sha,
-                     updated_at=excluded.updated_at, merged_at=excluded.merged_at""",
-                  (r["id"], p["number"], p["title"], p["state"], p["author"], p["url"], p["head_ref"], p["head_sha"], p["updated_at"], p["merged_at"]))
+                     updated_at=excluded.updated_at, merged_at=excluded.merged_at,
+                     merge_sha=CASE WHEN excluded.merge_sha<>'' THEN excluded.merge_sha ELSE git_prs.merge_sha END""",
+                  (r["id"], p["number"], p["title"], p["state"], p["author"], p["url"], p["head_ref"], p["head_sha"], p["updated_at"], p["merged_at"],
+                   p["merge_sha"]))
         fresh = old is None or not old["title"]  # a stub row from a merge request comment counts as new
         for tid in sorted(tids):
             new = c.execute("INSERT INTO git_links(task_id,conn_id,kind,ref,created_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
@@ -621,6 +627,7 @@ def git_ci_of(k, sha, gh):
 def git_poll(c, cid):
     """One poll of connection cid (the background thread). Never raises for provider problems (stored in last_error)."""
     from ..integrations.gitfolder import gf_rehome
+    from ..integrations.gitbuild import gb_branches, gb_main, gb_tags
     gf_rehome(c, cid)  # 2.33.0 (#934): a folder repository hangs on a list that is still in its folder
     r = c.execute("SELECT k.*, l.archived FROM git_conns k JOIN lists l ON l.id=k.list_id WHERE k.id=?", (cid,)).fetchone()
     if not r:
@@ -663,6 +670,8 @@ def git_poll(c, cid):
         j = git_items(get("commits", git_api(prov, k, "commits", default)))
         if j is not None:
             changed |= git_take_commits(c, r, [git_commit_norm(x, prov) for x in j], default, True)
+            if j:
+                gb_main(c, r, git_commit_norm(j[0], prov))  # 2.151.0 A (#2558)
         # 2.18.0 (#408): the newest tags (one request, ETag): a new one can reach a milestone
         try:  # optional: a server without the tags endpoint (or a token without access to it) never breaks the poll
             j = git_items(get("tags", git_api(prov, k, "tags")))
@@ -670,6 +679,8 @@ def git_poll(c, cid):
             j = None
         if j is not None:
             changed |= git_take_tags(c, r, j)
+        if r["tags_at"]:  # 2.151.0 A (#2558): the first version tag of the linked commits (after the baseline)
+            changed |= gb_tags(c, r, k, prov)
         # branches of open pull requests that name a task: their own commits (compare with the default branch)
         refs = [x[0] for x in c.execute("""SELECT p.head_ref FROM git_prs p WHERE p.conn_id=? AND p.state='open' AND p.head_ref!=''
                                            AND p.head_ref!=? GROUP BY p.head_ref ORDER BY MAX(p.updated_at) DESC""", (cid, default))][:GIT_BRANCHES]
@@ -681,6 +692,7 @@ def git_poll(c, cid):
             if lst is not None:
                 changed |= git_take_commits(c, r, [git_commit_norm(x, prov) for x in lst[-GIT_ITEMS:]], ref, False)
         keep = {x: v for x, v in keep.items() if not x.startswith("cmp:") or x[4:] in refs}
+        changed |= gb_branches(c, r, k, get, prov)  # 2.151.0 A (#2558): task branches and how far ahead they are
         # CI of open pull requests (unknown, pending or a new head)
         for p in c.execute("""SELECT number, head_sha, ci, ci_sha FROM git_prs WHERE conn_id=? AND state='open' AND head_sha!=''
                               AND (ci_sha!=head_sha OR ci IN ('pending','')) ORDER BY updated_at DESC LIMIT ?""", (cid, GIT_CI)).fetchall():
@@ -743,14 +755,15 @@ def git_code_for(c, ids):
             if len(lst) < GIT_TASK_PRS:
                 lst.append({"repo": f"{x['owner']}/{x['repo']}", "conn": x["conn_id"], "n": x["number"], "title": x["title"],
                             "state": x["state"], "ci": x["ci"] or None, "author": x["author"], "url": x["url"], "branch": x["head_ref"],
-                            "merged_at": x["merged_at"]})
+                            "merged_at": x["merged_at"], "tag": x["tag"] or None})  # 2.151.0 A (#2558): its first version tag
     for x in c.execute("""SELECT l.task_id, m.*, k.owner, k.repo FROM git_links l JOIN git_conns k ON k.id=l.conn_id
                           JOIN git_commits m ON m.conn_id=l.conn_id AND m.sha=l.ref WHERE l.kind='commit' ORDER BY m.at DESC"""):
         if x["task_id"] in ids:
             lst = out.setdefault(x["task_id"], {"prs": [], "commits": []})["commits"]
             if len(lst) < GIT_TASK_COMMITS:
                 lst.append({"repo": f"{x['owner']}/{x['repo']}", "sha": x["sha"], "short": x["sha"][:7], "message": x["message"],
-                            "author": x["author"], "url": x["url"], "branch": x["branch"], "at": x["at"]})
+                            "author": x["author"], "url": x["url"], "branch": x["branch"], "at": x["at"],
+                            "tag": x["tag"] or None})  # 2.151.0 A (#2558): the first version tag that holds it
     return out
 
 
@@ -779,6 +792,10 @@ def git_repo_for_task(c, t):
              commits=[{**x, "origin": "git", "untrusted": True} for x in code["commits"]])
     if len(rows) > 1:
         d["others"] = [{k: x[k] for k in ("provider", "web_url", "full_name", "default_branch")} for x in (git_public(c, y) for y in rows[1:])]
+    from ..integrations.gitbuild import gb_untrusted, git_build_for
+    b = git_build_for(c, [t]).get(t["id"])  # 2.151.0 A (#2558): what was built for it and whether it is live
+    if b:
+        d["build"] = gb_untrusted(b)
     return d
 
 
@@ -838,7 +855,9 @@ def git_list(lid):
     from ..integrations.gitfolder import gf_conns_for_list, gf_own_conns, gf_list_state
     rows = gf_own_conns(c, lid)
     # 2.33.0 (#934): the folder's repositories this list uses (or would use: switched off / an own repository), read-only here
+    from ..integrations.gitbuild import gb_ver_info
     return jsonify(repos=[git_public(c, r, manage) for r in rows], may=manage, key=bool(SECRET_KEY),
+                   version_field=gb_ver_info(c, lid),  # 2.151.0 A (#2558): the field with the package / target version
                    project=is_project(c, lid), max=GIT_MAX_CONNS, errors=errhook_public(c, lid, manage),  # 2.18.0: error reports
                    folder=gf_list_state(c, lid), folder_repos=[git_public(c, r) for r in gf_conns_for_list(c, lid, ignore_own=True, ignore_off=True)])
 

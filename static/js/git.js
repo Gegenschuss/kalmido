@@ -32,8 +32,15 @@ function prRow(p) {
   const u = httpUrl(p.url), inner = `${ic('pr', 's')}<span class="gst pr-${esc(p.state)}">${esc(tr(PR_ST[p.state] || p.state))}</span><span class="gtt">${esc(p.title || '#' + p.n)}</span><span class="muted gmeta">#${p.n}${p.author ? ' · ' + esc(p.author) : ''}</span>${ciIcon(p.ci)}`;
   return u ? `<a class="gitrow" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${inner}</a>` : `<div class="gitrow">${inner}</div>`;
 }
-function commitRow(m) {
-  const u = httpUrl(m.url), inner = `${ic('commit', 's')}<code>${esc(m.short)}</code><span class="gtt">${esc(m.message)}</span><span class="muted gmeta">${esc(m.author || '')}</span>`;
+// 2.151.0 A (#2558): a commit's mark: its first version, else its branch when it is not in the default branch
+function commitMark(t, m) {
+  const v = gitVer(m.tag); if (v) return `<span class="gmark gm-rel" title="${esc(tr('In version {0}', v))}">${esc(v)}</span>`;
+  const dflt = listRepos(t.list_id).find(r => r.full_name === m.repo)?.default_branch;
+  return m.branch && dflt && m.branch !== dflt ? `<span class="gmark" title="${esc(tr('Branch {0}', m.branch))}">${esc(m.branch)}</span>` : '';
+}
+const gitVer = n => { const s = String(n || '').trim(); return /^[vV]?\d/.test(s) ? s.replace(/^[vV]/, '') : ''; };
+function commitRow(m, t) {
+  const u = httpUrl(m.url), inner = `${ic('commit', 's')}<code>${esc(m.short)}</code><span class="gtt">${esc(m.message)}</span>${t ? commitMark(t, m) : ''}<span class="muted gmeta">${esc(m.author || '')}</span>`;
   return u ? `<a class="gitrow" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${inner}</a>` : `<div class="gitrow">${inner}</div>`;
 }
 // 2.4.2 (#387): the Code section only where it helps: the list has a repository AND the task has linked pull requests /
@@ -42,16 +49,46 @@ function commitRow(m) {
 function codeShown(t) {
   if (!(t?.id > 0) || t.context || !listRepos(t.list_id).length) return false;
   const c = t.code || {};
-  return !!(c.prs?.length || c.commits?.length) || t.ttype === 'bug' || t.ttype === 'feature' || (!!t.assignee_id && isAgentUser(t.assignee_id));
+  return !!(c.prs?.length || c.commits?.length || c.build) || t.ttype === 'bug' || t.ttype === 'feature' || (!!t.assignee_id && isAgentUser(t.assignee_id));
 }
 function codeHtml(t) {
   if (!codeShown(t)) return '';
   const repos = listRepos(t.list_id), c = t.code || {prs: [], commits: []};
   const a = agentOnIt(t);
-  const prs = c.prs.map(prRow).join(''), cms = c.commits.map(commitRow).join('');
-  const hint = !prs && !cms ? `<div class="muted ghint">${esc(tr('Nothing linked yet: mention #{0} in a commit or pull request, or name the branch {1}.', t.id, `kalmido-${t.id}`))}</div>` : '';
+  const prs = (c.prs || []).map(prRow).join(''), cms = (c.commits || []).map(m => commitRow(m, t)).join('');
+  const hint = !prs && !cms && !c.build ? `<div class="muted ghint">${esc(tr('Nothing linked yet: mention #{0} in a commit or pull request, or name the branch {1}.', t.id, `kalmido-${t.id}`))}</div>` : '';
   return `<div class="dsec gitsec" id="d-code"><h5>${tr('Code')}${repos.length ? ` <span class="muted h5note">${esc(repos.map(r => r.full_name).join(', '))}</span>` : ''}${repos.length ? `<button class="iconbtn gref" data-act="git-refresh" data-lid="${t.list_id}" title="${esc(tr('Check the repository now'))}" aria-label="${esc(tr('Check the repository now'))}">${ic('sync', 's')}</button>` : ''}</h5>
-    ${a ? `<div class="gitagent" role="status">${ic('bot', 's')}<span>${esc(tr('{0} is working on it', a.name))}</span>${a.status_text && a.status_task === t.id ? `<span class="muted">· ${esc(a.status_text)}</span>` : ''}</div>` : ''}${prs ? `<div class="gitl">${prs}</div>` : ''}${cms ? `<div class="gitl">${cms}</div>` : ''}${hint}${repos.length ? `<div class="gcopy"><button class="linkbtn gbranch" data-act="git-branch" data-id="${t.id}" title="${esc(tr('Copy a branch name for this task'))}" aria-label="${esc(tr('Copy the branch name {0}', gitBranch(t)))}">${ic('copy', 's')}<code>${esc(gitBranch(t))}</code></button><button class="linkbtn gbranch" data-act="git-ref" data-id="${t.id}" title="${esc(tr('Copy a commit reference: “fixes #{0}” completes the task when the pull request is merged', t.id))}" aria-label="${esc(tr('Copy the commit reference {0}', gitRef(t)))}">${ic('copy', 's')}<code>${esc(gitRef(t))}</code></button></div>` : ''}</div>`;
+    ${buildHtml(t)}${a ? `<div class="gitagent" role="status">${ic('bot', 's')}<span>${esc(tr('{0} is working on it', a.name))}</span>${a.status_text && a.status_task === t.id ? `<span class="muted">· ${esc(a.status_text)}</span>` : ''}</div>` : ''}${prs ? `<div class="gitl">${prs}</div>` : ''}${cms ? `<div class="gitl">${cms}</div>` : ''}${hint}${repos.length ? `<div class="gcopy"><button class="linkbtn gbranch" data-act="git-branch" data-id="${t.id}" title="${esc(tr('Copy a branch name for this task'))}" aria-label="${esc(tr('Copy the branch name {0}', gitBranch(t)))}">${ic('copy', 's')}<code>${esc(gitBranch(t))}</code></button><button class="linkbtn gbranch" data-act="git-ref" data-id="${t.id}" title="${esc(tr('Copy a commit reference: “fixes #{0}” completes the task when the pull request is merged', t.id))}" aria-label="${esc(tr('Copy the commit reference {0}', gitRef(t)))}">${ic('copy', 's')}<code>${esc(gitRef(t))}</code></button></div>` : ''}</div>`;
+}
+// 2.151.0 A (#2558): the build state on top of the Code section: released / in the default branch / only on a branch, and a
+// hint when the package (or the code) is released but the task is still open
+function buildText(t) {
+  const b = t.code?.build; if (!b) return '';
+  const dflt = listRepos(t.list_id)[0]?.default_branch || 'main';
+  return b.state === 'released' ? (b.version ? tr('In version {0}', b.version) : tr('In an earlier version'))
+    : b.state === 'main' ? tr('In {0}, not released yet', dflt)
+    : b.state === 'branch' ? tr('Built, not in {0} yet', dflt) : '';
+}
+function staleText(t) {
+  const b = t.code?.build; if (!b?.stale) return '';
+  return b.package?.released ? tr('Package {0} is already released, but the task is still open.', b.package.value)
+    : b.version ? tr('Its code is in version {0}, but the task is still open.', b.version) : tr('Its code is already released, but the task is still open.');
+}
+function buildHtml(t) {
+  const b = t.code?.build; if (!b) return '';
+  const txt = buildText(t), st = staleText(t);
+  const brs = (b.branches || []).map(x => { const u = httpUrl(x.url), lbl = `${ic('git', 's')}<code>${esc(x.name)}</code><span class="muted gmeta">${esc(trn('{0} commit ahead', '{0} commits ahead', x.ahead))}</span>`;
+    return u ? `<a class="gitrow gbr" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${lbl}</a>` : `<div class="gitrow gbr">${lbl}</div>`; }).join('');
+  const pk = b.package && !b.package.released && b.package.value ? `<span class="muted gbpk">${esc(tr('{0}: {1}', b.package.field, b.package.value))}</span>` : '';
+  return (txt || pk ? `<div class="gbuild gb-${esc(b.state)}" role="status">${ic(b.state === 'released' ? 'rocket' : b.state === 'branch' ? 'pr' : 'git', 's')}<span>${esc(txt || tr('Not built yet'))}</span>${pk}</div>` : '')
+    + (st ? `<div class="gstale" role="status">${ic('alert', 's')}<span>${esc(st)}</span></div>` : '')
+    + (brs ? `<div class="gitl">${brs}</div>` : '');
+}
+// in the task row only what needs a look: stale, or built on a branch that is not in the default branch (calm otherwise)
+function buildRowHint(t) {
+  const b = t.code?.build; if (!b || !(t.id > 0)) return '';
+  const tip = b.stale ? staleText(t) : b.state === 'branch' && b.branches?.length ? buildText(t) + ': ' + b.branches.map(x => x.name).join(', ') : '';
+  return tip ? `<span class="gbrow${b.stale ? ' stale' : ''}" title="${esc(tip)}" aria-label="${esc(tip)}">${ic(b.stale ? 'alert' : 'pr', 's')}</span>` : '';
 }
 const gitRef = t => `fixes #${t.id}`;  // 2.18.0 (#408): the commit / pull request reference that completes the ticket on merge
 const gitBranch = t => `kalmido-${t.id}`;  // 2.5.1 (#396): the id only, no title part (old <prefix>-<id>-slug branches still match)
@@ -143,7 +180,16 @@ function repoWire(md, lid, folder) {
         <div class="row rprow"><span class="spacer"></span><button class="btn sm pri" data-rp="add">${ic('plus', 's')} ${tr('Connect')}</button></div></div>` : '';
     box.innerHTML = rows + (isProj() ? add : `<div class="muted mhint">${tr('Make this list a project to connect a repository')}</div>`)
       + (!folder && !j.may && !j.repos.length && isProj() ? `<div class="muted mhint">${tr('The list owner and list admins connect repositories.')}</div>` : '')
-      + (folder ? folderSumHtml() : foldHtml() + errHookHtml());
+      + (folder ? folderSumHtml() : foldHtml() + verHtml() + errHookHtml());
+  };
+  // 2.151.0 A (#2558): which field holds the package / target version (compared with the repository's version tags)
+  const verHtml = () => {
+    const v = j.version_field; if (!v || listById(lid)?.kind !== 'project' || !(j.repos.length || j.folder_repos?.length)) return '';
+    const cur = v.setting === 'auto' ? 'auto' : v.setting === 'off' ? 'off' : String(v.setting);
+    const autoLbl = v.setting === 'auto' && v.field ? tr('Automatic ({0})', v.field.name) : tr('Automatic');
+    const ctl = j.may ? `<select id="rp-ver" aria-label="${esc(tr('Version field'))}"><option value="auto"${cur === 'auto' ? ' selected' : ''}>${esc(autoLbl)}</option><option value="off"${cur === 'off' ? ' selected' : ''}>${esc(tr('Off'))}</option>${v.fields.map(f => `<option value="${f.id}"${cur === String(f.id) ? ' selected' : ''}>${esc(f.name)}</option>`).join('')}</select>`
+      : `<span class="muted">${esc(v.field ? v.field.name : tr('Off'))}</span>`;
+    return `<div class="row rpver"><label for="rp-ver">${tr('Version field')}</label>${ctl}</div><div class="shint lhint">${esc(tr('A task whose version is already released but which is still open gets a hint. Automatic: a text field named Package, Version or Release.'))}</div>`;
   };
   // 2.33.0 (#934): the repositories this list takes from its folder
   const repoNames = rs => rs.map(r => r.full_name).join(', ');
@@ -249,7 +295,14 @@ function repoWire(md, lid, folder) {
     const hs = [host($('#rp-name', box)?.value), host($('#rp-base', box)?.value)].filter(Boolean);
     h.hidden = !(($('#rp-prov', box)?.value || 'github') === 'github' && hs.some(x => !/^(github\.com|gitlab\.com|bitbucket\.org)$/.test(x)));
   };
-  box.addEventListener('change', e => { if (e.target.id === 'rp-prov') { provHint(); selfHint(); } });
+  box.addEventListener('change', async e => {
+    if (e.target.id === 'rp-prov') { provHint(); selfHint(); }
+    if (e.target.id === 'rp-ver') {  // 2.151.0 A (#2558)
+      const v = e.target.value;
+      try { j.version_field = await api('PUT', `/api/lists/${lid}/repos/version-field`, {field: /^\d+$/.test(v) ? +v : v}); toast(tr('Saved')); } catch { /* shown */ }
+      draw(); $('#rp-ver', box)?.focus(); await load(); render();
+    }
+  });
   box.addEventListener('input', e => {  // 2.18.0: a cloud address picks its provider
     if (e.target.id === 'rp-name' || e.target.id === 'rp-base') { const ce = $('#rp-cerr', box); if (ce?.textContent) { ce.textContent = ''; $('#rp-name', box)?.removeAttribute('aria-invalid'); } }
     if (e.target.id === 'rp-base') { selfHint(); return; }
