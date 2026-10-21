@@ -253,6 +253,14 @@ for name, how in (("Gamma", "waived"), ("Delta", "exported")):
     r = A.delete(B + f"/api/admin/orgs/{G}", params={"retention": how})
     check(r.ok and not sql("SELECT 1 FROM orgs WHERE id=?", (G,)), f"{name}: deleted ({how}) " + r.text[:200])
     check(sql("SELECT kind FROM retention_log WHERE subject=? ORDER BY id DESC LIMIT 1", (f"org:{G}",)) == [("export" if how == "exported" else "waiver",)], f"{name}: noted")
+# 2.152.0 (#2167, review A9): an organisation with only a logbook drive needs the step too
+G = A.post(B + "/api/admin/orgs", json={"name": "Epsilon", "admin_id": ALICE}).json()["id"]
+A.patch(B + "/api/settings", json={"workspace": f"org:{G}"})
+vid = A.post(B + O + "/vehicles", json={"name": "Kombi", "kind": "private", "odo_start": "1000"}).json().get("id")
+r = A.post(B + O + "/drives", json={"vehicle_id": vid, "day": time.strftime("%Y-%m-%d"), "dest": "Kunde", "purpose": "Dreh", "km": 30, "kind": "business"})
+check(r.ok and A.get(B + RX + f"/org/{G}").json().get("counts", {}).get("drives") == 1, "review A9: the logbook drive is counted " + r.text[:200])
+check(A.delete(B + f"/api/admin/orgs/{G}").status_code == 409, "review A9: Epsilon (logbook only): 409 without the step")
+check(A.delete(B + f"/api/admin/orgs/{G}", params={"retention": "waived"}).ok, "review A9: Epsilon goes with the waiver")
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 check(A.delete(B + f"/api/admin/orgs/{ORG2}").ok, "an organisation without records: deleted as before")
 
