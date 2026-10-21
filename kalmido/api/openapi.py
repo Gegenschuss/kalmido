@@ -411,10 +411,14 @@ def openapi_spec():
             "id": {"type": "integer"}, "user_id": {"type": "integer"}, "user_name": {"type": "string"}, "task_id": nul("integer"),
             "list_id": nul("integer"), "title": {"type": "string"}, "start": {"type": "string", "format": "date-time"},
             "end": nul("string", format="date-time"), "seconds": {"type": "integer"}, "rounded": {"type": "integer"},
-            "note": {"type": "string"}, "source": {"type": "string", "enum": list(TIME_SOURCES)}, "running": {"type": "boolean"}}},
+            "note": {"type": "string"}, "source": {"type": "string", "enum": list(TIME_SOURCES)}, "running": {"type": "boolean"},
+            # 2.144.6 A (#2053)
+            "billable": {"type": "boolean", "description": "may go onto an invoice (default true)"},
+            "billed": {"type": "boolean", "description": "an invoice took it: only the note can change"}}},
         "TimeEntryInput": {"type": "object", "additionalProperties": False, "required": ["start"], "properties": {
             "task_id": {"type": "integer"}, "list_id": {"type": "integer"}, "start": {"type": "string", "description": "ISO date-time (local time if no offset)"},
-            "end": {"type": "string"}, "minutes": {"type": "number"}, "note": {"type": "string", "maxLength": 500}}},
+            "end": {"type": "string"}, "minutes": {"type": "number"}, "note": {"type": "string", "maxLength": 500},
+            "billable": {"type": "boolean", "description": "2.144.6: may go onto an invoice (default true)"}}},
         "TimeEntryPage": page("TimeEntry"),
         "Habit": {"type": "object", "properties": {
             "id": {"type": "integer"}, "name": {"type": "string"}, "color": {"type": "string"}, "goal": {"type": "integer"},
