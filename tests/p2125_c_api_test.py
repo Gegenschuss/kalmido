@@ -102,8 +102,12 @@ check(A.put(B + f"/api/lists/{L}/members", json={"user_id": BOB, "role": "edit"}
 t1 = A.post(B + "/api/tasks", json={"title": "Design", "list_id": L, "assignee_id": ALICE, "duration": 90, "due": T0.isoformat()}).json()["id"]
 t2 = A.post(B + "/api/tasks", json={"title": "Build", "list_id": L, "assignee_id": BOB, "duration": 30, "due": T0.isoformat()}).json()["id"]
 now = datetime.now().astimezone()
+# 2.144.0: a fixed midday start - "now - 3 h" crossed the Berlin midnight in the night CI run and an entry over midnight is one
+# row per day since 2.125.0 B (#2120), so the row counts below were one too high
+from datetime import time as _time, timezone as _tz
+st0 = datetime.combine(T0 - timedelta(days=1), _time(10, 0), tzinfo=_tz.utc)
 for s, tid, note, mins in ((A, t1, "alice one", 90), (A, t1, "=SUM(1+1)", 30), (Bo, t2, "bob one", 45)):
-    r = s.post(B + "/api/time/entries", json={"task_id": tid, "start": (now - timedelta(hours=3)).isoformat(), "minutes": mins, "note": note})
+    r = s.post(B + "/api/time/entries", json={"task_id": tid, "start": st0.isoformat(), "minutes": mins, "note": note})
     assert r.ok, r.text
 frm = (T0 - timedelta(days=1)).isoformat()
 Q = {"scope": "all", "from": frm}
@@ -196,7 +200,7 @@ A.patch(B + "/api/settings", json={"features": FEAT})
 # freelancer-matrix: time, tasks
 FID, Fr = freelancer(B, A)
 lid = Fr.post(B + "/api/lists", json={"name": "Own work", "time_tracking": True}).json()["id"]
-r = Fr.post(B + "/api/time/entries", json={"list_id": lid, "start": (now - timedelta(hours=2)).isoformat(), "minutes": 20, "note": "solo"})
+r = Fr.post(B + "/api/time/entries", json={"list_id": lid, "start": st0.isoformat(), "minutes": 20, "note": "solo"})
 check(r.ok, "freelancer: an own entry " + r.text[:200])
 rows, _ = xlsx(Fr.get(B + "/api/time/export.xlsx", params=Q))
 check([r[9] for r in rows[1:-1]] == ["solo"] and rows[-1][0] == "Total", f"freelancer: own entry in the xlsx {rows}")
