@@ -2990,6 +2990,11 @@ MIGRATIONS = [
     ("budget_entries", "ikey", "ALTER TABLE budget_entries ADD COLUMN ikey TEXT NOT NULL DEFAULT ''"),
     ("budget_entries", "import_run", "ALTER TABLE budget_entries ADD COLUMN import_run TEXT NOT NULL DEFAULT ''"),
     ("budget_meta", "runs", "ALTER TABLE budget_meta ADD COLUMN runs TEXT NOT NULL DEFAULT '[]'"),
+    # 2.144.10 (#2576): trial documents ("Nur zum Ausprobieren"): own TEST number series (office_numbers kind 'trial'),
+    # never in bookkeeping, exports, e-invoice, VAT, reports or dunning; an admin may delete them at any time. Follow-ups
+    # (invoice, delivery note, document) of a trial quotation are trial too. Older versions ignore the columns
+    ("office_docs", "trial", "ALTER TABLE office_docs ADD COLUMN trial BIGINT NOT NULL DEFAULT 0"),
+    ("office_gen_docs", "trial", "ALTER TABLE office_gen_docs ADD COLUMN trial BIGINT NOT NULL DEFAULT 0"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -3178,6 +3183,7 @@ USER_DEFAULTS = {
     # json object. 1.8.1: the global switch show_completed is gone, a view without an entry shows its completed tasks
     "show_done_views": "{}",
     "wgstd_hide": "{}",         # 2.46.2 (#1726): per view the signature of the arrangement whose "differs from the standard" note was dismissed
+    "trial_hint_seen": "[]",    # 2.144.10 (#2576): the "try it first" hints dismissed: ["<org id>:offer", "<org id>:invoice"]
     "mods_all": "1",            # 2.46.1 (#1591): "Switch on all modules" under "What do you use Kalmido for?" (0 = lists and tasks only)
     "show_done_new": "1",       # 2.49.0 (#1535): a new list hides its completed tasks (own entry in show_done_views at creation)
     "show_done_default": "1",   # 2.39.1 (#1214): views without an own entry (and without a folder default) show completed tasks
