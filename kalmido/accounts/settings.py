@@ -726,6 +726,9 @@ def export_json():
     from ..life.budget import bud_export
     data["budget"] = bud_export(c, me())  # 2.72.0 (#1333): my budgets, decrypted (receipt files stay in data/attachments/)
     data["user"] = user_public(g.user)
+    from ..admin.acctexport import umz_log_org_lists
+    umz_log_org_lists(c, me())  # 2.148.1 C (#2492): lists of an organisation in the file: noted in its list history
+    c.commit()
     name = f"kalmido-export-{local_now():%Y-%m-%d}.json"
     return Response(json.dumps(data, ensure_ascii=False, indent=1), mimetype="application/json",
                     headers={"Content-Disposition": f'attachment; filename="{name}"'})

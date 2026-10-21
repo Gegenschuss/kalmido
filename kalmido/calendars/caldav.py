@@ -30,7 +30,7 @@ from ..core.db import (
 from ..accounts.session import (
     _DUMMY_HASH, _rate_blocked, _rate_fail, _rate_keys, _rate_reset, client_ip, FAIL_WINDOW, me,
 )
-from ..accounts.login import RC_ALPHABET
+from ..accounts.login import login_log_ip, login_log_name, RC_ALPHABET
 from ..core.access import acx_lists_sql, collab_all, Denied, ov_role, plists, pvis, task_visible, tvis, WRITE_ROLES
 from ..core.pages import valid_url
 from ..tasks.validation import (
@@ -416,7 +416,7 @@ def dav_login():
                 aa_now("security", "ratelimit:dav:u:?",
                        N_("Login rate limit reached for an unknown user name (logins refused for {0} min)."), [FAIL_WINDOW // 60])
         aa_count("security", "logins", client_ip(), user=("caldav:" + username) if u else "caldav:?")
-        print("caldav login failed for", repr(username), "from", client_ip(), flush=True)
+        print("caldav login failed for", login_log_name(username), "from", login_log_ip(client_ip()), flush=True)  # 2.148.1 C (#2494)
         return None
     _rate_reset(username, "dav:")
     if hit_limit(f"dav:{hit['id']}", DAV_RATE):

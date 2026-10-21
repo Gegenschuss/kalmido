@@ -7,8 +7,8 @@
    another person 404, an agent token 401/403; GET /api/export.json unchanged
  - import into another person (private): the upload in pieces (wrong offset 409, another person's upload 404), the preview
    (counts, people found by the hash of their address -- review M1: no address of others in the file or the preview, again-warning), target checks (an organisation without admin rights 403, a foreign one
-   404), everything created anew with new ids, subtask + dependency mapped, the comment authors mapped (me -> me, a ticked
-   person -> that person), a found person shared only with a tick, the attachment readable; the upload is gone afterwards;
+   404), everything created anew with new ids, subtask + dependency mapped, the comment authors mapped (me -> me; 2.148.1: other
+   people by name only), a found person shared only with a tick, the attachment readable; the upload is gone afterwards;
    undo removes everything (also the files)
  - import into an organisation the person administers: the lists belong to it, the attachment is sealed on disk
  - a crafted file: ids / owner / org / author from the file are ignored, wrong types fall back, cycles and lists that are not
@@ -323,7 +323,9 @@ check(all(x["created_by"] == DAVE for x in dt.values()), "created_by = the impor
 check(dbx("SELECT 1 FROM task_deps WHERE task_id=? AND blocker_id=?", (dt["Umzugskartons packen"]["id"], dt["Moebelwagen buchen"]["id"])),
       "dependency mapped")
 cm = {r_["body"]: r_["user_id"] for r_ in dbx("SELECT body, user_id FROM comments WHERE task_id=?", (dt["Umzugskartons packen"]["id"],))}
-check(cm.get("Kommentar von Alice") == DAVE and cm.get("Kommentar von Bob") == ids["bob"], f"comment authors mapped {cm}")
+# 2.148.1 (#2492): another person's comment comes over by name only, never as their account (the file is not trusted)
+cx = {r_["body"]: r_["ext_name"] for r_ in dbx("SELECT body, ext_name FROM comments WHERE task_id=?", (dt["Umzugskartons packen"]["id"],))}
+check(cm.get("Kommentar von Alice") == DAVE and cm.get("Kommentar von Bob") is None and cx.get("Kommentar von Bob"), f"comment authors mapped {cm} {cx}")
 check(dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (dl["Umzug Privatliste"]["id"], ids["bob"])), "bob (ticked) shared")
 check(not dbx("SELECT 1 FROM list_members WHERE list_id IN (SELECT id FROM lists WHERE owner_id=?) AND user_id=?", (DAVE, ids["erin"])), "nobody else")
 ar = dbx("SELECT id, path FROM attachments WHERE task_id=? AND name='packliste.txt'", (dt["Umzugskartons packen"]["id"],))

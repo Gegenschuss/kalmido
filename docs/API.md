@@ -37,7 +37,7 @@ Create a token under **Settings > Account > API tokens**:
   | `files:read` (2.48.0) | the file store: list and read the folders and files shared with the token's account (agents: plus their own result folder) |
   | `files:write` (2.48.0) | the file store: add files and folders, upload new versions where the account may edit; new agents get both `files:` scopes |
   | `time` | the timer and time entries |
-  | `export` | `GET /export` |
+  | `export` | `GET /export` (2.148.1: a personal token also needs `account`) |
   | `calendar` (2.21.0) | events and event calendars, reading included: `/event-calendars…`, `/events…`, `/tasks/{id}/events` |
   | `contacts` (2.21.0) | address books and contacts, reading included (personal data of other people: never part of the old `write`, never an agent's default) |
   | `private` (2.22.0) | health lists and the journal, reading included (never part of the old `write`; an agent never gets it and never sees a health list) |
@@ -307,7 +307,7 @@ had been made in the app. Webhooks fire too.
 | `POST /habits` · `PATCH /habits/{id}` · `DELETE …` | tasks:write · delete | 2.15.0: habits `{name, color?, goal?, days?, per_week?, remind_at?, remind_times? (up to 6 × HH:MM, 2.140.0), archived?}` |
 | `GET /time/timer` · `POST …` · `DELETE …` | read · time | 2.15.0: the running timer; start `{task_id \| list_id, note?}` (a running one stops); stop |
 | `PATCH /time/entries/{id}` · `DELETE …` | time | 2.15.0: change / delete your entry `{start?, end?, minutes?, note?, task_id? \| list_id?}` |
-| `GET /export` | export | 2.15.0: everything you own as JSON (as Settings > Data > Export) |
+| `GET /export` | export | 2.15.0: everything you own as JSON (as Settings > Data > Export). 2.148.1: a personal token needs `account` as well (`403` with `required_scope`), an agent's token `export` only |
 | `GET /openapi.json` | none | This API as OpenAPI 3.1 |
 
 **Task filters** (`GET /tasks`): `list_id`, `status` (`open` default, `done`, `wont_do`, `all`), `due_from`, `due_to`,

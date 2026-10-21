@@ -46,6 +46,7 @@ from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _jdef, _safe_part, _under
 
 UMZ_DIR = os.path.join(EXPORT_DIR, "account")
 UMZ_KEEP_H = 24
+PART_STALE_S = 6 * 3600  # 2.148.1 C (#2482): an unfinished export file older than this is left over (runs end long before)
 UMZ_BLOCK = 1 << 20  # 1 MiB of plaintext per sealed block
 UMZ_MAGIC = b"KALMIDO-UMZ1\n"
 UMZ_FORMAT = "kalmido-account"
@@ -59,6 +60,11 @@ UMZ_NOT_INCLUDED = (
     "lists of other people that are shared with you (only a reference and your own comments there)",
     "organisation data that is not yours (use the organisation export for a whole organisation)",
     "the receipt files of household budgets (their entries are included)",  # 2.72.0 (#1333)
+    # 2.148.1 C (#2494): what is not in the file either (the manifest names it honestly)
+    "the content of your private files (only their list: name, type, size, dates), files of knowledge pages and tables",
+    "messages of other people in direct messages and team chats (only what you wrote in direct messages)",
+    "booking pages and their bookings, polls and forms with their answers, holiday allowances",
+    "the organisation's office (documents, receipts, cash book) and organisation knowledge pages: the organisation export",
 )
 
 _UMZ = {}  # user id -> the running export thread
@@ -289,7 +295,41 @@ def umz_extra_queries(uid):
         "video_versions": ("SELECT * FROM video_versions WHERE review_id IN (SELECT id FROM video_reviews WHERE owner_id=? AND org_id IS NULL)", (uid,)),
         "video_comments": ("SELECT * FROM video_comments WHERE review_id IN (SELECT id FROM video_reviews WHERE owner_id=? AND org_id IS NULL) "
                            "AND deleted_at IS NULL", (uid,)),
+        # 2.148.1 C (#2494): Art. 15 -- the list of my private files (not their content), my private knowledge pages, my chats
+        # with agents, what I wrote in direct messages, my absences and timesheets (protected fields decrypted, UMZ_DECRYPT)
+        "private_files": ("SELECT id, parent_id, kind, name, mime, size, created_at, updated_at FROM fs_nodes WHERE owner_id=? "
+                          "AND org_id IS NULL AND deleted_at IS NULL ORDER BY id", (uid,)),
+        "wiki_pages": ("SELECT id, org_id, owner_id, path, body, attrs, created_at, updated_at FROM wiki_pages WHERE owner_id=? "
+                       "AND org_id IS NULL AND deleted_at IS NULL ORDER BY id", (uid,)),
+        "agent_chats": ("SELECT id, agent_id, sender, body, task_id, created_at FROM agent_chat WHERE user_id=? ORDER BY id", (uid,)),
+        "direct_messages": ("SELECT m.id, m.room_id, m.body, m.enc, m.created_at, m.edited_at FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id "
+                            "WHERE r.kind='dm' AND m.user_id=? AND m.deleted_at IS NULL ORDER BY m.id", (uid,)),
+        "absences": ("SELECT id, org_id, kind, start_date, end_date, half_day, note, status, decided_at, decision_note, created_at "
+                     "FROM hub_absences WHERE user_id=? AND deleted_at IS NULL ORDER BY start_date", (uid,)),
+        "timesheets": ("SELECT id, org_id, month, state, closed_at, decided_at, note, created_at, updated_at FROM time_sheets "
+                       "WHERE user_id=? ORDER BY month", (uid,)),
     }
+
+
+# 2.148.1 C (#2494): tables whose protected fields are decrypted for the export (the key of the row's organisation)
+UMZ_DECRYPT = ("absences", "hub_absences"), ("timesheets", "time_sheets")
+
+
+def _umz_plain(c, table, d):
+    """A row of the export with its encrypted fields opened (an unreadable value is left out, never the export)."""
+    from ..core.orgcrypt import OrgCryptError, oc_dec_fields
+    if table == "wiki_pages":
+        from ..wiki.wkhist import wsb_body_or
+        d["body"] = wsb_body_or(c, d)
+        return d
+    src = dict(UMZ_DECRYPT).get(table)
+    if src and d.get("org_id"):
+        try:
+            return oc_dec_fields(c, d["org_id"], src, d)
+        except OrgCryptError:
+            from ..core.orgcrypt import FIELDS
+            return {k: v for k, v in d.items() if k not in FIELDS[src]}
+    return d
 
 
 class _Out:
@@ -362,7 +402,7 @@ def umz_build(c, uid, stream, export_id):
                         d["owner_email_hash"] = umz_email_hash(d.pop("owner_email", ""))
                     if (table, d.get("id")) in files:
                         d["file"] = files[(table, d["id"])]
-                    yield d
+                    yield _umz_plain(c, table, d)  # 2.148.1 C (#2494)
             _put_rows(zf, out, table, rows())
         _put_rows(zf, out, "people", umz_people(c, uid))
         if "msv_links" in have:  # 2.73.0: msv_links comes with part A -- the server accounts, never their token
@@ -421,6 +461,18 @@ def _running(uid):
     return bool(t and t.is_alive())
 
 
+def umz_log_org_lists(c, uid):
+    """2.148.1 C (#2492): an export that carries lists of an organisation (lists I own there) is noted in the organisation's
+    list history (org_list_log "export"), the admins see it. The caller commits."""
+    with system_ctx(c):  # the organisation's history (also of one I left while I still own a list there)
+        rows = c.execute("SELECT id, name, org_id FROM lists WHERE owner_id=? AND org_id IS NOT NULL AND deleted_at IS NULL", (uid,)).fetchall()
+        at = iso(now_utc())
+        for r in rows:
+            c.execute("INSERT INTO org_list_log(org_id,list_id,list_name,action,by_id,owner_id,to_id,created_at) VALUES(?,?,?,'export',?,?,NULL,?)",
+                      (r["org_id"], r["id"], r["name"], uid, uid, at))
+    return len(rows)
+
+
 def umz_user_conn(c, uid):
     """The background thread works in the person's own access context (row-level security as in their requests)."""
     from ..core.access import acx_of
@@ -447,6 +499,8 @@ def umz_run(uid, export_id):
                 os.remove(os.path.join(_udir(uid), old))
         os.replace(part, os.path.join(_udir(uid), name))
         part = None
+        umz_log_org_lists(c, uid)
+        c.commit()
         done = now_utc()
         st = _state(uid) or {}
         umz_write_state(_udir(uid), {"state": "done", "started_at": st.get("started_at"), "done_at": iso(done),
@@ -506,10 +560,12 @@ def umz_cleanup(c=None, force=False):
             for fn in os.listdir(p):
                 fp = os.path.join(p, fn)
                 old = time.time() - os.path.getmtime(fp) > UMZ_KEEP_H * 3600
-                if fn.endswith(".part") or (fn.endswith(UMZ_SUFFIX) and (fn != st.get("file") or st.get("expires_at", "") <= now or old)):
+                # 2.148.1 C (#2482): a .part only when stale (a run of another process writes it right now)
+                if (fn.endswith(".part") and time.time() - os.path.getmtime(fp) > PART_STALE_S) or (
+                        fn.endswith(UMZ_SUFFIX) and (fn != st.get("file") or st.get("expires_at", "") <= now or old)):
                     os.remove(fp)
                     n += 1
-            if not any(f.endswith(UMZ_SUFFIX) for f in os.listdir(p)):
+            if not any(f.endswith((UMZ_SUFFIX, ".part")) for f in os.listdir(p)):  # 2.148.1 C (#2482): + a running .part
                 shutil.rmtree(p, ignore_errors=True)
     from .acctimport import umz_import_cleanup
     return n + umz_import_cleanup()
