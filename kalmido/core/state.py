@@ -330,7 +330,7 @@ def state():
                                               (uid,))],
         timer=time_running(c, uid) if time_all() else None,
         time_totals=time_totals(c, uid) if time_all() else {},
-        time_lists=time_list_totals(c, uid) if time_all() else {},  # 2.7.0 (#407)
+        time_lists=time_list_totals(c, uid, own=True) if time_all() else {},  # 2.7.0 (#407); 2.144.5 C (#1523): own=True
         time_day_h=time_day_h(c),
         collab_all=collab_all(),
         time_all=time_all(),

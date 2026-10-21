@@ -284,10 +284,10 @@ check(Bo.post(B + "/api/time/entries", json={"list_id": P, "start": s0, "minutes
 tl = Bo.get(B + "/api/state").json().get("time_lists", {}).get(str(P))
 check(tl and tl["s"] == 3 * 3600 and tl["b"] == 20.5, f"time_lists: 3 h + budget 20.5: {tl}")
 check(Bo.get(B + "/api/state").json().get("time_lists", {}).get(str(L)) is None, "a plain list: no time sum")
-# a member sees the same sum (shared, the same hours per day)
+# a member sees the same day length; 2.144.5 (#1523): the header sum only of their own entries (none here), like the time window
 Bo.put(B + f"/api/lists/{P}/members", json={"user_id": 1, "role": "edit"})
 ta = A.get(B + "/api/state").json()
-check(ta["time_lists"].get(str(P), {}).get("s") == 3 * 3600 and next(x for x in ta["lists"] if x["id"] == P)["day_hours"] == 10, "member: same sum, same day length")
+check(not (ta["time_lists"].get(str(P)) or {}).get("s") and next(x for x in ta["lists"] if x["id"] == P)["day_hours"] == 10, "member: own sum only, same day length")
 # time switched off for the server: no sums
 A.patch(B + "/api/admin/settings", json={"time_all": False})
 check(Bo.get(B + "/api/state").json().get("time_lists") == {}, "time off: no time_lists")

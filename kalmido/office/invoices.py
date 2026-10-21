@@ -510,7 +510,8 @@ def inv_from_time(c, oid, uid, b):
         if hours <= 0:
             continue
         rows.append({"kind": "service", "service_id": None, "title": gr["lname"] or tr("Hours"), "detail": "", "qty": hours, "unit": "hour", "rate": rate,
-                     "tax": "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1})
+                     "tax": "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1,
+                     "list_id": gr["list_id"]})  # 2.144.5 C (#1523): "billed, stays" (personal/timewipe.py) by the list, not its name
     _put_rows(c, oid, did, rows)
     return did, len(rows)
 

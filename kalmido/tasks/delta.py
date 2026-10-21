@@ -184,5 +184,5 @@ def state_delta():
         tcontacts=task_contacts(c, uid, seen) if seen else {},
         timer=time_running(c, uid) if tall else None,
         time_totals=time_totals(c, uid) if tall else {},
-        time_lists=time_list_totals(c, uid) if tall else {},
+        time_lists=time_list_totals(c, uid, own=True) if tall else {},  # 2.144.5 C (#1523)
     )

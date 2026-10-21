@@ -339,13 +339,16 @@ def time_day_h(c):
 BUDGET_FIELD_NAMES = ("budget h", "budget (h)", "budget hours", "budget std", "budget (std)", "budget-stunden", "budgetstunden")
 
 
-def time_list_totals(c, uid):
+def time_list_totals(c, uid, own=False):
     """2.7.0 (#407): {list_id: {"s": seconds of everyone I can see, "b": budget hours or None}} of my project lists with
     time: the finished entries (with or without a task; the client adds my running timer) and the sum of a number field
-    called "Budget h" (the agency project type's field, any language) over the list's tasks."""
+    called "Budget h" (the agency project type's field, any language) over the list's tasks. own (2.144.5 C, #1523): the
+    sum of the list header (time_lists in /api/state and the delta) follows the time window: other people's entries only
+    for the list's owner, its admins and the organisation's admins (n43_admin_lists); the other sums stay everyone's."""
     out = {}
+    lim = n43_own_sql(uid, n43_admin_lists(c, uid), "") if own else "TRUE"
     for r in c.execute(f"""SELECT list_id, SUM(seconds) AS s FROM time_entries WHERE "end" IS NOT NULL
-                           AND (user_id=? OR list_id IN {vis_sql()}) AND {evis(c, uid, "")} AND {th_sql("")} GROUP BY list_id""", (uid, uid, uid)):
+                           AND (user_id=? OR list_id IN {vis_sql()}) AND {evis(c, uid, "")} AND {th_sql("")} AND {lim} GROUP BY list_id""", (uid, uid, uid)):
         if r["s"]:
             out[r["list_id"]] = {"s": r["s"], "b": None}
     names = set(BUDGET_FIELD_NAMES) | {tr("Budget h", lg=x).lower() for x in LANGS}

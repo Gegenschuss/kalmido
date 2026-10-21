@@ -698,6 +698,8 @@ def clean_items(c, oid, r, items, admin, part=None):
                "detail": _text(it.get("detail"), "items.detail", 4000), "qty": 1, "unit": "day", "rate": 0, "tax": "standard",
                "raw_fee": 0, "producing": 0, "in_handling": 0, "in_markup": 0, "intext": "intern", "cost": 0, "discountable": 1}  # 2.113.1 (#2252)
         prev = old.get(it.get("id")) if it.get("id") else None
+        if prev and prev.get("list_id"):  # 2.144.5 C (#1523): a saved position keeps the list it was made from (server-side only)
+            row["list_id"] = prev["list_id"]
         if kind == "discount":  # 2.38.0: a discount position: its amount (qty x rate) is taken off, same tax class
             row["qty"] = _num(it.get("qty"), "items.qty", 0, 1e6) or 1
             row["unit"] = _choice(it.get("unit") or "flat", "items.unit", UNITS)

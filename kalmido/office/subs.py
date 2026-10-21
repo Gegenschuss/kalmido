@@ -192,11 +192,24 @@ def abo_public(d, out, today=None):
     nr = abo_next(out, today)
     nd = int(g("notice_days") or 0)
     cb = (date.fromisoformat(nr) - timedelta(days=nd)).isoformat() if nr and nd else ""
+    # 2.144.5 C (#2021): the last day for the next renewal has passed -> cancel_missed = 1 and cancel_next = the last day of
+    # the first later renewal that can still be reached ('' when the cost ends before); cancel_by keeps its meaning
+    missed, cn = int(bool(cb) and cb < today), ""
+    if missed:
+        day = nr
+        for _ in range(40):  # notice <= 730 days: a monthly cost needs at most ~25 steps
+            day = abo_next(out, (date.fromisoformat(day) + timedelta(days=1)).isoformat())
+            if not day:
+                break
+            x = (date.fromisoformat(day) - timedelta(days=nd)).isoformat()
+            if x >= today:
+                cn = x
+                break
     pm, py = ABO_PER.get(out.get("repeat"), ABO_PER["monthly"])
     gross, net = dec(out["gross"]), dec(out["amount"])
     return {"sub": int(g("sub") or 0), "notice_days": nd, "seats": abo_seats(g("seats", "[]")), "low_use": int(g("low_use") or 0),
             "remind_days": int(g("remind_days") or 0), "remind_user": g("remind_user", None), "url": g("url", "") or "",
-            "next_renewal": nr, "cancel_by": cb,
+            "next_renewal": nr, "cancel_by": cb, "cancel_missed": missed, "cancel_next": cn,
             "per_month": dstr(money(gross * pm)), "per_year": dstr(money(gross * py)),
             "per_month_net": dstr(money(net * pm)), "per_year_net": dstr(money(net * py))}
 
@@ -227,7 +240,9 @@ def abo_view(c, oid):
     for f in items:
         f["seat_names"] = [names.get(x, "") if isinstance(x, int) else x for x in f["seats"]]
         f["running"] = _running(f, today)
-    items.sort(key=lambda f: (not f["running"], f["cancel_by"] or f["next_renewal"] or "9999", f["label"].casefold(), f["id"]))
+    # 2.144.5 C (#2021): a missed notice sorts by its next chance
+    items.sort(key=lambda f: (not f["running"], (f["cancel_next"] or "9999") if f["cancel_missed"] else f["cancel_by"] or f["next_renewal"] or "9999",
+                              f["label"].casefold(), f["id"]))
     run = [f for f in items if f["running"]]
     low = [f for f in run if f["low_use"]]
     s = lambda xs, k: dstr(money(sum((dec(f[k]) for f in xs), dec(0))))  # noqa: E731
@@ -314,6 +329,8 @@ def abo_tick(c, now=None, force=False):
         except Exception:  # noqa: BLE001 (a row that cannot be read, e.g. no key: the next one)
             continue
         due = f["cancel_by"] or f["next_renewal"]
+        if f.get("cancel_missed") and f.get("cancel_next"):  # 2.144.5 C (#2021): the next reachable last day, not the missed one
+            due = f["cancel_next"]
         if not due or not _running(f, today) or today > due:
             continue
         if today < (date.fromisoformat(due) - timedelta(days=f["remind_days"])).isoformat():

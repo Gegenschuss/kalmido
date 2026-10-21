@@ -7,6 +7,8 @@ const RIN = {items: null, docs: {}, loading: false, err: null, oid: null, listRe
 const RIN_EVERY = [['monthly', N_('monthly')], ['quarterly', N_('quarterly')], ['yearly', N_('yearly')]];
 const RIN_PH = [['{period}', N_('the period of service, e.g. 01.10.2026 - 31.10.2026')], ['{month}', N_('the month, e.g. October 2026')],
   ['{quarter}', N_('the quarter, e.g. Q4 2026')], ['{year}', N_('the year, e.g. 2026')]];
+// 2.144.5 C (#2021): a template's text without its placeholders, like recurring.py rin_bare (the name of a new series)
+const rinBare = t => String(t || '').replace(/\{(period|month|quarter|year)\}/g, '').replace(/\s{2,}/g, ' ').replace(/^[\s\-·,]+|[\s\-·,]+$/g, '');
 if (typeof OFD_ACTIONS === 'object') Object.assign(OFD_ACTIONS, {series: N_('created by an invoice series'), series_create: N_('invoice series created'),
   series_update: N_('invoice series changed'), series_delete: N_('invoice series deleted'), series_restore: N_('invoice series restored')});
 
@@ -90,7 +92,7 @@ function rinFirstStart(d) {
   return d.locked || d.status !== 'draft' ? rinNext(d.service_from, {start: d.service_from, every: 'monthly'}) : d.service_from;
 }
 function rinSheet(d, s) {
-  const v = s || {every: 'monthly', start: rinFirstStart(d), until: '', auto_send: 0, title: d.project_title || d.recipient?.name || ''};
+  const v = s || {every: 'monthly', start: rinFirstStart(d), until: '', auto_send: 0, title: rinBare(d.project_title) || d.recipient?.name || ''};
   const ph = `<details class="rin-ph"><summary>${tr('Placeholders in the texts')}</summary><ul role="list">${RIN_PH.map(([k, n]) => `<li><code>${k}</code> ${esc(tr(n))}</li>`).join('')}</ul>
     <p class="muted">${tr('They work in the project title, the introduction, the closing and the positions of the template; the template keeps them.')}</p></details>`;
   const body = ofdF('rin-title', tr('Name'), `<input id="ofd-rin-title" value="${esc(v.title || '')}" maxlength="200">`)
