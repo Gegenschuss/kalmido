@@ -25,7 +25,7 @@ from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .calc import INV_VAT_NOTES, dec, dstr, fmt_money, inv_calc, inv_open, money
 from .packs import office_pack_for
-from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql
+from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql, trial_flag
 from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
 
 INV_KINDS = ("invoice", "credit", "reminder")
@@ -355,8 +355,11 @@ def _insert_doc(c, oid, uid, row):
     ts = iso(now_utc())
     row.update(org_id=oid, number="", status="draft", totals="{}", created_by=uid, created_at=ts, updated_at=ts, sent_at=None)
     did = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+    if row.get("trial"):  # 2.144.10 A (#2576): a trial document takes its TEST number at once (no gap in a real series)
+        from .docs import _assign_number
+        _assign_number(c, oid, did)
     from ..integrations.webhooks import who_note
-    who_note("invoice.created", "invoice", did)  # 2.115.0 A (#2061)
+    who_note("invoice.created", "invoice", did)  # 2.115.0 A (#2061); a trial one is dropped in who_obj
     return did
 
 
@@ -408,6 +411,8 @@ def inv_new_row(c, oid, s, kind, lang, src=None):
             if k in src.keys() and src[k] is not None:
                 row[k] = src[k]
         row["order_ref"] = _col(src, "order_ref") or src["project_ref"] or ""
+        if _col(src, "trial"):  # 2.144.10 A (#2576): every follow-up of a trial document is a trial document
+            row["trial"] = 1
         if src["lang"] != lang:
             row["intro"], row["closing"] = inv_default_texts(c, oid, s, kind, src["lang"])
         if src["client_id"]:
@@ -504,6 +509,7 @@ def inv_from_time(c, oid, uid, b):
                project_title=cl["name"])
     if "payment_terms_days" in cl.keys() and cl["payment_terms_days"]:
         row["payment_days"] = int(cl["payment_terms_days"])
+    row["trial"] = trial_flag(b.get("trial"))  # 2.144.10 A (#2576)
     did = _insert_doc(c, oid, uid, row)
     rate = cl["rate"] if "rate" in cl.keys() and cl["rate"] else 0
     rows = []
@@ -578,6 +584,10 @@ def inv_make_reminder(c, oid, uid, b):
     s = office_settings(c, oid)
     rows = inv_reminder_rows(c, oid, ids)
     first = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (ids[0], oid)).fetchone()
+    # 2.144.10 A (#2576): a reminder is a trial document when its invoices are; trial and real ones never share one
+    if len({x["trial"] for x in c.execute("SELECT trial FROM office_docs WHERE org_id=? AND id IN (" + ",".join("?" * len(ids)) + ")",
+                                          [oid, *ids]).fetchall()}) > 1:
+        raise BadInput(tr("Trial and real invoices cannot share a reminder"))
     write_lock(c, f"office_dunning_{int(oid)}")  # 2.147.1 (#2054, review): the same lock as the suggestion run (no second draft at once)
     inv_check_reminder(c, oid, ids, rows)
     level = b.get("level", 1)
@@ -758,9 +768,8 @@ def inv_files(c, oid, did):
     m = odoc_render(c, did, oid)
     m.pop("internal", None)
     from .docs import doc_row
-    from .pdfweb import epdf_draft, epdf_is_draft
-    if epdf_is_draft(doc_row(c, oid, did)):
-        epdf_draft(m)  # 2.138.2 A (#2393): a draft goes out marked
+    from .pdfweb import epdf_mark
+    epdf_mark(doc_row(c, oid, did), m)  # 2.138.2 A (#2393): a draft goes out marked; 2.144.10 A (#2576): a trial one too
     number = re.sub(r"[^A-Za-z0-9._-]+", "-", str(m.get("number") or "")).strip("-") or f"doc-{did}"
     return [(f"{m['kind']}-{number}.pdf", office_pdf(m), "application/pdf")]
 
@@ -982,7 +991,7 @@ def inv_credit_post(did):
 
 @app.post("/api/office/docs/from-time")
 def inv_from_time_post():
-    """{client_id, from, to, project_id?} -> 201 an invoice draft from the client's time entries (one position per list)."""
+    """{client_id, from, to, project_id?, trial?} -> 201 an invoice draft from the client's time entries (one position per list)."""
     from .docs import recalc
     c, uid, oid = _ctx()
     b = body()

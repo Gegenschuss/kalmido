@@ -1169,6 +1169,29 @@ print model as JSON: all texts, labels and amounts already in the document's lan
 `POST /api/office/docs/<id>/finalize`, `GET /api/office/docs/<id>/log` and `GET /api/office/log?limit=` (organisation
 admins). The head also carries the period of service (`service_from`, `service_to`, dates; printed as one line).
 
+### Trial documents (2.144.10)
+
+"Only to try it out": `POST /api/office/docs` (every kind) and `POST /api/office/docs/from-time` take `trial: true`. A trial
+document is fixed at creation (no later switch) and:
+
+- counts in its own series `TEST-001`, `TEST-002` ... (one counter per organisation or personal office for all kinds,
+  `office_numbers` kind `trial`); it never takes a real number, a number by hand answers `400`, the real series stay
+  without gaps and the number ranges page does not show the TEST series;
+- passes trial on to everything made from it (invoice, progress / final invoice, credit note, reminder, delivery note,
+  copy, document from a template); a reminder never mixes trial and real invoices (`400`); an invoice series from a
+  trial invoice answers `409`;
+- prints SAMPLE / MUSTER large and diagonal on every page (instead of the draft mark) and has no e-invoice
+  (no ZUGFeRD / XRechnung XML; `GET .../xml` answers `409`); webhooks and agent events skip it;
+- can be deleted by an admin at any time (finalised, sent, signed, with follow-ups; the follow-ups stay, their link
+  is emptied). `POST /api/office/trial/delete-all` (admin; a person without an organisation is their own admin) deletes
+  every trial document and trial document from a template of the area with payments, links, stored PDF / XML files
+  and filed PDFs -> `{ok, docs, gen_docs}`; the TEST series starts again at 001.
+
+Every document (detail and list) carries `trial`; `GET /api/office/docs?trial=1|0` filters, the list also answers
+`trial_count` (trial documents + trial documents from templates), `first: {offer, invoice}` (true = no real quotation /
+invoice yet: the dialog shows the hint once per person, setting `trial_hint_seen`) and `office_id`.
+`GET /api/office/gen-docs` items carry `trial` too (`?trial=1|0`).
+
 Purchase and surplus (2.47): a new position of a service takes the purchase (`cost`) of the service's freelancer role
 for its unit (day / hour); a later change of the role's price reaches only new positions; the admin can change it per
 position. Admins get the surplus of every position (`items[].margin` = total minus purchase x quantity) and their sum

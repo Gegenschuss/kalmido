@@ -4,6 +4,7 @@ Tables office_docs / office_doc_items (schema.py). Every route: office_gate (no 
 the internal costs / margin. The sums come from kalmido/office/calc.py (office_calc) and are cached in office_docs.totals.
 odoc_render(c, doc_id) builds the print model (see docs/OFFICE.md) that the PDF writer (part D) and the preview use."""
 import json
+import os
 import re
 from datetime import date, timedelta
 
@@ -21,7 +22,7 @@ from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, RAW_MODES,
 from .packs import office_pack_for
 from .undo import oun_post, oun_pre
 from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
-                    office_seed_texts)
+                    office_seed_texts, office_trial_number, trial_flag)
 from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
                      ofx_number_at_finalize, ofx_snapshot_pack, OFX_LOCKED)
 from .invoices import (INV_KINDS, INV_STATUSES, STATE_TXT, inv_apply_client, inv_manual_number, inv_money_fields, inv_new_row, inv_paid_map, inv_payments,
@@ -439,7 +440,10 @@ def doc_public(c, oid, r, admin, items=True):
         d["locked_by_name"] = (u["display_name"] or u["username"]) if u else ""
     d["can_edit"] = not locked and r["status"] != "sent"  # 2.38.0: sent documents are locked as well
     d["can_unlock"] = bool(admin) and locked and not bga_offer_block(c, oid, r)  # 2.114.2 A (#2263): back to a draft
-    if OFFER_DELETE_TESTPHASE and r["kind"] == "offer":  # 2.144.8 (#2573): delete has its own, wider rule in the test phase
+    d["trial"] = bool(r["trial"])  # 2.144.10 A (#2576)
+    if r["trial"]:  # 2.144.10 A (#2576): an admin deletes a trial document at any time (finalised, sent, signed, with follow-ups)
+        d["can_delete"] = bool(admin)
+    elif OFFER_DELETE_TESTPHASE and r["kind"] == "offer":  # 2.144.8 (#2573): delete has its own, wider rule in the test phase
         d["can_delete"] = bool(admin) and not bga_offer_delete_block(c, oid, r)
         d["delete_sent"] = d["can_delete"] and bga_offer_was_sent(c, oid, r)  # the confirmation says it went out
     else:
@@ -467,7 +471,8 @@ def doc_brief(r, pm=None):
          "gross": t.get("gross") or 0, "gross_text": fmt_money(t.get("gross") or 0, r["lang"], r["currency"]),
          "net_incl_raw": t.get("net_incl_raw"), "updated_at": r["updated_at"], "created_by": r["created_by"],
          "locked": ofx_locked(r), "due_date": r["due_date"] if "due_date" in r.keys() else None, "cancels_id": r["cancels_id"] if "cancels_id" in r.keys() else None,
-         "inv_type": r["inv_type"] if "inv_type" in r.keys() else ""}  # 2.120.0 A (#2087)
+         "inv_type": r["inv_type"] if "inv_type" in r.keys() else "",  # 2.120.0 A (#2087)
+         "trial": bool(r["trial"]) if "trial" in r.keys() else False}  # 2.144.10 A (#2576)
     if r["kind"] == "offer" and "cashflow" in r.keys():  # 2.88.0 (#1915)
         d.update(version_of=r["version_of"], cashflow=r["cashflow"] or "auto")
     if r["kind"] in ("invoice", "credit"):
@@ -763,6 +768,7 @@ def doc_create(c, oid, uid, b, admin, number=True):
     if kind != "offer":  # 2.38.0 (#1021, F1): an empty invoice / credit note / reminder draft
         from .invoices import _insert_doc
         row = inv_new_row(c, oid, s, kind, lang)
+        row["trial"] = trial_flag(b.get("trial"))  # 2.144.10 A (#2576): set once at creation, never switched later
         cur = dict(row)
         cur["id"] = 0
         cur["kind"] = kind
@@ -798,7 +804,7 @@ def doc_create(c, oid, uid, b, admin, number=True):
            **prd_new_doc(c, oid, s),  # 2.113.1 (#2251, #2252): the options of the industry packs switched on
            "intro": _default_text(c, oid, s, "intro", lang), "closing": _default_text(c, oid, s, "closing", lang),
            "rights": json.dumps(rights, ensure_ascii=False), "fields": "[]", "totals": "{}", "created_by": uid, "created_at": ts,
-           "updated_at": ts, "sent_at": None}
+           "updated_at": ts, "sent_at": None, "trial": trial_flag(b.get("trial"))}  # 2.144.10 A (#2576)
     if s.get("small_business"):  # 2.47.3 (#1360): section 19 UStG
         row["vat_note"] = "small"
     if row["currency"] not in ("EUR", "USD"):
@@ -808,7 +814,7 @@ def doc_create(c, oid, uid, b, admin, number=True):
     f = clean_doc(c, oid, {k: v for k, v in b.items() if k != "kind"}, cur, admin)
     row.update(f)
     did = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
-    if number and not ofx_number_at_finalize(s, kind) and onc_ready(s, doc_row(c, oid, did)):  # 2.36.2 (P2): kinds numbered at finalising stay without a number as drafts; 2.118.0 A (#2265): onc_ready
+    if row["trial"] or number and not ofx_number_at_finalize(s, kind) and onc_ready(s, doc_row(c, oid, did)):  # 2.36.2 (P2): kinds numbered at finalising stay without a number as drafts; 2.118.0 A (#2265): onc_ready; 2.144.10 A (#2576): a trial one gets its TEST number at once
         _assign_number(c, oid, did, s)
     if isinstance(b.get("items"), list):
         _put_items(c, oid, doc_row(c, oid, did), b["items"], admin)
@@ -822,6 +828,14 @@ def _assign_number(c, oid, did, s=None, manual=None, reason=""):
     from .legacyimport import fi_number_taken
     write_lock(c, f"office_num_{int(oid)}")  # 2.39.1 (#1210 N2): check and write of a number (manual or next) in one go
     r = doc_row(c, oid, did)
+    if r["trial"]:  # 2.144.10 A (#2576): a trial document only ever carries a TEST number (no hand-set one, no real counter)
+        if manual is not None:
+            raise BadInput(tr("A trial document keeps its TEST number"))
+        if r["number"]:
+            return r["number"]
+        num = office_trial_number(c, oid, did)
+        c.execute("UPDATE office_docs SET number=?, updated_at=? WHERE id=? AND org_id=?", (num, iso(now_utc()), did, oid))
+        return num
     s = s or office_settings(c, oid)
     if manual is not None:
         num = _text(manual, "number", 80)
@@ -1024,6 +1038,9 @@ def odoc_list():
     if st in STATUSES + ("issued", "paid", "cancelled") and st not in ("partial", "overdue"):
         sql += " AND status=?"
         args.append(st)
+    if request.args.get("trial") in ("0", "1"):  # 2.144.10 A (#2576): only trial / only real documents
+        sql += " AND trial=?"
+        args.append(int(request.args["trial"]))
     q = (request.args.get("q") or "").strip()
     if q:
         like = f"%{like_escape(q)}%"
@@ -1042,6 +1059,10 @@ def odoc_list():
             for b, r in zip(rows, raw):
                 b["can_delete"] = r["id"] not in used
                 b["delete_sent"] = b["can_delete"] and (r["status"] != "draft" or bool(r["sent_at"]) or r["id"] in sent)
+    for b in rows:  # 2.144.10 A (#2576): an admin deletes a trial document at any time
+        if b["trial"]:
+            b["can_delete"] = role == "admin"
+            b.pop("delete_sent", None)
     if kind in ("invoice", "reminder"):  # 2.40.0 (#1368 points 8 + 9): open reminder fees, settled reminders ("done")
         from .invoices import fd_reminder_extra
         fd_reminder_extra(c, oid, rows)
@@ -1049,12 +1070,21 @@ def odoc_list():
     dun = dun_list_extra(c, oid, kind, rows)  # 2.147.1 B (#2054): suggested reminder drafts (count + mark)
     if st in ("partial", "overdue"):  # derived states: filtered after the fact
         rows = [x for x in rows if x["state"] == st]
-    return jsonify(docs=rows, role=role, org_id=oid, **({"dunning": dun} if dun else {}))
+    return jsonify(docs=rows, role=role, org_id=oid, **trial_summary(c, oid), **({"dunning": dun} if dun else {}))
+
+
+def trial_summary(c, oid):
+    """2.144.10 A (#2576): trial_count (trial documents + trial documents from templates of the area), first (true = the
+    area has no real quotation / invoice yet: the dialog shows the "try it first" hint) and office_id (the hint's key)."""
+    n = c.execute("SELECT (SELECT COUNT(*) FROM office_docs WHERE org_id=? AND trial=1) + "
+                  "(SELECT COUNT(*) FROM office_gen_docs WHERE org_id=? AND trial=1) AS n", (oid, oid)).fetchone()["n"]
+    real = {r["kind"] for r in c.execute("SELECT DISTINCT kind FROM office_docs WHERE org_id=? AND trial=0 AND kind IN ('offer', 'invoice')", (oid,))}
+    return {"trial_count": int(n or 0), "first": {"offer": "offer" not in real, "invoice": "invoice" not in real}, "office_id": oid}
 
 
 @app.post("/api/office/docs")
 def odoc_create():
-    """{kind?: offer, lang?, client_id?, contract_id?, project_title?, recipient?, items?: [...]} -> 201 the document (number
+    """{kind?: offer, lang?, client_id?, contract_id?, project_title?, recipient?, items?: [...], trial?} -> 201 the document (number
     reserved, unless the organisation numbers quotations when they are finalised)."""
     c, uid, oid = _ctx()
     office_seed_texts(c, oid)
@@ -1154,7 +1184,7 @@ def odoc_number(did):
     ofx_need_editable(r)
     b = body()
     b = b if isinstance(b, dict) else {}
-    if "number" not in b and ofx_number_at_finalize(office_settings(c, oid), r["kind"]):
+    if "number" not in b and not r["trial"] and ofx_number_at_finalize(office_settings(c, oid), r["kind"]):
         raise Denied(409, tr("the number comes only when the invoice is finalised; the series has no gaps"))
     reason = _text(b.get("reason"), "reason", 300)
     num = _assign_number(c, oid, did, manual=b.get("number") if "number" in b else None, reason=reason)
@@ -1250,8 +1280,8 @@ def odoc_duplicate(did):
     if r["kind"] == "offer":  # 2.47.0 (#1215): the parts with their positions
         from .parts import tp_duplicate
         tp_duplicate(c, oid, did, nid)
-    if not ofx_number_at_finalize(s, r["kind"]) and onc_ready(s, doc_row(c, oid, nid)):  # 2.118.0 A (#2265): onc_ready
-        _assign_number(c, oid, nid, s)
+    if r["trial"] or not ofx_number_at_finalize(s, r["kind"]) and onc_ready(s, doc_row(c, oid, nid)):  # 2.118.0 A (#2265): onc_ready
+        _assign_number(c, oid, nid, s)  # 2.144.10 A (#2576): a copy of a trial document stays one (TEST number)
     recalc(c, oid, nid)
     n = doc_row(c, oid, nid)
     ofx_log(c, oid, "duplicate", doc_id=nid, detail={"from_id": did, "from_number": r["number"], "number": n["number"]})
@@ -1335,6 +1365,12 @@ def odoc_delete(did):
     r = doc_row(c, oid, did)
     if office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this organisation can do this"))
+    if r["trial"]:  # 2.144.10 A (#2576): a trial document goes at any time, independent of OFFER_DELETE_TESTPHASE
+        paths = trial_drop_doc(c, oid, r)
+        bump(c)
+        c.commit()
+        trial_drop_files(paths)
+        return jsonify(ok=True)
     locked = ofx_locked(r)
     test = OFFER_DELETE_TESTPHASE and r["kind"] == "offer"  # 2.144.8 (#2573): the same rule as can_delete
     if locked or test:
@@ -1353,6 +1389,79 @@ def odoc_delete(did):
     bump(c)
     c.commit()
     return jsonify(ok=True)
+
+
+# 2.144.10 A (#2576): deleting trial documents. Follow-ups stay (they are trial documents themselves), their reference is
+# emptied; payments, items, parts and signoff links go with the row (ON DELETE CASCADE); the stored PDF / XML files and a
+# document's filed PDFs in the documents space are removed after the commit. The office log keeps a "delete" entry.
+def trial_drop_doc(c, oid, r):
+    """Deletes trial document r (the caller holds the locks, checked the role and commits) -> the file paths to remove."""
+    import glob
+    from ..core.config import OFFICE_DIR
+    did = r["id"]
+    for col in ("source_doc_id", "cancels_id", "version_of"):
+        c.execute(f"UPDATE office_docs SET {col}=NULL WHERE org_id=? AND {col}=?", (oid, did))
+    ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net"),
+                                                  "kind": r["kind"], "trial": True, **({"locked": True} if ofx_locked(r) else {})})
+    c.execute("DELETE FROM office_docs WHERE id=? AND org_id=? AND trial=1", (did, oid))
+    return glob.glob(os.path.join(OFFICE_DIR, str(int(oid)), f"doc{int(did)}-*"))
+
+
+def trial_drop_gen_doc(c, oid, g_):
+    """Deletes trial document-from-template g_ with its filed PDFs (files/store.py fs_purge) -> (ids, paths) of the files."""
+    from ..files.store import fs_purge
+    ids, paths = [], []
+    for nid in {g_["node_id"], g_["signed_node_id"]} - {None}:
+        if c.execute("SELECT 1 FROM fs_nodes WHERE id=?", (nid,)).fetchone():
+            i, p = fs_purge(c, nid)
+            ids += i
+            paths += p
+    ofx_log(c, oid, "gen_doc_delete", target="gen_doc", detail={"gen_doc": g_["id"], "status": g_["status"], "trial": True})
+    c.execute("DELETE FROM office_gen_docs WHERE id=? AND org_id=? AND trial=1", (g_["id"], oid))
+    return ids, paths
+
+
+def trial_drop_files(paths, fs=None):
+    """The files of deleted trial documents, after the commit (a failed commit keeps rows and files)."""
+    for p in paths:
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+    if fs:
+        from ..files.store import fs_purge_files
+        fs_purge_files(*fs)
+
+
+@app.post("/api/office/trial/delete-all")
+def otrial_delete_all():
+    """2.144.10 A (#2576): deletes every trial document and trial document-from-template of the area (admin; a person
+    without an organisation is their own admin; members 403) -> {ok, docs, gen_docs}. The TEST series starts again."""
+    c, uid, oid = _ctx()
+    if office_role(c, uid, oid) != "admin":
+        raise Denied(403, tr("Only an admin of this organisation can do this"))
+    write_lock(c, f"office_mail_{int(oid)}")  # the same locks as odoc_delete
+    write_lock(c, f"office_num_{int(oid)}")
+    gens = c.execute("SELECT id, status, node_id, signed_node_id FROM office_gen_docs WHERE org_id=? AND trial=1 ORDER BY id", (oid,)).fetchall()
+    fs_ids, fs_paths = [], []
+    for g_ in gens:
+        write_lock(c, f"office_gen_doc_{int(g_['id'])}")
+        for sg in c.execute("SELECT id FROM office_signoffs WHERE gen_doc_id=? AND org_id=? AND state='open' ORDER BY id", (g_["id"], oid)).fetchall():
+            write_lock(c, f"office_signoff_{int(sg['id'])}")  # as dt_doc_delete: deleting and signing never cross
+        i, p = trial_drop_gen_doc(c, oid, g_)
+        fs_ids += i
+        fs_paths += p
+    docs = c.execute("SELECT * FROM office_docs WHERE org_id=? AND trial=1 ORDER BY id DESC", (oid,)).fetchall()
+    paths = []
+    for r in docs:
+        write_lock(c, f"office_doc_{int(r['id'])}")
+        paths += trial_drop_doc(c, oid, r)
+    if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND trial=1 LIMIT 1", (oid,)).fetchone():
+        c.execute("DELETE FROM office_numbers WHERE org_id=? AND kind='trial'", (oid,))  # TEST-001 again
+    bump(c)
+    c.commit()
+    trial_drop_files(paths, (fs_ids, fs_paths))
+    return jsonify(ok=True, docs=len(docs), gen_docs=len(gens))
 
 
 @app.get("/api/office/docs/<int:did>/render")

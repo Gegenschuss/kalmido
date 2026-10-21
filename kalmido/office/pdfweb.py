@@ -134,9 +134,9 @@ def _model(c, oid, did):
     if not model.get("locked"):  # 2.36.2: a finalised document prints the logo of its snapshot (set by odoc_render)
         lp = opdf_logo_path(oid)
         co["logo_path"] = lp if (office_settings(c, oid).get("logo") and os.path.isfile(lp)) else None
-        from .docs import doc_row
-        if epdf_is_draft(doc_row(c, oid, did)):
-            epdf_draft(model)  # 2.138.2 A (#2393): every kind that is not finalised (2.38.0: the invoice kinds only)
+    from .docs import doc_row
+    # 2.138.2 A (#2393): every kind that is not finalised (2.38.0: the invoice kinds only); 2.144.10 A (#2576): a trial one always
+    epdf_mark(doc_row(c, oid, did), model)
     model.pop("internal", None)  # never printed
     from .letterhead import bp_model
     return bp_model(c, oid, did, model)  # 2.120.0 E (#2091): the own letterhead (a finalised document: the one frozen with it)
@@ -149,11 +149,21 @@ def epdf_is_draft(r):
     return not ofx_locked(r) and (r["status"] or "draft") == "draft"
 
 
-def epdf_draft(model):
+def epdf_mark(r, model):
+    """2.144.10 A (#2576): the one mark of document row r's print model: SAMPLE / MUSTER for a trial document (finalised or
+    not; it wins over DRAFT), DRAFT / ENTWURF for a draft (epdf_is_draft), none otherwise. Idempotent."""
+    if r["trial"]:
+        return epdf_draft(model, tr("SAMPLE", lg=model.get("lang") or "de"))
+    if epdf_is_draft(r):
+        return epdf_draft(model)
+    return model
+
+
+def epdf_draft(model, word=None):
     """2.138.2 A (#2393): marks the print model of a document that is not finalised: DRAFT / ENTWURF (the document's
     language) in bold at the number of the key data and as the light diagonal mark on every page (pdf.py). Coupled to
     "not finalised" in _render, so no PDF of a draft (button, preview, download, mail, agents) goes out unmarked."""
-    word = tr("Draft", lg=model.get("lang") or "de").upper()
+    word = word or tr("Draft", lg=model.get("lang") or "de").upper()
     model["draft_mark"] = word
     meta = model.get("meta")
     if isinstance(meta, list) and meta and isinstance(meta[0], (list, tuple)) and len(meta[0]) >= 2:
@@ -177,10 +187,9 @@ def _render(c, oid, r, model=None):
     """(pdf bytes, xml bytes or None, format) of document row r from its print model (the snapshot when finalised)."""
     from .ledger import ofx_locked
     model = model or _model(c, oid, r["id"])
-    if epdf_is_draft(r):
-        epdf_draft(model)  # 2.138.2 A (#2393): never an unmarked draft, whichever model came in
+    epdf_mark(r, model)  # 2.138.2 A (#2393): never an unmarked draft, whichever model came in; 2.144.10 A (#2576): nor trial
     xml, fmt = None, ""
-    if r["kind"] in EPDF_KINDS_XML and ofx_locked(r) and office_feature(c, oid, "docs.einvoice"):  # 2.147.0 (#2459, #2460)
+    if r["kind"] in EPDF_KINDS_XML and ofx_locked(r) and not r["trial"] and office_feature(c, oid, "docs.einvoice"):  # 2.147.0 (#2459, #2460); 2.144.10 A (#2576): no e-invoice for a trial one
         fmt = epdf_format(c, oid, r)
         xml = ein_build(model, fmt)
     when = None
@@ -319,6 +328,8 @@ def opdf_doc_xml(did):
     r = doc_row(c, oid, did)
     if r["kind"] not in EPDF_KINDS_XML or not ofx_locked(r):
         raise Denied(409, tr("The e-invoice XML exists for finalised invoices and credit notes only."))
+    if r["trial"]:  # 2.144.10 A (#2576)
+        raise Denied(409, tr("A trial document has no e-invoice"))
     x = _stored_or_missing(c, oid, r, "xml")
     if not x:  # 2.147.0 (#2460): a stored XML stays reachable (it is part of the document); a new one only while e-invoices are on
         office_need_feature(c, oid, "docs.einvoice")

@@ -241,6 +241,14 @@ def clean_setting(k, v):
         if not isinstance(o, dict) or len(o) > 200 or not all(isinstance(a, str) and 0 < len(a) <= 80 and isinstance(b, str) and len(b) <= 40 for a, b in o.items()):
             raise bad
         return json.dumps(o, ensure_ascii=False)
+    if k == "trial_hint_seen":  # 2.144.10 (#2576): ["<org id>:offer" | "<org id>:invoice", ...]
+        try:
+            o = v if isinstance(v, list) else json.loads(sv or "[]")
+        except ValueError:
+            raise bad from None
+        if not isinstance(o, list) or len(o) > 200 or not all(isinstance(x, str) and re.fullmatch(r"\d{1,12}:(offer|invoice)", x) for x in o):
+            raise bad
+        return json.dumps(list(dict.fromkeys(o)))
     if k == "group_order":  # 2.39.1 (#1221)
         return kb_clean_group_order(v)
     if k in CAL_LIST_KEYS:  # 2.36.1 (#1127, #956): json lists (list ids / calendar keys "e:<id>" | "s:<id>")
