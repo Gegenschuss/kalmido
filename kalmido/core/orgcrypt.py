@@ -83,7 +83,7 @@ FIELDS = {
     "office_bank_tx": ("amount", "counterpart", "purpose", "iban"),  # 2.90.0 B (#1921): imported bank bookings
     "office_bank_balances": ("amount", "account"),  # 2.124.0 D (#2342): balances of the imported statements
     "office_doc_templates": ("body",), "office_gen_docs": ("body",),  # 2.93.0 A (#1927): document templates, documents
-    "office_vehicles": ("plate",), "office_drives": ("start_place", "dest", "purpose"),  # 2.93.0 B (#1928): the logbook
+    "office_vehicles": ("plate",), "office_drives": ("start_place", "dest", "purpose", "correct_note"),  # 2.93.0 B (#1928): the logbook; 2.152.0 C (#2169): + reason
     "office_drive_log": ("prev",),  # 2.93.0 B (#1928): the change log of the logbook
     "office_cash_entries": ("text",), "office_cash_log": ("prev",),  # 2.121.0 B (#2095): the cash book
     "office_deals": ("value", "contact", "note", "lost_reason",

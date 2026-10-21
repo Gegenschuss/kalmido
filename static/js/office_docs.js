@@ -237,7 +237,7 @@ function ofdFeeHtml(d, adm) {
 }
 function ofdPaymentsHtml(d, adm) {
   const ps = d.payments || [];
-  const list = ps.length ? `<ul class="ofdits ofdpays" role="list">${ps.map(p => `<li class="ofdit ofdpay"><span class="ofdpos muted">${ic('check', 's')}</span><span class="ofcn"><b>${esc(ofdMoney(p.amount, d))}</b><small class="muted">${esc([p.date ? fmtDateLoc(p.date) : '', tr(OFD_PAY.find(x => x[0] === p.method)?.[1] || p.method), p.note, p.created_by_name].filter(Boolean).join(' · '))}</small></span>${adm ? `<button type="button" class="ib" data-ofd="pay-del" data-pid="${p.id}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>` : ''}</li>`).join('')}</ul>` : `<p class="muted">${tr('No payments yet.')}</p>`;
+  const list = ps.length ? `<ul class="ofdits ofdpays" role="list">${ps.map(p => `<li class="ofdit ofdpay"><span class="ofdpos muted">${ic('check', 's')}</span><span class="ofcn"><b>${esc(ofdMoney(p.amount, d))}</b><small class="muted">${esc([p.reverses_id ? tr('Reversal') : p.reversed ? tr('Reversed') : '', p.date ? fmtDateLoc(p.date) : '', tr(OFD_PAY.find(x => x[0] === p.method)?.[1] || p.method), p.note, p.created_by_name].filter(Boolean).join(' · '))}</small></span>${adm && !p.reverses_id && !p.reversed ? `<button type="button" class="ib" data-ofd="pay-del" data-pid="${p.id}" aria-label="${esc(tr('Reverse payment'))}" title="${esc(tr('Reverse payment'))}">${ic('x', 's')}</button>` : ''}</li>`).join('')}</ul>` : `<p class="muted">${tr('No payments yet.')}</p>`;
   const sum = `<p class="ofdpaysum"><span>${tr('Paid: {0}', ofdMoney(d.paid || 0, d))}</span>${+d.credits ? `<span>${tr('Credited: {0}', ofdMoney(d.credits, d))}</span>` : ''}<b>${tr('Open: {0}', ofdMoney(d.open || 0, d))}</b></p>`;
   const cr = (d.credits_of || []).length ? `<p class="muted ofchint">${tr('Credit notes')}: ${d.credits_of.map(c => `<a href="#office/offers/${c.id}">${esc(c.number || tr('Draft'))}</a>`).join(', ')}</p>` : '';
   if (d.status === 'cancelled') return list + sum + cr;
@@ -358,7 +358,7 @@ async function kvaToInvoice(d) {
 const OFD_ACTIONS = {create: N_('created'), update: N_('changed'), items: N_('positions changed'), number: N_('number set'), status: N_('status changed'),
   finalize: N_('finalised'), unlock: N_('finalising undone'), duplicate: N_('created as a copy'), cashflow: N_('cash flow choice changed'), delete: N_('deleted'), open: N_('opened'), pdf: N_('PDF opened'), render: N_('preview opened'),
   export: N_('exported'), import: N_('imported'), archive: N_('archived'), upload: N_('uploaded'),
-  payment: N_('payment recorded'), payment_delete: N_('payment removed'), send: N_('sent by e-mail'), datev: N_('sent to the DATEV inbox'), undo: N_('import undone'), reminder_fee: N_('reminder fee waived / paid / open again'), recovery_key: N_('recovery key shown'),
+  payment: N_('payment recorded'), payment_delete: N_('payment reversed'), send: N_('sent by e-mail'), datev: N_('sent to the DATEV inbox'), undo: N_('import undone'), reminder_fee: N_('reminder fee waived / paid / open again'), recovery_key: N_('recovery key shown'),
   agent_read: N_('read (agent)'), agent_write: N_('drafted (agent)'), from_sheet: N_('created from a table'), restore: N_('restored|office log')};  // 2.113.2 (#2253): + restore  // 2.89.0 (#1916, D): + from_sheet  // 2.51.0 A (#1348)  // 2.42.0 (#828): + recovery_key  // 2.39.1 (#1182): + undo; 2.40.0 (#1368): + reminder_fee
 const ofdActText = a => tr(OFD_ACTIONS[a] || a);
 const ofdWhen = iso => { try { return new Date(iso).toLocaleString(LOCALE(), {dateStyle: 'short', timeStyle: 'short'}); } catch { return iso || ''; } };
@@ -548,9 +548,11 @@ async function ofdClick(e) {
     try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/credit`); OFD.list = null; OFD.kind = 'credit'; OFD.doc = j; go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } return;
   }
   if (a === 'pay') { ofdPaymentDialog(d); return; }
-  if (a === 'pay-del') {
-    if (!await askConfirm(tr('Remove this payment?'), '', {ok: tr('Remove'), danger: true})) return;
-    const j = await ofdSave('DELETE', `/api/office/docs/${d.id}/payments/${b.dataset.pid}`); if (j) toast(tr('Removed')); return;
+  if (a === 'pay-del') {  // 2.152.0 C (#2168): a payment is reversed by a second line (both stay visible), never deleted
+    ofdDlg(tr('Reverse payment'), `<p class="muted">${esc(tr('A reversal line with the negative amount is booked; the payment stays visible. This keeps the books traceable.'))}</p>`
+      + ofdF('p-rnote', tr('Reason (optional)'), `<input id="ofd-p-rnote" maxlength="500">`),
+      tr('Reverse payment'), async md => { const j = await ofdSave('DELETE', `/api/office/docs/${d.id}/payments/${b.dataset.pid}`, {note: $('#ofd-p-rnote', md).value}); if (!j) return false; toast(tr('Payment reversed')); });
+    return;
   }
   if (a === 'send') { ofdSendDialog(d); return; }
   if (a === 'ln-x') { OFD.langNotes = null; ofdDraw(); return; }

@@ -276,7 +276,14 @@ def acx_token_bind(uid):
 def acx_anon_bind(c, org_id):
     """2.37.0 (#1150): a public path (list link, form, error-report / git hook) resolved its token as "system" and now
     reads as "anon" bound to exactly the organisation of what the token opens (None: a private object, no organisation).
-    Applies to the running transaction at once and to every later one of this request."""
+    Applies to the running transaction at once and to every later one of this request.
+    2.152.0 (#2167): a retired organisation (kept by law only) opens no public link any more: 404."""
+    if org_id:
+        from ..core.pg import system_ctx as _sys
+        with _sys(c):  # instance structure: is the organisation retired?
+            r = c.execute("SELECT retired_at FROM orgs WHERE id=?", (int(org_id),)).fetchone()
+        if r and r[0]:
+            raise Denied(404)
     g.acx_anon_orgs = (int(org_id),) if org_id else ()
     g.pop("acx", None)  # the next statement on c runs with it (core/pg.py asks acx_conn_hook)
 

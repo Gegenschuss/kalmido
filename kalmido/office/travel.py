@@ -25,6 +25,7 @@ from ..personal.timetrack import BadInput
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, office_settings
 from .ledger import ofx_items_brief, ofx_log, ofx_need_editable
+from .olock import olk_need_trip_items
 from .vma import vma_trip
 
 RK_CATS = (("car", N_("Car / fuel")), ("train", N_("Train")), ("flight", N_("Flight")), ("rental_car", N_("Rental car")),
@@ -446,6 +447,8 @@ def rk_trip_delete(tid):
     """Deletes a trip with its receipts; answers the trip as it was (the client's undo posts it again)."""
     c, uid, oid = _ctx()
     _trip(c, oid, tid)
+    # 2.152.0 C (#2168): receipts in DATEV / billed on a finalised document are kept by law -> the trip stays (409)
+    olk_need_trip_items(c, oid, c.execute("SELECT * FROM office_trip_items WHERE trip_id=? AND org_id=?", (tid, oid)).fetchall())
     old = _one(c, oid, tid)
     c.execute("DELETE FROM office_trips WHERE id=? AND org_id=?", (tid, oid))
     bump(c)
@@ -501,6 +504,7 @@ def rk_item_delete(tid, iid):
     """Deletes a receipt; answers the trip and the receipt as it was (for the undo)."""
     c, uid, oid = _ctx()
     r = _item(c, oid, tid, iid)
+    olk_need_trip_items(c, oid, [r])  # 2.152.0 C (#2168): in DATEV / billed on a finalised document -> 409
     old = _item_public(c, oid, r, _docs_map(c, oid))
     c.execute("DELETE FROM office_trip_items WHERE id=? AND org_id=?", (iid, oid))
     bump(c)

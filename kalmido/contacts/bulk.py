@@ -272,6 +272,8 @@ def op_contacts_bulk(c, uid, b):
         try:
             for blk in bk_blocks(ids):
                 bk_occ_drop(c, uid, blk)
+                from ..newsletter.sync import nls_keep  # 2.152.0 D (#2170): an unsubscription outlives the contact
+                nls_keep(c, blk)
                 c.execute(f"DELETE FROM contacts WHERE id IN ({bk_in(blk)})", blk)
                 for bid in sorted({rows[i]["book_id"] for i in blk}):
                     book_touch(c, bid)

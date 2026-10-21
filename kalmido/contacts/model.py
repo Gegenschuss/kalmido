@@ -175,7 +175,7 @@ def obk_can_take(c, uid, oid):
     """May person uid hand an address book over to organisation oid? Only its admins; never a personal office."""
     from ..core.pg import system_ctx
     with system_ctx(c):  # the organisation row itself (a personal office is a hidden orgs row)
-        real = c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (oid,)).fetchone()
+        real = c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL AND retired_at IS NULL", (oid,)).fetchone()
     return bool(real) and obk_org_role(c, uid, oid, "none") == "owner"
 
 

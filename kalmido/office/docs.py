@@ -1182,7 +1182,8 @@ def odoc_set_status(c, oid, did, st, uid, r=None):
         ok = ofx_locked(r) and r["status"] != "cancelled" and st in ("sent", "paid") and (st != "paid" or r["kind"] == "invoice")
         if not ok:
             raise Denied(409, tr("This status change is not allowed ({0} to {1})", r["status"], st))
-        if r["status"] == "paid" and c.execute("SELECT 1 FROM office_payments WHERE org_id=? AND doc_id=? LIMIT 1", (oid, did)).fetchone():
+        # 2.152.0 C (#2168): reversed payments stay as two lines -> what counts is their sum
+        if r["status"] == "paid" and c.execute("SELECT COALESCE(SUM(amount), 0) FROM office_payments WHERE org_id=? AND doc_id=?", (oid, did)).fetchone()[0]:
             raise Denied(409, tr("Payments are recorded on this invoice; remove them first"))  # 2.38.0 review
     c.execute("UPDATE office_docs SET status=?, updated_at=?, sent_at=COALESCE(sent_at, ?) WHERE id=? AND org_id=?",
               (st, ts, ts if st in ("sent", "accepted", "declined") else None, did, oid))

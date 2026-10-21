@@ -243,3 +243,11 @@ def admin_health():
     """Admins of the server: capacity numbers (pool, threads, connections, role, background loops). No user data."""
     need_admin()
     return jsonify(wrk_health(db()))
+
+
+@app.get("/api/admin/retention")
+def admin_retention():
+    """2.152.0 (#2165): admins of the server: the retention runs (switch, period, last result in numbers). No user data."""
+    need_admin()
+    from ..core.retention import ret_status
+    return jsonify(ret_status(db()))

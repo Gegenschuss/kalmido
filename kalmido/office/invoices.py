@@ -1012,16 +1012,19 @@ def inv_reminder_post():
     return _answer(c, oid, uid, nid, 201)
 
 
-def _payment_public(c, r):
+def _payment_public(c, r, reversed_ids=()):
     d = dict(r)
     d["amount"] = dstr(d.get("amount") or 0)
+    d["reversed"] = r["id"] in reversed_ids  # 2.152.0 C (#2168): a reversal line points to its payment (reverses_id)
     u = c.execute("SELECT display_name, username FROM users WHERE id=?", (r["created_by"],)).fetchone() if r["created_by"] else None
     d["created_by_name"] = (u["display_name"] or u["username"]) if u else ""
     return d
 
 
 def inv_payments(c, oid, did):
-    return [_payment_public(c, r) for r in c.execute("SELECT * FROM office_payments WHERE org_id=? AND doc_id=? ORDER BY date, id", (oid, did))]
+    rows = c.execute("SELECT * FROM office_payments WHERE org_id=? AND doc_id=? ORDER BY date, id", (oid, did)).fetchall()
+    rev = {r["reverses_id"] for r in rows if r["reverses_id"] is not None}
+    return [_payment_public(c, r, rev) for r in rows]
 
 
 @app.get("/api/office/docs/<int:did>/payments")
@@ -1079,28 +1082,46 @@ def inv_pay_add(c, oid, uid, did, b):
 
 @app.delete("/api/office/docs/<int:did>/payments/<int:pid>")
 def inv_payment_delete(did, pid):
-    """The organisation's admin removes a payment (a wrong entry); the state follows."""
+    """The organisation's admin takes back a payment (a wrong entry); the state follows. 2.152.0 C (#2168): never deleted:
+    a reversal line (the negative amount, reverses_id = the payment) is booked, both stay visible; optional body {note}."""
     from .docs import doc_row
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
     if office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this organisation can do this"))
-    inv_pay_del(c, oid, did, pid)
+    b = body()
+    note = b.get("note") if isinstance(b, dict) and isinstance(b.get("note"), str) else ""
+    inv_pay_del(c, oid, did, pid, note=note, uid=uid)
     bump(c)
     c.commit()
     return _answer(c, oid, uid, did)
 
 
-def inv_pay_del(c, oid, did, pid):
-    """2.90.0 B (#1921): removes payment pid of invoice did (404 when not there) and refreshes the state; also used by the
-    bank reconciliation's undo."""
+def olk_pay_reverse(c, oid, did, p, note="", uid=None):
+    """2.152.0 C (#2168): payments sit on finalised invoices only (books, GoBD): a wrong one is reversed, never deleted -- a
+    second line with the negative amount on the day of the correction, reverses_id = the payment, the reason in its note.
+    The balance (SUM of the amounts) is right again; both lines stay in the list, the books and the DATEV export. 409 for a
+    reversal line or a payment already reversed. Returns the id of the reversal line."""
+    if p["reverses_id"] is not None:
+        raise Denied(409, tr("A reversal cannot be reversed"))
+    if c.execute("SELECT 1 FROM office_payments WHERE org_id=? AND reverses_id=? LIMIT 1", (oid, p["id"])).fetchone():
+        raise Denied(409, tr("This payment has already been reversed"))
+    d = local_now().date().isoformat()
+    return insert_id(c, "INSERT INTO office_payments(org_id, doc_id, date, amount, method, note, created_by, created_at, reverses_id) "
+                        "VALUES(?,?,?,?,?,?,?,?,?)", (oid, did, max(d, p["date"] or d), -float(money(dec(p["amount"]))), p["method"],
+                                                      (note or "").strip()[:500], uid, iso(now_utc()), p["id"]))
+
+
+def inv_pay_del(c, oid, did, pid, note="", uid=None):
+    """2.90.0 B (#1921): takes back payment pid of invoice did (404 when not there) and refreshes the state; also used by the
+    bank reconciliation's undo. 2.152.0 C (#2168): as a reversal line (olk_pay_reverse), the payment row stays."""
     write_lock(c, f"office_pay_{did}")
     p = c.execute("SELECT * FROM office_payments WHERE id=? AND doc_id=? AND org_id=?", (pid, did, oid)).fetchone()
     if p is None:
         raise Denied(404)
-    c.execute("DELETE FROM office_payments WHERE id=? AND org_id=?", (pid, oid))
+    rid = olk_pay_reverse(c, oid, did, p, note=note, uid=uid)
     inv_refresh_paid(c, oid, did)
-    ofx_log(c, oid, "payment_delete", doc_id=did, detail={"id": pid, "date": p["date"], "amount": dstr(p["amount"])})
+    ofx_log(c, oid, "payment_delete", doc_id=did, detail={"id": pid, "date": p["date"], "amount": dstr(p["amount"]), "reversal_id": rid})
     # a bank booking matched by this payment is open again
     c.execute("UPDATE office_bank_tx SET match_kind=NULL, match_id=NULL, payment_id=NULL, matched_by=NULL, matched_at=NULL "
               "WHERE org_id=? AND payment_id=?", (oid, pid))

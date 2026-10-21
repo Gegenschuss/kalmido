@@ -396,6 +396,8 @@ def abdav(m, c, u, p):
         from ..core.db import bump
         from ..contacts.bulk import bk_occ_drop  # 2.58.0 (#1656): its birthday / anniversary tasks go as in the app
         bk_occ_drop(c, u["id"], [have[0]["id"]])
+        from ..newsletter.sync import nls_keep  # 2.152.0 D (#2170): an unsubscription outlives the contact
+        nls_keep(c, [have[0]["id"]])
         c.execute("DELETE FROM contacts WHERE id=?", (have[0]["id"],))
         book_touch(c, book["id"])
         bump(c)

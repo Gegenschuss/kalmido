@@ -15,33 +15,8 @@ from datetime import timedelta
 
 from ..core.db import bump, iso, now_utc
 from ..core.serializers import unlink_files
+from ..core.retention import ret_days, ret_on, ret_report  # 2.152.0: core/retention.py is here (its fallback went)
 from .tasks import hard_delete
-
-try:
-    from ..core.retention import ret_days, ret_on, ret_report
-except ImportError:  # 2.116.0 A (#2063): until 2.103.0 is merged -- same env names, same safe default (off = count only)
-    import os
-
-    def ret_days(kind):
-        raw = os.environ.get("KALMIDO_TRASH_DAYS", "").strip()
-        try:
-            return max(0, int(raw)) if raw else 30
-        except ValueError:
-            return 30
-
-    def ret_on(kind):
-        one = os.environ.get(f"KALMIDO_PURGE_{kind.upper()}", "").strip().lower()
-        if one in ("1", "on", "true", "yes"):
-            return True
-        if one in ("0", "off", "false", "no"):
-            return False
-        return os.environ.get("KALMIDO_RETENTION_PURGE", "").strip().lower() in ("1", "on", "true", "yes")
-
-    def ret_report(c, kind, counts, purged, run=None):
-        counts = {k: int(v) for k, v in (counts or {}).items() if v}
-        if counts:
-            print(f"retention: {kind}{'/' + run if run else ''} {'deleted' if purged else 'would delete (dry run)'}: "
-                  + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())), flush=True)
 
 TTP_TICK = {"at": 0.0}
 TTP_BATCH = 500  # tasks per run; the rest follows in the next hour

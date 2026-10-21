@@ -43,7 +43,7 @@ import zipfile
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from flask import jsonify, send_file
+from flask import g, jsonify, send_file
 
 from ..core.config import app, APP_VERSION, ATT_DIR, DB, OFFICE_DIR
 from ..core.db import connect, db, err, iso, now_utc
@@ -662,7 +662,10 @@ def ox_cleanup(c=None, force=False):
 # ---------------------------------------------------------------- routes (people only: /api/orgs is APP_ONLY, agents 403)
 def _need(c, oid, own=False):
     from ..accounts.orgs import _need_org_admin
-    if not own:  # 2.137.0 A (#2344): own = the person's own personal office, reached as organisation 0 (_ox_area)
+    from ..accounts.orgretain import odl_retired
+    from ..agents.core import is_agent
+    # 2.137.0 A (#2344): own = the person's own personal office, reached as organisation 0 (_ox_area)
+    if not own and not (g.user["is_admin"] and not is_agent(g.user) and odl_retired(c, oid) is not None):  # 2.152.0 A (#2167): a retired one: the instance admins
         _need_org_admin(c, oid)
     from ..core.orgcrypt import oc_enabled
     return oc_enabled()

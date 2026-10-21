@@ -1202,5 +1202,6 @@ document.addEventListener('click', e => {
     {label: tr('Copy'), icon: 'copy', fn: () => chatCopy(S.chat.msgs, m, 'agent')},  // 2.37.0 (#1165)
     {label: tr('Copy as Markdown'), icon: 'copy', fn: () => chatCopy(S.chat.msgs, m, 'agent', true)},  // 2.41.0 (#1374)
     {label: m.saved_task_id ? tr('Saved as a task: open it') : tr('Save as task'), icon: 'bookmark', fn: () => m.saved_task_id ? chatSaveOpen(m.saved_task_id) : chatSaveModal('agent', m, () => chatPatch())},
-    m.from !== 'agent' && ag?.enabled ? {label: tr('Edit'), icon: 'edit', fn: () => chatEditStart(m.id)} : null]);  // 2.39.0 (#1179): my own messages
+    m.from !== 'agent' && ag?.enabled ? {label: tr('Edit'), icon: 'edit', fn: () => chatEditStart(m.id)} : null,  // 2.39.0 (#1179): my own messages
+    {label: tr('Delete message'), icon: 'trash', fn: () => acdDeleteMsg(m.id)}]);  // 2.152.0 D (#2175)
 });

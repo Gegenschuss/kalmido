@@ -27,7 +27,7 @@ import re
 import unicodedata
 import zipfile
 import zlib
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from xml.etree import ElementTree as ET
 
@@ -36,7 +36,7 @@ from flask import jsonify, request
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
-from ..core.db import body, bump, db, iso, now_utc
+from ..core.db import body, bump, db, iso, now_utc, parse_iso
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .model import (MD, pb_cl_org, pb_cl_sql, office_create, office_gate, office_in_use, office_number_format, office_org, office_role, office_rows, office_scheme_period,
@@ -1174,6 +1174,28 @@ def _client_used(c, oid, cid, rid):
                 or c.execute("SELECT 1 FROM office_archive WHERE client_id=? AND org_id=? AND (run_id IS NULL OR run_id!=?) LIMIT 1", (cid, oid, rid)).fetchone())
 
 
+OLK_UNDO_HOURS = 24
+OLK_UNDO_LATE = N_("Old invoices can only be taken out again within 24 hours of their import.")
+OLK_UNDO_TOUCHED = N_("Old invoices of this import were edited or marked as paid since: the import can no longer be undone.")
+
+
+def olk_undo_check(c, oid, r):
+    """2.152.0 C (#2168): the undo of an import that brought old invoices (office_archive) removes records that may already
+    be part of the books: only within OLK_UNDO_HOURS of the import and while none of them was edited or marked paid (every
+    change of an entry lands in office_archive_log). Else 409 with the reason and nothing of the run is removed."""
+    if not c.execute("SELECT 1 FROM office_archive WHERE org_id=? AND run_id=? LIMIT 1", (oid, r["id"])).fetchone():
+        return
+    try:
+        at = parse_iso(r["created_at"])
+    except (TypeError, ValueError):
+        at = None
+    if at is None or now_utc() - at > timedelta(hours=OLK_UNDO_HOURS):
+        raise Denied(409, tr(OLK_UNDO_LATE))
+    if c.execute("""SELECT 1 FROM office_archive_log l JOIN office_archive a ON a.id=l.archive_id
+                    WHERE a.org_id=? AND a.run_id=? LIMIT 1""", (oid, r["id"])).fetchone():
+        raise Denied(409, tr(OLK_UNDO_TOUCHED))
+
+
 def fi_undo(c, oid, uid, rid, kinds=None):
     """Undoes run rid: removes its records nothing builds on; -> {removed: {...}, kept: {...}}. 409 when already undone.
     2.46.1 (#1557): kinds = only these areas of a data import (clients | services | equipment); the whole undo later
@@ -1191,6 +1213,8 @@ def fi_undo(c, oid, uid, rid, kinds=None):
         if any(k in undone for k in kinds):
             raise Denied(409, tr("This part of the import has already been undone"))
     todo = [k for k in (kinds or FI_AREAS) if k not in undone]
+    if kinds is None:
+        olk_undo_check(c, oid, r)  # 2.152.0 C (#2168): old invoices of the run are records: 24 h and untouched only
     removed = {"clients": 0, "services": 0, "equipment": 0, "archive": 0, "merged": 0, "contacts": 0, "filled": 0, "roles": 0, "crew": 0}
     kept = {"clients": 0, "services": 0, "equipment": 0, "roles": 0, "crew": 0}
     kept_ids = set()

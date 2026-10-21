@@ -368,7 +368,7 @@ def hosting_settings(c, b):
         # 2.46.0 (#1592): renames the instance's only organisation (several: the organisation dialog)
         from ..core.pg import system_ctx
         with system_ctx(c):  # 2.46.0 (#1592, review fix): every organisation counts, not only the admin's own
-            n_orgs = c.execute("SELECT COUNT(*) FROM orgs WHERE personal_of IS NULL").fetchone()[0]  # 2.47.3 (#1360)
+            n_orgs = c.execute("SELECT COUNT(*) FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL").fetchone()[0]  # 2.47.3 (#1360)
         if not nm or instance_mode(c) == "shared" or ORG_NAME_ENV or not main_org(c) or n_orgs != 1:
             return err(tr("Invalid value: {0}", "org_name"))
         c.execute("UPDATE orgs SET name=? WHERE id=?", (nm, main_org(c)))

@@ -127,7 +127,7 @@ def clean_client(c, uid, b, new=False):
             u = _user(c, uid)
             from ..accounts.orgs import user_orgs
             mine = set(user_orgs(c, uid))
-            if v is not None and not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (v,)).fetchone():  # 2.47.3 (#1360)
+            if v is not None and not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL AND retired_at IS NULL", (v,)).fetchone():  # 2.47.3 (#1360)
                 raise BadInput(tr("Invalid value: {0}", k))
             if v is not None and v in mine:
                 from ..accounts.orgroles import need_org_write
@@ -370,6 +370,13 @@ def client_delete(cid):
     r = need_client(c, cid, uid)
     if not (g.user["is_admin"] or r["created_by"] == uid):
         return err(tr("Only the person who created the client or an admin can delete it"), 403)
+    from .clients_bulk import ms_client_in_use
+    if ms_client_in_use(c, cid):  # 2.152.0 C (#2168): documents / contracts keep their client (records) -> archived, like the bulk delete
+        if not r["archived"]:
+            c.execute("UPDATE clients SET archived=1, updated_at=? WHERE id=?", (iso(now_utc()), cid))
+            bump(c)
+            c.commit()
+        return jsonify(ok=True, archived=True, message=tr("The client is used in quotations, invoices or contracts and was archived instead of deleted."))
     c.execute("UPDATE lists SET client_id=NULL WHERE client_id=?", (cid,))
     c.execute("DELETE FROM clients WHERE id=?", (cid,))
     bump(c)

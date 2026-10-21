@@ -42,7 +42,7 @@ def om_has_orgs(c):
     if instance_mode(c) == "shared":
         return False
     with system_ctx(c):  # instance structure, also before a login
-        return bool(c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL LIMIT 1").fetchone())  # 2.47.3 (#1360)
+        return bool(c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL LIMIT 1").fetchone())  # 2.47.3 (#1360)
 
 
 def signup_mode(c):
@@ -69,7 +69,7 @@ def org_for_email(c, email):
     dom = email.rsplit("@", 1)[-1].lower()
     from ..core.pg import system_ctx
     with system_ctx(c):  # 2.37.0 (#1150): before a login: which organisation an address belongs to (instance structure)
-        rows = c.execute("SELECT id, domains FROM orgs WHERE personal_of IS NULL ORDER BY id").fetchall()
+        rows = c.execute("SELECT id, domains FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL ORDER BY id").fetchall()
     for r in rows:
         if dom in _domains(r["domains"]):
             return r["id"]

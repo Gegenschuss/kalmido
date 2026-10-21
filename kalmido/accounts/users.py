@@ -21,7 +21,7 @@ from ..accounts.pictures import (
 )
 from ..accounts.login import session_via, twofa_clear, twofa_methods
 from ..core.access import collab_all, Denied, list_role, need_list, vis_sql
-from ..core.serializers import attachment_files, unlink_files
+from ..core.serializers import unlink_files
 from ..personal.timetrack import BadInput
 
 
@@ -159,7 +159,7 @@ def om_orgs_arg(c, b):
         out[oid] = role
     with system_ctx(c):  # the instance admin: which organisations exist (structure)
         for oid in out:
-            if not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (oid,)).fetchone():  # 2.47.3 (#1360)
+            if not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL AND retired_at IS NULL", (oid,)).fetchone():  # 2.47.3 (#1360)
                 return tr("Unknown organisation")
     return sorted(out.items())
 
@@ -266,7 +266,7 @@ def user_update(uid):
                 org_leave(c, o, uid, heir if heir != uid else me())
             for o in b["orgs"]:
                 if o not in have:
-                    if c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (o,)).fetchone():
+                    if c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL AND retired_at IS NULL", (o,)).fetchone():
                         org_member_add(c, o, uid)
     if uid == me() and (("is_admin" in b and not b["is_admin"]) or b.get("disabled") or b.get("kind") == "agent"):
         return err(tr("You cannot remove your own admin rights or disable yourself"))
@@ -399,8 +399,7 @@ def user_delete(uid):
     files = user_purge(c, uid)
     bump(c)
     c.commit()
-    unlink_files(files)
-    avatar_drop_file(uid, u["avatar"])
+    unlink_files(files)  # 2.152.0 (#2164): with the photo (user_purge)
     if icons or lfiles:
         from ..lists.projects import list_files_drop
         for lid, icon in icons:
@@ -414,15 +413,18 @@ def user_delete(uid):
 
 
 def user_purge(c, uid):
-    """Deletes user uid (no own lists besides the inbox left; the caller checked and commits). Returns the files to unlink."""
-    inbox = [r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=?", (uid,))]
-    files = attachment_files(c, [r[0] for r in c.execute(
-        f"SELECT id FROM tasks WHERE list_id IN ({','.join('?' * len(inbox)) or 'NULL'})", inbox)])
-    for lid in inbox:
-        c.execute("DELETE FROM lists WHERE id=?", (lid,))
+    """Deletes user uid (no own lists besides the inbox left; the caller checked and commits). Returns the files to unlink
+    (2.152.0 A: and clean-ups to run after the commit, see serializers.unlink_files)."""
+    from ..accounts.orgretain import upg_personal, upg_rest
+    from ..admin.backup import bkr_journal
+    bkr_journal(c, uid)  # 2.152.0 B (#2172): the journal of deleted accounts (a restore deletes them again)
+    # 2.152.0 A (#2164): the personal office is dismantled with its files, or retired when it keeps invoices / receipts by
+    # law; agents, organisation calendars, time of organisation projects, direct messages, mentions, logs, the inbox
+    files = upg_personal(c, uid)
+    files += upg_rest(c, uid)
     c.execute("DELETE FROM habits WHERE user_id=?", (uid,))
     c.execute("DELETE FROM pomos WHERE user_id=?", (uid,))
-    c.execute("DELETE FROM time_entries WHERE user_id=?", (uid,))
+    c.execute("DELETE FROM time_entries WHERE user_id=?", (uid,))  # 2.152.0 A: the private ones (organisation time stays, upg_rest)
     c.execute("DELETE FROM filters WHERE user_id=?", (uid,))
     c.execute("DELETE FROM task_tags WHERE user_id=?", (uid,))
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=?", (uid,))
@@ -456,6 +458,9 @@ def user_purge(c, uid):
     files += shk_user_files(c, uid)  # 2.124.0 B (#2110): the files of its private tables' file cells
     from ..wiki.wikie2e import wke_user_purge
     wke_user_purge(c, uid)  # 2.64.3 A (#1817): knowledge spaces with the lock whose key the person held: rotation pending
+    av = (c.execute("SELECT avatar FROM users WHERE id=?", (uid,)).fetchone() or [None])[0]
+    if av:  # 2.152.0 (#2164): the own photo goes after the commit for every caller (also the re-delete after a restore)
+        files.append(lambda: avatar_drop_file(uid, av))
     c.execute("DELETE FROM users WHERE id=?", (uid,))  # cascades: settings, memberships, sessions
     return files
 

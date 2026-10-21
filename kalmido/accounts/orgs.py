@@ -79,7 +79,7 @@ def instance_mode(c=None):
 
 def main_org(c):
     with system_ctx(c):  # 2.37.0 (#1150): instance structure (the first organisation's id)
-        r = c.execute("SELECT id FROM orgs WHERE personal_of IS NULL ORDER BY id LIMIT 1").fetchone()
+        r = c.execute("SELECT id FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL ORDER BY id LIMIT 1").fetchone()  # 2.152.0 A
     return r[0] if r else None
 
 
@@ -88,7 +88,7 @@ def has_workspaces(c):
     if instance_mode(c) == "shared":
         return False
     with system_ctx(c):  # 2.37.0 (#1150): instance structure
-        return bool(c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL LIMIT 1").fetchone())
+        return bool(c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL LIMIT 1").fetchone())  # 2.152.0 A
 
 
 def instance_sync(c):
@@ -120,7 +120,7 @@ def om_setup_org(c, uid, name):
     if not nm or instance_mode(c) == "shared":
         return None
     with system_ctx(c):  # instance structure: is there an organisation at all
-        if c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL LIMIT 1").fetchone():
+        if c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL LIMIT 1").fetchone():  # 2.152.0 A
             return None
         oid = insert_id(c, "INSERT INTO orgs(name,icon,created_at) VALUES(?,?,?)", (nm, "", iso(now_utc())))
         org_member_add(c, oid, uid, "admin")
@@ -206,7 +206,7 @@ def _visible_people(c, uid):
             full = [o for o in user_orgs_full(c, uid) if o in orgs]
             q = ",".join("?" * len(orgs))
             ids = {r[0] for r in c.execute(f"SELECT user_id FROM org_members WHERE org_id IN ({q}) AND (role='admin' OR org_id IN ({','.join(str(int(o)) for o in full) or 'NULL'}))", orgs)}
-        elif not c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL LIMIT 1").fetchone():
+        elif not c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL LIMIT 1").fetchone():  # 2.152.0 A
             return None  # 2.46.0 (#1592): an instance without any organisation (a household): everyone, as before
         return ids | _connections(c, uid) | {uid}
     if u[0]:
@@ -563,7 +563,10 @@ def orgs_get():
         m = instance_mode(c)
         rows = [] if m == "shared" else c.execute("SELECT * FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id").fetchall()  # 2.47.3 (#1360): never the personal offices
         from ..accounts.tenancy import boundary_summary
-        return jsonify(orgs=[org_public(c, r) for r in rows], visibility=vis_mode(c), mode=m, editable=m == "workspaces",
+        # 2.152.0 A (#2167): + retired_at / retain_until / retired_personal (a retired one: kept by law, export only)
+        return jsonify(orgs=[{**org_public(c, r), "retired_at": r["retired_at"], "retain_until": r["retain_until"] or "",
+                              "retired_personal": bool(r["retired_personal"])} for r in rows],
+                       visibility=vis_mode(c), mode=m, editable=m == "workspaces",
                        creatable=m == "workspaces", name_env=bool(ORG_NAME_ENV),
                        boundary=boundary_summary(c, g.user["id"]))  # 2.122.4 A (#1724): names only inside own orgs; 2.30.0 (#1036): memberships across the workspace boundary (0 = clean)
 
@@ -626,6 +629,8 @@ def org_update(oid):
             _no_change()
         if not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (oid,)).fetchone():  # 2.47.3 (#1360)
             return err(tr("Not found"), 404)
+        if c.execute("SELECT 1 FROM orgs WHERE id=? AND retired_at IS NOT NULL", (oid,)).fetchone():  # 2.152.0 A (#2167): read only
+            return err(tr("This organisation is retired: its data is kept by law and can only be exported"), 409)
         _org_patch(c, oid, b)
         if "members" in b:
             _set_members(c, oid, b["members"])
@@ -672,9 +677,12 @@ def _org_patch(c, oid, b):
 @app.delete("/api/admin/orgs/<int:oid>")
 def org_delete(oid):
     """2.28.0 (#935): the instance admin deletes an organisation (mode workspaces) -- only one without lists (409 otherwise:
-    its owners move or delete them first). 2.23.0: 403 in the other modes."""
+    its owners move or delete them first). 2.23.0: 403 in the other modes. 2.152.0 A (#2167): office data under a legal
+    period (orgretain.odl_retention) retires it instead; wiki pages, tables or office data that would go along (and the
+    retirement) answer 409 with the numbers until ?confirm=1; a retired one goes only after its period."""
     _need_admin()
     c = db()
+    from .orgretain import odl_dismantle, odl_retire
     with system_ctx(c):  # 2.37.0 (#1150): instance admin manages the organisations themselves (also ones he is not in)
         if instance_mode(c) != "workspaces":
             _no_change()
@@ -683,44 +691,75 @@ def org_delete(oid):
         n = c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (oid,)).fetchone()[0]
         if n:
             return err(tr("This organisation still has {0} lists: their owners move or delete them first", n), 409)
-        from ..files.store import fs_org_live, fs_org_purge
+        info = odl_delete_info(c, oid)
+        if info["kept_until"] and info["kept_until"] >= iso(now_utc())[:10]:
+            return err(tr("This organisation is kept until {0} by law (invoices, receipts, logbook): it can be deleted after that", info["kept_until"]), 409)
+        confirm = request.args.get("confirm") == "1"
+        if info["retain_until"] and not info["kept_until"]:
+            if not confirm:
+                return jsonify(error=tr("This organisation keeps {0} by law until {1}: it is retired instead of deleted. Export it first, then confirm.",
+                                        odl_text(info["kept"]), info["retain_until"]), **info), 409
+            odl_retire(c, oid, info["retain_until"])  # review F6: the acting admin may keep the files
+            bump(c)
+            c.commit()
+            return jsonify(ok=True, retired=True, retain_until=info["retain_until"])
+        if info["content"] and not confirm and not info["kept_until"]:
+            return jsonify(error=tr("This organisation still has {0}: export it first, then confirm the deletion.", odl_text(info["content"])), **info), 409
+        from ..files.store import fs_org_live
         n = fs_org_live(c, oid)  # 2.48.0 (#1207): nothing of the file store disappears with it (the trash does)
-        if n:
+        if n and not info["kept_until"]:
             return err(tr("This organisation still has {0} folders and files in its file store: delete them first", n), 409)
         from ..admin.retexport import rx_gate, rx_subject
         bad, retained = rx_gate(c, rx_subject(c, "org", oid))  # 2.146.0 D (#2468): the retention export (or its waiver) first
         if bad:
             return bad
         oname = (c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0]
-        fs_files = fs_org_purge(c, oid)
-        from ..wiki.wikiatt import wka_org_files
-        fs_files += wka_org_files(c, oid)  # 2.99.0 A (#2182): files of its knowledge pages (the rows go with the organisation)
-        from ..sheets.shkinds import shk_org_files
-        fs_files += shk_org_files(c, oid)  # 2.124.0 B (#2110): files of its tables' file cells
-        c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
-        c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))  # 2.30.0 (#1036): they stay with their owners, private
-        c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))  # 2.52.0 C (#1438): its own books -> the managers'
-        # 2.42.0 (#828): files of lists that left the organisation are sealed with their new organisation's key (or plain),
-        # then the organisation's key is destroyed (what is left encrypted with it can no longer be read) and its office
-        # folder (stored invoices, archive) removed
-        from ..admin.orgcrypt_cli import before_org_delete
-        from ..core.orgcrypt import oc_drop_key
-        if before_org_delete(c, oid)[1]:  # 2.64.0 (#1864): a file that lives on could not be resealed: keep the key
-            raise Denied(409, tr("Some files could not be encrypted again for their new place. Nothing was deleted; see the server log."))
-        oc_drop_key(c, oid)
-        icon = (c.execute("SELECT icon FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0]
-        c.execute("DELETE FROM orgs WHERE id=?", (oid,))
+        todo = odl_dismantle(c, oid)  # 2.152.0 A: the steps shared with the account deletion and the retention run
         bump(c)
         c.commit()
-        oc_drop_office_dir(oid)
-        from .pictures import org_icon_drop_file
-        org_icon_drop_file(oid, icon)  # 2.87.9 (#1913)
         from ..core.serializers import unlink_files
-        unlink_files(fs_files)
+        unlink_files(todo)
         if retained:
             from ..admin.retexport import rx_alert
             rx_alert(retained[0], [g.user["username"], oname])
         return jsonify(ok=True)
+
+
+def odl_delete_info(c, oid):
+    """2.152.0 A (#2167): what deleting organisation oid means (the caller is an instance admin, system context): content
+    that goes along, office data kept by law (retain_until), kept_until of an organisation retired already, whether the
+    caller may export it (an admin of it; any instance admin for a retired one)."""
+    from .orgretain import odl_content, odl_retention, odl_retired
+    kept = odl_retired(c, oid)
+    ret = odl_retention(c, oid) if kept is None else {"counts": {}, "until": None}
+    from ..files.store import fs_org_live
+    return {"content": odl_content(c, oid), "kept": ret["counts"], "retain_until": ret["until"], "kept_until": kept or None,
+            "retired": kept is not None, "lists": c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (oid,)).fetchone()[0],
+            "files": fs_org_live(c, oid), "can_export": kept is not None or org_role(c, me(), oid) == "admin"}
+
+
+ODL_WORDS = {"wiki_pages": ("{0} knowledge page", "{0} knowledge pages"), "tables": ("{0} table", "{0} tables"),
+             "office_documents": ("{0} document", "{0} documents"), "documents": ("{0} document", "{0} documents"),
+             "office_archive": ("{0} archive entry", "{0} archive entries"), "archive": ("{0} archive entry", "{0} archive entries"),
+             "trips": ("{0} trip", "{0} trips"), "drives": ("{0} drive", "{0} drives"), "clients": ("{0} client", "{0} clients"),
+             "receipts": ("{0} receipt", "{0} receipts"), "trip_receipts": ("{0} receipt", "{0} receipts")}
+
+
+def odl_text(counts):
+    """"3 knowledge pages, 2 tables" (translated) of {key: n}."""
+    from ..core.i18n import trn
+    return ", ".join(trn(*ODL_WORDS[k], n) for k, n in counts.items() if n and k in ODL_WORDS)
+
+
+@app.get("/api/admin/orgs/<int:oid>/delete-info")
+def odl_delete_info_get(oid):
+    """2.152.0 A (#2167): for the delete dialog of the organisations list -- see odl_delete_info."""
+    _need_admin()
+    c = db()
+    with system_ctx(c):  # instance admin: numbers of an organisation they need not be in, no content
+        if not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (oid,)).fetchone():
+            return err(tr("Not found"), 404)
+        return jsonify(odl_delete_info(c, oid))
 
 
 def oc_drop_office_dir(oid):
@@ -730,6 +769,9 @@ def oc_drop_office_dir(oid):
     d = os.path.join(OFFICE_DIR, str(int(oid)))
     if os.path.isdir(d) and not os.path.islink(d):
         shutil.rmtree(d, ignore_errors=True)
+        if os.path.exists(d):  # 2.152.0 A (#2167): what could not be removed is logged (count, path below OFFICE_DIR), not swallowed
+            n = sum(len(f) for _, _, f in os.walk(d))
+            print(f"organisation {int(oid)}: {n} file(s) left in office/{int(oid)} after the deletion", flush=True)
 
 
 @app.put("/api/admin/orgs/visibility")

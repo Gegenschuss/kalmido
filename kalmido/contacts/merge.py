@@ -213,6 +213,8 @@ def ctm_merge(c, uid, target, ids, pick=None, dry=False):
                 out = {"lines": ctm_lines(rows, f, refs, occ_names, unfit),
                        "fields": {k: (_jl(v) if k in CTM_LISTS else v) for k, v in f.items() if k not in CTM_NL and k != "photo"}}
                 raise _Dry()
+            from ..newsletter.sync import nls_keep  # 2.152.0 D (#2170): an unsubscription outlives the merged-away contact
+            nls_keep(c, others)
             c.execute(f"DELETE FROM contacts WHERE id IN ({','.join('?' * len(others))})", others)
             contact_store(c, uid, t["book_id"], f, cid=t["id"])  # search, birthday task of the target, book touched, bumped
             for bid in books:

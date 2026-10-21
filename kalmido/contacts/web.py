@@ -198,6 +198,8 @@ def op_contact_delete(c, uid, cid):
     r, role = need_contact(c, cid, write=True)
     from ..contacts.bulk import bk_occ_drop  # 2.46.1 (#1554): its birthday / anniversary tasks go to the trash with it
     bk_occ_drop(c, uid, [cid])
+    from ..newsletter.sync import nls_keep  # 2.152.0 D (#2170): an unsubscription outlives the contact
+    nls_keep(c, [cid])
     c.execute("DELETE FROM contacts WHERE id=?", (cid,))
     book_touch(c, r["book_id"])
     bump(c)

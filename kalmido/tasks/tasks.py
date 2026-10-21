@@ -108,6 +108,8 @@ def hard_delete(c, ids, lists=None):
                     continue
                 done.add(k["id"])
                 if (k["list_id"] not in lists) if lists is not None else list_role(c, k["list_id"]) != "owner":
+                    # 2.152.0 review F2: a subtask in another list stays there, detached (its list's people own it; sending it
+                    # to the trash would let whoever deletes the parent remove work in a list they do not own)
                     c.execute("UPDATE tasks SET parent_id=NULL WHERE id=?", (k["id"],))
                 else:
                     nxt.append(k["id"])

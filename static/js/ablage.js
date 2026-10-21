@@ -65,7 +65,8 @@ function viewAblage() {
   const search = !trash && typeof ftxtBox === 'function' ? ftxtBox() : '';  // 2.61.0 (#1820): names + recognised text
   if (search && ftxtActive()) body = ftxtResults();
   const hint = !r.nid && sp === 'private' && d && !d.items.length ? `<p class="muted abhint">${tr('Share a folder with a person or an agent: they see exactly that folder, nothing else.')}</p>` : '';
-  return `<div class="abview ${canAdd ? 'abdropok' : ''}" data-abzone="${r.nid || ''}">${spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools}${body}${search && ftxtActive() ? '' : hint + (trash ? '' : ab_smvBar())}</div></div>`;
+  const tdays = trash && d?.trash_days ? `<p class="muted abhint abtrashdays">${tr('Files and folders in the trash are deleted for good after {0} days.', d.trash_days)}</p>` : '';  // 2.152.0 B (#2165)
+  return `<div class="abview ${canAdd ? 'abdropok' : ''}" data-abzone="${r.nid || ''}">${spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools}${body}${search && ftxtActive() ? '' : hint + tdays + (trash ? '' : ab_smvBar())}</div></div>`;
 }
 function ab_rowHtml(n, trash) {
   const meta = [n.path || '', n.kind === 'folder' ? '' : fmtSize(n.size || 0), ab_when(trash ? n.deleted_at : n.updated_at), n.created_by_name && n.created_by !== S.me?.id ? n.created_by_name : ''].filter(Boolean).join(' · ');

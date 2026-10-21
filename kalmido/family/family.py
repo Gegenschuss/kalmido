@@ -133,7 +133,7 @@ def kid_parents(c, kid):
 # 2.86.0 (N8, decided 17.10.): an instance admin looks after the kid accounts of their own organisation / family only:
 # kids sharing an organisation with the admin, plus kids nobody else can look after (no organisation, no enabled parent).
 # An instance without any organisation (a household) is one family: there the admin looks after every kid, as before.
-H6A_ADMIN_KIDS = """(NOT EXISTS (SELECT 1 FROM orgs WHERE personal_of IS NULL)
+H6A_ADMIN_KIDS = """(NOT EXISTS (SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL)
     OR id IN (SELECT k.user_id FROM org_members k JOIN org_members a ON a.org_id=k.org_id WHERE a.user_id=?)
     OR (id NOT IN (SELECT user_id FROM org_members)
         AND id NOT IN (SELECT p.kid_id FROM kid_parents p JOIN users pu ON pu.id=p.parent_id WHERE pu.disabled=0)))"""
