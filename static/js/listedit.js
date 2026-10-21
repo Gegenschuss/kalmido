@@ -208,7 +208,10 @@ function typingHtml(ags, id) {
   // 2.13.2 (#478 F6): "is writing …" (dots) only for a real typing signal (or the chat's answer on its way); an agent that
   // only reports "working" on the task "is working on it"
   const wr = a => (id === 'chat-typing' && !a.busy) || (a.typing || 0) - agentAge() > 0, any = ags.some(wr);
-  return `<div class="atyping" id="${id}" role="status" aria-live="polite">${any ? '<span class="atdots" aria-hidden="true"><i></i><i></i><i></i></span>' : hdot('working')}<span class="ttx">${ags.map(a => licBot() + esc(wr(a) ? tr('{0} is writing …', a.name) : tr('{0} is working on it', a.name)) + (a.status_text ? ` <span class="muted">· ${esc(a.status_text)}</span>` : '')).join('<br>')}</span></div>`;
+  // 2.152.1 (#2610): the agent chat shows the small bot at work instead of the dots / the dot (same width); the task panel
+  // (people too) keeps the dots. The text in the status line stays for screen readers.
+  const fig = id === 'chat-typing';
+  return `<div class="atyping" id="${id}" role="status" aria-live="polite">${fig ? botFig('arbeitet', 'bchat') : any ? '<span class="atdots" aria-hidden="true"><i></i><i></i><i></i></span>' : hdot('working')}<span class="ttx">${ags.map(a => licBot() + esc(wr(a) ? tr('{0} is writing …', a.name) : tr('{0} is working on it', a.name)) + (a.status_text ? ` <span class="muted">· ${esc(a.status_text)}</span>` : '')).join('<br>')}</span></div>`;
 }
 const agentBusyState = () => { const ags = (S.agents || []).filter(a => a.enabled && !agentOffline(a)); return ags.some(a => a.status === 'working') ? 'working' : ags.some(a => a.status === 'waiting' || a.waiting) ? 'waiting' : ''; };
 const agentStatusLines = () => (S.agents || []).filter(a => a.enabled && a.status !== 'idle').map(agentHstLine);  // 2.13.0 (#453 P10): no stale status text while not connected

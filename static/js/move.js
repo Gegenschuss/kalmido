@@ -73,7 +73,7 @@ function umzResultHtml(j) {
 }
 function umzImpHtml(j) {
   if (!j) return '';
-  const bar = (a, b, lbl) => `<div class="umzbar"><div class="muted">${lbl}</div><progress max="${b || 1}" value="${a || 0}"></progress></div>`;
+  const bar = (a, b, lbl) => `<div class="umzbar">${botBusy(`<div class="muted">${lbl}</div><progress max="${b || 1}" value="${a || 0}"></progress>`)}</div>`;  // 2.152.1 (#2611): + the bot at work
   if (j.state === 'upload') return bar(j.received, j.size, tr('Uploading… {0} of {1}', fmtSize(j.received || 0), fmtSize(j.size || 0)))
     + `<div class="row"><button type="button" class="btn sm" data-umz="cancel">${tr('Cancel')}</button></div>`;
   if (j.state === 'checking') return bar(0, 0, tr('Checking the file…'));

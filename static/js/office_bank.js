@@ -188,7 +188,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
   };
   const take = fl => {
     files = [...(fl || [])]; if (!files.length) return;
-    Object.assign(st, {p: null, mapping: null}); card.innerHTML = `<p class="muted">${tr('Loading…')}</p>`; preview(null);
+    Object.assign(st, {p: null, mapping: null}); card.innerHTML = botBusy(`<p class="muted">${tr('Loading…')}</p>`); preview(null);  // 2.152.1 (#2611): + the bot at work
   };
   md.addEventListener('click', async e => {
     const am = e.target.closest('#bi-am [data-am]');
@@ -211,7 +211,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
   md.addEventListener('dragover', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); $('[data-bi-drop]', md)?.classList.add('on'); } });
   md.addEventListener('dragleave', e => { if (!md.contains(e.relatedTarget)) $('[data-bi-drop]', md)?.classList.remove('on'); });
   md.addEventListener('drop', e => { if (!e.dataTransfer?.files?.length) return; e.preventDefault(); if (!st.p || !st.p.rows) take(e.dataTransfer.files); });
-  if (files.length) { card.innerHTML = `<p class="muted">${tr('Loading…')}</p>`; preview(null); } else start();
+  if (files.length) { card.innerHTML = botBusy(`<p class="muted">${tr('Loading…')}</p>`); preview(null); } else start();
   md.bnkTake = take;  // the UI tests hand files over here
   return md;
 }

@@ -584,7 +584,7 @@ function ctImpPanel() {
   let el = $('#ctimp');
   if (!el) {
     el = document.createElement('div'); el.id = 'ctimp'; el.className = 'ctimp'; el.setAttribute('role', 'status');
-    el.innerHTML = '<div class="ctimp-t"></div><div class="pbar"><i></i></div><button class="iconbtn" data-ctimp="close" hidden></button>';
+    el.innerHTML = botBusy() + '<div class="ctimp-t"></div><div class="pbar"><i></i></div><button class="iconbtn" data-ctimp="close" hidden></button>';  // 2.152.1 (#2611): the bot at work (gone once it ended, app.css)
     document.body.appendChild(el);
     const x = el.querySelector('[data-ctimp="close"]'); x.innerHTML = ic('x'); x.setAttribute('aria-label', tr('Close')); x.title = tr('Close');
     x.onclick = () => el.remove();

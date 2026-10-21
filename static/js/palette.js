@@ -709,11 +709,32 @@ function celeSnap(ids) {
   return {today: counts().today, lists: openByList(), lids: [...new Set(ts.map(t => t.list_id))], inToday: ts.some(t => t.due && t.due <= today())};
 }
 function celeCheck(b) {
-  if (!b || S.settings.celebrate === '0') return;
-  if (b.inToday && b.today > 0 && counts().today === 0) { celebrate('today'); return; }
-  const after = openByList();
-  for (const lid of b.lids) {
-    const l = listById(lid);
-    if (l && !l.is_inbox && b.lists[lid] > 0 && !after[lid]) { celebrate('list', {name: lname(l)}); return; }
+  if (!b) return;
+  let hit = null;
+  if (b.inToday && b.today > 0 && counts().today === 0) hit = ['today'];
+  else {
+    const after = openByList();
+    for (const lid of b.lids) {
+      const l = listById(lid);
+      if (l && !l.is_inbox && b.lists[lid] > 0 && !after[lid]) { hit = ['list', {name: lname(l)}]; break; }
+    }
   }
+  if (!hit) return;
+  botNod();  // 2.152.1 (#2609)
+  if (S.settings.celebrate !== '0') celebrate(...hit);
 }
+// 2.152.1 (#2609): the last open task of Today or of a list ticked off: the figure of the now empty view nods once (also
+// with the celebration switched off: it is part of the empty view, not the celebration). Not for every task (celeCheck
+// only gets here for the last one), never a loop, nothing at all with reduced motion.
+function botNod() {
+  if (reducedMotion()) return;
+  const f = $('#view .o3c-empty svg.bot'); if (!f) return;
+  f.classList.remove('bnod'); void f.getBoundingClientRect?.();  // a second nod in a row starts again
+  f.classList.add('bnod');
+  f.addEventListener('animationend', e => { if (e.animationName === 'b-nod') f.classList.remove('bnod'); });
+}
+// 2.152.1 (#2611): a long job (a ZIP import, a bank statement being read, an export) shows the bot at work next to what it
+// shows anyway: html = the text / bar beside it (they stay as they were), no html = the figure alone (for a box of its own
+// layout). Decorative (aria-hidden, botFig): the text says what happens. Still with reduced motion (app.css).
+const botBusy = (html = null, cls = '') => html == null ? botFig('arbeitet', 'bbusy')
+  : `<div class="botbusy${cls ? ' ' + cls : ''}">${botFig('arbeitet', 'bbusy')}<div class="bbusy-c">${html}</div></div>`;
