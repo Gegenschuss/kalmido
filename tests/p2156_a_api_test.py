@@ -194,6 +194,12 @@ check(Bo.get(B + f"/api/lists/{P}/ideas").status_code == 404, "#1201: another pe
 check(decide(Bo, J1, take=["1"]).status_code == 404, "#1201: another person cannot take ideas over (404)")
 check(Ca.get(B + f"/api/proposals/agents", params={"kind": "ideas", "list_id": P}).status_code == 404, "#1201: another person: no agents of a foreign list")
 check(AGS.get(B + f"/api/lists/{P}/ideas").status_code in (401, 403, 404), "#1201: an agent's token gets no person route")
+# 2.156.0 review: an agent limited to other lists (agents.list_ids) is not offered and cannot be asked for this list
+OTHER = A.post(B + "/api/lists", json={"name": "Elsewhere"}).json()["id"]
+check(A.patch(B + f"/api/admin/agents/{AG}", json={"list_ids": [OTHER]}).ok, "#1201 review: the agent limited to another list")
+check(AG not in (agents_for(A, P) or []), "#1201 review: a fenced-out agent is not offered")
+check(ask(A, agent_id=AG, list_id=P, branch="r").status_code == 404, "#1201 review: a fenced-out agent cannot be asked (404)")
+check(A.patch(B + f"/api/admin/agents/{AG}", json={"list_ids": []}).ok, "#1201 review: the restriction lifted again")
 # take a sub-idea: its idea comes along
 check(decide(A, J1, take=["9"]).status_code == 400, "#1201: an unknown key 400")
 r = decide(A, J1, take=["0.1"])

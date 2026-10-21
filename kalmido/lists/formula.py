@@ -319,7 +319,7 @@ def fx_values(fields, vals):
                 r = ShEval(_FxEnv(get)).run(t)
             except ShErr as e:
                 bad = e.kind if e.kind in FX_ERRORS else "type"
-            except (RecursionError, OverflowError, ValueError, ZeroDivisionError):
+            except (RecursionError, ValueError, ArithmeticError):  # review: + decimal.InvalidOperation (ROUND of a huge value)
                 bad = "type"
         if isinstance(r, bool):
             r = 1.0 if r else 0.0

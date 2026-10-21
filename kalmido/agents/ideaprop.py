@@ -19,7 +19,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc, usettings
 from ..core.pg import insert_id
 from ..core.schema import MAX_DEPTH
-from ..core.access import Denied, list_role, need_collab, need_list, need_task, WRITE_ROLES
+from ..core.access import Denied, list_role, need_collab, need_list, need_task, task_visible, WRITE_ROLES
 from ..personal.timetrack import BadInput
 from ..tasks.validation import check_parent, depth
 from ..agents.core import agent_emit, agent_row, is_agent, job_dict, JOB_TITLE_MAX
@@ -38,7 +38,9 @@ IDP_NO_AGENT = N_("This agent cannot make proposals for you")
 def idp_agents(c, uid, lid):
     """Agents uid may ask for ideas in list lid: proposals allowed, the list shared with the agent, uid may address it there."""
     from ..agents.asstprop import ast_list_agents
-    return ast_list_agents(c, uid, lid)
+    from ..agents.safety import agent_reach
+    # review: also within the agent's list restriction (agents.list_ids), like agent_emit's gate
+    return [a for a in ast_list_agents(c, uid, lid) if lid in agent_reach(c, a["user_id"])]
 
 
 def idp_agents_get(c, uid, args):
@@ -121,8 +123,8 @@ def idp_request(c, uid, b):
         e = check_parent(c, None, tid)  # #1949: a branch on the deepest level takes no more sub-branches
         if e:
             raise BadInput(e)
-    if not [a for a in idp_agents(c, uid, lid) if a["user_id"] == aid]:
-        return err(tr(IDP_NO_AGENT), 404)
+    if not [a for a in idp_agents(c, uid, lid) if a["user_id"] == aid] or (kind == "task" and not task_visible(c, tid, aid)):
+        return err(tr(IDP_NO_AGENT), 404)  # review: a participant agent only hears of branches it may see
     a = agent_row(c, aid)
     if usage_block(c, aid):
         return err(tr("{0} reached its usage limit", a["display_name"] or a["username"]), 409)
@@ -139,7 +141,7 @@ def idp_request(c, uid, b):
                        VALUES(?,?,?,?,'running','',?,?,?,?,'requested',?)""",
                     (aid, tid, uid, title[:JOB_TITLE_MAX], ts, ts, "ideas", json.dumps(inp, ensure_ascii=False), lid))
     j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
-    agent_emit(c, aid, "job_request", {"job": job_dict(c, j), "kind": "ideas", "input": inp, "limits": {**PROP_LIMITS, **IDP_LIMITS},
+    agent_emit(c, aid, "job_request", {"list_id": lid, "task_id": tid if kind == "task" else None, "job": job_dict(c, j), "kind": "ideas", "input": inp, "limits": {**PROP_LIMITS, **IDP_LIMITS},
                                        "requested_by": {"id": uid, "name": user_names(c, [uid]).get(uid, "")}})
     bump(c)
     c.commit()
@@ -175,7 +177,8 @@ def idp_validate(b, inp):
 
 def idp_need_agent(c, j, aid):
     """Before the agent's proposal is stored: the list still shared with it; nothing taken over yet (no replacing then)."""
-    if not j["list_id"] or not list_role(c, j["list_id"], aid):
+    from ..agents.safety import agent_reach
+    if not j["list_id"] or not list_role(c, j["list_id"], aid) or j["list_id"] not in agent_reach(c, aid):
         raise Denied(403)
     if j["applied"]:
         raise Denied(409, tr("This proposal was already applied or discarded"))
@@ -221,7 +224,9 @@ def idp_take(c, j, take, drop, edits=None):
         top = c.execute("SELECT COALESCE(MAX(sort),0) FROM tasks WHERE list_id=? AND " +
                         ("parent_id=?" if kind == "task" else "parent_id IS NULL"), (lid, tid) if kind == "task" else (lid,)).fetchone()[0]
         for n, k in enumerate(want):
-            e = (edits or {}).get(k) or {}
+            e = (edits if isinstance(edits, dict) else {}).get(k) or {}
+            if not isinstance(e, dict):  # review: a bad edit is a 400, never a 500 (also through the generic /apply)
+                raise BadInput(tr("Invalid value: {0}", "edits"))
             if "." in k:
                 i, x = (int(v) for v in k.split("."))
                 title, parent = prop["items"][i]["children"][x]["title"], rec["taken"][str(i)]

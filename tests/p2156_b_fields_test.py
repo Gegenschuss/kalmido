@@ -240,6 +240,11 @@ r = Fl.get(B + f"/api/fields/task-refs?ids={O1['id']},{T1['id']}")
 check(r.ok and [x["id"] for x in r.json()["tasks"]] == [O1["id"]], f"freelancer: task-refs only the own task {r.text[:200]}")
 check(Bo.get(B + f"/api/fields/task-refs?ids={O1['id']}").json().get("tasks") == [], "the organisation does not see the freelancer's title")
 check(field(Fl, L, "Intruder", "rating").status_code in (403, 404), "freelancer: no field in an organisation's list")
+# 2.156.0 review: ROUND of a value beyond the decimal precision is an error in the field, the list still loads
+fbig = field(Fl, PL, "Huge", "formula", formula="RUNDEN({Fee} * {Fee} * {Fee}; 2)").json()
+O3 = mk(Fl, "Big fee", PL, {str(fcu["id"]): "100000000000"})
+check(O3.get("fields", {}).get(str(fbig.get("id"))) in ("#type", None) and Fl.get(B + "/api/state").ok,
+      f"#2070 review: a huge ROUND does not break the list {O3.get('fields')}")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
