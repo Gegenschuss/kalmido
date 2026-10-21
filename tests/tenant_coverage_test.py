@@ -120,6 +120,8 @@ KINDS = {
                             "member of the same organisation, a person without organisation: no decision by anyone (404)"),
     # 2.97.0 A (#1950): bookmarks belong to one organisation (every member reads, the owner / its admins change) or one person
     "bookmark": ("matrix", "p297_a_api_test.py: a bookmark of another organisation / person: 404 (read, change, delete, picture, move)"),
+    # 2.156.0 C (#2073): section templates belong to one person or one organisation (members read, its creator / admins change)
+    "sectpl": ("matrix", "p2156_c_api_test.py: a section template of another organisation / person: 404 (list, use, change, delete, save into it)"),
     # 2.98.0 A (#1953): scheduling polls belong to one organisation (every member reads, the owner / its admins change) or one person
     "poll": ("matrix", "p298_a_api_test.py: a poll of another organisation / person: 404 (read, change, delete, choose, move, list); "
                        "the public link reads inside the poll's organisation only"),
@@ -232,6 +234,9 @@ ROUTES = {
     "PATCH /api/bookmarks/{}": "bookmark", "DELETE /api/bookmarks/{}": "bookmark", "POST /api/bookmarks/{}/restore": "bookmark",
     "POST /api/bookmarks/{}/refresh": "bookmark", "GET /api/bookmarks/{}/image": "bookmark",
     "POST /api/bookmarks/move-space": "bookmark",
+    # 2.156.0 C (#2073): section templates (p2156_c_api_test.py)
+    "GET /api/section-templates": "sectpl", "POST /api/section-templates": "sectpl", "PATCH /api/section-templates/{}": "sectpl",
+    "DELETE /api/section-templates/{}": "sectpl", "POST /api/lists/{}/sections/from-template": "sectpl",
     # 2.96.0 C (#2015): job cards in the agent chat (p296_c_api_test.py)
     "POST /api/agents/{}/chat/{}/reactions": "agent", "POST /api/agents/{}/wake": "agent",
     "GET /api/proposals/agents": "agent", "POST /api/proposals": "agent", "GET /api/proposals/{}": "agent",

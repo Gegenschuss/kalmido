@@ -573,6 +573,9 @@ APP_ONLY = [
     # 2.97.0 A (#1950): bookmarks are for people in 2.97.0 (the preview is fetched by the server; agent access is its own step)
     ("2.97.0 (#1950): bookmarks are only for people in 2.97.0 (private or an organisation's; the server fetches the preview; "
      "agent access via REST v1 / MCP comes as its own step of the agents list)", ("* /api/bookmarks",)),
+    # 2.156.0 C (#2073): section templates are a person's shortcut in the app; agents create sections directly (sections API)
+    ("2.156.0 (#2073): section templates (save a list's section names, add the missing ones to another list) are for people in the "
+     "app; agents create and order sections with the sections tools", ("* /api/section-templates", "=POST /api/lists/{}/sections/from-template")),
     # 2.89.0 (#1916, D): tables step 2 -- only a person by button (no approval pattern for agents in the agent API)
     ("2.89.0 (#1916, D): carrying table rows over into tasks / a quotation draft and a list as rows are a person's button press "
      "(each one undo step); agents work inside a sheet through the table tools and create tasks / office drafts their own ways",

@@ -354,7 +354,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     // A7: the view switch; A11 habits; P13 contrast
     await nav(B + '?p=2#l/' + P); await ready(ev);
     const vs = await ev(`(() => { const s = document.querySelector('#view .vsegm'); if (!s) return null; const r = s.getBoundingClientRect(); return {n: s.querySelectorAll('button').length, h: Math.min(...[...s.querySelectorAll('button')].map(b => b.getBoundingClientRect().height)), right: r.right, vw: innerWidth, txt: s.textContent}; })()`);
-    check(vs && vs.n === 5 /* 2.49.0 (#1201): + Mind map */ && vs.h >= 35.5 && vs.right <= vs.vw + .5 && /Liste/.test(vs.txt) && /Projekt/.test(vs.txt), '390 A7: the view switch under the title (German), 36 px (2.31.0 #1053, was 44), inside the screen ' + JSON.stringify(vs));
+    check(vs && vs.n === 6 /* 2.49.0 (#1201): + Mind map; 2.156.0 (#2071): + Calendar */ && vs.h >= 35.5 && vs.right <= vs.vw + .5 && /Liste/.test(vs.txt) && /Projekt/.test(vs.txt), '390 A7: the view switch under the title (German), 36 px (2.31.0 #1053, was 44), inside the screen ' + JSON.stringify(vs));
     const ctr = await ev(`(() => { const C = ${CTR}, bg = ${bgOf}; const sp = [...document.querySelectorAll('#tabs button:not(.on) > span')].filter(s => s.offsetWidth)[0]; return sp ? C(getComputedStyle(sp).color, bg(sp)) : 0; })()`);
     check(ctr >= 4.5, '390 P13: inactive tab label contrast ' + ctr.toFixed(2));
     await shot('p2130-list-390.png');
