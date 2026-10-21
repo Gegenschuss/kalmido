@@ -12,6 +12,7 @@ agent API, MCP, tasks / quotations from a sheet). Every result is evaluated for 
 """
 import bisect
 import json
+import os
 import re
 import threading
 import time
@@ -35,6 +36,10 @@ from .shbook import (shb_counts, shb_deleted, shb_dict, shb_display, shb_interna
 
 SH_KINDS = ("text", "number", "currency", "percent", "date", "select") + SHK_KINDS  # 2.124.0 B (#2110): + checkbox, person, link, file
 SH_COLOR_MODES = ("cell", "row")
+# 2.148.1 D (#2485): range cells read per evaluation of a sheet (chain of sheets included); stored cells over all sheets of
+# one table. The environment values are for the tests only
+SH_RANGE_BUDGET = int(os.environ.get("KALMIDO_SHEET_RANGE_BUDGET") or 15_000_000)
+SH_BOOK_CELLS_MAX = int(os.environ.get("KALMIDO_SHEET_CELLS_MAX") or 1_000_000)
 SH_TITLE_MAX, SH_COL_TITLE_MAX, SH_COLS_MAX, SH_ROWS_MAX, SH_CELLS_MAX, SH_OPTIONS_MAX = 200, 80, 200, 5000, 5000, 100
 SH_START_COLS, SH_START_ROWS = 3, 10
 SH_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
@@ -530,13 +535,23 @@ class _Env:
         book = self.ev.book
         if not book.live(book.cells.get(a)) or not book.live(book.cells.get(b)):
             raise ShErr("ref")
-        return [self.ev.value_of(x["id"]) for x in _range_cells(book, a, b)]
+        cells = _range_cells(book, a, b)
+        self.work(len(cells))
+        return [self.ev.value_of(x["id"]) for x in cells]
 
     def col(self, col_id):
         book = self.ev.book
         if col_id not in book.col_idx:
             raise ShErr("ref")
-        return [self.ev.value_of(x["id"]) for x in book.col_cells(col_id) if x["id"] != self.cell_row["id"]]
+        cells = book.col_cells(col_id)
+        self.work(len(cells))
+        return [self.ev.value_of(x["id"]) for x in cells if x["id"] != self.cell_row["id"]]
+
+    def work(self, n):
+        """2.148.1 D (#2485): cells the ranges / columns of one evaluation may read (running totals over 5,000 rows fit)."""
+        self.ev.rng_work = getattr(self.ev, "rng_work", SH_RANGE_BUDGET) - n
+        if self.ev.rng_work < 0:
+            raise ShErr("type", "big")
 
     def spend(self, n):
         """Text "&" built: over the budget of this evaluation = an error instead of filling the memory (review 1)."""
@@ -559,7 +574,9 @@ class _Env:
 
     def xrange(self, a, b):
         from .shbook import shb_range
-        return shb_range(self.ev, a, b)
+        out = shb_range(self.ev, a, b)
+        self.work(len(out))  # 2.148.1 D (#2485)
+        return out
 
 
 class ShEvaluator:
@@ -1053,12 +1070,33 @@ def _resolve_target(book, d):
     return rid, cid
 
 
+def _book_cells_check(c, sheet_row, book, cells):
+    """2.148.1 D (#2485): a table holds at most SH_BOOK_CELLS_MAX stored cells over all its sheets (counted only when the
+    call adds cells)."""
+    new = 0
+    for d in cells:
+        if isinstance(d, dict) and d.get("raw") not in (None, ""):
+            try:
+                if _resolve_target(book, d) not in book.at:
+                    new += 1
+            except BadInput:
+                pass  # reported by the write itself
+    if not new:
+        return
+    bid = sheet_row["book_id"] or sheet_row["id"]
+    have = c.execute("SELECT COUNT(*) FROM sheet_cells WHERE sheet_id IN (SELECT id FROM sheets WHERE id=? OR book_id=?)",
+                     (bid, bid)).fetchone()[0]
+    if have + new > SH_BOOK_CELLS_MAX:
+        raise BadInput(tr("The table is full (at most {0} cells)", SH_BOOK_CELLS_MAX))
+
+
 def _write_cells(c, sheet_row, cells, uid, agent_id, batch, book):
     """Stores the inputs; returns the set of changed cell ids."""
     if not isinstance(cells, list) or len(cells) > SH_CELLS_MAX:
         raise BadInput(tr("Invalid value: {0}", "cells"))
     ts, changed, later = iso_ms(now_utc()), set(), []
     sid = sheet_row["id"]
+    _book_cells_check(c, sheet_row, book, cells)  # 2.148.1 D (#2485)
     for d in cells:
         if not isinstance(d, dict):
             raise BadInput(tr("Invalid value: {0}", "cells"))
