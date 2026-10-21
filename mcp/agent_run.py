@@ -669,6 +669,8 @@ def build_prompt(evs, chat_uid, extra=None):
                 out += merge_hint(x)
             if (x.get("kind") or j.get("kind")) in TEXT_KINDS:  # kalmido-capability: text_proposal (2.126.1, #2123 #2124)
                 out += text_hint(x)
+            if (x.get("kind") or j.get("kind")) == "ideas":  # kalmido-capability: ideas_proposal (2.156.0, #1201)
+                out += ideas_hint(x)
         elif kind == "message_edited":  # kalmido-capability: message_edited (2.39.0, #1179)
             out += edit_hint(x)
         elif kind == "chat_choice":
@@ -703,6 +705,18 @@ def text_hint(x):
             "no dates, prices, names or promises that are not in the input, no placeholders for unknown facts; write in the "
             "language of the document (input.doc.lang) or input.lang. Answer " + shape + " with submit_proposal. Kalmido sends "
             "nothing: the person edits it and takes it over."]
+
+
+def ideas_hint(x):
+    """2.156.0 (#1201): a person asks for ideas on a branch of a mind map; the input is the branch's path, the list's name,
+    the levels still free and the person's hint -- nothing else."""
+    inp = x.get("input") or {}
+    deep = int(inp.get("levels") or 1) >= 2
+    return ["Ideas for a mind map (kind ideas): propose sub-branches for the last title of input.path (empty path = the "
+            "list input.list itself), following input.hint when given. Short titles of a few words, no numbering, no dates, "
+            f"in input.lang, at most 50 entries in all. Answer {{items: [{{title{', children?: [{title}]' if deep else ''}}}]}} with "
+            "submit_proposal" + ("" if deep else " (no children: the branch has no deeper level left)") + ". Do not read the "
+            "list for more; the person takes single ideas or all of them over."]
 
 
 def merge_hint(x):
