@@ -449,9 +449,11 @@ function evImport(c, done, file) {  // 2.143.0 C (#2154): file = an .ics shared 
   inp.onchange = async () => {
     const f = file || inp.files[0]; if (!f) return;
     // 2.87.9 (#1940): where the events go, in words; from an organisation's calendar also into an own private calendar
-    const pc = (S.evcals || []).find(x => !x.org_id && x.role === 'owner');
-    const to = await importTargetConfirm({what: tr('the events'), ws: wsOf(c), place: c.name, privOk: !!pc});
+    // 2.144.5 B (#2002): also without one yet: it is made then (like the contact import's private address book)
+    let pc = (S.evcals || []).find(x => !x.org_id && x.role === 'owner');
+    const to = await importTargetConfirm({what: tr('the events'), ws: wsOf(c), place: c.name, privOk: true});
     if (!to) return;
+    if (to === 'private' && !pc) { try { pc = await api('POST', '/api/evcals', {name: tr('Calendar'), org_id: null}); await load(); } catch { return; } }
     if (to === 'private') c = pc;
     const fd = new FormData(); fd.append('file', f);
     try {

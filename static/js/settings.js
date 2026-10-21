@@ -1100,9 +1100,10 @@ function impInit(md) {
       toast(tr('Import: {0} tasks, {1} new lists', j.tasks, j.lists) + (j.skipped ? tr(', {0} already there', j.skipped) : ''));
       inp.value = ''; await load(); render(); return;
     }
-    // 2.87.9 (#1940): new lists go into the workspace shown in the sidebar ("All": the default of a new list, the first organisation)
-    const cur = wsCur(), firstOrg = (S.me?.workspaces || [])[0];
-    I.file = f; I.opts = {space: cur !== 'all' ? cur : firstOrg ? 'org:' + firstOrg.id : 'private'}; await preview();
+    // 2.87.9 (#1940): new lists go into the workspace shown in the sidebar
+    // 2.144.5 B (#2002): "All" = the private space (the dialog offers the first organisation instead)
+    const cur = wsCur();
+    I.file = f; I.opts = {space: cur !== 'all' ? cur : 'private'}; await preview();
   });
   out.addEventListener('change', e => {
     const k = e.target.dataset.io; if (!k) return;
@@ -1124,9 +1125,11 @@ function impInit(md) {
     if (a === 'go') {
       // 2.87.9 (#1940): where the tasks go, in words; new lists from an organisation can go into the private space instead
       const tl = I.opts.target && I.opts.target !== 'new' ? listById(+I.opts.target) : null, n = I.last?.created?.tasks;
-      const to = await importTargetConfirm({what: n ? trn('{0} task', '{0} tasks', n) : tr('the tasks'), ws: tl ? wsOf(tl) : I.opts.space || 'private', place: tl ? lname(tl) : '', privOk: !tl});
+      const firstOrg = (S.me?.workspaces || [])[0], orgAlt = !tl && (I.opts.space || 'private') === 'private' && firstOrg ? 'org:' + firstOrg.id : '';  // 2.144.5 B (#2002)
+      const to = await importTargetConfirm({what: n ? trn('{0} task', '{0} tasks', n) : tr('the tasks'), ws: tl ? wsOf(tl) : I.opts.space || 'private', place: tl ? lname(tl) : '', privOk: !tl, orgAlt});
       if (!to) return;
       if (to === 'private') I.opts.space = 'private';
+      if (to === 'org') I.opts.space = orgAlt;
       b.disabled = true;
       try {
         const j = await api('POST', `/api/import/${I.src}`, form(false));
