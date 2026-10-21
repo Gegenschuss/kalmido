@@ -7,6 +7,25 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+Package 2.144.5 "Leftovers: small fixes and UI from older packages" (version number set when it is merged).
+
+### Changed
+- Approval cards in comments are decided only by the list's managers, the assignee or an admin; others see who decides (#2001).
+- Import target: with the sidebar on "All", imported tasks go to Private, with "Rather into <organisation>" as the other choice; the calendar import offers "Rather into Private" also without a private calendar and creates one when needed (#2002).
+- Time: the sum in the list header shows members only their own hours, as the time window does; owners and admins see everyone's (#1523).
+- Subscriptions & tools: a missed notice period shows the next chance, sorts by it and reminds of it; invoice series without an own name are named without placeholders like {month} (#2021).
+- Phone: the full-screen search closes with a soft animation (#1560).
+
+### Fixed
+- Sheets on the phone: the suggestions after "=" stay above the keyboard and never cover the field, the cell editor stays inside the screen, the side panel shows the right button right after "Freeze value" / "Live again" (#2011).
+- CalDAV: a calendar app that never sends attendees no longer removes the attendees and their answers when it saves an event; capabilities are learned only after the version check (#2379).
+- The workspace mailbox moves along with the organisation export / move and the account export (server, user, sender; passwords never) and stays switched off until the passwords are entered again; the tenancy check knows it (#2410).
+- "Delete all times" recognises billed entries by the invoice position's list, also after a rename and in the personal office; list formulas have a fixed depth limit (#1523).
+- Test p2400_e_ui waits for all saved settings (#2026).
+
+### Security
+- Recovery key of accounts without a password (single sign-on): showing or renewing it needs a real new sign-in at the provider (prompt=login, max_age=0, a fresh auth_time from the ID token), bound to the organisation and the purpose; a link alone triggers nothing. The key-rotation test switch only works in test mode, a refused shortcut download says why, the settings hint at the incomplete search during a key rotation (#2387).
+
 ## [2.146.0] - 2026-10-21
 
 Imports from everyday life: e-invoices are received and read, duplicates are found, several files and ZIPs go in at once, and a retention export comes before deleting an account or organisation.
