@@ -12683,5 +12683,14 @@
   "Follow-up due on {0}": "Wiedervorlage am {0}",
   "Document linked": "Dokument verknüpft",
   "Document unlinked": "Verknüpfung gelöst",
-  "Reference line filled in": "Bezugszeile eingetragen"
+  "Reference line filled in": "Bezugszeile eingetragen",
+  "A field with this name exists already": "Ein Feld mit diesem Namen gibt es schon",
+  "At most {0} fields": "Höchstens {0} Felder",
+  "Extra fields every document of this workspace can have, e.g. a contract or customer number.": "Zusätzliche Felder, die jedes Dokument dieses Bereichs haben kann, z. B. eine Vertrags- oder Kundennummer.",
+  "Field added: {0}": "Feld angelegt: {0}",
+  "Remove options?": "Optionen entfernen?",
+  "Documents with {0} lose this value.": "Dokumente mit {0} verlieren diesen Wert.",
+  "The field and its values on every document of this workspace are deleted.": "Das Feld und seine Werte an allen Dokumenten dieses Bereichs werden gelöscht.",
+  "The target workspace has no room for another custom field; nothing was moved": "Im Zielbereich ist kein Platz für ein weiteres eigenes Feld; nichts wurde verschoben",
+  "Open the job chat": "Job-Chat öffnen"
 }

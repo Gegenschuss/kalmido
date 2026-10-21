@@ -62,13 +62,16 @@ function jc_barHtml() {
   return `<div class="jcbar${jn9_part(jb) ? ' jpart' : ''}" id="jc-bar" style="--jcol:${jn9_jobColor(jb)}"><button type="button" class="iconbtn jcback" data-act="jc-back" title="${esc(tr('Back to the whole chat'))}" aria-label="${esc(tr('Back to the whole chat'))}">${ic('back', 's')}</button><i class="jcdot" aria-hidden="true"></i><div class="jcn"><b>${esc(jc_label(j))}</b>${rest ? `<span>${esc(rest)}</span>` : ''}</div>${end ? `<span class="jcend">${esc(tr('Job has ended'))}</span>` : ''}</div>`;
 }
 const jc_ph = a => S.chat.job ? (jc_ended() ? tr('Job has ended') : tr('Message to {0}…', jc_label(jc_cur()))) : tr('Message to {0}…', a.name);
-// what the box sends: in a job's history "Job 220: <text>" (unless it already starts with that or the job's name) --
+// what the box sends: in a job's history (2.153.0 #1962: its own chat) "Job 220: <text>" (unless it already starts with that or the job's name) --
 // review: always the number, a title like "Release: 2.56" would otherwise address a job "Release" nobody knows
+// 2.153.0 (#1962): the job's id goes along as job_id (jc_field) for hosts that route by it; the prefix stays, hosts that read
+// only the text still reach the job
 function jc_send(body) {
   if (!S.chat.job || !body) return body;
   const j = jc_cur(), pre = `Job ${j.id}:`, low = body.toLowerCase();
   return low.startsWith(pre.toLowerCase()) || (j.name && low.startsWith(j.name.toLowerCase() + ':')) ? body : `${pre} ${body}`;
 }
+const jc_field = () => S.chat.job ? {job_id: +S.chat.job.id} : {};
 // after every chat patch: the bar and the box follow the job's state (fetched at most every 15 s)
 function jc_patch() {
   if (!S.chat.job) return;
@@ -164,14 +167,16 @@ document.addEventListener('toggle', e => {
 // the text (a leading ✅ = result, ⚠️ ⏰ ⏹ = error). A filter above the messages: All / Only me and <agent> / Jobs
 // (kept per device; on a phone a menu). The folded rows stay in the page (hidden), so search and reply quotes find them
 // (jcd_reveal unfolds). Without a single job: no filter, the chat as before. A job's own history (?job=) has no cards.
-S.jcd = {map: new Map(), n: 0, more: new Set()};
+S.jcd = {map: new Map(), n: 0, more: new Set(), under: new Set()};  // 2.153.0 (#1962): under = the ids shown under their card
 const JCD_KINDS = ['say', 'question', 'result', 'error'];
-const JCD_SHOW = new Set(['result', 'error']);
+const JCD_SHOW = new Set(['result', 'error', 'question']);  // 2.153.0 (#1962): + question, under the card
+const JCD_LINES = 3;  // 2.153.0 (#1962): at most this many under the card (the newest)
 const JCD_RES_RE = /^\s*✅/, JCD_ERR_RE = /^\s*(?:⚠|⏰|⏹)/;
 const JCD_VER_RE = /\d+\.\d+(?:\.\d+)?[a-z]?/;
 const JCD_ST = {running: N_('running'), waiting: N_('waiting'), done: N_('finished'), failed: N_('Error'), stopped: N_('stopped')};
 const JCD_ADDR_RE = /^\s*@?(?:job\s*#?|#)(\d+)\s*:/i;
 function jcd_kind(m) {
+  if (m.kind === 'notice' || m.job_msg === 'start') return 'say';  // 2.153.0 (#1962): the start line is never a result
   if (JCD_KINDS.includes(m.job_msg)) return m.job_msg;
   const b = m.body || '';
   return JCD_RES_RE.test(b) ? 'result' : JCD_ERR_RE.test(b) ? 'error' : 'say';
@@ -194,10 +199,11 @@ function jcd_jobOf(m, byId) {
 // 2.144.0 A (#2416): the job an agent message comes from, buttons or not (a job's result mostly carries the suggestion
 // buttons, since 2.122.1 also approval cards): the filter asks this, the card keeps a message with buttons as its own row
 function jcd_jobNo(m, byId) {
+  if (m.job_id && (m.from !== 'agent' || m.kind === 'notice')) return +m.job_id;  // 2.153.0 (#1962): typed in the job's chat, its start line
   if (m.from !== 'agent' || m.kind === 'notice') return 0;
   const jb = ux_jobOf(m); if (jb) return jb.no;
   const q = m.reply_to && byId.get(m.reply_to);
-  return q && q.from !== 'agent' ? jcd_addr(q.body) : 0;
+  return q && q.from !== 'agent' ? (+q.job_id || jcd_addr(q.body)) : 0;
 }
 // 2.144.0 A (#2416): a row through the filter. "Only me and <agent>": my messages and the main agent's, of the jobs only
 // open approvals / permission questions that wait for me. "Jobs": the job rows and my messages addressed to a job.
@@ -216,7 +222,7 @@ function jcd_setOpen(no, on) {
 // chatMsgs(): the rows (row = the html of one message) with the job messages gathered into cards and the filter applied
 function jcd_rows(a, row) {
   const ms = S.chat.msgs;
-  if (S.chat.job) { S.jcd.map = new Map(); return ms.map(row); }
+  if (S.chat.job) { S.jcd.map = new Map(); return jcs_rows(ms, row); }  // 2.153.0 (#1962): + its progress lines
   const byId = new Map(ms.map(m => [m.id, m])), of = new Map(), per = new Map(), last = new Map(), jn = new Map();
   ms.forEach((m, i) => {
     const no = jcd_jobNo(m, byId); if (!no) return;
@@ -244,7 +250,10 @@ function jcd_cardHtml(no, list, row) {
   const name = j.name || src.name || '', pj = +j.parent_id || src.parent || 0;
   const pname = pj ? j.parent_name || S.jc.jobs[pj]?.name || src.pname || '' : '';
   const jb = {no, parent: pj, name, pname};
-  const hid = list.filter(m => !JCD_SHOW.has(jcd_kind(m))), vis = list.filter(m => JCD_SHOW.has(jcd_kind(m)));
+  // 2.153.0 (#1962): under the card only the newest results / questions / errors (folded like 2.144.0 B) and the link to the
+  // job's own chat; everything else stays folded in the card
+  const vis = list.filter(m => JCD_SHOW.has(jcd_kind(m))).slice(-JCD_LINES), hid = list.filter(m => !vis.includes(m));
+  vis.forEach(m => S.jcd.under.add(m.id)); hid.forEach(m => S.jcd.under.delete(m.id));
   const lm = list[list.length - 1], lk = jcd_kind(lm);
   const st = j.state || (lk === 'result' ? 'done' : lk === 'error' ? 'failed' : '');
   const ver = j.version ?? (JCD_VER_RE.exec(j.title || '') || [''])[0];
@@ -253,7 +262,7 @@ function jcd_cardHtml(no, list, row) {
   const head = hid.length
     ? `<button type="button" class="jcdh" data-jca="tog" data-jcd="${no}" aria-expanded="${open}" aria-controls="jcdh-${no}" title="${esc(tr(open ? 'Show less' : 'Show more'))}">${hd}</button>`
     : `<div class="jcdh">${hd}</div>`;
-  return `<div class="jcd${open ? ' open' : ''}${jn9_part(jb) ? ' jpart' : ''}${st === 'failed' || st === 'stopped' ? ' jcderr' : ''}" data-k="jcd${no}" data-jcd="${no}" style="--jcol:${jn9_jobColor(jb)}">${head}${hid.length ? `<div class="jcdhist" id="jcdh-${no}"${open ? '' : ' hidden'}>${hid.map(row).join('')}</div>` : ''}${vis.map(m => jcd_resHtml(m, row)).join('')}</div>`;
+  return `<div class="jcd${open ? ' open' : ''}${jn9_part(jb) ? ' jpart' : ''}${st === 'failed' || st === 'stopped' ? ' jcderr' : ''}" data-k="jcd${no}" data-jcd="${no}" style="--jcol:${jn9_jobColor(jb)}">${head}${hid.length ? `<div class="jcdhist" id="jcdh-${no}"${open ? '' : ' hidden'}>${hid.map(row).join('')}</div>` : ''}${vis.map(m => jcd_resHtml(m, row)).join('')}${jcs_goHtml(no, j.agent_id)}</div>`;
 }
 // the end result / an error under the card: 5 lines, "Show more" for longer ones
 function jcd_resHtml(m, row) {
@@ -281,7 +290,7 @@ function jcf_btnHtml() {
 // the row of a message with the cut (long messages only; a job result in a card is cut by jcd_resHtml)
 function jcf_wrap(m, html) {
   if (m.kind === 'notice' || m.choices || S.chat.edit === m.id || !jcf_long(m)) return html;
-  if (S.jcd.map.has(m.id) && JCD_SHOW.has(jcd_kind(m))) return html;
+  if (S.jcd.map.has(m.id) && S.jcd.under.has(m.id)) return html;  // 2.153.0 (#1962): under the card, not every result
   const on = jcf_on(), more = S.jcd.more.has(m.id), cut = on && !more;
   const btn = `<button type="button" class="linkbtn jcdmore" data-jca="${on ? 'more' : 'fold'}" data-jm="${m.id}"${on ? ` aria-expanded="${more}"` : ''}>${esc(tr(cut ? 'Show more' : 'Show less'))}</button>`;
   const h = jcm_inBubble(html, btn);
@@ -329,8 +338,8 @@ function jcd_reveal(id) {
   const no = S.jcd.map.get(+id), m = S.chat.msgs.find(x => x.id === +id);
   let ch = false;
   if (jcd_filter() !== 'all' && m) { const r = document.querySelector(`#chat-msgs [data-mid="a:${+id}"]`); if (!r) { LS.set('jcdFilt', 'all'); ch = true; } }
-  if (no && m && !JCD_SHOW.has(jcd_kind(m)) && !jcd_open(no)) { jcd_setOpen(no, true); ch = true; }
-  if (m && jcf_long(m) && (jcf_on() || (no && JCD_SHOW.has(jcd_kind(m)))) && !S.jcd.more.has(m.id)) { S.jcd.more.add(m.id); jcf_save(); ch = true; }  // 2.144.0 B (#2417): the target is unfolded
+  if (no && m && !S.jcd.under.has(m.id) && !jcd_open(no)) { jcd_setOpen(no, true); ch = true; }
+  if (m && jcf_long(m) && (jcf_on() || (no && S.jcd.under.has(m.id))) && !S.jcd.more.has(m.id)) { S.jcd.more.add(m.id); jcf_save(); ch = true; }  // 2.144.0 B (#2417): the target is unfolded
   if (ch) { chatPatch({keep: true}); jcd_patch(); }
 }
 document.addEventListener('click', e => {
@@ -349,3 +358,23 @@ document.addEventListener('click', e => {
   n?.focus({preventScroll: true});
 });
 document.addEventListener('click', e => { const b = e.target.closest?.('#jcd-fbtn'); if (b) jcd_fmenu(b); });
+
+// ---- 2.153.0 (#1962): a chat of its own per job. The whole chat shows a job as its card (start line, the newest
+// results, questions, errors under it) and the link "Open the job chat"; the job's own chat (?job=) shows its messages, what I
+// typed there (sent with job_id, jc_field) and the job's progress lines (its log, S.chat.prog) as grey lines in time order.
+function jcs_goHtml(no, aid) {
+  return `<button type="button" class="linkbtn jcsgo" data-act="jc-open" data-jid="${no}" data-aid="${+aid || +S.chat.aid}">${ic('comment', 's')}<span>${esc(tr('Open the job chat'))}</span></button>`;
+}
+function jcs_rows(ms, row) {
+  const lo = S.chat.more && ms.length ? Date.parse(ms[0].created_at) : -Infinity;
+  const pr = (S.chat.prog || []).map((p, i) => ({...p, i, t: Date.parse(p.at)})).filter(p => p.t >= lo), out = [];
+  let k = 0;
+  for (const m of ms) {
+    const t = Date.parse(m.created_at);
+    while (k < pr.length && pr[k].t <= t) out.push(jcs_progHtml(pr[k++]));
+    out.push(row(m));
+  }
+  while (k < pr.length) out.push(jcs_progHtml(pr[k++]));
+  return out;
+}
+const jcs_progHtml = p => `<div class="cnotice jcsp" role="note" data-k="jp${p.i}_${p.t}" title="${esc(fmtWhen(p.at))}"><span>${esc(p.text || '')}</span></div>`;

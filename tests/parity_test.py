@@ -321,7 +321,7 @@ APP_ONLY = [
      "with /documents and add files with /files; 2.122.0 (#2098): create_document; (#2100) the CSV of chosen documents is a person's download", ("=POST /api/docs", "=POST /api/docs/export.csv", "=POST /api/docs/{}/accept", "=POST /api/docs/{}/review",
                                                    "=POST /api/docs/{}/redo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
                                                    "* /api/docs/{}/task", "* /api/docs/settings", "* /api/docs/rules", "* /api/docs/labels/",
-                                                   "* /api/docs/mail")),
+                                                   "* /api/docs/mail", "* /api/docs/fields")),  # 2.153.0 (#2179): agents fill in custom fields via /documents, never define them
     # 2.122.0 B (#2294 #2099)
     ("2.122.0 (#2294, #2099): a person's own steps on many documents at once (bulk tags / type / sender with its undo, the ZIP of a "
      "selection for the browser) and the tags of files / folders in the file store app; agents filter with /documents (the same "

@@ -117,6 +117,8 @@ def doc_json(c, m, node, full=False, role=None):
             d["einvoice"] = {k: einv.get(k) for k in ("format", "kind", "source", "number")}
         from ..agents.asstprop import ast_doc_extra
         ast_doc_extra(c, d, m)  # 2.126.1 A (#2123): the summary a person took over from an agent
+        from .fields import df_json
+        d["custom_fields"] = df_json(c, m)  # 2.153.0 (#2179)
     return d
 
 
@@ -368,6 +370,13 @@ def doc_update(c, nid, d, uid, by=None):
             if auto.pop("date", None):
                 S.meta_set_json(c, nid, ws, "auto", auto)
         m = S.meta_row(c, nid)  # the feature part below reads auto / suggest as they are now
+    if "custom_fields" in d:  # 2.153.0 (#2179): {field id (agents: or name): value | null}
+        from .fields import df_set
+        e = df_set(c, m, d["custom_fields"], by="agent" if by == "agent" else None)
+        if e:
+            return err(e)
+        m = S.meta_row(c, nid)
+        _reindex(c, nid)
     changed = [f for f in FEATURE_NAMES if f in d]
     if not changed:
         return None
@@ -411,7 +420,8 @@ def _reindex(c, nid):
 
 @app.patch("/api/docs/<int:nid>")
 def docs_patch(nid):
-    """{name?, date?, due?, amount?, currency?, sender? (name | id | null), type?, tags? [names | ids], folder? (name | id | "")}"""
+    """{name?, date?, due?, amount?, currency?, sender? (name | id | null), type?, tags? [names | ids], folder? (name | id | ""),
+    custom_fields? {field id: value | null} (2.153.0)}"""
     c = db()
     _no_agent()
     _doc(c, nid, write=True)
@@ -608,7 +618,8 @@ def _settings_json(c, ws, uid):
         "SELECT id, name FROM fs_nodes WHERE parent_id=? AND kind='folder' AND deleted_at IS NULL ORDER BY lower(name)", (root,))
         if x[0] in vis] if root else []
     cfg = S.cfg_get(c, ws)
-    return {"ws": f"org:{oid}" if oid else "private", "can_manage": can, "levels": cfg["levels"], "inbox": cfg["inbox"],
+    from .fields import df_list  # 2.153.0 (#2179): the custom fields of the workspace
+    return {"ws": f"org:{oid}" if oid else "private", "can_manage": can, "fields": df_list(c, ws), "levels": cfg["levels"], "inbox": cfg["inbox"],
             "rules": S.rules_get(c, ws) if can else [], **_settings_labels(c, ws, uid, can), "folders": [f for f in folders if f["name"].lower() != S.INBOX.lower()],
             "root_id": root, "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws), "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(tok[0]) if (tok and MAIL_IN_ON) else ""}}
 

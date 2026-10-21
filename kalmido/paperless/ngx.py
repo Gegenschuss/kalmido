@@ -402,15 +402,12 @@ def monetary_value(doc, fields):
 
 
 def _doc_text(doc, notes, fields):
-    """Paperless' text + custom fields + notes + archive serial number (labelled, below the text)."""
+    """Paperless' text + notes + archive serial number (labelled, below the text). 2.153.0 (#2179): the custom fields are
+    no longer lines here -- plh_store makes them fields of the document (docs/fields.py df_from_paperless)."""
     parts = [str(doc.get("content") or "").strip()]
     extra = []
     if doc.get("archive_serial_number") not in (None, ""):
         extra.append(f"{tr('Archive serial number')}: {doc['archive_serial_number']}")
-    for f in doc.get("custom_fields") or []:
-        if isinstance(f, dict) and f.get("value") not in (None, "", []):
-            fd = fields.get(f.get("field")) or {}
-            extra.append(f"{fd.get('name') or tr('Field')}: {_field_text(fd, f['value'])}")
     if extra:
         parts.append("\n".join(extra))
     if notes:
@@ -486,6 +483,9 @@ def plh_store(c, r, uid, src, doc, data, mime, fname, labels, text, fields=None)
     ext = ("." + orig.rsplit(".", 1)[1][:8]) if "." in orig else (".pdf" if mime == "application/pdf" else "")
     name = (title + ext if title and not title.lower().endswith(ext.lower()) else title) or orig or f"paperless-{pid}{ext}"
     nid = docs_ingest(c, uid, r["org_id"], name[:200], data, mime or None, "paperless", meta)
+    if doc.get("custom_fields"):  # 2.153.0 (#2179): Paperless' custom fields as fields of the document
+        from ..docs.fields import df_from_paperless
+        df_from_paperless(c, ws, nid, doc, fields, uid)
     if folder:
         node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
         fid = S.folder_by_name(c, node, uid, folder)

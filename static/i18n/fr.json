@@ -12683,5 +12683,14 @@
   "Follow-up due on {0}": "Relance le {0}",
   "Document linked": "Document lié",
   "Document unlinked": "Lien supprimé",
-  "Reference line filled in": "Ligne de référence remplie"
+  "Reference line filled in": "Ligne de référence remplie",
+  "A field with this name exists already": "Un champ portant ce nom existe déjà",
+  "At most {0} fields": "{0} champs au maximum",
+  "Extra fields every document of this workspace can have, e.g. a contract or customer number.": "Champs supplémentaires que chaque document de cet espace peut avoir, p. ex. un numéro de contrat ou de client.",
+  "Field added: {0}": "Champ ajouté : {0}",
+  "Remove options?": "Supprimer des options ?",
+  "Documents with {0} lose this value.": "Les documents avec {0} perdent cette valeur.",
+  "The field and its values on every document of this workspace are deleted.": "Le champ et ses valeurs sur tous les documents de cet espace sont supprimés.",
+  "The target workspace has no room for another custom field; nothing was moved": "L'espace cible n'a plus de place pour un autre champ personnalisé ; rien n'a été déplacé",
+  "Open the job chat": "Ouvrir le chat du job"
 }

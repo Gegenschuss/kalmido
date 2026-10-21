@@ -12683,5 +12683,14 @@
   "Follow-up due on {0}": "Promemoria il {0}",
   "Document linked": "Documento collegato",
   "Document unlinked": "Collegamento rimosso",
-  "Reference line filled in": "Riga di riferimento compilata"
+  "Reference line filled in": "Riga di riferimento compilata",
+  "A field with this name exists already": "Esiste già un campo con questo nome",
+  "At most {0} fields": "Al massimo {0} campi",
+  "Extra fields every document of this workspace can have, e.g. a contract or customer number.": "Campi aggiuntivi che ogni documento di questo spazio può avere, ad es. un numero di contratto o di cliente.",
+  "Field added: {0}": "Campo aggiunto: {0}",
+  "Remove options?": "Rimuovere le opzioni?",
+  "Documents with {0} lose this value.": "I documenti con {0} perdono questo valore.",
+  "The field and its values on every document of this workspace are deleted.": "Il campo e i suoi valori su tutti i documenti di questo spazio vengono eliminati.",
+  "The target workspace has no room for another custom field; nothing was moved": "Nello spazio di destinazione non c'è posto per un altro campo personalizzato; non è stato spostato nulla",
+  "Open the job chat": "Apri la chat del job"
 }

@@ -809,6 +809,8 @@ def agent_chat_get(aid):
     if request.args.get("job"):  # 2.56.0 (#1793): the history of one job of this agent, only from my own conversation
         from ..agents.jobchat import jc_chat_rows
         rows, more = jc_chat_rows(c, aid, as_int(request.args["job"], "job", 1), before, limit, after)
+        from ..agents.jobchat import jcs_progress
+        prog = jcs_progress(c, as_int(request.args["job"], "job", 1), me())  # 2.153.0 (#1962)
     if c.execute("UPDATE agent_chat SET read_at=? WHERE agent_id=? AND user_id=? AND sender='agent' AND read_at IS NULL",
                  (iso(now_utc()), aid, me())).rowcount:
         c.commit()
@@ -842,7 +844,8 @@ def agent_chat_get(aid):
                    steps_live=steps_live(c, aid, me()), approvals_open=apo,
                    pins=pins,  # 2.62.0 (#1848): the pinned messages, also older than this page
                    # 2.96.0 C (#2015): the jobs of these messages (name, version, state), for the job cards
-                   jobs=jcd_jobs(c, aid, msgs + apo + pins, me()))  # 2.62.0 (#1848): the pinned messages, also older than this page
+                   jobs=jcd_jobs(c, aid, msgs + apo + pins, me()),
+                   **({"progress": prog} if request.args.get("job") else {}))  # 2.62.0 (#1848): the pinned messages, also older than this page
 
 
 def chat_task(c, v, uid_a, uid_b):
@@ -882,8 +885,10 @@ def agent_chat_post(aid):
     if not agent_active(a):
         return err(tr("This agent is paused"), 409)
     try:
-        fb, files = chat_input(("body", "task_id", "reply_to", "client_id"))  # 2.62.0 (#1530): client_id
+        fb, files = chat_input(("body", "task_id", "reply_to", "client_id", "job_id"))  # 2.62.0 (#1530): client_id
         b = fb if fb is not None else body()
+        from ..agents.jobchat import jcs_job_in
+        job = jcs_job_in(c, aid, b.get("job_id"), me())  # 2.153.0 (#1962): typed in the job's own chat
         from ..collab.teamchat import csd_client_id, csd_dup
         cid = csd_client_id(b)
         dup = cid and csd_dup(c, "agent_chat", "agent_id=? AND user_id=? AND sender='user'", (aid, me()), cid,
@@ -893,6 +898,9 @@ def agent_chat_post(aid):
         r = chat_post(c, aid, me(), "user", b, files)
         if cid:
             c.execute("UPDATE agent_chat SET client_id=? WHERE id=?", (cid, r["id"]))
+        if job:
+            c.execute("UPDATE agent_chat SET job_id=?, job_parent=? WHERE id=?", (job["id"], job["parent_id"], r["id"]))
+            r = c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone()
     except UnknownFields as e:
         return err(str(e))
     except BadInput as e:
@@ -909,6 +917,10 @@ def chat_emit(c, aid, r):
     data = {"message": chat_one(c, r, api=True), "user": {"id": r["user_id"], "name": user_names(c, [r["user_id"]]).get(r["user_id"], "")}}
     if tid:
         data.update(agent_task_data(c, tid, aid))
+    if r["job_id"]:  # 2.153.0 (#1962): typed in the job's own chat -- the job it is for (message.job_id is its id)
+        j = c.execute("SELECT * FROM agent_jobs WHERE id=? AND agent_id=?", (r["job_id"], aid)).fetchone()
+        if j:
+            data["job"] = {k: v for k, v in job_dict(c, j).items() if k != "log"}  # review: not the whole log every time
     agent_emit(c, aid, "chat", data)
 
 

@@ -12683,5 +12683,14 @@
   "Follow-up due on {0}": "Opvolging op {0}",
   "Document linked": "Document gekoppeld",
   "Document unlinked": "Koppeling verwijderd",
-  "Reference line filled in": "Kenmerkregel ingevuld"
+  "Reference line filled in": "Kenmerkregel ingevuld",
+  "A field with this name exists already": "Er bestaat al een veld met deze naam",
+  "At most {0} fields": "Hoogstens {0} velden",
+  "Extra fields every document of this workspace can have, e.g. a contract or customer number.": "Extra velden die elk document in deze werkruimte kan hebben, bijv. een contract- of klantnummer.",
+  "Field added: {0}": "Veld toegevoegd: {0}",
+  "Remove options?": "Opties verwijderen?",
+  "Documents with {0} lose this value.": "Documenten met {0} verliezen deze waarde.",
+  "The field and its values on every document of this workspace are deleted.": "Het veld en de waarden ervan op alle documenten in deze werkruimte worden verwijderd.",
+  "The target workspace has no room for another custom field; nothing was moved": "De doelwerkruimte heeft geen ruimte voor nog een eigen veld; er is niets verplaatst",
+  "Open the job chat": "Jobchat openen"
 }

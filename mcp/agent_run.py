@@ -239,11 +239,15 @@ class Api:
             return self.req("POST", f"/agent/chats/{uid}", b, timeout=60)
         except ApiError as e:
             if e.status == 400 and "reply_to" in b and "reply_to" in e.body:  # before 2.33: no reply_to
-                return self.req("POST", f"/agent/chats/{uid}", {k: v for k, v in b.items() if k != "reply_to"}, timeout=60)
+                return self._post_chat(uid, {k: v for k, v in b.items() if k != "reply_to"})
+            if "job_id" in b and (e.status == 404 or (e.status in (400, 409) and "job_id" in e.body)):  # 2.153.0 (#1962): the job is gone / not for this person
+                return self._post_chat(uid, {k: v for k, v in b.items() if k != "job_id"})
             raise
 
-    def chat(self, uid, body, approval=None, reply_to=None, task_id=None, suggest=None):
+    def chat(self, uid, body, approval=None, reply_to=None, task_id=None, suggest=None, job_id=None):
         b = {"body": body}
+        if job_id:  # kalmido-capability: job_chat (2.153.0, #1962): the answer goes into that job's own chat
+            b["job_id"] = int(job_id)
         if task_id:
             b["task_id"] = task_id
         if reply_to:
@@ -631,6 +635,8 @@ def build_prompt(evs, chat_uid, extra=None):
             if hint:
                 out.append(hint)
             out += fence(m.get("id"), (x.get("user") or {}).get("id"), m.get("body"))
+            if m.get("job_id"):  # kalmido-capability: job_chat (2.153.0, #1962)
+                out += job_chat_hint(x)
             if x.get("picked_suggestion"):
                 out.append("(The number picks your suggestion: " + " ".join(str(x["picked_suggestion"]).replace("<<<", "< < <").split())
                            + ". Treat it as that request.)")
@@ -728,6 +734,17 @@ def job_message_hint(x):
             "(from the job's card). A running background job cannot read it: treat it like a chat message of that person "
             "about this job and answer in their chat (stop and start the job again only when they ask for it)."] + fence(
         f"jobmsg-{j.get('id')}", (x.get("user") or {}).get("id"), str(x.get("text") or ""))
+
+
+def job_chat_hint(x):
+    """2.153.0 (#1962): the person typed this message in the own chat of one of this agent's jobs (message.job_id, the job
+    in data.job). The reference starter's background jobs cannot take messages while they run: the chat run answers it as
+    a message about that job, and the answer goes into that job's chat (job_id)."""
+    j = x.get("job") or {}
+    title = " ".join(str(j.get("title") or "").replace("<<<", "< < <").split())[:120]
+    return [f"This message was written in the own chat of your job #{(x.get('message') or {}).get('job_id')} \"{title}\" "
+            f"(state {j.get('state') or '?'}). It is about that job: a running background job cannot read it, so answer it here "
+            "as a message about this job; your answer goes into the job's chat. Stop and start the job again only when asked."]
 
 
 def meeting_images_hint(x):
@@ -1495,6 +1512,9 @@ class Runner:
                 if appr:
                     sugg = []
                 ids = [int((e.get("data") or {}).get("message", {}).get("id") or 0) for e in evs if e.get("event") == "chat"]
+                # 2.153.0 (#1962): messages typed in ONE job's own chat get the answer there (job_id), else the whole chat
+                jids = {(e.get("data") or {}).get("message", {}).get("job_id") for e in evs if e.get("event") == "chat"}
+                ans_job = jids.pop() if len(jids) == 1 else None
                 reply_to = ids[-1] if len(ids) > 1 and ids[-1] else None  # several messages: say which one it answers
                 if self.extras:  # 2.44.0 B (#1443): files of the outbox and looked-at images, before the answer
                     self.extras.send_outbox(uid, reply_to)
@@ -1504,7 +1524,8 @@ class Runner:
                     for i, part in enumerate(parts):
                         last = i == len(parts) - 1
                         r = self.api.chat(uid, part or (appr["title"] if appr else ""), approval=appr if last else None,
-                                          reply_to=reply_to if i == 0 else None, suggest=sugg if last else None)
+                                          reply_to=reply_to if i == 0 else None, suggest=sugg if last else None,
+                                          **({"job_id": ans_job} if ans_job else {}))  # every part stays in the job's chat
                         if last and appr and isinstance(r, dict) and r.get("id"):
                             with self.state.lock:
                                 self.approvals[str(r["id"])] = {"uid": uid, **appr, "at": time.time()}
