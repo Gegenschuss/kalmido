@@ -101,7 +101,7 @@ $RestartDelay = if ($env:KALMIDO_RESTART_DELAY) { [int]$env:KALMIDO_RESTART_DELA
 $Url = $env:KALMIDO_URL.TrimEnd('/') + '/api/v1/agent'
 
 # GET /api/v1/agent -> a settings object. A paused agent's token is refused (403): enabled = $false. $null: Kalmido not
-# reachable (or another error). The token only goes into the request header.
+# reachable (or another error). 2.157.0 (#1517): a revoked token (401) -> revoked = $true. The token only goes into the request header.
 function Fetch {
   $h = @{ Authorization = "Bearer $($env:KALMIDO_TOKEN)" }
   try {
@@ -111,6 +111,7 @@ function Fetch {
     $code = $null
     try { $code = [int]$_.Exception.Response.StatusCode } catch { }
     if ($code -eq 403) { return [pscustomobject]@{model = '-'; ac = '-'; pct = '-'; nightly = '-'; seq = $script:Seq; tz = 'UTC'; enabled = $false} }
+    if ($code -eq 401) { return [pscustomobject]@{revoked = $true} }
     if ($code) { Log "GET /api/v1/agent: HTTP $code" } else { Log "GET /api/v1/agent: $($_.Exception.Message)" }
     return $null
   }
@@ -202,8 +203,21 @@ function Nightly-Due($s) {
   return ([DateTimeOffset]$script:Started -lt $at)  # started before tonight's time -> restart now
 }
 
-$s = Fetch
-if (-not $s) { Log "cannot read the runtime settings from $($env:KALMIDO_URL)"; exit 1 }
+# kalmido-capability: revoked_stop (2.157.0, #1517): a revoked token stops the agent with ONE log line; the launcher stays and
+# checks quietly (exiting would only make the scheduled task start it again and again)
+$script:Revoked = $false
+function Revoked {
+  if (-not $script:Revoked) { Log "this computer's key no longer works (computer removed or agent deleted in Kalmido): the agent stays stopped; take it off this computer with the uninstall command that Kalmido shows" }
+  $script:Revoked = $true
+}
+while ($true) {
+  $s = Fetch
+  if (-not $s -or ($s.revoked -and $Once)) { Log "cannot read the runtime settings from $($env:KALMIDO_URL)"; exit 1 }
+  if (-not $s.revoked) { break }
+  Revoked
+  Start-Sleep -Seconds $Poll
+}
+$script:Revoked = $false
 $script:Seq = $s.seq
 if ($Once) { Start-Agent $s; exit 0 }
 $sig = "$($s.model)|$($s.ac)|$($s.pct)"
@@ -218,6 +232,8 @@ try {
     }
     $n = Fetch
     if (-not $n) { Log 'Kalmido not reachable; keeping the agent as it is'; continue }
+    if ($n.revoked) { Revoked; Stop-Agent; continue }
+    $script:Revoked = $false
     $why = ''
     if ($n.seq -ne $script:Seq) { $why = "reset now ($($script:Seq) -> $($n.seq))" }
     if (-not $why -and "$($n.model)|$($n.ac)|$($n.pct)" -ne $sig) { $why = 'runtime settings changed' }

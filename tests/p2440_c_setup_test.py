@@ -86,7 +86,8 @@ for b in BASHES:
 
 # ---- a stub Kalmido
 TOKEN = "abk_stub_secret_token_4711"
-ST = {"status": [], "redeem": [], "remove": [], "enabled": True, "remove_code": 200}  # 2.47.3 (#1729): remove_code 401 = the key is already revoked
+ST = {"status": [], "redeem": [], "remove": [], "enabled": True, "remove_code": 200,  # 2.47.3 (#1729): remove_code 401 = the key is already revoked
+      "revoked": False}  # 2.157.0 (#1517): GET /api/v1/agent answers 401 (computer removed in Kalmido)
 
 
 class Stub(BaseHTTPRequestHandler):
@@ -105,6 +106,8 @@ class Stub(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(n) or b"{}")
 
     def do_GET(self):
+        if self.path == "/api/v1/agent" and ST["revoked"]:
+            return self._json(401, {"error": "invalid token"})
         if self.path == "/api/v1/agent" and self.headers.get("Authorization") == "Bearer " + TOKEN:
             return self._json(200, {"id": 9, "enabled": ST["enabled"], "runtime": {"model": None, "autocompact": True, "autocompact_pct": None,
                                                                                     "nightly_reset": "04:00", "reset_seq": 0, "timezone": "Europe/Berlin"}})
@@ -153,7 +156,7 @@ for t in ("bash", "env", "curl", "python3", "sleep", "seq", "date", "hostname", 
         os.symlink(w, os.path.join(nobin, t))
 fake = os.path.join(nobin, "fakeagent")
 with open(fake, "w") as f:
-    f.write("#!/usr/bin/env python3\nimport os, sys, time\nopen(os.environ['FAKE_OUT'], 'w').write('%d %d' % (os.getpid(), os.getpgid(0)))\ntime.sleep(120)\n")
+    f.write("#!/usr/bin/env python3\nimport os, sys, time\nopen(os.environ['FAKE_OUT'], 'w').write('%d %d %s' % (os.getpid(), os.getpgid(0), os.environ.get('KALMIDO_LAUNCHER_PID', '-')))\ntime.sleep(120)\n")
 os.chmod(fake, 0o755)
 envf = os.path.join(tmp, "agent.env")
 with open(envf, "w") as f:
@@ -174,9 +177,12 @@ for b in BASHES:
             break
         time.sleep(0.1)
     pid = pgid = None
+    lpid = "-"
     if os.path.exists(out_f) and os.path.getsize(out_f):
-        pid, pgid = map(int, read(out_f).split())
+        pid, pgid, lpid = read(out_f).split()
+        pid, pgid = int(pid), int(pgid)
     check(pid and pid == pgid and pgid != os.getpgid(0), f"{b}: the command runs in its own process group without setsid ({pid}, {pgid})")
+    check(lpid == str(p.pid), f"{b}: 2.157.0 (#1517): the command gets KALMIDO_LAUNCHER_PID = the launcher's pid ({lpid} vs {p.pid})")
     for _ in range(50):
         if ST["status"]:
             break
@@ -211,6 +217,53 @@ for b in BASHES:
         p.kill()
     st = ST["status"][0][1] if ST["status"] else {}
     check(st.get("status") == "error" and "no-such-agent-cmd" in st.get("text", ""), f"{b}: a missing agent command is the agent's error: {st}")
+    # 2.157.0 (#1517): the token is revoked while the agent runs -> the command stops, ONE log line, the launcher stays
+    if os.path.exists(out_f):
+        os.remove(out_f)
+    p = subprocess.Popen([b, LAUNCHER, "-e", envf, "--", "fakeagent"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    for _ in range(100):
+        if os.path.exists(out_f) and os.path.getsize(out_f):
+            break
+        time.sleep(0.1)
+    pid = int(read(out_f).split()[0]) if os.path.exists(out_f) and os.path.getsize(out_f) else None
+    ST["revoked"] = True
+    gone = False
+    for _ in range(150):
+        try:
+            os.kill(pid, 0)
+        except (OSError, TypeError):
+            gone = True
+            break
+        time.sleep(0.1)
+    time.sleep(3)  # three more polls (KALMIDO_POLL=1): still only one line, the launcher still there
+    alive = p.poll() is None
+    p.send_signal(signal.SIGTERM)
+    try:
+        _, err = p.communicate(timeout=40)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        _, err = p.communicate()
+    check(gone and alive and err.count("no longer works") == 1 and "not reachable" not in err,
+          f"{b}: revoked while running: command stopped ({gone}), launcher stays ({alive}), one log line: {err[-400:]!r}")
+    # ... and already revoked at the start: no command, the launcher waits quietly instead of exiting (no restart loop)
+    if os.path.exists(out_f):
+        os.remove(out_f)
+    p = subprocess.Popen([b, LAUNCHER, "-e", envf, "--", "fakeagent"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    time.sleep(3)
+    alive = p.poll() is None
+    ST["revoked"] = False
+    for _ in range(50):  # works again (a test only: a revoked token never comes back) -> it starts the command
+        if os.path.exists(out_f) and os.path.getsize(out_f):
+            break
+        time.sleep(0.1)
+    started = os.path.exists(out_f) and os.path.getsize(out_f) > 0
+    p.send_signal(signal.SIGTERM)
+    try:
+        _, err = p.communicate(timeout=40)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        _, err = p.communicate()
+    check(alive and started and err.count("no longer works") == 1, f"{b}: revoked at the start: waits quietly, starts once the key works: {alive} {started} {err[-400:]!r}")
 
 # ---- setup.sh
 check(os.path.isfile(SETUP_SH), "static/agent/setup.sh exists")

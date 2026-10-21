@@ -166,13 +166,16 @@ own Kalmido (`/agent-setup.sh`, `/agent-setup.ps1`):
 4. starts the agent in event mode (`agent_launcher.sh` / `.ps1 --events -- claude --mcp-config <instance>/mcp.json`)
    at every login: a **launchd LaunchAgent** on macOS (RunAtLoad, KeepAlive), a **systemd --user** service on Linux
    (`loginctl enable-linger` keeps it running after logout), a hidden **Task Scheduler** task at logon on Windows (no admin
-   rights; when the Task Scheduler refuses, an entry in your Startup folder).
+   rights; when the Task Scheduler refuses, an entry in your Startup folder). 2.157.0: set up over SSH on a Mac where
+   nobody is logged in at the screen, the agent runs in the background right away (until the next restart) and the
+   LaunchAgent takes over at the next login.
 
 One instance per project folder (`~/.kalmido/agents/<folder>-<hash>/`, Windows `%LOCALAPPDATA%\Kalmido\agents\...`), so
 several agents can run on one computer. Every computer gets its own token: the dialog lists the agent's computers with a
 green dot while connected, the computer's name (the launcher reports it with `PUT /api/v1/agent/status {host}`), the last
 contact and the agent's last error (e.g. a missing `claude`). **Remove computer** revokes that computer's token at once
-(it cannot be undone; set the computer up again to use it). On the computer, the same command with `--uninstall --dir ...`
+(it cannot be undone; set the computer up again to use it); the launcher there notices it at its next check, stops the
+agent with one log line and then waits quietly (2.157.0). On the computer, the same command with `--uninstall --dir ...`
 (`-Uninstall -Dir ...`) stops and removes the autostart, revokes its token and deletes the instance folder (the project
 folder stays). 2.47.3 (#1729): *Remove computer* and *Delete agent* show that uninstall command ready to copy for every
 computer set up this way (Mac/Linux or Windows after the stored operating system): run it on the computer first, then
